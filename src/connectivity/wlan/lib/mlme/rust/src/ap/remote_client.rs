@@ -1139,9 +1139,9 @@ mod tests {
             .handle_mlme_auth_resp(&mut ctx, fidl_mlme::AuthenticateResultCode::Success)
             .expect("expected OK");
         assert_variant!(r_sta.state.as_ref(), State::Authenticated);
-        assert_eq!(fake_device_state.lock().unwrap().wlan_queue.len(), 1);
+        assert_eq!(fake_device_state.lock().wlan_queue.len(), 1);
         #[rustfmt::skip]
-        assert_eq!(&fake_device_state.lock().unwrap().wlan_queue[0].0[..], &[
+        assert_eq!(&fake_device_state.lock().wlan_queue[0].0[..], &[
             // Mgmt header
             0b10110000, 0, // Frame Control
             0, 0, // Duration
@@ -1169,9 +1169,9 @@ mod tests {
             )
             .expect("expected OK");
         assert_variant!(r_sta.state.as_ref(), State::Deauthenticated);
-        assert_eq!(fake_device_state.lock().unwrap().wlan_queue.len(), 1);
+        assert_eq!(fake_device_state.lock().wlan_queue.len(), 1);
         #[rustfmt::skip]
-        assert_eq!(&fake_device_state.lock().unwrap().wlan_queue[0].0[..], &[
+        assert_eq!(&fake_device_state.lock().wlan_queue[0].0[..], &[
             // Mgmt header
             0b10110000, 0, // Frame Control
             0, 0, // Duration
@@ -1204,9 +1204,9 @@ mod tests {
             .handle_mlme_deauth_req(&mut ctx, fidl_ieee80211::ReasonCode::LeavingNetworkDeauth)
             .expect("expected OK");
         assert_variant!(r_sta.state.as_ref(), State::Deauthenticated);
-        assert_eq!(fake_device_state.lock().unwrap().wlan_queue.len(), 1);
+        assert_eq!(fake_device_state.lock().wlan_queue.len(), 1);
         #[rustfmt::skip]
-        assert_eq!(&fake_device_state.lock().unwrap().wlan_queue[0].0[..], &[
+        assert_eq!(&fake_device_state.lock().wlan_queue[0].0[..], &[
             // Mgmt header
             0b11000000, 0, // Frame Control
             0, 0, // Duration
@@ -1256,9 +1256,9 @@ mod tests {
             _ => panic!("no active timeout?"),
         };
 
-        assert_eq!(fake_device_state.lock().unwrap().wlan_queue.len(), 1);
+        assert_eq!(fake_device_state.lock().wlan_queue.len(), 1);
         #[rustfmt::skip]
-        assert_eq!(&fake_device_state.lock().unwrap().wlan_queue[0].0[..], &[
+        assert_eq!(&fake_device_state.lock().wlan_queue[0].0[..], &[
             // Mgmt header
             0b00010000, 0, // Frame Control
             0, 0, // Duration
@@ -1279,7 +1279,7 @@ mod tests {
             time_stream.try_next().unwrap().expect("Should have scheduled a timeout");
         assert_eq!(timed_event.id, *active_timeout_event_id);
 
-        assert!(fake_device_state.lock().unwrap().assocs.contains_key(&CLIENT_ADDR));
+        assert!(fake_device_state.lock().assocs.contains_key(&CLIENT_ADDR));
     }
 
     #[test]
@@ -1300,7 +1300,7 @@ mod tests {
                 &[1, 2, 3, 4, 5, 6, 7, 8, 9, 10][..],
             )
             .expect("expected OK");
-        assert!(fake_device_state.lock().unwrap().assocs.contains_key(&CLIENT_ADDR));
+        assert!(fake_device_state.lock().assocs.contains_key(&CLIENT_ADDR));
 
         r_sta
             .handle_mlme_disassoc_req(
@@ -1308,7 +1308,7 @@ mod tests {
                 fidl_ieee80211::ReasonCode::LeavingNetworkDisassoc.into_primitive(),
             )
             .expect("expected OK");
-        assert!(!fake_device_state.lock().unwrap().assocs.contains_key(&CLIENT_ADDR));
+        assert!(!fake_device_state.lock().assocs.contains_key(&CLIENT_ADDR));
     }
 
     #[test]
@@ -1329,12 +1329,12 @@ mod tests {
                 &[1, 2, 3, 4, 5, 6, 7, 8, 9, 10][..],
             )
             .expect("expected OK");
-        assert!(fake_device_state.lock().unwrap().assocs.contains_key(&CLIENT_ADDR));
+        assert!(fake_device_state.lock().assocs.contains_key(&CLIENT_ADDR));
 
         r_sta
             .handle_mlme_deauth_req(&mut ctx, fidl_ieee80211::ReasonCode::LeavingNetworkDeauth)
             .expect("expected OK");
-        assert!(!fake_device_state.lock().unwrap().assocs.contains_key(&CLIENT_ADDR));
+        assert!(!fake_device_state.lock().assocs.contains_key(&CLIENT_ADDR));
     }
 
     #[test]
@@ -1378,9 +1378,9 @@ mod tests {
             )
             .expect("expected OK");
         assert_variant!(r_sta.state.as_ref(), State::Authenticated);
-        assert_eq!(fake_device_state.lock().unwrap().wlan_queue.len(), 1);
+        assert_eq!(fake_device_state.lock().wlan_queue.len(), 1);
         #[rustfmt::skip]
-        assert_eq!(&fake_device_state.lock().unwrap().wlan_queue[0].0[..], &[
+        assert_eq!(&fake_device_state.lock().wlan_queue[0].0[..], &[
             // Mgmt header
             0b00010000, 0, // Frame Control
             0, 0, // Duration
@@ -1413,9 +1413,9 @@ mod tests {
             )
             .expect("expected OK");
         assert_variant!(r_sta.state.as_ref(), State::Authenticated);
-        assert_eq!(fake_device_state.lock().unwrap().wlan_queue.len(), 1);
+        assert_eq!(fake_device_state.lock().wlan_queue.len(), 1);
         #[rustfmt::skip]
-        assert_eq!(&fake_device_state.lock().unwrap().wlan_queue[0].0[..], &[
+        assert_eq!(&fake_device_state.lock().wlan_queue[0].0[..], &[
             // Mgmt header
             0b00010000, 0, // Frame Control
             0, 0, // Duration
@@ -1443,9 +1443,9 @@ mod tests {
             )
             .expect("expected OK");
         assert_variant!(r_sta.state.as_ref(), State::Authenticated);
-        assert_eq!(fake_device_state.lock().unwrap().wlan_queue.len(), 1);
+        assert_eq!(fake_device_state.lock().wlan_queue.len(), 1);
         #[rustfmt::skip]
-        assert_eq!(&fake_device_state.lock().unwrap().wlan_queue[0].0[..], &[
+        assert_eq!(&fake_device_state.lock().wlan_queue[0].0[..], &[
             // Mgmt header
             0b10100000, 0, // Frame Control
             0, 0, // Duration
@@ -1544,9 +1544,9 @@ mod tests {
         let mut r_sta = make_remote_client();
         let (mut ctx, _) = make_context(fake_device);
         r_sta.handle_mlme_eapol_req(&mut ctx, *CLIENT_ADDR2, &[1, 2, 3][..]).expect("expected OK");
-        assert_eq!(fake_device_state.lock().unwrap().wlan_queue.len(), 1);
+        assert_eq!(fake_device_state.lock().wlan_queue.len(), 1);
         #[rustfmt::skip]
-        assert_eq!(&fake_device_state.lock().unwrap().wlan_queue[0].0[..], &[
+        assert_eq!(&fake_device_state.lock().wlan_queue[0].0[..], &[
             // Mgmt header
             0b00001000, 0b00000010, // Frame Control
             0, 0, // Duration
@@ -1577,7 +1577,6 @@ mod tests {
 
         let msg = fake_device_state
             .lock()
-            .unwrap()
             .next_mlme_msg::<fidl_mlme::DisassociateIndication>()
             .expect("expected MLME message");
         assert_eq!(
@@ -1618,7 +1617,6 @@ mod tests {
 
         let msg = fake_device_state
             .lock()
-            .unwrap()
             .next_mlme_msg::<fidl_mlme::AssociateIndication>()
             .expect("expected MLME message");
         assert_eq!(
@@ -1652,7 +1650,6 @@ mod tests {
         r_sta.handle_auth_frame(&mut ctx, AuthAlgorithmNumber::SHARED_KEY).expect("expected OK");
         let msg = fake_device_state
             .lock()
-            .unwrap()
             .next_mlme_msg::<fidl_mlme::AuthenticateIndication>()
             .expect("expected MLME message");
         assert_eq!(
@@ -1672,9 +1669,9 @@ mod tests {
         let (mut ctx, _) = make_context(fake_device);
 
         r_sta.handle_auth_frame(&mut ctx, AuthAlgorithmNumber(0xffff)).expect("expected OK");
-        assert_eq!(fake_device_state.lock().unwrap().wlan_queue.len(), 1);
+        assert_eq!(fake_device_state.lock().wlan_queue.len(), 1);
         #[rustfmt::skip]
-        assert_eq!(&fake_device_state.lock().unwrap().wlan_queue[0].0[..], &[
+        assert_eq!(&fake_device_state.lock().wlan_queue[0].0[..], &[
             // Mgmt header
             0b10110000, 0, // Frame Control
             0, 0, // Duration
@@ -1709,7 +1706,6 @@ mod tests {
             .expect("expected OK");
         let msg = fake_device_state
             .lock()
-            .unwrap()
             .next_mlme_msg::<fidl_mlme::DeauthenticateIndication>()
             .expect("expected MLME message");
         assert_eq!(
@@ -1753,12 +1749,12 @@ mod tests {
             .expect("expected OK");
 
         // Make sure nothing has been actually sent to the WLAN queue.
-        assert_eq!(fake_device_state.lock().unwrap().wlan_queue.len(), 0);
+        assert_eq!(fake_device_state.lock().wlan_queue.len(), 0);
 
         r_sta.handle_ps_poll(&mut ctx, 1).expect("expected handle_ps_poll OK");
-        assert_eq!(fake_device_state.lock().unwrap().wlan_queue.len(), 1);
+        assert_eq!(fake_device_state.lock().wlan_queue.len(), 1);
         assert_eq!(
-            &fake_device_state.lock().unwrap().wlan_queue[0].0[..],
+            &fake_device_state.lock().wlan_queue[0].0[..],
             &[
                 // Mgmt header
                 0b00001000, 0b00100010, // Frame Control
@@ -1776,9 +1772,9 @@ mod tests {
         );
 
         r_sta.handle_ps_poll(&mut ctx, 1).expect("expected handle_ps_poll OK");
-        assert_eq!(fake_device_state.lock().unwrap().wlan_queue.len(), 2);
+        assert_eq!(fake_device_state.lock().wlan_queue.len(), 2);
         assert_eq!(
-            &fake_device_state.lock().unwrap().wlan_queue[1].0[..],
+            &fake_device_state.lock().wlan_queue[1].0[..],
             &[
                 // Mgmt header
                 0b00001000, 0b00000010, // Frame Control
@@ -1796,7 +1792,7 @@ mod tests {
         );
 
         r_sta.handle_ps_poll(&mut ctx, 1).expect("expected handle_ps_poll OK");
-        assert_eq!(fake_device_state.lock().unwrap().wlan_queue.len(), 2);
+        assert_eq!(fake_device_state.lock().wlan_queue.len(), 2);
     }
 
     #[test]
@@ -1878,7 +1874,6 @@ mod tests {
             .expect("expected OK");
         let msg = fake_device_state
             .lock()
-            .unwrap()
             .next_mlme_msg::<fidl_mlme::EapolIndication>()
             .expect("expected MLME message");
         assert_eq!(
@@ -1907,9 +1902,9 @@ mod tests {
         r_sta
             .handle_llc_frame(&mut ctx, *CLIENT_ADDR2, *CLIENT_ADDR, 0x1234, &[1, 2, 3, 4, 5][..])
             .expect("expected OK");
-        assert_eq!(fake_device_state.lock().unwrap().eth_queue.len(), 1);
+        assert_eq!(fake_device_state.lock().eth_queue.len(), 1);
         #[rustfmt::skip]
-        assert_eq!(&fake_device_state.lock().unwrap().eth_queue[0][..], &[
+        assert_eq!(&fake_device_state.lock().eth_queue[0][..], &[
             3, 3, 3, 3, 3, 3,  // dest
             1, 1, 1, 1, 1, 1,  // src
             0x12, 0x34,        // ether_type
@@ -1934,9 +1929,9 @@ mod tests {
         r_sta
             .handle_eth_frame(&mut ctx, *CLIENT_ADDR2, *CLIENT_ADDR, 0x1234, &[1, 2, 3, 4, 5][..])
             .expect("expected OK");
-        assert_eq!(fake_device_state.lock().unwrap().wlan_queue.len(), 1);
+        assert_eq!(fake_device_state.lock().wlan_queue.len(), 1);
         #[rustfmt::skip]
-        assert_eq!(&fake_device_state.lock().unwrap().wlan_queue[0].0[..], &[
+        assert_eq!(&fake_device_state.lock().wlan_queue[0].0[..], &[
             // Mgmt header
             0b00001000, 0b00000010, // Frame Control
             0, 0, // Duration
@@ -2017,9 +2012,9 @@ mod tests {
         r_sta
             .handle_eth_frame(&mut ctx, *CLIENT_ADDR2, *CLIENT_ADDR, 0x1234, &[1, 2, 3, 4, 5][..])
             .expect("expected OK");
-        assert_eq!(fake_device_state.lock().unwrap().wlan_queue.len(), 1);
+        assert_eq!(fake_device_state.lock().wlan_queue.len(), 1);
         #[rustfmt::skip]
-        assert_eq!(&fake_device_state.lock().unwrap().wlan_queue[0].0[..], &[
+        assert_eq!(&fake_device_state.lock().wlan_queue[0].0[..], &[
             // Mgmt header
             0b00001000, 0b01000010, // Frame Control
             0, 0, // Duration
@@ -2071,7 +2066,6 @@ mod tests {
 
         let msg = fake_device_state
             .lock()
-            .unwrap()
             .next_mlme_msg::<fidl_mlme::DeauthenticateIndication>()
             .expect("expected MLME message");
         assert_eq!(
@@ -2083,9 +2077,9 @@ mod tests {
             },
         );
 
-        assert_eq!(fake_device_state.lock().unwrap().wlan_queue.len(), 1);
+        assert_eq!(fake_device_state.lock().wlan_queue.len(), 1);
         assert_eq!(
-            fake_device_state.lock().unwrap().wlan_queue[0].0,
+            fake_device_state.lock().wlan_queue[0].0,
             &[
                 // Mgmt header
                 0b11000000, 0b00000000, // Frame Control
@@ -2136,7 +2130,6 @@ mod tests {
 
         let msg = fake_device_state
             .lock()
-            .unwrap()
             .next_mlme_msg::<fidl_mlme::DisassociateIndication>()
             .expect("expected MLME message");
         assert_eq!(
@@ -2148,9 +2141,9 @@ mod tests {
             },
         );
 
-        assert_eq!(fake_device_state.lock().unwrap().wlan_queue.len(), 1);
+        assert_eq!(fake_device_state.lock().wlan_queue.len(), 1);
         assert_eq!(
-            fake_device_state.lock().unwrap().wlan_queue[0].0,
+            fake_device_state.lock().wlan_queue[0].0,
             &[
                 // Mgmt header
                 0b10100000, 0b00000000, // Frame Control
@@ -2201,7 +2194,7 @@ mod tests {
             )
             .expect("expected OK");
 
-        assert_eq!(fake_device_state.lock().unwrap().eth_queue.len(), 1);
+        assert_eq!(fake_device_state.lock().eth_queue.len(), 1);
         assert_ne!(
             match r_sta.state.as_ref() {
                 State::Associated { active_timeout_event_id, .. } => *active_timeout_event_id,
@@ -2260,7 +2253,7 @@ mod tests {
             )
             .expect("expected OK");
 
-        assert_eq!(fake_device_state.lock().unwrap().eth_queue.len(), 2);
+        assert_eq!(fake_device_state.lock().eth_queue.len(), 2);
         assert_ne!(
             match r_sta.state.as_ref() {
                 State::Associated { active_timeout_event_id, .. } => *active_timeout_event_id,
@@ -2340,7 +2333,6 @@ mod tests {
 
         let msg = fake_device_state
             .lock()
-            .unwrap()
             .next_mlme_msg::<fidl_mlme::AssociateIndication>()
             .expect("expected MLME message");
         let expected_rsne = if has_rsne { Some(vec![48, 2, 77, 88]) } else { None };
@@ -2409,7 +2401,6 @@ mod tests {
 
         let msg = fake_device_state
             .lock()
-            .unwrap()
             .next_mlme_msg::<fidl_mlme::AssociateIndication>()
             .expect("expected MLME message");
         assert_eq!(
@@ -2458,7 +2449,6 @@ mod tests {
 
         let msg = fake_device_state
             .lock()
-            .unwrap()
             .next_mlme_msg::<fidl_mlme::DeauthenticateIndication>()
             .expect("expected MLME message");
         assert_eq!(
@@ -2470,9 +2460,9 @@ mod tests {
             },
         );
 
-        assert_eq!(fake_device_state.lock().unwrap().wlan_queue.len(), 1);
+        assert_eq!(fake_device_state.lock().wlan_queue.len(), 1);
         assert_eq!(
-            fake_device_state.lock().unwrap().wlan_queue[0].0,
+            fake_device_state.lock().wlan_queue[0].0,
             &[
                 // Mgmt header
                 0b11000000, 0b00000000, // Frame Control
@@ -2583,9 +2573,9 @@ mod tests {
 
         r_sta.handle_bss_idle_timeout(&mut ctx, event_id).expect("expected OK");
         assert_variant!(r_sta.state.as_ref(), State::Authenticated);
-        assert_eq!(fake_device_state.lock().unwrap().wlan_queue.len(), 1);
+        assert_eq!(fake_device_state.lock().wlan_queue.len(), 1);
         #[rustfmt::skip]
-        assert_eq!(&fake_device_state.lock().unwrap().wlan_queue[0].0[..], &[
+        assert_eq!(&fake_device_state.lock().wlan_queue[0].0[..], &[
             // Mgmt header
             0b10100000, 0, // Frame Control
             0, 0, // Duration
@@ -2598,7 +2588,6 @@ mod tests {
         ][..]);
         let msg = fake_device_state
             .lock()
-            .unwrap()
             .next_mlme_msg::<fidl_mlme::DisassociateIndication>()
             .expect("expected MLME message");
         assert_eq!(
@@ -2638,14 +2627,14 @@ mod tests {
         assert!(r_sta.has_buffered_frames());
 
         // Make sure nothing has been actually sent to the WLAN queue.
-        assert_eq!(fake_device_state.lock().unwrap().wlan_queue.len(), 0);
+        assert_eq!(fake_device_state.lock().wlan_queue.len(), 0);
 
         r_sta.set_power_state(&mut ctx, mac::PowerState::AWAKE).expect("expected wake OK");
         assert!(!r_sta.has_buffered_frames());
-        assert_eq!(fake_device_state.lock().unwrap().wlan_queue.len(), 2);
+        assert_eq!(fake_device_state.lock().wlan_queue.len(), 2);
 
         assert_eq!(
-            &fake_device_state.lock().unwrap().wlan_queue[0].0[..],
+            &fake_device_state.lock().wlan_queue[0].0[..],
             &[
                 // Mgmt header
                 0b00001000, 0b00100010, // Frame Control
@@ -2662,7 +2651,7 @@ mod tests {
             ][..]
         );
         assert_eq!(
-            &fake_device_state.lock().unwrap().wlan_queue[1].0[..],
+            &fake_device_state.lock().wlan_queue[1].0[..],
             &[
                 // Mgmt header
                 0b00001000, 0b00000010, // Frame Control

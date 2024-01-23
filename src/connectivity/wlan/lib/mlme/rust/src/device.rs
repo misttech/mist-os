@@ -729,12 +729,10 @@ pub mod test_utils {
         fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211,
         fidl_fuchsia_wlan_internal as fidl_internal, fidl_fuchsia_wlan_sme as fidl_sme,
         fuchsia_async as fasync,
+        fuchsia_sync::Mutex,
         fuchsia_zircon::HandleBased,
         ieee80211::Bssid,
-        std::{
-            collections::VecDeque,
-            sync::{Arc, Mutex},
-        },
+        std::{collections::VecDeque, sync::Arc},
         wlan_sme,
     };
 
@@ -876,11 +874,11 @@ pub mod test_utils {
         pub captured_passive_scan_request:
             Option<fidl_softmac::WlanSoftmacBaseStartPassiveScanRequest>,
         pub captured_active_scan_request: Option<fidl_softmac::WlanSoftmacStartActiveScanRequest>,
-        pub query_response: fidl_softmac::WlanSoftmacQueryResponse,
-        pub discovery_support: fidl_common::DiscoverySupport,
-        pub mac_sublayer_support: fidl_common::MacSublayerSupport,
-        pub security_support: fidl_common::SecuritySupport,
-        pub spectrum_management_support: fidl_common::SpectrumManagementSupport,
+        pub query_response: Result<fidl_softmac::WlanSoftmacQueryResponse, zx::Status>,
+        pub discovery_support: Result<fidl_common::DiscoverySupport, zx::Status>,
+        pub mac_sublayer_support: Result<fidl_common::MacSublayerSupport, zx::Status>,
+        pub security_support: Result<fidl_common::SecuritySupport, zx::Status>,
+        pub spectrum_management_support: Result<fidl_common::SpectrumManagementSupport, zx::Status>,
         pub join_bss_request: Option<fidl_common::JoinBssRequest>,
         pub beacon_config: Option<(Vec<u8>, usize, TimeUnit)>,
         pub link_status: LinkStatus,
@@ -939,11 +937,11 @@ pub mod test_utils {
                 next_scan_id: 0,
                 captured_passive_scan_request: None,
                 captured_active_scan_request: None,
-                query_response,
-                discovery_support: fake_discovery_support(),
-                mac_sublayer_support: fake_mac_sublayer_support(),
-                security_support: fake_security_support(),
-                spectrum_management_support: fake_spectrum_management_support(),
+                query_response: Ok(query_response),
+                discovery_support: Ok(fake_discovery_support()),
+                mac_sublayer_support: Ok(fake_mac_sublayer_support()),
+                security_support: Ok(fake_security_support()),
+                spectrum_management_support: Ok(fake_spectrum_management_support()),
                 keys: vec![],
                 join_bss_request: None,
                 beacon_config: None,
@@ -987,7 +985,7 @@ pub mod test_utils {
             _ifc: *const WlanSoftmacIfcProtocol<'_>,
             wlan_softmac_ifc_bridge_client_handle: zx::sys::zx_handle_t,
         ) -> Result<zx::Handle, zx::Status> {
-            let mut state = self.state.lock().unwrap();
+            let mut state = self.state.lock();
             state.wlan_softmac_ifc_bridge_proxy =
                 Some(fidl_softmac::WlanSoftmacIfcBridgeSynchronousProxy::new(fidl::Channel::from(
                     unsafe { fidl::Handle::from_raw(wlan_softmac_ifc_bridge_client_handle) },
@@ -1001,34 +999,34 @@ pub mod test_utils {
         fn wlan_softmac_query_response(
             &mut self,
         ) -> Result<fidl_softmac::WlanSoftmacQueryResponse, zx::Status> {
-            Ok(self.state.lock().unwrap().query_response.clone())
+            self.state.lock().query_response.clone()
         }
 
         fn discovery_support(&mut self) -> Result<fidl_common::DiscoverySupport, zx::Status> {
-            Ok(self.state.lock().unwrap().discovery_support)
+            self.state.lock().discovery_support
         }
 
         fn mac_sublayer_support(&mut self) -> Result<fidl_common::MacSublayerSupport, zx::Status> {
-            Ok(self.state.lock().unwrap().mac_sublayer_support)
+            self.state.lock().mac_sublayer_support
         }
 
         fn security_support(&mut self) -> Result<fidl_common::SecuritySupport, zx::Status> {
-            Ok(self.state.lock().unwrap().security_support)
+            self.state.lock().security_support
         }
 
         fn spectrum_management_support(
             &mut self,
         ) -> Result<fidl_common::SpectrumManagementSupport, zx::Status> {
-            Ok(self.state.lock().unwrap().spectrum_management_support)
+            self.state.lock().spectrum_management_support
         }
 
         fn deliver_eth_frame(&mut self, data: &[u8]) -> Result<(), zx::Status> {
-            self.state.lock().unwrap().eth_queue.push(data.to_vec());
+            self.state.lock().eth_queue.push(data.to_vec());
             Ok(())
         }
 
         fn send_wlan_frame(&mut self, buf: OutBuf, _tx_flags: u32) -> Result<(), zx::Status> {
-            let mut state = self.state.lock().unwrap();
+            let mut state = self.state.lock();
             if state.config.send_wlan_frame_fails {
                 buf.free();
                 return Err(zx::Status::IO);
@@ -1039,7 +1037,7 @@ pub mod test_utils {
         }
 
         fn set_ethernet_status(&mut self, status: LinkStatus) -> Result<(), zx::Status> {
-            self.state.lock().unwrap().link_status = status;
+            self.state.lock().link_status = status;
             Ok(())
         }
 
@@ -1047,7 +1045,7 @@ pub mod test_utils {
             &mut self,
             wlan_channel: fidl_common::WlanChannel,
         ) -> Result<(), zx::Status> {
-            self.state.lock().unwrap().wlan_channel = wlan_channel;
+            self.state.lock().wlan_channel = wlan_channel;
             Ok(())
         }
 
@@ -1055,7 +1053,7 @@ pub mod test_utils {
             &mut self,
             request: &fidl_softmac::WlanSoftmacBaseStartPassiveScanRequest,
         ) -> Result<fidl_softmac::WlanSoftmacBaseStartPassiveScanResponse, zx::Status> {
-            let mut state = self.state.lock().unwrap();
+            let mut state = self.state.lock();
             if state.config.start_passive_scan_fails {
                 return Err(zx::Status::NOT_SUPPORTED);
             }
@@ -1072,7 +1070,7 @@ pub mod test_utils {
             &mut self,
             request: &fidl_softmac::WlanSoftmacStartActiveScanRequest,
         ) -> Result<fidl_softmac::WlanSoftmacBaseStartActiveScanResponse, zx::Status> {
-            let mut state = self.state.lock().unwrap();
+            let mut state = self.state.lock();
             if state.config.start_active_scan_fails {
                 return Err(zx::Status::NOT_SUPPORTED);
             }
@@ -1093,7 +1091,7 @@ pub mod test_utils {
         }
 
         fn join_bss(&mut self, request: &fidl_common::JoinBssRequest) -> Result<(), zx::Status> {
-            self.state.lock().unwrap().join_bss_request.replace(request.clone());
+            self.state.lock().join_bss_request.replace(request.clone());
             Ok(())
         }
 
@@ -1103,7 +1101,7 @@ pub mod test_utils {
         ) -> Result<(), zx::Status> {
             match (request.packet_template, request.tim_ele_offset, request.beacon_interval) {
                 (Some(packet_template), Some(tim_ele_offset), Some(beacon_interval)) => Ok({
-                    self.state.lock().unwrap().beacon_config = Some((
+                    self.state.lock().beacon_config = Some((
                         packet_template.mac_frame.clone(),
                         usize::try_from(tim_ele_offset).map_err(|_| zx::Status::INTERNAL)?,
                         TimeUnit(beacon_interval),
@@ -1114,7 +1112,7 @@ pub mod test_utils {
         }
 
         fn disable_beaconing(&mut self) -> Result<(), zx::Status> {
-            self.state.lock().unwrap().beacon_config = None;
+            self.state.lock().beacon_config = None;
             Ok(())
         }
 
@@ -1122,7 +1120,7 @@ pub mod test_utils {
             &mut self,
             key_configuration: &fidl_softmac::WlanKeyConfiguration,
         ) -> Result<(), zx::Status> {
-            let mut state = self.state.lock().unwrap();
+            let mut state = self.state.lock();
             state.keys.push(key_configuration.clone());
             state.install_key_results.pop_front().unwrap_or(Ok(()))
         }
@@ -1131,7 +1129,7 @@ pub mod test_utils {
             &mut self,
             cfg: fidl_softmac::WlanAssociationConfig,
         ) -> Result<(), zx::Status> {
-            let mut state = self.state.lock().unwrap();
+            let mut state = self.state.lock();
             if let Some(minstrel) = &state.minstrel {
                 minstrel.lock().add_peer(&cfg)?
             }
@@ -1144,7 +1142,7 @@ pub mod test_utils {
             request: &fidl_softmac::WlanSoftmacBaseClearAssociationRequest,
         ) -> Result<(), zx::Status> {
             let addr: MacAddr = request.peer_addr.unwrap().into();
-            let mut state = self.state.lock().unwrap();
+            let mut state = self.state.lock();
             if let Some(minstrel) = &state.minstrel {
                 minstrel.lock().remove_peer(&addr);
             }
@@ -1157,7 +1155,7 @@ pub mod test_utils {
             &mut self,
             request: &fidl_softmac::WlanSoftmacBaseUpdateWmmParametersRequest,
         ) -> Result<(), zx::Status> {
-            let mut state = self.state.lock().unwrap();
+            let mut state = self.state.lock();
             state.captured_update_wmm_parameters_request.replace(request.clone());
             Ok(())
         }
@@ -1165,7 +1163,7 @@ pub mod test_utils {
         fn take_mlme_event_stream(
             &mut self,
         ) -> Option<mpsc::UnboundedReceiver<fidl_mlme::MlmeEvent>> {
-            self.state.lock().unwrap().mlme_event_stream.take()
+            self.state.lock().mlme_event_stream.take()
         }
 
         fn send_mlme_event(&mut self, event: fidl_mlme::MlmeEvent) -> Result<(), anyhow::Error> {
@@ -1173,11 +1171,11 @@ pub mod test_utils {
         }
 
         fn set_minstrel(&mut self, minstrel: crate::MinstrelWrapper) {
-            self.state.lock().unwrap().minstrel.replace(minstrel);
+            self.state.lock().minstrel.replace(minstrel);
         }
 
         fn minstrel(&mut self) -> Option<crate::MinstrelWrapper> {
-            self.state.lock().unwrap().minstrel.as_ref().map(Arc::clone)
+            self.state.lock().minstrel.as_ref().map(Arc::clone)
         }
     }
 
@@ -1456,10 +1454,10 @@ mod tests {
         let query_response = fake_device.wlan_softmac_query_response().unwrap();
         assert_eq!(query_response.mac_role, Some(fidl_common::WlanMacRole::Client));
 
-        fake_device_state.lock().unwrap().query_response = fidl_softmac::WlanSoftmacQueryResponse {
+        fake_device_state.lock().query_response = Ok(fidl_softmac::WlanSoftmacQueryResponse {
             mac_role: Some(fidl_common::WlanMacRole::Ap),
             ..query_response
-        };
+        });
 
         let query_response = fake_device.wlan_softmac_query_response().unwrap();
         assert_eq!(query_response.mac_role, Some(fidl_common::WlanMacRole::Ap));
@@ -1478,7 +1476,6 @@ mod tests {
         // Read message from channel.
         let msg = fake_device_state
             .lock()
-            .unwrap()
             .next_mlme_msg::<fidl_mlme::DeauthenticateConfirm>()
             .expect("error reading message from channel");
         assert_eq!(msg, make_deauth_confirm_msg());
@@ -1488,7 +1485,7 @@ mod tests {
     fn send_mlme_message_peer_already_closed() {
         let exec = fasync::TestExecutor::new();
         let (mut fake_device, fake_device_state) = FakeDevice::new(&exec);
-        fake_device_state.lock().unwrap().mlme_event_stream.take();
+        fake_device_state.lock().mlme_event_stream.take();
 
         fake_device
             .send_mlme_event(fidl_mlme::MlmeEvent::DeauthenticateConf {
@@ -1501,14 +1498,14 @@ mod tests {
     fn fake_device_deliver_eth_frame() {
         let exec = fasync::TestExecutor::new();
         let (mut fake_device, fake_device_state) = FakeDevice::new(&exec);
-        assert_eq!(fake_device_state.lock().unwrap().eth_queue.len(), 0);
+        assert_eq!(fake_device_state.lock().eth_queue.len(), 0);
         let first_frame = [5; 32];
         let second_frame = [6; 32];
         assert_eq!(fake_device.deliver_eth_frame(&first_frame[..]), Ok(()));
         assert_eq!(fake_device.deliver_eth_frame(&second_frame[..]), Ok(()));
-        assert_eq!(fake_device_state.lock().unwrap().eth_queue.len(), 2);
-        assert_eq!(&fake_device_state.lock().unwrap().eth_queue[0], &first_frame);
-        assert_eq!(&fake_device_state.lock().unwrap().eth_queue[1], &second_frame);
+        assert_eq!(fake_device_state.lock().eth_queue.len(), 2);
+        assert_eq!(&fake_device_state.lock().eth_queue[0], &first_frame);
+        assert_eq!(&fake_device_state.lock().eth_queue[1], &second_frame);
     }
 
     #[test]
@@ -1524,7 +1521,7 @@ mod tests {
             .expect("set_channel failed?");
         // Check the internal state.
         assert_eq!(
-            fake_device_state.lock().unwrap().wlan_channel,
+            fake_device_state.lock().wlan_channel,
             fidl_common::WlanChannel {
                 primary: 2,
                 cbw: fidl_common::ChannelBandwidth::Cbw80P80,
@@ -1550,7 +1547,7 @@ mod tests {
                 ..Default::default()
             })
             .expect("error setting key");
-        assert_eq!(fake_device_state.lock().unwrap().keys.len(), 1);
+        assert_eq!(fake_device_state.lock().keys.len(), 1);
     }
 
     #[test]
@@ -1569,7 +1566,7 @@ mod tests {
         assert!(result.is_ok());
 
         assert_eq!(
-            fake_device_state.lock().unwrap().captured_passive_scan_request,
+            fake_device_state.lock().captured_passive_scan_request,
             Some(fidl_softmac::WlanSoftmacBaseStartPassiveScanRequest {
                 channels: Some(vec![1, 2, 3]),
                 min_channel_time: Some(0),
@@ -1618,7 +1615,7 @@ mod tests {
             });
         assert!(result.is_ok());
         assert_eq!(
-            fake_device_state.lock().unwrap().captured_active_scan_request,
+            fake_device_state.lock().captured_active_scan_request,
             Some(fidl_softmac::WlanSoftmacStartActiveScanRequest {
                 channels: Some(vec![1, 2, 3]),
                 ssids: Some(vec![
@@ -1666,19 +1663,15 @@ mod tests {
                 ..Default::default()
             })
             .expect("error configuring bss");
-        assert!(fake_device_state.lock().unwrap().join_bss_request.is_some());
+        assert!(fake_device_state.lock().join_bss_request.is_some());
     }
 
     #[test]
     fn enable_disable_beaconing() {
         let exec = fasync::TestExecutor::new();
         let (mut fake_device, fake_device_state) = FakeDevice::new(&exec);
-        let mut in_buf = fake_device_state
-            .lock()
-            .unwrap()
-            .buffer_provider
-            .get_buffer(4)
-            .expect("error getting buffer");
+        let mut in_buf =
+            fake_device_state.lock().buffer_provider.get_buffer(4).expect("error getting buffer");
         in_buf.as_mut_slice().copy_from_slice(&[1, 2, 3, 4][..]);
         let mac_frame = in_buf.as_slice().to_vec();
 
@@ -1691,14 +1684,14 @@ mod tests {
             })
             .expect("error enabling beaconing");
         assert_variant!(
-        fake_device_state.lock().unwrap().beacon_config.as_ref(),
+        fake_device_state.lock().beacon_config.as_ref(),
         Some((buf, tim_ele_offset, beacon_interval)) => {
             assert_eq!(&buf[..], &[1, 2, 3, 4][..]);
             assert_eq!(*tim_ele_offset, 1);
             assert_eq!(*beacon_interval, TimeUnit(2));
         });
         fake_device.disable_beaconing().expect("error disabling beaconing");
-        assert_variant!(fake_device_state.lock().unwrap().beacon_config.as_ref(), None);
+        assert_variant!(fake_device_state.lock().beacon_config.as_ref(), None);
     }
 
     #[test]
@@ -1706,10 +1699,10 @@ mod tests {
         let exec = fasync::TestExecutor::new();
         let (mut fake_device, fake_device_state) = FakeDevice::new(&exec);
         fake_device.set_ethernet_up().expect("failed setting status");
-        assert_eq!(fake_device_state.lock().unwrap().link_status, LinkStatus::UP);
+        assert_eq!(fake_device_state.lock().link_status, LinkStatus::UP);
 
         fake_device.set_ethernet_down().expect("failed setting status");
-        assert_eq!(fake_device_state.lock().unwrap().link_status, LinkStatus::DOWN);
+        assert_eq!(fake_device_state.lock().link_status, LinkStatus::DOWN);
     }
 
     #[test]
@@ -1737,7 +1730,7 @@ mod tests {
                 ..Default::default()
             })
             .expect("error configuring assoc");
-        assert!(fake_device_state.lock().unwrap().assocs.contains_key(&[1, 2, 3, 4, 5, 6].into()));
+        assert!(fake_device_state.lock().assocs.contains_key(&[1, 2, 3, 4, 5, 6].into()));
     }
 
     #[test]
@@ -1765,17 +1758,17 @@ mod tests {
             ..Default::default()
         };
 
-        assert!(fake_device_state.lock().unwrap().join_bss_request.is_some());
+        assert!(fake_device_state.lock().join_bss_request.is_some());
         fake_device.notify_association_complete(assoc_cfg).expect("error configuring assoc");
-        assert_eq!(fake_device_state.lock().unwrap().assocs.len(), 1);
+        assert_eq!(fake_device_state.lock().assocs.len(), 1);
         fake_device
             .clear_association(&fidl_softmac::WlanSoftmacBaseClearAssociationRequest {
                 peer_addr: Some([1, 2, 3, 4, 5, 6]),
                 ..Default::default()
             })
             .expect("error clearing assoc");
-        assert_eq!(fake_device_state.lock().unwrap().assocs.len(), 0);
-        assert!(fake_device_state.lock().unwrap().join_bss_request.is_none());
+        assert_eq!(fake_device_state.lock().assocs.len(), 0);
+        assert!(fake_device_state.lock().join_bss_request.is_none());
     }
 
     #[test]
@@ -1821,9 +1814,6 @@ mod tests {
         let result = fake_device.update_wmm_parameters(&request);
         assert!(result.is_ok());
 
-        assert_eq!(
-            fake_device_state.lock().unwrap().captured_update_wmm_parameters_request,
-            Some(request),
-        );
+        assert_eq!(fake_device_state.lock().captured_update_wmm_parameters_request, Some(request),);
     }
 }

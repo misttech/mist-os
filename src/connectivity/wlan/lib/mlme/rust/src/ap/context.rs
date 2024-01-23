@@ -554,7 +554,6 @@ mod test {
             .expect("expected OK");
         let msg = fake_device_state
             .lock()
-            .unwrap()
             .next_mlme_msg::<fidl_mlme::AuthenticateIndication>()
             .expect("expected MLME message");
         assert_eq!(
@@ -579,7 +578,6 @@ mod test {
         .expect("expected OK");
         let msg = fake_device_state
             .lock()
-            .unwrap()
             .next_mlme_msg::<fidl_mlme::DeauthenticateIndication>()
             .expect("expected MLME message");
         assert_eq!(
@@ -608,7 +606,6 @@ mod test {
         .expect("expected OK");
         let msg = fake_device_state
             .lock()
-            .unwrap()
             .next_mlme_msg::<fidl_mlme::AssociateIndication>()
             .expect("expected MLME message");
         assert_eq!(
@@ -637,7 +634,6 @@ mod test {
         .expect("expected OK");
         let msg = fake_device_state
             .lock()
-            .unwrap()
             .next_mlme_msg::<fidl_mlme::DisassociateIndication>()
             .expect("expected MLME message");
         assert_eq!(
@@ -659,7 +655,6 @@ mod test {
             .expect("expected OK");
         let msg = fake_device_state
             .lock()
-            .unwrap()
             .next_mlme_msg::<fidl_mlme::EapolIndication>()
             .expect("expected MLME message");
         assert_eq!(
@@ -1072,9 +1067,9 @@ mod test {
         let (mut ctx, _) = make_context(fake_device);
         ctx.deliver_eth_frame(*CLIENT_ADDR2, *CLIENT_ADDR, 0x1234, &[1, 2, 3, 4, 5][..])
             .expect("expected OK");
-        assert_eq!(fake_device_state.lock().unwrap().eth_queue.len(), 1);
+        assert_eq!(fake_device_state.lock().eth_queue.len(), 1);
         #[rustfmt::skip]
-        assert_eq!(&fake_device_state.lock().unwrap().eth_queue[0][..], &[
+        assert_eq!(&fake_device_state.lock().eth_queue[0][..], &[
             3, 3, 3, 3, 3, 3,  // dest
             1, 1, 1, 1, 1, 1,  // src
             0x12, 0x34,        // ether_type

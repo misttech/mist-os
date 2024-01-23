@@ -492,8 +492,7 @@ mod tests {
         );
         let mut start_and_serve_fut = Box::pin(start_and_serve_fut);
 
-        let usme_bootstrap_client_end =
-            fake_device.state().lock().unwrap().usme_bootstrap_client_end.take();
+        let usme_bootstrap_client_end = fake_device.state().lock().usme_bootstrap_client_end.take();
         match usme_bootstrap_client_end {
             // Simulate an errant initialization case where the UsmeBootstrap client end has been dropped
             // during initialization.
@@ -560,7 +559,7 @@ mod tests {
     fn wlansoftmac_startup_fails_startup_during_bootstrap() {
         let mut exec = fasync::TestExecutor::new();
         let (fake_device, fake_device_state) = FakeDevice::new(&exec);
-        fake_device_state.lock().unwrap().usme_bootstrap_client_end = None;
+        fake_device_state.lock().usme_bootstrap_client_end = None;
         match start_and_serve_with_device(&mut exec, fake_device.clone()) {
             Ok(_) => panic!(
                 "start_and_serve() does not fail when the UsmeBootstrap client end is dropped."
@@ -574,9 +573,10 @@ mod tests {
         let mut exec = fasync::TestExecutor::new();
         let (fake_device, fake_device_state) = FakeDevice::new(&exec);
         {
-            let mut fake_device_state = fake_device_state.lock().unwrap();
-            fake_device_state.mac_sublayer_support.device.is_synthetic = true;
-            fake_device_state.mac_sublayer_support.device.mac_implementation_type =
+            let mut fake_device_state = fake_device_state.lock();
+            let mac_sublayer_support = fake_device_state.mac_sublayer_support.as_mut().unwrap();
+            mac_sublayer_support.device.is_synthetic = true;
+            mac_sublayer_support.device.mac_implementation_type =
                 fidl_common::MacImplementationType::Fullmac;
         }
 
@@ -632,7 +632,7 @@ mod tests {
             .expect("Generic SME proxy failed")
             .expect("Client SME request failed");
 
-        fake_device_state.lock().unwrap().wlan_softmac_ifc_bridge_proxy.take();
+        fake_device_state.lock().wlan_softmac_ifc_bridge_proxy.take();
         let (shutdown_sender, shutdown_receiver) = oneshot::channel::<()>();
         handle.stop(StopCompleter::new(Box::new(move || {
             shutdown_sender.send(()).expect("Failed to signal shutdown completion.")

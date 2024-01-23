@@ -471,13 +471,11 @@ mod tests {
         banjo_fuchsia_wlan_common as banjo_common, fidl_fuchsia_wlan_common as fidl_common,
         fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211, fidl_fuchsia_wlan_softmac as fidl_softmac,
         fuchsia_async as fasync,
+        fuchsia_sync::Mutex,
         futures::task::Poll,
         ieee80211::MacAddrBytes,
         lazy_static::lazy_static,
-        std::{
-            convert::TryFrom,
-            sync::{Arc, Mutex},
-        },
+        std::{convert::TryFrom, sync::Arc},
         wlan_common::{
             assert_variant, big_endian::BigEndianU16, test_utils::fake_frames::fake_wpa2_rsne,
             timer,
@@ -566,7 +564,7 @@ mod tests {
                 &[1, 2, 3, 4, 5, 6, 7, 8, 9, 10][..],
             )
             .expect("expected OK");
-        fake_device_state.lock().unwrap().wlan_queue.clear();
+        fake_device_state.lock().wlan_queue.clear();
 
         ap.handle_eth_frame_tx(&make_eth_frame(
             *CLIENT_ADDR,
@@ -575,9 +573,9 @@ mod tests {
             &[1, 2, 3, 4, 5][..],
         ));
 
-        assert_eq!(fake_device_state.lock().unwrap().wlan_queue.len(), 1);
+        assert_eq!(fake_device_state.lock().wlan_queue.len(), 1);
         assert_eq!(
-            &fake_device_state.lock().unwrap().wlan_queue[0].0[..],
+            &fake_device_state.lock().wlan_queue[0].0[..],
             &[
                 // Mgmt header
                 0b00001000, 0b00000010, // Frame Control
@@ -667,7 +665,6 @@ mod tests {
 
         let msg = fake_device_state
             .lock()
-            .unwrap()
             .next_mlme_msg::<fidl_mlme::AuthenticateIndication>()
             .expect("expected MLME message");
         assert_eq!(
@@ -713,7 +710,7 @@ mod tests {
                 &[1, 2, 3, 4, 5, 6, 7, 8, 9, 10][..],
             )
             .expect("expected OK");
-        fake_device_state.lock().unwrap().wlan_queue.clear();
+        fake_device_state.lock().wlan_queue.clear();
 
         // Put the client into dozing.
         ap.handle_mac_frame_rx(
@@ -734,7 +731,7 @@ mod tests {
             0x1234,
             &[1, 2, 3, 4, 5][..],
         ));
-        assert_eq!(fake_device_state.lock().unwrap().wlan_queue.len(), 0);
+        assert_eq!(fake_device_state.lock().wlan_queue.len(), 0);
 
         // Send a PS-Poll.
         ap.handle_mac_frame_rx(
@@ -748,9 +745,9 @@ mod tests {
             mock_rx_info(&ap),
         );
 
-        assert_eq!(fake_device_state.lock().unwrap().wlan_queue.len(), 1);
+        assert_eq!(fake_device_state.lock().wlan_queue.len(), 1);
         assert_eq!(
-            &fake_device_state.lock().unwrap().wlan_queue[0].0[..],
+            &fake_device_state.lock().wlan_queue[0].0[..],
             &[
                 // Mgmt header
                 0b00001000, 0b00000010, // Frame Control
@@ -884,7 +881,7 @@ mod tests {
         ap.handle_mac_frame_rx(&probe_req[..], rx_info_wrong_channel.clone());
 
         // Probe Request from the wrong channel should be dropped and no probe response sent.
-        assert_eq!(fake_device_state.lock().unwrap().wlan_queue.len(), 0);
+        assert_eq!(fake_device_state.lock().wlan_queue.len(), 0);
 
         // Frame from the same channel must be processed and a probe response sent.
         let rx_info_same_channel = banjo_wlan_softmac::WlanRxInfo {
@@ -895,9 +892,9 @@ mod tests {
             },
             ..rx_info_wrong_channel
         };
-        fake_device_state.lock().unwrap().wlan_queue.clear();
+        fake_device_state.lock().wlan_queue.clear();
         ap.handle_mac_frame_rx(&probe_req[..], rx_info_same_channel);
-        assert_eq!(fake_device_state.lock().unwrap().wlan_queue.len(), 1);
+        assert_eq!(fake_device_state.lock().wlan_queue.len(), 1);
     }
 
     #[test]
@@ -922,7 +919,7 @@ mod tests {
 
         assert!(ap.bss.is_some());
         assert_eq!(
-            fake_device_state.lock().unwrap().wlan_channel,
+            fake_device_state.lock().wlan_channel,
             fidl_common::WlanChannel {
                 primary: 2,
                 // TODO(https://fxbug.dev/40917): Correctly support this.
@@ -933,7 +930,6 @@ mod tests {
 
         let msg = fake_device_state
             .lock()
-            .unwrap()
             .next_mlme_msg::<fidl_mlme::StartConfirm>()
             .expect("expected MLME message");
         assert_eq!(
@@ -978,7 +974,6 @@ mod tests {
 
         let msg = fake_device_state
             .lock()
-            .unwrap()
             .next_mlme_msg::<fidl_mlme::StartConfirm>()
             .expect("expected MLME message");
         assert_eq!(
@@ -1015,7 +1010,6 @@ mod tests {
 
         let msg = fake_device_state
             .lock()
-            .unwrap()
             .next_mlme_msg::<fidl_mlme::StopConfirm>()
             .expect("expected MLME message");
         assert_eq!(msg, fidl_mlme::StopConfirm { result_code: fidl_mlme::StopResultCode::Success },);
@@ -1034,7 +1028,6 @@ mod tests {
 
         let msg = fake_device_state
             .lock()
-            .unwrap()
             .next_mlme_msg::<fidl_mlme::StopConfirm>()
             .expect("expected MLME message");
         assert_eq!(
@@ -1074,7 +1067,7 @@ mod tests {
         })
         .expect("expected Ap::handle_mlme_setkeys_req OK");
         assert_eq!(
-            fake_device_state.lock().unwrap().keys,
+            fake_device_state.lock().keys,
             vec![fidl_softmac::WlanKeyConfiguration {
                 protection: Some(fidl_softmac::WlanProtection::RxTx),
                 cipher_oui: Some([1, 2, 3]),
@@ -1171,9 +1164,9 @@ mod tests {
             result_code: fidl_mlme::AuthenticateResultCode::AntiCloggingTokenRequired,
         }))
         .expect("expected Ap::handle_mlme_msg(fidl_mlme::MlmeRequest::AuthenticateResp) ok");
-        assert_eq!(fake_device_state.lock().unwrap().wlan_queue.len(), 1);
+        assert_eq!(fake_device_state.lock().wlan_queue.len(), 1);
         assert_eq!(
-            &fake_device_state.lock().unwrap().wlan_queue[0].0[..],
+            &fake_device_state.lock().wlan_queue[0].0[..],
             &[
                 // Mgmt header
                 0b10110000, 0, // Frame Control
@@ -1271,9 +1264,9 @@ mod tests {
             },
         ))
         .expect("expected Ap::handle_mlme_msg(fidl_mlme::MlmeRequest::DeauthenticateReq) ok");
-        assert_eq!(fake_device_state.lock().unwrap().wlan_queue.len(), 1);
+        assert_eq!(fake_device_state.lock().wlan_queue.len(), 1);
         assert_eq!(
-            &fake_device_state.lock().unwrap().wlan_queue[0].0[..],
+            &fake_device_state.lock().wlan_queue[0].0[..],
             &[
                 // Mgmt header
                 0b11000000, 0, // Frame Control
@@ -1315,9 +1308,9 @@ mod tests {
             rates: vec![1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
         }))
         .expect("expected Ap::handle_mlme_msg(fidl_mlme::MlmeRequest::AssociateResp) ok");
-        assert_eq!(fake_device_state.lock().unwrap().wlan_queue.len(), 1);
+        assert_eq!(fake_device_state.lock().wlan_queue.len(), 1);
         assert_eq!(
-            &fake_device_state.lock().unwrap().wlan_queue[0].0[..],
+            &fake_device_state.lock().wlan_queue[0].0[..],
             &[
                 // Mgmt header
                 0b00010000, 0, // Frame Control
@@ -1362,9 +1355,9 @@ mod tests {
             reason_code: fidl_ieee80211::ReasonCode::LeavingNetworkDisassoc,
         }))
         .expect("expected Ap::handle_mlme_msg(fidl_mlme::MlmeRequest::DisassociateReq) ok");
-        assert_eq!(fake_device_state.lock().unwrap().wlan_queue.len(), 1);
+        assert_eq!(fake_device_state.lock().wlan_queue.len(), 1);
         assert_eq!(
-            &fake_device_state.lock().unwrap().wlan_queue[0].0[..],
+            &fake_device_state.lock().wlan_queue[0].0[..],
             &[
                 // Mgmt header
                 0b10100000, 0, // Frame Control
@@ -1441,9 +1434,9 @@ mod tests {
             data: vec![1, 2, 3],
         }))
         .expect("expected Ap::handle_mlme_msg(fidl_mlme::MlmeRequest::EapolReq) ok");
-        assert_eq!(fake_device_state.lock().unwrap().wlan_queue.len(), 1);
+        assert_eq!(fake_device_state.lock().wlan_queue.len(), 1);
         assert_eq!(
-            &fake_device_state.lock().unwrap().wlan_queue[0].0[..],
+            &fake_device_state.lock().wlan_queue[0].0[..],
             &[
                 // Header
                 0b00001000, 0b00000010, // Frame Control

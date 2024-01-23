@@ -626,12 +626,10 @@ mod tests {
             device::{FakeDevice, FakeDeviceState},
         },
         fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211, fuchsia_async as fasync,
+        fuchsia_sync::Mutex,
         ieee80211::Bssid,
         lazy_static::lazy_static,
-        std::{
-            convert::TryFrom,
-            sync::{Arc, Mutex},
-        },
+        std::{convert::TryFrom, sync::Arc},
         test_case::test_case,
         wlan_common::{
             assert_variant,
@@ -702,7 +700,7 @@ mod tests {
         .expect("expected InfraBss::new ok");
 
         assert_eq!(
-            fake_device_state.lock().unwrap().wlan_channel,
+            fake_device_state.lock().wlan_channel,
             fidl_common::WlanChannel {
                 primary: 1,
                 cbw: fidl_common::ChannelBandwidth::Cbw20,
@@ -730,12 +728,7 @@ mod tests {
         ];
 
         assert_eq!(
-            fake_device_state
-                .lock()
-                .unwrap()
-                .beacon_config
-                .as_ref()
-                .expect("expected beacon_config"),
+            fake_device_state.lock().beacon_config.as_ref().expect("expected beacon_config"),
             &(beacon_tmpl, 49, TimeUnit::DEFAULT_BEACON_INTERVAL)
         );
     }
@@ -747,7 +740,7 @@ mod tests {
         let (mut ctx, _) = make_context(fake_device);
         let bss = make_infra_bss(&mut ctx);
         bss.stop(&mut ctx).expect("expected InfraBss::stop ok");
-        assert!(fake_device_state.lock().unwrap().beacon_config.is_none());
+        assert!(fake_device_state.lock().beacon_config.is_none());
     }
 
     #[test]
@@ -767,9 +760,9 @@ mod tests {
             },
         )
         .expect("expected InfraBss::handle_mlme_auth_resp ok");
-        assert_eq!(fake_device_state.lock().unwrap().wlan_queue.len(), 1);
+        assert_eq!(fake_device_state.lock().wlan_queue.len(), 1);
         assert_eq!(
-            &fake_device_state.lock().unwrap().wlan_queue[0].0[..],
+            &fake_device_state.lock().wlan_queue[0].0[..],
             &[
                 // Mgmt header
                 0b10110000, 0, // Frame Control
@@ -825,9 +818,9 @@ mod tests {
             },
         )
         .expect("expected InfraBss::handle_mlme_deauth_req ok");
-        assert_eq!(fake_device_state.lock().unwrap().wlan_queue.len(), 1);
+        assert_eq!(fake_device_state.lock().wlan_queue.len(), 1);
         assert_eq!(
-            &fake_device_state.lock().unwrap().wlan_queue[0].0[..],
+            &fake_device_state.lock().wlan_queue[0].0[..],
             &[
                 // Mgmt header
                 0b11000000, 0, // Frame Control
@@ -863,9 +856,9 @@ mod tests {
             },
         )
         .expect("expected InfraBss::handle_mlme_assoc_resp ok");
-        assert_eq!(fake_device_state.lock().unwrap().wlan_queue.len(), 1);
+        assert_eq!(fake_device_state.lock().wlan_queue.len(), 1);
         assert_eq!(
-            &fake_device_state.lock().unwrap().wlan_queue[0].0[..],
+            &fake_device_state.lock().wlan_queue[0].0[..],
             &[
                 // Mgmt header
                 0b00010000, 0, // Frame Control
@@ -884,7 +877,7 @@ mod tests {
                 90, 3, 90, 0, 0, // BSS max idle period
             ][..]
         );
-        assert!(fake_device_state.lock().unwrap().assocs.contains_key(&CLIENT_ADDR));
+        assert!(fake_device_state.lock().assocs.contains_key(&CLIENT_ADDR));
     }
 
     #[test]
@@ -917,9 +910,9 @@ mod tests {
             },
         )
         .expect("expected InfraBss::handle_mlme_assoc_resp ok");
-        assert_eq!(fake_device_state.lock().unwrap().wlan_queue.len(), 1);
+        assert_eq!(fake_device_state.lock().wlan_queue.len(), 1);
         assert_eq!(
-            &fake_device_state.lock().unwrap().wlan_queue[0].0[..],
+            &fake_device_state.lock().wlan_queue[0].0[..],
             &[
                 // Mgmt header
                 0b00010000, 0, // Frame Control
@@ -938,7 +931,7 @@ mod tests {
                 90, 3, 90, 0, 0, // BSS max idle period
             ][..]
         );
-        assert!(fake_device_state.lock().unwrap().assocs.contains_key(&CLIENT_ADDR));
+        assert!(fake_device_state.lock().assocs.contains_key(&CLIENT_ADDR));
     }
 
     #[test]
@@ -958,9 +951,9 @@ mod tests {
             },
         )
         .expect("expected InfraBss::handle_mlme_disassoc_req ok");
-        assert_eq!(fake_device_state.lock().unwrap().wlan_queue.len(), 1);
+        assert_eq!(fake_device_state.lock().wlan_queue.len(), 1);
         assert_eq!(
-            &fake_device_state.lock().unwrap().wlan_queue[0].0[..],
+            &fake_device_state.lock().wlan_queue[0].0[..],
             &[
                 // Mgmt header
                 0b10100000, 0, // Frame Control
@@ -1021,9 +1014,9 @@ mod tests {
             },
         )
         .expect("expected InfraBss::handle_mlme_eapol_req ok");
-        assert_eq!(fake_device_state.lock().unwrap().wlan_queue.len(), 1);
+        assert_eq!(fake_device_state.lock().wlan_queue.len(), 1);
         assert_eq!(
-            &fake_device_state.lock().unwrap().wlan_queue[0].0[..],
+            &fake_device_state.lock().wlan_queue[0].0[..],
             &[
                 // Header
                 0b00001000, 0b00000010, // Frame Control
@@ -1042,7 +1035,6 @@ mod tests {
 
         let confirm = fake_device_state
             .lock()
-            .unwrap()
             .next_mlme_msg::<fidl_mlme::EapolConfirm>()
             .expect("Did not receive valid Eapol Confirm msg");
         assert_eq!(confirm.result_code, fidl_mlme::EapolResultCode::Success);
@@ -1081,7 +1073,6 @@ mod tests {
 
         let msg = fake_device_state
             .lock()
-            .unwrap()
             .next_mlme_msg::<fidl_mlme::AuthenticateIndication>()
             .expect("expected MLME message");
         assert_eq!(
@@ -1134,7 +1125,6 @@ mod tests {
 
         let msg = fake_device_state
             .lock()
-            .unwrap()
             .next_mlme_msg::<fidl_mlme::AssociateIndication>()
             .expect("expected MLME message");
         assert_eq!(
@@ -1333,9 +1323,9 @@ mod tests {
         )
         .expect("expected OK");
 
-        assert_eq!(fake_device_state.lock().unwrap().eth_queue.len(), 1);
+        assert_eq!(fake_device_state.lock().eth_queue.len(), 1);
         assert_eq!(
-            &fake_device_state.lock().unwrap().eth_queue[0][..],
+            &fake_device_state.lock().eth_queue[0][..],
             &[
                 6, 6, 6, 6, 6, 6, // dest
                 4, 4, 4, 4, 4, 4, // src
@@ -1380,7 +1370,7 @@ mod tests {
             Rejection::BadDsBits
         );
 
-        assert_eq!(fake_device_state.lock().unwrap().eth_queue.len(), 0);
+        assert_eq!(fake_device_state.lock().eth_queue.len(), 0);
     }
 
     #[test]
@@ -1409,7 +1399,7 @@ mod tests {
             )
             .expect("expected OK");
 
-        fake_device_state.lock().unwrap().wlan_queue.clear();
+        fake_device_state.lock().wlan_queue.clear();
 
         let (_, timed_event) =
             time_stream.try_next().unwrap().expect("Should have scheduled a timeout");
@@ -1421,9 +1411,9 @@ mod tests {
         .expect("expected OK");
 
         // Check that we received a disassociation frame.
-        assert_eq!(fake_device_state.lock().unwrap().wlan_queue.len(), 1);
+        assert_eq!(fake_device_state.lock().wlan_queue.len(), 1);
         #[rustfmt::skip]
-        assert_eq!(&fake_device_state.lock().unwrap().wlan_queue[0].0[..], &[
+        assert_eq!(&fake_device_state.lock().wlan_queue[0].0[..], &[
             // Mgmt header
             0b10100000, 0, // Frame Control
             0, 0, // Duration
@@ -1437,7 +1427,6 @@ mod tests {
 
         let msg = fake_device_state
             .lock()
-            .unwrap()
             .next_mlme_msg::<fidl_mlme::DisassociateIndication>()
             .expect("expected MLME message");
         assert_eq!(
@@ -1484,11 +1473,11 @@ mod tests {
             Rejection::Client(_, ClientRejection::NotPermitted)
         );
 
-        assert_eq!(fake_device_state.lock().unwrap().eth_queue.len(), 0);
+        assert_eq!(fake_device_state.lock().eth_queue.len(), 0);
 
-        assert_eq!(fake_device_state.lock().unwrap().wlan_queue.len(), 1);
+        assert_eq!(fake_device_state.lock().wlan_queue.len(), 1);
         assert_eq!(
-            fake_device_state.lock().unwrap().wlan_queue[0].0,
+            fake_device_state.lock().wlan_queue[0].0,
             &[
                 // Mgmt header
                 0b11000000, 0b00000000, // Frame Control
@@ -1519,7 +1508,7 @@ mod tests {
             .handle_mlme_auth_resp(&mut ctx, fidl_mlme::AuthenticateResultCode::Success)
             .expect("expected OK");
 
-        fake_device_state.lock().unwrap().wlan_queue.clear();
+        fake_device_state.lock().wlan_queue.clear();
 
         assert_variant!(
             bss.handle_data_frame(
@@ -1548,11 +1537,11 @@ mod tests {
             Rejection::Client(_, ClientRejection::NotPermitted)
         );
 
-        assert_eq!(fake_device_state.lock().unwrap().eth_queue.len(), 0);
+        assert_eq!(fake_device_state.lock().eth_queue.len(), 0);
 
-        assert_eq!(fake_device_state.lock().unwrap().wlan_queue.len(), 1);
+        assert_eq!(fake_device_state.lock().wlan_queue.len(), 1);
         assert_eq!(
-            fake_device_state.lock().unwrap().wlan_queue[0].0,
+            fake_device_state.lock().wlan_queue[0].0,
             &[
                 // Mgmt header
                 0b10100000, 0b00000000, // Frame Control
@@ -1590,7 +1579,7 @@ mod tests {
                 &[1, 2, 3, 4, 5, 6, 7, 8, 9, 10][..],
             )
             .expect("expected OK");
-        fake_device_state.lock().unwrap().wlan_queue.clear();
+        fake_device_state.lock().wlan_queue.clear();
 
         bss.handle_eth_frame(
             &mut ctx,
@@ -1603,9 +1592,9 @@ mod tests {
         )
         .expect("expected OK");
 
-        assert_eq!(fake_device_state.lock().unwrap().wlan_queue.len(), 1);
+        assert_eq!(fake_device_state.lock().wlan_queue.len(), 1);
         assert_eq!(
-            &fake_device_state.lock().unwrap().wlan_queue[0].0[..],
+            &fake_device_state.lock().wlan_queue[0].0[..],
             &[
                 // Mgmt header
                 0b00001000, 0b00000010, // Frame Control
@@ -1644,7 +1633,7 @@ mod tests {
             Rejection::Client(_, ClientRejection::NotAssociated)
         );
 
-        assert_eq!(fake_device_state.lock().unwrap().wlan_queue.len(), 0);
+        assert_eq!(fake_device_state.lock().wlan_queue.len(), 0);
     }
 
     #[test]
@@ -1670,7 +1659,7 @@ mod tests {
                 &[1, 2, 3, 4, 5, 6, 7, 8, 9, 10][..],
             )
             .expect("expected OK");
-        fake_device_state.lock().unwrap().wlan_queue.clear();
+        fake_device_state.lock().wlan_queue.clear();
 
         assert_variant!(
             bss.handle_eth_frame(
@@ -1710,7 +1699,7 @@ mod tests {
                 &[1, 2, 3, 4, 5, 6, 7, 8, 9, 10][..],
             )
             .expect("expected OK");
-        fake_device_state.lock().unwrap().wlan_queue.clear();
+        fake_device_state.lock().wlan_queue.clear();
 
         client
             .handle_mlme_set_controlled_port_req(fidl_mlme::ControlledPortState::Open)
@@ -1727,9 +1716,9 @@ mod tests {
         )
         .expect("expected OK");
 
-        assert_eq!(fake_device_state.lock().unwrap().wlan_queue.len(), 1);
+        assert_eq!(fake_device_state.lock().wlan_queue.len(), 1);
         assert_eq!(
-            &fake_device_state.lock().unwrap().wlan_queue[0].0[..],
+            &fake_device_state.lock().wlan_queue[0].0[..],
             &[
                 // Mgmt header
                 0b00001000, 0b01000010, // Frame Control
@@ -1771,7 +1760,7 @@ mod tests {
                 &[1, 2, 3, 4, 5, 6, 7, 8, 9, 10][..],
             )
             .expect("expected OK");
-        fake_device_state.lock().unwrap().wlan_queue.clear();
+        fake_device_state.lock().wlan_queue.clear();
 
         if controlled_port_open {
             client
@@ -1804,9 +1793,9 @@ mod tests {
         .expect("expected OK");
 
         if controlled_port_open {
-            assert_eq!(fake_device_state.lock().unwrap().eth_queue.len(), 1);
+            assert_eq!(fake_device_state.lock().eth_queue.len(), 1);
         } else {
-            assert!(fake_device_state.lock().unwrap().eth_queue.is_empty());
+            assert!(fake_device_state.lock().eth_queue.is_empty());
         }
     }
 
@@ -1839,7 +1828,6 @@ mod tests {
 
         fake_device_state
             .lock()
-            .unwrap()
             .next_mlme_msg::<fidl_mlme::AuthenticateIndication>()
             .expect("expected auth indication");
         bss.handle_mlme_auth_resp(
@@ -1850,8 +1838,8 @@ mod tests {
             },
         )
         .expect("failed to handle auth resp");
-        assert_eq!(fake_device_state.lock().unwrap().wlan_queue.len(), 1);
-        fake_device_state.lock().unwrap().wlan_queue.clear();
+        assert_eq!(fake_device_state.lock().wlan_queue.len(), 1);
+        fake_device_state.lock().wlan_queue.clear();
     }
 
     fn associate_client(
@@ -1886,7 +1874,6 @@ mod tests {
         .expect("expected OK");
         let msg = fake_device_state
             .lock()
-            .unwrap()
             .next_mlme_msg::<fidl_mlme::AssociateIndication>()
             .expect("expected assoc indication");
         bss.handle_mlme_assoc_resp(
@@ -1900,8 +1887,8 @@ mod tests {
             },
         )
         .expect("failed to handle assoc resp");
-        assert_eq!(fake_device_state.lock().unwrap().wlan_queue.len(), 1);
-        fake_device_state.lock().unwrap().wlan_queue.clear();
+        assert_eq!(fake_device_state.lock().wlan_queue.len(), 1);
+        fake_device_state.lock().wlan_queue.clear();
     }
 
     fn send_eth_frame_from_ds_to_client(
@@ -1940,7 +1927,7 @@ mod tests {
         send_eth_frame_from_ds_to_client(&mut ctx, &mut bss, *CLIENT_ADDR);
         send_eth_frame_from_ds_to_client(&mut ctx, &mut bss, *CLIENT_ADDR2);
 
-        assert_eq!(fake_device_state.lock().unwrap().wlan_queue.len(), 2);
+        assert_eq!(fake_device_state.lock().wlan_queue.len(), 2);
     }
 
     #[test]
@@ -1967,7 +1954,7 @@ mod tests {
             )
             .expect("expected OK");
         client.set_power_state(&mut ctx, mac::PowerState::DOZE).expect("expected doze ok");
-        fake_device_state.lock().unwrap().wlan_queue.clear();
+        fake_device_state.lock().wlan_queue.clear();
 
         bss.handle_eth_frame(
             &mut ctx,
@@ -1979,7 +1966,7 @@ mod tests {
             &[1, 2, 3, 4, 5][..],
         )
         .expect("expected OK");
-        assert_eq!(fake_device_state.lock().unwrap().wlan_queue.len(), 0);
+        assert_eq!(fake_device_state.lock().wlan_queue.len(), 0);
 
         bss.handle_ctrl_frame(
             &mut ctx,
@@ -1993,9 +1980,9 @@ mod tests {
             ][..],
         )
         .expect("expected OK");
-        assert_eq!(fake_device_state.lock().unwrap().wlan_queue.len(), 1);
+        assert_eq!(fake_device_state.lock().wlan_queue.len(), 1);
         assert_eq!(
-            &fake_device_state.lock().unwrap().wlan_queue[0].0[..],
+            &fake_device_state.lock().wlan_queue[0].0[..],
             &[
                 // Mgmt header
                 0b00001000, 0b00000010, // Frame Control
@@ -2033,7 +2020,7 @@ mod tests {
         )
         .expect("expected InfraBss::handle_mlme_setkeys_req OK");
         assert_eq!(
-            fake_device_state.lock().unwrap().keys,
+            fake_device_state.lock().keys,
             vec![fidl_softmac::WlanKeyConfiguration {
                 protection: Some(fidl_softmac::WlanProtection::RxTx),
                 cipher_oui: Some([1, 2, 3]),
@@ -2071,7 +2058,7 @@ mod tests {
             .expect_err("expected InfraBss::handle_mlme_setkeys_req error"),
             Error::Status(_, zx::Status::BAD_STATE)
         );
-        assert!(fake_device_state.lock().unwrap().keys.is_empty());
+        assert!(fake_device_state.lock().keys.is_empty());
     }
 
     #[test]
@@ -2093,9 +2080,9 @@ mod tests {
 
         bss.handle_probe_req(&mut ctx, *CLIENT_ADDR)
             .expect("expected InfraBss::handle_probe_req ok");
-        assert_eq!(fake_device_state.lock().unwrap().wlan_queue.len(), 1);
+        assert_eq!(fake_device_state.lock().wlan_queue.len(), 1);
         assert_eq!(
-            &fake_device_state.lock().unwrap().wlan_queue[0].0[..],
+            &fake_device_state.lock().wlan_queue[0].0[..],
             &[
                 // Mgmt header
                 0b01010000, 0, // Frame Control
@@ -2121,7 +2108,13 @@ mod tests {
     fn handle_probe_req_has_offload() {
         let exec = fasync::TestExecutor::new();
         let (fake_device, fake_device_state) = FakeDevice::new(&exec);
-        fake_device_state.lock().unwrap().discovery_support.probe_response_offload.supported = true;
+        fake_device_state
+            .lock()
+            .discovery_support
+            .as_mut()
+            .unwrap()
+            .probe_response_offload
+            .supported = true;
 
         let (mut ctx, _) = make_context(fake_device);
         let mut bss = InfraBss::new(
@@ -2188,9 +2181,9 @@ mod tests {
         )
         .expect("expected InfraBss::handle_mgmt_frame ok");
 
-        assert_eq!(fake_device_state.lock().unwrap().wlan_queue.len(), 1);
+        assert_eq!(fake_device_state.lock().wlan_queue.len(), 1);
         assert_eq!(
-            &fake_device_state.lock().unwrap().wlan_queue[0].0[..],
+            &fake_device_state.lock().wlan_queue[0].0[..],
             &[
                 // Mgmt header
                 0b01010000, 0, // Frame Control
@@ -2245,9 +2238,9 @@ mod tests {
         )
         .expect("expected InfraBss::handle_mgmt_frame ok");
 
-        assert_eq!(fake_device_state.lock().unwrap().wlan_queue.len(), 1);
+        assert_eq!(fake_device_state.lock().wlan_queue.len(), 1);
         assert_eq!(
-            &fake_device_state.lock().unwrap().wlan_queue[0].0[..],
+            &fake_device_state.lock().wlan_queue[0].0[..],
             &[
                 // Mgmt header
                 0b01010000, 0, // Frame Control
