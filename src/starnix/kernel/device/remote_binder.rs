@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use crate::{
-    device::{DeviceOps, RemoteBinderConnection},
+    device::{BinderDriver, DeviceOps, RemoteBinderConnection},
     mm::{DesiredAddress, MappingOptions, MemoryAccessorExt, ProtectionFlags},
     task::{with_current_task, CurrentTask, Kernel, ThreadGroup, WaitQueue, Waiter},
     vfs::{
@@ -895,13 +895,17 @@ impl<F: RemoteControllerConnector> RemoteBinderHandle<F> {
     ) -> Result<Arc<RemoteBinderConnection>, Errno> {
         let node = current_task.lookup_path_from_root(path.as_ref())?;
         let device_type = node.entry.node.info().rdev;
-        let connection = current_task
-            .kernel()
-            .binders
-            .read()
-            .get(&device_type)
-            .ok_or_else(|| errno!(ENOTSUP))?
-            .open_remote(current_task, process_accessor, process);
+        let connection = BinderDriver::open_remote(
+            current_task
+                .kernel()
+                .binders
+                .read()
+                .get(&device_type)
+                .ok_or_else(|| errno!(ENOTSUP))?,
+            current_task,
+            process_accessor,
+            process,
+        );
         Ok(connection)
     }
 

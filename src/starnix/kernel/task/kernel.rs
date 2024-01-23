@@ -7,7 +7,7 @@ use crate::{
         framebuffer::{AspectRatio, Framebuffer},
         input::InputDevice,
         loop_device::LoopDeviceRegistry,
-        BinderDriver, DeviceMode, DeviceRegistry,
+        BinderDevice, DeviceMode, DeviceRegistry,
     },
     fs::proc::SystemLimits,
     mm::{FutexTable, SharedFutexKey},
@@ -137,7 +137,7 @@ pub struct Kernel {
     pub input_device: Arc<InputDevice>,
 
     /// The binder driver registered for this container, indexed by their device type.
-    pub binders: RwLock<BTreeMap<DeviceType, Arc<BinderDriver>>>,
+    pub binders: RwLock<BTreeMap<DeviceType, BinderDevice>>,
 
     /// The iptables used for filtering network packets.
     pub iptables: OrderedRwLock<IpTables, KernelIpTables>,

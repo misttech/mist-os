@@ -70,7 +70,7 @@ pub use vmo_file::*;
 pub use wd_number::*;
 pub use xattr::*;
 
-use crate::task::CurrentTask;
+use crate::{device::BinderDriver, task::CurrentTask};
 use starnix_lifecycle::{ObjectReleaser, ReleaserAction};
 use starnix_uapi::ownership::{Releasable, ReleaseGuard};
 use std::{cell::RefCell, ops::DerefMut, sync::Arc};
@@ -78,7 +78,7 @@ use std::{cell::RefCell, ops::DerefMut, sync::Arc};
 pub enum FileObjectReleaserAction {}
 impl ReleaserAction<FileObject> for FileObjectReleaserAction {
     fn release(file_object: ReleaseGuard<FileObject>) {
-        LocalReleasable::DropedFile(file_object).register();
+        LocalReleasable::DroppedFile(file_object).register();
     }
 }
 pub type FileReleaser = ObjectReleaser<FileObject, FileObjectReleaserAction>;
@@ -86,10 +86,18 @@ pub type FileReleaser = ObjectReleaser<FileObject, FileObjectReleaserAction>;
 pub enum FsNodeReleaserAction {}
 impl ReleaserAction<FsNode> for FsNodeReleaserAction {
     fn release(fs_node: ReleaseGuard<FsNode>) {
-        LocalReleasable::DropedNode(fs_node).register();
+        LocalReleasable::DroppedNode(fs_node).register();
     }
 }
 pub type FsNodeReleaser = ObjectReleaser<FsNode, FsNodeReleaserAction>;
+
+pub enum BinderDriverReleaserAction {}
+impl ReleaserAction<BinderDriver> for BinderDriverReleaserAction {
+    fn release(driver: ReleaseGuard<BinderDriver>) {
+        LocalReleasable::DroppedBinderDriver(driver).register();
+    }
+}
+pub type BinderDriverReleaser = ObjectReleaser<BinderDriver, BinderDriverReleaserAction>;
 
 thread_local! {
     /// Container of all `FileObject` that are not used anymore, but have not been closed yet.
@@ -99,8 +107,9 @@ thread_local! {
 /// Container for all the types that can be deferred released.
 #[derive(Debug)]
 enum LocalReleasable {
-    DropedNode(ReleaseGuard<FsNode>),
-    DropedFile(ReleaseGuard<FileObject>),
+    DroppedBinderDriver(ReleaseGuard<BinderDriver>),
+    DroppedFile(ReleaseGuard<FileObject>),
+    DroppedNode(ReleaseGuard<FsNode>),
     FlushedFile(FileHandle, FdTableId),
 }
 
@@ -118,8 +127,9 @@ impl Releasable for LocalReleasable {
 
     fn release(self, context: Self::Context<'_>) {
         match self {
-            Self::DropedNode(fs_node) => fs_node.release(context),
-            Self::DropedFile(file_object) => file_object.release(context),
+            Self::DroppedBinderDriver(driver) => driver.release(context),
+            Self::DroppedFile(file_object) => file_object.release(context),
+            Self::DroppedNode(fs_node) => fs_node.release(context),
             Self::FlushedFile(file_handle, id) => file_handle.flush(context, id),
         }
     }

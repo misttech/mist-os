@@ -13,6 +13,12 @@ pub trait ReleaserAction<T> {
 /// delayed releasers to be released at the next release point.
 pub struct ObjectReleaser<T, F: ReleaserAction<T>>(ManuallyDrop<ReleaseGuard<T>>, PhantomData<F>);
 
+impl<T: Default, F: ReleaserAction<T>> Default for ObjectReleaser<T, F> {
+    fn default() -> Self {
+        Self::from(T::default())
+    }
+}
+
 impl<T, F: ReleaserAction<T>> From<T> for ObjectReleaser<T, F> {
     fn from(object: T) -> Self {
         Self(ManuallyDrop::new(object.into()), Default::default())
