@@ -293,7 +293,7 @@ impl Drop for CallbackResultRef {
     fn drop(&mut self) {
         // SAFETY: The pointer should always be valid by construction, unless take_ptr has nulled it
         // out.
-        let Some(this) = (unsafe {self.0.as_ref()}) else {
+        let Some(this) = (unsafe { self.0.as_ref() }) else {
             return;
         };
         let count = this.refcount.fetch_sub(1, Ordering::Release);
@@ -371,9 +371,9 @@ impl BulkOutEndpoint {
     }
 }
 
-#[allow(unused_tuple_struct_fields)]
+#[allow(dead_code)]
 pub struct ControlEndpoint(Arc<InterfaceInterface500>);
-#[allow(unused_tuple_struct_fields)]
+#[allow(dead_code)]
 pub struct InterruptEndpoint(Arc<InterfaceInterface500>);
-#[allow(unused_tuple_struct_fields)]
+#[allow(dead_code)]
 pub struct IsochronousEndpoint(Arc<InterfaceInterface500>);
