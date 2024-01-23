@@ -110,6 +110,7 @@ When a component reads the `say_hello` field of its structured configuration, it
 receiving the value of `fuchsia.config.MyBool`.
 
 You may optionally specify:
+
 * [`availability`](#availability)
 
 ## Renaming {#renaming}
@@ -134,12 +135,14 @@ You may `expose` or `offer` a capability by a different name:
 There are many supported types for configuration values.
 
 There are the following types for unsigned integers:
+
 - `uint8`
 - `uint16`
 - `uint32`
 - `uint64`
 
 There are the following types for signed integers:
+
 - `int8`
 - `int16`
 - `int32`
@@ -150,6 +153,7 @@ There is the `bool` type which supports values of `true` or `false`.
 There is the `string` type, which must have `max_size` set in addition to the string value.
 
 String example:
+
 ```json5
 {
     capabilities: [
@@ -167,6 +171,7 @@ There is the `vector` type, which must have a `element` field with `type` also s
 contain all other types except for vectors.
 
 Vector example:
+
 ```json5
 {
     capabilities: [
@@ -220,6 +225,7 @@ will not see any updates if the capability route changes while the component is 
 
 In order to launch a component with a different configuration the following things need to
 happen:
+
 1) Update the CML providing the configuration capbility (likely by re-resolving it).
 2) Stop and then Start the component that is using the configuration capbility.
 
