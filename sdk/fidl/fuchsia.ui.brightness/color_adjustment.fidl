@@ -9,6 +9,9 @@ library fuchsia.ui.brightness;
 @available(added=16)
 open protocol ColorAdjustment {
     /// Called to change the color adjustment to a discrete value.
+    /// The server will send a response once the request has been serviced.
+    /// A client can then use this response to determine when to make
+    /// additional calls when limiting the amount of requests being sent.
     flexible SetDiscreteColorAdjustment(struct {
         color_adjustment ColorAdjustmentTable;
     }) -> ();
