@@ -121,9 +121,96 @@ impl ProcDirectory {
                 // (https://man7.org/linux/man-pages/man5/proc.5.html)
                 FsNodeInfo::new_factory(mode!(IFREG, 0o200), FsCred::root()),
             ),
+            "asound".into() => fs.create_node(
+                current_task,
+                // Note: this is actually a directory but for now just track when it's opened.
+                StubEmptyFile::new_node("/proc/asound"),
+                FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root()),
+            ),
+            "diskstats".into() => fs.create_node(
+                current_task,
+                StubEmptyFile::new_node("/proc/diskstats"),
+                FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root()),
+            ),
+            "filesystems".into() => fs.create_node(
+                current_task,
+                StubEmptyFile::new_node_with_bug("/proc/filesystems", 309002087),
+                FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root()),
+            ),
+            "misc".into() => fs.create_node(
+                current_task,
+                StubEmptyFile::new_node("/proc/misc"),
+                FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root()),
+            ),
+            "modules".into() => fs.create_node(
+                current_task,
+                StubEmptyFile::new_node("/proc/modules"),
+                FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root()),
+            ),
+            "pagetypeinfo".into() => fs.create_node(
+                current_task,
+                StubEmptyFile::new_node("/proc/pagetypeinfo"),
+                FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root()),
+            ),
+            "slabinfo".into() => fs.create_node(
+                current_task,
+                StubEmptyFile::new_node("/proc/slabinfo"),
+                FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root()),
+            ),
+            "uid_cputime".into() => {
+                let mut dir = StaticDirectoryBuilder::new(fs);
+                dir.entry(
+                    current_task,
+                    "remove_uid_range",
+                    StubEmptyFile::new_node("/proc/uid_cputime/remove_uid_range"),
+                    mode!(IFREG, 0o222),
+                );
+                dir.entry(
+                    current_task,
+                    "show_uid_stat",
+                    StubEmptyFile::new_node("/proc/uid_cputime/show_uid_stat"),
+                    mode!(IFREG, 0444),
+                );
+                dir.build(current_task)
+            },
+            "uid_io".into() => {
+                let mut dir = StaticDirectoryBuilder::new(fs);
+                dir.entry(
+                    current_task,
+                    "stats",
+                    StubEmptyFile::new_node("/proc/uid_io/stats"),
+                    mode!(IFREG, 0o444),
+                );
+                dir.build(current_task)
+            },
+            "uid_procstat".into() => {
+                let mut dir = StaticDirectoryBuilder::new(fs);
+                dir.entry(
+                    current_task,
+                    "set",
+                    StubEmptyFile::new_node("/proc/uid_procstat/set"),
+                    mode!(IFREG, 0o222),
+                );
+                dir.build(current_task)
+            },
             "version".into() => fs.create_node(
                 current_task,
                 StubEmptyFile::new_node_with_bug("/proc/version", 309002311),
+                FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root()),
+            ),
+            "vmallocinfo".into() => fs.create_node(
+                current_task,
+                StubEmptyFile::new_node("/proc/vmallocinfo"),
+                FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root()),
+            ),
+            "vmstat".into() => fs.create_node(
+                current_task,
+                StubEmptyFile::new_node("/proc/vmstat"),
+                FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root()),
+            ),
+            "zoneinfo".into() => fs.create_node(
+                current_task,
+                StubEmptyFile::new_node("/proc/zoneinfo"),
                 FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root()),
             ),
         };
