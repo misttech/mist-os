@@ -36,6 +36,7 @@ typedef uint8_t vfs_internal_sharing_mode_t;
 
 // Handle to a VFS object capable of serving nodes.
 typedef struct vfs_internal_vfs vfs_internal_vfs_t;
+
 // Handle to a node/directory entry.
 typedef struct vfs_internal_node vfs_internal_node_t;
 
@@ -45,9 +46,14 @@ typedef void (*vfs_internal_destroy_cookie_t)(void* cookie);
 // Callback to connect a service node to `request`.
 typedef zx_status_t (*vfs_internal_svc_connector_t)(const void* cookie, zx_handle_t request);
 
+// Callback to populate contents of a pseudo-file during open.
 typedef zx_status_t (*vfs_internal_read_handler_t)(void* cookie, const char** data_out,
                                                    size_t* len_out);
+
+// Callback to release any buffers the pseudo-file implementation may allocate during open.
 typedef void (*vfs_internal_release_buffer_t)(void* cookie);
+
+// Callback to consume file contents when a pseudo-file is closed.
 typedef zx_status_t (*vfs_internal_write_handler_t)(const void* cookie, const char* data,
                                                     size_t len);
 
@@ -132,6 +138,32 @@ zx_status_t vfs_internal_composed_svc_dir_add(vfs_internal_node_t* dir,
 // compatible with the fuchsia.io protocol.
 zx_status_t vfs_internal_composed_svc_dir_set_fallback(vfs_internal_node_t* dir,
                                                        zx_handle_t fallback_channel);
+
+// Entries in a lazy directory.
+typedef struct vfs_internal_lazy_entry {
+  uint64_t id;
+  const char* name;
+  uint32_t type;
+} vfs_internal_lazy_entry_t;
+
+// Callback used to query the contents of a lazy directory.
+typedef void (*vfs_internal_get_contents_t)(void* cookie, vfs_internal_lazy_entry** entries_out,
+                                            size_t* len_out);
+
+// Callback used to get a lazy directory entry.
+typedef zx_status_t (*vfs_internal_get_entry_t)(void* cookie, vfs_internal_node_t** node_out,
+                                                uint64_t id, const char* name);
+
+// Context that encapsulates the state of a lazy directory.
+typedef struct vfs_internal_lazy_dir_context {
+  void* cookie;
+  vfs_internal_get_contents_t get_contents;
+  vfs_internal_get_entry_t get_entry;
+} vfs_internal_lazy_dir_context_t;
+
+// Create a new lazy directory node. The state of `context` must outlive the directory entry.
+zx_status_t vfs_internal_lazy_dir_create(const vfs_internal_lazy_dir_context* context,
+                                         vfs_internal_node_t** out_vnode);
 
 // NOLINTEND(modernize-use-using)
 

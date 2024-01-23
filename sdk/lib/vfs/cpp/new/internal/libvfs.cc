@@ -15,6 +15,7 @@
 #include <variant>
 
 #include <fbl/ref_ptr.h>
+#include <src/storage/lib/vfs/cpp/lazy_dir.h>
 #include <src/storage/lib/vfs/cpp/pseudo_dir.h>
 #include <src/storage/lib/vfs/cpp/pseudo_file.h>
 #include <src/storage/lib/vfs/cpp/remote_dir.h>
@@ -53,8 +54,9 @@ static_assert(static_cast<vfs_internal_sharing_mode_t>(DefaultSharingMode::kDupl
 static_assert(static_cast<vfs_internal_sharing_mode_t>(DefaultSharingMode::kCloneCow) ==
               VFS_INTERNAL_SHARING_MODE_COW);
 
+// Implements `vfs::ComposedServiceDir` functionality using the in-tree VFS.
 // TODO(https://fxbug.dev/309685624): Remove when all callers have migrated.
-class ComposedServiceDir final : public fs::PseudoDir {
+class LibvfsComposedServiceDir final : public fs::PseudoDir {
  public:
   zx_status_t Lookup(std::string_view name, fbl::RefPtr<fs::Vnode>* out) override {
     zx_status_t status = fs::PseudoDir::Lookup(name, out);
@@ -93,14 +95,32 @@ class ComposedServiceDir final : public fs::PseudoDir {
   }
 
  private:
-  friend fbl::internal::MakeRefCountedHelper<ComposedServiceDir>;
-  friend fbl::RefPtr<ComposedServiceDir>;
+  friend fbl::internal::MakeRefCountedHelper<LibvfsComposedServiceDir>;
+  friend fbl::RefPtr<LibvfsComposedServiceDir>;
 
   fidl::ClientEnd<fuchsia_io::Directory> fallback_dir_;
 
   // The collection of services that have been looked up on the fallback directory. These services
   // just forward connection requests to the fallback directory.
   mutable std::map<std::string, fbl::RefPtr<fs::Service>, std::less<>> fallback_services_;
+};
+
+// Implements in-tree `fs::LazyDir` using C callbacks defined in `vfs_internal_lazy_dir_context_t`.
+// TODO(https://fxbug.dev/309685624): Remove when all callers have migrated.
+
+class LibvfsLazyDir final : public fs::LazyDir {
+ public:
+  explicit LibvfsLazyDir(const vfs_internal_lazy_dir_context_t* context) : context_(*context) {}
+
+ protected:
+  friend fbl::internal::MakeRefCountedHelper<LibvfsLazyDir>;
+  friend fbl::RefPtr<LibvfsLazyDir>;
+
+  void GetContents(fbl::Vector<LazyEntry>* out_vector) override;
+  zx_status_t GetFile(fbl::RefPtr<Vnode>* out_vnode, uint64_t id, fbl::String name) override;
+
+ private:
+  vfs_internal_lazy_dir_context_t context_;
 };
 
 }  // namespace
@@ -113,7 +133,7 @@ typedef struct vfs_internal_node {
   using NodeVariant =
       std::variant<fbl::RefPtr<fs::PseudoDir>, fbl::RefPtr<fs::Service>, fbl::RefPtr<fs::RemoteDir>,
                    fbl::RefPtr<fs::VmoFile>, fbl::RefPtr<fs::BufferedPseudoFile>,
-                   fbl::RefPtr<ComposedServiceDir>>;
+                   fbl::RefPtr<LibvfsComposedServiceDir>, fbl::RefPtr<LibvfsLazyDir>>;
   NodeVariant node;
 
   template <typename T>
@@ -303,7 +323,7 @@ __EXPORT zx_status_t vfs_internal_composed_svc_dir_create(vfs_internal_node_t** 
   if (!out_vnode) {
     return ZX_ERR_INVALID_ARGS;
   }
-  *out_vnode = new vfs_internal_node_t{.node = fbl::MakeRefCounted<ComposedServiceDir>()};
+  *out_vnode = new vfs_internal_node_t{.node = fbl::MakeRefCounted<LibvfsComposedServiceDir>()};
   return ZX_OK;
 }
 
@@ -313,7 +333,7 @@ __EXPORT zx_status_t vfs_internal_composed_svc_dir_add(vfs_internal_node_t* dir,
   if (!dir || !service_node || !name) {
     return ZX_ERR_INVALID_ARGS;
   }
-  ComposedServiceDir* downcasted = dir->Downcast<ComposedServiceDir>();
+  LibvfsComposedServiceDir* downcasted = dir->Downcast<LibvfsComposedServiceDir>();
   if (!downcasted) {
     return ZX_ERR_WRONG_TYPE;
   }
@@ -325,17 +345,52 @@ __EXPORT zx_status_t vfs_internal_composed_svc_dir_set_fallback(vfs_internal_nod
   if (!dir) {
     return ZX_ERR_INVALID_ARGS;
   }
-  ComposedServiceDir* downcasted = dir->Downcast<ComposedServiceDir>();
+  LibvfsComposedServiceDir* downcasted = dir->Downcast<LibvfsComposedServiceDir>();
   if (!downcasted) {
     return ZX_ERR_WRONG_TYPE;
   }
-  // TODO(https://fxbug.dev/293936429): We might have to relax this check, as VmoFile should
-  // gracefully handle this case. The existing SDK VFS node constructors are infallible even when
-  // `vmo` is invalid.
   if (fallback_channel == ZX_HANDLE_INVALID) {
     return ZX_ERR_BAD_HANDLE;
   }
   downcasted->SetFallback(fidl::ClientEnd<fuchsia_io::Directory>{zx::channel(fallback_channel)});
+  return ZX_OK;
+}
+
+namespace {
+
+void LibvfsLazyDir::GetContents(fbl::Vector<LazyEntry>* out_vector) {
+  vfs_internal_lazy_entry_t* entries;
+  size_t num_entries;
+  context_.get_contents(context_.cookie, &entries, &num_entries);
+  out_vector->reset();
+  out_vector->reserve(num_entries);
+  for (size_t i = 0; i < num_entries; ++i) {
+    out_vector->push_back(LazyEntry{
+        .id = entries[i].id,
+        .name = entries[i].name,
+        .type = entries[i].type,
+    });
+  }
+}
+
+zx_status_t LibvfsLazyDir::GetFile(fbl::RefPtr<Vnode>* out_vnode, uint64_t id, fbl::String name) {
+  vfs_internal_node_t* node;
+  if (zx_status_t status = context_.get_entry(context_.cookie, &node, id, name.data());
+      status != ZX_OK) {
+    return status;
+  }
+  *out_vnode = node->AsNode();
+  return ZX_OK;
+}
+
+}  // namespace
+
+__EXPORT zx_status_t vfs_internal_lazy_dir_create(const vfs_internal_lazy_dir_context* context,
+                                                  vfs_internal_node_t** out_vnode) {
+  if (!context || !out_vnode || !context->cookie || !context->get_contents || !context->get_entry) {
+    return ZX_ERR_INVALID_ARGS;
+  }
+  *out_vnode = new vfs_internal_node_t{.node = fbl::MakeRefCounted<LibvfsLazyDir>(context)};
   return ZX_OK;
 }
 

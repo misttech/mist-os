@@ -11,8 +11,6 @@
 
 #include <string>
 
-// TODO(https://fxbug.dev/293936429): Implement this or migrate out of tree callers.
-
 namespace vfs {
 
 // A |LazyDir| a base class for directories that dynamically update their
@@ -38,7 +36,7 @@ namespace vfs {
 // TODO(https://fxbug.dev/309685624): Remove LazyDir once all out-of-tree users have been migrated.
 class LazyDir : public vfs::internal::Node {
  public:
-  LazyDir() : Node(nullptr) { ZX_PANIC("TODO(https://fxbug.dev/293936429)"); }
+  LazyDir() : Node(MakeLazyDir(this)) {}
   ~LazyDir() override = default;
 
   // Structure storing a single entry in the directory.
@@ -55,7 +53,7 @@ class LazyDir : public vfs::internal::Node {
 
  protected:
   // Get the contents of the directory in an output vector.
-  virtual void GetContents(LazyEntryVector* out_vector) const = 0;
+  virtual void GetContents(std::vector<LazyEntry>* out_vector) const = 0;
 
   // Get the reference to a single file. The id and name of the entry as
   // returned from GetContents are passed in to assist locating the file.
@@ -66,7 +64,55 @@ class LazyDir : public vfs::internal::Node {
   uint64_t GetStartingId() const { return kDotId; }
 
  private:
+  static inline vfs_internal_node_t* MakeLazyDir(LazyDir* self) {
+    // *WARNING*: `self` is not fully constructed at this point, so these callbacks are not safe
+    // to invoke yet. The function to create the underlying node only copies the pointers and only
+    // allows invoking them once the object is in a usable state.
+    vfs_internal_lazy_dir_context context{
+        .cookie = self,
+        .get_contents = &GetContentsCallback,
+        .get_entry = &GetEntryCallback,
+    };
+    vfs_internal_node_t* lazy_dir;
+    ZX_ASSERT(vfs_internal_lazy_dir_create(&context, &lazy_dir) == ZX_OK);
+    return lazy_dir;
+  }
+
+  static void GetContentsCallback(void* self, vfs_internal_lazy_entry** entries_out,
+                                  size_t* len_out) {
+    LazyDir* lazy_dir = static_cast<LazyDir*>(self);
+    lazy_dir->RefreshEntries();
+    *entries_out = lazy_dir->entries_internal_.data();
+    *len_out = lazy_dir->entries_internal_.size();
+  }
+
+  static zx_status_t GetEntryCallback(void* self, vfs_internal_node_t** node_out, uint64_t id,
+                                      const char* name) {
+    LazyDir* lazy_dir = static_cast<LazyDir*>(self);
+    Node* node;
+    if (zx_status_t status = lazy_dir->GetFile(&node, id, std::string(name)); status != ZX_OK) {
+      return status;
+    }
+    *node_out = node->handle();
+    return ZX_OK;
+  }
+
+  void RefreshEntries() {
+    entries_ = {};
+    entries_internal_ = {};
+    GetContents(&entries_);
+    for (const auto& entry : entries_) {
+      entries_internal_.push_back(vfs_internal_lazy_entry_t{
+          .id = entry.id,
+          .name = entry.name.c_str(),
+          .type = entry.type,
+      });
+    }
+  }
+
   static constexpr uint64_t kDotId = 1u;
+  std::vector<LazyEntry> entries_;                           // To keep memory of entry names alive.
+  std::vector<vfs_internal_lazy_entry_t> entries_internal_;  // Pointers to above entries.
 } ZX_DEPRECATED_SINCE(1, 16, "Use PseudoDir or RemoteDir instead.");
 
 }  // namespace vfs

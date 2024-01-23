@@ -259,6 +259,7 @@ sdk_source_set("cpp_new") {
 test("vfs_cpp_new_unittests") {
   sources = [
     "new/tests/composed_service_dir_test.cc",
+    "new/tests/lazy_dir_test.cc",
     "new/tests/pseudo_dir_test.cc",
     "new/tests/pseudo_file_test.cc",
     "new/tests/remote_dir_test.cc",
