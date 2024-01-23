@@ -69,10 +69,9 @@ TEST_F(DeviceEnumerationTest, Vim3Test) {
       // See b/296738636 for more information.
       // "sys/platform/05:03:2d/vim3_usb_phy/vim3_usb_phy/xhci/xhci/xhci/usb-bus/000/usb-hub",
 
-      // Thermal
-      "sys/platform/05:06:28",
-      "sys/platform/05:06:a",
-      "class/thermal/000",
+      // Temperature Sensors / Trip Point Devices.
+      "sys/platform/05:06:39/pll-temp-sensor/aml-trip-device",  // PLL Temperature Sensor
+      "sys/platform/05:06:40/ddr-temp-sensor/aml-trip-device",  // DDR Temperature Sensor
 
       // GPIO
       "sys/platform/05:00:2/i2c-0/aml-i2c/i2c/i2c-0-32/gpio-expander/ti-tca6408a/gpio/gpio-107",

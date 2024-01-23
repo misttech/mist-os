@@ -10,9 +10,9 @@
                 state: 1,
                 trip_points: [
                     {
-                        sensor: '/dev/sys/platform/05:06:a/thermal',
-                        deactivate_below: 30,  // 87.5C
-                        activate_at: 40,  // 90C
+                        sensor: '/dev/sys/platform/05:06:39/pll-temp-sensor/aml-trip-device',
+                        deactivate_below: 30, // 87.5C
+                        activate_at: 40, // 90C
                     },
                 ],
             },
@@ -20,9 +20,9 @@
                 state: 2,
                 trip_points: [
                     {
-                        sensor: '/dev/sys/platform/05:06:a/thermal',
-                        deactivate_below: 50,  // 92.5C
-                        activate_at: 60,  // 95C
+                        sensor: '/dev/sys/platform/05:06:39/pll-temp-sensor/aml-trip-device',
+                        deactivate_below: 50, // 92.5C
+                        activate_at: 60, // 95C
                     },
                 ],
             },
@@ -30,9 +30,9 @@
                 state: 3,
                 trip_points: [
                     {
-                        sensor: '/dev/sys/platform/05:06:a/thermal',
+                        sensor: '/dev/sys/platform/05:06:39/pll-temp-sensor/aml-trip-device',
                         deactivate_below: 70, // 97.5C
-                        activate_at: 80,  // 100C
+                        activate_at: 80, // 100C
                     },
                 ],
             },

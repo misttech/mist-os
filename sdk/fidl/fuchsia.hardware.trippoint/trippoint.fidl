@@ -7,6 +7,12 @@ library fuchsia.hardware.trippoint;
 using fuchsia.hardware.temperature;
 using zx;
 
+@available(added=18)
+type TripDeviceMetadata = struct {
+    /// Critical temperature in degrees Celsius.
+    critical_temp_celsius float32;
+};
+
 /// Denotes the type of a particular trip point.
 @available(added=18)
 type TripPointType = flexible enum : uint16 {

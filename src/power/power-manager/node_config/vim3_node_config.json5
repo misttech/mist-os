@@ -21,7 +21,7 @@
         type: "TemperatureHandler",
         name: "temperature_soc_pll",
         config: {
-            driver_path: "/dev/sys/platform/05:06:a/thermal",
+            driver_path: "/dev/sys/platform/05:06:39/pll-temp-sensor/aml-trip-device",
             cache_duration_ms: 50,
         },
     },
@@ -43,6 +43,7 @@
         config: {
             enable_client_state_connector: true,
         },
+
         // platform_metrics are disabled for this node.
     },
     {

@@ -191,6 +191,7 @@
 //src/devices/sysmem/drivers/sysmem:sysmem-driver
 //src/devices/tee/drivers/optee:optee-driver
 //src/devices/temperature/drivers/shtv3:shtv3-driver
+//src/devices/temperature/drivers/aml-trip:aml-trip-driver
 //src/devices/temperature/drivers/tmp112:tmp112-driver
 //src/devices/tests/autobind:driver
 //src/devices/tests/bind-fail-test:fuchsia_driver

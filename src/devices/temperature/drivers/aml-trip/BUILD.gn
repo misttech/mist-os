@@ -1,0 +1,60 @@
+# Copyright 2023 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/bind/bind.gni")
+import("//build/components.gni")
+import("//build/drivers.gni")
+
+driver_bind_rules("aml-trip-bind") {
+  rules = "aml-trip.bind"
+  bind_output = "aml-trip.bindbc"
+  tests = "aml-trip-bind-test.json"
+  deps = [
+    "//src/devices/bind/fuchsia.amlogic.platform",
+    "//src/devices/bind/fuchsia.clock",
+    "//src/devices/bind/fuchsia.platform",
+  ]
+}
+
+fuchsia_driver("aml-trip-driver") {
+  output_name = "aml-trip"
+
+  sources = [
+    "aml-trip-device.cc",
+    "aml-trip.cc",
+    "util.cc",
+  ]
+  deps = [
+    ":aml-trip-bind",
+    "//sdk/fidl/fuchsia.driver.compat:fuchsia.driver.compat_cpp",
+    "//sdk/fidl/fuchsia.hardware.clock:fuchsia.hardware.clock_cpp",
+    "//sdk/fidl/fuchsia.hardware.platform.bus:fuchsia.hardware.platform.bus_cpp",
+    "//sdk/fidl/fuchsia.hardware.platform.device:fuchsia.hardware.platform.device_cpp",
+    "//sdk/fidl/fuchsia.hardware.trippoint:fuchsia.hardware.trippoint_bindlib_cpp",
+    "//sdk/fidl/fuchsia.hardware.trippoint:fuchsia.hardware.trippoint_cpp",
+    "//sdk/lib/driver/compat/cpp",
+    "//sdk/lib/driver/component/cpp:cpp",
+    "//sdk/lib/driver/logging/cpp:cpp",
+    "//sdk/lib/driver/runtime:driver_runtime_cpp",
+    "//src/devices/bin/driver_runtime",
+    "//src/devices/bus/lib/device-protocol-pdev",
+    "//src/devices/lib/driver:driver_runtime",
+    "//src/devices/lib/mmio",
+    "//zircon/system/ulib/fbl",
+    "//zircon/system/ulib/hwreg",
+    "//zircon/system/ulib/zx",
+  ]
+}
+
+fuchsia_driver_component("aml-trip") {
+  component_name = "aml-trip"
+  deps = [ ":aml-trip-driver" ]
+  info = "aml-trip-info.json"
+  manifest = "meta/aml-trip.cml"
+}
+
+fuchsia_driver_package("package") {
+  package_name = "aml-trip"
+  driver_components = [ ":aml-trip" ]
+}

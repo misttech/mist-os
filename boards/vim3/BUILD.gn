@@ -183,6 +183,11 @@ board_input_bundle("main_bundle") {
       driver_components = [ "meta/aml-thermal.cm" ]
     },
     {
+      package_target = "//src/devices/temperature/drivers/aml-trip:package"
+      package_set = "bootfs"
+      driver_components = [ "meta/aml-trip.cm" ]
+    },
+    {
       package_target = "//src/devices/usb/drivers/dwc2:package"
       package_set = "bootfs"
       driver_components = [ "meta/dwc2.cm" ]

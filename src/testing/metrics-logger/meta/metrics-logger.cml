@@ -30,6 +30,11 @@
             path: "/dev/class/thermal",
         },
         {
+            directory: "dev-trippoint",
+            rights: [ "r*" ],
+            path: "/dev/class/trippoint",
+        },
+        {
             directory: "dev-power-sensor",
             rights: [ "r*" ],
             path: "/dev/class/power-sensor",

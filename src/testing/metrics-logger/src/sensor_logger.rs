@@ -17,9 +17,11 @@ use {
     tracing::{error, info},
 };
 
-// The fuchsia.hardware.temperature.Device is composed into fuchsia.hardware.thermal.Device, so
-// drivers are found in two directories.
-const TEMPERATURE_SERVICE_DIRS: [&str; 2] = ["/dev/class/temperature", "/dev/class/thermal"];
+// The fuchsia.hardware.temperature.Device is composed into fuchsia.hardware.thermal.Device, and
+// fuchsia.hardware.trippoint also provides temperature sensors so this driver is found in
+// three directories.
+const TEMPERATURE_SERVICE_DIRS: [&str; 3] =
+    ["/dev/class/temperature", "/dev/class/thermal", "/dev/class/trippoint"];
 const POWER_SERVICE_DIRS: [&str; 1] = ["/dev/class/power-sensor"];
 
 // Type aliases for convenience.

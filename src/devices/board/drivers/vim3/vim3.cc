@@ -118,6 +118,12 @@ int Vim3::Thread() {
     init_txn_->Reply(ZX_ERR_INTERNAL);
     return status;
   }
+  if ((status = TemperatureInit()) != ZX_OK) {
+    zxlogf(ERROR, "TemperatureInit() failed: %d", status);
+    init_txn_->Reply(ZX_ERR_INTERNAL);
+    return status;
+  }
+
   // ClkInit() must be called after other subsystems that bind to clock have had a chance to add
   // their init steps.
   if ((status = ClkInit()) != ZX_OK) {
@@ -192,11 +198,7 @@ int Vim3::Thread() {
     init_txn_->Reply(ZX_ERR_INTERNAL);
     return status;
   }
-  if ((status = ThermalInit()) != ZX_OK) {
-    zxlogf(ERROR, "ThermalInit() failed: %d", status);
-    init_txn_->Reply(ZX_ERR_INTERNAL);
-    return status;
-  }
+
   if ((status = VideoInit()) != ZX_OK) {
     zxlogf(ERROR, "VideoInit() failed: %d", status);
     init_txn_->Reply(ZX_ERR_INTERNAL);

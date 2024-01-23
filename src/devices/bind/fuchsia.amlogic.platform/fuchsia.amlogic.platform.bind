@@ -79,6 +79,8 @@ extend uint fuchsia.BIND_PLATFORM_DEV_DID {
   A1_USB_PHY = 0x36,
   AUDIO_COMPOSITE = 0x37,
   ADC = 0x38,
+  TEMP_SENSOR_PLL = 0x39,
+  TEMP_SENSOR_DDR = 0x40,
 };
 
 
