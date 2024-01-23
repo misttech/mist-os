@@ -15,6 +15,7 @@
 #include <zircon/syscalls/smc.h>
 
 #include <bind/fuchsia/cpp/bind.h>
+#include <bind/fuchsia/hardware/rpmb/cpp/bind.h>
 #include <bind/fuchsia/platform/cpp/bind.h>
 #include <bind/fuchsia/rpmb/cpp/bind.h>
 #include <fbl/algorithm.h>
@@ -73,7 +74,7 @@ static tee_thread_config_t tee_thread_cfg[] = {
      }}};
 
 const std::vector<fdf::BindRule> kRpmbRules = std::vector{fdf::MakeAcceptBindRule(
-    bind_fuchsia::FIDL_PROTOCOL, bind_fuchsia_rpmb::BIND_FIDL_PROTOCOL_DEVICE)};
+    bind_fuchsia_hardware_rpmb::SERVICE, bind_fuchsia_hardware_rpmb::SERVICE_ZIRCONTRANSPORT)};
 
 const std::vector<fdf::NodeProperty> kRpmbProperties = std::vector{
     fdf::MakeProperty(bind_fuchsia::FIDL_PROTOCOL, bind_fuchsia_rpmb::BIND_FIDL_PROTOCOL_DEVICE)};
