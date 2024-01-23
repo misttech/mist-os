@@ -284,6 +284,8 @@ board_input_bundle("main_bundle") {
     },
   ]
   kernel_cmdline = [
+    # TODO(b/322009732): Switch to a config api for these, when available.
+
     # Prefer using the built-in NIC to the CDC-ether interface.
     # TODO(https://fxbug.dev/117539): Update topopath when dwmac is off
     # netdevice migration.
@@ -291,6 +293,29 @@ board_input_bundle("main_bundle") {
 
     # Enable the Debug Access Port (DAP) for improved lockup/crash diagnostics.
     "kernel.arm64.debug.dap-rom-soc=amlogic-a311d",
+
+    # Physical page loaning and borrowing.
+    #
+    # These are enabled because vim3 requires physically contiguous
+    # framebuffers, which requires a significant contiguous_memory_size, which
+    # would strand pages when not used by sysmem buffers without these options.
+    "kernel.ppb.loan=true",
+    "kernel.ppb.borrow-in-supplypages=true",
+    "kernel.ppb.borrow-on-mru=true",
+    "kernel.ppb.replace-on-unloan=true",
+
+    # "k ppb stats" (see also "k ppb help") can be used to check whether the
+    # vast majority of loaned pages are absorbed by using them for pager-backed
+    # VMOs when running a relevant workload (not just mostly idle), or if some
+    # loaned pages remain stranded even as the system approaches OOM. As long as
+    # loaned free pages hits a low fraction of this value before any overall
+    # OOM, pages aren't being stranded when it really matters.
+    #
+    # 384 MiB, but with unused pages loaned back to zircon (see kernel.ppb
+    # settings above). This value leaves some loaned and free pages after boot,
+    # where not all the loaned pages are used by pager-backed VMOs. Whether
+    # those pages get absorbed later by pager-backed VMOs depends on workload.
+    "driver.sysmem.contiguous_memory_size=402653184",
   ]
 }
 
