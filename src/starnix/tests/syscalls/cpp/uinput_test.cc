@@ -13,6 +13,7 @@
 #include <cerrno>
 #include <cstddef>
 #include <cstdint>
+#include <cstdio>
 #include <set>
 #include <string>
 #include <vector>
@@ -225,27 +226,36 @@ TEST_F(UinputTest, UiDevDestroy) {
 }
 
 TEST_F(UinputTest, WriteEVKEY) {
+  // Need to create Keyboard device first
+  uinput_setup usetup{.id = {.bustype = BUS_USB, .vendor = GOOGLE_VENDOR_ID, .product = 2}};
+  strcpy(usetup.name, "Example device");
+  int r = ioctl(uinput_fd_.get(), UI_DEV_SETUP, &usetup);
+  ASSERT_EQ(r, 0);
+
+  r = ioctl(uinput_fd_.get(), UI_DEV_CREATE);
+  EXPECT_EQ(r, 0);
+
   /* timestamp values are ignored */
   struct timeval t = {.tv_sec = 0, .tv_usec = 0};
 
   // Key press
   struct input_event press_e = {.time = t, .type = EV_KEY, .code = KEY_SPACE, .value = 1};
   auto res = write(uinput_fd_.get(), &press_e, sizeof(press_e));
-  EXPECT_EQ(res, 24);
+  EXPECT_EQ(res, static_cast<ssize_t>(sizeof(press_e)));
 
   // Report the event
   struct input_event sync_e = {.time = t, .type = EV_SYN, .code = SYN_REPORT, .value = 0};
   res = write(uinput_fd_.get(), &sync_e, sizeof(sync_e));
-  EXPECT_EQ(res, 24);
+  EXPECT_EQ(res, static_cast<ssize_t>(sizeof(sync_e)));
 
   // Key release
   struct input_event release_e = {.time = t, .type = EV_KEY, .code = KEY_SPACE, .value = 0};
-  res = write(uinput_fd_.get(), &release_e, sizeof(press_e));
-  EXPECT_EQ(res, 24);
+  res = write(uinput_fd_.get(), &release_e, sizeof(release_e));
+  EXPECT_EQ(res, static_cast<ssize_t>(sizeof(release_e)));
 
   // Report the event
   res = write(uinput_fd_.get(), &sync_e, sizeof(sync_e));
-  EXPECT_EQ(res, 24);
+  EXPECT_EQ(res, static_cast<ssize_t>(sizeof(sync_e)));
 }
 
 }  // namespace

@@ -5,16 +5,19 @@
 use crate::{
     device::{
         input::{add_and_register_input_device, InputFile},
+        input_event_conversion::LinuxKeyboardEventParser,
         DeviceOps,
     },
     mm::MemoryAccessorExt,
     task::CurrentTask,
-    vfs::{default_ioctl, fileops_impl_seekless, FileObject, FileOps, FsNode},
+    vfs::{self, default_ioctl, fileops_impl_seekless, FileObject, FileOps, FsNode},
 };
 use bit_vec::BitVec;
-use fidl_fuchsia_ui_test_input::{self as futinput, RegistryRegisterKeyboardRequest};
+use fidl_fuchsia_ui_test_input::{
+    self as futinput, KeyboardSimulateKeyEventRequest, RegistryRegisterKeyboardRequest,
+};
 use fuchsia_zircon as zx;
-use starnix_logging::{log_info, log_trace, log_warn};
+use starnix_logging::{log_info, log_warn};
 use starnix_sync::{FileOpsIoctl, FileOpsRead, FileOpsWrite, Locked, Mutex};
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
 use starnix_uapi::{
@@ -52,7 +55,7 @@ pub fn create_uinput_device(
 #[allow(dead_code)]
 enum CreatedDevice {
     None,
-    Keyboard(futinput::KeyboardSynchronousProxy),
+    Keyboard(futinput::KeyboardSynchronousProxy, LinuxKeyboardEventParser),
     Touchscreen,
 }
 
@@ -182,7 +185,8 @@ impl UinputDevice {
                     DeviceType::Keyboard => {
                         let (key_client, key_server) =
                             fidl::endpoints::create_sync_proxy::<futinput::KeyboardMarker>();
-                        inner.created_device = CreatedDevice::Keyboard(key_client);
+                        inner.created_device =
+                            CreatedDevice::Keyboard(key_client, LinuxKeyboardEventParser::create());
                         key_server
                     }
                     DeviceType::Touchscreen => {
@@ -287,17 +291,41 @@ impl FileOps for Arc<UinputDevice> {
     fn write(
         &self,
         _locked: &mut Locked<'_, FileOpsWrite>,
-        _file: &crate::vfs::FileObject,
+        _file: &vfs::FileObject,
         _current_task: &crate::task::CurrentTask,
         _offset: usize,
-        data: &mut dyn crate::vfs::buffers::InputBuffer,
+        data: &mut dyn vfs::buffers::InputBuffer,
     ) -> Result<usize, Errno> {
         let content = data.read_all()?;
         let event = uapi::input_event::read_from(&content)
             .expect("UInput could not create input_event from InputBuffer data.");
-        log_trace!("event.type = {}", event.type_);
-        log_trace!("event.code = {}", event.code);
-        log_trace!("event.value = {}", event.value);
+
+        let mut inner = self.inner.lock();
+
+        match &mut inner.created_device {
+            CreatedDevice::Keyboard(proxy, parser) => {
+                let input_report = parser.handle(event);
+                match input_report {
+                    Ok(Some(report)) => {
+                        if let Some(keyboard_report) = report.keyboard {
+                            let res = proxy.simulate_key_event(
+                                &KeyboardSimulateKeyEventRequest {
+                                    report: Some(keyboard_report),
+                                    ..Default::default()
+                                },
+                                zx::Time::INFINITE,
+                            );
+                            if res.is_err() {
+                                return error!(EIO);
+                            }
+                        }
+                    }
+                    Ok(None) => (),
+                    Err(e) => return Err(e),
+                }
+            }
+            CreatedDevice::Touchscreen | CreatedDevice::None => return error!(EINVAL),
+        }
 
         Ok(content.len())
     }
@@ -305,10 +333,10 @@ impl FileOps for Arc<UinputDevice> {
     fn read(
         &self,
         _locked: &mut Locked<'_, FileOpsRead>,
-        _file: &crate::vfs::FileObject,
+        _file: &vfs::FileObject,
         _current_task: &crate::task::CurrentTask,
         _offset: usize,
-        _data: &mut dyn crate::vfs::buffers::OutputBuffer,
+        _data: &mut dyn vfs::buffers::OutputBuffer,
     ) -> Result<usize, Errno> {
         log_warn!("uinput FD does not support read().");
         error!(EINVAL)
@@ -352,15 +380,17 @@ mod test {
         mm::MemoryAccessor,
         task::Kernel,
         testing::{create_kernel_task_and_unlocked, map_memory, AutoReleasableTask},
-        vfs::FileHandle,
+        vfs::{FileHandle, VecInputBuffer},
     };
     use fidl::endpoints::create_sync_proxy_and_stream;
+    use fidl_fuchsia_input::Key;
     use fuchsia_async as fasync;
     use futures::{channel::mpsc, StreamExt};
     use starnix_sync::Unlocked;
     use starnix_uapi::user_address::UserAddress;
     use std::thread;
     use test_case::test_case;
+    use zerocopy::AsBytes;
 
     fn make_kernel_objects<'l>(
         file: Arc<UinputDevice>,
@@ -669,5 +699,150 @@ mod test {
             dev.ioctl(&mut locked, &file_object, &current_task, uapi::UI_DEV_SETUP, address.into());
         let res = dev.ui_dev_create_inner(&current_task, None);
         assert_eq!(res, error!(EPERM))
+    }
+
+    // In practice Uinput write() will send converted events to Input Pipeline via input_helper,
+    // but for testing purposes we create a mock server end and verify that it receives the
+    // correct KeyboardRequests from Uinput's CreatedDevice when write() calls are made.
+    #[fasync::run(2, test)]
+    async fn keyboard_write() {
+        let dev = UinputDevice::new();
+        let (_kernel, current_task, file_object, mut locked) = make_kernel_objects(dev.clone());
+        let mut locked_ioctl = locked.cast_locked::<FileOpsIoctl>();
+        let address = map_memory(
+            &current_task,
+            UserAddress::default(),
+            std::mem::size_of::<uapi::uinput_setup>() as u64,
+        );
+        let _ = dev.ioctl(
+            &mut locked_ioctl,
+            &file_object,
+            &current_task,
+            uapi::UI_DEV_SETUP,
+            address.into(),
+        );
+
+        let (key_client, mut key_server) =
+            fidl::endpoints::create_sync_proxy_and_stream::<futinput::KeyboardMarker>()
+                .expect("create Keyboard proxy and stream");
+        dev.inner.lock().created_device =
+            CreatedDevice::Keyboard(key_client, LinuxKeyboardEventParser::create());
+
+        let (input_id, device_type) = match dev.inner.lock().get_id_and_device_type() {
+            Some((id, dev)) => (id, dev),
+            None => panic!("Could not get device ID and type."),
+        };
+        add_and_register_input_device(&current_task, VirtualDevice { input_id, device_type });
+        new_device();
+
+        let expected_pressed_keys: Vec<Vec<Key>> =
+            vec![vec![Key::A], vec![Key::A, Key::B], vec![Key::B], vec![]];
+        let mut expected_keys = expected_pressed_keys.into_iter();
+
+        // Spawn a separate thread for Keyboard's server to wait for KeyboardRequests
+        // sent from write() calls
+        let handle = thread::spawn(move || {
+            fasync::LocalExecutor::new().run_singlethreaded(async {
+                let mut num_received_events = 0;
+                while let Some(Ok(request)) = key_server.next().await {
+                    match request {
+                        futinput::KeyboardRequest::SimulateKeyEvent {
+                            payload:
+                                KeyboardSimulateKeyEventRequest {
+                                    report:
+                                        Some(fidl_fuchsia_input_report::KeyboardInputReport {
+                                            pressed_keys3,
+                                            ..
+                                        }),
+                                    ..
+                                },
+                            responder,
+                        } => {
+                            assert_eq!(pressed_keys3, expected_keys.next());
+                            let _ = responder.send();
+                        }
+                        _ => panic!("Registry handler received an unexpected request"),
+                    }
+                    num_received_events += 1;
+
+                    // 4 expected incoming events
+                    if num_received_events > 3 {
+                        break;
+                    }
+                }
+            })
+        });
+
+        let mut press_a_ev: VecInputBuffer = uapi::input_event {
+            type_: uapi::EV_KEY as u16,
+            code: uapi::KEY_A as u16,
+            value: 1,
+            ..Default::default()
+        }
+        .as_bytes()
+        .to_vec()
+        .into();
+
+        let mut press_b_ev: VecInputBuffer = uapi::input_event {
+            type_: uapi::EV_KEY as u16,
+            code: uapi::KEY_B as u16,
+            value: 1,
+            ..Default::default()
+        }
+        .as_bytes()
+        .to_vec()
+        .into();
+
+        let mut release_a_ev: VecInputBuffer = uapi::input_event {
+            type_: uapi::EV_KEY as u16,
+            code: uapi::KEY_A as u16,
+            value: 0,
+            ..Default::default()
+        }
+        .as_bytes()
+        .to_vec()
+        .into();
+
+        let mut release_b_ev: VecInputBuffer = uapi::input_event {
+            type_: uapi::EV_KEY as u16,
+            code: uapi::KEY_B as u16,
+            value: 0,
+            ..Default::default()
+        }
+        .as_bytes()
+        .to_vec()
+        .into();
+
+        let sync_ev = uapi::input_event {
+            type_: uapi::EV_SYN as u16,
+            code: uapi::SYN_REPORT as u16,
+            value: 0,
+            ..Default::default()
+        };
+
+        let mut locked_write = locked.cast_locked::<FileOpsWrite>();
+
+        let mut res = dev.write(&mut locked_write, &file_object, &current_task, 0, &mut press_a_ev);
+        assert_eq!(res, Ok(24));
+        let mut sync_buff: VecInputBuffer = sync_ev.clone().as_bytes().to_vec().into();
+        res = dev.write(&mut locked_write, &file_object, &current_task, 0, &mut sync_buff);
+        assert_eq!(res, Ok(24));
+        res = dev.write(&mut locked_write, &file_object, &current_task, 0, &mut press_b_ev);
+        assert_eq!(res, Ok(24));
+        sync_buff = sync_ev.clone().as_bytes().to_vec().into();
+        res = dev.write(&mut locked_write, &file_object, &current_task, 0, &mut sync_buff);
+        assert_eq!(res, Ok(24));
+        res = dev.write(&mut locked_write, &file_object, &current_task, 0, &mut release_a_ev);
+        assert_eq!(res, Ok(24));
+        sync_buff = sync_ev.clone().as_bytes().to_vec().into();
+        res = dev.write(&mut locked_write, &file_object, &current_task, 0, &mut sync_buff);
+        assert_eq!(res, Ok(24));
+        res = dev.write(&mut locked_write, &file_object, &current_task, 0, &mut release_b_ev);
+        assert_eq!(res, Ok(24));
+        sync_buff = sync_ev.as_bytes().to_vec().into();
+        res = dev.write(&mut locked_write, &file_object, &current_task, 0, &mut sync_buff);
+        assert_eq!(res, Ok(24));
+
+        handle.join().expect("stream panic");
     }
 }
