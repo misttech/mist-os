@@ -196,8 +196,12 @@ pub mod ioctl {
         let header = task.read_object(header_ref)?;
         match &*file.node().fsverity.lock() {
             FsVerityState::FsVerity => {
-                // TODO(b/314182708): Remove hardcoding of blocksize
-                let descriptor = file.node().ops().get_fsverity_descriptor(12)?;
+                let block_size = file.name.entry.node.fs().statfs(task)?.f_bsize as u32;
+                if !block_size.is_power_of_two() {
+                    return error!(EINVAL);
+                }
+                let descriptor =
+                    file.node().ops().get_fsverity_descriptor(block_size.ilog2() as u8)?;
                 let digest_algorithm = HashAlgorithm::from_u8(descriptor.hash_algorithm)
                     .ok_or_else(|| errno!(EINVAL))?;
                 if descriptor.hash_algorithm as u16 != header.digest_algorithm {
