@@ -12,12 +12,15 @@ rustc_binary("bin") {
   source_root = "src/main.rs"
   sources = [ "src/main.rs" ]
   deps = [
+    "//sdk/fidl/fuchsia.diagnostics:fuchsia.diagnostics_rust",
     "//src/diagnostics/archivist/testing/fidl:fuchsia.archivist.test_rust",
     "//src/lib/diagnostics/hierarchy/rust",
     "//src/lib/diagnostics/inspect/runtime/rust",
     "//src/lib/diagnostics/inspect/rust",
     "//src/lib/diagnostics/inspect/rust/testing:inspect_testing",
+    "//src/lib/diagnostics/log/rust",
     "//src/lib/fidl/rust/fidl",
+    "//src/lib/fidl_table_validation",
     "//src/lib/fuchsia",
     "//src/lib/fuchsia-async",
     "//src/lib/fuchsia-component",

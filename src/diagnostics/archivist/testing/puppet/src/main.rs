@@ -10,20 +10,35 @@
 //
 // For full documentation, see //src/diagnostics/archivist/testing/realm-factory/README.md
 
-use anyhow::Error;
+use anyhow::{Context, Error};
 use diagnostics_hierarchy::Property;
+use diagnostics_log::{OnInterestChanged, PublishOptions, Publisher};
 use fidl::endpoints::create_request_stream;
-use fuchsia_async::Timer;
+use fidl_fuchsia_archivist_test as fpuppet;
+use fidl_fuchsia_diagnostics::Severity;
+use fidl_table_validation::ValidFidlTable;
+use fuchsia_async::{TaskGroup, Timer};
 use fuchsia_component::server::ServiceFs;
 use fuchsia_inspect::{component, health::Reporter, Inspector};
 use fuchsia_zircon::Duration;
-use futures::{FutureExt, StreamExt, TryStreamExt};
-use tracing::error;
+use futures::{
+    channel::mpsc::{unbounded, UnboundedReceiver, UnboundedSender},
+    lock::Mutex,
+    FutureExt, StreamExt, TryStreamExt,
+};
+use std::sync::Arc;
+use tracing::{debug, error, info, warn};
 
-use fidl_fuchsia_archivist_test as fpuppet;
-
-#[fuchsia::main]
+// `logging = false` allows us to set the global default trace dispatcher
+// ourselves. This can only be done once and is usually handled by fuchsia::main.
+#[fuchsia::main(logging = false)]
 async fn main() -> Result<(), Error> {
+    let (sender, receiver) = unbounded::<InterestChangedEvent>();
+    subscribe_to_log_interest_changes(InterestChangedNotifier(sender))?;
+
+    // All connections share the same puppet_server instance.
+    let puppet_server = Arc::new(PuppetServer::new(receiver));
+
     let mut fs = ServiceFs::new();
     let _inspect_server_task = inspect_runtime::publish(
         component::inspector(),
@@ -32,19 +47,77 @@ async fn main() -> Result<(), Error> {
 
     fs.dir("svc").add_fidl_service(|stream: fpuppet::PuppetRequestStream| stream);
     fs.take_and_serve_directory_handle()?;
-    fs.for_each_concurrent(0, serve_puppet).await;
+    fs.for_each_concurrent(0, |stream| async {
+        serve_puppet(puppet_server.clone(), stream).await;
+    })
+    .await;
     Ok(())
 }
 
-async fn serve_puppet(mut stream: fpuppet::PuppetRequestStream) {
+fn subscribe_to_log_interest_changes(notifier: InterestChangedNotifier) -> Result<(), Error> {
+    // It's unfortunate we can't just create the publisher directly and register
+    // the interest listener without the roundtrip through tracing::dispatcher.
+    // We must call diagnostics_log::initialize because it initializes global
+    // state through private function calls.
+    diagnostics_log::initialize(PublishOptions::default().wait_for_initial_interest(false))
+        .expect("initialized tracing");
+    tracing::dispatcher::get_default(|dispatcher| {
+        let publisher: &Publisher = dispatcher.downcast_ref().unwrap();
+        publisher.set_interest_listener(notifier.clone());
+    });
+    Ok(())
+}
+
+#[derive(Clone)]
+struct InterestChangedEvent {
+    severity: Severity,
+}
+
+struct PuppetServer {
+    // A stream of noifications about interest changed events.
+    interest_changed: Mutex<UnboundedReceiver<InterestChangedEvent>>,
+    // Tasks waiting to be notified of interest changed events.
+    interest_waiters: Mutex<TaskGroup>,
+}
+
+impl PuppetServer {
+    fn new(receiver: UnboundedReceiver<InterestChangedEvent>) -> Self {
+        Self {
+            interest_changed: Mutex::new(receiver),
+            interest_waiters: Mutex::new(TaskGroup::new()),
+        }
+    }
+}
+
+// Notifies the puppet when log interest changes.
+// Together, `PuppetServer` and `InterestChangeNotifier` must gaurantee delivery
+// of all interest change notifications to clients (test cases) regardless of
+// whether a test case begins waiting for the interest change notification
+// before or after it is received by this component. Failure to deliver will
+// cause the test case to hang.
+#[derive(Clone)]
+struct InterestChangedNotifier(UnboundedSender<InterestChangedEvent>);
+
+impl OnInterestChanged for InterestChangedNotifier {
+    fn on_changed(&self, severity: &Severity) {
+        let sender = self.0.clone();
+        // Panic on failure since undelivered notifications may hang clients.
+        sender.unbounded_send(InterestChangedEvent { severity: *severity }).unwrap();
+    }
+}
+
+async fn serve_puppet(server: Arc<PuppetServer>, mut stream: fpuppet::PuppetRequestStream) {
     while let Ok(Some(request)) = stream.try_next().await {
-        handle_puppet_request(request)
+        handle_puppet_request(server.clone(), request)
             .await
             .unwrap_or_else(|e| error!(?e, "handle_puppet_request"));
     }
 }
 
-async fn handle_puppet_request(request: fpuppet::PuppetRequest) -> Result<(), Error> {
+async fn handle_puppet_request(
+    server: Arc<PuppetServer>,
+    request: fpuppet::PuppetRequest,
+) -> Result<(), Error> {
     match request {
         fpuppet::PuppetRequest::EmitExampleInspectData { rows, columns, .. } => {
             inspect_testing::emit_example_inspect_data(inspect_testing::Options {
@@ -82,8 +155,42 @@ async fn handle_puppet_request(request: fpuppet::PuppetRequest) -> Result<(), Er
             eprintln!("{message}");
             Ok(())
         }
+        fpuppet::PuppetRequest::Log { payload, .. } => {
+            let request = LogRequest::try_from(payload).context("Log")?;
+            let LogRequest { message, severity, .. } = request;
+
+            match severity {
+                Severity::Debug => debug!("{message}"),
+                Severity::Error => error!("{message}"),
+                Severity::Info => info!("{message}"),
+                Severity::Warn => warn!("{message}"),
+                _ => unimplemented!("Logging with severity: {severity:?}"),
+            }
+
+            Ok(())
+        }
+        fpuppet::PuppetRequest::WaitForInterestChange { responder } => {
+            let mut task_group = server.interest_waiters.lock().await;
+            let server = server.clone();
+            task_group.spawn(async move {
+                let event = server.interest_changed.lock().await.next().await.unwrap();
+                let response = &fpuppet::LogPuppetWaitForInterestChangeResponse {
+                    severity: Some(event.severity),
+                    ..Default::default()
+                };
+                responder.send(response).unwrap();
+            });
+            Ok(())
+        }
         fpuppet::PuppetRequest::_UnknownMethod { .. } => unreachable!(),
     }
+}
+
+#[derive(Debug, Clone, ValidFidlTable)]
+#[fidl_table_src(fpuppet::LogPuppetLogRequest)]
+pub struct LogRequest {
+    pub message: String,
+    pub severity: Severity,
 }
 
 // Converts InspectPuppet requests into callbacks that report inspect values lazily.
@@ -122,7 +229,6 @@ async fn record_lazy_values(
                     }
                     .boxed()
                 });
-
                 return Ok(()); // drop the connection.
             }
             fpuppet::LazyInspectPuppetRequest::_UnknownMethod { .. } => unreachable!(),

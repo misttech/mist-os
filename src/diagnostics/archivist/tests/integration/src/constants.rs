@@ -21,5 +21,3 @@ pub const LOG_AND_EXIT_COMPONENT_URL: &str =
 pub const LOGGING_COMPONENT_URL: &str = "#meta/logging_component.cm";
 pub const STUB_INSPECT_COMPONENT_URL: &str =
     "fuchsia-pkg://fuchsia.com/archivist-integration-tests#meta/stub_inspect_component.cm";
-pub const LOGGER_COMPONENT_FOR_INTEREST_URL: &str =
-    "fuchsia-pkg://fuchsia.com/archivist-integration-tests#meta/log-on-interest.cm";

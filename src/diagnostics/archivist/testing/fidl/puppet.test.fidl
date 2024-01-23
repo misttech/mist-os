@@ -4,8 +4,9 @@
 
 library fuchsia.archivist.test;
 
-alias LogMessage = string:MAX;
+using fuchsia.diagnostics;
 
+alias LogMessage = string:MAX;
 
 /// Puppet is testing component that interacts with Archivist.
 ///
@@ -34,6 +35,20 @@ open protocol LogPuppet {
     flexible Eprintln(struct {
         message LogMessage;
     });
+
+    // Emits a tracing event at the specified severity level.
+    flexible Log(table {
+        1: message LogMessage;
+        2: severity fuchsia.diagnostics.Severity;
+    });
+
+    // Blocks the caller until the next time an interest change event is observed.
+    // Messages are lost if they are emitted using LogPuppet.Log before the
+    // puppet has observed the the interest change.
+    flexible WaitForInterestChange() -> (table {
+        // The new log interest observed by this component.
+        1: severity fuchsia.diagnostics.Severity;
+    });
 };
 
 /// InspectPuppet emits inspect data when requested.
@@ -48,7 +63,7 @@ open protocol InspectPuppet {
         key string:MAX;
         value string:MAX;
     });
-
+ 
     /// Records an integer inspect property.
     flexible RecordInt(struct {
         key string:MAX;
