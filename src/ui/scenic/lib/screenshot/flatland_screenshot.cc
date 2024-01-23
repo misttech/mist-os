@@ -7,6 +7,7 @@
 #include <lib/fdio/directory.h>
 #include <lib/syslog/cpp/macros.h>
 
+#include "fuchsia/ui/composition/cpp/fidl.h"
 #include "src/ui/scenic/lib/allocation/allocator.h"
 #include "src/ui/scenic/lib/allocation/buffer_collection_import_export_tokens.h"
 #include "src/ui/scenic/lib/flatland/buffers/util.h"
@@ -18,6 +19,7 @@ using fuchsia::ui::composition::FrameInfo;
 using fuchsia::ui::composition::GetNextFrameArgs;
 using fuchsia::ui::composition::ScreenCaptureConfig;
 using fuchsia::ui::composition::ScreenCaptureError;
+using fuchsia::ui::composition::ScreenshotFormat;
 using fuchsia::ui::composition::ScreenshotTakeFileResponse;
 using fuchsia::ui::composition::ScreenshotTakeRequest;
 using fuchsia::ui::composition::ScreenshotTakeResponse;
@@ -149,6 +151,12 @@ FlatlandScreenshot::~FlatlandScreenshot() {}
 
 void FlatlandScreenshot::Take(fuchsia::ui::composition::ScreenshotTakeRequest params,
                               TakeCallback callback) {
+  // TODO(b/304597135): Remove once we provide implementation for PNG format.
+  if (params.format() == ScreenshotFormat::PNG) {
+    FX_LOGS(ERROR)
+        << "PNG format is not yet implemented for Screenshot. Continuing with default BGRA_RAW format.";
+    params.set_format(ScreenshotFormat::BGRA_RAW);
+  }
   // Check if there is already a Take() call pending. Either the setup is done (|init_wait_| is
   // signaled) or the setup is still in progress.
   //
@@ -280,6 +288,13 @@ void FlatlandScreenshot::GetNextFrame() {
 
 void FlatlandScreenshot::TakeFile(fuchsia::ui::composition::ScreenshotTakeFileRequest params,
                                   TakeFileCallback callback) {
+  // TODO(b/304597135): Remove once we provide implementation for PNG format.
+  if (params.format() == ScreenshotFormat::PNG) {
+    FX_LOGS(ERROR)
+        << "PNG format is not yet implemented for Screenshot. Continuing with default BGRA_RAW format.";
+    params.set_format(ScreenshotFormat::BGRA_RAW);
+  }
+
   if (take_file_callback_ != nullptr) {
     FX_LOGS(ERROR)
         << "Screenshot::TakeFile() already in progress, closing connection. Wait for return "

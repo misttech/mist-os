@@ -12,7 +12,10 @@ using zx;
 type ScreenshotFormat = flexible enum : uint8 {
     /// The default format, requesting a tightly packed pixel data with 32 bit BGRA pixels.
     BGRA_RAW = 0;
-    // TODO(https://fxbug.dev/103742): Add png format.
+
+    /// Requests tightly packed pixel data which is compressed into PNG format.
+    @available(added=HEAD)
+    PNG = 1;
 };
 
 /// Collects the current graphical content of a display.
