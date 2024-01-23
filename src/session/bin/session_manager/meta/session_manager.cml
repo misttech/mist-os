@@ -64,6 +64,14 @@
             rights: [ "r*" ],
             path: "/data",
         },
+        {
+            config: "fuchsia.session.SessionUrl",
+            config_key: "session_url",
+        },
+        {
+            config: "fuchsia.session.AutoLaunch",
+            config_key: "autolaunch",
+        },
     ],
     offer: [
         {

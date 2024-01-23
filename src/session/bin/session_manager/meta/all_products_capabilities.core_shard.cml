@@ -260,6 +260,14 @@
             from: "self",
             to: "#session-manager",
         },
+        {
+            from: "parent",
+            to: "#session-manager",
+            config: [
+                "fuchsia.session.AutoLaunch",
+                "fuchsia.session.SessionUrl",
+            ],
+        },
 
         // TODO(https://fxbug.dev/126266): As of 2023-04-26, `session-manager` only uses
         // this directory so developers can stop the session from automatically

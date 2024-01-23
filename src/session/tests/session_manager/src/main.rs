@@ -10,7 +10,9 @@ mod tests {
         fidl::endpoints::create_proxy,
         fidl_fuchsia_component as fcomponent, fidl_fuchsia_io as fio,
         fuchsia_component::client::connect_to_protocol,
-        fuchsia_component_test::{ChildOptions, ChildRef, DirectoryContents, RealmBuilder},
+        fuchsia_component_test::{
+            Capability, ChildOptions, ChildRef, DirectoryContents, RealmBuilder, Ref, Route,
+        },
         session_manager_lib,
     };
 
@@ -47,9 +49,30 @@ mod tests {
         let child_ref = builder
             .add_child("session-manager", "#meta/session_manager.cm", ChildOptions::new().eager())
             .await?;
-        builder.init_mutable_config_to_empty(&child_ref).await?;
-        builder.set_config_value_string(&child_ref, "session_url", session_url).await?;
-        builder.set_config_value_bool(&child_ref, "autolaunch", autolaunch).await?;
+        builder
+            .add_capability(cm_rust::CapabilityDecl::Config(cm_rust::ConfigurationDecl {
+                name: "fuchsia.session.SessionUrl".to_string().parse()?,
+                value: cm_rust::ConfigValue::Single(cm_rust::ConfigSingleValue::String(
+                    session_url,
+                )),
+            }))
+            .await?;
+        builder
+            .add_capability(cm_rust::CapabilityDecl::Config(cm_rust::ConfigurationDecl {
+                name: "fuchsia.session.AutoLaunch".to_string().parse()?,
+                value: cm_rust::ConfigValue::Single(cm_rust::ConfigSingleValue::Bool(autolaunch)),
+            }))
+            .await?;
+
+        builder
+            .add_route(
+                Route::new()
+                    .capability(Capability::configuration("fuchsia.session.SessionUrl"))
+                    .capability(Capability::configuration("fuchsia.session.AutoLaunch"))
+                    .from(Ref::self_())
+                    .to(&child_ref),
+            )
+            .await?;
         Ok(child_ref)
     }
 

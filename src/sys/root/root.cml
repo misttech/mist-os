@@ -44,6 +44,14 @@
             ],
         },
         {
+            from: "#config",
+            to: "#core",
+            config: [
+                "fuchsia.session.AutoLaunch",
+                "fuchsia.session.SessionUrl",
+            ],
+        },
+        {
             protocol: "fuchsia.component.Binder",
             from: "#core",
             as: "fuchsia.component.CoreBinder",

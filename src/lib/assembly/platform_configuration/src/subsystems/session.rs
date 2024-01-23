@@ -4,6 +4,7 @@
 
 use crate::subsystems::prelude::*;
 use anyhow::ensure;
+use assembly_config_capabilities::{Config, ConfigValueType};
 use assembly_config_schema::platform_config::session_config::PlatformSessionConfig;
 
 pub(crate) struct SessionConfig;
@@ -31,17 +32,20 @@ impl DefineSubsystemConfiguration<(&PlatformSessionConfig, &String)> for Session
                 "valid session URLs must start with `fuchsia-pkg://`, got `{}`",
                 session_url
             );
-            builder
-                .package("session_manager")
-                .component("meta/session_manager.cm")?
-                .field("session_url", session_url.to_owned())?
-                .field("autolaunch", session_config.autolaunch)?;
         } else {
             ensure!(
                 session_url.is_empty(),
                 "sessions are only supported with the 'Minimal' feature set level"
             );
         }
+        builder.set_config_capability(
+            "fuchsia.session.SessionUrl",
+            Config::new(ConfigValueType::String { max_size: 512 }, session_url.to_owned().into()),
+        )?;
+        builder.set_config_capability(
+            "fuchsia.session.AutoLaunch",
+            Config::new(ConfigValueType::Bool, session_config.autolaunch.into()),
+        )?;
 
         if session_config.include_element_manager {
             ensure!(
