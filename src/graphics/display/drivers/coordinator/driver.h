@@ -5,7 +5,7 @@
 #ifndef SRC_GRAPHICS_DISPLAY_DRIVERS_COORDINATOR_DRIVER_H_
 #define SRC_GRAPHICS_DISPLAY_DRIVERS_COORDINATOR_DRIVER_H_
 
-#include <fidl/fuchsia.hardware.display/cpp/wire.h>
+#include <fidl/fuchsia.hardware.display.engine/cpp/driver/fidl.h>
 #include <fuchsia/hardware/display/clamprgb/cpp/banjo.h>
 #include <fuchsia/hardware/display/controller/cpp/banjo.h>
 
@@ -22,9 +22,7 @@ namespace display {
 class Controller;
 
 // Manages the state associated with a display coordinator driver connection.
-class Driver : public ddk::DisplayControllerInterfaceProtocol<Driver>,
-               public ddk::DisplayCaptureInterfaceProtocol<Driver>,
-               public ddk::EmptyProtocol<ZX_PROTOCOL_DISPLAY_COORDINATOR> {
+class Driver : public ddk::Device<Driver> {
  public:
   explicit Driver(Controller* controller, zx_device_t* parent);
 
@@ -37,17 +35,6 @@ class Driver : public ddk::DisplayControllerInterfaceProtocol<Driver>,
   void DdkUnbind(ddk::UnbindTxn txn);
   void DdkRelease();
   zx_status_t Bind(std::unique_ptr<Driver>* device_ptr);
-
-  // |DisplayControllerInterfaceProtocol|
-  void DisplayControllerInterfaceOnDisplaysChanged(const added_display_args_t* displays_added,
-                                                   size_t added_count,
-                                                   const uint64_t* displays_removed,
-                                                   size_t removed_count) {}
-  void DisplayControllerInterfaceOnDisplayVsync(uint64_t banjo_display_id, zx_time_t timestamp,
-                                                const config_stamp_t* config_stamp) {}
-
-  // |DisplayCaptureInterfaceProtocol|
-  void DisplayCaptureInterfaceOnCaptureComplete() {}
 
   void ReleaseImage(image_t* image);
   zx_status_t ReleaseCapture(DriverCaptureImageId driver_capture_image_id);
@@ -83,6 +70,10 @@ class Driver : public ddk::DisplayControllerInterfaceProtocol<Driver>,
   Controller* const controller_;
   zx_device_t* parent_;
 
+  // FIDL Client
+  fdf::WireSyncClient<fuchsia_hardware_display_engine::Engine> engine_;
+
+  // Banjo Client
   ddk::DisplayControllerImplProtocolClient dc_;
   ddk::DisplayClampRgbImplProtocolClient dc_clamp_rgb_;
 };

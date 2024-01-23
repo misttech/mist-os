@@ -16,6 +16,7 @@
         fallback: "false",
     },
     use: [
+        { protocol: "fuchsia.hardware.display.engine.Service" },
         { protocol: "fuchsia.kernel.FramebufferResource" },
         { protocol: "fuchsia.scheduler.ProfileProvider" },
         { protocol: "fuchsia.boot.Arguments" },
