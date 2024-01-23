@@ -85,7 +85,7 @@ use std::{
     collections::{BTreeMap, BTreeSet, VecDeque},
     mem::MaybeUninit,
     ops::{Deref, DerefMut},
-    sync::{Arc, Weak},
+    sync::Arc,
 };
 use zerocopy::{AsBytes, FromBytes, NoCell};
 
@@ -187,10 +187,15 @@ impl FileOps for BinderConnection {
                 Ok(binder_process) => {
                     let binder_thread =
                         binder_process.lock().find_or_register_thread(current_task.get_tid());
-                    let mut thread_state = binder_thread.lock();
-                    let mut process_command_queue = binder_process.command_queue.lock();
-                    BinderDriver::get_active_queue(&mut thread_state, &mut process_command_queue)
+                    release_after!(binder_thread, current_task, {
+                        let mut thread_state = binder_thread.lock();
+                        let mut process_command_queue = binder_process.command_queue.lock();
+                        BinderDriver::get_active_queue(
+                            &mut thread_state,
+                            &mut process_command_queue,
+                        )
                         .query_events()
+                    })
                 }
                 Err(_) => FdEvents::POLLERR,
             })
@@ -212,13 +217,15 @@ impl FileOps for BinderConnection {
                 Ok(binder_process) => {
                     let binder_thread =
                         binder_process.lock().find_or_register_thread(current_task.get_tid());
-                    Some(self.device.wait_async(
-                        &binder_process,
-                        &binder_thread,
-                        waiter,
-                        events,
-                        handler,
-                    ))
+                    release_after!(binder_thread, current_task, {
+                        Some(self.device.wait_async(
+                            &binder_process,
+                            &binder_thread,
+                            waiter,
+                            events,
+                            handler,
+                        ))
+                    })
                 }
                 Err(_) => {
                     handler.handle(FdEvents::POLLERR);
@@ -885,18 +892,18 @@ impl BinderProcess {
 
 impl<'a> BinderProcessGuard<'a> {
     /// Return the `BinderThread` with the given `tid`, creating it if it doesn't exist.
-    fn find_or_register_thread(&mut self, tid: pid_t) -> Arc<BinderThread> {
+    fn find_or_register_thread(&mut self, tid: pid_t) -> OwnedRef<BinderThread> {
         if let Some(thread) = self.thread_pool.0.get(&tid) {
             return thread.clone();
         }
-        let thread = Arc::new(BinderThread::new(self, tid));
-        self.thread_pool.0.insert(tid, thread.clone());
+        let thread = BinderThread::new(self, tid);
+        self.thread_pool.0.insert(tid, OwnedRef::clone(&thread));
         thread
     }
 
     /// Unregister the `BinderThread` with the given `tid`.
-    fn unregister_thread(&mut self, tid: pid_t) {
-        self.thread_pool.0.remove(&tid);
+    fn unregister_thread(&mut self, current_task: &CurrentTask, tid: pid_t) {
+        self.thread_pool.0.remove(&tid).release(current_task);
     }
 
     /// Inserts a reference to a binder object, returning a handle that represents it.
@@ -987,7 +994,7 @@ impl<'a> BinderProcessGuard<'a> {
     /// a new [`BinderObject`] to represent the one in the process.
     pub fn find_or_register_object(
         &mut self,
-        binder_thread: &Arc<BinderThread>,
+        binder_thread: &BinderThread,
         local: LocalBinderObject,
         flags: BinderObjectFlags,
     ) -> StrongRefGuard {
@@ -1009,7 +1016,7 @@ impl<'a> BinderProcessGuard<'a> {
     }
 
     /// Whether the driver should request that the client starts a new thread.
-    fn should_request_thread(&self, thread: &Arc<BinderThread>) -> bool {
+    fn should_request_thread(&self, thread: &BinderThread) -> bool {
         !self.thread_requested
             && self.thread_pool.registered_threads() < self.max_thread_count
             && thread.lock().is_main_or_registered()
@@ -1052,6 +1059,10 @@ impl Releasable for BinderProcess {
         }
 
         state.handles.release(context);
+
+        for thread in state.thread_pool.0.into_values() {
+            thread.release(context);
+        }
     }
 }
 
@@ -1305,7 +1316,7 @@ impl<'a, T: AsBytes> SharedBuffer<'a, T> {
 
 /// The set of threads that are interacting with the binder driver for a given process.
 #[derive(Debug, Default)]
-struct ThreadPool(BTreeMap<pid_t, Arc<BinderThread>>);
+struct ThreadPool(BTreeMap<pid_t, OwnedRef<BinderThread>>);
 
 impl ThreadPool {
     fn has_available_thread(&self) -> bool {
@@ -1527,7 +1538,7 @@ impl Releasable for RefCountActions {
     type Context<'a> = ();
 
     fn release(self, _context: ()) {
-        for object in self.iter() {
+        for object in self.objects.into_iter() {
             object.apply_deferred_refcounts();
         }
         self.drop_guard.disarm();
@@ -1535,10 +1546,6 @@ impl Releasable for RefCountActions {
 }
 
 impl RefCountActions {
-    fn iter(&self) -> std::collections::btree_set::Iter<'_, ArcKey<BinderObject>> {
-        self.objects.iter()
-    }
-
     #[cfg(test)]
     fn default_released() -> Self {
         let r = RefCountActions::default();
@@ -1643,13 +1650,16 @@ impl HandleTable {
 
 #[derive(Debug)]
 struct BinderThread {
+    /// Weak reference to self.
+    weak_self: WeakRef<BinderThread>,
+
     tid: pid_t,
     /// The mutable state of the binder thread, protected by a single lock.
     state: Mutex<BinderThreadState>,
 }
 
 impl BinderThread {
-    fn new(_binder_proc: &BinderProcessGuard<'_>, tid: pid_t) -> Self {
+    fn new(_binder_proc: &BinderProcessGuard<'_>, tid: pid_t) -> OwnedRef<Self> {
         let state = Mutex::new(BinderThreadState::new(tid));
         #[cfg(any(test, debug_assertions))]
         {
@@ -1659,12 +1669,20 @@ impl BinderThread {
             let _l1 = state.lock();
             let _l2 = _binder_proc.base.command_queue.lock();
         }
-        Self { tid, state }
+        OwnedRef::new_cyclic(|weak_self| Self { weak_self, tid, state })
     }
 
     /// Acquire the lock to the binder thread's mutable state.
     pub fn lock(&self) -> MutexGuard<'_, BinderThreadState> {
         self.state.lock()
+    }
+}
+
+impl Releasable for BinderThread {
+    type Context<'a> = &'a CurrentTask;
+
+    fn release(self, context: Self::Context<'_>) {
+        self.state.into_inner().release(context);
     }
 }
 
@@ -1754,7 +1772,8 @@ impl BinderThreadState {
     /// the calling process/thread are dead.
     pub fn pop_transaction_caller(
         &mut self,
-    ) -> Result<(TempRef<'static, BinderProcess>, Arc<BinderThread>), TransactionError> {
+    ) -> Result<(TempRef<'static, BinderProcess>, TempRef<'static, BinderThread>), TransactionError>
+    {
         let transaction = self.transactions.pop().ok_or_else(|| errno!(EINVAL))?;
         match transaction {
             TransactionRole::Receiver(peer) => {
@@ -1773,12 +1792,14 @@ impl BinderThreadState {
     }
 }
 
-impl Drop for BinderThreadState {
-    fn drop(&mut self) {
+impl Releasable for BinderThreadState {
+    type Context<'a> = &'a CurrentTask;
+
+    fn release(self, _context: Self::Context<'_>) {
         log_trace!("Dropping BinderThreadState id={}", self.tid);
         // If there are any transactions queued, we need to tell the caller that this thread is now
         // dead.
-        for command in &self.command_queue.commands {
+        for command in self.command_queue.commands {
             if let Command::Transaction { sender, .. } = command {
                 if let Some(sender_thread) = sender.thread.upgrade() {
                     sender_thread
@@ -1790,7 +1811,7 @@ impl Drop for BinderThreadState {
 
         // If there are any transactions that this thread was processing, we need to tell the caller
         // that this thread is now dead and to not expect a reply.
-        for transaction in &self.transactions {
+        for transaction in self.transactions {
             if let TransactionRole::Receiver(peer) = transaction {
                 if let Some(peer_thread) = peer.thread.upgrade() {
                     peer_thread
@@ -1823,17 +1844,20 @@ impl Default for RegistrationState {
 #[derive(Debug)]
 struct WeakBinderPeer {
     proc: WeakRef<BinderProcess>,
-    thread: Weak<BinderThread>,
+    thread: WeakRef<BinderThread>,
 }
 
 impl WeakBinderPeer {
-    fn new(proc: &BinderProcess, thread: &Arc<BinderThread>) -> Self {
-        Self { proc: proc.weak_self.clone(), thread: Arc::downgrade(thread) }
+    fn new(proc: &BinderProcess, thread: &BinderThread) -> Self {
+        Self { proc: proc.weak_self.clone(), thread: thread.weak_self.clone() }
     }
 
     /// Upgrades the process and thread weak references as a tuple.
-    fn upgrade(&self) -> Option<(TempRef<'static, BinderProcess>, Arc<BinderThread>)> {
-        self.proc.upgrade().map(TempRef::into_static).zip(self.thread.upgrade())
+    fn upgrade(&self) -> Option<(TempRef<'static, BinderProcess>, TempRef<'static, BinderThread>)> {
+        self.proc
+            .upgrade()
+            .map(TempRef::into_static)
+            .zip(self.thread.upgrade().map(TempRef::into_static))
     }
 }
 
@@ -2384,7 +2408,7 @@ impl BinderObject {
 
     /// Increments the strong reference count of the binder object. Allows to raise the strong
     /// count from 0 to 1.
-    fn inc_strong_unchecked(self: &Arc<Self>, binder_thread: &Arc<BinderThread>) -> StrongRefGuard {
+    fn inc_strong_unchecked(self: &Arc<Self>, binder_thread: &BinderThread) -> StrongRefGuard {
         let mut state = self.lock();
         if state.strong_count.inc_immediate() {
             binder_thread.lock().enqueue_command(Command::AcquireRef(self.local));
@@ -3007,7 +3031,7 @@ impl BinderDriver {
     fn create_process_and_thread(
         &self,
         pid: pid_t,
-    ) -> (OwnedRef<BinderProcess>, Arc<BinderThread>) {
+    ) -> (OwnedRef<BinderProcess>, OwnedRef<BinderThread>) {
         let identifier = self.create_local_process(pid);
         let binder_process = self.find_process(identifier).expect("find_process");
         let binder_thread = binder_process.lock().find_or_register_thread(pid);
@@ -3071,144 +3095,148 @@ impl BinderDriver {
         trace_duration!(trace_category_starnix!(), trace_name_binder_ioctl!(), "request" => request);
         let user_arg = UserAddress::from(arg);
         let binder_thread = binder_proc.lock().find_or_register_thread(current_task.get_tid());
-        match request {
-            uapi::BINDER_VERSION => {
-                // A thread is requesting the version of this binder driver.
-                if user_arg.is_null() {
-                    return error!(EINVAL);
+        release_after!(binder_thread, current_task, {
+            match request {
+                uapi::BINDER_VERSION => {
+                    // A thread is requesting the version of this binder driver.
+                    if user_arg.is_null() {
+                        return error!(EINVAL);
+                    }
+                    let response =
+                        binder_version { protocol_version: BINDER_CURRENT_PROTOCOL_VERSION as i32 };
+                    log_trace!("binder version is {:?}", response);
+                    binder_proc
+                        .get_resource_accessor(current_task)
+                        .write_object(UserRef::new(user_arg), &response)?;
+                    Ok(SUCCESS)
                 }
-                let response =
-                    binder_version { protocol_version: BINDER_CURRENT_PROTOCOL_VERSION as i32 };
-                log_trace!("binder version is {:?}", response);
-                binder_proc
-                    .get_resource_accessor(current_task)
-                    .write_object(UserRef::new(user_arg), &response)?;
-                Ok(SUCCESS)
-            }
-            uapi::BINDER_SET_CONTEXT_MGR | uapi::BINDER_SET_CONTEXT_MGR_EXT => {
-                // A process is registering itself as the context manager.
-                if user_arg.is_null() {
-                    return error!(EINVAL);
+                uapi::BINDER_SET_CONTEXT_MGR | uapi::BINDER_SET_CONTEXT_MGR_EXT => {
+                    // A process is registering itself as the context manager.
+                    if user_arg.is_null() {
+                        return error!(EINVAL);
+                    }
+
+                    let flags = if request == uapi::BINDER_SET_CONTEXT_MGR_EXT {
+                        let user_ref = UserRef::<flat_binder_object>::new(user_arg);
+                        let flat_binder_object = binder_proc
+                            .get_resource_accessor(current_task)
+                            .read_object(user_ref)?;
+                        BinderObjectFlags::parse(flat_binder_object.flags)?
+                    } else {
+                        BinderObjectFlags::empty()
+                    };
+
+                    log_trace!("binder setting context manager with flags {:x}", flags);
+
+                    *self.context_manager.lock() =
+                        Some(BinderObject::new_context_manager_marker(binder_proc, flags));
+                    Ok(SUCCESS)
                 }
+                uapi::BINDER_WRITE_READ => {
+                    // A thread is requesting to exchange data with the binder driver.
+                    if user_arg.is_null() {
+                        return error!(EINVAL);
+                    }
 
-                let flags = if request == uapi::BINDER_SET_CONTEXT_MGR_EXT {
-                    let user_ref = UserRef::<flat_binder_object>::new(user_arg);
-                    let flat_binder_object =
-                        binder_proc.get_resource_accessor(current_task).read_object(user_ref)?;
-                    BinderObjectFlags::parse(flat_binder_object.flags)?
-                } else {
-                    BinderObjectFlags::empty()
-                };
+                    let resource_accessor = binder_proc.get_resource_accessor(current_task);
+                    let user_ref = UserRef::<binder_write_read>::new(user_arg);
+                    let mut input = resource_accessor.read_object(user_ref)?;
 
-                log_trace!("binder setting context manager with flags {:x}", flags);
+                    log_trace!("binder write/read request start {:?}", input);
 
-                *self.context_manager.lock() =
-                    Some(BinderObject::new_context_manager_marker(binder_proc, flags));
-                Ok(SUCCESS)
-            }
-            uapi::BINDER_WRITE_READ => {
-                // A thread is requesting to exchange data with the binder driver.
-                if user_arg.is_null() {
-                    return error!(EINVAL);
-                }
+                    // We will be writing this back to userspace, don't trust what the client gave us.
+                    input.write_consumed = 0;
+                    input.read_consumed = 0;
 
-                let resource_accessor = binder_proc.get_resource_accessor(current_task);
-                let user_ref = UserRef::<binder_write_read>::new(user_arg);
-                let mut input = resource_accessor.read_object(user_ref)?;
+                    if input.write_size > 0 {
+                        // The calling thread wants to write some data to the binder driver.
+                        let mut cursor = UserMemoryCursor::new(
+                            resource_accessor.as_memory_accessor(),
+                            UserAddress::from(input.write_buffer),
+                            input.write_size,
+                        )?;
 
-                log_trace!("binder write/read request start {:?}", input);
+                        // Handle all the data the calling thread sent, which may include multiple
+                        // commands.
+                        while cursor.bytes_read() < input.write_size as usize {
+                            self.handle_thread_write(
+                                current_task,
+                                binder_proc,
+                                &binder_thread,
+                                &mut cursor,
+                            )?;
+                        }
+                        input.write_consumed = cursor.bytes_read() as u64;
+                    }
 
-                // We will be writing this back to userspace, don't trust what the client gave us.
-                input.write_consumed = 0;
-                input.read_consumed = 0;
-
-                if input.write_size > 0 {
-                    // The calling thread wants to write some data to the binder driver.
-                    let mut cursor = UserMemoryCursor::new(
-                        resource_accessor.as_memory_accessor(),
-                        UserAddress::from(input.write_buffer),
-                        input.write_size,
-                    )?;
-
-                    // Handle all the data the calling thread sent, which may include multiple
-                    // commands.
-                    while cursor.bytes_read() < input.write_size as usize {
-                        self.handle_thread_write(
+                    if input.read_size > 0 {
+                        // The calling thread wants to read some data from the binder driver, blocking
+                        // if there is nothing immediately available.
+                        let read_buffer = UserBuffer {
+                            address: UserAddress::from(input.read_buffer),
+                            length: input.read_size as usize,
+                        };
+                        let read_result = match self.handle_thread_read(
                             current_task,
                             binder_proc,
                             &binder_thread,
-                            &mut cursor,
-                        )?;
+                            &read_buffer,
+                        ) {
+                            // If the wait was interrupted and some command has been consumed, return a
+                            // success.
+                            Err(err) if err == EINTR && input.write_consumed > 0 => Ok(0),
+                            r => r,
+                        };
+                        input.read_consumed = read_result? as u64;
                     }
-                    input.write_consumed = cursor.bytes_read() as u64;
+
+                    log_trace!("binder write/read request end {:?}", input);
+
+                    // Write back to the calling thread how much data was read/written.
+                    resource_accessor.write_object(user_ref, &input)?;
+                    Ok(SUCCESS)
                 }
+                uapi::BINDER_SET_MAX_THREADS => {
+                    if user_arg.is_null() {
+                        return error!(EINVAL);
+                    }
 
-                if input.read_size > 0 {
-                    // The calling thread wants to read some data from the binder driver, blocking
-                    // if there is nothing immediately available.
-                    let read_buffer = UserBuffer {
-                        address: UserAddress::from(input.read_buffer),
-                        length: input.read_size as usize,
-                    };
-                    let read_result = match self.handle_thread_read(
-                        current_task,
-                        binder_proc,
-                        &binder_thread,
-                        &read_buffer,
-                    ) {
-                        // If the wait was interrupted and some command has been consumed, return a
-                        // success.
-                        Err(err) if err == EINTR && input.write_consumed > 0 => Ok(0),
-                        r => r,
-                    };
-                    input.read_consumed = read_result? as u64;
+                    let user_ref = UserRef::<u32>::new(user_arg);
+                    let new_max_threads = binder_proc
+                        .get_resource_accessor(current_task)
+                        .read_object(user_ref)? as usize;
+                    log_trace!("setting max binder threads to {}", new_max_threads);
+                    binder_proc.lock().max_thread_count = new_max_threads;
+                    Ok(SUCCESS)
                 }
-
-                log_trace!("binder write/read request end {:?}", input);
-
-                // Write back to the calling thread how much data was read/written.
-                resource_accessor.write_object(user_ref, &input)?;
-                Ok(SUCCESS)
-            }
-            uapi::BINDER_SET_MAX_THREADS => {
-                if user_arg.is_null() {
-                    return error!(EINVAL);
+                uapi::BINDER_ENABLE_ONEWAY_SPAM_DETECTION => {
+                    not_implemented!("binder ENABLE_ONEWAY_SPAM_DETECTION");
+                    Ok(SUCCESS)
                 }
-
-                let user_ref = UserRef::<u32>::new(user_arg);
-                let new_max_threads =
-                    binder_proc.get_resource_accessor(current_task).read_object(user_ref)? as usize;
-                log_trace!("setting max binder threads to {}", new_max_threads);
-                binder_proc.lock().max_thread_count = new_max_threads;
-                Ok(SUCCESS)
+                uapi::BINDER_THREAD_EXIT => {
+                    log_trace!("binder thread {} exiting", binder_thread.tid);
+                    binder_proc.lock().unregister_thread(current_task, binder_thread.tid);
+                    Ok(SUCCESS)
+                }
+                uapi::BINDER_GET_NODE_DEBUG_INFO => {
+                    not_implemented!("binder GET_NODE_DEBUG_INFO");
+                    error!(EOPNOTSUPP)
+                }
+                uapi::BINDER_GET_NODE_INFO_FOR_REF => {
+                    not_implemented!("binder GET_NODE_INFO_FOR_REF");
+                    error!(EOPNOTSUPP)
+                }
+                uapi::BINDER_FREEZE => {
+                    not_implemented!("binder BINDER_FREEZE");
+                    error!(EOPNOTSUPP)
+                }
+                _ => {
+                    not_implemented!("binder unknown ioctl", request);
+                    log_error!("binder received unknown ioctl request 0x{:08x}", request);
+                    error!(EINVAL)
+                }
             }
-            uapi::BINDER_ENABLE_ONEWAY_SPAM_DETECTION => {
-                not_implemented!("binder ENABLE_ONEWAY_SPAM_DETECTION");
-                Ok(SUCCESS)
-            }
-            uapi::BINDER_THREAD_EXIT => {
-                log_trace!("binder thread {} exiting", binder_thread.tid);
-                binder_proc.lock().unregister_thread(binder_thread.tid);
-                Ok(SUCCESS)
-            }
-            uapi::BINDER_GET_NODE_DEBUG_INFO => {
-                not_implemented!("binder GET_NODE_DEBUG_INFO");
-                error!(EOPNOTSUPP)
-            }
-            uapi::BINDER_GET_NODE_INFO_FOR_REF => {
-                not_implemented!("binder GET_NODE_INFO_FOR_REF");
-                error!(EOPNOTSUPP)
-            }
-            uapi::BINDER_FREEZE => {
-                not_implemented!("binder BINDER_FREEZE");
-                error!(EOPNOTSUPP)
-            }
-            _ => {
-                not_implemented!("binder unknown ioctl", request);
-                log_error!("binder received unknown ioctl request 0x{:08x}", request);
-                error!(EINVAL)
-            }
-        }
+        })
     }
 
     /// Consumes one command from the userspace binder_write_read buffer and handles it.
@@ -3217,7 +3245,7 @@ impl BinderDriver {
         &self,
         current_task: &CurrentTask,
         binder_proc: &BinderProcess,
-        binder_thread: &Arc<BinderThread>,
+        binder_thread: &BinderThread,
         cursor: &mut UserMemoryCursor,
     ) -> Result<(), Errno> {
         profile_duration!("ThreadWrite");
@@ -3330,7 +3358,7 @@ impl BinderDriver {
         &self,
         current_task: &CurrentTask,
         binder_proc: &BinderProcess,
-        binder_thread: &Arc<BinderThread>,
+        binder_thread: &BinderThread,
         data: binder_transaction_data_sg,
     ) -> Result<(), TransactionError> {
         // SAFETY: Transactions can only refer to handles.
@@ -3501,7 +3529,7 @@ impl BinderDriver {
         &self,
         current_task: &CurrentTask,
         binder_proc: &BinderProcess,
-        binder_thread: &Arc<BinderThread>,
+        binder_thread: &BinderThread,
         data: binder_transaction_data_sg,
     ) -> Result<(), TransactionError> {
         // Find the process and thread that initiated the transaction. This reply is for them.
@@ -3569,7 +3597,7 @@ impl BinderDriver {
         &self,
         current_task: &CurrentTask,
         binder_proc: &BinderProcess,
-        binder_thread: &Arc<BinderThread>,
+        binder_thread: &BinderThread,
         read_buffer: &UserBuffer,
     ) -> Result<usize, Errno> {
         profile_duration!("ThreadRead");
@@ -3678,7 +3706,7 @@ impl BinderDriver {
         current_task: &CurrentTask,
         source_resource_accessor: &dyn ResourceAccessor,
         source_proc: &BinderProcess,
-        source_thread: &Arc<BinderThread>,
+        source_thread: &BinderThread,
         target_resource_accessor: &'a dyn ResourceAccessor,
         target_proc: &BinderProcess,
         data: &binder_transaction_data_sg,
@@ -3759,7 +3787,7 @@ impl BinderDriver {
         current_task: &CurrentTask,
         source_resource_accessor: &dyn ResourceAccessor,
         source_proc: &BinderProcess,
-        source_thread: &Arc<BinderThread>,
+        source_thread: &BinderThread,
         target_resource_accessor: &'a dyn ResourceAccessor,
         target_proc: &BinderProcess,
         offsets: &[binder_uintptr_t],
@@ -4043,7 +4071,7 @@ impl BinderDriver {
     fn wait_async(
         &self,
         binder_proc: &BinderProcess,
-        binder_thread: &Arc<BinderThread>,
+        binder_thread: &BinderThread,
         waiter: &Waiter,
         events: FdEvents,
         handler: EventHandler,
@@ -4274,7 +4302,7 @@ enum TransactionError {
 impl TransactionError {
     /// Dispatches the error, by potentially queueing a command to `binder_thread` and/or returning
     /// an error.
-    fn dispatch(self, binder_thread: &Arc<BinderThread>) -> Result<(), Errno> {
+    fn dispatch(self, binder_thread: &BinderThread) -> Result<(), Errno> {
         log_trace!("Dispatching transaction error {:?} for thread {}", self, binder_thread.tid);
         binder_thread.lock().enqueue_command(match self {
             TransactionError::Malformed(err) => {
@@ -4410,7 +4438,7 @@ pub mod tests {
         file_mode::FileMode,
         BINDER_TYPE_WEAK_HANDLE,
     };
-    use std::ops::Deref;
+    use std::{ops::Deref, sync::Weak};
     use zerocopy::FromZeros;
 
     const BASE_ADDR: UserAddress = UserAddress::const_from(0x0000000000000100);
@@ -4446,7 +4474,7 @@ pub mod tests {
     struct BinderProcessFixture {
         device: Weak<BinderDriverReleaser>,
         proc: OwnedRef<BinderProcess>,
-        thread: Arc<BinderThread>,
+        thread: OwnedRef<BinderThread>,
         task: AutoReleasableTask,
     }
 
@@ -4471,6 +4499,7 @@ pub mod tests {
 
     impl Drop for BinderProcessFixture {
         fn drop(&mut self) {
+            OwnedRef::take(&mut self.thread).release(&self.task);
             if let Some(device) = self.device.upgrade() {
                 device.procs.write().remove(&self.proc.identifier).release(&self.task);
             }
@@ -6859,6 +6888,7 @@ pub mod tests {
             .unwrap();
         assert_eq!(bytes_read, 0);
         thread.join().expect("join");
+        binder_thread.release(&current_task);
         binder_proc.release(&current_task);
     }
 
