@@ -9,20 +9,17 @@
 #include <lib/zx/clock.h>
 
 #include <iomanip>
-#include <limits>
 #include <utility>
 
 #include "src/media/audio/audio_core/shared/mixer/mixer.h"
 #include "src/media/audio/audio_core/v1/audio_driver.h"
-#include "src/media/audio/audio_core/v1/base_renderer.h"
 #include "src/media/audio/audio_core/v1/stage_metrics.h"
 
 namespace media::audio {
 
 namespace {
 void DumpStageMetrics(std::ostringstream& os, const StageMetrics& metrics) {
-  os << metrics.name.c_str() << ": "
-     << "wall_time = " << metrics.wall_time.to_nsecs() << " ns, "
+  os << metrics.name.c_str() << ": " << "wall_time = " << metrics.wall_time.to_nsecs() << " ns, "
      << "cpu_time = " << metrics.cpu_time.to_nsecs() << " ns, "
      << "queue_time = " << metrics.queue_time.to_nsecs() << " ns, "
      << "page_fault_time = " << metrics.page_fault_time.to_nsecs() << " ns, "
@@ -90,11 +87,19 @@ void AudioOutput::Process() {
         DumpStageMetrics(os, metrics);
       }
 
-      FX_LOGS(ERROR) << "PIPELINE UNDERFLOW: Mixer ran for " << std::setprecision(4)
-                     << static_cast<double>(dt.to_nsecs()) / ZX_MSEC(1) << " ms, overran goal of "
-                     << static_cast<double>(MixDeadline().to_nsecs()) / ZX_MSEC(1)
-                     << " ms. Detailed metrics:\n"
-                     << os.str();
+      std::ostringstream log_output;
+      log_output << "PIPELINE UNDERFLOW: Mixer ran for " << std::setprecision(4)
+                 << static_cast<double>(dt.to_nsecs()) / ZX_MSEC(1) << " ms, overran goal of "
+                 << static_cast<double>(MixDeadline().to_nsecs()) / ZX_MSEC(1)
+                 << " ms. Detailed metrics:\n"
+                 << os.str();
+#ifdef NDEBUG
+      // Output or pipeline underflows should be logged at ERROR in production builds.
+      FX_LOGS(ERROR) << log_output.str();
+#else
+      // Log at WARNING in debug builds so we can run tests that auto-fail on any ERROR logging.
+      FX_LOGS(WARNING) << log_output.str();
+#endif
 
       ZX_DEBUG_ASSERT(reporter_.has_value());
       reporter_.value()->PipelineUnderflow(mono_now + MixDeadline(), mono_end);

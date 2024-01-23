@@ -204,12 +204,20 @@ std::optional<AudioOutput::FrameSpan> DriverOutput::StartMixJob(zx::time ref_tim
 
       TRACE_INSTANT("audio", "DriverOutput::UNDERFLOW", TRACE_SCOPE_THREAD);
       TRACE_ALERT("audio", "audiounderflow");
-      FX_LOGS(ERROR) << "OUTPUT UNDERFLOW: Missed mix target by (worst-case, expected) = ("
-                     << std::setprecision(4)
-                     << static_cast<double>(output_underflow_duration.to_nsecs()) / ZX_MSEC(1)
-                     << ", " << output_variance_from_expected_wakeup.to_msecs()
-                     << ") ms. Cooling down for " << kUnderflowCooldown.to_msecs()
-                     << " milliseconds.";
+
+      std::ostringstream log_output;
+      log_output << "OUTPUT UNDERFLOW: Missed mix target by (worst-case, expected) = ("
+                 << std::setprecision(4)
+                 << static_cast<double>(output_underflow_duration.to_nsecs()) / ZX_MSEC(1) << ", "
+                 << output_variance_from_expected_wakeup.to_msecs() << ") ms. Cooling down for "
+                 << kUnderflowCooldown.to_msecs() << " milliseconds.";
+#ifdef NDEBUG
+      // Output or pipeline underflows should be logged at ERROR in production builds.
+      FX_LOGS(ERROR) << log_output.str();
+#else
+      // Log at WARNING in debug builds so we can run tests that auto-fail on any ERROR logging.
+      FX_LOGS(WARNING) << log_output.str();
+#endif
 
       ZX_DEBUG_ASSERT(reporter().has_value());
       reporter().value()->DeviceUnderflow(mono_time, mono_time + output_underflow_duration);
