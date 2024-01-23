@@ -1382,8 +1382,7 @@ impl CurrentTask {
             pid = pids.allocate_pid();
             command = self.command();
             creds = self.creds();
-            // TODO(https://fxbug.dev/297961833) implement SCHED_RESET_ON_FORK
-            scheduler_policy = state.scheduler_policy;
+            scheduler_policy = state.scheduler_policy.fork();
             timerslack_ns = state.timerslack_ns;
 
             uts_ns = if new_uts {
