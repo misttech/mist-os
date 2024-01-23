@@ -88,12 +88,23 @@ pub fn serialize_i32_file(value: i32) -> Vec<u8> {
     string.as_bytes().to_vec()
 }
 
-pub struct BytesFile<Ops: BytesFileOps>(Arc<Ops>);
+pub struct BytesFile<Ops>(Arc<Ops>);
 
 impl<Ops: BytesFileOps> BytesFile<Ops> {
+    pub fn new(data: Ops) -> Self {
+        Self(Arc::new(data))
+    }
+
     pub fn new_node(data: Ops) -> impl FsNodeOps {
         let data = Arc::new(data);
         SimpleFileNode::new(move || Ok(BytesFile(Arc::clone(&data))))
+    }
+}
+
+// Hand-written to avoid an unnecessary `Ops: Clone` bound which the derive would emit.
+impl<Ops> std::clone::Clone for BytesFile<Ops> {
+    fn clone(&self) -> Self {
+        Self(self.0.clone())
     }
 }
 
