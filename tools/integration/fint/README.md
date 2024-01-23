@@ -198,7 +198,8 @@ infrastructure should be have.
 
 On that note, some fields of `set_artifacts.proto` also inform higher-level
 decisions made by the infrastructure, e.g. `enable_rbe` determines whether the
-infrastructure starts an RBE daemon prior to running `fint build`.
+infrastructure starts an re-client daemon (`reproxy`) for access to RBE,
+prior to running `fint build`.
 
 ### build_artifacts.proto
 

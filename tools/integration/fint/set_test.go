@@ -143,6 +143,21 @@ func TestSet(t *testing.T) {
 		}
 	})
 
+	t.Run("populates set_artifacts fields (Bazel)", func(t *testing.T) {
+		staticSpec := proto.Clone(staticSpec).(*fintpb.Static)
+		staticSpec.BazelRbeEnable = true // This turns on RBE, not doesn't use reclient.
+		runner := &fakeSubprocessRunner{
+			mockStdout: []byte("some stdout"),
+		}
+		artifacts, err := setImpl(ctx, runner, staticSpec, contextSpec, "linux-x64", false)
+		if err != nil {
+			t.Fatalf("Unexpected error from setImpl: %s", err)
+		}
+		if artifacts.EnableRbe {
+			t.Errorf("Bazel+RBE should not enable (reclient) 'enable_rbe'.")
+		}
+	})
+
 	t.Run("leaves failure summary empty in case of success", func(t *testing.T) {
 		runner := &fakeSubprocessRunner{
 			mockStdout: []byte("some stdout"),

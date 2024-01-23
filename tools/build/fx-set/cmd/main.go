@@ -183,7 +183,8 @@ type setArgs struct {
 	enableRbe     bool // deprecated, renamed
 	enableRustRbe bool
 
-	enableLinkRbe bool
+	enableLinkRbe  bool
+	enableBazelRbe bool
 
 	enableCxxRbe  bool
 	disableCxxRbe bool
@@ -248,6 +249,7 @@ func parseArgsAndEnv(args []string, env map[string]string) (*setArgs, error) {
 	flagSet.BoolVar(&cmd.enableCxxRbe, "cxx-rbe", false, "")
 	flagSet.BoolVar(&cmd.disableCxxRbe, "no-cxx-rbe", false, "")
 	flagSet.BoolVar(&cmd.enableLinkRbe, "link-rbe", false, "")
+	flagSet.BoolVar(&cmd.enableBazelRbe, "bazel-rbe", false, "")
 
 	flagSet.BoolVar(&cmd.isRelease, "release", false, "")
 	flagSet.BoolVar(&cmd.netboot, "netboot", false, "")
@@ -370,7 +372,7 @@ func constructStaticSpec(ctx context.Context, fx fxRunner, checkoutDir string, a
 
 	// Check for RBE eligibility.
 	rbeSupported := rbeIsSupported()
-	requestedAnyRbe := args.enableCxxRbe || args.enableRustRbe || args.enableLinkRbe
+	requestedAnyRbe := args.enableCxxRbe || args.enableRustRbe || args.enableLinkRbe || args.enableBazelRbe
 	if requestedAnyRbe {
 		if !rbeSupported {
 			return nil, fmt.Errorf("Sorry, RBE is only supported on linux-x64 at this time.")
@@ -474,6 +476,7 @@ func constructStaticSpec(ctx context.Context, fx fxRunner, checkoutDir string, a
 		RustRbeEnable:     args.enableRustRbe,
 		CxxRbeEnable:      useCxxRbeFinal,
 		LinkRbeEnable:     args.enableLinkRbe,
+		BazelRbeEnable:    args.enableBazelRbe,
 		IdeFiles:          args.ideFiles,
 		JsonIdeScripts:    args.jsonIDEScripts,
 		ExportRustProject: true,

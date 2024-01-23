@@ -86,6 +86,7 @@ func setImpl(
 			Variants:   staticSpec.Variants,
 		},
 		// True if any toolchain is using RBE and needs reproxy to run.
+		// Note: bazel+RBE doesn't require reproxy.
 		EnableRbe: staticSpec.RustRbeEnable || staticSpec.CxxRbeEnable || staticSpec.LinkRbeEnable,
 	}
 
@@ -267,6 +268,7 @@ func genArgs(ctx context.Context, staticSpec *fintpb.Static, contextSpec *fintpb
 	vars["rust_rbe_enable"] = staticSpec.RustRbeEnable
 	vars["cxx_rbe_enable"] = staticSpec.CxxRbeEnable
 	vars["link_rbe_enable"] = staticSpec.LinkRbeEnable
+	vars["enable_bazel_remote_rbe"] = staticSpec.BazelRbeEnable
 
 	if staticSpec.Product != "" {
 		basename := filepath.Base(staticSpec.Product)

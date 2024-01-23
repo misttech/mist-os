@@ -204,4 +204,7 @@ message Static {
 
   // If true, link C/C++ targets remotely with RBE/reclient.
   bool link_rbe_enable = 43;
+
+  // If true, enable remote builds for bazel on RBE.
+  bool bazel_rbe_enable = 44;
 }

@@ -54,8 +54,8 @@ if [[ "${FUCHSIA_DEVSHELL_VERBOSITY:-0}" -eq 1 ]]; then
   set -x
 fi
 
-# For commands whose subprocesses may use RBE, prefix those commands
-# conditioned on 'if fx-rbe-enabled' (function).
+# For commands whose subprocesses may use reclient for RBE, prefix those
+# commands conditioned on 'if fx-rbe-enabled' (function).
 # This could not be made into a shell-function because it is used
 # as both a function and non-built-in command, and functions do not compose
 # by prefixing in shell.
@@ -74,8 +74,8 @@ function fx-rbe-enabled {
     fx-warn "The 'enable_rbe' GN arg has been renamed to 'rust_rbe_enable'."
     fx-warn "Please update your ${FUCHSIA_BUILD_DIR}/args.gn file (fx args)."
   fi
-  # If RBE is enabled for any language, then the whole build needs to be
-  # wrapped with ${RBE_WRAPPER[@]}.
+  # If reclient-RBE is enabled for any language, then the whole build needs
+  # to be wrapped with ${RBE_WRAPPER[@]}.
   grep -q -e "^[ \t]*rust_rbe_enable[ ]*=[ ]*true" \
     -e "^[ \t]*cxx_rbe_enable[ ]*=[ ]*true" \
     -e "^[ \t]*link_rbe_enable[ ]*=[ ]*true" \
@@ -818,7 +818,7 @@ function fx-choose-build-concurrency {
   # If any remote execution is enabled (e.g. via Goma or RBE),
   # allow ninja to launch many more concurrent actions than what local
   # resources can support.
-  # This covers GN args: cxx_rbe_enable, rust_rbe_enable.
+  # This covers GN args: cxx_rbe_enable, rust_rbe_enable, link_rbe_enable.
   # Kludge: grep-ing the args.gn like this is admittedly brittle, and prone
   # to error when we enable remote execution on new tools.
   if grep -q -e "use_goma = true" \
@@ -976,8 +976,9 @@ function fx-run-ninja {
   # expression). GOMA_DISABLED will forcefully disable Goma even if it's set to
   # empty.
   #
-  # rbe_wrapper is used to auto-start/stop a proxy process for the duration of
-  # the build, so that RBE-enabled build actions can operate through the proxy.
+  # rbe_wrapper is used to auto-start/stop a (reclient) proxy process for the
+  # duration of the build, so that RBE-enabled build actions can operate
+  # through the proxy.
   #
   local build_uuid="$(fx-uuid)"
   local rbe_wrapper=()

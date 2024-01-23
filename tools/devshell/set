@@ -65,6 +65,8 @@
 ##   --rust-rbe            If set, use the remote backend (RBE) service for
 ##                         building and caching Rust targets.
 ##                         Default: disabled
+##   --bazel-rbe           If set, allow bazel to build remotely on RBE.
+##                         Default: disabled
 ##   --ide                 Pass --ide=VALUE to gn when generating to create project
 ##                         files usable with that IDE. Useful values include "vs"
 ##                         for Visual Studio or "xcode" for Xcode.

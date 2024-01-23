@@ -462,6 +462,21 @@ func TestConstructStaticSpec(t *testing.T) {
 			expectErr: !rbeSupported,
 		},
 		{
+			name: "bazel-rbe default",
+			args: &setArgs{disableCxxRbe: true},
+			expected: &fintpb.Static{
+				BazelRbeEnable: false,
+			},
+		},
+		{
+			name: "bazel-rbe enabled",
+			args: &setArgs{disableCxxRbe: true, enableBazelRbe: true},
+			expected: &fintpb.Static{
+				BazelRbeEnable: true,
+			},
+			expectErr: !rbeSupported,
+		},
+		{
 			name: "fuzzer variants",
 			args: &setArgs{
 				fuzzSanitizers: []string{"asan", "ubsan"},

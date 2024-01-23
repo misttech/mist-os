@@ -40,6 +40,9 @@ message SetArtifacts {
 
   Metadata metadata = 5;
 
-  // Where the caller should set up reproxy (RBE) before invoking `fint build`.
+  // Set to true if using re-client for RBE.
+  // Enabling this will startup reproxy (RBE) before invoking `fint build`.
+  // This is not needed for bazel+RBE.
+  // Hindsight: a better name for this would have been "enable_reclient_rbe".
   bool enable_rbe = 6;
 }
