@@ -9,14 +9,13 @@ use core::{
 };
 use fidl_fuchsia_bluetooth_sys as sys;
 use fuchsia_bluetooth::types::{Address, HostInfo};
+use fuchsia_bluetooth::Error;
 use futures::{
     ready,
     stream::{FusedStream, Stream, StreamExt},
 };
 use std::convert::TryFrom;
-use tracing::{info, trace};
-
-use crate::types::Error;
+use tracing::trace;
 
 /// Item type returned by `<HostWatcher as Stream>::poll_next`.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -29,7 +28,15 @@ pub enum HostEvent {
     NotAvailable,
 }
 
-/// Watches state changes on any Bluetooth hosts tracked by the system.
+/// The termination status of the stream.
+#[derive(Debug, Eq, PartialEq, PartialOrd, Ord)]
+enum Terminated {
+    Active,
+    ShuttingDown,
+    Done,
+}
+
+/// Watches for changes in state in the active Bluetooth Host of the system.
 /// `HostWatcher` implements Stream. The `HostWatcher` _must_ be polled to receive updates about
 /// the currently active host.
 pub struct HostWatcher {
@@ -38,7 +45,7 @@ pub struct HostWatcher {
     /// Information about the currently active Host, or None if there is no such Host.
     active_host: Option<HostInfo>,
     /// Termination status of the `host_updates` watcher.
-    terminated: bool,
+    terminated: Terminated,
 }
 
 impl HostWatcher {
@@ -47,7 +54,7 @@ impl HostWatcher {
     pub fn new(host_watcher: sys::HostWatcherProxy) -> Self {
         let host_updates =
             HangingGetStream::new_with_fn_ptr(host_watcher, sys::HostWatcherProxy::watch);
-        Self { host_updates, active_host: None, terminated: false }
+        Self { host_updates, active_host: None, terminated: Terminated::Active }
     }
 
     #[cfg(test)]
@@ -57,7 +64,6 @@ impl HostWatcher {
         this
     }
 
-    #[cfg(test)]
     pub fn set_active_host(&mut self, host: HostInfo) {
         self.active_host = Some(host);
     }
@@ -65,7 +71,7 @@ impl HostWatcher {
     // Compares the `new` host state to the current and returns a HostEvent if the relevant state
     // has changed.
     fn compare(&self, new: &Option<HostInfo>) -> Option<HostEvent> {
-        trace!("Comparing to: {:?}", new);
+        trace!("Current ({:?}) - New ({:?})", self.active_host, new);
         match (&self.active_host, new) {
             (None, Some(info)) => {
                 Some(HostEvent::NewActiveHost { discoverable: info.discoverable })
@@ -133,11 +139,16 @@ impl HostWatcher {
 }
 
 impl Stream for HostWatcher {
-    type Item = HostEvent;
+    type Item = Result<HostEvent, Error>;
 
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-        if self.terminated {
-            panic!("Cannot poll a terminated stream");
+        match self.terminated {
+            Terminated::Active => {}
+            Terminated::ShuttingDown => {
+                self.terminated = Terminated::Done;
+                return Poll::Ready(None);
+            }
+            Terminated::Done => panic!("Cannot poll a terminated stream"),
         }
 
         // Keep polling the request stream until it produces a request that should be returned or it
@@ -148,21 +159,20 @@ impl Stream for HostWatcher {
             let result = match result {
                 Some(Ok(update)) => match self.handle_host_watcher_update(update) {
                     Ok(None) => continue,
-                    Ok(Some(request)) => Some(request),
-                    Err(e) => {
-                        info!("Error handling HostWatcher FIDL client request: {}.", e);
-                        None
-                    }
+                    Ok(Some(request)) => Some(Ok(request)),
+                    Err(e) => Some(Err(e)),
                 },
                 Some(Err(e)) => {
-                    info!("Error in HostWatcher FIDL client request: {}.", e);
-                    None
+                    // FIDL errors are typically irrecoverable - return the Error and stage stream
+                    // for termination. The next time it is polled, it will complete.
+                    self.terminated = Terminated::ShuttingDown;
+                    Some(Err(e.into()))
                 }
                 None => None,
             };
             if result.is_none() {
-                trace!("Closing HostWatcher connection");
-                self.terminated = true;
+                trace!("HostWatcher hanging-get exhausted");
+                self.terminated = Terminated::Done;
             }
 
             return Poll::Ready(result);
@@ -172,7 +182,7 @@ impl Stream for HostWatcher {
 
 impl FusedStream for HostWatcher {
     fn is_terminated(&self) -> bool {
-        self.terminated
+        self.terminated == Terminated::Done
     }
 }
 
@@ -180,9 +190,10 @@ impl FusedStream for HostWatcher {
 pub(crate) mod tests {
     use super::*;
 
+    use assert_matches::assert_matches;
     use async_utils::PollExt;
     use fuchsia_async as fasync;
-    use fuchsia_bluetooth::types::HostId;
+    use fuchsia_bluetooth::types::{example_host, HostId};
     use futures::pin_mut;
     use std::convert::TryInto;
 
@@ -198,19 +209,6 @@ pub(crate) mod tests {
             .expect("valid FIDL request")
             .into_watch()
             .expect("Watch request")
-    }
-
-    pub(crate) fn example_host(id: HostId, active: bool, discoverable: bool) -> sys::HostInfo {
-        sys::HostInfo {
-            id: Some(id.into()),
-            technology: Some(sys::TechnologyType::LowEnergy),
-            active: Some(active),
-            local_name: Some("fuchsia123".to_string()),
-            discoverable: Some(discoverable),
-            discovering: Some(true),
-            addresses: Some(vec![Address::Public([1, 2, 3, 4, 5, 6]).into()]),
-            ..Default::default()
-        }
     }
 
     #[fuchsia::test]
@@ -249,8 +247,8 @@ pub(crate) mod tests {
         let _ = watch_responder.send(&[host1]).unwrap();
 
         // HostWatcher stream should yield a change in host state.
-        let item = exec.run_until_stalled(&mut watcher.next()).expect("host update");
-        assert_eq!(item, Some(HostEvent::NewActiveHost { discoverable: false }));
+        let item = exec.run_until_stalled(&mut watcher.next()).expect("host update ready");
+        assert_matches!(item, Some(Ok(HostEvent::NewActiveHost { discoverable: false })));
 
         // Because this is a hanging-get, we expect the HostWatcher to make the next request.
         let _ = exec.run_until_stalled(&mut watcher.next()).expect_pending("No updates");
@@ -260,7 +258,7 @@ pub(crate) mod tests {
 
         // HostWatcher stream should yield a change in host state.
         let item = exec.run_until_stalled(&mut watcher.next()).expect("host update");
-        assert_eq!(item, Some(HostEvent::NotAvailable));
+        assert_matches!(item, Some(Ok(HostEvent::NotAvailable)));
     }
 
     #[fuchsia::test]
@@ -285,7 +283,7 @@ pub(crate) mod tests {
         // HostWatcher stream should yield a change in host state since it went from active host
         // to no active host.
         let item = exec.run_until_stalled(&mut watcher.next()).expect("host update");
-        assert_eq!(item, Some(HostEvent::NotAvailable));
+        assert_matches!(item, Some(Ok(HostEvent::NotAvailable)));
     }
 
     #[fuchsia::test]
@@ -337,7 +335,7 @@ pub(crate) mod tests {
         let _ = watch_responder.send(&[host1.clone()]).unwrap();
 
         let item = exec.run_until_stalled(&mut watcher.next()).expect("host update");
-        assert_eq!(item, Some(HostEvent::Discoverable(true)));
+        assert_matches!(item, Some(Ok(HostEvent::Discoverable(true))));
     }
 
     #[fuchsia::test]
@@ -359,7 +357,7 @@ pub(crate) mod tests {
         let _ = watch_responder.send(&[host2]).unwrap();
 
         let item = exec.run_until_stalled(&mut watcher.next()).expect("host update");
-        assert_eq!(item, Some(HostEvent::NewActiveHost { discoverable: false }));
+        assert_matches!(item, Some(Ok(HostEvent::NewActiveHost { discoverable: false })));
 
         // Receive an update about a new active, discoverable host.
         let _ = exec.run_until_stalled(&mut watcher.next()).expect_pending("No updates");
@@ -368,11 +366,11 @@ pub(crate) mod tests {
         let _ = watch_responder.send(&[host3]).unwrap();
 
         let item = exec.run_until_stalled(&mut watcher.next()).expect("host update");
-        assert_eq!(item, Some(HostEvent::NewActiveHost { discoverable: true }));
+        assert_matches!(item, Some(Ok(HostEvent::NewActiveHost { discoverable: true })));
     }
 
     #[fuchsia::test]
-    fn invalidly_formatted_active_host_terminates_host_watcher() {
+    fn invalidly_formatted_host_returns_error_stream_item() {
         let mut exec = fasync::TestExecutor::new();
 
         let (proxy, mut server) =
@@ -387,13 +385,13 @@ pub(crate) mod tests {
             sys::HostInfo { id: Some(HostId(12).into()), active: Some(true), ..Default::default() };
         let _ = watch_responder.send(&[invalid_host]).unwrap();
 
-        let item = exec.run_until_stalled(&mut watcher.next()).expect("host watcher termination");
-        assert_eq!(item, None);
-        assert!(watcher.is_terminated());
+        let item = exec.run_until_stalled(&mut watcher.next()).expect("host watcher update");
+        assert_matches!(item, Some(Err(_)));
+        assert!(!watcher.is_terminated());
     }
 
     #[fuchsia::test]
-    fn termination_of_host_watcher_server_terminates_host_watcher() {
+    fn closing_fidl_server_terminates_host_watcher() {
         let mut exec = fasync::TestExecutor::new();
 
         let (proxy, mut server) =
@@ -405,12 +403,17 @@ pub(crate) mod tests {
         let watch_responder = expect_watch_request(&mut exec, &mut server);
         let _ = watch_responder.send(&[]).unwrap();
 
-        // In between somewhere, the upstream `HostWatcher` protocol server disconnects. The next
-        // time the `HostWatcher` stream is polled, it should detect closure and terminate.
+        // The upstream `HostWatcher` protocol server disconnects. This should result in a FIDL
+        // error propagated to the stream. The next time the `HostWatcher` stream is polled, it
+        // should detect closure and terminate.
         drop(server);
 
+        let item = exec.run_until_stalled(&mut watcher.next()).expect("host watcher FIDL error");
+        assert_matches!(item, Some(Err(_)));
+        assert!(!watcher.is_terminated());
+
         let item = exec.run_until_stalled(&mut watcher.next()).expect("host watcher termination");
-        assert_eq!(item, None);
+        assert_matches!(item, None);
         assert!(watcher.is_terminated());
     }
 }

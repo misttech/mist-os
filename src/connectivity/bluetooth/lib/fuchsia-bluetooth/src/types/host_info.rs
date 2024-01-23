@@ -147,6 +147,20 @@ impl InspectData<HostInfo> for HostInfoInspect {
     }
 }
 
+/// Example Bluetooth host for testing.
+pub fn example_host(id: HostId, active: bool, discoverable: bool) -> fsys::HostInfo {
+    fsys::HostInfo {
+        id: Some(id.into()),
+        technology: Some(fsys::TechnologyType::LowEnergy),
+        active: Some(active),
+        local_name: Some("fuchsia123".to_string()),
+        discoverable: Some(discoverable),
+        discovering: Some(true),
+        addresses: Some(vec![Address::Public([1, 2, 3, 4, 5, 6]).into()]),
+        ..Default::default()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -13,13 +13,13 @@ use fuchsia_inspect::{self as inspect, NumericProperty, Property};
 use fuchsia_inspect_derive::{AttachError, Inspect};
 use futures::stream::{FusedStream, StreamExt};
 use futures::{channel::mpsc, select, FutureExt};
+use host_watcher::{HostEvent, HostWatcher};
 use tracing::{debug, info, trace, warn};
 
 use crate::advertisement::LowEnergyAdvertiser;
 use crate::config::Config;
 use crate::fidl_client::FastPairConnectionManager;
 use crate::gatt_service::{GattRequest, GattService, GattServiceResponder};
-use crate::host_watcher::{HostEvent, HostWatcher};
 use crate::message_stream::MessageStream;
 use crate::pairing::{PairingArgs, PairingManager, PairingType};
 use crate::types::keys::aes_from_anti_spoofing_and_public;
@@ -280,7 +280,7 @@ impl Provider {
         };
         let discoverable = self.host_watcher.pairing_mode().expect("just checked active host");
 
-        let Some(pairing) =  self.pairing.inner_mut() else {
+        let Some(pairing) = self.pairing.inner_mut() else {
             response(Err(gatt::Error::UnlikelyError));
             return Err(Error::NoPairingManager);
         };
@@ -569,7 +569,8 @@ impl Provider {
                     debug!("HostWatcher event: {watcher_update:?}");
                     // Unexpected termination of the Host Watcher is a fatal error.
                     match watcher_update {
-                        Some(update) => self.handle_host_watcher_update(update).await?,
+                        Some(Ok(update)) => self.handle_host_watcher_update(update).await?,
+                        Some(Err(e)) => warn!("Error in `sys.HostWatcher`: {e:?}. Ignoring update"),
                         None => return Err(Error::internal("HostWatcher unexpectedly terminated")),
                     }
                 }
@@ -635,7 +636,7 @@ mod tests {
         HostWatcherRequestStream, InputCapability, OutputCapability, PairingDelegateMarker,
     };
     use fuchsia_async as fasync;
-    use fuchsia_bluetooth::types::{Address, HostId};
+    use fuchsia_bluetooth::types::{example_host, Address, HostId};
     use fuchsia_inspect::NumericProperty;
     use fuchsia_inspect_derive::WithInspect;
     use futures::{pin_mut, FutureExt, SinkExt};
@@ -647,7 +648,6 @@ mod tests {
         ACCOUNT_KEY_CHARACTERISTIC_HANDLE, ADDITIONAL_DATA_CHARACTERISTIC_HANDLE,
         KEY_BASED_PAIRING_CHARACTERISTIC_HANDLE, PASSKEY_CHARACTERISTIC_HANDLE,
     };
-    use crate::host_watcher::tests::example_host;
     use crate::pairing::tests::MockPairing;
     use crate::types::keys::tests::{encrypt_message, encrypt_message_include_public_key};
     use crate::types::packets::tests::{
