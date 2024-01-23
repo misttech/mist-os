@@ -57,9 +57,6 @@ impl LogSettingsServer {
                 source,
             })?;
             match request {
-                fdiagnostics::LogSettingsRequest::RegisterInterest { selectors, .. } => {
-                    logs_repo.update_logs_interest(connection_id, selectors);
-                }
                 fdiagnostics::LogSettingsRequest::SetInterest { selectors, responder } => {
                     logs_repo.update_logs_interest(connection_id, selectors);
                     responder.send().ok();

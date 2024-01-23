@@ -231,7 +231,7 @@ pub struct LogsRepositoryState {
     logs_multiplexers: MultiplexerBroker,
 
     /// Interest registrations that we have received through fuchsia.logger.Log/ListWithSelectors
-    /// or through fuchsia.logger.LogSettings/RegisterInterest.
+    /// or through fuchsia.logger.LogSettings/SetInterest.
     interest_registrations: BTreeMap<usize, Vec<LogInterestSelector>>,
 
     /// The task draining klog and routing to syslog.
