@@ -371,6 +371,9 @@ impl BulkOutEndpoint {
     }
 }
 
+#[allow(unused_tuple_struct_fields)]
 pub struct ControlEndpoint(Arc<InterfaceInterface500>);
+#[allow(unused_tuple_struct_fields)]
 pub struct InterruptEndpoint(Arc<InterfaceInterface500>);
+#[allow(unused_tuple_struct_fields)]
 pub struct IsochronousEndpoint(Arc<InterfaceInterface500>);
