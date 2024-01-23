@@ -23,6 +23,7 @@
 #include <zircon/syscalls/smc.h>
 
 #include <bind/fuchsia/arm/platform/cpp/bind.h>
+#include <bind/fuchsia/hardware/gpu/mali/cpp/bind.h>
 #include <bind/fuchsia/platform/cpp/bind.h>
 #include <soc/aml-s905d2/s905d2-hiu.h>
 
@@ -476,7 +477,8 @@ zx::result<> AmlGpu::Start() {
   fidl::Arena arena;
   node_ = fidl::WireSyncClient<fuchsia_driver_framework::Node>(std::move(node()));
   auto properties = std::vector<fuchsia_driver_framework::NodeProperty>{
-      fdf::MakeProperty(1 /*BIND_PROTOCOL*/, bind_fuchsia_arm_platform::BIND_PROTOCOL_ARM_MALI)};
+      fdf::MakeProperty(bind_fuchsia_hardware_gpu_mali::SERVICE,
+                        bind_fuchsia_hardware_gpu_mali::SERVICE_DRIVERTRANSPORT)};
 
   auto offers = std::vector{fdf::MakeOffer<fuchsia_hardware_gpu_mali::Service>("default")};
 

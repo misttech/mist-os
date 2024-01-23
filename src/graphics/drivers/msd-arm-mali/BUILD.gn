@@ -10,6 +10,7 @@ driver_bind_rules("msd_arm_bind") {
   rules = "msd_arm.bind"
   tests = "tests/bind_tests.json"
   deps = [
+    "//sdk/fidl/fuchsia.hardware.gpu.mali:fuchsia.hardware.gpu.mali_bindlib",
     "//src/devices/bind/fuchsia.arm.platform",
     "//src/devices/bind/fuchsia.platform",
   ]

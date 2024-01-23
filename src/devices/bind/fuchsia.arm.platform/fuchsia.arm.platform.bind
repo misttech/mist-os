@@ -4,10 +4,6 @@
 
 library fuchsia.arm.platform;
 
-extend uint fuchsia.BIND_PROTOCOL {
-  ARM_MALI = 156,
-};
-
 extend uint fuchsia.BIND_PLATFORM_DEV_VID {
   ARM = 0x12,
 };

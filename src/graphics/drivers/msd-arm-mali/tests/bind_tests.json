@@ -29,14 +29,14 @@
         "tests": [
             {
                 "device": {
-                    "fuchsia.BIND_PROTOCOL": "fuchsia.arm.platform.BIND_PROTOCOL.ARM_MALI"
+                    "fuchsia.hardware.gpu.mali.Service": "fuchsia.hardware.gpu.mali.Service.DriverTransport"
                 },
                 "expected": "match",
                 "name": "Match"
             },
             {
                 "device": {
-                    "fuchsia.BIND_PROTOCOL": "fuchsia.platform.BIND_PROTOCOL.DEVICE"
+                    "fuchsia.hardware.gpu.mali.Service": "fuchsia.hardware.gpu.mali.Service.ZirconTransport"
                 },
                 "expected": "abort",
                 "name": "Match"

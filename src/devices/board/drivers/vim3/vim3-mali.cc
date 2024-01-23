@@ -13,6 +13,7 @@
 #include <bind/fuchsia/amlogic/platform/cpp/bind.h>
 #include <bind/fuchsia/arm/platform/cpp/bind.h>
 #include <bind/fuchsia/cpp/bind.h>
+#include <bind/fuchsia/hardware/gpu/mali/cpp/bind.h>
 #include <bind/fuchsia/register/cpp/bind.h>
 #include <soc/aml-a311d/a311d-hw.h>
 #include <soc/aml-common/aml-registers.h>
@@ -122,11 +123,13 @@ zx_status_t Vim3::MaliInit() {
     fidl::Arena<> fidl_arena;
     fdf::Arena arena('MALI');
 
-    auto aml_gpu_bind_rules = std::vector{fdf::MakeAcceptBindRule(
-        bind_fuchsia::PROTOCOL, bind_fuchsia_arm_platform::BIND_PROTOCOL_ARM_MALI)};
+    auto aml_gpu_bind_rules = std::vector{
+        fdf::MakeAcceptBindRule(bind_fuchsia_hardware_gpu_mali::SERVICE,
+                                bind_fuchsia_hardware_gpu_mali::SERVICE_DRIVERTRANSPORT)};
 
-    auto aml_gpu_properties = std::vector{fdf::MakeProperty(
-        bind_fuchsia::PROTOCOL, bind_fuchsia_arm_platform::BIND_PROTOCOL_ARM_MALI)};
+    auto aml_gpu_properties =
+        std::vector{fdf::MakeProperty(bind_fuchsia_hardware_gpu_mali::SERVICE,
+                                      bind_fuchsia_hardware_gpu_mali::SERVICE_DRIVERTRANSPORT)};
 
     auto parents =
         std::vector{fuchsia_driver_framework::ParentSpec(aml_gpu_bind_rules, aml_gpu_properties)};
