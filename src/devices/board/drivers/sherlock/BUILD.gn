@@ -88,22 +88,6 @@ driver_bind_rules("sherlock-emmc-bind") {
   ]
 }
 
-driver_bind_rules("sherlock-thermal-bind") {
-  rules = "bind/sherlock-thermal.bind"
-  header_output = "sherlock-thermal-bind.h"
-  bind_output = "sherlock-thermal-bind.bc"
-  tests = "bind-tests/sherlock-thermal-test.json"
-  deps = [
-    "//src/devices/bind/fuchsia.amlogic.platform",
-    "//src/devices/bind/fuchsia.amlogic.platform.meson",
-    "//src/devices/bind/fuchsia.amlogic.platform.t931",
-    "//src/devices/bind/fuchsia.clock",
-    "//src/devices/bind/fuchsia.gpio",
-    "//src/devices/bind/fuchsia.platform",
-    "//src/devices/bind/fuchsia.pwm",
-  ]
-}
-
 driver_bind_rules("sherlock-sdio-bind") {
   rules = "bind/sherlock-sdio.bind"
   header_output = "sherlock-sdio-bind.h"
@@ -224,7 +208,6 @@ template("sherlock_driver") {
       ":sherlock-hevc-enc-bind_header",
       ":sherlock-pwm-bind_header",
       ":sherlock-sdio-bind_header",
-      ":sherlock-thermal-bind_header",
       ":sherlock-tweeter-left-bind_header",
       ":sherlock-tweeter-right-bind_header",
       ":sherlock-video-enc-bind_header",

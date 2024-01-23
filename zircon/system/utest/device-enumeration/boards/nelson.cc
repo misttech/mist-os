@@ -54,7 +54,7 @@ TEST_F(DeviceEnumerationTest, NelsonTest) {
       "sys/platform/05:05:1c/aml_nna",
       "sys/platform/05:05:22/clocks",
       "sys/platform/05:05:22/clocks/clock-init",
-      "sys/platform/05:05:a/aml-thermal-pll/thermal",
+      "sys/platform/05:05:a/aml_thermal_pll/thermal",
       "class/thermal/000",
       // "sys/platform/05:03:1e/cpu",
       "sys/platform/05:03:1a/aml_securemem/aml-securemem",

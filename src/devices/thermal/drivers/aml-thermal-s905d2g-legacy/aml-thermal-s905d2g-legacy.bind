@@ -2,13 +2,55 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+composite aml_thermal_pll;
+
+using fuchsia.platform;
 using fuchsia.amlogic.platform;
+using fuchsia.gpio;
+using fuchsia.pwm;
+using fuchsia.clock;
 
-fuchsia.BIND_COMPOSITE == 1;
-fuchsia.BIND_PLATFORM_DEV_VID == fuchsia.amlogic.platform.BIND_PLATFORM_DEV_VID.AMLOGIC;
-fuchsia.BIND_PLATFORM_DEV_DID == fuchsia.amlogic.platform.BIND_PLATFORM_DEV_DID.THERMAL_PLL;
+primary node "pdev" {
+  fuchsia.BIND_PROTOCOL == fuchsia.platform.BIND_PROTOCOL.DEVICE;
+  fuchsia.BIND_PLATFORM_DEV_VID == fuchsia.amlogic.platform.BIND_PLATFORM_DEV_VID.AMLOGIC;
+  accept fuchsia.BIND_PLATFORM_DEV_PID {
+    fuchsia.amlogic.platform.BIND_PLATFORM_DEV_PID.T931,
+    fuchsia.amlogic.platform.BIND_PLATFORM_DEV_PID.S905D3,
+  }
+  fuchsia.BIND_PLATFORM_DEV_DID == fuchsia.amlogic.platform.BIND_PLATFORM_DEV_DID.THERMAL_PLL;
+  fuchsia.BIND_PLATFORM_DEV_INSTANCE_ID == 0;
+}
 
-accept fuchsia.BIND_PLATFORM_DEV_PID {
-  fuchsia.amlogic.platform.BIND_PLATFORM_DEV_PID.T931,
-  fuchsia.amlogic.platform.BIND_PLATFORM_DEV_PID.S905D3,
+node "gpio-init" {
+  fuchsia.BIND_INIT_STEP == fuchsia.gpio.BIND_INIT_STEP.GPIO;
+}
+
+node "pwm-a" {
+  fuchsia.BIND_FIDL_PROTOCOL == fuchsia.pwm.BIND_FIDL_PROTOCOL.DEVICE;
+  fuchsia.pwm.PWM_ID_FUNCTION == fuchsia.pwm.PWM_ID_FUNCTION.CORE_POWER_BIG_CLUSTER;
+}
+
+optional node "pwm-ao-d" {
+  fuchsia.BIND_FIDL_PROTOCOL == fuchsia.pwm.BIND_FIDL_PROTOCOL.DEVICE;
+  fuchsia.pwm.PWM_ID_FUNCTION == fuchsia.pwm.PWM_ID_FUNCTION.CORE_POWER_LITTLE_CLUSTER;
+}
+
+node "clock-1" {
+  fuchsia.BIND_FIDL_PROTOCOL == fuchsia.clock.BIND_FIDL_PROTOCOL.SERVICE;
+  fuchsia.clock.FUNCTION == fuchsia.clock.FUNCTION.SYS_PLL_DIV16;
+}
+
+node "clock-2" {
+  fuchsia.BIND_FIDL_PROTOCOL == fuchsia.clock.BIND_FIDL_PROTOCOL.SERVICE;
+  fuchsia.clock.FUNCTION == fuchsia.clock.FUNCTION.SYS_CPU_DIV16;
+}
+
+optional node "clock-3" {
+  fuchsia.BIND_FIDL_PROTOCOL == fuchsia.clock.BIND_FIDL_PROTOCOL.SERVICE;
+  fuchsia.clock.FUNCTION == fuchsia.clock.FUNCTION.SYS_PLLB_DIV16;
+}
+
+optional node "clock-4" {
+  fuchsia.BIND_FIDL_PROTOCOL == fuchsia.clock.BIND_FIDL_PROTOCOL.SERVICE;
+  fuchsia.clock.FUNCTION == fuchsia.clock.FUNCTION.SYS_CPUB_DIV16;
 }

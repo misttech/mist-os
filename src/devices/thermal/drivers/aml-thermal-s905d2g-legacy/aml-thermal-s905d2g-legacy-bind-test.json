@@ -1,41 +1,107 @@
 [
     {
-        "device": {
-            "fuchsia.BIND_COMPOSITE": "1",
-            "fuchsia.BIND_PLATFORM_DEV_DID": "fuchsia.amlogic.platform.BIND_PLATFORM_DEV_DID.THERMAL_PLL",
-            "fuchsia.BIND_PLATFORM_DEV_PID": "fuchsia.amlogic.platform.BIND_PLATFORM_DEV_PID.T931",
-            "fuchsia.BIND_PLATFORM_DEV_VID": "fuchsia.amlogic.platform.BIND_PLATFORM_DEV_VID.AMLOGIC"
-        },
-        "expected": "match",
-        "name": "Match T931"
+        "node": "pdev",
+        "tests": [
+            {
+                "name": "Match T931",
+                "expected": "match",
+                "device": {
+                    "fuchsia.BIND_PROTOCOL": "fuchsia.platform.BIND_PROTOCOL.DEVICE",
+                    "fuchsia.BIND_PLATFORM_DEV_DID": "fuchsia.amlogic.platform.BIND_PLATFORM_DEV_DID.THERMAL_PLL",
+                    "fuchsia.BIND_PLATFORM_DEV_INSTANCE_ID": "0",
+                    "fuchsia.BIND_PLATFORM_DEV_VID": "fuchsia.amlogic.platform.BIND_PLATFORM_DEV_VID.AMLOGIC",
+                    "fuchsia.BIND_PLATFORM_DEV_PID": "fuchsia.amlogic.platform.BIND_PLATFORM_DEV_PID.T931"
+                }
+            },
+            {
+                "name": "Match S905D3",
+                "expected": "match",
+                "device": {
+                    "fuchsia.BIND_PROTOCOL": "fuchsia.platform.BIND_PROTOCOL.DEVICE",
+                    "fuchsia.BIND_PLATFORM_DEV_DID": "fuchsia.amlogic.platform.BIND_PLATFORM_DEV_DID.THERMAL_PLL",
+                    "fuchsia.BIND_PLATFORM_DEV_INSTANCE_ID": "0",
+                    "fuchsia.BIND_PLATFORM_DEV_VID": "fuchsia.amlogic.platform.BIND_PLATFORM_DEV_VID.AMLOGIC",
+                    "fuchsia.BIND_PLATFORM_DEV_PID": "fuchsia.amlogic.platform.BIND_PLATFORM_DEV_PID.S905D3"
+                }
+            }
+        ]
     },
     {
-        "device": {
-            "fuchsia.BIND_COMPOSITE": "1",
-            "fuchsia.BIND_PLATFORM_DEV_DID": "fuchsia.amlogic.platform.BIND_PLATFORM_DEV_DID.THERMAL_PLL",
-            "fuchsia.BIND_PLATFORM_DEV_PID": "fuchsia.amlogic.platform.BIND_PLATFORM_DEV_PID.S905D3",
-            "fuchsia.BIND_PLATFORM_DEV_VID": "fuchsia.amlogic.platform.BIND_PLATFORM_DEV_VID.AMLOGIC"
-        },
-        "expected": "match",
-        "name": "Match S905D3"
+        "node": "pwm-a",
+        "tests": [
+            {
+                "name": "Match",
+                "expected": "match",
+                "device": {
+                    "fuchsia.BIND_FIDL_PROTOCOL": "fuchsia.pwm.BIND_FIDL_PROTOCOL.DEVICE",
+                    "fuchsia.pwm.PWM_ID_FUNCTION": "fuchsia.pwm.PWM_ID_FUNCTION.CORE_POWER_BIG_CLUSTER"
+                }
+            }
+        ]
     },
     {
-        "device": {
-            "fuchsia.BIND_COMPOSITE": "1",
-            "fuchsia.BIND_PLATFORM_DEV_PID": "fuchsia.amlogic.platform.BIND_PLATFORM_DEV_PID.S905D3",
-            "fuchsia.BIND_PLATFORM_DEV_VID": "fuchsia.amlogic.platform.BIND_PLATFORM_DEV_VID.AMLOGIC"
-        },
-        "expected": "abort",
-        "name": "No DID"
+        "node": "pwm-ao-d",
+        "tests": [
+            {
+                "name": "Match",
+                "expected": "match",
+                "device": {
+                    "fuchsia.BIND_FIDL_PROTOCOL": "fuchsia.pwm.BIND_FIDL_PROTOCOL.DEVICE",
+                    "fuchsia.pwm.PWM_ID_FUNCTION": "fuchsia.pwm.PWM_ID_FUNCTION.CORE_POWER_LITTLE_CLUSTER"
+                }
+            }
+        ]
     },
     {
-        "device": {
-            "fuchsia.BIND_PLATFORM_DEV_DID": "fuchsia.amlogic.platform.BIND_PLATFORM_DEV_DID.THERMAL_PLL",
-            "fuchsia.BIND_PLATFORM_DEV_PID": "fuchsia.amlogic.platform.BIND_PLATFORM_DEV_PID.T931",
-            "fuchsia.BIND_PLATFORM_DEV_VID": "fuchsia.amlogic.platform.BIND_PLATFORM_DEV_VID.AMLOGIC",
-            "fuchsia.BIND_PROTOCOL": "fuchsia.platform.BIND_PROTOCOL.DEVICE"
-        },
-        "expected": "abort",
-        "name": "Bad protocol"
+        "node": "clock-1",
+        "tests": [
+            {
+                "name": "Match",
+                "expected": "match",
+                "device": {
+                    "fuchsia.BIND_FIDL_PROTOCOL": "fuchsia.clock.BIND_FIDL_PROTOCOL.SERVICE",
+                    "fuchsia.clock.FUNCTION": "fuchsia.clock.FUNCTION.SYS_PLL_DIV16"
+                }
+            }
+        ]
+    },
+    {
+        "node": "clock-2",
+        "tests": [
+            {
+                "name": "Match",
+                "expected": "match",
+                "device": {
+                    "fuchsia.BIND_FIDL_PROTOCOL": "fuchsia.clock.BIND_FIDL_PROTOCOL.SERVICE",
+                    "fuchsia.clock.FUNCTION": "fuchsia.clock.FUNCTION.SYS_CPU_DIV16"
+                }
+            }
+        ]
+    },
+    {
+        "node": "clock-3",
+        "tests": [
+            {
+                "name": "Match",
+                "expected": "match",
+                "device": {
+                    "fuchsia.BIND_FIDL_PROTOCOL": "fuchsia.clock.BIND_FIDL_PROTOCOL.SERVICE",
+                    "fuchsia.clock.FUNCTION": "fuchsia.clock.FUNCTION.SYS_PLLB_DIV16"
+                }
+            }
+        ]
+    },
+    {
+        "node": "clock-4",
+        "tests": [
+            {
+                "name": "Match",
+                "expected": "match",
+                "device": {
+                    "fuchsia.BIND_FIDL_PROTOCOL": "fuchsia.clock.BIND_FIDL_PROTOCOL.SERVICE",
+                    "fuchsia.clock.FUNCTION": "fuchsia.clock.FUNCTION.SYS_CPUB_DIV16"
+                }
+            }
+        ]
     }
 ]

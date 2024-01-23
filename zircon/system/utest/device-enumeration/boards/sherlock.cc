@@ -19,7 +19,7 @@ TEST_F(DeviceEnumerationTest, SherlockTest) {
       "sys/platform/05:00:2:1/i2c-1/aml-i2c",
       "sys/platform/05:00:2:2/i2c-2/aml-i2c",
       "sys/platform/05:00:10/aml-canvas",
-      "sys/platform/05:04:a/aml-thermal-pll/thermal",
+      "sys/platform/05:04:a/aml_thermal_pll/thermal",
       "sys/platform/00:00:1e/dw-dsi",
       "sys/platform/00:00:1e/dw-dsi/display/amlogic-display/display-coordinator",
       "sys/platform/05:00:18/aml_usb_phy_v2",
@@ -67,8 +67,8 @@ TEST_F(DeviceEnumerationTest, SherlockTest) {
       "sys/platform/03:05:6",
       "class/cpu-ctrl/000",
       "class/cpu-ctrl/001",
-      "sys/platform/05:04:a/aml-thermal-pll/thermal/aml_cpu_legacy/big-cluster",
-      "sys/platform/05:04:a/aml-thermal-pll/thermal/aml_cpu_legacy/little-cluster",
+      "sys/platform/05:04:a/aml_thermal_pll/thermal/aml_cpu_legacy/big-cluster",
+      "sys/platform/05:04:a/aml_thermal_pll/thermal/aml_cpu_legacy/little-cluster",
 
       // Thermal devices.
       "sys/platform/05:04:a",

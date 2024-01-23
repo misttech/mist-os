@@ -10,7 +10,14 @@
 #include <lib/ddk/device.h>
 #include <lib/ddk/metadata.h>
 #include <lib/ddk/platform-defs.h>
+#include <lib/driver/component/cpp/composite_node_spec.h>
+#include <lib/driver/component/cpp/node_add_args.h>
 
+#include <bind/fuchsia/amlogic/platform/cpp/bind.h>
+#include <bind/fuchsia/clock/cpp/bind.h>
+#include <bind/fuchsia/cpp/bind.h>
+#include <bind/fuchsia/gpio/cpp/bind.h>
+#include <bind/fuchsia/pwm/cpp/bind.h>
 #include <ddk/metadata/camera.h>
 #include <soc/aml-common/aml-thermal.h>
 #include <soc/aml-meson/g12b-clk.h>
@@ -19,8 +26,11 @@
 #include <soc/aml-t931/t931-pwm.h>
 
 #include "sherlock.h"
-#include "src/devices/board/drivers/sherlock/sherlock-thermal-bind.h"
 #include "src/devices/bus/lib/platform-bus-composites/platform-bus-composite.h"
+
+namespace fdf {
+using namespace fuchsia_driver_framework;
+}  // namespace fdf
 
 namespace sherlock {
 namespace fpbus = fuchsia_hardware_platform_bus;
@@ -248,12 +258,24 @@ const std::vector<fpbus::Metadata> thermal_metadata_ddr{
     }},
 };
 
+const std::map<uint32_t, std::string> kPwmIdMap = {
+    {T931_PWM_A, bind_fuchsia_pwm::PWM_ID_FUNCTION_CORE_POWER_BIG_CLUSTER},
+    {T931_PWM_AO_D, bind_fuchsia_pwm::PWM_ID_FUNCTION_CORE_POWER_LITTLE_CLUSTER},
+};
+
+const std::map<uint32_t, std::string> kClockFunctionMap = {
+    {g12b_clk::G12B_CLK_SYS_PLL_DIV16, bind_fuchsia_clock::FUNCTION_SYS_PLL_DIV16},
+    {g12b_clk::G12B_CLK_SYS_PLLB_DIV16, bind_fuchsia_clock::FUNCTION_SYS_PLLB_DIV16},
+    {g12b_clk::G12B_CLK_SYS_CPU_CLK_DIV16, bind_fuchsia_clock::FUNCTION_SYS_CPU_DIV16},
+    {g12b_clk::G12B_CLK_SYS_CPUB_CLK_DIV16, bind_fuchsia_clock::FUNCTION_SYS_CPUB_DIV16},
+};
+
 const fpbus::Node thermal_dev_pll = []() {
   fpbus::Node dev = {};
   dev.name() = "aml-thermal-pll";
-  dev.vid() = PDEV_VID_AMLOGIC;
-  dev.pid() = PDEV_PID_AMLOGIC_T931;
-  dev.did() = PDEV_DID_AMLOGIC_THERMAL_PLL;
+  dev.vid() = bind_fuchsia_amlogic_platform::BIND_PLATFORM_DEV_VID_AMLOGIC;
+  dev.pid() = bind_fuchsia_amlogic_platform::BIND_PLATFORM_DEV_PID_T931;
+  dev.did() = bind_fuchsia_amlogic_platform::BIND_PLATFORM_DEV_DID_THERMAL_PLL;
   dev.mmio() = thermal_mmios_pll;
   dev.irq() = thermal_irqs_pll;
   dev.metadata() = thermal_metadata_pll;
@@ -291,18 +313,59 @@ zx_status_t Sherlock::ThermalInit() {
   fidl::Arena<> fidl_arena;
   fdf::Arena arena('SHER');
   {
-    auto result = pbus_.buffer(arena)->AddComposite(
+    std::vector<fdf::ParentSpec> parents;
+    parents.reserve(kClockFunctionMap.size() + kPwmIdMap.size() + 1);
+    parents.push_back(fuchsia_driver_framework::ParentSpec{{
+        .bind_rules =
+            {
+                fdf::MakeAcceptBindRule(bind_fuchsia::INIT_STEP,
+                                        bind_fuchsia_gpio::BIND_INIT_STEP_GPIO),
+            },
+        .properties =
+            {
+                fdf::MakeProperty(bind_fuchsia::INIT_STEP, bind_fuchsia_gpio::BIND_INIT_STEP_GPIO),
+            },
+    }});
+
+    for (auto& [pwm_id, function] : kPwmIdMap) {
+      auto rules = std::vector{
+          fdf::MakeAcceptBindRule(bind_fuchsia::FIDL_PROTOCOL,
+                                  bind_fuchsia_pwm::BIND_FIDL_PROTOCOL_DEVICE),
+          fdf::MakeAcceptBindRule(bind_fuchsia::PWM_ID, pwm_id),
+      };
+      auto properties = std::vector{
+          fdf::MakeProperty(bind_fuchsia::FIDL_PROTOCOL,
+                            bind_fuchsia_pwm::BIND_FIDL_PROTOCOL_DEVICE),
+          fdf::MakeProperty(bind_fuchsia_pwm::PWM_ID_FUNCTION, function),
+      };
+      parents.push_back(fdf::ParentSpec{{rules, properties}});
+    }
+
+    for (auto& [clock_id, function] : kClockFunctionMap) {
+      auto rules = std::vector{
+          fdf::MakeAcceptBindRule(bind_fuchsia::FIDL_PROTOCOL,
+                                  bind_fuchsia_clock::BIND_FIDL_PROTOCOL_SERVICE),
+          fdf::MakeAcceptBindRule(bind_fuchsia::CLOCK_ID, clock_id),
+      };
+      auto properties = std::vector{
+          fdf::MakeProperty(bind_fuchsia::FIDL_PROTOCOL,
+                            bind_fuchsia_clock::BIND_FIDL_PROTOCOL_SERVICE),
+          fdf::MakeProperty(bind_fuchsia_clock::FUNCTION, function),
+      };
+      parents.push_back(fdf::ParentSpec{{rules, properties}});
+    }
+
+    auto result = pbus_.buffer(arena)->AddCompositeNodeSpec(
         fidl::ToWire(fidl_arena, thermal_dev_pll),
-        platform_bus_composite::MakeFidlFragment(fidl_arena, aml_thermal_pll_fragments,
-                                                 std::size(aml_thermal_pll_fragments)),
-        "pdev");
+        fidl::ToWire(fidl_arena, fuchsia_driver_framework::CompositeNodeSpec{
+                                     {.name = "aml_thermal_pll", .parents = parents}}));
     if (!result.ok()) {
-      zxlogf(ERROR, "%s: AddComposite SherlockThermal(thermal_dev_pll) request failed: %s",
-             __func__, result.FormatDescription().data());
+      zxlogf(ERROR, "AddCompositeNodeSpec SherlockThermal(thermal_dev_pll) request failed: %s",
+             result.FormatDescription().data());
       return result.status();
     }
     if (result->is_error()) {
-      zxlogf(ERROR, "%s: AddComposite SherlockThermal(thermal_dev_pll) failed: %s", __func__,
+      zxlogf(ERROR, "AddCompositeNodeSpec SherlockThermal(thermal_dev_pll) failed: %s",
              zx_status_get_string(result->error_value()));
       return result->error_value();
     }
