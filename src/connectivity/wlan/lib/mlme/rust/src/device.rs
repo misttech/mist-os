@@ -829,6 +829,7 @@ pub mod test_utils {
     pub struct FakeDeviceConfig {
         pub mac_role: fidl_common::WlanMacRole,
         pub sta_addr: Bssid,
+        pub start_result_override: Option<Result<zx::Handle, zx::Status>>,
         pub start_passive_scan_fails: bool,
         pub start_active_scan_fails: bool,
         pub send_wlan_frame_fails: bool,
@@ -839,6 +840,7 @@ pub mod test_utils {
             Self {
                 mac_role: fidl_common::WlanMacRole::Client,
                 sta_addr: [7u8; 6].into(),
+                start_result_override: None,
                 start_passive_scan_fails: false,
                 start_active_scan_fails: false,
                 send_wlan_frame_fails: false,
@@ -986,6 +988,12 @@ pub mod test_utils {
             wlan_softmac_ifc_bridge_client_handle: zx::sys::zx_handle_t,
         ) -> Result<zx::Handle, zx::Status> {
             let mut state = self.state.lock();
+
+            match state.config.start_result_override.take() {
+                Some(v) => return v,
+                None => (),
+            }
+
             state.wlan_softmac_ifc_bridge_proxy =
                 Some(fidl_softmac::WlanSoftmacIfcBridgeSynchronousProxy::new(fidl::Channel::from(
                     unsafe { fidl::Handle::from_raw(wlan_softmac_ifc_bridge_client_handle) },

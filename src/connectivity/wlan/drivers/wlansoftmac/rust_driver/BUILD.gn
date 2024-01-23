@@ -33,6 +33,7 @@ rustc_library("wlansoftmac-rust") {
 
   test_deps = [
     "//src/connectivity/wlan/lib/common/rust:wlan-common",
+    "//src/lib/diagnostics/testing/diagnostics-assertions/rust:diagnostics-assertions",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:pin-utils",
   ]
