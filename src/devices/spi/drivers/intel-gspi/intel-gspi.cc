@@ -114,7 +114,6 @@ void GspiDevice::DdkInit(ddk::InitTxn txn) {
 
   uint32_t bus_id = result->value()->bus_id;
   zxlogf(INFO, "using SPI bus ID %u", bus_id);
-  status = DdkAddMetadata(DEVICE_METADATA_PRIVATE, &bus_id, sizeof(bus_id));
 }
 
 void GspiDevice::DdkUnbind(ddk::UnbindTxn txn) {

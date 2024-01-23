@@ -8,9 +8,10 @@
 
 #include <zxtest/zxtest.h>
 
-static void check_encodes(cpp20::span<const fidl_metadata::spi::Channel> spi_channels) {
+static void check_encodes(uint32_t bus_id,
+                          cpp20::span<const fidl_metadata::spi::Channel> spi_channels) {
   // Encode.
-  auto result = fidl_metadata::spi::SpiChannelsToFidl(spi_channels);
+  auto result = fidl_metadata::spi::SpiChannelsToFidl(bus_id, spi_channels);
   ASSERT_OK(result.status_value());
   std::vector<uint8_t>& data = result.value();
 
@@ -22,13 +23,14 @@ static void check_encodes(cpp20::span<const fidl_metadata::spi::Channel> spi_cha
   auto& metadata = *decoded.value();
 
   // Check everything looks sensible.
+  ASSERT_TRUE(metadata.has_bus_id());
+  ASSERT_EQ(metadata.bus_id(), bus_id);
+
   ASSERT_TRUE(metadata.has_channels());
   auto channels = metadata.channels();
   ASSERT_EQ(channels.count(), spi_channels.size());
 
   for (size_t i = 0; i < spi_channels.size(); i++) {
-    ASSERT_TRUE(channels[i].has_bus_id());
-    ASSERT_EQ(channels[i].bus_id(), spi_channels[i].bus_id);
     ASSERT_TRUE(channels[i].has_cs());
     ASSERT_EQ(channels[i].cs(), spi_channels[i].cs);
     if (spi_channels[i].did || spi_channels[i].vid || spi_channels[i].pid) {
@@ -44,17 +46,15 @@ static void check_encodes(cpp20::span<const fidl_metadata::spi::Channel> spi_cha
 
 TEST(SpiMetadataTest, TestEncodeNoPlatformIDs) {
   static constexpr fidl_metadata::spi::Channel kSpiChannels[] = {{
-      .bus_id = 4,
       .cs = 0,
   }};
 
-  ASSERT_NO_FATAL_FAILURE(check_encodes(kSpiChannels));
+  ASSERT_NO_FATAL_FAILURE(check_encodes(4, kSpiChannels));
 }
 
 TEST(SpiMetadataTest, TestEncodeManyChannels) {
   static constexpr fidl_metadata::spi::Channel kSpiChannels[] = {
       {
-          .bus_id = 1,
           .cs = 4,
 
           .vid = 10,
@@ -62,7 +62,6 @@ TEST(SpiMetadataTest, TestEncodeManyChannels) {
           .did = 8,
       },
       {
-          .bus_id = 0,
           .cs = 2,
 
           .vid = 8,
@@ -70,7 +69,6 @@ TEST(SpiMetadataTest, TestEncodeManyChannels) {
           .did = 9,
       },
       {
-          .bus_id = 92,
           .cs = 1,
 
           .vid = 0,
@@ -79,9 +77,9 @@ TEST(SpiMetadataTest, TestEncodeManyChannels) {
       },
   };
 
-  ASSERT_NO_FATAL_FAILURE(check_encodes(kSpiChannels));
+  ASSERT_NO_FATAL_FAILURE(check_encodes(92, kSpiChannels));
 }
 
 TEST(SpiMetadataTest, TestEncodeNoChannels) {
-  ASSERT_NO_FATAL_FAILURE(check_encodes(cpp20::span<const fidl_metadata::spi::Channel>()));
+  ASSERT_NO_FATAL_FAILURE(check_encodes(0, cpp20::span<const fidl_metadata::spi::Channel>()));
 }

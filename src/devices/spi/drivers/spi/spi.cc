@@ -4,7 +4,6 @@
 
 #include "spi.h"
 
-#include <fidl/fuchsia.hardware.spi.businfo/cpp/wire.h>
 #include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/metadata.h>
@@ -19,21 +18,26 @@ namespace spi {
 void SpiDevice::DdkRelease() { delete this; }
 
 zx_status_t SpiDevice::Create(void* ctx, zx_device_t* parent, async_dispatcher_t* dispatcher) {
-  uint32_t bus_id;
-  size_t actual;
-  zx_status_t status =
-      device_get_metadata(parent, DEVICE_METADATA_PRIVATE, &bus_id, sizeof bus_id, &actual);
-  if (status != ZX_OK) {
-    return status;
+  auto decoded = ddk::GetEncodedMetadata<fuchsia_hardware_spi_businfo::wire::SpiBusMetadata>(
+      parent, DEVICE_METADATA_SPI_CHANNELS);
+  if (!decoded.is_ok()) {
+    zxlogf(ERROR, "Failed to decode metadata: %s", decoded.status_string());
+    return decoded.error_value();
+  }
+
+  fuchsia_hardware_spi_businfo::wire::SpiBusMetadata& metadata = *decoded.value();
+  if (!metadata.has_bus_id()) {
+    zxlogf(ERROR, "No bus ID metadata provided");
+    return ZX_ERR_INVALID_ARGS;
   }
 
   fbl::AllocChecker ac;
-  std::unique_ptr<SpiDevice> device(new (&ac) SpiDevice(parent, bus_id));
+  std::unique_ptr<SpiDevice> device(new (&ac) SpiDevice(parent, metadata.bus_id()));
   if (!ac.check()) {
     return ZX_ERR_NO_MEMORY;
   }
 
-  status = device->Init();
+  zx_status_t status = device->Init();
   if (status != ZX_OK) {
     return status;
   }
@@ -43,7 +47,12 @@ zx_status_t SpiDevice::Create(void* ctx, zx_device_t* parent, async_dispatcher_t
     return status;
   }
 
-  device->AddChildren(dispatcher);
+  if (!metadata.has_channels()) {
+    zxlogf(INFO, "No channels supplied.");
+  } else {
+    zxlogf(INFO, "%zu channels supplied.", metadata.channels().count());
+    device->AddChildren(dispatcher, metadata);
+  }
 
   [[maybe_unused]] auto* dummy = device.release();
 
@@ -79,28 +88,10 @@ zx_status_t SpiDevice::Init() {
   return ZX_OK;
 }
 
-void SpiDevice::AddChildren(async_dispatcher_t* dispatcher) {
-  auto decoded = ddk::GetEncodedMetadata<fuchsia_hardware_spi_businfo::wire::SpiBusMetadata>(
-      parent(), DEVICE_METADATA_SPI_CHANNELS);
-  if (!decoded.is_ok()) {
-    return;
-  }
-
-  fuchsia_hardware_spi_businfo::wire::SpiBusMetadata& metadata = *decoded.value();
-  if (!metadata.has_channels()) {
-    zxlogf(INFO, "No channels supplied.");
-    return;
-  }
-  zxlogf(INFO, "%zu channels supplied.", metadata.channels().count());
-
+void SpiDevice::AddChildren(async_dispatcher_t* dispatcher,
+                            const fuchsia_hardware_spi_businfo::wire::SpiBusMetadata& metadata) {
   bool has_siblings = metadata.channels().count() > 1;
   for (auto& channel : metadata.channels()) {
-    const auto bus_id = channel.has_bus_id() ? channel.bus_id() : 0;
-
-    if (bus_id != bus_id_) {
-      continue;
-    }
-
     const auto cs = channel.has_cs() ? channel.cs() : 0;
     const auto vid = channel.has_vid() ? channel.vid() : 0;
     const auto pid = channel.has_pid() ? channel.pid() : 0;
@@ -115,7 +106,7 @@ void SpiDevice::AddChildren(async_dispatcher_t* dispatcher) {
     }
 
     char name[20];
-    snprintf(name, sizeof(name), "spi-%u-%u", bus_id, cs);
+    snprintf(name, sizeof(name), "spi-%u-%u", bus_id_, cs);
 
     auto endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
     if (endpoints.is_error()) {
@@ -138,13 +129,13 @@ void SpiDevice::AddChildren(async_dispatcher_t* dispatcher) {
     std::vector<zx_device_prop_t> props;
     if (vid || pid || did) {
       props = std::vector<zx_device_prop_t>{
-          {BIND_SPI_BUS_ID, 0, bus_id},    {BIND_SPI_CHIP_SELECT, 0, cs},
+          {BIND_SPI_BUS_ID, 0, bus_id_},   {BIND_SPI_CHIP_SELECT, 0, cs},
           {BIND_PLATFORM_DEV_VID, 0, vid}, {BIND_PLATFORM_DEV_PID, 0, pid},
           {BIND_PLATFORM_DEV_DID, 0, did},
       };
     } else {
       props = std::vector<zx_device_prop_t>{
-          {BIND_SPI_BUS_ID, 0, bus_id},
+          {BIND_SPI_BUS_ID, 0, bus_id_},
           {BIND_SPI_CHIP_SELECT, 0, cs},
       };
     }

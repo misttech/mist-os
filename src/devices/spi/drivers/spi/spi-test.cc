@@ -191,8 +191,8 @@ class SpiDeviceTest : public zxtest::Test {
 
   static constexpr uint32_t kTestBusId = 0;
   static constexpr spi_channel_t kSpiChannels[] = {
-      {.bus_id = 0, .cs = 0, .vid = 0, .pid = 0, .did = 0},
-      {.bus_id = 0, .cs = 1, .vid = 0, .pid = 0, .did = 0},
+      {.cs = 0, .vid = 0, .pid = 0, .did = 0},
+      {.cs = 1, .vid = 0, .pid = 0, .did = 0},
   };
 
   virtual void SetUpSpiImpl() = 0;
@@ -205,7 +205,7 @@ class SpiDeviceTest : public zxtest::Test {
     ASSERT_OK(loop_.StartThread("spi-test-thread"));
 
     SetUpSpiImpl();
-    SetSpiChannelMetadata(kSpiChannels, std::size(kSpiChannels));
+    SetSpiChannelMetadata(0, kSpiChannels, std::size(kSpiChannels));
     parent_->SetMetadata(DEVICE_METADATA_PRIVATE, &kTestBusId, sizeof(kTestBusId));
   }
 
@@ -235,9 +235,9 @@ class SpiDeviceTest : public zxtest::Test {
     return component::ConnectAt<fuchsia_hardware_spi::Device>(child->outgoing(), path);
   }
 
-  void SetSpiChannelMetadata(const spi_channel_t* channels, size_t count) {
-    const auto result =
-        fidl_metadata::spi::SpiChannelsToFidl(cpp20::span<const spi_channel_t>(channels, count));
+  void SetSpiChannelMetadata(const uint32_t bus_id, const spi_channel_t* channels, size_t count) {
+    const auto result = fidl_metadata::spi::SpiChannelsToFidl(
+        bus_id, cpp20::span<const spi_channel_t>(channels, count));
     ASSERT_OK(result.status_value());
     parent_->SetMetadata(DEVICE_METADATA_SPI_CHANNELS, result->data(), result->size());
   }
@@ -611,7 +611,7 @@ void SpiDeviceTest<FakeSpiImplClass>::AssertCsWithSiblingTest() {
 
 template <class FakeSpiImplClass>
 void SpiDeviceTest<FakeSpiImplClass>::AssertCsNoSiblingTest() {
-  SetSpiChannelMetadata(kSpiChannels, 1);
+  SetSpiChannelMetadata(0, kSpiChannels, 1);
 
   fidl::WireSharedClient<fuchsia_hardware_spi::Device> cs0_client;
 
@@ -651,7 +651,7 @@ void SpiDeviceTest<FakeSpiImplClass>::AssertCsNoSiblingTest() {
 
 template <class FakeSpiImplClass>
 void SpiDeviceTest<FakeSpiImplClass>::OneClient() {
-  SetSpiChannelMetadata(kSpiChannels, 1);
+  SetSpiChannelMetadata(0, kSpiChannels, 1);
 
   fidl::WireSyncClient<fuchsia_hardware_spi::Device> cs0_client;
 
@@ -797,7 +797,7 @@ void SpiDeviceTest<FakeSpiImplClass>::OneClient() {
 
 template <class FakeSpiImplClass>
 void SpiDeviceTest<FakeSpiImplClass>::DdkLifecycle() {
-  SetSpiChannelMetadata(kSpiChannels, 1);
+  SetSpiChannelMetadata(0, kSpiChannels, 1);
 
   fidl::WireSyncClient<fuchsia_hardware_spi::Device> cs0_client;
 

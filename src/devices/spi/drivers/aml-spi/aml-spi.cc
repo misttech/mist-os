@@ -728,12 +728,6 @@ zx_status_t AmlSpi::Create(void* ctx, zx_device_t* device) {
     return status;
   }
 
-  status = spi->DdkAddMetadata(DEVICE_METADATA_PRIVATE, &config.bus_id, sizeof config.bus_id);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "DdkAddMetadata failed for SPI%u: %d", config.bus_id, status);
-    return status;
-  }
-
   [[maybe_unused]] auto* _ = spi.release();
 
   return ZX_OK;

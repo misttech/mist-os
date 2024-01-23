@@ -57,7 +57,6 @@ static const std::vector<fpbus::Irq> spi_irqs{
 static const spi_channel_t spi_channels[] = {
     // Thread SPI
     {
-        .bus_id = SHERLOCK_SPICC0,
         .cs = 0,  // index into matching chip-select map
         .vid = PDEV_VID_NORDIC,
         .pid = PDEV_PID_NORDIC_NRF52840,
@@ -124,7 +123,7 @@ zx_status_t Sherlock::SpiInit() {
     return ret;
   }());
 
-  auto spi_status = fidl_metadata::spi::SpiChannelsToFidl(spi_channels);
+  auto spi_status = fidl_metadata::spi::SpiChannelsToFidl(SHERLOCK_SPICC0, spi_channels);
   if (spi_status.is_error()) {
     zxlogf(ERROR, "%s: failed to encode spi channels to fidl: %d", __func__,
            spi_status.error_value());

@@ -14,7 +14,6 @@
 
 namespace fidl_metadata::spi {
 struct Channel {
-  uint32_t bus_id;
   uint32_t cs;
 
   uint32_t vid;
@@ -25,7 +24,8 @@ struct Channel {
 // Convert an array of spi_channel to fuchsia.hardware.spi.SpiBusMetadata encoded
 // in a FIDL byte stream, using the convention for data persistence:
 // https://fuchsia.dev/fuchsia-src/contribute/governance/rfcs/0120_standalone_use_of_fidl_wire_format?hl=en#convention_for_data_persistence
-zx::result<std::vector<uint8_t>> SpiChannelsToFidl(cpp20::span<const Channel> channels);
+zx::result<std::vector<uint8_t>> SpiChannelsToFidl(uint32_t bus_id,
+                                                   cpp20::span<const Channel> channels);
 
 }  // namespace fidl_metadata::spi
 

@@ -140,7 +140,6 @@ zx_status_t Nelson::Spi0Init() {
 
   static const spi_channel_t spi_0_channels[] = {
       {
-          .bus_id = NELSON_SPICC0,
           .cs = 0,  // index into matching chip-select map
           .vid = PDEV_VID_NORDIC,
           .pid = PDEV_PID_NORDIC_NRF52811,
@@ -190,7 +189,7 @@ zx_status_t Nelson::Spi0Init() {
     return ret;
   }());
 
-  auto spi_status = fidl_metadata::spi::SpiChannelsToFidl(spi_0_channels);
+  auto spi_status = fidl_metadata::spi::SpiChannelsToFidl(NELSON_SPICC0, spi_0_channels);
   if (spi_status.is_error()) {
     zxlogf(ERROR, "%s: failed to encode spi channels to fidl: %d", __func__,
            spi_status.error_value());
@@ -253,7 +252,6 @@ zx_status_t Nelson::Spi1Init() {
   static const spi_channel_t spi_1_channels[] = {
       // Radar sensor head.
       {
-          .bus_id = NELSON_SPICC1,
           .cs = 0,  // index into matching chip-select map
           .vid = PDEV_VID_INFINEON,
           .pid = PDEV_PID_INFINEON_BGT60TR13C,
@@ -307,7 +305,7 @@ zx_status_t Nelson::Spi1Init() {
     return ret;
   }());
 
-  auto spi_status = fidl_metadata::spi::SpiChannelsToFidl(spi_1_channels);
+  auto spi_status = fidl_metadata::spi::SpiChannelsToFidl(NELSON_SPICC1, spi_1_channels);
   if (spi_status.is_error()) {
     zxlogf(ERROR, "%s: failed to encode spi channels to fidl: %d", __func__,
            spi_status.error_value());

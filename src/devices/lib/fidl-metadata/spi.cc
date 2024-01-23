@@ -6,7 +6,8 @@
 #include <fidl/fuchsia.hardware.spi.businfo/cpp/wire.h>
 
 namespace fidl_metadata::spi {
-zx::result<std::vector<uint8_t>> SpiChannelsToFidl(const cpp20::span<const Channel> channels) {
+zx::result<std::vector<uint8_t>> SpiChannelsToFidl(const uint32_t bus_id,
+                                                   const cpp20::span<const Channel> channels) {
   fidl::Arena allocator;
   fidl::VectorView<fuchsia_hardware_spi_businfo::wire::SpiChannel> spi_channels(allocator,
                                                                                 channels.size());
@@ -15,7 +16,6 @@ zx::result<std::vector<uint8_t>> SpiChannelsToFidl(const cpp20::span<const Chann
     auto& chan = spi_channels[i];
     chan.Allocate(allocator);
 
-    chan.set_bus_id(channels[i].bus_id);
     chan.set_cs(channels[i].cs);
     chan.set_pid(channels[i].pid);
     chan.set_did(channels[i].did);
@@ -23,6 +23,7 @@ zx::result<std::vector<uint8_t>> SpiChannelsToFidl(const cpp20::span<const Chann
   }
 
   fuchsia_hardware_spi_businfo::wire::SpiBusMetadata metadata(allocator);
+  metadata.set_bus_id(bus_id);
   metadata.set_channels(allocator, spi_channels);
 
   return zx::result<std::vector<uint8_t>>{

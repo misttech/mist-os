@@ -18,8 +18,7 @@ namespace fpbus = fuchsia_hardware_platform_bus;
 namespace {
 using spi_channel_t = fidl_metadata::spi::Channel;
 
-static const spi_channel_t spi_channels[] = {{.bus_id = 0,
-                                              .cs = 0,
+static const spi_channel_t spi_channels[] = {{.cs = 0,
                                               // VID/PID/DID unused.
                                               .vid = 0,
                                               .pid = 0,
@@ -34,7 +33,7 @@ zx_status_t TestBoard::SpiInit() {
   spi_dev.pid() = PDEV_PID_PBUS_TEST;
   spi_dev.did() = PDEV_DID_TEST_SPI;
 
-  auto spi_status = fidl_metadata::spi::SpiChannelsToFidl(spi_channels);
+  auto spi_status = fidl_metadata::spi::SpiChannelsToFidl(0, spi_channels);
   if (spi_status.is_error()) {
     zxlogf(ERROR, "%s: failed to encode spi channels to fidl: %d", __func__,
            spi_status.error_value());

@@ -255,10 +255,8 @@ zx::result<std::vector<uint8_t>> DeviceBuilder::FidlEncodeMetadata() {
         } else if constexpr (std::is_same_v<T, std::vector<SpiChannel>>) {
           ZX_ASSERT(HasBusId());  // Bus ID should get set when a child device is added.
           fuchsia_hardware_spi_businfo::wire::SpiBusMetadata metadata(allocator);
-          for (auto& chan : arg) {
-            chan.set_bus_id(GetBusId());
-          }
           auto channels = fidl::VectorView<SpiChannel>::FromExternal(arg);
+          metadata.set_bus_id(GetBusId());
           metadata.set_channels(allocator, channels);
           return zx::result<std::vector<uint8_t>>{
               fidl::Persist(metadata).map_error(std::mem_fn(&fidl::Error::status))};
@@ -433,7 +431,7 @@ std::vector<zx_bind_inst_t> DeviceBuilder::GetFragmentBindInsnsForChild(size_t c
           ZX_ASSERT_MSG(false, "bus should have children");
         } else if constexpr (std::is_same_v<T, std::vector<SpiChannel>>) {
           SpiChannel& chan = arg[child_index];
-          ret.push_back(BI_ABORT_IF(NE, BIND_SPI_BUS_ID, chan.bus_id()));
+          ret.push_back(BI_ABORT_IF(NE, BIND_SPI_BUS_ID, bus_id));
           ret.push_back(BI_ABORT_IF(NE, BIND_SPI_CHIP_SELECT, chan.cs()));
         } else if constexpr (std::is_same_v<T, std::vector<I2CChannel>>) {
           I2CChannel& chan = arg[child_index];
