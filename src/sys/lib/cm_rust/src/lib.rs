@@ -284,7 +284,7 @@ pub enum UseDecl {
 
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
 #[derive(FidlDecl, UseDeclCommon, Debug, Clone, PartialEq, Eq)]
-#[fidl_decl(fidl_table = "fdecl::UseService")]
+#[fidl_decl(fidl_table = "fdecl::UseService", source_path = "dictionary")]
 pub struct UseServiceDecl {
     pub source: UseSource,
     pub source_name: Name,
@@ -297,7 +297,7 @@ pub struct UseServiceDecl {
 
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
 #[derive(FidlDecl, UseDeclCommon, Debug, Clone, PartialEq, Eq)]
-#[fidl_decl(fidl_table = "fdecl::UseProtocol")]
+#[fidl_decl(fidl_table = "fdecl::UseProtocol", source_path = "dictionary")]
 pub struct UseProtocolDecl {
     pub source: UseSource,
     pub source_name: Name,
@@ -308,18 +308,9 @@ pub struct UseProtocolDecl {
     pub availability: Availability,
 }
 
-impl SourcePath for UseProtocolDecl {
-    fn source_path(&self) -> BorrowedSeparatedPath<'_> {
-        BorrowedSeparatedPath {
-            dirname: self.source_dictionary.as_ref(),
-            basename: self.source_name.as_str(),
-        }
-    }
-}
-
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
 #[derive(FidlDecl, UseDeclCommon, Debug, Clone, PartialEq, Eq)]
-#[fidl_decl(fidl_table = "fdecl::UseDirectory")]
+#[fidl_decl(fidl_table = "fdecl::UseDirectory", source_path = "dictionary")]
 pub struct UseDirectoryDecl {
     pub source: UseSource,
     pub source_name: Name,
@@ -343,7 +334,7 @@ pub struct UseDirectoryDecl {
 
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
 #[derive(FidlDecl, Debug, Clone, PartialEq, Eq)]
-#[fidl_decl(fidl_table = "fdecl::UseStorage")]
+#[fidl_decl(fidl_table = "fdecl::UseStorage", source_path = "name_only")]
 pub struct UseStorageDecl {
     pub source_name: Name,
     pub target_path: Path,
@@ -376,7 +367,7 @@ pub struct EventSubscription {
 
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
 #[derive(FidlDecl, UseDeclCommon, Debug, Clone, PartialEq, Eq, Hash)]
-#[fidl_decl(fidl_table = "fdecl::UseEventStream")]
+#[fidl_decl(fidl_table = "fdecl::UseEventStream", source_path = "name_only")]
 pub struct UseEventStreamDecl {
     pub source_name: Name,
     pub source: UseSource,
@@ -389,7 +380,7 @@ pub struct UseEventStreamDecl {
 
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
 #[derive(FidlDecl, Debug, Clone, PartialEq, Eq)]
-#[fidl_decl(fidl_table = "fdecl::UseRunner")]
+#[fidl_decl(fidl_table = "fdecl::UseRunner", source_path = "dictionary")]
 pub struct UseRunnerDecl {
     pub source: UseSource,
     pub source_name: Name,
@@ -414,7 +405,7 @@ impl UseDeclCommon for UseRunnerDecl {
 
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
 #[derive(FidlDecl, Debug, Clone, PartialEq, Eq)]
-#[fidl_decl(fidl_table = "fdecl::UseConfiguration")]
+#[fidl_decl(fidl_table = "fdecl::UseConfiguration", source_path = "name_only")]
 pub struct UseConfigurationDecl {
     pub source: UseSource,
     pub source_name: Name,
@@ -460,7 +451,7 @@ pub enum OfferDecl {
 
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
 #[derive(FidlDecl, OfferDeclCommon, Debug, Clone, PartialEq, Eq)]
-#[fidl_decl(fidl_table = "fdecl::OfferEventStream")]
+#[fidl_decl(fidl_table = "fdecl::OfferEventStream", source_path = "name_only")]
 pub struct OfferEventStreamDecl {
     pub source: OfferSource,
     pub scope: Option<Vec<EventScope>>,
@@ -492,7 +483,7 @@ impl FidlIntoNative<NameMapping> for fdecl::NameMapping {
 
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
 #[derive(FidlDecl, OfferDeclCommon, Debug, Clone, PartialEq, Eq)]
-#[fidl_decl(fidl_table = "fdecl::OfferService")]
+#[fidl_decl(fidl_table = "fdecl::OfferService", source_path = "dictionary")]
 pub struct OfferServiceDecl {
     pub source: OfferSource,
     pub source_name: Name,
@@ -507,7 +498,7 @@ pub struct OfferServiceDecl {
 
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
 #[derive(FidlDecl, OfferDeclCommon, Debug, Clone, PartialEq, Eq)]
-#[fidl_decl(fidl_table = "fdecl::OfferProtocol")]
+#[fidl_decl(fidl_table = "fdecl::OfferProtocol", source_path = "dictionary")]
 pub struct OfferProtocolDecl {
     pub source: OfferSource,
     pub source_name: Name,
@@ -521,7 +512,7 @@ pub struct OfferProtocolDecl {
 
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
 #[derive(FidlDecl, OfferDeclCommon, Debug, Clone, PartialEq, Eq)]
-#[fidl_decl(fidl_table = "fdecl::OfferDirectory")]
+#[fidl_decl(fidl_table = "fdecl::OfferDirectory", source_path = "dictionary")]
 pub struct OfferDirectoryDecl {
     pub source: OfferSource,
     pub source_name: Name,
@@ -546,7 +537,7 @@ pub struct OfferDirectoryDecl {
 
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
 #[derive(FidlDecl, OfferDeclCommon, Debug, Clone, PartialEq, Eq)]
-#[fidl_decl(fidl_table = "fdecl::OfferStorage")]
+#[fidl_decl(fidl_table = "fdecl::OfferStorage", source_path = "name_only")]
 pub struct OfferStorageDecl {
     pub source: OfferSource,
     pub source_name: Name,
@@ -558,7 +549,7 @@ pub struct OfferStorageDecl {
 
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
 #[derive(FidlDecl, Debug, Clone, PartialEq, Eq)]
-#[fidl_decl(fidl_table = "fdecl::OfferRunner")]
+#[fidl_decl(fidl_table = "fdecl::OfferRunner", source_path = "dictionary")]
 pub struct OfferRunnerDecl {
     pub source: OfferSource,
     pub source_name: Name,
@@ -569,7 +560,7 @@ pub struct OfferRunnerDecl {
 
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
 #[derive(FidlDecl, OfferDeclCommonNoAvailability, Debug, Clone, PartialEq, Eq)]
-#[fidl_decl(fidl_table = "fdecl::OfferResolver")]
+#[fidl_decl(fidl_table = "fdecl::OfferResolver", source_path = "dictionary")]
 pub struct OfferResolverDecl {
     pub source: OfferSource,
     pub source_name: Name,
@@ -580,7 +571,7 @@ pub struct OfferResolverDecl {
 
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
 #[derive(FidlDecl, OfferDeclCommonNoAvailability, Debug, Clone, PartialEq, Eq)]
-#[fidl_decl(fidl_table = "fdecl::OfferDictionary")]
+#[fidl_decl(fidl_table = "fdecl::OfferDictionary", source_path = "dictionary")]
 pub struct OfferDictionaryDecl {
     pub source: OfferSource,
     pub source_name: Name,
@@ -594,7 +585,7 @@ pub struct OfferDictionaryDecl {
 
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
 #[derive(FidlDecl, OfferDeclCommon, Debug, Clone, PartialEq, Eq)]
-#[fidl_decl(fidl_table = "fdecl::OfferConfiguration")]
+#[fidl_decl(fidl_table = "fdecl::OfferConfiguration", source_path = "name_only")]
 pub struct OfferConfigurationDecl {
     pub source: OfferSource,
     pub source_name: Name,
@@ -616,6 +607,22 @@ impl SourceName for OfferDecl {
             OfferDecl::EventStream(o) => o.source_name(),
             OfferDecl::Dictionary(o) => o.source_name(),
             OfferDecl::Config(o) => o.source_name(),
+        }
+    }
+}
+
+impl SourcePath for OfferDecl {
+    fn source_path(&self) -> BorrowedSeparatedPath<'_> {
+        match &self {
+            OfferDecl::Service(o) => o.source_path(),
+            OfferDecl::Protocol(o) => o.source_path(),
+            OfferDecl::Directory(o) => o.source_path(),
+            OfferDecl::Storage(o) => o.source_path(),
+            OfferDecl::Runner(o) => o.source_path(),
+            OfferDecl::Resolver(o) => o.source_path(),
+            OfferDecl::EventStream(o) => o.source_path(),
+            OfferDecl::Dictionary(o) => o.source_path(),
+            OfferDecl::Config(o) => o.source_path(),
         }
     }
 }
@@ -759,6 +766,20 @@ impl SourceName for ExposeDecl {
     }
 }
 
+impl SourcePath for ExposeDecl {
+    fn source_path(&self) -> BorrowedSeparatedPath<'_> {
+        match self {
+            Self::Service(e) => e.source_path(),
+            Self::Protocol(e) => e.source_path(),
+            Self::Directory(e) => e.source_path(),
+            Self::Runner(e) => e.source_path(),
+            Self::Resolver(e) => e.source_path(),
+            Self::Dictionary(e) => e.source_path(),
+            Self::Config(e) => e.source_path(),
+        }
+    }
+}
+
 impl ExposeDeclCommon for ExposeDecl {
     fn source(&self) -> &ExposeSource {
         match self {
@@ -811,7 +832,7 @@ impl ExposeDeclCommon for ExposeDecl {
 
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
 #[derive(FidlDecl, ExposeDeclCommon, Debug, Clone, PartialEq, Eq)]
-#[fidl_decl(fidl_table = "fdecl::ExposeService")]
+#[fidl_decl(fidl_table = "fdecl::ExposeService", source_path = "dictionary")]
 pub struct ExposeServiceDecl {
     pub source: ExposeSource,
     pub source_name: Name,
@@ -824,7 +845,7 @@ pub struct ExposeServiceDecl {
 
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
 #[derive(FidlDecl, ExposeDeclCommon, Debug, Clone, PartialEq, Eq)]
-#[fidl_decl(fidl_table = "fdecl::ExposeProtocol")]
+#[fidl_decl(fidl_table = "fdecl::ExposeProtocol", source_path = "dictionary")]
 pub struct ExposeProtocolDecl {
     pub source: ExposeSource,
     pub source_name: Name,
@@ -837,7 +858,7 @@ pub struct ExposeProtocolDecl {
 
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
 #[derive(FidlDecl, ExposeDeclCommon, Debug, Clone, PartialEq, Eq)]
-#[fidl_decl(fidl_table = "fdecl::ExposeDirectory")]
+#[fidl_decl(fidl_table = "fdecl::ExposeDirectory", source_path = "dictionary")]
 pub struct ExposeDirectoryDecl {
     pub source: ExposeSource,
     pub source_name: Name,
@@ -862,7 +883,7 @@ pub struct ExposeDirectoryDecl {
 
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
 #[derive(FidlDecl, ExposeDeclCommonAlwaysRequired, Debug, Clone, PartialEq, Eq)]
-#[fidl_decl(fidl_table = "fdecl::ExposeRunner")]
+#[fidl_decl(fidl_table = "fdecl::ExposeRunner", source_path = "dictionary")]
 pub struct ExposeRunnerDecl {
     pub source: ExposeSource,
     pub source_name: Name,
@@ -873,7 +894,7 @@ pub struct ExposeRunnerDecl {
 
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
 #[derive(FidlDecl, ExposeDeclCommonAlwaysRequired, Debug, Clone, PartialEq, Eq)]
-#[fidl_decl(fidl_table = "fdecl::ExposeResolver")]
+#[fidl_decl(fidl_table = "fdecl::ExposeResolver", source_path = "dictionary")]
 pub struct ExposeResolverDecl {
     pub source: ExposeSource,
     pub source_name: Name,
@@ -884,7 +905,7 @@ pub struct ExposeResolverDecl {
 
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
 #[derive(FidlDecl, ExposeDeclCommonAlwaysRequired, Debug, Clone, PartialEq, Eq)]
-#[fidl_decl(fidl_table = "fdecl::ExposeDictionary")]
+#[fidl_decl(fidl_table = "fdecl::ExposeDictionary", source_path = "dictionary")]
 pub struct ExposeDictionaryDecl {
     pub source: ExposeSource,
     pub source_name: Name,
@@ -897,7 +918,7 @@ pub struct ExposeDictionaryDecl {
 
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
 #[derive(FidlDecl, ExposeDeclCommon, Debug, Clone, PartialEq, Eq)]
-#[fidl_decl(fidl_table = "fdecl::ExposeConfiguration")]
+#[fidl_decl(fidl_table = "fdecl::ExposeConfiguration", source_path = "name_only")]
 pub struct ExposeConfigurationDecl {
     pub source: ExposeSource,
     pub source_name: Name,
@@ -1778,13 +1799,27 @@ impl SourceName for UseDecl {
     }
 }
 
+impl SourcePath for UseDecl {
+    fn source_path(&self) -> BorrowedSeparatedPath<'_> {
+        match self {
+            UseDecl::Service(u) => u.source_path(),
+            UseDecl::Protocol(u) => u.source_path(),
+            UseDecl::Directory(u) => u.source_path(),
+            UseDecl::Storage(u) => u.source_path(),
+            UseDecl::EventStream(u) => u.source_path(),
+            UseDecl::Runner(u) => u.source_path(),
+            UseDecl::Config(u) => u.source_path(),
+        }
+    }
+}
+
 /// The trait for all declarations that have a source name.
 pub trait SourceName {
     fn source_name(&self) -> &Name;
 }
 
 /// The common properties of a [Use](fdecl::Use) declaration.
-pub trait UseDeclCommon: SourceName + Send + Sync {
+pub trait UseDeclCommon: SourceName + SourcePath + Send + Sync {
     fn source(&self) -> &UseSource;
     fn availability(&self) -> &Availability;
 }
@@ -1797,7 +1832,7 @@ pub trait RegistrationDeclCommon: SourceName + Send + Sync {
 }
 
 /// The common properties of an [Offer](fdecl::Offer) declaration.
-pub trait OfferDeclCommon: SourceName + fmt::Debug + Send + Sync {
+pub trait OfferDeclCommon: SourceName + SourcePath + fmt::Debug + Send + Sync {
     fn target_name(&self) -> &Name;
     fn target(&self) -> &OfferTarget;
     fn source(&self) -> &OfferSource;
@@ -1805,7 +1840,7 @@ pub trait OfferDeclCommon: SourceName + fmt::Debug + Send + Sync {
 }
 
 /// The common properties of an [Expose](fdecl::Expose) declaration.
-pub trait ExposeDeclCommon: SourceName + fmt::Debug + Send + Sync {
+pub trait ExposeDeclCommon: SourceName + SourcePath + fmt::Debug + Send + Sync {
     fn target_name(&self) -> &Name;
     fn target(&self) -> &ExposeTarget;
     fn source(&self) -> &ExposeSource;

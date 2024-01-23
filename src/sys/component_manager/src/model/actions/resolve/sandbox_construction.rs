@@ -195,12 +195,21 @@ fn extend_dict_with_use(
             router
         }
         cm_rust::UseSource::Self_ => {
-            let Some(router) =
-                program_output_dict.get_routable::<Router>(source_path.iter_segments())
-            else {
-                return;
-            };
-            router
+            if source_path.dirname.is_some() {
+                let Some(router) =
+                    program_output_dict.get_routable::<Dict>(source_path.iter_segments())
+                else {
+                    return;
+                };
+                router
+            } else {
+                let Some(router) =
+                    program_output_dict.get_routable::<Router>(source_path.iter_segments())
+                else {
+                    return;
+                };
+                router
+            }
         }
         cm_rust::UseSource::Child(child_name) => {
             let child_name = ChildName::parse(child_name).expect("invalid child name");
@@ -218,11 +227,17 @@ fn extend_dict_with_use(
             )
         }
         cm_rust::UseSource::Framework => {
+            if source_path.dirname.is_some() {
+                warn!(
+                    "routing from framework with dictionary path is not supported: {source_path}"
+                );
+                return;
+            }
             let (receiver, sender) = Receiver::new();
             let source_name = use_protocol.source_name.clone();
             sources_and_receivers.push((
                 CapabilitySourceFactory::new(move |component| CapabilitySource::Framework {
-                    capability: InternalCapability::Protocol(source_name.clone()),
+                    capability: InternalCapability::Protocol(source_name),
                     component,
                 }),
                 receiver,
@@ -264,9 +279,9 @@ fn extend_dict_with_offer(
         cm_rust::OfferDecl::Protocol(_) | cm_rust::OfferDecl::Dictionary(_) => (),
         _ => return,
     }
-    let source_name = offer.source_name();
+    let source_path = offer.source_path();
     let target_name = offer.target_name();
-    if target_dict.get_routable::<Router>(iter::once(target_name.as_str())).is_some() {
+    if target_dict.get_routable::<Router>(source_path.iter_segments()).is_some() {
         warn!(
             "duplicate sources for protocol {} in a dict, unable to populate dict entry",
             target_name
@@ -277,30 +292,29 @@ fn extend_dict_with_offer(
     let router = match offer.source() {
         cm_rust::OfferSource::Parent => {
             let Some(router) =
-                component_input_dict.get_routable::<Router>(iter::once(source_name.as_str()))
+                component_input_dict.get_routable::<Router>(source_path.iter_segments())
             else {
                 return;
             };
             router
         }
-        cm_rust::OfferSource::Self_ => match offer {
-            cm_rust::OfferDecl::Dictionary(_) => {
+        cm_rust::OfferSource::Self_ => {
+            if matches!(offer, cm_rust::OfferDecl::Dictionary(_)) || source_path.dirname.is_some() {
                 let Some(router) =
-                    program_output_dict.get_routable::<Dict>(iter::once(source_name.as_str()))
+                    program_output_dict.get_routable::<Dict>(source_path.iter_segments())
+                else {
+                    return;
+                };
+                router
+            } else {
+                let Some(router) =
+                    program_output_dict.get_routable::<Router>(source_path.iter_segments())
                 else {
                     return;
                 };
                 router
             }
-            _ => {
-                let Some(router) =
-                    program_output_dict.get_routable::<Router>(iter::once(source_name.as_str()))
-                else {
-                    return;
-                };
-                router
-            }
-        },
+        }
         cm_rust::OfferSource::Child(child_ref) => {
             let child_name: ChildName = child_ref.clone().try_into().expect("invalid child ref");
             let Some(child) = children.get(&child_name) else { return };
@@ -308,20 +322,26 @@ fn extend_dict_with_offer(
             new_forwarding_router_to_child(
                 component,
                 weak_child,
-                SeparatedPath { basename: source_name.to_string(), dirname: None },
+                source_path.to_owned(),
                 RoutingError::offer_from_child_expose_not_found(
                     child.moniker.leaf().unwrap(),
                     &child.moniker.parent().unwrap(),
-                    source_name.clone(),
+                    offer.source_name().clone(),
                 ),
             )
         }
         cm_rust::OfferSource::Framework => {
-            let source_name = source_name.clone();
+            if source_path.dirname.is_some() {
+                warn!(
+                    "routing from framework with dictionary path is not supported: {source_path}"
+                );
+                return;
+            }
+            let source_name = offer.source_name().clone();
             new_router_for_cm_hosted_receiver(
                 sources_and_receivers,
                 CapabilitySourceFactory::new(move |component| CapabilitySource::Framework {
-                    capability: InternalCapability::Protocol(source_name.clone()),
+                    capability: InternalCapability::Protocol(source_name),
                     component,
                 }),
             )
@@ -363,28 +383,28 @@ fn extend_dict_with_expose(
     if expose.target() != &cm_rust::ExposeTarget::Parent {
         return;
     }
-    let source_name = expose.source_name();
+    let source_path = expose.source_path();
     let target_name = expose.target_name();
 
     let router = match expose.source() {
-        cm_rust::ExposeSource::Self_ => match expose {
-            cm_rust::ExposeDecl::Dictionary(_) => {
+        cm_rust::ExposeSource::Self_ => {
+            if matches!(expose, cm_rust::ExposeDecl::Dictionary(_)) || source_path.dirname.is_some()
+            {
                 let Some(router) =
-                    program_output_dict.get_routable::<Dict>(iter::once(source_name.as_str()))
+                    program_output_dict.get_routable::<Dict>(source_path.iter_segments())
+                else {
+                    return;
+                };
+                router
+            } else {
+                let Some(router) =
+                    program_output_dict.get_routable::<Router>(source_path.iter_segments())
                 else {
                     return;
                 };
                 router
             }
-            _ => {
-                let Some(router) =
-                    program_output_dict.get_routable::<Router>(iter::once(source_name.as_str()))
-                else {
-                    return;
-                };
-                router
-            }
-        },
+        }
         cm_rust::ExposeSource::Child(child_name) => {
             let child_name = ChildName::parse(child_name).expect("invalid static child name");
             if let Some(child) = children.get(&child_name) {
@@ -392,11 +412,11 @@ fn extend_dict_with_expose(
                 new_forwarding_router_to_child(
                     component,
                     weak_child,
-                    SeparatedPath { basename: source_name.to_string(), dirname: None },
+                    source_path.to_owned(),
                     RoutingError::expose_from_child_expose_not_found(
                         child.moniker.leaf().unwrap(),
                         &child.moniker.parent().unwrap(),
-                        source_name.clone(),
+                        expose.source_name().clone(),
                     ),
                 )
             } else {
@@ -404,11 +424,17 @@ fn extend_dict_with_expose(
             }
         }
         cm_rust::ExposeSource::Framework => {
-            let source_name = source_name.clone();
+            if source_path.dirname.is_some() {
+                warn!(
+                    "routing from framework with dictionary path is not supported: {source_path}"
+                );
+                return;
+            }
+            let source_name = expose.source_name().clone();
             new_router_for_cm_hosted_receiver(
                 sources_and_receivers,
                 CapabilitySourceFactory::new(move |component| CapabilitySource::Framework {
-                    capability: InternalCapability::Protocol(source_name.clone()),
+                    capability: InternalCapability::Protocol(source_name),
                     component,
                 }),
             )

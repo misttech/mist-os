@@ -540,6 +540,16 @@ impl BorrowedSeparatedPath<'_> {
     }
 }
 
+impl fmt::Display for BorrowedSeparatedPath<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        if let Some(dirname) = &self.dirname {
+            write!(f, "{}/{}", dirname, self.basename)
+        } else {
+            write!(f, "{}", self.basename)
+        }
+    }
+}
+
 /// Path that separates the dirname and basename as different variables (owned
 /// type). Convenient for path representations that split the dirname and
 /// basename, like Fuchsia component decl.
@@ -564,6 +574,17 @@ impl SeparatedPath {
         BorrowedSeparatedPath { dirname: self.dirname.as_ref(), basename: &self.basename }
     }
 }
+
+impl fmt::Display for SeparatedPath {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        if let Some(dirname) = &self.dirname {
+            write!(f, "{}/{}", dirname, self.basename)
+        } else {
+            write!(f, "{}", self.basename)
+        }
+    }
+}
+
 /// A component URL. The URL is validated, but represented as a string to avoid
 /// normalization and retain the original representation.
 #[derive(Serialize, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
@@ -1016,6 +1037,9 @@ mod tests {
             assert_eq!(segments, expected_segments);
             let owned_path = borrowed_path.to_owned();
             assert_eq!(path, owned_path);
+            let expected_fmt = expected_segments.join("/");
+            assert_eq!(format!("{path}"), expected_fmt);
+            assert_eq!(format!("{owned_path}"), expected_fmt);
         }
         test_path(SeparatedPath { dirname: None, basename: "foo".into() }, vec!["foo"]);
         test_path(

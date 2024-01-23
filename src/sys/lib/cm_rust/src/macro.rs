@@ -58,6 +58,33 @@ struct StructField {
     default: bool,
 }
 
+#[derive(Clone, Copy, Debug)]
+enum SourcePathOpt {
+    None,
+    Dictionary,
+    NameOnly,
+}
+
+impl Default for SourcePathOpt {
+    fn default() -> Self {
+        Self::None
+    }
+}
+
+impl FromMeta for SourcePathOpt {
+    fn from_value(v: &syn::Lit) -> Result<Self, darling::Error> {
+        let v = String::from_value(v)?;
+        let v = v.as_str();
+        let v = match v {
+            "none" => Self::None,
+            "dictionary" => Self::Dictionary,
+            "name_only" => Self::NameOnly,
+            _ => return Err(darling::Error::unknown_value(v)),
+        };
+        Ok(v)
+    }
+}
+
 #[derive(FromDeriveInput)]
 #[darling(attributes(fidl_decl), supports(enum_newtype, struct_named))]
 struct FidlDeclOpts {
@@ -67,6 +94,8 @@ struct FidlDeclOpts {
     fidl_table: Option<PathSet>,
     #[darling(default)]
     fidl_union: Option<PathSet>,
+    #[darling(default)]
+    source_path: SourcePathOpt,
 }
 
 fn fidl_decl_derive_impl(input: syn::DeriveInput) -> TokenStream {
@@ -74,7 +103,7 @@ fn fidl_decl_derive_impl(input: syn::DeriveInput) -> TokenStream {
         Ok(opts) => opts,
         Err(e) => return e.write_errors(),
     };
-    match opts.data {
+    let ts = match opts.data {
         ast::Data::Enum(variants) => match (opts.fidl_union, opts.fidl_table) {
             (Some(ps), None) => {
                 let mut ts: TokenStream = TokenStream::new();
@@ -125,6 +154,43 @@ fn fidl_decl_derive_impl(input: syn::DeriveInput) -> TokenStream {
                 .with_span(&input)
                 .write_errors(),
         },
+    };
+    match opts.source_path {
+        SourcePathOpt::Dictionary => {
+            let ident = opts.ident;
+            let t = quote! {
+                impl SourcePath for #ident {
+                    fn source_path(&self) -> BorrowedSeparatedPath<'_> {
+                        BorrowedSeparatedPath {
+                            dirname: self.source_dictionary.as_ref(),
+                            basename: self.source_name.as_str(),
+                        }
+                    }
+                }
+            };
+            quote! {
+                #ts
+                #t
+            }
+        }
+        SourcePathOpt::NameOnly => {
+            let ident = opts.ident;
+            let t = quote! {
+                impl SourcePath for #ident {
+                    fn source_path(&self) -> BorrowedSeparatedPath<'_> {
+                        BorrowedSeparatedPath {
+                            dirname: None,
+                            basename: self.source_name.as_str(),
+                        }
+                    }
+                }
+            };
+            quote! {
+                #ts
+                #t
+            }
+        }
+        SourcePathOpt::None => ts,
     }
 }
 
