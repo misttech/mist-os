@@ -515,6 +515,12 @@ func infraToolLogChecks() []FailureModeCheck {
 			// connect after all retries and returns a fatal error.
 			SkipPassedTask: true,
 		},
+		// For https://fxbug.dev/321754579.
+		&stringInLogCheck{
+			String:         fmt.Sprintf("%s: context deadline exceeded", ffxutilconstants.CommandFailedMsg),
+			Type:           swarmingOutputType,
+			SkipPassedTask: true,
+		},
 		// For https://fxbug.dev/128608.
 		&stringInLogCheck{
 			String:         "No daemon was running.",
