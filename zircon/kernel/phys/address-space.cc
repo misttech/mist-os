@@ -127,11 +127,11 @@ void AddressSpace::IdentityMapUart() {
   };
 
   GetUartDriver().Visit([mapper = ktl::move(mapper)](auto&& driver) {
-    using config_type = typename ktl::decay_t<decltype(driver.uart())>::config_type;
+    using uart_type = ktl::decay_t<decltype(driver.uart())>;
+    using config_type = typename uart_type::config_type;
     if constexpr (ktl::is_same_v<config_type, zbi_dcfg_simple_t>) {
-      driver.io() = uart::BasicIoProvider<config_type>{
+      driver.io() = uart::BasicIoProvider<config_type, uart_type::kIoType>{
           driver.uart().config(),
-          driver.uart().pio_size(),
           ktl::move(mapper),
       };
     }

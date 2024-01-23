@@ -32,10 +32,10 @@ namespace mock {
 // this is just a placeholder.  When used with other uart::xyz::Driver
 // hardware drivers, it provides the hwreg::Mock API for testing expected I/O
 // calls from the driver.
-template <typename Config>
+template <typename Config, IoRegisterType>
 class IoProvider {
  public:
-  explicit IoProvider(const Config&, uint16_t pio_size) {}
+  explicit IoProvider(const Config&) {}
 
   auto* io() { return io_.io(); }
 
@@ -57,9 +57,10 @@ class IoProvider {
 class Driver {
  public:
   struct config_type {};
+  static constexpr IoRegisterType kIoType = IoRegisterType::kMmio8;
   constexpr config_type config() const { return {}; }
-  constexpr uint16_t pio_size() const { return 0; }
 
+  using IoProviderType = IoProvider<config_type, kIoType>;
   // Fluent API for priming and checking the mock.
 
   Driver& ExpectInit() {
@@ -125,18 +126,16 @@ class Driver {
   // access.  The mock Driver to be used with hwreg::mock::IoProvider, but it
   // never makes any calls.
 
-  void Init(IoProvider<config_type>& io) { mock_.Call(ExpectedInit{}); }
+  void Init(IoProviderType& io) { mock_.Call(ExpectedInit{}); }
 
   // Return true if Write can make forward progress right now.
-  bool TxReady(IoProvider<config_type>& io) {
-    return std::get<bool>(mock_.Call(ExpectedTxReady{}));
-  }
+  bool TxReady(IoProviderType& io) { return std::get<bool>(mock_.Call(ExpectedTxReady{})); }
 
   // This is called only when TxReady() has just returned true.  Advance
   // the iterator at least one and as many as is convenient but not past
   // end, outputting each character before advancing.
   template <typename It1, typename It2>
-  auto Write(IoProvider<config_type>& io, bool, It1 it, const It2& end) {
+  auto Write(IoProviderType& io, bool, It1 it, const It2& end) {
     for (auto n = std::get<size_t>(mock_.Call(ExpectedWrite{})); n > 0; --n) {
       ZX_ASSERT(it != end);
       mock_.Call(ExpectedChar{*it});
@@ -145,7 +144,7 @@ class Driver {
     return it;
   }
 
-  void EnableTxInterrupt(IoProvider<config_type>& io) { mock_.Call(ExpectedTxEnable{}); }
+  void EnableTxInterrupt(IoProviderType& io) { mock_.Call(ExpectedTxEnable{}); }
 
  private:
   template <typename Expected>

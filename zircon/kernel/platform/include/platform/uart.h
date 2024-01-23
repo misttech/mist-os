@@ -24,39 +24,40 @@ volatile void* PlatformUartMapMmio(paddr_t base_addr);
 ktl::optional<uint32_t> PlatformUartGetIrqNumber(uint32_t irq_num);
 
 // ulib/uart IoProvider implementation for the kernel.
-template <typename Config>
+template <typename Config, uart::IoRegisterType>
 class PlatformUartIoProvider;
 
 // Null Driver specialization.
 template <>
-class PlatformUartIoProvider<uart::null::Driver::config_type>
-    : public uart::BasicIoProvider<uart::null::Driver::config_type> {
+class PlatformUartIoProvider<uart::null::Driver::config_type, uart::IoRegisterType::kMmio8>
+    : public uart::BasicIoProvider<uart::null::Driver::config_type, uart::IoRegisterType::kMmio8> {
  public:
-  using Base = uart::BasicIoProvider<uart::null::Driver::config_type>;
+  using Base = uart::BasicIoProvider<uart::null::Driver::config_type, uart::IoRegisterType::kMmio8>;
   using Base::Base;
 };
 
 // MMIO Driver specialization.
-template <>
-class PlatformUartIoProvider<zbi_dcfg_simple_t> : public uart::BasicIoProvider<zbi_dcfg_simple_t> {
+template <uart::IoRegisterType IoType>
+class PlatformUartIoProvider<zbi_dcfg_simple_t, IoType>
+    : public uart::BasicIoProvider<zbi_dcfg_simple_t, IoType> {
  public:
-  using Base = uart::BasicIoProvider<zbi_dcfg_simple_t>;
+  using Base = uart::BasicIoProvider<zbi_dcfg_simple_t, IoType>;
 
   using Base::Base;
-  PlatformUartIoProvider(const zbi_dcfg_simple_t& config, uint16_t pio_size)
-      : Base(config, pio_size, PlatformUartMapMmio) {}
+  explicit PlatformUartIoProvider(const zbi_dcfg_simple_t& config)
+      : Base(config, PlatformUartMapMmio) {}
 };
 
 #if defined(__x86_64__) || defined(__i386__)
 // PIO Driver implementation.
 template <>
-class PlatformUartIoProvider<zbi_dcfg_simple_pio_t>
-    : public uart::BasicIoProvider<zbi_dcfg_simple_pio_t> {
+class PlatformUartIoProvider<zbi_dcfg_simple_pio_t, uart::IoRegisterType::kPio>
+    : public uart::BasicIoProvider<zbi_dcfg_simple_pio_t, uart::IoRegisterType::kPio> {
  public:
-  using Base = uart::BasicIoProvider<zbi_dcfg_simple_pio_t>;
-
+  using Base = uart::BasicIoProvider<zbi_dcfg_simple_pio_t, uart::IoRegisterType::kPio>;
   using Base::Base;
-  PlatformUartIoProvider(const zbi_dcfg_simple_pio_t& config, uint16_t pio_size);
+
+  explicit PlatformUartIoProvider(const zbi_dcfg_simple_pio_t& config);
 };
 #endif
 

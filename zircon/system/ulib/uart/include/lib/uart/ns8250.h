@@ -195,12 +195,12 @@ template <>
 inline constexpr uint32_t kPortCount<ZBI_KERNEL_DRIVER_I8250_MMIO8_UART> = 0;
 
 // This provides the actual driver logic common to MMIO and PIO variants.
-template <uint32_t KdrvExtra, typename KdrvConfig>
-class DriverImpl : public DriverBase<DriverImpl<KdrvExtra, KdrvConfig>, KdrvExtra, KdrvConfig,
-                                     kPortCount<KdrvExtra>> {
+template <uint32_t KdrvExtra, typename KdrvConfig, IoRegisterType IoRegType>
+class DriverImpl : public DriverBase<DriverImpl<KdrvExtra, KdrvConfig, IoRegType>, KdrvExtra,
+                                     KdrvConfig, IoRegType> {
  public:
   using Base =
-      DriverBase<DriverImpl<KdrvExtra, KdrvConfig>, KdrvExtra, KdrvConfig, kPortCount<KdrvExtra>>;
+      DriverBase<DriverImpl<KdrvExtra, KdrvConfig, IoRegType>, KdrvExtra, KdrvConfig, IoRegType>;
 
   static constexpr auto kDevicetreeBindings = []() {
     if constexpr (KdrvExtra == ZBI_KERNEL_DRIVER_I8250_MMIO32_UART ||
@@ -497,16 +497,20 @@ class DriverImpl : public DriverBase<DriverImpl<KdrvExtra, KdrvConfig>, KdrvExtr
 
 // uart::KernelDriver UartDriver API for PIO via MMIO where offsets expressed in bytes are scaled
 // by 4. Additionally all read or write operations are performed in 4 byte regions.
-using Mmio32Driver = DriverImpl<ZBI_KERNEL_DRIVER_I8250_MMIO32_UART, zbi_dcfg_simple_t>;
+using Mmio32Driver =
+    DriverImpl<ZBI_KERNEL_DRIVER_I8250_MMIO32_UART, zbi_dcfg_simple_t, IoRegisterType::kMmio32>;
 
 // uart::KernelDriver UartDriver API for PIO via MMIO where offsets are expressed in bytes.
-using Mmio8Driver = DriverImpl<ZBI_KERNEL_DRIVER_I8250_MMIO8_UART, zbi_dcfg_simple_t>;
+using Mmio8Driver =
+    DriverImpl<ZBI_KERNEL_DRIVER_I8250_MMIO8_UART, zbi_dcfg_simple_t, IoRegisterType::kMmio8>;
 
 // uart::KernelDriver UartDriver API for direct PIO.
-using PioDriver = DriverImpl<ZBI_KERNEL_DRIVER_I8250_PIO_UART, zbi_dcfg_simple_pio_t>;
+using PioDriver =
+    DriverImpl<ZBI_KERNEL_DRIVER_I8250_PIO_UART, zbi_dcfg_simple_pio_t, IoRegisterType::kPio>;
 
 // uart::KernelDriver UartDriver API for PIO via MMIO using legacy item type.
-using Dw8250Driver = DriverImpl<ZBI_KERNEL_DRIVER_DW8250_UART, zbi_dcfg_simple_t>;
+using Dw8250Driver =
+    DriverImpl<ZBI_KERNEL_DRIVER_DW8250_UART, zbi_dcfg_simple_t, IoRegisterType::kMmio32>;
 
 }  // namespace ns8250
 }  // namespace uart

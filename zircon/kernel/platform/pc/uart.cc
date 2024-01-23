@@ -4,6 +4,7 @@
 // license that can be found in the LICENSE file or at
 // https://opensource.org/licenses/MIT
 
+#include <lib/uart/uart.h>
 #include <lib/zbi-format/driver-config.h>
 
 #include <cstdint>
@@ -22,9 +23,9 @@ volatile void* PlatformUartMapMmio(paddr_t paddr) {
   return vaddr;
 }
 
-PlatformUartIoProvider<zbi_dcfg_simple_pio_t>::PlatformUartIoProvider(
-    const zbi_dcfg_simple_pio_t& config, uint16_t pio_size)
-    : Base(config, pio_size) {
+PlatformUartIoProvider<zbi_dcfg_simple_pio_t, uart::IoRegisterType::kPio>::PlatformUartIoProvider(
+    const zbi_dcfg_simple_pio_t& config)
+    : Base(config) {
   // Reserve pio.
   mark_pio_region_to_reserve(config.base, 8);
 }

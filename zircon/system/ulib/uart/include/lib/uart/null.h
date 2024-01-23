@@ -28,6 +28,7 @@ struct Driver {
 
   static constexpr std::array<std::string_view, 0> kDevicetreeBindings = {};
   static constexpr std::string_view config_name() { return "none"; }
+  static constexpr IoRegisterType kIoType = IoRegisterType::kMmio8;
 
   Driver() = default;
 
@@ -113,9 +114,6 @@ struct Driver {
 
   // This tells the IoProvider what device resources to provide.
   constexpr config_type config() const { return {}; }
-
-  // This tells the IoProvider whether this UartDriver wants PIO or MMIO.
-  constexpr uint16_t pio_size() const { return 0; }
 };
 
 }  // namespace null
@@ -123,9 +121,9 @@ struct Driver {
 // Provide a specialization to do nothing with the lack of configuration info
 // and provide no access to the lack of hardware.
 template <>
-class BasicIoProvider<null::Driver::config_type> {
+class BasicIoProvider<null::Driver::config_type, IoRegisterType::kMmio8> {
  public:
-  BasicIoProvider(const null::Driver::config_type&, uint16_t) {}
+  explicit BasicIoProvider(const null::Driver::config_type&) {}
 
  private:
   // Nothing should call this.  The visibility will cause a compilation error.

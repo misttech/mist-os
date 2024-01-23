@@ -12,6 +12,7 @@
 #include <lib/zircon-internal/macros.h>
 #include <lib/zircon-internal/thread_annotations.h>
 #include <zircon/assert.h>
+#include <zircon/compiler.h>
 
 #include <cstdlib>
 #include <optional>
@@ -23,6 +24,9 @@
 #include <hwreg/pio.h>
 
 #include "chars-from.h"
+
+// While this header is unused in this file, it provides the basic implementations
+// for `Sync` types.
 #include "sync.h"
 
 namespace acpi_lite {
@@ -72,6 +76,19 @@ inline void UnparseConfig(const Config& config, FILE* out) {
   static_assert(std::is_void_v<Config>, "missing specialization");
 }
 
+enum class IoRegisterType {
+  // MMIO is performed without any scaling what so ever, this means that
+  // registers offsets are treated as byte offsets from the base address.
+  kMmio8,
+
+  // MMIO is performed with an scaling factor of 4, this means that
+  // register offsets are treated as 4-byte offsets from the base address.
+  kMmio32,
+
+  // PIO.
+  kPio,
+};
+
 // Specific hardware support is implemented in a class uart::xyz::Driver,
 // referred to here as UartDriver.  The uart::DriverBase template class
 // provides a helper base class for UartDriver implementations.
@@ -110,13 +127,17 @@ inline void UnparseConfig(const Config& config, FILE* out) {
 // hwreg ReadFrom and WriteTo calls on the pointers from the provider.  The
 // IoProvider constructed is passed uart.config() and uart.pio_size().
 //
-template <typename Driver, uint32_t KdrvExtra, typename KdrvConfig, uint16_t Pio = 0>
+template <typename Driver, uint32_t KdrvExtra, typename KdrvConfig,
+          IoRegisterType IoRegType = IoRegisterType::kMmio8>
 class DriverBase {
  public:
   using config_type = KdrvConfig;
 
   // No devicetree bindings by default.
   static constexpr std::array<std::string_view, 0> kDevicetreeBindings{};
+
+  // Register Io Type.
+  static constexpr IoRegisterType kIoType = IoRegType;
 
   explicit DriverBase(const config_type& cfg) : cfg_(cfg) {}
 
@@ -197,7 +218,6 @@ class DriverBase {
 
   // API for use in IoProvider setup.
   const config_type& config() const { return cfg_; }
-  constexpr uint16_t pio_size() const { return Pio; }
 
  protected:
   config_type cfg_;
@@ -286,7 +306,7 @@ class DriverBase {
 // base addresses are used directly.  It also provides base classes that can be
 // subclassed with an overridden constructor that does address mapping.
 //
-template <typename Config>
+template <typename Config, IoRegisterType IoType>
 class BasicIoProvider;
 
 // This is the default "identity mapping" callback for BasicIoProvider::Init.
@@ -295,26 +315,26 @@ class BasicIoProvider;
 inline auto DirectMapMmio(uint64_t phys) { return reinterpret_cast<volatile void*>(phys); }
 
 // The specialization used most commonly handles simple MMIO devices.
-template <>
-class BasicIoProvider<zbi_dcfg_simple_t> {
+template <IoRegisterType IoType>
+class BasicIoProvider<zbi_dcfg_simple_t, IoType> {
  public:
   // Just install the MMIO base pointer.  The third argument can be passed by
   // a subclass constructor method to map the physical address to a virtual
   // address.
   template <typename T>
-  BasicIoProvider(const zbi_dcfg_simple_t& cfg, uint16_t pio_size, T&& map_mmio) {
+  BasicIoProvider(const zbi_dcfg_simple_t& cfg, T&& map_mmio) {
     auto ptr = map_mmio(cfg.mmio_phys);
-    if (pio_size != 0) {
-      // Scaled MMIO with 32-byte I/O access.
+    if constexpr (IoType == IoRegisterType::kMmio8) {
+      io_.emplace<hwreg::RegisterMmio>(ptr);
+    } else if constexpr (IoType == IoRegisterType::kMmio32) {
       io_.emplace<hwreg::RegisterMmioScaled<uint32_t>>(ptr);
     } else {
-      // This is normal MMIO.
-      io_.emplace<hwreg::RegisterMmio>(ptr);
+      // Pio uses a different specialization, this should never be reached.
+      static_assert(!std::is_same_v<T, T>);
     }
   }
 
-  BasicIoProvider(const zbi_dcfg_simple_t& cfg, uint16_t pio_size)
-      : BasicIoProvider(cfg, pio_size, DirectMapMmio) {}
+  explicit BasicIoProvider(const zbi_dcfg_simple_t& cfg) : BasicIoProvider(cfg, DirectMapMmio) {}
 
   BasicIoProvider& operator=(BasicIoProvider&& other) {
     io_.swap(other.io_);
@@ -330,11 +350,11 @@ class BasicIoProvider<zbi_dcfg_simple_t> {
 
 // The specialization for devices using actual PIO only occurs on x86.
 #if defined(__x86_64__) || defined(__i386__)
-template <>
-class BasicIoProvider<zbi_dcfg_simple_pio_t> {
+template <IoRegisterType IoType>
+class BasicIoProvider<zbi_dcfg_simple_pio_t, IoType> {
  public:
-  BasicIoProvider(const zbi_dcfg_simple_pio_t& cfg, uint16_t pio_size) : io_(cfg.base) {
-    ZX_DEBUG_ASSERT(pio_size > 0);
+  explicit BasicIoProvider(const zbi_dcfg_simple_pio_t& cfg) : io_(cfg.base) {
+    static_assert(IoType == IoRegisterType::kPio);
   }
 
   auto* io() { return &io_; }
@@ -358,7 +378,7 @@ class Driver;
 // handed off from one KernelDriver instantiation to a different one using a
 // different IoProvider (physboot vs kernel) and/or Sync (polling vs blocking).
 //
-template <class UartDriver, template <typename> class IoProvider, class SyncPolicy>
+template <class UartDriver, template <typename, IoRegisterType> class IoProvider, class SyncPolicy>
 class KernelDriver {
   using Waiter = typename SyncPolicy::Waiter;
 
@@ -381,8 +401,7 @@ class KernelDriver {
   // or might never actually be set up because this instantiation gets
   // replaced with a different one before ever calling Init.
   template <typename... Args>
-  explicit KernelDriver(Args&&... args)
-      : uart_(std::forward<Args>(args)...), io_(uart_.config(), uart_.pio_size()) {
+  explicit KernelDriver(Args&&... args) : uart_(std::forward<Args>(args)...), io_(uart_.config()) {
     if constexpr (std::is_same_v<mock::Driver, uart_type>) {
       // Initialize the mock sync object with the mock driver.
       lock_.Init(uart_);
@@ -484,7 +503,7 @@ class KernelDriver {
   Waiter waiter_ TA_GUARDED(lock_);
   uart_type uart_ TA_GUARDED(lock_);
 
-  IoProvider<typename uart_type::config_type> io_;
+  IoProvider<typename uart_type::config_type, uart_type::kIoType> io_;
 };
 
 // These specializations are defined in the library to cover all the ZBI item

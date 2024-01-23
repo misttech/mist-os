@@ -86,7 +86,8 @@ using WithAllDrivers = Template<
 using Driver = WithAllDrivers<std::variant>;
 
 // uart::all::KernelDriver is a variant across all the KernelDriver types.
-template <template <typename> class IoProvider, typename Sync, typename UartDriver = Driver>
+template <template <typename, IoRegisterType> class IoProvider, typename Sync,
+          typename UartDriver = Driver>
 class KernelDriver {
  public:
   using uart_type = UartDriver;
