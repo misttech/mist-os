@@ -249,6 +249,11 @@ impl Capability {
         }
     }
 
+    /// Creates a new configuration capability.
+    pub fn configuration(name: impl Into<String>) -> ConfigurationCapability {
+        ConfigurationCapability { name: name.into(), as_: None, availability: None }
+    }
+
     /// Creates a new directory capability.
     pub fn directory(name: impl Into<String>) -> DirectoryCapability {
         DirectoryCapability {
@@ -338,6 +343,26 @@ impl Into<ftest::Capability> for ProtocolCapability {
             as_: self.as_,
             type_: Some(self.type_),
             path: self.path,
+            availability: self.availability,
+            ..Default::default()
+        })
+    }
+}
+
+/// A configuration capability, which may be routed between components. Created by
+/// `Capability::configuration`.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ConfigurationCapability {
+    name: String,
+    as_: Option<String>,
+    availability: Option<fdecl::Availability>,
+}
+
+impl Into<ftest::Capability> for ConfigurationCapability {
+    fn into(self) -> ftest::Capability {
+        ftest::Capability::Config(ftest::Config {
+            name: Some(self.name),
+            as_: self.as_,
             availability: self.availability,
             ..Default::default()
         })
@@ -3271,6 +3296,7 @@ mod tests {
                 Route::new()
                     .capability(Capability::protocol_by_name("test"))
                     .capability(Capability::directory("test2"))
+                    .capability(Capability::configuration("test3"))
                     .from(&child_a)
                     .to(Ref::parent()),
             )
@@ -3288,6 +3314,7 @@ mod tests {
                 if capabilities == vec![
                     Capability::protocol_by_name("test").into(),
                     Capability::directory("test2").into(),
+                    Capability::configuration("test3").into(),
                 ]
                     && from == Ref::child("a").into()
                     && to == vec![Ref::parent().into()]
