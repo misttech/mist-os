@@ -44,14 +44,14 @@ TEST_F(DeviceEnumerationTest, Vim3Test) {
       "sys/platform/05:06:1d/aml-pwm-device/pwm-9/vreg/pwm-0-regulator",
       "sys/platform/05:06:1d/aml-pwm-device/pwm-9/vreg/pwm-9-regulator",
       "sys/platform/05:06:26/aml-power-impl-composite",
-      "sys/platform/05:06:26/aml-power-impl-composite/power-impl/pd-big-core",
-      "sys/platform/05:06:26/aml-power-impl-composite/power-impl/pd-little-core",
+      "sys/platform/05:06:26/aml-power-impl-composite/power-impl/pd_big_core",
+      "sys/platform/05:06:26/aml-power-impl-composite/power-impl/pd_little_core",
       "sys/platform/05:06:26",  // power
 
       // CPU devices.
       "sys/platform/05:06:1e",
-      "sys/platform/05:06:26/aml-power-impl-composite/power-impl/pd-big-core/power-0/aml_cpu/a311d-arm-a73",
-      "sys/platform/05:06:26/aml-power-impl-composite/power-impl/pd-big-core/power-0/aml_cpu/a311d-arm-a53",
+      "sys/platform/05:06:26/aml-power-impl-composite/power-impl/pd_big_core/power-0/aml_cpu/a311d-arm-a73",
+      "sys/platform/05:06:26/aml-power-impl-composite/power-impl/pd_big_core/power-0/aml_cpu/a311d-arm-a53",
 
       "sys/platform/05:06:1/aml-gpio/gpio/gpio-93/fusb302",
 

@@ -9,7 +9,12 @@
 #include <lib/ddk/device.h>
 #include <lib/ddk/metadata.h>
 #include <lib/ddk/platform-defs.h>
+#include <lib/driver/component/cpp/composite_node_spec.h>
+#include <lib/driver/component/cpp/node_add_args.h>
 
+#include <bind/fuchsia/cpp/bind.h>
+#include <bind/fuchsia/platform/cpp/bind.h>
+#include <bind/fuchsia/power/cpp/bind.h>
 #include <ddk/metadata/power.h>
 #include <soc/aml-common/aml-power.h>
 #include <soc/aml-s905d2/s905d2-power.h>
@@ -17,9 +22,12 @@
 
 #include "astro-gpios.h"
 #include "astro.h"
-#include "src/devices/board/drivers/astro/pd-armcore-bind.h"
 #include "src/devices/board/drivers/astro/pwm-ao-d-bind.h"
 #include "src/devices/bus/lib/platform-bus-composites/platform-bus-composite.h"
+
+namespace fdf {
+using namespace fuchsia_driver_framework;
+}  // namespace fdf
 
 namespace astro {
 namespace fpbus = fuchsia_hardware_platform_bus;
@@ -85,9 +93,9 @@ zx_status_t AddPowerImpl(fdf::WireSyncClient<fuchsia_hardware_platform_bus::Plat
 zx_status_t AddPdArmcore(fdf::WireSyncClient<fuchsia_hardware_platform_bus::PlatformBus>& pbus) {
   fpbus::Node dev;
   dev.name() = "composite-pd-armcore";
-  dev.vid() = PDEV_VID_GENERIC;
-  dev.pid() = PDEV_PID_GENERIC;
-  dev.did() = PDEV_DID_POWER_CORE;
+  dev.vid() = bind_fuchsia_platform::BIND_PLATFORM_DEV_VID_GENERIC;
+  dev.pid() = bind_fuchsia_platform::BIND_PLATFORM_DEV_PID_GENERIC;
+  dev.did() = bind_fuchsia_platform::BIND_PLATFORM_DEV_DID_POWER_CORE;
   dev.metadata() = std::vector<fpbus::Metadata>{
       {{
           .type = DEVICE_METADATA_POWER_DOMAINS,
@@ -97,14 +105,29 @@ zx_status_t AddPdArmcore(fdf::WireSyncClient<fuchsia_hardware_platform_bus::Plat
       }},
   };
 
+  const std::vector<fdf::BindRule> kPowerArmcoreRules = std::vector{
+      fdf::MakeAcceptBindRule(bind_fuchsia::PROTOCOL, bind_fuchsia_power::BIND_PROTOCOL_IMPL),
+  };
+
+  const std::vector<fdf::NodeProperty> kPowerArmcoreProperties = std::vector{
+      fdf::MakeProperty(bind_fuchsia::PROTOCOL, bind_fuchsia_power::BIND_PROTOCOL_IMPL),
+  };
+
+  const std::vector<fdf::ParentSpec> kParents = {
+      {
+          kPowerArmcoreRules,
+          kPowerArmcoreProperties,
+      },
+  };
+
   fidl::Arena<> fidl_arena;
   fdf::Arena arena('PDAC');
-  auto fragments = platform_bus_composite::MakeFidlFragment(
-      fidl_arena, power_domain_arm_core_fragments, std::size(power_domain_arm_core_fragments));
-  fdf::WireUnownedResult result =
-      pbus.buffer(arena)->AddComposite(fidl::ToWire(fidl_arena, dev), fragments, "power-impl");
+  auto result = pbus.buffer(arena)->AddCompositeNodeSpec(
+      fidl::ToWire(fidl_arena, dev),
+      fidl::ToWire(fidl_arena,
+                   fdf::CompositeNodeSpec{{.name = "pd_armcore", .parents = kParents}}));
   if (!result.ok()) {
-    zxlogf(ERROR, "Failed to send AddComposite request: %s", result.status_string());
+    zxlogf(ERROR, "Failed to send AddCompositeNodeSpec request: %s", result.status_string());
     return result.status();
   }
   if (result->is_error()) {

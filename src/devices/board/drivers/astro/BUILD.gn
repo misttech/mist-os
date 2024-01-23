@@ -37,17 +37,6 @@ driver_bind_rules("astro-pwm-bind") {
   ]
 }
 
-driver_bind_rules("pd-armcore-bind") {
-  rules = "bind/pd-armcore.bind"
-  header_output = "pd-armcore-bind.h"
-  bind_output = "pd-armcore-bind.bc"
-  tests = "bind-tests/pd-armcore-test.json"
-  deps = [
-    "//src/devices/bind/fuchsia.platform",
-    "//src/devices/bind/fuchsia.power",
-  ]
-}
-
 driver_bind_rules("pwm-ao-d-bind") {
   rules = "bind/pwm-ao-d.bind"
   header_output = "pwm-ao-d-bind.h"
@@ -130,7 +119,6 @@ fuchsia_driver("astro-driver") {
     ":astro-bind",
     ":astro-pwm-bind_header",
     ":astro-wifi-bind_header",
-    ":pd-armcore-bind_header",
     ":pwm-ao-d-bind_header",
     "//sdk/banjo/fuchsia.hardware.iommu:fuchsia.hardware.iommu_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.powerimpl:fuchsia.hardware.powerimpl_banjo_cpp",
@@ -234,7 +222,6 @@ group("tests") {
     ":astro-bind_test",
     ":astro-pwm-bind_test",
     ":astro-wifi-bind_test",
-    ":pd-armcore-bind_test",
     ":pwm-ao-d-bind_test",
     "post-init:tests",
   ]

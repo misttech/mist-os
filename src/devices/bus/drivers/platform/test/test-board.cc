@@ -49,11 +49,6 @@ int TestBoard::Thread() {
     zxlogf(ERROR, "%s: ClockInit failed: %d", __func__, status);
   }
 
-  status = PowerInit();
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "%s: PowerInit failed: %d", __func__, status);
-  }
-
   status = TestInit();
   if (status != ZX_OK) {
     zxlogf(ERROR, "%s: TestInit failed: %d", __func__, status);
@@ -188,7 +183,6 @@ zx_status_t TestBoard::Create(zx_device_t* parent) {
   }
 
   device_fragment_t composite2[] = {
-      {"power", std::size(power_fragment), power_fragment},
       {"spi", std::size(spi_fragment), spi_fragment},
   };
 

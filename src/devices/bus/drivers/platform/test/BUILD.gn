@@ -42,7 +42,6 @@ fuchsia_driver("test-board-driver") {
     "test-clock.cc",
     "test-composite-node-spec.cc",
     "test-gpio.cc",
-    "test-power.cc",
     "test-spi.cc",
     "test.cc",
   ]
