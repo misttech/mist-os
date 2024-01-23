@@ -358,6 +358,11 @@ struct BootstrappedGenericSme {
     pub inspect_node: InspectNode,
 }
 
+/// Call WlanSoftmac.Start() to retrieve the server end of UsmeBootstrap channel and wait
+/// for a UsmeBootstrap.Start() message to provide the server end of a GenericSme channel.
+///
+/// Any errors encountered in this function are fatal for the wlansoftmac driver. Failure to bootstrap
+/// GenericSme request stream will result in a driver no other component can communicate with.
 async fn bootstrap_generic_sme<D: DeviceOps>(
     device: &mut D,
     softmac_ifc_ffi: &WlanSoftmacIfcProtocol<'_>,
@@ -365,20 +370,18 @@ async fn bootstrap_generic_sme<D: DeviceOps>(
     let (softmac_ifc_bridge_client, _softmac_ifc_bridge_server) =
         fidl::endpoints::create_endpoints::<fidl_softmac::WlanSoftmacIfcBridgeMarker>();
 
-    // Indicate to the vendor driver that we can start sending and receiving
-    // info. Any messages received from the driver before we start our SME will
-    // be safely buffered in our driver_event_sink.
-    // Note that device.start will copy relevant fields out of ifc, so dropping
-    // it after this is fine. The returned value is the MLME server end of the
-    // channel wlanmevicemonitor created to connect MLME and SME.
+    // Calling WlanSoftmac.Start() indicates to the vendor driver that this driver (wlansoftmac) is ready to
+    // receive WlanSoftmacIfc messages. wlansoftmac will buffer all WlanSoftmacIfc messages in an
+    // mpsc::UnboundedReceiver<DriverEvent> sink until the MLME server drains them. The C++ portion of
+    // wlansoftmac will copy the pointers (to static functions) out of the WlanSoftmacIfcProtocol, so
+    // dropping the WlanSoftmacIfcProtocol after calling WlanSoftmac.Start() is safe.
     let usme_bootstrap_handle_via_iface_creation = match device.start(
         softmac_ifc_ffi,
         zx::Handle::from(softmac_ifc_bridge_client.into_channel()).into_raw(),
     ) {
         Ok(handle) => handle,
         Err(status) => {
-            // Failure to unwrap indicates a critical failure in the driver init thread.
-            error!("device.start failed: {}", status);
+            error!("Failed to receive a UsmeBootstrap handle: {}", status);
             return Err(status);
         }
     };
@@ -387,7 +390,7 @@ async fn bootstrap_generic_sme<D: DeviceOps>(
     let mut usme_bootstrap_stream = match server.into_stream() {
         Ok(res) => res,
         Err(e) => {
-            error!("Failed to get usme bootstrap stream: {}", e);
+            error!("Failed to create a UsmeBootstrap request stream: {}", e);
             return Err(zx::Status::INTERNAL);
         }
     };
@@ -401,7 +404,7 @@ async fn bootstrap_generic_sme<D: DeviceOps>(
                 ..
             })) => (generic_sme_server, legacy_privacy_support, responder),
             Some(Err(e)) => {
-                error!("USME bootstrap stream failed: {}", e);
+                error!("Received an error on USME bootstrap request stream: {}", e);
                 return Err(zx::Status::INTERNAL);
             }
             None => {
@@ -424,13 +427,13 @@ async fn bootstrap_generic_sme<D: DeviceOps>(
         }
     };
     if let Err(e) = responder.send(inspect_vmo).into() {
-        error!("Failed to respond to USME bootstrap: {}", e);
+        error!("Failed to respond to UsmeBootstrap.Start(): {}", e);
         return Err(zx::Status::INTERNAL);
     }
     let generic_sme_request_stream = match generic_sme_server.into_stream() {
         Ok(stream) => stream,
         Err(e) => {
-            error!("Failed to get generic SME stream: {}", e);
+            error!("Failed to create GenericSme request stream: {}", e);
             return Err(zx::Status::INTERNAL);
         }
     };
