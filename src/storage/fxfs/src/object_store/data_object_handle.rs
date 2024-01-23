@@ -306,11 +306,11 @@ impl<S: HandleOwner> DataObjectHandle<S> {
     /// computed merkle tree and then replaces the ObjectValue of the data attribute with
     /// ObjectValue::VerifiedAttribute, which stores the `descriptor` inline.
     /// TODO(b/314195208): Add locking to ensure file is modified while we are computing hashes.
-    /// TODO(b/315016599): Combine all mutations under a single transaction.
     pub async fn enable_verity(&self, options: fio::VerificationOptions) -> Result<(), Error> {
         let hash_alg =
             options.hash_algorithm.ok_or_else(|| anyhow!("No hash algorithm provided"))?;
         let salt = options.salt.ok_or_else(|| anyhow!("No salt provided"))?;
+        let mut transaction = self.new_transaction().await?;
         let (root_digest, merkle_tree) = match hash_alg {
             fio::HashAlgorithm::Sha256 => {
                 let hasher = FsVerityHasher::Sha256(FsVerityHasherOptions::new(
@@ -334,7 +334,16 @@ impl<S: HandleOwner> DataObjectHandle<S> {
                 let merkle_leaf_nodes: Vec<u8> =
                     tree.as_ref()[0].iter().flat_map(|x| x.clone()).collect();
                 // TODO(b/314194485): Eventually want streaming writes.
-                self.write_attr(FSVERITY_MERKLE_ATTRIBUTE_ID, &merkle_leaf_nodes).await?;
+                // The merkle tree attribute should not require trimming because it should not
+                // exist.
+                if self
+                    .handle
+                    .write_attr(&mut transaction, FSVERITY_MERKLE_ATTRIBUTE_ID, &merkle_leaf_nodes)
+                    .await?
+                    .0
+                {
+                    return Err(anyhow!(FxfsError::AlreadyExists));
+                }
                 let root: [u8; 32] = tree.root().try_into().unwrap();
                 (RootDigest::Sha256(root), merkle_leaf_nodes)
             }
@@ -360,7 +369,16 @@ impl<S: HandleOwner> DataObjectHandle<S> {
                 let merkle_leaf_nodes: Vec<u8> =
                     tree.as_ref()[0].iter().flat_map(|x| x.clone()).collect();
                 // TODO(b/314194485): Eventually want streaming writes.
-                self.write_attr(FSVERITY_MERKLE_ATTRIBUTE_ID, &merkle_leaf_nodes).await?;
+                // The merkle tree attribute should not require trimming because it should not
+                // exist.
+                if self
+                    .handle
+                    .write_attr(&mut transaction, FSVERITY_MERKLE_ATTRIBUTE_ID, &merkle_leaf_nodes)
+                    .await?
+                    .0
+                {
+                    return Err(anyhow!(FxfsError::AlreadyExists));
+                }
                 (RootDigest::Sha512(tree.root().to_vec()), merkle_leaf_nodes)
             }
             _ => {
@@ -368,7 +386,6 @@ impl<S: HandleOwner> DataObjectHandle<S> {
                     .context(format!("hash algorithm not supported")));
             }
         };
-        let mut transaction = self.new_transaction().await?;
         let descriptor = FsverityMetadata { root_digest, salt };
         self.set_fsverity_state_pending(descriptor.clone(), merkle_tree.into());
         transaction.add_with_object(
