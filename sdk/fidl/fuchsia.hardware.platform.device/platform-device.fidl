@@ -6,28 +6,6 @@ library fuchsia.hardware.platform.device;
 using fuchsia.hardware.power;
 using zx;
 
-/// DEPRECATED: Use `NodeDeviceInfo`.
-type DeviceInfo = table {
-    /// Vendor ID, specified in //zircon/system/ulib/ddk-platform-defs/include/lib/ddk/platform-defs.h
-    1: vid uint32;
-    /// Platform ID, specified in //zircon/system/ulib/ddk-platform-defs/include/lib/ddk/platform-defs.h
-    2: pid uint32;
-    /// Device ID, specified in //zircon/system/ulib/ddk-platform-defs/include/lib/ddk/platform-defs.h
-    3: did uint32;
-    /// The number of MMIO regions provided to this device.
-    4: mmio_count uint32;
-    /// The number of interrupts provided to this device.
-    5: irq_count uint32;
-    /// The number of bus transaction initiaitors provided to this device.
-    6: bti_count uint32;
-    /// The number of secure monitor call resources provided to this device.
-    7: smc_count uint32;
-    /// The number of metadata blobs associated provided this device.
-    8: metadata_count uint32;
-    /// The name the board driver provided for this device.
-    9: name string:32;
-};
-
 type NodeDeviceInfo = table {
     /// Vendor ID, specified in //zircon/system/ulib/ddk-platform-defs/include/lib/ddk/platform-defs.h
     1: vid uint32;
@@ -104,10 +82,6 @@ open protocol Device {
     flexible GetPowerConfiguration() -> (struct {
         config vector<fuchsia.hardware.power.PowerElementConfiguration>:32;
     }) error zx.Status;
-
-    /// Returns information about the device the driver has bound to.
-    /// DEPRECATED: Use `GetNodeDeviceInfo`.
-    flexible GetDeviceInfo() -> (DeviceInfo) error zx.Status;
 
     /// Returns information about the device corresponding to the node
     /// that the driver has bound to.

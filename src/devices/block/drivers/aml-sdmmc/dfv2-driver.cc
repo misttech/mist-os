@@ -47,7 +47,7 @@ zx::result<aml_sdmmc_config_t> ParseMetadata(
 }
 
 zx::result<pdev_device_info_t> FidlToBanjoDeviceInfo(
-    const fuchsia_hardware_platform_device::wire::DeviceInfo& wire_dev_info) {
+    const fuchsia_hardware_platform_device::wire::NodeDeviceInfo& wire_dev_info) {
   pdev_device_info_t banjo_dev_info = {};
   if (wire_dev_info.has_vid()) {
     banjo_dev_info.vid = wire_dev_info.vid();
@@ -301,13 +301,13 @@ zx::result<> Dfv2Driver::InitResources(
                  std::move(descs_buffer), std::move(clock_gate));
 
   {
-    const auto result = pdev->GetDeviceInfo();
+    const auto result = pdev->GetNodeDeviceInfo();
     if (!result.ok()) {
-      FDF_LOGL(ERROR, logger(), "Call to get device info failed: %s", result.status_string());
+      FDF_LOGL(ERROR, logger(), "Call to get node device info failed: %s", result.status_string());
       return zx::error(result.status());
     }
     if (!result->is_ok()) {
-      FDF_LOGL(ERROR, logger(), "Failed to get device info: %s",
+      FDF_LOGL(ERROR, logger(), "Failed to get node device info: %s",
                zx_status_get_string(result->error_value()));
       return zx::error(result->error_value());
     }

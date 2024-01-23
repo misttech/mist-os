@@ -102,8 +102,6 @@ class FakePlatformDevice : public fidl::WireServer<fuchsia_hardware_platform_dev
   void GetSmc(fuchsia_hardware_platform_device::wire::DeviceGetSmcRequest* request,
               GetSmcCompleter::Sync& completer) override {}
 
-  void GetDeviceInfo(GetDeviceInfoCompleter::Sync& completer) override {}
-
   void GetNodeDeviceInfo(GetNodeDeviceInfoCompleter::Sync& completer) override {}
 
   void GetBoardInfo(GetBoardInfoCompleter::Sync& completer) override {}

@@ -89,26 +89,6 @@ void FakePDevFidl::GetSmc(GetSmcRequestView request, GetSmcCompleter::Sync& comp
   completer.ReplySuccess(std::move(smc));
 }
 
-void FakePDevFidl::GetDeviceInfo(GetDeviceInfoCompleter::Sync& completer) {
-  if (!config_.device_info.has_value()) {
-    completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
-    return;
-  }
-  pdev_device_info_t& info = config_.device_info.value();
-  fidl::Arena arena;
-  completer.ReplySuccess(fuchsia_hardware_platform_device::wire::DeviceInfo::Builder(arena)
-                             .vid(info.vid)
-                             .pid(info.pid)
-                             .did(info.did)
-                             .mmio_count(info.mmio_count)
-                             .irq_count(info.irq_count)
-                             .bti_count(info.bti_count)
-                             .smc_count(info.smc_count)
-                             .metadata_count(info.metadata_count)
-                             .name(info.name)
-                             .Build());
-}
-
 void FakePDevFidl::GetNodeDeviceInfo(GetNodeDeviceInfoCompleter::Sync& completer) {
   if (!config_.device_info.has_value()) {
     completer.ReplyError(ZX_ERR_NOT_SUPPORTED);

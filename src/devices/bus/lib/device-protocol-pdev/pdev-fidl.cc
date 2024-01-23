@@ -139,7 +139,7 @@ zx_status_t PDevFidl::GetSmc(uint32_t index, zx::resource* out_smc) const {
 }
 
 zx_status_t PDevFidl::GetDeviceInfo(pdev_device_info_t* out_info) {
-  fidl::WireResult result = pdev_->GetDeviceInfo();
+  fidl::WireResult result = pdev_->GetNodeDeviceInfo();
   if (result.status() != ZX_OK) {
     return result.status();
   }
