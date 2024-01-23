@@ -121,10 +121,15 @@ import("//build/testing/host_test_data.gni")
 #    Default: false
 #
 #  timeout_secs (optional)
-#     [int] The infra timeout in seconds for the test.
+#    [int] The infra timeout in seconds for the test.
+#
+#   environments
+#    Optional: what environments this test should target. Only applies to host
+#    host tests. See //build/testing/test_spec.gni for more details.
+#    Type: list of scopes.
+#    Default: emu_env
 #
 #  deps
-#  environments
 #  visibility
 
 template("python_mobly_test") {
@@ -288,7 +293,6 @@ template("python_mobly_test") {
   host_test(_test_name) {
     forward_variables_from(invoker,
                            [
-                             "environments",
                              "visibility",
                              "timeout_secs",
                            ])
@@ -311,6 +315,12 @@ template("python_mobly_test") {
         ] + _additional_deps
     if (defined(invoker.test_data_deps)) {
       deps += invoker.test_data_deps
+    }
+
+    if (defined(invoker.environments)) {
+      environments = invoker.environments
+    } else {
+      environments = [ emu_env ]
     }
   }
 }
