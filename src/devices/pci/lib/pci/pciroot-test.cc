@@ -30,7 +30,8 @@ class PcirootTests : public zxtest::Test {
 
  protected:
   void SetUp() final {
-    root_host_ = std::make_unique<PciRootHost>(fake_root_resource_.borrow(), PCI_ADDRESS_SPACE_IO);
+    root_host_ = std::make_unique<PciRootHost>(fake_root_resource_.borrow(),
+                                               fake_root_resource_.borrow(), PCI_ADDRESS_SPACE_IO);
   }
 
  private:
