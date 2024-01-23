@@ -28,15 +28,10 @@ use starnix_logging::{
     trace_name_run_task, trace_name_write_restricted_state, CoreDumpInfo, TraceScope,
     MAX_ARGV_LENGTH,
 };
-use starnix_sync::{Locked, Unlocked};
+use starnix_sync::{LockBefore, Locked, ProcessGroupState, Unlocked};
 use starnix_syscalls::decls::SyscallDecl;
 use starnix_uapi::{
-    errno,
-    errors::Errno,
-    from_status_like_fdio,
-    ownership::{Releasable, WeakRef},
-    pid_t,
-    signals::SIGKILL,
+    errno, errors::Errno, from_status_like_fdio, ownership::WeakRef, pid_t, signals::SIGKILL,
 };
 use std::{
     os::unix::thread::JoinHandleExt,
@@ -401,14 +396,18 @@ fn get_core_dump_info(task: &Task) -> CoreDumpInfo {
     CoreDumpInfo { process_koid, thread_koid, pid, argv }
 }
 
-pub fn create_zircon_process(
+pub fn create_zircon_process<L>(
+    locked: &mut Locked<'_, L>,
     kernel: &Arc<Kernel>,
     parent: Option<ThreadGroupWriteGuard<'_>>,
     pid: pid_t,
     process_group: Arc<ProcessGroup>,
     signal_actions: Arc<SignalActions>,
     name: &[u8],
-) -> Result<TaskInfo, Errno> {
+) -> Result<TaskInfo, Errno>
+where
+    L: LockBefore<ProcessGroupState>,
+{
     let (process, root_vmar) =
         create_shared(&kernel.kthreads.starnix_process, zx::ProcessOptions::empty(), name)
             .map_err(|status| from_status_like_fdio!(status))?;
@@ -416,8 +415,15 @@ pub fn create_zircon_process(
     let memory_manager =
         Arc::new(MemoryManager::new(root_vmar).map_err(|status| from_status_like_fdio!(status))?);
 
-    let thread_group =
-        ThreadGroup::new(kernel.clone(), process, parent, pid, process_group, signal_actions);
+    let thread_group = ThreadGroup::new(
+        locked,
+        kernel.clone(),
+        process,
+        parent,
+        pid,
+        process_group,
+        signal_actions,
+    );
 
     Ok(TaskInfo { thread: None, thread_group, memory_manager })
 }
@@ -513,7 +519,7 @@ pub fn execute_task<F, G>(
 
             // `release` must be called as the absolute last action on this thread to ensure that
             // any deferred release are done before it.
-            current_task.release(());
+            current_task.release(&mut locked);
         })
         .expect("able to spawn threads");
 

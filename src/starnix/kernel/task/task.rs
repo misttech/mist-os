@@ -24,7 +24,7 @@ use once_cell::sync::OnceCell;
 use starnix_logging::{
     log_debug, log_warn, set_zx_name, {self},
 };
-use starnix_sync::{LockBefore, Locked, MmDumpable, Mutex, RwLock};
+use starnix_sync::{LockBefore, Locked, MmDumpable, Mutex, RwLock, TaskRelease};
 use starnix_uapi::{
     auth::{
         Credentials, FsCred, PtraceAccessMode, CAP_KILL, CAP_SYS_PTRACE, PTRACE_MODE_FSCREDS,
@@ -1205,11 +1205,11 @@ impl Task {
 }
 
 impl Releasable for Task {
-    type Context<'a> = ThreadState;
+    type Context<'a> = (ThreadState, &'a mut Locked<'a, TaskRelease>);
 
-    fn release(mut self, thread_state: ThreadState) {
-        self.thread_group.remove(&self);
-
+    fn release(mut self, context: (ThreadState, &mut Locked<'_, TaskRelease>)) {
+        let (thread_state, locked) = context;
+        self.thread_group.remove(locked, &self);
         // Disconnect from tracer, if one is present.
         let ptracer_pid =
             self.mutable_state.get_mut().ptrace.as_ref().map(|ptrace| ptrace.get_pid());
@@ -1355,10 +1355,10 @@ mod test {
 
     #[::fuchsia::test]
     async fn test_tid_allocation() {
-        let (kernel, current_task) = create_kernel_and_task();
+        let (kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
 
         assert_eq!(current_task.get_tid(), 1);
-        let another_current = create_task(&kernel, "another-task");
+        let another_current = create_task(&mut locked, &kernel, "another-task");
         let another_tid = another_current.get_tid();
         assert!(another_tid >= 2);
 

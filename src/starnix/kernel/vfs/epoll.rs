@@ -490,7 +490,7 @@ mod tests {
     use crate::{
         fs::fuchsia::create_fuchsia_pipe,
         task::Waiter,
-        testing::{create_kernel_and_task, create_task},
+        testing::{create_kernel_and_task, create_kernel_task_and_unlocked, create_task},
         vfs::{
             buffers::{VecInputBuffer, VecOutputBuffer},
             eventfd::{new_eventfd, EventFdType},
@@ -510,8 +510,8 @@ mod tests {
         static WRITE_COUNT: AtomicUsizeCounter = AtomicUsizeCounter::new(0);
         const EVENT_DATA: u64 = 42;
 
-        let (kernel, _init_task) = create_kernel_and_task();
-        let current_task = create_task(&kernel, "main-task");
+        let (kernel, _init_task, mut locked) = create_kernel_task_and_unlocked();
+        let current_task = create_task(&mut locked, &kernel, "main-task");
 
         let (pipe_out, pipe_in) = new_pipe(&current_task).unwrap();
 

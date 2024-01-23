@@ -20,6 +20,7 @@ use crate::{
     },
 };
 use starnix_logging::not_implemented;
+use starnix_sync::{LockBefore, Locked, ProcessGroupState, Unlocked};
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
 use starnix_uapi::{
     auth::FsCred,
@@ -336,9 +337,10 @@ impl FileOps for DevPtmxFile {
         offset: usize,
         data: &mut dyn OutputBuffer,
     ) -> Result<usize, Errno> {
+        let mut locked = Unlocked::new(); // TODO(https://fxbug.dev/314138012): propagate to FileOps
         debug_assert!(offset == 0);
         file.blocking_op(current_task, FdEvents::POLLIN | FdEvents::POLLHUP, None, || {
-            self.terminal.main_read(current_task, data)
+            self.terminal.main_read(&mut locked, current_task, data)
         })
     }
 
@@ -349,9 +351,10 @@ impl FileOps for DevPtmxFile {
         offset: usize,
         data: &mut dyn InputBuffer,
     ) -> Result<usize, Errno> {
+        let mut locked = Unlocked::new(); // TODO(https://fxbug.dev/314138012): propagate to FileOps
         debug_assert!(offset == 0);
         file.blocking_op(current_task, FdEvents::POLLOUT | FdEvents::POLLHUP, None, || {
-            self.terminal.main_write(current_task, data)
+            self.terminal.main_write(&mut locked, current_task, data)
         })
     }
 
@@ -381,6 +384,7 @@ impl FileOps for DevPtmxFile {
         request: u32,
         arg: SyscallArg,
     ) -> Result<SyscallResult, Errno> {
+        let mut locked = Unlocked::new(); // TODO(https://fxbug.dev/314138012): propagate to FileOps
         let user_addr = UserAddress::from(arg);
         match request {
             TIOCGPTN => {
@@ -401,7 +405,7 @@ impl FileOps for DevPtmxFile {
                 self.terminal.write().locked = value != 0;
                 Ok(SUCCESS)
             }
-            _ => shared_ioctl(&self.terminal, true, _file, current_task, request, arg),
+            _ => shared_ioctl(&mut locked, &self.terminal, true, _file, current_task, request, arg),
         }
     }
 }
@@ -431,9 +435,10 @@ impl FileOps for DevPtsFile {
         offset: usize,
         data: &mut dyn OutputBuffer,
     ) -> Result<usize, Errno> {
+        let mut locked = Unlocked::new(); // TODO(https://fxbug.dev/314138012): propagate to FileOps
         debug_assert!(offset == 0);
         file.blocking_op(current_task, FdEvents::POLLIN | FdEvents::POLLHUP, None, || {
-            self.terminal.replica_read(current_task, data)
+            self.terminal.replica_read(&mut locked, current_task, data)
         })
     }
 
@@ -444,9 +449,10 @@ impl FileOps for DevPtsFile {
         offset: usize,
         data: &mut dyn InputBuffer,
     ) -> Result<usize, Errno> {
+        let mut locked = Unlocked::new(); // TODO(https://fxbug.dev/314138012): propagate to FileOps
         debug_assert!(offset == 0);
         file.blocking_op(current_task, FdEvents::POLLOUT | FdEvents::POLLHUP, None, || {
-            self.terminal.replica_write(current_task, data)
+            self.terminal.replica_write(&mut locked, current_task, data)
         })
     }
 
@@ -476,7 +482,8 @@ impl FileOps for DevPtsFile {
         request: u32,
         arg: SyscallArg,
     ) -> Result<SyscallResult, Errno> {
-        shared_ioctl(&self.terminal, false, file, current_task, request, arg)
+        let mut locked = Unlocked::new(); // TODO(https://fxbug.dev/314138012): propagate to FileOps
+        shared_ioctl(&mut locked, &self.terminal, false, file, current_task, request, arg)
     }
 }
 
@@ -505,14 +512,18 @@ macro_rules! devpts_not_implemented_ioctl_requests  {
 }
 
 /// The ioctl behaviour common to main and replica terminal file descriptors.
-fn shared_ioctl(
+fn shared_ioctl<L>(
+    locked: &mut Locked<'_, L>,
     terminal: &Arc<Terminal>,
     is_main: bool,
     file: &FileObject,
     current_task: &CurrentTask,
     request: u32,
     arg: SyscallArg,
-) -> Result<SyscallResult, Errno> {
+) -> Result<SyscallResult, Errno>
+where
+    L: LockBefore<ProcessGroupState>,
+{
     let user_addr = UserAddress::from(arg);
     match request {
         FIONREAD => {
@@ -536,6 +547,7 @@ fn shared_ioctl(
         TIOCNOTTY => {
             // Release the controlling terminal.
             current_task.thread_group.release_controlling_terminal(
+                locked,
                 current_task,
                 terminal,
                 is_main,
@@ -552,6 +564,7 @@ fn shared_ioctl(
             // Set the foreground process group.
             let pgid = current_task.read_object(UserRef::<pid_t>::new(user_addr))?;
             current_task.thread_group.set_foreground_process_group(
+                locked,
                 current_task,
                 terminal,
                 is_main,
@@ -579,7 +592,7 @@ fn shared_ioctl(
                 .as_ref()
                 .and_then(|cs| cs.foregound_process_group.upgrade());
             if let Some(process_group) = foreground_process_group {
-                process_group.send_signals(&[SIGWINCH]);
+                process_group.send_signals(locked, &[SIGWINCH]);
             }
             Ok(SUCCESS)
         }
@@ -615,19 +628,19 @@ fn shared_ioctl(
             // N.B. TCSETS on the main terminal actually affects the configuration of the replica
             // end.
             let termios = current_task.read_object(UserRef::<uapi::termios>::new(user_addr))?;
-            terminal.set_termios(termios);
+            terminal.set_termios(locked, termios);
             Ok(SUCCESS)
         }
         TCSETSF => {
             // This should drain the output queue and discard the pending input first.
             let termios = current_task.read_object(UserRef::<uapi::termios>::new(user_addr))?;
-            terminal.set_termios(termios);
+            terminal.set_termios(locked, termios);
             Ok(SUCCESS)
         }
         TCSETSW => {
             // TODO(qsr): This should drain the output queue first.
             let termios = current_task.read_object(UserRef::<uapi::termios>::new(user_addr))?;
-            terminal.set_termios(termios);
+            terminal.set_termios(locked, termios);
             Ok(SUCCESS)
         }
         TIOCSETD => {
@@ -939,7 +952,7 @@ mod tests {
     async fn test_attach_terminal() {
         let (_kernel, task1, mut locked) = create_kernel_task_and_unlocked();
         let task2 = task1.clone_task_for_test(&mut locked, 0, Some(SIGCHLD));
-        task2.thread_group.setsid().expect("setsid");
+        task2.thread_group.setsid(&mut locked).expect("setsid");
 
         let fs = dev_pts_fs(&task1, Default::default());
         let opened_main = open_ptmx_and_unlock(&task1, fs).expect("ptmx");
@@ -990,7 +1003,7 @@ mod tests {
         // One cannot associate a terminal to a process that has already one
         assert_eq!(set_controlling_terminal(&task1, &opened_replica, false), error!(EINVAL));
 
-        task2.thread_group.setsid().expect("setsid");
+        task2.thread_group.setsid(&mut locked).expect("setsid");
 
         // One cannot associate a terminal that is already associated with another process.
         assert_eq!(set_controlling_terminal(&task2, &opened_replica, false), error!(EPERM));
@@ -1019,9 +1032,9 @@ mod tests {
     async fn test_set_foreground_process() {
         let (_kernel, init, mut locked) = create_kernel_task_and_unlocked();
         let task1 = init.clone_task_for_test(&mut locked, 0, Some(SIGCHLD));
-        task1.thread_group.setsid().expect("setsid");
+        task1.thread_group.setsid(&mut locked).expect("setsid");
         let task2 = task1.clone_task_for_test(&mut locked, 0, Some(SIGCHLD));
-        task2.thread_group.setpgid(&task2, 0).expect("setpgid");
+        task2.thread_group.setpgid(&mut locked, &task2, 0).expect("setpgid");
         let task2_pgid = task2.thread_group.read().process_group.leader;
 
         assert_ne!(task2_pgid, task1.thread_group.read().process_group.leader);
@@ -1087,7 +1100,7 @@ mod tests {
     async fn test_detach_session() {
         let (_kernel, task1, mut locked) = create_kernel_task_and_unlocked();
         let task2 = task1.clone_task_for_test(&mut locked, 0, Some(SIGCHLD));
-        task2.thread_group.setsid().expect("setsid");
+        task2.thread_group.setsid(&mut locked).expect("setsid");
 
         let fs = dev_pts_fs(&task1, Default::default());
         let _opened_main = open_ptmx_and_unlock(&task1, fs).expect("ptmx");

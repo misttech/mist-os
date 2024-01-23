@@ -25,7 +25,7 @@
 //!
 //! ```
 //! use std::sync::Mutex;
-//! use lock_sequence::{impl_lock_after, lock_level, lock::LockFor, relation::LockAfter, Unlocked};
+//! use starnix_sync::{impl_lock_after, lock_level, lock::LockFor, relation::LockAfter, Unlocked};
 //!
 //! #[derive(Default)]
 //! struct HoldsLocks {

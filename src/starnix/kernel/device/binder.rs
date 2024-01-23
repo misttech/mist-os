@@ -4391,6 +4391,7 @@ pub mod tests {
     use fuchsia_async::LocalExecutor;
     use futures::TryStreamExt;
     use memoffset::offset_of;
+    use starnix_sync::{Locked, Unlocked};
     use starnix_uapi::{
         binder_transaction_data__bindgen_ty_1, binder_transaction_data__bindgen_ty_2,
         errors::{EBADF, EINVAL},
@@ -4438,8 +4439,11 @@ pub mod tests {
     }
 
     impl BinderProcessFixture {
-        fn new(test_fixture: &TranslateHandlesTestFixture) -> Self {
-            let task = create_task(&test_fixture.kernel, "task");
+        fn new(
+            locked: &mut Locked<'_, Unlocked>,
+            test_fixture: &TranslateHandlesTestFixture,
+        ) -> Self {
+            let task = create_task(locked, &test_fixture.kernel, "task");
             let (proc, thread) = test_fixture.driver.create_process_and_thread(task.get_pid());
 
             mmap_shared_memory(&test_fixture.driver, &task, &proc);
@@ -4469,14 +4473,14 @@ pub mod tests {
     }
 
     impl TranslateHandlesTestFixture {
-        fn new() -> Self {
+        fn new<'l>() -> (Self, Locked<'l, Unlocked>) {
             let (kernel, init_task) = create_kernel_and_task();
             let driver = BinderDriver::new();
-            Self { kernel, driver, init_task }
+            (Self { kernel, driver, init_task }, Unlocked::new())
         }
 
-        fn new_process(&self) -> BinderProcessFixture {
-            BinderProcessFixture::new(self)
+        fn new_process(&self, locked: &mut Locked<'_, Unlocked>) -> BinderProcessFixture {
+            BinderProcessFixture::new(locked, self)
         }
     }
 
@@ -4559,8 +4563,8 @@ pub mod tests {
 
     #[fuchsia::test]
     async fn handle_0_succeeds_when_context_manager_is_set() {
-        let test = TranslateHandlesTestFixture::new();
-        let sender = test.new_process();
+        let (test, mut locked) = TranslateHandlesTestFixture::new();
+        let sender = test.new_process(&mut locked);
         let context_manager =
             BinderObject::new_context_manager_marker(&sender.proc, BinderObjectFlags::empty());
         *test.driver.context_manager.lock() = Some(context_manager.clone());
@@ -4572,16 +4576,16 @@ pub mod tests {
 
     #[fuchsia::test]
     async fn fail_to_retrieve_non_existing_handle() {
-        let test = TranslateHandlesTestFixture::new();
-        let sender = test.new_process();
+        let (test, mut locked) = TranslateHandlesTestFixture::new();
+        let sender = test.new_process(&mut locked);
         assert!(&sender.proc.lock().handles.get(3).is_none());
     }
 
     #[fuchsia::test]
     async fn handle_is_not_dropped_after_transaction_finishes_if_it_already_existed() {
-        let test = TranslateHandlesTestFixture::new();
-        let proc_1 = test.new_process();
-        let proc_2 = test.new_process();
+        let (test, mut locked) = TranslateHandlesTestFixture::new();
+        let proc_1 = test.new_process(&mut locked);
+        let proc_2 = test.new_process(&mut locked);
 
         let (transaction_ref, guard) = register_binder_object(
             &proc_1.proc,
@@ -4631,9 +4635,9 @@ pub mod tests {
 
     #[fuchsia::test]
     async fn handle_is_dropped_after_transaction_finishes() {
-        let test = TranslateHandlesTestFixture::new();
-        let proc_1 = test.new_process();
-        let proc_2 = test.new_process();
+        let (test, mut locked) = TranslateHandlesTestFixture::new();
+        let proc_1 = test.new_process(&mut locked);
+        let proc_2 = test.new_process(&mut locked);
 
         let (transaction_ref, guard) = register_binder_object(
             &proc_1.proc,
@@ -4672,9 +4676,9 @@ pub mod tests {
 
     #[fuchsia::test]
     async fn handle_is_dropped_after_last_weak_ref_released() {
-        let test = TranslateHandlesTestFixture::new();
-        let proc_1 = test.new_process();
-        let proc_2 = test.new_process();
+        let (test, mut locked) = TranslateHandlesTestFixture::new();
+        let proc_1 = test.new_process(&mut locked);
+        let proc_2 = test.new_process(&mut locked);
 
         let (transaction_ref, guard) = register_binder_object(
             &proc_1.proc,
@@ -5048,8 +5052,8 @@ pub mod tests {
 
     #[fuchsia::test]
     async fn binder_object_enqueues_release_command_when_dropped() {
-        let test = TranslateHandlesTestFixture::new();
-        let proc = test.new_process();
+        let (test, mut locked) = TranslateHandlesTestFixture::new();
+        let proc = test.new_process(&mut locked);
 
         const LOCAL_BINDER_OBJECT: LocalBinderObject = LocalBinderObject {
             weak_ref_addr: UserAddress::const_from(0x0000000000000010),
@@ -5075,8 +5079,8 @@ pub mod tests {
 
     #[fuchsia::test]
     async fn handle_table_refs() {
-        let test = TranslateHandlesTestFixture::new();
-        let proc = test.new_process();
+        let (test, mut locked) = TranslateHandlesTestFixture::new();
+        let proc = test.new_process(&mut locked);
 
         let (object, guard) = register_binder_object(
             &proc.proc,
@@ -5422,9 +5426,9 @@ pub mod tests {
 
     #[fuchsia::test]
     async fn copy_transaction_data_between_processes() {
-        let test = TranslateHandlesTestFixture::new();
-        let sender = test.new_process();
-        let receiver = test.new_process();
+        let (test, mut locked) = TranslateHandlesTestFixture::new();
+        let sender = test.new_process(&mut locked);
+        let receiver = test.new_process(&mut locked);
 
         // Explicitly install a VMO that we can read from later.
         let vmo = zx::Vmo::create(VMO_LENGTH as u64).expect("failed to create VMO");
@@ -5527,9 +5531,9 @@ pub mod tests {
 
     #[fuchsia::test]
     async fn transaction_translate_binder_leaving_process() {
-        let test = TranslateHandlesTestFixture::new();
-        let sender = test.new_process();
-        let receiver = test.new_process();
+        let (test, mut locked) = TranslateHandlesTestFixture::new();
+        let sender = test.new_process(&mut locked);
+        let receiver = test.new_process(&mut locked);
         let mut receiver_shared_memory = receiver.lock_shared_memory();
         let mut allocations =
             receiver_shared_memory.allocate_buffers(0, 0, 0, 0).expect("allocate buffers");
@@ -5605,9 +5609,9 @@ pub mod tests {
 
     #[fuchsia::test]
     async fn transaction_translate_binder_handle_entering_owning_process() {
-        let test = TranslateHandlesTestFixture::new();
-        let sender = test.new_process();
-        let receiver = test.new_process();
+        let (test, mut locked) = TranslateHandlesTestFixture::new();
+        let sender = test.new_process(&mut locked);
+        let receiver = test.new_process(&mut locked);
         let mut receiver_shared_memory = receiver.lock_shared_memory();
         let mut allocations =
             receiver_shared_memory.allocate_buffers(0, 0, 0, 0).expect("allocate buffers");
@@ -5674,10 +5678,10 @@ pub mod tests {
 
     #[fuchsia::test]
     async fn transaction_translate_binder_handle_passed_between_non_owning_processes() {
-        let test = TranslateHandlesTestFixture::new();
-        let sender = test.new_process();
-        let receiver = test.new_process();
-        let owner = test.new_process();
+        let (test, mut locked) = TranslateHandlesTestFixture::new();
+        let sender = test.new_process(&mut locked);
+        let receiver = test.new_process(&mut locked);
+        let owner = test.new_process(&mut locked);
         let mut receiver_shared_memory = receiver.lock_shared_memory();
         let mut allocations =
             receiver_shared_memory.allocate_buffers(0, 0, 0, 0).expect("allocate buffers");
@@ -5769,10 +5773,10 @@ pub mod tests {
 
     #[fuchsia::test]
     async fn transaction_translate_binder_handles_with_same_address() {
-        let test = TranslateHandlesTestFixture::new();
-        let sender = test.new_process();
-        let receiver = test.new_process();
-        let other_proc = test.new_process();
+        let (test, mut locked) = TranslateHandlesTestFixture::new();
+        let sender = test.new_process(&mut locked);
+        let receiver = test.new_process(&mut locked);
+        let other_proc = test.new_process(&mut locked);
         let mut receiver_shared_memory = receiver.lock_shared_memory();
         let mut allocations =
             receiver_shared_memory.allocate_buffers(0, 0, 0, 0).expect("allocate buffers");
@@ -5904,9 +5908,9 @@ pub mod tests {
     /// Tests that hwbinder's scatter-gather buffer-fix-up implementation is correct.
     #[fuchsia::test]
     async fn transaction_translate_buffers() {
-        let test = TranslateHandlesTestFixture::new();
-        let sender = test.new_process();
-        let receiver = test.new_process();
+        let (test, mut locked) = TranslateHandlesTestFixture::new();
+        let sender = test.new_process(&mut locked);
+        let receiver = test.new_process(&mut locked);
 
         // Allocate memory in the sender to hold all the buffers that will get submitted to the
         // binder driver.
@@ -6025,9 +6029,9 @@ pub mod tests {
     /// processing and fail, instead of skipping a buffer object that doesn't fit.
     #[fuchsia::test]
     async fn transaction_fails_when_sg_buffer_size_is_too_small() {
-        let test = TranslateHandlesTestFixture::new();
-        let sender = test.new_process();
-        let receiver = test.new_process();
+        let (test, mut locked) = TranslateHandlesTestFixture::new();
+        let sender = test.new_process(&mut locked);
+        let receiver = test.new_process(&mut locked);
 
         // Allocate memory in the sender to hold all the buffers that will get submitted to the
         // binder driver.
@@ -6109,9 +6113,9 @@ pub mod tests {
     /// object list, the transaction fails.
     #[fuchsia::test]
     async fn transaction_fails_when_sg_buffer_parent_is_out_of_order() {
-        let test = TranslateHandlesTestFixture::new();
-        let sender = test.new_process();
-        let receiver = test.new_process();
+        let (test, mut locked) = TranslateHandlesTestFixture::new();
+        let sender = test.new_process(&mut locked);
+        let receiver = test.new_process(&mut locked);
 
         // Allocate memory in the sender to hold all the buffers that will get submitted to the
         // binder driver.
@@ -6188,9 +6192,9 @@ pub mod tests {
 
     #[fuchsia::test]
     async fn transaction_translate_fd_array() {
-        let test = TranslateHandlesTestFixture::new();
-        let sender = test.new_process();
-        let receiver = test.new_process();
+        let (test, mut locked) = TranslateHandlesTestFixture::new();
+        let sender = test.new_process(&mut locked);
+        let receiver = test.new_process(&mut locked);
 
         // Insert a binder object for the receiver, and grab a handle to it in the sender.
         const OBJECT_ADDR: UserAddress = UserAddress::const_from(0x01);
@@ -6379,9 +6383,9 @@ pub mod tests {
     #[fuchsia::test]
     async fn transaction_receiver_exits_after_getting_fd_array() {
         let _init_task = {
-            let test = TranslateHandlesTestFixture::new();
-            let sender = test.new_process();
-            let receiver = test.new_process();
+            let (test, mut locked) = TranslateHandlesTestFixture::new();
+            let sender = test.new_process(&mut locked);
+            let receiver = test.new_process(&mut locked);
 
             // Insert a binder object for the receiver, and grab a handle to it in the sender.
             const OBJECT_ADDR: UserAddress = UserAddress::const_from(0x01);
@@ -6501,9 +6505,9 @@ pub mod tests {
 
     #[fuchsia::test]
     async fn transaction_fd_array_sender_cancels() {
-        let test = TranslateHandlesTestFixture::new();
-        let sender = test.new_process();
-        let receiver = test.new_process();
+        let (test, mut locked) = TranslateHandlesTestFixture::new();
+        let sender = test.new_process(&mut locked);
+        let receiver = test.new_process(&mut locked);
 
         // Insert a binder object for the receiver, and grab a handle to it in the sender.
         const OBJECT_ADDR: UserAddress = UserAddress::const_from(0x01);
@@ -6634,9 +6638,9 @@ pub mod tests {
 
     #[fuchsia::test]
     async fn transaction_translation_fails_on_invalid_handle() {
-        let test = TranslateHandlesTestFixture::new();
-        let sender = test.new_process();
-        let receiver = test.new_process();
+        let (test, mut locked) = TranslateHandlesTestFixture::new();
+        let sender = test.new_process(&mut locked);
+        let receiver = test.new_process(&mut locked);
         let mut receiver_shared_memory = receiver.lock_shared_memory();
         let mut allocations =
             receiver_shared_memory.allocate_buffers(0, 0, 0, 0).expect("allocate buffers");
@@ -6669,9 +6673,9 @@ pub mod tests {
 
     #[fuchsia::test]
     async fn transaction_translation_fails_on_invalid_object_type() {
-        let test = TranslateHandlesTestFixture::new();
-        let sender = test.new_process();
-        let receiver = test.new_process();
+        let (test, mut locked) = TranslateHandlesTestFixture::new();
+        let sender = test.new_process(&mut locked);
+        let receiver = test.new_process(&mut locked);
         let mut receiver_shared_memory = receiver.lock_shared_memory();
         let mut allocations =
             receiver_shared_memory.allocate_buffers(0, 0, 0, 0).expect("allocate buffers");
@@ -6704,9 +6708,9 @@ pub mod tests {
 
     #[fuchsia::test]
     async fn transaction_drop_references_on_failed_transaction() {
-        let test = TranslateHandlesTestFixture::new();
-        let sender = test.new_process();
-        let receiver = test.new_process();
+        let (test, mut locked) = TranslateHandlesTestFixture::new();
+        let sender = test.new_process(&mut locked);
+        let receiver = test.new_process(&mut locked);
         let mut receiver_shared_memory = receiver.lock_shared_memory();
         let mut allocations =
             receiver_shared_memory.allocate_buffers(0, 0, 0, 0).expect("allocate buffers");
@@ -6848,9 +6852,9 @@ pub mod tests {
 
     #[fuchsia::test]
     async fn decrementing_refs_on_dead_binder_succeeds() {
-        let test = TranslateHandlesTestFixture::new();
-        let owner = test.new_process();
-        let client = test.new_process();
+        let (test, mut locked) = TranslateHandlesTestFixture::new();
+        let owner = test.new_process(&mut locked);
+        let client = test.new_process(&mut locked);
 
         // Register an object with the owner.
         let guard = owner.proc.lock().find_or_register_object(
@@ -6923,9 +6927,9 @@ pub mod tests {
 
     #[fuchsia::test]
     async fn death_notification_fires_when_process_dies() {
-        let test = TranslateHandlesTestFixture::new();
-        let sender = test.new_process();
-        let receiver = test.new_process();
+        let (test, mut locked) = TranslateHandlesTestFixture::new();
+        let sender = test.new_process(&mut locked);
+        let receiver = test.new_process(&mut locked);
 
         // Register an object with the owner.
         let guard = sender.proc.lock().find_or_register_object(
@@ -6964,9 +6968,9 @@ pub mod tests {
 
     #[fuchsia::test]
     async fn death_notification_fires_when_request_for_death_notification_is_made_on_dead_binder() {
-        let test = TranslateHandlesTestFixture::new();
-        let sender = test.new_process();
-        let receiver = test.new_process();
+        let (test, mut locked) = TranslateHandlesTestFixture::new();
+        let sender = test.new_process(&mut locked);
+        let receiver = test.new_process(&mut locked);
 
         // Register an object with the sender.
         let guard = sender.proc.lock().find_or_register_object(
@@ -7007,9 +7011,9 @@ pub mod tests {
 
     #[fuchsia::test]
     async fn death_notification_is_cleared_before_process_dies() {
-        let test = TranslateHandlesTestFixture::new();
-        let owner = test.new_process();
-        let client = test.new_process();
+        let (test, mut locked) = TranslateHandlesTestFixture::new();
+        let owner = test.new_process(&mut locked);
+        let client = test.new_process(&mut locked);
 
         // Register an object with the owner.
         let guard = owner.proc.lock().find_or_register_object(
@@ -7072,9 +7076,9 @@ pub mod tests {
 
     #[fuchsia::test]
     async fn send_fd_in_transaction() {
-        let test = TranslateHandlesTestFixture::new();
-        let sender = test.new_process();
-        let receiver = test.new_process();
+        let (test, mut locked) = TranslateHandlesTestFixture::new();
+        let sender = test.new_process(&mut locked);
+        let receiver = test.new_process(&mut locked);
         let mut receiver_shared_memory = receiver.lock_shared_memory();
         let mut allocations =
             receiver_shared_memory.allocate_buffers(0, 0, 0, 0).expect("allocate buffers");
@@ -7143,9 +7147,9 @@ pub mod tests {
 
     #[fuchsia::test]
     async fn cleanup_fd_in_failed_transaction() {
-        let test = TranslateHandlesTestFixture::new();
-        let sender = test.new_process();
-        let receiver = test.new_process();
+        let (test, mut locked) = TranslateHandlesTestFixture::new();
+        let sender = test.new_process(&mut locked);
+        let receiver = test.new_process(&mut locked);
         let mut receiver_shared_memory = receiver.lock_shared_memory();
         let mut allocations =
             receiver_shared_memory.allocate_buffers(0, 0, 0, 0).expect("allocate buffers");
@@ -7190,9 +7194,9 @@ pub mod tests {
 
     #[fuchsia::test]
     async fn cleanup_refs_in_successful_transaction() {
-        let test = TranslateHandlesTestFixture::new();
-        let sender = test.new_process();
-        let receiver = test.new_process();
+        let (test, mut locked) = TranslateHandlesTestFixture::new();
+        let sender = test.new_process(&mut locked);
+        let receiver = test.new_process(&mut locked);
         let mut receiver_shared_memory = receiver.lock_shared_memory();
         let mut allocations =
             receiver_shared_memory.allocate_buffers(0, 0, 0, 0).expect("allocate buffers");
@@ -7261,8 +7265,8 @@ pub mod tests {
 
     #[fuchsia::test]
     async fn transaction_error_dispatch() {
-        let test = TranslateHandlesTestFixture::new();
-        let proc = test.new_process();
+        let (test, mut locked) = TranslateHandlesTestFixture::new();
+        let proc = test.new_process(&mut locked);
 
         TransactionError::Malformed(errno!(EINVAL)).dispatch(&proc.thread).expect("no error");
         assert_matches!(
@@ -7282,9 +7286,9 @@ pub mod tests {
 
     #[fuchsia::test]
     async fn next_oneway_transaction_scheduled_after_buffer_freed() {
-        let test = TranslateHandlesTestFixture::new();
-        let receiver = test.new_process();
-        let sender = test.new_process();
+        let (test, mut locked) = TranslateHandlesTestFixture::new();
+        let sender = test.new_process(&mut locked);
+        let receiver = test.new_process(&mut locked);
 
         // Insert a binder object for the receiver, and grab a handle to it in the sender.
         const OBJECT_ADDR: UserAddress = UserAddress::const_from(0x01);
@@ -7406,9 +7410,9 @@ pub mod tests {
 
     #[fuchsia::test]
     async fn synchronous_transactions_bypass_oneway_transaction_queue() {
-        let test = TranslateHandlesTestFixture::new();
-        let sender = test.new_process();
-        let receiver = test.new_process();
+        let (test, mut locked) = TranslateHandlesTestFixture::new();
+        let sender = test.new_process(&mut locked);
+        let receiver = test.new_process(&mut locked);
 
         // Insert a binder object for the receiver, and grab a handle to it in the sender.
         const OBJECT_ADDR: UserAddress = UserAddress::const_from(0x01);
@@ -7490,9 +7494,9 @@ pub mod tests {
 
     #[fuchsia::test]
     async fn dead_reply_when_transaction_recipient_proc_dies() {
-        let test = TranslateHandlesTestFixture::new();
-        let sender = test.new_process();
-        let receiver = test.new_process();
+        let (test, mut locked) = TranslateHandlesTestFixture::new();
+        let sender = test.new_process(&mut locked);
+        let receiver = test.new_process(&mut locked);
 
         // Insert a binder object for the receiver, and grab a handle to it in the sender.
         const OBJECT_ADDR: UserAddress = UserAddress::const_from(0x01);
@@ -7541,9 +7545,9 @@ pub mod tests {
 
     #[fuchsia::test]
     async fn dead_reply_when_transaction_recipient_thread_dies() {
-        let test = TranslateHandlesTestFixture::new();
-        let sender = test.new_process();
-        let receiver = test.new_process();
+        let (test, mut locked) = TranslateHandlesTestFixture::new();
+        let sender = test.new_process(&mut locked);
+        let receiver = test.new_process(&mut locked);
 
         // Insert a binder object for the receiver, and grab a handle to it in the sender.
         const OBJECT_ADDR: UserAddress = UserAddress::const_from(0x01);
@@ -7592,9 +7596,9 @@ pub mod tests {
 
     #[fuchsia::test]
     async fn dead_reply_when_transaction_recipient_thread_dies_while_processing_reply() {
-        let test = TranslateHandlesTestFixture::new();
-        let sender = test.new_process();
-        let receiver = test.new_process();
+        let (test, mut locked) = TranslateHandlesTestFixture::new();
+        let sender = test.new_process(&mut locked);
+        let receiver = test.new_process(&mut locked);
 
         // Insert a binder object for the receiver, and grab a handle to it in the sender.
         const OBJECT_ADDR: UserAddress = UserAddress::const_from(0x01);

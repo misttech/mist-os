@@ -12,11 +12,7 @@ use fuchsia_zircon as zx;
 use once_cell::sync::OnceCell;
 use pin_project::pin_project;
 use starnix_sync::{Locked, Unlocked};
-use starnix_uapi::{
-    errno, error,
-    errors::Errno,
-    ownership::{Releasable, WeakRef},
-};
+use starnix_uapi::{errno, error, errors::Errno, ownership::WeakRef};
 use std::{
     cell::RefCell,
     ffi::CString,
@@ -100,8 +96,9 @@ impl KernelThreads {
 
 impl Drop for KernelThreads {
     fn drop(&mut self) {
+        let mut locked = Unlocked::new(); // TODO: Replace with .release
         if let Some(system_task) = self.system_task.take() {
-            system_task.system_task.into_inner().release(());
+            system_task.system_task.into_inner().release(&mut locked);
         }
     }
 }
@@ -119,21 +116,30 @@ where
 }
 
 /// Create a new system task, register it on the thread and run the given closure with it.
-pub fn with_new_current_task<F, R>(system_task: &WeakRef<Task>, f: F) -> Result<R, Errno>
+pub fn with_new_current_task<F, R>(
+    locked: &mut Locked<'_, Unlocked>,
+    system_task: &WeakRef<Task>,
+    f: F,
+) -> Result<R, Errno>
 where
-    F: FnOnce(&CurrentTask) -> R,
+    F: FnOnce(&mut Locked<'_, Unlocked>, &CurrentTask) -> R,
 {
     let current_task = {
         let Some(system_task) = system_task.upgrade() else {
             return error!(ESRCH);
         };
-        CurrentTask::create_kernel_thread(&system_task, CString::new("[kthreadd]").unwrap())?
+        CurrentTask::create_kernel_thread(
+            locked,
+            &system_task,
+            CString::new("[kthreadd]").unwrap(),
+        )?
     };
     Ok(LOCAL_TASK.with(|task_option| {
         *task_option.borrow_mut() = Some(current_task);
-        let result = f(task_option.borrow().as_ref().unwrap());
-        let current_task = task_option.borrow_mut().take();
-        current_task.release(());
+        let result = f(locked, task_option.borrow().as_ref().unwrap());
+        if let Some(current_task) = task_option.borrow_mut().take() {
+            current_task.release(locked);
+        }
         result
     }))
 }

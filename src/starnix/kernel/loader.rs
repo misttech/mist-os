@@ -667,7 +667,7 @@ mod tests {
         let (kernel, mut current_task, mut locked) = create_kernel_task_and_unlocked_with_pkgfs();
         exec_hello_starnix(&mut current_task).expect("failed to load executable");
 
-        let current2 = create_task(&kernel, "another-task");
+        let current2 = create_task(&mut locked, &kernel, "another-task");
         current_task.mm().snapshot_to(&mut locked, current2.mm()).expect("failed to snapshot mm");
 
         assert_eq!(current_task.mm().get_mapping_count(), current2.mm().get_mapping_count());

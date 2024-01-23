@@ -21,7 +21,7 @@ use crate::{
     vfs::{FdNumber, FileHandle, MountNamespaceFile, UserBuffersOutputBuffer, VecOutputBuffer},
 };
 use starnix_logging::{log_error, log_trace, not_implemented, set_zx_name};
-use starnix_sync::MmDumpable;
+use starnix_sync::{MmDumpable, TaskRelease};
 use starnix_syscalls::SyscallResult;
 use starnix_uapi::{
     __user_cap_data_struct, __user_cap_header_struct,
@@ -66,6 +66,7 @@ pub fn do_clone<L>(
 ) -> Result<pid_t, Errno>
 where
     L: LockBefore<MmDumpable>,
+    L: LockBefore<TaskRelease>,
 {
     let child_exit_signal = if args.exit_signal == 0 {
         None
@@ -359,14 +360,14 @@ pub fn sys_getpgid(
 }
 
 pub fn sys_setpgid(
-    _locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
     pid: pid_t,
     pgid: pid_t,
 ) -> Result<(), Errno> {
     let weak = get_task_or_current(current_task, pid);
     let task = Task::from_weak(&weak)?;
-    current_task.thread_group.setpgid(&task, pgid)?;
+    current_task.thread_group.setpgid(locked, &task, pgid)?;
     Ok(())
 }
 
@@ -1439,10 +1440,10 @@ pub fn sys_getgroups(
 }
 
 pub fn sys_setsid(
-    _locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
 ) -> Result<pid_t, Errno> {
-    current_task.thread_group.setsid()?;
+    current_task.thread_group.setsid(locked)?;
     Ok(current_task.get_pid())
 }
 
@@ -1948,7 +1949,7 @@ mod tests {
             sys_getsid(&mut locked, &current_task, 0).expect("failed to get sid")
         );
 
-        let second_current = create_task(&kernel, "second task");
+        let second_current = create_task(&mut locked, &kernel, "second task");
 
         assert_eq!(
             second_current.get_tid(),

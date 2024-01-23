@@ -44,13 +44,14 @@ use starnix_logging::{
     log_error, log_info, log_warn, trace_category_starnix, trace_duration,
     trace_name_create_container,
 };
+use starnix_sync::{Locked, Unlocked};
 use starnix_uapi::{
     auth::Credentials,
     errno,
     errors::{SourceContext, ENOENT},
     mount_flags::MountFlags,
     open_flags::OpenFlags,
-    ownership::{release_on_error, Releasable},
+    ownership::release_on_error,
     pid_t,
     resource_limits::Resource,
     rlimit,
@@ -273,13 +274,14 @@ pub async fn create_component_from_stream(
     if let Some(event) = request_stream.try_next().await? {
         match event {
             frunner::ComponentRunnerRequest::Start { start_info, controller, .. } => {
+                let mut locked = Unlocked::new(); // TODO(https://fxbug.dev/320465852): Reuse an existing Locked context
                 let request_stream = controller.into_stream()?;
                 let mut config = get_config_from_component_start_info(start_info);
                 let (sender, receiver) = oneshot::channel::<TaskResult>();
                 let container =
-                    create_container(&mut config, sender).await.with_source_context(|| {
-                        format!("creating container \"{}\"", &config.config.name)
-                    })?;
+                    create_container(&mut locked, &mut config, sender).await.with_source_context(
+                        || format!("creating container \"{}\"", &config.config.name),
+                    )?;
                 let service_config = ContainerServiceConfig { config, request_stream, receiver };
                 let kernel = &container.kernel;
                 let vvar = kernel.vdso.vvar_writeable.clone();
@@ -297,6 +299,7 @@ pub async fn create_component_from_stream(
 }
 
 async fn create_container(
+    locked: &mut Locked<'_, Unlocked>,
     config: &mut ConfigWrapper,
     task_complete: oneshot::Sender<TaskResult>,
 ) -> Result<Container, Error> {
@@ -364,7 +367,7 @@ async fn create_container(
     // Lots of software assumes that the pid for the init process is 1.
     debug_assert_eq!(init_pid, 1);
 
-    let system_task = CurrentTask::create_system_task(&kernel, Arc::clone(&fs_context))
+    let system_task = CurrentTask::create_system_task(locked, &kernel, Arc::clone(&fs_context))
         .source_context("create system task")?;
     // The system task gives pid 2. This value is less critical than giving
     // pid 1 to init, but this value matches what is supposed to happen.
@@ -398,7 +401,7 @@ async fn create_container(
         .open_file(argv[0].as_bytes().into(), OpenFlags::RDONLY)
         .with_source_context(|| format!("opening init: {:?}", &argv[0]))?;
 
-    let init_task = create_init_task(&kernel, init_pid, Arc::clone(&fs_context), config)
+    let init_task = create_init_task(locked, &kernel, init_pid, Arc::clone(&fs_context), config)
         .with_source_context(|| format!("creating init task: {:?}", &config.init))?;
     execute_task_with_prerun_result(
         init_task,
@@ -484,6 +487,7 @@ pub fn set_rlimits(task: &Task, rlimits: &[String]) -> Result<(), Error> {
 }
 
 fn create_init_task(
+    locked: &mut Locked<'_, Unlocked>,
     kernel: &Arc<Kernel>,
     pid: pid_t,
     fs_context: Arc<FsContext>,
@@ -495,8 +499,8 @@ fn create_init_task(
     } else {
         CString::new(config.init[0].clone())?
     };
-    let task = CurrentTask::create_init_process(kernel, pid, initial_name, fs_context)?;
-    release_on_error!(task, (), {
+    let task = CurrentTask::create_init_process(locked, kernel, pid, initial_name, fs_context)?;
+    release_on_error!(task, locked, {
         task.set_creds(credentials);
         set_rlimits(&task, &config.rlimits)?;
         Ok(())

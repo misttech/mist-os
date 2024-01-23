@@ -339,7 +339,7 @@ fn send_unchecked_signal_info(
 }
 
 pub fn sys_kill(
-    _locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
     pid: pid_t,
     unchecked_signal: UncheckedSignal,
@@ -421,7 +421,7 @@ pub fn sys_kill(
                 let process_group = pids.get_process_group(process_group_id);
                 process_group
                     .iter()
-                    .flat_map(|pg| pg.read().thread_groups().collect::<Vec<_>>())
+                    .flat_map(|pg| pg.read(locked).thread_groups().collect::<Vec<_>>())
                     .collect::<Vec<_>>()
             };
             signal_thread_groups(current_task, unchecked_signal, thread_groups.into_iter())?;
@@ -1453,7 +1453,7 @@ mod tests {
     async fn test_kill_own_thread_group() {
         let (_kernel, init_task, mut locked) = create_kernel_task_and_unlocked();
         let task1 = init_task.clone_task_for_test(&mut locked, 0, Some(SIGCHLD));
-        task1.thread_group.setsid().expect("setsid");
+        task1.thread_group.setsid(&mut locked).expect("setsid");
         let task2 = task1.clone_task_for_test(&mut locked, 0, Some(SIGCHLD));
 
         assert_eq!(sys_kill(&mut locked, &task1, 0, SIGINT.into()), Ok(()));
@@ -1467,7 +1467,7 @@ mod tests {
     async fn test_kill_thread_group() {
         let (_kernel, init_task, mut locked) = create_kernel_task_and_unlocked();
         let task1 = init_task.clone_task_for_test(&mut locked, 0, Some(SIGCHLD));
-        task1.thread_group.setsid().expect("setsid");
+        task1.thread_group.setsid(&mut locked).expect("setsid");
         let task2 = task1.clone_task_for_test(&mut locked, 0, Some(SIGCHLD));
 
         assert_eq!(sys_kill(&mut locked, &task1, -task1.id, SIGINT.into()), Ok(()));
@@ -1481,7 +1481,7 @@ mod tests {
     async fn test_kill_all() {
         let (_kernel, init_task, mut locked) = create_kernel_task_and_unlocked();
         let task1 = init_task.clone_task_for_test(&mut locked, 0, Some(SIGCHLD));
-        task1.thread_group.setsid().expect("setsid");
+        task1.thread_group.setsid(&mut locked).expect("setsid");
         let task2 = task1.clone_task_for_test(&mut locked, 0, Some(SIGCHLD));
 
         assert_eq!(sys_kill(&mut locked, &task1, -1, SIGINT.into()), Ok(()));
@@ -1517,9 +1517,9 @@ mod tests {
     async fn test_kill_invalid_task_in_thread_group() {
         let (_kernel, init_task, mut locked) = create_kernel_task_and_unlocked();
         let task1 = init_task.clone_task_for_test(&mut locked, 0, Some(SIGCHLD));
-        task1.thread_group.setsid().expect("setsid");
+        task1.thread_group.setsid(&mut locked).expect("setsid");
         let task2 = task1.clone_task_for_test(&mut locked, 0, Some(SIGCHLD));
-        task2.thread_group.setsid().expect("setsid");
+        task2.thread_group.setsid(&mut locked).expect("setsid");
         task2.set_creds(Credentials::with_ids(2, 2));
 
         assert!(!task2.can_signal(&task1, SIGINT.into()));
@@ -1890,7 +1890,7 @@ mod tests {
         child1.thread_group.exit(ExitStatus::Exit(42));
         std::mem::drop(child1);
         let child2 = current_task.clone_task_for_test(&mut locked, 0, Some(SIGCHLD));
-        child2.thread_group.setsid().expect("setsid");
+        child2.thread_group.setsid(&mut locked).expect("setsid");
         let child2_pid = child2.id;
         child2.thread_group.exit(ExitStatus::Exit(42));
         std::mem::drop(child2);
@@ -1920,7 +1920,7 @@ mod tests {
         child1.thread_group.exit(ExitStatus::Exit(42));
         std::mem::drop(child1);
         let child2 = current_task.clone_task_for_test(&mut locked, 0, Some(SIGCHLD));
-        child2.thread_group.setsid().expect("setsid");
+        child2.thread_group.setsid(&mut locked).expect("setsid");
         let child2_pid = child2.id;
         child2.thread_group.exit(ExitStatus::Exit(42));
         std::mem::drop(child2);
@@ -1973,7 +1973,7 @@ mod tests {
 
         let addr = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
         current_task.write_memory(addr, &data).unwrap();
-        let second_current = create_task(&kernel, "second task");
+        let second_current = create_task(&mut locked, &kernel, "second task");
         let second_pid = second_current.get_pid();
         let second_tid = second_current.get_tid();
         assert_eq!(second_current.read().signals.queued_count(SIGIO), 0);

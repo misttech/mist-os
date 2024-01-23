@@ -26,7 +26,7 @@ use starnix_core::{
     vfs::{FileSystemOptions, FsString, LookupContext, NamespaceNode, WhatToMount},
 };
 use starnix_logging::{log_error, log_info};
-use starnix_sync::Mutex;
+use starnix_sync::{Mutex, Unlocked};
 use starnix_uapi::{
     auth::{Capabilities, Credentials},
     device_type::DeviceType,
@@ -61,6 +61,7 @@ pub async fn start_component(
     controller: ServerEnd<ComponentControllerMarker>,
     system_task: &CurrentTask,
 ) -> Result<(), Error> {
+    let mut locked = Unlocked::new(); // TODO(https://fxbug.dev/320465852): Reuse an existing Locked context
     let url = start_info.resolved_url.clone().unwrap_or_else(|| "<unknown>".to_string());
     log_info!("start_component: {}", url);
 
@@ -151,7 +152,8 @@ pub async fn start_component(
     });
 
     let (task_complete_sender, task_complete) = oneshot::channel::<TaskResult>();
-    let current_task = CurrentTask::create_init_child_process(system_task.kernel(), &binary_path)?;
+    let current_task =
+        CurrentTask::create_init_child_process(&mut locked, system_task.kernel(), &binary_path)?;
 
     let weak_task = execute_task_with_prerun_result(
         current_task,

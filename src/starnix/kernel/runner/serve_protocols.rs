@@ -24,6 +24,7 @@ use starnix_core::{
     },
 };
 use starnix_logging::{log_error, log_warn};
+use starnix_sync::{LockBefore, Locked, TaskRelease, Unlocked};
 use starnix_uapi::{open_flags::OpenFlags, uapi};
 use std::{ffi::CString, sync::Arc};
 
@@ -68,10 +69,14 @@ fn to_winsize(window_size: Option<fstarcontainer::ConsoleWindowSize>) -> uapi::w
         .unwrap_or(uapi::winsize::default())
 }
 
-async fn spawn_console(
+async fn spawn_console<L>(
+    locked: &mut Locked<'_, L>,
     kernel: &Arc<Kernel>,
     payload: fstarcontainer::ControllerSpawnConsoleRequest,
-) -> Result<Result<u8, fstarcontainer::SpawnConsoleError>, Error> {
+) -> Result<Result<u8, fstarcontainer::SpawnConsoleError>, Error>
+where
+    L: LockBefore<TaskRelease>,
+{
     if let (Some(console_in), Some(console_out), Some(binary_path)) =
         (payload.console_in, payload.console_out, payload.binary_path)
     {
@@ -89,7 +94,7 @@ async fn spawn_console(
             .map(CString::new)
             .collect::<Result<Vec<_>, _>>()?;
         let window_size = to_winsize(payload.window_size);
-        let current_task = CurrentTask::create_init_child_process(kernel, &binary_path)?;
+        let current_task = CurrentTask::create_init_child_process(locked, kernel, &binary_path)?;
         let (sender, receiver) = oneshot::channel();
         let pty = execute_task_with_prerun_result(
             current_task,
@@ -129,6 +134,7 @@ pub async fn serve_container_controller(
     request_stream
         .map_err(Error::from)
         .try_for_each_concurrent(None, |event| async {
+            let mut locked = Unlocked::new(); // TODO(https://fxbug.dev/320465852): Reuse an existing Locked context
             match event {
                 fstarcontainer::ControllerRequest::VsockConnect {
                     payload:
@@ -148,7 +154,8 @@ pub async fn serve_container_controller(
                     });
                 }
                 fstarcontainer::ControllerRequest::SpawnConsole { payload, responder } => {
-                    responder.send(spawn_console(system_task.kernel(), payload).await?)?;
+                    responder
+                        .send(spawn_console(&mut locked, system_task.kernel(), payload).await?)?;
                 }
                 fstarcontainer::ControllerRequest::_UnknownMethod { .. } => (),
             }

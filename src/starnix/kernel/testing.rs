@@ -26,8 +26,8 @@ use crate::{
 };
 use starnix_syscalls::{SyscallArg, SyscallResult};
 use starnix_uapi::{
-    errors::Errno, open_flags::OpenFlags, ownership::Releasable, statfs, user_address::UserAddress,
-    MAP_ANONYMOUS, MAP_PRIVATE, PROT_READ, PROT_WRITE,
+    errors::Errno, open_flags::OpenFlags, statfs, user_address::UserAddress, MAP_ANONYMOUS,
+    MAP_PRIVATE, PROT_READ, PROT_WRITE,
 };
 
 /// Create a FileSystemHandle for use in testing.
@@ -70,7 +70,7 @@ pub fn create_kernel_task_and_unlocked<'l>(
 fn create_kernel_task_and_unlocked_with_fs<'l>(
     create_fs: impl FnOnce(&Arc<Kernel>) -> FileSystemHandle,
 ) -> (Arc<Kernel>, AutoReleasableTask, Locked<'l, Unlocked>) {
-    let unlocked = Unlocked::new();
+    let mut locked = Unlocked::new();
     let kernel =
         Kernel::new(b"".into(), None, None, None, fuchsia_inspect::Node::default(), None, None)
             .expect("failed to create kernel");
@@ -79,13 +79,15 @@ fn create_kernel_task_and_unlocked_with_fs<'l>(
     assert_eq!(init_pid, 1);
     let fs = FsContext::new(create_fs(&kernel));
     let init_task = CurrentTask::create_init_process(
+        &mut locked,
         &kernel,
         init_pid,
         CString::new("test-task").unwrap(),
         fs.clone(),
     )
     .expect("failed to create first task");
-    let system_task = CurrentTask::create_system_task(&kernel, fs).expect("create system task");
+    let system_task =
+        CurrentTask::create_system_task(&mut locked, &kernel, fs).expect("create system task");
     kernel.kthreads.init(system_task).expect("failed to initialize kthreads");
 
     init_common_devices(&kernel.kthreads.system_task());
@@ -97,15 +99,20 @@ fn create_kernel_task_and_unlocked_with_fs<'l>(
         let _l2 = init_task.read();
     }
 
-    (kernel, init_task.into(), unlocked)
+    (kernel, init_task.into(), locked)
 }
 
 /// Creates a new `Task` in the provided kernel.
 ///
 /// The `Task` is backed by a real process, and can be used to test syscalls.
-pub fn create_task(kernel: &Arc<Kernel>, task_name: &str) -> AutoReleasableTask {
-    let task = CurrentTask::create_init_child_process(kernel, &CString::new(task_name).unwrap())
-        .expect("failed to create second task");
+pub fn create_task(
+    locked: &mut Locked<'_, Unlocked>,
+    kernel: &Arc<Kernel>,
+    task_name: &str,
+) -> AutoReleasableTask {
+    let task =
+        CurrentTask::create_init_child_process(locked, kernel, &CString::new(task_name).unwrap())
+            .expect("failed to create second task");
 
     // Take the lock on thread group and task in the correct order to ensure any wrong ordering
     // will trigger the tracing-mutex at the right call site.
@@ -375,7 +382,8 @@ impl From<TaskBuilder> for AutoReleasableTask {
 
 impl Drop for AutoReleasableTask {
     fn drop(&mut self) {
-        self.0.take().unwrap().release(());
+        let mut locked = Unlocked::new(); // TODO(mariagl): Find a way to avoid creating a new locked context here.
+        self.0.take().unwrap().release(&mut locked);
     }
 }
 

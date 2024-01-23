@@ -53,14 +53,14 @@ pub trait [< Releasable $($suffix)? >] {
 
     // TODO(https://fxbug.dev/131095): Only the `self` version should exist, but this is
     // problematic with Task and CurrentTask at this point.
-    fn release(self: $self, c: Self::Context<'_>);
+    fn release<'a>(self: $self, c: Self::Context<'a>);
 }
 
 /// Releasing an option calls release if the option is not empty.
 impl<T: [< Releasable $($suffix)? >]> [< Releasable $($suffix)? >] for Option<T> {
     type Context<'a> = T::Context<'a>;
 
-    fn release(self: $self, c: Self::Context<'_>) {
+    fn release<'a>(self: $self, c: Self::Context<'a>) {
         if let Some(v) = self {
             v.release(c);
         }
@@ -71,7 +71,7 @@ impl<T: [< Releasable $($suffix)? >]> [< Releasable $($suffix)? >] for Option<T>
 impl<T: [< Releasable $($suffix)? >], E> [< Releasable $($suffix)? >] for Result<T, E> {
     type Context<'a> = T::Context<'a>;
 
-    fn release(self: $self, c: Self::Context<'_>) {
+    fn release<'a>(self: $self, c: Self::Context<'a>) {
         if let Ok(v) = self {
             v.release(c);
         }

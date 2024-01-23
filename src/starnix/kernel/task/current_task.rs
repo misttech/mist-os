@@ -29,7 +29,8 @@ use fuchsia_zircon::{
 };
 use starnix_logging::{log_error, log_warn, not_implemented, set_zx_name, track_file_not_found};
 use starnix_sync::{
-    EventWaitGuard, LockBefore, Locked, MmDumpable, RwLock, RwLockWriteGuard, WakeReason,
+    EventWaitGuard, LockBefore, Locked, MmDumpable, RwLock, RwLockWriteGuard, TaskRelease,
+    WakeReason,
 };
 use starnix_syscalls::{decls::Syscall, SyscallResult};
 use starnix_uapi::{
@@ -65,6 +66,14 @@ impl TaskBuilder {
     pub fn new(task: Task) -> Self {
         Self { task: OwnedRef::new(task), thread_state: Default::default() }
     }
+
+    pub fn release<L>(self, locked: &mut Locked<'_, L>)
+    where
+        L: LockBefore<TaskRelease>,
+    {
+        let mut locked = locked.cast_locked::<TaskRelease>();
+        Releasable::release(self, &mut locked);
+    }
 }
 
 impl From<TaskBuilder> for CurrentTask {
@@ -74,10 +83,11 @@ impl From<TaskBuilder> for CurrentTask {
 }
 
 impl Releasable for TaskBuilder {
-    type Context<'a> = ();
+    type Context<'a> = &'a mut Locked<'a, TaskRelease>;
 
-    fn release(self, _: Self::Context<'_>) {
-        self.task.release(self.thread_state)
+    fn release<'a>(self, locked: &'a mut Locked<'a, TaskRelease>) {
+        let context = (self.thread_state, locked);
+        self.task.release(context);
     }
 }
 
@@ -151,12 +161,13 @@ type SyscallRestartFunc =
     dyn FnOnce(&mut CurrentTask) -> Result<SyscallResult, Errno> + Send + Sync;
 
 impl Releasable for CurrentTask {
-    type Context<'a> = ();
+    type Context<'a> = &'a mut Locked<'a, TaskRelease>;
 
-    fn release(self, _: ()) {
+    fn release<'a>(self, locked: &'a mut Locked<'a, TaskRelease>) {
         self.notify_robust_list();
         let _ignored = self.clear_child_tid_if_needed();
-        self.task.release(self.thread_state);
+        let context = (self.thread_state, locked);
+        self.task.release(context);
     }
 }
 
@@ -188,6 +199,14 @@ impl CurrentTask {
 
     pub fn temp_task(&self) -> TempRef<'_, Task> {
         TempRef::from(&self.task)
+    }
+
+    pub fn release<L>(self, locked: &mut Locked<'_, L>)
+    where
+        L: LockBefore<TaskRelease>,
+    {
+        let mut locked = locked.cast_locked::<TaskRelease>();
+        Releasable::release(self, &mut locked);
     }
 
     pub fn set_syscall_restart_func<R: Into<SyscallResult>>(
@@ -972,19 +991,25 @@ impl CurrentTask {
     /// `create_system_task` instead. Even better, consider using the `kthreads` threadpool.
     ///
     /// This function creates an underlying Zircon process to host the new task.
-    pub fn create_init_child_process(
+    pub fn create_init_child_process<L>(
+        locked: &mut Locked<'_, L>,
         kernel: &Arc<Kernel>,
         initial_name: &CString,
-    ) -> Result<TaskBuilder, Errno> {
+    ) -> Result<TaskBuilder, Errno>
+    where
+        L: LockBefore<TaskRelease>,
+    {
         let weak_init = kernel.pids.read().get_task(1);
         let init_task = weak_init.upgrade().ok_or_else(|| errno!(EINVAL))?;
         let initial_name_bytes = initial_name.as_bytes().to_owned();
         let task = Self::create_task(
+            locked,
             kernel,
             initial_name.clone(),
             init_task.fs().fork(),
-            |pid, process_group| {
+            |locked, pid, process_group| {
                 create_zircon_process(
+                    locked,
                     kernel,
                     None,
                     pid,
@@ -1025,24 +1050,37 @@ impl CurrentTask {
     /// The process created by this function should always have pid 1. We require the caller to
     /// pass the `pid` as an argument to clarify that it's the callers responsibility to determine
     /// the pid for the process.
-    pub fn create_init_process(
+    pub fn create_init_process<L>(
+        locked: &mut Locked<'_, L>,
         kernel: &Arc<Kernel>,
         pid: pid_t,
         initial_name: CString,
         fs: Arc<FsContext>,
-    ) -> Result<TaskBuilder, Errno> {
+    ) -> Result<TaskBuilder, Errno>
+    where
+        L: LockBefore<TaskRelease>,
+    {
         let initial_name_bytes = initial_name.as_bytes().to_owned();
         let pids = kernel.pids.write();
-        Self::create_task_with_pid(kernel, pids, pid, initial_name, fs, |pid, process_group| {
-            create_zircon_process(
-                kernel,
-                None,
-                pid,
-                process_group,
-                SignalActions::default(),
-                &initial_name_bytes,
-            )
-        })
+        Self::create_task_with_pid(
+            locked,
+            kernel,
+            pids,
+            pid,
+            initial_name,
+            fs,
+            |locked, pid, process_group| {
+                create_zircon_process(
+                    locked,
+                    kernel,
+                    None,
+                    pid,
+                    process_group,
+                    SignalActions::default(),
+                    &initial_name_bytes,
+                )
+            },
+        )
     }
 
     /// Create a task that runs inside the kernel.
@@ -1056,18 +1094,24 @@ impl CurrentTask {
     ///
     /// Rather than calling this function directly, consider using `kthreads`, which provides both
     /// a system task and a threadpool on which the task can do work.
-    pub fn create_system_task(
+    pub fn create_system_task<L>(
+        locked: &mut Locked<'_, L>,
         kernel: &Arc<Kernel>,
         fs: Arc<FsContext>,
-    ) -> Result<CurrentTask, Errno> {
+    ) -> Result<CurrentTask, Errno>
+    where
+        L: LockBefore<TaskRelease>,
+    {
         let builder = Self::create_task(
+            locked,
             kernel,
             CString::new("[kthreadd]").unwrap(),
             fs,
-            |pid, process_group| {
+            |locked, pid, process_group| {
                 let process = zx::Process::from(zx::Handle::invalid());
                 let memory_manager = Arc::new(MemoryManager::new_empty());
                 let thread_group = ThreadGroup::new(
+                    locked,
                     kernel.clone(),
                     process,
                     None,
@@ -1081,21 +1125,32 @@ impl CurrentTask {
         Ok(builder.into())
     }
 
-    fn create_task<F>(
+    fn create_task<F, L>(
+        locked: &mut Locked<'_, L>,
         kernel: &Arc<Kernel>,
         initial_name: CString,
         root_fs: Arc<FsContext>,
         task_info_factory: F,
     ) -> Result<TaskBuilder, Errno>
     where
-        F: FnOnce(i32, Arc<ProcessGroup>) -> Result<TaskInfo, Errno>,
+        F: FnOnce(&mut Locked<'_, L>, i32, Arc<ProcessGroup>) -> Result<TaskInfo, Errno>,
+        L: LockBefore<TaskRelease>,
     {
         let mut pids = kernel.pids.write();
         let pid = pids.allocate_pid();
-        Self::create_task_with_pid(kernel, pids, pid, initial_name, root_fs, task_info_factory)
+        Self::create_task_with_pid(
+            locked,
+            kernel,
+            pids,
+            pid,
+            initial_name,
+            root_fs,
+            task_info_factory,
+        )
     }
 
-    fn create_task_with_pid<F>(
+    fn create_task_with_pid<F, L>(
+        locked: &mut Locked<'_, L>,
         kernel: &Arc<Kernel>,
         mut pids: RwLockWriteGuard<'_, PidTable>,
         pid: pid_t,
@@ -1104,7 +1159,8 @@ impl CurrentTask {
         task_info_factory: F,
     ) -> Result<TaskBuilder, Errno>
     where
-        F: FnOnce(i32, Arc<ProcessGroup>) -> Result<TaskInfo, Errno>,
+        F: FnOnce(&mut Locked<'_, L>, i32, Arc<ProcessGroup>) -> Result<TaskInfo, Errno>,
+        L: LockBefore<TaskRelease>,
     {
         debug_assert!(pids.get_task(pid).upgrade().is_none());
 
@@ -1112,9 +1168,9 @@ impl CurrentTask {
         pids.add_process_group(&process_group);
 
         let TaskInfo { thread, thread_group, memory_manager } =
-            task_info_factory(pid, process_group.clone())?;
+            task_info_factory(locked, pid, process_group.clone())?;
 
-        process_group.insert(&thread_group);
+        process_group.insert(locked, &thread_group);
 
         // > The timer slack values of init (PID 1), the ancestor of all processes, are 50,000
         // > nanoseconds (50 microseconds).  The timer slack value is inherited by a child created
@@ -1146,7 +1202,7 @@ impl CurrentTask {
             )),
             thread_state: Default::default(),
         };
-        release_on_error!(builder, (), {
+        release_on_error!(builder, locked, {
             let temp_task = TempRef::from(&builder.task);
             builder.thread_group.add(&temp_task)?;
 
@@ -1160,10 +1216,14 @@ impl CurrentTask {
     /// Create a kernel task in the same ThreadGroup as the given `system_task`.
     ///
     /// There is no underlying Zircon thread to host the task.
-    pub fn create_kernel_thread(
+    pub fn create_kernel_thread<L>(
+        locked: &mut Locked<'_, L>,
         system_task: &Task,
         initial_name: CString,
-    ) -> Result<CurrentTask, Errno> {
+    ) -> Result<CurrentTask, Errno>
+    where
+        L: LockBefore<TaskRelease>,
+    {
         let mut pids = system_task.kernel().pids.write();
         let pid = pids.allocate_pid();
 
@@ -1200,7 +1260,7 @@ impl CurrentTask {
             default_timerslack_ns,
         ))
         .into();
-        release_on_error!(current_task, (), {
+        release_on_error!(current_task, locked, {
             let temp_task = current_task.temp_task();
             current_task.thread_group.add(&temp_task)?;
             pids.add_task(&temp_task);
@@ -1228,6 +1288,7 @@ impl CurrentTask {
     ) -> Result<TaskBuilder, Errno>
     where
         L: LockBefore<MmDumpable>,
+        L: LockBefore<TaskRelease>,
     {
         // TODO: Implement more flags.
         const IMPLEMENTED_FLAGS: u64 = (CLONE_VM
@@ -1354,6 +1415,7 @@ impl CurrentTask {
                 };
                 let process_group = thread_group_state.process_group.clone();
                 create_zircon_process(
+                    locked,
                     kernel,
                     Some(thread_group_state),
                     pid,
@@ -1394,7 +1456,7 @@ impl CurrentTask {
             timerslack_ns,
         ));
 
-        release_on_error!(child, (), {
+        release_on_error!(child, locked, {
             let child_task = TempRef::from(&child.task);
             // Drop the pids lock as soon as possible after creating the child. Destroying the child
             // and removing it from the pids table itself requires the pids lock, so if an early exit
@@ -1577,6 +1639,7 @@ impl CurrentTask {
     ) -> crate::testing::AutoReleasableTask
     where
         L: LockBefore<MmDumpable>,
+        L: LockBefore<TaskRelease>,
     {
         let result = self
             .clone_task(locked, flags, exit_signal, UserRef::default(), UserRef::default())

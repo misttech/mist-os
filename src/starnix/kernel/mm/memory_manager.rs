@@ -4620,7 +4620,7 @@ mod tests {
             )
             .expect("map failed");
 
-        let target = create_task(&kernel, "another-task");
+        let target = create_task(&mut locked, &kernel, "another-task");
         mm.snapshot_to(&mut locked, target.mm()).expect("snapshot_to failed");
 
         // Make sure it has what we wrote.
@@ -4850,7 +4850,7 @@ mod tests {
             Ok(starnix_syscalls::SUCCESS)
         );
 
-        let target = create_task(&kernel, "another-task");
+        let target = create_task(&mut locked, &kernel, "another-task");
         current_task.mm().snapshot_to(&mut locked, target.mm()).expect("snapshot_to failed");
 
         {

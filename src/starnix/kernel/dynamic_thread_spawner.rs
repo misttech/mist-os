@@ -9,7 +9,7 @@ use starnix_sync::{Locked, Mutex, Unlocked};
 use starnix_uapi::{
     errno,
     errors::Errno,
-    ownership::{release_after, Releasable, WeakRef},
+    ownership::{release_after, WeakRef},
 };
 use std::{
     ffi::CString,
@@ -165,23 +165,23 @@ impl RunningThread {
                 .name("kthread-dynamic-worker".to_string())
                 .spawn(move || {
                     let mut locked = Unlocked::new();
-                    let result = with_new_current_task(&system_task, |current_task| {
-                        while let Ok(f) = receiver.recv() {
-                            f(&mut locked, &current_task);
-
-                            // Apply any delayed releasers.
-                            current_task.trigger_delayed_releaser();
-                            let mut state = state.lock();
-                            state.idle_threads += 1;
-                            if state.idle_threads > state.max_idle_threads {
-                                // If the number of idle thread is greater than the max, the thread
-                                // terminates.  This disconnects the receiver, which will ensure
-                                // that the thread will be joined and remove from the list of
-                                // available threads the next time the pool tries to use it.
-                                return;
+                    let result =
+                        with_new_current_task(&mut locked, &system_task, |locked, current_task| {
+                            while let Ok(f) = receiver.recv() {
+                                f(locked, &current_task);
+                                // Apply any delayed releasers.
+                                current_task.trigger_delayed_releaser();
+                                let mut state = state.lock();
+                                state.idle_threads += 1;
+                                if state.idle_threads > state.max_idle_threads {
+                                    // If the number of idle thread is greater than the max, the
+                                    // thread terminates.  This disconnects the receiver, which will
+                                    // ensure that the thread will be joined and remove from the list
+                                    // of available threads the next time the pool tries to use it.
+                                    return;
+                                }
                             }
-                        }
-                    });
+                        });
                     if let Err(e) = result {
                         log_error!("Unable to create a kernel thread: {e:?}");
                     }
@@ -213,6 +213,7 @@ impl RunningThread {
                             return;
                         };
                         match CurrentTask::create_kernel_thread(
+                            &mut locked,
                             &system_task,
                             CString::new("[kthreadd]").unwrap(),
                         ) {
@@ -223,7 +224,7 @@ impl RunningThread {
                             }
                         }
                     };
-                    release_after!(current_task, (), {
+                    release_after!(current_task, &mut locked, {
                         while let Ok(f) = receiver.recv() {
                             f(&mut locked, &current_task);
 

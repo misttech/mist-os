@@ -144,7 +144,7 @@ impl<T: Default, L> Default for OrderedRwLock<T, L> {
     }
 }
 
-impl<T: Default + fmt::Debug, L> fmt::Debug for OrderedRwLock<T, L> {
+impl<T: fmt::Debug, L> fmt::Debug for OrderedRwLock<T, L> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "OrderedRwLock({:?}, {})", self.rwlock, any::type_name::<L>())
     }

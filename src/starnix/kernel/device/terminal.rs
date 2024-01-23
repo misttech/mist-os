@@ -19,6 +19,7 @@ use crate::{
         FdEvents,
     },
 };
+use starnix_sync::{LockBefore, Locked, ProcessGroupState};
 use starnix_uapi::{
     auth::FsCred,
     cc_t,
@@ -186,9 +187,12 @@ impl Terminal {
     }
 
     /// Sets the terminal configuration.
-    pub fn set_termios(&self, termios: uapi::termios) {
+    pub fn set_termios<L>(&self, locked: &mut Locked<'_, L>, termios: uapi::termios)
+    where
+        L: LockBefore<ProcessGroupState>,
+    {
         let signals = self.write().set_termios(termios);
-        self.send_signals(signals);
+        self.send_signals(locked, signals);
     }
 
     /// `close` implementation of the main side of the terminal.
@@ -217,24 +221,32 @@ impl Terminal {
     }
 
     /// `read` implementation of the main side of the terminal.
-    pub fn main_read(
+    pub fn main_read<L>(
         &self,
+        locked: &mut Locked<'_, L>,
         current_task: &CurrentTask,
         data: &mut dyn OutputBuffer,
-    ) -> Result<usize, Errno> {
+    ) -> Result<usize, Errno>
+    where
+        L: LockBefore<ProcessGroupState>,
+    {
         let (bytes, signals) = self.write().main_read(current_task, data)?;
-        self.send_signals(signals);
+        self.send_signals(locked, signals);
         Ok(bytes)
     }
 
     /// `write` implementation of the main side of the terminal.
-    pub fn main_write(
+    pub fn main_write<L>(
         &self,
+        locked: &mut Locked<'_, L>,
         current_task: &CurrentTask,
         data: &mut dyn InputBuffer,
-    ) -> Result<usize, Errno> {
+    ) -> Result<usize, Errno>
+    where
+        L: LockBefore<ProcessGroupState>,
+    {
         let (bytes, signals) = self.write().main_write(current_task, data)?;
-        self.send_signals(signals);
+        self.send_signals(locked, signals);
         Ok(bytes)
     }
 
@@ -264,29 +276,40 @@ impl Terminal {
     }
 
     /// `read` implementation of the replica side of the terminal.
-    pub fn replica_read(
+    pub fn replica_read<L>(
         &self,
+        locked: &mut Locked<'_, L>,
         current_task: &CurrentTask,
         data: &mut dyn OutputBuffer,
-    ) -> Result<usize, Errno> {
+    ) -> Result<usize, Errno>
+    where
+        L: LockBefore<ProcessGroupState>,
+    {
         let (bytes, signals) = self.write().replica_read(current_task, data)?;
-        self.send_signals(signals);
+        self.send_signals(locked, signals);
         Ok(bytes)
     }
 
     /// `write` implementation of the replica side of the terminal.
-    pub fn replica_write(
+    pub fn replica_write<L>(
         &self,
+        locked: &mut Locked<'_, L>,
         current_task: &CurrentTask,
         data: &mut dyn InputBuffer,
-    ) -> Result<usize, Errno> {
+    ) -> Result<usize, Errno>
+    where
+        L: LockBefore<ProcessGroupState>,
+    {
         let (bytes, signals) = self.write().replica_write(current_task, data)?;
-        self.send_signals(signals);
+        self.send_signals(locked, signals);
         Ok(bytes)
     }
 
     /// Send the pending signals to the associated foreground process groups if they exist.
-    fn send_signals(&self, signals: PendingSignals) {
+    fn send_signals<L>(&self, locked: &mut Locked<'_, L>, signals: PendingSignals)
+    where
+        L: LockBefore<ProcessGroupState>,
+    {
         for is_input in &[false, true] {
             let signals = signals.signals(*is_input);
             if !signals.is_empty() {
@@ -296,7 +319,7 @@ impl Terminal {
                     .as_ref()
                     .and_then(|cs| cs.foregound_process_group.upgrade());
                 if let Some(process_group) = process_group {
-                    process_group.send_signals(signals);
+                    process_group.send_signals(locked, signals);
                 }
             }
         }

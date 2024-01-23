@@ -11,6 +11,10 @@ pub enum DiagnosticsCoreDumpList {}
 
 pub enum MmDumpable {}
 
+/// Artificial lock level that is used when releasing a Task
+pub enum TaskRelease {}
+pub enum ProcessGroupState {}
+
 // This file defines a hierarchy of locks, that is, the order in which
 // the locks must be acquired. Unlocked is a highest level and represents
 // a state in which no locks are held.
@@ -20,3 +24,5 @@ impl_lock_after!(Unlocked => KernelIpTables);
 impl_lock_after!(Unlocked => KernelSwapFiles);
 impl_lock_after!(Unlocked => DiagnosticsCoreDumpList);
 impl_lock_after!(Unlocked => MmDumpable);
+impl_lock_after!(Unlocked => TaskRelease);
+impl_lock_after!(TaskRelease => ProcessGroupState);

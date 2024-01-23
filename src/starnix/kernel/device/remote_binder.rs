@@ -1106,7 +1106,7 @@ mod tests {
         let (kernel, _init_task) = create_kernel_and_task();
         let starnix_thread = kernel.kthreads.spawner().spawn_and_get_result({
             let kernel = Arc::clone(&kernel);
-            move |_, current_task| {
+            move |locked, current_task| {
                 current_task
                     .fs()
                     .root()
@@ -1124,6 +1124,7 @@ mod tests {
                 .expect("mount");
 
                 let task: AutoReleasableTask = CurrentTask::create_init_child_process(
+                    locked,
                     &kernel,
                     &CString::new("remote_binder".to_string()).expect("CString"),
                 )

@@ -3,12 +3,12 @@
 // found in the LICENSE file.
 
 use crate::{
-    mutable_state::{state_accessor, state_implementation},
+    mutable_state::{ordered_state_accessor, state_implementation},
     signals::{send_standard_signal, SignalInfo},
     task::{Session, ThreadGroup},
 };
 use macro_rules_attribute::apply;
-use starnix_sync::RwLock;
+use starnix_sync::{LockBefore, Locked, OrderedRwLock, ProcessGroupState};
 use starnix_uapi::{
     ownership::TempRef,
     pid_t,
@@ -41,7 +41,7 @@ pub struct ProcessGroup {
     pub leader: pid_t,
 
     /// The mutable state of the ProcessGroup.
-    mutable_state: RwLock<ProcessGroupMutableState>,
+    mutable_state: OrderedRwLock<ProcessGroupMutableState, ProcessGroupState>,
 }
 
 impl PartialEq for ProcessGroup {
@@ -81,7 +81,7 @@ impl ProcessGroup {
         let process_group = Arc::new(ProcessGroup {
             session: session.clone(),
             leader,
-            mutable_state: RwLock::new(ProcessGroupMutableState {
+            mutable_state: OrderedRwLock::new(ProcessGroupMutableState {
                 thread_groups: BTreeMap::new(),
                 orphaned: false,
             }),
@@ -90,27 +90,39 @@ impl ProcessGroup {
         process_group
     }
 
-    state_accessor!(ProcessGroup, mutable_state);
+    ordered_state_accessor!(ProcessGroup, mutable_state, ProcessGroupState);
 
-    pub fn insert(&self, thread_group: &Arc<ThreadGroup>) {
-        self.write().thread_groups.insert(thread_group.leader, Arc::downgrade(thread_group));
+    pub fn insert<L>(&self, locked: &mut Locked<'_, L>, thread_group: &Arc<ThreadGroup>)
+    where
+        L: LockBefore<ProcessGroupState>,
+    {
+        self.write(locked).thread_groups.insert(thread_group.leader, Arc::downgrade(thread_group));
     }
 
     /// Removes the thread group from the process group. Returns whether the process group is empty.
-    pub fn remove(&self, thread_group: &ThreadGroup) -> bool {
-        self.write().remove(thread_group)
+    pub fn remove<L>(&self, locked: &mut Locked<'_, L>, thread_group: &ThreadGroup) -> bool
+    where
+        L: LockBefore<ProcessGroupState>,
+    {
+        self.write(locked).remove(thread_group)
     }
 
-    pub fn send_signals(&self, signals: &[Signal]) {
-        let thread_groups = self.read().thread_groups().collect::<Vec<_>>();
+    pub fn send_signals<L>(&self, locked: &mut Locked<'_, L>, signals: &[Signal])
+    where
+        L: LockBefore<ProcessGroupState>,
+    {
+        let thread_groups = self.read(locked).thread_groups().collect::<Vec<_>>();
         Self::send_signals_to_thread_groups(signals, thread_groups);
     }
 
     /// Check whether the process group became orphaned. If this is the case, send signals to its
     /// members if at least one is stopped.
-    pub fn check_orphaned(&self) {
+    pub fn check_orphaned<L>(&self, locked: &mut Locked<'_, L>)
+    where
+        L: LockBefore<ProcessGroupState>,
+    {
         let thread_groups = {
-            let state = self.read();
+            let state = self.read(locked);
             if state.orphaned {
                 return;
             }
@@ -131,7 +143,7 @@ impl ProcessGroup {
             }
         }
         let thread_groups = {
-            let mut state = self.write();
+            let mut state = self.write(locked);
             if state.orphaned {
                 return;
             }

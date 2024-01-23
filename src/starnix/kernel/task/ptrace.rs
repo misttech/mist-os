@@ -1085,7 +1085,7 @@ mod tests {
     #[::fuchsia::test]
     async fn test_set_ptracer() {
         let (kernel, mut tracee, mut locked) = create_kernel_task_and_unlocked();
-        let mut tracer = create_task(&kernel, "tracer");
+        let mut tracer = create_task(&mut locked, &kernel, "tracer");
         kernel.ptrace_scope.store(RESTRICTED_SCOPE, Ordering::Relaxed);
         assert_eq!(
             sys_prctl(&mut locked, &mut tracee, PR_SET_PTRACER, 0xFFF, 0, 0, 0),
@@ -1114,7 +1114,7 @@ mod tests {
         )
         .is_ok());
 
-        let mut not_tracer = create_task(&kernel, "not-tracer");
+        let mut not_tracer = create_task(&mut locked, &kernel, "not-tracer");
         assert_eq!(
             ptrace_attach(
                 &mut locked,
@@ -1139,7 +1139,7 @@ mod tests {
     #[::fuchsia::test]
     async fn test_set_ptracer_any() {
         let (kernel, mut tracee, mut locked) = create_kernel_task_and_unlocked();
-        let mut tracer = create_task(&kernel, "tracer");
+        let mut tracer = create_task(&mut locked, &kernel, "tracer");
         kernel.ptrace_scope.store(RESTRICTED_SCOPE, Ordering::Relaxed);
         assert_eq!(
             sys_prctl(&mut locked, &mut tracee, PR_SET_PTRACER, 0xFFF, 0, 0, 0),
