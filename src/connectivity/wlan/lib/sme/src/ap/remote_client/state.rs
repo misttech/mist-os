@@ -1936,7 +1936,7 @@ mod tests {
             _ => panic!("Eapol conf should leave us in Associated"),
         }
 
-        // TODO(https://fxbug.dev/476098): Populate this test once eapol conf is handled.
+        // TODO(https://fxbug.dev/42147479): Populate this test once eapol conf is handled.
     }
 
     #[test]

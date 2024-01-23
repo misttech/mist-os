@@ -1181,7 +1181,7 @@ On type aliasing and named types
 *   [RFC-0052: Type Aliasing and New Types][rfc-0052]
 
 [^1]: Or at least, not without a good understanding of the wire format and care, e.g.
-    [https://fxbug.dev/360015](https://fuchsia-review.googlesource.com/c/fuchsia/+/360015)
+    [https://fxrev.dev/360015](https://fuchsia-review.googlesource.com/c/fuchsia/+/360015)
 
 ##### Footnote2
 

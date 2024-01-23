@@ -302,7 +302,7 @@ void Client::ReleaseEvent(ReleaseEventRequestView request,
 }
 
 void Client::CreateLayer(CreateLayerCompleter::Sync& completer) {
-  // TODO(https://fxbug.dev/129036): Layer IDs should be client-managed.
+  // TODO(https://fxbug.dev/42079482): Layer IDs should be client-managed.
 
   if (layers_.size() == kMaxLayers) {
     completer.Reply(ZX_ERR_NO_RESOURCES, ToFidlLayerId(kInvalidLayerId));
@@ -321,9 +321,9 @@ void Client::CreateLayer(CreateLayerCompleter::Sync& completer) {
   layers_.insert(std::move(new_layer));
 
   // Driver-side layer IDs are currently exposed to coordinator clients.
-  // https://fxbug.dev/129036 tracks having client-managed IDs. When that happens,
-  // Client instances will be responsible for translating between driver-side
-  // and client-side IDs.
+  // https://fxbug.dev/42079482 tracks having client-managed IDs. When that
+  // happens, Client instances will be responsible for translating between
+  // driver-side and client-side IDs.
   LayerId layer_id(driver_layer_id.value());
   completer.Reply(ZX_OK, ToFidlLayerId(layer_id));
 }
@@ -332,7 +332,7 @@ void Client::DestroyLayer(DestroyLayerRequestView request,
                           DestroyLayerCompleter::Sync& /*_completer*/) {
   LayerId layer_id = ToLayerId(request->layer_id);
 
-  // TODO(https://fxbug.dev/192036): When switching to client-managed IDs, the
+  // TODO(https://fxbug.dev/42079482): When switching to client-managed IDs, the
   // driver-side ID will have to be looked up in a map.
   DriverLayerId driver_layer_id(layer_id.value());
 
@@ -435,8 +435,8 @@ void Client::SetDisplayLayers(SetDisplayLayersRequestView request,
   for (uint64_t i = request->layer_ids.count() - 1; i != UINT64_MAX; i--) {
     LayerId layer_id = ToLayerId(request->layer_ids[i]);
 
-    // TODO(https://fxbug.dev/192036): When switching to client-managed IDs, the
-    // driver-side ID will have to be looked up in a map.
+    // TODO(https://fxbug.dev/42079482): When switching to client-managed IDs,
+    // the driver-side ID will have to be looked up in a map.
     DriverLayerId driver_layer_id(layer_id.value());
     auto layer = layers_.find(driver_layer_id);
     if (!layer.IsValid()) {
@@ -462,7 +462,7 @@ void Client::SetLayerPrimaryConfig(SetLayerPrimaryConfigRequestView request,
                                    SetLayerPrimaryConfigCompleter::Sync& /*_completer*/) {
   LayerId layer_id = ToLayerId(request->layer_id);
 
-  // TODO(https://fxbug.dev/192036): When switching to client-managed IDs, the
+  // TODO(https://fxbug.dev/42079482): When switching to client-managed IDs, the
   // driver-side ID will have to be looked up in a map.
   DriverLayerId driver_layer_id(layer_id.value());
   auto layer = layers_.find(driver_layer_id);
@@ -481,7 +481,7 @@ void Client::SetLayerPrimaryPosition(SetLayerPrimaryPositionRequestView request,
                                      SetLayerPrimaryPositionCompleter::Sync& /*_completer*/) {
   LayerId layer_id = ToLayerId(request->layer_id);
 
-  // TODO(https://fxbug.dev/192036): When switching to client-managed IDs, the
+  // TODO(https://fxbug.dev/42079482): When switching to client-managed IDs, the
   // driver-side ID will have to be looked up in a map.
   DriverLayerId driver_layer_id(layer_id.value());
   auto layer = layers_.find(driver_layer_id);
@@ -504,7 +504,7 @@ void Client::SetLayerPrimaryAlpha(SetLayerPrimaryAlphaRequestView request,
                                   SetLayerPrimaryAlphaCompleter::Sync& /*_completer*/) {
   LayerId layer_id = ToLayerId(request->layer_id);
 
-  // TODO(https://fxbug.dev/192036): When switching to client-managed IDs, the
+  // TODO(https://fxbug.dev/42079482): When switching to client-managed IDs, the
   // driver-side ID will have to be looked up in a map.
   DriverLayerId driver_layer_id(layer_id.value());
   auto layer = layers_.find(driver_layer_id);
@@ -529,7 +529,7 @@ void Client::SetLayerCursorConfig(SetLayerCursorConfigRequestView request,
                                   SetLayerCursorConfigCompleter::Sync& /*_completer*/) {
   LayerId layer_id = ToLayerId(request->layer_id);
 
-  // TODO(https://fxbug.dev/192036): When switching to client-managed IDs, the
+  // TODO(https://fxbug.dev/42079482): When switching to client-managed IDs, the
   // driver-side ID will have to be looked up in a map.
   DriverLayerId driver_layer_id(layer_id.value());
   auto layer = layers_.find(driver_layer_id);
@@ -548,7 +548,7 @@ void Client::SetLayerCursorPosition(SetLayerCursorPositionRequestView request,
                                     SetLayerCursorPositionCompleter::Sync& /*_completer*/) {
   LayerId layer_id = ToLayerId(request->layer_id);
 
-  // TODO(https://fxbug.dev/192036): When switching to client-managed IDs, the
+  // TODO(https://fxbug.dev/42079482): When switching to client-managed IDs, the
   // driver-side ID will have to be looked up in a map.
   DriverLayerId driver_layer_id(layer_id.value());
   auto layer = layers_.find(driver_layer_id);
@@ -566,7 +566,7 @@ void Client::SetLayerColorConfig(SetLayerColorConfigRequestView request,
                                  SetLayerColorConfigCompleter::Sync& /*_completer*/) {
   LayerId layer_id = ToLayerId(request->layer_id);
 
-  // TODO(https://fxbug.dev/192036): When switching to client-managed IDs, the
+  // TODO(https://fxbug.dev/42079482): When switching to client-managed IDs, the
   // driver-side ID will have to be looked up in a map.
   DriverLayerId driver_layer_id(layer_id.value());
   auto layer = layers_.find(driver_layer_id);
@@ -593,7 +593,7 @@ void Client::SetLayerImage(SetLayerImageRequestView request,
                            SetLayerImageCompleter::Sync& /*_completer*/) {
   LayerId layer_id = ToLayerId(request->layer_id);
 
-  // TODO(https://fxbug.dev/192036): When switching to client-managed IDs, the
+  // TODO(https://fxbug.dev/42079482): When switching to client-managed IDs, the
   // driver-side ID will have to be looked up in a map.
   DriverLayerId driver_layer_id(layer_id.value());
   auto layer = layers_.find(driver_layer_id);
@@ -1040,8 +1040,8 @@ bool Client::CheckConfig(fhdt::wire::ConfigResult* res,
         }
       }
 
-      // TODO(https://fxbug.dev/192036): When switching to client-managed IDs, the
-      // client-side ID will have to be looked up in a map.
+      // TODO(https://fxbug.dev/42079482): When switching to client-managed IDs,
+      // the client-side ID will have to be looked up in a map.
       const LayerId layer_id(layer_node.layer->id.value());
 
       for (uint8_t i = 0; i < 32; i++) {
