@@ -65,6 +65,11 @@
     "package_name": "basic-driver-test"
   },
   {
+    "archive_gn_label": "//src/devices/tests/v2/node_group:nodegroup_test_archive_copy",
+    "archive_name": "nodegroup_test",
+    "package_name": "nodegroup_test"
+  },
+  {
     "archive_gn_label": "//src/sys/pkg/tests/pkgdir:pkgdir-tests_archive_copy",
     "archive_name": "pkgdir-tests",
     "package_name": "pkgdir-tests"

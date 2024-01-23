@@ -9,7 +9,10 @@ group("tests") {
 
 group("ctf-tests") {
   testonly = true
-  deps = [ "basic_driver:ctf-tests" ]
+  deps = [
+    "basic_driver:ctf-tests",
+    "//src/devices/tests/v2/node_group:ctf-tests",
+  ]
 }
 
 group("drivers") {

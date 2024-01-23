@@ -253,6 +253,18 @@ template("generate_basic-driver-test") {
   }
 }
 
+template("generate_nodegroup_test") {
+  forward_variables_from(invoker, [ "test_info" ])
+  fuchsia_package_with_test(target_name) {
+    test_component = "//src/devices/tests/v2/node_group:nodegroup_test_root"
+    test_component_name = "nodegroup_test_root.cm"
+    subpackages = [
+      test_info.target_label,
+      "//src/devices/testing/realm-factory",
+    ]
+  }
+}
+
 # Expands a prebuilt CTF test into a runnable fuchsia package.
 #
 # This template is called several times with every combination of ctf_test and

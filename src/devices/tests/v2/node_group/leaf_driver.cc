@@ -58,7 +58,7 @@ class LeafDriver : public fdf::DriverBase {
 
     auto result = fidl::WireCall(*device)->GetNumber();
     if (result.status() != ZX_OK) {
-      FDF_LOG(ERROR, "Failed to call number on %s: %s", instance.data(),
+      FDF_LOG(WARNING, "Failed to call number on %s: %s", instance.data(),
               result.lossy_description());
       return zx::error(result.status());
     }
