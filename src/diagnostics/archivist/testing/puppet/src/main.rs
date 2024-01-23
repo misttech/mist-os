@@ -90,7 +90,8 @@ impl PuppetServer {
 }
 
 // Notifies the puppet when log interest changes.
-// Together, `PuppetServer` and `InterestChangeNotifier` must gaurantee delivery
+//
+// Together, `PuppetServer` and `InterestChangeNotifier` must guarantee delivery
 // of all interest change notifications to clients (test cases) regardless of
 // whether a test case begins waiting for the interest change notification
 // before or after it is received by this component. Failure to deliver will

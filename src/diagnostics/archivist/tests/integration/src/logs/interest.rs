@@ -53,7 +53,7 @@ async fn set_interest() {
     let selector = selectors::parse_component_selector::<VerboseError>(PUPPET_NAME).unwrap();
 
     // Helper function to generate a new LogInterestSelector from severity.
-    let interest_selector = |severity: Severity| {
+    let interest_selectors = |severity: Severity| {
         [LogInterestSelector {
             selector: selector.clone(),
             interest: Interest { min_severity: Some(severity), ..Default::default() },
@@ -68,81 +68,81 @@ async fn set_interest() {
     // Log one info message before the first debug message to confirm the debug
     // message isn't skipped because of a race condition.
     puppet.log_messages(vec![
-        (Severity::Info, "A1".to_string()),
-        (Severity::Debug, "B1".to_string()), // not observed.
-        (Severity::Info, "C1".to_string()),
-        (Severity::Warn, "D1".to_string()),
-        (Severity::Error, "E1".to_string()),
+        (Severity::Info, "A1"),
+        (Severity::Debug, "B1"), // not observed.
+        (Severity::Info, "C1"),
+        (Severity::Warn, "D1"),
+        (Severity::Error, "E1"),
     ]);
 
     assert_ordered_logs(
         &mut logs,
         PUPPET_NAME,
         vec![
-            (Severity::Info, "A1".to_string()),
-            (Severity::Info, "C1".to_string()),
-            (Severity::Warn, "D1".to_string()),
-            (Severity::Error, "E1".to_string()),
+            (Severity::Info, "A1"),
+            (Severity::Info, "C1"),
+            (Severity::Warn, "D1"),
+            (Severity::Error, "E1"),
         ],
     )
     .await;
 
     // Severity: DEBUG
-    let mut interest = interest_selector(Severity::Debug);
+    let mut interest = interest_selectors(Severity::Debug);
     log_settings.set_interest(&interest).await.expect("registered interest");
     response = puppet.wait_for_interest_change().await.unwrap();
     assert_eq!(response.severity, Some(Severity::Debug));
     puppet.log_messages(vec![
-        (Severity::Debug, "A2".to_string()),
-        (Severity::Info, "B2".to_string()),
-        (Severity::Warn, "C2".to_string()),
-        (Severity::Error, "D2".to_string()),
+        (Severity::Debug, "A2"),
+        (Severity::Info, "B2"),
+        (Severity::Warn, "C2"),
+        (Severity::Error, "D2"),
     ]);
 
     assert_ordered_logs(
         &mut logs,
         PUPPET_NAME,
         vec![
-            (Severity::Debug, "A2".to_string()),
-            (Severity::Info, "B2".to_string()),
-            (Severity::Warn, "C2".to_string()),
-            (Severity::Error, "D2".to_string()),
+            (Severity::Debug, "A2"),
+            (Severity::Info, "B2"),
+            (Severity::Warn, "C2"),
+            (Severity::Error, "D2"),
         ],
     )
     .await;
 
     // Severity: WARN
-    interest = interest_selector(Severity::Warn);
+    interest = interest_selectors(Severity::Warn);
     log_settings.set_interest(&interest).await.expect("registered interest");
     response = puppet.wait_for_interest_change().await.unwrap();
     assert_eq!(response.severity, Some(Severity::Warn));
     puppet.log_messages(vec![
-        (Severity::Debug, "A3".to_string()), // Not observed.
-        (Severity::Info, "B3".to_string()),  // Not observed.
-        (Severity::Warn, "C3".to_string()),
-        (Severity::Error, "D3".to_string()),
+        (Severity::Debug, "A3"), // Not observed.
+        (Severity::Info, "B3"),  // Not observed.
+        (Severity::Warn, "C3"),
+        (Severity::Error, "D3"),
     ]);
 
     assert_ordered_logs(
         &mut logs,
         PUPPET_NAME,
-        vec![(Severity::Warn, "C3".to_string()), (Severity::Error, "D3".to_string())],
+        vec![(Severity::Warn, "C3"), (Severity::Error, "D3")],
     )
     .await;
 
     // Severity: ERROR
-    interest = interest_selector(Severity::Error);
+    interest = interest_selectors(Severity::Error);
     log_settings.set_interest(&interest).await.expect("registered interest");
     response = puppet.wait_for_interest_change().await.unwrap();
     assert_eq!(response.severity, Some(Severity::Error));
     puppet.log_messages(vec![
-        (Severity::Debug, "A4".to_string()), // Not observed.
-        (Severity::Info, "B4".to_string()),  // Not observed.
-        (Severity::Warn, "C4".to_string()),  // Not observed.
-        (Severity::Error, "D4".to_string()),
+        (Severity::Debug, "A4"), // Not observed.
+        (Severity::Info, "B4"),  // Not observed.
+        (Severity::Warn, "C4"),  // Not observed.
+        (Severity::Error, "D4"),
     ]);
 
-    assert_ordered_logs(&mut logs, PUPPET_NAME, vec![(Severity::Error, "D4".to_string())]).await;
+    assert_ordered_logs(&mut logs, PUPPET_NAME, vec![(Severity::Error, "D4")]).await;
 
     // Disconnecting the protocol, brings back an EMPTY interest, which defaults to Severity::Info.
     drop(log_settings);
@@ -152,21 +152,21 @@ async fn set_interest() {
     // Again, log one info message before the first debug message to confirm the
     // debug message isn't skipped because of a race condition.
     puppet.log_messages(vec![
-        (Severity::Debug, "A5".to_string()), // Not observed.
-        (Severity::Info, "B5".to_string()),
-        (Severity::Info, "C5".to_string()),
-        (Severity::Warn, "D5".to_string()),
-        (Severity::Error, "E5".to_string()),
+        (Severity::Debug, "A5"), // Not observed.
+        (Severity::Info, "B5"),
+        (Severity::Info, "C5"),
+        (Severity::Warn, "D5"),
+        (Severity::Error, "E5"),
     ]);
 
     assert_ordered_logs(
         &mut logs,
         PUPPET_NAME,
         vec![
-            (Severity::Info, "B5".to_string()),
-            (Severity::Info, "C5".to_string()),
-            (Severity::Warn, "D5".to_string()),
-            (Severity::Error, "E5".to_string()),
+            (Severity::Info, "B5"),
+            (Severity::Info, "C5"),
+            (Severity::Warn, "D5"),
+            (Severity::Error, "E5"),
         ],
     )
     .await;
@@ -219,15 +219,12 @@ async fn set_interest_before_startup() {
     assert_ordered_logs(
         &mut logs,
         LOG_AND_EXIT_COMPONENT_URL,
-        vec![
-            (Severity::Debug, "debugging world".to_string()),
-            (Severity::Info, "Hello, world!".to_string()),
-        ],
+        vec![(Severity::Debug, "debugging world"), (Severity::Info, "Hello, world!")],
     )
     .await;
 }
 
-type Message = (Severity, String);
+type Message = (Severity, &'static str);
 
 async fn assert_ordered_logs<'a, S>(mut logs: S, component_name: &str, messages: Vec<Message>)
 where
