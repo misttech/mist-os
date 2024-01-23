@@ -354,3 +354,7 @@ open protocol Engine {
         config_stamp box<fuchsia.hardware.display.types.ConfigStamp>;
     });
 };
+
+service Service {
+    engine client_end:Engine;
+};
