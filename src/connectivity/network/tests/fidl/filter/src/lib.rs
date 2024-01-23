@@ -11,12 +11,14 @@ use fidl_fuchsia_net_filter_ext as fnet_filter_ext;
 use fuchsia_async::{DurationExt as _, TimeoutExt as _};
 use futures::{FutureExt as _, StreamExt as _};
 use itertools::Itertools as _;
+use net_declare::fidl_ip;
 use netstack_testing_common::{
     realms::{Netstack3, TestSandboxExt as _},
     ASYNC_EVENT_NEGATIVE_CHECK_TIMEOUT,
 };
 use netstack_testing_macros::netstack_test;
 use std::collections::{HashMap, HashSet};
+use test_case::test_case;
 
 trait TestValue {
     fn test_value() -> Self;
@@ -490,7 +492,7 @@ async fn drop_controller_removes_resources(name: &str) {
 }
 
 #[netstack_test]
-async fn too_many_changes(name: &str) {
+async fn push_too_many_changes(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
     let realm = sandbox.create_netstack_realm::<Netstack3, _>(name).expect("create realm");
     let control =
@@ -536,4 +538,231 @@ async fn too_many_changes(name: &str) {
     // Committing should still succeed because the final change was not pushed
     // to the server.
     controller.commit().await.expect("commit changes");
+}
+
+#[netstack_test]
+async fn push_commit_zero_changes_is_valid(name: &str) {
+    let sandbox = netemul::TestSandbox::new().expect("create sandbox");
+    let realm = sandbox.create_netstack_realm::<Netstack3, _>(name).expect("create realm");
+    let control =
+        realm.connect_to_protocol::<fnet_filter::ControlMarker>().expect("connect to protocol");
+
+    let mut controller = fnet_filter_ext::Controller::new(
+        &control,
+        &fnet_filter_ext::ControllerId(String::from("test")),
+    )
+    .await
+    .expect("create controller");
+
+    controller.push_changes(Vec::new()).await.expect("push zero changes");
+    controller.commit().await.expect("commit changes");
+}
+
+#[netstack_test]
+async fn push_change_missing_required_field(name: &str) {
+    let sandbox = netemul::TestSandbox::new().expect("create sandbox");
+    let realm = sandbox.create_netstack_realm::<Netstack3, _>(name).expect("create realm");
+    let control =
+        realm.connect_to_protocol::<fnet_filter::ControlMarker>().expect("connect to protocol");
+
+    // Use the FIDL bindings directly rather than going through the extension
+    // library, because it intentionally does not allow us to express the
+    // invalid types that we are testing.
+    let (controller, server_end) = fidl::endpoints::create_proxy().unwrap();
+    control.open_controller("test", server_end).expect("open controller");
+    let fnet_filter::NamespaceControllerEvent::OnIdAssigned { id: _ } = controller
+        .take_event_stream()
+        .next()
+        .await
+        .expect("controller should receive event")
+        .expect("controller should be assigned ID");
+
+    assert_eq!(
+        controller
+            .push_changes(&[fnet_filter::Change::Create(fnet_filter::Resource::Namespace(
+                fnet_filter::Namespace {
+                    id: None,
+                    domain: Some(fnet_filter::Domain::AllIp),
+                    ..Default::default()
+                }
+            ))])
+            .await
+            .expect("call push changes"),
+        fnet_filter::ChangeValidationResult::ErrorOnChange(vec![
+            fnet_filter::ChangeValidationError::MissingRequiredField
+        ])
+    );
+}
+
+#[netstack_test]
+#[test_case(
+    fnet_filter::AddressRange {
+        start: fidl_ip!("192.0.2.1"),
+        end: fidl_ip!("2001:db8::1"),
+    };
+    "address family mismatch"
+)]
+#[test_case(
+    fnet_filter::AddressRange {
+        start: fidl_ip!("192.0.2.2"),
+        end: fidl_ip!("192.0.2.1"),
+    };
+    "start > end"
+)]
+async fn push_change_invalid_address_matcher(name: &str, range: fnet_filter::AddressRange) {
+    let sandbox = netemul::TestSandbox::new().expect("create sandbox");
+    let realm = sandbox.create_netstack_realm::<Netstack3, _>(name).expect("create realm");
+    let control =
+        realm.connect_to_protocol::<fnet_filter::ControlMarker>().expect("connect to protocol");
+
+    // Use the FIDL bindings directly rather than going through the extension
+    // library, because it intentionally does not allow us to express the
+    // invalid types that we are testing.
+    let (controller, server_end) = fidl::endpoints::create_proxy().unwrap();
+    control.open_controller("test", server_end).expect("open controller");
+    let fnet_filter::NamespaceControllerEvent::OnIdAssigned { id: _ } = controller
+        .take_event_stream()
+        .next()
+        .await
+        .expect("controller should receive event")
+        .expect("controller should be assigned ID");
+
+    assert_eq!(
+        controller
+            .push_changes(&[fnet_filter::Change::Create(fnet_filter::Resource::Rule(
+                fnet_filter::Rule {
+                    id: fnet_filter::RuleId {
+                        routine: fnet_filter::RoutineId {
+                            namespace: String::from("namespace"),
+                            name: String::from("routine"),
+                        },
+                        index: 0,
+                    },
+                    matchers: fnet_filter::Matchers {
+                        src_addr: Some(fnet_filter::AddressMatcher {
+                            matcher: fnet_filter::AddressMatcherType::Range(range),
+                            invert: false,
+                        }),
+                        ..Default::default()
+                    },
+                    action: fnet_filter::Action::Drop(fnet_filter::Empty {}),
+                }
+            ))])
+            .await
+            .expect("call push changes"),
+        fnet_filter::ChangeValidationResult::ErrorOnChange(vec![
+            fnet_filter::ChangeValidationError::InvalidAddressMatcher
+        ])
+    );
+}
+
+#[netstack_test]
+async fn push_change_invalid_port_matcher(name: &str) {
+    let sandbox = netemul::TestSandbox::new().expect("create sandbox");
+    let realm = sandbox.create_netstack_realm::<Netstack3, _>(name).expect("create realm");
+    let control =
+        realm.connect_to_protocol::<fnet_filter::ControlMarker>().expect("connect to protocol");
+
+    // Use the FIDL bindings directly rather than going through the extension
+    // library, because it intentionally does not allow us to express the
+    // invalid types that we are testing.
+    let (controller, server_end) = fidl::endpoints::create_proxy().unwrap();
+    control.open_controller("test", server_end).expect("open controller");
+    let fnet_filter::NamespaceControllerEvent::OnIdAssigned { id: _ } = controller
+        .take_event_stream()
+        .next()
+        .await
+        .expect("controller should receive event")
+        .expect("controller should be assigned ID");
+
+    assert_eq!(
+        controller
+            .push_changes(&[fnet_filter::Change::Create(fnet_filter::Resource::Rule(
+                fnet_filter::Rule {
+                    id: fnet_filter::RuleId {
+                        routine: fnet_filter::RoutineId {
+                            namespace: String::from("namespace"),
+                            name: String::from("routine"),
+                        },
+                        index: 0,
+                    },
+                    matchers: fnet_filter::Matchers {
+                        transport_protocol: Some(fnet_filter::TransportProtocol::Tcp(
+                            fnet_filter::TcpMatcher {
+                                src_port: Some(fnet_filter::PortMatcher {
+                                    start: 1,
+                                    end: 0,
+                                    invert: false,
+                                }),
+                                ..Default::default()
+                            }
+                        )),
+                        ..Default::default()
+                    },
+                    action: fnet_filter::Action::Drop(fnet_filter::Empty {}),
+                }
+            ))])
+            .await
+            .expect("call push changes"),
+        fnet_filter::ChangeValidationResult::ErrorOnChange(vec![
+            fnet_filter::ChangeValidationError::InvalidPortMatcher
+        ])
+    );
+}
+
+enum InvalidChangePosition {
+    First,
+    Middle,
+    Last,
+}
+
+#[netstack_test]
+#[test_case(InvalidChangePosition::First)]
+#[test_case(InvalidChangePosition::Middle)]
+#[test_case(InvalidChangePosition::Last)]
+async fn push_changes_index_based_error_return(name: &str, pos: InvalidChangePosition) {
+    let sandbox = netemul::TestSandbox::new().expect("create sandbox");
+    let realm = sandbox.create_netstack_realm::<Netstack3, _>(name).expect("create realm");
+    let control =
+        realm.connect_to_protocol::<fnet_filter::ControlMarker>().expect("connect to protocol");
+
+    // Use the FIDL bindings directly rather than going through the extension
+    // library, because it intentionally does not allow us to express the
+    // invalid types that we are testing.
+    let (controller, server_end) = fidl::endpoints::create_proxy().unwrap();
+    control.open_controller("test", server_end).expect("open controller");
+    let fnet_filter::NamespaceControllerEvent::OnIdAssigned { id: _ } = controller
+        .take_event_stream()
+        .next()
+        .await
+        .expect("controller should receive event")
+        .expect("controller should be assigned ID");
+
+    // Create a batch of valid changes, and insert an invalid change somewhere in the batch.
+    let mut changes =
+        vec![fnet_filter::Change::Create(fnet_filter_ext::Resource::test_value().into()); 10];
+    let index = match pos {
+        InvalidChangePosition::First => 0,
+        InvalidChangePosition::Middle => changes.len() / 2,
+        InvalidChangePosition::Last => changes.len() - 1,
+    };
+    changes[index] =
+        fnet_filter::Change::Create(fnet_filter::Resource::Namespace(fnet_filter::Namespace {
+            id: None,
+            domain: Some(fnet_filter::Domain::AllIp),
+            ..Default::default()
+        }));
+    let errors = assert_matches!(
+        controller.push_changes(&changes).await.expect("call push changes"),
+        fnet_filter::ChangeValidationResult::ErrorOnChange(errors) => errors
+    );
+    let expected = std::iter::repeat(fnet_filter::ChangeValidationError::Ok)
+        .take(index)
+        .chain(std::iter::once(fnet_filter::ChangeValidationError::MissingRequiredField))
+        .chain(
+            std::iter::repeat(fnet_filter::ChangeValidationError::NotReached)
+                .take(changes.len() - index - 1),
+        )
+        .collect::<Vec<_>>();
+    assert_eq!(errors, expected);
 }

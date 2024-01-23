@@ -99,16 +99,26 @@ closed protocol NamespaceController {
             NOT_REACHED = 1;
             /// The change was valid.
             OK = 2;
-            /// The change included a rule with a matcher specified that is
-            /// unavailable in the context in which the rule will be evaluated.
-            MATCHER_UNAVAILABLE_IN_ROUTINE = 3;
+            /// The change included a resource that was missing a field that is
+            /// required to be specified.
+            MISSING_REQUIRED_FIELD = 3;
             /// The change included a rule with an invalid address matcher.
             INVALID_ADDRESS_MATCHER = 4;
             /// The change included a rule with an invalid port matcher.
             INVALID_PORT_MATCHER = 5;
+            /// The change included a rule with a matcher specified that is
+            /// unavailable in the context in which the rule will be evaluated.
+            ///
+            /// For example, this could be a matcher on the ingress interface on
+            /// a rule that is in a routine installed in the egress hook, or a
+            /// matcher on the source address specifying an IPv4 subnet that is
+            /// in an IPv6-only namespace.
+            MATCHER_UNAVAILABLE = 7;
             /// The change included a rule with an action that was not valid for
             /// the routine to which the rule was appended.
-            INVALID_ACTION_FOR_ROUTINE = 6;
+            ///
+            /// For example, this could be a NAT action in an IP routine.
+            INVALID_ACTION_FOR_ROUTINE = 8;
         }>:MAX_BATCH_SIZE;
     });
 

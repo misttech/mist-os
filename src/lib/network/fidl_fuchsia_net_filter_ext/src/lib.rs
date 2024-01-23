@@ -1070,12 +1070,14 @@ pub enum ControllerCreationError {
 /// Extension type for the error variants of [`fnet_filter::ChangeValidationError`].
 #[derive(Debug, Error, PartialEq)]
 pub enum ChangeValidationError {
-    #[error("rule specifies a matcher that is unavailable rule's context")]
-    MatcherUnavailableInRoutine,
+    #[error("change contains a resource that is missing a required field")]
+    MissingRequiredField,
     #[error("rule specifies an invalid address matcher")]
     InvalidAddressMatcher,
     #[error("rule specifies an invalid port matcher")]
     InvalidPortMatcher,
+    #[error("rule specifies a matcher that is unavailable in rule's context")]
+    MatcherUnavailable,
     #[error("rule has an action that is invalid for the rule's routine")]
     InvalidActionForRoutine,
 }
@@ -1085,13 +1087,14 @@ impl TryFrom<fnet_filter::ChangeValidationError> for ChangeValidationError {
 
     fn try_from(error: fnet_filter::ChangeValidationError) -> Result<Self, Self::Error> {
         match error {
-            fnet_filter::ChangeValidationError::MatcherUnavailableInRoutine => {
-                Ok(Self::MatcherUnavailableInRoutine)
+            fnet_filter::ChangeValidationError::MissingRequiredField => {
+                Ok(Self::MissingRequiredField)
             }
             fnet_filter::ChangeValidationError::InvalidAddressMatcher => {
                 Ok(Self::InvalidAddressMatcher)
             }
             fnet_filter::ChangeValidationError::InvalidPortMatcher => Ok(Self::InvalidPortMatcher),
+            fnet_filter::ChangeValidationError::MatcherUnavailable => Ok(Self::MatcherUnavailable),
             fnet_filter::ChangeValidationError::InvalidActionForRoutine => {
                 Ok(Self::InvalidActionForRoutine)
             }
@@ -1243,26 +1246,25 @@ impl Controller {
             fnet_filter::ChangeValidationResult::ErrorOnChange(results) => {
                 let errors: Result<_, PushChangesError> = changes.iter().zip(results).try_fold(
                     Vec::new(),
-                    |mut errors, (change, result)| {
-                        match result {
-                            fnet_filter::ChangeValidationError::Ok
-                            | fnet_filter::ChangeValidationError::NotReached => Ok(errors),
-                            error @ (
-                                fnet_filter::ChangeValidationError::MatcherUnavailableInRoutine
-                                | fnet_filter::ChangeValidationError::InvalidAddressMatcher
-                                | fnet_filter::ChangeValidationError::InvalidPortMatcher
-                                | fnet_filter::ChangeValidationError::InvalidActionForRoutine
-                            ) => {
-                                let error = error
-                                    .try_into()
-                                    .expect("`Ok` and `NotReached` are handled in another arm");
-                                errors.push((change.clone(), error));
-                                Ok(errors)
-                            }
-                            fnet_filter::ChangeValidationError::__SourceBreaking { .. } =>
-                                Err(FidlConversionError::UnknownUnionVariant(
-                                    type_names::CHANGE_VALIDATION_ERROR
-                                ).into()),
+                    |mut errors, (change, result)| match result {
+                        fnet_filter::ChangeValidationError::Ok
+                        | fnet_filter::ChangeValidationError::NotReached => Ok(errors),
+                        error @ (fnet_filter::ChangeValidationError::MissingRequiredField
+                        | fnet_filter::ChangeValidationError::InvalidAddressMatcher
+                        | fnet_filter::ChangeValidationError::InvalidPortMatcher
+                        | fnet_filter::ChangeValidationError::MatcherUnavailable
+                        | fnet_filter::ChangeValidationError::InvalidActionForRoutine) => {
+                            let error = error
+                                .try_into()
+                                .expect("`Ok` and `NotReached` are handled in another arm");
+                            errors.push((change.clone(), error));
+                            Ok(errors)
+                        }
+                        fnet_filter::ChangeValidationError::__SourceBreaking { .. } => {
+                            Err(FidlConversionError::UnknownUnionVariant(
+                                type_names::CHANGE_VALIDATION_ERROR,
+                            )
+                            .into())
                         }
                     },
                 );

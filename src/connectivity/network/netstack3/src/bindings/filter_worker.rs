@@ -352,27 +352,90 @@ async fn serve_controller(
     while let Some(request) = stream.try_next().await? {
         match request {
             NamespaceControllerRequest::PushChanges { changes, responder } => {
-                if pending_changes.len() + changes.len() > fnet_filter::MAX_COMMIT_SIZE.into() {
+                let num_changes = changes.len();
+                if pending_changes.len() + num_changes > fnet_filter::MAX_COMMIT_SIZE.into() {
                     responder.send(fnet_filter::ChangeValidationResult::TooManyChanges(
                         fnet_filter::Empty {},
                     ))?;
                     continue;
                 }
 
-                // TODO(https://fxbug.dev/137448): validate changes and return
-                // proper errors.
-                let changes =
-                    match changes.into_iter().map(TryInto::try_into).collect::<Result<Vec<_>, _>>()
-                    {
-                        Ok(changes) => changes,
-                        Err(e) => {
-                            error!("got invalid filtering change: {e:?}; closing channel");
-                            return Ok(());
-                        }
-                    };
-                pending_changes.extend(changes);
+                enum Error {
+                    ReturnToClient(fnet_filter::ChangeValidationError),
+                    Fatal,
+                }
 
-                responder.send(fnet_filter::ChangeValidationResult::Ok(fnet_filter::Empty {}))?;
+                let result = changes
+                    .into_iter()
+                    .enumerate()
+                    .map(|(i, change)| {
+                        change.try_into().map_err(|error| {
+                            use fnet_filter::ChangeValidationError;
+                            use fnet_filter_ext::FidlConversionError;
+
+                            warn!("encountered an invalid filter change at index {i}: {error:?}");
+
+                            let error = match error {
+                                FidlConversionError::UnknownUnionVariant(type_name) => {
+                                    warn!("client specified unknown variant of {type_name}");
+                                    Error::Fatal
+                                }
+                                FidlConversionError::MissingNamespaceId
+                                | FidlConversionError::MissingNamespaceDomain
+                                | FidlConversionError::MissingRoutineId
+                                | FidlConversionError::MissingRoutineType
+                                | FidlConversionError::MissingIpInstallationHook
+                                | FidlConversionError::MissingNatInstallationHook => {
+                                    Error::ReturnToClient(
+                                        ChangeValidationError::MissingRequiredField,
+                                    )
+                                }
+                                FidlConversionError::InvalidAddressRange
+                                | FidlConversionError::AddressRangeFamilyMismatch => {
+                                    Error::ReturnToClient(
+                                        ChangeValidationError::InvalidAddressMatcher,
+                                    )
+                                }
+                                FidlConversionError::InvalidPortRange => {
+                                    Error::ReturnToClient(ChangeValidationError::InvalidPortMatcher)
+                                }
+                                FidlConversionError::NotAnError => unreachable!(
+                                    "should not get this error when converting a `Change`"
+                                ),
+                            };
+                            (i, error)
+                        })
+                    })
+                    .collect::<Result<Vec<_>, _>>()
+                    .map(|changes| {
+                        pending_changes.extend(changes);
+                    });
+
+                let result = match result {
+                    Ok(()) => fnet_filter::ChangeValidationResult::Ok(fnet_filter::Empty {}),
+                    Err((valid_change_count, error)) => {
+                        let error = match error {
+                            Error::ReturnToClient(error) => error,
+                            Error::Fatal => {
+                                error!("fatal error serving filtering controller; closing channel");
+                                control_handle.shutdown_with_epitaph(zx::Status::NOT_SUPPORTED);
+                                return Ok(());
+                            }
+                        };
+                        // Return `Ok` for all valid changes, followed by the error we encountered,
+                        // and pad the results with `NotReached` for the remaining changes.
+                        let errors = std::iter::repeat(fnet_filter::ChangeValidationError::Ok)
+                            .take(valid_change_count)
+                            .chain(std::iter::once(error))
+                            .chain(
+                                std::iter::repeat(fnet_filter::ChangeValidationError::NotReached)
+                                    .take(num_changes - valid_change_count - 1),
+                            )
+                            .collect::<Vec<_>>();
+                        fnet_filter::ChangeValidationResult::ErrorOnChange(errors)
+                    }
+                };
+                responder.send(result)?;
             }
             NamespaceControllerRequest::Commit { payload: options, responder } => {
                 let fnet_filter::CommitOptions { idempotent, .. } = options;
