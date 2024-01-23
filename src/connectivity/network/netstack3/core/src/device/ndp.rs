@@ -150,14 +150,15 @@ mod tests {
         device::{
             ethernet::{EthernetCreationProperties, EthernetLinkDevice, MaxEthernetFrameSize},
             link::LinkAddress,
-            testutil::{
-                is_forwarding_enabled, receive_frame, set_forwarding_enabled,
-                update_ipv6_configuration,
-            },
+            testutil::{is_forwarding_enabled, receive_frame, set_forwarding_enabled},
             DeviceId, EthernetDeviceId, EthernetWeakDeviceId, FrameDestination,
         },
         ip::{
             device::{
+                config::{
+                    IpDeviceConfigurationUpdate, Ipv4DeviceConfigurationUpdate,
+                    Ipv6DeviceConfigurationUpdate,
+                },
                 get_ipv6_hop_limit,
                 router_solicitation::{MAX_RTR_SOLICITATION_DELAY, RTR_SOLICITATION_INTERVAL},
                 slaac::{SlaacConfiguration, SlaacTimerId, TemporarySlaacAddressConfiguration},
@@ -166,9 +167,7 @@ mod tests {
                     TemporarySlaacConfig,
                 },
                 testutil::with_assigned_ipv6_addr_subnets,
-                IpAddressId as _, IpDeviceConfigurationUpdate, Ipv4DeviceConfigurationUpdate,
-                Ipv6DeviceAddr, Ipv6DeviceConfigurationUpdate, Ipv6DeviceHandler,
-                Ipv6DeviceTimerId,
+                IpAddressId as _, Ipv6DeviceAddr, Ipv6DeviceHandler, Ipv6DeviceTimerId,
             },
             icmp::REQUIRED_NDP_IP_PACKET_HOP_LIMIT,
             receive_ip_packet,
@@ -477,17 +476,21 @@ mod tests {
             }),
             ..Default::default()
         };
-        net.with_context("local", |Ctx { core_ctx, bindings_ctx }| {
-            let _: Ipv6DeviceConfigurationUpdate =
-                update_ipv6_configuration(core_ctx, bindings_ctx, &local_device_id, update)
-                    .unwrap();
-            assert_eq!(bindings_ctx.frames_sent().len(), 1);
+        net.with_context("local", |ctx| {
+            let _: Ipv6DeviceConfigurationUpdate = ctx
+                .core_api()
+                .device_ip::<Ipv6>()
+                .update_configuration(&local_device_id, update)
+                .unwrap();
+            assert_eq!(ctx.bindings_ctx.frames_sent().len(), 1);
         });
-        net.with_context("remote", |Ctx { core_ctx, bindings_ctx }| {
-            let _: Ipv6DeviceConfigurationUpdate =
-                update_ipv6_configuration(core_ctx, bindings_ctx, &remote_device_id, update)
-                    .unwrap();
-            assert_eq!(bindings_ctx.frames_sent().len(), 1);
+        net.with_context("remote", |ctx| {
+            let _: Ipv6DeviceConfigurationUpdate = ctx
+                .core_api()
+                .device_ip::<Ipv6>()
+                .update_configuration(&remote_device_id, update)
+                .unwrap();
+            assert_eq!(ctx.bindings_ctx.frames_sent().len(), 1);
         });
 
         // Both devices should be in the solicited-node multicast group.
@@ -563,19 +566,17 @@ mod tests {
         let addr = AddrSubnet::<Ipv6Addr, _>::new(local_ip().into(), 128).unwrap();
         let multicast_addr = local_ip().to_solicited_node_address();
         net.with_context("local", |ctx| {
-            let _: Ipv6DeviceConfigurationUpdate = update_ipv6_configuration(
-                &ctx.core_ctx,
-                &mut ctx.bindings_ctx,
-                &local_device_id,
-                update,
-            )
-            .unwrap();
-            ctx.core_api().device_ip::<Ipv6>().add_ip_addr_subnet(&local_device_id, addr).unwrap();
-        });
-        net.with_context("remote", |Ctx { core_ctx, bindings_ctx }| {
+            let mut api = ctx.core_api().device_ip::<Ipv6>();
             let _: Ipv6DeviceConfigurationUpdate =
-                update_ipv6_configuration(core_ctx, bindings_ctx, &remote_device_id, update)
-                    .unwrap();
+                api.update_configuration(&local_device_id, update).unwrap();
+            api.add_ip_addr_subnet(&local_device_id, addr).unwrap();
+        });
+        net.with_context("remote", |ctx| {
+            let _: Ipv6DeviceConfigurationUpdate = ctx
+                .core_api()
+                .device_ip::<Ipv6>()
+                .update_configuration(&remote_device_id, update)
+                .unwrap();
         });
 
         // Only local should be in the solicited node multicast group.
@@ -644,20 +645,21 @@ mod tests {
                 DEFAULT_INTERFACE_METRIC,
             )
             .into();
-        let _: Ipv6DeviceConfigurationUpdate = update_ipv6_configuration(
-            &ctx.core_ctx,
-            &mut ctx.bindings_ctx,
-            &dev_id,
-            Ipv6DeviceConfigurationUpdate {
-                dad_transmits: Some(NonZeroU8::new(1)),
-                ip_config: Some(IpDeviceConfigurationUpdate {
-                    ip_enabled: Some(true),
+        let _: Ipv6DeviceConfigurationUpdate = ctx
+            .core_api()
+            .device_ip::<Ipv6>()
+            .update_configuration(
+                &dev_id,
+                Ipv6DeviceConfigurationUpdate {
+                    dad_transmits: Some(NonZeroU8::new(1)),
+                    ip_config: Some(IpDeviceConfigurationUpdate {
+                        ip_enabled: Some(true),
+                        ..Default::default()
+                    }),
                     ..Default::default()
-                }),
-                ..Default::default()
-            },
-        )
-        .unwrap();
+                },
+            )
+            .unwrap();
         let addr = local_ip();
         ctx.core_api()
             .device_ip::<Ipv6>()
@@ -689,24 +691,24 @@ mod tests {
                 DEFAULT_INTERFACE_METRIC,
             );
         let dev_id = eth_dev_id.clone().into();
-        let Ctx { core_ctx, bindings_ctx } = &mut ctx;
-        crate::device::testutil::enable_device(core_ctx, bindings_ctx, &dev_id);
+        crate::device::testutil::enable_device(&mut ctx, &dev_id);
 
         // Enable DAD.
-        let _: Ipv6DeviceConfigurationUpdate = update_ipv6_configuration(
-            core_ctx,
-            bindings_ctx,
-            &dev_id,
-            Ipv6DeviceConfigurationUpdate {
-                dad_transmits: Some(NonZeroU8::new(3)),
-                ip_config: Some(IpDeviceConfigurationUpdate {
-                    ip_enabled: Some(true),
+        let _: Ipv6DeviceConfigurationUpdate = ctx
+            .core_api()
+            .device_ip::<Ipv6>()
+            .update_configuration(
+                &dev_id,
+                Ipv6DeviceConfigurationUpdate {
+                    dad_transmits: Some(NonZeroU8::new(3)),
+                    ip_config: Some(IpDeviceConfigurationUpdate {
+                        ip_enabled: Some(true),
+                        ..Default::default()
+                    }),
                     ..Default::default()
-                }),
-                ..Default::default()
-            },
-        )
-        .unwrap();
+                },
+            )
+            .unwrap();
         ctx.core_api()
             .device_ip::<Ipv6>()
             .add_ip_addr_subnet(&dev_id, AddrSubnet::new(local_ip().into(), 128).unwrap())
@@ -739,13 +741,11 @@ mod tests {
             ..Default::default()
         };
         net.with_context("local", |ctx| {
-            let _: Ipv6DeviceConfigurationUpdate = update_ipv6_configuration(
-                &ctx.core_ctx,
-                &mut ctx.bindings_ctx,
-                &local_device_id,
-                update,
-            )
-            .unwrap();
+            let _: Ipv6DeviceConfigurationUpdate = ctx
+                .core_api()
+                .device_ip::<Ipv6>()
+                .update_configuration(&local_device_id, update)
+                .unwrap();
 
             ctx.core_api()
                 .device_ip::<Ipv6>()
@@ -755,10 +755,12 @@ mod tests {
                 )
                 .unwrap();
         });
-        net.with_context("remote", |Ctx { core_ctx, bindings_ctx }| {
-            let _: Ipv6DeviceConfigurationUpdate =
-                update_ipv6_configuration(core_ctx, bindings_ctx, &remote_device_id, update)
-                    .unwrap();
+        net.with_context("remote", |ctx| {
+            let _: Ipv6DeviceConfigurationUpdate = ctx
+                .core_api()
+                .device_ip::<Ipv6>()
+                .update_configuration(&remote_device_id, update)
+                .unwrap();
         });
 
         let expected_timer_id = dad_timer_id(local_eth_device_id, local_ip());
@@ -855,26 +857,26 @@ mod tests {
                 DEFAULT_INTERFACE_METRIC,
             );
         let dev_id = eth_dev_id.clone().into();
-        let Ctx { core_ctx, bindings_ctx } = &mut ctx;
-        crate::device::testutil::enable_device(core_ctx, bindings_ctx, &dev_id);
+        crate::device::testutil::enable_device(&mut ctx, &dev_id);
 
-        assert_empty(bindings_ctx.frames_sent().iter());
+        assert_empty(ctx.bindings_ctx.frames_sent().iter());
 
-        let _: Ipv6DeviceConfigurationUpdate = update_ipv6_configuration(
-            core_ctx,
-            bindings_ctx,
-            &dev_id,
-            Ipv6DeviceConfigurationUpdate {
-                dad_transmits: Some(NonZeroU8::new(3)),
-                max_router_solicitations: Some(None),
-                ip_config: Some(IpDeviceConfigurationUpdate {
-                    ip_enabled: Some(true),
+        let _: Ipv6DeviceConfigurationUpdate = ctx
+            .core_api()
+            .device_ip::<Ipv6>()
+            .update_configuration(
+                &dev_id,
+                Ipv6DeviceConfigurationUpdate {
+                    dad_transmits: Some(NonZeroU8::new(3)),
+                    max_router_solicitations: Some(None),
+                    ip_config: Some(IpDeviceConfigurationUpdate {
+                        ip_enabled: Some(true),
+                        ..Default::default()
+                    }),
                     ..Default::default()
-                }),
-                ..Default::default()
-            },
-        )
-        .unwrap();
+                },
+            )
+            .unwrap();
 
         // Add an IP.
         ctx.core_api()
@@ -952,27 +954,27 @@ mod tests {
                 DEFAULT_INTERFACE_METRIC,
             );
         let dev_id = eth_dev_id.clone().into();
-        let Ctx { core_ctx, bindings_ctx } = &mut ctx;
-        crate::device::testutil::enable_device(core_ctx, bindings_ctx, &dev_id);
+        crate::device::testutil::enable_device(&mut ctx, &dev_id);
 
         // Enable DAD.
-        let _: Ipv6DeviceConfigurationUpdate = update_ipv6_configuration(
-            core_ctx,
-            bindings_ctx,
-            &dev_id,
-            Ipv6DeviceConfigurationUpdate {
-                dad_transmits: Some(NonZeroU8::new(3)),
-                max_router_solicitations: Some(None),
-                ip_config: Some(IpDeviceConfigurationUpdate {
-                    ip_enabled: Some(true),
+        let _: Ipv6DeviceConfigurationUpdate = ctx
+            .core_api()
+            .device_ip::<Ipv6>()
+            .update_configuration(
+                &dev_id,
+                Ipv6DeviceConfigurationUpdate {
+                    dad_transmits: Some(NonZeroU8::new(3)),
+                    max_router_solicitations: Some(None),
+                    ip_config: Some(IpDeviceConfigurationUpdate {
+                        ip_enabled: Some(true),
+                        ..Default::default()
+                    }),
                     ..Default::default()
-                }),
-                ..Default::default()
-            },
-        )
-        .unwrap();
+                },
+            )
+            .unwrap();
 
-        assert_empty(bindings_ctx.frames_sent().iter());
+        assert_empty(ctx.bindings_ctx.frames_sent().iter());
 
         // Add an IP.
         ctx.core_api()
@@ -1278,8 +1280,8 @@ mod tests {
         let src_mac = Mac::new([10, 11, 12, 13, 14, 15]);
         let src_ip = src_mac.to_ipv6_link_local().addr();
 
+        crate::device::testutil::enable_device(&mut ctx, &device);
         let Ctx { core_ctx, bindings_ctx } = &mut ctx;
-        crate::device::testutil::enable_device(core_ctx, bindings_ctx, &device);
 
         // Receive a new RA with a valid MTU option (but the new MTU should only
         // be 5000 as that is the max MTU of the device).
@@ -1395,26 +1397,27 @@ mod tests {
                 DEFAULT_INTERFACE_METRIC,
             );
         let device_id = eth_device_id.clone().into();
+        let _: Ipv6DeviceConfigurationUpdate = ctx
+            .core_api()
+            .device_ip::<Ipv6>()
+            .update_configuration(
+                &device_id,
+                Ipv6DeviceConfigurationUpdate {
+                    // Test expects to send 3 RSs.
+                    max_router_solicitations: Some(NonZeroU8::new(3)),
+                    slaac_config: Some(SlaacConfiguration {
+                        enable_stable_addresses: true,
+                        ..Default::default()
+                    }),
+                    ip_config: Some(IpDeviceConfigurationUpdate {
+                        ip_enabled: Some(true),
+                        ..Default::default()
+                    }),
+                    ..Default::default()
+                },
+            )
+            .unwrap();
         let Ctx { core_ctx, bindings_ctx } = &mut ctx;
-        let _: Ipv6DeviceConfigurationUpdate = update_ipv6_configuration(
-            core_ctx,
-            bindings_ctx,
-            &device_id,
-            Ipv6DeviceConfigurationUpdate {
-                // Test expects to send 3 RSs.
-                max_router_solicitations: Some(NonZeroU8::new(3)),
-                slaac_config: Some(SlaacConfiguration {
-                    enable_stable_addresses: true,
-                    ..Default::default()
-                }),
-                ip_config: Some(IpDeviceConfigurationUpdate {
-                    ip_enabled: Some(true),
-                    ..Default::default()
-                }),
-                ..Default::default()
-            },
-        )
-        .unwrap();
         assert_empty(bindings_ctx.frames_sent().iter());
 
         let time = bindings_ctx.now();
@@ -1502,25 +1505,26 @@ mod tests {
                 DEFAULT_INTERFACE_METRIC,
             );
         let device_id = eth_device_id.clone().into();
+        let _: Ipv6DeviceConfigurationUpdate = ctx
+            .core_api()
+            .device_ip::<Ipv6>()
+            .update_configuration(
+                &device_id,
+                Ipv6DeviceConfigurationUpdate {
+                    max_router_solicitations: Some(NonZeroU8::new(2)),
+                    slaac_config: Some(SlaacConfiguration {
+                        enable_stable_addresses: true,
+                        ..Default::default()
+                    }),
+                    ip_config: Some(IpDeviceConfigurationUpdate {
+                        ip_enabled: Some(true),
+                        ..Default::default()
+                    }),
+                    ..Default::default()
+                },
+            )
+            .unwrap();
         let Ctx { core_ctx, bindings_ctx } = &mut ctx;
-        let _: Ipv6DeviceConfigurationUpdate = update_ipv6_configuration(
-            core_ctx,
-            bindings_ctx,
-            &device_id,
-            Ipv6DeviceConfigurationUpdate {
-                max_router_solicitations: Some(NonZeroU8::new(2)),
-                slaac_config: Some(SlaacConfiguration {
-                    enable_stable_addresses: true,
-                    ..Default::default()
-                }),
-                ip_config: Some(IpDeviceConfigurationUpdate {
-                    ip_enabled: Some(true),
-                    ..Default::default()
-                }),
-                ..Default::default()
-            },
-        )
-        .unwrap();
         assert_empty(bindings_ctx.frames_sent().iter());
 
         let time = bindings_ctx.now();
@@ -1585,23 +1589,24 @@ mod tests {
                 DEFAULT_INTERFACE_METRIC,
             );
         let device = eth_device.clone().into();
-        let Ctx { core_ctx, bindings_ctx } = &mut ctx;
-        let _: Ipv6DeviceConfigurationUpdate = update_ipv6_configuration(
-            core_ctx,
-            bindings_ctx,
-            &device,
-            Ipv6DeviceConfigurationUpdate {
-                // Doesn't matter as long as we are configured to send at least 2
-                // solicitations.
-                max_router_solicitations: Some(NonZeroU8::new(2)),
-                ip_config: Some(IpDeviceConfigurationUpdate {
-                    ip_enabled: Some(true),
+        let _: Ipv6DeviceConfigurationUpdate = ctx
+            .core_api()
+            .device_ip::<Ipv6>()
+            .update_configuration(
+                &device,
+                Ipv6DeviceConfigurationUpdate {
+                    // Doesn't matter as long as we are configured to send at least 2
+                    // solicitations.
+                    max_router_solicitations: Some(NonZeroU8::new(2)),
+                    ip_config: Some(IpDeviceConfigurationUpdate {
+                        ip_enabled: Some(true),
+                        ..Default::default()
+                    }),
                     ..Default::default()
-                }),
-                ..Default::default()
-            },
-        )
-        .unwrap();
+                },
+            )
+            .unwrap();
+        let Ctx { core_ctx, bindings_ctx } = &mut ctx;
         let timer_id: TimerId<_> =
             rs_timer_id(device.clone().try_into().expect("expected ethernet ID"));
 
@@ -1627,8 +1632,8 @@ mod tests {
         bindings_ctx.timer_ctx().assert_timers_installed([(timer_id.clone(), ..)]);
 
         // Enable routing on device.
-        set_forwarding_enabled::<_, Ipv6>(core_ctx, bindings_ctx, &device, true)
-            .expect("error setting routing enabled");
+        set_forwarding_enabled::<_, Ipv6>(&mut ctx, &device, true);
+        let Ctx { core_ctx, bindings_ctx } = &mut ctx;
         assert!(is_forwarding_enabled::<_, Ipv6>(core_ctx, &device));
 
         // Should have not sent any new packets, but unset the router
@@ -1637,8 +1642,8 @@ mod tests {
         assert_empty(bindings_ctx.timer_ctx().timers().iter().filter(|x| &x.1 == &timer_id));
 
         // Unsetting routing should succeed.
-        set_forwarding_enabled::<_, Ipv6>(core_ctx, bindings_ctx, &device, false)
-            .expect("error setting routing enabled");
+        set_forwarding_enabled::<_, Ipv6>(&mut ctx, &device, false);
+        let Ctx { core_ctx, bindings_ctx } = &mut ctx;
         assert!(!is_forwarding_enabled::<_, Ipv6>(core_ctx, &device));
         assert_eq!(bindings_ctx.frames_sent().len(), 1);
         bindings_ctx.timer_ctx().assert_timers_installed([(timer_id.clone(), ..)]);
@@ -1686,10 +1691,9 @@ mod tests {
                 DEFAULT_INTERFACE_METRIC,
             )
             .into();
-        let Ctx { core_ctx, bindings_ctx } = &mut ctx;
-        crate::device::testutil::enable_device(core_ctx, bindings_ctx, &device);
-        assert_empty(bindings_ctx.frames_sent().iter());
-        assert_empty(bindings_ctx.timer_ctx().timers());
+        crate::device::testutil::enable_device(&mut ctx, &device);
+        assert_empty(ctx.bindings_ctx.frames_sent().iter());
+        assert_empty(ctx.bindings_ctx.timer_ctx().timers());
 
         // Updating the IP should resolve immediately since DAD is turned off by
         // `FakeEventDispatcherBuilder::build`.
@@ -1706,20 +1710,21 @@ mod tests {
 
         // Enable DAD for the device.
         const DUP_ADDR_DETECT_TRANSMITS: u8 = 3;
-        let _: Ipv6DeviceConfigurationUpdate = update_ipv6_configuration(
-            core_ctx,
-            bindings_ctx,
-            &device,
-            Ipv6DeviceConfigurationUpdate {
-                dad_transmits: Some(NonZeroU8::new(DUP_ADDR_DETECT_TRANSMITS)),
-                ip_config: Some(IpDeviceConfigurationUpdate {
-                    ip_enabled: Some(true),
+        let _: Ipv6DeviceConfigurationUpdate = ctx
+            .core_api()
+            .device_ip::<Ipv6>()
+            .update_configuration(
+                &device,
+                Ipv6DeviceConfigurationUpdate {
+                    dad_transmits: Some(NonZeroU8::new(DUP_ADDR_DETECT_TRANSMITS)),
+                    ip_config: Some(IpDeviceConfigurationUpdate {
+                        ip_enabled: Some(true),
+                        ..Default::default()
+                    }),
                     ..Default::default()
-                }),
-                ..Default::default()
-            },
-        )
-        .unwrap();
+                },
+            )
+            .unwrap();
 
         // Updating the IP should start the DAD process.
         ctx.core_api()
@@ -1733,13 +1738,15 @@ mod tests {
         assert_eq!(bindings_ctx.timer_ctx().timers().len(), 1);
 
         // Disable DAD during DAD.
-        let _: Ipv6DeviceConfigurationUpdate = update_ipv6_configuration(
-            core_ctx,
-            bindings_ctx,
-            &device,
-            Ipv6DeviceConfigurationUpdate { dad_transmits: Some(None), ..Default::default() },
-        )
-        .unwrap();
+        let _: Ipv6DeviceConfigurationUpdate = ctx
+            .core_api()
+            .device_ip::<Ipv6>()
+            .update_configuration(
+                &device,
+                Ipv6DeviceConfigurationUpdate { dad_transmits: Some(None), ..Default::default() },
+            )
+            .unwrap();
+        let Ctx { core_ctx, bindings_ctx } = &mut ctx;
         let expected_timer_id = dad_timer_id(device_id, remote_ip());
         // Allow already started DAD to complete (2 more more NS, 3 more timers).
         assert_eq!(
@@ -1833,10 +1840,9 @@ mod tests {
                 DEFAULT_INTERFACE_METRIC,
             )
             .into();
+        crate::device::testutil::enable_device(&mut ctx, &device);
+        set_forwarding_enabled::<_, Ipv6>(&mut ctx, &device, true);
         let Ctx { core_ctx, bindings_ctx } = &mut ctx;
-        crate::device::testutil::enable_device(core_ctx, bindings_ctx, &device);
-        set_forwarding_enabled::<_, Ipv6>(core_ctx, bindings_ctx, &device, true)
-            .expect("error setting routing enabled");
 
         let src_mac = config.remote_mac;
         let src_ip = src_mac.to_ipv6_link_local().addr().get();
@@ -1986,8 +1992,7 @@ mod tests {
                 DEFAULT_INTERFACE_METRIC,
             )
             .into();
-        let Ctx { core_ctx, bindings_ctx } = &mut ctx;
-        crate::device::testutil::enable_device(core_ctx, bindings_ctx, &device);
+        crate::device::testutil::enable_device(&mut ctx, &device);
 
         let max_valid_lifetime = Duration::from_secs(60 * 60);
         let max_preferred_lifetime = Duration::from_secs(30 * 60);
@@ -1995,22 +2000,23 @@ mod tests {
         let mut slaac_config = SlaacConfiguration::default();
         enable_temporary_addresses(
             &mut slaac_config,
-            bindings_ctx.rng(),
+            ctx.bindings_ctx.rng(),
             NonZeroDuration::new(max_valid_lifetime).unwrap(),
             NonZeroDuration::new(max_preferred_lifetime).unwrap(),
             idgen_retries,
         );
 
-        let _: Ipv6DeviceConfigurationUpdate = update_ipv6_configuration(
-            core_ctx,
-            bindings_ctx,
-            &device,
-            Ipv6DeviceConfigurationUpdate {
-                slaac_config: Some(slaac_config),
-                ..Default::default()
-            },
-        )
-        .unwrap();
+        let _: Ipv6DeviceConfigurationUpdate = ctx
+            .core_api()
+            .device_ip::<Ipv6>()
+            .update_configuration(
+                &device,
+                Ipv6DeviceConfigurationUpdate {
+                    slaac_config: Some(slaac_config),
+                    ..Default::default()
+                },
+            )
+            .unwrap();
         (ctx, device, slaac_config)
     }
 
@@ -2018,21 +2024,21 @@ mod tests {
     fn test_host_stateless_address_autoconfiguration_multiple_prefixes() {
         let (mut ctx, device, _): (_, _, SlaacConfiguration) =
             initialize_with_temporary_addresses_enabled();
-        let Ctx { core_ctx, bindings_ctx } = &mut ctx;
-        let config = crate::device::get_ipv6_configuration_and_flags(core_ctx, &device);
-        let _: Ipv6DeviceConfigurationUpdate = update_ipv6_configuration(
-            core_ctx,
-            bindings_ctx,
-            &device,
-            Ipv6DeviceConfigurationUpdate {
-                slaac_config: Some(SlaacConfiguration {
-                    enable_stable_addresses: true,
-                    ..config.config.slaac_config
-                }),
-                ..Default::default()
-            },
-        )
-        .unwrap();
+
+        let mut api = ctx.core_api().device_ip::<Ipv6>();
+        let config = api.get_configuration(&device);
+        let _: Ipv6DeviceConfigurationUpdate = api
+            .update_configuration(
+                &device,
+                Ipv6DeviceConfigurationUpdate {
+                    slaac_config: Some(SlaacConfiguration {
+                        enable_stable_addresses: true,
+                        ..config.config.slaac_config
+                    }),
+                    ..Default::default()
+                },
+            )
+            .unwrap();
 
         let prefix1 = TestSlaacPrefix {
             prefix: subnet_v6!("1:2:3:4::/64"),
@@ -2048,7 +2054,7 @@ mod tests {
         let config = Ipv6::FAKE_CONFIG;
         let src_mac = config.remote_mac;
         let src_ip: Ipv6Addr = src_mac.to_ipv6_link_local().addr().get();
-
+        let Ctx { core_ctx, bindings_ctx } = &mut ctx;
         // After the RA for the first prefix, we should have two addresses, one
         // static and one temporary.
         prefix1.send_prefix_update(core_ctx, bindings_ctx, &device, src_ip);
@@ -2301,8 +2307,8 @@ mod tests {
                 DEFAULT_INTERFACE_METRIC,
             )
             .into();
+        crate::device::testutil::enable_device(&mut ctx, &device);
         let Ctx { core_ctx, bindings_ctx } = &mut ctx;
-        crate::device::testutil::enable_device(core_ctx, bindings_ctx, &device);
 
         let src_mac = config.remote_mac;
         let src_ip = src_mac.to_ipv6_link_local().addr().get();
@@ -2354,8 +2360,7 @@ mod tests {
                 DEFAULT_INTERFACE_METRIC,
             )
             .into();
-        let Ctx { core_ctx, bindings_ctx } = &mut ctx;
-        crate::device::testutil::enable_device(core_ctx, bindings_ctx, &device);
+        crate::device::testutil::enable_device(&mut ctx, &device);
 
         let src_mac = config.remote_mac;
         let src_ip = src_mac.to_ipv6_link_local().addr().get();
@@ -2367,27 +2372,29 @@ mod tests {
         let expected_addr_sub = AddrSubnet::from_witness(expected_addr, prefix.prefix()).unwrap();
 
         // Have no addresses yet.
-        assert_empty(get_global_ipv6_addrs(core_ctx, &device));
+        assert_empty(get_global_ipv6_addrs(&ctx.core_ctx, &device));
 
-        let _: Ipv6DeviceConfigurationUpdate = update_ipv6_configuration(
-            core_ctx,
-            bindings_ctx,
-            &device,
-            Ipv6DeviceConfigurationUpdate {
-                // Doesn't matter as long as we perform DAD.
-                dad_transmits: Some(NonZeroU8::new(1)),
-                slaac_config: Some(SlaacConfiguration {
-                    enable_stable_addresses: true,
+        let _: Ipv6DeviceConfigurationUpdate = ctx
+            .core_api()
+            .device_ip::<Ipv6>()
+            .update_configuration(
+                &device,
+                Ipv6DeviceConfigurationUpdate {
+                    // Doesn't matter as long as we perform DAD.
+                    dad_transmits: Some(NonZeroU8::new(1)),
+                    slaac_config: Some(SlaacConfiguration {
+                        enable_stable_addresses: true,
+                        ..Default::default()
+                    }),
+                    ip_config: Some(IpDeviceConfigurationUpdate {
+                        ip_enabled: Some(true),
+                        ..Default::default()
+                    }),
                     ..Default::default()
-                }),
-                ip_config: Some(IpDeviceConfigurationUpdate {
-                    ip_enabled: Some(true),
-                    ..Default::default()
-                }),
-                ..Default::default()
-            },
-        )
-        .unwrap();
+                },
+            )
+            .unwrap();
+        let Ctx { core_ctx, bindings_ctx } = &mut ctx;
 
         // Set the retransmit timer between neighbor solicitations to be greater
         // than the preferred lifetime of the prefix.
@@ -2609,24 +2616,24 @@ mod tests {
                 DEFAULT_INTERFACE_METRIC,
             )
             .into();
-        let Ctx { core_ctx, bindings_ctx } = &mut ctx;
-        let _: Ipv6DeviceConfigurationUpdate = update_ipv6_configuration(
-            core_ctx,
-            bindings_ctx,
-            &device,
-            Ipv6DeviceConfigurationUpdate {
-                slaac_config: Some(SlaacConfiguration {
-                    enable_stable_addresses: true,
+        let _: Ipv6DeviceConfigurationUpdate = ctx
+            .core_api()
+            .device_ip::<Ipv6>()
+            .update_configuration(
+                &device,
+                Ipv6DeviceConfigurationUpdate {
+                    slaac_config: Some(SlaacConfiguration {
+                        enable_stable_addresses: true,
+                        ..Default::default()
+                    }),
+                    ip_config: Some(IpDeviceConfigurationUpdate {
+                        ip_enabled: Some(true),
+                        ..Default::default()
+                    }),
                     ..Default::default()
-                }),
-                ip_config: Some(IpDeviceConfigurationUpdate {
-                    ip_enabled: Some(true),
-                    ..Default::default()
-                }),
-                ..Default::default()
-            },
-        )
-        .unwrap();
+                },
+            )
+            .unwrap();
 
         let src_mac = config.remote_mac;
         let src_ip = src_mac.to_ipv6_link_local().addr().get();
@@ -2639,6 +2646,7 @@ mod tests {
             NonMappedAddr::new(UnicastAddr::new(Ipv6Addr::from(expected_addr)).unwrap()).unwrap();
         let expected_addr_sub = AddrSubnet::from_witness(expected_addr, prefix_length).unwrap();
 
+        let Ctx { core_ctx, bindings_ctx } = &mut ctx;
         // Have no addresses yet.
         assert_empty(get_global_ipv6_addrs(core_ctx, &device));
 
@@ -2824,7 +2832,6 @@ mod tests {
                 DEFAULT_INTERFACE_METRIC,
             )
             .into();
-        let Ctx { core_ctx, bindings_ctx } = &mut ctx;
 
         let router_mac = config.remote_mac;
         let router_ip = router_mac.to_ipv6_link_local().addr().get();
@@ -2840,28 +2847,31 @@ mod tests {
         let mut slaac_config = SlaacConfiguration::default();
         enable_temporary_addresses(
             &mut slaac_config,
-            bindings_ctx.rng(),
+            ctx.bindings_ctx.rng(),
             NonZeroDuration::new(MAX_VALID_LIFETIME).unwrap(),
             NonZeroDuration::new(MAX_PREFERRED_LIFETIME).unwrap(),
             idgen_retries,
         );
 
-        let _: Ipv6DeviceConfigurationUpdate = update_ipv6_configuration(
-            core_ctx,
-            bindings_ctx,
-            &device,
-            Ipv6DeviceConfigurationUpdate {
-                // Doesn't matter as long as we perform DAD.
-                dad_transmits: Some(NonZeroU8::new(1)),
-                slaac_config: Some(slaac_config),
-                ip_config: Some(IpDeviceConfigurationUpdate {
-                    ip_enabled: Some(true),
+        let _: Ipv6DeviceConfigurationUpdate = ctx
+            .core_api()
+            .device_ip::<Ipv6>()
+            .update_configuration(
+                &device,
+                Ipv6DeviceConfigurationUpdate {
+                    // Doesn't matter as long as we perform DAD.
+                    dad_transmits: Some(NonZeroU8::new(1)),
+                    slaac_config: Some(slaac_config),
+                    ip_config: Some(IpDeviceConfigurationUpdate {
+                        ip_enabled: Some(true),
+                        ..Default::default()
+                    }),
                     ..Default::default()
-                }),
-                ..Default::default()
-            },
-        )
-        .unwrap();
+                },
+            )
+            .unwrap();
+
+        let Ctx { core_ctx, bindings_ctx } = &mut ctx;
 
         // Send an update with lifetimes that are smaller than the ones specified in the preferences.
         let valid_lifetime = 10000;
@@ -2974,7 +2984,6 @@ mod tests {
                 DEFAULT_INTERFACE_METRIC,
             )
             .into();
-        let Ctx { core_ctx, bindings_ctx } = &mut ctx;
 
         let router_mac = config.remote_mac;
         let router_ip = router_mac.to_ipv6_link_local().addr().get();
@@ -2989,28 +2998,31 @@ mod tests {
         let mut slaac_config = SlaacConfiguration::default();
         enable_temporary_addresses(
             &mut slaac_config,
-            bindings_ctx.rng(),
+            ctx.bindings_ctx.rng(),
             NonZeroDuration::new(MAX_VALID_LIFETIME).unwrap(),
             NonZeroDuration::new(MAX_PREFERRED_LIFETIME).unwrap(),
             idgen_retries,
         );
 
-        let _: Ipv6DeviceConfigurationUpdate = update_ipv6_configuration(
-            core_ctx,
-            bindings_ctx,
-            &device,
-            Ipv6DeviceConfigurationUpdate {
-                // Doesn't matter as long as we perform DAD.
-                dad_transmits: Some(NonZeroU8::new(1)),
-                slaac_config: Some(slaac_config),
-                ip_config: Some(IpDeviceConfigurationUpdate {
-                    ip_enabled: Some(true),
+        let _: Ipv6DeviceConfigurationUpdate = ctx
+            .core_api()
+            .device_ip::<Ipv6>()
+            .update_configuration(
+                &device,
+                Ipv6DeviceConfigurationUpdate {
+                    // Doesn't matter as long as we perform DAD.
+                    dad_transmits: Some(NonZeroU8::new(1)),
+                    slaac_config: Some(slaac_config),
+                    ip_config: Some(IpDeviceConfigurationUpdate {
+                        ip_enabled: Some(true),
+                        ..Default::default()
+                    }),
                     ..Default::default()
-                }),
-                ..Default::default()
-            },
-        )
-        .unwrap();
+                },
+            )
+            .unwrap();
+
+        let Ctx { core_ctx, bindings_ctx } = &mut ctx;
 
         receive_prefix_update(
             core_ctx,
@@ -3110,7 +3122,6 @@ mod tests {
                 DEFAULT_INTERFACE_METRIC,
             )
             .into();
-        let Ctx { core_ctx, bindings_ctx } = &mut ctx;
 
         let router_mac = config.remote_mac;
         let router_ip = router_mac.to_ipv6_link_local().addr().get();
@@ -3123,26 +3134,28 @@ mod tests {
         let mut slaac_config = SlaacConfiguration::default();
         enable_temporary_addresses(
             &mut slaac_config,
-            bindings_ctx.rng(),
+            ctx.bindings_ctx.rng(),
             NonZeroDuration::new(MAX_VALID_LIFETIME).unwrap(),
             NonZeroDuration::new(MAX_PREFERRED_LIFETIME).unwrap(),
             0,
         );
 
-        let _: Ipv6DeviceConfigurationUpdate = update_ipv6_configuration(
-            core_ctx,
-            bindings_ctx,
-            &device,
-            Ipv6DeviceConfigurationUpdate {
-                slaac_config: Some(slaac_config),
-                ip_config: Some(IpDeviceConfigurationUpdate {
-                    ip_enabled: Some(true),
+        let _: Ipv6DeviceConfigurationUpdate = ctx
+            .core_api()
+            .device_ip::<Ipv6>()
+            .update_configuration(
+                &device,
+                Ipv6DeviceConfigurationUpdate {
+                    slaac_config: Some(slaac_config),
+                    ip_config: Some(IpDeviceConfigurationUpdate {
+                        ip_enabled: Some(true),
+                        ..Default::default()
+                    }),
                     ..Default::default()
-                }),
-                ..Default::default()
-            },
-        )
-        .unwrap();
+                },
+            )
+            .unwrap();
+        let Ctx { core_ctx, bindings_ctx } = &mut ctx;
 
         // The prefix updates contains a shorter preferred lifetime than
         // the preferences allow.
@@ -3303,22 +3316,22 @@ mod tests {
                 DEFAULT_INTERFACE_METRIC,
             );
         let device = eth_device_id.clone().into();
-        let Ctx { core_ctx, bindings_ctx } = &mut ctx;
         // No DAD for the auto-generated link-local address.
-        let _: Ipv6DeviceConfigurationUpdate = update_ipv6_configuration(
-            core_ctx,
-            bindings_ctx,
-            &device,
-            Ipv6DeviceConfigurationUpdate {
-                dad_transmits: Some(None),
-                ip_config: Some(IpDeviceConfigurationUpdate {
-                    ip_enabled: Some(true),
+        let _: Ipv6DeviceConfigurationUpdate = ctx
+            .core_api()
+            .device_ip::<Ipv6>()
+            .update_configuration(
+                &device,
+                Ipv6DeviceConfigurationUpdate {
+                    dad_transmits: Some(None),
+                    ip_config: Some(IpDeviceConfigurationUpdate {
+                        ip_enabled: Some(true),
+                        ..Default::default()
+                    }),
                     ..Default::default()
-                }),
-                ..Default::default()
-            },
-        )
-        .unwrap();
+                },
+            )
+            .unwrap();
 
         let router_mac = config.remote_mac;
         let router_ip = router_mac.to_ipv6_link_local().addr().get();
@@ -3331,24 +3344,27 @@ mod tests {
         let mut slaac_config = SlaacConfiguration::default();
         enable_temporary_addresses(
             &mut slaac_config,
-            bindings_ctx.rng(),
+            ctx.bindings_ctx.rng(),
             NonZeroDuration::new(MAX_VALID_LIFETIME).unwrap(),
             NonZeroDuration::new(max_preferred_lifetime).unwrap(),
             1,
         );
 
-        let _: Ipv6DeviceConfigurationUpdate = update_ipv6_configuration(
-            core_ctx,
-            bindings_ctx,
-            &device,
-            Ipv6DeviceConfigurationUpdate {
-                // Perform DAD for later addresses.
-                dad_transmits: Some(NonZeroU8::new(1)),
-                slaac_config: Some(slaac_config),
-                ..Default::default()
-            },
-        )
-        .unwrap();
+        let _: Ipv6DeviceConfigurationUpdate = ctx
+            .core_api()
+            .device_ip::<Ipv6>()
+            .update_configuration(
+                &device,
+                Ipv6DeviceConfigurationUpdate {
+                    // Perform DAD for later addresses.
+                    dad_transmits: Some(NonZeroU8::new(1)),
+                    slaac_config: Some(slaac_config),
+                    ..Default::default()
+                },
+            )
+            .unwrap();
+
+        let Ctx { core_ctx, bindings_ctx } = &mut ctx;
 
         // Set a large value for the retransmit period. This forces
         // REGEN_ADVANCE to be large, which increases the window between when an
@@ -3416,16 +3432,19 @@ mod tests {
             NonZeroDuration::new(max_preferred_lifetime).unwrap(),
             1,
         );
-        let _: Ipv6DeviceConfigurationUpdate = update_ipv6_configuration(
-            core_ctx,
-            bindings_ctx,
-            &device,
-            Ipv6DeviceConfigurationUpdate {
-                slaac_config: Some(slaac_config),
-                ..Default::default()
-            },
-        )
-        .unwrap();
+        let _: Ipv6DeviceConfigurationUpdate = ctx
+            .core_api()
+            .device_ip::<Ipv6>()
+            .update_configuration(
+                &device,
+                Ipv6DeviceConfigurationUpdate {
+                    slaac_config: Some(slaac_config),
+                    ..Default::default()
+                },
+            )
+            .unwrap();
+
+        let Ctx { core_ctx, bindings_ctx } = &mut ctx;
 
         // Receiving this update should result in requiring a regen time that is
         // before the current time. The address should be regenerated
@@ -3618,22 +3637,24 @@ mod tests {
             idgen_retries,
         );
 
-        let _: Ipv6DeviceConfigurationUpdate = update_ipv6_configuration(
-            core_ctx,
-            bindings_ctx,
-            &device,
-            Ipv6DeviceConfigurationUpdate {
-                slaac_config: Some(slaac_config),
-                ..Default::default()
-            },
-        )
-        .unwrap();
+        let _: Ipv6DeviceConfigurationUpdate = ctx
+            .core_api()
+            .device_ip::<Ipv6>()
+            .update_configuration(
+                &device,
+                Ipv6DeviceConfigurationUpdate {
+                    slaac_config: Some(slaac_config),
+                    ..Default::default()
+                },
+            )
+            .unwrap();
+
         // The new valid time is measured from the time at which the address was created (`start`),
         // not the current time (`now`). That means the max valid lifetime takes precedence over
         // the router's advertised valid lifetime.
         let max_valid_until = start.checked_add(max_valid_lifetime.get()).unwrap();
         assert!(expected_valid_until > max_valid_until);
-
+        let Ctx { core_ctx, bindings_ctx } = &mut ctx;
         receive_prefix_update(
             core_ctx,
             bindings_ctx,
@@ -3679,24 +3700,24 @@ mod tests {
                 DEFAULT_INTERFACE_METRIC,
             )
             .into();
-        let Ctx { core_ctx, bindings_ctx } = &mut ctx;
-        let _: Ipv6DeviceConfigurationUpdate = update_ipv6_configuration(
-            core_ctx,
-            bindings_ctx,
-            &device,
-            Ipv6DeviceConfigurationUpdate {
-                slaac_config: Some(SlaacConfiguration {
-                    enable_stable_addresses: true,
+        let _: Ipv6DeviceConfigurationUpdate = ctx
+            .core_api()
+            .device_ip::<Ipv6>()
+            .update_configuration(
+                &device,
+                Ipv6DeviceConfigurationUpdate {
+                    slaac_config: Some(SlaacConfiguration {
+                        enable_stable_addresses: true,
+                        ..Default::default()
+                    }),
+                    ip_config: Some(IpDeviceConfigurationUpdate {
+                        ip_enabled: Some(true),
+                        ..Default::default()
+                    }),
                     ..Default::default()
-                }),
-                ip_config: Some(IpDeviceConfigurationUpdate {
-                    ip_enabled: Some(true),
-                    ..Default::default()
-                }),
-                ..Default::default()
-            },
-        )
-        .unwrap();
+                },
+            )
+            .unwrap();
 
         let src_mac = config.remote_mac;
         let src_ip = src_mac.to_ipv6_link_local().addr().get();
@@ -3724,6 +3745,7 @@ mod tests {
             VALID_LIFETIME_SECS,
             PREFERRED_LIFETIME_SECS,
         );
+        let Ctx { core_ctx, bindings_ctx } = &mut ctx;
         receive_ip_packet::<_, _, Ipv6>(
             core_ctx,
             bindings_ctx,

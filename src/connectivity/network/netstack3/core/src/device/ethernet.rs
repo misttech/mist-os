@@ -1454,18 +1454,17 @@ mod tests {
         device::{
             arp::ArpCounters,
             socket::Frame,
-            testutil::{
-                set_forwarding_enabled, update_ipv6_configuration, FakeDeviceId, FakeWeakDeviceId,
-            },
+            testutil::{set_forwarding_enabled, FakeDeviceId, FakeWeakDeviceId},
             DeviceId,
         },
         error::NotFoundError,
         ip::{
             device::{
                 api::AddIpAddrSubnetError,
+                config::{IpDeviceConfigurationUpdate, Ipv6DeviceConfigurationUpdate},
                 nud::{self, api::NeighborApi, DynamicNeighborUpdateSource},
                 slaac::SlaacConfiguration,
-                IpAddressId as _, IpDeviceConfigurationUpdate, Ipv6DeviceConfigurationUpdate,
+                IpAddressId as _,
             },
             receive_ip_packet,
             testutil::is_in_ip_multicast,
@@ -1951,7 +1950,6 @@ mod tests {
                 },
                 DEFAULT_INTERFACE_METRIC,
             );
-        let crate::testutil::FakeCtx { core_ctx, bindings_ctx } = &mut ctx;
         let device = eth_device.clone().into();
         let mut bytes = match I::VERSION {
             IpVersion::V4 => dns_request_v4::ETHERNET_FRAME,
@@ -1964,7 +1962,7 @@ mod tests {
         bytes[0..6].copy_from_slice(&mac_bytes);
 
         let expected_received = if enable {
-            crate::device::testutil::enable_device(core_ctx, bindings_ctx, &device);
+            crate::device::testutil::enable_device(&mut ctx, &device);
             1
         } else {
             0
@@ -1994,11 +1992,11 @@ mod tests {
                 DEFAULT_INTERFACE_METRIC,
             )
             .into();
-        crate::device::testutil::enable_device(&ctx.core_ctx, &mut ctx.bindings_ctx, &device);
+        crate::device::testutil::enable_device(&mut ctx, &device);
     }
 
     fn is_forwarding_enabled<I: Ip>(
-        core_ctx: &mut &crate::testutil::FakeCoreCtx,
+        core_ctx: &crate::testutil::FakeCoreCtx,
         device: &DeviceId<crate::testutil::FakeBindingsCtx>,
     ) -> bool {
         match I::VERSION {
@@ -2012,9 +2010,10 @@ mod tests {
     }
 
     #[ip_test]
-    fn test_set_ip_routing<I: Ip + TestIpExt>() {
+    #[netstack3_macros::context_ip_bounds(I, crate::testutil::FakeBindingsCtx, crate)]
+    fn test_set_ip_routing<I: Ip + TestIpExt + crate::IpExt>() {
         fn check_other_is_forwarding_enabled<I: Ip>(
-            core_ctx: &mut &crate::testutil::FakeCoreCtx,
+            core_ctx: &crate::testutil::FakeCoreCtx,
             device: &DeviceId<crate::testutil::FakeBindingsCtx>,
             expected: bool,
         ) {
@@ -2072,29 +2071,29 @@ mod tests {
         let mut builder = FakeEventDispatcherBuilder::from_config(config.clone());
         let device_builder_id = 0;
         add_arp_or_ndp_table_entry(&mut builder, device_builder_id, src_ip, src_mac);
-        let (Ctx { core_ctx, mut bindings_ctx }, device_ids) = builder.build();
+        let (mut ctx, device_ids) = builder.build();
         let device: DeviceId<_> = device_ids[device_builder_id].clone().into();
-        let mut core_ctx = &core_ctx;
+        let Ctx { core_ctx, bindings_ctx } = &mut ctx;
 
         // Should not be a router (default).
-        assert!(!is_forwarding_enabled::<I>(&mut core_ctx, &device));
-        check_other_is_forwarding_enabled::<I>(&mut core_ctx, &device, false);
+        assert!(!is_forwarding_enabled::<I>(core_ctx, &device));
+        check_other_is_forwarding_enabled::<I>(core_ctx, &device, false);
 
         // Receiving a packet not destined for the node should only result in a
         // dest unreachable message if routing is enabled.
-        receive_ip_packet::<_, _, I>(&core_ctx, &mut bindings_ctx, &device, frame_dst, buf.clone());
+        receive_ip_packet::<_, _, I>(core_ctx, bindings_ctx, &device, frame_dst, buf.clone());
         assert_empty(bindings_ctx.frames_sent().iter());
 
         // Set routing and expect packets to be forwarded.
-        set_forwarding_enabled::<_, I>(&core_ctx, &mut bindings_ctx, &device, true)
-            .expect("error setting routing enabled");
-        assert!(is_forwarding_enabled::<I>(&mut core_ctx, &device));
+        set_forwarding_enabled::<_, I>(&mut ctx, &device, true);
+        let Ctx { core_ctx, bindings_ctx } = &mut ctx;
+        assert!(is_forwarding_enabled::<I>(core_ctx, &device));
         // Should not update other Ip routing status.
-        check_other_is_forwarding_enabled::<I>(&mut core_ctx, &device, false);
+        check_other_is_forwarding_enabled::<I>(core_ctx, &device, false);
 
         // Should route the packet since routing fully enabled (netstack &
         // device).
-        receive_ip_packet::<_, _, I>(&core_ctx, &mut bindings_ctx, &device, frame_dst, buf.clone());
+        receive_ip_packet::<_, _, I>(core_ctx, bindings_ctx, &device, frame_dst, buf.clone());
         {
             assert_eq!(bindings_ctx.frames_sent().len(), 1);
             let frames = bindings_ctx.frames_sent();
@@ -2125,24 +2124,18 @@ mod tests {
             .ok()
             .unwrap()
             .unwrap_b();
-        receive_ip_packet::<_, _, I>(
-            &core_ctx,
-            &mut bindings_ctx,
-            &device,
-            frame_dst,
-            buf_unknown_dest,
-        );
+        receive_ip_packet::<_, _, I>(core_ctx, bindings_ctx, &device, frame_dst, buf_unknown_dest);
         assert_eq!(bindings_ctx.frames_sent().len(), 2);
         check_icmp::<I>(&bindings_ctx.frames_sent()[1].1);
 
         // Attempt to unset router
-        set_forwarding_enabled::<_, I>(&core_ctx, &mut bindings_ctx, &device, false)
-            .expect("error setting routing enabled");
-        assert!(!is_forwarding_enabled::<I>(&mut core_ctx, &device));
-        check_other_is_forwarding_enabled::<I>(&mut core_ctx, &device, false);
+        set_forwarding_enabled::<_, I>(&mut ctx, &device, false);
+        let Ctx { core_ctx, bindings_ctx } = &mut ctx;
+        assert!(!is_forwarding_enabled::<I>(core_ctx, &device));
+        check_other_is_forwarding_enabled::<I>(core_ctx, &device, false);
 
         // Should not route packets anymore
-        receive_ip_packet::<_, _, I>(&core_ctx, &mut bindings_ctx, &device, frame_dst, buf);
+        receive_ip_packet::<_, _, I>(core_ctx, bindings_ctx, &device, frame_dst, buf);
         assert_eq!(bindings_ctx.frames_sent().len(), 2);
     }
 
@@ -2274,7 +2267,7 @@ mod tests {
             )
             .into();
 
-        crate::device::testutil::enable_device(&ctx.core_ctx, &mut ctx.bindings_ctx, &device);
+        crate::device::testutil::enable_device(&mut ctx, &device);
 
         let ip1 = I::get_other_ip_address(1);
         let ip2 = I::get_other_ip_address(2);
@@ -2384,7 +2377,7 @@ mod tests {
                 DEFAULT_INTERFACE_METRIC,
             )
             .into();
-        crate::device::testutil::enable_device(&ctx.core_ctx, &mut ctx.bindings_ctx, &device);
+        crate::device::testutil::enable_device(&mut ctx, &device);
 
         let ip1 = I::get_other_ip_address(1);
         let ip2 = I::get_other_ip_address(2);
@@ -2494,8 +2487,8 @@ mod tests {
                 DEFAULT_INTERFACE_METRIC,
             )
             .into();
+        crate::device::testutil::enable_device(&mut ctx, &device);
         let crate::testutil::FakeCtx { core_ctx, bindings_ctx } = &mut ctx;
-        crate::device::testutil::enable_device(core_ctx, bindings_ctx, &device);
 
         let multicast_addr = I::get_multicast_addr(3);
 
@@ -2549,8 +2542,8 @@ mod tests {
                 DEFAULT_INTERFACE_METRIC,
             )
             .into();
+        crate::device::testutil::enable_device(&mut ctx, &device);
         let crate::testutil::FakeCtx { core_ctx, bindings_ctx } = &mut ctx;
-        crate::device::testutil::enable_device(core_ctx, bindings_ctx, &device);
 
         let multicast_addr = I::get_multicast_addr(3);
 
@@ -2581,8 +2574,7 @@ mod tests {
                 DEFAULT_INTERFACE_METRIC,
             )
             .into();
-        let crate::testutil::FakeCtx { core_ctx, bindings_ctx } = &mut ctx;
-        crate::device::testutil::enable_device(core_ctx, bindings_ctx, &device);
+        crate::device::testutil::enable_device(&mut ctx, &device);
 
         let ip1 = SpecifiedAddr::new(Ipv6Addr::new([0, 0, 0, 1, 0, 0, 0, 1])).unwrap();
         let ip2 = SpecifiedAddr::new(Ipv6Addr::new([0, 0, 0, 2, 0, 0, 0, 1])).unwrap();
@@ -2597,7 +2589,7 @@ mod tests {
         let addr_sub1 = AddrSubnet::new(ip1.get(), 64).unwrap();
         let addr_sub2 = AddrSubnet::new(ip2.get(), 64).unwrap();
 
-        assert_eq!(core_ctx.state.ip_counters::<Ipv6>().dispatch_receive_ip_packet.get(), 0);
+        assert_eq!(ctx.core_ctx.state.ip_counters::<Ipv6>().dispatch_receive_ip_packet.get(), 0);
 
         // Add ip1 to the device.
         //
@@ -2644,25 +2636,26 @@ mod tests {
         let device = eth_device.clone().into();
         let eth_device = eth_device.device_state();
 
-        let crate::testutil::FakeCtx { core_ctx, bindings_ctx } = &mut ctx;
         // Enable the device and configure it to generate a link-local address.
-        let _: Ipv6DeviceConfigurationUpdate = update_ipv6_configuration(
-            core_ctx,
-            bindings_ctx,
-            &device,
-            Ipv6DeviceConfigurationUpdate {
-                slaac_config: Some(SlaacConfiguration {
-                    enable_stable_addresses: true,
+        let _: Ipv6DeviceConfigurationUpdate = ctx
+            .core_api()
+            .device_ip::<Ipv6>()
+            .update_configuration(
+                &device,
+                Ipv6DeviceConfigurationUpdate {
+                    slaac_config: Some(SlaacConfiguration {
+                        enable_stable_addresses: true,
+                        ..Default::default()
+                    }),
+                    ip_config: Some(IpDeviceConfigurationUpdate {
+                        ip_enabled: Some(true),
+                        ..Default::default()
+                    }),
                     ..Default::default()
-                }),
-                ip_config: Some(IpDeviceConfigurationUpdate {
-                    ip_enabled: Some(true),
-                    ..Default::default()
-                }),
-                ..Default::default()
-            },
-        )
-        .unwrap();
+                },
+            )
+            .unwrap();
+
         // Verify that there is a single assigned address.
         assert_eq!(
             eth_device

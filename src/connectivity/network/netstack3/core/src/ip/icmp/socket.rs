@@ -790,10 +790,9 @@ mod tests {
 
     use super::*;
     use crate::{
-        api::CoreApi,
         device::loopback::{LoopbackCreationProperties, LoopbackDevice},
         ip::icmp::tests::FakeIcmpCtx,
-        testutil::{handle_queued_rx_packets, Ctx, TestIpExt, DEFAULT_INTERFACE_METRIC},
+        testutil::{handle_queued_rx_packets, TestIpExt, DEFAULT_INTERFACE_METRIC},
     };
 
     impl<I: Ip> SocketId<I> {
@@ -876,9 +875,8 @@ mod tests {
             .unwrap()
             .into_inner();
         let conn = net.with_context(LOCAL_CTX_NAME, |ctx| {
-            let Ctx { core_ctx, bindings_ctx } = ctx;
-            crate::device::testutil::enable_device(core_ctx, bindings_ctx, &loopback_device_id);
-            let mut socket_api = CoreApi::with_contexts(core_ctx, bindings_ctx).icmp_echo::<I>();
+            crate::device::testutil::enable_device(ctx, &loopback_device_id);
+            let mut socket_api = ctx.core_api().icmp_echo::<I>();
             let conn = socket_api.create();
             if bind_to_device {
                 let device = local_device_ids[0].clone().into();

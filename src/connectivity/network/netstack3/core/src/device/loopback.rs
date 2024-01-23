@@ -604,19 +604,18 @@ mod tests {
                 DEFAULT_INTERFACE_METRIC,
             )
             .into();
-        let crate::testutil::FakeCtx { core_ctx, bindings_ctx } = &mut ctx;
-        crate::device::testutil::enable_device(core_ctx, bindings_ctx, &device);
+        crate::device::testutil::enable_device(&mut ctx, &device);
 
         assert_eq!(
             crate::ip::IpDeviceContext::<Ipv4, _>::get_mtu(
-                &mut CoreCtx::new_deprecated(core_ctx),
+                &mut CoreCtx::new_deprecated(&ctx.core_ctx),
                 &device
             ),
             MTU
         );
         assert_eq!(
             crate::ip::IpDeviceContext::<Ipv6, _>::get_mtu(
-                &mut CoreCtx::new_deprecated(core_ctx),
+                &mut CoreCtx::new_deprecated(&ctx.core_ctx),
                 &device
             ),
             MTU
@@ -635,8 +634,7 @@ mod tests {
                 DEFAULT_INTERFACE_METRIC,
             )
             .into();
-        let crate::testutil::FakeCtx { core_ctx, bindings_ctx } = &mut ctx;
-        crate::device::testutil::enable_device(core_ctx, bindings_ctx, &device);
+        crate::device::testutil::enable_device(&mut ctx, &device);
 
         let get_addrs = |ctx: &mut crate::testutil::FakeCtx| {
             crate::ip::device::IpDeviceStateContext::<I, _>::with_address_ids(
@@ -675,8 +673,8 @@ mod tests {
             LoopbackCreationProperties { mtu: MTU },
             DEFAULT_INTERFACE_METRIC,
         );
+        crate::device::testutil::enable_device(&mut ctx, &device.clone().into());
         let crate::testutil::FakeCtx { core_ctx, bindings_ctx } = &mut ctx;
-        crate::device::testutil::enable_device(core_ctx, bindings_ctx, &device.clone().into());
 
         let local_addr = I::FAKE_CONFIG.local_ip;
         const BODY: &[u8] = b"IP body".as_slice();

@@ -21,8 +21,13 @@ use crate::{
     ip::{
         self,
         device::{
+            config::{
+                IpDeviceConfigurationHandler, PendingIpDeviceConfigurationUpdate,
+                UpdateIpConfigurationError,
+            },
             state::{Ipv4AddrConfig, Ipv6AddrManualConfig},
             DelIpAddr, IpDeviceBindingsContext, IpDeviceConfigurationContext, IpDeviceIpExt,
+            IpDeviceStateContext as _,
         },
         AddressRemovedReason,
     },
@@ -41,10 +46,16 @@ impl<I, C> DeviceIpApi<I, C>
 where
     I: IpDeviceIpExt,
     C: ContextPair,
-    C::CoreContext: IpDeviceConfigurationContext<I, C::BindingsContext>,
+    C::CoreContext: IpDeviceConfigurationContext<I, C::BindingsContext>
+        + IpDeviceConfigurationHandler<I, C::BindingsContext>,
     C::BindingsContext:
         IpDeviceBindingsContext<I, <C::CoreContext as DeviceIdContext<AnyDevice>>::DeviceId>,
 {
+    fn core_ctx(&mut self) -> &mut C::CoreContext {
+        let Self(pair, IpVersionMarker { .. }) = self;
+        pair.core_ctx()
+    }
+
     fn contexts(&mut self) -> (&mut C::CoreContext, &mut C::BindingsContext) {
         let Self(pair, IpVersionMarker { .. }) = self;
         pair.contexts()
@@ -106,6 +117,75 @@ where
             AddressRemovedReason::Manual,
         )
     }
+
+    /// Updates the IP configuration for a device.
+    ///
+    /// Each field in [`Ipv4DeviceConfigurationUpdate`] or
+    /// [`Ipv6DeviceConfigurationUpdate`] represents an optionally updateable
+    /// configuration. If the field has a `Some(_)` value, then an attempt will
+    /// be made to update that configuration on the device. A `None` value
+    /// indicates that an update for the configuration is not requested.
+    ///
+    /// Note that some fields have the type `Option<Option<T>>`. In this case,
+    /// as long as the outer `Option` is `Some`, then an attempt will be made to
+    /// update the configuration.
+    ///
+    /// This function returns a [`PendingDeviceConfigurationUpdate`] which is
+    /// validated and [`DeviceIpApi::apply`] can be called to apply the
+    /// configuration.
+    pub fn new_configuration_update<'a>(
+        &mut self,
+        device_id: &'a <C::CoreContext as DeviceIdContext<AnyDevice>>::DeviceId,
+        config: I::ConfigurationUpdate,
+    ) -> Result<
+        PendingIpDeviceConfigurationUpdate<
+            'a,
+            I,
+            <C::CoreContext as DeviceIdContext<AnyDevice>>::DeviceId,
+        >,
+        UpdateIpConfigurationError,
+    > {
+        PendingIpDeviceConfigurationUpdate::new(config, device_id)
+    }
+
+    /// Applies a pre-validated pending configuration to the device.
+    ///
+    /// Returns a configuration update with the previous value for all the
+    /// requested fields in `config`.
+    pub fn apply_configuration(
+        &mut self,
+        config: PendingIpDeviceConfigurationUpdate<
+            '_,
+            I,
+            <C::CoreContext as DeviceIdContext<AnyDevice>>::DeviceId,
+        >,
+    ) -> I::ConfigurationUpdate {
+        let (core_ctx, bindings_ctx) = self.contexts();
+        IpDeviceConfigurationHandler::apply_configuration(core_ctx, bindings_ctx, config)
+    }
+
+    /// A shortcut for [`DeviceIpApi::new_configuration_update`] followed by
+    /// [`DeviceIpApi::apply_configuration`].
+    pub fn update_configuration(
+        &mut self,
+        device_id: &<C::CoreContext as DeviceIdContext<AnyDevice>>::DeviceId,
+        config: I::ConfigurationUpdate,
+    ) -> Result<I::ConfigurationUpdate, UpdateIpConfigurationError> {
+        let pending = self.new_configuration_update(device_id, config)?;
+        Ok(self.apply_configuration(pending))
+    }
+
+    /// Gets the IP configuration and flags for a `device_id`.
+    pub fn get_configuration(
+        &mut self,
+        device_id: &<C::CoreContext as DeviceIdContext<AnyDevice>>::DeviceId,
+    ) -> I::ConfigurationAndFlags {
+        self.core_ctx()
+            .with_ip_device_configuration(device_id, |config, mut core_ctx| {
+                (config.clone(), core_ctx.with_ip_device_flags(device_id, |flags| flags.clone()))
+            })
+            .into()
+    }
 }
 /// The device IP API interacting with all IP versions.
 pub struct DeviceIpAnyApi<C>(C);
@@ -120,7 +200,9 @@ impl<C> DeviceIpAnyApi<C>
 where
     C: ContextPair,
     C::CoreContext: IpDeviceConfigurationContext<Ipv4, C::BindingsContext>
-        + IpDeviceConfigurationContext<Ipv6, C::BindingsContext>,
+        + IpDeviceConfigurationHandler<Ipv4, C::BindingsContext>
+        + IpDeviceConfigurationContext<Ipv6, C::BindingsContext>
+        + IpDeviceConfigurationHandler<Ipv6, C::BindingsContext>,
     C::BindingsContext: IpDeviceBindingsContext<Ipv4, <C::CoreContext as DeviceIdContext<AnyDevice>>::DeviceId>
         + IpDeviceBindingsContext<Ipv6, <C::CoreContext as DeviceIdContext<AnyDevice>>::DeviceId>,
 {

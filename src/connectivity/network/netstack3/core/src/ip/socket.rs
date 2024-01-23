@@ -1970,8 +1970,7 @@ mod tests {
             )
             .into();
 
-        let Ctx { core_ctx, bindings_ctx } = &mut ctx;
-        crate::device::testutil::enable_device(core_ctx, bindings_ctx, &loopback_device_id);
+        crate::device::testutil::enable_device(&mut ctx, &loopback_device_id);
 
         let NewSocketTestCase { local_ip_type, remote_ip_type, expected_result, device_type } =
             test_case;
@@ -2115,8 +2114,8 @@ mod tests {
                 DEFAULT_INTERFACE_METRIC,
             )
             .into();
+        crate::device::testutil::enable_device(&mut ctx, &loopback_device_id);
         let Ctx { core_ctx, bindings_ctx } = &mut ctx;
-        crate::device::testutil::enable_device(core_ctx, bindings_ctx, &loopback_device_id);
 
         let (expected_from_ip, from_ip) = match from_addr_type {
             AddressType::LocallyOwned => (local_ip, Some(local_ip)),

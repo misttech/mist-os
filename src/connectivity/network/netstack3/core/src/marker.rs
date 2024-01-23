@@ -22,6 +22,7 @@ use crate::{
     ip::{
         self,
         device::{
+            config::IpDeviceConfigurationHandler,
             nud::{NudBindingsContext, NudContext},
             IpDeviceBindingsContext, IpDeviceConfigurationContext, IpDeviceIpExt,
         },
@@ -74,6 +75,7 @@ pub trait CoreContext<I, BC>:
     + IpLayerContext<I, BC>
     + NudContext<I, EthernetLinkDevice, BC>
     + IpDeviceConfigurationContext<I, BC>
+    + IpDeviceConfigurationHandler<I, BC>
     + IpSocketContext<I, BC>
     + DeviceIdContext<AnyDevice, DeviceId = DeviceId<BC>, WeakDeviceId = WeakDeviceId<BC>>
     + DeviceIdContext<
@@ -99,6 +101,7 @@ where
         + IpLayerContext<I, BC>
         + NudContext<I, EthernetLinkDevice, BC>
         + IpDeviceConfigurationContext<I, BC>
+        + IpDeviceConfigurationHandler<I, BC>
         + IpSocketContext<I, BC>
         + DeviceIdContext<AnyDevice, DeviceId = DeviceId<BC>, WeakDeviceId = WeakDeviceId<BC>>
         + DeviceIdContext<

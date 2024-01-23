@@ -275,7 +275,7 @@ mod tests {
         },
         device::{
             ethernet::{EthernetCreationProperties, EthernetLinkDevice},
-            testutil::{update_ipv6_configuration, FakeDeviceId, FakeWeakDeviceId},
+            testutil::{FakeDeviceId, FakeWeakDeviceId},
             DeviceId, FrameDestination,
         },
         ip::{
@@ -741,22 +741,22 @@ mod tests {
                 DEFAULT_INTERFACE_METRIC,
             )
             .into();
-        let Ctx { core_ctx, bindings_ctx } = &mut ctx;
-        let _: Ipv6DeviceConfigurationUpdate = update_ipv6_configuration(
-            core_ctx,
-            bindings_ctx,
-            &device_id,
-            Ipv6DeviceConfigurationUpdate {
-                ip_config: Some(IpDeviceConfigurationUpdate {
-                    ip_enabled: Some(true),
+        let _: Ipv6DeviceConfigurationUpdate = ctx
+            .core_api()
+            .device_ip::<Ipv6>()
+            .update_configuration(
+                &device_id,
+                Ipv6DeviceConfigurationUpdate {
+                    ip_config: Some(IpDeviceConfigurationUpdate {
+                        ip_enabled: Some(true),
+                        ..Default::default()
+                    }),
                     ..Default::default()
-                }),
-                ..Default::default()
-            },
-        )
-        .unwrap();
+                },
+            )
+            .unwrap();
 
-        bindings_ctx.timer_ctx().assert_no_timers_installed();
+        ctx.bindings_ctx.timer_ctx().assert_no_timers_installed();
 
         (ctx, device_id, Ipv6::FAKE_CONFIG)
     }
@@ -1133,7 +1133,7 @@ mod tests {
     #[test]
     fn flush_routes_on_interface_disabled_integration() {
         let (
-            Ctx { core_ctx, mut bindings_ctx },
+            mut ctx,
             device_id,
             FakeEventDispatcherConfig {
                 local_mac: _,
@@ -1143,9 +1143,8 @@ mod tests {
                 subnet,
             },
         ) = setup();
-        let core_ctx = &core_ctx;
-
-        add_link_local_route(core_ctx, &mut bindings_ctx, &device_id);
+        let Ctx { core_ctx, bindings_ctx } = &mut ctx;
+        add_link_local_route(core_ctx, bindings_ctx, &device_id);
 
         let src_ip = remote_mac.to_ipv6_link_local().addr();
         let gateway_route =
@@ -1161,8 +1160,8 @@ mod tests {
 
         // Discover both an on-link prefix and default router.
         receive_ip_packet::<_, _, Ipv6>(
-            &core_ctx,
-            &mut bindings_ctx,
+            core_ctx,
+            bindings_ctx,
             &device_id,
             FrameDestination::Individual { local: true },
             router_advertisement_buf(
@@ -1191,20 +1190,21 @@ mod tests {
         );
 
         // Disable the interface.
-        let _: Ipv6DeviceConfigurationUpdate = update_ipv6_configuration(
-            core_ctx,
-            &mut bindings_ctx,
-            &device_id,
-            Ipv6DeviceConfigurationUpdate {
-                ip_config: Some(IpDeviceConfigurationUpdate {
-                    ip_enabled: Some(false),
+        let _: Ipv6DeviceConfigurationUpdate = ctx
+            .core_api()
+            .device_ip::<Ipv6>()
+            .update_configuration(
+                &device_id,
+                Ipv6DeviceConfigurationUpdate {
+                    ip_config: Some(IpDeviceConfigurationUpdate {
+                        ip_enabled: Some(false),
+                        ..Default::default()
+                    }),
                     ..Default::default()
-                }),
-                ..Default::default()
-            },
-        )
-        .unwrap();
-        bindings_ctx.timer_ctx().assert_no_timers_installed();
+                },
+            )
+            .unwrap();
+        ctx.bindings_ctx.timer_ctx().assert_no_timers_installed();
 
         {
             let crate::ip::types::Entry { subnet, device, gateway, metric: _ } =
@@ -1213,7 +1213,7 @@ mod tests {
             let crate::ip::types::Entry { subnet, device, gateway, metric: _ } =
                 on_link_route_entry;
             let event2 = IpLayerEvent::RemoveRoutes { subnet, device: device.downgrade(), gateway };
-            let events = bindings_ctx.take_events();
+            let events = ctx.bindings_ctx.take_events();
             let (a, b, c) = assert_matches!(&events[..], [a, b, c] => (a, b, c));
             assert!([a, b].contains(&&crate::testutil::DispatchedEvent::IpLayerIpv6(event1)));
             assert!([a, b].contains(&&crate::testutil::DispatchedEvent::IpLayerIpv6(event2)));

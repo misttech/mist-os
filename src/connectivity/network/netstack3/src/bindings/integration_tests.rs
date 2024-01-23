@@ -511,19 +511,19 @@ impl TestSetupBuilder {
 
                 // Disable DAD for simplicity of testing.
                 stack.with_ctx(|ctx| {
-                    let (core_ctx, bindings_ctx) = ctx.contexts_mut();
-                    let devices: &Devices<_> = bindings_ctx.as_ref();
+                    let devices: &Devices<_> = ctx.bindings_ctx().as_ref();
                     let device = devices.get_core_id(if_id).unwrap();
-                    let _: Ipv6DeviceConfigurationUpdate =
-                        netstack3_core::device::new_ipv6_configuration_update(
+                    let _: Ipv6DeviceConfigurationUpdate = ctx
+                        .api()
+                        .device_ip::<Ipv6>()
+                        .update_configuration(
                             &device,
                             Ipv6DeviceConfigurationUpdate {
                                 dad_transmits: Some(None),
                                 ..Default::default()
                             },
                         )
-                        .unwrap()
-                        .apply(core_ctx, bindings_ctx);
+                        .unwrap();
                 });
                 if let Some(addr) = addr {
                     stack.with_ctx(|ctx| {
@@ -949,9 +949,10 @@ fn get_slaac_secret<'s>(
     if_id: BindingId,
 ) -> Option<[u8; STABLE_IID_SECRET_KEY_BYTES]> {
     test_stack.with_ctx(|ctx| {
-        let (core_ctx, bindings_ctx) = ctx.contexts_mut();
-        let device = AsRef::<Devices<_>>::as_ref(bindings_ctx).get_core_id(if_id).unwrap();
-        netstack3_core::device::get_ipv6_configuration_and_flags(core_ctx, &device)
+        let device = ctx.bindings_ctx().devices.get_core_id(if_id).unwrap();
+        ctx.api()
+            .device_ip::<Ipv6>()
+            .get_configuration(&device)
             .config
             .slaac_config
             .temporary_address_configuration

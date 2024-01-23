@@ -413,6 +413,12 @@ impl AsRef<IpDeviceFlags> for Ipv4DeviceConfigurationAndFlags {
     }
 }
 
+impl From<(Ipv4DeviceConfiguration, IpDeviceFlags)> for Ipv4DeviceConfigurationAndFlags {
+    fn from((config, flags): (Ipv4DeviceConfiguration, IpDeviceFlags)) -> Self {
+        Self { config, flags }
+    }
+}
+
 /// IPv6 device configurations and flags.
 #[derive(Copy, Clone, Debug, Default, PartialEq, Eq)]
 pub struct Ipv6DeviceConfigurationAndFlags {
@@ -437,6 +443,12 @@ impl AsMut<IpDeviceConfiguration> for Ipv6DeviceConfigurationAndFlags {
 impl AsRef<IpDeviceFlags> for Ipv6DeviceConfigurationAndFlags {
     fn as_ref(&self) -> &IpDeviceFlags {
         &self.flags
+    }
+}
+
+impl From<(Ipv6DeviceConfiguration, IpDeviceFlags)> for Ipv6DeviceConfigurationAndFlags {
+    fn from((config, flags): (Ipv6DeviceConfiguration, IpDeviceFlags)) -> Self {
+        Self { config, flags }
     }
 }
 

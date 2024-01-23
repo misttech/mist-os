@@ -71,8 +71,9 @@ use crate::{
     filter::FilterBindingsTypes,
     ip::{
         device::{
+            config::{Ipv4DeviceConfigurationUpdate, Ipv6DeviceConfigurationUpdate},
             nud::{self, LinkResolutionContext, LinkResolutionNotifier},
-            IpDeviceEvent, Ipv4DeviceConfigurationUpdate, Ipv6DeviceConfigurationUpdate,
+            IpDeviceEvent,
         },
         icmp::{socket::IcmpEchoBindingsContext, IcmpIpExt},
         types::{AddableEntry, AddableMetric, RawMetric},
@@ -1096,27 +1097,22 @@ impl FakeEventDispatcherBuilder {
                         },
                         DEFAULT_INTERFACE_METRIC,
                     );
-                let Ctx { core_ctx, bindings_ctx } = &mut ctx;
                 let id = eth_id.clone().into();
                 if let Some(ipv4_config) = ipv4_config {
-                    let _previous = crate::device::testutil::update_ipv4_configuration(
-                        core_ctx,
-                        bindings_ctx,
-                        &id,
-                        ipv4_config,
-                    )
-                    .unwrap();
+                    let _previous = ctx
+                        .core_api()
+                        .device_ip::<Ipv4>()
+                        .update_configuration(&id, ipv4_config)
+                        .unwrap();
                 }
                 if let Some(ipv6_config) = ipv6_config {
-                    let _previous = crate::device::testutil::update_ipv6_configuration(
-                        core_ctx,
-                        bindings_ctx,
-                        &id,
-                        ipv6_config,
-                    )
-                    .unwrap();
+                    let _previous = ctx
+                        .core_api()
+                        .device_ip::<Ipv6>()
+                        .update_configuration(&id, ipv6_config)
+                        .unwrap();
                 }
-                crate::device::testutil::enable_device(core_ctx, bindings_ctx, &id);
+                crate::device::testutil::enable_device(&mut ctx, &id);
                 match ip_and_subnet {
                     Some(addr_sub) => {
                         ctx.core_api().device_ip_any().add_ip_addr_subnet(&id, addr_sub).unwrap();

@@ -480,8 +480,9 @@ mod tests {
         },
         ip::{
             device::{
-                slaac::SlaacConfiguration, IpDeviceConfigurationUpdate,
-                Ipv6DeviceConfigurationUpdate, Ipv6DeviceTimerId,
+                config::{IpDeviceConfigurationUpdate, Ipv6DeviceConfigurationUpdate},
+                slaac::SlaacConfiguration,
+                Ipv6DeviceTimerId,
             },
             gmp::{
                 GmpHandler as _, GroupJoinResult, GroupLeaveResult, MemberState, MulticastGroupSet,
@@ -491,8 +492,8 @@ mod tests {
         },
         state::StackStateBuilder,
         testutil::{
-            assert_empty, new_rng, run_with_many_seeds, Ctx, FakeEventDispatcherConfig,
-            TestIpExt as _, DEFAULT_INTERFACE_METRIC, IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
+            assert_empty, new_rng, run_with_many_seeds, FakeEventDispatcherConfig, TestIpExt as _,
+            DEFAULT_INTERFACE_METRIC, IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
         },
         time::TimerIdInner,
         TimerId,
@@ -1262,8 +1263,7 @@ mod tests {
             );
         let device_id: DeviceId<_> = eth_device_id.clone().into();
 
-        let Ctx { core_ctx, bindings_ctx } = &mut ctx;
-        let now = bindings_ctx.now();
+        let now = ctx.bindings_ctx.now();
         let ll_addr = local_mac.to_ipv6_link_local().addr();
         let snmc_addr = ll_addr.to_solicited_node_address();
         let snmc_timer_id = TimerId(TimerIdInner::Ipv6Device(
@@ -1278,13 +1278,12 @@ mod tests {
             ip_enabled: bool,
             gmp_enabled: bool,
         }
-        let set_config = |core_ctx: &mut crate::testutil::FakeCoreCtx,
-                          bindings_ctx: &mut crate::testutil::FakeBindingsCtx,
+        let set_config = |ctx: &mut crate::testutil::FakeCtx,
                           TestConfig { ip_enabled, gmp_enabled }| {
-            let _: Ipv6DeviceConfigurationUpdate =
-                crate::device::testutil::update_ipv6_configuration(
-                    core_ctx,
-                    bindings_ctx,
+            let _: Ipv6DeviceConfigurationUpdate = ctx
+                .core_api()
+                .device_ip::<Ipv6>()
+                .update_configuration(
                     &device_id,
                     Ipv6DeviceConfigurationUpdate {
                         // TODO(https://fxbug.dev/98534): Make sure that DAD resolving
@@ -1364,43 +1363,47 @@ mod tests {
         //
         // MLD should be performed for the auto-generated link-local address's
         // solicited-node multicast address.
-        set_config(core_ctx, bindings_ctx, TestConfig { ip_enabled: true, gmp_enabled: true });
-        bindings_ctx.timer_ctx().assert_timers_installed([(snmc_timer_id.clone(), range.clone())]);
-        check_sent_report(bindings_ctx, false);
+        set_config(&mut ctx, TestConfig { ip_enabled: true, gmp_enabled: true });
+        ctx.bindings_ctx
+            .timer_ctx()
+            .assert_timers_installed([(snmc_timer_id.clone(), range.clone())]);
+        check_sent_report(&mut ctx.bindings_ctx, false);
 
         // Disable MLD.
-        set_config(core_ctx, bindings_ctx, TestConfig { ip_enabled: true, gmp_enabled: false });
-        bindings_ctx.timer_ctx().assert_no_timers_installed();
-        check_sent_done(bindings_ctx, true);
+        set_config(&mut ctx, TestConfig { ip_enabled: true, gmp_enabled: false });
+        ctx.bindings_ctx.timer_ctx().assert_no_timers_installed();
+        check_sent_done(&mut ctx.bindings_ctx, true);
 
         // Enable MLD but disable IPv6.
         //
         // Should do nothing.
-        set_config(core_ctx, bindings_ctx, TestConfig { ip_enabled: false, gmp_enabled: true });
-        bindings_ctx.timer_ctx().assert_no_timers_installed();
-        assert_matches!(bindings_ctx.take_frames()[..], []);
+        set_config(&mut ctx, TestConfig { ip_enabled: false, gmp_enabled: true });
+        ctx.bindings_ctx.timer_ctx().assert_no_timers_installed();
+        assert_matches!(ctx.bindings_ctx.take_frames()[..], []);
 
         // Disable MLD but enable IPv6.
         //
         // Should do nothing.
-        set_config(core_ctx, bindings_ctx, TestConfig { ip_enabled: true, gmp_enabled: false });
-        bindings_ctx.timer_ctx().assert_no_timers_installed();
-        assert_matches!(bindings_ctx.take_frames()[..], []);
+        set_config(&mut ctx, TestConfig { ip_enabled: true, gmp_enabled: false });
+        ctx.bindings_ctx.timer_ctx().assert_no_timers_installed();
+        assert_matches!(ctx.bindings_ctx.take_frames()[..], []);
 
         // Enable MLD.
-        set_config(core_ctx, bindings_ctx, TestConfig { ip_enabled: true, gmp_enabled: true });
-        bindings_ctx.timer_ctx().assert_timers_installed([(snmc_timer_id.clone(), range.clone())]);
-        check_sent_report(bindings_ctx, true);
+        set_config(&mut ctx, TestConfig { ip_enabled: true, gmp_enabled: true });
+        ctx.bindings_ctx
+            .timer_ctx()
+            .assert_timers_installed([(snmc_timer_id.clone(), range.clone())]);
+        check_sent_report(&mut ctx.bindings_ctx, true);
 
         // Disable IPv6.
-        set_config(core_ctx, bindings_ctx, TestConfig { ip_enabled: false, gmp_enabled: true });
-        bindings_ctx.timer_ctx().assert_no_timers_installed();
-        check_sent_done(bindings_ctx, false);
+        set_config(&mut ctx, TestConfig { ip_enabled: false, gmp_enabled: true });
+        ctx.bindings_ctx.timer_ctx().assert_no_timers_installed();
+        check_sent_done(&mut ctx.bindings_ctx, false);
 
         // Enable IPv6.
-        set_config(core_ctx, bindings_ctx, TestConfig { ip_enabled: true, gmp_enabled: true });
-        bindings_ctx.timer_ctx().assert_timers_installed([(snmc_timer_id, range)]);
-        check_sent_report(bindings_ctx, false);
+        set_config(&mut ctx, TestConfig { ip_enabled: true, gmp_enabled: true });
+        ctx.bindings_ctx.timer_ctx().assert_timers_installed([(snmc_timer_id, range)]);
+        check_sent_report(&mut ctx.bindings_ctx, false);
 
         // Remove the device to cleanup all dangling references.
         core::mem::drop(device_id);

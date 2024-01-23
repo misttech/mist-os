@@ -3510,13 +3510,16 @@ mod tests {
             self,
             ethernet::{EthernetCreationProperties, EthernetLinkDevice, RecvEthernetFrameMeta},
             loopback::{LoopbackCreationProperties, LoopbackDevice},
-            testutil::{set_forwarding_enabled, update_ipv6_configuration},
+            testutil::set_forwarding_enabled,
             DeviceId, FrameDestination,
         },
         ip::{
             device::{
-                slaac::SlaacConfiguration, IpDeviceConfigurationUpdate,
-                Ipv4DeviceConfigurationUpdate, Ipv6DeviceConfigurationUpdate,
+                config::{
+                    IpDeviceConfigurationUpdate, Ipv4DeviceConfigurationUpdate,
+                    Ipv6DeviceConfigurationUpdate,
+                },
+                slaac::SlaacConfiguration,
             },
             testutil::is_in_ip_multicast,
             types::{AddableEntryEither, AddableMetric, RawMetric},
@@ -4116,7 +4119,8 @@ mod tests {
     }
 
     #[ip_test]
-    fn test_ip_reassembly_only_at_destination_host<I: Ip + TestIpExt>() {
+    #[netstack3_macros::context_ip_bounds(I, FakeBindingsCtx, crate)]
+    fn test_ip_reassembly_only_at_destination_host<I: Ip + TestIpExt + crate::IpExt>() {
         // Create a new network with two parties (alice & bob) and enable IP
         // packet routing for alice.
         let a = "alice";
@@ -4125,14 +4129,7 @@ mod tests {
         let (mut alice, alice_device_ids) =
             FakeEventDispatcherBuilder::from_config(fake_config.swap()).build();
         {
-            let Ctx { core_ctx, bindings_ctx } = &mut alice;
-            set_forwarding_enabled::<_, I>(
-                core_ctx,
-                bindings_ctx,
-                &alice_device_ids[0].clone().into(),
-                true,
-            )
-            .expect("qerror setting routing enabled");
+            set_forwarding_enabled::<_, I>(&mut alice, &alice_device_ids[0].clone().into(), true);
         }
         let (bob, bob_device_ids) = FakeEventDispatcherBuilder::from_config(fake_config).build();
         let mut net = crate::context::testutil::new_simple_fake_network(
@@ -4240,12 +4237,12 @@ mod tests {
             extra_mac.to_ipv6_link_local().addr().get(),
             extra_mac,
         );
-        let (Ctx { core_ctx, mut bindings_ctx }, device_ids) = dispatcher_builder.build();
-        let core_ctx = &core_ctx;
+        let (mut ctx, device_ids) = dispatcher_builder.build();
+
         let device: DeviceId<_> = device_ids[0].clone().into();
-        set_forwarding_enabled::<_, Ipv6>(core_ctx, &mut bindings_ctx, &device, true)
-            .expect("error setting routing enabled");
+        set_forwarding_enabled::<_, Ipv6>(&mut ctx, &device, true);
         let frame_dst = FrameDestination::Individual { local: true };
+        let Ctx { core_ctx, bindings_ctx } = &mut ctx;
 
         // Construct an IPv6 packet that is too big for our MTU (MTU = 1280;
         // body itself is 5000). Note, the final packet will be larger because
@@ -4266,8 +4263,8 @@ mod tests {
             .unwrap();
         // Receive the IP packet.
         receive_ip_packet::<_, _, Ipv6>(
-            &core_ctx,
-            &mut bindings_ctx,
+            core_ctx,
+            bindings_ctx,
             &device,
             frame_dst,
             ipv6_packet_buf.clone(),
@@ -4666,9 +4663,8 @@ mod tests {
     #[test]
     fn test_invalid_icmpv4_in_ipv6() {
         let ip_config = Ipv6::FAKE_CONFIG;
-        let (Ctx { core_ctx, mut bindings_ctx }, device_ids) =
+        let (mut ctx, device_ids) =
             FakeEventDispatcherBuilder::from_config(ip_config.clone()).build();
-        let core_ctx = &core_ctx;
         let device: DeviceId<_> = device_ids[0].clone().into();
         let frame_dst = FrameDestination::Individual { local: true };
 
@@ -4693,8 +4689,9 @@ mod tests {
             .serialize_vec_outer()
             .unwrap();
 
-        crate::device::testutil::enable_device(&core_ctx, &mut bindings_ctx, &device);
-        receive_ip_packet::<_, _, Ipv6>(&core_ctx, &mut bindings_ctx, &device, frame_dst, buf);
+        crate::device::testutil::enable_device(&mut ctx, &device);
+        let Ctx { core_ctx, bindings_ctx } = &mut ctx;
+        receive_ip_packet::<_, _, Ipv6>(core_ctx, bindings_ctx, &device, frame_dst, buf);
 
         // Should not have dispatched the packet.
         assert_eq!(core_ctx.state.ipv6.inner.counters.receive_ip_packet.get(), 1);
@@ -4862,27 +4859,29 @@ mod tests {
                 DEFAULT_INTERFACE_METRIC,
             )
             .into();
+
+        let _: Ipv6DeviceConfigurationUpdate = ctx
+            .core_api()
+            .device_ip::<Ipv6>()
+            .update_configuration(
+                &device,
+                Ipv6DeviceConfigurationUpdate {
+                    // Doesn't matter as long as DAD is enabled.
+                    dad_transmits: Some(NonZeroU8::new(1)),
+                    // Auto-generate a link-local address.
+                    slaac_config: Some(SlaacConfiguration {
+                        enable_stable_addresses: true,
+                        ..Default::default()
+                    }),
+                    ip_config: Some(IpDeviceConfigurationUpdate {
+                        ip_enabled: Some(true),
+                        ..Default::default()
+                    }),
+                    ..Default::default()
+                },
+            )
+            .unwrap();
         let Ctx { core_ctx, bindings_ctx } = &mut ctx;
-        let _: Ipv6DeviceConfigurationUpdate = update_ipv6_configuration(
-            core_ctx,
-            bindings_ctx,
-            &device,
-            Ipv6DeviceConfigurationUpdate {
-                // Doesn't matter as long as DAD is enabled.
-                dad_transmits: Some(NonZeroU8::new(1)),
-                // Auto-generate a link-local address.
-                slaac_config: Some(SlaacConfiguration {
-                    enable_stable_addresses: true,
-                    ..Default::default()
-                }),
-                ip_config: Some(IpDeviceConfigurationUpdate {
-                    ip_enabled: Some(true),
-                    ..Default::default()
-                }),
-                ..Default::default()
-            },
-        )
-        .unwrap();
 
         let frame_dst = FrameDestination::Individual { local: true };
 
@@ -4965,8 +4964,8 @@ mod tests {
                 DEFAULT_INTERFACE_METRIC,
             )
             .into();
+        crate::device::testutil::enable_device(&mut ctx, &device);
         let Ctx { core_ctx, bindings_ctx } = &mut ctx;
-        crate::device::testutil::enable_device(core_ctx, bindings_ctx, &device);
 
         let ip: Ipv6Addr = cfg.local_mac.to_ipv6_link_local().addr().get();
         let buf = Buf::new(vec![0; 10], ..)
@@ -5118,27 +5117,28 @@ mod tests {
                     DEFAULT_INTERFACE_METRIC,
                 );
             let device = eth_device.clone().into();
+            let _: Ipv6DeviceConfigurationUpdate = ctx
+                .core_api()
+                .device_ip::<Ipv6>()
+                .update_configuration(
+                    &device,
+                    Ipv6DeviceConfigurationUpdate {
+                        // Doesn't matter as long as DAD is enabled.
+                        dad_transmits: Some(NonZeroU8::new(1)),
+                        // Auto-generate a link-local address.
+                        slaac_config: Some(SlaacConfiguration {
+                            enable_stable_addresses: true,
+                            ..Default::default()
+                        }),
+                        ip_config: Some(IpDeviceConfigurationUpdate {
+                            ip_enabled: Some(true),
+                            ..Default::default()
+                        }),
+                        ..Default::default()
+                    },
+                )
+                .unwrap();
             let Ctx { core_ctx, bindings_ctx } = &mut ctx;
-            let _: Ipv6DeviceConfigurationUpdate = update_ipv6_configuration(
-                core_ctx,
-                bindings_ctx,
-                &device,
-                Ipv6DeviceConfigurationUpdate {
-                    // Doesn't matter as long as DAD is enabled.
-                    dad_transmits: Some(NonZeroU8::new(1)),
-                    // Auto-generate a link-local address.
-                    slaac_config: Some(SlaacConfiguration {
-                        enable_stable_addresses: true,
-                        ..Default::default()
-                    }),
-                    ip_config: Some(IpDeviceConfigurationUpdate {
-                        ip_enabled: Some(true),
-                        ..Default::default()
-                    }),
-                    ..Default::default()
-                },
-            )
-            .unwrap();
             let tentative: UnicastAddr<Ipv6Addr> = local_mac.to_ipv6_link_local().addr().get();
             assert_eq!(
                 receive_ipv6_packet_action(
@@ -5177,10 +5177,9 @@ mod tests {
 
         // Receive packet destined to a remote address when forwarding is
         // enabled both globally and on the inbound device.
-        set_forwarding_enabled::<_, Ipv4>(core_ctx, bindings_ctx, &v4_dev, true)
-            .expect("error setting routing enabled");
-        set_forwarding_enabled::<_, Ipv6>(core_ctx, bindings_ctx, &v6_dev, true)
-            .expect("error setting routing enabled");
+        set_forwarding_enabled::<_, Ipv4>(&mut ctx, &v4_dev, true);
+        set_forwarding_enabled::<_, Ipv6>(&mut ctx, &v6_dev, true);
+        let Ctx { core_ctx, bindings_ctx } = &mut ctx;
         assert_eq!(
             receive_ipv4_packet_action(
                 &mut CoreCtx::new_deprecated(core_ctx),
@@ -5304,7 +5303,7 @@ mod tests {
                 DEFAULT_INTERFACE_METRIC,
             )
             .into();
-        crate::device::testutil::enable_device(&ctx.core_ctx, &mut ctx.bindings_ctx, &loopback_id);
+        crate::device::testutil::enable_device(&mut ctx, &loopback_id);
         ctx.core_api()
             .device_ip::<I>()
             .add_ip_addr_subnet(

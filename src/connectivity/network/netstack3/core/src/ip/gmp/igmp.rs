@@ -573,7 +573,8 @@ mod tests {
         },
         ip::{
             device::{
-                IpDeviceConfigurationUpdate, Ipv4DeviceConfigurationUpdate, Ipv4DeviceTimerId,
+                config::{IpDeviceConfigurationUpdate, Ipv4DeviceConfigurationUpdate},
+                Ipv4DeviceTimerId,
             },
             gmp::{
                 GmpHandler as _, GroupJoinResult, GroupLeaveResult, MemberState, MulticastGroupSet,
@@ -583,8 +584,8 @@ mod tests {
         },
         state::StackStateBuilder,
         testutil::{
-            assert_empty, new_rng, run_with_many_seeds, Ctx, FakeEventDispatcherConfig,
-            TestIpExt as _, DEFAULT_INTERFACE_METRIC,
+            assert_empty, new_rng, run_with_many_seeds, FakeEventDispatcherConfig, TestIpExt as _,
+            DEFAULT_INTERFACE_METRIC,
         },
         time::TimerIdInner,
         TimerId,
@@ -1332,10 +1333,9 @@ mod tests {
             .device_ip::<Ipv4>()
             .add_ip_addr_subnet(&device_id, AddrSubnet::new(MY_ADDR.get(), 24).unwrap())
             .unwrap();
-        let Ctx { core_ctx, bindings_ctx } = &mut ctx;
-        bindings_ctx.timer_ctx().assert_no_timers_installed();
+        ctx.bindings_ctx.timer_ctx().assert_no_timers_installed();
 
-        let now = bindings_ctx.now();
+        let now = ctx.bindings_ctx.now();
         let timer_id = TimerId(TimerIdInner::Ipv4Device(
             Ipv4DeviceTimerId::from(IgmpTimerId::Gmp(GmpDelayedReportTimerId {
                 device: device_id.clone(),
@@ -1349,13 +1349,12 @@ mod tests {
             gmp_enabled: bool,
         }
 
-        let set_config = |core_ctx: &mut crate::testutil::FakeCoreCtx,
-                          bindings_ctx: &mut crate::testutil::FakeBindingsCtx,
+        let set_config = |ctx: &mut crate::testutil::FakeCtx,
                           TestConfig { ip_enabled, gmp_enabled }| {
-            let _: Ipv4DeviceConfigurationUpdate =
-                crate::device::testutil::update_ipv4_configuration(
-                    core_ctx,
-                    bindings_ctx,
+            let _: Ipv4DeviceConfigurationUpdate = ctx
+                .core_api()
+                .device_ip::<Ipv4>()
+                .update_configuration(
                     &device_id,
                     Ipv4DeviceConfigurationUpdate {
                         ip_config: Some(IpDeviceConfigurationUpdate {
@@ -1416,43 +1415,43 @@ mod tests {
         //
         // Should send report for the all-systems multicast group that all
         // interfaces join.
-        set_config(core_ctx, bindings_ctx, TestConfig { ip_enabled: true, gmp_enabled: true });
-        bindings_ctx.timer_ctx().assert_timers_installed([(timer_id.clone(), range.clone())]);
-        check_sent_report(bindings_ctx);
+        set_config(&mut ctx, TestConfig { ip_enabled: true, gmp_enabled: true });
+        ctx.bindings_ctx.timer_ctx().assert_timers_installed([(timer_id.clone(), range.clone())]);
+        check_sent_report(&mut ctx.bindings_ctx);
 
         // Disable IGMP.
-        set_config(core_ctx, bindings_ctx, TestConfig { ip_enabled: true, gmp_enabled: false });
-        bindings_ctx.timer_ctx().assert_no_timers_installed();
-        check_sent_leave(bindings_ctx);
+        set_config(&mut ctx, TestConfig { ip_enabled: true, gmp_enabled: false });
+        ctx.bindings_ctx.timer_ctx().assert_no_timers_installed();
+        check_sent_leave(&mut ctx.bindings_ctx);
 
         // Enable IGMP but disable IPv4.
         //
         // Should do nothing.
-        set_config(core_ctx, bindings_ctx, TestConfig { ip_enabled: false, gmp_enabled: true });
-        bindings_ctx.timer_ctx().assert_no_timers_installed();
-        assert_matches!(bindings_ctx.take_frames()[..], []);
+        set_config(&mut ctx, TestConfig { ip_enabled: false, gmp_enabled: true });
+        ctx.bindings_ctx.timer_ctx().assert_no_timers_installed();
+        assert_matches!(ctx.bindings_ctx.take_frames()[..], []);
 
         // Disable IGMP but enable IPv4.
         //
         // Should do nothing.
-        set_config(core_ctx, bindings_ctx, TestConfig { ip_enabled: true, gmp_enabled: false });
-        bindings_ctx.timer_ctx().assert_no_timers_installed();
-        assert_matches!(bindings_ctx.take_frames()[..], []);
+        set_config(&mut ctx, TestConfig { ip_enabled: true, gmp_enabled: false });
+        ctx.bindings_ctx.timer_ctx().assert_no_timers_installed();
+        assert_matches!(ctx.bindings_ctx.take_frames()[..], []);
 
         // Enable IGMP.
-        set_config(core_ctx, bindings_ctx, TestConfig { ip_enabled: true, gmp_enabled: true });
-        bindings_ctx.timer_ctx().assert_timers_installed([(timer_id.clone(), range.clone())]);
-        check_sent_report(bindings_ctx);
+        set_config(&mut ctx, TestConfig { ip_enabled: true, gmp_enabled: true });
+        ctx.bindings_ctx.timer_ctx().assert_timers_installed([(timer_id.clone(), range.clone())]);
+        check_sent_report(&mut ctx.bindings_ctx);
 
         // Disable IPv4.
-        set_config(core_ctx, bindings_ctx, TestConfig { ip_enabled: false, gmp_enabled: true });
-        bindings_ctx.timer_ctx().assert_no_timers_installed();
-        check_sent_leave(bindings_ctx);
+        set_config(&mut ctx, TestConfig { ip_enabled: false, gmp_enabled: true });
+        ctx.bindings_ctx.timer_ctx().assert_no_timers_installed();
+        check_sent_leave(&mut ctx.bindings_ctx);
 
         // Enable IPv4.
-        set_config(core_ctx, bindings_ctx, TestConfig { ip_enabled: true, gmp_enabled: true });
-        bindings_ctx.timer_ctx().assert_timers_installed([(timer_id, range)]);
-        check_sent_report(bindings_ctx);
+        set_config(&mut ctx, TestConfig { ip_enabled: true, gmp_enabled: true });
+        ctx.bindings_ctx.timer_ctx().assert_timers_installed([(timer_id, range)]);
+        check_sent_report(&mut ctx.bindings_ctx);
 
         core::mem::drop(device_id);
         ctx.core_api().device().remove_device(eth_device_id).into_removed();

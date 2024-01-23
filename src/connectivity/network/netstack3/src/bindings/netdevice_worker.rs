@@ -527,13 +527,12 @@ impl DeviceHandler {
             &core_ethernet_id,
             netstack3_core::device::TransmitQueueConfiguration::Fifo,
         );
-        let (core_ctx, bindings_ctx) = ctx.contexts_mut();
-        add_initial_routes(bindings_ctx, &core_id).await;
+        add_initial_routes(ctx.bindings_ctx_mut(), &core_id).await;
 
         // TODO(https://fxbug.dev/69644): Use a different secret key (not this
         // one) to generate stable opaque interface identifiers.
         let mut secret_key = [0; STABLE_IID_SECRET_KEY_BYTES];
-        bindings_ctx.rng().fill(&mut secret_key);
+        ctx.bindings_ctx_mut().rng().fill(&mut secret_key);
 
         let ip_config = Some(IpDeviceConfigurationUpdate {
             ip_enabled: Some(false),
@@ -541,8 +540,10 @@ impl DeviceHandler {
             gmp_enabled: Some(true),
         });
 
-        let _: Ipv6DeviceConfigurationUpdate =
-            netstack3_core::device::new_ipv6_configuration_update(
+        let _: Ipv6DeviceConfigurationUpdate = ctx
+            .api()
+            .device_ip::<Ipv6>()
+            .update_configuration(
                 &core_id,
                 Ipv6DeviceConfigurationUpdate {
                     dad_transmits: Some(Some(
@@ -560,17 +561,14 @@ impl DeviceHandler {
                     ip_config,
                 },
             )
-            .unwrap()
-            .apply(core_ctx, bindings_ctx);
-        let _: Ipv4DeviceConfigurationUpdate =
-            netstack3_core::device::new_ipv4_configuration_update(
-                &core_id,
-                Ipv4DeviceConfigurationUpdate { ip_config },
-            )
-            .unwrap()
-            .apply(core_ctx, bindings_ctx);
+            .unwrap();
+        let _: Ipv4DeviceConfigurationUpdate = ctx
+            .api()
+            .device_ip::<Ipv4>()
+            .update_configuration(&core_id, Ipv4DeviceConfigurationUpdate { ip_config })
+            .unwrap();
 
-        bindings_ctx.devices.add_device(binding_id, core_id);
+        ctx.bindings_ctx().devices.add_device(binding_id, core_id);
 
         Ok((binding_id, status_stream, task))
     }

@@ -6469,8 +6469,8 @@ mod tests {
                 crate::testutil::DEFAULT_INTERFACE_METRIC,
             )
             .into();
+        crate::device::testutil::enable_device(&mut ctx, &loopback_device_id);
         let crate::testutil::Ctx { core_ctx, bindings_ctx } = &mut ctx;
-        crate::device::testutil::enable_device(core_ctx, bindings_ctx, &loopback_device_id);
         let mut api = CoreApi::with_contexts(core_ctx, bindings_ctx).udp::<I>();
         let socket = api.create();
         api.listen(&socket, None, Some(LOCAL_PORT)).unwrap();

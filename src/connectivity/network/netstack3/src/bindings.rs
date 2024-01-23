@@ -971,16 +971,17 @@ impl Netstack {
             gmp_enabled: Some(false),
         });
 
-        let (core_ctx, bindings_ctx) = self.ctx.contexts_mut();
-        let _: Ipv4DeviceConfigurationUpdate =
-            netstack3_core::device::new_ipv4_configuration_update(
-                &loopback,
-                Ipv4DeviceConfigurationUpdate { ip_config },
-            )
-            .unwrap()
-            .apply(core_ctx, bindings_ctx);
-        let _: Ipv6DeviceConfigurationUpdate =
-            netstack3_core::device::new_ipv6_configuration_update(
+        let _: Ipv4DeviceConfigurationUpdate = self
+            .ctx
+            .api()
+            .device_ip::<Ipv4>()
+            .update_configuration(&loopback, Ipv4DeviceConfigurationUpdate { ip_config })
+            .unwrap();
+        let _: Ipv6DeviceConfigurationUpdate = self
+            .ctx
+            .api()
+            .device_ip::<Ipv6>()
+            .update_configuration(
                 &loopback,
                 Ipv6DeviceConfigurationUpdate {
                     dad_transmits: Some(None),
@@ -992,8 +993,7 @@ impl Netstack {
                     ip_config,
                 },
             )
-            .unwrap()
-            .apply(core_ctx, bindings_ctx);
+            .unwrap();
         add_loopback_ip_addrs(&mut self.ctx, &loopback).expect("error adding loopback addresses");
         add_loopback_routes(self.ctx.bindings_ctx_mut(), &loopback).await;
 

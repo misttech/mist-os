@@ -47,7 +47,7 @@ use futures::{
     StreamExt as _, TryFutureExt as _, TryStreamExt as _,
 };
 use net_types::{
-    ip::{AddrSubnetEither, IpAddr},
+    ip::{AddrSubnetEither, IpAddr, Ipv4, Ipv6},
     SpecifiedAddr, Witness,
 };
 use netstack3_core::{
@@ -893,7 +893,7 @@ fn set_configuration(
 
     let ipv4_update = ipv4_update
         .map(|ipv4_update| {
-            netstack3_core::device::new_ipv4_configuration_update(&core_id, ipv4_update)
+            ctx.api().device_ip::<Ipv4>().new_configuration_update(&core_id, ipv4_update)
         })
         .transpose()
         .map_err(|e| match e {
@@ -903,7 +903,7 @@ fn set_configuration(
         })?;
     let ipv6_update = ipv6_update
         .map(|ipv6_update| {
-            netstack3_core::device::new_ipv6_configuration_update(&core_id, ipv6_update)
+            ctx.api().device_ip::<Ipv6>().new_configuration_update(&core_id, ipv6_update)
         })
         .transpose()
         .map_err(|e| match e {
@@ -927,14 +927,13 @@ fn set_configuration(
     let DeviceConfigurationUpdate { arp, ndp } =
         ctx.api().device_any().apply_configuration(device_update);
 
-    let (core_ctx, bindings_ctx) = ctx.contexts_mut();
-
     // Apply both updates now that we have checked for errors and get the deltas
     // back. If we didn't apply updates, use the default struct to construct the
     // delta responses.
     let ipv4 = {
-        let Ipv4DeviceConfigurationUpdate { ip_config } =
-            ipv4_update.map(|u| u.apply(core_ctx, bindings_ctx)).unwrap_or_default();
+        let Ipv4DeviceConfigurationUpdate { ip_config } = ipv4_update
+            .map(|u| ctx.api().device_ip::<Ipv4>().apply_configuration(u))
+            .unwrap_or_default();
         ip_config.map(
             move |IpDeviceConfigurationUpdate {
                       forwarding_enabled,
@@ -957,7 +956,9 @@ fn set_configuration(
             dad_transmits: _,
             max_router_solicitations: _,
             slaac_config: _,
-        } = ipv6_update.map(|u| u.apply(core_ctx, bindings_ctx)).unwrap_or_default();
+        } = ipv6_update
+            .map(|u| ctx.api().device_ip::<Ipv6>().apply_configuration(u))
+            .unwrap_or_default();
         ip_config.map(
             move |IpDeviceConfigurationUpdate {
                       forwarding_enabled,
@@ -991,11 +992,12 @@ fn get_configuration(ctx: &mut Ctx, id: BindingId) -> fnet_interfaces_admin::Con
 
     let DeviceConfiguration { arp, ndp } = ctx.api().device_any().get_configuration(&core_id);
 
-    let core_ctx = ctx.core_ctx();
     fnet_interfaces_admin::Configuration {
         ipv4: Some(fnet_interfaces_admin::Ipv4Configuration {
             forwarding: Some(
-                netstack3_core::device::get_ipv4_configuration_and_flags(&core_ctx, &core_id)
+                ctx.api()
+                    .device_ip::<Ipv4>()
+                    .get_configuration(&core_id)
                     .config
                     .ip_config
                     .forwarding_enabled,
@@ -1011,7 +1013,9 @@ fn get_configuration(ctx: &mut Ctx, id: BindingId) -> fnet_interfaces_admin::Con
         }),
         ipv6: Some(fnet_interfaces_admin::Ipv6Configuration {
             forwarding: Some(
-                netstack3_core::device::get_ipv6_configuration_and_flags(&core_ctx, &core_id)
+                ctx.api()
+                    .device_ip::<Ipv6>()
+                    .get_configuration(&core_id)
                     .config
                     .ip_config
                     .forwarding_enabled,
@@ -1798,8 +1802,8 @@ mod enabled {
         /// Panics if `should_enable` is `false` but the device state reflects
         /// that it should be enabled.
         fn update_enabled_state(ctx: &mut Ctx, id: BindingId) {
-            let (core_ctx, bindings_ctx) = ctx.contexts_mut();
-            let core_id = bindings_ctx
+            let core_id = ctx
+                .bindings_ctx()
                 .devices
                 .get_core_id(id)
                 .expect("tried to enable/disable nonexisting device");
@@ -1838,27 +1842,31 @@ mod enabled {
             // The update functions from core are already capable of identifying
             // deltas and return the previous values for us. Log the deltas for
             // info.
-            let v4_was_enabled = netstack3_core::device::new_ipv4_configuration_update(
-                &core_id,
-                Ipv4DeviceConfigurationUpdate { ip_config, ..Default::default() },
-            )
-            .expect("changing ip_enabled should never fail")
-            .apply(core_ctx, bindings_ctx)
-            .ip_config
-            .expect("ip config must be informed")
-            .ip_enabled
-            .expect("ip enabled must be informed");
+            let v4_was_enabled = ctx
+                .api()
+                .device_ip::<Ipv4>()
+                .update_configuration(
+                    &core_id,
+                    Ipv4DeviceConfigurationUpdate { ip_config, ..Default::default() },
+                )
+                .expect("changing ip_enabled should never fail")
+                .ip_config
+                .expect("ip config must be informed")
+                .ip_enabled
+                .expect("ip enabled must be informed");
 
-            let v6_was_enabled = netstack3_core::device::new_ipv6_configuration_update(
-                &core_id,
-                Ipv6DeviceConfigurationUpdate { ip_config, ..Default::default() },
-            )
-            .expect("changing ip_enabled should never fail")
-            .apply(core_ctx, bindings_ctx)
-            .ip_config
-            .expect("ip config must be informed")
-            .ip_enabled
-            .expect("ip enabled must be informed");
+            let v6_was_enabled = ctx
+                .api()
+                .device_ip::<Ipv6>()
+                .update_configuration(
+                    &core_id,
+                    Ipv6DeviceConfigurationUpdate { ip_config, ..Default::default() },
+                )
+                .expect("changing ip_enabled should never fail")
+                .ip_config
+                .expect("ip config must be informed")
+                .ip_enabled
+                .expect("ip enabled must be informed");
 
             tracing::info!("updated core ip_enabled state to {dev_enabled}, prev v4={v4_was_enabled},v6={v6_was_enabled}");
         }

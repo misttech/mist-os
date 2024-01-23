@@ -37,7 +37,7 @@ use crate::{
     state::StackStateBuilder,
     testutil::{
         benchmarks::{black_box, Bencher},
-        Ctx, FakeEventDispatcherBuilder, FAKE_CONFIG_V4,
+        FakeEventDispatcherBuilder, FAKE_CONFIG_V4,
     },
 };
 
@@ -55,16 +55,9 @@ fn bench_forward_minimum<B: Bencher>(b: &mut B, frame_size: usize) {
     let (mut ctx, idx_to_device_id) = FakeEventDispatcherBuilder::from_config(FAKE_CONFIG_V4)
         .build_with(StackStateBuilder::default());
 
-    let Ctx { core_ctx, bindings_ctx } = &mut ctx;
     let eth_device = idx_to_device_id[0].clone();
     let device: DeviceId<_> = eth_device.clone().into();
-    crate::device::testutil::set_forwarding_enabled::<_, Ipv4>(
-        core_ctx,
-        bindings_ctx,
-        &device,
-        true,
-    )
-    .expect("error setting routing enabled");
+    crate::device::testutil::set_forwarding_enabled::<_, Ipv4>(&mut ctx, &device, true);
 
     assert!(
         frame_size

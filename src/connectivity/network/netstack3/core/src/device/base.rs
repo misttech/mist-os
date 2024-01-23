@@ -38,13 +38,8 @@ use crate::{
     ip::{
         device::{
             nud::LinkResolutionContext,
-            state::{
-                AssignedAddress as _, IpDeviceFlags, Ipv4DeviceConfigurationAndFlags,
-                Ipv6DeviceConfigurationAndFlags, Lifetime,
-            },
+            state::{AssignedAddress as _, IpDeviceFlags, Lifetime},
             DualStackDeviceHandler, IpDeviceIpExt, IpDeviceStateContext,
-            Ipv4DeviceConfigurationUpdate, Ipv6DeviceConfigurationUpdate,
-            PendingIpv4DeviceConfigurationUpdate, PendingIpv6DeviceConfigurationUpdate,
         },
         forwarding::IpForwardingDeviceContext,
         types::RawMetric,
@@ -610,74 +605,6 @@ pub fn set_ip_addr_properties<BC: BindingsContext, A: IpAddress>(
     }
 }
 
-/// Gets the IPv4 configuration and flags for a `device`.
-pub fn get_ipv4_configuration_and_flags<BC: BindingsContext>(
-    core_ctx: &SyncCtx<BC>,
-    device: &DeviceId<BC>,
-) -> Ipv4DeviceConfigurationAndFlags {
-    crate::ip::device::get_ipv4_configuration_and_flags(
-        &mut CoreCtx::new_deprecated(core_ctx),
-        device,
-    )
-}
-
-/// Gets the IPv6 configuration and flags for a `device`.
-pub fn get_ipv6_configuration_and_flags<BC: BindingsContext>(
-    core_ctx: &SyncCtx<BC>,
-    device: &DeviceId<BC>,
-) -> Ipv6DeviceConfigurationAndFlags {
-    crate::ip::device::get_ipv6_configuration_and_flags(
-        &mut CoreCtx::new_deprecated(core_ctx),
-        device,
-    )
-}
-
-/// Updates the IPv4 configuration for a device.
-///
-/// Each field in [`Ipv4DeviceConfigurationUpdate`] represents an optionally
-/// updateable configuration. If the field has a `Some(_)` value, then an
-/// attempt will be made to update that configuration on the device. A `None`
-/// value indicates that an update for the configuration is not requested.
-///
-/// Note that some fields have the type `Option<Option<T>>`. In this case, as
-/// long as the outer `Option` is `Some`, then an attempt will be made to update
-/// the configuration.
-///
-/// This function returns a [`PendingIpv4DeviceConfigurationUpdate`] which is validated
-/// and its `apply` method can be called to apply the configuration.
-pub fn new_ipv4_configuration_update<'a, BC: BindingsContext>(
-    device: &'a DeviceId<BC>,
-    config: Ipv4DeviceConfigurationUpdate,
-) -> Result<
-    PendingIpv4DeviceConfigurationUpdate<'a, DeviceId<BC>>,
-    crate::ip::UpdateIpConfigurationError,
-> {
-    PendingIpv4DeviceConfigurationUpdate::new(device, config)
-}
-
-/// Updates the IPv6 configuration for a device.
-///
-/// Each field in [`Ipv6DeviceConfigurationUpdate`] represents an optionally
-/// updateable configuration. If the field has a `Some(_)` value, then an
-/// attempt will be made to update that configuration on the device. A `None`
-/// value indicates that an update for the configuration is not requested.
-///
-/// Note that some fields have the type `Option<Option<T>>`. In this case,
-/// as long as the outer `Option` is `Some`, then an attempt will be made to
-/// update the configuration.
-///
-/// This function returns a [`PendingIpv6DeviceConfigurationUpdate`] which is validated
-/// and its `apply` method can be called to apply the configuration.
-pub fn new_ipv6_configuration_update<'a, BC: BindingsContext>(
-    device: &'a DeviceId<BC>,
-    config: Ipv6DeviceConfigurationUpdate,
-) -> Result<
-    PendingIpv6DeviceConfigurationUpdate<'a, DeviceId<BC>>,
-    crate::ip::UpdateIpConfigurationError,
-> {
-    PendingIpv6DeviceConfigurationUpdate::new(device, config)
-}
-
 #[cfg(any(test, feature = "testutils"))]
 pub(crate) mod testutil {
     use super::*;
@@ -685,7 +612,9 @@ pub(crate) mod testutil {
     #[cfg(test)]
     use net_types::ip::IpVersion;
 
-    use crate::ip::device::IpDeviceConfigurationUpdate;
+    use crate::ip::device::config::{
+        IpDeviceConfigurationUpdate, Ipv4DeviceConfigurationUpdate, Ipv6DeviceConfigurationUpdate,
+    };
     #[cfg(test)]
     use crate::testutil::Ctx;
 
@@ -741,64 +670,49 @@ pub(crate) mod testutil {
     }
 
     pub fn enable_device<BC: BindingsContext>(
-        core_ctx: &SyncCtx<BC>,
-        bindings_ctx: &mut BC,
+        ctx: &mut crate::testutil::Ctx<BC>,
         device: &DeviceId<BC>,
     ) {
         let ip_config =
             Some(IpDeviceConfigurationUpdate { ip_enabled: Some(true), ..Default::default() });
-        let _: Ipv4DeviceConfigurationUpdate = crate::device::testutil::update_ipv4_configuration(
-            core_ctx,
-            bindings_ctx,
-            device,
-            Ipv4DeviceConfigurationUpdate { ip_config, ..Default::default() },
-        )
-        .unwrap();
-        let _: Ipv6DeviceConfigurationUpdate = crate::device::testutil::update_ipv6_configuration(
-            core_ctx,
-            bindings_ctx,
-            device,
-            Ipv6DeviceConfigurationUpdate { ip_config, ..Default::default() },
-        )
-        .unwrap();
+        let _: Ipv4DeviceConfigurationUpdate = ctx
+            .core_api()
+            .device_ip::<Ipv4>()
+            .update_configuration(
+                device,
+                Ipv4DeviceConfigurationUpdate { ip_config, ..Default::default() },
+            )
+            .unwrap();
+        let _: Ipv6DeviceConfigurationUpdate = ctx
+            .core_api()
+            .device_ip::<Ipv6>()
+            .update_configuration(
+                device,
+                Ipv6DeviceConfigurationUpdate { ip_config, ..Default::default() },
+            )
+            .unwrap();
     }
 
     /// Enables or disables IP packet routing on `device`.
     #[cfg(test)]
-    pub(crate) fn set_forwarding_enabled<BC: BindingsContext, I: Ip>(
-        core_ctx: &SyncCtx<BC>,
-        bindings_ctx: &mut BC,
+    #[netstack3_macros::context_ip_bounds(I, BC, crate)]
+    pub(crate) fn set_forwarding_enabled<BC: BindingsContext, I: crate::IpExt>(
+        ctx: &mut Ctx<BC>,
         device: &DeviceId<BC>,
         enabled: bool,
-    ) -> Result<(), NotSupportedError> {
-        let ip_config = Some(IpDeviceConfigurationUpdate {
-            forwarding_enabled: Some(enabled),
-            ..Default::default()
-        });
-        match I::VERSION {
-            IpVersion::V4 => {
-                let _: Ipv4DeviceConfigurationUpdate =
-                    crate::device::testutil::update_ipv4_configuration(
-                        core_ctx,
-                        bindings_ctx,
-                        device,
-                        Ipv4DeviceConfigurationUpdate { ip_config, ..Default::default() },
-                    )
-                    .unwrap();
-            }
-            IpVersion::V6 => {
-                let _: Ipv6DeviceConfigurationUpdate =
-                    crate::device::testutil::update_ipv6_configuration(
-                        core_ctx,
-                        bindings_ctx,
-                        device,
-                        Ipv6DeviceConfigurationUpdate { ip_config, ..Default::default() },
-                    )
-                    .unwrap();
-            }
-        }
-
-        Ok(())
+    ) {
+        let _config = ctx
+            .core_api()
+            .device_ip::<I>()
+            .update_configuration(
+                device,
+                IpDeviceConfigurationUpdate {
+                    forwarding_enabled: Some(enabled),
+                    ..Default::default()
+                }
+                .into(),
+            )
+            .unwrap();
     }
 
     /// Returns whether IP packet routing is enabled on `device`.
@@ -846,28 +760,6 @@ pub(crate) mod testutil {
     impl StrongId for MultipleDevicesId {
         type Weak = FakeWeakDeviceId<Self>;
     }
-
-    /// A shortcut to update IPv4 configuration in a single call.
-    pub fn update_ipv4_configuration<BC: crate::BindingsContext>(
-        core_ctx: &SyncCtx<BC>,
-        bindings_ctx: &mut BC,
-        device: &DeviceId<BC>,
-        config: Ipv4DeviceConfigurationUpdate,
-    ) -> Result<Ipv4DeviceConfigurationUpdate, crate::ip::UpdateIpConfigurationError> {
-        let pending = crate::device::new_ipv4_configuration_update(device, config)?;
-        Ok(pending.apply_inner(&mut CoreCtx::new_deprecated(core_ctx), bindings_ctx))
-    }
-
-    /// A shortcut to update IPv6 configuration in a single call.
-    pub fn update_ipv6_configuration<BC: crate::BindingsContext>(
-        core_ctx: &SyncCtx<BC>,
-        bindings_ctx: &mut BC,
-        device: &DeviceId<BC>,
-        config: Ipv6DeviceConfigurationUpdate,
-    ) -> Result<Ipv6DeviceConfigurationUpdate, crate::ip::UpdateIpConfigurationError> {
-        let pending = crate::device::new_ipv6_configuration_update(device, config)?;
-        Ok(pending.apply_inner(&mut CoreCtx::new_deprecated(core_ctx), bindings_ctx))
-    }
 }
 
 #[cfg(test)]
@@ -894,9 +786,12 @@ mod tests {
         error,
         ip::device::{
             api::AddIpAddrSubnetError,
+            config::{
+                IpDeviceConfigurationUpdate, Ipv4DeviceConfigurationUpdate,
+                Ipv6DeviceConfigurationUpdate,
+            },
             slaac::SlaacConfiguration,
             state::{Ipv4AddrConfig, Ipv6AddrManualConfig, Lifetime},
-            IpDeviceConfigurationUpdate,
         },
         testutil::{TestIpExt, DEFAULT_INTERFACE_METRIC, IPV6_MIN_IMPLIED_MAX_FRAME_SIZE},
         work_queue::WorkQueueReport,
@@ -979,23 +874,20 @@ mod tests {
             let device = ethernet_device.clone().into();
             // Enable the device, turning on a bunch of features that install
             // timers.
-            let ip_config = Some(IpDeviceConfigurationUpdate {
+            let ip_config = IpDeviceConfigurationUpdate {
                 ip_enabled: Some(true),
                 gmp_enabled: Some(true),
                 ..Default::default()
-            });
-            let _: Ipv4DeviceConfigurationUpdate =
-                crate::device::testutil::update_ipv4_configuration(
-                    &ctx.core_ctx,
-                    &mut ctx.bindings_ctx,
-                    &device,
-                    Ipv4DeviceConfigurationUpdate { ip_config, ..Default::default() },
-                )
+            };
+            let _: Ipv4DeviceConfigurationUpdate = ctx
+                .core_api()
+                .device_ip::<Ipv4>()
+                .update_configuration(&device, ip_config.into())
                 .unwrap();
-            let _: Ipv6DeviceConfigurationUpdate =
-                crate::device::testutil::update_ipv6_configuration(
-                    &ctx.core_ctx,
-                    &mut ctx.bindings_ctx,
+            let _: Ipv6DeviceConfigurationUpdate = ctx
+                .core_api()
+                .device_ip::<Ipv6>()
+                .update_configuration(
                     &device,
                     Ipv6DeviceConfigurationUpdate {
                         max_router_solicitations: Some(Some(const_unwrap_option(NonZeroU8::new(
@@ -1005,7 +897,7 @@ mod tests {
                             enable_stable_addresses: true,
                             ..Default::default()
                         }),
-                        ip_config,
+                        ip_config: Some(ip_config),
                         ..Default::default()
                     },
                 )
@@ -1108,35 +1000,34 @@ mod tests {
             }
         }
 
-        let crate::testutil::FakeCtx { core_ctx, bindings_ctx } = &mut ctx;
-
-        let _: Ipv6DeviceConfigurationUpdate = crate::device::testutil::update_ipv6_configuration(
-            core_ctx,
-            bindings_ctx,
-            &device,
-            Ipv6DeviceConfigurationUpdate {
-                // Enable DAD so that the auto-generated address triggers a DAD
-                // message immediately on interface enable.
-                dad_transmits: Some(Some(const_unwrap_option(NonZeroU8::new(1)))),
-                // Enable stable addresses so the link-local address is auto-
-                // generated.
-                slaac_config: Some(SlaacConfiguration {
-                    enable_stable_addresses: true,
+        let _: Ipv6DeviceConfigurationUpdate = ctx
+            .core_api()
+            .device_ip::<Ipv6>()
+            .update_configuration(
+                &device,
+                Ipv6DeviceConfigurationUpdate {
+                    // Enable DAD so that the auto-generated address triggers a DAD
+                    // message immediately on interface enable.
+                    dad_transmits: Some(Some(const_unwrap_option(NonZeroU8::new(1)))),
+                    // Enable stable addresses so the link-local address is auto-
+                    // generated.
+                    slaac_config: Some(SlaacConfiguration {
+                        enable_stable_addresses: true,
+                        ..Default::default()
+                    }),
+                    ip_config: Some(IpDeviceConfigurationUpdate {
+                        ip_enabled: Some(true),
+                        ..Default::default()
+                    }),
                     ..Default::default()
-                }),
-                ip_config: Some(IpDeviceConfigurationUpdate {
-                    ip_enabled: Some(true),
-                    ..Default::default()
-                }),
-                ..Default::default()
-            },
-        )
-        .unwrap();
+                },
+            )
+            .unwrap();
 
         if with_tx_queue {
-            check_transmitted(bindings_ctx, &device, 0);
+            check_transmitted(&mut ctx.bindings_ctx, &device, 0);
             assert_eq!(
-                core::mem::take(&mut bindings_ctx.state_mut().tx_available),
+                core::mem::take(&mut ctx.bindings_ctx.state_mut().tx_available),
                 [device.clone()]
             );
             let result = match &device {
@@ -1178,8 +1069,7 @@ mod tests {
             )
             .into();
 
-        let crate::testutil::FakeCtx { core_ctx, bindings_ctx } = &mut ctx;
-        crate::device::testutil::enable_device(core_ctx, bindings_ctx, &device);
+        crate::device::testutil::enable_device(&mut ctx, &device);
 
         let ip = I::get_other_ip_address(1).get();
         let prefix = config.subnet.prefix();
@@ -1188,7 +1078,7 @@ mod tests {
 
         // IP doesn't exist initially.
         assert_eq!(
-            get_all_ip_addr_subnets(core_ctx, &device)
+            get_all_ip_addr_subnets(&ctx.core_ctx, &device)
                 .into_iter()
                 .find(|&a| a == addr_subnet_either),
             None

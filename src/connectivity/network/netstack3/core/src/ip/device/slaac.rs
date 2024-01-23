@@ -1683,7 +1683,7 @@ mod tests {
         },
         device::{
             ethernet::{EthernetCreationProperties, EthernetLinkDevice},
-            testutil::{update_ipv6_configuration, FakeDeviceId},
+            testutil::FakeDeviceId,
             FrameDestination,
         },
         ip::{
@@ -2784,44 +2784,44 @@ mod tests {
                 DEFAULT_INTERFACE_METRIC,
             )
             .into();
-        let Ctx { core_ctx, bindings_ctx } = &mut ctx;
-        let _: Ipv6DeviceConfigurationUpdate = update_ipv6_configuration(
-            core_ctx,
-            bindings_ctx,
-            &device_id,
-            Ipv6DeviceConfigurationUpdate {
-                slaac_config: Some(SlaacConfiguration {
-                    enable_stable_addresses: true,
-                    temporary_address_configuration: Some(TemporarySlaacAddressConfiguration {
-                        temp_valid_lifetime: ONE_HOUR,
-                        temp_preferred_lifetime: ONE_HOUR,
-                        temp_idgen_retries: 0,
-                        secret_key: SECRET_KEY,
-                    }),
-                }),
-                ..Default::default()
-            },
-        )
-        .unwrap();
-
-        let set_ip_enabled = |core_ctx: &mut crate::testutil::FakeCoreCtx,
-                              bindings_ctx: &mut crate::testutil::FakeBindingsCtx,
-                              enabled| {
-            let _: Ipv6DeviceConfigurationUpdate = update_ipv6_configuration(
-                core_ctx,
-                bindings_ctx,
+        let _: Ipv6DeviceConfigurationUpdate = ctx
+            .core_api()
+            .device_ip::<Ipv6>()
+            .update_configuration(
                 &device_id,
                 Ipv6DeviceConfigurationUpdate {
-                    ip_config: Some(IpDeviceConfigurationUpdate {
-                        ip_enabled: Some(enabled),
-                        ..Default::default()
+                    slaac_config: Some(SlaacConfiguration {
+                        enable_stable_addresses: true,
+                        temporary_address_configuration: Some(TemporarySlaacAddressConfiguration {
+                            temp_valid_lifetime: ONE_HOUR,
+                            temp_preferred_lifetime: ONE_HOUR,
+                            temp_idgen_retries: 0,
+                            secret_key: SECRET_KEY,
+                        }),
                     }),
                     ..Default::default()
                 },
             )
             .unwrap();
+
+        let set_ip_enabled = |ctx: &mut crate::testutil::FakeCtx, enabled| {
+            let _: Ipv6DeviceConfigurationUpdate = ctx
+                .core_api()
+                .device_ip::<Ipv6>()
+                .update_configuration(
+                    &device_id,
+                    Ipv6DeviceConfigurationUpdate {
+                        ip_config: Some(IpDeviceConfigurationUpdate {
+                            ip_enabled: Some(enabled),
+                            ..Default::default()
+                        }),
+                        ..Default::default()
+                    },
+                )
+                .unwrap();
         };
-        set_ip_enabled(core_ctx, bindings_ctx, true /* enabled */);
+        set_ip_enabled(&mut ctx, true /* enabled */);
+        let Ctx { core_ctx, bindings_ctx } = &mut ctx;
         bindings_ctx.timer_ctx().assert_no_timers_installed();
 
         // Generate stable and temporary SLAAC addresses.
@@ -2928,13 +2928,13 @@ mod tests {
         ]);
 
         // Disabling IP should remove all the SLAAC addresses.
-        set_ip_enabled(core_ctx, bindings_ctx, false /* enabled */);
+        set_ip_enabled(&mut ctx, false /* enabled */);
         let addrs = with_assigned_ipv6_addr_subnets(
-            &mut CoreCtx::new_deprecated(core_ctx),
+            &mut CoreCtx::new_deprecated(&ctx.core_ctx),
             &device_id,
             |addrs| addrs.filter(|a| !a.addr().is_link_local()).collect::<Vec<_>>(),
         );
         assert_matches!(addrs[..], []);
-        bindings_ctx.timer_ctx().assert_no_timers_installed();
+        ctx.bindings_ctx.timer_ctx().assert_no_timers_installed();
     }
 }

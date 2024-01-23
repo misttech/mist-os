@@ -69,9 +69,7 @@ pub mod device {
     // TODO(https://fxbug.dev/42083910): Replace freestanding functions with API
     // objects.
     pub use base::{
-        get_all_ip_addr_subnets, get_ipv4_configuration_and_flags,
-        get_ipv6_configuration_and_flags, get_routing_metric, inspect_devices,
-        new_ipv4_configuration_update, new_ipv6_configuration_update, set_ip_addr_properties,
+        get_all_ip_addr_subnets, get_routing_metric, inspect_devices, set_ip_addr_properties,
     };
 
     // Re-exported types.
@@ -159,10 +157,13 @@ pub mod ip {
     pub use base::{IpLayerEvent, ResolveRouteError};
     pub use device::{
         api::{AddIpAddrSubnetError, AddrSubnetAndManualConfigEither},
+        config::{
+            IpDeviceConfigurationUpdate, Ipv4DeviceConfigurationUpdate,
+            Ipv6DeviceConfigurationUpdate, UpdateIpConfigurationError,
+        },
         slaac::{SlaacConfiguration, TemporarySlaacAddressConfiguration},
         state::{Ipv4AddrConfig, Ipv6AddrManualConfig, Ipv6DeviceConfiguration, Lifetime},
-        AddressRemovedReason, IpAddressState, IpDeviceConfigurationUpdate, IpDeviceEvent,
-        Ipv4DeviceConfigurationUpdate, Ipv6DeviceConfigurationUpdate, UpdateIpConfigurationError,
+        AddressRemovedReason, IpAddressState, IpDeviceEvent,
     };
     pub use socket::{IpSockCreateAndSendError, IpSockCreationError, IpSockSendError};
 }

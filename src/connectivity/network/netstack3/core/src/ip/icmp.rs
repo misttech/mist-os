@@ -2968,7 +2968,7 @@ mod tests {
     use core::{convert::TryInto, fmt::Debug, num::NonZeroU16, time::Duration};
 
     use net_types::{
-        ip::{Ip, IpVersion, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr, Subnet},
+        ip::{Ip, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr, Subnet},
         ZonedAddr,
     };
     use packet::{Buf, Serializer};
@@ -3278,8 +3278,9 @@ mod tests {
     ///
     /// The state is initialized to `I::FAKE_CONFIG` when testing.
     #[allow(clippy::too_many_arguments)]
+    #[netstack3_macros::context_ip_bounds(I, crate::testutil::FakeBindingsCtx, crate)]
     fn test_receive_ip_packet<
-        I: TestIpExt + IcmpIpExt,
+        I: TestIpExt + crate::IpExt,
         C: PartialEq + Debug,
         M: IcmpMessage<I, Code = C> + PartialEq + Debug,
         PBF: FnOnce(&mut <I as packet_formats::ip::IpExt>::PacketBuilder),
@@ -3306,29 +3307,19 @@ mod tests {
         modify_packet_builder(&mut pb);
         let buffer = Buf::new(body, ..).encapsulate(pb).serialize_vec_outer().unwrap();
 
-        let (Ctx { core_ctx, mut bindings_ctx }, device_ids) =
+        let (mut ctx, device_ids) =
             I::FAKE_CONFIG.into_builder().build_with_modifications(modify_stack_state_builder);
-        let core_ctx = &core_ctx;
 
         let device: DeviceId<_> = device_ids[0].clone().into();
-        set_forwarding_enabled::<_, I>(&core_ctx, &mut bindings_ctx, &device, true)
-            .expect("error setting routing enabled");
-        match I::VERSION {
-            IpVersion::V4 => receive_ip_packet::<_, _, Ipv4>(
-                &core_ctx,
-                &mut bindings_ctx,
-                &device,
-                FrameDestination::Individual { local: true },
-                buffer,
-            ),
-            IpVersion::V6 => receive_ip_packet::<_, _, Ipv6>(
-                &core_ctx,
-                &mut bindings_ctx,
-                &device,
-                FrameDestination::Individual { local: true },
-                buffer,
-            ),
-        }
+        set_forwarding_enabled::<_, I>(&mut ctx, &device, true);
+        let Ctx { core_ctx, bindings_ctx } = &mut ctx;
+        receive_ip_packet::<_, _, I>(
+            core_ctx,
+            bindings_ctx,
+            &device,
+            FrameDestination::Individual { local: true },
+            buffer,
+        );
 
         for counter in assert_counters {
             // TODO(https://fxbug.dev/134635): Redesign iterating through
@@ -3385,7 +3376,8 @@ mod tests {
         // Test that, when receiving an echo request, we respond with an echo
         // reply with the appropriate parameters.
 
-        fn test<I: TestIpExt + IcmpIpExt>(assert_counters: &[&str]) {
+        #[netstack3_macros::context_ip_bounds(I, crate::testutil::FakeBindingsCtx, crate)]
+        fn test<I: TestIpExt + crate::IpExt>(assert_counters: &[&str]) {
             let req = IcmpEchoRequest::new(0, 0);
             let req_body = &[1, 2, 3, 4];
             let mut buffer = Buf::new(req_body.to_vec(), ..)
@@ -3505,7 +3497,8 @@ mod tests {
         // the same for a stack which has the UDP `send_port_unreachable` option
         // disable, and make sure that we DON'T respond with an ICMP message.
 
-        fn test<I: TestIpExt + IcmpIpExt, C: PartialEq + Debug>(
+        #[netstack3_macros::context_ip_bounds(I, crate::testutil::FakeBindingsCtx, crate)]
+        fn test<I: TestIpExt + crate::IpExt, C: PartialEq + Debug>(
             code: C,
             assert_counters: &[&str],
             original_packet_len: usize,

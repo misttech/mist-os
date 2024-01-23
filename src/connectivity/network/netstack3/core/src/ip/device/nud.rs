@@ -2481,13 +2481,12 @@ mod tests {
             ethernet::{EthernetCreationProperties, EthernetLinkDevice},
             link::testutil::{FakeLinkAddress, FakeLinkDevice, FakeLinkDeviceId},
             ndp::testutil::{neighbor_advertisement_ip_packet, neighbor_solicitation_ip_packet},
-            testutil::{update_ipv6_configuration, FakeWeakDeviceId},
+            testutil::FakeWeakDeviceId,
             EthernetDeviceId, EthernetWeakDeviceId, FrameDestination, WeakDeviceId,
         },
         ip::{
             device::{
-                nud::api::NeighborApi, slaac::SlaacConfiguration,
-                testutil::UpdateIpDeviceConfigurationAndFlagsTestIpExt as _,
+                nud::api::NeighborApi, slaac::SlaacConfiguration, testutil::set_ip_device_enabled,
                 Ipv6DeviceConfigurationUpdate,
             },
             icmp::REQUIRED_NDP_IP_PACKET_HOP_LIMIT,
@@ -4953,9 +4952,9 @@ mod tests {
                 DEFAULT_INTERFACE_METRIC,
             )
             .into();
-        let testutil::FakeCtx { core_ctx, bindings_ctx } = &mut ctx;
 
-        Ipv6::set_ip_device_enabled(core_ctx, bindings_ctx, &device_id, true, false);
+        set_ip_device_enabled::<Ipv6>(&mut ctx, &device_id, true, false);
+        let testutil::FakeCtx { core_ctx, bindings_ctx } = &mut ctx;
 
         let remote_mac_bytes = remote_mac.bytes();
         let options = vec![NdpOptionBuilder::SourceLinkLayerAddress(&remote_mac_bytes[..])];
@@ -5044,21 +5043,21 @@ mod tests {
                 DEFAULT_INTERFACE_METRIC,
             );
         let device_id = link_device_id.clone().into();
-        let testutil::FakeCtx { core_ctx, bindings_ctx } = &mut ctx;
-        Ipv6::set_ip_device_enabled(core_ctx, bindings_ctx, &device_id, true, false);
+        set_ip_device_enabled::<Ipv6>(&mut ctx, &device_id, true, false);
 
         // Set DAD config after enabling the device so that the default address
         // does not perform DAD.
-        let _: Ipv6DeviceConfigurationUpdate = update_ipv6_configuration(
-            core_ctx,
-            bindings_ctx,
-            &device_id,
-            Ipv6DeviceConfigurationUpdate {
-                dad_transmits: Some(dad_transmits),
-                ..Default::default()
-            },
-        )
-        .unwrap();
+        let _: Ipv6DeviceConfigurationUpdate = ctx
+            .core_api()
+            .device_ip::<Ipv6>()
+            .update_configuration(
+                &device_id,
+                Ipv6DeviceConfigurationUpdate {
+                    dad_transmits: Some(dad_transmits),
+                    ..Default::default()
+                },
+            )
+            .unwrap();
         ctx.core_api()
             .device_ip::<Ipv6>()
             .add_ip_addr_subnet(&device_id, AddrSubnet::new(LOCAL_IP, Ipv6Addr::BYTES * 8).unwrap())
@@ -5172,22 +5171,22 @@ mod tests {
                 DEFAULT_INTERFACE_METRIC,
             );
         let device_id = eth_device_id.clone().into();
-        let testutil::FakeCtx { core_ctx, bindings_ctx } = &mut ctx;
         // Configure the device to generate a link-local address.
-        let _: Ipv6DeviceConfigurationUpdate = update_ipv6_configuration(
-            core_ctx,
-            bindings_ctx,
-            &device_id,
-            Ipv6DeviceConfigurationUpdate {
-                slaac_config: Some(SlaacConfiguration {
-                    enable_stable_addresses: true,
+        let _: Ipv6DeviceConfigurationUpdate = ctx
+            .core_api()
+            .device_ip::<Ipv6>()
+            .update_configuration(
+                &device_id,
+                Ipv6DeviceConfigurationUpdate {
+                    slaac_config: Some(SlaacConfiguration {
+                        enable_stable_addresses: true,
+                        ..Default::default()
+                    }),
                     ..Default::default()
-                }),
-                ..Default::default()
-            },
-        )
-        .unwrap();
-        Ipv6::set_ip_device_enabled(core_ctx, bindings_ctx, &device_id, true, false);
+                },
+            )
+            .unwrap();
+        set_ip_device_enabled::<Ipv6>(&mut ctx, &device_id, true, false);
 
         let neighbor_ip = remote_mac.to_ipv6_link_local().addr();
         let neighbor_ip: UnicastAddr<_> = neighbor_ip.into_addr();
@@ -5203,6 +5202,7 @@ mod tests {
             )
         };
 
+        let testutil::Ctx { core_ctx, bindings_ctx } = &mut ctx;
         // NeighborAdvertisements should not create a new entry even if
         // the advertisement has both the solicited and override flag set.
         receive_ip_packet::<_, _, Ipv6>(
@@ -5318,9 +5318,9 @@ mod tests {
         assert_eq!(payload, body);
 
         // Disabling the device should clear the neighbor table.
-        Ipv6::set_ip_device_enabled(core_ctx, bindings_ctx, &device_id, false, true);
-        assert_neighbors::<Ipv6, _>(core_ctx, &link_device_id, HashMap::new());
-        bindings_ctx.timer_ctx().assert_no_timers_installed();
+        set_ip_device_enabled::<Ipv6>(&mut ctx, &device_id, false, true);
+        assert_neighbors::<Ipv6, _>(&ctx.core_ctx, &link_device_id, HashMap::new());
+        ctx.bindings_ctx.timer_ctx().assert_no_timers_installed();
     }
 
     type FakeNudNetwork<L> = FakeNetwork<
