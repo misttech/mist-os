@@ -527,6 +527,7 @@ pub(crate) mod testutil {
     use crate::{
         data_structures::ref_counted_hash_map::{RefCountedHashSet, RemoveResult},
         device::{link::LinkDevice, EthernetWeakDeviceId},
+        filter::FilterBindingsTypes,
         ip::device::nud::{LinkResolutionContext, LinkResolutionNotifier},
         sync::Mutex,
         testutil::FakeCryptoRng,
@@ -1375,6 +1376,10 @@ pub(crate) mod testutil {
         pub(crate) fn state_mut(&mut self) -> &mut State {
             &mut self.state
         }
+    }
+
+    impl<TimerId, Event: Debug, State> FilterBindingsTypes for FakeBindingsCtx<TimerId, Event, State> {
+        type DeviceClass = ();
     }
 
     impl<TimerId, Event: Debug, State> RngContext for FakeBindingsCtx<TimerId, Event, State> {

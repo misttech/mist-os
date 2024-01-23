@@ -4,7 +4,7 @@
 
 //! Structs containing the entire stack state.
 
-use net_types::ip::{Ip, IpInvariant};
+use net_types::ip::{GenericOverIp, Ip, IpInvariant};
 
 use crate::{
     api::CoreApi,
@@ -16,6 +16,7 @@ use crate::{
         icmp::{IcmpRxCounters, IcmpTxCounters, NdpCounters},
         IpCounters, Ipv4State, Ipv6State,
     },
+    sync::RwLock,
     transport::{self, udp::UdpCounters, TransportLayerState},
     BindingsContext, BindingsTypes, CoreCtx,
 };
@@ -60,8 +61,8 @@ impl StackStateBuilder {
 /// The state associated with the network stack.
 pub struct StackState<BT: BindingsTypes> {
     pub(crate) transport: TransportLayerState<BT>,
-    pub(crate) ipv4: Ipv4State<BT::Instant, DeviceId<BT>>,
-    pub(crate) ipv6: Ipv6State<BT::Instant, DeviceId<BT>>,
+    pub(crate) ipv4: Ipv4State<BT::Instant, DeviceId<BT>, BT::DeviceClass>,
+    pub(crate) ipv6: Ipv6State<BT::Instant, DeviceId<BT>, BT::DeviceClass>,
     pub(crate) device: DeviceLayerState<BT>,
     #[cfg(test)]
     pub(crate) timer_counters: crate::time::TimerCounters,
@@ -84,12 +85,28 @@ impl<BT: BindingsTypes> StackState<BT> {
         )
     }
 
-    pub(crate) fn ipv4(&self) -> &Ipv4State<BT::Instant, DeviceId<BT>> {
+    pub(crate) fn ipv4(&self) -> &Ipv4State<BT::Instant, DeviceId<BT>, BT::DeviceClass> {
         &self.ipv4
     }
 
-    pub(crate) fn ipv6(&self) -> &Ipv6State<BT::Instant, DeviceId<BT>> {
+    pub(crate) fn ipv6(&self) -> &Ipv6State<BT::Instant, DeviceId<BT>, BT::DeviceClass> {
         &self.ipv6
+    }
+
+    pub(crate) fn filter<I: packet_formats::ip::IpExt>(
+        &self,
+    ) -> &RwLock<crate::filter::State<I, BT::DeviceClass>> {
+        #[derive(GenericOverIp)]
+        #[generic_over_ip(I, Ip)]
+        struct Wrap<'a, I: packet_formats::ip::IpExt, DeviceClass>(
+            &'a RwLock<crate::filter::State<I, DeviceClass>>,
+        );
+        let Wrap(state) = I::map_ip(
+            IpInvariant(self),
+            |IpInvariant(state)| Wrap(state.ipv4.filter()),
+            |IpInvariant(state)| Wrap(state.ipv6.filter()),
+        );
+        state
     }
 
     pub(crate) fn icmp_tx_counters<I: Ip>(&self) -> &IcmpTxCounters<I> {

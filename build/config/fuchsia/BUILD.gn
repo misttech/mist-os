@@ -218,6 +218,10 @@ config("dynamic_rust_standard_library") {
   rustflags = [ "-Cprefer-dynamic" ]
 }
 
+config("static_rust_standard_library") {
+  rustflags = [ "-Cprefer-dynamic=no" ]
+}
+
 # Configure a larger (2MB) stack size for Rust binaries.
 #
 # Currently, threads created by Rust's libstd have a hardcoded default stack

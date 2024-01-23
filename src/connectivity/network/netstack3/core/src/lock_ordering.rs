@@ -198,6 +198,8 @@ pub enum LoopbackRxDequeue {}
 pub enum LoopbackTxQueue {}
 pub enum LoopbackTxDequeue {}
 
+pub(crate) struct FilterState<I>(PhantomData<I>, Never);
+
 impl LockAfter<Unlocked> for LoopbackTxDequeue {}
 impl_lock_after!(LoopbackTxDequeue => EthernetTxDequeue);
 impl_lock_after!(EthernetTxDequeue => LoopbackRxDequeue);
@@ -229,7 +231,9 @@ impl_lock_after!(IpDeviceConfiguration<Ipv6> => Ipv6DeviceRouteDiscovery);
 impl_lock_after!(Ipv6DeviceRouteDiscovery => IpStateRoutingTable<Ipv4>);
 impl_lock_after!(IpStateRoutingTable<Ipv4> => IpStateRoutingTable<Ipv6>);
 impl_lock_after!(IpStateRoutingTable<Ipv6> => Ipv6DeviceAddressDad);
-impl_lock_after!(Ipv6DeviceAddressDad => IpState<Ipv4>);
+impl_lock_after!(Ipv6DeviceAddressDad => FilterState<Ipv4>);
+impl_lock_after!(FilterState<Ipv4> => FilterState<Ipv6>);
+impl_lock_after!(FilterState<Ipv6> => IpState<Ipv4>);
 impl_lock_after!(IpState<Ipv4> => IpState<Ipv6>);
 
 impl_lock_after!(IpState<Ipv4> => IpStatePmtuCache<Ipv4>);

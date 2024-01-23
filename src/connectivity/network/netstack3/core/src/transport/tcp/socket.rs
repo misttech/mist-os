@@ -3676,6 +3676,7 @@ mod tests {
             testutil::{FakeDeviceId, FakeStrongDeviceId, FakeWeakDeviceId, MultipleDevicesId},
             DeviceLayerStateTypes,
         },
+        filter::FilterBindingsTypes,
         ip::{
             device::{
                 nud::LinkResolutionContext,
@@ -3937,6 +3938,10 @@ mod tests {
         type DurationScope = ();
 
         fn duration(&self, _: &'static CStr) {}
+    }
+
+    impl<D: FakeStrongDeviceId> FilterBindingsTypes for TcpBindingsCtx<D> {
+        type DeviceClass = ();
     }
 
     impl<D: FakeStrongDeviceId> TcpBindingsTypes for TcpBindingsCtx<D> {

@@ -122,19 +122,22 @@ network_unified_binary("bin") {
 
   sources = common_sources
 
+  bin_add_configs = [ ":netstack3_configs" ]
+}
+
+config("netstack3_configs") {
   if (!is_debug) {
-    bin_add_configs = [
+    configs = [
       # Allow cross-crate optimization since netstack3 is split between multiple
       # crates.
       "//build/config/rust:lto_thin",
 
-      # Always optimize speed, even if they increase size.
+      # Always optimize speed, even if it increases size.
       "//build/config:optimize_speed",
-    ]
 
-    # Dynamic linking libstd is incompatible with LTO.
-    bin_remove_configs =
-        [ "//build/config/fuchsia:dynamic_rust_standard_library" ]
+      # Dynamic linking libstd is incompatible with LTO.
+      "//build/config/fuchsia:static_rust_standard_library",
+    ]
   }
 }
 

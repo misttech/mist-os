@@ -68,6 +68,7 @@ use crate::{
         DeviceId, DeviceLayerEventDispatcher, DeviceLayerStateTypes, DeviceSendFrameError,
         EthernetDeviceId, EthernetWeakDeviceId, WeakDeviceId,
     },
+    filter::FilterBindingsTypes,
     ip::{
         device::{
             nud::{self, LinkResolutionContext, LinkResolutionNotifier},
@@ -420,6 +421,10 @@ impl FakeBindingsCtx {
     ) -> Vec<Vec<u8>> {
         self.state_mut().udp_state_mut::<I>().remove(&conn).unwrap_or_else(Vec::default)
     }
+}
+
+impl FilterBindingsTypes for FakeBindingsCtx {
+    type DeviceClass = ();
 }
 
 impl WithFakeTimerContext<TimerId<FakeBindingsCtx>> for FakeCtx {

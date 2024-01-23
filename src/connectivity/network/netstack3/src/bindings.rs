@@ -71,6 +71,7 @@ use netstack3_core::{
         EthernetDeviceId, LoopbackCreationProperties, LoopbackDevice, LoopbackDeviceId,
     },
     error::NetstackError,
+    filter::FilterBindingsTypes,
     handle_timer,
     icmp::{self, IcmpEchoBindingsContext},
     ip::{
@@ -418,6 +419,10 @@ macro_rules! trace_duration {
 }
 
 pub(crate) use trace_duration;
+
+impl FilterBindingsTypes for BindingsCtx {
+    type DeviceClass = fidl_fuchsia_net_filter::DeviceClass;
+}
 
 #[derive(Default)]
 pub(crate) struct RngImpl;

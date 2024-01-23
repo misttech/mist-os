@@ -18,6 +18,7 @@ use crate::{
         self, AnyDevice, DeviceId, DeviceIdContext, DeviceLayerTypes, EthernetDeviceId,
         EthernetLinkDevice, EthernetWeakDeviceId, WeakDeviceId,
     },
+    filter::FilterBindingsTypes,
     ip::{
         self,
         device::{
@@ -110,9 +111,15 @@ where
 
 /// A marker trait for all the types stored in core objects that are specified
 /// by bindings.
-pub trait BindingsTypes: InstantBindingsTypes + DeviceLayerTypes + TcpBindingsTypes {}
+pub trait BindingsTypes:
+    InstantBindingsTypes + DeviceLayerTypes + TcpBindingsTypes + FilterBindingsTypes
+{
+}
 
-impl<O> BindingsTypes for O where O: InstantBindingsTypes + DeviceLayerTypes + TcpBindingsTypes {}
+impl<O> BindingsTypes for O where
+    O: InstantBindingsTypes + DeviceLayerTypes + TcpBindingsTypes + FilterBindingsTypes
+{
+}
 
 /// The execution context provided by bindings for a given IP version.
 pub trait IpBindingsContext<I: IpExt>:

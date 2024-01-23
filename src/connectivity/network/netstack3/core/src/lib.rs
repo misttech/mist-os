@@ -109,6 +109,14 @@ pub mod device_socket {
 // uphold.
 pub mod error;
 
+/// Framework for packet filtering.
+pub mod filter {
+    pub(crate) mod integration;
+
+    pub use netstack3_filter::FilterBindingsTypes;
+    pub(crate) use netstack3_filter::{FilterContext, FilterHandler, FilterImpl, State};
+}
+
 /// Facilities for inspecting stack state for debugging.
 pub mod inspect {
     // Re-exported functions.

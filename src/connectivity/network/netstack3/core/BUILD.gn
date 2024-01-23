@@ -12,6 +12,9 @@ import(
 rustc_library_with_features("netstack3-core") {
   version = "0.1.0"
   edition = "2021"
+  if (!is_host) {
+    configs += [ "//src/connectivity/network/netstack3:netstack3_configs" ]
+  }
   configs -= [ "//build/config/rust/lints:allow_unused_results" ]
   sources = [
     "src/algorithm.rs",
@@ -43,6 +46,7 @@ rustc_library_with_features("netstack3-core") {
     "src/device/socket.rs",
     "src/device/state.rs",
     "src/error.rs",
+    "src/filter/integration.rs",
     "src/ip/api.rs",
     "src/ip/base.rs",
     "src/ip/device.rs",
@@ -141,7 +145,10 @@ rustc_library_with_features("netstack3-core") {
   feature_sets = [
     {
       features = []
-      deps += [ "sync:netstack3-sync" ]
+      deps += [
+        "filter:netstack3-filter",
+        "sync:netstack3-sync",
+      ]
     },
 
     # A variant of the netstack3-core library that has additional
@@ -151,7 +158,10 @@ rustc_library_with_features("netstack3-core") {
       target_name = "netstack3-core-instrumented"
       features = [ "instrumented" ]
       with_unit_tests = true
-      deps += [ "sync:netstack3-sync-instrumented" ]
+      deps += [
+        "filter:netstack3-filter",
+        "sync:netstack3-sync-instrumented",
+      ]
       test_deps += [ "//third_party/rust_crates:scopeguard" ]
 
       # TODO(https://fxbug.dev/136837): Split up large tests.
@@ -173,6 +183,7 @@ rustc_library_with_features("netstack3-core") {
         "testutils",
       ]
       deps += [
+        "filter:netstack3-filter",
         "sync:netstack3-sync-instrumented",
         "//third_party/rust_crates:rand_xorshift",
       ]
@@ -185,6 +196,7 @@ rustc_library_with_features("netstack3-core") {
       testonly = true
       features = []
       deps += [
+        "filter:netstack3-filter",
         "sync:netstack3-sync",
         "//third_party/rust_crates:criterion",
         "//third_party/rust_crates:rand_xorshift",
@@ -206,6 +218,7 @@ rustc_library_with_features("netstack3-core") {
           "testutils",
         ]
         deps += [
+          "filter:netstack3-filter-loom",
           "sync:netstack3-sync-loom",
           "//third_party/rust_crates:rand_xorshift",
         ]

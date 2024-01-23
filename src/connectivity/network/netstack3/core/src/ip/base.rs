@@ -458,7 +458,9 @@ pub enum Ipv6PresentAddressStatus {
 /// An extension trait providing IP layer properties.
 pub trait IpLayerIpExt: IpExt {
     type AddressStatus;
-    type State<I: Instant, StrongDeviceId: StrongId>: AsRef<IpStateInner<Self, I, StrongDeviceId>>;
+    type State<I: Instant, StrongDeviceId: StrongId, DeviceClass>: AsRef<
+        IpStateInner<Self, I, StrongDeviceId>,
+    >;
     type PacketIdState;
     type PacketId;
     fn next_packet_id_from_state(state: &Self::PacketIdState) -> Self::PacketId;
@@ -466,7 +468,8 @@ pub trait IpLayerIpExt: IpExt {
 
 impl IpLayerIpExt for Ipv4 {
     type AddressStatus = Ipv4PresentAddressStatus;
-    type State<I: Instant, StrongDeviceId: StrongId> = Ipv4State<I, StrongDeviceId>;
+    type State<I: Instant, StrongDeviceId: StrongId, DeviceClass> =
+        Ipv4State<I, StrongDeviceId, DeviceClass>;
     type PacketIdState = AtomicU16;
     type PacketId = u16;
     fn next_packet_id_from_state(next_packet_id: &Self::PacketIdState) -> Self::PacketId {
@@ -481,7 +484,8 @@ impl IpLayerIpExt for Ipv4 {
 
 impl IpLayerIpExt for Ipv6 {
     type AddressStatus = Ipv6PresentAddressStatus;
-    type State<I: Instant, StrongDeviceId: StrongId> = Ipv6State<I, StrongDeviceId>;
+    type State<I: Instant, StrongDeviceId: StrongId, DeviceClass> =
+        Ipv6State<I, StrongDeviceId, DeviceClass>;
     type PacketIdState = ();
     type PacketId = ();
     fn next_packet_id_from_state((): &Self::PacketIdState) -> Self::PacketId {
@@ -1090,9 +1094,9 @@ impl Ipv4StateBuilder {
         &mut self.icmp
     }
 
-    pub(crate) fn build<Instant: crate::Instant, StrongDeviceId: StrongId>(
+    pub(crate) fn build<Instant: crate::Instant, StrongDeviceId: StrongId, DeviceClass>(
         self,
-    ) -> Ipv4State<Instant, StrongDeviceId> {
+    ) -> Ipv4State<Instant, StrongDeviceId, DeviceClass> {
         let Ipv4StateBuilder { icmp } = self;
 
         Ipv4State {
@@ -1100,6 +1104,7 @@ impl Ipv4StateBuilder {
             icmp: icmp.build(),
             next_packet_id: Default::default(),
             counters: Default::default(),
+            filter: RwLock::new(crate::filter::State::default()),
         }
     }
 }
@@ -1111,9 +1116,9 @@ pub(crate) struct Ipv6StateBuilder {
 }
 
 impl Ipv6StateBuilder {
-    pub(crate) fn build<Instant: crate::Instant, StrongDeviceId: StrongId>(
+    pub(crate) fn build<Instant: crate::Instant, StrongDeviceId: StrongId, DeviceClass>(
         self,
-    ) -> Ipv6State<Instant, StrongDeviceId> {
+    ) -> Ipv6State<Instant, StrongDeviceId, DeviceClass> {
         let Ipv6StateBuilder { icmp } = self;
 
         Ipv6State {
@@ -1121,18 +1126,22 @@ impl Ipv6StateBuilder {
             icmp: icmp.build(),
             counters: Default::default(),
             slaac_counters: Default::default(),
+            filter: RwLock::new(crate::filter::State::default()),
         }
     }
 }
 
-pub struct Ipv4State<Instant: crate::Instant, StrongDeviceId: StrongId> {
+pub struct Ipv4State<Instant: crate::Instant, StrongDeviceId: StrongId, DeviceClass> {
     pub(super) inner: IpStateInner<Ipv4, Instant, StrongDeviceId>,
     pub(super) icmp: Icmpv4State<Instant, StrongDeviceId::Weak>,
     pub(super) next_packet_id: AtomicU16,
     pub(super) counters: Ipv4Counters,
+    pub(super) filter: RwLock<crate::filter::State<Ipv4, DeviceClass>>,
 }
 
-impl<Instant: crate::Instant, StrongDeviceId: StrongId> Ipv4State<Instant, StrongDeviceId> {
+impl<Instant: crate::Instant, StrongDeviceId: StrongId, DeviceClass>
+    Ipv4State<Instant, StrongDeviceId, DeviceClass>
+{
     pub(crate) fn counters(&self) -> &Ipv4Counters {
         &self.counters
     }
@@ -1144,10 +1153,14 @@ impl<Instant: crate::Instant, StrongDeviceId: StrongId> Ipv4State<Instant, Stron
     pub(crate) fn icmp_rx_counters(&self) -> &IcmpRxCounters<Ipv4> {
         &self.icmp.inner.rx_counters
     }
+
+    pub fn filter(&self) -> &RwLock<crate::filter::State<Ipv4, DeviceClass>> {
+        &self.filter
+    }
 }
 
-impl<I: Instant, StrongDeviceId: StrongId> AsRef<IpStateInner<Ipv4, I, StrongDeviceId>>
-    for Ipv4State<I, StrongDeviceId>
+impl<I: Instant, StrongDeviceId: StrongId, DeviceClass> AsRef<IpStateInner<Ipv4, I, StrongDeviceId>>
+    for Ipv4State<I, StrongDeviceId, DeviceClass>
 {
     fn as_ref(&self) -> &IpStateInner<Ipv4, I, StrongDeviceId> {
         &self.inner
@@ -1160,14 +1173,17 @@ pub(super) fn gen_ip_packet_id<I: IpLayerIpExt, BC, CC: IpDeviceStateContext<I, 
     core_ctx.with_next_packet_id(|state| I::next_packet_id_from_state(state))
 }
 
-pub struct Ipv6State<Instant: crate::Instant, StrongDeviceId: StrongId> {
+pub struct Ipv6State<Instant: crate::Instant, StrongDeviceId: StrongId, DeviceClass> {
     pub(super) inner: IpStateInner<Ipv6, Instant, StrongDeviceId>,
     pub(super) icmp: Icmpv6State<Instant, StrongDeviceId::Weak>,
     pub(super) counters: Ipv6Counters,
     pub(super) slaac_counters: SlaacCounters,
+    pub(super) filter: RwLock<crate::filter::State<Ipv6, DeviceClass>>,
 }
 
-impl<Instant: crate::Instant, StrongDeviceId: StrongId> Ipv6State<Instant, StrongDeviceId> {
+impl<Instant: crate::Instant, StrongDeviceId: StrongId, DeviceClass>
+    Ipv6State<Instant, StrongDeviceId, DeviceClass>
+{
     pub(crate) fn counters(&self) -> &Ipv6Counters {
         &self.counters
     }
@@ -1187,10 +1203,14 @@ impl<Instant: crate::Instant, StrongDeviceId: StrongId> Ipv6State<Instant, Stron
     pub(crate) fn slaac_counters(&self) -> &SlaacCounters {
         &self.slaac_counters
     }
+
+    pub fn filter(&self) -> &RwLock<crate::filter::State<Ipv6, DeviceClass>> {
+        &self.filter
+    }
 }
 
-impl<I: Instant, StrongDeviceId: StrongId> AsRef<IpStateInner<Ipv6, I, StrongDeviceId>>
-    for Ipv6State<I, StrongDeviceId>
+impl<I: Instant, StrongDeviceId: StrongId, DeviceClass> AsRef<IpStateInner<Ipv6, I, StrongDeviceId>>
+    for Ipv6State<I, StrongDeviceId, DeviceClass>
 {
     fn as_ref(&self) -> &IpStateInner<Ipv6, I, StrongDeviceId> {
         &self.inner
