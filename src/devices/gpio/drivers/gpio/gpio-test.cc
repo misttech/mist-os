@@ -208,7 +208,7 @@ TEST_F(GpioTest, ValidateMetadataOk) {
   parent->AddProtocol(ZX_PROTOCOL_GPIO_IMPL, gpio_impl.GetProto()->ops, gpio_impl.GetProto()->ctx);
   parent->SetMetadata(DEVICE_METADATA_GPIO_PINS, pins, std::size(pins) * sizeof(gpio_pin_t));
 
-  ASSERT_OK(GpioDevice::Create(nullptr, parent.get()));
+  ASSERT_OK(GpioRootDevice::Create(nullptr, parent.get()));
 }
 
 TEST_F(GpioTest, ValidateMetadataRejectDuplicates) {
@@ -225,7 +225,7 @@ TEST_F(GpioTest, ValidateMetadataRejectDuplicates) {
   parent->AddProtocol(ZX_PROTOCOL_GPIO_IMPL, gpio_impl.GetProto()->ops, gpio_impl.GetProto()->ctx);
   parent->SetMetadata(DEVICE_METADATA_GPIO_PINS, pins, std::size(pins) * sizeof(gpio_pin_t));
 
-  ASSERT_NOT_OK(GpioDevice::Create(nullptr, parent.get()));
+  ASSERT_NOT_OK(GpioRootDevice::Create(nullptr, parent.get()));
 }
 
 TEST_F(GpioTest, ValidateGpioNameGeneration) {
@@ -378,11 +378,13 @@ TEST_F(GpioTest, Init) {
   fake_root->SetMetadata(DEVICE_METADATA_GPIO_INIT, message.data(), message.size());
   fake_root->SetMetadata(DEVICE_METADATA_GPIO_PINS, kGpioPins, sizeof(kGpioPins));
 
-  EXPECT_OK(GpioDevice::Create(nullptr, fake_root.get()));
+  EXPECT_OK(GpioRootDevice::Create(nullptr, fake_root.get()));
 
-  // GPIO init device and three GPIO pin devices.
-  EXPECT_EQ(fake_root->child_count(), 4);
-  device_async_remove(fake_root.get());
+  // GPIO init and root devices.
+  EXPECT_EQ(fake_root->child_count(), 2);
+  for (auto& child : fake_root->children()) {
+    device_async_remove(child.get());
+  }
   mock_ddk::ReleaseFlaggedDevices(fake_root.get());
 
   EXPECT_NO_FAILURES(gpio.VerifyAndClear());
@@ -454,11 +456,11 @@ TEST_F(GpioTest, InitErrorHandling) {
   fake_root->SetMetadata(DEVICE_METADATA_GPIO_INIT, message.data(), message.size());
   fake_root->SetMetadata(DEVICE_METADATA_GPIO_PINS, kGpioPins, sizeof(kGpioPins));
 
-  EXPECT_OK(GpioDevice::Create(nullptr, fake_root.get()));
+  EXPECT_OK(GpioRootDevice::Create(nullptr, fake_root.get()));
 
-  // Three GPIO pin devices (GPIO init device should not be added due to errors).
-  EXPECT_EQ(fake_root->child_count(), 3);
-  device_async_remove(fake_root.get());
+  // GPIO root device (init device should not be added due to errors).
+  EXPECT_EQ(fake_root->child_count(), 1);
+  device_async_remove(fake_root->GetLatestChild());
   mock_ddk::ReleaseFlaggedDevices(fake_root.get());
 
   EXPECT_NO_FAILURES(gpio.VerifyAndClear());
@@ -556,11 +558,13 @@ TEST(GpioTest, ControllerId) {
         .ExpectWrite(ZX_OK, 2, uint8_t{0});
   });
 
-  ASSERT_OK(GpioDevice::Create(nullptr, parent.get()));
+  ASSERT_OK(GpioRootDevice::Create(nullptr, parent.get()));
 
-  ASSERT_EQ(parent->child_count(), 3);
+  ASSERT_EQ(parent->child_count(), 1);
+  auto* const root_device = parent->GetLatestChild();
 
-  for (const auto& child : parent->children()) {
+  ASSERT_EQ(root_device->child_count(), 3);
+  for (const auto& child : root_device->children()) {
     const cpp20::span properties = child->GetProperties();
     ASSERT_EQ(properties.size(), 2);
 

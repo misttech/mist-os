@@ -57,12 +57,25 @@ class GpioImplProxy {
   fdf::WireSyncClient<fuchsia_hardware_gpioimpl::GpioImpl> gpio_fidl_;
 };
 
+class GpioRootDevice;
+using GpioRootDeviceType = ddk::Device<GpioRootDevice>;
+
+class GpioRootDevice : public GpioRootDeviceType {
+ public:
+  static zx_status_t Create(void* ctx, zx_device_t* parent);
+
+  void DdkRelease();
+
+ private:
+  explicit GpioRootDevice(zx_device_t* parent) : GpioRootDeviceType(parent) {}
+
+  zx_status_t AddPinDevices(uint32_t controller_id, const ddk::GpioImplProtocolClient& gpio_banjo);
+};
+
 class GpioDevice : public GpioDeviceType, public ddk::GpioProtocol<GpioDevice, ddk::base_protocol> {
  public:
   GpioDevice(zx_device_t* parent, GpioImplProxy gpio, uint32_t pin, std::string_view name)
       : GpioDeviceType(parent), gpio_(std::move(gpio)), pin_(pin), name_(name) {}
-
-  static zx_status_t Create(void* ctx, zx_device_t* parent);
 
   zx_status_t InitAddDevice(uint32_t controller_id);
 

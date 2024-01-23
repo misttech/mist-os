@@ -53,7 +53,8 @@ TEST(PbusTest, DISABLED_Enumeration) {
   EXPECT_OK(RecursiveWaitForFile(dirfd, "sys/platform/11:01:1/child-1/child-3-top").status_value());
   EXPECT_OK(RecursiveWaitForFile(dirfd, "sys/platform/11:01:1/child-1/child-3-top/child-3")
                 .status_value());
-  EXPECT_OK(RecursiveWaitForFile(dirfd, "sys/platform/11:01:5/test-gpio/gpio-3").status_value());
+  EXPECT_OK(
+      RecursiveWaitForFile(dirfd, "sys/platform/11:01:5/test-gpio/gpio/gpio-3").status_value());
   EXPECT_OK(RecursiveWaitForFile(dirfd, "sys/platform/11:01:7/test-clock/clock-1").status_value());
   EXPECT_OK(RecursiveWaitForFile(dirfd, "sys/platform/11:01:f").status_value());
   EXPECT_OK(RecursiveWaitForFile(dirfd, "sys/platform/11:01:f/composite-dev").status_value());
@@ -76,7 +77,7 @@ TEST(PbusTest, DISABLED_Enumeration) {
   EXPECT_EQ(fstatat(dirfd, "sys/platform/11:01:1/child-1/child-3-top", &st, 0), 0);
   EXPECT_EQ(fstatat(dirfd, "sys/platform/11:01:1/child-1/child-2/child-4", &st, 0), 0);
   EXPECT_EQ(fstatat(dirfd, "sys/platform/11:01:1/child-1/child-3-top/child-3", &st, 0), 0);
-  EXPECT_EQ(fstatat(dirfd, "sys/platform/11:01:5/test-gpio/gpio-3", &st, 0), 0);
+  EXPECT_EQ(fstatat(dirfd, "sys/platform/11:01:5/test-gpio/gpio/gpio-3", &st, 0), 0);
   EXPECT_EQ(fstatat(dirfd, "sys/platform/11:01:7/test-clock/clock-1", &st, 0), 0);
   EXPECT_EQ(fstatat(dirfd, "sys/platform/11:01:f/composite-dev/composite", &st, 0), 0);
   EXPECT_EQ(

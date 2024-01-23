@@ -124,7 +124,7 @@ void GpioDevice::DdkUnbind(ddk::UnbindTxn txn) {
 
 void GpioDevice::DdkRelease() { delete this; }
 
-zx_status_t GpioDevice::Create(void* ctx, zx_device_t* parent) {
+zx_status_t GpioRootDevice::Create(void* ctx, zx_device_t* parent) {
   const ddk::GpioImplProtocolClient gpio_banjo(parent);
   if (gpio_banjo.is_valid()) {
     zxlogf(INFO, "Using Banjo gpioimpl protocol");
@@ -157,7 +157,30 @@ zx_status_t GpioDevice::Create(void* ctx, zx_device_t* parent) {
     GpioInitDevice::Create(parent, {gpio_banjo, std::move(gpio_fidl)}, controller_id);
   }
 
-  auto pins = ddk::GetMetadataArray<gpio_pin_t>(parent, DEVICE_METADATA_GPIO_PINS);
+  fbl::AllocChecker ac;
+  std::unique_ptr<GpioRootDevice> root(new (&ac) GpioRootDevice(parent));
+  if (!ac.check()) {
+    return ZX_ERR_NO_MEMORY;
+  }
+
+  zx_status_t status = root->DdkAdd(ddk::DeviceAddArgs("gpio").set_flags(DEVICE_ADD_NON_BINDABLE));
+  if (status != ZX_OK) {
+    zxlogf(ERROR, "DdkAdd failed: %s", zx_status_get_string(status));
+    return status;
+  }
+
+  status = root->AddPinDevices(controller_id, gpio_banjo);
+
+  [[maybe_unused]] auto ptr = root.release();
+
+  return status;
+}
+
+void GpioRootDevice::DdkRelease() { delete this; }
+
+zx_status_t GpioRootDevice::AddPinDevices(const uint32_t controller_id,
+                                          const ddk::GpioImplProtocolClient& gpio_banjo) {
+  auto pins = ddk::GetMetadataArray<gpio_pin_t>(parent(), DEVICE_METADATA_GPIO_PINS);
   if (!pins.is_ok()) {
     zxlogf(ERROR, "Failed to get metadata array: %s", pins.status_string());
     return pins.error_value();
@@ -173,11 +196,11 @@ zx_status_t GpioDevice::Create(void* ctx, zx_device_t* parent) {
     return ZX_ERR_INVALID_ARGS;
   }
 
-  for (auto pin : pins.value()) {
+  for (auto pin : *pins) {
     fdf::WireSyncClient<fuchsia_hardware_gpioimpl::GpioImpl> gpio_fidl;
     if (!gpio_banjo.is_valid()) {
       zx::result gpio_fidl_client =
-          DdkConnectRuntimeProtocol<fuchsia_hardware_gpioimpl::Service::Device>(parent);
+          DdkConnectRuntimeProtocol<fuchsia_hardware_gpioimpl::Service::Device>(parent());
       ZX_ASSERT_MSG(gpio_fidl_client.is_ok(), "Failed to get additional FIDL client: %s",
                     gpio_fidl_client.status_string());
       gpio_fidl = fdf::WireSyncClient(std::move(*gpio_fidl_client));
@@ -187,7 +210,7 @@ zx_status_t GpioDevice::Create(void* ctx, zx_device_t* parent) {
 
     fbl::AllocChecker ac;
     std::unique_ptr<GpioDevice> dev(new (&ac)
-                                        GpioDevice(parent, std::move(gpio), pin.pin, pin.name));
+                                        GpioDevice(zxdev(), std::move(gpio), pin.pin, pin.name));
     if (!ac.check()) {
       return ZX_ERR_NO_MEMORY;
     }
@@ -453,7 +476,7 @@ zx_status_t GpioImplProxy::SetDriveStrength(uint32_t index, uint64_t ds_ua,
 static constexpr zx_driver_ops_t driver_ops = []() {
   zx_driver_ops_t ops = {};
   ops.version = DRIVER_OPS_VERSION;
-  ops.bind = GpioDevice::Create;
+  ops.bind = GpioRootDevice::Create;
   return ops;
 }();
 

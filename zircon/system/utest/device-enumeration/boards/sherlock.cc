@@ -10,7 +10,7 @@ TEST_F(DeviceEnumerationTest, SherlockTest) {
   static const char* kDevicePaths[] = {
       "sys/platform/pt/sherlock",
       "sys/platform/pt/sherlock/post-init/post-init",
-      "sys/platform/05:04:1/aml-gpio",
+      "sys/platform/05:04:1/aml-gpio/gpio",
       "sys/platform/05:04:1/aml-gpio/gpio-init",
       "sys/platform/05:00:14/clocks",
       "sys/platform/05:00:14/clocks/clock-init",
@@ -54,7 +54,7 @@ TEST_F(DeviceEnumerationTest, SherlockTest) {
       "sys/platform/05:04:12:1/aml_tdm/sherlock-audio-i2s-out",
       "sys/platform/05:00:2:1/i2c-1/aml-i2c/i2c/i2c-1-56/focaltech_touch",
       "sys/platform/00:00:e/tee/optee",
-      "sys/platform/05:04:1:1/aml-gpio/gpio-50/spi_0/aml-spi-0/spi/spi-0-0",
+      "sys/platform/05:04:1:1/aml-gpio/gpio/gpio-50/spi_0/aml-spi-0/spi/spi-0-0",
       "sys/platform/00:00:36/sherlock-buttons/buttons",
       "sys/platform/05:00:2:2/i2c-2/aml-i2c/i2c/i2c-2-44/backlight/ti-lp8556",
       "sys/platform/05:00:2/i2c-0/aml-i2c/i2c/i2c-0-57/tcs3400_light/tcs-3400",
@@ -99,7 +99,7 @@ TEST_F(DeviceEnumerationTest, SherlockTest) {
 
       "sys/platform/05:04:e/aml_video",
 
-      "sys/platform/05:04:1:1/aml-gpio/gpio-50/spi_0/aml-spi-0/spi/spi-0-0/nrf52840_radio/ot-radio",
+      "sys/platform/05:04:1:1/aml-gpio/gpio/gpio-50/spi_0/aml-spi-0/spi/spi-0-0/nrf52840_radio/ot-radio",
 
       // WLAN
       "sys/platform/05:00:6/sherlock-sd-emmc/aml-sd-emmc/sdmmc/sdmmc-sdio/sdmmc-sdio-1/wifi/brcmfmac-wlanphy",

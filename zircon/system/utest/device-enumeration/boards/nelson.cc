@@ -10,9 +10,9 @@ TEST_F(DeviceEnumerationTest, NelsonTest) {
   static const char* kDevicePaths[] = {
       "sys/platform/pt/nelson",
       "sys/platform/pt/nelson/post-init/post-init",
-      "sys/platform/05:05:1/aml-gpio",
+      "sys/platform/05:05:1/aml-gpio/gpio",
       "sys/platform/05:05:1/aml-gpio/gpio-init",
-      "sys/platform/05:05:1:1/aml-gpio",
+      "sys/platform/05:05:1:1/aml-gpio/gpio",
       "sys/platform/00:00:36/nelson-buttons/buttons",
       "sys/platform/05:00:3/bluetooth-composite-spec/aml-uart/bt-transport-uart",
       "sys/platform/05:00:3/bluetooth-composite-spec/aml-uart/bt-transport-uart/bt-hci-broadcom",
@@ -83,7 +83,7 @@ TEST_F(DeviceEnumerationTest, NelsonTest) {
       // Amber LED.
       "sys/platform/05:00:1c/aml_light",
 
-      "sys/platform/05:05:1:1/aml-gpio/gpio-82/spi_1/aml-spi-1/spi/spi-1-0/selina-composite/selina",
+      "sys/platform/05:05:1:1/aml-gpio/gpio/gpio-82/spi_1/aml-spi-1/spi/spi-1-0/selina-composite/selina",
 
       "sys/platform/05:05:24/ram",
 
@@ -100,13 +100,13 @@ TEST_F(DeviceEnumerationTest, NelsonTest) {
       "sys/platform/05:00:2:2/i2c-2/aml-i2c/i2c/i2c-2-45/tas58xx/TAS5805m",
       "sys/platform/05:00:2:2/i2c-2/aml-i2c/i2c/i2c-2-45/tas58xx/TAS5805m/brownout_protection",
 
-      "sys/platform/05:05:1:2/aml-gpio/gpio-50/spi_0/aml-spi-0/spi/spi-0-0",
+      "sys/platform/05:05:1:2/aml-gpio/gpio/gpio-50/spi_0/aml-spi-0/spi/spi-0-0",
 
 #ifdef include_packaged_drivers
       // BT
       "sys/platform/05:00:3/bluetooth-composite-spec/aml-uart/bt-transport-uart/bt-hci-broadcom/bt_host",
 
-      "sys/platform/05:05:1:2/aml-gpio/gpio-50/spi_0/aml-spi-0/spi/spi-0-0/nrf52811_radio/ot-radio",
+      "sys/platform/05:05:1:2/aml-gpio/gpio/gpio-50/spi_0/aml-spi-0/spi/spi-0-0/nrf52811_radio/ot-radio",
 
       // WLAN
       "sys/platform/05:00:6/aml-sdio/aml-sd-emmc/sdmmc/sdmmc-sdio/sdmmc-sdio-1/wifi/brcmfmac-wlanphy",

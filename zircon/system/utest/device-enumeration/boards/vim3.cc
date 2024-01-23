@@ -12,7 +12,7 @@ TEST_F(DeviceEnumerationTest, Vim3Test) {
       "sys/platform/00:00:1b/sysmem",
       "sys/platform/00:00:1e/dw-dsi",
 
-      "sys/platform/05:06:1/aml-gpio",
+      "sys/platform/05:06:1/aml-gpio/gpio",
       "sys/platform/05:06:1/aml-gpio/gpio-init",
       "sys/platform/05:06:14/clocks",
       "sys/platform/05:06:14/clocks/clock-init",
@@ -53,7 +53,7 @@ TEST_F(DeviceEnumerationTest, Vim3Test) {
       "sys/platform/05:06:26/aml-power-impl-composite/power-impl/pd-big-core/power-0/aml_cpu/a311d-arm-a73",
       "sys/platform/05:06:26/aml-power-impl-composite/power-impl/pd-big-core/power-0/aml_cpu/a311d-arm-a53",
 
-      "sys/platform/05:06:1/aml-gpio/gpio-93/fusb302",
+      "sys/platform/05:06:1/aml-gpio/gpio/gpio-93/fusb302",
 
       // USB
       "sys/platform/05:03:2d/vim3_usb_phy",
@@ -75,16 +75,16 @@ TEST_F(DeviceEnumerationTest, Vim3Test) {
       "class/thermal/000",
 
       // GPIO
-      "sys/platform/05:00:2/i2c-0/aml-i2c/i2c/i2c-0-32/gpio-expander/ti-tca6408a/gpio-107",
+      "sys/platform/05:00:2/i2c-0/aml-i2c/i2c/i2c-0-32/gpio-expander/ti-tca6408a/gpio/gpio-107",
 
       // Touch panel
       //
       // i2c device
       "sys/platform/05:00:2:2/i2c-2/aml-i2c/i2c/i2c-2-56",
       // interrupt pin
-      "sys/platform/05:06:1/aml-gpio/gpio-21",
+      "sys/platform/05:06:1/aml-gpio/gpio/gpio-21",
       // reset pin
-      "sys/platform/05:00:2/i2c-0/aml-i2c/i2c/i2c-0-32/gpio-expander/ti-tca6408a/gpio-106",
+      "sys/platform/05:00:2/i2c-0/aml-i2c/i2c/i2c-0-32/gpio-expander/ti-tca6408a/gpio/gpio-106",
 
       "sys/platform/05:00:2/i2c-0/aml-i2c/i2c/i2c-0-24/vim3-mcu",
 
