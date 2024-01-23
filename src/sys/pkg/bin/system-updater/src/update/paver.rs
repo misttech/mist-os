@@ -12,7 +12,7 @@ use {
     fuchsia_zircon::{Status, VmoChildOptions},
     thiserror::Error,
     tracing::{info, warn},
-    update_package::{Image, ImageClass},
+    update_package::Image,
 };
 
 mod configuration;
@@ -97,24 +97,25 @@ fn classify_image(
     image: &Image,
     desired_config: NonCurrentConfiguration,
 ) -> Result<ImageTarget<'_>, Error> {
-    let target = match image.classify() {
-        ImageClass::Zbi => ImageTarget::Asset {
+    use {update_package::ImageType as Type, ImageTarget as Target};
+    let target = match image.imagetype() {
+        Type::Zbi => Target::Asset {
             asset: Asset::Kernel,
             configuration: desired_config.to_target_configuration(),
         },
-        ImageClass::ZbiVbmeta => ImageTarget::Asset {
+        Type::FuchsiaVbmeta => Target::Asset {
             asset: Asset::VerifiedBootMetadata,
             configuration: desired_config.to_target_configuration(),
         },
-        ImageClass::Recovery => ImageTarget::Asset {
+        Type::Recovery => Target::Asset {
             asset: Asset::Kernel,
             configuration: TargetConfiguration::Single(Configuration::Recovery),
         },
-        ImageClass::RecoveryVbmeta => ImageTarget::Asset {
+        Type::RecoveryVbmeta => Target::Asset {
             asset: Asset::VerifiedBootMetadata,
             configuration: TargetConfiguration::Single(Configuration::Recovery),
         },
-        ImageClass::Firmware => ImageTarget::Firmware {
+        Type::Firmware => Target::Firmware {
             subtype: image.subtype().unwrap_or(""),
             configuration: desired_config.to_target_configuration(),
         },
@@ -719,7 +720,7 @@ mod tests {
         write_image_buffer(
             &data_sink,
             make_buffer("firmware contents"),
-            &Image::new(ImageType::Bootloader, None),
+            &Image::new(ImageType::Firmware, None),
             NonCurrentConfiguration::A,
         )
         .await

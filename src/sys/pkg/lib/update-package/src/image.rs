@@ -49,9 +49,6 @@ pub enum ImageType {
     /// Metadata for recovery image.
     RecoveryVbmeta,
 
-    /// Bootloader.
-    Bootloader,
-
     /// Firmware
     Firmware,
 }
@@ -64,7 +61,6 @@ impl ImageType {
             Self::FuchsiaVbmeta => "fuchsia.vbmeta",
             Self::Recovery => "recovery",
             Self::RecoveryVbmeta => "recovery.vbmeta",
-            Self::Bootloader => "bootloader",
             Self::Firmware => "firmware",
         }
     }
@@ -92,17 +88,6 @@ impl Image {
         self.imagetype
     }
 
-    /// The name of this image as understood by the system updater.
-    pub fn classify(&self) -> ImageClass {
-        match self.imagetype() {
-            ImageType::Zbi => ImageClass::Zbi,
-            ImageType::FuchsiaVbmeta => ImageClass::ZbiVbmeta,
-            ImageType::Recovery => ImageClass::Recovery,
-            ImageType::RecoveryVbmeta => ImageClass::RecoveryVbmeta,
-            ImageType::Bootloader | ImageType::Firmware => ImageClass::Firmware,
-        }
-    }
-
     /// The particular type of this image as understood by the paver service, if present.
     pub fn subtype(&self) -> Option<&str> {
         if self.filename.len() == self.imagetype.name().len() {
@@ -113,31 +98,12 @@ impl Image {
     }
 }
 
-/// A classification for the type of an image.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum ImageClass {
-    /// Kernel image
-    Zbi,
-
-    /// Metadata for [`ImageClass::Zbi`]
-    ZbiVbmeta,
-
-    /// Recovery image
-    Recovery,
-
-    /// Metadata for [`ImageClass::Recovery`]
-    RecoveryVbmeta,
-
-    /// Bootloader firmware
-    Firmware,
-}
-
-impl ImageClass {
-    /// Determines if this image class would target a recovery partition.
+impl ImageType {
+    /// Determines if this image type would target a recovery partition.
     pub fn targets_recovery(self) -> bool {
         match self {
-            ImageClass::Recovery | ImageClass::RecoveryVbmeta => true,
-            ImageClass::Zbi | ImageClass::ZbiVbmeta | ImageClass::Firmware => false,
+            Self::Recovery | Self::RecoveryVbmeta => true,
+            Self::Zbi | Self::FuchsiaVbmeta | Self::Firmware => false,
         }
     }
 }
@@ -191,11 +157,11 @@ mod tests {
     #[test]
     fn recovery_images_target_recovery() {
         assert!(
-            Image::new(ImageType::Recovery, None).classify().targets_recovery(),
+            Image::new(ImageType::Recovery, None).imagetype().targets_recovery(),
             "image recovery should target recovery",
         );
         assert!(
-            Image::new(ImageType::RecoveryVbmeta, None).classify().targets_recovery(),
+            Image::new(ImageType::RecoveryVbmeta, None).imagetype().targets_recovery(),
             "image recovery.vbmeta should target recovery",
         );
     }
@@ -203,15 +169,15 @@ mod tests {
     #[test]
     fn non_recovery_images_do_not_target_recovery() {
         assert!(
-            !Image::new(ImageType::Zbi, None).classify().targets_recovery(),
+            !Image::new(ImageType::Zbi, None).imagetype().targets_recovery(),
             "image zbi should not target recovery",
         );
         assert!(
-            !Image::new(ImageType::FuchsiaVbmeta, None).classify().targets_recovery(),
+            !Image::new(ImageType::FuchsiaVbmeta, None).imagetype().targets_recovery(),
             "image fuchsia.vbmeta should not target recovery",
         );
         assert!(
-            !Image::new(ImageType::Firmware, None).classify().targets_recovery(),
+            !Image::new(ImageType::Firmware, None).imagetype().targets_recovery(),
             "image firmware should not target recovery",
         );
     }
@@ -255,7 +221,7 @@ mod tests {
         #[test]
         fn image_accessors_do_not_panic(image in arb_image()) {
             image.subtype();
-            image.classify();
+            image.imagetype();
             format!("{image:?}");
         }
     }
