@@ -1039,8 +1039,7 @@ pub enum TargetQuery {
     /// Attempts to match the nodename, falling back to serial (in that order).
     /// TODO(b/299345828): Make this an exact match by default, fall back to substring matching
     NodenameOrSerial(String),
-    AddrPort((TargetAddr, u16)),
-    Addr(TargetAddr),
+    Addr(SocketAddr),
     First,
 }
 
@@ -1050,7 +1049,7 @@ impl TargetQuery {
     }
 
     fn is_query_on_address(&self) -> bool {
-        matches!(self, TargetQuery::AddrPort(..) | TargetQuery::Addr(..))
+        matches!(self, TargetQuery::Addr(..))
     }
 
     pub fn match_info(&self, t: &TargetEventInfo) -> bool {
@@ -1068,16 +1067,31 @@ impl TargetQuery {
                 }
                 false
             }
-            Self::AddrPort((addr, port)) => {
-                let no_port_and_zero = *port == 0 && t.ssh_port.is_none();
-                let ports_equal = t.ssh_port.unwrap_or(22) == *port;
-                (no_port_and_zero || ports_equal) && Self::Addr(*addr).match_info(t)
+            Self::Addr(addr) => {
+                let ssh_port = t.ssh_port.unwrap_or(22);
+                t.addresses.iter().any(|a| {
+                    let mut a = SocketAddr::from(a);
+
+                    // Use the SSH port if the target address' port is 0
+                    if a.port() == 0 {
+                        a.set_port(ssh_port)
+                    }
+
+                    // Clear the target address' port if the query has no port
+                    if addr.port() == 0 {
+                        a.set_port(0)
+                    }
+
+                    // Clear the target address' scope if the query has no scope
+                    if let (SocketAddr::V6(addr), SocketAddr::V6(a)) = (&addr, &mut a) {
+                        if addr.scope_id() == 0 {
+                            a.set_scope_id(0)
+                        }
+                    }
+
+                    &a == addr
+                })
             }
-            Self::Addr(addr) => t.addresses.iter().any(|a| {
-                // If the query does not contain a scope, allow a match against
-                // only the IP.
-                a == addr || addr.scope_id() == 0 && a.ip() == addr.ip()
-            }),
             Self::First => true,
         }
     }
@@ -1124,16 +1138,13 @@ impl From<String> for TargetQuery {
         // This does mean it might be possible to include arbitrary inaccurate scope names for
         // looking up a target, however (like `fe80::1%nonsense`).
         let scope = scope.map(|s| netext::get_verified_scope_id(s).unwrap_or(0)).unwrap_or(0);
-        match port {
-            Some(p) => Self::AddrPort((TargetAddr::new(addr, scope, 0), p)),
-            None => Self::Addr(TargetAddr::new(addr, scope, 0)),
-        }
+        Self::Addr(TargetAddr::new(addr, scope, port.unwrap_or(0)).into())
     }
 }
 
 impl From<TargetAddr> for TargetQuery {
     fn from(t: TargetAddr) -> Self {
-        Self::Addr(t)
+        Self::Addr(t.into())
     }
 }
 
@@ -1202,13 +1213,17 @@ mod tests {
     use futures::prelude::*;
     use std::{
         collections::BTreeSet,
-        net::{Ipv4Addr, Ipv6Addr},
+        net::{Ipv4Addr, Ipv6Addr, SocketAddrV6},
         pin::Pin,
         task::{Context, Poll},
         time::Instant,
     };
 
     mod update;
+
+    const IPV6_ULA: Ipv6Addr = Ipv6Addr::new(0xfe80, 0, 0, 0, 0, 0, 0, 1);
+
+    const IPV4_PRIVATE: Ipv4Addr = Ipv4Addr::new(192, 168, 0, 1);
 
     #[track_caller]
     fn expect_target(tc: &TargetCollection, query: &TargetQuery) -> Rc<Target> {
@@ -1442,8 +1457,8 @@ mod tests {
         let tc = TargetCollection::new_with_queue();
         tc.merge_insert(t.clone());
 
-        let ipv4_query = TargetQuery::Addr(ipv4_addr);
-        let ipv6_query = TargetQuery::Addr(ipv6_addr);
+        let ipv4_query = TargetQuery::Addr(ipv4_addr.into());
+        let ipv6_query = TargetQuery::Addr(ipv6_addr.into());
 
         assert_eq!(expect_target(&tc, &ipv4_query), t);
         expect_no_target(&tc, &ipv6_query);
@@ -2042,40 +2057,40 @@ mod tests {
     fn test_target_query_from_socketaddr_both_zero_port() {
         let tq = TargetQuery::from("127.0.0.1:0");
         let ti = TargetEventInfo {
-            addresses: vec![TargetAddr::new("127.0.0.1".parse::<IpAddr>().unwrap(), 0, 0)],
+            addresses: vec![TargetAddr::new(Ipv4Addr::LOCALHOST.into(), 0, 0)],
             ssh_port: None,
             ..Default::default()
         };
         assert!(
-            matches!(tq, TargetQuery::AddrPort((addr, port)) if addr == ti.addresses[0] && None == ti.ssh_port && port == 0)
+            matches!(tq, TargetQuery::Addr(addr) if addr == SocketAddr::new(Ipv4Addr::LOCALHOST.into(), 0))
         );
         assert!(tq.match_info(&ti));
     }
 
     #[test]
-    fn test_target_query_from_socketaddr_zero_port_to_standard_ssh_port_fails() {
+    fn test_target_query_from_socketaddr_zero_port_to_standard_ssh_port() {
         let tq = TargetQuery::from("127.0.0.1:0");
         let ti = TargetEventInfo {
-            addresses: vec![TargetAddr::new("127.0.0.1".parse::<IpAddr>().unwrap(), 0, 0)],
+            addresses: vec![TargetAddr::new(Ipv4Addr::LOCALHOST.into(), 0, 0)],
             ssh_port: Some(22),
             ..Default::default()
         };
         assert!(
-            matches!(tq, TargetQuery::AddrPort((addr, port)) if addr == ti.addresses[0] && Some(22) == ti.ssh_port && port == 0)
+            matches!(tq, TargetQuery::Addr(addr) if addr == SocketAddr::new(Ipv4Addr::LOCALHOST.into(), 0))
         );
-        assert!(!tq.match_info(&ti));
+        assert!(tq.match_info(&ti));
     }
 
     #[test]
     fn test_target_query_from_socketaddr_standard_port_to_no_port() {
         let tq = TargetQuery::from("127.0.0.1:22");
         let ti = TargetEventInfo {
-            addresses: vec![TargetAddr::new("127.0.0.1".parse::<IpAddr>().unwrap(), 0, 0)],
+            addresses: vec![TargetAddr::new(Ipv4Addr::LOCALHOST.into(), 0, 0)],
             ssh_port: None,
             ..Default::default()
         };
         assert!(
-            matches!(tq, TargetQuery::AddrPort((addr, port)) if addr == ti.addresses[0] && None == ti.ssh_port && port == 22)
+            matches!(tq, TargetQuery::Addr(addr) if addr == SocketAddr::new(Ipv4Addr::LOCALHOST.into(), 22))
         );
         assert!(tq.match_info(&ti));
     }
@@ -2089,13 +2104,13 @@ mod tests {
             ..Default::default()
         };
         assert!(
-            matches!(tq, TargetQuery::AddrPort((addr, port)) if addr == ti.addresses[0] && Some(22) == ti.ssh_port && port == 22)
+            matches!(tq, TargetQuery::Addr(addr) if addr == SocketAddr::new(Ipv4Addr::LOCALHOST.into(), 22))
         );
         assert!(tq.match_info(&ti));
     }
 
     #[test]
-    fn test_target_query_from_socketaddr_random_port_no_target_port_fails() {
+    fn test_target_query_from_socketaddr_random_port_no_target_port() {
         let tq = TargetQuery::from("127.0.0.1:2342");
         let ti = TargetEventInfo {
             addresses: vec![TargetAddr::new("127.0.0.1".parse::<IpAddr>().unwrap(), 0, 0)],
@@ -2103,13 +2118,13 @@ mod tests {
             ..Default::default()
         };
         assert!(
-            matches!(tq, TargetQuery::AddrPort((addr, port)) if addr == ti.addresses[0] && None == ti.ssh_port && port == 2342)
+            matches!(tq, TargetQuery::Addr(addr) if addr == SocketAddr::new(Ipv4Addr::LOCALHOST.into(), 2342))
         );
         assert!(!tq.match_info(&ti));
     }
 
     #[test]
-    fn test_target_query_from_socketaddr_zero_port_to_random_target_port_fails() {
+    fn test_target_query_from_socketaddr_zero_port_to_random_target_port() {
         let tq = TargetQuery::from("127.0.0.1:0");
         let ti = TargetEventInfo {
             addresses: vec![TargetAddr::new("127.0.0.1".parse::<IpAddr>().unwrap(), 0, 0)],
@@ -2117,9 +2132,9 @@ mod tests {
             ..Default::default()
         };
         assert!(
-            matches!(tq, TargetQuery::AddrPort((addr, port)) if addr == ti.addresses[0] && Some(2223) == ti.ssh_port && port == 0)
+            matches!(tq, TargetQuery::Addr(addr) if addr == SocketAddr::new(Ipv4Addr::LOCALHOST.into(), 0))
         );
-        assert!(!tq.match_info(&ti));
+        assert!(tq.match_info(&ti));
     }
 
     #[test]
@@ -2131,7 +2146,7 @@ mod tests {
             ..Default::default()
         };
         assert!(
-            matches!(tq, TargetQuery::AddrPort((addr, port)) if addr == ti.addresses[0] && Some(port) == ti.ssh_port)
+            matches!(tq, TargetQuery::Addr(addr) if addr == SocketAddr::new(Ipv4Addr::LOCALHOST.into(), 8022))
         );
         assert!(tq.match_info(&ti));
 
@@ -2142,7 +2157,7 @@ mod tests {
             ..Default::default()
         };
         assert!(
-            matches!(tq, TargetQuery::AddrPort((addr, port)) if addr == ti.addresses[0] && Some(port) == ti.ssh_port)
+            matches!(tq, TargetQuery::Addr(addr) if addr == SocketAddr::new(Ipv6Addr::LOCALHOST.into(), 8022))
         );
         assert!(tq.match_info(&ti));
 
@@ -2152,7 +2167,9 @@ mod tests {
             ssh_port: None,
             ..Default::default()
         };
-        assert!(matches!(tq, TargetQuery::Addr(addr) if addr == ti.addresses[0]));
+        assert!(
+            matches!(tq, TargetQuery::Addr(addr) if addr == SocketAddr::new(Ipv6Addr::LOCALHOST.into(), 0))
+        );
         assert!(tq.match_info(&ti));
 
         let tq = TargetQuery::from("[fe80::1]:22");
@@ -2162,7 +2179,7 @@ mod tests {
             ..Default::default()
         };
         assert!(
-            matches!(tq, TargetQuery::AddrPort((addr, port)) if addr == ti.addresses[0] && Some(port) == ti.ssh_port)
+            matches!(tq, TargetQuery::Addr(addr) if addr == SocketAddr::new(IPV6_ULA.into(), 22))
         );
         assert!(tq.match_info(&ti));
 
@@ -2173,7 +2190,7 @@ mod tests {
             ..Default::default()
         };
         assert!(
-            matches!(tq, TargetQuery::AddrPort((addr, port)) if addr == ti.addresses[0] && Some(port) == ti.ssh_port)
+            matches!(tq, TargetQuery::Addr(addr) if addr == SocketAddr::new(IPV4_PRIVATE.into(), 22))
         );
         assert!(tq.match_info(&ti));
 
@@ -2185,7 +2202,7 @@ mod tests {
             ..Default::default()
         };
         assert!(
-            matches!(tq, TargetQuery::AddrPort((addr, port)) if addr == ti.addresses[0] && Some(port) == ti.ssh_port)
+            matches!(tq, TargetQuery::Addr(addr) if addr == SocketAddrV6::new(IPV6_ULA.into(), 22, 0, 1).into())
         );
         assert!(tq.match_info(&ti));
     }

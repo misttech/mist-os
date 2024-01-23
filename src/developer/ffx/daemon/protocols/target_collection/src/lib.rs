@@ -155,11 +155,7 @@ async fn add_manual_target(
     });
 
     let target = tc
-        .query_single_enabled_target(&if addr.port() == 0 {
-            TargetQuery::Addr(addr.into())
-        } else {
-            TargetQuery::AddrPort((addr.into(), addr.port()))
-        })
+        .query_single_enabled_target(&TargetQuery::Addr(addr.into()))
         .expect("Query by address cannot be ambiguous")
         .expect("Could not find inserted manual target");
 
@@ -1050,7 +1046,7 @@ mod tests {
         target_add_fut.await.unwrap();
         let target_collection = Context::new(fake_daemon).get_target_collection().await.unwrap();
         let target = target_collection
-            .query_single_enabled_target(&TargetQuery::Addr(target_addr))
+            .query_single_enabled_target(&TargetQuery::Addr(target_addr.into()))
             .unwrap()
             .expect("Target not found");
         assert_eq!(target.addrs().len(), 1);
@@ -1073,7 +1069,7 @@ mod tests {
         proxy.add_ephemeral_target(&target_addr.into(), 3600).await.unwrap();
         let target_collection = Context::new(fake_daemon).get_target_collection().await.unwrap();
         let target = target_collection
-            .query_single_enabled_target(&TargetQuery::Addr(target_addr))
+            .query_single_enabled_target(&TargetQuery::Addr(target_addr.into()))
             .unwrap()
             .expect("Target not found");
         assert_eq!(target.addrs().len(), 1);
@@ -1100,7 +1096,7 @@ mod tests {
         target_add_fut.await.unwrap();
         let target_collection = Context::new(fake_daemon).get_target_collection().await.unwrap();
         let target = target_collection
-            .query_single_enabled_target(&TargetQuery::Addr(target_addr))
+            .query_single_enabled_target(&TargetQuery::Addr(target_addr.into()))
             .unwrap()
             .expect("Target not found");
         assert_eq!(target.addrs().len(), 1);
@@ -1123,7 +1119,7 @@ mod tests {
         proxy.add_ephemeral_target(&target_addr.into(), 3600).await.unwrap();
         let target_collection = Context::new(fake_daemon).get_target_collection().await.unwrap();
         let target = target_collection
-            .query_single_enabled_target(&TargetQuery::Addr(target_addr))
+            .query_single_enabled_target(&TargetQuery::Addr(target_addr.into()))
             .unwrap()
             .expect("Target not found");
         assert_eq!(target.addrs().len(), 1);
