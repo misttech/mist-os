@@ -5,7 +5,7 @@
 use crate::{
     power::{PowerStateFile, PowerSyncOnSuspendFile, PowerWakeupCountFile},
     task::CurrentTask,
-    vfs::{create_bytes_file_with_handler, StaticDirectoryBuilder},
+    vfs::{create_bytes_file_with_handler, StaticDirectoryBuilder, StubEmptyFile},
 };
 use starnix_uapi::file_mode::mode;
 use std::sync::Arc;
@@ -17,6 +17,18 @@ pub fn sysfs_power_directory(current_task: &CurrentTask, dir: &mut StaticDirecto
             current_task,
             "wakeup_count",
             PowerWakeupCountFile::new_node(),
+            mode!(IFREG, 0o644),
+        );
+        dir.entry(
+            current_task,
+            "wake_lock",
+            StubEmptyFile::new_node("/sys/power/wake_lock"),
+            mode!(IFREG, 0o644),
+        );
+        dir.entry(
+            current_task,
+            "wake_unlock",
+            StubEmptyFile::new_node("/sys/power/wake_unlock"),
             mode!(IFREG, 0o644),
         );
         dir.entry(current_task, "state", PowerStateFile::new_node(), mode!(IFREG, 0o644));
