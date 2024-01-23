@@ -31,11 +31,11 @@ pub enum WriteAssetError {
 async fn paver_write_firmware(
     data_sink: &DataSinkProxy,
     configuration: Configuration,
-    subtype: &str,
+    type_: &str,
     buffer: Buffer,
 ) -> Result<(), Error> {
     let res = data_sink
-        .write_firmware(configuration, subtype, buffer)
+        .write_firmware(configuration, type_, buffer)
         .await
         .context("while performing write_firmware call")?;
 
@@ -44,7 +44,7 @@ async fn paver_write_firmware(
             Status::ok(status).context("firmware failed to write")?;
         }
         WriteFirmwareResult::Unsupported(_) => {
-            info!("skipping unsupported firmware type: {}", subtype);
+            info!("skipping unsupported firmware type: {type_}");
         }
     }
 
@@ -54,10 +54,10 @@ async fn paver_write_firmware(
 pub async fn paver_read_firmware(
     data_sink: &DataSinkProxy,
     configuration: Configuration,
-    subtype: &str,
+    type_: &str,
 ) -> Result<Buffer, Error> {
     let result = data_sink
-        .read_firmware(configuration, subtype)
+        .read_firmware(configuration, type_)
         .await
         .context("while performing the read_firmware call")?;
     let buffer = result
@@ -89,7 +89,7 @@ pub async fn paver_read_asset(
 
 #[derive(Debug, PartialEq, Eq)]
 enum ImageTarget<'a> {
-    Firmware { subtype: &'a str, configuration: TargetConfiguration },
+    Firmware { type_: &'a str, configuration: TargetConfiguration },
     Asset { asset: Asset, configuration: TargetConfiguration },
 }
 
@@ -97,31 +97,28 @@ fn classify_image(
     image: &Image,
     desired_config: NonCurrentConfiguration,
 ) -> Result<ImageTarget<'_>, Error> {
-    use {update_package::ImageType as Type, ImageTarget as Target};
-    let target = match image.imagetype() {
-        Type::Zbi => Target::Asset {
+    Ok(match image {
+        Image::Zbi => ImageTarget::Asset {
             asset: Asset::Kernel,
             configuration: desired_config.to_target_configuration(),
         },
-        Type::FuchsiaVbmeta => Target::Asset {
+        Image::FuchsiaVbmeta => ImageTarget::Asset {
             asset: Asset::VerifiedBootMetadata,
             configuration: desired_config.to_target_configuration(),
         },
-        Type::Recovery => Target::Asset {
+        Image::Recovery => ImageTarget::Asset {
             asset: Asset::Kernel,
             configuration: TargetConfiguration::Single(Configuration::Recovery),
         },
-        Type::RecoveryVbmeta => Target::Asset {
+        Image::RecoveryVbmeta => ImageTarget::Asset {
             asset: Asset::VerifiedBootMetadata,
             configuration: TargetConfiguration::Single(Configuration::Recovery),
         },
-        Type::Firmware => Target::Firmware {
-            subtype: image.subtype().unwrap_or(""),
+        Image::Firmware { type_ } => ImageTarget::Firmware {
+            type_: &type_,
             configuration: desired_config.to_target_configuration(),
         },
-    };
-
-    Ok(target)
+    })
 }
 
 struct Payload {
@@ -179,24 +176,24 @@ async fn write_asset_to_configurations(
 async fn write_firmware_to_configurations(
     data_sink: &DataSinkProxy,
     configuration: TargetConfiguration,
-    subtype: &str,
+    type_: &str,
     payload: Payload,
 ) -> Result<(), Error> {
     match configuration {
         TargetConfiguration::Single(configuration) => {
             // Devices supports ABR and/or a specific configuration (ex. Recovery) was requested.
-            paver_write_firmware(data_sink, configuration, subtype, payload.buffer).await?;
+            paver_write_firmware(data_sink, configuration, type_, payload.buffer).await?;
         }
         TargetConfiguration::AB => {
             // For device that does not support ABR. There will only be one single
             // partition for that firmware. The configuration parameter should be Configuration::A.
-            paver_write_firmware(data_sink, Configuration::A, subtype, payload.clone_buffer()?)
+            paver_write_firmware(data_sink, Configuration::A, type_, payload.clone_buffer()?)
                 .await?;
             // Similar to asset, we also write Configuration::B to be forwards compatible with
             // devices that will eventually support ABR. For device that does not support A/B, it
             // will log/report WriteFirmwareResult::Unsupported and the paving  will be
             // skipped.
-            paver_write_firmware(data_sink, Configuration::B, subtype, payload.buffer).await?;
+            paver_write_firmware(data_sink, Configuration::B, type_, payload.buffer).await?;
         }
     }
 
@@ -210,14 +207,11 @@ pub async fn write_image_buffer(
     desired_config: NonCurrentConfiguration,
 ) -> Result<(), Error> {
     let target = classify_image(image, desired_config)?;
-    let payload = Payload {
-        display_name: format!("{}: {:?}", image.imagetype().name(), image.subtype()),
-        buffer,
-    };
+    let payload = Payload { display_name: format!("{image:?}"), buffer };
 
     match target {
-        ImageTarget::Firmware { subtype, configuration } => {
-            write_firmware_to_configurations(data_sink, configuration, subtype, payload).await?;
+        ImageTarget::Firmware { type_, configuration } => {
+            write_firmware_to_configurations(data_sink, configuration, type_, payload).await?;
         }
         ImageTarget::Asset { asset, configuration } => {
             write_asset_to_configurations(data_sink, configuration, asset, payload).await?;
@@ -480,7 +474,6 @@ mod tests {
         assert_matches::assert_matches,
         mock_paver::{hooks as mphooks, MockPaverServiceBuilder, PaverEvent},
         std::sync::Arc,
-        update_package::ImageType,
     };
 
     #[fuchsia_async::run_singlethreaded(test)]
@@ -720,13 +713,13 @@ mod tests {
         write_image_buffer(
             &data_sink,
             make_buffer("firmware contents"),
-            &Image::new(ImageType::Firmware, None),
+            &Image::Firmware { type_: "".into() },
             NonCurrentConfiguration::A,
         )
         .await
         .unwrap();
 
-        let image = &Image::new(ImageType::Firmware, Some("foo"));
+        let image = &Image::Firmware { type_: "foo".into() };
 
         write_image_buffer(
             &data_sink,
@@ -768,7 +761,7 @@ mod tests {
         write_image_buffer(
             &data_sink,
             make_buffer("firmware of the future!"),
-            &Image::new(ImageType::Firmware, Some("unknown")),
+            &Image::Firmware { type_: "unknown".into() },
             NonCurrentConfiguration::A,
         )
         .await
@@ -799,7 +792,7 @@ mod tests {
             write_image_buffer(
                 &data_sink,
                 make_buffer("oops"),
-                &Image::new(ImageType::Firmware, None),
+                &Image::Firmware{type_: "".into()},
                 NonCurrentConfiguration::A,
             )
             .await,
@@ -824,7 +817,7 @@ mod tests {
         write_image_buffer(
             &data_sink,
             make_buffer("zbi contents"),
-            &Image::new(ImageType::Zbi, None),
+            &Image::Zbi,
             NonCurrentConfiguration::A,
         )
         .await
@@ -856,7 +849,7 @@ mod tests {
             write_image_buffer(
                 &data_sink,
                 make_buffer("zbi contents"),
-                &Image::new(ImageType::Zbi, None),
+                &Image::Zbi,
                 NonCurrentConfiguration::A,
             )
             .await,
@@ -867,7 +860,7 @@ mod tests {
             write_image_buffer(
                 &data_sink,
                 make_buffer("vbmeta contents"),
-                &Image::new(ImageType::FuchsiaVbmeta, None),
+                &Image::FuchsiaVbmeta,
                 NonCurrentConfiguration::A,
             )
             .await,
@@ -878,7 +871,7 @@ mod tests {
             write_image_buffer(
                 &data_sink,
                 make_buffer("zbi contents"),
-                &Image::new(ImageType::Zbi, None),
+                &Image::Zbi,
                 NonCurrentConfiguration::B,
             )
             .await,
@@ -889,7 +882,7 @@ mod tests {
             write_image_buffer(
                 &data_sink,
                 make_buffer("vbmeta contents"),
-                &Image::new(ImageType::FuchsiaVbmeta, None),
+                &Image::FuchsiaVbmeta,
                 NonCurrentConfiguration::B,
             )
             .await,
@@ -914,7 +907,6 @@ mod abr_not_supported_tests {
         assert_matches::assert_matches,
         mock_paver::{hooks as mphooks, MockPaverServiceBuilder, PaverEvent},
         std::sync::Arc,
-        update_package::ImageType,
     };
 
     #[fuchsia_async::run_singlethreaded(test)]
@@ -974,7 +966,7 @@ mod abr_not_supported_tests {
         write_image_buffer(
             &data_sink,
             make_buffer("zbi contents"),
-            &Image::new(ImageType::Zbi, None),
+            &Image::Zbi,
             NonCurrentConfiguration::NotSupported,
         )
         .await
@@ -983,7 +975,7 @@ mod abr_not_supported_tests {
         write_image_buffer(
             &data_sink,
             make_buffer("the new vbmeta"),
-            &Image::new(ImageType::FuchsiaVbmeta, None),
+            &Image::FuchsiaVbmeta,
             NonCurrentConfiguration::NotSupported,
         )
         .await
@@ -1024,7 +1016,7 @@ mod abr_not_supported_tests {
         write_image_buffer(
             &data_sink,
             make_buffer("firmware contents"),
-            &Image::new(ImageType::Firmware, None),
+            &Image::Firmware { type_: "".into() },
             NonCurrentConfiguration::NotSupported,
         )
         .await
@@ -1067,7 +1059,7 @@ mod abr_not_supported_tests {
             write_image_buffer(
                 &data_sink,
                 make_buffer("zbi contents"),
-                &Image::new(ImageType::Zbi, None),
+                &Image::Zbi,
                 NonCurrentConfiguration::NotSupported,
             )
             .await,
@@ -1103,7 +1095,7 @@ mod abr_not_supported_tests {
         write_image_buffer(
             &data_sink,
             make_buffer("zbi contents"),
-            &Image::new(ImageType::Zbi, None),
+            &Image::Zbi,
             NonCurrentConfiguration::NotSupported,
         )
         .await
@@ -1141,7 +1133,7 @@ mod abr_not_supported_tests {
         write_image_buffer(
             &data_sink,
             make_buffer("firmware contents"),
-            &Image::new(ImageType::Firmware, None),
+            &Image::Firmware { type_: "".into() },
             NonCurrentConfiguration::NotSupported,
         )
         .await
@@ -1184,7 +1176,7 @@ mod abr_not_supported_tests {
             write_image_buffer(
                 &data_sink,
                 make_buffer("zbi contents"),
-                &Image::new(ImageType::Zbi, None),
+                &Image::Zbi,
                 NonCurrentConfiguration::NotSupported,
             )
             .await,

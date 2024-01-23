@@ -27,9 +27,7 @@ use {
     std::{collections::HashSet, pin::Pin, sync::Arc, time::Duration},
     thiserror::Error,
     tracing::{error, info},
-    update_package::{
-        Image, ImagePackagesSlots, ImageType, UpdateImagePackage, UpdateMode, UpdatePackage,
-    },
+    update_package::{Image, ImagePackagesSlots, UpdateImagePackage, UpdateMode, UpdatePackage},
 };
 
 mod config;
@@ -505,7 +503,7 @@ impl ImagesToWrite {
             let package_url = absolute_component_url.package_url();
             let resource = absolute_component_url.resource();
             let proxy = &url_directory_map[package_url];
-            let image = Image::new(ImageType::Firmware, Some(filename));
+            let image = Image::Firmware { type_: filename.into() };
             write_image(proxy, resource, &image, data_sink, desired_config).await?;
         }
 
@@ -513,14 +511,14 @@ impl ImagesToWrite {
             let package_url = zbi.package_url();
             let resource = zbi.resource();
             let proxy = &url_directory_map[package_url];
-            let image = Image::new(ImageType::Zbi, None);
+            let image = Image::Zbi;
             write_image(proxy, resource, &image, data_sink, desired_config).await?;
         }
 
         if let Some(vbmeta) = &self.fuchsia.vbmeta {
             let package_url = vbmeta.package_url();
             let proxy = &url_directory_map[package_url];
-            let image = Image::new(ImageType::FuchsiaVbmeta, None);
+            let image = Image::FuchsiaVbmeta;
             let resource = vbmeta.resource();
             write_image(proxy, resource, &image, data_sink, desired_config).await?;
         }
@@ -528,7 +526,7 @@ impl ImagesToWrite {
         if let Some(zbi) = &self.recovery.zbi {
             let package_url = zbi.package_url();
             let proxy = &url_directory_map[package_url];
-            let image = Image::new(ImageType::Recovery, None);
+            let image = Image::Recovery;
             let resource = zbi.resource();
             write_image(proxy, resource, &image, data_sink, desired_config).await?;
         }
@@ -536,7 +534,7 @@ impl ImagesToWrite {
         if let Some(vbmeta) = &self.recovery.vbmeta {
             let package_url = vbmeta.package_url();
             let proxy = &url_directory_map[package_url];
-            let image = Image::new(ImageType::RecoveryVbmeta, None);
+            let image = Image::RecoveryVbmeta;
             let resource = vbmeta.resource();
             write_image(proxy, resource, &image, data_sink, desired_config).await?;
         }
@@ -810,7 +808,7 @@ impl<'a> Attempt<'a> {
                 current_config,
                 &self.env.data_sink,
                 Asset::Kernel,
-                &Image::new(ImageType::Zbi, None),
+                &Image::Zbi,
             )
             .await
             {
@@ -834,7 +832,7 @@ impl<'a> Attempt<'a> {
                     current_config,
                     &self.env.data_sink,
                     Asset::VerifiedBootMetadata,
-                    &Image::new(ImageType::FuchsiaVbmeta, None),
+                    &Image::FuchsiaVbmeta,
                 )
                 .await
                 {
@@ -896,7 +894,7 @@ impl<'a> Attempt<'a> {
                 imagemetadata,
                 current_config,
                 &self.env.data_sink,
-                &Image::new(ImageType::Firmware, Some(filename)),
+                &Image::Firmware { type_: filename.into() },
             )
             .await
             {

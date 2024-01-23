@@ -32,11 +32,9 @@ pub enum OpenImageError {
     CloneBuffer { path: String, status: Status },
 }
 
-/// An identifier for an image type which corresponds to the file's name without
-/// a subtype.
-#[derive(Debug, PartialEq, Eq, Clone, Copy)]
-#[cfg_attr(test, derive(proptest_derive::Arbitrary))]
-pub enum ImageType {
+/// An identifier for an image that can be paved.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum Image {
     /// Kernel image.
     Zbi,
 
@@ -50,60 +48,21 @@ pub enum ImageType {
     RecoveryVbmeta,
 
     /// Firmware
-    Firmware,
-}
-
-impl ImageType {
-    /// The name of the ImageType.
-    pub fn name(&self) -> &'static str {
-        match self {
-            Self::Zbi => "zbi",
-            Self::FuchsiaVbmeta => "fuchsia.vbmeta",
-            Self::Recovery => "recovery",
-            Self::RecoveryVbmeta => "recovery.vbmeta",
-            Self::Firmware => "firmware",
-        }
-    }
-}
-
-/// An identifier for an image that can be paved.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct Image {
-    imagetype: ImageType,
-    filename: String,
+    Firmware {
+        /// A device-specific string given to the paver when writing the image.
+        /// Frequently the empty string on devices that only support a single firmware image type
+        /// (the bootloader).
+        /// https://cs.opensource.google/fuchsia/fuchsia/+/main:sdk/fidl/fuchsia.paver/paver.fidl;l=173-175;drc=4902eb163d5036cd2d2889b6cb22cb42a1cdd6b5
+        type_: String,
+    },
 }
 
 impl Image {
-    /// Construct an Image using the given imagetype and optional subtype.
-    pub fn new(imagetype: ImageType, subtype: Option<&str>) -> Self {
-        let filename = match subtype {
-            None => imagetype.name().to_string(),
-            Some(subtype) => format!("{}_{}", imagetype.name(), subtype),
-        };
-        Self { imagetype, filename }
-    }
-
-    /// The imagetype of the image relative to the update package.
-    pub fn imagetype(&self) -> ImageType {
-        self.imagetype
-    }
-
-    /// The particular type of this image as understood by the paver service, if present.
-    pub fn subtype(&self) -> Option<&str> {
-        if self.filename.len() == self.imagetype.name().len() {
-            return None;
-        }
-
-        Some(&self.filename[(self.imagetype.name().len() + 1)..])
-    }
-}
-
-impl ImageType {
-    /// Determines if this image type would target a recovery partition.
+    /// Determines if this image would target a recovery partition.
     pub fn targets_recovery(self) -> bool {
         match self {
             Self::Recovery | Self::RecoveryVbmeta => true,
-            Self::Zbi | Self::FuchsiaVbmeta | Self::Firmware => false,
+            Self::Zbi | Self::FuchsiaVbmeta | Self::Firmware { .. } => false,
         }
     }
 }
@@ -144,85 +103,27 @@ pub(crate) async fn open_from_path(
 
 #[cfg(test)]
 mod tests {
-    use {super::*, proptest::prelude::*, proptest_derive::Arbitrary};
-
-    #[test]
-    fn image_new() {
-        assert_eq!(
-            Image::new(ImageType::Zbi, None),
-            Image { imagetype: ImageType::Zbi, filename: "zbi".to_string() }
-        );
-    }
+    use super::*;
 
     #[test]
     fn recovery_images_target_recovery() {
+        assert!(Image::Recovery.targets_recovery(), "image recovery should target recovery",);
         assert!(
-            Image::new(ImageType::Recovery, None).imagetype().targets_recovery(),
-            "image recovery should target recovery",
-        );
-        assert!(
-            Image::new(ImageType::RecoveryVbmeta, None).imagetype().targets_recovery(),
+            Image::RecoveryVbmeta.targets_recovery(),
             "image recovery.vbmeta should target recovery",
         );
     }
 
     #[test]
     fn non_recovery_images_do_not_target_recovery() {
+        assert!(!Image::Zbi.targets_recovery(), "image zbi should not target recovery",);
         assert!(
-            !Image::new(ImageType::Zbi, None).imagetype().targets_recovery(),
-            "image zbi should not target recovery",
-        );
-        assert!(
-            !Image::new(ImageType::FuchsiaVbmeta, None).imagetype().targets_recovery(),
+            !Image::FuchsiaVbmeta.targets_recovery(),
             "image fuchsia.vbmeta should not target recovery",
         );
         assert!(
-            !Image::new(ImageType::Firmware, None).imagetype().targets_recovery(),
+            !Image::Firmware { type_: "".into() }.targets_recovery(),
             "image firmware should not target recovery",
         );
-    }
-
-    #[test]
-    fn test_image_typed_accessors() {
-        let image = Image::new(ImageType::Zbi, None);
-        assert_eq!(image.imagetype(), ImageType::Zbi);
-        assert_eq!(image.subtype(), None);
-
-        let image = Image::new(ImageType::Zbi, Some("ibz"));
-        assert_eq!(image.imagetype(), ImageType::Zbi);
-        assert_eq!(image.subtype(), Some("ibz"));
-    }
-
-    #[derive(Debug, Arbitrary)]
-    enum ImageConstructor {
-        New,
-        MatchesBase,
-    }
-
-    prop_compose! {
-        fn arb_image()(
-            constructor: ImageConstructor,
-            imagetype: ImageType,
-            subtype: Option<String>,
-        ) -> Image {
-            let subtype = subtype.as_deref();
-            let image = Image::new(imagetype, subtype);
-
-            match constructor {
-                ImageConstructor::New => image,
-                ImageConstructor::MatchesBase => {
-                    Image::new(imagetype, None)
-                }
-            }
-        }
-    }
-
-    proptest! {
-        #[test]
-        fn image_accessors_do_not_panic(image in arb_image()) {
-            image.subtype();
-            image.imagetype();
-            format!("{image:?}");
-        }
     }
 }
