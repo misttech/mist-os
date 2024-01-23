@@ -49,7 +49,7 @@ SoftAp::~SoftAp() {
 }
 
 wlan_fullmac_wire::WlanStartResult SoftAp::Start(
-    const fuchsia_wlan_fullmac::wire::WlanFullmacImplStartBssRequest* req) {
+    const fuchsia_wlan_fullmac::wire::WlanFullmacImplBaseStartBssRequest* req) {
   std::lock_guard lock(mutex_);
   IoctlRequest<mlan_ds_bss> start_req(MLAN_IOCTL_BSS, MLAN_ACT_GET, bss_index_,
                                       {.sub_command = MLAN_OID_UAP_BSS_CONFIG});

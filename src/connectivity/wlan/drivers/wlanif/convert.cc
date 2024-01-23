@@ -41,10 +41,10 @@ fuchsia_wlan_fullmac::WlanScanType ConvertScanType(wlan_scan_type_t scan_type) {
   }
 }
 
-void ConvertScanReq(const wlan_fullmac_impl_start_scan_request_t& in,
-                    fuchsia_wlan_fullmac::wire::WlanFullmacImplStartScanRequest* out,
+void ConvertScanReq(const wlan_fullmac_impl_base_start_scan_request_t& in,
+                    fuchsia_wlan_fullmac::wire::WlanFullmacImplBaseStartScanRequest* out,
                     fidl::AnyArena& arena) {
-  auto builder = fuchsia_wlan_fullmac::wire::WlanFullmacImplStartScanRequest::Builder(arena);
+  auto builder = fuchsia_wlan_fullmac::wire::WlanFullmacImplBaseStartScanRequest::Builder(arena);
   builder.txn_id(in.txn_id);
   builder.scan_type(ConvertScanType(in.scan_type));
   auto channels_vec = std::vector<uint8_t>(in.channels_list, in.channels_list + in.channels_count);
@@ -235,10 +235,10 @@ void ConvertDeleteKeyDescriptor(const delete_key_descriptor_t& in,
   memcpy(out->address.data(), in.address, fuchsia_wlan_ieee80211::wire::kMacAddrLen);
 }
 
-void ConvertConnectReq(const wlan_fullmac_impl_connect_request_t& in,
-                       fuchsia_wlan_fullmac::wire::WlanFullmacImplConnectRequest* out,
+void ConvertConnectReq(const wlan_fullmac_impl_base_connect_request_t& in,
+                       fuchsia_wlan_fullmac::wire::WlanFullmacImplBaseConnectRequest* out,
                        fidl::AnyArena& arena) {
-  auto builder = fuchsia_wlan_fullmac::wire::WlanFullmacImplConnectRequest::Builder(arena);
+  auto builder = fuchsia_wlan_fullmac::wire::WlanFullmacImplBaseConnectRequest::Builder(arena);
   fuchsia_wlan_internal::wire::BssDescription bss;
   ConvertBssDecription(in.selected_bss, &bss, arena);
   builder.selected_bss(bss);

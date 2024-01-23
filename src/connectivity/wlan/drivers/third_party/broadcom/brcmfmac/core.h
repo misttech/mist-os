@@ -196,7 +196,7 @@ using reassoc_context_t = struct {
 };
 
 constexpr size_t kConnectReqBufferSize =
-    fidl::MaxSizeInChannel<fuchsia_wlan_fullmac::wire::WlanFullmacImplConnectRequest,
+    fidl::MaxSizeInChannel<fuchsia_wlan_fullmac::wire::WlanFullmacImplBaseConnectRequest,
                            fidl::MessageDirection::kSending>();
 /**
  * struct brcmf_if - interface control information.
@@ -233,7 +233,7 @@ struct brcmf_if {
   int32_t bsscfgidx;
   uint8_t mac_addr[ETH_ALEN];
   uint8_t netif_stop;
-  fuchsia_wlan_fullmac::WlanFullmacImplConnectRequest connect_req;
+  fuchsia_wlan_fullmac::WlanFullmacImplBaseConnectRequest connect_req;
   // SSID of Successfully started SoftAP.
   fuchsia_wlan_ieee80211::wire::CSsid saved_softap_ssid;
   reassoc_context_t reassoc_context;

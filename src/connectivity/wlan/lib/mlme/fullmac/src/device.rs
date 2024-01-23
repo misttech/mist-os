@@ -310,22 +310,22 @@ pub trait DeviceOps {
     fn query_security_support(&mut self) -> banjo_wlan_common::SecuritySupport;
     fn query_spectrum_management_support(&mut self)
         -> banjo_wlan_common::SpectrumManagementSupport;
-    fn start_scan(&mut self, req: banjo_wlan_fullmac::WlanFullmacImplStartScanRequest);
-    fn connect(&mut self, req: banjo_wlan_fullmac::WlanFullmacImplConnectRequest);
-    fn reconnect(&mut self, req: banjo_wlan_fullmac::WlanFullmacImplReconnectRequest);
-    fn auth_resp(&mut self, resp: banjo_wlan_fullmac::WlanFullmacImplAuthRespRequest);
-    fn deauth(&mut self, req: banjo_wlan_fullmac::WlanFullmacImplDeauthRequest);
-    fn assoc_resp(&mut self, resp: banjo_wlan_fullmac::WlanFullmacImplAssocRespRequest);
-    fn disassoc(&mut self, req: banjo_wlan_fullmac::WlanFullmacImplDisassocRequest);
-    fn reset(&mut self, req: banjo_wlan_fullmac::WlanFullmacImplResetRequest);
-    fn start_bss(&mut self, req: banjo_wlan_fullmac::WlanFullmacImplStartBssRequest);
-    fn stop_bss(&mut self, req: banjo_wlan_fullmac::WlanFullmacImplStopBssRequest);
+    fn start_scan(&mut self, req: banjo_wlan_fullmac::WlanFullmacImplBaseStartScanRequest);
+    fn connect(&mut self, req: banjo_wlan_fullmac::WlanFullmacImplBaseConnectRequest);
+    fn reconnect(&mut self, req: banjo_wlan_fullmac::WlanFullmacImplBaseReconnectRequest);
+    fn auth_resp(&mut self, resp: banjo_wlan_fullmac::WlanFullmacImplBaseAuthRespRequest);
+    fn deauth(&mut self, req: banjo_wlan_fullmac::WlanFullmacImplBaseDeauthRequest);
+    fn assoc_resp(&mut self, resp: banjo_wlan_fullmac::WlanFullmacImplBaseAssocRespRequest);
+    fn disassoc(&mut self, req: banjo_wlan_fullmac::WlanFullmacImplBaseDisassocRequest);
+    fn reset(&mut self, req: banjo_wlan_fullmac::WlanFullmacImplBaseResetRequest);
+    fn start_bss(&mut self, req: banjo_wlan_fullmac::WlanFullmacImplBaseStartBssRequest);
+    fn stop_bss(&mut self, req: banjo_wlan_fullmac::WlanFullmacImplBaseStopBssRequest);
     fn set_keys_req(
         &mut self,
         req: banjo_wlan_fullmac::WlanFullmacSetKeysReq,
     ) -> banjo_wlan_fullmac::WlanFullmacSetKeysResp;
     fn del_keys_req(&mut self, req: banjo_wlan_fullmac::WlanFullmacDelKeysReq);
-    fn eapol_tx(&mut self, req: banjo_wlan_fullmac::WlanFullmacImplEapolTxRequest);
+    fn eapol_tx(&mut self, req: banjo_wlan_fullmac::WlanFullmacImplBaseEapolTxRequest);
     fn get_iface_counter_stats(&mut self) -> fidl_mlme::GetIfaceCounterStatsResponse;
     fn get_iface_histogram_stats(&mut self) -> fidl_mlme::GetIfaceHistogramStatsResponse;
     fn sae_handshake_resp(&mut self, resp: banjo_wlan_fullmac::WlanFullmacSaeHandshakeResp);
@@ -356,43 +356,43 @@ pub struct RawFullmacDeviceInterface {
 
     start_scan: extern "C" fn(
         device: *mut c_void,
-        req: *mut banjo_wlan_fullmac::WlanFullmacImplStartScanRequest,
+        req: *mut banjo_wlan_fullmac::WlanFullmacImplBaseStartScanRequest,
     ),
     connect: extern "C" fn(
         device: *mut c_void,
-        req: *mut banjo_wlan_fullmac::WlanFullmacImplConnectRequest,
+        req: *mut banjo_wlan_fullmac::WlanFullmacImplBaseConnectRequest,
     ),
     reconnect: extern "C" fn(
         device: *mut c_void,
-        req: *mut banjo_wlan_fullmac::WlanFullmacImplReconnectRequest,
+        req: *mut banjo_wlan_fullmac::WlanFullmacImplBaseReconnectRequest,
     ),
     auth_resp: extern "C" fn(
         device: *mut c_void,
-        resp: *mut banjo_wlan_fullmac::WlanFullmacImplAuthRespRequest,
+        resp: *mut banjo_wlan_fullmac::WlanFullmacImplBaseAuthRespRequest,
     ),
     deauth: extern "C" fn(
         device: *mut c_void,
-        req: *mut banjo_wlan_fullmac::WlanFullmacImplDeauthRequest,
+        req: *mut banjo_wlan_fullmac::WlanFullmacImplBaseDeauthRequest,
     ),
     assoc_resp: extern "C" fn(
         device: *mut c_void,
-        resp: *mut banjo_wlan_fullmac::WlanFullmacImplAssocRespRequest,
+        resp: *mut banjo_wlan_fullmac::WlanFullmacImplBaseAssocRespRequest,
     ),
     disassoc: extern "C" fn(
         device: *mut c_void,
-        req: *mut banjo_wlan_fullmac::WlanFullmacImplDisassocRequest,
+        req: *mut banjo_wlan_fullmac::WlanFullmacImplBaseDisassocRequest,
     ),
     reset: extern "C" fn(
         device: *mut c_void,
-        req: *mut banjo_wlan_fullmac::WlanFullmacImplResetRequest,
+        req: *mut banjo_wlan_fullmac::WlanFullmacImplBaseResetRequest,
     ),
     start_bss: extern "C" fn(
         device: *mut c_void,
-        req: *mut banjo_wlan_fullmac::WlanFullmacImplStartBssRequest,
+        req: *mut banjo_wlan_fullmac::WlanFullmacImplBaseStartBssRequest,
     ),
     stop_bss: extern "C" fn(
         device: *mut c_void,
-        req: *mut banjo_wlan_fullmac::WlanFullmacImplStopBssRequest,
+        req: *mut banjo_wlan_fullmac::WlanFullmacImplBaseStopBssRequest,
     ),
     set_keys_req: extern "C" fn(
         device: *mut c_void,
@@ -402,7 +402,7 @@ pub struct RawFullmacDeviceInterface {
         extern "C" fn(device: *mut c_void, req: *mut banjo_wlan_fullmac::WlanFullmacDelKeysReq),
     eapol_tx: extern "C" fn(
         device: *mut c_void,
-        req: *mut banjo_wlan_fullmac::WlanFullmacImplEapolTxRequest,
+        req: *mut banjo_wlan_fullmac::WlanFullmacImplBaseEapolTxRequest,
     ),
     get_iface_counter_stats: extern "C" fn(
         device: *mut c_void,
@@ -472,64 +472,64 @@ impl DeviceOps for FullmacDevice {
         (self.raw_device.query_spectrum_management_support)(self.raw_device.device)
     }
 
-    fn start_scan(&mut self, mut req: banjo_wlan_fullmac::WlanFullmacImplStartScanRequest) {
+    fn start_scan(&mut self, mut req: banjo_wlan_fullmac::WlanFullmacImplBaseStartScanRequest) {
         (self.raw_device.start_scan)(
             self.raw_device.device,
-            &mut req as *mut banjo_wlan_fullmac::WlanFullmacImplStartScanRequest,
+            &mut req as *mut banjo_wlan_fullmac::WlanFullmacImplBaseStartScanRequest,
         )
     }
-    fn connect(&mut self, mut req: banjo_wlan_fullmac::WlanFullmacImplConnectRequest) {
+    fn connect(&mut self, mut req: banjo_wlan_fullmac::WlanFullmacImplBaseConnectRequest) {
         (self.raw_device.connect)(
             self.raw_device.device,
-            &mut req as *mut banjo_wlan_fullmac::WlanFullmacImplConnectRequest,
+            &mut req as *mut banjo_wlan_fullmac::WlanFullmacImplBaseConnectRequest,
         )
     }
-    fn reconnect(&mut self, mut req: banjo_wlan_fullmac::WlanFullmacImplReconnectRequest) {
+    fn reconnect(&mut self, mut req: banjo_wlan_fullmac::WlanFullmacImplBaseReconnectRequest) {
         (self.raw_device.reconnect)(
             self.raw_device.device,
-            &mut req as *mut banjo_wlan_fullmac::WlanFullmacImplReconnectRequest,
+            &mut req as *mut banjo_wlan_fullmac::WlanFullmacImplBaseReconnectRequest,
         )
     }
-    fn auth_resp(&mut self, mut resp: banjo_wlan_fullmac::WlanFullmacImplAuthRespRequest) {
+    fn auth_resp(&mut self, mut resp: banjo_wlan_fullmac::WlanFullmacImplBaseAuthRespRequest) {
         (self.raw_device.auth_resp)(
             self.raw_device.device,
-            &mut resp as *mut banjo_wlan_fullmac::WlanFullmacImplAuthRespRequest,
+            &mut resp as *mut banjo_wlan_fullmac::WlanFullmacImplBaseAuthRespRequest,
         )
     }
-    fn deauth(&mut self, mut req: banjo_wlan_fullmac::WlanFullmacImplDeauthRequest) {
+    fn deauth(&mut self, mut req: banjo_wlan_fullmac::WlanFullmacImplBaseDeauthRequest) {
         (self.raw_device.deauth)(
             self.raw_device.device,
-            &mut req as *mut banjo_wlan_fullmac::WlanFullmacImplDeauthRequest,
+            &mut req as *mut banjo_wlan_fullmac::WlanFullmacImplBaseDeauthRequest,
         )
     }
-    fn assoc_resp(&mut self, mut resp: banjo_wlan_fullmac::WlanFullmacImplAssocRespRequest) {
+    fn assoc_resp(&mut self, mut resp: banjo_wlan_fullmac::WlanFullmacImplBaseAssocRespRequest) {
         (self.raw_device.assoc_resp)(
             self.raw_device.device,
-            &mut resp as *mut banjo_wlan_fullmac::WlanFullmacImplAssocRespRequest,
+            &mut resp as *mut banjo_wlan_fullmac::WlanFullmacImplBaseAssocRespRequest,
         )
     }
-    fn disassoc(&mut self, mut req: banjo_wlan_fullmac::WlanFullmacImplDisassocRequest) {
+    fn disassoc(&mut self, mut req: banjo_wlan_fullmac::WlanFullmacImplBaseDisassocRequest) {
         (self.raw_device.disassoc)(
             self.raw_device.device,
-            &mut req as *mut banjo_wlan_fullmac::WlanFullmacImplDisassocRequest,
+            &mut req as *mut banjo_wlan_fullmac::WlanFullmacImplBaseDisassocRequest,
         )
     }
-    fn reset(&mut self, mut req: banjo_wlan_fullmac::WlanFullmacImplResetRequest) {
+    fn reset(&mut self, mut req: banjo_wlan_fullmac::WlanFullmacImplBaseResetRequest) {
         (self.raw_device.reset)(
             self.raw_device.device,
-            &mut req as *mut banjo_wlan_fullmac::WlanFullmacImplResetRequest,
+            &mut req as *mut banjo_wlan_fullmac::WlanFullmacImplBaseResetRequest,
         )
     }
-    fn start_bss(&mut self, mut req: banjo_wlan_fullmac::WlanFullmacImplStartBssRequest) {
+    fn start_bss(&mut self, mut req: banjo_wlan_fullmac::WlanFullmacImplBaseStartBssRequest) {
         (self.raw_device.start_bss)(
             self.raw_device.device,
-            &mut req as *mut banjo_wlan_fullmac::WlanFullmacImplStartBssRequest,
+            &mut req as *mut banjo_wlan_fullmac::WlanFullmacImplBaseStartBssRequest,
         )
     }
-    fn stop_bss(&mut self, mut req: banjo_wlan_fullmac::WlanFullmacImplStopBssRequest) {
+    fn stop_bss(&mut self, mut req: banjo_wlan_fullmac::WlanFullmacImplBaseStopBssRequest) {
         (self.raw_device.stop_bss)(
             self.raw_device.device,
-            &mut req as *mut banjo_wlan_fullmac::WlanFullmacImplStopBssRequest,
+            &mut req as *mut banjo_wlan_fullmac::WlanFullmacImplBaseStopBssRequest,
         )
     }
     fn set_keys_req(
@@ -547,10 +547,10 @@ impl DeviceOps for FullmacDevice {
             &mut req as *mut banjo_wlan_fullmac::WlanFullmacDelKeysReq,
         )
     }
-    fn eapol_tx(&mut self, mut req: banjo_wlan_fullmac::WlanFullmacImplEapolTxRequest) {
+    fn eapol_tx(&mut self, mut req: banjo_wlan_fullmac::WlanFullmacImplBaseEapolTxRequest) {
         (self.raw_device.eapol_tx)(
             self.raw_device.device,
-            &mut req as *mut banjo_wlan_fullmac::WlanFullmacImplEapolTxRequest,
+            &mut req as *mut banjo_wlan_fullmac::WlanFullmacImplBaseEapolTxRequest,
         )
     }
     fn get_iface_counter_stats(&mut self) -> fidl_mlme::GetIfaceCounterStatsResponse {
@@ -619,40 +619,40 @@ pub mod test_utils {
     #[derive(Debug)]
     pub enum DriverCall {
         StartScan {
-            req: banjo_wlan_fullmac::WlanFullmacImplStartScanRequest,
+            req: banjo_wlan_fullmac::WlanFullmacImplBaseStartScanRequest,
             channels: Vec<u8>,
             ssids: Vec<banjo_wlan_ieee80211::CSsid>,
         },
         ConnectReq {
-            req: banjo_wlan_fullmac::WlanFullmacImplConnectRequest,
+            req: banjo_wlan_fullmac::WlanFullmacImplBaseConnectRequest,
             selected_bss_ies: Vec<u8>,
             sae_password: Vec<u8>,
             wep_key: Vec<u8>,
             security_ie: Vec<u8>,
         },
         ReconnectReq {
-            req: banjo_wlan_fullmac::WlanFullmacImplReconnectRequest,
+            req: banjo_wlan_fullmac::WlanFullmacImplBaseReconnectRequest,
         },
         AuthResp {
-            resp: banjo_wlan_fullmac::WlanFullmacImplAuthRespRequest,
+            resp: banjo_wlan_fullmac::WlanFullmacImplBaseAuthRespRequest,
         },
         DeauthReq {
-            req: banjo_wlan_fullmac::WlanFullmacImplDeauthRequest,
+            req: banjo_wlan_fullmac::WlanFullmacImplBaseDeauthRequest,
         },
         AssocResp {
-            resp: banjo_wlan_fullmac::WlanFullmacImplAssocRespRequest,
+            resp: banjo_wlan_fullmac::WlanFullmacImplBaseAssocRespRequest,
         },
         Disassoc {
-            req: banjo_wlan_fullmac::WlanFullmacImplDisassocRequest,
+            req: banjo_wlan_fullmac::WlanFullmacImplBaseDisassocRequest,
         },
         Reset {
-            req: banjo_wlan_fullmac::WlanFullmacImplResetRequest,
+            req: banjo_wlan_fullmac::WlanFullmacImplBaseResetRequest,
         },
         StartBss {
-            req: banjo_wlan_fullmac::WlanFullmacImplStartBssRequest,
+            req: banjo_wlan_fullmac::WlanFullmacImplBaseStartBssRequest,
         },
         StopBss {
-            req: banjo_wlan_fullmac::WlanFullmacImplStopBssRequest,
+            req: banjo_wlan_fullmac::WlanFullmacImplBaseStopBssRequest,
         },
         SetKeysReq {
             req: banjo_wlan_fullmac::WlanFullmacSetKeysReq,
@@ -662,7 +662,7 @@ pub mod test_utils {
             req: banjo_wlan_fullmac::WlanFullmacDelKeysReq,
         },
         EapolTx {
-            req: banjo_wlan_fullmac::WlanFullmacImplEapolTxRequest,
+            req: banjo_wlan_fullmac::WlanFullmacImplBaseEapolTxRequest,
             data: Vec<u8>,
         },
         GetIfaceCounterStats,
@@ -794,7 +794,7 @@ pub mod test_utils {
         }
 
         // Cannot mark fn unsafe because it has to match fn signature in FullDeviceInterface
-        fn start_scan(&mut self, req: banjo_wlan_fullmac::WlanFullmacImplStartScanRequest) {
+        fn start_scan(&mut self, req: banjo_wlan_fullmac::WlanFullmacImplBaseStartScanRequest) {
             let channels =
                 unsafe { slice::from_raw_parts(req.channels_list, req.channels_count) }.to_vec();
             let ssids = unsafe { slice::from_raw_parts(req.ssids_list, req.ssids_count) }.to_vec();
@@ -805,7 +805,7 @@ pub mod test_utils {
             });
         }
 
-        fn connect(&mut self, req: banjo_wlan_fullmac::WlanFullmacImplConnectRequest) {
+        fn connect(&mut self, req: banjo_wlan_fullmac::WlanFullmacImplBaseConnectRequest) {
             let selected_bss_ies = unsafe {
                 slice::from_raw_parts(req.selected_bss.ies_list, req.selected_bss.ies_count)
             }
@@ -828,28 +828,28 @@ pub mod test_utils {
                 security_ie,
             });
         }
-        fn reconnect(&mut self, req: banjo_wlan_fullmac::WlanFullmacImplReconnectRequest) {
+        fn reconnect(&mut self, req: banjo_wlan_fullmac::WlanFullmacImplBaseReconnectRequest) {
             self.mocks.lock().unwrap().captured_driver_calls.push(DriverCall::ReconnectReq { req });
         }
-        fn auth_resp(&mut self, resp: banjo_wlan_fullmac::WlanFullmacImplAuthRespRequest) {
+        fn auth_resp(&mut self, resp: banjo_wlan_fullmac::WlanFullmacImplBaseAuthRespRequest) {
             self.mocks.lock().unwrap().captured_driver_calls.push(DriverCall::AuthResp { resp });
         }
-        fn deauth(&mut self, req: banjo_wlan_fullmac::WlanFullmacImplDeauthRequest) {
+        fn deauth(&mut self, req: banjo_wlan_fullmac::WlanFullmacImplBaseDeauthRequest) {
             self.mocks.lock().unwrap().captured_driver_calls.push(DriverCall::DeauthReq { req });
         }
-        fn assoc_resp(&mut self, resp: banjo_wlan_fullmac::WlanFullmacImplAssocRespRequest) {
+        fn assoc_resp(&mut self, resp: banjo_wlan_fullmac::WlanFullmacImplBaseAssocRespRequest) {
             self.mocks.lock().unwrap().captured_driver_calls.push(DriverCall::AssocResp { resp });
         }
-        fn disassoc(&mut self, req: banjo_wlan_fullmac::WlanFullmacImplDisassocRequest) {
+        fn disassoc(&mut self, req: banjo_wlan_fullmac::WlanFullmacImplBaseDisassocRequest) {
             self.mocks.lock().unwrap().captured_driver_calls.push(DriverCall::Disassoc { req });
         }
-        fn reset(&mut self, req: banjo_wlan_fullmac::WlanFullmacImplResetRequest) {
+        fn reset(&mut self, req: banjo_wlan_fullmac::WlanFullmacImplBaseResetRequest) {
             self.mocks.lock().unwrap().captured_driver_calls.push(DriverCall::Reset { req });
         }
-        fn start_bss(&mut self, req: banjo_wlan_fullmac::WlanFullmacImplStartBssRequest) {
+        fn start_bss(&mut self, req: banjo_wlan_fullmac::WlanFullmacImplBaseStartBssRequest) {
             self.mocks.lock().unwrap().captured_driver_calls.push(DriverCall::StartBss { req });
         }
-        fn stop_bss(&mut self, req: banjo_wlan_fullmac::WlanFullmacImplStopBssRequest) {
+        fn stop_bss(&mut self, req: banjo_wlan_fullmac::WlanFullmacImplBaseStopBssRequest) {
             self.mocks.lock().unwrap().captured_driver_calls.push(DriverCall::StopBss { req });
         }
         fn set_keys_req(
@@ -881,7 +881,7 @@ pub mod test_utils {
         fn del_keys_req(&mut self, req: banjo_wlan_fullmac::WlanFullmacDelKeysReq) {
             self.mocks.lock().unwrap().captured_driver_calls.push(DriverCall::DelKeysReq { req });
         }
-        fn eapol_tx(&mut self, req: banjo_wlan_fullmac::WlanFullmacImplEapolTxRequest) {
+        fn eapol_tx(&mut self, req: banjo_wlan_fullmac::WlanFullmacImplBaseEapolTxRequest) {
             let data = unsafe { slice::from_raw_parts(req.data_list, req.data_count) }.to_vec();
             self.mocks
                 .lock()

@@ -512,16 +512,14 @@ closed protocol WlanFullmacImplIfc {
     compose WlanFullmacImplIfcBase;
 };
 
+/// Protocol definition for communication from the platform to the fullmac
+/// vendor driver.
+///
+/// This base protocol is composed into WlanFullmacImpl and WlanFullmacImplBridge
+/// below to share common methods definitions.
 @discoverable
-@transport("Driver")
-closed protocol WlanFullmacImpl {
+closed protocol WlanFullmacImplBase {
     // Lifecycle operations
-    strict Start(resource struct {
-        ifc client_end:WlanFullmacImplIfc;
-    }) -> (resource struct {
-        // status zx.Status;
-        sme_channel zx.Handle:CHANNEL;
-    }) error zx.Status;
     strict Stop() -> ();
 
     // State operation
@@ -673,6 +671,30 @@ closed protocol WlanFullmacImpl {
         online bool;
     }) -> ();
 };
+
+@discoverable
+closed protocol WlanFullmacImplBridge {
+    compose WlanFullmacImplBase;
+
+    strict Start(resource struct {
+        ifc client_end:WlanFullmacImplIfcBridge;
+    }) -> (resource struct {
+        sme_channel zx.Handle:CHANNEL;
+    }) error zx.Status;
+};
+
+@discoverable
+@transport("Driver")
+closed protocol WlanFullmacImpl {
+    compose WlanFullmacImplBase;
+
+    strict Start(resource struct {
+        ifc client_end:WlanFullmacImplIfc;
+    }) -> (resource struct {
+        sme_channel zx.Handle:CHANNEL;
+    }) error zx.Status;
+};
+
 
 service Service {
     wlan_fullmac_impl client_end:WlanFullmacImpl;

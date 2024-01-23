@@ -57,8 +57,8 @@ wlan_mlme::StopRequest CreateStopReq() {
   return req;
 }
 
-wlan_fullmac_impl_connect_request CreateConnectReq() {
-  wlan_fullmac_impl_connect_request req = {};
+wlan_fullmac_impl_base_connect_request CreateConnectReq() {
+  wlan_fullmac_impl_base_connect_request req = {};
 
   req.selected_bss = CreateBssDescription(kBssChannel);
   req.connect_failure_timeout = kConnectFailureTimeout;

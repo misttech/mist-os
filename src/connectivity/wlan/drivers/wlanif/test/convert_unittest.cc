@@ -98,7 +98,7 @@ class ConvertTest : public ::testing::Test {
 /* Tests for to-FIDL conversions */
 
 TEST_F(ConvertTest, ToFidlStartScanRequest) {
-  wlan_fullmac_impl_start_scan_request_t in;
+  wlan_fullmac_impl_base_start_scan_request_t in;
   in.txn_id = kRandomPopulaterUint64;
   in.scan_type = kFakeBanjoScanType;
 
@@ -120,7 +120,7 @@ TEST_F(ConvertTest, ToFidlStartScanRequest) {
   in.max_channel_time = kRandomPopulaterUint32;
 
   fidl::Arena arena;
-  fuchsia_wlan_fullmac::wire::WlanFullmacImplStartScanRequest out;
+  fuchsia_wlan_fullmac::wire::WlanFullmacImplBaseStartScanRequest out;
   wlanif::ConvertScanReq(in, &out, arena);
 
   EXPECT_EQ(kRandomPopulaterUint64, out.txn_id());
@@ -139,7 +139,7 @@ TEST_F(ConvertTest, ToFidlStartScanRequest) {
 }
 
 TEST_F(ConvertTest, ToFidlQueryConnectReqRequest) {
-  wlan_fullmac_impl_connect_request_t in;
+  wlan_fullmac_impl_base_connect_request_t in;
   bss_description_t bss;
 
   memcpy(bss.bssid, kFakeMacAddr, sizeof(kFakeMacAddr));
@@ -179,7 +179,7 @@ TEST_F(ConvertTest, ToFidlQueryConnectReqRequest) {
   in.security_ie_count = kFakeIeLen;
 
   fidl::Arena arena;
-  fuchsia_wlan_fullmac::wire::WlanFullmacImplConnectRequest out;
+  fuchsia_wlan_fullmac::wire::WlanFullmacImplBaseConnectRequest out;
 
   wlanif::ConvertConnectReq(in, &out, arena);
 

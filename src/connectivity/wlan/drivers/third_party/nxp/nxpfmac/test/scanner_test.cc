@@ -156,7 +156,7 @@ TEST_F(ScannerTest, Scan) {
 
   // Perform an active scan
   fidl::Arena arena;
-  auto builder = fuchsia_wlan_fullmac::wire::WlanFullmacImplStartScanRequest::Builder(arena);
+  auto builder = fuchsia_wlan_fullmac::wire::WlanFullmacImplBaseStartScanRequest::Builder(arena);
   builder.txn_id(kTxnId);
   builder.scan_type(fuchsia_wlan_fullmac::wire::WlanScanType::kActive);
   builder.min_channel_time(0);
@@ -237,7 +237,7 @@ TEST_F(ScannerTest, StopScan) {
 
     // Perform an active scan
     fidl::Arena arena;
-    auto builder = fuchsia_wlan_fullmac::wire::WlanFullmacImplStartScanRequest::Builder(arena);
+    auto builder = fuchsia_wlan_fullmac::wire::WlanFullmacImplBaseStartScanRequest::Builder(arena);
     builder.txn_id(kTxnId);
     builder.scan_type(fuchsia_wlan_fullmac::wire::WlanScanType::kActive);
     builder.min_channel_time(0);
@@ -288,7 +288,7 @@ TEST_F(ScannerTest, ScanSpecificSsids) {
   constexpr uint64_t kTxnId = 42;
 
   fidl::Arena arena;
-  auto builder = fuchsia_wlan_fullmac::wire::WlanFullmacImplStartScanRequest::Builder(arena);
+  auto builder = fuchsia_wlan_fullmac::wire::WlanFullmacImplBaseStartScanRequest::Builder(arena);
   builder.txn_id(kTxnId);
   builder.scan_type(fuchsia_wlan_fullmac::wire::WlanScanType::kActive);
   constexpr fuchsia_wlan_ieee80211::wire::CSsid kSsids[] = {{.len = 4, .data{"foo"}},
@@ -350,7 +350,7 @@ TEST_F(ScannerTest, ScanTooManySsids) {
 
   // Just use an empty list, the important thing is the number of SSIDs.
   fidl::Arena arena;
-  auto builder = fuchsia_wlan_fullmac::wire::WlanFullmacImplStartScanRequest::Builder(arena);
+  auto builder = fuchsia_wlan_fullmac::wire::WlanFullmacImplBaseStartScanRequest::Builder(arena);
   builder.txn_id(kTxnId);
   builder.scan_type(fuchsia_wlan_fullmac::wire::WlanScanType::kActive);
   constexpr fuchsia_wlan_ieee80211::wire::CSsid kSsids[kTooManySsids] = {};
@@ -376,7 +376,7 @@ TEST_F(ScannerTest, ScanTimeout) {
   constexpr zx_duration_t kShortTimeout = ZX_MSEC(5);
 
   fidl::Arena arena;
-  auto builder = fuchsia_wlan_fullmac::wire::WlanFullmacImplStartScanRequest::Builder(arena);
+  auto builder = fuchsia_wlan_fullmac::wire::WlanFullmacImplBaseStartScanRequest::Builder(arena);
   builder.txn_id(kTxnId);
   builder.scan_type(fuchsia_wlan_fullmac::wire::WlanScanType::kActive);
   builder.min_channel_time(0);

@@ -70,8 +70,9 @@ class ActiveScanTest : public SimTest {
                    const wlan_common::WlanChannel& channel,
                    zx::duration beacon_interval = kBeaconInterval);
 
-  void StartScan(const wlan_fullmac_wire::WlanFullmacImplStartScanRequest* req);
+  void StartScan(const wlan_fullmac_wire::WlanFullmacImplBaseStartScanRequest* req);
   // TODO(https://fxbug.dev/https://fxbug.dev/83861): Align the way active_scan_test and passive_scan_test
+
   // verify scan results.
   void VerifyScanResults();
   void EndSimulation();
@@ -151,7 +152,7 @@ void ActiveScanTest::StartFakeAp(const common::MacAddr& bssid, const wlan_ieee80
 }
 
 // Tell the DUT to run a scan
-void ActiveScanTest::StartScan(const wlan_fullmac_wire::WlanFullmacImplStartScanRequest* req) {
+void ActiveScanTest::StartScan(const wlan_fullmac_wire::WlanFullmacImplBaseStartScanRequest* req) {
   auto result = client_ifc_.client_.buffer(client_ifc_.test_arena_)->StartScan(*req);
 }
 
@@ -278,7 +279,7 @@ TEST_F(ActiveScanTest, RandomMacThreeAps) {
 
   // Build scan request
   auto builder =
-      wlan_fullmac_wire::WlanFullmacImplStartScanRequest::Builder(client_ifc_.test_arena_);
+      wlan_fullmac_wire::WlanFullmacImplBaseStartScanRequest::Builder(client_ifc_.test_arena_);
   builder.txn_id(++scan_txn_id_);
   builder.scan_type(wlan_fullmac_wire::WlanScanType::kActive);
   builder.channels(
@@ -304,7 +305,7 @@ TEST_F(ActiveScanTest, ScanTwice) {
   Init();
   // Build scan request
   auto builder =
-      wlan_fullmac_wire::WlanFullmacImplStartScanRequest::Builder(client_ifc_.test_arena_);
+      wlan_fullmac_wire::WlanFullmacImplBaseStartScanRequest::Builder(client_ifc_.test_arena_);
   builder.txn_id(++scan_txn_id_);
   builder.scan_type(wlan_fullmac_wire::WlanScanType::kActive);
   builder.channels(
@@ -337,7 +338,7 @@ TEST_F(ActiveScanTest, CheckNumProbeReqsSent) {
   Init();
 
   auto builder =
-      wlan_fullmac_wire::WlanFullmacImplStartScanRequest::Builder(client_ifc_.test_arena_);
+      wlan_fullmac_wire::WlanFullmacImplBaseStartScanRequest::Builder(client_ifc_.test_arena_);
   builder.txn_id(++scan_txn_id_);
   builder.scan_type(wlan_fullmac_wire::WlanScanType::kActive);
   builder.channels(
@@ -368,7 +369,7 @@ TEST_F(ActiveScanTest, EmptyChannelList) {
 
   // Case contains empty channels_list.
   auto builder =
-      wlan_fullmac_wire::WlanFullmacImplStartScanRequest::Builder(client_ifc_.test_arena_);
+      wlan_fullmac_wire::WlanFullmacImplBaseStartScanRequest::Builder(client_ifc_.test_arena_);
   builder.txn_id(++scan_txn_id_);
   builder.scan_type(wlan_fullmac_wire::WlanScanType::kActive);
   // Keep the table entry but make the VectorView empty.
@@ -413,7 +414,7 @@ TEST_F(ActiveScanTest, SsidTooLong) {
 
   // Case contains over-size ssid in ssids_list in request.
   auto builder =
-      wlan_fullmac_wire::WlanFullmacImplStartScanRequest::Builder(client_ifc_.test_arena_);
+      wlan_fullmac_wire::WlanFullmacImplBaseStartScanRequest::Builder(client_ifc_.test_arena_);
   builder.txn_id(++scan_txn_id_);
   builder.scan_type(wlan_fullmac_wire::WlanScanType::kActive);
   // Keep the table entry but make the VectorView empty.
@@ -450,7 +451,7 @@ TEST_F(ActiveScanTest, ScanWhenFirmwareBusy) {
   sim->sim_fw->err_inj_.AddErrInjIovar("escan", ZX_OK, BCME_BUSY);
 
   auto builder =
-      wlan_fullmac_wire::WlanFullmacImplStartScanRequest::Builder(client_ifc_.test_arena_);
+      wlan_fullmac_wire::WlanFullmacImplBaseStartScanRequest::Builder(client_ifc_.test_arena_);
   builder.txn_id(++scan_txn_id_);
   builder.scan_type(wlan_fullmac_wire::WlanScanType::kActive);
   // Keep the table entry but make the VectorView empty.

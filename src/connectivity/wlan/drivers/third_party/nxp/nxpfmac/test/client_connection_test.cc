@@ -115,7 +115,7 @@ struct ClientConnectionTest : public zxtest::Test {
                                             .data_plane_ = test_data_plane_->GetDataPlane()};
 
     auto builder =
-        fuchsia_wlan_fullmac::wire::WlanFullmacImplConnectRequest::Builder(request_arena_);
+        fuchsia_wlan_fullmac::wire::WlanFullmacImplBaseConnectRequest::Builder(request_arena_);
 
     fuchsia_wlan_internal::wire::BssDescription bss;
     memcpy(bss.bssid.data(), kBss, sizeof(kBss));
@@ -174,7 +174,7 @@ struct ClientConnectionTest : public zxtest::Test {
   std::shared_ptr<MockDevice> parent_{MockDevice::FakeRootParent()};
   fdf::UnownedSynchronizedDispatcher dispatcher_{runtime()->StartBackgroundDispatcher()};
   fidl::Arena<wlan::nxpfmac::kConnectReqBufferSize> request_arena_;
-  fuchsia_wlan_fullmac::wire::WlanFullmacImplConnectRequest default_request_;
+  fuchsia_wlan_fullmac::wire::WlanFullmacImplBaseConnectRequest default_request_;
   wlan::simulation::Environment env_ = {};
   TestDevice *test_device_ = nullptr;
   wlan::nxpfmac::MlanMockAdapter mocks_;
@@ -560,7 +560,7 @@ TEST_F(ClientConnectionTest, InitiateSaeHandshake) {
   // Create a request with a specific BSSID and SAE auth method, this should trigger the SAE
   // handshake request.
   fidl::Arena arena;
-  auto builder = fuchsia_wlan_fullmac::wire::WlanFullmacImplConnectRequest::Builder(arena);
+  auto builder = fuchsia_wlan_fullmac::wire::WlanFullmacImplBaseConnectRequest::Builder(arena);
 
   fuchsia_wlan_internal::wire::BssDescription bss;
   memcpy(bss.bssid.data(), kBss, sizeof(kBss));
@@ -628,7 +628,7 @@ TEST_F(ClientConnectionTest, TransmitAuthFrame) {
   // We need to connect first, there has to be a stored connection request for the auth frame
   // transmission to work and the connection has to be in the correct state.
   fidl::Arena arena;
-  auto builder = fuchsia_wlan_fullmac::wire::WlanFullmacImplConnectRequest::Builder(arena);
+  auto builder = fuchsia_wlan_fullmac::wire::WlanFullmacImplBaseConnectRequest::Builder(arena);
 
   fuchsia_wlan_internal::wire::BssDescription bss;
   memcpy(bss.bssid.data(), kBss, sizeof(kBss));

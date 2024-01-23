@@ -43,7 +43,7 @@ Scanner::Scanner(DeviceContext* context, uint32_t bss_index)
 
 Scanner::~Scanner() { StopScan(); }
 
-zx_status_t Scanner::Scan(const wlan_fullmac_wire::WlanFullmacImplStartScanRequest* req,
+zx_status_t Scanner::Scan(const wlan_fullmac_wire::WlanFullmacImplBaseStartScanRequest* req,
                           zx_duration_t timeout, OnScanResult&& on_scan_result,
                           OnScanEnd&& on_scan_end) {
   const std::lock_guard lock(mutex_);
@@ -137,7 +137,7 @@ zx_status_t Scanner::ConnectScan(const uint8_t* ssid, size_t ssid_len, uint8_t c
   std::vector<uint8_t> channel_vec;
   channel_vec.push_back(channel);
 
-  auto builder = wlan_fullmac_wire::WlanFullmacImplStartScanRequest::Builder(arena);
+  auto builder = wlan_fullmac_wire::WlanFullmacImplBaseStartScanRequest::Builder(arena);
 
   builder.txn_id(0);
   builder.scan_type(fuchsia_wlan_fullmac::wire::WlanScanType::kActive);
@@ -210,7 +210,7 @@ zx_status_t Scanner::StopScan() __TA_NO_THREAD_SAFETY_ANALYSIS {
 }
 
 zx_status_t Scanner::PrepareScanRequest(
-    const wlan_fullmac_wire::WlanFullmacImplStartScanRequest* req) {
+    const wlan_fullmac_wire::WlanFullmacImplBaseStartScanRequest* req) {
   scan_request_ = ScanRequestType(MLAN_IOCTL_SCAN, MLAN_ACT_SET, bss_index_,
                                   {.sub_command = MLAN_OID_SCAN_USER_CONFIG});
   auto scan_cfg =

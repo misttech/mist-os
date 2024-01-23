@@ -940,7 +940,7 @@ mod handle_mlme_request_tests {
             assert_variant!(driver_calls.next(), Some(DriverCall::ReconnectReq { req }) => req);
         assert_eq!(
             *driver_req,
-            banjo_wlan_fullmac::WlanFullmacImplReconnectRequest { peer_sta_address: [1u8; 6] }
+            banjo_wlan_fullmac::WlanFullmacImplBaseReconnectRequest { peer_sta_address: [1u8; 6] }
         );
     }
 
@@ -960,7 +960,7 @@ mod handle_mlme_request_tests {
             assert_variant!(driver_calls.next(), Some(DriverCall::AuthResp { resp }) => resp);
         assert_eq!(
             *driver_req,
-            banjo_wlan_fullmac::WlanFullmacImplAuthRespRequest {
+            banjo_wlan_fullmac::WlanFullmacImplBaseAuthRespRequest {
                 peer_sta_address: [1u8; 6],
                 result_code: banjo_wlan_fullmac::WlanAuthResult::SUCCESS,
             }
@@ -1052,7 +1052,7 @@ mod handle_mlme_request_tests {
             assert_variant!(driver_calls.next(), Some(DriverCall::Reset { req }) => req);
         assert_eq!(
             *driver_req,
-            banjo_wlan_fullmac::WlanFullmacImplResetRequest {
+            banjo_wlan_fullmac::WlanFullmacImplBaseResetRequest {
                 sta_address: [1u8; 6],
                 set_default_mib: true,
             }

@@ -450,47 +450,54 @@ TEST_F(WlanifDeviceTest, OnLinkStateChangedOnlyCalledWhenStateChanges) {
 
 TEST_F(WlanifDeviceTest, StartScan) {
   const uint8_t chan_list[1] = {0x9};
-  const wlan_fullmac_impl_start_scan_request_t req = {.scan_type = WLAN_SCAN_TYPE_ACTIVE,
-                                                      .channels_list = chan_list,
-                                                      .channels_count = 1,
-                                                      .ssids_count = 0,
-                                                      .min_channel_time = 10,
-                                                      .max_channel_time = 100};
+  const wlan_fullmac_impl_base_start_scan_request_t req = {.scan_type = WLAN_SCAN_TYPE_ACTIVE,
+                                                           .channels_list = chan_list,
+                                                           .channels_count = 1,
+                                                           .ssids_count = 0,
+                                                           .min_channel_time = 10,
+                                                           .max_channel_time = 100};
   driver()->StartScan(&req);
 }
 
 TEST_F(WlanifDeviceTest, Connect) {
-  const wlan_fullmac_impl_connect_request_t req = wlan_fullmac_test::CreateConnectReq();
+  const wlan_fullmac_impl_base_connect_request_t req = wlan_fullmac_test::CreateConnectReq();
   driver()->Connect(&req);
 }
 
 TEST_F(WlanifDeviceTest, CheckReconnReq) {
-  wlan_fullmac_impl_reconnect_request_t req;
+  wlan_fullmac_impl_base_reconnect_request_t req;
   memcpy(req.peer_sta_address, kPeerStaAddress, sizeof(kPeerStaAddress));
   driver()->Reconnect(&req);
 }
 
+TEST_F(WlanifDeviceTest, CheckDeauthReq) {
+  wlan_fullmac_impl_base_deauth_request_t req = {.reason_code = REASON_CODE_AP_INITIATED};
+  memcpy(req.peer_sta_address, kPeerStaAddress, sizeof(kPeerStaAddress));
+  driver()->Deauthenticate(&req);
+}
+
 TEST_F(WlanifDeviceTest, CheckAuthResp) {
-  wlan_fullmac_impl_auth_resp_request_t resp = {.result_code = WLAN_AUTH_RESULT_SUCCESS};
+  wlan_fullmac_impl_base_auth_resp_request_t resp = {.result_code = WLAN_AUTH_RESULT_SUCCESS};
   memcpy(resp.peer_sta_address, kPeerStaAddress, sizeof(kPeerStaAddress));
   driver()->AuthenticateResp(&resp);
 }
 
 TEST_F(WlanifDeviceTest, CheckAssocResp) {
-  wlan_fullmac_impl_assoc_resp_request resp = {.result_code = WLAN_ASSOC_RESULT_SUCCESS,
-                                               .association_id = 42};
+  wlan_fullmac_impl_base_assoc_resp_request resp = {.result_code = WLAN_ASSOC_RESULT_SUCCESS,
+                                                    .association_id = 42};
   memcpy(resp.peer_sta_address, kPeerStaAddress, sizeof(kPeerStaAddress));
   driver()->AssociateResp(&resp);
 }
 
 TEST_F(WlanifDeviceTest, CheckDisassoc) {
-  wlan_fullmac_impl_disassoc_request_t req = {.reason_code = REASON_CODE_LEAVING_NETWORK_DISASSOC};
+  wlan_fullmac_impl_base_disassoc_request_t req = {.reason_code =
+                                                       REASON_CODE_LEAVING_NETWORK_DISASSOC};
   memcpy(req.peer_sta_address, kPeerStaAddress, sizeof(kPeerStaAddress));
   driver()->Disassociate(&req);
 }
 
 TEST_F(WlanifDeviceTest, CheckStartBss) {
-  wlan_fullmac_impl_start_bss_request_t req = {
+  wlan_fullmac_impl_base_start_bss_request_t req = {
       .bss_type = BSS_TYPE_INFRASTRUCTURE, .beacon_period = 100, .dtim_period = 100, .channel = 1};
   memcpy(req.ssid.data, kPeerStaAddress, sizeof(kPeerStaAddress));
   req.ssid.len = sizeof(kPeerStaAddress);
@@ -498,14 +505,14 @@ TEST_F(WlanifDeviceTest, CheckStartBss) {
 }
 
 TEST_F(WlanifDeviceTest, CheckStopBss) {
-  wlan_fullmac_impl_stop_bss_request_t req;
+  wlan_fullmac_impl_base_stop_bss_request_t req;
   memcpy(req.ssid.data, kPeerStaAddress, sizeof(kPeerStaAddress));
   req.ssid.len = sizeof(kPeerStaAddress);
   driver()->StopBss(&req);
 }
 
 TEST_F(WlanifDeviceTest, CheckReset) {
-  wlan_fullmac_impl_reset_request_t req = {.set_default_mib = true};
+  wlan_fullmac_impl_base_reset_request_t req = {.set_default_mib = true};
   memcpy(req.sta_address, kPeerStaAddress, sizeof(kPeerStaAddress));
   driver()->Reset(&req);
 }
@@ -525,7 +532,7 @@ TEST_F(WlanifDeviceTest, CheckDeauthConf) {
   };
 
   EXPECT_EQ(ZX_OK, StartWlanifDevice(&ops, &signal));
-  wlan_fullmac_impl_deauth_request_t req;
+  wlan_fullmac_impl_base_deauth_request_t req;
   memcpy(req.peer_sta_address, kPeerStaAddress, ETH_ALEN);
   req.reason_code = 0;
   driver()->Deauthenticate(&req);
@@ -555,7 +562,7 @@ TEST_F(WlanifDeviceTest, SetDelKey) {
 }
 
 TEST_F(WlanifDeviceTest, CheckEapolTx) {
-  wlan_fullmac_impl_eapol_tx_request_t req = {};
+  wlan_fullmac_impl_base_eapol_tx_request_t req = {};
   uint8_t data[256];
   req.data_count = 100;
   req.data_list = data;

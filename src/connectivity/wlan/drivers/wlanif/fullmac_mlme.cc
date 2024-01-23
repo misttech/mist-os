@@ -55,39 +55,43 @@ zx_status_t FullmacMlme::Init() {
         return out_resp;
       },
       .start_scan =
-          [](void *device, wlan_fullmac_impl_start_scan_request_t *req) {
+          [](void *device, wlan_fullmac_impl_base_start_scan_request_t *req) {
             DEVICE(device)->StartScan(req);
           },
-      .connect = [](void *device,
-                    wlan_fullmac_impl_connect_request_t *req) { DEVICE(device)->Connect(req); },
+      .connect =
+          [](void *device, wlan_fullmac_impl_base_connect_request_t *req) {
+            DEVICE(device)->Connect(req);
+          },
       .reconnect =
-          [](void *device, wlan_fullmac_impl_reconnect_request_t *req) {
+          [](void *device, wlan_fullmac_impl_base_reconnect_request_t *req) {
             DEVICE(device)->Reconnect(req);
           },
       .auth_resp =
-          [](void *device, wlan_fullmac_impl_auth_resp_request_t *resp) {
+          [](void *device, wlan_fullmac_impl_base_auth_resp_request_t *resp) {
             DEVICE(device)->AuthenticateResp(resp);
           },
       .deauth =
-          [](void *device, wlan_fullmac_impl_deauth_request_t *req) {
+          [](void *device, wlan_fullmac_impl_base_deauth_request_t *req) {
             DEVICE(device)->Deauthenticate(req);
           },
       .assoc_resp =
-          [](void *device, wlan_fullmac_impl_assoc_resp_request_t *resp) {
+          [](void *device, wlan_fullmac_impl_base_assoc_resp_request_t *resp) {
             DEVICE(device)->AssociateResp(resp);
           },
       .disassoc =
-          [](void *device, wlan_fullmac_impl_disassoc_request_t *req) {
+          [](void *device, wlan_fullmac_impl_base_disassoc_request_t *req) {
             DEVICE(device)->Disassociate(req);
           },
       .reset = [](void *device,
-                  wlan_fullmac_impl_reset_request_t *req) { DEVICE(device)->Reset(req); },
+                  wlan_fullmac_impl_base_reset_request_t *req) { DEVICE(device)->Reset(req); },
       .start_bss =
-          [](void *device, wlan_fullmac_impl_start_bss_request_t *req) {
+          [](void *device, wlan_fullmac_impl_base_start_bss_request_t *req) {
             DEVICE(device)->StartBss(req);
           },
-      .stop_bss = [](void *device,
-                     wlan_fullmac_impl_stop_bss_request_t *req) { DEVICE(device)->StopBss(req); },
+      .stop_bss =
+          [](void *device, wlan_fullmac_impl_base_stop_bss_request_t *req) {
+            DEVICE(device)->StopBss(req);
+          },
       .set_keys_req = [](void *device,
                          wlan_fullmac_set_keys_req_t *req) -> wlan_fullmac_set_keys_resp_t {
         wlan_fullmac_set_keys_resp_t out_resp;
@@ -96,8 +100,10 @@ zx_status_t FullmacMlme::Init() {
       },
       .del_keys_req = [](void *device,
                          wlan_fullmac_del_keys_req_t *req) { DEVICE(device)->DeleteKeysReq(req); },
-      .eapol_tx = [](void *device,
-                     wlan_fullmac_impl_eapol_tx_request_t *req) { DEVICE(device)->EapolTx(req); },
+      .eapol_tx =
+          [](void *device, wlan_fullmac_impl_base_eapol_tx_request_t *req) {
+            DEVICE(device)->EapolTx(req);
+          },
       .get_iface_counter_stats = [](void *device,
                                     int32_t *out_status) -> wlan_fullmac_iface_counter_stats_t {
         wlan_fullmac_iface_counter_stats_t out_stats;

@@ -146,8 +146,8 @@ pub fn convert_ssid(ssid: &[u8]) -> banjo_wlan_ieee80211::CSsid {
 pub fn convert_scan_request<'a>(
     req: &'a fidl_mlme::ScanRequest,
     ssid_list_copy: &'a [banjo_wlan_ieee80211::CSsid],
-) -> BanjoReturnType<'a, banjo_wlan_fullmac::WlanFullmacImplStartScanRequest> {
-    BanjoReturnType::new(banjo_wlan_fullmac::WlanFullmacImplStartScanRequest {
+) -> BanjoReturnType<'a, banjo_wlan_fullmac::WlanFullmacImplBaseStartScanRequest> {
+    BanjoReturnType::new(banjo_wlan_fullmac::WlanFullmacImplBaseStartScanRequest {
         txn_id: req.txn_id,
         scan_type: match req.scan_type {
             fidl_mlme::ScanTypes::Active => banjo_wlan_fullmac::WlanScanType::ACTIVE,
@@ -164,9 +164,9 @@ pub fn convert_scan_request<'a>(
 
 pub fn convert_connect_request(
     req: &fidl_mlme::ConnectRequest,
-) -> BanjoReturnType<'_, banjo_wlan_fullmac::WlanFullmacImplConnectRequest> {
+) -> BanjoReturnType<'_, banjo_wlan_fullmac::WlanFullmacImplBaseConnectRequest> {
     use banjo_wlan_fullmac::WlanAuthType;
-    BanjoReturnType::new(banjo_wlan_fullmac::WlanFullmacImplConnectRequest {
+    BanjoReturnType::new(banjo_wlan_fullmac::WlanFullmacImplBaseConnectRequest {
         selected_bss: convert_bss_description(&req.selected_bss).0,
         connect_failure_timeout: req.connect_failure_timeout,
         auth_type: match req.auth_type {
@@ -188,15 +188,17 @@ pub fn convert_connect_request(
 
 pub fn convert_reconnect_request(
     req: &fidl_mlme::ReconnectRequest,
-) -> banjo_wlan_fullmac::WlanFullmacImplReconnectRequest {
-    banjo_wlan_fullmac::WlanFullmacImplReconnectRequest { peer_sta_address: req.peer_sta_address }
+) -> banjo_wlan_fullmac::WlanFullmacImplBaseReconnectRequest {
+    banjo_wlan_fullmac::WlanFullmacImplBaseReconnectRequest {
+        peer_sta_address: req.peer_sta_address,
+    }
 }
 
 pub fn convert_authenticate_response(
     resp: &fidl_mlme::AuthenticateResponse,
-) -> banjo_wlan_fullmac::WlanFullmacImplAuthRespRequest {
+) -> banjo_wlan_fullmac::WlanFullmacImplBaseAuthRespRequest {
     use banjo_wlan_fullmac::WlanAuthResult;
-    banjo_wlan_fullmac::WlanFullmacImplAuthRespRequest {
+    banjo_wlan_fullmac::WlanFullmacImplBaseAuthRespRequest {
         peer_sta_address: resp.peer_sta_address,
         result_code: match resp.result_code {
             fidl_mlme::AuthenticateResultCode::Success => WlanAuthResult::SUCCESS,
@@ -217,8 +219,8 @@ pub fn convert_authenticate_response(
 
 pub fn convert_deauthenticate_request(
     req: &fidl_mlme::DeauthenticateRequest,
-) -> banjo_wlan_fullmac::WlanFullmacImplDeauthRequest {
-    banjo_wlan_fullmac::WlanFullmacImplDeauthRequest {
+) -> banjo_wlan_fullmac::WlanFullmacImplBaseDeauthRequest {
+    banjo_wlan_fullmac::WlanFullmacImplBaseDeauthRequest {
         peer_sta_address: req.peer_sta_address,
         reason_code: banjo_wlan_ieee80211::ReasonCode(req.reason_code.into_primitive()),
     }
@@ -226,9 +228,9 @@ pub fn convert_deauthenticate_request(
 
 pub fn convert_associate_response(
     resp: &fidl_mlme::AssociateResponse,
-) -> banjo_wlan_fullmac::WlanFullmacImplAssocRespRequest {
+) -> banjo_wlan_fullmac::WlanFullmacImplBaseAssocRespRequest {
     use banjo_wlan_fullmac::WlanAssocResult;
-    banjo_wlan_fullmac::WlanFullmacImplAssocRespRequest {
+    banjo_wlan_fullmac::WlanFullmacImplBaseAssocRespRequest {
         peer_sta_address: resp.peer_sta_address,
         result_code: match resp.result_code {
             fidl_mlme::AssociateResultCode::Success => WlanAssocResult::SUCCESS,
@@ -263,8 +265,8 @@ pub fn convert_associate_response(
 
 pub fn convert_disassociate_request(
     req: &fidl_mlme::DisassociateRequest,
-) -> banjo_wlan_fullmac::WlanFullmacImplDisassocRequest {
-    banjo_wlan_fullmac::WlanFullmacImplDisassocRequest {
+) -> banjo_wlan_fullmac::WlanFullmacImplBaseDisassocRequest {
+    banjo_wlan_fullmac::WlanFullmacImplBaseDisassocRequest {
         peer_sta_address: req.peer_sta_address,
         reason_code: banjo_wlan_ieee80211::ReasonCode(req.reason_code.into_primitive()),
     }
@@ -272,8 +274,8 @@ pub fn convert_disassociate_request(
 
 pub fn convert_reset_request(
     req: &fidl_mlme::ResetRequest,
-) -> banjo_wlan_fullmac::WlanFullmacImplResetRequest {
-    banjo_wlan_fullmac::WlanFullmacImplResetRequest {
+) -> banjo_wlan_fullmac::WlanFullmacImplBaseResetRequest {
+    banjo_wlan_fullmac::WlanFullmacImplBaseResetRequest {
         sta_address: req.sta_address,
         set_default_mib: req.set_default_mib,
     }
@@ -281,8 +283,8 @@ pub fn convert_reset_request(
 
 pub fn convert_start_bss_request(
     req: &fidl_mlme::StartRequest,
-) -> banjo_wlan_fullmac::WlanFullmacImplStartBssRequest {
-    let mut request = banjo_wlan_fullmac::WlanFullmacImplStartBssRequest {
+) -> banjo_wlan_fullmac::WlanFullmacImplBaseStartBssRequest {
+    let mut request = banjo_wlan_fullmac::WlanFullmacImplBaseStartBssRequest {
         ssid: convert_ssid(&req.ssid[..]),
         bss_type: banjo_wlan_common::BssType(req.bss_type.into_primitive()),
         beacon_period: req.beacon_period as u32,
@@ -302,7 +304,7 @@ pub fn convert_start_bss_request(
             );
         }
         // Assuming here that the input StartRequest outlives the output
-        // WlanFullmacImplStartBssRequest.
+        // WlanFullmacImplBaseStartBssRequest.
         request.rsne_list = rsne.as_ptr();
         request.rsne_count = min(rsne.len(), banjo_wlan_ieee80211::WLAN_IE_BODY_MAX_LEN as usize);
     }
@@ -311,8 +313,8 @@ pub fn convert_start_bss_request(
 
 pub fn convert_stop_bss_request(
     req: &fidl_mlme::StopRequest,
-) -> banjo_wlan_fullmac::WlanFullmacImplStopBssRequest {
-    banjo_wlan_fullmac::WlanFullmacImplStopBssRequest { ssid: convert_ssid(&req.ssid[..]) }
+) -> banjo_wlan_fullmac::WlanFullmacImplBaseStopBssRequest {
+    banjo_wlan_fullmac::WlanFullmacImplBaseStopBssRequest { ssid: convert_ssid(&req.ssid[..]) }
 }
 
 pub fn convert_set_keys_request(
@@ -352,8 +354,8 @@ pub fn convert_delete_keys_request(
 
 pub fn convert_eapol_request(
     req: &fidl_mlme::EapolRequest,
-) -> BanjoReturnType<'_, banjo_wlan_fullmac::WlanFullmacImplEapolTxRequest> {
-    BanjoReturnType::new(banjo_wlan_fullmac::WlanFullmacImplEapolTxRequest {
+) -> BanjoReturnType<'_, banjo_wlan_fullmac::WlanFullmacImplBaseEapolTxRequest> {
+    BanjoReturnType::new(banjo_wlan_fullmac::WlanFullmacImplBaseEapolTxRequest {
         src_addr: req.src_addr,
         dst_addr: req.dst_addr,
         data_list: req.data.as_ptr(),

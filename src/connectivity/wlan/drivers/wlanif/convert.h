@@ -17,12 +17,12 @@ namespace wlanif {
 
 void ConvertCSsid(const cssid_t& cssid, fuchsia_wlan_ieee80211::wire::CSsid* out_cssid);
 
-void ConvertScanReq(const wlan_fullmac_impl_start_scan_request_t& in,
-                    fuchsia_wlan_fullmac::wire::WlanFullmacImplStartScanRequest* out,
+void ConvertScanReq(const wlan_fullmac_impl_base_start_scan_request_t& in,
+                    fuchsia_wlan_fullmac::wire::WlanFullmacImplBaseStartScanRequest* out,
                     fidl::AnyArena& arena);
 
-void ConvertConnectReq(const wlan_fullmac_impl_connect_request_t& in,
-                       fuchsia_wlan_fullmac::wire::WlanFullmacImplConnectRequest* out,
+void ConvertConnectReq(const wlan_fullmac_impl_base_connect_request_t& in,
+                       fuchsia_wlan_fullmac::wire::WlanFullmacImplBaseConnectRequest* out,
                        fidl::AnyArena& arena);
 
 fuchsia_wlan_fullmac::wire::WlanAuthResult ConvertAuthResult(uint8_t in);

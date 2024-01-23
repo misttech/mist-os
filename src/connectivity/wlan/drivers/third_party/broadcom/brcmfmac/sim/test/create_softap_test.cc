@@ -266,7 +266,7 @@ uint16_t CreateSoftAPTest::CreateRsneIe(uint8_t* buffer) {
 
 zx_status_t CreateSoftAPTest::StartSoftAP() {
   fuchsia_wlan_ieee80211::wire::CSsid ssid = {.len = 6, .data = {.data_ = "Sim_AP"}};
-  auto builder = wlan_fullmac_wire::WlanFullmacImplStartBssRequest::Builder(test_arena_)
+  auto builder = wlan_fullmac_wire::WlanFullmacImplBaseStartBssRequest::Builder(test_arena_)
                      .bss_type(fuchsia_wlan_common_wire::BssType::kInfrastructure)
                      .beacon_period(100)
                      .dtim_period(100)
@@ -320,7 +320,7 @@ void CreateSoftAPTest::InjectSetSsidError() {
 void CreateSoftAPTest::SetExpectMacForInds(common::MacAddr set_mac) { ind_expect_mac_ = set_mac; }
 
 zx_status_t CreateSoftAPTest::StopSoftAP() {
-  auto builder = wlan_fullmac_wire::WlanFullmacImplStopBssRequest::Builder(test_arena_);
+  auto builder = wlan_fullmac_wire::WlanFullmacImplBaseStopBssRequest::Builder(test_arena_);
   fuchsia_wlan_ieee80211::wire::CSsid ssid = {.len = 6, .data = {.data_ = "Sim_AP"}};
   builder.ssid(ssid);
   auto result = softap_ifc_.client_.buffer(softap_ifc_.test_arena_)->StopBss(builder.Build());
@@ -405,8 +405,8 @@ void CreateSoftAPTest::TxDeauthReq(common::MacAddr client_mac) {
 }
 
 void CreateSoftAPTest::DeauthClient(common::MacAddr client_mac) {
-  auto builder =
-      fuchsia_wlan_fullmac::wire::WlanFullmacImplDeauthRequest::Builder(softap_ifc_.test_arena_);
+  auto builder = fuchsia_wlan_fullmac::wire::WlanFullmacImplBaseDeauthRequest::Builder(
+      softap_ifc_.test_arena_);
 
   ::fidl::Array<uint8_t, ETH_ALEN> peer_sta_address;
   std::memcpy(peer_sta_address.data(), client_mac.byte, ETH_ALEN);
@@ -489,7 +489,7 @@ TEST_F(CreateSoftAPTest, CreateSoftAPMissingParams) {
   CreateInterface();
   EXPECT_EQ(DeviceCountByProtocolId(ZX_PROTOCOL_WLAN_FULLMAC_IMPL), 1u);
   // Create the Start BSS request without the SSID.
-  auto builder = wlan_fullmac_wire::WlanFullmacImplStartBssRequest::Builder(test_arena_)
+  auto builder = wlan_fullmac_wire::WlanFullmacImplBaseStartBssRequest::Builder(test_arena_)
                      .bss_type(fuchsia_wlan_common_wire::BssType::kInfrastructure)
                      .beacon_period(100)
                      .dtim_period(100)
@@ -549,7 +549,7 @@ TEST_F(CreateSoftAPTest, BssStopMissingParam) {
   // Start SoftAP
   StartSoftAP();
   // Create the Stop BSS request without the SSID.
-  auto builder = wlan_fullmac_wire::WlanFullmacImplStopBssRequest::Builder(test_arena_);
+  auto builder = wlan_fullmac_wire::WlanFullmacImplBaseStopBssRequest::Builder(test_arena_);
 
   auto result = softap_ifc_.client_.buffer(softap_ifc_.test_arena_)->StopBss(builder.Build());
   EXPECT_TRUE(result.ok());

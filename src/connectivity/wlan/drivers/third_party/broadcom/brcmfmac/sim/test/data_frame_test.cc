@@ -359,7 +359,8 @@ void DataFrameTest::OnDisassocInd(const wlan_fullmac_wire::WlanFullmacDisassocIn
 
 void DataFrameTest::StartConnect() {
   // Send connect request
-  auto builder = wlan_fullmac_wire::WlanFullmacImplConnectRequest::Builder(client_ifc_.test_arena_);
+  auto builder =
+      wlan_fullmac_wire::WlanFullmacImplBaseConnectRequest::Builder(client_ifc_.test_arena_);
   fuchsia_wlan_internal::wire::BssDescription bss;
   std::memcpy(bss.bssid.data(), assoc_context_.bssid.byte, ETH_ALEN);
   bss.ies =
@@ -381,7 +382,7 @@ void DataFrameTest::TxEapolRequest(common::MacAddr dstAddr, common::MacAddr srcA
   memcpy(src_addr.data(), srcAddr.byte, ETH_ALEN);
 
   auto eapol_req =
-      wlan_fullmac_wire::WlanFullmacImplEapolTxRequest::Builder(client_ifc_.test_arena_)
+      wlan_fullmac_wire::WlanFullmacImplBaseEapolTxRequest::Builder(client_ifc_.test_arena_)
           .src_addr(src_addr)
           .dst_addr(dst_addr)
           .data(fidl::VectorView<uint8_t>::FromExternal(const_cast<uint8_t*>(eapol.data()),

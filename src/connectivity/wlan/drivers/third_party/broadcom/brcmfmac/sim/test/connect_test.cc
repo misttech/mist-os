@@ -423,7 +423,8 @@ void ConnectTest::OnSignalReport(const wlan_fullmac_wire::WlanFullmacSignalRepor
 
 void ConnectTest::StartConnect() {
   // Send connect request
-  auto builder = wlan_fullmac_wire::WlanFullmacImplConnectRequest::Builder(client_ifc_.test_arena_);
+  auto builder =
+      wlan_fullmac_wire::WlanFullmacImplBaseConnectRequest::Builder(client_ifc_.test_arena_);
   fuchsia_wlan_internal::wire::BssDescription bss;
   std::memcpy(bss.bssid.data(), context_.bssid.byte, ETH_ALEN);
   bss.ies = fidl::VectorView<uint8_t>(client_ifc_.test_arena_, context_.ies);
@@ -439,7 +440,7 @@ void ConnectTest::StartReconnect() {
   // Send reconnect request
   // This is what SME does on a disassoc ind.
   auto builder =
-      wlan_fullmac_wire::WlanFullmacImplReconnectRequest::Builder(client_ifc_.test_arena_);
+      wlan_fullmac_wire::WlanFullmacImplBaseReconnectRequest::Builder(client_ifc_.test_arena_);
   ::fidl::Array<uint8_t, 6> peer_sta_address;
   std::memcpy(peer_sta_address.data(), context_.bssid.byte, ETH_ALEN);
   builder.peer_sta_address(peer_sta_address);
@@ -642,8 +643,8 @@ void ConnectTest::StartDeauth() {
 }
 
 void ConnectTest::DisassocClient(const common::MacAddr& mac_addr) {
-  auto builder =
-      fuchsia_wlan_fullmac::wire::WlanFullmacImplDisassocRequest::Builder(client_ifc_.test_arena_);
+  auto builder = fuchsia_wlan_fullmac::wire::WlanFullmacImplBaseDisassocRequest::Builder(
+      client_ifc_.test_arena_);
 
   ::fidl::Array<uint8_t, ETH_ALEN> peer_sta_address;
   std::memcpy(peer_sta_address.data(), mac_addr.byte, ETH_ALEN);
@@ -655,8 +656,8 @@ void ConnectTest::DisassocClient(const common::MacAddr& mac_addr) {
 }
 
 void ConnectTest::DeauthClient() {
-  auto builder =
-      fuchsia_wlan_fullmac::wire::WlanFullmacImplDeauthRequest::Builder(client_ifc_.test_arena_);
+  auto builder = fuchsia_wlan_fullmac::wire::WlanFullmacImplBaseDeauthRequest::Builder(
+      client_ifc_.test_arena_);
 
   ::fidl::Array<uint8_t, ETH_ALEN> peer_sta_address;
   std::memcpy(peer_sta_address.data(), context_.bssid.byte, ETH_ALEN);
@@ -1078,7 +1079,7 @@ TEST_F(ConnectTest, AssocWhileScanning) {
 
   const uint8_t channels_list[] = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11};
   auto builder =
-      wlan_fullmac_wire::WlanFullmacImplStartScanRequest::Builder(client_ifc_.test_arena_);
+      wlan_fullmac_wire::WlanFullmacImplBaseStartScanRequest::Builder(client_ifc_.test_arena_);
 
   builder.txn_id(42);
   builder.scan_type(wlan_fullmac_wire::WlanScanType::kPassive);

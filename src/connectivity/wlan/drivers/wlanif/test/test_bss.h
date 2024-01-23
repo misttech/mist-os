@@ -83,7 +83,7 @@ static constexpr uint8_t kRates[] = {0x82, 0x84, 0x8b, 0x96, 0x0c, 0x12,
 bss_description_t CreateBssDescription(wlan_channel_t channel);
 ::fuchsia::wlan::mlme::StartRequest CreateStartReq();
 ::fuchsia::wlan::mlme::StopRequest CreateStopReq();
-wlan_fullmac_impl_connect_request CreateConnectReq();
+wlan_fullmac_impl_base_connect_request CreateConnectReq();
 ::fuchsia::wlan::mlme::DeauthenticateRequest CreateDeauthenticateReq();
 ::fuchsia::wlan::mlme::DisassociateRequest CreateDisassociateReq();
 

@@ -54,19 +54,19 @@ class Device final : public fdf::DriverBase,
 
   void handle_unknown_event(
       fidl::UnknownEventMetadata<fuchsia_driver_framework::NodeController> metadata) override {}
-  void StartScan(const wlan_fullmac_impl_start_scan_request_t* req);
-  void Connect(const wlan_fullmac_impl_connect_request_t* req);
-  void Reconnect(const wlan_fullmac_impl_reconnect_request_t* req);
-  void AuthenticateResp(const wlan_fullmac_impl_auth_resp_request_t* resp);
-  void Deauthenticate(const wlan_fullmac_impl_deauth_request_t* req);
-  void AssociateResp(const wlan_fullmac_impl_assoc_resp_request_t* resp);
-  void Disassociate(const wlan_fullmac_impl_disassoc_request_t* req);
-  void Reset(const wlan_fullmac_impl_reset_request_t* req);
-  void StartBss(const wlan_fullmac_impl_start_bss_request_t* req);
-  void StopBss(const wlan_fullmac_impl_stop_bss_request_t* req);
+  void StartScan(const wlan_fullmac_impl_base_start_scan_request_t* req);
+  void Connect(const wlan_fullmac_impl_base_connect_request_t* req);
+  void Reconnect(const wlan_fullmac_impl_base_reconnect_request_t* req);
+  void AuthenticateResp(const wlan_fullmac_impl_base_auth_resp_request_t* resp);
+  void Deauthenticate(const wlan_fullmac_impl_base_deauth_request_t* req);
+  void AssociateResp(const wlan_fullmac_impl_base_assoc_resp_request_t* resp);
+  void Disassociate(const wlan_fullmac_impl_base_disassoc_request_t* req);
+  void Reset(const wlan_fullmac_impl_base_reset_request_t* req);
+  void StartBss(const wlan_fullmac_impl_base_start_bss_request_t* req);
+  void StopBss(const wlan_fullmac_impl_base_stop_bss_request_t* req);
   void SetKeysReq(const wlan_fullmac_set_keys_req_t* req, wlan_fullmac_set_keys_resp_t* out_resp);
   void DeleteKeysReq(const wlan_fullmac_del_keys_req_t* req);
-  void EapolTx(const wlan_fullmac_impl_eapol_tx_request_t* req);
+  void EapolTx(const wlan_fullmac_impl_base_eapol_tx_request_t* req);
   void QueryDeviceInfo(wlan_fullmac_query_info_t* out_resp);
   void QueryMacSublayerSupport(mac_sublayer_support_t* out_resp);
   void QuerySecuritySupport(security_support_t* out_resp);

@@ -43,7 +43,7 @@ class Scanner {
   // Start a scan. Returns ZX_ERR_ALREADY_EXISTS if a scan is already in progress. The scan will
   // time out after the given timeout has elapsed. Scan results are reported one at a time through
   // the `on_scan_result` callback and `on_scan_end` will be called when the scan ends.
-  zx_status_t Scan(const wlan_fullmac_wire::WlanFullmacImplStartScanRequest* req,
+  zx_status_t Scan(const wlan_fullmac_wire::WlanFullmacImplBaseStartScanRequest* req,
                    zx_duration_t timeout, OnScanResult&& on_scan_result, OnScanEnd&& on_scan_end)
       __TA_EXCLUDES(mutex_);
 
@@ -64,7 +64,8 @@ class Scanner {
 
  private:
   zx_status_t PrepareScanRequest(
-      const fuchsia_wlan_fullmac::wire::WlanFullmacImplStartScanRequest* req) __TA_REQUIRES(mutex_);
+      const fuchsia_wlan_fullmac::wire::WlanFullmacImplBaseStartScanRequest* req)
+      __TA_REQUIRES(mutex_);
   void PopulateScanChannel(wlan_user_scan_chan& user_scan_chan, uint8_t channel, uint8_t scan_type,
                            uint32_t channel_time);
   void OnScanReport(pmlan_event event) __TA_EXCLUDES(mutex_);
