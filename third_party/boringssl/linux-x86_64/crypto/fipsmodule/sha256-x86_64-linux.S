@@ -1,18 +1,39 @@
 // This file is generated from a similarly-named Perl script in the BoringSSL
 // source tree. Do not edit by hand.
 
-#include <openssl/asm_base.h>
+#if defined(__has_feature)
+#if __has_feature(memory_sanitizer) && !defined(OPENSSL_NO_ASM)
+#define OPENSSL_NO_ASM
+#endif
+#endif
 
-#if !defined(OPENSSL_NO_ASM) && defined(OPENSSL_X86_64) && defined(__ELF__)
+#if defined(__x86_64__) && !defined(OPENSSL_NO_ASM) && defined(__ELF__)
+#if defined(BORINGSSL_PREFIX)
+#include <boringssl_prefix_symbols_asm.h>
+#endif
 .text	
 
-.globl	sha256_block_data_order_nohw
-.hidden sha256_block_data_order_nohw
-.type	sha256_block_data_order_nohw,@function
+.extern	OPENSSL_ia32cap_P
+.hidden OPENSSL_ia32cap_P
+.globl	sha256_block_data_order
+.hidden sha256_block_data_order
+.type	sha256_block_data_order,@function
 .align	16
-sha256_block_data_order_nohw:
+sha256_block_data_order:
 .cfi_startproc	
-_CET_ENDBR
+	leaq	OPENSSL_ia32cap_P(%rip),%r11
+	movl	0(%r11),%r9d
+	movl	4(%r11),%r10d
+	movl	8(%r11),%r11d
+	testl	$536870912,%r11d
+	jnz	.Lshaext_shortcut
+	andl	$1073741824,%r9d
+	andl	$268435968,%r10d
+	orl	%r9d,%r10d
+	cmpl	$1342177792,%r10d
+	je	.Lavx_shortcut
+	testl	$512,%r10d
+	jnz	.Lssse3_shortcut
 	movq	%rsp,%rax
 .cfi_def_cfa_register	%rax
 	pushq	%rbx
@@ -1716,9 +1737,9 @@ _CET_ENDBR
 	leaq	(%rsi),%rsp
 .cfi_def_cfa_register	%rsp
 .Lepilogue:
-	ret
+	.byte	0xf3,0xc3
 .cfi_endproc	
-.size	sha256_block_data_order_nohw,.-sha256_block_data_order_nohw
+.size	sha256_block_data_order,.-sha256_block_data_order
 .section	.rodata
 .align	64
 .type	K256,@object
@@ -1764,13 +1785,11 @@ K256:
 .long	0xffffffff,0xffffffff,0x03020100,0x0b0a0908
 .byte	83,72,65,50,53,54,32,98,108,111,99,107,32,116,114,97,110,115,102,111,114,109,32,102,111,114,32,120,56,54,95,54,52,44,32,67,82,89,80,84,79,71,65,77,83,32,98,121,32,60,97,112,112,114,111,64,111,112,101,110,115,115,108,46,111,114,103,62,0
 .text	
-.globl	sha256_block_data_order_hw
-.hidden sha256_block_data_order_hw
-.type	sha256_block_data_order_hw,@function
+.type	sha256_block_data_order_shaext,@function
 .align	64
-sha256_block_data_order_hw:
+sha256_block_data_order_shaext:
 .cfi_startproc	
-_CET_ENDBR
+.Lshaext_shortcut:
 	leaq	K256+128(%rip),%rcx
 	movdqu	(%rdi),%xmm1
 	movdqu	16(%rdi),%xmm2
@@ -1972,16 +1991,14 @@ _CET_ENDBR
 
 	movdqu	%xmm1,(%rdi)
 	movdqu	%xmm2,16(%rdi)
-	ret
+	.byte	0xf3,0xc3
 .cfi_endproc	
-.size	sha256_block_data_order_hw,.-sha256_block_data_order_hw
-.globl	sha256_block_data_order_ssse3
-.hidden sha256_block_data_order_ssse3
+.size	sha256_block_data_order_shaext,.-sha256_block_data_order_shaext
 .type	sha256_block_data_order_ssse3,@function
 .align	64
 sha256_block_data_order_ssse3:
 .cfi_startproc	
-_CET_ENDBR
+.Lssse3_shortcut:
 	movq	%rsp,%rax
 .cfi_def_cfa_register	%rax
 	pushq	%rbx
@@ -3087,16 +3104,14 @@ _CET_ENDBR
 	leaq	(%rsi),%rsp
 .cfi_def_cfa_register	%rsp
 .Lepilogue_ssse3:
-	ret
+	.byte	0xf3,0xc3
 .cfi_endproc	
 .size	sha256_block_data_order_ssse3,.-sha256_block_data_order_ssse3
-.globl	sha256_block_data_order_avx
-.hidden sha256_block_data_order_avx
 .type	sha256_block_data_order_avx,@function
 .align	64
 sha256_block_data_order_avx:
 .cfi_startproc	
-_CET_ENDBR
+.Lavx_shortcut:
 	movq	%rsp,%rax
 .cfi_def_cfa_register	%rax
 	pushq	%rbx
@@ -4164,7 +4179,11 @@ _CET_ENDBR
 	leaq	(%rsi),%rsp
 .cfi_def_cfa_register	%rsp
 .Lepilogue_avx:
-	ret
+	.byte	0xf3,0xc3
 .cfi_endproc	
 .size	sha256_block_data_order_avx,.-sha256_block_data_order_avx
+#endif
+#if defined(__ELF__)
+// See https://www.airs.com/blog/archives/518.
+.section .note.GNU-stack,"",%progbits
 #endif

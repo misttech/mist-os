@@ -29,7 +29,21 @@ group("boringssl-static") {
   ]
 }
 
-crypto_sources += crypto_sources_asm
+if (current_cpu == "arm64" && (is_fuchsia || is_linux)) {
+  crypto_sources += crypto_sources_linux_aarch64
+} else if (current_cpu == "arm64" && is_mac) {
+  crypto_sources += crypto_sources_apple_aarch64
+} else if (current_cpu == "x64" && (is_fuchsia || is_linux)) {
+  crypto_sources += crypto_sources_linux_x86_64
+} else if (current_cpu == "x64" && is_mac) {
+  crypto_sources += crypto_sources_apple_x86_64
+} else if (current_cpu == "riscv64" && (is_fuchsia || is_linux)) {
+  # Nothing to do here: As of 2023-03-07, only openssl contains riscv64
+  # assembly routines, but only for crypto/aes and crypto/ghash which are
+  # not part of boringssl.
+} else if (!is_kernel) {
+  assert(false, "unsupported OS or CPU: $current_os/$current_cpu")
+}
 
 # TODO(https://fxbug.dev/46139): remove this added source.
 crypto_sources += [ "src/decrepit/xts/xts.c" ]
@@ -190,6 +204,7 @@ if (!is_kernel) {
   common_crypto_test_sources = [
     # This test does nothing when BORINGSSL_SHARED_LIBRARY is defined and is
     # needed to resolve missing symbols. /shrug
+    "src/crypto/test/abi_test.cc",
     "src/crypto/test/file_test_gtest.cc",
     "src/crypto/test/gtest_main.cc",
   ]
@@ -218,7 +233,6 @@ if (!is_kernel) {
       deps = [
         ":crypto",
         ":crypto_test_data",
-        "//third_party/googletest:gmock",
         "//third_party/googletest:gtest",
       ]
     }
@@ -231,7 +245,6 @@ if (!is_kernel) {
     deps = [
       ":crypto",
       ":ssl",
-      "//third_party/googletest:gmock",
       "//third_party/googletest:gtest",
     ]
   }

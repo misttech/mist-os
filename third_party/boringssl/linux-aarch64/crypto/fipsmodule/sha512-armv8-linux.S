@@ -1,9 +1,17 @@
 // This file is generated from a similarly-named Perl script in the BoringSSL
 // source tree. Do not edit by hand.
 
-#include <openssl/asm_base.h>
+#if !defined(__has_feature)
+#define __has_feature(x) 0
+#endif
+#if __has_feature(memory_sanitizer) && !defined(OPENSSL_NO_ASM)
+#define OPENSSL_NO_ASM
+#endif
 
-#if !defined(OPENSSL_NO_ASM) && defined(OPENSSL_AARCH64) && defined(__ELF__)
+#if !defined(OPENSSL_NO_ASM) && defined(__AARCH64EL__) && defined(__ELF__)
+#if defined(BORINGSSL_PREFIX)
+#include <boringssl_prefix_symbols_asm.h>
+#endif
 // Copyright 2014-2020 The OpenSSL Project Authors. All Rights Reserved.
 //
 // Licensed under the OpenSSL license (the "License").  You may not use
@@ -50,11 +58,24 @@
 
 .text
 
-.globl	sha512_block_data_order_nohw
-.hidden	sha512_block_data_order_nohw
-.type	sha512_block_data_order_nohw,%function
+
+.hidden	OPENSSL_armcap_P
+.globl	sha512_block_data_order
+.hidden	sha512_block_data_order
+.type	sha512_block_data_order,%function
 .align	6
-sha512_block_data_order_nohw:
+sha512_block_data_order:
+	AARCH64_VALID_CALL_TARGET
+#ifndef	__KERNEL__
+#if __has_feature(hwaddress_sanitizer) && __clang_major__ >= 10
+	adrp	x16,:pg_hi21_nc:OPENSSL_armcap_P
+#else
+	adrp	x16,OPENSSL_armcap_P
+#endif
+	ldr	w16,[x16,:lo12:OPENSSL_armcap_P]
+	tst	w16,#ARMV8_SHA512
+	b.ne	.Lv8_entry
+#endif
 	AARCH64_SIGN_LINK_REGISTER
 	stp	x29,x30,[sp,#-128]!
 	add	x29,sp,#0
@@ -1018,7 +1039,7 @@ sha512_block_data_order_nohw:
 	ldp	x29,x30,[sp],#128
 	AARCH64_VALIDATE_LINK_REGISTER
 	ret
-.size	sha512_block_data_order_nohw,.-sha512_block_data_order_nohw
+.size	sha512_block_data_order,.-sha512_block_data_order
 
 .section	.rodata
 .align	6
@@ -1071,13 +1092,10 @@ sha512_block_data_order_nohw:
 .align	2
 .text
 #ifndef	__KERNEL__
-.globl	sha512_block_data_order_hw
-.hidden	sha512_block_data_order_hw
-.type	sha512_block_data_order_hw,%function
+.type	sha512_block_armv8,%function
 .align	6
-sha512_block_data_order_hw:
-	// Armv8.3-A PAuth: even though x30 is pushed to stack it is not popped later.
-	AARCH64_VALID_CALL_TARGET
+sha512_block_armv8:
+.Lv8_entry:
 	stp	x29,x30,[sp,#-16]!
 	add	x29,sp,#0
 
@@ -1591,6 +1609,10 @@ sha512_block_data_order_hw:
 
 	ldr	x29,[sp],#16
 	ret
-.size	sha512_block_data_order_hw,.-sha512_block_data_order_hw
+.size	sha512_block_armv8,.-sha512_block_armv8
 #endif
-#endif  // !OPENSSL_NO_ASM && defined(OPENSSL_AARCH64) && defined(__ELF__)
+#endif  // !OPENSSL_NO_ASM && defined(__AARCH64EL__) && defined(__ELF__)
+#if defined(__ELF__)
+// See https://www.airs.com/blog/archives/518.
+.section .note.GNU-stack,"",%progbits
+#endif

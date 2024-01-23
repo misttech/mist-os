@@ -5,7 +5,6 @@
     include: [
         "//sdk/lib/syslog/client.shard.cml",
         "//src/sys/test_runners/gtest/default.shard.cml",
-        "//src/sys/test_runners/tmp_storage.shard.cml",
     ],
     program: {
         binary: "test/bio_test_crypto_test",
