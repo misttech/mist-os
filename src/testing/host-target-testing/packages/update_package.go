@@ -209,7 +209,6 @@ func (u *UpdatePackage) EditSystemImagePackage(
 	repoName string,
 	dstUpdatePackagePath string,
 	bootfsCompression string,
-	useNewUpdateFormat bool,
 	editFunc func(systemImage *SystemImagePackage) (*SystemImagePackage, error),
 ) (*UpdatePackage, *SystemImagePackage, error) {
 	srcSystemImage, err := u.OpenSystemImagePackage(ctx)
@@ -234,7 +233,6 @@ func (u *UpdatePackage) EditSystemImagePackage(
 		dstSystemImage,
 		dstUpdatePackagePath,
 		bootfsCompression,
-		useNewUpdateFormat,
 	)
 	if err != nil {
 		return nil, nil, err
@@ -302,7 +300,6 @@ func (u *UpdatePackage) EditUpdatePackageWithNewSystemImage(
 	systemImage *SystemImagePackage,
 	dstUpdatePackagePath string,
 	bootfsCompression string,
-	useNewUpdateFormat bool,
 ) (*UpdatePackage, error) {
 	return u.EditContents(
 		ctx,
@@ -313,7 +310,6 @@ func (u *UpdatePackage) EditUpdatePackageWithNewSystemImage(
 				ctx,
 				repoName,
 				dstUpdatePackagePath,
-				useNewUpdateFormat,
 				tempDir,
 				func(tempDir string, zbiName string, vbmetaName string) error {
 					zbiPath := filepath.Join(tempDir, zbiName)
@@ -368,7 +364,6 @@ func (u *UpdatePackage) EditUpdatePackageWithVBMetaProperties(
 	repoName string,
 	dstUpdatePackagePath string,
 	vbmetaPropertyFiles map[string]string,
-	useNewUpdateFormat bool,
 ) (*UpdatePackage, error) {
 	return u.EditContents(
 		ctx,
@@ -379,7 +374,6 @@ func (u *UpdatePackage) EditUpdatePackageWithVBMetaProperties(
 				ctx,
 				repoName,
 				dstUpdatePackagePath,
-				useNewUpdateFormat,
 				tempDir,
 				func(tempDir string, zbiName string, vbmetaName string) error {
 					vbmetaPath := filepath.Join(tempDir, vbmetaName)
@@ -412,7 +406,6 @@ func (u *UpdatePackage) editZbiAndVbmeta(
 	ctx context.Context,
 	repoName string,
 	dstUpdatePackagePath string,
-	useNewUpdateFormat bool,
 	tempDir string,
 	editFunc func(tempDir string, zbiName string, vbmetaName string) error,
 ) error {
@@ -432,11 +425,6 @@ func (u *UpdatePackage) editZbiAndVbmeta(
 			updateImages,
 			editFunc,
 		)
-	}
-
-	// Directly edit the zbi if we're using the legacy update format
-	if !useNewUpdateFormat {
-		return editFunc(tempDir, "zbi", "fuchsia.vbmeta")
 	}
 
 	// Otherwise we need to migrate to the new update package format.

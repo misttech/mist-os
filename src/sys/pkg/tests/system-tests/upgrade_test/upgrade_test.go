@@ -485,7 +485,6 @@ func systemPrimeOTA(
 		dstSystemImage,
 		dstUpdatePath,
 		c.bootfsCompression,
-		c.useNewUpdateFormat,
 	)
 	if err != nil {
 		return fmt.Errorf("failed to create the %q package: %w", dstUpdatePath, err)
@@ -546,7 +545,6 @@ func otaToPackage(
 		repo,
 		dstUpdatePackageUrl,
 		checkForUnknownFirmware,
-		c.useNewUpdateFormat,
 	)
 	if err != nil {
 		return fmt.Errorf("failed to create updater: %w", err)
@@ -632,7 +630,6 @@ func AddRandomFilesToUpdate(
 		"fuchsia.com",
 		dstUpdatePath,
 		c.bootfsCompression,
-		c.useNewUpdateFormat,
 		func(systemImage *packages.SystemImagePackage) (*packages.SystemImagePackage, error) {
 			if c.maxSystemImageSize == 0 {
 				return systemImage.AddRandomFilesWithAdditionalBytes(

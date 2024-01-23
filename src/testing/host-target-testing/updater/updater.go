@@ -343,7 +343,6 @@ type OmahaUpdater struct {
 	zbiTool                     *zbi.ZBITool
 	workaroundOtaNoRewriteRules bool
 	checkForUnkownFirmware      bool
-	useNewUpdateFormat          bool
 }
 
 func NewOmahaUpdater(
@@ -354,7 +353,6 @@ func NewOmahaUpdater(
 	zbiTool *zbi.ZBITool,
 	workaroundOtaNoRewriteRules bool,
 	checkForUnkownFirmware bool,
-	useNewUpdateFormat bool,
 ) (*OmahaUpdater, error) {
 	u, err := url.Parse(updatePackageURL)
 	if err != nil {
@@ -377,7 +375,6 @@ func NewOmahaUpdater(
 		zbiTool:                     zbiTool,
 		workaroundOtaNoRewriteRules: workaroundOtaNoRewriteRules,
 		checkForUnkownFirmware:      checkForUnkownFirmware,
-		useNewUpdateFormat:          useNewUpdateFormat,
 	}, nil
 }
 
@@ -422,7 +419,6 @@ func (u *OmahaUpdater) Update(ctx context.Context, c client) error {
 		repoName,
 		"update_omaha/0",
 		propFiles,
-		u.useNewUpdateFormat,
 	)
 	if err != nil {
 		return fmt.Errorf("failed to inject vbmeta properties into update package: %w", err)

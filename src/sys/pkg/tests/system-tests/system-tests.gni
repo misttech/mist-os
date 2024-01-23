@@ -374,11 +374,6 @@ template("system_test_upgrade_suite") {
       ]
     }
 
-    if (defined(invoker.use_new_update_format) &&
-        invoker.use_new_update_format) {
-      _args += [ "-use-new-update-format" ]
-    }
-
     if (defined(invoker.bootfs_compression)) {
       assert(
           invoker.bootfs_compression != "",

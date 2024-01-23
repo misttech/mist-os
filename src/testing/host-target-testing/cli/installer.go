@@ -192,7 +192,6 @@ func (c *InstallerConfig) Updater(
 	repo *packages.Repository,
 	updatePackageURL string,
 	checkForUnkownFirmware bool,
-	useNewUpdateFormat bool,
 ) (updater.Updater, error) {
 	switch c.installerMode {
 	case Omaha:
@@ -214,7 +213,6 @@ func (c *InstallerConfig) Updater(
 			zbiTool,
 			c.workaroundOtaNoRewriteRules,
 			checkForUnkownFirmware,
-			useNewUpdateFormat,
 		)
 
 	case SystemUpdateChecker:
