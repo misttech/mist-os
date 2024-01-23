@@ -399,18 +399,18 @@ impl<'a> ValidationContext<'a> {
         }
 
         // Validate "offers".
-        if let Some(dynamic_offers) = dynamic_offers.as_ref() {
-            for dynamic_offer in dynamic_offers.iter() {
-                self.validate_offers_decl(&dynamic_offer, OfferType::Dynamic);
-            }
-            self.validate_offer_group(&dynamic_offers, OfferType::Dynamic);
-        }
-
         if let Some(offers) = decl.offers.as_ref() {
             for offer in offers.iter() {
                 self.validate_offers_decl(&offer, OfferType::Static);
             }
             self.validate_offer_group(&offers, OfferType::Static);
+        }
+
+        if let Some(dynamic_offers) = dynamic_offers.as_ref() {
+            for dynamic_offer in dynamic_offers.iter() {
+                self.validate_offers_decl(&dynamic_offer, OfferType::Dynamic);
+            }
+            self.validate_offer_group(&dynamic_offers, OfferType::Dynamic);
         }
 
         // Validate "environments" after all other declarations are processed.
@@ -2529,6 +2529,20 @@ impl<'a> ValidationContext<'a> {
                         "target_name",
                         target_name as &str,
                     ));
+                }
+            }
+            if let Some(collection) = child.collection.as_ref() {
+                if let Some(names_for_target) =
+                    self.target_ids.get(&TargetId::Collection(&collection))
+                {
+                    if names_for_target.contains_key(&target_name.as_str()) {
+                        // This dynamic offer conflicts with a static offer to the same collection.
+                        self.errors.push(Error::duplicate_field(
+                            decl,
+                            "target_name",
+                            target_name as &str,
+                        ));
+                    }
                 }
             }
         }
@@ -9866,6 +9880,48 @@ mod tests {
                 Error::missing_field(DeclType::OfferRunner, "target"),
                 Error::missing_field(DeclType::OfferResolver, "target"),
             ]))
+        );
+    }
+
+    #[test]
+    fn test_validate_dynamic_offers_collection_collision() {
+        assert_eq!(
+            validate_dynamic_offers(
+                &vec![fdecl::Offer::Protocol(fdecl::OfferProtocol {
+                    dependency_type: Some(fdecl::DependencyType::Strong),
+                    source: Some(fdecl::Ref::Parent(fdecl::ParentRef)),
+                    source_name: Some("thing".to_string()),
+                    target_name: Some("thing".to_string()),
+                    target: Some(fdecl::Ref::Child(fdecl::ChildRef {
+                        name: "child".to_string(),
+                        collection: Some("coll".to_string()),
+                    })),
+                    ..Default::default()
+                }),],
+                &fdecl::Component {
+                    offers: Some(vec![fdecl::Offer::Protocol(fdecl::OfferProtocol {
+                        dependency_type: Some(fdecl::DependencyType::Strong),
+                        source: Some(fdecl::Ref::Parent(fdecl::ParentRef)),
+                        source_name: Some("thing".to_string()),
+                        target_name: Some("thing".to_string()),
+                        target: Some(fdecl::Ref::Collection(fdecl::CollectionRef {
+                            name: "coll".into()
+                        })),
+                        ..Default::default()
+                    }),]),
+                    collections: Some(vec![fdecl::Collection {
+                        name: Some("coll".to_string()),
+                        durability: Some(fdecl::Durability::Transient),
+                        ..Default::default()
+                    },]),
+                    ..Default::default()
+                }
+            ),
+            Err(ErrorList::new(vec![Error::duplicate_field(
+                DeclType::OfferProtocol,
+                "target_name",
+                "thing"
+            ),]))
         );
     }
 

@@ -953,14 +953,6 @@ impl Offer {
                     }
                 }
                 RouteBundle::Aggregate(_) => {
-                    let decl_target = offer_bundle.iter().next().unwrap().target();
-                    if offer_bundle.iter().any(|o| o.target() != decl_target) {
-                        // TODO(https://fxbug.dev/298698003): This situation should be caught by the
-                        // validator, but due to this bug it is not. Fail the route.
-                        return Err(RoutingError::UnsupportedRouteSource {
-                            source_type: "disallowed aggregate".into(),
-                        });
-                    }
                     if offer_bundle.iter().all(|o| !is_filtered_offer(o)) {
                         return Ok(OfferResult::OfferFromAnonymizedAggregate(offer_bundle, target));
                     } else {
