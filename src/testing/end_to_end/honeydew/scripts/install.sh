@@ -3,7 +3,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-# Creates a new virtual environment and pip installs HoneyDew
+# Creates a new virtual environment and pip installs Honeydew
 
 LACEWING_SRC="$FUCHSIA_DIR/src/testing/end_to_end"
 HONEYDEW_SRC="$LACEWING_SRC/honeydew"
@@ -42,12 +42,12 @@ source $VENV_PATH/bin/activate
 echo "Upgrading pip module..."
 python -m pip install --upgrade pip
 
-# install honeydew
-echo "Installing 'honeydew' module..."
+# install Honeydew
+echo "Installing 'Honeydew' module..."
 cd $HONEYDEW_SRC
 python -m pip install --editable ".[test,guidelines]"
 
-echo "Configuring environment for honeydew..."
+echo "Configuring environment for Honeydew..."
 OLD_PYTHONPATH=$PYTHONPATH
 PYTHONPATH=$FUCHSIA_DIR/$BUILD_DIR/host_x64:$FUCHSIA_DIR/src/developer/ffx/lib/fuchsia-controller/python:$PYTHONPATH
 # Set FIDL_IR_PATH inorder to successfully imoport Fuchsia-Controller
@@ -55,10 +55,10 @@ export FIDL_IR_PATH="$(fx get-build-dir)/fidling/gen/ir_root"
 
 python -c "import honeydew"
 if [ $? -eq 0 ]; then
-    echo "Successfully installed honeydew"
+    echo "Successfully installed Honeydew"
 else
     echo
-    echo "ERROR: honeydew installation failed. Please try again by following instructions manually"
+    echo "ERROR: Honeydew installation failed. Please try again by following instructions manually"
     echo
 fi
 

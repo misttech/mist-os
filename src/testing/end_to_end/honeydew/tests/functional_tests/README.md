@@ -1,6 +1,6 @@
-# HoneyDew Functional tests
+# Honeydew Functional tests
 
-Every single HoneyDew’s Host-(Fuchsia)Target interaction API should have a
+Every single Honeydew’s Host-(Fuchsia)Target interaction API should have a
 minimum of one functional test case that aims to ensure that the API works as
 intended (that is, `<device>.reboot()` actually reboots Fuchsia device)
 which can’t be ensured using unit test cases.
@@ -91,8 +91,8 @@ that one device connected then you can most likely skip this step
 * Refer to [CQ VS CI vs FYI](#CQ-VS-CI-vs-FYI) section to decide which test case
 build group the new test belongs to
 * Once decided, you can add it accordingly to that group by updating
-[HoneyDew Infra Test Groups]
-* If the desired group is not present in [HoneyDew Infra Test Groups] then in
+[Honeydew Infra Test Groups]
+* If the desired group is not present in [Honeydew Infra Test Groups] then in
   addition to creating a new group here, you may also need to
   * Add the same group in [Lacewing Infra Test Groups] (follow the already
     available test groups in this file for reference)
@@ -140,6 +140,6 @@ Based on this we have created the following:
       postfix is necessary (`-staging` or `-ci`)
 
 
-[HoneyDew Infra Test Groups]: BUILD.gn
+[Honeydew Infra Test Groups]: BUILD.gn
 
 [Lacewing Infra Test Groups]: ../../../BUILD.gn

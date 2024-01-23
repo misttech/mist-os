@@ -12,7 +12,7 @@ group("packages") {
   ]
 }
 
-# All of the HoneyDew functional tests and their dependencies.
+# All of the Honeydew functional tests and their dependencies.
 group("functional_tests") {
   testonly = true
   public_deps = [
@@ -22,7 +22,7 @@ group("functional_tests") {
 }
 
 if (is_host) {
-  # All of the HoneyDew functional tests
+  # All of the Honeydew functional tests
   group("tests") {
     testonly = true
     public_deps = [

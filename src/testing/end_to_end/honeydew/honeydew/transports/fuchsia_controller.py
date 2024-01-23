@@ -75,7 +75,7 @@ class FuchsiaController:
             # Do not autostart the daemon if it is not running.
             # If Fuchsia-Controller need to start a daemon then it needs to know
             # SDK path to find FFX CLI.
-            # However, HoneyDew calls FFX CLI (and thus starts the FFX daemon)
+            # However, Honeydew calls FFX CLI (and thus starts the FFX daemon)
             # even before it instantiates Fuchsia-Controller. So tell
             # Fuchsia-Controller to use the same daemon (by pointing to same
             # isolate-dir and logs-dir path used to start the daemon) and set

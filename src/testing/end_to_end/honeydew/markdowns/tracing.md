@@ -2,7 +2,7 @@
 
 [TOC]
 
-This page talks about [Tracing] affordance in HoneyDew.
+This page talks about [Tracing] affordance in Honeydew.
 
 ## Usage
 ```python

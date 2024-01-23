@@ -578,7 +578,7 @@ class FastbootTests(unittest.TestCase):
     @mock.patch.object(
         fastboot.common,
         "wait_for_state",
-        side_effect=errors.HoneyDewTimeoutError("error"),
+        side_effect=errors.HoneydewTimeoutError("error"),
         autospec=True,
     )
     def test_wait_for_fastboot_mode_exception(
@@ -596,7 +596,7 @@ class FastbootTests(unittest.TestCase):
     def test_wait_for_fuchsia_mode_exception(self) -> None:
         """Test case for Fastboot.wait_for_fuchsia_mode() failure case."""
         self.ffx_obj.wait_for_rcs_connection.side_effect = (
-            errors.HoneyDewTimeoutError("error")
+            errors.HoneydewTimeoutError("error")
         )
         with self.assertRaises(errors.FuchsiaDeviceError):
             self.fastboot_obj.wait_for_fuchsia_mode()
@@ -612,7 +612,7 @@ class FastbootTests(unittest.TestCase):
     @mock.patch.object(
         fastboot.common,
         "wait_for_state",
-        side_effect=errors.HoneyDewTimeoutError("error"),
+        side_effect=errors.HoneydewTimeoutError("error"),
         autospec=True,
     )
     def test_wait_for_valid_tcp_address_exception(

@@ -16,7 +16,7 @@ host-side FIDL access to a Fuchsia device-under-test.
 At a high level, the Lacewing test framework consists of three layers of
 abstraction:
 * Test framework - Mobly
-* Device Controller - HoneyDew
+* Device Controller - Honeydew
 * Host-Target Transport - Currently SL4F (eventually [Fuchsia Controller](https://cs.opensource.google/fuchsia/fuchsia/+/main:src/developer/ffx/lib/fuchsia-controller/))
 
 Why the name Lacewing? Lacewings are insects that keep the Fuchsia plant healthy

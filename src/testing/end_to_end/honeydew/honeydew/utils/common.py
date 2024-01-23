@@ -2,7 +2,7 @@
 # Copyright 2023 The Fuchsia Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
-"""Common utils used across HoneyDew."""
+"""Common utils used across Honeydew."""
 import logging
 import time
 from typing import Callable
@@ -23,7 +23,7 @@ def wait_for_state(
         timeout: How long in sec to wait.
 
     Raises:
-        errors.HoneyDewTimeoutError: If state_fn does not return the
+        errors.HoneydewTimeoutError: If state_fn does not return the
             expected_state with in specified timeout.
     """
     _LOGGER.info(
@@ -49,7 +49,7 @@ def wait_for_state(
             _LOGGER.debug(err)
         time.sleep(0.5)
     else:
-        raise errors.HoneyDewTimeoutError(
+        raise errors.HoneydewTimeoutError(
             f"{state_fn.__qualname__} didn't return {expected_state} in "
             f"{timeout} sec"
         )
@@ -66,7 +66,7 @@ def retry(
         wait_time: How long in sec to wait between the retries.
 
     Raises:
-        errors.HoneyDewTimeoutError: If fn does not succeed with in specified
+        errors.HoneydewTimeoutError: If fn does not succeed with in specified
             timeout.
     """
     _LOGGER.info(
@@ -96,6 +96,6 @@ def retry(
             )
         time.sleep(wait_time)
     else:
-        raise errors.HoneyDewTimeoutError(
+        raise errors.HoneydewTimeoutError(
             f"{fn.__qualname__} didn't succeed in {timeout} sec"
         )

@@ -2,7 +2,7 @@
 # Copyright 2023 The Fuchsia Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
-"""Utility module for different type of property decorators in HoneyDew."""
+"""Utility module for different type of property decorators in Honeydew."""
 
 import functools
 from typing import Any, Callable

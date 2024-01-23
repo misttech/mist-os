@@ -5,7 +5,7 @@
 
 set -e
 
-# Uninstall HoneyDew and deletes the virtual environment
+# Uninstall Honeydew and deletes the virtual environment
 
 LACEWING_SRC="$FUCHSIA_DIR/src/testing/end_to_end"
 HONEYDEW_SRC="$LACEWING_SRC/honeydew"

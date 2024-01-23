@@ -8,17 +8,17 @@ Python code and fix/flag the CL during development/review process.
 
 Many teams across Fuchsia (and potentially third party vendors such as driver
 development)
-1. will be using Lacewing and HoneyDew for the testing. So it is of the utmost
+1. will be using Lacewing and Honeydew for the testing. So it is of the utmost
    importance to ensure code works reliably
-2. will be contributing to HoneyDew to add/fix Host-(Fuchsia)Target
+2. will be contributing to Honeydew to add/fix Host-(Fuchsia)Target
    interactions. Some of them may not have prior Python development experience.
    So it is of the utmost importance to ensure code written is consistent and
    meets the readability, quality bar set at Google and Fuchsia
 
-To help facilitate #1, HoneyDew relies on having solid unit test and
+To help facilitate #1, Honeydew relies on having solid unit test and
 functional test coverage.
 
-To help facilitate #2, HoneyDew relies on [Google Python Style Guide]
+To help facilitate #2, Honeydew relies on [Google Python Style Guide]
 (which contains a list of dos and don’ts for Python programs).
 
 ## Proposal
@@ -33,7 +33,7 @@ CQ/Pre-Submit.
 
 ### Interim
 Until that point, the Lacewing team has created below guidelines that need to be
-followed by everyone while contributing to HoneyDew. Following these guidelines
+followed by everyone while contributing to Honeydew. Following these guidelines
 will ensure code is well tested, consistent and readable before it is merged.
 
 We understand it's difficult to meet these requirements without automated
@@ -46,12 +46,12 @@ checks.
     - Tests individual code units (such as functions) in isolation from the rest
       of the system by mocking all of the dependencies.
     - Makes it easy to test different error conditions, corner cases etc
-    - Minimum of 70% of HoneyDew code is tested using these unit tests
+    - Minimum of 70% of Honeydew code is tested using these unit tests
   - Functional test cases
     - Aims to ensure that a given API works as intended and indeed does what it
       is supposed to do (that is, `<device>.reboot()` actually reboots Fuchsia
       device) which can’t be ensured using unit test cases
-    - Every single HoneyDew’s Host-(Fuchsia)Target interaction API should have
+    - Every single Honeydew’s Host-(Fuchsia)Target interaction API should have
       at-least one functional test case
 - Ensuring code is meeting google’s Python style guide
   - Remove unused Python code using [autoflake]
@@ -99,11 +99,11 @@ This script will run the following scripts in same sequence:
 [Setup](interactive_usage.md#Setup)
 
 **Running** `cd $FUCHSIA_DIR && sh $FUCHSIA_DIR/src/testing/end_to_end/honeydew/scripts/install.sh`
-**will install honeydew**
+**will install Honeydew**
 
 ### Un-installation
 **Running** `cd $FUCHSIA_DIR && sh $FUCHSIA_DIR/src/testing/end_to_end/honeydew/scripts/uninstall.sh`
-**will uninstall honeydew**
+**will uninstall Honeydew**
 
 ### Python Style Guide
 **Run** `cd $FUCHSIA_DIR && sh $FUCHSIA_DIR/src/testing/end_to_end/honeydew/scripts/format.sh`

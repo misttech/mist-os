@@ -48,7 +48,7 @@ line_length = 80
 # Needed because dependency modules such as mobly are not pip installed
 ignore_missing_imports = true
 
-# HoneyDew uses `fx format-code` to format the code.
+# Honeydew uses `fx format-code` to format the code.
 # `fx format-code` uses `black` underneath to format the python code, using the
 # configuration specified in $FUCHSIA_DIR/pyproject.toml.
 # So just run the below command to format the code inside this folder:

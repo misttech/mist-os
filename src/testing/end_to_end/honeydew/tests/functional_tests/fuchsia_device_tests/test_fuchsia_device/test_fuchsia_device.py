@@ -33,7 +33,7 @@ _LOGGER: logging.Logger = logging.getLogger(__name__)
 #   * `wait_for_offline()`
 
 # Note - Do not add separate functional test for `close()` as it will clean up
-# the FuchsiaDevice HoneyDew object and thus any subsequent calls will fail.
+# the FuchsiaDevice Honeydew object and thus any subsequent calls will fail.
 # `close()` is called anyway when Mobly calls `destroy()` defined in the
 # FuchsiaDevice mobly controller
 

@@ -2,7 +2,7 @@
 
 [TOC]
 
-This page talks about Fastboot transport in HoneyDew.
+This page talks about Fastboot transport in Honeydew.
 
 ## Usage
 ```python

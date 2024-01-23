@@ -239,7 +239,7 @@ class Fastboot:
                 timeout=timeout,
             )
             _LOGGER.info("%s is in fastboot mode...", self._device_name)
-        except errors.HoneyDewTimeoutError as err:
+        except errors.HoneydewTimeoutError as err:
             raise errors.FuchsiaDeviceError(
                 f"'{self._device_name}' failed to go into fastboot mode in "
                 f"{timeout}sec."
@@ -261,7 +261,7 @@ class Fastboot:
         try:
             self._ffx_transport.wait_for_rcs_connection(timeout=timeout)
             _LOGGER.info("%s is in fuchsia mode...", self._device_name)
-        except errors.HoneyDewTimeoutError as err:
+        except errors.HoneydewTimeoutError as err:
             raise errors.FuchsiaDeviceError(
                 f"'{self._device_name}' failed to go into fuchsia mode in "
                 f"{timeout}sec."
@@ -362,7 +362,7 @@ class Fastboot:
                 expected_state=True,
                 timeout=timeout,
             )
-        except errors.HoneyDewTimeoutError as err:
+        except errors.HoneydewTimeoutError as err:
             raise errors.FuchsiaDeviceError(
                 f"Unable to get the TCP address of '{self._device_name}' "
                 f"when in fastboot mode "

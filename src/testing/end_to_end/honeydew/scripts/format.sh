@@ -4,7 +4,7 @@
 # found in the LICENSE file.
 
 
-# Formats the HoneyDew code as per coding guidelines
+# Formats the Honeydew code as per coding guidelines
 LACEWING_SRC="$FUCHSIA_DIR/src/testing/end_to_end"
 HONEYDEW_SRC="$LACEWING_SRC/honeydew"
 

@@ -2,7 +2,7 @@
 
 [TOC]
 
-This page talks about [wlan] affordance in HoneyDew.
+This page talks about [wlan] affordance in Honeydew.
 
 ## Usage
 ```python

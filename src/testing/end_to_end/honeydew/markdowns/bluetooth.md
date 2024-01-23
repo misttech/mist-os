@@ -2,7 +2,7 @@
 
 [TOC]
 
-This page talks about [Bluetooth] affordance in HoneyDew.
+This page talks about [Bluetooth] affordance in Honeydew.
 
 ## Usage
 

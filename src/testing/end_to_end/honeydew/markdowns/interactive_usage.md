@@ -2,7 +2,7 @@
 
 [TOC]
 
-This page will guide you to use honeydew using an interactive python terminal.
+This page will guide you to use Honeydew using an interactive python terminal.
 
 Before proceeding further, please make sure to follow [Setup](#Setup) and
 [Installation](code_guidelines.md#installation) steps.
@@ -13,7 +13,7 @@ start a Python interpreter and import Honeydew.
 ## Setup
 The Honeydew library depends on some Fuchsia build artifacts that must be built
 for Honeydew to be successfully imported in Python. So before running
-[conformance scripts](../README.md#honeydew-code-guidelines) or to use honeydew
+[conformance scripts](../README.md#honeydew-code-guidelines) or to use Honeydew
 in interactive python terminal, you need to run the below commands.
 
 ```shell
@@ -39,18 +39,18 @@ required if you wish to use Honeydew's SL4F-based affordances.
 >>> import logging
 >>> logging.basicConfig(level=logging.INFO)
 
-# Setup HoneyDew to run using isolated FFX and collect the logs
-# Call this first prior to calling any other HoneyDew API
+# Setup Honeydew to run using isolated FFX and collect the logs
+# Call this first prior to calling any other Honeydew API
 >>> from honeydew.transports import ffx
 >>> ffx_config = ffx.FfxConfig()
 >>> ffx_config.setup(binary_path="/usr/local/google/home/jpavankumar/fuchsia/.jiri_root/bin/ffx", isolate_dir=None, logs_dir="/tmp/logs/honeydew/", logs_level="debug", enable_mdns=True)
 
-# Create honeydew device object for a local device
+# Create Honeydew device object for a local device
 >>> import honeydew
 emu = honeydew.create_device("fuchsia-emulator", transport=honeydew.transports.TRANSPORT.SL4F, ffx_config=ffx_config.get_config())
 # Note - Depending on whether you want to use SL4F or Fuchsia-Controller as a primary transport to perform the host-(fuchsia) target communications, set `transport` variable accordingly
 
-# Create honeydew device object for a remote/wfh device
+# Create Honeydew device object for a remote/wfh device
 >>> from honeydew import custom_types
 # Note - While using remote/wfh device, you need to pass `device_ip_port` argument.
 # "[::1]:8022" is a fuchsia device whose SSH port is proxied via SSH from a local machine to a remote workstation.

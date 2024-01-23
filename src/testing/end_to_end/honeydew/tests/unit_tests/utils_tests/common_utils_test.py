@@ -25,7 +25,7 @@ class CommonUtilsTests(unittest.TestCase):
     def test_wait_for_state_fail(self, mock_time, mock_sleep) -> None:
         """Test case for common.wait_for_state() failure case where state_fn
         never returns the expected state."""
-        with self.assertRaises(errors.HoneyDewTimeoutError):
+        with self.assertRaises(errors.HoneydewTimeoutError):
             common.wait_for_state(
                 state_fn=lambda: True, expected_state=False, timeout=5
             )
@@ -42,7 +42,7 @@ class CommonUtilsTests(unittest.TestCase):
         def _state_fn() -> bool:
             raise RuntimeError("Error")
 
-        with self.assertRaises(errors.HoneyDewTimeoutError):
+        with self.assertRaises(errors.HoneydewTimeoutError):
             common.wait_for_state(
                 state_fn=_state_fn, expected_state=False, timeout=5
             )
@@ -80,7 +80,7 @@ class CommonUtilsTests(unittest.TestCase):
         def _fn() -> None:
             raise RuntimeError("Error")
 
-        with self.assertRaises(errors.HoneyDewTimeoutError):
+        with self.assertRaises(errors.HoneydewTimeoutError):
             common.retry(
                 fn=_fn,
                 timeout=30,

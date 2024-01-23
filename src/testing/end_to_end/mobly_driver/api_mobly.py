@@ -72,8 +72,8 @@ def get_result_path(mobly_output_path: str, testbed_name: str) -> str:
     )
 
 
-# TODO(https://fxbug.dev/119213) - Update |controllers| type to use HoneyDew's
-# definition. When HoneyDew's Mobly device class is available, we
+# TODO(https://fxbug.dev/119213) - Update |controllers| type to use Honeydew's
+# definition. When Honeydew's Mobly device class is available, we
 # should use that class as the Pytype to reduce the chance of controller
 # instantiation error.
 def new_testbed_config(

@@ -2,21 +2,21 @@
 # Copyright 2023 The Fuchsia Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
-"""Contains errors raised by HoneyDew."""
+"""Contains errors raised by Honeydew."""
 
 import logging
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
 
-class HoneyDewError(Exception):
-    """Base exception for honeydew module.
+class HoneydewError(Exception):
+    """Base exception for Honeydew module.
 
     More specific exceptions will be created by inheriting from this exception.
     """
 
     def __init__(self, msg: str | Exception) -> None:
-        """Inits HoneyDewError with 'msg' (an error message string).
+        """Inits HoneydewError with 'msg' (an error message string).
 
         Args:
             msg: an error message string or an Exception instance.
@@ -27,8 +27,8 @@ class HoneyDewError(Exception):
         _LOGGER.debug(repr(self), exc_info=True)
 
 
-class TransportError(HoneyDewError):
-    """Exception for errors raised by honeydew transports."""
+class TransportError(HoneydewError):
+    """Exception for errors raised by Honeydew transports."""
 
 
 class HttpRequestError(TransportError):
@@ -51,11 +51,11 @@ class FuchsiaControllerError(TransportError):
     """Exception for errors raised by Fuchsia Controller requests."""
 
 
-class FastbootCommandError(HoneyDewError):
+class FastbootCommandError(HoneydewError):
     """Exception for errors raised by Fastboot commands."""
 
 
-class TransportConnectionError(HoneyDewError):
+class TransportConnectionError(HoneydewError):
     """Raised when transport's check_connection fails."""
 
 
@@ -79,25 +79,25 @@ class FastbootConnectionError(TransportConnectionError):
     """Raised when Fastboot transport's check_connection fails."""
 
 
-class FfxConfigError(HoneyDewError):
+class FfxConfigError(HoneydewError):
     """Raised by ffx.FfxConfig class."""
 
 
-class HoneyDewTimeoutError(HoneyDewError):
-    """Exception for timeout based raised by HoneyDew."""
+class HoneydewTimeoutError(HoneydewError):
+    """Exception for timeout based raised by Honeydew."""
 
 
-class FuchsiaStateError(HoneyDewError):
+class FuchsiaStateError(HoneydewError):
     """Exception for state errors."""
 
 
-class FuchsiaDeviceError(HoneyDewError):
+class FuchsiaDeviceError(HoneydewError):
     """Base exception for errors raised by fuchsia device."""
 
 
-class SessionError(HoneyDewError):
+class SessionError(HoneydewError):
     """Exception for errors raised by Session."""
 
 
-class DeviceNotConnectedError(HoneyDewError):
+class DeviceNotConnectedError(HoneydewError):
     """Exception to be raised when device is not connected to host."""

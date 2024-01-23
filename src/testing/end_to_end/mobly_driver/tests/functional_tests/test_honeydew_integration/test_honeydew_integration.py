@@ -4,7 +4,7 @@
 # found in the LICENSE file.
 """Mobly Driver honeydew integration test.
 
-Test that Mobly driver's Mobly config interfaces with HoneyDew correctly.
+Test that Mobly driver's Mobly config interfaces with Honeydew correctly.
 """
 
 from mobly import asserts
