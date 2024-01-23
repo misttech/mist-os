@@ -554,6 +554,12 @@ TEST_F(UmsTest, TestRead) {
     size_t block_op_size;
     block_dev->BlockImplQuery(&info, &block_op_size);
 
+    // Use the READ_10 command instead of READ_12
+    // TODO: Consider setting use_read_write_12 to false during scsi::Disk::Bind() instead.
+    if (i == 0) {
+      block_dev->GetDiskOptions().use_read_write_12 = false;
+    }
+
     auto block_op = std::make_unique<uint8_t[]>(block_op_size);
     block_op_t& op = *reinterpret_cast<block_op_t*>(block_op.get());
     op = {};
@@ -604,6 +610,12 @@ TEST_F(UmsTest, TestWrite) {
     block_info_t info;
     size_t block_op_size;
     block_dev->BlockImplQuery(&info, &block_op_size);
+
+    // Use the WRITE_10 command instead of READ_12
+    // TODO: Consider setting use_read_write_12 to false during scsi::Disk::Bind() instead.
+    if (i == 0) {
+      block_dev->GetDiskOptions().use_read_write_12 = false;
+    }
 
     auto block_op = std::make_unique<uint8_t[]>(block_op_size);
     block_op_t& op = *reinterpret_cast<block_op_t*>(block_op.get());

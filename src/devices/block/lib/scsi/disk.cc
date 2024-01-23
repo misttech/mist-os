@@ -56,7 +56,7 @@ zx_status_t Disk::AddDisk() {
 
   removable_ = inquiry_data.value().removable_media();
 
-  if (disk_options_.check_unmap_support_) {
+  if (disk_options_.check_unmap_support) {
     zx::result<VPDBlockLimits> block_limits = controller_->InquiryBlockLimits(target_, lun_);
     if (block_limits.is_error()) {
       return block_limits.status_value();
@@ -72,7 +72,7 @@ zx_status_t Disk::AddDisk() {
 
   zx::result<std::tuple<bool, bool>> parameter =
       controller_->ModeSenseDpoFuaAndWriteProtectedEnabled(target_, lun_,
-                                                           disk_options_.use_mode_sense_6_);
+                                                           disk_options_.use_mode_sense_6);
   if (parameter.is_error()) {
     zxlogf(WARNING,
            "Failed to get DPO FUA and write protected parameter for target %u, lun %u: %s.",
@@ -82,7 +82,7 @@ zx_status_t Disk::AddDisk() {
   std::tie(dpo_fua_available_, write_protected_) = parameter.value();
 
   zx::result write_cache_enabled =
-      controller_->ModeSenseWriteCacheEnabled(target_, lun_, disk_options_.use_mode_sense_6_);
+      controller_->ModeSenseWriteCacheEnabled(target_, lun_, disk_options_.use_mode_sense_6);
   if (write_cache_enabled.is_error()) {
     zxlogf(WARNING, "Failed to get write cache status for target %u, lun %u: %s.", target_, lun_,
            zx_status_get_string(write_cache_enabled.status_value()));
@@ -106,6 +106,14 @@ zx_status_t Disk::AddDisk() {
       return ZX_ERR_BAD_STATE;
     }
     max_transfer_blocks_ = max_transfer_bytes_ / block_size_bytes_;
+  }
+
+  // If we only need to use the read(10)/write(10) commands, then limit max_transfer_blocks_ and
+  // max_transfer_bytes_.
+  if (block_count_ <= UINT32_MAX && !disk_options_.use_read_write_12 &&
+      max_transfer_blocks_ > UINT16_MAX) {
+    max_transfer_blocks_ = UINT16_MAX;
+    max_transfer_bytes_ = max_transfer_blocks_ * block_size_bytes_;
   }
 
   zxlogf(INFO, "%ld blocks of %d bytes", block_count_, block_size_bytes_);
@@ -161,19 +169,19 @@ void Disk::BlockImplQueue(block_op_t* op, block_impl_queue_callback completion_c
         cdb->logical_block_address = htobe64(op->rw.offset_dev);
         cdb->transfer_length = htobe32(op->rw.length);
         cdb->set_force_unit_access(is_fua);
-      } else if (op->rw.length <= UINT16_MAX) {
-        auto cdb = reinterpret_cast<Read10CDB*>(cdb_buffer);  // Struct-wise equiv. to Write10CDB.
-        cdb_length = 10;
-        cdb->opcode = is_write ? Opcode::WRITE_10 : Opcode::READ_10;
-        cdb->logical_block_address = htobe32(static_cast<uint32_t>(op->rw.offset_dev));
-        cdb->transfer_length = htobe16(static_cast<uint16_t>(op->rw.length));
-        cdb->set_force_unit_access(is_fua);
-      } else {
+      } else if (disk_options_.use_read_write_12) {
         auto cdb = reinterpret_cast<Read12CDB*>(cdb_buffer);  // Struct-wise equiv. to Write12CDB.
         cdb_length = 12;
         cdb->opcode = is_write ? Opcode::WRITE_12 : Opcode::READ_12;
         cdb->logical_block_address = htobe32(static_cast<uint32_t>(op->rw.offset_dev));
         cdb->transfer_length = htobe32(op->rw.length);
+        cdb->set_force_unit_access(is_fua);
+      } else {
+        auto cdb = reinterpret_cast<Read10CDB*>(cdb_buffer);  // Struct-wise equiv. to Write10CDB.
+        cdb_length = 10;
+        cdb->opcode = is_write ? Opcode::WRITE_10 : Opcode::READ_10;
+        cdb->logical_block_address = htobe32(static_cast<uint32_t>(op->rw.offset_dev));
+        cdb->transfer_length = htobe16(static_cast<uint16_t>(op->rw.length));
         cdb->set_force_unit_access(is_fua);
       }
       ZX_ASSERT(cdb_length <= sizeof(cdb_buffer));

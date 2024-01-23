@@ -365,7 +365,8 @@ class DiskTest : public zxtest::Test {
 TEST_F(DiskTest, TestCreateDestroy) {
   std::shared_ptr<MockDevice> fake_parent = MockDevice::FakeRootParent();
   ASSERT_OK(Disk::Bind(fake_parent.get(), &controller_, kTarget, kLun, kTransferSize,
-                       DiskOptions(/*check_unmap_support=*/true, /*use_mode_sense_6*/ true)));
+                       DiskOptions(/*check_unmap_support=*/true, /*use_mode_sense_6*/ true,
+                                   /*use_read_write_12*/ true)));
   ASSERT_EQ(1, fake_parent->child_count());
 }
 
@@ -373,7 +374,8 @@ TEST_F(DiskTest, TestCreateDestroy) {
 TEST_F(DiskTest, TestCreateDestroyWithModeSense10) {
   std::shared_ptr<MockDevice> fake_parent = MockDevice::FakeRootParent();
   ASSERT_OK(Disk::Bind(fake_parent.get(), &controller_, kTarget, kLun, kTransferSize,
-                       DiskOptions(/*check_unmap_support=*/true, /*use_mode_sense_6*/ false)));
+                       DiskOptions(/*check_unmap_support=*/true, /*use_mode_sense_6*/ false,
+                                   /*use_read_write_12*/ true)));
   ASSERT_EQ(1, fake_parent->child_count());
 }
 
@@ -381,7 +383,8 @@ TEST_F(DiskTest, TestCreateDestroyWithModeSense10) {
 TEST_F(DiskTest, TestCreateReadDestroy) {
   std::shared_ptr<MockDevice> fake_parent = MockDevice::FakeRootParent();
   ASSERT_OK(Disk::Bind(fake_parent.get(), &controller_, kTarget, kLun, kTransferSize,
-                       DiskOptions(/*check_unmap_support=*/true, /*use_mode_sense_6*/ true)));
+                       DiskOptions(/*check_unmap_support=*/true, /*use_mode_sense_6*/ true,
+                                   /*use_read_write_12*/ true)));
   ASSERT_EQ(1, fake_parent->child_count());
   auto* dev = fake_parent->GetLatestChild()->GetDeviceContext<Disk>();
   block_info_t info;

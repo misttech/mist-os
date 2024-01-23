@@ -617,9 +617,11 @@ zx::result<uint8_t> Ufs::AddLogicalUnits() {
     }
 
     // UFS does not support the MODE SENSE(6) command. We should use the MODE SENSE(10) command.
-    zx::result disk = scsi::Disk::Bind(
-        zxdev(), this, kPlaceholderTarget, lun, max_transfer_bytes_,
-        scsi::DiskOptions(/*check_unmap_support=*/true, /*use_mode_sense_6*/ false));
+    // UFS does not support the READ(12)/WRITE(12) commands.
+    zx::result disk =
+        scsi::Disk::Bind(zxdev(), this, kPlaceholderTarget, lun, max_transfer_bytes_,
+                         scsi::DiskOptions(/*check_unmap_support=*/true, /*use_mode_sense_6*/ false,
+                                           /*use_read_write_12*/ false));
     if (disk.is_error()) {
       zxlogf(ERROR, "UFS: device_add for block device failed: %s", disk.status_string());
       return disk.take_error();

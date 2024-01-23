@@ -29,15 +29,19 @@ struct DiskOp {
 
 struct DiskOptions {
   static DiskOptions Default() {
-    return DiskOptions(/*check_unmap_support=*/false, /*use_mode_sense_6*/ true);
+    return DiskOptions(/*check_unmap_support=*/false, /*use_mode_sense_6*/ true,
+                       /*use_read_write_12*/ true);
   }
 
-  explicit DiskOptions(bool check_unmap_support, bool use_mode_sense_6)
-      : check_unmap_support_(check_unmap_support), use_mode_sense_6_(use_mode_sense_6) {}
+  explicit DiskOptions(bool check_unmap_support, bool use_mode_sense_6, bool use_read_write_12)
+      : check_unmap_support(check_unmap_support),
+        use_mode_sense_6(use_mode_sense_6),
+        use_read_write_12(use_read_write_12) {}
   DiskOptions() = delete;
 
-  bool check_unmap_support_;
-  bool use_mode_sense_6_;
+  bool check_unmap_support;
+  bool use_mode_sense_6;
+  bool use_read_write_12;
 };
 
 class Disk;
@@ -94,13 +98,16 @@ class Disk : public DeviceType,
   Disk(const Disk&) = delete;
   Disk& operator=(const Disk&) = delete;
 
+  // for test
+  DiskOptions& GetDiskOptions() { return disk_options_; }
+
  private:
   zx_status_t AddDisk();
 
   Controller* const controller_;
   const uint8_t target_;
   const uint16_t lun_;
-  const uint32_t max_transfer_bytes_;
+  uint32_t max_transfer_bytes_;
   uint32_t max_transfer_blocks_;
 
   bool removable_;
