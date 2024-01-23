@@ -114,36 +114,36 @@ zx::result<std::unique_ptr<SoftmacBridge>> SoftmacBridge::New(
         server_binding_task_complete.Signal();
       });
 
-  auto start_sta_completer = std::make_unique<StartStaCompleter>(
+  auto init_completer = std::make_unique<InitCompleter>(
       [softmac_bridge = softmac_bridge.get(), completer = std::move(completer)](
           zx_status_t status, wlansoftmac_handle_t* rust_handle) mutable {
-        WLAN_LAMBDA_TRACE_DURATION("SoftmacBridge start_sta_completer");
+        WLAN_LAMBDA_TRACE_DURATION("SoftmacBridge startup_rust_completer");
         softmac_bridge->rust_handle_ = rust_handle;
         (*completer)(status);
       });
 
   async::PostTask(softmac_bridge->rust_dispatcher_.async_dispatcher(),
-                  [start_sta_completer = std::move(start_sta_completer),
+                  [init_completer = std::move(init_completer),
                    sta_shutdown_handler = std::move(sta_shutdown_handler),
                    wlansoftmac_rust_ops = wlansoftmac_rust_ops,
                    rust_buffer_provider = softmac_bridge->rust_buffer_provider,
                    client_end = endpoints->client.TakeHandle().release()]() mutable {
                     WLAN_LAMBDA_TRACE_DURATION("Rust MLME dispatcher");
-                    sta_shutdown_handler(start_sta(
-                        start_sta_completer.release(),
+                    sta_shutdown_handler(start_and_run_bridged_wlansoftmac(
+                        init_completer.release(),
                         [](void* ctx, zx_status_t status, wlansoftmac_handle_t* rust_handle) {
-                          WLAN_LAMBDA_TRACE_DURATION("run StartStaCompleter");
-                          auto start_sta_completer = static_cast<StartStaCompleter*>(ctx);
-                          if (start_sta_completer == nullptr) {
-                            lerror("Received NULL StartStaCompleter pointer!");
+                          WLAN_LAMBDA_TRACE_DURATION("run InitCompleter");
+                          auto init_completer = static_cast<InitCompleter*>(ctx);
+                          if (init_completer == nullptr) {
+                            lerror("Received NULL InitCompleter pointer!");
                             return;
                           }
                           // Skip the check for whether completer has already been
                           // called.  This is the only location where completer is
                           // called, and its deallocated immediately after. Thus, such a
                           // check would be a use-after-free violation.
-                          (*start_sta_completer)(status, rust_handle);
-                          delete start_sta_completer;
+                          (*init_completer)(status, rust_handle);
+                          delete init_completer;
                         },
                         wlansoftmac_rust_ops, rust_buffer_provider, client_end));
                   });
@@ -155,19 +155,19 @@ zx::result<std::unique_ptr<SoftmacBridge>> SoftmacBridge::New(
   return fit::success(std::move(softmac_bridge));
 }
 
-zx_status_t SoftmacBridge::StopSta(std::unique_ptr<StopStaCompleter> completer) {
+zx_status_t SoftmacBridge::Stop(std::unique_ptr<StopCompleter> completer) {
   WLAN_TRACE_DURATION();
   if (rust_handle_ == nullptr) {
-    lerror("Failed to call stop_sta()! Encountered NULL rust_handle_");
+    lerror("Failed to call stop_bridged_wlansoftmac()! Encountered NULL rust_handle_");
     return ZX_ERR_BAD_STATE;
   }
-  stop_sta(
+  stop_bridged_wlansoftmac(
       completer.release(),
       [](void* ctx) {
-        WLAN_LAMBDA_TRACE_DURATION("run StopStaCompleter");
-        auto completer = static_cast<StopStaCompleter*>(ctx);
+        WLAN_LAMBDA_TRACE_DURATION("run StopCompleter");
+        auto completer = static_cast<StopCompleter*>(ctx);
         if (completer == nullptr) {
-          lerror("Received NULL StopStaCompleter pointer!");
+          lerror("Received NULL StopCompleter pointer!");
           return;
         }
         // Skip the check for whether completer has already been

@@ -19,14 +19,14 @@ use {
 pub mod completers {
     use {fuchsia_zircon as zx, tracing::error};
 
-    pub struct StartStaCompleter<F>
+    pub struct InitCompleter<F>
     where
         F: FnOnce(Result<(), zx::Status>) + Send,
     {
         completer: Option<F>,
     }
 
-    impl<F> StartStaCompleter<F>
+    impl<F> InitCompleter<F>
     where
         F: FnOnce(Result<(), zx::Status>) + Send,
     {
@@ -46,7 +46,7 @@ pub mod completers {
         }
     }
 
-    impl<F> Drop for StartStaCompleter<F>
+    impl<F> Drop for InitCompleter<F>
     where
         F: FnOnce(Result<(), zx::Status>) + Send,
     {
@@ -61,14 +61,14 @@ pub mod completers {
         }
     }
 
-    pub struct StopStaCompleter {
+    pub struct StopCompleter {
         // TODO(42075638): Using dynamic dispatch since otherwise we would need to plumb generics
         // everywhere MLME uses a DriverEventSink. Since we will remove DriverEventSink soon, this
         // is not worthwhile.
         completer: Option<Box<dyn FnOnce() + Send>>,
     }
 
-    impl StopStaCompleter {
+    impl StopCompleter {
         pub fn new(completer: Box<dyn FnOnce() + Send>) -> Self {
             Self { completer: Some(completer) }
         }
@@ -86,12 +86,12 @@ pub mod completers {
         }
     }
 
-    impl Drop for StopStaCompleter {
+    impl Drop for StopCompleter {
         fn drop(&mut self) {
             if let Some(completer) = self.completer.take() {
                 error!(
-                    "About to drop stop_sta() completer without calling it!\n\
-                     Calling stop_sta() completer from drop() to mitigate potential deadlock."
+                    "About to drop StopCompleter without calling it!\n\
+                     Calling StopCompleter completer from drop() to mitigate potential deadlock."
                 );
                 completer()
             }
@@ -104,55 +104,52 @@ pub mod completers {
         use futures::channel::oneshot;
 
         #[test]
-        fn start_sta_completer_sends_ok() {
+        fn init_completer_sends_ok() {
             let (sender, mut receiver) = oneshot::channel::<Result<(), zx::Status>>();
-            let start_sta_completer =
-                StartStaCompleter::new(move |result: Result<(), zx::Status>| {
-                    sender.send(result).expect("Failed to send result.");
-                });
-            start_sta_completer.complete(Ok(()));
+            let init_completer = InitCompleter::new(move |result: Result<(), zx::Status>| {
+                sender.send(result).expect("Failed to send result.");
+            });
+            init_completer.complete(Ok(()));
             assert_eq!(Ok(Some(Ok(()))), receiver.try_recv());
         }
 
         #[test]
-        fn start_sta_completer_sends_err() {
+        fn init_completer_sends_err() {
             let (sender, mut receiver) = oneshot::channel::<Result<(), zx::Status>>();
-            let start_sta_completer =
-                StartStaCompleter::new(move |result: Result<(), zx::Status>| {
-                    sender.send(result).expect("Failed to send result.");
-                });
-            start_sta_completer.complete(Err(zx::Status::INTERNAL));
+            let init_completer = InitCompleter::new(move |result: Result<(), zx::Status>| {
+                sender.send(result).expect("Failed to send result.");
+            });
+            init_completer.complete(Err(zx::Status::INTERNAL));
             assert_eq!(Ok(Some(Err(zx::Status::INTERNAL))), receiver.try_recv());
         }
 
         #[test]
-        fn start_sta_completer_sends_err_on_drop() {
+        fn init_completer_sends_err_on_drop() {
             let (sender, mut receiver) = oneshot::channel::<Result<(), zx::Status>>();
-            let start_sta_completer =
-                StartStaCompleter::new(move |result: Result<(), zx::Status>| {
-                    sender.send(result).expect("Failed to send result.");
-                });
-            drop(start_sta_completer);
+            let init_completer = InitCompleter::new(move |result: Result<(), zx::Status>| {
+                sender.send(result).expect("Failed to send result.");
+            });
+            drop(init_completer);
             assert_eq!(Ok(Some(Err(zx::Status::BAD_STATE))), receiver.try_recv());
         }
 
         #[test]
-        fn stop_sta_completer_sends_value() {
+        fn stop_completer_sends_value() {
             let (sender, mut receiver) = oneshot::channel();
-            let stop_sta_completer = StopStaCompleter::new(Box::new(move || {
+            let stop_completer = StopCompleter::new(Box::new(move || {
                 sender.send(()).expect("Failed to send.");
             }));
-            stop_sta_completer.complete();
+            stop_completer.complete();
             assert_eq!(Ok(Some(())), receiver.try_recv());
         }
 
         #[test]
-        fn stop_sta_completer_sends_value_on_drop() {
+        fn stop_completer_sends_value_on_drop() {
             let (sender, mut receiver) = oneshot::channel();
-            let stop_sta_completer = StopStaCompleter::new(Box::new(move || {
+            let stop_completer = StopCompleter::new(Box::new(move || {
                 sender.send(()).expect("Failed to send.");
             }));
-            drop(stop_sta_completer);
+            drop(stop_completer);
             assert_eq!(Ok(Some(())), receiver.try_recv());
         }
     }
@@ -864,6 +861,8 @@ pub mod test_utils {
         pub minstrel: Option<crate::MinstrelWrapper>,
         pub eth_queue: Vec<Vec<u8>>,
         pub wlan_queue: Vec<(Vec<u8>, u32)>,
+        pub wlan_softmac_ifc_bridge_proxy:
+            Option<fidl_softmac::WlanSoftmacIfcBridgeSynchronousProxy>,
         pub mlme_event_stream: Option<mpsc::UnboundedReceiver<fidl_mlme::MlmeEvent>>,
         pub mlme_request_sink: mpsc::UnboundedSender<wlan_sme::MlmeRequest>,
         pub mlme_request_stream: Option<mpsc::UnboundedReceiver<wlan_sme::MlmeRequest>>,
@@ -926,6 +925,7 @@ pub mod test_utils {
                 minstrel: None,
                 eth_queue: vec![],
                 wlan_queue: vec![],
+                wlan_softmac_ifc_bridge_proxy: None,
                 mlme_event_stream: Some(mlme_event_stream),
                 mlme_request_sink,
                 mlme_request_stream: Some(mlme_request_stream),
@@ -985,9 +985,13 @@ pub mod test_utils {
         fn start(
             &mut self,
             _ifc: *const WlanSoftmacIfcProtocol<'_>,
-            _wlan_softmac_ifc_bridge_client_handle: zx::sys::zx_handle_t,
+            wlan_softmac_ifc_bridge_client_handle: zx::sys::zx_handle_t,
         ) -> Result<zx::Handle, zx::Status> {
             let mut state = self.state.lock().unwrap();
+            state.wlan_softmac_ifc_bridge_proxy =
+                Some(fidl_softmac::WlanSoftmacIfcBridgeSynchronousProxy::new(fidl::Channel::from(
+                    unsafe { fidl::Handle::from_raw(wlan_softmac_ifc_bridge_client_handle) },
+                )));
             let usme_bootstrap_server_end_handle =
                 state.usme_bootstrap_server_end.take().unwrap().into_channel().into_handle();
             // TODO(https://fxbug.dev/45464): Capture _ifc and provide a testing surface.

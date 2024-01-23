@@ -7,15 +7,15 @@
 // Explicitly declare usage for cbindgen.
 
 use {
-    fuchsia_zircon as zx,
+    fidl_fuchsia_wlan_softmac as fidl_softmac, fuchsia_async as fasync, fuchsia_zircon as zx,
     std::ffi::c_void,
     tracing::error,
     wlan_mlme::{
         buffer::BufferProvider,
-        device::{completers::StopStaCompleter, DeviceInterface},
+        device::{completers::StopCompleter, Device, DeviceInterface},
     },
     wlan_span::CSpan,
-    wlansoftmac_rust::{start_wlansoftmac, WlanSoftmacHandle},
+    wlansoftmac_rust::WlanSoftmacHandle,
 };
 
 /// Cast a *mut c_void to a usize. This is normally done to workaround the Send trait which *mut c_void does
@@ -40,18 +40,20 @@ unsafe fn usize_as_ptr(u: usize) -> *mut c_void {
     u as *mut c_void
 }
 
-/// FFI interface: Start the Rust portion of the wlansoftmac driver which will implement
-/// an MLME server and an SME server.
+/// Start and run a bridged wlansoftmac driver hosting an MLME server and an SME server. The driver is
+/// "bridged" in sense that it requires a bridge to a Fuchsia driver to communicate with other Fuchsia
+/// drivers over the FDF transport. When initialization of the bridged driver completes, run_init_completer
+/// will be called.
 ///
 /// # Safety
 ///
 /// The caller of this function should provide raw pointers that will be valid in the address space
 /// where the Rust portion of wlansoftmac will run.
 #[no_mangle]
-pub unsafe extern "C" fn start_sta(
-    completer: *mut c_void,
-    run_completer: extern "C" fn(
-        completer: *mut c_void,
+pub unsafe extern "C" fn start_and_run_bridged_wlansoftmac(
+    init_completer: *mut c_void,
+    run_init_completer: extern "C" fn(
+        init_completer: *mut c_void,
         status: zx::zx_status_t,
         wlan_softmac_handle: *mut WlanSoftmacHandle,
     ),
@@ -59,27 +61,43 @@ pub unsafe extern "C" fn start_sta(
     buf_provider: BufferProvider,
     wlan_softmac_bridge_client_handle: zx::sys::zx_handle_t,
 ) -> zx::sys::zx_status_t {
+    let wlan_softmac_bridge_proxy = {
+        let handle = unsafe { fidl::Handle::from_raw(wlan_softmac_bridge_client_handle) };
+        let channel = fidl::Channel::from(handle);
+        fidl_softmac::WlanSoftmacBridgeSynchronousProxy::new(channel)
+    };
+    let device = Device::new(device, wlan_softmac_bridge_proxy);
+
     // SAFETY: Cast *mut c_void to usize so the constructed lambda will be Send. This is safe since
-    // StartStaCompleter will not move to a thread in a different address space.
-    let completer = unsafe { ptr_as_usize(completer) };
-    zx::Status::from(start_wlansoftmac(
-        move |result: Result<WlanSoftmacHandle, zx::Status>| match result {
-            Ok(handle) => {
-                run_completer(
-                    unsafe { usize_as_ptr(completer) },
-                    zx::Status::OK.into_raw(),
-                    Box::into_raw(Box::new(handle)),
-                );
-            }
-            Err(status) => {
-                run_completer(completer as *mut c_void, status.into_raw(), std::ptr::null_mut());
-            }
-        },
-        device,
-        buf_provider,
-        wlan_softmac_bridge_client_handle,
-    ))
-    .into_raw()
+    // InitCompleter will not move to a thread in a different address space.
+    let mut executor = fasync::LocalExecutor::new();
+    executor.run_singlethreaded(async move {
+        let init_completer = unsafe { ptr_as_usize(init_completer) };
+        zx::Status::from(
+            wlansoftmac_rust::start_and_serve(
+                move |result: Result<WlanSoftmacHandle, zx::Status>| match result {
+                    Ok(handle) => {
+                        run_init_completer(
+                            unsafe { usize_as_ptr(init_completer) },
+                            zx::Status::OK.into_raw(),
+                            Box::into_raw(Box::new(handle)),
+                        );
+                    }
+                    Err(status) => {
+                        run_init_completer(
+                            unsafe { usize_as_ptr(init_completer) },
+                            status.into_raw(),
+                            std::ptr::null_mut(),
+                        );
+                    }
+                },
+                device,
+                buf_provider,
+            )
+            .await,
+        )
+        .into_raw()
+    })
 }
 
 /// FFI interface: Stop a WlanSoftmac via the WlanSoftmacHandle. Takes ownership and invalidates
@@ -90,20 +108,20 @@ pub unsafe extern "C" fn start_sta(
 /// This function casts a raw pointer to a WlanSoftmacHandle. This API is fundamentally
 /// unsafe, and relies on the caller passing ownership of the correct pointer.
 #[no_mangle]
-pub unsafe extern "C" fn stop_sta(
+pub unsafe extern "C" fn stop_bridged_wlansoftmac(
     completer: *mut c_void,
     run_completer: extern "C" fn(completer: *mut c_void),
     softmac: *mut WlanSoftmacHandle,
 ) {
     if softmac.is_null() {
-        error!("Call to stop_sta() with NULL pointer!");
+        error!("Call to stop_bridged_wlansoftmac() with NULL pointer!");
         return;
     }
     let softmac = Box::from_raw(softmac);
     // SAFETY: Cast *mut c_void to usize so the constructed lambda will be Send. This is safe since
-    // StopStaCompleter will not move to a thread in a different address space.
+    // StopCompleter will not move to a thread in a different address space.
     let completer = unsafe { ptr_as_usize(completer) };
-    softmac.stop(StopStaCompleter::new(Box::new(move || {
+    softmac.stop(StopCompleter::new(Box::new(move || {
         run_completer(unsafe { usize_as_ptr(completer) })
     })));
 }

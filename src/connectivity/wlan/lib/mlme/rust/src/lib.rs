@@ -26,16 +26,16 @@ mod minstrel;
 mod probe_sequence;
 
 use {
-    anyhow::{bail, Error},
+    anyhow::{bail, format_err, Error},
     banjo_fuchsia_wlan_common as banjo_common, banjo_fuchsia_wlan_softmac as banjo_wlan_softmac,
-    device::{
-        completers::{StartStaCompleter, StopStaCompleter},
-        DeviceOps,
-    },
+    device::{completers::StopCompleter, DeviceOps},
     fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_softmac as fidl_softmac,
     fuchsia_sync::Mutex,
     fuchsia_trace as trace, fuchsia_zircon as zx,
-    futures::{channel::mpsc, select, StreamExt},
+    futures::{
+        channel::{mpsc, oneshot},
+        select, StreamExt,
+    },
     std::{cmp, sync::Arc, time::Duration},
     tracing::info,
     wlan_sme,
@@ -156,7 +156,7 @@ pub struct DriverEventSink(pub mpsc::UnboundedSender<DriverEvent>);
 // TODO(https://fxbug.dev/29063): Remove copies from MacFrame and EthFrame.
 pub enum DriverEvent {
     // Indicates that the device is being removed and our main loop should exit.
-    Stop(StopStaCompleter),
+    Stop(StopCompleter),
     // TODO(https://fxbug.dev/43456): We need to keep stats for these events and respond to StatsQueryRequest.
     // Indicates receipt of a MAC frame from a peer.
     MacFrameRx { bytes: Vec<u8>, rx_info: banjo_wlan_softmac::WlanRxInfo },
@@ -182,7 +182,7 @@ const MINSTREL_UPDATE_INTERVAL: std::time::Duration = std::time::Duration::from_
 const MINSTREL_UPDATE_INTERVAL_HW_SIM: std::time::Duration = std::time::Duration::from_millis(83);
 
 pub async fn mlme_main_loop<T: MlmeImpl>(
-    start_sta_completer: StartStaCompleter<impl FnOnce(Result<(), zx::Status>) + Send>,
+    init_sender: oneshot::Sender<Result<(), zx::Status>>,
     config: T::Config,
     mut device: T::Device,
     buf_provider: buffer::BufferProvider,
@@ -211,8 +211,8 @@ pub async fn mlme_main_loop<T: MlmeImpl>(
     // path if this occurs.
     let mlme_impl = T::new(config, device, buf_provider, timer).expect("Failed to create MLME.");
 
-    // Signal the main driver dispatcher that startup is complete.
-    start_sta_completer.complete(Ok(()));
+    // Signal init is complete.
+    init_sender.send(Ok(())).map_err(|_| format_err!("Failed to signal init complete."))?;
 
     main_loop_impl(
         mlme_impl,
@@ -258,8 +258,8 @@ async fn main_loop_impl<T: MlmeImpl>(
             driver_event = driver_event_stream.next() => match driver_event {
                 Some(event) => match event {
                     // DriverEvent::Stop indicates a safe shutdown.
-                    DriverEvent::Stop(stop_sta_completer) => {
-                        stop_sta_completer.complete();
+                    DriverEvent::Stop(stop_completer) => {
+                        stop_completer.complete();
                         return Ok(())
                     },
                     DriverEvent::MacFrameRx { bytes, rx_info } => {
@@ -445,12 +445,10 @@ mod tests {
         let buf_provider = FakeBufferProvider::new();
         let (device_sink, device_stream) = mpsc::unbounded();
         let (_mlme_request_sink, mlme_request_stream) = mpsc::unbounded();
-        let (startup_sender, mut startup_receiver) = oneshot::channel::<Result<(), zx::Status>>();
+        let (init_sender, mut init_receiver) = oneshot::channel::<Result<(), zx::Status>>();
         let (shutdown_sender, mut shutdown_receiver) = oneshot::channel::<()>();
         let mut main_loop = Box::pin(mlme_main_loop::<FakeMlme>(
-            StartStaCompleter::new(move |status: Result<(), zx::Status>| {
-                startup_sender.send(status).expect("Failed to signal startup completion.")
-            }),
+            init_sender,
             (),
             fake_device,
             buf_provider,
@@ -458,10 +456,10 @@ mod tests {
             device_stream,
         ));
         assert_variant!(exec.run_until_stalled(&mut main_loop), Poll::Pending);
-        assert_eq!(exec.run_until_stalled(&mut startup_receiver), Poll::Ready(Ok(Ok(()))));
+        assert_eq!(exec.run_until_stalled(&mut init_receiver), Poll::Ready(Ok(Ok(()))));
 
         device_sink
-            .unbounded_send(DriverEvent::Stop(StopStaCompleter::new(Box::new(move || {
+            .unbounded_send(DriverEvent::Stop(StopCompleter::new(Box::new(move || {
                 shutdown_sender.send(()).expect("Failed to signal shutdown completion.")
             }))))
             .expect("Failed to send stop event");

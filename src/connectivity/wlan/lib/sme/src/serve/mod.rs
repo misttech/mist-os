@@ -34,7 +34,7 @@ pub enum SmeServer {
 }
 
 async fn serve_generic_sme(
-    mut generic_sme_stream: <fidl_sme::GenericSmeMarker as fidl::endpoints::ProtocolMarker>::RequestStream,
+    mut generic_sme_request_stream: <fidl_sme::GenericSmeMarker as fidl::endpoints::ProtocolMarker>::RequestStream,
     mlme_sink: crate::MlmeSink,
     mut sme_server_sender: SmeServer,
     mut telemetry_server_sender: Option<
@@ -45,7 +45,7 @@ async fn serve_generic_sme(
     >,
 ) -> Result<(), anyhow::Error> {
     loop {
-        match generic_sme_stream.next().await {
+        match generic_sme_request_stream.next().await {
             Some(Ok(req)) => {
                 let result = match req {
                     fidl_sme::GenericSmeRequest::Query { responder } => {
@@ -112,10 +112,10 @@ async fn serve_generic_sme(
                 }
             }
             Some(Err(e)) => {
-                return Err(format_err!("Generic SME stream failed: {}", e));
+                return Err(format_err!("Generic SME request stream failed: {}", e));
             }
             None => {
-                info!("Generic SME stream terminated. Shutting down.");
+                info!("Generic SME request stream terminated. Shutting down.");
                 return Ok(());
             }
         }
@@ -131,7 +131,7 @@ pub fn create_sme(
     spectrum_management_support: fidl_common::SpectrumManagementSupport,
     inspect_node: fuchsia_inspect::Node,
     persistence_req_sender: auto_persist::PersistenceReqSender,
-    generic_sme_stream: <fidl_sme::GenericSmeMarker as fidl::endpoints::ProtocolMarker>::RequestStream,
+    generic_sme_request_stream: <fidl_sme::GenericSmeMarker as fidl::endpoints::ProtocolMarker>::RequestStream,
 ) -> Result<(MlmeStream, Pin<Box<impl Future<Output = Result<(), anyhow::Error>>>>), anyhow::Error>
 {
     let device_info = device_info.clone();
@@ -184,7 +184,7 @@ pub fn create_sme(
         serve_fidl(mlme_req_sink.clone(), feature_support_receiver, handle_feature_support_query)
             .map(|result| result.map(|_| ()));
     let generic_sme_fut = serve_generic_sme(
-        generic_sme_stream,
+        generic_sme_request_stream,
         mlme_req_sink,
         server,
         telemetry_sender,

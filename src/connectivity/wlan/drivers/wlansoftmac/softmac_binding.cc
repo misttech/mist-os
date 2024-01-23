@@ -177,15 +177,15 @@ void SoftmacBinding::Init() {
   client_ = fdf::WireSharedClient(std::move(endpoints->client), client_dispatcher_.get());
   linfo("Connected to WlanSoftmac service.");
 
-  linfo("Initializing Rust WlanSoftmac...");
+  linfo("Starting up Rust WlanSoftmac...");
   auto completer = std::make_unique<fit::callback<void(zx_status_t status)>>(
       [main_device_dispatcher = main_device_dispatcher_->async_dispatcher(),
        device = device_](zx_status_t status) {
-        WLAN_LAMBDA_TRACE_DURATION("start_sta_completer");
+        WLAN_LAMBDA_TRACE_DURATION("startup_rust_completer");
         if (status == ZX_OK) {
-          linfo("Initialized Rust WlanSoftmac.");
+          linfo("Completed Rust WlanSoftmac startup.");
         } else {
-          lerror("Failed to initialize Rust WlanSoftmac: %s", zx_status_get_string(status));
+          lerror("Failed to startup Rust WlanSoftmac: %s", zx_status_get_string(status));
         }
 
         // device_init_reply() must be called on a driver framework managed
@@ -234,24 +234,24 @@ void SoftmacBinding::Unbind() {
 
   ldebug(0, nullptr, "Entering.");
   auto softmac_bridge = softmac_bridge_.release();
-  auto stop_sta_returned = std::make_unique<libsync::Completion>();
-  auto unowned_stop_sta_returned = stop_sta_returned.get();
-  auto completer = std::make_unique<StopStaCompleter>(
+  auto stop_returned = std::make_unique<libsync::Completion>();
+  auto unowned_stop_returned = stop_returned.get();
+  auto completer = std::make_unique<StopCompleter>(
       [softmac_bridge_server_dispatcher = softmac_bridge_server_dispatcher_.async_dispatcher(),
        softmac_bridge, client_dispatcher = client_dispatcher_.release(),
-       stop_sta_returned = std::move(stop_sta_returned)]() mutable {
-        WLAN_LAMBDA_TRACE_DURATION("StopStaCompleter");
-        async::PostTask(softmac_bridge_server_dispatcher,
-                        [softmac_bridge, client_dispatcher,
-                         stop_sta_returned = std::move(stop_sta_returned)]() {
-                          WLAN_LAMBDA_TRACE_DURATION("SoftmacBridge destruction");
-                          stop_sta_returned->Wait();
-                          delete softmac_bridge;
-                          fdf_dispatcher_shutdown_async(client_dispatcher);
-                        });
+       stop_returned = std::move(stop_returned)]() mutable {
+        WLAN_LAMBDA_TRACE_DURATION("StopCompleter");
+        async::PostTask(
+            softmac_bridge_server_dispatcher,
+            [softmac_bridge, client_dispatcher, stop_returned = std::move(stop_returned)]() {
+              WLAN_LAMBDA_TRACE_DURATION("SoftmacBridge destruction");
+              stop_returned->Wait();
+              delete softmac_bridge;
+              fdf_dispatcher_shutdown_async(client_dispatcher);
+            });
       });
-  softmac_bridge->StopSta(std::move(completer));
-  unowned_stop_sta_returned->Signal();
+  softmac_bridge->Stop(std::move(completer));
+  unowned_stop_returned->Signal();
 }
 
 // See lib/ddk/device.h for documentation on when this method is called.
