@@ -27,7 +27,162 @@ use std::{
 pub fn sysctl_directory(current_task: &CurrentTask, fs: &FileSystemHandle) -> FsNodeHandle {
     let mode = mode!(IFREG, 0o644);
     let mut dir = StaticDirectoryBuilder::new(fs);
+    dir.subdir(current_task, "abi", 0o555, |_dir| {
+        #[cfg(target_arch = "aarch64")]
+        _dir.entry(current_task, "swp", StubSysctl::new_node("/proc/sys/abi/swp", None), mode);
+    });
     dir.subdir(current_task, "kernel", 0o555, |dir| {
+        dir.entry(
+            current_task,
+            "core_pattern",
+            StubSysctl::new_node("/proc/sys/kernel/core_pattern", None),
+            mode,
+        );
+        dir.entry(
+            current_task,
+            "core_pipe_limit",
+            StubSysctl::new_node("/proc/sys/kernel/core_pipe_limit", None),
+            mode,
+        );
+        dir.entry(
+            current_task,
+            "dmsg_restrict",
+            StubSysctl::new_node("/proc/sys/kernel/dmsg_restrict", None),
+            mode,
+        );
+        dir.entry(
+            current_task,
+            "domainname",
+            StubSysctl::new_node("/proc/sys/kernel/domainname", None),
+            mode,
+        );
+        dir.entry(
+            current_task,
+            "hostname",
+            StubSysctl::new_node("/proc/sys/kernel/hostname", None),
+            mode,
+        );
+        dir.entry(
+            current_task,
+            "hung_task_check_count",
+            StubSysctl::new_node("/proc/sys/kernel/hung_task_check_count", None),
+            mode,
+        );
+        dir.entry(
+            current_task,
+            "hung_task_panic",
+            StubSysctl::new_node("/proc/sys/kernel/hung_task_panic", None),
+            mode,
+        );
+        //
+        dir.entry(
+            current_task,
+            "hung_task_timeout_secs",
+            StubSysctl::new_node("/proc/sys/kernel/hung_task_timeout_secs", None),
+            mode,
+        );
+        dir.entry(
+            current_task,
+            "hung_task_warnings",
+            StubSysctl::new_node("/proc/sys/kernel/hung_task_warnings", None),
+            mode,
+        );
+        dir.entry(
+            current_task,
+            "modprobe",
+            StubSysctl::new_node("/proc/sys/kernel/modprobe", None),
+            mode,
+        );
+        dir.entry(
+            current_task,
+            "modules_disabled",
+            StubSysctl::new_node("/proc/sys/kernel/modules_disabled", None),
+            mode,
+        );
+        dir.entry(
+            current_task,
+            "panic_on_oops",
+            StubSysctl::new_node("/proc/sys/kernel/panic_on_oops", None),
+            mode,
+        );
+        dir.entry(
+            current_task,
+            "perf_cpu_time_max_percent",
+            StubSysctl::new_node("/proc/sys/kernel/perf_cpu_time_max_percent", None),
+            mode,
+        );
+        dir.entry(
+            current_task,
+            "perf_event_max_sample_rate",
+            StubSysctl::new_node("/proc/sys/kernel/perf_event_max_sample_rate", None),
+            mode,
+        );
+        dir.entry(
+            current_task,
+            "perf_event_mlock_kb",
+            StubSysctl::new_node("/proc/sys/kernel/perf_event_mlock_kb", None),
+            mode,
+        );
+        dir.entry(
+            current_task,
+            "perf_event_paranoid",
+            StubSysctl::new_node("/proc/sys/kernel/perf_event_paranoid", None),
+            mode,
+        );
+        dir.entry(
+            current_task,
+            "randomize_va_space",
+            StubSysctl::new_node("/proc/sys/kernel/randomize_va_space", None),
+            mode,
+        );
+        dir.entry(
+            current_task,
+            "sched_child_runs_first",
+            StubSysctl::new_node("/proc/sys/kernel/sched_child_runs_first", None),
+            mode,
+        );
+        dir.entry(
+            current_task,
+            "sched_latency_ns",
+            StubSysctl::new_node("/proc/sys/kernel/sched_latency_ns", None),
+            mode,
+        );
+        dir.entry(
+            current_task,
+            "sched_rt_period_us",
+            StubSysctl::new_node("/proc/sys/kernel/sched_rt_period_us", None),
+            mode,
+        );
+        dir.entry(
+            current_task,
+            "sched_rt_runtime_us",
+            StubSysctl::new_node("/proc/sys/kernel/sched_rt_runtime_us", None),
+            mode,
+        );
+        dir.entry(
+            current_task,
+            "sched_schedstats",
+            StubSysctl::new_node("/proc/sys/kernel/sched_schedstats", None),
+            mode,
+        );
+        dir.entry(
+            current_task,
+            "sched_tunable_scaling",
+            StubSysctl::new_node("/proc/sys/kernel/sched_tunable_scaling", None),
+            mode,
+        );
+        dir.entry(
+            current_task,
+            "sched_wakeup_granularity_ns",
+            StubSysctl::new_node("/proc/sys/kernel/sched_wakeup_granularity_ns", None),
+            mode,
+        );
+        dir.entry(
+            current_task,
+            "sysrq",
+            StubSysctl::new_node("/proc/sys/kernel/sysrq", None),
+            mode,
+        );
         dir.entry(
             current_task,
             "unprivileged_bpf_disable",
@@ -65,6 +220,12 @@ pub fn sysctl_directory(current_task: &CurrentTask, fs: &FileSystemHandle) -> Fs
             ),
         );
         dir.subdir(current_task, "random", 0o555, |dir| {
+            dir.entry(
+                current_task,
+                "boot_id",
+                StubSysctl::new_node("/proc/sys/kernel/random/boot_id", None),
+                mode,
+            );
             dir.entry(
                 current_task,
                 "entropy_avail",

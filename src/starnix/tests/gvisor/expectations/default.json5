@@ -466,7 +466,6 @@
                 "ProcTask.TaskDirHasCorrectMetadata",
                 "ProcTask.VerifyTaskChildren",
                 "ProcTask.VerifyTaskDirNlinks",
-                "ProcSysKernelHostname.Exists",
                 "ProcSysKernelHostname.MatchesUname",
                 "ProcSysVmMaxmapCount.HasNumericValue",
                 "ProcSysVmMmapMinAddr.HasNumericValue",
