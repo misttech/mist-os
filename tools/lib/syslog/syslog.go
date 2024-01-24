@@ -6,9 +6,11 @@ package syslog
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"time"
 
+	"go.fuchsia.dev/fuchsia/tools/lib/ffxutil"
 	"go.fuchsia.dev/fuchsia/tools/lib/logger"
 	"go.fuchsia.dev/fuchsia/tools/lib/retry"
 	"go.fuchsia.dev/fuchsia/tools/lib/syslog/constants"
@@ -28,6 +30,7 @@ const (
 // Syslogger streams systems logs from a Fuchsia instance.
 type Syslogger struct {
 	client  sshClient
+	ffx     *ffxutil.FFXInstance
 	running bool
 }
 
@@ -40,10 +43,22 @@ func LogListenerWithArgs(args ...string) []string {
 	return append([]string{LogListener, "--no-color"}, args...)
 }
 
+func ffxLogWithArgs(args ...string) []string {
+	return []string{"log", "--no-color", "--no-symbolize"}
+}
+
 // NewSyslogger creates a new Syslogger, given an SSH session with a Fuchsia instance.
 func NewSyslogger(client *sshutil.Client) *Syslogger {
 	return &Syslogger{
 		client: client,
+	}
+}
+
+// NewFFXSyslogger creates a new Syslogger which will use the provided ffx instance
+// to capture syslogs.
+func NewFFXSyslogger(ffx *ffxutil.FFXInstance) *Syslogger {
+	return &Syslogger{
+		ffx: ffx,
 	}
 }
 
@@ -68,12 +83,32 @@ func (s *Syslogger) Stream(ctx context.Context, output io.Writer) <-chan error {
 		}
 		errs <- err
 	}
-	cmd := LogListenerWithArgs()
+	var cmd []string
+	if s.ffx != nil {
+		cmd = ffxLogWithArgs()
+	} else {
+		cmd = LogListenerWithArgs()
+	}
+
 	s.running = true
 	go func() {
 		for {
-			// Note: Fuchsia's log_listener does not write to stderr.
-			err := s.client.Run(ctx, cmd, output, nil)
+			var err error
+			if s.ffx != nil {
+				command := s.ffx.CommandWithTarget(cmd...)
+				command.Stdout = output
+				err = command.Run()
+			} else if s.client != nil {
+				// Note: Fuchsia's log_listener does not write to stderr.
+				err = s.client.Run(ctx, cmd, output, nil)
+			} else {
+				err = fmt.Errorf("syslogger requires an SSH client or ffx instance to run")
+				logger.Errorf(ctx, "error streaming syslog: %s", err)
+				s.running = false
+				sendErr(errs, err)
+				close(errs)
+				return
+			}
 			if ctx.Err() == nil {
 				if err != nil {
 					logger.Debugf(ctx, "error streaming syslog: %s", err)
@@ -81,7 +116,11 @@ func (s *Syslogger) Stream(ctx context.Context, output io.Writer) <-chan error {
 					logger.Debugf(ctx, "log_listener exited successfully, will rerun")
 					// Don't stream from the beginning of the system's uptime, since
 					// that would include logs that we've already streamed.
-					cmd = LogListenerWithArgs("--since_now", "yes")
+					if s.ffx != nil {
+						cmd = ffxLogWithArgs("--since", "now")
+					} else {
+						cmd = LogListenerWithArgs("--since_now", "yes")
+					}
 					continue
 				}
 			}
@@ -91,7 +130,7 @@ func (s *Syslogger) Stream(ctx context.Context, output io.Writer) <-chan error {
 			// canceled (context cancellation is the only mechanism for stopping
 			// this method, so it generally indicates that the caller is exiting
 			// normally).
-			if ctx.Err() != nil || !sshutil.IsConnectionError(err) {
+			if ctx.Err() != nil || (s.client != nil && !sshutil.IsConnectionError(err)) {
 				logger.Debugf(ctx, "syslog streaming complete: %s", err)
 				s.running = false
 				sendErr(errs, err)
@@ -100,20 +139,26 @@ func (s *Syslogger) Stream(ctx context.Context, output io.Writer) <-chan error {
 			}
 
 			logger.Errorf(ctx, "syslog: SSH client unresponsive; will attempt to reconnect and continue streaming: %s", err)
-			if err := s.client.ReconnectWithBackoff(ctx, retry.NewConstantBackoff(defaultReconnectInterval)); err != nil {
-				// The context probably got cancelled before we were able to
-				// reconnect.
-				if ctx.Err() != nil {
-					logger.Errorf(ctx, "syslog: %s: %s", constants.CtxReconnectError, ctx.Err())
+			if s.client != nil {
+				if err := s.client.ReconnectWithBackoff(ctx, retry.NewConstantBackoff(defaultReconnectInterval)); err != nil {
+					// The context probably got cancelled before we were able to
+					// reconnect.
+					if ctx.Err() != nil {
+						logger.Errorf(ctx, "syslog: %s: %s", constants.CtxReconnectError, ctx.Err())
+					}
+					s.running = false
+					sendErr(errs, err)
+					close(errs)
+					return
 				}
-				s.running = false
-				sendErr(errs, err)
-				close(errs)
-				return
 			}
 			// Start streaming from the beginning of the system's uptime again now that
 			// we're rebooting.
-			cmd = LogListenerWithArgs()
+			if s.ffx != nil {
+				cmd = ffxLogWithArgs()
+			} else {
+				cmd = LogListenerWithArgs()
+			}
 			logger.Infof(ctx, "syslog: refreshed ssh connection")
 			io.WriteString(output, "\n\n<< SYSLOG STREAM INTERRUPTED; RECONNECTING NOW >>\n\n")
 			sendErr(errs, err)

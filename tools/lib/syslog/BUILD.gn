@@ -12,6 +12,7 @@ go_library("syslog") {
   ]
   deps = [
     ":constants",
+    "//tools/lib/ffxutil",
     "//tools/lib/logger",
     "//tools/lib/retry",
     "//tools/net/sshutil",

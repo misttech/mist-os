@@ -391,7 +391,12 @@ func (t *genericFuchsiaTarget) AddPackageRepository(client *sshutil.Client, repo
 // it easy to re-register the package repository on reboot. This function
 // blocks until the target is stopped.
 func (t *genericFuchsiaTarget) CaptureSyslog(client *sshutil.Client, filename, repoURL, blobURL string) error {
-	syslogger := syslog.NewSyslogger(client)
+	var syslogger *syslog.Syslogger
+	if t.UseFFXExperimental(2) {
+		syslogger = syslog.NewFFXSyslogger(t.ffx.FFXInstance)
+	} else {
+		syslogger = syslog.NewSyslogger(client)
+	}
 
 	f, err := os.Create(filename)
 	if err != nil {

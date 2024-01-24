@@ -206,6 +206,12 @@ func (f *FFXInstance) Command(args ...string) *exec.Cmd {
 	return getCommand(f.runner, f.stdout, f.stderr, args...)
 }
 
+// CommandWithTarget returns a Command to run with the associated target.
+func (f *FFXInstance) CommandWithTarget(args ...string) *exec.Cmd {
+	args = append([]string{"--target", f.target}, args...)
+	return f.Command(args...)
+}
+
 // Run runs ffx with the associated config and provided args.
 func (f *FFXInstance) Run(ctx context.Context, args ...string) error {
 	cmd := f.Command(args...)
