@@ -20,12 +20,13 @@ if (is_host) {
 
   _sources = [
     "src/allow.rs",
+    "src/api.rs",
+    "src/bugspec.rs",
     "src/fix.rs",
     "src/issues.rs",
     "src/lint.rs",
     "src/main.rs",
-    "src/monorail/mod.rs",
-    "src/monorail/schema.rs",
+    "src/mock.rs",
     "src/owners.rs",
     "src/rollout.rs",
     "src/span.rs",

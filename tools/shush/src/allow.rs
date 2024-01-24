@@ -17,9 +17,9 @@ use std::{
 };
 
 use crate::{
+    api::Api,
     issues::IssueTemplate,
     lint::{filter_lints, Lint, LintFile},
-    monorail::Monorail,
     owners::FileOwnership,
     span::Span,
 };
@@ -28,9 +28,10 @@ pub fn allow(
     lints: &mut impl BufRead,
     filter: &[String],
     fuchsia_dir: &Path,
-    monorail: &mut (impl Monorail + ?Sized),
+    api: &mut (impl Api + ?Sized),
     issue_template: &mut IssueTemplate<'_>,
     rollout_path: &Path,
+    holding_component_name: &str,
     dryrun: bool,
     verbose: bool,
 ) -> Result<()> {
@@ -44,19 +45,29 @@ pub fn allow(
 
     let mut created_issues = Vec::new();
     for (ownership, files) in ownership_to_lints.iter() {
-        let issue = issue_template.create(monorail, ownership, files)?;
-        let bug_link = format!("https://fxbug.dev/{}", issue.id());
-        created_issues.push(issue);
+        let (private_files, public_files) =
+            files.iter().partition::<Vec<_>, _>(|f| f.path.starts_with("vendor"));
 
-        if !dryrun {
-            for file in files.iter() {
-                match insert_allows(&file.path, &file.lints, &bug_link) {
-                    Ok(ins) => ins,
-                    Err(e) => {
-                        eprintln!("Failed to annotate {}: {:?}", file.path, e);
-                        continue;
-                    }
-                };
+        for private_file in private_files.iter() {
+            eprintln!("Skipping issue for lint in private file: {}", private_file.path);
+        }
+
+        if !public_files.is_empty() {
+            let issue =
+                issue_template.create(api, ownership, &public_files, holding_component_name)?;
+            let bug_link = format!("https://fxbug.dev/{}", issue.id);
+            created_issues.push(issue);
+
+            if !dryrun {
+                for public_file in public_files.iter() {
+                    match insert_allows(&public_file.path, &public_file.lints, &bug_link) {
+                        Ok(ins) => ins,
+                        Err(e) => {
+                            eprintln!("Failed to annotate {}: {:?}", public_file.path, e);
+                            continue;
+                        }
+                    };
+                }
             }
         }
     }

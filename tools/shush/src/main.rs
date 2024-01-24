@@ -2,6 +2,17 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+mod allow;
+mod api;
+mod bugspec;
+mod fix;
+mod issues;
+mod lint;
+mod mock;
+mod owners;
+mod rollout;
+mod span;
+
 use anyhow::{anyhow, Result};
 use argh::FromArgs;
 
@@ -13,16 +24,7 @@ use std::{
     process::Command,
 };
 
-use crate::monorail::Monorail;
-
-mod allow;
-mod fix;
-mod issues;
-mod lint;
-mod monorail;
-mod owners;
-mod rollout;
-mod span;
+use crate::api::Api;
 
 #[derive(Debug, FromArgs)]
 /// Silence rustc and clippy lints with allow attributes and autofixes
@@ -47,10 +49,10 @@ struct Args {
     /// file containing json lints (uses stdin if not given)
     #[argh(positional)]
     lint_file: Option<PathBuf>,
-    /// path to a prpc binary for monorail API calls
+    /// path to a binary for API calls
     #[argh(option)]
-    prpc: Option<PathBuf>,
-    /// mock monorail issue creation calls instead of calling prpc
+    api: Option<PathBuf>,
+    /// mock API issue creation calls
     #[argh(switch)]
     mock: bool,
     /// print details of created issues to the command line
@@ -78,19 +80,16 @@ impl Args {
         }
     }
 
-    pub fn monorail_api(&self) -> Result<Box<dyn Monorail>> {
-        const MONORAIL_API_URL: &'static str = "api-dot-monorail-prod.appspot.com";
-
-        let prpc = self.prpc.as_ref().map(|binary_path| {
-            monorail::Prpc::new(binary_path.clone(), MONORAIL_API_URL.to_string())
-        });
+    pub fn api(&self) -> Result<Box<dyn Api>> {
+        let api = self
+            .api
+            .as_ref()
+            .map(|path| Box::new(bugspec::Bugspec::new(path.clone())) as Box<dyn Api>);
 
         if self.dryrun || self.mock {
-            Ok(Box::new(monorail::Mock::new(self.log_api, prpc)))
+            Ok(Box::new(mock::Mock::new(self.log_api, api)))
         } else {
-            Ok(Box::new(
-                prpc.ok_or_else(|| anyhow!("--prpc is required when monorail is not mocked"))?,
-            ))
+            Ok(api.ok_or_else(|| anyhow!("--api is required when shush is not mocked"))?)
         }
     }
 
@@ -136,12 +135,12 @@ struct Allow {
     /// the issue to mark created issues as blocking
     #[argh(option)]
     blocking_issue: Option<String>,
-    /// the labels to add to created issues
-    #[argh(option)]
-    labels: Vec<String>,
     /// the maximum number of additional users to CC on created issues
     #[argh(option, default = "3")]
     max_cc_users: usize,
+    /// the holding component to place newly-created bugs into (default "LanguagePlatforms>Rust")
+    #[argh(option)]
+    holding_component: Option<String>,
 }
 
 impl Allow {
@@ -170,13 +169,12 @@ fn main() -> Result<()> {
     match args.action {
         Action::Fix(_) => fix::fix(&mut args.read_lints(), args.try_get_filter()?, args.dryrun),
         Action::Allow(ref allow_args) => {
-            let mut monorail = args.monorail_api()?;
+            let mut api = args.api()?;
             let mut issue_template = issues::IssueTemplate::new(
                 &args.lint,
                 allow_args.codesearch_tag.as_deref(),
                 allow_args.load_template()?,
                 allow_args.blocking_issue.as_deref(),
-                allow_args.labels.as_ref(),
                 allow_args.max_cc_users,
             );
 
@@ -192,15 +190,20 @@ fn main() -> Result<()> {
                 &mut args.read_lints(),
                 args.try_get_filter()?,
                 &args.change_to_fuchsia_root()?,
-                &mut *monorail,
+                &mut *api,
                 &mut issue_template,
                 rollout_path,
+                allow_args
+                    .holding_component
+                    .as_ref()
+                    .map(String::as_str)
+                    .unwrap_or("LanguagePlatforms>Rust"),
                 args.dryrun,
                 args.verbose,
             )
         }
         Action::Rollout(_) => {
-            let mut monorail = args.monorail_api()?;
+            let mut api = args.api()?;
             let rollout_path = args.rollout_path();
             if !rollout_path.exists() {
                 return Err(anyhow!(
@@ -209,7 +212,7 @@ fn main() -> Result<()> {
                 ));
             }
 
-            rollout::rollout(&mut *monorail, rollout_path, args.verbose)
+            rollout::rollout(&mut *api, rollout_path, args.verbose)
         }
     }
 }

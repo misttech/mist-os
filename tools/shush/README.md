@@ -28,12 +28,12 @@ Run `fx shush --help` for details.
 
 `shush` can perform large-scale lint rollouts across the tree automatically:
 
-1. Create a tracking issue by hand. This can be done from the Monorail UI. Keep the issue number for later.
-2. Get a copy of `prpc`. You can find packages under `infra/tools/prpc` on the [CIPD site](https://chrome-infra-packages.appspot.com/p/infra/tools/prpc) or through the command line `cipd` client.
+1. Create a tracking issue by hand. This can be done from the issue tracker UI. Keep the issue number for later.
+2. Get an issue tracker API binary. This should accept a `bugspec` and respond to create, update, and list-components requests.
 3. Pick a commit to generate codesearch links with. This should be a commit prior to the lint rollout CL.
 4. Write an issue description template in Markdown. The file should contain `INSERT_DETAILS_HERE` where code links should be added.
-5. `fx clippy --all --raw | shush --lint $LINT --prpc $PRPC_PATH allow --codesearch_tag $COMMIT --template $TEMPLATE --blocking-issue $ISSUE`
+5. `fx clippy --all --raw | shush --lint $LINT --api $API_PATH allow --codesearch_tag $COMMIT --template $TEMPLATE --blocking-issue $ISSUE`
 6. Land a CL with the generated changes.
-7. `shush --prpc $PRPC_PATH rollout`
+7. `shush --api $API_PATH rollout`
 
 `shush allow` also takes additional arguments for customizing the generated issues, including CC limits and issue labels.

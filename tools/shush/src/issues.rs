@@ -10,46 +10,30 @@ use std::collections::HashMap;
 use std::fmt::Write;
 
 use crate::{
+    api::{Api, ComponentId, CreateIssue, IssueId, Status, UpdateIssue},
     lint::{Lint, LintFile},
-    monorail::{schema, Monorail},
     owners::FileOwnership,
 };
 
 struct ComponentDefs {
-    defs: HashMap<String, u64>,
+    defs: HashMap<String, ComponentId>,
 }
 
 impl ComponentDefs {
-    fn load(monorail: &mut (impl Monorail + ?Sized)) -> Result<Self> {
+    fn load(api: &mut (impl Api + ?Sized)) -> Result<Self> {
         let mut defs = HashMap::new();
-
-        let mut page_token = None;
-        loop {
-            let response = monorail.list_component_defs(schema::ListComponentDefsRequest {
-                parent: "projects/fuchsia".to_string(),
-                page_size: 100,
-                page_token,
-            })?;
-            for component_def in response.component_defs {
-                let id = component_def
-                    .name
-                    .strip_prefix("projects/fuchsia/componentDefs/")
-                    .unwrap()
-                    .parse()
-                    .unwrap();
-                defs.insert(component_def.value, id);
-            }
-            page_token = response.next_page_token;
-            if page_token.is_none() {
-                break;
-            }
+        for component in api.list_components()? {
+            let path = component
+                .path
+                .iter()
+                .fold(String::new(), |acc, x| format!("{acc}>{}", x.replace(' ', "")));
+            defs.insert(path, component.id);
         }
-
         Ok(Self { defs })
     }
 
-    fn get(&self, component: &str) -> Option<String> {
-        self.defs.get(component).map(|id| format!("projects/fuchsia/componentDefs/{id}"))
+    fn get(&self, component: &str) -> Option<ComponentId> {
+        self.defs.get(component).copied()
     }
 }
 
@@ -59,14 +43,11 @@ pub struct IssueTemplate<'a> {
     codesearch_tag: Option<&'a str>,
     template: Option<String>,
     blocking_issue: Option<&'a str>,
-    labels: &'a [String],
     max_cc_users: usize,
 
     // Cache
     component_defs: OnceCell<ComponentDefs>,
 }
-
-const HOLDING_COMPONENT: &'static str = "Rust>tools>Shush>Rollout";
 
 impl<'a> IssueTemplate<'a> {
     pub fn new(
@@ -74,7 +55,6 @@ impl<'a> IssueTemplate<'a> {
         codesearch_tag: Option<&'a str>,
         template: Option<String>,
         blocking_issue: Option<&'a str>,
-        labels: &'a [String],
         max_cc_users: usize,
     ) -> Self {
         Self {
@@ -82,7 +62,6 @@ impl<'a> IssueTemplate<'a> {
             codesearch_tag,
             template,
             blocking_issue,
-            labels,
             max_cc_users,
 
             component_defs: OnceCell::new(),
@@ -135,46 +114,46 @@ impl<'a> IssueTemplate<'a> {
         link
     }
 
-    fn get_component_defs(
-        &self,
-        monorail: &mut (impl Monorail + ?Sized),
-    ) -> Result<&ComponentDefs> {
-        self.component_defs.get_or_try_init(|| ComponentDefs::load(monorail))
+    fn get_component_defs(&self, api: &mut (impl Api + ?Sized)) -> Result<&ComponentDefs> {
+        self.component_defs.get_or_try_init(|| ComponentDefs::load(api))
     }
 
     pub fn create(
         &self,
-        monorail: &mut (impl Monorail + ?Sized),
+        api: &mut (impl Api + ?Sized),
         ownership: &FileOwnership,
-        files: &[LintFile],
+        files: &[&LintFile],
+        holding_component_name: &str,
     ) -> Result<Issue> {
-        let component_defs = self.get_component_defs(monorail)?;
+        let component_defs = self.get_component_defs(api)?;
 
-        let mut summary = "Please inspect ".to_string();
+        let mut title = "Please inspect ".to_string();
         match self.filter {
-            [a] => write!(summary, "these {}", a)?,
-            [a, b] => write!(summary, "these {} and {}", a, b)?,
-            _ => write!(summary, "multiple new")?,
+            [a] => write!(title, "these {}", a)?,
+            [a, b] => write!(title, "these {} and {}", a, b)?,
+            _ => write!(title, "multiple new")?,
         }
-        write!(summary, " lints")?;
+        write!(title, " lints")?;
 
-        let mut components = None;
+        let mut component = None;
         let mut owner = None;
         let mut cc_users = None;
+        let mut blocking_issues = Vec::new();
 
-        if let Some(component) = &ownership.component {
-            write!(summary, " in {}", component)?;
-            if let Some(component) = component_defs.get(component) {
-                components = Some(vec![schema::ComponentValue::from(component)]);
+        if let Some(component_name) = &ownership.component {
+            write!(title, " in {}", component_name)?;
+            if let Some(c) = component_defs.get(&component_name) {
+                component = Some(c);
             } else {
-                eprintln!("could not find component '{component}' in components map, skipping");
+                eprintln!(
+                    "could not find component '{component_name}' in components map, skipping"
+                );
             }
         }
 
         if !ownership.owners.is_empty() {
             // A small price to pay for salvation
-            owner =
-                Some(schema::UserValue::from(format!("users/{}@google.com", ownership.owners[0])));
+            owner = Some(ownership.owners[0].clone());
 
             if ownership.component.is_none() && ownership.owners.len() > 1 {
                 cc_users = Some(
@@ -184,9 +163,7 @@ impl<'a> IssueTemplate<'a> {
                         // skip the owner
                         .skip(1)
                         .take(self.max_cc_users)
-                        .map(|owner| {
-                            schema::UserValue::from(format!("users/{}@google.com", owner.clone()))
-                        })
+                        .cloned()
                         .collect(),
                 );
             }
@@ -199,119 +176,56 @@ impl<'a> IssueTemplate<'a> {
             details
         };
 
-        let blocking_issue_refs = self.blocking_issue.map(|issue| {
-            vec![schema::IssueRef::from(format!("projects/fuchsia/issues/{}", issue))]
-        });
-
-        // Ensure RVG label present.
-        let mut label_vec = self.labels.to_vec();
-        let rvg_label = "Restrict-View-Google".to_string();
-        if !label_vec.contains(&rvg_label) {
-            label_vec.push(rvg_label);
+        if let Some(i) = self.blocking_issue {
+            blocking_issues.push(IssueId::new(i.parse()?));
         }
 
-        let labels =
-            Some(label_vec.iter().cloned().map(schema::LabelValue::from).collect::<Vec<_>>());
-
-        let holding_component = component_defs.get(HOLDING_COMPONENT).expect("couldn't find holding component definition, you may need to rerun with --prpc to fetch component definitions");
-        let request = schema::MakeIssueRequest {
-            parent: "projects/fuchsia",
-            issue: schema::Issue {
-                name: None,
-                summary: Some(summary),
-                status: Some(schema::StatusValue::from("NeedsInfo".to_string())),
-                owner: None,
-                cc_users: None,
-                labels,
-                components: Some(vec![schema::ComponentValue::from(holding_component)]),
-                field_values: None,
-                merged_into_issue_ref: None,
-                blocked_on_issue_refs: None,
-                blocking_issue_refs,
-            },
+        let holding_component = component_defs
+            .get(holding_component_name)
+            .expect("couldn't find holding component definition");
+        let request = CreateIssue {
+            title,
             description,
-            notify_type: schema::NotifyType::NotifyTypeUnspecified,
+            status: Status::New,
+            component: holding_component,
+            blocking_issues,
         };
 
-        let issue = monorail.create_issue(request)?;
-        // The returned issue name is of the form "fuchsia/issues/{number}".
-        let id = issue.name.unwrap().split('/').last().unwrap().parse()?;
+        let id = api.create_issue(request)?;
 
-        Ok(Issue { id, components, owner, cc_users })
+        Ok(Issue { id, component, owner, cc_users })
     }
 }
 
 #[derive(Deserialize, Serialize)]
 pub struct Issue {
-    id: usize,
-    components: Option<Vec<schema::ComponentValue>>,
-    owner: Option<schema::UserValue>,
-    cc_users: Option<Vec<schema::UserValue>>,
+    pub id: IssueId,
+    pub component: Option<ComponentId>,
+    pub owner: Option<String>,
+    pub cc_users: Option<Vec<String>>,
 }
 
 impl Issue {
-    fn update_from_deltas(
-        monorail: &mut (impl Monorail + ?Sized),
-        deltas: Vec<schema::IssueDelta>,
-    ) -> Result<()> {
-        monorail.update_issues(schema::ModifyIssuesRequest {
-            deltas: Some(deltas),
-            notify_type: schema::NotifyType::Email,
-            comment_content: None,
-        })
-    }
-
-    pub fn id(&self) -> usize {
-        self.id
-    }
-
     pub fn rollout(
         mut issues: Vec<Self>,
-        monorail: &mut (impl Monorail + ?Sized),
+        api: &mut (impl Api + ?Sized),
         verbose: bool,
     ) -> Result<()> {
-        let component_defs = ComponentDefs::load(monorail)?;
-
-        // Monorail modification requests are batched up in groups of up to 100 modifications.
-        let mut deltas = Vec::new();
         let issues_len = issues.len();
         for (i, issue) in issues.drain(..).enumerate() {
             if verbose {
-                println!("[{i}/{issues_len}] Rolling out https://fxbug.dev/{}", issue.id());
-            }
-            let mut update_mask = "status,components".to_string();
-            if issue.owner.is_some() {
-                update_mask += ",owner";
-            }
-            if issue.cc_users.is_some() {
-                update_mask += ",cc_users";
+                println!("[{i}/{issues_len}] Rolling out https://fxbug.dev/{}", issue.id);
             }
 
-            deltas.push(schema::IssueDelta {
-                issue: schema::Issue {
-                    name: Some(format!("projects/fuchsia/issues/{}", issue.id())),
-                    summary: None,
-                    status: Some(schema::StatusValue::from("Available".to_string())),
-                    owner: issue.owner,
-                    cc_users: issue.cc_users,
-                    labels: None,
-                    components: issue.components,
-                    field_values: None,
-                    merged_into_issue_ref: None,
-                    blocked_on_issue_refs: None,
-                    blocking_issue_refs: None,
-                },
-                update_mask,
-                components_remove: Some(vec![component_defs.get(HOLDING_COMPONENT).unwrap()]),
-            });
-            if deltas.len() >= 100 {
-                let deltas = ::core::mem::replace(&mut deltas, Vec::new());
-                Self::update_from_deltas(monorail, deltas)?;
-            }
+            api.update_issue(UpdateIssue {
+                id: issue.id,
+                status: Some(Status::Assigned),
+                owner: issue.owner,
+                cc_users: issue.cc_users,
+                component: issue.component,
+            })?;
         }
-        if !deltas.is_empty() {
-            Self::update_from_deltas(monorail, deltas)?;
-        }
+
         Ok(())
     }
 }

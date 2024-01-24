@@ -6,19 +6,15 @@ use std::{fs::File, io::BufReader, path::Path};
 
 use anyhow::Result;
 
-use crate::{issues::Issue, monorail::Monorail};
+use crate::{api::Api, issues::Issue};
 
-pub fn rollout(
-    monorail: &mut (impl Monorail + ?Sized),
-    rollout_path: &Path,
-    verbose: bool,
-) -> Result<()> {
+pub fn rollout(api: &mut (impl Api + ?Sized), rollout_path: &Path, verbose: bool) -> Result<()> {
     let created_issues =
         serde_json::from_reader::<_, Vec<Issue>>(BufReader::new(File::open(rollout_path)?))?;
 
     println!("Rolling out {} lints...", created_issues.len());
 
-    Issue::rollout(created_issues, monorail, verbose)?;
+    Issue::rollout(created_issues, api, verbose)?;
 
     Ok(())
 }
