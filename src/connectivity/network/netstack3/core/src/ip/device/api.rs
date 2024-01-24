@@ -29,6 +29,8 @@ use crate::{
             DelIpAddr, IpDeviceBindingsContext, IpDeviceConfigurationContext, IpDeviceIpExt,
             IpDeviceStateContext as _,
         },
+        forwarding::IpForwardingDeviceContext,
+        types::RawMetric,
         AddressRemovedReason,
     },
 };
@@ -47,7 +49,8 @@ where
     I: IpDeviceIpExt,
     C: ContextPair,
     C::CoreContext: IpDeviceConfigurationContext<I, C::BindingsContext>
-        + IpDeviceConfigurationHandler<I, C::BindingsContext>,
+        + IpDeviceConfigurationHandler<I, C::BindingsContext>
+        + IpForwardingDeviceContext<I>,
     C::BindingsContext:
         IpDeviceBindingsContext<I, <C::CoreContext as DeviceIdContext<AnyDevice>>::DeviceId>,
 {
@@ -186,6 +189,14 @@ where
             })
             .into()
     }
+
+    /// Gets the routing metric for the device.
+    pub fn get_routing_metric(
+        &mut self,
+        device_id: &<C::CoreContext as DeviceIdContext<AnyDevice>>::DeviceId,
+    ) -> RawMetric {
+        self.core_ctx().get_routing_metric(device_id)
+    }
 }
 /// The device IP API interacting with all IP versions.
 pub struct DeviceIpAnyApi<C>(C);
@@ -201,8 +212,10 @@ where
     C: ContextPair,
     C::CoreContext: IpDeviceConfigurationContext<Ipv4, C::BindingsContext>
         + IpDeviceConfigurationHandler<Ipv4, C::BindingsContext>
+        + IpForwardingDeviceContext<Ipv4>
         + IpDeviceConfigurationContext<Ipv6, C::BindingsContext>
-        + IpDeviceConfigurationHandler<Ipv6, C::BindingsContext>,
+        + IpDeviceConfigurationHandler<Ipv6, C::BindingsContext>
+        + IpForwardingDeviceContext<Ipv6>,
     C::BindingsContext: IpDeviceBindingsContext<Ipv4, <C::CoreContext as DeviceIdContext<AnyDevice>>::DeviceId>
         + IpDeviceBindingsContext<Ipv6, <C::CoreContext as DeviceIdContext<AnyDevice>>::DeviceId>,
 {
@@ -240,6 +253,18 @@ where
             IpAddr::V4(addr) => self.ip::<Ipv4>().del_ip_addr(device, addr),
             IpAddr::V6(addr) => self.ip::<Ipv6>().del_ip_addr(device, addr),
         }
+    }
+
+    /// Like [`DeviceIpApi::get_routing_metric`].
+    pub fn get_routing_metric(
+        &mut self,
+        device_id: &<C::CoreContext as DeviceIdContext<AnyDevice>>::DeviceId,
+    ) -> RawMetric {
+        // NB: The routing metric is kept only once for both IP versions, debug
+        // assert that this is true, but return the v4 version otherwise.
+        let metric = self.ip::<Ipv4>().get_routing_metric(device_id);
+        debug_assert_eq!(metric, self.ip::<Ipv6>().get_routing_metric(device_id));
+        metric
     }
 }
 

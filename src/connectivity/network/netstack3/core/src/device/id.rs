@@ -10,7 +10,6 @@ use core::hash::Hash;
 
 use derivative::Derivative;
 
-use crate::ip::device::state::DualStackIpDeviceState;
 use crate::{
     device::{
         ethernet::EthernetLinkDevice,
@@ -400,10 +399,6 @@ impl<T: DeviceStateSpec, BT: DeviceLayerTypes> StrongId for BaseDeviceId<T, BT> 
 impl<T: DeviceStateSpec, BT: DeviceLayerTypes> BaseDeviceId<T, BT> {
     pub(crate) fn device_state(&self) -> &IpLinkDeviceState<T, BT> {
         &self.rc.ip
-    }
-
-    pub(crate) fn ip_device_state(&self) -> &DualStackIpDeviceState<BT::Instant> {
-        &self.rc.ip.ip
     }
 
     /// Returns a reference to the external state for the device.

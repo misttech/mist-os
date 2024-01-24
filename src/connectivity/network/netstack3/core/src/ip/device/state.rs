@@ -9,7 +9,7 @@ use core::{fmt::Debug, hash::Hash, num::NonZeroU8, time::Duration};
 
 use const_unwrap::const_unwrap_option;
 use derivative::Derivative;
-use lock_order::lock::{LockFor, RwLockFor};
+use lock_order::lock::{LockFor, RwLockFor, UnlockedAccess};
 use net_types::{
     ip::{AddrSubnet, GenericOverIp, Ip, IpAddress, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr},
     SpecifiedAddr,
@@ -276,6 +276,18 @@ impl<I: Instant> LockFor<crate::lock_ordering::IpDeviceFlags<Ipv6>> for DualStac
             Self: 'l;
     fn lock(&self) -> Self::Guard<'_> {
         self.ipv6.ip_state.flags.lock()
+    }
+}
+
+impl<I: Instant> UnlockedAccess<crate::lock_ordering::RoutingMetric> for DualStackIpDeviceState<I> {
+    type Data = RawMetric;
+
+    type Guard<'l> = &'l RawMetric
+    where
+        Self: 'l;
+
+    fn access(&self) -> Self::Guard<'_> {
+        &self.metric
     }
 }
 

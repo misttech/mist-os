@@ -118,7 +118,9 @@ where
     Self: IpDeviceStateContext<I, BC, DeviceId = DeviceId<BC>>,
 {
     fn get_routing_metric(&mut self, device_id: &Self::DeviceId) -> RawMetric {
-        for_any_device_id!(DeviceId, device_id, id => id.ip_device_state().metric)
+        crate::device::integration::with_ip_device_state(self, device_id, |state| {
+            *state.unlocked_access::<crate::lock_ordering::RoutingMetric>()
+        })
     }
 
     fn is_ip_device_enabled(&mut self, device_id: &Self::DeviceId) -> bool {
@@ -128,14 +130,6 @@ where
             |IpDeviceFlags { ip_enabled }| *ip_enabled,
         )
     }
-}
-
-/// Gets the routing metric for the device.
-pub fn get_routing_metric<BC: BindingsContext>(
-    _core_ctx: &SyncCtx<BC>,
-    device_id: &DeviceId<BC>,
-) -> RawMetric {
-    for_any_device_id!(DeviceId, device_id, id => id.ip_device_state().metric)
 }
 
 /// Creates a snapshot of the devices in the stack at the time of invocation.

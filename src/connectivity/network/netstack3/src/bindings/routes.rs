@@ -16,10 +16,7 @@
 //! about them, such as the reference-counted RouteSets specified in
 //! fuchsia.net.routes.admin.
 
-use std::{
-    collections::{HashMap, HashSet},
-    sync::Arc,
-};
+use std::collections::{HashMap, HashSet};
 
 use futures::{
     channel::{mpsc, oneshot},
@@ -29,7 +26,7 @@ use net_types::{
     ip::{GenericOverIp, Ip, IpAddress, IpInvariant, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr, Subnet},
     SpecifiedAddr,
 };
-use netstack3_core::{routes::AddableMetric, SyncCtx};
+use netstack3_core::routes::AddableMetric;
 
 use crate::bindings::{util::TryIntoFidlWithContext, BindingsCtx, Ctx, IpExt};
 
@@ -407,11 +404,12 @@ where
     }
 }
 
-fn to_entry<I: Ip>(
-    core_ctx: &Arc<SyncCtx<BindingsCtx>>,
+#[netstack3_core::context_ip_bounds(I, BindingsCtx)]
+fn to_entry<I: netstack3_core::IpExt>(
+    ctx: &mut Ctx,
     addable_entry: netstack3_core::routes::AddableEntry<I::Addr, DeviceId>,
 ) -> netstack3_core::routes::Entry<I::Addr, DeviceId> {
-    let device_metric = netstack3_core::device::get_routing_metric(core_ctx, &addable_entry.device);
+    let device_metric = ctx.api().device_ip::<I>().get_routing_metric(&addable_entry.device);
     addable_entry.resolve_metric(device_metric)
 }
 
@@ -441,7 +439,7 @@ where
                 TableModifyResult::NoChange => return Ok(ChangeOutcome::NoChange),
                 TableModifyResult::SetChanged => return Ok(ChangeOutcome::Changed),
                 TableModifyResult::TableChanged((addable_entry, _generation)) => {
-                    TableChange::Add(to_entry::<I>(ctx.core_ctx(), addable_entry))
+                    TableChange::Add(to_entry::<I>(ctx, addable_entry))
                 }
             }
         }
@@ -509,8 +507,7 @@ where
         .inner
         .iter()
         .map(|(entry, data)| {
-            let device_metric =
-                netstack3_core::device::get_routing_metric(ctx.core_ctx(), &entry.device);
+            let device_metric = ctx.api().device_ip::<I>().get_routing_metric(&entry.device);
             entry.clone().resolve_metric(device_metric).with_generation(data.generation)
         })
         .collect::<Vec<_>>();
@@ -550,11 +547,14 @@ where
                 .expect("failed to notify route update dispatcher");
         }
         TableChange::Remove(removed) => {
-            let (core_ctx, bindings_ctx) = ctx.contexts_mut();
+            // Clone the Ctx so we can capture it in the mapping iterator. This
+            // is cheaper than collecting into a Vec to eliminate the borrow.
+            let mut ctx_clone = ctx.clone();
+            let removed = removed.map(|(entry, _generation)| to_entry::<I>(&mut ctx_clone, entry));
             notify_removed_routes::<I>(
-                bindings_ctx,
+                ctx.bindings_ctx_mut(),
                 route_update_dispatcher,
-                removed.map(|(entry, _generation)| to_entry::<I>(core_ctx, entry)),
+                removed,
                 table,
             )
             .await;

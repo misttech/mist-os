@@ -147,6 +147,8 @@ pub enum ArpCounters {}
 pub struct UdpCounters<I>(PhantomData<I>, Never);
 // Provides unlocked access of SlaacCounters.
 pub enum SlaacCounters {}
+// Provides unlocked access to a device's routing metric.
+pub enum RoutingMetric {}
 
 pub struct IpDeviceConfiguration<I>(PhantomData<I>, Never);
 pub struct IpDeviceGmp<I>(PhantomData<I>, Never);
