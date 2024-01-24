@@ -12,12 +12,11 @@ use derivative::Derivative;
 use lock_order::{lock::UnlockedAccess, wrap::prelude::*};
 use net_types::{
     ethernet::Mac,
-    ip::{AddrSubnetEither, Ip, IpAddr, IpAddress, Ipv4, Ipv6},
-    BroadcastAddr, MulticastAddr, SpecifiedAddr, Witness as _,
+    ip::{AddrSubnetEither, Ip, IpAddr, Ipv4, Ipv6},
+    BroadcastAddr, MulticastAddr, Witness as _,
 };
 use packet::Buf;
 use smallvec::SmallVec;
-use tracing::trace;
 
 use crate::{
     context::{CounterContext, InstantContext},
@@ -34,11 +33,11 @@ use crate::{
         socket::{self, HeldSockets},
         state::DeviceStateSpec,
     },
-    error::{NotSupportedError, SetIpAddressPropertiesError},
+    error::NotSupportedError,
     ip::{
         device::{
             nud::LinkResolutionContext,
-            state::{AssignedAddress as _, IpDeviceFlags, Lifetime},
+            state::{AssignedAddress as _, IpDeviceFlags},
             DualStackDeviceHandler, IpDeviceIpExt, IpDeviceStateContext,
         },
         forwarding::IpForwardingDeviceContext,
@@ -566,39 +565,6 @@ pub fn get_all_ip_addr_subnets<BC: BindingsContext>(
     DualStackDeviceHandler::get_all_ip_addr_subnets(&mut CoreCtx::new_deprecated(core_ctx), device)
 }
 
-/// Sets properties on an IP address.
-pub fn set_ip_addr_properties<BC: BindingsContext, A: IpAddress>(
-    core_ctx: &SyncCtx<BC>,
-    bindings_ctx: &mut BC,
-    device: &DeviceId<BC>,
-    address: SpecifiedAddr<A>,
-    next_valid_until: Lifetime<BC::Instant>,
-) -> Result<(), SetIpAddressPropertiesError> {
-    trace!(
-        "set_ip_addr_properties: setting valid_until={:?} for addr={}",
-        next_valid_until,
-        address
-    );
-    let mut core_ctx = CoreCtx::new_deprecated(core_ctx);
-
-    match address.into() {
-        IpAddr::V4(address) => crate::ip::device::set_ipv4_addr_properties(
-            &mut core_ctx,
-            bindings_ctx,
-            device,
-            address,
-            next_valid_until,
-        ),
-        IpAddr::V6(address) => crate::ip::device::set_ipv6_addr_properties(
-            &mut core_ctx,
-            bindings_ctx,
-            device,
-            address,
-            next_valid_until,
-        ),
-    }
-}
-
 #[cfg(any(test, feature = "testutils"))]
 pub(crate) mod testutil {
     use super::*;
@@ -765,7 +731,7 @@ mod tests {
     use net_declare::net_mac;
     use net_types::{
         ip::{AddrSubnet, AddrSubnetEither, Mtu},
-        UnicastAddr,
+        SpecifiedAddr, UnicastAddr,
     };
     use test_case::test_case;
 

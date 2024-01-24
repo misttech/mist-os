@@ -225,7 +225,7 @@ impl<BT: BindingsTypes, L> crate::context::CounterContext<TimerCounters> for Cor
 /// `Instant` can be implemented by any type which represents an instant in
 /// time. This can include any sort of real-world clock time (e.g.,
 /// [`std::time::Instant`]) or fake time such as in testing.
-pub trait Instant: Sized + Ord + Copy + Clone + Debug + Send + Sync {
+pub trait Instant: Sized + Ord + Copy + Clone + Debug + Send + Sync + 'static {
     /// Returns the amount of time elapsed from another instant to this one.
     ///
     /// # Panics

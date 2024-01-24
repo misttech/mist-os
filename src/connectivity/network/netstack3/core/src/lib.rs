@@ -68,7 +68,7 @@ pub mod device {
     //
     // TODO(https://fxbug.dev/42083910): Replace freestanding functions with API
     // objects.
-    pub use base::{get_all_ip_addr_subnets, inspect_devices, set_ip_addr_properties};
+    pub use base::{get_all_ip_addr_subnets, inspect_devices};
 
     // Re-exported types.
     pub use api::{RemoveDeviceResult, RemoveDeviceResultWithContext};
@@ -154,7 +154,7 @@ pub mod ip {
     pub use crate::algorithm::STABLE_IID_SECRET_KEY_BYTES;
     pub use base::{IpLayerEvent, ResolveRouteError};
     pub use device::{
-        api::{AddIpAddrSubnetError, AddrSubnetAndManualConfigEither},
+        api::{AddIpAddrSubnetError, AddrSubnetAndManualConfigEither, SetIpAddressPropertiesError},
         config::{
             IpDeviceConfigurationUpdate, Ipv4DeviceConfigurationUpdate,
             Ipv6DeviceConfigurationUpdate, UpdateIpConfigurationError,

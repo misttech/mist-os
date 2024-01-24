@@ -36,7 +36,7 @@ use crate::{
         EventContext, InstantBindingsTypes, InstantContext, RngContext, TimerContext, TimerHandler,
     },
     device::{AnyDevice, DeviceIdContext},
-    error::{ExistsError, NotFoundError, SetIpAddressPropertiesError},
+    error::{ExistsError, NotFoundError},
     ip::{
         device::{
             config::{
@@ -315,7 +315,7 @@ pub trait IpDeviceIpExt: IpDeviceStateIpExt {
         + Into<SpecifiedAddr<Self::Addr>>;
     type AddressConfig<I: Instant>: Default + Debug;
     type ManualAddressConfig<I: Instant>: Default + Debug + Into<Self::AddressConfig<I>>;
-    type AddressState<I: Instant>;
+    type AddressState<I: Instant>: 'static;
     type ConfigurationUpdate: From<IpDeviceConfigurationUpdate>
         + AsRef<Option<IpDeviceConfigurationUpdate>>
         + Debug;
@@ -1549,63 +1549,6 @@ fn add_ip_addr_subnet_with_config<
     Ok(addr_id)
 }
 
-pub(crate) fn set_ipv4_addr_properties<
-    CC: IpDeviceConfigurationContext<Ipv4, BC>,
-    BC: IpDeviceBindingsContext<Ipv4, CC::DeviceId>,
->(
-    core_ctx: &mut CC,
-    bindings_ctx: &mut BC,
-    device: &CC::DeviceId,
-    address: SpecifiedAddr<Ipv4Addr>,
-    next_valid_until: Lifetime<BC::Instant>,
-) -> Result<(), SetIpAddressPropertiesError> {
-    let address_id = core_ctx.get_address_id(device, address)?;
-    core_ctx.with_ip_address_state_mut(
-        device,
-        &address_id,
-        |Ipv4AddressState { config: Ipv4AddrConfig { valid_until } }| {
-            if core::mem::replace(valid_until, next_valid_until) != next_valid_until {
-                bindings_ctx.on_event(IpDeviceEvent::AddressPropertiesChanged {
-                    device: device.clone(),
-                    addr: address,
-                    valid_until: next_valid_until,
-                });
-            }
-        },
-    );
-    Ok(())
-}
-
-pub(crate) fn set_ipv6_addr_properties<
-    CC: IpDeviceConfigurationContext<Ipv6, BC>,
-    BC: IpDeviceBindingsContext<Ipv6, CC::DeviceId>,
->(
-    core_ctx: &mut CC,
-    bindings_ctx: &mut BC,
-    device: &CC::DeviceId,
-    address: SpecifiedAddr<Ipv6Addr>,
-    next_valid_until: Lifetime<BC::Instant>,
-) -> Result<(), SetIpAddressPropertiesError> {
-    let address_id = core_ctx.get_address_id(device, address)?;
-    core_ctx.with_ip_address_state_mut(
-        device,
-        &address_id,
-        |Ipv6AddressState { config, flags: _ }| match config {
-            Ipv6AddrConfig::Slaac(_) => Err(SetIpAddressPropertiesError::NotManual),
-            Ipv6AddrConfig::Manual(Ipv6AddrManualConfig { valid_until }) => {
-                if core::mem::replace(valid_until, next_valid_until) != next_valid_until {
-                    bindings_ctx.on_event(IpDeviceEvent::AddressPropertiesChanged {
-                        device: device.clone(),
-                        addr: address,
-                        valid_until: next_valid_until,
-                    });
-                }
-                Ok(())
-            }
-        },
-    )
-}
-
 /// A handler to abstract side-effects of removing IP device addresses.
 pub trait IpAddressRemovalHandler<I: IpDeviceIpExt, BC: InstantBindingsTypes>:
     DeviceIdContext<AnyDevice>
@@ -1897,6 +1840,7 @@ mod tests {
         },
         ip::{
             device::{
+                api::SetIpAddressPropertiesError,
                 config::{IpDeviceConfigurationUpdate, UpdateIpConfigurationError},
                 nud::LinkResolutionResult,
                 slaac::SlaacConfiguration,
@@ -2029,14 +1973,10 @@ mod tests {
         assert_eq!(ctx.bindings_ctx.take_events()[..], []);
 
         let valid_until = Lifetime::Finite(FakeInstant::from(Duration::from_secs(1)));
-        set_ipv4_addr_properties(
-            &mut CoreCtx::new_deprecated(&ctx.core_ctx),
-            &mut ctx.bindings_ctx,
-            &device_id,
-            ipv4_addr_subnet.addr(),
-            valid_until,
-        )
-        .expect("set properties should succeed");
+        ctx.core_api()
+            .device_ip::<Ipv4>()
+            .set_addr_properties(&device_id, ipv4_addr_subnet.addr(), valid_until)
+            .expect("set properties should succeed");
         assert_eq!(
             ctx.bindings_ctx.take_events()[..],
             [DispatchedEvent::IpDeviceIpv4(IpDeviceEvent::AddressPropertiesChanged {
@@ -2047,14 +1987,10 @@ mod tests {
         );
 
         // Verify that a redundant "set properties" does not generate any events.
-        set_ipv4_addr_properties(
-            &mut CoreCtx::new_deprecated(&ctx.core_ctx),
-            &mut ctx.bindings_ctx,
-            &device_id,
-            ipv4_addr_subnet.addr(),
-            valid_until,
-        )
-        .expect("set properties should succeed");
+        ctx.core_api()
+            .device_ip::<Ipv4>()
+            .set_addr_properties(&device_id, ipv4_addr_subnet.addr(), valid_until)
+            .expect("set properties should succeed");
         assert_eq!(ctx.bindings_ctx.take_events()[..], []);
 
         set_ipv4_enabled(&mut ctx, false, true);
@@ -2206,9 +2142,7 @@ mod tests {
         // Because the added address is from SLAAC, setting its lifetime should fail.
         let valid_until = Lifetime::Finite(FakeInstant::from(Duration::from_secs(1)));
         assert_matches!(
-            set_ipv6_addr_properties(
-                &mut CoreCtx::new_deprecated(&ctx.core_ctx),
-                &mut ctx.bindings_ctx,
+            ctx.core_api().device_ip::<Ipv6>().set_addr_properties(
                 &device_id,
                 ll_addr.addr().into(),
                 valid_until,
@@ -2328,14 +2262,10 @@ mod tests {
             ]
         );
 
-        set_ipv6_addr_properties(
-            &mut CoreCtx::new_deprecated(&ctx.core_ctx),
-            &mut ctx.bindings_ctx,
-            &device_id,
-            ll_addr.addr().into(),
-            valid_until,
-        )
-        .expect("set properties should succeed");
+        ctx.core_api()
+            .device_ip::<Ipv6>()
+            .set_addr_properties(&device_id, ll_addr.addr().into(), valid_until)
+            .expect("set properties should succeed");
         assert_eq!(
             ctx.bindings_ctx.take_events()[..],
             [DispatchedEvent::IpDeviceIpv6(IpDeviceEvent::AddressPropertiesChanged {
@@ -2346,14 +2276,10 @@ mod tests {
         );
 
         // Verify that a redundant "set properties" does not generate any events.
-        set_ipv6_addr_properties(
-            &mut CoreCtx::new_deprecated(&ctx.core_ctx),
-            &mut ctx.bindings_ctx,
-            &device_id,
-            ll_addr.addr().into(),
-            valid_until,
-        )
-        .expect("set properties should succeed");
+        ctx.core_api()
+            .device_ip::<Ipv6>()
+            .set_addr_properties(&device_id, ll_addr.addr().into(), valid_until)
+            .expect("set properties should succeed");
         assert_eq!(ctx.bindings_ctx.take_events()[..], []);
 
         test_disable_device(&mut ctx, true);

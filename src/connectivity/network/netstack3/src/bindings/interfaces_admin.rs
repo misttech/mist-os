@@ -57,7 +57,8 @@ use netstack3_core::{
     ip::{
         AddIpAddrSubnetError, AddrSubnetAndManualConfigEither, IpDeviceConfigurationUpdate,
         Ipv4AddrConfig, Ipv4DeviceConfigurationUpdate, Ipv6AddrManualConfig,
-        Ipv6DeviceConfigurationUpdate, Lifetime, UpdateIpConfigurationError,
+        Ipv6DeviceConfigurationUpdate, Lifetime, SetIpAddressPropertiesError,
+        UpdateIpConfigurationError,
     },
 };
 
@@ -1607,26 +1608,21 @@ fn dispatch_address_state_provider_request(
             if preferred_lifetime_info.is_some() {
                 tracing::warn!("Updating preferred lifetime info is not yet supported (https://fxbug.dev/105011)");
             }
-            let (core_ctx, bindings_ctx) = ctx.contexts_mut();
-            let device_id = bindings_ctx.devices.get_core_id(id).expect("interface not found");
+            let device_id =
+                ctx.bindings_ctx().devices.get_core_id(id).expect("interface not found");
+            let valid_lifetime_end = valid_lifetime_end_nanos
+                .map(|nanos| Lifetime::Finite(StackTime(fasync::Time::from_nanos(nanos))))
+                .unwrap_or(Lifetime::Infinite);
             let result = match address.into() {
-                IpAddr::V4(address) => netstack3_core::device::set_ip_addr_properties(
-                    core_ctx,
-                    bindings_ctx,
+                IpAddr::V4(address) => ctx.api().device_ip::<Ipv4>().set_addr_properties(
                     &device_id,
                     address,
-                    valid_lifetime_end_nanos
-                        .map(|nanos| Lifetime::Finite(StackTime(fasync::Time::from_nanos(nanos))))
-                        .unwrap_or(Lifetime::Infinite),
+                    valid_lifetime_end,
                 ),
-                IpAddr::V6(address) => netstack3_core::device::set_ip_addr_properties(
-                    core_ctx,
-                    bindings_ctx,
+                IpAddr::V6(address) => ctx.api().device_ip::<Ipv6>().set_addr_properties(
                     &device_id,
                     address,
-                    valid_lifetime_end_nanos
-                        .map(|nanos| Lifetime::Finite(StackTime(fasync::Time::from_nanos(nanos))))
-                        .unwrap_or(Lifetime::Infinite),
+                    valid_lifetime_end,
                 ),
             };
             match result {
@@ -1634,12 +1630,12 @@ fn dispatch_address_state_provider_request(
                     responder.send().map_err(AddressStateProviderError::Fidl)?;
                     Ok(None)
                 }
-                Err(netstack3_core::error::SetIpAddressPropertiesError::NotFound(
+                Err(SetIpAddressPropertiesError::NotFound(
                     netstack3_core::error::NotFoundError,
                 )) => {
                     panic!("address not found")
                 }
-                Err(netstack3_core::error::SetIpAddressPropertiesError::NotManual) => {
+                Err(SetIpAddressPropertiesError::NotManual) => {
                     panic!("address not manual")
                 }
             }

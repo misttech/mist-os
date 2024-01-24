@@ -11,10 +11,11 @@ use net_types::{
     },
     SpecifiedAddr,
 };
+use thiserror::Error;
 use tracing::trace;
 
 use crate::{
-    context::{ContextPair, InstantBindingsTypes},
+    context::{ContextPair, EventContext as _, InstantBindingsTypes},
     device::{AnyDevice, DeviceIdContext},
     error::ExistsError,
     error::NotFoundError,
@@ -25,14 +26,18 @@ use crate::{
                 IpDeviceConfigurationHandler, PendingIpDeviceConfigurationUpdate,
                 UpdateIpConfigurationError,
             },
-            state::{Ipv4AddrConfig, Ipv6AddrManualConfig},
-            DelIpAddr, IpDeviceBindingsContext, IpDeviceConfigurationContext, IpDeviceIpExt,
-            IpDeviceStateContext as _,
+            state::{
+                Ipv4AddrConfig, Ipv4AddressState, Ipv6AddrConfig, Ipv6AddrManualConfig,
+                Ipv6AddressState, Lifetime,
+            },
+            DelIpAddr, IpDeviceAddressContext as _, IpDeviceBindingsContext,
+            IpDeviceConfigurationContext, IpDeviceEvent, IpDeviceIpExt, IpDeviceStateContext as _,
         },
         forwarding::IpForwardingDeviceContext,
         types::RawMetric,
         AddressRemovedReason,
     },
+    time::Instant,
 };
 
 /// Provides an API for dealing with devices at the IP layer, aka interfaces.
@@ -197,6 +202,50 @@ where
     ) -> RawMetric {
         self.core_ctx().get_routing_metric(device_id)
     }
+
+    /// Sets properties on an IP address.
+    pub fn set_addr_properties(
+        &mut self,
+        device: &<C::CoreContext as DeviceIdContext<AnyDevice>>::DeviceId,
+        address: SpecifiedAddr<I::Addr>,
+        next_valid_until: Lifetime<<C::BindingsContext as InstantBindingsTypes>::Instant>,
+    ) -> Result<(), SetIpAddressPropertiesError> {
+        trace!(
+            "set_ip_addr_properties: setting valid_until={:?} for addr={:?}",
+            next_valid_until,
+            address
+        );
+        let (core_ctx, bindings_ctx) = self.contexts();
+        let address_id = core_ctx.get_address_id(device, address)?;
+        core_ctx.with_ip_address_state_mut(device, &address_id, |address_state| {
+            #[derive(GenericOverIp)]
+            #[generic_over_ip(I, Ip)]
+            struct Wrap<'a, I: IpDeviceIpExt, II: Instant>(&'a mut I::AddressState<II>);
+            let IpInvariant(valid_until) = I::map_ip(
+                Wrap(address_state),
+                |Wrap(Ipv4AddressState { config: Ipv4AddrConfig { valid_until } })| {
+                    IpInvariant(Ok(valid_until))
+                },
+                |Wrap(Ipv6AddressState { flags: _, config })| {
+                    IpInvariant(match config {
+                        Ipv6AddrConfig::Slaac(_) => Err(SetIpAddressPropertiesError::NotManual),
+                        Ipv6AddrConfig::Manual(Ipv6AddrManualConfig { valid_until }) => {
+                            Ok(valid_until)
+                        }
+                    })
+                },
+            );
+            let valid_until = valid_until?;
+            if core::mem::replace(valid_until, next_valid_until) != next_valid_until {
+                bindings_ctx.on_event(IpDeviceEvent::AddressPropertiesChanged {
+                    device: device.clone(),
+                    addr: address,
+                    valid_until: next_valid_until,
+                });
+            }
+            Ok(())
+        })
+    }
 }
 /// The device IP API interacting with all IP versions.
 pub struct DeviceIpAnyApi<C>(C);
@@ -344,4 +393,16 @@ pub enum AddIpAddrSubnetError {
     /// The address is invalid and cannot be assigned to any device. For
     /// example, an IPv4-mapped-IPv6 address.
     InvalidAddr,
+}
+
+/// Error type for setting properties on IP addresses.
+#[derive(Error, Debug, PartialEq)]
+pub enum SetIpAddressPropertiesError {
+    /// The address we tried to set properties on was not found.
+    #[error("{0}")]
+    NotFound(#[from] NotFoundError),
+
+    /// We tried to set properties on a non-manually-configured address.
+    #[error("tried to set properties on a non-manually-configured address")]
+    NotManual,
 }
