@@ -26,6 +26,9 @@
             rights: [ "r*" ],
             path: "/dev/class/bt-hci",
         },
+        {
+            protocol: [ "fuchsia.bluetooth.host.Receiver" ],
+        },
     ],
     config: {
         device_path: {

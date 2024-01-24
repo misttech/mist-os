@@ -9,6 +9,7 @@
 
 #include "fidl/host_server.h"
 #include "lib/async/default.h"
+#include "src/connectivity/bluetooth/core/bt-host/controllers/fidl_controller.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/log.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/random.h"
 
@@ -107,7 +108,8 @@ void BtHostComponent::ShutDown() {
   hci_ = nullptr;
 }
 
-void BtHostComponent::BindHostInterface(zx::channel channel) {
+void BtHostComponent::BindToHostInterface(
+    fidl::ServerEnd<fuchsia_bluetooth_host::Host> host_client) {
   if (host_server_) {
     bt_log(WARN, "bt-host", "Host interface channel already open");
     return;
@@ -115,6 +117,8 @@ void BtHostComponent::BindHostInterface(zx::channel channel) {
 
   BT_DEBUG_ASSERT(gap_);
   BT_DEBUG_ASSERT(gatt_);
+
+  zx::channel channel = host_client.TakeChannel();
 
   host_server_ =
       std::make_unique<HostServer>(std::move(channel), gap_->AsWeakPtr(), gatt_->GetWeakPtr());

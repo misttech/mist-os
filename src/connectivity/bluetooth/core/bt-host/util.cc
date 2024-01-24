@@ -18,13 +18,13 @@ fuchsia::hardware::bluetooth::HciHandle CreateHciHandle(const std::string& devic
   zx::channel client, server;
   zx_status_t status = zx::channel::create(0, &client, &server);
   if (status != ZX_OK) {
-    bt_log(WARN, "bt-host", "Failed to open HCI device. Could not create fidl channel");
+    bt_log(WARN, "bt-host", "Failed to open HCI device: Could not create FIDL channel");
     return nullptr;
   }
 
   status = fdio_service_connect(device_path.c_str(), server.release());
   if (status != ZX_OK) {
-    bt_log(WARN, "bt-host", "Failed to open HCI device. Could not connect to service directory");
+    bt_log(WARN, "bt-host", "Failed to open HCI device: Could not connect to service directory");
     return nullptr;
   }
 

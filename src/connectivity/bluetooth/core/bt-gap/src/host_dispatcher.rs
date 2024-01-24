@@ -4,14 +4,14 @@
 
 use anyhow::{anyhow, format_err, Context as _, Error};
 use async_helpers::hanging_get::asynchronous as hanging_get;
-use fidl::endpoints::ServerEnd;
+use fidl::endpoints::{Proxy, ServerEnd};
 use fidl_fuchsia_bluetooth::{Appearance, DeviceClass};
 use fidl_fuchsia_bluetooth_bredr::ProfileMarker;
 use fidl_fuchsia_bluetooth_gatt::Server_Marker;
 use fidl_fuchsia_bluetooth_gatt2::{
     LocalServiceRequest, Server_Marker as Server_Marker2, Server_Proxy,
 };
-use fidl_fuchsia_bluetooth_host::HostMarker;
+use fidl_fuchsia_bluetooth_host::{HostMarker, HostProxy};
 use fidl_fuchsia_bluetooth_le::{CentralMarker, PeripheralMarker};
 use fidl_fuchsia_bluetooth_sys::{
     self as sys, InputCapability, OutputCapability, PairingDelegateProxy,
@@ -27,7 +27,7 @@ use fuchsia_bluetooth::types::{
 use fuchsia_inspect::{self as inspect, unique_name, NumericProperty, Property};
 use fuchsia_inspect_contrib::{inspect_log, nodes::BoundedListNode};
 use fuchsia_sync::RwLock;
-use fuchsia_zircon::{self as zx, Duration};
+use fuchsia_zircon::{self as zx, AsHandleRef, Duration};
 use futures::channel::{mpsc, oneshot};
 use futures::future::{BoxFuture, Future};
 use futures::FutureExt;
@@ -302,7 +302,7 @@ impl HostDispatcherState {
 
     fn add_host(&mut self, id: HostId, host: HostDevice) {
         if self.host_devices.insert(id, host.clone()).is_some() {
-            warn!("Host replaced: {}:", id.to_string())
+            warn!("Host replaced: {}", id.to_string())
         } else {
             info!("Host added: {}", id.to_string());
         }
@@ -833,15 +833,24 @@ impl HostDispatcher {
         .with_context(|| format!("failed to open {host_path}"))?;
         let device_topo = host_dev.get_topological_path().await?.map_err(zx::Status::from_raw)?;
         info!("Adding Adapter: {:?} (topology: {:?})", host_path, device_topo);
-        let host_device = init_host(dir, host_path, node).await?;
+
+        // Connect to the host device.
+        let hardware = fuchsia_component::client::connect_to_named_protocol_at_dir_root::<
+            HardwareHostMarker,>(dir, host_path)
+        .context("failed to open bt-host device")?;
+        let (host, server_end) = fidl::endpoints::create_proxy::<HostMarker>()?;
+        hardware.open(server_end)?;
+
+        let host_device = init_host(host_path, node, host).await?;
         self.add_host_device(&host_device).await?;
 
         // Start listening to Host interface events.
         fasync::Task::spawn(host_device.watch_events(self.clone()).map(|r| {
             r.unwrap_or_else(|err| {
                 warn!("Error handling host event: {:?}", err);
-                // TODO(https://fxbug.dev/44180): This should probably remove the bt-host since termination of the
-                // `watch_events` task indicates that it no longer functions properly.
+                // TODO(https://fxbug.dev/44180): This should probably remove the bt-host since
+                // termination of the `watch_events` task indicates that it no longer functions
+                // properly.
             })
         }))
         .detach();
@@ -917,6 +926,43 @@ impl HostDispatcher {
             handle.add_host(host.id(), host.proxy().clone());
         }
     }
+
+    pub async fn add_host_component(&self, proxy: HostProxy) -> types::Result<()> {
+        info!("Adding host component");
+
+        let node = self.state.read().inspect.hosts().create_child(unique_name("device_"));
+
+        let proxy_handle = proxy.as_channel().raw_handle().to_string();
+        let host_device = init_host(proxy_handle.as_str(), node, proxy).await?;
+        info!("Successfully started host device: {:?}", host_device.info());
+        self.add_host_device(&host_device).await?;
+
+        // Start listening to Host interface events.
+        fasync::Task::spawn(host_device.watch_events(self.clone()).map(|r| {
+            r.unwrap_or_else(|err| {
+                warn!("Error handling host event: {:?}", err);
+                // TODO(https://fxbug.dev/44180): This should probably remove the bt-host since
+                // termination of the `watch_events` task indicates that it no longer functions
+                // properly.
+            })
+        }))
+        .detach();
+        Ok(())
+    }
+}
+
+async fn init_host(
+    path: &str,
+    node: inspect::Node,
+    proxy: HostProxy,
+) -> Result<HostDevice, Error> {
+    node.record_string("path", path);
+
+    // Obtain basic information and create and entry in the dispatcher's map.
+    let host_info = proxy.watch_state().await.context("failed to obtain bt-host information")?;
+    let host_info = Inspectable::new(HostInfo::try_from(host_info)?, node);
+
+    Ok(HostDevice::new(path.to_string(), proxy, host_info))
 }
 
 impl HostListener for HostDispatcher {
@@ -996,29 +1042,6 @@ impl Future for WhenHostsFound {
             Poll::Ready(self.hd.clone())
         }
     }
-}
-
-/// Initialize a HostDevice
-async fn init_host(
-    dir: &DirectoryProxy,
-    path: &str,
-    node: inspect::Node,
-) -> Result<HostDevice, Error> {
-    // Connect to the host device.
-    let hardware = fuchsia_component::client::connect_to_named_protocol_at_dir_root::<
-        HardwareHostMarker,
-    >(dir, path)
-    .context("failed to open bt-host device")?;
-    let (host, server_end) = fidl::endpoints::create_proxy::<HostMarker>()?;
-    hardware.open(server_end)?;
-
-    node.record_string("path", path);
-
-    // Obtain basic information and create and entry in the dispatcher's map.
-    let host_info = host.watch_state().await.context("failed to obtain bt-host information")?;
-    let host_info = Inspectable::new(HostInfo::try_from(host_info)?, node);
-
-    Ok(HostDevice::new(path.to_string(), host, host_info))
 }
 
 async fn try_restore_bonds(

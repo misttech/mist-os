@@ -6,11 +6,12 @@
 
 use anyhow::{format_err, Context as _, Error};
 use async_helpers::hanging_get::asynchronous as hanging_get;
-use fidl::endpoints::{DiscoverableProtocolMarker, ProtocolMarker};
+use fidl::endpoints::{ControlHandle, DiscoverableProtocolMarker, ProtocolMarker};
 use fidl_fuchsia_bluetooth::Appearance;
 use fidl_fuchsia_bluetooth_bredr::ProfileMarker;
 use fidl_fuchsia_bluetooth_gatt::Server_Marker;
 use fidl_fuchsia_bluetooth_gatt2::{LocalServiceRequest, Server_Marker as Server_Marker2};
+use fidl_fuchsia_bluetooth_host::{ReceiverRequest, ReceiverRequestStream};
 use fidl_fuchsia_bluetooth_le::{CentralMarker, PeripheralMarker};
 use fidl_fuchsia_device::NameProviderMarker;
 use fuchsia_async as fasync;
@@ -77,6 +78,30 @@ fn host_service_handler(
         fasync::Task::spawn(dispatcher.clone().request_host_service(chan, service)).detach();
         None
     }
+}
+
+async fn run_receiver_server(
+    hd: HostDispatcher,
+    mut stream: ReceiverRequestStream,
+) -> Result<(), Error> {
+    info!("Receiver server task started");
+
+    let hd_ref = &hd;
+
+    while let Some(request) = stream.try_next().await? {
+        match request {
+            ReceiverRequest::AddHost { request, control_handle } => {
+                if let Err(e) = hd_ref.add_host_component(request.into_proxy()?).await {
+                    info!("Error while adding host to bt-gap: {e:?}");
+                    control_handle.shutdown();
+                }
+            }
+            ReceiverRequest::_UnknownMethod { ordinal, .. } => {
+                println!("Received an unknown method with ordinal {ordinal}");
+            }
+        }
+    }
+    Ok(())
 }
 
 /// The constituent parts of the bt-gap application.
@@ -290,6 +315,14 @@ async fn serve_fidl(hd: HostDispatcher, inspect: fuchsia_inspect::Inspector) -> 
             fasync::Task::spawn(
                 services::pairing::run(hd, request_stream)
                     .unwrap_or_else(|e| warn!("Pairing service failed: {:?}", e)),
+            )
+            .detach();
+        })
+        .add_fidl_service(|request_stream| {
+            let hd = hd.clone();
+            fasync::Task::spawn(
+                run_receiver_server(hd, request_stream)
+                    .unwrap_or_else(|e| warn!("Receiver service failed: {:?}", e)),
             )
             .detach();
         });

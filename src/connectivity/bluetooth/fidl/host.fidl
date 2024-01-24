@@ -11,6 +11,15 @@ using fuchsia.bluetooth.gatt;
 using fuchsia.bluetooth.gatt2;
 using fuchsia.bluetooth.le;
 
+/// Receives a bt-host by protocol for use in the Bluetooth Host Subsystem
+@discoverable
+open protocol Receiver {
+    /// Adds a new bt-host. If `request` cannot be handled, it should be closed.
+    flexible AddHost(resource struct {
+        request client_end:Host;
+    });
+};
+
 /// Interface for interacting with a Bluetooth host device (bt-host)
 closed protocol Host {
     /// The following methods fulfill a given interface request. bt-host device

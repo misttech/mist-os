@@ -75,6 +75,11 @@
             rights: [ "r*" ],
         },
         {
+            protocol: [ "fuchsia.bluetooth.host.Receiver" ],
+            from: "#bt-gap",
+            to: [ "#bt-host-collection" ],
+        },
+        {
             protocol: [
                 "fuchsia.device.NameProvider",
                 "fuchsia.stash.SecureStore",

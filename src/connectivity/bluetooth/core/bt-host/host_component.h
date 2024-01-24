@@ -9,6 +9,9 @@
 
 #include <pw_async_fuchsia/dispatcher.h>
 
+#include "fidl/fuchsia.bluetooth.host/cpp/fidl.h"
+#include "fuchsia/hardware/bluetooth/cpp/fidl.h"
+#include "lib/fidl/cpp/wire/channel.h"
 #include "src/connectivity/bluetooth/core/bt-host/controllers/fidl_controller.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/gap/adapter.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/gatt/gatt.h"
@@ -41,8 +44,10 @@ class BtHostComponent {
   // Shuts down all systems.
   void ShutDown();
 
-  // Binds the given |channel| to a Host FIDL interface server.
-  void BindHostInterface(zx::channel channel);
+  // Binds the given |host_client| to a Host FIDL interface server.
+  void BindToHostInterface(fidl::ServerEnd<fuchsia_bluetooth_host::Host> host_client);
+
+  std::string device_path() { return device_path_; }
 
   using WeakPtr = WeakSelf<BtHostComponent>::WeakPtr;
   WeakPtr GetWeakPtr() { return weak_self_.GetWeakPtr(); }
@@ -53,6 +58,7 @@ class BtHostComponent {
 
   pw::async::fuchsia::FuchsiaDispatcher pw_dispatcher_;
 
+  // Path of bt-hci device the component supports
   std::string device_path_;
 
   bool initialize_rng_;
