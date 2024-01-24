@@ -10,6 +10,7 @@
 #include <fuchsia/hardware/test/cpp/banjo.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
+#include <lib/async/cpp/wait.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/driver.h>
@@ -23,7 +24,7 @@
 
 #include <pw_async_fuchsia/dispatcher.h>
 
-#include "src/connectivity/bluetooth/core/bt-host/testing/fake_controller.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/testing/fake_controller.h"
 #include "src/connectivity/bluetooth/hci/virtual/emulated_peer.h"
 #include "src/connectivity/bluetooth/lib/fidl/hanging_getter.h"
 #include "third_party/pigweed/backends/pw_random/zircon_random_generator.h"

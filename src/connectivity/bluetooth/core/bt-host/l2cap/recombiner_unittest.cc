@@ -2,13 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "recombiner.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/l2cap/recombiner.h"
 
 #include <gtest/gtest.h>
 
-#include "pdu.h"
-#include "src/connectivity/bluetooth/core/bt-host/hci-spec/protocol.h"
-#include "src/connectivity/bluetooth/core/bt-host/transport/packet.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/hci-spec/protocol.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/l2cap/pdu.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/transport/packet.h"
 
 namespace bt::l2cap {
 namespace {

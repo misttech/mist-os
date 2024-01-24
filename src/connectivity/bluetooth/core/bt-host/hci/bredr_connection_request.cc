@@ -2,10 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "bredr_connection_request.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/hci/bredr_connection_request.h"
 
-#include "src/connectivity/bluetooth/core/bt-host/common/log.h"
-#include "src/connectivity/bluetooth/core/bt-host/hci-spec/protocol.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/log.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/hci-spec/protocol.h"
 
 namespace bt::hci {
 
@@ -67,7 +67,8 @@ void BrEdrConnectionRequest::CreateConnection(
     } else {
       // Both CommandChannel and the controller perform some scheduling, so log when the controller
       // finally acknowledges Create Connection to observe outgoing connection sequencing.
-      // TODO(https://fxbug.dev/92299): Added to investigate timing and can be removed if it adds no value
+      // TODO(https://fxbug.dev/92299): Added to investigate timing and can be removed if it adds no
+      // value
       bt_log(INFO, "hci-bredr", "Create Connection for peer %s successfully dispatched",
              bt_str(peer_id));
 
@@ -126,8 +127,8 @@ bool BrEdrConnectionRequest::Cancel() {
     bt_log(WARN, "hci-bredr", "connection attempt already canceled! (peer: %s)", bt_str(peer_id_));
     return false;
   }
-  // TODO(https://fxbug.dev/65157) - We should correctly handle cancels due to a disconnect call during a
-  // pending connection creation attempt
+  // TODO(https://fxbug.dev/65157) - We should correctly handle cancels due to a disconnect call
+  // during a pending connection creation attempt
   bt_log(INFO, "hci-bredr", "canceling connection request (peer: %s)", bt_str(peer_id_));
   state_ = RequestState::kCanceled;
   timeout_task_.Cancel();

@@ -12,11 +12,11 @@
 
 #include "gatt_client_server.h"
 #include "helpers.h"
-#include "src/connectivity/bluetooth/core/bt-host/common/assert.h"
-#include "src/connectivity/bluetooth/core/bt-host/common/error.h"
-#include "src/connectivity/bluetooth/core/bt-host/common/log.h"
-#include "src/connectivity/bluetooth/core/bt-host/hci-spec/constants.h"
-#include "src/connectivity/bluetooth/core/bt-host/sm/types.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/assert.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/error.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/log.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/hci-spec/constants.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/sm/types.h"
 
 using fuchsia::bluetooth::ErrorCode;
 using fuchsia::bluetooth::Int8;

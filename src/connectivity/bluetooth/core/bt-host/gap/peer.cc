@@ -2,16 +2,16 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "peer.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/gap/peer.h"
 
-#include "src/connectivity/bluetooth/core/bt-host/common/advertising_data.h"
-#include "src/connectivity/bluetooth/core/bt-host/common/assert.h"
-#include "src/connectivity/bluetooth/core/bt-host/common/manufacturer_names.h"
-#include "src/connectivity/bluetooth/core/bt-host/common/uuid.h"
-#include "src/connectivity/bluetooth/core/bt-host/gap/gap.h"
-#include "src/connectivity/bluetooth/core/bt-host/hci-spec/util.h"
-#include "src/connectivity/bluetooth/core/bt-host/hci/low_energy_scanner.h"
-#include "src/connectivity/bluetooth/core/bt-host/sm/types.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/advertising_data.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/assert.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/manufacturer_names.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/uuid.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/gap/gap.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/hci-spec/util.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/hci/low_energy_scanner.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/sm/types.h"
 #include "src/connectivity/bluetooth/lib/cpp-string/string_printf.h"
 #include "src/connectivity/bluetooth/lib/cpp-string/utf_codecs.h"
 
@@ -120,7 +120,8 @@ void Peer::LowEnergyData::SetAdvertisingData(int8_t rssi, const ByteBuffer& data
     parsed_adv_data_ = std::move(res);
 
     // Do not update the name of bonded peers because advertisements are unauthenticated.
-    // TODO(https://fxbug.dev/85365): Populate more Peer fields with relevant fields from parsed_adv_data_.
+    // TODO(https://fxbug.dev/85365): Populate more Peer fields with relevant fields from
+    // parsed_adv_data_.
     if (!peer_->bonded() && parsed_adv_data_->local_name().has_value()) {
       peer_->RegisterNameInternal(parsed_adv_data_->local_name()->name,
                                   parsed_adv_data_->local_name()->is_complete

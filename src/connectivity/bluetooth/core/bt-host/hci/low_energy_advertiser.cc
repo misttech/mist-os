@@ -2,9 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "low_energy_advertiser.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/hci/low_energy_advertiser.h"
 
-#include "src/connectivity/bluetooth/core/bt-host/hci/sequential_command_runner.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/hci/sequential_command_runner.h"
 
 namespace bt::hci {
 

@@ -2,12 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "fake_client.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/gatt/fake_client.h"
 
 #include <unordered_set>
 
-#include "src/connectivity/bluetooth/core/bt-host/common/assert.h"
-#include "src/connectivity/bluetooth/core/bt-host/gatt/client.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/assert.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/gatt/client.h"
 
 namespace bt::gatt::testing {
 

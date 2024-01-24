@@ -2,15 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "src/connectivity/bluetooth/core/bt-host/gap/bredr_discovery_manager.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/gap/bredr_discovery_manager.h"
 
-#include "src/connectivity/bluetooth/core/bt-host/gap/peer_cache.h"
-#include "src/connectivity/bluetooth/core/bt-host/hci-spec/protocol.h"
-#include "src/connectivity/bluetooth/core/bt-host/testing/controller_test.h"
-#include "src/connectivity/bluetooth/core/bt-host/testing/inspect.h"
-#include "src/connectivity/bluetooth/core/bt-host/testing/mock_controller.h"
-#include "src/connectivity/bluetooth/core/bt-host/testing/test_helpers.h"
-#include "src/connectivity/bluetooth/core/bt-host/testing/test_packets.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/gap/peer_cache.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/hci-spec/protocol.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/testing/controller_test.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/testing/inspect.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/testing/mock_controller.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/testing/test_helpers.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/testing/test_packets.h"
 
 namespace bt::gap {
 namespace {

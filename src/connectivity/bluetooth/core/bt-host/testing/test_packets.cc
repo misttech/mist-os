@@ -2,13 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "test_packets.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/testing/test_packets.h"
 
-#include "src/connectivity/bluetooth/core/bt-host/common/byte_buffer.h"
-#include "src/connectivity/bluetooth/core/bt-host/hci-spec/constants.h"
-#include "src/connectivity/bluetooth/core/bt-host/hci-spec/protocol.h"
-#include "src/connectivity/bluetooth/core/bt-host/hci/bredr_connection_request.h"
-#include "src/connectivity/bluetooth/core/bt-host/testing/test_helpers.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/byte_buffer.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/hci-spec/constants.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/hci-spec/protocol.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/hci/bredr_connection_request.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/testing/test_helpers.h"
 
 namespace bt::testing {
 

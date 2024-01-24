@@ -7,11 +7,11 @@
 
 #include <fuchsia/bluetooth/le/cpp/fidl.h>
 
-#include "src/connectivity/bluetooth/core/bt-host/common/macros.h"
 #include "src/connectivity/bluetooth/core/bt-host/fidl/gatt2_client_server.h"
 #include "src/connectivity/bluetooth/core/bt-host/fidl/server_base.h"
-#include "src/connectivity/bluetooth/core/bt-host/gap/low_energy_connection_handle.h"
-#include "src/connectivity/bluetooth/core/bt-host/gatt/gatt.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/macros.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/gap/low_energy_connection_handle.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/gatt/gatt.h"
 
 namespace bthost {
 

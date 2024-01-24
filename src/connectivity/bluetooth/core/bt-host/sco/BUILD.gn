@@ -5,13 +5,15 @@
 import("//build_overrides/pigweed.gni")
 import("$dir_pw_unit_test/test.gni")
 
+public_dir = "//src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/sco"
+
 pw_source_set("sco") {
   sources = [
-    "sco.h",
+    "$public_dir/sco.h",
+    "$public_dir/sco_connection.h",
+    "$public_dir/sco_connection_manager.h",
     "sco_connection.cc",
-    "sco_connection.h",
     "sco_connection_manager.cc",
-    "sco_connection_manager.h",
   ]
 
   public_deps = [

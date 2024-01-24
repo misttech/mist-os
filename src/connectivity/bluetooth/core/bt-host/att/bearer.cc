@@ -2,16 +2,16 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "bearer.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/att/bearer.h"
 
 #include <lib/fit/defer.h>
 
 #include <type_traits>
 
-#include "src/connectivity/bluetooth/core/bt-host/common/log.h"
-#include "src/connectivity/bluetooth/core/bt-host/common/slab_allocator.h"
-#include "src/connectivity/bluetooth/core/bt-host/l2cap/channel.h"
-#include "src/connectivity/bluetooth/core/bt-host/sm/types.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/log.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/slab_allocator.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/l2cap/channel.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/sm/types.h"
 #include "src/connectivity/bluetooth/lib/cpp-string/string_printf.h"
 
 namespace bt::att {

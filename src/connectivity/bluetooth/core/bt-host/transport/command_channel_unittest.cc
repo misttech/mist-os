@@ -2,16 +2,16 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "src/connectivity/bluetooth/core/bt-host/transport/command_channel.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/transport/command_channel.h"
 
-#include "src/connectivity/bluetooth/core/bt-host/common/byte_buffer.h"
-#include "src/connectivity/bluetooth/core/bt-host/hci-spec/protocol.h"
-#include "src/connectivity/bluetooth/core/bt-host/testing/controller_test.h"
-#include "src/connectivity/bluetooth/core/bt-host/testing/inspect.h"
-#include "src/connectivity/bluetooth/core/bt-host/testing/mock_controller.h"
-#include "src/connectivity/bluetooth/core/bt-host/testing/test_helpers.h"
-#include "src/connectivity/bluetooth/core/bt-host/testing/test_packets.h"
-#include "src/connectivity/bluetooth/core/bt-host/transport/control_packets.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/byte_buffer.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/hci-spec/protocol.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/testing/controller_test.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/testing/inspect.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/testing/mock_controller.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/testing/test_helpers.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/testing/test_packets.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/transport/control_packets.h"
 
 #include <pw_bluetooth/hci_commands.emb.h>
 #include <pw_bluetooth/hci_vendor.emb.h>
@@ -607,8 +607,8 @@ TEST_F(CommandChannelTest, EventHandlerBasic) {
 
   auto reset =
       hci::EmbossCommandPacket::New<pw::bluetooth::emboss::ResetCommandWriter>(hci_spec::kReset);
-  auto transaction_id = cmd_channel()->SendCommand(
-      std::move(reset), [](auto, const auto&) {}, kTestEventCode0);
+  auto transaction_id =
+      cmd_channel()->SendCommand(std::move(reset), [](auto, const auto&) {}, kTestEventCode0);
 
   EXPECT_EQ(0u, transaction_id);
 
@@ -1652,8 +1652,8 @@ TEST_F(CommandChannelTest, SendCommandFailsIfEventHandlerInstalled) {
   // registered with "AddEventHandler".
   auto reset =
       hci::EmbossCommandPacket::New<pw::bluetooth::emboss::ResetCommandWriter>(hci_spec::kReset);
-  auto transaction_id = cmd_channel()->SendCommand(
-      std::move(reset), [](auto, const auto&) {}, kTestEventCode0);
+  auto transaction_id =
+      cmd_channel()->SendCommand(std::move(reset), [](auto, const auto&) {}, kTestEventCode0);
   EXPECT_EQ(0u, transaction_id);
 }
 

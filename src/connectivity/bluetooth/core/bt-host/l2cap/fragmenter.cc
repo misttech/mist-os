@@ -2,17 +2,17 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "fragmenter.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/l2cap/fragmenter.h"
 
 #include <endian.h>
 
 #include <limits>
 #include <optional>
 
-#include "src/connectivity/bluetooth/core/bt-host/common/assert.h"
-#include "src/connectivity/bluetooth/core/bt-host/l2cap/fcs.h"
-#include "src/connectivity/bluetooth/core/bt-host/l2cap/l2cap_defs.h"
-#include "src/connectivity/bluetooth/core/bt-host/transport/acl_data_packet.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/assert.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/l2cap/fcs.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/l2cap/l2cap_defs.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/transport/acl_data_packet.h"
 
 namespace bt::l2cap {
 namespace {

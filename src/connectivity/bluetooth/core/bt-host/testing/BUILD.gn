@@ -5,18 +5,20 @@
 import("//build_overrides/pigweed.gni")
 import("$dir_pw_unit_test/test.gni")
 
+public_dir = "//src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/testing"
+
 pw_source_set("testing") {
   testonly = true
 
   sources = [
-    "controller_test.h",
-    "inspect.h",
+    "$public_dir/controller_test.h",
+    "$public_dir/inspect.h",
+    "$public_dir/inspect_util.h",
+    "$public_dir/parse_args.h",
+    "$public_dir/test_packets.h",
     "inspect_util.cc",
-    "inspect_util.h",
     "parse_args.cc",
-    "parse_args.h",
     "test_packets.cc",
-    "test_packets.h",
   ]
 
   deps = [ "$dir_pw_unit_test" ]
@@ -38,7 +40,7 @@ pw_source_set("testing") {
 pw_source_set("test_helpers") {
   testonly = true
 
-  sources = [ "test_helpers.h" ]
+  sources = [ "$public_dir/test_helpers.h" ]
 
   deps = [ "//src/connectivity/bluetooth/lib/cpp-string" ]
 
@@ -69,8 +71,8 @@ pw_source_set("controller_test_double_base") {
   testonly = true
 
   sources = [
+    "$public_dir/controller_test_double_base.h",
     "controller_test_double_base.cc",
-    "controller_test_double_base.h",
   ]
 
   public_deps = [
@@ -86,8 +88,8 @@ pw_source_set("mock_controller") {
   testonly = true
 
   sources = [
+    "$public_dir/mock_controller.h",
     "mock_controller.cc",
-    "mock_controller.h",
   ]
 
   public_deps = [
@@ -106,20 +108,20 @@ pw_source_set("fake_controller") {
   testonly = true
 
   sources = [
+    "$public_dir/fake_controller.h",
+    "$public_dir/fake_dynamic_channel.h",
+    "$public_dir/fake_gatt_server.h",
+    "$public_dir/fake_l2cap.h",
+    "$public_dir/fake_peer.h",
+    "$public_dir/fake_sdp_server.h",
+    "$public_dir/fake_signaling_server.h",
     "fake_controller.cc",
-    "fake_controller.h",
     "fake_dynamic_channel.cc",
-    "fake_dynamic_channel.h",
     "fake_gatt_server.cc",
-    "fake_gatt_server.h",
     "fake_l2cap.cc",
-    "fake_l2cap.h",
     "fake_peer.cc",
-    "fake_peer.h",
     "fake_sdp_server.cc",
-    "fake_sdp_server.h",
     "fake_signaling_server.cc",
-    "fake_signaling_server.h",
   ]
 
   public_deps = [
@@ -154,7 +156,7 @@ pw_source_set("gtest_main") {
 
 pw_source_set("fuzzing") {
   testonly = true
-  sources = [ "peer_fuzzer.h" ]
+  sources = [ "$public_dir/peer_fuzzer.h" ]
   deps = [ "//src/connectivity/bluetooth/core/bt-host/gap" ]
 }
 

@@ -2,18 +2,18 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "src/connectivity/bluetooth/core/bt-host/testing/fake_sdp_server.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/testing/fake_sdp_server.h"
 
 #include <pw_async/fake_dispatcher_fixture.h>
 
-#include "src/connectivity/bluetooth/core/bt-host/common/byte_buffer.h"
-#include "src/connectivity/bluetooth/core/bt-host/hci-spec/protocol.h"
-#include "src/connectivity/bluetooth/core/bt-host/l2cap/l2cap_defs.h"
-#include "src/connectivity/bluetooth/core/bt-host/l2cap/test_packets.h"
-#include "src/connectivity/bluetooth/core/bt-host/testing/fake_dynamic_channel.h"
-#include "src/connectivity/bluetooth/core/bt-host/testing/fake_l2cap.h"
-#include "src/connectivity/bluetooth/core/bt-host/testing/fake_signaling_server.h"
-#include "src/connectivity/bluetooth/core/bt-host/testing/test_helpers.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/byte_buffer.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/hci-spec/protocol.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/l2cap/l2cap_defs.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/l2cap/test_packets.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/testing/fake_dynamic_channel.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/testing/fake_l2cap.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/testing/fake_signaling_server.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/testing/test_helpers.h"
 
 namespace bt::testing {
 namespace {

@@ -2,12 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "src/connectivity/bluetooth/core/bt-host/l2cap/low_energy_command_handler.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/l2cap/low_energy_command_handler.h"
 
 #include <pw_async/fake_dispatcher_fixture.h>
 
-#include "src/connectivity/bluetooth/core/bt-host/l2cap/fake_signaling_channel.h"
-#include "src/connectivity/bluetooth/core/bt-host/testing/test_helpers.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/l2cap/fake_signaling_channel.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/testing/test_helpers.h"
 
 namespace bt::l2cap::internal {
 

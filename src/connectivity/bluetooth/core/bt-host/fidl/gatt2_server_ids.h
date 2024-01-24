@@ -5,7 +5,7 @@
 #ifndef SRC_CONNECTIVITY_BLUETOOTH_CORE_BT_HOST_FIDL_GATT2_SERVER_IDS_H_
 #define SRC_CONNECTIVITY_BLUETOOTH_CORE_BT_HOST_FIDL_GATT2_SERVER_IDS_H_
 
-#include "src/connectivity/bluetooth/core/bt-host/common/identifier.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/identifier.h"
 
 namespace bthost {
 // Separate types to help prevent mixing up the two types of service IDs used in gatt2/Server.

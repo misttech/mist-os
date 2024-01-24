@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "src/connectivity/bluetooth/core/bt-host/l2cap/channel_configuration.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/l2cap/channel_configuration.h"
 
 #include <endian.h>
 #include <lib/fit/function.h>
@@ -10,10 +10,10 @@
 #include <iterator>
 #include <optional>
 
-#include "src/connectivity/bluetooth/core/bt-host/common/byte_buffer.h"
-#include "src/connectivity/bluetooth/core/bt-host/common/log.h"
-#include "src/connectivity/bluetooth/core/bt-host/common/packet_view.h"
-#include "src/connectivity/bluetooth/core/bt-host/l2cap/l2cap_defs.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/byte_buffer.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/log.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/packet_view.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/l2cap/l2cap_defs.h"
 #include "src/connectivity/bluetooth/lib/cpp-string/string_printf.h"
 
 namespace bt::l2cap::internal {

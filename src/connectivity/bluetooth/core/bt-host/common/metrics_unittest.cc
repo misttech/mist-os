@@ -4,11 +4,11 @@
 
 #ifndef NINSPECT
 
-#include "src/connectivity/bluetooth/core/bt-host/common/metrics.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/metrics.h"
 
 #include <gtest/gtest.h>
 
-#include "src/connectivity/bluetooth/core/bt-host/testing/inspect.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/testing/inspect.h"
 
 namespace bt {
 namespace {

@@ -2,15 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "src/connectivity/bluetooth/core/bt-host/gap/discovery_filter.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/gap/discovery_filter.h"
 
 #include <gtest/gtest.h>
 
-#include "src/connectivity/bluetooth/core/bt-host/common/advertising_data.h"
-#include "src/connectivity/bluetooth/core/bt-host/common/supplement_data.h"
-#include "src/connectivity/bluetooth/core/bt-host/common/uint128.h"
-#include "src/connectivity/bluetooth/core/bt-host/hci/low_energy_scanner.h"
-#include "src/connectivity/bluetooth/core/bt-host/testing/test_helpers.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/advertising_data.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/supplement_data.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/uint128.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/hci/low_energy_scanner.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/testing/test_helpers.h"
 
 namespace bt::gap {
 namespace {

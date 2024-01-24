@@ -14,8 +14,8 @@
 
 #include <ddktl/device.h>
 
-#include "src/connectivity/bluetooth/core/bt-host/common/macros.h"
 #include "src/connectivity/bluetooth/core/bt-host/host.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/macros.h"
 
 namespace bthost {
 

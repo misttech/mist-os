@@ -7,8 +7,8 @@
 
 #include <fbl/macros.h>
 
-#include "src/connectivity/bluetooth/core/bt-host/common/device_address.h"
-#include "src/connectivity/bluetooth/core/bt-host/hci-spec/protocol.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/device_address.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/hci-spec/protocol.h"
 
 namespace bt_intel {
 

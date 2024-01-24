@@ -2,37 +2,37 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "adapter.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/gap/adapter.h"
 
 #include <endian.h>
 
 #include <pw_async/dispatcher.h>
 
-#include "bredr_connection_manager.h"
-#include "bredr_discovery_manager.h"
-#include "event_masks.h"
-#include "low_energy_address_manager.h"
-#include "low_energy_advertising_manager.h"
-#include "low_energy_connection_manager.h"
-#include "low_energy_discovery_manager.h"
-#include "peer.h"
-#include "src/connectivity/bluetooth/core/bt-host/common/assert.h"
-#include "src/connectivity/bluetooth/core/bt-host/common/log.h"
-#include "src/connectivity/bluetooth/core/bt-host/common/metrics.h"
-#include "src/connectivity/bluetooth/core/bt-host/common/random.h"
-#include "src/connectivity/bluetooth/core/bt-host/gap/gap.h"
-#include "src/connectivity/bluetooth/core/bt-host/hci-spec/util.h"
-#include "src/connectivity/bluetooth/core/bt-host/hci-spec/vendor_protocol.h"
-#include "src/connectivity/bluetooth/core/bt-host/hci/android_extended_low_energy_advertiser.h"
-#include "src/connectivity/bluetooth/core/bt-host/hci/connection.h"
-#include "src/connectivity/bluetooth/core/bt-host/hci/extended_low_energy_advertiser.h"
-#include "src/connectivity/bluetooth/core/bt-host/hci/legacy_low_energy_advertiser.h"
-#include "src/connectivity/bluetooth/core/bt-host/hci/legacy_low_energy_scanner.h"
-#include "src/connectivity/bluetooth/core/bt-host/hci/low_energy_connector.h"
-#include "src/connectivity/bluetooth/core/bt-host/hci/sequential_command_runner.h"
-#include "src/connectivity/bluetooth/core/bt-host/l2cap/channel_manager.h"
-#include "src/connectivity/bluetooth/core/bt-host/transport/emboss_control_packets.h"
-#include "src/connectivity/bluetooth/core/bt-host/transport/transport.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/assert.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/log.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/metrics.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/random.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/gap/bredr_connection_manager.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/gap/bredr_discovery_manager.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/gap/event_masks.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/gap/gap.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/gap/low_energy_address_manager.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/gap/low_energy_advertising_manager.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/gap/low_energy_connection_manager.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/gap/low_energy_discovery_manager.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/gap/peer.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/hci-spec/util.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/hci-spec/vendor_protocol.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/hci/android_extended_low_energy_advertiser.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/hci/connection.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/hci/extended_low_energy_advertiser.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/hci/legacy_low_energy_advertiser.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/hci/legacy_low_energy_scanner.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/hci/low_energy_connector.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/hci/sequential_command_runner.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/l2cap/channel_manager.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/transport/emboss_control_packets.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/transport/transport.h"
 
 #include <pw_bluetooth/hci_commands.emb.h>
 

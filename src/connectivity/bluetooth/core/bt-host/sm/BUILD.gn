@@ -7,15 +7,17 @@ import("//build_overrides/pigweed.gni")
 import("$dir_pw_fuzzer/fuzzer.gni")
 import("$dir_pw_unit_test/test.gni")
 
+public_dir = "//src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/sm"
+
 pw_source_set("definitions") {
   sources = [
+    "$public_dir/error.h",
+    "$public_dir/packet.h",
+    "$public_dir/smp.h",
+    "$public_dir/types.h",
     "error.cc",
-    "error.h",
     "packet.cc",
-    "packet.h",
-    "smp.h",
     "types.cc",
-    "types.h",
   ]
 
   public_deps = [
@@ -26,31 +28,31 @@ pw_source_set("definitions") {
 
 pw_source_set("sm") {
   sources = [
+    "$public_dir/ecdh_key.h",
+    "$public_dir/pairing_channel.h",
+    "$public_dir/pairing_phase.h",
+    "$public_dir/phase_1.h",
+    "$public_dir/phase_2_legacy.h",
+    "$public_dir/phase_2_secure_connections.h",
+    "$public_dir/phase_3.h",
+    "$public_dir/sc_stage_1.h",
+    "$public_dir/sc_stage_1_just_works_numeric_comparison.h",
+    "$public_dir/sc_stage_1_passkey.h",
+    "$public_dir/security_manager.h",
+    "$public_dir/security_request_phase.h",
+    "$public_dir/util.h",
     "ecdh_key.cc",
-    "ecdh_key.h",
     "pairing_channel.cc",
-    "pairing_channel.h",
     "pairing_phase.cc",
-    "pairing_phase.h",
     "phase_1.cc",
-    "phase_1.h",
     "phase_2_legacy.cc",
-    "phase_2_legacy.h",
     "phase_2_secure_connections.cc",
-    "phase_2_secure_connections.h",
     "phase_3.cc",
-    "phase_3.h",
-    "sc_stage_1.h",
     "sc_stage_1_just_works_numeric_comparison.cc",
-    "sc_stage_1_just_works_numeric_comparison.h",
     "sc_stage_1_passkey.cc",
-    "sc_stage_1_passkey.h",
     "security_manager.cc",
-    "security_manager.h",
     "security_request_phase.cc",
-    "security_request_phase.h",
     "util.cc",
-    "util.h",
   ]
 
   public_deps = [
@@ -68,9 +70,9 @@ pw_source_set("testing") {
   testonly = true
 
   sources = [
-    "fake_phase_listener.h",
+    "$public_dir/fake_phase_listener.h",
+    "$public_dir/test_security_manager.h",
     "test_security_manager.cc",
-    "test_security_manager.h",
   ]
 
   deps = [ ":sm" ]

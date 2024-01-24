@@ -2,14 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "src/connectivity/bluetooth/core/bt-host/hci/legacy_low_energy_advertiser.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/hci/legacy_low_energy_advertiser.h"
 
-#include "src/connectivity/bluetooth/core/bt-host/common/advertising_data.h"
-#include "src/connectivity/bluetooth/core/bt-host/common/device_address.h"
-#include "src/connectivity/bluetooth/core/bt-host/common/macros.h"
-#include "src/connectivity/bluetooth/core/bt-host/testing/controller_test.h"
-#include "src/connectivity/bluetooth/core/bt-host/testing/fake_controller.h"
-#include "src/connectivity/bluetooth/core/bt-host/testing/test_helpers.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/advertising_data.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/device_address.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/macros.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/testing/controller_test.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/testing/fake_controller.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/testing/test_helpers.h"
 
 namespace bt {
 
@@ -369,12 +369,12 @@ TEST_F(LegacyLowEnergyAdvertiserTest, StartAdvertisingReadTxPowerFails) {
 }
 
 // TODO(create bug): This test should really belong in LowEnergyAdvertiser's unittest file
-// (//src/connectivity/bluetooth/core/bt-host/hci/low_energy_advertiser_unittest.cc) because all low
-// energy advertisers should follow this convention. However, this requires that all low energy
-// advertisers implement random address rotation. Currently, the only other low energy advertiser
-// is the ExtendedLowEnergyAdvertiser. For ExtendedLowEnergyAdvertiser, we will implement random
-// address rotation in a future project. When that is done, we should move this test to the general
-// LowEnergyAdvertiser unit test file.
+// (//src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/hci/low_energy_advertiser_unittest.cc)
+// because all low energy advertisers should follow this convention. However, this requires that all
+// low energy advertisers implement random address rotation. Currently, the only other low energy
+// advertiser is the ExtendedLowEnergyAdvertiser. For ExtendedLowEnergyAdvertiser, we will implement
+// random address rotation in a future project. When that is done, we should move this test to the
+// general LowEnergyAdvertiser unit test file.
 TEST_F(LegacyLowEnergyAdvertiserTest, AllowsRandomAddressChange) {
   AdvertisingData scan_rsp;
   AdvertisingOptions options(kTestInterval, /*anonymous=*/false, kDefaultNoAdvFlags,

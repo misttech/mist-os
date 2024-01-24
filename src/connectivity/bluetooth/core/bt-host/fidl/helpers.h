@@ -18,17 +18,17 @@
 #include "lib/fidl/cpp/type_converter.h"
 #include "lib/fidl/cpp/vector.h"
 #include "lib/fpromise/result.h"
-#include "src/connectivity/bluetooth/core/bt-host/common/advertising_data.h"
-#include "src/connectivity/bluetooth/core/bt-host/common/byte_buffer.h"
-#include "src/connectivity/bluetooth/core/bt-host/common/error.h"
-#include "src/connectivity/bluetooth/core/bt-host/common/identifier.h"
-#include "src/connectivity/bluetooth/core/bt-host/common/uuid.h"
-#include "src/connectivity/bluetooth/core/bt-host/gap/adapter.h"
-#include "src/connectivity/bluetooth/core/bt-host/gap/gap.h"
-#include "src/connectivity/bluetooth/core/bt-host/gap/low_energy_advertising_manager.h"
-#include "src/connectivity/bluetooth/core/bt-host/gap/peer.h"
-#include "src/connectivity/bluetooth/core/bt-host/gap/types.h"
-#include "src/connectivity/bluetooth/core/bt-host/gatt/types.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/advertising_data.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/byte_buffer.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/error.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/identifier.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/uuid.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/gap/adapter.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/gap/gap.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/gap/low_energy_advertising_manager.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/gap/peer.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/gap/types.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/gatt/types.h"
 
 // Helpers for implementing the Bluetooth FIDL interfaces.
 
@@ -174,8 +174,8 @@ fuchsia::bluetooth::le::Peer PeerToFidlLe(const bt::gap::Peer& peer);
 // Functions that convert FIDL GATT types to library objects.
 bt::gatt::ReliableMode ReliableModeFromFidl(
     const fuchsia::bluetooth::gatt::WriteOptions& write_options);
-// TODO(https://fxbug.dev/63438): The 64 bit `fidl_gatt_id` can overflow the 16 bits of a bt:att::Handle
-// that underlies Characteristic/DescriptorHandles when directly casted. Fix this.
+// TODO(https://fxbug.dev/63438): The 64 bit `fidl_gatt_id` can overflow the 16 bits of a
+// bt:att::Handle that underlies Characteristic/DescriptorHandles when directly casted. Fix this.
 bt::gatt::CharacteristicHandle CharacteristicHandleFromFidl(uint64_t fidl_gatt_id);
 bt::gatt::DescriptorHandle DescriptorHandleFromFidl(uint64_t fidl_gatt_id);
 

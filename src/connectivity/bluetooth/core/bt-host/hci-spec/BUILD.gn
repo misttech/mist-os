@@ -5,19 +5,21 @@
 import("//build_overrides/pigweed.gni")
 import("$dir_pw_unit_test/test.gni")
 
+public_dir = "//src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/hci-spec"
+
 # Static library containing the HCI specification definitions
 pw_source_set("hci-spec") {
   sources = [
-    "constants.h",
-    "defaults.h",
+    "$public_dir/constants.h",
+    "$public_dir/defaults.h",
+    "$public_dir/le_connection_parameters.h",
+    "$public_dir/link_key.h",
+    "$public_dir/lmp_feature_set.h",
+    "$public_dir/protocol.h",
+    "$public_dir/util.h",
     "le_connection_parameters.cc",
-    "le_connection_parameters.h",
     "link_key.cc",
-    "link_key.h",
-    "lmp_feature_set.h",
-    "protocol.h",
     "util.cc",
-    "util.h",
   ]
 
   public_deps = [

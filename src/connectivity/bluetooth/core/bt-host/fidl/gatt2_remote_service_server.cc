@@ -8,9 +8,9 @@
 
 #include <measure_tape/hlcpp/hlcpp_measure_tape_for_read_by_type_result.h>
 
-#include "src/connectivity/bluetooth/core/bt-host/att/att.h"
-#include "src/connectivity/bluetooth/core/bt-host/common/identifier.h"
 #include "src/connectivity/bluetooth/core/bt-host/fidl/helpers.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/att/att.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/identifier.h"
 
 namespace fbg = fuchsia::bluetooth::gatt2;
 namespace measure_fbg = measure_tape::fuchsia::bluetooth::gatt2;

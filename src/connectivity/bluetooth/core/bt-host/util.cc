@@ -8,7 +8,7 @@
 #include <lib/fdio/directory.h>
 #include <lib/zx/channel.h>
 
-#include "src/connectivity/bluetooth/core/bt-host/common/log.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/log.h"
 
 using namespace bt;
 

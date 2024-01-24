@@ -2,14 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "bredr_dynamic_channel.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/l2cap/bredr_dynamic_channel.h"
 
 #include <endian.h>
 
-#include "src/connectivity/bluetooth/core/bt-host/common/assert.h"
-#include "src/connectivity/bluetooth/core/bt-host/common/log.h"
-#include "src/connectivity/bluetooth/core/bt-host/l2cap/channel_configuration.h"
-#include "src/connectivity/bluetooth/core/bt-host/l2cap/l2cap_defs.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/assert.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/log.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/l2cap/channel_configuration.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/l2cap/l2cap_defs.h"
 
 namespace bt::l2cap::internal {
 namespace {
@@ -406,7 +406,8 @@ void BrEdrDynamicChannel::OnRxConfigReq(uint16_t flags, ChannelConfiguration con
   if (remote_config_accum_.has_value()) {
     remote_config_accum_->Merge(std::move(config));
   } else {
-    // TODO(https://fxbug.dev/40053): if channel is being re-configured, merge with existing configuration
+    // TODO(https://fxbug.dev/40053): if channel is being re-configured, merge with existing
+    // configuration
     remote_config_accum_ = std::move(config);
   }
 
@@ -494,7 +495,8 @@ void BrEdrDynamicChannel::OnRxConfigReq(uint16_t flags, ChannelConfiguration con
 
   // Successful response should include actual MTU local device will use. This must be min(received
   // MTU, local outgoing MTU capability). Currently, we accept any MTU.
-  // TODO(https://fxbug.dev/41376): determine the upper bound of what we are actually capable of sending
+  // TODO(https://fxbug.dev/41376): determine the upper bound of what we are actually capable of
+  // sending
   uint16_t actual_mtu = req_config.mtu_option()->mtu();
   response_config.set_mtu_option(ChannelConfiguration::MtuOption(actual_mtu));
   req_config.set_mtu_option(response_config.mtu_option());
@@ -740,8 +742,8 @@ bool BrEdrDynamicChannel::AcceptedChannelModesAreConsistent() const {
 
 ChannelConfiguration BrEdrDynamicChannel::CheckForUnacceptableConfigReqOptions(
     const ChannelConfiguration& config) const {
-  // TODO(https://fxbug.dev/40053): reject reconfiguring MTU if mode is Enhanced Retransmission or Streaming
-  // mode.
+  // TODO(https://fxbug.dev/40053): reject reconfiguring MTU if mode is Enhanced Retransmission or
+  // Streaming mode.
   ChannelConfiguration unacceptable;
 
   // Reject MTUs below minimum size
@@ -832,8 +834,8 @@ BrEdrDynamicChannel::CheckForUnacceptableErtmOptions(const ChannelConfiguration&
     unacceptable_rfc_option->set_tx_window_size(kErtmMaxUnackedInboundFrames);
   }
 
-  // NOTE(https://fxbug.dev/1033): MPS must be large enough to fit the largest SDU in the minimum MTU case,
-  // because ERTM does not segment in the outbound direction.
+  // NOTE(https://fxbug.dev/1033): MPS must be large enough to fit the largest SDU in the minimum
+  // MTU case, because ERTM does not segment in the outbound direction.
   if (peer_rfc_option.mps() < kMinACLMTU) {
     bt_log(DEBUG, "l2cap-bredr", "Channel %#.4x: rejecting too-small ERTM MPS of %hu", local_cid(),
            peer_rfc_option.mps());

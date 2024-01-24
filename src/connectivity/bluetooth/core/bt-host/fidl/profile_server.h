@@ -10,10 +10,10 @@
 #include <fbl/ref_counted.h>
 
 #include "lib/fidl/cpp/binding.h"
-#include "src/connectivity/bluetooth/core/bt-host/common/macros.h"
 #include "src/connectivity/bluetooth/core/bt-host/fidl/server_base.h"
-#include "src/connectivity/bluetooth/core/bt-host/gap/bredr_connection_manager.h"
-#include "src/connectivity/bluetooth/core/bt-host/sdp/server.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/macros.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/gap/bredr_connection_manager.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/sdp/server.h"
 #include "src/connectivity/bluetooth/core/bt-host/socket/socket_factory.h"
 
 namespace bthost {

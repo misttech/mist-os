@@ -2,11 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "src/connectivity/bluetooth/core/bt-host/gap/low_energy_connector.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/gap/low_energy_connector.h"
 
 #include <utility>
 
-#include "src/connectivity/bluetooth/core/bt-host/gap/peer_cache.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/gap/peer_cache.h"
 
 namespace bt::gap::internal {
 
@@ -287,7 +287,8 @@ void LowEnergyConnector::RequestCreateConnection() {
 
   state_.Set(State::kConnecting);
 
-  // TODO(https://fxbug.dev/70199): Use slow interval & window for auto connections during background scan.
+  // TODO(https://fxbug.dev/70199): Use slow interval & window for auto connections during
+  // background scan.
   BT_ASSERT(hci_connector_->CreateConnection(
       /*use_accept_list=*/false, peer_address_, kLEScanFastInterval, kLEScanFastWindow,
       kInitialConnectionParameters, std::move(status_cb), hci_request_timeout_));

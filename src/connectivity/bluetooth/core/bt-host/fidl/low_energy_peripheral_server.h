@@ -6,18 +6,19 @@
 #define SRC_CONNECTIVITY_BLUETOOTH_CORE_BT_HOST_FIDL_LOW_ENERGY_PERIPHERAL_SERVER_H_
 
 #include <fuchsia/bluetooth/le/cpp/fidl.h>
+#include <lib/async/cpp/wait.h>
 #include <lib/fidl/cpp/binding.h>
 
 #include <memory>
 #include <unordered_map>
 
-#include "src/connectivity/bluetooth/core/bt-host/common/macros.h"
-#include "src/connectivity/bluetooth/core/bt-host/common/weak_self.h"
 #include "src/connectivity/bluetooth/core/bt-host/fidl/low_energy_connection_server.h"
 #include "src/connectivity/bluetooth/core/bt-host/fidl/server_base.h"
-#include "src/connectivity/bluetooth/core/bt-host/gap/adapter.h"
-#include "src/connectivity/bluetooth/core/bt-host/gap/low_energy_advertising_manager.h"
-#include "src/connectivity/bluetooth/core/bt-host/gap/low_energy_connection_manager.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/macros.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/weak_self.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/gap/adapter.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/gap/low_energy_advertising_manager.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/gap/low_energy_connection_manager.h"
 
 namespace bthost {
 
@@ -154,8 +155,8 @@ class LowEnergyPeripheralServer : public AdapterServerBase<fuchsia::bluetooth::l
   // Map of all active advertisement instances associated with a call to `Advertise`.
   // bt::gap::AdvertisementId cannot be used as a map key because it is received asynchronously, and
   // we need an advertisement ID to refer to before advertising starts.
-  // TODO(https://fxbug.dev/77644): Support AdvertisedPeripheral protocols that outlive this Peripheral
-  // protocol. This may require passing AdvertisementInstances to HostServer.
+  // TODO(https://fxbug.dev/77644): Support AdvertisedPeripheral protocols that outlive this
+  // Peripheral protocol. This may require passing AdvertisementInstances to HostServer.
   AdvertisementInstanceId next_advertisement_instance_id_ = 0u;
   std::unordered_map<AdvertisementInstanceId, AdvertisementInstance> advertisements_;
 

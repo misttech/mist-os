@@ -2,10 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "src/connectivity/bluetooth/core/bt-host/transport/emboss_control_packets.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/transport/emboss_control_packets.h"
 
-#include "src/connectivity/bluetooth/core/bt-host/common/packet_view.h"
-#include "src/connectivity/bluetooth/core/bt-host/hci-spec/vendor_protocol.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/packet_view.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/hci-spec/vendor_protocol.h"
 
 #include <pw_bluetooth/hci_vendor.emb.h>
 

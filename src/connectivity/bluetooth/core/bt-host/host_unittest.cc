@@ -8,7 +8,7 @@
 
 #include <memory>
 
-#include "src/connectivity/bluetooth/core/bt-host/testing/inspect.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/testing/inspect.h"
 #include "src/lib/testing/loop_fixture/test_loop_fixture.h"
 
 namespace bthost::testing {

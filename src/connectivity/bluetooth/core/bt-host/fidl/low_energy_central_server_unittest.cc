@@ -15,9 +15,9 @@
 #include "lib/fidl/cpp/interface_request.h"
 #include "src/connectivity/bluetooth/core/bt-host/fidl/fake_adapter_test_fixture.h"
 #include "src/connectivity/bluetooth/core/bt-host/fidl/helpers.h"
-#include "src/connectivity/bluetooth/core/bt-host/sm/types.h"
-#include "src/connectivity/bluetooth/core/bt-host/testing/fake_controller.h"
-#include "src/connectivity/bluetooth/core/bt-host/testing/fake_peer.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/sm/types.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/testing/fake_controller.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/testing/fake_peer.h"
 #include "src/connectivity/bluetooth/lib/cpp-string/string_printf.h"
 
 namespace bthost {

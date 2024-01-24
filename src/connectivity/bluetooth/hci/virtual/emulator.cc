@@ -15,8 +15,8 @@
 #include <future>
 #include <thread>
 
-#include "src/connectivity/bluetooth/core/bt-host/common/random.h"
-#include "src/connectivity/bluetooth/core/bt-host/testing/fake_peer.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/random.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/testing/fake_peer.h"
 #include "src/connectivity/bluetooth/hci/virtual/log.h"
 
 namespace fbt = fuchsia::bluetooth;

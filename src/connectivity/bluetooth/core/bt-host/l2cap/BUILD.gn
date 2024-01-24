@@ -7,12 +7,14 @@ import("//build_overrides/pigweed.gni")
 import("$dir_pw_fuzzer/fuzzer.gni")
 import("$dir_pw_unit_test/test.gni")
 
+public_dir = "//src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/l2cap"
+
 # Basic target with protocol definitions and no logic, suitable for test
 # emulation.
 pw_source_set("definitions") {
   sources = [
-    "frame_headers.h",
-    "l2cap_defs.h",
+    "$public_dir/frame_headers.h",
+    "$public_dir/l2cap_defs.h",
   ]
 
   public_deps = [
@@ -23,58 +25,58 @@ pw_source_set("definitions") {
 
 pw_source_set("l2cap") {
   sources = [
+    "$public_dir/a2dp_offload_manager.h",
+    "$public_dir/basic_mode_rx_engine.h",
+    "$public_dir/basic_mode_tx_engine.h",
+    "$public_dir/bredr_command_handler.h",
+    "$public_dir/bredr_dynamic_channel.h",
+    "$public_dir/bredr_signaling_channel.h",
+    "$public_dir/channel.h",
+    "$public_dir/channel_configuration.h",
+    "$public_dir/channel_manager.h",
+    "$public_dir/command_handler.h",
+    "$public_dir/dynamic_channel.h",
+    "$public_dir/dynamic_channel_registry.h",
+    "$public_dir/enhanced_retransmission_mode_engines.h",
+    "$public_dir/enhanced_retransmission_mode_rx_engine.h",
+    "$public_dir/enhanced_retransmission_mode_tx_engine.h",
+    "$public_dir/fcs.h",
+    "$public_dir/fragmenter.h",
+    "$public_dir/le_signaling_channel.h",
+    "$public_dir/logical_link.h",
+    "$public_dir/low_energy_command_handler.h",
+    "$public_dir/pdu.h",
+    "$public_dir/recombiner.h",
+    "$public_dir/rx_engine.h",
+    "$public_dir/scoped_channel.h",
+    "$public_dir/signaling_channel.h",
+    "$public_dir/tx_engine.h",
+    "$public_dir/types.h",
     "a2dp_offload_manager.cc",
-    "a2dp_offload_manager.h",
     "basic_mode_rx_engine.cc",
-    "basic_mode_rx_engine.h",
     "basic_mode_tx_engine.cc",
-    "basic_mode_tx_engine.h",
     "bredr_command_handler.cc",
-    "bredr_command_handler.h",
     "bredr_dynamic_channel.cc",
-    "bredr_dynamic_channel.h",
     "bredr_signaling_channel.cc",
-    "bredr_signaling_channel.h",
     "channel.cc",
-    "channel.h",
     "channel_configuration.cc",
-    "channel_configuration.h",
     "channel_manager.cc",
-    "channel_manager.h",
     "command_handler.cc",
-    "command_handler.h",
     "dynamic_channel.cc",
-    "dynamic_channel.h",
     "dynamic_channel_registry.cc",
-    "dynamic_channel_registry.h",
     "enhanced_retransmission_mode_engines.cc",
-    "enhanced_retransmission_mode_engines.h",
     "enhanced_retransmission_mode_rx_engine.cc",
-    "enhanced_retransmission_mode_rx_engine.h",
     "enhanced_retransmission_mode_tx_engine.cc",
-    "enhanced_retransmission_mode_tx_engine.h",
     "fcs.cc",
-    "fcs.h",
     "fragmenter.cc",
-    "fragmenter.h",
     "le_signaling_channel.cc",
-    "le_signaling_channel.h",
     "logical_link.cc",
-    "logical_link.h",
     "low_energy_command_handler.cc",
-    "low_energy_command_handler.h",
     "pdu.cc",
-    "pdu.h",
     "recombiner.cc",
-    "recombiner.h",
-    "rx_engine.h",
     "scoped_channel.cc",
-    "scoped_channel.h",
     "signaling_channel.cc",
-    "signaling_channel.h",
-    "tx_engine.h",
     "types.cc",
-    "types.h",
   ]
 
   public_deps = [
@@ -90,7 +92,7 @@ pw_source_set("l2cap") {
 pw_source_set("channel_manager_mock_controller_test_fixture") {
   testonly = true
 
-  sources = [ "channel_manager_mock_controller_test_fixture.h" ]
+  sources = [ "$public_dir/channel_manager_mock_controller_test_fixture.h" ]
 
   public_deps = [
     ":l2cap",
@@ -104,18 +106,18 @@ pw_source_set("testing") {
   testonly = true
 
   sources = [
+    "$public_dir/fake_channel.h",
+    "$public_dir/fake_channel_test.h",
+    "$public_dir/fake_l2cap.h",
+    "$public_dir/fake_signaling_channel.h",
+    "$public_dir/mock_channel_test.h",
+    "$public_dir/test_packets.h",
     "fake_channel.cc",
-    "fake_channel.h",
     "fake_channel_test.cc",
-    "fake_channel_test.h",
     "fake_l2cap.cc",
-    "fake_l2cap.h",
     "fake_signaling_channel.cc",
-    "fake_signaling_channel.h",
     "mock_channel_test.cc",
-    "mock_channel_test.h",
     "test_packets.cc",
-    "test_packets.h",
   ]
 
   public_deps = [

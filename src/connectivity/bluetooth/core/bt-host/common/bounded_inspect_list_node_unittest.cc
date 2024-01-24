@@ -4,12 +4,12 @@
 
 #ifndef NINSPECT
 
-#include "bounded_inspect_list_node.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/bounded_inspect_list_node.h"
 
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
-#include "src/connectivity/bluetooth/core/bt-host/testing/inspect.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/testing/inspect.h"
 
 namespace bt {
 

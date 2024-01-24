@@ -2,13 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "error.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/error.h"
 
 #include <sstream>
 
 #include <gtest/gtest.h>
 
-#include "src/connectivity/bluetooth/core/bt-host/common/uuid.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/uuid.h"
 
 namespace bt {
 namespace {

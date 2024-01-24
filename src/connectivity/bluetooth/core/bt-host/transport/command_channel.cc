@@ -2,15 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "command_channel.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/transport/command_channel.h"
 
 #include <endian.h>
 #include <lib/fit/defer.h>
 
-#include "slab_allocators.h"
-#include "src/connectivity/bluetooth/core/bt-host/common/assert.h"
-#include "src/connectivity/bluetooth/core/bt-host/common/log.h"
-#include "src/connectivity/bluetooth/core/bt-host/common/trace.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/assert.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/log.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/trace.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/transport/slab_allocators.h"
 #include "src/connectivity/bluetooth/lib/cpp-string/string_printf.h"
 
 #include <pw_bluetooth/hci_common.emb.h>
@@ -565,7 +565,8 @@ void CommandChannel::UpdateTransaction(std::unique_ptr<EventPacket> event) {
     return;
   }
 
-  // TODO(https://fxbug.dev/1109): Do not allow asynchronous commands to finish with Command Complete.
+  // TODO(https://fxbug.dev/1109): Do not allow asynchronous commands to finish with Command
+  // Complete.
   if (event_code == hci_spec::kCommandCompleteEventCode) {
     bt_log(WARN, "hci", "async command received CommandComplete");
     unregister_async_handler = true;

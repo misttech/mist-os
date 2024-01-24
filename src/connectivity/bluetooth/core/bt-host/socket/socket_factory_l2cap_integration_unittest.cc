@@ -6,12 +6,12 @@
 #include <pw_async_fuchsia/dispatcher.h>
 
 #include "socket_factory.h"
-#include "src/connectivity/bluetooth/core/bt-host/l2cap/channel.h"
-#include "src/connectivity/bluetooth/core/bt-host/l2cap/channel_manager.h"
-#include "src/connectivity/bluetooth/core/bt-host/l2cap/channel_manager_mock_controller_test_fixture.h"
-#include "src/connectivity/bluetooth/core/bt-host/l2cap/l2cap_defs.h"
-#include "src/connectivity/bluetooth/core/bt-host/l2cap/test_packets.h"
-#include "src/connectivity/bluetooth/core/bt-host/testing/mock_controller.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/l2cap/channel.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/l2cap/channel_manager.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/l2cap/channel_manager_mock_controller_test_fixture.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/l2cap/l2cap_defs.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/l2cap/test_packets.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/testing/mock_controller.h"
 #include "src/lib/testing/loop_fixture/test_loop_fixture.h"
 
 namespace bt::socket {

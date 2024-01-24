@@ -2,17 +2,17 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "src/connectivity/bluetooth/core/bt-host/gap/peer.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/gap/peer.h"
 
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 #include <pw_async/fake_dispatcher_fixture.h>
 
-#include "src/connectivity/bluetooth/core/bt-host/common/advertising_data.h"
-#include "src/connectivity/bluetooth/core/bt-host/common/byte_buffer.h"
-#include "src/connectivity/bluetooth/core/bt-host/common/manufacturer_names.h"
-#include "src/connectivity/bluetooth/core/bt-host/hci-spec/util.h"
-#include "src/connectivity/bluetooth/core/bt-host/testing/inspect_util.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/advertising_data.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/byte_buffer.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/manufacturer_names.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/hci-spec/util.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/testing/inspect_util.h"
 
 namespace bt::gap {
 namespace {

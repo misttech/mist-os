@@ -14,17 +14,17 @@
 #include "low_energy_central_server.h"
 #include "low_energy_peripheral_server.h"
 #include "profile_server.h"
-#include "src/connectivity/bluetooth/core/bt-host/common/assert.h"
-#include "src/connectivity/bluetooth/core/bt-host/common/identifier.h"
-#include "src/connectivity/bluetooth/core/bt-host/common/log.h"
-#include "src/connectivity/bluetooth/core/bt-host/gap/adapter.h"
-#include "src/connectivity/bluetooth/core/bt-host/gap/bonding_data.h"
-#include "src/connectivity/bluetooth/core/bt-host/gap/bredr_connection_manager.h"
-#include "src/connectivity/bluetooth/core/bt-host/gap/bredr_discovery_manager.h"
-#include "src/connectivity/bluetooth/core/bt-host/gap/gap.h"
-#include "src/connectivity/bluetooth/core/bt-host/gap/low_energy_discovery_manager.h"
-#include "src/connectivity/bluetooth/core/bt-host/sm/types.h"
-#include "src/connectivity/bluetooth/core/bt-host/sm/util.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/assert.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/identifier.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/log.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/gap/adapter.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/gap/bonding_data.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/gap/bredr_connection_manager.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/gap/bredr_discovery_manager.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/gap/gap.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/gap/low_energy_discovery_manager.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/sm/types.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/sm/util.h"
 #include "src/connectivity/bluetooth/lib/cpp-string/string_printf.h"
 
 namespace bthost {
@@ -711,8 +711,8 @@ void HostServer::PairBrEdr(PeerId peer_id, PairCallback callback) {
       callback(fpromise::ok());
     }
   };
-  // TODO(https://fxbug.dev/57991): Add security parameter to Pair and use that here instead of hardcoding
-  // default.
+  // TODO(https://fxbug.dev/57991): Add security parameter to Pair and use that here instead of
+  // hardcoding default.
   bt::gap::BrEdrSecurityRequirements security{.authentication = false, .secure_connections = false};
   BT_ASSERT(adapter()->bredr());
   adapter()->bredr()->Pair(peer_id, security, std::move(on_complete));

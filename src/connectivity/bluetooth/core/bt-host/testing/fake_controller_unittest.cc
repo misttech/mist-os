@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "src/connectivity/bluetooth/core/bt-host/testing/fake_controller.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/testing/fake_controller.h"
 
 #include <chrono>
 #include <cstddef>
@@ -11,7 +11,7 @@
 #include <gtest/gtest.h>
 #include <pw_async/fake_dispatcher_fixture.h>
 
-#include "src/connectivity/bluetooth/core/bt-host/hci-spec/protocol.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/hci-spec/protocol.h"
 
 #include <pw_bluetooth/hci_events.emb.h>
 

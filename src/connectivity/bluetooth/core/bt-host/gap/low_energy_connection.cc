@@ -2,9 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "low_energy_connection.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/gap/low_energy_connection.h"
 
-#include "src/connectivity/bluetooth/core/bt-host/gap/low_energy_connection_manager.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/gap/low_energy_connection_manager.h"
 
 namespace bt::gap::internal {
 
@@ -333,8 +333,8 @@ void LowEnergyConnection::RequestConnectionParameterUpdate(
   // Ensure interrogation has completed.
   BT_ASSERT(peer_->le()->features().has_value());
 
-  // TODO(https://fxbug.dev/49714): check local controller support for LL Connection Parameters Request
-  // procedure (mask is currently in Adapter le state, consider propagating down)
+  // TODO(https://fxbug.dev/49714): check local controller support for LL Connection Parameters
+  // Request procedure (mask is currently in Adapter le state, consider propagating down)
   bool ll_connection_parameters_req_supported =
       peer_->le()->features()->le_features &
       static_cast<uint64_t>(hci_spec::LESupportedFeature::kConnectionParametersRequestProcedure);
@@ -409,8 +409,8 @@ void LowEnergyConnection::L2capRequestConnectionParameterUpdate(
     }
   };
 
-  // TODO(https://fxbug.dev/49717): don't send request until after kLEConnectionParameterTimeout of an
-  // l2cap conn parameter update response being received (Core Spec v5.2, Vol 3, Part C,
+  // TODO(https://fxbug.dev/49717): don't send request until after kLEConnectionParameterTimeout of
+  // an l2cap conn parameter update response being received (Core Spec v5.2, Vol 3, Part C,
   // Sec 9.3.9).
   l2cap_->RequestConnectionParameterUpdate(handle(), params, std::move(response_cb));
 }

@@ -2,14 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "enhanced_retransmission_mode_engines.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/l2cap/enhanced_retransmission_mode_engines.h"
 
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 #include <pw_async/fake_dispatcher_fixture.h>
 
-#include "src/connectivity/bluetooth/core/bt-host/l2cap/fragmenter.h"
-#include "src/connectivity/bluetooth/core/bt-host/testing/test_helpers.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/l2cap/fragmenter.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/testing/test_helpers.h"
 
 namespace bt::l2cap::internal {
 namespace {

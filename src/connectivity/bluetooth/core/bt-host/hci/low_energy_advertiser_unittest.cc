@@ -2,15 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "src/connectivity/bluetooth/core/bt-host/hci/low_energy_advertiser.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/hci/low_energy_advertiser.h"
 
-#include "src/connectivity/bluetooth/core/bt-host/hci/android_extended_low_energy_advertiser.h"
-#include "src/connectivity/bluetooth/core/bt-host/hci/extended_low_energy_advertiser.h"
-#include "src/connectivity/bluetooth/core/bt-host/hci/legacy_low_energy_advertiser.h"
-#include "src/connectivity/bluetooth/core/bt-host/testing/controller_test.h"
-#include "src/connectivity/bluetooth/core/bt-host/testing/fake_controller.h"
-#include "src/connectivity/bluetooth/core/bt-host/testing/fake_peer.h"
-#include "src/connectivity/bluetooth/core/bt-host/testing/test_helpers.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/hci/android_extended_low_energy_advertiser.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/hci/extended_low_energy_advertiser.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/hci/legacy_low_energy_advertiser.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/testing/controller_test.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/testing/fake_controller.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/testing/fake_peer.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/testing/test_helpers.h"
 
 // LowEnergyAdvertiser has many potential subclasses (e.g. LegacyLowEnergyAdvertiser,
 // ExtendedLowEnergyAdvertiser, AndroidExtendedLowEnergyAdvertiser, etc). The unique features of

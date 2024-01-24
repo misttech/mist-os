@@ -16,7 +16,7 @@
 #include <iostream>
 
 #include "bt_intel.h"
-#include "src/connectivity/bluetooth/core/bt-host/transport/slab_allocators.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/transport/slab_allocators.h"
 #include "src/lib/fxl/strings/string_printf.h"
 
 namespace {

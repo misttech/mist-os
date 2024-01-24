@@ -11,13 +11,13 @@
 #include "fuchsia/bluetooth/gatt2/cpp/fidl.h"
 #include "lib/fidl/cpp/interface_ptr.h"
 #include "lib/fit/function.h"
-#include "src/connectivity/bluetooth/core/bt-host/att/att.h"
-#include "src/connectivity/bluetooth/core/bt-host/common/log.h"
-#include "src/connectivity/bluetooth/core/bt-host/common/uuid.h"
 #include "src/connectivity/bluetooth/core/bt-host/fidl/gatt2_server_ids.h"
 #include "src/connectivity/bluetooth/core/bt-host/fidl/helpers.h"
-#include "src/connectivity/bluetooth/core/bt-host/gatt/gatt_defs.h"
-#include "src/connectivity/bluetooth/core/bt-host/gatt/server.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/att/att.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/log.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/uuid.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/gatt/gatt_defs.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/gatt/server.h"
 
 namespace fbt = fuchsia::bluetooth;
 namespace btg = bt::gatt;

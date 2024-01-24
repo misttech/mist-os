@@ -7,7 +7,7 @@
 
 #include <lib/async/dispatcher.h>
 
-#include "src/connectivity/bluetooth/core/bt-host/transport/command_channel.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/transport/command_channel.h"
 #include "src/connectivity/bluetooth/tools/lib/command_dispatcher.h"
 
 namespace hcitool {

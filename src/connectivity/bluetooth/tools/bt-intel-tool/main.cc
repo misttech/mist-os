@@ -12,7 +12,7 @@
 
 #include "command_channel.h"
 #include "commands.h"
-#include "src/connectivity/bluetooth/core/bt-host/common/log.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/log.h"
 #include "src/connectivity/bluetooth/tools/lib/command_dispatcher.h"
 #include "src/lib/fxl/command_line.h"
 

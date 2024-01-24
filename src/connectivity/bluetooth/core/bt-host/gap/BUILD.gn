@@ -7,68 +7,70 @@ import("//build_overrides/pigweed.gni")
 import("$dir_pw_fuzzer/fuzzer.gni")
 import("$dir_pw_unit_test/test.gni")
 
+public_dir = "//src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/gap"
+
 pw_source_set("definitions") {
   sources = [
+    "$public_dir/gap.h",
     "gap.cc",
-    "gap.h",
   ]
   deps = [ "//src/connectivity/bluetooth/core/bt-host/common" ]
 }
 
 pw_source_set("gap") {
   sources = [
+    "$public_dir/adapter.h",
+    "$public_dir/adapter_state.h",
+    "$public_dir/android_vendor_capabilities.h",
+    "$public_dir/bredr_connection.h",
+    "$public_dir/bredr_connection_manager.h",
+    "$public_dir/bredr_connection_request.h",
+    "$public_dir/bredr_discovery_manager.h",
+    "$public_dir/bredr_interrogator.h",
+    "$public_dir/discovery_filter.h",
+    "$public_dir/event_masks.h",
+    "$public_dir/generic_access_client.h",
+    "$public_dir/identity_resolving_list.h",
+    "$public_dir/low_energy_address_manager.h",
+    "$public_dir/low_energy_advertising_manager.h",
+    "$public_dir/low_energy_connection.h",
+    "$public_dir/low_energy_connection_handle.h",
+    "$public_dir/low_energy_connection_manager.h",
+    "$public_dir/low_energy_connection_request.h",
+    "$public_dir/low_energy_connector.h",
+    "$public_dir/low_energy_discovery_manager.h",
+    "$public_dir/low_energy_interrogator.h",
+    "$public_dir/low_energy_state.h",
+    "$public_dir/pairing_delegate.h",
+    "$public_dir/pairing_state.h",
+    "$public_dir/peer.h",
+    "$public_dir/peer_cache.h",
+    "$public_dir/peer_metrics.h",
+    "$public_dir/types.h",
     "adapter.cc",
-    "adapter.h",
-    "adapter_state.h",
     "android_vendor_capabilities.cc",
-    "android_vendor_capabilities.h",
     "bredr_connection.cc",
-    "bredr_connection.h",
     "bredr_connection_manager.cc",
-    "bredr_connection_manager.h",
     "bredr_connection_request.cc",
-    "bredr_connection_request.h",
     "bredr_discovery_manager.cc",
-    "bredr_discovery_manager.h",
     "bredr_interrogator.cc",
-    "bredr_interrogator.h",
     "discovery_filter.cc",
-    "discovery_filter.h",
-    "event_masks.h",
     "generic_access_client.cc",
-    "generic_access_client.h",
     "identity_resolving_list.cc",
-    "identity_resolving_list.h",
     "low_energy_address_manager.cc",
-    "low_energy_address_manager.h",
     "low_energy_advertising_manager.cc",
-    "low_energy_advertising_manager.h",
     "low_energy_connection.cc",
-    "low_energy_connection.h",
     "low_energy_connection_handle.cc",
-    "low_energy_connection_handle.h",
     "low_energy_connection_manager.cc",
-    "low_energy_connection_manager.h",
     "low_energy_connection_request.cc",
-    "low_energy_connection_request.h",
     "low_energy_connector.cc",
-    "low_energy_connector.h",
     "low_energy_discovery_manager.cc",
-    "low_energy_discovery_manager.h",
     "low_energy_interrogator.cc",
-    "low_energy_interrogator.h",
-    "low_energy_state.h",
-    "pairing_delegate.h",
     "pairing_state.cc",
-    "pairing_state.h",
     "peer.cc",
-    "peer.h",
     "peer_cache.cc",
-    "peer_cache.h",
     "peer_metrics.cc",
-    "peer_metrics.h",
     "types.cc",
-    "types.h",
   ]
 
   public_deps = [
@@ -90,10 +92,10 @@ pw_source_set("testing") {
   testonly = true
 
   sources = [
+    "$public_dir/fake_adapter.h",
+    "$public_dir/fake_pairing_delegate.h",
     "fake_adapter.cc",
-    "fake_adapter.h",
     "fake_pairing_delegate.cc",
-    "fake_pairing_delegate.h",
   ]
 
   public_deps = [

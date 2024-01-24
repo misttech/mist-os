@@ -2,11 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "util.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/hci-spec/util.h"
 
 #include <endian.h>
 
-#include "src/connectivity/bluetooth/core/bt-host/common/assert.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/assert.h"
 
 namespace bt::hci_spec {
 
@@ -174,9 +174,9 @@ std::string ConnectionRoleToString(pw::bluetooth::emboss::ConnectionRole role) {
 
 std::optional<AdvertisingEventBits> AdvertisingTypeToEventBits(
     pw::bluetooth::emboss::LEAdvertisingType type) {
-  // TODO(https://fxbug.dev/81470): for backwards compatibility and because supporting extended advertising
-  // PDUs is a much larger project, we currently only support legacy PDUs. Without using legacy
-  // PDUs, non-Bluetooth 5 devices will not be able to discover extended advertisements.
+  // TODO(https://fxbug.dev/81470): for backwards compatibility and because supporting extended
+  // advertising PDUs is a much larger project, we currently only support legacy PDUs. Without using
+  // legacy PDUs, non-Bluetooth 5 devices will not be able to discover extended advertisements.
   uint16_t adv_event_properties = kLEAdvEventPropBitUseLegacyPDUs;
 
   // Bluetooth Spec Volume 4, Part E, Section 7.8.53, Table 7.2 defines the mapping of legacy PDU

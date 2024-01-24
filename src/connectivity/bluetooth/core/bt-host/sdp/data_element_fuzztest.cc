@@ -4,7 +4,7 @@
 
 #include <fuzzer/FuzzedDataProvider.h>
 
-#include "src/connectivity/bluetooth/core/bt-host/sdp/data_element.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/sdp/data_element.h"
 
 namespace bt::sdp {
 

@@ -7,11 +7,11 @@
 
 #include <fuchsia/bluetooth/gatt/cpp/fidl.h>
 
-#include "src/connectivity/bluetooth/core/bt-host/common/macros.h"
-#include "src/connectivity/bluetooth/core/bt-host/common/weak_self.h"
 #include "src/connectivity/bluetooth/core/bt-host/fidl/server_base.h"
-#include "src/connectivity/bluetooth/core/bt-host/gatt/local_service_manager.h"
-#include "src/connectivity/bluetooth/core/bt-host/gatt/types.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/macros.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/weak_self.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/gatt/local_service_manager.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/gatt/types.h"
 
 namespace bthost {
 

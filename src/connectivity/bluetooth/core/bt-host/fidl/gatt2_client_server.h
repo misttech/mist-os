@@ -10,7 +10,7 @@
 
 #include "src/connectivity/bluetooth/core/bt-host/fidl/gatt2_remote_service_server.h"
 #include "src/connectivity/bluetooth/core/bt-host/fidl/server_base.h"
-#include "src/connectivity/bluetooth/core/bt-host/gatt/gatt.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/gatt/gatt.h"
 
 namespace bthost {
 class Gatt2ClientServer : public GattServerBase<fuchsia::bluetooth::gatt2::Client> {
@@ -56,7 +56,8 @@ class Gatt2ClientServer : public GattServerBase<fuchsia::bluetooth::gatt2::Clien
 
   // If a service's handle maps to a null value, a connection request to that service is in
   // progress.
-  // TODO(https://fxbug.dev/84788): Once FindService() returns the service directly, don't use null values.
+  // TODO(https://fxbug.dev/84788): Once FindService() returns the service directly, don't use null
+  // values.
   std::unordered_map<bt::att::Handle, std::unique_ptr<Gatt2RemoteServiceServer>> services_;
 
   // False initially, and set to true after GATT::ListServices() completes.

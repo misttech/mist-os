@@ -2,32 +2,31 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "low_energy_connection_manager.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/gap/low_energy_connection_manager.h"
 
 #include <optional>
 #include <vector>
 
-#include "low_energy_connection.h"
-#include "pairing_delegate.h"
-#include "peer.h"
-#include "peer_cache.h"
-#include "src/connectivity/bluetooth/core/bt-host/common/assert.h"
-#include "src/connectivity/bluetooth/core/bt-host/gap/gap.h"
-#include "src/connectivity/bluetooth/core/bt-host/gap/generic_access_client.h"
-#include "src/connectivity/bluetooth/core/bt-host/gap/peer.h"
-#include "src/connectivity/bluetooth/core/bt-host/gatt/local_service_manager.h"
-#include "src/connectivity/bluetooth/core/bt-host/hci-spec/constants.h"
-#include "src/connectivity/bluetooth/core/bt-host/hci-spec/defaults.h"
-#include "src/connectivity/bluetooth/core/bt-host/hci-spec/protocol.h"
-#include "src/connectivity/bluetooth/core/bt-host/hci-spec/util.h"
-#include "src/connectivity/bluetooth/core/bt-host/hci/local_address_delegate.h"
-#include "src/connectivity/bluetooth/core/bt-host/l2cap/channel_manager.h"
-#include "src/connectivity/bluetooth/core/bt-host/sm/error.h"
-#include "src/connectivity/bluetooth/core/bt-host/sm/security_manager.h"
-#include "src/connectivity/bluetooth/core/bt-host/sm/smp.h"
-#include "src/connectivity/bluetooth/core/bt-host/sm/types.h"
-#include "src/connectivity/bluetooth/core/bt-host/sm/util.h"
-#include "src/connectivity/bluetooth/core/bt-host/transport/transport.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/assert.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/gap/gap.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/gap/generic_access_client.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/gap/low_energy_connection.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/gap/pairing_delegate.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/gap/peer.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/gap/peer_cache.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/gatt/local_service_manager.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/hci-spec/constants.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/hci-spec/defaults.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/hci-spec/protocol.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/hci-spec/util.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/hci/local_address_delegate.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/l2cap/channel_manager.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/sm/error.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/sm/security_manager.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/sm/smp.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/sm/types.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/sm/util.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/transport/transport.h"
 #include "src/connectivity/bluetooth/lib/cpp-string/string_printf.h"
 
 using bt::sm::BondableMode;
@@ -162,7 +161,8 @@ void LowEnergyConnectionManager::Connect(PeerId peer_id, ConnectionResultCallbac
              "%s)",
              bt_str(peer_id));
     }
-    // TODO(https://fxbug.dev/65592): Merge connection_options with the options of the pending request.
+    // TODO(https://fxbug.dev/65592): Merge connection_options with the options of the pending
+    // request.
     pending_iter->second.AddCallback(std::move(callback));
     // TODO(https://fxbug.dev/69621): Try to create this connection.
     return;
@@ -170,14 +170,16 @@ void LowEnergyConnectionManager::Connect(PeerId peer_id, ConnectionResultCallbac
 
   // Add callback to connecting request if |peer_id| matches.
   if (current_request_ && current_request_->request.peer_id() == peer_id) {
-    // TODO(https://fxbug.dev/65592): Merge connection_options with the options of the current request.
+    // TODO(https://fxbug.dev/65592): Merge connection_options with the options of the current
+    // request.
     current_request_->request.AddCallback(std::move(callback));
     return;
   }
 
   auto conn_iter = connections_.find(peer_id);
   if (conn_iter != connections_.end()) {
-    // TODO(https://fxbug.dev/65592): Handle connection_options that conflict with the existing connection.
+    // TODO(https://fxbug.dev/65592): Handle connection_options that conflict with the existing
+    // connection.
     callback(fit::ok(conn_iter->second->AddRef()));
     return;
   }

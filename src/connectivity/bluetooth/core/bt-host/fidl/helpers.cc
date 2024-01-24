@@ -15,15 +15,15 @@
 
 #include "fuchsia/bluetooth/sys/cpp/fidl.h"
 #include "fuchsia/media/cpp/fidl.h"
-#include "src/connectivity/bluetooth/core/bt-host/att/att.h"
-#include "src/connectivity/bluetooth/core/bt-host/common/advertising_data.h"
-#include "src/connectivity/bluetooth/core/bt-host/common/log.h"
-#include "src/connectivity/bluetooth/core/bt-host/gap/discovery_filter.h"
-#include "src/connectivity/bluetooth/core/bt-host/gap/gap.h"
-#include "src/connectivity/bluetooth/core/bt-host/gatt/gatt.h"
-#include "src/connectivity/bluetooth/core/bt-host/hci-spec/vendor_protocol.h"
-#include "src/connectivity/bluetooth/core/bt-host/sco/sco.h"
-#include "src/connectivity/bluetooth/core/bt-host/sm/types.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/att/att.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/advertising_data.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/log.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/gap/discovery_filter.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/gap/gap.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/gatt/gatt.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/hci-spec/vendor_protocol.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/sco/sco.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/sm/types.h"
 
 using fuchsia::bluetooth::Error;
 using fuchsia::bluetooth::ErrorCode;
@@ -773,8 +773,8 @@ fsys::Peer PeerToFidl(const bt::gap::Peer& peer) {
                    std::back_inserter(*output.mutable_bredr_services()), UuidToFidl);
   }
 
-  // TODO(https://fxbug.dev/57344): Populate le_service UUIDs based on GATT results as well as advertising
-  // and inquiry data.
+  // TODO(https://fxbug.dev/57344): Populate le_service UUIDs based on GATT results as well as
+  // advertising and inquiry data.
 
   return output;
 }
@@ -789,10 +789,10 @@ std::optional<bt::DeviceAddress> AddressFromFidlBondingData(
       bt_log(WARN, "fidl", "BR/EDR or Dual-Mode bond cannot have a random identity address!");
       return std::nullopt;
     }
-    // TODO(https://fxbug.dev/2761): We currently assign kBREDR as the address type for dual-mode bonds.
-    // This makes address management for dual-mode devices a bit confusing as we have two "public"
-    // address types (i.e. kBREDR and kLEPublic). We should align the stack address types with
-    // the FIDL address types, such that both kBREDR and kLEPublic are represented as the same
+    // TODO(https://fxbug.dev/2761): We currently assign kBREDR as the address type for dual-mode
+    // bonds. This makes address management for dual-mode devices a bit confusing as we have two
+    // "public" address types (i.e. kBREDR and kLEPublic). We should align the stack address types
+    // with the FIDL address types, such that both kBREDR and kLEPublic are represented as the same
     // kind of "PUBLIC".
     type = bt::DeviceAddress::Type::kBREDR;
   } else {
@@ -1109,8 +1109,8 @@ fble::AdvertisingData AdvertisingDataToFidl(const bt::AdvertisingData& input) {
     output.set_name(input.local_name()->name);
   }
   if (input.appearance()) {
-    // TODO(https://fxbug.dev/66358): Remove this to allow for passing arbitrary appearance values to
-    // clients in a way that's forward-compatible with future BLE revisions.
+    // TODO(https://fxbug.dev/66358): Remove this to allow for passing arbitrary appearance values
+    // to clients in a way that's forward-compatible with future BLE revisions.
     const uint16_t appearance_raw = input.appearance().value();
     if (auto appearance = AppearanceToFidl(appearance_raw)) {
       output.set_appearance(appearance.value());
@@ -1273,8 +1273,8 @@ bt::gatt::ReliableMode ReliableModeFromFidl(const fgatt::WriteOptions& write_opt
              : bt::gatt::ReliableMode::kDisabled;
 }
 
-// TODO(https://fxbug.dev/63438): The 64 bit `fidl_gatt_id` can overflow the 16 bits of a bt:att::Handle
-// that underlies CharacteristicHandles when directly casted. Fix this.
+// TODO(https://fxbug.dev/63438): The 64 bit `fidl_gatt_id` can overflow the 16 bits of a
+// bt:att::Handle that underlies CharacteristicHandles when directly casted. Fix this.
 bt::gatt::CharacteristicHandle CharacteristicHandleFromFidl(uint64_t fidl_gatt_id) {
   if (fidl_gatt_id > std::numeric_limits<bt::att::Handle>::max()) {
     bt_log(ERROR, "fidl",
@@ -1285,8 +1285,8 @@ bt::gatt::CharacteristicHandle CharacteristicHandleFromFidl(uint64_t fidl_gatt_i
   return bt::gatt::CharacteristicHandle(static_cast<bt::att::Handle>(fidl_gatt_id));
 }
 
-// TODO(https://fxbug.dev/63438): The 64 bit `fidl_gatt_id` can overflow the 16 bits of a bt:att::Handle
-// that underlies DescriptorHandles when directly casted. Fix this.
+// TODO(https://fxbug.dev/63438): The 64 bit `fidl_gatt_id` can overflow the 16 bits of a
+// bt:att::Handle that underlies DescriptorHandles when directly casted. Fix this.
 bt::gatt::DescriptorHandle DescriptorHandleFromFidl(uint64_t fidl_gatt_id) {
   if (fidl_gatt_id > std::numeric_limits<bt::att::Handle>::max()) {
     bt_log(ERROR, "fidl",
@@ -1476,8 +1476,8 @@ pw::bluetooth::emboss::ScoDataPath FidlToScoDataPath(const fbredr::DataPath& pat
     case fbredr::DataPath::HOST:
       return pw::bluetooth::emboss::ScoDataPath::HCI;
     case fbredr::DataPath::OFFLOAD: {
-      // TODO(https://fxbug.dev/58458): Use path from stack configuration file instead of this hardcoded
-      // value. "6" is the data path usually used in Broadcom controllers.
+      // TODO(https://fxbug.dev/58458): Use path from stack configuration file instead of this
+      // hardcoded value. "6" is the data path usually used in Broadcom controllers.
       return static_cast<pw::bluetooth::emboss::ScoDataPath>(6);
     }
     case fbredr::DataPath::TEST:
@@ -1576,8 +1576,8 @@ FidlToScoParameters(const fbredr::ScoConnectionParameters& params) {
 
   // For HCI Host transport the transport unit size should be "0". For PCM transport the unit size
   // is vendor specific. A unit size of "0" indicates "not applicable".
-  // TODO(https://fxbug.dev/58458): Use unit size from stack configuration file instead of hardcoding "not
-  // applicable".
+  // TODO(https://fxbug.dev/58458): Use unit size from stack configuration file instead of
+  // hardcoding "not applicable".
   view.input_transport_unit_size_bits().Write(0u);
   view.output_transport_unit_size_bits().Write(0u);
 

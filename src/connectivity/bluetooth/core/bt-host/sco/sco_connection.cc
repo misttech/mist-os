@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "sco_connection.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/sco/sco_connection.h"
 
 namespace bt::sco {
 
@@ -53,7 +53,8 @@ void ScoConnection::Close() {
 }
 
 bool ScoConnection::Activate(fit::closure rx_callback, fit::closure closed_callback) {
-  // TODO(https://fxbug.dev/58458): Handle Activate() called on a connection that has been closed already.
+  // TODO(https://fxbug.dev/58458): Handle Activate() called on a connection that has been closed
+  // already.
   BT_ASSERT(closed_callback);
   BT_ASSERT(!active_);
   BT_ASSERT(rx_callback);

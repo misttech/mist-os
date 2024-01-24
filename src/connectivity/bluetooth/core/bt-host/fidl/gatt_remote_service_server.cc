@@ -7,8 +7,8 @@
 #include <algorithm>
 
 #include "helpers.h"
-#include "src/connectivity/bluetooth/core/bt-host/att/att.h"
-#include "src/connectivity/bluetooth/core/bt-host/common/log.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/att/att.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/log.h"
 
 using fuchsia::bluetooth::ErrorCode;
 using fuchsia::bluetooth::Status;
@@ -107,7 +107,8 @@ void GattRemoteServiceServer::ReadCharacteristic(uint64_t id, ReadCharacteristic
     callback(fidl_helpers::ResultToFidlDeprecated(status), std::move(vec));
   };
 
-  // TODO(https://fxbug.dev/63438): The 64 bit `id` can overflow the 16 bits of a bt::att:Handle. Fix this.
+  // TODO(https://fxbug.dev/63438): The 64 bit `id` can overflow the 16 bits of a bt::att:Handle.
+  // Fix this.
   service_->ReadCharacteristic(CharacteristicHandleFromFidl(id), std::move(cb));
 }
 
@@ -129,7 +130,8 @@ void GattRemoteServiceServer::ReadLongCharacteristic(uint64_t id, uint16_t offse
     callback(fidl_helpers::ResultToFidlDeprecated(status), std::move(vec));
   };
 
-  // TODO(https://fxbug.dev/63438): The 64 bit `id` can overflow the 16 bits of a bt::att:Handle. Fix this.
+  // TODO(https://fxbug.dev/63438): The 64 bit `id` can overflow the 16 bits of a bt::att:Handle.
+  // Fix this.
   service_->ReadLongCharacteristic(CharacteristicHandleFromFidl(id), offset, max_bytes,
                                    std::move(cb));
 }
@@ -140,7 +142,8 @@ void GattRemoteServiceServer::WriteCharacteristic(uint64_t id, ::std::vector<uin
     callback(fidl_helpers::ResultToFidlDeprecated(status, ""));
   };
 
-  // TODO(https://fxbug.dev/63438): The 64 bit `id` can overflow the 16 bits of a bt::att:Handle. Fix this.
+  // TODO(https://fxbug.dev/63438): The 64 bit `id` can overflow the 16 bits of a bt::att:Handle.
+  // Fix this.
   service_->WriteCharacteristic(CharacteristicHandleFromFidl(id), std::move(value), std::move(cb));
 }
 
@@ -153,14 +156,16 @@ void GattRemoteServiceServer::WriteLongCharacteristic(uint64_t id, uint16_t offs
   };
 
   auto reliable_mode = fidl_helpers::ReliableModeFromFidl(write_options);
-  // TODO(https://fxbug.dev/63438): The 64 bit `id` can overflow the 16 bits of a bt::att:Handle. Fix this.
+  // TODO(https://fxbug.dev/63438): The 64 bit `id` can overflow the 16 bits of a bt::att:Handle.
+  // Fix this.
   service_->WriteLongCharacteristic(CharacteristicHandleFromFidl(id), offset, std::move(value),
                                     std::move(reliable_mode), std::move(cb));
 }
 
 void GattRemoteServiceServer::WriteCharacteristicWithoutResponse(uint64_t id,
                                                                  ::std::vector<uint8_t> value) {
-  // TODO(https://fxbug.dev/63438): The 64 bit `id` can overflow the 16 bits of a bt::att:Handle. Fix this.
+  // TODO(https://fxbug.dev/63438): The 64 bit `id` can overflow the 16 bits of a bt::att:Handle.
+  // Fix this.
   service_->WriteCharacteristicWithoutResponse(CharacteristicHandleFromFidl(id), std::move(value),
                                                /*cb=*/[](auto) {});
 }
@@ -181,7 +186,8 @@ void GattRemoteServiceServer::ReadDescriptor(uint64_t id, ReadDescriptorCallback
     callback(fidl_helpers::ResultToFidlDeprecated(status), std::move(vec));
   };
 
-  // TODO(https://fxbug.dev/63438): The 64 bit `id` can overflow the 16 bits of a bt::att:Handle. Fix this.
+  // TODO(https://fxbug.dev/63438): The 64 bit `id` can overflow the 16 bits of a bt::att:Handle.
+  // Fix this.
   service_->ReadDescriptor(DescriptorHandleFromFidl(id), std::move(cb));
 }
 
@@ -202,13 +208,15 @@ void GattRemoteServiceServer::ReadLongDescriptor(uint64_t id, uint16_t offset, u
     callback(fidl_helpers::ResultToFidlDeprecated(status), std::move(vec));
   };
 
-  // TODO(https://fxbug.dev/63438): The 64 bit `id` can overflow the 16 bits of a bt::att:Handle. Fix this.
+  // TODO(https://fxbug.dev/63438): The 64 bit `id` can overflow the 16 bits of a bt::att:Handle.
+  // Fix this.
   service_->ReadLongDescriptor(DescriptorHandleFromFidl(id), offset, max_bytes, std::move(cb));
 }
 
 void GattRemoteServiceServer::WriteDescriptor(uint64_t id, ::std::vector<uint8_t> value,
                                               WriteDescriptorCallback callback) {
-  // TODO(https://fxbug.dev/63438): The 64 bit `id` can overflow the 16 bits of a bt::att:Handle. Fix this.
+  // TODO(https://fxbug.dev/63438): The 64 bit `id` can overflow the 16 bits of a bt::att:Handle.
+  // Fix this.
   service_->WriteDescriptor(DescriptorHandleFromFidl(id), std::move(value),
                             [callback = std::move(callback)](bt::att::Result<> status) {
                               callback(fidl_helpers::ResultToFidlDeprecated(status, ""));
@@ -218,7 +226,8 @@ void GattRemoteServiceServer::WriteDescriptor(uint64_t id, ::std::vector<uint8_t
 void GattRemoteServiceServer::WriteLongDescriptor(uint64_t id, uint16_t offset,
                                                   ::std::vector<uint8_t> value,
                                                   WriteLongDescriptorCallback callback) {
-  // TODO(https://fxbug.dev/63438): The 64 bit `id` can overflow the 16 bits of a bt::att:Handle. Fix this.
+  // TODO(https://fxbug.dev/63438): The 64 bit `id` can overflow the 16 bits of a bt::att:Handle.
+  // Fix this.
   service_->WriteLongDescriptor(DescriptorHandleFromFidl(id), offset, std::move(value),
                                 [callback = std::move(callback)](bt::att::Result<> status) {
                                   callback(fidl_helpers::ResultToFidlDeprecated(status, ""));
@@ -274,7 +283,8 @@ void GattRemoteServiceServer::ReadByType(fuchsia::bluetooth::Uuid uuid,
 
 void GattRemoteServiceServer::NotifyCharacteristic(uint64_t id, bool enable,
                                                    NotifyCharacteristicCallback callback) {
-  // TODO(https://fxbug.dev/63438): The 64 bit `id` can overflow the 16 bits of a bt::att:Handle. Fix this.
+  // TODO(https://fxbug.dev/63438): The 64 bit `id` can overflow the 16 bits of a bt::att:Handle.
+  // Fix this.
   auto handle = CharacteristicHandleFromFidl(id);
   if (!enable) {
     auto iter = notify_handlers_.find(handle);

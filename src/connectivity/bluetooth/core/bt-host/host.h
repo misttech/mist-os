@@ -10,6 +10,7 @@
 #include <lib/async/default.h>
 #include <lib/fit/function.h>
 #include <lib/fit/thread_checker.h>
+#include <lib/zx/channel.h>
 #include <zircon/types.h>
 
 #include <memory>
@@ -18,8 +19,8 @@
 #include <fbl/ref_ptr.h>
 #include <pw_async_fuchsia/dispatcher.h>
 
-#include "src/connectivity/bluetooth/core/bt-host/gap/adapter.h"
-#include "src/connectivity/bluetooth/core/bt-host/gatt/gatt.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/gap/adapter.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/gatt/gatt.h"
 #include "third_party/pigweed/backends/pw_random/zircon_random_generator.h"
 
 namespace bthost {

@@ -9,9 +9,9 @@
 
 #include <gtest/gtest.h>
 
-#include "src/connectivity/bluetooth/core/bt-host/testing/test_helpers.h"
-#include "src/connectivity/bluetooth/core/bt-host/transport/acl_data_packet.h"
-#include "src/connectivity/bluetooth/core/bt-host/transport/control_packets.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/testing/test_helpers.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/transport/acl_data_packet.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/transport/control_packets.h"
 
 using bt::ContainersEqual;
 using bt::StaticByteBuffer;

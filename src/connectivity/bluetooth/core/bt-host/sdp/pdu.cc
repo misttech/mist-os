@@ -2,16 +2,16 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "src/connectivity/bluetooth/core/bt-host/sdp/pdu.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/sdp/pdu.h"
 
 #include <endian.h>
 
 #include <memory>
 
-#include "src/connectivity/bluetooth/core/bt-host/common/byte_buffer.h"
-#include "src/connectivity/bluetooth/core/bt-host/common/log.h"
-#include "src/connectivity/bluetooth/core/bt-host/common/packet_view.h"
-#include "src/connectivity/bluetooth/core/bt-host/common/slab_allocator.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/byte_buffer.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/log.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/packet_view.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/slab_allocator.h"
 
 namespace bt::sdp {
 
@@ -53,8 +53,8 @@ bool ValidContinuationState(const ByteBuffer& buf, BufferView* out) {
 }
 
 MutableByteBufferPtr NewSdpBuffer(size_t buffer_size) {
-  // TODO(https://fxbug.dev/1338): Remove unique_ptr->DynamicByteBuffer double indirection once sufficient
-  // progress has been made on the attached bug (specifically re:l2cap::Channel::Send).
+  // TODO(https://fxbug.dev/1338): Remove unique_ptr->DynamicByteBuffer double indirection once
+  // sufficient progress has been made on the attached bug (specifically re:l2cap::Channel::Send).
   return std::make_unique<DynamicByteBuffer>(buffer_size);
 }
 

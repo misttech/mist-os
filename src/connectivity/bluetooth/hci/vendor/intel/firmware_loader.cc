@@ -18,7 +18,7 @@
 #include <fbl/unique_fd.h>
 
 #include "logging.h"
-#include "src/connectivity/bluetooth/core/bt-host/transport/control_packets.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/transport/control_packets.h"
 
 namespace btintel {
 

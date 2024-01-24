@@ -11,7 +11,7 @@
 #include <lib/zx/channel.h>
 #include <zircon/types.h>
 
-#include "src/connectivity/bluetooth/core/bt-host/transport/control_packets.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/transport/control_packets.h"
 
 // Sends and receives events from a command channel that it retrieves from a
 // Zircon Bluetooth HCI device.  It parses the incoming event packets, only

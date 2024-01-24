@@ -8,8 +8,8 @@
 #include <zircon/status.h>
 
 #include "host.h"
-#include "src/connectivity/bluetooth/core/bt-host/common/inspect.h"
-#include "src/connectivity/bluetooth/core/bt-host/common/log.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/inspect.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/log.h"
 
 namespace bthost {
 namespace {
@@ -127,8 +127,8 @@ void HostDevice::InitializeHostLocked(fit::function<void(bool success)> callback
         bt_host_node_ = inspect_.GetRoot().CreateChild("bt-host");
         host_->Initialize(bt_host_node_, std::move(callback), [this]() {
           bt_log(WARN, "bt-host", "transport error, shutting down and removing host..");
-          // TODO(https://fxbug.dev/52588): Consider destroying the host stack synchronously here, instead
-          // of waiting for device unbinding.
+          // TODO(https://fxbug.dev/52588): Consider destroying the host stack synchronously here,
+          // instead of waiting for device unbinding.
           DdkAsyncRemove();
         });
       });

@@ -2,21 +2,21 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "fake_controller.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/testing/fake_controller.h"
 
 #include <endian.h>
 #include <lib/async/cpp/task.h>
 
 #include <cstddef>
 
-#include "src/connectivity/bluetooth/core/bt-host/common/log.h"
-#include "src/connectivity/bluetooth/core/bt-host/common/packet_view.h"
-#include "src/connectivity/bluetooth/core/bt-host/hci-spec/constants.h"
-#include "src/connectivity/bluetooth/core/bt-host/hci-spec/defaults.h"
-#include "src/connectivity/bluetooth/core/bt-host/hci-spec/protocol.h"
-#include "src/connectivity/bluetooth/core/bt-host/hci-spec/util.h"
-#include "src/connectivity/bluetooth/core/bt-host/hci-spec/vendor_protocol.h"
-#include "src/connectivity/bluetooth/core/bt-host/hci/util.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/log.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/packet_view.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/hci-spec/constants.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/hci-spec/defaults.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/hci-spec/protocol.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/hci-spec/util.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/hci-spec/vendor_protocol.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/hci/util.h"
 #include "src/connectivity/bluetooth/lib/cpp-string/string_printf.h"
 
 #include <pw_bluetooth/hci_vendor.emb.h>
@@ -156,8 +156,8 @@ void FakeController::Settings::ApplyExtendedLEConfig() {
 void FakeController::Settings::ApplyAndroidVendorExtensionDefaults() {
   // Settings for the android vendor extensions component within the Fake Controller. These settings
   // correspond to the vendor capabilities returned by the controller. See
-  // src/connectivity/bluetooth/core/bt-host/hci-spec/vendor_protocol.h and LEGetVendorCapabilities
-  // for more information.
+  // src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/hci-spec/vendor_protocol.h
+  // and LEGetVendorCapabilities for more information.
   android_extension_settings.view().status().Write(pw::bluetooth::emboss::StatusCode::SUCCESS);
   android_extension_settings.view().max_advt_instances().Write(3);
   android_extension_settings.view().total_scan_results_storage().Write(1024);
@@ -1289,7 +1289,8 @@ void FakeController::OnReadBRADDR() {
 
 void FakeController::OnLESetAdvertisingEnable(
     const pw::bluetooth::emboss::LESetAdvertisingEnableCommandView& params) {
-  // TODO(https://fxbug.dev/81444): if own address type is random, check that a random address is set
+  // TODO(https://fxbug.dev/81444): if own address type is random, check that a random address is
+  // set
 
   legacy_advertising_state_.enabled =
       params.advertising_enable().Read() == pw::bluetooth::emboss::GenericEnableParam::ENABLE;
@@ -1963,8 +1964,8 @@ void FakeController::OnLESetExtendedAdvertisingParameters(
     return;
   }
 
-  // TODO(https://fxbug.dev/80049): Core spec Volume 4, Part E, Section 7.8.53: if legacy advertising PDUs
-  // are being used, the Primary_Advertising_PHY shall indicate the LE 1M PHY.
+  // TODO(https://fxbug.dev/80049): Core spec Volume 4, Part E, Section 7.8.53: if legacy
+  // advertising PDUs are being used, the Primary_Advertising_PHY shall indicate the LE 1M PHY.
   if (params.primary_advertising_phy().Read() !=
       pw::bluetooth::emboss::LEPrimaryAdvertisingPHY::LE_1M) {
     bt_log(INFO, "fake-hci", "only legacy pdus are supported, requires advertising on 1M PHY");
@@ -2225,7 +2226,8 @@ void FakeController::OnLESetExtendedAdvertisingEnable(
       return;
     }
 
-    // TODO(https://fxbug.dev/81444): if own address type is random, check that a random address is set
+    // TODO(https://fxbug.dev/81444): if own address type is random, check that a random address is
+    // set
     state.enabled = true;
   }
 
@@ -2238,10 +2240,10 @@ void FakeController::OnLEReadMaximumAdvertisingDataLength() {
   hci_spec::LEReadMaxAdvertisingDataLengthReturnParams params;
   params.status = pw::bluetooth::emboss::StatusCode::SUCCESS;
 
-  // TODO(https://fxbug.dev/77476): Extended advertising supports sending larger amounts of data, but they
-  // have to be fragmented across multiple commands to the controller. This is not yet supported in
-  // this implementation. We should support larger than kMaxLEExtendedAdvertisingDataLength
-  // advertising data with fragmentation.
+  // TODO(https://fxbug.dev/77476): Extended advertising supports sending larger amounts of data,
+  // but they have to be fragmented across multiple commands to the controller. This is not yet
+  // supported in this implementation. We should support larger than
+  // kMaxLEExtendedAdvertisingDataLength advertising data with fragmentation.
   params.max_adv_data_length = htole16(hci_spec::kMaxLEAdvertisingDataLength);
   RespondWithCommandComplete(hci_spec::kLEReadMaxAdvertisingDataLength,
                              BufferView(&params, sizeof(params)));

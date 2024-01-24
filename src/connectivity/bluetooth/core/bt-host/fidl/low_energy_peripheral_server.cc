@@ -8,16 +8,16 @@
 #include <zircon/status.h>
 
 #include "helpers.h"
-#include "src/connectivity/bluetooth/core/bt-host/common/advertising_data.h"
-#include "src/connectivity/bluetooth/core/bt-host/common/assert.h"
-#include "src/connectivity/bluetooth/core/bt-host/common/identifier.h"
-#include "src/connectivity/bluetooth/core/bt-host/common/log.h"
-#include "src/connectivity/bluetooth/core/bt-host/gap/low_energy_advertising_manager.h"
-#include "src/connectivity/bluetooth/core/bt-host/gap/low_energy_connection_manager.h"
-#include "src/connectivity/bluetooth/core/bt-host/gap/peer.h"
-#include "src/connectivity/bluetooth/core/bt-host/hci-spec/constants.h"
-#include "src/connectivity/bluetooth/core/bt-host/hci-spec/util.h"
-#include "src/connectivity/bluetooth/core/bt-host/sm/types.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/advertising_data.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/assert.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/identifier.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/log.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/gap/low_energy_advertising_manager.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/gap/low_energy_connection_manager.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/gap/peer.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/hci-spec/constants.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/hci-spec/util.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/sm/types.h"
 
 #define LOG_TAG "fidl"
 
@@ -207,8 +207,8 @@ void LowEnergyPeripheralServer::Advertise(
     return;
   }
 
-  // TODO(https://fxbug.dev/76557): As a temporary hack until multiple advertisements is supported, don't
-  // allow more than one advertisement. The current behavior of hci::LegacyLowEnergyAdvertiser
+  // TODO(https://fxbug.dev/76557): As a temporary hack until multiple advertisements is supported,
+  // don't allow more than one advertisement. The current behavior of hci::LegacyLowEnergyAdvertiser
   // is to replace the current advertisement, which is not the intended behavior of `Advertise`.
   // NOTE: This is insufficient  when there are multiple Peripheral clients advertising, but that is
   // the status quo with `StartAdvertising` anyway (the last advertiser wins).

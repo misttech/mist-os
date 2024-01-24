@@ -7,8 +7,8 @@
 
 #include <pw_async_fuchsia/dispatcher.h>
 
-#include "src/connectivity/bluetooth/core/bt-host/common/macros.h"
-#include "src/connectivity/bluetooth/core/bt-host/gatt/fake_layer.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/macros.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/gatt/fake_layer.h"
 #include "src/lib/testing/loop_fixture/test_loop_fixture.h"
 
 namespace bt::fidl::testing {

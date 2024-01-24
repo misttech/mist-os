@@ -16,12 +16,12 @@
 #include "lib/fidl/cpp/binding.h"
 #include "lib/fidl/cpp/interface_ptr.h"
 #include "lib/fpromise/result.h"
-#include "src/connectivity/bluetooth/core/bt-host/common/host_error.h"
-#include "src/connectivity/bluetooth/core/bt-host/common/log.h"
-#include "src/connectivity/bluetooth/core/bt-host/common/uuid.h"
-#include "src/connectivity/bluetooth/core/bt-host/common/weak_self.h"
-#include "src/connectivity/bluetooth/core/bt-host/gap/types.h"
-#include "src/connectivity/bluetooth/core/bt-host/l2cap/types.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/host_error.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/log.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/uuid.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/weak_self.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/gap/types.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/l2cap/types.h"
 #include "zircon/errors.h"
 
 namespace fidlbredr = fuchsia::bluetooth::bredr;
@@ -246,7 +246,8 @@ void ProfileServer::L2capParametersExt::RequestParameters(
                    "L2capParametersExt::RequestParameters: setting flush timeout failed");
           }
           // Return the current parameters even if the request failed.
-          // TODO(https://fxbug.dev/73039): set current security requirements in returned channel parameters
+          // TODO(https://fxbug.dev/73039): set current security requirements in returned channel
+          // parameters
           cb(ChannelInfoToFidlChannelParameters(chan->info()));
         });
     return;

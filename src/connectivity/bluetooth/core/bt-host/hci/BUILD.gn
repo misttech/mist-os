@@ -5,43 +5,45 @@
 import("//build_overrides/pigweed.gni")
 import("$dir_pw_unit_test/test.gni")
 
+public_dir = "//src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/hci"
+
 pw_source_set("hci") {
   sources = [
+    "$public_dir/acl_connection.h",
+    "$public_dir/advertising_report_parser.h",
+    "$public_dir/android_extended_low_energy_advertiser.h",
+    "$public_dir/bredr_connection.h",
+    "$public_dir/bredr_connection_request.h",
+    "$public_dir/command_handler.h",
+    "$public_dir/connection.h",
+    "$public_dir/extended_low_energy_advertiser.h",
+    "$public_dir/legacy_low_energy_advertiser.h",
+    "$public_dir/legacy_low_energy_scanner.h",
+    "$public_dir/local_address_delegate.h",
+    "$public_dir/low_energy_advertiser.h",
+    "$public_dir/low_energy_connection.h",
+    "$public_dir/low_energy_connector.h",
+    "$public_dir/low_energy_scanner.h",
+    "$public_dir/sco_connection.h",
+    "$public_dir/sequential_command_runner.h",
+    "$public_dir/util.h",
     "acl_connection.cc",
-    "acl_connection.h",
     "advertising_handle_map.cc",
     "advertising_report_parser.cc",
-    "advertising_report_parser.h",
     "android_extended_low_energy_advertiser.cc",
-    "android_extended_low_energy_advertiser.h",
     "bredr_connection.cc",
-    "bredr_connection.h",
     "bredr_connection_request.cc",
-    "bredr_connection_request.h",
-    "command_handler.h",
     "connection.cc",
-    "connection.h",
     "extended_low_energy_advertiser.cc",
-    "extended_low_energy_advertiser.h",
     "legacy_low_energy_advertiser.cc",
-    "legacy_low_energy_advertiser.h",
     "legacy_low_energy_scanner.cc",
-    "legacy_low_energy_scanner.h",
-    "local_address_delegate.h",
     "low_energy_advertiser.cc",
-    "low_energy_advertiser.h",
     "low_energy_connection.cc",
-    "low_energy_connection.h",
     "low_energy_connector.cc",
-    "low_energy_connector.h",
     "low_energy_scanner.cc",
-    "low_energy_scanner.h",
     "sco_connection.cc",
-    "sco_connection.h",
     "sequential_command_runner.cc",
-    "sequential_command_runner.h",
     "util.cc",
-    "util.h",
   ]
 
   public_deps = [
@@ -56,14 +58,14 @@ pw_source_set("testing") {
   testonly = true
 
   sources = [
+    "$public_dir/fake_bredr_connection.h",
+    "$public_dir/fake_local_address_delegate.h",
+    "$public_dir/fake_low_energy_connection.h",
+    "$public_dir/fake_sco_connection.h",
     "fake_bredr_connection.cc",
-    "fake_bredr_connection.h",
     "fake_local_address_delegate.cc",
-    "fake_local_address_delegate.h",
     "fake_low_energy_connection.cc",
-    "fake_low_energy_connection.h",
     "fake_sco_connection.cc",
-    "fake_sco_connection.h",
   ]
 
   deps = [ "//third_party/pigweed:pw_async_heap_dispatcher" ]

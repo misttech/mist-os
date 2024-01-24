@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "sco_data_channel.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/transport/sco_data_channel.h"
 
 #include <lib/fit/defer.h>
 
@@ -209,11 +209,11 @@ CommandChannel::EventCallbackResult ScoDataChannelImpl::OnNumberOfCompletedPacke
     uint16_t comp_packets = le16toh(data->hc_num_of_completed_packets);
 
     if (iter->second < comp_packets) {
-      // TODO(https://fxbug.dev/2795): This can be caused by the controller reusing the connection handle
-      // of a connection that just disconnected. We should somehow avoid sending the controller
-      // packets for a connection that has disconnected. ScoDataChannel already dequeues such
-      // packets, but this is insufficient: packets can be queued in the channel to the transport
-      // driver, and possibly in the transport driver or USB/UART drivers.
+      // TODO(https://fxbug.dev/2795): This can be caused by the controller reusing the connection
+      // handle of a connection that just disconnected. We should somehow avoid sending the
+      // controller packets for a connection that has disconnected. ScoDataChannel already dequeues
+      // such packets, but this is insufficient: packets can be queued in the channel to the
+      // transport driver, and possibly in the transport driver or USB/UART drivers.
       bt_log(ERROR, "hci",
              "SCO packet tx count mismatch! (handle: %#.4x, expected: %zu, actual : %u)",
              le16toh(data->connection_handle), iter->second, comp_packets);

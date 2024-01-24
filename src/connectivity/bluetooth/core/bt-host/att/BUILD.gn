@@ -5,13 +5,15 @@
 import("//build_overrides/pigweed.gni")
 import("$dir_pw_unit_test/test.gni")
 
+public_dir = "//src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/att"
+
 # Basic target with protocol definitions and no logic, suitable for test
 # emulation.
 pw_source_set("definitions") {
   sources = [
-    "att.h",
+    "$public_dir/att.h",
+    "$public_dir/packet.h",
     "packet.cc",
-    "packet.h",
   ]
 
   public_deps = [
@@ -23,18 +25,18 @@ pw_source_set("definitions") {
 
 pw_source_set("att") {
   sources = [
+    "$public_dir/attribute.h",
+    "$public_dir/bearer.h",
+    "$public_dir/database.h",
+    "$public_dir/error.h",
+    "$public_dir/permissions.h",
+    "$public_dir/write_queue.h",
     "attribute.cc",
-    "attribute.h",
     "bearer.cc",
-    "bearer.h",
     "database.cc",
-    "database.h",
     "error.cc",
-    "error.h",
     "permissions.cc",
-    "permissions.h",
     "write_queue.cc",
-    "write_queue.h",
   ]
 
   public_deps = [

@@ -2,21 +2,21 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "channel.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/l2cap/channel.h"
 
 #include <memory>
 #include <utility>
 
 #include "lib/fit/result.h"
-#include "logical_link.h"
-#include "src/connectivity/bluetooth/core/bt-host/common/assert.h"
-#include "src/connectivity/bluetooth/core/bt-host/common/log.h"
-#include "src/connectivity/bluetooth/core/bt-host/common/weak_self.h"
-#include "src/connectivity/bluetooth/core/bt-host/l2cap/basic_mode_rx_engine.h"
-#include "src/connectivity/bluetooth/core/bt-host/l2cap/basic_mode_tx_engine.h"
-#include "src/connectivity/bluetooth/core/bt-host/l2cap/enhanced_retransmission_mode_engines.h"
-#include "src/connectivity/bluetooth/core/bt-host/l2cap/l2cap_defs.h"
-#include "src/connectivity/bluetooth/core/bt-host/transport/link_type.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/assert.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/log.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/weak_self.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/l2cap/basic_mode_rx_engine.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/l2cap/basic_mode_tx_engine.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/l2cap/enhanced_retransmission_mode_engines.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/l2cap/l2cap_defs.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/l2cap/logical_link.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/transport/link_type.h"
 #include "src/connectivity/bluetooth/lib/cpp-string/string_printf.h"
 
 namespace bt::l2cap {
@@ -197,7 +197,8 @@ bool ChannelImpl::Send(ByteBufferPtr sdu) {
   if (!active_)
     return false;
 
-  return tx_engine_->QueueSdu(std::move(sdu));  // TODO(https://fxbug.dev/123081): Refactor to queue PDUs
+  return tx_engine_->QueueSdu(
+      std::move(sdu));  // TODO(https://fxbug.dev/123081): Refactor to queue PDUs
 }
 
 std::unique_ptr<hci::ACLDataPacket> ChannelImpl::GetNextOutboundPacket() {

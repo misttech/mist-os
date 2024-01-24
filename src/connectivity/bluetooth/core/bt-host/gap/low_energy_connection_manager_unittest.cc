@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "src/connectivity/bluetooth/core/bt-host/gap/low_energy_connection_manager.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/gap/low_energy_connection_manager.h"
 
 #include <lib/fit/function.h>
 
@@ -11,38 +11,38 @@
 #include <memory>
 #include <vector>
 
-#include "src/connectivity/bluetooth/core/bt-host/common/assert.h"
-#include "src/connectivity/bluetooth/core/bt-host/common/byte_buffer.h"
-#include "src/connectivity/bluetooth/core/bt-host/common/device_address.h"
-#include "src/connectivity/bluetooth/core/bt-host/common/macros.h"
-#include "src/connectivity/bluetooth/core/bt-host/common/random.h"
-#include "src/connectivity/bluetooth/core/bt-host/gap/fake_pairing_delegate.h"
-#include "src/connectivity/bluetooth/core/bt-host/gap/gap.h"
-#include "src/connectivity/bluetooth/core/bt-host/gap/low_energy_address_manager.h"
-#include "src/connectivity/bluetooth/core/bt-host/gap/low_energy_connection_manager.h"
-#include "src/connectivity/bluetooth/core/bt-host/gap/peer.h"
-#include "src/connectivity/bluetooth/core/bt-host/gap/peer_cache.h"
-#include "src/connectivity/bluetooth/core/bt-host/gatt/fake_layer.h"
-#include "src/connectivity/bluetooth/core/bt-host/hci-spec/constants.h"
-#include "src/connectivity/bluetooth/core/bt-host/hci-spec/defaults.h"
-#include "src/connectivity/bluetooth/core/bt-host/hci-spec/util.h"
-#include "src/connectivity/bluetooth/core/bt-host/hci/fake_local_address_delegate.h"
-#include "src/connectivity/bluetooth/core/bt-host/hci/legacy_low_energy_scanner.h"
-#include "src/connectivity/bluetooth/core/bt-host/hci/low_energy_connection.h"
-#include "src/connectivity/bluetooth/core/bt-host/hci/low_energy_connector.h"
-#include "src/connectivity/bluetooth/core/bt-host/l2cap/fake_channel.h"
-#include "src/connectivity/bluetooth/core/bt-host/l2cap/fake_channel_test.h"
-#include "src/connectivity/bluetooth/core/bt-host/l2cap/fake_l2cap.h"
-#include "src/connectivity/bluetooth/core/bt-host/l2cap/l2cap_defs.h"
-#include "src/connectivity/bluetooth/core/bt-host/sm/smp.h"
-#include "src/connectivity/bluetooth/core/bt-host/sm/test_security_manager.h"
-#include "src/connectivity/bluetooth/core/bt-host/sm/types.h"
-#include "src/connectivity/bluetooth/core/bt-host/testing/controller_test.h"
-#include "src/connectivity/bluetooth/core/bt-host/testing/fake_controller.h"
-#include "src/connectivity/bluetooth/core/bt-host/testing/fake_peer.h"
-#include "src/connectivity/bluetooth/core/bt-host/testing/inspect.h"
-#include "src/connectivity/bluetooth/core/bt-host/testing/test_packets.h"
-#include "src/connectivity/bluetooth/core/bt-host/transport/fake_acl_connection.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/assert.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/byte_buffer.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/device_address.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/macros.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/random.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/gap/fake_pairing_delegate.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/gap/gap.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/gap/low_energy_address_manager.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/gap/low_energy_connection_manager.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/gap/peer.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/gap/peer_cache.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/gatt/fake_layer.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/hci-spec/constants.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/hci-spec/defaults.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/hci-spec/util.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/hci/fake_local_address_delegate.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/hci/legacy_low_energy_scanner.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/hci/low_energy_connection.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/hci/low_energy_connector.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/l2cap/fake_channel.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/l2cap/fake_channel_test.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/l2cap/fake_l2cap.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/l2cap/l2cap_defs.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/sm/smp.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/sm/test_security_manager.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/sm/types.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/testing/controller_test.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/testing/fake_controller.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/testing/fake_peer.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/testing/inspect.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/testing/test_packets.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/transport/fake_acl_connection.h"
 
 namespace bt::gap {
 namespace {
@@ -1405,8 +1405,8 @@ TEST_F(LowEnergyConnectionManagerTest, IncomingConnectionUpgradesKnownBrEdrPeerT
 }
 
 // Successful connection to a peer whose address type is kBREDR.
-// TODO(https://fxbug.dev/2761): This test will likely become obsolete when LE connections are based on the
-// presence of LowEnergyData in a Peer and no address type enum exists.
+// TODO(https://fxbug.dev/2761): This test will likely become obsolete when LE connections are based
+// on the presence of LowEnergyData in a Peer and no address type enum exists.
 TEST_F(LowEnergyConnectionManagerTest, ConnectAndDisconnectDualModeDeviceWithBrEdrAddress) {
   Peer* peer = peer_cache()->NewPeer(kAddrAlias0, /*connectable=*/true);
   ASSERT_TRUE(peer);
@@ -1972,8 +1972,8 @@ TEST_F(LowEnergyConnectionManagerTest,
                                      kPeripheralPreferredConnectionParametersCharacteristic);
   service_client->set_characteristics({char_data});
 
-  // TODO(https://fxbug.dev/123377): These parameters are invalid, but this test passes because we fail to
-  // validate them before sending them to the controller.
+  // TODO(https://fxbug.dev/123377): These parameters are invalid, but this test passes because we
+  // fail to validate them before sending them to the controller.
   StaticByteBuffer char_value(0x01, 0x00,   // min interval
                               0x02, 0x00,   // max interval
                               0x03, 0x00,   // max latency

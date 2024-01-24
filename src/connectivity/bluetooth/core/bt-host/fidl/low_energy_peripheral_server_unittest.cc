@@ -7,13 +7,13 @@
 #include "adapter_test_fixture.h"
 #include "fuchsia/bluetooth/cpp/fidl.h"
 #include "fuchsia/bluetooth/le/cpp/fidl.h"
-#include "src/connectivity/bluetooth/core/bt-host/common/advertising_data.h"
-#include "src/connectivity/bluetooth/core/bt-host/common/byte_buffer.h"
 #include "src/connectivity/bluetooth/core/bt-host/fidl/fake_adapter_test_fixture.h"
-#include "src/connectivity/bluetooth/core/bt-host/gap/low_energy_advertising_manager.h"
-#include "src/connectivity/bluetooth/core/bt-host/gap/low_energy_connection_manager.h"
-#include "src/connectivity/bluetooth/core/bt-host/testing/fake_peer.h"
-#include "src/connectivity/bluetooth/core/bt-host/testing/test_helpers.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/advertising_data.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/byte_buffer.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/gap/low_energy_advertising_manager.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/gap/low_energy_connection_manager.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/testing/fake_peer.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/testing/test_helpers.h"
 
 namespace bthost {
 namespace {
@@ -522,7 +522,8 @@ TEST_F(LowEnergyPeripheralServerTest, RestartStartAdvertisingDuringInboundConnKe
       bt::hci_spec::kLESetAdvertisingParameters,
       [&](fit::closure trigger) { complete_start_advertising = std::move(trigger); });
 
-  // Restart advertising during inbound connection, simulating the race seen in https://fxbug.dev/72825.
+  // Restart advertising during inbound connection, simulating the race seen in
+  // https://fxbug.dev/72825.
   result = std::nullopt;
   server()->StartAdvertising(fble::AdvertisingParameters{}, second_token.NewRequest(),
                              [&](auto cb_result) { result = std::move(cb_result); });
@@ -590,7 +591,8 @@ TEST_F(LowEnergyPeripheralServerTest, RestartAdvertiseDuringInboundConnKeepsNewA
       bt::hci_spec::kLESetAdvertisingParameters,
       [&](fit::closure trigger) { complete_start_advertising = std::move(trigger); });
 
-  // Restart advertising during inbound connection, simulating the race seen in https://fxbug.dev/72825.
+  // Restart advertising during inbound connection, simulating the race seen in
+  // https://fxbug.dev/72825.
   fble::AdvertisedPeripheralHandle adv_peripheral_handle_1;
   FakeAdvertisedPeripheral adv_peripheral_server_1(adv_peripheral_handle_1.NewRequest());
   bool server_1_closed = false;

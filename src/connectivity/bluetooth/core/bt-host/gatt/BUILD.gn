@@ -6,12 +6,14 @@ import("//build_overrides/pigweed.gni")
 import("$dir_pw_build/target_types.gni")
 import("$dir_pw_unit_test/test.gni")
 
+public_dir = "//src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/gatt"
+
 # Basic target with protocol definitions and no logic, suitable for test
 # emulation.
 pw_source_set("definitions") {
   sources = [
+    "$public_dir/gatt_defs.h",
     "gatt_defs.cc",
-    "gatt_defs.h",
   ]
 
   public_deps = [ "//src/connectivity/bluetooth/core/bt-host/att:definitions" ]
@@ -19,26 +21,26 @@ pw_source_set("definitions") {
 
 pw_source_set("gatt") {
   sources = [
+    "$public_dir/client.h",
+    "$public_dir/connection.h",
+    "$public_dir/gatt.h",
+    "$public_dir/generic_attribute_service.h",
+    "$public_dir/local_service_manager.h",
+    "$public_dir/remote_characteristic.h",
+    "$public_dir/remote_service.h",
+    "$public_dir/remote_service_manager.h",
+    "$public_dir/server.h",
+    "$public_dir/types.h",
     "client.cc",
-    "client.h",
     "connection.cc",
-    "connection.h",
     "gatt.cc",
-    "gatt.h",
     "generic_attribute_service.cc",
-    "generic_attribute_service.h",
     "local_service_manager.cc",
-    "local_service_manager.h",
     "remote_characteristic.cc",
-    "remote_characteristic.h",
     "remote_service.cc",
-    "remote_service.h",
     "remote_service_manager.cc",
-    "remote_service_manager.h",
     "server.cc",
-    "server.h",
     "types.cc",
-    "types.h",
   ]
 
   public_deps = [
@@ -52,12 +54,12 @@ pw_source_set("testing") {
   testonly = true
 
   sources = [
+    "$public_dir/fake_client.h",
+    "$public_dir/fake_layer.h",
+    "$public_dir/mock_server.h",
     "fake_client.cc",
-    "fake_client.h",
     "fake_layer.cc",
-    "fake_layer.h",
     "mock_server.cc",
-    "mock_server.h",
   ]
 
   public_deps = [

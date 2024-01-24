@@ -2,18 +2,18 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "src/connectivity/bluetooth/core/bt-host/hci/low_energy_connector.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/hci/low_energy_connector.h"
 
 #include <vector>
 
 #include "pw_async/heap_dispatcher.h"
-#include "src/connectivity/bluetooth/core/bt-host/common/macros.h"
-#include "src/connectivity/bluetooth/core/bt-host/hci-spec/defaults.h"
-#include "src/connectivity/bluetooth/core/bt-host/hci/fake_local_address_delegate.h"
-#include "src/connectivity/bluetooth/core/bt-host/hci/fake_low_energy_connection.h"
-#include "src/connectivity/bluetooth/core/bt-host/testing/controller_test.h"
-#include "src/connectivity/bluetooth/core/bt-host/testing/fake_controller.h"
-#include "src/connectivity/bluetooth/core/bt-host/testing/fake_peer.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/macros.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/hci-spec/defaults.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/hci/fake_local_address_delegate.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/hci/fake_low_energy_connection.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/testing/controller_test.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/testing/fake_controller.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/testing/fake_peer.h"
 
 namespace bt::hci {
 namespace {
@@ -381,8 +381,9 @@ TEST_F(LowEnergyConnectorTest, SendRequestAndDelete) {
   test_device()->AddPeer(std::move(fake_peer));
 
   bool ret = connector()->CreateConnection(
-      /*use_accept_list=*/false, kTestAddress, hci_spec::defaults::kLEScanInterval,
-      hci_spec::defaults::kLEScanWindow, kTestParams, [](auto, auto) {}, kPwConnectTimeout);
+      /*use_accept_list=*/
+      false, kTestAddress, hci_spec::defaults::kLEScanInterval, hci_spec::defaults::kLEScanWindow,
+      kTestParams, [](auto, auto) {}, kPwConnectTimeout);
   EXPECT_TRUE(ret);
   EXPECT_TRUE(connector()->request_pending());
 
@@ -401,8 +402,9 @@ TEST_F(LowEnergyConnectorTest, AllowsRandomAddressChange) {
 
   // Address change should not be allowed while the procedure is pending.
   connector()->CreateConnection(
-      /*use_accept_list=*/false, kTestAddress, hci_spec::defaults::kLEScanInterval,
-      hci_spec::defaults::kLEScanWindow, kTestParams, [](auto, auto) {}, kPwConnectTimeout);
+      /*use_accept_list=*/
+      false, kTestAddress, hci_spec::defaults::kLEScanInterval, hci_spec::defaults::kLEScanWindow,
+      kTestParams, [](auto, auto) {}, kPwConnectTimeout);
   EXPECT_TRUE(connector()->request_pending());
   EXPECT_FALSE(connector()->AllowsRandomAddressChange());
 
@@ -417,15 +419,17 @@ TEST_F(LowEnergyConnectorTest, AllowsRandomAddressChangeWhileRequestingLocalAddr
   // The connector should be in the "request pending" state without initiating
   // controller procedures that would prevent a local address change.
   connector()->CreateConnection(
-      /*use_accept_list=*/false, kTestAddress, hci_spec::defaults::kLEScanInterval,
-      hci_spec::defaults::kLEScanWindow, kTestParams, [](auto, auto) {}, kPwConnectTimeout);
+      /*use_accept_list=*/
+      false, kTestAddress, hci_spec::defaults::kLEScanInterval, hci_spec::defaults::kLEScanWindow,
+      kTestParams, [](auto, auto) {}, kPwConnectTimeout);
   EXPECT_TRUE(connector()->request_pending());
   EXPECT_TRUE(connector()->AllowsRandomAddressChange());
 
   // Initiating a new connection should fail in this state.
   bool result = connector()->CreateConnection(
-      /*use_accept_list=*/false, kTestAddress, hci_spec::defaults::kLEScanInterval,
-      hci_spec::defaults::kLEScanWindow, kTestParams, [](auto, auto) {}, kPwConnectTimeout);
+      /*use_accept_list=*/
+      false, kTestAddress, hci_spec::defaults::kLEScanInterval, hci_spec::defaults::kLEScanWindow,
+      kTestParams, [](auto, auto) {}, kPwConnectTimeout);
   EXPECT_FALSE(result);
 
   // After the loop runs the request should remain pending (since we added no
@@ -440,8 +444,9 @@ TEST_F(LowEnergyConnectorTest, ConnectUsingPublicAddress) {
   auto fake_device = std::make_unique<FakePeer>(kTestAddress, dispatcher(), true, true);
   test_device()->AddPeer(std::move(fake_device));
   connector()->CreateConnection(
-      /*use_accept_list=*/false, kTestAddress, hci_spec::defaults::kLEScanInterval,
-      hci_spec::defaults::kLEScanWindow, kTestParams, [](auto, auto) {}, kPwConnectTimeout);
+      /*use_accept_list=*/
+      false, kTestAddress, hci_spec::defaults::kLEScanInterval, hci_spec::defaults::kLEScanWindow,
+      kTestParams, [](auto, auto) {}, kPwConnectTimeout);
   RunUntilIdle();
   ASSERT_TRUE(test_device()->le_connect_params());
   EXPECT_EQ(pw::bluetooth::emboss::LEOwnAddressType::PUBLIC,
@@ -454,8 +459,9 @@ TEST_F(LowEnergyConnectorTest, ConnectUsingRandomAddress) {
   auto fake_device = std::make_unique<FakePeer>(kTestAddress, dispatcher(), true, true);
   test_device()->AddPeer(std::move(fake_device));
   connector()->CreateConnection(
-      /*use_accept_list=*/false, kTestAddress, hci_spec::defaults::kLEScanInterval,
-      hci_spec::defaults::kLEScanWindow, kTestParams, [](auto, auto) {}, kPwConnectTimeout);
+      /*use_accept_list=*/
+      false, kTestAddress, hci_spec::defaults::kLEScanInterval, hci_spec::defaults::kLEScanWindow,
+      kTestParams, [](auto, auto) {}, kPwConnectTimeout);
   RunUntilIdle();
   ASSERT_TRUE(test_device()->le_connect_params());
   EXPECT_EQ(pw::bluetooth::emboss::LEOwnAddressType::RANDOM,
@@ -502,8 +508,9 @@ TEST_F(LowEnergyConnectorTest, UseLocalIdentityAddress) {
   auto fake_device = std::make_unique<FakePeer>(kTestAddress, dispatcher(), true, true);
   test_device()->AddPeer(std::move(fake_device));
   connector()->CreateConnection(
-      /*use_accept_list=*/false, kTestAddress, hci_spec::defaults::kLEScanInterval,
-      hci_spec::defaults::kLEScanWindow, kTestParams, [](auto, auto) {}, kPwConnectTimeout);
+      /*use_accept_list=*/
+      false, kTestAddress, hci_spec::defaults::kLEScanInterval, hci_spec::defaults::kLEScanWindow,
+      kTestParams, [](auto, auto) {}, kPwConnectTimeout);
   RunUntilIdle();
   ASSERT_TRUE(test_device()->le_connect_params());
 

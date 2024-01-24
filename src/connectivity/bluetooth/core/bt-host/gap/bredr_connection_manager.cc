@@ -2,26 +2,26 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "bredr_connection_manager.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/gap/bredr_connection_manager.h"
 
 #include <lib/async/time.h>
 
-#include "src/connectivity/bluetooth/core/bt-host/common/assert.h"
-#include "src/connectivity/bluetooth/core/bt-host/common/expiring_set.h"
-#include "src/connectivity/bluetooth/core/bt-host/common/inspectable.h"
-#include "src/connectivity/bluetooth/core/bt-host/common/log.h"
-#include "src/connectivity/bluetooth/core/bt-host/gap/bredr_connection.h"
-#include "src/connectivity/bluetooth/core/bt-host/gap/bredr_interrogator.h"
-#include "src/connectivity/bluetooth/core/bt-host/gap/gap.h"
-#include "src/connectivity/bluetooth/core/bt-host/gap/peer_cache.h"
-#include "src/connectivity/bluetooth/core/bt-host/hci-spec/constants.h"
-#include "src/connectivity/bluetooth/core/bt-host/hci-spec/protocol.h"
-#include "src/connectivity/bluetooth/core/bt-host/hci-spec/util.h"
-#include "src/connectivity/bluetooth/core/bt-host/hci/bredr_connection.h"
-#include "src/connectivity/bluetooth/core/bt-host/hci/sequential_command_runner.h"
-#include "src/connectivity/bluetooth/core/bt-host/l2cap/l2cap_defs.h"
-#include "src/connectivity/bluetooth/core/bt-host/l2cap/types.h"
-#include "src/connectivity/bluetooth/core/bt-host/transport/emboss_control_packets.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/assert.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/expiring_set.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/inspectable.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/log.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/gap/bredr_connection.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/gap/bredr_interrogator.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/gap/gap.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/gap/peer_cache.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/hci-spec/constants.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/hci-spec/protocol.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/hci-spec/util.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/hci/bredr_connection.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/hci/sequential_command_runner.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/l2cap/l2cap_defs.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/l2cap/types.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/transport/emboss_control_packets.h"
 
 namespace bt::gap {
 
@@ -383,8 +383,8 @@ bool BrEdrConnectionManager::Disconnect(PeerId peer_id, DisconnectReason reason)
   bt_log(INFO, "gap-bredr", "Disconnect Requested (reason %hhu - %s) (peer: %s)",
          static_cast<unsigned char>(reason), ReasonAsString(reason).c_str(), bt_str(peer_id));
 
-  // TODO(https://fxbug.dev/65157) - If a disconnect request is received when we have a pending connection,
-  // we should instead abort the connection, by either:
+  // TODO(https://fxbug.dev/65157) - If a disconnect request is received when we have a pending
+  // connection, we should instead abort the connection, by either:
   //   * removing the request if it has not yet been processed
   //   * sending a cancel command to the controller and waiting for it to be processed
   //   * sending a cancel command, and if we already complete, then beginning a disconnect procedure
@@ -886,7 +886,8 @@ void BrEdrConnectionManager::CompleteRequest(PeerId peer_id, DeviceAddress addre
   } else {
     // This incoming connection arrived while we're trying to make an outgoing connection; not an
     // impossible coincidence but log it in case it's interesting.
-    // TODO(https://fxbug.dev/92299): Added to investigate timing and can be removed if it adds no value
+    // TODO(https://fxbug.dev/92299): Added to investigate timing and can be removed if it adds no
+    // value
     if (pending_request_.has_value()) {
       bt_log(INFO, "gap-bredr",
              "doesn't complete pending outgoing connection to peer %s (addr: %s)",

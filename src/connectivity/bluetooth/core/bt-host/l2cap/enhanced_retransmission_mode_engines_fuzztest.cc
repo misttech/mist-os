@@ -8,10 +8,10 @@
 #include <fuzzer/FuzzedDataProvider.h>
 #include <pw_async/fake_dispatcher.h>
 
-#include "enhanced_retransmission_mode_engines.h"
-#include "src/connectivity/bluetooth/core/bt-host/common/byte_buffer.h"
-#include "src/connectivity/bluetooth/core/bt-host/l2cap/fragmenter.h"
-#include "src/connectivity/bluetooth/core/bt-host/l2cap/l2cap_defs.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/byte_buffer.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/l2cap/enhanced_retransmission_mode_engines.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/l2cap/fragmenter.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/l2cap/l2cap_defs.h"
 
 constexpr static bt::hci_spec::ConnectionHandle kTestHandle = 0x0001;
 constexpr bt::l2cap::ChannelId kTestChannelId = 0x0001;

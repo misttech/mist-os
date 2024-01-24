@@ -6,9 +6,9 @@
 #include <pw_async/fake_dispatcher.h>
 #include <pw_random/fuzzer.h>
 
-#include "src/connectivity/bluetooth/core/bt-host/common/random.h"
-#include "src/connectivity/bluetooth/core/bt-host/gap/peer_cache.h"
-#include "src/connectivity/bluetooth/core/bt-host/testing/peer_fuzzer.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/random.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/gap/peer_cache.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/testing/peer_fuzzer.h"
 
 // Lightweight harness that adds a single peer to a PeerCache and mutates it with fuzz inputs
 extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {

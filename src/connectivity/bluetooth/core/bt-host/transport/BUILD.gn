@@ -6,32 +6,34 @@ import("//build_overrides/pigweed.gni")
 import("$dir_pw_build/target_types.gni")
 import("$dir_pw_unit_test/test.gni")
 
+public_dir = "//src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/transport"
+
 pw_source_set("transport") {
   sources = [
+    "$public_dir/acl_data_channel.h",
+    "$public_dir/acl_data_packet.h",
+    "$public_dir/command_channel.h",
+    "$public_dir/control_packets.h",
+    "$public_dir/data_buffer_info.h",
+    "$public_dir/emboss_control_packets.h",
+    "$public_dir/emboss_packet.h",
+    "$public_dir/error.h",
+    "$public_dir/link_type.h",
+    "$public_dir/packet.h",
+    "$public_dir/sco_data_channel.h",
+    "$public_dir/sco_data_packet.h",
+    "$public_dir/slab_allocators.h",
+    "$public_dir/transport.h",
     "acl_data_channel.cc",
-    "acl_data_channel.h",
     "acl_data_packet.cc",
-    "acl_data_packet.h",
     "command_channel.cc",
-    "command_channel.h",
     "control_packets.cc",
-    "control_packets.h",
-    "data_buffer_info.h",
     "emboss_control_packets.cc",
-    "emboss_control_packets.h",
-    "emboss_packet.h",
     "error.cc",
-    "error.h",
     "link_type.cc",
-    "link_type.h",
-    "packet.h",
     "sco_data_channel.cc",
-    "sco_data_channel.h",
     "sco_data_packet.cc",
-    "sco_data_packet.h",
-    "slab_allocators.h",
     "transport.cc",
-    "transport.h",
   ]
 
   public_deps = [
@@ -50,10 +52,10 @@ pw_source_set("testing") {
   testonly = true
 
   sources = [
+    "$public_dir/fake_sco_data_channel.h",
+    "$public_dir/mock_acl_data_channel.h",
     "fake_sco_data_channel.cc",
-    "fake_sco_data_channel.h",
     "mock_acl_data_channel.cc",
-    "mock_acl_data_channel.h",
   ]
 
   public_deps = [ ":transport" ]

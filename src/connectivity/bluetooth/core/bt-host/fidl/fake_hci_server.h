@@ -14,8 +14,8 @@
 
 #include "fuchsia/hardware/bluetooth/cpp/fidl.h"
 #include "gmock/gmock.h"
-#include "src/connectivity/bluetooth/core/bt-host/common/byte_buffer.h"
-#include "src/connectivity/bluetooth/core/bt-host/transport/slab_allocators.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/byte_buffer.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/transport/slab_allocators.h"
 
 namespace bt::fidl::testing {
 

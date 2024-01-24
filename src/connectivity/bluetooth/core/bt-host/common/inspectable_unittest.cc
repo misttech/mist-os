@@ -4,12 +4,12 @@
 
 #ifndef NINSPECT
 
-#include "inspectable.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/inspectable.h"
 
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
-#include "src/connectivity/bluetooth/core/bt-host/testing/inspect.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/testing/inspect.h"
 
 namespace bt {
 
@@ -145,14 +145,14 @@ TEST(InspectableTest, MakeContainerOfToStringConvertFunction) {
   auto& root = inspector.GetRoot();
 
   std::array values = {StringValue{"fuchsia"}, StringValue{"purple"}, StringValue{"magenta"}};
-  StringInspectable inspectable(
-      std::move(values), root.CreateString(kPropertyName, ""),
-      MakeContainerOfToStringConvertFunction({.prologue = "👉", .delimiter = "🥺", .epilogue = "👈"}));
+  StringInspectable inspectable(std::move(values), root.CreateString(kPropertyName, ""),
+                                MakeContainerOfToStringConvertFunction(
+                                    {.prologue = "👉", .delimiter = "🥺", .epilogue = "👈"}));
 
   auto hierarchy = inspect::ReadFromVmo(inspector.DuplicateVmo());
   ASSERT_TRUE(hierarchy.is_ok());
-  EXPECT_THAT(hierarchy.take_value(), AllOf(NodeMatches(PropertyList(ElementsAre(
-                                          StringIs(kPropertyName, "👉fuchsia🥺purple🥺magenta👈"))))));
+  EXPECT_THAT(hierarchy.take_value(), AllOf(NodeMatches(PropertyList(ElementsAre(StringIs(
+                                          kPropertyName, "👉fuchsia🥺purple🥺magenta👈"))))));
 }
 
 TEST(InspectableTest, InspectRealStringProperty) {

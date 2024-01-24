@@ -10,8 +10,8 @@
 
 #include "gatt_remote_service_server.h"
 #include "helpers.h"
-#include "src/connectivity/bluetooth/core/bt-host/common/log.h"
-#include "src/connectivity/bluetooth/core/bt-host/gatt/gatt.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/log.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/gatt/gatt.h"
 
 using fuchsia::bluetooth::ErrorCode;
 using fuchsia::bluetooth::Status;

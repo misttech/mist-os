@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "data_element.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/sdp/data_element.h"
 
 #include <endian.h>
 
@@ -10,7 +10,7 @@
 #include <set>
 #include <vector>
 
-#include "src/connectivity/bluetooth/core/bt-host/common/log.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/log.h"
 #include "src/connectivity/bluetooth/lib/cpp-string/string_printf.h"
 
 // Returns true if |url| is a valid URI.

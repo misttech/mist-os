@@ -18,7 +18,7 @@
 #include <usb/usb.h>
 
 #include "logging.h"
-#include "src/connectivity/bluetooth/core/bt-host/common/packet_view.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/packet_view.h"
 
 namespace btatheros {
 

@@ -5,10 +5,10 @@
 #include <fuzzer/FuzzedDataProvider.h>
 #include <pw_random/fuzzer.h>
 
-#include "src/connectivity/bluetooth/core/bt-host/common/random.h"
 #include "src/connectivity/bluetooth/core/bt-host/fidl/adapter_test_fixture.h"
 #include "src/connectivity/bluetooth/core/bt-host/fidl/host_server.h"
-#include "src/connectivity/bluetooth/core/bt-host/testing/peer_fuzzer.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/random.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/testing/peer_fuzzer.h"
 
 namespace bthost {
 namespace {
@@ -38,8 +38,8 @@ class HostServerFuzzTest final : public bthost::testing::AdapterTestFixture {
       peer_fuzzer.FuzzOneField();
     }
 
-    // TODO(https://fxbug.dev/65461): WatchPeers will trigger this test as a failure if we try to encode a
-    // lot of peers, even though fuzzing multiple peers would be helpful.
+    // TODO(https://fxbug.dev/65461): WatchPeers will trigger this test as a failure if we try to
+    // encode a lot of peers, even though fuzzing multiple peers would be helpful.
     int watch_peers_responses = 0;
     host_client()->WatchPeers([this, peer, &watch_peers_responses](auto updated, auto removed) {
       BT_ASSERT_MSG(updated.size() == 1, "peer %s: peers updated = %zu", bt_str(*peer),

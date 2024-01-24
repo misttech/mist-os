@@ -12,8 +12,8 @@
 #include "fuchsia/bluetooth/gatt2/cpp/fidl.h"
 #include "gtest/gtest.h"
 #include "src/connectivity/bluetooth/core/bt-host/fidl/fake_gatt_fixture.h"
-#include "src/connectivity/bluetooth/core/bt-host/gatt/remote_service.h"
-#include "src/connectivity/bluetooth/core/bt-host/testing/test_helpers.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/gatt/remote_service.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/testing/test_helpers.h"
 
 namespace bthost {
 namespace {

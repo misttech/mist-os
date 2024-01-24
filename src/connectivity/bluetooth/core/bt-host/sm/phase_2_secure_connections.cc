@@ -2,26 +2,26 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "phase_2_secure_connections.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/sm/phase_2_secure_connections.h"
 
 #include <memory>
 #include <optional>
 #include <type_traits>
 
-#include "src/connectivity/bluetooth/core/bt-host/common/assert.h"
-#include "src/connectivity/bluetooth/core/bt-host/common/byte_buffer.h"
-#include "src/connectivity/bluetooth/core/bt-host/common/log.h"
-#include "src/connectivity/bluetooth/core/bt-host/common/uint256.h"
-#include "src/connectivity/bluetooth/core/bt-host/hci/connection.h"
-#include "src/connectivity/bluetooth/core/bt-host/sm/ecdh_key.h"
-#include "src/connectivity/bluetooth/core/bt-host/sm/error.h"
-#include "src/connectivity/bluetooth/core/bt-host/sm/packet.h"
-#include "src/connectivity/bluetooth/core/bt-host/sm/pairing_phase.h"
-#include "src/connectivity/bluetooth/core/bt-host/sm/sc_stage_1_just_works_numeric_comparison.h"
-#include "src/connectivity/bluetooth/core/bt-host/sm/sc_stage_1_passkey.h"
-#include "src/connectivity/bluetooth/core/bt-host/sm/smp.h"
-#include "src/connectivity/bluetooth/core/bt-host/sm/types.h"
-#include "src/connectivity/bluetooth/core/bt-host/sm/util.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/assert.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/byte_buffer.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/log.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/uint256.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/hci/connection.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/sm/ecdh_key.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/sm/error.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/sm/packet.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/sm/pairing_phase.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/sm/sc_stage_1_just_works_numeric_comparison.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/sm/sc_stage_1_passkey.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/sm/smp.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/sm/types.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/sm/util.h"
 
 namespace bt::sm {
 
@@ -104,10 +104,11 @@ void Phase2SecureConnections::OnPeerPublicKey(PairingPublicKeyParams peer_pub_ke
   BT_ASSERT(local_ecdh_.has_value());
   if (peer_key.GetPublicKeyX() == local_ecdh_->GetPublicKeyX() &&
       peer_key.GetPublicKeyY() == local_ecdh_->GetPublicKeyY()) {
-    // NOTE(https://fxbug.dev/80650): When passkey entry is used, the non-initiating device can reflect
-    // our public key (which we send in plaintext). The inputs to the hash that we disclose bit-
-    // by-bit in ScStage1Passkey are the two public keys, our nonce, and one bit of our passkey, so
-    // if the peer uses the same public key then it can easily brute force for the passkey bit.
+    // NOTE(https://fxbug.dev/80650): When passkey entry is used, the non-initiating device can
+    // reflect our public key (which we send in plaintext). The inputs to the hash that we disclose
+    // bit- by-bit in ScStage1Passkey are the two public keys, our nonce, and one bit of our
+    // passkey, so if the peer uses the same public key then it can easily brute force for the
+    // passkey bit.
     bt_log(WARN, "sm", "peer public ECDH key mirrors local public ECDH key (sent_local_ecdh_: %d)",
            sent_local_ecdh_);
     Abort(ErrorCode::kInvalidParameters);
@@ -142,8 +143,9 @@ void Phase2SecureConnections::StartAuthenticationStage1() {
                                                  peer_ecdh_->GetPublicKeyX(), features_.method,
                                                  sm_chan().GetWeakPtr(), std::move(complete_cb));
   } else {  // method == kOutOfBand
-    // TODO(https://fxbug.dev/601): OOB would require significant extra plumbing & add security exposure not
-    // necessary for current goals. This is not spec-compliant but should allow us to pass PTS.
+    // TODO(https://fxbug.dev/601): OOB would require significant extra plumbing & add security
+    // exposure not necessary for current goals. This is not spec-compliant but should allow us to
+    // pass PTS.
     bt_log(WARN, "sm", "Received unsupported request for OOB pairing");
     Abort(ErrorCode::kCommandNotSupported);
     return;

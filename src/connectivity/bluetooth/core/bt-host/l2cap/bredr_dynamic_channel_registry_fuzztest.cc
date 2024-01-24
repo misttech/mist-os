@@ -6,11 +6,11 @@
 #include <pw_async/fake_dispatcher.h>
 #include <pw_random/fuzzer.h>
 
-#include "src/connectivity/bluetooth/core/bt-host/common/byte_buffer.h"
-#include "src/connectivity/bluetooth/core/bt-host/hci-spec/protocol.h"
-#include "src/connectivity/bluetooth/core/bt-host/l2cap/bredr_dynamic_channel.h"
-#include "src/connectivity/bluetooth/core/bt-host/l2cap/bredr_signaling_channel.h"
-#include "src/connectivity/bluetooth/core/bt-host/l2cap/fake_channel.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/byte_buffer.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/hci-spec/protocol.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/l2cap/bredr_dynamic_channel.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/l2cap/bredr_signaling_channel.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/l2cap/fake_channel.h"
 
 constexpr static bt::hci_spec::ConnectionHandle kTestHandle = 0x0001;
 

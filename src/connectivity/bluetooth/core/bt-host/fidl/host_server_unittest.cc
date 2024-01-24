@@ -15,20 +15,20 @@
 #include "adapter_test_fixture.h"
 #include "fuchsia/bluetooth/host/cpp/fidl.h"
 #include "helpers.h"
-#include "src/connectivity/bluetooth/core/bt-host/common/byte_buffer.h"
-#include "src/connectivity/bluetooth/core/bt-host/common/device_address.h"
 #include "src/connectivity/bluetooth/core/bt-host/fidl/fake_adapter_test_fixture.h"
 #include "src/connectivity/bluetooth/core/bt-host/fidl/helpers.h"
-#include "src/connectivity/bluetooth/core/bt-host/gap/gap.h"
-#include "src/connectivity/bluetooth/core/bt-host/gap/low_energy_address_manager.h"
-#include "src/connectivity/bluetooth/core/bt-host/gatt/fake_layer.h"
-#include "src/connectivity/bluetooth/core/bt-host/l2cap/fake_channel.h"
-#include "src/connectivity/bluetooth/core/bt-host/l2cap/fake_l2cap.h"
-#include "src/connectivity/bluetooth/core/bt-host/sm/smp.h"
-#include "src/connectivity/bluetooth/core/bt-host/testing/controller_test.h"
-#include "src/connectivity/bluetooth/core/bt-host/testing/fake_peer.h"
-#include "src/connectivity/bluetooth/core/bt-host/testing/test_helpers.h"
-#include "src/connectivity/bluetooth/core/bt-host/testing/test_packets.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/byte_buffer.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/device_address.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/gap/gap.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/gap/low_energy_address_manager.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/gatt/fake_layer.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/l2cap/fake_channel.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/l2cap/fake_l2cap.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/sm/smp.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/testing/controller_test.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/testing/fake_peer.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/testing/test_helpers.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/testing/test_packets.h"
 
 namespace fuchsia::bluetooth {
 // Make PeerIds equality comparable for advanced testing matchers. ADL rules mandate the namespace.
@@ -634,9 +634,9 @@ TEST_F(HostServerPairingTest, InitiatePairingLeDefault) {
                       [&](auto result) { pair_result = std::move(result); });
   RunLoopUntilIdle();
 
-  // TODO(https://fxbug.dev/886): We don't have a good mechanism for driving pairing to completion without
-  // faking the entire SMP exchange. We should add SMP mocks that allows us to propagate a result up
-  // to the FIDL layer. For now we assert that pairing has started and remains pending.
+  // TODO(https://fxbug.dev/886): We don't have a good mechanism for driving pairing to completion
+  // without faking the entire SMP exchange. We should add SMP mocks that allows us to propagate a
+  // result up to the FIDL layer. For now we assert that pairing has started and remains pending.
   ASSERT_FALSE(pair_result);  // Pairing request is pending
   ASSERT_TRUE(pairing_request_sent);
 }
@@ -669,9 +669,9 @@ TEST_F(HostServerPairingTest, InitiatePairingLeEncrypted) {
                       [&](auto result) { pair_result = std::move(result); });
   RunLoopUntilIdle();
 
-  // TODO(https://fxbug.dev/886): We don't have a good mechanism for driving pairing to completion without
-  // faking the entire SMP exchange. We should add SMP mocks that allows us to propagate a result up
-  // to the FIDL layer. For now we assert that pairing has started and remains pending.
+  // TODO(https://fxbug.dev/886): We don't have a good mechanism for driving pairing to completion
+  // without faking the entire SMP exchange. We should add SMP mocks that allows us to propagate a
+  // result up to the FIDL layer. For now we assert that pairing has started and remains pending.
   ASSERT_FALSE(pair_result);  // Pairing request is pending
   ASSERT_TRUE(pairing_request_sent);
 }
@@ -706,9 +706,9 @@ TEST_F(HostServerPairingTest, InitiatePairingNonBondableLe) {
                       [&](auto result) { pair_result = std::move(result); });
   RunLoopUntilIdle();
 
-  // TODO(https://fxbug.dev/886): We don't have a good mechanism for driving pairing to completion without
-  // faking the entire SMP exchange. We should add SMP mocks that allows us to propagate a result up
-  // to the FIDL layer. For now we assert that pairing has started and remains pending.
+  // TODO(https://fxbug.dev/886): We don't have a good mechanism for driving pairing to completion
+  // without faking the entire SMP exchange. We should add SMP mocks that allows us to propagate a
+  // result up to the FIDL layer. For now we assert that pairing has started and remains pending.
   ASSERT_FALSE(pair_result);  // Pairing request is pending
   ASSERT_TRUE(pairing_request_sent);
 }

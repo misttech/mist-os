@@ -5,12 +5,12 @@
 #include "gatt_server_server.h"
 
 #include "helpers.h"
-#include "src/connectivity/bluetooth/core/bt-host/common/log.h"
-#include "src/connectivity/bluetooth/core/bt-host/common/uuid.h"
-#include "src/connectivity/bluetooth/core/bt-host/gap/low_energy_connection_manager.h"
-#include "src/connectivity/bluetooth/core/bt-host/gatt/connection.h"
-#include "src/connectivity/bluetooth/core/bt-host/gatt/gatt_defs.h"
-#include "src/connectivity/bluetooth/core/bt-host/gatt/server.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/log.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/uuid.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/gap/low_energy_connection_manager.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/gatt/connection.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/gatt/gatt_defs.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/gatt/server.h"
 
 using fuchsia::bluetooth::ErrorCode;
 using fuchsia::bluetooth::Status;

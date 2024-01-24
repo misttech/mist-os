@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "acl_data_channel.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/transport/acl_data_channel.h"
 
 #include <endian.h>
 #include <lib/async/cpp/time.h>
@@ -11,13 +11,13 @@
 
 #include "lib/fit/function.h"
 #include "pw_bluetooth/vendor.h"
-#include "src/connectivity/bluetooth/core/bt-host/common/assert.h"
-#include "src/connectivity/bluetooth/core/bt-host/common/inspectable.h"
-#include "src/connectivity/bluetooth/core/bt-host/common/log.h"
-#include "src/connectivity/bluetooth/core/bt-host/hci-spec/util.h"
-#include "src/connectivity/bluetooth/core/bt-host/transport/acl_data_packet.h"
-#include "src/connectivity/bluetooth/core/bt-host/transport/link_type.h"
-#include "transport.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/assert.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/inspectable.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/log.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/hci-spec/util.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/transport/acl_data_packet.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/transport/link_type.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/transport/transport.h"
 
 namespace bt::hci {
 
@@ -414,11 +414,11 @@ CommandChannel::EventCallbackResult AclDataChannelImpl::NumberOfCompletedPackets
     uint16_t comp_packets = le16toh(data->hc_num_of_completed_packets);
 
     if (iter->second.count < comp_packets) {
-      // TODO(https://fxbug.dev/2795): This can be caused by the controller reusing the connection handle
-      // of a connection that just disconnected. We should somehow avoid sending the controller
-      // packets for a connection that has disconnected. AclDataChannel already dequeues such
-      // packets, but this is insufficient: packets can be queued in the channel to the transport
-      // driver, and possibly in the transport driver or USB/UART drivers.
+      // TODO(https://fxbug.dev/2795): This can be caused by the controller reusing the connection
+      // handle of a connection that just disconnected. We should somehow avoid sending the
+      // controller packets for a connection that has disconnected. AclDataChannel already dequeues
+      // such packets, but this is insufficient: packets can be queued in the channel to the
+      // transport driver, and possibly in the transport driver or USB/UART drivers.
       bt_log(ERROR, "hci",
              "ACL packet tx count mismatch! (handle: %#.4x, expected: %zu, actual : %u)",
              le16toh(data->connection_handle), iter->second.count, comp_packets);

@@ -4,7 +4,7 @@
 
 #ifndef NINSPECT
 
-#include "src/connectivity/bluetooth/core/bt-host/testing/inspect_util.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/testing/inspect_util.h"
 
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>

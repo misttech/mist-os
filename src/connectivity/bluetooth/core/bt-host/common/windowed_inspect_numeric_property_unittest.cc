@@ -6,8 +6,8 @@
 
 #ifndef NINSPECT
 
-#include "src/connectivity/bluetooth/core/bt-host/testing/inspect.h"
-#include "windowed_inspect_numeric_property.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/windowed_inspect_numeric_property.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/testing/inspect.h"
 
 namespace bt {
 

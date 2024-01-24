@@ -97,6 +97,7 @@ default_args = {
   pw_async_EXPERIMENTAL_MODULE_VISIBILITY = [
     "//third_party/pigweed/backends/pw_async_fuchsia:*",
     "//third_party/pigweed:*",
+    "//src/connectivity/bluetooth/core/bt-host/*",
   ]
 
   pw_async_TASK_BACKEND = "//third_party/pigweed/backends/pw_async_fuchsia:task"
@@ -119,6 +120,9 @@ default_args = {
   pw_unit_test_GOOGLETEST_BACKEND = "//third_party/googletest:gmock_no_testonly"
   pw_unit_test_BACKEND = "//third_party/pigweed/src/pw_unit_test:googletest"
   pw_unit_test_TESTONLY = true
+
+  # Point Pigweed's ICU target to Fuchsia's checkout.
+  dir_pw_third_party_icu = "//third_party/icu/default"
 
   # This is a Pigweed build configuration argument that removes default configs
   # from pw_* targets. Due to linker errors ("undefined symbol: typeinfo") when

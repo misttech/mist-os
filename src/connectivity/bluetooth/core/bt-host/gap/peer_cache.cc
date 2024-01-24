@@ -2,16 +2,16 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "peer_cache.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/gap/peer_cache.h"
 
 #include <lib/fit/function.h>
 
-#include "src/connectivity/bluetooth/core/bt-host/common/assert.h"
-#include "src/connectivity/bluetooth/core/bt-host/common/random.h"
-#include "src/connectivity/bluetooth/core/bt-host/gap/peer.h"
-#include "src/connectivity/bluetooth/core/bt-host/hci/connection.h"
-#include "src/connectivity/bluetooth/core/bt-host/hci/low_energy_scanner.h"
-#include "src/connectivity/bluetooth/core/bt-host/sm/types.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/assert.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/random.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/gap/peer.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/hci/connection.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/hci/low_energy_scanner.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/sm/types.h"
 
 namespace bt::gap {
 
@@ -55,9 +55,9 @@ bool PeerCache::AddBondedPeer(BondingData bd) {
 
   // |bd.le_pairing_data| must contain either a LTK or CSRK for LE Security Mode 1 or 2.
   //
-  // TODO(https://fxbug.dev/2761): the address type checks here don't add much value because the address
-  // type is derived from the presence of FIDL bredr_bond and le_bond fields, so the check really
-  // should be whether at least one of the mandatory bond secrets is present.
+  // TODO(https://fxbug.dev/2761): the address type checks here don't add much value because the
+  // address type is derived from the presence of FIDL bredr_bond and le_bond fields, so the check
+  // really should be whether at least one of the mandatory bond secrets is present.
   if (bd.address.IsLowEnergy() && !bond_le) {
     bt_log(ERROR, "gap-le", "mandatory keys missing: no LTK or CSRK (id: %s)",
            bt_str(bd.identifier));
@@ -212,9 +212,9 @@ bool PeerCache::SetAutoConnectBehaviorForIntentionalDisconnect(PeerId peer_id) {
 
   peer->MutLe().set_auto_connect_behavior(Peer::AutoConnectBehavior::kSkipUntilNextConnection);
 
-  // TODO(https://fxbug.dev/37584): When implementing auto-connect behavior tracking for classic bluetooth,
-  // consider tracking this policy for the peer as a whole unless we think this policy should be
-  // applied separately for each transport (per armansito@).
+  // TODO(https://fxbug.dev/37584): When implementing auto-connect behavior tracking for classic
+  // bluetooth, consider tracking this policy for the peer as a whole unless we think this policy
+  // should be applied separately for each transport (per armansito@).
 
   return true;
 }

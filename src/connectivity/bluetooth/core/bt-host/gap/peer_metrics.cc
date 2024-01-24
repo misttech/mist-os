@@ -3,7 +3,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "peer_metrics.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/gap/peer_metrics.h"
 
 namespace bt::gap {
 
@@ -23,4 +23,4 @@ void PeerMetrics::AttachInspect(inspect::Node& parent) {
   bredr_disconnections_.AttachInspect(metrics_bredr_node_, "disconnection_events");
 }
 
-} // namespace bt::gap
+}  // namespace bt::gap
