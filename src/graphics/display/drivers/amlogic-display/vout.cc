@@ -16,6 +16,7 @@
 #include <ddktl/fidl.h>
 #include <fbl/alloc_checker.h>
 
+#include "src/graphics/display/drivers/amlogic-display/panel-config.h"
 #include "src/graphics/display/lib/api-types-cpp/display-id.h"
 #include "src/graphics/display/lib/api-types-cpp/display-timing.h"
 
@@ -35,31 +36,6 @@ constexpr supported_features_t kDsiSupportedFeatures = supported_features_t{
 constexpr supported_features_t kHdmiSupportedFeatures = supported_features_t{
     .hpd = true,
 };
-
-zx::result<display_setting_t> GetDisplaySettingForPanel(uint32_t panel_type) {
-  switch (panel_type) {
-    case PANEL_TV070WSM_FT:
-    case PANEL_TV070WSM_FT_9365:
-      return zx::ok(kDisplaySettingTV070WSM_FT);
-    case PANEL_P070ACB_FT:
-      return zx::ok(kDisplaySettingP070ACB_FT);
-    case PANEL_KD070D82_FT_9365:
-    case PANEL_KD070D82_FT:
-      return zx::ok(kDisplaySettingKD070D82_FT);
-    case PANEL_TV101WXM_FT_9365:
-    case PANEL_TV101WXM_FT:
-      return zx::ok(kDisplaySettingTV101WXM_FT);
-    case PANEL_P101DEZ_FT:
-      return zx::ok(kDisplaySettingP101DEZ_FT);
-    case PANEL_TV070WSM_ST7703I:
-      return zx::ok(kDisplaySettingTV070WSM_ST7703I);
-    case PANEL_MTF050FHDI_03:
-      return zx::ok(kDisplaySettingMTF050FHDI_03);
-    default:
-      zxlogf(ERROR, "Unsupported panel detected!");
-      return zx::error(ZX_ERR_NOT_SUPPORTED);
-  }
-}
 
 }  // namespace
 
@@ -110,16 +86,16 @@ zx::result<std::unique_ptr<Vout>> Vout::CreateDsiVout(zx_device_t* parent, uint3
   std::unique_ptr<Clock> clock = std::move(clock_result).value();
 
   zxlogf(INFO, "Fixed panel type is %d", dsi_host->panel_type());
-  zx::result display_setting_result = GetDisplaySettingForPanel(dsi_host->panel_type());
-  if (display_setting_result.is_error()) {
-    return display_setting_result.take_error();
+  const display_setting_t* display_setting = GetPanelDisplaySetting(dsi_host->panel_type());
+  if (display_setting == nullptr) {
+    zxlogf(ERROR, "Unsupported panel (panel type %" PRIu32 ") detected!", panel_type);
+    return zx::error(ZX_ERR_NOT_SUPPORTED);
   }
-  display_setting_t display_setting = display_setting_result.value();
 
   fbl::AllocChecker alloc_checker;
   std::unique_ptr<Vout> vout =
       fbl::make_unique_checked<Vout>(&alloc_checker, std::move(dsi_host), std::move(clock), width,
-                                     height, display_setting, std::move(node));
+                                     height, *display_setting, std::move(node));
   if (!alloc_checker.check()) {
     zxlogf(ERROR, "Failed to allocate memory for Vout.");
     return zx::error(ZX_ERR_NO_MEMORY);
@@ -129,16 +105,17 @@ zx::result<std::unique_ptr<Vout>> Vout::CreateDsiVout(zx_device_t* parent, uint3
 
 zx::result<std::unique_ptr<Vout>> Vout::CreateDsiVoutForTesting(uint32_t panel_type, uint32_t width,
                                                                 uint32_t height) {
-  zx::result display_setting = GetDisplaySettingForPanel(panel_type);
-  if (display_setting.is_error()) {
-    return display_setting.take_error();
+  const display_setting_t* display_setting = GetPanelDisplaySetting(panel_type);
+  if (display_setting == nullptr) {
+    zxlogf(ERROR, "Unsupported panel (panel type %" PRIu32 ") detected!", panel_type);
+    return zx::error(ZX_ERR_NOT_SUPPORTED);
   }
 
   fbl::AllocChecker alloc_checker;
   std::unique_ptr<Vout> vout =
       fbl::make_unique_checked<Vout>(&alloc_checker,
                                      /*dsi_host=*/nullptr, /*dsi_clock=*/nullptr, width, height,
-                                     display_setting.value(), inspect::Node{});
+                                     *display_setting, inspect::Node{});
   if (!alloc_checker.check()) {
     zxlogf(ERROR, "Failed to allocate memory for Vout.");
     return zx::error(ZX_ERR_NO_MEMORY);

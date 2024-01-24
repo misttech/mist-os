@@ -5,6 +5,7 @@
 #ifndef SRC_GRAPHICS_DISPLAY_DRIVERS_AMLOGIC_DISPLAY_PANEL_CONFIG_H_
 #define SRC_GRAPHICS_DISPLAY_DRIVERS_AMLOGIC_DISPLAY_PANEL_CONFIG_H_
 
+#include <fuchsia/hardware/dsiimpl/c/banjo.h>
 #include <lib/stdcompat/span.h>
 #include <lib/zx/result.h>
 #include <zircon/types.h>
@@ -114,6 +115,13 @@ struct PanelConfig {
 // If the `panel_type` is supported, returns the panel configuration.
 // Otherwise returns nullptr.
 const PanelConfig* GetPanelConfig(uint32_t panel_type);
+
+// If the `panel_type` is supported, returns the panel timing settings.
+// Otherwise returns nullptr.
+//
+// TODO(https://fxbug.dev/318479388): Unify the panel configuration and timing
+// types.
+const display_setting_t* GetPanelDisplaySetting(uint32_t panel_type);
 
 }  // namespace amlogic_display
 

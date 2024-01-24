@@ -6,7 +6,5 @@ import("//build/cpp/library_headers.gni")
 
 library_headers("device-protocol-display") {
   headers = [ "lib/device-protocol/display-panel.h" ]
-  public_deps = [
-    "//sdk/banjo/fuchsia.hardware.dsiimpl:fuchsia.hardware.dsiimpl_banjo_cpp",
-  ]
+  public_deps = [ "//src/zircon/lib/zircon:headers" ]
 }
