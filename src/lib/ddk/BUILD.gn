@@ -181,6 +181,7 @@ sdk_static_library("ddk") {
     "//src/devices/block/lib/scsi/tests:*",
     "//src/devices/board/drivers/acpi-arm64:*",
     "//src/devices/board/drivers/astro:*",
+    "//src/devices/board/drivers/astro/post-init:*",
     "//src/devices/board/drivers/integration-test:*",
     "//src/devices/board/drivers/machina:*",
     "//src/devices/board/drivers/nelson:*",
