@@ -5,8 +5,8 @@
 #ifndef SRC_CONNECTIVITY_NETWORK_DRIVERS_NETWORK_DEVICE_DEVICE_DEFINITIONS_H_
 #define SRC_CONNECTIVITY_NETWORK_DRIVERS_NETWORK_DEVICE_DEVICE_DEFINITIONS_H_
 
+#include <fidl/fuchsia.hardware.network.driver/cpp/driver/fidl.h>
 #include <fidl/fuchsia.hardware.network/cpp/wire.h>
-#include <fuchsia/hardware/network/driver/c/banjo.h>
 
 #include <array>
 
@@ -14,11 +14,12 @@
 
 namespace network {
 namespace netdev = fuchsia_hardware_network;
+namespace netdriver = fuchsia_hardware_network_driver;
 constexpr uint16_t kMaxFifoDepth = ZX_PAGE_SIZE / sizeof(uint16_t);
 
 namespace internal {
 template <typename T>
-using BufferParts = std::array<T, MAX_BUFFER_PARTS>;
+using BufferParts = std::array<T, netdriver::kMaxBufferParts>;
 using DataVmoStore = vmo_store::VmoStore<vmo_store::SlabStorage<uint8_t>>;
 }  // namespace internal
 

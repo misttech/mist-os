@@ -5,7 +5,6 @@
 #ifndef SRC_CONNECTIVITY_NETWORK_DRIVERS_NETWORK_DEVICE_DEVICE_STATUS_WATCHER_H_
 #define SRC_CONNECTIVITY_NETWORK_DRIVERS_NETWORK_DEVICE_DEVICE_STATUS_WATCHER_H_
 
-#include <fuchsia/hardware/network/driver/cpp/banjo.h>
 #include <lib/async/dispatcher.h>
 #include <lib/fidl/cpp/wire/server.h>
 #include <lib/sync/completion.h>
@@ -22,12 +21,23 @@
 namespace network::internal {
 
 template <typename F>
-void WithWireStatus(F fn, port_status_t status) {
+void WithWireStatus(F fn, const fuchsia_hardware_network::wire::PortStatus& status) {
   fidl::WireTableFrame<netdev::wire::PortStatus> frame;
   netdev::wire::PortStatus wire_status(
       fidl::ObjectView<fidl::WireTableFrame<netdev::wire::PortStatus>>::FromExternal(&frame));
-  wire_status.set_flags(netdev::wire::StatusFlags::TruncatingUnknown(status.flags));
-  wire_status.set_mtu(status.mtu);
+  wire_status.set_flags(status.flags());
+  wire_status.set_mtu(status.mtu());
+
+  fn(wire_status);
+}
+
+template <typename F>
+void WithWireStatus(F fn, netdev::wire::StatusFlags flags, uint32_t mtu) {
+  fidl::WireTableFrame<netdev::wire::PortStatus> frame;
+  netdev::wire::PortStatus wire_status(
+      fidl::ObjectView<fidl::WireTableFrame<netdev::wire::PortStatus>>::FromExternal(&frame));
+  wire_status.set_flags(flags);
+  wire_status.set_mtu(mtu);
 
   fn(wire_status);
 }
@@ -42,15 +52,30 @@ class StatusWatcher : public fbl::DoublyLinkedListable<std::unique_ptr<StatusWat
                    fit::callback<void(StatusWatcher*)> closed_callback);
   void Unbind();
 
-  void PushStatus(const port_status_t& status);
+  void PushStatus(const fuchsia_hardware_network::wire::PortStatus& status);
 
  private:
   void WatchStatus(WatchStatusCompleter::Sync& _completer) override;
 
+  StatusWatcher(const StatusWatcher&) = delete;
+  StatusWatcher& operator=(const StatusWatcher&) = delete;
+
   fbl::Mutex lock_;
   uint32_t max_queue_;
-  std::optional<port_status_t> last_observed_ __TA_GUARDED(lock_);
-  std::queue<port_status_t> queue_ __TA_GUARDED(lock_);
+
+  // We need a value type to store the port status. It's possible to use FIDL types such as
+  // WireTableFrames to do this but they're cumbersome to work with.
+  struct PortStatus {
+    explicit PortStatus(const netdev::wire::PortStatus ps) : flags(ps.flags()), mtu(ps.mtu()) {}
+    bool operator==(const netdev::wire::PortStatus& ps) const {
+      return ps.has_flags() && ps.has_mtu() && ps.flags() == flags && ps.mtu() == mtu;
+    }
+    netdev::wire::StatusFlags flags;
+    uint32_t mtu;
+  };
+
+  std::optional<PortStatus> last_observed_ __TA_GUARDED(lock_);
+  std::queue<PortStatus> queue_ __TA_GUARDED(lock_);
   std::optional<WatchStatusCompleter::Async> pending_txn_ __TA_GUARDED(lock_);
   std::optional<fidl::ServerBindingRef<netdev::StatusWatcher>> binding_ __TA_GUARDED(lock_);
   fit::callback<void(StatusWatcher*)> closed_cb_;

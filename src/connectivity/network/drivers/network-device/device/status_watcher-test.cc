@@ -25,13 +25,6 @@ using network::internal::StatusWatcher;
 constexpr StatusFlags kStatusOnline = StatusFlags::kOnline;
 constexpr StatusFlags kStatusOffline = StatusFlags();
 
-port_status_t MakeStatus(StatusFlags status_flags, uint32_t mtu) {
-  return {
-      .flags = static_cast<uint32_t>(status_flags),
-      .mtu = mtu,
-  };
-}
-
 class ObservedStatus {
  public:
   explicit ObservedStatus(const netdev::wire::PortStatus& status)
@@ -193,8 +186,13 @@ class StatusWatcherTest : public ::testing::Test {
     return zx::ok(unowned);
   }
 
+  netdev::wire::PortStatus MakeStatus(StatusFlags status_flags, uint32_t mtu) {
+    return netdev::wire::PortStatus::Builder(fidl_arena_).flags(status_flags).mtu(mtu).Build();
+  }
+
   async::Loop loop_;
   fbl::Mutex lock_;
+  fidl::Arena<> fidl_arena_;
   fbl::DoublyLinkedList<std::unique_ptr<StatusWatcher>> watchers_ __TA_GUARDED(lock_);
   sync_completion_t* teardown_completion_ __TA_GUARDED(lock_) = nullptr;
 };

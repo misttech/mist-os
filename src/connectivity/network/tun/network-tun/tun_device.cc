@@ -45,15 +45,19 @@ void WithWireState(F fn, InternalState& state) {
 }
 }  // namespace
 
-TunDevice::TunDevice(fit::callback<void(TunDevice*)> teardown, DeviceConfig config)
+TunDevice::TunDevice(fdf::Dispatcher* dispatcher, fit::callback<void(TunDevice*)> teardown,
+                     DeviceConfig&& config)
     : teardown_callback_(std::move(teardown)),
       config_(std::move(config)),
-      loop_(&kAsyncLoopConfigNoAttachToCurrentThread) {}
+      loop_(&kAsyncLoopConfigNoAttachToCurrentThread),
+      dispatcher_(dispatcher) {}
 
 zx::result<std::unique_ptr<TunDevice>> TunDevice::Create(
-    fit::callback<void(TunDevice*)> teardown, const fuchsia_net_tun::wire::DeviceConfig& config) {
+    const DeviceInterfaceDispatchers& dispatchers, const ShimDispatchers& shim_dispatchers,
+    fit::callback<void(TunDevice*)> teardown, DeviceConfig&& config) {
   fbl::AllocChecker ac;
-  std::unique_ptr<TunDevice> tun(new (&ac) TunDevice(std::move(teardown), DeviceConfig(config)));
+  std::unique_ptr<TunDevice> tun(new (&ac)
+                                     TunDevice(nullptr, std::move(teardown), std::move(config)));
   if (!ac.check()) {
     return zx::error(ZX_ERR_NO_MEMORY);
   }
@@ -65,7 +69,7 @@ zx::result<std::unique_ptr<TunDevice>> TunDevice::Create(
     return zx::error(status);
   }
 
-  zx::result device = DeviceAdapter::Create(tun->loop_.dispatcher(), tun.get());
+  zx::result device = DeviceAdapter::Create(dispatchers, shim_dispatchers, tun.get());
   if (device.is_error()) {
     FX_LOGF(ERROR, "tun", "TunDevice::Init device init failed with %s", device.status_string());
     return device.take_error();
@@ -91,6 +95,7 @@ TunDevice::~TunDevice() {
     device_->TeardownSync();
   }
   loop_.Shutdown();
+
   FX_VLOG(1, "tun", "TunDevice destroyed");
 }
 
@@ -227,10 +232,7 @@ void TunDevice::Port::RunStateChange() {
   WatchStateCompleter::Async completer = std::exchange(pending_watch_state_, std::nullopt).value();
 
   WithWireState(
-      [&completer](fuchsia_net_tun::wire::InternalState state) {
-        completer.Reply(std::move(state));
-      },
-      state);
+      [&completer](fuchsia_net_tun::wire::InternalState state) { completer.Reply(state); }, state);
 
   // store the last informed state through WatchState
   last_state_ = std::move(state);

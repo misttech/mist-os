@@ -4,45 +4,84 @@
 
 #include "test_util.h"
 
+#include <lib/sync/cpp/completion.h>
+
 #include "src/lib/testing/predicates/status.h"
 
 namespace network {
 namespace testing {
 
-FakeMacDeviceImpl::FakeMacDeviceImpl() {
+FakeMacDeviceImpl::FakeMacDeviceImpl()
+    : features_(fuchsia_hardware_network_driver::wire::Features::Builder(arena_)) {
   // setup default info
-  features_.multicast_filter_count = MAX_MAC_FILTER / 2;
-  features_.supported_modes = kSupportedModesMask;
-
+  features_.multicast_filter_count(fuchsia_hardware_network_driver::wire::kMaxMacFilter / 2);
+  features_.supported_modes(netdriver::SupportedMacFilterMode::kMask);
   EXPECT_OK(zx::event::create(0, &event_));
 }
 
-zx::result<std::unique_ptr<MacAddrDeviceInterface>> FakeMacDeviceImpl::CreateChild() {
-  auto protocol = proto();
-  return MacAddrDeviceInterface::Create(ddk::MacAddrProtocolClient(&protocol));
+fdf::ClientEnd<fuchsia_hardware_network_driver::MacAddr> FakeMacDeviceImpl::Bind(
+    const fdf::Dispatcher& dispatcher) {
+  auto endpoints = fdf::CreateEndpoints<fuchsia_hardware_network_driver::MacAddr>();
+  EXPECT_TRUE(!endpoints.is_error());
+
+  binding_ = fdf::BindServer(dispatcher.get(), std::move(endpoints->server), this);
+
+  return std::move(endpoints->client);
 }
 
-void FakeMacDeviceImpl::MacAddrGetAddress(mac_address_t* out_mac) {
-  std::copy(mac_.octets.begin(), mac_.octets.end(), out_mac->octets);
-}
-
-void FakeMacDeviceImpl::MacAddrGetFeatures(features_t* out_features) { *out_features = features_; }
-
-void FakeMacDeviceImpl::MacAddrSetMode(mode_t mode, const mac_address_t* multicast_macs_list,
-                                       size_t multicast_macs_count) {
-  EXPECT_EQ(mode & kSupportedModesMask, mode);
-  std::optional<mac_filter_mode_t> old_mode = mode_;
-  mode_ = mode;
-  addresses_.clear();
-  for (size_t i = 0; i < multicast_macs_count; i++) {
-    MacAddress mac{};
-    memcpy(mac.octets.data(), multicast_macs_list[i].octets, MAC_SIZE);
-    addresses_.push_back(mac);
+zx::result<std::unique_ptr<MacAddrDeviceInterface>> FakeMacDeviceImpl::CreateChild(
+    const fdf::Dispatcher& dispatcher) {
+  auto endpoints = fdf::CreateEndpoints<fuchsia_hardware_network_driver::MacAddr>();
+  if (endpoints.is_error()) {
+    return endpoints.take_error();
   }
-  // Signal only if this wasn't the first time, given we always get a SetMode on startup.
+
+  binding_ = fdf::BindServer(dispatcher.get(), std::move(endpoints->server), this);
+  fdf::WireSharedClient client(std::move(endpoints->client), dispatcher.get());
+
+  libsync::Completion completion;
+  std::unique_ptr<MacAddrDeviceInterface> mac;
+  zx_status_t status = ZX_ERR_BAD_STATE;
+  MacAddrDeviceInterface::Create(std::move(client),
+                                 [&](zx::result<std::unique_ptr<MacAddrDeviceInterface>> result) {
+                                   status = result.status_value();
+                                   if (result.is_ok()) {
+                                     mac = std::move(result.value());
+                                   }
+                                   completion.Signal();
+                                 });
+  completion.Wait();
+
+  if (status != ZX_OK) {
+    return zx::error(status);
+  }
+
+  return zx::ok(std::move(mac));
+}
+
+void FakeMacDeviceImpl::GetAddress(fdf::Arena& arena, GetAddressCompleter::Sync& completer) {
+  completer.buffer(arena).Reply(mac_);
+}
+
+void FakeMacDeviceImpl::GetFeatures(fdf::Arena& arena, GetFeaturesCompleter::Sync& completer) {
+  // Calling `Build` effectively destroys the builder. As a result, copy the
+  // builder before calling `Build`.
+  auto builder = features_;
+  completer.buffer(arena).Reply(builder.Build());
+}
+
+void FakeMacDeviceImpl::SetMode(
+    fuchsia_hardware_network_driver::wire::MacAddrSetModeRequest* request, fdf::Arena& arena,
+    SetModeCompleter::Sync& completer) {
+  EXPECT_TRUE(IsValidMacFilterMode(request->mode));
+  std::optional<netdev::wire::MacFilterMode> old_mode = mode_;
+  mode_ = request->mode;
+  addresses_.assign(request->multicast_macs.begin(), request->multicast_macs.end());
   if (old_mode.has_value()) {
     event_.signal(0, kConfigurationChangedEvent);
   }
+
+  completer.buffer(arena).Reply();
 }
 
 zx_status_t FakeMacDeviceImpl::WaitConfigurationChanged() {

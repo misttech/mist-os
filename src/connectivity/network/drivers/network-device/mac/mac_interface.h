@@ -5,8 +5,9 @@
 #ifndef SRC_CONNECTIVITY_NETWORK_DRIVERS_NETWORK_DEVICE_MAC_MAC_INTERFACE_H_
 #define SRC_CONNECTIVITY_NETWORK_DRIVERS_NETWORK_DEVICE_MAC_MAC_INTERFACE_H_
 
+#include <fidl/fuchsia.hardware.network.driver/cpp/driver/wire.h>
+#include <fidl/fuchsia.hardware.network.driver/cpp/fidl.h>
 #include <fidl/fuchsia.hardware.network/cpp/wire.h>
-#include <fuchsia/hardware/network/driver/cpp/banjo.h>
 #include <lib/async/dispatcher.h>
 #include <lib/fidl/cpp/wire/server.h>
 
@@ -23,12 +24,10 @@
 
 namespace network {
 
-constexpr supported_mac_filter_mode_t kSupportedModesMask =
-    SUPPORTED_MAC_FILTER_MODE_PROMISCUOUS | SUPPORTED_MAC_FILTER_MODE_MULTICAST_PROMISCUOUS |
-    SUPPORTED_MAC_FILTER_MODE_MULTICAST_FILTER;
 using MacAddress = fuchsia_net::wire::MacAddress;
 
 namespace netdev = fuchsia_hardware_network;
+namespace netdriver = fuchsia_hardware_network_driver;
 
 namespace internal {
 
@@ -38,7 +37,7 @@ class MacClientInstance;
 // fuchsia.hardware.network.MacAddressing (FIDL).
 class MacInterface : public ::network::MacAddrDeviceInterface {
  public:
-  static zx::result<std::unique_ptr<MacInterface>> Create(ddk::MacAddrProtocolClient parent);
+  static void Create(fdf::WireSharedClient<netdriver::MacAddr>&& parent, OnCreated&& on_created);
 
   ~MacInterface() override;
 
@@ -47,25 +46,29 @@ class MacInterface : public ::network::MacAddrDeviceInterface {
                    fidl::ServerEnd<netdev::MacAddressing> req) override;
   void Teardown(fit::callback<void()> callback) override;
 
-  // Converts a fuchsia.hardware.network.MacFilterMode to a valid mode to be communicated to the
-  // device implementation, taking into consideration the device's available operating modes.
-  std::optional<mac_filter_mode_t> ConvertMode(const netdev::wire::MacFilterMode& mode) const;
+  std::optional<netdev::wire::MacFilterMode> ConvertMode(
+      const netdev::wire::MacFilterMode& mode) const;
 
  private:
   friend MacClientInstance;
   // Consolidates all the requested operating modes and multicast filtering from all the attached
   // clients into a final operating mode and sets it on the parent device implementation.
-  void Consolidate() __TA_REQUIRES(lock_);
+  void Consolidate(fit::function<void()> callback) __TA_REQUIRES(lock_);
   // Closes a client instance, causing a new operating mode to be calculated once the instance state
   // is removed. If the `MacInterface` is undergoing a teardown, the teardown will be finished if
   // there are no more open client instances.
   void CloseClient(MacClientInstance* client) __TA_EXCLUDES(lock_);
 
-  explicit MacInterface(ddk::MacAddrProtocolClient parent);
+  void Init(fit::callback<void(zx_status_t)>&& on_complete);
+  void GetFeatures(fit::callback<void(zx_status_t)>&& on_complete);
+  void SetDefaultMode(fit::callback<void(zx_status_t)>&& on_complete);
 
-  const ddk::MacAddrProtocolClient impl_;
-  features_t features_{};
-  mac_filter_mode_t default_mode_{};
+  explicit MacInterface(fdf::WireSharedClient<netdriver::MacAddr>&& parent);
+
+  fdf::WireSharedClient<netdriver::MacAddr> impl_;
+
+  netdriver::Features features_;
+  netdev::wire::MacFilterMode default_mode_;
   fbl::Mutex lock_;
   fbl::DoublyLinkedList<std::unique_ptr<MacClientInstance>> clients_ __TA_GUARDED(lock_);
   fit::callback<void()> teardown_callback_ __TA_GUARDED(lock_);
@@ -98,9 +101,10 @@ class ClientState {
     }
   };
 
-  explicit ClientState(mac_filter_mode_t filter_mode) : filter_mode(filter_mode) {}
+  explicit ClientState(fuchsia_hardware_network::wire::MacFilterMode filter_mode)
+      : filter_mode(filter_mode) {}
 
-  mac_filter_mode_t filter_mode;
+  fuchsia_hardware_network::wire::MacFilterMode filter_mode;
   std::unordered_set<Addr, MacHasher> addresses;
 };
 
@@ -111,7 +115,7 @@ class ClientState {
 class MacClientInstance : public fidl::WireServer<netdev::MacAddressing>,
                           public fbl::DoublyLinkedListable<std::unique_ptr<MacClientInstance>> {
  public:
-  explicit MacClientInstance(MacInterface* parent, mac_filter_mode_t default_mode);
+  explicit MacClientInstance(MacInterface* parent, netdev::wire::MacFilterMode default_mode);
 
   void GetUnicastAddress(GetUnicastAddressCompleter::Sync& _completer) override;
   void SetMode(SetModeRequestView request, SetModeCompleter::Sync& _completer) override;

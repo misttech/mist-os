@@ -8,10 +8,15 @@
 #include <zircon/types.h>
 
 #include "src/virtualization/bin/vmm/device/virtio_net/src/cpp/guest_ethernet.h"
+#include "src/virtualization/bin/vmm/device/virtio_net/src/cpp/guest_ethernet_context.h"
 
 extern "C" {
+zx_status_t guest_ethernet_context_create(GuestEthernetContext** context_out);
+void guest_ethernet_context_destroy(GuestEthernetContext* context);
+
 // Creation, initialization, and destruction functions for the C++ device.
-zx_status_t guest_ethernet_create(GuestEthernet** guest_ethernet_out);
+zx_status_t guest_ethernet_create(GuestEthernetContext* context,
+                                  GuestEthernet** guest_ethernet_out);
 zx_status_t guest_ethernet_initialize(GuestEthernet* guest_ethernet,
                                       const void* rust_guest_ethernet, const uint8_t* mac,
                                       size_t mac_len, bool enable_bridge);

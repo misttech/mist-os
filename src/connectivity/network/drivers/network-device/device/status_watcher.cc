@@ -10,14 +10,6 @@
 
 namespace network::internal {
 
-namespace {
-
-bool StatusEquals(const port_status_t& a, const port_status_t& b) {
-  return a.flags == b.flags && a.mtu == b.mtu;
-}
-
-}  // namespace
-
 StatusWatcher::StatusWatcher(uint32_t max_queue) : max_queue_(max_queue) {
   if (max_queue_ == 0) {
     max_queue_ = 1;
@@ -80,7 +72,7 @@ void StatusWatcher::WatchStatus(WatchStatusCompleter::Sync& completer) {
         WithWireStatus(
             [completer = std::move(std::exchange(pending_txn_, completer.ToAsync()).value())](
                 netdev::wire::PortStatus wire_status) mutable { completer.Reply(wire_status); },
-            last_observed_.value());
+            last_observed_->flags, last_observed_->mtu);
       } else {
         // If we already have a pending transaction that hasn't been resolved and we don't have a
         // last observed value to give to it (meaning whoever created `StatusWatcher` scheduled it
@@ -92,24 +84,23 @@ void StatusWatcher::WatchStatus(WatchStatusCompleter::Sync& completer) {
       pending_txn_ = completer.ToAsync();
     }
   } else {
-    const port_status_t status = queue_.front();
+    last_observed_ = queue_.front();
     queue_.pop();
     WithWireStatus(
         [&completer](netdev::wire::PortStatus wire_status) { completer.Reply(wire_status); },
-        status);
-    last_observed_ = status;
+        last_observed_->flags, last_observed_->mtu);
   }
 }
 
-void StatusWatcher::PushStatus(const port_status_t& status) {
+void StatusWatcher::PushStatus(const fuchsia_hardware_network::wire::PortStatus& status) {
   fbl::AutoLock lock(&lock_);
-  std::optional<port_status_t> tail;
+  std::optional<PortStatus> tail;
   if (queue_.empty()) {
     tail = last_observed_;
   } else {
     tail = queue_.back();
   }
-  if (tail.has_value() && StatusEquals(tail.value(), status)) {
+  if (tail.has_value() && tail.value() == status) {
     // ignore if no change is observed
     return;
   }
@@ -118,10 +109,10 @@ void StatusWatcher::PushStatus(const port_status_t& status) {
     WithWireStatus(
         [completer = std::move(std::exchange(pending_txn_, std::nullopt).value())](
             netdev::wire::PortStatus wire_status) mutable { completer.Reply(wire_status); },
-        status);
-    last_observed_ = status;
+        status.flags(), status.mtu());
+    last_observed_ = PortStatus(status);
   } else {
-    queue_.push(status);
+    queue_.emplace(status);
     // limit the queue to max_queue_
     if (queue_.size() > max_queue_) {
       queue_.pop();

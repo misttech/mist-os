@@ -6,8 +6,6 @@
 
 #include <lib/async/cpp/task.h>
 
-#include <array>
-
 #include <fbl/alloc_checker.h>
 
 #include "log.h"
@@ -16,37 +14,21 @@ namespace network {
 
 zx::result<std::unique_ptr<MacAddrDeviceInterface>> MacAddrDeviceInterface::Create(
     ddk::MacAddrProtocolClient parent) {
-  return internal::MacInterface::Create(parent);
+  return zx::ok(nullptr);
+}
+
+void MacAddrDeviceInterface::Create(
+    fdf::WireSharedClient<fuchsia_hardware_network_driver::MacAddr> parent,
+    OnCreated&& on_created) {
+  return internal::MacInterface::Create(std::move(parent), std::move(on_created));
 }
 
 namespace internal {
-namespace {
-
-mac_filter_mode_t ConvertSupportedMode(supported_mac_filter_mode_t mode) {
-  switch (mode) {
-    case SUPPORTED_MAC_FILTER_MODE_MULTICAST_FILTER:
-      return MAC_FILTER_MODE_MULTICAST_FILTER;
-    case SUPPORTED_MAC_FILTER_MODE_MULTICAST_PROMISCUOUS:
-      return MAC_FILTER_MODE_MULTICAST_PROMISCUOUS;
-    case SUPPORTED_MAC_FILTER_MODE_PROMISCUOUS:
-      return MAC_FILTER_MODE_PROMISCUOUS;
-    default:
-      ZX_PANIC("Failed to convert supported_mac_filter_mode: %d", mode);
-  }
-}
-
-}  // namespace
 
 constexpr uint8_t kMacMulticast = 0x01;
 
-// We make some assumptions in the logic about the ordering of the constants defined in the
-// protocol. If that's not true we want a compilation failure.
-static_assert(SUPPORTED_MAC_FILTER_MODE_MULTICAST_PROMISCUOUS ==
-              SUPPORTED_MAC_FILTER_MODE_MULTICAST_FILTER << 1u);
-static_assert(SUPPORTED_MAC_FILTER_MODE_PROMISCUOUS ==
-              SUPPORTED_MAC_FILTER_MODE_MULTICAST_PROMISCUOUS << 1u);
-
-MacInterface::MacInterface(ddk::MacAddrProtocolClient parent) : impl_(parent) {}
+MacInterface::MacInterface(fdf::WireSharedClient<fuchsia_hardware_network_driver::MacAddr>&& parent)
+    : impl_(std::move(parent)) {}
 
 MacInterface::~MacInterface() {
   ZX_ASSERT_MSG(clients_.is_empty(),
@@ -54,40 +36,37 @@ MacInterface::~MacInterface() {
                 clients_.size_slow());
 }
 
-zx::result<std::unique_ptr<MacInterface>> MacInterface::Create(ddk::MacAddrProtocolClient parent) {
+void MacInterface::Create(fdf::WireSharedClient<fuchsia_hardware_network_driver::MacAddr>&& parent,
+                          OnCreated&& on_created) {
   fbl::AllocChecker ac;
-  std::unique_ptr<MacInterface> mac(new (&ac) MacInterface(parent));
+  std::unique_ptr<MacInterface> mac(new (&ac) MacInterface(std::move(parent)));
   if (!ac.check()) {
-    return zx::error(ZX_ERR_NO_MEMORY);
+    LOGF_ERROR("Could not allocate MacInterface");
+    on_created(zx::error(ZX_ERR_NO_MEMORY));
+    return;
   }
+  // Keep a raw pointer for making the call below, the unique ptr will have been moved.
+  MacInterface* mac_ptr = mac.get();
+  mac_ptr->Init(
+      [mac = std::move(mac), on_created = std::move(on_created)](zx_status_t status) mutable {
+        if (status != ZX_OK) {
+          on_created(zx::error(status));
+          return;
+        }
+        on_created(zx::ok(std::move(mac)));
+      });
+}
 
-  mac->impl_.GetFeatures(&mac->features_);
-  if ((mac->features_.supported_modes & ~kSupportedModesMask) != 0) {
-    LOGF_ERROR("mac-addr-device:Init: Invalid supported modes bitmask: %08X",
-               mac->features_.supported_modes);
-    return zx::error(ZX_ERR_NOT_SUPPORTED);
-  }
-  if (mac->features_.supported_modes & SUPPORTED_MAC_FILTER_MODE_MULTICAST_FILTER) {
-    mac->default_mode_ = MAC_FILTER_MODE_MULTICAST_FILTER;
-  } else if (mac->features_.supported_modes & SUPPORTED_MAC_FILTER_MODE_MULTICAST_PROMISCUOUS) {
-    mac->default_mode_ = MAC_FILTER_MODE_MULTICAST_PROMISCUOUS;
-  } else if (mac->features_.supported_modes & SUPPORTED_MAC_FILTER_MODE_PROMISCUOUS) {
-    mac->default_mode_ = MAC_FILTER_MODE_PROMISCUOUS;
-  } else {
-    // No supported modes.
-    LOGF_ERROR("mac-addr-device:Init: Invalid supported modes bitmask: %08X",
-               mac->features_.supported_modes);
-    return zx::error(ZX_ERR_NOT_SUPPORTED);
-  }
-  // Limit multicast filter count to protocol definition.
-  if (mac->features_.multicast_filter_count > MAX_MAC_FILTER) {
-    mac->features_.multicast_filter_count = MAX_MAC_FILTER;
-  }
-
-  // Set the default mode to the parent on initialization.
-  mac->impl_.SetMode(mac->default_mode_, nullptr, 0);
-
-  return zx::ok(std::move(mac));
+void MacInterface::Init(fit::callback<void(zx_status_t)>&& on_complete) {
+  GetFeatures([this, on_complete = std::move(on_complete)](zx_status_t status) mutable {
+    if (status != ZX_OK) {
+      on_complete(status);
+      return;
+    }
+    SetDefaultMode([on_complete = std::move(on_complete)](zx_status_t status) mutable {
+      on_complete(status);
+    });
+  });
 }
 
 zx_status_t MacInterface::Bind(async_dispatcher_t* dispatcher,
@@ -115,99 +94,173 @@ zx_status_t MacInterface::Bind(async_dispatcher_t* dispatcher,
   // DFv2. For now, dispatching to do the work eliminates known deadlocks.
   async::PostTask(dispatcher, [this]() {
     fbl::AutoLock lock(&lock_);
-    Consolidate();
+    Consolidate([]() {});
   });
   return ZX_OK;
 }
 
-std::optional<mac_filter_mode_t> MacInterface::ConvertMode(
+std::optional<netdev::wire::MacFilterMode> MacInterface::ConvertMode(
     const netdev::wire::MacFilterMode& mode) const {
+  using fuchsia_hardware_network_driver::wire::SupportedMacFilterMode;
   using netdev::wire::MacFilterMode;
-  supported_mac_filter_mode_t check;
+
+  if (!features_.supported_modes().has_value()) {
+    return std::nullopt;
+  }
+
+  const SupportedMacFilterMode supported_modes = features_.supported_modes().value();
+
   switch (mode) {
-    case MacFilterMode::kPromiscuous:
-      check = SUPPORTED_MAC_FILTER_MODE_PROMISCUOUS;
-      break;
-    case MacFilterMode::kMulticastPromiscuous:
-      check = SUPPORTED_MAC_FILTER_MODE_MULTICAST_PROMISCUOUS;
-      break;
     case MacFilterMode::kMulticastFilter:
-      check = SUPPORTED_MAC_FILTER_MODE_MULTICAST_FILTER;
-      break;
+      if (supported_modes & SupportedMacFilterMode::kMulticastFilter) {
+        return MacFilterMode::kMulticastFilter;
+      }
+      // Multicast filter not supported, attempt to fall back on multicast promiscuous.
+      [[fallthrough]];
+    case MacFilterMode::kMulticastPromiscuous:
+      if (supported_modes & SupportedMacFilterMode::kMulticastPromiscuous) {
+        return MacFilterMode::kMulticastPromiscuous;
+      }
+      // Multicast promiscuous not supported, attempt to fall back on promiscuous.
+      [[fallthrough]];
+    case MacFilterMode::kPromiscuous:
+      if (supported_modes & SupportedMacFilterMode::kPromiscuous) {
+        return MacFilterMode::kPromiscuous;
+      }
+      // Promiscuous not supported, fail.
+      [[fallthrough]];
     default:
       return std::nullopt;
   }
-  while (check != (SUPPORTED_MAC_FILTER_MODE_PROMISCUOUS << 1u)) {
-    if ((features_.supported_modes & check) != 0) {
-      return ConvertSupportedMode(check);
-    }
-    check <<= 1u;
-  }
-  return std::nullopt;
 }
 
-void MacInterface::Consolidate() {
-  mac_filter_mode_t mode = default_mode_;
+void MacInterface::Consolidate(fit::function<void()> callback) {
+  netdev::wire::MacFilterMode mode = default_mode_;
   // Gather the most permissive mode that the clients want.
   for (auto& c : clients_) {
-    if (c.state().filter_mode > mode) {
+    if ((uint32_t)c.state().filter_mode > (uint32_t)mode) {
       mode = c.state().filter_mode;
     }
   }
-  std::vector<mac_address_t> addr_buff{};
+
+  std::vector<MacAddress> addr_buff;
   // If selected mode is multicast filter, then collect all the unique addresses.
-  if (mode == MAC_FILTER_MODE_MULTICAST_FILTER) {
+  if (mode == netdev::wire::MacFilterMode::kMulticastFilter) {
+    uint32_t multicast_filter_count = features_.multicast_filter_count().value_or(0);
     std::unordered_set<ClientState::Addr, ClientState::MacHasher> addresses;
     for (const auto& c : clients_) {
       const auto& client_addresses = c.state().addresses;
       addresses.insert(client_addresses.begin(), client_addresses.end());
-      if (addresses.size() > features_.multicast_filter_count) {
+      if (addresses.size() > multicast_filter_count) {
         // Try to go into multicast_promiscuous mode, if it's supported.
-        std::optional<mac_filter_mode_t> try_mode =
-            ConvertMode(netdev::wire::MacFilterMode::kMulticastPromiscuous);
+        auto try_mode = ConvertMode(netdev::wire::MacFilterMode::kMulticastPromiscuous);
         // If it's not supported (meaning that neither multicast promiscuous nor promiscuous is
         // supported, since ConvertMode will fall back to the more permissive mode), we have no
         // option but to truncate the address list.
         if (try_mode.has_value()) {
           mode = try_mode.value();
         } else {
+          // If neither are supported we have no option but to truncate the address list.
           LOGF_WARN(
               "MAC filter list is full, but more permissive modes are not supported. Multicast MAC "
               "filter list is being truncated to %d entries",
-              features_.multicast_filter_count);
+              multicast_filter_count);
         }
         break;
       }
     }
     // If the mode didn't change out of multicast filter, build the multicast list.
-    if (mode == MAC_FILTER_MODE_MULTICAST_FILTER) {
-      for (auto& address : addresses) {
-        if (addr_buff.size() >= MAX_MAC_FILTER ||
-            addr_buff.size() >= features_.multicast_filter_count) {
+    if (mode == fuchsia_hardware_network::wire::MacFilterMode::kMulticastFilter) {
+      for (const auto& address : addresses) {
+        if (addr_buff.size() > fuchsia_hardware_network_driver::wire::kMaxMacFilter ||
+            addr_buff.size() >= multicast_filter_count) {
           break;
         }
-        auto& addr = addr_buff.emplace_back();
-        std::copy(address.address.octets.begin(), address.address.octets.end(), addr.octets);
+        addr_buff.push_back(address.address);
       }
     }
   }
-  impl_.SetMode(mode, addr_buff.data(), addr_buff.size());
+
+  fdf::Arena fdf_arena('NMAC');
+  impl_.buffer(fdf_arena)
+      ->SetMode(mode, fidl::VectorView<MacAddress>::FromExternal(addr_buff))
+      .Then([callback = std::move(callback)](
+                fdf::WireUnownedResult<fuchsia_hardware_network_driver::MacAddr::SetMode>& result) {
+        if (!result.ok()) {
+          LOGF_ERROR("SetMode() failed: %s", result.error().FormatDescription().c_str());
+          return;
+        }
+        callback();
+      });
 }
 
 void MacInterface::CloseClient(MacClientInstance* client) {
-  fit::callback<void()> teardown;
-  {
+  fbl::AutoLock lock(&lock_);
+  clients_.erase(*client);
+  Consolidate([this]() {
     fbl::AutoLock lock(&lock_);
-    clients_.erase(*client);
-    Consolidate();
     if (clients_.is_empty() && teardown_callback_) {
-      teardown = std::move(teardown_callback_);
+      teardown_callback_();
+      impl_ = {};
     }
+  });
+}
+
+void MacInterface::GetFeatures(fit::callback<void(zx_status_t)>&& on_complete) {
+  fdf::Arena arena('NMAC');
+  impl_.buffer(arena)->GetFeatures().Then(
+      [this, on_complete = std::move(on_complete)](
+          fdf::WireUnownedResult<netdriver::MacAddr::GetFeatures>& result) mutable {
+        if (!result.ok()) {
+          on_complete(result.status());
+          return;
+        }
+
+        features_ = fidl::ToNatural(result.value().features);
+        return on_complete(ZX_OK);
+      });
+}
+
+void MacInterface::SetDefaultMode(fit::callback<void(zx_status_t)>&& on_complete) {
+  const netdriver::SupportedMacFilterMode supported_modes =
+      features_.supported_modes().value_or(static_cast<netdriver::SupportedMacFilterMode>(0));
+  if (supported_modes & ~netdriver::SupportedMacFilterMode::kMask) {
+    LOGF_ERROR("mac-addr-device:Init: Invalid supported modes bitmask: %08X",
+               static_cast<uint32_t>(supported_modes));
+    on_complete(ZX_ERR_NOT_SUPPORTED);
+    return;
   }
 
-  if (teardown) {
-    teardown();
+  netdev::wire::MacFilterMode mode;
+  if (supported_modes & netdriver::SupportedMacFilterMode::kMulticastFilter) {
+    mode = netdev::wire::MacFilterMode::kMulticastFilter;
+  } else if (supported_modes & netdriver::SupportedMacFilterMode::kMulticastPromiscuous) {
+    mode = netdev::wire::MacFilterMode::kMulticastPromiscuous;
+  } else if (supported_modes & netdriver::wire::SupportedMacFilterMode::kPromiscuous) {
+    mode = netdev::wire::MacFilterMode::kPromiscuous;
+  } else {
+    // No supported modes.
+    LOGF_ERROR("mac-addr-device:Init: Invalid supported modes bitmask: %08X",
+               static_cast<uint32_t>(supported_modes));
+    on_complete(ZX_ERR_NOT_SUPPORTED);
+    return;
   }
+
+  fidl::VectorView<::fuchsia_net::wire::MacAddress> macs(nullptr, 0);
+  fdf::Arena arena('NMAC');
+  // Set the default mode to the parent on initialization.
+  impl_.buffer(arena)
+      ->SetMode(mode, macs)
+      .Then([this, mode, on_complete = std::move(on_complete)](
+                fdf::WireUnownedResult<netdriver::MacAddr::SetMode>& result) mutable {
+        if (!result.ok()) {
+          LOGF_ERROR("SetMode() failed: %s", result.error().FormatDescription().c_str());
+          on_complete(ZX_ERR_INTERNAL);
+          return;
+        }
+        default_mode_ = mode;
+        on_complete(ZX_OK);
+      });
 }
 
 void MacInterface::Teardown(fit::callback<void()> callback) {
@@ -226,20 +279,26 @@ void MacInterface::Teardown(fit::callback<void()> callback) {
 }
 
 void MacClientInstance::GetUnicastAddress(GetUnicastAddressCompleter::Sync& completer) {
-  MacAddress addr{};
-  mac_address_t out_mac{};
-  parent_->impl_.GetAddress(&out_mac);
-  std::memcpy(addr.octets.data(), out_mac.octets, MAC_SIZE);
-  completer.Reply(addr);
+  fdf::Arena arena('NMAC');
+  parent_->impl_.buffer(arena)->GetAddress().Then(
+      [completer = completer.ToAsync()](
+          fdf::WireUnownedResult<fuchsia_hardware_network_driver::MacAddr::GetAddress>&
+              result) mutable {
+        if (!result.ok()) {
+          LOGF_ERROR("GetAddress() failed: %s", result.error().FormatDescription().c_str());
+          completer.Close(result.status());
+          return;
+        }
+        completer.Reply(result->mac);
+      });
 }
 
 void MacClientInstance::SetMode(SetModeRequestView request, SetModeCompleter::Sync& completer) {
-  std::optional<mac_filter_mode_t> resolved_mode = parent_->ConvertMode(request->mode);
+  auto resolved_mode = parent_->ConvertMode(request->mode);
   if (resolved_mode.has_value()) {
     fbl::AutoLock lock(&parent_->lock_);
     state_.filter_mode = resolved_mode.value();
-    parent_->Consolidate();
-    completer.Reply(ZX_OK);
+    parent_->Consolidate([completer = completer.ToAsync()]() mutable { completer.Reply(ZX_OK); });
   } else {
     completer.Reply(ZX_ERR_NOT_SUPPORTED);
   }
@@ -251,10 +310,9 @@ void MacClientInstance::AddMulticastAddress(AddMulticastAddressRequestView reque
     completer.Reply(ZX_ERR_INVALID_ARGS);
   } else {
     fbl::AutoLock lock(&parent_->lock_);
-    if (state_.addresses.size() < MAX_MAC_FILTER) {
+    if (state_.addresses.size() < netdriver::wire::kMaxMacFilter) {
       state_.addresses.insert(ClientState::Addr{request->address});
-      parent_->Consolidate();
-      completer.Reply(ZX_OK);
+      parent_->Consolidate([completer = completer.ToAsync()]() mutable { completer.Reply(ZX_OK); });
     } else {
       completer.Reply(ZX_ERR_NO_RESOURCES);
     }
@@ -268,12 +326,11 @@ void MacClientInstance::RemoveMulticastAddress(RemoveMulticastAddressRequestView
   } else {
     fbl::AutoLock lock(&parent_->lock_);
     state_.addresses.erase(ClientState::Addr{request->address});
-    parent_->Consolidate();
-    completer.Reply(ZX_OK);
+    parent_->Consolidate([completer = completer.ToAsync()]() mutable { completer.Reply(ZX_OK); });
   }
 }
 
-MacClientInstance::MacClientInstance(MacInterface* parent, mac_filter_mode_t default_mode)
+MacClientInstance::MacClientInstance(MacInterface* parent, netdev::wire::MacFilterMode default_mode)
     : parent_(parent), state_(default_mode) {}
 
 zx_status_t MacClientInstance::Bind(async_dispatcher_t* dispatcher,

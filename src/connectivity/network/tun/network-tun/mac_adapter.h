@@ -7,6 +7,7 @@
 
 #include <fidl/fuchsia.net.tun/cpp/wire.h>
 #include <fidl/fuchsia.net/cpp/wire.h>
+#include <fuchsia/hardware/network/driver/cpp/banjo.h>
 
 #include <fbl/mutex.h>
 

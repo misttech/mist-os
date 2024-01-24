@@ -10,19 +10,20 @@
 
 #include <gtest/gtest.h>
 
+#include "network_device_shim.h"
 #include "src/lib/testing/predicates/status.h"
 
 namespace network::testing {
 
-zx::result<std::vector<uint8_t>> TxBuffer::GetData(const VmoProvider& vmo_provider) const {
+zx::result<std::vector<uint8_t>> TxBuffer::GetData(const VmoProvider& vmo_provider) {
   if (!vmo_provider) {
     return zx::error(ZX_ERR_INTERNAL);
   }
   // We don't support copying chained buffers.
-  if (buffer_.data_count != 1) {
+  if (buffer_.data.count() != 1) {
     return zx::error(ZX_ERR_INTERNAL);
   }
-  const buffer_region_t& region = buffer_.data_list[0];
+  const fuchsia_hardware_network_driver::wire::BufferRegion& region = buffer_.data.at(0);
   zx::unowned_vmo vmo = vmo_provider(region.vmo);
   if (!vmo->is_valid()) {
     return zx::error(ZX_ERR_INTERNAL);
@@ -50,18 +51,13 @@ zx_status_t RxBuffer::WriteData(cpp20::span<const uint8_t> data, const VmoProvid
 
 FakeNetworkPortImpl::FakeNetworkPortImpl()
     : port_info_({
-          .port_class = static_cast<uint8_t>(netdev::wire::DeviceClass::kEthernet),
-          .rx_types_list = rx_types_.data(),
-          .rx_types_count = 1,
-          .tx_types_list = tx_types_.data(),
-          .tx_types_count = 1,
+          .port_class = netdev::wire::DeviceClass::kEthernet,
+          .rx_types = {netdev::wire::FrameType::kEthernet},
+          .tx_types = {{.type = netdev::wire::FrameType::kEthernet,
+                        .features = netdev::wire::kFrameFeaturesRaw,
+                        .supported_flags = netdev::wire::TxFlags(0)}},
+
       }) {
-  rx_types_[0] = static_cast<uint8_t>(netdev::wire::FrameType::kEthernet);
-  tx_types_[0] = {
-      .type = static_cast<uint8_t>(netdev::wire::FrameType::kEthernet),
-      .features = netdev::wire::kFrameFeaturesRaw,
-      .supported_flags = 0,
-  };
   EXPECT_OK(zx::event::create(0, &event_));
 }
 
@@ -71,57 +67,143 @@ FakeNetworkPortImpl::~FakeNetworkPortImpl() {
   }
 }
 
-void FakeNetworkPortImpl::NetworkPortGetInfo(port_base_info_t* out_info) { *out_info = port_info_; }
+void FakeNetworkPortImpl::WaitPortRemoved() {
+  if (port_added_) {
+    WaitForPortRemoval();
+    ASSERT_TRUE(port_removed_) << "port was added but remove was not called";
+  }
+}
 
-void FakeNetworkPortImpl::NetworkPortGetStatus(port_status_t* out_status) { *out_status = status_; }
+void FakeNetworkPortImpl::GetInfo(fdf::Arena& arena, GetInfoCompleter::Sync& completer) {
+  fidl::Arena fidl_arena;
+  auto builder = fuchsia_hardware_network::wire::PortBaseInfo::Builder(fidl_arena);
+  auto rx_types = fidl::VectorView<netdev::wire::FrameType>::FromExternal(port_info_.rx_types);
+  auto tx_types =
+      fidl::VectorView<netdev::wire::FrameTypeSupport>::FromExternal(port_info_.tx_types);
 
-void FakeNetworkPortImpl::NetworkPortSetActive(bool active) {
-  port_active_ = active;
+  builder.port_class(port_info_.port_class)
+      .tx_types(fidl::ObjectView<decltype(tx_types)>::FromExternal(&tx_types))
+      .rx_types(fidl::ObjectView<decltype(rx_types)>::FromExternal(&rx_types));
+
+  completer.buffer(arena).Reply(builder.Build());
+}
+
+void FakeNetworkPortImpl::GetStatus(fdf::Arena& arena, GetStatusCompleter::Sync& completer) {
+  fidl::Arena fidl_arena;
+  auto builder = fuchsia_hardware_network::wire::PortStatus::Builder(fidl_arena);
+  builder.mtu(status_.mtu).flags(status_.flags);
+  completer.buffer(arena).Reply(builder.Build());
+}
+
+void FakeNetworkPortImpl::SetActive(
+    fuchsia_hardware_network_driver::wire::NetworkPortSetActiveRequest* request, fdf::Arena& arena,
+    SetActiveCompleter::Sync& completer) {
+  port_active_ = request->active;
   if (on_set_active_) {
-    on_set_active_(active);
+    on_set_active_(request->active);
   }
   ASSERT_OK(event_.signal(0, kEventPortActiveChanged));
 }
 
-void FakeNetworkPortImpl::NetworkPortGetMac(mac_addr_protocol_t** out_mac_ifc) {
-  if (out_mac_ifc) {
-    *out_mac_ifc = &mac_proto_;
-  }
-}
-
-void FakeNetworkPortImpl::NetworkPortRemoved() {
-  EXPECT_FALSE(port_removed_) << "removed same port twice";
+void FakeNetworkPortImpl::Removed(fdf::Arena& arena, RemovedCompleter::Sync& completer) {
+  ASSERT_FALSE(port_removed_) << "removed same port twice";
   port_removed_ = true;
-  if (on_removed_) {
-    on_removed_();
-  }
+  sync_completion_signal(&wait_removed_);
 }
 
-zx_status_t FakeNetworkPortImpl::AddPort(uint8_t port_id,
-                                         ddk::NetworkDeviceIfcProtocolClient ifc_client) {
+void FakeNetworkPortImpl::GetMac(fdf::Arena& arena, GetMacCompleter::Sync& completer) {
+  fdf::ClientEnd<fuchsia_hardware_network_driver::MacAddr> client{};
+  if (mac_client_end_.has_value()) {
+    client = std::move(*mac_client_end_);
+    mac_client_end_ = {};
+  }
+  completer.buffer(arena).Reply(std::move(client));
+}
+
+zx_status_t FakeNetworkPortImpl::AddPort(uint8_t port_id, const fdf::Dispatcher& dispatcher,
+                                         fidl::WireSyncClient<netdev::Device> device,
+                                         FakeNetworkDeviceImpl& parent) {
   if (port_added_) {
     return ZX_ERR_ALREADY_EXISTS;
   }
+  id_ = port_id;
+  parent_ = &parent;
 
-  using Context = std::tuple<libsync::Completion, zx_status_t>;
-  Context context;
+  zx::result fidl_endpoints = fidl::CreateEndpoints<fuchsia_hardware_network::PortWatcher>();
+  if (fidl_endpoints.is_error()) {
+    return fidl_endpoints.status_value();
+  }
+  auto status = device->GetPortWatcher(std::move(fidl_endpoints->server));
+  if (!status.ok()) {
+    return status.status();
+  }
+  fidl::WireSyncClient port_watcher(std::move(fidl_endpoints->client));
 
-  ifc_client.AddPort(
-      port_id, this, &network_port_protocol_ops_,
-      [](void* ctx, zx_status_t status) {
-        auto& [port_added, out_status] = *static_cast<Context*>(ctx);
-        out_status = status;
-        port_added.Signal();
-      },
-      &context);
-  auto& [port_added, status] = context;
-  port_added.Wait();
-  if (status != ZX_OK) {
-    return status;
+  bool found_idle = false;
+  while (!found_idle) {
+    auto result = port_watcher->Watch();
+    if (!result.ok()) {
+      return result.status();
+    }
+    found_idle = result->event.Which() == netdev::wire::DevicePortEvent::Tag::kIdle;
+  }
+
+  auto endpoints = fdf::CreateEndpoints<fuchsia_hardware_network_driver::NetworkPort>();
+  if (endpoints.is_error()) {
+    return endpoints.status_value();
+  }
+
+  binding_ = fdf::BindServer(dispatcher.get(), std::move(endpoints->server), this);
+
+  fdf::Arena arena('NETD');
+  auto add_port_status =
+      parent.client().sync().buffer(arena)->AddPort(port_id, std::move(endpoints->client));
+  if (!add_port_status.ok() || add_port_status->status != ZX_OK) {
+    return add_port_status.ok() ? add_port_status->status : add_port_status.status();
+  }
+
+  auto result = port_watcher->Watch();
+  if (!result.ok()) {
+    return result.status();
+  }
+
+  if (result->event.Which() != netdev::wire::DevicePortEvent::Tag::kAdded) {
+    return ZX_ERR_BAD_STATE;
+  }
+
+  port_added_ = true;
+  device_ = std::move(device);
+  return ZX_OK;
+}
+
+zx_status_t FakeNetworkPortImpl::AddPortNoWait(uint8_t port_id, const fdf::Dispatcher& dispatcher,
+                                               fidl::WireSyncClient<netdev::Device> device,
+                                               FakeNetworkDeviceImpl& parent) {
+  if (port_added_) {
+    return ZX_ERR_ALREADY_EXISTS;
   }
   id_ = port_id;
+  parent_ = &parent;
+
+  auto endpoints = fdf::CreateEndpoints<fuchsia_hardware_network_driver::NetworkPort>();
+  if (endpoints.is_error()) {
+    return endpoints.status_value();
+  }
+
+  binding_ = fdf::BindServer(
+      dispatcher.get(), std::move(endpoints->server), this,
+      [](fdf::WireServer<fuchsia_hardware_network_driver::NetworkPort>*, fidl::UnbindInfo foo,
+         fdf::ServerEnd<fuchsia_hardware_network_driver::NetworkPort> /*unused*/) {});
+
+  fdf::Arena arena('NETD');
+  auto status =
+      parent.client().sync().buffer(arena)->AddPort(port_id, std::move(endpoints->client));
+  if (!status.ok() || status->status != ZX_OK) {
+    return status.ok() ? status->status : status.status();
+  }
+
   port_added_ = true;
-  device_client_ = ifc_client;
+  device_ = std::move(device);
   return ZX_OK;
 }
 
@@ -130,23 +212,25 @@ void FakeNetworkPortImpl::RemoveSync() {
   if (!port_added_ || port_removed_) {
     return;
   }
-  sync_completion_t signal;
-  on_removed_ = [&signal]() { sync_completion_signal(&signal); };
-  device_client_.RemovePort(id_);
-  sync_completion_wait(&signal, zx::time::infinite().get());
+  fdf::Arena arena('NETD');
+  EXPECT_TRUE(parent_->client().buffer(arena)->RemovePort(id_).ok());
+  WaitForPortRemoval();
 }
 
 void FakeNetworkPortImpl::SetOnline(bool online) {
-  port_status_t status = status_;
-  status.flags = static_cast<uint32_t>(online ? netdev::wire::StatusFlags::kOnline
-                                              : netdev::wire::StatusFlags());
+  PortStatus status = status_;
+  status.flags = online ? netdev::wire::StatusFlags::kOnline : netdev::wire::StatusFlags();
   SetStatus(status);
 }
 
-void FakeNetworkPortImpl::SetStatus(const port_status_t& status) {
+void FakeNetworkPortImpl::SetStatus(const PortStatus& status) {
   status_ = status;
-  if (device_client_.is_valid()) {
-    device_client_.PortStatusChanged(id_, &status);
+  if (parent_ != nullptr && parent_->client().is_valid()) {
+    fidl::Arena fidl_arena;
+    auto builder = fuchsia_hardware_network::wire::PortStatus::Builder(fidl_arena);
+    builder.mtu(status_.mtu).flags(status_.flags);
+    fdf::Arena arena('NETD');
+    EXPECT_TRUE(parent_->client().buffer(arena)->PortStatusChanged(id_, builder.Build()).ok());
   }
 }
 
@@ -168,15 +252,14 @@ FakeNetworkDeviceImpl::~FakeNetworkDeviceImpl() {
   }
 }
 
-void FakeNetworkDeviceImpl::NetworkDeviceImplInit(const network_device_ifc_protocol_t* iface,
-                                                  network_device_impl_init_callback callback,
-                                                  void* cookie) {
-  device_client_ = ddk::NetworkDeviceIfcProtocolClient(iface);
-  callback(cookie, ZX_OK);
+void FakeNetworkDeviceImpl::Init(
+    fuchsia_hardware_network_driver::wire::NetworkDeviceImplInitRequest* request, fdf::Arena& arena,
+    InitCompleter::Sync& completer) {
+  device_client_ = fdf::WireSharedClient(std::move(request->iface), dispatcher_);
+  completer.buffer(arena).Reply(ZX_OK);
 }
 
-void FakeNetworkDeviceImpl::NetworkDeviceImplStart(network_device_impl_start_callback callback,
-                                                   void* cookie) {
+void FakeNetworkDeviceImpl::Start(fdf::Arena& arena, StartCompleter::Sync& completer) {
   fbl::AutoLock lock(&lock_);
   EXPECT_FALSE(device_started_) << "called start on already started device";
   if (auto_start_.has_value()) {
@@ -184,28 +267,28 @@ void FakeNetworkDeviceImpl::NetworkDeviceImplStart(network_device_impl_start_cal
     if (auto_start == ZX_OK) {
       device_started_ = true;
     }
-    callback(cookie, auto_start);
+    completer.buffer(arena).Reply(auto_start);
   } else {
     ZX_ASSERT(!(pending_start_callback_ || pending_stop_callback_));
-    pending_start_callback_ = [cookie, callback, this]() {
+    pending_start_callback_ = [completer = completer.ToAsync(), this]() mutable {
       {
         fbl::AutoLock lock(&lock_);
         device_started_ = true;
       }
-      callback(cookie, ZX_OK);
+      fdf::Arena arena('NETD');
+      completer.buffer(arena).Reply(ZX_OK);
     };
   }
   EXPECT_OK(event_.signal(0, kEventStart));
 }
 
-void FakeNetworkDeviceImpl::NetworkDeviceImplStop(network_device_impl_stop_callback callback,
-                                                  void* cookie) {
+void FakeNetworkDeviceImpl::Stop(fdf::Arena& arena, StopCompleter::Sync& completer) {
   fbl::AutoLock lock(&lock_);
   EXPECT_TRUE(device_started_) << "called stop on already stopped device";
   device_started_ = false;
   zx_signals_t clear;
   if (auto_stop_) {
-    RxReturnTransaction rx_return(this);
+    RxFidlReturnTransaction rx_return(this);
     while (!rx_buffers_.is_empty()) {
       std::unique_ptr rx_buffer = rx_buffers_.pop_front();
       // Return unfulfilled buffers with zero length and an invalid port number.
@@ -215,75 +298,105 @@ void FakeNetworkDeviceImpl::NetworkDeviceImplStop(network_device_impl_stop_callb
     }
     rx_return.Commit();
 
-    TxReturnTransaction tx_return(this);
+    TxFidlReturnTransaction tx_return(this);
     while (!tx_buffers_.is_empty()) {
       std::unique_ptr tx_buffer = tx_buffers_.pop_front();
       tx_buffer->set_status(ZX_ERR_UNAVAILABLE);
       tx_return.Enqueue(std::move(tx_buffer));
     }
     tx_return.Commit();
-    callback(cookie);
-    // Must clear the queue signals if we're clearing the queues automatically.
+    fdf::Arena arena('NETD');
+    completer.buffer(arena).Reply();
+    //  Must clear the queue signals if we're clearing the queues automatically.
     clear = kEventTx | kEventRxAvailable;
   } else {
     ZX_ASSERT(!(pending_start_callback_ || pending_stop_callback_));
-    pending_stop_callback_ = [cookie, callback]() { callback(cookie); };
+    pending_stop_callback_ = [completer = completer.ToAsync()]() mutable {
+      fdf::Arena arena('NETD');
+      completer.buffer(arena).Reply();
+    };
     clear = 0;
   }
   EXPECT_OK(event_.signal(clear, kEventStop));
 }
 
-void FakeNetworkDeviceImpl::NetworkDeviceImplGetInfo(device_impl_info_t* out_info) {
-  *out_info = info_;
+void FakeNetworkDeviceImpl::GetInfo(fdf::Arena& arena, GetInfoCompleter::Sync& completer) {
+  fidl::Arena fidl_arena;
+  auto builder = fuchsia_hardware_network_driver::wire::DeviceImplInfo::Builder(fidl_arena);
+
+  auto tx_accel = fidl::VectorView<netdev::wire::TxAcceleration>::FromExternal(info_.tx_accel);
+  auto rx_accel = fidl::VectorView<netdev::wire::RxAcceleration>::FromExternal(info_.rx_accel);
+
+  builder.device_features(info_.device_features)
+      .tx_depth(info_.tx_depth)
+      .rx_depth(info_.rx_depth)
+      .rx_threshold(info_.rx_threshold)
+      .max_buffer_parts(info_.max_buffer_parts)
+      .max_buffer_length(info_.max_buffer_length)
+      .buffer_alignment(info_.buffer_alignment)
+      .buffer_alignment(info_.buffer_alignment)
+      .min_rx_buffer_length(info_.min_rx_buffer_length)
+      .min_tx_buffer_length(info_.min_tx_buffer_length)
+      .tx_head_length(info_.tx_head_length)
+      .tx_tail_length(info_.tx_tail_length)
+      .tx_accel(fidl::ObjectView<decltype(tx_accel)>::FromExternal(&tx_accel))
+      .rx_accel(fidl::ObjectView<decltype(rx_accel)>::FromExternal(&rx_accel));
+
+  completer.buffer(arena).Reply(builder.Build());
 }
 
-void FakeNetworkDeviceImpl::NetworkDeviceImplQueueTx(const tx_buffer_t* buf_list,
-                                                     size_t buf_count) {
-  EXPECT_NE(buf_count, 0u);
+void FakeNetworkDeviceImpl::QueueTx(
+    fuchsia_hardware_network_driver::wire::NetworkDeviceImplQueueTxRequest* request,
+    fdf::Arena& arena, QueueTxCompleter::Sync& completer) {
+  EXPECT_NE(request->buffers.count(), 0u);
   ASSERT_TRUE(device_client_.is_valid());
 
   fbl::AutoLock lock(&lock_);
-  queue_tx_called_.push_back(buf_count);
-  cpp20::span buffers(buf_list, buf_count);
+  cpp20::span buffers = request->buffers.get();
+  queue_tx_called_.push_back(buffers.size());
   if (immediate_return_tx_ || !device_started_) {
     const zx_status_t return_status = device_started_ ? ZX_OK : ZX_ERR_UNAVAILABLE;
-    ASSERT_LE(buf_count, info_.tx_depth);
-    std::vector<tx_result_t> results(info_.tx_depth);
+    ASSERT_LE(request->buffers.count(), kDefaultTxDepth);
+    std::array<fuchsia_hardware_network_driver::wire::TxResult, kDefaultTxDepth> results;
     auto results_iter = results.begin();
-    for (const tx_buffer_t& buff : buffers) {
+    for (const fuchsia_hardware_network_driver::wire::TxBuffer& buff : buffers) {
       *results_iter++ = {
           .id = buff.id,
           .status = return_status,
       };
     }
-    device_client_.CompleteTx(results.data(), buf_count);
+    auto output = fidl::VectorView<fuchsia_hardware_network_driver::wire::TxResult>::FromExternal(
+        results.data(), request->buffers.count());
+    EXPECT_TRUE(device_client_.buffer(arena)->CompleteTx(output).ok());
     return;
   }
 
-  for (const tx_buffer_t& buff : buffers) {
+  for (const fuchsia_hardware_network_driver::wire::TxBuffer& buff : buffers) {
     auto back = std::make_unique<TxBuffer>(buff);
     tx_buffers_.push_back(std::move(back));
   }
   EXPECT_OK(event_.signal(0, kEventTx));
 }
 
-void FakeNetworkDeviceImpl::NetworkDeviceImplQueueRxSpace(const rx_space_buffer_t* buf_list,
-                                                          size_t buf_count) {
+void FakeNetworkDeviceImpl::QueueRxSpace(
+    fuchsia_hardware_network_driver::wire::NetworkDeviceImplQueueRxSpaceRequest* request,
+    fdf::Arena& arena, QueueRxSpaceCompleter::Sync& completer) {
   ASSERT_TRUE(device_client_.is_valid());
+  size_t buf_count = request->buffers.count();
 
   fbl::AutoLock lock(&lock_);
   queue_rx_space_called_.push_back(buf_count);
-  cpp20::span buffers(buf_list, buf_count);
+  auto buffers = request->buffers.get();
   if (immediate_return_rx_ || !device_started_) {
     const uint32_t length = device_started_ ? kAutoReturnRxLength : 0;
-    ASSERT_TRUE(buf_count < info_.rx_depth);
-    std::vector<rx_buffer_t> results(info_.rx_depth);
-    std::vector<rx_buffer_part_t> parts(info_.rx_depth);
+    ASSERT_TRUE(buf_count < kDefaultTxDepth);
+    std::array<fuchsia_hardware_network_driver::wire::RxBuffer, kDefaultTxDepth> results;
+    std::array<fuchsia_hardware_network_driver::wire::RxBufferPart, kDefaultTxDepth> parts;
     auto results_iter = results.begin();
     auto parts_iter = parts.begin();
-    for (const rx_space_buffer_t& space : buffers) {
-      rx_buffer_part_t& part = *parts_iter++;
-      rx_buffer_t& rx_buffer = *results_iter++;
+    for (const fuchsia_hardware_network_driver::wire::RxSpaceBuffer& space : buffers) {
+      fuchsia_hardware_network_driver::wire::RxBufferPart& part = *parts_iter++;
+      fuchsia_hardware_network_driver::wire::RxBuffer& rx_buffer = *results_iter++;
       part = {
           .id = space.id,
           .length = length,
@@ -291,22 +404,66 @@ void FakeNetworkDeviceImpl::NetworkDeviceImplQueueRxSpace(const rx_space_buffer_
       rx_buffer = {
           .meta =
               {
-                  .frame_type =
-                      static_cast<uint8_t>(fuchsia_hardware_network::wire::FrameType::kEthernet),
+                  .info = netdriver::wire::FrameInfo::WithNoInfo(netdriver::wire::NoInfo{
+                      static_cast<uint8_t>(netdev::wire::InfoType::kNoInfo)}),
+                  .frame_type = fuchsia_hardware_network::wire::FrameType::kEthernet,
               },
-          .data_list = &part,
-          .data_count = 1,
+          .data =
+              fidl::VectorView<fuchsia_hardware_network_driver::wire::RxBufferPart>::FromExternal(
+                  &part, 1),
       };
     }
-    device_client_.CompleteRx(results.data(), buf_count);
+    auto output = fidl::VectorView<fuchsia_hardware_network_driver::wire::RxBuffer>::FromExternal(
+        results.data(), buf_count);
+    EXPECT_TRUE(device_client_.buffer(arena)->CompleteRx(output).ok());
     return;
   }
 
-  for (const rx_space_buffer_t& buff : buffers) {
+  for (const fuchsia_hardware_network_driver::wire::RxSpaceBuffer& buff : buffers) {
     auto back = std::make_unique<RxBuffer>(buff);
     rx_buffers_.push_back(std::move(back));
   }
   EXPECT_OK(event_.signal(0, kEventRxAvailable));
+}
+
+void FakeNetworkDeviceImpl::PrepareVmo(
+    fuchsia_hardware_network_driver::wire::NetworkDeviceImplPrepareVmoRequest* request,
+    fdf::Arena& arena, PrepareVmoCompleter::Sync& completer) {
+  zx::vmo& slot = vmos_[request->id];
+  EXPECT_FALSE(slot.is_valid()) << "vmo " << static_cast<uint32_t>(request->id)
+                                << " already prepared";
+  slot = std::move(request->vmo);
+  if (prepare_vmo_handler_) {
+    prepare_vmo_handler_(request->id, slot, completer);
+  } else {
+    completer.buffer(arena).Reply(ZX_OK);
+  }
+}
+void FakeNetworkDeviceImpl::ReleaseVmo(
+    fuchsia_hardware_network_driver::wire::NetworkDeviceImplReleaseVmoRequest* request,
+    fdf::Arena& arena, ReleaseVmoCompleter::Sync& completer) {
+  zx::vmo& slot = vmos_[request->id];
+  EXPECT_TRUE(slot.is_valid()) << "vmo " << static_cast<uint32_t>(request->id)
+                               << " already released";
+  slot.reset();
+
+  bool all_released = true;
+  for (auto& vmo : vmos_) {
+    if (vmo.is_valid()) {
+      all_released = false;
+    }
+  }
+
+  if (all_released) {
+    sync_completion_signal(&released_completer_);
+  }
+  completer.buffer(arena).Reply();
+}
+
+void FakeNetworkDeviceImpl::SetSnoop(
+    fuchsia_hardware_network_driver::wire::NetworkDeviceImplSetSnoopRequest* request,
+    fdf::Arena& arena, SetSnoopCompleter::Sync& completer) {
+  // Do nothing , only auto-snooping is allowed.
 }
 
 fit::function<zx::unowned_vmo(uint8_t)> FakeNetworkDeviceImpl::VmoGetter() {
@@ -337,11 +494,23 @@ bool FakeNetworkDeviceImpl::TriggerStop() {
   return false;
 }
 
+zx::result<fdf::ClientEnd<fuchsia_hardware_network_driver::NetworkDeviceImpl>>
+FakeNetworkDeviceImpl::Binder::Bind() {
+  auto endpoints = fdf::CreateEndpoints<
+      fuchsia_hardware_network_driver::Service::NetworkDeviceImpl::ProtocolType>();
+  if (endpoints.is_error()) {
+    return endpoints.take_error();
+  }
+  binding_ = fdf::BindServer(dispatcher_, std::move(endpoints->server), parent_);
+  return zx::ok(std::move(endpoints->client));
+}
+
 zx::result<std::unique_ptr<NetworkDeviceInterface>> FakeNetworkDeviceImpl::CreateChild(
-    async_dispatcher_t* dispatcher) {
-  network_device_impl_protocol_t protocol = proto();
-  zx::result device = internal::DeviceInterface::Create(
-      dispatcher, ddk::NetworkDeviceImplProtocolClient(&protocol));
+    DeviceInterfaceDispatchers dispatchers) {
+  dispatcher_ = dispatchers.impl_->get();
+  auto binder = std::make_unique<Binder>(this, dispatcher_);
+
+  zx::result device = internal::DeviceInterface::Create(dispatchers, std::move(binder));
   if (device.is_error()) {
     return device.take_error();
   }
@@ -350,7 +519,63 @@ zx::result<std::unique_ptr<NetworkDeviceInterface>> FakeNetworkDeviceImpl::Creat
   value->evt_session_started_ = [this](const char* session) {
     event_.signal(0, kEventSessionStarted);
   };
+  value->evt_session_died_ = [this](const char* session) { event_.signal(0, kEventSessionDied); };
   return zx::ok(std::move(value));
+}
+
+zx::result<fdf::ClientEnd<netdriver::NetworkDeviceIfc>> FakeNetworkDeviceIfc::Bind(
+    fdf::Dispatcher* dispatcher) {
+  auto endpoints = fdf::CreateEndpoints<netdriver::NetworkDeviceIfc>();
+  if (endpoints.is_error()) {
+    return endpoints.take_error();
+  }
+
+  fdf::BindServer(dispatcher->get(), std::move(endpoints->server), this);
+
+  return zx::ok(std::move(endpoints->client));
+}
+
+void FakeNetworkDeviceIfc::PortStatusChanged(
+    netdriver::wire::NetworkDeviceIfcPortStatusChangedRequest* request, fdf::Arena& arena,
+    PortStatusChangedCompleter::Sync& completer) {
+  if (port_status_changed_) {
+    port_status_changed_(request, arena, completer);
+  }
+}
+
+void FakeNetworkDeviceIfc::AddPort(netdriver::wire::NetworkDeviceIfcAddPortRequest* request,
+                                   fdf::Arena& arena, AddPortCompleter::Sync& completer) {
+  if (add_port_) {
+    add_port_(request, arena, completer);
+  }
+}
+
+void FakeNetworkDeviceIfc::RemovePort(netdriver::wire::NetworkDeviceIfcRemovePortRequest* request,
+                                      fdf::Arena& arena, RemovePortCompleter::Sync& completer) {
+  if (remove_port_) {
+    remove_port_(request, arena, completer);
+  }
+}
+
+void FakeNetworkDeviceIfc::CompleteRx(netdriver::wire::NetworkDeviceIfcCompleteRxRequest* request,
+                                      fdf::Arena& arena, CompleteRxCompleter::Sync& completer) {
+  if (complete_rx_) {
+    complete_rx_(request, arena, completer);
+  }
+}
+
+void FakeNetworkDeviceIfc::CompleteTx(netdriver::wire::NetworkDeviceIfcCompleteTxRequest* request,
+                                      fdf::Arena& arena, CompleteTxCompleter::Sync& completer) {
+  if (complete_tx_) {
+    complete_tx_(request, arena, completer);
+  }
+}
+
+void FakeNetworkDeviceIfc::Snoop(netdriver::wire::NetworkDeviceIfcSnoopRequest* request,
+                                 fdf::Arena& arena, SnoopCompleter::Sync& completer) {
+  if (snoop_) {
+    snoop_(request, arena, completer);
+  }
 }
 
 }  // namespace network::testing
