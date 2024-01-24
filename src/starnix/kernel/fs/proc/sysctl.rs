@@ -184,11 +184,35 @@ impl BytesFileOps for StubSysctl {
 
 pub fn net_directory(current_task: &CurrentTask, fs: &FileSystemHandle) -> FsNodeHandle {
     let mut dir = StaticDirectoryBuilder::new(fs);
+    dir.entry(
+        current_task,
+        "fib_trie",
+        StubSysctl::new_node("/proc/net/fib_trie", None),
+        mode!(IFREG, 0o400),
+    );
+    dir.entry(
+        current_task,
+        "if_inet6",
+        StubSysctl::new_node("/proc/net/if_inet6", None),
+        mode!(IFREG, 0o444),
+    );
+    dir.entry(
+        current_task,
+        "psched",
+        StubSysctl::new_node("/proc/net/psched", None),
+        mode!(IFREG, 0o444),
+    );
+    dir.entry(
+        current_task,
+        "xt_qtaguid",
+        StubSysctl::new_node("/proc/net/xt_qtaguid", None),
+        mode!(IFREG, 0o644),
+    );
     dir.subdir(current_task, "xt_quota", 0o555, |dir| {
         dir.entry(
             current_task,
             "globalAlert",
-            StubSysctl::new_node("/proc/sys/net/xt_quota/globalAlert", None),
+            StubSysctl::new_node("/proc/net/xt_quota/globalAlert", None),
             mode!(IFREG, 0o444),
         );
     });
