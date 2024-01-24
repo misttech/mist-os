@@ -97,7 +97,6 @@ if (!is_kernel) {
   import("//build/components.gni")
   import("//build/cpp/cpp_fuzzer.gni")
   import("//build/test.gni")
-  import("//build/testing/boot_tests/zbi_test.gni")
 
   test("trivial-allocator-unittests") {
     sources = [
