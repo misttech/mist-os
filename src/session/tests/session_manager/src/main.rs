@@ -52,15 +52,13 @@ mod tests {
         builder
             .add_capability(cm_rust::CapabilityDecl::Config(cm_rust::ConfigurationDecl {
                 name: "fuchsia.session.SessionUrl".to_string().parse()?,
-                value: cm_rust::ConfigValue::Single(cm_rust::ConfigSingleValue::String(
-                    session_url,
-                )),
+                value: session_url.into(),
             }))
             .await?;
         builder
             .add_capability(cm_rust::CapabilityDecl::Config(cm_rust::ConfigurationDecl {
                 name: "fuchsia.session.AutoLaunch".to_string().parse()?,
-                value: cm_rust::ConfigValue::Single(cm_rust::ConfigSingleValue::Bool(autolaunch)),
+                value: autolaunch.into(),
             }))
             .await?;
 

@@ -1442,7 +1442,7 @@ pub struct ConfigValueSpec {
     pub value: ConfigValue,
 }
 
-#[derive(FidlDecl, Debug, Clone, PartialEq, Eq)]
+#[derive(FromEnum, FidlDecl, Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
 #[fidl_decl(fidl_union = "fdecl::ConfigValue")]
 pub enum ConfigValue {
@@ -1473,6 +1473,37 @@ impl ConfigValue {
     }
 }
 
+macro_rules! generate_configvalue_from {
+    ($name:expr, $type:ty) => {
+        impl From<$type> for ConfigValue {
+            fn from(value: $type) -> Self {
+                $name(value.into())
+            }
+        }
+    };
+}
+
+generate_configvalue_from!(ConfigValue::Single, bool);
+generate_configvalue_from!(ConfigValue::Single, u8);
+generate_configvalue_from!(ConfigValue::Single, u16);
+generate_configvalue_from!(ConfigValue::Single, u32);
+generate_configvalue_from!(ConfigValue::Single, u64);
+generate_configvalue_from!(ConfigValue::Single, i8);
+generate_configvalue_from!(ConfigValue::Single, i16);
+generate_configvalue_from!(ConfigValue::Single, i32);
+generate_configvalue_from!(ConfigValue::Single, i64);
+generate_configvalue_from!(ConfigValue::Single, String);
+generate_configvalue_from!(ConfigValue::Vector, Vec<bool>);
+generate_configvalue_from!(ConfigValue::Vector, Vec<u8>);
+generate_configvalue_from!(ConfigValue::Vector, Vec<u16>);
+generate_configvalue_from!(ConfigValue::Vector, Vec<u32>);
+generate_configvalue_from!(ConfigValue::Vector, Vec<u64>);
+generate_configvalue_from!(ConfigValue::Vector, Vec<i8>);
+generate_configvalue_from!(ConfigValue::Vector, Vec<i16>);
+generate_configvalue_from!(ConfigValue::Vector, Vec<i32>);
+generate_configvalue_from!(ConfigValue::Vector, Vec<i64>);
+generate_configvalue_from!(ConfigValue::Vector, Vec<String>);
+
 impl fmt::Display for ConfigValue {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
@@ -1482,7 +1513,7 @@ impl fmt::Display for ConfigValue {
     }
 }
 
-#[derive(FidlDecl, Debug, Clone, PartialEq, Eq)]
+#[derive(FromEnum, FidlDecl, Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
 #[fidl_decl(fidl_union = "fdecl::ConfigSingleValue")]
 pub enum ConfigSingleValue {
@@ -1534,7 +1565,7 @@ impl fmt::Display for ConfigSingleValue {
     }
 }
 
-#[derive(FidlDecl, Debug, Clone, PartialEq, Eq)]
+#[derive(FromEnum, FidlDecl, Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
 #[fidl_decl(fidl_union = "fdecl::ConfigVectorValue")]
 pub enum ConfigVectorValue {
