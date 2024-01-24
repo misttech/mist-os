@@ -154,6 +154,9 @@ class Fastboot:
             target_info["target_state"],
         ) == (self._device_name, "N", "Fastboot")
 
+    # pylint: disable=missing-raises-doc
+    # To handle below pylint warning:
+    #   W9006: "Exception" not documented as being raised (missing-raises-doc)
     def run(
         self,
         cmd: list[str],
@@ -218,6 +221,8 @@ class Fastboot:
             raise errors.FastbootCommandError(
                 f"`{fastboot_cmd}` command failed"
             ) from err
+
+    # pylint: enable=missing-raises-doc
 
     def wait_for_fastboot_mode(
         self, timeout: float = _TIMEOUTS["FASTBOOT_MODE"]

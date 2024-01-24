@@ -19,7 +19,9 @@ persistent=no
 
 # List of plugins (as comma separated values of python modules names) to load,
 # usually to register additional checkers.
-load-plugins=
+# EditedForHoneydew - Start
+load-plugins=pylint.extensions.docstyle,pylint.extensions.docparams
+# EditedForHoneydew - End
 
 # Use multiple processes to speed up Pylint.
 jobs=4
@@ -39,7 +41,14 @@ confidence=
 # either give multiple identifier separated by comma (,) or put this option
 # multiple time (only on the command line, not in the configuration file where
 # it should appear only once). See also the "--disable" option for examples.
-#enable=
+# EditedForHoneydew - Start
+enable=R,
+        missing-class-docstring,
+        missing-function-docstring,
+        missing-module-docstring,
+        empty-docstring,
+        bad-docstring-quotes,
+# EditedForHoneydew - End
 
 # Disable the message, report, category or checker with the given id(s). You
 # can either give multiple identifiers separated by comma (,) or put this
@@ -83,15 +92,16 @@ disable=R,
         input-builtin,
         intern-builtin,
         invalid-str-codec,
+        # EditedForHoneydew - Start
         # TODO(b/303493616): Line-too-long warning is disabled due to Black
         # conflicts, re-enable it once Black resolves the issue.
+        # EditedForHoneydew - End
         line-too-long,
         locally-disabled,
         long-builtin,
         long-suffix,
         map-builtin-not-iterating,
         misplaced-comparison-constant,
-        missing-function-docstring,
         metaclass-assignment,
         next-method-called,
         next-method-defined,

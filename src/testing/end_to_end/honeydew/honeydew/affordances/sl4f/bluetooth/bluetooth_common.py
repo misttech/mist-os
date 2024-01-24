@@ -33,6 +33,7 @@ class BluetoothCommon(bluetooth_common.BluetoothCommon):
     Args:
         device_name: Device name returned by `ffx target list`.
         sl4f: SL4F transport.
+        reboot_affordance: Object that implements RebootCapableDevice.
     """
 
     def __init__(
@@ -109,9 +110,6 @@ class BluetoothCommon(bluetooth_common.BluetoothCommon):
 
         Args:
             identifier: the identifier of target remote device.
-            transport:
-                1 -> Bluetooth classic transport.
-                2 -> Bluetooth LE (low energy) transport.
 
         Raises:
             errors.Sl4fError: On failure.

@@ -310,6 +310,7 @@ class Tracing(tracing.Tracing):
             Bytes read from the socket.
 
         Raises:
+            errors.FuchsiaStateError: When trace session is not initialized.
             errors.FuchsiaControllerError: When reading from the socket failed.
         """
         if not self._session_initialized:

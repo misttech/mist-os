@@ -96,7 +96,7 @@ class FfxConfig:
                 look for plugins.
 
         Raises:
-            errors.FfxCommandError: In case of failure.
+            errors.FfxConfigError: If setup has already been called once.
 
         Note:
             * This method should be called only once to ensure daemon logs are
@@ -522,6 +522,9 @@ class FFX:
         )
         return board_entry["value"]
 
+    # pylint: disable=missing-raises-doc
+    # To handle below pylint warning:
+    #   W9006: "Exception" not documented as being raised (missing-raises-doc)
     def run(
         self,
         cmd: list[str],
@@ -535,9 +538,10 @@ class FFX:
             cmd: FFX command to run.
             timeout: Timeout to wait for the ffx command to return.
             exceptions_to_skip: Any non fatal exceptions to be ignored.
-            capture_output: When True, the stdout/err from the command will be captured and
-                returned. When False, the output of the command will be streamed to stdout/err
-                accordingly and it won't be returned. Defaults to True.
+            capture_output: When True, the stdout/err from the command will be
+                captured and returned. When False, the output of the command
+                will be streamed to stdout/err accordingly and it won't be
+                returned. Defaults to True.
 
         Returns:
             Output of `ffx -t {target} {cmd}` when capture_output is set to True, otherwise an
@@ -591,6 +595,8 @@ class FFX:
 
             raise errors.FfxCommandError(f"`{ffx_cmd}` command failed") from err
 
+    # pylint: enable=missing-raises-doc
+
     def popen(
         self,
         cmd: list[str],
@@ -623,12 +629,10 @@ class FFX:
         timeout: float | None = _TIMEOUTS["FFX_CLI"],
         capture_output: bool = True,
     ) -> str:
-        """
-        Executes and returns the output of `ffx -t {target} test run {component_url}` with the
-        given options.
+        """Executes and returns the output of
+        `ffx -t {target} test run {component_url}` with the given options.
 
         This results in an invocation:
-
         ```
         ffx -t {target} test {component_url} {ffx_test_args} -- {test_component_args}`.
         ```
@@ -755,7 +759,7 @@ class FFX:
 
         Args:
             cmd: FFX command.
-            target: target name or ipaddress.
+            include_target: True to include "-t <target_name>", False otherwise.
 
         Returns:
             FFX command to be run as list of string.
