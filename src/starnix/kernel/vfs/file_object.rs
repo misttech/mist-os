@@ -1011,6 +1011,10 @@ impl FileObject {
         self.ops.as_ref()
     }
 
+    pub fn ops_type_name(&self) -> &'static str {
+        self.ops().type_name()
+    }
+
     /// Returns the `FileObject`'s `FileOps` as a `&T`, or `None` if the downcast fails.
     ///
     /// This is useful for syscalls that only operate on a certain type of file.

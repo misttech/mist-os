@@ -23,7 +23,7 @@ use crate::{
         VecOutputBuffer,
     },
 };
-use starnix_logging::{log_error, log_trace, set_zx_name, track_stub};
+use starnix_logging::{log_error, log_info, log_trace, set_zx_name, track_stub};
 use starnix_sync::{FileOpsRead, MmDumpable, TaskRelease};
 use starnix_syscalls::SyscallResult;
 use starnix_uapi::{
@@ -1520,9 +1520,8 @@ pub fn sys_setns(
         return error!(ENOSYS);
     }
 
-    // If we didn't encounter a supported type of file descriptor above, then ns_fd is not a
-    // suitable namespace to set for this task.
-    log_trace!("ns_fd was not a supported namespace file");
+    track_stub!("unknown ns file for setns, see logs");
+    log_info!("ns_fd was not a supported namespace file: {}", file_handle.ops_type_name());
     error!(EINVAL)
 }
 
