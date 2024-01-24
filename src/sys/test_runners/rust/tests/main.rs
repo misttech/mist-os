@@ -157,11 +157,10 @@ async fn launch_and_run_sample_test_include_disabled() {
         &RunEvent::case_started("my_tests::failing_test")
     );
 
-    // TODO(https://fxbug.dev/132477): Re-enable this
-    // assert_eq!(
-    //     &events_failing_test.stderr_events[1],
-    //     &RunEvent::case_stderr("my_tests::failing_test", "I'm supposed to panic!()")
-    // );
+    assert_eq!(
+        &events_failing_test.stderr_events[1],
+        &RunEvent::case_stderr("my_tests::failing_test", "I'm supposed to panic!()")
+    );
 
     let events_ignored_failing_test =
         grouped_events.get(&Some("my_tests::ignored_failing_test".to_string())).unwrap();
