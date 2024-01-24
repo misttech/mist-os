@@ -87,7 +87,6 @@
 //src/devices/block/drivers/ramdisk:ramdisk-driver
 //src/devices/block/drivers/sdhci:sdhci-driver
 //src/devices/block/drivers/sdmmc:sdmmc-driver
-//src/devices/block/drivers/sdmmc-dfv1:sdmmc-dfv1-driver
 //src/devices/block/drivers/ufs:ufs-driver
 //src/devices/block/drivers/ums-function:ums-function-driver
 //src/devices/block/drivers/usb-mass-storage:usb-mass-storage-driver

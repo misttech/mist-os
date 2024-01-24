@@ -131,7 +131,6 @@ source_set("ddktl") {
     "//src/devices/block/drivers/mbr:*",
     "//src/devices/block/drivers/ramdisk:*",
     "//src/devices/block/drivers/sdmmc:*",
-    "//src/devices/block/drivers/sdmmc-dfv1:*",
     "//src/devices/block/drivers/virtio:*",
     "//src/devices/block/drivers/zxcrypt:*",
     "//src/devices/block/lib/scsi:*",

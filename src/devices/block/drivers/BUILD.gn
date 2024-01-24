@@ -19,7 +19,6 @@ group("tests") {
     "ramdisk:tests",
     "sdhci:tests",
     "sdmmc:tests",
-    "sdmmc-dfv1:tests",
     "ufs:tests",
     "usb-mass-storage:tests",
     "virtio:tests",
