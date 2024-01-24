@@ -70,9 +70,12 @@ void DeviceManager::DdkUnbind(ddk::UnbindTxn txn) {
   fbl::AutoLock lock(&mtx_);
   switch (state_) {
     case kSealed:
+      break;
     case kUnsealed:
     case kUnsealedShredded:
     case kSealing:
+      // The child device should have been removed by the driver manager already.
+      ZX_PANIC("unexpected DdkUnbind before child device removed, state=%d", state_);
       break;
     case kBinding:
     case kRemoved:
@@ -104,9 +107,9 @@ void DeviceManager::DdkChildPreRelease(void* child_ctx) {
     case kUnsealed:
     case kUnsealedShredded:
       // These can be triggered if some other program explicitly unbound our
-      // child out from under us.  It's not expected, but let's handle it
-      // cleanly anyway and return the device to the Sealed state.
-      zxlogf(ERROR, "unexpected DdkChildPreRelease, state=%d", state_);
+      // child out from under us, or in the case of shutting down the driver
+      // manager will remove the child before calling our Unbind.
+      // Return the device to the Sealed state.
       TransitionState(kSealed);
       break;
     case kRemoved:
