@@ -140,7 +140,7 @@ fn parse_action(pair: Pair<'_, Rule>) -> filter::Action {
         Rule::pass => filter::Action::Pass,
         Rule::drop => filter::Action::Drop,
         Rule::dropreset => filter::Action::DropReset,
-        _ => unreachable!(),
+        _ => unreachable!("action must be one of (pass|drop|dropreset)"),
     }
 }
 
@@ -149,7 +149,7 @@ fn parse_direction(pair: Pair<'_, Rule>) -> filter::Direction {
     match pair.into_inner().next().unwrap().as_rule() {
         Rule::incoming => filter::Direction::Incoming,
         Rule::outgoing => filter::Direction::Outgoing,
-        _ => unreachable!(),
+        _ => unreachable!("direction must be one of (in|out)"),
     }
 }
 
@@ -160,7 +160,7 @@ fn parse_proto(pair: Pair<'_, Rule>) -> filter::SocketProtocol {
             Rule::tcp => filter::SocketProtocol::Tcp,
             Rule::udp => filter::SocketProtocol::Udp,
             Rule::icmp => filter::SocketProtocol::Icmp,
-            _ => unreachable!(),
+            _ => unreachable!("protocol must be one of (tcp|udp|icmp)"),
         },
         None => filter::SocketProtocol::Any,
     }
@@ -176,7 +176,7 @@ fn parse_devclass(pair: Pair<'_, Rule>) -> filter::DeviceClass {
             Rule::ppp => filter::DeviceClass::Match_(fhnet::DeviceClass::Ppp),
             Rule::bridge => filter::DeviceClass::Match_(fhnet::DeviceClass::Bridge),
             Rule::ap => filter::DeviceClass::Match_(fhnet::DeviceClass::WlanAp),
-            _ => unreachable!(),
+            _ => unreachable!("devclass must be one of (virt|ethernet|wlan|ppp|bridge|ap)"),
         },
         None => filter::DeviceClass::Any(filter::Empty {}),
     }
@@ -211,7 +211,7 @@ fn parse_src_or_dst(
                 Ok((Some(Box::new(subnet)), invert_match, port))
             }
             Rule::port_range => Ok((None, false, parse_port_range(pair)?)),
-            _ => unreachable!(),
+            _ => unreachable!("src or dst must be either an invertible subnet or port range"),
         },
         None => Ok((None, false, filter::PortRange { start: 0, end: 0 })),
     }
@@ -227,7 +227,7 @@ fn parse_invertible_subnet(pair: Pair<'_, Rule>) -> Result<(net::Subnet, bool), 
             true
         }
         Rule::subnet => false,
-        _ => unreachable!(),
+        _ => unreachable!("invertible subnet must be either not or a subnet"),
     };
     let subnet = parse_subnet(pair)?;
     Ok((subnet, invert_match))
@@ -239,7 +239,7 @@ fn parse_subnet(pair: Pair<'_, Rule>) -> Result<net::Subnet, Error> {
     let addr = parse_ipaddr(inner.next().unwrap())?;
     let prefix_len = parse_prefix_len(inner.next().unwrap())?;
 
-    Ok(net::Subnet { addr: addr, prefix_len: prefix_len })
+    Ok(net::Subnet { addr, prefix_len })
 }
 
 fn parse_ipaddr(pair: Pair<'_, Rule>) -> Result<net::IpAddress, Error> {
@@ -275,7 +275,7 @@ fn parse_port_range(pair: Pair<'_, Rule>) -> Result<filter::PortRange, Error> {
             let port_end = parse_port_num(inner.next().unwrap())?;
             Ok(filter::PortRange { start: port_start, end: port_end })
         }
-        _ => unreachable!(),
+        _ => unreachable!("port range must be either a single port, or a port range"),
     }
 }
 
@@ -297,7 +297,7 @@ fn parse_state(pair: Pair<'_, Rule>) -> bool {
             match pair.as_str() {
                 "no" => false,
                 "keep" => true,
-                _ => unreachable!(),
+                _ => unreachable!("state must be either (no|keep)"),
             }
         }
         None => false, // no state by default
@@ -318,19 +318,19 @@ fn parse_rule(pair: Pair<'_, Rule>) -> Result<filter::Rule, Error> {
     let keep_state = parse_state(pairs.next().unwrap());
 
     Ok(filter::Rule {
-        action: action,
-        direction: direction,
-        proto: proto,
-        src_subnet: src_subnet,
-        src_subnet_invert_match: src_subnet_invert_match,
-        src_port_range: src_port_range,
-        dst_subnet: dst_subnet,
-        dst_subnet_invert_match: dst_subnet_invert_match,
-        dst_port_range: dst_port_range,
+        action,
+        direction,
+        proto,
+        src_subnet,
+        src_subnet_invert_match,
+        src_port_range,
+        dst_subnet,
+        dst_subnet_invert_match,
+        dst_port_range,
         nic: 0, // TODO: Support NICID (currently always 0 (= any))
-        log: log,
-        keep_state: keep_state,
-        device_class: device_class,
+        log,
+        keep_state,
+        device_class,
     })
 }
 
@@ -342,8 +342,8 @@ fn parse_nat(pair: Pair<'_, Rule>) -> Result<filter::Nat, Error> {
     let src_subnet = parse_subnet(pairs.next().unwrap())?;
 
     Ok(filter::Nat {
-        proto: proto,
-        src_subnet: src_subnet,
+        proto,
+        src_subnet,
         outgoing_nic: 0, // TODO: Support NICID.
     })
 }
@@ -359,11 +359,11 @@ fn parse_rdr(pair: Pair<'_, Rule>) -> Result<filter::Rdr, Error> {
     let new_dst_port_range = parse_port_range(pairs.next().unwrap())?;
 
     Ok(filter::Rdr {
-        proto: proto,
-        dst_addr: dst_addr,
-        dst_port_range: dst_port_range,
-        new_dst_addr: new_dst_addr,
-        new_dst_port_range: new_dst_port_range,
+        proto,
+        dst_addr,
+        dst_port_range,
+        new_dst_addr,
+        new_dst_port_range,
         nic: 0, // TODO: Support NICID.
     })
 }
@@ -423,7 +423,7 @@ pub fn parse_str_to_rules(line: &str) -> Result<Vec<filter::Rule>, Error> {
                 rules.push(rule);
             }
             Rule::EOI => (),
-            _ => unreachable!(),
+            _ => unreachable!("rule must only have a rule case"),
         }
     }
     Ok(rules)
@@ -439,7 +439,7 @@ pub fn parse_str_to_nat_rules(line: &str) -> Result<Vec<filter::Nat>, Error> {
                 nat_rules.push(nat);
             }
             Rule::EOI => (),
-            _ => unreachable!(),
+            _ => unreachable!("nat must only have a nat case"),
         }
     }
     Ok(nat_rules)
@@ -456,7 +456,7 @@ pub fn parse_str_to_rdr_rules(line: &str) -> Result<Vec<filter::Rdr>, Error> {
                 rdr_rules.push(rdr);
             }
             Rule::EOI => (),
-            _ => unreachable!(),
+            _ => unreachable!("rdr must only have a rdr case"),
         }
     }
     Ok(rdr_rules)
