@@ -5,8 +5,8 @@
 """Wlan policy affordance implementation using SL4F."""
 
 import logging
+from collections.abc import Mapping
 from enum import StrEnum
-from typing import Mapping
 
 from honeydew.interfaces.affordances.wlan import wlan_policy
 from honeydew.transports.sl4f import SL4F

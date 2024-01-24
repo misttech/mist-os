@@ -5,7 +5,7 @@
 """Contains Abstract Base Classes for all affordances capable devices."""
 
 import abc
-from typing import Callable
+from collections.abc import Callable
 
 from honeydew.interfaces.device_classes import fuchsia_device
 

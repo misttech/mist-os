@@ -5,7 +5,7 @@
 """Abstract base class for Fuchsia device."""
 
 import abc
-from typing import Callable
+from collections.abc import Callable
 
 from honeydew import custom_types
 from honeydew.interfaces.affordances import session, tracing

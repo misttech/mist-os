@@ -7,7 +7,8 @@
 import ipaddress
 import logging
 import subprocess
-from typing import Any, Iterable, Type
+from collections.abc import Iterable
+from typing import Any
 
 from honeydew import errors
 from honeydew.interfaces.device_classes import affordances_capable
@@ -161,7 +162,7 @@ class Fastboot:
         self,
         cmd: list[str],
         timeout: float = _TIMEOUTS["FASTBOOT_CLI"],
-        exceptions_to_skip: Iterable[Type[Exception]] | None = None,
+        exceptions_to_skip: Iterable[type[Exception]] | None = None,
     ) -> list[str]:
         """Executes and returns the output of `fastboot -s {node} {cmd}`.
 

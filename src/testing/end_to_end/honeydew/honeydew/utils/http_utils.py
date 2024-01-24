@@ -8,7 +8,8 @@ import json
 import logging
 import time
 import urllib.request
-from typing import Any, Iterable, Type
+from collections.abc import Iterable
+from typing import Any
 
 from honeydew import errors
 
@@ -31,7 +32,7 @@ def send_http_request(
     timeout: float = _TIMEOUTS["HTTP_RESPONSE"],
     attempts: int = _DEFAULTS["ATTEMPTS"],
     interval: int = _DEFAULTS["INTERVAL"],
-    exceptions_to_skip: Iterable[Type[Exception]] | None = None,
+    exceptions_to_skip: Iterable[type[Exception]] | None = None,
 ) -> dict[str, Any]:
     """Send HTTP request and returns the string response.
 

@@ -6,8 +6,8 @@
 
 import abc
 import os
+from collections.abc import Iterator
 from contextlib import contextmanager
-from typing import Iterator
 
 
 class Tracing(abc.ABC):

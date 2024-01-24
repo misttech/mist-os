@@ -9,7 +9,8 @@ import ipaddress
 import json
 import logging
 import subprocess
-from typing import Any, Iterable, Type
+from collections.abc import Iterable
+from typing import Any
 
 import fuchsia_controller_py as fuchsia_controller
 
@@ -529,7 +530,7 @@ class FFX:
         self,
         cmd: list[str],
         timeout: float | None = _TIMEOUTS["FFX_CLI"],
-        exceptions_to_skip: Iterable[Type[Exception]] | None = None,
+        exceptions_to_skip: Iterable[type[Exception]] | None = None,
         capture_output: bool = True,
     ) -> str:
         """Executes and returns the output of `ffx -t {target} {cmd}`.

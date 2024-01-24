@@ -5,7 +5,8 @@
 """Utility module for different type of property decorators in Honeydew."""
 
 import functools
-from typing import Any, Callable
+from collections.abc import Callable
+from typing import Any
 
 
 class DynamicProperty(property):

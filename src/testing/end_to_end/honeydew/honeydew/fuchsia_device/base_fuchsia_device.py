@@ -8,8 +8,9 @@ import abc
 import ipaddress
 import logging
 import os
+from collections.abc import Callable
 from datetime import datetime
-from typing import Any, Callable
+from typing import Any
 
 from honeydew import custom_types, errors
 from honeydew.affordances.ffx import session as session_ffx

@@ -7,7 +7,8 @@
 import ipaddress
 import logging
 import time
-from typing import Any, Iterable, Type
+from collections.abc import Iterable
+from typing import Any
 
 from honeydew import custom_types, errors
 from honeydew.transports import ffx
@@ -118,7 +119,7 @@ class SL4F:
         timeout: float = _TIMEOUTS["RESPONSE"],
         attempts: int = _DEFAULTS["ATTEMPTS"],
         interval: int = _DEFAULTS["INTERVAL"],
-        exceptions_to_skip: Iterable[Type[Exception]] | None = None,
+        exceptions_to_skip: Iterable[type[Exception]] | None = None,
     ) -> dict[str, Any]:
         """Run the SL4F method on Fuchsia device and return the response.
 
