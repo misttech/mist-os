@@ -36,6 +36,7 @@ class Flags:
     suggestion_count: int
 
     parallel: int
+    parallel_cases: int
     random: bool
     count: int
     limit: int | None
@@ -87,6 +88,10 @@ class Flags:
             and pathlib.Path(self.ffx_output_directory).is_file()
         ):
             raise FlagError("--ffx-output-directory cannot be a file")
+        if self.parallel < 0:
+            raise FlagError("--parallel must be non-negative")
+        if self.parallel_cases < 0:
+            raise FlagError("--parallel-cases must be non-negative")
 
         if not termout.is_valid() and self.status:
             raise FlagError(
@@ -264,6 +269,12 @@ def parse_args(
         type=int,
         help="Maximum number of test suites to run in parallel. Does not affect per-suite parallelism.",
         default=4,
+    )
+    execution.add_argument(
+        "--parallel-cases",
+        type=int,
+        help="Instruct on-device test runners to prefer running this number of cases in parallel.",
+        default=0,
     )
     execution.add_argument(
         "-r",

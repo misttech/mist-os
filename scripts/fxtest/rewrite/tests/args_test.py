@@ -69,6 +69,14 @@ class TestArgs(unittest.TestCase):
                 "cannot output to a file",
                 ["--ffx-output-directory", GLOBAL_FILE_NAME],
             ),
+            (
+                "cannot set a negative --parallel",
+                ["--parallel", "-1"],
+            ),
+            (
+                "cannot set a negative --parallel-cases",
+                ["--parallel-cases", "-1"],
+            ),
         ]
     )
     @mock.patch("args.termout.is_valid", return_value=False)

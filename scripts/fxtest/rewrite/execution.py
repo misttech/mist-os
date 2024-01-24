@@ -128,11 +128,19 @@ class TestExecution:
             if min_severity_logs:
                 for min_severity_log in min_severity_logs:
                     extra_args += ["--min-severity-logs", min_severity_log]
-            if self._test.build.test.parallel is not None:
+
+            parallel_cases = self._flags.parallel_cases
+            if (
+                parallel_cases == 0
+                and self._test.build.test.parallel is not None
+            ):
+                parallel_cases = self._test.build.test.parallel
+            if parallel_cases != 0:
                 extra_args += [
                     "--parallel",
-                    str(self._test.build.test.parallel),
+                    str(parallel_cases),
                 ]
+
             for test_filter in self._flags.test_filter:
                 extra_args += ["--test-filter", test_filter]
             if self._flags.also_run_disabled_tests:

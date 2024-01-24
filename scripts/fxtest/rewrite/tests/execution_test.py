@@ -195,9 +195,35 @@ class TestExecution(unittest.IsolatedAsyncioTestCase):
         self.assertIsNone(test.environment())
         self.assertTrue(test.should_symbolize())
 
-    async def test_test_execution_component_parallel(self):
-        """Test the usage of the TestExecution wrapper on a component test with a parallel override"""
-
+    @parameterized.expand(
+        [
+            (
+                "test execution does not pass a --parallel by default",
+                None,
+                None,
+                [],
+            ),
+            (
+                "test execution respects parallel overrides in test specs",
+                1,
+                None,
+                ["--parallel", "1"],
+            ),
+            (
+                "test execution flag overrides test spec",
+                4,
+                2,
+                ["--parallel", "2"],
+            ),
+        ]
+    )
+    async def test_test_execution_parallel_cases(
+        self,
+        _unused_name,
+        spec_parallel: int | None,
+        flag_parallel: int | None,
+        expected_args: typing.List[str],
+    ):
         exec_env = environment.ExecutionEnvironment(
             "/fuchsia", "/out/fuchsia", None, "", ""
         )
@@ -206,7 +232,7 @@ class TestExecution(unittest.IsolatedAsyncioTestCase):
             test_list_file.Test(
                 tests_json_file.TestEntry(
                     tests_json_file.TestSection(
-                        "foo", "//foo", "fuchsia", parallel=1
+                        "foo", "//foo", "fuchsia", parallel=spec_parallel
                     )
                 ),
                 test_list_file.TestListEntry(
@@ -221,7 +247,14 @@ class TestExecution(unittest.IsolatedAsyncioTestCase):
                 ),
             ),
             exec_env,
-            args.parse_args(["--no-use-package-hash"]),
+            args.parse_args(
+                ["--no-use-package-hash"]
+                + (
+                    []
+                    if not flag_parallel
+                    else ["--parallel-cases", str(flag_parallel)]
+                )
+            ),
         )
 
         self.assertListEqual(
@@ -237,8 +270,9 @@ class TestExecution(unittest.IsolatedAsyncioTestCase):
                 "INFO",
                 "--min-severity-logs",
                 "TRACE",
-                "--parallel",
-                "1",
+            ]
+            + expected_args
+            + [
                 "fuchsia-pkg://fuchsia.com/foo#meta/foo_test.cm",
             ],
         )
