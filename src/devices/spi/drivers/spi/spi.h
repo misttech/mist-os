@@ -6,6 +6,7 @@
 #define SRC_DEVICES_SPI_DRIVERS_SPI_SPI_H_
 
 #include <fidl/fuchsia.hardware.spi.businfo/cpp/wire.h>
+#include <fidl/fuchsia.hardware.spi/cpp/fidl.h>
 #include <fidl/fuchsia.hardware.spiimpl/cpp/wire.h>
 #include <fuchsia/hardware/spiimpl/cpp/banjo.h>
 
@@ -28,6 +29,7 @@ class SpiDevice : public SpiDeviceType {
   void DdkRelease();
 
  private:
+  template <typename T>
   void AddChildren(async_dispatcher_t* dispatcher,
                    const fuchsia_hardware_spi_businfo::wire::SpiBusMetadata& metadata);
 

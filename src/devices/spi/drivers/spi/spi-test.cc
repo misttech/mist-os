@@ -22,6 +22,7 @@
 
 #include <zxtest/zxtest.h>
 
+#include "spi-banjo-child.h"
 #include "spi-child.h"
 #include "src/devices/lib/fidl-metadata/spi.h"
 #include "src/devices/testing/mock-ddk/mock-device.h"
@@ -301,7 +302,8 @@ void SpiDeviceTest<FakeSpiImplClass>::SpiTest() {
     zx::result endpoints = fidl::CreateEndpoints<fuchsia_hardware_spi::Device>();
     ASSERT_OK(endpoints);
     auto& [client, server] = endpoints.value();
-    fidl::BindServer(loop_.dispatcher(), std::move(server), (*it)->GetDeviceContext<SpiChild>());
+    fidl::BindServer(loop_.dispatcher(), std::move(server),
+                     (*it)->GetDeviceContext<typename FakeSpiImplClass::ChildType>());
 
     set_test_mode(FakeSpiImplBase::SpiTestMode::kTransmit);
     EXPECT_OK(spilib_transmit(client, txbuf, sizeof txbuf));
@@ -718,7 +720,7 @@ void SpiDeviceTest<FakeSpiImplClass>::OneClient() {
     ASSERT_OK(endpoints);
     auto& [controller, server] = endpoints.value();
     fidl::BindServer(loop_.dispatcher(), std::move(server),
-                     spi_child->GetDeviceContext<SpiChild>());
+                     spi_child->GetDeviceContext<typename FakeSpiImplClass::ChildType>());
     {
       zx::result endpoints = fidl::CreateEndpoints<fuchsia_hardware_spi::Device>();
       ASSERT_OK(endpoints);
@@ -737,7 +739,7 @@ void SpiDeviceTest<FakeSpiImplClass>::OneClient() {
     ASSERT_OK(endpoints);
     auto& [controller, server] = endpoints.value();
     fidl::BindServer(loop_.dispatcher(), std::move(server),
-                     spi_child->GetDeviceContext<SpiChild>());
+                     spi_child->GetDeviceContext<typename FakeSpiImplClass::ChildType>());
     {
       zx::result server = fidl::CreateEndpoints<fuchsia_hardware_spi::Device>(&device);
       ASSERT_OK(server);
@@ -765,7 +767,7 @@ void SpiDeviceTest<FakeSpiImplClass>::OneClient() {
     ASSERT_OK(endpoints);
     auto& [controller, server] = endpoints.value();
     fidl::BindServer(loop_.dispatcher(), std::move(server),
-                     spi_child->GetDeviceContext<SpiChild>());
+                     spi_child->GetDeviceContext<typename FakeSpiImplClass::ChildType>());
     {
       zx::result endpoints = fidl::CreateEndpoints<fuchsia_hardware_spi::Device>();
       ASSERT_OK(endpoints);
@@ -843,6 +845,8 @@ namespace {
 class FakeDdkSpiImpl : public ddk::SpiImplProtocol<FakeDdkSpiImpl, ddk::base_protocol>,
                        public FakeSpiImplBase {
  public:
+  using ChildType = SpiBanjoChild;
+
   spi_impl_protocol_ops_t* ops() { return &spi_impl_protocol_ops_; }
 
   uint32_t SpiImplGetChipSelectCount() { return kChipSelectCount; }
@@ -913,6 +917,8 @@ namespace {
 class FakeSpiImplServer : public fidl::testing::WireTestBase<fuchsia_hardware_spiimpl::SpiImpl>,
                           public FakeSpiImplBase {
  public:
+  using ChildType = SpiChild;
+
   fidl::ProtocolHandler<fuchsia_hardware_spiimpl::SpiImpl> GetHandler() {
     return bindings_.CreateHandler(this, async_get_default_dispatcher(),
                                    std::mem_fn(&FakeSpiImplServer::OnClosed));

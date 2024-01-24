@@ -51,6 +51,7 @@ fuchsia_driver("spi-driver") {
     "//build/config/fuchsia:enable_zircon_asserts",
   ]
   sources = [
+    "spi-banjo-child.cc",
     "spi-child.cc",
     "spi-impl-client.cc",
     "spi.cc",
@@ -77,6 +78,7 @@ fuchsia_driver_package("package") {
 test("spi-test-bin") {
   output_name = "spi-test"
   sources = [
+    "spi-banjo-child.cc",
     "spi-child.cc",
     "spi-impl-client.cc",
     "spi-test.cc",

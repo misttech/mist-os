@@ -10,6 +10,7 @@
 
 #include <fbl/alloc_checker.h>
 
+#include "spi-banjo-child.h"
 #include "spi-child.h"
 #include "src/devices/spi/drivers/spi/spi-impl-client.h"
 
@@ -51,7 +52,14 @@ zx_status_t SpiDevice::Create(void* ctx, zx_device_t* parent, async_dispatcher_t
     zxlogf(INFO, "No channels supplied.");
   } else {
     zxlogf(INFO, "%zu channels supplied.", metadata.channels().count());
-    device->AddChildren(dispatcher, metadata);
+
+    if (std::holds_alternative<FidlSpiImplClient>(*device->spi_impl_)) {
+      device->AddChildren<SpiChild>(dispatcher, metadata);
+    } else if (std::holds_alternative<BanjoSpiImplClient>(*device->spi_impl_)) {
+      device->AddChildren<SpiBanjoChild>(dispatcher, metadata);
+    } else {
+      ZX_DEBUG_ASSERT_MSG(false, "Banjo and FIDL clients are both invalid");
+    }
   }
 
   [[maybe_unused]] auto* dummy = device.release();
@@ -88,6 +96,7 @@ zx_status_t SpiDevice::Init() {
   return ZX_OK;
 }
 
+template <typename T>
 void SpiDevice::AddChildren(async_dispatcher_t* dispatcher,
                             const fuchsia_hardware_spi_businfo::wire::SpiBusMetadata& metadata) {
   bool has_siblings = metadata.channels().count() > 1;
@@ -98,8 +107,7 @@ void SpiDevice::AddChildren(async_dispatcher_t* dispatcher,
     const auto did = channel.has_did() ? channel.did() : 0;
 
     fbl::AllocChecker ac;
-    std::unique_ptr<SpiChild> dev(
-        new (&ac) SpiChild(zxdev(), GetSpiImpl(), cs, has_siblings, dispatcher));
+    std::unique_ptr<T> dev(new (&ac) T(zxdev(), GetSpiImpl(), cs, has_siblings, dispatcher));
     if (!ac.check()) {
       zxlogf(ERROR, "Out of memory");
       return;
