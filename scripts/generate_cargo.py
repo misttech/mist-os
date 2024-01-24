@@ -402,6 +402,11 @@ def write_toml_file(
             if "third_party/rust_crates:" in dep:
                 match = re.search(r"rust_crates:([\w-]*)", dep)
                 crate_name, version = str(match.group(1)).rsplit("-v", 1)
+                if crate_name in dep_crate_names:
+                    # Don't add the same crate twice. Can happen with many
+                    # versions of the same crate declared with different
+                    # features.
+                    continue
                 dep_crate_names.add(crate_name)
                 version = version.replace("_", ".")
                 fout.write('[%s."%s"]\n' % (dep_type, crate_name))
@@ -424,6 +429,12 @@ def write_toml_file(
                 crate_name = lookup_gn_pkg_name(
                     project, dep, for_workspace=for_workspace
                 )
+                if crate_name in dep_crate_names:
+                    # Don't add the same crate twice. Can happen with many
+                    # versions of the same crate declared with different
+                    # features.
+                    continue
+                dep_crate_names.add(crate_name)
                 dep_dir = os.path.join(gn_cargo_dir, str(lookup[dep]))
                 fout.write(
                     CARGO_PACKAGE_DEP
