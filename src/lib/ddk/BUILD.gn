@@ -188,6 +188,7 @@ sdk_static_library("ddk") {
     "//src/devices/board/drivers/qemu-arm64:*",
     "//src/devices/board/drivers/qemu-riscv64:*",
     "//src/devices/board/drivers/sherlock:*",
+    "//src/devices/board/drivers/sherlock/post-init:*",
     "//src/devices/board/drivers/vim3:*",
     "//src/devices/board/drivers/x86:*",
     "//src/devices/board/lib/acpi:*",
