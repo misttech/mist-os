@@ -46,7 +46,6 @@
           "units": "pixels"
         }
       },
-      "start_up_args_template": "",
       "ports": null
     }
   }

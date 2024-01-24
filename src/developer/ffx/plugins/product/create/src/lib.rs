@@ -213,31 +213,8 @@ pub async fn pb_create_with_sdk_version(
         std::fs::create_dir_all(&vd_dir).context("Creating the virtual_devices directory.")?;
 
         for path in cmd.virtual_device {
-            let mut device = VirtualDevice::try_load_from(&path)
+            let device = VirtualDevice::try_load_from(&path)
                 .with_context(|| format!("Parsing file as virtual device: '{}'", path))?;
-
-            match device {
-                VirtualDevice::V1(ref mut device) => {
-                    // Copy the template to the directory.
-                    let template_path = path
-                        .parent()
-                        .with_context(|| format!("Template path has no parent: '{}'", path))?
-                        .join(&device.start_up_args_template);
-                    copy_file(&template_path, &vd_dir).with_context(|| {
-                        format!("Copying template file to target directory: '{}'", template_path)
-                    })?;
-
-                    // Update the template path in the virtual device.
-                    let template_file_name =
-                        device.start_up_args_template.file_name().with_context(|| {
-                            format!(
-                                "Template path has no file name: '{}'",
-                                &device.start_up_args_template
-                            )
-                        })?;
-                    device.start_up_args_template = Utf8PathBuf::from(template_file_name);
-                }
-            }
 
             // Write the virtual device to the directory.
             let device_file_name =

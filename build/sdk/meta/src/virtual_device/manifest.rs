@@ -65,18 +65,6 @@ impl VirtualDeviceManifest {
         }
     }
 
-    /// Given a VirtualDevice, ensure the template path is specified relative to this manifest's
-    /// local filesystem path.
-    fn adjust_template_path(&self, mut device: VirtualDevice) -> VirtualDevice {
-        match device {
-            VirtualDevice::V1(ref mut v) => {
-                let template = &v.start_up_args_template;
-                v.start_up_args_template = self.parent_dir_path.join(template);
-            }
-        }
-        device
-    }
-
     /// Return a vector of the Virtual Device names listed in this manifest.
     /// Placing the recommended device at position 0.
     pub fn device_names(&self) -> Vec<String> {
@@ -112,7 +100,7 @@ impl VirtualDeviceManifest {
             VirtualDevice::try_load_from(&self.parent_dir_path.join(path)).with_context(|| {
                 format!("parse virtual device file '{}'", self.parent_dir_path.join(path))
             })?;
-        Ok(self.adjust_template_path(device))
+        Ok(device)
     }
 
     /// If this manifest has a "recommended" virtual device specified, deserialize that file and
@@ -131,9 +119,7 @@ impl VirtualDeviceManifest {
             .device_paths
             .get(rec)
             .ok_or_else(|| anyhow!("Default of '{}' was not found in the device manifest.", rec))?;
-        VirtualDevice::try_load_from(&self.parent_dir_path.join(path))
-            .map(|d| self.adjust_template_path(d))
-            .map(|d| Some(d))
+        VirtualDevice::try_load_from(&self.parent_dir_path.join(path)).map(|d| Some(d))
     }
 }
 

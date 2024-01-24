@@ -4,7 +4,6 @@
 
 //! The show_output module contains print routines for the Show subcommand.
 
-use camino::Utf8PathBuf;
 use emulator_instance::{EmulatorConfiguration, NetworkingMode};
 use ffx_emulator_config::ShowDetail;
 use sdk_metadata::{
@@ -73,9 +72,6 @@ pub(crate) fn device(emu_config: &EmulatorConfiguration) -> ShowDetail {
             memory: emu_config.device.memory.clone(),
             window_size: emu_config.device.screen.clone(),
         },
-
-        // TODO(wilkinsonclay): Removing the template from the Virtual device.
-        start_up_args_template: Utf8PathBuf::new(),
         ports: None,
     };
 

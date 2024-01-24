@@ -12,7 +12,6 @@ use {
         },
         json::{schema, JsonObject},
     },
-    camino::Utf8PathBuf,
     serde::{Deserialize, Serialize},
     std::collections::HashMap,
 };
@@ -105,10 +104,6 @@ pub struct VirtualDeviceV1 {
     /// Details about the properties of the device.
     pub hardware: Hardware,
 
-    /// Relative path to the file containing the start-up arguments
-    /// Handlebars template.
-    pub start_up_args_template: Utf8PathBuf,
-
     /// A map of names to port numbers. These are the ports that need to be
     /// available to the virtual device, though a given use case may not require
     /// all of them. When emulating with user-mode networking, these must be
@@ -126,7 +121,6 @@ impl VirtualDeviceV1 {
             description: None,
             kind: ElementType::VirtualDevice,
             hardware,
-            start_up_args_template: Utf8PathBuf::new(),
             ports: None,
         }
     }

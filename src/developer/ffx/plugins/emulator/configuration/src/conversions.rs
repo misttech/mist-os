@@ -83,16 +83,7 @@ fn parse_device_name_as_path(path: &Option<String>) -> Option<VirtualDevice> {
             return None;
         }
         match VirtualDevice::try_load_from(&path) {
-            Ok(VirtualDevice::V1(mut vd)) => {
-                // The template file path is relative to the device file.
-                tracing::debug!("Using file '{}' as a virtual device.", path);
-                let template = vd.start_up_args_template;
-                // The path was successfully used for a device file, so it must
-                // have a parent, and this '.unwrap()' will never fail.
-                let parent = path.parent().unwrap();
-                vd.start_up_args_template = parent.join(template);
-                Some(VirtualDevice::V1(vd))
-            }
+            Ok(VirtualDevice::V1(vd)) => Some(VirtualDevice::V1(vd)),
             Err(_) => {
                 println!(
                     "Attempted to use the file at '{}' to configure the device, but the contents \
@@ -232,7 +223,6 @@ mod tests {
                 memory: DataAmount { quantity: 4, units: DataUnits::Gigabytes },
                 window_size: Screen { height: 480, width: 640, units: ScreenUnits::Pixels },
             },
-            start_up_args_template: Utf8PathBuf::from_path_buf(template_path.clone()).unwrap(),
             ports: None,
         };
 
@@ -281,7 +271,6 @@ mod tests {
             memory: DataAmount { quantity: 2048, units: DataUnits::Megabytes },
             window_size: Screen { height: 1024, width: 1280, units: ScreenUnits::Pixels },
         };
-        device.start_up_args_template = Utf8PathBuf::from_path_buf(template_path).unwrap();
 
         let mut ports = HashMap::new();
         ports.insert("ssh".to_string(), 22);

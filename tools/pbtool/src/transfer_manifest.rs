@@ -9,7 +9,7 @@ use argh::FromArgs;
 use assembly_manifest::Image;
 use camino::{Utf8Path, Utf8PathBuf};
 use pathdiff::diff_utf8_paths;
-use sdk_metadata::{ProductBundle, VirtualDevice, VirtualDeviceManifest};
+use sdk_metadata::{ProductBundle, VirtualDeviceManifest};
 use std::fs::File;
 use transfer_manifest::{
     ArtifactEntry, ArtifactType, TransferEntry, TransferManifest, TransferManifestV1,
@@ -123,17 +123,6 @@ impl GenerateTransferManifest {
                     name: diff_utf8_paths(&virtual_device_path, &canonical_product_bundle_path)
                         .context("rebasing virtual device path")?,
                 });
-                let virtual_device_dir = virtual_device_path.parent().unwrap_or("".into());
-                match VirtualDevice::try_load_from(&virtual_device_path)? {
-                    VirtualDevice::V1(virtual_device) => {
-                        let template_path =
-                            virtual_device_dir.join(&virtual_device.start_up_args_template);
-                        product_bundle_entries.push(ArtifactEntry {
-                            name: diff_utf8_paths(template_path, &canonical_product_bundle_path)
-                                .context("rebasing virtual device template path")?,
-                        });
-                    }
-                }
             }
         }
 
@@ -198,7 +187,7 @@ mod tests {
     use camino::Utf8Path;
     use fuchsia_repo::test_utils;
     use sdk_metadata::virtual_device::Hardware;
-    use sdk_metadata::{ProductBundleV2, Repository, VirtualDeviceV1};
+    use sdk_metadata::{ProductBundleV2, Repository, VirtualDevice, VirtualDeviceV1};
     use std::io::Write;
     use tempfile::tempdir;
 
@@ -235,8 +224,7 @@ mod tests {
         ]
         .into();
         for (name, path) in &vd_manifest.device_paths {
-            let mut vd = VirtualDeviceV1::new(name, Hardware::default());
-            vd.start_up_args_template = vd_dir.join(format!("{name}_flags.json.template"));
+            let vd = VirtualDeviceV1::new(name, Hardware::default());
             VirtualDevice::V1(vd).write(vd_dir.join(path)).unwrap();
         }
         let vd_manifest_file = File::create(vd_manifest_path.clone()).unwrap();
@@ -316,11 +304,8 @@ mod tests {
                             ArtifactEntry { name: "repository/timestamp.json".into() },
                             ArtifactEntry { name: "virtual_devices/manifest.json".into() },
                             ArtifactEntry { name: "virtual_devices/virtual_device_A.json".into() },
-                            ArtifactEntry { name: "virtual_devices/virtual_device_A_flags.json.template".into() },
                             ArtifactEntry { name: "virtual_devices/virtual_device_B.json".into() },
-                            ArtifactEntry { name: "virtual_devices/virtual_device_B_flags.json.template".into() },
                             ArtifactEntry { name: "virtual_devices/virtual_device_C.json".into() },
-                            ArtifactEntry { name: "virtual_devices/virtual_device_C_flags.json.template".into() },
                             ArtifactEntry { name: "zbi".into() },
                         ]
                     },

@@ -30,7 +30,6 @@ if (is_host) {
       "//src/lib/fuchsia-async",
       "//third_party/rust_crates:anyhow",
       "//third_party/rust_crates:async-trait",
-      "//third_party/rust_crates:camino",
       "//third_party/rust_crates:cfg-if",
       "//third_party/rust_crates:handlebars",
       "//third_party/rust_crates:nix",
