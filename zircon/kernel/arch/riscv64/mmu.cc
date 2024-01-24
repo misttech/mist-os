@@ -392,12 +392,24 @@ class Riscv64ArchVmAspace::ConsistencyManager {
     // Check if we should just be performing a full ASID invalidation.
     if (full_flush_) {
       aspace_.FlushAsid();
+      // If this is a restricted aspace, invalidate the associated unified aspace's ASID.
+      if (aspace_.IsRestricted() && aspace_.referenced_aspace_ != nullptr) {
+        Guard<Mutex> b{AssertOrderedLock, &aspace_.referenced_aspace_->lock_,
+                       aspace_.referenced_aspace_->LockOrder()};
+        aspace_.referenced_aspace_->FlushAsid();
+      }
     } else {
       for (size_t i = 0; i < num_pending_tlb_runs_; i++) {
         const vaddr_t va = pending_tlbs_[i].va;
         const size_t count = pending_tlbs_[i].count;
 
         aspace_.FlushTLBEntryRun(va, count);
+        // If this is a restricted aspace, invalidate the same run in the unified aspace.
+        if (aspace_.IsRestricted() && aspace_.referenced_aspace_ != nullptr) {
+          Guard<Mutex> b{AssertOrderedLock, &aspace_.referenced_aspace_->lock_,
+                         aspace_.referenced_aspace_->LockOrder()};
+          aspace_.referenced_aspace_->FlushTLBEntryRun(va, count);
+        }
       }
     }
 
@@ -469,7 +481,7 @@ uint Riscv64ArchVmAspace::MmuFlagsFromPte(pte_t pte) {
 }
 
 zx_status_t Riscv64ArchVmAspace::Query(vaddr_t vaddr, paddr_t* paddr, uint* mmu_flags) {
-  Guard<Mutex> al{&lock_};
+  Guard<Mutex> al{AssertOrderedLock, &lock_, LockOrder()};
   return QueryLocked(vaddr, paddr, mmu_flags);
 }
 
@@ -599,7 +611,7 @@ zx_status_t Riscv64ArchVmAspace::SplitLargePage(vaddr_t vaddr, uint level, vaddr
 }
 
 // Use the appropriate TLB flush instruction to globally flush the modified run of pages
-// in the appropriate ASID or global if kernel.
+// in the appropriate ASID, or across all ASIDs if the run is in the kernel or in a shared aspace.
 void Riscv64ArchVmAspace::FlushTLBEntryRun(vaddr_t vaddr, size_t count) const {
   LTRACEF("vaddr %#lx, count %#lx, asid %#hx, kernel %u\n", vaddr, count, asid_, IsKernel());
 
@@ -610,7 +622,7 @@ void Riscv64ArchVmAspace::FlushTLBEntryRun(vaddr_t vaddr, size_t count) const {
   // Based on which cpu has the aspace active, only send IPIs (either directly
   // or via SBI) to the cores from that list to shoot down TLBs.
   const size_t size = count * PAGE_SIZE;
-  if (IsKernel()) {
+  if (IsKernel() || IsShared()) {
     SfenceVmaArgs args{SfenceVmaArgs::Range{vaddr, size}};
     mp_sync_exec(MP_IPI_TARGET_ALL, /* cpu_mask */ 0, &SfenceVma, &args);
   } else if (IsUser()) {
@@ -626,7 +638,7 @@ void Riscv64ArchVmAspace::FlushTLBEntryRun(vaddr_t vaddr, size_t count) const {
 void Riscv64ArchVmAspace::FlushAsid() const {
   LTRACEF("asid %#hx, kernel %u\n", asid_, IsKernel());
 
-  if (IsKernel()) {
+  if (IsKernel() || IsShared()) {
     // Perform a full flush of all cpus across all ASIDs
     SfenceVmaArgs args{};
     mp_sync_exec(MP_IPI_TARGET_ALL, /* cpu_mask */ 0, &SfenceVma, &args);
@@ -689,14 +701,24 @@ zx::result<size_t> Riscv64ArchVmAspace::UnmapPageTable(vaddr_t vaddr, vaddr_t va
       // spaces.
       const bool kernel_top_level_pt = (type_ == Riscv64AspaceType::kKernel) &&
                                        (index >= RISCV64_MMU_PT_KERNEL_BASE_INDEX) &&
-                                       level == (RISCV64_MMU_PT_LEVELS - 1);
-      if (!kernel_top_level_pt &&
+                                       IsTopLevel(level);
+      // Similarly, if this is an entry corresponding to a top level shared page table, skip
+      // freeing it as there may be several unified aspaces referencing its contents.
+      const bool shared_top_level_pt = IsShared() && IsTopLevel(level);
+      if (!kernel_top_level_pt && !shared_top_level_pt &&
           (chunk_size == block_size || page_table_is_clear(next_page_table))) {
         // If we unmapped an entire page table leaf and/or the unmap made the level below us empty,
         // free the page table.
         LTRACEF("pte %p[0x%lx] = 0 (was page table phys %#lx virt %p)\n", page_table, index,
                 page_table_paddr, next_page_table);
         update_pte(&page_table[index], 0);
+        // If this is a restricted aspace and we are updating the top level page table, we need to
+        // update the top level page of the associated unified aspace.
+        if (IsTopLevel(level) && IsRestricted() && referenced_aspace_ != nullptr) {
+          Guard<Mutex> b{AssertOrderedLock, &referenced_aspace_->lock_,
+                         referenced_aspace_->LockOrder()};
+          update_pte(&referenced_aspace_->tt_virt_[index], 0);
+        }
 
         // We can safely defer TLB flushing as the consistency manager will not return the backing
         // page to the PMM until after the tlb is flushed.
@@ -783,6 +805,13 @@ zx::result<size_t> Riscv64ArchVmAspace::MapPageTable(vaddr_t vaddr_in, vaddr_t v
 
         pte = mmu_non_leaf_pte(page_table_paddr, IsKernel());
         update_pte(&page_table[index], pte);
+        // If this is a restricted aspace and we are mapping into the top level page, we need to
+        // add the page table entry to the top level page of the associated unified aspace as well.
+        if (IsTopLevel(level) && IsRestricted() && referenced_aspace_ != nullptr) {
+          Guard<Mutex> b{AssertOrderedLock, &referenced_aspace_->lock_,
+                         referenced_aspace_->LockOrder()};
+          update_pte(&referenced_aspace_->tt_virt_[index], pte);
+        }
         // We do not need to sync the walker, despite writing a new entry, as this is a
         // non-terminal entry and so is irrelevant to the walker anyway.
         LTRACEF("pte %p[%#" PRIxPTR "] = %#" PRIx64 " (paddr %#lx)\n", page_table, index, pte,
@@ -1082,7 +1111,7 @@ zx_status_t Riscv64ArchVmAspace::MapContiguous(vaddr_t vaddr, paddr_t paddr, siz
     return ZX_OK;
   }
 
-  Guard<Mutex> a{&lock_};
+  Guard<Mutex> a{AssertOrderedLock, &lock_, LockOrder()};
 
   if (mmu_flags & ARCH_MMU_FLAG_PERM_EXECUTE) {
     Riscv64VmICacheConsistencyManager cache_cm;
@@ -1133,7 +1162,7 @@ zx_status_t Riscv64ArchVmAspace::Map(vaddr_t vaddr, paddr_t* phys, size_t count,
 
   size_t total_mapped = 0;
   {
-    Guard<Mutex> a{&lock_};
+    Guard<Mutex> a{AssertOrderedLock, &lock_, LockOrder()};
     if (mmu_flags & ARCH_MMU_FLAG_PERM_EXECUTE) {
       Riscv64VmICacheConsistencyManager cache_cm;
       for (size_t idx = 0; idx < count; ++idx) {
@@ -1199,7 +1228,7 @@ zx_status_t Riscv64ArchVmAspace::Unmap(vaddr_t vaddr, size_t count, EnlargeOpera
     return ZX_ERR_INVALID_ARGS;
   }
 
-  Guard<Mutex> a{&lock_};
+  Guard<Mutex> a{AssertOrderedLock, &lock_, LockOrder()};
 
   ConsistencyManager cm(*this);
   zx::result<size_t> result = UnmapPages(vaddr, count * PAGE_SIZE, enlarge, cm);
@@ -1227,7 +1256,7 @@ zx_status_t Riscv64ArchVmAspace::Protect(vaddr_t vaddr, size_t count, uint mmu_f
     return ZX_ERR_INVALID_ARGS;
   }
 
-  Guard<Mutex> a{&lock_};
+  Guard<Mutex> a{AssertOrderedLock, &lock_, LockOrder()};
   if (mmu_flags & ARCH_MMU_FLAG_PERM_EXECUTE) {
     // If mappings are going to become executable then we first need to sync their caches.
     // Unfortunately this needs to be done on kernel virtual addresses to avoid taking translation
@@ -1264,7 +1293,7 @@ zx_status_t Riscv64ArchVmAspace::HarvestAccessed(vaddr_t vaddr, size_t count,
     return ZX_ERR_INVALID_ARGS;
   }
 
-  Guard<Mutex> guard{&lock_};
+  Guard<Mutex> guard{AssertOrderedLock, &lock_, LockOrder()};
 
   const size_t size = count * PAGE_SIZE;
   LOCAL_KTRACE("mmu harvest accessed",
@@ -1285,7 +1314,7 @@ zx_status_t Riscv64ArchVmAspace::MarkAccessed(vaddr_t vaddr, size_t count) {
     return ZX_ERR_OUT_OF_RANGE;
   }
 
-  Guard<Mutex> a{&lock_};
+  Guard<Mutex> a{AssertOrderedLock, &lock_, LockOrder()};
 
   const size_t size = count * PAGE_SIZE;
   LOCAL_KTRACE("mmu mark accessed", (vaddr & ~PAGE_MASK) | ((size >> PAGE_SIZE_SHIFT) & PAGE_MASK));
@@ -1320,10 +1349,10 @@ zx_status_t Riscv64ArchVmAspace::Init() {
           static_cast<int>(Riscv64AspaceTypeName(type_).size()),
           Riscv64AspaceTypeName(type_).data());
 
-  Guard<Mutex> a{&lock_};
+  Guard<Mutex> a{AssertOrderedLock, &lock_, LockOrder()};
 
   // Validate that the base + size is valid and doesn't wrap.
-  DEBUG_ASSERT(size_ > 0);
+  DEBUG_ASSERT(size_ > 0 || IsUnified());
   DEBUG_ASSERT(IS_PAGE_ALIGNED(base_));
   DEBUG_ASSERT(IS_PAGE_ALIGNED(size_));
   [[maybe_unused]] uintptr_t unused;
@@ -1339,9 +1368,9 @@ zx_status_t Riscv64ArchVmAspace::Init() {
     asid_ = kernel_asid();
   } else {
     if (type_ == Riscv64AspaceType::kUser) {
-      DEBUG_ASSERT_MSG(IsUserBaseSizeValid(base_, size_), "base %#" PRIxPTR " size 0x%zx", base_,
-                       size_);
-      if (!IsUserBaseSizeValid(base_, size_)) {
+      DEBUG_ASSERT_MSG(IsUnified() || IsUserBaseSizeValid(base_, size_),
+                       "base %#" PRIxPTR " size 0x%zx", base_, size_);
+      if (!IsUserBaseSizeValid(base_, size_) && !IsUnified()) {
         return ZX_ERR_INVALID_ARGS;
       }
 
@@ -1384,25 +1413,185 @@ zx_status_t Riscv64ArchVmAspace::Init() {
   return ZX_OK;
 }
 
-zx_status_t Riscv64ArchVmAspace::InitShared() { return ZX_ERR_NOT_SUPPORTED; }
-zx_status_t Riscv64ArchVmAspace::InitRestricted() { return ZX_ERR_NOT_SUPPORTED; }
-zx_status_t Riscv64ArchVmAspace::InitUnified(ArchVmAspaceInterface& shared,
-                                             ArchVmAspaceInterface& restricted) {
-  return ZX_ERR_NOT_SUPPORTED;
+zx_status_t Riscv64ArchVmAspace::InitRestricted() {
+  role_ = Riscv64AspaceRole::kRestricted;
+  return Init();
+}
+
+zx_status_t Riscv64ArchVmAspace::InitShared() {
+  role_ = Riscv64AspaceRole::kShared;
+  zx_status_t status = Init();
+  if (status != ZX_OK) {
+    return status;
+  }
+
+  Guard<Mutex> a{AssertOrderedLock, &lock_, LockOrder()};
+
+  // Prepopulate the portion of the top level page table spanned by this aspace by allocating the
+  // necessary second level entries.
+  const uint top_level = RISCV64_MMU_PT_LEVELS - 1;
+  const uint start = vaddr_to_index(base_, top_level);
+  const uint end = vaddr_to_index(base_ + size_, top_level) - 1;
+  for (uint i = start; i <= end; i++) {
+    zx::result<paddr_t> result = AllocPageTable();
+    if (result.is_error()) {
+      LTRACEF("failed to allocate second level page table for shared aspace\n");
+      return result.error_value();
+    }
+    paddr_t page_table_paddr = result.value();
+    void* pt_vaddr = paddr_to_physmap(page_table_paddr);
+    arch_zero_page(pt_vaddr);
+
+    // Ensure that the zeroing is observable from hardware page table walkers, as we need to
+    // do this prior to writing the pte we cannot defer it using the consistency manager.
+    mb();
+
+    pte_t pte = mmu_non_leaf_pte(page_table_paddr, false);
+    update_pte(&tt_virt_[i], pte);
+  }
+  return ZX_OK;
+}
+
+zx_status_t Riscv64ArchVmAspace::InitUnified(ArchVmAspaceInterface& s, ArchVmAspaceInterface& r) {
+  canary_.Assert();
+
+  // The base_ and size_ of a unified aspace are expected to be zero.
+  DEBUG_ASSERT(size_ == 0);
+  DEBUG_ASSERT(base_ == 0);
+
+  role_ = Riscv64AspaceRole::kUnified;
+  zx_status_t status = Init();
+  if (status != ZX_OK) {
+    return status;
+  }
+  Riscv64ArchVmAspace& shared = static_cast<Riscv64ArchVmAspace&>(s);
+  Riscv64ArchVmAspace& restricted = static_cast<Riscv64ArchVmAspace&>(r);
+  {
+    Guard<Mutex> a{AssertOrderedLock, &lock_, LockOrder()};
+    referenced_aspace_ = &restricted;
+    shared_aspace_ = &shared;
+  }
+
+  const uint top_level = RISCV64_MMU_PT_LEVELS - 1;
+  const uint restricted_start = vaddr_to_index(restricted.base_, top_level);
+  const uint restricted_end = vaddr_to_index(restricted.base_ + restricted.size_, top_level) - 1;
+  const uint shared_start = vaddr_to_index(shared.base_, top_level);
+  const uint shared_end = vaddr_to_index(shared.base_ + shared.size_, top_level) - 1;
+  DEBUG_ASSERT(restricted_end < shared_start);
+
+  // Validate that the restricted aspace is empty and set its metadata.
+  {
+    Guard<Mutex> a{AssertOrderedLock, &restricted.lock_, restricted.LockOrder()};
+    DEBUG_ASSERT(restricted.tt_virt_);
+    DEBUG_ASSERT(restricted.IsRestricted());
+    DEBUG_ASSERT(restricted.num_references_ == 0);
+    DEBUG_ASSERT(restricted.referenced_aspace_ == nullptr);
+    for (uint i = restricted_start; i <= restricted_end; i++) {
+      DEBUG_ASSERT(restricted.tt_virt_[i] == 0);
+    }
+    restricted.num_references_++;
+    restricted.referenced_aspace_ = this;
+  }
+
+  // Copy all mappings from the shared aspace and set its metadata.
+  {
+    Guard<Mutex> a{AssertOrderedLock, &shared.lock_, shared.LockOrder()};
+    DEBUG_ASSERT(shared.tt_virt_);
+    DEBUG_ASSERT(shared.IsShared());
+    for (uint i = shared_start; i <= shared_end; i++) {
+      tt_virt_[i] = shared.tt_virt_[i];
+    }
+    shared.num_references_++;
+  }
+  return ZX_OK;
 }
 
 void Riscv64ArchVmAspace::DisableUpdates() {
   // TODO-rvbringup: add machinery for this and the update checker logic
 }
 
+void Riscv64ArchVmAspace::FreeTopLevelPage() {
+  vm_page_t* page = paddr_to_vm_page(tt_phys_);
+  DEBUG_ASSERT(page);
+  pmm_free_page(page);
+  pt_pages_--;
+
+  tt_phys_ = 0;
+  tt_virt_ = nullptr;
+}
+
 zx_status_t Riscv64ArchVmAspace::Destroy() {
   canary_.Assert();
   LTRACEF("aspace %p\n", this);
 
-  Guard<Mutex> guard{&lock_};
-
   // Not okay to destroy the kernel address space.
   DEBUG_ASSERT(type_ != Riscv64AspaceType::kKernel);
+
+  if (IsUnified()) {
+    return DestroyUnified();
+  }
+  return DestroyIndividual();
+}
+
+zx_status_t Riscv64ArchVmAspace::DestroyUnified() {
+  DEBUG_ASSERT(IsUnified());
+
+  Riscv64ArchVmAspace* restricted = nullptr;
+  Riscv64ArchVmAspace* shared = nullptr;
+  {
+    Guard<Mutex> a{AssertOrderedLock, &lock_, LockOrder()};
+    restricted = referenced_aspace_;
+    shared = shared_aspace_;
+    shared_aspace_ = nullptr;
+    referenced_aspace_ = nullptr;
+  }
+  {
+    Guard<Mutex> a{AssertOrderedLock, &shared->lock_, shared->LockOrder()};
+    // The shared page table should be referenced by at least this page table, and could be
+    // referenced by many other unified page tables.
+    DEBUG_ASSERT(shared->num_references_ > 0);
+    shared->num_references_--;
+  }
+  {
+    Guard<Mutex> a{AssertOrderedLock, &restricted->lock_, restricted->LockOrder()};
+    // The restricted_aspace_ page table can only be referenced by a singular unified page table.
+    DEBUG_ASSERT(restricted->num_references_ == 1);
+    restricted->num_references_--;
+  }
+
+  Guard<Mutex> a{AssertOrderedLock, &lock_, LockOrder()};
+  if (riscv_use_asid) {
+    // Flush the ASID associated with this aspace
+    FlushAsid();
+
+    // Free any ASID.
+    auto status = asid_allocator.Free(asid_);
+    ASSERT(status.is_ok());
+    asid_ = MMU_RISCV64_UNUSED_ASID;
+  }
+
+  FreeTopLevelPage();
+  return ZX_OK;
+}
+
+zx_status_t Riscv64ArchVmAspace::DestroyIndividual() {
+  DEBUG_ASSERT(!IsUnified());
+  Guard<Mutex> guard{AssertOrderedLock, &lock_, LockOrder()};
+  DEBUG_ASSERT(num_references_ == 0);
+
+  // If this is a shared aspace, its top level page table was statically prepopulated. Therefore,
+  // we need to clean up all of the entries manually here.
+  if (IsShared()) {
+    const uint top_level = RISCV64_MMU_PT_LEVELS - 1;
+    const uint start = vaddr_to_index(base_, top_level);
+    const uint end = vaddr_to_index(base_ + size_, top_level) - 1;
+    for (uint i = start; i <= end; i++) {
+      const paddr_t page_table_paddr = riscv64_pte_pa(tt_virt_[i]);
+      pmm_free_page(paddr_to_vm_page(page_table_paddr));
+      pt_pages_--;
+      update_pte(&tt_virt_[i], 0);
+    }
+  }
 
   // Check to see if the top level page table is empty. If not the user didn't
   // properly unmap everything before destroying the aspace.
@@ -1426,14 +1615,7 @@ zx_status_t Riscv64ArchVmAspace::Destroy() {
   }
 
   // Free the top level page table
-  vm_page_t* page = paddr_to_vm_page(tt_phys_);
-  DEBUG_ASSERT(page);
-  pmm_free_page(page);
-  pt_pages_--;
-
-  tt_phys_ = 0;
-  tt_virt_ = nullptr;
-
+  FreeTopLevelPage();
   return ZX_OK;
 }
 
@@ -1456,6 +1638,13 @@ void Riscv64ArchVmAspace::ContextSwitch(Riscv64ArchVmAspace* old_aspace,
         aspace->num_active_cpus_.fetch_add(1, ktl::memory_order_relaxed);
     DEBUG_ASSERT(prev < SMP_MAX_CPUS);
     aspace->active_since_last_check_.store(true, ktl::memory_order_relaxed);
+    // If the aspace we are context switching to is unified, we need to mark the associated shared
+    // and restricted aspaces as active since we may access their mappings indirectly.
+    if (aspace->IsUnified()) {
+      aspace->get_shared_aspace()->active_since_last_check_.store(true, ktl::memory_order_relaxed);
+      aspace->get_restricted_aspace()->active_since_last_check_.store(true,
+                                                                      ktl::memory_order_relaxed);
+    }
   } else {
     // Switching to the null aspace, which means kernel address space only.
     satp = ((uint64_t)RISCV64_SATP_MODE_SV39 << RISCV64_SATP_MODE_SHIFT) |

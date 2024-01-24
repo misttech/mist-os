@@ -21,6 +21,13 @@ enum class Riscv64AspaceType {
   kGuest,   // Second-stage address space.
 };
 
+enum class Riscv64AspaceRole : uint8_t {
+  kIndependent,
+  kRestricted,
+  kShared,
+  kUnified,
+};
+
 class Riscv64ArchVmAspace final : public ArchVmAspaceInterface {
  public:
   Riscv64ArchVmAspace(vaddr_t base, size_t size, Riscv64AspaceType type,
@@ -31,6 +38,7 @@ class Riscv64ArchVmAspace final : public ArchVmAspaceInterface {
 
   using ArchVmAspaceInterface::page_alloc_fn_t;
 
+  // See comments on `ArchVmAspaceInterface` where these methods are declared.
   zx_status_t Init() override;
   zx_status_t InitShared() override;
   zx_status_t InitRestricted() override;
@@ -82,6 +90,11 @@ class Riscv64ArchVmAspace final : public ArchVmAspaceInterface {
   Riscv64AspaceType type() const { return type_; }
   bool IsKernel() const { return type_ == Riscv64AspaceType::kKernel; }
   bool IsUser() const { return type_ == Riscv64AspaceType::kUser; }
+
+  // Returns 1 for unified aspaces and 0 for all other aspaces. This establishes an ordering that
+  // is used when the lock_ is acquired. The restricted aspace page table lock is acquired first,
+  // and the unified aspace lock is acquired afterwards.
+  uint32_t LockOrder() const { return IsUnified() ? 1 : 0; }
 
  private:
   class ConsistencyManager;
@@ -142,10 +155,39 @@ class Riscv64ArchVmAspace final : public ArchVmAspaceInterface {
 
   uint MmuFlagsFromPte(pte_t pte);
 
+  // Returns true if the given level corresponds to the top level page table.
+  bool IsTopLevel(uint level) { return level == (RISCV64_MMU_PT_LEVELS - 1); }
+
+  bool IsShared() const { return role_ == Riscv64AspaceRole::kShared; }
+  bool IsRestricted() const { return role_ == Riscv64AspaceRole::kRestricted; }
+  bool IsUnified() const { return role_ == Riscv64AspaceRole::kUnified; }
+
+  // The `DestroyIndividual` and `DestroyUnified` functions are called by the public `Destroy`
+  // function depending on whether this address space is unified or not. Note that unified aspaces
+  // must be destroyed prior to destroying their constituent aspaces. In other words, the shared
+  // and restricted aspaces must have a longer lifetime than the unified aspaces they are part of.
+  zx_status_t DestroyIndividual();
+  zx_status_t DestroyUnified();
+
+  // Frees the top level page table.
+  void FreeTopLevelPage() TA_REQ(lock_);
+
+  // Accessors for the shared and restricted aspaces associated with a unified aspace.
+  // We can turn off thread safety analysis as these accessors should only be used on unified
+  // aspaces, for which both the shared and restricted aspace pointers are notionally const.
+  Riscv64ArchVmAspace* get_shared_aspace() TA_NO_THREAD_SAFETY_ANALYSIS {
+    DEBUG_ASSERT(IsUnified());
+    return shared_aspace_;
+  }
+  Riscv64ArchVmAspace* get_restricted_aspace() TA_NO_THREAD_SAFETY_ANALYSIS {
+    DEBUG_ASSERT(IsUnified());
+    return referenced_aspace_;
+  }
+
   // data fields
   fbl::Canary<fbl::magic("VAAS")> canary_;
 
-  DECLARE_MUTEX(Riscv64ArchVmAspace) lock_;
+  DECLARE_MUTEX(Riscv64ArchVmAspace, lockdep::LockFlagsNestable) lock_;
 
   // Page allocate function, if set will be used instead of the default allocator
   const page_alloc_fn_t test_page_alloc_func_ = nullptr;
@@ -162,6 +204,25 @@ class Riscv64ArchVmAspace final : public ArchVmAspaceInterface {
 
   // Type of address space.
   const Riscv64AspaceType type_;
+
+  // The role this aspace plays in unified aspaces, if any. This should only be set by the `Init*`
+  // functions and should not be modified anywhere else.
+  Riscv64AspaceRole role_ = Riscv64AspaceRole::kIndependent;
+
+  // The number of times entries in the top level page are referenced by other page tables.
+  // Unified aspaces increment and decrement this value on their associated shared and restricted
+  // aspaces, so we must hold the lock_ when doing so.
+  uint32_t num_references_ TA_GUARDED(lock_) = 0;
+
+  // A pointer to another aspace that shares entries with this one.
+  // If this is a restricted aspace, this references the associated unified aspace.
+  // If this is a unified aspace, this references the associated restricted aspace.
+  // If neither is true, this is set to null.
+  Riscv64ArchVmAspace* referenced_aspace_ TA_GUARDED(lock_) = nullptr;
+
+  // A pointer to the shared aspace whose contents are shared with this unified aspace.
+  // Set to null if this is not a unified aspace.
+  Riscv64ArchVmAspace* shared_aspace_ TA_GUARDED(lock_) = nullptr;
 
   // Range of address space.
   const vaddr_t base_ = 0;
