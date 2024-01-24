@@ -1641,9 +1641,7 @@ fn add_slaac_addr_sub<BC: SlaacBindingsContext<CC::DeviceId>, CC: SlaacContext<B
                 // Try the next address.
                 //
                 // TODO(https://fxbug.dev/100003): Limit number of attempts.
-                slaac_addrs.with_counters(|counters| {
-                    counters.generated_slaac_addr_exists.increment();
-                });
+                slaac_addrs.increment(|counters| &counters.generated_slaac_addr_exists);
             }
             Ok(addr_sub) => {
                 trace!("receive_ndp_packet: Successfully configured new IPv6 address {:?} on device {:?} via SLAAC", addr_sub, device_id);

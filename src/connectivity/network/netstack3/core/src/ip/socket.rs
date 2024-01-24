@@ -490,9 +490,7 @@ impl<
         O: SendOptions<I>,
     {
         // TODO(joshlf): Call `trace!` with relevant fields from the socket.
-        self.with_counters(|counters| {
-            counters.send_ip_packet.increment();
-        });
+        self.increment(|counters| &counters.send_ip_packet);
 
         send_ip_packet(self, bindings_ctx, ip_sock, body, mtu)
     }

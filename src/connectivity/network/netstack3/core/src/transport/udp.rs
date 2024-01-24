@@ -1247,9 +1247,7 @@ fn receive_ip_packet<
     mut buffer: B,
 ) -> Result<(), (B, TransportReceiveError)> {
     trace_duration!(bindings_ctx, "udp::receive_ip_packet");
-    core_ctx.with_counters(|counters| {
-        counters.rx.increment();
-    });
+    core_ctx.increment(|counters| &counters.rx);
     trace!("received UDP packet: {:x?}", buffer.as_mut());
     let src_ip: I::Addr = src_ip.into();
 
@@ -1260,9 +1258,7 @@ fn receive_ip_packet<
     } else {
         // There isn't much we can do if the UDP packet is
         // malformed.
-        core_ctx.with_counters(|counters| {
-            counters.rx_malformed.increment();
-        });
+        core_ctx.increment(|counters| &counters.rx_malformed);
         return Ok(());
     };
 
@@ -1270,9 +1266,7 @@ fn receive_ip_packet<
         match src_ip.try_into() {
             Ok(addr) => Some(addr),
             Err(AddrIsMappedError {}) => {
-                core_ctx.with_counters(|counters| {
-                    counters.rx_mapped_addr.increment();
-                });
+                core_ctx.increment(|counters| &counters.rx_mapped_addr);
                 trace!("udp::receive_ip_packet: mapped source address");
                 return Ok(());
             }
@@ -1283,9 +1277,7 @@ fn receive_ip_packet<
     let dst_ip = match dst_ip.try_into() {
         Ok(addr) => addr,
         Err(AddrIsMappedError {}) => {
-            core_ctx.with_counters(|counters| {
-                counters.rx_mapped_addr.increment();
-            });
+            core_ctx.increment(|counters| &counters.rx_mapped_addr);
             trace!("udp::receive_ip_packet: mapped destination address");
             return Ok(());
         }
@@ -1339,9 +1331,7 @@ fn receive_ip_packet<
 
     if !was_delivered && StateContext::<I, _>::should_send_port_unreachable(core_ctx) {
         buffer.undo_parse(meta);
-        core_ctx.with_counters(|counters| {
-            counters.rx_unknown_dest_port.increment();
-        });
+        core_ctx.increment(|counters| &counters.rx_unknown_dest_port);
         Err((buffer, TransportReceiveError::new_port_unreachable()))
     } else {
         Ok(())
@@ -1488,9 +1478,7 @@ impl<
         _original_udp_packet: &[u8],
         err: I::ErrorCode,
     ) {
-        core_ctx.with_counters(|counters| {
-            counters.rx_icmp_error.increment();
-        });
+        core_ctx.increment(|counters| &counters.rx_icmp_error);
         // NB: At the moment bindings has no need to consume ICMP errors, so we
         // swallow them here.
         debug!(
@@ -2077,13 +2065,9 @@ where
         body: B,
     ) -> Result<(), Either<SendError, ExpectedConnError>> {
         let (core_ctx, bindings_ctx) = self.contexts();
-        core_ctx.with_counters(|counters| {
-            counters.tx.increment();
-        });
+        core_ctx.increment(|counters| &counters.tx);
         datagram::send_conn(core_ctx, bindings_ctx, *id, body).map_err(|err| {
-            core_ctx.with_counters(|counters| {
-                counters.tx_error.increment();
-            });
+            core_ctx.increment(|counters| &counters.tx_error);
             match err {
                 DatagramSendError::NotConnected => Either::Right(ExpectedConnError),
                 DatagramSendError::NotWriteable => Either::Left(SendError::NotWriteable),
@@ -2128,11 +2112,9 @@ where
         }
 
         let (core_ctx, bindings_ctx) = self.contexts();
-        core_ctx.with_counters(|counters| {
-            counters.tx.increment();
-        });
+        core_ctx.increment(|counters| &counters.tx);
         datagram::send_to(core_ctx, bindings_ctx, *id, remote_ip, remote_port, body).map_err(|e| {
-            core_ctx.with_counters(|counters| counters.tx_error.increment());
+            core_ctx.increment(|counters| &counters.tx_error);
             match e {
                 Either::Left(e) => Either::Left(e),
                 Either::Right(e) => {

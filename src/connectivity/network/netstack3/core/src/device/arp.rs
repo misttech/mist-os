@@ -363,9 +363,7 @@ fn handle_packet<
     frame_dst: FrameDestination,
     mut buffer: B,
 ) {
-    core_ctx.with_counters(|counters| {
-        counters.rx_packets.increment();
-    });
+    core_ctx.increment(|counters| &counters.rx_packets);
     // TODO(wesleyac) Add support for probe.
     let packet = match buffer.parse::<ArpPacket<_, D::HType, Ipv4Addr>>() {
         Ok(packet) => packet,
@@ -377,9 +375,7 @@ fn handle_packet<
             // conditionals indicate an end of processing and a discarding of
             // the packet."
             debug!("discarding malformed ARP packet: {}", err);
-            core_ctx.with_counters(|counters| {
-                counters.rx_malformed_packets.increment();
-            });
+            core_ctx.increment(|counters| &counters.rx_malformed_packets);
             return;
         }
     };
@@ -391,21 +387,15 @@ fn handle_packet<
 
     let op = match packet.operation() {
         ArpOp::Request => {
-            core_ctx.with_counters(|counters| {
-                counters.rx_requests.increment();
-            });
+            core_ctx.increment(|counters| &counters.rx_requests);
             ValidArpOp::Request
         }
         ArpOp::Response => {
-            core_ctx.with_counters(|counters| {
-                counters.rx_responses.increment();
-            });
+            core_ctx.increment(|counters| &counters.rx_responses);
             ValidArpOp::Response
         }
         ArpOp::Other(o) => {
-            core_ctx.with_counters(|counters| {
-                counters.rx_malformed_packets.increment();
-            });
+            core_ctx.increment(|counters| &counters.rx_malformed_packets);
             debug!("dropping arp packet with op = {:?}", o);
             return;
         }
@@ -514,9 +504,7 @@ fn handle_packet<
             (source, PacketKind::AddressedToMe)
         }
         (false, false) => {
-            core_ctx.with_counters(|counters| {
-                counters.rx_dropped_non_local_target.increment();
-            });
+            core_ctx.increment(|counters| &counters.rx_dropped_non_local_target);
             trace!(
                 "non-gratuitous ARP packet not targetting us; sender = {}, target={}",
                 sender_addr,
@@ -551,9 +539,7 @@ fn handle_packet<
             DynamicNeighborUpdateSource::Probe => {
                 let self_hw_addr = core_ctx.get_hardware_addr(bindings_ctx, &device_id);
 
-                core_ctx.with_counters(|counters| {
-                    counters.tx_responses.increment();
-                });
+                core_ctx.increment(|counters| &counters.tx_responses);
                 debug!("sending ARP response for {target_addr} to {sender_addr}");
 
                 // TODO(joshlf): Do something if send_frame returns an error?
@@ -600,9 +586,7 @@ fn send_arp_request<
         let self_hw_addr = core_ctx.get_hardware_addr(bindings_ctx, device_id);
         // TODO(joshlf): Do something if send_frame returns an error?
         let dst_addr = remote_link_addr.unwrap_or(D::HType::BROADCAST);
-        core_ctx.with_counters(|counters| {
-            counters.tx_requests.increment();
-        });
+        core_ctx.increment(|counters| &counters.tx_requests);
         debug!("sending ARP request for {lookup_addr} to {dst_addr:?}");
         let _ = SendFrameContext::send_frame(
             core_ctx,
@@ -627,9 +611,7 @@ fn send_arp_request<
         // So, if this is the case, we do not send an ARP request.
         // TODO(wesleyac): Should we cache these, and send packets once we have
         // an address?
-        core_ctx.with_counters(|counters| {
-            counters.tx_requests_dropped_no_local_addr.increment();
-        });
+        core_ctx.increment(|counters| &counters.tx_requests_dropped_no_local_addr);
         debug!("Not sending ARP request, since we don't know our local protocol address");
     }
 }

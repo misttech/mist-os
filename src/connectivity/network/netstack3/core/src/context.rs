@@ -43,6 +43,7 @@ use packet::{BufferMut, Serializer};
 use rand::{CryptoRng, RngCore};
 
 use crate::{
+    counters::Counter,
     marker::{BindingsContext, BindingsTypes},
     state::{StackState, StackStateBuilder},
     sync, Instant,
@@ -234,6 +235,11 @@ pub trait SendFrameContext<BC, Meta> {
 pub trait CounterContext<T> {
     /// Call the function with an immutable reference to counter type T.
     fn with_counters<O, F: FnOnce(&T) -> O>(&self, cb: F) -> O;
+
+    /// Increments the counter returned by the callback.
+    fn increment<F: FnOnce(&T) -> &Counter>(&self, cb: F) {
+        self.with_counters(|counters| cb(counters).increment());
+    }
 }
 
 /// A context for emitting events.

@@ -185,8 +185,8 @@ pub fn handle_timer<BC: BindingsContext>(
         }
         #[cfg(test)]
         TimerId(TimerIdInner::Nop(_)) => {
-            crate::context::CounterContext::with_counters(&core_ctx, |counters: &TimerCounters| {
-                counters.nop.increment()
+            crate::context::CounterContext::increment(&core_ctx, |counters: &TimerCounters| {
+                &counters.nop
             })
         }
     }

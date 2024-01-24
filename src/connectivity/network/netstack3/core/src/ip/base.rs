@@ -1633,15 +1633,11 @@ fn dispatch_receive_ipv4_packet<
     body: B,
     parse_metadata: Option<ParseMetadata>,
 ) {
-    core_ctx.with_counters(|counters| {
-        counters.dispatch_receive_ip_packet.increment();
-    });
+    core_ctx.increment(|counters| &counters.dispatch_receive_ip_packet);
 
     match frame_dst {
         FrameDestination::Individual { local: false } => {
-            core_ctx.with_counters(|counters| {
-                counters.dispatch_receive_ip_packet_other_host.increment();
-            });
+            core_ctx.increment(|counters| &counters.dispatch_receive_ip_packet_other_host);
         }
         FrameDestination::Individual { local: true }
         | FrameDestination::Multicast
@@ -1732,15 +1728,11 @@ fn dispatch_receive_ipv6_packet<
     // parse_metadata argument which corresponds to a single extension
     // header rather than all of the IPv6 headers.
 
-    core_ctx.with_counters(|counters| {
-        counters.dispatch_receive_ip_packet.increment();
-    });
+    core_ctx.increment(|counters| &counters.dispatch_receive_ip_packet);
 
     match frame_dst {
         FrameDestination::Individual { local: false } => {
-            core_ctx.with_counters(|counters| {
-                counters.dispatch_receive_ip_packet_other_host.increment();
-            });
+            core_ctx.increment(|counters| &counters.dispatch_receive_ip_packet_other_host);
         }
         FrameDestination::Individual { local: true }
         | FrameDestination::Multicast
@@ -1883,8 +1875,8 @@ macro_rules! process_fragment {
                     _ => return,
                     #[allow(unreachable_patterns)]
                     Err(e) => {
-                        $core_ctx.with_counters(|counters: &IpCounters<$ip>| {
-                            counters.fragment_reassembly_error.increment();
+                        $core_ctx.increment(|counters: &IpCounters<$ip>| {
+                            &counters.fragment_reassembly_error
                         });
                         trace!("receive_ip_packet: fragmented, failed to reassemble: {:?}", e);
                     }
@@ -1893,21 +1885,21 @@ macro_rules! process_fragment {
             // Cannot proceed since we need more fragments before we
             // can reassemble a packet.
             FragmentProcessingState::NeedMoreFragments => {
-                $core_ctx.with_counters(|counters: &IpCounters<$ip>| {
-                    counters.need_more_fragments.increment();
+                $core_ctx.increment(|counters: &IpCounters<$ip>| {
+                    &counters.need_more_fragments
                 });
                 trace!("receive_ip_packet: fragmented, need more before reassembly")
             }
             // TODO(ghanan): Handle invalid fragments.
             FragmentProcessingState::InvalidFragment => {
-                $core_ctx.with_counters(|counters: &IpCounters<$ip>| {
-                    counters.invalid_fragment.increment();
+                $core_ctx.increment(|counters: &IpCounters<$ip>| {
+                    &counters.invalid_fragment
                 });
                 trace!("receive_ip_packet: fragmented, invalid")
             }
             FragmentProcessingState::OutOfMemory => {
-                $core_ctx.with_counters(|counters: &IpCounters<$ip>| {
-                    counters.fragment_cache_full.increment();
+                $core_ctx.increment(|counters: &IpCounters<$ip>| {
+                    &counters.fragment_cache_full
                 });
                 trace!("receive_ip_packet: fragmented, dropped because OOM")
             }
@@ -1995,9 +1987,7 @@ pub(crate) fn receive_ipv4_packet<
         return;
     }
 
-    core_ctx.with_counters(|counters: &IpCounters<Ipv4>| {
-        counters.receive_ip_packet.increment();
-    });
+    core_ctx.increment(|counters: &IpCounters<Ipv4>| &counters.receive_ip_packet);
     trace!("receive_ip_packet({device:?})");
 
     let mut packet: Ipv4Packet<_> = match try_parse_ip_packet!(buffer) {
@@ -2019,17 +2009,14 @@ pub(crate) fn receive_ipv4_packet<
             header_len,
             action,
         }) if must_send_icmp && action.should_send_icmp(&dst_ip) => {
-            core_ctx.with_counters(|counters: &IpCounters<Ipv4>| {
-                counters.parameter_problem.increment();
-            });
+            core_ctx.increment(|counters: &IpCounters<Ipv4>| &counters.parameter_problem);
             // `should_send_icmp_to_multicast` should never return `true` for IPv4.
             assert!(!action.should_send_icmp_to_multicast());
             let dst_ip = match SpecifiedAddr::new(dst_ip) {
                 Some(ip) => ip,
                 None => {
-                    core_ctx.with_counters(|counters: &IpCounters<Ipv4>| {
-                        counters.unspecified_destination.increment();
-                    });
+                    core_ctx
+                        .increment(|counters: &IpCounters<Ipv4>| &counters.unspecified_destination);
                     debug!("receive_ipv4_packet: Received packet with unspecified destination IP address; dropping");
                     return;
                 }
@@ -2037,9 +2024,7 @@ pub(crate) fn receive_ipv4_packet<
             let src_ip = match SpecifiedAddr::new(src_ip) {
                 Some(ip) => ip,
                 None => {
-                    core_ctx.with_counters(|counters: &IpCounters<Ipv4>| {
-                        counters.unspecified_source.increment();
-                    });
+                    core_ctx.increment(|counters: &IpCounters<Ipv4>| &counters.unspecified_source);
                     trace!("receive_ipv4_packet: Cannot send ICMP error in response to packet with unspecified source IP address");
                     return;
                 }
@@ -2071,9 +2056,7 @@ pub(crate) fn receive_ipv4_packet<
     let dst_ip = match SpecifiedAddr::new(packet.dst_ip()) {
         Some(ip) => ip,
         None => {
-            core_ctx.with_counters(|counters: &IpCounters<Ipv4>| {
-                counters.unspecified_destination.increment();
-            });
+            core_ctx.increment(|counters: &IpCounters<Ipv4>| &counters.unspecified_destination);
             debug!("receive_ipv4_packet: Received packet with unspecified destination IP address; dropping");
             return;
         }
@@ -2134,9 +2117,7 @@ pub(crate) fn receive_ipv4_packet<
                     Ok(()) => (),
                     Err(b) => {
                         let _: B = b;
-                        core_ctx.with_counters(|counters: &IpCounters<Ipv4>| {
-                            counters.mtu_exceeded.increment();
-                        });
+                        core_ctx.increment(|counters: &IpCounters<Ipv4>| &counters.mtu_exceeded);
                         // TODO(https://fxbug.dev/86247): Encode the MTU error
                         // more obviously in the type system.
                         debug!("failed to forward IPv4 packet: MTU exceeded");
@@ -2146,9 +2127,7 @@ pub(crate) fn receive_ipv4_packet<
                 // TTL is 0 or would become 0 after decrement; see "TTL"
                 // section, https://tools.ietf.org/html/rfc791#page-14
                 use packet_formats::ipv4::Ipv4Header as _;
-                core_ctx.with_counters(|counters: &IpCounters<Ipv4>| {
-                    counters.ttl_expired.increment();
-                });
+                core_ctx.increment(|counters: &IpCounters<Ipv4>| &counters.ttl_expired);
                 debug!("received IPv4 packet dropped due to expired TTL");
                 let fragment_type = packet.fragment_type();
                 let (src_ip, _, proto, meta): (_, Ipv4Addr, _, _) =
@@ -2156,9 +2135,8 @@ pub(crate) fn receive_ipv4_packet<
                 let src_ip = match SpecifiedAddr::new(src_ip) {
                     Some(ip) => ip,
                     None => {
-                        core_ctx.with_counters(|counters: &IpCounters<Ipv4>| {
-                            counters.unspecified_source.increment();
-                        });
+                        core_ctx
+                            .increment(|counters: &IpCounters<Ipv4>| &counters.unspecified_source);
                         trace!("receive_ipv4_packet: Cannot send ICMP error in response to packet with unspecified source IP address");
                         return;
                     }
@@ -2180,9 +2158,7 @@ pub(crate) fn receive_ipv4_packet<
         }
         ReceivePacketAction::SendNoRouteToDest => {
             use packet_formats::ipv4::Ipv4Header as _;
-            core_ctx.with_counters(|counters: &IpCounters<Ipv4>| {
-                counters.no_route_to_host.increment();
-            });
+            core_ctx.increment(|counters: &IpCounters<Ipv4>| &counters.no_route_to_host);
             debug!("received IPv4 packet with no known route to destination {}", dst_ip);
             let fragment_type = packet.fragment_type();
             let (src_ip, _, proto, meta): (_, Ipv4Addr, _, _) =
@@ -2190,9 +2166,7 @@ pub(crate) fn receive_ipv4_packet<
             let src_ip = match SpecifiedAddr::new(src_ip) {
                 Some(ip) => ip,
                 None => {
-                    core_ctx.with_counters(|counters: &IpCounters<Ipv4>| {
-                        counters.unspecified_source.increment();
-                    });
+                    core_ctx.increment(|counters: &IpCounters<Ipv4>| &counters.unspecified_source);
                     trace!("receive_ipv4_packet: Cannot send ICMP error in response to packet with unspecified source IP address");
                     return;
                 }
@@ -2213,9 +2187,7 @@ pub(crate) fn receive_ipv4_packet<
         }
         ReceivePacketAction::Drop { reason } => {
             let src_ip = packet.src_ip();
-            core_ctx.with_counters(|counters: &IpCounters<Ipv4>| {
-                counters.dropped.increment();
-            });
+            core_ctx.increment(|counters: &IpCounters<Ipv4>| &counters.dropped);
             debug!(
                 "receive_ipv4_packet: dropping packet from {src_ip} to {dst_ip} received on \
                 {device:?}: {reason:?}",
@@ -2245,9 +2217,7 @@ pub(crate) fn receive_ipv6_packet<
         return;
     }
 
-    core_ctx.with_counters(|counters: &IpCounters<Ipv6>| {
-        counters.receive_ip_packet.increment();
-    });
+    core_ctx.increment(|counters: &IpCounters<Ipv6>| &counters.receive_ip_packet);
     trace!("receive_ipv6_packet({:?})", device);
 
     let mut packet: Ipv6Packet<_> = match try_parse_ip_packet!(buffer) {
@@ -2266,15 +2236,12 @@ pub(crate) fn receive_ipv6_packet<
             header_len: _,
             action,
         }) if must_send_icmp && action.should_send_icmp(&dst_ip) => {
-            core_ctx.with_counters(|counters: &IpCounters<Ipv6>| {
-                counters.parameter_problem.increment();
-            });
+            core_ctx.increment(|counters: &IpCounters<Ipv6>| &counters.parameter_problem);
             let dst_ip = match SpecifiedAddr::new(dst_ip) {
                 Some(ip) => ip,
                 None => {
-                    core_ctx.with_counters(|counters: &IpCounters<Ipv6>| {
-                        counters.unspecified_destination.increment();
-                    });
+                    core_ctx
+                        .increment(|counters: &IpCounters<Ipv6>| &counters.unspecified_destination);
                     debug!("receive_ipv6_packet: Received packet with unspecified destination IP address; dropping");
                     return;
                 }
@@ -2282,9 +2249,7 @@ pub(crate) fn receive_ipv6_packet<
             let src_ip = match UnicastAddr::new(src_ip) {
                 Some(ip) => ip,
                 None => {
-                    core_ctx.with_counters(|counters: &Ipv6Counters| {
-                        counters.non_unicast_source.increment();
-                    });
+                    core_ctx.increment(|counters: &Ipv6Counters| &counters.non_unicast_source);
                     trace!("receive_ipv6_packet: Cannot send ICMP error in response to packet with non unicast source IP address");
                     return;
                 }
@@ -2319,18 +2284,14 @@ pub(crate) fn receive_ipv6_packet<
                 "receive_ipv6_packet: received packet from non-unicast source {}; dropping",
                 packet.src_ip()
             );
-            core_ctx.with_counters(|counters: &Ipv6Counters| {
-                counters.non_unicast_source.increment();
-            });
+            core_ctx.increment(|counters: &Ipv6Counters| &counters.non_unicast_source);
             return;
         }
     };
     let dst_ip = match SpecifiedAddr::new(packet.dst_ip()) {
         Some(ip) => ip,
         None => {
-            core_ctx.with_counters(|counters: &IpCounters<Ipv6>| {
-                counters.unspecified_destination.increment();
-            });
+            core_ctx.increment(|counters: &IpCounters<Ipv6>| &counters.unspecified_destination);
             debug!("receive_ipv6_packet: Received packet with unspecified destination IP address; dropping");
             return;
         }
@@ -2355,9 +2316,8 @@ pub(crate) fn receive_ipv6_packet<
             // handle reassembly.
             match ipv6::handle_extension_headers(core_ctx, device, frame_dst, &packet, true) {
                 Ipv6PacketAction::_Discard => {
-                    core_ctx.with_counters(|counters: &Ipv6Counters| {
-                        counters.extension_header_discard.increment();
-                    });
+                    core_ctx
+                        .increment(|counters: &Ipv6Counters| &counters.extension_header_discard);
                     trace!(
                         "receive_ipv6_packet: handled IPv6 extension headers: discarding packet"
                     );
@@ -2428,8 +2388,8 @@ pub(crate) fn receive_ipv6_packet<
                 // Handle extension headers first.
                 match ipv6::handle_extension_headers(core_ctx, device, frame_dst, &packet, false) {
                     Ipv6PacketAction::_Discard => {
-                        core_ctx.with_counters(|counters: &Ipv6Counters| {
-                            counters.extension_header_discard.increment();
+                        core_ctx.increment(|counters: &Ipv6Counters| {
+                            &counters.extension_header_discard
                         });
                         trace!("receive_ipv6_packet: handled IPv6 extension headers: discarding packet");
                         return;
@@ -2456,9 +2416,7 @@ pub(crate) fn receive_ipv6_packet<
                 ) {
                     // TODO(https://fxbug.dev/86247): Encode the MTU error more
                     // obviously in the type system.
-                    core_ctx.with_counters(|counters: &IpCounters<Ipv6>| {
-                        counters.mtu_exceeded.increment();
-                    });
+                    core_ctx.increment(|counters: &IpCounters<Ipv6>| &counters.mtu_exceeded);
                     debug!("failed to forward IPv6 packet: MTU exceeded");
                     if let Ipv6SourceAddr::Unicast(src_ip) = src_ip {
                         trace!("receive_ipv6_packet: Sending ICMPv6 Packet Too Big");
@@ -2491,9 +2449,7 @@ pub(crate) fn receive_ipv6_packet<
             } else {
                 // Hop Limit is 0 or would become 0 after decrement; see RFC
                 // 2460 Section 3.
-                core_ctx.with_counters(|counters: &IpCounters<Ipv6>| {
-                    counters.ttl_expired.increment();
-                });
+                core_ctx.increment(|counters: &IpCounters<Ipv6>| &counters.ttl_expired);
                 debug!("received IPv6 packet dropped due to expired Hop Limit");
 
                 if let Ipv6SourceAddr::Unicast(src_ip) = src_ip {
@@ -2513,9 +2469,7 @@ pub(crate) fn receive_ipv6_packet<
             }
         }
         ReceivePacketAction::SendNoRouteToDest => {
-            core_ctx.with_counters(|counters: &IpCounters<Ipv6>| {
-                counters.no_route_to_host.increment();
-            });
+            core_ctx.increment(|counters: &IpCounters<Ipv6>| &counters.no_route_to_host);
             let (_, _, proto, meta): (Ipv6Addr, Ipv6Addr, _, _) =
                 drop_packet_and_undo_parse!(packet, buffer);
             debug!("received IPv6 packet with no known route to destination {}", dst_ip);
@@ -2534,9 +2488,7 @@ pub(crate) fn receive_ipv6_packet<
             }
         }
         ReceivePacketAction::Drop { reason } => {
-            core_ctx.with_counters(|counters: &IpCounters<Ipv6>| {
-                counters.dropped.increment();
-            });
+            core_ctx.increment(|counters: &IpCounters<Ipv6>| &counters.dropped);
             let src_ip = packet.src_ip();
             debug!(
                 "receive_ipv6_packet: dropping packet from {src_ip} to {dst_ip} received on \
@@ -2612,9 +2564,7 @@ fn receive_ipv4_packet_action<
             | Ipv4PresentAddressStatus::Multicast
             | Ipv4PresentAddressStatus::Unicast,
         ) => {
-            core_ctx.with_counters(|counters: &Ipv4Counters| {
-                counters.deliver.increment();
-            });
+            core_ctx.increment(|counters: &Ipv4Counters| &counters.deliver);
             ReceivePacketAction::Deliver
         }
         None => {
@@ -2681,15 +2631,11 @@ fn receive_ipv6_packet_action<
     };
     match highest_priority {
         Some(Ipv6PresentAddressStatus::Multicast) => {
-            core_ctx.with_counters(|counters: &Ipv6Counters| {
-                counters.deliver_multicast.increment();
-            });
+            core_ctx.increment(|counters: &Ipv6Counters| &counters.deliver_multicast);
             ReceivePacketAction::Deliver
         }
         Some(Ipv6PresentAddressStatus::UnicastAssigned) => {
-            core_ctx.with_counters(|counters: &Ipv6Counters| {
-                counters.deliver_unicast.increment();
-            });
+            core_ctx.increment(|counters: &Ipv6Counters| &counters.deliver_unicast);
             ReceivePacketAction::Deliver
         }
         Some(Ipv6PresentAddressStatus::UnicastTentative) => {
@@ -2723,9 +2669,7 @@ fn receive_ipv6_packet_action<
             // address. NS and NA packets should be addressed to a multicast
             // address that we would have joined during DAD so that we can
             // receive those packets.
-            core_ctx.with_counters(|counters: &Ipv6Counters| {
-                counters.drop_for_tentative.increment();
-            });
+            core_ctx.increment(|counters: &Ipv6Counters| &counters.drop_for_tentative);
             ReceivePacketAction::Drop { reason: DropReason::Tentative }
         }
         None => {
@@ -2760,22 +2704,16 @@ fn receive_ip_packet_action_common<
         // case is a Destination Unreachable message, we interpret the RFC text
         // to mean that, consistent with IPv4's behavior, we should silently
         // discard the packet in this case.
-        core_ctx.with_counters(|counters| {
-            counters.routing_disabled_per_device.increment();
-        });
+        core_ctx.increment(|counters| &counters.routing_disabled_per_device);
         ReceivePacketAction::Drop { reason: DropReason::ForwardingDisabledInboundIface }
     } else {
         match lookup_route_table(core_ctx, bindings_ctx, None, *dst_ip) {
             Some(dst) => {
-                core_ctx.with_counters(|counters| {
-                    counters.forward.increment();
-                });
+                core_ctx.increment(|counters| &counters.forward);
                 ReceivePacketAction::Forward { dst }
             }
             None => {
-                core_ctx.with_counters(|counters| {
-                    counters.no_route_to_host.increment();
-                });
+                core_ctx.increment(|counters| &counters.no_route_to_host);
                 ReceivePacketAction::SendNoRouteToDest
             }
         }
@@ -2952,9 +2890,7 @@ impl<
         original_body: &[u8],
         err: Icmpv4ErrorCode,
     ) {
-        self.with_counters(|counters: &IpCounters<Ipv4>| {
-            counters.receive_icmp_error.increment();
-        });
+        self.increment(|counters: &IpCounters<Ipv4>| &counters.receive_icmp_error);
         trace!("InnerIcmpContext<Ipv4>::receive_icmp_error({:?})", err);
 
         match original_proto {
@@ -3057,9 +2993,7 @@ impl<
         original_body: &[u8],
         err: Icmpv6ErrorCode,
     ) {
-        self.with_counters(|counters: &IpCounters<Ipv6>| {
-            counters.receive_icmp_error.increment();
-        });
+        self.increment(|counters: &IpCounters<Ipv6>| &counters.receive_icmp_error);
         trace!("InnerIcmpContext<Ipv6>::receive_icmp_error({:?})", err);
 
         match original_next_header {
