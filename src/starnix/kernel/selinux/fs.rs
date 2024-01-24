@@ -29,10 +29,6 @@ use starnix_uapi::{
     statfs, SELINUX_MAGIC,
 };
 use std::{borrow::Cow, collections::BTreeMap, sync::Arc};
-use zerocopy::{AsBytes, NoCell};
-
-/// The version of selinux_status_t this kernel implements.
-const SELINUX_STATUS_VERSION: u32 = 1;
 
 const SELINUX_PERMS: &[&str] = &["add", "find", "read", "set"];
 
@@ -109,10 +105,7 @@ impl SeLinuxFs {
             // When the selinux state changes in the future, the way to update this data (and
             // communicate updates with userspace) is to use the
             // ["seqlock"](https://en.wikipedia.org/wiki/Seqlock) technique.
-            VmoFileNode::from_bytes(
-                selinux_status_t { version: SELINUX_STATUS_VERSION, ..Default::default() }
-                    .as_bytes(),
-            )?,
+            VmoFileNode::from_vmo(security_server.get_status_vmo()),
             mode!(IFREG, 0o444),
         );
 
@@ -148,24 +141,6 @@ impl SeLinuxFs {
 
         Ok(fs)
     }
-}
-
-/// The C-style struct exposed to userspace by the /sys/fs/selinux/status file.
-/// Defined here (instead of imported through bindgen) as selinux headers are not exposed through
-/// kernel uapi headers.
-#[derive(Debug, Copy, Clone, AsBytes, NoCell, Default)]
-#[repr(C, packed)]
-struct selinux_status_t {
-    /// Version number of this structure (1).
-    version: u32,
-    /// Sequence number. See [seqlock](https://en.wikipedia.org/wiki/Seqlock).
-    sequence: u32,
-    /// `0` means permissive mode, `1` means enforcing mode.
-    enforcing: u32,
-    /// The number of times the selinux policy has been reloaded.
-    policyload: u32,
-    /// `0` means allow and `1` means deny unknown object classes/permissions.
-    deny_unknown: u32,
 }
 
 struct SeLoad {

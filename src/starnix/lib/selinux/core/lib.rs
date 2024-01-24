@@ -6,6 +6,7 @@ pub mod access_vector_cache;
 pub mod hooks;
 pub mod permission_check;
 pub mod security_server;
+pub mod seq_lock;
 
 use bitflags::bitflags;
 

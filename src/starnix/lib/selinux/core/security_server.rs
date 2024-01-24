@@ -4,14 +4,20 @@
 
 use crate::{
     access_vector_cache::{Manager as AvcManager, Query, QueryMut},
+    seq_lock::SeqLock,
     AccessVector, ObjectClass, SecurityId,
 };
 
 use anyhow;
+use fuchsia_zircon::{self as zx};
 use selinux_common::security_context::SecurityContext;
 use selinux_policy::{metadata::HandleUnknown, parse_policy_by_value, parser::ByValue, Policy};
 use starnix_sync::Mutex;
-use std::{collections::HashMap, sync::Arc};
+use std::{collections::HashMap, ops::DerefMut, sync::Arc};
+use zerocopy::{AsBytes, NoCell};
+
+/// The version of the SELinux "status" file this implementation implements.
+const SELINUX_STATUS_VERSION: u32 = 1;
 
 /// Specifies whether the implementation should be fully functional, or provide
 /// only hard-coded fake information.
@@ -29,6 +35,8 @@ struct LoadedPolicy {
     binary: Vec<u8>,
 }
 
+type SeLinuxStatus = SeqLock<SeLinuxStatusHeader, SeLinuxStatusValue>;
+
 struct SecurityServerState {
     // TODO(http://b/308175643): reference count SIDs, so that when the last SELinux object
     // referencing a SID gets destroyed, the entry is removed from the map.
@@ -37,8 +45,15 @@ struct SecurityServerState {
     /// Describes the currently active policy.
     policy: Option<Arc<LoadedPolicy>>,
 
+    /// Encapsulates the security server "status" fields, which are exposed to
+    /// userspace as a C-layout structure, and updated with the SeqLock pattern.
+    status: SeLinuxStatus,
+
     /// True if hooks should enforce policy-based access decisions.
     enforcing: bool,
+
+    /// The number of times the selinux policy has been reloaded.
+    policy_load_count: u32,
 }
 
 impl SecurityServerState {
@@ -66,14 +81,18 @@ pub struct SecurityServer {
 }
 
 impl SecurityServer {
-    pub fn new(mode: Mode) -> Arc<SecurityServer> {
+    pub fn new(mode: Mode) -> Arc<Self> {
         let avc_manager = AvcManager::new();
+        let status = SeLinuxStatus::new_default().expect("Failed to create SeLinuxStatus");
         let state = Mutex::new(SecurityServerState {
             sids: HashMap::new(),
             policy: None,
+            status,
             enforcing: false,
+            policy_load_count: 0,
         });
-        let security_server = Arc::new(SecurityServer { mode, avc_manager, state });
+
+        let security_server = Arc::new(Self { mode, avc_manager, state });
 
         // TODO(http://b/304776236): Consider constructing shared owner of `AvcManager` and
         // `SecurityServer` to eliminate weak reference.
@@ -117,26 +136,29 @@ impl SecurityServer {
         // parsed policy is not valid.
         let policy = Arc::new(LoadedPolicy { parsed, binary });
 
-        // Replace any existing policy.
-        // TODO(b/315531456): Update the policy load count for "status".
-        self.state.lock().policy = Some(policy);
+        // Replace any existing policy and update the [`SeLinuxStatus`].
+        self.with_state_and_update_status(|state| {
+            state.policy = Some(policy);
+            state.policy_load_count += 1;
+        });
+
         Ok(())
+    }
+
+    /// Returns the active policy in binary form.
+    pub fn get_binary_policy(&self) -> Vec<u8> {
+        self.state.lock().policy.as_ref().map_or(Vec::new(), |p| p.binary.clone())
     }
 
     /// Set to enforcing mode if `enforce` is true, permissive mode otherwise.
     pub fn set_enforcing(&self, enforcing: bool) {
-        self.state.lock().enforcing = enforcing;
+        self.with_state_and_update_status(|state| state.enforcing = enforcing);
     }
 
     /// Returns true if access decisions by the [`SecurityServer`] should be
     /// enforced by hooks.
     pub fn enforcing(&self) -> bool {
         self.state.lock().enforcing
-    }
-
-    /// Returns the active policy in binary form.
-    pub fn get_binary_policy(&self) -> Vec<u8> {
-        self.state.lock().policy.as_ref().map_or(Vec::new(), |p| p.binary.clone())
     }
 
     /// Returns true if the policy requires unknown class / permissions to be
@@ -170,6 +192,11 @@ impl SecurityServer {
         AccessVector::ALL
     }
 
+    /// Returns a read-only VMO containing the SELinux "status" structure.
+    pub fn get_status_vmo(&self) -> Arc<zx::Vmo> {
+        self.state.lock().status.get_readonly_vmo()
+    }
+
     /// Returns true if the `SecurityServer` is using hard-code fake policy.
     pub fn is_fake(&self) -> bool {
         match self.mode {
@@ -189,6 +216,18 @@ impl SecurityServer {
     pub fn new_thread_local_avc(&self) -> impl QueryMut {
         self.avc_manager.new_thread_local_cache()
     }
+
+    // Runs the supplied function with locked `self`, and then updates the [`SeLinuxStatus`].
+    fn with_state_and_update_status(&self, f: impl FnOnce(&mut SecurityServerState)) {
+        let mut state = self.state.lock();
+        f(state.deref_mut());
+        let new_value = SeLinuxStatusValue {
+            enforcing: state.enforcing as u32,
+            policyload: state.policy_load_count,
+            deny_unknown: if self.is_fake() { 0 } else { state.deny_unknown() as u32 },
+        };
+        state.status.set_value(new_value);
+    }
 }
 
 impl Query for SecurityServer {
@@ -202,9 +241,42 @@ impl Query for SecurityServer {
     }
 }
 
+/// Header of the C-style struct exposed via the /sys/fs/selinux/status file,
+/// to userspace. Defined here (instead of imported through bindgen) as selinux
+/// headers are not exposed through  kernel uapi headers.
+#[derive(AsBytes, Copy, Clone, NoCell)]
+#[repr(C, align(4))]
+struct SeLinuxStatusHeader {
+    /// Version number of this structure (1).
+    version: u32,
+}
+
+impl Default for SeLinuxStatusHeader {
+    fn default() -> Self {
+        Self { version: SELINUX_STATUS_VERSION }
+    }
+}
+
+/// Value part of the C-style struct exposed via the /sys/fs/selinux/status file,
+/// to userspace. Defined here (instead of imported through bindgen) as selinux
+/// headers are not exposed through  kernel uapi headers.
+#[derive(AsBytes, Copy, Clone, Default, NoCell)]
+#[repr(C, align(4))]
+struct SeLinuxStatusValue {
+    /// `0` means permissive mode, `1` means enforcing mode.
+    enforcing: u32,
+    /// The number of times the selinux policy has been reloaded.
+    policyload: u32,
+    /// `0` means allow and `1` means deny unknown object classes/permissions.
+    deny_unknown: u32,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    use fuchsia_zircon::AsHandleRef;
+    use std::mem::size_of;
 
     const MINIMAL_BINARY_POLICY: &[u8] = include_bytes!("../testdata/policies/minimal");
 
@@ -292,5 +364,29 @@ mod tests {
 
         security_server.set_enforcing(true);
         assert!(security_server.enforcing());
+    }
+
+    #[fuchsia::test]
+    fn status_vmo_has_correct_size_and_rights() {
+        // The current version of the "status" file contains five packed
+        // u32 values.
+        const STATUS_T_SIZE: usize = size_of::<u32>() * 5;
+
+        let security_server = SecurityServer::new(Mode::Enable);
+        let status_vmo = security_server.get_status_vmo();
+
+        // Verify the content and actual size of the structure are as expected.
+        let content_size = status_vmo.get_content_size().unwrap() as usize;
+        assert_eq!(content_size, STATUS_T_SIZE);
+        let actual_size = status_vmo.get_size().unwrap() as usize;
+        assert!(actual_size >= STATUS_T_SIZE);
+
+        // Ensure the returned handle is read-only and non-resizable.
+        let rights = status_vmo.basic_info().unwrap().rights;
+        assert_eq!((rights & zx::Rights::MAP), zx::Rights::MAP);
+        assert_eq!((rights & zx::Rights::READ), zx::Rights::READ);
+        assert_eq!((rights & zx::Rights::GET_PROPERTY), zx::Rights::GET_PROPERTY);
+        assert_eq!((rights & zx::Rights::WRITE), zx::Rights::NONE);
+        assert_eq!((rights & zx::Rights::RESIZE), zx::Rights::NONE);
     }
 }

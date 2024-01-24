@@ -28,20 +28,18 @@ pub struct VmoFileNode {
 }
 
 impl VmoFileNode {
-    /// Create a new file node based on a blank VMO.
-    pub fn new() -> Result<VmoFileNode, Errno> {
+    /// Create a new writable file node based on a blank VMO.
+    pub fn new() -> Result<Self, Errno> {
         let vmo =
             zx::Vmo::create_with_opts(zx::VmoOptions::RESIZABLE, 0).map_err(|_| errno!(ENOMEM))?;
-        Ok(VmoFileNode { vmo: Arc::new(vmo), xattrs: MemoryXattrStorage::default() })
+        Ok(Self { vmo: Arc::new(vmo), xattrs: MemoryXattrStorage::default() })
     }
 
-    /// Create a file node from byte data. This assumes that the node does not support
-    /// sealing via `fcntl` syscall.
-    pub fn from_bytes(data: &[u8]) -> Result<VmoFileNode, Errno> {
-        let vmo = zx::Vmo::create_with_opts(zx::VmoOptions::RESIZABLE, data.len() as u64)
-            .map_err(|_| errno!(ENOMEM))?;
-        vmo.write(data, 0).map_err(|_| errno!(ENOMEM))?;
-        Ok(VmoFileNode { vmo: Arc::new(vmo), xattrs: MemoryXattrStorage::default() })
+    /// Create a new file node based on an existing VMO.
+    /// Attempts to open the file for writing will fail unless [`vmo`] has both
+    /// the `WRITE` and `RESIZE` rights.
+    pub fn from_vmo(vmo: Arc<zx::Vmo>) -> Self {
+        Self { vmo, xattrs: MemoryXattrStorage::default() }
     }
 }
 
@@ -61,13 +59,13 @@ impl FsNodeOps for VmoFileNode {
         }
 
         // Produce a VMO handle with rights reduced to those requested in |flags|.
-        // self.vmo has the default VMO object rights plus the RESIZE as we create it with zx::VmoOptions::RESIZABLE.
+        // TODO(b/319240806): Accumulate required rights, rather than starting from `DEFAULT`.
         let mut desired_rights = zx::Rights::VMO_DEFAULT | zx::Rights::RESIZE;
         if !flags.can_read() {
             desired_rights.remove(zx::Rights::READ);
         }
         if !flags.can_write() {
-            desired_rights.remove(zx::Rights::WRITE);
+            desired_rights.remove(zx::Rights::WRITE | zx::Rights::RESIZE);
         }
         let scoped_vmo =
             Arc::new(self.vmo.duplicate_handle(desired_rights).map_err(|_e| errno!(EIO))?);
