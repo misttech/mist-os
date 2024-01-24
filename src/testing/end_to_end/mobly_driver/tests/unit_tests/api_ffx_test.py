@@ -4,6 +4,7 @@
 # found in the LICENSE file.
 """Unit tests for Mobly driver's api_ffx.py."""
 
+import ipaddress
 import subprocess
 import unittest
 from unittest.mock import patch
@@ -97,3 +98,111 @@ class FfxClientTest(unittest.TestCase):
         mock_check_output.return_value = target_list_output
         with self.assertRaises(api_ffx.OutputFormatException):
             self.client.target_list(isolate_dir=None)
+
+    @patch(
+        "subprocess.check_output",
+        autospec=True,
+    )
+    def test_get_target_ssh_address(self, mock_check_output):
+        """Test case for get_target_ssh_address() returning expected results"""
+        ssh_ip = "fe80::4fce:3102:ef13:888c%qemu"
+        ssh_port = 8022
+        mock_check_output.return_value = f"[{ssh_ip}]:{ssh_port}".encode()
+
+        expected_target_ssh_address = api_ffx.TargetSshAddress(
+            ip=ipaddress.IPv6Address(ssh_ip), port=ssh_port
+        )
+
+        self.assertEqual(
+            self.client.get_target_ssh_address(
+                target_name="fuchsia-emulator",
+                isolate_dir="some_isolate_dir_path",
+            ),
+            expected_target_ssh_address,
+        )
+
+        mock_check_output.assert_called()
+
+    @parameterized.expand(
+        [
+            (
+                "timeout",
+                subprocess.TimeoutExpired(cmd="", timeout=-1),
+            ),
+            (
+                "failure",
+                subprocess.CalledProcessError(returncode=1, cmd=[], stderr=""),
+            ),
+        ]
+    )
+    @patch("subprocess.check_output", autospec=True)
+    def test_get_target_ssh_address_failure_raises_exception(
+        self, unused_name, mock_exception, mock_check_output
+    ):
+        """Test case for get_target_ssh_address() raising exceptions for
+        subprocess failure"""
+        mock_check_output.side_effect = mock_exception
+        with self.assertRaises(api_ffx.CommandException):
+            self.client.get_target_ssh_address(
+                target_name="fuchsia-emulator",
+                isolate_dir=None,
+            )
+        mock_check_output.assert_called()
+
+    @patch(
+        "subprocess.check_output",
+        return_value=b"some invalid output",
+        autospec=True,
+    )
+    def test_get_target_ssh_address_invalid_output_raises_exception(
+        self, mock_check_output
+    ):
+        """Test case for get_target_ssh_address raising exception for invalid
+        output"""
+        with self.assertRaises(api_ffx.OutputFormatException):
+            self.client.get_target_ssh_address(
+                target_name="fuchsia-emulator",
+                isolate_dir=None,
+            )
+        mock_check_output.assert_called()
+
+    @parameterized.expand(
+        [
+            (
+                "::1",
+                api_ffx._REMOTE_TARGET_SSH_PORT,
+                True,
+            ),
+            (
+                "fe80::6f01:a7e5:3e79:ceec",
+                api_ffx._REMOTE_TARGET_SSH_PORT,
+                False,
+            ),
+            (
+                "::1",
+                80,
+                False,
+            ),
+            (
+                "127.0.0.1",
+                api_ffx._REMOTE_TARGET_SSH_PORT,
+                True,
+            ),
+            (
+                "192.168.1.1",
+                api_ffx._REMOTE_TARGET_SSH_PORT,
+                False,
+            ),
+            (
+                "127.0.0.1",
+                80,
+                False,
+            ),
+        ]
+    )
+    def test_target_ssh_address(self, ip, port, is_remote) -> None:
+        """Test case for TargetSshAddress dataclass"""
+        target_ssh_address = api_ffx.TargetSshAddress(
+            ip=ipaddress.ip_address(ip), port=port
+        )
+        self.assertEqual(target_ssh_address.is_remote(), is_remote)

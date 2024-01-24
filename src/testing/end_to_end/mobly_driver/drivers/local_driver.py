@@ -116,17 +116,26 @@ class LocalDriver(base_mobly_driver.BaseDriver):
           common.DriverException if device discovery command fails or no devices
             detected.
         """
-        mobly_controllers: List[str] = []
+        mobly_controllers: List[Dict[str, Any]] = []
         for target in self._get_test_targets():
-            mobly_controllers.append(
-                {
-                    "type": api_infra.FUCHSIA_DEVICE,
-                    "name": target,
-                    # Assume connected devices are provisioned with default
-                    # Fuchsia.git SSH credentials.
-                    "ssh_private_key": "~/.ssh/fuchsia_ed25519",
-                }
+            fx_device = {
+                "type": api_infra.FUCHSIA_DEVICE,
+                "name": target,
+                # Assume connected devices are provisioned with default
+                # Fuchsia.git SSH credentials.
+                "ssh_private_key": "~/.ssh/fuchsia_ed25519",
+            }
+
+            # Check if the target connected is "local" or "remote".
+            target_ssh_address: api_ffx.TargetSshAddress = (
+                self._ffx_client.get_target_ssh_address(
+                    target_name=target, isolate_dir=None
+                )
             )
+            if target_ssh_address.is_remote():
+                fx_device["device_ip_port"] = str(target_ssh_address)
+
+            mobly_controllers.append(fx_device)
 
         config = api_mobly.new_testbed_config(
             testbed_name="GeneratedLocalTestbed",

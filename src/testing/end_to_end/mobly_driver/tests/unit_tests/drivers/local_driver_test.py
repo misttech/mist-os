@@ -4,6 +4,8 @@
 # found in the LICENSE file.
 """Unit tests for Mobly driver's local_driver.py."""
 
+from ipaddress import ip_address
+import ipaddress
 import unittest
 from unittest.mock import ANY, patch
 
@@ -93,6 +95,13 @@ class LocalDriverTest(unittest.TestCase):
     @patch("builtins.print")
     @patch("yaml.dump", return_value="yaml_str")
     @patch(
+        "api_ffx.FfxClient.get_target_ssh_address",
+        autospec=True,
+        return_value=api_ffx.TargetSshAddress(
+            ip=ipaddress.ip_address("::1"), port=8022
+        ),
+    )
+    @patch(
         "api_ffx.FfxClient.target_list",
         autospec=True,
         return_value=api_ffx.TargetListResult(
@@ -104,6 +113,7 @@ class LocalDriverTest(unittest.TestCase):
         self,
         mock_new_tb_config,
         mock_ffx_target_list,
+        mock_ffx_target_ssh_address,
         *unused_args,
     ):
         """Test case for successful env config generation"""
@@ -118,6 +128,9 @@ class LocalDriverTest(unittest.TestCase):
         self.assertEqual([c["name"] for c in controllers], ["dut_1", "dut_2"])
         self.assertEqual(ret, "yaml_str")
 
+        mock_ffx_target_list.assert_called()
+        mock_ffx_target_ssh_address.assert_called()
+
     @parameterized.expand(
         [
             (
@@ -129,6 +142,13 @@ class LocalDriverTest(unittest.TestCase):
     )
     @patch("builtins.print")
     @patch("yaml.dump", return_value="yaml_str")
+    @patch(
+        "api_ffx.FfxClient.get_target_ssh_address",
+        autospec=True,
+        return_value=api_ffx.TargetSshAddress(
+            ip=ipaddress.ip_address("::1"), port=8022
+        ),
+    )
     @patch("api_ffx.FfxClient.target_list", autospec=True)
     @patch("api_mobly.new_testbed_config", autospec=True)
     def test_multi_device_config_generation(
@@ -137,6 +157,7 @@ class LocalDriverTest(unittest.TestCase):
         default_nodes,
         mock_new_tb_config,
         mock_ffx_target_list,
+        mock_ffx_target_ssh_address,
         *unused_args,
     ):
         """Test case for multi-device config generation."""
@@ -157,6 +178,9 @@ class LocalDriverTest(unittest.TestCase):
         self.assertEqual([c["name"] for c in controllers], ["dut_1", "dut_2"])
         self.assertEqual(ret, "yaml_str")
 
+        mock_ffx_target_list.assert_called()
+        mock_ffx_target_ssh_address.assert_called()
+
     @parameterized.expand(
         [
             ("default_nodes exist, prefer default_nodes", ["dut_1"], ["dut_1"]),
@@ -165,6 +189,13 @@ class LocalDriverTest(unittest.TestCase):
     )
     @patch("builtins.print")
     @patch("yaml.dump", return_value="yaml_str")
+    @patch(
+        "api_ffx.FfxClient.get_target_ssh_address",
+        autospec=True,
+        return_value=api_ffx.TargetSshAddress(
+            ip=ipaddress.ip_address("::1"), port=8022
+        ),
+    )
     @patch("api_ffx.FfxClient.target_list", autospec=True)
     @patch("api_mobly.new_testbed_config", autospec=True)
     def test_single_device_config_generation(
@@ -174,6 +205,7 @@ class LocalDriverTest(unittest.TestCase):
         want_nodes,
         mock_new_tb_config,
         mock_ffx_target_list,
+        mock_ffx_target_ssh_address,
         *unused_args,
     ):
         """Test case for single-device config generation."""
@@ -193,6 +225,9 @@ class LocalDriverTest(unittest.TestCase):
         controllers = mock_new_tb_config.call_args.kwargs["mobly_controllers"]
         self.assertEqual([c["name"] for c in controllers], want_nodes)
         self.assertEqual(ret, "yaml_str")
+
+        mock_ffx_target_list.assert_called()
+        mock_ffx_target_ssh_address.assert_called()
 
     @patch("builtins.print")
     @patch(
