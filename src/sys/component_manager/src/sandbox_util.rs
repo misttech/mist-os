@@ -8,7 +8,6 @@ use {
         capability_source::CapabilitySource, policy::GlobalPolicyChecker, Completer, Request,
         Routable, Router,
     },
-    async_trait::async_trait,
     cm_types::Name,
     cm_util::WeakTaskGroup,
     fidl::{
@@ -71,7 +70,6 @@ impl ProtocolPayloadExt for fsandbox::ProtocolPayload {
 
 // TODO: use the `Name` type in `Dict`, so that Dicts aren't holding duplicate strings.
 
-#[async_trait]
 pub trait DictExt {
     fn get_or_insert_sub_dict<'a>(&self, path: impl Iterator<Item = &'a str>) -> Dict;
 
@@ -95,7 +93,6 @@ pub trait DictExt {
     fn remove_capability<'a>(&self, path: impl Iterator<Item = &'a str>);
 }
 
-#[async_trait]
 impl DictExt for Dict {
     fn get_or_insert_sub_dict<'a>(&self, mut path: impl Iterator<Item = &'a str>) -> Dict {
         let Some(next_name) = path.next() else { return self.clone() };
