@@ -4,7 +4,7 @@
 
 #include "spi.h"
 
-#include <fidl/fuchsia.hardware.spiimpl/cpp/wire_test_base.h>
+#include <fidl/fuchsia.hardware.spiimpl/cpp/driver/wire.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
 #include <lib/async/default.h>
@@ -22,6 +22,7 @@
 
 #include <zxtest/zxtest.h>
 
+#include "sdk/lib/driver/outgoing/cpp/outgoing_directory.h"
 #include "spi-banjo-child.h"
 #include "spi-child.h"
 #include "src/devices/lib/fidl-metadata/spi.h"
@@ -187,8 +188,10 @@ template <class FakeSpiImplClass>
 class SpiDeviceTest : public zxtest::Test {
  protected:
   SpiDeviceTest()
-      : loop_(&kAsyncLoopConfigNoAttachToCurrentThread),
-        incoming_loop_(&kAsyncLoopConfigNoAttachToCurrentThread) {}
+      : runtime_(mock_ddk::GetDriverRuntime()),
+        loop_(&kAsyncLoopConfigNoAttachToCurrentThread),
+        incoming_dispatcher_(runtime_->StartBackgroundDispatcher()),
+        ns_(incoming_dispatcher_->async_dispatcher(), std::in_place) {}
 
   static constexpr uint32_t kTestBusId = 0;
   static constexpr spi_channel_t kSpiChannels[] = {
@@ -199,8 +202,6 @@ class SpiDeviceTest : public zxtest::Test {
   virtual void SetUpSpiImpl() = 0;
 
   void SetUp() override {
-    ASSERT_OK(incoming_loop_.StartThread("incoming-loop"));
-
     // TODO(https://fxbug.dev/124464): Migrate test to use dispatcher integration.
     parent_ = MockDevice::FakeRootParent();
     ASSERT_OK(loop_.StartThread("spi-test-thread"));
@@ -243,6 +244,7 @@ class SpiDeviceTest : public zxtest::Test {
     parent_->SetMetadata(DEVICE_METADATA_SPI_CHANNELS, result->data(), result->size());
   }
 
+  std::shared_ptr<fdf_testing::DriverRuntime> runtime_;
   std::shared_ptr<MockDevice> parent_;
   async::Loop loop_;
 
@@ -275,13 +277,12 @@ class SpiDeviceTest : public zxtest::Test {
   void OneClient();
   void DdkLifecycle();
 
-  async::Loop incoming_loop_;
+  fdf::UnownedSynchronizedDispatcher incoming_dispatcher_;
   struct IncomingNamespace {
     FakeSpiImplClass fake_spi_impl;
-    component::OutgoingDirectory outgoing{async_get_default_dispatcher()};
+    fdf::OutgoingDirectory outgoing{fdf::Dispatcher::GetCurrent()->get()};
   };
-  async_patterns::TestDispatcherBound<IncomingNamespace> ns_{incoming_loop_.dispatcher(),
-                                                             std::in_place};
+  async_patterns::TestDispatcherBound<IncomingNamespace> ns_;
 };
 
 template <class FakeSpiImplClass>
@@ -914,127 +915,125 @@ TEST_F(BanjoSpiDeviceTest, DdkLifecycle) { DdkLifecycle(); }
 // FIDL Tests
 namespace {
 
-class FakeSpiImplServer : public fidl::testing::WireTestBase<fuchsia_hardware_spiimpl::SpiImpl>,
+class FakeSpiImplServer : public fdf::WireServer<fuchsia_hardware_spiimpl::SpiImpl>,
                           public FakeSpiImplBase {
  public:
   using ChildType = SpiChild;
 
   fidl::ProtocolHandler<fuchsia_hardware_spiimpl::SpiImpl> GetHandler() {
-    return bindings_.CreateHandler(this, async_get_default_dispatcher(),
+    return bindings_.CreateHandler(this, fdf::Dispatcher::GetCurrent()->get(),
                                    std::mem_fn(&FakeSpiImplServer::OnClosed));
   }
 
   // fuchsia_hardware_spiimpl::SpiImpl methods
-  void NotImplemented_(const std::string& name, fidl::CompleterBase& completer) final {
-    completer.Close(ZX_ERR_NOT_SUPPORTED);
-  }
-  void GetChipSelectCount(GetChipSelectCountCompleter::Sync& completer) override {
-    completer.Reply(kChipSelectCount);
+  void GetChipSelectCount(fdf::Arena& arena,
+                          GetChipSelectCountCompleter::Sync& completer) override {
+    completer.buffer(arena).Reply(kChipSelectCount);
   }
   void TransmitVector(fuchsia_hardware_spiimpl::wire::SpiImplTransmitVectorRequest* request,
-                      TransmitVectorCompleter::Sync& completer) override {
+                      fdf::Arena& arena, TransmitVectorCompleter::Sync& completer) override {
     size_t actual;
     auto status = FakeSpiImplBase::SpiImplExchange(request->chip_select, request->data.data(),
                                                    request->data.count(), nullptr, 0, &actual);
     if (status != ZX_OK) {
-      completer.ReplyError(status);
+      completer.buffer(arena).ReplyError(status);
       return;
     }
-    completer.ReplySuccess();
+    completer.buffer(arena).ReplySuccess();
   }
   void ReceiveVector(fuchsia_hardware_spiimpl::wire::SpiImplReceiveVectorRequest* request,
-                     ReceiveVectorCompleter::Sync& completer) override {
+                     fdf::Arena& arena, ReceiveVectorCompleter::Sync& completer) override {
     std::vector<uint8_t> rxdata(request->size);
     size_t actual;
     auto status = FakeSpiImplBase::SpiImplExchange(request->chip_select, nullptr, 0, rxdata.data(),
                                                    rxdata.size(), &actual);
     if (status != ZX_OK) {
-      completer.ReplyError(status);
+      completer.buffer(arena).ReplyError(status);
       return;
     }
     rxdata.resize(actual);
-    completer.ReplySuccess(fidl::VectorView<uint8_t>::FromExternal(rxdata));
+    completer.buffer(arena).ReplySuccess(fidl::VectorView<uint8_t>::FromExternal(rxdata));
   }
   void ExchangeVector(fuchsia_hardware_spiimpl::wire::SpiImplExchangeVectorRequest* request,
-                      ExchangeVectorCompleter::Sync& completer) override {
+                      fdf::Arena& arena, ExchangeVectorCompleter::Sync& completer) override {
     std::vector<uint8_t> rxdata(request->txdata.count());
     size_t actual;
     auto status = FakeSpiImplBase::SpiImplExchange(request->chip_select, request->txdata.data(),
                                                    request->txdata.count(), rxdata.data(),
                                                    rxdata.size(), &actual);
     if (status != ZX_OK) {
-      completer.ReplyError(status);
+      completer.buffer(arena).ReplyError(status);
       return;
     }
     rxdata.resize(actual);
-    completer.ReplySuccess(fidl::VectorView<uint8_t>::FromExternal(rxdata));
+    completer.buffer(arena).ReplySuccess(fidl::VectorView<uint8_t>::FromExternal(rxdata));
   }
-  void LockBus(fuchsia_hardware_spiimpl::wire::SpiImplLockBusRequest* request,
+  void LockBus(fuchsia_hardware_spiimpl::wire::SpiImplLockBusRequest* request, fdf::Arena& arena,
                LockBusCompleter::Sync& completer) override {
-    completer.ReplySuccess();
+    completer.buffer(arena).ReplySuccess();
   }
   void UnlockBus(fuchsia_hardware_spiimpl::wire::SpiImplUnlockBusRequest* request,
-                 UnlockBusCompleter::Sync& completer) override {
-    completer.ReplySuccess();
+                 fdf::Arena& arena, UnlockBusCompleter::Sync& completer) override {
+    completer.buffer(arena).ReplySuccess();
   }
   void RegisterVmo(fuchsia_hardware_spiimpl::wire::SpiImplRegisterVmoRequest* request,
-                   RegisterVmoCompleter::Sync& completer) override {
+                   fdf::Arena& arena, RegisterVmoCompleter::Sync& completer) override {
     auto status = FakeSpiImplBase::SpiImplRegisterVmo(
         request->chip_select, request->vmo_id, std::move(request->vmo.vmo), request->vmo.offset,
         request->vmo.size, static_cast<uint32_t>(request->rights));
     if (status != ZX_OK) {
-      completer.ReplyError(status);
+      completer.buffer(arena).ReplyError(status);
       return;
     }
-    completer.ReplySuccess();
+    completer.buffer(arena).ReplySuccess();
   }
   void UnregisterVmo(fuchsia_hardware_spiimpl::wire::SpiImplUnregisterVmoRequest* request,
-                     UnregisterVmoCompleter::Sync& completer) override {
+                     fdf::Arena& arena, UnregisterVmoCompleter::Sync& completer) override {
     zx::vmo vmo;
     auto status =
         FakeSpiImplBase::SpiImplUnregisterVmo(request->chip_select, request->vmo_id, &vmo);
     if (status != ZX_OK) {
-      completer.ReplyError(status);
+      completer.buffer(arena).ReplyError(status);
       return;
     }
-    completer.ReplySuccess(std::move(vmo));
+    completer.buffer(arena).ReplySuccess(std::move(vmo));
   }
   void ReleaseRegisteredVmos(
       fuchsia_hardware_spiimpl::wire::SpiImplReleaseRegisteredVmosRequest* request,
-      ReleaseRegisteredVmosCompleter::Sync& completer) override {
+      fdf::Arena& arena, ReleaseRegisteredVmosCompleter::Sync& completer) override {
     FakeSpiImplBase::SpiImplReleaseRegisteredVmos(request->chip_select);
   }
   void TransmitVmo(fuchsia_hardware_spiimpl::wire::SpiImplTransmitVmoRequest* request,
-                   TransmitVmoCompleter::Sync& completer) override {
+                   fdf::Arena& arena, TransmitVmoCompleter::Sync& completer) override {
     auto status = FakeSpiImplBase::SpiImplTransmitVmo(request->chip_select, request->buffer.vmo_id,
                                                       request->buffer.offset, request->buffer.size);
     if (status != ZX_OK) {
-      completer.ReplyError(status);
+      completer.buffer(arena).ReplyError(status);
       return;
     }
-    completer.ReplySuccess();
+    completer.buffer(arena).ReplySuccess();
   }
   void ReceiveVmo(fuchsia_hardware_spiimpl::wire::SpiImplReceiveVmoRequest* request,
-                  ReceiveVmoCompleter::Sync& completer) override {
+                  fdf::Arena& arena, ReceiveVmoCompleter::Sync& completer) override {
     auto status = FakeSpiImplBase::SpiImplReceiveVmo(request->chip_select, request->buffer.vmo_id,
                                                      request->buffer.offset, request->buffer.size);
     if (status != ZX_OK) {
-      completer.ReplyError(status);
+      completer.buffer(arena).ReplyError(status);
       return;
     }
-    completer.ReplySuccess();
+    completer.buffer(arena).ReplySuccess();
   }
   void ExchangeVmo(fuchsia_hardware_spiimpl::wire::SpiImplExchangeVmoRequest* request,
-                   ExchangeVmoCompleter::Sync& completer) override {
+                   fdf::Arena& arena, ExchangeVmoCompleter::Sync& completer) override {
     ASSERT_EQ(request->tx_buffer.size, request->rx_buffer.size);
     auto status = FakeSpiImplBase::SpiImplExchangeVmo(
         request->chip_select, request->tx_buffer.vmo_id, request->tx_buffer.offset,
         request->rx_buffer.vmo_id, request->rx_buffer.offset, request->tx_buffer.size);
     if (status != ZX_OK) {
-      completer.ReplyError(status);
+      completer.buffer(arena).ReplyError(status);
       return;
     }
-    completer.ReplySuccess();
+    completer.buffer(arena).ReplySuccess();
   }
 
  private:
@@ -1043,7 +1042,7 @@ class FakeSpiImplServer : public fidl::testing::WireTestBase<fuchsia_hardware_sp
     // This is provided to the binding group during |CreateHandler|.
   }
 
-  fidl::ServerBindingGroup<fuchsia_hardware_spiimpl::SpiImpl> bindings_;
+  fdf::ServerBindingGroup<fuchsia_hardware_spiimpl::SpiImpl> bindings_;
 };
 
 class FidlSpiDeviceTest : public SpiDeviceTest<FakeSpiImplServer> {

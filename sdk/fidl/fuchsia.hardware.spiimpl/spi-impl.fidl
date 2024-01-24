@@ -10,6 +10,7 @@ using zx;
 
 /// Low-level protocol for spi drivers.
 @discoverable
+@transport("Driver")
 closed protocol SpiImpl {
     /// Returns the number of chip select lines available or provided by the driver instance.
     /// To be used as a limit on the acceptable values for the `chip_select' field in the Exchange()

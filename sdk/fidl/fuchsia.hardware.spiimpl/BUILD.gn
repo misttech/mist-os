@@ -7,6 +7,7 @@ import("//build/fidl/fidl.gni")
 fidl("fuchsia.hardware.spiimpl") {
   sources = [ "spi-impl.fidl" ]
 
+  contains_drivers = true
   public_deps = [
     "//sdk/fidl/fuchsia.hardware.sharedmemory",
     "//sdk/fidl/fuchsia.mem",

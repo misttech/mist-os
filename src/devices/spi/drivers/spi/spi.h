@@ -7,7 +7,7 @@
 
 #include <fidl/fuchsia.hardware.spi.businfo/cpp/wire.h>
 #include <fidl/fuchsia.hardware.spi/cpp/fidl.h>
-#include <fidl/fuchsia.hardware.spiimpl/cpp/wire.h>
+#include <fidl/fuchsia.hardware.spiimpl/cpp/driver/wire.h>
 #include <fuchsia/hardware/spiimpl/cpp/banjo.h>
 
 #include <ddktl/device.h>

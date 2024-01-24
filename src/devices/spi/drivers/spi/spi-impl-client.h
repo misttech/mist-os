@@ -5,7 +5,7 @@
 #ifndef SRC_DEVICES_SPI_DRIVERS_SPI_SPI_IMPL_CLIENT_H_
 #define SRC_DEVICES_SPI_DRIVERS_SPI_SPI_IMPL_CLIENT_H_
 
-#include <fidl/fuchsia.hardware.spiimpl/cpp/fidl.h>
+#include <fidl/fuchsia.hardware.spiimpl/cpp/driver/fidl.h>
 #include <fuchsia/hardware/spiimpl/cpp/banjo.h>
 
 namespace spi {
@@ -36,7 +36,7 @@ class SpiImplClient {
 // FIDL SpiImpl Client
 class FidlSpiImplClient : public SpiImplClient {
  public:
-  explicit FidlSpiImplClient(fidl::ClientEnd<fuchsia_hardware_spiimpl::SpiImpl> client)
+  explicit FidlSpiImplClient(fdf::ClientEnd<fuchsia_hardware_spiimpl::SpiImpl> client)
       : client_(std::move(client)) {}
 
   zx::result<uint32_t> GetChipSelectCount() override;
@@ -59,7 +59,7 @@ class FidlSpiImplClient : public SpiImplClient {
   zx::result<> UnlockBus(uint32_t chip_select) override;
 
  private:
-  fidl::SyncClient<fuchsia_hardware_spiimpl::SpiImpl> client_;
+  fdf::WireSyncClient<fuchsia_hardware_spiimpl::SpiImpl> client_;
 };
 
 // Banjo SpiImpl Client

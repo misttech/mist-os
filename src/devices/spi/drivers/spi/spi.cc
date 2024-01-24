@@ -87,7 +87,7 @@ zx_status_t SpiDevice::Init() {
     return ZX_OK;
   }
 
-  auto client_end = DdkConnectFidlProtocol<fuchsia_hardware_spiimpl::Service::Device>();
+  auto client_end = DdkConnectRuntimeProtocol<fuchsia_hardware_spiimpl::Service::Device>();
   if (client_end.is_error()) {
     return client_end.error_value();
   }

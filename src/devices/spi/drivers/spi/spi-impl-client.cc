@@ -9,110 +9,133 @@
 
 namespace spi {
 
-#define ZX_ERROR(result)                                            \
-  zx::error((result).error_value().is_framework_error()             \
-                ? (result).error_value().framework_error().status() \
-                : (result).error_value().domain_error())
+template <typename T>
+inline zx::result<> FidlStatus(T& result) {
+  if (!result.ok()) {
+    return zx::error(result.status());
+  }
+  if (result->is_ok()) {
+    return zx::ok();
+  }
+  return result->take_error();
+}
+
+inline fidl::VectorView<uint8_t> VectorToFidl(std::vector<uint8_t>& data) {
+  return fidl::VectorView<uint8_t>::FromExternal(data.data(), data.size());
+}
+
+inline std::vector<uint8_t> FidlToVector(const fidl::VectorView<uint8_t>& data) {
+  return std::vector<uint8_t>(data.cbegin(), data.cend());
+}
+
+inline fuchsia_hardware_sharedmemory::wire::SharedVmoBuffer BufferToWire(
+    const fuchsia_hardware_sharedmemory::SharedVmoBuffer& buffer) {
+  return {buffer.vmo_id(), buffer.offset(), buffer.size()};
+}
 
 // FIDL
 zx::result<uint32_t> FidlSpiImplClient::GetChipSelectCount() {
-  auto result = client_->GetChipSelectCount();
-  if (result.is_error()) {
+  fdf::Arena arena('SPI_');
+  auto result = client_.buffer(arena)->GetChipSelectCount();
+  if (!result.ok()) {
     zxlogf(ERROR, "Couldn't complete SpiImpl::GetChipSelectCount: %s",
-           result.error_value().FormatDescription().c_str());
-    return zx::error(result.error_value().status());
+           result.FormatDescription().c_str());
+    return zx::error(result.status());
   }
-  return zx::ok(result->count());
+  return zx::ok(result->count);
 }
 
 zx::result<> FidlSpiImplClient::TransmitVector(uint32_t cs, std::vector<uint8_t> txdata) {
-  auto result = client_->TransmitVector({cs, std::move(txdata)});
-  if (result.is_error()) {
-    zxlogf(ERROR, "Couldn't complete SpiImpl::TransmitVector: %s",
-           result.error_value().FormatDescription().c_str());
-    return ZX_ERROR(result);
+  fdf::Arena arena('SPI_');
+  auto result = client_.buffer(arena)->TransmitVector(cs, VectorToFidl(txdata));
+  if (zx::result<> status = FidlStatus(result); status.is_error()) {
+    zxlogf(ERROR, "Couldn't complete SpiImpl::TransmitVector: %s", status.status_string());
+    return status.take_error();
   }
   return zx::ok();
 }
 
 zx::result<std::vector<uint8_t>> FidlSpiImplClient::ReceiveVector(uint32_t cs, uint32_t size) {
-  auto result = client_->ReceiveVector({cs, size});
-  if (result.is_error()) {
-    zxlogf(ERROR, "Couldn't complete SpiImpl::ReceiveVector: %s",
-           result.error_value().FormatDescription().c_str());
-    return ZX_ERROR(result);
+  fdf::Arena arena('SPI_');
+  auto result = client_.buffer(arena)->ReceiveVector(cs, size);
+  if (zx::result<> status = FidlStatus(result); status.is_error()) {
+    zxlogf(ERROR, "Couldn't complete SpiImpl::ReceiveVector: %s", status.status_string());
+    return status.take_error();
   }
-  if (result->data().size() != size) {
-    zxlogf(ERROR, "Expected %u bytes != received %zu bytes", size, result->data().size());
+  if (result->value()->data.count() != size) {
+    zxlogf(ERROR, "Expected %u bytes != received %zu bytes", size, result->value()->data.count());
     return zx::error(ZX_ERR_INTERNAL);
   }
-  return zx::ok(std::move(result->data()));
+  return zx::ok(FidlToVector(result->value()->data));
 }
 
 zx::result<std::vector<uint8_t>> FidlSpiImplClient::ExchangeVector(uint32_t cs,
                                                                    std::vector<uint8_t> txdata) {
+  fdf::Arena arena('SPI_');
   auto size = txdata.size();
-  auto result = client_->ExchangeVector({cs, std::move(txdata)});
-  if (result.is_error()) {
-    zxlogf(ERROR, "Couldn't complete SpiImpl::ExchangeVector: %s",
-           result.error_value().FormatDescription().c_str());
-    return ZX_ERROR(result);
+  auto result = client_.buffer(arena)->ExchangeVector(cs, VectorToFidl(txdata));
+  if (zx::result<> status = FidlStatus(result); status.is_error()) {
+    zxlogf(ERROR, "Couldn't complete SpiImpl::ExchangeVector: %s", status.status_string());
+    return status.take_error();
   }
-  if (result->rxdata().size() != size) {
-    zxlogf(ERROR, "Expected %zu bytes != received %zu bytes", size, result->rxdata().size());
+  if (result->value()->rxdata.count() != size) {
+    zxlogf(ERROR, "Expected %zu bytes != received %zu bytes", size,
+           result->value()->rxdata.count());
     return zx::error(ZX_ERR_INTERNAL);
   }
-  return zx::ok(std::move(result->rxdata()));
+  return zx::ok(FidlToVector(result->value()->rxdata));
 }
 
 zx::result<> FidlSpiImplClient::RegisterVmo(uint32_t chip_select, uint32_t vmo_id,
                                             fuchsia_mem::Range vmo,
                                             fuchsia_hardware_sharedmemory::SharedVmoRight rights) {
-  auto result = client_->RegisterVmo({chip_select, vmo_id, std::move(vmo), rights});
-  if (result.is_error()) {
-    zxlogf(ERROR, "Couldn't complete SpiImpl::RegisterVmo: %s",
-           result.error_value().FormatDescription().c_str());
-    return ZX_ERROR(result);
+  fdf::Arena arena('SPI_');
+  auto result = client_.buffer(arena)->RegisterVmo(
+      chip_select, vmo_id, {std::move(vmo.vmo()), vmo.offset(), vmo.size()}, rights);
+  if (zx::result<> status = FidlStatus(result); status.is_error()) {
+    zxlogf(ERROR, "Couldn't complete SpiImpl::RegisterVmo: %s", status.status_string());
+    return status.take_error();
   }
   return zx::ok();
 }
 
 zx::result<zx::vmo> FidlSpiImplClient::UnregisterVmo(uint32_t chip_select, uint32_t vmo_id) {
-  auto result = client_->UnregisterVmo({chip_select, vmo_id});
-  if (result.is_error()) {
-    zxlogf(ERROR, "Couldn't complete SpiImpl::UnregisterVmo: %s",
-           result.error_value().FormatDescription().c_str());
-    return ZX_ERROR(result);
+  fdf::Arena arena('SPI_');
+  auto result = client_.buffer(arena)->UnregisterVmo(chip_select, vmo_id);
+  if (zx::result<> status = FidlStatus(result); status.is_error()) {
+    zxlogf(ERROR, "Couldn't complete SpiImpl::UnregisterVmo: %s", status.status_string());
+    return status.take_error();
   }
-  return zx::ok(std::move(result->vmo()));
+  return zx::ok(std::move(result->value()->vmo));
 }
 
 void FidlSpiImplClient::ReleaseRegisteredVmos(uint32_t chip_select) {
-  auto result = client_->ReleaseRegisteredVmos(chip_select);
-  if (result.is_error()) {
+  fdf::Arena arena('SPI_');
+  auto result = client_.buffer(arena)->ReleaseRegisteredVmos(chip_select);
+  if (!result.ok()) {
     zxlogf(ERROR, "Couldn't complete SpiImpl::ReleaseRegisteredVmos: %s",
-           result.error_value().FormatDescription().c_str());
+           result.FormatDescription().c_str());
   }
 }
 
 zx::result<> FidlSpiImplClient::TransmitVmo(uint32_t chip_select,
                                             fuchsia_hardware_sharedmemory::SharedVmoBuffer buffer) {
-  auto result = client_->TransmitVmo({chip_select, std::move(buffer)});
-  if (result.is_error()) {
-    zxlogf(ERROR, "Couldn't complete SpiImpl::TransmitVmo: %s",
-           result.error_value().FormatDescription().c_str());
-    return ZX_ERROR(result);
+  fdf::Arena arena('SPI_');
+  auto result = client_.buffer(arena)->TransmitVmo(chip_select, BufferToWire(buffer));
+  if (zx::result<> status = FidlStatus(result); status.is_error()) {
+    zxlogf(ERROR, "Couldn't complete SpiImpl::TransmitVmo: %s", status.status_string());
+    return status.take_error();
   }
   return zx::ok();
 }
 
 zx::result<> FidlSpiImplClient::ReceiveVmo(uint32_t chip_select,
                                            fuchsia_hardware_sharedmemory::SharedVmoBuffer buffer) {
-  auto result = client_->ReceiveVmo({chip_select, std::move(buffer)});
-  if (result.is_error()) {
-    zxlogf(ERROR, "Couldn't complete SpiImpl::ReceiveVmo: %s",
-           result.error_value().FormatDescription().c_str());
-    return ZX_ERROR(result);
+  fdf::Arena arena('SPI_');
+  auto result = client_.buffer(arena)->ReceiveVmo(chip_select, BufferToWire(buffer));
+  if (zx::result<> status = FidlStatus(result); status.is_error()) {
+    zxlogf(ERROR, "Couldn't complete SpiImpl::ReceiveVmo: %s", status.status_string());
+    return status.take_error();
   }
   return zx::ok();
 }
@@ -120,37 +143,37 @@ zx::result<> FidlSpiImplClient::ReceiveVmo(uint32_t chip_select,
 zx::result<> FidlSpiImplClient::ExchangeVmo(
     uint32_t chip_select, fuchsia_hardware_sharedmemory::SharedVmoBuffer tx_buffer,
     fuchsia_hardware_sharedmemory::SharedVmoBuffer rx_buffer) {
+  fdf::Arena arena('SPI_');
   if (tx_buffer.size() != rx_buffer.size()) {
     zxlogf(ERROR, "tx_buffer and rx_buffer size must match. %zu (tx) != %zu (rx)", tx_buffer.size(),
            rx_buffer.size());
     return zx::error(ZX_ERR_INVALID_ARGS);
-    ;
   }
-  auto result = client_->ExchangeVmo({chip_select, std::move(tx_buffer), std::move(rx_buffer)});
-  if (result.is_error()) {
-    zxlogf(ERROR, "Couldn't complete SpiImpl::ExchangeVmo: %s",
-           result.error_value().FormatDescription().c_str());
-    return ZX_ERROR(result);
+  auto result = client_.buffer(arena)->ExchangeVmo(chip_select, BufferToWire(tx_buffer),
+                                                   BufferToWire(rx_buffer));
+  if (zx::result<> status = FidlStatus(result); status.is_error()) {
+    zxlogf(ERROR, "Couldn't complete SpiImpl::ExchangeVmo: %s", status.status_string());
+    return status.take_error();
   }
   return zx::ok();
 }
 
 zx::result<> FidlSpiImplClient::LockBus(uint32_t chip_select) {
-  auto result = client_->LockBus(chip_select);
-  if (result.is_error()) {
-    zxlogf(ERROR, "Couldn't complete SpiImpl::LockBus: %s",
-           result.error_value().FormatDescription().c_str());
-    return ZX_ERROR(result);
+  fdf::Arena arena('SPI_');
+  auto result = client_.buffer(arena)->LockBus(chip_select);
+  if (zx::result<> status = FidlStatus(result); status.is_error()) {
+    zxlogf(ERROR, "Couldn't complete SpiImpl::LockBus: %s", status.status_string());
+    return status.take_error();
   }
   return zx::ok();
 }
 
 zx::result<> FidlSpiImplClient::UnlockBus(uint32_t chip_select) {
-  auto result = client_->UnlockBus(chip_select);
-  if (result.is_error()) {
-    zxlogf(ERROR, "Couldn't complete SpiImpl::UnlockBus: %s",
-           result.error_value().FormatDescription().c_str());
-    return ZX_ERROR(result);
+  fdf::Arena arena('SPI_');
+  auto result = client_.buffer(arena)->UnlockBus(chip_select);
+  if (zx::result<> status = FidlStatus(result); status.is_error()) {
+    zxlogf(ERROR, "Couldn't complete SpiImpl::UnlockBus: %s", status.status_string());
+    return status.take_error();
   }
   return zx::ok();
 }
