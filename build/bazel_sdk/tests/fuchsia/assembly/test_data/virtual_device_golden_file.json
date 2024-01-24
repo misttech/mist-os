@@ -31,7 +31,6 @@
             "mdns": 5353,
             "ssh": 22
         },
-        "start_up_args_template": "test.json.template",
         "type": "virtual_device"
     },
     "schema_id": "http://fuchsia.com/schemas/sdk/virtual_device-93A41932.json"

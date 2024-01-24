@@ -12,16 +12,6 @@ ARCH = struct(
 )
 
 def _fuchsia_virtual_device_impl(ctx):
-    # Copy the start up arguments template next to the output virtual device.
-    template_file_name = ctx.attr.device_name + ".json.template"
-    template_file = ctx.actions.declare_file(template_file_name)
-    ctx.actions.run_shell(
-        inputs = [ctx.file._start_up_args_template],
-        outputs = [template_file],
-        command = "cp $1 $2",
-        arguments = [ctx.file._start_up_args_template.path, template_file.path],
-    )
-
     virtual_device_file = ctx.actions.declare_file(ctx.attr.device_name + ".json")
     virtual_device = {
         "schema_id": "http://fuchsia.com/schemas/sdk/virtual_device-93A41932.json",
@@ -60,9 +50,6 @@ def _fuchsia_virtual_device_impl(ctx):
                 "mdns": 5353,
                 "debug": 2345,
             },
-
-            # TODO(https://fxbug.dev/94125): remove once solution is available.
-            "start_up_args_template": template_file_name,
         },
     }
     ctx.actions.write(virtual_device_file, json.encode(virtual_device))
@@ -71,7 +58,6 @@ def _fuchsia_virtual_device_impl(ctx):
         FuchsiaVirtualDeviceInfo(
             device_name = ctx.attr.device_name,
             config = virtual_device_file,
-            template = template_file,
         ),
     ]
 
@@ -115,10 +101,6 @@ fuchsia_virtual_device = rule(
         "storage_unit": attr.string(
             doc = "Unit for storage of the virtual device (e.g. megabytes, gigabytes, etc.)",
             default = "gigabytes",
-        ),
-        "_start_up_args_template": attr.label(
-            allow_single_file = True,
-            default = "//fuchsia/private:templates/emulator_flags.json.template",
         ),
     },
 )

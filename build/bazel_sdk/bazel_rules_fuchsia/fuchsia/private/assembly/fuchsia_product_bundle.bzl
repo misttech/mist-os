@@ -579,7 +579,6 @@ def _build_fuchsia_product_bundle_impl(ctx):
         ffx_invocation.append("--virtual-device")
         ffx_invocation.append(virtual_device[FuchsiaVirtualDeviceInfo].config.path)
         inputs.append(virtual_device[FuchsiaVirtualDeviceInfo].config)
-        inputs.append(virtual_device[FuchsiaVirtualDeviceInfo].template)
     if ctx.attr.default_virtual_device != None:
         ffx_invocation.append("--recommended-device")
         ffx_invocation.append(ctx.attr.default_virtual_device[FuchsiaVirtualDeviceInfo].device_name)

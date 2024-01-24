@@ -62,9 +62,6 @@ template("virtual_device_specification") {
   # Schema ID must match the schema file.
   schema_id = "http://fuchsia.com/schemas/sdk/${schema_file}"
 
-  template_output = "${target_out_dir}/${target_name}_flags.json.template"
-  template_target = "${target_name}_copy_template_file"
-
   emu_window_size = {
     height = 800
     width = 1280
@@ -136,9 +133,6 @@ template("virtual_device_specification") {
         mdns = 5353
         debug = 2345
       }
-
-      # TODO(https://fxbug.dev/94125): remove once solution is available.
-      start_up_args_template = rebase_path(template_output, root_build_dir)
     }
   }
 
@@ -161,21 +155,6 @@ template("virtual_device_specification") {
           label = get_label_info(":$target_name", "label_with_toolchain")
           name = "virtual_device"
           path = rebase_path(file, root_build_dir)
-          type = "manifest"
-        },
-      ]
-    }
-  }
-
-  copy(template_target) {
-    sources = [ "//src/developer/ffx/plugins/emulator/engines/templates/emulator_flags.json.template" ]
-    outputs = [ template_output ]
-    metadata = {
-      images = [
-        {
-          label = get_label_info(":$target_name", "label_with_toolchain")
-          name = "emulator_flags"
-          path = rebase_path(template_output, root_build_dir)
           type = "manifest"
         },
       ]
@@ -206,7 +185,6 @@ template("virtual_device_specification") {
                            ])
     public_deps = [
       ":${generator_target}",
-      ":${template_target}",
       ":${validator_target}",
     ]
   }
