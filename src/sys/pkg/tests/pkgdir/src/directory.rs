@@ -534,7 +534,7 @@ async fn verify_directory_opened(node: fio::NodeProxy, flag: fio::OpenFlags) -> 
                 let expected = if flag.intersects(fio::OpenFlags::NODE_REFERENCE) {
                     fio::NodeInfoDeprecated::Service(fio::Service)
                 } else {
-                    fio::NodeInfoDeprecated::Directory(fio::DirectoryObject { supports_io2: false })
+                    fio::NodeInfoDeprecated::Directory(fio::DirectoryObject)
                 };
                 if *info != expected {
                     return Err(anyhow!("wrong protocol returned: {:?}", info));
@@ -767,12 +767,7 @@ async fn assert_clone_sends_on_open_event(package_root: &fio::DirectoryProxy, pa
         match node.take_event_stream().next().await {
             Some(Ok(fio::NodeEvent::OnOpen_ { s, info: Some(boxed) })) => {
                 assert_eq!(zx::Status::from_raw(s), zx::Status::OK);
-                assert_eq!(
-                    *boxed,
-                    fio::NodeInfoDeprecated::Directory(fio::DirectoryObject {
-                        supports_io2: false
-                    })
-                );
+                assert_eq!(*boxed, fio::NodeInfoDeprecated::Directory(fio::DirectoryObject {}));
                 Ok(())
             }
             Some(Ok(other)) => Err(anyhow!("wrong node event returned: {:?}", other)),

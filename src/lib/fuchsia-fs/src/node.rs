@@ -113,7 +113,7 @@ impl Kind {
 
     fn expect_directory(info: fio::NodeInfoDeprecated) -> Result<(), Kind> {
         match info {
-            fio::NodeInfoDeprecated::Directory(fio::DirectoryObject { .. }) => Ok(()),
+            fio::NodeInfoDeprecated::Directory(fio::DirectoryObject) => Ok(()),
             other => Err(Kind::kind_of(&other)),
         }
     }

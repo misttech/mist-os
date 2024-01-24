@@ -116,14 +116,7 @@ closed protocol Node1 {
             };
 
             /// The connection composes [`Directory`].
-            3: directory @generated_name("DirectoryObject") struct {
-                /// Indicates that certain io2 methods are supported. This helps roll out some io2
-                /// methods without waiting for the whole of io2 to be migrated.
-                ///
-                /// Note that this assumes that everything below this directory also supports io2.
-                @available(added=HEAD)
-                supports_io2 bool;
-            };
+            3: directory @generated_name("DirectoryObject") struct {};
 
             /// The connection composes ['Symlink'].
             @available(added=HEAD)

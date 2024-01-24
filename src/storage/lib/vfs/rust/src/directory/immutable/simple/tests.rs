@@ -120,9 +120,7 @@ fn open_empty_directory_with_describe() {
             assert_eq!(s, Status::OK.into_raw());
             assert_eq!(
                 info,
-                Some(Box::new(fio::NodeInfoDeprecated::Directory(fio::DirectoryObject {
-                    supports_io2: false
-                })))
+                Some(Box::new(fio::NodeInfoDeprecated::Directory(fio::DirectoryObject)))
             );
         });
     });
