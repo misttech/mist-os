@@ -80,6 +80,45 @@ zx_status_t AmlGpio::Create(void* ctx, zx_device_t* parent) {
     return status;
   }
 
+  if (info.pid == 0) {
+    // TODO(https://fxbug.dev/318736574) : Remove and rely only on GetDeviceInfo.
+    pdev_board_info_t board_info;
+    if ((status = pdev.GetBoardInfo(&board_info)) != ZX_OK) {
+      zxlogf(ERROR, "AmlGpio::Create: GetBoardInfo failed");
+      return status;
+    }
+    if (board_info.vid == PDEV_VID_AMLOGIC) {
+      info.pid = board_info.pid;
+    } else if (board_info.vid == PDEV_VID_GOOGLE) {
+      switch (board_info.pid) {
+        case PDEV_PID_ASTRO:
+          info.pid = PDEV_PID_AMLOGIC_S905D2;
+          break;
+        case PDEV_PID_SHERLOCK:
+          info.pid = PDEV_PID_AMLOGIC_T931;
+          break;
+        case PDEV_PID_NELSON:
+          info.pid = PDEV_PID_AMLOGIC_S905D3;
+          break;
+        default:
+          zxlogf(ERROR, "Unsupported PID 0x%x for VID 0x%x", board_info.pid, board_info.vid);
+          return ZX_ERR_INVALID_ARGS;
+      }
+    } else if (board_info.vid == PDEV_VID_KHADAS) {
+      switch (board_info.pid) {
+        case PDEV_PID_VIM3:
+          info.pid = PDEV_PID_AMLOGIC_A311D;
+          break;
+        default:
+          zxlogf(ERROR, "Unsupported PID 0x%x for VID 0x%x", board_info.pid, board_info.vid);
+          return ZX_ERR_INVALID_ARGS;
+      }
+    } else {
+      zxlogf(ERROR, "Unsupported VID 0x%x", board_info.vid);
+      return ZX_ERR_INVALID_ARGS;
+    }
+  }
+
   const AmlGpioBlock* gpio_blocks;
   const AmlGpioInterrupt* gpio_interrupt;
   size_t block_count;

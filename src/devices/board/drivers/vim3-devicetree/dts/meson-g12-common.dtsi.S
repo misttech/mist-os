@@ -15,6 +15,23 @@
 		#size-cells = <2>;
 		ranges;
 
+		gpio: gpio-controller@ff634400 {
+			compatible = "amlogic,meson-g12a-gpio";
+			reg = <0x0 A311D_GPIO_BASE 0x0 A311D_GPIO_LENGTH>,
+				<0x0 A311D_GPIO_AO_BASE 0x0 A311D_GPIO_AO_LENGTH>,
+				<0x0 A311D_GPIO_INTERRUPT_BASE 0x0 A311D_GPIO_INTERRUPT_LENGTH>;
+			interrupts = <GIC_SPI 64 GIC_IRQ_MODE_EDGE_RISING>,
+				<GIC_SPI 65 GIC_IRQ_MODE_EDGE_RISING>,
+				<GIC_SPI 66 GIC_IRQ_MODE_EDGE_RISING>,
+				<GIC_SPI 67 GIC_IRQ_MODE_EDGE_RISING>,
+				<GIC_SPI 68 GIC_IRQ_MODE_EDGE_RISING>,
+				<GIC_SPI 69 GIC_IRQ_MODE_EDGE_RISING>,
+				<GIC_SPI 70 GIC_IRQ_MODE_EDGE_RISING>,
+				<GIC_SPI 71 GIC_IRQ_MODE_EDGE_RISING>;
+			gpio-controller;
+			#gpio-cells = <2>;
+		};
+
 		aobus: bus@ff800000 {
 			reg = <0x0 0xff800000 0x0 0x100000>;
 			#address-cells = <2>;
