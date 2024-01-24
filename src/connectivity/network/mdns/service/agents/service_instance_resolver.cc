@@ -12,6 +12,11 @@
 #include "src/connectivity/network/mdns/service/common/type_converters.h"
 
 namespace mdns {
+namespace {
+constexpr zx::duration kAdditionalInterval = zx::sec(1);
+constexpr uint32_t kAdditionalIntervalMultiplier = 2;
+constexpr uint32_t kAdditionalMaxQueries = 3;
+}  // namespace
 
 ServiceInstanceResolver::ServiceInstanceResolver(MdnsAgent::Owner* owner,
                                                  const std::string& service,
@@ -49,7 +54,16 @@ void ServiceInstanceResolver::EndOfMessage() {
     return;
   }
 
-  if (port_.is_valid() && (instance_.has_ipv4_endpoint() || instance_.has_ipv6_endpoint())) {
+  // if srv was received but has no aaaa record, send aaaa query.
+  // Since nsec is not supported, the following check is intentional as
+  // ServiceInstanceResolver supports only v6 addresses.
+  if (instance_.has_service() && !instance_.has_ipv6_endpoint()) {
+    Query(DnsType::kAaaa, target_full_name_, media_, ip_versions_, now(), kAdditionalInterval,
+          kAdditionalIntervalMultiplier, kAdditionalMaxQueries);
+    return;
+  }
+
+  if (port_.is_valid() && instance_.has_ipv6_endpoint()) {
     callback_(std::move(instance_));
     callback_ = nullptr;
     PostTaskForTime([this]() { RemoveSelf(); }, now());
@@ -59,8 +73,12 @@ void ServiceInstanceResolver::EndOfMessage() {
 void ServiceInstanceResolver::Start(const std::string& service_instance) {
   MdnsAgent::Start(service_instance);
   service_instance_ = MdnsNames::InstanceFullName(instance_name_, service_);
-  SendQuestion(std::make_shared<DnsQuestion>(service_instance_, DnsType::kSrv),
-               ReplyAddress::Multicast(media_, ip_versions_));
+  // Increase the chance of coalescing the queries together in one message.
+  auto ts = now();
+  Query(DnsType::kSrv, service_instance_, media_, ip_versions_, ts, kAdditionalInterval,
+        kAdditionalIntervalMultiplier, kAdditionalMaxQueries);
+  Query(DnsType::kTxt, service_instance_, media_, ip_versions_, ts, kAdditionalInterval,
+        kAdditionalIntervalMultiplier, kAdditionalMaxQueries);
 
   PostTaskForTime(
       [this]() {

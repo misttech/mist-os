@@ -41,7 +41,7 @@ class InstanceResolverTest : public AgentTest {
   void ReceivePublication(ServiceInstanceResolver& under_test, const std::string& host_full_name,
                           const std::string& service_name, const std::string& instance_name,
                           inet::IpPort port, const std::vector<std::vector<uint8_t>>& text,
-                          ReplyAddress sender_address) {
+                          ReplyAddress sender_address, bool include_address) {
     auto service_full_name = MdnsNames::ServiceFullName(service_name);
     auto instance_full_name = MdnsNames::InstanceFullName(instance_name, service_name);
 
@@ -58,6 +58,16 @@ class InstanceResolverTest : public AgentTest {
     txt_resource.txt_.strings_ = text;
     under_test.ReceiveResource(txt_resource, MdnsResourceSection::kAnswer, sender_address);
 
+    if (include_address) {
+      DnsResource a_resource(host_full_name, sender_address.socket_address().address());
+      under_test.ReceiveResource(a_resource, MdnsResourceSection::kAnswer, sender_address);
+    }
+
+    under_test.EndOfMessage();
+  }
+
+  void ReceiveAddress(ServiceInstanceResolver& under_test, const std::string& host_full_name,
+                      ReplyAddress sender_address) {
     DnsResource a_resource(host_full_name, sender_address.socket_address().address());
     under_test.ReceiveResource(a_resource, MdnsResourceSection::kAnswer, sender_address);
 
@@ -66,9 +76,9 @@ class InstanceResolverTest : public AgentTest {
 };
 
 constexpr char kHostName[] = "test2host";
+constexpr char kHostFullName[] = "test2host.local.";
 constexpr char kServiceName[] = "_testservice._tcp.";
 constexpr char kInstanceName[] = "testinstance";
-constexpr char kInstanceFullName[] = "testinstance._testservice._tcp.local.";
 const inet::IpPort kPort = inet::IpPort::From_uint16_t(1234);
 const std::vector<std::vector<uint8_t>> kText = fidl::To<std::vector<std::vector<uint8_t>>>(
     std::vector<std::string>{"color=red", "shape=round"});
@@ -84,6 +94,9 @@ const std::vector<HostAddress> kHostAddresses{
 const std::vector<inet::SocketAddress> kSocketAddresses{
     inet::SocketAddress(inet::IpAddress(192, 168, 1, 200), kPort, 1),
     inet::SocketAddress(inet::IpAddress(0xfe80, 200), kPort, 1)};
+constexpr zx::duration kAdditionalInterval = zx::sec(1);
+constexpr uint32_t kAdditionalIntervalMultiplier = 2;
+constexpr uint32_t kAdditionalMaxQueries = 3;
 
 // Tests the behavior of the resolver when configured to discover services on the local host.
 TEST_F(InstanceResolverTest, LocalInstance) {
@@ -103,10 +116,13 @@ TEST_F(InstanceResolverTest, LocalInstance) {
 
   under_test.Start(kLocalHostFullName);
 
-  // Expect a PTR question on start.
-  auto message = ExpectOutboundMessage(ReplyAddress::Multicast(Media::kBoth, IpVersions::kBoth));
-  ExpectQuestion(message.get(), kInstanceFullName, DnsType::kSrv);
-  ExpectNoOtherQuestionOrResource(message.get());
+  // Expect a SRV and TXT questions on start.
+  ExpectQueryCall(DnsType::kSrv, MdnsNames::InstanceFullName(kInstanceName, kServiceName),
+                  Media::kBoth, IpVersions::kBoth, now(), kAdditionalInterval,
+                  kAdditionalIntervalMultiplier, kAdditionalMaxQueries);
+  ExpectQueryCall(DnsType::kTxt, MdnsNames::InstanceFullName(kInstanceName, kServiceName),
+                  Media::kBoth, IpVersions::kBoth, now(), kAdditionalInterval,
+                  kAdditionalIntervalMultiplier, kAdditionalMaxQueries);
   ExpectPostTaskForTime(zx::sec(0), zx::sec(0));
   ExpectNoOther();
 
@@ -142,10 +158,13 @@ TEST_F(InstanceResolverTest, LocalProxyInstance) {
 
   under_test.Start(kLocalHostFullName);
 
-  // Expect a PTR question on start.
-  auto message = ExpectOutboundMessage(ReplyAddress::Multicast(Media::kBoth, IpVersions::kBoth));
-  ExpectQuestion(message.get(), kInstanceFullName, DnsType::kSrv);
-  ExpectNoOtherQuestionOrResource(message.get());
+  // Expect a SRV and TXT questions on start.
+  ExpectQueryCall(DnsType::kSrv, MdnsNames::InstanceFullName(kInstanceName, kServiceName),
+                  Media::kBoth, IpVersions::kBoth, now(), kAdditionalInterval,
+                  kAdditionalIntervalMultiplier, kAdditionalMaxQueries);
+  ExpectQueryCall(DnsType::kTxt, MdnsNames::InstanceFullName(kInstanceName, kServiceName),
+                  Media::kBoth, IpVersions::kBoth, now(), kAdditionalInterval,
+                  kAdditionalIntervalMultiplier, kAdditionalMaxQueries);
   ExpectPostTaskForTime(zx::sec(0), zx::sec(0));
   ExpectNoOther();
 
@@ -183,10 +202,13 @@ TEST_F(InstanceResolverTest, LocalProxyInstanceFail) {
 
   under_test.Start(kLocalHostFullName);
 
-  // Expect a PTR question on start.
-  auto message = ExpectOutboundMessage(ReplyAddress::Multicast(Media::kBoth, IpVersions::kBoth));
-  ExpectQuestion(message.get(), kInstanceFullName, DnsType::kSrv);
-  ExpectNoOtherQuestionOrResource(message.get());
+  // Expect a SRV and TXT questions on start.
+  ExpectQueryCall(DnsType::kSrv, MdnsNames::InstanceFullName(kInstanceName, kServiceName),
+                  Media::kBoth, IpVersions::kBoth, now(), kAdditionalInterval,
+                  kAdditionalIntervalMultiplier, kAdditionalMaxQueries);
+  ExpectQueryCall(DnsType::kTxt, MdnsNames::InstanceFullName(kInstanceName, kServiceName),
+                  Media::kBoth, IpVersions::kBoth, now(), kAdditionalInterval,
+                  kAdditionalIntervalMultiplier, kAdditionalMaxQueries);
   ExpectPostTaskForTime(zx::sec(0), zx::sec(0));
   ExpectNoOther();
 
@@ -198,6 +220,48 @@ TEST_F(InstanceResolverTest, LocalProxyInstanceFail) {
       kFromLocalProxyHost);
 
   EXPECT_FALSE(callback_called);
+}
+
+TEST_F(InstanceResolverTest, ResponseWithoutAaaa) {
+  fuchsia::net::mdns::ServiceInstance instance_from_callback;
+  bool callback_called = false;
+
+  ServiceInstanceResolver under_test(
+      this, kServiceName, kInstanceName, now(), Media::kBoth, IpVersions::kBoth, kExcludeLocal,
+      kIncludeLocalProxies,
+      [&instance_from_callback, &callback_called](fuchsia::net::mdns::ServiceInstance instance) {
+        instance_from_callback = std::move(instance);
+        callback_called = true;
+      });
+
+  SetAgent(under_test);
+
+  under_test.Start(kLocalHostFullName);
+
+  // Expect a SRV & TXT questions on start.
+  ExpectQueryCall(DnsType::kSrv, MdnsNames::InstanceFullName(kInstanceName, kServiceName),
+                  Media::kBoth, IpVersions::kBoth, now(), kAdditionalInterval,
+                  kAdditionalIntervalMultiplier, kAdditionalMaxQueries);
+  ExpectQueryCall(DnsType::kTxt, MdnsNames::InstanceFullName(kInstanceName, kServiceName),
+                  Media::kBoth, IpVersions::kBoth, now(), kAdditionalInterval,
+                  kAdditionalIntervalMultiplier, kAdditionalMaxQueries);
+  ExpectPostTaskForTime(zx::sec(0), zx::sec(0));
+  ExpectNoOther();
+
+  // Receive publication with no aaaa record.
+  ReplyAddress sender_address(inet::SocketAddress(0xfe80, 1, inet::IpPort::From_uint16_t(5353)),
+                              inet::IpAddress(0xfe80, 100), 1, Media::kWireless, IpVersions::kV6);
+  ReceivePublication(under_test, kHostFullName, kServiceName, kInstanceName, kPort, kText,
+                     sender_address, false);
+
+  // Expect a aaaa query call.
+  ExpectQueryCall(DnsType::kAaaa, kHostFullName, Media::kBoth, IpVersions::kBoth, now(),
+                  kAdditionalInterval, kAdditionalIntervalMultiplier, kAdditionalMaxQueries);
+
+  // Receive a response with only an aaaa record.
+  ReceiveAddress(under_test, kHostFullName, sender_address);
+  ExpectPostTaskForTime(zx::sec(0), zx::sec(0));
+  ExpectNoOther();
 }
 
 }  // namespace test
