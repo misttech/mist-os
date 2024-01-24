@@ -277,6 +277,7 @@ mod tests {
 
     use fuchsia_zircon::AsHandleRef;
     use std::mem::size_of;
+    use zerocopy::{FromBytes, FromZeroes};
 
     const MINIMAL_BINARY_POLICY: &[u8] = include_bytes!("../testdata/policies/minimal");
 
@@ -388,5 +389,56 @@ mod tests {
         assert_eq!((rights & zx::Rights::GET_PROPERTY), zx::Rights::GET_PROPERTY);
         assert_eq!((rights & zx::Rights::WRITE), zx::Rights::NONE);
         assert_eq!((rights & zx::Rights::RESIZE), zx::Rights::NONE);
+    }
+
+    #[derive(FromBytes, FromZeroes)]
+    #[repr(C, align(4))]
+    struct TestSeLinuxStatusT {
+        version: u32,
+        sequence: u32,
+        enforcing: u32,
+        policyload: u32,
+        deny_unknown: u32,
+    }
+
+    fn with_status_t<R>(
+        security_server: &SecurityServer,
+        do_test: impl FnOnce(&TestSeLinuxStatusT) -> R,
+    ) -> R {
+        let flags = zx::VmarFlags::PERM_READ
+            | zx::VmarFlags::ALLOW_FAULTS
+            | zx::VmarFlags::REQUIRE_NON_RESIZABLE;
+        let map_addr = fuchsia_runtime::vmar_root_self()
+            .map(0, &security_server.get_status_vmo(), 0, size_of::<TestSeLinuxStatusT>(), flags)
+            .unwrap();
+        let mapped_status = unsafe { &mut *(map_addr as *mut TestSeLinuxStatusT) };
+        let result = do_test(mapped_status);
+        unsafe {
+            fuchsia_runtime::vmar_root_self()
+                .unmap(map_addr, size_of::<TestSeLinuxStatusT>())
+                .unwrap()
+        };
+        result
+    }
+
+    #[fuchsia::test]
+    fn status_file_layout() {
+        let security_server = SecurityServer::new(Mode::Enable);
+        security_server.set_enforcing(false);
+        let mut seq_no: u32 = 0;
+        with_status_t(&security_server, |status| {
+            assert_eq!(status.version, SELINUX_STATUS_VERSION);
+            assert_eq!(status.enforcing, 0);
+            seq_no = status.sequence;
+            assert_eq!(seq_no % 2, 0);
+        });
+        security_server.set_enforcing(true);
+        with_status_t(&security_server, |status| {
+            assert_eq!(status.version, SELINUX_STATUS_VERSION);
+            assert_eq!(status.enforcing, 1);
+            assert_ne!(status.sequence, seq_no);
+            seq_no = status.sequence;
+            assert_eq!(seq_no % 2, 0);
+        });
     }
 }
