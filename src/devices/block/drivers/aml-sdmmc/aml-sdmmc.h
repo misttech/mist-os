@@ -7,10 +7,15 @@
 
 #include <fidl/fuchsia.hardware.clock/cpp/wire.h>
 #include <fidl/fuchsia.hardware.gpio/cpp/wire.h>
+#include <fidl/fuchsia.hardware.platform.device/cpp/wire.h>
 #include <fidl/fuchsia.hardware.sdmmc/cpp/driver/fidl.h>
 #include <fuchsia/hardware/platform/device/cpp/banjo.h>
 #include <fuchsia/hardware/sdmmc/cpp/banjo.h>
+#include <lib/ddk/metadata.h>
 #include <lib/dma-buffer/buffer.h>
+#include <lib/driver/compat/cpp/compat.h>
+#include <lib/driver/component/cpp/driver_base.h>
+#include <lib/inspect/component/cpp/component.h>
 #include <lib/inspect/cpp/inspect.h>
 #include <lib/mmio/mmio.h>
 #include <lib/stdcompat/span.h>
@@ -30,13 +35,19 @@
 
 namespace aml_sdmmc {
 
-class AmlSdmmc : public fdf::WireServer<fuchsia_hardware_sdmmc::Sdmmc> {
+class AmlSdmmc : public fdf::DriverBase,
+                 public ddk::SdmmcProtocol<AmlSdmmc>,
+                 public fdf::WireServer<fuchsia_hardware_sdmmc::Sdmmc> {
  public:
+  // Note: This name can't be changed without migrating users in other repos.
+  static constexpr char kDriverName[] = "aml-sd-emmc";
+
   // Limit maximum number of descriptors to 512 for now
   static constexpr size_t kMaxDmaDescriptors = 512;
 
-  AmlSdmmc()
-      : registered_vmos_{
+  AmlSdmmc(fdf::DriverStartArgs start_args, fdf::UnownedSynchronizedDispatcher dispatcher)
+      : fdf::DriverBase(kDriverName, std::move(start_args), std::move(dispatcher)),
+        registered_vmos_{
             // clang-format off
             SdmmcVmoStore{vmo_store::Options{}},
             SdmmcVmoStore{vmo_store::Options{}},
@@ -55,11 +66,25 @@ class AmlSdmmc : public fdf::WireServer<fuchsia_hardware_sdmmc::Sdmmc> {
     }
   }
 
-  void SetUpResources(zx::bti bti, fdf::MmioBuffer mmio, const aml_sdmmc_config_t& config,
-                      zx::interrupt irq, fidl::ClientEnd<fuchsia_hardware_gpio::Gpio> reset_gpio,
-                      std::unique_ptr<dma_buffer::ContiguousBuffer> descs_buffer,
-                      std::optional<fidl::ClientEnd<fuchsia_hardware_clock::Clock>> clock_gate =
-                          std::nullopt) TA_EXCL(lock_);
+  void Start(fdf::StartCompleter completer) override;
+
+  void PrepareStop(fdf::PrepareStopCompleter completer) TA_EXCL(lock_) override;
+
+  // ddk::SdmmcProtocol implementation
+  zx_status_t SdmmcHostInfo(sdmmc_host_info_t* out_info);
+  zx_status_t SdmmcSetSignalVoltage(sdmmc_voltage_t voltage);
+  zx_status_t SdmmcSetBusWidth(sdmmc_bus_width_t bus_width) TA_EXCL(lock_);
+  zx_status_t SdmmcSetBusFreq(uint32_t bus_freq) TA_EXCL(lock_);
+  zx_status_t SdmmcSetTiming(sdmmc_timing_t timing) TA_EXCL(lock_);
+  zx_status_t SdmmcHwReset() TA_EXCL(lock_);
+  zx_status_t SdmmcPerformTuning(uint32_t cmd_idx) TA_EXCL(tuning_lock_);
+  zx_status_t SdmmcRegisterInBandInterrupt(const in_band_interrupt_protocol_t* interrupt_cb);
+  void SdmmcAckInBandInterrupt() {}
+  zx_status_t SdmmcRegisterVmo(uint32_t vmo_id, uint8_t client_id, zx::vmo vmo, uint64_t offset,
+                               uint64_t size, uint32_t vmo_rights) TA_EXCL(lock_);
+  zx_status_t SdmmcUnregisterVmo(uint32_t vmo_id, uint8_t client_id, zx::vmo* out_vmo)
+      TA_EXCL(lock_);
+  zx_status_t SdmmcRequest(const sdmmc_req_t* req, uint32_t out_response[4]) TA_EXCL(lock_);
 
   // fuchsia_hardware_sdmmc::Sdmmc implementation
   void HostInfo(fdf::Arena& arena, HostInfoCompleter::Sync& completer) override;
@@ -78,7 +103,7 @@ class AmlSdmmc : public fdf::WireServer<fuchsia_hardware_sdmmc::Sdmmc> {
                                RegisterInBandInterruptCompleter::Sync& completer) override;
   void AckInBandInterrupt(fdf::Arena& arena,
                           AckInBandInterruptCompleter::Sync& completer) override {
-    // Mirroring AmlSdmmc::AckInBandInterrupt().
+    // Mirroring AmlSdmmc::SdmmcAckInBandInterrupt().
   }
   void RegisterVmo(RegisterVmoRequestView request, fdf::Arena& arena,
                    RegisterVmoCompleter::Sync& completer) override;
@@ -101,33 +126,8 @@ class AmlSdmmc : public fdf::WireServer<fuchsia_hardware_sdmmc::Sdmmc> {
   }
 
  protected:
-  static constexpr size_t kMaxLoggingCharacters = 256;
-  virtual void DriverLogTrace(const char* message) = 0;
-  virtual void DriverLogInfo(const char* message) = 0;
-  virtual void DriverLogWarning(const char* message) = 0;
-  virtual void DriverLogError(const char* message) = 0;
-
-  void ShutDown() TA_EXCL(lock_);
-
-  // Actual ddk::SdmmcProtocol implementation
-  zx_status_t HostInfo(sdmmc_host_info_t* out_info);
-  zx_status_t SetSignalVoltage(sdmmc_voltage_t voltage);
-  zx_status_t SetBusWidth(sdmmc_bus_width_t bus_width) TA_EXCL(lock_);
-  zx_status_t SetBusFreq(uint32_t bus_freq) TA_EXCL(lock_);
-  zx_status_t SetTiming(sdmmc_timing_t timing) TA_EXCL(lock_);
-  zx_status_t HwReset() TA_EXCL(lock_);
-  zx_status_t PerformTuning(uint32_t cmd_idx) TA_EXCL(tuning_lock_);
-  zx_status_t RegisterInBandInterrupt(const in_band_interrupt_protocol_t* interrupt_cb);
-  void AckInBandInterrupt() {}
-  zx_status_t RegisterVmo(uint32_t vmo_id, uint8_t client_id, zx::vmo vmo, uint64_t offset,
-                          uint64_t size, uint32_t vmo_rights) TA_EXCL(lock_);
-  zx_status_t UnregisterVmo(uint32_t vmo_id, uint8_t client_id, zx::vmo* out_vmo) TA_EXCL(lock_);
-  zx_status_t Request(const sdmmc_req_t* req, uint32_t out_response[4]) TA_EXCL(lock_);
-
   virtual zx_status_t WaitForInterruptImpl();
   virtual void WaitForBus() const TA_REQ(lock_);
-
-  const inspect::Inspector& inspector() const { return inspect_.inspector; }
 
   // Visible for tests
   const zx::bti& bti() const { return bti_; }
@@ -139,6 +139,7 @@ class AmlSdmmc : public fdf::WireServer<fuchsia_hardware_sdmmc::Sdmmc> {
     fbl::AutoLock lock(&lock_);
     return descs_buffer_->virt();
   }
+  const inspect::Inspector& inspector() const { return inspect_.inspector; }
 
  private:
   constexpr static size_t kResponseCount = 4;
@@ -202,33 +203,17 @@ class AmlSdmmc : public fdf::WireServer<fuchsia_hardware_sdmmc::Sdmmc> {
 
   using SdmmcVmoStore = vmo_store::VmoStore<vmo_store::HashTableStorage<uint32_t, OwnedVmoInfo>>;
 
-  enum class LogSeverity : uint8_t { TRACE, INFO, WARNING, ERROR };
-  static constexpr LogSeverity TRACE = LogSeverity::TRACE;
-  static constexpr LogSeverity INFO = LogSeverity::INFO;
-  static constexpr LogSeverity WARNING = LogSeverity::WARNING;
-  static constexpr LogSeverity ERROR = LogSeverity::ERROR;
+  zx::result<> InitResources(fidl::ClientEnd<fuchsia_hardware_platform_device::Device> pdev_client);
 
-  void DriverLog(LogSeverity log_severity, const char* format, ...) {
-    va_list args;
-    va_start(args, format);
-    char buffer[kMaxLoggingCharacters];
-    std::vsnprintf(buffer, sizeof(buffer), format, args);
-    va_end(args);
+  void Serve(fdf::ServerEnd<fuchsia_hardware_sdmmc::Sdmmc> request);
 
-    switch (log_severity) {
-      case TRACE:
-        DriverLogTrace(buffer);
-        break;
-      case INFO:
-        DriverLogInfo(buffer);
-        break;
-      case WARNING:
-        DriverLogWarning(buffer);
-        break;
-      case ERROR:
-        DriverLogError(buffer);
-        break;
-    }
+  void CompatServerInitialized(zx::result<> compat_result);
+  void CompleteStart(zx::result<> result);
+
+  compat::DeviceServer::BanjoConfig get_banjo_config() {
+    compat::DeviceServer::BanjoConfig config{ZX_PROTOCOL_SDMMC};
+    config.callbacks[ZX_PROTOCOL_SDMMC] = banjo_server_.callback();
+    return config;
   }
 
   aml_sdmmc_desc_t* descs() const TA_REQ(lock_) {
@@ -299,6 +284,24 @@ class AmlSdmmc : public fdf::WireServer<fuchsia_hardware_sdmmc::Sdmmc> {
   uint64_t consecutive_data_errors_ = 0;
 
   Inspect inspect_;
+
+  std::optional<inspect::ComponentInspector> exposed_inspector_;
+
+  fidl::WireSyncClient<fuchsia_driver_framework::Node> parent_;
+  fidl::WireSyncClient<fuchsia_driver_framework::NodeController> controller_;
+
+  std::optional<fdf::StartCompleter> start_completer_;
+
+  compat::BanjoServer banjo_server_{ZX_PROTOCOL_SDMMC, this, &sdmmc_protocol_ops_};
+  compat::DeviceServer compat_server_{
+      dispatcher(),
+      incoming(),
+      outgoing(),
+      node_name(),
+      name(),
+      std::nullopt,
+      compat::ForwardMetadata::Some({DEVICE_METADATA_SDMMC, DEVICE_METADATA_GPT_INFO}),
+      get_banjo_config()};
 };
 
 }  // namespace aml_sdmmc

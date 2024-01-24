@@ -4,6 +4,6 @@
 
 #include <lib/driver/component/cpp/driver_export.h>
 
-#include "dfv2-driver.h"
+#include "aml-sdmmc.h"
 
-FUCHSIA_DRIVER_EXPORT(aml_sdmmc::Dfv2Driver);
+FUCHSIA_DRIVER_EXPORT(aml_sdmmc::AmlSdmmc);

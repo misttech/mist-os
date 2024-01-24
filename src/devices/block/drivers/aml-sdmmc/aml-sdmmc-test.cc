@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "dfv2-driver.h"
+#include "aml-sdmmc.h"
 
 #include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
 #include <lib/driver/compat/cpp/device_server.h>
@@ -33,10 +33,10 @@
 
 namespace aml_sdmmc {
 
-class TestDfv2Driver : public Dfv2Driver {
+class TestAmlSdmmc : public AmlSdmmc {
  public:
-  TestDfv2Driver(fdf::DriverStartArgs start_args, fdf::UnownedSynchronizedDispatcher dispatcher)
-      : Dfv2Driver(std::move(start_args), std::move(dispatcher)) {}
+  TestAmlSdmmc(fdf::DriverStartArgs start_args, fdf::UnownedSynchronizedDispatcher dispatcher)
+      : AmlSdmmc(std::move(start_args), std::move(dispatcher)) {}
 
   void* SetTestHooks() {
     view_.emplace(mmio().View(0));
@@ -296,7 +296,7 @@ class AmlSdmmcTest : public zxtest::Test {
     mmio_->Write32(0xff, kAmlSdmmcDelay2Offset);
     mmio_->Write32(0xff, kAmlSdmmcAdjustOffset);
 
-    dut_->SdmmcHwReset();
+    ASSERT_OK(dut_->SdmmcHwReset());
 
     EXPECT_EQ(mmio_->Read32(kAmlSdmmcDelay1Offset), 0);
     EXPECT_EQ(mmio_->Read32(kAmlSdmmcDelay2Offset), 0);
@@ -347,7 +347,7 @@ class AmlSdmmcTest : public zxtest::Test {
   fdf_testing::DriverRuntime runtime_;
   fdf::UnownedSynchronizedDispatcher env_dispatcher_;
   async_patterns::TestDispatcherBound<IncomingNamespace> incoming_;
-  fdf_testing::DriverUnderTest<TestDfv2Driver> dut_;
+  fdf_testing::DriverUnderTest<TestAmlSdmmc> dut_;
 
  private:
   fdf::MmioBuffer mmio_buffer_;
@@ -2142,4 +2142,4 @@ TEST_F(AmlSdmmcTest, PowerSuspendResume) {
 
 }  // namespace aml_sdmmc
 
-FUCHSIA_DRIVER_EXPORT(aml_sdmmc::TestDfv2Driver);
+FUCHSIA_DRIVER_EXPORT(aml_sdmmc::TestAmlSdmmc);

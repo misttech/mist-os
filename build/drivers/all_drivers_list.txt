@@ -74,8 +74,7 @@
 //src/devices/bin/driver_host2:test_driver_driver
 //src/devices/bin/driver_host2:test_not_driver_driver
 //src/devices/block/drivers/ahci:ahci-driver
-//src/devices/block/drivers/aml-sdmmc:aml-sdmmc-driver-dfv1
-//src/devices/block/drivers/aml-sdmmc:aml-sdmmc-driver-dfv2
+//src/devices/block/drivers/aml-sdmmc:aml-sdmmc-driver
 //src/devices/block/drivers/block-verity:block-verity-driver
 //src/devices/block/drivers/bootpart:bootpart-driver
 //src/devices/block/drivers/core:core-driver

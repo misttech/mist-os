@@ -9,7 +9,7 @@
     ],
     program: {
         runner: "driver",
-        binary: "driver/aml-sdmmc-dfv2.so",
+        binary: "driver/aml-sdmmc.so",
         bind: "meta/bind/aml-sdmmc.bindbc",
         colocate: "true",
         default_dispatcher_opts: [ "allow_sync_calls" ],

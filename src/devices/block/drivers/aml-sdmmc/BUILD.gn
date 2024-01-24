@@ -14,8 +14,8 @@ driver_bind_rules("aml-sdmmc-bind") {
   deps = [ "//src/devices/bind/fuchsia.amlogic.platform" ]
 }
 
-fuchsia_driver("aml-sdmmc-driver-dfv1") {
-  output_name = "aml-sdmmc-dfv1"
+fuchsia_driver("aml-sdmmc-driver") {
+  output_name = "aml-sdmmc"
   configs += [
     "//build/config:all_source",
     "//build/config/fuchsia:enable_zircon_asserts",
@@ -24,120 +24,8 @@ fuchsia_driver("aml-sdmmc-driver-dfv1") {
     "//build/config:Wno-vla-cxx-extension",
   ]
   sources = [
+    "aml-sdmmc-export.cc",
     "aml-sdmmc.cc",
-    "dfv1-driver.cc",
-  ]
-  deps = [
-    ":aml-sdmmc-bind",
-    "//sdk/banjo/fuchsia.hardware.sdmmc:fuchsia.hardware.sdmmc_banjo_cpp",
-    "//sdk/fidl/fuchsia.hardware.block.driver:fuchsia.hardware.block.driver_banjo_cpp",
-    "//sdk/fidl/fuchsia.hardware.clock:fuchsia.hardware.clock_cpp",
-    "//sdk/fidl/fuchsia.hardware.gpio:fuchsia.hardware.gpio_cpp",
-    "//sdk/fidl/fuchsia.hardware.sdmmc:fuchsia.hardware.sdmmc_cpp",
-    "//sdk/lib/driver/component/cpp:cpp",
-    "//sdk/lib/fit",
-    "//src/devices/block/lib/sdio",
-    "//src/devices/block/lib/sdmmc",
-    "//src/devices/bus/lib/device-protocol-pdev",
-    "//src/devices/lib/amlogic",
-    "//src/devices/lib/dma-buffer",
-    "//src/devices/lib/driver",
-    "//src/devices/lib/driver:driver_runtime",
-    "//src/devices/lib/mmio",
-    "//src/lib/ddk",
-    "//src/lib/ddktl",
-    "//src/lib/vmo_store",
-    "//zircon/system/ulib/hwreg",
-    "//zircon/system/ulib/inspect",
-    "//zircon/system/ulib/sync",
-    "//zircon/system/ulib/zircon-internal",
-    "//zircon/system/ulib/zx",
-  ]
-}
-
-fuchsia_driver_component("aml-sdmmc-dfv1") {
-  component_name = "aml-sdmmc-dfv1"
-  deps = [ ":aml-sdmmc-driver-dfv1" ]
-  info = "aml-sdmmc-info.json"
-  manifest = "meta/dfv1-driver.cml"
-}
-
-fuchsia_driver_package("package-dfv1") {
-  package_name = "aml-sdmmc-dfv1"
-  driver_components = [ ":aml-sdmmc-dfv1" ]
-}
-
-test("aml-sdmmc-test-bin-dfv1") {
-  output_name = "aml-sdmmc-test-dfv1"
-  sources = [
-    "aml-sdmmc.cc",
-    "dfv1-driver-test.cc",
-    "dfv1-driver.cc",
-  ]
-  deps = [
-    ":aml-sdmmc-bind",
-    "//sdk/banjo/fuchsia.hardware.sdmmc:fuchsia.hardware.sdmmc_banjo_cpp",
-    "//sdk/fidl/fuchsia.hardware.clock:fuchsia.hardware.clock_cpp",
-    "//sdk/fidl/fuchsia.hardware.gpio:fuchsia.hardware.gpio_cpp",
-    "//sdk/fidl/fuchsia.hardware.sdmmc:fuchsia.hardware.sdmmc_cpp",
-    "//sdk/lib/driver/component/cpp:cpp",
-    "//sdk/lib/fit",
-    "//sdk/lib/inspect/testing/cpp:zxtest",
-    "//src/devices/block/lib/sdio",
-    "//src/devices/block/lib/sdmmc",
-    "//src/devices/bus/lib/device-protocol-pdev",
-    "//src/devices/lib/amlogic",
-    "//src/devices/lib/dma-buffer",
-    "//src/devices/lib/driver:driver_runtime",
-    "//src/devices/lib/mmio",
-    "//src/devices/lib/mmio:test_helper",
-    "//src/devices/testing/fake-bti",
-    "//src/devices/testing/mock-ddk",
-    "//src/lib/ddk",
-    "//src/lib/ddktl",
-    "//src/lib/vmo_store",
-    "//zircon/system/ulib/hwreg",
-    "//zircon/system/ulib/inspect",
-    "//zircon/system/ulib/mmio-ptr:mmio-ptr-fake",
-    "//zircon/system/ulib/sync",
-    "//zircon/system/ulib/zircon-internal",
-    "//zircon/system/ulib/zx",
-    "//zircon/system/ulib/zxtest",
-  ]
-}
-
-fuchsia_unittest_package("aml-sdmmc-test-dfv1") {
-  deps = [ ":aml-sdmmc-test-bin-dfv1" ]
-  test_specs = {
-    environments = basic_envs
-    log_settings = {
-      max_severity = "ERROR"
-    }
-  }
-}
-
-group("tests") {
-  testonly = true
-  deps = [
-    ":aml-sdmmc-bind_test",
-    ":aml-sdmmc-test-dfv1",
-    ":aml-sdmmc-test-dfv2",
-  ]
-}
-
-fuchsia_driver("aml-sdmmc-driver-dfv2") {
-  output_name = "aml-sdmmc-dfv2"
-  configs += [
-    "//build/config:all_source",
-    "//build/config/fuchsia:enable_zircon_asserts",
-
-    # TODO(https://fxbug.dev/135694): delete the below and fix compiler warnings
-    "//build/config:Wno-vla-cxx-extension",
-  ]
-  sources = [
-    "aml-sdmmc.cc",
-    "dfv2-driver-export.cc",
-    "dfv2-driver.cc",
   ]
   deps = [
     ":aml-sdmmc-bind",
@@ -168,24 +56,37 @@ fuchsia_driver("aml-sdmmc-driver-dfv2") {
   ]
 }
 
+# TODO(hanbinyoon): Transition users to the identical component below, and then remove this.
 fuchsia_driver_component("aml-sdmmc-dfv2") {
   component_name = "aml-sdmmc-dfv2"
-  deps = [ ":aml-sdmmc-driver-dfv2" ]
+  deps = [ ":aml-sdmmc-driver" ]
   info = "aml-sdmmc-info.json"
-  manifest = "meta/dfv2-driver.cml"
+  manifest = "meta/aml-sdmmc.cml"
 }
 
+fuchsia_driver_component("aml-sdmmc") {
+  component_name = "aml-sdmmc"
+  deps = [ ":aml-sdmmc-driver" ]
+  info = "aml-sdmmc-info.json"
+  manifest = "meta/aml-sdmmc.cml"
+}
+
+# TODO(hanbinyoon): Transition users to the identical package below, and then remove this.
 fuchsia_driver_package("package-dfv2") {
   package_name = "aml-sdmmc-dfv2"
   driver_components = [ ":aml-sdmmc-dfv2" ]
 }
 
-test("aml-sdmmc-test-bin-dfv2") {
-  output_name = "aml-sdmmc-test-dfv2"
+fuchsia_driver_package("package") {
+  package_name = "aml-sdmmc"
+  driver_components = [ ":aml-sdmmc" ]
+}
+
+test("aml-sdmmc-test-bin") {
+  output_name = "aml-sdmmc-test"
   sources = [
+    "aml-sdmmc-test.cc",
     "aml-sdmmc.cc",
-    "dfv2-driver-test.cc",
-    "dfv2-driver.cc",
   ]
   deps = [
     ":aml-sdmmc-bind",
@@ -221,12 +122,20 @@ test("aml-sdmmc-test-bin-dfv2") {
   ]
 }
 
-fuchsia_unittest_package("aml-sdmmc-test-dfv2") {
-  deps = [ ":aml-sdmmc-test-bin-dfv2" ]
+fuchsia_unittest_package("aml-sdmmc-test") {
+  deps = [ ":aml-sdmmc-test-bin" ]
   test_specs = {
     environments = basic_envs
     log_settings = {
       max_severity = "ERROR"
     }
   }
+}
+
+group("tests") {
+  testonly = true
+  deps = [
+    ":aml-sdmmc-bind_test",
+    ":aml-sdmmc-test",
+  ]
 }
