@@ -196,24 +196,22 @@ async fn test_not_fsverity_enabled() {
                 .expect("open failed"),
         );
         assert!(!attrs.fsverity_enabled);
-        let query = zxio_node_attr_has_t { fsverity_enabled: true, ..Default::default() };
-        let attrs = foo_zxio.attr_get(query).expect("attr_get failed");
-        assert!(!attrs.fsverity_enabled);
-
-        let query = zxio_node_attr_has_t { fsverity_options: true, ..Default::default() };
-        assert_eq!(
-            foo_zxio.attr_get(query).expect_err("attr_get succeeded for the 'options' attribute"),
-            zx::Status::INVALID_ARGS
-        );
 
         let mut fsverity_root_hash = [0; ZXIO_ROOT_HASH_LENGTH];
-        let query = zxio_node_attr_has_t { fsverity_root_hash: true, ..Default::default() };
-        assert_eq!(
-            foo_zxio
-                .attr_get_with_root_hash(query, &mut fsverity_root_hash)
-                .expect_err("attr_get succeeded for the 'root_hash' attribute"),
-            zx::Status::INVALID_ARGS
-        );
+        let query = zxio_node_attr_has_t {
+            fsverity_enabled: true,
+            fsverity_options: true,
+            fsverity_root_hash: true,
+            ..Default::default()
+        };
+        let attrs = foo_zxio
+            .attr_get_with_root_hash(query, &mut fsverity_root_hash)
+            .expect("attr_get failed");
+        // We expect fxfs to report the value of fsverity_enabled, but it should be turned off.
+        assert!(attrs.has.fsverity_enabled && !attrs.fsverity_enabled);
+        // fxfs does not support the following attributes yet:
+        assert!(!attrs.has.fsverity_options);
+        assert!(!attrs.has.fsverity_root_hash);
     })
     .await;
 

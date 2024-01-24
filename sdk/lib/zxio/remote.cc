@@ -2117,43 +2117,44 @@ uint32_t zxio_get_posix_mode(zxio_node_protocols_t protocols, zxio_abilities_t a
 }
 
 #if __Fuchsia_API_level__ >= FUCHSIA_HEAD
-// TODO(b/309561887): Clear the flag in `out` for attributes not provided in `in` instead of
-// returning ZX_ERR_INVALID_ARGS.
 zx_status_t zxio_attr_from_wire(const fio::wire::NodeAttributes2& in, zxio_node_attributes_t* out) {
-  if (out->has.protocols) {
-    if (!in.immutable_attributes.has_protocols())
-      return ZX_ERR_INVALID_ARGS;
+  if (out->has.protocols && in.immutable_attributes.has_protocols()) {
     out->protocols = static_cast<uint64_t>(in.immutable_attributes.protocols());
+  } else {
+    out->has.protocols = false;
   }
-  if (out->has.abilities) {
-    if (!in.immutable_attributes.has_abilities())
-      return ZX_ERR_INVALID_ARGS;
+
+  if (out->has.abilities && in.immutable_attributes.has_abilities()) {
     out->abilities = static_cast<uint64_t>(in.immutable_attributes.abilities());
+  } else {
+    out->has.abilities = false;
   }
-  if (out->has.id) {
-    if (!in.immutable_attributes.has_id())
-      return ZX_ERR_INVALID_ARGS;
+
+  if (out->has.id && in.immutable_attributes.has_id()) {
     out->id = in.immutable_attributes.id();
+  } else {
+    out->has.id = false;
   }
-  if (out->has.content_size) {
-    if (!in.immutable_attributes.has_content_size())
-      return ZX_ERR_INVALID_ARGS;
+
+  if (out->has.content_size && in.immutable_attributes.has_content_size()) {
     out->content_size = in.immutable_attributes.content_size();
+  } else {
+    out->has.content_size = false;
   }
-  if (out->has.storage_size) {
-    if (!in.immutable_attributes.has_storage_size())
-      return ZX_ERR_INVALID_ARGS;
+
+  if (out->has.storage_size && in.immutable_attributes.has_storage_size()) {
     out->storage_size = in.immutable_attributes.storage_size();
+  } else {
+    out->has.storage_size = false;
   }
-  if (out->has.link_count) {
-    if (!in.immutable_attributes.has_link_count())
-      return ZX_ERR_INVALID_ARGS;
+
+  if (out->has.link_count && in.immutable_attributes.has_link_count()) {
     out->link_count = in.immutable_attributes.link_count();
+  } else {
+    out->has.link_count = false;
   }
-  if (out->has.fsverity_options) {
-    if (!in.immutable_attributes.has_options()) {
-      return ZX_ERR_INVALID_ARGS;
-    }
+
+  if (out->has.fsverity_options && in.immutable_attributes.has_options()) {
     zxio_verification_options_t out_options{};
     fio::wire::VerificationOptions in_options = in.immutable_attributes.options();
     size_t salt_size = in_options.salt().count();
@@ -2163,58 +2164,74 @@ zx_status_t zxio_attr_from_wire(const fio::wire::NodeAttributes2& in, zxio_node_
     memcpy(out_options.salt, in_options.salt().data(), salt_size);
     out_options.hash_alg = static_cast<zxio_hash_algorithm_t>(in_options.hash_algorithm());
     out->fsverity_options = out_options;
+  } else {
+    out->has.fsverity_options = false;
   }
-  if (out->has.fsverity_root_hash) {
-    if (!in.immutable_attributes.has_root_hash())
-      return ZX_ERR_INVALID_ARGS;
+
+  if (out->has.fsverity_root_hash && in.immutable_attributes.has_root_hash()) {
+    if (!out->fsverity_root_hash) {
+      return ZX_ERR_INVALID_ARGS;  // Caller must provide a pointer to write root hash to.
+    }
     memcpy(out->fsverity_root_hash, in.immutable_attributes.root_hash().data(),
            ZXIO_ROOT_HASH_LENGTH);
+  } else {
+    out->has.fsverity_root_hash = false;
   }
-  if (out->has.fsverity_enabled) {
-    if (!in.immutable_attributes.has_verity_enabled())
-      return ZX_ERR_INVALID_ARGS;
+
+  if (out->has.fsverity_enabled && in.immutable_attributes.has_verity_enabled()) {
     out->fsverity_enabled = in.immutable_attributes.verity_enabled();
+  } else {
+    out->has.fsverity_enabled = false;
   }
-  if (out->has.creation_time) {
-    if (!in.mutable_attributes.has_creation_time())
-      return ZX_ERR_INVALID_ARGS;
+
+  if (out->has.creation_time && in.mutable_attributes.has_creation_time()) {
     out->creation_time = in.mutable_attributes.creation_time();
+  } else {
+    out->has.creation_time = false;
   }
-  if (out->has.modification_time) {
-    if (!in.mutable_attributes.has_modification_time())
-      return ZX_ERR_INVALID_ARGS;
+
+  if (out->has.modification_time && in.mutable_attributes.has_modification_time()) {
     out->modification_time = in.mutable_attributes.modification_time();
+  } else {
+    out->has.modification_time = false;
   }
-  if (out->has.change_time) {
-    if (!in.immutable_attributes.has_change_time())
-      return ZX_ERR_INVALID_ARGS;
+
+  if (out->has.change_time && in.immutable_attributes.has_change_time()) {
     out->change_time = in.immutable_attributes.change_time();
+  } else {
+    out->has.change_time = false;
   }
-  if (out->has.access_time) {
-    if (!in.mutable_attributes.has_access_time())
-      return ZX_ERR_INVALID_ARGS;
+
+  if (out->has.access_time && in.mutable_attributes.has_access_time()) {
     out->access_time = in.mutable_attributes.access_time();
+  } else {
+    out->has.access_time = false;
   }
-  if (out->has.mode) {
-    if (!in.mutable_attributes.has_mode())
-      return ZX_ERR_INVALID_ARGS;
+
+  if (out->has.mode && in.mutable_attributes.has_mode()) {
     out->mode = in.mutable_attributes.mode();
+  } else {
+    out->has.mode = false;
   }
-  if (out->has.uid) {
-    if (!in.mutable_attributes.has_uid())
-      return ZX_ERR_INVALID_ARGS;
+
+  if (out->has.uid && in.mutable_attributes.has_uid()) {
     out->uid = in.mutable_attributes.uid();
+  } else {
+    out->has.uid = false;
   }
-  if (out->has.gid) {
-    if (!in.mutable_attributes.has_gid())
-      return ZX_ERR_INVALID_ARGS;
+
+  if (out->has.gid && in.mutable_attributes.has_gid()) {
     out->gid = in.mutable_attributes.gid();
+  } else {
+    out->has.gid = false;
   }
-  if (out->has.rdev) {
-    if (!in.mutable_attributes.has_rdev())
-      return ZX_ERR_INVALID_ARGS;
+
+  if (out->has.rdev && in.mutable_attributes.has_rdev()) {
     out->rdev = in.mutable_attributes.rdev();
+  } else {
+    out->has.rdev = false;
   }
+
   return ZX_OK;
 }
 #endif

@@ -16,6 +16,8 @@
 
 __BEGIN_CDECLS
 
+// NOLINTBEGIN(modernize-use-using): This library uses typedefs to export a C interface.
+
 // Flags for read and write operations -----------------------------------------
 
 typedef uint32_t zxio_flags_t;
@@ -559,6 +561,8 @@ typedef uint32_t zxio_allocate_mode_t;
 #define ZXIO_ALLOCATE_COLLAPSE_RANGE ((zxio_allocate_mode_t)1ul << 3)
 #define ZXIO_ALLOCATE_ZERO_RANGE ((zxio_allocate_mode_t)1ul << 4)
 #define ZXIO_ALLOCATE_INSERT_RANGE ((zxio_allocate_mode_t)1ul << 5)
+
+// NOLINTEND(modernize-use-using)
 
 __END_CDECLS
 
