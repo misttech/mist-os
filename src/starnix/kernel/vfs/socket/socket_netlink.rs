@@ -40,7 +40,7 @@ use crate::{
         FdEvents,
     },
 };
-use starnix_logging::{log_error, log_info, log_warn, not_implemented};
+use starnix_logging::{log_error, log_info, log_warn, track_stub};
 use starnix_uapi::{
     auth::CAP_NET_ADMIN, errno, error, errors::Errno, nlmsghdr, sockaddr_nl, socklen_t, ucred,
     user_buffer::UserBuffer, AF_NETLINK, NETLINK_ADD_MEMBERSHIP, NETLINK_AUDIT, NETLINK_CONNECTOR,
@@ -242,7 +242,7 @@ impl NetlinkSocketInner {
         }
 
         if self.passcred {
-            not_implemented!(fxb@297373991, "SCM_CREDENTIALS/SO_PASSCRED");
+            track_stub!(TODO("https://fxbug.dev/297373991"), "SCM_CREDENTIALS/SO_PASSCRED");
             info.ancillary_data.push(AncillaryData::Unix(UnixControlData::unknown_creds()));
         }
 
@@ -462,7 +462,7 @@ impl SocketOps for BaseNetlinkSocket {
         };
 
         if destination.groups != 0 {
-            not_implemented!("BaseNetlinkSockets multicasting");
+            track_stub!("BaseNetlinkSockets multicasting");
             return Ok(data.drain());
         }
 
@@ -489,7 +489,7 @@ impl SocketOps for BaseNetlinkSocket {
     }
 
     fn shutdown(&self, _socket: &Socket, _how: SocketShutdownFlags) -> Result<(), Errno> {
-        not_implemented!("BaseNetlinkSocket::shutdown");
+        track_stub!("BaseNetlinkSocket::shutdown");
         Ok(())
     }
 
@@ -646,7 +646,7 @@ impl SocketOps for UEventNetlinkSocket {
     }
 
     fn shutdown(&self, _socket: &Socket, _how: SocketShutdownFlags) -> Result<(), Errno> {
-        not_implemented!("BaseNetlinkSocket::shutdown");
+        track_stub!("BaseNetlinkSocket::shutdown");
         Ok(())
     }
 
@@ -1106,7 +1106,7 @@ impl SocketOps for GenericNetlinkSocket {
     }
 
     fn shutdown(&self, _socket: &Socket, _how: SocketShutdownFlags) -> Result<(), Errno> {
-        not_implemented!("BaseNetlinkSocket::shutdown");
+        track_stub!("BaseNetlinkSocket::shutdown");
         Ok(())
     }
 

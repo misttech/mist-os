@@ -22,9 +22,7 @@ use crate::{
 use fidl::HandleBased;
 use fuchsia_inspect_contrib::profile_duration;
 use fuchsia_zircon as zx;
-use starnix_logging::{
-    impossible_error, not_implemented, trace_category_starnix_mm, trace_duration,
-};
+use starnix_logging::{impossible_error, trace_category_starnix_mm, trace_duration, track_stub};
 use starnix_sync::{FileOpsIoctl, FileOpsRead, FileOpsWrite, LockBefore, Locked, Mutex};
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
 use starnix_uapi::{
@@ -610,7 +608,7 @@ pub fn default_ioctl(
             Ok(SUCCESS)
         }
         FIONREAD => {
-            not_implemented!("FIONREAD");
+            track_stub!("FIONREAD");
             if !file.name.entry.node.is_reg() {
                 return error!(ENOTTY);
             }
@@ -624,19 +622,19 @@ pub fn default_ioctl(
             Ok(SUCCESS)
         }
         FS_IOC_FSGETXATTR => {
-            not_implemented!("FS_IOC_FSGETXATTR");
+            track_stub!("FS_IOC_FSGETXATTR");
             let arg = UserAddress::from(arg).into();
             current_task.write_object(arg, &fsxattr::default())?;
             Ok(SUCCESS)
         }
         FS_IOC_FSSETXATTR => {
-            not_implemented!("FS_IOC_FSSETXATTR");
+            track_stub!("FS_IOC_FSSETXATTR");
             let arg = UserAddress::from(arg).into();
             let _: fsxattr = current_task.read_object(arg)?;
             Ok(SUCCESS)
         }
         FS_IOC_GETFLAGS => {
-            not_implemented!("FS_IOC_GETFLAGS");
+            track_stub!("FS_IOC_GETFLAGS");
             let arg = UserAddress::from(arg).into();
             let mut flags: u32 = 0;
             if matches!(*file.node().fsverity.lock(), FsVerityState::FsVerity) {
@@ -646,7 +644,7 @@ pub fn default_ioctl(
             Ok(SUCCESS)
         }
         FS_IOC_SETFLAGS => {
-            not_implemented!("FS_IOC_SETFLAGS");
+            track_stub!("FS_IOC_SETFLAGS");
             let arg = UserAddress::from(arg).into();
             let _: u32 = current_task.read_object(arg)?;
             Ok(SUCCESS)
@@ -661,14 +659,14 @@ pub fn default_ioctl(
             Ok(fsverity::ioctl::read_metadata(current_task, UserAddress::from(arg).into(), file)?)
         }
         _ => {
-            not_implemented!("ioctl", request);
+            track_stub!("ioctl", request);
             error!(ENOTTY)
         }
     }
 }
 
 pub fn default_fcntl(cmd: u32) -> Result<SyscallResult, Errno> {
-    not_implemented!("fcntl", cmd);
+    track_stub!("fcntl", cmd);
     error!(EINVAL)
 }
 

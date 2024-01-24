@@ -16,7 +16,7 @@ use crate::{
         fileops_impl_nonseekable, FdEvents, FileObject, FileOps, FsNode, FsString,
     },
 };
-use starnix_logging::{log_info, log_warn, not_implemented};
+use starnix_logging::{log_info, log_warn, track_stub};
 use starnix_sync::{FileOpsIoctl, FileOpsRead, FileOpsWrite, Locked};
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
 use starnix_uapi::{
@@ -564,7 +564,7 @@ impl FileOps for Arc<InputFile> {
                 Ok(SUCCESS)
             }
             _ => {
-                not_implemented!("ioctl() on input device", request);
+                track_stub!("input ioctl", request);
                 error!(EOPNOTSUPP)
             }
         }
@@ -607,7 +607,7 @@ impl FileOps for Arc<InputFile> {
         _data: &mut dyn InputBuffer,
     ) -> Result<usize, Errno> {
         debug_assert!(offset == 0);
-        not_implemented!("write() on input device");
+        track_stub!("write() on input device");
         error!(EOPNOTSUPP)
     }
 

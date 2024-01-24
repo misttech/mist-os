@@ -20,7 +20,7 @@ use linux_uapi::{
     ASHMEM_GET_NAME, ASHMEM_GET_PIN_STATUS, ASHMEM_GET_PROT_MASK, ASHMEM_GET_SIZE, ASHMEM_PIN,
     ASHMEM_PURGE_ALL_CACHES, ASHMEM_SET_NAME, ASHMEM_SET_PROT_MASK, ASHMEM_SET_SIZE, ASHMEM_UNPIN,
 };
-use starnix_logging::not_implemented;
+use starnix_logging::track_stub;
 use starnix_sync::{FileOpsIoctl, Locked, Mutex};
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
 use starnix_uapi::{
@@ -118,31 +118,31 @@ impl FileOps for Ashmem {
             }
 
             ASHMEM_SET_PROT_MASK => {
-                not_implemented!("ASHMEM_SET_PROT_MASK");
+                track_stub!("ASHMEM_SET_PROT_MASK");
                 error!(ENOSYS)
             }
             ASHMEM_GET_PROT_MASK => {
-                not_implemented!("ASHMEM_GET_PROT_MASK");
+                track_stub!("ASHMEM_GET_PROT_MASK");
                 error!(ENOSYS)
             }
             ASHMEM_PIN => {
-                not_implemented!("ASHMEM_PIN");
+                track_stub!("ASHMEM_PIN");
                 error!(ENOSYS)
             }
             ASHMEM_UNPIN => {
-                not_implemented!("ASHMEM_UNPIN");
+                track_stub!("ASHMEM_UNPIN");
                 error!(ENOSYS)
             }
             ASHMEM_GET_PIN_STATUS => {
-                not_implemented!("ASHMEM_GET_PIN_STATUS");
+                track_stub!("ASHMEM_GET_PIN_STATUS");
                 error!(ENOSYS)
             }
             ASHMEM_PURGE_ALL_CACHES => {
-                not_implemented!("ASHMEM_PURGE_ALL_CACHES");
+                track_stub!("ASHMEM_PURGE_ALL_CACHES");
                 error!(ENOSYS)
             }
             ASHMEM_GET_FILE_ID => {
-                not_implemented!("ASHMEM_GET_FILE_ID");
+                track_stub!("ASHMEM_GET_FILE_ID");
                 error!(ENOSYS)
             }
             _ => default_ioctl(file, current_task, request, arg),

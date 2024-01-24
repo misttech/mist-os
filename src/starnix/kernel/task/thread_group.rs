@@ -23,7 +23,7 @@ use itertools::Itertools;
 use macro_rules_attribute::apply;
 use selinux::hooks::SeLinuxThreadGroupState;
 use starnix_lifecycle::{AtomicU64Counter, DropNotifier};
-use starnix_logging::{log_error, log_warn, not_implemented};
+use starnix_logging::{log_error, log_warn, track_stub};
 use starnix_sync::{LockBefore, Locked, Mutex, MutexGuard, ProcessGroupState, RwLock};
 use starnix_uapi::{
     auth::{Credentials, CAP_SYS_ADMIN, CAP_SYS_RESOURCE},
@@ -654,7 +654,7 @@ impl ThreadGroup {
             if value.it_value.tv_sec == 0 && value.it_value.tv_usec == 0 {
                 return Ok(itimerval::default());
             }
-            not_implemented!("Unsupported itimer type: {which}");
+            track_stub!("Unsupported itimer type: {which}");
             return Err(errno!(ENOTSUP));
         }
 

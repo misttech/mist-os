@@ -20,8 +20,7 @@ use fuchsia_zircon::{
 use once_cell::sync::Lazy;
 use range_map::RangeMap;
 use starnix_logging::{
-    impossible_error, log_warn, not_implemented, set_zx_name, trace_category_starnix_mm,
-    trace_duration,
+    impossible_error, log_warn, set_zx_name, trace_category_starnix_mm, trace_duration, track_stub,
 };
 use starnix_sync::{LockBefore, Locked, MmDumpable, OrderedMutex, RwLock};
 use starnix_uapi::{
@@ -871,7 +870,7 @@ impl MemoryManagerState {
         }
 
         if flags.contains(MremapFlags::DONTUNMAP) {
-            not_implemented!(fxb@297372077, "MREMAP_DONTUNMAP");
+            track_stub!(TODO("https://fxbug.dev/297372077"), "MREMAP_DONTUNMAP");
             return error!(EOPNOTSUPP);
         }
 
@@ -1472,14 +1471,14 @@ impl MemoryManagerState {
                         // Note, we cannot simply implemented MADV_DONTNEED with
                         // zx::VmoOp::DONT_NEED because they have different
                         // semantics.
-                        not_implemented!("MADV_DONTNEED with file-backed mapping");
+                        track_stub!("MADV_DONTNEED with file-backed mapping");
                         return error!(EINVAL);
                     }
                     MADV_DONTNEED => zx::VmoOp::ZERO,
                     MADV_WILLNEED => zx::VmoOp::COMMIT,
                     MADV_NOHUGEPAGE => return Ok(()),
                     advice => {
-                        not_implemented!("madvise", advice);
+                        track_stub!("madvise", advice);
                         return error!(EINVAL);
                     }
                 };

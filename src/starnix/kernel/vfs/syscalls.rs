@@ -22,7 +22,7 @@ use crate::{
     },
 };
 use fuchsia_zircon as zx;
-use starnix_logging::{log_trace, not_implemented};
+use starnix_logging::{log_trace, track_stub};
 use starnix_sync::{FileOpsIoctl, FileOpsRead, FileOpsWrite, Locked, Mutex, Unlocked};
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
 use starnix_uapi::{
@@ -348,7 +348,7 @@ fn do_readv(
         return error!(EOPNOTSUPP);
     }
     if flags != 0 {
-        not_implemented!("preadv2", flags);
+        track_stub!("preadv2", flags);
     }
     let file = current_task.files.get(fd)?;
     let iovec = current_task.read_iovec(iovec_addr, iovec_count)?;
@@ -414,7 +414,7 @@ fn do_writev(
         return error!(EOPNOTSUPP);
     }
     if flags != 0 {
-        not_implemented!("pwritev2", flags);
+        track_stub!("pwritev2", flags);
     }
     // TODO(https://fxbug.dev/117677) Allow partial writes.
     let file = current_task.files.get(fd)?;
@@ -571,7 +571,7 @@ impl LookupFlags {
         let automount =
             if allowed_flags & AT_NO_AUTOMOUNT != 0 { flags & AT_NO_AUTOMOUNT == 0 } else { false };
         if automount {
-            not_implemented!("LookupFlags::automount");
+            track_stub!("LookupFlags::automount");
         }
         Ok(LookupFlags {
             allow_empty_path: flags & AT_EMPTY_PATH != 0,
@@ -732,7 +732,7 @@ pub fn sys_newfstatat(
     flags: u32,
 ) -> Result<(), Errno> {
     if flags & !(AT_SYMLINK_NOFOLLOW | AT_EMPTY_PATH) != 0 {
-        not_implemented!(fxb@297370602, "newfstatat", flags);
+        track_stub!(TODO("https://fxbug.dev/297370602"), "newfstatat", flags);
         return error!(ENOSYS);
     }
     let flags = LookupFlags::from_bits(flags, AT_EMPTY_PATH | AT_SYMLINK_NOFOLLOW)?;
@@ -868,7 +868,7 @@ pub fn sys_linkat(
     flags: u32,
 ) -> Result<(), Errno> {
     if flags & !(AT_SYMLINK_FOLLOW | AT_EMPTY_PATH) != 0 {
-        not_implemented!("linkat", flags);
+        track_stub!("linkat", flags);
         return error!(EINVAL);
     }
 
@@ -934,7 +934,7 @@ pub fn sys_renameat2(
 
     // RENAME_WHITEOUT is not supported.
     if flags.contains(RenameFlags::WHITEOUT) {
-        not_implemented!("RENAME_WHITEOUT");
+        track_stub!("RENAME_WHITEOUT");
         return error!(ENOSYS);
     };
 
@@ -1440,7 +1440,7 @@ pub fn sys_memfd_create(
     };
 
     if flags & !(MFD_CLOEXEC | MFD_ALLOW_SEALING) != 0 {
-        not_implemented!("memfd_create", flags);
+        track_stub!("memfd_create", flags);
     }
 
     let name = current_task.read_c_string_to_vec(user_name, MEMFD_NAME_MAX_LEN).map_err(|e| {
@@ -1482,7 +1482,7 @@ pub fn sys_mount(
     }
 
     let flags = MountFlags::from_bits(flags).ok_or_else(|| {
-        not_implemented!("mount", flags & !MountFlags::from_bits_truncate(flags).bits());
+        track_stub!("mount", flags & !MountFlags::from_bits_truncate(flags).bits());
         errno!(EINVAL)
     })?;
 
@@ -1505,7 +1505,7 @@ fn do_mount_remount(
     data_addr: UserCString,
 ) -> Result<(), Errno> {
     if !data_addr.is_null() {
-        not_implemented!("MS_REMOUNT: Updating data");
+        track_stub!("MS_REMOUNT: Updating data");
     }
     let mount = target.mount_if_root()?;
     let updated_flags = flags & MountFlags::CHANGEABLE_WITH_REMOUNT;
@@ -1517,7 +1517,7 @@ fn do_mount_remount(
         //   to modify only the per-mount-point flags.  This is particularly
         //   useful for setting or clearing the "read-only" flag on a mount
         //   without changing the underlying filesystem.
-        not_implemented!("MS_REMOUNT: Updating superblock flags");
+        track_stub!("MS_REMOUNT: Updating superblock flags");
     }
     Ok(())
 }
@@ -1708,21 +1708,29 @@ pub fn sys_timerfd_create(
             if !current_task.creds().has_capability(CAP_WAKE_ALARM) {
                 return error!(EPERM);
             }
-            not_implemented!(fxb@297375023, "timerfd_create: CLOCK_BOOTTIME_ALARM");
+
+            track_stub!(
+                TODO("https://fxbug.dev/297375023"),
+                "timerfd_create: CLOCK_BOOTTIME_ALARM",
+            );
             TimerFileClock::Monotonic
         }
         CLOCK_REALTIME_ALARM => {
             if !current_task.creds().has_capability(CAP_WAKE_ALARM) {
                 return error!(EPERM);
             }
-            not_implemented!(fxb@297375023, "timerfd_create: CLOCK_REALTIME_ALARM");
+
+            track_stub!(
+                TODO("https://fxbug.dev/297375023"),
+                "timerfd_create: CLOCK_REALTIME_ALARM",
+            );
             TimerFileClock::Realtime
         }
         CLOCK_REALTIME => TimerFileClock::Realtime,
         _ => return error!(EINVAL),
     };
     if flags & !(TFD_NONBLOCK | TFD_CLOEXEC) != 0 {
-        not_implemented!("timerfd_create", flags);
+        track_stub!("timerfd_create", flags);
         return error!(EINVAL);
     }
     log_trace!("timerfd_create(clock_id={:?}, flags={:#x})", clock_id, flags);
@@ -1765,12 +1773,15 @@ pub fn sys_timerfd_settime(
     user_old_value: UserRef<itimerspec>,
 ) -> Result<(), Errno> {
     if flags & !(TFD_TIMER_ABSTIME | TFD_TIMER_CANCEL_ON_SET) != 0 {
-        not_implemented!("timerfd_settime", flags);
+        track_stub!("timerfd_settime", flags);
         return error!(EINVAL);
     }
 
     if flags & TFD_TIMER_CANCEL_ON_SET != 0 {
-        not_implemented!(fxb@297433837, "timerfd_settime: TFD_TIMER_CANCEL_ON_SET");
+        track_stub!(
+            TODO("https://fxbug.dev/297433837"),
+            "timerfd_settime: TFD_TIMER_CANCEL_ON_SET",
+        );
     }
 
     let file = current_task.files.get(fd)?;
@@ -2310,7 +2321,7 @@ pub fn sys_sync(
     _locked: &mut Locked<'_, Unlocked>,
     _current_task: &CurrentTask,
 ) -> Result<(), Errno> {
-    not_implemented!("sync");
+    track_stub!("sync");
     Ok(())
 }
 
@@ -2320,7 +2331,7 @@ pub fn sys_syncfs(
     fd: FdNumber,
 ) -> Result<(), Errno> {
     let _file = current_task.files.get_unless_opath(fd)?;
-    not_implemented!("syncfs");
+    track_stub!("syncfs");
     Ok(())
 }
 

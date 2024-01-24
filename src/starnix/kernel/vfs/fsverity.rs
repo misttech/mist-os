@@ -6,7 +6,7 @@ use crate::{mm::MemoryAccessorExt, task::CurrentTask};
 use mundane::hash::{Digest, Hasher, Sha256, Sha512};
 use num_derive::FromPrimitive;
 use num_traits::FromPrimitive;
-use starnix_logging::not_implemented;
+use starnix_logging::track_stub;
 use starnix_uapi::{
     errno, error, errors::Errno, fsverity_descriptor, fsverity_enable_arg,
     fsverity_read_metadata_arg, user_address::UserAddress, FS_VERITY_HASH_ALG_SHA256,
@@ -48,7 +48,7 @@ fn fsverity_descriptor_from_enable_arg(
     if src.sig_size > 0 {
         // TODO(https://fxbug.dev/302620572) Under linux, signatures are supported up to 16128 bytes.
         // We don't support these currently.
-        not_implemented!(fxb@302620572, "fsverity_enable signature");
+        track_stub!(TODO("https://fxbug.dev/302620572"), "fsverity_enable signature");
         return error!(ENOTSUP);
     }
     let salt =

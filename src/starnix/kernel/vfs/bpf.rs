@@ -23,7 +23,7 @@ use crate::{
         FsString, LookupContext, MemoryDirectoryFile, MemoryXattrStorage, NamespaceNode, XattrOp,
     },
 };
-use starnix_logging::{log_error, log_trace, not_implemented};
+use starnix_logging::{log_error, log_trace, track_stub};
 use starnix_sync::{BpfMapEntries, FileOpsRead, FileOpsWrite, Locked, OrderedMutex, Unlocked};
 use starnix_syscalls::{SyscallResult, SUCCESS};
 use starnix_uapi::{
@@ -295,7 +295,7 @@ pub fn sys_bpf(
         // Attach an eBPF program to a target_fd at the specified attach_type hook.
         bpf_cmd_BPF_PROG_ATTACH => {
             log_trace!("BPF_PROG_ATTACH");
-            not_implemented!("Bpf::BPF_PROG_ATTACH");
+            track_stub!("Bpf::BPF_PROG_ATTACH");
             Ok(SUCCESS)
         }
 
@@ -304,7 +304,7 @@ pub fn sys_bpf(
             let mut prog_attr: bpf_attr__bindgen_ty_10 =
                 read_attr(current_task, attr_addr, attr_size)?;
             log_trace!("BPF_PROG_QUERY");
-            not_implemented!("Bpf::BPF_PROG_QUERY");
+            track_stub!("Bpf::BPF_PROG_QUERY");
             current_task.write_memory(UserAddress::from(prog_attr.prog_ids), 1.as_bytes())?;
             prog_attr.prog_cnt = std::mem::size_of::<u64>() as u32;
             current_task.write_memory(attr_addr, prog_attr.as_bytes())?;
@@ -404,7 +404,7 @@ pub fn sys_bpf(
         }
 
         _ => {
-            not_implemented!("bpf", cmd);
+            track_stub!("bpf", cmd);
             error!(EINVAL)
         }
     }

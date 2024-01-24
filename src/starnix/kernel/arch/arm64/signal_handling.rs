@@ -11,7 +11,7 @@ use crate::{
     task::{CurrentTask, Task},
 };
 use extended_pstate::ExtendedPstateState;
-use starnix_logging::{log_debug, not_implemented};
+use starnix_logging::{log_debug, track_stub};
 use starnix_uapi::{
     __NR_restart_syscall, _aarch64_ctx, error,
     errors::{Errno, ErrnoCode, ERESTART_RESTARTBLOCK},
@@ -212,7 +212,7 @@ fn parse_sigcontext_data(
                     return error!(EINVAL);
                 }
 
-                not_implemented!("sigcontext EXTRA_MAGIC");
+                track_stub!("sigcontext EXTRA_MAGIC");
                 offset += ESR_CONTEXT_SIZE as usize;
             }
 

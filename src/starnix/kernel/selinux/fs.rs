@@ -17,7 +17,7 @@ use crate::{
 use selinux::security_server::SecurityServer;
 use selinux_common::security_context::SecurityContext;
 use selinux_policy::SUPPORTED_POLICY_VERSION;
-use starnix_logging::{log_error, log_info, not_implemented};
+use starnix_logging::{log_error, log_info, track_stub};
 use starnix_sync::{FileOpsRead, FileOpsWrite, Locked, Mutex};
 use starnix_uapi::{
     device_type::DeviceType,
@@ -155,7 +155,7 @@ impl SeLoad {
 
 impl BytesFileOps for SeLoad {
     fn write(&self, _current_task: &CurrentTask, data: Vec<u8>) -> Result<(), Errno> {
-        not_implemented!("ignoring selinux policy");
+        track_stub!("ignoring selinux policy");
         log_info!("Loading {} byte policy", data.len());
         self.security_server.load_policy(data).map_err(|error| {
             log_error!("Policy load error: {}", error);
@@ -269,7 +269,7 @@ impl SeCheckReqProt {
 impl BytesFileOps for SeCheckReqProt {
     fn write(&self, _current_task: &CurrentTask, data: Vec<u8>) -> Result<(), Errno> {
         let _checkreqprot = parse_unsigned_file::<u32>(&data)?;
-        not_implemented!("selinux checkreqprot");
+        track_stub!("selinux checkreqprot");
         Ok(())
     }
 }

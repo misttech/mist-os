@@ -16,7 +16,7 @@ use crate::{
     vfs::parse_unsigned_file,
 };
 use bitflags::bitflags;
-use starnix_logging::not_implemented;
+use starnix_logging::track_stub;
 use starnix_sync::{LockBefore, Locked, MmDumpable};
 use starnix_syscalls::{decls::SyscallDecl, SyscallResult};
 use starnix_uapi::{
@@ -789,7 +789,7 @@ pub fn ptrace_dispatch(
             error!(EIO)
         }
         _ => {
-            not_implemented!("ptrace", request);
+            track_stub!("ptrace", request);
             error!(ENOSYS)
         }
     }

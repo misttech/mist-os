@@ -21,7 +21,7 @@ use crate::{
         DirentSink32, FdNumber,
     },
 };
-use starnix_logging::not_implemented;
+use starnix_logging::track_stub;
 use starnix_uapi::{
     __kernel_time_t, clone_args,
     device_type::DeviceType,
@@ -87,7 +87,7 @@ pub fn sys_arch_prctl(
             Ok(())
         }
         _ => {
-            not_implemented!("arch_prctl", code);
+            track_stub!("arch_prctl", code);
             error!(ENOSYS)
         }
     }

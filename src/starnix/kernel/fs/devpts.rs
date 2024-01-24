@@ -19,7 +19,7 @@ use crate::{
         FsNodeOps, FsStr, FsString, SpecialNode, VecDirectory, VecDirectoryEntry,
     },
 };
-use starnix_logging::not_implemented;
+use starnix_logging::track_stub;
 use starnix_sync::{
     FileOpsIoctl, FileOpsRead, FileOpsWrite, LockBefore, Locked, ProcessGroupState,
 };
@@ -489,12 +489,12 @@ impl FileOps for DevPtsFile {
     }
 }
 
-macro_rules! not_implemented_ioctl_requests {
+macro_rules! stub_ioctl_requests {
     ($request:ident, $($($context:literal,)? $unsupported:ident)|*) => {{
         match $request {
             $(
                 $unsupported => {
-                    not_implemented!(concat!("ioctl ", $($context, " ",)? stringify!($unsupported)));
+                    track_stub!(concat!("ioctl ", $($context, " ",)? stringify!($unsupported)));
                     error!(ENOSYS)
                 }
             )+
@@ -503,12 +503,12 @@ macro_rules! not_implemented_ioctl_requests {
     }};
 }
 
-macro_rules! devpts_not_implemented_ioctl_requests  {
+macro_rules! devpts_stub_ioctl_requests  {
     ($request:ident, $is_main:expr, $($unsupported:ident)|*) => {{
         if $is_main {
-            not_implemented_ioctl_requests!($request, $("ptmx", $unsupported)|*)
+            stub_ioctl_requests!($request, $("ptmx", $unsupported)|*)
         } else {
-            not_implemented_ioctl_requests!($request, $("pts", $unsupported)|*)
+            stub_ioctl_requests!($request, $("pts", $unsupported)|*)
         }
     }};
 }
@@ -647,14 +647,14 @@ where
         }
         TIOCSETD => {
             if is_main {
-                not_implemented!("ptmx setting line discipline");
+                track_stub!("ptmx setting line discipline");
             } else {
-                not_implemented!("pts setting line discipline");
+                track_stub!("pts setting line discipline");
             }
             error!(EINVAL)
         }
         #[rustfmt::skip]
-        unsupported => devpts_not_implemented_ioctl_requests!(
+        unsupported => devpts_stub_ioctl_requests!(
             unsupported, is_main,
             TCSETA | TCSETAW | TCSETAF | TCSBRK | TCXONC | TCFLSH | TIOCEXCL
             | TIOCNXCL | TIOCOUTQ | TIOCSTI | TIOCMGET | TIOCMBIS | TIOCMBIC | TIOCMSET

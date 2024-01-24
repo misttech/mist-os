@@ -16,7 +16,7 @@ use crate::{
 };
 use bitflags::bitflags;
 use fuchsia_zircon::{Vmo, VmoChildOptions};
-use starnix_logging::not_implemented;
+use starnix_logging::track_stub;
 use starnix_sync::{FileOpsIoctl, FileOpsRead, FileOpsWrite, Locked, Mutex};
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
 use starnix_uapi::{
@@ -398,7 +398,7 @@ impl FileOps for LoopDeviceFile {
                 Ok(SUCCESS)
             }
             BLKFLSBUF => {
-                not_implemented!("Loop device BLKFLSBUF");
+                track_stub!("Loop device BLKFLSBUF");
                 Ok(SUCCESS)
             }
             LOOP_SET_FD => {
@@ -482,7 +482,7 @@ impl FileOps for LoopDeviceFile {
                 Ok(SUCCESS)
             }
             LOOP_SET_DIRECT_IO => {
-                not_implemented!("Loop device LOOP_SET_DIRECT_IO");
+                track_stub!("Loop device LOOP_SET_DIRECT_IO");
                 error!(ENOTTY)
             }
             LOOP_SET_BLOCK_SIZE => {

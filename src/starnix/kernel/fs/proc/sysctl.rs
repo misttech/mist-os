@@ -12,7 +12,6 @@ use crate::{
         FsNodeHandle, FsNodeInfo, FsNodeOps, FsString, SimpleFileNode, StaticDirectoryBuilder,
     },
 };
-use starnix_logging::not_implemented;
 use starnix_sync::Mutex;
 use starnix_uapi::{
     auth::{FsCred, CAP_SYS_ADMIN, CAP_SYS_RESOURCE},
@@ -163,14 +162,11 @@ struct StubSysctl {
 
 impl StubSysctl {
     #[track_caller]
-    fn new_node(message: &'static str, bug_number: Option<u64>) -> impl FsNodeOps {
+    fn new_node(message: &'static str, bug_url: Option<&'static str>) -> impl FsNodeOps {
+        let location = std::panic::Location::caller();
         let file = BytesFile::new(Self::default());
         SimpleFileNode::new(move || {
-            if let Some(bug) = bug_number {
-                not_implemented!(fxb@ bug, message);
-            } else {
-                not_implemented!(message);
-            }
+            starnix_logging::__track_stub_inner(bug_url, message, None, location);
             Ok(file.clone())
         })
     }

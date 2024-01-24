@@ -14,7 +14,7 @@ use crate::{
 use fidl_fuchsia_hardware_power_statecontrol::{AdminMarker, RebootReason};
 use fuchsia_component::client::connect_to_protocol_sync;
 use fuchsia_zircon as zx;
-use starnix_logging::{log_warn, not_implemented};
+use starnix_logging::{log_warn, track_stub};
 use starnix_sync::{FileOpsRead, FileOpsWrite, Locked};
 use starnix_uapi::{
     auth::FsCred, device_type::DeviceType, error, errors::Errno, file_mode::FileMode, off_t,
@@ -123,7 +123,7 @@ impl FileOps for SysRqFile {
         let commands = data.read_all()?;
         for command in &commands {
             match *command {
-                b'b' => not_implemented!(fxb@319745106, "SysRqRebootNoSync"),
+                b'b' => track_stub!(TODO("https://fxbug.dev/319745106"), "SysRqRebootNoSync"),
                 b'c' => {
                     log_warn!("SysRq kernel crash request.");
 
@@ -142,36 +142,62 @@ impl FileOps for SysRqFile {
                     );
                     // LINT.ThenChange(src/starnix/tests/sysrq/src/lib.rs)
                 }
-                b'd' => not_implemented!(fxb@319745106, "SysRqDumpLocksHeld"),
-                b'e' => not_implemented!(fxb@319745106, "SysRqSigtermAllButInit"),
-                b'f' => not_implemented!(fxb@319745106, "SysRqOomKiller"),
-                b'h' => not_implemented!(fxb@319745106, "SysRqPrintHelp"),
-                b'i' => not_implemented!(fxb@319745106, "SysRqSigkillAllButInit"),
-                b'j' => not_implemented!(fxb@319745106, "SysRqJustThawIt"),
-                b'k' => not_implemented!(fxb@319745106, "SysRqSecureAccessKey"),
-                b'l' => not_implemented!(fxb@319745106, "SysRqBacktraceActiveCpus"),
-                b'm' => not_implemented!(fxb@319745106, "SysRqDumpMemoryInfo"),
-                b'n' => not_implemented!(fxb@319745106, "SysRqRealtimeNice"),
-                b'o' => not_implemented!(fxb@319745106, "SysRqPowerOff"),
-                b'p' => not_implemented!(fxb@319745106, "SysRqDumpRegistersAndFlags"),
-                b'q' => not_implemented!(fxb@319745106, "SysRqDumpHrTimers"),
-                b'r' => not_implemented!(fxb@319745106, "SysRqDisableKeyboardRawMode"),
-                b's' => not_implemented!(fxb@319745106, "SysRqSyncMountedFilesystems"),
-                b't' => not_implemented!(fxb@319745106, "SysRqDumpCurrentTasks"),
-                b'u' => not_implemented!(fxb@319745106, "SysRqRemountAllReadonly"),
-                b'v' => not_implemented!(fxb@319745106, "SysRqRestoreFramebuffer"),
-                b'w' => not_implemented!(fxb@319745106, "SysRqDumpBlockedTasks"),
-                b'x' => not_implemented!(fxb@319745106, "SysRqDumpFtraceBuffer"),
-                b'0' => not_implemented!(fxb@319745106, "SysRqLogLevel0"),
-                b'1' => not_implemented!(fxb@319745106, "SysRqLogLevel1"),
-                b'2' => not_implemented!(fxb@319745106, "SysRqLogLevel2"),
-                b'3' => not_implemented!(fxb@319745106, "SysRqLogLevel3"),
-                b'4' => not_implemented!(fxb@319745106, "SysRqLogLevel4"),
-                b'5' => not_implemented!(fxb@319745106, "SysRqLogLevel5"),
-                b'6' => not_implemented!(fxb@319745106, "SysRqLogLevel6"),
-                b'7' => not_implemented!(fxb@319745106, "SysRqLogLevel7"),
-                b'8' => not_implemented!(fxb@319745106, "SysRqLogLevel8"),
-                b'9' => not_implemented!(fxb@319745106, "SysRqLogLevel9"),
+                b'd' => track_stub!(TODO("https://fxbug.dev/319745106"), "SysRqDumpLocksHeld"),
+                b'e' => {
+                    track_stub!(TODO("https://fxbug.dev/319745106"), "SysRqSigtermAllButInit")
+                }
+                b'f' => track_stub!(TODO("https://fxbug.dev/319745106"), "SysRqOomKiller"),
+                b'h' => track_stub!(TODO("https://fxbug.dev/319745106"), "SysRqPrintHelp"),
+                b'i' => {
+                    track_stub!(TODO("https://fxbug.dev/319745106"), "SysRqSigkillAllButInit")
+                }
+                b'j' => track_stub!(TODO("https://fxbug.dev/319745106"), "SysRqJustThawIt"),
+                b'k' => {
+                    track_stub!(TODO("https://fxbug.dev/319745106"), "SysRqSecureAccessKey")
+                }
+                b'l' => {
+                    track_stub!(TODO("https://fxbug.dev/319745106"), "SysRqBacktraceActiveCpus",)
+                }
+                b'm' => {
+                    track_stub!(TODO("https://fxbug.dev/319745106"), "SysRqDumpMemoryInfo")
+                }
+                b'n' => track_stub!(TODO("https://fxbug.dev/319745106"), "SysRqRealtimeNice"),
+                b'o' => track_stub!(TODO("https://fxbug.dev/319745106"), "SysRqPowerOff"),
+                b'p' => {
+                    track_stub!(TODO("https://fxbug.dev/319745106"), "SysRqDumpRegistersAndFlags",)
+                }
+                b'q' => track_stub!(TODO("https://fxbug.dev/319745106"), "SysRqDumpHrTimers"),
+                b'r' => {
+                    track_stub!(TODO("https://fxbug.dev/319745106"), "SysRqDisableKeyboardRawMode",)
+                }
+                b's' => {
+                    track_stub!(TODO("https://fxbug.dev/319745106"), "SysRqSyncMountedFilesystems",)
+                }
+                b't' => {
+                    track_stub!(TODO("https://fxbug.dev/319745106"), "SysRqDumpCurrentTasks")
+                }
+                b'u' => {
+                    track_stub!(TODO("https://fxbug.dev/319745106"), "SysRqRemountAllReadonly")
+                }
+                b'v' => {
+                    track_stub!(TODO("https://fxbug.dev/319745106"), "SysRqRestoreFramebuffer")
+                }
+                b'w' => {
+                    track_stub!(TODO("https://fxbug.dev/319745106"), "SysRqDumpBlockedTasks")
+                }
+                b'x' => {
+                    track_stub!(TODO("https://fxbug.dev/319745106"), "SysRqDumpFtraceBuffer")
+                }
+                b'0' => track_stub!(TODO("https://fxbug.dev/319745106"), "SysRqLogLevel0"),
+                b'1' => track_stub!(TODO("https://fxbug.dev/319745106"), "SysRqLogLevel1"),
+                b'2' => track_stub!(TODO("https://fxbug.dev/319745106"), "SysRqLogLevel2"),
+                b'3' => track_stub!(TODO("https://fxbug.dev/319745106"), "SysRqLogLevel3"),
+                b'4' => track_stub!(TODO("https://fxbug.dev/319745106"), "SysRqLogLevel4"),
+                b'5' => track_stub!(TODO("https://fxbug.dev/319745106"), "SysRqLogLevel5"),
+                b'6' => track_stub!(TODO("https://fxbug.dev/319745106"), "SysRqLogLevel6"),
+                b'7' => track_stub!(TODO("https://fxbug.dev/319745106"), "SysRqLogLevel7"),
+                b'8' => track_stub!(TODO("https://fxbug.dev/319745106"), "SysRqLogLevel8"),
+                b'9' => track_stub!(TODO("https://fxbug.dev/319745106"), "SysRqLogLevel9"),
 
                 _ => return error!(EINVAL),
             }

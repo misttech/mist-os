@@ -23,7 +23,7 @@ use fuchsia_component::client::connect_to_protocol_sync;
 use fuchsia_zircon as zx;
 use maplit::btreemap;
 use once_cell::sync::Lazy;
-use starnix_logging::{log_error, not_implemented};
+use starnix_logging::{log_error, track_stub};
 use starnix_sync::{FileOpsRead, FileOpsWrite, Locked};
 use starnix_uapi::{
     auth::FsCred, errno, error, errors::Errno, file_mode::mode, off_t, open_flags::OpenFlags,
@@ -134,7 +134,7 @@ impl ProcDirectory {
             ),
             "filesystems".into() => fs.create_node(
                 current_task,
-                StubEmptyFile::new_node_with_bug("/proc/filesystems", 309002087),
+                StubEmptyFile::new_node_with_bug("/proc/filesystems", "https://fxbug.dev/309002087"),
                 FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root()),
             ),
             "misc".into() => fs.create_node(
@@ -195,7 +195,7 @@ impl ProcDirectory {
             },
             "version".into() => fs.create_node(
                 current_task,
-                StubEmptyFile::new_node_with_bug("/proc/version", 309002311),
+                StubEmptyFile::new_node_with_bug("/proc/version", "https://fxbug.dev/309002311"),
                 FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root()),
             ),
             "vmallocinfo".into() => fs.create_node(
@@ -473,7 +473,7 @@ impl FileOps for PressureFile {
         data: &mut dyn InputBuffer,
     ) -> Result<usize, Errno> {
         // Ignore the request for now.
-        not_implemented!("pressure notification setup");
+        track_stub!("pressure notification setup");
         Ok(data.drain())
     }
 

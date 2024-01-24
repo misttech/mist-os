@@ -17,7 +17,7 @@ use crate::{
     vfs::{FdFlags, FdNumber},
 };
 use fuchsia_zircon as zx;
-use starnix_logging::not_implemented;
+use starnix_logging::track_stub;
 use starnix_sync::{Locked, Unlocked};
 use starnix_syscalls::SyscallResult;
 use starnix_uapi::{
@@ -642,7 +642,7 @@ impl WaitingOptions {
     pub fn new_for_waitid(options: u32) -> Result<Self, Errno> {
         if options & !(__WCLONE | __WALL | WNOHANG | WNOWAIT | WSTOPPED | WEXITED | WCONTINUED) != 0
         {
-            not_implemented!("waitid", options);
+            track_stub!("waitid", options);
             return error!(EINVAL);
         }
         if options & (WEXITED | WSTOPPED | WCONTINUED) == 0 {
@@ -654,7 +654,7 @@ impl WaitingOptions {
     /// Build a `WaitingOptions` from the waiting flags of wait4.
     pub fn new_for_wait4(options: u32, waiter_pid: pid_t) -> Result<Self, Errno> {
         if options & !(__WCLONE | __WALL | WNOHANG | WUNTRACED | WCONTINUED) != 0 {
-            not_implemented!("wait4", options);
+            track_stub!("wait4", options);
             return error!(EINVAL);
         }
         let mut result = Self::new(options | WEXITED);
@@ -819,7 +819,7 @@ pub fn sys_wait4(
     } else if raw_selector < -1 {
         ProcessSelector::Pgid(negate_pid(raw_selector)?)
     } else {
-        not_implemented!("wait4", raw_selector as u64);
+        track_stub!("wait4", raw_selector as u64);
         return error!(ENOSYS);
     };
 

@@ -13,7 +13,7 @@ use crate::{
         FdNumber, FileHandle,
     },
 };
-use starnix_logging::not_implemented;
+use starnix_logging::track_stub;
 use starnix_sync::{
     ordered_lock, FileOpsRead, FileOpsWrite, LockBefore, Locked, MutexGuard, Unlocked,
 };
@@ -211,7 +211,7 @@ where
     const KNOWN_FLAGS: u32 =
         uapi::SPLICE_F_MOVE | uapi::SPLICE_F_NONBLOCK | uapi::SPLICE_F_MORE | uapi::SPLICE_F_GIFT;
     if flags & !KNOWN_FLAGS != 0 {
-        not_implemented!("splice flags", flags & !KNOWN_FLAGS);
+        track_stub!("splice flags", flags & !KNOWN_FLAGS);
         return error!(EINVAL);
     }
 
@@ -282,7 +282,7 @@ pub fn vmsplice(
     const KNOWN_FLAGS: u32 =
         uapi::SPLICE_F_MOVE | uapi::SPLICE_F_NONBLOCK | uapi::SPLICE_F_MORE | uapi::SPLICE_F_GIFT;
     if flags & !KNOWN_FLAGS != 0 {
-        not_implemented!("vmsplice flags", flags & !KNOWN_FLAGS);
+        track_stub!("vmsplice flags", flags & !KNOWN_FLAGS);
         return error!(EINVAL);
     }
 
@@ -319,7 +319,7 @@ pub fn tee(
     const KNOWN_FLAGS: u32 =
         uapi::SPLICE_F_MOVE | uapi::SPLICE_F_NONBLOCK | uapi::SPLICE_F_MORE | uapi::SPLICE_F_GIFT;
     if flags & !KNOWN_FLAGS != 0 {
-        not_implemented!("tee flags", flags & !KNOWN_FLAGS);
+        track_stub!("tee flags", flags & !KNOWN_FLAGS);
         return error!(EINVAL);
     }
 

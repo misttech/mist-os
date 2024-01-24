@@ -16,7 +16,7 @@ use crate::{
     },
 };
 use fuchsia_zircon as zx;
-use starnix_logging::{log_trace, not_implemented};
+use starnix_logging::{log_trace, track_stub};
 use starnix_sync::{Locked, Unlocked};
 use starnix_uapi::{
     cmsghdr, errno, error,
@@ -69,14 +69,14 @@ fn socket_flags_to_fd_flags(flags: u32) -> FdFlags {
 
 fn parse_socket_domain(domain: u32) -> Result<SocketDomain, Errno> {
     SocketDomain::from_raw(domain.try_into().map_err(|_| errno!(EAFNOSUPPORT))?).ok_or_else(|| {
-        not_implemented!("socket", domain);
+        track_stub!("socket", domain);
         errno!(EAFNOSUPPORT)
     })
 }
 
 fn parse_socket_type(domain: SocketDomain, socket_type: u32) -> Result<SocketType, Errno> {
     let socket_type = SocketType::from_raw(socket_type & 0xf).ok_or_else(|| {
-        not_implemented!("socket", socket_type);
+        track_stub!("socket", socket_type);
         errno!(EINVAL)
     })?;
     // For AF_UNIX, SOCK_RAW sockets are treated as if they were SOCK_DGRAM.

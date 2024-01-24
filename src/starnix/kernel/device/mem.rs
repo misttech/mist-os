@@ -19,7 +19,7 @@ use crate::{
 use fuchsia_zircon::{
     cprng_draw_uninit, {self as zx},
 };
-use starnix_logging::{log_info, not_implemented};
+use starnix_logging::{log_info, track_stub};
 use starnix_sync::{FileOpsIoctl, FileOpsRead, FileOpsWrite, Locked, Mutex};
 use starnix_uapi::{
     auth::FsCred, device_type::DeviceType, error, errors::Errno, file_mode::FileMode,
@@ -290,7 +290,7 @@ impl FileOps for DevKmsg {
                 Ok(0)
             }
             SeekTarget::Data(0) => {
-                not_implemented!("/dev/kmsg: SEEK_DATA");
+                track_stub!("/dev/kmsg: SEEK_DATA");
                 Ok(0)
             }
             // The following are implemented as documented on:

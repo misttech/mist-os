@@ -15,7 +15,7 @@ use crate::{
 };
 use once_cell::sync::OnceCell;
 use rand::Rng;
-use starnix_logging::{log_error, log_warn, not_implemented};
+use starnix_logging::{log_error, log_warn, track_stub};
 use starnix_sync::{
     FileOpsRead, FileOpsWrite, LockBefore, Locked, RwLock, RwLockReadGuard, RwLockWriteGuard,
     Unlocked,
@@ -871,7 +871,7 @@ impl OverlayFs {
             None => (),
             Some(o) if o == "off" => (),
             Some(_) => {
-                not_implemented!("overlayfs redirect_dir");
+                track_stub!("overlayfs redirect_dir");
                 return error!(ENOTSUP);
             }
         }

@@ -12,7 +12,7 @@ use fuchsia_inspect_contrib::profile_duration;
 use fuchsia_zircon::{
     Task, {self as zx},
 };
-use starnix_logging::{log_trace, not_implemented};
+use starnix_logging::{log_trace, track_stub};
 use starnix_sync::{InterruptibleEvent, WakeReason};
 use starnix_sync::{Locked, Unlocked};
 use starnix_uapi::{
@@ -110,7 +110,7 @@ pub fn sys_gettimeofday(
         current_task.write_object(user_tv, &tv)?;
     }
     if !user_tz.is_null() {
-        not_implemented!("gettimeofday tz argument");
+        track_stub!("gettimeofday tz argument");
     }
     Ok(())
 }
@@ -137,15 +137,15 @@ pub fn sys_clock_nanosleep(
     match which_clock {
         CLOCK_REALTIME | CLOCK_MONOTONIC => {}
         CLOCK_TAI => {
-            not_implemented!("clock_nanosleep, CLOCK_TAI", flags);
+            track_stub!("clock_nanosleep, CLOCK_TAI", flags);
             return error!(EINVAL);
         }
         CLOCK_BOOTTIME => {
-            not_implemented!("clock_nanosleep, CLOCK_BOOTTIME", flags);
+            track_stub!("clock_nanosleep, CLOCK_BOOTTIME", flags);
             return error!(EINVAL);
         }
         CLOCK_PROCESS_CPUTIME_ID => {
-            not_implemented!("clock_nanosleep, CLOCK_PROCESS_CPUTIME_ID", flags);
+            track_stub!("clock_nanosleep, CLOCK_PROCESS_CPUTIME_ID", flags);
             return error!(EINVAL);
         }
         _ => return error!(EOPNOTSUPP),

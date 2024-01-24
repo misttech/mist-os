@@ -20,7 +20,7 @@ use crate::{
     },
     vfs::{FdNumber, FileHandle, MountNamespaceFile, UserBuffersOutputBuffer, VecOutputBuffer},
 };
-use starnix_logging::{log_error, log_trace, not_implemented, set_zx_name};
+use starnix_logging::{log_error, log_trace, set_zx_name, track_stub};
 use starnix_sync::{FileOpsRead, MmDumpable, TaskRelease};
 use starnix_syscalls::SyscallResult;
 use starnix_uapi::{
@@ -755,7 +755,7 @@ pub fn sys_sched_getaffinity(
     // sched_setaffinity() is not implemented. Fake affinity mask based on the number of CPUs.
     let mask = get_default_cpumask();
     current_task.write_memory(user_mask, &mask.to_ne_bytes())?;
-    not_implemented!("sched_getaffinity");
+    track_stub!("sched_getaffinity");
     Ok(CPU_AFFINITY_MASK_SIZE as usize)
 }
 
@@ -788,7 +788,7 @@ pub fn sys_sched_setaffinity(
 
     // Currently, we ignore the mask and act as if the system reset the mask
     // immediately to allowing all CPUs.
-    not_implemented!("sched_setaffinity");
+    track_stub!("sched_setaffinity");
     Ok(())
 }
 
@@ -860,7 +860,7 @@ pub fn sys_prctl(
     match option {
         PR_SET_VMA => {
             if arg2 != PR_SET_VMA_ANON_NAME as u64 {
-                not_implemented!("prctl PR_SET_VMA", arg2);
+                track_stub!("prctl PR_SET_VMA", arg2);
                 return error!(ENOSYS);
             }
             let addr = UserAddress::from(arg3);
@@ -906,7 +906,7 @@ pub fn sys_prctl(
             })
         }
         PR_SET_PDEATHSIG => {
-            not_implemented!("PR_SET_PDEATHSIG");
+            track_stub!("PR_SET_PDEATHSIG");
             Ok(().into())
         }
         PR_SET_NAME => {
@@ -1013,7 +1013,7 @@ pub fn sys_prctl(
             }
 
             let securebits = SecureBits::from_bits(arg2 as u32).ok_or_else(|| {
-                not_implemented!("PR_SET_SECUREBITS", arg2);
+                track_stub!("PR_SET_SECUREBITS", arg2);
                 errno!(ENOSYS)
             })?;
             creds.securebits = securebits;
@@ -1089,7 +1089,7 @@ pub fn sys_prctl(
             Ok(().into())
         }
         _ => {
-            not_implemented!("prctl", option);
+            track_stub!("prctl", option);
             error!(ENOSYS)
         }
     }
@@ -1174,7 +1174,7 @@ pub fn sys_prlimit64(
 ) -> Result<(), Errno> {
     // TODO: Lookup tasks by pid.
     if pid != 0 {
-        not_implemented!("prlimit64 with non 0 pid");
+        track_stub!("prlimit64 with non 0 pid");
         return error!(ENOSYS);
     }
     let task = &current_task.task;
@@ -1195,7 +1195,7 @@ pub fn sys_prlimit64(
         // TODO: Integrate Resource::STACK with generic ResourceLimits machinery.
         Resource::STACK => {
             if maybe_new_limit.is_some() {
-                not_implemented!("prlimit64 cannot set RLIMIT_STACK");
+                track_stub!("prlimit64 cannot set RLIMIT_STACK");
             }
             // The stack size is fixed at the moment, but
             // if MAP_GROWSDOWN is implemented this should
@@ -1394,7 +1394,7 @@ pub fn sys_seccomp(
             if flags != 0 {
                 return error!(EINVAL);
             }
-            not_implemented!("seccomp not implemented");
+            track_stub!("seccomp");
             error!(ENOSYS)
         }
         _ => error!(EINVAL),
@@ -1529,7 +1529,7 @@ pub fn sys_unshare(
 ) -> Result<(), Errno> {
     const IMPLEMENTED_FLAGS: u32 = CLONE_FILES | CLONE_NEWNS | CLONE_NEWUTS;
     if flags & !IMPLEMENTED_FLAGS != 0 {
-        not_implemented!("unshare", flags & !IMPLEMENTED_FLAGS);
+        track_stub!("unshare", flags & !IMPLEMENTED_FLAGS);
         return error!(EINVAL);
     }
 
@@ -1745,23 +1745,23 @@ pub fn sys_syslog(
         SyslogAction::SizeBuffer => syslog.size_buffer(),
         SyslogAction::Close | SyslogAction::Open => Ok(0),
         SyslogAction::ReadClear => {
-            not_implemented!("syslog: read clear");
+            track_stub!("syslog: read clear");
             Ok(0)
         }
         SyslogAction::Clear => {
-            not_implemented!("syslog: clear");
+            track_stub!("syslog: clear");
             Ok(0)
         }
         SyslogAction::ConsoleOff => {
-            not_implemented!("syslog: console off");
+            track_stub!("syslog: console off");
             Ok(0)
         }
         SyslogAction::ConsoleOn => {
-            not_implemented!("syslog: console on");
+            track_stub!("syslog: console on");
             Ok(0)
         }
         SyslogAction::ConsoleLevel => {
-            not_implemented!("syslog: console level");
+            track_stub!("syslog: console level");
             Ok(0)
         }
     }

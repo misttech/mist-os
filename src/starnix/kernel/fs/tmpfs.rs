@@ -13,7 +13,7 @@ use crate::{
     },
 };
 use bstr::B;
-use starnix_logging::{log_warn, not_implemented};
+use starnix_logging::{log_warn, track_stub};
 use starnix_sync::{Mutex, MutexGuard};
 use starnix_uapi::{
     auth::FsCred,
@@ -160,7 +160,7 @@ impl TmpFs {
         fs.set_root_node(root_node);
 
         if !mount_options.is_empty() {
-            not_implemented!("unknown tmpfs options, see logs for strings");
+            track_stub!("unknown tmpfs options, see logs for strings");
             log_warn!(
                 "Unknown tmpfs options: {}",
                 itertools::join(mount_options.iter().map(|(k, v)| format!("{k}={v}")), ",")

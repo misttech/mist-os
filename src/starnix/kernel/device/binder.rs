@@ -32,7 +32,7 @@ use fuchsia_inspect_contrib::profile_duration;
 use fuchsia_zircon as zx;
 use starnix_lifecycle::AtomicU64Counter;
 use starnix_logging::{
-    log_error, log_trace, log_warn, not_implemented, trace_category_starnix, trace_duration,
+    log_error, log_trace, log_warn, trace_category_starnix, trace_duration, track_stub,
 };
 use starnix_sync::{
     FileOpsIoctl, FileOpsRead, FileOpsWrite, InterruptibleEvent, Locked, Mutex, MutexGuard, RwLock,
@@ -818,7 +818,7 @@ impl BinderProcess {
     ) -> Result<(), Errno> {
         let proxy = match handle {
             Handle::ContextManager => {
-                not_implemented!("death notification for service manager");
+                track_stub!("death notification for service manager");
                 return Ok(());
             }
             Handle::Object { index } => {
@@ -854,7 +854,7 @@ impl BinderProcess {
     ) -> Result<(), Errno> {
         let owner = match handle {
             Handle::ContextManager => {
-                not_implemented!("clear death notification for service manager");
+                track_stub!("clear death notification for service manager");
                 self.enqueue_command(Command::ClearDeathNotificationDone(cookie));
                 return Ok(());
             }
@@ -933,7 +933,7 @@ impl<'a> BinderProcessGuard<'a> {
             Handle::ContextManager => {
                 // TODO: Figure out how to acquire/release refs for the context manager
                 // object.
-                not_implemented!("acquire/release refs for context manager object");
+                track_stub!("acquire/release refs for context manager object");
                 return Ok(());
             }
             Handle::Object { index } => index,
@@ -3210,7 +3210,7 @@ impl BinderDriver {
                     Ok(SUCCESS)
                 }
                 uapi::BINDER_ENABLE_ONEWAY_SPAM_DETECTION => {
-                    not_implemented!("binder ENABLE_ONEWAY_SPAM_DETECTION");
+                    track_stub!("binder ENABLE_ONEWAY_SPAM_DETECTION");
                     Ok(SUCCESS)
                 }
                 uapi::BINDER_THREAD_EXIT => {
@@ -3219,19 +3219,19 @@ impl BinderDriver {
                     Ok(SUCCESS)
                 }
                 uapi::BINDER_GET_NODE_DEBUG_INFO => {
-                    not_implemented!("binder GET_NODE_DEBUG_INFO");
+                    track_stub!("binder GET_NODE_DEBUG_INFO");
                     error!(EOPNOTSUPP)
                 }
                 uapi::BINDER_GET_NODE_INFO_FOR_REF => {
-                    not_implemented!("binder GET_NODE_INFO_FOR_REF");
+                    track_stub!("binder GET_NODE_INFO_FOR_REF");
                     error!(EOPNOTSUPP)
                 }
                 uapi::BINDER_FREEZE => {
-                    not_implemented!("binder BINDER_FREEZE");
+                    track_stub!("binder BINDER_FREEZE");
                     error!(EOPNOTSUPP)
                 }
                 _ => {
-                    not_implemented!("binder unknown ioctl", request);
+                    track_stub!("binder unknown ioctl", request);
                     log_error!("binder received unknown ioctl request 0x{:08x}", request);
                     error!(EINVAL)
                 }
@@ -4215,7 +4215,7 @@ impl SerializedBinderObject {
                 })
             }
             object_type => {
-                not_implemented!("unknown object type", object_type);
+                track_stub!("unknown object type", object_type);
                 error!(EINVAL)
             }
         }

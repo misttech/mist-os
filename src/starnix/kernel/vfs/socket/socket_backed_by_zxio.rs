@@ -14,7 +14,7 @@ use crate::{
         AncillaryData, FdEvents, InputBuffer, MessageReadInfo, OutputBuffer,
     },
 };
-use starnix_logging::not_implemented;
+use starnix_logging::track_stub;
 use starnix_uapi::{
     c_int, errno, errno_from_zxio_code, error,
     errors::{Errno, ENOTSUP},
@@ -371,7 +371,7 @@ impl SocketOps for ZxioBackedSocket {
         let optval = task.read_buffer(&user_opt)?;
 
         if level == SOL_SOCKET && optname == SO_ATTACH_FILTER {
-            not_implemented!(fxb@42079971, "SOL_SOCKET.SO_ATTACH_FILTER");
+            track_stub!(TODO("https://fxbug.dev/42079971"), "SOL_SOCKET.SO_ATTACH_FILTER");
             return Ok(());
         }
 

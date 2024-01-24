@@ -19,7 +19,7 @@ use crate::{
     },
 };
 use fuchsia_inspect_contrib::profile_duration;
-use starnix_logging::{log_trace, not_implemented, trace_category_starnix_mm, trace_duration};
+use starnix_logging::{log_trace, trace_category_starnix_mm, trace_duration, track_stub};
 use starnix_uapi::{
     auth::{CAP_SYS_PTRACE, PTRACE_MODE_ATTACH_REALCREDS},
     errno, error,
@@ -80,7 +80,7 @@ pub fn do_mmap(
     offset: u64,
 ) -> Result<UserAddress, Errno> {
     let prot_flags = ProtectionFlags::from_bits(prot).ok_or_else(|| {
-        not_implemented!("mmap", prot);
+        track_stub!("mmap", prot);
         errno!(EINVAL)
     })?;
 
@@ -96,7 +96,7 @@ pub fn do_mmap(
         | MAP_DENYWRITE
         | MAP_GROWSDOWN;
     if flags & !valid_flags != 0 {
-        not_implemented!("mmap", flags);
+        track_stub!("mmap", flags);
         return error!(EINVAL);
     }
 
@@ -163,7 +163,7 @@ pub fn sys_mprotect(
     prot: u32,
 ) -> Result<(), Errno> {
     let prot_flags = ProtectionFlags::from_bits(prot).ok_or_else(|| {
-        not_implemented!("mprotect", prot);
+        track_stub!("mprotect", prot);
         errno!(EINVAL)
     })?;
     current_task.mm().protect(addr, length, prot_flags)?;
@@ -202,7 +202,7 @@ pub fn sys_msync(
     length: usize,
     _flags: u32,
 ) -> Result<(), Errno> {
-    not_implemented!("msync not implemented");
+    track_stub!("msync");
     // Perform some basic validation of the address range given to satisfy gvisor tests that
     // use msync as a way to probe whether a page is mapped or not.
     current_task.mm().ensure_mapped(addr, length)?;
@@ -333,7 +333,7 @@ pub fn sys_membarrier(
     _flags: u32,
     _cpu_id: i32,
 ) -> Result<u32, Errno> {
-    not_implemented!(fxb@297526152, "membarrier", cmd);
+    track_stub!(TODO("https://fxbug.dev/297526152"), "membarrier", cmd);
     match cmd {
         uapi::membarrier_cmd_MEMBARRIER_CMD_QUERY => Ok(0),
         uapi::membarrier_cmd_MEMBARRIER_CMD_PRIVATE_EXPEDITED_RSEQ => Ok(0),
@@ -413,7 +413,7 @@ fn do_futex<Key: FutexKey>(
             Ok(0)
         }
         _ => {
-            not_implemented!("futex", cmd);
+            track_stub!("futex", cmd);
             error!(ENOSYS)
         }
     }
@@ -487,7 +487,7 @@ pub fn sys_mlock(
     _addr: UserAddress,
     _length: usize,
 ) -> Result<(), Errno> {
-    not_implemented!(fxb@297591218, "mlock not implemented");
+    track_stub!(TODO("https://fxbug.dev/297591218"), "mlock");
     Ok(())
 }
 
@@ -497,7 +497,7 @@ pub fn sys_munlock(
     _addr: UserAddress,
     _length: usize,
 ) -> Result<(), Errno> {
-    not_implemented!(fxb@297591218, "munlock not implemented");
+    track_stub!(TODO("https://fxbug.dev/297591218"), "munlock");
     Ok(())
 }
 

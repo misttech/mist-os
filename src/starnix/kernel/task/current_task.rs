@@ -27,7 +27,7 @@ use fuchsia_zircon::{
     sys::zx_thread_state_general_regs_t,
     {self as zx},
 };
-use starnix_logging::{log_error, log_warn, not_implemented, set_zx_name, track_file_not_found};
+use starnix_logging::{log_error, log_warn, set_zx_name, track_file_not_found, track_stub};
 use starnix_sync::{
     EventWaitGuard, LockBefore, Locked, MmDumpable, RwLock, RwLockWriteGuard, TaskRelease,
     WakeReason,
@@ -683,7 +683,7 @@ impl CurrentTask {
         let resolved_elf = resolve_executable(self, executable, path.clone(), argv, environ)?;
 
         if self.thread_group.read().tasks_count() > 1 {
-            not_implemented!(fxb@297434895, "exec on multithread process");
+            track_stub!(TODO("https://fxbug.dev/297434895"), "exec on multithread process");
             return error!(EINVAL);
         }
 
@@ -971,7 +971,7 @@ impl CurrentTask {
             }
             zx::sys::ZX_EXCP_SW_BREAKPOINT => ExceptionResult::Signal(SignalInfo::default(SIGTRAP)),
             unknown => {
-                not_implemented!("zircon exception", unknown);
+                track_stub!("zircon exception", unknown);
                 log_error!("Unknown exception {:?}", report);
                 ExceptionResult::Signal(SignalInfo::default(SIGSEGV))
             }
@@ -1344,12 +1344,12 @@ impl CurrentTask {
                 log_warn!("CLONE_VM set without CLONE_THREAD. Ignoring CLONE_VM (doing a fork).");
             }
         } else if clone_thread && !clone_vm {
-            not_implemented!("CLONE_THREAD without CLONE_VM");
+            track_stub!("CLONE_THREAD without CLONE_VM");
             return error!(ENOSYS);
         }
 
         if flags & !IMPLEMENTED_FLAGS != 0 {
-            not_implemented!("clone", flags & !IMPLEMENTED_FLAGS);
+            track_stub!("clone", flags & !IMPLEMENTED_FLAGS);
             return error!(ENOSYS);
         }
 

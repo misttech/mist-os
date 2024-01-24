@@ -7,7 +7,7 @@ use crate::{
     task::CurrentTask,
     vfs::socket::{SocketDomain, SocketHandle, SocketType},
 };
-use starnix_logging::{log_warn, not_implemented};
+use starnix_logging::{log_warn, track_stub};
 use starnix_uapi::{
     c_char, errno, error, errors::Errno, ip6t_get_entries, ip6t_getinfo, ip6t_replace,
     ipt_get_entries, ipt_getinfo, ipt_replace, nf_inet_hooks_NF_INET_NUMHOOKS,
@@ -176,7 +176,7 @@ impl IpTables {
                 Ok(revision.as_bytes().to_vec())
             }
             _ => {
-                not_implemented!("optname for network sockets");
+                track_stub!("optname for network sockets");
                 Ok(vec![])
             }
         }

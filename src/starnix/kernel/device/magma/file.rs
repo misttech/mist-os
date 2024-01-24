@@ -147,7 +147,7 @@ use magma::{
     MAGMA_STATUS_OK, MAGMA_STATUS_TIMED_OUT,
 };
 use starnix_lifecycle::AtomicU64Counter;
-use starnix_logging::{impossible_error, log_error, log_warn, not_implemented, set_zx_name};
+use starnix_logging::{impossible_error, log_error, log_warn, set_zx_name, track_stub};
 use starnix_sync::{FileOpsIoctl, FileOpsRead, FileOpsWrite, Locked, Mutex};
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
 use starnix_uapi::{
@@ -1247,7 +1247,7 @@ impl FileOps for MagmaFile {
                 current_task.write_object(UserRef::new(response_address), &response)
             }
             t => {
-                not_implemented!("virtio magma ioctl", t);
+                track_stub!("virtio magma ioctl", t);
                 error!(ENOSYS)
             }
         }?;

@@ -13,7 +13,7 @@ use crate::{
         VecDirectory, VecDirectoryEntry, DEFAULT_BYTES_PER_BLOCK,
     },
 };
-use starnix_logging::not_implemented;
+use starnix_logging::track_stub;
 use starnix_sync::{FileOpsWrite, Locked};
 use starnix_uapi::{
     auth::FsCred, device_type::DeviceType, errno, error, errors::Errno, file_mode::mode,
@@ -293,7 +293,7 @@ impl FileOps for ReadAheadKbFile {
         data: &mut dyn InputBuffer,
     ) -> Result<usize, Errno> {
         let updated = data.read_all()?;
-        not_implemented!("updating read_ahead_kb");
+        track_stub!("updating read_ahead_kb");
         Ok(updated.len())
     }
 }

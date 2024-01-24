@@ -14,7 +14,7 @@ use crate::{
     task::CurrentTask,
     vfs::FsString,
 };
-use starnix_logging::{log_error, log_info, log_warn, not_implemented};
+use starnix_logging::{log_error, log_info, log_warn, track_stub};
 use starnix_syscalls::{
     for_each_syscall, syscall_number_to_name_literal_callback, SyscallResult, SUCCESS,
 };
@@ -235,7 +235,7 @@ pub fn sys_reboot(
                 fpower::RebootReason::UserRequest
             } else {
                 log_warn!("Unknown reboot args: {arg_bytes}");
-                not_implemented!("unknown reboot args, see logs for strings");
+                track_stub!("unknown reboot args, see logs for strings");
                 return error!(ENOSYS);
             };
             match proxy.reboot(reboot_reason, zx::Time::INFINITE) {
@@ -267,7 +267,7 @@ pub fn sys_unknown(
     _current_task: &CurrentTask,
     syscall_number: u64,
 ) -> Result<SyscallResult, Errno> {
-    not_implemented!(for_each_syscall! { syscall_number_to_name_literal_callback, syscall_number });
+    track_stub!(for_each_syscall! { syscall_number_to_name_literal_callback, syscall_number });
     // TODO: We should send SIGSYS once we have signals.
     error!(ENOSYS)
 }

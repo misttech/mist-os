@@ -5,7 +5,7 @@
 use fidl::HandleBased;
 use fidl_fuchsia_scheduler::ProfileProviderSynchronousProxy;
 use fuchsia_zircon as zx;
-use starnix_logging::{impossible_error, log_debug, log_warn, not_implemented};
+use starnix_logging::{impossible_error, log_debug, log_warn, track_stub};
 use starnix_uapi::{
     errno, error, errors::Errno, sched_param, SCHED_BATCH, SCHED_DEADLINE, SCHED_FIFO, SCHED_IDLE,
     SCHED_NORMAL, SCHED_RESET_ON_FORK, SCHED_RR,
@@ -66,7 +66,10 @@ impl SchedulerPolicy {
     pub fn from_raw(mut policy: u32, params: sched_param, rlimit: u64) -> Result<Self, Errno> {
         let reset_on_fork = (policy & SCHED_RESET_ON_FORK) != 0;
         if reset_on_fork {
-            not_implemented!(fxb@297961833, "SCHED_RESET_ON_FORK check CAP_SYS_NICE");
+            track_stub!(
+                TODO("https://fxbug.dev/297961833"),
+                "SCHED_RESET_ON_FORK check CAP_SYS_NICE"
+            );
             policy -= SCHED_RESET_ON_FORK;
         }
 

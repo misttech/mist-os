@@ -523,7 +523,7 @@ rustc_library("starnix_logging") {
     "logging/lib.rs",
     "logging/logging.rs",
     "logging/not_found.rs",
-    "logging/not_implemented.rs",
+    "logging/stubs.rs",
     "logging/trace.rs",
   ]
 

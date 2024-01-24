@@ -5,11 +5,11 @@
 mod core_dump_list;
 mod logging;
 mod not_found;
-mod not_implemented;
+mod stubs;
 mod trace;
 
 pub use core_dump_list::*;
 pub use logging::*;
 pub use not_found::*;
-pub use not_implemented::*;
+pub use stubs::*;
 pub use trace::*;

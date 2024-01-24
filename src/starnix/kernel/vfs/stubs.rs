@@ -16,17 +16,17 @@ impl StubEmptyFile {
         // This ensures the caller of this fn is recorded instead of the location of the closure.
         let location = Location::caller();
         SimpleFileNode::new(move || {
-            starnix_logging::__not_implemented_inner(None, message, None, location);
+            starnix_logging::__track_stub_inner(None, message, None, location);
             Ok(StubEmptyFile)
         })
     }
 
     #[track_caller]
-    pub fn new_node_with_bug(message: &'static str, bug_number: u64) -> impl FsNodeOps {
+    pub fn new_node_with_bug(message: &'static str, bug_url: &'static str) -> impl FsNodeOps {
         // This ensures the caller of this fn is recorded instead of the location of the closure.
         let location = Location::caller();
         SimpleFileNode::new(move || {
-            starnix_logging::__not_implemented_inner(Some(bug_number), message, None, location);
+            starnix_logging::__track_stub_inner(Some(bug_url), message, None, location);
             Ok(StubEmptyFile)
         })
     }
