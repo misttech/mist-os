@@ -14,22 +14,26 @@
 
 namespace {
 
+using zircon_profile::LoadConfigs;
+using zircon_profile::ProfileScope;
+using zircon_profile::Role;
+
 TEST(ProfileConfig, Parse) {
-  fit::result result = zircon_profile::LoadConfigs("/pkg/data");
+  fit::result result = LoadConfigs("/pkg/data");
   ASSERT_TRUE(result.is_ok());
 
   {
-    const auto iter = result->thread.find("fuchsia.default");
+    const auto iter = result->thread.find(*Role::Create("fuchsia.default"));
     ASSERT_TRUE(iter != result->thread.end());
-    EXPECT_EQ(iter->second.scope, zircon_profile::ProfileScope::Builtin);
+    EXPECT_EQ(iter->second.scope, ProfileScope::Builtin);
     EXPECT_EQ(iter->second.info.flags, ZX_PROFILE_INFO_FLAG_PRIORITY);
     EXPECT_EQ(iter->second.info.priority, 16);
   }
 
   {
-    const auto iter = result->thread.find("test.bringup.a:affinity");
+    const auto iter = result->thread.find(*Role::Create("test.bringup.a:affinity"));
     ASSERT_TRUE(iter != result->thread.end());
-    EXPECT_EQ(iter->second.scope, zircon_profile::ProfileScope::Bringup);
+    EXPECT_EQ(iter->second.scope, ProfileScope::Bringup);
     EXPECT_EQ(iter->second.info.flags,
               ZX_PROFILE_INFO_FLAG_CPU_MASK | ZX_PROFILE_INFO_FLAG_PRIORITY);
     EXPECT_EQ(iter->second.info.priority, 0);
@@ -37,9 +41,9 @@ TEST(ProfileConfig, Parse) {
   }
 
   {
-    const auto iter = result->thread.find("test.bringup.b:affinity");
+    const auto iter = result->thread.find(*Role::Create("test.bringup.b:affinity"));
     ASSERT_TRUE(iter != result->thread.end());
-    EXPECT_EQ(iter->second.scope, zircon_profile::ProfileScope::Core);
+    EXPECT_EQ(iter->second.scope, ProfileScope::Core);
     EXPECT_EQ(iter->second.info.flags,
               ZX_PROFILE_INFO_FLAG_CPU_MASK | ZX_PROFILE_INFO_FLAG_PRIORITY);
     EXPECT_EQ(iter->second.info.priority, 1);
@@ -47,9 +51,9 @@ TEST(ProfileConfig, Parse) {
   }
 
   {
-    const auto iter = result->thread.find("test.core.a");
+    const auto iter = result->thread.find(*Role::Create("test.core.a"));
     ASSERT_TRUE(iter != result->thread.end());
-    EXPECT_EQ(iter->second.scope, zircon_profile::ProfileScope::Core);
+    EXPECT_EQ(iter->second.scope, ProfileScope::Core);
     EXPECT_EQ(iter->second.info.flags, ZX_PROFILE_INFO_FLAG_DEADLINE);
     EXPECT_EQ(iter->second.info.deadline_params.capacity, 5'000'000);
     EXPECT_EQ(iter->second.info.deadline_params.relative_deadline, 10'000'000);
@@ -57,25 +61,25 @@ TEST(ProfileConfig, Parse) {
   }
 
   {
-    const auto iter = result->thread.find("test.bringup.a");
+    const auto iter = result->thread.find(*Role::Create("test.bringup.a"));
     ASSERT_TRUE(iter != result->thread.end());
-    EXPECT_EQ(iter->second.scope, zircon_profile::ProfileScope::Core);
+    EXPECT_EQ(iter->second.scope, ProfileScope::Core);
     EXPECT_EQ(iter->second.info.flags, ZX_PROFILE_INFO_FLAG_PRIORITY);
     EXPECT_EQ(iter->second.info.priority, 10);
   }
 
   {
-    const auto iter = result->thread.find("test.product.a");
+    const auto iter = result->thread.find(*Role::Create("test.product.a"));
     ASSERT_TRUE(iter != result->thread.end());
-    EXPECT_EQ(iter->second.scope, zircon_profile::ProfileScope::Product);
+    EXPECT_EQ(iter->second.scope, ProfileScope::Product);
     EXPECT_EQ(iter->second.info.flags, ZX_PROFILE_INFO_FLAG_PRIORITY);
     EXPECT_EQ(iter->second.info.priority, 25);
   }
 
   {
-    const auto iter = result->thread.find("test.core.a:affinity");
+    const auto iter = result->thread.find(*Role::Create("test.core.a:affinity"));
     ASSERT_TRUE(iter != result->thread.end());
-    EXPECT_EQ(iter->second.scope, zircon_profile::ProfileScope::Product);
+    EXPECT_EQ(iter->second.scope, ProfileScope::Product);
     EXPECT_EQ(iter->second.info.flags,
               ZX_PROFILE_INFO_FLAG_CPU_MASK | ZX_PROFILE_INFO_FLAG_DEADLINE);
     EXPECT_EQ(iter->second.info.deadline_params.capacity, 6'000'000);
@@ -85,131 +89,208 @@ TEST(ProfileConfig, Parse) {
   }
 
   {
-    const auto iter = result->thread.find("test.bringup.b");
+    const auto iter = result->thread.find(*Role::Create("test.bringup.b"));
     ASSERT_TRUE(iter != result->thread.end());
-    EXPECT_EQ(iter->second.scope, zircon_profile::ProfileScope::Product);
+    EXPECT_EQ(iter->second.scope, ProfileScope::Product);
     EXPECT_EQ(iter->second.info.flags, ZX_PROFILE_INFO_FLAG_PRIORITY);
     EXPECT_EQ(iter->second.info.priority, 20);
   }
 
+  // The next two test cases validate that the same role name with different selectors correctly
+  // fetches two different roles.
   {
-    const auto iter = result->memory.find("fuchsia.default");
+    const auto iter = result->thread.find(*Role::Create("test.core.parameterized.role:input=foo"));
     ASSERT_TRUE(iter != result->memory.end());
-    EXPECT_EQ(iter->second.scope, zircon_profile::ProfileScope::Builtin);
+    EXPECT_EQ(iter->second.scope, ProfileScope::Core);
+    EXPECT_EQ(iter->second.info.flags, ZX_PROFILE_INFO_FLAG_DEADLINE);
+    EXPECT_EQ(iter->second.info.deadline_params.capacity, 5'000'000);
+    EXPECT_EQ(iter->second.info.deadline_params.relative_deadline, 10'000'000);
+    EXPECT_EQ(iter->second.info.deadline_params.period, 10'000'000);
+    EXPECT_EQ(iter->second.output_parameters.size(), 2);
+    EXPECT_EQ(iter->second.output_parameters[0].key(), "output1");
+    EXPECT_EQ(iter->second.output_parameters[0].value().int_value().value(), 1);
+    EXPECT_EQ(iter->second.output_parameters[1].key(), "output2");
+    EXPECT_EQ(iter->second.output_parameters[1].value().float_value().value(), 2.5);
+  }
+
+  {
+    const auto iter = result->thread.find(*Role::Create("test.core.parameterized.role:input=bar"));
+    ASSERT_TRUE(iter != result->memory.end());
+    EXPECT_EQ(iter->second.scope, ProfileScope::Core);
+    EXPECT_EQ(iter->second.info.flags, ZX_PROFILE_INFO_FLAG_DEADLINE);
+    EXPECT_EQ(iter->second.info.deadline_params.capacity, 6'000'000);
+    EXPECT_EQ(iter->second.info.deadline_params.relative_deadline, 9'000'000);
+    EXPECT_EQ(iter->second.info.deadline_params.period, 10'000'000);
+    EXPECT_EQ(iter->second.output_parameters.size(), 2);
+    EXPECT_EQ(iter->second.output_parameters[0].key(), "output1");
+    EXPECT_EQ(iter->second.output_parameters[0].value().int_value().value(), 5);
+    EXPECT_EQ(iter->second.output_parameters[1].key(), "output2");
+    EXPECT_EQ(iter->second.output_parameters[1].value().float_value().value(), 42.6);
+  }
+
+  // The next two test cases validate that the order of selectors does not change the role that is
+  // fetched.
+  {
+    const auto iter =
+        result->thread.find(*Role::Create("test.core.parameterized.role:param1=foo,param2=bar"));
+    ASSERT_TRUE(iter != result->memory.end());
+    EXPECT_EQ(iter->second.scope, ProfileScope::Core);
+    EXPECT_EQ(iter->second.info.flags, ZX_PROFILE_INFO_FLAG_DEADLINE);
+    EXPECT_EQ(iter->second.info.deadline_params.capacity, 7'000'000);
+    EXPECT_EQ(iter->second.info.deadline_params.relative_deadline, 8'000'000);
+    EXPECT_EQ(iter->second.info.deadline_params.period, 10'000'000);
+    EXPECT_EQ(iter->second.output_parameters.size(), 3);
+    EXPECT_EQ(iter->second.output_parameters[0].key(), "output1");
+    EXPECT_EQ(iter->second.output_parameters[0].value().int_value().value(), 489);
+    EXPECT_EQ(iter->second.output_parameters[1].key(), "output2");
+    EXPECT_EQ(iter->second.output_parameters[1].value().float_value().value(), 297.5);
+    EXPECT_EQ(iter->second.output_parameters[2].key(), "output3");
+    EXPECT_EQ(iter->second.output_parameters[2].value().string_value().value(), "Hello, World!");
+  }
+
+  {
+    const auto iter =
+        result->thread.find(*Role::Create("test.core.parameterized.role:param2=bar,param1=foo"));
+    ASSERT_TRUE(iter != result->memory.end());
+    EXPECT_EQ(iter->second.scope, ProfileScope::Core);
+    EXPECT_EQ(iter->second.info.flags, ZX_PROFILE_INFO_FLAG_DEADLINE);
+    EXPECT_EQ(iter->second.info.deadline_params.capacity, 7'000'000);
+    EXPECT_EQ(iter->second.info.deadline_params.relative_deadline, 8'000'000);
+    EXPECT_EQ(iter->second.info.deadline_params.period, 10'000'000);
+    EXPECT_EQ(iter->second.output_parameters.size(), 3);
+    EXPECT_EQ(iter->second.output_parameters[0].key(), "output1");
+    EXPECT_EQ(iter->second.output_parameters[0].value().int_value().value(), 489);
+    EXPECT_EQ(iter->second.output_parameters[1].key(), "output2");
+    EXPECT_EQ(iter->second.output_parameters[1].value().float_value().value(), 297.5);
+    EXPECT_EQ(iter->second.output_parameters[2].key(), "output3");
+    EXPECT_EQ(iter->second.output_parameters[2].value().string_value().value(), "Hello, World!");
+  }
+
+  {
+    const auto iter = result->memory.find(*Role::Create("fuchsia.default"));
+    ASSERT_TRUE(iter != result->memory.end());
+    EXPECT_EQ(iter->second.scope, ProfileScope::Builtin);
     EXPECT_EQ(iter->second.info.flags, ZX_PROFILE_INFO_FLAG_MEMORY_PRIORITY);
     EXPECT_EQ(iter->second.info.priority, 16);
   }
   {
-    const auto iter = result->memory.find("test.bringup.a");
+    const auto iter = result->memory.find(*Role::Create("test.bringup.a"));
     ASSERT_TRUE(iter != result->memory.end());
-    EXPECT_EQ(iter->second.scope, zircon_profile::ProfileScope::Core);
+    EXPECT_EQ(iter->second.scope, ProfileScope::Core);
     EXPECT_EQ(iter->second.info.flags, ZX_PROFILE_INFO_FLAG_MEMORY_PRIORITY);
     EXPECT_EQ(iter->second.info.priority, 20);
   }
 
   {
-    const auto iter = result->memory.find("test.bringup.b");
+    const auto iter = result->memory.find(*Role::Create("test.bringup.b"));
     ASSERT_TRUE(iter != result->memory.end());
-    EXPECT_EQ(iter->second.scope, zircon_profile::ProfileScope::Bringup);
+    EXPECT_EQ(iter->second.scope, ProfileScope::Bringup);
     EXPECT_EQ(iter->second.info.flags, ZX_PROFILE_INFO_FLAG_MEMORY_PRIORITY);
     EXPECT_EQ(iter->second.info.priority, 24);
   }
 
   {
-    const auto iter = result->memory.find("test.core.a");
+    const auto iter = result->memory.find(*Role::Create("test.core.a"));
     ASSERT_TRUE(iter != result->memory.end());
-    EXPECT_EQ(iter->second.scope, zircon_profile::ProfileScope::Core);
+    EXPECT_EQ(iter->second.scope, ProfileScope::Core);
     EXPECT_EQ(iter->second.info.flags, ZX_PROFILE_INFO_FLAG_MEMORY_PRIORITY);
     EXPECT_EQ(iter->second.info.priority, 24);
   }
 
   {
-    const auto iter = result->memory.find("test.core.mem");
+    const auto iter = result->memory.find(*Role::Create("test.core.mem"));
     ASSERT_TRUE(iter != result->memory.end());
-    EXPECT_EQ(iter->second.scope, zircon_profile::ProfileScope::Core);
+    EXPECT_EQ(iter->second.scope, ProfileScope::Core);
     EXPECT_EQ(iter->second.info.flags, ZX_PROFILE_INFO_FLAG_MEMORY_PRIORITY);
     EXPECT_EQ(iter->second.info.priority, 20);
   }
 
   const std::unordered_set<std::string> expected_thread_profiles{
-      "test.product.a", "test.core.a:affinity",    "test.bringup.a:affinity",
-      "test.bringup.b", "test.bringup.b:affinity", "test.core.a",
-      "test.bringup.a", "fuchsia.default",
+      "test.product.a",
+      "test.core.a:affinity",
+      "test.bringup.a:affinity",
+      "test.bringup.b",
+      "test.bringup.b:affinity",
+      "test.core.a",
+      "test.core.parameterized.role:input=foo",
+      "test.core.parameterized.role:input=bar",
+      "test.core.parameterized.role:param1=foo,param2=bar",
+      "test.bringup.a",
+      "fuchsia.default",
   };
-
-  for (const auto& [key, value] : result->thread) {
-    EXPECT_NE(expected_thread_profiles.end(), expected_thread_profiles.find(key));
+  EXPECT_EQ(result->thread.size(), expected_thread_profiles.size());
+  for (auto expected_thread_profile : expected_thread_profiles) {
+    fit::result role = zircon_profile::Role::Create(expected_thread_profile);
+    ASSERT_TRUE(role.is_ok());
+    EXPECT_NE(result->thread.cend(), result->thread.find(*role));
   }
 
   const std::unordered_set<std::string> expected_memory_profiles{
       "test.bringup.a", "test.bringup.b", "test.core.a", "test.core.mem", "fuchsia.default",
   };
-
-  for (const auto& [key, value] : result->memory) {
-    EXPECT_NE(expected_memory_profiles.end(), expected_memory_profiles.find(key));
+  EXPECT_EQ(result->memory.size(), expected_memory_profiles.size());
+  for (auto expected_memory_profile : expected_memory_profiles) {
+    fit::result role = zircon_profile::Role::Create(expected_memory_profile);
+    ASSERT_TRUE(role.is_ok());
+    EXPECT_NE(result->memory.cend(), result->memory.find(*role));
   }
 }
 
-TEST(ProfileConfig, ParseRoleSelector) {
-  EXPECT_EQ(fit::success{}, zircon_profile::ParseRoleSelector("abcd"));
-  EXPECT_EQ(fit::success{}, zircon_profile::ParseRoleSelector("a.b.c.d"));
-  EXPECT_EQ(fit::success{}, zircon_profile::ParseRoleSelector("abcd123"));
-  EXPECT_EQ(fit::success{}, zircon_profile::ParseRoleSelector("_abcd123"));
-  EXPECT_EQ(fit::success{}, zircon_profile::ParseRoleSelector("abcd123.01234"));
-  EXPECT_EQ(fit::success{}, zircon_profile::ParseRoleSelector("abcd-123.012-34"));
-  EXPECT_EQ(fit::success{}, zircon_profile::ParseRoleSelector("abcd_123.012_34"));
-  EXPECT_EQ(fit::success{}, zircon_profile::ParseRoleSelector("abcd123.abc123"));
-  EXPECT_EQ(fit::success{}, zircon_profile::ParseRoleSelector("abcd123._abc123"));
-  EXPECT_EQ(fit::success{}, zircon_profile::ParseRoleSelector("abcd123._abc123:xyz123"));
-  EXPECT_EQ(fit::success{}, zircon_profile::ParseRoleSelector("abcd123._abc123:xyz-123"));
-  EXPECT_EQ(fit::success{}, zircon_profile::ParseRoleSelector("abcd123._abc123:xyz_123"));
-  EXPECT_EQ(fit::success{},
-            zircon_profile::ParseRoleSelector("abcd123._abc123:xyz123,abc987=01234"));
+TEST(ProfileConfig, CreateRole) {
+  EXPECT_EQ(fit::success{}, Role::Create("abcd"));
+  EXPECT_EQ(fit::success{}, Role::Create("a.b.c.d"));
+  EXPECT_EQ(fit::success{}, Role::Create("abcd123"));
+  EXPECT_EQ(fit::success{}, Role::Create("_abcd123"));
+  EXPECT_EQ(fit::success{}, Role::Create("abcd123.01234"));
+  EXPECT_EQ(fit::success{}, Role::Create("abcd-123.012-34"));
+  EXPECT_EQ(fit::success{}, Role::Create("abcd_123.012_34"));
+  EXPECT_EQ(fit::success{}, Role::Create("abcd123.abc123"));
+  EXPECT_EQ(fit::success{}, Role::Create("abcd123._abc123"));
+  EXPECT_EQ(fit::success{}, Role::Create("abcd123._abc123:xyz123"));
+  EXPECT_EQ(fit::success{}, Role::Create("abcd123._abc123:xyz-123"));
+  EXPECT_EQ(fit::success{}, Role::Create("abcd123._abc123:xyz_123"));
+  EXPECT_EQ(fit::success{}, Role::Create("abcd123._abc123:xyz123,abc987=01234"));
 
-  EXPECT_EQ(fit::failed{}, zircon_profile::ParseRoleSelector(""));
-  EXPECT_EQ(fit::failed{}, zircon_profile::ParseRoleSelector("+abcd"));
-  EXPECT_EQ(fit::failed{}, zircon_profile::ParseRoleSelector("-abcd"));
+  EXPECT_EQ(fit::failed{}, Role::Create(""));
+  EXPECT_EQ(fit::failed{}, Role::Create("+abcd"));
+  EXPECT_EQ(fit::failed{}, Role::Create("-abcd"));
 }
 
 TEST(ProfileConfig, MaybeMediaRole) {
   {
-    zircon_profile::Role role{
-        .name = "foo",
-        .selectors = {{"realm", "media"}, {"capacity", "1000000"}, {"deadline", "10000000"}}};
-    EXPECT_EQ(fit::success{}, zircon_profile::MaybeMediaRole(role));
+    fit::result role = Role::Create("foo.bar:realm=media,capacity=1000000,deadline=1000000");
+    ASSERT_TRUE(role.is_ok());
+    EXPECT_EQ(fit::success{}, role->ToMediaRole());
   }
   {
-    zircon_profile::Role role{
-        .name = "foo",
-        .selectors = {{"realm", "bar"}, {"capacity", "1000000"}, {"deadline", "10000000"}}};
-    EXPECT_EQ(fit::failed{}, zircon_profile::MaybeMediaRole(role));
+    fit::result role = Role::Create("foo.bar:realm=bar,capacity=1000000,deadline=1000000");
+    ASSERT_TRUE(role.is_ok());
+    EXPECT_EQ(fit::failed{}, role->ToMediaRole());
   }
   {
-    zircon_profile::Role role{
-        .name = "foo",
-        .selectors = {{"realm", "media"}, {"capacity", "bar"}, {"deadline", "10000000"}}};
-    EXPECT_EQ(fit::failed{}, zircon_profile::MaybeMediaRole(role));
+    fit::result role = Role::Create("foo.bar:realm=media,capacity=baz,deadline=1000000");
+    ASSERT_TRUE(role.is_ok());
+    EXPECT_EQ(fit::failed{}, role->ToMediaRole());
   }
   {
-    zircon_profile::Role role{
-        .name = "foo",
-        .selectors = {{"realm", "media"}, {"capacity", "1000000"}, {"deadline", "bar"}}};
-    EXPECT_EQ(fit::failed{}, zircon_profile::MaybeMediaRole(role));
+    fit::result role = Role::Create("foo.bar:realm=media,capacity=1000000,deadline=baz");
+    ASSERT_TRUE(role.is_ok());
+    EXPECT_EQ(fit::failed{}, role->ToMediaRole());
   }
   {
-    zircon_profile::Role role{.name = "foo",
-                              .selectors = {{"capacity", "1000000"}, {"deadline", "10000000"}}};
-    EXPECT_EQ(fit::failed{}, zircon_profile::MaybeMediaRole(role));
+    fit::result role = Role::Create("foo.bar:capacity=1000000,deadline=baz");
+    ASSERT_TRUE(role.is_ok());
+    EXPECT_EQ(fit::failed{}, role->ToMediaRole());
   }
   {
-    zircon_profile::Role role{.name = "foo",
-                              .selectors = {{"realm", "media"}, {"deadline", "10000000"}}};
-    EXPECT_EQ(fit::failed{}, zircon_profile::MaybeMediaRole(role));
+    fit::result role = Role::Create("foo.bar:realm=media,deadline=1000000");
+    ASSERT_TRUE(role.is_ok());
+    EXPECT_EQ(fit::failed{}, role->ToMediaRole());
   }
   {
-    zircon_profile::Role role{.name = "foo",
-                              .selectors = {{"realm", "media"}, {"capacity", "1000000"}}};
-    EXPECT_EQ(fit::failed{}, zircon_profile::MaybeMediaRole(role));
+    fit::result role = Role::Create("foo.bar:realm=media,capacity=1000000");
+    ASSERT_TRUE(role.is_ok());
+    EXPECT_EQ(fit::failed{}, role->ToMediaRole());
   }
 }
 

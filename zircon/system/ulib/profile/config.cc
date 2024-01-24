@@ -25,12 +25,39 @@
 #include <src/lib/files/directory.h>
 #include <src/lib/files/file.h>
 
+using fuchsia_scheduler::Parameter;
+using fuchsia_scheduler::ParameterValue;
 using zircon_profile::Profile;
 using zircon_profile::ProfileScope;
+using zircon_profile::Role;
 
 namespace {
 
 constexpr char kConfigFileExtension[] = ".profiles";
+
+std::string ToString(const std::vector<Parameter> params) {
+  std::ostringstream stream;
+  stream << "{ ";
+  for (auto param : params) {
+    stream << param.key() << ": ";
+    switch (param.value().Which()) {
+      case ParameterValue::Tag::kIntValue:
+        stream << std::to_string(param.value().int_value().value());
+        break;
+      case ParameterValue::Tag::kFloatValue:
+        stream << std::to_string(param.value().float_value().value());
+        break;
+      case ParameterValue::Tag::kStringValue:
+        stream << param.value().string_value().value();
+        break;
+      default:
+        FX_SLOG(WARNING, "invalid output parameter format");
+    }
+    stream << ", ";
+  }
+  stream << " }";
+  return stream.str();
+}
 
 std::string ToString(const zx_profile_info_t& info) {
   std::ostringstream stream;
@@ -441,6 +468,14 @@ void ParseProfiles(const std::string& filename, const rapidjson::Document& docum
       continue;
     }
 
+    fit::result role = Role::Create(profile_name);
+    if (role.is_error()) {
+      FX_SLOG(WARNING, "Failed to create role from JSON object!", FX_KV("filename", filename),
+              FX_KV("type", type_name), FX_KV("profile", profile_name),
+              FX_KV("tag", "ProfileProvider"));
+      continue;
+    }
+
     auto result = parser(filename, profile_name, profile);
     if (!result.has_value()) {
       continue;
@@ -455,7 +490,35 @@ void ParseProfiles(const std::string& filename, const rapidjson::Document& docum
       continue;
     }
 
-    const auto [iter, added] = profiles->emplace(profile_name, Profile{scope, info});
+    Profile p{scope, info};
+    if (profile.value.HasMember("output_parameters")) {
+      const auto& output_param_member = profile.value["output_parameters"];
+      if (!output_param_member.IsObject()) {
+        FX_SLOG(WARNING, "Output parameters must be a JSON object!", FX_KV("filename", filename),
+                FX_KV("type", type_name), FX_KV("profile", profile_name),
+                FX_KV("tag", "ProfileProvider"));
+        continue;
+      }
+      for (const auto& m : IterateMembers(output_param_member)) {
+        if (m.value.IsInt()) {
+          p.output_parameters.push_back(
+              Parameter{m.name.GetString(), ParameterValue::WithIntValue(m.value.GetInt())});
+        } else if (m.value.IsDouble()) {
+          p.output_parameters.push_back(
+              Parameter{m.name.GetString(), ParameterValue::WithFloatValue(m.value.GetDouble())});
+        } else if (m.value.IsString()) {
+          p.output_parameters.push_back(
+              Parameter{m.name.GetString(), ParameterValue::WithStringValue(m.value.GetString())});
+        } else {
+          FX_SLOG(WARNING, "Output parameter value must be a float, integer, or string!",
+                  FX_KV("parameter_name", m.name.GetString()), FX_KV("filename", filename),
+                  FX_KV("type", type_name), FX_KV("profile", profile_name),
+                  FX_KV("tag", "ProfileProvider"));
+        }
+      }
+    }
+
+    const auto [iter, added] = profiles->insert(std::pair{std::move(role.value()), std::move(p)});
     if (!added) {
       const ProfileScope existing_scope = iter->second.scope;
       if (existing_scope >= scope) {
@@ -480,60 +543,6 @@ void ParseProfiles(const std::string& filename, const rapidjson::Document& docum
 }  // anonymous namespace
 
 namespace zircon_profile {
-
-fit::result<fit::failed, Role> ParseRoleSelector(std::string_view role_selector) {
-  static const re2::RE2 kReRoleParts{"(\\w[\\w\\-]*(?:\\.\\w[\\w\\-]*)*)(?::(.+))?"};
-  static const re2::RE2 kSelector{"(\\w[\\w\\-]+)(?:=([^,]+))?,?"};
-
-  Role role;
-  std::string selectors;
-  if (!re2::RE2::FullMatch(role_selector, kReRoleParts, &role.name, &selectors)) {
-    FX_SLOG(WARNING, "Bad selector.", FX_KV("role_selector", role_selector),
-            FX_KV("tag", "ProfileProvider"));
-    return fit::failed{};
-  }
-
-  re2::StringPiece input{selectors};
-  std::string key, value;
-  while (re2::RE2::Consume(&input, kSelector, &key, &value)) {
-    const auto [iter, added] = role.selectors.emplace(key, value);
-    if (!added) {
-      FX_SLOG(WARNING, "Duplicate key in selector.", FX_KV("key", key), FX_KV("value", value),
-              FX_KV("role_selector", role_selector), FX_KV("tag", "ProfileProvider"));
-    }
-  }
-
-  return fit::ok(std::move(role));
-}
-
-fit::result<fit::failed, MediaRole> MaybeMediaRole(const Role& role) {
-  const auto realm_iter = role.selectors.find("realm");
-  if (realm_iter == role.selectors.end() || realm_iter->second != "media") {
-    return fit::failed{};
-  }
-
-  const auto capacity_iter = role.selectors.find("capacity");
-  const auto deadline_iter = role.selectors.find("deadline");
-  if (capacity_iter == role.selectors.end() || deadline_iter == role.selectors.end()) {
-    return fit::failed{};
-  }
-
-  int64_t capacity;
-  if (!re2::RE2::FullMatch(capacity_iter->second, "(\\d+)", &capacity)) {
-    FX_SLOG(WARNING, "Media role has invalid capacity selector.", FX_KV("role_name", role.name),
-            FX_KV("capacity_selector", capacity_iter->second), FX_KV("tag", "ProfileProvider"));
-    return fit::failed{};
-  }
-
-  int64_t deadline;
-  if (!re2::RE2::FullMatch(deadline_iter->second, "(\\d+)", &deadline)) {
-    FX_SLOG(WARNING, "Media role has invalid deadline selector.", FX_KV("role_name", role.name),
-            FX_KV("deadline_selector", deadline_iter->second), FX_KV("tag", "ProfileProvider"));
-    return fit::failed{};
-  }
-
-  return fit::ok(MediaRole{.capacity = capacity, .deadline = deadline});
-}
 
 fit::result<std::string, ConfiguredProfiles> LoadConfigs(const std::string& config_path) {
   fbl::unique_fd dir_fd(openat(AT_FDCWD, config_path.c_str(), O_RDONLY | O_DIRECTORY));
@@ -562,16 +571,20 @@ fit::result<std::string, ConfiguredProfiles> LoadConfigs(const std::string& conf
     zx_profile_info_t info{};
     info.flags = ZX_PROFILE_INFO_FLAG_PRIORITY;
     info.priority = ZX_PRIORITY_DEFAULT;
-    auto [iter, added] =
-        profiles.thread.emplace("fuchsia.default", Profile{ProfileScope::Builtin, info});
+    fit::result default_role_result = Role::Create("fuchsia.default");
+    ZX_DEBUG_ASSERT(default_role_result.is_ok());
+    auto [iter, added] = profiles.thread.emplace(std::move(default_role_result.value()),
+                                                 Profile{ProfileScope::Builtin, info});
     ZX_DEBUG_ASSERT(added);
   }
   {
     zx_profile_info_t info{};
     info.flags = ZX_PROFILE_INFO_FLAG_MEMORY_PRIORITY;
     info.priority = ZX_PRIORITY_DEFAULT;
-    auto [iter, added] =
-        profiles.memory.emplace("fuchsia.default", Profile{ProfileScope::Builtin, info});
+    fit::result default_role_result = Role::Create("fuchsia.default");
+    ZX_DEBUG_ASSERT(default_role_result.is_ok());
+    auto [iter, added] = profiles.memory.emplace(std::move(default_role_result.value()),
+                                                 Profile{ProfileScope::Builtin, info});
     ZX_DEBUG_ASSERT(added);
   }
 
@@ -606,8 +619,10 @@ fit::result<std::string, ConfiguredProfiles> LoadConfigs(const std::string& conf
 
   auto log_profiles = [](ProfileMap& profiles) {
     for (const auto& [key, value] : profiles) {
-      FX_SLOG(INFO, "Loaded profile.", FX_KV("key", key), FX_KV("scope", ToString(value.scope)),
-              FX_KV("info", ToString(value.info)), FX_KV("tag", "ProfileProvider"));
+      FX_SLOG(INFO, "Loaded profile.", FX_KV("key", key.name()),
+              FX_KV("scope", ToString(value.scope)), FX_KV("info", ToString(value.info)),
+              FX_KV("tag", "ProfileProvider"),
+              FX_KV("output_parameters", ToString(value.output_parameters)));
     }
   };
   FX_SLOG(INFO, "Loaded thread profiles:");
@@ -616,6 +631,149 @@ fit::result<std::string, ConfiguredProfiles> LoadConfigs(const std::string& conf
   log_profiles(profiles.memory);
 
   return fit::ok(std::move(profiles));
+}
+
+fit::result<zx_status_t, Role> Role::Create(std::string_view name,
+                                            std::vector<Parameter> selectors) {
+  // Validate the name. It should have no selectors embedded in it.
+  Role role;
+  if (!re2::RE2::FullMatch(name, kReRoleName, &role.name_)) {
+    FX_SLOG(WARNING, "Bad role name.", FX_KV("role_name", name), FX_KV("tag", "RoleManager"));
+    return fit::error(ZX_ERR_INVALID_ARGS);
+  }
+  for (auto selector : selectors) {
+    role.selectors_.insert(std::pair{selector.key(), selector.value()});
+  }
+  return fit::ok(std::move(role));
+}
+
+// ToLong attempts to convert the given string into a long and populates *out with the result.
+// Returns true if str is indeed a long, false otherwise.
+bool ToLong(std::string str, long* out) {
+  char* end = nullptr;
+  long value = std::strtol(str.c_str(), &end, 10);
+  if (end == str.c_str() || *end != '\0' || value == LONG_MAX || value == LONG_MIN) {
+    return false;
+  }
+  *out = value;
+  return true;
+}
+
+// ToDouble attempts to convert the given string into a long and populates *out with the result.
+// Returns true if str is indeed a double, false otherwise.
+// Note that this will return true for any whole number, so it's important that the caller checks
+// if the number is a long using ToLong before calling this function.
+bool ToDouble(std::string str, double* out) {
+  char* end = nullptr;
+  double value = std::strtod(str.c_str(), &end);
+  if (end == str.c_str() || *end != '\0' || value == HUGE_VAL) {
+    return false;
+  }
+  *out = value;
+  return true;
+}
+
+fit::result<zx_status_t, Role> Role::Create(std::string_view name_with_selectors) {
+  Role role;
+  std::string selectors;
+  if (!re2::RE2::FullMatch(name_with_selectors, kReRoleParts, &role.name_, &selectors)) {
+    FX_SLOG(WARNING, "Bad selector.", FX_KV("role_selector", name_with_selectors),
+            FX_KV("tag", "RoleManager"));
+    return fit::error(ZX_ERR_INVALID_ARGS);
+  }
+  re2::StringPiece input{selectors};
+  std::string key, raw_value;
+  while (re2::RE2::Consume(&input, kReSelector, &key, &raw_value)) {
+    ParameterValue value = ParameterValue::WithStringValue(raw_value);
+    long l;
+    double d;
+    if (ToLong(raw_value, &l)) {
+      value = ParameterValue::WithIntValue(l);
+    } else if (ToDouble(raw_value, &d)) {
+      value = ParameterValue::WithFloatValue(d);
+    }
+    const auto [iter, added] = role.selectors_.emplace(key, value);
+    if (!added) {
+      FX_SLOG(WARNING, "Duplicate key in selector.", FX_KV("key", key), FX_KV("value", raw_value),
+              FX_KV("role_selector", name_with_selectors), FX_KV("tag", "RoleManager"));
+    }
+  }
+  return fit::ok(std::move(role));
+}
+
+bool Role::HasSelector(std::string selector) const {
+  auto search = selectors_.find(selector);
+  return search != selectors_.end();
+}
+
+fit::result<fit::failed, MediaRole> Role::ToMediaRole() const {
+  const auto realm_iter = selectors_.find("realm");
+  if (realm_iter == selectors_.end() || realm_iter->second.string_value().value() != "media") {
+    return fit::failed{};
+  }
+
+  const auto capacity_iter = selectors_.find("capacity");
+  const auto deadline_iter = selectors_.find("deadline");
+  if (capacity_iter == selectors_.end() || deadline_iter == selectors_.end()) {
+    return fit::failed{};
+  }
+
+  if (capacity_iter->second.Which() != ParameterValue::Tag::kIntValue) {
+    FX_SLOG(WARNING, "Media role has invalid capacity selector.", FX_KV("role_name", name_),
+            FX_KV("tag", "ProfileProvider"));
+    return fit::failed{};
+  }
+  int64_t capacity = capacity_iter->second.int_value().value();
+
+  if (deadline_iter->second.Which() != ParameterValue::Tag::kIntValue) {
+    FX_SLOG(WARNING, "Media role has invalid deadline selector.", FX_KV("role_name", name_),
+            FX_KV("tag", "ProfileProvider"));
+    return fit::failed{};
+  }
+  int64_t deadline = deadline_iter->second.int_value().value();
+
+  return fit::ok(MediaRole{.capacity = capacity, .deadline = deadline});
+}
+
+bool Role::operator==(const Role& other) const {
+  // The role names must be the same.
+  if (name_ != other.name_) {
+    return false;
+  }
+  // The other role must have the exact same selectors as this one.
+  if (selectors_.size() != other.selectors_.size()) {
+    return false;
+  }
+  for (auto selector : selectors_) {
+    auto it = other.selectors_.find(selector.first);
+    if (it == other.selectors_.end()) {
+      return false;
+    }
+    if (selector.second.Which() != it->second.Which()) {
+      return false;
+    }
+    switch (selector.second.Which()) {
+      case ParameterValue::Tag::kIntValue:
+        if (selector.second.int_value().value() != it->second.int_value().value()) {
+          return false;
+        }
+        break;
+      case ParameterValue::Tag::kFloatValue:
+        if (selector.second.float_value().value() != it->second.float_value().value()) {
+          return false;
+        }
+        break;
+      case ParameterValue::Tag::kStringValue:
+        if (selector.second.string_value().value() != it->second.string_value().value()) {
+          return false;
+        }
+        break;
+      default:
+        // We should never hit this case.
+        return false;
+    }
+  }
+  return true;
 }
 
 }  // namespace zircon_profile

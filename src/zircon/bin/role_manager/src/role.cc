@@ -21,7 +21,7 @@ namespace {
 constexpr char kConfigPath[] = "/config/profiles";
 
 using zircon_profile::ConfiguredProfiles;
-using zircon_profile::ParseRoleSelector;
+using zircon_profile::Role;
 
 zx::result<zx::resource> GetSystemProfileResource() {
   zx::result client = component::Connect<fuchsia_kernel::ProfileResource>();
@@ -72,7 +72,7 @@ zx::result<std::unique_ptr<RoleManager>> RoleManager::Create() {
           zx::profile::create(profile_resource, 0, &iter->second.info, &iter->second.profile);
       if (status != ZX_OK) {
         FX_SLOG(ERROR, "Failed to create profile for role. Requests for this role will fail.",
-                FX_KV("role", iter->first), FX_KV("status", zx_status_get_string(status)));
+                FX_KV("role", iter->first.name()), FX_KV("status", zx_status_get_string(status)));
         iter = profiles.erase(iter);
       } else {
         ++iter;
@@ -83,8 +83,14 @@ zx::result<std::unique_ptr<RoleManager>> RoleManager::Create() {
   create(config_result->memory);
 
   // Apply the dispatch role if defined.
-  const std::string dispatch_role = "fuchsia.system.profile-provider.dispatch";
-  const auto search = config_result->thread.find(dispatch_role);
+  const std::string dispatch_role_name = "fuchsia.system.profile-provider.dispatch";
+  const fit::result dispatch_role = Role::Create(dispatch_role_name);
+  if (dispatch_role.is_error()) {
+    FX_SLOG(ERROR, "Failed to parse dispatch role.",
+            FX_KV("error", zx_status_get_string(dispatch_role.error_value())),
+            FX_KV("tag", "ProfileProvider"));
+  }
+  const auto search = config_result->thread.find(*dispatch_role);
   if (search != config_result->thread.end()) {
     const zx_status_t status = zx::thread::self()->set_profile(search->second.profile, 0);
     if (status != ZX_OK) {
@@ -105,7 +111,7 @@ void RoleManager::handle_unknown_method(
 
 void RoleManager::SetRole(SetRoleRequestView request, SetRoleCompleter::Sync& completer) {
   // Log the requested role and PID:TID of the thread or vmar being assigned.
-  const std::string_view role_selector{request->role().get()};
+  const std::string_view role_name{request->role().role.get()};
   zx_status_t status = ZX_OK;
   zx_handle_t target_handle = ZX_HANDLE_INVALID;
   if (request->target().is_thread()) {
@@ -117,7 +123,7 @@ void RoleManager::SetRole(SetRoleRequestView request, SetRoleCompleter::Sync& co
       completer.ReplyError(status);
       return;
     }
-    FX_SLOG(DEBUG, "Role requested for thread:", FX_KV("role", role_selector),
+    FX_SLOG(DEBUG, "Role requested for thread:", FX_KV("role", role_name),
             FX_KV("pid", handle_info.related_koid), FX_KV("tid", handle_info.koid),
             FX_KV("tag", "RoleManager"));
   } else if (request->target().is_vmar()) {
@@ -129,7 +135,7 @@ void RoleManager::SetRole(SetRoleRequestView request, SetRoleCompleter::Sync& co
       completer.ReplyError(status);
       return;
     }
-    FX_SLOG(DEBUG, "Role requested for vmar:", FX_KV("role", role_selector),
+    FX_SLOG(DEBUG, "Role requested for vmar:", FX_KV("role", role_name),
             FX_KV("pid", handle_info.related_koid), FX_KV("koid", handle_info.koid),
             FX_KV("tag", "RoleManager"));
   } else {
@@ -137,33 +143,53 @@ void RoleManager::SetRole(SetRoleRequestView request, SetRoleCompleter::Sync& co
     return;
   }
 
-  const fit::result role_result = ParseRoleSelector(role_selector);
-  if (role_result.is_error()) {
+  std::optional<std::vector<fuchsia_scheduler::Parameter>> input_params =
+      fidl::ToNatural(request->input_parameters());
+  if (!input_params.has_value()) {
+    FX_SLOG(WARNING, "Unable to take ownership of input parameters.", FX_KV("role", role_name),
+            FX_KV("tag", "RoleManager"));
     completer.ReplyError(ZX_ERR_INVALID_ARGS);
+    return;
+  }
+  const fit::result role = Role::Create(role_name, input_params.value());
+  if (role.is_error()) {
+    completer.ReplyError(role.error_value());
     return;
   }
 
   const auto& profile_map = request->target().is_thread() ? profiles_.thread : profiles_.memory;
 
   // Select the profile parameters based on the role selector.
-  // TODO(https://fxbug.dev/133955): The search through the profile map should take into account
-  // role selectors.
-  if (role_result->name == "fuchsia.test-role" && role_result->has("not-found")) {
-    completer.ReplyError(ZX_ERR_NOT_FOUND);
-  } else if (role_result->name == "fuchsia.test-role" && role_result->has("ok")) {
-    completer.ReplySuccess();
-  } else if (auto search = profile_map.find(role_result->name); search != profile_map.cend()) {
+  fidl::Arena arena;
+  auto builder = fuchsia_scheduler::wire::RoleManagerSetRoleResponse::Builder(arena);
+
+  // Handle the test role case specially.
+  if (role->IsTestRole()) {
+    if (role->HasSelector("not-found")) {
+      completer.ReplyError(ZX_ERR_NOT_FOUND);
+    } else if (role->HasSelector("ok")) {
+      completer.ReplySuccess(builder.Build());
+    } else {
+      completer.ReplyError(ZX_ERR_INVALID_ARGS);
+    }
+    return;
+  }
+
+  // Look for the requested role in the profile map and set the profile if found.
+  if (auto search = profile_map.find(*role); search != profile_map.cend()) {
     status = zx_object_set_profile(target_handle, search->second.profile.get(), 0);
     if (status != ZX_OK) {
       completer.ReplyError(status);
       return;
     }
-    completer.ReplySuccess();
-  } else {
-    FX_SLOG(DEBUG, "Requested role not found", FX_KV("role", role_result->name),
-            FX_KV("tag", "RoleManager"));
-    completer.ReplyError(ZX_ERR_NOT_FOUND);
+    builder.output_parameters(fidl::ToWire(arena, search->second.output_parameters));
+    completer.ReplySuccess(builder.Build());
+    return;
   }
+
+  FX_SLOG(DEBUG, "Requested role not found", FX_KV("role", role->name()),
+          FX_KV("tag", "RoleManager"));
+  completer.ReplyError(ZX_ERR_NOT_FOUND);
 }
 
 }  // namespace
