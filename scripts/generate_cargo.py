@@ -469,12 +469,24 @@ def main():
     parser.add_argument("--fuchsia_dir", required=True)
     parser.add_argument("json_path")
     args = parser.parse_args()
-    json_path = args.json_path
 
-    project = None
+    json_path = args.json_path
+    root_path = os.path.abspath(args.fuchsia_dir)
+    root_build_dir = os.path.abspath(args.root_build_dir)
+    gn_cargo_dir = os.path.join(root_build_dir, "cargo")
+    rust_crates_path = os.path.join(root_path, "third_party/rust_crates")
+
+    # remove the previously generated rust crates
+    shutil.rmtree(gn_cargo_dir, ignore_errors=True)
+    os.makedirs(gn_cargo_dir)
+
+    # unconditionally write a stamp to prevent GN from re-running this action
+    with open(os.path.join(gn_cargo_dir, "generate_cargo.stamp"), "w") as f:
+        f.truncate()
+
     try:
         with open(json_path, "r") as json_file:
-            project = json.loads(json_file.read())
+            project = Project(json.loads(json_file.read()))
     except (IOError, json.decoder.JSONDecodeError) as err:
         print("Failed to generate Cargo.toml files")
         print("No project.json in the root of your out directory!")
@@ -482,12 +494,6 @@ def main():
         print(f"Caused by: Could not parse file {json_path}: {err}")
         # returns 0 so that CQ doesn't fail if this isn't set properly
         return 0
-
-    project = Project(project)
-    root_path = os.path.abspath(args.fuchsia_dir)
-    root_build_dir = os.path.abspath(args.root_build_dir)
-
-    rust_crates_path = os.path.join(root_path, "third_party/rust_crates")
 
     # this will be removed eventually?
     with open(rust_crates_path + "/Cargo.toml", "r") as f:
@@ -497,15 +503,6 @@ def main():
     for target in project.rust_targets:
         # hash is the GN target name without the prefixed //
         lookup[target] = hashlib.sha1(target[2:].encode("utf-8")).hexdigest()
-
-    # remove the priorly generated rust crates
-    gn_cargo_dir = os.path.join(root_build_dir, "cargo")
-    shutil.rmtree(gn_cargo_dir, ignore_errors=True)
-    os.makedirs(gn_cargo_dir)
-    # Write a stamp file with a predictable name so the build system knows the
-    # step ran successfully.
-    with open(os.path.join(gn_cargo_dir, "generate_cargo.stamp"), "w") as f:
-        f.truncate()
 
     # a dict of "toolchain label" to list of Cargo.toml files in it
     # special case: the key None means the default toolchain

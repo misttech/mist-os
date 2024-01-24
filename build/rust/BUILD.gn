@@ -105,7 +105,6 @@ if (current_toolchain != default_toolchain) {
     hermetic_deps = false
 
     outputs = [ "$root_build_dir/cargo/generate_cargo.stamp" ]
-    depfile = "$root_build_dir/cargo/generate_cargo.stamp.d"
     args = [
       rebase_path(gn_desc_out, root_build_dir),
       "--root_build_dir",
