@@ -722,6 +722,7 @@
                 target_monikers: [
                     "/bootstrap",
                     "/bootstrap/console-launcher",
+                    "/bootstrap/cpu_manager",
                     "/bootstrap/devfs-with-pkg",
                     "/bootstrap/flashmap",
                     "/bootstrap/miscsvc",

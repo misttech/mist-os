@@ -121,6 +121,7 @@ assembly_input_bundle("bootstrap") {
     "//src/devices/bin/driver-index:package",
     "//src/diagnostics/archivist:package",
     "//src/power/power-manager:package",
+    "//src/power/cpu-manager:package",
     "//src/power/shutdown-shim:package",
     "//src/sys/bootstrap:package",
     "//src/sys/root:package",

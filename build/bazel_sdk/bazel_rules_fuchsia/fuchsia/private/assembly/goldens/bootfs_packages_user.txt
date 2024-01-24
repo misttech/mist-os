@@ -11,6 +11,7 @@ clock
 ?config
 console
 console-launcher
+cpu-manager
 devfs
 device-name-provider
 display-coordinator

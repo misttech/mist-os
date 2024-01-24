@@ -120,6 +120,10 @@
             url: "fuchsia-boot:///power-manager#meta/power-manager.cm",
         },
         {
+            name: "cpu_manager",
+            url: "fuchsia-boot:///cpu-manager#meta/cpu-manager.cm",
+        },
+        {
             name: "virtual_console",
             url: "fuchsia-boot:///virtual-console#meta/virtual-console.cm",
         },
@@ -200,6 +204,7 @@
                 "#archivist",
                 "#boot-drivers",
                 "#console-launcher",
+                "#cpu_manager",
                 "#driver-hosts",
                 "#driver_manager",
                 "#fshost",
@@ -394,6 +399,14 @@
             subdir: "config/power_manager",
         },
         {
+            directory: "boot",
+            from: "parent",
+            as: "config",
+            to: [ "#cpu_manager" ],
+            rights: [ "r*" ],
+            subdir: "config/cpu_manager",
+        },
+        {
             protocol: [
                 "fuchsia.boot.Arguments",
                 "fuchsia.boot.Items",
@@ -442,6 +455,11 @@
             protocol: [ "power-manager-outlives-driver-manager" ],
             from: "#power_manager",
             to: "#driver_manager",
+        },
+        {
+            protocol: [ "fuchsia.thermal.ClientStateConnector" ],
+            from: "#power_manager",
+            to: "#cpu_manager",
         },
         {
             protocol: [ "fuchsia.boot.WriteOnlyLog" ],
@@ -574,6 +592,14 @@
             ],
             from: "parent",
             to: "#power_manager",
+        },
+        {
+            protocol: [
+                "fuchsia.kernel.CpuResource",
+                "fuchsia.kernel.Stats",
+            ],
+            from: "parent",
+            to: [ "#cpu_manager" ],
         },
         {
             protocol: [ "fuchsia.kernel.VmexResource" ],
@@ -749,7 +775,10 @@
         {
             directory: "dev-topological",
             from: "#devfs-with-pkg",
-            to: "#power_manager",
+            to: [
+                "#cpu_manager",
+                "#power_manager",
+            ],
             dependency: "weak",
         },
         {
@@ -969,6 +998,7 @@
                 "#boot-drivers",
                 "#console",
                 "#console-launcher",
+                "#cpu_manager",
                 "#cr50_agent",
                 "#devfs",
                 "#devfs-with-pkg",

@@ -7,6 +7,7 @@ group("power") {
   deps = [
     ":battery",
     ":tests",
+    "cpu-manager",
     "power-manager",
     "shutdown-shim",
   ]
@@ -41,6 +42,7 @@ group("tests") {
     "battery-manager:tests",
     "battery-manager/battery-cli:tests",
     "broker:tests",
+    "cpu-manager:tests",
     "fake-battery:tests",
     "fidl/testing",
     "power-manager:tests",
