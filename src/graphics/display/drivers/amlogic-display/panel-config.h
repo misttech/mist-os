@@ -16,31 +16,55 @@ namespace amlogic_display {
 // To simplify compatibility checks, DsiOpcode and PowerOpcode should match the
 // AMLogic MIPI-DSI tuning guide.
 
+// DSI packet DI (Data Identifier) values that convey special operations.
+//
+// The values here share a namespace with valid DSI DIs, described by Section
+// 8.5.1 "Data Identifier Byte" and Section 8.7 "Processor to Peripheral
+// Direction (Processor-Sourced) Packet Data Types" of the DSI spec.
 enum DsiOpcode : uint8_t {
   // Turn the DSI phy off/on.
   // <op> <size=0>
+  //
+  // These opcodes are intentionally the same as the "Shut Down Peripheral
+  // Command" (for PHY power off) and "Turn On Peripheral Command" (for PHY
+  // power on) DSI packet DT (Data Type) values for Virtual Channel 0.
   kDsiOpPhyPowerOff = 0x22,
   kDsiOpPhyPowerOn = 0x32,
 
   // Drive a GPIO pin.
   //
   // <op> <size=2|3> <gpio_id=0> <value> [delay_ms]
+  //
+  // gpio_id 0 is connected to the RESX (LCD RESET) pin. All other IDs are
+  // invalid.
+  //
+  // DSI packet types ending in 0b0000 are reserved, so this opcode will not
+  // overlap any valid DSI packet DI (Data Identifier) value.
   kDsiOpGpio = 0xf0,
 
   // Attempt to read MIPI-DSI reg.
   //
   // <op> <size=2> <reg> <value!=0>
+  //
+  // This opcode overlaps the DSI packet DI (Data Identifier) value for "Packed
+  // Pixel Stream, 20-bit YCbCr, 4:2:2 Format" data type, Virtual Channel 3.
   kDsiOpReadReg = 0xfc,
 
   // Odd extended delay command to take several delays and gather them into
   // one big sleep. Behaves as an exit if byte 1 is 0xff or 0x0.
   //
   // <op> <size> <sleep_ms_1> <sleep_ms_2> ... <sleep_ms_N>
+  //
+  // This opcode overlaps the DSI packet DI (Data Identifier) value for "Packed
+  // Pixel Stream, 12-bit YCbCr, 4:2:0 Format" data type, Virtual Channel 3.
   kDsiOpDelay = 0xfd,
 
   // Simple sleep for N millis, or exit if N=0xff || N=0x0.
   //
   // <op> <sleep_ms>
+  //
+  // DSI packet types ending in 0b1111 are reserved, so this opcode will not
+  // overlap any valid DSI packet DI (Data Identifier) value.
   kDsiOpSleep = 0xff,
 
   // Everything else is potentially a DSI command.
