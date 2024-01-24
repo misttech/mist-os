@@ -12,10 +12,11 @@ use fidl_fuchsia_tracing_provider as ftracing;
 use fuchsia_component_test::{
     Capability, ChildOptions, RealmBuilder, RealmBuilderParams, RealmInstance, Ref, Route,
 };
+
 const ARCHIVIST_URL: &str = "#meta/archivist.cm";
 const ARCHIVIST_WITH_KERNEL_LOG_URL: &str = "#meta/archivist-with-kernel-log.cm";
-
 const PUPPET_URL: &str = "#meta/puppet.cm";
+
 #[derive(Default)]
 pub(crate) struct ArchivistRealmFactory;
 

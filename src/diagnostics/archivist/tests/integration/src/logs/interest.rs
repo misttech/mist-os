@@ -2,19 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{constants::*, test_topology};
+use crate::test_topology;
 use diagnostics_data::LogsData;
 use diagnostics_reader::{ArchiveReader, Error, Logs};
 use fidl_fuchsia_archivist_test as ftest;
-use fidl_fuchsia_component as fcomponent;
 use fidl_fuchsia_diagnostics::{
     ArchiveAccessorMarker, Interest, LogInterestSelector, LogSettingsMarker, Severity,
 };
-use fuchsia_component_test::ScopedInstanceFactory;
 use futures::{Stream, StreamExt};
-use selectors::{self, VerboseError};
-
-const LOG_AND_EXIT_COMPONENT: &str = "log_and_exit";
+use selectors::{self, parse_component_selector, VerboseError};
 
 // This test verifies that a component only emits messages at or above its
 // current interest severity level, even when the interest changes while the
@@ -24,7 +20,6 @@ async fn set_interest() {
     const PUPPET_NAME: &str = "puppet";
 
     let realm_proxy = test_topology::create_realm(&ftest::RealmOptions {
-        realm_name: Some("register_interest_test_case".to_string()),
         puppets: Some(vec![ftest::PuppetDecl { name: PUPPET_NAME.to_string() }]),
         ..Default::default()
     })
@@ -50,7 +45,7 @@ async fn set_interest() {
         .await
         .expect("connect to puppet");
 
-    let selector = selectors::parse_component_selector::<VerboseError>(PUPPET_NAME).unwrap();
+    let selector = parse_component_selector::<VerboseError>(PUPPET_NAME).unwrap();
 
     // Helper function to generate a new LogInterestSelector from severity.
     let interest_selectors = |severity: Severity| {
@@ -172,53 +167,66 @@ async fn set_interest() {
     .await;
 }
 
+// This test verifies that a component only emits messages at or above its
+// current interest severity level, where the interest is inherited from the
+// parent realm, having been configured before the component was launched.
 #[fuchsia::test]
 async fn set_interest_before_startup() {
-    // Set up topology.
-    let (builder, test_realm) = test_topology::create(test_topology::Options::default())
-        .await
-        .expect("create test topology");
-    test_topology::add_collection(&test_realm, "coll").await.unwrap();
-    test_topology::expose_test_realm_protocol(&builder, &test_realm).await;
-    let instance = builder.build().await.unwrap();
+    const PUPPET_NAME: &str = "puppet";
+
+    // Create the test realm.
+    // We won't connect to the puppet until after we've configured logging interest.
+    let realm_proxy = test_topology::create_realm(&ftest::RealmOptions {
+        puppets: Some(vec![ftest::PuppetDecl { name: PUPPET_NAME.to_string() }]),
+        ..Default::default()
+    })
+    .await
+    .expect("create test topology");
+
+    // Helper function to generate a new LogInterestSelector from severity.
+    let selector = parse_component_selector::<VerboseError>("**").unwrap();
+    let interest_selectors = |severity: Severity| {
+        [LogInterestSelector {
+            selector: selector.clone(),
+            interest: Interest { min_severity: Some(severity), ..Default::default() },
+        }]
+    };
 
     // Set the coll:* minimum severity to Severity::Debug.
-    let log_settings = instance
-        .root
-        .connect_to_protocol_at_exposed_dir::<LogSettingsMarker>()
+    let interests = interest_selectors(Severity::Debug);
+    let log_settings = realm_proxy
+        .connect_to_protocol::<LogSettingsMarker>()
+        .await
         .expect("connect to log settings");
-    let selector = selectors::parse_component_selector::<VerboseError>("**").unwrap();
-    let interests = &[LogInterestSelector {
-        selector,
-        interest: Interest { min_severity: Some(Severity::Debug), ..Default::default() },
-    }];
-    log_settings.set_interest(interests).await.expect("set interest");
+    log_settings.set_interest(&interests).await.expect("set interest");
 
     // Start listening for logs.
-    let accessor = instance
-        .root
-        .connect_to_protocol_at_exposed_dir::<ArchiveAccessorMarker>()
+    let accessor = realm_proxy
+        .connect_to_protocol::<ArchiveAccessorMarker>()
+        .await
         .expect("connect to archive accessor");
+
     let mut logs = ArchiveReader::new()
         .with_archive(accessor)
         .snapshot_then_subscribe::<Logs>()
         .expect("subscribe to logs");
 
-    // Create the component under test.
-    let realm_proxy =
-        instance.root.connect_to_protocol_at_exposed_dir::<fcomponent::RealmMarker>().unwrap();
-    let child_instance = ScopedInstanceFactory::new("coll")
-        .with_realm_proxy(realm_proxy)
-        .new_named_instance(LOG_AND_EXIT_COMPONENT, LOG_AND_EXIT_COMPONENT_URL)
+    // Connect to the component under test to start it.
+    let puppet = test_topology::connect_to_puppet(&realm_proxy, PUPPET_NAME)
         .await
-        .unwrap();
-    let _ =
-        child_instance.connect_to_protocol_at_exposed_dir::<fcomponent::BinderMarker>().unwrap();
+        .expect("connect to puppet");
+
+    let response = puppet.wait_for_interest_change().await.unwrap();
+    assert_eq!(response.severity, Some(Severity::Debug));
+    puppet.log_messages(vec![
+        (Severity::Debug, "debugging world"),
+        (Severity::Info, "Hello, world!"),
+    ]);
 
     // Assert logs include the Severity::Debug log.
     assert_ordered_logs(
         &mut logs,
-        LOG_AND_EXIT_COMPONENT_URL,
+        PUPPET_NAME,
         vec![(Severity::Debug, "debugging world"), (Severity::Info, "Hello, world!")],
     )
     .await;
