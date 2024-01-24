@@ -16,13 +16,13 @@
 #include "low_energy_connection_manager.h"
 #include "low_energy_discovery_manager.h"
 #include "peer.h"
-#include "src/connectivity/bluetooth/core/bt-host//hci-spec/vendor_protocol.h"
 #include "src/connectivity/bluetooth/core/bt-host/common/assert.h"
 #include "src/connectivity/bluetooth/core/bt-host/common/log.h"
 #include "src/connectivity/bluetooth/core/bt-host/common/metrics.h"
 #include "src/connectivity/bluetooth/core/bt-host/common/random.h"
 #include "src/connectivity/bluetooth/core/bt-host/gap/gap.h"
 #include "src/connectivity/bluetooth/core/bt-host/hci-spec/util.h"
+#include "src/connectivity/bluetooth/core/bt-host/hci-spec/vendor_protocol.h"
 #include "src/connectivity/bluetooth/core/bt-host/hci/android_extended_low_energy_advertiser.h"
 #include "src/connectivity/bluetooth/core/bt-host/hci/connection.h"
 #include "src/connectivity/bluetooth/core/bt-host/hci/extended_low_energy_advertiser.h"
@@ -591,8 +591,8 @@ bool AdapterImpl::IsDiscoverable() const {
   }
 
   // If LE Privacy is enabled, then we are not discoverable.
-  // TODO(https://fxbug.dev/109132): Make this dependent on whether the LE Public advertisement is active or
-  // not.
+  // TODO(https://fxbug.dev/109132): Make this dependent on whether the LE Public advertisement is
+  // active or not.
   if (le_address_manager_ && le_address_manager_->PrivacyEnabled()) {
     return false;
   }
