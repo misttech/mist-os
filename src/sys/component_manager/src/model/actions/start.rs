@@ -502,8 +502,8 @@ mod tests {
     use {
         crate::model::{
             actions::{
-                start::should_return_early, ActionSet, ShutdownAction, ShutdownType, StartAction,
-                StopAction,
+                resolve::sandbox_construction::ComponentInput, start::should_return_early,
+                ActionSet, ShutdownAction, ShutdownType, StartAction, StopAction,
             },
             component::{
                 Component, ComponentInstance, ComponentRuntime, ExecutionState, InstanceState,
@@ -524,7 +524,6 @@ mod tests {
         futures::{channel::mpsc, StreamExt},
         moniker::Moniker,
         routing::resolving::ComponentAddress,
-        sandbox::Dict,
         std::sync::{Arc, Mutex, Weak},
     };
 
@@ -778,7 +777,7 @@ mod tests {
         // Checks based on InstanceState:
         assert!(should_return_early(&InstanceState::New, &es, &m).is_none());
         assert!(should_return_early(
-            &InstanceState::Unresolved(UnresolvedInstanceState::new(Dict::new())),
+            &InstanceState::Unresolved(UnresolvedInstanceState::new(ComponentInput::empty())),
             &es,
             &m
         )
@@ -802,7 +801,7 @@ mod tests {
             resolved_component,
             ComponentAddress::from_absolute_url(&child.component_url).unwrap(),
             Default::default(),
-            Dict::new(),
+            ComponentInput::empty(),
         )
         .await
         .unwrap();

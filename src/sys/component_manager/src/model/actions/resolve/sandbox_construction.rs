@@ -20,7 +20,7 @@ use {
     cm_rust::{self, ExposeDeclCommon, OfferDeclCommon, SourceName, SourcePath, UseDeclCommon},
     cm_types::{Name, SeparatedPath},
     moniker::{ChildName, ChildNameBase, MonikerBase},
-    sandbox::{Dict, Receiver, Unit},
+    sandbox::{Capability, Dict, ErasedCapability, Receiver, Unit},
     std::{collections::HashMap, iter, sync::Arc},
     tracing::warn,
 };
@@ -42,11 +42,42 @@ impl CapabilitySourceFactory {
     }
 }
 
+/// The dicts a component receives from its parent.
+#[derive(Default, Clone)]
+pub struct ComponentInput {
+    capabilities: Dict,
+}
+
+impl ComponentInput {
+    pub fn empty() -> Self {
+        Self::default()
+    }
+
+    pub fn new(capabilities: Dict) -> Self {
+        Self { capabilities }
+    }
+
+    /// Creates a new ComponentInput with entries cloned from this ComponentInput.
+    ///
+    /// This is a shallow copy. Values are cloned, not copied, so are new references to the same
+    /// underlying data.
+    pub fn shallow_copy(&self) -> Self {
+        Self { capabilities: self.capabilities.copy() }
+    }
+
+    pub fn insert_capability<'a, C>(&self, path: impl Iterator<Item = &'a str>, capability: C)
+    where
+        C: ErasedCapability + Capability,
+    {
+        self.capabilities.insert_capability(path, capability)
+    }
+}
+
 /// The dicts a component holds once it has been resolved.
 #[derive(Default)]
 pub struct ComponentSandbox {
     /// Initial dicts for children and collections
-    pub child_dicts: HashMap<Name, Dict>,
+    pub child_inputs: HashMap<Name, ComponentInput>,
     /// Capability source factories and receivers for capabilities that are dispatched through the
     /// hook system.
     pub sources_and_receivers: Vec<(CapabilitySourceFactory, Receiver<WeakComponentInstance>)>,
@@ -58,7 +89,7 @@ pub fn build_component_sandbox(
     component: &Arc<ComponentInstance>,
     children: &HashMap<ChildName, Arc<ComponentInstance>>,
     decl: &cm_rust::ComponentDecl,
-    component_input_dict: &Dict,
+    component_input: &ComponentInput,
     component_output_dict: &Dict,
     program_input_dict: &Dict,
     program_output_dict: &Dict,
@@ -68,7 +99,7 @@ pub fn build_component_sandbox(
 
     for child in &decl.children {
         let child_name = Name::new(&child.name).unwrap();
-        output.child_dicts.insert(child_name, Dict::new());
+        output.child_inputs.insert(child_name, ComponentInput::empty());
     }
 
     for collection in &decl.collections {
@@ -79,7 +110,7 @@ pub fn build_component_sandbox(
         extend_dict_with_use(
             component,
             children,
-            component_input_dict,
+            component_input,
             program_input_dict,
             program_output_dict,
             use_,
@@ -98,7 +129,11 @@ pub fn build_component_sandbox(
             cm_rust::OfferTarget::Child(child_ref) => {
                 assert!(child_ref.collection.is_none(), "unexpected dynamic offer target");
                 let child_name = Name::new(&child_ref.name).unwrap();
-                output.child_dicts.entry(child_name).or_insert(Dict::new())
+                &mut output
+                    .child_inputs
+                    .entry(child_name)
+                    .or_insert(ComponentInput::empty())
+                    .capabilities
             }
             cm_rust::OfferTarget::Collection(name) => {
                 collection_dicts.entry(name.clone()).or_insert(Dict::new())
@@ -119,7 +154,7 @@ pub fn build_component_sandbox(
         extend_dict_with_offer(
             component,
             children,
-            component_input_dict,
+            component_input,
             program_output_dict,
             offer,
             target_dict,
@@ -146,20 +181,20 @@ pub fn build_component_sandbox(
 pub fn extend_dict_with_offers(
     component: &Arc<ComponentInstance>,
     children: &HashMap<ChildName, Arc<ComponentInstance>>,
-    component_input_dict: &Dict,
+    component_input: &ComponentInput,
     program_output_dict: &Dict,
     dynamic_offers: &Vec<cm_rust::OfferDecl>,
-    target_dict: &mut Dict,
+    target_input: &mut ComponentInput,
 ) -> Vec<(CapabilitySourceFactory, Receiver<WeakComponentInstance>)> {
     let mut sources_and_receivers = vec![];
     for offer in dynamic_offers {
         extend_dict_with_offer(
             component,
             children,
-            component_input_dict,
+            component_input,
             program_output_dict,
             offer,
-            target_dict,
+            &mut target_input.capabilities,
             &mut sources_and_receivers,
         );
     }
@@ -169,7 +204,7 @@ pub fn extend_dict_with_offers(
 fn extend_dict_with_use(
     component: &Arc<ComponentInstance>,
     children: &HashMap<ChildName, Arc<ComponentInstance>>,
-    component_input_dict: &Dict,
+    component_input: &ComponentInput,
     program_input_dict: &Dict,
     program_output_dict: &Dict,
     use_: &cm_rust::UseDecl,
@@ -188,7 +223,7 @@ fn extend_dict_with_use(
     let router = match use_.source() {
         cm_rust::UseSource::Parent => {
             let Some(router) =
-                component_input_dict.get_routable::<Router>(source_path.iter_segments())
+                component_input.capabilities.get_routable::<Router>(source_path.iter_segments())
             else {
                 return;
             };
@@ -268,7 +303,7 @@ fn extend_dict_with_use(
 fn extend_dict_with_offer(
     component: &Arc<ComponentInstance>,
     children: &HashMap<ChildName, Arc<ComponentInstance>>,
-    component_input_dict: &Dict,
+    component_input: &ComponentInput,
     program_output_dict: &Dict,
     offer: &cm_rust::OfferDecl,
     target_dict: &mut Dict,
@@ -292,7 +327,7 @@ fn extend_dict_with_offer(
     let router = match offer.source() {
         cm_rust::OfferSource::Parent => {
             let Some(router) =
-                component_input_dict.get_routable::<Router>(source_path.iter_segments())
+                component_input.capabilities.get_routable::<Router>(source_path.iter_segments())
             else {
                 return;
             };

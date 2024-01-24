@@ -215,7 +215,7 @@ mod tests {
     use {
         super::*,
         crate::model::{
-            actions::DiscoverAction,
+            actions::{resolve::sandbox_construction::ComponentInput, DiscoverAction},
             component::{ComponentInstance, ComponentManagerInstance, WeakExtendedInstance},
             context::ModelContext,
             environment::Environment,
@@ -232,7 +232,6 @@ mod tests {
         moniker::MonikerBase,
         routing::environment::{DebugRegistry, RunnerRegistry},
         routing::resolving::{ComponentAddress, ComponentResolutionContext},
-        sandbox::Dict,
         serde_json::json,
         std::sync::{Arc, Mutex, Weak},
     };
@@ -366,7 +365,7 @@ mod tests {
         let _ = component
             .lock_actions()
             .await
-            .register_no_wait(&component, DiscoverAction::new(Dict::new()));
+            .register_no_wait(&component, DiscoverAction::new(ComponentInput::empty()));
         component
     }
 
@@ -398,7 +397,7 @@ mod tests {
         let _ = component
             .lock_actions()
             .await
-            .register_no_wait(&component, DiscoverAction::new(Dict::new()));
+            .register_no_wait(&component, DiscoverAction::new(ComponentInput::empty()));
         component
     }
 

@@ -175,6 +175,7 @@ mod tests {
     use {
         super::*,
         crate::model::{
+            actions::resolve::sandbox_construction::ComponentInput,
             component::StartReason,
             context::ModelContext,
             error::{ActionError, ModelError},
@@ -193,7 +194,6 @@ mod tests {
         fidl_fuchsia_component as fcomponent,
         maplit::hashmap,
         moniker::{Moniker, MonikerBase},
-        sandbox::Dict,
         std::{collections::HashMap, sync::Weak},
     };
 
@@ -319,7 +319,7 @@ mod tests {
         )
         .await
         .unwrap();
-        model.discover_root_component(Dict::new()).await;
+        model.discover_root_component(ComponentInput::empty()).await;
         let component =
             model.start_instance(&vec!["a", "b"].try_into().unwrap(), &StartReason::Eager).await?;
         assert_eq!(component.component_url, "test:///b");
@@ -419,7 +419,7 @@ mod tests {
             InstanceRegistry::new(),
         )
         .await?;
-        model.discover_root_component(Dict::new()).await;
+        model.discover_root_component(ComponentInput::empty()).await;
         let component =
             model.start_instance(&vec!["a", "b"].try_into().unwrap(), &StartReason::Eager).await?;
         assert_eq!(component.component_url, "test:///b");
@@ -523,7 +523,7 @@ mod tests {
             InstanceRegistry::new(),
         )
         .await?;
-        model.discover_root_component(Dict::new()).await;
+        model.discover_root_component(ComponentInput::empty()).await;
         // Add instance to collection.
         {
             let parent =
@@ -630,7 +630,7 @@ mod tests {
         )
         .await
         .unwrap();
-        model.discover_root_component(Dict::new()).await;
+        model.discover_root_component(ComponentInput::empty()).await;
 
         let component =
             model.start_instance(&vec!["a", "b"].try_into().unwrap(), &StartReason::Eager).await?;
@@ -705,7 +705,7 @@ mod tests {
             InstanceRegistry::new(),
         )
         .await?;
-        model.discover_root_component(Dict::new()).await;
+        model.discover_root_component(ComponentInput::empty()).await;
         assert_matches!(
             model.start_instance(&vec!["a", "b"].try_into().unwrap(), &StartReason::Eager).await,
             Err(ModelError::ActionError { err: ActionError::ResolveError { .. } })

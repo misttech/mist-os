@@ -10,6 +10,7 @@ use {
         actions::{
             resolve::sandbox_construction::{
                 build_component_sandbox, extend_dict_with_offers, CapabilitySourceFactory,
+                ComponentInput,
             },
             shutdown, start, ActionSet, DestroyAction, DiscoverAction, ResolveAction,
             ShutdownAction, ShutdownType, StartAction, StopAction, UnresolveAction,
@@ -600,8 +601,9 @@ impl ComponentInstance {
         let collection_dict = state
             .collection_dicts
             .get(&Name::new(&collection_name).unwrap())
-            .expect("dict missing for declared collection");
-        let child_dict = collection_dict.copy();
+            .expect("dict missing for declared collection")
+            .copy();
+        let child_input = ComponentInput::new(collection_dict);
 
         let (child, discover_fut) = state
             .add_child(
@@ -611,7 +613,7 @@ impl ComponentInstance {
                 Some(dynamic_offers),
                 Some(dynamic_capabilities),
                 child_args.controller,
-                child_dict,
+                child_input,
             )
             .await?;
 
@@ -1341,12 +1343,12 @@ pub struct UnresolvedInstanceState {
     instance_token_state: InstanceTokenState,
 
     /// The dict containing all capabilities that the parent wished to provide to us.
-    pub component_input_dict: Dict,
+    pub component_input: ComponentInput,
 }
 
 impl UnresolvedInstanceState {
-    pub fn new(component_input_dict: Dict) -> Self {
-        Self { instance_token_state: Default::default(), component_input_dict }
+    pub fn new(component_input: ComponentInput) -> Self {
+        Self { instance_token_state: Default::default(), component_input }
     }
 
     fn instance_token(&mut self, moniker: &Moniker, context: &Arc<ModelContext>) -> InstanceToken {
@@ -1354,10 +1356,10 @@ impl UnresolvedInstanceState {
     }
 
     /// Returns relevant information and prepares to enter the resolved state.
-    pub fn to_resolved(&mut self) -> (InstanceTokenState, Dict) {
+    pub fn to_resolved(&mut self) -> (InstanceTokenState, ComponentInput) {
         (
             std::mem::replace(&mut self.instance_token_state, Default::default()),
-            self.component_input_dict.clone(),
+            self.component_input.clone(),
         )
     }
 }
@@ -1460,7 +1462,7 @@ pub struct ResolvedInstanceState {
     pub anonymized_services: HashMap<AnonymizedServiceRoute, Arc<AnonymizedAggregateServiceDir>>,
 
     /// The dict containing all capabilities that the parent wished to provide to us.
-    pub component_input_dict: Dict,
+    pub component_input: ComponentInput,
 
     /// The dict containing all capabilities that we expose.
     pub component_output_dict: Dict,
@@ -1472,7 +1474,7 @@ pub struct ResolvedInstanceState {
     program_output_dict: Dict,
 
     /// Dicts containing the capabilities we want to provide to each collection. Each new
-    /// dynamic child gets a clone of one of these dicts (which is potentially extended by
+    /// dynamic child gets a clone of one of these inputs (which is potentially extended by
     /// dynamic offers).
     collection_dicts: HashMap<Name, Dict>,
 }
@@ -1483,7 +1485,7 @@ impl ResolvedInstanceState {
         resolved_component: Component,
         address: ComponentAddress,
         instance_token_state: InstanceTokenState,
-        component_input_dict: Dict,
+        component_input: ComponentInput,
     ) -> Result<Self, ResolveActionError> {
         let weak_component = WeakComponentInstance::new(component);
         let execution_scope = ExecutionScope::new();
@@ -1512,7 +1514,7 @@ impl ResolvedInstanceState {
             dynamic_offers: vec![],
             address,
             anonymized_services: HashMap::new(),
-            component_input_dict,
+            component_input,
             component_output_dict: Dict::new(),
             program_input_dict: Dict::new(),
             program_output_dict,
@@ -1524,13 +1526,13 @@ impl ResolvedInstanceState {
             component,
             &state.children,
             &decl,
-            &state.component_input_dict,
+            &state.component_input,
             &state.component_output_dict,
             &state.program_input_dict,
             &state.program_output_dict,
             &mut state.collection_dicts,
         );
-        state.discover_static_children(component_sandbox.child_dicts).await;
+        state.discover_static_children(component_sandbox.child_inputs).await;
         state.dispatch_receivers_to_providers(component, component_sandbox.sources_and_receivers);
         Ok(state)
     }
@@ -1725,7 +1727,7 @@ impl ResolvedInstanceState {
                 &mut self.instance_token_state,
                 Default::default(),
             ),
-            component_input_dict: self.component_input_dict.clone(),
+            component_input: self.component_input.clone(),
         }
     }
 
@@ -1924,10 +1926,10 @@ impl ResolvedInstanceState {
         dynamic_offers: Option<Vec<fdecl::Offer>>,
         dynamic_capabilities: Option<Vec<fdecl::Capability>>,
         controller: Option<ServerEnd<fcomponent::ControllerMarker>>,
-        dict: Dict,
+        input: ComponentInput,
     ) -> Result<(Arc<ComponentInstance>, BoxFuture<'static, Result<(), ActionError>>), AddChildError>
     {
-        let (child, dict) = self
+        let (child, input) = self
             .add_child_internal(
                 component,
                 child,
@@ -1935,7 +1937,7 @@ impl ResolvedInstanceState {
                 dynamic_offers,
                 dynamic_capabilities,
                 controller,
-                dict,
+                input,
             )
             .await?;
         // Register a Discover action.
@@ -1943,7 +1945,7 @@ impl ResolvedInstanceState {
             .clone()
             .lock_actions()
             .await
-            .register_no_wait(&child, DiscoverAction::new(dict))
+            .register_no_wait(&child, DiscoverAction::new(input))
             .boxed();
         Ok((child, discover_fut))
     }
@@ -1958,9 +1960,17 @@ impl ResolvedInstanceState {
         child: &ChildDecl,
         collection: Option<&CollectionDecl>,
     ) -> Result<(), AddChildError> {
-        self.add_child_internal(component, child, collection, None, None, None, Dict::new())
-            .await
-            .map(|_| ())
+        self.add_child_internal(
+            component,
+            child,
+            collection,
+            None,
+            None,
+            None,
+            ComponentInput::empty(),
+        )
+        .await
+        .map(|_| ())
     }
 
     async fn add_child_internal(
@@ -1971,8 +1981,8 @@ impl ResolvedInstanceState {
         dynamic_offers: Option<Vec<fdecl::Offer>>,
         dynamic_capabilities: Option<Vec<fdecl::Capability>>,
         controller: Option<ServerEnd<fcomponent::ControllerMarker>>,
-        mut child_dict: Dict,
-    ) -> Result<(Arc<ComponentInstance>, Dict), AddChildError> {
+        mut child_input: ComponentInput,
+    ) -> Result<(Arc<ComponentInstance>, ComponentInput), AddChildError> {
         assert!(
             (dynamic_offers.is_none()) || collection.is_some(),
             "setting numbered handles or dynamic offers for static children",
@@ -1991,10 +2001,10 @@ impl ResolvedInstanceState {
             let sources_and_receivers = extend_dict_with_offers(
                 component,
                 &self.children,
-                &self.component_input_dict,
+                &self.component_input,
                 &self.program_output_dict,
                 &dynamic_offers,
-                &mut child_dict,
+                &mut child_input,
             );
             self.dispatch_receivers_to_providers(component, sources_and_receivers);
         }
@@ -2039,7 +2049,7 @@ impl ResolvedInstanceState {
         self.dynamic_offers.extend(dynamic_offers.into_iter());
         self.dynamic_capabilities.extend(dynamic_capabilities.into_iter());
 
-        Ok((child, child_dict))
+        Ok((child, child_input))
     }
 
     fn add_target_dynamic_offers(
@@ -2151,15 +2161,15 @@ impl ResolvedInstanceState {
         Ok(())
     }
 
-    async fn discover_static_children(&self, mut child_dicts: HashMap<Name, Dict>) {
+    async fn discover_static_children(&self, mut child_inputs: HashMap<Name, ComponentInput>) {
         for (child_name, child_instance) in &self.children {
             let child_name = Name::new(child_name.name()).unwrap();
-            let child_dict = child_dicts.remove(&child_name).expect("missing child dict");
+            let child_input = child_inputs.remove(&child_name).expect("missing child dict");
             let _discover_fut = child_instance
                 .clone()
                 .lock_actions()
                 .await
-                .register_no_wait(&child_instance, DiscoverAction::new(child_dict));
+                .register_no_wait(&child_instance, DiscoverAction::new(child_input));
         }
     }
 }
@@ -3218,7 +3228,7 @@ pub mod tests {
             resolved_component,
             ComponentAddress::from(&comp.component_url, &comp).await.unwrap(),
             Default::default(),
-            Dict::new(),
+            ComponentInput::empty(),
         )
         .await
         .unwrap();
@@ -3226,7 +3236,7 @@ pub mod tests {
     }
 
     async fn new_unresolved() -> InstanceState {
-        InstanceState::Unresolved(UnresolvedInstanceState::new(Dict::new()))
+        InstanceState::Unresolved(UnresolvedInstanceState::new(ComponentInput::empty()))
     }
 
     #[fuchsia::test]

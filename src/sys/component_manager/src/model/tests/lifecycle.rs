@@ -6,7 +6,10 @@ use {
     crate::{
         builtin_environment::BuiltinEnvironment,
         model::{
-            actions::{ActionSet, ShutdownAction, ShutdownType, StartAction, StopAction},
+            actions::{
+                resolve::sandbox_construction::ComponentInput, ActionSet, ShutdownAction,
+                ShutdownType, StartAction, StopAction,
+            },
             component::{ComponentInstance, InstanceState, StartReason},
             error::{ActionError, ModelError, StartActionError},
             events::registry::EventSubscription,
@@ -34,7 +37,6 @@ use {
     fuchsia_zircon as zx,
     futures::{channel::mpsc, future::pending, join, lock::Mutex, prelude::*},
     moniker::{ChildName, Moniker, MonikerBase},
-    sandbox::Dict,
     std::sync::{Arc, Weak},
     std::{collections::HashSet, convert::TryFrom},
 };
@@ -126,7 +128,7 @@ async fn bind_concurrent() {
     .await;
 
     // Start the root component.
-    model.start(Dict::new()).await;
+    model.start(ComponentInput::empty()).await;
 
     // Attempt to start the "system" component
     let system_component = model.find(&vec!["system"].try_into().unwrap()).await.unwrap();
@@ -442,7 +444,7 @@ async fn bind_action_sequence() {
 
     // Child of root should start out discovered but not resolved yet.
     let m = Moniker::parse_str("/system").unwrap();
-    model.start(Dict::new()).await;
+    model.start(ComponentInput::empty()).await;
     event_stream.wait_until(EventType::Resolved, vec![].try_into().unwrap()).await.unwrap();
     event_stream.wait_until(EventType::Discovered, m.clone()).await.unwrap();
     event_stream.wait_until(EventType::Started, vec![].try_into().unwrap()).await.unwrap();

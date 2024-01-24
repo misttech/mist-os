@@ -227,8 +227,8 @@ pub mod tests {
             .await
             .expect("subscribe to event stream");
         let model = test.model.clone();
-        let dict = test.builtin_environment.lock().await.dict.clone();
-        fasync::Task::spawn(async move { model.start(dict).await }).detach();
+        let input = test.builtin_environment.lock().await.root_component_input.clone();
+        fasync::Task::spawn(async move { model.start(input).await }).detach();
         event_stream
     }
 

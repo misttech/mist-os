@@ -61,6 +61,7 @@ use {
         inspect_sink_provider::InspectSinkProvider,
         model::events::registry::EventSubscription,
         model::{
+            actions::resolve::sandbox_construction::ComponentInput,
             component::ComponentManagerInstance,
             environment::Environment,
             event_logger::EventLogger,
@@ -77,7 +78,7 @@ use {
             token::InstanceRegistry,
         },
         root_stop_notifier::RootStopNotifier,
-        sandbox_util::{new_terminating_router, DictExt, LaunchTaskOnReceive},
+        sandbox_util::{new_terminating_router, LaunchTaskOnReceive},
     },
     ::routing::{
         capability_source::{CapabilitySource, InternalCapability},
@@ -108,7 +109,7 @@ use {
     fuchsia_zircon::{self as zx, Clock, HandleBased, Resource},
     futures::{future::BoxFuture, sink::drain, stream::FuturesUnordered, FutureExt, StreamExt},
     moniker::{Moniker, MonikerBase},
-    sandbox::{Dict, Receiver},
+    sandbox::Receiver,
     std::{iter, sync::Arc},
     tracing::info,
 };
@@ -372,22 +373,22 @@ impl BuiltinEnvironmentBuilder {
     }
 }
 
-/// Constructs a [Dict] that contains built-in capabilities.
-struct BuiltinDictBuilder {
-    dict: Dict,
+/// Constructs a [ComponentInput] that contains built-in capabilities.
+struct RootComponentInputBuilder {
+    input: ComponentInput,
     builtin_task_launchers: Vec<LaunchTaskOnReceive>,
     top_instance: Arc<ComponentManagerInstance>,
     policy_checker: GlobalPolicyChecker,
     builtin_capabilities: Vec<cm_rust::CapabilityDecl>,
 }
 
-impl BuiltinDictBuilder {
+impl RootComponentInputBuilder {
     fn new(
         top_instance: Arc<ComponentManagerInstance>,
         runtime_config: &Arc<RuntimeConfig>,
     ) -> Self {
         Self {
-            dict: Dict::new(),
+            input: ComponentInput::empty(),
             builtin_task_launchers: Vec::new(),
             top_instance,
             policy_checker: GlobalPolicyChecker::new(runtime_config.security_policy.clone()),
@@ -395,9 +396,9 @@ impl BuiltinDictBuilder {
         }
     }
 
-    /// Adds a new builtin protocol to the dict that will be given to the root component. If the
+    /// Adds a new builtin protocol to the input that will be given to the root component. If the
     /// protocol is not listed in `self.builtin_capabilities`, then it will silently be omitted
-    /// from the dict.
+    /// from the input.
     fn add_protocol_if_enabled<P>(
         &mut self,
         task_to_launch: impl Fn(P::RequestStream) -> BoxFuture<'static, Result<(), anyhow::Error>>
@@ -414,12 +415,12 @@ impl BuiltinDictBuilder {
         // unknown.
         if self.builtin_capabilities.iter().find(|decl| decl.name() == &name).is_none() {
             // This builtin protocol is not enabled based on the runtime config, so don't add the
-            // capability to the dict.
+            // capability to the input.
             return;
         }
         let (receiver, sender) = Receiver::new();
         let router = new_terminating_router(sender);
-        self.dict.insert_capability(iter::once(P::PROTOCOL_NAME), router);
+        self.input.insert_capability(iter::once(P::PROTOCOL_NAME), router);
 
         let capability_source = CapabilitySource::Builtin {
             capability: InternalCapability::Protocol(name.clone()),
@@ -436,14 +437,14 @@ impl BuiltinDictBuilder {
         ));
     }
 
-    fn build(self) -> (Dict, fasync::Task<()>) {
+    fn build(self) -> (ComponentInput, fasync::Task<()>) {
         let builtin_receivers_future: FuturesUnordered<_> =
             self.builtin_task_launchers.into_iter().map(LaunchTaskOnReceive::run).collect();
         let builtin_receivers_task = fasync::Task::spawn(async move {
             // The result here is irrelevant because the stream is infallible
             let _ = builtin_receivers_future.map(Result::Ok).forward(drain()).await;
         });
-        (self.dict, builtin_receivers_task)
+        (self.input, builtin_receivers_task)
     }
 }
 
@@ -472,7 +473,7 @@ pub struct BuiltinEnvironment {
     pub debug: bool,
     pub num_threads: usize,
     pub realm_builder_resolver: Option<Arc<RealmBuilderResolver>>,
-    pub dict: Dict,
+    pub root_component_input: ComponentInput,
     _builtin_receivers_task_group: TaskGroup,
     _service_fs_task: Option<fasync::Task<()>>,
 }
@@ -501,12 +502,12 @@ impl BuiltinEnvironment {
             None
         };
 
-        let mut builtin_dict_builder =
-            BuiltinDictBuilder::new(model.top_instance().clone(), &runtime_config);
+        let mut root_input_builder =
+            RootComponentInputBuilder::new(model.top_instance().clone(), &runtime_config);
 
         // Set up ProcessLauncher if available.
         if runtime_config.use_builtin_process_launcher {
-            builtin_dict_builder.add_protocol_if_enabled::<fprocess::LauncherMarker>(|stream| {
+            root_input_builder.add_protocol_if_enabled::<fprocess::LauncherMarker>(|stream| {
                 async move {
                         ProcessLauncher::serve(stream).await.map_err(|e| format_err!("{:?}", e))
                     }
@@ -515,22 +516,20 @@ impl BuiltinEnvironment {
         }
 
         // Set up RootJob service.
-        builtin_dict_builder.add_protocol_if_enabled::<fkernel::RootJobMarker>(|stream| {
+        root_input_builder.add_protocol_if_enabled::<fkernel::RootJobMarker>(|stream| {
             RootJob::serve(stream, zx::Rights::SAME_RIGHTS).boxed()
         });
 
         // Set up RootJobForInspect service.
-        builtin_dict_builder.add_protocol_if_enabled::<fkernel::RootJobForInspectMarker>(
-            |stream| {
-                let stream = stream.cast_stream::<fkernel::RootJobRequestStream>();
-                let rights = zx::Rights::INSPECT
-                    | zx::Rights::ENUMERATE
-                    | zx::Rights::DUPLICATE
-                    | zx::Rights::TRANSFER
-                    | zx::Rights::GET_PROPERTY;
-                RootJob::serve(stream, rights).boxed()
-            },
-        );
+        root_input_builder.add_protocol_if_enabled::<fkernel::RootJobForInspectMarker>(|stream| {
+            let stream = stream.cast_stream::<fkernel::RootJobRequestStream>();
+            let rights = zx::Rights::INSPECT
+                | zx::Rights::ENUMERATE
+                | zx::Rights::DUPLICATE
+                | zx::Rights::TRANSFER
+                | zx::Rights::GET_PROPERTY;
+            RootJob::serve(stream, rights).boxed()
+        });
 
         let mmio_resource_handle =
             take_startup_handle(HandleType::MmioResource.into()).map(zx::Resource::from);
@@ -567,34 +566,34 @@ impl BuiltinEnvironment {
             .map(zx::Channel::from)
             .map(SvcStashCapability::new);
         if let Some(svc_stash_provider) = svc_stash_provider {
-            builtin_dict_builder.add_protocol_if_enabled::<fboot::SvcStashProviderMarker>(
+            root_input_builder.add_protocol_if_enabled::<fboot::SvcStashProviderMarker>(
                 move |stream| svc_stash_provider.clone().serve(stream).boxed(),
             );
         }
 
         // Set up BootArguments service.
         let boot_args = BootArguments::new(&mut zbi_parser).await?;
-        builtin_dict_builder.add_protocol_if_enabled::<fboot::ArgumentsMarker>(move |stream| {
+        root_input_builder.add_protocol_if_enabled::<fboot::ArgumentsMarker>(move |stream| {
             boot_args.clone().serve(stream).boxed()
         });
 
         if let Some(mut zbi_parser) = zbi_parser {
             let factory_items = FactoryItems::new(&mut zbi_parser)?;
-            builtin_dict_builder.add_protocol_if_enabled::<fboot::FactoryItemsMarker>(
+            root_input_builder.add_protocol_if_enabled::<fboot::FactoryItemsMarker>(
                 move |stream| factory_items.clone().serve(stream).boxed(),
             );
 
             let items = Items::new(zbi_parser)?;
-            builtin_dict_builder.add_protocol_if_enabled::<fboot::ItemsMarker>(move |stream| {
+            root_input_builder.add_protocol_if_enabled::<fboot::ItemsMarker>(move |stream| {
                 items.clone().serve(stream).boxed()
             });
         }
 
         // Set up CrashRecords service.
         let crash_records_svc = CrashIntrospectSvc::new(crash_records);
-        builtin_dict_builder.add_protocol_if_enabled::<fsys::CrashIntrospectMarker>(
-            move |stream| crash_records_svc.clone().serve(stream).boxed(),
-        );
+        root_input_builder.add_protocol_if_enabled::<fsys::CrashIntrospectMarker>(move |stream| {
+            crash_records_svc.clone().serve(stream).boxed()
+        });
 
         // Set up KernelStats service.
         let info_resource_handle = system_resource_handle
@@ -613,7 +612,7 @@ impl BuiltinEnvironment {
             })
             .flatten();
         if let Some(kernel_stats) = info_resource_handle.map(KernelStats::new) {
-            builtin_dict_builder.add_protocol_if_enabled::<fkernel::StatsMarker>(move |stream| {
+            root_input_builder.add_protocol_if_enabled::<fkernel::StatsMarker>(move |stream| {
                 kernel_stats.clone().serve(stream).boxed()
             });
         }
@@ -627,9 +626,9 @@ impl BuiltinEnvironment {
             )
         });
         if let Some(read_only_log) = read_only_log {
-            builtin_dict_builder.add_protocol_if_enabled::<fboot::ReadOnlyLogMarker>(
-                move |stream| read_only_log.clone().serve(stream).boxed(),
-            );
+            root_input_builder.add_protocol_if_enabled::<fboot::ReadOnlyLogMarker>(move |stream| {
+                read_only_log.clone().serve(stream).boxed()
+            });
         }
 
         // Set up WriteOnlyLog service.
@@ -637,7 +636,7 @@ impl BuiltinEnvironment {
             WriteOnlyLog::new(zx::DebugLog::create(handle, zx::DebugLogOpts::empty()).unwrap())
         });
         if let Some(write_only_log) = write_only_log {
-            builtin_dict_builder.add_protocol_if_enabled::<fboot::WriteOnlyLogMarker>(
+            root_input_builder.add_protocol_if_enabled::<fboot::WriteOnlyLogMarker>(
                 move |stream| write_only_log.clone().serve(stream).boxed(),
             );
         }
@@ -645,15 +644,15 @@ impl BuiltinEnvironment {
         // Register the UTC time maintainer.
         if let Some(clock) = utc_clock {
             let utc_time_maintainer = Arc::new(UtcTimeMaintainer::new(clock));
-            builtin_dict_builder.add_protocol_if_enabled::<ftime::MaintenanceMarker>(
-                move |stream| utc_time_maintainer.clone().serve(stream).boxed(),
-            );
+            root_input_builder.add_protocol_if_enabled::<ftime::MaintenanceMarker>(move |stream| {
+                utc_time_maintainer.clone().serve(stream).boxed()
+            });
         }
 
         // Set up the MmioResource service.
         let mmio_resource = mmio_resource_handle.map(MmioResource::new);
         if let Some(mmio_resource) = mmio_resource {
-            builtin_dict_builder.add_protocol_if_enabled::<fkernel::MmioResourceMarker>(
+            root_input_builder.add_protocol_if_enabled::<fkernel::MmioResourceMarker>(
                 move |stream| mmio_resource.clone().serve(stream).boxed(),
             );
         }
@@ -661,7 +660,7 @@ impl BuiltinEnvironment {
         #[cfg(target_arch = "x86_64")]
         if let Some(handle) = take_startup_handle(HandleType::IoportResource.into()) {
             let ioport_resource = IoportResource::new(handle.into());
-            builtin_dict_builder.add_protocol_if_enabled::<fkernel::IoportResourceMarker>(
+            root_input_builder.add_protocol_if_enabled::<fkernel::IoportResourceMarker>(
                 move |stream| ioport_resource.clone().serve(stream).boxed(),
             );
         }
@@ -669,7 +668,7 @@ impl BuiltinEnvironment {
         // Set up the IrqResource service.
         let irq_resource = irq_resource_handle.map(IrqResource::new);
         if let Some(irq_resource) = irq_resource {
-            builtin_dict_builder.add_protocol_if_enabled::<fkernel::IrqResourceMarker>(
+            root_input_builder.add_protocol_if_enabled::<fkernel::IrqResourceMarker>(
                 move |stream| irq_resource.clone().serve(stream).boxed(),
             );
         }
@@ -677,7 +676,7 @@ impl BuiltinEnvironment {
         // Set up RootResource service.
         let root_resource = root_resource_handle.map(RootResource::new);
         if let Some(root_resource) = root_resource {
-            builtin_dict_builder.add_protocol_if_enabled::<fboot::RootResourceMarker>(
+            root_input_builder.add_protocol_if_enabled::<fboot::RootResourceMarker>(
                 move |stream| root_resource.clone().serve(stream).boxed(),
             );
         }
@@ -686,7 +685,7 @@ impl BuiltinEnvironment {
         #[cfg(target_arch = "aarch64")]
         if let Some(handle) = take_startup_handle(HandleType::SmcResource.into()) {
             let smc_resource = SmcResource::new(handle.into());
-            builtin_dict_builder.add_protocol_if_enabled::<fkernel::SmcResourceMarker>(
+            root_input_builder.add_protocol_if_enabled::<fkernel::SmcResourceMarker>(
                 move |stream| smc_resource.clone().serve(stream).boxed(),
             );
         }
@@ -708,7 +707,7 @@ impl BuiltinEnvironment {
             .map(CpuResource::new)
             .and_then(Result::ok);
         if let Some(cpu_resource) = cpu_resource {
-            builtin_dict_builder.add_protocol_if_enabled::<fkernel::CpuResourceMarker>(
+            root_input_builder.add_protocol_if_enabled::<fkernel::CpuResourceMarker>(
                 move |stream| cpu_resource.clone().serve(stream).boxed(),
             );
         }
@@ -730,7 +729,7 @@ impl BuiltinEnvironment {
             .map(EnergyInfoResource::new)
             .and_then(Result::ok);
         if let Some(energy_info_resource) = energy_info_resource {
-            builtin_dict_builder.add_protocol_if_enabled::<fkernel::EnergyInfoResourceMarker>(
+            root_input_builder.add_protocol_if_enabled::<fkernel::EnergyInfoResourceMarker>(
                 move |stream| energy_info_resource.clone().serve(stream).boxed(),
             );
         }
@@ -752,7 +751,7 @@ impl BuiltinEnvironment {
             .map(DebugResource::new)
             .and_then(Result::ok);
         if let Some(debug_resource) = debug_resource {
-            builtin_dict_builder.add_protocol_if_enabled::<fkernel::DebugResourceMarker>(
+            root_input_builder.add_protocol_if_enabled::<fkernel::DebugResourceMarker>(
                 move |stream| debug_resource.clone().serve(stream).boxed(),
             );
         }
@@ -774,7 +773,7 @@ impl BuiltinEnvironment {
             .map(FramebufferResource::new)
             .and_then(Result::ok);
         if let Some(framebuffer_resource) = framebuffer_resource {
-            builtin_dict_builder.add_protocol_if_enabled::<fkernel::FramebufferResourceMarker>(
+            root_input_builder.add_protocol_if_enabled::<fkernel::FramebufferResourceMarker>(
                 move |stream| framebuffer_resource.clone().serve(stream).boxed(),
             );
         }
@@ -796,7 +795,7 @@ impl BuiltinEnvironment {
             .map(HypervisorResource::new)
             .and_then(Result::ok);
         if let Some(hypervisor_resource) = hypervisor_resource {
-            builtin_dict_builder.add_protocol_if_enabled::<fkernel::HypervisorResourceMarker>(
+            root_input_builder.add_protocol_if_enabled::<fkernel::HypervisorResourceMarker>(
                 move |stream| hypervisor_resource.clone().serve(stream).boxed(),
             );
         }
@@ -818,7 +817,7 @@ impl BuiltinEnvironment {
             .map(InfoResource::new)
             .and_then(Result::ok);
         if let Some(info_resource) = info_resource {
-            builtin_dict_builder.add_protocol_if_enabled::<fkernel::InfoResourceMarker>(
+            root_input_builder.add_protocol_if_enabled::<fkernel::InfoResourceMarker>(
                 move |stream| info_resource.clone().serve(stream).boxed(),
             );
         }
@@ -840,7 +839,7 @@ impl BuiltinEnvironment {
             .map(IommuResource::new)
             .and_then(Result::ok);
         if let Some(iommu_resource) = iommu_resource {
-            builtin_dict_builder.add_protocol_if_enabled::<fkernel::IommuResourceMarker>(
+            root_input_builder.add_protocol_if_enabled::<fkernel::IommuResourceMarker>(
                 move |stream| iommu_resource.clone().serve(stream).boxed(),
             );
         }
@@ -862,7 +861,7 @@ impl BuiltinEnvironment {
             .map(MexecResource::new)
             .and_then(Result::ok);
         if let Some(mexec_resource) = mexec_resource {
-            builtin_dict_builder.add_protocol_if_enabled::<fkernel::MexecResourceMarker>(
+            root_input_builder.add_protocol_if_enabled::<fkernel::MexecResourceMarker>(
                 move |stream| mexec_resource.clone().serve(stream).boxed(),
             );
         }
@@ -884,7 +883,7 @@ impl BuiltinEnvironment {
             .map(PowerResource::new)
             .and_then(Result::ok);
         if let Some(power_resource) = power_resource {
-            builtin_dict_builder.add_protocol_if_enabled::<fkernel::PowerResourceMarker>(
+            root_input_builder.add_protocol_if_enabled::<fkernel::PowerResourceMarker>(
                 move |stream| power_resource.clone().serve(stream).boxed(),
             );
         }
@@ -906,7 +905,7 @@ impl BuiltinEnvironment {
             .map(ProfileResource::new)
             .and_then(Result::ok);
         if let Some(profile_resource) = profile_resource {
-            builtin_dict_builder.add_protocol_if_enabled::<fkernel::ProfileResourceMarker>(
+            root_input_builder.add_protocol_if_enabled::<fkernel::ProfileResourceMarker>(
                 move |stream| profile_resource.clone().serve(stream).boxed(),
             );
         }
@@ -928,18 +927,16 @@ impl BuiltinEnvironment {
             .map(VmexResource::new)
             .and_then(Result::ok);
         if let Some(vmex_resource) = vmex_resource {
-            builtin_dict_builder.add_protocol_if_enabled::<fkernel::VmexResourceMarker>(
+            root_input_builder.add_protocol_if_enabled::<fkernel::VmexResourceMarker>(
                 move |stream| vmex_resource.clone().serve(stream).boxed(),
             );
         }
 
         // Set up System Controller service.
         let weak_model = Arc::downgrade(&model);
-        builtin_dict_builder.add_protocol_if_enabled::<fsys::SystemControllerMarker>(
-            move |stream| {
-                SystemController::new(weak_model.clone(), SHUTDOWN_TIMEOUT).serve(stream).boxed()
-            },
-        );
+        root_input_builder.add_protocol_if_enabled::<fsys::SystemControllerMarker>(move |stream| {
+            SystemController::new(weak_model.clone(), SHUTDOWN_TIMEOUT).serve(stream).boxed()
+        });
 
         // Set up the directory ready notifier.
         let directory_ready_notifier =
@@ -1052,7 +1049,7 @@ impl BuiltinEnvironment {
         let node = inspect::stats::Node::new(&inspector, inspector.root());
         inspector.root().record(node.take());
 
-        let (dict, builtin_receivers_task) = builtin_dict_builder.build();
+        let (root_component_input, builtin_receivers_task) = root_input_builder.build();
         let builtin_receivers_task_group = TaskGroup::new();
         builtin_receivers_task_group.spawn(builtin_receivers_task);
 
@@ -1072,7 +1069,7 @@ impl BuiltinEnvironment {
             debug,
             num_threads,
             realm_builder_resolver,
-            dict,
+            root_component_input,
             _builtin_receivers_task_group: builtin_receivers_task_group,
             _service_fs_task: None,
         })
@@ -1261,7 +1258,7 @@ impl BuiltinEnvironment {
     {
         let (receiver, sender) = Receiver::new();
         let router = new_terminating_router(sender);
-        self.dict.insert_capability(iter::once(name.as_str()), router);
+        self.root_component_input.insert_capability(iter::once(name.as_str()), router);
 
         let capability_source = CapabilitySource::Builtin {
             capability: InternalCapability::Protocol(name.clone()),
@@ -1286,7 +1283,7 @@ impl BuiltinEnvironment {
     /// dict from the builtin environment. This is called in some tests because the tests create
     /// a new model but do not call `Model::start`.
     pub async fn discover_root_component(&self) {
-        self.model.discover_root_component(self.dict.clone()).await;
+        self.model.discover_root_component(self.root_component_input.clone()).await;
     }
 
     pub async fn wait_for_root_stop(&self) {
@@ -1295,7 +1292,7 @@ impl BuiltinEnvironment {
 
     pub async fn run_root(&mut self) -> Result<(), Error> {
         self.bind_service_fs_to_out().await?;
-        self.model.start(self.dict.clone()).await;
+        self.model.start(self.root_component_input.clone()).await;
         component::health().set_ok();
         self.wait_for_root_stop().await;
 

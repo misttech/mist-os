@@ -4,33 +4,32 @@
 
 use {
     crate::model::{
-        actions::{Action, ActionKey},
+        actions::{resolve::sandbox_construction::ComponentInput, Action, ActionKey},
         component::{ComponentInstance, InstanceState, UnresolvedInstanceState},
         error::{ActionError, DiscoverActionError},
         hooks::{Event, EventPayload},
     },
     async_trait::async_trait,
-    sandbox::Dict,
     std::sync::Arc,
 };
 
 /// Dispatches a `Discovered` event for a component instance. This action should be registered
 /// when a component instance is created.
 pub struct DiscoverAction {
-    /// A Dict holding the capabilities made available to this component by its parent.
-    dict: Dict,
+    /// A struct holding the capabilities made available to this component by its parent.
+    component_input: ComponentInput,
 }
 
 impl DiscoverAction {
-    pub fn new(dict: Dict) -> Self {
-        Self { dict }
+    pub fn new(component_input: ComponentInput) -> Self {
+        Self { component_input }
     }
 }
 
 #[async_trait]
 impl Action for DiscoverAction {
     async fn handle(self, component: &Arc<ComponentInstance>) -> Result<(), ActionError> {
-        do_discover(component, self.dict).await.map_err(Into::into)
+        do_discover(component, self.component_input).await.map_err(Into::into)
     }
     fn key(&self) -> ActionKey {
         ActionKey::Discover
@@ -39,7 +38,7 @@ impl Action for DiscoverAction {
 
 async fn do_discover(
     component: &Arc<ComponentInstance>,
-    dict: Dict,
+    component_input: ComponentInput,
 ) -> Result<(), DiscoverActionError> {
     let is_discovered = {
         let state = component.lock_state().await;
@@ -76,7 +75,7 @@ async fn do_discover(
                 );
             }
             InstanceState::New => {
-                state.set(InstanceState::Unresolved(UnresolvedInstanceState::new(dict)));
+                state.set(InstanceState::Unresolved(UnresolvedInstanceState::new(component_input)));
             }
         }
     }

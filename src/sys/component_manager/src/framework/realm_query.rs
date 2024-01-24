@@ -728,6 +728,7 @@ mod tests {
     use {
         super::*,
         crate::model::{
+            actions::resolve::sandbox_construction::ComponentInput,
             component::StartReason,
             testing::test_helpers::{TestEnvironmentBuilder, TestModelResult},
         },
@@ -739,7 +740,6 @@ mod tests {
         fidl_fuchsia_component_decl as fcdecl, fidl_fuchsia_io as fio, fuchsia_async as fasync,
         fuchsia_zircon as zx,
         routing_test_helpers::component_id_index::make_index_file,
-        sandbox::Dict,
     };
 
     fn is_closed(handle: impl fidl::AsHandleRef) -> bool {
@@ -777,7 +777,7 @@ mod tests {
             realm_query.serve(Moniker::root(), query_request_stream).await
         });
 
-        model.start(Dict::new()).await;
+        model.start(ComponentInput::empty()).await;
 
         let instance = query.get_instance(".").await.unwrap().unwrap();
 
@@ -840,7 +840,7 @@ mod tests {
             realm_query.serve(Moniker::root(), query_request_stream).await
         });
 
-        model.start(Dict::new()).await;
+        model.start(ComponentInput::empty()).await;
 
         let iterator = query.get_resolved_declaration("./").await.unwrap().unwrap();
         let iterator = iterator.into_proxy().unwrap();
@@ -921,7 +921,7 @@ mod tests {
             realm_query.serve(Moniker::root(), query_request_stream).await
         });
 
-        model.start(Dict::new()).await;
+        model.start(ComponentInput::empty()).await;
 
         let config = query.get_structured_config("./").await.unwrap().unwrap();
 
@@ -976,7 +976,7 @@ mod tests {
             realm_query.serve(Moniker::root(), query_request_stream).await
         });
 
-        model.start(Dict::new()).await;
+        model.start(ComponentInput::empty()).await;
 
         let (outgoing_dir, server_end) = create_endpoints::<fio::DirectoryMarker>();
         let server_end = ServerEnd::new(server_end.into_channel());
@@ -1118,7 +1118,7 @@ mod tests {
             realm_query.serve(Moniker::root(), query_request_stream).await
         });
 
-        model.start(Dict::new()).await;
+        model.start(ComponentInput::empty()).await;
 
         let mut ns = query.construct_namespace("./").await.unwrap().unwrap();
 
@@ -1208,7 +1208,7 @@ mod tests {
             realm_query.serve(Moniker::root(), query_request_stream).await
         });
 
-        model.start(Dict::new()).await;
+        model.start(ComponentInput::empty()).await;
 
         let (storage_admin, server_end) = create_proxy::<fsys::StorageAdminMarker>().unwrap();
 
