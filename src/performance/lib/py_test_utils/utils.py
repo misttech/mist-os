@@ -79,7 +79,6 @@ def single_run_test_component(
     ffx_test_args: list[str] | None = None,
     test_component_args: list[str] | None = None,
     host_results_file: str = DEFAULT_HOST_RESULTS_FILE,
-    target_results_file: str = DEFAULT_TARGET_RESULTS_FILE,
 ) -> str:
     """Runs a test component and collects the output fuchsiaperf files.
 
@@ -94,11 +93,8 @@ def single_run_test_component(
         the given `test_url`.
       host_results_file: The name of the file in the host where the results will
         be placed.
-      target_results_file: The name of the results file that the component is
-        expected to output and that will be placed in the host output path.
 
-    Returns: The path to the resulting fuchsiaperf file named
-      `target_results_file.`
+    Returns: The path to the resulting fuchsiaperf file.
     """
     if ffx_test_args is None:
         ffx_test_args = []
@@ -117,8 +113,14 @@ def single_run_test_component(
         capture_output=False,
     )
     test_result_files = list(
-        pathlib.Path(host_output_path).rglob(target_results_file)
+        pathlib.Path(host_output_path).rglob("*.fuchsiaperf.json")
     )
+    if len(test_result_files) != 1:
+        raise ValueError(
+            f"Expected a single result file. Got: {len(test_result_files)}"
+        )
+
     dest_file = os.path.join(host_output_path, host_results_file)
     os.rename(test_result_files[0], dest_file)
+
     return dest_file
