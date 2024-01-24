@@ -434,7 +434,7 @@ impl SeccompState {
                 Some(Err(errno_from_code!(0)))
             }
             SeccompAction::KillProcess => {
-                current_task.thread_group.exit(ExitStatus::CoreDump(SignalInfo::default(SIGSYS)));
+                current_task.thread_group_exit(ExitStatus::CoreDump(SignalInfo::default(SIGSYS)));
                 Some(Err(errno_from_code!(0)))
             }
             SeccompAction::Log => {

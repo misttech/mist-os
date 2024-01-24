@@ -1745,7 +1745,7 @@ mod tests {
             exit_info: ProcessExitInfo { status: ExitStatus::Exit(1), exit_signal: Some(SIGCHLD) },
             time_stats: Default::default(),
         };
-        child.thread_group.exit(ExitStatus::Exit(1));
+        child.thread_group.exit(ExitStatus::Exit(1), None);
         std::mem::drop(child);
 
         assert_eq!(
@@ -1786,7 +1786,7 @@ mod tests {
                 while !task.read().signals.run_state.is_blocked() {
                     std::thread::sleep(std::time::Duration::from_millis(10));
                 }
-                child.thread_group.exit(ExitStatus::Exit(0));
+                child.thread_group.exit(ExitStatus::Exit(0), None);
                 child.id
             }
         });
@@ -1887,12 +1887,12 @@ mod tests {
         let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
         let child1 = current_task.clone_task_for_test(&mut locked, 0, Some(SIGCHLD));
         let child1_pid = child1.id;
-        child1.thread_group.exit(ExitStatus::Exit(42));
+        child1.thread_group.exit(ExitStatus::Exit(42), None);
         std::mem::drop(child1);
         let child2 = current_task.clone_task_for_test(&mut locked, 0, Some(SIGCHLD));
         child2.thread_group.setsid(&mut locked).expect("setsid");
         let child2_pid = child2.id;
-        child2.thread_group.exit(ExitStatus::Exit(42));
+        child2.thread_group.exit(ExitStatus::Exit(42), None);
         std::mem::drop(child2);
 
         assert_eq!(
@@ -1917,12 +1917,12 @@ mod tests {
         let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
         let child1 = current_task.clone_task_for_test(&mut locked, 0, Some(SIGCHLD));
         let child1_pid = child1.id;
-        child1.thread_group.exit(ExitStatus::Exit(42));
+        child1.thread_group.exit(ExitStatus::Exit(42), None);
         std::mem::drop(child1);
         let child2 = current_task.clone_task_for_test(&mut locked, 0, Some(SIGCHLD));
         child2.thread_group.setsid(&mut locked).expect("setsid");
         let child2_pid = child2.id;
-        child2.thread_group.exit(ExitStatus::Exit(42));
+        child2.thread_group.exit(ExitStatus::Exit(42), None);
         std::mem::drop(child2);
 
         let address = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);

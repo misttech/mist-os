@@ -40,9 +40,12 @@ if (is_host && has_board) {
               "root_out_dir") + "/extended_pstate_initial_state_child",
       get_label_info(":syscall_test_exec_child($target_linux_toolchain)",
                      "root_out_dir") + "/syscall_test_exec_child",
+      get_label_info(":ptrace_test_exec_child($target_linux_toolchain)",
+                     "root_out_dir") + "/ptrace_test_exec_child",
     ]
     deps = [
       ":extended_pstate_initial_state_child($target_linux_toolchain)",
+      ":ptrace_test_exec_child($target_linux_toolchain)",
       ":syscall_test_exec_child($target_linux_toolchain)",
     ]
   }
@@ -221,6 +224,25 @@ if (is_linux) {
     ]
   }
 
+  executable("ptrace_test_exec_child") {
+    testonly = true
+    sources = [ "ptrace_test_exec_child.cc" ]
+
+    # TODO(https://fxbug.dev/297293167) enable ASan instrumentation for Linux binaries in Starnix
+    exclude_toolchain_tags = [
+      "asan",
+      "coverage",
+    ]
+    deps = [ ":test_utils" ]
+  }
+
+  resource("ptrace_test_exec_child_resource") {
+    testonly = true
+    sources = [ "$root_out_dir/ptrace_test_exec_child" ]
+    outputs = [ "data/tests/ptrace_test_exec_child" ]
+    deps = [ ":ptrace_test_exec_child" ]
+  }
+
   executable("syscall_test_exec_child") {
     testonly = true
     sources = [ "syscall_test_exec_child.cc" ]
@@ -262,6 +284,7 @@ starnix_linux_test_component("syscalls_cpp_test") {
   test_binary = "syscalls_cpp_test_bin"
   deps = [
     ":fuse_overlayfs",
+    ":ptrace_test_exec_child_resource($target_linux_toolchain)",
     ":simple_ext4_image",
     ":syscall_test_exec_child_resource($target_linux_toolchain)",
   ]

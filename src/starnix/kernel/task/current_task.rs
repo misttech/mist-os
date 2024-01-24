@@ -10,9 +10,9 @@ use crate::{
     execution::{create_zircon_process, TaskInfo},
     loader::{load_executable, resolve_executable, ResolvedElf},
     mm::{MemoryAccessor, MemoryAccessorExt, MemoryManager, TaskMemoryAccessor},
-    signals::{send_standard_signal, RunState, SignalActions, SignalInfo},
+    signals::{send_signal_first, send_standard_signal, RunState, SignalActions, SignalInfo},
     task::{
-        Kernel, PidTable, ProcessGroup, PtraceCoreState, PtraceEvent, PtraceEventData,
+        ExitStatus, Kernel, PidTable, ProcessGroup, PtraceCoreState, PtraceEvent, PtraceEventData,
         PtraceOptions, SeccompFilter, SeccompFilterContainer, SeccompNotifierHandle, SeccompState,
         SeccompStateValue, StopState, Task, TaskFlags, ThreadGroup, Waiter,
     },
@@ -697,6 +697,7 @@ impl CurrentTask {
             return Err(err);
         }
 
+        self.ptrace_event(PtraceOptions::TRACEEXEC, self.task.id as u32);
         self.signal_vfork();
 
         Ok(())
@@ -1608,24 +1609,46 @@ impl CurrentTask {
     }
 
     /// If currently being ptraced with the given option, emit the appropriate
-    /// event.  PTRACE_EVENTMSG will return the given message.
+    /// event.  PTRACE_EVENTMSG will return the given message.  Also emits the
+    /// appropriate event for execve in the absence of TRACEEXEC.
+    ///
+    /// Note that the Linux kernel has a documented bug where, if TRACEEXIT is
+    /// enabled, SIGKILL will trigger an event.  We do not exhibit this
+    /// behavior.
     pub fn ptrace_event(&mut self, trace_kind: PtraceOptions, msg: u32) {
         if !trace_kind.is_empty() {
             {
                 let mut state = self.write();
+                if let Some(ref mut ptrace) = &mut state.ptrace {
+                    if !ptrace.has_option(trace_kind) {
+                        // If this would be a TRACEEXEC, but TRACEEXEC is not
+                        // turned on, then send a SIGTRAP.
+                        if trace_kind == PtraceOptions::TRACEEXEC && !ptrace.is_seized() {
+                            // Send a SIGTRAP so that the parent can gain control.
+                            send_signal_first(self, state, SignalInfo::default(SIGTRAP));
+                        }
 
-                if state.ptrace.as_ref().map_or(true, |ptrace| !ptrace.has_option(trace_kind)) {
+                        return;
+                    }
+                    state.set_stopped(
+                        StopState::PtraceEventStopping,
+                        Some(SignalInfo::default(starnix_uapi::signals::SIGTRAP)),
+                        None,
+                        Some(PtraceEventData::new(trace_kind, msg)),
+                    );
+                } else {
                     return;
                 }
-                state.set_stopped(
-                    StopState::PtraceEventStopping,
-                    Some(SignalInfo::default(starnix_uapi::signals::SIGTRAP)),
-                    None,
-                    Some(PtraceEventData::new(trace_kind, msg)),
-                );
             }
             self.block_while_stopped();
         }
+    }
+
+    /// Causes the current thread's thread group to exit, notifying any ptracer
+    /// of this task first.
+    pub fn thread_group_exit(&mut self, exit_status: ExitStatus) {
+        self.ptrace_event(PtraceOptions::TRACEEXIT, exit_status.signal_info_status() as u32);
+        self.thread_group.exit(exit_status, None);
     }
 
     /// The flags indicates only the flags as in clone3(), and does not use the low 8 bits for the

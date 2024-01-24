@@ -34,10 +34,11 @@ use starnix_uapi::{
     PTRACE_EVENT_EXIT, PTRACE_EVENT_FORK, PTRACE_EVENT_SECCOMP, PTRACE_EVENT_STOP,
     PTRACE_EVENT_VFORK, PTRACE_EVENT_VFORK_DONE, PTRACE_GETEVENTMSG, PTRACE_GETREGSET,
     PTRACE_GETSIGINFO, PTRACE_GETSIGMASK, PTRACE_GET_SYSCALL_INFO, PTRACE_INTERRUPT, PTRACE_KILL,
-    PTRACE_LISTEN, PTRACE_O_TRACECLONE, PTRACE_O_TRACEFORK, PTRACE_O_TRACESYSGOOD,
-    PTRACE_O_TRACEVFORK, PTRACE_PEEKDATA, PTRACE_PEEKTEXT, PTRACE_PEEKUSR, PTRACE_POKEDATA,
-    PTRACE_POKETEXT, PTRACE_SETOPTIONS, PTRACE_SETSIGINFO, PTRACE_SETSIGMASK, PTRACE_SYSCALL,
-    PTRACE_SYSCALL_INFO_ENTRY, PTRACE_SYSCALL_INFO_EXIT, PTRACE_SYSCALL_INFO_NONE, SI_MAX_SIZE,
+    PTRACE_LISTEN, PTRACE_O_TRACECLONE, PTRACE_O_TRACEEXEC, PTRACE_O_TRACEEXIT, PTRACE_O_TRACEFORK,
+    PTRACE_O_TRACESYSGOOD, PTRACE_O_TRACEVFORK, PTRACE_PEEKDATA, PTRACE_PEEKTEXT, PTRACE_PEEKUSR,
+    PTRACE_POKEDATA, PTRACE_POKETEXT, PTRACE_SETOPTIONS, PTRACE_SETSIGINFO, PTRACE_SETSIGMASK,
+    PTRACE_SYSCALL, PTRACE_SYSCALL_INFO_ENTRY, PTRACE_SYSCALL_INFO_EXIT, PTRACE_SYSCALL_INFO_NONE,
+    SI_MAX_SIZE,
 };
 
 use std::sync::{atomic::Ordering, Arc};
@@ -765,7 +766,9 @@ pub fn ptrace_dispatch(
                     & !(PTRACE_O_TRACESYSGOOD
                         | PTRACE_O_TRACECLONE
                         | PTRACE_O_TRACEFORK
-                        | PTRACE_O_TRACEVFORK)
+                        | PTRACE_O_TRACEVFORK
+                        | PTRACE_O_TRACEEXEC
+                        | PTRACE_O_TRACEEXIT)
                     != 0)
             {
                 return error!(ENOSYS);
@@ -836,8 +839,8 @@ fn check_caps_for_attach(ptrace_scope: u8, current_task: &CurrentTask) -> Result
 }
 
 /// Uses the given core ptrace state (including tracer, attach type, etc) to
-/// attach to another pid.  Also sends a signal to stop |current_task|.  Typical
-/// for when inheriting ptrace state from another task.
+/// attach to another task, given by `tracee_task`.  Also sends a signal to stop
+/// tracee_task.  Typical for when inheriting ptrace state from another task.
 pub fn ptrace_attach_from_state(
     tracee_task: &OwnedRef<Task>,
     ptrace_state: PtraceCoreState,

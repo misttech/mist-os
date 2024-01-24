@@ -548,14 +548,19 @@ fn process_completed_exception(current_task: &mut CurrentTask, exception_result:
             // TODO: Verify that the rip is actually in restricted code.
             let mut registers = current_task.thread_state.registers;
             registers.reset_flags();
-            let task = &current_task.task;
-            deliver_signal(
-                &task,
-                task.write(),
-                signal,
-                &mut registers,
-                &current_task.thread_state.extended_pstate,
-            );
+            {
+                let task_state = current_task.task.write();
+
+                if let Some(status) = deliver_signal(
+                    current_task,
+                    task_state,
+                    signal,
+                    &mut registers,
+                    &current_task.thread_state.extended_pstate,
+                ) {
+                    current_task.thread_group_exit(status);
+                }
+            }
             current_task.thread_state.registers = registers;
         }
     }
