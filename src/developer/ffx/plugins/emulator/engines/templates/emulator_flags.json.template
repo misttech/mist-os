@@ -178,6 +178,10 @@
         {{/if}}
         {{#if runtime.headless}}
             "-nographic",
+        {{else}}
+            {{#if (eq runtime.engine_type "qemu")}}
+                "-device", "virtio-gpu-pci",
+            {{/if}}
         {{/if}}
           {{#if (eq device.cpu.architecture "riscv64")}}
           {{else}}
@@ -202,6 +206,9 @@
         {{/if}}
     ],
     "features": [
+        {{! TODO(https://fxbug.dev/322029860): The following feature flags are
+            effective when using the FEMU engine. Remove them from QEMU
+            engine configurations. }}
         {{! We don't bother checking for "auto" here because the Rust code
             will resolve "auto" to an actual value before it resolves the
             template. }}
@@ -250,6 +257,9 @@
         {{/each}}
     ],
     "options": [
+        {{! TODO(https://fxbug.dev/322029860): The following options are
+            effective when using the FEMU engine. Remove them from QEMU
+            engine configurations. }}
         "-metrics-collection",
         {{#if (eq device.cpu.architecture "arm64")}}
             "-avd-arch", "arm64",
