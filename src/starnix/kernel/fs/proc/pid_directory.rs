@@ -13,7 +13,8 @@ use crate::{
         CallbackSymlinkNode, DirectoryEntryType, DirentSink, DynamicFile, DynamicFileBuf,
         DynamicFileSource, FdNumber, FileObject, FileOps, FileSystemHandle, FsNode, FsNodeHandle,
         FsNodeInfo, FsNodeOps, FsStr, FsString, ProcMountinfoFile, ProcMountsFile, SeekTarget,
-        SimpleFileNode, StaticDirectoryBuilder, SymlinkTarget, VecDirectory, VecDirectoryEntry,
+        SimpleFileNode, StaticDirectoryBuilder, StubEmptyFile, SymlinkTarget, VecDirectory,
+        VecDirectoryEntry,
     },
 };
 use fuchsia_zircon as zx;
@@ -156,6 +157,12 @@ fn static_directory_builder_with_common_task_entries<'a>(
     dir.entry_creds(task.as_fscred());
     dir.entry(
         current_task,
+        "cgroup",
+        StubEmptyFile::new_node("/proc/pid/cgroup"),
+        mode!(IFREG, 0o444),
+    );
+    dir.entry(
+        current_task,
         "cwd",
         CallbackSymlinkNode::new({
             let task = WeakRef::from(task);
@@ -192,6 +199,18 @@ fn static_directory_builder_with_common_task_entries<'a>(
             move || Ok(SymlinkTarget::Node(Task::from_weak(&task)?.fs().root()))
         }),
         mode!(IFLNK, 0o777),
+    );
+    dir.entry(
+        current_task,
+        "sched",
+        StubEmptyFile::new_node("/proc/pid/sched"),
+        mode!(IFREG, 0o644),
+    );
+    dir.entry(
+        current_task,
+        "schedstat",
+        StubEmptyFile::new_node("/proc/pid/schedstat"),
+        mode!(IFREG, 0o444),
     );
     dir.entry(current_task, "smaps", ProcSmapsFile::new_node(task.into()), mode!(IFREG, 0o444));
     dir.entry(current_task, "stat", StatFile::new_node(task.into(), scope), mode!(IFREG, 0o444));
