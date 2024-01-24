@@ -25,14 +25,14 @@ There is currently no support for running these tests on an emulator.
 
 ## Run manually
 
-1.  Add these args to your `fx set` command:
+1.  Add the test to your `fx set` command:
 
     ```shell
-    $ fx set ... \
-        --with //src/testing/sl4f \
-        --with //src/sys/bin/start_sl4f \
-        --with-host //src/firmware/tests/lacewing
+    $ fx set ... --with-host //src/firmware/tests/lacewing
     ```
+
+    Or to edit the current args with `fx args` instead, add `"//src/firmware/tests/lacewing"` to
+    `host_labels` (note: *not* `host_test_labels`, that will not work).
 
 2.  Put the device in Fuchsia mode, with SSH configured properly.
 
