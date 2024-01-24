@@ -75,6 +75,17 @@ struct Elf<Class, Data>::RDebug {
 
   // This is the load bias of the dynamic linker itself.
   Addr ldbase;
+
+  // <lib/ld/remote-abi-transcriber.h> introspection API.
+
+  using AbiLocal = RDebug<LocalAbiTraits>;
+
+  template <template <class...> class Template>
+  using AbiBases = Template<>;
+
+  template <template <auto...> class Template>
+  using AbiMembers =
+      Template<&RDebug::version, &RDebug::map, &RDebug::brk, &RDebug::state, &RDebug::ldbase>;
 };
 
 // This is the traditional `struct link_map` that SVR4 and other systems
@@ -128,6 +139,17 @@ struct Elf<Class, Data>::LinkMap {
   // from anywhere in the list after the initial-exec set, depending on the
   // order of adding and removing modules and how they may share dependencies.
   AbiPtr<LinkMap, Elf, AbiTraits> next, prev;
+
+  // <lib/ld/remote-abi-transcriber.h> introspection API.
+
+  using AbiLocal = LinkMap<LocalAbiTraits>;
+
+  template <template <class...> class Template>
+  using AbiBases = Template<>;
+
+  template <template <auto...> class Template>
+  using AbiMembers =
+      Template<&LinkMap::addr, &LinkMap::name, &LinkMap::ld, &LinkMap::next, &LinkMap::prev>;
 };
 
 }  // namespace elfldltl

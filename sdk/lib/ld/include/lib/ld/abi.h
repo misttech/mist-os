@@ -116,6 +116,17 @@ struct Abi {
 
   // The soname for the main executable is an empty string.
   static constexpr elfldltl::Soname<Elf> kExecutableName{""};
+
+  // <lib/ld/remote-abi-transcriber.h> introspection API.
+
+  using AbiLocal = Abi<Elf, elfldltl::LocalAbiTraits>;
+
+  template <template <class...> class Template>
+  using AbiBases = Template<>;
+
+  template <template <auto...> class Template>
+  using AbiMembers = Template<&Abi::loaded_modules, &Abi::static_tls_modules,
+                              &Abi::static_tls_offsets, &Abi::static_tls_layout>;
 };
 
 // This is the standard PT_INTERP value for using a compatible dynamic linker

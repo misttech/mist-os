@@ -123,6 +123,10 @@ class AbiStringView {
   constexpr size_t size() const { return contents_.size(); }
   constexpr size_t length() const { return contents_.size(); }
 
+  constexpr typename Span::Ptr ptr() const { return contents_.ptr(); }
+
+  constexpr Span as_span() const { return contents_; }
+
   template <typename S = Span, typename = decltype(S{}.get())>
   constexpr operator std::string_view() const {
     return get();

@@ -126,16 +126,19 @@ void LdRemoteProcessTests::Load(std::string_view executable_name) {
   EXPECT_NE(abi_stub.rdebug_offset(), abi_stub.abi_offset())
       << "with data_size() " << abi_stub.data_size();
 
+  // First just decode all the modules: the executable and dependencies.
   auto get_dep_vmo = [this](const RemoteModule::Soname& soname) {
     return mock_loader_->LoadObject(std::string{soname.str()});
   };
-
   auto decode_result =
       RemoteModule::DecodeModules(diag, std::move(vmo), get_dep_vmo, std::move(predecoded_modules));
   ASSERT_TRUE(decode_result);
-  set_stack_size(decode_result->main_exec.stack_size);
+  const RemoteModule::ExecInfo& exec_info = decode_result->main_exec;
 
   auto& modules = decode_result->modules;
+  RemoteModule& loaded_exec = modules.front();
+  RemoteModule& loaded_stub = modules[decode_result->predecoded_positions[kStub]];
+  RemoteModule& loaded_vdso = modules[decode_result->predecoded_positions[kStub]];
   ASSERT_FALSE(modules.empty());
 
   // Check the loaded-by pointers.
@@ -168,25 +171,33 @@ void LdRemoteProcessTests::Load(std::string_view executable_name) {
     }
   }
 
-  RemoteModule& loaded_stub = modules[decode_result->predecoded_positions[kStub]];
+  // Record any stack size request from the executable's PT_GNU_STACK.
+  set_stack_size(exec_info.stack_size);
+
+  // Now that the set of modules is known, initialize the remote ABI heap in
+  // the loaded_stub module.  This can change that module's vaddr_size.
   RemoteAbi<> remote_abi;
   zx::result<> abi_result = remote_abi.Init(diag, abi_stub, loaded_stub, modules);
   ASSERT_TRUE(abi_result.is_ok()) << abi_result.status_string();
 
+  // Choose load addresses.
   EXPECT_TRUE(RemoteModule::AllocateModules(diag, modules, root_vmar().borrow()));
+
+  // Apply relocations to segment VMOs.
   EXPECT_TRUE(RemoteModule::RelocateModules(diag, modules));
 
-  abi_result = std::move(remote_abi).Finish(abi_stub, loaded_stub, modules);
+  // Now that load addresses have been chosen, populate the remote ABI data.
+  abi_result = std::move(remote_abi).Finish(diag, abi_stub, loaded_stub, modules);
   EXPECT_TRUE(abi_result.is_ok()) << abi_result.status_string();
 
+  // Finally, all the VMO contents are in place to be mapped into the process.
   EXPECT_TRUE(RemoteModule::LoadModules(diag, modules));
 
-  // The executable will always be the first module, retrieve it to set the
-  // loaded entry point.
-  set_entry(decode_result->main_exec.relative_entry + modules[kVdso].load_bias());
+  // Use the executable's entry point at its loaded address.
+
+  set_entry(decode_result->main_exec.relative_entry + loaded_exec.load_bias());
 
   // Locate the loaded vDSO to pass its base pointer to the test process.
-  RemoteModule& loaded_vdso = modules[decode_result->predecoded_positions[kStub]];
   set_vdso_base(loaded_vdso.module().vaddr_start());
 
   RemoteModule::CommitModules(modules);

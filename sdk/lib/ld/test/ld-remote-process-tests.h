@@ -24,12 +24,10 @@ namespace ld::testing {
 class LdRemoteProcessTests : public ::testing::Test, public LdLoadZirconProcessTestsBase {
  public:
   static constexpr bool kCanCollectLog = false;
+  static constexpr bool kHasTls = false;
 
   LdRemoteProcessTests();
   ~LdRemoteProcessTests();
-
-  static constexpr bool kHasPassiveAbi = false;
-  static constexpr bool kHasTls = false;
 
   void Init(std::initializer_list<std::string_view> args = {},
             std::initializer_list<std::string_view> env = {});

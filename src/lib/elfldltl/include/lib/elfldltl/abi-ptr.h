@@ -83,6 +83,14 @@ struct AbiPtr {
     return *this;
   }
 
+  // AbiPtr<T> is convertible to AbiPtr<const T> just like T* to const T*.
+  template <typename TT = T, typename = std::enable_if_t<!std::is_const_v<TT>>>
+  constexpr operator AbiPtr<const TT, Elf, Traits>() const {
+    static_assert(std::is_same_v<TT, T>);
+    static_assert(!std::is_const_v<TT>);
+    return Reinterpret<const T>();
+  }
+
   static constexpr AbiPtr FromAddress(Addr address) {
     return AbiPtr{Traits::template FromAddress<Elf, T>(address), std::in_place};
   }
@@ -187,6 +195,10 @@ struct AbiPtr {
 
   StorageType storage_{};
 };
+
+// Deduction guide.
+template <typename T>
+AbiPtr(T*) -> AbiPtr<T>;
 
 // This is the default Traits type for AbiPtr and things that use it.
 // It also serves as the exemplar for the template API.  Comments here

@@ -92,6 +92,11 @@ class RemoteAbiHeap;
 // the data in the remote address space where it will be after Commit.
 template <typename T>
 class RemoteAbiSpan {
+ public:
+  constexpr size_t size() const { return count_; }
+
+  constexpr size_t size_bytes() const { return count_ * sizeof(T); }
+
  private:
   friend RemoteAbiHeapLayout;
   template <class Elf, class AbiTraits>
@@ -110,6 +115,11 @@ class RemoteAbiSpan {
 // where it will be after Commit.  (Note that a NUL terminator is guaranteed to
 // be present after the bytes descirbed by the AbiStringView.)
 class RemoteAbiString {
+ public:
+  constexpr size_t size() const { return size_; }
+
+  constexpr bool empty() const { return size_ == 0; }
+
  private:
   friend RemoteAbiHeapLayout;
   template <class Elf, class AbiTraits>
@@ -194,6 +204,8 @@ class RemoteAbiHeap {
   using Phdr = typename Elf::Phdr;
   using AbiStringView = elfldltl::AbiStringView<Elf, AbiTraits>;
   template <typename T>
+  using AbiPtr = elfldltl::AbiPtr<T, Elf, AbiTraits>;
+  template <typename T>
   using AbiSpan = elfldltl::AbiSpan<T, cpp20::dynamic_extent, Elf, AbiTraits>;
 
   RemoteAbiHeap(RemoteAbiHeap&&) = default;
@@ -256,6 +268,19 @@ class RemoteAbiHeap {
   // size a mapping location whose vaddr will be passed into Remote calls.
   size_type size_bytes() const { return size_bytes_; }
 
+  // After the stub module's load_bias() has been fixed, this yields the
+  // runtime vaddr of the stub module's heap segment: the vaddr argument for
+  // the Remote() methods below.
+  //
+  // This should only be called on a stub_module that was previously modified
+  // by a successful Create() call, and has since had its load_bias() set.
+  static size_type HeapVaddr(const RemoteLoadModule<Elf>& stub_module) {
+    const auto& segment = stub_module.load_info().segments().back();
+    const size_type segment_vaddr =
+        std::visit([](const auto& segment) { return segment.vaddr(); }, segment);
+    return segment_vaddr + stub_module.load_bias();
+  }
+
   // Return a local mutable reference to a global of type T at a known offset
   // in the stub data segment.
   template <typename T>
@@ -278,6 +303,7 @@ class RemoteAbiHeap {
         reinterpret_cast<const char*>(strtab_image.data()),
         strtab_image.size(),
     };
+
     if (str.size_ == 0) {
       return strtab.last<1>();
     }
@@ -295,8 +321,7 @@ class RemoteAbiHeap {
 
   // Given the remote virtual address where the segment will be mapped,
   // RemoteAbiString and RemoteAbiSpan placeholders can be turned into remote
-  // AbiSpan objects ready to be copied into place.  The virtual address can
-  // also be derived from a LoadInfo::Segment or *Segment.
+  // AbiSpan objects ready to be copied into place.
 
   AbiSpan<char> Remote(size_type vaddr, RemoteAbiString str) const {
     using Ptr = typename AbiSpan<char>::Ptr;
@@ -307,12 +332,7 @@ class RemoteAbiHeap {
     } else {
       vaddr += static_cast<size_type>(strtab_ + str.offset_);
     }
-    return Ptr{AbiSpan<char>::Ptr::FromAddress(vaddr), str.size_ + 1};
-  }
-
-  template <class Segment>
-  AbiSpan<char> Remote(const Segment& segment, RemoteAbiString str) const {
-    return Remote(SegmentVaddr(segment), str);
+    return AbiSpan<char>{Ptr::FromAddress(vaddr), str.size_ + 1};
   }
 
   template <typename T>
@@ -321,11 +341,6 @@ class RemoteAbiHeap {
         AbiSpan<T>::Ptr::FromAddress(vaddr + span.offset_),
         span.count_,
     };
-  }
-
-  template <class Segment, typename T>
-  AbiSpan<T> Remote(const Segment& segment, RemoteAbiSpan<T> span) const {
-    return Remote(SegmentVaddr(segment), span);
   }
 
   // When a RemoteAbiHeap has been filled and is ready to be mapped into a
@@ -360,16 +375,6 @@ class RemoteAbiHeap {
     zx::unowned_vmo vmo;
   };
   using Mapped = elfldltl::MappedVmoFile;
-
-  template <class... Segment>
-  size_type SegmentVaddr(const std::variant<Segment...>& segment) {
-    return std::visit([this](const auto& segment) { return SegmentVaddr(segment); });
-  }
-
-  template <class Segment>
-  size_type SegmentVaddr(const Segment& segment) {
-    return segment.vaddr();
-  }
 
   cpp20::span<std::byte> image() {
     if (auto* mapped = std::get_if<Mapped>(&data_)) {

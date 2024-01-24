@@ -234,12 +234,33 @@ class DirectMemory {
 
   // This returns an address in memory for an address in the loaded ELF file.
   template <typename T>
-  T* GetPointer(uintptr_t ptr) {
+  T* GetPointer(uintptr_t ptr) const {
     if (ptr < base_ || ptr - base_ >= image_.size() ||
         image_.size() - (ptr - base_) < PointerSize<T>()) [[unlikely]] {
       return nullptr;
     }
     return reinterpret_cast<T*>(&image_[ptr - base_]);
+  }
+
+  // Given a an address range previously handed out by GetPointer,
+  // ReadArrayFromFile, or ReadArray, yield the address value that
+  // must have been passed to ReadArray et al.
+  template <typename T>
+  std::optional<uintptr_t> GetVaddr(cpp20::span<const T> data) const {
+    cpp20::span bytes = cpp20::as_bytes(data);
+    if (bytes.data() < image_.data() || bytes.data() > &image_.back()) [[unlikely]] {
+      return std::nullopt;
+    }
+    const size_t data_offset = bytes.data() - image_.data();
+    if (image_.size_bytes() - data_offset < bytes.size_bytes()) [[unlikely]] {
+      return std::nullopt;
+    }
+    return base_ + data_offset;
+  }
+
+  template <typename T>
+  std::optional<uintptr_t> GetVaddr(const T* ptr) const {
+    return GetVaddr(cpp20::span{ptr, 1});
   }
 
   // File API assumes this file's first segment has page-aligned p_offset of 0.

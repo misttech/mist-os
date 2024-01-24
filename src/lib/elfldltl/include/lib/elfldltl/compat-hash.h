@@ -74,6 +74,19 @@ class CompatHash {
 
  private:
   AbiSpan<const Word, cpp20::dynamic_extent, Elf, AbiTraits> buckets_, chain_;
+
+ public:
+  // <lib/ld/remote-abi-transcriber.h> introspection API.  These aliases must
+  // be public, but can't be defined lexically before the private: section that
+  // declares the members; so this special public: section is at the end.
+
+  using AbiLocal = CompatHash<Elf, LocalAbiTraits>;
+
+  template <template <class...> class Template>
+  using AbiBases = Template<>;
+
+  template <template <auto...> class Template>
+  using AbiMembers = Template<&CompatHash::buckets_, &CompatHash::chain_>;
 };
 
 // This is only actually used when AbiTraits supports direct memory access, so

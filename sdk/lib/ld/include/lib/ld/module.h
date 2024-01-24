@@ -10,6 +10,7 @@
 #include <lib/elfldltl/symbol.h>
 #include <lib/stdcompat/span.h>
 
+#include <array>
 #include <cstddef>
 #include <cstdint>
 
@@ -118,6 +119,13 @@ struct Abi<Elf, AbiTraits>::Module {
   // symbols) even if that module has no PT_TLS segment of its own.
   Addr tls_modid = 0;
 
+  // If nonempty, this is the (first) NT_GNU_BUILD_ID note payload (not
+  // including Elf::Nhdr or name parts): just the build ID bytes themselves.
+  // This is simply the result of parsing PT_NOTE segments in the phdrs that
+  // presumably point to read-only data in the module's load image, which can
+  // always be repeated; this just caches the parsing result from load time.
+  Span<const std::byte> build_id;
+
   // Each and every module gets a "module ID" number that's used in symbolizer
   // markup contextual elements describing the module.  These are expected to
   // be arbitrary integers, probably small, that are unique within the process
@@ -129,17 +137,30 @@ struct Abi<Elf, AbiTraits>::Module {
   // when modules are unloaded.
   Word symbolizer_modid = 0;
 
-  // If nonempty, this is the (first) NT_GNU_BUILD_ID note payload (not
-  // including Elf::Nhdr or name parts): just the build ID bytes themselves.
-  // This is simply the result of parsing PT_NOTE segments in the phdrs that
-  // presumably point to read-only data in the module's load image, which can
-  // always be repeated; this just caches the parsing result from load time.
-  Span<const std::byte> build_id;
-
   // This is true if the module participates in symbolic resolution. If false,
   // the module will still be part of the unwinding domain, and therefore will
   // still be visible to dl_iterate_phdr.
   bool symbols_visible = false;
+
+  // This makes explicit the alignment padding that would be here implicitly.
+  // It can be reduced to introduce new flags or small integers without risk of
+  // backward ABI incompatibility if zero is the safe default for new consumers
+  // of old passive ABI data from an older producer.
+  std::array<typename Elf::Byte, sizeof(Addr) - (sizeof(Word) + sizeof(bool))> reserved_zero{};
+
+  // <lib/ld/remote-abi-transcriber.h> introspection API.
+
+  using AbiLocal = typename Abi<Elf, elfldltl::LocalAbiTraits>::Module;
+
+  template <template <class...> class Template>
+  using AbiBases = Template<>;
+
+  template <template <auto...> class Template>
+  using AbiMembers =
+      Template<&Module::link_map, &Module::vaddr_start, &Module::vaddr_end, &Module::phdrs,
+               &Module::symbols, &Module::soname, &Module::init, &Module::fini, &Module::tls_modid,
+               &Module::build_id, &Module::symbolizer_modid, &Module::symbols_visible,
+               &Module::reserved_zero>;
 };
 
 }  // namespace abi

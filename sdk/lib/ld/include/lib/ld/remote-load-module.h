@@ -93,6 +93,8 @@ class RemoteLoadModule : public RemoteLoadModuleBase {
 
   const zx::vmo& vmo() const { return vmo_; }
 
+  const elfldltl::MappedVmoFile& mapped_vmo() const { return mapped_vmo_; }
+
   // Initialize the module from the provided VMO, representing either the
   // binary or shared library to be loaded.  Create the data structures that
   // make make the VMO readable, and scan and decode its phdrs to set and
@@ -364,9 +366,12 @@ class RemoteLoadModule : public RemoteLoadModuleBase {
             mod.set_loaded_by_modid(loaded_by_modid);
             // Mark that the module is in the symbolic resolution set.
             mod.module().symbols_visible = true;
+
             // Use the exact pointer that's the dependent module's DT_NEEDED
             // string for the name field, so remoting can transcribe it.
             mod.set_name(soname);
+            mod.set_loaded_by_modid(loaded_by_modid);
+
             // Assign the module ID that matches the position in the list.
             mod.module().symbolizer_modid = static_cast<uint32_t>(pos);
             return true;

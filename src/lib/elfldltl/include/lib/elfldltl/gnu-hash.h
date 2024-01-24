@@ -328,6 +328,21 @@ class GnuHash {
   Word chain_index_bias_ = 0;
   Word filter_index_mask_ = 0;
   Word filter_hash_shift_ = 0;
+
+ public:
+  // <lib/ld/remote-abi-transcriber.h> introspection API.  These aliases must
+  // be public, but can't be defined lexically before the private: section that
+  // declares the members; so this special public: section is at the end.
+
+  using AbiLocal = GnuHash<Elf, LocalAbiTraits>;
+
+  template <template <class...> class Template>
+  using AbiBases = Template<>;
+
+  template <template <auto...> class Template>
+  using AbiMembers =
+      Template<&GnuHash::tables_, &GnuHash::bucket_count_, &GnuHash::chain_index_bias_,
+               &GnuHash::filter_index_mask_, &GnuHash::filter_hash_shift_>;
 };
 
 template <class Elf, class AbiTraits>

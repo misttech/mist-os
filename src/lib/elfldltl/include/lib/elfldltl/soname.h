@@ -108,6 +108,19 @@ class Soname {
   AbiPtr<const char, Elf, AbiTraits> name_;
   typename Elf::Word size_ = 0;
   typename Elf::Word hash_ = 0;
+
+ public:
+  // <lib/ld/remote-abi-transcriber.h> introspection API.  These aliases must
+  // be public, but can't be defined lexically before the private: section that
+  // declares the members; so this special public: section is at the end.
+
+  using AbiLocal = Soname<Elf, LocalAbiTraits>;
+
+  template <template <class...> class Template>
+  using AbiBases = Template<>;
+
+  template <template <auto...> class Template>
+  using AbiMembers = Template<&Soname::name_, &Soname::size_, &Soname::hash_>;
 };
 
 }  // namespace elfldltl

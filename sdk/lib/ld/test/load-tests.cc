@@ -154,10 +154,6 @@ TYPED_TEST(LdLoadTests, IndirectDeps) {
 }
 
 TYPED_TEST(LdLoadTests, PassiveAbiBasic) {
-  if constexpr (!TestFixture::kHasPassiveAbi) {
-    GTEST_SKIP() << "test requires passive ABI support";
-  }
-
   constexpr int64_t kReturnValue = 17;
 
   ASSERT_NO_FATAL_FAILURE(this->Init());
@@ -182,10 +178,6 @@ TYPED_TEST(LdLoadTests, PassiveAbiRdebug) {
 }
 
 TYPED_TEST(LdLoadTests, SymbolicNamespace) {
-  if constexpr (!TestFixture::kHasPassiveAbi) {
-    GTEST_SKIP() << "test requires passive ABI support";
-  }
-
   constexpr int64_t kReturnValue = 17;
 
   ASSERT_NO_FATAL_FAILURE(this->Init());
@@ -200,10 +192,6 @@ TYPED_TEST(LdLoadTests, SymbolicNamespace) {
 }
 
 TYPED_TEST(LdLoadTests, ManyDeps) {
-  if constexpr (!TestFixture::kHasPassiveAbi) {
-    GTEST_SKIP() << "test requires passive ABI support";
-  }
-
   constexpr int64_t kReturnValue = 17;
 
   ASSERT_NO_FATAL_FAILURE(this->Init());
@@ -225,10 +213,6 @@ TYPED_TEST(LdLoadTests, ManyDeps) {
 }
 
 TYPED_TEST(LdLoadTests, InitFini) {
-  if constexpr (!TestFixture::kHasPassiveAbi) {
-    GTEST_SKIP() << "test requires passive ABI support";
-  }
-
   constexpr int64_t kReturnValue = 17;
 
   ASSERT_NO_FATAL_FAILURE(this->Init());

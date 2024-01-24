@@ -425,7 +425,6 @@ class SymbolInfo {
     return symtab_.size();
   }
 
- public:
   AbiStringView<Elf, AbiTraits> strtab_ = kEmptyStrtab;
   Span<Sym> symtab_;
   Span<Word> compat_hash_;
@@ -433,6 +432,21 @@ class SymbolInfo {
   Addr soname_ = 0;
   Addr flags_ = 0;   // DT_FLAGS
   Addr flags1_ = 0;  // DT_FLAGS_1
+
+ public:
+  // <lib/ld/remote-abi-transcriber.h> introspection API.  These aliases must
+  // be public, but can't be defined lexically before the private: section that
+  // declares the members; so this special public: section is at the end.
+
+  using AbiLocal = SymbolInfo<Elf, LocalAbiTraits>;
+
+  template <template <class...> class Template>
+  using AbiBases = Template<>;
+
+  template <template <auto...> class Template>
+  using AbiMembers = Template<&SymbolInfo::strtab_, &SymbolInfo::symtab_, &SymbolInfo::compat_hash_,
+                              &SymbolInfo::gnu_hash_, &SymbolInfo::soname_, &SymbolInfo::flags_,
+                              &SymbolInfo::flags1_>;
 };
 
 // This constructs a SymbolInfo that just contains a single undefined symbol.

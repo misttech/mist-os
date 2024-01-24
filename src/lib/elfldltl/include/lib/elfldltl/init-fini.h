@@ -121,6 +121,19 @@ struct InitFiniInfo {
  private:
   AbiSpan<const Addr, cpp20::dynamic_extent, Elf, AbiTraits> array_;
   Addr legacy_ = 0;
+
+ public:
+  // <lib/ld/remote-abi-transcriber.h> introspection API.  These aliases must
+  // be public, but can't be defined lexically before the private: section that
+  // declares the members; so this special public: section is at the end.
+
+  using AbiLocal = InitFiniInfo<Elf, LocalAbiTraits>;
+
+  template <template <class...> class Template>
+  using AbiBases = Template<>;
+
+  template <template <auto...> class Template>
+  using AbiMembers = Template<&InitFiniInfo::array_, &InitFiniInfo::legacy_>;
 };
 
 }  // namespace elfldltl

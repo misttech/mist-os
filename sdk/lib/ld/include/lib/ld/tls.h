@@ -53,6 +53,17 @@ struct Abi<Elf, AbiTraits>::TlsModule {
   // for this segment must have at least this minimum alignment (p_align).
   // This is validated to be a power of two before the module is loaded.
   Addr tls_alignment = 0;
+
+  // <lib/ld/remote-abi-transcriber.h> introspection API.
+
+  using AbiLocal = typename Abi<Elf, elfldltl::LocalAbiTraits>::TlsModule;
+
+  template <template <class...> class Template>
+  using AbiBases = Template<>;
+
+  template <template <auto...> class Template>
+  using AbiMembers =
+      Template<&TlsModule::tls_initial_data, &TlsModule::tls_bss_size, &TlsModule::tls_alignment>;
 };
 
 // This is the symbol that compilers generate calls to for GD/LD TLS accesses
