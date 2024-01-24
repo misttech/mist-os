@@ -12,6 +12,12 @@
         runner: "elf",
         binary: "bin/scenic",
     },
+    children: [
+        {
+            name: "image-compression",
+            url: "#meta/image-compression.cm",
+        },
+    ],
     capabilities: [
         {
             protocol: [
@@ -56,6 +62,10 @@
                 "fuchsia.scheduler.ProfileProvider",
                 "fuchsia.sysmem.Allocator",
             ],
+        },
+        {
+            protocol: "fuchsia.ui.compression.internal.ImageCompressor",
+            from: "#image-compression",
         },
     ],
     expose: [

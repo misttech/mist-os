@@ -15,4 +15,13 @@
         // The binary to run for this component.
         binary: "bin/image-compression",
     },
+    capabilities: [
+        { protocol: "fuchsia.ui.compression.internal.ImageCompressor" },
+    ],
+    expose: [
+        {
+            protocol: "fuchsia.ui.compression.internal.ImageCompressor",
+            from: "self",
+        },
+    ],
 }

@@ -270,7 +270,10 @@ fuchsia_component_manifest("scenic_manifest") {
 
 fuchsia_component("component_v2") {
   cm_label = ":scenic_manifest"
-  deps = [ "bin" ]
+  deps = [
+    "bin",
+    "//src/ui/scenic/lib/image-compression:component",
+  ]
 
   if (escher_use_runtime_glsl) {
     deps += [ "//src/ui/lib/escher/shaders:escher_shaders_resources" ]

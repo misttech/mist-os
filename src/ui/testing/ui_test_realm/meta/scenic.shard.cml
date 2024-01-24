@@ -61,6 +61,7 @@
             protocol: [
                 "fuchsia.ui.annotation.Registry",
                 "fuchsia.ui.composition.FlatlandDisplay",
+                "fuchsia.ui.compression.internal.ImageCompressor",
                 "fuchsia.ui.display.singleton.Info",
                 "fuchsia.ui.observation.scope.Registry",
                 "fuchsia.ui.observation.test.Registry",
