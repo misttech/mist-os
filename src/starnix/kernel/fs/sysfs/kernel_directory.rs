@@ -4,7 +4,7 @@
 
 use crate::{
     task::CurrentTask,
-    vfs::{create_bytes_file_with_handler, StaticDirectoryBuilder},
+    vfs::{create_bytes_file_with_handler, StaticDirectoryBuilder, StubEmptyFile},
 };
 use starnix_logging::track_stub;
 use starnix_uapi::file_mode::mode;
@@ -16,6 +16,16 @@ pub fn sysfs_kernel_directory(current_task: &CurrentTask, dir: &mut StaticDirect
     let kernel = current_task.kernel();
     dir.subdir(current_task, "kernel", 0o755, |dir| {
         dir.subdir(current_task, "tracing", 0o755, |_| ());
+        dir.subdir(current_task, "mm", 0o755, |dir| {
+            dir.subdir(current_task, "transparent_hugepage", 0o755, |dir| {
+                dir.entry(
+                    current_task,
+                    "enabled",
+                    StubEmptyFile::new_node("/sys/kernel/mm/transparent_hugepage/enabled"),
+                    mode!(IFREG, 0o644),
+                );
+            });
+        });
         dir.subdir(current_task, "wakeup_reasons", 0o755, |dir| {
             let read_only_file_mode = mode!(IFREG, 0o444);
             dir.entry(

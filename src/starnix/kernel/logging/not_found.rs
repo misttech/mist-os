@@ -13,6 +13,15 @@ use std::collections::{hash_map::Entry, BTreeMap, HashMap};
 /// Path prefixes for which Starnix is responsible.
 const DESIRED_PATH_PREFIXES: &[&str] = &["/dev/", "/proc/", "/sys/"];
 
+/// Path prefixes excluded from inspect output.
+const IGNORED_PATH_PREFIXES: &[&str] = &[
+    // TODO(https://fxbug.dev/311449535) we may need to implement tracing directories under these
+    // paths but actually stubbing them breaks the current perfetto integration. They don't need to
+    // be in the ENOENT list when they're already tracked elsewhere.
+    "/sys/kernel/tracing",
+    "/sys/kernel/debug/tracing",
+];
+
 /// Regular expression to deduplicate commonly seen numbered elements of paths in internal
 /// filesystems.
 const NUMBER_DEDUPER: &str = r#"(block/[A-Za-z]+|cpu|proc/|pid_|uid_)\d+"#;
@@ -49,6 +58,9 @@ pub fn not_found_lazy_node_callback() -> BoxFuture<'static, Result<Inspector, an
         let original_counts = NOT_FOUND_COUNTS.lock();
         let original_counts = original_counts.iter().map(|(p, n)| (p.as_slice(), *n));
         for (path, count) in dedupe_uninteresting_numbers_in_paths(original_counts) {
+            if IGNORED_PATH_PREFIXES.iter().any(|prefix| path.starts_with(prefix)) {
+                continue;
+            }
             inspector.root().record_uint(path, count);
         }
         Ok(inspector)
