@@ -98,9 +98,9 @@ board_input_bundle("main_bundle") {
       driver_components = [ "meta/aml-saradc.cm" ]
     },
     {
-      package_target = "//src/devices/block/drivers/aml-sdmmc:package-dfv2"
+      package_target = "//src/devices/block/drivers/aml-sdmmc:package"
       package_set = "bootfs"
-      driver_components = [ "meta/aml-sdmmc-dfv2.cm" ]
+      driver_components = [ "meta/aml-sdmmc.cm" ]
     },
     {
       package_target = "//src/devices/block/drivers/bootpart:package"
