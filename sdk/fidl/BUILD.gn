@@ -67,6 +67,7 @@ sdk_fidl_targets = [
   "//sdk/fidl/fuchsia.hardware.i2c:fuchsia.hardware.i2c",
   "//sdk/fidl/fuchsia.hardware.light:fuchsia.hardware.light",
   "//sdk/fidl/fuchsia.hardware.network:fuchsia.hardware.network",
+  "//sdk/fidl/fuchsia.hardware.power:fuchsia.hardware.power",
   "//sdk/fidl/fuchsia.hardware.power.sensor:fuchsia.hardware.power.sensor",
   "//sdk/fidl/fuchsia.hardware.power.statecontrol:fuchsia.hardware.power.statecontrol",
   "//sdk/fidl/fuchsia.hardware.radar:fuchsia.hardware.radar",

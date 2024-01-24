@@ -1,29 +1,24 @@
 // Copyright 2023 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-@available(added=HEAD)
 library fuchsia.hardware.power;
 
 using zx;
 
-@available(added=HEAD)
 const MAX_NAME_LENGTH uint16 = 63;
+
 /// This means we could have up to 128 power levels, which seems like more than
 /// enough.
-@available(added=HEAD)
 const MAX_TRANSITIONS uint16 = 127;
 
 /// Should be MAX_TRANSITIONS + 1
-@available(added=HEAD)
 const MAX_LEVELS uint16 = 128;
 
-@available(added=HEAD)
 const MAX_DEPENDENCIES uint16 = 128;
 
 /// The length of time it takes to move to a power level.
 /// + `target_level` is the power level we're moving to.
 /// + `latency_us` is the time it takes to move to the level in microseconds.
-@available(added=HEAD)
 type Transition = table {
     1: target_level uint16;
     2: latency_us uint32;
@@ -35,7 +30,6 @@ type Transition = table {
 ///   debugging.
 /// + `transitions` describes the levels that are valid transitions from this
 ///   `PowerLevel`.
-@available(added=HEAD)
 type PowerLevel = table {
     1: level uint16;
     2: name string:MAX_NAME_LENGTH;
@@ -44,7 +38,6 @@ type PowerLevel = table {
 
 /// Set of `PowerLevel`s and a human-readable identifier. A `PowerLevel` itself
 /// contains information about valid transitions out of that level.
-@available(added=HEAD)
 type PowerElement = table {
     1: name string:MAX_NAME_LENGTH;
     2: levels vector<PowerLevel>:MAX_LEVELS;
@@ -52,7 +45,6 @@ type PowerElement = table {
 
 /// Represents a dependency between two power levels of two different
 /// `PowerElement`s.
-@available(added=HEAD)
 type LevelTuple = table {
     1: child_level uint16;
     2: parent_level uint16;
@@ -64,7 +56,6 @@ type LevelTuple = table {
 /// + `child` is the name for a `PowerElement` which a driver owns.
 /// + `parent` is the name for a `PowerElement` which a driver has access to
 /// + `level_deps` is the map of level dependencies from `child` to `parent`.
-@available(added=HEAD)
 type PowerDependency = table {
     1: child string:MAX_NAME_LENGTH;
     2: parent string:MAX_NAME_LENGTH;
@@ -73,14 +64,12 @@ type PowerDependency = table {
 
 /// Contains the `PowerElement` description and any dependencies it has on
 /// other `PowerElement`s.
-@available(added=HEAD)
 type PowerElementConfiguration = table {
     1: element PowerElement;
     2: dependencies vector<PowerDependency>:MAX_DEPENDENCIES;
 };
 
 @discoverable
-@available(added=HEAD)
 open protocol PowerTokenProvider {
     /// Returns a token which can be used with `fuchsia.power.broker` APIs to
     /// create a relationship between this driver's power element(s) and the

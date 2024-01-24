@@ -5,14 +5,12 @@ library fuchsia.hardware.power;
 
 using zx;
 
-@available(added=HEAD)
 type PowerDomainStatus = strict enum : uint8 {
     DISABLED = 1;
     ENABLED = 2;
 };
 
 @discoverable
-@available(added=HEAD)
 closed protocol Device {
     /// Register the callee for this power domain. The callee will be registered until
     /// UnregisterPowerDomain is called. Any voltage changes to the power domain will
@@ -62,7 +60,6 @@ closed protocol Device {
     }) error zx.Status;
 };
 
-@available(added=HEAD)
 service Service {
     device client_end:Device;
 };

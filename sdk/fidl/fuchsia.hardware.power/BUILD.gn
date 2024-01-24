@@ -7,8 +7,9 @@ import("//build/fidl/fidl.gni")
 fidl("fuchsia.hardware.power") {
   sources = [
     "config.fidl",
+    "overview.fidl",
     "power.fidl",
   ]
-  sdk_category = "internal"
+  sdk_category = "partner"
   public_deps = [ "//zircon/vdso/zx" ]
 }
