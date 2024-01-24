@@ -464,11 +464,10 @@ impl FileOps for LoopDeviceFile {
                     //
                     //   This operation is possible only if the loop device is read-only and the
                     //   new backing store is the same size and type as the old backing store.
-                    //
-                    // TODO: Add a check for the backing store size, once we know what that means.
                     if !state.flags.contains(LoopDeviceFlags::READ_ONLY) {
                         return error!(EINVAL);
                     }
+                    track_stub!("check backing store size before change loop fd");
                     state.backing_file = Some(backing_file);
                     Ok(SUCCESS)
                 } else {

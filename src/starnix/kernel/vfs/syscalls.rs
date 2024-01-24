@@ -30,6 +30,7 @@ use starnix_uapi::{
     auth::{CAP_DAC_READ_SEARCH, CAP_SYS_ADMIN, CAP_WAKE_ALARM, PTRACE_MODE_ATTACH_REALCREDS},
     device_type::DeviceType,
     epoll_event, errno, error,
+    errors::EFAULT,
     errors::{Errno, ErrnoResultExt, EINTR, ENAMETOOLONG, ETIMEDOUT},
     f_owner_ex,
     file_mode::{Access, FileMode},
@@ -416,12 +417,12 @@ fn do_writev(
     if flags != 0 {
         track_stub!("pwritev2", flags);
     }
-    // TODO(https://fxbug.dev/117677) Allow partial writes.
+
     let file = current_task.files.get(fd)?;
     let iovec = current_task.read_iovec(iovec_addr, iovec_count)?;
     let mut data = UserBuffersInputBuffer::unified_new(current_task, iovec)?;
     let mut locked = locked.cast_locked::<FileOpsWrite>();
-    if let Some(offset) = offset {
+    let res = if let Some(offset) = offset {
         file.write_at(
             &mut locked,
             current_task,
@@ -430,7 +431,16 @@ fn do_writev(
         )
     } else {
         file.write(&mut locked, current_task, &mut data)
+    };
+
+    match &res {
+        Err(e) if e.code == EFAULT => {
+            track_stub!(TODO("https://fxbug.dev/297370529"), "allow partial writes")
+        }
+        _ => (),
     }
+
+    res
 }
 
 pub fn sys_writev(
@@ -549,7 +559,7 @@ struct LookupFlags {
     symlink_mode: SymlinkMode,
 
     /// Automount directories on the path.
-    // TODO(https://fxbug.dev/91430): Support the `AT_NO_AUTOMOUNT` flag.
+    // TODO(https://fxbug.dev/297370602): Support the `AT_NO_AUTOMOUNT` flag.
     #[allow(dead_code)]
     automount: bool,
 }
@@ -571,7 +581,7 @@ impl LookupFlags {
         let automount =
             if allowed_flags & AT_NO_AUTOMOUNT != 0 { flags & AT_NO_AUTOMOUNT == 0 } else { false };
         if automount {
-            track_stub!("LookupFlags::automount");
+            track_stub!(TODO("https://fxbug.dev/297370602"), "LookupFlags::automount");
         }
         Ok(LookupFlags {
             allow_empty_path: flags & AT_EMPTY_PATH != 0,
@@ -2297,9 +2307,10 @@ pub fn sys_ppoll(
     match (current_task.write_object(user_timespec, &remaining_timespec), poll_result) {
         // If write was ok, and poll was ok, return poll result.
         (Ok(_), Ok(num_events)) => Ok(num_events),
-        // TODO: Here we should return an error that indicates the syscall should return EINTR if
-        // interrupted by a signal with a user handler, and otherwise be restarted.
-        (Ok(_), Err(e)) if e == EINTR => error!(EINTR),
+        (Ok(_), Err(e)) if e == EINTR => {
+            track_stub!("restart ppoll if not user handle");
+            error!(EINTR)
+        }
         (Ok(_), poll_result) => poll_result,
         // If write was a failure, return the poll result unchanged.
         (Err(_), poll_result) => poll_result,
@@ -2361,7 +2372,6 @@ pub fn sys_fadvise64(
     len: off_t,
     advice: u32,
 ) -> Result<(), Errno> {
-    // TODO(https://fxbug.dev/125680): Implement fadvise.
     match advice {
         POSIX_FADV_NORMAL
         | POSIX_FADV_RANDOM
@@ -2369,7 +2379,10 @@ pub fn sys_fadvise64(
         | POSIX_FADV_WILLNEED
         | POSIX_FADV_DONTNEED
         | POSIX_FADV_NOREUSE => (),
-        _ => return error!(EINVAL),
+        _ => {
+            track_stub!("fadvise64 unknown advice", advice);
+            return error!(EINVAL);
+        }
     }
 
     if offset < 0 || len < 0 {
@@ -2386,6 +2399,8 @@ pub fn sys_fadvise64(
     if file.flags().contains(OpenFlags::PATH) {
         return error!(EBADF);
     }
+
+    track_stub!(TODO("https://fxbug.dev/297434181"), "fadvise64");
 
     Ok(())
 }

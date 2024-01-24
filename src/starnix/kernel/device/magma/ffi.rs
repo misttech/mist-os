@@ -52,6 +52,7 @@ use magma::{
     MAGMA_QUERY_VENDOR_ID, MAGMA_STATUS_INVALID_ARGS, MAGMA_STATUS_OK, MAGMA_VENDOR_ID_INTEL,
     MAGMA_VENDOR_ID_MALI,
 };
+use starnix_logging::track_stub;
 use starnix_uapi::{
     errno,
     errors::Errno,
@@ -224,15 +225,16 @@ pub fn device_import(
     _control: virtio_magma_device_import_ctrl_t,
     response: &mut virtio_magma_device_import_resp_t,
 ) -> Result<MagmaDevice, Errno> {
-    // TODO(https://fxbug.dev/100454): This currently picks the first available device in the allowlist, but
-    // multiple devices should probably be exposed to clients.
     let entries =
         std::fs::read_dir("/dev/class/gpu").map_err(|_| errno!(EINVAL))?.filter_map(|x| x.ok());
 
-    let magma_device = entries
-        .filter_map(|entry| attempt_open_path(entry.path()).ok())
-        .next()
-        .ok_or_else(|| errno!(EINVAL))?;
+    let mut magma_devices = entries.filter_map(|entry| attempt_open_path(entry.path()).ok());
+    let magma_device = magma_devices.next().ok_or_else(|| errno!(EINVAL))?;
+
+    if magma_devices.next().is_some() {
+        track_stub!(TODO("https://fxbug.dev/297445280"), "expose multiple magma devices");
+    }
+
     response.result_return = MAGMA_STATUS_OK as u64;
 
     response.device_out = magma_device.handle;

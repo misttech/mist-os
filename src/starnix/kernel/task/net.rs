@@ -11,6 +11,7 @@ use crate::{
         FsNodeHandle, FsNodeOps, FsStr, FsString, SeekTarget, StaticDirectoryBuilder,
     },
 };
+use starnix_logging::track_stub;
 use starnix_sync::Mutex;
 use starnix_uapi::{errno, errors::Errno, off_t, open_flags::OpenFlags};
 use std::{collections::HashMap, sync::Arc};
@@ -43,9 +44,7 @@ impl NetstackDevices {
             // `/sys/devices`. However, currently known use-cases only enumerate
             // the nodes in `/sys/class/net` so we enable that use-case with the
             // workaround here where we create empty directories.
-            //
-            // TODO(https://fxbug.dev/128794): Support `/sys/class/net`
-            // properly.
+            track_stub!(TODO("https://fxbug.dev/297438880"), "/sys/class/net");
             StaticDirectoryBuilder::new(sys_fs).build(current_task)
         });
 

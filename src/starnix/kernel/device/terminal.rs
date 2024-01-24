@@ -19,6 +19,7 @@ use crate::{
         FdEvents,
     },
 };
+use starnix_logging::track_stub;
 use starnix_sync::{LockBefore, Locked, ProcessGroupState};
 use starnix_uapi::{
     auth::FsCred,
@@ -28,8 +29,9 @@ use starnix_uapi::{
     errors::Errno,
     pid_t,
     signals::{Signal, SIGINT, SIGQUIT, SIGSTOP},
-    tcflag_t, uapi, ECHO, ECHOCTL, ECHONL, ICANON, ICRNL, IEXTEN, IGNCR, INLCR, ISIG, IUTF8, OCRNL,
-    ONLCR, ONLRET, ONOCR, OPOST, TABDLY, VEOF, VEOL, VEOL2, VERASE, VINTR, VQUIT, VSUSP, XTABS,
+    tcflag_t, uapi, ECHO, ECHOCTL, ECHOE, ECHOK, ECHOKE, ECHONL, ECHOPRT, ICANON, ICRNL, IEXTEN,
+    IGNCR, INLCR, ISIG, IUTF8, OCRNL, ONLCR, ONLRET, ONOCR, OPOST, TABDLY, VEOF, VEOL, VEOL2,
+    VERASE, VINTR, VQUIT, VSUSP, XTABS,
 };
 
 // CANON_MAX_BYTES is the number of bytes that fit into a single line of
@@ -773,11 +775,18 @@ impl TerminalMutableState<Base = Terminal> {
                 queue.read_buffer.extend_from_slice(&character_bytes);
             }
 
-            // TODO: Implement remaining echo flags:
-            // * ECHOE
-            // * ECHOPRT
-            // * ECHOK
-            // * ECHOKE
+            if self.termios.has_local_flags(ECHOE) {
+                track_stub!("terminal ECHOE");
+            }
+            if self.termios.has_local_flags(ECHOPRT) {
+                track_stub!("terminal ECHOPRT");
+            }
+            if self.termios.has_local_flags(ECHOK) {
+                track_stub!("terminal ECHOK");
+            }
+            if self.termios.has_local_flags(ECHOKE) {
+                track_stub!("terminal ECHOKE");
+            }
 
             // Anything written to the read buffer will have to be echoed.
             let mut echo_bytes = vec![];

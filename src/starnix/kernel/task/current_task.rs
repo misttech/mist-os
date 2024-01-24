@@ -1291,7 +1291,6 @@ impl CurrentTask {
         L: LockBefore<MmDumpable>,
         L: LockBefore<TaskRelease>,
     {
-        // TODO: Implement more flags.
         const IMPLEMENTED_FLAGS: u64 = (CLONE_VM
             | CLONE_FS
             | CLONE_FILES
@@ -1312,12 +1311,27 @@ impl CurrentTask {
 
         // CLONE_SETTLS is implemented by sys_clone.
 
+        let clone_files = flags & (CLONE_FILES as u64) != 0;
+        let clone_fs = flags & (CLONE_FS as u64) != 0;
+        let clone_parent_settid = flags & (CLONE_PARENT_SETTID as u64) != 0;
+        let clone_child_cleartid = flags & (CLONE_CHILD_CLEARTID as u64) != 0;
+        let clone_child_settid = flags & (CLONE_CHILD_SETTID as u64) != 0;
+        let clone_sysvsem = flags & (CLONE_SYSVSEM as u64) != 0;
+        let clone_ptrace = flags & (CLONE_PTRACE as u64) != 0;
         let clone_thread = flags & (CLONE_THREAD as u64) != 0;
         let clone_vm = flags & (CLONE_VM as u64) != 0;
         let clone_sighand = flags & (CLONE_SIGHAND as u64) != 0;
         let clone_vfork = flags & (CLONE_VFORK as u64) != 0;
 
         let new_uts = flags & (CLONE_NEWUTS as u64) != 0;
+
+        if clone_ptrace {
+            track_stub!("CLONE_PTRACE");
+        }
+
+        if clone_sysvsem {
+            track_stub!("CLONE_SYSVSEM");
+        }
 
         if clone_sighand && !clone_vm {
             return error!(EINVAL);
@@ -1341,7 +1355,7 @@ impl CurrentTask {
             // the two processes. And the vfork() man page explicitly allows vfork() to be
             // implemented as fork() which is what we do here.
             if !clone_vfork {
-                log_warn!("CLONE_VM set without CLONE_THREAD. Ignoring CLONE_VM (doing a fork).");
+                track_stub!("CLONE_VM without CLONE_THREAD or CLONE_VFORK");
             }
         } else if clone_thread && !clone_vm {
             track_stub!("CLONE_THREAD without CLONE_VM");
@@ -1353,9 +1367,8 @@ impl CurrentTask {
             return error!(ENOSYS);
         }
 
-        let fs = if flags & (CLONE_FS as u64) != 0 { self.fs().clone() } else { self.fs().fork() };
-        let files =
-            if flags & (CLONE_FILES as u64) != 0 { self.files.clone() } else { self.files.fork() };
+        let fs = if clone_fs { self.fs().clone() } else { self.fs().fork() };
+        let files = if clone_files { self.files.clone() } else { self.files.fork() };
 
         let kernel = self.kernel();
         let mut pids = kernel.pids.write();
@@ -1427,11 +1440,7 @@ impl CurrentTask {
         };
 
         // Only create the vfork event when the caller requested CLONE_VFORK.
-        let vfork_event = if flags & (CLONE_VFORK as u64) != 0 {
-            Some(Arc::new(zx::Event::create()))
-        } else {
-            None
-        };
+        let vfork_event = if clone_vfork { Some(Arc::new(zx::Event::create())) } else { None };
 
         let mut child = TaskBuilder::new(Task::new(
             pid,
@@ -1491,15 +1500,15 @@ impl CurrentTask {
                 self.mm().snapshot_to(locked, child.mm())?;
             }
 
-            if flags & (CLONE_PARENT_SETTID as u64) != 0 {
+            if clone_parent_settid {
                 self.write_object(user_parent_tid, &child.id)?;
             }
 
-            if flags & (CLONE_CHILD_CLEARTID as u64) != 0 {
+            if clone_child_cleartid {
                 child.write().clear_child_tid = user_child_tid;
             }
 
-            if flags & (CLONE_CHILD_SETTID as u64) != 0 {
+            if clone_child_settid {
                 child.write_object(user_child_tid, &child.id)?;
             }
             child.thread_state = self.thread_state.snapshot();

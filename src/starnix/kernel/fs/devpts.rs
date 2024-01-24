@@ -216,7 +216,7 @@ impl FsNodeOps for DevPtsRootDir {
                     );
                     info.rdev = get_device_type_for_pts(id);
                     info.blksize = BLOCK_SIZE;
-                    // TODO(qsr): set gid to the tty group
+                    track_stub!("devpts set gid to tty group");
                     info.gid = 0;
                     let node =
                         node.fs().create_node_with_id(current_task, SpecialNode, info.ino, info);
@@ -640,7 +640,7 @@ where
             Ok(SUCCESS)
         }
         TCSETSW => {
-            // TODO(qsr): This should drain the output queue first.
+            track_stub!("TCSETSW drain output queue first");
             let termios = current_task.read_object(UserRef::<uapi::termios>::new(user_addr))?;
             terminal.set_termios(locked, termios);
             Ok(SUCCESS)

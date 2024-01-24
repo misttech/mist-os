@@ -18,6 +18,7 @@ use fidl::{
 };
 use fidl_fuchsia_io as fio;
 use fuchsia_zircon as zx;
+use starnix_logging::track_stub;
 use starnix_sync::{FileOpsRead, FileOpsWrite};
 use starnix_uapi::{
     device_type::DeviceType, errno, error, errors::Errno, file_mode::FileMode, ino_t, off_t,
@@ -430,7 +431,7 @@ impl directory::entry_container::Directory for StarnixNodeConnection {
         _mask: fio::WatchMask,
         _watcher: directory::entry_container::DirectoryWatcher,
     ) -> Result<(), zx::Status> {
-        // TODO: Implement watcher using inotify apis.
+        track_stub!("register directory watcher");
         Ok(())
     }
     fn unregister_watcher(self: Arc<Self>, _key: usize) {}

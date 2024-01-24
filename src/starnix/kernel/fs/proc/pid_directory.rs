@@ -20,6 +20,7 @@ use fuchsia_zircon as zx;
 use itertools::Itertools;
 use once_cell::sync::Lazy;
 use regex::Regex;
+use starnix_logging::track_stub;
 use starnix_sync::{FileOpsRead, FileOpsWrite, Locked};
 use starnix_uapi::{
     auth::CAP_SYS_RESOURCE,
@@ -278,7 +279,6 @@ impl FsNodeOps for FdDirectory {
             current_task,
             CallbackSymlinkNode::new(move || {
                 let task = Task::from_weak(&task_reference)?;
-                //Task::try_from(&task_reference)?;
                 let file = task.files.get(fd).map_err(|_| errno!(ENOENT))?;
                 Ok(SymlinkTarget::Node(file.name.clone()))
             }),
@@ -354,18 +354,55 @@ impl FsNodeOps for NsDirectory {
             if !NS_IDENTIFIER_RE.is_match(id) {
                 return error!(ENOENT);
             }
-            let node_info = FsNodeInfo::new_factory(mode!(IFREG, 0o444), task.as_fscred());
-
+            let node_info = || FsNodeInfo::new_factory(mode!(IFREG, 0o444), task.as_fscred());
+            let fallback =
+                || node.fs().create_node(current_task, BytesFile::new_node(vec![]), node_info());
             Ok(match ns {
+                "cgroup" => {
+                    track_stub!(TODO("https://fxbug.dev/297313673"), "cgroup namespaces");
+                    fallback()
+                }
+                "ipc" => {
+                    track_stub!(TODO("https://fxbug.dev/297313673"), "ipc namespaces");
+                    fallback()
+                }
                 "mnt" => node.fs().create_node(
                     current_task,
                     current_task.task.fs().namespace(),
-                    node_info,
+                    node_info(),
                 ),
-                _ => {
-                    // TODO(https://fxbug.dev/76946) support other kinds of namespaces
-                    node.fs().create_node(current_task, BytesFile::new_node(vec![]), node_info)
+                "net" => {
+                    track_stub!(TODO("https://fxbug.dev/297313673"), "net namespaces");
+                    fallback()
                 }
+                "pid" => {
+                    track_stub!(TODO("https://fxbug.dev/297313673"), "pid namespaces");
+                    fallback()
+                }
+                "pid_for_children" => {
+                    track_stub!(TODO("https://fxbug.dev/297313673"), "pid_for_children namespaces");
+                    fallback()
+                }
+                "time" => {
+                    track_stub!(TODO("https://fxbug.dev/297313673"), "time namespaces");
+                    fallback()
+                }
+                "time_for_children" => {
+                    track_stub!(
+                        TODO("https://fxbug.dev/297313673"),
+                        "time_for_children namespaces"
+                    );
+                    fallback()
+                }
+                "user" => {
+                    track_stub!(TODO("https://fxbug.dev/297313673"), "user namespaces");
+                    fallback()
+                }
+                "uts" => {
+                    track_stub!(TODO("https://fxbug.dev/297313673"), "uts namespaces");
+                    fallback()
+                }
+                _ => return error!(ENOENT),
             })
         } else {
             // The name is {namespace}, link to the correct one of the current task.
@@ -629,7 +666,7 @@ impl IoFile {
 }
 impl DynamicFileSource for IoFile {
     fn generate(&self, sink: &mut DynamicFileBuf) -> Result<(), Errno> {
-        // TODO: Keep track of these stats and report them in this file.
+        track_stub!("/proc/pid/io");
         sink.write(b"rchar: 0\n");
         sink.write(b"wchar: 0\n");
         sink.write(b"syscr: 0\n");
@@ -963,16 +1000,16 @@ impl DynamicFileSource for StatusFile {
             let task_group = task.thread_group.read();
             (task_group.get_ppid(), task_group.tasks_count())
         } else {
-            // TODO(https://fxbug.dev/129993): The data is incorrect, and requires keeping information for zombie processes.
+            track_stub!(TODO("https://fxbug.dev/297440106"), "/proc/pid/status zombies");
             (1, 1)
         };
         writeln!(sink, "PPid:\t{}", ppid)?;
 
-        // TODO(tbodt): the fourth one is supposed to be fsuid, but we haven't implemented fsuid.
         let creds = info.creds();
         writeln!(sink, "Uid:\t{}\t{}\t{}\t{}", creds.uid, creds.euid, creds.saved_uid, creds.euid)?;
         writeln!(sink, "Gid:\t{}\t{}\t{}\t{}", creds.gid, creds.egid, creds.saved_gid, creds.egid)?;
         writeln!(sink, "Groups:\t{}", creds.groups.iter().map(|n| n.to_string()).join(" "))?;
+        track_stub!("/proc/pid/status fsuid");
 
         if let Some(task) = task {
             let mem_stats = task.mm().get_stats().map_err(|_| errno!(EIO))?;
@@ -1005,8 +1042,7 @@ impl OomScoreFile {
 impl BytesFileOps for OomScoreFile {
     fn read(&self, _current_task: &CurrentTask) -> Result<Cow<'_, [u8]>, Errno> {
         let _task = Task::from_weak(&self.0)?;
-        // TODO: Compute this score from the amount of memory used by the task.
-        // See https://man7.org/linux/man-pages/man5/proc.5.html for the algorithm.
+        track_stub!("/proc/pid/oom_score");
         Ok(serialize_i32_file(0).into())
     }
 }

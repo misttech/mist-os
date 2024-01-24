@@ -146,9 +146,7 @@ async fn main() -> Result<(), Error> {
         );
     }
     inspector.root().record_lazy_child("not_found", starnix_logging::not_found_lazy_node_callback);
-    inspector
-        .root()
-        .record_lazy_child("not_implemented", starnix_logging::track_stub_lazy_node_callback);
+    inspector.root().record_lazy_child("stubs", starnix_logging::track_stub_lazy_node_callback);
 
     log_debug!("Serving kernel services on outgoing directory handle.");
     fs.take_and_serve_directory_handle()?;

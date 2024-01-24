@@ -18,7 +18,10 @@ use crate::{
         PtraceAttachType, SchedulerPolicy, SeccompAction, SeccompStateValue, Task,
         PR_SET_PTRACER_ANY,
     },
-    vfs::{FdNumber, FileHandle, MountNamespaceFile, UserBuffersOutputBuffer, VecOutputBuffer},
+    vfs::{
+        FdNumber, FileHandle, MountNamespaceFile, PidFdFileObject, UserBuffersOutputBuffer,
+        VecOutputBuffer,
+    },
 };
 use starnix_logging::{log_error, log_trace, set_zx_name, track_stub};
 use starnix_sync::{FileOpsRead, MmDumpable, TaskRelease};
@@ -285,7 +288,7 @@ pub fn sys_getcpu(
     cpu_out: UserRef<u32>,
     node_out: UserRef<u32>,
 ) -> Result<(), Errno> {
-    // TODO(https://fxbug.dev/76948) make this a real implementation
+    track_stub!(TODO("https://fxbug.dev/297305396"), "real getcpu implementation");
     let fake_cpu_and_node = std::u32::MAX;
     current_task.write_object(cpu_out, &fake_cpu_and_node)?;
     current_task.write_object(node_out, &fake_cpu_and_node)?;
@@ -1128,7 +1131,7 @@ pub fn sys_getrusage(
 ) -> Result<(), Errno> {
     const RUSAGE_SELF: i32 = starnix_uapi::uapi::RUSAGE_SELF as i32;
     const RUSAGE_THREAD: i32 = starnix_uapi::uapi::RUSAGE_THREAD as i32;
-    // TODO(https://fxbug.dev/76811): Implement proper rusage.
+    track_stub!(TODO("https://fxbug.dev/297370242"), "real rusage");
     let time_stats = match who {
         RUSAGE_CHILDREN => current_task.task.thread_group.read().children_time_stats,
         RUSAGE_SELF => current_task.task.thread_group.time_stats(),
@@ -1172,7 +1175,6 @@ pub fn sys_prlimit64(
     user_new_limit: UserRef<rlimit>,
     user_old_limit: UserRef<rlimit>,
 ) -> Result<(), Errno> {
-    // TODO: Lookup tasks by pid.
     if pid != 0 {
         track_stub!("prlimit64 with non 0 pid");
         return error!(ENOSYS);
@@ -1457,7 +1459,7 @@ pub fn sys_getpriority(
         PRIO_PROCESS => {}
         _ => return error!(EINVAL),
     }
-    // TODO(tbodt): check permissions
+    track_stub!("getpriority permissions");
     let weak = get_task_or_current(current_task, who);
     let target_task = Task::from_weak(&weak)?;
     let state = target_task.read();
@@ -1475,7 +1477,7 @@ pub fn sys_setpriority(
         PRIO_PROCESS => {}
         _ => return error!(EINVAL),
     }
-    // TODO(tbodt): check permissions
+    track_stub!("setpriority permissions");
     let weak = get_task_or_current(current_task, who);
     let target_task = Task::from_weak(&weak)?;
     // The priority passed into setpriority is actually in the -19...20 range and is not
@@ -1508,13 +1510,15 @@ pub fn sys_setns(
             return error!(EINVAL);
         }
 
-        // TODO(https://fxbug.dev/130293) enforce CLONE_FS limitations
-
+        track_stub!(TODO("https://fxbug.dev/297312091"), "setns CLONE_FS limitations");
         current_task.task.fs().set_namespace(mount_ns.0.clone())?;
         return Ok(());
     }
 
-    // TODO(https://fxbug.dev/75966) support PID fd's from pidfd_open
+    if let Some(_pidfd) = file_handle.downcast_file::<PidFdFileObject>() {
+        track_stub!(TODO("https://fxbug.dev/297312844"), "setns w/ pidfd");
+        return error!(ENOSYS);
+    }
 
     // If we didn't encounter a supported type of file descriptor above, then ns_fd is not a
     // suitable namespace to set for this task.
@@ -1569,7 +1573,7 @@ pub fn sys_swapon(
         return error!(EPERM);
     }
 
-    // TODO: Validate flags.
+    track_stub!("swapon validate flags");
 
     let path = current_task.read_c_string_to_vec(user_path, PATH_MAX as usize)?;
     let file = current_task.open_file(path.as_ref(), OpenFlags::RDWR)?;

@@ -748,7 +748,7 @@ impl DynamicFileSource for LoadavgFile {
             (runnable_tasks, existing_tasks, pid_table.last_pid())
         };
 
-        // TODO: Collect and report load stats.
+        track_stub!("/proc/loadavg load stats");
         writeln!(sink, "0.50 0.50 0.50 {}/{} {}", runnable_tasks, existing_tasks, last_pid)?;
         Ok(())
     }
@@ -765,10 +765,8 @@ impl SwapsFile {
 }
 impl DynamicFileSource for SwapsFile {
     fn generate(&self, sink: &mut DynamicFileBuf) -> Result<(), Errno> {
+        track_stub!("/proc/swaps include Kernel::swap_files");
         writeln!(sink, "Filename\t\t\t\tType\t\tSize\t\tUsed\t\tPriority")?;
-        // TODO: Include information about the `swap_files` in Kernel. We don't
-        // include this information yet because `swap_files` is an OrderedMutex
-        // and we don't have the lock state plumbed through this deep.
         Ok(())
     }
 }

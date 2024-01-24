@@ -18,7 +18,7 @@ use crate::{
 use bitflags::bitflags;
 use fuchsia_zircon as zx;
 use once_cell::sync::OnceCell;
-use starnix_logging::log_error;
+use starnix_logging::{log_error, track_stub};
 use starnix_sync::{Mutex, RwLock, RwLockReadGuard};
 use starnix_uapi::{
     __kernel_ulong_t,
@@ -1688,7 +1688,9 @@ impl FsNode {
             return error!(EINVAL);
         }
 
-        let mut stx_attributes = 0; // TODO(https://fxbug.dev/302594110)
+        track_stub!(TODO("https://fxbug.dev/302594110"), "statx attributes");
+        let stx_mnt_id = 0;
+        let mut stx_attributes = 0;
         let stx_attributes_mask = STATX_ATTR_VERITY as u64;
 
         if matches!(*self.fsverity.lock(), FsVerityState::FsVerity) {
@@ -1725,7 +1727,7 @@ impl FsNode {
 
             stx_dev_major: self.fs().dev_id.major(),
             stx_dev_minor: self.fs().dev_id.minor(),
-            stx_mnt_id: 0, // TODO(https://fxbug.dev/302594110)
+            stx_mnt_id,
             ..Default::default()
         })
     }

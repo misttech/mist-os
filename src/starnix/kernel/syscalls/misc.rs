@@ -91,20 +91,20 @@ pub fn sys_sysinfo(
     let page_size = zx::system_get_page_size();
     let total_ram_pages = zx::system_get_physmem() / (page_size as u64);
     let num_procs = current_task.kernel().pids.read().len();
+
+    track_stub!(TODO("https://fxbug.dev/297374270"), "compute system load");
+    let loads = [0; 3];
+
+    track_stub!("compute actual free ram usage");
+    let freeram = total_ram_pages / 8;
+
     let result = uapi::sysinfo {
         uptime: (zx::Time::get_monotonic() - zx::Time::ZERO).into_seconds(),
-
-        // TODO(https://fxbug.dev/125626): Report system load.
-        loads: [0; 3],
-
+        loads,
         totalram: total_ram_pages,
-
-        // TODO(https://fxbug.dev/125625): Return actual memory usage.
-        freeram: total_ram_pages / 8,
-
+        freeram,
         procs: num_procs.try_into().map_err(|_| errno!(EINVAL))?,
         mem_unit: page_size,
-
         ..Default::default()
     };
 

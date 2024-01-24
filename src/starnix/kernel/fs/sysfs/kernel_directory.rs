@@ -6,6 +6,7 @@ use crate::{
     task::CurrentTask,
     vfs::{create_bytes_file_with_handler, StaticDirectoryBuilder},
 };
+use starnix_logging::track_stub;
 use starnix_uapi::file_mode::mode;
 use std::sync::Arc;
 
@@ -29,9 +30,13 @@ pub fn sysfs_kernel_directory(current_task: &CurrentTask, dir: &mut StaticDirect
                 current_task,
                 "last_suspend_time",
                 create_bytes_file_with_handler(Arc::downgrade(kernel), |kernel| {
-                    // TODO(b/303507442): It contains two numbers (in seconds) separated by space.
+                    // It contains two numbers (in seconds) separated by space.
                     // First number is the time spent in suspend and resume processes.
                     // Second number is the time spent in sleep state.
+                    track_stub!(
+                        TODO("https://fxbug.dev/303507442"),
+                        "/sys/kernel/wakeup_reasons/last_suspend_time"
+                    );
                     let suspend_time = kernel
                         .power_manager
                         .suspend_stats()

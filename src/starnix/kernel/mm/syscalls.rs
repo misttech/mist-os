@@ -264,7 +264,9 @@ pub fn sys_process_vm_readv(
         local_iov,
         remote_iov
     );
-    // TODO(tbodt): According to the man page, this syscall was added to Linux specifically to
+
+    track_stub!("process_vm_readv single-copy");
+    // According to the man page, this syscall was added to Linux specifically to
     // avoid doing two copies like other IPC mechanisms require. We should avoid this too at some
     // point.
     let mut output = UserBuffersOutputBuffer::unified_new(current_task, local_iov)?;
@@ -313,7 +315,9 @@ pub fn sys_process_vm_writev(
         local_iov,
         remote_iov
     );
-    // TODO(tbodt): According to the man page, this syscall was added to Linux specifically to
+
+    track_stub!("process_vm_writev single-copy");
+    // NB: According to the man page, this syscall was added to Linux specifically to
     // avoid doing two copies like other IPC mechanisms require. We should avoid this too at some
     // point.
     let mut input = UserBuffersInputBuffer::unified_new(current_task, local_iov)?;

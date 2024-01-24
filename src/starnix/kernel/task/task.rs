@@ -166,7 +166,6 @@ pub enum StopState {
     /// In this state, we have stopped after executing a syscall
     SyscallExitStopping,
     SyscallExitStopped,
-    // TODO: Other states.
 }
 
 impl StopState {

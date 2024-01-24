@@ -15,8 +15,9 @@ use starnix_logging::{log_debug, track_stub};
 use starnix_uapi::{
     __NR_restart_syscall, _aarch64_ctx, error,
     errors::{Errno, ErrnoCode, ERESTART_RESTARTBLOCK},
-    esr_context, fpsimd_context, sigaction_t, sigaltstack, sigcontext, siginfo_t, ucontext,
-    ESR_MAGIC, EXTRA_MAGIC, FPSIMD_MAGIC,
+    esr_context, fpsimd_context, sigaction_t, sigaltstack, sigcontext, siginfo_t,
+    signals::{SIGBUS, SIGSEGV},
+    ucontext, ESR_MAGIC, EXTRA_MAGIC, FPSIMD_MAGIC,
 };
 use zerocopy::{AsBytes, FromBytes};
 
@@ -49,6 +50,11 @@ impl SignalStackFrame {
     ) -> SignalStackFrame {
         let mut regs = registers.r.to_vec();
         regs.push(registers.lr);
+
+        let fault_address = 0;
+        if signal_state.has_queued(SIGBUS) || signal_state.has_queued(SIGSEGV) {
+            track_stub!("arm64 signal fault address");
+        }
         let context = ucontext {
             uc_flags: 0,
             uc_link: Default::default(),
@@ -67,9 +73,7 @@ impl SignalStackFrame {
                 sp: registers.sp,
                 pc: registers.pc,
                 pstate: registers.cpsr,
-                // TODO(https://fxbug.dev/121659): Should actually contain the fault address for SIGBUS and
-                // SIGSEGV.
-                fault_address: 0,
+                fault_address,
                 __reserved: get_sigcontext_data(extended_pstate),
                 ..Default::default()
             },

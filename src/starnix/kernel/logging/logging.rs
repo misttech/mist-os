@@ -142,7 +142,6 @@ macro_rules! log_error {
 
 // Call this when you get an error that should "never" happen, i.e. if it does that means the
 // kernel was updated to produce some other error after this match was written.
-// TODO(tbodt): find a better way to handle this than a panic.
 #[track_caller]
 pub fn impossible_error(status: zx::Status) -> Errno {
     panic!("encountered impossible error: {status}");

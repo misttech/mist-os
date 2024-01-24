@@ -16,7 +16,7 @@ use crate::{
 };
 use bstr::ByteSlice;
 use starnix_lifecycle::AtomicU64Counter;
-use starnix_logging::log_warn;
+use starnix_logging::{log_warn, track_stub};
 use starnix_sync::{FileOpsIoctl, FileOpsRead, FileOpsWrite, Locked, Mutex};
 use starnix_syscalls::{decls::Syscall, SyscallArg, SyscallResult};
 use starnix_uapi::{
@@ -442,7 +442,7 @@ impl SeccompState {
                 None
             }
             SeccompAction::Trace => {
-                // TODO(https://fxbug.dev/76810): Because there is no ptrace support, this returns ENOSYS
+                track_stub!(TODO("https://fxbug.dev/297311898"), "ptrace seccomp support");
                 Some(Err(errno!(ENOSYS)))
             }
             SeccompAction::Trap(errno) => {

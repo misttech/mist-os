@@ -16,7 +16,7 @@ use fuchsia_zircon::{self as zx, AsHandleRef};
 use starnix_uapi::{errors::Errno, open_flags::OpenFlags, pid_t};
 use std::sync::Arc;
 
-struct PidFdFileObject {
+pub struct PidFdFileObject {
     // In principle, we need some way to designate a Task that is durable for
     // the lifetime of the `PidFdFileObject`. In practice, we never actually
     // reuse pids and have no mechanism for tracking which pids have been freed.

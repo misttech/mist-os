@@ -777,7 +777,7 @@ pub fn sys_waitid(
                 ..Default::default()
             };
 
-            // TODO(https://fxbug.dev/76976): Return proper usage information.
+            track_stub!("real rusage from waitid");
             current_task.write_object(user_rusage, &usage)?;
         }
 
@@ -827,13 +827,12 @@ pub fn sys_wait4(
         let status = waitable_process.exit_info.status.wait_status();
 
         if !user_rusage.is_null() {
+            track_stub!("real rusage from wait4");
             let usage = rusage {
                 ru_utime: timeval_from_duration(waitable_process.time_stats.user_time),
                 ru_stime: timeval_from_duration(waitable_process.time_stats.system_time),
                 ..Default::default()
             };
-
-            // TODO(https://fxbug.dev/76976): Return proper usage information.
             current_task.write_object(user_rusage, &usage)?;
         }
 

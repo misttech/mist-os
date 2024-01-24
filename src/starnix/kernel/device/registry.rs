@@ -17,7 +17,7 @@ use crate::{
     task::CurrentTask,
     vfs::{FileOps, FsNode, FsStr},
 };
-use starnix_logging::log_error;
+use starnix_logging::{log_error, track_stub};
 use starnix_uapi::{
     device_type::{DeviceType, DYN_MAJOR},
     errno, error,
@@ -100,16 +100,6 @@ pub fn simple_device_ops<T: Default + FileOps + 'static>(
     _flags: OpenFlags,
 ) -> Result<Box<dyn FileOps>, Errno> {
     Ok(Box::new(T::default()))
-}
-
-// TODO(https://fxbug.dev/128798): It's ideal to support all registered device nodes.
-pub fn create_unknown_device(
-    _current_task: &CurrentTask,
-    _id: DeviceType,
-    _node: &FsNode,
-    _flags: OpenFlags,
-) -> Result<Box<dyn FileOps>, Errno> {
-    error!(ENODEV)
 }
 
 /// Keys returned by the registration method for `DeviceListener`s that allows to unregister a
@@ -468,7 +458,7 @@ struct DynRegistry {
 
 impl DynRegistry {
     fn register(&mut self, device: impl DeviceOps) -> Result<DeviceType, Errno> {
-        // TODO(quiche): Emit a `uevent` to notify userspace of the new device.
+        track_stub!("emit uevent for dynamic registration");
 
         let minor = self.next_dynamic_minor;
         if minor > 255 {

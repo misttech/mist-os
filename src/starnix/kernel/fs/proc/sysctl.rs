@@ -225,27 +225,34 @@ pub struct ProcSysNetDev {
 impl ProcSysNetDev {
     pub fn new(current_task: &CurrentTask, proc_fs: &FileSystemHandle) -> Self {
         let file_mode = mode!(IFREG, 0o644);
-        // TODO(https://fxbug.dev/128995): Implement the "files" properly instead
-        // of using stubs.
         ProcSysNetDev {
             ipv4_neigh: {
                 let mut dir = StaticDirectoryBuilder::new(proc_fs);
                 dir.entry(
                     current_task,
                     "ucast_solicit",
-                    StubSysctl::new_node("/proc/sys/net/ipv4/DEVICE/neigh/ucast_solicit", None),
+                    StubSysctl::new_node(
+                        "/proc/sys/net/ipv4/DEVICE/neigh/ucast_solicit",
+                        Some("https://fxbug.dev/297439563"),
+                    ),
                     file_mode,
                 );
                 dir.entry(
                     current_task,
                     "retrans_time_ms",
-                    StubSysctl::new_node("/proc/sys/net/ipv4/DEVICE/neigh/retrans_time_ms", None),
+                    StubSysctl::new_node(
+                        "/proc/sys/net/ipv4/DEVICE/neigh/retrans_time_ms",
+                        Some("https://fxbug.dev/297439563"),
+                    ),
                     file_mode,
                 );
                 dir.entry(
                     current_task,
                     "mcast_resolicit",
-                    StubSysctl::new_node("/proc/sys/net/ipv4/DEVICE/neigh/mcast_resolicit", None),
+                    StubSysctl::new_node(
+                        "/proc/sys/net/ipv4/DEVICE/neigh/mcast_resolicit",
+                        Some("https://fxbug.dev/297439563"),
+                    ),
                     file_mode,
                 );
                 dir.build(current_task)
@@ -255,37 +262,55 @@ impl ProcSysNetDev {
                 dir.entry(
                     current_task,
                     "accept_ra",
-                    StubSysctl::new_node("/proc/sys/net/ipv4/DEVICE/conf/accept_ra", None),
+                    StubSysctl::new_node(
+                        "/proc/sys/net/ipv4/DEVICE/conf/accept_ra",
+                        Some("https://fxbug.dev/297439563"),
+                    ),
                     file_mode,
                 );
                 dir.entry(
                     current_task,
                     "dad_transmits",
-                    StubSysctl::new_node("/proc/sys/net/ipv4/DEVICE/conf/dad_transmits", None),
+                    StubSysctl::new_node(
+                        "/proc/sys/net/ipv4/DEVICE/conf/dad_transmits",
+                        Some("https://fxbug.dev/297439563"),
+                    ),
                     file_mode,
                 );
                 dir.entry(
                     current_task,
                     "use_tempaddr",
-                    StubSysctl::new_node("/proc/sys/net/ipv4/DEVICE/conf/use_tempaddr", None),
+                    StubSysctl::new_node(
+                        "/proc/sys/net/ipv4/DEVICE/conf/use_tempaddr",
+                        Some("https://fxbug.dev/297439563"),
+                    ),
                     file_mode,
                 );
                 dir.entry(
                     current_task,
                     "addr_gen_mode",
-                    StubSysctl::new_node("/proc/sys/net/ipv4/DEVICE/conf/addr_gen_mode", None),
+                    StubSysctl::new_node(
+                        "/proc/sys/net/ipv4/DEVICE/conf/addr_gen_mode",
+                        Some("https://fxbug.dev/297439563"),
+                    ),
                     file_mode,
                 );
                 dir.entry(
                     current_task,
                     "stable_secret",
-                    StubSysctl::new_node("/proc/sys/net/ipv4/DEVICE/conf/stable_secret", None),
+                    StubSysctl::new_node(
+                        "/proc/sys/net/ipv4/DEVICE/conf/stable_secret",
+                        Some("https://fxbug.dev/297439563"),
+                    ),
                     file_mode,
                 );
                 dir.entry(
                     current_task,
                     "disable_ipv6",
-                    StubSysctl::new_node("/proc/sys/net/ipv4/DEVICE/conf/disable_ip64", None),
+                    StubSysctl::new_node(
+                        "/proc/sys/net/ipv4/DEVICE/conf/disable_ip64",
+                        Some("https://fxbug.dev/297439563"),
+                    ),
                     file_mode,
                 );
                 dir.build(current_task)
@@ -295,19 +320,28 @@ impl ProcSysNetDev {
                 dir.entry(
                     current_task,
                     "ucast_solicit",
-                    StubSysctl::new_node("/proc/sys/net/ipv6/DEVICE/neigh/ucast_solicit", None),
+                    StubSysctl::new_node(
+                        "/proc/sys/net/ipv6/DEVICE/neigh/ucast_solicit",
+                        Some("https://fxbug.dev/297439563"),
+                    ),
                     file_mode,
                 );
                 dir.entry(
                     current_task,
                     "retrans_time_ms",
-                    StubSysctl::new_node("/proc/sys/net/ipv6/DEVICE/neigh/retrans_time_ms", None),
+                    StubSysctl::new_node(
+                        "/proc/sys/net/ipv6/DEVICE/neigh/retrans_time_ms",
+                        Some("https://fxbug.dev/297439563"),
+                    ),
                     file_mode,
                 );
                 dir.entry(
                     current_task,
                     "mcast_resolicit",
-                    StubSysctl::new_node("/proc/sys/net/ipv6/DEVICE/neigh/mcast_resolicit", None),
+                    StubSysctl::new_node(
+                        "/proc/sys/net/ipv6/DEVICE/neigh/mcast_resolicit",
+                        Some("https://fxbug.dev/297439563"),
+                    ),
                     file_mode,
                 );
                 dir.build(current_task)

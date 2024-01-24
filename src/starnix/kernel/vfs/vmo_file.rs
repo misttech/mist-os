@@ -15,7 +15,7 @@ use crate::{
 };
 use fidl::HandleBased;
 use fuchsia_zircon as zx;
-use starnix_logging::impossible_error;
+use starnix_logging::{impossible_error, track_stub};
 use starnix_uapi::{
     errno, error, errors::Errno, file_mode::mode, open_flags::OpenFlags, seal_flags::SealFlags,
 };
@@ -357,7 +357,7 @@ impl FileOps for VmoFileObject {
         _offset: usize,
         _length: usize,
     ) -> Result<(), Errno> {
-        // TODO(b/42082608): Implement for paged VMO's once this feature is supported in Zircon.
+        track_stub!(TODO("https://fxbug.dev/42082608"), "paged VMO readahead");
         Ok(())
     }
 }

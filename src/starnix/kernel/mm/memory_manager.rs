@@ -752,8 +752,9 @@ impl MemoryManagerState {
         mapping.name = name;
         self.mappings.insert(mapped_addr..end, mapping);
 
-        // TODO(https://fxbug.dev/97514): Create a guard region below this mapping if GROWSDOWN is
-        // in |options|.
+        if flags.contains(MappingFlags::GROWSDOWN) {
+            track_stub!(TODO("https://fxbug.dev/297373369"), "GROWSDOWN guard region");
+        }
 
         Ok(mapped_addr)
     }
@@ -800,8 +801,9 @@ impl MemoryManagerState {
         let mapping = Mapping::new_private_anonymous(flags, name);
         self.mappings.insert(mapped_addr..end, mapping);
 
-        // TODO(https://fxbug.dev/97514): Create a guard region below this mapping if GROWSDOWN is
-        // in |options|.
+        if flags.contains(MappingFlags::GROWSDOWN) {
+            track_stub!(TODO("https://fxbug.dev/297373369"), "GROWSDOWN guard region");
+        }
 
         Ok(mapped_addr)
     }
@@ -1371,8 +1373,10 @@ impl MemoryManagerState {
         // SAFETY: This is safe because the vmar belongs to a different process.
         unsafe { self.user_vmar.protect(addr.ptr(), length, vmar_flags) }.map_err(|s| match s {
             zx::Status::INVALID_ARGS => errno!(EINVAL),
-            // TODO: This should still succeed and change protection on whatever is mapped.
-            zx::Status::NOT_FOUND => errno!(EINVAL),
+            zx::Status::NOT_FOUND => {
+                track_stub!("mprotect: succeed and update prot after NOT_FOUND");
+                errno!(EINVAL)
+            }
             zx::Status::ACCESS_DENIED => errno!(EACCES),
             _ => impossible_error(s),
         })?;
@@ -3601,16 +3605,15 @@ impl SequenceFileSource for ProcSmapsFile {
                 }
             )?;
 
+            track_stub!("smaps dirty pages");
+            let (shared_dirty_kb, private_dirty_kb) = (0, 0);
+
             let is_shared = share_count > 1;
             let shared_clean_kb = if is_shared { rss_kb } else { 0 };
-            // TODO: Report dirty pages for paged VMOs.
-            let shared_dirty_kb = 0;
             writeln!(sink, "Shared_Clean:\t{shared_clean_kb} kB")?;
             writeln!(sink, "Shared_Dirty:\t{shared_dirty_kb} kB")?;
 
             let private_clean_kb = if is_shared { 0 } else { rss_kb };
-            // TODO: Report dirty pages for paged VMOs.
-            let private_dirty_kb = 0;
             writeln!(sink, "Private_Clean:\t{} kB", private_clean_kb)?;
             writeln!(sink, "Private_Dirty:\t{} kB", private_dirty_kb)?;
 
@@ -3619,7 +3622,7 @@ impl SequenceFileSource for ProcSmapsFile {
             writeln!(sink, "KernelPageSize:\t{page_size_kb} kB")?;
             writeln!(sink, "MMUPageSize:\t{page_size_kb} kB")?;
 
-            // TODO(https://fxrev.dev/79328): Add optional fields.
+            track_stub!(TODO("https://fxbug.dev/297444691"), "optional smaps fields");
             return Ok(Some(range.end));
         }
         Ok(None)

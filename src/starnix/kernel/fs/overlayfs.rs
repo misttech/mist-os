@@ -290,7 +290,7 @@ impl OverlayNode {
             };
             let cred = info.cred();
 
-            if info.mode.is_lnk() {
+            let res = if info.mode.is_lnk() {
                 let link_target = lower.entry().node.readlink(current_task)?;
                 let link_path = match &link_target {
                     SymlinkTarget::Node(_) => return error!(EIO),
@@ -324,9 +324,10 @@ impl OverlayNode {
                 parent_upper.create_entry(current_task, name.as_ref(), |dir, mount, name| {
                     dir.mknod(current_task, mount, name, info.mode, info.rdev, cred)
                 })
-            }
+            };
 
-            // TODO(sergeyu): Copy xattrs to the new node.
+            track_stub!("overlayfs copy xattrs");
+            res
         })
     }
 

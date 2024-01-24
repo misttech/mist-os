@@ -252,7 +252,6 @@ impl DynamicFileSource for BlockDeviceSizeFile {
     }
 }
 
-// TODO(https://fxbug.dev/76801) connect this to an actual readahead implementation
 #[derive(Clone)]
 struct ReadAheadKbSource;
 
@@ -293,7 +292,7 @@ impl FileOps for ReadAheadKbFile {
         data: &mut dyn InputBuffer,
     ) -> Result<usize, Errno> {
         let updated = data.read_all()?;
-        track_stub!("updating read_ahead_kb");
+        track_stub!(TODO("https://fxbug.dev/297295673"), "updating read_ahead_kb");
         Ok(updated.len())
     }
 }

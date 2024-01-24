@@ -60,6 +60,7 @@ pub use fs_context::*;
 pub use fs_node::*;
 pub use namespace::*;
 pub use path::*;
+pub use pidfd::*;
 pub use record_locks::*;
 pub use simple_file::*;
 pub use static_directory::*;

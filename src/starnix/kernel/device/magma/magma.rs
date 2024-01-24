@@ -35,7 +35,7 @@ use magma::{
     MAGMA_MAX_IMAGE_PLANES, MAGMA_POLL_TYPE_SEMAPHORE, MAGMA_STATUS_INTERNAL_ERROR,
     MAGMA_STATUS_INVALID_ARGS,
 };
-use starnix_logging::log_warn;
+use starnix_logging::{log_warn, track_stub};
 use starnix_uapi::{
     errno,
     errors::Errno,
@@ -190,7 +190,7 @@ pub fn create_drm_image(
         vk_usage |= vk::IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT;
     };
 
-    // TODO: verify physical device limits
+    track_stub!("verify physical device limits");
     let scenic_allocator = if use_scenic {
         Some(init_scenic().map_err(|_| MAGMA_STATUS_INTERNAL_ERROR)?)
     } else {

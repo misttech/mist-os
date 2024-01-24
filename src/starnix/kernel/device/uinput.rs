@@ -17,7 +17,7 @@ use fidl_fuchsia_ui_test_input::{
     self as futinput, KeyboardSimulateKeyEventRequest, RegistryRegisterKeyboardRequest,
 };
 use fuchsia_zircon as zx;
-use starnix_logging::{log_info, log_warn};
+use starnix_logging::{log_warn, track_stub};
 use starnix_sync::{FileOpsIoctl, FileOpsRead, FileOpsWrite, Locked, Mutex};
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
 use starnix_uapi::{
@@ -190,7 +190,10 @@ impl UinputDevice {
                         key_server
                     }
                     DeviceType::Touchscreen => {
-                        // TODO(b/302172833): also support touchscreen here.
+                        track_stub!(
+                            TODO("https://fxbug.dev/302172833"),
+                            "run uinput touchscreen server"
+                        );
                         return Ok(SUCCESS);
                     }
                 };
@@ -231,8 +234,7 @@ impl UinputDevice {
     }
 
     fn ui_dev_destroy(&self) -> Result<SyscallResult, Errno> {
-        // TODO(b/302174354): impl ui_dev_destroy.
-        log_info!("ui_dev_destroy()");
+        track_stub!(TODO("https://fxbug.dev/302174354"), "ui_dev_destroy()");
 
         destroy_device();
 

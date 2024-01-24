@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 use crate::task::{ProcessGroup, Task, ThreadGroup, ZombieProcess};
+use starnix_logging::track_stub;
 use starnix_uapi::{
     ownership::{TempRef, WeakRef},
     pid_t,
@@ -80,10 +81,15 @@ impl PidTable {
     }
 
     pub fn allocate_pid(&mut self) -> pid_t {
-        // TODO: wrap the pid number and check for collisions
-        // If/when we re-use pids, we need to check that PidFdFileObject is holding onto the task
-        // correctly.
-        self.last_pid += 1;
+        match self.last_pid.checked_add(1) {
+            Some(p) => self.last_pid = p,
+            None => {
+                // NB: If/when we re-use pids, we need to check that PidFdFileObject is holding onto
+                // the task correctly.
+                track_stub!("pid wraparound");
+                self.last_pid = self.last_pid.overflowing_add(1).0;
+            }
+        }
         self.last_pid
     }
 

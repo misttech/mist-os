@@ -66,22 +66,22 @@ impl FileOps for BpfHandle {
         _locked: &mut Locked<'_, FileOpsRead>,
         _file: &FileObject,
         _current_task: &crate::task::CurrentTask,
-        offset: usize,
+        _offset: usize,
         _data: &mut dyn OutputBuffer,
     ) -> Result<usize, Errno> {
-        debug_assert!(offset == 0);
-        error!(EINVAL) // TODO
+        track_stub!("bpf handle read");
+        error!(EINVAL)
     }
     fn write(
         &self,
         _locked: &mut Locked<'_, FileOpsWrite>,
         _file: &FileObject,
         _current_task: &crate::task::CurrentTask,
-        offset: usize,
+        _offset: usize,
         _data: &mut dyn InputBuffer,
     ) -> Result<usize, Errno> {
-        debug_assert!(offset == 0);
-        error!(EINVAL) // TODO
+        track_stub!("bpf handle write");
+        error!(EINVAL)
     }
 }
 

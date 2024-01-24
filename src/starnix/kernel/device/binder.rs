@@ -931,8 +931,6 @@ impl<'a> BinderProcessGuard<'a> {
     ) -> Result<(), Errno> {
         let idx = match handle {
             Handle::ContextManager => {
-                // TODO: Figure out how to acquire/release refs for the context manager
-                // object.
                 track_stub!("acquire/release refs for context manager object");
                 return Ok(());
             }

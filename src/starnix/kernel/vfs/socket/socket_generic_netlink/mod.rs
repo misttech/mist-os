@@ -18,6 +18,7 @@ use netlink_packet_generic::{
     },
     GenlMessage,
 };
+use starnix_logging::track_stub;
 use starnix_sync::Mutex;
 use std::{
     collections::{HashMap, HashSet},
@@ -216,8 +217,33 @@ impl<S: Sender<GenericMessage>> GenericNetlinkServerState<S> {
                     }
                 }
             }
-            // TODO(https://fxbug.dev/128857): Support additionl Ctrl commands.
-            other => log_error!(tag = NETLINK_LOG_TAG, "Unsupported GenlCtrlCmd: {:?}", other),
+            GenlCtrlCmd::NewFamily => {
+                track_stub!(TODO("https://fxbug.dev/297431602"), "NetlinkCtrlNewFamily")
+            }
+            GenlCtrlCmd::DelFamily => {
+                track_stub!(TODO("https://fxbug.dev/297431602"), "NetlinkCtrlDelFamily")
+            }
+            GenlCtrlCmd::NewOps => {
+                track_stub!(TODO("https://fxbug.dev/297431602"), "NetlinkCtrlNewOps")
+            }
+            GenlCtrlCmd::DelOps => {
+                track_stub!(TODO("https://fxbug.dev/297431602"), "NetlinkCtrlDelOps")
+            }
+            GenlCtrlCmd::GetOps => {
+                track_stub!(TODO("https://fxbug.dev/297431602"), "NetlinkCtrlGetOps")
+            }
+            GenlCtrlCmd::NewMcastGrp => {
+                track_stub!(TODO("https://fxbug.dev/297431602"), "NetlinkCtrlNewMcastGrp")
+            }
+            GenlCtrlCmd::DelMcastGrp => {
+                track_stub!(TODO("https://fxbug.dev/297431602"), "NetlinkCtrlDelMcastGrp")
+            }
+            GenlCtrlCmd::GetMcastGrp => {
+                track_stub!(TODO("https://fxbug.dev/297431602"), "NetlinkCtrlGetMcastGrp")
+            }
+            GenlCtrlCmd::GetPolicy => {
+                track_stub!(TODO("https://fxbug.dev/297431602"), "NetlinkCtrlGetPolicy")
+            }
         }
     }
 }

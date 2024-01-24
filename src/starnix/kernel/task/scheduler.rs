@@ -201,16 +201,21 @@ impl SchedulerPolicyKind {
 
             // Configured with nice 0-40 and mapped to 6-26. 20 is the default nice which we want to
             // map to 16.
-            // TODO(https://fxbug.dev/308055542) SCHED_BATCH hinting
-            Self::Normal { priority } | Self::Batch { priority } => (priority / 2) + 6,
+            Self::Normal { priority } => (priority / 2) + 6,
+            Self::Batch { priority } => {
+                track_stub!(TODO("https://fxbug.dev/308055542"), "SCHED_BATCH hinting");
+                (priority / 2) + 6
+            }
 
             // Configured with priority 1-99, mapped to 28-31.
-            // TODO(https://fxbug.dev/308055654) improve FIFO handling
-            Self::Fifo { priority } | Self::RoundRobin { priority } => match priority {
-                1 => 29,
-                2 => 30,
-                _ => 31,
-            },
+            Self::Fifo { priority } | Self::RoundRobin { priority } => {
+                track_stub!(TODO("https://fxbug.dev/308055654"), "real SCHED_FIFO/SCHED_RR");
+                match priority {
+                    1 => 29,
+                    2 => 30,
+                    _ => 31,
+                }
+            }
         }
     }
 

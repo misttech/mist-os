@@ -12,6 +12,7 @@ use crate::{
         FsString, PathBuilder,
     },
 };
+use starnix_logging::track_stub;
 use starnix_sync::{FileOpsRead, FileOpsWrite, Locked, Mutex};
 use starnix_uapi::{device_type::DeviceType, error, errors::Errno, open_flags::OpenFlags};
 use std::{
@@ -342,7 +343,6 @@ impl FileOps for UEventFile {
         if offset != 0 {
             return error!(EINVAL);
         }
-        // TODO(https://fxbug.dev/127713): Support parsing synthetic variables.
         let content = data.read_all()?;
         for command in Self::parse_commands(&content) {
             // Ignore empty lines.
@@ -350,10 +350,15 @@ impl FileOps for UEventFile {
                 continue;
             }
 
-            current_task
-                .kernel()
-                .device_registry
-                .dispatch_uevent(command.try_into()?, self.device.clone());
+            match UEventAction::try_from(command) {
+                Ok(c) => {
+                    current_task.kernel().device_registry.dispatch_uevent(c, self.device.clone())
+                }
+                Err(e) => {
+                    track_stub!(TODO("https://fxbug.dev/297435061"), "synthetic uevent variables");
+                    return Err(e);
+                }
+            }
         }
         Ok(content.len())
     }

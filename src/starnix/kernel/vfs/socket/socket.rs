@@ -27,7 +27,7 @@ use netlink_packet_route::{
     rtnl::{address::nlas::Nla as AddressNla, link::nlas::Nla as LinkNla},
     AddressMessage, LinkMessage, RtnlMessage,
 };
-use starnix_logging::log_warn;
+use starnix_logging::{log_warn, track_stub};
 use starnix_sync::{FileOpsRead, FileOpsWrite, LockBefore, Locked, Mutex};
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
 use starnix_uapi::{
@@ -627,12 +627,12 @@ impl Socket {
                 Ok(SUCCESS)
             }
             SIOCGIFMTU => {
+                track_stub!(TODO("https://fxbug.dev/297369462"), "return actual socket MTU");
+                let ifru_mtu = 1280; /* IPv6 MIN MTU */
                 let in_ifreq: ifreq = current_task.read_object(UserRef::new(user_addr))?;
                 let out_ifreq: [u8; std::mem::size_of::<ifreq>()] = struct_with_union_into_bytes!(ifreq {
                     ifr_ifrn.ifrn_name: unsafe { in_ifreq.ifr_ifrn.ifrn_name },
-                    // TODO(https://fxbug.dev/129165): Return the actual MTU instead
-                    // of this hard-coded value.
-                    ifr_ifru.ifru_mtu: 1280 /* IPv6 MIN MTU */,
+                    ifr_ifru.ifru_mtu: ifru_mtu,
                 });
                 current_task.write_object(UserRef::new(user_addr), &out_ifreq)?;
                 Ok(SUCCESS)

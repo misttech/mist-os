@@ -12,6 +12,7 @@ use crate::{
 use fuchsia_runtime::zx_utc_reference_get;
 use fuchsia_zircon as zx;
 use fuchsia_zircon::{AsHandleRef, Clock, Unowned};
+use starnix_logging::track_stub;
 use starnix_sync::{FileOpsRead, FileOpsWrite, Locked, Mutex};
 use starnix_uapi::{
     error,
@@ -113,9 +114,11 @@ impl TimerFile {
                     TimerFileClock::Realtime => {
                         // Since Zircon does not have realtime timers, compute what the value would
                         // be in the monotonic clock assuming realtime progresses linearly.
-                        //
-                        // TODO(https://fxbug.dev/117507) implement proper realtime timers that will work
-                        // when the realtime clock changes, and implement TFD_TIMER_CANCEL_ON_SET.
+                        track_stub!(
+                            TODO("https://fxbug.dev/297433837"),
+                            "realtime timer, TFD_TIMER_CANCEL_ON_SET"
+                        );
+
                         let utc_clock: Unowned<'static, Clock> = unsafe {
                             let handle = zx_utc_reference_get();
                             Unowned::from_raw_handle(handle)
