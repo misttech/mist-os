@@ -14,16 +14,6 @@
           },
           {
             "projects": [
-              "prebuilt/third_party/cast_runner/arch/arm64",
-              "prebuilt/third_party/cast_runner/arch/x64",
-              "prebuilt/third_party/cast_runner_latest/arch/arm64",
-              "prebuilt/third_party/cast_runner_latest/arch/x64"
-            ],
-            "bug": "",
-            "notes": []
-          },
-          {
-            "projects": [
               "prebuilt/third_party/web_engine_shell/arch/arm64",
               "prebuilt/third_party/web_engine_shell/arch/x64",
               "prebuilt/third_party/web_engine_shell_latest/arch/arm64",
