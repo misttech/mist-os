@@ -453,40 +453,36 @@ class DriverImpl : public DriverBase<DriverImpl<KdrvExtra, KdrvConfig, IoRegType
     auto iir = InterruptIdentRegister::Get();
     InterruptType id;
     while ((id = iir.ReadFrom(io.io()).interrupt_id()) != InterruptType::kNone) {
-      switch (id) {
-        case InterruptType::kRxDataAvailable:
-        case InterruptType::kCharTimeout:
-          // Read the character if there's a place to put it.
-          rx(
-              lock,  //
-              [&]() { return RxBufferRegister::Get().ReadFrom(io.io()).data(); },
-              [&]() {
-                // If the buffer is full, disable the receive interrupt instead.
-                EnableRxInterrupt(io, false);
-              });
-          break;
+      if constexpr (KdrvExtra == ZBI_KERNEL_DRIVER_DW8250_UART) {
+        if (id == InterruptType::kDw8250BusyDetect) {
+          // dw8250 only. From the manual:
+          // "Master has tried to write to the Line Control Register while the DW_apb_uart is busy
+          // (USR[0] is set to one)." Read the UART Status Register to clear it.
+          UartStatusRegister::Get().ReadFrom(io.io());
+        }
+      }
 
-        case InterruptType::kTxEmpty:
-          tx(lock, waiter, [&]() { EnableTxInterrupt(io, false); });
-          break;
+      // Reading LSR will clear kRxLineStatus signal.
+      auto lsr = LineStatusRegister::Get().ReadFrom(io.io());
 
-        case InterruptType::kRxLineStatus:
-          LineStatusRegister::Get().ReadFrom(io.io());
-          break;
+      // Notify TX.
+      if (lsr.tx_register_empty()) {
+        tx(lock, waiter, [&]() { EnableTxInterrupt(io, false); });
+      }
 
-        case InterruptType::kDw8250BusyDetect:
-          if constexpr (KdrvExtra == ZBI_KERNEL_DRIVER_DW8250_UART) {
-            // dw8250 only. From the manual:
-            // "Master has tried to write to the Line Control Register while the DW_apb_uart is busy
-            // (USR[0] is set to one)." Read the UART Status Register to clear it.
-            UartStatusRegister::Get().ReadFrom(io.io());
-            break;
-          }
-          // If not a dw8250...
-          [[fallthrough]];
-
-        default:
-          ZX_PANIC("unhandled interrupt ID %#x", static_cast<unsigned int>(id));
+      // Drain RX while the line status bit is ready.
+      bool should_drain_rx = true;
+      for (; should_drain_rx && lsr.data_ready();
+           lsr = LineStatusRegister::Get().ReadFrom(io.io())) {
+        rx(
+            lock,  //
+            [&]() { return RxBufferRegister::Get().ReadFrom(io.io()).data(); },
+            [&]() {
+              // If the buffer is full, disable the receive interrupt instead and
+              // exit the loop.
+              EnableRxInterrupt(io, false);
+              should_drain_rx = false;
+            });
       }
     }
   }

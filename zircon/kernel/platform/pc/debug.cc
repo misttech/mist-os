@@ -140,30 +140,25 @@ static void uart_irq_handler(void* arg) {
   // see why we have gotten an irq
   for (;;) {
     uint8_t iir = uart_read(2);
+    // No interrupt pending.
     if (BIT(iir, 0))
-      break;  // no valid interrupt
+      break;
 
-    // 3 bit identification field
-    uint ident = BITS(iir, 3, 0);
-    switch (ident) {
-      case 0b0100:
-      case 0b1100: {
-        // rx fifo is non empty, drain it
-        unsigned char c = uart_read(0);
-        console_input_buf.WriteChar(c);
-        break;
-      }
-      case 0b0010:
-        // disable the tx irq
-        uart_write(1, (1 << 0));  // just rx interrupt enable
-        // transmitter is empty, signal any waiting senders
-        uart_dputc_event.Signal();
-        break;
-      case 0b0110:     // receiver line status
-        uart_read(5);  // read the LSR
-        break;
-      default:
-        panic("UART: unhandled ident %#x\n", ident);
+    // Reading LSR should clear Receiver Line Status signal, ID: 0b011
+    uint8_t lsr = uart_read(5);
+
+    // LSR Transmit Holder Register Empty
+    if (BIT(lsr, 5)) {
+      // disable the tx irq
+      uart_write(1, (1 << 0));  // just rx interrupt enable
+      // transmitter is empty, signal any waiting senders
+      uart_dputc_event.Signal();
+    }
+
+    // LSR Data Ready
+    for (; BIT(lsr, 0); lsr = uart_read(5)) {
+      unsigned char c = uart_read(0);
+      console_input_buf.WriteChar(c);
     }
   }
 }

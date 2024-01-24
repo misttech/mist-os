@@ -72,7 +72,9 @@ func TestLegacyUartSmallMessage(t *testing.T) {
 	i.Start()
 
 	i.WaitForLogMessages([]string{serialInputReady})
+	t.Log("Serial Ready detected. Writing serial message.")
 	i.RunCommand(msg)
+	t.Log("Serial message written. Waiting for echo.")
 	i.WaitForLogMessages([]string{msg})
 }
 
@@ -100,7 +102,9 @@ func TestLegacyUartLargeMessage(t *testing.T) {
 	i.Start()
 
 	i.WaitForLogMessages([]string{serialInputReady})
+	t.Log("Serial Ready detected. Writing serial message.")
 	i.RunCommand(msg)
+	t.Log("Serial message written. Waiting for echo.")
 	i.WaitForLogMessages([]string{msg})
 }
 
@@ -122,7 +126,9 @@ func TestMigratedUartSmallMessage(t *testing.T) {
 	i.Start()
 
 	i.WaitForLogMessages([]string{serialInputReady})
+	t.Log("Serial Ready detected. Writing serial message.")
 	i.RunCommand(msg)
+	t.Log("Serial message written. Waiting for echo.")
 	i.WaitForLogMessages([]string{msg})
 }
 
@@ -144,6 +150,8 @@ func TestMigratedUartLargeMessage(t *testing.T) {
 	i.Start()
 
 	i.WaitForLogMessages([]string{serialInputReady})
+	t.Log("Serial Ready detected. Writing serial message.")
 	i.RunCommand(msg)
+	t.Log("Serial message written. Waiting for echo.")
 	i.WaitForLogMessages([]string{msg})
 }
