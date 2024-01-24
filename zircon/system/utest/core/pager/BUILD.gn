@@ -8,7 +8,10 @@ source_set("pager") {
   configs += [ "//build/config:all_source" ]
 
   testonly = true
-  sources = [ "pager.cc" ]
+  sources = [
+    "pager.cc",
+    "snapshot.cc",
+  ]
   deps = [
     ":userpager",
     "//src/zircon/testing/maybe-standalone-test",

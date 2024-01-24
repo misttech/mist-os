@@ -270,6 +270,7 @@ typedef struct zx_pager_vmo_stats {
 #define ZX_VMO_CHILD_SLICE                ((uint32_t)1u << 3)
 #define ZX_VMO_CHILD_NO_WRITE             ((uint32_t)1u << 5)
 #define ZX_VMO_CHILD_REFERENCE            ((uint32_t)1u << 6)
+#define ZX_VMO_CHILD_SNAPSHOT_MODIFIED    ((uint32_t)1u << 7)
 
 typedef uint32_t zx_vm_option_t;
 // Mapping flags to vmar routines

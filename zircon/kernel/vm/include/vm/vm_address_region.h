@@ -143,10 +143,8 @@ class VmAddressRegionOrMapping
   virtual void DumpLocked(uint depth, bool verbose) const TA_REQ(lock()) = 0;
 
   // Expose our backing lock for annotation purposes.
-  Lock<CriticalMutex>* lock() const TA_RET_CAP(aspace_ -> lock()) { return aspace_->lock(); }
-  Lock<CriticalMutex>& lock_ref() const TA_RET_CAP(aspace_ -> lock()) {
-    return aspace_->lock_ref();
-  }
+  Lock<CriticalMutex>* lock() const TA_RET_CAP(aspace_->lock()) { return aspace_->lock(); }
+  Lock<CriticalMutex>& lock_ref() const TA_RET_CAP(aspace_->lock()) { return aspace_->lock_ref(); }
 
   bool is_in_range_locked(vaddr_t base, size_t size) const TA_REQ(lock()) {
     const size_t offset = base - base_;
@@ -957,20 +955,20 @@ class VmMapping final : public VmAddressRegionOrMapping,
     return protection_ranges_.MmuFlagsForRegion(offset);
   }
   uint arch_mmu_flags_locked_object(vaddr_t offset) const
-      TA_REQ(object_ -> lock()) TA_NO_THREAD_SAFETY_ANALYSIS {
+      TA_REQ(object_->lock()) TA_NO_THREAD_SAFETY_ANALYSIS {
     return protection_ranges_.MmuFlagsForRegion(offset);
   }
   uint64_t object_offset_locked() const TA_REQ(lock()) TA_NO_THREAD_SAFETY_ANALYSIS {
     return object_offset_;
   }
   uint64_t object_offset_locked_object() const
-      TA_REQ(object_ -> lock()) TA_NO_THREAD_SAFETY_ANALYSIS {
+      TA_REQ(object_->lock()) TA_NO_THREAD_SAFETY_ANALYSIS {
     return object_offset_;
   }
-  vaddr_t base_locked_object() const TA_REQ(object_ -> lock()) TA_NO_THREAD_SAFETY_ANALYSIS {
+  vaddr_t base_locked_object() const TA_REQ(object_->lock()) TA_NO_THREAD_SAFETY_ANALYSIS {
     return base_;
   }
-  size_t size_locked_object() const TA_REQ(object_ -> lock()) TA_NO_THREAD_SAFETY_ANALYSIS {
+  size_t size_locked_object() const TA_REQ(object_->lock()) TA_NO_THREAD_SAFETY_ANALYSIS {
     return size_;
   }
 
@@ -1020,21 +1018,21 @@ class VmMapping final : public VmAddressRegionOrMapping,
   // Since this is asserting that the lock is held, and not just returning a reference to the lock,
   // this method is logically correct since object_ itself is only modified if object_->lock() is
   // held.
-  void assert_object_lock() TA_ASSERT(object_ -> lock()) TA_NO_THREAD_SAFETY_ANALYSIS {
+  void assert_object_lock() TA_ASSERT(object_->lock()) TA_NO_THREAD_SAFETY_ANALYSIS {
     AssertHeld(object_->lock_ref());
   }
 
   // Unmap any pages that map the passed in vmo range from the arch aspace.
   // May not intersect with this range.
-  void AspaceUnmapLockedObject(uint64_t offset, uint64_t len) const TA_REQ(object_ -> lock());
+  void AspaceUnmapLockedObject(uint64_t offset, uint64_t len) const TA_REQ(object_->lock());
 
   // Removes any writeable mappings for the passed in vmo range from the arch aspace.
   // May fall back to unmapping pages from the arch aspace if necessary.
-  void AspaceRemoveWriteLockedObject(uint64_t offset, uint64_t len) const TA_REQ(object_ -> lock());
+  void AspaceRemoveWriteLockedObject(uint64_t offset, uint64_t len) const TA_REQ(object_->lock());
 
   // Checks if this is a kernel mapping within the given VMO range, which would be an error to be
   // unpinning.
-  void AspaceDebugUnpinLockedObject(uint64_t offset, uint64_t len) const TA_REQ(object_ -> lock());
+  void AspaceDebugUnpinLockedObject(uint64_t offset, uint64_t len) const TA_REQ(object_->lock());
 
   // Marks this mapping as being a candidate for merging, and will immediately attempt to merge with
   // any neighboring mappings. Making a mapping mergeable essentially indicates that you will no
@@ -1123,13 +1121,13 @@ class VmMapping final : public VmAddressRegionOrMapping,
 
   void Activate() TA_REQ(lock()) override;
 
-  void ActivateLocked() TA_REQ(lock()) TA_REQ(object_ -> lock());
+  void ActivateLocked() TA_REQ(lock()) TA_REQ(object_->lock());
 
   // Takes a range relative to the vmo object_ and converts it into a virtual address range relative
   // to aspace_. Returns true if a non zero sized intersection was found, false otherwise. If false
   // is returned |base| and |virtual_len| hold undefined contents.
   bool ObjectRangeToVaddrRange(uint64_t offset, uint64_t len, vaddr_t* base,
-                               uint64_t* virtual_len) const TA_REQ(object_ -> lock());
+                               uint64_t* virtual_len) const TA_REQ(object_->lock());
 
   // Attempts to merge this mapping with any neighbors. It is the responsibility of the caller to
   // ensure a refptr to this is being held, as on return |this| may be in the dead state and have
@@ -1159,7 +1157,7 @@ class VmMapping final : public VmAddressRegionOrMapping,
   // Helper function that updates the |size_| to |new_size| and also increments the mapping
   // generation count. Requires both the aspace lock and the object lock to be held, since |size_|
   // can be read under either of those locks.
-  void set_size_locked(size_t new_size) TA_REQ(lock()) TA_REQ(object_ -> lock()) {
+  void set_size_locked(size_t new_size) TA_REQ(lock()) TA_REQ(object_->lock()) {
     // Mappings cannot be zero sized while the mapping is in the region list.
     DEBUG_ASSERT(new_size > 0 || !in_subregion_tree());
     // Check that if we have additional protection regions that they have already been constrained
@@ -1182,7 +1180,7 @@ class VmMapping final : public VmAddressRegionOrMapping,
   // For a VmMapping |state_| is only modified either with the object_ lock held, or if there is no
   // |object_|. Therefore it is safe to read state if just the object lock is held.
   LifeCycleState get_state_locked_object() const
-      TA_REQ(object_ -> lock()) TA_NO_THREAD_SAFETY_ANALYSIS {
+      TA_REQ(object_->lock()) TA_NO_THREAD_SAFETY_ANALYSIS {
     return state_;
   }
 
@@ -1208,7 +1206,7 @@ class VmMapping final : public VmAddressRegionOrMapping,
     return protection_ranges_;
   }
   const MappingProtectionRanges& ProtectRangesLockedObject() const
-      TA_REQ(object_ -> lock()) __TA_NO_THREAD_SAFETY_ANALYSIS {
+      TA_REQ(object_->lock()) __TA_NO_THREAD_SAFETY_ANALYSIS {
     return protection_ranges_;
   }
 
@@ -1237,13 +1235,13 @@ class VmEnumerator {
   // pre-order. If any call returns false, the traversal will stop. The root
   // VmAspace's lock will be held during the entire traversal.
   // |depth| will be 0 for the root VmAddressRegion.
-  virtual bool OnVmAddressRegion(const VmAddressRegion* vmar, uint depth) TA_REQ(vmar -> lock()) {
+  virtual bool OnVmAddressRegion(const VmAddressRegion* vmar, uint depth) TA_REQ(vmar->lock()) {
     return true;
   }
 
   // |vmar| is the parent of |map|. The root VmAspace's lock will be held when this is called.
   virtual bool OnVmMapping(const VmMapping* map, const VmAddressRegion* vmar, uint depth)
-      TA_REQ(map -> lock()) TA_REQ(vmar->lock()) {
+      TA_REQ(map->lock()) TA_REQ(vmar->lock()) {
     return true;
   }
 

@@ -1584,11 +1584,11 @@ class MultiVmoTestInstance : public TestInstance {
           Printf("P");
           static const uint32_t policies[] = {ZX_CACHE_POLICY_CACHED,
 
-          // TODO(https://fxbug.dev/131108): On arm64, unaligned access to Device memory generates an
-          // alignment exception.  Our current memcpy/memset implementations are designed to
-          // work on Normal memory and will result in unaligned access if the pointer arguments
-          // are not aligned.  We should fix vmstress to never issue unaligned memcpy/memset to
-          // Device memory.
+          // TODO(https://fxbug.dev/131108): On arm64, unaligned access to Device memory generates
+          // an alignment exception.  Our current memcpy/memset implementations are designed to work
+          // on Normal memory and will result in unaligned access if the pointer arguments are not
+          // aligned.  We should fix vmstress to never issue unaligned memcpy/memset to Device
+          // memory.
 #if !defined(__aarch64__)
                                               ZX_CACHE_POLICY_UNCACHED,
                                               ZX_CACHE_POLICY_UNCACHED_DEVICE,
@@ -1600,9 +1600,9 @@ class MultiVmoTestInstance : public TestInstance {
         }
         case 51 ... 60: {  // vmo_create_child
           Printf("C");
-          static const uint32_t type[] = {ZX_VMO_CHILD_SNAPSHOT,
-                                          ZX_VMO_CHILD_SNAPSHOT_AT_LEAST_ON_WRITE,
-                                          ZX_VMO_CHILD_SLICE, ZX_VMO_CHILD_REFERENCE};
+          static const uint32_t type[] = {
+              ZX_VMO_CHILD_SNAPSHOT, ZX_VMO_CHILD_SNAPSHOT_AT_LEAST_ON_WRITE, ZX_VMO_CHILD_SLICE,
+              ZX_VMO_CHILD_REFERENCE, ZX_VMO_CHILD_SNAPSHOT_MODIFIED};
           uint32_t options = type[uniform_rand(std::size(type), rng)];
           bool child_reliable_mappings = reliable_mappings;
           if (uniform_rand(3, rng) == 0) {

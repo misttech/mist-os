@@ -450,6 +450,9 @@ zx_status_t VmObjectDispatcher::CreateChildInternal(
   } else if (options & ZX_VMO_CHILD_SNAPSHOT_AT_LEAST_ON_WRITE) {
     options &= ~ZX_VMO_CHILD_SNAPSHOT_AT_LEAST_ON_WRITE;
     type = CloneType::SnapshotAtLeastOnWrite;
+  } else if (options & ZX_VMO_CHILD_SNAPSHOT_MODIFIED) {
+    options &= ~ZX_VMO_CHILD_SNAPSHOT_MODIFIED;
+    type = CloneType::SnapshotModified;
   } else {
     return ZX_ERR_INVALID_ARGS;
   }

@@ -137,17 +137,17 @@ void Vmo::GenerateBufferContents(void* dest_buffer, uint64_t page_count,
   }
 }
 
-std::unique_ptr<Vmo> Vmo::Clone(uint64_t offset, uint64_t size) const {
+std::unique_ptr<Vmo> Vmo::Clone(uint64_t offset, uint64_t size, uint32_t options,
+                                uint32_t map_prems) const {
   zx::vmo clone;
-  zx_status_t status = vmo_.create_child(
-      ZX_VMO_CHILD_SNAPSHOT_AT_LEAST_ON_WRITE | ZX_VMO_CHILD_RESIZABLE, offset, size, &clone);
+  zx_status_t status = vmo_.create_child(options, offset, size, &clone);
   if (status != ZX_OK) {
     fprintf(stderr, "vmo create_child failed with %s\n", zx_status_get_string(status));
     return nullptr;
   }
 
   zx_vaddr_t addr;
-  status = zx::vmar::root_self()->map(ZX_VM_PERM_READ | ZX_VM_PERM_WRITE, 0, clone, 0, size, &addr);
+  status = zx::vmar::root_self()->map(map_prems, 0, clone, 0, size, &addr);
   if (status != ZX_OK) {
     fprintf(stderr, "vmar map failed with %s\n", zx_status_get_string(status));
     return nullptr;
@@ -155,6 +155,34 @@ std::unique_ptr<Vmo> Vmo::Clone(uint64_t offset, uint64_t size) const {
 
   return std::unique_ptr<Vmo>(
       new Vmo(std::move(clone), size, addr, key_ + (offset / sizeof(uint64_t))));
+}
+
+size_t Vmo::PollNumChildren(size_t expected_children) const {
+  zx_info_vmo_t info;
+  while (true) {
+    if (vmo().get_info(ZX_INFO_VMO, &info, sizeof(info), nullptr, nullptr) != ZX_OK) {
+      return false;
+    }
+    if (info.num_children == expected_children) {
+      return true;
+    }
+    printf("polling again. num children %zu\n", info.num_children);
+    zx::nanosleep(zx::deadline_after(zx::msec(50)));
+  }
+}
+
+bool Vmo::PollPopulatedBytes(size_t expected_bytes) const {
+  zx_info_vmo_t info;
+  while (true) {
+    if (vmo().get_info(ZX_INFO_VMO, &info, sizeof(info), nullptr, nullptr) != ZX_OK) {
+      return false;
+    }
+    if (info.populated_bytes == expected_bytes) {
+      return true;
+    }
+    printf("polling again. page count %zu\n", info.populated_bytes / zx_system_get_page_size());
+    zx::nanosleep(zx::deadline_after(zx::msec(50)));
+  }
 }
 
 UserPager::UserPager()
