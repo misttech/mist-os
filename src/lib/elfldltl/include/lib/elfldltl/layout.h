@@ -257,7 +257,7 @@ struct Elf : private Layout<Class, Data> {
 
   using size_type = typename Addr::value_type;
 
-  using Addend = SignedField<size_type, kSwap>;
+  using Addend = typename Addr::Signed;
 
   static constexpr auto kAddressBits = kAddrBits<Addr>;
 
@@ -442,7 +442,7 @@ struct Elf : private Layout<Class, Data> {
 
     Addr offset;
     Addr info;
-    SignedField<size_type, kSwap> addend;
+    Addend addend;
   };
 
   // When the compiler generates a call to __tls_get_addr, the linker

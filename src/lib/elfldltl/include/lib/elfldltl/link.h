@@ -91,7 +91,7 @@ enum class RelocateTls {
 //    Returns the GOT contents for a TLSDESC resolution that was an
 //    undefined weak symbol.  The addend is always applied to the value.
 //
-//  * std::optional<TlsDescGot> tls_desc(Diagnostics&, Addr addend)
+//  * std::optional<TlsDescGot> tls_desc(Diagnostics&, Addend addend)
 //    Returns the GOT contents for a TLSDESC resolution, which can fail.
 //    If this overload is present, then it is always used and the second
 //    overload need not be defined.  This overload can use the relocation
@@ -112,6 +112,7 @@ constexpr bool RelocateSymbolic(Memory& memory, DiagnosticsType& diagnostics,
 
   using Elf = typename RelocInfo::Elf;
   using Addr = typename Elf::Addr;
+  using Addend = typename Elf::Addend;
   using size_type = typename Elf::size_type;
   using Rel = typename Elf::Rel;
   using Rela = typename Elf::Rela;
@@ -244,7 +245,7 @@ constexpr bool RelocateSymbolic(Memory& memory, DiagnosticsType& diagnostics,
     auto apply = [reloc, value_reloc, apply_no_addend, apply_with_addend,
                   &memory](auto&& get_desc) -> bool {
       using Reloc = std::decay_t<decltype(value_reloc)>;
-      constexpr bool kAddend = std::is_invocable_v<decltype(get_desc), Addr>;
+      constexpr bool kAddend = std::is_invocable_v<decltype(get_desc), Addend>;
 
       const auto& apply_value = [&]() -> auto& {
         if constexpr (kAddend) {
@@ -261,7 +262,7 @@ constexpr bool RelocateSymbolic(Memory& memory, DiagnosticsType& diagnostics,
       if constexpr (kAddend) {
         if constexpr (std::is_same_v<Reloc, Rel>) {
           // The addend must be read out of the memory being relocated.
-          auto read = memory.template ReadArray<Addr>(value_reloc.offset, 1);
+          auto read = memory.template ReadArray<Addend>(value_reloc.offset, 1);
           if (read) {
             desc = get_desc(read->front());
           }

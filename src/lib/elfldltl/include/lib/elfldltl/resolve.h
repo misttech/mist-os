@@ -37,7 +37,7 @@ namespace elfldltl {
 //  * size_type static_tls_bias() const
 //    Returns the static TLS layout bias for the defining module.
 //
-//  * std::optional<TlsDescGot> tls_desc(Diagnostics&, const Sym&, Addr addend)
+//  * std::optional<TlsDescGot> tls_desc(Diagnostics&, const Sym&, Addend addend)
 //  * std::optional<TlsDescGot> tls_desc(Diagnostics&)
 //    See elfldltl::RelocateSymbolic API comments about the two overloads.
 //    This implements that method but for some particular defined symbol in
@@ -47,6 +47,7 @@ template <class Module, typename TlsDescResolver>
 struct ResolverDefinition {
   using Elf = typename std::decay_t<decltype(std::declval<Module>().symbol_info())>::Elf;
   using Addr = typename Elf::Addr;
+  using Addend = typename Elf::Addend;
   using Sym = typename Elf::Sym;
   using TlsDescGot = typename Elf::TlsDescGot;
 
@@ -73,8 +74,8 @@ struct ResolverDefinition {
 
   template <class Diagnostics, typename T = TlsDescResolver,
             typename = std::enable_if_t<
-                std::is_invocable_v<T, Diagnostics&, const ResolverDefinition&, Addr>>>
-  constexpr auto tls_desc(Diagnostics& diag, Addr addend) const {
+                std::is_invocable_v<T, Diagnostics&, const ResolverDefinition&, Addend>>>
+  constexpr auto tls_desc(Diagnostics& diag, Addend addend) const {
     return (*tlsdesc_resolver_)(diag, *this, addend);
   }
 
@@ -83,8 +84,9 @@ struct ResolverDefinition {
     return (*tlsdesc_resolver_)();
   }
 
-  template <typename T = TlsDescResolver, typename = std::enable_if_t<std::is_invocable_v<T, Addr>>>
-  constexpr TlsDescGot tls_desc_undefined_weak(Addr addend) const {
+  template <typename T = TlsDescResolver,
+            typename = std::enable_if_t<std::is_invocable_v<T, Addend>>>
+  constexpr TlsDescGot tls_desc_undefined_weak(Addend addend) const {
     return (*tlsdesc_resolver_)(addend);
   }
 
@@ -111,10 +113,10 @@ enum class ResolverPolicy : bool {
 // resolved, this list is in order of precedence.  The ModuleList type is a
 // forward iterable range or container.  diag is a diagnostics object for
 // reporting errors.  The TlsDescResolver is a callable object that's called as
-// `std::optional<TlsDescGot>(Diagnostics&, const Definition&, Addr addend)` or
-// `std::optional<TlsDescGot>(Diagnostics&, const Definition&)` for a TLSDESDC
-// relocation resolved to a defined symbol; and as `TlsDescGot()` or
-// `TlsDescGot(Addr addend)` for one resolved as an undefined weak reference.
+// `std::optional<TlsDescGot>(Diagnostics&, const Definition&, Addend addend)`
+// or `std::optional<TlsDescGot>(Diagnostics&, const Definition&)` for a
+// TLSDESDC relocation resolved to a defined symbol; and as `TlsDescGot()` or
+// `TlsDescGot(Addend addend)` for one resolved as an undefined weak reference.
 //
 // All references passed to elfldltl::MakeSymbolResolver should outlive the
 // returned object, which in turn must outlive its return values (Definition

@@ -42,7 +42,9 @@ static_assert(kMaxPhdrs > kMaxSegments);
 
 // The startup dynamic linker always uses the default ELF layout.
 using Elf = elfldltl::Elf<>;
+using size_type = Elf::size_type;
 using Addr = Elf::Addr;
+using Addend = Elf::Addend;
 using Ehdr = Elf::Ehdr;
 using Phdr = Elf::Phdr;
 using Sym = Elf::Sym;
@@ -67,11 +69,14 @@ class TlsDescResolver {
  public:
   // Handle an undefined weak TLSDESC reference.  There are special runtime
   // resolvers for this case: one for zero addend, and one for nonzero addend.
-  TlsDescGot operator()(Addr addend) const {
+  TlsDescGot operator()(Addend addend) const {
     if (addend == 0) {
       return {.function = kRuntimeUndefinedWeak};
     }
-    return {.function = kRuntimeUndefinedWeakAddend, .value = addend};
+    return {
+        .function = kRuntimeUndefinedWeakAddend,
+        .value = cpp20::bit_cast<size_type>(addend),
+    };
   }
 
   // Handle a TLSDESC reference to a defined symbol.  The runtime resolver just

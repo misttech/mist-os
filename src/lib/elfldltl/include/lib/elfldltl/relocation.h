@@ -40,6 +40,7 @@ class RelocationInfo {
   using Elf = ElfLayout;
   using size_type = typename Elf::size_type;
   using Addr = typename Elf::Addr;
+  using Addend = typename Elf::Addend;
   using Rel = typename Elf::Rel;
   using Rela = typename Elf::Rela;
 

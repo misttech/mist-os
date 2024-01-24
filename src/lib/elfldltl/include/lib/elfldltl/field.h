@@ -21,37 +21,47 @@ namespace elfldltl {
 // But it's usually used only via a pointer to memory holding data from an
 // ELF file or target process memory.
 template <typename T, bool kSwap>
-class UnsignedField {
+class UnsignedField;
+
+// This is like UnsignedField but for signed integer types.
+// Note that T is the corresponding unsigned integer type, not
+// the signed integer type.  The SignedField<T> object behaves
+// for implicit conversions like the signed integer type.
+
+template <typename T, bool kSwap>
+class SignedField;
+
+template <typename T, bool kSwap>
+class FieldStorage {
  public:
   using value_type = T;
 
   static_assert(std::is_integral_v<value_type>);
   static_assert(std::is_unsigned_v<value_type>);
 
-  constexpr UnsignedField() = default;
+  using Unsigned = FieldStorage<T, kSwap>;
+  using Signed = SignedField<T, kSwap>;
 
-  constexpr UnsignedField(const UnsignedField&) = default;
+  constexpr FieldStorage() = default;
 
-  constexpr UnsignedField(value_type x) : value_(Convert(x)) {}
+  constexpr FieldStorage(const FieldStorage&) = default;
 
-  explicit constexpr UnsignedField(std::array<std::byte, sizeof(value_type)> bytes)
+  explicit constexpr FieldStorage(value_type x) : value_(Convert(x)) {}
+
+  explicit constexpr FieldStorage(std::array<std::byte, sizeof(value_type)> bytes)
       : value_(Convert(bytes)) {}
 
-  explicit constexpr UnsignedField(std::array<char, sizeof(value_type)> bytes)
+  explicit constexpr FieldStorage(std::array<char, sizeof(value_type)> bytes)
       : value_(Convert(bytes)) {}
 
-  constexpr UnsignedField& operator=(const UnsignedField&) = default;
+  constexpr FieldStorage& operator=(const FieldStorage&) = default;
 
-  constexpr UnsignedField& operator=(value_type x) {
+  constexpr FieldStorage& operator=(value_type x) {
     value_ = Convert(x);
     return *this;
   }
 
   constexpr value_type get() const { return Convert(value_); }
-
-  constexpr value_type operator()() const { return get(); }
-
-  constexpr operator value_type() const { return get(); }
 
  private:
   template <typename Byte, typename = std::enable_if_t<sizeof(Byte) == 1>>
@@ -96,29 +106,53 @@ class UnsignedField {
   value_type value_{};
 };
 
-// This is like UnsignedField but for signed integer types.
-// Note that T is the corresponding unsigned integer type, not
-// the signed integer type.  The SignedField<T> object behaves
-// for implicit conversions like the signed integer type.
 template <typename T, bool kSwap>
-class SignedField final : public UnsignedField<T, kSwap> {
+class UnsignedField final : public FieldStorage<T, kSwap> {
  public:
-  using Base = UnsignedField<T, kSwap>;
+  using Storage = FieldStorage<T, kSwap>;
+  using typename Storage::value_type;
+
+  using Storage::get;
+  using Storage::Storage;
+
+  constexpr UnsignedField(const UnsignedField&) = default;
+
+  // Allow implicit conversion.
+  constexpr UnsignedField(value_type x) : Storage{x} {}
+
+  constexpr UnsignedField& operator=(const UnsignedField&) = default;
+
+  constexpr UnsignedField& operator=(value_type x) {
+    Storage::operator=(x);
+    return *this;
+  }
+
+  constexpr value_type operator()() const { return get(); }
+
+  constexpr operator value_type() const { return get(); }
+};
+
+template <typename T, bool kSwap>
+class SignedField final : public FieldStorage<T, kSwap> {
+ public:
+  using Storage = FieldStorage<T, kSwap>;
 
   using value_type = std::make_signed_t<T>;
 
-  using Base::Base;
+  using Storage::Storage;
+
+  constexpr SignedField(value_type value) : Storage{cpp20::bit_cast<T>(value)} {}
 
   constexpr SignedField(const SignedField&) = default;
 
   constexpr SignedField& operator=(const SignedField&) = default;
 
   constexpr SignedField& operator=(value_type x) {
-    Base::operator=(cpp20::bit_cast<T>(x));
+    Storage::operator=(cpp20::bit_cast<T>(x));
     return *this;
   }
 
-  constexpr value_type get() const { return Base::get(); }
+  constexpr value_type get() const { return cpp20::bit_cast<value_type>(Storage::get()); }
 
   constexpr value_type operator()() const { return get(); }
 

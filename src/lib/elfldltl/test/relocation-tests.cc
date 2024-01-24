@@ -45,20 +45,20 @@ constexpr typename RelocInfo::size_type RelocOffset(const RelocInfo& info,
 }
 
 template <class RelocInfo>
-constexpr typename RelocInfo::size_type RelocAddend(const RelocInfo& info,
-                                                    const typename RelocInfo::Rel& reloc) {
+constexpr typename RelocInfo::Addend RelocAddend(const RelocInfo& info,
+                                                 const typename RelocInfo::Rel& reloc) {
   return 0;
 }
 
 template <class RelocInfo>
-constexpr typename RelocInfo::size_type RelocAddend(const RelocInfo& info,
-                                                    const typename RelocInfo::Rela& reloc) {
+constexpr typename RelocInfo::Addend RelocAddend(const RelocInfo& info,
+                                                 const typename RelocInfo::Rela& reloc) {
   return reloc.addend;
 }
 
 template <class RelocInfo>
-constexpr typename RelocInfo::size_type RelocAddend(const RelocInfo& info,
-                                                    const typename RelocInfo::size_type& reloc) {
+constexpr typename RelocInfo::Addend RelocAddend(const RelocInfo& info,
+                                                 const typename RelocInfo::size_type& reloc) {
   return 0;
 }
 
@@ -123,15 +123,15 @@ void VisitRelativeRela() {
   size_t count = 0;
   EXPECT_TRUE(info.VisitRelative([&](auto&& reloc) -> bool {
     auto offset = RelocOffset(info, reloc);
-    auto addend = RelocAddend(info, reloc);
+    auto addend = RelocAddend(info, reloc)();
     switch (count++) {
       case 0:
         EXPECT_EQ(8u, offset);
-        EXPECT_EQ(0x11111111u, addend);
+        EXPECT_EQ(0x11111111, addend);
         break;
       case 1:
         EXPECT_EQ(24u, offset);
-        EXPECT_EQ(0x33333333u, addend);
+        EXPECT_EQ(0x33333333, addend);
         break;
     }
     return true;
