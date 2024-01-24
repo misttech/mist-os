@@ -23,7 +23,7 @@ class LdLoadTestsBase {
  public:
   // An indicator to GTEST of whether the test fixture supports the following
   // features so that it may skip related tests if not supported.
-  static constexpr bool kHasTls = true;
+  static constexpr bool kHasTlsdesc = true;
   static constexpr bool kCanCollectLog = true;
 
   void InitLog(fbl::unique_fd& log_fd);

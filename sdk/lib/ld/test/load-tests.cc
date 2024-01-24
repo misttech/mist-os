@@ -225,10 +225,6 @@ TYPED_TEST(LdLoadTests, InitFini) {
 }
 
 TYPED_TEST(LdLoadTests, TlsExecOnly) {
-  if constexpr (!TestFixture::kHasTls) {
-    GTEST_SKIP() << "test requires TLS support";
-  }
-
   constexpr int64_t kReturnValue = 17;
 
   ASSERT_NO_FATAL_FAILURE(this->Init());
@@ -241,10 +237,6 @@ TYPED_TEST(LdLoadTests, TlsExecOnly) {
 }
 
 TYPED_TEST(LdLoadTests, TlsShlibOnly) {
-  if constexpr (!TestFixture::kHasTls) {
-    GTEST_SKIP() << "test requires TLS support";
-  }
-
   constexpr int64_t kReturnValue = 17;
 
   ASSERT_NO_FATAL_FAILURE(this->Init());
@@ -259,10 +251,6 @@ TYPED_TEST(LdLoadTests, TlsShlibOnly) {
 }
 
 TYPED_TEST(LdLoadTests, TlsExecShlib) {
-  if constexpr (!TestFixture::kHasTls) {
-    GTEST_SKIP() << "test requires TLS support";
-  }
-
   constexpr int64_t kReturnValue = 17;
 
   ASSERT_NO_FATAL_FAILURE(this->Init());
@@ -277,10 +265,6 @@ TYPED_TEST(LdLoadTests, TlsExecShlib) {
 }
 
 TYPED_TEST(LdLoadTests, TlsInitialExecAccess) {
-  if constexpr (!TestFixture::kHasTls) {
-    GTEST_SKIP() << "test requires TLS support";
-  }
-
   constexpr int64_t kReturnValue = 17;
 
   ASSERT_NO_FATAL_FAILURE(this->Init());
@@ -295,10 +279,6 @@ TYPED_TEST(LdLoadTests, TlsInitialExecAccess) {
 }
 
 TYPED_TEST(LdLoadTests, TlsGlobalDynamicAccess) {
-  if constexpr (!TestFixture::kHasTls) {
-    GTEST_SKIP() << "test requires TLS support";
-  }
-
   constexpr int64_t kReturnValue = 17;
   constexpr int64_t kSkipReturnValue = 77;
 
@@ -321,7 +301,7 @@ TYPED_TEST(LdLoadTests, TlsGlobalDynamicAccess) {
 }
 
 TYPED_TEST(LdLoadTests, TlsDescAccess) {
-  if constexpr (!TestFixture::kHasTls) {
+  if constexpr (!TestFixture::kHasTlsdesc) {
     GTEST_SKIP() << "test requires TLS support";
   }
 

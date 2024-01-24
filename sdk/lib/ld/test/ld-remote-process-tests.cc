@@ -91,7 +91,9 @@ void LdRemoteProcessTests::Load(std::string_view executable_name) {
   auto predecode = [&diag](RemoteModule& module, std::string_view what, zx::vmo vmo) {
     // Set a temporary name until we decode the DT_SONAME.
     module.set_name(what);
-    auto result = module.Decode(diag, std::move(vmo), -1);
+    RemoteModule::size_type tls_id = 0;
+    auto result = module.Decode(diag, std::move(vmo), -1, tls_id);
+    EXPECT_EQ(tls_id, 0u);
     ASSERT_TRUE(result.is_ok());
     EXPECT_THAT(result->needed, ::testing::IsEmpty()) << what << " cannot have DT_NEEDED";
     EXPECT_THAT(module.reloc_info().rel_relative(), ::testing::IsEmpty())
@@ -177,7 +179,8 @@ void LdRemoteProcessTests::Load(std::string_view executable_name) {
   // Now that the set of modules is known, initialize the remote ABI heap in
   // the loaded_stub module.  This can change that module's vaddr_size.
   RemoteAbi<> remote_abi;
-  zx::result<> abi_result = remote_abi.Init(diag, abi_stub, loaded_stub, modules);
+  zx::result abi_result =
+      remote_abi.Init(diag, abi_stub, loaded_stub, modules, decode_result->max_tls_modid);
   ASSERT_TRUE(abi_result.is_ok()) << abi_result.status_string();
 
   // Choose load addresses.

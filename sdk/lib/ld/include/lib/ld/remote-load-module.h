@@ -65,6 +65,7 @@ class RemoteLoadModule : public RemoteLoadModuleBase {
   struct DecodeModulesResult {
     List modules;        // The list of all decoded modules.
     ExecInfo main_exec;  // Decoded information for the main executable.
+    size_type max_tls_modid = 0;
 
     // This corresponds 1:1 to the pre_decoded_modules list passed into
     // DecodeModules, giving the position in .modules where each was moved.
@@ -103,7 +104,8 @@ class RemoteLoadModule : public RemoteLoadModuleBase {
   // about this module's dependencies.  In error cases, the error_value() is
   // the return value from the Diagnostics object.
   template <class Diagnostics>
-  fit::result<bool, DecodeResult> Decode(Diagnostics& diag, zx::vmo vmo, uint32_t modid) {
+  fit::result<bool, DecodeResult> Decode(Diagnostics& diag, zx::vmo vmo, uint32_t modid,
+                                         size_type& max_tls_modid) {
     if (auto result = InitMappedVmo(diag, std::move(vmo)); result.is_error()) [[unlikely]] {
       return result.take_error();
     }
@@ -147,7 +149,7 @@ class RemoteLoadModule : public RemoteLoadModuleBase {
       module().build_id = build_id->desc;
     }
 
-    // Apply relro protections before segments are aligned & equipped with VMOs.
+    // Apply RELRO protection before segments are aligned & equipped with VMOs.
     if (!load_info().ApplyRelro(diag, relro_phdr, Loader::page_size(), false)) {
       // ApplyRelro only fails if Diagnostics said to give up.
       return fit::error{false};
@@ -162,6 +164,11 @@ class RemoteLoadModule : public RemoteLoadModuleBase {
 
     auto memory = metadata_memory();
     SetModulePhdrs(module(), ehdr, load_info(), memory);
+
+    // If there was a PT_TLS, fill in tls_module() to be published later.
+    if (tls_phdr) {
+      SetTls(diag, memory, ++max_tls_modid, *tls_phdr);
+    }
 
     auto needed = DecodeDynamic(diag, dyn_phdr);
     if (!needed) {
@@ -226,18 +233,20 @@ class RemoteLoadModule : public RemoteLoadModuleBase {
   static std::optional<DecodeModulesResult<PredecodedCount>> DecodeModules(
       Diagnostics& diag, zx::vmo main_executable_vmo, GetDepVmo&& get_dep_vmo,
       std::array<RemoteLoadModule, PredecodedCount> predecoded_modules) {
+    size_type max_tls_modid = 0;
+
     // Decode the main executable first and save its decoded information to
     // include in the result returned to the caller.
     RemoteLoadModule exec{abi::Abi<>::kExecutableName, std::nullopt};
-    auto exec_decode_result = exec.Decode(diag, std::move(main_executable_vmo), 0);
+    auto exec_decode_result = exec.Decode(diag, std::move(main_executable_vmo), 0, max_tls_modid);
     if (exec_decode_result.is_error()) [[unlikely]] {
       return std::nullopt;
     }
 
     // The main executable will always be the first entry of the modules list.
-    auto [modules, predecoded_positions] =
-        DecodeDeps(diag, std::move(exec), exec_decode_result->needed,
-                   std::forward<GetDepVmo>(get_dep_vmo), std::move(predecoded_modules));
+    auto [modules, predecoded_positions] = DecodeDeps(
+        diag, std::move(exec), exec_decode_result->needed, std::forward<GetDepVmo>(get_dep_vmo),
+        std::move(predecoded_modules), max_tls_modid);
     if (modules.empty()) [[unlikely]] {
       return std::nullopt;
     }
@@ -245,6 +254,7 @@ class RemoteLoadModule : public RemoteLoadModuleBase {
     return DecodeModulesResult<PredecodedCount>{
         .modules = std::move(modules),
         .main_exec = exec_decode_result->exec_info,
+        .max_tls_modid = max_tls_modid,
         .predecoded_positions = predecoded_positions,
     };
   }
@@ -328,7 +338,8 @@ class RemoteLoadModule : public RemoteLoadModuleBase {
   template <class Diagnostics, typename GetDepVmo, size_t PredecodedCount>
   static std::pair<List, PredecodedPositions<PredecodedCount>> DecodeDeps(
       Diagnostics& diag, RemoteLoadModule main_exec, const std::vector<Soname>& main_exec_needed,
-      GetDepVmo&& get_dep_vmo, std::array<RemoteLoadModule, PredecodedCount> predecoded_modules) {
+      GetDepVmo&& get_dep_vmo, std::array<RemoteLoadModule, PredecodedCount> predecoded_modules,
+      size_type& max_tls_modid) {
     assert(std::all_of(predecoded_modules.begin(), predecoded_modules.end(),
                        [](const auto& m) { return m.HasModule(); }));
 
@@ -428,7 +439,7 @@ class RemoteLoadModule : public RemoteLoadModuleBase {
           continue;
         }
 
-        decode_result = mod.Decode(diag, std::move(vmo), modid);
+        decode_result = mod.Decode(diag, std::move(vmo), modid, max_tls_modid);
       }
 
       if (decode_result.is_error()) [[unlikely]] {

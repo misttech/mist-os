@@ -33,6 +33,7 @@ class RemoteAbi {
  public:
   using size_type = typename Elf::size_type;
   using Addr = typename Elf::Addr;
+  using TlsLayout = elfldltl::TlsLayout<Elf>;
 
   using AbiStub = RemoteAbiStub<Elf>;
   using RemoteModule = RemoteLoadModule<Elf>;
@@ -49,13 +50,20 @@ class RemoteAbi {
   // its final vaddr_size; load addresses can be selected for all modules.
   template <class Diagnostics>
   zx::result<> Init(Diagnostics& diag, const AbiStub& abi_stub, RemoteModule& stub_module,
-                    ModuleList& modules) {
+                    ModuleList& modules, size_type max_tls_modid) {
     RemoteAbiHeapLayout layout{abi_stub.data_size()};
 
     // The _ld_abi.loaded_modules linked-list will be populated by elements of
     // a flat array.  To simplify transcription, this array is indexed by the
     // module's symbolizer_modid, which is also its index in the ModuleList.
     abi_modules_ = layout.Allocate<AbiModule>(modules.size());
+
+    // The TLS arrays are indexed by TLS module ID - 1.  Not every module has a
+    // slot in these arrays, only those with a PT_TLS segment.
+    if (max_tls_modid > 0) {
+      abi_tls_modules_ = layout.Allocate<AbiTlsModule>(max_tls_modid);
+      abi_tls_offsets_ = layout.Allocate<Addr>(max_tls_modid);
+    }
 
     // The link_map.name pointer is one of the most complicated aspects of
     // transcription.  It's the only pointer in the whole (flattened) AbiModule
@@ -103,8 +111,6 @@ class RemoteAbi {
     }
     assert(module_heap_names_.size() == modules.size());
 
-    // TODO(https://fxbug.dev/318041873): TLS arrays & layout
-
     auto result = AbiHeap::Create(diag, abi_stub.data_size(), stub_module, std::move(layout));
     if (result.is_error()) {
       return result.take_error();
@@ -115,6 +121,12 @@ class RemoteAbi {
     // Clear the remote _ld_abi struct before Finish is called to fill it in.
     Abi& abi = heap_->template Local<Abi>(abi_stub.abi_offset());
     abi = {};
+
+    for (RemoteModule& module : modules) {
+      // Do TLS layout, directly updating the remote _ld_abi.static_tls_layout
+      // while setting module.static_tls_bias().
+      module.AssignStaticTls(abi.static_tls_layout);
+    }
 
     return zx::ok();
   }
@@ -149,6 +161,7 @@ class RemoteAbi {
   using Abi = abi::Abi<Elf, elfldltl::RemoteAbiTraits>;
   using AbiModule = typename Abi::Module;
   using AbiModuleSpan = typename AbiHeap::template AbiSpan<AbiModule>;
+  using AbiTlsModule = typename Abi::TlsModule;
   using RDebug = typename Elf::template RDebug<elfldltl::RemoteAbiTraits>;
   using LinkMap = typename Elf::template LinkMap<elfldltl::RemoteAbiTraits>;
   using LinkMapPtr = typename AbiHeap::template AbiPtr<LinkMap>;
@@ -463,6 +476,21 @@ class RemoteAbi {
       }
     };
 
+    // The TLS arrays get filled in only for modules with a PT_TLS.
+    assert(abi_tls_modules_.size() == abi_tls_offsets_.size());
+    auto do_tls = [tls_modules = heap_->Local(abi_tls_modules_),
+                   tls_offsets = heap_->Local(abi_tls_offsets_)](  //
+                      const ModuleContext& context) -> bool {
+      const RemoteModule& module = context.vaddr_map.module();
+      if (module.tls_module_id() == 0) {
+        return true;
+      }
+      const size_t idx = module.tls_module_id() - 1;
+      tls_offsets[idx] = module.static_tls_bias();
+      return RemoteAbiTranscriber<AbiTlsModule>::FromLocal(  //
+          context, tls_modules[idx], module.tls_module());
+    };
+
     do {
       // Set up the linked-list pointers in the LocalAbiModule.
       chain_module();
@@ -470,9 +498,10 @@ class RemoteAbi {
       // Now transcribe the LocalAbiModule into the remote AbiModule.
       // link_map.name is handled specially after the main transcription.
       const auto context = make_module_context(*vaddr_map);
-      const LocalAbiModule& local_module = vaddr_map->module().module();
+      const RemoteModule& module = vaddr_map->module();
+      const LocalAbiModule& local_module = module.module();
       if (!ModuleTranscriber::FromLocal(context, *abi_module, local_module) ||
-          !set_link_map_name(context)) [[unlikely]] {
+          !set_link_map_name(context) || !do_tls(context)) [[unlikely]] {
         return false;
       }
     } while (next_module());
@@ -481,12 +510,15 @@ class RemoteAbi {
     // finish setting the remote _ld_abi members.  This could fill a LocalAbi
     // and then transcribe it, but that would just require extra machinery for
     // the few pointers it needs.  Instead, just populate the remote Abi struct
-    // directly.  It was already cleared by Init.
-    // TODO(https://fxbug.dev/318041873): fill in TLS items; later Init will
-    // set abi.static_tls_layout too.
+    // directly.  It was already cleared by Init, which also did TLS layout
+    // by directly updating abi.static_tls_layout.
 
     // This is the head of the list, which is also the front of the array.
     abi.loaded_modules = abi_context.abi_modules.ptr();
+
+    // These are used directly as flat arrays.
+    abi.static_tls_modules = heap_->Remote(heap_vaddr, abi_tls_modules_);
+    abi.static_tls_offsets = heap_->Remote(heap_vaddr, abi_tls_offsets_);
 
     return true;
   }
@@ -501,6 +533,8 @@ class RemoteAbi {
 
   std::optional<AbiHeap> heap_;
   RemoteAbiSpan<AbiModule> abi_modules_;
+  RemoteAbiSpan<AbiTlsModule> abi_tls_modules_;
+  RemoteAbiSpan<Addr> abi_tls_offsets_;
   std::vector<RemoteAbiString> module_heap_names_;
 };
 
