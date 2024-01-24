@@ -16,7 +16,9 @@
 #include <fbl/algorithm.h>
 #include <fbl/alloc_checker.h>
 
+#include "src/graphics/display/lib/api-types-cpp/display-timing.h"
 #include "src/graphics/display/lib/edid/eisa_vid_lut.h"
+#include "src/graphics/display/lib/edid/timings.h"
 
 namespace {
 
@@ -261,50 +263,76 @@ bool Edid::is_hdmi() const {
   return false;
 }
 
-void convert_dtd_to_timing(const DetailedTimingDescriptor& dtd, timing_params* params) {
-  params->pixel_freq_khz = dtd.pixel_clock_10khz * 10;
-  params->horizontal_addressable = dtd.horizontal_addressable();
-  params->horizontal_front_porch = dtd.horizontal_front_porch();
-  params->horizontal_sync_pulse = dtd.horizontal_sync_pulse_width();
-  params->horizontal_blanking = dtd.horizontal_blanking();
+display::DisplayTiming DetailedTimingDescriptorToDisplayTiming(
+    const DetailedTimingDescriptor& dtd) {
+  // A valid DetailedTimingDescriptor guarantees that
+  // horizontal_blanking >= horizontal_front_porch + horizontal_sync_pulse, and
+  // all of them are non-negative and fit in [0, kMaxTimingValue].
+  //
+  // This constraint guarantees that
+  // horizontal_blanking - (horizontal_front_porch + horizontal_sync_pulse)
+  // will also fit in [0, kMaxTimingValue]; the calculation won't overflow,
+  // causing undefined behaviors.
+  int32_t horizontal_back_porch_px =
+      static_cast<int32_t>(dtd.horizontal_blanking() -
+                           (dtd.horizontal_front_porch() + dtd.horizontal_sync_pulse_width()));
 
-  params->vertical_addressable = dtd.vertical_addressable();
-  params->vertical_front_porch = dtd.vertical_front_porch();
-  params->vertical_sync_pulse = dtd.vertical_sync_pulse_width();
-  params->vertical_blanking = dtd.vertical_blanking();
+  // A similar argument holds for the vertical back porch.
+  int32_t vertical_back_porch_lines = static_cast<int32_t>(
+      dtd.vertical_blanking() - (dtd.vertical_front_porch() + dtd.vertical_sync_pulse_width()));
 
   if (dtd.type() != TYPE_DIGITAL_SEPARATE) {
-    printf("edid: Ignoring bad timing type %d\n", dtd.type());
+    // TODO(https://fxbug.dev/136949): Displays using composite syncs are not
+    // supported. We treat them as if they were using separate sync signals.
+    zxlogf(WARNING, "The detailed timing descriptor uses composite sync; this is not supported.");
   }
-  params->flags = (dtd.vsync_polarity() ? timing_params::kPositiveVsync : 0) |
-                  (dtd.hsync_polarity() ? timing_params::kPositiveHsync : 0) |
-                  (dtd.interlaced() ? timing_params::kInterlaced : 0);
 
-  double total_pxls = (params->horizontal_addressable + params->horizontal_blanking) *
-                      (params->vertical_addressable + params->vertical_blanking);
-  double pixel_clock_hz = params->pixel_freq_khz * 1000;
-  params->vertical_refresh_e2 = static_cast<uint32_t>(round(100 * pixel_clock_hz / total_pxls));
+  return display::DisplayTiming{
+      .horizontal_active_px = static_cast<int32_t>(dtd.horizontal_addressable()),
+      .horizontal_front_porch_px = static_cast<int32_t>(dtd.horizontal_front_porch()),
+      .horizontal_sync_width_px = static_cast<int32_t>(dtd.horizontal_sync_pulse_width()),
+      .horizontal_back_porch_px = horizontal_back_porch_px,
+
+      .vertical_active_lines = static_cast<int32_t>(dtd.vertical_addressable()),
+      .vertical_front_porch_lines = static_cast<int32_t>(dtd.vertical_front_porch()),
+      .vertical_sync_width_lines = static_cast<int32_t>(dtd.vertical_sync_pulse_width()),
+      .vertical_back_porch_lines = vertical_back_porch_lines,
+
+      .pixel_clock_frequency_khz = dtd.pixel_clock_10khz * 10,
+      .fields_per_frame = dtd.interlaced() ? display::FieldsPerFrame::kInterlaced
+                                           : display::FieldsPerFrame::kProgressive,
+      .hsync_polarity = dtd.hsync_polarity() ? display::SyncPolarity::kPositive
+                                             : display::SyncPolarity::kNegative,
+      .vsync_polarity = dtd.vsync_polarity() ? display::SyncPolarity::kPositive
+                                             : display::SyncPolarity::kNegative,
+      .vblank_alternates = false,
+      .pixel_repetition = 0,
+  };
 }
 
-void convert_std_to_timing(const BaseEdid& edid, const StandardTimingDescriptor& std,
-                           timing_params* params) {
+// Returns std::nullopt if the standard timing descriptor `std` is invalid or
+// unsupported.
+// Otherwise, returns the DisplayTiming converted from the descriptor.
+std::optional<display::DisplayTiming> StandardTimingDescriptorToDisplayTiming(
+    const BaseEdid& edid, const StandardTimingDescriptor& std) {
   // Pick the largest resolution advertised by the display and then use the
   // generalized timing formula to compute the timing parameters.
   // TODO(stevensd): Support interlaced modes and margins
-  uint32_t width = std.horizontal_resolution();
-  uint32_t height = std.vertical_resolution(edid.edid_version, edid.edid_revision);
-  uint32_t v_rate = std.vertical_freq() + 60;
+  int32_t width = static_cast<int32_t>(std.horizontal_resolution());
+  int32_t height =
+      static_cast<int32_t>(std.vertical_resolution(edid.edid_version, edid.edid_revision));
+  int32_t v_rate = static_cast<int32_t>(std.vertical_freq()) + 60;
 
   if (!width || !height || !v_rate) {
-    return;
+    zxlogf(WARNING, "Invalid standard timing descriptor: %" PRId32 " x %" PRId32 "@ %" PRId32 " Hz",
+           width, height, v_rate);
+    return std::nullopt;
   }
 
-  const timing_params_t* dmt_timing = internal::dmt_timings;
-  for (unsigned i = 0; i < internal::dmt_timings_count; i++, dmt_timing++) {
-    if (dmt_timing->horizontal_addressable == width && dmt_timing->vertical_addressable == height &&
-        ((dmt_timing->vertical_refresh_e2 + 50) / 100) == v_rate) {
-      *params = *dmt_timing;
-      return;
+  for (const display::DisplayTiming& dmt_timing : internal::kDmtDisplayTimings) {
+    if (dmt_timing.horizontal_active_px == width && dmt_timing.vertical_active_lines == height &&
+        ((dmt_timing.vertical_field_refresh_rate_millihertz() + 500) / 1000) == v_rate) {
+      return dmt_timing;
     }
   }
 
@@ -313,17 +341,14 @@ void convert_std_to_timing(const BaseEdid& edid, const StandardTimingDescriptor&
          "Hz). The timing is not supported and will be ignored. See https://fxbug.dev/135772 for "
          "details.",
          width, height, v_rate);
-  // TODO(https://fxbug.dev/135820): timing_iterator uses vertical_addressable == 0 or
-  // horizontal_addressable == 0 to determine whether a timing is valid.
-  // Instead we should use a std::optional<> to represent invalid timings.
-  *params = {};
+  return std::nullopt;
 }
 
 timing_iterator& timing_iterator::operator++() {
   while (state_ != kDone) {
     Advance();
     // If either of these are 0, then the timing value is definitely wrong
-    if (params_.vertical_addressable != 0 && params_.horizontal_addressable != 0) {
+    if (display_timing_.vertical_active_lines != 0 && display_timing_.horizontal_active_px != 0) {
       break;
     }
   }
@@ -334,7 +359,7 @@ void timing_iterator::Advance() {
   if (state_ == kDtds) {
     while (descriptors_.is_valid()) {
       if (descriptors_->timing.pixel_clock_10khz != 0) {
-        convert_dtd_to_timing(descriptors_->timing, &params_);
+        display_timing_ = DetailedTimingDescriptorToDisplayTiming(descriptors_->timing);
         ++descriptors_;
         return;
       }
@@ -351,29 +376,33 @@ void timing_iterator::Advance() {
         uint32_t modes_to_skip = state_index_;
         for (unsigned i = 0; i < dbs_->length(); i++) {
           uint32_t idx = dbs_->payload.video[i].standard_mode_idx() - 1;
-          if (idx >= internal::cea_timings_count) {
+          if (idx >= internal::kCtaDisplayTimings.size()) {
             continue;
           }
           if (modes_to_skip == 0) {
-            params_ = internal::cea_timings[idx];
+            display_timing_ = internal::kCtaDisplayTimings[idx];
             return;
           }
 
           // For timings with refresh rates that are multiples of 6, there are
           // corresponding timings adjusted by a factor of 1000/1001.
-          uint32_t rounded_refresh = (internal::cea_timings[idx].vertical_refresh_e2 + 99) / 100;
+          //
+          // TODO(https://fxbug.dev/136950): Revise the refresh rate adjustment
+          // logic to make sure that it complies with the CTA-861 standards.
+          uint32_t rounded_refresh =
+              (internal::kCtaDisplayTimings[idx].vertical_field_refresh_rate_millihertz() + 999) /
+              1000;
           if (rounded_refresh % 6 == 0) {
             if (modes_to_skip == 1) {
-              params_ = internal::cea_timings[idx];
-              double clock = params_.pixel_freq_khz;
-              double refresh = params_.vertical_refresh_e2;
-              // 240/480 height entries are already multipled by 1000/1001
-              double mult =
-                  params_.vertical_addressable == 240 || params_.vertical_addressable == 480
-                      ? 1.001
-                      : (1000. / 1001.);
-              params_.pixel_freq_khz = static_cast<uint32_t>(round(clock * mult));
-              params_.vertical_refresh_e2 = static_cast<uint32_t>(round(refresh * mult));
+              display_timing_ = internal::kCtaDisplayTimings[idx];
+              double clock = display_timing_.pixel_clock_frequency_khz;
+              // 240/480 height entries are already multiplied by 1000/1001
+              double mult = display_timing_.vertical_active_lines == 240 ||
+                                    display_timing_.vertical_active_lines == 480
+                                ? 1.001
+                                : (1000. / 1001.);
+              display_timing_.pixel_clock_frequency_khz =
+                  static_cast<uint32_t>(round(clock * mult));
               return;
             }
             modes_to_skip -= 2;
@@ -397,7 +426,11 @@ void timing_iterator::Advance() {
       if (desc->byte1 == 0x01 && desc->byte2 == 0x01) {
         continue;
       }
-      convert_std_to_timing(*edid_->base_edid_, *desc, &params_);
+      std::optional<display::DisplayTiming> display_timing =
+          StandardTimingDescriptorToDisplayTiming(*edid_->base_edid_, *desc);
+      if (display_timing.has_value()) {
+        display_timing_ = *display_timing;
+      }
       return;
     }
 

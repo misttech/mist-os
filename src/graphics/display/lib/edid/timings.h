@@ -5,14 +5,16 @@
 #ifndef SRC_GRAPHICS_DISPLAY_LIB_EDID_TIMINGS_H_
 #define SRC_GRAPHICS_DISPLAY_LIB_EDID_TIMINGS_H_
 
+#include <lib/stdcompat/span.h>
+
 #include <cinttypes>
 
 #include "src/graphics/display/lib/api-types-cpp/display-timing.h"
 
 namespace edid {
 
-// TODO(fxbug.dev/135377): The type name violates the C++ style guide. Delete
-// the struct once all the clients are migrated.
+// TODO(https://fxbug.dev/135377): The type name violates the C++ style guide.
+// Delete the struct once all the clients are migrated.
 struct timing_params {
   uint32_t pixel_freq_khz;
 
@@ -40,17 +42,14 @@ struct timing_params {
   uint32_t vertical_refresh_e2;
 };
 
-// TODO(fxbug.dev/135377): The type name violates the C++ style guide. Delete
-// the struct once all the clients are migrated.
+// TODO(https://fxbug.dev/135377): The type name violates the C++ style guide.
+// Delete the struct once all the clients are migrated.
 using timing_params_t = timing_params;
 
 namespace internal {
 
-extern const timing_params_t* dmt_timings;
-extern const uint32_t dmt_timings_count;
-
-extern const timing_params_t* cea_timings;
-extern const uint32_t cea_timings_count;
+extern const cpp20::span<const display::DisplayTiming> kDmtDisplayTimings;
+extern const cpp20::span<const display::DisplayTiming> kCtaDisplayTimings;
 
 }  // namespace internal
 

@@ -22,6 +22,7 @@ source_set("edid") {
     "//zircon/system/ulib/zx",
   ]
   public_deps = [
+    "//sdk/lib/stdcompat",
     "//src/graphics/display/lib/api-types-cpp",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/hwreg",

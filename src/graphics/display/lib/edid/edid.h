@@ -16,6 +16,7 @@
 #include <fbl/vector.h>
 #include <hwreg/bitfields.h>
 
+#include "src/graphics/display/lib/api-types-cpp/display-timing.h"
 #include "src/graphics/display/lib/edid/timings.h"
 
 namespace edid {
@@ -439,8 +440,8 @@ class timing_iterator {
 
   timing_iterator& operator++();
 
-  const timing_params& operator*() const { return params_; }
-  const timing_params* operator->() const { return &params_; }
+  const display::DisplayTiming& operator*() const { return display_timing_; }
+  const display::DisplayTiming* operator->() const { return &display_timing_; }
 
   bool is_valid() const { return state_ != kDone; }
 
@@ -459,7 +460,7 @@ class timing_iterator {
 
   void Advance();
 
-  timing_params params_;
+  display::DisplayTiming display_timing_;
 
   const Edid* edid_;
   uint8_t state_;

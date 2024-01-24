@@ -104,7 +104,7 @@ void Controller::PopulateDisplayTimings(const fbl::RefPtr<DisplayInfo>& info) {
 
   for (auto edid_timing = edid::timing_iterator(&info->edid->base); edid_timing.is_valid();
        ++edid_timing) {
-    display::DisplayTiming timing = ToDisplayTiming(*edid_timing);
+    const display::DisplayTiming& timing = *edid_timing;
     int32_t width = timing.horizontal_active_px;
     int32_t height = timing.vertical_active_lines;
     bool duplicate = false;

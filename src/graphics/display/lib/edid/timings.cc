@@ -4,6 +4,8 @@
 
 #include "src/graphics/display/lib/edid/timings.h"
 
+#include <lib/stdcompat/span.h>
+
 #include <array>
 #include <cstddef>
 
@@ -14,27 +16,25 @@
 namespace edid {
 namespace internal {
 
-constexpr std::array<timing_params_t, kDmtTimings.size()> kDmtTimingParams = [] {
-  std::array<timing_params_t, kDmtTimings.size()> params = {};
+constexpr std::array<display::DisplayTiming, kDmtTimings.size()> kDmtDisplayTimingsArray = [] {
+  std::array<display::DisplayTiming, kDmtTimings.size()> params = {};
   for (size_t i = 0; i < kDmtTimings.size(); i++) {
-    params[i] = ToTimingParams(kDmtTimings[i]);
+    params[i] = ToDisplayTiming(kDmtTimings[i]);
   }
   return params;
 }();
 
-const timing_params_t* dmt_timings = kDmtTimingParams.data();
-const uint32_t dmt_timings_count = kDmtTimingParams.size();
+const cpp20::span<const display::DisplayTiming> kDmtDisplayTimings(kDmtDisplayTimingsArray);
 
-constexpr std::array<timing_params_t, kCtaTimings.size()> kCtaTimingParams = [] {
-  std::array<timing_params_t, kCtaTimings.size()> params = {};
+constexpr std::array<display::DisplayTiming, kCtaTimings.size()> kCtaDisplayTimingsArray = [] {
+  std::array<display::DisplayTiming, kCtaTimings.size()> params = {};
   for (size_t i = 0; i < kCtaTimings.size(); i++) {
-    params[i] = ToTimingParams(kCtaTimings[i]);
+    params[i] = ToDisplayTiming(kCtaTimings[i]);
   }
   return params;
 }();
 
-const timing_params_t* cea_timings = kCtaTimingParams.data();
-const uint32_t cea_timings_count = kCtaTimingParams.size();
+const cpp20::span<const display::DisplayTiming> kCtaDisplayTimings(kCtaDisplayTimingsArray);
 
 }  // namespace internal
 

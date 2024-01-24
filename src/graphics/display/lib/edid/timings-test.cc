@@ -195,56 +195,6 @@ TEST(EdidTimingParams, PolarityMapping) {
   }
 }
 
-TEST(EdidTimingParams, CeaTimingsToDisplayTiming) {
-  cpp20::span<const edid::timing_params_t> kCeaTimings(edid::internal::cea_timings,
-                                                       edid::internal::cea_timings_count);
-  for (const edid::timing_params_t& cea_timing : kCeaTimings) {
-    display::DisplayTiming timing = ToDisplayTiming(cea_timing);
-    EXPECT_EQ(timing.horizontal_active_px, static_cast<int32_t>(cea_timing.horizontal_addressable));
-    EXPECT_EQ(timing.horizontal_front_porch_px,
-              static_cast<int32_t>(cea_timing.horizontal_front_porch));
-    EXPECT_EQ(timing.horizontal_sync_width_px,
-              static_cast<int32_t>(cea_timing.horizontal_sync_pulse));
-    EXPECT_EQ(timing.horizontal_blank_px(), static_cast<int32_t>(cea_timing.horizontal_blanking));
-    EXPECT_EQ(timing.vertical_active_lines, static_cast<int32_t>(cea_timing.vertical_addressable));
-    EXPECT_EQ(timing.vertical_front_porch_lines,
-              static_cast<int32_t>(cea_timing.vertical_front_porch));
-    EXPECT_EQ(timing.vertical_sync_width_lines,
-              static_cast<int32_t>(cea_timing.vertical_sync_pulse));
-    EXPECT_EQ(timing.vertical_blank_lines(), static_cast<int32_t>(cea_timing.vertical_blanking));
-    EXPECT_EQ(timing.pixel_clock_frequency_khz, static_cast<int32_t>(cea_timing.pixel_freq_khz));
-
-    const int vertical_refresh_rate_centihertz =
-        (timing.vertical_field_refresh_rate_millihertz() + 5) / 10;
-    EXPECT_EQ(vertical_refresh_rate_centihertz, static_cast<int>(cea_timing.vertical_refresh_e2));
-  }
-}
-
-TEST(EdidTimingParams, DmtTimingsToDisplayTiming) {
-  cpp20::span<const edid::timing_params_t> kDmtTimings(edid::internal::dmt_timings,
-                                                       edid::internal::dmt_timings_count);
-  for (const edid::timing_params_t& dmt_timing : kDmtTimings) {
-    display::DisplayTiming timing = ToDisplayTiming(dmt_timing);
-    EXPECT_EQ(timing.horizontal_active_px, static_cast<int32_t>(dmt_timing.horizontal_addressable));
-    EXPECT_EQ(timing.horizontal_front_porch_px,
-              static_cast<int32_t>(dmt_timing.horizontal_front_porch));
-    EXPECT_EQ(timing.horizontal_sync_width_px,
-              static_cast<int32_t>(dmt_timing.horizontal_sync_pulse));
-    EXPECT_EQ(timing.horizontal_blank_px(), static_cast<int32_t>(dmt_timing.horizontal_blanking));
-    EXPECT_EQ(timing.vertical_active_lines, static_cast<int32_t>(dmt_timing.vertical_addressable));
-    EXPECT_EQ(timing.vertical_front_porch_lines,
-              static_cast<int32_t>(dmt_timing.vertical_front_porch));
-    EXPECT_EQ(timing.vertical_sync_width_lines,
-              static_cast<int32_t>(dmt_timing.vertical_sync_pulse));
-    EXPECT_EQ(timing.vertical_blank_lines(), static_cast<int32_t>(dmt_timing.vertical_blanking));
-    EXPECT_EQ(timing.pixel_clock_frequency_khz, static_cast<int32_t>(dmt_timing.pixel_freq_khz));
-
-    const int vertical_refresh_rate_centihertz =
-        (timing.vertical_field_refresh_rate_millihertz() + 5) / 10;
-    EXPECT_EQ(vertical_refresh_rate_centihertz, static_cast<int>(dmt_timing.vertical_refresh_e2));
-  }
-}
-
 }  // namespace
 
 }  // namespace edid
