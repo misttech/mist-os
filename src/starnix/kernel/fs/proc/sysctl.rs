@@ -91,6 +91,42 @@ pub fn sysctl_directory(current_task: &CurrentTask, fs: &FileSystemHandle) -> Fs
     dir.subdir(current_task, "vm", 0o555, |dir| {
         dir.entry(
             current_task,
+            "dirty_background_ratio",
+            StubSysctl::new_node("/proc/sys/vm/dirty_background_ratio", None),
+            mode,
+        );
+        dir.entry(
+            current_task,
+            "dirty_expire_centisecs",
+            StubSysctl::new_node("/proc/sys/vm/dirty_expire_centisecs", None),
+            mode,
+        );
+        dir.entry(
+            current_task,
+            "drop_caches",
+            StubSysctl::new_node("/proc/sys/vm/drop_caches", None),
+            mode,
+        );
+        dir.entry(
+            current_task,
+            "extra_free_kbytes",
+            StubSysctl::new_node("/proc/sys/vm/extra_free_kbytes", None),
+            mode,
+        );
+        dir.entry(
+            current_task,
+            "max_map_count",
+            StubSysctl::new_node("/proc/sys/vm/max_map_count", None),
+            mode,
+        );
+        dir.entry(
+            current_task,
+            "mmap_min_addr",
+            StubSysctl::new_node("/proc/sys/vm/mmap_min_addr", None),
+            mode,
+        );
+        dir.entry(
+            current_task,
             "mmap_rnd_bits",
             StubSysctl::new_node("/proc/sys/vm/mmap_rnd_bits", None),
             mode,
@@ -103,8 +139,20 @@ pub fn sysctl_directory(current_task: &CurrentTask, fs: &FileSystemHandle) -> Fs
         );
         dir.entry(
             current_task,
-            "drop_caches",
-            StubSysctl::new_node("/proc/sys/vm/drop_caches", None),
+            "overcommit_memory",
+            StubSysctl::new_node("/proc/sys/vm/overcommit_memory", None),
+            mode,
+        );
+        dir.entry(
+            current_task,
+            "page-cluster",
+            StubSysctl::new_node("/proc/sys/vm/page-cluster", None),
+            mode,
+        );
+        dir.entry(
+            current_task,
+            "watermark_scale_factor",
+            StubSysctl::new_node("/proc/sys/vm/watermark_scale_factor", None),
             mode,
         );
     });
@@ -130,6 +178,24 @@ pub fn sysctl_directory(current_task: &CurrentTask, fs: &FileSystemHandle) -> Fs
             );
         });
         dir.entry(current_task, "pipe-max-size", PipeMaxSizeFile::new_node(), mode);
+        dir.entry(
+            current_task,
+            "protected_hardlinks",
+            StubSysctl::new_node("/proc/sys/fs/protected_hardlinks", None),
+            mode,
+        );
+        dir.entry(
+            current_task,
+            "protected_symlinks",
+            StubSysctl::new_node("/proc/sys/fs/protected_symlinks", None),
+            mode,
+        );
+        dir.entry(
+            current_task,
+            "suid_dumpable",
+            StubSysctl::new_node("/proc/sys/fs/suid_dumpable", None),
+            mode,
+        );
     });
     dir.build(current_task)
 }
