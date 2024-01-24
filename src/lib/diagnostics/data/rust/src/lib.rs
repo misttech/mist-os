@@ -506,6 +506,13 @@ where
         self.payload = None;
     }
 
+    /// Sorts this [`Data`]'s payload if one is present.
+    pub fn sort_payload(&mut self) {
+        if let Some(payload) = &mut self.payload {
+            payload.sort();
+        }
+    }
+
     /// Uses a set of Selectors to filter self's payload and returns the resulting
     /// Data. If the resulting payload is empty, it returns Ok(None).
     pub fn filter(mut self, selectors: &[Selector]) -> Result<Option<Self>, Error> {
