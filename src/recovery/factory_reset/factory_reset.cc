@@ -18,11 +18,11 @@
 #include <zircon/errors.h>
 #include <zircon/status.h>
 
+#include "src/recovery/factory_reset/factory_reset_config.h"
 #include "src/security/lib/kms-stateless/kms-stateless.h"
 #include "src/security/lib/zxcrypt/client.h"
 #include "src/storage/lib/block_client/cpp/remote_block_device.h"
 #include "src/storage/lib/fs_management/cpp/format.h"
-
 namespace factory_reset {
 
 const char* kBlockPath = "class/block";
@@ -50,54 +50,21 @@ zx_status_t ShredZxcryptDevice(fidl::ClientEnd<fuchsia_device::Controller> devic
   return ZX_OK;
 }
 
-zx_status_t ShredFxfsDevice(const fidl::ClientEnd<fuchsia_hardware_block::Block>& device) {
-  // Overwrite the magic bytes of both superblocks.
-  //
-  // Note: This may occasionally be racy. Superblocks may be writen after
-  // the overwrite below but before reboot. When we move this to fshost, we
-  // will have access to the running filesystem and can wait for shutdown with
-  // something like:
-  //   fdio_cpp::FdioCaller caller(std::move(fd));
-  //   if (zx::result<> status = fs_management::Shutdown(caller.directory()); !status.is_ok()) {
-  //     return status.error_value();
-  //   }
-  // TODO(https://fxbug.dev/98889): Perform secure erase once we have keybag support.
-  const fidl::WireResult result = fidl::WireCall(device)->GetInfo();
-  if (!result.ok()) {
-    FX_PLOGS(ERROR, result.status()) << "Failed to fetch block size";
-    return result.status();
-  }
-  const fit::result response = result.value();
-  if (response.is_error()) {
-    FX_PLOGS(ERROR, response.error_value()) << "Failed to fetch block size";
-    return response.error_value();
-  }
-  size_t block_size = response.value()->info.block_size;
-  std::unique_ptr<uint8_t[]> block = std::make_unique<uint8_t[]>(block_size);
-  memset(block.get(), 0, block_size);
-  for (off_t offset : {0L, 512L << 10}) {
-    if (zx_status_t status =
-            block_client::SingleWriteBytes(device, block.get(), block_size, offset);
-        status != ZX_OK) {
-      FX_PLOGS(ERROR, status) << "Failed to write to fxfs device at offset " << offset;
-      return status;
-    }
-  }
-  return ZX_OK;
-}
-
 FactoryReset::FactoryReset(async_dispatcher_t* dispatcher,
                            fidl::ClientEnd<fuchsia_io::Directory> dev,
                            fidl::ClientEnd<fuchsia_hardware_power_statecontrol::Admin> admin,
-                           fidl::ClientEnd<fuchsia_fshost::Admin> fshost_admin)
+                           fidl::ClientEnd<fuchsia_fshost::Admin> fshost_admin,
+                           factory_reset_config::Config config)
     : dev_(std::move(dev)),
       admin_(std::move(admin), dispatcher),
-      fshost_admin_(std::move(fshost_admin), dispatcher) {}
+      fshost_admin_(std::move(fshost_admin), dispatcher),
+      config_(config) {}
 
 void FactoryReset::Shred(fit::callback<void(zx_status_t)> callback) const {
   // First try and shred the data volume using fshost.
   auto cb = [this, callback = std::move(callback)](const auto& result) mutable {
     callback([this, &result]() {
+      zx_status_t status;
       if (result.ok()) {
         const fit::result response = result.value();
         if (response.is_ok()) {
@@ -109,10 +76,17 @@ void FactoryReset::Shred(fit::callback<void(zx_status_t)> callback) const {
             FX_PLOGS(ERROR, response.error_value()) << "fshost ShredDataVolume failed";
           }
         }
+        status = response.error_value();
       } else {
         FX_LOGS(ERROR) << "Failed to call ShredDataVolume: " << result.FormatDescription();
+        status = result.status();
       }
-      // Fall back to shredding all zxcrypt devices and Fxfs volumes...
+      if (config_.use_fxblob()) {
+        // We can't fall back to shredding manually for Fxblob, so fail now.
+        return status;
+      }
+      // Fall back to shredding all zxcrypt devices...
+      FX_LOGS(INFO) << "Falling back to manually shredding zxcrypt...";
       zx::result block_dir = component::ConnectAt<fuchsia_io::Directory>(dev_, kBlockPath);
       if (block_dir.is_error()) {
         FX_PLOGS(ERROR, block_dir.error_value()) << "Failed to open '" << kBlockPath << "'";
@@ -150,39 +124,30 @@ void FactoryReset::Shred(fit::callback<void(zx_status_t)> callback) const {
           FX_PLOGS(ERROR, block_controller.status_value()) << "Error opening " << controller_path;
           continue;
         }
-        zx_status_t status;
-        switch (fs_management::DetectDiskFormat(block.value())) {
-          case fs_management::kDiskFormatZxcrypt: {
-            fbl::unique_fd dev_fd;
-            {
-              zx::result dev = component::Clone(dev_);
-              if (dev.is_error()) {
-                FX_PLOGS(ERROR, dev.error_value()) << "Error cloning connection to /dev";
-                continue;
-              }
-              if (zx_status_t status = fdio_fd_create(dev.value().TakeChannel().release(),
-                                                      dev_fd.reset_and_get_address());
-                  status != ZX_OK) {
-                FX_PLOGS(ERROR, status) << "Error creating file descriptor from /dev";
-                continue;
-              }
+        if (fs_management::DetectDiskFormat(block.value()) == fs_management::kDiskFormatZxcrypt) {
+          fbl::unique_fd dev_fd;
+          {
+            zx::result dev = component::Clone(dev_);
+            if (dev.is_error()) {
+              FX_PLOGS(ERROR, dev.error_value()) << "Error cloning connection to /dev";
+              continue;
             }
+            if (zx_status_t status = fdio_fd_create(dev.value().TakeChannel().release(),
+                                                    dev_fd.reset_and_get_address());
+                status != ZX_OK) {
+              FX_PLOGS(ERROR, status) << "Error creating file descriptor from /dev";
+              continue;
+            }
+          }
 
-            status = ShredZxcryptDevice(std::move(block_controller.value()), std::move(dev_fd));
-            break;
+          zx_status_t status =
+              ShredZxcryptDevice(std::move(block_controller.value()), std::move(dev_fd));
+          if (status != ZX_OK) {
+            FX_PLOGS(ERROR, status) << "Error shredding " << de->d_name;
+            return status;
           }
-          case fs_management::kDiskFormatFxfs: {
-            status = ShredFxfsDevice(block.value());
-            break;
-          }
-          default:
-            continue;
+          FX_LOGS(INFO) << "Successfully shredded " << de->d_name;
         }
-        if (status != ZX_OK) {
-          FX_PLOGS(ERROR, status) << "Error shredding " << de->d_name;
-          return status;
-        }
-        FX_LOGS(INFO) << "Successfully shredded " << de->d_name;
       }
     }());
   };

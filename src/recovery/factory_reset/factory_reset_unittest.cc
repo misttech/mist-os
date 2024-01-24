@@ -168,31 +168,6 @@ class FactoryResetTest : public gtest::RealLoopFixture {
     ASSERT_NO_FATAL_FAILURE(WriteBlocks(client_end, block.get(), block_size, 0));
   }
 
-  void CreateFakeFxfs() {
-    // Writes just the Fxfs magic byte sequence (FxfsSupr) so that we detect that the filesystem
-    // is Fxfs and shred it accordingly.
-    zx::result channel = WaitForDevice(fvm_block_path_);
-    ASSERT_EQ(channel.status_value(), ZX_OK);
-    fidl::ClientEnd<fuchsia_hardware_block::Block> client_end(std::move(channel.value()));
-
-    ssize_t block_size;
-    GetBlockSize(client_end, &block_size);
-    std::unique_ptr block = std::make_unique<uint8_t[]>(block_size);
-    memset(block.get(), 0, block_size);
-
-    // Initialize one megabyte of NULL for the A/B super block extents.
-    const size_t num_blocks = (1L << 20) / block_size;
-    for (size_t i = 0; i < num_blocks; i++) {
-      ASSERT_NO_FATAL_FAILURE(WriteBlocks(client_end, block.get(), block_size, i * block_size));
-    }
-
-    // Add magic bytes at the correct offsets.
-    memcpy(block.get(), fs_management::kFxfsMagic, sizeof(fs_management::kFxfsMagic));
-    for (off_t ofs : {0L, 512L << 10}) {
-      ASSERT_NO_FATAL_FAILURE(WriteBlocks(client_end, block.get(), block_size, ofs));
-    }
-  }
-
   const fbl::unique_fd& devfs_root_fd() const { return devmgr_.devfs_root(); }
 
   zx::result<fidl::ClientEnd<fuchsia_io::Directory>> devfs_root() const {
@@ -226,7 +201,7 @@ class FactoryResetTest : public gtest::RealLoopFixture {
     }
 
     factory_reset::FactoryReset reset(dispatcher(), std::move(dev.value()), std::move(admin),
-                                      std::move(fshost_admin));
+                                      std::move(fshost_admin), {});
 
     std::optional<zx_status_t> status;
     reset.Reset([&status](zx_status_t s) { status = s; });
@@ -368,18 +343,6 @@ TEST_F(FactoryResetTest, DoesntShredUnknownVolumeType) {
   WithPartitionHasFormat([](fs_management::DiskFormat format) {
     EXPECT_EQ(format, fs_management::kDiskFormatBlobfs);
   });
-}
-
-TEST_F(FactoryResetTest, ShredsFxfs) {
-  CreateFakeFxfs();
-
-  WithPartitionHasFormat(
-      [](fs_management::DiskFormat format) { EXPECT_EQ(format, fs_management::kDiskFormatFxfs); });
-
-  RunReset([](const MockAdmin& mock_admin) { EXPECT_TRUE(mock_admin.suspend_called()); });
-
-  WithPartitionHasFormat(
-      [](fs_management::DiskFormat format) { EXPECT_NE(format, fs_management::kDiskFormatFxfs); });
 }
 
 TEST_F(FactoryResetTest, ShredUsingFshostMock) {
