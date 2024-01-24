@@ -1,0 +1,10 @@
+---
+BasedOnStyle: InheritParentConfig
+ColumnLimit: 80
+BinPackArguments: false
+BinPackParameters: false
+DerivePointerAlignment: false
+PointerAlignment: Left
+AllowShortIfStatementsOnASingleLine: false
+AllowShortLoopsOnASingleLine: false
+
