@@ -314,13 +314,25 @@ llvm_library("LLVMExecutionEngine") {
   ]
 }
 
+llvm_library("LLVMFrontendOffloading") {
+  deps = [
+    ":LLVMCore",
+    ":LLVMSupport",
+    ":LLVMTargetParser",
+    ":LLVMTransformUtils",
+  ]
+}
+
 llvm_library("LLVMFrontendOpenMP") {
   deps = [
     ":LLVMAnalysis",
+    ":LLVMBitReader",
     ":LLVMCore",
+    ":LLVMFrontendOffloading",
     ":LLVMMC",
     ":LLVMScalarOpts",
     ":LLVMSupport",
+    ":LLVMTargetParser",
     ":LLVMTransformUtils",
   ]
 }
@@ -334,6 +346,15 @@ llvm_library("LLVMGlobalISel") {
     ":LLVMSelectionDAG",
     ":LLVMSupport",
     ":LLVMTarget",
+    ":LLVMTransformUtils",
+  ]
+}
+
+llvm_library("LLVMHipStdPar") {
+  deps = [
+    ":LLVMAnalysis",
+    ":LLVMCore",
+    ":LLVMSupport",
     ":LLVMTransformUtils",
   ]
 }
@@ -414,6 +435,14 @@ llvm_library("LLVMMC") {
   ]
 }
 
+llvm_library("LLVMMCDisassembler") {
+  deps = [
+    ":LLVMMC",
+    ":LLVMSupport",
+    ":LLVMTargetParser",
+  ]
+}
+
 llvm_library("LLVMMCJIT") {
   deps = [
     ":LLVMCore",
@@ -422,14 +451,6 @@ llvm_library("LLVMMCJIT") {
     ":LLVMRuntimeDyld",
     ":LLVMSupport",
     ":LLVMTarget",
-  ]
-}
-
-llvm_library("LLVMMCDisassembler") {
-  deps = [
-    ":LLVMMC",
-    ":LLVMSupport",
-    ":LLVMTargetParser",
   ]
 }
 
@@ -481,6 +502,7 @@ llvm_library("LLVMPasses") {
     ":LLVMAnalysis",
     ":LLVMCore",
     ":LLVMCoroutines",
+    ":LLVMHipStdPar",
     ":LLVMInstCombine",
     ":LLVMInstrumentation",
     ":LLVMObjCARCOpts",
