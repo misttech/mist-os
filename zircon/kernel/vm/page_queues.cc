@@ -57,21 +57,20 @@ class PageQueues::LruIsolate {
 
   // Adds a page to be potentially replaced with a loaned page.
   // Requires PageQueues lock to be held
-  void AddLoanReplacement(vm_page_t* page, PageQueues* pq) TA_REQ(pq -> get_lock()) {
+  void AddLoanReplacement(vm_page_t* page, PageQueues* pq) TA_REQ(pq->get_lock()) {
     DEBUG_ASSERT(page);
     DEBUG_ASSERT(!page->is_loaned());
     VmCowPages* cow = reinterpret_cast<VmCowPages*>(page->object.get_object());
     DEBUG_ASSERT(cow);
     fbl::RefPtr<VmCowPages> cow_ref = fbl::MakeRefPtrUpgradeFromRaw(cow, pq->get_lock());
-    if (cow_ref) {
-      AddInternal(ktl::move(cow_ref), page, ListAction::ReplaceWithLoaned);
-    }
+    DEBUG_ASSERT(cow_ref);
+    AddInternal(ktl::move(cow_ref), page, ListAction::ReplaceWithLoaned);
   }
 
   // Add a page to be reclaimed. Actual reclamation will only be done if the `SetLruAction` is
   // compatible with the page and its VMO owner.
   // Requires PageQueues lock to be held
-  void AddReclaimable(vm_page_t* page, PageQueues* pq) TA_REQ(pq -> get_lock()) {
+  void AddReclaimable(vm_page_t* page, PageQueues* pq) TA_REQ(pq->get_lock()) {
     DEBUG_ASSERT(page);
     if (lru_action_ == LruAction::None) {
       return;
@@ -81,9 +80,7 @@ class PageQueues::LruIsolate {
     // Need to get the cow refptr before we can check if our lru action is appropriate for this
     // page.
     fbl::RefPtr<VmCowPages> cow_ref = fbl::MakeRefPtrUpgradeFromRaw(cow, pq->get_lock());
-    if (!cow_ref) {
-      return;
-    }
+    DEBUG_ASSERT(cow_ref);
     if (lru_action_ == LruAction::EvictAndCompress ||
         (cow_ref->can_evict() == (lru_action_ == LruAction::EvictOnly))) {
       AddInternal(ktl::move(cow_ref), page, ListAction::Reclaim);
@@ -1316,8 +1313,9 @@ bool PageQueues::DebugPageIsSpecificReclaim(const vm_page_t* page, F validator,
     VmCowPages* cow = reinterpret_cast<VmCowPages*>(page->object.get_object());
     DEBUG_ASSERT(cow);
     cow_pages = fbl::MakeRefPtrUpgradeFromRaw(cow, guard);
+    DEBUG_ASSERT(cow_pages);
   }
-  return cow_pages && validator(cow_pages);
+  return validator(cow_pages);
 }
 
 template <typename F>
@@ -1333,8 +1331,9 @@ bool PageQueues::DebugPageIsSpecificQueue(const vm_page_t* page, PageQueue queue
     VmCowPages* cow = reinterpret_cast<VmCowPages*>(page->object.get_object());
     DEBUG_ASSERT(cow);
     cow_pages = fbl::MakeRefPtrUpgradeFromRaw(cow, guard);
+    DEBUG_ASSERT(cow_pages);
   }
-  return cow_pages && validator(cow_pages);
+  return validator(cow_pages);
 }
 
 bool PageQueues::DebugPageIsPagerBacked(const vm_page_t* page, size_t* queue) const {
@@ -1393,11 +1392,6 @@ ktl::optional<PageQueues::VmoBacklink> PageQueues::PopAnonymousZeroFork() {
   DEBUG_ASSERT(cow);
   MoveToQueueLocked(page, PageQueueAnonymous, dps);
 
-  // We may be racing with destruction of VMO. As we currently hold our lock we know that our
-  // back pointer is correct in so far as the VmCowPages has not yet had completed running its
-  // destructor, so we know it is safe to attempt to upgrade it to a RefPtr. If upgrading fails
-  // we assume the page is about to be removed from the page queue once the VMO destructor gets
-  // a chance to run.
   return VmoBacklink{fbl::MakeRefPtrUpgradeFromRaw(cow, guard), page, page_offset};
 }
 
@@ -1452,7 +1446,7 @@ void PageQueues::EnableAnonymousReclaim(bool zero_forks) {
   }
 }
 
-ktl::optional<PageQueues::VmoContainerBacklink> PageQueues::GetCowWithReplaceablePage(
+ktl::optional<PageQueues::VmoBacklink> PageQueues::GetCowWithReplaceablePage(
     vm_page_t* page, VmCowPages* owning_cow) {
   // Wait for the page to not be in a transient state.  This is in a loop, since the wait happens
   // outside the lock, so another thread doing commit/decommit on owning_cow can cause the page
@@ -1544,10 +1538,8 @@ ktl::optional<PageQueues::VmoContainerBacklink> PageQueues::GetCowWithReplaceabl
                 return ktl::nullopt;
               }
             }
-            // There is a using/borrowing cow, but we may not be able to get a ref to it, if it's
-            // already destructing.  We actually try to get a ref to the VmCowPagesContainer instead
-            // since that allows us to get a ref successfully up until _after_ the page has moved to
-            // FREE, avoiding any need to wait, and avoiding stuff needed to support such a wait.
+            // There is a using/borrowing cow and we know it is still alive as we hold the
+            // PageQueues lock, and the cow may not destruct while it still has pages.
             //
             // We're under PageQueues lock, so this value is stable at the moment, but by the time
             // the caller acquires the cow lock this page could potentially be elsewhere, depending
@@ -1559,31 +1551,11 @@ ktl::optional<PageQueues::VmoContainerBacklink> PageQueues::GetCowWithReplaceabl
             // VmCowPages or to a different offset in the same VmCowPages without going through
             // FREE.
             uint64_t page_offset = page->object.get_page_offset();
-            // We may be racing with destruction of VMO. As we currently hold PageQueues lock we
-            // know that our back pointer is correct as the VmCowPages has not yet completed
-            // running fbl_recycle() (which has to acquire PageQueues lock to remove the backlink
-            // and then release the ref on its VmCowPagesContainer), so we know it is safe to
-            // attempt to upgrade from a raw VmCowPagesContainer pointer to a VmCowPagesContainer
-            // RefPtr, and that this upgrade will succeed until _after_ the page is FREE.  If
-            // upgrading fails we know the page has already become FREE; in that case we just go
-            // back around the loop since that's almost as efficient and less code than handling
-            // here.
-            VmCowPagesContainer* raw_cow_container = cow->raw_container();
-            VmoContainerBacklink backlink{fbl::MakeRefPtrUpgradeFromRaw(raw_cow_container, guard),
-                                          page, page_offset};
-            if (!backlink.cow_container) {
-              // Existing cow is at least at the end of fbl_recycle().  The page has already become
-              // FREE.  Let the loop handle that since it's less code than handling here and not
-              // significantly more expensive to handle with the loop.
-              DEBUG_ASSERT(page->is_free());
-              continue;
-            } else {
-              // We AddRef(ed) the using cow_container.  Success.  Return the backlink.  The caller
-              // can use this to call cow->RemovePageForEviction(), which is ok to call on a cow
-              // with refcount 0 as long as the caller is holding the backlink's cow_container
-              // VmCowPagesContainer ref.
-              return backlink;
-            }
+            VmoBacklink backlink{fbl::MakeRefPtrUpgradeFromRaw(cow, guard), page, page_offset};
+            DEBUG_ASSERT(backlink.cow);
+            // We AddRef(ed) the using cow_container.  Success.  Return the backlink.  The caller
+            // can use this to call cow->RemovePageForEviction().
+            return backlink;
           }
           break;
         }
@@ -1626,7 +1598,7 @@ ktl::optional<PageQueues::VmoContainerBacklink> PageQueues::GetCowWithReplaceabl
     // destination cow, but may now be moving again.  What we do still know is that the page still
     // has owning_cow as its underlying owner (owning_cow is a contiguous VmCowPages), thanks to
     // the ref on owning_cow held by the caller, and how contiguous VmCowPages keep the same
-    // physical pages from creation to fbl_recycle().
+    // physical pages from creation to Dead.
     //
     // It's still the goal of this method to return the borrowing cow if there is one, or return
     // success without a borrowing cow if the page is verified to be reclaim-able by the owning_cow

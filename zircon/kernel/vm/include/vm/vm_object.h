@@ -91,8 +91,9 @@ class VmHierarchyState : public fbl::RefCounted<VmHierarchyState> {
   Lock<CriticalMutex>* lock() const TA_RET_CAP(lock_) { return &lock_; }
   Lock<CriticalMutex>& lock_ref() const TA_RET_CAP(lock_) { return lock_; }
 
-  // Drops the refptr to the given object by either placing it on the deferred delete list for
-  // another thread already running deferred delete to drop, or drops itself.
+  // Calls MaybeDeadTransition and then drops the refptr to the given object by either placing it on
+  // the deferred delete list for another thread already running deferred delete to drop, or drops
+  // itself.
   // This can be used to avoid unbounded recursion when dropping chained refptrs, as found in
   // vmo parent_ refs.
   void DoDeferredDelete(fbl::RefPtr<VmHierarchyBase> vmo) TA_EXCL(lock());
@@ -133,8 +134,7 @@ class VmHierarchyState : public fbl::RefCounted<VmHierarchyState> {
 // Base class for any objects that want to be part of the VMO hierarchy and share some state,
 // including a lock. Additionally all objects in the hierarchy can become part of the same
 // deferred deletion mechanism to avoid unbounded chained destructors.
-class VmHierarchyBase : public fbl::RefCountedUpgradeable<VmHierarchyBase>,
-                        public fbl::Recyclable<VmHierarchyBase> {
+class VmHierarchyBase : public fbl::RefCountedUpgradeable<VmHierarchyBase> {
  public:
   explicit VmHierarchyBase(fbl::RefPtr<VmHierarchyState> state);
 
@@ -149,10 +149,10 @@ class VmHierarchyBase : public fbl::RefCountedUpgradeable<VmHierarchyBase>,
   // private destructor, only called from refptr
   virtual ~VmHierarchyBase() = default;
   friend fbl::RefPtr<VmHierarchyBase>;
-  // Similar to the destructor, fbl_recycle() needs to be virtual so DoDeferredDelete() can take a
-  // RefPtr<VmHierarchyBase> but when fbl_recycle() is called the VmCowPages::fbl_recycle() will be
-  // run.
-  virtual void fbl_recycle() { delete this; }
+  // Objects in the deferred delete queue will have MaybeDeadTransition called on them first, prior
+  // to dropping the RefPtr, allowing them to perform cleanup that they would rather happen before
+  // the destructor executes.
+  virtual void MaybeDeadTransition() {}
   friend class fbl::Recyclable<VmHierarchyBase>;
 
   // Pointer to state shared across all objects in a hierarchy.

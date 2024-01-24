@@ -63,10 +63,16 @@ enum class VmCowPagesOptions : uint32_t {
 FBL_ENABLE_ENUM_BITS(VmCowPagesOptions)
 
 // Implements a copy-on-write hierarchy of pages in a VmPageList.
+// VmCowPages have a life cycle where they start in an Init state to allow them to have
+// initialization finished outside the constructor. A VmCowPages in the Init state may be
+// destructed, although it is not allowed to have any pages put in it.
+// Once transitioned to the Alive state the VmCowPages may generally be used, and must be
+// explicitly transitioned to the Dead state prior to being destructed. The explicit transition
+// ensures that a VmCowPages does not own any pages whilst in its destructor, and hence while the
+// object is unreachable due to having a ref count of 0.
 class VmCowPages final : public VmHierarchyBase,
                          public fbl::ContainableBaseClasses<
-                             fbl::TaggedDoublyLinkedListable<VmCowPages*, internal::ChildListTag>>,
-                         public fbl::Recyclable<VmCowPages> {
+                             fbl::TaggedDoublyLinkedListable<VmCowPages*, internal::ChildListTag>> {
  public:
   static zx_status_t Create(fbl::RefPtr<VmHierarchyState> root_lock, VmCowPagesOptions options,
                             uint32_t pmm_alloc_flags, uint64_t size,
@@ -89,6 +95,12 @@ class VmCowPages final : public VmHierarchyBase,
   // created this node should not ever be Resized.
   zx_status_t CreateChildSliceLocked(uint64_t offset, uint64_t size,
                                      fbl::RefPtr<VmCowPages>* cow_slice) TA_REQ(lock());
+
+  // VmCowPages are initially created in the Init state and need to be transitioned to Alive prior
+  // to being used. This is exposed for VmObjectPaged to call after ensuring that creation is
+  // successful, i.e. after it can guarantee that it will transition this cow pages to Dead prior to
+  // it being destroyed.
+  void TransitionToAliveLocked() TA_REQ(lock());
 
   // Returns the size in bytes of this cow pages range. This will always be a multiple of the page
   // size.
@@ -572,9 +584,6 @@ class VmCowPages final : public VmHierarchyBase,
   // directly accessed externally, but this exposed specifically for tests.
   fbl::RefPtr<VmCowPages> DebugGetParent();
 
-  // Only for use by loaned page reclaim.
-  VmCowPagesContainer* raw_container();
-
   // Initializes the PageCache instance for COW page allocations.
   static void InitializePageCache(uint32_t level);
 
@@ -609,38 +618,49 @@ class VmCowPages final : public VmHierarchyBase,
   }
 #endif
 
+  // Unlocked wrapper around ReplacePageLocked, exposed for the physical page provider to cancel
+  // loans with.
+  zx_status_t ReplacePage(vm_page_t* before_page, uint64_t offset, bool with_loaned,
+                          vm_page_t** after_page, LazyPageRequest* page_request) TA_EXCL(lock()) {
+    Guard<CriticalMutex> guard{lock()};
+    return ReplacePageLocked(before_page, offset, with_loaned, after_page, page_request);
+  }
+
+  // Eviction wrapper, unlike ReclaimPage this wrapper can assume it just needs to evict, and has no
+  // requirements on updating any reclamation lists. Exposed for the physical page provider to
+  // reclaim loaned pages.
+  bool RemovePageForEviction(vm_page_t* page, uint64_t offset);
+
+  // Potentially transitions from Alive->Dead if the cow pages is unreachable (i.e. has no
+  // paged_ref_ and no children). Used by the VmObjectPaged when it unlinks the paged_ref_, but
+  // prior to dropping the RefPtr, giving the VmCowPages a chance to transition.
+  void MaybeDeadTransitionLocked(Guard<CriticalMutex>& guard) TA_REQ(lock());
+
+  // Unlocked helper around MaybeDeadTransitionLocked
+  void MaybeDeadTransition() override;
+
  private:
   // private constructor (use Create...())
-  VmCowPages(ktl::unique_ptr<VmCowPagesContainer> cow_container,
-             fbl::RefPtr<VmHierarchyState> root_lock, VmCowPagesOptions options,
+  VmCowPages(fbl::RefPtr<VmHierarchyState> root_lock, VmCowPagesOptions options,
              uint32_t pmm_alloc_flags, uint64_t size, fbl::RefPtr<PageSource> page_source,
              ktl::unique_ptr<DiscardableVmoTracker> discardable_tracker,
              fbl::RefPtr<AttributionObject> attribution_object);
-  friend class VmCowPagesContainer;
 
   ~VmCowPages() override;
-
-  // This takes all the constructor parameters including the VmCowPagesContainer, which avoids any
-  // possiblity of allocation failure.
-  template <class... Args>
-  static fbl::RefPtr<VmCowPages> NewVmCowPages(ktl::unique_ptr<VmCowPagesContainer> cow_container,
-                                               Args&&... args);
-
-  // This takes all the constructor parameters except for the VmCowPagesContainer which is
-  // allocated. The AllocChecker will reflect whether allocation was successful.
-  template <class... Args>
-  static fbl::RefPtr<VmCowPages> NewVmCowPages(fbl::AllocChecker* ac, Args&&... args);
 
   // A private helper that takes pages if this VmCowPages has a parent.
   zx_status_t TakePagesWithParentLocked(uint64_t offset, uint64_t len, VmPageSpliceList* pages,
                                         uint64_t* taken_len, LazyPageRequest* page_request)
       TA_REQ(lock());
 
-  // fbl_recycle() does all the explicit cleanup, and the destructor does all the implicit cleanup.
-  void fbl_recycle() override;
-  friend class fbl::Recyclable<VmCowPages>;
+  friend class fbl::RefPtr<VmCowPages>;
 
   DISALLOW_COPY_ASSIGN_AND_MOVE(VmCowPages);
+
+  // Transitions from Alive->Dead, freeing pages and cleaning up state. Responsibility of the caller
+  // to validate that it is correct to be doing this transition. May drop the lock during its
+  // execution.
+  void DeadTransition(Guard<CriticalMutex>& guard) TA_REQ(lock());
 
   bool is_hidden_locked() const TA_REQ(lock()) { return !!(options_ & VmCowPagesOptions::kHidden); }
   bool is_slice_locked() const TA_REQ(lock()) { return !!(options_ & VmCowPagesOptions::kSlice); }
@@ -1202,13 +1222,6 @@ class VmCowPages final : public VmHierarchyBase,
 
   void CopyPageForReplacementLocked(vm_page_t* dst_page, vm_page_t* src_page) TA_REQ(lock());
 
-  // Unlocked wrapper around ReplacePageLocked intended to be called via the VmCowPagesContainer.
-  zx_status_t ReplacePage(vm_page_t* before_page, uint64_t offset, bool with_loaned,
-                          vm_page_t** after_page, LazyPageRequest* page_request) TA_EXCL(lock()) {
-    Guard<CriticalMutex> guard{lock()};
-    return ReplacePageLocked(before_page, offset, with_loaned, after_page, page_request);
-  }
-
   // Internal helper for performing reclamation via eviction on pager backed VMOs.
   // Assumes that the page is owned by this VMO at the specified offset.
   bool RemovePageForEvictionLocked(vm_page_t* page, uint64_t offset, EvictionHintAction hint_action)
@@ -1222,11 +1235,6 @@ class VmCowPages final : public VmHierarchyBase,
   bool RemovePageForCompressionLocked(vm_page_t* page, uint64_t offset, VmCompressor* compressor,
                                       Guard<CriticalMutex>& guard) TA_REQ(lock());
 
-  // Eviction wrapper that exists to be called from the VmCowPagesContainer. Unlike ReclaimPage this
-  // wrapper can assume it just needs to evict, and has no requirements on updating any reclamation
-  // lists.
-  bool RemovePageForEviction(vm_page_t* page, uint64_t offset);
-
   // Internal helper for modifying just this value of high_priority_count_ without performing any
   // propagating.
   // Returns any delta that needs to be applied to the parent. If a zero value is returned then
@@ -1237,16 +1245,6 @@ class VmCowPages final : public VmHierarchyBase,
   fbl::Canary<fbl::magic("VMCP")> canary_;
 
   const uint32_t pmm_alloc_flags_;
-
-  // VmCowPages keeps this ref on VmCowPagesContainer until the end of VmCowPages::fbl_recycle().
-  // This allows loaned page reclaim to upgrade a raw container pointer until _after_ all the pages
-  // have been removed from the VmCowPages.  This way there's always something for loaned page
-  // reclaim to block on that'll do priority inheritance to the thread that needs to finish moving
-  // pages.
-  fbl::RefPtr<VmCowPagesContainer> container_;
-#if DEBUG_ASSERT_IMPLEMENTED
-  VmCowPagesContainer* debug_retained_raw_container_ = nullptr;
-#endif
 
   VmCowPagesOptions options_ TA_GUARDED(lock());
 
@@ -1383,80 +1381,19 @@ class VmCowPages final : public VmHierarchyBase,
   // to false if QueryPagerVmoStatsLocked() is called with |reset| set to true.
   bool pager_stats_modified_ TA_GUARDED(lock()) = false;
 
+  // Tracks the life cycle of the VmCowPages. The primary purpose of the life cycle is to create an
+  // invariant that by the time a VmCowPages destructor runs it does not contain any pages. This is
+  // achieved by requiring an explicit Dead transition that provides a point to perform cleanup.
+  // An Init state is introduced to allow for multi step creation that may fail.
+  enum class LifeCycle : uint8_t {
+    Init,
+    Alive,
+    Dead,
+  };
+  LifeCycle life_cycle_ TA_GUARDED(lock()) = LifeCycle::Init;
+
   // PageCache instance for COW page allocations.
   inline static page_cache::PageCache page_cache_;
-};
-
-// VmCowPagesContainer exists to essentially split the VmCowPages ref_count_ into two counts, so
-// that it remains possible to upgrade from a raw container pointer until after the VmCowPages
-// fbl_recycle() has mostly completed and has removed and freed all the pages.
-//
-// This way, if we can upgrade, then we can call RemovePageForEviction() and it'll either work or
-// the page will already have been removed from that location in the VmCowPages, or we can't
-// upgrade, in which case all the pages have already been removed and freed.
-//
-// In contrast if we were to attempt upgrade of a raw VmCowPages pointer to VmCowPages ref, the
-// ability to upgrade would disappear before the backlink is removed to make room for a
-// StackOwnedLoanedPagesInterval, so loaned page reclaim would need to wait (somehow) for the page
-// to be removed from the VmCowPages and at least have a backlink.  That wait is problematic since
-// it would also need to propagate priority inheritance properly like StackOwnedLoanedPagesInterval
-// does, but the interval begins at the moment the refcount goes from 1 to 0, and reliably wrapping
-// that 1 to 0 transition, while definitely posssible with some RefPtr changes etc etc, is more
-// complicated than having a VmCowPagesContainer whose ref can still be obtained up until after the
-// pages have become FREE.  There may of course be yet other options that are overall better; please
-// suggest if you think of one.
-//
-// All the explicit cleanup of VmCowPages happens in VmCowPages::fbl_recycle(), with the final
-// explicit fbl_recycle() step being release of the containing VmCowPagesContainer which in turn
-// triggers ~VmCowPages which finishes up with implicit cleanup of VmCowPages (but possibly delayed
-// slightly by loaned page reclaimer(s) that can have a VmCowPagesContainer ref transiently).
-//
-// Those paying close attention may note that under high load with potential low priority thread
-// starvation (with a hypothetical scheduling policy that is assumed to let thread starvation be
-// possible), each low priority loaned page reclaiming thread may essentially be thought of as
-// having up to one VmCowPagesContainer + contained de-populated VmCowPages as additional memory
-// overhead that can be thought of as being essentially attributed to the memory cost of the low
-// priority thread.  I think this is completely fine and completely analogous to many other similar
-// situations.  In a sense it's priority inversion of the rest of cleanup of the VmCowPages memory,
-// but since it's a depopulated VmCowPages, the symptom isn't enough of a problem to justify any
-// mitigation other than mentally accounting for it in the low priority thread's memory cost.  We
-// should be careful not to let a refcount held by a lower priority thread potentially keep
-// unbounded memory allocated of course, but in this case it's well bounded.
-//
-// We restrict visibility of VmCowPages via its VmCowPagesContainer, to control which methods are
-// ok to call on the VmCowPages via a VmCowPagesContainer ref while lacking any direct VmCowPages
-// ref.  The methods that are ok to call with only a VmCowPagesContainer ref are called via a
-// corresponding method on VmCowPagesContainer.
-class VmCowPagesContainer : public fbl::RefCountedUpgradeable<VmCowPagesContainer> {
- public:
-  VmCowPagesContainer() = default;
-  ~VmCowPagesContainer();
-
-  // These are the only VmCowPages methods that are ok to call via ref on VmCowPagesContainer while
-  // holding no ref on the contained VmCowPages.  These will operate correctly despite potential
-  // concurrent VmCowPages::fbl_recycle() on a different thread and despite VmCowPages refcount_
-  // potentially being 0.  The VmCowPagesContainer ref held by the caller keeps the actual
-  // VmCowPages object alive during this call.
-  bool RemovePageForEviction(vm_page_t* page, uint64_t offset);
-
-  zx_status_t ReplacePage(vm_page_t* before_page, uint64_t offset, bool with_loaned,
-                          vm_page_t** after_page, LazyPageRequest* page_request);
-
- private:
-  friend class VmCowPages;
-
-  // We'd use ktl::optional<VmCowPages> or std::variant<monostate, VmCowPages>, but both those
-  // require is_constructible_v<VmCowPages, ...>, which in turn requires the VmCowPages constructor
-  // to be public, which we don't want.
-
-  // Used for construction of contained VmCowPages.
-  template <class... Args>
-  void EmplaceCow(Args&&... args);
-
-  VmCowPages& cow();
-
-  ktl::aligned_storage_t<sizeof(VmCowPages), alignof(VmCowPages)> cow_space_;
-  bool is_cow_present_ = false;
 };
 
 // Implements a cursor that allows for retrieving successive pages over a range in a VMO. The

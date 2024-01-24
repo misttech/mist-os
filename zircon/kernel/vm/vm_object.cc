@@ -358,7 +358,10 @@ void VmHierarchyState::DoDeferredDelete(fbl::RefPtr<VmHierarchyBase> vmo) {
   if (!running_delete_) {
     running_delete_ = true;
     while (!delete_list_.is_empty()) {
-      guard.CallUnlocked([ptr = delete_list_.pop_front()]() mutable { ptr.reset(); });
+      guard.CallUnlocked([ptr = delete_list_.pop_front()]() mutable {
+        ptr->MaybeDeadTransition();
+        ptr.reset();
+      });
     }
     running_delete_ = false;
   }

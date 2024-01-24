@@ -136,7 +136,7 @@ void PhysicalPageProvider::OnClose() {
   Guard<Mutex> guard{&mtx_};
   ASSERT(!closed_);
   closed_ = true;
-  // By the time OnClose() is called, VmCowPages::fbl_recycle() has already loaned all the pages,
+  // By the time OnClose() is called, VmCowPages::DeadTransition() has already loaned all the pages,
   // so we can do pmm_delete_lender() on the whole range here.
   if (phys_base_ != kInvalidPhysBase) {
     pmm_delete_lender(phys_base_, size_ / PAGE_SIZE);
@@ -213,11 +213,8 @@ zx_status_t PhysicalPageProvider::WaitOnEvent(Event* event) {
         } else {
           auto& vmo_backlink = maybe_vmo_backlink.value();
           // Else GetCowWithReplaceablePage would have kept trying.
-          DEBUG_ASSERT(vmo_backlink.cow_container);
-          auto& cow_container = vmo_backlink.cow_container;
-          // If it were equal, GetCowWithReplaceablePage would not have returned a backlink (would
-          // have PANIC()ed in fact).
-          DEBUG_ASSERT(cow_container.get() != cow_pages_->raw_container());
+          DEBUG_ASSERT(vmo_backlink.cow);
+          auto& cow_container = vmo_backlink.cow;
 
           // We stack-own loaned pages from RemovePageForEviction() to pmm_free_page().  This
           // interval is for the benefit of asserts in vm_page_t, not for any functional purpose.

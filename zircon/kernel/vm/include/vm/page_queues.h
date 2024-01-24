@@ -23,7 +23,6 @@
 #include <vm/page.h>
 
 class VmCowPages;
-class VmCowPagesContainer;
 
 // Allocated pages that are part of the cow pages in a VmObjectPaged can be placed in a page queue.
 // The page queues provide a way to
@@ -173,11 +172,10 @@ class PageQueues {
   void RotateReclaimQueues(AgeReason reason = AgeReason::Manual);
 
   // Used to represent and return page backlink information acquired whilst holding the page queue
-  // lock. The contained vmo could be null if the refptr could not be upgraded, indicating that the
-  // vmo was being destroyed whilst trying to construct the backlink.
-  // The page and offset contained here are not synchronized and must be separately validated before
-  // use. This can be done by acquiring the returned vmo's lock and then validating that the page is
-  // still contained at the offset.
+  // lock. As a VMO may not destruct while it has pages in it, the cow RefPtr will always be valid,
+  // although the page and offset contained here are not synchronized and must be separately
+  // validated before use. This can be done by acquiring the returned vmo's lock and then validating
+  // that the page is still contained at the offset.
   struct VmoBacklink {
     fbl::RefPtr<VmCowPages> cow;
     vm_page_t* page = nullptr;
@@ -199,25 +197,10 @@ class PageQueues {
   // not modified.
   ktl::optional<VmoBacklink> PeekReclaim(size_t lowest_queue);
 
-  // Not all methods are safe to call via a referenced VmoContainerBacklink since VmCowPages
-  // refcount may already be 0, but RemovePageForEviction() is.  For loaned page reclaim we don't
-  // have the option of just recognizing that the VmCowPages is deleting soon and moving on - we
-  // must get the page.
-  struct VmoContainerBacklink {
-    fbl::RefPtr<VmCowPagesContainer> cow_container;
-    vm_page_t* page = nullptr;
-    uint64_t offset = 0;
-  };
-
-  // Called while the loaning VmCowPages is known referenced, so the loaning VmCowPages won't be
-  // running its destructor.  The owning_cow parameter can be nullptr, if the caller doesn't care
-  // to exclude the owning cow from being returned, or if there isn't an owning cow.  We use a
-  // VmoContainerBacklink instead of VmoBacklink so that it remains possible to get a backlink
-  // until _after_ all the pages have been removed from the VmCowPages and have become FREE.  Not
-  // all methods are safe to call via a referenced VmoContainerBacklink, but RemovePageForEviction()
-  // is.
-  ktl::optional<VmoContainerBacklink> GetCowWithReplaceablePage(vm_page_t* page,
-                                                                VmCowPages* owning_cow);
+  // Called while the loaning VmCowPages is known referenced. The owning_cow parameter can be
+  // nullptr, if the caller doesn't care to exclude the owning cow from being returned, or if there
+  // isn't an owning cow.
+  ktl::optional<VmoBacklink> GetCowWithReplaceablePage(vm_page_t* page, VmCowPages* owning_cow);
 
   // Helper struct to group reclaimable queue length counts returned by GetReclaimCounts.
   struct ReclaimCounts {

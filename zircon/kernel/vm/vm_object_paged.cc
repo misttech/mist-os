@@ -112,6 +112,7 @@ VmObjectPaged::~VmObjectPaged() {
     paged_backlink->reference_list_.splice(paged_backlink->reference_list_.end(), reference_list_);
   }
   DEBUG_ASSERT(reference_list_.is_empty());
+  cow_pages_locked()->MaybeDeadTransitionLocked(guard);
 
   // Re-home all our children with any parent that we have.
   while (!children_list_.is_empty()) {
@@ -304,6 +305,7 @@ zx_status_t VmObjectPaged::CreateCommon(uint32_t pmm_alloc_flags, uint32_t optio
     Guard<CriticalMutex> guard{vmo->lock()};
     AssertHeld(cow_pages->lock_ref());
     cow_pages->set_paged_backlink_locked(vmo.get());
+    cow_pages->TransitionToAliveLocked();
     vmo->cow_pages_ = ktl::move(cow_pages);
   }
   vmo->AddToGlobalList();
@@ -524,6 +526,7 @@ zx_status_t VmObjectPaged::CreateWithSourceCommon(fbl::RefPtr<PageSource> src,
     Guard<CriticalMutex> guard{vmo->lock()};
     AssertHeld(cow_pages->lock_ref());
     cow_pages->set_paged_backlink_locked(vmo.get());
+    cow_pages->TransitionToAliveLocked();
     vmo->cow_pages_ = ktl::move(cow_pages);
   }
   vmo->AddToGlobalList();
@@ -598,6 +601,7 @@ zx_status_t VmObjectPaged::CreateChildSlice(uint64_t offset, uint64_t size, bool
     // Both child notification and inserting into the globals list has to happen outside the lock.
     AssertHeld(cow_pages->lock_ref());
     cow_pages->set_paged_backlink_locked(vmo.get());
+    cow_pages->TransitionToAliveLocked();
     vmo->cow_pages_ = ktl::move(cow_pages);
 
     vmo->parent_ = this;
@@ -770,6 +774,7 @@ zx_status_t VmObjectPaged::CreateClone(Resizability resizable, CloneType type, u
     // the global list later once lock has been dropped.
     AssertHeld(clone_cow_pages->lock_ref());
     clone_cow_pages->set_paged_backlink_locked(vmo.get());
+    clone_cow_pages->TransitionToAliveLocked();
     vmo->cow_pages_ = ktl::move(clone_cow_pages);
 
     // Install the parent.
@@ -832,8 +837,8 @@ VmObject::AttributionCounts VmObjectPaged::AttributedPagesInRangeLocked(uint64_t
   // A reference never has pages attributed to it. It points to the parent's VmCowPages, and we need
   // to hold the invariant that every page is attributed to a single VMO.
   //
-  // TODO(https://fxbug.dev/117886): Consider attributing pages to the current VmCowPages backlink for the case
-  // where the parent has gone away.
+  // TODO(https://fxbug.dev/117886): Consider attributing pages to the current VmCowPages backlink
+  // for the case where the parent has gone away.
   if (is_reference()) {
     return AttributionCounts{};
   }

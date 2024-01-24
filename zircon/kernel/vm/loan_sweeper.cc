@@ -186,10 +186,10 @@ uint64_t LoanSweeper::SynchronousSweepInternal() {
       }
       auto& vmo_backlink = maybe_vmo_backlink.value();
       // Else GetCowWithReplaceablePage wouldn't have set the optional backlink.
-      DEBUG_ASSERT(vmo_backlink.cow_container);
-      auto& cow_container = vmo_backlink.cow_container;
-      // TODO(https://fxbug.dev/99890): Implement way to replace loaned with non-loaned that supports
-      // delayed allocations.
+      DEBUG_ASSERT(vmo_backlink.cow);
+      auto& cow_container = vmo_backlink.cow;
+      // TODO(https://fxbug.dev/99890): Implement way to replace loaned with non-loaned that
+      // supports delayed allocations.
       ASSERT(ppb_enabled);
       // vmo_backlink.offset is offset in cow
       zx_status_t replace_result =
