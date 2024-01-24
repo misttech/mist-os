@@ -160,7 +160,7 @@ async fn add_manual_target(
         .expect("Could not find inserted manual target");
 
     if !is_fastboot_tcp {
-        tracing::info!("Running host pipe");
+        tracing::debug!("Running host pipe since target is not fastboot");
         target.run_host_pipe(overnet_node);
     }
     target
@@ -249,7 +249,7 @@ impl TargetCollectionProtocol {
             if should_load {
                 let tc = cx.get_target_collection().await?;
                 let overnet_node = cx.overnet_node()?;
-                tracing::debug!("Adding manual target: {:?}", sa);
+                tracing::info!("Adding manual target with address: {:?}", sa);
                 add_manual_target(manual_targets.clone(), &tc, sa, lifetime, &overnet_node).await;
             }
         }
@@ -499,7 +499,7 @@ impl FidlProtocol for TargetCollectionProtocol {
             None
         };
         self.tasks.spawn(async move {
-            tracing::info!("Loading previously configured manual targets");
+            tracing::debug!("Loading previously configured manual targets");
             if let Err(e) = TargetCollectionProtocol::load_manual_targets(
                 &load_manual_cx,
                 manual_targets_collection,
@@ -567,12 +567,17 @@ impl FidlProtocol for TargetCollectionProtocol {
                         }
                         EmulatorTargetAction::Remove(emu_target) => {
                             if let Some(id) = emu_target.nodename {
-                                let result = tc2.remove_target(id.clone());
-                                tracing::info!(
-                                    "Removing emulator instance {} resulted in {}",
-                                    &id,
-                                    result
-                                );
+                                if tc2.remove_target(id.clone()) {
+                                    tracing::info!(
+                                        "Successfully removed emulator instance ['{}']",
+                                        &id
+                                    );
+                                } else {
+                                    tracing::error!(
+                                        "Unable to remove emulator instance ['{}']",
+                                        &id
+                                    );
+                                };
                             }
                         }
                     };

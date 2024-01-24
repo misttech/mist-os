@@ -150,10 +150,16 @@ impl DaemonEventHandler {
         ) {
             // Print out better Peer information in logs
             0 => {
-                tracing::error!("No targets match identity ['{nodename}', '{product_config}.{board_config}', {ids:?}] with node id: {node_id}");
+                tracing::error!(
+                    "No targets match identity ['{nodename}', \
+                    '{product_config}.{board_config}', {ids:?}] with node id: {node_id}"
+                );
             }
             _ => {
-                tracing::info!( "Overnet peer is identified as target: ['{nodename}', '{product_config}.{board_config}', {ids:?}] with node id: {node_id}");
+                tracing::info!(
+                    "Overnet peer identified as: ['{nodename}', \
+                    '{product_config}.{board_config}', {ids:?}] with node id: {node_id}"
+                );
             }
         }
     }

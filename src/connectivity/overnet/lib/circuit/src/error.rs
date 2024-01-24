@@ -18,7 +18,10 @@ pub enum Error {
     CallbackRejectedBuffer(usize, usize),
     #[error("Bad characters in UTF8 String `{0}`")]
     BadUTF8(String),
-    #[error("Connection closed. reason: `{}`", .0.as_deref().unwrap_or("not given"))]
+    // Change this to be more explicit that the connection closed is coming from the target.
+    // Example: "Connection closed from the target. Reason: "remote_control_runner closed the
+    // connection"."
+    #[error("Connection closed from the target. Reason: \"{}\"", .0.as_deref().unwrap_or("not given"))]
     ConnectionClosed(Option<String>),
     #[error("Version mismatch")]
     VersionMismatch,

@@ -296,11 +296,19 @@ impl RebootController {
 #[tracing::instrument]
 pub(crate) fn handle_fidl_connection_err(e: Error, responder: TargetRebootResponder) -> Result<()> {
     match e {
-        Error::ClientChannelClosed { .. } => {
-            tracing::warn!(
-                "Reboot returned a client channel closed - assuming reboot succeeded: {:?}",
-                e
-            );
+        Error::ClientChannelClosed { protocol_name, .. } => {
+            // Changing this to an info from warn since reboot has succeeded The assumption that
+            // reboot has succeeded is correct since we received a ClientChannelClosed
+            // successfully. So let's just make the message clearer to the user.
+            //
+            // Check the 'protocol_name' and if it is 'fuchsia.hardware.power.statecontrol.Admin'
+            // then we can be more confident that target reboot/shutdown has succeeded.
+            if protocol_name == "fuchsia.hardware.power.statecontrol.Admin" {
+                tracing::info!("Target reboot succeeded.");
+            } else {
+                tracing::info!("Assuming target reboot succeeded. Client received a PEER_CLOSED from '{protocol_name}'");
+            }
+            tracing::debug!("{:?}", e);
             responder.send(Ok(()))?;
         }
         _ => {

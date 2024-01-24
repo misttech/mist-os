@@ -1210,12 +1210,21 @@ impl Target {
                         }
 
                         // wait for the host pipe to exit.
-                        let r = hp.wait(&node).await;
-                        // XXX(raggi): decide what to do with this log data:
-                        tracing::info!("HostPipeConnection returned: {:?}", r);
+                        let _r = match hp.wait(&node).await {
+                            Ok(r) => {
+                                // This was an info. Moved to debug as this is not informational or
+                                // actionable to end users.
+                                tracing::debug!("HostPipeConnection returned: {:?}", r);
+                            }
+                            Err(r) => {
+                                tracing::warn!("The host pipe connection to ['{target_name_str}'] returned: {:?}", r);
+                            }
+                        };
                     }
                     Err(e) => {
-                        tracing::warn!("Host pipe spawn {:?}", e);
+                        // Change this to a debug message (from warn). We will get any error from
+                        // SSH client in the logs so this is redundant.
+                        tracing::debug!("Host pipe spawn {:?}", e);
                         let compatibility_status = Some(CompatibilityInfo {
                             status: CompatibilityState::Error,
                             platform_abi: 0,
