@@ -12,7 +12,7 @@
 #include "fuchsia/hardware/bluetooth/cpp/fidl.h"
 #include "host_component.h"
 #include "src/connectivity/bluetooth/core/bt-host/bt_host_config.h"
-#include "src/connectivity/bluetooth/core/bt-host/common/log.h"
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/log.h"
 #include "util.h"
 
 using InitCallback = fit::callback<void(bool success)>;
