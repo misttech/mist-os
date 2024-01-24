@@ -28,6 +28,10 @@
 
 namespace {
 
+// The SDK VFS library exposes types under the "vfs" namespace, which is visibly similar to the
+// in-tree "fs" namespace. To prevent confusion with the SDK types, we use a more verbose name.
+namespace intree_vfs = fs;
+
 // Scope-based deleter for user-provided cookies.
 using CookieDestroyer = std::unique_ptr<void, vfs_internal_destroy_cookie_t>;
 
@@ -41,7 +45,7 @@ CookieDestroyer MakeDestroyer(void* cookie, vfs_internal_destroy_cookie_t destro
 
 // Ensure constants defined in the SDK match those from the in-tree VFS.
 
-using DefaultSharingMode = fs::VmoFile::DefaultSharingMode;
+using DefaultSharingMode = intree_vfs::VmoFile::DefaultSharingMode;
 
 static_assert(
     std::is_same_v<vfs_internal_sharing_mode_t, std::underlying_type_t<DefaultSharingMode>>);
@@ -56,10 +60,10 @@ static_assert(static_cast<vfs_internal_sharing_mode_t>(DefaultSharingMode::kClon
 
 // Implements `vfs::ComposedServiceDir` functionality using the in-tree VFS.
 // TODO(https://fxbug.dev/309685624): Remove when all callers have migrated.
-class LibvfsComposedServiceDir final : public fs::PseudoDir {
+class LibvfsComposedServiceDir final : public intree_vfs::PseudoDir {
  public:
-  zx_status_t Lookup(std::string_view name, fbl::RefPtr<fs::Vnode>* out) override {
-    zx_status_t status = fs::PseudoDir::Lookup(name, out);
+  zx_status_t Lookup(std::string_view name, fbl::RefPtr<intree_vfs::Vnode>* out) override {
+    zx_status_t status = intree_vfs::PseudoDir::Lookup(name, out);
     if (status == ZX_OK) {
       return status;
     }
@@ -79,7 +83,7 @@ class LibvfsComposedServiceDir final : public fs::PseudoDir {
           return ZX_OK;
         };
 
-        auto service = fbl::MakeRefCounted<fs::Service>(std::move(connector));
+        auto service = fbl::MakeRefCounted<intree_vfs::Service>(std::move(connector));
         *out = service;
         fallback_services_[std::string(name)] = std::move(service);
       }
@@ -90,7 +94,7 @@ class LibvfsComposedServiceDir final : public fs::PseudoDir {
 
   void SetFallback(fidl::ClientEnd<fuchsia_io::Directory> dir) { fallback_dir_ = std::move(dir); }
 
-  zx_status_t AddService(std::string_view name, fbl::RefPtr<fs::Service> service) {
+  zx_status_t AddService(std::string_view name, fbl::RefPtr<intree_vfs::Service> service) {
     return this->AddEntry(name, std::move(service));
   }
 
@@ -102,13 +106,12 @@ class LibvfsComposedServiceDir final : public fs::PseudoDir {
 
   // The collection of services that have been looked up on the fallback directory. These services
   // just forward connection requests to the fallback directory.
-  mutable std::map<std::string, fbl::RefPtr<fs::Service>, std::less<>> fallback_services_;
+  mutable std::map<std::string, fbl::RefPtr<intree_vfs::Service>, std::less<>> fallback_services_;
 };
 
 // Implements in-tree `fs::LazyDir` using C callbacks defined in `vfs_internal_lazy_dir_context_t`.
 // TODO(https://fxbug.dev/309685624): Remove when all callers have migrated.
-
-class LibvfsLazyDir final : public fs::LazyDir {
+class LibvfsLazyDir final : public intree_vfs::LazyDir {
  public:
   explicit LibvfsLazyDir(const vfs_internal_lazy_dir_context_t* context) : context_(*context) {}
 
@@ -126,14 +129,18 @@ class LibvfsLazyDir final : public fs::LazyDir {
 }  // namespace
 
 typedef struct vfs_internal_vfs {
-  std::unique_ptr<fs::FuchsiaVfs> vfs;
+  std::unique_ptr<intree_vfs::FuchsiaVfs> vfs;
 } vfs_internal_vfs_t;
 
 typedef struct vfs_internal_node {
-  using NodeVariant =
-      std::variant<fbl::RefPtr<fs::PseudoDir>, fbl::RefPtr<fs::Service>, fbl::RefPtr<fs::RemoteDir>,
-                   fbl::RefPtr<fs::VmoFile>, fbl::RefPtr<fs::BufferedPseudoFile>,
-                   fbl::RefPtr<LibvfsComposedServiceDir>, fbl::RefPtr<LibvfsLazyDir>>;
+  using NodeVariant = std::variant<
+      /* in-tree VFS types */
+      fbl::RefPtr<intree_vfs::PseudoDir>, fbl::RefPtr<intree_vfs::Service>,
+      fbl::RefPtr<intree_vfs::RemoteDir>, fbl::RefPtr<intree_vfs::VmoFile>,
+      fbl::RefPtr<intree_vfs::BufferedPseudoFile>,
+      /* types this library implements */
+      fbl::RefPtr<LibvfsComposedServiceDir>, fbl::RefPtr<LibvfsLazyDir>>;
+
   NodeVariant node;
 
   template <typename T>
@@ -144,8 +151,8 @@ typedef struct vfs_internal_node {
     return nullptr;
   }
 
-  fbl::RefPtr<fs::Vnode> AsNode() const {
-    return std::visit([](const auto& node) { return fbl::RefPtr<fs::Vnode>(node); }, node);
+  fbl::RefPtr<intree_vfs::Vnode> AsNode() const {
+    return std::visit([](const auto& node) { return fbl::RefPtr<intree_vfs::Vnode>(node); }, node);
   }
 } vfs_internal_node_t;
 
@@ -154,7 +161,8 @@ __EXPORT zx_status_t vfs_internal_create(async_dispatcher_t* dispatcher,
   if (!out_vfs || !dispatcher) {
     return ZX_ERR_INVALID_ARGS;
   }
-  *out_vfs = new vfs_internal_vfs_t{.vfs = std::make_unique<fs::SynchronousVfs>(dispatcher)};
+  *out_vfs =
+      new vfs_internal_vfs_t{.vfs = std::make_unique<intree_vfs::SynchronousVfs>(dispatcher)};
   return ZX_OK;
 }
 
@@ -181,7 +189,7 @@ __EXPORT zx_status_t vfs_internal_serve(vfs_internal_vfs_t* vfs, const vfs_inter
     return ZX_ERR_INVALID_ARGS;
   }
   return vfs->vfs->Serve(vnode->AsNode(), std::move(chan),
-                         fs::VnodeConnectionOptions::FromIoV1Flags(*fidl_rights));
+                         intree_vfs::VnodeConnectionOptions::FromIoV1Flags(*fidl_rights));
 }
 
 __EXPORT zx_status_t vfs_internal_node_destroy(vfs_internal_node_t* vnode) {
@@ -196,7 +204,7 @@ __EXPORT zx_status_t vfs_internal_directory_create(vfs_internal_node_t** out_vno
   if (!out_vnode) {
     return ZX_ERR_INVALID_ARGS;
   }
-  *out_vnode = new vfs_internal_node_t{.node = fbl::MakeRefCounted<fs::PseudoDir>()};
+  *out_vnode = new vfs_internal_node_t{.node = fbl::MakeRefCounted<intree_vfs::PseudoDir>()};
   return ZX_OK;
 }
 
@@ -206,7 +214,7 @@ __EXPORT zx_status_t vfs_internal_directory_add(vfs_internal_node_t* dir,
   if (!dir || !vnode || !name) {
     return ZX_ERR_INVALID_ARGS;
   }
-  fs::PseudoDir* downcasted = dir->Downcast<fs::PseudoDir>();
+  intree_vfs::PseudoDir* downcasted = dir->Downcast<intree_vfs::PseudoDir>();
   if (!downcasted) {
     return ZX_ERR_NOT_DIR;
   }
@@ -217,7 +225,7 @@ __EXPORT zx_status_t vfs_internal_directory_remove(vfs_internal_node_t* dir, con
   if (!dir || !name) {
     return ZX_ERR_INVALID_ARGS;
   }
-  fs::PseudoDir* downcasted = dir->Downcast<fs::PseudoDir>();
+  intree_vfs::PseudoDir* downcasted = dir->Downcast<intree_vfs::PseudoDir>();
   if (!downcasted) {
     return ZX_ERR_WRONG_TYPE;
   }
@@ -236,7 +244,7 @@ __EXPORT zx_status_t vfs_internal_remote_directory_create(zx_handle_t remote,
     return ZX_ERR_BAD_HANDLE;
   }
   *out_vnode =
-      new vfs_internal_node_t{.node = fbl::MakeRefCounted<fs::RemoteDir>(
+      new vfs_internal_node_t{.node = fbl::MakeRefCounted<intree_vfs::RemoteDir>(
                                   fidl::ClientEnd<fuchsia_io::Directory>{zx::channel(remote)})};
   return ZX_OK;
 }
@@ -249,12 +257,12 @@ __EXPORT zx_status_t vfs_internal_service_create(const vfs_internal_svc_context_
   if (!context || !context->connect) {
     return ZX_ERR_INVALID_ARGS;
   }
-  fs::Service::Connector connector = [context = *context,
-                                      destroyer = std::move(destroyer)](zx::channel channel) {
-    return context.connect(context.cookie, channel.release());
-  };
-  *out_vnode =
-      new vfs_internal_node_t{.node = fbl::MakeRefCounted<fs::Service>(std::move(connector))};
+  intree_vfs::Service::Connector connector =
+      [context = *context, destroyer = std::move(destroyer)](zx::channel channel) {
+        return context.connect(context.cookie, channel.release());
+      };
+  *out_vnode = new vfs_internal_node_t{
+      .node = fbl::MakeRefCounted<intree_vfs::Service>(std::move(connector))};
   return ZX_OK;
 }
 
@@ -274,10 +282,10 @@ __EXPORT zx_status_t vfs_internal_vmo_file_create(zx_handle_t vmo_handle, uint64
   }
 
   // We statically verify the sharing mode constants are the same between both libraries above.
-  *out_vnode = new vfs_internal_node_t{
-      .node = fbl::MakeRefCounted<fs::VmoFile>(std::move(vmo), static_cast<size_t>(length),
-                                               writable == VFS_INTERNAL_WRITE_MODE_WRITABLE,
-                                               static_cast<DefaultSharingMode>(sharing_mode))};
+  *out_vnode = new vfs_internal_node_t{.node = fbl::MakeRefCounted<intree_vfs::VmoFile>(
+                                           std::move(vmo), static_cast<size_t>(length),
+                                           writable == VFS_INTERNAL_WRITE_MODE_WRITABLE,
+                                           static_cast<DefaultSharingMode>(sharing_mode))};
   return ZX_OK;
 }
 
@@ -293,7 +301,7 @@ __EXPORT zx_status_t vfs_internal_pseudo_file_create(size_t max_bytes,
   if (!context || !context->read) {
     return ZX_ERR_INVALID_ARGS;
   }
-  fs::BufferedPseudoFile::ReadHandler read_handler =
+  intree_vfs::BufferedPseudoFile::ReadHandler read_handler =
       [context = *context, destroyer = std::move(destroyer)](fbl::String* output) -> zx_status_t {
     const char* data;
     size_t len;
@@ -306,7 +314,7 @@ __EXPORT zx_status_t vfs_internal_pseudo_file_create(size_t max_bytes,
     }
     return ZX_OK;
   };
-  fs::BufferedPseudoFile::WriteHandler write_handler = nullptr;
+  intree_vfs::BufferedPseudoFile::WriteHandler write_handler = nullptr;
   if (context->write) {
     write_handler = [context = *context](std::string_view input) -> zx_status_t {
       return context.write(context.cookie, input.data(), input.length());
@@ -314,7 +322,7 @@ __EXPORT zx_status_t vfs_internal_pseudo_file_create(size_t max_bytes,
   }
 
   *out_vnode =
-      new vfs_internal_node_t{.node = fbl::MakeRefCounted<fs::BufferedPseudoFile>(
+      new vfs_internal_node_t{.node = fbl::MakeRefCounted<intree_vfs::BufferedPseudoFile>(
                                   std::move(read_handler), std::move(write_handler), max_bytes)};
   return ZX_OK;
 }
