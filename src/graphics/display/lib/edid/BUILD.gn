@@ -13,7 +13,6 @@ source_set("edid") {
     "edid.cc",
     "edid.h",
     "eisa_vid_lut.cc",
-    "test-support.h",
     "timings.cc",
     "timings.h",
   ]
@@ -48,6 +47,7 @@ test("edid-test") {
   deps = [
     ":edid",
     "//src/devices/testing/no_ddk",
+    "//src/graphics/display/lib/edid-values",
     "//src/lib/fxl",
     "//src/lib/fxl/test:gtest_main",
     "//src/lib/testing/predicates",
