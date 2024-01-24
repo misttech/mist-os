@@ -11,9 +11,10 @@
 
 namespace bt::l2cap::testing {
 
-// Provides a GTest harness base class for tests that operate over an L2CAP channel. Outgoing packet
-// expectations are written using the EXPECT_PACKET_OUT() macro, and may specify 0 or more responses
-// that should be sent when the outgoing packet is received by MockChannelTest:
+// Provides a GTest harness base class for tests that operate over an L2CAP
+// channel. Outgoing packet expectations are written using the
+// EXPECT_PACKET_OUT() macro, and may specify 0 or more responses that should be
+// sent when the outgoing packet is received by MockChannelTest:
 //
 // StaticByteBuffer kRequest_0(...);
 // StaticByteBuffer kRequest_1(...);
@@ -38,9 +39,10 @@ class MockChannelTest : public pw::async::test::FakeDispatcherFixture {
 
   class Transaction {
    public:
-    // The |expected| buffer and the buffers in |replies| will be copied, so their lifetime does not
-    // need to extend past Transaction construction.
-    Transaction(const ByteBuffer& expected, const std::vector<const ByteBuffer*>& replies,
+    // The |expected| buffer and the buffers in |replies| will be copied, so
+    // their lifetime does not need to extend past Transaction construction.
+    Transaction(const ByteBuffer& expected,
+                const std::vector<const ByteBuffer*>& replies,
                 ExpectationMetadata meta);
     virtual ~Transaction() = default;
     Transaction(Transaction&& other) = default;
@@ -51,8 +53,8 @@ class MockChannelTest : public pw::async::test::FakeDispatcherFixture {
 
     const PacketExpectation& expected() { return expected_; }
     void set_expected(const PacketExpectation& expected) {
-      expected_ =
-          PacketExpectation{.data = DynamicByteBuffer(expected.data), .meta = expected.meta};
+      expected_ = PacketExpectation{.data = DynamicByteBuffer(expected.data),
+                                    .meta = expected.meta};
     }
 
     std::queue<DynamicByteBuffer>& replies() { return replies_; }
@@ -82,20 +84,24 @@ class MockChannelTest : public pw::async::test::FakeDispatcherFixture {
 
   pw::async::HeapDispatcher& heap_dispatcher() { return heap_dispatcher_; }
 
-  // Queues a transaction into the MockChannelTest's expected packet queue. Each packet received
-  // through the channel will be verified against the next expected transaction in the queue. A
-  // mismatch will cause a fatal assertion. On a match, MockChannelTest will send back the replies
-  // provided in the transaction.
-  // NOTE: It is recommended to use the EXPECT_PACKET_OUT macro instead of calling this method
-  // directly.
-  void QueueTransaction(const ByteBuffer& expected, const std::vector<const ByteBuffer*>& replies,
+  // Queues a transaction into the MockChannelTest's expected packet queue. Each
+  // packet received through the channel will be verified against the next
+  // expected transaction in the queue. A mismatch will cause a fatal assertion.
+  // On a match, MockChannelTest will send back the replies provided in the
+  // transaction. NOTE: It is recommended to use the EXPECT_PACKET_OUT macro
+  // instead of calling this method directly.
+  void QueueTransaction(const ByteBuffer& expected,
+                        const std::vector<const ByteBuffer*>& replies,
                         ExpectationMetadata meta);
 
-  // Create a FakeChannel owned by this test fixture. Replaces any existing channel.
+  // Create a FakeChannel owned by this test fixture. Replaces any existing
+  // channel.
   FakeChannel::WeakPtr CreateFakeChannel(const ChannelOptions& options);
 
   using PacketCallback = fit::function<void(const ByteBuffer& packet)>;
-  void SetPacketCallback(PacketCallback callback) { packet_callback_ = std::move(callback); }
+  void SetPacketCallback(PacketCallback callback) {
+    packet_callback_ = std::move(callback);
+  }
 
   bool AllExpectedPacketsSent() const { return transactions_.empty(); }
 
@@ -110,11 +116,13 @@ class MockChannelTest : public pw::async::test::FakeDispatcherFixture {
   pw::async::HeapDispatcher heap_dispatcher_{dispatcher()};
 };
 
-// Helper macro for expecting a packet and receiving a variable number of responses.
-#define EXPECT_PACKET_OUT(expected, ...) \
-  QueueTransaction(                      \
-      (expected), {__VA_ARGS__},         \
-      bt::l2cap::testing::MockChannelTest::ExpectationMetadata{__FILE__, __LINE__, #expected})
+// Helper macro for expecting a packet and receiving a variable number of
+// responses.
+#define EXPECT_PACKET_OUT(expected, ...)                                     \
+  QueueTransaction((expected),                                               \
+                   {__VA_ARGS__},                                            \
+                   bt::l2cap::testing::MockChannelTest::ExpectationMetadata{ \
+                       __FILE__, __LINE__, #expected})
 
 }  // namespace bt::l2cap::testing
 

@@ -16,26 +16,27 @@ class Transport;
 
 namespace gap {
 
-// LowEnergyInterrogator sends HCI commands that request the controller version and features of a
-// peer and handles responses by updating the Peer. LowEnergyInterrogator must only be used with an
-// LE or dual mode controller.
+// LowEnergyInterrogator sends HCI commands that request the controller version
+// and features of a peer and handles responses by updating the Peer.
+// LowEnergyInterrogator must only be used with an LE or dual mode controller.
 class LowEnergyInterrogator final {
  public:
   // |peer| must outlive this object.
-  LowEnergyInterrogator(Peer::WeakPtr peer, hci_spec::ConnectionHandle handle,
+  LowEnergyInterrogator(Peer::WeakPtr peer,
+                        hci_spec::ConnectionHandle handle,
                         hci::CommandChannel::WeakPtr hci);
 
-  // Destroying the LowEnergyInterrogator effectively abandons an in-flight interrogation, if there
-  // is one. The result callback will not be called.
+  // Destroying the LowEnergyInterrogator effectively abandons an in-flight
+  // interrogation, if there is one. The result callback will not be called.
   ~LowEnergyInterrogator() = default;
 
-  // Starts interrogation. Calls |callback| when the sequence is completed or fails. Only 1
-  // interrogation may be pending at a time.
+  // Starts interrogation. Calls |callback| when the sequence is completed or
+  // fails. Only 1 interrogation may be pending at a time.
   using ResultCallback = hci::ResultCallback<>;
   void Start(ResultCallback callback);
 
-  // Abandons interrogation. The result callbacks will be called with result of kCanceled. No-op if
-  // interrogation has already completed.
+  // Abandons interrogation. The result callbacks will be called with result of
+  // kCanceled. No-op if interrogation has already completed.
   void Cancel();
 
  private:
@@ -45,7 +46,8 @@ class LowEnergyInterrogator final {
   void QueueReadRemoteVersionInformation();
 
   Peer::WeakPtr peer_;
-  // Cache of the PeerId to allow for debug logging even if the WeakPtr<Peer> is invalidated
+  // Cache of the PeerId to allow for debug logging even if the WeakPtr<Peer> is
+  // invalidated
   const PeerId peer_id_;
   const hci_spec::ConnectionHandle handle_;
 

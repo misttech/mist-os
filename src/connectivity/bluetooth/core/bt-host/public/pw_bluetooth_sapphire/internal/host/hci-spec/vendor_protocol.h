@@ -5,21 +5,23 @@
 #ifndef SRC_CONNECTIVITY_BLUETOOTH_CORE_BT_HOST_PUBLIC_PW_BLUETOOTH_SAPPHIRE_INTERNAL_HOST_HCI_SPEC_VENDOR_PROTOCOL_H_
 #define SRC_CONNECTIVITY_BLUETOOTH_CORE_BT_HOST_PUBLIC_PW_BLUETOOTH_SAPPHIRE_INTERNAL_HOST_HCI_SPEC_VENDOR_PROTOCOL_H_
 
-// This file contains general opcode/number and static packet definitions for extensions to the
-// Bluetooth Host-Controller interface. These extensions aren't standardized through the Bluetooth
-// SIG and their documentation is available separately (linked below). Each packet payload structure
-// contains parameter descriptions based on their respective documentation.
+// This file contains general opcode/number and static packet definitions for
+// extensions to the Bluetooth Host-Controller interface. These extensions
+// aren't standardized through the Bluetooth SIG and their documentation is
+// available separately (linked below). Each packet payload structure contains
+// parameter descriptions based on their respective documentation.
 //
 // Documentation links:
 //
 //    - Android: https://source.android.com/devices/bluetooth/hci_requirements
 //
-// NOTE: The definitions below are incomplete. They get added as needed. This list will grow as we
-// support more vendor features.
+// NOTE: The definitions below are incomplete. They get added as needed. This
+// list will grow as we support more vendor features.
 //
-// NOTE: Avoid casting raw buffer pointers to the packet payload structure types below; use as
-// template parameter to PacketView::payload(), MutableBufferView::mutable_payload(), or
-// CommandPacket::mutable_payload() instead. Take extra care when accessing flexible array members.
+// NOTE: Avoid casting raw buffer pointers to the packet payload structure types
+// below; use as template parameter to PacketView::payload(),
+// MutableBufferView::mutable_payload(), or CommandPacket::mutable_payload()
+// instead. Take extra care when accessing flexible array members.
 
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/hci-spec/protocol.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/l2cap/l2cap_defs.h"
@@ -205,12 +207,13 @@ struct StopA2dpOffloadCommandReturnParams {
 // ============================================================================
 // Multiple Advertising
 //
-// NOTE: Multiple advertiser support is deprecated in the Google feature spec v0.98 and above. Users
-// of the following vendor extension HCI commands should first ensure that the controller is using a
-// compatible Google feature spec.
+// NOTE: Multiple advertiser support is deprecated in the Google feature spec
+// v0.98 and above. Users of the following vendor extension HCI commands should
+// first ensure that the controller is using a compatible Google feature spec.
 
-// The kLEMultiAdvt opcode is shared across all multiple advertising HCI commands. To differentiate
-// between the multiple commands, a subopcode field is included in the command payload.
+// The kLEMultiAdvt opcode is shared across all multiple advertising HCI
+// commands. To differentiate between the multiple commands, a subopcode field
+// is included in the command payload.
 constexpr OpCode kLEMultiAdvt = VendorOpCode(0x154);
 
 // ============================================================================
@@ -233,22 +236,23 @@ struct LEMultiAdvtSetAdvtParamCommandParams {
   // Time Range: 20 ms to 10.24 s
   uint16_t adv_interval_max;
 
-  // Used to determine the packet type that is used for advertising when advertising is enabled (see
-  // hci_constants.h)
+  // Used to determine the packet type that is used for advertising when
+  // advertising is enabled (see hci_constants.h)
   pw::bluetooth::emboss::LEAdvertisingType adv_type;
 
   pw::bluetooth::emboss::LEOwnAddressType own_address_type;
   LEPeerAddressType peer_address_type;
 
-  // Public Device Address, Random Device Address, Public Identity Address, or Random (static)
-  // Identity Address of the device to be connected.
+  // Public Device Address, Random Device Address, Public Identity Address, or
+  // Random (static) Identity Address of the device to be connected.
   DeviceAddressBytes peer_address;
 
-  // (See the constants kLEAdvertisingChannel* in hci_constants.h for possible values).
+  // (See the constants kLEAdvertisingChannel* in hci_constants.h for possible
+  // values).
   uint8_t adv_channel_map;
 
-  // This parameter shall be ignored when directed advertising is enabled (see hci_constants.h for
-  // possible values).
+  // This parameter shall be ignored when directed advertising is enabled (see
+  // hci_constants.h for possible values).
   LEAdvFilterPolicy adv_filter_policy;
 
   // Handle used to identify an advertising set.
@@ -278,7 +282,8 @@ struct LEMultiAdvtSetAdvtDataCommandParams {
   // kMaxLEAdvertisingDataLength bytes.
   uint8_t adv_data_length;
 
-  // 31 octets of advertising data formatted as defined in Core Spec v5.0, Vol 3, Part C, Section 11
+  // 31 octets of advertising data formatted as defined in Core Spec v5.0, Vol
+  // 3, Part C, Section 11
   uint8_t adv_data[kMaxLEAdvertisingDataLength];
 
   // Handle used to identify an advertising set.
@@ -304,7 +309,8 @@ struct LEMultiAdvtSetScanRespCommandParams {
   // kMaxLEAdvertisingDataLength bytes.
   uint8_t scan_rsp_data_length;
 
-  // 31 octets of advertising data formatted as defined in Core Spec v5.0, Vol 3, Part C, Section 11
+  // 31 octets of advertising data formatted as defined in Core Spec v5.0, Vol
+  // 3, Part C, Section 11
   uint8_t scan_rsp_data[kMaxLEAdvertisingDataLength];
 
   // Handle used to identify an advertising set.

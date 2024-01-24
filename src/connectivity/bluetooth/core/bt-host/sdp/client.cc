@@ -11,24 +11,29 @@ namespace bt::sdp {
 
 namespace {
 
-// Increased after some particularly slow devices taking a long time for transactions with
-// continuations.
-constexpr pw::chrono::SystemClock::duration kTransactionTimeout = std::chrono::seconds(10);
+// Increased after some particularly slow devices taking a long time for
+// transactions with continuations.
+constexpr pw::chrono::SystemClock::duration kTransactionTimeout =
+    std::chrono::seconds(10);
 
 class Impl final : public Client {
  public:
-  explicit Impl(l2cap::Channel::WeakPtr channel, pw::async::Dispatcher& dispatcher);
+  explicit Impl(l2cap::Channel::WeakPtr channel,
+                pw::async::Dispatcher& dispatcher);
 
   ~Impl() override;
 
  private:
-  void ServiceSearchAttributes(std::unordered_set<UUID> search_pattern,
-                               const std::unordered_set<AttributeId>& req_attributes,
-                               SearchResultFunction result_cb) override;
+  void ServiceSearchAttributes(
+      std::unordered_set<UUID> search_pattern,
+      const std::unordered_set<AttributeId>& req_attributes,
+      SearchResultFunction result_cb) override;
 
   // Information about a transaction that hasn't finished yet.
   struct Transaction {
-    Transaction(TransactionId id, ServiceSearchAttributeRequest req, SearchResultFunction cb);
+    Transaction(TransactionId id,
+                ServiceSearchAttributeRequest req,
+                SearchResultFunction cb);
     // The TransactionId used for this request.  This will be reused until the
     // transaction is complete.
     TransactionId id;
@@ -47,11 +52,12 @@ class Impl final : public Client {
   // Finishes a pending transaction on this client, completing their callbacks.
   void Finish(TransactionId id);
 
-  // Cancels a pending transaction this client has started, completing the callback with the given
-  // reason as an error.
+  // Cancels a pending transaction this client has started, completing the
+  // callback with the given reason as an error.
   void Cancel(TransactionId id, HostError reason);
 
-  // Cancels all remaining transactions without sending them, with the given reason as an error.
+  // Cancels all remaining transactions without sending them, with the given
+  // reason as an error.
   void CancelAll(HostError reason);
 
   // Get the next available transaction id
@@ -67,7 +73,8 @@ class Impl final : public Client {
   TransactionId next_tid_ = 0;
   // Any transactions that are not completed.
   std::unordered_map<TransactionId, Transaction> pending_;
-  // Timeout for the current transaction. false if none are waiting for a response.
+  // Timeout for the current transaction. false if none are waiting for a
+  // response.
   std::optional<SmartTask> pending_timeout_;
 
   WeakSelf<Impl> weak_self_{this};
@@ -113,7 +120,10 @@ void Impl::TrySendNextTransaction() {
   }
 
   if (!channel_) {
-    bt_log(INFO, "sdp", "Failed to send %zu requests: link closed", pending_.size());
+    bt_log(INFO,
+           "sdp",
+           "Failed to send %zu requests: link closed",
+           pending_.size());
     CancelAll(HostError::kLinkDisconnected);
     return;
   }
@@ -133,19 +143,21 @@ void Impl::TrySendNextTransaction() {
   auto& timeout = pending_timeout_.emplace(pw_dispatcher_);
 
   // Timeouts are held in this so it is safe to use.
-  timeout.set_function([this, id = next.id](pw::async::Context /*ctx*/, pw::Status status) {
-    if (!status.ok()) {
-      return;
-    }
-    bt_log(WARN, "sdp", "Transaction %d timed out, removing!", id);
-    Cancel(id, HostError::kTimedOut);
-  });
+  timeout.set_function(
+      [this, id = next.id](pw::async::Context /*ctx*/, pw::Status status) {
+        if (!status.ok()) {
+          return;
+        }
+        bt_log(WARN, "sdp", "Transaction %d timed out, removing!", id);
+        Cancel(id, HostError::kTimedOut);
+      });
   timeout.PostAfter(kTransactionTimeout);
 }
 
-void Impl::ServiceSearchAttributes(std::unordered_set<UUID> search_pattern,
-                                   const std::unordered_set<AttributeId>& req_attributes,
-                                   SearchResultFunction result_cb) {
+void Impl::ServiceSearchAttributes(
+    std::unordered_set<UUID> search_pattern,
+    const std::unordered_set<AttributeId>& req_attributes,
+    SearchResultFunction result_cb) {
   ServiceSearchAttributeRequest req;
   req.set_search_pattern(std::move(search_pattern));
   if (req_attributes.empty()) {
@@ -157,7 +169,8 @@ void Impl::ServiceSearchAttributes(std::unordered_set<UUID> search_pattern,
   }
   TransactionId next = GetNextId();
 
-  auto [iter, placed] = pending_.try_emplace(next, next, std::move(req), std::move(result_cb));
+  auto [iter, placed] =
+      pending_.try_emplace(next, next, std::move(req), std::move(result_cb));
   BT_DEBUG_ASSERT_MSG(placed, "Should not have repeat transaction ID %u", next);
 
   TrySendNextTransaction();
@@ -171,7 +184,8 @@ void Impl::Finish(TransactionId id) {
   if (!state.callback) {
     return;
   }
-  BT_DEBUG_ASSERT_MSG(state.response.complete(), "Finished without complete response");
+  BT_DEBUG_ASSERT_MSG(state.response.complete(),
+                      "Finished without complete response");
 
   auto self = weak_self_.GetWeakPtr();
 
@@ -181,11 +195,11 @@ void Impl::Finish(TransactionId id) {
       state.callback(fit::error(Error(HostError::kNotFound)));
       break;
     }
-    // |count| and |idx| are at most std::numeric_limits<uint32_t>::max() + 1, which is caught by
-    // the above if statement.
+    // |count| and |idx| are at most std::numeric_limits<uint32_t>::max() + 1,
+    // which is caught by the above if statement.
     BT_DEBUG_ASSERT(idx <= std::numeric_limits<uint32_t>::max());
-    if (!state.callback(
-            fit::ok(std::cref(state.response.attributes(static_cast<uint32_t>(idx)))))) {
+    if (!state.callback(fit::ok(std::cref(
+            state.response.attributes(static_cast<uint32_t>(idx)))))) {
       break;
     }
   }
@@ -198,7 +212,8 @@ void Impl::Finish(TransactionId id) {
   TrySendNextTransaction();
 }
 
-Impl::Transaction::Transaction(TransactionId id, ServiceSearchAttributeRequest req,
+Impl::Transaction::Transaction(TransactionId id,
+                               ServiceSearchAttributeRequest req,
                                SearchResultFunction cb)
     : id(id), request(std::move(req)), callback(std::move(cb)) {}
 
@@ -224,7 +239,11 @@ void Impl::OnRxFrame(ByteBufferPtr data) {
   size_t pkt_params_len = data->size() - sizeof(Header);
   uint16_t params_len = betoh16(packet.header().param_length);
   if (params_len != pkt_params_len) {
-    bt_log(INFO, "sdp", "bad params length (len %zu != %u), dropping", pkt_params_len, params_len);
+    bt_log(INFO,
+           "sdp",
+           "bad params length (len %zu != %u), dropping",
+           pkt_params_len,
+           params_len);
     return;
   }
   packet.Resize(params_len);
@@ -235,17 +254,23 @@ void Impl::OnRxFrame(ByteBufferPtr data) {
     return;
   }
   auto& transaction = it->second;
-  fit::result<Error<>> parse_status = transaction.response.Parse(packet.payload_data());
+  fit::result<Error<>> parse_status =
+      transaction.response.Parse(packet.payload_data());
   if (parse_status.is_error()) {
     if (parse_status.error_value().is(HostError::kInProgress)) {
       bt_log(INFO, "sdp", "Requesting continuation of id (%u)", tid);
-      transaction.request.SetContinuationState(transaction.response.ContinuationState());
+      transaction.request.SetContinuationState(
+          transaction.response.ContinuationState());
       if (!channel_->Send(transaction.request.GetPDU(tid))) {
         bt_log(INFO, "sdp", "Failed to send continuation of transaction!");
       }
       return;
     }
-    bt_log(INFO, "sdp", "Failed to parse packet for tid %u: %s", tid, bt_str(parse_status));
+    bt_log(INFO,
+           "sdp",
+           "Failed to parse packet for tid %u: %s",
+           tid,
+           bt_str(parse_status));
     // Drop the transaction with the error.
     Cancel(tid, parse_status.error_value().host_error());
     return;

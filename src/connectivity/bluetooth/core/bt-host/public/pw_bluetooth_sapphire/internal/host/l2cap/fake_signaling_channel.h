@@ -16,7 +16,8 @@
 // the test call site that expected the command, and to reduce one level of
 // braces in the responses. |fake_sig| should be a FakeSignalingChannel lvalue.
 #define EXPECT_OUTBOUND_REQ(fake_sig, req_code, req_payload, ...) \
-  (fake_sig).AddOutbound(__FILE__, __LINE__, req_code, req_payload, {__VA_ARGS__})
+  (fake_sig).AddOutbound(                                         \
+      __FILE__, __LINE__, req_code, req_payload, {__VA_ARGS__})
 
 namespace bt::l2cap::internal::testing {
 
@@ -35,7 +36,9 @@ class FakeSignalingChannel : public SignalingChannelInterface {
   ~FakeSignalingChannel() override;
 
   // SignalingChannelInterface overrides
-  bool SendRequest(CommandCode req_code, const ByteBuffer& payload, ResponseHandler cb) override;
+  bool SendRequest(CommandCode req_code,
+                   const ByteBuffer& payload,
+                   ResponseHandler cb) override;
   void ServeRequest(CommandCode req_code, RequestDelegate cb) override;
 
   // Add an expected outbound request, which FakeSignalingChannel will respond
@@ -44,26 +47,34 @@ class FakeSignalingChannel : public SignalingChannelInterface {
   // handler will be expected to handle all responses provided here.
   // Returns a handle that can be used to provide additional responses with
   // |ReceiveResponses|. |file| and |line| will be used to trace test failures.
-  TransactionId AddOutbound(const char* file, int line, CommandCode req_code,
-                            BufferView req_payload, std::vector<Response> responses);
+  TransactionId AddOutbound(const char* file,
+                            int line,
+                            CommandCode req_code,
+                            BufferView req_payload,
+                            std::vector<Response> responses);
 
   // Receive additional responses to an already received request.
-  void ReceiveResponses(TransactionId id, const std::vector<Response>& responses);
+  void ReceiveResponses(TransactionId id,
+                        const std::vector<Response>& responses);
 
   // Simulate reception of an inbound request with |req_code| and |req_payload|,
   // then expect a corresponding outbound response with payload |rsp_payload|.
-  void ReceiveExpect(CommandCode req_code, const ByteBuffer& req_payload,
+  void ReceiveExpect(CommandCode req_code,
+                     const ByteBuffer& req_payload,
                      const ByteBuffer& rsp_payload);
 
   // Simulate reception of an inbound request with |req_code| and |req_payload|,
   // then expect a matching rejection with the Not Understood reason.
-  void ReceiveExpectRejectNotUnderstood(CommandCode req_code, const ByteBuffer& req_payload);
+  void ReceiveExpectRejectNotUnderstood(CommandCode req_code,
+                                        const ByteBuffer& req_payload);
 
   // Simulate reception of an inbound request with |req_code| and |req_payload|,
   // then expect a matching rejection with the Invalid Channel ID reason and the
   // rejected IDs |local_cid| and |remote_cid|.
-  void ReceiveExpectRejectInvalidChannelId(CommandCode req_code, const ByteBuffer& req_payload,
-                                           ChannelId local_cid, ChannelId remote_cid);
+  void ReceiveExpectRejectInvalidChannelId(CommandCode req_code,
+                                           const ByteBuffer& req_payload,
+                                           ChannelId local_cid,
+                                           ChannelId remote_cid);
 
  private:
   // Expected outbound request and response(s) that this fake sends back
@@ -83,7 +94,8 @@ class FakeSignalingChannel : public SignalingChannelInterface {
 
   // Simulate reception of |responses|, calling |transaction.response_callback|
   // on each response until it returns false. Returns the number of invocations.
-  size_t TriggerResponses(const Transaction& transaction, const std::vector<Response>& responses);
+  size_t TriggerResponses(const Transaction& transaction,
+                          const std::vector<Response>& responses);
 
   // Test a previously-registered request handler by simulating an inbound
   // request of |req_code| and |req_payload|. The test will assert-fail if no
@@ -91,7 +103,8 @@ class FakeSignalingChannel : public SignalingChannelInterface {
   // generated internally based on the kind of reply that the handler is
   // expected to send and is passed to the handler-under-test. The test will
   // fail if no reply at all is sent.
-  void ReceiveExpectInternal(CommandCode req_code, const ByteBuffer& req_payload,
+  void ReceiveExpectInternal(CommandCode req_code,
+                             const ByteBuffer& req_payload,
                              Responder* fake_responder);
 
   // Expected outbound transactions

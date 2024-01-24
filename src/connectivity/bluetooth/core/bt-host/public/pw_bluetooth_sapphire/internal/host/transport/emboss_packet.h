@@ -9,20 +9,22 @@
 
 namespace bt {
 
-// This file defines classes which provide the interface for constructing HCI packets and
-// reading/writing them using Emboss (https://github.com/google/emboss).
+// This file defines classes which provide the interface for constructing HCI
+// packets and reading/writing them using Emboss
+// (https://github.com/google/emboss).
 //
-// Emboss does not own memory; it provides structured views into user allocated memory. These views
-// are specified in Emboss source files such as hci.emb in pw_bluetooth, which implements the HCI
-// protocol packet definitions.
+// Emboss does not own memory; it provides structured views into user allocated
+// memory. These views are specified in Emboss source files such as hci.emb in
+// pw_bluetooth, which implements the HCI protocol packet definitions.
 //
-// This file defines two classes: StaticPacket, which provides an Emboss view over a statically
-// allocated buffer, and DynamicPacket, which is part of a class hierarchy that provides Emboss
-// views over dynamic memory.
+// This file defines two classes: StaticPacket, which provides an Emboss view
+// over a statically allocated buffer, and DynamicPacket, which is part of a
+// class hierarchy that provides Emboss views over dynamic memory.
 //
 // EXAMPLE:
 //
-// Consider the following Emboss definition of the HCI Command packet header and Inquiry Command.
+// Consider the following Emboss definition of the HCI Command packet header and
+// Inquiry Command.
 //
 //  [(cpp) namespace: "bt::hci_spec"]
 //  struct CommandHeader:
@@ -36,9 +38,10 @@ namespace bt {
 //    $next [+1] UInt inquiry_length
 //    $next [+1] UInt num_responses
 //
-// The Emboss compiler generates two types of view for each struct. In the case of InquiryCommand,
-// it generates InquiryCommandView (read-only) and InquiryCommandWriter (read & writable). We can
-// parameterize StaticPacket over one of these views to read and/or write an Inquiry packet:
+// The Emboss compiler generates two types of view for each struct. In the case
+// of InquiryCommand, it generates InquiryCommandView (read-only) and
+// InquiryCommandWriter (read & writable). We can parameterize StaticPacket over
+// one of these views to read and/or write an Inquiry packet:
 //
 //  bt::StaticPacket<pw::bluetooth::emboss::InquiryCommandWriter> packet;
 //  auto view = packet.view();
@@ -58,8 +61,8 @@ class StaticPacket {
     view().CopyFrom(other);
   }
 
-  // Returns an Emboss view over the buffer. Emboss views consist of two pointers and a length, so
-  // they are cheap to construct on-demand.
+  // Returns an Emboss view over the buffer. Emboss views consist of two
+  // pointers and a length, so they are cheap to construct on-demand.
   template <typename... Args>
   T view(Args... args) {
     T view(args..., buffer_.mutable_data(), buffer_.size());
@@ -68,46 +71,53 @@ class StaticPacket {
   }
 
   BufferView data() const { return {buffer_.data(), buffer_.size()}; }
-  MutableBufferView mutable_data() { return {buffer_.mutable_data(), buffer_.size()}; }
+  MutableBufferView mutable_data() {
+    return {buffer_.mutable_data(), buffer_.size()};
+  }
   void SetToZeros() { buffer_.SetToZeros(); }
 
  private:
-  // The intrinsic size of an Emboss struct is the size required to hold all of its fields. An
-  // Emboss view has a static IntrinsicSizeInBytes() accessor if the struct does not have dynamic
-  // length (i.e. not a variable length packet).
+  // The intrinsic size of an Emboss struct is the size required to hold all of
+  // its fields. An Emboss view has a static IntrinsicSizeInBytes() accessor if
+  // the struct does not have dynamic length (i.e. not a variable length
+  // packet).
   StaticByteBuffer<T::IntrinsicSizeInBytes().Read()> buffer_;
 };
 
-// DynamicPacket is the parent class of a two-level class hierarchy that implements
-// dynamically-allocated HCI packets to which reading/writing is mediated by Emboss.
+// DynamicPacket is the parent class of a two-level class hierarchy that
+// implements dynamically-allocated HCI packets to which reading/writing is
+// mediated by Emboss.
 //
-// DynamicPacket contains data and methods that are universal across packet type. Its children are
-// packet type specializations, i.e. Command, Event, ACL, and Sco packets. These classes provide
-// header-type-specific functionality.
+// DynamicPacket contains data and methods that are universal across packet
+// type. Its children are packet type specializations, i.e. Command, Event, ACL,
+// and Sco packets. These classes provide header-type-specific functionality.
 //
-// Instances of DynamicPacket should not be constructed directly. Instead, packet type
-// specialization classes should provide static factory functions.
+// Instances of DynamicPacket should not be constructed directly. Instead,
+// packet type specialization classes should provide static factory functions.
 //
-// See EmbossCommandPacket in emboss_control_packets.h for an example of a packet type
-// specialization.
+// See EmbossCommandPacket in emboss_control_packets.h for an example of a
+// packet type specialization.
 class DynamicPacket {
  public:
-  // Returns an Emboss view over the buffer. Unlike StaticPacket, which ensures type security as a
-  // struct parameterized over a particular Emboss view type, DynamicPacket is a generic type for
-  // all packets, so view() is to be parameterized over an Emboss view type on each call.
+  // Returns an Emboss view over the buffer. Unlike StaticPacket, which ensures
+  // type security as a struct parameterized over a particular Emboss view type,
+  // DynamicPacket is a generic type for all packets, so view() is to be
+  // parameterized over an Emboss view type on each call.
   template <typename T, typename... Args>
   T view(Args... args) {
     T view(args..., buffer_.mutable_data(), size());
-    BT_ASSERT_MSG(view.IsComplete(),
-                  "emboss packet buffer not large enough to hold requested view");
+    BT_ASSERT_MSG(
+        view.IsComplete(),
+        "emboss packet buffer not large enough to hold requested view");
     return view;
   }
 
   template <typename T, typename... Args>
   T view(Args... args) const {
     T view(args..., buffer_.data(), size());
-    BT_ASSERT_MSG(view.IsComplete(),
-                  "emboss packet buffer not large enough to hold requested view");
+    BT_ASSERT_MSG(
+        view.IsComplete(),
+        "emboss packet buffer not large enough to hold requested view");
     return view;
   }
 

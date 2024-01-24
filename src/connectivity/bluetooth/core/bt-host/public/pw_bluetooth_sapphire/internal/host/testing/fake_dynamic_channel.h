@@ -47,7 +47,9 @@ class FakeDynamicChannel {
   // Create a FakeDynamicChannel with Connection Handle |conn|, Protocol
   // Service Multiplexer (PSM) |psm| locally registered Channel ID |local_cid|,
   // and remote Channel ID |remote_cid|. Set to closed upon creation.
-  FakeDynamicChannel(hci_spec::ConnectionHandle conn, l2cap::Psm psm, l2cap::ChannelId local_cid,
+  FakeDynamicChannel(hci_spec::ConnectionHandle conn,
+                     l2cap::Psm psm,
+                     l2cap::ChannelId local_cid,
                      l2cap::ChannelId remote_cid);
 
   // Call the ChannelDeletedCallback instance associated with the server upon
@@ -60,28 +62,42 @@ class FakeDynamicChannel {
 
   void set_opened() { opened_ = true; }
   void set_closed() { opened_ = false; }
-  void set_configuration_request_received() { configuration_request_received_ = true; }
-  void set_configuration_response_received() { configuration_response_received_ = true; }
-  void set_packet_handler_callback(PacketHandlerCallback packet_handler_callback) {
+  void set_configuration_request_received() {
+    configuration_request_received_ = true;
+  }
+  void set_configuration_response_received() {
+    configuration_response_received_ = true;
+  }
+  void set_packet_handler_callback(
+      PacketHandlerCallback packet_handler_callback) {
     packet_handler_callback_ = std::move(packet_handler_callback);
   }
   void set_send_packet_callback(SendPacketCallback send_packet_callback) {
     send_packet_callback_ = std::move(send_packet_callback);
   }
-  void set_channel_deleted_callback(ChannelDeletedCallback channel_deleted_callback) {
+  void set_channel_deleted_callback(
+      ChannelDeletedCallback channel_deleted_callback) {
     channel_deleted_callback_ = std::move(channel_deleted_callback);
   }
 
   hci_spec::ConnectionHandle handle() const { return handle_; }
   bool opened() const { return opened_; }
-  bool configuration_request_received() const { return configuration_request_received_; }
-  bool configuration_response_received() const { return configuration_response_received_; }
+  bool configuration_request_received() const {
+    return configuration_request_received_;
+  }
+  bool configuration_response_received() const {
+    return configuration_response_received_;
+  }
   l2cap::Psm psm() const { return psm_; }
   l2cap::ChannelId local_cid() const { return local_cid_; }
   l2cap::ChannelId remote_cid() const { return remote_cid_; }
-  PacketHandlerCallback& packet_handler_callback() { return packet_handler_callback_; }
+  PacketHandlerCallback& packet_handler_callback() {
+    return packet_handler_callback_;
+  }
   SendPacketCallback& send_packet_callback() { return send_packet_callback_; }
-  ChannelDeletedCallback& channel_deleted_callback() { return channel_deleted_callback_; }
+  ChannelDeletedCallback& channel_deleted_callback() {
+    return channel_deleted_callback_;
+  }
 
   // Return a WeakPtr instance of this FakeDynamicChannel
   using WeakPtr = WeakSelf<FakeDynamicChannel>::WeakPtr;
@@ -91,7 +107,8 @@ class FakeDynamicChannel {
   // ConnectionHandle associated with what
   hci_spec::ConnectionHandle handle_;
 
-  // If the device is connected  and so is ready to communicate over the channel.
+  // If the device is connected  and so is ready to communicate over the
+  // channel.
   bool opened_;
 
   // If the initial ConfigurationRequest needed to open the channel has been

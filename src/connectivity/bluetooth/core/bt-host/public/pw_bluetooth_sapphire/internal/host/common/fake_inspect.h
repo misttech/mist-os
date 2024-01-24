@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-// This file contains a minimal fake implementation of Inspect to enable code to compile when
-// Inspect is not supported.
+// This file contains a minimal fake implementation of Inspect to enable code to
+// compile when Inspect is not supported.
 
 #ifndef SRC_CONNECTIVITY_BLUETOOTH_CORE_BT_HOST_PUBLIC_PW_BLUETOOTH_SAPPHIRE_INTERNAL_HOST_COMMON_FAKE_INSPECT_H_
 #define SRC_CONNECTIVITY_BLUETOOTH_CORE_BT_HOST_PUBLIC_PW_BLUETOOTH_SAPPHIRE_INTERNAL_HOST_COMMON_FAKE_INSPECT_H_
@@ -37,7 +37,9 @@ class Node final {
 
   std::string UniqueName(const std::string& prefix) { return ""; }
 
-  StringProperty CreateString(std::string_view name, const std::string& value) { return {}; }
+  StringProperty CreateString(std::string_view name, const std::string& value) {
+    return {};
+  }
 
   template <typename T>
   void CreateString(std::string_view name, const std::string& value, T* list) {}

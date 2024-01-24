@@ -17,13 +17,21 @@ class FakeClient final : public Client {
   ~FakeClient() override = default;
 
   void set_server_mtu(uint16_t mtu) { server_mtu_ = mtu; }
-  void set_exchange_mtu_status(att::Result<> status) { exchange_mtu_status_ = status; }
+  void set_exchange_mtu_status(att::Result<> status) {
+    exchange_mtu_status_ = status;
+  }
 
-  void set_services(std::vector<ServiceData> services) { services_ = std::move(services); }
+  void set_services(std::vector<ServiceData> services) {
+    services_ = std::move(services);
+  }
 
-  void set_characteristics(std::vector<CharacteristicData> chrcs) { chrcs_ = std::move(chrcs); }
+  void set_characteristics(std::vector<CharacteristicData> chrcs) {
+    chrcs_ = std::move(chrcs);
+  }
 
-  void set_descriptors(std::vector<DescriptorData> descs) { descs_ = std::move(descs); }
+  void set_descriptors(std::vector<DescriptorData> descs) {
+    descs_ = std::move(descs);
+  }
 
   void set_characteristic_discovery_status(att::Result<> status) {
     chrc_discovery_status_ = status;
@@ -37,13 +45,21 @@ class FakeClient final : public Client {
     desc_discovery_status_ = status;
   }
 
-  att::Handle last_chrc_discovery_start_handle() const { return last_chrc_discovery_start_handle_; }
+  att::Handle last_chrc_discovery_start_handle() const {
+    return last_chrc_discovery_start_handle_;
+  }
 
-  att::Handle last_chrc_discovery_end_handle() const { return last_chrc_discovery_end_handle_; }
+  att::Handle last_chrc_discovery_end_handle() const {
+    return last_chrc_discovery_end_handle_;
+  }
 
-  att::Handle last_desc_discovery_start_handle() const { return last_desc_discovery_start_handle_; }
+  att::Handle last_desc_discovery_start_handle() const {
+    return last_desc_discovery_start_handle_;
+  }
 
-  att::Handle last_desc_discovery_end_handle() const { return last_desc_discovery_end_handle_; }
+  att::Handle last_desc_discovery_end_handle() const {
+    return last_desc_discovery_end_handle_;
+  }
 
   size_t chrc_discovery_count() const { return chrc_discovery_count_; }
   size_t desc_discovery_count() const { return desc_discovery_count_; }
@@ -61,57 +77,68 @@ class FakeClient final : public Client {
   }
 
   // Sets a callback which will run when ReadByTypeRequest gets called.
-  using ReadByTypeRequestCallback = fit::function<void(const UUID& type, att::Handle start_handle,
-                                                       att::Handle end_handle, ReadByTypeCallback)>;
+  using ReadByTypeRequestCallback = fit::function<void(const UUID& type,
+                                                       att::Handle start_handle,
+                                                       att::Handle end_handle,
+                                                       ReadByTypeCallback)>;
   void set_read_by_type_request_callback(ReadByTypeRequestCallback callback) {
     read_by_type_request_callback_ = std::move(callback);
   }
 
   // Sets a callback which will run when ReadBlobRequest gets called.
-  using ReadBlobRequestCallback = fit::function<void(att::Handle, uint16_t offset, ReadCallback)>;
+  using ReadBlobRequestCallback =
+      fit::function<void(att::Handle, uint16_t offset, ReadCallback)>;
   void set_read_blob_request_callback(ReadBlobRequestCallback callback) {
     read_blob_request_callback_ = std::move(callback);
   }
 
   // Sets a callback which will run when WriteRequest gets called.
-  using WriteRequestCallback =
-      fit::function<void(att::Handle, const ByteBuffer&, att::ResultFunction<>)>;
+  using WriteRequestCallback = fit::function<void(
+      att::Handle, const ByteBuffer&, att::ResultFunction<>)>;
   void set_write_request_callback(WriteRequestCallback callback) {
     write_request_callback_ = std::move(callback);
   }
 
-  using ExecutePrepareWritesCallback = fit::function<void(att::PrepareWriteQueue prep_write_queue,
-                                                          ReliableMode, att::ResultFunction<>)>;
-  void set_execute_prepare_writes_callback(ExecutePrepareWritesCallback callback) {
+  using ExecutePrepareWritesCallback =
+      fit::function<void(att::PrepareWriteQueue prep_write_queue,
+                         ReliableMode,
+                         att::ResultFunction<>)>;
+  void set_execute_prepare_writes_callback(
+      ExecutePrepareWritesCallback callback) {
     execute_prepare_writes_callback_ = std::move(callback);
   }
 
   // Sets a callback which will run when PrepareWriteRequest gets called.
-  using PrepareWriteRequestCallback =
-      fit::function<void(att::Handle, uint16_t offset, const ByteBuffer&, PrepareCallback)>;
-  void set_prepare_write_request_callback(PrepareWriteRequestCallback callback) {
+  using PrepareWriteRequestCallback = fit::function<void(
+      att::Handle, uint16_t offset, const ByteBuffer&, PrepareCallback)>;
+  void set_prepare_write_request_callback(
+      PrepareWriteRequestCallback callback) {
     prepare_write_request_callback_ = std::move(callback);
   }
 
   // Sets a callback which will run when ExecuteWriteRequest gets called.
   using ExecuteWriteRequestCallback =
       fit::function<void(att::ExecuteWriteFlag flag, att::ResultFunction<>)>;
-  void set_execute_write_request_callback(ExecuteWriteRequestCallback callback) {
+  void set_execute_write_request_callback(
+      ExecuteWriteRequestCallback callback) {
     execute_write_request_callback_ = std::move(callback);
   }
 
   // Sets a callback which will run when WriteWithoutResponse gets called.
-  using WriteWithoutResponseCallback =
-      fit::function<void(att::Handle, const ByteBuffer&, att::ResultFunction<>)>;
+  using WriteWithoutResponseCallback = fit::function<void(
+      att::Handle, const ByteBuffer&, att::ResultFunction<>)>;
   void set_write_without_rsp_callback(WriteWithoutResponseCallback callback) {
     write_without_rsp_callback_ = std::move(callback);
   }
 
   // Emulates the receipt of a notification or indication PDU.
-  void SendNotification(bool indicate, att::Handle handle, const ByteBuffer& value,
+  void SendNotification(bool indicate,
+                        att::Handle handle,
+                        const ByteBuffer& value,
                         bool maybe_truncated);
 
-  // Methods to obtain a weak pointer to both FakeClient and the base class types.
+  // Methods to obtain a weak pointer to both FakeClient and the base class
+  // types.
   Client::WeakPtr GetWeakPtr() override { return weak_self_.GetWeakPtr(); }
   using WeakPtr = WeakSelf<FakeClient>::WeakPtr;
   FakeClient::WeakPtr AsFakeWeakPtr() { return weak_fake_.GetWeakPtr(); }
@@ -122,36 +149,54 @@ class FakeClient final : public Client {
  private:
   // Client overrides:
   void ExchangeMTU(MTUCallback callback) override;
-  void DiscoverServices(ServiceKind kind, ServiceCallback svc_callback,
+  void DiscoverServices(ServiceKind kind,
+                        ServiceCallback svc_callback,
                         att::ResultFunction<> status_callback) override;
-  void DiscoverServicesInRange(ServiceKind kind, att::Handle start, att::Handle end,
+  void DiscoverServicesInRange(ServiceKind kind,
+                               att::Handle start,
+                               att::Handle end,
                                ServiceCallback svc_callback,
                                att::ResultFunction<> status_callback) override;
-  void DiscoverCharacteristics(att::Handle range_start, att::Handle range_end,
+  void DiscoverCharacteristics(att::Handle range_start,
+                               att::Handle range_end,
                                CharacteristicCallback chrc_callback,
                                att::ResultFunction<> status_callback) override;
-  void DiscoverDescriptors(att::Handle range_start, att::Handle range_end,
+  void DiscoverDescriptors(att::Handle range_start,
+                           att::Handle range_end,
                            DescriptorCallback desc_callback,
                            att::ResultFunction<> status_callback) override;
-  void DiscoverServicesWithUuids(ServiceKind kind, ServiceCallback svc_callback,
+  void DiscoverServicesWithUuids(ServiceKind kind,
+                                 ServiceCallback svc_callback,
                                  att::ResultFunction<> status_callback,
                                  std::vector<UUID> uuids) override;
-  void DiscoverServicesWithUuidsInRange(ServiceKind kind, att::Handle start, att::Handle end,
+  void DiscoverServicesWithUuidsInRange(ServiceKind kind,
+                                        att::Handle start,
+                                        att::Handle end,
                                         ServiceCallback svc_callback,
                                         att::ResultFunction<> status_callback,
                                         std::vector<UUID> uuids) override;
   void ReadRequest(att::Handle handle, ReadCallback callback) override;
-  void ReadByTypeRequest(const UUID& type, att::Handle start_handle, att::Handle end_handle,
+  void ReadByTypeRequest(const UUID& type,
+                         att::Handle start_handle,
+                         att::Handle end_handle,
                          ReadByTypeCallback callback) override;
-  void ReadBlobRequest(att::Handle handle, uint16_t offset, ReadCallback callback) override;
-  void WriteRequest(att::Handle handle, const ByteBuffer& value,
+  void ReadBlobRequest(att::Handle handle,
+                       uint16_t offset,
+                       ReadCallback callback) override;
+  void WriteRequest(att::Handle handle,
+                    const ByteBuffer& value,
                     att::ResultFunction<> callback) override;
-  void ExecutePrepareWrites(att::PrepareWriteQueue prep_write_queue, ReliableMode reliable_mode,
+  void ExecutePrepareWrites(att::PrepareWriteQueue prep_write_queue,
+                            ReliableMode reliable_mode,
                             att::ResultFunction<> callback) override;
-  void PrepareWriteRequest(att::Handle handle, uint16_t offset, const ByteBuffer& part_value,
+  void PrepareWriteRequest(att::Handle handle,
+                           uint16_t offset,
+                           const ByteBuffer& part_value,
                            PrepareCallback callback) override;
-  void ExecuteWriteRequest(att::ExecuteWriteFlag flag, att::ResultFunction<> callback) override;
-  void WriteWithoutResponse(att::Handle handle, const ByteBuffer& value,
+  void ExecuteWriteRequest(att::ExecuteWriteFlag flag,
+                           att::ResultFunction<> callback) override;
+  void WriteWithoutResponse(att::Handle handle,
+                            const ByteBuffer& value,
                             att::ResultFunction<> callback) override;
   void SetNotificationHandler(NotificationCallback callback) override;
 

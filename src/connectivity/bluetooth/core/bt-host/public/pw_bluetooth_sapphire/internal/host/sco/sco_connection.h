@@ -22,12 +22,15 @@ namespace bt::sco {
 // This class is intended to be owned by a ScoConnectionManager.
 class ScoConnection final : public hci::ScoDataChannel::ConnectionInterface {
  public:
-  // |connection| is the underlying connection and must have the link type kSCO or kESCO.
-  // |deactivated_cb| will be called when the connection has been Deactivated and should be
-  // destroyed.
+  // |connection| is the underlying connection and must have the link type kSCO
+  // or kESCO. |deactivated_cb| will be called when the connection has been
+  // Deactivated and should be destroyed.
   ScoConnection(
-      std::unique_ptr<hci::Connection> connection, fit::closure deactivated_cb,
-      bt::StaticPacket<pw::bluetooth::emboss::SynchronousConnectionParametersWriter> parameters,
+      std::unique_ptr<hci::Connection> connection,
+      fit::closure deactivated_cb,
+      bt::StaticPacket<
+          pw::bluetooth::emboss::SynchronousConnectionParametersWriter>
+          parameters,
       hci::ScoDataChannel* channel);
 
   // Destroying this object will disconnect the underlying HCI connection.
@@ -35,8 +38,8 @@ class ScoConnection final : public hci::ScoDataChannel::ConnectionInterface {
 
   hci_spec::ConnectionHandle handle() const override { return handle_; }
 
-  // Called by ScoConnectionManager to notify a connection it can no longer process data and its
-  // hci::Connection should be closed.
+  // Called by ScoConnectionManager to notify a connection it can no longer
+  // process data and its hci::Connection should be closed.
   void Close();
 
   // Returns a value that's unique for any SCO connection on this device.
@@ -44,8 +47,9 @@ class ScoConnection final : public hci::ScoDataChannel::ConnectionInterface {
   UniqueId unique_id() const;
   UniqueId id() const;
 
-  // Activates this channel. |rx_callback| and |closed_callback| are called as data is received and
-  // the channel is closed, respectively. `Deactivate` should be called in `closed_callback`.
+  // Activates this channel. |rx_callback| and |closed_callback| are called as
+  // data is received and the channel is closed, respectively. `Deactivate`
+  // should be called in `closed_callback`.
   //
   // Returns false if the channel could not be activated.
   bool Activate(fit::closure rx_callback, fit::closure closed_callback);
@@ -59,29 +63,32 @@ class ScoConnection final : public hci::ScoDataChannel::ConnectionInterface {
   uint16_t max_tx_sdu_size() const;
 
   // Queue the given SCO payload for transmission over this channel, taking
-  // ownership of |payload|. Returns true if the payload was queued successfully, and
-  // false otherwise.
+  // ownership of |payload|. Returns true if the payload was queued
+  // successfully, and false otherwise.
   bool Send(ByteBufferPtr payload);
 
-  // If an inbound packet is ready to be read, returns the packet. Otherwise, returns nullptr.
+  // If an inbound packet is ready to be read, returns the packet. Otherwise,
+  // returns nullptr.
   std::unique_ptr<hci::ScoDataPacket> Read();
 
   using WeakPtr = WeakSelf<ScoConnection>::WeakPtr;
   WeakPtr GetWeakPtr() { return weak_self_.GetWeakPtr(); }
 
   // ScoDataChannel overrides:
-  bt::StaticPacket<pw::bluetooth::emboss::SynchronousConnectionParametersWriter> parameters()
-      override;
+  bt::StaticPacket<pw::bluetooth::emboss::SynchronousConnectionParametersWriter>
+  parameters() override;
   std::unique_ptr<hci::ScoDataPacket> GetNextOutboundPacket() override;
-  void ReceiveInboundPacket(std::unique_ptr<hci::ScoDataPacket> packet) override;
+  void ReceiveInboundPacket(
+      std::unique_ptr<hci::ScoDataPacket> packet) override;
   void OnHciError() override;
 
  private:
-  // Common clean up logic for Close() and Deactivate(). Marks connection as inactive and closes the
-  // underlying connection.
+  // Common clean up logic for Close() and Deactivate(). Marks connection as
+  // inactive and closes the underlying connection.
   void CleanUp();
 
-  // True if Activate() has been called and neither Close() or Deactivate() has been called yet.
+  // True if Activate() has been called and neither Close() or Deactivate() has
+  // been called yet.
   bool active_;
 
   hci_spec::ConnectionHandle handle_;
@@ -94,7 +101,8 @@ class ScoConnection final : public hci::ScoDataChannel::ConnectionInterface {
   // Called to notify the owner that the connection was deactivated.
   fit::closure deactivated_cb_;
 
-  // Notify caller of Activate() that an inbound packet has been received and may be read.
+  // Notify caller of Activate() that an inbound packet has been received and
+  // may be read.
   fit::closure rx_callback_ = nullptr;
 
   // Contains outbound SCO payloads.
@@ -106,7 +114,8 @@ class ScoConnection final : public hci::ScoDataChannel::ConnectionInterface {
   // This will be null if HCI SCO is not supported.
   hci::ScoDataChannel* channel_ = nullptr;
 
-  bt::StaticPacket<pw::bluetooth::emboss::SynchronousConnectionParametersWriter> parameters_;
+  bt::StaticPacket<pw::bluetooth::emboss::SynchronousConnectionParametersWriter>
+      parameters_;
 
   WeakSelf<ScoConnection> weak_self_;
 

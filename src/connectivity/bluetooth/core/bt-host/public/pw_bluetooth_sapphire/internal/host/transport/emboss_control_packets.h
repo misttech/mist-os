@@ -16,29 +16,34 @@ namespace bt::hci {
 template <class ViewT>
 class EmbossCommandPacketT;
 
-// EmbossCommandPacket is the HCI Command packet specialization of DynamicPacket.
+// EmbossCommandPacket is the HCI Command packet specialization of
+// DynamicPacket.
 class EmbossCommandPacket : public DynamicPacket {
  public:
-  // Construct an HCI Command packet from an Emboss view T and initialize its header with the
-  // |opcode| and size.
+  // Construct an HCI Command packet from an Emboss view T and initialize its
+  // header with the |opcode| and size.
   template <typename T>
   static EmbossCommandPacketT<T> New(hci_spec::OpCode opcode) {
     return New<T>(opcode, T::IntrinsicSizeInBytes().Read());
   }
 
-  // Construct an HCI Command packet from an Emboss view T of |packet_size| total bytes (header +
-  // payload) and initialize its header with the |opcode| and size. This constructor is meant for
-  // variable size packets, for which clients must calculate packet size manually.
+  // Construct an HCI Command packet from an Emboss view T of |packet_size|
+  // total bytes (header + payload) and initialize its header with the |opcode|
+  // and size. This constructor is meant for variable size packets, for which
+  // clients must calculate packet size manually.
   template <typename T>
-  static EmbossCommandPacketT<T> New(hci_spec::OpCode opcode, size_t packet_size) {
+  static EmbossCommandPacketT<T> New(hci_spec::OpCode opcode,
+                                     size_t packet_size) {
     EmbossCommandPacketT<T> packet(opcode, packet_size);
     return packet;
   }
 
   hci_spec::OpCode opcode() const;
-  // Returns the OGF (OpCode Group Field) which occupies the upper 6-bits of the opcode.
+  // Returns the OGF (OpCode Group Field) which occupies the upper 6-bits of the
+  // opcode.
   uint8_t ogf() const;
-  // Returns the OCF (OpCode Command Field) which occupies the lower 10-bits of the opcode.
+  // Returns the OCF (OpCode Command Field) which occupies the lower 10-bits of
+  // the opcode.
   uint16_t ocf() const;
 
  protected:
@@ -48,8 +53,8 @@ class EmbossCommandPacket : public DynamicPacket {
   pw::bluetooth::emboss::CommandHeaderView header_view() const;
 };
 
-// Helper subclass that remembers the view type it was constructed with. It is safe to slice
-// an EmbossCommandPacketT into an EmbossCommandPacket.
+// Helper subclass that remembers the view type it was constructed with. It is
+// safe to slice an EmbossCommandPacketT into an EmbossCommandPacket.
 template <class ViewT>
 class EmbossCommandPacketT : public EmbossCommandPacket {
  public:
@@ -68,59 +73,67 @@ class EmbossEventPacketT;
 // EmbossEventPacket is the HCI Event packet specialization of DynamicPacket.
 class EmbossEventPacket : public DynamicPacket {
  public:
-  // Construct an HCI Event packet of |packet_size| total bytes (header + payload).
+  // Construct an HCI Event packet of |packet_size| total bytes (header +
+  // payload).
   static EmbossEventPacket New(size_t packet_size) {
     EmbossEventPacket packet(packet_size);
     return packet;
   }
 
-  // Construct an HCI Event packet from an Emboss view T and initialize its header with the
-  // |event_code| and size.
+  // Construct an HCI Event packet from an Emboss view T and initialize its
+  // header with the |event_code| and size.
   template <typename T>
   static EmbossEventPacketT<T> New(hci_spec::EventCode event_code) {
     EmbossEventPacketT<T> packet(T::IntrinsicSizeInBytes().Read());
-    auto header = packet.template view<pw::bluetooth::emboss::EventHeaderWriter>();
+    auto header =
+        packet.template view<pw::bluetooth::emboss::EventHeaderWriter>();
     header.event_code().Write(event_code);
-    header.parameter_total_size().Write(T::IntrinsicSizeInBytes().Read() -
-                                        pw::bluetooth::emboss::EventHeader::IntrinsicSizeInBytes());
+    header.parameter_total_size().Write(
+        T::IntrinsicSizeInBytes().Read() -
+        pw::bluetooth::emboss::EventHeader::IntrinsicSizeInBytes());
     return packet;
   }
 
-  // Construct an HCI Event packet from an Emboss view T of |packet_size| total bytes (header +
-  // payload) and initialize its header with the |event_code| and size. This constructor is meant
-  // for variable size packets, for which clients must calculate packet size manually.
+  // Construct an HCI Event packet from an Emboss view T of |packet_size| total
+  // bytes (header + payload) and initialize its header with the |event_code|
+  // and size. This constructor is meant for variable size packets, for which
+  // clients must calculate packet size manually.
   template <typename T>
   // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
-  static EmbossEventPacketT<T> New(hci_spec::EventCode event_code, size_t packet_size) {
+  static EmbossEventPacketT<T> New(hci_spec::EventCode event_code,
+                                   size_t packet_size) {
     EmbossEventPacketT<T> packet(packet_size);
-    auto header = packet.template view<pw::bluetooth::emboss::EventHeaderWriter>();
+    auto header =
+        packet.template view<pw::bluetooth::emboss::EventHeaderWriter>();
     header.event_code().Write(event_code);
-    header.parameter_total_size().Write(packet_size -
-                                        pw::bluetooth::emboss::EventHeader::IntrinsicSizeInBytes());
+    header.parameter_total_size().Write(
+        packet_size -
+        pw::bluetooth::emboss::EventHeader::IntrinsicSizeInBytes());
     return packet;
   }
 
   hci_spec::EventCode event_code() const;
 
-  // If this event packet contains a StatusCode field, this method returns the status. Not all
-  // events contain a StatusCode and not all of those that do are supported by this method. Returns
-  // std::nullopt for such events.
+  // If this event packet contains a StatusCode field, this method returns the
+  // status. Not all events contain a StatusCode and not all of those that do
+  // are supported by this method. Returns std::nullopt for such events.
   //
-  // NOTE: If you intend to use this with a new event code, make sure to add an entry to the
-  // implementation in emboss_control_packets.cc.
+  // NOTE: If you intend to use this with a new event code, make sure to add an
+  // entry to the implementation in emboss_control_packets.cc.
   std::optional<pw::bluetooth::emboss::StatusCode> StatusCode() const;
 
-  // Returns a status if this event represents the result of an operation. See the documentation on
-  // StatusCode() as the same conditions apply to this method. Returns a default status of type
-  // HostError::kMalformedPacket on error.
+  // Returns a status if this event represents the result of an operation. See
+  // the documentation on StatusCode() as the same conditions apply to this
+  // method. Returns a default status of type HostError::kMalformedPacket on
+  // error.
   hci::Result<> ToResult() const;
 
  protected:
   explicit EmbossEventPacket(size_t packet_size);
 
  private:
-  // From an Emboss view T containing a StatusCode field named "status", returns the status. Returns
-  // std::nullopt on error.
+  // From an Emboss view T containing a StatusCode field named "status", returns
+  // the status. Returns std::nullopt on error.
   template <typename T>
   std::optional<pw::bluetooth::emboss::StatusCode> StatusCodeFromView() const {
     // Don't use view(), which asserts on IsComplete().
@@ -132,8 +145,8 @@ class EmbossEventPacket : public DynamicPacket {
   }
 };
 
-// Helper subclass that remembers the view type it was constructed with. It is safe to slice
-// an EmbossEventPacketT into an EmbossEventPacket.
+// Helper subclass that remembers the view type it was constructed with. It is
+// safe to slice an EmbossEventPacketT into an EmbossEventPacket.
 template <class ViewT>
 class EmbossEventPacketT : public EmbossEventPacket {
  public:
@@ -145,7 +158,8 @@ class EmbossEventPacketT : public EmbossEventPacket {
  private:
   friend class EmbossEventPacket;
 
-  explicit EmbossEventPacketT(size_t packet_size) : EmbossEventPacket(packet_size) {}
+  explicit EmbossEventPacketT(size_t packet_size)
+      : EmbossEventPacket(packet_size) {}
 };
 
 }  // namespace bt::hci

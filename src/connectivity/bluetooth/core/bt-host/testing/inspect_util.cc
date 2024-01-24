@@ -14,7 +14,9 @@ inspect::Hierarchy ReadInspect(const inspect::Inspector& inspector) {
   fpromise::single_threaded_executor executor;
   fpromise::result<inspect::Hierarchy> hierarchy;
   executor.schedule_task(inspect::ReadFromInspector(inspector).then(
-      [&](fpromise::result<inspect::Hierarchy>& res) { hierarchy = std::move(res); }));
+      [&](fpromise::result<inspect::Hierarchy>& res) {
+        hierarchy = std::move(res);
+      }));
   executor.run();
   BT_ASSERT(hierarchy.is_ok());
   return hierarchy.take_value();

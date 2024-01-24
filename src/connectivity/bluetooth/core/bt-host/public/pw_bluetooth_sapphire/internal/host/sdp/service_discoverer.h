@@ -46,8 +46,10 @@ class ServiceDiscoverer final {
   // Returns a SearchId can be used to remove the search later if successful,
   // or kInvalidSearchId if adding the search failed.
   // |callback| will be called on the creation thread of ServiceDiscoverer.
-  using ResultCallback = fit::function<void(PeerId, const std::map<AttributeId, DataElement> &)>;
-  SearchId AddSearch(const UUID &uuid, std::unordered_set<AttributeId> attributes,
+  using ResultCallback =
+      fit::function<void(PeerId, const std::map<AttributeId, DataElement>&)>;
+  SearchId AddSearch(const UUID& uuid,
+                     std::unordered_set<AttributeId> attributes,
                      ResultCallback callback);
 
   // Remove a search previously added with AddSearch().
@@ -61,7 +63,9 @@ class ServiceDiscoverer final {
   // Does nothing if |search_id| is not currently registered.
   // If |client| is nullptr, this search will only be performed if a client is
   // already open to the peer.
-  void SingleSearch(SearchId search_id, PeerId peer_id, std::unique_ptr<Client> client);
+  void SingleSearch(SearchId search_id,
+                    PeerId peer_id,
+                    std::unique_ptr<Client> client);
 
   // Searches for all the registered services using a SDP |client|
   // asynchronously.  The client is destroyed (disconnected) afterwards.

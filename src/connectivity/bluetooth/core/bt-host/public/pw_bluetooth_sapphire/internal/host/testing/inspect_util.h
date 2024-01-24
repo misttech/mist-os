@@ -20,7 +20,8 @@ inspect::Hierarchy ReadInspect(const inspect::Inspector& inspector);
 // Get the value of the property at |path|. The last item in |path|
 // should be the property name.
 // Example:
-// EXPECT_THAT(GetInspectValue<inspect::IntPropertyValue>(inspector, {"node", "property"}),
+// EXPECT_THAT(GetInspectValue<inspect::IntPropertyValue>(inspector, {"node",
+// "property"}),
 //             Optional(42));
 template <class PropertyValue>
 std::optional<typename PropertyValue::value_type> GetInspectValue(
@@ -38,7 +39,8 @@ std::optional<typename PropertyValue::value_type> GetInspectValue(
   if (!node) {
     return std::nullopt;
   }
-  const PropertyValue* prop_value = node->node().get_property<PropertyValue>(property);
+  const PropertyValue* prop_value =
+      node->node().get_property<PropertyValue>(property);
   if (!prop_value) {
     return std::nullopt;
   }

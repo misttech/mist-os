@@ -22,41 +22,49 @@ namespace bt::hci::allocators {
 // usage.
 constexpr size_t kMaxControlSlabSize = 65536;  // 64K
 constexpr size_t kMaxACLSlabSize = 65536;      // 64K
-constexpr size_t kMaxScoSlabSize = 33024;      // exactly 128 max size SCO packets
+constexpr size_t kMaxScoSlabSize = 33024;  // exactly 128 max size SCO packets
 constexpr size_t kMaxNumSlabs = 100;
 
 // The largest possible control packet size.
-constexpr size_t kLargeControlPayloadSize = hci_spec::kMaxCommandPacketPayloadSize;
+constexpr size_t kLargeControlPayloadSize =
+    hci_spec::kMaxCommandPacketPayloadSize;
 constexpr size_t kLargeControlPacketSize =
     sizeof(hci_spec::CommandHeader) + kLargeControlPayloadSize;
-constexpr size_t kNumLargeControlPackets = kMaxControlSlabSize / kLargeControlPacketSize;
+constexpr size_t kNumLargeControlPackets =
+    kMaxControlSlabSize / kLargeControlPacketSize;
 
 // The average HCI control packet payload size. Most packets are under 16 bytes.
 constexpr size_t kSmallControlPayloadSize = 16;
 constexpr size_t kSmallControlPacketSize =
     sizeof(hci_spec::CommandHeader) + kSmallControlPayloadSize;
-constexpr size_t kNumSmallControlPackets = kMaxControlSlabSize / kSmallControlPacketSize;
+constexpr size_t kNumSmallControlPackets =
+    kMaxControlSlabSize / kSmallControlPacketSize;
 
 // Large, medium, and small buffer sizes for ACL data packets.
 constexpr size_t kLargeACLDataPayloadSize = hci_spec::kMaxACLPayloadSize;
 constexpr size_t kLargeACLDataPacketSize =
     sizeof(hci_spec::ACLDataHeader) + kLargeACLDataPayloadSize;
-constexpr size_t kNumLargeACLDataPackets = kMaxACLSlabSize / kLargeACLDataPacketSize;
+constexpr size_t kNumLargeACLDataPackets =
+    kMaxACLSlabSize / kLargeACLDataPacketSize;
 
 constexpr size_t kMediumACLDataPayloadSize = 256;
 constexpr size_t kMediumACLDataPacketSize =
     sizeof(hci_spec::ACLDataHeader) + kMediumACLDataPayloadSize;
-constexpr size_t kNumMediumACLDataPackets = kMaxACLSlabSize / kMediumACLDataPacketSize;
+constexpr size_t kNumMediumACLDataPackets =
+    kMaxACLSlabSize / kMediumACLDataPacketSize;
 
 constexpr size_t kSmallACLDataPayloadSize = 64;
 constexpr size_t kSmallACLDataPacketSize =
     sizeof(hci_spec::ACLDataHeader) + kSmallACLDataPayloadSize;
-constexpr size_t kNumSmallACLDataPackets = kMaxACLSlabSize / kSmallACLDataPacketSize;
+constexpr size_t kNumSmallACLDataPackets =
+    kMaxACLSlabSize / kSmallACLDataPacketSize;
 
-constexpr size_t kMaxScoDataPayloadSize = hci_spec::kMaxSynchronousDataPacketPayloadSize;
+constexpr size_t kMaxScoDataPayloadSize =
+    hci_spec::kMaxSynchronousDataPacketPayloadSize;
 constexpr size_t kMaxScoDataPacketSize =
     sizeof(hci_spec::SynchronousDataHeader) + kMaxScoDataPayloadSize;
-constexpr size_t kNumMaxScoDataPackets = kMaxScoSlabSize / kMaxScoDataPacketSize;
+constexpr size_t kNumMaxScoDataPackets =
+    kMaxScoSlabSize / kMaxScoDataPacketSize;
 
 namespace internal {
 
@@ -66,14 +74,16 @@ class FixedSizePacketStorage {
   StaticByteBuffer<BufferSize> buffer_;
 };
 
-// A FixedSizePacket provides fixed-size buffer storage for Packets and is the basis for a
-// slab-allocated Packet. Multiple inheritance is required to initialize the underlying buffer
-// before PacketBase.
+// A FixedSizePacket provides fixed-size buffer storage for Packets and is the
+// basis for a slab-allocated Packet. Multiple inheritance is required to
+// initialize the underlying buffer before PacketBase.
 template <typename HeaderType, size_t BufferSize>
-class FixedSizePacket : public FixedSizePacketStorage<BufferSize>, public Packet<HeaderType> {
+class FixedSizePacket : public FixedSizePacketStorage<BufferSize>,
+                        public Packet<HeaderType> {
  public:
   explicit FixedSizePacket(size_t payload_size = 0u)
-      : Packet<HeaderType>(MutablePacketView<HeaderType>(&this->buffer_, payload_size)) {}
+      : Packet<HeaderType>(
+            MutablePacketView<HeaderType>(&this->buffer_, payload_size)) {}
 
   ~FixedSizePacket() override = default;
 

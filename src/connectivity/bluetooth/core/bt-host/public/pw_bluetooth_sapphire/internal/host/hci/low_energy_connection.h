@@ -11,36 +11,46 @@
 
 namespace bt::hci {
 
-class LowEnergyConnection : public AclConnection, public WeakSelf<LowEnergyConnection> {
+class LowEnergyConnection : public AclConnection,
+                            public WeakSelf<LowEnergyConnection> {
  public:
-  LowEnergyConnection(hci_spec::ConnectionHandle handle, const DeviceAddress& local_address,
+  LowEnergyConnection(hci_spec::ConnectionHandle handle,
+                      const DeviceAddress& local_address,
                       const DeviceAddress& peer_address,
                       const hci_spec::LEConnectionParameters& params,
-                      pw::bluetooth::emboss::ConnectionRole role, const Transport::WeakPtr& hci);
+                      pw::bluetooth::emboss::ConnectionRole role,
+                      const Transport::WeakPtr& hci);
 
   ~LowEnergyConnection() override;
 
-  // Authenticate (i.e. encrypt) this connection using its current link key.  Returns false if the
-  // procedure cannot be initiated. The result of the authentication procedure will be reported via
-  // the encryption change callback.  If the link layer procedure fails, the connection will be
-  // disconnected. The encryption change callback will be notified of the failure.
+  // Authenticate (i.e. encrypt) this connection using its current link key.
+  // Returns false if the procedure cannot be initiated. The result of the
+  // authentication procedure will be reported via the encryption change
+  // callback.  If the link layer procedure fails, the connection will be
+  // disconnected. The encryption change callback will be notified of the
+  // failure.
   bool StartEncryption() override;
 
   // Sets the active LE parameters of this connection.
-  void set_low_energy_parameters(const hci_spec::LEConnectionParameters& params) {
+  void set_low_energy_parameters(
+      const hci_spec::LEConnectionParameters& params) {
     parameters_ = params;
   }
 
   // The active LE connection parameters of this connection.
-  const hci_spec::LEConnectionParameters& low_energy_parameters() const { return parameters_; }
+  const hci_spec::LEConnectionParameters& low_energy_parameters() const {
+    return parameters_;
+  }
 
   using AclConnection::set_ltk;
 
  private:
-  void HandleEncryptionStatus(Result<bool /*enabled*/> result, bool key_refreshed) override;
+  void HandleEncryptionStatus(Result<bool /*enabled*/> result,
+                              bool key_refreshed) override;
 
   // HCI event handlers.
-  CommandChannel::EventCallbackResult OnLELongTermKeyRequestEvent(const EventPacket& event);
+  CommandChannel::EventCallbackResult OnLELongTermKeyRequestEvent(
+      const EventPacket& event);
 
   // IDs for encryption related HCI event handlers.
   CommandChannel::EventHandlerId le_ltk_request_id_;

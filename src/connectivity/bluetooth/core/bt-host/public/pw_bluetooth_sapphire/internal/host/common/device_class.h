@@ -68,8 +68,8 @@ class DeviceClass {
 
   const Bytes& bytes() const { return bytes_; }
 
-  // Converts the DeviceClass into an integer with host-endianness. Only the lower 24 bits are used,
-  // and the highest 8 bits will be 0.
+  // Converts the DeviceClass into an integer with host-endianness. Only the
+  // lower 24 bits are used, and the highest 8 bits will be 0.
   uint32_t to_int() const;
 
   // Sets the major service classes of this.
@@ -91,7 +91,8 @@ class DeviceClass {
   Bytes bytes_;
 };
 
-static_assert(sizeof(DeviceClass) == 3, "DeviceClass must take up exactly 3 bytes");
+static_assert(sizeof(DeviceClass) == 3,
+              "DeviceClass must take up exactly 3 bytes");
 
 }  // namespace bt
 

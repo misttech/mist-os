@@ -11,8 +11,10 @@ namespace bt::hci::testing {
 
 class FakeBrEdrConnection final : public BrEdrConnection {
  public:
-  FakeBrEdrConnection(hci_spec::ConnectionHandle handle, const DeviceAddress& local_address,
-                      const DeviceAddress& peer_address, pw::bluetooth::emboss::ConnectionRole role,
+  FakeBrEdrConnection(hci_spec::ConnectionHandle handle,
+                      const DeviceAddress& local_address,
+                      const DeviceAddress& peer_address,
+                      pw::bluetooth::emboss::ConnectionRole role,
                       const hci::Transport::WeakPtr& hci);
 
   // Triggers the encryption change callback.
@@ -20,7 +22,8 @@ class FakeBrEdrConnection final : public BrEdrConnection {
 
   void TriggerPeerDisconnectCallback() {
     peer_disconnect_callback()(
-        *this, pw::bluetooth::emboss::StatusCode::REMOTE_USER_TERMINATED_CONNECTION);
+        *this,
+        pw::bluetooth::emboss::StatusCode::REMOTE_USER_TERMINATED_CONNECTION);
   }
 
   // BrEdrConnection overrides:

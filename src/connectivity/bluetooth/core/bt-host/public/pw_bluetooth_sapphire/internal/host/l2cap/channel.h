@@ -61,7 +61,8 @@ constexpr uint16_t kDefaultTxMaxQueuedCount = 500;
 //   * FakeChannel, which can be used for unit testing service-layer entities
 //     that operate on one or more L2CAP channel(s).
 //
-// Production instances are obtained from a ChannelManager. Channels are not thread safe.
+// Production instances are obtained from a ChannelManager. Channels are not
+// thread safe.
 //
 // A Channel's owner must explicitly call Deactivate() and must not rely on
 // dropping its reference to close the channel.
@@ -72,8 +73,12 @@ constexpr uint16_t kDefaultTxMaxQueuedCount = 500;
 class Channel : public WeakSelf<Channel> {
  public:
   // TODO(https://fxbug.dev/1022): define a preferred MTU somewhere
-  Channel(ChannelId id, ChannelId remote_id, bt::LinkType link_type,
-          hci_spec::ConnectionHandle link_handle, ChannelInfo info, uint16_t max_tx_queued);
+  Channel(ChannelId id,
+          ChannelId remote_id,
+          bt::LinkType link_type,
+          hci_spec::ConnectionHandle link_handle,
+          ChannelInfo info,
+          uint16_t max_tx_queued);
   virtual ~Channel() = default;
 
   // Identifier for this channel's endpoint on this device. It can be prior-
@@ -97,21 +102,24 @@ class Channel : public WeakSelf<Channel> {
   // channels even if their ids match.
   using UniqueId = uint32_t;
   UniqueId unique_id() const {
-    static_assert(sizeof(UniqueId) >= sizeof(hci_spec::ConnectionHandle) + sizeof(ChannelId),
+    static_assert(sizeof(UniqueId) >=
+                      sizeof(hci_spec::ConnectionHandle) + sizeof(ChannelId),
                   "UniqueId needs to be large enough to make unique IDs");
     return (link_handle() << (sizeof(ChannelId) * CHAR_BIT)) | id();
   }
 
   const AnyChannelMode& mode() const { return info().mode; }
 
-  // These accessors define the concept of a Maximum Transmission Unit (MTU) as a maximum inbound
-  // (rx) and outbound (tx) packet size for the L2CAP implementation (see v5.2, Vol. 3, Part A
-  // 5.1). L2CAP requires that channel MTUs are at least 23 bytes for LE-U links and 48 bytes for
-  // ACL-U links. A further requirement is that "[t]he minimum MTU for a channel is the larger of
-  // the L2CAP minimum [...] and any MTU explicitly required by the protocols and profiles using
-  // that channel." `max_rx_sdu_size` is always determined by the capabilities of the local
-  // implementation. For dynamic channels, `max_tx_sdu_size` is determined through a configuration
-  // procedure with the peer (v5.2 Vol. 3 Part A 7.1). For fixed channels, this is always the
+  // These accessors define the concept of a Maximum Transmission Unit (MTU) as
+  // a maximum inbound (rx) and outbound (tx) packet size for the L2CAP
+  // implementation (see v5.2, Vol. 3, Part A 5.1). L2CAP requires that channel
+  // MTUs are at least 23 bytes for LE-U links and 48 bytes for ACL-U links. A
+  // further requirement is that "[t]he minimum MTU for a channel is the larger
+  // of the L2CAP minimum [...] and any MTU explicitly required by the protocols
+  // and profiles using that channel." `max_rx_sdu_size` is always determined by
+  // the capabilities of the local implementation. For dynamic channels,
+  // `max_tx_sdu_size` is determined through a configuration procedure with the
+  // peer (v5.2 Vol. 3 Part A 7.1). For fixed channels, this is always the
   // maximum allowable L2CAP packet size, not a protocol-specific MTU.
   uint16_t max_rx_sdu_size() const { return info().max_rx_sdu_size; }
   uint16_t max_tx_sdu_size() const { return info().max_tx_sdu_size; }
@@ -140,19 +148,20 @@ class Channel : public WeakSelf<Channel> {
   // Activates this channel to execute |rx_callback| and |closed_callback|
   // immediately as L2CAP is notified of their underlying events.
   //
-  // Any inbound data that has already been buffered for this channel will be drained by calling
-  // |rx_callback| repeatedly, before this call returns.
+  // Any inbound data that has already been buffered for this channel will be
+  // drained by calling |rx_callback| repeatedly, before this call returns.
   //
-  // Execution of |rx_callback| may block L2CAP data routing, so care should be taken to avoid
-  // introducing excessive latency.
+  // Execution of |rx_callback| may block L2CAP data routing, so care should be
+  // taken to avoid introducing excessive latency.
   //
   // Each channel can be activated only once.
   //
   // Returns false if the channel's link has been closed.
   //
-  // NOTE: Callers shouldn't assume that this method will succeed, as the underlying link can be
-  // removed at any time.
-  virtual bool Activate(RxCallback rx_callback, ClosedCallback closed_callback) = 0;
+  // NOTE: Callers shouldn't assume that this method will succeed, as the
+  // underlying link can be removed at any time.
+  virtual bool Activate(RxCallback rx_callback,
+                        ClosedCallback closed_callback) = 0;
 
   // Deactivates this channel. No more packets can be sent or received after
   // this is called. |rx_callback| may still be called if it has been already
@@ -173,9 +182,11 @@ class Channel : public WeakSelf<Channel> {
   // close when the link gets removed later.
   virtual void SignalLinkError() = 0;
 
-  // Requests to upgrade the security properties of the underlying link to the requested |level| and
-  // reports the result via |callback|. Has no effect if the channel is not active.
-  virtual void UpgradeSecurity(sm::SecurityLevel level, sm::ResultFunction<> callback) = 0;
+  // Requests to upgrade the security properties of the underlying link to the
+  // requested |level| and reports the result via |callback|. Has no effect if
+  // the channel is not active.
+  virtual void UpgradeSecurity(sm::SecurityLevel level,
+                               sm::ResultFunction<> callback) = 0;
 
   // Queue the given SDU payload for transmission over this channel, taking
   // ownership of |sdu|. Returns true if the SDU was queued successfully, and
@@ -189,34 +200,41 @@ class Channel : public WeakSelf<Channel> {
 
   // Request that the ACL priority of this channel be changed to |priority|.
   // Calls |callback| with success if the request succeeded, or error otherwise.
-  // Requests may fail if the controller does not support changing the ACL priority or the indicated
-  // priority conflicts with another channel.
-  virtual void RequestAclPriority(pw::bluetooth::AclPriority,
-                                  fit::callback<void(fit::result<fit::failed>)> callback) = 0;
+  // Requests may fail if the controller does not support changing the ACL
+  // priority or the indicated priority conflicts with another channel.
+  virtual void RequestAclPriority(
+      pw::bluetooth::AclPriority,
+      fit::callback<void(fit::result<fit::failed>)> callback) = 0;
 
-  // Sets an automatic flush timeout with duration |flush_timeout|. |callback| will be called with
-  // the result of the operation. This is only supported if the link type is kACL (BR/EDR).
-  // |flush_timeout| must be in the range [1ms - hci_spec::kMaxAutomaticFlushTimeoutDuration]. A
-  // flush timeout of pw::chrono::SystemClock::duration::max() indicates an infinite flush timeout
-  // (packets will be marked flushable, but there will be no automatic flush timeout).
-  virtual void SetBrEdrAutomaticFlushTimeout(pw::chrono::SystemClock::duration flush_timeout,
-                                             hci::ResultCallback<> callback) = 0;
+  // Sets an automatic flush timeout with duration |flush_timeout|. |callback|
+  // will be called with the result of the operation. This is only supported if
+  // the link type is kACL (BR/EDR). |flush_timeout| must be in the range [1ms -
+  // hci_spec::kMaxAutomaticFlushTimeoutDuration]. A flush timeout of
+  // pw::chrono::SystemClock::duration::max() indicates an infinite flush
+  // timeout (packets will be marked flushable, but there will be no automatic
+  // flush timeout).
+  virtual void SetBrEdrAutomaticFlushTimeout(
+      pw::chrono::SystemClock::duration flush_timeout,
+      hci::ResultCallback<> callback) = 0;
 
   // Attach this channel as a child node of |parent| with the given |name|.
   virtual void AttachInspect(inspect::Node& parent, std::string name) = 0;
 
-  // Request the start of A2DP source offloading. |callback| will be called with the result of the
-  // request. If offloading is already started or is pending, the request will fail and an error
-  // will be reported synchronously.
+  // Request the start of A2DP source offloading. |callback| will be called with
+  // the result of the request. If offloading is already started or is pending,
+  // the request will fail and an error will be reported synchronously.
   virtual void StartA2dpOffload(const A2dpOffloadManager::Configuration& config,
                                 hci::ResultCallback<> callback) = 0;
 
-  // Request the stop of A2DP source offloading. |callback| will be called with the result of the
-  // request. If offloading is already stopped, report success.
+  // Request the stop of A2DP source offloading. |callback| will be called with
+  // the result of the request. If offloading is already stopped, report
+  // success.
   virtual void StopA2dpOffload(hci::ResultCallback<> callback) = 0;
 
   // The ACL priority that was both requested and accepted by the controller.
-  pw::bluetooth::AclPriority requested_acl_priority() const { return requested_acl_priority_; }
+  pw::bluetooth::AclPriority requested_acl_priority() const {
+    return requested_acl_priority_;
+  }
 
  protected:
   const ChannelId id_;
@@ -226,7 +244,8 @@ class Channel : public WeakSelf<Channel> {
   ChannelInfo info_;
   // Maximum number of PDUs in the channel queue
   uint16_t max_tx_queued_;
-  // The ACL priority that was requested by a client and accepted by the controller.
+  // The ACL priority that was requested by a client and accepted by the
+  // controller.
   pw::bluetooth::AclPriority requested_acl_priority_;
 
   BT_DISALLOW_COPY_AND_ASSIGN_ALLOW_MOVE(Channel);
@@ -240,28 +259,40 @@ using LogicalLinkWeakPtr = WeakSelf<LogicalLink>::WeakPtr;
 // Channel implementation used in production.
 class ChannelImpl : public Channel {
  public:
-  // Many core-spec protocols which operate over fixed channels (e.g. v5.2 Vol. 3 Parts F (ATT) and
-  // H (SMP)) define service-specific MTU values. Channels created with `CreateFixedChannel` do not
-  // check against these service-specific MTUs. Thus `bt-host` local services which operate over
+  // Many core-spec protocols which operate over fixed channels (e.g. v5.2 Vol.
+  // 3 Parts F (ATT) and H (SMP)) define service-specific MTU values. Channels
+  // created with `CreateFixedChannel` do not check against these
+  // service-specific MTUs. Thus `bt-host` local services which operate over
   // fixed channels are required to respect their MTU internally by:
   //   1.) never sending packets larger than their spec-defined MTU.
-  //   2.) handling inbound PDUs which are larger than their spec-defined MTU appropriately.
+  //   2.) handling inbound PDUs which are larger than their spec-defined MTU
+  //   appropriately.
   static std::unique_ptr<ChannelImpl> CreateFixedChannel(
-      pw::async::Dispatcher& dispatcher, ChannelId id, internal::LogicalLinkWeakPtr link,
-      hci::CommandChannel::WeakPtr cmd_channel, uint16_t max_acl_payload_size,
-      A2dpOffloadManager& a2dp_offload_manager, uint16_t max_tx_queued = kDefaultTxMaxQueuedCount);
+      pw::async::Dispatcher& dispatcher,
+      ChannelId id,
+      internal::LogicalLinkWeakPtr link,
+      hci::CommandChannel::WeakPtr cmd_channel,
+      uint16_t max_acl_payload_size,
+      A2dpOffloadManager& a2dp_offload_manager,
+      uint16_t max_tx_queued = kDefaultTxMaxQueuedCount);
 
   static std::unique_ptr<ChannelImpl> CreateDynamicChannel(
-      pw::async::Dispatcher& dispatcher, ChannelId id, ChannelId peer_id,
-      internal::LogicalLinkWeakPtr link, ChannelInfo info, hci::CommandChannel::WeakPtr cmd_channel,
-      uint16_t max_acl_payload_size, A2dpOffloadManager& a2dp_offload_manager,
+      pw::async::Dispatcher& dispatcher,
+      ChannelId id,
+      ChannelId peer_id,
+      internal::LogicalLinkWeakPtr link,
+      ChannelInfo info,
+      hci::CommandChannel::WeakPtr cmd_channel,
+      uint16_t max_acl_payload_size,
+      A2dpOffloadManager& a2dp_offload_manager,
       uint16_t max_tx_queued = kDefaultTxMaxQueuedCount);
 
   ~ChannelImpl() override;
 
   // Returns the next PDU fragment, or nullptr if none is available.
   // Converts pending transmission PDUs to fragments
-  // Fragments of the same PDU must be sent before another channel in the same link can send packets
+  // Fragments of the same PDU must be sent before another channel in the same
+  // link can send packets
   std::unique_ptr<hci::ACLDataPacket> GetNextOutboundPacket();
 
   // Called by |link_| to notify us when the channel can no longer process data.
@@ -279,15 +310,19 @@ class ChannelImpl : public Channel {
 
   // Channel overrides:
   const sm::SecurityProperties security() override;
-  bool Activate(RxCallback rx_callback, ClosedCallback closed_callback) override;
+  bool Activate(RxCallback rx_callback,
+                ClosedCallback closed_callback) override;
   void Deactivate() override;
   void SignalLinkError() override;
   bool Send(ByteBufferPtr sdu) override;
-  void UpgradeSecurity(sm::SecurityLevel level, sm::ResultFunction<> callback) override;
-  void RequestAclPriority(pw::bluetooth::AclPriority priority,
-                          fit::callback<void(fit::result<fit::failed>)> callback) override;
-  void SetBrEdrAutomaticFlushTimeout(pw::chrono::SystemClock::duration flush_timeout,
-                                     hci::ResultCallback<> callback) override;
+  void UpgradeSecurity(sm::SecurityLevel level,
+                       sm::ResultFunction<> callback) override;
+  void RequestAclPriority(
+      pw::bluetooth::AclPriority priority,
+      fit::callback<void(fit::result<fit::failed>)> callback) override;
+  void SetBrEdrAutomaticFlushTimeout(
+      pw::chrono::SystemClock::duration flush_timeout,
+      hci::ResultCallback<> callback) override;
   void AttachInspect(inspect::Node& parent, std::string name) override;
   void StartA2dpOffload(const A2dpOffloadManager::Configuration& config,
                         hci::ResultCallback<> callback) override;
@@ -297,10 +332,15 @@ class ChannelImpl : public Channel {
   WeakPtr GetWeakPtr() { return weak_self_.GetWeakPtr(); }
 
  private:
-  ChannelImpl(pw::async::Dispatcher& dispatcher, ChannelId id, ChannelId remote_id,
-              internal::LogicalLinkWeakPtr link, ChannelInfo info,
-              hci::CommandChannel::WeakPtr cmd_channel, uint16_t max_acl_payload_size,
-              A2dpOffloadManager& a2dp_offload_manager, uint16_t max_tx_queued);
+  ChannelImpl(pw::async::Dispatcher& dispatcher,
+              ChannelId id,
+              ChannelId remote_id,
+              internal::LogicalLinkWeakPtr link,
+              ChannelInfo info,
+              hci::CommandChannel::WeakPtr cmd_channel,
+              uint16_t max_acl_payload_size,
+              A2dpOffloadManager& a2dp_offload_manager,
+              uint16_t max_tx_queued);
 
   // Common channel closure logic. Called on Deactivate/OnClosed.
   void CleanUp();
@@ -323,7 +363,8 @@ class ChannelImpl : public Channel {
   // nullptr.
   internal::LogicalLinkWeakPtr link_;
 
-  // Command channel used to transport A2DP offload configuration of vendor extensions.
+  // Command channel used to transport A2DP offload configuration of vendor
+  // extensions.
   hci::CommandChannel::WeakPtr cmd_channel_;
 
   // The engine which processes received PDUs, and converts them to SDUs for

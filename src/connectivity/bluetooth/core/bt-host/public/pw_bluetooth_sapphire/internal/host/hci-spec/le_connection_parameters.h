@@ -25,7 +25,9 @@ namespace bt::hci_spec {
 // active use by the link layer for a particular logical link.
 class LEConnectionParameters final {
  public:
-  LEConnectionParameters(uint16_t interval, uint16_t latency, uint16_t supervision_timeout);
+  LEConnectionParameters(uint16_t interval,
+                         uint16_t latency,
+                         uint16_t supervision_timeout);
 
   // Default constructor initializes all values to 0. This is intended for cases
   // that require default initialization, e.g. when this structure is used
@@ -66,8 +68,10 @@ class LEConnectionParameters final {
 //   * to represent a peripheral's preferred connection parameters
 class LEPreferredConnectionParameters final {
  public:
-  LEPreferredConnectionParameters(uint16_t min_interval, uint16_t max_interval,
-                                  uint16_t max_latency, uint16_t supervision_timeout);
+  LEPreferredConnectionParameters(uint16_t min_interval,
+                                  uint16_t max_interval,
+                                  uint16_t max_latency,
+                                  uint16_t supervision_timeout);
 
   // Default constructor initializes all values to 0. This is intended for cases
   // that require default initialization, e.g. when this structure is used

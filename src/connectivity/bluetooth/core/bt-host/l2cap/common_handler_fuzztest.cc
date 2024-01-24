@@ -7,9 +7,12 @@
 namespace bt::l2cap::internal {
 class TestResponse : public CommandHandler::Response {
  public:
-  TestResponse(SignalingChannel::Status status) : CommandHandler::Response(status) {}
+  TestResponse(SignalingChannel::Status status)
+      : CommandHandler::Response(status) {}
 
-  bool TestParseReject(const ByteBuffer& rej_payload_buf) { return ParseReject(rej_payload_buf); }
+  bool TestParseReject(const ByteBuffer& rej_payload_buf) {
+    return ParseReject(rej_payload_buf);
+  }
 };
 
 void fuzz(const uint8_t* data, size_t size) {

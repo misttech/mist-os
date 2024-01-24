@@ -32,13 +32,15 @@ struct AdapterState final {
   }
 
   // Returns true if the indicated feature is supported by Controller.
-  bool IsControllerFeatureSupported(pw::bluetooth::Controller::FeaturesBits feature) const {
+  bool IsControllerFeatureSupported(
+      pw::bluetooth::Controller::FeaturesBits feature) const {
     return feature & controller_features;
   }
 
   // Helpers for querying LMP capabilities.
   inline bool IsBREDRSupported() const {
-    return !features.HasBit(/*page=*/0u, hci_spec::LMPFeature::kBREDRNotSupported);
+    return !features.HasBit(/*page=*/0u,
+                            hci_spec::LMPFeature::kBREDRNotSupported);
   }
 
   inline bool IsLowEnergySupported() const {
@@ -46,17 +48,23 @@ struct AdapterState final {
   }
 
   inline bool IsLocalSecureConnectionsSupported() const {
-    return features.HasBit(/*page=*/1u, hci_spec::LMPFeature::kSecureConnectionsHostSupport) &&
-           features.HasBit(/*page=*/2u, hci_spec::LMPFeature::kSecureConnectionsControllerSupport);
+    return features.HasBit(
+               /*page=*/1u,
+               hci_spec::LMPFeature::kSecureConnectionsHostSupport) &&
+           features.HasBit(
+               /*page=*/2u,
+               hci_spec::LMPFeature::kSecureConnectionsControllerSupport);
   }
 
   inline bool IsSecureConnectionHostSupportSupported() const {
-    return features.HasBit(/*page=*/1, hci_spec::LMPFeature::kSecureConnectionsHostSupport);
+    return features.HasBit(/*page=*/1,
+                           hci_spec::LMPFeature::kSecureConnectionsHostSupport);
   }
 
   // Returns true if |command_bit| in the given |octet| is set in the supported
   // command list.
-  inline bool IsCommandSupported(size_t octet, hci_spec::SupportedCommand command_bit) const {
+  inline bool IsCommandSupported(size_t octet,
+                                 hci_spec::SupportedCommand command_bit) const {
     BT_DEBUG_ASSERT(octet < sizeof(supported_commands));
     return supported_commands[octet] & static_cast<uint8_t>(command_bit);
   }
@@ -93,8 +101,8 @@ struct AdapterState final {
   LowEnergyState low_energy_state;
 
   // Android vendor extensions capabilities
-  // NOTE: callers should separately check that the controller actually supports android vendor
-  // extensions first.
+  // NOTE: callers should separately check that the controller actually supports
+  // android vendor extensions first.
   AndroidVendorCapabilities android_vendor_capabilities;
 
   // Local name

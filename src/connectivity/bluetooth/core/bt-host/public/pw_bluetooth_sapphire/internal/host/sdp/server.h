@@ -28,8 +28,8 @@ class Server final {
  public:
   static constexpr const char* kInspectNodeName = "sdp_server";
   // A placeholder value for a dynamic PSM.
-  // Note: This is not a valid PSM value itself. It is used to request a randomly
-  // generated dynamic PSM.
+  // Note: This is not a valid PSM value itself. It is used to request a
+  // randomly generated dynamic PSM.
   static constexpr uint16_t kDynamicPsm = 0xffff;
 
   // A new SDP server, which starts with just a ServiceDiscoveryService record.
@@ -38,30 +38,37 @@ class Server final {
   ~Server();
 
   // Attach SDP server inspect node as a child node of |parent|.
-  void AttachInspect(inspect::Node& parent, std::string name = kInspectNodeName);
+  void AttachInspect(inspect::Node& parent,
+                     std::string name = kInspectNodeName);
 
   // Initialize a new SDP profile connection with |peer_id| on |channel|.
   // Returns false if the channel cannot be activated.
   bool AddConnection(l2cap::Channel::WeakPtr channel);
 
-  // An identifier for a set of services that have been registered at the same time.
+  // An identifier for a set of services that have been registered at the same
+  // time.
   using RegistrationHandle = uint32_t;
 
   const RegistrationHandle kNotRegistered = 0x00000000;
 
-  // Given incomplete ServiceRecords, register services that will be made available over SDP.
-  // Takes ownership of |records|. Channels created for this service will be configured using the
-  // preferred parameters in |chan_params|.
+  // Given incomplete ServiceRecords, register services that will be made
+  // available over SDP. Takes ownership of |records|. Channels created for this
+  // service will be configured using the preferred parameters in |chan_params|.
   //
-  // A non-zero RegistrationHandle will be returned if the service was successfully registered.
+  // A non-zero RegistrationHandle will be returned if the service was
+  // successfully registered.
   //
-  // If any record in |records| fails registration checks, none of the services will be registered.
+  // If any record in |records| fails registration checks, none of the services
+  // will be registered.
   //
-  // |conn_cb| will be called for any connections made to any of the services in |records| with a
-  // connected channel and the descriptor list for the endpoint which was connected.
-  using ConnectCallback = fit::function<void(l2cap::Channel::WeakPtr, const DataElement&)>;
+  // |conn_cb| will be called for any connections made to any of the services in
+  // |records| with a connected channel and the descriptor list for the endpoint
+  // which was connected.
+  using ConnectCallback =
+      fit::function<void(l2cap::Channel::WeakPtr, const DataElement&)>;
   RegistrationHandle RegisterService(std::vector<ServiceRecord> records,
-                                     l2cap::ChannelParameters chan_params, ConnectCallback conn_cb);
+                                     l2cap::ChannelParameters chan_params,
+                                     ConnectCallback conn_cb);
 
   // Unregister services previously registered with RegisterService. Idempotent.
   // Returns |true| if any records were removed.
@@ -78,7 +85,8 @@ class Server final {
   // are compatible.
   // This function will drop the packet if the PDU is too short, and it will
   // handle most errors by returning a valid packet with an ErrorResponse.
-  std::optional<ByteBufferPtr> HandleRequest(ByteBufferPtr sdu, uint16_t max_tx_sdu_size);
+  std::optional<ByteBufferPtr> HandleRequest(ByteBufferPtr sdu,
+                                             uint16_t max_tx_sdu_size);
 
   // Returns the set of allocated L2CAP PSMs in the SDP server.
   // This is a TEST ONLY hook and should not be used otherwise.
@@ -90,12 +98,13 @@ class Server final {
 
   // Performs a Service Search, returning any service record that contains
   // all UUID from the |search_pattern|
-  ServiceSearchResponse SearchServices(const std::unordered_set<UUID>& pattern) const;
+  ServiceSearchResponse SearchServices(
+      const std::unordered_set<UUID>& pattern) const;
 
   // Gets Service Attributes in the |attribute_ranges| from the service record
   // with |handle|.
-  ServiceAttributeResponse GetServiceAttributes(ServiceHandle handle,
-                                                const std::list<AttributeRange>& ranges) const;
+  ServiceAttributeResponse GetServiceAttributes(
+      ServiceHandle handle, const std::list<AttributeRange>& ranges) const;
 
   // Retrieves Service Attributes in the |attribute_ranges|, using the pattern
   // to search for the services that contain all UUIDs from the |search_pattern|
@@ -111,13 +120,15 @@ class Server final {
   bool IsAllocated(l2cap::Psm psm) const { return psm_to_service_.count(psm); }
 
   // Attempts to add the |psm| to the queue of protocols to be registered.
-  // Returns true if the PSM was successfully added to the queue, false otherwise.
-  bool AddPsmToProtocol(ProtocolQueue* protocols_to_register, l2cap::Psm psm,
+  // Returns true if the PSM was successfully added to the queue, false
+  // otherwise.
+  bool AddPsmToProtocol(ProtocolQueue* protocols_to_register,
+                        l2cap::Psm psm,
                         ServiceHandle handle) const;
 
-  // Returns the next available dynamic PSM. A PSM is considered available if it has not been
-  // allocated already nor reserved in |queued_psms|.
-  // Returns |kInvalidPsm| if no PSM is available.
+  // Returns the next available dynamic PSM. A PSM is considered available if it
+  // has not been allocated already nor reserved in |queued_psms|. Returns
+  // |kInvalidPsm| if no PSM is available.
   l2cap::Psm GetDynamicPsm(const ProtocolQueue* queued_psms) const;
 
   // Given a complete ServiceRecord, extracts the PSM, ProtocolDescriptorList,
@@ -127,7 +138,8 @@ class Server final {
   //
   // Returns |true| if the protocols are successfully validated and queued,
   // |false| otherwise.
-  bool QueueService(ServiceRecord* record, ProtocolQueue* protocols_to_register);
+  bool QueueService(ServiceRecord* record,
+                    ProtocolQueue* protocols_to_register);
 
   // l2cap::Channel callbacks
   void OnChannelClosed(l2cap::Channel::UniqueId channel_id);
@@ -146,9 +158,11 @@ class Server final {
     // Inspect hierarchy node representing the sdp server.
     inspect::Node sdp_server_node;
 
-    // Each ServiceRecord has it's record and nodes associated wth the registered PSMs.
+    // Each ServiceRecord has it's record and nodes associated wth the
+    // registered PSMs.
     struct InspectServiceRecordProperties {
-      InspectServiceRecordProperties(std::string record, std::unordered_set<l2cap::Psm> psms);
+      InspectServiceRecordProperties(std::string record,
+                                     std::unordered_set<l2cap::Psm> psms);
       void AttachInspect(inspect::Node& parent, std::string name);
       inspect::Node node;
       // The record description.
@@ -166,23 +180,28 @@ class Server final {
   };
   InspectProperties inspect_properties_;
 
-  // Map of channels that are opened to the server.  Keyed by the channels unique id.
+  // Map of channels that are opened to the server.  Keyed by the channels
+  // unique id.
   std::unordered_map<l2cap::Channel::UniqueId, l2cap::ScopedChannel> channels_;
   // The map of ServiceHandles that are associated with ServiceRecords.
   // This is a 1:1 mapping.
   std::unordered_map<ServiceHandle, ServiceRecord> records_;
 
-  // Which PSMs are registered to services. Multiple ServiceHandles can be registered
-  // to a single PSM.
-  std::unordered_map<l2cap::Psm, std::unordered_set<ServiceHandle>> psm_to_service_;
+  // Which PSMs are registered to services. Multiple ServiceHandles can be
+  // registered to a single PSM.
+  std::unordered_map<l2cap::Psm, std::unordered_set<ServiceHandle>>
+      psm_to_service_;
   // The set of PSMs that are registered to a service.
-  std::unordered_map<ServiceHandle, std::unordered_set<l2cap::Psm>> service_to_psms_;
+  std::unordered_map<ServiceHandle, std::unordered_set<l2cap::Psm>>
+      service_to_psms_;
 
   // The next available ServiceHandle.
   ServiceHandle next_handle_;
 
-  // The set of ServiceHandles that are registered together, identified by a RegistrationHandle.
-  std::unordered_map<RegistrationHandle, std::set<ServiceHandle>> reg_to_service_;
+  // The set of ServiceHandles that are registered together, identified by a
+  // RegistrationHandle.
+  std::unordered_map<RegistrationHandle, std::set<ServiceHandle>>
+      reg_to_service_;
 
   // The service database state tracker.
   uint32_t db_state_ [[maybe_unused]];

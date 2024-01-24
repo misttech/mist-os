@@ -11,7 +11,8 @@ namespace bt::hci::testing {
 
 class FakeLowEnergyConnection final : public LowEnergyConnection {
  public:
-  FakeLowEnergyConnection(hci_spec::ConnectionHandle handle, const DeviceAddress& local_address,
+  FakeLowEnergyConnection(hci_spec::ConnectionHandle handle,
+                          const DeviceAddress& local_address,
                           const DeviceAddress& peer_address,
                           pw::bluetooth::emboss::ConnectionRole role,
                           const Transport::WeakPtr& hci);
@@ -21,7 +22,8 @@ class FakeLowEnergyConnection final : public LowEnergyConnection {
 
   void TriggerPeerDisconnectCallback() {
     peer_disconnect_callback()(
-        *this, pw::bluetooth::emboss::StatusCode::REMOTE_USER_TERMINATED_CONNECTION);
+        *this,
+        pw::bluetooth::emboss::StatusCode::REMOTE_USER_TERMINATED_CONNECTION);
   }
 
   // LowEnergyConnection overrides:

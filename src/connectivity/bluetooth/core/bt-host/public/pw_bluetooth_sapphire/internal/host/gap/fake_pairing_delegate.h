@@ -20,7 +20,9 @@ class FakePairingDelegate final : public PairingDelegate {
   explicit FakePairingDelegate(sm::IOCapability io_capability);
   ~FakePairingDelegate() override;
 
-  void set_io_capability(sm::IOCapability io_capability) { io_capability_ = io_capability; }
+  void set_io_capability(sm::IOCapability io_capability) {
+    io_capability_ = io_capability;
+  }
 
   // If set, these will receive calls to their respective calls. If not set,
   // the corresponding PairingDelegate call will result in a test failure.
@@ -29,18 +31,27 @@ class FakePairingDelegate final : public PairingDelegate {
     complete_pairing_cb_ = std::move(cb);
   }
   using ConfirmPairingCallback = fit::function<void(PeerId, ConfirmCallback)>;
-  void SetConfirmPairingCallback(ConfirmPairingCallback cb) { confirm_pairing_cb_ = std::move(cb); }
+  void SetConfirmPairingCallback(ConfirmPairingCallback cb) {
+    confirm_pairing_cb_ = std::move(cb);
+  }
   using DisplayPasskeyCallback =
       fit::function<void(PeerId, uint32_t, DisplayMethod, ConfirmCallback)>;
-  void SetDisplayPasskeyCallback(DisplayPasskeyCallback cb) { display_passkey_cb_ = std::move(cb); }
-  using RequestPasskeyCallback = fit::function<void(PeerId, PasskeyResponseCallback)>;
-  void SetRequestPasskeyCallback(RequestPasskeyCallback cb) { request_passkey_cb_ = std::move(cb); }
+  void SetDisplayPasskeyCallback(DisplayPasskeyCallback cb) {
+    display_passkey_cb_ = std::move(cb);
+  }
+  using RequestPasskeyCallback =
+      fit::function<void(PeerId, PasskeyResponseCallback)>;
+  void SetRequestPasskeyCallback(RequestPasskeyCallback cb) {
+    request_passkey_cb_ = std::move(cb);
+  }
 
   // PairingDelegate overrides.
   sm::IOCapability io_capability() const override { return io_capability_; }
   void CompletePairing(PeerId peer_id, sm::Result<> status) override;
   void ConfirmPairing(PeerId peer_id, ConfirmCallback confirm) override;
-  void DisplayPasskey(PeerId peer_id, uint32_t passkey, DisplayMethod method,
+  void DisplayPasskey(PeerId peer_id,
+                      uint32_t passkey,
+                      DisplayMethod method,
                       ConfirmCallback confirm) override;
   void RequestPasskey(PeerId peer_id, PasskeyResponseCallback respond) override;
 

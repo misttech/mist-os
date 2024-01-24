@@ -40,8 +40,8 @@ class ServiceRecord {
   // Removes the attribute identified by |id|. Idempotent.
   void RemoveAttribute(AttributeId id);
 
-  // Protocol-only services only reserve a protocol endpoint, and don't advertise a service in the
-  // SDP database.
+  // Protocol-only services only reserve a protocol endpoint, and don't
+  // advertise a service in the SDP database.
   bool IsProtocolOnly() const;
 
   // Returns true if the ServiceRecord contains the required fields
@@ -57,7 +57,8 @@ class ServiceRecord {
   // the range |start| - |end| inclusive.
   // If |start| > |end| or no attributes are present, returns a
   // an empty set.
-  std::set<AttributeId> GetAttributesInRange(AttributeId start, AttributeId end) const;
+  std::set<AttributeId> GetAttributesInRange(AttributeId start,
+                                             AttributeId end) const;
 
   // Returns true if any value of the attributes in this service contain all
   // of the |uuids| given.  The uuids need not be in any specific attribute
@@ -81,7 +82,9 @@ class ServiceRecord {
   //   - a single DataElement parameter
   // kPrimaryProtocolList is presented as the primary protocol.
   // Other protocol will be added to the additional protocol lists,
-  void AddProtocolDescriptor(const ProtocolListId id, const UUID& uuid, DataElement params);
+  void AddProtocolDescriptor(const ProtocolListId id,
+                             const UUID& uuid,
+                             DataElement params);
 
   // Adds a profile to the bluetooth profile descriptor list attribute.
   // |uuid| is the UUID of the profile. |major| and |minor| are the major and
@@ -94,17 +97,21 @@ class ServiceRecord {
   // Empty attributes will be omitted.
   // All strings are UTF-8 encoded.
   // Returns true if attributes were added, false otherwise.
-  bool AddInfo(const std::string& language_code, const std::string& name,
-               const std::string& description, const std::string& provider);
+  bool AddInfo(const std::string& language_code,
+               const std::string& name,
+               const std::string& description,
+               const std::string& provider);
 
   // Set the security level required to connect to this service.
   // See v5.0, Vol 3, Part C, Section 5.2.2.8
-  void set_security_level(SecurityLevel security_level) { security_level_ = security_level; }
+  void set_security_level(SecurityLevel security_level) {
+    security_level_ = security_level;
+  }
   SecurityLevel security_level() const { return security_level_; }
 
   // Debug representation of a service record used for Inspect.
-  // Only includes kBluetoothProfileDescriptorList and kServiceClassIdList to minimize
-  // log spam.
+  // Only includes kBluetoothProfileDescriptorList and kServiceClassIdList to
+  // minimize log spam.
   std::string ToString() const;
 
  private:

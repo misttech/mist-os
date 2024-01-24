@@ -42,7 +42,8 @@ constexpr UUID kCharacteristicAggregateFormat(kCharacteristicAggregateFormat16);
 
 // Defined Generic Attribute Profile Service (Vol 3, Part G, 7)
 constexpr bt::UUID kGenericAttributeService(kGenericAttributeService16);
-constexpr bt::UUID kServiceChangedCharacteristic(kServiceChangedCharacteristic16);
+constexpr bt::UUID kServiceChangedCharacteristic(
+    kServiceChangedCharacteristic16);
 
 }  // namespace types
 
@@ -81,7 +82,8 @@ constexpr uint16_t kCCCIndicationBit = 0x0002;
 using PeerId = PeerId;
 
 // An identity for a Characteristic within a RemoteService
-// Characteristic IDs are guaranteed to equal the Value Handle for the characteristic
+// Characteristic IDs are guaranteed to equal the Value Handle for the
+// characteristic
 struct CharacteristicHandle {
   constexpr explicit CharacteristicHandle(att::Handle handle) : value(handle) {}
   CharacteristicHandle() = delete;
@@ -89,8 +91,12 @@ struct CharacteristicHandle {
 
   CharacteristicHandle& operator=(const CharacteristicHandle& other) = default;
 
-  inline bool operator<(const CharacteristicHandle& rhs) const { return this->value < rhs.value; }
-  inline bool operator==(const CharacteristicHandle& rhs) const { return this->value == rhs.value; }
+  inline bool operator<(const CharacteristicHandle& rhs) const {
+    return this->value < rhs.value;
+  }
+  inline bool operator==(const CharacteristicHandle& rhs) const {
+    return this->value == rhs.value;
+  }
 
   att::Handle value;
 };
@@ -103,13 +109,18 @@ struct DescriptorHandle {
 
   DescriptorHandle& operator=(const DescriptorHandle& other) = default;
 
-  inline bool operator<(const DescriptorHandle& rhs) const { return this->value < rhs.value; }
-  inline bool operator==(const DescriptorHandle& rhs) const { return this->value == rhs.value; }
+  inline bool operator<(const DescriptorHandle& rhs) const {
+    return this->value < rhs.value;
+  }
+  inline bool operator==(const DescriptorHandle& rhs) const {
+    return this->value == rhs.value;
+  }
 
   att::Handle value;
 };
 
-// An identifier uniquely identifies a local GATT service, characteristic, or descriptor.
+// An identifier uniquely identifies a local GATT service, characteristic, or
+// descriptor.
 using IdType = uint64_t;
 
 // 0 is reserved as an invalid ID.
@@ -124,7 +135,10 @@ enum class ServiceKind {
 
 struct ServiceData {
   ServiceData() = default;
-  ServiceData(ServiceKind kind, att::Handle start, att::Handle end, const UUID& type);
+  ServiceData(ServiceKind kind,
+              att::Handle start,
+              att::Handle end,
+              const UUID& type);
 
   ServiceKind kind;
   att::Handle range_start;
@@ -133,16 +147,19 @@ struct ServiceData {
 
   // NOTE: In C++20 this can be generated via `= default` assignment.
   bool operator==(const ServiceData& other) const {
-    return kind == other.kind && range_start == other.range_start && range_end == other.range_end &&
-           type == other.type;
+    return kind == other.kind && range_start == other.range_start &&
+           range_end == other.range_end && type == other.type;
   }
 };
 
 // An immutable definition of a GATT Characteristic
 struct CharacteristicData {
   CharacteristicData() = delete;
-  CharacteristicData(Properties props, std::optional<ExtendedProperties> ext_props,
-                     att::Handle handle, att::Handle value_handle, const UUID& type);
+  CharacteristicData(Properties props,
+                     std::optional<ExtendedProperties> ext_props,
+                     att::Handle handle,
+                     att::Handle value_handle,
+                     const UUID& type);
 
   Properties properties;
   std::optional<ExtendedProperties> extended_properties;
@@ -152,8 +169,10 @@ struct CharacteristicData {
 
   // NOTE: In C++20 this can be generated via `= default` assignment.
   bool operator==(const CharacteristicData& other) const {
-    return properties == other.properties && extended_properties == other.extended_properties &&
-           handle == other.handle && value_handle == other.value_handle && type == other.type;
+    return properties == other.properties &&
+           extended_properties == other.extended_properties &&
+           handle == other.handle && value_handle == other.value_handle &&
+           type == other.type;
   }
 };
 
@@ -172,17 +191,19 @@ struct DescriptorData {
 };
 
 // Delegates for ATT read/write operations
-using ReadResponder =
-    fit::callback<void(fit::result<att::ErrorCode> status, const ByteBuffer& value)>;
+using ReadResponder = fit::callback<void(fit::result<att::ErrorCode> status,
+                                         const ByteBuffer& value)>;
 using WriteResponder = fit::callback<void(fit::result<att::ErrorCode> status)>;
 
 // No-op implementations of asynchronous event handlers
 inline void NopReadHandler(PeerId, IdType, IdType, uint16_t, ReadResponder) {}
-inline void NopWriteHandler(PeerId, IdType, IdType, uint16_t, const ByteBuffer&, WriteResponder) {}
+inline void NopWriteHandler(
+    PeerId, IdType, IdType, uint16_t, const ByteBuffer&, WriteResponder) {}
 inline void NopCCCallback(IdType, IdType, PeerId, bool notify, bool indicate) {}
 inline void NopSendIndication(IdType, IdType, PeerId, BufferView) {}
 
-// Characteristic Declaration attribute value (Core Spec v5.2, Vol 3, Sec 3.3.1).
+// Characteristic Declaration attribute value (Core Spec v5.2, Vol 3,
+// Sec 3.3.1).
 template <att::UUIDType Format>
 struct CharacteristicDeclarationAttributeValue {
   Properties properties;
@@ -190,7 +211,8 @@ struct CharacteristicDeclarationAttributeValue {
   att::AttributeType<Format> value_uuid;
 } __attribute__((packed));
 
-// Service Changed Characteristic attribute value (Core Spec v5.2, Vol 3, Part G, Sec 7.1).
+// Service Changed Characteristic attribute value (Core Spec v5.2, Vol 3, Part
+// G, Sec 7.1).
 struct ServiceChangedCharacteristicValue {
   att::Handle range_start_handle;
   att::Handle range_end_handle;

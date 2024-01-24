@@ -18,7 +18,8 @@ namespace bt::hci {
 // |out_resolved| will indicate whether or not this address corresponds to a
 // resolved RPA (Vol 2, Part E, 7.7.65.2).
 bool DeviceAddressFromAdvReport(const hci_spec::LEAdvertisingReportData& report,
-                                DeviceAddress* out_address, bool* out_resolved);
+                                DeviceAddress* out_address,
+                                bool* out_resolved);
 
 }  // namespace bt::hci
 

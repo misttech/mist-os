@@ -17,7 +17,10 @@ class FakeAclConnection : public AclDataChannel::ConnectionInterface {
   explicit FakeAclConnection(AclDataChannel* data_channel,
                              hci_spec::ConnectionHandle handle = kTestHandle,
                              bt::LinkType type = bt::LinkType::kACL)
-      : handle_(handle), type_(type), data_channel_(data_channel), weak_interface_(this) {}
+      : handle_(handle),
+        type_(type),
+        data_channel_(data_channel),
+        weak_interface_(this) {}
 
   ~FakeAclConnection() override = default;
 
@@ -26,9 +29,13 @@ class FakeAclConnection : public AclDataChannel::ConnectionInterface {
     data_channel_->OnOutboundPacketAvailable();
   }
 
-  const std::queue<ACLDataPacketPtr>& queued_packets() const { return queued_packets_; }
+  const std::queue<ACLDataPacketPtr>& queued_packets() const {
+    return queued_packets_;
+  }
 
-  WeakPtr<ConnectionInterface> GetWeakPtr() { return weak_interface_.GetWeakPtr(); }
+  WeakPtr<ConnectionInterface> GetWeakPtr() {
+    return weak_interface_.GetWeakPtr();
+  }
 
   // AclDataChannel::ConnectionInterface overrides:
   hci_spec::ConnectionHandle handle() const override { return handle_; }

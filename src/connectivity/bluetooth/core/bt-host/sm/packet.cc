@@ -15,9 +15,11 @@ namespace bt::sm {
 PacketReader::PacketReader(const ByteBuffer* buffer)
     : PacketView<Header>(buffer, buffer->size() - sizeof(Header)) {}
 
-ValidPacketReader::ValidPacketReader(const ByteBuffer* buffer) : PacketReader(buffer) {}
+ValidPacketReader::ValidPacketReader(const ByteBuffer* buffer)
+    : PacketReader(buffer) {}
 
-fit::result<ErrorCode, ValidPacketReader> ValidPacketReader::ParseSdu(const ByteBufferPtr& sdu) {
+fit::result<ErrorCode, ValidPacketReader> ValidPacketReader::ParseSdu(
+    const ByteBufferPtr& sdu) {
   BT_ASSERT(sdu);
   size_t length = sdu->size();
   if (length < sizeof(Header)) {

@@ -19,26 +19,31 @@
 
 namespace bt::hci {
 
-// A Connection represents a logical link connection to a peer. It maintains link-specific
-// configuration parameters (such as the connection handle) and state (e.g
-// kConnected/kDisconnected). Controller procedures that are related to managing a logical link are
-// performed by a Connection, e.g. disconnecting the link.
+// A Connection represents a logical link connection to a peer. It maintains
+// link-specific configuration parameters (such as the connection handle) and
+// state (e.g kConnected/kDisconnected). Controller procedures that are related
+// to managing a logical link are performed by a Connection, e.g. disconnecting
+// the link.
 //
-// Connection instances are intended to be uniquely owned. The owner of an instance is also the
-// owner of the underlying link and the lifetime of a Connection determines the lifetime of the
-// link.
+// Connection instances are intended to be uniquely owned. The owner of an
+// instance is also the owner of the underlying link and the lifetime of a
+// Connection determines the lifetime of the link.
 //
-// Connection is not expected to be constructed directly. Users should instead construct a
-// specialization based on the link type: LowEnergyConnection, BrEdrConnection, or ScoConnection,
+// Connection is not expected to be constructed directly. Users should instead
+// construct a specialization based on the link type: LowEnergyConnection,
+// BrEdrConnection, or ScoConnection,
 class Connection {
  public:
   enum class State {
-    // Default state of a newly created Connection. This is the only connection state that is
+    // Default state of a newly created Connection. This is the only connection
+    // state that is
     // considered "open".
     kConnected,
 
-    // HCI Disconnect command has been sent, but HCI Disconnection Complete event has not yet been
-    // received. This state is skipped when the disconnection is initiated by the peer.
+    // HCI Disconnect command has been sent, but HCI Disconnection Complete
+    // event has not yet been
+    // received. This state is skipped when the disconnection is initiated by
+    // the peer.
     kWaitingForDisconnectionComplete,
 
     // HCI Disconnection Complete event has been received.
@@ -64,36 +69,43 @@ class Connection {
   State state() const { return conn_state_; }
 
   // Assigns a callback that will be run when the peer disconnects.
-  using PeerDisconnectCallback =
-      fit::function<void(const Connection& connection, pw::bluetooth::emboss::StatusCode reason)>;
+  using PeerDisconnectCallback = fit::function<void(
+      const Connection& connection, pw::bluetooth::emboss::StatusCode reason)>;
   void set_peer_disconnect_callback(PeerDisconnectCallback callback) {
     peer_disconnect_callback_ = std::move(callback);
   }
 
-  // Send HCI Disconnect and set state to closed. Must not be called on an already disconnected
-  // connection.
+  // Send HCI Disconnect and set state to closed. Must not be called on an
+  // already disconnected connection.
   virtual void Disconnect(pw::bluetooth::emboss::StatusCode reason);
 
  protected:
-  // |on_disconnection_complete| will be called when the disconnection complete event is received,
-  // which may be after this object is destroyed (which is why this isn't a virtual method).
-  Connection(hci_spec::ConnectionHandle handle, const DeviceAddress& local_address,
-             const DeviceAddress& peer_address, const Transport::WeakPtr& hci,
+  // |on_disconnection_complete| will be called when the disconnection complete
+  // event is received, which may be after this object is destroyed (which is
+  // why this isn't a virtual method).
+  Connection(hci_spec::ConnectionHandle handle,
+             const DeviceAddress& local_address,
+             const DeviceAddress& peer_address,
+             const Transport::WeakPtr& hci,
              fit::callback<void()> on_disconnection_complete);
 
   const Transport::WeakPtr& hci() { return hci_; }
 
-  PeerDisconnectCallback& peer_disconnect_callback() { return peer_disconnect_callback_; }
+  PeerDisconnectCallback& peer_disconnect_callback() {
+    return peer_disconnect_callback_;
+  }
 
  private:
   // Checks |event|, unregisters link, and clears pending packets count.
-  // If the disconnection was initiated by the peer, call |peer_disconnect_callback|.
-  // Returns true if event was valid and for this connection.
-  // This method is static so that it can be called in an event handler
-  // after this object has been destroyed.
+  // If the disconnection was initiated by the peer, call
+  // |peer_disconnect_callback|. Returns true if event was valid and for this
+  // connection. This method is static so that it can be called in an event
+  // handler after this object has been destroyed.
   static CommandChannel::EventCallbackResult OnDisconnectionComplete(
-      const WeakSelf<Connection>::WeakPtr& self, hci_spec::ConnectionHandle handle,
-      const EmbossEventPacket& event, fit::callback<void()> on_disconnection_complete);
+      const WeakSelf<Connection>::WeakPtr& self,
+      hci_spec::ConnectionHandle handle,
+      const EmbossEventPacket& event,
+      fit::callback<void()> on_disconnection_complete);
 
   hci_spec::ConnectionHandle handle_;
 

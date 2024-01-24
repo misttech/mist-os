@@ -58,18 +58,22 @@ enum class DisconnectReason : uint8_t {
 // controller, including whether the peer can be connected to, incoming
 // connections, and initiating connections.
 //
-// There are two flows for destroying connections: explicit local disconnections, and peer
-// disconnections. When the connection is disconnected explicitly with |Disconnect()|, the
-// connection is immediately cleaned up and removed from the internal |connections_| map and owned
-// by itself until the HCI Disconnection Complete event is received by the underlying
-// hci::Connection object. When the peer disconnects, the |OnPeerDisconnect()| callback is
-// called by the underlying hci::Connection object and the connection is cleaned up and removed
-// from the internal |connections_| map.
+// There are two flows for destroying connections: explicit local
+// disconnections, and peer disconnections. When the connection is disconnected
+// explicitly with |Disconnect()|, the connection is immediately cleaned up and
+// removed from the internal |connections_| map and owned by itself until the
+// HCI Disconnection Complete event is received by the underlying
+// hci::Connection object. When the peer disconnects, the |OnPeerDisconnect()|
+// callback is called by the underlying hci::Connection object and the
+// connection is cleaned up and removed from the internal |connections_| map.
 class BrEdrConnectionManager final {
  public:
-  BrEdrConnectionManager(hci::Transport::WeakPtr hci, PeerCache* peer_cache,
-                         DeviceAddress local_address, l2cap::ChannelManager* l2cap,
-                         bool use_interlaced_scan, bool local_secure_connections_supported,
+  BrEdrConnectionManager(hci::Transport::WeakPtr hci,
+                         PeerCache* peer_cache,
+                         DeviceAddress local_address,
+                         l2cap::ChannelManager* l2cap,
+                         bool use_interlaced_scan,
+                         bool local_secure_connections_supported,
                          pw::async::Dispatcher& dispatcher);
   ~BrEdrConnectionManager();
 
@@ -77,7 +81,9 @@ class BrEdrConnectionManager final {
   void SetConnectable(bool connectable, hci::ResultFunction<> status_cb);
 
   // Returns the PairingDelegate currently assigned to this connection manager.
-  const PairingDelegate::WeakPtr& pairing_delegate() const { return pairing_delegate_; }
+  const PairingDelegate::WeakPtr& pairing_delegate() const {
+    return pairing_delegate_;
+  }
 
   // Assigns a new PairingDelegate to handle BR/EDR authentication challenges.
   // Replacing an existing pairing delegate cancels all ongoing pairing
@@ -89,40 +95,48 @@ class BrEdrConnectionManager final {
   // Returns kInvalidPeerId if no such peer exists.
   PeerId GetPeerId(hci_spec::ConnectionHandle handle) const;
 
-  // Opens a new L2CAP channel to service |psm| on |peer_id| using the preferred parameters
-  // |params|. If the current connection doesn't meet |security_requirements|, attempt to upgrade
-  // the link key and report an error via |cb| if the upgrade fails.
+  // Opens a new L2CAP channel to service |psm| on |peer_id| using the preferred
+  // parameters |params|. If the current connection doesn't meet
+  // |security_requirements|, attempt to upgrade the link key and report an
+  // error via |cb| if the upgrade fails.
   //
-  // |cb| will be called with the channel created to the peer, or nullptr if the channel creation
-  // resulted in an error.
-  void OpenL2capChannel(PeerId peer_id, l2cap::Psm psm,
+  // |cb| will be called with the channel created to the peer, or nullptr if the
+  // channel creation resulted in an error.
+  void OpenL2capChannel(PeerId peer_id,
+                        l2cap::Psm psm,
                         BrEdrSecurityRequirements security_requirements,
-                        l2cap::ChannelParameters params, l2cap::ChannelCallback cb);
+                        l2cap::ChannelParameters params,
+                        l2cap::ChannelCallback cb);
 
   // See ScoConnectionManager for documentation. If a BR/EDR connection with
   // the peer does not exist, returns nullopt.
   using ScoRequestHandle = BrEdrConnection::ScoRequestHandle;
   std::optional<ScoRequestHandle> OpenScoConnection(
       PeerId peer_id,
-      bt::StaticPacket<pw::bluetooth::emboss::SynchronousConnectionParametersWriter> parameters,
+      bt::StaticPacket<
+          pw::bluetooth::emboss::SynchronousConnectionParametersWriter>
+          parameters,
       sco::ScoConnectionManager::OpenConnectionCallback callback);
   std::optional<ScoRequestHandle> AcceptScoConnection(
       PeerId peer_id,
-      std::vector<bt::StaticPacket<pw::bluetooth::emboss::SynchronousConnectionParametersWriter>>
+      std::vector<bt::StaticPacket<
+          pw::bluetooth::emboss::SynchronousConnectionParametersWriter>>
           parameters,
       sco::ScoConnectionManager::AcceptConnectionCallback callback);
 
   // Add a service search to be performed on new connected remote peers.
   // This search will happen on every peer connection.
-  // |callback| will be called with the |attributes| that exist in the service entry on the peer's
-  // SDP server. If |attributes| is empty, all attributes on the server will be returned. Returns a
-  // SearchId which can be used to remove the search later. Identical searches will perform the same
-  // search for each search added. Results of added service searches will be added to each Peer's
-  // BrEdrData.
+  // |callback| will be called with the |attributes| that exist in the service
+  // entry on the peer's SDP server. If |attributes| is empty, all attributes on
+  // the server will be returned. Returns a SearchId which can be used to remove
+  // the search later. Identical searches will perform the same search for each
+  // search added. Results of added service searches will be added to each
+  // Peer's BrEdrData.
   // TODO(https://fxbug.dev/1378): Make identical searches just search once
   using SearchCallback = sdp::ServiceDiscoverer::ResultCallback;
   using SearchId = sdp::ServiceDiscoverer::SearchId;
-  SearchId AddServiceSearch(const UUID& uuid, std::unordered_set<sdp::AttributeId> attributes,
+  SearchId AddServiceSearch(const UUID& uuid,
+                            std::unordered_set<sdp::AttributeId> attributes,
                             SearchCallback callback);
 
   // Remove a search previously added with AddServiceSearch()
@@ -130,7 +144,8 @@ class BrEdrConnectionManager final {
   // This function is idempotent.
   bool RemoveServiceSearch(SearchId id);
 
-  using ConnectResultCallback = fit::function<void(hci::Result<>, BrEdrConnection*)>;
+  using ConnectResultCallback =
+      fit::function<void(hci::Result<>, BrEdrConnection*)>;
 
   // Initiates an outgoing Create Connection Request to attempt to connect to
   // the peer identified by |peer_id|. Returns false if the connection
@@ -139,26 +154,30 @@ class BrEdrConnectionManager final {
   // TODO(https://fxbug.dev/1413) - implement a timeout
   [[nodiscard]] bool Connect(PeerId peer_id, ConnectResultCallback callback);
 
-  // Initiate pairing to the peer with |peer_id| using the bondable preference. Pairing will only be
-  // initiated if the current link key does not meet the |security| requirements. |callback| will be
-  // called with the result of the procedure, successful or not.
-  void Pair(PeerId peer_id, BrEdrSecurityRequirements security, hci::ResultFunction<> callback);
+  // Initiate pairing to the peer with |peer_id| using the bondable preference.
+  // Pairing will only be initiated if the current link key does not meet the
+  // |security| requirements. |callback| will be called with the result of the
+  // procedure, successful or not.
+  void Pair(PeerId peer_id,
+            BrEdrSecurityRequirements security,
+            hci::ResultFunction<> callback);
 
   // Disconnects any existing BR/EDR connection to |peer_id|. Returns true if
   // the peer is disconnected, false if the peer can not be disconnected.
   bool Disconnect(PeerId peer_id, DisconnectReason reason);
 
-  // Sets the BR/EDR security mode of the local device (Core Spec v5.4, Vol 3, Part C, 5.2.2). If
-  // set to SecureConnectionsOnly, any currently encrypted links not meeting the requirements of
-  // Security Mode 4 Level 4 will be disconnected.
+  // Sets the BR/EDR security mode of the local device (Core Spec v5.4, Vol 3,
+  // Part C, 5.2.2). If set to SecureConnectionsOnly, any currently encrypted
+  // links not meeting the requirements of Security Mode 4 Level 4 will be
+  // disconnected.
   void SetSecurityMode(BrEdrSecurityMode mode);
 
   BrEdrSecurityMode security_mode() { return *security_mode_; }
 
-  // If `reason` is DisconnectReason::kApiRequest, then incoming connections from `peer_id` are
-  // rejected for kLocalDisconnectCooldownDuration
-  static constexpr pw::chrono::SystemClock::duration kLocalDisconnectCooldownDuration =
-      std::chrono::seconds(30);
+  // If `reason` is DisconnectReason::kApiRequest, then incoming connections
+  // from `peer_id` are rejected for kLocalDisconnectCooldownDuration
+  static constexpr pw::chrono::SystemClock::duration
+      kLocalDisconnectCooldownDuration = std::chrono::seconds(30);
 
   // Attach Inspect node as child of |parent| named |name|.
   // Only connections established after a call to AttachInspect are tracked.
@@ -171,17 +190,23 @@ class BrEdrConnectionManager final {
   // Called to cancel an outgoing connection request
   void SendCreateConnectionCancelCommand(DeviceAddress addr);
 
-  // Attempt to complete the active connection request for the peer |peer_id| with status |status|
-  void CompleteRequest(PeerId peer_id, DeviceAddress address, hci::Result<> status,
+  // Attempt to complete the active connection request for the peer |peer_id|
+  // with status |status|
+  void CompleteRequest(PeerId peer_id,
+                       DeviceAddress address,
+                       hci::Result<> status,
                        hci_spec::ConnectionHandle handle);
 
-  // Is there a current incoming connection request in progress for the given address
+  // Is there a current incoming connection request in progress for the given
+  // address
   bool ExistsIncomingRequest(PeerId id);
 
   // Writes page timeout duration to the controller.
-  // |page_timeout| must be in the range [PageTimeout::MIN (0x0001), PageTimeout::MAX (0xFFFF)]
-  // |cb| will be called with the resulting return parameter status.
-  void WritePageTimeout(pw::chrono::SystemClock::duration page_timeout, hci::ResultFunction<> cb);
+  // |page_timeout| must be in the range [PageTimeout::MIN (0x0001),
+  // PageTimeout::MAX (0xFFFF)] |cb| will be called with the resulting return
+  // parameter status.
+  void WritePageTimeout(pw::chrono::SystemClock::duration page_timeout,
+                        hci::ResultFunction<> cb);
 
   // Reads the controller page scan settings.
   void ReadPageScanSettings();
@@ -189,53 +214,66 @@ class BrEdrConnectionManager final {
   // Writes page scan parameters to the controller.
   // If |interlaced| is true, and the controller does not support interlaced
   // page scan mode, standard mode is used.
-  void WritePageScanSettings(uint16_t interval, uint16_t window, bool interlaced,
+  void WritePageScanSettings(uint16_t interval,
+                             uint16_t window,
+                             bool interlaced,
                              hci::ResultFunction<> cb);
 
   // Helper to register an event handler to run.
-  hci::CommandChannel::EventHandlerId AddEventHandler(const hci_spec::EventCode& code,
-                                                      hci::CommandChannel::EventCallbackVariant cb);
+  hci::CommandChannel::EventHandlerId AddEventHandler(
+      const hci_spec::EventCode& code,
+      hci::CommandChannel::EventCallbackVariant cb);
 
   // Find the handle for a connection to |peer_id|. Returns nullopt if no BR/EDR
   // |peer_id| is connected.
-  std::optional<std::pair<hci_spec::ConnectionHandle, BrEdrConnection*>> FindConnectionById(
-      PeerId peer_id);
+  std::optional<std::pair<hci_spec::ConnectionHandle, BrEdrConnection*>>
+  FindConnectionById(PeerId peer_id);
 
   // Find the handle for a connection to |bd_addr|. Returns nullopt if no BR/EDR
   // |bd_addr| is connected.
-  std::optional<std::pair<hci_spec::ConnectionHandle, BrEdrConnection*>> FindConnectionByAddress(
-      const DeviceAddressBytes& bd_addr);
+  std::optional<std::pair<hci_spec::ConnectionHandle, BrEdrConnection*>>
+  FindConnectionByAddress(const DeviceAddressBytes& bd_addr);
 
   // Find a peer with |addr| or create one if not found.
   Peer* FindOrInitPeer(DeviceAddress addr);
 
-  // Initialize ACL connection state from |connection_handle| obtained from the controller and begin
-  // interrogation. The connection will be initialized with the role |role|.
-  void InitializeConnection(DeviceAddress addr, hci_spec::ConnectionHandle connection_handle,
+  // Initialize ACL connection state from |connection_handle| obtained from the
+  // controller and begin interrogation. The connection will be initialized with
+  // the role |role|.
+  void InitializeConnection(DeviceAddress addr,
+                            hci_spec::ConnectionHandle connection_handle,
                             pw::bluetooth::emboss::ConnectionRole role);
 
-  // Called once interrogation completes to make connection identified by |handle| available to
-  // upper layers and begin new connection procedures.
-  void CompleteConnectionSetup(Peer::WeakPtr peer, hci_spec::ConnectionHandle handle);
+  // Called once interrogation completes to make connection identified by
+  // |handle| available to upper layers and begin new connection procedures.
+  void CompleteConnectionSetup(Peer::WeakPtr peer,
+                               hci_spec::ConnectionHandle handle);
 
   // Callbacks for registered events
   hci::CommandChannel::EventCallbackResult OnAuthenticationComplete(
       const hci::EmbossEventPacket& event);
-  hci::CommandChannel::EventCallbackResult OnConnectionRequest(const hci::EmbossEventPacket& event);
+  hci::CommandChannel::EventCallbackResult OnConnectionRequest(
+      const hci::EmbossEventPacket& event);
   hci::CommandChannel::EventCallbackResult OnConnectionComplete(
       const hci::EmbossEventPacket& event);
   hci::CommandChannel::EventCallbackResult OnIoCapabilityRequest(
       const hci::EmbossEventPacket& event);
   hci::CommandChannel::EventCallbackResult OnIoCapabilityResponse(
       const hci::EmbossEventPacket& event);
-  hci::CommandChannel::EventCallbackResult OnLinkKeyRequest(const hci::EmbossEventPacket& event);
+  hci::CommandChannel::EventCallbackResult OnLinkKeyRequest(
+      const hci::EmbossEventPacket& event);
   hci::CommandChannel::EventCallbackResult OnLinkKeyNotification(
       const hci::EmbossEventPacket& event);
-  hci::CommandChannel::EventCallbackResult OnSimplePairingComplete(const hci::EventPacket& event);
-  hci::CommandChannel::EventCallbackResult OnUserConfirmationRequest(const hci::EventPacket& event);
-  hci::CommandChannel::EventCallbackResult OnUserPasskeyRequest(const hci::EventPacket& event);
-  hci::CommandChannel::EventCallbackResult OnUserPasskeyNotification(const hci::EventPacket& event);
-  hci::CommandChannel::EventCallbackResult OnRoleChange(const hci::EmbossEventPacket& event);
+  hci::CommandChannel::EventCallbackResult OnSimplePairingComplete(
+      const hci::EventPacket& event);
+  hci::CommandChannel::EventCallbackResult OnUserConfirmationRequest(
+      const hci::EventPacket& event);
+  hci::CommandChannel::EventCallbackResult OnUserPasskeyRequest(
+      const hci::EventPacket& event);
+  hci::CommandChannel::EventCallbackResult OnUserPasskeyNotification(
+      const hci::EventPacket& event);
+  hci::CommandChannel::EventCallbackResult OnRoleChange(
+      const hci::EmbossEventPacket& event);
 
   void HandleNonAclConnectionRequest(const DeviceAddress& addr,
                                      pw::bluetooth::emboss::LinkType link_type);
@@ -249,7 +287,8 @@ class BrEdrConnectionManager final {
     PeerId peer_id;
     DeviceAddress addr;
     std::optional<uint16_t> clock_offset;
-    std::optional<pw::bluetooth::emboss::PageScanRepetitionMode> page_scan_repetition_mode;
+    std::optional<pw::bluetooth::emboss::PageScanRepetitionMode>
+        page_scan_repetition_mode;
   };
 
   // Find the next valid Request that is available to begin connecting
@@ -267,47 +306,59 @@ class BrEdrConnectionManager final {
   // link closed. Unregisters the connection from the data domain and marks the
   // peer's BR/EDR cache state as disconnected. Takes ownership of |conn| and
   // destroys it.
-  void CleanUpConnection(hci_spec::ConnectionHandle handle, BrEdrConnection conn,
+  void CleanUpConnection(hci_spec::ConnectionHandle handle,
+                         BrEdrConnection conn,
                          DisconnectReason reason);
 
   // Helpers for sending commands on the command channel for this controller.
   // All callbacks will run on |dispatcher_|.
-  void SendAuthenticationRequested(hci_spec::ConnectionHandle handle, hci::ResultFunction<> cb);
+  void SendAuthenticationRequested(hci_spec::ConnectionHandle handle,
+                                   hci::ResultFunction<> cb);
   void SendIoCapabilityRequestReply(
-      DeviceAddressBytes bd_addr, pw::bluetooth::emboss::IoCapability io_capability,
+      DeviceAddressBytes bd_addr,
+      pw::bluetooth::emboss::IoCapability io_capability,
       pw::bluetooth::emboss::OobDataPresent oob_data_present,
       pw::bluetooth::emboss::AuthenticationRequirements auth_requirements,
       hci::ResultFunction<> cb = nullptr);
-  void SendIoCapabilityRequestNegativeReply(DeviceAddressBytes bd_addr,
-                                            pw::bluetooth::emboss::StatusCode reason,
-                                            hci::ResultFunction<> cb = nullptr);
+  void SendIoCapabilityRequestNegativeReply(
+      DeviceAddressBytes bd_addr,
+      pw::bluetooth::emboss::StatusCode reason,
+      hci::ResultFunction<> cb = nullptr);
   void SendUserConfirmationRequestReply(DeviceAddressBytes bd_addr,
                                         hci::ResultFunction<> cb = nullptr);
-  void SendUserConfirmationRequestNegativeReply(DeviceAddressBytes bd_addr,
-                                                hci::ResultFunction<> cb = nullptr);
-  void SendUserPasskeyRequestReply(DeviceAddressBytes bd_addr, uint32_t numeric_value,
+  void SendUserConfirmationRequestNegativeReply(
+      DeviceAddressBytes bd_addr, hci::ResultFunction<> cb = nullptr);
+  void SendUserPasskeyRequestReply(DeviceAddressBytes bd_addr,
+                                   uint32_t numeric_value,
                                    hci::ResultFunction<> cb = nullptr);
   void SendUserPasskeyRequestNegativeReply(DeviceAddressBytes bd_addr,
                                            hci::ResultFunction<> cb = nullptr);
   void SendLinkKeyRequestNegativeReply(DeviceAddressBytes bd_addr,
                                        hci::ResultFunction<> cb = nullptr);
-  void SendLinkKeyRequestReply(DeviceAddressBytes bd_addr, hci_spec::LinkKey link_key,
+  void SendLinkKeyRequestReply(DeviceAddressBytes bd_addr,
+                               hci_spec::LinkKey link_key,
                                hci::ResultFunction<> cb = nullptr);
-  void SendAcceptConnectionRequest(DeviceAddressBytes addr, hci::ResultFunction<> cb = nullptr);
-  void SendRejectConnectionRequest(DeviceAddress addr, pw::bluetooth::emboss::StatusCode reason,
+  void SendAcceptConnectionRequest(DeviceAddressBytes addr,
                                    hci::ResultFunction<> cb = nullptr);
-  void SendRejectSynchronousRequest(DeviceAddress addr, pw::bluetooth::emboss::StatusCode reason,
+  void SendRejectConnectionRequest(DeviceAddress addr,
+                                   pw::bluetooth::emboss::StatusCode reason,
+                                   hci::ResultFunction<> cb = nullptr);
+  void SendRejectSynchronousRequest(DeviceAddress addr,
+                                    pw::bluetooth::emboss::StatusCode reason,
                                     hci::ResultFunction<> cb = nullptr);
 
-  // Send the HCI command encoded in |command_packet|. If |cb| is not nullptr, the event returned
-  // will be decoded for its status, which is passed to |cb|.
+  // Send the HCI command encoded in |command_packet|. If |cb| is not nullptr,
+  // the event returned will be decoded for its status, which is passed to |cb|.
   template <typename T>
-  void SendCommandWithStatusCallback(T command_packet, hci::ResultFunction<> cb);
+  void SendCommandWithStatusCallback(T command_packet,
+                                     hci::ResultFunction<> cb);
 
   // Record a disconnection in Inspect's list of disconnections.
-  void RecordDisconnectInspect(const BrEdrConnection& conn, DisconnectReason reason);
+  void RecordDisconnectInspect(const BrEdrConnection& conn,
+                               DisconnectReason reason);
 
-  using ConnectionMap = std::unordered_map<hci_spec::ConnectionHandle, BrEdrConnection>;
+  using ConnectionMap =
+      std::unordered_map<hci_spec::ConnectionHandle, BrEdrConnection>;
 
   hci::Transport::WeakPtr hci_;
   std::unique_ptr<hci::SequentialCommandRunner> hci_cmd_runner_;
@@ -358,10 +409,12 @@ class BrEdrConnectionManager final {
   std::optional<hci::BrEdrConnectionRequest> pending_request_;
 
   // Time after which a connection attempt is considered to have timed out.
-  pw::chrono::SystemClock::duration request_timeout_{kBrEdrCreateConnectionTimeout};
+  pw::chrono::SystemClock::duration request_timeout_{
+      kBrEdrCreateConnectionTimeout};
 
   struct InspectProperties {
-    BoundedInspectListNode last_disconnected_list = BoundedInspectListNode(/*capacity=*/5);
+    BoundedInspectListNode last_disconnected_list =
+        BoundedInspectListNode(/*capacity=*/5);
     inspect::Node connections_node_;
     inspect::Node requests_node_;
     struct DirectionalCounts {

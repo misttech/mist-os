@@ -32,13 +32,15 @@ class DynamicChannelRegistry : public WeakSelf<DynamicChannelRegistry> {
   // Used to pass an optional channel to clients of the registry. |channel| may
   // be nullptr upon failure to open. Otherwise, it points to an instance owned
   // by the registry and should not be retained by the callee.
-  using DynamicChannelCallback = fit::function<void(const DynamicChannel* channel)>;
+  using DynamicChannelCallback =
+      fit::function<void(const DynamicChannel* channel)>;
   using ServiceInfo = ServiceInfo<DynamicChannelCallback>;
 
   // Used to query the upper layers for the presence of a service that is
   // accepting channels. If the service exists, it should return a callback
   // that accepts the inbound dynamic channel opened.
-  using ServiceRequestCallback = fit::function<std::optional<ServiceInfo>(Psm psm)>;
+  using ServiceRequestCallback =
+      fit::function<std::optional<ServiceInfo>(Psm psm)>;
 
   virtual ~DynamicChannelRegistry() = default;
 
@@ -47,14 +49,18 @@ class DynamicChannelRegistry : public WeakSelf<DynamicChannelRegistry> {
   // transfer, with a nullptr if unsuccessful. The DynamicChannel passed will
   // contain the local and remote channel IDs to be used for user data transfer
   // over the new channel. Preferred channel parameters can be set in |params|.
-  void OpenOutbound(Psm psm, ChannelParameters params, DynamicChannelCallback open_cb);
+  void OpenOutbound(Psm psm,
+                    ChannelParameters params,
+                    DynamicChannelCallback open_cb);
 
-  // Disconnect and remove the channel identified by |local_cid|. After this call completes,
-  // incoming PDUs with |local_cid| should be discarded as in error or considered to belong to a
-  // subsequent channel with that ID. Any outbound PDUs passed to the Channel interface for this
-  // channel should be discarded. When the close operation completes, |close_cb| will be called, the
-  // internal channel will be destroyed, and |local_cid| may be recycled for another dynamic
-  // channel. |close_cb| will be called immediately if the channel doesn't exist.
+  // Disconnect and remove the channel identified by |local_cid|. After this
+  // call completes, incoming PDUs with |local_cid| should be discarded as in
+  // error or considered to belong to a subsequent channel with that ID. Any
+  // outbound PDUs passed to the Channel interface for this channel should be
+  // discarded. When the close operation completes, |close_cb| will be called,
+  // the internal channel will be destroyed, and |local_cid| may be recycled for
+  // another dynamic channel. |close_cb| will be called immediately if the
+  // channel doesn't exist.
   void CloseChannel(ChannelId local_cid, fit::closure close_cb);
 
  protected:
@@ -73,30 +79,37 @@ class DynamicChannelRegistry : public WeakSelf<DynamicChannelRegistry> {
   // opened channel, which only be called if the channel successfully opens. To
   // deny the channel creation, |service_request_cb| should return a nullptr.
   //
-  // If |random_channel_ids| is true then the channel IDs assigned will be randomized.
-  // Otherwise, they will be assigned starting at the lowest available dynamic channel id (for
-  // testing).
-  DynamicChannelRegistry(uint16_t max_num_channels, DynamicChannelCallback close_cb,
-                         ServiceRequestCallback service_request_cb, bool random_channel_ids);
+  // If |random_channel_ids| is true then the channel IDs assigned will be
+  // randomized. Otherwise, they will be assigned starting at the lowest
+  // available dynamic channel id (for testing).
+  DynamicChannelRegistry(uint16_t max_num_channels,
+                         DynamicChannelCallback close_cb,
+                         ServiceRequestCallback service_request_cb,
+                         bool random_channel_ids);
 
   // Factory method for a DynamicChannel implementation that represents an
   // outbound channel with an endpoint on this device identified by |local_cid|.
-  virtual DynamicChannelPtr MakeOutbound(Psm psm, ChannelId local_cid,
+  virtual DynamicChannelPtr MakeOutbound(Psm psm,
+                                         ChannelId local_cid,
                                          ChannelParameters params) = 0;
 
   // Factory method for a DynamicChannel implementation that represents an
   // inbound channel from a remote endpoint identified by |remote_cid| to an
   // endpoint on this device identified by |local_cid|.
-  virtual DynamicChannelPtr MakeInbound(Psm psm, ChannelId local_cid, ChannelId remote_cid,
+  virtual DynamicChannelPtr MakeInbound(Psm psm,
+                                        ChannelId local_cid,
+                                        ChannelId remote_cid,
                                         ChannelParameters params) = 0;
 
   // Open an inbound channel for a service |psm| from the remote endpoint
   // identified by |remote_cid| to the local endpoint by |local_cid|.
-  DynamicChannel* RequestService(Psm psm, ChannelId local_cid, ChannelId remote_cid);
+  DynamicChannel* RequestService(Psm psm,
+                                 ChannelId local_cid,
+                                 ChannelId remote_cid);
 
-  // In the range starting at kFirstDynamicChannelId with |max_num_channels_|, pick a dynamic
-  // channel ID that is available on this link.
-  // Returns kInvalidChannelId if all IDs have been exhausted.
+  // In the range starting at kFirstDynamicChannelId with |max_num_channels_|,
+  // pick a dynamic channel ID that is available on this link. Returns
+  // kInvalidChannelId if all IDs have been exhausted.
   ChannelId FindAvailableChannelId();
 
   // Return the number of alive channels on this link.
@@ -120,7 +133,9 @@ class DynamicChannelRegistry : public WeakSelf<DynamicChannelRegistry> {
   // |open_cb| with the result of the operation, including with nullptr if the
   // channel failed to open. Otherwise if |pass_failed| is false, only invoke
   // |open_cb| for successfully-opened channels.
-  void ActivateChannel(DynamicChannel* channel, DynamicChannelCallback open_cb, bool pass_failed);
+  void ActivateChannel(DynamicChannel* channel,
+                       DynamicChannelCallback open_cb,
+                       bool pass_failed);
 
   // Signal a remote-initiated closure of a channel owned by this registry, then
   // delete it. |close_cb_| is invoked if the channel was ever open (see

@@ -23,7 +23,8 @@ struct ExpectationMetadata {
       : file(file), line(line), expectation(expectation) {}
   const char* file;
   int line;
-  // String inside of the expectation expression: EXPECT_ACL_PACKET_OUT(expectation, ...).
+  // String inside of the expectation expression:
+  // EXPECT_ACL_PACKET_OUT(expectation, ...).
   const char* expectation;
 };
 
@@ -34,9 +35,10 @@ struct PacketExpectation {
 
 class Transaction {
  public:
-  // The |expected| buffer and the buffers in |replies| will be copied, so their lifetime does not
-  // need to extend past Transaction construction.
-  Transaction(const ByteBuffer& expected, const std::vector<const ByteBuffer*>& replies,
+  // The |expected| buffer and the buffers in |replies| will be copied, so their
+  // lifetime does not need to extend past Transaction construction.
+  Transaction(const ByteBuffer& expected,
+              const std::vector<const ByteBuffer*>& replies,
               ExpectationMetadata meta);
   virtual ~Transaction() = default;
   Transaction(Transaction&& other) = default;
@@ -47,7 +49,8 @@ class Transaction {
 
   const PacketExpectation& expected() { return expected_; }
   void set_expected(const PacketExpectation& expected) {
-    expected_ = PacketExpectation{.data = DynamicByteBuffer(expected.data), .meta = expected.meta};
+    expected_ = PacketExpectation{.data = DynamicByteBuffer(expected.data),
+                                  .meta = expected.meta};
   }
 
   std::queue<DynamicByteBuffer>& replies() { return replies_; }
@@ -63,13 +66,15 @@ class Transaction {
 // packet and the events that should be sent back in response to it.
 class CommandTransaction final : public Transaction {
  public:
-  CommandTransaction(const ByteBuffer& expected, const std::vector<const ByteBuffer*>& replies,
+  CommandTransaction(const ByteBuffer& expected,
+                     const std::vector<const ByteBuffer*>& replies,
                      ExpectationMetadata meta)
       : Transaction(expected, replies, meta), prefix_(false) {}
 
   // Match by opcode only.
   CommandTransaction(hci_spec::OpCode expected_opcode,
-                     const std::vector<const ByteBuffer*>& replies, ExpectationMetadata meta);
+                     const std::vector<const ByteBuffer*>& replies,
+                     ExpectationMetadata meta);
 
   // Move constructor and assignment operator.
   CommandTransaction(CommandTransaction&& other) = default;
@@ -85,7 +90,8 @@ class CommandTransaction final : public Transaction {
 // A DataTransaction is used to set up an expectation for an acl data channel
 class DataTransaction final : public Transaction {
  public:
-  DataTransaction(const ByteBuffer& expected, const std::vector<const ByteBuffer*>& replies,
+  DataTransaction(const ByteBuffer& expected,
+                  const std::vector<const ByteBuffer*>& replies,
                   ExpectationMetadata meta)
       : Transaction(expected, replies, meta) {}
   DataTransaction(DataTransaction&& other) = default;
@@ -102,26 +108,35 @@ class ScoTransaction final : public Transaction {
   ScoTransaction& operator=(ScoTransaction&& other) = default;
 };
 
-// Helper macro for expecting a data packet and specifying a variable number of responses that the
-// MockController should send in response to the expected packet.
-#define EXPECT_ACL_PACKET_OUT(device, expected, ...)        \
-  (device)->QueueDataTransaction((expected), {__VA_ARGS__}, \
-                                 bt::testing::ExpectationMetadata(__FILE__, __LINE__, #expected))
+// Helper macro for expecting a data packet and specifying a variable number of
+// responses that the MockController should send in response to the expected
+// packet.
+#define EXPECT_ACL_PACKET_OUT(device, expected, ...) \
+  (device)->QueueDataTransaction(                    \
+      (expected),                                    \
+      {__VA_ARGS__},                                 \
+      bt::testing::ExpectationMetadata(__FILE__, __LINE__, #expected))
 
 // Helper macro for expecting a SCO packet.
 #define EXPECT_SCO_PACKET_OUT(device, expected) \
-  (device)->QueueScoTransaction((expected),     \
-                                bt::testing::ExpectationMetadata(__FILE__, __LINE__, #expected))
+  (device)->QueueScoTransaction(                \
+      (expected),                               \
+      bt::testing::ExpectationMetadata(__FILE__, __LINE__, #expected))
 
-// Helper macro for expecting a command packet and receiving a variable number of responses.
+// Helper macro for expecting a command packet and receiving a variable number
+// of responses.
 #define EXPECT_CMD_PACKET_OUT(device, expected, ...) \
   (device)->QueueCommandTransaction(                 \
-      (expected), {__VA_ARGS__}, bt::testing::ExpectationMetadata(__FILE__, __LINE__, #expected))
+      (expected),                                    \
+      {__VA_ARGS__},                                 \
+      bt::testing::ExpectationMetadata(__FILE__, __LINE__, #expected))
 
 // MockController allows unit tests to set up an expected sequence of HCI
-// command packets and ACL data packets and any packets that should be sent back in response. The
-// code internally verifies each received packet using gtest ASSERT_* macros.
-class MockController final : public ControllerTestDoubleBase, public WeakSelf<MockController> {
+// command packets and ACL data packets and any packets that should be sent back
+// in response. The code internally verifies each received packet using gtest
+// ASSERT_* macros.
+class MockController final : public ControllerTestDoubleBase,
+                             public WeakSelf<MockController> {
  public:
   explicit MockController(pw::async::Dispatcher& pw_dispatcher);
   ~MockController() override;
@@ -133,13 +148,14 @@ class MockController final : public ControllerTestDoubleBase, public WeakSelf<Mo
   // provided in the transaction.
   void QueueCommandTransaction(CommandTransaction transaction);
   void QueueCommandTransaction(const ByteBuffer& expected,
-                               const std::vector<const ByteBuffer*>& replies, ExpectationMetadata);
+                               const std::vector<const ByteBuffer*>& replies,
+                               ExpectationMetadata);
   void QueueCommandTransaction(hci_spec::OpCode expected_opcode,
                                const std::vector<const ByteBuffer*>& replies,
                                ExpectationMetadata meta);
 
-  // Queues a transaction into the MockController's expected ACL data queue. Each
-  // packet received through the ACL data channel endpoint will be verified
+  // Queues a transaction into the MockController's expected ACL data queue.
+  // Each packet received through the ACL data channel endpoint will be verified
   // against the next expected transaction in the queue. A mismatch will cause a
   // fatal assertion. On a match, MockController will send back the replies
   // provided in the transaction.
@@ -148,19 +164,23 @@ class MockController final : public ControllerTestDoubleBase, public WeakSelf<Mo
                             const std::vector<const ByteBuffer*>& replies,
                             ExpectationMetadata meta);
 
-  // Queues a transaction into the MockController's expected SCO packet queue. Each
-  // packet received through the SCO data channel endpoint will be verified
+  // Queues a transaction into the MockController's expected SCO packet queue.
+  // Each packet received through the SCO data channel endpoint will be verified
   // against the next expected transaction in the queue. A mismatch will cause a
   // fatal assertion.
-  void QueueScoTransaction(const ByteBuffer& expected, ExpectationMetadata meta);
+  void QueueScoTransaction(const ByteBuffer& expected,
+                           ExpectationMetadata meta);
 
-  // Returns true iff all transactions queued with QueueScoTransaction() have been received.
+  // Returns true iff all transactions queued with QueueScoTransaction() have
+  // been received.
   bool AllExpectedScoPacketsSent() const;
 
-  // Returns true iff all transactions queued with QueueDataTransaction() have been received.
+  // Returns true iff all transactions queued with QueueDataTransaction() have
+  // been received.
   bool AllExpectedDataPacketsSent() const;
 
-  // Returns true iff all transactions queued with QueueCommandTransaction() have been received.
+  // Returns true iff all transactions queued with QueueCommandTransaction()
+  // have been received.
   bool AllExpectedCommandPacketsSent() const;
 
   // Callback to invoke when a packet is received over the data channel. Care

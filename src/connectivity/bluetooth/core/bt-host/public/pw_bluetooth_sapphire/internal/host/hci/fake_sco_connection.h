@@ -11,12 +11,15 @@ namespace bt::hci::testing {
 
 class FakeScoConnection final : public ScoConnection {
  public:
-  FakeScoConnection(hci_spec::ConnectionHandle handle, const DeviceAddress& local_address,
-                    const DeviceAddress& peer_address, const hci::Transport::WeakPtr& hci);
+  FakeScoConnection(hci_spec::ConnectionHandle handle,
+                    const DeviceAddress& local_address,
+                    const DeviceAddress& peer_address,
+                    const hci::Transport::WeakPtr& hci);
 
   void TriggerPeerDisconnectCallback() {
     peer_disconnect_callback()(
-        *this, pw::bluetooth::emboss::StatusCode::REMOTE_USER_TERMINATED_CONNECTION);
+        *this,
+        pw::bluetooth::emboss::StatusCode::REMOTE_USER_TERMINATED_CONNECTION);
   }
 
   // ScoConnection overrides:

@@ -10,7 +10,8 @@
 namespace bt::gap {
 
 LowEnergyConnectionHandle::LowEnergyConnectionHandle(
-    PeerId peer_id, hci_spec::ConnectionHandle handle,
+    PeerId peer_id,
+    hci_spec::ConnectionHandle handle,
     fit::callback<void(LowEnergyConnectionHandle*)> release_cb,
     fit::function<sm::BondableMode()> bondable_cb,
     fit::function<sm::SecurityProperties()> security_cb)

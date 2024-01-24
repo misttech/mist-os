@@ -26,11 +26,16 @@ enum class RequestState : uint8_t {
 // Bitmask enabling all packets types. By enabling as many as we can, we expect
 // the controller to only use the ones it supports
 constexpr hci_spec::PacketTypeType kEnableAllPacketTypes =
-    static_cast<hci_spec::PacketTypeType>(hci_spec::PacketTypeBits::kEnableDM1) |
-    static_cast<hci_spec::PacketTypeType>(hci_spec::PacketTypeBits::kEnableDH1) |
-    static_cast<hci_spec::PacketTypeType>(hci_spec::PacketTypeBits::kEnableDM3) |
-    static_cast<hci_spec::PacketTypeType>(hci_spec::PacketTypeBits::kEnableDH3) |
-    static_cast<hci_spec::PacketTypeType>(hci_spec::PacketTypeBits::kEnableDM5) |
+    static_cast<hci_spec::PacketTypeType>(
+        hci_spec::PacketTypeBits::kEnableDM1) |
+    static_cast<hci_spec::PacketTypeType>(
+        hci_spec::PacketTypeBits::kEnableDH1) |
+    static_cast<hci_spec::PacketTypeType>(
+        hci_spec::PacketTypeBits::kEnableDM3) |
+    static_cast<hci_spec::PacketTypeType>(
+        hci_spec::PacketTypeBits::kEnableDH3) |
+    static_cast<hci_spec::PacketTypeType>(
+        hci_spec::PacketTypeBits::kEnableDM5) |
     static_cast<hci_spec::PacketTypeType>(hci_spec::PacketTypeBits::kEnableDH5);
 
 // This class represents a pending request by the BrEdr connector to initiate an
@@ -43,7 +48,9 @@ class BrEdrConnectionRequest final {
  public:
   using OnCompleteDelegate = fit::function<void(Result<>, PeerId)>;
 
-  BrEdrConnectionRequest(PeerId id, DeviceAddress addr, fit::closure timeout_cb,
+  BrEdrConnectionRequest(PeerId id,
+                         DeviceAddress addr,
+                         fit::closure timeout_cb,
                          pw::async::Dispatcher& dispatcher)
       : state_(RequestState::kPending),
         peer_id_(id),
@@ -51,7 +58,8 @@ class BrEdrConnectionRequest final {
         timeout_task_(dispatcher),
         weak_self_(this) {
     timeout_task_.set_function(
-        [timeout_cb = std::move(timeout_cb)](pw::async::Context /*ctx*/, pw::Status status) {
+        [timeout_cb = std::move(timeout_cb)](pw::async::Context /*ctx*/,
+                                             pw::Status status) {
           if (status.ok()) {
             timeout_cb();
           }
@@ -69,9 +77,12 @@ class BrEdrConnectionRequest final {
   // we receive the CommandStatus response from the controller until we cancel
   // the procedure if we have not received ConnectionComplete
   void CreateConnection(
-      CommandChannel* command_channel, std::optional<uint16_t> clock_offset,
-      std::optional<pw::bluetooth::emboss::PageScanRepetitionMode> page_scan_repetition_mode,
-      pw::chrono::SystemClock::duration timeout, OnCompleteDelegate on_command_fail);
+      CommandChannel* command_channel,
+      std::optional<uint16_t> clock_offset,
+      std::optional<pw::bluetooth::emboss::PageScanRepetitionMode>
+          page_scan_repetition_mode,
+      pw::chrono::SystemClock::duration timeout,
+      OnCompleteDelegate on_command_fail);
 
   PeerId peer_id() const { return peer_id_; }
   DeviceAddress peer_address() const { return peer_address_; }

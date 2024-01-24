@@ -15,7 +15,8 @@ class FakeScoDataChannel final : public ScoDataChannel {
     WeakPtr<ConnectionInterface> connection;
   };
 
-  explicit FakeScoDataChannel(uint16_t max_data_length) : max_data_length_(max_data_length) {}
+  explicit FakeScoDataChannel(uint16_t max_data_length)
+      : max_data_length_(max_data_length) {}
 
   ~FakeScoDataChannel() override = default;
 
@@ -33,7 +34,8 @@ class FakeScoDataChannel final : public ScoDataChannel {
  private:
   uint16_t max_data_length_;
   uint16_t readable_count_ = 0;
-  std::unordered_map<hci_spec::ConnectionHandle, RegisteredConnection> connections_;
+  std::unordered_map<hci_spec::ConnectionHandle, RegisteredConnection>
+      connections_;
 };
 
 }  // namespace bt::hci

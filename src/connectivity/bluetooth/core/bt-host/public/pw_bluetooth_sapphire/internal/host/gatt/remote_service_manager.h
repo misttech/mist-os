@@ -30,27 +30,31 @@ class RemoteServiceManager final {
   RemoteServiceManager(std::unique_ptr<Client> client);
   ~RemoteServiceManager();
 
-  // Adds a handler to be notified when services are removed, added, or modified.
-  // NOTE: `removed` services should be handled first because they may share handles with `added`
-  // services.
-  void set_service_watcher(RemoteServiceWatcher watcher) { svc_watcher_ = std::move(watcher); }
+  // Adds a handler to be notified when services are removed, added, or
+  // modified. NOTE: `removed` services should be handled first because they may
+  // share handles with `added` services.
+  void set_service_watcher(RemoteServiceWatcher watcher) {
+    svc_watcher_ = std::move(watcher);
+  }
 
   // Initiates the Exchange MTU procedure followed by service discovery.
   // |callback| is called to notify the result of the procedure.
-  // |mtu_cb| is called when the MTU for the connection is determined, which may occur before
-  // initialization completes.
-  // If |services| is empty, discover all services.
-  // If |services| is not empty, only discover services that match the UUIDs in |services|.
-  // TODO(https://fxbug.dev/65592): Support initiating multiple service discoveries for different
-  // service UUIDs.
-  void Initialize(att::ResultFunction<> callback, fit::callback<void(uint16_t)> mtu_cb,
+  // |mtu_cb| is called when the MTU for the connection is determined, which may
+  // occur before initialization completes. If |services| is empty, discover all
+  // services. If |services| is not empty, only discover services that match the
+  // UUIDs in |services|.
+  // TODO(https://fxbug.dev/65592): Support initiating multiple service
+  // discoveries for different service UUIDs.
+  void Initialize(att::ResultFunction<> callback,
+                  fit::callback<void(uint16_t)> mtu_cb,
                   std::vector<UUID> services = {});
 
   // Returns a vector containing discovered services that match any of the given
   // |uuids| via |callback|. All services will be returned if |uuids| is empty.
   //
   // If called while uninitialized, |callback| will be run after initialization.
-  void ListServices(const std::vector<UUID>& uuids, ServiceListCallback callback);
+  void ListServices(const std::vector<UUID>& uuids,
+                    ServiceListCallback callback);
 
   // Returns the RemoteService with the requested range start |handle| or
   // nullptr if it is not recognized. This method may fail if called before or
@@ -63,7 +67,8 @@ class RemoteServiceManager final {
   // Used to represent a queued ListServices() request.
   class ServiceListRequest {
    public:
-    ServiceListRequest(ServiceListCallback callback, const std::vector<UUID>& uuids);
+    ServiceListRequest(ServiceListCallback callback,
+                       const std::vector<UUID>& uuids);
 
     ServiceListRequest() = default;
     ServiceListRequest(ServiceListRequest&&) = default;
@@ -86,66 +91,80 @@ class RemoteServiceManager final {
     std::map<att::Handle, ServiceData> services;
   };
 
-  // If the GATT Profile service has been discovered, returns the service. Returns
-  // nullptr otherwise.
+  // If the GATT Profile service has been discovered, returns the service.
+  // Returns nullptr otherwise.
   RemoteService* GattProfileService();
 
-  // Attempt to discover the GATT Profile service. This method must complete before discovery of
-  // other services. Notifies |callback| with a status of HostError::kNotFound if the GATT Profile
-  // service is not found.
+  // Attempt to discover the GATT Profile service. This method must complete
+  // before discovery of other services. Notifies |callback| with a status of
+  // HostError::kNotFound if the GATT Profile service is not found.
   void DiscoverGattProfileService(att::ResultFunction<> callback);
 
-  // Discovers characteristics of |gatt_profile_service| and enables notifications of the Service
-  // Changed characteristic. Notifies |callback| with a status of HostError::kNotFound if the GATT
-  // Profile service's Service Changed characteristic is not found.
+  // Discovers characteristics of |gatt_profile_service| and enables
+  // notifications of the Service Changed characteristic. Notifies |callback|
+  // with a status of HostError::kNotFound if the GATT Profile service's Service
+  // Changed characteristic is not found.
   void ConfigureServiceChangedNotifications(RemoteService* gatt_profile_service,
                                             att::ResultFunction<> callback);
 
-  // Discover the GATT Profile service and configure the Service Changed characteristic therein.
+  // Discover the GATT Profile service and configure the Service Changed
+  // characteristic therein.
   void InitializeGattProfileService(att::ResultFunction<> callback);
 
-  // Create a RemoteService and insert it into the services map, discarding duplicates.
+  // Create a RemoteService and insert it into the services map, discarding
+  // duplicates.
   void AddService(const ServiceData& service_data);
 
   // Discover services of the indicated |kind|.
-  // If |service_uuids| is non-empty, only discovers services with the given UUIDs.
-  // |status_cb| will be called when the operation completes.
+  // If |service_uuids| is non-empty, only discovers services with the given
+  // UUIDs. |status_cb| will be called when the operation completes.
   using ServiceCallback = fit::function<void(const ServiceData&)>;
-  void DiscoverServicesOfKind(ServiceKind kind, std::vector<UUID> service_uuids,
+  void DiscoverServicesOfKind(ServiceKind kind,
+                              std::vector<UUID> service_uuids,
                               att::ResultFunction<> status_cb);
 
   // Discover primary and secondary services.
-  // If |service_uuids| is non-empty, only discovers services with the given UUIDs.
-  // |status_cb| will be called when the operation completes.
-  void DiscoverServices(std::vector<UUID> service_uuids, att::ResultFunction<> status_cb);
-  void DiscoverPrimaryAndSecondaryServicesInRange(std::vector<UUID> service_uuids,
-                                                  att::Handle start, att::Handle end,
-                                                  ServiceCallback service_cb,
-                                                  att::ResultFunction<> status_cb);
+  // If |service_uuids| is non-empty, only discovers services with the given
+  // UUIDs. |status_cb| will be called when the operation completes.
+  void DiscoverServices(std::vector<UUID> service_uuids,
+                        att::ResultFunction<> status_cb);
+  void DiscoverPrimaryAndSecondaryServicesInRange(
+      std::vector<UUID> service_uuids,
+      att::Handle start,
+      att::Handle end,
+      ServiceCallback service_cb,
+      att::ResultFunction<> status_cb);
 
   // Called by |client_| when a notification or indication is received.
-  void OnNotification(bool ind, att::Handle value_handle, const ByteBuffer& value,
+  void OnNotification(bool ind,
+                      att::Handle value_handle,
+                      const ByteBuffer& value,
                       bool maybe_truncated);
 
   // Handler of notifications from the Service Changed Characteristic
   void OnServiceChangedNotification(const ByteBuffer& buffer);
 
-  // If a service changed notification is queued and none are currently being handled, start
-  // processing the next notification.
-  // |on_complete| is called when all pending service changed notifications have been processed
+  // If a service changed notification is queued and none are currently being
+  // handled, start processing the next notification. |on_complete| is called
+  // when all pending service changed notifications have been processed
   // (immediately if there are none).
-  void MaybeHandleNextServiceChangedNotification(fit::callback<void()> on_complete = nullptr);
+  void MaybeHandleNextServiceChangedNotification(
+      fit::callback<void()> on_complete = nullptr);
 
-  // Apply service changed discovery results to |services_|. If initialization is complete, notify
-  // |svc_watcher_|.
-  void ProcessServiceChangedDiscoveryResults(const ServiceChangedState& service_changed);
+  // Apply service changed discovery results to |services_|. If initialization
+  // is complete, notify |svc_watcher_|.
+  void ProcessServiceChangedDiscoveryResults(
+      const ServiceChangedState& service_changed);
 
-  // Calculate the difference between the current services and the services discovered in the
-  // Service Changed notification range. Results are appended to the parameters vectors.
+  // Calculate the difference between the current services and the services
+  // discovered in the Service Changed notification range. Results are appended
+  // to the parameters vectors.
   void CalculateServiceChanges(
       const ServiceChangedState& service_changed,
-      std::vector<ServiceMap::iterator>& removed_services, std::vector<ServiceData>& added_services,
-      std::vector<std::pair<ServiceMap::iterator, ServiceData>>& modified_services);
+      std::vector<ServiceMap::iterator>& removed_services,
+      std::vector<ServiceData>& added_services,
+      std::vector<std::pair<ServiceMap::iterator, ServiceData>>&
+          modified_services);
 
   std::unique_ptr<Client> client_;
 
@@ -161,12 +180,12 @@ class RemoteServiceManager final {
   // Queue of unprocessed Service Changed notification changes.
   std::queue<ServiceChangedCharacteristicValue> queued_service_changes_;
 
-  // Service Changed notification that is currently being processed by performing service
-  // discovery.
+  // Service Changed notification that is currently being processed by
+  // performing service discovery.
   std::optional<ServiceChangedState> current_service_change_;
 
-  // Callbacks passed to MaybeHandleNextServiceChangedNotification. Will be called when all queued
-  // service changes have been processed.
+  // Callbacks passed to MaybeHandleNextServiceChangedNotification. Will be
+  // called when all queued service changes have been processed.
   std::vector<fit::callback<void()>> service_changes_complete_callbacks_;
 
   WeakSelf<RemoteServiceManager> weak_self_;

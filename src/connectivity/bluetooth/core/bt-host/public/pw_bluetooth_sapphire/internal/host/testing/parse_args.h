@@ -11,9 +11,11 @@
 
 namespace bt::testing {
 
-// Searches argv for an arg with the name |arg_name|. If the arg is present and has a value, the
-// value will be returned.
-std::optional<std::string_view> GetArgValue(std::string_view arg_name, int argc, char** argv);
+// Searches argv for an arg with the name |arg_name|. If the arg is present and
+// has a value, the value will be returned.
+std::optional<std::string_view> GetArgValue(std::string_view arg_name,
+                                            int argc,
+                                            char** argv);
 
 }  // namespace bt::testing
 

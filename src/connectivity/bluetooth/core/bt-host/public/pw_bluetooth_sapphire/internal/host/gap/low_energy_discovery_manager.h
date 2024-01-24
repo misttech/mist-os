@@ -78,7 +78,8 @@ class PeerCache;
 //     ...
 //
 //     std::unique_ptr<bt::gap::LowEnergyDiscoverySession> session;
-//     discovery_manager.StartDiscovery(/*active=*/true, [&session](auto new_session) {
+//     discovery_manager.StartDiscovery(/*active=*/true, [&session](auto
+//     new_session) {
 //       // Take ownership of the session to make sure it isn't terminated when
 //       // this callback returns.
 //       session = std::move(new_session);
@@ -110,11 +111,13 @@ class LowEnergyDiscoverySession;
 using LowEnergyDiscoverySessionPtr = std::unique_ptr<LowEnergyDiscoverySession>;
 
 // See comments above.
-class LowEnergyDiscoveryManager final : public hci::LowEnergyScanner::Delegate,
-                                        public WeakSelf<LowEnergyDiscoveryManager> {
+class LowEnergyDiscoveryManager final
+    : public hci::LowEnergyScanner::Delegate,
+      public WeakSelf<LowEnergyDiscoveryManager> {
  public:
   // |peer_cache| and |scanner| MUST out-live this LowEnergyDiscoveryManager.
-  LowEnergyDiscoveryManager(hci::LowEnergyScanner* scanner, PeerCache* peer_cache,
+  LowEnergyDiscoveryManager(hci::LowEnergyScanner* scanner,
+                            PeerCache* peer_cache,
                             pw::async::Dispatcher& dispatcher);
   virtual ~LowEnergyDiscoveryManager();
 
@@ -129,15 +132,18 @@ class LowEnergyDiscoveryManager final : public hci::LowEnergyScanner::Delegate,
   using SessionCallback = fit::function<void(LowEnergyDiscoverySessionPtr)>;
   void StartDiscovery(bool active, SessionCallback callback);
 
-  // Pause current and future discovery sessions until the returned PauseToken is destroyed.
-  // If PauseDiscovery is called multiple times, discovery will be paused until all returned
-  // PauseTokens are destroyed.
-  // NOTE: deferred_action::cancel() must not be called, or else discovery will never resume.
+  // Pause current and future discovery sessions until the returned PauseToken
+  // is destroyed. If PauseDiscovery is called multiple times, discovery will be
+  // paused until all returned PauseTokens are destroyed. NOTE:
+  // deferred_action::cancel() must not be called, or else discovery will never
+  // resume.
   using PauseToken = fit::deferred_action<fit::callback<void()>>;
   [[nodiscard]] PauseToken PauseDiscovery();
 
   // Sets a new scan period to any future and ongoing discovery procedures.
-  void set_scan_period(pw::chrono::SystemClock::duration period) { scan_period_ = period; }
+  void set_scan_period(pw::chrono::SystemClock::duration period) {
+    scan_period_ = period;
+  }
 
   // Returns whether there is an active scan in progress.
   bool discovering() const;
@@ -146,10 +152,10 @@ class LowEnergyDiscoveryManager final : public hci::LowEnergyScanner::Delegate,
   bool paused() const { return *paused_count_ != 0; }
 
   // Registers a callback which runs when a connectable advertisement is
-  // received from known peer which was previously observed to be connectable during general
-  // discovery. The |peer| argument is guaranteed to be valid until the callback returns.
-  // The callback can also assume that LE transport information (i.e. |peer->le()|) will be present
-  // and accessible.
+  // received from known peer which was previously observed to be connectable
+  // during general discovery. The |peer| argument is guaranteed to be valid
+  // until the callback returns. The callback can also assume that LE transport
+  // information (i.e. |peer->le()|) will be present and accessible.
   using PeerConnectableCallback = fit::function<void(Peer* peer)>;
   void set_peer_connectable_callback(PeerConnectableCallback callback) {
     connectable_cb_ = std::move(callback);
@@ -178,7 +184,9 @@ class LowEnergyDiscoveryManager final : public hci::LowEnergyScanner::Delegate,
 
   const PeerCache* peer_cache() const { return peer_cache_; }
 
-  const std::unordered_set<PeerId>& cached_scan_results() const { return cached_scan_results_; }
+  const std::unordered_set<PeerId>& cached_scan_results() const {
+    return cached_scan_results_;
+  }
 
   // Creates and stores a new session object and returns it.
   std::unique_ptr<LowEnergyDiscoverySession> AddSession(bool active);
@@ -188,7 +196,8 @@ class LowEnergyDiscoveryManager final : public hci::LowEnergyScanner::Delegate,
   void RemoveSession(LowEnergyDiscoverySession* session);
 
   // hci::LowEnergyScanner::Delegate override:
-  void OnPeerFound(const hci::LowEnergyScanResult& result, const ByteBuffer& data) override;
+  void OnPeerFound(const hci::LowEnergyScanResult& result,
+                   const ByteBuffer& data) override;
   void OnDirectedAdvertisement(const hci::LowEnergyScanResult& result) override;
 
   // Called by hci::LowEnergyScanner
@@ -201,7 +210,8 @@ class LowEnergyDiscoveryManager final : public hci::LowEnergyScanner::Delegate,
   void OnScanStopped();
   void OnScanComplete();
 
-  // Create sessions for all pending requests and pass the sessions to the request callbacks.
+  // Create sessions for all pending requests and pass the sessions to the
+  // request callbacks.
   void NotifyPending();
 
   // Tells the scanner to start scanning. Aliases are provided for improved
@@ -215,7 +225,8 @@ class LowEnergyDiscoveryManager final : public hci::LowEnergyScanner::Delegate,
 
   // If there are any pending requests or valid sessions, start discovery.
   // Discovery must not be paused.
-  // Called when discovery is unpaused or the scan period ends and needs to be restarted.
+  // Called when discovery is unpaused or the scan period ends and needs to be
+  // restarted.
   void ResumeDiscovery();
 
   // Used by destructor to handle all sessions
@@ -264,8 +275,8 @@ class LowEnergyDiscoveryManager final : public hci::LowEnergyScanner::Delegate,
   // The value (in ms) that we use for the duration of each scan period.
   pw::chrono::SystemClock::duration scan_period_ = kLEGeneralDiscoveryScanMin;
 
-  // Count of the number of outstanding PauseTokens. When |paused_count_| is 0, discovery is
-  // unpaused.
+  // Count of the number of outstanding PauseTokens. When |paused_count_| is 0,
+  // discovery is unpaused.
   IntInspectable<int> paused_count_;
 
   // The scanner that performs the HCI procedures. |scanner_| must out-live this
@@ -291,15 +302,17 @@ class LowEnergyDiscoverySession final {
   // assigned earlier, then the callback will only receive results that match
   // the filter.
   //
-  // Passive discovery sessions will call this callback for both directed and undirected
-  // advertisements from known peers, while active discovery sessions will ignore directed
-  // advertisements (as they are not from new peers).
+  // Passive discovery sessions will call this callback for both directed and
+  // undirected advertisements from known peers, while active discovery sessions
+  // will ignore directed advertisements (as they are not from new peers).
   using PeerFoundCallback = fit::function<void(const Peer& peer)>;
   void SetResultCallback(PeerFoundCallback callback);
 
   // Sets a callback to get notified when the session becomes inactive due to an
   // internal error.
-  void set_error_callback(fit::closure callback) { error_callback_ = std::move(callback); }
+  void set_error_callback(fit::closure callback) {
+    error_callback_ = std::move(callback);
+  }
 
   // Returns the filter that belongs to this session. The caller may modify the
   // filter as desired. By default no peers are filtered.
@@ -315,15 +328,16 @@ class LowEnergyDiscoverySession final {
   // Returns true if this session has not been stopped and has not errored.
   bool alive() const { return alive_; }
 
-  // Returns true if this is an active discovery session, or false if this is a passive discovery
-  // session.
+  // Returns true if this is an active discovery session, or false if this is a
+  // passive discovery session.
   bool active() const { return active_; }
 
  private:
   friend class LowEnergyDiscoveryManager;
 
   // Called by LowEnergyDiscoveryManager.
-  explicit LowEnergyDiscoverySession(bool active, LowEnergyDiscoveryManager::WeakPtr manager);
+  explicit LowEnergyDiscoverySession(
+      bool active, LowEnergyDiscoveryManager::WeakPtr manager);
 
   // Called by LowEnergyDiscoveryManager on newly discovered scan results.
   void NotifyDiscoveryResult(const Peer& peer) const;

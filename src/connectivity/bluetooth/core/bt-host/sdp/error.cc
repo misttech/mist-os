@@ -31,8 +31,10 @@ constexpr const char* ErrorCodeToString(ErrorCode code) {
 }  // namespace
 }  // namespace sdp
 
-std::string ProtocolErrorTraits<sdp::ErrorCode>::ToString(sdp::ErrorCode ecode) {
-  return bt_lib_cpp_string::StringPrintf("%s (SDP %#.2x)", bt::sdp::ErrorCodeToString(ecode),
+std::string ProtocolErrorTraits<sdp::ErrorCode>::ToString(
+    sdp::ErrorCode ecode) {
+  return bt_lib_cpp_string::StringPrintf("%s (SDP %#.2x)",
+                                         bt::sdp::ErrorCodeToString(ecode),
                                          static_cast<unsigned int>(ecode));
 }
 

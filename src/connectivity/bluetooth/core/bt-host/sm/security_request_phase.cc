@@ -15,9 +15,12 @@
 
 namespace bt::sm {
 
-SecurityRequestPhase::SecurityRequestPhase(PairingChannel::WeakPtr chan, Listener::WeakPtr listener,
-                                           SecurityLevel desired_level, BondableMode bondable_mode,
-                                           PairingRequestCallback on_pairing_req)
+SecurityRequestPhase::SecurityRequestPhase(
+    PairingChannel::WeakPtr chan,
+    Listener::WeakPtr listener,
+    SecurityLevel desired_level,
+    BondableMode bondable_mode,
+    PairingRequestCallback on_pairing_req)
     : PairingPhase(std::move(chan), std::move(listener), Role::kResponder),
       bondable_mode_(bondable_mode),
       pending_security_request_(desired_level),
@@ -51,7 +54,8 @@ void SecurityRequestPhase::OnPairingRequest(PairingRequestParams req_params) {
 }
 
 void SecurityRequestPhase::OnRxBFrame(ByteBufferPtr sdu) {
-  fit::result<ErrorCode, ValidPacketReader> maybe_reader = ValidPacketReader::ParseSdu(sdu);
+  fit::result<ErrorCode, ValidPacketReader> maybe_reader =
+      ValidPacketReader::ParseSdu(sdu);
   if (maybe_reader.is_error()) {
     Abort(maybe_reader.error_value());
     return;
@@ -62,7 +66,10 @@ void SecurityRequestPhase::OnRxBFrame(ByteBufferPtr sdu) {
   if (smp_code == kPairingRequest) {
     OnPairingRequest(reader.payload<PairingRequestParams>());
   } else {
-    bt_log(DEBUG, "sm", "received unexpected code %#.2X with pending Security Request", smp_code);
+    bt_log(DEBUG,
+           "sm",
+           "received unexpected code %#.2X with pending Security Request",
+           smp_code);
     Abort(ErrorCode::kUnspecifiedReason);
   }
 }

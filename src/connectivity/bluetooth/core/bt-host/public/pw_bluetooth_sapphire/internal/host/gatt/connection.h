@@ -33,21 +33,26 @@ namespace internal {
 // link.
 class Connection final {
  public:
-  // |client| is the GATT client for this connection, which uses |att_bearer| in production.
-  // |server| is the GATT server for this connection, which uses |att_bearer| in production.
-  // |svc_watcher| communicates updates about the peer's GATT services to the Connection's owner.
-  Connection(std::unique_ptr<Client> client, std::unique_ptr<Server> server,
+  // |client| is the GATT client for this connection, which uses |att_bearer| in
+  // production. |server| is the GATT server for this connection, which uses
+  // |att_bearer| in production. |svc_watcher| communicates updates about the
+  // peer's GATT services to the Connection's owner.
+  Connection(std::unique_ptr<Client> client,
+             std::unique_ptr<Server> server,
              RemoteServiceWatcher svc_watcher);
   ~Connection() = default;
 
   Server* server() const { return server_.get(); }
-  RemoteServiceManager* remote_service_manager() const { return remote_service_manager_.get(); }
+  RemoteServiceManager* remote_service_manager() const {
+    return remote_service_manager_.get();
+  }
 
-  // Performs MTU exchange, then primary service discovery. Shuts down the connection on failure.
-  // If |service_uuids| is non-empty, discovery is only performed for services with the indicated
-  // UUIDs.
-  // Returns the agreed-upon MTU via |mtu_cb|.
-  void Initialize(std::vector<UUID> service_uuids, fit::callback<void(uint16_t)> mtu_cb);
+  // Performs MTU exchange, then primary service discovery. Shuts down the
+  // connection on failure. If |service_uuids| is non-empty, discovery is only
+  // performed for services with the indicated UUIDs. Returns the agreed-upon
+  // MTU via |mtu_cb|.
+  void Initialize(std::vector<UUID> service_uuids,
+                  fit::callback<void(uint16_t)> mtu_cb);
 
   // Closes the ATT bearer on which the connection operates.
   void ShutDown();

@@ -218,7 +218,8 @@ constexpr OpCode kReadRemoteVersionInfo = LinkControlOpCode(0x001D);
 
 // =============================================
 // Reject Synchronous Connection Command (BR/EDR)
-constexpr OpCode kRejectSynchronousConnectionRequest = LinkControlOpCode(0x002A);
+constexpr OpCode kRejectSynchronousConnectionRequest =
+    LinkControlOpCode(0x002A);
 
 // =========================================================
 // IO Capability Request Reply Command (v2.1 + EDR) (BR/EDR)
@@ -238,7 +239,8 @@ constexpr OpCode kUserConfirmationRequestReply = LinkControlOpCode(0x002C);
 
 // ======================================================================
 // User Confirmation Request Negative Reply Command (v2.1 + EDR) (BR/EDR)
-constexpr OpCode kUserConfirmationRequestNegativeReply = LinkControlOpCode(0x002D);
+constexpr OpCode kUserConfirmationRequestNegativeReply =
+    LinkControlOpCode(0x002D);
 
 // ========================================================
 // User Passkey Request Reply Command (v2.1 + EDR) (BR/EDR)
@@ -262,11 +264,13 @@ struct IOCapabilityRequestNegativeReplyReturnParams {
 
 // ======================================================
 // Enhanced Setup Synchronous Connection Command (BR/EDR)
-constexpr OpCode kEnhancedSetupSynchronousConnection = LinkControlOpCode(0x003D);
+constexpr OpCode kEnhancedSetupSynchronousConnection =
+    LinkControlOpCode(0x003D);
 
 // ===============================================================
 // Enhanced Accept Synchronous Connection Request Command (BR/EDR)
-constexpr OpCode kEnhancedAcceptSynchronousConnectionRequest = LinkControlOpCode(0x003E);
+constexpr OpCode kEnhancedAcceptSynchronousConnectionRequest =
+    LinkControlOpCode(0x003E);
 
 // ======= Controller & Baseband Commands =======
 // Core Spec v5.0 Vol 2, Part E, Section 7.3
@@ -369,7 +373,8 @@ struct ReadInquiryScanActivityReturnParams {
 
 // ================================================
 // Write Inquiry Scan Activity Command (v1.1) (BR/EDR)
-constexpr OpCode kWriteInquiryScanActivity = ControllerAndBasebandOpCode(0x001E);
+constexpr OpCode kWriteInquiryScanActivity =
+    ControllerAndBasebandOpCode(0x001E);
 
 // ============================================
 // Read Class of Device Command (v1.1) (BR/EDR)
@@ -389,7 +394,8 @@ constexpr OpCode kWriteClassOfDevice = ControllerAndBasebandOpCode(0x0024);
 // =============================================
 // Write Automatic Flush Timeout Command (v1.1) (BR/EDR)
 
-constexpr OpCode kWriteAutomaticFlushTimeout = ControllerAndBasebandOpCode(0x0028);
+constexpr OpCode kWriteAutomaticFlushTimeout =
+    ControllerAndBasebandOpCode(0x0028);
 
 // ===============================================================
 // Read Transmit Transmit Power Level Command (v1.1) (BR/EDR & LE)
@@ -421,7 +427,8 @@ struct ReadTransmitPowerLevelReturnParams {
 
 // ===============================================================
 // Write Synchonous Flow Control Enable Command (BR/EDR)
-constexpr OpCode kWriteSynchronousFlowControlEnable = ControllerAndBasebandOpCode(0x002F);
+constexpr OpCode kWriteSynchronousFlowControlEnable =
+    ControllerAndBasebandOpCode(0x002F);
 
 // ===================================
 // Read Inquiry Scan Type (v1.2) (BR/EDR)
@@ -472,7 +479,8 @@ constexpr OpCode kWritePageScanType = ControllerAndBasebandOpCode(0x0047);
 
 // =================================
 // Write Extended Inquiry Response (v1.2) (BR/EDR)
-constexpr OpCode kWriteExtendedInquiryResponse = ControllerAndBasebandOpCode(0x0052);
+constexpr OpCode kWriteExtendedInquiryResponse =
+    ControllerAndBasebandOpCode(0x0052);
 
 // ==============================================
 // Read Simple Pairing Mode (v2.1 + EDR) (BR/EDR)
@@ -542,11 +550,13 @@ constexpr OpCode kWriteLEHostSupport = ControllerAndBasebandOpCode(0x006D);
 
 // =============================================
 // Write Secure Connections Host Support Command (v4.1) (BR/EDR)
-constexpr OpCode kWriteSecureConnectionsHostSupport = ControllerAndBasebandOpCode(0x007A);
+constexpr OpCode kWriteSecureConnectionsHostSupport =
+    ControllerAndBasebandOpCode(0x007A);
 
 // ===============================================================
 // Read Authenticated Payload Timeout Command (v4.1) (BR/EDR & LE)
-constexpr OpCode kReadAuthenticatedPayloadTimeout = ControllerAndBasebandOpCode(0x007B);
+constexpr OpCode kReadAuthenticatedPayloadTimeout =
+    ControllerAndBasebandOpCode(0x007B);
 
 struct ReadAuthenticatedPayloadTimeoutCommandParams {
   // Connection_Handle (only the lower 12-bits are meaningful).
@@ -571,7 +581,8 @@ struct ReadAuthenticatedPayloadTimeoutReturnParams {
 
 // ================================================================
 // Write Authenticated Payload Timeout Command (v4.1) (BR/EDR & LE)
-constexpr OpCode kWriteAuthenticatedPayloadTimeout = ControllerAndBasebandOpCode(0x007C);
+constexpr OpCode kWriteAuthenticatedPayloadTimeout =
+    ControllerAndBasebandOpCode(0x007C);
 
 struct WriteAuthenticatedPayloadTimeoutCommandParams {
   // Connection_Handle (only the lower 12-bits are meaningful).
@@ -619,7 +630,8 @@ struct ReadLocalVersionInfoReturnParams {
 
 // ============================================
 // Read Local Supported Commands Command (v1.2)
-constexpr OpCode kReadLocalSupportedCommands = InformationalParamsOpCode(0x0002);
+constexpr OpCode kReadLocalSupportedCommands =
+    InformationalParamsOpCode(0x0002);
 
 struct ReadLocalSupportedCommandsReturnParams {
   // See enum StatusCode in hci_constants.h.
@@ -632,7 +644,8 @@ struct ReadLocalSupportedCommandsReturnParams {
 
 // ============================================
 // Read Local Supported Features Command (v1.1)
-constexpr OpCode kReadLocalSupportedFeatures = InformationalParamsOpCode(0x0003);
+constexpr OpCode kReadLocalSupportedFeatures =
+    InformationalParamsOpCode(0x0003);
 
 struct ReadLocalSupportedFeaturesReturnParams {
   // See enum StatusCode in hci_constants.h.
@@ -1109,8 +1122,8 @@ struct LEEnhancedConnectionCompleteSubeventParams {
   // Time Range: 100 ms to 32 s
   uint16_t supervision_timeout;
 
-  // The Central_Clock_Accuracy parameter is only valid for a peripheral. On a central, this
-  // parameter shall be set to 0x00.
+  // The Central_Clock_Accuracy parameter is only valid for a peripheral. On a
+  // central, this parameter shall be set to 0x00.
   pw::bluetooth::emboss::LEClockAccuracy central_clock_accuracy;
 } __attribute__((packed));
 
@@ -1385,7 +1398,9 @@ constexpr OpCode LEControllerCommandOpCode(const uint16_t ocf) {
 }
 
 // Returns true if the given |opcode| corresponds to a LE controller command.
-inline bool IsLECommand(OpCode opcode) { return GetOGF(opcode) == kLEControllerCommandsOGF; }
+inline bool IsLECommand(OpCode opcode) {
+  return GetOGF(opcode) == kLEControllerCommandsOGF;
+}
 
 // =====================================
 // LE Set Event Mask Command (v4.0) (LE)
@@ -1405,7 +1420,8 @@ struct LEReadBufferSizeReturnParams {
 
 // ====================================================
 // LE Read Local Supported Features Command (v4.0) (LE)
-constexpr OpCode kLEReadLocalSupportedFeatures = LEControllerCommandOpCode(0x0003);
+constexpr OpCode kLEReadLocalSupportedFeatures =
+    LEControllerCommandOpCode(0x0003);
 
 struct LEReadLocalSupportedFeaturesReturnParams {
   // See enum StatusCode in hci_constants.h.
@@ -1426,11 +1442,13 @@ struct LESetRandomAddressCommandParams {
 
 // =================================================
 // LE Set Advertising Parameters Command (v4.0) (LE)
-constexpr OpCode kLESetAdvertisingParameters = LEControllerCommandOpCode(0x0006);
+constexpr OpCode kLESetAdvertisingParameters =
+    LEControllerCommandOpCode(0x0006);
 
 // ========================================================
 // LE Read Advertising Channel Tx Power Command (v4.0) (LE)
-constexpr OpCode kLEReadAdvertisingChannelTxPower = LEControllerCommandOpCode(0x0007);
+constexpr OpCode kLEReadAdvertisingChannelTxPower =
+    LEControllerCommandOpCode(0x0007);
 
 struct LEReadAdvertisingChannelTxPowerReturnParams {
   // See enum StatusCode in hci_constants.h.
@@ -1479,7 +1497,8 @@ constexpr OpCode kLECreateConnectionCancel = LEControllerCommandOpCode(0x000E);
 
 // ===========================================
 // LE Read Filter Accept List Size Command (v4.0) (LE)
-constexpr OpCode kLEReadFilterAcceptListSize = LEControllerCommandOpCode(0x000F);
+constexpr OpCode kLEReadFilterAcceptListSize =
+    LEControllerCommandOpCode(0x000F);
 
 struct LEReadFilterAcceptListSizeReturnParams {
   // See enum StatusCode in hci_constants.h.
@@ -1493,7 +1512,8 @@ constexpr OpCode kLEClearFilterAcceptList = LEControllerCommandOpCode(0x0010);
 
 // ===============================================
 // LE Add Device To Filter Accept List Command (v4.0) (LE)
-constexpr OpCode kLEAddDeviceToFilterAcceptList = LEControllerCommandOpCode(0x0011);
+constexpr OpCode kLEAddDeviceToFilterAcceptList =
+    LEControllerCommandOpCode(0x0011);
 
 struct LEAddDeviceToFilterAcceptListCommandParams {
   // The address type of the peer. The |address| parameter will be ignored if
@@ -1507,7 +1527,8 @@ struct LEAddDeviceToFilterAcceptListCommandParams {
 
 // ====================================================
 // LE Remove Device From Filter Accept List Command (v4.0) (LE)
-constexpr OpCode kLERemoveDeviceFromFilterAcceptList = LEControllerCommandOpCode(0x0012);
+constexpr OpCode kLERemoveDeviceFromFilterAcceptList =
+    LEControllerCommandOpCode(0x0012);
 
 struct LERemoveDeviceFromFilterAcceptListCommandParams {
   // The address type of the peer. The |address| parameter will be ignored if
@@ -1529,7 +1550,8 @@ constexpr OpCode kLEConnectionUpdate = LEControllerCommandOpCode(0x0013);
 
 // ======================================================
 // LE Set Host Channel Classification Command (v4.0) (LE)
-constexpr OpCode kLESetHostChannelClassification = LEControllerCommandOpCode(0x0014);
+constexpr OpCode kLESetHostChannelClassification =
+    LEControllerCommandOpCode(0x0014);
 
 struct LESetHostChannelClassificationCommandParams {
   // This parameter contains 37 1-bit fields (only the lower 37-bits of the
@@ -1659,7 +1681,8 @@ struct LELongTermKeyRequestReplyReturnParams {
 
 // ===========================================================
 // LE Long Term Key Request Negative Reply Command (v4.0) (LE)
-constexpr OpCode kLELongTermKeyRequestNegativeReply = LEControllerCommandOpCode(0x001B);
+constexpr OpCode kLELongTermKeyRequestNegativeReply =
+    LEControllerCommandOpCode(0x001B);
 
 struct LELongTermKeyRequestNegativeReplyReturnParams {
   // See enum StatusCode in hci_constants.h.
@@ -1724,7 +1747,8 @@ struct LETestEndReturnParams {
 
 // ================================================================
 // LE Remote Connection Parameter Request Reply Command (v4.1) (LE)
-constexpr OpCode kLERemoteConnectionParameterRequestReply = LEControllerCommandOpCode(0x0020);
+constexpr OpCode kLERemoteConnectionParameterRequestReply =
+    LEControllerCommandOpCode(0x0020);
 
 struct LERemoteConnectionParameterRequestReplyCommandParams {
   // Connection Handle (only the lower 12-bits are meaningful).
@@ -1810,7 +1834,8 @@ struct LESetDataLengthReturnParams {
 
 // =========================================================
 // LE Read Suggested Default Data Length Command (v4.2) (LE)
-constexpr OpCode kLEReadSuggestedDefaultDataLength = LEControllerCommandOpCode(0x0023);
+constexpr OpCode kLEReadSuggestedDefaultDataLength =
+    LEControllerCommandOpCode(0x0023);
 
 struct LEReadSuggestedDefaultDataLengthReturnParams {
   // See enum StatusCode in hci_constants.h.
@@ -1825,7 +1850,8 @@ struct LEReadSuggestedDefaultDataLengthReturnParams {
 
 // ==========================================================
 // LE Write Suggested Default Data Length Command (v4.2) (LE)
-constexpr OpCode kLEWriteSuggestedDefaultDataLength = LEControllerCommandOpCode(0x0024);
+constexpr OpCode kLEWriteSuggestedDefaultDataLength =
+    LEControllerCommandOpCode(0x0024);
 
 struct LEWriteSuggestedDefaultDataLengthCommandParams {
   // Range: see kLEMaxTxOctets[Min|Max] in hci_constants.h
@@ -1870,7 +1896,8 @@ struct LEGenerateDHKeyCommandParams {
 
 // ===================================================
 // LE Add Device To Resolving List Command (v4.2) (LE)
-constexpr OpCode kLEAddDeviceToResolvingList = LEControllerCommandOpCode(0x0027);
+constexpr OpCode kLEAddDeviceToResolvingList =
+    LEControllerCommandOpCode(0x0027);
 
 struct LEAddDeviceToResolvingListCommandParams {
   // The peer device's identity address type.
@@ -1888,7 +1915,8 @@ struct LEAddDeviceToResolvingListCommandParams {
 
 // ========================================================
 // LE Remove Device From Resolving List Command (v4.2) (LE)
-constexpr OpCode kLERemoveDeviceFromResolvingList = LEControllerCommandOpCode(0x0028);
+constexpr OpCode kLERemoveDeviceFromResolvingList =
+    LEControllerCommandOpCode(0x0028);
 
 struct LERemoveDeviceFromResolvingListCommandParams {
   // The peer device's identity address type.
@@ -1916,7 +1944,8 @@ struct LEReadResolvingListReturnParams {
 
 // ===================================================
 // LE Read Peer Resolvable Address Command (v4.2) (LE)
-constexpr OpCode kLEReadPeerResolvableAddress = LEControllerCommandOpCode(0x002B);
+constexpr OpCode kLEReadPeerResolvableAddress =
+    LEControllerCommandOpCode(0x002B);
 
 struct LEReadPeerResolvableAddressCommandParams {
   // The peer device's identity address type.
@@ -1936,7 +1965,8 @@ struct LEReadPeerResolvableAddressReturnParams {
 
 // ====================================================
 // LE Read Local Resolvable Address Command (v4.2) (LE)
-constexpr OpCode kLEReadLocalResolvableAddress = LEControllerCommandOpCode(0x002C);
+constexpr OpCode kLEReadLocalResolvableAddress =
+    LEControllerCommandOpCode(0x002C);
 
 struct LEReadLocalResolvableAddressCommandParams {
   // The peer device's identity address type.
@@ -1956,7 +1986,8 @@ struct LEReadLocalResolvableAddressReturnParams {
 
 // ====================================================
 // LE Set Address Resolution Enable Command (v4.2) (LE)
-constexpr OpCode kLESetAddressResolutionEnable = LEControllerCommandOpCode(0x002D);
+constexpr OpCode kLESetAddressResolutionEnable =
+    LEControllerCommandOpCode(0x002D);
 
 struct LESetAddressResolutionEnableCommandParams {
   GenericEnableParam address_resolution_enable;
@@ -1964,7 +1995,8 @@ struct LESetAddressResolutionEnableCommandParams {
 
 // =============================================================
 // LE Set Resolvable Private Address Timeout Command (v4.2) (LE)
-constexpr OpCode kLESetResolvablePrivateAddressTimeout = LEControllerCommandOpCode(0x002E);
+constexpr OpCode kLESetResolvablePrivateAddressTimeout =
+    LEControllerCommandOpCode(0x002E);
 
 struct LESetResolvablePrivateAddressTimeoutCommandParams {
   // Range: See kLERPATimeout[Min|Max] in hci_constants.h
@@ -2103,11 +2135,13 @@ struct LEEnhancedTransmitterTestCommandParams {
 
 // =========================================================
 // LE Set Advertising Set Random Address Command (v5.0) (LE)
-constexpr OpCode kLESetAdvertisingSetRandomAddress = LEControllerCommandOpCode(0x0035);
+constexpr OpCode kLESetAdvertisingSetRandomAddress =
+    LEControllerCommandOpCode(0x0035);
 
 // ==========================================================
 // LE Set Extended Advertising Parameters Command (v5.0) (LE)
-constexpr OpCode kLESetExtendedAdvertisingParameters = LEControllerCommandOpCode(0x0036);
+constexpr OpCode kLESetExtendedAdvertisingParameters =
+    LEControllerCommandOpCode(0x0036);
 
 struct LESetExtendedAdvertisingParametersReturnParams {
   // See enum StatusCode in hci_constants.h.
@@ -2117,19 +2151,23 @@ struct LESetExtendedAdvertisingParametersReturnParams {
 
 // ====================================================
 // LE Set Extended Advertising Data Command (v5.0) (LE)
-constexpr OpCode kLESetExtendedAdvertisingData = LEControllerCommandOpCode(0x0037);
+constexpr OpCode kLESetExtendedAdvertisingData =
+    LEControllerCommandOpCode(0x0037);
 
 // ======================================================
 // LE Set Extended Scan Response Data Command (v5.0) (LE)
-constexpr OpCode kLESetExtendedScanResponseData = LEControllerCommandOpCode(0x0038);
+constexpr OpCode kLESetExtendedScanResponseData =
+    LEControllerCommandOpCode(0x0038);
 
 // ======================================================
 // LE Set Extended Advertising Enable Command (v5.0) (LE)
-constexpr OpCode kLESetExtendedAdvertisingEnable = LEControllerCommandOpCode(0x0039);
+constexpr OpCode kLESetExtendedAdvertisingEnable =
+    LEControllerCommandOpCode(0x0039);
 
 // ===========================================================
 // LE Read Maximum Advertising Data Length Command (v5.0) (LE)
-constexpr OpCode kLEReadMaxAdvertisingDataLength = LEControllerCommandOpCode(0x003A);
+constexpr OpCode kLEReadMaxAdvertisingDataLength =
+    LEControllerCommandOpCode(0x003A);
 
 struct LEReadMaxAdvertisingDataLengthReturnParams {
   // See enum StatusCode in hci_constants.h.
@@ -2140,7 +2178,8 @@ struct LEReadMaxAdvertisingDataLengthReturnParams {
 
 // ================================================================
 // LE Read Number of Supported Advertising Sets Command (v5.0) (LE)
-constexpr OpCode kLEReadNumSupportedAdvertisingSets = LEControllerCommandOpCode(0x003B);
+constexpr OpCode kLEReadNumSupportedAdvertisingSets =
+    LEControllerCommandOpCode(0x003B);
 
 struct LEReadNumSupportedAdvertisingSetsReturnParams {
   // See enum StatusCode in hci_constants.h.
@@ -2164,7 +2203,8 @@ constexpr OpCode kLEClearAdvertisingSets = LEControllerCommandOpCode(0x003D);
 
 // ==========================================================
 // LE Set Periodic Advertising Parameters Command (v5.0) (LE)
-constexpr OpCode kLESetPeriodicAdvertisingParameters = LEControllerCommandOpCode(0x003E);
+constexpr OpCode kLESetPeriodicAdvertisingParameters =
+    LEControllerCommandOpCode(0x003E);
 
 struct LESetPeriodicAdvertisingParametersCommandParams {
   // Identifies the advertising set whose periodic advertising parameters are
@@ -2184,7 +2224,8 @@ struct LESetPeriodicAdvertisingParametersCommandParams {
 
 // ====================================================
 // LE Set Periodic Advertising Data Command (v5.0) (LE)
-constexpr OpCode kLESetPeriodicAdvertisingData = LEControllerCommandOpCode(0x003F);
+constexpr OpCode kLESetPeriodicAdvertisingData =
+    LEControllerCommandOpCode(0x003F);
 
 struct LESetPeriodicAdvertisingDataCommandParams {
   LESetPeriodicAdvertisingDataCommandParams() = delete;
@@ -2207,7 +2248,8 @@ struct LESetPeriodicAdvertisingDataCommandParams {
 
 // ======================================================
 // LE Set Periodic Advertising Enable Command (v5.0) (LE)
-constexpr OpCode kLESetPeriodicAdvertisingEnable = LEControllerCommandOpCode(0x0040);
+constexpr OpCode kLESetPeriodicAdvertisingEnable =
+    LEControllerCommandOpCode(0x0040);
 
 struct LESetPeriodicAdvertisingEnableCommandParams {
   // Enable or Disable periodic advertising.
@@ -2219,7 +2261,8 @@ struct LESetPeriodicAdvertisingEnableCommandParams {
 
 // ===================================================
 // LE Set Extended Scan Parameters Command (v5.0) (LE)
-constexpr OpCode kLESetExtendedScanParameters = LEControllerCommandOpCode(0x0041);
+constexpr OpCode kLESetExtendedScanParameters =
+    LEControllerCommandOpCode(0x0041);
 
 // ===============================================
 // LE Set Extended Scan Enable Command (v5.0) (LE)
@@ -2227,11 +2270,13 @@ constexpr OpCode kLESetExtendedScanEnable = LEControllerCommandOpCode(0x0042);
 
 // =================================================
 // LE Extended Create Connection Command (v5.0) (LE)
-constexpr OpCode kLEExtendedCreateConnection = LEControllerCommandOpCode(0x0043);
+constexpr OpCode kLEExtendedCreateConnection =
+    LEControllerCommandOpCode(0x0043);
 
 // =======================================================
 // LE Periodic Advertising Create Sync Command (v5.0) (LE)
-constexpr OpCode kLEPeriodicAdvertisingCreateSync = LEControllerCommandOpCode(0x0044);
+constexpr OpCode kLEPeriodicAdvertisingCreateSync =
+    LEControllerCommandOpCode(0x0044);
 
 // NOTE on ReturnParams: No Command Complete event is sent by the Controller to
 // indicate that this command has been completed. Instead, the LE Periodic
@@ -2240,27 +2285,33 @@ constexpr OpCode kLEPeriodicAdvertisingCreateSync = LEControllerCommandOpCode(0x
 
 // ==============================================================
 // LE Periodic Advertising Create Sync Cancel Command (v5.0) (LE)
-constexpr OpCode kLEPeriodicAdvertisingCreateSyncCancel = LEControllerCommandOpCode(0x0045);
+constexpr OpCode kLEPeriodicAdvertisingCreateSyncCancel =
+    LEControllerCommandOpCode(0x0045);
 
 // ==========================================================
 // LE Periodic Advertising Terminate Sync Command (v5.0) (LE)
-constexpr OpCode kLEPeriodicAdvertisingTerminateSync = LEControllerCommandOpCode(0x0046);
+constexpr OpCode kLEPeriodicAdvertisingTerminateSync =
+    LEControllerCommandOpCode(0x0046);
 
 // =============================================================
 // LE Add Device To Periodic Advertiser List Command (v5.0) (LE)
-constexpr OpCode kLEAddDeviceToPeriodicAdvertiserList = LEControllerCommandOpCode(0x0047);
+constexpr OpCode kLEAddDeviceToPeriodicAdvertiserList =
+    LEControllerCommandOpCode(0x0047);
 
 // ==================================================================
 // LE Remove Device From Periodic Advertiser List Command (v5.0) (LE)
-constexpr OpCode kLERemoveDeviceFromPeriodicAdvertiserList = LEControllerCommandOpCode(0x0048);
+constexpr OpCode kLERemoveDeviceFromPeriodicAdvertiserList =
+    LEControllerCommandOpCode(0x0048);
 
 // =====================================================
 // LE Clear Periodic Advertiser List Command (v5.0) (LE)
-constexpr OpCode kLEClearPeriodicAdvertiserList = LEControllerCommandOpCode(0x0049);
+constexpr OpCode kLEClearPeriodicAdvertiserList =
+    LEControllerCommandOpCode(0x0049);
 
 // =========================================================
 // LE Read Periodic Advertiser List Size Command (v5.0) (LE)
-constexpr OpCode kLEReadPeriodicAdvertiserListSize = LEControllerCommandOpCode(0x004A);
+constexpr OpCode kLEReadPeriodicAdvertiserListSize =
+    LEControllerCommandOpCode(0x004A);
 
 struct LEReadPeriodicAdvertiserListSizeReturnParams {
   // See enum StatusCode in hci_constants.h.
@@ -2313,7 +2364,9 @@ constexpr OpCode kLESetPrivacyMode = LEControllerCommandOpCode(0x004E);
 // The OGF of 0x3F is reserved for vendor-specific debug commands (see Core Spec
 // v5.0, Vol 2, Part E, Section 5.4.1).
 constexpr uint8_t kVendorOGF = 0x3F;
-constexpr OpCode VendorOpCode(const uint16_t ocf) { return DefineOpCode(kVendorOGF, ocf); }
+constexpr OpCode VendorOpCode(const uint16_t ocf) {
+  return DefineOpCode(kVendorOGF, ocf);
+}
 
 }  // namespace bt::hci_spec
 

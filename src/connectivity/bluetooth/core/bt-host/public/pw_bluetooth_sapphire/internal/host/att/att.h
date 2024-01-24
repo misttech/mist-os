@@ -22,14 +22,16 @@ constexpr uint16_t kLEMinMTU = 23;
 // v5.0, Vol 3, Part G, 5.1.1
 constexpr uint16_t kBREDRMinMTU = 48;
 
-constexpr uint16_t kLEMaxMTU = hci_spec::kMaxLEExtendedDataLength - sizeof(l2cap::BasicHeader);
+constexpr uint16_t kLEMaxMTU =
+    hci_spec::kMaxLEExtendedDataLength - sizeof(l2cap::BasicHeader);
 
 // The maximum length of an attribute value (v5.0, Vol 3, Part F, 3.2.9).
 constexpr size_t kMaxAttributeValueLength = 512;
 
 // The ATT protocol transaction timeout.
 // (see v5.0, Vol 3, Part F, Section 3.3.3).
-constexpr pw::chrono::SystemClock::duration kTransactionTimeout = std::chrono::seconds(30);
+constexpr pw::chrono::SystemClock::duration kTransactionTimeout =
+    std::chrono::seconds(30);
 
 // A server identifies each attribute using a 16-bit handle.
 using Handle = uint16_t;
@@ -106,7 +108,8 @@ enum class UUIDType : uint8_t {
 };
 
 template <UUIDType Type>
-using AttributeType = typename std::conditional<Type == UUIDType::k16Bit, uint16_t, UInt128>::type;
+using AttributeType = typename std::
+    conditional<Type == UUIDType::k16Bit, uint16_t, UInt128>::type;
 
 using AttributeType16 = AttributeType<UUIDType::k16Bit>;
 using AttributeType128 = AttributeType<UUIDType::k128Bit>;

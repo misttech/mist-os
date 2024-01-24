@@ -26,7 +26,8 @@ class LESignalingChannelTestBase : public testing::FakeChannelTest {
     options.conn_handle = kTestHandle;
 
     fake_sig_chan_ = CreateFakeChannel(options);
-    sig_ = std::make_unique<LESignalingChannel>(fake_sig_chan_->GetWeakPtr(), Role, dispatcher());
+    sig_ = std::make_unique<LESignalingChannel>(
+        fake_sig_chan_->GetWeakPtr(), Role, dispatcher());
   }
 
   void TearDown() override { sig_ = nullptr; }
@@ -42,8 +43,8 @@ class LESignalingChannelTestBase : public testing::FakeChannelTest {
 
 using LESignalingChannelTest = LESignalingChannelTestBase<>;
 
-using LESignalingChannelPeripheralTest =
-    LESignalingChannelTestBase<pw::bluetooth::emboss::ConnectionRole::PERIPHERAL>;
+using LESignalingChannelPeripheralTest = LESignalingChannelTestBase<
+    pw::bluetooth::emboss::ConnectionRole::PERIPHERAL>;
 
 TEST_F(LESignalingChannelTest, IgnoreEmptyFrame) {
   bool send_cb_called = false;

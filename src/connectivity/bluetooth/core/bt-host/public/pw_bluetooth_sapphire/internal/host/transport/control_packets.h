@@ -24,11 +24,13 @@ using EventPacketPtr = std::unique_ptr<EventPacket>;
 
 // Packet template specialization for HCI command packets.
 template <>
-class Packet<hci_spec::CommandHeader> : public PacketBase<hci_spec::CommandHeader, CommandPacket> {
+class Packet<hci_spec::CommandHeader>
+    : public PacketBase<hci_spec::CommandHeader, CommandPacket> {
  public:
   // Slab-allocates a new CommandPacket with the given payload size and
   // initializes the packet's header field.
-  static std::unique_ptr<CommandPacket> New(hci_spec::OpCode opcode, size_t payload_size = 0u);
+  static std::unique_ptr<CommandPacket> New(hci_spec::OpCode opcode,
+                                            size_t payload_size = 0u);
 
   // Returns the HCI command opcode currently in this packet.
   hci_spec::OpCode opcode() const { return le16toh(view().header().opcode); }
@@ -49,7 +51,8 @@ class Packet<hci_spec::CommandHeader> : public PacketBase<hci_spec::CommandHeade
 
 // Packet template specialization for HCI event packets.
 template <>
-class Packet<hci_spec::EventHeader> : public PacketBase<hci_spec::EventHeader, EventPacket> {
+class Packet<hci_spec::EventHeader>
+    : public PacketBase<hci_spec::EventHeader, EventPacket> {
  public:
   // Slab-allocates a new EventPacket with the given payload size without
   // initializing its contents.
@@ -71,19 +74,22 @@ class Packet<hci_spec::EventHeader> : public PacketBase<hci_spec::EventHeader, E
   template <typename ReturnParams>
   const ReturnParams* return_params() const {
     if (event_code() != hci_spec::kCommandCompleteEventCode ||
-        sizeof(ReturnParams) > view().payload_size() - sizeof(hci_spec::CommandCompleteEventParams))
+        sizeof(ReturnParams) > view().payload_size() -
+                                   sizeof(hci_spec::CommandCompleteEventParams))
       return nullptr;
     return reinterpret_cast<const ReturnParams*>(
         params<hci_spec::CommandCompleteEventParams>().return_parameters);
   }
 
-  // If this is a LE Meta Event packet, this method returns a pointer to the beginning of the
-  // subevent parameter structure. If the given template type would exceed the bounds of the packet
-  // or if this packet does not represent a LE Meta Event, this method returns nullptr.
+  // If this is a LE Meta Event packet, this method returns a pointer to the
+  // beginning of the subevent parameter structure. If the given template type
+  // would exceed the bounds of the packet or if this packet does not represent
+  // a LE Meta Event, this method returns nullptr.
   template <typename SubeventParams>
   const SubeventParams* subevent_params() const {
     if (event_code() != hci_spec::kLEMetaEventCode ||
-        sizeof(SubeventParams) > view().payload_size() - sizeof(hci_spec::LEMetaEventParams)) {
+        sizeof(SubeventParams) >
+            view().payload_size() - sizeof(hci_spec::LEMetaEventParams)) {
       return nullptr;
     }
 
@@ -124,6 +130,7 @@ class Packet<hci_spec::EventHeader> : public PacketBase<hci_spec::EventHeader, E
 
 // Convenience macros to check and log any non-Success status of an event.
 // Evaluate to true if the event status is not success.
-#define hci_is_error(event, flag, tag, fmt...) bt_is_error(event.ToResult(), flag, tag, fmt)
+#define hci_is_error(event, flag, tag, fmt...) \
+  bt_is_error(event.ToResult(), flag, tag, fmt)
 
 #endif  // SRC_CONNECTIVITY_BLUETOOTH_CORE_BT_HOST_PUBLIC_PW_BLUETOOTH_SAPPHIRE_INTERNAL_HOST_TRANSPORT_CONTROL_PACKETS_H_

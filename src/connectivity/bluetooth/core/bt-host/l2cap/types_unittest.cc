@@ -12,7 +12,8 @@ namespace {
 
 TEST(AnyChannelMode, ToString) {
   AnyChannelMode mode = RetransmissionAndFlowControlMode::kRetransmission;
-  EXPECT_EQ(AnyChannelModeToString(mode), "(RetransmissionAndFlowControlMode) 0x01");
+  EXPECT_EQ(AnyChannelModeToString(mode),
+            "(RetransmissionAndFlowControlMode) 0x01");
   mode = CreditBasedFlowControlMode::kLeCreditBasedFlowControl;
   EXPECT_EQ(AnyChannelModeToString(mode), "(CreditBasedFlowControlMode) 0x14");
 }

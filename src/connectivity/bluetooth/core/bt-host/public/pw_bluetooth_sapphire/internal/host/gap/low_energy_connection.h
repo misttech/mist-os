@@ -26,62 +26,74 @@ namespace bt::gap {
 
 namespace internal {
 
-// LowEnergyConnector constructs LowEnergyConnection instances immediately upon successful
-// completion of the link layer connection procedure (to hook up HCI event callbacks). However,
-// LowEnergyConnections aren't exposed to the rest of the stack (including the
-// LowEnergyConnectionManager) until fully interrogated, as completion of the link-layer connection
-// process is insufficient to guarantee a working connection. Thus this class represents the state
-// of an active *AND* (outside of LowEnergyConnector) known-functional connection.
+// LowEnergyConnector constructs LowEnergyConnection instances immediately upon
+// successful completion of the link layer connection procedure (to hook up HCI
+// event callbacks). However, LowEnergyConnections aren't exposed to the rest of
+// the stack (including the LowEnergyConnectionManager) until fully
+// interrogated, as completion of the link-layer connection process is
+// insufficient to guarantee a working connection. Thus this class represents
+// the state of an active *AND* (outside of LowEnergyConnector) known-functional
+// connection.
 //
-// Instances are kept alive as long as there is at least one LowEnergyConnectionHandle that
-// references them. Instances are expected to be destroyed immediately after a peer disconnect
-// event is received (as indicated by peer_disconnect_cb).
+// Instances are kept alive as long as there is at least one
+// LowEnergyConnectionHandle that references them. Instances are expected to be
+// destroyed immediately after a peer disconnect event is received (as indicated
+// by peer_disconnect_cb).
 class LowEnergyConnection final : public sm::Delegate {
  public:
   // |peer| is the peer that this connection is connected to.
-  // |link| is the underlying LE HCI connection that this connection corresponds to.
-  // |peer_disconnect_cb| will be called when the peer disconnects. It will not be called before
-  // this method returns.
-  // |error_cb| will be called when a fatal connection error occurs and the connection should be
-  // closed (e.g. when L2CAP reports an error). It will not be called before this method returns.
-  // |conn_mgr| is the LowEnergyConnectionManager that owns this connection.
-  // |l2cap|, |gatt|, and |cmd_channel| are pointers to the interfaces of the corresponding layers.
-  // Returns nullptr if connection initialization fails.
-  using PeerDisconnectCallback = fit::callback<void(pw::bluetooth::emboss::StatusCode)>;
+  // |link| is the underlying LE HCI connection that this connection corresponds
+  // to. |peer_disconnect_cb| will be called when the peer disconnects. It will
+  // not be called before this method returns. |error_cb| will be called when a
+  // fatal connection error occurs and the connection should be closed (e.g.
+  // when L2CAP reports an error). It will not be called before this method
+  // returns. |conn_mgr| is the LowEnergyConnectionManager that owns this
+  // connection. |l2cap|, |gatt|, and |cmd_channel| are pointers to the
+  // interfaces of the corresponding layers. Returns nullptr if connection
+  // initialization fails.
+  using PeerDisconnectCallback =
+      fit::callback<void(pw::bluetooth::emboss::StatusCode)>;
   using ErrorCallback = fit::callback<void()>;
   static std::unique_ptr<LowEnergyConnection> Create(
-      Peer::WeakPtr peer, std::unique_ptr<hci::LowEnergyConnection> link,
-      LowEnergyConnectionOptions connection_options, PeerDisconnectCallback peer_disconnect_cb,
-      ErrorCallback error_cb, WeakSelf<LowEnergyConnectionManager>::WeakPtr conn_mgr,
-      l2cap::ChannelManager* l2cap, gatt::GATT::WeakPtr gatt,
-      hci::CommandChannel::WeakPtr cmd_channel, pw::async::Dispatcher& dispatcher);
+      Peer::WeakPtr peer,
+      std::unique_ptr<hci::LowEnergyConnection> link,
+      LowEnergyConnectionOptions connection_options,
+      PeerDisconnectCallback peer_disconnect_cb,
+      ErrorCallback error_cb,
+      WeakSelf<LowEnergyConnectionManager>::WeakPtr conn_mgr,
+      l2cap::ChannelManager* l2cap,
+      gatt::GATT::WeakPtr gatt,
+      hci::CommandChannel::WeakPtr cmd_channel,
+      pw::async::Dispatcher& dispatcher);
 
   // Notifies request callbacks and connection refs of the disconnection.
   ~LowEnergyConnection() override;
 
-  // Create a reference to this connection. When the last reference is dropped, this connection will
-  // be disconnected.
+  // Create a reference to this connection. When the last reference is dropped,
+  // this connection will be disconnected.
   std::unique_ptr<LowEnergyConnectionHandle> AddRef();
 
-  // Decrements the ref count. Must be called when a LowEnergyConnectionHandle is
-  // released/destroyed.
+  // Decrements the ref count. Must be called when a LowEnergyConnectionHandle
+  // is released/destroyed.
   void DropRef(LowEnergyConnectionHandle* ref);
 
   // Used to respond to protocol/service requests for increased security.
   void OnSecurityRequest(sm::SecurityLevel level, sm::ResultFunction<> cb);
 
-  // Handles a pairing request (i.e. security upgrade) received from "higher levels", likely
-  // initiated from GAP. This will only be used by pairing requests that are initiated
-  // in the context of testing. May only be called on an already-established connection.
-  void UpgradeSecurity(sm::SecurityLevel level, sm::BondableMode bondable_mode,
+  // Handles a pairing request (i.e. security upgrade) received from "higher
+  // levels", likely initiated from GAP. This will only be used by pairing
+  // requests that are initiated in the context of testing. May only be called
+  // on an already-established connection.
+  void UpgradeSecurity(sm::SecurityLevel level,
+                       sm::BondableMode bondable_mode,
                        sm::ResultFunction<> cb);
 
   // Cancels any on-going pairing procedures and sets up SMP to use the provided
   // new I/O capabilities for future pairing procedures.
   void ResetSecurityManager(sm::IOCapability ioc);
 
-  // Must be called when interrogation has completed. May update connection parameters if all
-  // initialization procedures have completed.
+  // Must be called when interrogation has completed. May update connection
+  // parameters if all initialization procedures have completed.
   void OnInterrogationComplete();
 
   // Attach connection as child node of |parent| with specified |name|.
@@ -98,8 +110,8 @@ class LowEnergyConnection final : public sm::Delegate {
     peer_disconnect_callback_ = std::move(cb);
   }
 
-  // |peer_conn_token| is a token generated by the connected Peer, and is used to
-  // synchronize connection state.
+  // |peer_conn_token| is a token generated by the connected Peer, and is used
+  // to synchronize connection state.
   void set_peer_conn_token(Peer::ConnectionToken peer_conn_token) {
     BT_ASSERT(interrogation_completed_);
     BT_ASSERT(!peer_conn_token_);
@@ -131,12 +143,16 @@ class LowEnergyConnection final : public sm::Delegate {
   LowEnergyConnection::WeakPtr GetWeakPtr() { return weak_self_.GetWeakPtr(); }
 
  private:
-  LowEnergyConnection(Peer::WeakPtr peer, std::unique_ptr<hci::LowEnergyConnection> link,
+  LowEnergyConnection(Peer::WeakPtr peer,
+                      std::unique_ptr<hci::LowEnergyConnection> link,
                       LowEnergyConnectionOptions connection_options,
-                      PeerDisconnectCallback peer_disconnect_cb, ErrorCallback error_cb,
+                      PeerDisconnectCallback peer_disconnect_cb,
+                      ErrorCallback error_cb,
                       WeakSelf<LowEnergyConnectionManager>::WeakPtr conn_mgr,
-                      l2cap::ChannelManager* l2cap, gatt::GATT::WeakPtr gatt,
-                      hci::CommandChannel::WeakPtr cmd_channel, pw::async::Dispatcher& dispatcher);
+                      l2cap::ChannelManager* l2cap,
+                      gatt::GATT::WeakPtr gatt,
+                      hci::CommandChannel::WeakPtr cmd_channel,
+                      pw::async::Dispatcher& dispatcher);
 
   // Registers this connection with L2CAP and initializes the fixed channel
   // protocols. Return true on success, false on failure.
@@ -145,24 +161,27 @@ class LowEnergyConnection final : public sm::Delegate {
   // Register handlers for HCI events that correspond to this connection.
   void RegisterEventHandlers();
 
-  // Start kLEConnectionPauseCentral/Peripheral timeout that will update connection parameters.
-  // Should be called as soon as this GAP connection is established.
+  // Start kLEConnectionPauseCentral/Peripheral timeout that will update
+  // connection parameters. Should be called as soon as this GAP connection is
+  // established.
   void StartConnectionPauseTimeout();
 
-  // Start kLEConnectionPausePeripheral timeout that will send a connection parameter update
-  // request. Should be called as soon as connection is established.
+  // Start kLEConnectionPausePeripheral timeout that will send a connection
+  // parameter update request. Should be called as soon as connection is
+  // established.
   void StartConnectionPausePeripheralTimeout();
 
-  // Start kLEConnectionPauseCentral timeout that will update connection parameters.
-  // Should be called as soon as connection is established.
+  // Start kLEConnectionPauseCentral timeout that will update connection
+  // parameters. Should be called as soon as connection is established.
   void StartConnectionPauseCentralTimeout();
 
   // Initializes SecurityManager and GATT.
   // Called by the L2CAP layer once the link has been registered and the fixed
   // channels have been opened. Returns false if GATT initialization fails.
-  [[nodiscard]] bool OnL2capFixedChannelsOpened(l2cap::Channel::WeakPtr att,
-                                                l2cap::Channel::WeakPtr smp,
-                                                LowEnergyConnectionOptions connection_options);
+  [[nodiscard]] bool OnL2capFixedChannelsOpened(
+      l2cap::Channel::WeakPtr att,
+      l2cap::Channel::WeakPtr smp,
+      LowEnergyConnectionOptions connection_options);
 
   // Called when the preferred connection parameters have been received for a LE
   // peripheral. This can happen in the form of:
@@ -184,69 +203,83 @@ class LowEnergyConnection final : public sm::Delegate {
   //
   // |peer_id| uniquely identifies the peer. |handle| represents
   // the logical link that |params| should be applied to.
-  void OnNewLEConnectionParams(const hci_spec::LEPreferredConnectionParameters& params);
+  void OnNewLEConnectionParams(
+      const hci_spec::LEPreferredConnectionParameters& params);
 
-  // As an LE peripheral, request that the connection parameters |params| be used on the given
-  // connection |conn| with peer |peer_id|. This may send an HCI LE Connection Update command or an
-  // L2CAP Connection Parameter Update Request depending on what the local and remote controllers
-  // support.
+  // As an LE peripheral, request that the connection parameters |params| be
+  // used on the given connection |conn| with peer |peer_id|. This may send an
+  // HCI LE Connection Update command or an L2CAP Connection Parameter Update
+  // Request depending on what the local and remote controllers support.
   //
   // Interrogation must have completed before this may be called.
-  void RequestConnectionParameterUpdate(const hci_spec::LEPreferredConnectionParameters& params);
+  void RequestConnectionParameterUpdate(
+      const hci_spec::LEPreferredConnectionParameters& params);
 
-  // Handler for connection parameter update command sent when an update is requested by
-  // RequestConnectionParameterUpdate.
+  // Handler for connection parameter update command sent when an update is
+  // requested by RequestConnectionParameterUpdate.
   //
-  // If the HCI LE Connection Update command fails with status kUnsupportedRemoteFeature, the update
-  // will be retried with an L2CAP Connection Parameter Update Request.
+  // If the HCI LE Connection Update command fails with status
+  // kUnsupportedRemoteFeature, the update will be retried with an L2CAP
+  // Connection Parameter Update Request.
   void HandleRequestConnectionParameterUpdateCommandStatus(
       hci_spec::LEPreferredConnectionParameters params, hci::Result<> status);
 
-  // As an LE peripheral, send an L2CAP Connection Parameter Update Request requesting |params| on
-  // the LE signaling channel of the given logical link |handle|.
+  // As an LE peripheral, send an L2CAP Connection Parameter Update Request
+  // requesting |params| on the LE signaling channel of the given logical link
+  // |handle|.
   //
-  // NOTE: This should only be used if the LE peripheral and/or LE central do not support the
-  // Connection Parameters Request Link Layer Control Procedure (Core Spec v5.2  Vol 3, Part A,
-  // Sec 4.20). If they do, UpdateConnectionParams(...) should be used instead.
+  // NOTE: This should only be used if the LE peripheral and/or LE central do
+  // not support the Connection Parameters Request Link Layer Control Procedure
+  // (Core Spec v5.2  Vol 3, Part A, Sec 4.20). If they do,
+  // UpdateConnectionParams(...) should be used instead.
   void L2capRequestConnectionParameterUpdate(
       const hci_spec::LEPreferredConnectionParameters& params);
 
-  // Requests that the controller use the given connection |params| by sending an HCI LE Connection
-  // Update command. This may be issued on both the LE peripheral and the LE central.
+  // Requests that the controller use the given connection |params| by sending
+  // an HCI LE Connection Update command. This may be issued on both the LE
+  // peripheral and the LE central.
   //
-  // The link layer may modify the preferred parameters |params| before initiating the Connection
-  // Parameters Request Link Layer Control Procedure (Core Spec v5.2, Vol 6, Part B, Sec 5.1.7).
+  // The link layer may modify the preferred parameters |params| before
+  // initiating the Connection Parameters Request Link Layer Control Procedure
+  // (Core Spec v5.2, Vol 6, Part B, Sec 5.1.7).
   //
-  // If non-null, |status_cb| will be called when the HCI Command Status event is received.
+  // If non-null, |status_cb| will be called when the HCI Command Status event
+  // is received.
   //
-  // The HCI LE Connection Update Complete event will be generated after the parameters have been
-  // applied or if the update fails, and will indicate the (possibly modified) parameter values.
+  // The HCI LE Connection Update Complete event will be generated after the
+  // parameters have been applied or if the update fails, and will indicate the
+  // (possibly modified) parameter values.
   //
-  // NOTE: If the local host is an LE peripheral, then the local controller and the remote
-  // LE central must have indicated support for this procedure in the LE feature mask. Otherwise,
-  // L2capRequestConnectionParameterUpdate(...) should be used instead.
+  // NOTE: If the local host is an LE peripheral, then the local controller and
+  // the remote LE central must have indicated support for this procedure in the
+  // LE feature mask. Otherwise, L2capRequestConnectionParameterUpdate(...)
+  // should be used instead.
   using StatusCallback = hci::ResultCallback<>;
-  void UpdateConnectionParams(const hci_spec::LEPreferredConnectionParameters& params,
-                              StatusCallback status_cb = nullptr);
+  void UpdateConnectionParams(
+      const hci_spec::LEPreferredConnectionParameters& params,
+      StatusCallback status_cb = nullptr);
 
-  // This event may be generated without host interaction by the Link Layer, or as the result of a
-  // Connection Update Command sent by either device, which is why it is not simply handled by the
-  // command handler. (See Core Spec v5.2, Vol 6, Part B, Sec 5.1.7.1).
+  // This event may be generated without host interaction by the Link Layer, or
+  // as the result of a Connection Update Command sent by either device, which
+  // is why it is not simply handled by the command handler. (See Core Spec
+  // v5.2, Vol 6, Part B, Sec 5.1.7.1).
   void OnLEConnectionUpdateComplete(const hci::EmbossEventPacket& event);
 
-  // Updates or requests an update of the connection parameters, for central and peripheral roles
-  // respectively, if interrogation has completed.
-  // TODO(https://fxbug.dev/79491): Wait to update connection parameters until all initialization
-  // procedures have completed.
+  // Updates or requests an update of the connection parameters, for central and
+  // peripheral roles respectively, if interrogation has completed.
+  // TODO(https://fxbug.dev/79491): Wait to update connection parameters until
+  // all initialization procedures have completed.
   void MaybeUpdateConnectionParameters();
 
-  // Registers the peer with GATT and initiates service discovery. If |service_uuid| is specified,
-  // only discover the indicated service and the GAP service. Returns true on success, false on
-  // failure.
-  bool InitializeGatt(l2cap::Channel::WeakPtr att, std::optional<UUID> service_uuid);
+  // Registers the peer with GATT and initiates service discovery. If
+  // |service_uuid| is specified, only discover the indicated service and the
+  // GAP service. Returns true on success, false on failure.
+  bool InitializeGatt(l2cap::Channel::WeakPtr att,
+                      std::optional<UUID> service_uuid);
 
-  // Called when service discovery completes. |services| will only include services with the GAP
-  // UUID (there should only be one, but this is not guaranteed).
+  // Called when service discovery completes. |services| will only include
+  // services with the GAP UUID (there should only be one, but this is not
+  // guaranteed).
   void OnGattServicesResult(att::Result<> status, gatt::ServiceList services);
 
   // Notifies all connection refs of disconnection.
@@ -259,14 +292,15 @@ class LowEnergyConnection final : public sm::Delegate {
   void OnNewSecurityProperties(const sm::SecurityProperties& sec) override;
   std::optional<sm::IdentityInfo> OnIdentityInformationRequest() override;
   void ConfirmPairing(ConfirmCallback confirm) override;
-  void DisplayPasskey(uint32_t passkey, sm::Delegate::DisplayMethod method,
+  void DisplayPasskey(uint32_t passkey,
+                      sm::Delegate::DisplayMethod method,
                       ConfirmCallback confirm) override;
   void RequestPasskey(PasskeyResponseCallback respond) override;
 
   pw::async::Dispatcher& dispatcher_;
 
-  // Notifies Peer of connection destruction. This should be ordered first so that it is
-  // destroyed last.
+  // Notifies Peer of connection destruction. This should be ordered first so
+  // that it is destroyed last.
   std::optional<Peer::ConnectionToken> peer_conn_token_;
 
   Peer::WeakPtr peer_;
@@ -288,9 +322,10 @@ class LowEnergyConnection final : public sm::Delegate {
   // and register the link.
   gatt::GATT::WeakPtr gatt_;
 
-  // The ATT Bearer is owned by LowEnergyConnection but weak pointers are passed to the GATT layer.
-  // As such, this connection must be unregistered from the GATT layer before the Bearer is
-  // destroyed. Created during initialization, but if initialization fails this may be nullptr.
+  // The ATT Bearer is owned by LowEnergyConnection but weak pointers are passed
+  // to the GATT layer. As such, this connection must be unregistered from the
+  // GATT layer before the Bearer is destroyed. Created during initialization,
+  // but if initialization fails this may be nullptr.
   std::unique_ptr<att::Bearer> att_bearer_;
 
   // SMP pairing manager.
@@ -309,9 +344,11 @@ class LowEnergyConnection final : public sm::Delegate {
   hci::CommandChannel::EventHandlerId conn_update_cmpl_handler_id_;
 
   // Called with the status of the next HCI LE Connection Update Complete event.
-  // The HCI LE Connection Update command does not have its own complete event handler because the
-  // HCI LE Connection Complete event can be generated for other reasons.
-  fit::callback<void(pw::bluetooth::emboss::StatusCode)> le_conn_update_complete_command_callback_;
+  // The HCI LE Connection Update command does not have its own complete event
+  // handler because the HCI LE Connection Complete event can be generated for
+  // other reasons.
+  fit::callback<void(pw::bluetooth::emboss::StatusCode)>
+      le_conn_update_complete_command_callback_;
 
   // Called after kLEConnectionPausePeripheral.
   std::optional<SmartTask> conn_pause_peripheral_timeout_;
@@ -319,7 +356,8 @@ class LowEnergyConnection final : public sm::Delegate {
   // Called after kLEConnectionPauseCentral.
   std::optional<SmartTask> conn_pause_central_timeout_;
 
-  // Set to true when a request to update the connection parameters has been sent.
+  // Set to true when a request to update the connection parameters has been
+  // sent.
   bool connection_parameters_update_requested_ = false;
 
   bool interrogation_completed_ = false;

@@ -20,42 +20,53 @@ class ExtendedLowEnergyAdvertiser final : public LowEnergyAdvertiser {
 
   bool AllowsRandomAddressChange() const override { return !IsAdvertising(); }
 
-  // TODO(https://fxbug.dev/81470): The maximum length of data that can be advertised. For backwards
-  // compatibility and because supporting it is a much larger project, we currently only support
-  // legacy PDUs. When using legacy PDUs, the maximum advertising data size is
+  // TODO(https://fxbug.dev/81470): The maximum length of data that can be
+  // advertised. For backwards compatibility and because supporting it is a much
+  // larger project, we currently only support legacy PDUs. When using legacy
+  // PDUs, the maximum advertising data size is
   // hci_spec::kMaxLEAdvertisingDataLength.
   //
-  // TODO(https://fxbug.dev/77476): Extended advertising supports sending larger amounts of data,
-  // but they have to be fragmented across multiple commands to the controller. This is not yet
-  // supported in this implementation. We should support larger than
-  // kMaxLEExtendedAdvertisingDataLength advertising data with fragmentation.
-  size_t GetSizeLimit() const override { return hci_spec::kMaxLEAdvertisingDataLength; }
+  // TODO(https://fxbug.dev/77476): Extended advertising supports sending larger
+  // amounts of data, but they have to be fragmented across multiple commands to
+  // the controller. This is not yet supported in this implementation. We should
+  // support larger than kMaxLEExtendedAdvertisingDataLength advertising data
+  // with fragmentation.
+  size_t GetSizeLimit() const override {
+    return hci_spec::kMaxLEAdvertisingDataLength;
+  }
 
-  // Attempt to start advertising. See LowEnergyAdvertiser::StartAdvertising for full documentation.
+  // Attempt to start advertising. See LowEnergyAdvertiser::StartAdvertising for
+  // full documentation.
   //
-  // According to the Bluetooth Spec, Volume 4, Part E, Section 7.8.58, "the number of advertising
-  // sets that can be supported is not fixed and the Controller can change it at any time. The
-  // memory used to store advertising sets can also be used for other purposes."
+  // According to the Bluetooth Spec, Volume 4, Part E, Section 7.8.58, "the
+  // number of advertising sets that can be supported is not fixed and the
+  // Controller can change it at any time. The memory used to store advertising
+  // sets can also be used for other purposes."
   //
-  // This method may report an error if the controller cannot currently support another advertising
-  // set.
-  void StartAdvertising(const DeviceAddress& address, const AdvertisingData& data,
-                        const AdvertisingData& scan_rsp, AdvertisingOptions adv_options,
+  // This method may report an error if the controller cannot currently support
+  // another advertising set.
+  void StartAdvertising(const DeviceAddress& address,
+                        const AdvertisingData& data,
+                        const AdvertisingData& scan_rsp,
+                        AdvertisingOptions adv_options,
                         ConnectionCallback connect_callback,
                         ResultFunction<> result_callback) override;
 
   void StopAdvertising() override;
   void StopAdvertising(const DeviceAddress& address) override;
 
-  void OnIncomingConnection(hci_spec::ConnectionHandle handle,
-                            pw::bluetooth::emboss::ConnectionRole role,
-                            const DeviceAddress& peer_address,
-                            const hci_spec::LEConnectionParameters& conn_params) override;
+  void OnIncomingConnection(
+      hci_spec::ConnectionHandle handle,
+      pw::bluetooth::emboss::ConnectionRole role,
+      const DeviceAddress& peer_address,
+      const hci_spec::LEConnectionParameters& conn_params) override;
 
-  size_t MaxAdvertisements() const override { return advertising_handle_map_.capacity(); }
+  size_t MaxAdvertisements() const override {
+    return advertising_handle_map_.capacity();
+  }
 
-  // Returns the last used advertising handle that was used for an advertising set when
-  // communicating with the controller.
+  // Returns the last used advertising handle that was used for an advertising
+  // set when communicating with the controller.
   std::optional<hci_spec::AdvertisingHandle> LastUsedHandleForTesting() const {
     return advertising_handle_map_.LastUsedHandleForTesting();
   }
@@ -73,22 +84,25 @@ class ExtendedLowEnergyAdvertiser final : public LowEnergyAdvertiser {
   };
 
   std::optional<EmbossCommandPacket> BuildEnablePacket(
-      const DeviceAddress& address, pw::bluetooth::emboss::GenericEnableParam enable) override;
+      const DeviceAddress& address,
+      pw::bluetooth::emboss::GenericEnableParam enable) override;
 
   CommandChannel::CommandPacketVariant BuildSetAdvertisingParams(
-      const DeviceAddress& address, pw::bluetooth::emboss::LEAdvertisingType type,
+      const DeviceAddress& address,
+      pw::bluetooth::emboss::LEAdvertisingType type,
       pw::bluetooth::emboss::LEOwnAddressType own_address_type,
       AdvertisingIntervalRange interval) override;
 
-  CommandChannel::CommandPacketVariant BuildSetAdvertisingData(const DeviceAddress& address,
-                                                               const AdvertisingData& data,
-                                                               AdvFlags flags) override;
+  CommandChannel::CommandPacketVariant BuildSetAdvertisingData(
+      const DeviceAddress& address,
+      const AdvertisingData& data,
+      AdvFlags flags) override;
 
   CommandChannel::CommandPacketVariant BuildUnsetAdvertisingData(
       const DeviceAddress& address) override;
 
-  CommandChannel::CommandPacketVariant BuildSetScanResponse(const DeviceAddress& address,
-                                                            const AdvertisingData& data) override;
+  CommandChannel::CommandPacketVariant BuildSetScanResponse(
+      const DeviceAddress& address, const AdvertisingData& data) override;
 
   CommandChannel::CommandPacketVariant BuildUnsetScanResponse(
       const DeviceAddress& address) override;
@@ -101,24 +115,26 @@ class ExtendedLowEnergyAdvertiser final : public LowEnergyAdvertiser {
   void OnCurrentOperationComplete() override;
 
   // Event handler for the HCI LE Advertising Set Terminated event
-  CommandChannel::EventCallbackResult OnAdvertisingSetTerminatedEvent(const EventPacket& event);
+  CommandChannel::EventCallbackResult OnAdvertisingSetTerminatedEvent(
+      const EventPacket& event);
   CommandChannel::EventHandlerId set_terminated_event_handler_id_;
 
   AdvertisingHandleMap advertising_handle_map_;
   std::queue<fit::closure> op_queue_;
   StagedAdvertisingParameters staged_advertising_parameters_;
 
-  // Core Spec Volume 4, Part E, Section 7.8.56: Incoming connections to LE Extended Advertising
-  // occur through two events: HCI_LE_Connection_Complete and HCI_LE_Advertising_Set_Terminated.
-  // The HCI_LE_Connection_Complete event provides the connection handle along with some other
-  // connection related parameters. Notably missing is the advertising handle, which we need to
-  // obtain the advertised device address. Until we receive the HCI_LE_Advertising_Set_Terminated
-  // event, we stage these parameters.
+  // Core Spec Volume 4, Part E, Section 7.8.56: Incoming connections to LE
+  // Extended Advertising occur through two events: HCI_LE_Connection_Complete
+  // and HCI_LE_Advertising_Set_Terminated. The HCI_LE_Connection_Complete event
+  // provides the connection handle along with some other connection related
+  // parameters. Notably missing is the advertising handle, which we need to
+  // obtain the advertised device address. Until we receive the
+  // HCI_LE_Advertising_Set_Terminated event, we stage these parameters.
   std::unordered_map<hci_spec::ConnectionHandle, StagedConnectionParameters>
       staged_connections_map_;
 
-  // Keep this as the last member to make sure that all weak pointers are invalidated before other
-  // members get destroyed
+  // Keep this as the last member to make sure that all weak pointers are
+  // invalidated before other members get destroyed
   WeakSelf<ExtendedLowEnergyAdvertiser> weak_self_;
 
   BT_DISALLOW_COPY_AND_ASSIGN_ALLOW_MOVE(ExtendedLowEnergyAdvertiser);

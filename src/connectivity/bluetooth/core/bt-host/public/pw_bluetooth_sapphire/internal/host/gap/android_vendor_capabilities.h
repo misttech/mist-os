@@ -13,25 +13,31 @@ namespace hci_android = hci_spec::vendor::android;
 
 class AndroidVendorCapabilities final {
  public:
-  void Initialize(
-      const pw::bluetooth::vendor::android_hci::LEGetVendorCapabilitiesCommandCompleteEventView& c);
+  void Initialize(const pw::bluetooth::vendor::android_hci::
+                      LEGetVendorCapabilitiesCommandCompleteEventView& c);
   bool IsInitialized() const { return initialized_; }
 
   // Number of advertisement instances supported.
   //
-  // This parameter is deprecated in the Google feature spec v0.98 and higher in favor of the LE
-  // Extended Advertising available in the BT spec version 5.0 and higher.
-  uint8_t max_simultaneous_advertisements() const { return max_simultaneous_advertisement_; }
+  // This parameter is deprecated in the Google feature spec v0.98 and higher in
+  // favor of the LE Extended Advertising available in the BT spec version 5.0
+  // and higher.
+  uint8_t max_simultaneous_advertisements() const {
+    return max_simultaneous_advertisement_;
+  }
 
-  // BT chip capability of resolution of private addresses. If supported by a chip, it needs
-  // enablement by the host.
+  // BT chip capability of resolution of private addresses. If supported by a
+  // chip, it needs enablement by the host.
   //
-  // This parameter is deprecated in the Google feature spec v0.98 and higher in favor of the
-  // Privacy feature available in the BT spec version 4.2 and higher.
+  // This parameter is deprecated in the Google feature spec v0.98 and higher in
+  // favor of the Privacy feature available in the BT spec version 4.2 and
+  // higher.
   bool supports_offloaded_rpa() const { return supports_offloaded_rpa_; }
 
   // Storage for scan results in bytes
-  uint16_t scan_results_storage_bytes() const { return scan_results_storage_bytes_; }
+  uint16_t scan_results_storage_bytes() const {
+    return scan_results_storage_bytes_;
+  }
 
   // Number of IRK entries supported in the firmware
   uint8_t irk_list_size() const { return irk_list_size_; }
@@ -43,7 +49,9 @@ class AndroidVendorCapabilities final {
   uint8_t max_filters() const { return max_filters_; }
 
   // Supports reporting of activity and energy information
-  bool supports_activity_energy_info() const { return supports_activity_energy_info_; }
+  bool supports_activity_energy_info() const {
+    return supports_activity_energy_info_;
+  }
 
   // Specifies the minor version of the Google feature spec supported
   uint8_t version_minor() const { return version_minor_; }
@@ -60,25 +68,31 @@ class AndroidVendorCapabilities final {
   // Supports logging of binary debug information from controller
   bool supports_debug_logging() const { return supports_debug_logging_; }
 
-  // This parameter is deprecated in the Google feature spec v0.98 and higher in favor of the
-  // Privacy feature available in the BT spec version 4.2 and higher.
+  // This parameter is deprecated in the Google feature spec v0.98 and higher in
+  // favor of the Privacy feature available in the BT spec version 4.2 and
+  // higher.
   bool supports_offloading_le_address_generation() const {
     return supports_offloading_le_address_generation_;
   }
 
-  // Get a bitmask of the codec types supported for A2DP source offload. See A2dpCodecType in
+  // Get a bitmask of the codec types supported for A2DP source offload. See
+  // A2dpCodecType in
   // src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/hci_spec/vendor_protocol.h.
   uint32_t a2dp_source_offload_capability_mask() const {
     return a2dp_source_offload_capability_mask_;
   }
 
   // Supports reporting of Bluetooth Quality events
-  bool supports_bluetooth_quality_report() const { return supports_bluetooth_quality_report_; }
+  bool supports_bluetooth_quality_report() const {
+    return supports_bluetooth_quality_report_;
+  }
 
-  // Get a bitmask of the codec types where dynamic audio buffering in the Bluetooth controller is
-  // supported. See A2dpCodecType in
+  // Get a bitmask of the codec types where dynamic audio buffering in the
+  // Bluetooth controller is supported. See A2dpCodecType in
   // src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/hci_spec/vendor_protocol.h.
-  uint32_t supports_dynamic_audio_buffer() const { return supports_dynamic_audio_buffer_; }
+  uint32_t supports_dynamic_audio_buffer() const {
+    return supports_dynamic_audio_buffer_;
+  }
 
  private:
   bool initialized_ = false;

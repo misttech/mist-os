@@ -17,14 +17,16 @@ TEST(InspectUtil, InspectPropertyValueAtPathSuccess) {
   inspect::Inspector inspector_;
   inspect::Node child = inspector_.GetRoot().CreateChild("child");
   inspect::IntProperty prop = child.CreateInt("property", 42);
-  EXPECT_THAT(GetInspectValue<inspect::IntPropertyValue>(inspector_, {"child", "property"}),
+  EXPECT_THAT(GetInspectValue<inspect::IntPropertyValue>(inspector_,
+                                                         {"child", "property"}),
               Optional(42));
 }
 
 TEST(InspectUtil, InspectPropertyValueAtPathFailure) {
   inspect::Inspector inspector_;
   inspect::Node child = inspector_.GetRoot().CreateChild("child");
-  EXPECT_FALSE(GetInspectValue<inspect::StringPropertyValue>(inspector_, {"child", "property"}));
+  EXPECT_FALSE(GetInspectValue<inspect::StringPropertyValue>(
+      inspector_, {"child", "property"}));
 }
 
 TEST(InspectUtil, EmptyPath) {
@@ -34,7 +36,8 @@ TEST(InspectUtil, EmptyPath) {
 
 TEST(InspectUtil, NodeInPathDoesNotExist) {
   inspect::Inspector inspector_;
-  EXPECT_FALSE(GetInspectValue<inspect::StringPropertyValue>(inspector_, {"child", "property"}));
+  EXPECT_FALSE(GetInspectValue<inspect::StringPropertyValue>(
+      inspector_, {"child", "property"}));
 }
 
 }  // namespace bt::testing

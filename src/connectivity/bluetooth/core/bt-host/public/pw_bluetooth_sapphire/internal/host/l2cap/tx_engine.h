@@ -33,7 +33,9 @@ class TxEngine {
   // NOTE: The user of this class must ensure that a synchronous invocation of
   // |send_frame_callback| does not deadlock. E.g., the callback must not
   // attempt to lock the same mutex as the caller of QueueSdu().
-  TxEngine(ChannelId channel_id, uint16_t max_tx_sdu_size, SendFrameCallback send_frame_callback)
+  TxEngine(ChannelId channel_id,
+           uint16_t max_tx_sdu_size,
+           SendFrameCallback send_frame_callback)
       : channel_id_(channel_id),
         max_tx_sdu_size_(max_tx_sdu_size),
         send_frame_callback_(std::move(send_frame_callback)) {

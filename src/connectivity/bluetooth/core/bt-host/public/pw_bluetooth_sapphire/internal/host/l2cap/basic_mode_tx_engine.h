@@ -17,7 +17,8 @@ namespace bt::l2cap::internal {
 // concurrently with the destructor.
 class BasicModeTxEngine final : public TxEngine {
  public:
-  BasicModeTxEngine(ChannelId channel_id, uint16_t max_tx_sdu_size,
+  BasicModeTxEngine(ChannelId channel_id,
+                    uint16_t max_tx_sdu_size,
                     SendFrameCallback send_frame_callback)
       : TxEngine(channel_id, max_tx_sdu_size, std::move(send_frame_callback)) {}
   ~BasicModeTxEngine() override = default;

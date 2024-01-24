@@ -13,8 +13,9 @@
 
 namespace bt::sco {
 
-// TODO(https://fxbug.dev/110686): This type should be deleted as it duplicates `ScoPacketType` in
-// hci-protocol.emb. This may involve migrating `ParameterSet` below to Emboss.
+// TODO(https://fxbug.dev/110686): This type should be deleted as it duplicates
+// `ScoPacketType` in hci-protocol.emb. This may involve migrating
+// `ParameterSet` below to Emboss.
 enum class ScoPacketTypeBits : uint16_t {
   // SCO packet types
   kHv1 = (1 << 0),
@@ -46,7 +47,8 @@ constexpr ParameterSet kParameterSetT1{
     .transmit_receive_bandwidth = 8000,
     .transmit_receive_format = pw::bluetooth::emboss::CodingFormat::TRANSPARENT,
     .max_latency_ms = 8,
-    .retransmission_effort = hci_spec::ScoRetransmissionEffort::kQualityOptimized};
+    .retransmission_effort =
+        hci_spec::ScoRetransmissionEffort::kQualityOptimized};
 
 constexpr ParameterSet kParameterSetT2{
     .packet_types = static_cast<uint8_t>(ScoPacketTypeBits::kEv3) |
@@ -55,7 +57,8 @@ constexpr ParameterSet kParameterSetT2{
     .transmit_receive_bandwidth = 8000,
     .transmit_receive_format = pw::bluetooth::emboss::CodingFormat::TRANSPARENT,
     .max_latency_ms = 13,
-    .retransmission_effort = hci_spec::ScoRetransmissionEffort::kQualityOptimized};
+    .retransmission_effort =
+        hci_spec::ScoRetransmissionEffort::kQualityOptimized};
 
 constexpr ParameterSet kParameterSetS1{
     .packet_types = static_cast<uint8_t>(ScoPacketTypeBits::kHv1) |
@@ -67,7 +70,8 @@ constexpr ParameterSet kParameterSetS1{
     .transmit_receive_bandwidth = 8000,
     .transmit_receive_format = pw::bluetooth::emboss::CodingFormat::CVSD,
     .max_latency_ms = 7,
-    .retransmission_effort = hci_spec::ScoRetransmissionEffort::kPowerOptimized};
+    .retransmission_effort =
+        hci_spec::ScoRetransmissionEffort::kPowerOptimized};
 
 constexpr ParameterSet kParameterSetS2{
     .packet_types = static_cast<uint8_t>(ScoPacketTypeBits::kEv3) |
@@ -76,7 +80,8 @@ constexpr ParameterSet kParameterSetS2{
     .transmit_receive_bandwidth = 8000,
     .transmit_receive_format = pw::bluetooth::emboss::CodingFormat::CVSD,
     .max_latency_ms = 7,
-    .retransmission_effort = hci_spec::ScoRetransmissionEffort::kPowerOptimized};
+    .retransmission_effort =
+        hci_spec::ScoRetransmissionEffort::kPowerOptimized};
 
 constexpr ParameterSet kParameterSetS3{
     .packet_types = static_cast<uint8_t>(ScoPacketTypeBits::kEv3) |
@@ -85,7 +90,8 @@ constexpr ParameterSet kParameterSetS3{
     .transmit_receive_bandwidth = 8000,
     .transmit_receive_format = pw::bluetooth::emboss::CodingFormat::CVSD,
     .max_latency_ms = 10,
-    .retransmission_effort = hci_spec::ScoRetransmissionEffort::kPowerOptimized};
+    .retransmission_effort =
+        hci_spec::ScoRetransmissionEffort::kPowerOptimized};
 
 constexpr ParameterSet kParameterSetS4{
     .packet_types = static_cast<uint8_t>(ScoPacketTypeBits::kEv3) |
@@ -94,7 +100,8 @@ constexpr ParameterSet kParameterSetS4{
     .transmit_receive_bandwidth = 8000,
     .transmit_receive_format = pw::bluetooth::emboss::CodingFormat::CVSD,
     .max_latency_ms = 12,
-    .retransmission_effort = hci_spec::ScoRetransmissionEffort::kQualityOptimized};
+    .retransmission_effort =
+        hci_spec::ScoRetransmissionEffort::kQualityOptimized};
 
 constexpr ParameterSet kParameterSetD0{
     .packet_types = static_cast<uint8_t>(ScoPacketTypeBits::kHv1),

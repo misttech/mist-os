@@ -33,7 +33,9 @@ class FakeChannelHandler : public PairingChannel::Handler {
 
   int frames_received() const { return frames_received_; }
   int channel_closed_count() const { return channel_closed_count_; }
-  PairingChannel::Handler::WeakPtr as_weak_handler() { return weak_self_.GetWeakPtr(); }
+  PairingChannel::Handler::WeakPtr as_weak_handler() {
+    return weak_self_.GetWeakPtr();
+  }
 
  private:
   ByteBufferPtr last_rx_data_ = nullptr;
@@ -50,13 +52,14 @@ class PairingChannelTest : public l2cap::testing::MockChannelTest {
 
   void NewPairingChannel(bt::LinkType ll_type = bt::LinkType::kLE,
                          uint16_t mtu = kNoSecureConnectionsMtu) {
-    l2cap::ChannelId cid =
-        ll_type == bt::LinkType::kLE ? l2cap::kLESMPChannelId : l2cap::kSMPChannelId;
+    l2cap::ChannelId cid = ll_type == bt::LinkType::kLE ? l2cap::kLESMPChannelId
+                                                        : l2cap::kSMPChannelId;
     ChannelOptions options(cid, mtu);
     options.link_type = ll_type;
     fake_sm_chan_ = CreateFakeChannel(options);
     sm_chan_ = std::make_unique<PairingChannel>(
-        fake_sm_chan_->GetWeakPtr(), fit::bind_member<&PairingChannelTest::ResetTimer>(this));
+        fake_sm_chan_->GetWeakPtr(),
+        fit::bind_member<&PairingChannelTest::ResetTimer>(this));
   }
 
   PairingChannel* sm_chan() { return sm_chan_.get(); }
@@ -74,17 +77,20 @@ class PairingChannelTest : public l2cap::testing::MockChannelTest {
 
 using PairingChannelDeathTest = PairingChannelTest;
 TEST_F(PairingChannelDeathTest, L2capChannelMtuTooSmallDies) {
-  ASSERT_DEATH_IF_SUPPORTED(NewPairingChannel(bt::LinkType::kLE, kNoSecureConnectionsMtu - 1),
-                            ".*max.*_sdu_size.*");
+  ASSERT_DEATH_IF_SUPPORTED(
+      NewPairingChannel(bt::LinkType::kLE, kNoSecureConnectionsMtu - 1),
+      ".*max.*_sdu_size.*");
 }
 
 TEST_F(PairingChannelDeathTest, SendInvalidMessageDies) {
   // Tests that an invalid SMP code aborts the process
-  EXPECT_DEATH_IF_SUPPORTED(sm_chan()->SendMessage(0xFF, ErrorCode::kUnspecifiedReason), ".*end.*");
+  EXPECT_DEATH_IF_SUPPORTED(
+      sm_chan()->SendMessage(0xFF, ErrorCode::kUnspecifiedReason), ".*end.*");
 
   // Tests that a valid SMP code with a mismatched payload aborts the process
-  EXPECT_DEATH_IF_SUPPORTED(sm_chan()->SendMessage(kPairingFailed, PairingRequestParams{}),
-                            ".*sizeof.*");
+  EXPECT_DEATH_IF_SUPPORTED(
+      sm_chan()->SendMessage(kPairingFailed, PairingRequestParams{}),
+      ".*sizeof.*");
 }
 
 TEST_F(PairingChannelTest, SendMessageWorks) {
@@ -100,10 +106,12 @@ TEST_F(PairingChannelTest, SendMessageWorks) {
   ASSERT_TRUE(timer_reset);
 }
 
-// This checks that PairingChannel doesn't crash when receiving events without a handler set.
+// This checks that PairingChannel doesn't crash when receiving events without a
+// handler set.
 TEST_F(PairingChannelTest, NoHandlerSetDataDropped) {
   ASSERT_TRUE(sm_chan());
-  const StaticByteBuffer kSmPacket(kPairingFailed, ErrorCode::kPairingNotSupported);
+  const StaticByteBuffer kSmPacket(kPairingFailed,
+                                   ErrorCode::kPairingNotSupported);
 
   fake_chan()->Receive(kSmPacket);
   RunUntilIdle();
@@ -114,8 +122,10 @@ TEST_F(PairingChannelTest, NoHandlerSetDataDropped) {
 
 TEST_F(PairingChannelTest, SetHandlerReceivesData) {
   ASSERT_TRUE(sm_chan());
-  const StaticByteBuffer kSmPacket1(kPairingFailed, ErrorCode::kPairingNotSupported);
-  const StaticByteBuffer kSmPacket2(kPairingFailed, ErrorCode::kConfirmValueFailed);
+  const StaticByteBuffer kSmPacket1(kPairingFailed,
+                                    ErrorCode::kPairingNotSupported);
+  const StaticByteBuffer kSmPacket2(kPairingFailed,
+                                    ErrorCode::kConfirmValueFailed);
   FakeChannelHandler handler;
   sm_chan()->SetChannelHandler(handler.as_weak_handler());
   ASSERT_EQ(handler.last_rx_data(), nullptr);
@@ -140,8 +150,10 @@ TEST_F(PairingChannelTest, SetHandlerReceivesData) {
 
 TEST_F(PairingChannelTest, ChangeHandlerNewHandlerReceivesData) {
   ASSERT_TRUE(sm_chan());
-  const StaticByteBuffer kSmPacket1(kPairingFailed, ErrorCode::kPairingNotSupported);
-  const StaticByteBuffer kSmPacket2(kPairingFailed, ErrorCode::kConfirmValueFailed);
+  const StaticByteBuffer kSmPacket1(kPairingFailed,
+                                    ErrorCode::kPairingNotSupported);
+  const StaticByteBuffer kSmPacket2(kPairingFailed,
+                                    ErrorCode::kConfirmValueFailed);
   FakeChannelHandler handler;
   sm_chan()->SetChannelHandler(handler.as_weak_handler());
   ASSERT_EQ(handler.last_rx_data(), nullptr);

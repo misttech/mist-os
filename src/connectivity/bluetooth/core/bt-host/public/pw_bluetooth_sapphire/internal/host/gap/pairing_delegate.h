@@ -40,9 +40,12 @@ class PairingDelegate : public WeakSelf<PairingDelegate> {
   // |id| and confirm or reject by calling |confirm|.
   virtual void ConfirmPairing(PeerId peer_id, ConfirmCallback confirm) = 0;
 
-  // Show the user the 6-digit |passkey| that should be compared to the peer's passkey or entered
-  // into the peer. |confirm| may be called to accept a comparison or to reject the pairing.
-  virtual void DisplayPasskey(PeerId peer_id, uint32_t passkey, DisplayMethod method,
+  // Show the user the 6-digit |passkey| that should be compared to the peer's
+  // passkey or entered into the peer. |confirm| may be called to accept a
+  // comparison or to reject the pairing.
+  virtual void DisplayPasskey(PeerId peer_id,
+                              uint32_t passkey,
+                              DisplayMethod method,
                               ConfirmCallback confirm) = 0;
 
   // Ask the user to enter a 6-digit passkey or reject pairing. Report the
@@ -51,7 +54,8 @@ class PairingDelegate : public WeakSelf<PairingDelegate> {
   // A valid |passkey| must be a non-negative integer. Pass a negative value to
   // reject pairing.
   using PasskeyResponseCallback = fit::callback<void(int64_t passkey)>;
-  virtual void RequestPasskey(PeerId peer_id, PasskeyResponseCallback respond) = 0;
+  virtual void RequestPasskey(PeerId peer_id,
+                              PasskeyResponseCallback respond) = 0;
 
  protected:
   PairingDelegate() : WeakSelf(this) {}

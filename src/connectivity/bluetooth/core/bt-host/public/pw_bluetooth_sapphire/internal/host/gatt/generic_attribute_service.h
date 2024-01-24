@@ -17,15 +17,17 @@
 namespace bt::gatt {
 constexpr IdType kServiceChangedChrcId = 0u;
 
-// Callback to send an indication. Used to inject the GATT object's update-sending ability without
-// requiring this service to carry a reference to GATT or Server.
+// Callback to send an indication. Used to inject the GATT object's
+// update-sending ability without requiring this service to carry a reference to
+// GATT or Server.
 //   |chrc_id|: the service-defined ID of the characteristic to indicate
 //   |svc_id|: the gatt::GATT-defined ID of the service containing |chrc_id|.
-// For example, to indicate a new service to a peer via the Service Changed chrc, one would invoke
-// this with svc_id = the GenericAttributeService's service_id_, chrc_id = kServiceChangedChrcId,
-// peer_id of the peer, and value = the att::Handle range of the new service.
-using SendIndicationCallback =
-    fit::function<void(IdType svc_id, IdType chrc_id, PeerId peer_id, BufferView value)>;
+// For example, to indicate a new service to a peer via the Service Changed
+// chrc, one would invoke this with svc_id = the GenericAttributeService's
+// service_id_, chrc_id = kServiceChangedChrcId, peer_id of the peer, and value
+// = the att::Handle range of the new service.
+using SendIndicationCallback = fit::function<void(
+    IdType svc_id, IdType chrc_id, PeerId peer_id, BufferView value)>;
 
 // Implements the "Generic Attribute Profile Service" containing the "Service
 // Changed" characteristic that is "...used to indicate to connected devices
@@ -41,9 +43,11 @@ class GenericAttributeService final {
                           SendIndicationCallback send_indication_callback);
   ~GenericAttributeService();
 
-  // This callback is called when a client changes the CCC for the service changed
-  // characteristic to inform the upper layers of the stack to persist this value.
-  void SetPersistServiceChangedCCCCallback(PersistServiceChangedCCCCallback callback) {
+  // This callback is called when a client changes the CCC for the service
+  // changed characteristic to inform the upper layers of the stack to persist
+  // this value.
+  void SetPersistServiceChangedCCCCallback(
+      PersistServiceChangedCCCCallback callback) {
     persist_service_changed_ccc_callback_ = std::move(callback);
   }
 

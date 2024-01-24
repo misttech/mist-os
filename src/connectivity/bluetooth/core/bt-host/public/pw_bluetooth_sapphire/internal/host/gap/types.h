@@ -15,11 +15,13 @@ struct BrEdrSecurityRequirements {
   bool secure_connections;
 
   bool operator==(const BrEdrSecurityRequirements& rhs) const {
-    return authentication == rhs.authentication && secure_connections == rhs.secure_connections;
+    return authentication == rhs.authentication &&
+           secure_connections == rhs.secure_connections;
   }
 };
 
-// Returns true if a key's security properties satisfy the specified security requirements.
+// Returns true if a key's security properties satisfy the specified security
+// requirements.
 bool SecurityPropertiesMeetRequirements(sm::SecurityProperties properties,
                                         BrEdrSecurityRequirements requirements);
 

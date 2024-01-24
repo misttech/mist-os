@@ -82,7 +82,9 @@ class Bearer final {
 
   // Sets a callback to be invoked invoked when the underlying channel has
   // closed. |callback| should disconnect the underlying logical link.
-  void set_closed_callback(fit::closure callback) { closed_cb_ = std::move(callback); }
+  void set_closed_callback(fit::closure callback) {
+    closed_cb_ = std::move(callback);
+  }
 
   // Closes the channel. This should be called when a protocol transaction
   // warrants the link to be disconnected. Notifies any callback set via
@@ -132,7 +134,8 @@ class Bearer final {
   //     require a response which can be sent by calling Reply().
   using TransactionId = size_t;
   static constexpr TransactionId kInvalidTransactionId = 0u;
-  using Handler = fit::function<void(TransactionId tid, const PacketReader& packet)>;
+  using Handler =
+      fit::function<void(TransactionId tid, const PacketReader& packet)>;
 
   // Handler: called when |pdu| does not need flow control. This will be
   // called for commands and notifications.
@@ -155,14 +158,17 @@ class Bearer final {
   WeakPtr GetWeakPtr() { return weak_self_.GetWeakPtr(); }
 
  private:
-  explicit Bearer(l2cap::Channel::WeakPtr chan, pw::async::Dispatcher& dispatcher);
+  explicit Bearer(l2cap::Channel::WeakPtr chan,
+                  pw::async::Dispatcher& dispatcher);
 
   // Returns false if activation fails. This is called by the factory method.
   bool Activate();
 
   // Represents a locally initiated pending request or indication transaction.
   struct PendingTransaction {
-    PendingTransaction(OpCode opcode, TransactionCallback callback, ByteBufferPtr pdu);
+    PendingTransaction(OpCode opcode,
+                       TransactionCallback callback,
+                       ByteBufferPtr pdu);
 
     // Required fields
     OpCode opcode;
@@ -199,7 +205,8 @@ class Bearer final {
   // transactions.
   class TransactionQueue {
    public:
-    TransactionQueue(pw::async::Dispatcher& dispatcher) : timeout_task_(dispatcher) {}
+    TransactionQueue(pw::async::Dispatcher& dispatcher)
+        : timeout_task_(dispatcher) {}
     ~TransactionQueue() = default;
 
     TransactionQueue(TransactionQueue&& other);
@@ -214,7 +221,8 @@ class Bearer final {
 
     // Tries to initiate the next transaction. Sends the PDU over |chan| if
     // successful.
-    void TrySendNext(const l2cap::Channel::WeakPtr& chan, pw::async::TaskFunction timeout_cb,
+    void TrySendNext(const l2cap::Channel::WeakPtr& chan,
+                     pw::async::TaskFunction timeout_cb,
                      pw::chrono::SystemClock::duration timeout);
 
     // Adds |next| to the transaction queue.
@@ -244,7 +252,9 @@ class Bearer final {
   void TryStartNextTransaction(TransactionQueue* tq);
 
   // Sends out an immediate error response.
-  void SendErrorResponse(OpCode request_opcode, Handle attribute_handle, ErrorCode error_code);
+  void SendErrorResponse(OpCode request_opcode,
+                         Handle attribute_handle,
+                         ErrorCode error_code);
 
   // Called when the peer sends us a response or confirmation PDU.
   void HandleEndTransaction(TransactionQueue* tq, const PacketReader& packet);
@@ -258,7 +268,8 @@ class Bearer final {
   using RemoteTransaction = std::optional<PendingRemoteTransaction>;
 
   // Called when the peer initiates a request or indication transaction.
-  void HandleBeginTransaction(RemoteTransaction* currently_pending, const PacketReader& packet);
+  void HandleBeginTransaction(RemoteTransaction* currently_pending,
+                              const PacketReader& packet);
 
   // Returns any pending peer-initiated transaction that matches |id|. Returns
   // nullptr otherwise.

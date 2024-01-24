@@ -11,7 +11,8 @@
 namespace bt::testing {
 
 FakeSdpServer::FakeSdpServer(pw::async::Dispatcher& pw_dispatcher)
-    : l2cap_(std::make_unique<l2cap::testing::FakeL2cap>(pw_dispatcher)), server_(l2cap_.get()) {}
+    : l2cap_(std::make_unique<l2cap::testing::FakeL2cap>(pw_dispatcher)),
+      server_(l2cap_.get()) {}
 
 void FakeSdpServer::RegisterWithL2cap(FakeL2cap* l2cap_) {
   auto channel_cb = [this](FakeDynamicChannel::WeakPtr channel) {
@@ -25,10 +26,11 @@ void FakeSdpServer::RegisterWithL2cap(FakeL2cap* l2cap_) {
   l2cap_->RegisterService(l2cap::kSDP, channel_cb);
 }
 
-void FakeSdpServer::HandleSdu(FakeDynamicChannel::WeakPtr channel, const ByteBuffer& sdu) {
+void FakeSdpServer::HandleSdu(FakeDynamicChannel::WeakPtr channel,
+                              const ByteBuffer& sdu) {
   BT_ASSERT(channel->opened());
-  auto response =
-      server()->HandleRequest(std::make_unique<DynamicByteBuffer>(sdu), l2cap::kDefaultMTU);
+  auto response = server()->HandleRequest(
+      std::make_unique<DynamicByteBuffer>(sdu), l2cap::kDefaultMTU);
   if (response) {
     auto& callback = channel->send_packet_callback();
     return callback(*response.value());

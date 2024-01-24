@@ -253,8 +253,8 @@ constexpr AttributeId kBluetoothProfileDescriptorList = 0x0009;
 //     - 8 LSbits minor version
 using BluetoothProfileDescriptorListValueType = std::vector<DataElement>;
 
-// TODO(https://fxbug.dev/128186): Documentation URL, ClientExecutableURL, IconURL
-// When we support the URL type.
+// TODO(https://fxbug.dev/128186): Documentation URL, ClientExecutableURL,
+// IconURL When we support the URL type.
 
 // ##### Language Attribute Offsets #####
 // These must be added to the attribute ID retrieved from the
@@ -296,9 +296,9 @@ constexpr AttributeId kSDP_ServiceDatabaseState = 0x0201;
 constexpr AttributeId kA2DP_SupportedFeatures = 0x0311;
 
 // ===== OBEX Protocol Attribute Definitions =====
-// This attribute is defined on a per-profile basis, and is the same for all relevant profiles that
-// require OBEX.
-// See https://www.bluetooth.com/specifications/assigned-numbers/service-discovery
+// This attribute is defined on a per-profile basis, and is the same for all
+// relevant profiles that require OBEX. See
+// https://www.bluetooth.com/specifications/assigned-numbers/service-discovery
 constexpr AttributeId kGoepL2capPsm = 0x0200;
 
 }  // namespace bt::sdp

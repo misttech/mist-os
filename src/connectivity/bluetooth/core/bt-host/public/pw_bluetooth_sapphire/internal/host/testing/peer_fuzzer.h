@@ -14,12 +14,12 @@
 namespace bt {
 namespace testing {
 
-inline DeviceAddress MakePublicDeviceAddress(FuzzedDataProvider &fdp) {
+inline DeviceAddress MakePublicDeviceAddress(FuzzedDataProvider& fdp) {
   DeviceAddressBytes device_address_bytes;
   fdp.ConsumeData(&device_address_bytes, sizeof(device_address_bytes));
-  return DeviceAddress(
-      fdp.PickValueInArray({DeviceAddress::Type::kBREDR, DeviceAddress::Type::kLEPublic}),
-      device_address_bytes);
+  return DeviceAddress(fdp.PickValueInArray({DeviceAddress::Type::kBREDR,
+                                             DeviceAddress::Type::kLEPublic}),
+                       device_address_bytes);
 }
 
 }  // namespace testing
@@ -31,16 +31,16 @@ class PeerFuzzer final {
   // Core Spec v5.2, Vol 6, Part B, Section 2.3.4.9
   static constexpr size_t kMaxLeAdvDataLength = 1650;
 
-  // Create a PeerFuzzer that mutates |peer| using |fuzzed_data_provider|. Both arguments must
-  // outlive this object.
-  PeerFuzzer(FuzzedDataProvider &fuzzed_data_provider, Peer &peer)
+  // Create a PeerFuzzer that mutates |peer| using |fuzzed_data_provider|. Both
+  // arguments must outlive this object.
+  PeerFuzzer(FuzzedDataProvider& fuzzed_data_provider, Peer& peer)
       : fuzzed_data_provider_(fuzzed_data_provider), peer_(peer) {}
 
-  // Use the FuzzedDataProvider with which this object was constructed to choose a member function
-  // that is then used to mutate the corresponding Peer field.
+  // Use the FuzzedDataProvider with which this object was constructed to choose
+  // a member function that is then used to mutate the corresponding Peer field.
   void FuzzOneField() {
-    // The decltype is easier to read than void (&PeerFuzzer::*)(), but this function isn't special
-    // and should not pick itself
+    // The decltype is easier to read than void (&PeerFuzzer::*)(), but this
+    // function isn't special and should not pick itself
     using FuzzMemberFunction = decltype(&PeerFuzzer::FuzzOneField);
     constexpr FuzzMemberFunction kFuzzFunctions[] = {
         &PeerFuzzer::LEDataSetAdvertisingData,
@@ -77,13 +77,15 @@ class PeerFuzzer final {
   void LEDataSetAdvertisingData() {
     peer_.MutLe().SetAdvertisingData(
         fdp().ConsumeIntegral<uint8_t>(),
-        DynamicByteBuffer(BufferView(fdp().ConsumeBytes<uint8_t>(kMaxLeAdvDataLength))),
+        DynamicByteBuffer(
+            BufferView(fdp().ConsumeBytes<uint8_t>(kMaxLeAdvDataLength))),
         pw::chrono::SystemClock::time_point());
   }
 
   void LEDataRegisterInitializingConnection() {
     if (peer_.connectable() && fdp().ConsumeBool()) {
-      le_init_conn_tokens_.emplace_back(peer_.MutLe().RegisterInitializingConnection());
+      le_init_conn_tokens_.emplace_back(
+          peer_.MutLe().RegisterInitializingConnection());
     } else if (!le_init_conn_tokens_.empty()) {
       le_init_conn_tokens_.pop_back();
     }
@@ -101,9 +103,10 @@ class PeerFuzzer final {
     if (!peer_.connectable()) {
       return;
     }
-    const hci_spec::LEConnectionParameters conn_params(fdp().ConsumeIntegral<uint16_t>(),
-                                                       fdp().ConsumeIntegral<uint16_t>(),
-                                                       fdp().ConsumeIntegral<uint16_t>());
+    const hci_spec::LEConnectionParameters conn_params(
+        fdp().ConsumeIntegral<uint16_t>(),
+        fdp().ConsumeIntegral<uint16_t>(),
+        fdp().ConsumeIntegral<uint16_t>());
     peer_.MutLe().SetConnectionParameters(conn_params);
   }
 
@@ -112,8 +115,10 @@ class PeerFuzzer final {
       return;
     }
     const hci_spec::LEPreferredConnectionParameters conn_params(
-        fdp().ConsumeIntegral<uint16_t>(), fdp().ConsumeIntegral<uint16_t>(),
-        fdp().ConsumeIntegral<uint16_t>(), fdp().ConsumeIntegral<uint16_t>());
+        fdp().ConsumeIntegral<uint16_t>(),
+        fdp().ConsumeIntegral<uint16_t>(),
+        fdp().ConsumeIntegral<uint16_t>(),
+        fdp().ConsumeIntegral<uint16_t>());
     peer_.MutLe().SetPreferredConnectionParameters(conn_params);
   }
 
@@ -127,7 +132,9 @@ class PeerFuzzer final {
         action();
       }
     };
-    do_if_fdp([&] { data.identity_address = bt::testing::MakePublicDeviceAddress(fdp()); });
+    do_if_fdp([&] {
+      data.identity_address = bt::testing::MakePublicDeviceAddress(fdp());
+    });
     do_if_fdp([&] { data.local_ltk = MakeLtk(); });
     do_if_fdp([&] { data.peer_ltk = MakeLtk(); });
     do_if_fdp([&] { data.cross_transport_key = MakeLtk(); });
@@ -150,12 +157,14 @@ class PeerFuzzer final {
   }
 
   void LEDataSetServiceChangedGattData() {
-    peer_.MutLe().set_service_changed_gatt_data({fdp().ConsumeBool(), fdp().ConsumeBool()});
+    peer_.MutLe().set_service_changed_gatt_data(
+        {fdp().ConsumeBool(), fdp().ConsumeBool()});
   }
 
   void LEDataSetAutoConnectBehavior() {
     peer_.MutLe().set_auto_connect_behavior(fdp().PickValueInArray(
-        {Peer::AutoConnectBehavior::kAlways, Peer::AutoConnectBehavior::kSkipUntilNextConnection}));
+        {Peer::AutoConnectBehavior::kAlways,
+         Peer::AutoConnectBehavior::kSkipUntilNextConnection}));
   }
 
   void BrEdrDataSetInquiryData() {
@@ -163,14 +172,17 @@ class PeerFuzzer final {
       return;
     }
     StaticPacket<pw::bluetooth::emboss::InquiryResultWriter> inquiry_data;
-    fdp().ConsumeData(inquiry_data.mutable_data().mutable_data(), inquiry_data.data().size());
+    fdp().ConsumeData(inquiry_data.mutable_data().mutable_data(),
+                      inquiry_data.data().size());
     inquiry_data.view().bd_addr().CopyFrom(peer_.address().value().view());
     peer_.MutBrEdr().SetInquiryData(inquiry_data.view());
   }
 
   void BrEdrDataSetInquiryDataWithRssi() {
-    StaticPacket<pw::bluetooth::emboss::InquiryResultWithRssiWriter> inquiry_data;
-    fdp().ConsumeData(inquiry_data.mutable_data().mutable_data(), inquiry_data.data().size());
+    StaticPacket<pw::bluetooth::emboss::InquiryResultWithRssiWriter>
+        inquiry_data;
+    fdp().ConsumeData(inquiry_data.mutable_data().mutable_data(),
+                      inquiry_data.data().size());
     inquiry_data.view().bd_addr().CopyFrom(peer_.address().value().view());
     peer_.MutBrEdr().SetInquiryData(inquiry_data.view());
   }
@@ -179,17 +191,21 @@ class PeerFuzzer final {
     if (!peer_.identity_known()) {
       return;
     }
-    StaticPacket<pw::bluetooth::emboss::ExtendedInquiryResultEventWriter> inquiry_data;
-    fdp().ConsumeData(inquiry_data.mutable_data().mutable_data(), inquiry_data.data().size());
+    StaticPacket<pw::bluetooth::emboss::ExtendedInquiryResultEventWriter>
+        inquiry_data;
+    fdp().ConsumeData(inquiry_data.mutable_data().mutable_data(),
+                      inquiry_data.data().size());
     inquiry_data.view().bd_addr().CopyFrom(peer_.address().value().view());
     peer_.MutBrEdr().SetInquiryData(inquiry_data.view());
   }
 
   void BrEdrDataRegisterInitializingConnection() {
-    if (!peer_.identity_known() || !peer_.connectable() || bredr_conn_token_.has_value()) {
+    if (!peer_.identity_known() || !peer_.connectable() ||
+        bredr_conn_token_.has_value()) {
       return;
     }
-    bredr_init_conn_tokens_.emplace_back(peer_.MutBrEdr().RegisterInitializingConnection());
+    bredr_init_conn_tokens_.emplace_back(
+        peer_.MutBrEdr().RegisterInitializingConnection());
   }
 
   void BrEdrDataUnregisterInitializingConnection() {
@@ -237,16 +253,21 @@ class PeerFuzzer final {
 
   void SetFeaturePage() {
     peer_.SetFeaturePage(
-        fdp().ConsumeIntegralInRange<size_t>(0, bt::hci_spec::LMPFeatureSet::kMaxLastPageNumber),
+        fdp().ConsumeIntegralInRange<size_t>(
+            0, bt::hci_spec::LMPFeatureSet::kMaxLastPageNumber),
         fdp().ConsumeIntegral<uint64_t>());
   }
 
-  void set_last_page_number() { peer_.set_last_page_number(fdp().ConsumeIntegral<uint8_t>()); }
+  void set_last_page_number() {
+    peer_.set_last_page_number(fdp().ConsumeIntegral<uint8_t>());
+  }
 
   void set_version() {
     peer_.set_version(
-        pw::bluetooth::emboss::CoreSpecificationVersion{fdp().ConsumeIntegral<uint8_t>()},
-        fdp().ConsumeIntegral<uint16_t>(), fdp().ConsumeIntegral<uint16_t>());
+        pw::bluetooth::emboss::CoreSpecificationVersion{
+            fdp().ConsumeIntegral<uint8_t>()},
+        fdp().ConsumeIntegral<uint16_t>(),
+        fdp().ConsumeIntegral<uint16_t>());
   }
 
   void set_identity_known() { peer_.set_identity_known(fdp().ConsumeBool()); }
@@ -262,12 +283,13 @@ class PeerFuzzer final {
   }
 
   void set_connectable() {
-    // It doesn't make sense to make a peer unconnectable and it fires lots of asserts.
+    // It doesn't make sense to make a peer unconnectable and it fires lots of
+    // asserts.
     peer_.set_connectable(true);
   }
 
  private:
-  FuzzedDataProvider &fdp() { return fuzzed_data_provider_; }
+  FuzzedDataProvider& fdp() { return fuzzed_data_provider_; }
 
   sm::Key MakeKey() {
     // Actual value of the key is not fuzzed.
@@ -281,13 +303,15 @@ class PeerFuzzer final {
 
   sm::SecurityProperties MakeSecurityProperties() {
     sm::SecurityProperties security(
-        fdp().ConsumeBool(), fdp().ConsumeBool(), fdp().ConsumeBool(),
+        fdp().ConsumeBool(),
+        fdp().ConsumeBool(),
+        fdp().ConsumeBool(),
         fdp().ConsumeIntegralInRange<size_t>(0, sm::kMaxEncryptionKeySize));
     return security;
   }
 
-  FuzzedDataProvider &fuzzed_data_provider_;
-  Peer &peer_;
+  FuzzedDataProvider& fuzzed_data_provider_;
+  Peer& peer_;
   std::vector<Peer::ConnectionToken> le_conn_tokens_;
   std::vector<Peer::InitializingConnectionToken> le_init_conn_tokens_;
   std::optional<Peer::ConnectionToken> bredr_conn_token_;

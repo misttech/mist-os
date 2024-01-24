@@ -24,9 +24,10 @@
 
 namespace bt::hci {
 
-// Our ACL implementation allows specifying a Unique ChannelId for purposes of grouping packets so
-// they can be dropped together when necessary. In practice, this channel id will always be equal
-// to a given L2CAP ChannelId, as specified in the l2cap library
+// Our ACL implementation allows specifying a Unique ChannelId for purposes of
+// grouping packets so they can be dropped together when necessary. In practice,
+// this channel id will always be equal to a given L2CAP ChannelId, as specified
+// in the l2cap library
 using UniqueChannelId = uint16_t;
 
 class Transport;
@@ -54,21 +55,24 @@ class AclDataChannel {
     virtual bool HasAvailablePacket() const = 0;
   };
 
-  // Registers a connection. Failure to register a connection before sending packets will result in
-  // the packets being dropped immediately. A connection must not be registered again until after
-  // |UnregisterConnection| has been called on that connection.
+  // Registers a connection. Failure to register a connection before sending
+  // packets will result in the packets being dropped immediately. A connection
+  // must not be registered again until after |UnregisterConnection| has been
+  // called on that connection.
   virtual void RegisterConnection(WeakPtr<ConnectionInterface> connection) = 0;
 
-  // Unregister a connection when it is disconnected. Cleans up all outgoing data buffering state
-  // related to the logical link with the given |handle|. This must be called upon disconnection of
-  // a link to ensure that stale outbound packets are filtered out of the send queue. All future
-  // packets sent to this link will be dropped.
+  // Unregister a connection when it is disconnected. Cleans up all outgoing
+  // data buffering state related to the logical link with the given |handle|.
+  // This must be called upon disconnection of a link to ensure that stale
+  // outbound packets are filtered out of the send queue. All future packets
+  // sent to this link will be dropped.
   //
-  // |RegisterConnection| must be called before |UnregisterConnection| for the same handle.
+  // |RegisterConnection| must be called before |UnregisterConnection| for the
+  // same handle.
   //
   // |UnregisterConnection| does not clear the controller packet count, so
-  // |ClearControllerPacketCount| must be called after |UnregisterConnection| and the
-  // HCI_Disconnection_Complete event has been received.
+  // |ClearControllerPacketCount| must be called after |UnregisterConnection|
+  // and the HCI_Disconnection_Complete event has been received.
   virtual void UnregisterConnection(hci_spec::ConnectionHandle handle) = 0;
 
   // Called by LogicalLink when a packet is available
@@ -76,8 +80,8 @@ class AclDataChannel {
 
   enum class PacketPriority { kHigh, kLow };
 
-  using AclPacketPredicate =
-      fit::function<bool(const ACLDataPacketPtr& packet, UniqueChannelId channel_id)>;
+  using AclPacketPredicate = fit::function<bool(const ACLDataPacketPtr& packet,
+                                                UniqueChannelId channel_id)>;
 
   // Starts listening on the HCI ACL data channel and starts handling data flow
   // control. |bredr_buffer_info| represents the controller's data buffering
@@ -92,26 +96,31 @@ class AclDataChannel {
   //
   // As this class is intended to support flow-control for both, this function
   // should be called based on what is reported by the controller.
-  static std::unique_ptr<AclDataChannel> Create(Transport* transport,
-                                                pw::bluetooth::Controller* hci,
-                                                const DataBufferInfo& bredr_buffer_info,
-                                                const DataBufferInfo& le_buffer_info);
+  static std::unique_ptr<AclDataChannel> Create(
+      Transport* transport,
+      pw::bluetooth::Controller* hci,
+      const DataBufferInfo& bredr_buffer_info,
+      const DataBufferInfo& le_buffer_info);
 
   virtual ~AclDataChannel() = default;
 
   // Attach inspect node as a child node of |parent|.
   static constexpr const char* const kInspectNodeName = "acl_data_channel";
-  virtual void AttachInspect(inspect::Node& parent, const std::string& name) = 0;
+  virtual void AttachInspect(inspect::Node& parent,
+                             const std::string& name) = 0;
 
-  // Assigns a handler callback for received ACL data packets. |rx_callback| will shall take
-  // ownership of each packet received from the controller.
+  // Assigns a handler callback for received ACL data packets. |rx_callback|
+  // will shall take ownership of each packet received from the controller.
   virtual void SetDataRxHandler(ACLPacketHandler rx_callback) = 0;
 
-  // Resets controller packet count for |handle| so that controller buffer credits can be reused.
-  // This must be called on the HCI_Disconnection_Complete event to notify ACLDataChannel that
-  // packets in the controller's buffer for |handle| have been flushed. See Core Spec v5.1, Vol 2,
-  // Part E, Section 4.3. This must be called after |UnregisterConnection|.
-  virtual void ClearControllerPacketCount(hci_spec::ConnectionHandle handle) = 0;
+  // Resets controller packet count for |handle| so that controller buffer
+  // credits can be reused. This must be called on the
+  // HCI_Disconnection_Complete event to notify ACLDataChannel that packets in
+  // the controller's buffer for |handle| have been flushed. See Core Spec v5.1,
+  // Vol 2, Part E, Section 4.3. This must be called after
+  // |UnregisterConnection|.
+  virtual void ClearControllerPacketCount(
+      hci_spec::ConnectionHandle handle) = 0;
 
   // Returns the BR/EDR buffer information that the channel was initialized
   // with.
@@ -122,11 +131,12 @@ class AclDataChannel {
   // dedicated LE buffer.
   virtual const DataBufferInfo& GetLeBufferInfo() const = 0;
 
-  // Attempts to set the ACL |priority| of the connection indicated by |handle|. |callback| will be
-  // called with the result of the request.
-  virtual void RequestAclPriority(pw::bluetooth::AclPriority priority,
-                                  hci_spec::ConnectionHandle handle,
-                                  fit::callback<void(fit::result<fit::failed>)> callback) = 0;
+  // Attempts to set the ACL |priority| of the connection indicated by |handle|.
+  // |callback| will be called with the result of the request.
+  virtual void RequestAclPriority(
+      pw::bluetooth::AclPriority priority,
+      hci_spec::ConnectionHandle handle,
+      fit::callback<void(fit::result<fit::failed>)> callback) = 0;
 };
 
 }  // namespace bt::hci

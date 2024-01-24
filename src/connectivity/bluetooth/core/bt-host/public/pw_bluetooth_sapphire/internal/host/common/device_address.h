@@ -44,9 +44,15 @@ class DeviceAddressBytes {
   BufferView bytes() const { return BufferView(bytes_.data(), bytes_.size()); }
 
   // Comparison operators.
-  bool operator==(const DeviceAddressBytes& other) const { return bytes_ == other.bytes_; }
-  bool operator!=(const DeviceAddressBytes& other) const { return !(*this == other); }
-  bool operator<(const DeviceAddressBytes& other) const { return bytes_ < other.bytes_; }
+  bool operator==(const DeviceAddressBytes& other) const {
+    return bytes_ == other.bytes_;
+  }
+  bool operator!=(const DeviceAddressBytes& other) const {
+    return !(*this == other);
+  }
+  bool operator<(const DeviceAddressBytes& other) const {
+    return bytes_ < other.bytes_;
+  }
 
   pw::bluetooth::emboss::BdAddrView view() const {
     return pw::bluetooth::emboss::MakeBdAddrView(&bytes_);
@@ -60,15 +66,17 @@ class DeviceAddressBytes {
   std::array<uint8_t, kDeviceAddressSize> bytes_;
 };
 
-static_assert(sizeof(DeviceAddressBytes) == 6, "DeviceAddressBytes must take up exactly 6 bytes");
+static_assert(sizeof(DeviceAddressBytes) == 6,
+              "DeviceAddressBytes must take up exactly 6 bytes");
 
 // DeviceAddress represents a Bluetooth device address, encapsulating the 48-bit
 // device address and the address type. A DeviceAddress is comparable and can be
 // used as a key in ordered and unordered associative STL containers.
 //
-// TODO(https://fxbug.dev/2761): Using the underlying DeviceAddressBytes for equality, comparison,
-// and hashing effectively obsoletes DeviceAddressBytes as a separate class. Removing the |type_|
-// field (see bug for rationale) will make this class compatible with serialization.
+// TODO(https://fxbug.dev/2761): Using the underlying DeviceAddressBytes for
+// equality, comparison, and hashing effectively obsoletes DeviceAddressBytes as
+// a separate class. Removing the |type_| field (see bug for rationale) will
+// make this class compatible with serialization.
 class DeviceAddress {
  public:
   // Bluetooth device address types.
@@ -82,9 +90,12 @@ class DeviceAddress {
     kLEAnonymous,
   };
 
-  // Utilities to convert between DeviceAddress::Type and the LE peer address type.
-  static pw::bluetooth::emboss::LEPeerAddressType DeviceAddrToLePeerAddr(Type type);
-  static Type LePeerAddrToDeviceAddr(pw::bluetooth::emboss::LEPeerAddressType type);
+  // Utilities to convert between DeviceAddress::Type and the LE peer address
+  // type.
+  static pw::bluetooth::emboss::LEPeerAddressType DeviceAddrToLePeerAddr(
+      Type type);
+  static Type LePeerAddrToDeviceAddr(
+      pw::bluetooth::emboss::LEPeerAddressType type);
   static pw::bluetooth::emboss::LEAddressType DeviceAddrToLeAddr(Type type);
   static Type LeAddrToDeviceAddr(pw::bluetooth::emboss::LEAddressType type);
 
@@ -101,7 +112,8 @@ class DeviceAddress {
 
   bool IsBrEdr() const { return type_ == Type::kBREDR; }
   bool IsLowEnergy() const {
-    return type_ == Type::kLEPublic || type_ == Type::kLERandom || type_ == Type::kLEAnonymous;
+    return type_ == Type::kLEPublic || type_ == Type::kLERandom ||
+           type_ == Type::kLEAnonymous;
   }
 
   // Comparison operators. The equality and less-than operators are needed to
@@ -109,7 +121,9 @@ class DeviceAddress {
   bool operator==(const DeviceAddress& other) const {
     return IsTypeCompatible(other) && value_ == other.value_;
   }
-  bool operator!=(const DeviceAddress& other) const { return !(*this == other); }
+  bool operator!=(const DeviceAddress& other) const {
+    return !(*this == other);
+  }
   bool operator<(const DeviceAddress& other) const {
     // Treat |type_| as the higher-order bits
     if (type_ < other.type_ && !IsTypeCompatible(other)) {
@@ -119,7 +133,9 @@ class DeviceAddress {
   }
 
   // Returns true if this address is a BR/EDR BD_ADDR or LE public address.
-  bool IsPublic() const { return type_ == Type::kBREDR || type_ == Type::kLEPublic; }
+  bool IsPublic() const {
+    return type_ == Type::kBREDR || type_ == Type::kLEPublic;
+  }
 
   // Returns true if this address is a Resolvable Private Address.
   bool IsResolvablePrivate() const;
@@ -137,7 +153,8 @@ class DeviceAddress {
   std::string ToString() const;
 
  private:
-  // True if both addresses have types indicating they're used for the same purpose
+  // True if both addresses have types indicating they're used for the same
+  // purpose
   bool IsTypeCompatible(const DeviceAddress& other) const {
     return (type_ == other.type_) || (IsPublic() && other.IsPublic());
   }
@@ -146,7 +163,8 @@ class DeviceAddress {
   DeviceAddressBytes value_;
 };
 
-static_assert(sizeof(DeviceAddress) == 8, "DeviceAddress must take up exactly 8 bytes");
+static_assert(sizeof(DeviceAddress) == 8,
+              "DeviceAddress must take up exactly 8 bytes");
 
 }  // namespace bt
 

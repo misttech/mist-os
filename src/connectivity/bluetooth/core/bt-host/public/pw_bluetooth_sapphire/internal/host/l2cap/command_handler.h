@@ -26,18 +26,20 @@ namespace bt::l2cap::internal {
 // kind of request to register, and even ephemerally as a temporary around a
 // SignalingChannel.
 //
-// For outbound requests, use the CommandHandler::Send*Request methods. They take parameters to be
-// encoded into the request payload (with endian conversion and bounds checking) and a
-// *ResponseCallback callback. When a matching response or rejection is received, the callback will
-// be passed a *Response object containing the decoded command's parameters. Its |status()| shall
-// be checked first to determine whether it's a rejection or response command. Return
-// ResponseHandlerAction::kExpectAdditionalResponse if more request responses from the peer will
-// follow, or else ResponseHandlerAction::kCompleteOutboundTransaction. Returning
+// For outbound requests, use the CommandHandler::Send*Request methods. They
+// take parameters to be encoded into the request payload (with endian
+// conversion and bounds checking) and a *ResponseCallback callback. When a
+// matching response or rejection is received, the callback will be passed a
+// *Response object containing the decoded command's parameters. Its |status()|
+// shall be checked first to determine whether it's a rejection or response
+// command. Return ResponseHandlerAction::kExpectAdditionalResponse if more
+// request responses from the peer will follow, or else
+// ResponseHandlerAction::kCompleteOutboundTransaction. Returning
 // kCompleteOutboundTransaction will destroy the *ResponseCallback object.
 //
-// If the underlying SignalingChannel times out waiting for a response, the *ResponseCallback will
-// not be called. Instead, the |request_fail_callback| that CommandHandler was constructed with will
-// be called.
+// If the underlying SignalingChannel times out waiting for a response, the
+// *ResponseCallback will not be called. Instead, the |request_fail_callback|
+// that CommandHandler was constructed with will be called.
 //
 // Example:
 //   DisconnectionResponseCallback rsp_cb =
@@ -48,7 +50,8 @@ namespace bt::l2cap::internal {
 //           // Do something with rsp.local_cid() and rsp.remote_cid()
 //         }
 //       };
-//   cmd_handler.SendDisonnectionRequest(remote_cid, local_cid, std::move(rsp_cb));
+//   cmd_handler.SendDisonnectionRequest(remote_cid, local_cid,
+//   std::move(rsp_cb));
 //
 // For inbound requests, use the CommandHandler::Serve*Req methods. They
 // each take a request-handling delegate that will be called with decoded
@@ -78,7 +81,8 @@ namespace bt::l2cap::internal {
 class CommandHandler {
  public:
   using Status = SignalingChannel::Status;
-  using ResponseHandlerAction = SignalingChannelInterface::ResponseHandlerAction;
+  using ResponseHandlerAction =
+      SignalingChannelInterface::ResponseHandlerAction;
 
   // Base for all responses received, including Command Reject. If |status()|
   // evaluates as |Status::kReject|, then this holds a Command Reject; then
@@ -150,19 +154,24 @@ class CommandHandler {
 
   class DisconnectionResponder final : public Responder {
    public:
-    DisconnectionResponder(SignalingChannel::Responder* sig_responder, ChannelId local_cid,
+    DisconnectionResponder(SignalingChannel::Responder* sig_responder,
+                           ChannelId local_cid,
                            ChannelId remote_cid);
 
     void Send();
   };
 
   // Disconnection Responses never have additional responses.
-  using DisconnectionResponseCallback = fit::function<void(const DisconnectionResponse& rsp)>;
-  bool SendDisconnectionRequest(ChannelId remote_cid, ChannelId local_cid,
+  using DisconnectionResponseCallback =
+      fit::function<void(const DisconnectionResponse& rsp)>;
+  bool SendDisconnectionRequest(ChannelId remote_cid,
+                                ChannelId local_cid,
                                 DisconnectionResponseCallback cb);
 
-  using DisconnectionRequestCallback = fit::function<void(ChannelId local_cid, ChannelId remote_cid,
-                                                          DisconnectionResponder* responder)>;
+  using DisconnectionRequestCallback =
+      fit::function<void(ChannelId local_cid,
+                         ChannelId remote_cid,
+                         DisconnectionResponder* responder)>;
   void ServeDisconnectionRequest(DisconnectionRequestCallback cb);
 
   // |sig| must be valid for the lifetime of this object.
@@ -174,61 +183,74 @@ class CommandHandler {
   virtual ~CommandHandler() = default;
 
  protected:
-  // Returns a function that decodes a response status and payload into a |ResponseT| object and
-  // invokes |rsp_cb| with it.
-  // |ResponseT| needs to have
-  //  - |Decode| function that accepts a buffer of at least |sizeof(ResponseT::PayloadT)| bytes. If
-  //    it returns false, then decoding failed, no additional responses are expected, and the user
-  //    response handler will not be called.
+  // Returns a function that decodes a response status and payload into a
+  // |ResponseT| object and invokes |rsp_cb| with it. |ResponseT| needs to have
+  //  - |Decode| function that accepts a buffer of at least
+  //  |sizeof(ResponseT::PayloadT)| bytes. If
+  //    it returns false, then decoding failed, no additional responses are
+  //    expected, and the user response handler will not be called.
   //  - |kName| string literal
   //
-  // TODO(https://fxbug.dev/36062): Name the return type of CallbackT to make parsing code more
-  // readable.
+  // TODO(https://fxbug.dev/36062): Name the return type of CallbackT to make
+  // parsing code more readable.
   template <class ResponseT, typename CallbackT>
   SignalingChannel::ResponseHandler BuildResponseHandler(CallbackT rsp_cb) {
-    return [rsp_cb = std::move(rsp_cb), fail_cb = request_fail_callback_.share()](
-               Status status, const ByteBuffer& rsp_payload) {
-      if (status == Status::kTimeOut) {
-        bt_log(INFO, "l2cap", "cmd: timed out waiting for \"%s\"", ResponseT::kName);
-        if (fail_cb) {
-          fail_cb();
-        }
-        return ResponseHandlerAction::kCompleteOutboundTransaction;
-      }
+    return
+        [rsp_cb = std::move(rsp_cb), fail_cb = request_fail_callback_.share()](
+            Status status, const ByteBuffer& rsp_payload) {
+          if (status == Status::kTimeOut) {
+            bt_log(INFO,
+                   "l2cap",
+                   "cmd: timed out waiting for \"%s\"",
+                   ResponseT::kName);
+            if (fail_cb) {
+              fail_cb();
+            }
+            return ResponseHandlerAction::kCompleteOutboundTransaction;
+          }
 
-      ResponseT rsp(status);
-      if (status == Status::kReject) {
-        if (!rsp.ParseReject(rsp_payload)) {
-          bt_log(DEBUG, "l2cap", "cmd: ignoring malformed Command Reject, size %zu",
-                 rsp_payload.size());
-          return ResponseHandlerAction::kCompleteOutboundTransaction;
-        }
-        return InvokeResponseCallback(&rsp_cb, std::move(rsp));
-      }
+          ResponseT rsp(status);
+          if (status == Status::kReject) {
+            if (!rsp.ParseReject(rsp_payload)) {
+              bt_log(DEBUG,
+                     "l2cap",
+                     "cmd: ignoring malformed Command Reject, size %zu",
+                     rsp_payload.size());
+              return ResponseHandlerAction::kCompleteOutboundTransaction;
+            }
+            return InvokeResponseCallback(&rsp_cb, std::move(rsp));
+          }
 
-      if (rsp_payload.size() < sizeof(typename ResponseT::PayloadT)) {
-        bt_log(DEBUG, "l2cap", "cmd: ignoring malformed \"%s\", size %zu (expected %zu)",
-               ResponseT::kName, rsp_payload.size(), sizeof(typename ResponseT::PayloadT));
-        return ResponseHandlerAction::kCompleteOutboundTransaction;
-      }
+          if (rsp_payload.size() < sizeof(typename ResponseT::PayloadT)) {
+            bt_log(DEBUG,
+                   "l2cap",
+                   "cmd: ignoring malformed \"%s\", size %zu (expected %zu)",
+                   ResponseT::kName,
+                   rsp_payload.size(),
+                   sizeof(typename ResponseT::PayloadT));
+            return ResponseHandlerAction::kCompleteOutboundTransaction;
+          }
 
-      if (!rsp.Decode(rsp_payload)) {
-        bt_log(DEBUG, "l2cap", "cmd: ignoring malformed \"%s\", could not decode",
-               ResponseT::kName);
-        return ResponseHandlerAction::kCompleteOutboundTransaction;
-      }
+          if (!rsp.Decode(rsp_payload)) {
+            bt_log(DEBUG,
+                   "l2cap",
+                   "cmd: ignoring malformed \"%s\", could not decode",
+                   ResponseT::kName);
+            return ResponseHandlerAction::kCompleteOutboundTransaction;
+          }
 
-      return InvokeResponseCallback(&rsp_cb, std::move(rsp));
-    };
+          return InvokeResponseCallback(&rsp_cb, std::move(rsp));
+        };
   }
 
-  // Invokes |rsp_cb| with |rsp|. Returns ResponseHandlerAction::kCompleteOutboundTransaction for
-  // "no additional responses expected" if |rsp_cb| returns void, otherwise passes along its return
-  // result. Used because not all *ResponseCallback types return void (some can request additional
-  // continuations in their return value).
+  // Invokes |rsp_cb| with |rsp|. Returns
+  // ResponseHandlerAction::kCompleteOutboundTransaction for "no additional
+  // responses expected" if |rsp_cb| returns void, otherwise passes along its
+  // return result. Used because not all *ResponseCallback types return void
+  // (some can request additional continuations in their return value).
   template <typename CallbackT, class ResponseT>
-  static CommandHandler::ResponseHandlerAction InvokeResponseCallback(CallbackT* const rsp_cb,
-                                                                      ResponseT rsp) {
+  static CommandHandler::ResponseHandlerAction InvokeResponseCallback(
+      CallbackT* const rsp_cb, ResponseT rsp) {
     if constexpr (std::is_void_v<std::invoke_result_t<CallbackT, ResponseT>>) {
       (*rsp_cb)(rsp);
       return ResponseHandlerAction::kCompleteOutboundTransaction;

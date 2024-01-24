@@ -61,25 +61,30 @@ class SequentialCommandRunner final {
   // successfully before this command is sent.
   // |exclusions| will be passed to CommandChannel::SendExclusiveCommand().
   using CommandCompleteCallback = fit::function<void(const EventPacket& event)>;
-  using EmbossCommandCompleteCallback = fit::function<void(const EmbossEventPacket& event_packet)>;
+  using EmbossCommandCompleteCallback =
+      fit::function<void(const EmbossEventPacket& event_packet)>;
   using CommandCompleteCallbackVariant =
       std::variant<CommandCompleteCallback, EmbossCommandCompleteCallback>;
-  void QueueCommand(CommandPacketVariant command_packet,
-                    CommandCompleteCallbackVariant callback = CommandCompleteCallback(),
-                    bool wait = true,
-                    hci_spec::EventCode complete_event_code = hci_spec::kCommandCompleteEventCode,
-                    std::unordered_set<hci_spec::OpCode> exclusions = {});
+  void QueueCommand(
+      CommandPacketVariant command_packet,
+      CommandCompleteCallbackVariant callback = CommandCompleteCallback(),
+      bool wait = true,
+      hci_spec::EventCode complete_event_code =
+          hci_spec::kCommandCompleteEventCode,
+      std::unordered_set<hci_spec::OpCode> exclusions = {});
 
-  // Same as QueueCommand(), except the command completes on the LE Meta Event with subevent code
-  // |le_meta_subevent_code|.
-  void QueueLeAsyncCommand(CommandPacketVariant command_packet,
-                           hci_spec::EventCode le_meta_subevent_code,
-                           CommandCompleteCallbackVariant callback = CommandCompleteCallback(),
-                           bool wait = true);
+  // Same as QueueCommand(), except the command completes on the LE Meta Event
+  // with subevent code |le_meta_subevent_code|.
+  void QueueLeAsyncCommand(
+      CommandPacketVariant command_packet,
+      hci_spec::EventCode le_meta_subevent_code,
+      CommandCompleteCallbackVariant callback = CommandCompleteCallback(),
+      bool wait = true);
 
   // Runs all the queued commands. This method will return before queued
   // commands have been run. |status_callback| is called with the status of the
-  // last command run, or kSuccess if all commands returned HCI_Command_Complete.
+  // last command run, or kSuccess if all commands returned
+  // HCI_Command_Complete.
   //
   // Once RunCommands() has been called this instance will not be ready for
   // re-use until |status_callback| gets run. At that point new commands can be
@@ -134,7 +139,8 @@ class SequentialCommandRunner final {
   void TryRunNextQueuedCommand(Result<> status = fit::ok());
 
   // Returns true on success, false on failure.
-  bool SendQueuedCommand(QueuedCommand command, CommandChannel::CommandCallback callback);
+  bool SendQueuedCommand(QueuedCommand command,
+                         CommandChannel::CommandCallback callback);
 
   void Reset();
   void NotifyStatusAndReset(Result<> status);

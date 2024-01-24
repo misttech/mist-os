@@ -30,8 +30,8 @@ template <>
 struct ProtocolErrorTraits<sm::ErrorCode> {
   static std::string ToString(sm::ErrorCode ecode);
 
-  // is_success() not declared because the reason does not include a "success" value (Core Spec
-  // v5.3, Vol 3, Part H, 3.5.5, Table 3.7).
+  // is_success() not declared because the reason does not include a "success"
+  // value (Core Spec v5.3, Vol 3, Part H, 3.5.5, Table 3.7).
 };
 
 }  // namespace bt

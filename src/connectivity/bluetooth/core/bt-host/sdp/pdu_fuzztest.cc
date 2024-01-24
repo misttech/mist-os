@@ -11,7 +11,8 @@ namespace bt::sdp {
 void fuzz(const uint8_t* data, size_t size) {
   FuzzedDataProvider fuzzed_data(data, size);
   uint8_t type = fuzzed_data.ConsumeIntegral<uint8_t>();
-  std::vector<uint8_t> remaining_bytes = fuzzed_data.ConsumeRemainingBytes<uint8_t>();
+  std::vector<uint8_t> remaining_bytes =
+      fuzzed_data.ConsumeRemainingBytes<uint8_t>();
   DynamicByteBuffer buf(remaining_bytes.size());
   memcpy(buf.mutable_data(), remaining_bytes.data(), remaining_bytes.size());
   fit::result<Error<>> status = fit::ok();

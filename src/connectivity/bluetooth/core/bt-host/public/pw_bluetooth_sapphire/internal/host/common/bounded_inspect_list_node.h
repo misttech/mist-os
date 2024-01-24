@@ -13,13 +13,15 @@
 
 namespace bt {
 
-// This class is intended to represent a list node in Inspect, which doesn't support lists natively.
-// Furthermore, it makes sure that the number of list items doesn't exceed |capacity|.
+// This class is intended to represent a list node in Inspect, which doesn't
+// support lists natively. Furthermore, it makes sure that the number of list
+// items doesn't exceed |capacity|.
 //
-// Each item in BoundedInspectListNode is represented as a child node with name as index. This
-// index is always increasing and does not wrap around. For example, if capacity is 3,
-// then the children names are `[0, 1, 2]` on the first three additions. When a new node is
-// added, `0` is popped, and the children names are `[1, 2, 3]`.
+// Each item in BoundedInspectListNode is represented as a child node with name
+// as index. This index is always increasing and does not wrap around. For
+// example, if capacity is 3, then the children names are `[0, 1, 2]` on the
+// first three additions. When a new node is added, `0` is popped, and the
+// children names are `[1, 2, 3]`.
 //
 // Example Usage:
 //    BoundedInspectListNode list(/*capacity=*/2);
@@ -54,9 +56,9 @@ class BoundedInspectListNode {
   // Attach this node as a child of |parent| with the name |name|.
   void AttachInspect(inspect::Node& parent, std::string name);
 
-  // Add an item to the list, removing a previous item if the list is at capacity.
-  // The returned item reference is valid until the next item is added (or this list node is
-  // destroyed).
+  // Add an item to the list, removing a previous item if the list is at
+  // capacity. The returned item reference is valid until the next item is added
+  // (or this list node is destroyed).
   Item& CreateItem();
 
  private:

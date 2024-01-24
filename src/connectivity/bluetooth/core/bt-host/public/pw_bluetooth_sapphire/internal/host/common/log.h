@@ -22,7 +22,8 @@
 // number:
 //
 //     if (IsLogLevelEnabled(LogSeverity::TRACE)) {
-//       LogMessage(__FILE__, __LINE__, LogSeverity::TRACE, "bt-host", "oops: %d", foo);
+//       LogMessage(__FILE__, __LINE__, LogSeverity::TRACE, "bt-host", "oops:
+//       %d", foo);
 //     }
 //
 // or using the bt_log convenience macro:
@@ -31,24 +32,26 @@
 //
 // DRIVER MODE:
 //
-// By default, the log messages use <lib/ddk/debug.h> as its backend. In this mode
-// the ERROR, WARN, INFO, DEBUG and TRACE severity levels directly correspond to
-// the DDK severity levels. Log levels are supplied to the kernel commandline,
-// e.g. to disable INFO level and enable TRACE level messages in the bt-host
-// driver use the following:
+// By default, the log messages use <lib/ddk/debug.h> as its backend. In this
+// mode the ERROR, WARN, INFO, DEBUG and TRACE severity levels directly
+// correspond to the DDK severity levels. Log levels are supplied to the kernel
+// commandline, e.g. to disable INFO level and enable TRACE level messages in
+// the bt-host driver use the following:
 //
 //     driver.bthost.log=-info,+trace
 //
 // In driver mode, the "tag" argument to bt_log is informational and gets
 // included in the log message.
 //
-// (refer to https://fuchsia.dev/fuchsia-src/reference/kernel/kernel_cmdline#drivernamelogflags
+// (refer to
+// https://fuchsia.dev/fuchsia-src/reference/kernel/kernel_cmdline#drivernamelogflags
 // for all supported DDK debug log flags).
 //
 // PRINTF MODE:
 //
-// When the host stack code is run outside a driver log messages can be routed to stdout via printf
-// instead of driver_logf. To enable this mode, call the UsePrintf() function at process start-up:
+// When the host stack code is run outside a driver log messages can be routed
+// to stdout via printf instead of driver_logf. To enable this mode, call the
+// UsePrintf() function at process start-up:
 //
 //    int main() {
 //      bt::UsePrintf(bt::LogSeverity::ERROR);
@@ -114,18 +117,23 @@ void UsePrintf(LogSeverity min_severity);
 namespace internal {
 
 // No-op function used to check consistency between format string and arguments.
-PW_PRINTF_FORMAT(1, 2) constexpr void CheckFormat([[maybe_unused]] const char* fmt, ...) {}
+PW_PRINTF_FORMAT(1, 2)
+constexpr void CheckFormat([[maybe_unused]] const char* fmt, ...) {}
 
 }  // namespace internal
 }  // namespace bt
 
 // This macro should be kept as small as possible to reduce binary size.
-// This macro should not wrap its contents in a lambda, as it breaks logs using __FUNCTION__.
-// TODO(https://fxbug.dev/1390): Due to limitations, |tag| is processed by printf-style formatters
-// as a format string, so check that |tag| does not specify any additional args.
-#define bt_log(level, tag, fmt...)                                                             \
-  PW_LOG(static_cast<int>(bt::LogSeverity::level), tag, GetPwLogFlags(bt::LogSeverity::level), \
-         fmt);                                                                                 \
+// This macro should not wrap its contents in a lambda, as it breaks logs using
+// __FUNCTION__.
+// TODO(https://fxbug.dev/1390): Due to limitations, |tag| is processed by
+// printf-style formatters as a format string, so check that |tag| does not
+// specify any additional args.
+#define bt_log(level, tag, fmt...)                 \
+  PW_LOG(static_cast<int>(bt::LogSeverity::level), \
+         tag,                                      \
+         GetPwLogFlags(bt::LogSeverity::level),    \
+         fmt);                                     \
   ::bt::internal::CheckFormat(tag)
 
 #endif  // SRC_CONNECTIVITY_BLUETOOTH_CORE_BT_HOST_PUBLIC_PW_BLUETOOTH_SAPPHIRE_INTERNAL_HOST_COMMON_LOG_H_

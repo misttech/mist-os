@@ -19,16 +19,21 @@ class Delegate {
   virtual ~Delegate() = default;
 
   using ConfirmCallback = fit::callback<void(bool confirm)>;
-  // Asks higher-level protocols outside bt-host to confirm the pairing request from the device.
+  // Asks higher-level protocols outside bt-host to confirm the pairing request
+  // from the device.
   virtual void ConfirmPairing(ConfirmCallback confirm) = 0;
 
   using DisplayMethod = gap::PairingDelegate::DisplayMethod;
-  // Show the user the 6-digit |passkey| that should be compared to the peer's passkey or entered
-  // into the peer. |confirm| may be called to accept a comparison or to reject the pairing.
-  virtual void DisplayPasskey(uint32_t passkey, DisplayMethod method, ConfirmCallback confirm) = 0;
+  // Show the user the 6-digit |passkey| that should be compared to the peer's
+  // passkey or entered into the peer. |confirm| may be called to accept a
+  // comparison or to reject the pairing.
+  virtual void DisplayPasskey(uint32_t passkey,
+                              DisplayMethod method,
+                              ConfirmCallback confirm) = 0;
 
-  // Ask the user to enter a 6-digit passkey or reject pairing. Reports the result by invoking
-  // |respond| with |passkey| - a negative value of |passkey| indicates entry failed.
+  // Ask the user to enter a 6-digit passkey or reject pairing. Reports the
+  // result by invoking |respond| with |passkey| - a negative value of |passkey|
+  // indicates entry failed.
   using PasskeyResponseCallback = fit::callback<void(int64_t passkey)>;
   virtual void RequestPasskey(PasskeyResponseCallback respond) = 0;
 
@@ -44,8 +49,9 @@ class Delegate {
   // Called when new pairing data has been obtained for this peer.
   virtual void OnNewPairingData(const PairingData& data) = 0;
 
-  // Called when the link layer authentication procedure fails. This likely indicates that
-  // the LTK or STK used to encrypt the connection was rejected by the peer device.
+  // Called when the link layer authentication procedure fails. This likely
+  // indicates that the LTK or STK used to encrypt the connection was rejected
+  // by the peer device.
   //
   // The underlying link should disconnect after this callback runs.
   virtual void OnAuthenticationFailure(hci::Result<> status) = 0;

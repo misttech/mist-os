@@ -24,9 +24,12 @@ namespace bt::l2cap::testing {
 // channel.
 class FakeChannel : public Channel {
  public:
-  FakeChannel(ChannelId id, ChannelId remote_id, hci_spec::ConnectionHandle handle,
+  FakeChannel(ChannelId id,
+              ChannelId remote_id,
+              hci_spec::ConnectionHandle handle,
               bt::LinkType link_type,
-              ChannelInfo info = ChannelInfo::MakeBasicMode(kDefaultMTU, kDefaultMTU),
+              ChannelInfo info = ChannelInfo::MakeBasicMode(kDefaultMTU,
+                                                            kDefaultMTU),
               uint16_t max_tx_queued = 1);
   ~FakeChannel() override = default;
 
@@ -38,14 +41,16 @@ class FakeChannel : public Channel {
   // If a |dispatcher| is specified, |callback| will be invoked asynchronously.
   using SendCallback = fit::function<void(ByteBufferPtr)>;
   void SetSendCallback(SendCallback callback);
-  void SetSendCallback(SendCallback callback, pw::async::Dispatcher& dispatcher);
+  void SetSendCallback(SendCallback callback,
+                       pw::async::Dispatcher& dispatcher);
 
   // Sets a callback to emulate the result of "SignalLinkError()". In
   // production, this callback is invoked by the link.
   void SetLinkErrorCallback(LinkErrorCallback callback);
 
   // Sets a callback to emulate the result of "UpgradeSecurity()".
-  void SetSecurityCallback(SecurityUpgradeCallback callback, pw::async::Dispatcher& dispatcher);
+  void SetSecurityCallback(SecurityUpgradeCallback callback,
+                           pw::async::Dispatcher& dispatcher);
 
   // Emulates channel closure.
   void Close();
@@ -63,27 +68,37 @@ class FakeChannel : public Channel {
   bool activated() const { return static_cast<bool>(rx_cb_); }
 
   // Assigns a link security level.
-  void set_security(const sm::SecurityProperties& sec_props) { security_ = sec_props; }
+  void set_security(const sm::SecurityProperties& sec_props) {
+    security_ = sec_props;
+  }
 
   // RequestAclPriority always fails if true.
   void set_acl_priority_fails(bool fail) { acl_priority_fails_ = fail; }
 
-  void set_flush_timeout_succeeds(bool succeed) { flush_timeout_succeeds_ = succeed; }
+  void set_flush_timeout_succeeds(bool succeed) {
+    flush_timeout_succeeds_ = succeed;
+  }
 
   // StartA2dpOffload() and StopA2dpOffload() fail with given |error_code|.
-  void set_a2dp_offload_fails(HostError error_code) { a2dp_offload_error_ = error_code; }
+  void set_a2dp_offload_fails(HostError error_code) {
+    a2dp_offload_error_ = error_code;
+  }
 
   // Channel overrides:
   const sm::SecurityProperties security() override { return security_; }
-  bool Activate(RxCallback rx_callback, ClosedCallback closed_callback) override;
+  bool Activate(RxCallback rx_callback,
+                ClosedCallback closed_callback) override;
   void Deactivate() override;
   void SignalLinkError() override;
   bool Send(ByteBufferPtr sdu) override;
-  void UpgradeSecurity(sm::SecurityLevel level, sm::ResultFunction<> callback) override;
-  void RequestAclPriority(pw::bluetooth::AclPriority priority,
-                          fit::callback<void(fit::result<fit::failed>)> cb) override;
-  void SetBrEdrAutomaticFlushTimeout(pw::chrono::SystemClock::duration flush_timeout,
-                                     hci::ResultCallback<> callback) override;
+  void UpgradeSecurity(sm::SecurityLevel level,
+                       sm::ResultFunction<> callback) override;
+  void RequestAclPriority(
+      pw::bluetooth::AclPriority priority,
+      fit::callback<void(fit::result<fit::failed>)> cb) override;
+  void SetBrEdrAutomaticFlushTimeout(
+      pw::chrono::SystemClock::duration flush_timeout,
+      hci::ResultCallback<> callback) override;
   void AttachInspect(inspect::Node& parent, std::string name) override {}
   void StartA2dpOffload(const A2dpOffloadManager::Configuration& config,
                         hci::ResultCallback<> callback) override;

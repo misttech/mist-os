@@ -36,23 +36,27 @@ class BrEdrDiscoverableSession;
 // Ownership of this session is passed to the caller; when no sessions exist,
 // discovery is halted.
 //
-// TODO(jamuraa): Name resolution should also happen here. (https://fxbug.dev/851)
+// TODO(jamuraa): Name resolution should also happen here.
+// (https://fxbug.dev/851)
 //
 // This class is not thread-safe, BrEdrDiscoverySessions should be created and
 // accessed on the same thread the BrEdrDiscoveryManager is created.
 class BrEdrDiscoveryManager final {
  public:
   // |peer_cache| MUST out-live this BrEdrDiscoveryManager.
-  BrEdrDiscoveryManager(pw::async::Dispatcher& pw_dispatcher, hci::CommandChannel::WeakPtr cmd,
-                        pw::bluetooth::emboss::InquiryMode mode, PeerCache* peer_cache);
+  BrEdrDiscoveryManager(pw::async::Dispatcher& pw_dispatcher,
+                        hci::CommandChannel::WeakPtr cmd,
+                        pw::bluetooth::emboss::InquiryMode mode,
+                        PeerCache* peer_cache);
 
   ~BrEdrDiscoveryManager();
 
   // Starts discovery and reports the status via |callback|. If discovery has
   // been successfully started, the callback will receive a session object that
   // it owns. If no sessions are owned, peer discovery is stopped.
-  using DiscoveryCallback = fit::function<void(const hci::Result<>& status,
-                                               std::unique_ptr<BrEdrDiscoverySession> session)>;
+  using DiscoveryCallback =
+      fit::function<void(const hci::Result<>& status,
+                         std::unique_ptr<BrEdrDiscoverySession> session)>;
   void RequestDiscovery(DiscoveryCallback callback);
 
   // Returns whether a discovery session is active.
@@ -60,8 +64,9 @@ class BrEdrDiscoveryManager final {
 
   // Requests this device be discoverable. We are discoverable as long as
   // anyone holds a discoverable session.
-  using DiscoverableCallback = fit::function<void(
-      const hci::Result<>& status, std::unique_ptr<BrEdrDiscoverableSession> session)>;
+  using DiscoverableCallback =
+      fit::function<void(const hci::Result<>& status,
+                         std::unique_ptr<BrEdrDiscoverableSession> session)>;
   void RequestDiscoverable(DiscoverableCallback callback);
 
   bool discoverable() const { return !discoverable_.empty(); }
@@ -89,7 +94,8 @@ class BrEdrDiscoveryManager final {
   void StopInquiry();
 
   // Used to receive Inquiry Results.
-  hci::CommandChannel::EventCallbackResult InquiryResult(const hci::EmbossEventPacket& event);
+  hci::CommandChannel::EventCallbackResult InquiryResult(
+      const hci::EmbossEventPacket& event);
 
   // Used to receive Inquiry Results.
   hci::CommandChannel::EventCallbackResult InquiryResultWithRssi(
@@ -115,7 +121,9 @@ class BrEdrDiscoveryManager final {
   // Writes the Inquiry Scan Settings to the controller.
   // If |interlaced| is true, and the controller does not support interlaces
   // inquiry scan mode, standard mode is used.
-  void WriteInquiryScanSettings(uint16_t interval, uint16_t window, bool interlaced);
+  void WriteInquiryScanSettings(uint16_t interval,
+                                uint16_t window,
+                                bool interlaced);
 
   // Creates and stores a new session object and returns it.
   std::unique_ptr<BrEdrDiscoverableSession> AddDiscoverableSession();
@@ -151,12 +159,15 @@ class BrEdrDiscoveryManager final {
     inspect::UintProperty inquiry_sessions_count;
     inspect::UintProperty last_inquiry_length_sec;
 
-    std::optional<pw::chrono::SystemClock::time_point> discoverable_started_time;
+    std::optional<pw::chrono::SystemClock::time_point>
+        discoverable_started_time;
     std::optional<pw::chrono::SystemClock::time_point> inquiry_started_time;
 
     void Initialize(inspect::Node node);
-    void Update(size_t discoverable_count, size_t pending_discoverable_count,
-                size_t discovery_count, pw::chrono::SystemClock::time_point now);
+    void Update(size_t discoverable_count,
+                size_t pending_discoverable_count,
+                size_t discovery_count,
+                pw::chrono::SystemClock::time_point now);
   };
 
   InspectProperties inspect_properties_;
@@ -179,7 +190,8 @@ class BrEdrDiscoveryManager final {
   std::unordered_set<BrEdrDiscoverySession*> discovering_;
   // Sessions that have been removed but are still active.
   // Inquiry persists until we receive a Inquiry Complete event.
-  // TODO(https://fxbug.dev/668): we should not need these once we can Inquiry Cancel.
+  // TODO(https://fxbug.dev/668): we should not need these once we can Inquiry
+  // Cancel.
   std::unordered_set<BrEdrDiscoverySession*> zombie_discovering_;
 
   // The set of peers that we have pending name requests for.
@@ -230,7 +242,9 @@ class BrEdrDiscoverySession final {
 
   // Set a callback to be notified if the session becomes inactive because
   // of internal errors.
-  void set_error_callback(fit::closure callback) { error_callback_ = std::move(callback); }
+  void set_error_callback(fit::closure callback) {
+    error_callback_ = std::move(callback);
+  }
 
  private:
   friend class BrEdrDiscoveryManager;

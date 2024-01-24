@@ -12,7 +12,8 @@ namespace bt::hci {
 
 // Represents an ACL-U or LE-U link, both of which use the ACL data channel and
 // support encryption procedures.
-// Concrete implementations are found in BrEdrConnection and LowEnergyConnection.
+// Concrete implementations are found in BrEdrConnection and
+// LowEnergyConnection.
 class AclConnection : public Connection {
  public:
   ~AclConnection() override;
@@ -22,12 +23,12 @@ class AclConnection : public Connection {
   // authentication procedure will be reported via the encryption change
   // callback.
   //
-  // If the link layer procedure fails, the connection will be disconnected. The encryption change
-  // callback will be notified of the failure.
+  // If the link layer procedure fails, the connection will be disconnected. The
+  // encryption change callback will be notified of the failure.
   virtual bool StartEncryption() = 0;
 
-  // Assigns a callback that will run when the encryption state of the underlying link changes. The
-  // bool value parameter represents the new state.
+  // Assigns a callback that will run when the encryption state of the
+  // underlying link changes. The bool value parameter represents the new state.
   void set_encryption_change_callback(ResultFunction<bool> callback) {
     encryption_change_callback_ = std::move(callback);
   }
@@ -45,28 +46,36 @@ class AclConnection : public Connection {
     use_secure_connections_ = use_secure_connections;
   }
 
-  pw::bluetooth::emboss::EncryptionStatus encryption_status() const { return encryption_status_; }
+  pw::bluetooth::emboss::EncryptionStatus encryption_status() const {
+    return encryption_status_;
+  }
 
  protected:
-  AclConnection(hci_spec::ConnectionHandle handle, const DeviceAddress& local_address,
-                const DeviceAddress& peer_address, pw::bluetooth::emboss::ConnectionRole role,
+  AclConnection(hci_spec::ConnectionHandle handle,
+                const DeviceAddress& local_address,
+                const DeviceAddress& peer_address,
+                pw::bluetooth::emboss::ConnectionRole role,
                 const Transport::WeakPtr& hci);
 
   void set_ltk(const hci_spec::LinkKey& link_key) { ltk_ = link_key; }
 
   // Notifies subclasses of a change in encryption status.
-  virtual void HandleEncryptionStatus(Result<bool /*enabled*/> result, bool key_refreshed) = 0;
+  virtual void HandleEncryptionStatus(Result<bool /*enabled*/> result,
+                                      bool key_refreshed) = 0;
 
-  ResultFunction<bool>& encryption_change_callback() { return encryption_change_callback_; }
+  ResultFunction<bool>& encryption_change_callback() {
+    return encryption_change_callback_;
+  }
 
  private:
-  // This method must be static since it may be invoked after the connection associated with it is
-  // destroyed.
+  // This method must be static since it may be invoked after the connection
+  // associated with it is destroyed.
   static void OnDisconnectionComplete(hci_spec::ConnectionHandle handle,
                                       const Transport::WeakPtr& hci);
 
   // HCI event handlers.
-  CommandChannel::EventCallbackResult OnEncryptionChangeEvent(const EmbossEventPacket& event);
+  CommandChannel::EventCallbackResult OnEncryptionChangeEvent(
+      const EmbossEventPacket& event);
   CommandChannel::EventCallbackResult OnEncryptionKeyRefreshCompleteEvent(
       const EmbossEventPacket& event);
 
@@ -77,8 +86,8 @@ class AclConnection : public Connection {
   // This connection's current link key.
   std::optional<hci_spec::LinkKey> ltk_;
 
-  // Flag indicating if peer and local Secure Connections support are both present. Set in
-  // OnLinkKeyNotification in PairingState
+  // Flag indicating if peer and local Secure Connections support are both
+  // present. Set in OnLinkKeyNotification in PairingState
   bool use_secure_connections_ = false;
 
   pw::bluetooth::emboss::EncryptionStatus encryption_status_ =

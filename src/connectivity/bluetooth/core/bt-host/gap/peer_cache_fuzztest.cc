@@ -10,7 +10,8 @@
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/gap/peer_cache.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/testing/peer_fuzzer.h"
 
-// Lightweight harness that adds a single peer to a PeerCache and mutates it with fuzz inputs
+// Lightweight harness that adds a single peer to a PeerCache and mutates it
+// with fuzz inputs
 extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
   FuzzedDataProvider fuzzed_data_provider(data, size);
   pw::random::FuzzerRandomGenerator rng(&fuzzed_data_provider);
@@ -19,7 +20,8 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
   pw::async::test::FakeDispatcher dispatcher;
   bt::gap::PeerCache peer_cache(dispatcher);
 
-  bt::DeviceAddress addr = bt::testing::MakePublicDeviceAddress(fuzzed_data_provider);
+  bt::DeviceAddress addr =
+      bt::testing::MakePublicDeviceAddress(fuzzed_data_provider);
   bool connectable = fuzzed_data_provider.ConsumeBool();
   // NewPeer() can get stuck in an infinite loop generating a PeerId if there is
   // no fuzzer data left.

@@ -16,7 +16,8 @@ namespace bt::l2cap::internal {
 // the L2CAP thread in production.
 class BrEdrSignalingChannel final : public SignalingChannel {
  public:
-  BrEdrSignalingChannel(Channel::WeakPtr chan, pw::bluetooth::emboss::ConnectionRole role,
+  BrEdrSignalingChannel(Channel::WeakPtr chan,
+                        pw::bluetooth::emboss::ConnectionRole role,
                         pw::async::Dispatcher& dispatcher);
   ~BrEdrSignalingChannel() override = default;
 
@@ -26,14 +27,15 @@ class BrEdrSignalingChannel final : public SignalingChannel {
   // remote responded with a rejection. Returns false if the request failed to
   // send.
   //
-  // This is implemented as v5.0 Vol 3, Part A Section 4.8: "These requests may be
-  // used for testing the link or for passing vendor specific information using
-  // the optional data field."
+  // This is implemented as v5.0 Vol 3, Part A Section 4.8: "These requests may
+  // be used for testing the link or for passing vendor specific information
+  // using the optional data field."
   bool TestLink(const ByteBuffer& data, DataCallback cb);
 
  private:
   // SignalingChannel overrides
-  void DecodeRxUnit(ByteBufferPtr sdu, const SignalingPacketHandler& cb) override;
+  void DecodeRxUnit(ByteBufferPtr sdu,
+                    const SignalingPacketHandler& cb) override;
   bool IsSupportedResponse(CommandCode code) const override;
 };
 

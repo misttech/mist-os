@@ -15,8 +15,8 @@ namespace bt::l2cap {
 
 using TestingBase = bt::testing::ControllerTest<bt::testing::MockController>;
 
-// ChannelManager test fixture that uses a real AclDataChannel and uses MockController
-// for HCI packet expectations.
+// ChannelManager test fixture that uses a real AclDataChannel and uses
+// MockController for HCI packet expectations.
 class ChannelManagerMockControllerTest : public TestingBase {
  public:
   static constexpr size_t kMaxDataPacketLength = 64;
@@ -24,7 +24,9 @@ class ChannelManagerMockControllerTest : public TestingBase {
   static constexpr size_t kBufferMaxNumPackets = 10;
 
   static constexpr l2cap::ChannelParameters kChannelParameters{
-      l2cap::RetransmissionAndFlowControlMode::kBasic, l2cap::kMaxMTU, std::nullopt};
+      l2cap::RetransmissionAndFlowControlMode::kBasic,
+      l2cap::kMaxMTU,
+      std::nullopt};
 
   static constexpr l2cap::ExtendedFeatures kExtendedFeatures =
       l2cap::kExtendedFeaturesBitEnhancedRetransmission;
@@ -39,27 +41,34 @@ class ChannelManagerMockControllerTest : public TestingBase {
  protected:
   void Initialize() {
     TestingBase::Initialize(pw::bluetooth::Controller::FeaturesBits::kHciSco);
-    const auto bredr_buffer_info = hci::DataBufferInfo(kMaxDataPacketLength, kBufferMaxNumPackets);
+    const auto bredr_buffer_info =
+        hci::DataBufferInfo(kMaxDataPacketLength, kBufferMaxNumPackets);
     InitializeACLDataChannel(bredr_buffer_info);
 
-    // TODO(63074): Remove assumptions about channel ordering so we can turn random ids on.
-    channel_manager_ =
-        ChannelManager::Create(transport()->acl_data_channel(), transport()->command_channel(),
-                               /*random_channel_ids=*/false, dispatcher_);
+    // TODO(63074): Remove assumptions about channel ordering so we can turn
+    // random ids on.
+    channel_manager_ = ChannelManager::Create(transport()->acl_data_channel(),
+                                              transport()->command_channel(),
+                                              /*random_channel_ids=*/false,
+                                              dispatcher_);
 
     next_command_id_ = 1;
   }
 
-  void Initialize(size_t max_acl_payload_size, size_t max_le_payload_size, size_t max_acl_packets,
+  void Initialize(size_t max_acl_payload_size,
+                  size_t max_le_payload_size,
+                  size_t max_acl_packets,
                   size_t max_le_packets) {
     TestingBase::Initialize(pw::bluetooth::Controller::FeaturesBits::kHciSco);
 
-    InitializeACLDataChannel(hci::DataBufferInfo(max_acl_payload_size, max_acl_packets),
-                             hci::DataBufferInfo(max_le_payload_size, max_le_packets));
+    InitializeACLDataChannel(
+        hci::DataBufferInfo(max_acl_payload_size, max_acl_packets),
+        hci::DataBufferInfo(max_le_payload_size, max_le_packets));
 
-    channel_manager_ =
-        ChannelManager::Create(transport()->acl_data_channel(), transport()->command_channel(),
-                               /*random_channel_ids=*/false, dispatcher_);
+    channel_manager_ = ChannelManager::Create(transport()->acl_data_channel(),
+                                              transport()->command_channel(),
+                                              /*random_channel_ids=*/false,
+                                              dispatcher_);
 
     next_command_id_ = 1;
   }
@@ -70,51 +79,75 @@ class ChannelManagerMockControllerTest : public TestingBase {
 
   void QueueConfigNegotiation(hci_spec::ConnectionHandle handle,
                               l2cap::ChannelParameters local_params,
-                              l2cap::ChannelParameters peer_params, l2cap::ChannelId local_cid,
-                              l2cap::ChannelId remote_cid, l2cap::CommandId local_config_req_id,
+                              l2cap::ChannelParameters peer_params,
+                              l2cap::ChannelId local_cid,
+                              l2cap::ChannelId remote_cid,
+                              l2cap::CommandId local_config_req_id,
                               l2cap::CommandId peer_config_req_id) {
-    const auto kPeerConfigRsp =
-        l2cap::testing::AclConfigRsp(local_config_req_id, handle, local_cid, local_params);
-    const auto kPeerConfigReq =
-        l2cap::testing::AclConfigReq(peer_config_req_id, handle, local_cid, peer_params);
+    const auto kPeerConfigRsp = l2cap::testing::AclConfigRsp(
+        local_config_req_id, handle, local_cid, local_params);
+    const auto kPeerConfigReq = l2cap::testing::AclConfigReq(
+        peer_config_req_id, handle, local_cid, peer_params);
     EXPECT_ACL_PACKET_OUT(
         test_device(),
-        l2cap::testing::AclConfigReq(local_config_req_id, handle, remote_cid, local_params),
-        &kPeerConfigRsp, &kPeerConfigReq);
-    EXPECT_ACL_PACKET_OUT(test_device(), l2cap::testing::AclConfigRsp(peer_config_req_id, handle,
-                                                                      remote_cid, peer_params));
+        l2cap::testing::AclConfigReq(
+            local_config_req_id, handle, remote_cid, local_params),
+        &kPeerConfigRsp,
+        &kPeerConfigReq);
+    EXPECT_ACL_PACKET_OUT(
+        test_device(),
+        l2cap::testing::AclConfigRsp(
+            peer_config_req_id, handle, remote_cid, peer_params));
   }
 
-  void QueueInboundL2capConnection(hci_spec::ConnectionHandle handle, l2cap::Psm psm,
-                                   l2cap::ChannelId local_cid, l2cap::ChannelId remote_cid,
-                                   l2cap::ChannelParameters local_params = kChannelParameters,
-                                   l2cap::ChannelParameters peer_params = kChannelParameters) {
+  void QueueInboundL2capConnection(
+      hci_spec::ConnectionHandle handle,
+      l2cap::Psm psm,
+      l2cap::ChannelId local_cid,
+      l2cap::ChannelId remote_cid,
+      l2cap::ChannelParameters local_params = kChannelParameters,
+      l2cap::ChannelParameters peer_params = kChannelParameters) {
     const l2cap::CommandId kPeerConnReqId = 1;
     const l2cap::CommandId kPeerConfigReqId = kPeerConnReqId + 1;
     const auto kConfigReqId = NextCommandId();
-    EXPECT_ACL_PACKET_OUT(test_device(), l2cap::testing::AclConnectionRsp(kPeerConnReqId, handle,
-                                                                          remote_cid, local_cid));
-    QueueConfigNegotiation(handle, local_params, peer_params, local_cid, remote_cid, kConfigReqId,
+    EXPECT_ACL_PACKET_OUT(test_device(),
+                          l2cap::testing::AclConnectionRsp(
+                              kPeerConnReqId, handle, remote_cid, local_cid));
+    QueueConfigNegotiation(handle,
+                           local_params,
+                           peer_params,
+                           local_cid,
+                           remote_cid,
+                           kConfigReqId,
                            kPeerConfigReqId);
 
-    test_device()->SendACLDataChannelPacket(
-        l2cap::testing::AclConnectionReq(kPeerConnReqId, handle, remote_cid, psm));
+    test_device()->SendACLDataChannelPacket(l2cap::testing::AclConnectionReq(
+        kPeerConnReqId, handle, remote_cid, psm));
   }
 
-  void QueueOutboundL2capConnection(hci_spec::ConnectionHandle handle, l2cap::Psm psm,
-                                    l2cap::ChannelId local_cid, l2cap::ChannelId remote_cid,
-                                    ChannelCallback open_cb,
-                                    l2cap::ChannelParameters local_params = kChannelParameters,
-                                    l2cap::ChannelParameters peer_params = kChannelParameters) {
+  void QueueOutboundL2capConnection(
+      hci_spec::ConnectionHandle handle,
+      l2cap::Psm psm,
+      l2cap::ChannelId local_cid,
+      l2cap::ChannelId remote_cid,
+      ChannelCallback open_cb,
+      l2cap::ChannelParameters local_params = kChannelParameters,
+      l2cap::ChannelParameters peer_params = kChannelParameters) {
     const l2cap::CommandId kPeerConfigReqId = 1;
     const auto kConnReqId = NextCommandId();
     const auto kConfigReqId = NextCommandId();
-    const auto kConnRsp =
-        l2cap::testing::AclConnectionRsp(kConnReqId, handle, local_cid, remote_cid);
-    EXPECT_ACL_PACKET_OUT(test_device(),
-                          l2cap::testing::AclConnectionReq(kConnReqId, handle, local_cid, psm),
-                          &kConnRsp);
-    QueueConfigNegotiation(handle, local_params, peer_params, local_cid, remote_cid, kConfigReqId,
+    const auto kConnRsp = l2cap::testing::AclConnectionRsp(
+        kConnReqId, handle, local_cid, remote_cid);
+    EXPECT_ACL_PACKET_OUT(
+        test_device(),
+        l2cap::testing::AclConnectionReq(kConnReqId, handle, local_cid, psm),
+        &kConnRsp);
+    QueueConfigNegotiation(handle,
+                           local_params,
+                           peer_params,
+                           local_cid,
+                           remote_cid,
+                           kConfigReqId,
                            kPeerConfigReqId);
 
     chanmgr()->OpenL2capChannel(handle, psm, local_params, std::move(open_cb));
@@ -128,40 +161,50 @@ class ChannelManagerMockControllerTest : public TestingBase {
 
   QueueAclConnectionRetVal QueueAclConnection(
       hci_spec::ConnectionHandle handle,
-      pw::bluetooth::emboss::ConnectionRole role = pw::bluetooth::emboss::ConnectionRole::CENTRAL) {
+      pw::bluetooth::emboss::ConnectionRole role =
+          pw::bluetooth::emboss::ConnectionRole::CENTRAL) {
     QueueAclConnectionRetVal return_val;
     return_val.extended_features_id = NextCommandId();
     return_val.fixed_channels_supported_id = NextCommandId();
 
     const auto kExtFeaturesRsp = l2cap::testing::AclExtFeaturesInfoRsp(
         return_val.extended_features_id, handle, kExtendedFeatures);
-    EXPECT_ACL_PACKET_OUT(
-        test_device(),
-        l2cap::testing::AclExtFeaturesInfoReq(return_val.extended_features_id, handle),
-        &kExtFeaturesRsp);
-    EXPECT_ACL_PACKET_OUT(test_device(), l2cap::testing::AclFixedChannelsSupportedInfoReq(
-                                             return_val.fixed_channels_supported_id, handle));
+    EXPECT_ACL_PACKET_OUT(test_device(),
+                          l2cap::testing::AclExtFeaturesInfoReq(
+                              return_val.extended_features_id, handle),
+                          &kExtFeaturesRsp);
+    EXPECT_ACL_PACKET_OUT(test_device(),
+                          l2cap::testing::AclFixedChannelsSupportedInfoReq(
+                              return_val.fixed_channels_supported_id, handle));
 
     return_val.fixed_channels = chanmgr()->AddACLConnection(
-        handle, role, /*link_error_callback=*/[]() {},
+        handle,
+        role,
+        /*link_error_callback=*/[]() {},
         /*security_callback=*/[](auto, auto, auto) {});
 
     return return_val;
   }
 
-  ChannelManager::LEFixedChannels QueueLEConnection(hci_spec::ConnectionHandle handle,
-                                                    pw::bluetooth::emboss::ConnectionRole role) {
+  ChannelManager::LEFixedChannels QueueLEConnection(
+      hci_spec::ConnectionHandle handle,
+      pw::bluetooth::emboss::ConnectionRole role) {
     return chanmgr()->AddLEConnection(
-        handle, role, /*link_error_callback=*/[] {}, /*conn_param_callback=*/[](auto&) {},
+        handle,
+        role,
+        /*link_error_callback=*/[] {},
+        /*conn_param_callback=*/[](auto&) {},
         /*security_callback=*/[](auto, auto, auto) {});
   }
 
-  Channel::WeakPtr ActivateNewFixedChannel(ChannelId id,
-                                           hci_spec::ConnectionHandle conn_handle = 0x0001,
-                                           Channel::ClosedCallback closed_cb = DoNothing,
-                                           Channel::RxCallback rx_cb = NopRxCallback) {
+  Channel::WeakPtr ActivateNewFixedChannel(
+      ChannelId id,
+      hci_spec::ConnectionHandle conn_handle = 0x0001,
+      Channel::ClosedCallback closed_cb = DoNothing,
+      Channel::RxCallback rx_cb = NopRxCallback) {
     auto chan = chanmgr()->OpenFixedChannel(conn_handle, id);
-    if (!chan.is_alive() || !chan->Activate(std::move(rx_cb), std::move(closed_cb))) {
+    if (!chan.is_alive() ||
+        !chan->Activate(std::move(rx_cb), std::move(closed_cb))) {
       return Channel::WeakPtr();
     }
 
@@ -187,10 +230,14 @@ class FakeDispatcherChannelManagerMockControllerTest
 
   void SetUp() override { Initialize(); }
 
-  void SetUp(size_t max_acl_payload_size, size_t max_le_payload_size,
+  void SetUp(size_t max_acl_payload_size,
+             size_t max_le_payload_size,
              size_t max_acl_packets = kBufferMaxNumPackets,
              size_t max_le_packets = kBufferMaxNumPackets) {
-    Initialize(max_acl_payload_size, max_le_payload_size, max_acl_packets, max_le_packets);
+    Initialize(max_acl_payload_size,
+               max_le_payload_size,
+               max_acl_packets,
+               max_le_packets);
   }
 
   void TearDown() override {

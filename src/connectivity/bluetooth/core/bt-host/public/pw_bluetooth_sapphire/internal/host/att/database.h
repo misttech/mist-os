@@ -58,7 +58,11 @@ class Database final : public WeakSelf<Database> {
     inline void MarkEnd() { grp_iter_ = grp_end_; }
 
     friend class Database;
-    Iterator(GroupingList* list, Handle start, Handle end, const UUID* type, bool groups_only);
+    Iterator(GroupingList* list,
+             Handle start,
+             Handle end,
+             const UUID* type,
+             bool groups_only);
 
     Handle start_;
     Handle end_;
@@ -66,7 +70,8 @@ class Database final : public WeakSelf<Database> {
     GroupingList::iterator grp_end_;
     GroupingList::iterator grp_iter_;
     uint16_t attr_offset_;
-    static_assert(std::numeric_limits<decltype(attr_offset_)>::max() >= kHandleMax,
+    static_assert(std::numeric_limits<decltype(attr_offset_)>::max() >=
+                      kHandleMax,
                   "attr_offset_ must be able to fit kMaxHandle!");
     std::optional<UUID> type_filter_;
   };
@@ -79,7 +84,8 @@ class Database final : public WeakSelf<Database> {
   // Note: This is to make it easy for the GATT layer to group service
   // declarations with 16-bit UUIDs and 128-bit UUIDs separately as recommended
   // by the GATT specification (see Vol 3, Part G, 3.1).
-  explicit Database(Handle range_start = kHandleMin, Handle range_end = kHandleMax);
+  explicit Database(Handle range_start = kHandleMin,
+                    Handle range_end = kHandleMax);
   ~Database() = default;
 
   // Returns an iterator that covers the handle range defined by |start| and
@@ -90,7 +96,9 @@ class Database final : public WeakSelf<Database> {
   //
   // If |type| is not a nullptr, it will be assigned as the iterator's type
   // filter.
-  Iterator GetIterator(Handle start, Handle end, const UUID* type = nullptr,
+  Iterator GetIterator(Handle start,
+                       Handle end,
+                       const UUID* type = nullptr,
                        bool groups_only = false);
 
   // Creates a new attribute grouping with the given |type|. The grouping will
@@ -105,7 +113,8 @@ class Database final : public WeakSelf<Database> {
   // The returned pointer is owned and managed by this Database and should not
   // be retained by the caller. Removing the grouping will invalidate the
   // returned pointer.
-  AttributeGrouping* NewGrouping(const UUID& group_type, size_t attr_count,
+  AttributeGrouping* NewGrouping(const UUID& group_type,
+                                 size_t attr_count,
                                  const ByteBuffer& decl_value);
 
   // Removes the attribute grouping that has the given starting handle. Returns
@@ -141,8 +150,10 @@ class Database final : public WeakSelf<Database> {
   // attribute supports writes.
   using WriteQueueResult = fit::result<std::tuple<Handle, ErrorCode>>;
   using WriteCallback = fit::callback<void(WriteQueueResult)>;
-  void ExecuteWriteQueue(PeerId peer_id, PrepareWriteQueue write_queue,
-                         const sm::SecurityProperties& security, WriteCallback callback);
+  void ExecuteWriteQueue(PeerId peer_id,
+                         PrepareWriteQueue write_queue,
+                         const sm::SecurityProperties& security,
+                         WriteCallback callback);
 
  private:
   Handle range_start_;

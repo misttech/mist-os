@@ -67,25 +67,29 @@ class ByteBuffer {
   // A BufferView is only valid as long as the buffer that it points to is
   // valid. Care should be taken to ensure that a BufferView does not outlive
   // its backing buffer.
-  BufferView view(size_t pos = 0, size_t size = std::numeric_limits<std::size_t>::max()) const;
+  BufferView view(size_t pos = 0,
+                  size_t size = std::numeric_limits<std::size_t>::max()) const;
 
   // Same as view(), but returns a span instead of a BufferView.
-  pw::span<const std::byte> subspan(size_t pos = 0,
-                                    size_t size = std::numeric_limits<std::size_t>::max()) const;
+  pw::span<const std::byte> subspan(
+      size_t pos = 0,
+      size_t size = std::numeric_limits<std::size_t>::max()) const;
 
-  // Copies all bytes of this buffer into |out_buffer|. |out_buffer| must be large enough to
-  // accommodate the result of this operation.
+  // Copies all bytes of this buffer into |out_buffer|. |out_buffer| must be
+  // large enough to accommodate the result of this operation.
   void Copy(MutableByteBuffer* out_buffer) const;
 
-  // Copies |size| bytes of this buffer into |out_buffer| starting at offset |pos|. |out_buffer|
-  // must be large enough to accommodate the result of this operation.
+  // Copies |size| bytes of this buffer into |out_buffer| starting at offset
+  // |pos|. |out_buffer| must be large enough to accommodate the result of this
+  // operation.
   void Copy(MutableByteBuffer* out_buffer, size_t pos, size_t size) const;
 
-  // Creates a new std::string that contains a printable representation of a range of this buffer
-  // starting at |pos|. The string is checked to see if it is UTF-8. If not, each byte in the range
-  // to be converted is checked to see if it is printable ASCII. If so, the character is used as is.
-  // If not, it is replaced by '.'. The returned std::string will have size |size| + 1 to fit a
-  // terminating '\0'.
+  // Creates a new std::string that contains a printable representation of a
+  // range of this buffer starting at |pos|. The string is checked to see if it
+  // is UTF-8. If not, each byte in the range to be converted is checked to see
+  // if it is printable ASCII. If so, the character is used as is. If not, it is
+  // replaced by '.'. The returned std::string will have size |size| + 1 to fit
+  // a terminating '\0'.
   std::string Printable(size_t pos, size_t size) const;
 
   // Iterator functions.
@@ -100,80 +104,101 @@ class ByteBuffer {
     return data()[pos];
   }
 
-  // Creates an object of type T with the first sizeof(T) bytes of the buffer as its representation
-  // (per definition at ISO/IEC 14882:2017(E) § 6.9 [basic.types] ¶ 4.4). The user is responsible
-  // for checking that the first sizeof(T) bytes represent a valid instance of T. If T is an array
-  // type, the return value will be a std::array with the same element type and extents.
+  // Creates an object of type T with the first sizeof(T) bytes of the buffer as
+  // its representation (per definition at ISO/IEC 14882:2017(E) § 6.9
+  // [basic.types] ¶ 4.4). The user is responsible for checking that the first
+  // sizeof(T) bytes represent a valid instance of T. If T is an array type, the
+  // return value will be a std::array with the same element type and extents.
   //
-  // This or ReadMember should always be used in place of reinterpret_cast on raw pointers because
-  // of dangerous UB related to object lifetimes and alignment issues (see https://fxbug.dev/46637).
-  // Moreover, this will perform bounds checking on the data being read.
+  // This or ReadMember should always be used in place of reinterpret_cast on
+  // raw pointers because of dangerous UB related to object lifetimes and
+  // alignment issues (see https://fxbug.dev/46637). Moreover, this will perform
+  // bounds checking on the data being read.
   template <typename T>
   [[nodiscard]] auto To() const {
-    static_assert(std::is_trivially_copyable_v<T>, "unsafe to copy representation");
+    static_assert(std::is_trivially_copyable_v<T>,
+                  "unsafe to copy representation");
     static_assert(std::is_default_constructible_v<T>);
     using OutType = std::remove_cv_t<bt_lib_cpp_type::ToStdArrayT<T>>;
 
-    // This is value-initialized in order to construct objects that have const members. The
-    // consideration for modifying the object through its representation even if the constituent
-    // types are cv-qualified is based on the potent rules for memcpy'ing "underlying bytes" at
-    // ISO/IEC 14882:2017(E) § 6.9 [basic.types] ¶ 4.2–4.3.
+    // This is value-initialized in order to construct objects that have const
+    // members. The consideration for modifying the object through its
+    // representation even if the constituent types are cv-qualified is based on
+    // the potent rules for memcpy'ing "underlying bytes" at ISO/IEC
+    // 14882:2017(E) § 6.9 [basic.types] ¶ 4.2–4.3.
     OutType out{};
-    CopyRaw(/*dst_data=*/std::addressof(out), /*dst_capacity=*/sizeof(out), /*src_offset=*/0,
+    CopyRaw(/*dst_data=*/std::addressof(out),
+            /*dst_capacity=*/sizeof(out),
+            /*src_offset=*/0,
             /*copy_size=*/sizeof(out));
     return out;
   }
 
-  // Given a pointer to a member of a class, interpret the underlying buffer as a representation of
-  // the class and return a copy of the member, with bounds checking for reading the representation.
-  // Array elements (including multi-dimensional) will be returned as std::array. The buffer is
-  // allowed to be larger than T. The user is responsible for checking that the first sizeof(T)
-  // bytes represent a valid instance of T.
+  // Given a pointer to a member of a class, interpret the underlying buffer as
+  // a representation of the class and return a copy of the member, with bounds
+  // checking for reading the representation. Array elements (including
+  // multi-dimensional) will be returned as std::array. The buffer is allowed to
+  // be larger than T. The user is responsible for checking that the first
+  // sizeof(T) bytes represent a valid instance of T.
   //
   // Example:
   //   struct Foo { float bar[3]; int baz; char qux[]; };
   //   buffer.ReadMember<&Foo::bar>();  // OK, returns std::array<float, 3>
   //   buffer.ReadMember<&Foo::baz>();  // OK, returns int
-  //   buffer.ReadMember<&Foo::qux>();  // Asserts, use ReadMember<&Foo::qux>(index) instead
+  //   buffer.ReadMember<&Foo::qux>();  // Asserts, use
+  //   ReadMember<&Foo::qux>(index) instead
   //
   // This functions similarly to C-style type punning at address
   //   |buffer.data() + offsetof(Foo, bar)|
   template <auto PointerToMember>
   auto ReadMember() const {
-    using ClassT = typename bt_lib_cpp_type::MemberPointerTraits<PointerToMember>::ClassType;
+    using ClassT = typename bt_lib_cpp_type::MemberPointerTraits<
+        PointerToMember>::ClassType;
     BT_ASSERT_MSG(sizeof(ClassT) <= this->size(),
-                  "insufficient buffer (class size: %zu, buffer size: %zu)", sizeof(ClassT),
+                  "insufficient buffer (class size: %zu, buffer size: %zu)",
+                  sizeof(ClassT),
                   this->size());
-    using MemberT = typename bt_lib_cpp_type::MemberPointerTraits<PointerToMember>::MemberType;
+    using MemberT = typename bt_lib_cpp_type::MemberPointerTraits<
+        PointerToMember>::MemberType;
     if constexpr (std::is_array_v<MemberT>) {
-      static_assert(std::extent_v<MemberT> > 0,
-                    "use indexed overload of ReadMember for flexible array members");
+      static_assert(
+          std::extent_v<MemberT> > 0,
+          "use indexed overload of ReadMember for flexible array members");
     }
     using ReturnType = std::remove_cv_t<bt_lib_cpp_type::ToStdArrayT<MemberT>>;
 
-    // std::array is required to be an aggregate that's list-initialized per ISO/IEC 14882:2017(E)
-    // § 26.3.7.1 [array.overview] ¶ 2, so its layout's initial run is identical to a raw array.
+    // std::array is required to be an aggregate that's list-initialized per
+    // ISO/IEC 14882:2017(E) § 26.3.7.1 [array.overview] ¶ 2, so its layout's
+    // initial run is identical to a raw array.
     static_assert(sizeof(MemberT) <= sizeof(ReturnType));
-    static_assert(std::is_trivially_copyable_v<MemberT>, "unsafe to copy representation");
-    static_assert(std::is_trivially_copyable_v<ReturnType>, "unsafe to copy representation");
+    static_assert(std::is_trivially_copyable_v<MemberT>,
+                  "unsafe to copy representation");
+    static_assert(std::is_trivially_copyable_v<ReturnType>,
+                  "unsafe to copy representation");
     ReturnType out{};
-    const size_t offset = bt_lib_cpp_type::MemberPointerTraits<PointerToMember>::offset();
-    CopyRaw(/*dst_data=*/std::addressof(out), /*dst_capacity=*/sizeof(out), /*src_offset=*/offset,
+    const size_t offset =
+        bt_lib_cpp_type::MemberPointerTraits<PointerToMember>::offset();
+    CopyRaw(/*dst_data=*/std::addressof(out),
+            /*dst_capacity=*/sizeof(out),
+            /*src_offset=*/offset,
             /*copy_size=*/sizeof(MemberT));
     return out;
   }
 
-  // Given a pointer to an array (or smart array) member of a class, interpret the underlying buffer
-  // as a representation of the class and return a copy of the member's |index - 1|-th element, with
-  // bounds checking for the indexing and reading representation bytes. Multi-dimensional arrays
-  // will return array elements as std::array. The buffer is allowed to be larger than T. The user
-  // is responsible for checking that the first sizeof(T) bytes represent a valid instance of T.
+  // Given a pointer to an array (or smart array) member of a class, interpret
+  // the underlying buffer as a representation of the class and return a copy of
+  // the member's |index - 1|-th element, with bounds checking for the indexing
+  // and reading representation bytes. Multi-dimensional arrays will return
+  // array elements as std::array. The buffer is allowed to be larger than T.
+  // The user is responsible for checking that the first sizeof(T) bytes
+  // represent a valid instance of T.
   //
   // Example:
   //   struct Foo { float bar[3]; int baz; char qux[]; };
   //   buffer.ReadMember<&Foo::bar>(2);  // OK
   //   buffer.ReadMember<&Foo::qux>(3);  // OK, checked against buffer.size()
-  //   buffer.ReadMember<&Foo::bar>(3);  // Asserts because out-of-bounds on Foo::bar
+  //   buffer.ReadMember<&Foo::bar>(3);  // Asserts because out-of-bounds on
+  //   Foo::bar
   //
   // This functions similarly to C-style type punning at address
   //   |buffer.data() + offsetof(Foo, bar) + index * sizeof(bar[0])|
@@ -181,41 +206,55 @@ class ByteBuffer {
   template <auto PointerToMember>
   auto ReadMember(size_t index) const {
     // From the ReadMember<&Foo::bar>(2) example, ClassT = Foo
-    using ClassT = typename bt_lib_cpp_type::MemberPointerTraits<PointerToMember>::ClassType;
+    using ClassT = typename bt_lib_cpp_type::MemberPointerTraits<
+        PointerToMember>::ClassType;
     BT_ASSERT_MSG(sizeof(ClassT) <= this->size(),
-                  "insufficient buffer (class size: %zu, buffer size: %zu)", sizeof(ClassT),
+                  "insufficient buffer (class size: %zu, buffer size: %zu)",
+                  sizeof(ClassT),
                   this->size());
 
     // From the ReadMember<&Foo::bar>(2) example, MemberT = float[3]
-    using MemberT = typename bt_lib_cpp_type::MemberPointerTraits<PointerToMember>::MemberType;
-    static_assert(std::is_trivially_copyable_v<MemberT>, "unsafe to copy representation");
+    using MemberT = typename bt_lib_cpp_type::MemberPointerTraits<
+        PointerToMember>::MemberType;
+    static_assert(std::is_trivially_copyable_v<MemberT>,
+                  "unsafe to copy representation");
 
-    // From the ReadMember<&Foo::bar>(2) example, MemberAsStdArrayT = std::array<float, 3>
+    // From the ReadMember<&Foo::bar>(2) example, MemberAsStdArrayT =
+    // std::array<float, 3>
     using MemberAsStdArrayT = bt_lib_cpp_type::ToStdArrayT<MemberT>;
 
     // Check array bounds
     constexpr size_t kArraySize = std::tuple_size_v<MemberAsStdArrayT>;
-    const size_t base_offset = bt_lib_cpp_type::MemberPointerTraits<PointerToMember>::offset();
+    const size_t base_offset =
+        bt_lib_cpp_type::MemberPointerTraits<PointerToMember>::offset();
     if constexpr (kArraySize > 0) {
-      // std::array is required to be an aggregate that's list-initialized per ISO/IEC 14882:2017(E)
-      // § 26.3.7.1 [array.overview] ¶ 2, so we can rely on the initial run of its layout, but in
-      // the technically possible but unlikely case that it contains additional bytes, we can't use
-      // its size for array indexing calculations.
+      // std::array is required to be an aggregate that's list-initialized per
+      // ISO/IEC 14882:2017(E) § 26.3.7.1 [array.overview] ¶ 2, so we can rely
+      // on the initial run of its layout, but in the technically possible but
+      // unlikely case that it contains additional bytes, we can't use its size
+      // for array indexing calculations.
       static_assert(sizeof(MemberAsStdArrayT) == sizeof(MemberT));
-      BT_ASSERT_MSG(index < kArraySize, "index past array bounds (index: %zu, array size: %zu)",
-                    index, kArraySize);
+      BT_ASSERT_MSG(index < kArraySize,
+                    "index past array bounds (index: %zu, array size: %zu)",
+                    index,
+                    kArraySize);
     } else {
-      // Allow flexible array members (at the end of structs) that have zero length
-      BT_ASSERT_MSG(base_offset == sizeof(ClassT), "read from zero-length array");
+      // Allow flexible array members (at the end of structs) that have zero
+      // length
+      BT_ASSERT_MSG(base_offset == sizeof(ClassT),
+                    "read from zero-length array");
     }
 
     // From the ReadMember<&Foo::bar>(2) example, ElementT = float
     using ElementT = std::remove_cv_t<typename MemberAsStdArrayT::value_type>;
-    static_assert(std::is_trivially_copyable_v<ElementT>, "unsafe to copy representation");
+    static_assert(std::is_trivially_copyable_v<ElementT>,
+                  "unsafe to copy representation");
     const size_t offset = base_offset + index * sizeof(ElementT);
     ElementT element{};
-    CopyRaw(/*dst_data=*/std::addressof(element), /*dst_capacity=*/sizeof(ElementT),
-            /*src_offset=*/offset, /*copy_size=*/sizeof(ElementT));
+    CopyRaw(/*dst_data=*/std::addressof(element),
+            /*dst_capacity=*/sizeof(ElementT),
+            /*src_offset=*/offset,
+            /*copy_size=*/sizeof(ElementT));
     return element;
   }
 
@@ -238,7 +277,10 @@ class ByteBuffer {
   std::vector<uint8_t> ToVector() const;
 
  private:
-  void CopyRaw(void* dst_data, size_t dst_capacity, size_t src_offset, size_t copy_size) const;
+  void CopyRaw(void* dst_data,
+               size_t dst_capacity,
+               size_t src_offset,
+               size_t copy_size) const;
 };
 
 using ByteBufferPtr = std::unique_ptr<ByteBuffer>;
@@ -259,13 +301,15 @@ class MutableByteBuffer : public ByteBuffer {
     return mutable_data()[pos];
   }
 
-  // Read-only random access operator. Required because there is no overload resolution from derived
-  // to base classes - without this, |const MutableByteBuffer|s cannot use operator[].
+  // Read-only random access operator. Required because there is no overload
+  // resolution from derived to base classes - without this, |const
+  // MutableByteBuffer|s cannot use operator[].
   uint8_t operator[](size_t pos) const { return ByteBuffer::operator[](pos); }
 
-  // Converts the underlying buffer to a mutable reference to the given type, with bounds checking.
-  // The buffer is allowed to be larger than T. The user is responsible for checking that the first
-  // sizeof(T) bytes represents a valid instance of T.
+  // Converts the underlying buffer to a mutable reference to the given type,
+  // with bounds checking. The buffer is allowed to be larger than T. The user
+  // is responsible for checking that the first sizeof(T) bytes represents a
+  // valid instance of T.
   template <typename T>
   T* AsMutable() {
     static_assert(std::is_trivially_copyable_v<T>);
@@ -289,11 +333,14 @@ class MutableByteBuffer : public ByteBuffer {
   // If T is an array of known bounds, the entire array will be written.
   template <typename T>
   void WriteObj(const T& data, size_t pos = 0) {
-    // ByteBuffers are (mostly?) not TriviallyCopyable, but check this first for the error to be
-    // useful.
-    static_assert(!std::is_base_of_v<ByteBuffer, T>, "ByteBuffer passed to WriteObj; use Write");
-    static_assert(!std::is_pointer_v<T>, "Pointer passed to WriteObj, deref or use Write");
-    static_assert(std::is_trivially_copyable_v<T>, "Unsafe to peek byte representation");
+    // ByteBuffers are (mostly?) not TriviallyCopyable, but check this first for
+    // the error to be useful.
+    static_assert(!std::is_base_of_v<ByteBuffer, T>,
+                  "ByteBuffer passed to WriteObj; use Write");
+    static_assert(!std::is_pointer_v<T>,
+                  "Pointer passed to WriteObj, deref or use Write");
+    static_assert(std::is_trivially_copyable_v<T>,
+                  "Unsafe to peek byte representation");
     Write(reinterpret_cast<const uint8_t*>(&data), sizeof(T), pos);
   }
 
@@ -305,12 +352,13 @@ class MutableByteBuffer : public ByteBuffer {
   // A BufferView is only valid as long as the buffer that it points to is
   // valid. Care should be taken to ensure that a BufferView does not outlive
   // its backing buffer.
-  MutableBufferView mutable_view(size_t pos = 0,
-                                 size_t size = std::numeric_limits<std::size_t>::max());
+  MutableBufferView mutable_view(
+      size_t pos = 0, size_t size = std::numeric_limits<std::size_t>::max());
 
-  // Same as mutable_view(), but returns a mutable span instead of a MutableBufferView.
-  pw::span<std::byte> mutable_subspan(size_t pos = 0,
-                                      size_t size = std::numeric_limits<std::size_t>::max());
+  // Same as mutable_view(), but returns a mutable span instead of a
+  // MutableBufferView.
+  pw::span<std::byte> mutable_subspan(
+      size_t pos = 0, size_t size = std::numeric_limits<std::size_t>::max());
 
   // Sets the contents of the buffer to 0s.
   void SetToZeros() { Fill(0); }
@@ -328,30 +376,38 @@ using MutableByteBufferPtr = std::unique_ptr<MutableByteBuffer>;
 template <size_t BufferSize>
 class StaticByteBuffer : public MutableByteBuffer {
  public:
-  // Create a buffer of size |BufferSize|. The buffer bytes will be initialized to 0x00.
-  StaticByteBuffer() { static_assert(BufferSize, "|BufferSize| must be non-zero"); }
+  // Create a buffer of size |BufferSize|. The buffer bytes will be initialized
+  // to 0x00.
+  StaticByteBuffer() {
+    static_assert(BufferSize, "|BufferSize| must be non-zero");
+  }
   ~StaticByteBuffer() override = default;
 
-  // Variadic template constructor to initialize a StaticByteBuffer using a parameter pack e.g.:
+  // Variadic template constructor to initialize a StaticByteBuffer using a
+  // parameter pack e.g.:
   //
   //   StaticByteBuffer foo(0x00, 0x01, 0x02);
   //   StaticByteBuffer<3> foo(0x00, 0x01, 0x02);
   //
-  // The class's |BufferSize| template parameter, if explicitly provided, will be checked against
-  // the number of initialization elements provided.
+  // The class's |BufferSize| template parameter, if explicitly provided, will
+  // be checked against the number of initialization elements provided.
   //
-  // All types castable to uint8_t can be used without casting (including class enums) for brevity
-  // but care must be taken not to exceed uint8_t range limits.
+  // All types castable to uint8_t can be used without casting (including class
+  // enums) for brevity but care must be taken not to exceed uint8_t range
+  // limits.
   //
-  //   StaticByteBuffer foo(-257);  // -257 has type int and will likely convert to uint8_t{0xff}
+  //   StaticByteBuffer foo(-257);  // -257 has type int and will likely convert
+  //   to uint8_t{0xff}
   template <typename... T>
-  constexpr explicit StaticByteBuffer(T... bytes) : buffer_{{static_cast<uint8_t>(bytes)...}} {
+  constexpr explicit StaticByteBuffer(T... bytes)
+      : buffer_{{static_cast<uint8_t>(bytes)...}} {
     static_assert(BufferSize, "|BufferSize| must be non-zero");
-    static_assert(BufferSize == sizeof...(T), "|BufferSize| must match initializer list count");
+    static_assert(BufferSize == sizeof...(T),
+                  "|BufferSize| must match initializer list count");
 
-    // Check that arguments are within byte range. Restrict checking to smaller inputs to limit
-    // compile time impact and because clang considers fold expressions "nested" (i.e. subject to a
-    // default 256 depth limit).
+    // Check that arguments are within byte range. Restrict checking to smaller
+    // inputs to limit compile time impact and because clang considers fold
+    // expressions "nested" (i.e. subject to a default 256 depth limit).
     if constexpr (sizeof...(bytes) <= 256) {
       constexpr auto is_byte_storable = [](auto value) {
         if constexpr (sizeof(value) > sizeof(uint8_t)) {
@@ -361,8 +417,9 @@ class StaticByteBuffer : public MutableByteBuffer {
         return true;
       };
 
-      // This is a runtime assert because this class was written to work with non-constant values
-      // but most uses of StaticByteBuffer are in tests so this is an acceptable cost.
+      // This is a runtime assert because this class was written to work with
+      // non-constant values but most uses of StaticByteBuffer are in tests so
+      // this is an acceptable cost.
       BT_DEBUG_ASSERT((is_byte_storable(bytes) && ...));
     }
   }
@@ -382,9 +439,10 @@ class StaticByteBuffer : public MutableByteBuffer {
   std::array<uint8_t, BufferSize> buffer_{};
 };
 
-// Template deduction guide for the |BufferSize| class template parameter using the number of
-// parameters passed into the templated parameter pack constructor. This allows |BufferSize| to be
-// omitted when it should be deduced from the initializer:
+// Template deduction guide for the |BufferSize| class template parameter using
+// the number of parameters passed into the templated parameter pack
+// constructor. This allows |BufferSize| to be omitted when it should be deduced
+// from the initializer:
 //
 //   StaticByteBuffer buffer(0x00, 0x01, 0x02);
 //
@@ -399,7 +457,8 @@ class DynamicByteBuffer : public MutableByteBuffer {
   DynamicByteBuffer();
   ~DynamicByteBuffer() override = default;
 
-  // Allocates a new buffer with |buffer_size| bytes. The buffer bytes will be initialized to 0x00.
+  // Allocates a new buffer with |buffer_size| bytes. The buffer bytes will be
+  // initialized to 0x00.
   explicit DynamicByteBuffer(size_t buffer_size);
 
   // Copies the contents of |buffer|.

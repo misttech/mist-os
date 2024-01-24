@@ -20,16 +20,22 @@ class LegacyLowEnergyAdvertiser final : public LowEnergyAdvertiser {
 
   // LowEnergyAdvertiser overrides:
   size_t MaxAdvertisements() const override { return 1; }
-  size_t GetSizeLimit() const override { return hci_spec::kMaxLEAdvertisingDataLength; }
-  bool AllowsRandomAddressChange() const override { return !starting_ && !IsAdvertising(); }
+  size_t GetSizeLimit() const override {
+    return hci_spec::kMaxLEAdvertisingDataLength;
+  }
+  bool AllowsRandomAddressChange() const override {
+    return !starting_ && !IsAdvertising();
+  }
 
   // LegacyLowEnergyAdvertiser supports only a single advertising instance,
   // hence it can report additional errors in the following conditions:
   // 1. If called while a start request is pending, reports kRepeatedAttempts.
   // 2. If called while a stop request is pending, then cancels the stop request
   //    and proceeds with start.
-  void StartAdvertising(const DeviceAddress& address, const AdvertisingData& data,
-                        const AdvertisingData& scan_rsp, AdvertisingOptions options,
+  void StartAdvertising(const DeviceAddress& address,
+                        const AdvertisingData& data,
+                        const AdvertisingData& scan_rsp,
+                        AdvertisingOptions options,
                         ConnectionCallback connect_callback,
                         ResultFunction<> status_callback) override;
 
@@ -42,23 +48,27 @@ class LegacyLowEnergyAdvertiser final : public LowEnergyAdvertiser {
   // TODO(https://fxbug.dev/50542): Update documentation.
   void StopAdvertising(const DeviceAddress& address) override;
 
-  void OnIncomingConnection(hci_spec::ConnectionHandle handle,
-                            pw::bluetooth::emboss::ConnectionRole role,
-                            const DeviceAddress& peer_address,
-                            const hci_spec::LEConnectionParameters& conn_params) override;
+  void OnIncomingConnection(
+      hci_spec::ConnectionHandle handle,
+      pw::bluetooth::emboss::ConnectionRole role,
+      const DeviceAddress& peer_address,
+      const hci_spec::LEConnectionParameters& conn_params) override;
 
  private:
   std::optional<EmbossCommandPacket> BuildEnablePacket(
-      const DeviceAddress& address, pw::bluetooth::emboss::GenericEnableParam enable) override;
+      const DeviceAddress& address,
+      pw::bluetooth::emboss::GenericEnableParam enable) override;
 
   CommandChannel::CommandPacketVariant BuildSetAdvertisingParams(
-      const DeviceAddress& address, pw::bluetooth::emboss::LEAdvertisingType type,
+      const DeviceAddress& address,
+      pw::bluetooth::emboss::LEAdvertisingType type,
       pw::bluetooth::emboss::LEOwnAddressType own_address_type,
       AdvertisingIntervalRange interval) override;
 
-  CommandChannel::CommandPacketVariant BuildSetAdvertisingData(const DeviceAddress& address,
-                                                               const AdvertisingData& data,
-                                                               AdvFlags flags) override;
+  CommandChannel::CommandPacketVariant BuildSetAdvertisingData(
+      const DeviceAddress& address,
+      const AdvertisingData& data,
+      AdvFlags flags) override;
 
   CommandChannel::CommandPacketVariant BuildUnsetAdvertisingData(
       const DeviceAddress& address) override;

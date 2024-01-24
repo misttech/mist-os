@@ -11,16 +11,20 @@
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/gatt/server.h"
 
 namespace bt::gatt::testing {
-using UpdateHandler = fit::function<void(IdType service_id, IdType chrc_id, BufferView value,
+using UpdateHandler = fit::function<void(IdType service_id,
+                                         IdType chrc_id,
+                                         BufferView value,
                                          IndicationCallback indicate_cb)>;
 
-// A mock implementation of a gatt::Server object. Can be used to mock outbound notifications/
-// indications without a production att::Bearer in tests.
+// A mock implementation of a gatt::Server object. Can be used to mock outbound
+// notifications/ indications without a production att::Bearer in tests.
 class MockServer : public Server {
  public:
   MockServer(PeerId peer_id, LocalServiceManager::WeakPtr local_services);
 
-  void set_update_handler(UpdateHandler handler) { update_handler_ = std::move(handler); }
+  void set_update_handler(UpdateHandler handler) {
+    update_handler_ = std::move(handler);
+  }
 
   using WeakPtr = WeakSelf<MockServer>::WeakPtr;
   MockServer::WeakPtr AsMockWeakPtr() { return weak_self_.GetWeakPtr(); }
@@ -29,7 +33,9 @@ class MockServer : public Server {
 
  private:
   // Server overrides:
-  void SendUpdate(IdType service_id, IdType chrc_id, BufferView value,
+  void SendUpdate(IdType service_id,
+                  IdType chrc_id,
+                  BufferView value,
                   IndicationCallback indicate_cb) override;
   void ShutDown() override { was_shut_down_ = true; }
 

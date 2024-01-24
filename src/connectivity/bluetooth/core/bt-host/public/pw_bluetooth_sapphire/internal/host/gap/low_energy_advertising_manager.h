@@ -30,7 +30,8 @@ constexpr AdvertisementId kInvalidAdvertisementId(0u);
 
 class LowEnergyAdvertisingManager;
 
-// Represents an active advertising instance. Stops the associated advertisement upon destruction.
+// Represents an active advertising instance. Stops the associated advertisement
+// upon destruction.
 class AdvertisementInstance final {
  public:
   // The default constructor initializes an instance with an invalid ID.
@@ -48,7 +49,8 @@ class AdvertisementInstance final {
  private:
   friend class LowEnergyAdvertisingManager;
 
-  AdvertisementInstance(AdvertisementId id, WeakSelf<LowEnergyAdvertisingManager>::WeakPtr owner);
+  AdvertisementInstance(AdvertisementId id,
+                        WeakSelf<LowEnergyAdvertisingManager>::WeakPtr owner);
   void Move(AdvertisementInstance* other);
   void Reset();
 
@@ -58,8 +60,9 @@ class AdvertisementInstance final {
   BT_DISALLOW_COPY_AND_ASSIGN_ALLOW_MOVE(AdvertisementInstance);
 };
 
-// Enum values for determining the advertising interval range. These ranges come from Core
-// Specification v5.1, Vol 3, Part C, Appendix A (see also the constants defined in gap.h).
+// Enum values for determining the advertising interval range. These ranges come
+// from Core Specification v5.1, Vol 3, Part C, Appendix A (see also the
+// constants defined in gap.h).
 enum class AdvertisingInterval {
   FAST1,
   FAST2,
@@ -97,13 +100,17 @@ class LowEnergyAdvertisingManager {
   //      or if the requested parameters are not supported by the hardware.
   //    * HostError::kProtocolError with a HCI error reported from
   //      the controller, otherwise.
-  using ConnectionCallback = fit::function<void(AdvertisementId advertisement_id,
-                                                std::unique_ptr<hci::LowEnergyConnection> link)>;
+  using ConnectionCallback =
+      fit::function<void(AdvertisementId advertisement_id,
+                         std::unique_ptr<hci::LowEnergyConnection> link)>;
   using AdvertisingStatusCallback =
       fit::function<void(AdvertisementInstance instance, hci::Result<> status)>;
-  void StartAdvertising(AdvertisingData data, AdvertisingData scan_rsp,
-                        ConnectionCallback connect_callback, AdvertisingInterval interval,
-                        bool anonymous, bool include_tx_power_level,
+  void StartAdvertising(AdvertisingData data,
+                        AdvertisingData scan_rsp,
+                        ConnectionCallback connect_callback,
+                        AdvertisingInterval interval,
+                        bool anonymous,
+                        bool include_tx_power_level,
                         AdvertisingStatusCallback status_callback);
 
   // Stop advertising the advertisement with the id |advertisement_id|
@@ -121,7 +128,8 @@ class LowEnergyAdvertisingManager {
   // TODO(armansito): Use fbl::HashMap here (https://fxbug.dev/652) or move
   // ActiveAdvertisement definition here and store by value (it is a small
   // object).
-  std::unordered_map<AdvertisementId, std::unique_ptr<ActiveAdvertisement>> advertisements_;
+  std::unordered_map<AdvertisementId, std::unique_ptr<ActiveAdvertisement>>
+      advertisements_;
 
   // Used to communicate with the controller. |advertiser_| must outlive this
   // advertising manager.

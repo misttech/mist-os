@@ -17,7 +17,8 @@ namespace bt::gap {
 constexpr uint64_t BuildEventMask() {
   uint64_t event_mask = 0;
 
-#define ENABLE_EVT(event) event_mask |= static_cast<uint64_t>(hci_spec::EventMask::event)
+#define ENABLE_EVT(event) \
+  event_mask |= static_cast<uint64_t>(hci_spec::EventMask::event)
 
   // Enable events that are needed for basic functionality. (alphabetic)
   ENABLE_EVT(kAuthenticationCompleteEvent);
@@ -60,7 +61,8 @@ constexpr uint64_t BuildEventMask() {
 constexpr uint64_t BuildLEEventMask() {
   uint64_t event_mask = 0;
 
-#define ENABLE_EVT(event) event_mask |= static_cast<uint64_t>(hci_spec::LEEventMask::event)
+#define ENABLE_EVT(event) \
+  event_mask |= static_cast<uint64_t>(hci_spec::LEEventMask::event)
 
   ENABLE_EVT(kLEAdvertisingReport);
   ENABLE_EVT(kLEConnectionComplete);

@@ -13,7 +13,8 @@
 
 namespace bt {
 
-// Use raw, non-class enum to explicitly enable usage of enum values as numeric sizes.
+// Use raw, non-class enum to explicitly enable usage of enum values as numeric
+// sizes.
 enum UUIDElemSize : uint8_t { k16Bit = 2, k32Bit = 4, k128Bit = 16 };
 
 // Represents a 128-bit Bluetooth UUID. This class allows UUID values to be
@@ -32,8 +33,8 @@ class UUID final {
   // The default constructor initializes all values to zero.
   constexpr UUID() = default;
 
-  // Constructs a UUID from |bytes|. This is similar to FromBytes, except it asserts if |bytes| has
-  // an unsupported size.
+  // Constructs a UUID from |bytes|. This is similar to FromBytes, except it
+  // asserts if |bytes| has an unsupported size.
   explicit UUID(const ByteBuffer& bytes);
 
   constexpr explicit UUID(const UInt128& uuid128) : value_(uuid128) {
@@ -51,7 +52,8 @@ class UUID final {
       : type_(Type::k16Bit), value_(BuildSIGUUID(uuid16)) {}
 
   constexpr explicit UUID(const uint32_t uuid32)
-      : type_(uuid32 > std::numeric_limits<uint16_t>::max() ? Type::k32Bit : Type::k16Bit),
+      : type_(uuid32 > std::numeric_limits<uint16_t>::max() ? Type::k32Bit
+                                                            : Type::k16Bit),
         value_(BuildSIGUUID(uuid32)) {}
 
   // Equality operators.
@@ -113,8 +115,22 @@ class UUID final {
   //    "00000000-0000-1000-8000-00805F9B34FB"
   //
   // (see Core Spec v5.0, Vol 3, Part B, Section 2.5.1)
-  static constexpr UInt128 kBaseUuid = {{0xFB, 0x34, 0x9B, 0x5F, 0x80, 0x00, 0x00, 0x80, 0x00, 0x10,
-                                         0x00, 0x00, 0x00, 0x00, 0x00, 0x00}};
+  static constexpr UInt128 kBaseUuid = {{0xFB,
+                                         0x34,
+                                         0x9B,
+                                         0x5F,
+                                         0x80,
+                                         0x00,
+                                         0x00,
+                                         0x80,
+                                         0x00,
+                                         0x10,
+                                         0x00,
+                                         0x00,
+                                         0x00,
+                                         0x00,
+                                         0x00,
+                                         0x00}};
 
   // A 16-bit or 32-bit UUID can be converted to a 128-bit UUID using the
   // following formula:
@@ -197,13 +213,17 @@ inline bool operator==(uint16_t lhs, const UUID& rhs) { return rhs == lhs; }
 
 inline bool operator==(uint32_t lhs, const UUID& rhs) { return rhs == lhs; }
 
-inline bool operator==(const UInt128& lhs, const UUID& rhs) { return rhs == lhs; }
+inline bool operator==(const UInt128& lhs, const UUID& rhs) {
+  return rhs == lhs;
+}
 
 inline bool operator!=(uint16_t lhs, const UUID& rhs) { return rhs != lhs; }
 
 inline bool operator!=(uint32_t lhs, const UUID& rhs) { return rhs != lhs; }
 
-inline bool operator!=(const UInt128& lhs, const UUID& rhs) { return rhs != lhs; }
+inline bool operator!=(const UInt128& lhs, const UUID& rhs) {
+  return rhs != lhs;
+}
 
 }  // namespace bt
 

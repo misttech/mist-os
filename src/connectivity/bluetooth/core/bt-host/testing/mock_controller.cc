@@ -15,7 +15,8 @@
 
 namespace bt::testing {
 
-Transaction::Transaction(const ByteBuffer& expected, const std::vector<const ByteBuffer*>& replies,
+Transaction::Transaction(const ByteBuffer& expected,
+                         const std::vector<const ByteBuffer*>& replies,
                          ExpectationMetadata meta)
     : expected_({DynamicByteBuffer(expected), meta}) {
   for (const auto* buffer : replies) {
@@ -27,9 +28,10 @@ bool Transaction::Match(const ByteBuffer& packet) {
   return ContainersEqual(expected_.data, packet);
 }
 
-CommandTransaction::CommandTransaction(hci_spec::OpCode expected_opcode,
-                                       const std::vector<const ByteBuffer*>& replies,
-                                       ExpectationMetadata meta)
+CommandTransaction::CommandTransaction(
+    hci_spec::OpCode expected_opcode,
+    const std::vector<const ByteBuffer*>& replies,
+    ExpectationMetadata meta)
     : Transaction(DynamicByteBuffer(), replies, meta), prefix_(true) {
   hci_spec::OpCode le_opcode = htole16(expected_opcode);
   const BufferView expected(&le_opcode, sizeof(expected_opcode));
@@ -37,8 +39,9 @@ CommandTransaction::CommandTransaction(hci_spec::OpCode expected_opcode,
 }
 
 bool CommandTransaction::Match(const ByteBuffer& cmd) {
-  return ContainersEqual(expected().data,
-                         (prefix_ ? cmd.view(0, expected().data.size()) : cmd.view()));
+  return ContainersEqual(
+      expected().data,
+      (prefix_ ? cmd.view(0, expected().data.size()) : cmd.view()));
 }
 
 MockController::MockController(pw::async::Dispatcher& pw_dispatcher)
@@ -49,7 +52,8 @@ MockController::~MockController() {
     auto& transaction = cmd_transactions_.front();
     auto meta = transaction.expected().meta;
     ADD_FAILURE_AT(meta.file, meta.line)
-        << "Didn't receive expected outbound command packet (" << meta.expectation << ") {"
+        << "Didn't receive expected outbound command packet ("
+        << meta.expectation << ") {"
         << ByteContainerToString(transaction.expected().data) << "}";
     cmd_transactions_.pop();
   }
@@ -58,8 +62,8 @@ MockController::~MockController() {
     auto& transaction = data_transactions_.front();
     auto meta = transaction.expected().meta;
     ADD_FAILURE_AT(meta.file, meta.line)
-        << "Didn't receive expected outbound data packet (" << meta.expectation << ") {"
-        << ByteContainerToString(transaction.expected().data) << "}";
+        << "Didn't receive expected outbound data packet (" << meta.expectation
+        << ") {" << ByteContainerToString(transaction.expected().data) << "}";
     data_transactions_.pop();
   }
 
@@ -67,8 +71,8 @@ MockController::~MockController() {
     auto& transaction = sco_transactions_.front();
     auto meta = transaction.expected().meta;
     ADD_FAILURE_AT(meta.file, meta.line)
-        << "Didn't receive expected outbound SCO packet (" << meta.expectation << ") {"
-        << ByteContainerToString(transaction.expected().data) << "}";
+        << "Didn't receive expected outbound SCO packet (" << meta.expectation
+        << ") {" << ByteContainerToString(transaction.expected().data) << "}";
     sco_transactions_.pop();
   }
 }
@@ -77,15 +81,18 @@ void MockController::QueueCommandTransaction(CommandTransaction transaction) {
   cmd_transactions_.push(std::move(transaction));
 }
 
-void MockController::QueueCommandTransaction(const ByteBuffer& expected,
-                                             const std::vector<const ByteBuffer*>& replies,
-                                             ExpectationMetadata meta) {
-  QueueCommandTransaction(CommandTransaction(DynamicByteBuffer(expected), replies, meta));
+void MockController::QueueCommandTransaction(
+    const ByteBuffer& expected,
+    const std::vector<const ByteBuffer*>& replies,
+    ExpectationMetadata meta) {
+  QueueCommandTransaction(
+      CommandTransaction(DynamicByteBuffer(expected), replies, meta));
 }
 
-void MockController::QueueCommandTransaction(hci_spec::OpCode expected_opcode,
-                                             const std::vector<const ByteBuffer*>& replies,
-                                             ExpectationMetadata meta) {
+void MockController::QueueCommandTransaction(
+    hci_spec::OpCode expected_opcode,
+    const std::vector<const ByteBuffer*>& replies,
+    ExpectationMetadata meta) {
   QueueCommandTransaction(CommandTransaction(expected_opcode, replies, meta));
 }
 
@@ -93,21 +100,30 @@ void MockController::QueueDataTransaction(DataTransaction transaction) {
   data_transactions_.push(std::move(transaction));
 }
 
-void MockController::QueueDataTransaction(const ByteBuffer& expected,
-                                          const std::vector<const ByteBuffer*>& replies,
-                                          ExpectationMetadata meta) {
-  QueueDataTransaction(DataTransaction(DynamicByteBuffer(expected), replies, meta));
+void MockController::QueueDataTransaction(
+    const ByteBuffer& expected,
+    const std::vector<const ByteBuffer*>& replies,
+    ExpectationMetadata meta) {
+  QueueDataTransaction(
+      DataTransaction(DynamicByteBuffer(expected), replies, meta));
 }
 
-void MockController::QueueScoTransaction(const ByteBuffer& expected, ExpectationMetadata meta) {
+void MockController::QueueScoTransaction(const ByteBuffer& expected,
+                                         ExpectationMetadata meta) {
   sco_transactions_.push(ScoTransaction(DynamicByteBuffer(expected), meta));
 }
 
-bool MockController::AllExpectedScoPacketsSent() const { return sco_transactions_.empty(); }
+bool MockController::AllExpectedScoPacketsSent() const {
+  return sco_transactions_.empty();
+}
 
-bool MockController::AllExpectedDataPacketsSent() const { return data_transactions_.empty(); }
+bool MockController::AllExpectedDataPacketsSent() const {
+  return data_transactions_.empty();
+}
 
-bool MockController::AllExpectedCommandPacketsSent() const { return cmd_transactions_.empty(); }
+bool MockController::AllExpectedCommandPacketsSent() const {
+  return cmd_transactions_.empty();
+}
 
 void MockController::SetDataCallback(DataCallback callback) {
   BT_DEBUG_ASSERT(callback);
@@ -145,8 +161,8 @@ void MockController::OnCommandReceived(const ByteBuffer& data) {
   // Note: we upcast ogf to uint16_t so that it does not get interpreted as a
   // char for printing
   ASSERT_FALSE(cmd_transactions_.empty())
-      << "Received unexpected command packet with OGF: 0x" << std::hex << static_cast<uint16_t>(ogf)
-      << ", OCF: 0x" << ocf;
+      << "Received unexpected command packet with OGF: 0x" << std::hex
+      << static_cast<uint16_t>(ogf) << ", OCF: 0x" << ocf;
 
   auto& transaction = cmd_transactions_.front();
   const hci_spec::OpCode expected_opcode =
@@ -157,10 +173,10 @@ void MockController::OnCommandReceived(const ByteBuffer& data) {
   if (!transaction.Match(data)) {
     auto meta = transaction.expected().meta;
     GTEST_FAIL_AT(meta.file, meta.line)
-        << " Expected command packet (" << meta.expectation << ") with OGF: 0x" << std::hex
-        << static_cast<uint16_t>(expected_ogf) << ", OCF: 0x" << expected_ocf
-        << ". Received command packet with OGF: 0x" << static_cast<uint16_t>(ogf) << ", OCF: 0x"
-        << ocf;
+        << " Expected command packet (" << meta.expectation << ") with OGF: 0x"
+        << std::hex << static_cast<uint16_t>(expected_ogf) << ", OCF: 0x"
+        << expected_ocf << ". Received command packet with OGF: 0x"
+        << static_cast<uint16_t>(ogf) << ", OCF: 0x" << ocf;
   }
 
   while (!transaction.replies().empty()) {
@@ -173,7 +189,8 @@ void MockController::OnCommandReceived(const ByteBuffer& data) {
   if (transaction_callback_) {
     DynamicByteBuffer rx(data);
     heap_dispatcher().Post(
-        [rx = std::move(rx), f = transaction_callback_.share()](auto, pw::Status status) {
+        [rx = std::move(rx), f = transaction_callback_.share()](
+            auto, pw::Status status) {
           if (status.ok()) {
             f(rx);
           }
@@ -181,14 +198,17 @@ void MockController::OnCommandReceived(const ByteBuffer& data) {
   }
 }
 
-void MockController::OnACLDataPacketReceived(const ByteBuffer& acl_data_packet) {
+void MockController::OnACLDataPacketReceived(
+    const ByteBuffer& acl_data_packet) {
   ASSERT_FALSE(data_transactions_.empty())
-      << "Received unexpected acl data packet: { " << ByteContainerToString(acl_data_packet) << "}";
+      << "Received unexpected acl data packet: { "
+      << ByteContainerToString(acl_data_packet) << "}";
 
   auto& expected = data_transactions_.front();
   if (!expected.Match(acl_data_packet.view())) {
     auto meta = expected.expected().meta;
-    GTEST_FAIL_AT(meta.file, meta.line) << "Expected data packet (" << meta.expectation << ")";
+    GTEST_FAIL_AT(meta.file, meta.line)
+        << "Expected data packet (" << meta.expectation << ")";
   }
 
   while (!expected.replies().empty()) {
@@ -200,23 +220,27 @@ void MockController::OnACLDataPacketReceived(const ByteBuffer& acl_data_packet) 
 
   if (data_callback_) {
     DynamicByteBuffer packet_copy(acl_data_packet);
-    heap_dispatcher().Post([packet_copy = std::move(packet_copy), cb = data_callback_.share()](
-                               auto, pw::Status status) mutable {
-      if (status.ok()) {
-        cb(packet_copy);
-      }
-    });
+    heap_dispatcher().Post(
+        [packet_copy = std::move(packet_copy), cb = data_callback_.share()](
+            auto, pw::Status status) mutable {
+          if (status.ok()) {
+            cb(packet_copy);
+          }
+        });
   }
 }
 
-void MockController::OnScoDataPacketReceived(const ByteBuffer& sco_data_packet) {
+void MockController::OnScoDataPacketReceived(
+    const ByteBuffer& sco_data_packet) {
   ASSERT_FALSE(sco_transactions_.empty())
-      << "Received unexpected SCO data packet: { " << ByteContainerToString(sco_data_packet) << "}";
+      << "Received unexpected SCO data packet: { "
+      << ByteContainerToString(sco_data_packet) << "}";
 
   auto& expected = sco_transactions_.front();
   if (!expected.Match(sco_data_packet.view())) {
     auto meta = expected.expected().meta;
-    GTEST_FAIL_AT(meta.file, meta.line) << "Expected SCO packet (" << meta.expectation << ")";
+    GTEST_FAIL_AT(meta.file, meta.line)
+        << "Expected SCO packet (" << meta.expectation << ")";
   }
 
   sco_transactions_.pop();
@@ -225,32 +249,32 @@ void MockController::OnScoDataPacketReceived(const ByteBuffer& sco_data_packet) 
 void MockController::SendCommand(pw::span<const std::byte> data) {
   // Post task to simulate async
   DynamicByteBuffer buffer(BufferView(data.data(), data.size()));
-  heap_dispatcher().Post(
-      [this, buffer = std::move(buffer)](pw::async::Context /*ctx*/, pw::Status status) {
-        if (status.ok()) {
-          OnCommandReceived(buffer);
-        }
-      });
+  heap_dispatcher().Post([this, buffer = std::move(buffer)](
+                             pw::async::Context /*ctx*/, pw::Status status) {
+    if (status.ok()) {
+      OnCommandReceived(buffer);
+    }
+  });
 }
 void MockController::SendAclData(pw::span<const std::byte> data) {
   // Post task to simulate async
   DynamicByteBuffer buffer(BufferView(data.data(), data.size()));
-  heap_dispatcher().Post(
-      [this, buffer = std::move(buffer)](pw::async::Context /*ctx*/, pw::Status status) {
-        if (status.ok()) {
-          OnACLDataPacketReceived(buffer);
-        }
-      });
+  heap_dispatcher().Post([this, buffer = std::move(buffer)](
+                             pw::async::Context /*ctx*/, pw::Status status) {
+    if (status.ok()) {
+      OnACLDataPacketReceived(buffer);
+    }
+  });
 }
 void MockController::SendScoData(pw::span<const std::byte> data) {
   // Post task to simulate async
   DynamicByteBuffer buffer(BufferView(data.data(), data.size()));
-  heap_dispatcher().Post(
-      [this, buffer = std::move(buffer)](pw::async::Context /*ctx*/, pw::Status status) {
-        if (status.ok()) {
-          OnScoDataPacketReceived(buffer);
-        }
-      });
+  heap_dispatcher().Post([this, buffer = std::move(buffer)](
+                             pw::async::Context /*ctx*/, pw::Status status) {
+    if (status.ok()) {
+      OnScoDataPacketReceived(buffer);
+    }
+  });
 }
 
 }  // namespace bt::testing

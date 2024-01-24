@@ -14,21 +14,26 @@ namespace bt::gap {
 // Stores Bluetooth Low Energy settings and state information.
 class LowEnergyState final {
  public:
-  // Returns true if |feature_bit| is set as supported in the local LE features list.
-  inline bool IsFeatureSupported(hci_spec::LESupportedFeature feature_bit) const {
+  // Returns true if |feature_bit| is set as supported in the local LE features
+  // list.
+  inline bool IsFeatureSupported(
+      hci_spec::LESupportedFeature feature_bit) const {
     return supported_features_ & static_cast<uint64_t>(feature_bit);
   }
 
   uint64_t supported_features() const { return supported_features_; }
 
   // Returns the LE ACL data buffer capacity.
-  const hci::DataBufferInfo& data_buffer_info() const { return data_buffer_info_; }
+  const hci::DataBufferInfo& data_buffer_info() const {
+    return data_buffer_info_;
+  }
 
  private:
   friend class Adapter;
   friend class AdapterImpl;
 
-  // Storage capacity information about the controller's internal ACL data buffers.
+  // Storage capacity information about the controller's internal ACL data
+  // buffers.
   hci::DataBufferInfo data_buffer_info_;
 
   // Local supported LE Features reported by the controller.

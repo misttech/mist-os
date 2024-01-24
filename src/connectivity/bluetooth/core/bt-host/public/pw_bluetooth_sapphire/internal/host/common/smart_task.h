@@ -17,7 +17,8 @@ namespace bt {
 // should only be used on the same thread that the dispatcher is running on.
 class SmartTask {
  public:
-  SmartTask(pw::async::Dispatcher& dispatcher, pw::async::TaskFunction&& func = nullptr)
+  SmartTask(pw::async::Dispatcher& dispatcher,
+            pw::async::TaskFunction&& func = nullptr)
       : dispatcher_(dispatcher), func_(std::move(func)) {}
 
   ~SmartTask() {

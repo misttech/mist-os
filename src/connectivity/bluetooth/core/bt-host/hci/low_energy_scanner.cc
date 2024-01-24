@@ -15,7 +15,8 @@ namespace bt::hci {
 void LowEnergyScanner::Delegate::OnPeerFound(const LowEnergyScanResult& result,
                                              const ByteBuffer& data) {}
 
-void LowEnergyScanner::Delegate::OnDirectedAdvertisement(const LowEnergyScanResult& result) {}
+void LowEnergyScanner::Delegate::OnDirectedAdvertisement(
+    const LowEnergyScanResult& result) {}
 
 LowEnergyScanner::LowEnergyScanner(hci::Transport::WeakPtr hci,
                                    pw::async::Dispatcher& pw_dispatcher)
@@ -26,8 +27,8 @@ LowEnergyScanner::LowEnergyScanner(hci::Transport::WeakPtr hci,
       transport_(std::move(hci)) {
   BT_DEBUG_ASSERT(transport_.is_alive());
 
-  hci_cmd_runner_ =
-      std::make_unique<SequentialCommandRunner>(transport_->command_channel()->AsWeakPtr());
+  hci_cmd_runner_ = std::make_unique<SequentialCommandRunner>(
+      transport_->command_channel()->AsWeakPtr());
 }
 
 }  // namespace bt::hci

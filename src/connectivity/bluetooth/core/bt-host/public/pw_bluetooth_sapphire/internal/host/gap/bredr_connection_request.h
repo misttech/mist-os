@@ -19,10 +19,10 @@ namespace bt::gap {
 
 class BrEdrConnection;
 
-// A |BrEdrConnectionRequest| represents a request for the GAP to connect to a given
-// |DeviceAddress| by one or more clients. BrEdrConnectionManager
-// is responsible for tracking ConnectionRequests and passing them to the
-// Connector when ready.
+// A |BrEdrConnectionRequest| represents a request for the GAP to connect to a
+// given |DeviceAddress| by one or more clients. BrEdrConnectionManager is
+// responsible for tracking ConnectionRequests and passing them to the Connector
+// when ready.
 //
 // There is at most One BrEdrConnectionRequest per address at any given time; if
 // multiple clients wish to connect, they each append a callback to the list in
@@ -37,11 +37,15 @@ class BrEdrConnectionRequest final {
   using RefFactory = fit::function<BrEdrConnection*()>;
 
   // Construct without a callback. Can be used for incoming only requests
-  BrEdrConnectionRequest(pw::async::Dispatcher& pw_dispatcher, const DeviceAddress& addr,
-                         PeerId peer_id, Peer::InitializingConnectionToken token);
+  BrEdrConnectionRequest(pw::async::Dispatcher& pw_dispatcher,
+                         const DeviceAddress& addr,
+                         PeerId peer_id,
+                         Peer::InitializingConnectionToken token);
 
-  BrEdrConnectionRequest(pw::async::Dispatcher& pw_dispatcher, const DeviceAddress& addr,
-                         PeerId peer_id, Peer::InitializingConnectionToken token,
+  BrEdrConnectionRequest(pw::async::Dispatcher& pw_dispatcher,
+                         const DeviceAddress& addr,
+                         PeerId peer_id,
+                         Peer::InitializingConnectionToken token,
                          OnComplete&& callback);
 
   BrEdrConnectionRequest(BrEdrConnectionRequest&&) = default;
@@ -49,7 +53,9 @@ class BrEdrConnectionRequest final {
   void RecordHciCreateConnectionAttempt();
   bool ShouldRetry(hci::Error failure_mode);
 
-  void AddCallback(OnComplete cb) { callbacks_.Mutable()->push_back(std::move(cb)); }
+  void AddCallback(OnComplete cb) {
+    callbacks_.Mutable()->push_back(std::move(cb));
+  }
 
   // Notifies all elements in |callbacks| with |status| and the result of
   // |generate_ref|. Called by the appropriate manager once a connection request
@@ -66,13 +72,16 @@ class BrEdrConnectionRequest final {
 
   DeviceAddress address() const { return address_; }
 
-  // If a role change occurs while this request is still pending, set it here so that the correct
-  // role is used when connection establishment completes.
-  void set_role_change(pw::bluetooth::emboss::ConnectionRole role) { role_change_ = role; }
+  // If a role change occurs while this request is still pending, set it here so
+  // that the correct role is used when connection establishment completes.
+  void set_role_change(pw::bluetooth::emboss::ConnectionRole role) {
+    role_change_ = role;
+  }
 
-  // If the default role of the requested connection is changed during connection establishment, the
-  // new role will be returned.
-  const std::optional<pw::bluetooth::emboss::ConnectionRole>& role_change() const {
+  // If the default role of the requested connection is changed during
+  // connection establishment, the new role will be returned.
+  const std::optional<pw::bluetooth::emboss::ConnectionRole>& role_change()
+      const {
     return role_change_;
   }
 
@@ -87,12 +96,14 @@ class BrEdrConnectionRequest final {
   UintInspectable<std::list<OnComplete>> callbacks_;
   BoolInspectable<bool> has_incoming_{false};
   std::optional<pw::bluetooth::emboss::ConnectionRole> role_change_;
-  // Used to determine whether an outbound connection request should be retried. If empty, no HCI
-  // Create Connection Requests associated with this object have been made, otherwise stores the
-  // time at which the first HCI request associated with this object was made.
+  // Used to determine whether an outbound connection request should be retried.
+  // If empty, no HCI Create Connection Requests associated with this object
+  // have been made, otherwise stores the time at which the first HCI request
+  // associated with this object was made.
   IntInspectable<std::optional<pw::chrono::SystemClock::time_point>>
       first_create_connection_req_made_{
-          std::nullopt, [](auto& t) { return t ? t->time_since_epoch().count() : -1; }};
+          std::nullopt,
+          [](auto& t) { return t ? t->time_since_epoch().count() : -1; }};
 
   inspect::StringProperty peer_id_property_;
   inspect::Node inspect_node_;

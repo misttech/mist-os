@@ -30,8 +30,10 @@ class FakePeer {
   // false. This is OK since we use |scannable| to drive the receipt of Scan
   // Response PDUs: we use this to test the condition in which the advertisement
   // is scannable but the host never receives a scan response.
-  explicit FakePeer(const DeviceAddress& address, pw::async::Dispatcher& pw_dispatcher,
-                    bool connectable = true, bool scannable = true);
+  explicit FakePeer(const DeviceAddress& address,
+                    pw::async::Dispatcher& pw_dispatcher,
+                    bool connectable = true,
+                    bool scannable = true);
 
   void SetAdvertisingData(const ByteBuffer& data);
 
@@ -44,16 +46,20 @@ class FakePeer {
   // Toggles whether the address of this device represents a resolved RPA.
   void set_address_resolved(bool value) { address_resolved_ = value; }
 
-  // TODO(armansito): Come up with a better scheme to determine supported transport type instead of
-  // relying on address type, which doesn't translate well to dual-mode.
+  // TODO(armansito): Come up with a better scheme to determine supported
+  // transport type instead of relying on address type, which doesn't translate
+  // well to dual-mode.
   bool supports_bredr() const {
     // All BR/EDR devices have inquiry responses.
     return address().type() == DeviceAddress::Type::kBREDR;
   }
 
-  // TODO(armansito): Come up with a better scheme to determine supported transport type instead of
-  // relying on address type, which doesn't translate well to dual-mode.
-  bool supports_le() const { return address().type() != DeviceAddress::Type::kBREDR; }
+  // TODO(armansito): Come up with a better scheme to determine supported
+  // transport type instead of relying on address type, which doesn't translate
+  // well to dual-mode.
+  bool supports_le() const {
+    return address().type() != DeviceAddress::Type::kBREDR;
+  }
 
   // |should_batch_reports| indicates to the FakeController that the SCAN_IND
   // report should be included in the same HCI LE Advertising Report Event
@@ -72,7 +78,8 @@ class FakePeer {
 
   // Generates a Inquiry Response Event payload containing a inquiry result
   // response.
-  DynamicByteBuffer CreateInquiryResponseEvent(pw::bluetooth::emboss::InquiryMode mode) const;
+  DynamicByteBuffer CreateInquiryResponseEvent(
+      pw::bluetooth::emboss::InquiryMode mode) const;
 
   const DeviceAddress& address() const { return address_; }
 
@@ -104,39 +111,58 @@ class FakePeer {
   bool connected() const { return connected_; }
   void set_connected(bool connected) { connected_ = connected; }
 
-  void set_class_of_device(DeviceClass class_of_device) { class_of_device_ = class_of_device; }
+  void set_class_of_device(DeviceClass class_of_device) {
+    class_of_device_ = class_of_device;
+  }
 
-  const hci_spec::LEConnectionParameters& le_params() const { return le_params_; }
-  void set_le_params(const hci_spec::LEConnectionParameters& value) { le_params_ = value; }
+  const hci_spec::LEConnectionParameters& le_params() const {
+    return le_params_;
+  }
+  void set_le_params(const hci_spec::LEConnectionParameters& value) {
+    le_params_ = value;
+  }
 
-  bool supports_ll_conn_update_procedure() const { return supports_ll_conn_update_procedure_; }
+  bool supports_ll_conn_update_procedure() const {
+    return supports_ll_conn_update_procedure_;
+  }
   void set_supports_ll_conn_update_procedure(bool supports) {
     supports_ll_conn_update_procedure_ = supports;
   }
 
   hci_spec::LESupportedFeatures le_features() const { return le_features_; }
-  void set_le_features(hci_spec::LESupportedFeatures le_features) { le_features_ = le_features; }
+  void set_le_features(hci_spec::LESupportedFeatures le_features) {
+    le_features_ = le_features;
+  }
 
   // The response status that will be returned when this device receives a LE
   // Create Connection command.
-  pw::bluetooth::emboss::StatusCode connect_response() const { return connect_response_; }
+  pw::bluetooth::emboss::StatusCode connect_response() const {
+    return connect_response_;
+  }
   void set_connect_response(pw::bluetooth::emboss::StatusCode response) {
     connect_response_ = response;
   }
 
   // The status that will be returned in the Command Status event in response to
   // a LE Create Connection command. If this is set to anything other than
-  // pw::bluetooth::emboss::StatusCode::SUCCESS, then connect_response() will have no effect.
-  pw::bluetooth::emboss::StatusCode connect_status() const { return connect_status_; }
-  void set_connect_status(pw::bluetooth::emboss::StatusCode status) { connect_status_ = status; }
+  // pw::bluetooth::emboss::StatusCode::SUCCESS, then connect_response() will
+  // have no effect.
+  pw::bluetooth::emboss::StatusCode connect_status() const {
+    return connect_status_;
+  }
+  void set_connect_status(pw::bluetooth::emboss::StatusCode status) {
+    connect_status_ = status;
+  }
 
   bool force_pending_connect() const { return force_pending_connect_; }
   void set_force_pending_connect(bool value) { force_pending_connect_ = value; }
 
-  void set_last_connection_request_link_type(std::optional<pw::bluetooth::emboss::LinkType> type) {
+  void set_last_connection_request_link_type(
+      std::optional<pw::bluetooth::emboss::LinkType> type) {
     last_connection_request_link_type_ = type;
   }
-  const std::optional<pw::bluetooth::emboss::LinkType>& last_connection_request_link_type() const {
+  const std::optional<pw::bluetooth::emboss::LinkType>&
+  last_connection_request_link_type() const {
     return last_connection_request_link_type_;
   }
 
@@ -174,7 +200,9 @@ class FakePeer {
   // FakeController's SendL2CapBFrame function. Assumes that input buffer
   // |packet| has signaling packet header intact but does not have an L2CAP
   //  packet header.
-  void SendPacket(hci_spec::ConnectionHandle conn, l2cap::ChannelId cid, const ByteBuffer& packet);
+  void SendPacket(hci_spec::ConnectionHandle conn,
+                  l2cap::ChannelId cid,
+                  const ByteBuffer& packet);
 
   // The FakeController that this FakePeer has been assigned to.
   FakeController* ctrl_;  // weak
@@ -191,12 +219,13 @@ class FakePeer {
   pw::bluetooth::emboss::StatusCode connect_status_;
   pw::bluetooth::emboss::StatusCode connect_response_;
   bool force_pending_connect_;  // Causes connection requests to remain pending.
-  std::optional<pw::bluetooth::emboss::LinkType> last_connection_request_link_type_;
+  std::optional<pw::bluetooth::emboss::LinkType>
+      last_connection_request_link_type_;
 
   hci_spec::LEConnectionParameters le_params_;
 
-  // If false, FakeController will send LE Connection Update complete events with status
-  // kRemoteFeatureNotSupported.
+  // If false, FakeController will send LE Connection Update complete events
+  // with status kRemoteFeatureNotSupported.
   bool supports_ll_conn_update_procedure_;
 
   hci_spec::LESupportedFeatures le_features_;

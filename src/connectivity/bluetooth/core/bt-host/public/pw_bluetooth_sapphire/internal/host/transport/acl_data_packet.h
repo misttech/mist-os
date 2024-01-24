@@ -25,7 +25,8 @@ using ACLDataPacketPtr = std::unique_ptr<ACLDataPacket>;
 using ACLPacketHandler = fit::function<void(ACLDataPacketPtr data_packet)>;
 
 template <>
-class Packet<hci_spec::ACLDataHeader> : public PacketBase<hci_spec::ACLDataHeader, ACLDataPacket> {
+class Packet<hci_spec::ACLDataHeader>
+    : public PacketBase<hci_spec::ACLDataHeader, ACLDataPacket> {
  public:
   // Slab-allocates a new ACLDataPacket with the given payload size without
   // initializing its contents.
@@ -33,10 +34,11 @@ class Packet<hci_spec::ACLDataHeader> : public PacketBase<hci_spec::ACLDataHeade
 
   // Slab-allocates a new ACLDataPacket with the given payload size and
   // initializes the packet's header field with the given data.
-  static ACLDataPacketPtr New(hci_spec::ConnectionHandle connection_handle,
-                              hci_spec::ACLPacketBoundaryFlag packet_boundary_flag,
-                              hci_spec::ACLBroadcastFlag broadcast_flag,
-                              uint16_t payload_size = 0u);
+  static ACLDataPacketPtr New(
+      hci_spec::ConnectionHandle connection_handle,
+      hci_spec::ACLPacketBoundaryFlag packet_boundary_flag,
+      hci_spec::ACLBroadcastFlag broadcast_flag,
+      uint16_t payload_size = 0u);
 
   // Getters for the header fields.
   hci_spec::ConnectionHandle connection_handle() const;

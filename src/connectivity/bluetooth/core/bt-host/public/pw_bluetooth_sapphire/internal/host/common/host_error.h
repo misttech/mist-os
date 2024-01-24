@@ -53,7 +53,8 @@ enum class HostError : uint8_t {
   // Operation security requirements were not met.
   kInsufficientSecurity,
 
-  // A transaction did not meet reliability requirements (e.g. an ATT Reliable Write)
+  // A transaction did not meet reliability requirements (e.g. an ATT Reliable
+  // Write)
   kNotReliable,
 
   // Generic error code. Use this only if another error code does not accurately

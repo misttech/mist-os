@@ -35,7 +35,8 @@ class FakeSignalingServer final {
   // Parses the InformationRequest signaling packet |info_req| and then
   // calls the appropriate function to construct and send a response packet
   // over handle |conn| and ID |id|.
-  void ProcessInformationRequest(hci_spec::ConnectionHandle conn, l2cap::CommandId id,
+  void ProcessInformationRequest(hci_spec::ConnectionHandle conn,
+                                 l2cap::CommandId id,
                                  const ByteBuffer& info_req);
 
   // Handle incoming ConnectionRequest |connection_req| by validating the
@@ -43,7 +44,8 @@ class FakeSignalingServer final {
   // channel with the associated FakeL2cap module. Also will use the server's
   // SendFrameCallback to send a ConnectionResponse and ConfigurationRequest
   // over handle |conn| and ID |id|.
-  void ProcessConnectionRequest(hci_spec::ConnectionHandle conn, l2cap::CommandId id,
+  void ProcessConnectionRequest(hci_spec::ConnectionHandle conn,
+                                l2cap::CommandId id,
                                 const ByteBuffer& connection_req);
 
   // Handle incoming ConfigurationRequest |configuration_req|. Note that
@@ -58,15 +60,17 @@ class FakeSignalingServer final {
   // FakePeer will still respond with a ConfigurationResponse over handle
   // |conn| using the ID |id| and send it using the FakeL2cap instance's
   // SendFrameCallback.
-  void ProcessConfigurationRequest(hci_spec::ConnectionHandle conn, l2cap::CommandId id,
+  void ProcessConfigurationRequest(hci_spec::ConnectionHandle conn,
+                                   l2cap::CommandId id,
                                    const ByteBuffer& configuration_req);
 
-  // Handle configuration responses sent by bt-host. The emulator assumes that the
-  // ProcessConnectionRequest function handles sending the initial
+  // Handle configuration responses sent by bt-host. The emulator assumes that
+  // the ProcessConnectionRequest function handles sending the initial
   // ConfigurationRequest from FakePeer, so it disregards this
   // ConnfigurationResponse and instead only processes bt-host's inbound
   // ConfigurationRequest.
-  void ProcessConfigurationResponse(hci_spec::ConnectionHandle conn, l2cap::CommandId id,
+  void ProcessConfigurationResponse(hci_spec::ConnectionHandle conn,
+                                    l2cap::CommandId id,
                                     const ByteBuffer& configuration_res);
 
   // Upon receiving the disconnection request |disconnection_req|, close and
@@ -74,26 +78,31 @@ class FakeSignalingServer final {
   // and then send back a disconnection response with connection handle
   //  |conn| and ID |id| and send it using the FakeL2cap instance's
   // SendFrameCallback..
-  void ProcessDisconnectionRequest(hci_spec::ConnectionHandle conn, l2cap::CommandId id,
+  void ProcessDisconnectionRequest(hci_spec::ConnectionHandle conn,
+                                   l2cap::CommandId id,
                                    const ByteBuffer& disconnection_req);
 
   // Helper function for sending an individual payload buffer |payload_buffer|
   // by assembling a header with CommandCode |code| and CommandId |id| and then
   // send it over handle |conn| and with the FakeL2cap instance's
   // SendFrameCallback.
-  void SendCFrame(hci_spec::ConnectionHandle conn, l2cap::CommandCode code, l2cap::CommandId id,
+  void SendCFrame(hci_spec::ConnectionHandle conn,
+                  l2cap::CommandCode code,
+                  l2cap::CommandId id,
                   DynamicByteBuffer& payload_buffer);
 
   // Reject a command packet for some |reason|. Assemble a command reject
   // packet using the handle |conn| and the CommandId |id| and send with the
   // FakeL2cap instance's SendFrameCallback.
-  void SendCommandReject(hci_spec::ConnectionHandle conn, l2cap::CommandId id,
+  void SendCommandReject(hci_spec::ConnectionHandle conn,
+                         l2cap::CommandId id,
                          l2cap::RejectReason reason);
 
   // Respond to a received fixed channels InformationRequest packet with a
   // InformationResponse. Assemble the InformationResponse using the handle
   // |conn| and id |id|. Send with the FakeL2cap instance's SendFrameCallback.
-  void SendInformationResponseFixedChannels(hci_spec::ConnectionHandle conn, l2cap::CommandId id);
+  void SendInformationResponseFixedChannels(hci_spec::ConnectionHandle conn,
+                                            l2cap::CommandId id);
 
   // Respond to a received extended features InformationRequest packet with a
   // InformationResponse. Assemble the InformationResponse using the handle
@@ -106,30 +115,39 @@ class FakeSignalingServer final {
   // channel |local_id|, remote channel |remote_id|, ConnectionResult |result|,
   // and ConnectionStatus |status|. Send with the FakeL2cap instance's
   // SendFrameCallback.
-  void SendConnectionResponse(hci_spec::ConnectionHandle conn, l2cap::CommandId id,
-                              l2cap::ChannelId local_cid, l2cap::ChannelId remote_id,
-                              l2cap::ConnectionResult result, l2cap::ConnectionStatus status);
+  void SendConnectionResponse(hci_spec::ConnectionHandle conn,
+                              l2cap::CommandId id,
+                              l2cap::ChannelId local_cid,
+                              l2cap::ChannelId remote_id,
+                              l2cap::ConnectionResult result,
+                              l2cap::ConnectionStatus status);
 
   // Send a ConfigurationRequest packet following a ConnectionResponse.
   // Assemble the ConfigurationRequest using the handle |conn|, id |id|,
   // and remote ID |remote_cid|. Send with the FakeL2cap instance's
   // SendFrameCallback.
-  void SendConfigurationRequest(hci_spec::ConnectionHandle conn, l2cap::CommandId id,
+  void SendConfigurationRequest(hci_spec::ConnectionHandle conn,
+                                l2cap::CommandId id,
                                 l2cap::ChannelId remote_cid);
 
-  // Respond to a received ConfigurationRequest packet with a ConfigurationResposne.
-  // Assemble the ConfigurationResposne using the handle |conn|, id |id|,
-  // local ID |local_cid|, and ConfigurationResult |result|. Send with the
+  // Respond to a received ConfigurationRequest packet with a
+  // ConfigurationResposne. Assemble the ConfigurationResposne using the handle
+  // |conn|, id |id|, local ID |local_cid|, and ConfigurationResult |result|.
+  // Send with the
   /// FakeL2cap instance's SendFrameCallback.
-  void SendConfigurationResponse(hci_spec::ConnectionHandle conn, l2cap::CommandId id,
-                                 l2cap::ChannelId local_cid, l2cap::ConfigurationResult result);
+  void SendConfigurationResponse(hci_spec::ConnectionHandle conn,
+                                 l2cap::CommandId id,
+                                 l2cap::ChannelId local_cid,
+                                 l2cap::ConfigurationResult result);
 
-  // Respond to a received DisconnectionRequest packet with a DisconnectionResponse.
-  // Assemble the DisconnectionREsponse using the handle |conn|, id |id|,
-  // local ID |local_cid|, and remote ID |remote_cid|. Send with the FakeL2cap
-  // instance's SendFrameCallback.
-  void SendDisconnectionResponse(hci_spec::ConnectionHandle conn, l2cap::CommandId id,
-                                 l2cap::ChannelId local_cid, l2cap::ChannelId remote_cid);
+  // Respond to a received DisconnectionRequest packet with a
+  // DisconnectionResponse. Assemble the DisconnectionREsponse using the handle
+  // |conn|, id |id|, local ID |local_cid|, and remote ID |remote_cid|. Send
+  // with the FakeL2cap instance's SendFrameCallback.
+  void SendDisconnectionResponse(hci_spec::ConnectionHandle conn,
+                                 l2cap::CommandId id,
+                                 l2cap::ChannelId local_cid,
+                                 l2cap::ChannelId remote_cid);
 
   // Return the FakeL2cap instance associated with this FakeSignalingServer.
   FakeL2cap* fake_l2cap() { return fake_l2cap_; }

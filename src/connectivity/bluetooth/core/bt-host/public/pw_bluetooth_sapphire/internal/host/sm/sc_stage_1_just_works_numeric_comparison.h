@@ -18,17 +18,22 @@
 
 namespace bt::sm {
 
-// ScStage1JustWorksNumericComparison encapsulates Stage 1 of LE Secure Connections Pairing Phase
-// 2, which handles authentication using the Just Works or Numeric Comparison methods described in
-// Spec V5.0 Vol. 3 Part H 2.3.5.6.2.
+// ScStage1JustWorksNumericComparison encapsulates Stage 1 of LE Secure
+// Connections Pairing Phase 2, which handles authentication using the Just
+// Works or Numeric Comparison methods described in Spec V5.0 Vol. 3 Part
+// H 2.3.5.6.2.
 //
-// This class is not thread safe and is meant to be accessed on the thread it was created on. All
-// callbacks will be run by the default dispatcher of a Phase2SecureConnections's creation thread.
+// This class is not thread safe and is meant to be accessed on the thread it
+// was created on. All callbacks will be run by the default dispatcher of a
+// Phase2SecureConnections's creation thread.
 class ScStage1JustWorksNumericComparison final : public ScStage1 {
  public:
-  ScStage1JustWorksNumericComparison(PairingPhase::Listener::WeakPtr listener, Role role,
-                                     UInt256 local_pub_key_x, UInt256 peer_pub_key_x,
-                                     PairingMethod method, PairingChannel::WeakPtr sm_chan,
+  ScStage1JustWorksNumericComparison(PairingPhase::Listener::WeakPtr listener,
+                                     Role role,
+                                     UInt256 local_pub_key_x,
+                                     UInt256 peer_pub_key_x,
+                                     PairingMethod method,
+                                     PairingChannel::WeakPtr sm_chan,
                                      Stage1CompleteCallback on_complete);
   void Run() override;
   void OnPairingConfirm(PairingConfirmValue confirm) override;
@@ -46,15 +51,17 @@ class ScStage1JustWorksNumericComparison final : public ScStage1 {
   UInt256 peer_public_key_x_;
   PairingMethod method_;
 
-  // In Just Works/Numeric Comparison SC pairing, only the responder sends the Pairing Confirm (see
-  // V5.0 Vol. 3 Part H 2.3.5.6.2, Figure 2.3). This member stores the locally generated Pairing
-  // Confirm when acting as responder, or the received Pairing Confirm when acting as initiator.
+  // In Just Works/Numeric Comparison SC pairing, only the responder sends the
+  // Pairing Confirm (see V5.0 Vol. 3 Part H 2.3.5.6.2, Figure 2.3). This member
+  // stores the locally generated Pairing Confirm when acting as responder, or
+  // the received Pairing Confirm when acting as initiator.
   std::optional<PairingConfirmValue> responder_confirm_;
   bool sent_pairing_confirm_;
 
   PairingRandomValue local_rand_;
   bool sent_local_rand_;
-  // The presence of |peer_rand_| signals if we've received the peer's Pairing Random message.
+  // The presence of |peer_rand_| signals if we've received the peer's Pairing
+  // Random message.
   std::optional<PairingRandomValue> peer_rand_;
 
   PairingChannel::WeakPtr sm_chan_;

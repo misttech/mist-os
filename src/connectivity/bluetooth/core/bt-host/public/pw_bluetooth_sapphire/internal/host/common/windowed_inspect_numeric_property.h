@@ -14,24 +14,29 @@
 
 namespace bt {
 
-// This class is a utility for wrapping a numeric Inspect property, such as IntProperty or
-// UintProperty, such that value updates are reversed after |expiry_duration|. This is useful for
-// creating properties like "disconnects in the past 10 minutes". Note that this is not very space
-// efficient and should not be used for properties that get updated extremely frequently.
+// This class is a utility for wrapping a numeric Inspect property, such as
+// IntProperty or UintProperty, such that value updates are reversed after
+// |expiry_duration|. This is useful for creating properties like "disconnects
+// in the past 10 minutes". Note that this is not very space efficient and
+// should not be used for properties that get updated extremely frequently.
 //
-// |NumericPropertyT| is an inspect property like inspect::IntProperty, and |ValueT| is the internal
-// value like int64_t. Use the convenience types below to simplify type declaration.
+// |NumericPropertyT| is an inspect property like inspect::IntProperty, and
+// |ValueT| is the internal value like int64_t. Use the convenience types below
+// to simplify type declaration.
 template <typename NumericPropertyT, typename ValueT>
 class WindowedInspectNumericProperty {
  public:
-  // |expiry_duration| is the time duration after which changes should be reversed.
-  // |min_resolution| is the smallest duration between changes such that they are reversed
-  // independently. Changes closer to this interval may be batched together for expiry, biased
-  // towards earlier expiry than |expiry_duration|. May be 0 (default) to disable batching.
+  // |expiry_duration| is the time duration after which changes should be
+  // reversed. |min_resolution| is the smallest duration between changes such
+  // that they are reversed independently. Changes closer to this interval may
+  // be batched together for expiry, biased towards earlier expiry than
+  // |expiry_duration|. May be 0 (default) to disable batching.
   explicit WindowedInspectNumericProperty(
       pw::async::Dispatcher& pw_dispatcher,
-      pw::chrono::SystemClock::duration expiry_duration = std::chrono::minutes(10),
-      pw::chrono::SystemClock::duration min_resolution = pw::chrono::SystemClock::duration())
+      pw::chrono::SystemClock::duration expiry_duration =
+          std::chrono::minutes(10),
+      pw::chrono::SystemClock::duration min_resolution =
+          pw::chrono::SystemClock::duration())
       : expiry_duration_(expiry_duration),
         min_resolution_(min_resolution),
         expiry_task_(pw_dispatcher,
@@ -51,14 +56,17 @@ class WindowedInspectNumericProperty {
   virtual ~WindowedInspectNumericProperty() = default;
 
   // Allow moving, disallow copying.
-  WindowedInspectNumericProperty(const WindowedInspectNumericProperty& other) = delete;
-  WindowedInspectNumericProperty(WindowedInspectNumericProperty&& other) noexcept = default;
-  WindowedInspectNumericProperty& operator=(const WindowedInspectNumericProperty& other) = delete;
-  WindowedInspectNumericProperty& operator=(WindowedInspectNumericProperty&& other) noexcept =
-      default;
+  WindowedInspectNumericProperty(const WindowedInspectNumericProperty& other) =
+      delete;
+  WindowedInspectNumericProperty(
+      WindowedInspectNumericProperty&& other) noexcept = default;
+  WindowedInspectNumericProperty& operator=(
+      const WindowedInspectNumericProperty& other) = delete;
+  WindowedInspectNumericProperty& operator=(
+      WindowedInspectNumericProperty&& other) noexcept = default;
 
-  // Set the underlying inspect property, and reset the expiry timer. This is used by the
-  // convenience types that implement AttachInspect() below.
+  // Set the underlying inspect property, and reset the expiry timer. This is
+  // used by the convenience types that implement AttachInspect() below.
   void SetProperty(NumericPropertyT property) {
     property_ = std::move(property);
     expiry_task_.Cancel();
@@ -78,7 +86,8 @@ class WindowedInspectNumericProperty {
     property_.Add(value);
     pw::chrono::SystemClock::time_point now = pw_dispatcher_.now();
     if (!values_.empty()) {
-      // If the most recent change's age is less than |min_resolution_|, merge this change to it
+      // If the most recent change's age is less than |min_resolution_|, merge
+      // this change to it
       if (now < values_.back().first + min_resolution_) {
         values_.back().second += value;
         return;
@@ -99,11 +108,13 @@ class WindowedInspectNumericProperty {
 
     auto oldest_value = values_.front();
     pw::chrono::SystemClock::time_point oldest_value_time = oldest_value.first;
-    pw::chrono::SystemClock::time_point expiry_time = expiry_duration_ + oldest_value_time;
+    pw::chrono::SystemClock::time_point expiry_time =
+        expiry_duration_ + oldest_value_time;
     expiry_task_.PostAt(expiry_time);
   }
 
-  // This is not very space efficient, requiring a node for every value during the expiry_duration_.
+  // This is not very space efficient, requiring a node for every value during
+  // the expiry_duration_.
   std::queue<std::pair<pw::chrono::SystemClock::time_point, ValueT>> values_;
 
   NumericPropertyT property_;
@@ -117,15 +128,17 @@ class WindowedInspectNumericProperty {
 
 // Convenience WindowedInspectNumericProperty types:
 
-#define CREATE_WINDOWED_TYPE(property_t, inner_t)                                         \
-  class WindowedInspect##property_t##Property final                                       \
-      : public WindowedInspectNumericProperty<::inspect::property_t##Property, inner_t> { \
-   public:                                                                                \
-    using WindowedInspectNumericProperty<::inspect::property_t##Property,                 \
-                                         inner_t>::WindowedInspectNumericProperty;        \
-    void AttachInspect(::inspect::Node& node, std::string name) override {                \
-      this->SetProperty(node.Create##property_t(name, inner_t()));                        \
-    }                                                                                     \
+#define CREATE_WINDOWED_TYPE(property_t, inner_t)                              \
+  class WindowedInspect##property_t##Property final                            \
+      : public WindowedInspectNumericProperty<::inspect::property_t##Property, \
+                                              inner_t> {                       \
+   public:                                                                     \
+    using WindowedInspectNumericProperty<                                      \
+        ::inspect::property_t##Property,                                       \
+        inner_t>::WindowedInspectNumericProperty;                              \
+    void AttachInspect(::inspect::Node& node, std::string name) override {     \
+      this->SetProperty(node.Create##property_t(name, inner_t()));             \
+    }                                                                          \
   };
 
 // WindowedInspectIntProperty

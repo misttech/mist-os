@@ -26,7 +26,9 @@ class SlabBuffer : public MutableByteBuffer {
 
   // MutableByteBuffer overrides:
   uint8_t* mutable_data() override { return buffer_.mutable_data(); }
-  void Fill(uint8_t value) override { buffer_.mutable_view(0, size_).Fill(value); }
+  void Fill(uint8_t value) override {
+    buffer_.mutable_view(0, size_).Fill(value);
+  }
 
  private:
   size_t size_;

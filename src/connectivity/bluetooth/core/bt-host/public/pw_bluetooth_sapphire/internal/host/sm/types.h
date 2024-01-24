@@ -34,12 +34,15 @@ const std::unordered_map<Code, size_t> kCodeToPayloadSize{
     {kPairingDHKeyCheck, sizeof(PairingDHKeyCheckValueE)},
 };
 
-// The available algorithms used to generate the cross-transport key during pairing.
+// The available algorithms used to generate the cross-transport key during
+// pairing.
 enum CrossTransportKeyAlgo {
-  // Use only the H6 function during cross-transport derivation (v5.2 Vol. 3 Part H 2.2.10).
+  // Use only the H6 function during cross-transport derivation (v5.2 Vol. 3
+  // Part H 2.2.10).
   kUseH6,
 
-  // Use the H7 function during cross-transport derivation (v5.2 Vol. 3 Part H 2.2.11).
+  // Use the H7 function during cross-transport derivation (v5.2 Vol. 3 Part
+  // H 2.2.11).
   kUseH7
 };
 
@@ -55,8 +58,9 @@ struct PairingFeatures final {
   // True if pairing is to be performed with bonding, false if not
   bool will_bond = false;
 
-  // If present, prescribes the algorithm to use during cross-transport key derivation. If not
-  // present, cross-transport key derivation should not take place.
+  // If present, prescribes the algorithm to use during cross-transport key
+  // derivation. If not present, cross-transport key derivation should not take
+  // place.
   std::optional<CrossTransportKeyAlgo> generate_ct_key;
 
   // Indicates the key generation model used for Phase 2.
@@ -73,13 +77,14 @@ struct PairingFeatures final {
 };
 
 constexpr KeyDistGenField DistributableKeys(KeyDistGenField keys) {
-  // The link key field never affects the distributed keys. It only has meaning when the devices use
-  // LE Secure Connections, where it means the devices should generate the BR/EDR Link Key locally.
+  // The link key field never affects the distributed keys. It only has meaning
+  // when the devices use LE Secure Connections, where it means the devices
+  // should generate the BR/EDR Link Key locally.
   return keys & ~KeyDistGen::kLinkKey;
 }
 
-// Returns a bool indicating whether `features` calls for the devices to exchange key information
-// during the Key Distribution/Generation Phase 3.
+// Returns a bool indicating whether `features` calls for the devices to
+// exchange key information during the Key Distribution/Generation Phase 3.
 bool HasKeysToDistribute(PairingFeatures features);
 
 // Each enum variant corresponds to either:
@@ -96,7 +101,8 @@ enum class SecurityLevel {
   // Encrypted with MITM protection (authenticated)
   kAuthenticated = 3,
 
-  // Encrypted with MITM protection, Secure Connections, and a 128-bit encryption key.
+  // Encrypted with MITM protection, Secure Connections, and a 128-bit
+  // encryption key.
   kSecureAuthenticated = 4,
 };
 
@@ -108,23 +114,29 @@ const char* LevelToString(SecurityLevel level);
 class SecurityProperties final {
  public:
   SecurityProperties();
-  SecurityProperties(SecurityLevel level, size_t enc_key_size, bool secure_connections);
-  SecurityProperties(bool encrypted, bool authenticated, bool secure_connections,
+  SecurityProperties(SecurityLevel level,
+                     size_t enc_key_size,
+                     bool secure_connections);
+  SecurityProperties(bool encrypted,
+                     bool authenticated,
+                     bool secure_connections,
                      size_t enc_key_size);
-  // Build from a BR/EDR Link Key that resulted from pairing. |lk_type| should not be
-  // kChangedCombination, because that means that the link key is the same type as before it was
-  // changed, which this has no knowledge of.
+  // Build from a BR/EDR Link Key that resulted from pairing. |lk_type| should
+  // not be kChangedCombination, because that means that the link key is the
+  // same type as before it was changed, which this has no knowledge of.
   //
-  // Legacy pairing keys will be considered to have security level kNoSecurity because legacy
-  // pairing is superceded by Secure Simple Pairing in Core Spec v2.1 + EDR in 2007. Backwards
-  // compatiblity is optional per v5.0, Vol 3, Part C, Section 5. Furthermore, the last Core Spec
-  // with only legacy pairing (v2.0 + EDR) was withdrawn by Bluetooth SIG on 2019-01-28.
+  // Legacy pairing keys will be considered to have security level kNoSecurity
+  // because legacy pairing is superceded by Secure Simple Pairing in Core Spec
+  // v2.1 + EDR in 2007. Backwards compatiblity is optional per v5.0, Vol 3,
+  // Part C, Section 5. Furthermore, the last Core Spec with only legacy pairing
+  // (v2.0 + EDR) was withdrawn by Bluetooth SIG on 2019-01-28.
   //
-  // TODO(https://fxbug.dev/36360): SecurityProperties will treat kDebugCombination keys as
-  // "encrypted, unauthenticated, and no Secure Connections" to potentially allow their use as valid
-  // link keys, but does not store the fact that they originate from a controller in pairing debug
-  // mode, a potential hazard. Care should be taken at the controller interface to enforce
-  // particular policies regarding debug keys.
+  // TODO(https://fxbug.dev/36360): SecurityProperties will treat
+  // kDebugCombination keys as "encrypted, unauthenticated, and no Secure
+  // Connections" to potentially allow their use as valid link keys, but does
+  // not store the fact that they originate from a controller in pairing debug
+  // mode, a potential hazard. Care should be taken at the controller interface
+  // to enforce particular policies regarding debug keys.
   explicit SecurityProperties(hci_spec::LinkKeyType lk_type);
 
   ~SecurityProperties() = default;
@@ -136,14 +148,18 @@ class SecurityProperties final {
   SecurityLevel level() const;
   size_t enc_key_size() const { return enc_key_size_; }
   bool encrypted() const { return properties_ & Property::kEncrypted; }
-  bool secure_connections() const { return properties_ & Property::kSecureConnections; }
+  bool secure_connections() const {
+    return properties_ & Property::kSecureConnections;
+  }
   bool authenticated() const { return properties_ & Property::kAuthenticated; }
 
-  // Returns the BR/EDR link key type that produces the current security properties. Returns
-  // std::nullopt if the current security level is kNoSecurity.
+  // Returns the BR/EDR link key type that produces the current security
+  // properties. Returns std::nullopt if the current security level is
+  // kNoSecurity.
   //
-  // SecurityProperties does not encode the use of LinkKeyType::kDebugCombination keys (see Core
-  // Spec v5.0 Vol 2, Part E Section 7.6.4), produced when a controller is in debug mode, so
+  // SecurityProperties does not encode the use of
+  // LinkKeyType::kDebugCombination keys (see Core Spec v5.0 Vol 2, Part E
+  // Section 7.6.4), produced when a controller is in debug mode, so
   // SecurityProperties constructed from LinkKeyType::kDebugCombination returns
   // LinkKeyType::kUnauthenticatedCombination192 from this method.
   std::optional<hci_spec::LinkKeyType> GetLinkKeyType() const;
@@ -151,9 +167,10 @@ class SecurityProperties final {
   // Returns a string representation of these properties.
   std::string ToString() const;
 
-  // Returns whether `this` SecurityProperties is at least as secure as |other|. This checks the
-  // encryption/authentication level of `this` vs. other, that `this` used secure connections if
-  // |other| did, and that `this` encryption key size is at least as large as |others|.
+  // Returns whether `this` SecurityProperties is at least as secure as |other|.
+  // This checks the encryption/authentication level of `this` vs. other, that
+  // `this` used secure connections if |other| did, and that `this` encryption
+  // key size is at least as large as |others|.
   bool IsAsSecureAs(const SecurityProperties& other) const;
 
   // Attach pairing state inspect node named |name| as a child of |parent|.
@@ -161,10 +178,13 @@ class SecurityProperties final {
 
   // Compare two properties for equality.
   bool operator==(const SecurityProperties& other) const {
-    return properties_ == other.properties_ && enc_key_size_ == other.enc_key_size_;
+    return properties_ == other.properties_ &&
+           enc_key_size_ == other.enc_key_size_;
   }
 
-  bool operator!=(const SecurityProperties& other) const { return !(*this == other); }
+  bool operator!=(const SecurityProperties& other) const {
+    return !(*this == other);
+  }
 
  private:
   struct InspectProperties {
@@ -234,12 +254,12 @@ struct PairingData final {
   // The identity address.
   std::optional<DeviceAddress> identity_address;
 
-  // The long term link encryption key generated by the local device. For LTKs generated by Secure
-  // Connections, this will be the same as peer_ltk.
+  // The long term link encryption key generated by the local device. For LTKs
+  // generated by Secure Connections, this will be the same as peer_ltk.
   std::optional<sm::LTK> local_ltk;
 
-  // The long term link encryption key generated by the peer device. For LTKs generated by Secure
-  // Connections, this will be the same as local_ltk.
+  // The long term link encryption key generated by the peer device. For LTKs
+  // generated by Secure Connections, this will be the same as local_ltk.
   std::optional<sm::LTK> peer_ltk;
 
   // The cross-transport key for pairing-free encryption on the other transport.
@@ -252,8 +272,9 @@ struct PairingData final {
   std::optional<sm::Key> csrk;
 
   bool operator==(const PairingData& other) const {
-    return identity_address == other.identity_address && local_ltk == other.local_ltk &&
-           peer_ltk == other.peer_ltk && irk == other.irk && csrk == other.csrk;
+    return identity_address == other.identity_address &&
+           local_ltk == other.local_ltk && peer_ltk == other.peer_ltk &&
+           irk == other.irk && csrk == other.csrk;
   }
 };
 
@@ -263,8 +284,8 @@ struct IdentityInfo {
   DeviceAddress address;
 };
 
-// Enum for the possible values of the SM Bondable Mode as defined in spec V5.1 Vol 3 Part C
-// Section 9.4
+// Enum for the possible values of the SM Bondable Mode as defined in spec V5.1
+// Vol 3 Part C Section 9.4
 enum class BondableMode {
   // Allows pairing which results in bonding, as well as pairing which does not
   Bondable,
@@ -272,19 +293,22 @@ enum class BondableMode {
   NonBondable,
 };
 
-// Represents the local device's settings for easy mapping to Pairing(Request|Response)Parameters.
+// Represents the local device's settings for easy mapping to
+// Pairing(Request|Response)Parameters.
 struct LocalPairingParams {
   // The local I/O capability.
   IOCapability io_capability;
-  // Whether or not OOB authentication data is available locally. Defaults to no OOB data.
+  // Whether or not OOB authentication data is available locally. Defaults to no
+  // OOB data.
   OOBDataFlag oob_data_flag = OOBDataFlag::kNotPresent;
-  // The local requested security properties (Vol 3, Part H, 2.3.1). Defaults to no Authentication
-  // Requirements.
+  // The local requested security properties (Vol 3, Part H, 2.3.1). Defaults to
+  // no Authentication Requirements.
   AuthReqField auth_req = 0u;
-  // Maximum encryption key size supported by the local device. Valid values are 7-16. Defaults
-  // to maximum allowed encryption key size.
+  // Maximum encryption key size supported by the local device. Valid values are
+  // 7-16. Defaults to maximum allowed encryption key size.
   uint8_t max_encryption_key_size = kMaxEncryptionKeySize;
-  // The keys that the local system is able to distribute. Defaults to distributing no keys.
+  // The keys that the local system is able to distribute. Defaults to
+  // distributing no keys.
   KeyDistGenField local_keys = 0u;
   // The keys that are desired from the peer. Defaults to distributing no keys.
   KeyDistGenField remote_keys = 0u;
@@ -292,18 +316,21 @@ struct LocalPairingParams {
 
 // These roles correspond to the device which starts pairing.
 enum class Role {
-  // The LMP Central device is always kInitiator (V5.0 Vol. 3 Part H Appendix C.1).
+  // The LMP Central device is always kInitiator (V5.0 Vol. 3 Part H Appendix
+  // C.1).
   kInitiator,
 
-  // The LMP Peripheral device is always kResponder (V5.0 Vol. 3 Part H Appendix C.1).
+  // The LMP Peripheral device is always kResponder (V5.0 Vol. 3 Part H Appendix
+  // C.1).
   kResponder
 };
 
 using PairingProcedureId = uint64_t;
 
-// Used by Phase 2 classes to notify their owner that a new encryption key is ready. For Legacy
-// Pairing, this is the STK which may only be used for the current session. For Secure Connections,
-// this is the LTK which may be persisted.
+// Used by Phase 2 classes to notify their owner that a new encryption key is
+// ready. For Legacy Pairing, this is the STK which may only be used for the
+// current session. For Secure Connections, this is the LTK which may be
+// persisted.
 using OnPhase2KeyGeneratedCallback = fit::function<void(const UInt128&)>;
 
 // Used to notify classes of peer Pairing Requests.

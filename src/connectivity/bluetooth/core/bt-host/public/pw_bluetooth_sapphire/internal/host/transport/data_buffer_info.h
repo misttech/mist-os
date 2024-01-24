@@ -9,7 +9,8 @@
 
 namespace bt::hci {
 
-// Represents the controller data buffer settings for one of the BR/EDR, LE, or SCO transports.
+// Represents the controller data buffer settings for one of the BR/EDR, LE, or
+// SCO transports.
 class DataBufferInfo {
  public:
   // Initialize fields to non-zero values.
@@ -35,9 +36,12 @@ class DataBufferInfo {
 
   // Comparison operators.
   bool operator==(const DataBufferInfo& other) const {
-    return max_data_length_ == other.max_data_length_ && max_num_packets_ == other.max_num_packets_;
+    return max_data_length_ == other.max_data_length_ &&
+           max_num_packets_ == other.max_num_packets_;
   }
-  bool operator!=(const DataBufferInfo& other) const { return !(*this == other); }
+  bool operator!=(const DataBufferInfo& other) const {
+    return !(*this == other);
+  }
 
  private:
   size_t max_data_length_ = 0u;

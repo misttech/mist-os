@@ -14,10 +14,12 @@
 
 namespace bt::hci {
 
-// Packet template specialization for SCO data packets. ScoDataPacket does not have a public ctor,
-// so clients should use its |New| factory methods to instantiate it.
+// Packet template specialization for SCO data packets. ScoDataPacket does not
+// have a public ctor, so clients should use its |New| factory methods to
+// instantiate it.
 using ScoDataPacket = Packet<hci_spec::SynchronousDataHeader>;
-using ScoPacketHandler = fit::function<void(std::unique_ptr<ScoDataPacket> data_packet)>;
+using ScoPacketHandler =
+    fit::function<void(std::unique_ptr<ScoDataPacket> data_packet)>;
 
 template <>
 class Packet<hci_spec::SynchronousDataHeader>
@@ -29,8 +31,8 @@ class Packet<hci_spec::SynchronousDataHeader>
 
   // Slab-allocates a new ScoDataPacket with the given payload size and
   // initializes the packet's header field with the given data.
-  static std::unique_ptr<ScoDataPacket> New(hci_spec::ConnectionHandle connection_handle,
-                                            uint8_t payload_size);
+  static std::unique_ptr<ScoDataPacket> New(
+      hci_spec::ConnectionHandle connection_handle, uint8_t payload_size);
 
   // Getters for the header fields.
   hci_spec::ConnectionHandle connection_handle() const;

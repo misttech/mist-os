@@ -36,11 +36,15 @@ class FakeGattServer final {
     UUID type;
   };
 
-  void HandleReadByGrpType(hci_spec::ConnectionHandle conn, const ByteBuffer& bytes);
-  void HandleFindByTypeValue(hci_spec::ConnectionHandle conn, const ByteBuffer& bytes);
+  void HandleReadByGrpType(hci_spec::ConnectionHandle conn,
+                           const ByteBuffer& bytes);
+  void HandleFindByTypeValue(hci_spec::ConnectionHandle conn,
+                             const ByteBuffer& bytes);
 
   void Send(hci_spec::ConnectionHandle conn, const ByteBuffer& pdu);
-  void SendErrorRsp(hci_spec::ConnectionHandle conn, att::OpCode opcode, att::Handle handle,
+  void SendErrorRsp(hci_spec::ConnectionHandle conn,
+                    att::OpCode opcode,
+                    att::Handle handle,
                     att::ErrorCode ecode);
 
   // Map of service start handles to services.

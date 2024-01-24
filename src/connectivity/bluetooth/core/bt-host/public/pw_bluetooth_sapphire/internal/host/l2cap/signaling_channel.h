@@ -26,7 +26,8 @@ using SignalingPacket = PacketView<CommandHeader>;
 using MutableSignalingPacket = MutablePacketView<CommandHeader>;
 
 using DataCallback = fit::function<void(const ByteBuffer& data)>;
-using SignalingPacketHandler = fit::function<void(const SignalingPacket& packet)>;
+using SignalingPacketHandler =
+    fit::function<void(const SignalingPacket& packet)>;
 
 // SignalingChannelInterface contains the procedures that command flows use to
 // send and receive signaling channel transactions.
@@ -39,27 +40,30 @@ class SignalingChannelInterface {
     kTimeOut,  // Timed out waiting for matching remote command
   };
 
-  // ResponseHandler return value. Indicates whether additional responses are expected in this
-  // transaction (e.g. in the case of receiving a response with a pending status or continuation
-  // flag).
+  // ResponseHandler return value. Indicates whether additional responses are
+  // expected in this transaction (e.g. in the case of receiving a response with
+  // a pending status or continuation flag).
   enum class ResponseHandlerAction {
     kExpectAdditionalResponse,
     // No additional responses expected in this transaction.
     kCompleteOutboundTransaction,
   };
 
-  // Callback invoked to handle a response received from the remote. If |status| is kSuccess or
-  // kReject, then |rsp_payload| will contain any payload received. This callback is allowed to
-  // destroy the SignalingChannel, but must return kCompleteOutboundTransaction if it does.
-  using ResponseHandler =
-      fit::function<ResponseHandlerAction(Status, const ByteBuffer& rsp_payload)>;
+  // Callback invoked to handle a response received from the remote. If |status|
+  // is kSuccess or kReject, then |rsp_payload| will contain any payload
+  // received. This callback is allowed to destroy the SignalingChannel, but
+  // must return kCompleteOutboundTransaction if it does.
+  using ResponseHandler = fit::function<ResponseHandlerAction(
+      Status, const ByteBuffer& rsp_payload)>;
 
   // Initiate an outbound transaction. The signaling channel will send a request
   // then expect reception of one or more responses with a code one greater than
   // the request. Each response or rejection received invokes |cb|. When |cb|
   // returns false, it will be removed. Returns false if the request failed to
   // send.
-  virtual bool SendRequest(CommandCode req_code, const ByteBuffer& payload, ResponseHandler cb) = 0;
+  virtual bool SendRequest(CommandCode req_code,
+                           const ByteBuffer& payload,
+                           ResponseHandler cb) = 0;
 
   // Send a command packet in response to an incoming request.
   class Responder {
@@ -71,7 +75,8 @@ class SignalingChannelInterface {
     virtual void RejectNotUnderstood() = 0;
 
     // Reject request non-existent or otherwise invalid channel ID(s)
-    virtual void RejectInvalidChannelId(ChannelId local_cid, ChannelId remote_cid) = 0;
+    virtual void RejectInvalidChannelId(ChannelId local_cid,
+                                        ChannelId remote_cid) = 0;
 
    protected:
     virtual ~Responder() = default;
@@ -81,7 +86,8 @@ class SignalingChannelInterface {
   // |req_payload| contains any payload received, without the command header.
   // The callee can use |responder| to respond or reject. Parameters passed to
   // this handler are only guaranteed to be valid while the handler is running.
-  using RequestDelegate = fit::function<void(const ByteBuffer& req_payload, Responder* responder)>;
+  using RequestDelegate =
+      fit::function<void(const ByteBuffer& req_payload, Responder* responder)>;
 
   // Register a handler for all inbound transactions matching |req_code|, which
   // should be the code of a request. |cb| will be called with request payloads
@@ -100,12 +106,15 @@ class SignalingChannelInterface {
 // TODO(armansito): Implement flow control (RTX/ERTX timers).
 class SignalingChannel : public SignalingChannelInterface {
  public:
-  SignalingChannel(Channel::WeakPtr chan, pw::bluetooth::emboss::ConnectionRole role,
+  SignalingChannel(Channel::WeakPtr chan,
+                   pw::bluetooth::emboss::ConnectionRole role,
                    pw::async::Dispatcher& dispatcher);
   ~SignalingChannel() override = default;
 
   // SignalingChannelInterface overrides
-  bool SendRequest(CommandCode req_code, const ByteBuffer& payload, ResponseHandler cb) override;
+  bool SendRequest(CommandCode req_code,
+                   const ByteBuffer& payload,
+                   ResponseHandler cb) override;
   void ServeRequest(CommandCode req_code, RequestDelegate cb) override;
 
   bool is_open() const { return is_open_; }
@@ -123,7 +132,8 @@ class SignalingChannel : public SignalingChannelInterface {
     ResponderImpl(SignalingChannel* sig, CommandCode code, CommandId id);
     void Send(const ByteBuffer& rsp_payload) override;
     void RejectNotUnderstood() override;
-    void RejectInvalidChannelId(ChannelId local_cid, ChannelId remote_cid) override;
+    void RejectInvalidChannelId(ChannelId local_cid,
+                                ChannelId remote_cid) override;
 
    private:
     SignalingChannel* sig() const { return sig_; }
@@ -144,19 +154,22 @@ class SignalingChannel : public SignalingChannelInterface {
   // a valid payload length, send a Command Reject packet for each packet with
   // an intact ID in its header but invalid payload length, and drop any other
   // incoming data.
-  virtual void DecodeRxUnit(ByteBufferPtr sdu, const SignalingPacketHandler& cb) = 0;
+  virtual void DecodeRxUnit(ByteBufferPtr sdu,
+                            const SignalingPacketHandler& cb) = 0;
 
   // Called when a new signaling packet has been received. Returns false if
   // |packet| is rejected. Otherwise returns true and sends a response packet.
   //
   // This method is thread-safe in that a SignalingChannel cannot be deleted
   // while this is running. SendPacket() can be called safely from this method.
-  // TODO(https://fxbug.dev/1049): make non-virtual & private after removing le signaling channel
-  // override
+  // TODO(https://fxbug.dev/1049): make non-virtual & private after removing le
+  // signaling channel override
   virtual bool HandlePacket(const SignalingPacket& packet);
 
   // Sends out a command reject packet with the given parameters.
-  bool SendCommandReject(uint8_t identifier, RejectReason reason, const ByteBuffer& data);
+  bool SendCommandReject(uint8_t identifier,
+                         RejectReason reason,
+                         const ByteBuffer& data);
 
   // Returns true if called on this SignalingChannel's creation thread. Mainly
   // intended for debug assertions.
@@ -170,13 +183,16 @@ class SignalingChannel : public SignalingChannelInterface {
   CommandId GetNextCommandId();
 
  private:
-  // Enqueue a response to a request with command id |id| and payload |request_packet|. Register a
-  // callback |cb| that will be invoked when a response-type command packet (specified by
-  // |response_code|) is received. Starts the RTX timer and handles retransmission of
-  // |request_packet| and eventual timeout failure if a response isn't received. If the signaling
-  // channel receives a Command Reject that matches the same |id|, the rejection packet will be
-  // forwarded to the callback instead.
-  void EnqueueResponse(const ByteBuffer& request_packet, CommandId id, CommandCode response_code,
+  // Enqueue a response to a request with command id |id| and payload
+  // |request_packet|. Register a callback |cb| that will be invoked when a
+  // response-type command packet (specified by |response_code|) is received.
+  // Starts the RTX timer and handles retransmission of |request_packet| and
+  // eventual timeout failure if a response isn't received. If the signaling
+  // channel receives a Command Reject that matches the same |id|, the rejection
+  // packet will be forwarded to the callback instead.
+  void EnqueueResponse(const ByteBuffer& request_packet,
+                       CommandId id,
+                       CommandCode response_code,
                        ResponseHandler cb);
 
   // Called when a response-type command packet is received. Sends a Command
@@ -184,10 +200,11 @@ class SignalingChannel : public SignalingChannelInterface {
   // code and identifier.
   void OnRxResponse(const SignalingPacket& packet);
 
-  // Called after Response Timeout eXpired (RTX) or Extended Response Timeout eXpired (ERTX) timer
-  // expires. |id| must be in |pending_commands_|. If |retransmit| is true, requests will be
-  // retransmitted up to the retransmission limit before timing out the response. The
-  // ResponseHandler will be invoked with Status::kTimeOut and an empty ByteBuffer.
+  // Called after Response Timeout eXpired (RTX) or Extended Response Timeout
+  // eXpired (ERTX) timer expires. |id| must be in |pending_commands_|. If
+  // |retransmit| is true, requests will be retransmitted up to the
+  // retransmission limit before timing out the response. The ResponseHandler
+  // will be invoked with Status::kTimeOut and an empty ByteBuffer.
   void OnResponseTimeout(CommandId id, bool retransmit);
 
   // True if an outbound request-type command has registered a callback for its
@@ -206,7 +223,9 @@ class SignalingChannel : public SignalingChannelInterface {
 
   // Builds a signaling packet with the given parameters and payload. The
   // backing buffer is slab allocated.
-  ByteBufferPtr BuildPacket(CommandCode code, uint8_t identifier, const ByteBuffer& data);
+  ByteBufferPtr BuildPacket(CommandCode code,
+                            uint8_t identifier,
+                            const ByteBuffer& data);
   // Channel callbacks:
   void OnChannelClosed();
   void OnRxBFrame(ByteBufferPtr sdu);
@@ -216,10 +235,13 @@ class SignalingChannel : public SignalingChannelInterface {
   // or can't be handled by this host.
   void CheckAndDispatchPacket(const SignalingPacket& packet);
 
-  // Stores copy of request, response handlers, and timeout state for requests that have been sent.
+  // Stores copy of request, response handlers, and timeout state for requests
+  // that have been sent.
   struct PendingCommand {
-    PendingCommand(const ByteBuffer& request_packet, CommandCode response_code,
-                   ResponseHandler response_handler, pw::async::Dispatcher& dispatcher)
+    PendingCommand(const ByteBuffer& request_packet,
+                   CommandCode response_code,
+                   ResponseHandler response_handler,
+                   pw::async::Dispatcher& dispatcher)
         : response_code(response_code),
           response_handler(std::move(response_handler)),
           command_packet(std::make_unique<DynamicByteBuffer>(request_packet)),
@@ -235,14 +257,16 @@ class SignalingChannel : public SignalingChannelInterface {
     // Number of times this request has been transmitted.
     size_t transmit_count;
 
-    // The current timer duration. Used to perform exponential backoff with the RTX timer.
+    // The current timer duration. Used to perform exponential backoff with the
+    // RTX timer.
     pw::chrono::SystemClock::duration timer_duration;
 
     // Automatically canceled by destruction if the response is received.
     SmartTask response_timeout_task;
   };
 
-  // Retransmit the request corresponding to |pending_command| and reset the RTX timer.
+  // Retransmit the request corresponding to |pending_command| and reset the RTX
+  // timer.
   void RetransmitPendingCommand(PendingCommand& pending_command);
 
   pw::async::Dispatcher& pw_dispatcher_;
@@ -253,7 +277,8 @@ class SignalingChannel : public SignalingChannelInterface {
   uint16_t mtu_;
   uint8_t next_cmd_id_;
 
-  // Stores response handlers for outbound request packets with the corresponding CommandId.
+  // Stores response handlers for outbound request packets with the
+  // corresponding CommandId.
   std::unordered_map<CommandId, PendingCommand> pending_commands_;
 
   // Stores handlers for incoming request packets.

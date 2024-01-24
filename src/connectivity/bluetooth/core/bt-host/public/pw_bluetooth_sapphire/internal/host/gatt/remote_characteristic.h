@@ -30,14 +30,18 @@ class Client;
 // ID SCHEME:
 //
 // The ID that gets assigned to a RemoteCharacteristic is its value_handle
-// The ID that gets assigned to a Descriptor is its handle. Looking up a descriptor by id from the
-// service is logarithmic in the number of descriptors.
+// The ID that gets assigned to a Descriptor is its handle. Looking up a
+// descriptor by id from the service is logarithmic in the number of
+// descriptors.
 class RemoteCharacteristic final {
  public:
-  using ValueCallback = fit::function<void(const ByteBuffer&, bool maybe_truncated)>;
-  using NotifyStatusCallback = fit::function<void(att::Result<>, IdType handler_id)>;
+  using ValueCallback =
+      fit::function<void(const ByteBuffer&, bool maybe_truncated)>;
+  using NotifyStatusCallback =
+      fit::function<void(att::Result<>, IdType handler_id)>;
 
-  // We use an ordered map so that the Descriptors are exposed to the world in order
+  // We use an ordered map so that the Descriptors are exposed to the world in
+  // order
   using DescriptorMap = std::map<DescriptorHandle, DescriptorData>;
 
   RemoteCharacteristic(Client::WeakPtr client, const CharacteristicData& info);
@@ -62,12 +66,15 @@ class RemoteCharacteristic final {
 
   // The following private methods can only be called by a RemoteService.
 
-  // `service_changed` indicates whether destruction will occur due to a Service Changed
-  // notification, in which case this characteristic may no longer exist or may have been changed.
-  void set_service_changed(bool service_changed) { service_changed_ = service_changed; }
+  // `service_changed` indicates whether destruction will occur due to a Service
+  // Changed notification, in which case this characteristic may no longer exist
+  // or may have been changed.
+  void set_service_changed(bool service_changed) {
+    service_changed_ = service_changed;
+  }
 
-  // Updates the CharacteristicData |info_| with the Extended Properties that are read from the
-  // descriptors discovered in |DiscoverDescriptors|.
+  // Updates the CharacteristicData |info_| with the Extended Properties that
+  // are read from the descriptors discovered in |DiscoverDescriptors|.
   void UpdateDataWithExtendedProperties(ExtendedProperties ext_props);
 
   // Discovers the descriptors of this characteristic and reports the status in
@@ -75,10 +82,12 @@ class RemoteCharacteristic final {
   //
   // NOTE: The owning RemoteService is responsible for ensuring that this object
   // outlives the discovery procedure.
-  void DiscoverDescriptors(att::Handle range_end, att::ResultFunction<> callback);
+  void DiscoverDescriptors(att::Handle range_end,
+                           att::ResultFunction<> callback);
 
   // (See RemoteService::EnableNotifications in remote_service.h).
-  void EnableNotifications(ValueCallback value_callback, NotifyStatusCallback status_callback);
+  void EnableNotifications(ValueCallback value_callback,
+                           NotifyStatusCallback status_callback);
   bool DisableNotifications(IdType handler_id);
 
   // Sends a request to disable notifications and indications. Called by
@@ -96,8 +105,8 @@ class RemoteCharacteristic final {
   DescriptorMap descriptors_;
   bool discovery_error_;
 
-  // If true, this characteristic was in a service that has been changed. Values should not be
-  // read/written after a service is changed.
+  // If true, this characteristic was in a service that has been changed. Values
+  // should not be read/written after a service is changed.
   bool service_changed_ = false;
 
   // Handle of the Client Characteristic Configuration descriptor, or 0 if none.
@@ -108,7 +117,8 @@ class RemoteCharacteristic final {
 
   // Represents a pending request to subscribe to notifications or indications.
   struct PendingNotifyRequest {
-    PendingNotifyRequest(ValueCallback value_callback, NotifyStatusCallback status_callback);
+    PendingNotifyRequest(ValueCallback value_callback,
+                         NotifyStatusCallback status_callback);
 
     PendingNotifyRequest() = default;
     PendingNotifyRequest(PendingNotifyRequest&&) = default;

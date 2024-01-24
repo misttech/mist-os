@@ -9,8 +9,9 @@
 PW_LOG_DECLARE_FAKE_DRIVER();
 #endif
 
-// Entry point for libFuzzer that switches logging to printf output with lower verbosity.
-extern "C" int LLVMFuzzerInitialize(int *argc, char ***argv) {
+// Entry point for libFuzzer that switches logging to printf output with lower
+// verbosity.
+extern "C" int LLVMFuzzerInitialize(int* argc, char*** argv) {
   bt::UsePrintf(bt::LogSeverity::ERROR);
   return 0;
 }

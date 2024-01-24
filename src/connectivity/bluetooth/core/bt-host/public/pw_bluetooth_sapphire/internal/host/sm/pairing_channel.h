@@ -15,9 +15,10 @@
 
 namespace bt::sm {
 
-// Bridge class for the SMP L2CAP channel, which implements SM-specific functionality on top of
-// existing L2CAP functionality. Besides this SM-specific functionality, also allows runtime
-// modification of L2CAP event callbacks by changing the PairingChannel::Handler pointer.
+// Bridge class for the SMP L2CAP channel, which implements SM-specific
+// functionality on top of existing L2CAP functionality. Besides this
+// SM-specific functionality, also allows runtime modification of L2CAP event
+// callbacks by changing the PairingChannel::Handler pointer.
 
 class PairingChannel {
  public:
@@ -31,28 +32,32 @@ class PairingChannel {
     using WeakPtr = WeakSelf<Handler>::WeakPtr;
   };
 
-  // Initializes this PairingChannel with the L2CAP SMP fixed channel that this class wraps and the
-  // specified timer reset method. For use in production code.
+  // Initializes this PairingChannel with the L2CAP SMP fixed channel that this
+  // class wraps and the specified timer reset method. For use in production
+  // code.
   PairingChannel(l2cap::Channel::WeakPtr chan, fit::closure timer_resetter);
 
-  // Initializes this PairingChannel with a no-op timer reset method. Only for use in tests of
-  // classes which do not depend on the timer reset behavior.
+  // Initializes this PairingChannel with a no-op timer reset method. Only for
+  // use in tests of classes which do not depend on the timer reset behavior.
   explicit PairingChannel(l2cap::Channel::WeakPtr chan);
 
-  // For setting the new handler, expected to be used when switching phases. PairingChannel is not
-  // fully initialized until SetChannelHandler has been called with a valid Handler. This two-phase
-  // initialization exists because concrete Handlers are expected to depend on PairingChannels.
+  // For setting the new handler, expected to be used when switching phases.
+  // PairingChannel is not fully initialized until SetChannelHandler has been
+  // called with a valid Handler. This two-phase initialization exists because
+  // concrete Handlers are expected to depend on PairingChannels.
   void SetChannelHandler(Handler::WeakPtr new_handler);
 
-  // Wrapper which encapsulates some of the boilerplate involved in sending an SMP object.
+  // Wrapper which encapsulates some of the boilerplate involved in sending an
+  // SMP object.
   template <typename PayloadType>
   void SendMessage(Code message_code, const PayloadType& payload) {
     SendMessageNoTimerReset(message_code, payload);
     reset_timer_();
   }
 
-  // This method exists for situations when we send messages while not pairing (e.g. rejection of
-  // pairing), where we do not want to reset the SMP timer upon transmission.
+  // This method exists for situations when we send messages while not pairing
+  // (e.g. rejection of pairing), where we do not want to reset the SMP timer
+  // upon transmission.
   template <typename PayloadType>
   void SendMessageNoTimerReset(Code message_code, const PayloadType& payload) {
     auto kExpectedSize = kCodeToPayloadSize.find(message_code);
@@ -81,12 +86,14 @@ class PairingChannel {
   void OnRxBFrame(ByteBufferPtr ptr);
   void OnChannelClosed();
 
-  // The L2CAP Channel this class wraps. Uses a ScopedChannel because a PairingChannel is expected
-  // to own the lifetime of the underlying L2CAP channel.
+  // The L2CAP Channel this class wraps. Uses a ScopedChannel because a
+  // PairingChannel is expected to own the lifetime of the underlying L2CAP
+  // channel.
   l2cap::ScopedChannel chan_;
 
-  // Per v5.2 Vol. 3 Part H 3.4, "The Security Manager Timer shall be reset when an L2CAP SMP
-  // command is queued for transmission". This closure signals this reset to occur.
+  // Per v5.2 Vol. 3 Part H 3.4, "The Security Manager Timer shall be reset when
+  // an L2CAP SMP command is queued for transmission". This closure signals this
+  // reset to occur.
   fit::closure reset_timer_;
 
   // L2CAP channel events are delegated to this handler.

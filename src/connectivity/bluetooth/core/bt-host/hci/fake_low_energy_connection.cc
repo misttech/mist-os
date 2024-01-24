@@ -6,15 +6,21 @@
 
 namespace bt::hci::testing {
 
-FakeLowEnergyConnection::FakeLowEnergyConnection(hci_spec::ConnectionHandle handle,
-                                                 const DeviceAddress& local_address,
-                                                 const DeviceAddress& peer_address,
-                                                 pw::bluetooth::emboss::ConnectionRole role,
-                                                 const hci::Transport::WeakPtr& hci)
-    : LowEnergyConnection(handle, local_address, peer_address, hci_spec::LEConnectionParameters(),
-                          role, hci) {}
+FakeLowEnergyConnection::FakeLowEnergyConnection(
+    hci_spec::ConnectionHandle handle,
+    const DeviceAddress& local_address,
+    const DeviceAddress& peer_address,
+    pw::bluetooth::emboss::ConnectionRole role,
+    const hci::Transport::WeakPtr& hci)
+    : LowEnergyConnection(handle,
+                          local_address,
+                          peer_address,
+                          hci_spec::LEConnectionParameters(),
+                          role,
+                          hci) {}
 
-void FakeLowEnergyConnection::TriggerEncryptionChangeCallback(hci::Result<bool> result) {
+void FakeLowEnergyConnection::TriggerEncryptionChangeCallback(
+    hci::Result<bool> result) {
   BT_ASSERT(encryption_change_callback());
   encryption_change_callback()(result);
 }

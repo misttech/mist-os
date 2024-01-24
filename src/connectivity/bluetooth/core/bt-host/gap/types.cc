@@ -6,10 +6,11 @@
 
 namespace bt::gap {
 
-bool SecurityPropertiesMeetRequirements(sm::SecurityProperties properties,
-                                        BrEdrSecurityRequirements requirements) {
+bool SecurityPropertiesMeetRequirements(
+    sm::SecurityProperties properties, BrEdrSecurityRequirements requirements) {
   bool auth_ok = !requirements.authentication || properties.authenticated();
-  bool sc_ok = !requirements.secure_connections || properties.secure_connections();
+  bool sc_ok =
+      !requirements.secure_connections || properties.secure_connections();
   return auth_ok && sc_ok;
 }
 

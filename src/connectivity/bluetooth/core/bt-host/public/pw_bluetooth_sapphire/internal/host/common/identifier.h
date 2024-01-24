@@ -43,8 +43,12 @@ class Identifier {
   T value() const { return value_; }
 
   // Comparison.
-  bool operator==(const Identifier& other) const { return value_ == other.value_; }
-  bool operator!=(const Identifier& other) const { return value_ != other.value_; }
+  bool operator==(const Identifier& other) const {
+    return value_ == other.value_;
+  }
+  bool operator!=(const Identifier& other) const {
+    return value_ != other.value_;
+  }
 
   // Returns a string representation of this identifier. This function allocates
   // memory.
@@ -76,7 +80,9 @@ namespace std {
 
 template <typename T>
 struct hash<bt::Identifier<T>> {
-  size_t operator()(const bt::Identifier<T>& id) const { return std::hash<T>()(id.value()); }
+  size_t operator()(const bt::Identifier<T>& id) const {
+    return std::hash<T>()(id.value());
+  }
 };
 
 template <>

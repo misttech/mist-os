@@ -24,22 +24,27 @@ using PairingChannelHandler = PairingChannel::Handler;
 
 class ConcretePairingPhase : public PairingPhase, public PairingChannelHandler {
  public:
-  ConcretePairingPhase(PairingChannel::WeakPtr chan, Listener::WeakPtr listener, Role role,
+  ConcretePairingPhase(PairingChannel::WeakPtr chan,
+                       Listener::WeakPtr listener,
+                       Role role,
                        size_t max_packet_size = sizeof(PairingPublicKeyParams))
-      : PairingPhase(std::move(chan), std::move(listener), role), weak_handler_(this) {
-    // All concrete pairing phases should set themselves as the pairing channel handler.
+      : PairingPhase(std::move(chan), std::move(listener), role),
+        weak_handler_(this) {
+    // All concrete pairing phases should set themselves as the pairing channel
+    // handler.
     SetPairingChannelHandler(*this);
     last_rx_packet_ = DynamicByteBuffer(max_packet_size);
   }
 
-  // All concrete pairing phases should invalidate the channel handler in their destructor.
+  // All concrete pairing phases should invalidate the channel handler in their
+  // destructor.
   ~ConcretePairingPhase() override { InvalidatePairingChannelHandler(); }
 
   // PairingPhase overrides.
   std::string ToStringInternal() override { return ""; }
 
-  // PairingPhase override, not tested as PairingPhase does not implement this pure virtual
-  // function.
+  // PairingPhase override, not tested as PairingPhase does not implement this
+  // pure virtual function.
   void Start() override {}
 
   // PairingChannelHandler override
@@ -63,17 +68,18 @@ class PairingPhaseTest : public l2cap::testing::FakeChannelTest {
 
   void TearDown() override { pairing_phase_ = nullptr; }
 
-  void NewPairingPhase(Role role = Role::kInitiator, bt::LinkType ll_type = bt::LinkType::kLE) {
-    l2cap::ChannelId cid =
-        ll_type == bt::LinkType::kLE ? l2cap::kLESMPChannelId : l2cap::kSMPChannelId;
+  void NewPairingPhase(Role role = Role::kInitiator,
+                       bt::LinkType ll_type = bt::LinkType::kLE) {
+    l2cap::ChannelId cid = ll_type == bt::LinkType::kLE ? l2cap::kLESMPChannelId
+                                                        : l2cap::kSMPChannelId;
     ChannelOptions options(cid);
     options.link_type = ll_type;
 
     listener_ = std::make_unique<FakeListener>();
     fake_chan_ = CreateFakeChannel(options);
     sm_chan_ = std::make_unique<PairingChannel>(fake_chan_->GetWeakPtr());
-    pairing_phase_ = std::make_unique<ConcretePairingPhase>(sm_chan_->GetWeakPtr(),
-                                                            listener_->as_weak_ptr(), role);
+    pairing_phase_ = std::make_unique<ConcretePairingPhase>(
+        sm_chan_->GetWeakPtr(), listener_->as_weak_ptr(), role);
   }
 
   l2cap::testing::FakeChannel* fake_chan() const { return fake_chan_.get(); }
@@ -93,7 +99,8 @@ using PairingPhaseDeathTest = PairingPhaseTest;
 
 TEST_F(PairingPhaseDeathTest, CallMethodOnFailedPhaseDies) {
   pairing_phase()->Abort(ErrorCode::kUnspecifiedReason);
-  ASSERT_DEATH_IF_SUPPORTED(pairing_phase()->OnFailure(Error(HostError::kFailed)), ".*failed.*");
+  ASSERT_DEATH_IF_SUPPORTED(
+      pairing_phase()->OnFailure(Error(HostError::kFailed)), ".*failed.*");
 }
 
 TEST_F(PairingPhaseTest, ChannelClosedNotifiesListener) {
@@ -115,8 +122,9 @@ TEST_F(PairingPhaseTest, OnFailureNotifiesListener) {
 
 TEST_F(PairingPhaseTest, AbortSendsFailureMessageAndNotifiesListener) {
   ByteBufferPtr msg_sent = nullptr;
-  fake_chan()->SetSendCallback([&msg_sent](ByteBufferPtr sdu) { msg_sent = std::move(sdu); },
-                               dispatcher());
+  fake_chan()->SetSendCallback(
+      [&msg_sent](ByteBufferPtr sdu) { msg_sent = std::move(sdu); },
+      dispatcher());
   ASSERT_EQ(0, listener()->pairing_error_count());
 
   pairing_phase()->Abort(ErrorCode::kDHKeyCheckFailed);

@@ -174,8 +174,9 @@ TEST(AdvertisingReportParserTest, ReportsAllValid) {
   EXPECT_EQ(hci_spec::LEAddressType::kRandom, data->address_type);
   EXPECT_EQ("0C:0B:0A:09:08:07", data->address.ToString());
   EXPECT_EQ(3, data->length_data);
-  EXPECT_TRUE(
-      ContainersEqual(std::array<uint8_t, 3>{{0x01, 0x02, 0x03}}, data->data, data->length_data));
+  EXPECT_TRUE(ContainersEqual(std::array<uint8_t, 3>{{0x01, 0x02, 0x03}},
+                              data->data,
+                              data->length_data));
   EXPECT_EQ(15, rssi);
 
   // There are more reports
@@ -185,8 +186,10 @@ TEST(AdvertisingReportParserTest, ReportsAllValid) {
   EXPECT_EQ(hci_spec::LEAddressType::kPublic, data->address_type);
   EXPECT_EQ("12:11:10:0F:0E:0D", data->address.ToString());
   EXPECT_EQ(5, data->length_data);
-  EXPECT_TRUE(ContainersEqual(std::array<uint8_t, 5>{{0xFF, 0xFF, 0xFF, 0xFF, 0xFF}}, data->data,
-                              data->length_data));
+  EXPECT_TRUE(
+      ContainersEqual(std::array<uint8_t, 5>{{0xFF, 0xFF, 0xFF, 0xFF, 0xFF}},
+                      data->data,
+                      data->length_data));
   EXPECT_EQ(1, rssi);
 
   // No more reports.

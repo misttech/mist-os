@@ -12,7 +12,8 @@
 namespace bt::hci {
 
 bool DeviceAddressFromAdvReport(const hci_spec::LEAdvertisingReportData& report,
-                                DeviceAddress* out_address, bool* out_resolved) {
+                                DeviceAddress* out_address,
+                                bool* out_resolved) {
   BT_DEBUG_ASSERT(out_address);
   BT_DEBUG_ASSERT(out_resolved);
 
@@ -35,7 +36,9 @@ bool DeviceAddressFromAdvReport(const hci_spec::LEAdvertisingReportData& report,
       *out_resolved = false;
       break;
     default:
-      bt_log(WARN, "hci", "invalid address type in advertising report: %#.2x",
+      bt_log(WARN,
+             "hci",
+             "invalid address type in advertising report: %#.2x",
              static_cast<uint8_t>(report.address_type));
       return false;
   }

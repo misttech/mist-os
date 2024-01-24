@@ -12,16 +12,19 @@
 
 namespace bt {
 
-// Non-templated base class for PacketView to reduce per-instantiation code size overhead. This
-// could also be instantiated on <size_t HeaderSize> instead of storing a |header_size_| field,
-// which would instantiate one class per header size needed for an insignificant time and stack win.
+// Non-templated base class for PacketView to reduce per-instantiation code size
+// overhead. This could also be instantiated on <size_t HeaderSize> instead of
+// storing a |header_size_| field, which would instantiate one class per header
+// size needed for an insignificant time and stack win.
 //
-// MutablePacketView methods are included in this class instead of a separate class to avoid a
-// diamond inheritance hierarchy.
+// MutablePacketView methods are included in this class instead of a separate
+// class to avoid a diamond inheritance hierarchy.
 class PacketViewBase {
  public:
   BufferView data() const { return buffer_->view(0, size_); }
-  BufferView payload_data() const { return buffer_->view(header_size(), size_ - header_size()); }
+  BufferView payload_data() const {
+    return buffer_->view(header_size(), size_ - header_size());
+  }
 
   size_t size() const { return size_; }
   size_t payload_size() const {
@@ -35,26 +38,36 @@ class PacketViewBase {
     return *reinterpret_cast<const PayloadType*>(payload_data().data());
   }
 
-  // Adjusts the size of this PacketView to match the given |payload_size|. This is useful when the
-  // exact packet size is not known during construction.
+  // Adjusts the size of this PacketView to match the given |payload_size|. This
+  // is useful when the exact packet size is not known during construction.
   //
-  // This performs runtime checks to make sure that the underlying buffer is appropriately sized.
-  void Resize(size_t payload_size) { this->set_size(header_size() + payload_size); }
+  // This performs runtime checks to make sure that the underlying buffer is
+  // appropriately sized.
+  void Resize(size_t payload_size) {
+    this->set_size(header_size() + payload_size);
+  }
 
  protected:
-  PacketViewBase(size_t header_size, const ByteBuffer* buffer, size_t payload_size)
-      : header_size_(header_size), buffer_(buffer), size_(header_size_ + payload_size) {
+  PacketViewBase(size_t header_size,
+                 const ByteBuffer* buffer,
+                 size_t payload_size)
+      : header_size_(header_size),
+        buffer_(buffer),
+        size_(header_size_ + payload_size) {
     BT_ASSERT(buffer_);
-    BT_ASSERT_MSG(buffer_->size() >= size_, "view size %zu exceeds buffer size %zu", size_,
+    BT_ASSERT_MSG(buffer_->size() >= size_,
+                  "view size %zu exceeds buffer size %zu",
+                  size_,
                   buffer_->size());
   }
 
-  // Default copy ctor is required for PacketView and MutablePacketView to be copy-constructed, but
-  // it should stay protected to avoid upcasting from causing issues.
+  // Default copy ctor is required for PacketView and MutablePacketView to be
+  // copy-constructed, but it should stay protected to avoid upcasting from
+  // causing issues.
   PacketViewBase(const PacketViewBase&) = default;
 
-  // Assignment disabled because PacketViewBase doesn't know whether |this| and the assigned
-  // parameter are the same type of PacketView<…>.
+  // Assignment disabled because PacketViewBase doesn't know whether |this| and
+  // the assigned parameter are the same type of PacketView<…>.
   PacketViewBase& operator=(const PacketViewBase&) = delete;
 
   void set_size(size_t size) {
@@ -68,23 +81,30 @@ class PacketViewBase {
   const ByteBuffer* buffer() const { return buffer_; }
 
   // Method for MutableBufferView only
-  MutableBufferView mutable_data() const { return mutable_buffer()->mutable_view(0, this->size()); }
+  MutableBufferView mutable_data() const {
+    return mutable_buffer()->mutable_view(0, this->size());
+  }
 
   // Method for MutableBufferView only
   MutableBufferView mutable_payload_data() const {
-    return mutable_buffer()->mutable_view(header_size(), this->size() - header_size());
+    return mutable_buffer()->mutable_view(header_size(),
+                                          this->size() - header_size());
   }
 
   // Method for MutableBufferView only
   uint8_t* mutable_payload_bytes() const {
-    return this->payload_size() ? mutable_buffer()->mutable_data() + header_size() : nullptr;
+    return this->payload_size()
+               ? mutable_buffer()->mutable_data() + header_size()
+               : nullptr;
   }
 
  private:
   MutableByteBuffer* mutable_buffer() const {
-    // For use only by MutableBufferView, which is constructed with a MutableBufferView*. This
-    // restores the mutability that is implicitly upcasted away when stored in this Base class.
-    return const_cast<MutableByteBuffer*>(static_cast<const MutableByteBuffer*>(this->buffer()));
+    // For use only by MutableBufferView, which is constructed with a
+    // MutableBufferView*. This restores the mutability that is implicitly
+    // upcasted away when stored in this Base class.
+    return const_cast<MutableByteBuffer*>(
+        static_cast<const MutableByteBuffer*>(this->buffer()));
   }
 
   const size_t header_size_;
@@ -138,9 +158,9 @@ class PacketViewBase {
 template <typename HeaderType>
 class PacketView : public PacketViewBase {
  public:
-  // Initializes this Packet to operate over |buffer|. |payload_size| is the size of the packet
-  // payload not including the packet header. A |payload_size| value of 0 indicates that the packet
-  // contains no payload.
+  // Initializes this Packet to operate over |buffer|. |payload_size| is the
+  // size of the packet payload not including the packet header. A
+  // |payload_size| value of 0 indicates that the packet contains no payload.
   explicit PacketView(const ByteBuffer* buffer, size_t payload_size = 0u)
       : PacketViewBase(sizeof(HeaderType), buffer, payload_size) {}
 
@@ -150,7 +170,8 @@ class PacketView : public PacketViewBase {
 template <typename HeaderType>
 class MutablePacketView : public PacketView<HeaderType> {
  public:
-  explicit MutablePacketView(MutableByteBuffer* buffer, size_t payload_size = 0u)
+  explicit MutablePacketView(MutableByteBuffer* buffer,
+                             size_t payload_size = 0u)
       : PacketView<HeaderType>(buffer, payload_size) {}
 
   using PacketViewBase::mutable_data;

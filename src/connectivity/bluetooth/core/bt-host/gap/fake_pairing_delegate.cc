@@ -10,7 +10,8 @@ namespace bt::gap {
 namespace {
 
 void AddFailure(const char* func_name, PeerId peer_id) {
-  return ADD_FAILURE() << "Unexpected call to " << __func__ << ", peer_id: " << peer_id.ToString();
+  return ADD_FAILURE() << "Unexpected call to " << __func__
+                       << ", peer_id: " << peer_id.ToString();
 }
 
 }  // namespace
@@ -47,7 +48,8 @@ void FakePairingDelegate::CompletePairing(PeerId peer_id, sm::Result<> status) {
   complete_pairing_count_++;
 }
 
-void FakePairingDelegate::ConfirmPairing(PeerId peer_id, ConfirmCallback confirm) {
+void FakePairingDelegate::ConfirmPairing(PeerId peer_id,
+                                         ConfirmCallback confirm) {
   if (!confirm_pairing_cb_) {
     AddFailure(__func__, peer_id);
     return;
@@ -56,7 +58,9 @@ void FakePairingDelegate::ConfirmPairing(PeerId peer_id, ConfirmCallback confirm
   confirm_pairing_count_++;
 }
 
-void FakePairingDelegate::DisplayPasskey(PeerId peer_id, uint32_t passkey, DisplayMethod method,
+void FakePairingDelegate::DisplayPasskey(PeerId peer_id,
+                                         uint32_t passkey,
+                                         DisplayMethod method,
                                          ConfirmCallback confirm) {
   if (!display_passkey_cb_) {
     AddFailure(__func__, peer_id);
@@ -67,7 +71,8 @@ void FakePairingDelegate::DisplayPasskey(PeerId peer_id, uint32_t passkey, Displ
   display_passkey_count_++;
 }
 
-void FakePairingDelegate::RequestPasskey(PeerId peer_id, PasskeyResponseCallback respond) {
+void FakePairingDelegate::RequestPasskey(PeerId peer_id,
+                                         PasskeyResponseCallback respond) {
   if (!request_passkey_cb_) {
     AddFailure(__func__, peer_id);
     return;

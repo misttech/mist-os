@@ -14,8 +14,8 @@ namespace bt {
 // configured by initialization code.
 pw::random::RandomGenerator* random_generator();
 
-// Sets the global random number generator used by the host stack. To prevent overriding, the
-// current generator must be nullptr or an assert will fail.
+// Sets the global random number generator used by the host stack. To prevent
+// overriding, the current generator must be nullptr or an assert will fail.
 void set_random_generator(pw::random::RandomGenerator* generator);
 
 template <typename T>

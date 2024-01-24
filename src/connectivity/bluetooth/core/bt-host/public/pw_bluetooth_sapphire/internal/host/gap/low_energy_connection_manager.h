@@ -59,8 +59,9 @@ enum class LowEnergyDisconnectReason : uint8_t {
   kError,
 };
 
-// LowEnergyConnectionManager is responsible for connecting and initializing new connections,
-// interrogating connections, intiating pairing, and disconnecting connections.
+// LowEnergyConnectionManager is responsible for connecting and initializing new
+// connections, interrogating connections, intiating pairing, and disconnecting
+// connections.
 class LowEnergyConnectionManager final {
  public:
   // Duration after which connection failures are removed from Inspect.
@@ -79,63 +80,76 @@ class LowEnergyConnectionManager final {
   //                 connection and bonding state of a peer via the cache.
   // |l2cap|: Used to interact with the L2CAP layer.
   // |gatt|: Used to interact with the GATT profile layer.
-  LowEnergyConnectionManager(hci::CommandChannel::WeakPtr cmd_channel,
-                             hci::LocalAddressDelegate* addr_delegate,
-                             hci::LowEnergyConnector* connector, PeerCache* peer_cache,
-                             l2cap::ChannelManager* l2cap, gatt::GATT::WeakPtr gatt,
-                             LowEnergyDiscoveryManager::WeakPtr discovery_manager,
-                             sm::SecurityManagerFactory sm_creator,
-                             pw::async::Dispatcher& dispatcher);
+  LowEnergyConnectionManager(
+      hci::CommandChannel::WeakPtr cmd_channel,
+      hci::LocalAddressDelegate* addr_delegate,
+      hci::LowEnergyConnector* connector,
+      PeerCache* peer_cache,
+      l2cap::ChannelManager* l2cap,
+      gatt::GATT::WeakPtr gatt,
+      LowEnergyDiscoveryManager::WeakPtr discovery_manager,
+      sm::SecurityManagerFactory sm_creator,
+      pw::async::Dispatcher& dispatcher);
   ~LowEnergyConnectionManager();
 
-  // Allows a caller to claim shared ownership over a connection to the requested remote LE peer
-  // identified by |peer_id|.
+  // Allows a caller to claim shared ownership over a connection to the
+  // requested remote LE peer identified by |peer_id|.
   //   * If |peer_id| is not recognized, |callback| is called with an error.
   //
   //   * If the requested peer is already connected, |callback| is called with a
   //     LowEnergyConnectionHandle immediately.
-  //     This is done for both local and remote initiated connections (i.e. the local adapter
-  //     can either be in the LE central or peripheral roles).
+  //     This is done for both local and remote initiated connections (i.e. the
+  //     local adapter can either be in the LE central or peripheral roles).
   //
   //   * If the requested peer is NOT connected, then this method initiates a
-  //     connection to the requested peer using the internal::LowEnergyConnector. See that class's
-  //     documentation for a more detailed overview of the Connection process. A
-  //     LowEnergyConnectionHandle is asynchronously returned to the caller once the connection has
-  //     been set up.
+  //     connection to the requested peer using the
+  //     internal::LowEnergyConnector. See that class's documentation for a more
+  //     detailed overview of the Connection process. A
+  //     LowEnergyConnectionHandle is asynchronously returned to the caller once
+  //     the connection has been set up.
   //
   // The status of the procedure is reported in |callback| in the case of an
   // error.
-  using ConnectionResult = fit::result<HostError, std::unique_ptr<LowEnergyConnectionHandle>>;
+  using ConnectionResult =
+      fit::result<HostError, std::unique_ptr<LowEnergyConnectionHandle>>;
   using ConnectionResultCallback = fit::function<void(ConnectionResult)>;
-  void Connect(PeerId peer_id, ConnectionResultCallback callback,
+  void Connect(PeerId peer_id,
+               ConnectionResultCallback callback,
                LowEnergyConnectionOptions connection_options);
 
-  hci::LocalAddressDelegate* local_address_delegate() const { return local_address_delegate_; }
+  hci::LocalAddressDelegate* local_address_delegate() const {
+    return local_address_delegate_;
+  }
 
-  // Disconnects any existing or pending LE connection to |peer_id|, invalidating all
-  // active LowEnergyConnectionHandles. Returns false if the peer can not be
-  // disconnected.
+  // Disconnects any existing or pending LE connection to |peer_id|,
+  // invalidating all active LowEnergyConnectionHandles. Returns false if the
+  // peer can not be disconnected.
   bool Disconnect(PeerId peer_id,
-                  LowEnergyDisconnectReason reason = LowEnergyDisconnectReason::kApiRequest);
+                  LowEnergyDisconnectReason reason =
+                      LowEnergyDisconnectReason::kApiRequest);
 
-  // Initializes a new connection over the given |link| and asynchronously returns a connection
-  // reference.
+  // Initializes a new connection over the given |link| and asynchronously
+  // returns a connection reference.
   //
   // |link| must be the result of a remote initiated connection.
   //
-  // |callback| will be called with a connection status and connection reference. The connection
-  // reference will be nullptr if the connection was rejected (as indicated by a failure status).
+  // |callback| will be called with a connection status and connection
+  // reference. The connection reference will be nullptr if the connection was
+  // rejected (as indicated by a failure status).
   //
   // TODO(armansito): Add an |own_address| parameter for the locally advertised
   // address that was connected to.
   //
   // A link with the given handle should not have been previously registered.
-  void RegisterRemoteInitiatedLink(std::unique_ptr<hci::LowEnergyConnection> link,
-                                   sm::BondableMode bondable_mode,
-                                   ConnectionResultCallback callback);
+  void RegisterRemoteInitiatedLink(
+      std::unique_ptr<hci::LowEnergyConnection> link,
+      sm::BondableMode bondable_mode,
+      ConnectionResultCallback callback);
 
   // Returns the PairingDelegate currently assigned to this connection manager.
-  const PairingDelegate::WeakPtr& pairing_delegate() const { return pairing_delegate_; }
+  const PairingDelegate::WeakPtr& pairing_delegate() const {
+    return pairing_delegate_;
+  }
 
   // Assigns a new PairingDelegate to handle LE authentication challenges.
   // Replacing an existing pairing delegate cancels all ongoing pairing
@@ -158,7 +172,8 @@ class LowEnergyConnectionManager final {
 
   // Sets the timeout interval to be used on future connect requests. The
   // default value is kLECreateConnectionTimeout.
-  void set_request_timeout_for_testing(pw::chrono::SystemClock::duration value) {
+  void set_request_timeout_for_testing(
+      pw::chrono::SystemClock::duration value) {
     request_timeout_ = value;
   }
 
@@ -167,27 +182,38 @@ class LowEnergyConnectionManager final {
   void OnPeerDisconnect(const hci::Connection* connection,
                         pw::bluetooth::emboss::StatusCode reason);
 
-  // Initiates the pairing process. Expected to only be called during higher-level testing.
-  //   |peer_id|: the peer to pair to - if the peer is not connected, |cb| is called with an error.
-  //   |pairing_level|: determines the security level of the pairing. **Note**: If the security
-  //                    level of the link is already >= |pairing level|, no pairing takes place.
-  //   |bondable_mode|: sets the bonding mode of this connection. A device in bondable mode forms a
-  //                    bond to the peer upon pairing, assuming the peer is also in bondable mode.
-  //                    A device in non-bondable mode will not allow pairing that forms a bond.
-  //   |cb|: callback called upon completion of this function, whether pairing takes place or not.
-  void Pair(PeerId peer_id, sm::SecurityLevel pairing_level, sm::BondableMode bondable_mode,
+  // Initiates the pairing process. Expected to only be called during
+  // higher-level testing.
+  //   |peer_id|: the peer to pair to - if the peer is not connected, |cb| is
+  //   called with an error. |pairing_level|: determines the security level of
+  //   the pairing. **Note**: If the security
+  //                    level of the link is already >= |pairing level|, no
+  //                    pairing takes place.
+  //   |bondable_mode|: sets the bonding mode of this connection. A device in
+  //   bondable mode forms a
+  //                    bond to the peer upon pairing, assuming the peer is also
+  //                    in bondable mode. A device in non-bondable mode will not
+  //                    allow pairing that forms a bond.
+  //   |cb|: callback called upon completion of this function, whether pairing
+  //   takes place or not.
+  void Pair(PeerId peer_id,
+            sm::SecurityLevel pairing_level,
+            sm::BondableMode bondable_mode,
             sm::ResultFunction<> cb);
 
-  // Sets the LE security mode of the local device (see v5.2 Vol. 3 Part C Section 10.2). If set to
-  // SecureConnectionsOnly, any currently encrypted links not meeting the requirements of Security
-  // Mode 1 Level 4 will be disconnected.
+  // Sets the LE security mode of the local device (see v5.2 Vol. 3 Part C
+  // Section 10.2). If set to SecureConnectionsOnly, any currently encrypted
+  // links not meeting the requirements of Security Mode 1 Level 4 will be
+  // disconnected.
   void SetSecurityMode(LESecurityMode mode);
 
   // Attach manager inspect node as a child node of |parent|.
   void AttachInspect(inspect::Node& parent, std::string name);
 
   LESecurityMode security_mode() const { return security_mode_; }
-  sm::SecurityManagerFactory sm_factory_func() const { return sm_factory_func_; }
+  sm::SecurityManagerFactory sm_factory_func() const {
+    return sm_factory_func_;
+  }
 
   using WeakPtr = WeakSelf<LowEnergyConnectionManager>::WeakPtr;
 
@@ -195,33 +221,44 @@ class LowEnergyConnectionManager final {
   friend class internal::LowEnergyConnection;
 
   // Mapping from peer identifiers to open LE connections.
-  using ConnectionMap = std::unordered_map<PeerId, std::unique_ptr<internal::LowEnergyConnection>>;
+  using ConnectionMap =
+      std::unordered_map<PeerId,
+                         std::unique_ptr<internal::LowEnergyConnection>>;
 
   // Called by LowEnergyConnectionHandle::Release().
   void ReleaseReference(LowEnergyConnectionHandle* handle);
 
-  // Initiates a new connection attempt for the next peer in the pending list, if any.
+  // Initiates a new connection attempt for the next peer in the pending list,
+  // if any.
   void TryCreateNextConnection();
 
-  // Called by internal::LowEnergyConnector to indicate the result of a local connect request.
+  // Called by internal::LowEnergyConnector to indicate the result of a local
+  // connect request.
   void OnLocalInitiatedConnectResult(
       hci::Result<std::unique_ptr<internal::LowEnergyConnection>> result);
 
-  // Called by internal::LowEnergyConnector to indicate the result of a remote connect request.
+  // Called by internal::LowEnergyConnector to indicate the result of a remote
+  // connect request.
   void OnRemoteInitiatedConnectResult(
-      PeerId peer_id, hci::Result<std::unique_ptr<internal::LowEnergyConnection>> result);
+      PeerId peer_id,
+      hci::Result<std::unique_ptr<internal::LowEnergyConnection>> result);
 
-  // Either report an error to clients or initialize the connection and report success to clients.
-  void ProcessConnectResult(hci::Result<std::unique_ptr<internal::LowEnergyConnection>> result,
-                            internal::LowEnergyConnectionRequest request);
+  // Either report an error to clients or initialize the connection and report
+  // success to clients.
+  void ProcessConnectResult(
+      hci::Result<std::unique_ptr<internal::LowEnergyConnection>> result,
+      internal::LowEnergyConnectionRequest request);
 
-  // Finish setting up connection, adding to |connections_| map, and notifying clients.
-  bool InitializeConnection(std::unique_ptr<internal::LowEnergyConnection> connection,
-                            internal::LowEnergyConnectionRequest request);
+  // Finish setting up connection, adding to |connections_| map, and notifying
+  // clients.
+  bool InitializeConnection(
+      std::unique_ptr<internal::LowEnergyConnection> connection,
+      internal::LowEnergyConnectionRequest request);
 
-  // Cleans up a connection state. This results in a HCI_Disconnect command if the connection has
-  // not already been disconnected, and notifies any referenced LowEnergyConnectionHandles of the
-  // disconnection. Marks the corresponding PeerCache entry as disconnected and cleans up all data
+  // Cleans up a connection state. This results in a HCI_Disconnect command if
+  // the connection has not already been disconnected, and notifies any
+  // referenced LowEnergyConnectionHandles of the disconnection. Marks the
+  // corresponding PeerCache entry as disconnected and cleans up all data
   // bearers.
   //
   // |conn_state| will have been removed from the underlying map at the time of
@@ -244,10 +281,11 @@ class LowEnergyConnectionManager final {
   // Called by RegisterRemoteInitiatedLink() and RegisterLocalInitiatedLink().
   Peer* UpdatePeerWithLink(const hci::LowEnergyConnection& link);
 
-  // Called when the peer disconnects with a "Connection Failed to be Established" error.
-  // Cleans up the existing connection and adds the connection request back to the queue for a
-  // retry.
-  void CleanUpAndRetryConnection(std::unique_ptr<internal::LowEnergyConnection> connection);
+  // Called when the peer disconnects with a "Connection Failed to be
+  // Established" error. Cleans up the existing connection and adds the
+  // connection request back to the queue for a retry.
+  void CleanUpAndRetryConnection(
+      std::unique_ptr<internal::LowEnergyConnection> connection);
 
   // Returns an iterator into |connections_| if a connection is found that
   // matches the given logical link |handle|. Otherwise, returns an iterator
@@ -298,7 +336,8 @@ class LowEnergyConnectionManager final {
   DisconnectCallback test_disconn_cb_;
 
   // Outstanding connection requests based on remote peer ID.
-  std::unordered_map<PeerId, internal::LowEnergyConnectionRequest> pending_requests_;
+  std::unordered_map<PeerId, internal::LowEnergyConnectionRequest>
+      pending_requests_;
 
   // Mapping from peer identifiers to currently open LE connections.
   ConnectionMap connections_;
@@ -321,14 +360,15 @@ class LowEnergyConnectionManager final {
   // procedures. Expected to outlive this instance.
   hci::LocalAddressDelegate* local_address_delegate_;  // weak
 
-  // True if the connection manager is performing a scan for a peer before connecting.
+  // True if the connection manager is performing a scan for a peer before
+  // connecting.
   bool scanning_ = false;
 
   struct InspectProperties {
     // Count of connection failures in the past 10 minutes.
     explicit InspectProperties(pw::async::Dispatcher& pw_dispatcher)
-        : recent_connection_failures(pw_dispatcher,
-                                     kInspectRecentConnectionFailuresExpiryDuration) {}
+        : recent_connection_failures(
+              pw_dispatcher, kInspectRecentConnectionFailuresExpiryDuration) {}
     WindowedInspectIntProperty recent_connection_failures;
 
     UintMetricCounter outgoing_connection_success_count_;

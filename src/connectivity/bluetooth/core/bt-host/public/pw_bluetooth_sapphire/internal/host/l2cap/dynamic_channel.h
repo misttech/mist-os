@@ -63,10 +63,11 @@ class DynamicChannel {
   // channel is considered open.
   virtual void Open(fit::closure open_result_cb) = 0;
 
-  // If connected, close the channel. |disconnect_callback| will be called when the peer confirms
-  // that the channel is disconnected, if the channel is already not connected, or if the
-  // underlying Signaling Channel times out waiting for the peer confirmation. The owner should then
-  // destroy this object and not reuse it.
+  // If connected, close the channel. |disconnect_callback| will be called when
+  // the peer confirms that the channel is disconnected, if the channel is
+  // already not connected, or if the underlying Signaling Channel times out
+  // waiting for the peer confirmation. The owner should then destroy this
+  // object and not reuse it.
   using DisconnectDoneCallback = fit::callback<void()>;
   virtual void Disconnect(DisconnectDoneCallback done_cb) = 0;
 
@@ -100,7 +101,9 @@ class DynamicChannel {
  protected:
   // |registry| points to the registry that created and owns this channel. It
   // must be valid for the duration of this object.
-  DynamicChannel(DynamicChannelRegistry* registry, Psm psm, ChannelId local_cid,
+  DynamicChannel(DynamicChannelRegistry* registry,
+                 Psm psm,
+                 ChannelId local_cid,
                  ChannelId remote_cid);
 
   // Signal the registry of a remote-requested closure.

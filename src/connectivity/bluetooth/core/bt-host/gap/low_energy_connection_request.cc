@@ -7,7 +7,8 @@
 namespace bt::gap::internal {
 
 LowEnergyConnectionRequest::LowEnergyConnectionRequest(
-    PeerId peer_id, ConnectionResultCallback first_callback,
+    PeerId peer_id,
+    ConnectionResultCallback first_callback,
     LowEnergyConnectionOptions connection_options,
     Peer::InitializingConnectionToken peer_conn_token)
     : peer_id_(peer_id, MakeToStringInspectConvertFunction()),
@@ -17,7 +18,8 @@ LowEnergyConnectionRequest::LowEnergyConnectionRequest(
   callbacks_.Mutable()->push_back(std::move(first_callback));
 }
 
-void LowEnergyConnectionRequest::NotifyCallbacks(fit::result<HostError, RefFunc> result) {
+void LowEnergyConnectionRequest::NotifyCallbacks(
+    fit::result<HostError, RefFunc> result) {
   peer_conn_token_.reset();
 
   for (const auto& callback : *callbacks_) {
@@ -30,7 +32,8 @@ void LowEnergyConnectionRequest::NotifyCallbacks(fit::result<HostError, RefFunc>
   }
 }
 
-void LowEnergyConnectionRequest::AttachInspect(inspect::Node& parent, std::string name) {
+void LowEnergyConnectionRequest::AttachInspect(inspect::Node& parent,
+                                               std::string name) {
   inspect_node_ = parent.CreateChild(name);
   peer_id_.AttachInspect(inspect_node_, "peer_id");
   callbacks_.AttachInspect(inspect_node_, "callbacks");

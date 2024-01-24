@@ -54,11 +54,15 @@ constexpr const char* ErrorToString(att::ErrorCode ecode) {
 
 }  // namespace
 
-std::string ProtocolErrorTraits<att::ErrorCode>::ToString(att::ErrorCode ecode) {
-  constexpr size_t out_size = sizeof("invalid attribute value length (ATT 0x0d)");
+std::string ProtocolErrorTraits<att::ErrorCode>::ToString(
+    att::ErrorCode ecode) {
+  constexpr size_t out_size =
+      sizeof("invalid attribute value length (ATT 0x0d)");
   char out[out_size] = "";
   pw::StatusWithSize status =
-      pw::string::Format({out, sizeof(out)}, "%s (ATT %#.2hhx)", ErrorToString(ecode),
+      pw::string::Format({out, sizeof(out)},
+                         "%s (ATT %#.2hhx)",
+                         ErrorToString(ecode),
                          static_cast<unsigned char>(ecode));
   BT_DEBUG_ASSERT(status.ok());
   return out;

@@ -70,7 +70,9 @@ void PrintByteContainer(const Container& c) {
 // equality. If the contents are not equal, this logs a GTEST-style error
 // message to stdout. Meant to be used from unit tests.
 template <class InputIt1, class InputIt2>
-bool ContainersEqual(InputIt1 expected_begin, InputIt1 expected_end, InputIt2 actual_begin,
+bool ContainersEqual(InputIt1 expected_begin,
+                     InputIt1 expected_end,
+                     InputIt2 actual_begin,
                      InputIt2 actual_end) {
   if (std::equal(expected_begin, expected_end, actual_begin, actual_end))
     return true;
@@ -84,27 +86,33 @@ bool ContainersEqual(InputIt1 expected_begin, InputIt1 expected_end, InputIt2 ac
 
 template <class Container1, class Container2>
 bool ContainersEqual(const Container1& expected, const Container2& actual) {
-  return ContainersEqual(expected.begin(), expected.end(), actual.begin(), actual.end());
+  return ContainersEqual(
+      expected.begin(), expected.end(), actual.begin(), actual.end());
 }
 
 template <class Container1>
-bool ContainersEqual(const Container1& expected, const uint8_t* actual_bytes,
+bool ContainersEqual(const Container1& expected,
+                     const uint8_t* actual_bytes,
                      size_t actual_num_bytes) {
-  return ContainersEqual(expected.begin(), expected.end(), actual_bytes,
+  return ContainersEqual(expected.begin(),
+                         expected.end(),
+                         actual_bytes,
                          actual_bytes + actual_num_bytes);
 }
 
 // Returns a managed pointer to a heap allocated MutableByteBuffer.
 template <typename... T>
 MutableByteBufferPtr NewBuffer(T... bytes) {
-  return std::make_unique<StaticByteBuffer<sizeof...(T)>>(std::forward<T>(bytes)...);
+  return std::make_unique<StaticByteBuffer<sizeof...(T)>>(
+      std::forward<T>(bytes)...);
 }
 
-// Returns the value of |x| as a little-endian array, i.e. the first byte of the array has the value
-// of the least significant byte of |x|.
+// Returns the value of |x| as a little-endian array, i.e. the first byte of the
+// array has the value of the least significant byte of |x|.
 template <typename T>
 constexpr std::array<uint8_t, sizeof(T)> ToBytes(T x) {
-  static_assert(std::is_integral_v<T>, "Must use integral types for safe bytewise access");
+  static_assert(std::is_integral_v<T>,
+                "Must use integral types for safe bytewise access");
   std::array<uint8_t, sizeof(T)> bytes;
   for (auto& byte : bytes) {
     byte = static_cast<uint8_t>(x);
@@ -119,8 +127,10 @@ constexpr uint8_t LowerBits(const uint16_t x) { return ToBytes(x).front(); }
 
 // Wraps ContainerEq, which doesn't support comparing different ByteBuffer types
 MATCHER_P(BufferEq, b, "") {
-  return ::testing::ExplainMatchResult(::testing::ContainerEq(bt::BufferView(b)),
-                                       bt::BufferView(arg), result_listener);
+  return ::testing::ExplainMatchResult(
+      ::testing::ContainerEq(bt::BufferView(b)),
+      bt::BufferView(arg),
+      result_listener);
 }
 
 }  // namespace bt

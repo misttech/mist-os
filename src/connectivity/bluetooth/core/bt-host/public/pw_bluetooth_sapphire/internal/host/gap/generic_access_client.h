@@ -10,15 +10,17 @@
 
 namespace bt::gap::internal {
 
-// This is a helper for reading characteristics of a remote Generic Access GATT service.
-// Characteristics are not cached and read requests are not multiplexed because this is already
-// taken care of in gatt::RemoteService.
-// Destroying GenericAccessClient will cancel any read requests and callbacks will not be called.
+// This is a helper for reading characteristics of a remote Generic Access GATT
+// service. Characteristics are not cached and read requests are not multiplexed
+// because this is already taken care of in gatt::RemoteService. Destroying
+// GenericAccessClient will cancel any read requests and callbacks will not be
+// called.
 class GenericAccessClient : private WeakSelf<GenericAccessClient> {
  public:
   // |peer_id| is the id of the peer serving the service.
   // The UUID of |generic_access_service| must be kGenericAccessService.
-  GenericAccessClient(PeerId peer_id, gatt::RemoteService::WeakPtr generic_access_service);
+  GenericAccessClient(PeerId peer_id,
+                      gatt::RemoteService::WeakPtr generic_access_service);
 
   // Discover and read the device name characteristic, if present.
   using DeviceNameCallback = fit::callback<void(att::Result<std::string>)>;
@@ -28,10 +30,12 @@ class GenericAccessClient : private WeakSelf<GenericAccessClient> {
   using AppearanceCallback = fit::callback<void(att::Result<uint16_t>)>;
   void ReadAppearance(AppearanceCallback callback);
 
-  // Discover and read the peripheral preferred connections characteristic, if present.
-  using ConnectionParametersCallback =
-      fit::callback<void(att::Result<hci_spec::LEPreferredConnectionParameters>)>;
-  void ReadPeripheralPreferredConnectionParameters(ConnectionParametersCallback callback);
+  // Discover and read the peripheral preferred connections characteristic, if
+  // present.
+  using ConnectionParametersCallback = fit::callback<void(
+      att::Result<hci_spec::LEPreferredConnectionParameters>)>;
+  void ReadPeripheralPreferredConnectionParameters(
+      ConnectionParametersCallback callback);
 
  private:
   gatt::RemoteService::WeakPtr service_;

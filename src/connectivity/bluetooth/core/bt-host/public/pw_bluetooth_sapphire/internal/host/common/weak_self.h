@@ -14,12 +14,12 @@
 template <typename T>
 class DynamicWeakManager;
 
-// WeakRef is an intrusively-counted reference to an object that may or may not still exist.
-// Check is_alive() before using the get() function to get a reference to
-// the object.
+// WeakRef is an intrusively-counted reference to an object that may or may not
+// still exist. Check is_alive() before using the get() function to get a
+// reference to the object.
 //
-// This is not thread-safe: get() must be used on the thread the WeakPtr was created on
-// (but can be passed through other threads while not being used)
+// This is not thread-safe: get() must be used on the thread the WeakPtr was
+// created on (but can be passed through other threads while not being used)
 class WeakRef : public pw::RefCounted<WeakRef> {
  public:
   ~WeakRef() = default;
@@ -48,16 +48,17 @@ class WeakRef : public pw::RefCounted<WeakRef> {
 
   explicit WeakRef(void* ptr) : ptr_(ptr) {}
 
-  // Pointer to the existent object if it is alive, otherwise a nullptr. We use a void* to avoid
-  // templating and to avoid having separate variables for the flag and the pointer. Avoiding
-  // templating enables us to support upcasting, as WeakRef type remains the same for the upcasted
-  // WeakPtr.
+  // Pointer to the existent object if it is alive, otherwise a nullptr. We use
+  // a void* to avoid templating and to avoid having separate variables for the
+  // flag and the pointer. Avoiding templating enables us to support upcasting,
+  // as WeakRef type remains the same for the upcasted WeakPtr.
   void* ptr_;
 };
 
-// RecyclingWeakRef is a version of WeakRef which avoids deletion after the last count is
-// destructed, instead marking itself as not in use, for reuse by a WeakManager that
-// maintains a pool of RecyclingWeakRefs for static memory usage.
+// RecyclingWeakRef is a version of WeakRef which avoids deletion after the last
+// count is destructed, instead marking itself as not in use, for reuse by a
+// WeakManager that maintains a pool of RecyclingWeakRefs for static memory
+// usage.
 //
 // For an example, see OnlyTwoStaticManager in the unit tests for WeakSelf.
 class RecyclingWeakRef : public pw::Recyclable<RecyclingWeakRef>,
@@ -109,16 +110,18 @@ class RecyclingWeakRef : public pw::Recyclable<RecyclingWeakRef>,
   void* ptr_;
 };
 
-// Default Manager for Weak Pointers. Each object that derives from WeakSelf holds one manager
-// object. This indirection is used to enable shared static memory weak pointers across multiple
-// copies of the same class of objects.
+// Default Manager for Weak Pointers. Each object that derives from WeakSelf
+// holds one manager object. This indirection is used to enable shared static
+// memory weak pointers across multiple copies of the same class of objects.
 //
-// The default manager allocates a single weak pointer for each object that acquires at least one
-// weak reference, and holds the weak reference alive until the object referenced is destroyed.
+// The default manager allocates a single weak pointer for each object that
+// acquires at least one weak reference, and holds the weak reference alive
+// until the object referenced is destroyed.
 template <typename T>
 class DynamicWeakManager {
  public:
-  explicit DynamicWeakManager(T* self_ptr) : self_ptr_(self_ptr), weak_ptr_ref_(nullptr) {}
+  explicit DynamicWeakManager(T* self_ptr)
+      : self_ptr_(self_ptr), weak_ptr_ref_(nullptr) {}
 
   using RefType = WeakRef;
 
@@ -153,11 +156,13 @@ class WeakPtr {
   explicit WeakPtr(std::nullptr_t) : WeakPtr() {}
 
   // Implicit upcast via copy construction.
-  template <typename U, typename = std::enable_if_t<std::is_convertible_v<U*, T*>>>
+  template <typename U,
+            typename = std::enable_if_t<std::is_convertible_v<U*, T*>>>
   WeakPtr(const WeakPtr<U>& r) : WeakPtr(r.ptr_) {}
 
   // Implicit upcast via move construction.
-  template <typename U, typename = std::enable_if_t<std::is_convertible_v<U*, T*>>>
+  template <typename U,
+            typename = std::enable_if_t<std::is_convertible_v<U*, T*>>>
   WeakPtr(WeakPtr<U>&& r) : WeakPtr(std::move(r.ptr_)) {}
 
   bool is_alive() const { return ptr_ && ptr_->is_alive(); }
@@ -178,15 +183,16 @@ class WeakPtr {
   // Only WeakSelf<T> should have access to the constructor.
   friend class WeakSelf<T, WeakPtrManager>;
 
-  explicit WeakPtr(pw::IntrusivePtr<typename WeakPtrManager::RefType> ptr) : ptr_(std::move(ptr)) {}
+  explicit WeakPtr(pw::IntrusivePtr<typename WeakPtrManager::RefType> ptr)
+      : ptr_(std::move(ptr)) {}
 
   pw::IntrusivePtr<typename WeakPtrManager::RefType> ptr_;
 };
 
-// WeakSelf is a class used to create pointers to an object that must be checked before
-// using - because their target may have been destroyed.  These are termed "weak pointers"
-// and can be vended in one of two ways:
-// (1) inheriting from the WeakSelf class and initializing it on construction,
+// WeakSelf is a class used to create pointers to an object that must be checked
+// before using - because their target may have been destroyed.  These are
+// termed "weak pointers" and can be vended in one of two ways: (1) inheriting
+// from the WeakSelf class and initializing it on construction,
 //
 // class A: WeakSelf<A> {
 //    A() : WeakSelf(this) {}
@@ -200,7 +206,8 @@ class WeakPtr {
 //     }
 //  };
 //
-// (2) making a WeakSelf<T> a member of your class and using it to vend pointers.
+// (2) making a WeakSelf<T> a member of your class and using it to vend
+// pointers.
 //
 // class A {
 //  public:
@@ -214,14 +221,15 @@ class WeakPtr {
 //       return std::move(cb);
 //     }
 //   private:
-//    // Other members should be defined before weak_factory_ so it is destroyed first.
-//    WeakSelf<A> weak_factory_;
+//    // Other members should be defined before weak_factory_ so it is destroyed
+//    first. WeakSelf<A> weak_factory_;
 //  };
 //
-// The first method is preferable if you expect to vend weak pointers outside the class, as the
-// WeakSelf::GetWeakPtr function is public. However, note that with the first method, members of the
-// class will be destroyed before the class is destroyed - it may be undesirable if during
-// destruction, the weak pointer should be considered dead.  This can be mitigated by using
+// The first method is preferable if you expect to vend weak pointers outside
+// the class, as the WeakSelf::GetWeakPtr function is public. However, note that
+// with the first method, members of the class will be destroyed before the
+// class is destroyed - it may be undesirable if during destruction, the weak
+// pointer should be considered dead.  This can be mitigated by using
 // InvalidatePtrs() to invalidate the weak pointers in the destructor.
 template <typename T, typename WeakPtrManager = DynamicWeakManager<T>>
 class WeakSelf {
@@ -231,9 +239,10 @@ class WeakSelf {
 
   using WeakPtr = WeakPtr<T, WeakPtrManager>;
 
-  // Invalidates all the WeakPtrs that have been vended before now (they will return false for
-  // is_alive) and prevents any new pointers from being vended.  This is effectively the same as
-  // calling the destructor, but can be done early.
+  // Invalidates all the WeakPtrs that have been vended before now (they will
+  // return false for is_alive) and prevents any new pointers from being vended.
+  // This is effectively the same as calling the destructor, but can be done
+  // early.
   void InvalidatePtrs() { manager_.InvalidateAll(); }
 
   WeakPtr GetWeakPtr() {

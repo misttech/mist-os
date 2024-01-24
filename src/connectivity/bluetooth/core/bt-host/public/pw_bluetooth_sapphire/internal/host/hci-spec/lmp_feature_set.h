@@ -48,19 +48,25 @@ class LMPFeatureSet {
   }
 
   // Returns true if the feature page |page| has been set.
-  inline bool HasPage(size_t page) const { return (page < kMaxPages) && valid_pages_[page]; }
+  inline bool HasPage(size_t page) const {
+    return (page < kMaxPages) && valid_pages_[page];
+  }
 
   inline std::string ToString() const {
     std::string str;
     for (size_t i = 0; i <= last_page_number_; i++)
       if (HasPage(i))
-        str += bt_lib_cpp_string::StringPrintf("[P%zu: 0x%016lx]", i, features_[i]);
+        str += bt_lib_cpp_string::StringPrintf(
+            "[P%zu: 0x%016lx]", i, features_[i]);
     return str;
   }
 
   inline void set_last_page_number(uint8_t page) {
     if (page > kMaxLastPageNumber) {
-      bt_log(TRACE, "hci", "attempt to set lmp last page number to %u, capping at %u", page,
+      bt_log(TRACE,
+             "hci",
+             "attempt to set lmp last page number to %u, capping at %u",
+             page,
              kMaxLastPageNumber);
       last_page_number_ = kMaxLastPageNumber;
     } else {

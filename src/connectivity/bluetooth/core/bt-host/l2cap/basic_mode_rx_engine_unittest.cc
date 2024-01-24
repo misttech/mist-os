@@ -22,16 +22,24 @@ TEST(BasicModeRxEngineTest, ProcessPduReturnsSdu) {
   const StaticByteBuffer payload('h', 'e', 'l', 'l', 'o');
   const auto sdu = BasicModeRxEngine().ProcessPdu(
       Fragmenter(kTestHandle)
-          .BuildFrame(kTestChannelId, payload, FrameCheckSequenceOption::kNoFcs));
+          .BuildFrame(
+              kTestChannelId, payload, FrameCheckSequenceOption::kNoFcs));
   ASSERT_TRUE(sdu);
   EXPECT_TRUE(ContainersEqual(payload, *sdu));
 }
 
 TEST(BasicModeRxEngineTest, ProcessPduCanHandleZeroBytePayload) {
-  const StaticByteBuffer byte_buf(0x01, 0x00, 0x04, 0x00,  // ACL data header
-                                  0x00, 0x00, 0xFF, 0xFF   // Basic L2CAP header
+  const StaticByteBuffer byte_buf(0x01,
+                                  0x00,
+                                  0x04,
+                                  0x00,  // ACL data header
+                                  0x00,
+                                  0x00,
+                                  0xFF,
+                                  0xFF  // Basic L2CAP header
   );
-  auto hci_packet = hci::ACLDataPacket::New(byte_buf.size() - sizeof(hci_spec::ACLDataHeader));
+  auto hci_packet = hci::ACLDataPacket::New(byte_buf.size() -
+                                            sizeof(hci_spec::ACLDataHeader));
   hci_packet->mutable_view()->mutable_data().Write(byte_buf);
   hci_packet->InitializeFromBuffer();
 
@@ -44,7 +52,8 @@ TEST(BasicModeRxEngineTest, ProcessPduCanHandleZeroBytePayload) {
   ASSERT_EQ(1u, result.pdu->fragment_count());
   ASSERT_EQ(0u, result.pdu->length());
 
-  const ByteBufferPtr sdu = BasicModeRxEngine().ProcessPdu(std::move(*result.pdu));
+  const ByteBufferPtr sdu =
+      BasicModeRxEngine().ProcessPdu(std::move(*result.pdu));
   ASSERT_TRUE(sdu);
   EXPECT_EQ(0u, sdu->size());
 }

@@ -40,10 +40,13 @@ class Client {
   //   - when no more services remain, the result_cb status will be
   //     HostError::kNotFound. The return value is ignored.
   using SearchResultFunction = fit::function<bool(
-      fit::result<Error<>, std::reference_wrapper<const std::map<AttributeId, DataElement>>>)>;
-  virtual void ServiceSearchAttributes(std::unordered_set<UUID> search_pattern,
-                                       const std::unordered_set<AttributeId>& req_attributes,
-                                       SearchResultFunction result_cb) = 0;
+      fit::result<
+          Error<>,
+          std::reference_wrapper<const std::map<AttributeId, DataElement>>>)>;
+  virtual void ServiceSearchAttributes(
+      std::unordered_set<UUID> search_pattern,
+      const std::unordered_set<AttributeId>& req_attributes,
+      SearchResultFunction result_cb) = 0;
 };
 
 }  // namespace bt::sdp

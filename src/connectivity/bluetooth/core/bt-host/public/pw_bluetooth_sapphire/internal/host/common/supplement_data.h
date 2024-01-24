@@ -45,10 +45,13 @@ UUIDElemSize SizeForType(DataType type);
 
 using UuidFunction = fit::function<bool(const UUID&)>;
 
-// Parses `data` into `data.size()` / `uuid_size` UUIDs, calling `func` with each parsed UUID.
-// Returns false without further parsing if `uuid_size` does not evenly divide `data.size()` or
-// `func` returns false for any UUID, otherwise returns true.
-bool ParseUuids(const BufferView& data, UUIDElemSize uuid_size, UuidFunction func);
+// Parses `data` into `data.size()` / `uuid_size` UUIDs, calling `func` with
+// each parsed UUID. Returns false without further parsing if `uuid_size` does
+// not evenly divide `data.size()` or `func` returns false for any UUID,
+// otherwise returns true.
+bool ParseUuids(const BufferView& data,
+                UUIDElemSize uuid_size,
+                UuidFunction func);
 
 // Convenience classes for reading and writing the contents
 // of Advertising Data, Scan Response Data, or Extended Inquiry Response Data

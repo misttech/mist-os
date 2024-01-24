@@ -33,7 +33,8 @@ size_t PDU::Copy(MutableByteBuffer* out_buffer, size_t pos, size_t size) const {
 
   bool found = false;
   size_t offset = 0u;
-  for (auto iter = fragments_.begin(); iter != fragments_.end() && remaining; ++iter) {
+  for (auto iter = fragments_.begin(); iter != fragments_.end() && remaining;
+       ++iter) {
     auto payload = (*iter)->view().payload_data();
 
     // Skip the Basic L2CAP header for the first fragment.
@@ -89,8 +90,8 @@ const BasicHeader& PDU::basic_header() const {
 
 void PDU::AppendFragment(hci::ACLDataPacketPtr fragment) {
   BT_DEBUG_ASSERT(fragment);
-  BT_DEBUG_ASSERT(!is_valid() ||
-                  (*fragments_.begin())->connection_handle() == fragment->connection_handle());
+  BT_DEBUG_ASSERT(!is_valid() || (*fragments_.begin())->connection_handle() ==
+                                     fragment->connection_handle());
   fragments_.push_back(std::move(fragment));
 }
 

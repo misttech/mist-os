@@ -44,18 +44,25 @@ class Peer final {
     kBondNotUpdated,  // No persistent data has changed
     kBondUpdated,     // Persistent data has changed
   };
-  using NotifyListenersCallback = fit::function<void(const Peer&, NotifyListenersChange)>;
+  using NotifyListenersCallback =
+      fit::function<void(const Peer&, NotifyListenersChange)>;
 
-  using StoreLowEnergyBondCallback = fit::function<bool(const sm::PairingData&)>;
+  using StoreLowEnergyBondCallback =
+      fit::function<bool(const sm::PairingData&)>;
 
   // Caller must ensure that callbacks are non-empty.
   // Note that the ctor is only intended for use by PeerCache.
   // Expanding access would a) violate the constraint that all Peers
   // are created through a PeerCache, and b) introduce lifetime issues
   // (do the callbacks outlive |this|?).
-  Peer(NotifyListenersCallback notify_listeners_callback, PeerCallback update_expiry_callback,
-       PeerCallback dual_mode_callback, StoreLowEnergyBondCallback store_le_bond_callback,
-       PeerId identifier, const DeviceAddress& address, bool connectable, PeerMetrics* peer_metrics,
+  Peer(NotifyListenersCallback notify_listeners_callback,
+       PeerCallback update_expiry_callback,
+       PeerCallback dual_mode_callback,
+       StoreLowEnergyBondCallback store_le_bond_callback,
+       PeerId identifier,
+       const DeviceAddress& address,
+       bool connectable,
+       PeerMetrics* peer_metrics,
        pw::async::Dispatcher& dispatcher);
 
   // Connection state as considered by the GAP layer. This may not correspond
@@ -91,11 +98,11 @@ class Peer final {
   };
 
   // This device's name can be read from various sources: LE advertisements,
-  // Inquiry results, Name Discovery Procedure, the GAP service, or from a restored bond.
-  // When a name is read, it should be registered along with its source location.
-  // `RegisterName()` will update the device name attribute if the newly
-  // encountered name's source is of higher priority (lower enum value) than that
-  // of the existing name.
+  // Inquiry results, Name Discovery Procedure, the GAP service, or from a
+  // restored bond. When a name is read, it should be registered along with its
+  // source location. `RegisterName()` will update the device name attribute if
+  // the newly encountered name's source is of higher priority (lower enum
+  // value) than that of the existing name.
   enum NameSource {
     kGenericAccessService = /*highest priority*/ 0,
     kNameDiscoveryProcedure = 1,
@@ -135,20 +142,23 @@ class Peer final {
     BT_DISALLOW_COPY_AND_ASSIGN_ALLOW_MOVE(TokenWithCallback);
   };
 
-  // InitializingConnectionToken is meant to be held by a connection request object. When the
-  // request object is destroyed, the specified callback will be called to update the connection
-  // state.
-  using InitializingConnectionToken = TokenWithCallback<TokenType::kInitializing>;
+  // InitializingConnectionToken is meant to be held by a connection request
+  // object. When the request object is destroyed, the specified callback will
+  // be called to update the connection state.
+  using InitializingConnectionToken =
+      TokenWithCallback<TokenType::kInitializing>;
 
-  // ConnectionToken is meant to be held by a connection object. When the connection object is
-  // destroyed, the specified callback will be called to update the connection state.
+  // ConnectionToken is meant to be held by a connection object. When the
+  // connection object is destroyed, the specified callback will be called to
+  // update the connection state.
   using ConnectionToken = TokenWithCallback<TokenType::kConnection>;
 
   // Contains Peer data that apply only to the LE transport.
   class LowEnergyData final {
    public:
     static constexpr const char* kInspectNodeName = "le_data";
-    static constexpr const char* kInspectConnectionStateName = "connection_state";
+    static constexpr const char* kInspectConnectionStateName =
+        "connection_state";
     static constexpr const char* kInspectAdvertisingDataParseFailureCountName =
         "adv_data_parse_failure_count";
     static constexpr const char* kInspectLastAdvertisingDataParseFailureName =
@@ -158,7 +168,8 @@ class Peer final {
 
     explicit LowEnergyData(Peer* owner);
 
-    void AttachInspect(inspect::Node& parent, std::string name = kInspectNodeName);
+    void AttachInspect(inspect::Node& parent,
+                       std::string name = kInspectNodeName);
 
     // Current connection state.
     ConnectionState connection_state() const {
@@ -167,30 +178,36 @@ class Peer final {
                               : ConnectionState::kNotConnected;
     }
     bool connected() const { return connection_tokens_count_ > 0; }
-    bool initializing() const { return !connected() && initializing_tokens_count_ > 0; }
+    bool initializing() const {
+      return !connected() && initializing_tokens_count_ > 0;
+    }
 
     bool bonded() const { return bond_data_->has_value(); }
     bool should_auto_connect() const {
       return bonded() && auto_conn_behavior_ == AutoConnectBehavior::kAlways;
     }
 
-    // Note that it is possible for `advertising_data()` to return a non-empty buffer while this
-    // method returns std::nullopt, as AdvertisingData is only stored if it is parsed correctly.
-    // TODO(https://fxbug.dev/85368): Migrate clients off of advertising_data, so that we do not
-    // need to store the raw buffer after parsing it.
-    const std::optional<std::reference_wrapper<const AdvertisingData>> parsed_advertising_data()
-        const {
+    // Note that it is possible for `advertising_data()` to return a non-empty
+    // buffer while this method returns std::nullopt, as AdvertisingData is only
+    // stored if it is parsed correctly.
+    // TODO(https://fxbug.dev/85368): Migrate clients off of advertising_data,
+    // so that we do not need to store the raw buffer after parsing it.
+    const std::optional<std::reference_wrapper<const AdvertisingData>>
+    parsed_advertising_data() const {
       if (parsed_adv_data_.is_error()) {
         return std::nullopt;
       }
       return std::cref(parsed_adv_data_.value());
     }
-    // Returns the timestamp associated with the most recently successfully parsed AdvertisingData.
-    std::optional<pw::chrono::SystemClock::time_point> parsed_advertising_data_timestamp() const {
+    // Returns the timestamp associated with the most recently successfully
+    // parsed AdvertisingData.
+    std::optional<pw::chrono::SystemClock::time_point>
+    parsed_advertising_data_timestamp() const {
       return adv_timestamp_;
     }
 
-    // Returns the error, if any, encountered when parsing the advertising data from the peer.
+    // Returns the error, if any, encountered when parsing the advertising data
+    // from the peer.
     std::optional<AdvertisingData::ParseError> advertising_data_error() const {
       if (!parsed_adv_data_.is_error()) {
         return std::nullopt;
@@ -200,7 +217,8 @@ class Peer final {
 
     // Most recently used LE connection parameters. Has no value if the peer
     // has never been connected.
-    const std::optional<hci_spec::LEConnectionParameters>& connection_parameters() const {
+    const std::optional<hci_spec::LEConnectionParameters>&
+    connection_parameters() const {
       return conn_params_;
     }
 
@@ -211,34 +229,44 @@ class Peer final {
     }
 
     // This peer's LE bond data, if bonded.
-    const std::optional<sm::PairingData>& bond_data() const { return *bond_data_; }
+    const std::optional<sm::PairingData>& bond_data() const {
+      return *bond_data_;
+    }
 
     // Bit mask of LE features (Core Spec v5.2, Vol 6, Part B, Section 4.6).
-    std::optional<hci_spec::LESupportedFeatures> features() const { return *features_; }
+    std::optional<hci_spec::LESupportedFeatures> features() const {
+      return *features_;
+    }
 
     // Setters:
 
-    // Overwrites the stored advertising and scan response data with the contents of |data|
-    // and updates the known RSSI and timestamp with the given values.
-    void SetAdvertisingData(int8_t rssi, const ByteBuffer& data,
+    // Overwrites the stored advertising and scan response data with the
+    // contents of |data| and updates the known RSSI and timestamp with the
+    // given values.
+    void SetAdvertisingData(int8_t rssi,
+                            const ByteBuffer& data,
                             pw::chrono::SystemClock::time_point timestamp);
 
-    // Register a connection that is in the request/initializing state. A token is returned that
-    // should be owned until the initialization is complete or canceled. The connection state may be
-    // updated and listeners may be notified. Multiple initializating connections may be registered.
+    // Register a connection that is in the request/initializing state. A token
+    // is returned that should be owned until the initialization is complete or
+    // canceled. The connection state may be updated and listeners may be
+    // notified. Multiple initializating connections may be registered.
     [[nodiscard]] InitializingConnectionToken RegisterInitializingConnection();
 
-    // Register a connection that is in the connected state. A token is returned that should be
-    // owned until the connection is disconnected. The connection state may be updated and listeners
-    // may be notified. Multiple connections may be registered.
+    // Register a connection that is in the connected state. A token is returned
+    // that should be owned until the connection is disconnected. The connection
+    // state may be updated and listeners may be notified. Multiple connections
+    // may be registered.
     [[nodiscard]] ConnectionToken RegisterConnection();
 
     // Modify the current or preferred connection parameters.
     // The device must be connectable.
     void SetConnectionParameters(const hci_spec::LEConnectionParameters& value);
-    void SetPreferredConnectionParameters(const hci_spec::LEPreferredConnectionParameters& value);
+    void SetPreferredConnectionParameters(
+        const hci_spec::LEPreferredConnectionParameters& value);
 
-    // Stores the bond in PeerCache, which updates the address map and calls SetBondData.
+    // Stores the bond in PeerCache, which updates the address map and calls
+    // SetBondData.
     bool StoreBond(const sm::PairingData& bond_data);
 
     // Stores LE bonding data and makes this "bonded."
@@ -250,19 +278,25 @@ class Peer final {
     // is disconnected. Does not notify listeners.
     void ClearBondData();
 
-    void SetFeatures(hci_spec::LESupportedFeatures features) { features_.Set(features); }
+    void SetFeatures(hci_spec::LESupportedFeatures features) {
+      features_.Set(features);
+    }
 
     // Get pieces of the GATT database that must be persisted for bonded peers.
-    const gatt::ServiceChangedCCCPersistedData& get_service_changed_gatt_data() const {
+    const gatt::ServiceChangedCCCPersistedData& get_service_changed_gatt_data()
+        const {
       return service_changed_gatt_data_;
     }
 
     // Set pieces of the GATT database that must be persisted for bonded peers.
-    void set_service_changed_gatt_data(const gatt::ServiceChangedCCCPersistedData& gatt_data) {
+    void set_service_changed_gatt_data(
+        const gatt::ServiceChangedCCCPersistedData& gatt_data) {
       service_changed_gatt_data_ = gatt_data;
     }
 
-    void set_auto_connect_behavior(AutoConnectBehavior behavior) { auto_conn_behavior_ = behavior; }
+    void set_auto_connect_behavior(AutoConnectBehavior behavior) {
+      auto_conn_behavior_ = behavior;
+    }
 
     // TODO(armansito): Store most recently seen random address and identity
     // address separately, once PeerCache can index peers by multiple
@@ -285,16 +319,19 @@ class Peer final {
     uint16_t initializing_tokens_count_ = 0;
     uint16_t connection_tokens_count_ = 0;
     std::optional<hci_spec::LEConnectionParameters> conn_params_;
-    std::optional<hci_spec::LEPreferredConnectionParameters> preferred_conn_params_;
+    std::optional<hci_spec::LEPreferredConnectionParameters>
+        preferred_conn_params_;
 
-    // Buffer containing advertising and scan response data appended to each other.
-    // NOTE: Repeated fields in advertising and scan response data are not deduplicated, so
-    // duplicate entries are possible. It is OK to assume that fields repeated in scan response
-    // data supercede those in the original advertising data when processing fields in order.
+    // Buffer containing advertising and scan response data appended to each
+    // other. NOTE: Repeated fields in advertising and scan response data are
+    // not deduplicated, so duplicate entries are possible. It is OK to assume
+    // that fields repeated in scan response data supercede those in the
+    // original advertising data when processing fields in order.
     DynamicByteBuffer adv_data_buffer_;
     // Time when advertising data was last updated and successfully parsed.
     std::optional<pw::chrono::SystemClock::time_point> adv_timestamp_;
-    // AdvertisingData parsed from the peer's advertising data, if parsed correctly.
+    // AdvertisingData parsed from the peer's advertising data, if parsed
+    // correctly.
     AdvertisingData::ParseResult parsed_adv_data_ =
         fit::error(AdvertisingData::ParseError::kMissing);
 
@@ -316,14 +353,16 @@ class Peer final {
   class BrEdrData final {
    public:
     static constexpr const char* kInspectNodeName = "bredr_data";
-    static constexpr const char* kInspectConnectionStateName = "connection_state";
+    static constexpr const char* kInspectConnectionStateName =
+        "connection_state";
     static constexpr const char* kInspectLinkKeyName = "link_key";
     static constexpr const char* kInspectServicesName = "services";
 
     explicit BrEdrData(Peer* owner);
 
     // Attach peer inspect node as a child node of |parent|.
-    void AttachInspect(inspect::Node& parent, std::string name = kInspectNodeName);
+    void AttachInspect(inspect::Node& parent,
+                       std::string name = kInspectNodeName);
 
     // Current connection state.
     ConnectionState connection_state() const {
@@ -335,7 +374,9 @@ class Peer final {
       }
       return ConnectionState::kNotConnected;
     }
-    bool connected() const { return !initializing() && connection_tokens_count_ > 0; }
+    bool connected() const {
+      return !initializing() && connection_tokens_count_ > 0;
+    }
     bool initializing() const { return initializing_tokens_count_ > 0; }
 
     bool bonded() const { return link_key_.has_value(); }
@@ -344,18 +385,23 @@ class Peer final {
     const DeviceAddress& address() const { return address_; }
 
     // Returns the device class reported by the peer, if it is known.
-    const std::optional<DeviceClass>& device_class() const { return device_class_; }
+    const std::optional<DeviceClass>& device_class() const {
+      return device_class_;
+    }
 
     // Returns the page scan repetition mode of the peer, if known.
-    const std::optional<pw::bluetooth::emboss::PageScanRepetitionMode>& page_scan_repetition_mode()
-        const {
+    const std::optional<pw::bluetooth::emboss::PageScanRepetitionMode>&
+    page_scan_repetition_mode() const {
       return page_scan_rep_mode_;
     }
 
-    // Returns the clock offset reported by the peer, if known and valid. The clock offset will NOT
-    // have the highest-order bit set and the rest represents bits 16-2 of CLKNPeripheral-CLK (see
+    // Returns the clock offset reported by the peer, if known and valid. The
+    // clock offset will NOT have the highest-order bit set and the rest
+    // represents bits 16-2 of CLKNPeripheral-CLK (see
     // hci_spec::kClockOffsetFlagBit in hci/hci_constants.h).
-    const std::optional<uint16_t>& clock_offset() const { return clock_offset_; }
+    const std::optional<uint16_t>& clock_offset() const {
+      return clock_offset_;
+    }
 
     const std::optional<sm::LTK>& link_key() const { return link_key_; }
 
@@ -368,17 +414,21 @@ class Peer final {
     // the Bluetooth controller. Each field should be encoded in little-endian
     // byte order.
     void SetInquiryData(const pw::bluetooth::emboss::InquiryResultView& view);
-    void SetInquiryData(const pw::bluetooth::emboss::InquiryResultWithRssiView& view);
-    void SetInquiryData(const pw::bluetooth::emboss::ExtendedInquiryResultEventView& view);
+    void SetInquiryData(
+        const pw::bluetooth::emboss::InquiryResultWithRssiView& view);
+    void SetInquiryData(
+        const pw::bluetooth::emboss::ExtendedInquiryResultEventView& view);
 
-    // Register a connection that is in the request/initializing state. A token is returned that
-    // should be owned until the initialization is complete or canceled. The connection state may be
-    // updated and listeners may be notified. Multiple initializating connections may be registered.
+    // Register a connection that is in the request/initializing state. A token
+    // is returned that should be owned until the initialization is complete or
+    // canceled. The connection state may be updated and listeners may be
+    // notified. Multiple initializating connections may be registered.
     [[nodiscard]] InitializingConnectionToken RegisterInitializingConnection();
 
-    // Register a connection that is in the connected state. A token is returned that should be
-    // owned until the connection is disconnected. The connection state may be updated and listeners
-    // may be notified. Only one connection may be registered at a time (enforced by assertion).
+    // Register a connection that is in the connected state. A token is returned
+    // that should be owned until the connection is disconnected. The connection
+    // state may be updated and listeners may be notified. Only one connection
+    // may be registered at a time (enforced by assertion).
     [[nodiscard]] ConnectionToken RegisterConnection();
 
     // Stores a link key resulting from Secure Simple Pairing and makes this
@@ -390,8 +440,8 @@ class Peer final {
     // it is disconnected. Does not notify listeners.
     void ClearBondData();
 
-    // Adds a service discovered on the peer, identified by |uuid|, then notifies listeners. No-op
-    // if already present.
+    // Adds a service discovered on the peer, identified by |uuid|, then
+    // notifies listeners. No-op if already present.
     void AddService(UUID uuid);
 
     // TODO(armansito): Store BD_ADDR here, once PeerCache can index
@@ -407,10 +457,12 @@ class Peer final {
 
     // All multi-byte fields must be in little-endian byte order as they were
     // received from the controller.
-    void SetInquiryData(DeviceClass device_class, uint16_t clock_offset,
-                        pw::bluetooth::emboss::PageScanRepetitionMode page_scan_rep_mode,
-                        int8_t rssi = hci_spec::kRSSIInvalid,
-                        const BufferView& eir_data = BufferView());
+    void SetInquiryData(
+        DeviceClass device_class,
+        uint16_t clock_offset,
+        pw::bluetooth::emboss::PageScanRepetitionMode page_scan_rep_mode,
+        int8_t rssi = hci_spec::kRSSIInvalid,
+        const BufferView& eir_data = BufferView());
 
     // Updates the EIR data field and returns true if any properties changed.
     bool SetEirData(const ByteBuffer& data);
@@ -424,7 +476,8 @@ class Peer final {
 
     DeviceAddress address_;
     std::optional<DeviceClass> device_class_;
-    std::optional<pw::bluetooth::emboss::PageScanRepetitionMode> page_scan_rep_mode_;
+    std::optional<pw::bluetooth::emboss::PageScanRepetitionMode>
+        page_scan_rep_mode_;
     std::optional<uint16_t> clock_offset_;
 
     std::optional<sm::LTK> link_key_;
@@ -464,7 +517,8 @@ class Peer final {
   bool identity_known() const { return identity_known_; }
 
   // The LMP version of this device obtained doing discovery.
-  const std::optional<pw::bluetooth::emboss::CoreSpecificationVersion>& version() const {
+  const std::optional<pw::bluetooth::emboss::CoreSpecificationVersion>&
+  version() const {
     return *lmp_version_;
   }
 
@@ -477,7 +531,9 @@ class Peer final {
   }
 
   // Returns true if this device has been bonded over BR/EDR or LE transports.
-  bool bonded() const { return (le() && le()->bonded()) || (bredr() && bredr()->bonded()); }
+  bool bonded() const {
+    return (le() && le()->bonded()) || (bredr() && bredr()->bonded());
+  }
 
   // Returns the most recently observed RSSI for this peer. Returns
   // hci_spec::kRSSIInvalid if the value is unknown.
@@ -485,12 +541,14 @@ class Peer final {
 
   // Gets the user-friendly name of the device, if it's known.
   std::optional<std::string> name() const {
-    return name_->has_value() ? std::optional<std::string>{(*name_)->name} : std::nullopt;
+    return name_->has_value() ? std::optional<std::string>{(*name_)->name}
+                              : std::nullopt;
   }
 
   // Gets the source from which this peer's name was read, if it's known.
   std::optional<NameSource> name_source() const {
-    return name_->has_value() ? std::optional<NameSource>{(*name_)->source} : std::nullopt;
+    return name_->has_value() ? std::optional<NameSource>{(*name_)->source}
+                              : std::nullopt;
   }
 
   // Gets the appearance of the device, if it's known.
@@ -534,10 +592,11 @@ class Peer final {
 
   // The following methods mutate Peer properties:
 
-  // Updates the name of this device if no name is currently set or if the source
-  // of `name` has higher priority than that of the existing name. Returns true if
-  // a name change occurs.  If the name is updated and `notify_listeners` is false,
-  // then listeners will not be notified of an update to this peer.
+  // Updates the name of this device if no name is currently set or if the
+  // source of `name` has higher priority than that of the existing name.
+  // Returns true if a name change occurs.  If the name is updated and
+  // `notify_listeners` is false, then listeners will not be notified of an
+  // update to this peer.
   bool RegisterName(const std::string& name, NameSource source = kUnknown);
 
   // Updates the appearance of this device.
@@ -549,9 +608,12 @@ class Peer final {
   }
 
   // Sets the last available LMP feature |page| number for this device.
-  void set_last_page_number(uint8_t page) { lmp_features_.Mutable()->set_last_page_number(page); }
+  void set_last_page_number(uint8_t page) {
+    lmp_features_.Mutable()->set_last_page_number(page);
+  }
 
-  void set_version(pw::bluetooth::emboss::CoreSpecificationVersion version, uint16_t manufacturer,
+  void set_version(pw::bluetooth::emboss::CoreSpecificationVersion version,
+                   uint16_t manufacturer,
                    uint16_t subversion) {
     lmp_version_.Set(version);
     lmp_manufacturer_.Set(manufacturer);
@@ -563,13 +625,15 @@ class Peer final {
   // with an identity address.
   void set_identity_known(bool value) { identity_known_ = value; }
 
-  // Stores the BR/EDR cross-transport key generated through LE pairing. This method will not mark
-  // the peer as dual-mode if it is not already dual-mode. It will also not overwrite existing
-  // BR/EDR link keys of stronger security than `ct_key`.
+  // Stores the BR/EDR cross-transport key generated through LE pairing. This
+  // method will not mark the peer as dual-mode if it is not already dual-mode.
+  // It will also not overwrite existing BR/EDR link keys of stronger security
+  // than `ct_key`.
   void StoreBrEdrCrossTransportKey(sm::LTK ct_key);
 
-  // Update the connectable status of this peer. This is useful if the peer sends both
-  // non-connectable and connectable advertisements (e.g. when it is a beacon).
+  // Update the connectable status of this peer. This is useful if the peer
+  // sends both non-connectable and connectable advertisements (e.g. when it is
+  // a beacon).
   void set_connectable(bool connectable) { connectable_.Set(connectable); }
 
   // The time when the most recent update occurred. Updates include:
@@ -581,7 +645,9 @@ class Peer final {
   // * BR/EDR bond data updated
   // * BR/EDR services updated
   // * name is updated
-  pw::chrono::SystemClock::time_point last_updated() const { return last_updated_; }
+  pw::chrono::SystemClock::time_point last_updated() const {
+    return last_updated_;
+  }
 
   using WeakPtr = WeakSelf<Peer>::WeakPtr;
   Peer::WeakPtr GetWeakPtr() { return weak_self_.GetWeakPtr(); }
@@ -648,10 +714,12 @@ class Peer final {
   bool identity_known_;
 
   StringInspectable<std::optional<PeerName>> name_;
-  // TODO(https://fxbug.dev/95912): Coordinate this field with the appearance read from advertising
-  // data.
+  // TODO(https://fxbug.dev/95912): Coordinate this field with the appearance
+  // read from advertising data.
   std::optional<uint16_t> appearance_;
-  StringInspectable<std::optional<pw::bluetooth::emboss::CoreSpecificationVersion>> lmp_version_;
+  StringInspectable<
+      std::optional<pw::bluetooth::emboss::CoreSpecificationVersion>>
+      lmp_version_;
   StringInspectable<std::optional<uint16_t>> lmp_manufacturer_;
   std::optional<uint16_t> lmp_subversion_;
   StringInspectable<hci_spec::LMPFeatureSet> lmp_features_;
@@ -659,9 +727,9 @@ class Peer final {
   BoolInspectable<bool> temporary_;
   int8_t rssi_;
 
-  // The spec does not explicitly prohibit LE->BREDR cross-transport key generation for LE-only
-  // peers. This is used to store a CT-generated BR/EDR key for LE-only peers to avoid incorrectly
-  // marking a peer as dual-mode.
+  // The spec does not explicitly prohibit LE->BREDR cross-transport key
+  // generation for LE-only peers. This is used to store a CT-generated BR/EDR
+  // key for LE-only peers to avoid incorrectly marking a peer as dual-mode.
   std::optional<sm::LTK> bredr_cross_transport_key_;
 
   // Data that only applies to the LE transport. This is present if this device

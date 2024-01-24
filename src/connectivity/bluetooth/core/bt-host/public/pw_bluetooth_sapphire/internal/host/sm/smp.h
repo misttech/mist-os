@@ -22,7 +22,8 @@ constexpr uint16_t kNoSecureConnectionsMtu = 23;
 constexpr uint16_t kLeSecureConnectionsMtu = 65;
 
 // SMP Timeout in seconds (Core Spec v5.3, Vol 3, Part H, 3.4)
-constexpr pw::chrono::SystemClock::duration kPairingTimeout = std::chrono::seconds(30);
+constexpr pw::chrono::SystemClock::duration kPairingTimeout =
+    std::chrono::seconds(30);
 
 // The supported encryption key sizes (Core Spec v5.3, Vol 3, Part H, 2.3.4).
 constexpr uint8_t kMinEncryptionKeySize = 7;
@@ -31,8 +32,22 @@ constexpr uint8_t kMaxEncryptionKeySize = 16;
 // These are the sample ltk and random from (Core Spec v5.3, Vol 6, Part C, 1),
 // they are declared so that SecurityManager can reject any peers using them and
 // prevent a mitm.
-constexpr UInt128 kSpecSampleLtk = {0xBF, 0x01, 0xFB, 0x9D, 0x4E, 0xF3, 0xBC, 0x36,
-                                    0xD8, 0x74, 0xF5, 0x39, 0x41, 0x38, 0x68, 0x4C};
+constexpr UInt128 kSpecSampleLtk = {0xBF,
+                                    0x01,
+                                    0xFB,
+                                    0x9D,
+                                    0x4E,
+                                    0xF3,
+                                    0xBC,
+                                    0x36,
+                                    0xD8,
+                                    0x74,
+                                    0xF5,
+                                    0x39,
+                                    0x41,
+                                    0x38,
+                                    0x68,
+                                    0x4C};
 constexpr uint64_t kSpecSampleRandom = 0xABCDEF1234567890;
 
 // The field that identifies the type of a command.

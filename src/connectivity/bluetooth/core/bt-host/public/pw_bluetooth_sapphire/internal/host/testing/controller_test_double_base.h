@@ -22,12 +22,15 @@ class ControllerTestDoubleBase : public pw::bluetooth::Controller {
  public:
   using PwStatusCallback = pw::Callback<void(pw::Status)>;
 
-  using EncodeVendorCommandFunction =
-      fit::function<void(pw::bluetooth::VendorCommandParameters,
-                         pw::Callback<void(pw::Result<pw::span<const std::byte>>)>)>;
+  using EncodeVendorCommandFunction = fit::function<void(
+      pw::bluetooth::VendorCommandParameters,
+      pw::Callback<void(pw::Result<pw::span<const std::byte>>)>)>;
 
-  using ConfigureScoFunction = fit::function<void(ScoCodingFormat, ScoEncoding, ScoSampleRate,
-                                                  fit::callback<void(pw::Status)>)>;
+  using ConfigureScoFunction =
+      fit::function<void(ScoCodingFormat,
+                         ScoEncoding,
+                         ScoSampleRate,
+                         fit::callback<void(pw::Status)>)>;
 
   using ResetScoFunction = fit::function<void(fit::callback<void(pw::Status)>)>;
 
@@ -67,31 +70,45 @@ class ControllerTestDoubleBase : public pw::bluetooth::Controller {
     encode_vendor_command_cb_ = std::move(cb);
   }
 
-  void set_configure_sco_cb(ConfigureScoFunction cb) { configure_sco_cb_ = std::move(cb); }
+  void set_configure_sco_cb(ConfigureScoFunction cb) {
+    configure_sco_cb_ = std::move(cb);
+  }
 
   void set_reset_sco_cb(ResetScoFunction cb) { reset_sco_cb_ = std::move(cb); }
 
   // Controller overrides:
-  void SetEventFunction(DataFunction func) override { event_cb_ = std::move(func); }
+  void SetEventFunction(DataFunction func) override {
+    event_cb_ = std::move(func);
+  }
 
-  void SetReceiveAclFunction(DataFunction func) override { acl_cb_ = std::move(func); }
+  void SetReceiveAclFunction(DataFunction func) override {
+    acl_cb_ = std::move(func);
+  }
 
-  void SetReceiveScoFunction(DataFunction func) override { sco_cb_ = std::move(func); }
+  void SetReceiveScoFunction(DataFunction func) override {
+    sco_cb_ = std::move(func);
+  }
 
-  void Initialize(PwStatusCallback complete_callback, PwStatusCallback error_callback) override;
+  void Initialize(PwStatusCallback complete_callback,
+                  PwStatusCallback error_callback) override;
 
   void Close(PwStatusCallback callback) override;
 
-  void ConfigureSco(ScoCodingFormat coding_format, ScoEncoding encoding, ScoSampleRate sample_rate,
+  void ConfigureSco(ScoCodingFormat coding_format,
+                    ScoEncoding encoding,
+                    ScoSampleRate sample_rate,
                     pw::Callback<void(pw::Status)> callback) override;
 
   void ResetSco(pw::Callback<void(pw::Status)> callback) override;
 
-  void GetFeatures(pw::Callback<void(FeaturesBits)> callback) override { callback(features_); }
+  void GetFeatures(pw::Callback<void(FeaturesBits)> callback) override {
+    callback(features_);
+  }
 
   void EncodeVendorCommand(
       pw::bluetooth::VendorCommandParameters parameters,
-      pw::Callback<void(pw::Result<pw::span<const std::byte>>)> callback) override {
+      pw::Callback<void(pw::Result<pw::span<const std::byte>>)> callback)
+      override {
     if (encode_vendor_command_cb_) {
       encode_vendor_command_cb_(parameters, std::move(callback));
     }

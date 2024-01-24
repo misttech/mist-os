@@ -32,31 +32,37 @@ class Recombiner final {
  public:
   explicit Recombiner(hci_spec::ConnectionHandle handle);
 
-  // Consumes an ACL data fragment. This function may return a complete L2CAP PDU if |fragment|
-  // completes a sequence or constitutes a complete fragment on its own. The |frames_dropped| flag
-  // is set to true if a sequence was dropped due to a recombination error. The most likely causes
-  // for an error are:
+  // Consumes an ACL data fragment. This function may return a complete L2CAP
+  // PDU if |fragment| completes a sequence or constitutes a complete fragment
+  // on its own. The |frames_dropped| flag is set to true if a sequence was
+  // dropped due to a recombination error. The most likely causes for an error
+  // are:
   //
-  //   1. |fragment| contains a malformed L2CAP frame. A packet is treated as malformed if:
-  //      a. Its suspected to be the first fragment in a new recombination sequence and does not
-  //      contain a complete L2CAP basic header.
-  //      b. After a recombination sequence is considered complete, the length of the frame does not
-  //      match the length that was obtained from the L2CAP basic header.
+  //   1. |fragment| contains a malformed L2CAP frame. A packet is treated as
+  //   malformed if:
+  //      a. Its suspected to be the first fragment in a new recombination
+  //      sequence and does not contain a complete L2CAP basic header. b. After
+  //      a recombination sequence is considered complete, the length of the
+  //      frame does not match the length that was obtained from the L2CAP basic
+  //      header.
   //
-  //   2. |fragment| begins a new sequence when a prior incomplete sequence was in progress, in
-  //   which case the incomplete sequence is dropped but |fragment| is retained UNLESS |fragment|
-  //   itself constitues a malformed PDU (as in #1);
+  //   2. |fragment| begins a new sequence when a prior incomplete sequence was
+  //   in progress, in which case the incomplete sequence is dropped but
+  //   |fragment| is retained UNLESS |fragment| itself constitues a malformed
+  //   PDU (as in #1);
   //
-  //   3. |fragment| is a continuing fragment that leaves the sequence in progress in a malformed
-  //   state, in which case the sequence and |fragment| are dropped;
+  //   3. |fragment| is a continuing fragment that leaves the sequence in
+  //   progress in a malformed state, in which case the sequence and |fragment|
+  //   are dropped;
   //
-  // A "true" |frames_dropped| value does not imply that the supplied input |fragment| itself was in
-  // error and it is possible for |frames_dropped| to be true alongside a valid |pdu| value. The
-  // caller can resume calling ConsumeFragment as normal, as the Recombiner can internally recover
-  // from a recombination error.
+  // A "true" |frames_dropped| value does not imply that the supplied input
+  // |fragment| itself was in error and it is possible for |frames_dropped| to
+  // be true alongside a valid |pdu| value. The caller can resume calling
+  // ConsumeFragment as normal, as the Recombiner can internally recover from a
+  // recombination error.
   //
-  // This function panics if |fragment| is not built for the connection handle that this Recombiner
-  // was assigned to.
+  // This function panics if |fragment| is not built for the connection handle
+  // that this Recombiner was assigned to.
   struct Result {
     std::optional<PDU> pdu;
     bool frames_dropped;
@@ -64,19 +70,22 @@ class Recombiner final {
   Result ConsumeFragment(hci::ACLDataPacketPtr fragment);
 
  private:
-  // Handles a new ACL data fragment received when a recombination is not in progress. This may
-  // deliver |fragment| as is if it constitutes a complete PDU, drop it if it's malformed, or
-  // initiate a new recombination if it's partial.
+  // Handles a new ACL data fragment received when a recombination is not in
+  // progress. This may deliver |fragment| as is if it constitutes a complete
+  // PDU, drop it if it's malformed, or initiate a new recombination if it's
+  // partial.
   Result ProcessFirstFragment(hci::ACLDataPacketPtr fragment);
 
   // Clears the current recombination.
   void ClearRecombination();
 
-  // Begins a trace for a new queued fragment, tracking a single new trace ID in |trace_ids_|.
+  // Begins a trace for a new queued fragment, tracking a single new trace ID in
+  // |trace_ids_|.
   void BeginTrace();
 
-  // Ends the traces for all queued fragments. This gets called by ClearRecombination() when a
-  // pending recombination ends (either successfully or in error).
+  // Ends the traces for all queued fragments. This gets called by
+  // ClearRecombination() when a pending recombination ends (either successfully
+  // or in error).
   void EndTraces();
 
   struct Recombination {
@@ -86,8 +95,9 @@ class Recombiner final {
   };
   std::optional<Recombination> recombination_;
 
-  // The handle for the logical link this Recombiner operates on. This field is here purely to
-  // enforce that this Recombiner is used with ACL fragments from the correct link.
+  // The handle for the logical link this Recombiner operates on. This field is
+  // here purely to enforce that this Recombiner is used with ACL fragments from
+  // the correct link.
   const hci_spec::ConnectionHandle handle_;
 
   // Trace flow IDs for the fragments being recombined into a single PDU.

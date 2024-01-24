@@ -15,13 +15,15 @@ namespace bt::l2cap::internal {
 // Implements the L2CAP LE signaling fixed channel.
 class LESignalingChannel final : public SignalingChannel {
  public:
-  LESignalingChannel(Channel::WeakPtr chan, pw::bluetooth::emboss::ConnectionRole role,
+  LESignalingChannel(Channel::WeakPtr chan,
+                     pw::bluetooth::emboss::ConnectionRole role,
                      pw::async::Dispatcher& dispatcher);
   ~LESignalingChannel() override = default;
 
  private:
   // SignalingChannel overrides
-  void DecodeRxUnit(ByteBufferPtr sdu, const SignalingPacketHandler& cb) override;
+  void DecodeRxUnit(ByteBufferPtr sdu,
+                    const SignalingPacketHandler& cb) override;
   bool IsSupportedResponse(CommandCode code) const override;
 
   BT_DISALLOW_COPY_AND_ASSIGN_ALLOW_MOVE(LESignalingChannel);

@@ -28,23 +28,28 @@ class LocalAddressDelegate;
 //     - HCI_LE_Advertising_Report event
 class LegacyLowEnergyScanner : public LowEnergyScanner {
  public:
-  LegacyLowEnergyScanner(LocalAddressDelegate* local_addr_delegate, Transport::WeakPtr hci,
+  LegacyLowEnergyScanner(LocalAddressDelegate* local_addr_delegate,
+                         Transport::WeakPtr hci,
                          pw::async::Dispatcher& pw_dispatcher);
   ~LegacyLowEnergyScanner() override;
 
   // LowEnergyScanner overrides:
-  bool StartScan(const ScanOptions& options, ScanStatusCallback callback) override;
+  bool StartScan(const ScanOptions& options,
+                 ScanStatusCallback callback) override;
   bool StopScan() override;
 
  private:
-  // This represents the data obtained for a scannable advertisement for which a scan response has
-  // not yet been received. Clients are notified for scannable advertisement either when the
-  // corresponding scan response is received or, otherwise, a timeout expires.
+  // This represents the data obtained for a scannable advertisement for which a
+  // scan response has not yet been received. Clients are notified for scannable
+  // advertisement either when the corresponding scan response is received or,
+  // otherwise, a timeout expires.
   class PendingScanResult {
    public:
     // |adv|: Initial advertising data payload.
-    PendingScanResult(LowEnergyScanResult result, const ByteBuffer& adv,
-                      pw::chrono::SystemClock::duration timeout, fit::closure timeout_handler,
+    PendingScanResult(LowEnergyScanResult result,
+                      const ByteBuffer& adv,
+                      pw::chrono::SystemClock::duration timeout,
+                      fit::closure timeout_handler,
                       pw::async::Dispatcher& dispatcher);
 
     // Return the contents of the data.
@@ -67,26 +72,31 @@ class LegacyLowEnergyScanner : public LowEnergyScanner {
     // Buffer large enough to store both advertising and scan response payloads.
     StaticByteBuffer<hci_spec::kMaxLEAdvertisingDataLength * 2> buffer_;
 
-    // Since not all scannable advertisements are always followed by a scan response, we report a
-    // pending result if a scan response is not received within a timeout.
+    // Since not all scannable advertisements are always followed by a scan
+    // response, we report a pending result if a scan response is not received
+    // within a timeout.
     SmartTask timeout_task_;
   };
 
   // Called by StartScan() after the local peer address has been obtained.
-  void StartScanInternal(const DeviceAddress& local_address, const ScanOptions& options,
+  void StartScanInternal(const DeviceAddress& local_address,
+                         const ScanOptions& options,
                          ScanStatusCallback callback);
 
   // Called by StopScan() and by the scan timeout handler set up by StartScan().
   void StopScanInternal(bool stopped);
 
   // Event handler for HCI LE Advertising Report event.
-  CommandChannel::EventCallbackResult OnAdvertisingReportEvent(const EventPacket& event);
+  CommandChannel::EventCallbackResult OnAdvertisingReportEvent(
+      const EventPacket& event);
 
   // Called when a Scan Response is received during an active scan.
-  void HandleScanResponse(const hci_spec::LEAdvertisingReportData& report, int8_t rssi);
+  void HandleScanResponse(const hci_spec::LEAdvertisingReportData& report,
+                          int8_t rssi);
 
   // Notifies observers of a peer that was found.
-  void NotifyPeerFound(const LowEnergyScanResult& result, const ByteBuffer& data);
+  void NotifyPeerFound(const LowEnergyScanResult& result,
+                       const ByteBuffer& data);
 
   // Called when the scan timeout task executes.
   void OnScanPeriodComplete();
@@ -103,8 +113,9 @@ class LegacyLowEnergyScanner : public LowEnergyScanner {
   // The scan period timeout handler for the currently active scan session.
   SmartTask scan_timeout_task_{pw_dispatcher()};
 
-  // Maximum time duration for which a scannable advertisement will be stored and not reported to
-  // clients until a corresponding scan response is received.
+  // Maximum time duration for which a scannable advertisement will be stored
+  // and not reported to clients until a corresponding scan response is
+  // received.
   pw::chrono::SystemClock::duration scan_response_timeout_;
 
   // Our event handler ID for the LE Advertising Report event.
@@ -113,7 +124,8 @@ class LegacyLowEnergyScanner : public LowEnergyScanner {
   // Scannable advertising events for which a Scan Response PDU has not been
   // received. This is accumulated during a discovery procedure and always
   // cleared at the end of the scan period.
-  std::unordered_map<DeviceAddress, std::unique_ptr<PendingScanResult>> pending_results_;
+  std::unordered_map<DeviceAddress, std::unique_ptr<PendingScanResult>>
+      pending_results_;
 
   BT_DISALLOW_COPY_AND_ASSIGN_ALLOW_MOVE(LegacyLowEnergyScanner);
 };

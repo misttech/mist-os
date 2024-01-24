@@ -10,20 +10,24 @@
 
 namespace bt::hci {
 
-// BrEdrConnection represents a BR/EDR logical link connection to a peer. In addition to general
-// link lifetime and encryption procedures provided by AclConnection, BrEdrConnection manages
-// BR/EDR-specific encryption procedures.
+// BrEdrConnection represents a BR/EDR logical link connection to a peer. In
+// addition to general link lifetime and encryption procedures provided by
+// AclConnection, BrEdrConnection manages BR/EDR-specific encryption procedures.
 class BrEdrConnection : public AclConnection, public WeakSelf<BrEdrConnection> {
  public:
-  BrEdrConnection(hci_spec::ConnectionHandle handle, const DeviceAddress& local_address,
-                  const DeviceAddress& peer_address, pw::bluetooth::emboss::ConnectionRole role,
+  BrEdrConnection(hci_spec::ConnectionHandle handle,
+                  const DeviceAddress& local_address,
+                  const DeviceAddress& peer_address,
+                  pw::bluetooth::emboss::ConnectionRole role,
                   const Transport::WeakPtr& hci);
 
   bool StartEncryption() override;
 
-  // Assigns a link key with its corresponding HCI type to this BR/EDR connection. This will be
-  // used for bonding procedures and determines the resulting security properties of the link.
-  void set_link_key(const hci_spec::LinkKey& link_key, hci_spec::LinkKeyType type) {
+  // Assigns a link key with its corresponding HCI type to this BR/EDR
+  // connection. This will be used for bonding procedures and determines the
+  // resulting security properties of the link.
+  void set_link_key(const hci_spec::LinkKey& link_key,
+                    hci_spec::LinkKeyType type) {
     set_ltk(link_key);
     ltk_type_ = type;
   }
@@ -31,7 +35,8 @@ class BrEdrConnection : public AclConnection, public WeakSelf<BrEdrConnection> {
   const std::optional<hci_spec::LinkKeyType>& ltk_type() { return ltk_type_; }
 
  private:
-  void HandleEncryptionStatus(Result<bool /*enabled*/> result, bool key_refreshed) override;
+  void HandleEncryptionStatus(Result<bool /*enabled*/> result,
+                              bool key_refreshed) override;
 
   void HandleEncryptionStatusValidated(Result<bool> result);
 

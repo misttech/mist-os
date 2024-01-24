@@ -14,15 +14,18 @@ AdvertisingReportParser::AdvertisingReportParser(const EventPacket& event)
   BT_DEBUG_ASSERT(event.event_code() == hci_spec::kLEMetaEventCode);
 
   const auto& params = event.params<hci_spec::LEMetaEventParams>();
-  BT_DEBUG_ASSERT(params.subevent_code == hci_spec::kLEAdvertisingReportSubeventCode);
+  BT_DEBUG_ASSERT(params.subevent_code ==
+                  hci_spec::kLEAdvertisingReportSubeventCode);
 
   static const size_t report_packet_header_size =
-      sizeof(hci_spec::LEMetaEventParams) + sizeof(hci_spec::LEAdvertisingReportSubeventParams);
+      sizeof(hci_spec::LEMetaEventParams) +
+      sizeof(hci_spec::LEAdvertisingReportSubeventParams);
 
   BT_DEBUG_ASSERT(event.view().payload_size() <= UINT8_MAX);
   BT_DEBUG_ASSERT(event.view().payload_size() >= report_packet_header_size);
 
-  auto subevent_params = event.subevent_params<hci_spec::LEAdvertisingReportSubeventParams>();
+  auto subevent_params =
+      event.subevent_params<hci_spec::LEAdvertisingReportSubeventParams>();
 
   remaining_reports_ = subevent_params->num_reports;
 
@@ -30,8 +33,8 @@ AdvertisingReportParser::AdvertisingReportParser(const EventPacket& event)
   ptr_ = subevent_params->reports;
 }
 
-bool AdvertisingReportParser::GetNextReport(const hci_spec::LEAdvertisingReportData** out_data,
-                                            int8_t* out_rssi) {
+bool AdvertisingReportParser::GetNextReport(
+    const hci_spec::LEAdvertisingReportData** out_data, int8_t* out_rssi) {
   BT_DEBUG_ASSERT(out_data);
   BT_DEBUG_ASSERT(out_rssi);
 

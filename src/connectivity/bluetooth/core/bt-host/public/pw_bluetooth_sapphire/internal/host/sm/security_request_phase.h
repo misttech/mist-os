@@ -17,24 +17,32 @@
 
 namespace bt::sm {
 
-// SecurityRequestPhase is responsible for sending outbound Security Requests and handling the
-// peer's response. As Security Requests can only be sent from an SMP responder, this class should
-// only be instantiated when acting as the SMP responder.
+// SecurityRequestPhase is responsible for sending outbound Security Requests
+// and handling the peer's response. As Security Requests can only be sent from
+// an SMP responder, this class should only be instantiated when acting as the
+// SMP responder.
 //
-// This class is not thread safe and is meant to be accessed on the thread it was created on. All
-// callbacks will be run by the default dispatcher of an SecurityRequestPhase's creation thread.
+// This class is not thread safe and is meant to be accessed on the thread it
+// was created on. All callbacks will be run by the default dispatcher of an
+// SecurityRequestPhase's creation thread.
 
-class SecurityRequestPhase final : public PairingPhase, public PairingChannelHandler {
+class SecurityRequestPhase final : public PairingPhase,
+                                   public PairingChannelHandler {
  public:
   // Initializes this SecurityRequestPhase with the following parameters:
   //   - |chan|, |listener|: To construct the base PairingPhase
-  //   - |desired_level|: The level of security requested by the SM client to cause this Security
+  //   - |desired_level|: The level of security requested by the SM client to
+  //   cause this Security
   //                      Request.
-  //   - |bondable_mode|: The operating bondable mode of the device (v5.2 Vol. 3 Part C 9.4).
-  //   - |on_pairing_req|: Used to signal the owning class of an inbound Pairing Request triggered
+  //   - |bondable_mode|: The operating bondable mode of the device (v5.2 Vol. 3
+  //   Part C 9.4).
+  //   - |on_pairing_req|: Used to signal the owning class of an inbound Pairing
+  //   Request triggered
   //                       by this Security Request.
-  SecurityRequestPhase(PairingChannel::WeakPtr chan, Listener::WeakPtr listener,
-                       SecurityLevel desired_level, BondableMode bondable_mode,
+  SecurityRequestPhase(PairingChannel::WeakPtr chan,
+                       Listener::WeakPtr listener,
+                       SecurityLevel desired_level,
+                       BondableMode bondable_mode,
                        PairingRequestCallback on_pairing_req);
 
   ~SecurityRequestPhase() override { InvalidatePairingChannelHandler(); }
@@ -42,12 +50,16 @@ class SecurityRequestPhase final : public PairingPhase, public PairingChannelHan
   // PairingPhase override.
   void Start() final;
 
-  SecurityLevel pending_security_request() const { return pending_security_request_; }
+  SecurityLevel pending_security_request() const {
+    return pending_security_request_;
+  }
 
  private:
-  // Makes a Security Request to the peer per V5.0 Vol. 3 Part H 2.4.6. Providing
-  // SecurityLevel::kNoSecurity as |desired_level| is a client error and will assert.
-  void MakeSecurityRequest(SecurityLevel desired_level, BondableMode bondable_mode);
+  // Makes a Security Request to the peer per V5.0 Vol. 3 Part H 2.4.6.
+  // Providing SecurityLevel::kNoSecurity as |desired_level| is a client error
+  // and will assert.
+  void MakeSecurityRequest(SecurityLevel desired_level,
+                           BondableMode bondable_mode);
 
   // Handle pairing requests from the peer.
   void OnPairingRequest(PairingRequestParams req_params);

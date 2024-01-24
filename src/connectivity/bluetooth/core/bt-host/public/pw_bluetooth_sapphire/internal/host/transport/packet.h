@@ -79,14 +79,15 @@ namespace bt::hci {
 //         std::make_unique<FixedBufferPacket<MagicHeader, 255>>();
 //     packet->InitPancakes();
 //
-//   This pattern is used by CommandPacket, EventPacket, ACLDataPacket, and ScoDataPacket
+//   This pattern is used by CommandPacket, EventPacket, ACLDataPacket, and
+//   ScoDataPacket
 //
 // THREAD-SAFETY:
 //
 //   Packet is NOT thread-safe without external locking.
 
-// PacketBase provides basic view functionality. Intended to be inherited by the Packet template and
-// all of its specializations.
+// PacketBase provides basic view functionality. Intended to be inherited by the
+// Packet template and all of its specializations.
 template <typename HeaderType, typename T>
 class PacketBase {
  public:
@@ -96,7 +97,8 @@ class PacketBase {
   MutablePacketView<HeaderType>* mutable_view() { return &view_; }
 
  protected:
-  explicit PacketBase(const MutablePacketView<HeaderType>& view) : view_(view) {}
+  explicit PacketBase(const MutablePacketView<HeaderType>& view)
+      : view_(view) {}
 
  private:
   MutablePacketView<HeaderType> view_;

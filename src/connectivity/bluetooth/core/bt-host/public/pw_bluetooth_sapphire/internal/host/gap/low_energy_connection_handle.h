@@ -19,15 +19,17 @@ class LowEnergyConnectionManager;
 
 class LowEnergyConnectionHandle final {
  public:
-  // |release_cb| will be called when this handle releases its reference to the connection.
-  // |bondable_cb| returns the current bondable mode of the connection. It will only be called while
-  // the connection is active.
-  // |security_mode| returns the current security properties of the connection. It will only be
-  // called while the connection is active.
-  LowEnergyConnectionHandle(PeerId peer_id, hci_spec::ConnectionHandle handle,
-                            fit::callback<void(LowEnergyConnectionHandle*)> release_cb,
-                            fit::function<sm::BondableMode()> bondable_cb,
-                            fit::function<sm::SecurityProperties()> security_cb);
+  // |release_cb| will be called when this handle releases its reference to the
+  // connection. |bondable_cb| returns the current bondable mode of the
+  // connection. It will only be called while the connection is active.
+  // |security_mode| returns the current security properties of the connection.
+  // It will only be called while the connection is active.
+  LowEnergyConnectionHandle(
+      PeerId peer_id,
+      hci_spec::ConnectionHandle handle,
+      fit::callback<void(LowEnergyConnectionHandle*)> release_cb,
+      fit::function<sm::BondableMode()> bondable_cb,
+      fit::function<sm::SecurityProperties()> security_cb);
 
   // Destroying this object releases its reference to the underlying connection.
   ~LowEnergyConnectionHandle();
@@ -39,10 +41,12 @@ class LowEnergyConnectionHandle final {
   bool active() const { return active_; }
 
   // Sets a callback to be called when the underlying connection is closed.
-  void set_closed_callback(fit::closure callback) { closed_cb_ = std::move(callback); }
+  void set_closed_callback(fit::closure callback) {
+    closed_cb_ = std::move(callback);
+  }
 
-  // Returns the operational bondable mode of the underlying connection. See spec V5.1 Vol 3 Part
-  // C Section 9.4 for more details.
+  // Returns the operational bondable mode of the underlying connection. See
+  // spec V5.1 Vol 3 Part C Section 9.4 for more details.
   sm::BondableMode bondable_mode() const;
 
   sm::SecurityProperties security() const;

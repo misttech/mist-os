@@ -24,8 +24,9 @@ std::optional<hci_spec::AdvertisingHandle> AdvertisingHandleMap::MapHandle(
   return handle;
 }
 
-// Convert a DeviceAddress to an AdvertisingHandle. The conversion may fail if there is no
-// AdvertisingHandle currently mapping to the provided device address.
+// Convert a DeviceAddress to an AdvertisingHandle. The conversion may fail if
+// there is no AdvertisingHandle currently mapping to the provided device
+// address.
 std::optional<hci_spec::AdvertisingHandle> AdvertisingHandleMap::GetHandle(
     const DeviceAddress& address) const {
   if (auto it = addr_to_handle_.find(address); it != addr_to_handle_.end()) {
@@ -94,7 +95,8 @@ std::optional<hci_spec::AdvertisingHandle> AdvertisingHandleMap::NextHandle() {
   return handle;
 }
 
-std::optional<hci_spec::AdvertisingHandle> AdvertisingHandleMap::LastUsedHandleForTesting() const {
+std::optional<hci_spec::AdvertisingHandle>
+AdvertisingHandleMap::LastUsedHandleForTesting() const {
   if (last_handle_ > hci_spec::kMaxAdvertisingHandle) {
     return std::nullopt;
   }

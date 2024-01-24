@@ -15,7 +15,8 @@ namespace bt {
 constexpr size_t kUInt256Size = 32;
 using UInt256 = std::array<uint8_t, kUInt256Size>;
 
-static_assert(UInt256().size() == kUInt256Size, "UInt256 must take up exactly 32 bytes");
+static_assert(UInt256().size() == kUInt256Size,
+              "UInt256 must take up exactly 32 bytes");
 
 }  // namespace bt
 

@@ -30,17 +30,18 @@ class Transport final : public WeakSelf<Transport> {
   explicit Transport(std::unique_ptr<pw::bluetooth::Controller> hci,
                      pw::async::Dispatcher& dispatcher);
 
-  // Initializes the command channel and features. The result will be reported via
-  // |complete_callback|.
+  // Initializes the command channel and features. The result will be reported
+  // via |complete_callback|.
   //
-  // NOTE: AclDataChannel and ScoDataChannel will be left uninitialized. They must be
-  // initialized after available data buffer information has been obtained from
-  // the controller (via HCI_Read_Buffer_Size and HCI_LE_Read_Buffer_Size).
+  // NOTE: AclDataChannel and ScoDataChannel will be left uninitialized. They
+  // must be initialized after available data buffer information has been
+  // obtained from the controller (via HCI_Read_Buffer_Size and
+  // HCI_LE_Read_Buffer_Size).
   void Initialize(fit::callback<void(bool /*success*/)> complete_callback);
 
-  // TODO(armansito): hci::Transport::~Transport() should send a shutdown message
-  // to the bt-hci device, which would be responsible for sending HCI_Reset upon
-  // exit.
+  // TODO(armansito): hci::Transport::~Transport() should send a shutdown
+  // message to the bt-hci device, which would be responsible for sending
+  // HCI_Reset upon exit.
   ~Transport();
 
   // Initializes the ACL data channel with the given parameters. Returns false
@@ -70,17 +71,19 @@ class Transport final : public WeakSelf<Transport> {
   // ScoDataChannel is guaranteed to live as long as Transport.
   ScoDataChannel* sco_data_channel() const { return sco_data_channel_.get(); }
 
-  // Set a callback that should be invoked when any one of the underlying channels experiences a
-  // fatal error (e.g. the HCI device has disappeared).
+  // Set a callback that should be invoked when any one of the underlying
+  // channels experiences a fatal error (e.g. the HCI device has disappeared).
   //
-  // When this callback is called the channels will be in an invalid state and packet processing is
-  // no longer guaranteed to work. However, the channel pointers are guaranteed to still be valid.
-  // It is the responsibility of the callback implementation to clean up this Transport instance.
+  // When this callback is called the channels will be in an invalid state and
+  // packet processing is no longer guaranteed to work. However, the channel
+  // pointers are guaranteed to still be valid. It is the responsibility of the
+  // callback implementation to clean up this Transport instance.
   void SetTransportErrorCallback(fit::closure callback);
 
   // Attach hci transport inspect node as a child node of |parent|.
   static constexpr const char* kInspectNodeName = "hci";
-  void AttachInspect(inspect::Node& parent, const std::string& name = kInspectNodeName);
+  void AttachInspect(inspect::Node& parent,
+                     const std::string& name = kInspectNodeName);
 
  private:
   // Callback called by CommandChannel or ACLDataChannel on errors.
@@ -99,9 +102,10 @@ class Transport final : public WeakSelf<Transport> {
   std::optional<pw::bluetooth::Controller::FeaturesBits> features_;
 
   // The HCI command and event flow control handler.
-  // CommandChannel must be constructed first & shut down last because AclDataChannel and
-  // ScoDataChannel depend on it. CommandChannel must live as long as Transport to meet the
-  // expectations of upper layers, which may try to send commands on destruction.
+  // CommandChannel must be constructed first & shut down last because
+  // AclDataChannel and ScoDataChannel depend on it. CommandChannel must live as
+  // long as Transport to meet the expectations of upper layers, which may try
+  // to send commands on destruction.
   std::unique_ptr<CommandChannel> command_channel_;
 
   // The ACL data flow control handler.

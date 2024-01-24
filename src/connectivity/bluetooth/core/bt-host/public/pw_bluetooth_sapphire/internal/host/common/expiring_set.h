@@ -16,11 +16,15 @@ template <typename Key>
 class ExpiringSet {
  public:
   virtual ~ExpiringSet() = default;
-  explicit ExpiringSet(pw::async::Dispatcher& pw_dispatcher) : pw_dispatcher_(pw_dispatcher) {}
+  explicit ExpiringSet(pw::async::Dispatcher& pw_dispatcher)
+      : pw_dispatcher_(pw_dispatcher) {}
 
   // Add an item with the key `k` to the set, until the `expiration` passes.
-  // If the key is already in the set, the expiration is updated, even if it changes the expiration.
-  void add_until(Key k, pw::chrono::SystemClock::time_point expiration) { elems_[k] = expiration; }
+  // If the key is already in the set, the expiration is updated, even if it
+  // changes the expiration.
+  void add_until(Key k, pw::chrono::SystemClock::time_point expiration) {
+    elems_[k] = expiration;
+  }
 
   // Remove an item from the set. Idempotent.
   void remove(const Key& k) { elems_.erase(k); }

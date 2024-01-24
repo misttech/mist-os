@@ -29,7 +29,8 @@ class BrEdrInterrogator final {
   using ResultCallback = hci::ResultCallback<>;
 
   // |peer| must live longer than this object.
-  BrEdrInterrogator(Peer::WeakPtr peer, hci_spec::ConnectionHandle handle,
+  BrEdrInterrogator(Peer::WeakPtr peer,
+                    hci_spec::ConnectionHandle handle,
                     hci::CommandChannel::WeakPtr cmd_channel);
 
   // Cancels the pending interrogation without calling the result callback.
@@ -39,8 +40,8 @@ class BrEdrInterrogator final {
   // fails. Only 1 interrogation may be pending at a time.
   void Start(ResultCallback callback);
 
-  // Abandons interrogation. The result callbacks will be called with result of kCanceled. No-op if
-  // interrogation has already completed.
+  // Abandons interrogation. The result callbacks will be called with result of
+  // kCanceled. No-op if interrogation has already completed.
   void Cancel();
 
  private:
@@ -49,7 +50,8 @@ class BrEdrInterrogator final {
   // Requests the name of the remote peer.
   void QueueRemoteNameRequest();
 
-  // Requests features of the peer, and asks for Extended Features if they exist.
+  // Requests features of the peer, and asks for Extended Features if they
+  // exist.
   void QueueReadRemoteFeatures();
 
   // Reads the extended feature page |page| of the peer.

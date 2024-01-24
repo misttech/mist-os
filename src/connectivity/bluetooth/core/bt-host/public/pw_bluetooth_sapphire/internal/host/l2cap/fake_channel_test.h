@@ -64,16 +64,19 @@ class FakeChannelTest : public pw::async::test::FakeDispatcherFixture {
   //
   // NOTE: This overwrites the underlying FakeChannel's "send callback" by
   // calling FakeChannel::SetSendCallback().
-  bool ReceiveAndExpect(const ByteBuffer& packet, const ByteBuffer& expected_response);
+  bool ReceiveAndExpect(const ByteBuffer& packet,
+                        const ByteBuffer& expected_response);
 
   FakeChannel::WeakPtr fake_chan() const { return fake_chan_; }
 
   void set_fake_chan(FakeChannel::WeakPtr chan) { fake_chan_ = chan; }
 
  private:
-  // Helper that sets a reception expectation callback with |expected| then sends |packet| if it is
-  // not std::nullopt, returning whether |expected| was received when the test loop run until idle.
-  bool ExpectAfterMaybeReceiving(std::optional<BufferView> packet, const ByteBuffer& expected);
+  // Helper that sets a reception expectation callback with |expected| then
+  // sends |packet| if it is not std::nullopt, returning whether |expected| was
+  // received when the test loop run until idle.
+  bool ExpectAfterMaybeReceiving(std::optional<BufferView> packet,
+                                 const ByteBuffer& expected);
 
   FakeChannel::WeakPtr fake_chan_;
 

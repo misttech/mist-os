@@ -70,7 +70,8 @@ class PDU final {
   // NOTE: Use this method wisely as it can be costly. In particular, large
   // values of |pos| will incur a cost (O(pos)) as the underlying fragments need
   // to be traversed to find the initial fragment.
-  size_t Copy(MutableByteBuffer* out_buffer, size_t pos = 0,
+  size_t Copy(MutableByteBuffer* out_buffer,
+              size_t pos = 0,
               size_t size = std::numeric_limits<std::size_t>::max()) const;
 
   // Release ownership of the current fragments, moving them to the caller. Once

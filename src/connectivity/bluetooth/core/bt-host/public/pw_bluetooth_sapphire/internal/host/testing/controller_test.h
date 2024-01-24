@@ -22,9 +22,9 @@ namespace bt::testing {
 class ControllerTestDoubleBase;
 
 // ControllerTest is a test harness intended for tests that rely on HCI
-// transactions. It is templated on ControllerTestDoubleType which must derive from
-// ControllerTestDoubleBase and must be able to send and receive HCI packets over
-// Zircon channels, acting as the controller endpoint of HCI.
+// transactions. It is templated on ControllerTestDoubleType which must derive
+// from ControllerTestDoubleBase and must be able to send and receive HCI
+// packets over Zircon channels, acting as the controller endpoint of HCI.
 //
 // The testing library provides two such types:
 //
@@ -55,11 +55,13 @@ class ControllerTest {
     std::unique_ptr<pw::bluetooth::Controller> controller =
         ControllerTest<ControllerTestDoubleType>::SetUpTestController();
     test_device_->set_features(features);
-    transport_ = std::make_unique<hci::Transport>(std::move(controller), dispatcher_);
+    transport_ =
+        std::make_unique<hci::Transport>(std::move(controller), dispatcher_);
 
     if (initialize_transport) {
       std::optional<bool> init_result;
-      transport_->Initialize([&init_result](bool success) { init_result = success; });
+      transport_->Initialize(
+          [&init_result](bool success) { init_result = success; });
       ASSERT_TRUE(init_result.has_value());
       ASSERT_TRUE(init_result.value());
     }
@@ -71,22 +73,27 @@ class ControllerTest {
   // If data buffer information isn't provided, the ACLDataChannel will be
   // initialized with shared BR/EDR/LE buffers using the constants declared
   // above.
-  bool InitializeACLDataChannel(const hci::DataBufferInfo& bredr_buffer_info = hci::DataBufferInfo(
-                                    kDefaultMaxAclDataPacketLength, kDefaultMaxAclPacketCount),
-                                const hci::DataBufferInfo& le_buffer_info = hci::DataBufferInfo()) {
-    if (!transport_->InitializeACLDataChannel(bredr_buffer_info, le_buffer_info)) {
+  bool InitializeACLDataChannel(
+      const hci::DataBufferInfo& bredr_buffer_info = hci::DataBufferInfo(
+          kDefaultMaxAclDataPacketLength, kDefaultMaxAclPacketCount),
+      const hci::DataBufferInfo& le_buffer_info = hci::DataBufferInfo()) {
+    if (!transport_->InitializeACLDataChannel(bredr_buffer_info,
+                                              le_buffer_info)) {
       return false;
     }
 
-    transport_->acl_data_channel()->SetDataRxHandler(std::bind(
-        &ControllerTest<ControllerTestDoubleType>::OnAclDataReceived, this, std::placeholders::_1));
+    transport_->acl_data_channel()->SetDataRxHandler(
+        std::bind(&ControllerTest<ControllerTestDoubleType>::OnAclDataReceived,
+                  this,
+                  std::placeholders::_1));
 
     return true;
   }
 
   // Directly initializes the SCO data channel.
-  bool InitializeScoDataChannel(const hci::DataBufferInfo& buffer_info = hci::DataBufferInfo(
-                                    kDefaultMaxScoPacketLength, kDefaultMaxScoPacketCount)) {
+  bool InitializeScoDataChannel(
+      const hci::DataBufferInfo& buffer_info = hci::DataBufferInfo(
+          kDefaultMaxScoPacketLength, kDefaultMaxScoPacketCount)) {
     return transport_->InitializeScoDataChannel(buffer_info);
   }
 
@@ -101,16 +108,24 @@ class ControllerTest {
   }
 
   hci::Transport* transport() const { return transport_.get(); }
-  hci::CommandChannel* cmd_channel() const { return transport_->command_channel(); }
-  hci::AclDataChannel* acl_data_channel() const { return transport_->acl_data_channel(); }
-  hci::ScoDataChannel* sco_data_channel() const { return transport_->sco_data_channel(); }
+  hci::CommandChannel* cmd_channel() const {
+    return transport_->command_channel();
+  }
+  hci::AclDataChannel* acl_data_channel() const {
+    return transport_->acl_data_channel();
+  }
+  hci::ScoDataChannel* sco_data_channel() const {
+    return transport_->sco_data_channel();
+  }
 
   // Deletes |test_device_| and resets the pointer.
   void DeleteTestDevice() { test_device_ = nullptr; }
   void DeleteTransport() { transport_ = nullptr; }
 
   // Getters for internal fields frequently used by tests.
-  const typename ControllerTestDoubleType::WeakPtr& test_device() const { return test_device_; }
+  const typename ControllerTestDoubleType::WeakPtr& test_device() const {
+    return test_device_;
+  }
 
  private:
   std::unique_ptr<pw::bluetooth::Controller> SetUpTestController() {
@@ -126,12 +141,13 @@ class ControllerTest {
     if (!data_received_callback_)
       return;
 
-    heap_dispatcher_.Post([this, packet = std::move(data_packet)](pw::async::Context /*ctx*/,
-                                                                  pw::Status status) mutable {
-      if (status.ok()) {
-        data_received_callback_(std::move(packet));
-      }
-    });
+    heap_dispatcher_.Post(
+        [this, packet = std::move(data_packet)](pw::async::Context /*ctx*/,
+                                                pw::Status status) mutable {
+          if (status.ok()) {
+            data_received_callback_(std::move(packet));
+          }
+        });
   }
 
   pw::async::Dispatcher& dispatcher_;
@@ -141,27 +157,36 @@ class ControllerTest {
   hci::ACLPacketHandler data_received_callback_;
 
   BT_DISALLOW_COPY_AND_ASSIGN_ALLOW_MOVE(ControllerTest);
-  static_assert(std::is_base_of<ControllerTestDoubleBase, ControllerTestDoubleType>::value,
-                "TestBase must be used with a derivative of ControllerTestDoubleBase");
+  static_assert(
+      std::is_base_of<ControllerTestDoubleBase,
+                      ControllerTestDoubleType>::value,
+      "TestBase must be used with a derivative of ControllerTestDoubleBase");
 };
 
-// FakeDispatcherControllerTest is a convenience test fixture that initializes ControllerTest with a
-// pw_async FakeDispatcherFixture backend. Only if a different underlying dispatcher is desired
-// (e.g. Zircon TestLoopFixture) should ControllerTest be referenced directly and passed the desired
+// FakeDispatcherControllerTest is a convenience test fixture that initializes
+// ControllerTest with a pw_async FakeDispatcherFixture backend. Only if a
+// different underlying dispatcher is desired (e.g. Zircon TestLoopFixture)
+// should ControllerTest be referenced directly and passed the desired
 // dispatcher, which must implement the pw_async Dispatcher interface.
 //
-// To properly "TearDown" ControllerTest, the Dispatcher must be driven, then DeleteTransport()
-// called.
+// To properly "TearDown" ControllerTest, the Dispatcher must be driven, then
+// DeleteTransport() called.
 template <typename ControllerTestDoubleType>
-class FakeDispatcherControllerTest : public pw::async::test::FakeDispatcherFixture,
-                                     public ControllerTest<ControllerTestDoubleType> {
+class FakeDispatcherControllerTest
+    : public pw::async::test::FakeDispatcherFixture,
+      public ControllerTest<ControllerTestDoubleType> {
  protected:
-  FakeDispatcherControllerTest() : ControllerTest<ControllerTestDoubleType>(dispatcher()) {}
+  FakeDispatcherControllerTest()
+      : ControllerTest<ControllerTestDoubleType>(dispatcher()) {}
 
-  void SetUp() override { SetUp(pw::bluetooth::Controller::FeaturesBits::kHciSco); }
+  void SetUp() override {
+    SetUp(pw::bluetooth::Controller::FeaturesBits::kHciSco);
+  }
 
-  void SetUp(pw::bluetooth::Controller::FeaturesBits features, bool initialize_transport = true) {
-    ControllerTest<ControllerTestDoubleType>::Initialize(features, initialize_transport);
+  void SetUp(pw::bluetooth::Controller::FeaturesBits features,
+             bool initialize_transport = true) {
+    ControllerTest<ControllerTestDoubleType>::Initialize(features,
+                                                         initialize_transport);
     RunUntilIdle();
   }
 

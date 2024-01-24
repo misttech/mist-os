@@ -47,7 +47,9 @@ class DiscoveryFilter final {
   //
   // Passing an empty value for |service_uuids| effectively disables this
   // filter.
-  void set_service_uuids(const std::vector<UUID>& service_uuids) { service_uuids_ = service_uuids; }
+  void set_service_uuids(const std::vector<UUID>& service_uuids) {
+    service_uuids_ = service_uuids;
+  }
   const std::vector<UUID>& service_uuids() const { return service_uuids_; }
 
   // Filter on service data UUIDs.
@@ -57,7 +59,9 @@ class DiscoveryFilter final {
   void set_service_data_uuids(const std::vector<UUID>& service_data_uuids) {
     service_data_uuids_ = service_data_uuids;
   }
-  const std::vector<UUID>& service_data_uuids() const { return service_data_uuids_; }
+  const std::vector<UUID>& service_data_uuids() const {
+    return service_data_uuids_;
+  }
 
   // Sets a string to be matched against the device name. A scan result
   // satisfies this filter if part of the complete or shortened device name
@@ -65,7 +69,9 @@ class DiscoveryFilter final {
   //
   // Passing an empty value for |name_substring| effectively disables this
   // filter.
-  void set_name_substring(const std::string& name_substring) { name_substring_ = name_substring; }
+  void set_name_substring(const std::string& name_substring) {
+    name_substring_ = name_substring;
+  }
   const std::string& name_substring() const { return name_substring_; }
 
   // Sets a device to be filtered by the pathloss (in dBm) of the radio wave.
@@ -100,8 +106,12 @@ class DiscoveryFilter final {
   // Sets a device to be filtered by manufacturer specific data. A scan result
   // satisfies this filter if it advertises manufacturer specific data
   // containing |manufacturer_code|.
-  void set_manufacturer_code(uint16_t manufacturer_code) { manufacturer_code_ = manufacturer_code; }
-  std::optional<uint16_t> manufacturer_code() const { return manufacturer_code_; }
+  void set_manufacturer_code(uint16_t manufacturer_code) {
+    manufacturer_code_ = manufacturer_code;
+  }
+  std::optional<uint16_t> manufacturer_code() const {
+    return manufacturer_code_;
+  }
 
   // Sets this filter up for the "General Discovery" procedure.
   void SetGeneralDiscoveryFlags();
@@ -110,8 +120,10 @@ class DiscoveryFilter final {
   // returns false. |advertising_data| should include scan response data, if
   // any.
   bool MatchLowEnergyResult(
-      const std::optional<std::reference_wrapper<const AdvertisingData>> advertising_data,
-      bool connectable, int8_t rssi) const;
+      const std::optional<std::reference_wrapper<const AdvertisingData>>
+          advertising_data,
+      bool connectable,
+      int8_t rssi) const;
 
   // Clears all the fields of this filter.
   void Reset();

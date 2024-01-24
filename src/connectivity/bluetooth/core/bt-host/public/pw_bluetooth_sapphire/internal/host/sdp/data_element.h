@@ -14,9 +14,9 @@ namespace bt::sdp {
 
 // See Bluetooth Core Spec v5.0, Vol 3, Part B, Sec 3.1.
 //
-// Each Data element has a header and a data field. The header field contains a type descriptor and
-// a size descriptor. The header field is of variable length, which is determined by the size
-// descriptor.
+// Each Data element has a header and a data field. The header field contains a
+// type descriptor and a size descriptor. The header field is of variable
+// length, which is determined by the size descriptor.
 //
 // DataElements all start as the Null type, and then can be set to any type.
 //
@@ -37,8 +37,8 @@ namespace bt::sdp {
 //    BT_DEBUG_ASSERT(!e.Get<uint32_t>());
 class DataElement {
  public:
-  // Type Descriptors. Only the top 5 bits are used, see kTypeMask in Bluetooth Core Spec v5.0, Vol
-  // 3, Part B, Sec 3.2.
+  // Type Descriptors. Only the top 5 bits are used, see kTypeMask in Bluetooth
+  // Core Spec v5.0, Vol 3, Part B, Sec 3.2.
   enum class Type : uint8_t {
     kNull = (0 << 3),
     kUnsignedInt = (1 << 3),
@@ -54,8 +54,9 @@ class DataElement {
 
   // Size Descriptor describing the size of the data following.
   //
-  // Only three bits are used. For 0-4, the size is 2^(value) except in the case of kNull, in which
-  // case the size is 0. otherwise, the size is described in 2^(5-value) extra bytes following.
+  // Only three bits are used. For 0-4, the size is 2^(value) except in the case
+  // of kNull, in which case the size is 0. otherwise, the size is described in
+  // 2^(5-value) extra bytes following.
   //
   // v45.0, Vol 3, Part B, Sec 3.3
   enum class Size : uint8_t {
@@ -80,7 +81,9 @@ class DataElement {
 
   explicit DataElement(const bt::DynamicByteBuffer& value) { Set(value); }
   explicit DataElement(const std::string& value) { Set(value); }
-  explicit DataElement(std::vector<DataElement>&& value) { Set(std::move(value)); }
+  explicit DataElement(std::vector<DataElement>&& value) {
+    Set(std::move(value));
+  }
 
   // Convenience constructor to create a DataElement from a basic type.
   template <typename T>
@@ -91,8 +94,9 @@ class DataElement {
   // Make a deep copy of this element.
   DataElement Clone() const { return DataElement(*this); }
 
-  // Reads a DataElement from |buffer|, replacing any data that was in |elem|. Returns the amount of
-  // space occupied on |buffer| by the data element, or zero if no element could be read.
+  // Reads a DataElement from |buffer|, replacing any data that was in |elem|.
+  // Returns the amount of space occupied on |buffer| by the data element, or
+  // zero if no element could be read.
   static size_t Read(DataElement* elem, const ByteBuffer& buffer);
 
   // The type of this element.
@@ -122,32 +126,35 @@ class DataElement {
   // Sets this element's value to an alternative of the items in |items|
   void SetAlternative(std::vector<DataElement>&& items);
 
-  // Sets this element's value to the provided |url|. No-op if |url| contains invalid URI characters
-  // as defined in [RFC 3986](https://www.rfc-editor.org/rfc/rfc3986).
+  // Sets this element's value to the provided |url|. No-op if |url| contains
+  // invalid URI characters as defined in [RFC
+  // 3986](https://www.rfc-editor.org/rfc/rfc3986).
   void SetUrl(const std::string& url);
 
-  // Get the URL value of this element. Returns an optional without a value if the wrong type is
-  // stored.
+  // Get the URL value of this element. Returns an optional without a value if
+  // the wrong type is stored.
   std::optional<std::string> GetUrl() const;
 
-  // Get the value of this element. Has the same defined specializations as Set(). Returns an
-  // optional without a value if the wrong type is stored.
+  // Get the value of this element. Has the same defined specializations as
+  // Set(). Returns an optional without a value if the wrong type is stored.
   template <typename T>
   std::optional<T> Get() const;
 
-  // Get a pointer to an element in a DataElement Sequence. Returns nullptr if type() is not
-  // kSequence or the index is invalid. Only valid as long as the containing sequence is valid.
+  // Get a pointer to an element in a DataElement Sequence. Returns nullptr if
+  // type() is not kSequence or the index is invalid. Only valid as long as the
+  // containing sequence is valid.
   const DataElement* At(size_t idx) const;
 
-  // Calculates the number of bytes that this DataElement will use if it's written using Write().
+  // Calculates the number of bytes that this DataElement will use if it's
+  // written using Write().
   size_t WriteSize() const;
 
-  // Writes this DataElement to |buffer|. Returns the number of bytes used for writing this
-  // element.
+  // Writes this DataElement to |buffer|. Returns the number of bytes used for
+  // writing this element.
   size_t Write(MutableByteBuffer* buffer) const;
 
-  // Debug representation of this element (including it's type and size) in a string, i.e.
-  // UnsignedInt:4(15) or Sequence { UUID(1567), UUID(2502) }
+  // Debug representation of this element (including it's type and size) in a
+  // string, i.e. UnsignedInt:4(15) or Sequence { UUID(1567), UUID(2502) }
   std::string ToString() const;
 
  private:
@@ -161,7 +168,8 @@ class DataElement {
   Type type_;
   Size size_;
 
-  // Various types for the stored value. These are only valid if the type_ is set correctly.
+  // Various types for the stored value. These are only valid if the type_ is
+  // set correctly.
   int64_t int_value_;
   uint64_t uint_value_;
   UUID uuid_;

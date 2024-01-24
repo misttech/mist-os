@@ -100,7 +100,8 @@ class PeerCache final {
   bool SetAutoConnectBehaviorForIntentionalDisconnect(PeerId peer_id);
 
   // Update a peer's auto-connect behavior appropriately after a successful
-  // connection. Returns false if the address does not match that of a known peer.
+  // connection. Returns false if the address does not match that of a known
+  // peer.
   bool SetAutoConnectBehaviorForSuccessfulConnection(PeerId peer_id);
 
   // If a peer identified by |peer_id| exists and is not connected on either
@@ -120,13 +121,15 @@ class PeerCache final {
 
   // Attach peer cache inspect node as a child node of |parent|.
   static constexpr const char* kInspectNodeName = "peer_cache";
-  void AttachInspect(inspect::Node& parent, std::string name = kInspectNodeName);
+  void AttachInspect(inspect::Node& parent,
+                     std::string name = kInspectNodeName);
 
   // Register a |callback| to be invoked whenever a peer is added or updated.
   CallbackId add_peer_updated_callback(PeerCallback callback);
 
-  // Unregister the callback indicated by |id|. Returns true if the callback was removed
-  // successfully, or false otherwise (e.g. the callback was previously removed).
+  // Unregister the callback indicated by |id|. Returns true if the callback was
+  // removed successfully, or false otherwise (e.g. the callback was previously
+  // removed).
   bool remove_peer_updated_callback(CallbackId id);
 
   // When set, |callback| will be invoked whenever a peer is removed.
@@ -156,16 +159,18 @@ class PeerCache final {
  private:
   class PeerRecord final {
    public:
-    PeerRecord(std::unique_ptr<Peer> peer, fit::closure remove_peer_callback,
+    PeerRecord(std::unique_ptr<Peer> peer,
+               fit::closure remove_peer_callback,
                pw::async::Dispatcher& dispatcher)
         : peer_(std::move(peer)),
           remove_peer_callback_(std::move(remove_peer_callback)),
           removal_task_(dispatcher) {
-      removal_task_.set_function([this](pw::async::Context /*ctx*/, pw::Status status) {
-        if (status.ok() && remove_peer_callback_) {
-          remove_peer_callback_();
-        }
-      });
+      removal_task_.set_function(
+          [this](pw::async::Context /*ctx*/, pw::Status status) {
+            if (status.ok() && remove_peer_callback_) {
+              remove_peer_callback_();
+            }
+          });
     }
 
     // The copy and move ctors cannot be implicitly defined, since
@@ -190,7 +195,9 @@ class PeerCache final {
   // |address|, and connectability (|connectable|). Returns a pointer to the
   // inserted peer or nullptr if |identifier| or |address| already exists in
   // the cache.
-  Peer* InsertPeerRecord(PeerId identifier, const DeviceAddress& address, bool connectable);
+  Peer* InsertPeerRecord(PeerId identifier,
+                         const DeviceAddress& address,
+                         bool connectable);
 
   // Notifies interested parties that |peer| has bonded
   // |peer| must already exist in the cache.

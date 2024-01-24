@@ -28,21 +28,27 @@ class AccessRequirements final {
   AccessRequirements();
 
   // Enables access permission with the given requirements.
-  // |min_enc_key_size| is the required minimum size of the key encrypting the connection in order
-  // to access an attribute where |encryption| is true.
+  // |min_enc_key_size| is the required minimum size of the key encrypting the
+  // connection in order to access an attribute where |encryption| is true.
   //
-  // The default value of |min_enc_key_size| enforces maximum security, but could prevent devices
-  // that don't support |kMaxEncryptionKeySize| from accessing attributes that require encryption.
-  // In practice, it seems that most devices that access such attributes support
-  // |kMaxEncryptionKeySize|.
-  AccessRequirements(bool encryption, bool authentication, bool authorization,
+  // The default value of |min_enc_key_size| enforces maximum security, but
+  // could prevent devices that don't support |kMaxEncryptionKeySize| from
+  // accessing attributes that require encryption. In practice, it seems that
+  // most devices that access such attributes support |kMaxEncryptionKeySize|.
+  AccessRequirements(bool encryption,
+                     bool authentication,
+                     bool authorization,
                      uint8_t min_enc_key_size = sm::kMaxEncryptionKeySize);
 
   // Returns true if this attribute can be accessed at all.
-  inline bool allowed() const { return value_ & kAttributePermissionBitAllowed; }
+  inline bool allowed() const {
+    return value_ & kAttributePermissionBitAllowed;
+  }
 
   // Returns true if no security is required.
-  inline bool allowed_without_security() const { return value_ == kAttributePermissionBitAllowed; }
+  inline bool allowed_without_security() const {
+    return value_ == kAttributePermissionBitAllowed;
+  }
 
   // The following getters return the security requirements of this attribute:
 
@@ -61,7 +67,8 @@ class AccessRequirements final {
   inline uint8_t min_enc_key_size() const { return min_enc_key_size_; }
 
   inline bool operator==(const AccessRequirements& other) const {
-    return value_ == other.value_ && min_enc_key_size_ == other.min_enc_key_size_;
+    return value_ == other.value_ &&
+           min_enc_key_size_ == other.min_enc_key_size_;
   }
 
  private:
@@ -120,27 +127,40 @@ class Attribute final {
   // Handlers for reading and writing and attribute value asynchronously. A
   // handler must call the provided the |result_callback| to signal the end of
   // the operation.
-  using ReadResultCallback =
-      fit::callback<void(fit::result<ErrorCode> status, const ByteBuffer& value)>;
-  using ReadHandler = fit::function<void(PeerId peer_id, Handle handle, uint16_t offset,
+  using ReadResultCallback = fit::callback<void(fit::result<ErrorCode> status,
+                                                const ByteBuffer& value)>;
+  using ReadHandler = fit::function<void(PeerId peer_id,
+                                         Handle handle,
+                                         uint16_t offset,
                                          ReadResultCallback result_callback)>;
-  void set_read_handler(ReadHandler read_handler) { read_handler_ = std::move(read_handler); }
+  void set_read_handler(ReadHandler read_handler) {
+    read_handler_ = std::move(read_handler);
+  }
 
   // An "ATT Write Command" will trigger WriteHandler with
   // a null |result_callback|
-  using WriteResultCallback = fit::callback<void(fit::result<ErrorCode> status)>;
-  using WriteHandler =
-      fit::function<void(PeerId peer_id, Handle handle, uint16_t offset, const ByteBuffer& value,
-                         WriteResultCallback result_callback)>;
-  void set_write_handler(WriteHandler write_handler) { write_handler_ = std::move(write_handler); }
+  using WriteResultCallback =
+      fit::callback<void(fit::result<ErrorCode> status)>;
+  using WriteHandler = fit::function<void(PeerId peer_id,
+                                          Handle handle,
+                                          uint16_t offset,
+                                          const ByteBuffer& value,
+                                          WriteResultCallback result_callback)>;
+  void set_write_handler(WriteHandler write_handler) {
+    write_handler_ = std::move(write_handler);
+  }
 
   // Initiates an asynchronous read of the attribute value. Returns false if
   // this attribute is not dynamic.
-  bool ReadAsync(PeerId peer_id, uint16_t offset, ReadResultCallback result_callback) const;
+  bool ReadAsync(PeerId peer_id,
+                 uint16_t offset,
+                 ReadResultCallback result_callback) const;
 
   // Initiates an asynchronous write of the attribute value. Returns false if
   // this attribute is not dynamic.
-  bool WriteAsync(PeerId peer_id, uint16_t offset, const ByteBuffer& value,
+  bool WriteAsync(PeerId peer_id,
+                  uint16_t offset,
+                  const ByteBuffer& value,
                   WriteResultCallback result_callback) const;
 
  private:
@@ -150,8 +170,11 @@ class Attribute final {
   // The default constructor will construct this attribute as uninitialized.
   // This is intended for STL containers.
   Attribute();
-  Attribute(AttributeGrouping* group, Handle handle, const UUID& type,
-            const AccessRequirements& read_reqs, const AccessRequirements& write_reqs);
+  Attribute(AttributeGrouping* group,
+            Handle handle,
+            const UUID& type,
+            const AccessRequirements& read_reqs,
+            const AccessRequirements& write_reqs);
 
   AttributeGrouping* group_;  // The group that owns this Attribute.
   Handle handle_;
@@ -184,7 +207,9 @@ class AttributeGrouping final {
   //
   // Note: |attr_count| should not cause the group end handle to exceed
   // att::kHandleMax.
-  AttributeGrouping(const UUID& group_type, Handle start_handle, size_t attr_count,
+  AttributeGrouping(const UUID& group_type,
+                    Handle start_handle,
+                    size_t attr_count,
                     const ByteBuffer& decl_value);
 
   // Inserts a new attribute into this grouping using the given parameters and
@@ -193,12 +218,15 @@ class AttributeGrouping final {
   //
   // The caller should not hold on to the returned pointer as the Attribute
   // object is owned and managed by this AttributeGrouping.
-  Attribute* AddAttribute(const UUID& type,
-                          const AccessRequirements& read_reqs = AccessRequirements(),
-                          const AccessRequirements& write_reqs = AccessRequirements());
+  Attribute* AddAttribute(
+      const UUID& type,
+      const AccessRequirements& read_reqs = AccessRequirements(),
+      const AccessRequirements& write_reqs = AccessRequirements());
 
   // Returns true if all attributes of this grouping have been populated.
-  bool complete() const { return attributes_.size() == (end_handle_ - start_handle_ + 1); }
+  bool complete() const {
+    return attributes_.size() == (end_handle_ - start_handle_ + 1);
+  }
 
   const UUID& group_type() const {
     BT_DEBUG_ASSERT(!attributes_.empty());
@@ -218,7 +246,8 @@ class AttributeGrouping final {
 
   bool active() const { return active_; }
   void set_active(bool active) {
-    BT_DEBUG_ASSERT_MSG(complete(), "set_active() called on incomplete grouping!");
+    BT_DEBUG_ASSERT_MSG(complete(),
+                        "set_active() called on incomplete grouping!");
     active_ = active;
   }
 

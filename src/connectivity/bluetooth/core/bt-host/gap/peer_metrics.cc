@@ -20,7 +20,8 @@ void PeerMetrics::AttachInspect(inspect::Node& parent) {
   bredr_bond_success_.AttachInspect(metrics_bredr_node_, "bond_success_events");
   bredr_bond_failure_.AttachInspect(metrics_bredr_node_, "bond_failure_events");
   bredr_connections_.AttachInspect(metrics_bredr_node_, "connection_events");
-  bredr_disconnections_.AttachInspect(metrics_bredr_node_, "disconnection_events");
+  bredr_disconnections_.AttachInspect(metrics_bredr_node_,
+                                      "disconnection_events");
 }
 
 }  // namespace bt::gap
