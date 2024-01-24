@@ -245,7 +245,7 @@ From //products/bringup.gni:14
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:39
+From //BUILD.gn:38
 
 **Current value for `target_cpu = "x64"`:** `[]`
 
@@ -253,7 +253,7 @@ From //products/bringup.gni:14
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:39
+From //BUILD.gn:38
 
 ### base_package_labels
 
@@ -265,19 +265,19 @@ Base) for a product. These packages are never evicted by the system.
 
 **Current value for `target_cpu = "arm64"`:** `[]`
 
-From //out/not-default/args.gn:16
+From //out/not-default/args.gn:17
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:46
+From //BUILD.gn:45
 
 **Current value for `target_cpu = "x64"`:** `[]`
 
-From //out/not-default/args.gn:16
+From //out/not-default/args.gn:17
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:46
+From //BUILD.gn:45
 
 ### basic_env_names
 
@@ -839,7 +839,7 @@ dependency of anything else, and so are "build only".
 
 **Current value for `target_cpu = "arm64"`:** `[]`
 
-From //out/not-default/args.gn:19
+From //out/not-default/args.gn:20
 
 **Overridden from the default:** `[]`
 
@@ -847,7 +847,7 @@ From //build/input/BUILD.gn:9
 
 **Current value for `target_cpu = "x64"`:** `[]`
 
-From //out/not-default/args.gn:19
+From //out/not-default/args.gn:20
 
 **Overridden from the default:** `[]`
 
@@ -912,19 +912,19 @@ pressure arises or other policies indicate.
 
 **Current value for `target_cpu = "arm64"`:** `[]`
 
-From //out/not-default/args.gn:17
+From //out/not-default/args.gn:18
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:55
+From //BUILD.gn:54
 
 **Current value for `target_cpu = "x64"`:** `[]`
 
-From //out/not-default/args.gn:17
+From //out/not-default/args.gn:18
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:55
+From //BUILD.gn:54
 
 ### camera_debug
 
@@ -1505,19 +1505,19 @@ These are always a dependency of the main product assembly.
 
 **Current value for `target_cpu = "arm64"`:** `[]`
 
-From //out/not-default/args.gn:28
+From //out/not-default/args.gn:29
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:102
+From //BUILD.gn:101
 
 **Current value for `target_cpu = "x64"`:** `[]`
 
-From //out/not-default/args.gn:28
+From //out/not-default/args.gn:29
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:102
+From //BUILD.gn:101
 
 ### devicetree_board_driver
 
@@ -2357,7 +2357,7 @@ created at "$dir_pw_third_party/chre".
 
 **Current value for `target_cpu = "arm64"`:** `"//third_party/chre/src"`
 
-From //.gn:112
+From //.gn:113
 
 **Overridden from the default:** `""`
 
@@ -2365,7 +2365,7 @@ From //third_party/pigweed/src/third_party/chre/chre.gni:19
 
 **Current value for `target_cpu = "x64"`:** `"//third_party/chre/src"`
 
-From //.gn:112
+From //.gn:113
 
 **Overridden from the default:** `""`
 
@@ -2531,77 +2531,71 @@ From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:185
 
 From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:186
 
-### dir_pw_tool
-
-**Current value (from the default):** `"//third_party/pigweed/src/pw_tool"`
-
-From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:187
-
 ### dir_pw_toolchain
 
 **Current value (from the default):** `"//third_party/pigweed/src/pw_toolchain"`
 
-From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:188
+From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:187
 
 ### dir_pw_toolchain_bazel
 
 **Current value (from the default):** `"//third_party/pigweed/src/pw_toolchain_bazel"`
 
-From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:189
+From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:188
 
 ### dir_pw_trace
 
 **Current value (from the default):** `"//third_party/pigweed/src/pw_trace"`
 
-From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:190
+From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:189
 
 ### dir_pw_trace_tokenized
 
 **Current value (from the default):** `"//third_party/pigweed/src/pw_trace_tokenized"`
 
-From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:191
+From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:190
 
 ### dir_pw_transfer
 
 **Current value (from the default):** `"//third_party/pigweed/src/pw_transfer"`
 
-From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:192
+From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:191
 
 ### dir_pw_unit_test
 
 **Current value (from the default):** `"//third_party/pigweed/src/pw_unit_test"`
 
-From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:193
+From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:192
 
 ### dir_pw_unit_test_zephyr
 
 **Current value (from the default):** `"//third_party/pigweed/src/pw_unit_test_zephyr"`
 
-From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:194
+From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:193
 
 ### dir_pw_varint
 
 **Current value (from the default):** `"//third_party/pigweed/src/pw_varint"`
 
-From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:195
+From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:194
 
 ### dir_pw_watch
 
 **Current value (from the default):** `"//third_party/pigweed/src/pw_watch"`
 
-From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:196
+From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:195
 
 ### dir_pw_web
 
 **Current value (from the default):** `"//third_party/pigweed/src/pw_web"`
 
-From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:197
+From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:196
 
 ### dir_pw_work_queue
 
 **Current value (from the default):** `"//third_party/pigweed/src/pw_work_queue"`
 
-From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:198
+From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:197
 
 ### disable_boot_tests
 
@@ -2653,7 +2647,7 @@ As these cannot be part of the legacy AIB for a product, there is no
 
 **Current value (from the default):** `[]`
 
-From //BUILD.gn:76
+From //BUILD.gn:75
 
 ### dont_profile_source_files
 
@@ -2679,19 +2673,19 @@ hardware or emulated).
 
 **Current value for `target_cpu = "arm64"`:** `[]`
 
-From //out/not-default/args.gn:24
+From //out/not-default/args.gn:25
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:91
+From //BUILD.gn:90
 
 **Current value for `target_cpu = "x64"`:** `[]`
 
-From //out/not-default/args.gn:24
+From //out/not-default/args.gn:25
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:91
+From //BUILD.gn:90
 
 ### emu_window_size_height
 
@@ -2718,7 +2712,19 @@ The Remote Execution API can be found at:
 https://github.com/bazelbuild/remote-apis
 For an overview of remote execution for Bazel, see https://bazel.build/remote/rbe
 
-**Current value (from the default):** `false`
+**Current value for `target_cpu = "arm64"`:** `false`
+
+From //out/not-default/args.gn:8
+
+**Overridden from the default:** `false`
+
+From //build/bazel/remote_services.gni:14
+
+**Current value for `target_cpu = "x64"`:** `false`
+
+From //out/not-default/args.gn:8
+
+**Overridden from the default:** `false`
 
 From //build/bazel/remote_services.gni:14
 
@@ -3591,19 +3597,19 @@ Fully hermetic tests (both by packaging and at runtime)
 
 **Current value for `target_cpu = "arm64"`:** `[]`
 
-From //out/not-default/args.gn:22
+From //out/not-default/args.gn:23
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:83
+From //BUILD.gn:82
 
 **Current value for `target_cpu = "x64"`:** `[]`
 
-From //out/not-default/args.gn:22
+From //out/not-default/args.gn:23
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:83
+From //BUILD.gn:82
 
 ### host_byteorder
 
@@ -3625,19 +3631,19 @@ These will be added to the build using the host toolchain.
 
 **Current value for `target_cpu = "arm64"`:** `[]`
 
-From //out/not-default/args.gn:8
+From //out/not-default/args.gn:9
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:109
+From //BUILD.gn:108
 
 **Current value for `target_cpu = "x64"`:** `[]`
 
-From //out/not-default/args.gn:8
+From //out/not-default/args.gn:9
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:109
+From //BUILD.gn:108
 
 ### host_os
 
@@ -3652,19 +3658,19 @@ These will be added to the build using the host toolchain.
 
 **Current value for `target_cpu = "arm64"`:** `[]`
 
-From //out/not-default/args.gn:25
+From //out/not-default/args.gn:26
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:97
+From //BUILD.gn:96
 
 **Current value for `target_cpu = "x64"`:** `[]`
 
-From //out/not-default/args.gn:25
+From //out/not-default/args.gn:26
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:97
+From //BUILD.gn:96
 
 ### host_tools_base_path_override
 
@@ -3959,7 +3965,7 @@ Debug build.
 
 **Current value for `target_cpu = "arm64"`:** `false`
 
-From //out/not-default/args.gn:9
+From //out/not-default/args.gn:10
 
 **Overridden from the default:** `true`
 
@@ -3967,7 +3973,7 @@ From //build/config/BUILDCONFIG.gn:25
 
 **Current value for `target_cpu = "x64"`:** `false`
 
-From //out/not-default/args.gn:9
+From //out/not-default/args.gn:10
 
 **Overridden from the default:** `true`
 
@@ -4298,13 +4304,13 @@ From //build/config/BUILDCONFIG.gn:1634
 
 **Current value (from the default):** `[]`
 
-From //BUILD.gn:47
+From //BUILD.gn:46
 
 ### legacy_cache_package_labels
 
 **Current value (from the default):** `[]`
 
-From //BUILD.gn:56
+From //BUILD.gn:55
 
 ### link_rbe_check
 
@@ -4339,7 +4345,7 @@ linkers like `lld`.
 
 **Current value for `target_cpu = "arm64"`:** `false`
 
-From //out/not-default/args.gn:10
+From //out/not-default/args.gn:11
 
 **Overridden from the default:** `false`
 
@@ -4347,7 +4353,7 @@ From //build/toolchain/rbe.gni:197
 
 **Current value for `target_cpu = "x64"`:** `false`
 
-From //out/not-default/args.gn:10
+From //out/not-default/args.gn:11
 
 **Overridden from the default:** `false`
 
@@ -5589,7 +5595,7 @@ To depend on pw_async, add targets to this list.
 
 WARNING: This is experimental and *not* guaranteed to work.
 
-**Current value for `target_cpu = "arm64"`:** `["//third_party/pigweed/backends/pw_async_fuchsia:*", "//third_party/pigweed:*"]`
+**Current value for `target_cpu = "arm64"`:** `["//third_party/pigweed/backends/pw_async_fuchsia:*", "//third_party/pigweed:*", "//src/connectivity/bluetooth/core/bt-host/*"]`
 
 From //.gn:97
 
@@ -5597,7 +5603,7 @@ From //.gn:97
 
 From //third_party/pigweed/src/pw_async/async.gni:21
 
-**Current value for `target_cpu = "x64"`:** `["//third_party/pigweed/backends/pw_async_fuchsia:*", "//third_party/pigweed:*"]`
+**Current value for `target_cpu = "x64"`:** `["//third_party/pigweed/backends/pw_async_fuchsia:*", "//third_party/pigweed:*", "//src/connectivity/bluetooth/core/bt-host/*"]`
 
 From //.gn:97
 
@@ -5611,7 +5617,7 @@ Configures the backend to use for the //pw_async:fake_dispatcher facade.
 
 **Current value for `target_cpu = "arm64"`:** `"//third_party/pigweed/backends/pw_async_fuchsia:fake_dispatcher"`
 
-From //.gn:105
+From //.gn:106
 
 **Overridden from the default:** `""`
 
@@ -5619,7 +5625,7 @@ From //third_party/pigweed/src/pw_async/backend.gni:22
 
 **Current value for `target_cpu = "x64"`:** `"//third_party/pigweed/backends/pw_async_fuchsia:fake_dispatcher"`
 
-From //.gn:105
+From //.gn:106
 
 **Overridden from the default:** `""`
 
@@ -5631,7 +5637,7 @@ Configures the backend to use for the //pw_async:task facade.
 
 **Current value for `target_cpu = "arm64"`:** `"//third_party/pigweed/backends/pw_async_fuchsia:task"`
 
-From //.gn:102
+From //.gn:103
 
 **Overridden from the default:** `""`
 
@@ -5639,7 +5645,7 @@ From //third_party/pigweed/src/pw_async/backend.gni:19
 
 **Current value for `target_cpu = "x64"`:** `"//third_party/pigweed/backends/pw_async_fuchsia:task"`
 
-From //.gn:102
+From //.gn:103
 
 **Overridden from the default:** `""`
 
@@ -5885,7 +5891,7 @@ The configuration for building CHRE.
 
 **Current value for `target_cpu = "arm64"`:** `"//third_party/chre:chre_config"`
 
-From //.gn:113
+From //.gn:114
 
 **Overridden from the default:** `"//third_party/chre:default_chre_config"`
 
@@ -5893,7 +5899,7 @@ From //third_party/pigweed/src/third_party/chre/chre.gni:22
 
 **Current value for `target_cpu = "x64"`:** `"//third_party/chre:chre_config"`
 
-From //.gn:113
+From //.gn:114
 
 **Overridden from the default:** `"//third_party/chre:default_chre_config"`
 
@@ -5905,7 +5911,7 @@ CHRE's platform backend implementation. The default is the Pigweed backend.
 
 **Current value for `target_cpu = "arm64"`:** `"//third_party/pigweed/src/pw_chre:chre_backend"`
 
-From //.gn:114
+From //.gn:115
 
 **Overridden from the default:** `"//pw_chre:chre_backend"`
 
@@ -5913,7 +5919,7 @@ From //third_party/pigweed/src/third_party/chre/chre.gni:28
 
 **Current value for `target_cpu = "x64"`:** `"//third_party/pigweed/src/pw_chre:chre_backend"`
 
-From //.gn:114
+From //.gn:115
 
 **Overridden from the default:** `"//pw_chre:chre_backend"`
 
@@ -5925,7 +5931,7 @@ CHRE's platform backend headers. The default is the Pigweed backend.
 
 **Current value for `target_cpu = "arm64"`:** `"//third_party/pigweed/src/pw_chre:chre_backend_headers"`
 
-From //.gn:116
+From //.gn:117
 
 **Overridden from the default:** `"//pw_chre:chre_backend_headers"`
 
@@ -5933,7 +5939,7 @@ From //third_party/pigweed/src/third_party/chre/chre.gni:25
 
 **Current value for `target_cpu = "x64"`:** `"//third_party/pigweed/src/pw_chre:chre_backend_headers"`
 
-From //.gn:116
+From //.gn:117
 
 **Overridden from the default:** `"//pw_chre:chre_backend_headers"`
 
@@ -6188,25 +6194,25 @@ From //third_party/pigweed/src/pw_log_tokenized/backend.gni:17
 
 A list with all Pigweed modules docs groups. DO NOT SET THIS BUILD ARGUMENT!
 
-**Current value (from the default):** `["//third_party/pigweed/src/docker:docs", "//third_party/pigweed/src/pw_alignment:docs", "//third_party/pigweed/src/pw_allocator:docs", "//third_party/pigweed/src/pw_analog:docs", "//third_party/pigweed/src/pw_android_toolchain:docs", "//third_party/pigweed/src/pw_arduino_build:docs", "//third_party/pigweed/src/pw_assert:docs", "//third_party/pigweed/src/pw_assert_basic:docs", "//third_party/pigweed/src/pw_assert_log:docs", "//third_party/pigweed/src/pw_assert_tokenized:docs", "//third_party/pigweed/src/pw_assert_zephyr:docs", "//third_party/pigweed/src/pw_async:docs", "//third_party/pigweed/src/pw_async2:docs", "//third_party/pigweed/src/pw_async2_basic:docs", "//third_party/pigweed/src/pw_async_basic:docs", "//third_party/pigweed/src/pw_base64:docs", "//third_party/pigweed/src/pw_bloat:docs", "//third_party/pigweed/src/pw_blob_store:docs", "//third_party/pigweed/src/pw_bluetooth:docs", "//third_party/pigweed/src/pw_bluetooth_hci:docs", "//third_party/pigweed/src/pw_bluetooth_profiles:docs", "//third_party/pigweed/src/pw_bluetooth_sapphire:docs", "//third_party/pigweed/src/pw_boot:docs", "//third_party/pigweed/src/pw_boot_cortex_m:docs", "//third_party/pigweed/src/pw_build:docs", "//third_party/pigweed/src/pw_build_info:docs", "//third_party/pigweed/src/pw_build_mcuxpresso:docs", "//third_party/pigweed/src/pw_bytes:docs", "//third_party/pigweed/src/pw_checksum:docs", "//third_party/pigweed/src/pw_chre:docs", "//third_party/pigweed/src/pw_chrono:docs", "//third_party/pigweed/src/pw_chrono_embos:docs", "//third_party/pigweed/src/pw_chrono_freertos:docs", "//third_party/pigweed/src/pw_chrono_rp2040:docs", "//third_party/pigweed/src/pw_chrono_stl:docs", "//third_party/pigweed/src/pw_chrono_threadx:docs", "//third_party/pigweed/src/pw_chrono_zephyr:docs", "//third_party/pigweed/src/pw_cli:docs", "//third_party/pigweed/src/pw_compilation_testing:docs", "//third_party/pigweed/src/pw_console:docs", "//third_party/pigweed/src/pw_containers:docs", "//third_party/pigweed/src/pw_cpu_exception:docs", "//third_party/pigweed/src/pw_cpu_exception_cortex_m:docs", "//third_party/pigweed/src/pw_crypto:docs", "//third_party/pigweed/src/pw_digital_io:docs", "//third_party/pigweed/src/pw_digital_io_mcuxpresso:docs", "//third_party/pigweed/src/pw_digital_io_rp2040:docs", "//third_party/pigweed/src/pw_docgen:docs", "//third_party/pigweed/src/pw_doctor:docs", "//third_party/pigweed/src/pw_emu:docs", "//third_party/pigweed/src/pw_env_setup:docs", "//third_party/pigweed/src/pw_file:docs", "//third_party/pigweed/src/pw_format:docs", "//third_party/pigweed/src/pw_function:docs", "//third_party/pigweed/src/pw_fuzzer:docs", "//third_party/pigweed/src/pw_hdlc:docs", "//third_party/pigweed/src/pw_hex_dump:docs", "//third_party/pigweed/src/pw_i2c:docs", "//third_party/pigweed/src/pw_i2c_linux:docs", "//third_party/pigweed/src/pw_i2c_mcuxpresso:docs", "//third_party/pigweed/src/pw_ide:docs", "//third_party/pigweed/src/pw_interrupt:docs", "//third_party/pigweed/src/pw_interrupt_cortex_m:docs", "//third_party/pigweed/src/pw_interrupt_xtensa:docs", "//third_party/pigweed/src/pw_interrupt_zephyr:docs", "//third_party/pigweed/src/pw_intrusive_ptr:docs", "//third_party/pigweed/src/pw_kvs:docs", "//third_party/pigweed/src/pw_libc:docs", "//third_party/pigweed/src/pw_libcxx:docs", "//third_party/pigweed/src/pw_log:docs", "//third_party/pigweed/src/pw_log_android:docs", "//third_party/pigweed/src/pw_log_basic:docs", "//third_party/pigweed/src/pw_log_null:docs", "//third_party/pigweed/src/pw_log_rpc:docs", "//third_party/pigweed/src/pw_log_string:docs", "//third_party/pigweed/src/pw_log_tokenized:docs", "//third_party/pigweed/src/pw_log_zephyr:docs", "//third_party/pigweed/src/pw_malloc:docs", "//third_party/pigweed/src/pw_malloc_freelist:docs", "//third_party/pigweed/src/pw_malloc_freertos:docs", "//third_party/pigweed/src/pw_metric:docs", "//third_party/pigweed/src/pw_minimal_cpp_stdlib:docs", "//third_party/pigweed/src/pw_module:docs", "//third_party/pigweed/src/pw_multibuf:docs", "//third_party/pigweed/src/pw_multisink:docs", "//third_party/pigweed/src/pw_package:docs", "//third_party/pigweed/src/pw_perf_test:docs", "//third_party/pigweed/src/pw_persistent_ram:docs", "//third_party/pigweed/src/pw_polyfill:docs", "//third_party/pigweed/src/pw_preprocessor:docs", "//third_party/pigweed/src/pw_presubmit:docs", "//third_party/pigweed/src/pw_protobuf:docs", "//third_party/pigweed/src/pw_protobuf_compiler:docs", "//third_party/pigweed/src/pw_random:docs", "//third_party/pigweed/src/pw_result:docs", "//third_party/pigweed/src/pw_ring_buffer:docs", "//third_party/pigweed/src/pw_router:docs", "//third_party/pigweed/src/pw_rpc:docs", "//third_party/pigweed/src/pw_rpc_transport:docs", "//third_party/pigweed/src/pw_rust:docs", "//third_party/pigweed/src/pw_snapshot:docs", "//third_party/pigweed/src/pw_software_update:docs", "//third_party/pigweed/src/pw_span:docs", "//third_party/pigweed/src/pw_spi:docs", "//third_party/pigweed/src/pw_spi_mcuxpresso:docs", "//third_party/pigweed/src/pw_status:docs", "//third_party/pigweed/src/pw_stm32cube_build:docs", "//third_party/pigweed/src/pw_stream:docs", "//third_party/pigweed/src/pw_stream_shmem_mcuxpresso:docs", "//third_party/pigweed/src/pw_stream_uart_linux:docs", "//third_party/pigweed/src/pw_stream_uart_mcuxpresso:docs", "//third_party/pigweed/src/pw_string:docs", "//third_party/pigweed/src/pw_symbolizer:docs", "//third_party/pigweed/src/pw_sync:docs", "//third_party/pigweed/src/pw_sync_baremetal:docs", "//third_party/pigweed/src/pw_sync_embos:docs", "//third_party/pigweed/src/pw_sync_freertos:docs", "//third_party/pigweed/src/pw_sync_stl:docs", "//third_party/pigweed/src/pw_sync_threadx:docs", "//third_party/pigweed/src/pw_sync_zephyr:docs", "//third_party/pigweed/src/pw_sys_io:docs", "//third_party/pigweed/src/pw_sys_io_ambiq_sdk:docs", "//third_party/pigweed/src/pw_sys_io_arduino:docs", "//third_party/pigweed/src/pw_sys_io_baremetal_lm3s6965evb:docs", "//third_party/pigweed/src/pw_sys_io_baremetal_stm32f429:docs", "//third_party/pigweed/src/pw_sys_io_emcraft_sf2:docs", "//third_party/pigweed/src/pw_sys_io_mcuxpresso:docs", "//third_party/pigweed/src/pw_sys_io_rp2040:docs", "//third_party/pigweed/src/pw_sys_io_stdio:docs", "//third_party/pigweed/src/pw_sys_io_stm32cube:docs", "//third_party/pigweed/src/pw_sys_io_zephyr:docs", "//third_party/pigweed/src/pw_system:docs", "//third_party/pigweed/src/pw_target_runner:docs", "//third_party/pigweed/src/pw_thread:docs", "//third_party/pigweed/src/pw_thread_embos:docs", "//third_party/pigweed/src/pw_thread_freertos:docs", "//third_party/pigweed/src/pw_thread_stl:docs", "//third_party/pigweed/src/pw_thread_threadx:docs", "//third_party/pigweed/src/pw_thread_zephyr:docs", "//third_party/pigweed/src/pw_tls_client:docs", "//third_party/pigweed/src/pw_tls_client_boringssl:docs", "//third_party/pigweed/src/pw_tls_client_mbedtls:docs", "//third_party/pigweed/src/pw_tokenizer:docs", "//third_party/pigweed/src/pw_tool:docs", "//third_party/pigweed/src/pw_toolchain:docs", "//third_party/pigweed/src/pw_toolchain_bazel:docs", "//third_party/pigweed/src/pw_trace:docs", "//third_party/pigweed/src/pw_trace_tokenized:docs", "//third_party/pigweed/src/pw_transfer:docs", "//third_party/pigweed/src/pw_unit_test:docs", "//third_party/pigweed/src/pw_unit_test_zephyr:docs", "//third_party/pigweed/src/pw_varint:docs", "//third_party/pigweed/src/pw_watch:docs", "//third_party/pigweed/src/pw_web:docs", "//third_party/pigweed/src/pw_work_queue:docs"]`
+**Current value (from the default):** `["//third_party/pigweed/src/docker:docs", "//third_party/pigweed/src/pw_alignment:docs", "//third_party/pigweed/src/pw_allocator:docs", "//third_party/pigweed/src/pw_analog:docs", "//third_party/pigweed/src/pw_android_toolchain:docs", "//third_party/pigweed/src/pw_arduino_build:docs", "//third_party/pigweed/src/pw_assert:docs", "//third_party/pigweed/src/pw_assert_basic:docs", "//third_party/pigweed/src/pw_assert_log:docs", "//third_party/pigweed/src/pw_assert_tokenized:docs", "//third_party/pigweed/src/pw_assert_zephyr:docs", "//third_party/pigweed/src/pw_async:docs", "//third_party/pigweed/src/pw_async2:docs", "//third_party/pigweed/src/pw_async2_basic:docs", "//third_party/pigweed/src/pw_async_basic:docs", "//third_party/pigweed/src/pw_base64:docs", "//third_party/pigweed/src/pw_bloat:docs", "//third_party/pigweed/src/pw_blob_store:docs", "//third_party/pigweed/src/pw_bluetooth:docs", "//third_party/pigweed/src/pw_bluetooth_hci:docs", "//third_party/pigweed/src/pw_bluetooth_profiles:docs", "//third_party/pigweed/src/pw_bluetooth_sapphire:docs", "//third_party/pigweed/src/pw_boot:docs", "//third_party/pigweed/src/pw_boot_cortex_m:docs", "//third_party/pigweed/src/pw_build:docs", "//third_party/pigweed/src/pw_build_info:docs", "//third_party/pigweed/src/pw_build_mcuxpresso:docs", "//third_party/pigweed/src/pw_bytes:docs", "//third_party/pigweed/src/pw_checksum:docs", "//third_party/pigweed/src/pw_chre:docs", "//third_party/pigweed/src/pw_chrono:docs", "//third_party/pigweed/src/pw_chrono_embos:docs", "//third_party/pigweed/src/pw_chrono_freertos:docs", "//third_party/pigweed/src/pw_chrono_rp2040:docs", "//third_party/pigweed/src/pw_chrono_stl:docs", "//third_party/pigweed/src/pw_chrono_threadx:docs", "//third_party/pigweed/src/pw_chrono_zephyr:docs", "//third_party/pigweed/src/pw_cli:docs", "//third_party/pigweed/src/pw_compilation_testing:docs", "//third_party/pigweed/src/pw_console:docs", "//third_party/pigweed/src/pw_containers:docs", "//third_party/pigweed/src/pw_cpu_exception:docs", "//third_party/pigweed/src/pw_cpu_exception_cortex_m:docs", "//third_party/pigweed/src/pw_crypto:docs", "//third_party/pigweed/src/pw_digital_io:docs", "//third_party/pigweed/src/pw_digital_io_mcuxpresso:docs", "//third_party/pigweed/src/pw_digital_io_rp2040:docs", "//third_party/pigweed/src/pw_docgen:docs", "//third_party/pigweed/src/pw_doctor:docs", "//third_party/pigweed/src/pw_emu:docs", "//third_party/pigweed/src/pw_env_setup:docs", "//third_party/pigweed/src/pw_file:docs", "//third_party/pigweed/src/pw_format:docs", "//third_party/pigweed/src/pw_function:docs", "//third_party/pigweed/src/pw_fuzzer:docs", "//third_party/pigweed/src/pw_hdlc:docs", "//third_party/pigweed/src/pw_hex_dump:docs", "//third_party/pigweed/src/pw_i2c:docs", "//third_party/pigweed/src/pw_i2c_linux:docs", "//third_party/pigweed/src/pw_i2c_mcuxpresso:docs", "//third_party/pigweed/src/pw_ide:docs", "//third_party/pigweed/src/pw_interrupt:docs", "//third_party/pigweed/src/pw_interrupt_cortex_m:docs", "//third_party/pigweed/src/pw_interrupt_xtensa:docs", "//third_party/pigweed/src/pw_interrupt_zephyr:docs", "//third_party/pigweed/src/pw_intrusive_ptr:docs", "//third_party/pigweed/src/pw_kvs:docs", "//third_party/pigweed/src/pw_libc:docs", "//third_party/pigweed/src/pw_libcxx:docs", "//third_party/pigweed/src/pw_log:docs", "//third_party/pigweed/src/pw_log_android:docs", "//third_party/pigweed/src/pw_log_basic:docs", "//third_party/pigweed/src/pw_log_null:docs", "//third_party/pigweed/src/pw_log_rpc:docs", "//third_party/pigweed/src/pw_log_string:docs", "//third_party/pigweed/src/pw_log_tokenized:docs", "//third_party/pigweed/src/pw_log_zephyr:docs", "//third_party/pigweed/src/pw_malloc:docs", "//third_party/pigweed/src/pw_malloc_freelist:docs", "//third_party/pigweed/src/pw_malloc_freertos:docs", "//third_party/pigweed/src/pw_metric:docs", "//third_party/pigweed/src/pw_minimal_cpp_stdlib:docs", "//third_party/pigweed/src/pw_module:docs", "//third_party/pigweed/src/pw_multibuf:docs", "//third_party/pigweed/src/pw_multisink:docs", "//third_party/pigweed/src/pw_package:docs", "//third_party/pigweed/src/pw_perf_test:docs", "//third_party/pigweed/src/pw_persistent_ram:docs", "//third_party/pigweed/src/pw_polyfill:docs", "//third_party/pigweed/src/pw_preprocessor:docs", "//third_party/pigweed/src/pw_presubmit:docs", "//third_party/pigweed/src/pw_protobuf:docs", "//third_party/pigweed/src/pw_protobuf_compiler:docs", "//third_party/pigweed/src/pw_random:docs", "//third_party/pigweed/src/pw_result:docs", "//third_party/pigweed/src/pw_ring_buffer:docs", "//third_party/pigweed/src/pw_router:docs", "//third_party/pigweed/src/pw_rpc:docs", "//third_party/pigweed/src/pw_rpc_transport:docs", "//third_party/pigweed/src/pw_rust:docs", "//third_party/pigweed/src/pw_snapshot:docs", "//third_party/pigweed/src/pw_software_update:docs", "//third_party/pigweed/src/pw_span:docs", "//third_party/pigweed/src/pw_spi:docs", "//third_party/pigweed/src/pw_spi_mcuxpresso:docs", "//third_party/pigweed/src/pw_status:docs", "//third_party/pigweed/src/pw_stm32cube_build:docs", "//third_party/pigweed/src/pw_stream:docs", "//third_party/pigweed/src/pw_stream_shmem_mcuxpresso:docs", "//third_party/pigweed/src/pw_stream_uart_linux:docs", "//third_party/pigweed/src/pw_stream_uart_mcuxpresso:docs", "//third_party/pigweed/src/pw_string:docs", "//third_party/pigweed/src/pw_symbolizer:docs", "//third_party/pigweed/src/pw_sync:docs", "//third_party/pigweed/src/pw_sync_baremetal:docs", "//third_party/pigweed/src/pw_sync_embos:docs", "//third_party/pigweed/src/pw_sync_freertos:docs", "//third_party/pigweed/src/pw_sync_stl:docs", "//third_party/pigweed/src/pw_sync_threadx:docs", "//third_party/pigweed/src/pw_sync_zephyr:docs", "//third_party/pigweed/src/pw_sys_io:docs", "//third_party/pigweed/src/pw_sys_io_ambiq_sdk:docs", "//third_party/pigweed/src/pw_sys_io_arduino:docs", "//third_party/pigweed/src/pw_sys_io_baremetal_lm3s6965evb:docs", "//third_party/pigweed/src/pw_sys_io_baremetal_stm32f429:docs", "//third_party/pigweed/src/pw_sys_io_emcraft_sf2:docs", "//third_party/pigweed/src/pw_sys_io_mcuxpresso:docs", "//third_party/pigweed/src/pw_sys_io_rp2040:docs", "//third_party/pigweed/src/pw_sys_io_stdio:docs", "//third_party/pigweed/src/pw_sys_io_stm32cube:docs", "//third_party/pigweed/src/pw_sys_io_zephyr:docs", "//third_party/pigweed/src/pw_system:docs", "//third_party/pigweed/src/pw_target_runner:docs", "//third_party/pigweed/src/pw_thread:docs", "//third_party/pigweed/src/pw_thread_embos:docs", "//third_party/pigweed/src/pw_thread_freertos:docs", "//third_party/pigweed/src/pw_thread_stl:docs", "//third_party/pigweed/src/pw_thread_threadx:docs", "//third_party/pigweed/src/pw_thread_zephyr:docs", "//third_party/pigweed/src/pw_tls_client:docs", "//third_party/pigweed/src/pw_tls_client_boringssl:docs", "//third_party/pigweed/src/pw_tls_client_mbedtls:docs", "//third_party/pigweed/src/pw_tokenizer:docs", "//third_party/pigweed/src/pw_toolchain:docs", "//third_party/pigweed/src/pw_toolchain_bazel:docs", "//third_party/pigweed/src/pw_trace:docs", "//third_party/pigweed/src/pw_trace_tokenized:docs", "//third_party/pigweed/src/pw_transfer:docs", "//third_party/pigweed/src/pw_unit_test:docs", "//third_party/pigweed/src/pw_unit_test_zephyr:docs", "//third_party/pigweed/src/pw_varint:docs", "//third_party/pigweed/src/pw_watch:docs", "//third_party/pigweed/src/pw_web:docs", "//third_party/pigweed/src/pw_work_queue:docs"]`
 
-From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:523
+From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:520
 
 ### pw_module_tests
 
 A list with all Pigweed module test groups. DO NOT SET THIS BUILD ARGUMENT!
 
-**Current value (from the default):** `["//third_party/pigweed/src/docker:tests", "//third_party/pigweed/src/pw_alignment:tests", "//third_party/pigweed/src/pw_allocator:tests", "//third_party/pigweed/src/pw_analog:tests", "//third_party/pigweed/src/pw_android_toolchain:tests", "//third_party/pigweed/src/pw_arduino_build:tests", "//third_party/pigweed/src/pw_assert:tests", "//third_party/pigweed/src/pw_assert_basic:tests", "//third_party/pigweed/src/pw_assert_log:tests", "//third_party/pigweed/src/pw_assert_tokenized:tests", "//third_party/pigweed/src/pw_assert_zephyr:tests", "//third_party/pigweed/src/pw_async:tests", "//third_party/pigweed/src/pw_async2:tests", "//third_party/pigweed/src/pw_async2_basic:tests", "//third_party/pigweed/src/pw_async_basic:tests", "//third_party/pigweed/src/pw_base64:tests", "//third_party/pigweed/src/pw_bloat:tests", "//third_party/pigweed/src/pw_blob_store:tests", "//third_party/pigweed/src/pw_bluetooth:tests", "//third_party/pigweed/src/pw_bluetooth_hci:tests", "//third_party/pigweed/src/pw_bluetooth_profiles:tests", "//third_party/pigweed/src/pw_bluetooth_sapphire:tests", "//third_party/pigweed/src/pw_boot:tests", "//third_party/pigweed/src/pw_boot_cortex_m:tests", "//third_party/pigweed/src/pw_build:tests", "//third_party/pigweed/src/pw_build_info:tests", "//third_party/pigweed/src/pw_build_mcuxpresso:tests", "//third_party/pigweed/src/pw_bytes:tests", "//third_party/pigweed/src/pw_checksum:tests", "//third_party/pigweed/src/pw_chre:tests", "//third_party/pigweed/src/pw_chrono:tests", "//third_party/pigweed/src/pw_chrono_embos:tests", "//third_party/pigweed/src/pw_chrono_freertos:tests", "//third_party/pigweed/src/pw_chrono_rp2040:tests", "//third_party/pigweed/src/pw_chrono_stl:tests", "//third_party/pigweed/src/pw_chrono_threadx:tests", "//third_party/pigweed/src/pw_chrono_zephyr:tests", "//third_party/pigweed/src/pw_cli:tests", "//third_party/pigweed/src/pw_compilation_testing:tests", "//third_party/pigweed/src/pw_console:tests", "//third_party/pigweed/src/pw_containers:tests", "//third_party/pigweed/src/pw_cpu_exception:tests", "//third_party/pigweed/src/pw_cpu_exception_cortex_m:tests", "//third_party/pigweed/src/pw_crypto:tests", "//third_party/pigweed/src/pw_digital_io:tests", "//third_party/pigweed/src/pw_digital_io_mcuxpresso:tests", "//third_party/pigweed/src/pw_digital_io_rp2040:tests", "//third_party/pigweed/src/pw_docgen:tests", "//third_party/pigweed/src/pw_doctor:tests", "//third_party/pigweed/src/pw_emu:tests", "//third_party/pigweed/src/pw_env_setup:tests", "//third_party/pigweed/src/pw_file:tests", "//third_party/pigweed/src/pw_format:tests", "//third_party/pigweed/src/pw_function:tests", "//third_party/pigweed/src/pw_fuzzer:tests", "//third_party/pigweed/src/pw_hdlc:tests", "//third_party/pigweed/src/pw_hex_dump:tests", "//third_party/pigweed/src/pw_i2c:tests", "//third_party/pigweed/src/pw_i2c_linux:tests", "//third_party/pigweed/src/pw_i2c_mcuxpresso:tests", "//third_party/pigweed/src/pw_ide:tests", "//third_party/pigweed/src/pw_interrupt:tests", "//third_party/pigweed/src/pw_interrupt_cortex_m:tests", "//third_party/pigweed/src/pw_interrupt_xtensa:tests", "//third_party/pigweed/src/pw_interrupt_zephyr:tests", "//third_party/pigweed/src/pw_intrusive_ptr:tests", "//third_party/pigweed/src/pw_kvs:tests", "//third_party/pigweed/src/pw_libc:tests", "//third_party/pigweed/src/pw_libcxx:tests", "//third_party/pigweed/src/pw_log:tests", "//third_party/pigweed/src/pw_log_android:tests", "//third_party/pigweed/src/pw_log_basic:tests", "//third_party/pigweed/src/pw_log_null:tests", "//third_party/pigweed/src/pw_log_rpc:tests", "//third_party/pigweed/src/pw_log_string:tests", "//third_party/pigweed/src/pw_log_tokenized:tests", "//third_party/pigweed/src/pw_log_zephyr:tests", "//third_party/pigweed/src/pw_malloc:tests", "//third_party/pigweed/src/pw_malloc_freelist:tests", "//third_party/pigweed/src/pw_malloc_freertos:tests", "//third_party/pigweed/src/pw_metric:tests", "//third_party/pigweed/src/pw_minimal_cpp_stdlib:tests", "//third_party/pigweed/src/pw_module:tests", "//third_party/pigweed/src/pw_multibuf:tests", "//third_party/pigweed/src/pw_multisink:tests", "//third_party/pigweed/src/pw_package:tests", "//third_party/pigweed/src/pw_perf_test:tests", "//third_party/pigweed/src/pw_persistent_ram:tests", "//third_party/pigweed/src/pw_polyfill:tests", "//third_party/pigweed/src/pw_preprocessor:tests", "//third_party/pigweed/src/pw_presubmit:tests", "//third_party/pigweed/src/pw_protobuf:tests", "//third_party/pigweed/src/pw_protobuf_compiler:tests", "//third_party/pigweed/src/pw_random:tests", "//third_party/pigweed/src/pw_result:tests", "//third_party/pigweed/src/pw_ring_buffer:tests", "//third_party/pigweed/src/pw_router:tests", "//third_party/pigweed/src/pw_rpc:tests", "//third_party/pigweed/src/pw_rpc_transport:tests", "//third_party/pigweed/src/pw_rust:tests", "//third_party/pigweed/src/pw_snapshot:tests", "//third_party/pigweed/src/pw_software_update:tests", "//third_party/pigweed/src/pw_span:tests", "//third_party/pigweed/src/pw_spi:tests", "//third_party/pigweed/src/pw_spi_mcuxpresso:tests", "//third_party/pigweed/src/pw_status:tests", "//third_party/pigweed/src/pw_stm32cube_build:tests", "//third_party/pigweed/src/pw_stream:tests", "//third_party/pigweed/src/pw_stream_shmem_mcuxpresso:tests", "//third_party/pigweed/src/pw_stream_uart_linux:tests", "//third_party/pigweed/src/pw_stream_uart_mcuxpresso:tests", "//third_party/pigweed/src/pw_string:tests", "//third_party/pigweed/src/pw_symbolizer:tests", "//third_party/pigweed/src/pw_sync:tests", "//third_party/pigweed/src/pw_sync_baremetal:tests", "//third_party/pigweed/src/pw_sync_embos:tests", "//third_party/pigweed/src/pw_sync_freertos:tests", "//third_party/pigweed/src/pw_sync_stl:tests", "//third_party/pigweed/src/pw_sync_threadx:tests", "//third_party/pigweed/src/pw_sync_zephyr:tests", "//third_party/pigweed/src/pw_sys_io:tests", "//third_party/pigweed/src/pw_sys_io_ambiq_sdk:tests", "//third_party/pigweed/src/pw_sys_io_arduino:tests", "//third_party/pigweed/src/pw_sys_io_baremetal_lm3s6965evb:tests", "//third_party/pigweed/src/pw_sys_io_baremetal_stm32f429:tests", "//third_party/pigweed/src/pw_sys_io_emcraft_sf2:tests", "//third_party/pigweed/src/pw_sys_io_mcuxpresso:tests", "//third_party/pigweed/src/pw_sys_io_rp2040:tests", "//third_party/pigweed/src/pw_sys_io_stdio:tests", "//third_party/pigweed/src/pw_sys_io_stm32cube:tests", "//third_party/pigweed/src/pw_sys_io_zephyr:tests", "//third_party/pigweed/src/pw_system:tests", "//third_party/pigweed/src/pw_target_runner:tests", "//third_party/pigweed/src/pw_thread:tests", "//third_party/pigweed/src/pw_thread_embos:tests", "//third_party/pigweed/src/pw_thread_freertos:tests", "//third_party/pigweed/src/pw_thread_stl:tests", "//third_party/pigweed/src/pw_thread_threadx:tests", "//third_party/pigweed/src/pw_thread_zephyr:tests", "//third_party/pigweed/src/pw_tls_client:tests", "//third_party/pigweed/src/pw_tls_client_boringssl:tests", "//third_party/pigweed/src/pw_tls_client_mbedtls:tests", "//third_party/pigweed/src/pw_tokenizer:tests", "//third_party/pigweed/src/pw_tool:tests", "//third_party/pigweed/src/pw_toolchain:tests", "//third_party/pigweed/src/pw_toolchain_bazel:tests", "//third_party/pigweed/src/pw_trace:tests", "//third_party/pigweed/src/pw_trace_tokenized:tests", "//third_party/pigweed/src/pw_transfer:tests", "//third_party/pigweed/src/pw_unit_test:tests", "//third_party/pigweed/src/pw_unit_test_zephyr:tests", "//third_party/pigweed/src/pw_varint:tests", "//third_party/pigweed/src/pw_watch:tests", "//third_party/pigweed/src/pw_web:tests", "//third_party/pigweed/src/pw_work_queue:tests"]`
+**Current value (from the default):** `["//third_party/pigweed/src/docker:tests", "//third_party/pigweed/src/pw_alignment:tests", "//third_party/pigweed/src/pw_allocator:tests", "//third_party/pigweed/src/pw_analog:tests", "//third_party/pigweed/src/pw_android_toolchain:tests", "//third_party/pigweed/src/pw_arduino_build:tests", "//third_party/pigweed/src/pw_assert:tests", "//third_party/pigweed/src/pw_assert_basic:tests", "//third_party/pigweed/src/pw_assert_log:tests", "//third_party/pigweed/src/pw_assert_tokenized:tests", "//third_party/pigweed/src/pw_assert_zephyr:tests", "//third_party/pigweed/src/pw_async:tests", "//third_party/pigweed/src/pw_async2:tests", "//third_party/pigweed/src/pw_async2_basic:tests", "//third_party/pigweed/src/pw_async_basic:tests", "//third_party/pigweed/src/pw_base64:tests", "//third_party/pigweed/src/pw_bloat:tests", "//third_party/pigweed/src/pw_blob_store:tests", "//third_party/pigweed/src/pw_bluetooth:tests", "//third_party/pigweed/src/pw_bluetooth_hci:tests", "//third_party/pigweed/src/pw_bluetooth_profiles:tests", "//third_party/pigweed/src/pw_bluetooth_sapphire:tests", "//third_party/pigweed/src/pw_boot:tests", "//third_party/pigweed/src/pw_boot_cortex_m:tests", "//third_party/pigweed/src/pw_build:tests", "//third_party/pigweed/src/pw_build_info:tests", "//third_party/pigweed/src/pw_build_mcuxpresso:tests", "//third_party/pigweed/src/pw_bytes:tests", "//third_party/pigweed/src/pw_checksum:tests", "//third_party/pigweed/src/pw_chre:tests", "//third_party/pigweed/src/pw_chrono:tests", "//third_party/pigweed/src/pw_chrono_embos:tests", "//third_party/pigweed/src/pw_chrono_freertos:tests", "//third_party/pigweed/src/pw_chrono_rp2040:tests", "//third_party/pigweed/src/pw_chrono_stl:tests", "//third_party/pigweed/src/pw_chrono_threadx:tests", "//third_party/pigweed/src/pw_chrono_zephyr:tests", "//third_party/pigweed/src/pw_cli:tests", "//third_party/pigweed/src/pw_compilation_testing:tests", "//third_party/pigweed/src/pw_console:tests", "//third_party/pigweed/src/pw_containers:tests", "//third_party/pigweed/src/pw_cpu_exception:tests", "//third_party/pigweed/src/pw_cpu_exception_cortex_m:tests", "//third_party/pigweed/src/pw_crypto:tests", "//third_party/pigweed/src/pw_digital_io:tests", "//third_party/pigweed/src/pw_digital_io_mcuxpresso:tests", "//third_party/pigweed/src/pw_digital_io_rp2040:tests", "//third_party/pigweed/src/pw_docgen:tests", "//third_party/pigweed/src/pw_doctor:tests", "//third_party/pigweed/src/pw_emu:tests", "//third_party/pigweed/src/pw_env_setup:tests", "//third_party/pigweed/src/pw_file:tests", "//third_party/pigweed/src/pw_format:tests", "//third_party/pigweed/src/pw_function:tests", "//third_party/pigweed/src/pw_fuzzer:tests", "//third_party/pigweed/src/pw_hdlc:tests", "//third_party/pigweed/src/pw_hex_dump:tests", "//third_party/pigweed/src/pw_i2c:tests", "//third_party/pigweed/src/pw_i2c_linux:tests", "//third_party/pigweed/src/pw_i2c_mcuxpresso:tests", "//third_party/pigweed/src/pw_ide:tests", "//third_party/pigweed/src/pw_interrupt:tests", "//third_party/pigweed/src/pw_interrupt_cortex_m:tests", "//third_party/pigweed/src/pw_interrupt_xtensa:tests", "//third_party/pigweed/src/pw_interrupt_zephyr:tests", "//third_party/pigweed/src/pw_intrusive_ptr:tests", "//third_party/pigweed/src/pw_kvs:tests", "//third_party/pigweed/src/pw_libc:tests", "//third_party/pigweed/src/pw_libcxx:tests", "//third_party/pigweed/src/pw_log:tests", "//third_party/pigweed/src/pw_log_android:tests", "//third_party/pigweed/src/pw_log_basic:tests", "//third_party/pigweed/src/pw_log_null:tests", "//third_party/pigweed/src/pw_log_rpc:tests", "//third_party/pigweed/src/pw_log_string:tests", "//third_party/pigweed/src/pw_log_tokenized:tests", "//third_party/pigweed/src/pw_log_zephyr:tests", "//third_party/pigweed/src/pw_malloc:tests", "//third_party/pigweed/src/pw_malloc_freelist:tests", "//third_party/pigweed/src/pw_malloc_freertos:tests", "//third_party/pigweed/src/pw_metric:tests", "//third_party/pigweed/src/pw_minimal_cpp_stdlib:tests", "//third_party/pigweed/src/pw_module:tests", "//third_party/pigweed/src/pw_multibuf:tests", "//third_party/pigweed/src/pw_multisink:tests", "//third_party/pigweed/src/pw_package:tests", "//third_party/pigweed/src/pw_perf_test:tests", "//third_party/pigweed/src/pw_persistent_ram:tests", "//third_party/pigweed/src/pw_polyfill:tests", "//third_party/pigweed/src/pw_preprocessor:tests", "//third_party/pigweed/src/pw_presubmit:tests", "//third_party/pigweed/src/pw_protobuf:tests", "//third_party/pigweed/src/pw_protobuf_compiler:tests", "//third_party/pigweed/src/pw_random:tests", "//third_party/pigweed/src/pw_result:tests", "//third_party/pigweed/src/pw_ring_buffer:tests", "//third_party/pigweed/src/pw_router:tests", "//third_party/pigweed/src/pw_rpc:tests", "//third_party/pigweed/src/pw_rpc_transport:tests", "//third_party/pigweed/src/pw_rust:tests", "//third_party/pigweed/src/pw_snapshot:tests", "//third_party/pigweed/src/pw_software_update:tests", "//third_party/pigweed/src/pw_span:tests", "//third_party/pigweed/src/pw_spi:tests", "//third_party/pigweed/src/pw_spi_mcuxpresso:tests", "//third_party/pigweed/src/pw_status:tests", "//third_party/pigweed/src/pw_stm32cube_build:tests", "//third_party/pigweed/src/pw_stream:tests", "//third_party/pigweed/src/pw_stream_shmem_mcuxpresso:tests", "//third_party/pigweed/src/pw_stream_uart_linux:tests", "//third_party/pigweed/src/pw_stream_uart_mcuxpresso:tests", "//third_party/pigweed/src/pw_string:tests", "//third_party/pigweed/src/pw_symbolizer:tests", "//third_party/pigweed/src/pw_sync:tests", "//third_party/pigweed/src/pw_sync_baremetal:tests", "//third_party/pigweed/src/pw_sync_embos:tests", "//third_party/pigweed/src/pw_sync_freertos:tests", "//third_party/pigweed/src/pw_sync_stl:tests", "//third_party/pigweed/src/pw_sync_threadx:tests", "//third_party/pigweed/src/pw_sync_zephyr:tests", "//third_party/pigweed/src/pw_sys_io:tests", "//third_party/pigweed/src/pw_sys_io_ambiq_sdk:tests", "//third_party/pigweed/src/pw_sys_io_arduino:tests", "//third_party/pigweed/src/pw_sys_io_baremetal_lm3s6965evb:tests", "//third_party/pigweed/src/pw_sys_io_baremetal_stm32f429:tests", "//third_party/pigweed/src/pw_sys_io_emcraft_sf2:tests", "//third_party/pigweed/src/pw_sys_io_mcuxpresso:tests", "//third_party/pigweed/src/pw_sys_io_rp2040:tests", "//third_party/pigweed/src/pw_sys_io_stdio:tests", "//third_party/pigweed/src/pw_sys_io_stm32cube:tests", "//third_party/pigweed/src/pw_sys_io_zephyr:tests", "//third_party/pigweed/src/pw_system:tests", "//third_party/pigweed/src/pw_target_runner:tests", "//third_party/pigweed/src/pw_thread:tests", "//third_party/pigweed/src/pw_thread_embos:tests", "//third_party/pigweed/src/pw_thread_freertos:tests", "//third_party/pigweed/src/pw_thread_stl:tests", "//third_party/pigweed/src/pw_thread_threadx:tests", "//third_party/pigweed/src/pw_thread_zephyr:tests", "//third_party/pigweed/src/pw_tls_client:tests", "//third_party/pigweed/src/pw_tls_client_boringssl:tests", "//third_party/pigweed/src/pw_tls_client_mbedtls:tests", "//third_party/pigweed/src/pw_tokenizer:tests", "//third_party/pigweed/src/pw_toolchain:tests", "//third_party/pigweed/src/pw_toolchain_bazel:tests", "//third_party/pigweed/src/pw_trace:tests", "//third_party/pigweed/src/pw_trace_tokenized:tests", "//third_party/pigweed/src/pw_transfer:tests", "//third_party/pigweed/src/pw_unit_test:tests", "//third_party/pigweed/src/pw_unit_test_zephyr:tests", "//third_party/pigweed/src/pw_varint:tests", "//third_party/pigweed/src/pw_watch:tests", "//third_party/pigweed/src/pw_web:tests", "//third_party/pigweed/src/pw_work_queue:tests"]`
 
-From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:364
+From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:362
 
 ### pw_modules
 
 A list with paths to all Pigweed module. DO NOT SET THIS BUILD ARGUMENT!
 
-**Current value (from the default):** `["//third_party/pigweed/src/docker", "//third_party/pigweed/src/pw_alignment", "//third_party/pigweed/src/pw_allocator", "//third_party/pigweed/src/pw_analog", "//third_party/pigweed/src/pw_android_toolchain", "//third_party/pigweed/src/pw_arduino_build", "//third_party/pigweed/src/pw_assert", "//third_party/pigweed/src/pw_assert_basic", "//third_party/pigweed/src/pw_assert_log", "//third_party/pigweed/src/pw_assert_tokenized", "//third_party/pigweed/src/pw_assert_zephyr", "//third_party/pigweed/src/pw_async", "//third_party/pigweed/src/pw_async2", "//third_party/pigweed/src/pw_async2_basic", "//third_party/pigweed/src/pw_async_basic", "//third_party/pigweed/src/pw_base64", "//third_party/pigweed/src/pw_bloat", "//third_party/pigweed/src/pw_blob_store", "//third_party/pigweed/src/pw_bluetooth", "//third_party/pigweed/src/pw_bluetooth_hci", "//third_party/pigweed/src/pw_bluetooth_profiles", "//third_party/pigweed/src/pw_bluetooth_sapphire", "//third_party/pigweed/src/pw_boot", "//third_party/pigweed/src/pw_boot_cortex_m", "//third_party/pigweed/src/pw_build", "//third_party/pigweed/src/pw_build_info", "//third_party/pigweed/src/pw_build_mcuxpresso", "//third_party/pigweed/src/pw_bytes", "//third_party/pigweed/src/pw_checksum", "//third_party/pigweed/src/pw_chre", "//third_party/pigweed/src/pw_chrono", "//third_party/pigweed/src/pw_chrono_embos", "//third_party/pigweed/src/pw_chrono_freertos", "//third_party/pigweed/src/pw_chrono_rp2040", "//third_party/pigweed/src/pw_chrono_stl", "//third_party/pigweed/src/pw_chrono_threadx", "//third_party/pigweed/src/pw_chrono_zephyr", "//third_party/pigweed/src/pw_cli", "//third_party/pigweed/src/pw_compilation_testing", "//third_party/pigweed/src/pw_console", "//third_party/pigweed/src/pw_containers", "//third_party/pigweed/src/pw_cpu_exception", "//third_party/pigweed/src/pw_cpu_exception_cortex_m", "//third_party/pigweed/src/pw_crypto", "//third_party/pigweed/src/pw_digital_io", "//third_party/pigweed/src/pw_digital_io_mcuxpresso", "//third_party/pigweed/src/pw_digital_io_rp2040", "//third_party/pigweed/src/pw_docgen", "//third_party/pigweed/src/pw_doctor", "//third_party/pigweed/src/pw_emu", "//third_party/pigweed/src/pw_env_setup", "//third_party/pigweed/src/pw_file", "//third_party/pigweed/src/pw_format", "//third_party/pigweed/src/pw_function", "//third_party/pigweed/src/pw_fuzzer", "//third_party/pigweed/src/pw_hdlc", "//third_party/pigweed/src/pw_hex_dump", "//third_party/pigweed/src/pw_i2c", "//third_party/pigweed/src/pw_i2c_linux", "//third_party/pigweed/src/pw_i2c_mcuxpresso", "//third_party/pigweed/src/pw_ide", "//third_party/pigweed/src/pw_interrupt", "//third_party/pigweed/src/pw_interrupt_cortex_m", "//third_party/pigweed/src/pw_interrupt_xtensa", "//third_party/pigweed/src/pw_interrupt_zephyr", "//third_party/pigweed/src/pw_intrusive_ptr", "//third_party/pigweed/src/pw_kvs", "//third_party/pigweed/src/pw_libc", "//third_party/pigweed/src/pw_libcxx", "//third_party/pigweed/src/pw_log", "//third_party/pigweed/src/pw_log_android", "//third_party/pigweed/src/pw_log_basic", "//third_party/pigweed/src/pw_log_null", "//third_party/pigweed/src/pw_log_rpc", "//third_party/pigweed/src/pw_log_string", "//third_party/pigweed/src/pw_log_tokenized", "//third_party/pigweed/src/pw_log_zephyr", "//third_party/pigweed/src/pw_malloc", "//third_party/pigweed/src/pw_malloc_freelist", "//third_party/pigweed/src/pw_malloc_freertos", "//third_party/pigweed/src/pw_metric", "//third_party/pigweed/src/pw_minimal_cpp_stdlib", "//third_party/pigweed/src/pw_module", "//third_party/pigweed/src/pw_multibuf", "//third_party/pigweed/src/pw_multisink", "//third_party/pigweed/src/pw_package", "//third_party/pigweed/src/pw_perf_test", "//third_party/pigweed/src/pw_persistent_ram", "//third_party/pigweed/src/pw_polyfill", "//third_party/pigweed/src/pw_preprocessor", "//third_party/pigweed/src/pw_presubmit", "//third_party/pigweed/src/pw_protobuf", "//third_party/pigweed/src/pw_protobuf_compiler", "//third_party/pigweed/src/pw_random", "//third_party/pigweed/src/pw_result", "//third_party/pigweed/src/pw_ring_buffer", "//third_party/pigweed/src/pw_router", "//third_party/pigweed/src/pw_rpc", "//third_party/pigweed/src/pw_rpc_transport", "//third_party/pigweed/src/pw_rust", "//third_party/pigweed/src/pw_snapshot", "//third_party/pigweed/src/pw_software_update", "//third_party/pigweed/src/pw_span", "//third_party/pigweed/src/pw_spi", "//third_party/pigweed/src/pw_spi_mcuxpresso", "//third_party/pigweed/src/pw_status", "//third_party/pigweed/src/pw_stm32cube_build", "//third_party/pigweed/src/pw_stream", "//third_party/pigweed/src/pw_stream_shmem_mcuxpresso", "//third_party/pigweed/src/pw_stream_uart_linux", "//third_party/pigweed/src/pw_stream_uart_mcuxpresso", "//third_party/pigweed/src/pw_string", "//third_party/pigweed/src/pw_symbolizer", "//third_party/pigweed/src/pw_sync", "//third_party/pigweed/src/pw_sync_baremetal", "//third_party/pigweed/src/pw_sync_embos", "//third_party/pigweed/src/pw_sync_freertos", "//third_party/pigweed/src/pw_sync_stl", "//third_party/pigweed/src/pw_sync_threadx", "//third_party/pigweed/src/pw_sync_zephyr", "//third_party/pigweed/src/pw_sys_io", "//third_party/pigweed/src/pw_sys_io_ambiq_sdk", "//third_party/pigweed/src/pw_sys_io_arduino", "//third_party/pigweed/src/pw_sys_io_baremetal_lm3s6965evb", "//third_party/pigweed/src/pw_sys_io_baremetal_stm32f429", "//third_party/pigweed/src/pw_sys_io_emcraft_sf2", "//third_party/pigweed/src/pw_sys_io_mcuxpresso", "//third_party/pigweed/src/pw_sys_io_rp2040", "//third_party/pigweed/src/pw_sys_io_stdio", "//third_party/pigweed/src/pw_sys_io_stm32cube", "//third_party/pigweed/src/pw_sys_io_zephyr", "//third_party/pigweed/src/pw_system", "//third_party/pigweed/src/pw_target_runner", "//third_party/pigweed/src/pw_thread", "//third_party/pigweed/src/pw_thread_embos", "//third_party/pigweed/src/pw_thread_freertos", "//third_party/pigweed/src/pw_thread_stl", "//third_party/pigweed/src/pw_thread_threadx", "//third_party/pigweed/src/pw_thread_zephyr", "//third_party/pigweed/src/pw_tls_client", "//third_party/pigweed/src/pw_tls_client_boringssl", "//third_party/pigweed/src/pw_tls_client_mbedtls", "//third_party/pigweed/src/pw_tokenizer", "//third_party/pigweed/src/pw_tool", "//third_party/pigweed/src/pw_toolchain", "//third_party/pigweed/src/pw_toolchain_bazel", "//third_party/pigweed/src/pw_trace", "//third_party/pigweed/src/pw_trace_tokenized", "//third_party/pigweed/src/pw_transfer", "//third_party/pigweed/src/pw_unit_test", "//third_party/pigweed/src/pw_unit_test_zephyr", "//third_party/pigweed/src/pw_varint", "//third_party/pigweed/src/pw_watch", "//third_party/pigweed/src/pw_web", "//third_party/pigweed/src/pw_work_queue"]`
+**Current value (from the default):** `["//third_party/pigweed/src/docker", "//third_party/pigweed/src/pw_alignment", "//third_party/pigweed/src/pw_allocator", "//third_party/pigweed/src/pw_analog", "//third_party/pigweed/src/pw_android_toolchain", "//third_party/pigweed/src/pw_arduino_build", "//third_party/pigweed/src/pw_assert", "//third_party/pigweed/src/pw_assert_basic", "//third_party/pigweed/src/pw_assert_log", "//third_party/pigweed/src/pw_assert_tokenized", "//third_party/pigweed/src/pw_assert_zephyr", "//third_party/pigweed/src/pw_async", "//third_party/pigweed/src/pw_async2", "//third_party/pigweed/src/pw_async2_basic", "//third_party/pigweed/src/pw_async_basic", "//third_party/pigweed/src/pw_base64", "//third_party/pigweed/src/pw_bloat", "//third_party/pigweed/src/pw_blob_store", "//third_party/pigweed/src/pw_bluetooth", "//third_party/pigweed/src/pw_bluetooth_hci", "//third_party/pigweed/src/pw_bluetooth_profiles", "//third_party/pigweed/src/pw_bluetooth_sapphire", "//third_party/pigweed/src/pw_boot", "//third_party/pigweed/src/pw_boot_cortex_m", "//third_party/pigweed/src/pw_build", "//third_party/pigweed/src/pw_build_info", "//third_party/pigweed/src/pw_build_mcuxpresso", "//third_party/pigweed/src/pw_bytes", "//third_party/pigweed/src/pw_checksum", "//third_party/pigweed/src/pw_chre", "//third_party/pigweed/src/pw_chrono", "//third_party/pigweed/src/pw_chrono_embos", "//third_party/pigweed/src/pw_chrono_freertos", "//third_party/pigweed/src/pw_chrono_rp2040", "//third_party/pigweed/src/pw_chrono_stl", "//third_party/pigweed/src/pw_chrono_threadx", "//third_party/pigweed/src/pw_chrono_zephyr", "//third_party/pigweed/src/pw_cli", "//third_party/pigweed/src/pw_compilation_testing", "//third_party/pigweed/src/pw_console", "//third_party/pigweed/src/pw_containers", "//third_party/pigweed/src/pw_cpu_exception", "//third_party/pigweed/src/pw_cpu_exception_cortex_m", "//third_party/pigweed/src/pw_crypto", "//third_party/pigweed/src/pw_digital_io", "//third_party/pigweed/src/pw_digital_io_mcuxpresso", "//third_party/pigweed/src/pw_digital_io_rp2040", "//third_party/pigweed/src/pw_docgen", "//third_party/pigweed/src/pw_doctor", "//third_party/pigweed/src/pw_emu", "//third_party/pigweed/src/pw_env_setup", "//third_party/pigweed/src/pw_file", "//third_party/pigweed/src/pw_format", "//third_party/pigweed/src/pw_function", "//third_party/pigweed/src/pw_fuzzer", "//third_party/pigweed/src/pw_hdlc", "//third_party/pigweed/src/pw_hex_dump", "//third_party/pigweed/src/pw_i2c", "//third_party/pigweed/src/pw_i2c_linux", "//third_party/pigweed/src/pw_i2c_mcuxpresso", "//third_party/pigweed/src/pw_ide", "//third_party/pigweed/src/pw_interrupt", "//third_party/pigweed/src/pw_interrupt_cortex_m", "//third_party/pigweed/src/pw_interrupt_xtensa", "//third_party/pigweed/src/pw_interrupt_zephyr", "//third_party/pigweed/src/pw_intrusive_ptr", "//third_party/pigweed/src/pw_kvs", "//third_party/pigweed/src/pw_libc", "//third_party/pigweed/src/pw_libcxx", "//third_party/pigweed/src/pw_log", "//third_party/pigweed/src/pw_log_android", "//third_party/pigweed/src/pw_log_basic", "//third_party/pigweed/src/pw_log_null", "//third_party/pigweed/src/pw_log_rpc", "//third_party/pigweed/src/pw_log_string", "//third_party/pigweed/src/pw_log_tokenized", "//third_party/pigweed/src/pw_log_zephyr", "//third_party/pigweed/src/pw_malloc", "//third_party/pigweed/src/pw_malloc_freelist", "//third_party/pigweed/src/pw_malloc_freertos", "//third_party/pigweed/src/pw_metric", "//third_party/pigweed/src/pw_minimal_cpp_stdlib", "//third_party/pigweed/src/pw_module", "//third_party/pigweed/src/pw_multibuf", "//third_party/pigweed/src/pw_multisink", "//third_party/pigweed/src/pw_package", "//third_party/pigweed/src/pw_perf_test", "//third_party/pigweed/src/pw_persistent_ram", "//third_party/pigweed/src/pw_polyfill", "//third_party/pigweed/src/pw_preprocessor", "//third_party/pigweed/src/pw_presubmit", "//third_party/pigweed/src/pw_protobuf", "//third_party/pigweed/src/pw_protobuf_compiler", "//third_party/pigweed/src/pw_random", "//third_party/pigweed/src/pw_result", "//third_party/pigweed/src/pw_ring_buffer", "//third_party/pigweed/src/pw_router", "//third_party/pigweed/src/pw_rpc", "//third_party/pigweed/src/pw_rpc_transport", "//third_party/pigweed/src/pw_rust", "//third_party/pigweed/src/pw_snapshot", "//third_party/pigweed/src/pw_software_update", "//third_party/pigweed/src/pw_span", "//third_party/pigweed/src/pw_spi", "//third_party/pigweed/src/pw_spi_mcuxpresso", "//third_party/pigweed/src/pw_status", "//third_party/pigweed/src/pw_stm32cube_build", "//third_party/pigweed/src/pw_stream", "//third_party/pigweed/src/pw_stream_shmem_mcuxpresso", "//third_party/pigweed/src/pw_stream_uart_linux", "//third_party/pigweed/src/pw_stream_uart_mcuxpresso", "//third_party/pigweed/src/pw_string", "//third_party/pigweed/src/pw_symbolizer", "//third_party/pigweed/src/pw_sync", "//third_party/pigweed/src/pw_sync_baremetal", "//third_party/pigweed/src/pw_sync_embos", "//third_party/pigweed/src/pw_sync_freertos", "//third_party/pigweed/src/pw_sync_stl", "//third_party/pigweed/src/pw_sync_threadx", "//third_party/pigweed/src/pw_sync_zephyr", "//third_party/pigweed/src/pw_sys_io", "//third_party/pigweed/src/pw_sys_io_ambiq_sdk", "//third_party/pigweed/src/pw_sys_io_arduino", "//third_party/pigweed/src/pw_sys_io_baremetal_lm3s6965evb", "//third_party/pigweed/src/pw_sys_io_baremetal_stm32f429", "//third_party/pigweed/src/pw_sys_io_emcraft_sf2", "//third_party/pigweed/src/pw_sys_io_mcuxpresso", "//third_party/pigweed/src/pw_sys_io_rp2040", "//third_party/pigweed/src/pw_sys_io_stdio", "//third_party/pigweed/src/pw_sys_io_stm32cube", "//third_party/pigweed/src/pw_sys_io_zephyr", "//third_party/pigweed/src/pw_system", "//third_party/pigweed/src/pw_target_runner", "//third_party/pigweed/src/pw_thread", "//third_party/pigweed/src/pw_thread_embos", "//third_party/pigweed/src/pw_thread_freertos", "//third_party/pigweed/src/pw_thread_stl", "//third_party/pigweed/src/pw_thread_threadx", "//third_party/pigweed/src/pw_thread_zephyr", "//third_party/pigweed/src/pw_tls_client", "//third_party/pigweed/src/pw_tls_client_boringssl", "//third_party/pigweed/src/pw_tls_client_mbedtls", "//third_party/pigweed/src/pw_tokenizer", "//third_party/pigweed/src/pw_toolchain", "//third_party/pigweed/src/pw_toolchain_bazel", "//third_party/pigweed/src/pw_trace", "//third_party/pigweed/src/pw_trace_tokenized", "//third_party/pigweed/src/pw_transfer", "//third_party/pigweed/src/pw_unit_test", "//third_party/pigweed/src/pw_unit_test_zephyr", "//third_party/pigweed/src/pw_varint", "//third_party/pigweed/src/pw_watch", "//third_party/pigweed/src/pw_web", "//third_party/pigweed/src/pw_work_queue"]`
 
-From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:205
+From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:204
 
 ### pw_perf_test_EXECUTABLE_TARGET_TYPE
 
@@ -6270,7 +6276,7 @@ root_build_dir, to the protoc binary.
 
 **Current value for `target_cpu = "arm64"`:** `"host_x64/protoc"`
 
-From //.gn:109
+From //.gn:110
 
 **Overridden from the default:** `""`
 
@@ -6278,7 +6284,7 @@ From //third_party/pigweed/src/pw_protobuf_compiler/proto.gni:55
 
 **Current value for `target_cpu = "x64"`:** `"host_x64/protoc"`
 
-From //.gn:109
+From //.gn:110
 
 **Overridden from the default:** `""`
 
@@ -6291,7 +6297,7 @@ the protobuf compiler.
 
 **Current value for `target_cpu = "arm64"`:** `"//third_party/protobuf:protoc"`
 
-From //.gn:108
+From //.gn:109
 
 **Overridden from the default:** `""`
 
@@ -6299,7 +6305,7 @@ From //third_party/pigweed/src/pw_protobuf_compiler/proto.gni:38
 
 **Current value for `target_cpu = "x64"`:** `"//third_party/protobuf:protoc"`
 
-From //.gn:108
+From //.gn:109
 
 **Overridden from the default:** `""`
 
@@ -6989,7 +6995,7 @@ Usage: toolchain-controlled only
 
 **Current value for `target_cpu = "arm64"`:** `"//third_party/pigweed/src/pw_unit_test:googletest"`
 
-From //.gn:120
+From //.gn:121
 
 **Overridden from the default:** `"//third_party/pigweed/src/pw_unit_test:light"`
 
@@ -6997,7 +7003,7 @@ From //third_party/pigweed/src/pw_unit_test/test.gni:31
 
 **Current value for `target_cpu = "x64"`:** `"//third_party/pigweed/src/pw_unit_test:googletest"`
 
-From //.gn:120
+From //.gn:121
 
 **Overridden from the default:** `"//third_party/pigweed/src/pw_unit_test:light"`
 
@@ -7070,7 +7076,7 @@ Usage: toolchain-controlled only
 
 **Current value for `target_cpu = "arm64"`:** `"//third_party/googletest:gmock_no_testonly"`
 
-From //.gn:119
+From //.gn:120
 
 **Overridden from the default:** `"//third_party/pigweed/src/third_party/googletest"`
 
@@ -7078,7 +7084,7 @@ From //third_party/pigweed/src/pw_unit_test/test.gni:41
 
 **Current value for `target_cpu = "x64"`:** `"//third_party/googletest:gmock_no_testonly"`
 
-From //.gn:119
+From //.gn:120
 
 **Overridden from the default:** `"//third_party/pigweed/src/third_party/googletest"`
 
@@ -7094,7 +7100,7 @@ Usage: toolchain-controlled only
 
 **Current value for `target_cpu = "arm64"`:** `"//src/lib/fxl/test:gtest_main"`
 
-From //.gn:118
+From //.gn:119
 
 **Overridden from the default:** `"//third_party/pigweed/src/pw_unit_test:simple_printing_main"`
 
@@ -7102,7 +7108,7 @@ From //third_party/pigweed/src/pw_unit_test/test.gni:48
 
 **Current value for `target_cpu = "x64"`:** `"//src/lib/fxl/test:gtest_main"`
 
-From //.gn:118
+From //.gn:119
 
 **Overridden from the default:** `"//third_party/pigweed/src/pw_unit_test:simple_printing_main"`
 
@@ -7149,7 +7155,7 @@ compatibility.
 
 **Current value for `target_cpu = "arm64"`:** `true`
 
-From //.gn:121
+From //.gn:122
 
 **Overridden from the default:** `false`
 
@@ -7157,7 +7163,7 @@ From //third_party/pigweed/src/pw_unit_test/test.gni:117
 
 **Current value for `target_cpu = "x64"`:** `true`
 
-From //.gn:121
+From //.gn:122
 
 **Overridden from the default:** `false`
 
@@ -7213,7 +7219,7 @@ From //build/images/args.gni:20
 
 **Current value for `target_cpu = "arm64"`:** `["//third_party/pigweed/src/pw_build:reduced_size"]`
 
-From //.gn:127
+From //.gn:131
 
 **Overridden from the default:** `[]`
 
@@ -7221,7 +7227,7 @@ From //third_party/pigweed/src/pw_build/gn_internal/defaults.gni:36
 
 **Current value for `target_cpu = "x64"`:** `["//third_party/pigweed/src/pw_build:reduced_size"]`
 
-From //.gn:127
+From //.gn:131
 
 **Overridden from the default:** `[]`
 
@@ -7366,7 +7372,7 @@ Set to true to enable distributed compilation of Rust using RBE.
 
 **Current value for `target_cpu = "arm64"`:** `false`
 
-From //out/not-default/args.gn:11
+From //out/not-default/args.gn:12
 
 **Overridden from the default:** `false`
 
@@ -7374,7 +7380,7 @@ From //build/toolchain/rbe.gni:70
 
 **Current value for `target_cpu = "x64"`:** `false`
 
-From //out/not-default/args.gn:11
+From //out/not-default/args.gn:12
 
 **Overridden from the default:** `false`
 
@@ -7457,7 +7463,7 @@ toolchain, so that recompilations with the new compiler can be triggered.
 When using the prebuilt, this is ignored and the CIPD instance ID of the
 prebuilt is used.
 
-**Current value (from the default):** `"zEzfFxt5WEkAY2lRuAx9NzQyTLD5E8WlbRFCteHHkE4C"`
+**Current value (from the default):** `"5DPMgVsHLiYYnmk_e0Ww3jcqGJkk7yE88bJr2-SWHV0C"`
 
 From //build/rust/config.gni:38
 
@@ -7554,7 +7560,7 @@ From //products/bringup.gni:16
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:119
+From //BUILD.gn:118
 
 **Current value for `target_cpu = "x64"`:** `[]`
 
@@ -7562,7 +7568,7 @@ From //products/bringup.gni:16
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:119
+From //BUILD.gn:118
 
 ### sdk_cross_compile_host_tools
 
@@ -7579,7 +7585,7 @@ From //sdk/config.gni:13
 
 Identifier for the Core SDK.
 
-**Current value (from the default):** `"17.99991231.0.1"`
+**Current value (from the default):** `"18.99991231.0.1"`
 
 From //sdk/config.gni:7
 
@@ -7985,13 +7991,13 @@ From //src/storage/lib/trace/BUILD.gn:10
 
 **Current value for `target_cpu = "arm64"`:** `"arm64"`
 
-From //out/not-default/args.gn:12
+From //out/not-default/args.gn:13
 
 **Overridden from the default:** `""`
 
 **Current value for `target_cpu = "x64"`:** `"x64"`
 
-From //out/not-default/args.gn:12
+From //out/not-default/args.gn:13
 
 **Overridden from the default:** `""`
 
@@ -8164,7 +8170,7 @@ afterwards.
 
 **Current value (from the default):** `""`
 
-From //BUILD.gn:115
+From //BUILD.gn:114
 
 ### test_package_labels
 
@@ -8173,19 +8179,19 @@ be flagged as an error by the build.
 
 **Current value for `target_cpu = "arm64"`:** `[]`
 
-From //out/not-default/args.gn:23
+From //out/not-default/args.gn:24
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:87
+From //BUILD.gn:86
 
 **Current value for `target_cpu = "x64"`:** `[]`
 
-From //out/not-default/args.gn:23
+From //out/not-default/args.gn:24
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:87
+From //BUILD.gn:86
 
 ### testonly_in_containers
 
@@ -8320,19 +8326,19 @@ include those labels in this variable.
 
 **Current value for `target_cpu = "arm64"`:** `["//bundles/kitchen_sink"]`
 
-From //out/not-default/args.gn:18
+From //out/not-default/args.gn:19
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:64
+From //BUILD.gn:63
 
 **Current value for `target_cpu = "x64"`:** `["//bundles/kitchen_sink"]`
 
-From //out/not-default/args.gn:18
+From //out/not-default/args.gn:19
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:64
+From //BUILD.gn:63
 
 ### update_goldens
 
@@ -8502,7 +8508,7 @@ This has lower precedence than `use_reclient_cxx` in
 
 **Current value for `target_cpu = "arm64"`:** `false`
 
-From //out/not-default/args.gn:13
+From //out/not-default/args.gn:14
 
 **Overridden from the default:** `false`
 
@@ -8510,7 +8516,7 @@ From //build/toolchain/goma.gni:13
 
 **Current value for `target_cpu = "x64"`:** `false`
 
-From //out/not-default/args.gn:13
+From //out/not-default/args.gn:14
 
 **Overridden from the default:** `false`
 
