@@ -13,8 +13,7 @@
 #include "src/graphics/display/lib/edid/cta-timing.h"
 #include "src/graphics/display/lib/edid/dmt-timing.h"
 
-namespace edid {
-namespace internal {
+namespace edid::internal {
 
 constexpr std::array<display::DisplayTiming, kDmtTimings.size()> kDmtDisplayTimingsArray = [] {
   std::array<display::DisplayTiming, kDmtTimings.size()> params = {};
@@ -36,51 +35,4 @@ constexpr std::array<display::DisplayTiming, kCtaTimings.size()> kCtaDisplayTimi
 
 const cpp20::span<const display::DisplayTiming> kCtaDisplayTimings(kCtaDisplayTimingsArray);
 
-}  // namespace internal
-
-display::DisplayTiming ToDisplayTiming(const timing_params& timing_params) {
-  // A valid display_mode_t guarantees that both horizontal_front_porch and
-  // horizontal_sync_pulse are no more than kMaxTimingValue, so
-  // (horizontal_front_porch + horizontal_sync_pulse) won't overflow.
-  //
-  // It also guarantees that horizontal_blanking >= horizontal_front_porch +
-  // horizontal_sync_pulse, so horizontal_blanking - (horizontal_front_porch +
-  // horizontal_sync_pulse) won't overflow and will fit in [0, kMaxTimingValue]
-  // -- so we can use int32_t.
-  int32_t horizontal_back_porch_px = static_cast<int32_t>(
-      timing_params.horizontal_blanking -
-      (timing_params.horizontal_front_porch + timing_params.horizontal_sync_pulse));
-
-  // An argument similar to the one above can be used to show that the vertical
-  // back porch calculations do not cause UB.
-  int32_t vertical_back_porch_lines =
-      static_cast<int32_t>(timing_params.vertical_blanking - (timing_params.vertical_front_porch +
-                                                              timing_params.vertical_sync_pulse));
-
-  const display::DisplayTiming display_timing = {
-      .horizontal_active_px = static_cast<int32_t>(timing_params.horizontal_addressable),
-      .horizontal_front_porch_px = static_cast<int32_t>(timing_params.horizontal_front_porch),
-      .horizontal_sync_width_px = static_cast<int32_t>(timing_params.horizontal_sync_pulse),
-      .horizontal_back_porch_px = horizontal_back_porch_px,
-      .vertical_active_lines = static_cast<int32_t>(timing_params.vertical_addressable),
-      .vertical_front_porch_lines = static_cast<int32_t>(timing_params.vertical_front_porch),
-      .vertical_sync_width_lines = static_cast<int32_t>(timing_params.vertical_sync_pulse),
-      .vertical_back_porch_lines = vertical_back_porch_lines,
-      .pixel_clock_frequency_khz = static_cast<int32_t>(timing_params.pixel_freq_khz),
-      .fields_per_frame = (timing_params.flags & edid::timing_params_t::kInterlaced)
-                              ? display::FieldsPerFrame::kInterlaced
-                              : display::FieldsPerFrame::kProgressive,
-      .hsync_polarity = (timing_params.flags & edid::timing_params_t::kPositiveHsync)
-                            ? display::SyncPolarity::kPositive
-                            : display::SyncPolarity::kNegative,
-      .vsync_polarity = (timing_params.flags & edid::timing_params_t::kPositiveVsync)
-                            ? display::SyncPolarity::kPositive
-                            : display::SyncPolarity::kNegative,
-      .vblank_alternates = (timing_params.flags & edid::timing_params_t::kAlternatingVblank) != 0,
-      .pixel_repetition = (timing_params.flags & edid::timing_params_t::kDoubleClocked) ? 1 : 0,
-  };
-
-  return display_timing;
-}
-
-}  // namespace edid
+}  // namespace edid::internal

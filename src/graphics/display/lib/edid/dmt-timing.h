@@ -144,60 +144,6 @@ struct DmtTiming {
   int32_t vertical_top_border_lines;
 };
 
-constexpr timing_params_t ToTimingParams(const DmtTiming& dmt) {
-  // The borders are included in the front porch and blanking in timing_params_t
-  // but not in DmtTiming, so we need to recalculate them to include the borders
-  // for timing_params_t.
-  const uint32_t horizontal_front_porch_including_border_px =
-      dmt.horitontal_sync_start_px - dmt.horizontal_active_px;
-  const uint32_t horizontal_blank_including_borders_px =
-      dmt.horizontal_total_px - dmt.horizontal_active_px;
-
-  const uint32_t vertical_front_porch_including_border_lines =
-      dmt.vertical_sync_start_lines - dmt.vertical_active_lines;
-  const int32_t total_vertical_blank_including_borders_lines_per_frame =
-      dmt.vertical_total_lines - dmt.vertical_active_lines;
-
-  const bool is_interlaced = dmt.fields_per_frame == display::FieldsPerFrame::kInterlaced;
-  const bool alternating_vblank =
-      is_interlaced && total_vertical_blank_including_borders_lines_per_frame % 2 == 1;
-  const uint32_t vertical_blank_including_borders_lines =
-      is_interlaced ? total_vertical_blank_including_borders_lines_per_frame / 2
-                    : total_vertical_blank_including_borders_lines_per_frame;
-
-  const uint32_t horizontal_sync_polarity_flag =
-      dmt.horizontal_sync_polarity == display::SyncPolarity::kPositive
-          ? timing_params::kPositiveHsync
-          : 0;
-  const uint32_t vertical_sync_polarity_flag =
-      dmt.vertical_sync_polarity == display::SyncPolarity::kPositive ? timing_params::kPositiveVsync
-                                                                     : 0;
-  const uint32_t is_interlaced_flag = is_interlaced ? timing_params::kInterlaced : 0;
-  const uint32_t alternating_vblank_flag =
-      alternating_vblank ? timing_params::kAlternatingVblank : 0;
-
-  // DMT formats never repeat the pixels.
-  const uint32_t pixel_repeated_flag = 0;
-
-  const uint32_t vertical_field_refresh_rate_centihertz =
-      static_cast<uint32_t>(dmt.vertical_field_refresh_rate_millihertz + 5) / 10;
-
-  return timing_params_t{
-      .pixel_freq_khz = static_cast<uint32_t>(dmt.pixel_clock_khz),
-      .horizontal_addressable = static_cast<uint32_t>(dmt.horizontal_active_px),
-      .horizontal_front_porch = horizontal_front_porch_including_border_px,
-      .horizontal_sync_pulse = static_cast<uint32_t>(dmt.horizontal_sync_width_px),
-      .horizontal_blanking = horizontal_blank_including_borders_px,
-      .vertical_addressable = static_cast<uint32_t>(dmt.vertical_active_lines),
-      .vertical_front_porch = vertical_front_porch_including_border_lines,
-      .vertical_sync_pulse = static_cast<uint32_t>(dmt.vertical_sync_width_lines),
-      .vertical_blanking = vertical_blank_including_borders_lines,
-      .flags = horizontal_sync_polarity_flag | vertical_sync_polarity_flag | is_interlaced_flag |
-               alternating_vblank_flag | pixel_repeated_flag,
-      .vertical_refresh_e2 = vertical_field_refresh_rate_centihertz,
-  };
-}
-
 constexpr display::DisplayTiming ToDisplayTiming(const DmtTiming& dmt) {
   const bool is_interlaced = dmt.fields_per_frame == display::FieldsPerFrame::kInterlaced;
   const int32_t total_vertical_blank_including_borders_lines_per_frame =

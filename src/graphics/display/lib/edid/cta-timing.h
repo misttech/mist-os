@@ -124,39 +124,6 @@ struct CtaTiming {
   int32_t pixel_clock_khz;
 };
 
-constexpr timing_params_t ToTimingParams(const CtaTiming& cta) {
-  const uint32_t vertical_field_refresh_rate_centihertz =
-      static_cast<uint32_t>(cta.vertical_field_refresh_rate_millihertz + 5) / 10;
-
-  const uint32_t horizontal_sync_polarity_flag =
-      cta.horizontal_sync_polarity == display::SyncPolarity::kPositive
-          ? timing_params::kPositiveHsync
-          : 0;
-  const uint32_t vertical_sync_polarity_flag =
-      cta.vertical_sync_polarity == display::SyncPolarity::kPositive ? timing_params::kPositiveVsync
-                                                                     : 0;
-  const uint32_t fields_per_frame_flag =
-      cta.fields_per_frame == display::FieldsPerFrame::kInterlaced ? timing_params::kInterlaced : 0;
-  const uint32_t second_field_has_extra_vertical_blank_line_flag =
-      cta.second_field_has_extra_vertical_blank_line ? timing_params::kAlternatingVblank : 0;
-  const uint32_t pixel_repeated_flag = cta.pixel_repeated ? timing_params::kDoubleClocked : 0;
-
-  return timing_params_t{
-      .pixel_freq_khz = static_cast<uint32_t>(cta.pixel_clock_khz),
-      .horizontal_addressable = static_cast<uint32_t>(cta.horizontal_active_px),
-      .horizontal_front_porch = static_cast<uint32_t>(cta.horizontal_front_porch_px),
-      .horizontal_sync_pulse = static_cast<uint32_t>(cta.horizontal_sync_width_px),
-      .horizontal_blanking = static_cast<uint32_t>(cta.horizontal_blank_px),
-      .vertical_addressable = static_cast<uint32_t>(cta.vertical_active_lines),
-      .vertical_front_porch = static_cast<uint32_t>(cta.vertical_front_porch_lines),
-      .vertical_sync_pulse = static_cast<uint32_t>(cta.vertical_sync_width_lines),
-      .vertical_blanking = static_cast<uint32_t>(cta.vertical_blank_lines),
-      .flags = horizontal_sync_polarity_flag | vertical_sync_polarity_flag | fields_per_frame_flag |
-               second_field_has_extra_vertical_blank_line_flag | pixel_repeated_flag,
-      .vertical_refresh_e2 = vertical_field_refresh_rate_centihertz,
-  };
-}
-
 constexpr display::DisplayTiming ToDisplayTiming(const CtaTiming& dmt) {
   return display::DisplayTiming{
       .horizontal_active_px = dmt.horizontal_active_px,

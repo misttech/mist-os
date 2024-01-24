@@ -42,7 +42,6 @@ test("edid-test") {
   sources = [
     "cta-timing-test.cc",
     "dmt-timing-test.cc",
-    "timings-test.cc",
     "unit-tests.cc",
   ]
   deps = [
