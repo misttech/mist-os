@@ -220,6 +220,9 @@
                 "syslog12",
                 "time-schedule01",
 
+                // Depends on real contents in /proc/sys/net/ipv4/ping_group_range
+                "cve-2017-2671",
+
                 // https://fxbug.dev/127682
                 "times03",
                 "umip_basic_test",

@@ -214,6 +214,8 @@ impl BytesFileOps for KernelTaintedFile {
 
 /// Holds the device-specific directories that are found under `/proc/sys/net`.
 pub struct ProcSysNetDev {
+    /// The `/proc/sys/net/ipv4/{device}/conf` directory.
+    ipv4_conf: FsNodeHandle,
     /// The `/proc/sys/net/ipv4/{device}/neigh` directory.
     ipv4_neigh: FsNodeHandle,
     /// The `/proc/sys/net/ipv6/{device}/conf` directory.
@@ -226,6 +228,19 @@ impl ProcSysNetDev {
     pub fn new(current_task: &CurrentTask, proc_fs: &FileSystemHandle) -> Self {
         let file_mode = mode!(IFREG, 0o644);
         ProcSysNetDev {
+            ipv4_conf: {
+                let mut dir = StaticDirectoryBuilder::new(proc_fs);
+                dir.entry(
+                    current_task,
+                    "accept_redirects",
+                    StubSysctl::new_node(
+                        "/proc/sys/net/ipv4/DEVICE/conf/accept_redirects",
+                        Some("https://fxbug.dev/297439563"),
+                    ),
+                    file_mode,
+                );
+                dir.build(current_task)
+            },
             ipv4_neigh: {
                 let mut dir = StaticDirectoryBuilder::new(proc_fs);
                 dir.entry(
@@ -255,6 +270,15 @@ impl ProcSysNetDev {
                     ),
                     file_mode,
                 );
+                dir.entry(
+                    current_task,
+                    "base_reachable_time_ms",
+                    StubSysctl::new_node(
+                        "/proc/sys/net/ipv4/DEVICE/neigh/base_reachable_time_ms",
+                        Some("https://fxbug.dev/297439563"),
+                    ),
+                    file_mode,
+                );
                 dir.build(current_task)
             },
             ipv6_conf: {
@@ -263,7 +287,34 @@ impl ProcSysNetDev {
                     current_task,
                     "accept_ra",
                     StubSysctl::new_node(
-                        "/proc/sys/net/ipv4/DEVICE/conf/accept_ra",
+                        "/proc/sys/net/ipv6/DEVICE/conf/accept_ra",
+                        Some("https://fxbug.dev/297439563"),
+                    ),
+                    file_mode,
+                );
+                dir.entry(
+                    current_task,
+                    "accept_ra_info_min_plen",
+                    StubSysctl::new_node(
+                        "/proc/sys/net/ipv6/DEVICE/conf/accept_ra_info_min_plen",
+                        Some("https://fxbug.dev/297439563"),
+                    ),
+                    file_mode,
+                );
+                dir.entry(
+                    current_task,
+                    "accept_ra_rt_table",
+                    StubSysctl::new_node(
+                        "/proc/sys/net/ipv6/DEVICE/conf/accept_ra_rt_table",
+                        Some("https://fxbug.dev/297439563"),
+                    ),
+                    file_mode,
+                );
+                dir.entry(
+                    current_task,
+                    "accept_redirects",
+                    StubSysctl::new_node(
+                        "/proc/sys/net/ipv6/DEVICE/conf/accept_redirects",
                         Some("https://fxbug.dev/297439563"),
                     ),
                     file_mode,
@@ -272,7 +323,7 @@ impl ProcSysNetDev {
                     current_task,
                     "dad_transmits",
                     StubSysctl::new_node(
-                        "/proc/sys/net/ipv4/DEVICE/conf/dad_transmits",
+                        "/proc/sys/net/ipv6/DEVICE/conf/dad_transmits",
                         Some("https://fxbug.dev/297439563"),
                     ),
                     file_mode,
@@ -281,7 +332,7 @@ impl ProcSysNetDev {
                     current_task,
                     "use_tempaddr",
                     StubSysctl::new_node(
-                        "/proc/sys/net/ipv4/DEVICE/conf/use_tempaddr",
+                        "/proc/sys/net/ipv6/DEVICE/conf/use_tempaddr",
                         Some("https://fxbug.dev/297439563"),
                     ),
                     file_mode,
@@ -290,7 +341,7 @@ impl ProcSysNetDev {
                     current_task,
                     "addr_gen_mode",
                     StubSysctl::new_node(
-                        "/proc/sys/net/ipv4/DEVICE/conf/addr_gen_mode",
+                        "/proc/sys/net/ipv6/DEVICE/conf/addr_gen_mode",
                         Some("https://fxbug.dev/297439563"),
                     ),
                     file_mode,
@@ -299,7 +350,7 @@ impl ProcSysNetDev {
                     current_task,
                     "stable_secret",
                     StubSysctl::new_node(
-                        "/proc/sys/net/ipv4/DEVICE/conf/stable_secret",
+                        "/proc/sys/net/ipv6/DEVICE/conf/stable_secret",
                         Some("https://fxbug.dev/297439563"),
                     ),
                     file_mode,
@@ -308,7 +359,34 @@ impl ProcSysNetDev {
                     current_task,
                     "disable_ipv6",
                     StubSysctl::new_node(
-                        "/proc/sys/net/ipv4/DEVICE/conf/disable_ip64",
+                        "/proc/sys/net/ipv6/DEVICE/conf/disable_ip64",
+                        Some("https://fxbug.dev/297439563"),
+                    ),
+                    file_mode,
+                );
+                dir.entry(
+                    current_task,
+                    "optimistic_dad",
+                    StubSysctl::new_node(
+                        "/proc/sys/net/ipv6/DEVICE/conf/optimistic_dad",
+                        Some("https://fxbug.dev/297439563"),
+                    ),
+                    file_mode,
+                );
+                dir.entry(
+                    current_task,
+                    "use_oif_addrs_only",
+                    StubSysctl::new_node(
+                        "/proc/sys/net/ipv6/DEVICE/conf/use_oif_addrs_only",
+                        Some("https://fxbug.dev/297439563"),
+                    ),
+                    file_mode,
+                );
+                dir.entry(
+                    current_task,
+                    "use_optimistic",
+                    StubSysctl::new_node(
+                        "/proc/sys/net/ipv6/DEVICE/conf/use_optimistic",
                         Some("https://fxbug.dev/297439563"),
                     ),
                     file_mode,
@@ -344,9 +422,22 @@ impl ProcSysNetDev {
                     ),
                     file_mode,
                 );
+                dir.entry(
+                    current_task,
+                    "base_reachable_time_ms",
+                    StubSysctl::new_node(
+                        "/proc/sys/net/ipv6/DEVICE/neigh/base_reachable_time_ms",
+                        Some("https://fxbug.dev/297439563"),
+                    ),
+                    file_mode,
+                );
                 dir.build(current_task)
             },
         }
+    }
+
+    pub fn get_ipv4_conf(&self) -> &FsNodeHandle {
+        &self.ipv4_conf
     }
 
     pub fn get_ipv4_neigh(&self) -> &FsNodeHandle {
@@ -397,9 +488,51 @@ fn sysctl_net_diretory(current_task: &CurrentTask, fs: &FileSystemHandle) -> FsN
     dir.subdir(current_task, "ipv4", 0o555, |dir| {
         dir.entry(
             current_task,
+            "conf",
+            NetstackDevicesDirectory::new_proc_sys_net_ipv4_conf(),
+            dir_mode,
+        );
+        dir.entry(
+            current_task,
+            "fwmark_reflect",
+            StubSysctl::new_node("/proc/sys/net/ipv4/fwmark_reflect", None),
+            file_mode,
+        );
+        dir.entry(
+            current_task,
+            "ip_forward",
+            StubSysctl::new_node("/proc/sys/net/ipv4/ip_forward", None),
+            file_mode,
+        );
+        dir.entry(
+            current_task,
             "neigh",
             NetstackDevicesDirectory::new_proc_sys_net_ipv4_neigh(),
             dir_mode,
+        );
+        dir.entry(
+            current_task,
+            "ping_group_range",
+            StubSysctl::new_node("/proc/sys/net/ipv4/ping_group_range", None),
+            file_mode,
+        );
+        dir.entry(
+            current_task,
+            "tcp_default_init_rwnd",
+            StubSysctl::new_node("/proc/sys/net/ipv4/tcp_default_init_rwnd", None),
+            file_mode,
+        );
+        dir.entry(
+            current_task,
+            "tcp_fwmark_accept",
+            StubSysctl::new_node("/proc/sys/net/ipv4/tcp_fwmark_accept", None),
+            file_mode,
+        );
+        dir.entry(
+            current_task,
+            "tcp_rmem",
+            StubSysctl::new_node("/proc/sys/net/ipv4/tcp_rmem", None),
+            file_mode,
         );
     });
     dir.subdir(current_task, "ipv6", 0o555, |dir| {
@@ -411,9 +544,23 @@ fn sysctl_net_diretory(current_task: &CurrentTask, fs: &FileSystemHandle) -> FsN
         );
         dir.entry(
             current_task,
+            "fwmark_reflect",
+            StubSysctl::new_node("/proc/sys/net/ipv6/fwmark_reflect", None),
+            file_mode,
+        );
+        dir.entry(
+            current_task,
             "neigh",
             NetstackDevicesDirectory::new_proc_sys_net_ipv6_neigh(),
             dir_mode,
+        );
+    });
+    dir.subdir(current_task, "unix", 0o555, |dir| {
+        dir.entry(
+            current_task,
+            "max_dgram_qlen",
+            StubSysctl::new_node("/proc/sys/net/unix/max_dgram_qlen", None),
+            file_mode,
         );
     });
     dir.build(current_task)

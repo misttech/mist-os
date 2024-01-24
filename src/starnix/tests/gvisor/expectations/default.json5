@@ -506,7 +506,6 @@
                 "ProcNetSnmp.UdpIn",
                 "ProcNetSnmp.Stat",
                 "ProcSysNetIpv4Recovery.Exists",
-                "ProcSysNetIpv4IpForward.Exists",
                 "ProcSysNetIpv4IpForward.DefaultValueEqZero",
                 "ProcSysNetPortRange.CanReadAndWrite",
                 "ProcSysNetIpv4IpForward.CanReadAndWrite",

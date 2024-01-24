@@ -66,6 +66,10 @@ pub struct NetstackDevicesDirectory {
 }
 
 impl NetstackDevicesDirectory {
+    pub fn new_proc_sys_net_ipv4_conf() -> Arc<Self> {
+        Self::new(|d| d.proc_sys_net.as_ref().map(ProcSysNetDev::get_ipv4_conf))
+    }
+
     pub fn new_proc_sys_net_ipv4_neigh() -> Arc<Self> {
         Self::new(|d| d.proc_sys_net.as_ref().map(ProcSysNetDev::get_ipv4_neigh))
     }
