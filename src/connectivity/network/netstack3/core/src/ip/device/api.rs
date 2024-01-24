@@ -4,6 +4,8 @@
 
 //! Device IP API.
 
+use alloc::vec::Vec;
+
 use net_types::{
     ip::{
         AddrSubnet, AddrSubnetEither, GenericOverIp, Ip, IpAddr, IpAddress, IpInvariant,
@@ -30,7 +32,7 @@ use crate::{
                 Ipv4AddrConfig, Ipv4AddressState, Ipv6AddrConfig, Ipv6AddrManualConfig,
                 Ipv6AddressState, Lifetime,
             },
-            DelIpAddr, IpDeviceAddressContext as _, IpDeviceBindingsContext,
+            DelIpAddr, IpAddressId as _, IpDeviceAddressContext as _, IpDeviceBindingsContext,
             IpDeviceConfigurationContext, IpDeviceEvent, IpDeviceIpExt, IpDeviceStateContext as _,
         },
         forwarding::IpForwardingDeviceContext,
@@ -246,6 +248,35 @@ where
             Ok(())
         })
     }
+
+    /// Calls `f` for each assigned IP address on the device.
+    pub fn for_each_assigned_ip_addr_subnet<F: FnMut(AddrSubnet<I::Addr>)>(
+        &mut self,
+        device: &<C::CoreContext as DeviceIdContext<AnyDevice>>::DeviceId,
+        f: F,
+    ) {
+        self.core_ctx().with_address_ids(device, |addrs, core_ctx| {
+            addrs
+                .filter_map(|addr| {
+                    let assigned = core_ctx.with_ip_address_state(device, &addr, |addr_state| {
+                        I::is_addr_assigned(addr_state)
+                    });
+                    assigned.then(|| addr.addr_sub().to_witness())
+                })
+                .for_each(f);
+        })
+    }
+
+    /// Shorthand for [`DeviceIpApi::Collect_assigned_ip_addr_subnets`],
+    /// returning the addresses in a `Vec`.
+    pub fn get_assigned_ip_addr_subnets(
+        &mut self,
+        device: &<C::CoreContext as DeviceIdContext<AnyDevice>>::DeviceId,
+    ) -> Vec<AddrSubnet<I::Addr>> {
+        let mut vec = Vec::new();
+        self.for_each_assigned_ip_addr_subnet(device, |a| vec.push(a));
+        vec
+    }
 }
 /// The device IP API interacting with all IP versions.
 pub struct DeviceIpAnyApi<C>(C);
@@ -314,6 +345,28 @@ where
         let metric = self.ip::<Ipv4>().get_routing_metric(device_id);
         debug_assert_eq!(metric, self.ip::<Ipv6>().get_routing_metric(device_id));
         metric
+    }
+
+    /// Like [`DeviceIpApi::collect_assigned_ip_addr_subnets`], collecting
+    /// addresses for both IP versions.
+    pub fn for_each_assigned_ip_addr_subnet<F: FnMut(AddrSubnetEither)>(
+        &mut self,
+        device: &<C::CoreContext as DeviceIdContext<AnyDevice>>::DeviceId,
+        mut f: F,
+    ) {
+        self.ip::<Ipv4>().for_each_assigned_ip_addr_subnet(device, |a| f(a.into()));
+        self.ip::<Ipv6>().for_each_assigned_ip_addr_subnet(device, |a| f(a.into()));
+    }
+
+    /// Like [`DeviceIpApi::get_assigned_ip_addr_subnets`], returning addresses
+    /// for both IP versions.
+    pub fn get_assigned_ip_addr_subnets(
+        &mut self,
+        device: &<C::CoreContext as DeviceIdContext<AnyDevice>>::DeviceId,
+    ) -> Vec<AddrSubnetEither> {
+        let mut vec = Vec::new();
+        self.for_each_assigned_ip_addr_subnet(device, |a| vec.push(a));
+        vec
     }
 }
 

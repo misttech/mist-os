@@ -15,12 +15,12 @@ pub(crate) mod slaac;
 pub(crate) mod state;
 
 use alloc::{boxed::Box, vec::Vec};
-use core::{fmt::Debug, num::NonZeroU8, ops::Deref};
+use core::{fmt::Debug, num::NonZeroU8};
 
 use net_types::{
     ip::{
-        AddrSubnet, AddrSubnetEither, GenericOverIp, Ip, IpAddress, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr,
-        Ipv6SourceAddr, Mtu, Subnet,
+        AddrSubnet, GenericOverIp, Ip, IpAddress, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr, Ipv6SourceAddr,
+        Mtu, Subnet,
     },
     MulticastAddr, NonMappedAddr, SpecifiedAddr, UnicastAddr, Witness,
 };
@@ -51,8 +51,8 @@ use crate::{
             router_solicitation::{RsHandler, RsTimerId},
             slaac::{SlaacHandler, SlaacTimerId},
             state::{
-                IpDeviceAddresses, IpDeviceConfiguration, IpDeviceFlags, IpDeviceState,
-                IpDeviceStateIpExt, Ipv4AddrConfig, Ipv4AddressState, Ipv4DeviceConfiguration,
+                IpDeviceConfiguration, IpDeviceFlags, IpDeviceState, IpDeviceStateIpExt,
+                Ipv4AddrConfig, Ipv4AddressState, Ipv4DeviceConfiguration,
                 Ipv4DeviceConfigurationAndFlags, Ipv4DeviceState, Ipv6AddrConfig,
                 Ipv6AddrManualConfig, Ipv6AddressFlags, Ipv6AddressState, Ipv6DeviceConfiguration,
                 Ipv6DeviceConfigurationAndFlags, Ipv6DeviceState, Lifetime,
@@ -327,6 +327,8 @@ pub trait IpDeviceIpExt: IpDeviceStateIpExt {
         + Debug;
 
     fn get_valid_until<I: Instant>(config: &Self::AddressConfig<I>) -> Lifetime<I>;
+
+    fn is_addr_assigned<I: Instant>(addr_state: &Self::AddressState<I>) -> bool;
 }
 
 impl IpDeviceIpExt for Ipv4 {
@@ -343,6 +345,11 @@ impl IpDeviceIpExt for Ipv4 {
     fn get_valid_until<I: Instant>(config: &Self::AddressConfig<I>) -> Lifetime<I> {
         config.valid_until
     }
+
+    fn is_addr_assigned<I: Instant>(addr_state: &Ipv4AddressState<I>) -> bool {
+        let Ipv4AddressState { config: _ } = addr_state;
+        true
+    }
 }
 
 impl IpDeviceIpExt for Ipv6 {
@@ -358,6 +365,10 @@ impl IpDeviceIpExt for Ipv6 {
 
     fn get_valid_until<I: Instant>(config: &Self::AddressConfig<I>) -> Lifetime<I> {
         config.valid_until()
+    }
+
+    fn is_addr_assigned<I: Instant>(addr_state: &Ipv6AddressState<I>) -> bool {
+        addr_state.flags.assigned
     }
 }
 
@@ -461,53 +472,6 @@ impl<
                 },
             ),
         }
-    }
-}
-
-pub(crate) struct DualStackDeviceStateRef<'a, I: Instant> {
-    pub(crate) ipv4: &'a IpDeviceAddresses<I, Ipv4>,
-    pub(crate) ipv6: &'a IpDeviceAddresses<I, Ipv6>,
-}
-
-/// The bindings execution context for dual-stack devices.
-pub(crate) trait DualStackDeviceBindingsContext: InstantContext {}
-impl<BC: InstantContext> DualStackDeviceBindingsContext for BC {}
-
-/// The core execution context for dual-stack devices.
-pub(crate) trait DualStackDeviceContext<BC: DualStackDeviceBindingsContext>:
-    DeviceIdContext<AnyDevice>
-{
-    /// Calls the function with an immutable view into the dual-stack device's
-    /// state.
-    fn with_dual_stack_device_state<O, F: FnOnce(DualStackDeviceStateRef<'_, BC::Instant>) -> O>(
-        &mut self,
-        device_id: &Self::DeviceId,
-        cb: F,
-    ) -> O;
-}
-
-/// An implementation of dual-stack devices.
-pub(crate) trait DualStackDeviceHandler<BC>: DeviceIdContext<AnyDevice> {
-    /// Get all IPv4 and IPv6 address/subnet pairs configured on a device.
-    fn get_all_ip_addr_subnets(&mut self, device_id: &Self::DeviceId) -> Vec<AddrSubnetEither>;
-}
-
-impl<BC: DualStackDeviceBindingsContext, CC: DualStackDeviceContext<BC>> DualStackDeviceHandler<BC>
-    for CC
-{
-    fn get_all_ip_addr_subnets(&mut self, device_id: &Self::DeviceId) -> Vec<AddrSubnetEither> {
-        self.with_dual_stack_device_state(device_id, |DualStackDeviceStateRef { ipv4, ipv6 }| {
-            let addrs_v4 = ipv4
-                .iter()
-                .map(Deref::deref)
-                .filter_map(<Ipv4 as IpDeviceStateIpExt>::assigned_addr::<BC::Instant>);
-            let addrs_v6 = ipv6
-                .iter()
-                .map(Deref::deref)
-                .filter_map(<Ipv6 as IpDeviceStateIpExt>::assigned_addr::<BC::Instant>);
-
-            addrs_v4.map(AddrSubnetEither::V4).chain(addrs_v6.map(AddrSubnetEither::V6)).collect()
-        })
     }
 }
 

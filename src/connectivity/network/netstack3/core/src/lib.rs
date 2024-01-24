@@ -68,7 +68,7 @@ pub mod device {
     //
     // TODO(https://fxbug.dev/42083910): Replace freestanding functions with API
     // objects.
-    pub use base::{get_all_ip_addr_subnets, inspect_devices};
+    pub use base::inspect_devices;
 
     // Re-exported types.
     pub use api::{RemoveDeviceResult, RemoveDeviceResultWithContext};

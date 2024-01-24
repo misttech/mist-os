@@ -65,10 +65,9 @@ const ZXSIO_SIGNAL_CONNECTED: zx::Signals =
 pub(crate) struct SocketWorkerProperties {}
 
 pub(crate) async fn serve(
-    ctx: crate::bindings::Ctx,
+    mut ctx: crate::bindings::Ctx,
     stream: psocket::ProviderRequestStream,
 ) -> crate::bindings::util::TaskWaitGroup {
-    let ctx = &ctx;
     let (wait_group, task_spawner) = crate::bindings::util::TaskWaitGroup::new();
     let task_spawner: worker::ProviderScopedSpawner<_> = task_spawner.into();
     stream
@@ -159,7 +158,7 @@ pub(crate) async fn serve(
                 }
                 psocket::ProviderRequest::GetInterfaceAddresses { responder } => {
                     responder
-                        .send(&get_interface_addresses(&ctx))
+                        .send(&get_interface_addresses(&mut ctx))
                         .unwrap_or_else(|e| tracing::error!("failed to respond: {e:?}"));
                 }
             }
@@ -175,19 +174,21 @@ pub(crate) fn create_request_stream<T: fidl::endpoints::ProtocolMarker>(
     fidl::endpoints::create_request_stream().expect("can't create stream")
 }
 
-fn get_interface_addresses(ctx: &Ctx) -> Vec<psocket::InterfaceAddresses> {
-    let (core_ctx, bindings_ctx) = ctx.contexts();
-    bindings_ctx.devices.with_devices(|devices| {
+fn get_interface_addresses(ctx: &mut Ctx) -> Vec<psocket::InterfaceAddresses> {
+    // Clone `ctx` so we can call API in the closure, it's cheaper than doing
+    // extra vec cloning to satisfy the borrow checker.
+    let mut ctx_clone = ctx.clone();
+    ctx.bindings_ctx().devices.with_devices(|devices| {
         devices
             .map(|d| {
                 // Generally, calling into `netstack3_core` while operating
                 // on the non-sync context is a recipe for deadlocks. That's
                 // not an issue here since the non-sync context isn't being
                 // passed into `get_all_ip_addr_subnets`.
-                let addresses = netstack3_core::device::get_all_ip_addr_subnets(&*core_ctx, d)
-                    .into_iter()
-                    .map(fidl_fuchsia_net_ext::FromExt::from_ext)
-                    .collect();
+                let mut addresses = Vec::new();
+                ctx_clone.api().device_ip_any().for_each_assigned_ip_addr_subnet(d, |a| {
+                    addresses.push(fidl_fuchsia_net_ext::FromExt::from_ext(a))
+                });
 
                 let DeviceIdAndName { id, name } = d.bindings_id();
                 let info = d.external_state();

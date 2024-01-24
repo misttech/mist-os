@@ -52,23 +52,11 @@ pub trait IpDeviceStateIpExt: Ip {
     /// device (because there are no remote hosts) or in the context of an IPsec
     /// device (because multicast is not supported).
     type GmpState<I: Instant>;
-
-    /// Examines the address and returns its subnet if it is assigned.
-    ///
-    /// Otherwise returns `None`.
-    fn assigned_addr<I: Instant>(addr: &Self::AssignedAddress<I>)
-        -> Option<AddrSubnet<Self::Addr>>;
 }
 
 impl IpDeviceStateIpExt for Ipv4 {
     type AssignedAddress<I: Instant> = Ipv4AddressEntry<I>;
     type GmpState<I: Instant> = IgmpGroupState<I>;
-
-    fn assigned_addr<I: Instant>(
-        addr: &Self::AssignedAddress<I>,
-    ) -> Option<AddrSubnet<Self::Addr>> {
-        Some(*addr.addr_sub())
-    }
 }
 
 impl<I: Instant> IpAddressId<Ipv4Addr> for StrongRc<Ipv4AddressEntry<I>> {
@@ -94,16 +82,6 @@ impl<I: Instant> IpAddressId<Ipv6Addr> for StrongRc<Ipv6AddressEntry<I>> {
 impl IpDeviceStateIpExt for Ipv6 {
     type AssignedAddress<I: Instant> = Ipv6AddressEntry<I>;
     type GmpState<I: Instant> = MldGroupState<I>;
-
-    fn assigned_addr<I: Instant>(
-        addr: &Self::AssignedAddress<I>,
-    ) -> Option<AddrSubnet<Self::Addr>> {
-        // Tentative IP addresses (addresses which are not yet fully bound to a
-        // device) and deprecated IP addresses (addresses which have been
-        // assigned but should no longer be used for new connections) will not
-        // be returned.
-        addr.state.read().flags.assigned.then_some((*addr.addr_sub()).to_witness())
-    }
 }
 
 /// The state associated with an IP address assigned to an IP device.

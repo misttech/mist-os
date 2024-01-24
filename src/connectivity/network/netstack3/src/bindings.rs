@@ -137,11 +137,6 @@ mod ctx {
             &mut self.bindings_ctx
         }
 
-        pub(crate) fn contexts(&self) -> (&Arc<SyncCtx<BindingsCtx>>, &BindingsCtx) {
-            let Ctx { bindings_ctx, core_ctx } = self;
-            (core_ctx, bindings_ctx)
-        }
-
         pub(crate) fn contexts_mut(&mut self) -> (&Arc<SyncCtx<BindingsCtx>>, &mut BindingsCtx) {
             let Ctx { bindings_ctx, core_ctx } = self;
             (core_ctx, bindings_ctx)

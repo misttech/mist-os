@@ -12,7 +12,7 @@ use derivative::Derivative;
 use lock_order::{lock::UnlockedAccess, wrap::prelude::*};
 use net_types::{
     ethernet::Mac,
-    ip::{AddrSubnetEither, Ip, IpAddr, Ipv4, Ipv6},
+    ip::{Ip, IpAddr, Ipv4, Ipv6},
     BroadcastAddr, MulticastAddr, Witness as _,
 };
 use packet::Buf;
@@ -38,7 +38,7 @@ use crate::{
         device::{
             nud::LinkResolutionContext,
             state::{AssignedAddress as _, IpDeviceFlags},
-            DualStackDeviceHandler, IpDeviceIpExt, IpDeviceStateContext,
+            IpDeviceIpExt, IpDeviceStateContext,
         },
         forwarding::IpForwardingDeviceContext,
         types::RawMetric,
@@ -557,14 +557,6 @@ pub(crate) fn set_promiscuous_mode<BC: BindingsContext>(
     }
 }
 
-/// Get all IPv4 and IPv6 address/subnet pairs configured on a device
-pub fn get_all_ip_addr_subnets<BC: BindingsContext>(
-    core_ctx: &SyncCtx<BC>,
-    device: &DeviceId<BC>,
-) -> Vec<AddrSubnetEither> {
-    DualStackDeviceHandler::get_all_ip_addr_subnets(&mut CoreCtx::new_deprecated(core_ctx), device)
-}
-
 #[cfg(any(test, feature = "testutils"))]
 pub(crate) mod testutil {
     use super::*;
@@ -730,7 +722,7 @@ mod tests {
     use const_unwrap::const_unwrap_option;
     use net_declare::net_mac;
     use net_types::{
-        ip::{AddrSubnet, AddrSubnetEither, Mtu},
+        ip::{AddrSubnet, Mtu},
         SpecifiedAddr, UnicastAddr,
     };
     use test_case::test_case;
@@ -1034,39 +1026,30 @@ mod tests {
         let ip = I::get_other_ip_address(1).get();
         let prefix = config.subnet.prefix();
         let addr_subnet = AddrSubnet::new(ip, prefix).unwrap();
-        let addr_subnet_either = AddrSubnetEither::from(addr_subnet);
+
+        let check_contains_addr = |ctx: &mut crate::testutil::FakeCtx| {
+            ctx.core_api()
+                .device_ip::<I>()
+                .get_assigned_ip_addr_subnets(&device)
+                .contains(&addr_subnet)
+        };
 
         // IP doesn't exist initially.
-        assert_eq!(
-            get_all_ip_addr_subnets(&ctx.core_ctx, &device)
-                .into_iter()
-                .find(|&a| a == addr_subnet_either),
-            None
-        );
+        assert_eq!(check_contains_addr(&mut ctx), false);
 
         // Add IP (OK).
         ctx.core_api()
             .device_ip::<I>()
             .add_ip_addr_subnet_with_config(&device, addr_subnet, addr_config.unwrap_or_default())
             .unwrap();
-        assert_eq!(
-            get_all_ip_addr_subnets(&ctx.core_ctx, &device)
-                .into_iter()
-                .find(|&a| a == addr_subnet_either),
-            Some(addr_subnet_either)
-        );
+        assert_eq!(check_contains_addr(&mut ctx), true);
 
         // Add IP again (already exists).
         assert_eq!(
             ctx.core_api().device_ip::<I>().add_ip_addr_subnet(&device, addr_subnet),
             Err(AddIpAddrSubnetError::Exists),
         );
-        assert_eq!(
-            get_all_ip_addr_subnets(&ctx.core_ctx, &device)
-                .into_iter()
-                .find(|&a| a == addr_subnet_either),
-            Some(addr_subnet_either)
-        );
+        assert_eq!(check_contains_addr(&mut ctx), true);
 
         // Add IP with different subnet (already exists).
         let wrong_addr_subnet = AddrSubnet::new(ip, prefix - 1).unwrap();
@@ -1074,34 +1057,20 @@ mod tests {
             ctx.core_api().device_ip::<I>().add_ip_addr_subnet(&device, wrong_addr_subnet),
             Err(AddIpAddrSubnetError::Exists),
         );
-        assert_eq!(
-            get_all_ip_addr_subnets(&ctx.core_ctx, &device)
-                .into_iter()
-                .find(|&a| a == addr_subnet_either),
-            Some(addr_subnet_either)
-        );
+        assert_eq!(check_contains_addr(&mut ctx), true);
 
         let ip = SpecifiedAddr::new(ip).unwrap();
         // Del IP (ok).
         let () = ctx.core_api().device_ip::<I>().del_ip_addr(&device, ip).unwrap();
-        assert_eq!(
-            get_all_ip_addr_subnets(&ctx.core_ctx, &device)
-                .into_iter()
-                .find(|&a| a == addr_subnet_either),
-            None
-        );
+        assert_eq!(check_contains_addr(&mut ctx), false);
 
         // Del IP again (not found).
         assert_eq!(
             ctx.core_api().device_ip::<I>().del_ip_addr(&device, ip),
             Err(error::NotFoundError),
         );
-        assert_eq!(
-            get_all_ip_addr_subnets(&ctx.core_ctx, &device)
-                .into_iter()
-                .find(|&a| a == addr_subnet_either),
-            None
-        );
+
+        assert_eq!(check_contains_addr(&mut ctx), false);
     }
 
     #[test_case(None; "with no AddressConfig specified")]

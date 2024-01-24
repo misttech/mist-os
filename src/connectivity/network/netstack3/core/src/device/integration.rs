@@ -49,9 +49,9 @@ use crate::{
             Ipv4AddressState, Ipv4DeviceConfiguration, Ipv6AddressEntry, Ipv6AddressState,
             Ipv6DadState, Ipv6DeviceConfiguration, Ipv6NetworkLearnedParameters,
         },
-        DualStackDeviceContext, DualStackDeviceStateRef, IpDeviceAddressContext,
-        IpDeviceAddressIdContext, IpDeviceConfigurationContext, IpDeviceIpExt, IpDeviceSendContext,
-        IpDeviceStateContext, Ipv6DeviceAddr, Ipv6DeviceConfigurationContext, Ipv6DeviceContext,
+        IpDeviceAddressContext, IpDeviceAddressIdContext, IpDeviceConfigurationContext,
+        IpDeviceIpExt, IpDeviceSendContext, IpDeviceStateContext, Ipv6DeviceAddr,
+        Ipv6DeviceConfigurationContext, Ipv6DeviceContext,
     },
     sync::{PrimaryRc, StrongRc},
     BindingsContext, BindingsTypes, CoreCtx, StackState,
@@ -1053,23 +1053,6 @@ fn leave_link_multicast_group<
             MulticastAddr::from(&multicast_addr),
         ),
         DeviceId::Loopback(LoopbackDeviceId { .. }) => {}
-    }
-}
-
-impl<BC: BindingsContext> DualStackDeviceContext<BC>
-    for CoreCtx<'_, BC, crate::lock_ordering::Unlocked>
-{
-    fn with_dual_stack_device_state<O, F: FnOnce(DualStackDeviceStateRef<'_, BC::Instant>) -> O>(
-        &mut self,
-        device_id: &Self::DeviceId,
-        cb: F,
-    ) -> O {
-        with_ip_device_state(self, device_id, |mut state| {
-            let (ipv4, mut locked) =
-                state.read_lock_and::<crate::lock_ordering::IpDeviceAddresses<Ipv4>>();
-            let ipv6 = locked.read_lock::<crate::lock_ordering::IpDeviceAddresses<Ipv6>>();
-            cb(DualStackDeviceStateRef { ipv4: &ipv4, ipv6: &ipv6 })
-        })
     }
 }
 
