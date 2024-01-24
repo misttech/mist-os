@@ -23,7 +23,7 @@ use crate::{
         FsString, LookupContext, MemoryDirectoryFile, MemoryXattrStorage, NamespaceNode, XattrOp,
     },
 };
-use starnix_logging::{log_trace, not_implemented};
+use starnix_logging::{log_error, log_trace, not_implemented};
 use starnix_sync::{BpfMapEntries, FileOpsRead, FileOpsWrite, Locked, OrderedMutex, Unlocked};
 use starnix_syscalls::{SyscallResult, SUCCESS};
 use starnix_uapi::{
@@ -34,7 +34,7 @@ use starnix_uapi::{
     bpf_cmd, bpf_cmd_BPF_BTF_LOAD, bpf_cmd_BPF_MAP_CREATE, bpf_cmd_BPF_MAP_GET_NEXT_KEY,
     bpf_cmd_BPF_MAP_UPDATE_ELEM, bpf_cmd_BPF_OBJ_GET, bpf_cmd_BPF_OBJ_GET_INFO_BY_FD,
     bpf_cmd_BPF_OBJ_PIN, bpf_cmd_BPF_PROG_ATTACH, bpf_cmd_BPF_PROG_LOAD, bpf_cmd_BPF_PROG_QUERY,
-    bpf_map_info, bpf_map_type, bpf_map_type_BPF_MAP_TYPE_DEVMAP,
+    bpf_insn, bpf_map_info, bpf_map_type, bpf_map_type_BPF_MAP_TYPE_DEVMAP,
     bpf_map_type_BPF_MAP_TYPE_DEVMAP_HASH, bpf_prog_info,
     device_type::DeviceType,
     errno, error,
@@ -46,6 +46,7 @@ use starnix_uapi::{
     BPF_FS_MAGIC, BPF_F_RDONLY_PROG, PATH_MAX,
 };
 use std::{collections::BTreeMap, ops::Bound, sync::Arc};
+use ubpf::program::EbpfProgram;
 use zerocopy::{AsBytes, FromBytes};
 
 /// The default selinux context to use for each BPF object.
@@ -117,9 +118,8 @@ struct Map {
 }
 impl BpfObject for Map {}
 
-/// A BPF program. Currently empty because none of the state of a program actually matters to us
-/// yet.
-struct Program;
+/// A BPF program.
+struct Program {}
 impl BpfObject for Program {}
 
 /// Read the arguments for a BPF command. The ABI works like this: If the arguments struct
@@ -278,10 +278,18 @@ pub fn sys_bpf(
         // Verify and load an eBPF program, returning a new file descriptor associated with the
         // program.
         bpf_cmd_BPF_PROG_LOAD => {
-            let _prog_attr: bpf_attr__bindgen_ty_4 = read_attr(current_task, attr_addr, attr_size)?;
+            let prog_attr: bpf_attr__bindgen_ty_4 = read_attr(current_task, attr_addr, attr_size)?;
             log_trace!("BPF_PROG_LOAD");
-            // Just pretend to load the program. We certainly can't execute it.
-            install_bpf_fd(current_task, Program)
+
+            let user_code = UserRef::<bpf_insn>::new(UserAddress::from(prog_attr.insns));
+            let code = current_task.read_objects_to_vec(user_code, prog_attr.insn_cnt as usize)?;
+
+            // We ignore any errors in loading the program at the moment.
+            let _program_result = EbpfProgram::new(code).map_err(|e| {
+                log_error!("Failed to load BPF program: {:?}", e);
+                errno!(EINVAL)
+            });
+            install_bpf_fd(current_task, Program {})
         }
 
         // Attach an eBPF program to a target_fd at the specified attach_type hook.

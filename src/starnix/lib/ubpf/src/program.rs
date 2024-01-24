@@ -48,7 +48,7 @@ pub enum UbpfError {
 
 impl UbpfVm {
     // Return a fresh VM, ready for action.
-    fn init(mut prg: Vec<bpf_insn>) -> Result<Self, UbpfError> {
+    fn init(mut code: Vec<bpf_insn>) -> Result<Self, UbpfError> {
         let vm = unsafe { ubpf_create() };
         if vm == std::ptr::null_mut() {
             return Err(VmInitialization);
@@ -58,8 +58,8 @@ impl UbpfVm {
             let mut errmsg = std::ptr::null_mut();
             let success = ubpf_load(
                 vm,
-                prg.as_mut_ptr() as *mut c_void,
-                (prg.len() * std::mem::size_of::<bpf_insn>()) as u32,
+                code.as_mut_ptr() as *mut c_void,
+                (code.len() * std::mem::size_of::<bpf_insn>()) as u32,
                 &mut errmsg,
             );
 
@@ -78,7 +78,7 @@ impl UbpfVm {
             }
         }
 
-        Ok(UbpfVm { opaque_vm: vm, program: prg })
+        Ok(UbpfVm { opaque_vm: vm, program: code })
     }
 
     fn run<T>(&self, data: &mut T) -> Result<u64, i32> {
@@ -109,15 +109,15 @@ pub struct EbpfProgram {
 }
 
 impl EbpfProgram {
+    /// This method instantiates an EbpfProgram given ebpf instructions.
+    pub fn new(code: Vec<bpf_insn>) -> Result<Self, UbpfError> {
+        Ok(EbpfProgram { bpf_vm: UbpfVm::init(code)? })
+    }
+
     /// This method instantiates an EbpfProgram given a cbpf original.
     pub fn from_cbpf(bpf_code: &[sock_filter]) -> Result<Self, UbpfError> {
         // Convert the sock_filter to ebpf
-        let prg = cbpf_to_ebpf(bpf_code)?;
-
-        // Create the ubpf VM
-        let vm = UbpfVm::init(prg)?;
-
-        Ok(EbpfProgram { bpf_vm: vm })
+        Self::new(cbpf_to_ebpf(bpf_code)?)
     }
 
     /// Executes the given program on the provided data.  Warning: If
