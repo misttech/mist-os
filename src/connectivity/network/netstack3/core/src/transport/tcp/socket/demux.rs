@@ -166,12 +166,12 @@ where
         let conn_addr =
             ConnIpAddr { local: (local_ip, local_port), remote: (remote_ip, remote_port) };
 
-        handle_incoming_packet::<I, B, _, _>(core_ctx, bindings_ctx, conn_addr, device, incoming);
+        handle_incoming_packet::<I, _, _>(core_ctx, bindings_ctx, conn_addr, device, incoming);
         Ok(())
     }
 }
 
-fn handle_incoming_packet<I, B, BC, CC>(
+fn handle_incoming_packet<I, BC, CC>(
     core_ctx: &mut CC,
     bindings_ctx: &mut BC,
     conn_addr: ConnIpAddr<I::Addr, NonZeroU16, NonZeroU16>,
@@ -179,7 +179,6 @@ fn handle_incoming_packet<I, B, BC, CC>(
     incoming: Segment<&[u8]>,
 ) where
     I: DualStackIpExt,
-    B: BufferMut,
     BC: TcpBindingsContext<I, CC::WeakDeviceId>
         + TcpBindingsContext<I::OtherVersion, CC::WeakDeviceId>
         + BufferProvider<
@@ -243,7 +242,7 @@ fn handle_incoming_packet<I, B, BC, CC>(
                     &id,
                     |core_ctx, socket_state, isn| {
                         let (core_ctx, converter) = core_ctx.into_single_stack();
-                        try_handle_incoming_for_listener::<I, CC, BC, B>(
+                        try_handle_incoming_for_listener::<I, CC, BC>(
                             core_ctx,
                             converter,
                             bindings_ctx,
@@ -685,7 +684,7 @@ where
 /// Tries to handle an incoming segment by passing it to a listening socket.
 ///
 /// Returns `FoundSocket` if the segment was handled, otherwise `NoMatchingSocket`.
-fn try_handle_incoming_for_listener<I, CC, BC, B>(
+fn try_handle_incoming_for_listener<I, CC, BC>(
     core_ctx: &mut CC::SingleStackIpTransportAndDemuxCtx<'_>,
     converter: MaybeDualStack<CC::DualStackConverter, CC::SingleStackConverter>,
     bindings_ctx: &mut BC,
@@ -701,7 +700,6 @@ fn try_handle_incoming_for_listener<I, CC, BC, B>(
 ) -> ListenerIncomingSegmentDisposition<PrimaryRc<I, CC::WeakDeviceId, BC>>
 where
     I: DualStackIpExt,
-    B: BufferMut,
     BC: TcpBindingsContext<I, CC::WeakDeviceId>
         + BufferProvider<
             BC::ReceiveBuffer,
