@@ -1395,11 +1395,6 @@ version = "1.0.11"
 criteria = ["safe-to-deploy", "ub-risk-2"]
 notes = "Needs re-audit"
 
-[[exemptions.pin-project-lite]]
-version = "0.2.4"
-criteria = ["safe-to-deploy", "ub-risk-2"]
-notes = "Needs re-audit"
-
 [[exemptions.pin-utils]]
 version = "0.1.0"
 criteria = ["safe-to-deploy", "ub-risk-2"]
