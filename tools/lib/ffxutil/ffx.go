@@ -144,10 +144,9 @@ func NewFFXInstance(
 	for _, args := range ffxCmds {
 		ctx, cancel := context.WithTimeout(ctx, 20*time.Second)
 		defer cancel()
+		// TODO(https://fxbug.dev/321754579): Remove when no longer needed for debugging.
+		args = append([]string{"-v", "--log-level", "TRACE"}, args...)
 		if err := ffx.Run(ctx, args...); err != nil {
-			if stopErr := ffx.Stop(); stopErr != nil {
-				logger.Debugf(ctx, "failed to stop daemon: %s", stopErr)
-			}
 			return nil, err
 		}
 	}
