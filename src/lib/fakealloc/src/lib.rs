@@ -6,7 +6,7 @@
 //! currently require `std` such as `HashMap` and `HashSet`.
 
 // TODO(https://github.com/rust-lang-nursery/portability-wg/issues/11): remove this module.
-// TODO(https://fxbug.dev/134858): Use the `hashbrown` crate to provide a `HashMap`
+// TODO(https://fxbug.dev/42084580): Use the `hashbrown` crate to provide a `HashMap`
 // with a default hasher that requires the (to-be-imported) `ahash` crate.
 extern crate alloc as rustalloc;
 

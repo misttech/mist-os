@@ -78,7 +78,7 @@ func (s *Service) getIO() (io.NodeWithCtx, func() error, error) {
 }
 
 func (s *Service) addConnection(ctx fidl.Context, flags io.OpenFlags, mode io.ModeType, req io.NodeWithCtxInterfaceRequest) error {
-	// TODO(https://fxbug.dev/33595): this does not implement the node protocol correctly,
+	// TODO(https://fxbug.dev/42108808): this does not implement the node protocol correctly,
 	// but matches the behaviour of SDK VFS.
 	if flags&io.OpenFlagsNodeReference != 0 {
 		stub := io.NodeWithCtxStub{Impl: s}
@@ -95,7 +95,7 @@ func (s *Service) Clone(ctx fidl.Context, flags io.OpenFlags, req io.NodeWithCtx
 }
 
 func (s *Service) Reopen(ctx fidl.Context, rights io.RightsRequest, req io.NodeWithCtxInterfaceRequest) error {
-	// TODO(https://fxbug.dev/77623): implement.
+	// TODO(https://fxbug.dev/42157659): implement.
 	_ = req.Close()
 	return nil
 }
@@ -112,7 +112,7 @@ func (*Service) DescribeDeprecated(fidl.Context) (io.NodeInfoDeprecated, error) 
 
 func (*Service) GetConnectionInfo(fidl.Context) (io.ConnectionInfo, error) {
 	var connectionInfo io.ConnectionInfo
-	// TODO(https://fxbug.dev/77623): Populate the rights requested by the client at connection.
+	// TODO(https://fxbug.dev/42157659): Populate the rights requested by the client at connection.
 	// This might require separating Service from the VFS implementation so that the latter can
 	// hold these rights.
 	connectionInfo.SetRights(io.OperationsConnect)
@@ -136,12 +136,12 @@ func (*Service) SetAttr(fidl.Context, io.NodeAttributeFlags, io.NodeAttributes) 
 }
 
 func (*Service) GetAttributes(fidl.Context, io.NodeAttributesQuery) (io.Node2GetAttributesResult, error) {
-	// TODO(https://fxbug.dev/77623): implement.
+	// TODO(https://fxbug.dev/42157659): implement.
 	return io.Node2GetAttributesResultWithErr(int32(zx.ErrNotSupported)), nil
 }
 
 func (*Service) UpdateAttributes(fidl.Context, io.MutableNodeAttributes) (io.Node2UpdateAttributesResult, error) {
-	// TODO(https://fxbug.dev/77623): implement.
+	// TODO(https://fxbug.dev/42157659): implement.
 	return io.Node2UpdateAttributesResultWithErr(int32(zx.ErrNotSupported)), nil
 }
 
@@ -266,7 +266,7 @@ func (dirState *directoryState) Clone(ctx fidl.Context, flags io.OpenFlags, req 
 }
 
 func (dirState *directoryState) Reopen(ctx fidl.Context, rights io.RightsRequest, req io.NodeWithCtxInterfaceRequest) error {
-	// TODO(https://fxbug.dev/77623): implement.
+	// TODO(https://fxbug.dev/42157659): implement.
 	_ = req.Close()
 	return nil
 }
@@ -283,7 +283,7 @@ func (*DirectoryWrapper) DescribeDeprecated(fidl.Context) (io.NodeInfoDeprecated
 
 func (*directoryState) GetConnectionInfo(fidl.Context) (io.ConnectionInfo, error) {
 	var connectionInfo io.ConnectionInfo
-	// TODO(https://fxbug.dev/77623): Populate the rights requested by the client at connection.
+	// TODO(https://fxbug.dev/42157659): Populate the rights requested by the client at connection.
 	rights := io.RStarDir
 	connectionInfo.SetRights(rights)
 	return connectionInfo, nil
@@ -306,12 +306,12 @@ func (*directoryState) SetAttr(fidl.Context, io.NodeAttributeFlags, io.NodeAttri
 }
 
 func (*directoryState) GetAttributes(fidl.Context, io.NodeAttributesQuery) (io.Node2GetAttributesResult, error) {
-	// TODO(https://fxbug.dev/77623): implement.
+	// TODO(https://fxbug.dev/42157659): implement.
 	return io.Node2GetAttributesResultWithErr(int32(zx.ErrNotSupported)), nil
 }
 
 func (*directoryState) UpdateAttributes(fidl.Context, io.MutableNodeAttributes) (io.Node2UpdateAttributesResult, error) {
-	// TODO(https://fxbug.dev/77623): implement.
+	// TODO(https://fxbug.dev/42157659): implement.
 	return io.Node2UpdateAttributesResultWithErr(int32(zx.ErrNotSupported)), nil
 }
 
@@ -363,7 +363,7 @@ func (dirState *directoryState) Open(ctx fidl.Context, flags io.OpenFlags, mode 
 }
 
 func (dirState *directoryState) Open2(ctx fidl.Context, path string, protocols io.ConnectionProtocols, channel zx.Channel) error {
-	// TODO(https://fxbug.dev/77623): implement.
+	// TODO(https://fxbug.dev/42157659): implement.
 	_ = channel.Close()
 	return nil
 }
@@ -373,7 +373,7 @@ func (*directoryState) Unlink(fidl.Context, string, io.UnlinkOptions) (io.Direct
 }
 
 func (dirState *directoryState) Enumerate(ctx fidl.Context, options io.DirectoryEnumerateOptions, req io.DirectoryIteratorWithCtxInterfaceRequest) error {
-	// TODO(https://fxbug.dev/77623): implement.
+	// TODO(https://fxbug.dev/42157659): implement.
 	_ = req.Close()
 	return nil
 }
@@ -624,7 +624,7 @@ func (fState *fileState) Clone(ctx fidl.Context, flags io.OpenFlags, req io.Node
 }
 
 func (fState *fileState) Reopen(ctx fidl.Context, rights io.RightsRequest, req io.NodeWithCtxInterfaceRequest) error {
-	// TODO(https://fxbug.dev/77623): implement.
+	// TODO(https://fxbug.dev/42157659): implement.
 	_ = req.Close()
 	return nil
 }
@@ -650,7 +650,7 @@ func (*fileState) LinkInto(fidl.Context, zx.Event, string) (io.LinkableLinkIntoR
 
 func (fState *fileState) GetConnectionInfo(fidl.Context) (io.ConnectionInfo, error) {
 	var connectionInfo io.ConnectionInfo
-	// TODO(https://fxbug.dev/77623): Populate the rights requested by the client at connection.
+	// TODO(https://fxbug.dev/42157659): Populate the rights requested by the client at connection.
 	rights := io.RStarDir
 	connectionInfo.SetRights(rights)
 	return connectionInfo, nil
@@ -674,12 +674,12 @@ func (*fileState) SetAttr(fidl.Context, io.NodeAttributeFlags, io.NodeAttributes
 }
 
 func (*fileState) GetAttributes(fidl.Context, io.NodeAttributesQuery) (io.Node2GetAttributesResult, error) {
-	// TODO(https://fxbug.dev/77623): implement.
+	// TODO(https://fxbug.dev/42157659): implement.
 	return io.Node2GetAttributesResultWithErr(int32(zx.ErrNotSupported)), nil
 }
 
 func (*fileState) UpdateAttributes(fidl.Context, io.MutableNodeAttributes) (io.Node2UpdateAttributesResult, error) {
-	// TODO(https://fxbug.dev/77623): implement.
+	// TODO(https://fxbug.dev/42157659): implement.
 	return io.Node2UpdateAttributesResultWithErr(int32(zx.ErrNotSupported)), nil
 }
 
@@ -780,7 +780,7 @@ func (fState *fileState) AdvisoryLock(fidl.Context, io.AdvisoryLockRequest) (io.
 
 func (fState *fileState) GetBackingMemory(fidl.Context, io.VmoFlags) (io.FileGetBackingMemoryResult, error) {
 	if vmo := fState.reader.GetVMO(); vmo != nil {
-		// TODO(https://fxbug.dev/77623): The rights on this VMO should be capped at the connection's.
+		// TODO(https://fxbug.dev/42157659): The rights on this VMO should be capped at the connection's.
 		h, err := vmo.Handle().Duplicate(zx.RightSameRights)
 		switch err := err.(type) {
 		case nil:

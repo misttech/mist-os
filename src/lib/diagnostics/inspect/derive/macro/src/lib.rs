@@ -288,7 +288,7 @@ fn check_container_attrs(d: &syn::DeriveInput) -> Result<(), Error> {
 /// Type- and lifetime parameters are supported if they are ignored.
 ///
 /// The only supported field-level attribute is `inspect(skip)`.
-// TODO(https://fxbug.dev/50504): Add support for more types, such as enums.
+// TODO(https://fxbug.dev/42127592): Add support for more types, such as enums.
 #[proc_macro_derive(Unit, attributes(inspect))]
 pub fn derive_unit(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     let ast = parse_macro_input!(input as DeriveInput);

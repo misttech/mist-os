@@ -262,7 +262,7 @@ impl Process {
             sys::zx_process_read_memory(
                 self.raw_handle(),
                 vaddr,
-                // TODO(https://fxbug.dev/129307) use MaybeUninit::slice_as_mut_ptr when stable
+                // TODO(https://fxbug.dev/42079723) use MaybeUninit::slice_as_mut_ptr when stable
                 buffer.as_mut_ptr() as *mut u8,
                 buffer.len(),
                 &mut actually_read,
@@ -271,7 +271,7 @@ impl Process {
         ok(status)?;
         let (initialized, uninitialized) = buffer.split_at_mut(actually_read);
         Ok((
-            // TODO(https://fxbug.dev/129307) use MaybeUninit::slice_assume_init_mut when stable
+            // TODO(https://fxbug.dev/42079723) use MaybeUninit::slice_assume_init_mut when stable
             // SAFETY: We're converting &mut [MaybeUninit<u8>] back to &mut [u8], which is only
             // valid to do if all elements of `initialized` have actually been initialized. Here we
             // have to trust that the kernel didn't lie when it said it wrote to the entire buffer,

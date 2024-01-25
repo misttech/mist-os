@@ -341,7 +341,7 @@ impl Inner {
     /// lifecycle of the port itself is not currently tied to it. Executor vends clones of its
     /// inner Arc structure to all receivers, so we don't have a type-safe way of ensuring that
     /// the port is dropped alongside the Executor as it should.
-    /// TODO(https://fxbug.dev/75075): Ensure the port goes away with the executor.
+    /// TODO(https://fxbug.dev/42154828): Ensure the port goes away with the executor.
     ///
     /// b) The Executor's lifetime is also tied to the thread-local variable pointing to the
     /// "current" executor being set, and that's unset when the executor is dropped.

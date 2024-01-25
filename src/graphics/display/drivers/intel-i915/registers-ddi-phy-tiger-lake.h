@@ -434,7 +434,7 @@ class PortCompensation1 : public hwreg::RegisterBase<PortCompensation1, uint32_t
   DEF_BIT(25, frequency_compensation_polarity_select);
   DEF_BIT(24, resistance_compensation_enabled);
 
-  // TODO(https://fxbug.dev/114665): Add helpers for reading and writing the fields
+  // TODO(https://fxbug.dev/42065922): Add helpers for reading and writing the fields
   // below, which are spread across PortCompensation1,
   // PortCompensationNominalVoltageReferences, and
   // PortCompensationLowVoltageReferences.

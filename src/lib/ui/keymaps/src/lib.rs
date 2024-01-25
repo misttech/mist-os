@@ -1202,7 +1202,7 @@ mod tests {
     ]
     #[test_case(
         // This test case is needed for Chromium integration.
-        // See https://fxbug.dev/109987.
+        // See https://fxbug.dev/42061371.
         &FR_AZERTY,
         Key::RightAlt,
         ModifierState::new(),

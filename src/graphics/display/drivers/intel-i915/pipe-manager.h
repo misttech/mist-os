@@ -70,7 +70,7 @@ class PipeManager {
   //
   // Returns |nullptr| if there is no Pipe available.
   //
-  // TODO(https://fxbug.dev/104985): This is error-prone because the caller has to call
+  // TODO(https://fxbug.dev/42056163): This is error-prone because the caller has to call
   // `ReturnPipe()` to recycle used pipe manually. Instead we should add a
   // wrapper class (like `BorrowedPipeRef`) which could automatically return the
   // Pipe after use.
@@ -105,7 +105,7 @@ class PipeManager {
   // Random accessor and forward iterator so that we can access the pipes
   // using <algorithms> methods and range-based for loop.
   //
-  // TODO(https://fxbug.dev/104986): This (and the pipe iterator class) adds some
+  // TODO(https://fxbug.dev/42056164): This (and the pipe iterator class) adds some
   // unnecessary complexity to the PipeManager; we can just replace it with a
   // method which returns `std::span<Pipe*>` instead.
   Pipe* operator[](PipeId idx) const;

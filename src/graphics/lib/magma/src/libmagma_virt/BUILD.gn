@@ -37,7 +37,7 @@ static_library("libmagma_virt") {
   # All functions should be declared in magma.h, so warn about unnecessary functions.
   cflags = [ "-Wmissing-prototypes" ]
 
-  # TODO(https://fxbug.dev/135694): delete the below and fix compiler warnings
+  # TODO(https://fxbug.dev/42085293): delete the below and fix compiler warnings
   configs += [ "//build/config:Wno-vla-cxx-extension" ]
 
   if (virtmagma_debug) {

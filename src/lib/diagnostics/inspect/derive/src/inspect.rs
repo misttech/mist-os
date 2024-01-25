@@ -32,7 +32,7 @@ impl From<&str> for AttachError {
 /// various Mutex types. This method should generally be implemented for a
 /// mutable reference (or a regular reference if the type has interior
 /// mutability).
-// TODO(https://fxbug.dev/50412): Add a derive-macro to auto generate this trait.
+// TODO(https://fxbug.dev/42127490): Add a derive-macro to auto generate this trait.
 pub trait Inspect {
     /// Attaches `self` to the inspect tree, under `parent[name]`. Note that:
     ///

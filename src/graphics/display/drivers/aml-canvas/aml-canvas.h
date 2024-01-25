@@ -47,7 +47,7 @@ struct CanvasEntry {
 
   zx::pmt pmt;
   // Hold a handle to the VMO so the memory diagnostic tools can realize that it's in use by this
-  // process.  See https://fxbug.dev/75877.
+  // process.  See https://fxbug.dev/42155718.
   zx::vmo vmo;
   inspect::Node node;
 };

@@ -83,7 +83,7 @@ impl synthesizer::InputDevice for self::InputDevice {
             .context("sending media button InputReport")
     }
 
-    // TODO(https://fxbug.dev/63973): remove dependency on HID usage codes.
+    // TODO(https://fxbug.dev/42142533): remove dependency on HID usage codes.
     fn key_press(&mut self, report: KeyboardReport, time: u64) -> Result<(), Error> {
         self.key_press_internal(report, time, Self::convert_keyboard_report_to_keys)
     }
@@ -92,7 +92,7 @@ impl synthesizer::InputDevice for self::InputDevice {
         self.key_press_internal(report, time, Self::convert_keyboard_report_to_keys_no_transform)
     }
 
-    // TODO(https://fxbug.dev/63973): remove reference to HID usage codes.
+    // TODO(https://fxbug.dev/42142533): remove reference to HID usage codes.
     fn key_press_usage(&mut self, usage: Option<u32>, time: u64) -> Result<(), Error> {
         self.key_press(KeyboardReport { pressed_keys: usage.into_iter().collect() }, time)
     }

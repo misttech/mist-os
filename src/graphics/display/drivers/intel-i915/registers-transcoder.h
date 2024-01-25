@@ -152,7 +152,7 @@ class TranscoderDdiControl : public hwreg::RegisterBase<TranscoderDdiControl, ui
   // DisplayPort SST (Single Stream) mode.
   DEF_FIELD(26, 24, ddi_mode);
 
-  // TODO(https://fxbug.dev/110690): Move the constants below into an enum class once we
+  // TODO(https://fxbug.dev/42062082): Move the constants below into an enum class once we
   // figure out how to handle invalid field values.
   static constexpr uint32_t kModeHdmi = 0;
   static constexpr uint32_t kModeDvi = 1;
@@ -169,7 +169,7 @@ class TranscoderDdiControl : public hwreg::RegisterBase<TranscoderDdiControl, ui
   // format in the TRANS_DSI_FUNC_CONF register.
   DEF_FIELD(22, 20, bits_per_color);
 
-  // TODO(https://fxbug.dev/110690): Move the constants below into an enum class once we
+  // TODO(https://fxbug.dev/42062082): Move the constants below into an enum class once we
   // figure out how to handle invalid field values.
   static constexpr uint32_t k8bpc = 0;
   static constexpr uint32_t k10bpc = 1;
@@ -274,7 +274,7 @@ class TranscoderDdiControl : public hwreg::RegisterBase<TranscoderDdiControl, ui
       case kInputSelectPipeC:
         return i915::PipeId::PIPE_C;
 
-        // TODO(https://fxbug.dev/109278): Add pipe D, once we support it.
+        // TODO(https://fxbug.dev/42060657): Add pipe D, once we support it.
     };
 
     return i915::PipeId::PIPE_INVALID;
@@ -290,7 +290,7 @@ class TranscoderDdiControl : public hwreg::RegisterBase<TranscoderDdiControl, ui
       case i915::PipeId::PIPE_C:
         return set_input_pipe_select(kInputSelectPipeC);
 
-        // TODO(https://fxbug.dev/109278): Add pipe D, once we support it.
+        // TODO(https://fxbug.dev/42060657): Add pipe D, once we support it.
 
       case i915::PipeId::PIPE_INVALID:
           // The code handling the explicit invalid pipe value is outside the
@@ -412,7 +412,7 @@ class TranscoderDdiControl : public hwreg::RegisterBase<TranscoderDdiControl, ui
   static auto GetForTigerLakeTranscoder(i915::TranscoderId transcoder_id) {
     ZX_ASSERT(transcoder_id >= i915::TranscoderId::TRANSCODER_A);
 
-    // TODO(https://fxbug.dev/109278): Allow transcoder D, once we support it.
+    // TODO(https://fxbug.dev/42060657): Allow transcoder D, once we support it.
     ZX_ASSERT(transcoder_id <= i915::TranscoderId::TRANSCODER_C);
 
     const int transcoder_index = transcoder_id - i915::TranscoderId::TRANSCODER_A;
@@ -423,7 +423,7 @@ class TranscoderDdiControl : public hwreg::RegisterBase<TranscoderDdiControl, ui
   static constexpr uint32_t kInputSelectPipeA = 0;
   static constexpr uint32_t kInputSelectPipeB = 5;
   static constexpr uint32_t kInputSelectPipeC = 6;
-  // TODO(https://fxbug.dev/109278): Add pipe D, once we support it. The value is 7.
+  // TODO(https://fxbug.dev/42060657): Add pipe D, once we support it. The value is 7.
 };
 
 // TRANS_CONF (Transcoder Configuration)
@@ -488,7 +488,7 @@ class TranscoderConfig : public hwreg::RegisterBase<TranscoderConfig, uint32_t> 
   static auto GetForTigerLakeTranscoder(i915::TranscoderId transcoder_id) {
     ZX_ASSERT(transcoder_id >= i915::TranscoderId::TRANSCODER_A);
 
-    // TODO(https://fxbug.dev/109278): Allow transcoder D, once we support it.
+    // TODO(https://fxbug.dev/42060657): Allow transcoder D, once we support it.
     ZX_ASSERT(transcoder_id <= i915::TranscoderId::TRANSCODER_C);
 
     const int transcoder_index = transcoder_id - i915::TranscoderId::TRANSCODER_A;
@@ -574,7 +574,7 @@ class TranscoderClockSelect : public hwreg::RegisterBase<TranscoderClockSelect, 
   static auto GetForTranscoder(i915::TranscoderId transcoder_id) {
     ZX_ASSERT(transcoder_id >= i915::TranscoderId::TRANSCODER_A);
 
-    // TODO(https://fxbug.dev/109278): Allow transcoder D, once we support it.
+    // TODO(https://fxbug.dev/42060657): Allow transcoder D, once we support it.
     ZX_ASSERT(transcoder_id <= i915::TranscoderId::TRANSCODER_C);
 
     const int transcoder_index = transcoder_id - i915::TranscoderId::TRANSCODER_A;
@@ -656,7 +656,7 @@ class TranscoderDataM : public hwreg::RegisterBase<TranscoderDataM, uint32_t> {
   static auto GetForTigerLakeTranscoder(i915::TranscoderId transcoder_id) {
     ZX_ASSERT(transcoder_id >= i915::TranscoderId::TRANSCODER_A);
 
-    // TODO(https://fxbug.dev/109278): Allow transcoder D, once we support it.
+    // TODO(https://fxbug.dev/42060657): Allow transcoder D, once we support it.
     ZX_ASSERT(transcoder_id <= i915::TranscoderId::TRANSCODER_C);
 
     const int transcoder_index = transcoder_id - i915::TranscoderId::TRANSCODER_A;
@@ -696,7 +696,7 @@ class TranscoderDataN : public hwreg::RegisterBase<TranscoderDataN, uint32_t> {
   static auto GetForTigerLakeTranscoder(i915::TranscoderId transcoder_id) {
     ZX_ASSERT(transcoder_id >= i915::TranscoderId::TRANSCODER_A);
 
-    // TODO(https://fxbug.dev/109278): Allow transcoder D, once we support it.
+    // TODO(https://fxbug.dev/42060657): Allow transcoder D, once we support it.
     ZX_ASSERT(transcoder_id <= i915::TranscoderId::TRANSCODER_C);
 
     const int transcoder_index = transcoder_id - i915::TranscoderId::TRANSCODER_A;
@@ -736,7 +736,7 @@ class TranscoderLinkM : public hwreg::RegisterBase<TranscoderLinkM, uint32_t> {
   static auto GetForTigerLakeTranscoder(i915::TranscoderId transcoder_id) {
     ZX_ASSERT(transcoder_id >= i915::TranscoderId::TRANSCODER_A);
 
-    // TODO(https://fxbug.dev/109278): Allow transcoder D, once we support it.
+    // TODO(https://fxbug.dev/42060657): Allow transcoder D, once we support it.
     ZX_ASSERT(transcoder_id <= i915::TranscoderId::TRANSCODER_C);
 
     const int transcoder_index = transcoder_id - i915::TranscoderId::TRANSCODER_A;
@@ -777,7 +777,7 @@ class TranscoderLinkN : public hwreg::RegisterBase<TranscoderLinkN, uint32_t> {
   static auto GetForTigerLakeTranscoder(i915::TranscoderId transcoder_id) {
     ZX_ASSERT(transcoder_id >= i915::TranscoderId::TRANSCODER_A);
 
-    // TODO(https://fxbug.dev/109278): Allow transcoder D, once we support it.
+    // TODO(https://fxbug.dev/42060657): Allow transcoder D, once we support it.
     ZX_ASSERT(transcoder_id <= i915::TranscoderId::TRANSCODER_C);
 
     const int transcoder_index = transcoder_id - i915::TranscoderId::TRANSCODER_A;
@@ -794,7 +794,7 @@ class TranscoderLinkN : public hwreg::RegisterBase<TranscoderLinkN, uint32_t> {
 // The encoding here is correct for all modes except for RAW, which uses a
 // different encoding.
 //
-// TODO(https://fxbug.dev/105221): This covers a general DisplayPort concept, so it
+// TODO(https://fxbug.dev/42056427): This covers a general DisplayPort concept, so it
 // belongs in a general-purpose DisplayPort support library.
 enum class DisplayPortMsaBitsPerComponent {
   k6Bpc = 0,
@@ -810,7 +810,7 @@ enum class DisplayPortMsaBitsPerComponent {
 // "MSA MISC1 and MISC0 Fields for Pixel Encoding/Colorimetry Format Indication"
 // at page 158. The table belongs to Section 2.2.4 "MSA Data Transport".
 //
-// TODO(https://fxbug.dev/105221): This covers a general DisplayPort concept, so it
+// TODO(https://fxbug.dev/42056427): This covers a general DisplayPort concept, so it
 // belongs in a general-purpose DisplayPort support library.
 enum class DisplayPortMsaColorimetry {
   kRgbUnspecifiedLegacy = 0b0'0'00,
@@ -843,7 +843,7 @@ enum class DisplayPortMsaColorimetry {
 class TranscoderMainStreamAttributeMisc
     : public hwreg::RegisterBase<TranscoderMainStreamAttributeMisc, uint32_t> {
  public:
-  // TODO(https://fxbug.dev/105221): The MSA field definitions are a general DisplayPort
+  // TODO(https://fxbug.dev/42056427): The MSA field definitions are a general DisplayPort
   // concept, and belong in a general-purpose DisplayPort support library. Once
   // we have that, this register's definition should only map MSA fields to
   // register bytes, matching the PRM.
@@ -921,7 +921,7 @@ class TranscoderMainStreamAttributeMisc
   static auto GetForTigerLakeTranscoder(i915::TranscoderId transcoder_id) {
     ZX_ASSERT(transcoder_id >= i915::TranscoderId::TRANSCODER_A);
 
-    // TODO(https://fxbug.dev/109278): Allow transcoder D, once we support it.
+    // TODO(https://fxbug.dev/42060657): Allow transcoder D, once we support it.
     ZX_ASSERT(transcoder_id <= i915::TranscoderId::TRANSCODER_C);
 
     const int transcoder_index = transcoder_id - i915::TranscoderId::TRANSCODER_A;
@@ -986,7 +986,7 @@ class TranscoderVariableRateRefreshControl
   static auto GetForTigerLakeTranscoder(i915::TranscoderId transcoder_id) {
     ZX_ASSERT(transcoder_id >= i915::TranscoderId::TRANSCODER_A);
 
-    // TODO(https://fxbug.dev/109278): Allow transcoder D, once we support it.
+    // TODO(https://fxbug.dev/42060657): Allow transcoder D, once we support it.
     ZX_ASSERT(transcoder_id <= i915::TranscoderId::TRANSCODER_C);
 
     const int transcoder_index = transcoder_id - i915::TranscoderId::TRANSCODER_A;
@@ -1075,7 +1075,7 @@ class TranscoderChicken : public hwreg::RegisterBase<TranscoderChicken, uint32_t
   static auto GetForTigerLakeTranscoder(i915::TranscoderId transcoder_id) {
     ZX_ASSERT(transcoder_id >= i915::TranscoderId::TRANSCODER_A);
 
-    // TODO(https://fxbug.dev/109278): Allow transcoder D, once we support it.
+    // TODO(https://fxbug.dev/42060657): Allow transcoder D, once we support it.
     ZX_ASSERT(transcoder_id <= i915::TranscoderId::TRANSCODER_C);
 
     // The transcoder-to-MMIO address mapping is presented in section "Variable
@@ -1107,14 +1107,14 @@ class TranscoderRegs {
     // This works for Tiger Lake too, because the supported transcoders are a
     // subset of the Kaby Lake transcoders, and the MMIO addresses for these
     // transcoders are the same.
-    // TODO(https://fxbug.dev/109278): This won't be true once we support transcoder D.
+    // TODO(https://fxbug.dev/42060657): This won't be true once we support transcoder D.
     return TranscoderDdiControl::GetForKabyLakeTranscoder(transcoder_id_);
   }
   hwreg::RegisterAddr<TranscoderConfig> Config() {
     // This works for Tiger Lake too, because the supported transcoders are a
     // subset of the Kaby Lake transcoders, and the MMIO addresses for these
     // transcoders are the same.
-    // TODO(https://fxbug.dev/109278): This won't be true once we support transcoder D.
+    // TODO(https://fxbug.dev/42060657): This won't be true once we support transcoder D.
     return TranscoderConfig::GetForKabyLakeTranscoder(transcoder_id_);
   }
   hwreg::RegisterAddr<TranscoderClockSelect> ClockSelect() {
@@ -1130,7 +1130,7 @@ class TranscoderRegs {
     // This works for Tiger Lake too, because the supported transcoders are a
     // subset of the Kaby Lake transcoders, and the MMIO addresses for these
     // transcoders are the same.
-    // TODO(https://fxbug.dev/109278): This won't be true once we support transcoder D.
+    // TODO(https://fxbug.dev/42060657): This won't be true once we support transcoder D.
     return TranscoderChicken::GetForKabyLakeTranscoder(transcoder_id_);
   }
 
@@ -1143,28 +1143,28 @@ class TranscoderRegs {
     // This works for Tiger Lake too, because the supported transcoders are a
     // subset of the Kaby Lake transcoders, and the MMIO addresses for these
     // transcoders are the same.
-    // TODO(https://fxbug.dev/109278): This won't be true once we support transcoder D.
+    // TODO(https://fxbug.dev/42060657): This won't be true once we support transcoder D.
     return TranscoderDataM::GetForKabyLakeTranscoder(transcoder_id_);
   }
   hwreg::RegisterAddr<TranscoderDataN> DataN() {
     // This works for Tiger Lake too, because the supported transcoders are a
     // subset of the Kaby Lake transcoders, and the MMIO addresses for these
     // transcoders are the same.
-    // TODO(https://fxbug.dev/109278): This won't be true once we support transcoder D.
+    // TODO(https://fxbug.dev/42060657): This won't be true once we support transcoder D.
     return TranscoderDataN::GetForKabyLakeTranscoder(transcoder_id_);
   }
   hwreg::RegisterAddr<TranscoderLinkM> LinkM() {
     // This works for Tiger Lake too, because the supported transcoders are a
     // subset of the Kaby Lake transcoders, and the MMIO addresses for these
     // transcoders are the same.
-    // TODO(https://fxbug.dev/109278): This won't be true once we support transcoder D.
+    // TODO(https://fxbug.dev/42060657): This won't be true once we support transcoder D.
     return TranscoderLinkM::GetForKabyLakeTranscoder(transcoder_id_);
   }
   hwreg::RegisterAddr<TranscoderLinkN> LinkN() {
     // This works for Tiger Lake too, because the supported transcoders are a
     // subset of the Kaby Lake transcoders, and the MMIO addresses for these
     // transcoders are the same.
-    // TODO(https://fxbug.dev/109278): This won't be true once we support transcoder D.
+    // TODO(https://fxbug.dev/42060657): This won't be true once we support transcoder D.
     return TranscoderLinkN::GetForKabyLakeTranscoder(transcoder_id_);
   }
 

@@ -64,7 +64,7 @@ pub trait PacketReceiver: Send + Sync + 'static {
 }
 
 // Simple slab::Slab replacement that doesn't re-use keys
-// TODO(https://fxbug.dev/43101): figure out how to safely cancel async waits so we can re-use keys again.
+// TODO(https://fxbug.dev/42119369): figure out how to safely cancel async waits so we can re-use keys again.
 pub(crate) struct PacketReceiverMap<T> {
     next_key: usize,
     pub mapping: HashMap<usize, T>,

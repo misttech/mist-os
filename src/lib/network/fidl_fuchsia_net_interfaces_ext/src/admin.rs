@@ -56,7 +56,7 @@ pub async fn wait_for_address_added_event(
     }
 }
 
-// TODO(https://fxbug.dev/81964): Introduce type with better concurrency safety
+// TODO(https://fxbug.dev/42162477): Introduce type with better concurrency safety
 // for hanging gets.
 /// Returns a stream of assignment states obtained by watching on `address_state_provider`.
 ///
@@ -117,7 +117,7 @@ pub fn assignment_state_stream(
     )
 }
 
-// TODO(https://fxbug.dev/81964): Introduce type with better concurrency safety
+// TODO(https://fxbug.dev/42162477): Introduce type with better concurrency safety
 // for hanging gets.
 /// Wait until the Assigned state is observed on `stream`.
 ///
@@ -380,7 +380,7 @@ impl Control {
             if !err.is_closed() {
                 return TerminalError::Fidl(err);
             }
-            // TODO(https://fxbug.dev/96755): The terminal event may have been
+            // TODO(https://fxbug.dev/42178907): The terminal event may have been
             // sent by the server but the future may not resolve immediately,
             // resulting in the terminal event being missed and a FIDL error
             // being returned to the user.

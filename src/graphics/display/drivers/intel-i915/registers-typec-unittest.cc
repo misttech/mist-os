@@ -22,7 +22,7 @@ class RegisterTypeCTest : public ::testing::Test {
 
 using DynamicFlexIoDisplayPortMainLinkLaneEnabledTest = RegisterTypeCTest;
 
-// TODO(https://fxbug.dev/110198): Separate MMIO address testing and bit helper methods
+// TODO(https://fxbug.dev/42061535): Separate MMIO address testing and bit helper methods
 // testing.
 TEST_F(DynamicFlexIoDisplayPortMainLinkLaneEnabledTest, Getter) {
   constexpr uint32_t kFiaOffsets[] = {0x1638C0, 0x16E8C0, 0x16F8C0};
@@ -59,7 +59,7 @@ TEST_F(DynamicFlexIoDisplayPortMainLinkLaneEnabledTest, Getter) {
   }
 }
 
-// TODO(https://fxbug.dev/110198): Separate MMIO address testing and bit helper methods
+// TODO(https://fxbug.dev/42061535): Separate MMIO address testing and bit helper methods
 // testing.
 TEST_F(DynamicFlexIoDisplayPortMainLinkLaneEnabledTest, Setter) {
   constexpr uint32_t kFiaOffsets[] = {0x1638C0, 0x16E8C0, 0x16F8C0};
@@ -166,7 +166,7 @@ TEST_F(DynamicFlexIoDisplayPortMainLinkLaneEnabledTest,
 
 using DynamicFlexIoScratchPadTest = RegisterTypeCTest;
 
-// TODO(https://fxbug.dev/110198): Separate MMIO address testing and bit helper methods
+// TODO(https://fxbug.dev/42061535): Separate MMIO address testing and bit helper methods
 // testing.
 TEST_F(DynamicFlexIoScratchPadTest, Getter) {
   constexpr uint32_t kFiaOffsets[] = {0x1638A0, 0x16E8A0, 0x16F8A0};
@@ -242,7 +242,7 @@ TEST_F(DynamicFlexIoScratchPadTest, HelperMethodsRejectDdiFromDifferentFia) {
 
 using DynamicFlexIoPinAssignmentTest = RegisterTypeCTest;
 
-// TODO(https://fxbug.dev/110198): Separate MMIO address testing and bit helper methods
+// TODO(https://fxbug.dev/42061535): Separate MMIO address testing and bit helper methods
 // testing.
 TEST_F(DynamicFlexIoPinAssignmentTest, Getter) {
   constexpr uint32_t kFiaOffsets[] = {0x163880, 0x16E880, 0x16F880};
@@ -327,7 +327,7 @@ TEST_F(DynamicFlexIoPinAssignmentTest, PinAssignmentRejectDdiFromDifferentFia) {
 
 using DynamicFlexIoDisplayPortControllerSafeStateSettingsTest = RegisterTypeCTest;
 
-// TODO(https://fxbug.dev/110198): Separate MMIO address testing and bit helper methods
+// TODO(https://fxbug.dev/42061535): Separate MMIO address testing and bit helper methods
 // testing.
 TEST_F(DynamicFlexIoDisplayPortControllerSafeStateSettingsTest, Getter) {
   constexpr uint32_t kFiaOffsets[] = {0x163894, 0x16E894, 0x16F894};
@@ -395,7 +395,7 @@ TEST_F(DynamicFlexIoDisplayPortControllerSafeStateSettingsTest,
 
 using DynamicFlexIoDisplayPortPhyModeStatusTest = RegisterTypeCTest;
 
-// TODO(https://fxbug.dev/110198): Separate MMIO address testing and bit helper methods
+// TODO(https://fxbug.dev/42061535): Separate MMIO address testing and bit helper methods
 // testing.
 TEST_F(DynamicFlexIoDisplayPortPhyModeStatusTest, Getter) {
   constexpr uint32_t kFiaOffsets[] = {0x163890, 0x16E890, 0x16F890};

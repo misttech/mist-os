@@ -394,7 +394,7 @@ type MessageIds = strict enum : uint64 {
                </resources>
             "#,
         }];
-        #[allow(clippy::never_loop)] // TODO(https://fxbug.dev/95047)
+        #[allow(clippy::never_loop)] // TODO(https://fxbug.dev/42177010)
         for test in tests {
             let input = EventReader::from_str(&test.content);
             let mut parser = parser::Instance::new(false /* verbose */);

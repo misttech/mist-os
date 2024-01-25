@@ -460,7 +460,7 @@ impl ArchiveReader {
     where
         D: DiagnosticsData,
     {
-        // TODO(https://fxbug.dev/58051) this should be done in an ArchiveReaderBuilder -> Reader init
+        // TODO(https://fxbug.dev/42135966) this should be done in an ArchiveReaderBuilder -> Reader init
         let mut archive = self.archive.lock();
         if archive.is_none() {
             *archive = Some(

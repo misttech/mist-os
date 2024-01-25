@@ -353,7 +353,7 @@ class LoadInfo {
   // When loading before relocation, the RelroBounds() region can just be made
   // read-only in memory after relocation. Partial pages in the RELRO region are
   // excluded from RelroBounds, as protections can only be applied per-page.
-  // TODO(https://fxbug.dev/123468): Address the discrepancy between our round-up behavior and
+  // TODO(https://fxbug.dev/42074388): Address the discrepancy between our round-up behavior and
   // glibc's round-down behavior for RELRO start.
   static constexpr Region RelroBounds(const std::optional<Phdr>& relro, size_type page_size) {
     Region region;

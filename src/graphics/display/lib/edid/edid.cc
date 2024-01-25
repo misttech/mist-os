@@ -282,7 +282,7 @@ display::DisplayTiming DetailedTimingDescriptorToDisplayTiming(
       dtd.vertical_blanking() - (dtd.vertical_front_porch() + dtd.vertical_sync_pulse_width()));
 
   if (dtd.type() != TYPE_DIGITAL_SEPARATE) {
-    // TODO(https://fxbug.dev/136949): Displays using composite syncs are not
+    // TODO(https://fxbug.dev/42086615): Displays using composite syncs are not
     // supported. We treat them as if they were using separate sync signals.
     zxlogf(WARNING, "The detailed timing descriptor uses composite sync; this is not supported.");
   }
@@ -338,7 +338,7 @@ std::optional<display::DisplayTiming> StandardTimingDescriptorToDisplayTiming(
 
   zxlogf(WARNING,
          "This EDID contains a non-DMT standard timing (%" PRIu32 "x%" PRIu32 " @%" PRIu32
-         "Hz). The timing is not supported and will be ignored. See https://fxbug.dev/135772 for "
+         "Hz). The timing is not supported and will be ignored. See https://fxbug.dev/42085380 for "
          "details.",
          width, height, v_rate);
   return std::nullopt;
@@ -387,7 +387,7 @@ void timing_iterator::Advance() {
           // For timings with refresh rates that are multiples of 6, there are
           // corresponding timings adjusted by a factor of 1000/1001.
           //
-          // TODO(https://fxbug.dev/136950): Revise the refresh rate adjustment
+          // TODO(https://fxbug.dev/42086617): Revise the refresh rate adjustment
           // logic to make sure that it complies with the CTA-861 standards.
           uint32_t rounded_refresh =
               (internal::kCtaDisplayTimings[idx].vertical_field_refresh_rate_millihertz() + 999) /

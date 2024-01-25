@@ -11,7 +11,7 @@ using fuchsia.platform;
 using fuchsia.sysmem;
 using fuchsia.amlogic.platform;
 
-// TODO(https://fxbug.dev/125227): `dsi` must be the primary node.
+// TODO(https://fxbug.dev/42076007): `dsi` must be the primary node.
 //
 // amlogic-display driver needs to create a DsiImpl banjo client, but there's
 // no fragment proxy support for the DsiImpl protocol.

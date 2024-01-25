@@ -279,7 +279,7 @@ TEST_F(AddressSpaceDeviceTest, OpenChildDriver) {
   // Post a task to have the child be opened. Our FIDL servers are not thread safe, so they
   // should be accessed on the same thread. We only have to worry about this in testing
   // because the driver doesn't rely on multiple threads in a real environment.
-  // TODO(https://fxbug.dev/116594): Use one thread when mock-ddk doesn't block on unbind.
+  // TODO(https://fxbug.dev/42067777): Use one thread when mock-ddk doesn't block on unbind.
   async::PostTask(loop.dispatcher(), [dispatcher = loop.dispatcher(),
                                       server = std::move(endpoints->server),
                                       dut = this->dut_]() mutable {

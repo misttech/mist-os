@@ -177,7 +177,7 @@ pub fn validate_resource_path(input: &str) -> Result<(), ResourcePathError> {
         if segment.len() > MAX_RESOURCE_PATH_SEGMENT_BYTES {
             return Err(ResourcePathError::NameTooLong);
         }
-        // TODO(https://fxbug.dev/22531) allow newline once meta/contents supports it in blob paths
+        // TODO(https://fxbug.dev/42096516) allow newline once meta/contents supports it in blob paths
         if segment.contains('\n') {
             return Err(ResourcePathError::NameContainsNewline);
         }
@@ -490,7 +490,7 @@ mod test_validate_resource_path {
         #[test]
         fn test_long_name(
             ref s in random_resource_path_with_regex_segment_str(
-                5, "[[[:ascii:]]--\0--/--\n]{255}")) // TODO(https://fxbug.dev/22531) allow newline once meta/contents supports it in blob paths
+                5, "[[[:ascii:]]--\0--/--\n]{255}")) // TODO(https://fxbug.dev/42096516) allow newline once meta/contents supports it in blob paths
         {
             prop_assert_eq!(validate_resource_path(s), Ok(()));
         }

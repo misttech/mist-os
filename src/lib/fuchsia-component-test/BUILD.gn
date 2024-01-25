@@ -27,7 +27,7 @@ group("prod-fuchsia-component-test") {
   ]
   public_deps = [ ":fuchsia-component-test-lib" ]
   visibility = [
-    # https://fxbug.dev/104520 V2 Factory Runin needs RealmBuilder.
+    # https://fxbug.dev/42055686 V2 Factory Runin needs RealmBuilder.
     # Factory Runin is a non-test component that runs on
     # userfacing builds to validate hardware. It does this
     # by executing profiles of "plugin" components which

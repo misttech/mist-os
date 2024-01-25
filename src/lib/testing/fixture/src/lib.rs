@@ -50,7 +50,7 @@ fn fixture_inner(wrapper_fn: syn::Path, input: syn::ItemFn) -> Result<TokenStrea
         })
         .collect::<Result<Vec<_>, TokenStream>>()?;
 
-    // TODO(https://fxbug.dev/76111): make passing `test_name` to the wrapper function an optional
+    // TODO(https://fxbug.dev/42155980): make passing `test_name` to the wrapper function an optional
     // parameter on the #[fixture] macro.
     let result = quote! {
         #(#attrs)*

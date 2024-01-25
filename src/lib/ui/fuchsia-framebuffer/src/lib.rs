@@ -10,12 +10,12 @@ pub mod sysmem;
 #[cfg(test)]
 use std::ops::Range;
 
-// TODO(https://fxbug.dev/130035): Use display_utils structs instead.
+// TODO(https://fxbug.dev/42080389): Use display_utils structs instead.
 pub type ImageId = u64;
 
 #[derive(Debug)]
 pub struct FrameSet {
-    // TODO(https://fxbug.dev/84729)
+    // TODO(https://fxbug.dev/42165549)
     #[allow(unused)]
     collection_id: BufferCollectionId,
     image_count: usize,

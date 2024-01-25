@@ -74,7 +74,7 @@ fn read_runtime_object(
 pub struct File {
     backboard: Object<Backboard>,
     artboards: Vec<Object<Artboard>>,
-    // TODO(https://fxbug.dev/84729)
+    // TODO(https://fxbug.dev/42165549)
     #[allow(unused)]
     objects: Vec<Rc<dyn Core>>,
 }

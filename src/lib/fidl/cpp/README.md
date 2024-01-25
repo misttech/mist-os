@@ -1,7 +1,7 @@
 # New C++ bindings headers
 
 The headers in this directory are meant to support the new C++ bindings
-(https://fxbug.dev/60240). The headers would be exposed to users via the same include
+(https://fxbug.dev/42138399). The headers would be exposed to users via the same include
 pattern as those from the high-level C++ bindings at //sdk/lib/fidl/cpp,
 i.e. `#include <lib/fidl/cpp/foobar.h>`. The intention is that as the unified
 C++ bindings becomes the prevalent C++ bindings API, we won't have to make

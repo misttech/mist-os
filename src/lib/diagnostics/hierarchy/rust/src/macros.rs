@@ -149,7 +149,7 @@ macro_rules! impl_into_property_with_key {
     };
 }
 
-// TODO(https://fxbug.dev/75992): support missing data types -> bytes, histograms
+// TODO(https://fxbug.dev/42155846): support missing data types -> bytes, histograms
 impl_into_property_with_key!(String, [String, &str]);
 impl_into_property_with_key!(Int, [i64, i32, i16, i8]);
 impl_into_property_with_key!(Uint, [u64, u32, u16, u8]);

@@ -128,7 +128,7 @@ class TestMagmaFidl : public gtest::RealLoopFixture {
   uint64_t vendor_id() { return vendor_id_; }
 
   bool CheckForUnbind() {
-    // TODO(https://fxbug.dev/97955) Consider handling the error instead of ignoring it.
+    // TODO(https://fxbug.dev/42180237) Consider handling the error instead of ignoring it.
     (void)primary_.sync()->Flush();
     RunLoopUntilIdle();
     return async_handler_.unbind_info().has_value();

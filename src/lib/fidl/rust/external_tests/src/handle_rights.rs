@@ -207,7 +207,7 @@ fn send_handle_sync_end_to_end() {
 }
 
 #[test]
-#[ignore] // TODO(https://fxbug.dev/74939) Remove the ignore
+#[ignore] // TODO(https://fxbug.dev/42154676) Remove the ignore
 fn send_handle_sync_send() {
     // - The client creates an event with same rights.
     // - In zx_channel_write_etc, the rights are reduced to zx.Rights.TRANSFER (specified by FIDL
@@ -269,7 +269,7 @@ async fn send_handle_async_end_to_end() {
 }
 
 #[fasync::run_singlethreaded(test)]
-#[ignore] // TODO(https://fxbug.dev/74939) Remove the ignore
+#[ignore] // TODO(https://fxbug.dev/42154676) Remove the ignore
 async fn send_handle_async_send() {
     // See comment on sync version for details.
     send_handle_async_helper(
@@ -373,7 +373,7 @@ fn echo_handle_sync_end_to_end() {
 }
 
 #[test]
-#[ignore] // TODO(https://fxbug.dev/74939) Remove the ignore
+#[ignore] // TODO(https://fxbug.dev/42154676) Remove the ignore
 fn echo_handle_sync_request_send() {
     // - The client creates an event with same rights.
     // - In zx_channel_write_etc, the rights are reduced to zx.Rights.TRANSFER (specified by FIDL
@@ -410,7 +410,7 @@ fn echo_handle_sync_request_receive() {
 }
 
 #[test]
-#[ignore] // TODO(https://fxbug.dev/74939) Remove the ignore
+#[ignore] // TODO(https://fxbug.dev/42154676) Remove the ignore
 fn echo_handle_sync_response_send() {
     // - The client creates an event with same rights and sends it to the server.
     // - The message ordinal is changed in transit from EchoHandleResponseSameRights to
@@ -489,7 +489,7 @@ async fn echo_handle_async_end_to_end() {
 }
 
 #[fasync::run_singlethreaded(test)]
-#[ignore] // TODO(https://fxbug.dev/74939) Remove the ignore
+#[ignore] // TODO(https://fxbug.dev/42154676) Remove the ignore
 async fn echo_handle_async_request_send() {
     // See comment on sync version for details.
     echo_handle_async_helper(
@@ -516,7 +516,7 @@ async fn echo_handle_async_request_receive() {
 }
 
 #[fasync::run_singlethreaded(test)]
-#[ignore] // TODO(https://fxbug.dev/74939) Remove the ignore
+#[ignore] // TODO(https://fxbug.dev/42154676) Remove the ignore
 async fn echo_handle_async_response_send() {
     // See comment on sync version for details.
     echo_handle_async_helper(
@@ -592,7 +592,7 @@ async fn push_event_send_and_receive() {
 }
 
 #[fasync::run_singlethreaded(test)]
-#[ignore] // TODO(https://fxbug.dev/74939) Remove the ignore
+#[ignore] // TODO(https://fxbug.dev/42154676) Remove the ignore
 async fn push_event_send() {
     // Sends an event
     // - On the sending side, the PushEventReducedRights event is used in which

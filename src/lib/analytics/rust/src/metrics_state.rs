@@ -17,7 +17,7 @@ pub const UNKNOWN_GA4_PRODUCT_CODE: &str = "unknown ga4 property";
 pub const UNKNOWN_GA4_KEY: &str = "unknown ga4 key";
 
 /// Maintains and memo-izes the operational state of the analytics service for the app.
-/// TODO(https://fxbug.dev/126764) Once we turn down UA analytics, ~July 2023, remove ga_product_code.
+/// TODO(https://fxbug.dev/42077438) Once we turn down UA analytics, ~July 2023, remove ga_product_code.
 #[derive(Clone, Debug, PartialEq)]
 pub struct MetricsState {
     pub(crate) app_name: String,

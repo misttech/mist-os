@@ -33,7 +33,7 @@ mod tests {
         let s = sv.to_string();
 
         // Incremental builders set kernel version string to "nostamp".
-        // See https://fxbug.dev/74797 for details.
+        // See https://fxbug.dev/42154518 for details.
         if s != "nostamp" {
             assert!(
                 sv.len() > 20,

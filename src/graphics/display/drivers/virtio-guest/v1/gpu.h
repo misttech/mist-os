@@ -183,7 +183,7 @@ class GpuDevice : public virtio::Device,
   display::ConfigStamp latest_config_stamp_ = display::kInvalidConfigStamp;
   display::ConfigStamp displayed_config_stamp_ = display::kInvalidConfigStamp;
 
-  // TODO(https://fxbug.dev/122802): Support more formats.
+  // TODO(https://fxbug.dev/42073721): Support more formats.
   static constexpr std::array<fuchsia_images2_pixel_format_enum_value_t, 1> kSupportedFormats = {
       static_cast<fuchsia_images2_pixel_format_enum_value_t>(
           fuchsia_images2::wire::PixelFormat::kBgra32),

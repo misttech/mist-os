@@ -260,7 +260,7 @@ void PrimaryFidlServer::ExecuteCommand(ExecuteCommandRequestView request,
   TRACE_DURATION("magma", "PrimaryFidlServer::ExecuteCommand");
   FlowControl();
 
-  // TODO(https://fxbug.dev/92606) - support > 1 command buffer
+  // TODO(https://fxbug.dev/42174299) - support > 1 command buffer
   if (request->command_buffers.count() > 1) {
     SetError(&completer, MAGMA_STATUS_UNIMPLEMENTED);
     return;

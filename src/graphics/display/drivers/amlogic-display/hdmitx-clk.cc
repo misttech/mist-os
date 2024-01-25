@@ -11,7 +11,7 @@
 
 namespace amlogic_display {
 
-// TODO(https://fxbug.dev/69072): Reconcile with amlogic-clock
+// TODO(https://fxbug.dev/42148166): Reconcile with amlogic-clock
 
 namespace {
 

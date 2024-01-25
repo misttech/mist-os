@@ -130,7 +130,7 @@ TEST(NullParameters, validate_v2_null_validate_parameters) {
 // The Walker tests are disabled for host because they depend on fidl
 // generated LLCPP code that can't run on host.
 
-// TODO(https://fxbug.dev/52382): Move this test to GIDL.
+// TODO(https://fxbug.dev/42129678): Move this test to GIDL.
 #ifdef __Fuchsia__
 TEST(Walker, validate_v2_walker_recursive_struct_max_out_of_line_depth) {
   // Up to 32 out of line objects are allowed - here there are 33 pointers.
@@ -154,7 +154,7 @@ TEST(Walker, validate_v2_walker_recursive_struct_max_out_of_line_depth) {
 }
 #endif
 
-// TODO(https://fxbug.dev/52382): Move this test to GIDL.
+// TODO(https://fxbug.dev/42129678): Move this test to GIDL.
 #ifdef __Fuchsia__
 TEST(Walker, validate_v2_walker_table_max_out_of_line_depth_exceeded) {
   // 1 table + 31 non-null pointers + 1 null pointer = 33 out of line elements.
@@ -180,7 +180,7 @@ TEST(Walker, validate_v2_walker_table_max_out_of_line_depth_exceeded) {
   EXPECT_STREQ(error, "recursion depth exceeded");
 }
 
-// TODO(https://fxbug.dev/52382): Move this test to GIDL.
+// TODO(https://fxbug.dev/42129678): Move this test to GIDL.
 TEST(Walker, validate_v2_walker_table_max_out_of_line_depth_matched) {
   // 1 table + 30 non-null pointers + 1 null pointer = 32 out of line elements.
   uint8_t message[sizeof(fidl_vector_t) + sizeof(fidl_envelope_t) + sizeof(uintptr_t) * 31];
@@ -735,7 +735,7 @@ TEST(Enums, validate_v2_invalid_uint64_enum) {
 }
 
 TEST(Primitives, validate_v2_primitives_struct) {
-  // TODO(https://fxbug.dev/52585): Use generated types - primitive struct fields actually have null type.
+  // TODO(https://fxbug.dev/42129903): Use generated types - primitive struct fields actually have null type.
   // The following coding table is equivalent to this FIDL struct definition:
   //
   // struct PrimitiveStruct {

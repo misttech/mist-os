@@ -88,7 +88,7 @@ impl HyperConnector {
         .await?;
 
         if self.socket_options.bind_device.is_some() {
-            unimplemented!("TODO(https://fxbug.dev/133952) fuchsia-hyper does not support bind_device on non-fuchsia devices");
+            unimplemented!("TODO(https://fxbug.dev/42083862) fuchsia-hyper does not support bind_device on non-fuchsia devices");
         }
 
         let stream = if let Some(addr) = addr {
@@ -104,7 +104,7 @@ impl HyperConnector {
 
 /// Resolve a hostname into an address.
 async fn resolve_host_port(host: &str, port: u16) -> Result<net::TcpStream, io::Error> {
-    // TODO(https://fxbug.dev/124222): Implement happy eyeballs algorithm to make this
+    // TODO(https://fxbug.dev/42075095): Implement happy eyeballs algorithm to make this
     // more efficient.
     let mut last_err = None;
     for addr in (host, port).to_socket_addrs()? {

@@ -37,7 +37,7 @@ pub static GA4_METRICS_INSTANCE: OnceLock<Arc<Mutex<GA4MetricsService>>> = OnceL
 
 /// This function initializes the metrics service so that an app
 /// can make posts to the analytics service and read the current opt in status of the user
-/// TODO(https://fxbug.dev/126764) remove this function once we remove UA 4 and refactor all clients.
+/// TODO(https://fxbug.dev/42077438) remove this function once we remove UA 4 and refactor all clients.
 pub async fn init_with_invoker(
     app_name: String,
     build_version: Option<String>,
@@ -59,7 +59,7 @@ pub async fn init_with_invoker(
         invoker,
     );
 
-    // TODO(https://fxbug.dev/126764) Remove this line when UA is turned down (July 1, 2023)
+    // TODO(https://fxbug.dev/42077438) Remove this line when UA is turned down (July 1, 2023)
     // We are running both versions of the service until July 1 since the
     // protocols are organized differently enough to make it worth creating two
     // different services.
@@ -106,7 +106,7 @@ pub async fn init(app_name: String, build_version: Option<String>, ga_product_co
 }
 
 /// Initializes and return the G4 Metrics Service.
-/// TODO(https://fxbug.dev/126764) refactor all clients to use this once we remove UA analytics
+/// TODO(https://fxbug.dev/42077438) refactor all clients to use this once we remove UA analytics
 pub async fn init_ga4_metrics_service(
     app_name: String,
     build_version: Option<String>,
@@ -137,7 +137,7 @@ pub async fn init_ga4_metrics_service(
 /// Returns a legal notice of metrics data collection if user
 /// is new to all tools (full notice) or new to this tool (brief notice).
 /// Returns an error if init has not been called.
-/// TODO(https://fxbug.dev/126764) remove this once we remove UA
+/// TODO(https://fxbug.dev/42077438) remove this once we remove UA
 pub async fn get_notice() -> Option<String> {
     GA4_METRICS_INSTANCE.get()?.lock().await.get_notice()
 }
@@ -151,28 +151,28 @@ async fn ga4_metrics() -> Result<impl DerefMut<Target = GA4MetricsService>> {
 }
 /// Records intended opt in status.
 /// Returns an error if init has not been called
-/// TODO(https://fxbug.dev/126764) remove this once we remove UA
+/// TODO(https://fxbug.dev/42077438) remove this once we remove UA
 pub async fn set_opt_in_status(enabled: bool) -> Result<()> {
     ga4_metrics().await?.set_opt_in_status(enabled)
 }
 
 /// Returns current opt in status.
 /// Returns an error if init has not been called.
-/// TODO(https://fxbug.dev/126764) remove this once we remove UA
+/// TODO(https://fxbug.dev/42077438) remove this once we remove UA
 pub async fn is_opted_in() -> bool {
     ga4_metrics().await.is_ok_and(|s| s.is_opted_in())
 }
 
 /// Disable analytics for this invocation only.
 /// This does not affect the global analytics state.
-/// TODO(https://fxbug.dev/126764) remove this once we remove UA
+/// TODO(https://fxbug.dev/42077438) remove this once we remove UA
 pub async fn opt_out_for_this_invocation() -> Result<()> {
     ga4_metrics().await?.opt_out_for_this_invocation()
 }
 
 /// Records a launch event with the command line args used to launch app.
 /// Returns an error if init has not been called.
-/// TODO(https://fxbug.dev/126764) remove this once we remove UA
+/// TODO(https://fxbug.dev/42077438) remove this once we remove UA
 pub async fn add_launch_event(args: Option<&str>) -> Result<()> {
     let svc = METRICS_SERVICE.lock().await;
     match &svc.init_state {
@@ -192,7 +192,7 @@ pub async fn add_launch_event(args: Option<&str>) -> Result<()> {
 
 /// Records an error event in the app.
 /// Returns an error if init has not been called.
-/// TODO(https://fxbug.dev/126764) remove this once we remove UA
+/// TODO(https://fxbug.dev/42077438) remove this once we remove UA
 pub async fn add_crash_event(description: &str, fatal: Option<&bool>) -> Result<()> {
     let svc = METRICS_SERVICE.lock().await;
     match &svc.init_state {
@@ -211,7 +211,7 @@ pub async fn add_crash_event(description: &str, fatal: Option<&bool>) -> Result<
 
 /// Records a timing event from the app.
 /// Returns an error if init has not been called.
-/// TODO(https://fxbug.dev/126764) remove this once we remove UA
+/// TODO(https://fxbug.dev/42077438) remove this once we remove UA
 pub async fn add_timing_event(
     category: Option<&str>,
     duration_str: String,
@@ -250,7 +250,7 @@ pub async fn add_timing_event(
 
 /// Records an event with an option to specify every parameter.
 /// Returns an error if init has not been called.
-/// TODO(https://fxbug.dev/126764) remove this when UA is removed.
+/// TODO(https://fxbug.dev/42077438) remove this when UA is removed.
 pub async fn add_custom_event(
     category: Option<&str>,
     action: Option<&str>,
@@ -275,7 +275,7 @@ pub async fn add_custom_event(
     ga4_svc.send_events().await
 }
 
-/// TODO(https://fxbug.dev/126764) drop when we remove UA
+/// TODO(https://fxbug.dev/42077438) drop when we remove UA
 pub async fn make_batch() -> Result<MetricsEventBatch> {
     let svc = METRICS_SERVICE.lock().await;
     match &svc.init_state {
@@ -287,16 +287,16 @@ pub async fn make_batch() -> Result<MetricsEventBatch> {
     }
 }
 
-/// TODO(https://fxbug.dev/126764) use this fn once we delete UA analytics and remove MetricsEventBatch.
+/// TODO(https://fxbug.dev/42077438) use this fn once we delete UA analytics and remove MetricsEventBatch.
 /// Until then, MetricsEventBatch will call GA4METRICS_SERVICE.send_events.
 pub async fn send_events() -> Result<()> {
-    // TODO(https://fxbug.dev/126764) after dropping UA, change this to Post::add_event followed by Post::send_events separately
+    // TODO(https://fxbug.dev/42077438) after dropping UA, change this to Post::add_event followed by Post::send_events separately
     ga4_metrics().await?.send_events().await
 }
 
 /// This is exposed for clients who want to use the uuid as a custom dimension
 /// to do more accurate user counts in DataStudio analyses.
-/// TODO(https://fxbug.dev/126764) Remove this when we remove UA analytics since it will no longer be necessary.
+/// TODO(https://fxbug.dev/42077438) Remove this when we remove UA analytics since it will no longer be necessary.
 pub async fn uuid_as_str() -> Result<String> {
     let svc = METRICS_SERVICE.lock().await;
     match &svc.init_state {

@@ -257,7 +257,7 @@ void Client::ReleaseBufferCollection(ReleaseBufferCollectionRequestView request,
     return;
   }
 
-  // TODO(https://fxbug.dev/97955) Consider handling the error instead of ignoring it.
+  // TODO(https://fxbug.dev/42180237) Consider handling the error instead of ignoring it.
   controller_->driver()->ReleaseBufferCollection(it->second.driver_buffer_collection_id);
 
   collection_map_.erase(it);
@@ -296,7 +296,7 @@ void Client::SetBufferCollectionConstraints(
 void Client::ReleaseEvent(ReleaseEventRequestView request,
                           ReleaseEventCompleter::Sync& /*_completer*/) {
   const EventId event_id = ToEventId(request->id);
-  // TODO(https://fxbug.dev/129990): Check if the ID is valid (i.e. imported but not
+  // TODO(https://fxbug.dev/42080337): Check if the ID is valid (i.e. imported but not
   // yet released) before calling ReleaseEvent().
   fences_.ReleaseEvent(event_id);
 }
@@ -616,7 +616,7 @@ void Client::SetLayerImage(SetLayerImageRequestView request,
     return;
   }
   const image_t* cur_image = layer->pending_image();
-  // TODO(https://fxbug.dev/126156): Warning: Currently we only compare size and usage
+  // TODO(https://fxbug.dev/42076907): Warning: Currently we only compare size and usage
   // type between `image` and `layer`. This implicitly assume that images can
   // be applied to any layer as long as the format is negotiated by sysmem,
   // which may not be true in the future. We should figure out a way to better
@@ -632,7 +632,7 @@ void Client::SetLayerImage(SetLayerImageRequestView request,
 
   const EventId wait_event_id = ToEventId(request->wait_event_id);
   const EventId signal_event_id = ToEventId(request->signal_event_id);
-  // TODO(https://fxbug.dev/129990): Check if the IDs are valid (i.e. imported but not
+  // TODO(https://fxbug.dev/42080337): Check if the IDs are valid (i.e. imported but not
   // yet released) before calling SetImage().
   layer->SetImage(image.CopyPointer(), wait_event_id, signal_event_id);
   // no Reply defined
@@ -894,7 +894,7 @@ bool Client::CheckConfig(fhdt::wire::ConfigResult* res,
   const display_config_t* configs[configs_.size()];
   layer_t* layers[layers_size];
 
-  // TODO(https://fxbug.dev/130605): Do not use VLA. We should introduce a limit on
+  // TODO(https://fxbug.dev/42080896): Do not use VLA. We should introduce a limit on
   // totally supported layers instead.
   client_composition_opcode_t client_composition_opcodes[layers_size];
   memset(client_composition_opcodes, 0, layers_size * sizeof(client_composition_opcode_t));
@@ -949,7 +949,7 @@ bool Client::CheckConfig(fhdt::wire::ConfigResult* res,
         // and display engine drivers when being imported, so they are always
         // accepted by the display coordinator.
       } else if (layer_node.layer->pending_layer_.type == LAYER_TYPE_CURSOR) {
-        // TODO(https://fxbug.dev/126123): Currently we don't check the pixel formats,
+        // TODO(https://fxbug.dev/42076871): Currently we don't check the pixel formats,
         // nor sizes of the imported image. These should be done when we import
         // cursor images to the display driver, and the clients should only use
         // images imported for cursor use on cursor layers.
@@ -1525,7 +1525,7 @@ Client::Init(fidl::ServerEnd<fuchsia_hardware_display::Coordinator> server_end) 
 
             auto process_name = GetObjectName(zx_process_self());
 
-            // TODO(https://fxbug.dev/97955) Consider handling the error instead of ignoring it.
+            // TODO(https://fxbug.dev/42180237) Consider handling the error instead of ignoring it.
             std::string debug_name = std::string("display[") + process_name + "]";
             fidl::OneWayStatus status = sysmem_allocator_->SetDebugClientInfo(
                 fidl::StringView::FromExternal(debug_name), GetKoid(zx_process_self()));
@@ -1533,7 +1533,7 @@ Client::Init(fidl::ServerEnd<fuchsia_hardware_display::Coordinator> server_end) 
           }();
       status != ZX_OK) {
     // Not a fatal error, but BufferCollection functions won't work.
-    // TODO(https://fxbug.dev/33157) TODO: Fail creation once all drivers implement this.
+    // TODO(https://fxbug.dev/42108322) TODO: Fail creation once all drivers implement this.
     zxlogf(ERROR, "GetSysmemConnection failed (continuing) - status: %d", status);
   }
 
@@ -1851,7 +1851,7 @@ ClientProxy::~ClientProxy() {
 // Checks the FIDL ClientCompositionOpcode enum matches the corresponding bits
 // in banjo ClientCompositionOpcode bitfield.
 //
-// TODO(https://fxbug.dev/130427): In the short term, instead of checking this in
+// TODO(https://fxbug.dev/42080698): In the short term, instead of checking this in
 // Coordinator, a bridging type should be used for conversion of the types. In
 // the long term, these two types should be unified.
 namespace {

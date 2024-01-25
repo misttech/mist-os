@@ -236,7 +236,7 @@ macro_rules! arithmetic_array_fns {
 pub struct State {
     /// The inner state that actually performs the operations.
     /// This should always be accessed by locking the mutex and then locking the header.
-    // TODO(https://fxbug.dev/51298): have a single locking mechanism implemented on top of the vmo header.
+    // TODO(https://fxbug.dev/42128473): have a single locking mechanism implemented on top of the vmo header.
     inner: Arc<Mutex<InnerState>>,
 }
 
@@ -1175,7 +1175,7 @@ impl InnerState {
             }
         }
 
-        // TODO(https://fxbug.dev/124958): we can remove cast
+        // TODO(https://fxbug.dev/42075779): we can remove cast
         // Safety: each max sized block has fewer than u32::MAX bytes, so an individual
         // block cannot have more than u32::MAX bytes written. The max VMO is also smaller
         // than u32::MAX bytes, so the sum of the bytes of all the blocks in the VMO

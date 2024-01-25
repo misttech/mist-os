@@ -43,7 +43,7 @@ struct pll_param {
 // HdmiHost has access to the amlogic/designware HDMI block and controls its
 // operation. It also handles functions and keeps track of data that the
 // amlogic/designware block does not need to know about, including clock
-// calculations (which may move out of the host after https://fxbug.dev/69072 is resolved),
+// calculations (which may move out of the host after https://fxbug.dev/42148166 is resolved),
 // VPU and HHI register handling, HDMI parameters, etc.
 class HdmiHost {
  public:

@@ -25,7 +25,7 @@ TEST(DsiDwTest, DdkLifeCycle) {
   auto dev = std::make_unique<DsiDw>(fake_parent.get(), mmio_region.GetMmioBuffer());
   EXPECT_OK(dev->DdkAdd("dw-dsi"));
   [[maybe_unused]] DsiDw* dsi_dw_ptr = dev.release();
-  // TODO(https://fxbug.dev/79639): Removed the obsolete fake_ddk.Ok() check.
+  // TODO(https://fxbug.dev/42159897): Removed the obsolete fake_ddk.Ok() check.
   // To test Unbind and Release behavior, call UnbindOp and ReleaseOp directly.
 }
 

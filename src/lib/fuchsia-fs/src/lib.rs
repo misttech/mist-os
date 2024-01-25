@@ -14,7 +14,7 @@ pub mod node;
 pub use fio::OpenFlags;
 
 /// canonicalize_path will remove a leading `/` if it exists, since it's always unnecessary and in
-/// some cases disallowed (https://fxbug.dev/28436).
+/// some cases disallowed (https://fxbug.dev/42103076).
 pub fn canonicalize_path(path: &str) -> &str {
     if path == "/" {
         return ".";

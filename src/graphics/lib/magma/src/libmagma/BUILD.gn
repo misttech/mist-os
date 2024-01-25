@@ -54,7 +54,7 @@ static_library("libmagma_static") {
 }
 
 # This library is complete, so it's usable outside BUILD.gn.
-# TODO(https://fxbug.dev/92268): Remove in favor of magma_client, which is hermetic and usable when linking
+# TODO(https://fxbug.dev/42173923): Remove in favor of magma_client, which is hermetic and usable when linking
 # against code built with a different C++ ABI and standard library version.
 static_library("libmagma_complete") {
   complete_static_lib = true
@@ -62,7 +62,7 @@ static_library("libmagma_complete") {
   deps = [ ":libmagma_static" ]
 }
 
-# TODO(https://fxbug.dev/66859): Remove once zxio is available in the SDK and ICDs can use that instead.
+# TODO(https://fxbug.dev/42145712): Remove once zxio is available in the SDK and ICDs can use that instead.
 static_library("zxio") {
   complete_static_lib = true
 

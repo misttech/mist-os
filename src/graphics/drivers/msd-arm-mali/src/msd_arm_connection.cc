@@ -525,7 +525,7 @@ bool MsdArmConnection::UpdateCommittedMemory(GpuMapping* mapping) __TA_NO_THREAD
     // Technically if there's an IOMMU the new mapping might be at a different address, so we'd need
     // to update the GPU address space to represent that. However, on current systems (amlogic) that
     // doesn't happen.
-    // TODO(https://fxbug.dev/32763): Shrink existing PMTs when that's supported.
+    // TODO(https://fxbug.dev/42107884): Shrink existing PMTs when that's supported.
     std::unique_ptr<magma::PlatformBusMapper::BusMapping> bus_mapping;
     if (committed_region.length() > 0) {
       bus_mapping = owner_->GetBusMapper()->MapPageRangeBus(
@@ -634,7 +634,7 @@ bool MsdArmConnection::PageInMemory(uint64_t address) {
     return false;
   }
 
-  // TODO(https://fxbug.dev/13028): Look into growing the buffer on a different thread.
+  // TODO(https://fxbug.dev/42080588): Look into growing the buffer on a different thread.
 
   constexpr uint64_t kCacheLineSize = 64;
   uint64_t offset_needed = address - mapping.gpu_va() + kCacheLineSize - 1;
@@ -856,7 +856,7 @@ std::optional<ArmMaliResultCode> MsdArmConnection::AllocateOneJitMemoryRegion(
     return {kArmMaliResultJobInvalid};
   }
   uint64_t current_address = FindBestJitRegionAddress(info);
-  // TODO(https://fxbug.dev/12972): Run on other thread.
+  // TODO(https://fxbug.dev/42080109): Run on other thread.
 
   if (!current_address) {
     auto allocate_result = AllocateNewJitMemoryRegion(info, &current_address);
@@ -1028,7 +1028,7 @@ void MsdArmConnection::MarkDestroyed() {
   uint64_t received_atom_count = received_atom_count_;
   uint64_t notified_atom_count = notified_atom_count_;
   if (received_atom_count != notified_atom_count) {
-    // To help determine the cause of https://fxbug.dev/118466
+    // To help determine the cause of https://fxbug.dev/42069578
     MAGMA_LOG(WARNING, "Connection %ld received %ld atoms and notified %ld\n", client_id(),
               received_atom_count, notified_atom_count);
   }

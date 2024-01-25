@@ -107,7 +107,7 @@ class PipeScalerControlSkylake : public hwreg::RegisterBase<PipeScalerControlSky
   DEF_ENUM_FIELD(FilterSelection, 24, 23, filter_selection);
 
   // Minimum supported horizontal and vertical sizes, in pixels.
-  // TODO(https://fxbug.dev/120621): Move all the pipe scaler limits to a separated
+  // TODO(https://fxbug.dev/42071707): Move all the pipe scaler limits to a separated
   // class.
   static constexpr uint32_t kMinSrcSizePx = 8;
 
@@ -115,7 +115,7 @@ class PipeScalerControlSkylake : public hwreg::RegisterBase<PipeScalerControlSky
   static constexpr uint32_t kMaxSrcWidthPx = 4096;
 
   // Number of scalers available in Pipe A and Pipe B.
-  // TODO(https://fxbug.dev/120621): This can be refactored into a static method
+  // TODO(https://fxbug.dev/42071707): This can be refactored into a static method
   // taking pipe and platform as its input.
   static constexpr uint32_t kPipeABScalersAvailable = 2;
 
@@ -123,7 +123,7 @@ class PipeScalerControlSkylake : public hwreg::RegisterBase<PipeScalerControlSky
   static constexpr uint32_t kPipeCScalersAvailable = 1;
 
   // Maximum upscaling / downscaling ratio under 7x5 mode.
-  // TODO(https://fxbug.dev/120621): This can be refactored into a static method
+  // TODO(https://fxbug.dev/42071707): This can be refactored into a static method
   // taking scaling mode and size as its input.
   static constexpr float k7x5MaxRatio = 2.99f;
 
@@ -634,7 +634,7 @@ class PipeScalerCoefficientIndex
 // software must trigger the double buffer arm register (PipeScalerWindowSize)
 // by themselves to apply the value update.
 //
-// TODO(https://fxbug.dev/120615): Move this alongside with scaler management logic,
+// TODO(https://fxbug.dev/42071700): Move this alongside with scaler management logic,
 // as this is a layer above the register definitions.
 class PipeScalerCoefficients {
  public:

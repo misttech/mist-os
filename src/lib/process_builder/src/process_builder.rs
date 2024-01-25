@@ -899,7 +899,7 @@ impl ReservationVmar {
         // (base+len) represents the full address space, assuming this is used with a root VMAR and
         // length extends to the end of the address space, including a region the kernel reserves
         // at the start of the space.
-        // TODO(https://fxbug.dev/25042): Clean up address space reservation to avoid unnecessary
+        // TODO(https://fxbug.dev/42099306): Clean up address space reservation to avoid unnecessary
         // reservations, which should also avoid the "fake" reservation in the else-clause.
         if let Some(reserve_size) =
             util::page_end((info.base + info.len) / 2).checked_sub(info.base)

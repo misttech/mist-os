@@ -99,7 +99,7 @@ impl Display {
             view_producer_client: ViewProducerClient::Local(client),
             // Set this to 0 when new_local clients have been updated to request views.
             view_provider_requests: Arc::new(AtomicUsize::new(1)),
-            // TODO(https://fxbug.dev/90630): Remove these default values.
+            // TODO(https://fxbug.dev/42172104): Remove these default values.
             display_info: DisplayInfo { width_in_px: 1920, height_in_px: 1080 },
         })
     }

@@ -124,4 +124,4 @@ instantiated using different traits as part of the "remoting" process, those
 class objects can't really be used with all the methods supported by the
 default instantiations--they're really just for the mechanics of remoting.
 
-**TODO(https://fxbug.dev/121817):** Remoting is not implemented yet.
+**TODO(https://fxbug.dev/42072830):** Remoting is not implemented yet.

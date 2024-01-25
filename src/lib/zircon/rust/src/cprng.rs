@@ -42,7 +42,7 @@ pub fn cprng_draw_uninit(buffer: &mut [MaybeUninit<u8>]) -> &mut [u8] {
     // buffer, but as long as that assumption is valid them it's safe to assume this
     // slice is init.
     //
-    // TODO(https://fxbug.dev/129307) use MaybeUninit::slice_assume_init_mut when stable
+    // TODO(https://fxbug.dev/42079723) use MaybeUninit::slice_assume_init_mut when stable
     unsafe { std::slice::from_raw_parts_mut(buffer.as_mut_ptr() as *mut u8, buffer.len()) }
 }
 

@@ -18,7 +18,7 @@ namespace amlogic_display {
 namespace {
 
 TEST(VideoClock2Divider, GetSetDivider2) {
-  // TODO(https://fxbug.dev/136381): Use meaningful variable names for registers.
+  // TODO(https://fxbug.dev/42085985): Use meaningful variable names for registers.
   auto reg = VideoClock2Divider::Get().FromValue(0);
   reg.SetDivider2(1);
   EXPECT_EQ(reg.Divider2(), 1);

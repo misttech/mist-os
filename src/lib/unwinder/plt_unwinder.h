@@ -11,7 +11,7 @@
 
 namespace unwinder {
 
-// Unwind when PC is in PLT, because lld doesn't generate CFI for PLT (https://fxbug.dev/112402).
+// Unwind when PC is in PLT, because lld doesn't generate CFI for PLT (https://fxbug.dev/42063697).
 class PltUnwinder {
  public:
   // We need |CfiUnwinder::IsValidPC|.

@@ -131,7 +131,7 @@ group("bench") {
     ":diagnostics-log-rust-decoding-benchmark",
   ]
 
-  # TODO(https://fxbug.dev/131000): diagnostics_log_encoding_bench
+  # TODO(https://fxbug.dev/42081258): diagnostics_log_encoding_bench
   # currently fails to build for ARM64/VIM3 due to a toolchain bug.
   # Re-enable it for ARM64 when the bug is fixed.
   if (target_cpu != "arm64") {

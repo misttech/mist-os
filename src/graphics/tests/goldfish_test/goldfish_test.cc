@@ -21,18 +21,18 @@
 
 namespace {
 
-// TODO(https://fxbug.dev/113830): Stop hardcoding the 000 in this path.
+// TODO(https://fxbug.dev/42065067): Stop hardcoding the 000 in this path.
 zx::result<fidl::ClientEnd<fuchsia_hardware_goldfish::Controller>> ConnectToPipe() {
   return component::Connect<fuchsia_hardware_goldfish::Controller>("/dev/class/goldfish-pipe/000");
 }
 
-// TODO(https://fxbug.dev/113830): Stop hardcoding the 000 in this path.
+// TODO(https://fxbug.dev/42065067): Stop hardcoding the 000 in this path.
 zx::result<fidl::ClientEnd<fuchsia_hardware_goldfish::ControlDevice>> ConnectToControl() {
   return component::Connect<fuchsia_hardware_goldfish::ControlDevice>(
       "/dev/class/goldfish-control/000");
 }
 
-// TODO(https://fxbug.dev/113830): Stop hardcoding the 000 in this path.
+// TODO(https://fxbug.dev/42065067): Stop hardcoding the 000 in this path.
 zx::result<fidl::ClientEnd<fuchsia_hardware_goldfish::AddressSpaceDevice>> ConnectToAddress() {
   return component::Connect<fuchsia_hardware_goldfish::AddressSpaceDevice>(
       "/dev/class/goldfish-address-space/000");
@@ -45,7 +45,7 @@ fidl::WireSyncClient<fuchsia_sysmem::Allocator> CreateSysmemAllocator() {
     return {};
   }
   fidl::WireSyncClient allocator(std::move(*client_end));
-  // TODO(https://fxbug.dev/97955) Consider handling the error instead of ignoring it.
+  // TODO(https://fxbug.dev/42180237) Consider handling the error instead of ignoring it.
   (void)allocator->SetDebugClientInfo(fidl::StringView::FromExternal(fsl::GetCurrentProcessName()),
                                       fsl::GetCurrentProcessKoid());
   return allocator;

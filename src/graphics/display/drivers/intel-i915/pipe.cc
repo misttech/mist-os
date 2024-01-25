@@ -135,7 +135,7 @@ void Pipe::ResetTranscoder(TranscoderId transcoder_id, registers::Platform platf
       transcoder_chicken.set_override_forward_error_correction_tiger_lake(false).WriteTo(
           mmio_space);
 
-      // TODO(https://fxbug.dev/110411): Remove this warning once we support DisplayPort
+      // TODO(https://fxbug.dev/42061773): Remove this warning once we support DisplayPort
       // MST (Multi-Stream).
       zxlogf(WARNING, "Transcoder %d was using a DisplayPort MST feature. Reset may be incomplete.",
              transcoder_id);
@@ -205,7 +205,7 @@ void Pipe::Reset() {
   // sequence" to disable planes, connected transcoder and scalers (i.e. panel
   // fitter).
   //
-  // TODO(https://fxbug.dev/110411): Currently the procedure is the same for DisplayPort
+  // TODO(https://fxbug.dev/42061773): Currently the procedure is the same for DisplayPort
   // and HDMI/DVI. This may change once DisplayPort Multistream (MST) is
   // supported.
   //
@@ -264,7 +264,7 @@ void Pipe::ResetScaler() {
   // PRM, but experiments on Atlas (using Kaby Lake) shows that it does have
   // this scaler, so we use the same value across all generations.
   //
-  // TODO(https://fxbug.dev/120328): Verify the existence of the scaler and document
+  // TODO(https://fxbug.dev/42071441): Verify the existence of the scaler and document
   // the experiment results.
   const int kScalerCount = 2;
 
@@ -681,7 +681,7 @@ void Pipe::ConfigurePrimaryPlane(uint32_t plane_num, const primary_layer_t* prim
     default:
       // This should not happen. The sysmem-negotiated pixel format type can
       // only be RGBA or BGRA.
-      // TODO(https://fxbug.dev/126049): Support other formats.
+      // TODO(https://fxbug.dev/42076788): Support other formats.
       ZX_ASSERT_MSG(false,
                     "Sysmem-negotiated pixel format %u does not meet the constraints we placed",
                     static_cast<uint32_t>(pixel_format.pixel_format));
@@ -696,7 +696,7 @@ void Pipe::ConfigurePrimaryPlane(uint32_t plane_num, const primary_layer_t* prim
   } else {
     ZX_ASSERT(primary->image.type == IMAGE_TYPE_YF_TILED);
     if (platform_ == registers::Platform::kTigerLake) {
-      // TODO(https://fxbug.dev/111347): Remove this warning or turn it into an error.
+      // TODO(https://fxbug.dev/42062668): Remove this warning or turn it into an error.
       zxlogf(ERROR, "The Tiger Lake display engine may not support YF tiling.");
     }
     plane_ctrl.set_surface_tiling(registers::PlaneControl::SurfaceTiling::kTilingYFKabyLake);

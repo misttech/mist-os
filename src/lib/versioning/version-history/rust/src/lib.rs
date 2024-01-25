@@ -120,7 +120,7 @@ impl Version {
 }
 
 pub fn version_from_abi_revision(abi_revision: AbiRevision) -> Option<Version> {
-    // TODO(https://fxbug.dev/117262): Store APIs and ABIs in a map instead of a list.
+    // TODO(https://fxbug.dev/42068452): Store APIs and ABIs in a map instead of a list.
     VERSION_HISTORY.iter().find(|v| v.abi_revision == abi_revision).cloned()
 }
 

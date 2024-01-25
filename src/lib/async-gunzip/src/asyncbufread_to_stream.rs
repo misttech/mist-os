@@ -147,7 +147,7 @@ impl<R: AsyncBufRead> Decoder<R> {
         Ok(())
     }
 
-    // TODO(https://fxbug.dev/96236): The gzip spec permits ignoring the CRC,
+    // TODO(https://fxbug.dev/42178331): The gzip spec permits ignoring the CRC,
     // but we may like to implement it as an optional check in a future CL.
     // (Same goes for the optional header CRC.)
     async fn read_and_validate_footer(
@@ -162,7 +162,7 @@ impl<R: AsyncBufRead> Decoder<R> {
 
     /// Yield output chunks to `out`.
     //
-    // TODO(https://fxbug.dev/96237): This implementation blocks on output
+    // TODO(https://fxbug.dev/42178332): This implementation blocks on output
     // until it has consumed enough input to produce a full output buffer. Some API
     // consumers may like to have the output buffer flushed whenever reading from input
     // would block.
@@ -179,7 +179,7 @@ impl<R: AsyncBufRead> Decoder<R> {
         let mut output_len = 0; // How much of the output buffer is currently filled.
 
         loop {
-            // TODO(https://fxbug.dev/114840): Remove condition to wait for input prior
+            // TODO(https://fxbug.dev/42066117): Remove condition to wait for input prior
             // to inflating
             // Ensure more input is available. Note the deflate body is followed by a gzip
             // footer, so the stream should never dry up at this stage.

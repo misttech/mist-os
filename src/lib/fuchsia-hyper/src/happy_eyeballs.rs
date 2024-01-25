@@ -95,7 +95,7 @@ where
         None => false,
     };
 
-    // TODO(https://fxbug.dev/68611): Implement an iterator over addrs such that we avoid allocating two
+    // TODO(https://fxbug.dev/42147654): Implement an iterator over addrs such that we avoid allocating two
     // new Vecs here.
     let (v4, v6): (Vec<_>, Vec<_>) = addrs.partition(|a| a.is_ipv4());
     let addrs = match v4first {

@@ -54,7 +54,7 @@ struct DdiPhyConfigEntry {
 // Kaby Lake: IHD-OS-KBL-Vol 12-1.17 pages 187-190
 // Skylake: IHD-OS-SKL-Vol 12-05.16 pages 181-183
 //
-// TODO(https://fxbug.dev/108252): Per-entry Iboost values.
+// TODO(https://fxbug.dev/42059656): Per-entry Iboost values.
 
 constexpr DdiPhyConfigEntry kPhyConfigHdmiSkylakeUhs[11] = {
     {0x000000ac, 0x00000018}, {0x0000009d, 0x00005012}, {0x00000088, 0x00007011},
@@ -110,7 +110,7 @@ bool HdmiDisplay::Query() {
   // VESA Enhanced Display Data Channel (E-DDC) Standard version 1.3 revised
   // Dec 31 2020, Section 2.2.3 "DDC Addresses", page 17.
   //
-  // TODO(https://fxbug.dev/117194): De-duplicate DDC address definitions from
+  // TODO(https://fxbug.dev/42068376): De-duplicate DDC address definitions from
   // HdmiDisplay and GMBusI2c implementations.
   constexpr static uint8_t kDdcDataAddress = 0x50;
 
@@ -227,7 +227,7 @@ bool HdmiDisplay::PipeConfigEpilogue(const display::DisplayTiming& mode, PipeId 
 
   // Configure voltage swing and related IO settings.
   //
-  // TODO(https://fxbug.dev/114460): Move voltage swing configuration logic to a
+  // TODO(https://fxbug.dev/42065767): Move voltage swing configuration logic to a
   // DDI-specific class.
 
   // kUseDefaultIdx always fails the idx-in-bounds check, so no additional handling is needed

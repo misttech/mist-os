@@ -50,7 +50,7 @@ impl ServeInner {
 
     /// Sets the server to shutdown the next time the stream is polled.
     ///
-    /// TODO(https://fxbug.dev/74241): This should cause the channel to close on the
+    /// TODO(https://fxbug.dev/42153903): This should cause the channel to close on the
     /// next poll, but in fact the channel won't close until the user of the
     /// bindings drops their request stream, responders, and control handles.
     pub fn shutdown(&self) {
@@ -60,7 +60,7 @@ impl ServeInner {
 
     /// Sets the server to shutdown with an epitaph the next time the stream is polled.
     ///
-    /// TODO(https://fxbug.dev/74241): This should cause the channel to close on the
+    /// TODO(https://fxbug.dev/42153903): This should cause the channel to close on the
     /// next poll, but in fact the channel won't close until the user of the
     /// bindings drops their request stream, responders, and control handles.
     pub fn shutdown_with_epitaph(&self, status: zx_status::Status) {

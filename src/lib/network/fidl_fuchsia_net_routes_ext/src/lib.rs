@@ -1562,7 +1562,7 @@ mod tests {
     #[test_case(vec![0..10]; "single_batch_many_events")]
     #[test_case(vec![0..10, 10..20, 20..30]; "many_batches_many_events")]
     async fn event_stream_from_state_against_shape<I: net_types::ip::Ip + FidlRouteIpExt>(
-        // TODO(https://fxbug.dev/119320): remove `_test_name` once optional.
+        // TODO(https://fxbug.dev/42070381): remove `_test_name` once optional.
         _test_name: &str,
         test_shape: Vec<std::ops::Range<u32>>,
     ) {
@@ -1633,7 +1633,7 @@ mod tests {
     // same `State` proxy, results in independent `Watcher` clients.
     #[netstack_test]
     async fn event_stream_from_state_multiple_watchers<I: net_types::ip::Ip + FidlRouteIpExt>(
-        // TODO(https://fxbug.dev/119320): remove `_test_name` once optional.
+        // TODO(https://fxbug.dev/42070381): remove `_test_name` once optional.
         _test_name: &str,
     ) {
         // Events for 3 watchers. Each receives one batch containing 10 events.
@@ -1696,7 +1696,7 @@ mod tests {
     #[test_case(false, true; "trailing_batch")]
     #[test_case(true, true; "trailing_event_and_batch")]
     async fn event_stream_from_state_conversion_error<I: net_types::ip::Ip + FidlRouteIpExt>(
-        // TODO(https://fxbug.dev/119320): remove `_test_name` once optional.
+        // TODO(https://fxbug.dev/42070381): remove `_test_name` once optional.
         _test_name: &str,
         trailing_event: bool,
         trailing_batch: bool,
@@ -1769,7 +1769,7 @@ mod tests {
     #[test_case(false; "no_trailing_batch")]
     #[test_case(true; "trailing_batch")]
     async fn event_stream_from_state_empty_batch_error<I: net_types::ip::Ip + FidlRouteIpExt>(
-        // TODO(https://fxbug.dev/119320): remove `_test_name` once optional.
+        // TODO(https://fxbug.dev/42070381): remove `_test_name` once optional.
         _test_name: &str,
         trailing_batch: bool,
     ) {
@@ -1833,7 +1833,7 @@ mod tests {
     #[test_case(CollectRoutesUntilIdleErrorTestCase::UnexpectedEvent; "unexpected_event")]
     #[test_case(CollectRoutesUntilIdleErrorTestCase::StreamEnded; "stream_ended")]
     async fn collect_routes_until_idle_error<I: net_types::ip::Ip + FidlRouteIpExt>(
-        // TODO(https://fxbug.dev/119320): remove `_test_name` once optional.
+        // TODO(https://fxbug.dev/42070381): remove `_test_name` once optional.
         _test_name: &str,
         test_case: CollectRoutesUntilIdleErrorTestCase,
     ) {
@@ -1872,7 +1872,7 @@ mod tests {
     // drops the idle event, and leaves all trailing events intact.
     #[netstack_test]
     async fn collect_routes_until_idle_success<I: net_types::ip::Ip + FidlRouteIpExt>(
-        // TODO(https://fxbug.dev/119320): remove `_test_name` once optional.
+        // TODO(https://fxbug.dev/42070381): remove `_test_name` once optional.
         _test_name: &str,
     ) {
         let route = arbitrary_test_route();
@@ -1897,7 +1897,7 @@ mod tests {
 
     #[netstack_test]
     async fn wait_for_routes_errors<I: net_types::ip::Ip + FidlRouteIpExt>(
-        // TODO(https://fxbug.dev/119320): remove `_test_name` once optional.
+        // TODO(https://fxbug.dev/42070381): remove `_test_name` once optional.
         _test_name: &str,
     ) {
         let mut state = HashSet::new();
@@ -1926,7 +1926,7 @@ mod tests {
 
     #[netstack_test]
     async fn wait_for_routes_add_remove<I: net_types::ip::Ip + FidlRouteIpExt>(
-        // TODO(https://fxbug.dev/119320): remove `_test_name` once optional.
+        // TODO(https://fxbug.dev/42070381): remove `_test_name` once optional.
         _test_name: &str,
     ) {
         let into_stream = |t| futures::stream::once(futures::future::ready(t));

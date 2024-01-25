@@ -33,7 +33,7 @@ use {
     thiserror::Error,
 };
 
-// TODO(https://fxbug.dev/61174): Document these.
+// TODO(https://fxbug.dev/42139436): Document these.
 #[allow(missing_docs)]
 extern "C" {
     pub fn dl_clone_loader_service(out: *mut zx_handle_t) -> zx_status_t;
@@ -314,7 +314,7 @@ pub fn process_self() -> Unowned<'static, Process> {
     unsafe {
         // zx_process_self() doesn't work correctly in jobs where multiple processes share
         // the portion of their address space for global variables. Use thrd_get_zx_process() to
-        // return the correct value in that context. See https://fxbug.dev/133807 for background.
+        // return the correct value in that context. See https://fxbug.dev/42083701 for background.
         let handle = thrd_get_zx_process();
         Unowned::from_raw_handle(handle)
     }

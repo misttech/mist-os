@@ -60,7 +60,7 @@ class DisplayDevice : public fidl::WireServer<FidlBacklight::Device> {
   void ApplyConfiguration(const display_config_t* banjo_display_config,
                           display::ConfigStamp config_stamp);
 
-  // TODO(https://fxbug.dev/86038): Initialization-related interactions between the Controller class and
+  // TODO(https://fxbug.dev/42167004): Initialization-related interactions between the Controller class and
   // DisplayDevice can currently take different paths, with Init() being called conditionally in
   // some cases (e.g. if the display has already been configured and powered up by the bootloader),
   // which means a DisplayDevice can hold many states before being considered fully-initialized.

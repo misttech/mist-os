@@ -118,7 +118,7 @@ impl<R: SeedableRng + Rng> DiagnosticsHierarchyGetter<String> for InspectHierarc
 /// Generate selectors which selects the nodes in the tree
 /// and all the properties on the nodes till a given depth.
 fn generate_selectors_till_level(depth: usize) -> Vec<String> {
-    // TODO(https://fxbug.dev/104109): Create a good combination of wildcards and exact matches
+    // TODO(https://fxbug.dev/42055229): Create a good combination of wildcards and exact matches
     let mut selector: String = String::from("*:root");
     (0..depth)
         .map(|_| {

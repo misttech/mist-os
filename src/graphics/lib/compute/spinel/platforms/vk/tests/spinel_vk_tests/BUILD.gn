@@ -21,7 +21,7 @@ source_set("spinel_vk_tests_sources") {
     "fxt_spinel_vk_render.h",
   ]
 
-  # TODO(https://fxbug.dev/135694): delete the below and fix compiler warnings
+  # TODO(https://fxbug.dev/42085293): delete the below and fix compiler warnings
   configs += [ "//build/config:Wno-vla-cxx-extension" ]
   deps = [
     "${graphics_compute_dir}/common",

@@ -396,7 +396,7 @@ void RdmaEngine::FlushAfbcRdmaTable() const {
                     VPU_RDMA_AHB_END_ADDR(kAfbcRdmaChannel));
 }
 
-// TODO(https://fxbug.dev/57633): stop all channels for safer reloads.
+// TODO(https://fxbug.dev/42135501): stop all channels for safer reloads.
 void RdmaEngine::StopRdma() {
   // TODO(https://fxbug.dev/322296668): Make StopRdma() idempotent.
   zxlogf(DEBUG, "Stopping RDMA");

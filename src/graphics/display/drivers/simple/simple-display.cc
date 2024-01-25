@@ -167,7 +167,7 @@ zx_status_t SimpleDisplay::DisplayControllerImplImportImage(
   const fidl::WireSyncClient<fuchsia_sysmem2::BufferCollection>& collection = it->second;
 
   fidl::WireResult check_result = collection->CheckAllBuffersAllocated();
-  // TODO(https://fxbug.dev/121691): The sysmem FIDL error logging patterns are
+  // TODO(https://fxbug.dev/42072690): The sysmem FIDL error logging patterns are
   // inconsistent across drivers. The FIDL error handling and logging should be
   // unified.
   if (!check_result.ok()) {
@@ -184,7 +184,7 @@ zx_status_t SimpleDisplay::DisplayControllerImplImportImage(
   }
 
   fidl::WireResult wait_result = collection->WaitForAllBuffersAllocated();
-  // TODO(https://fxbug.dev/121691): The sysmem FIDL error logging patterns are
+  // TODO(https://fxbug.dev/42072690): The sysmem FIDL error logging patterns are
   // inconsistent across drivers. The FIDL error handling and logging should be
   // unified.
   if (!wait_result.ok()) {

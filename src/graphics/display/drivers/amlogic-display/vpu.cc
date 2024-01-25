@@ -143,7 +143,7 @@ void Vpu::SetupPostProcessorOutputInterface() {
 }
 
 void Vpu::SetupPostProcessorColorConversion(ColorSpaceConversionMode mode) {
-  // TODO(https://fxbug.dev/132309): Revise the selection of matrices used for color
+  // TODO(https://fxbug.dev/42082404): Revise the selection of matrices used for color
   // conversion.
   switch (mode) {
     case ColorSpaceConversionMode::kRgbInternalRgbOut:
@@ -160,7 +160,7 @@ void Vpu::SetupPostProcessorColorConversion(ColorSpaceConversionMode mode) {
       const int16_t* m = RGB709_to_YUV709l_coeff;
 
       // VPP WRAP OSD1 matrix
-      // TODO(https://fxbug.dev/107649): Also set VPP_WRAP_OSD2/3 when OSD2/3 is
+      // TODO(https://fxbug.dev/42059021): Also set VPP_WRAP_OSD2/3 when OSD2/3 is
       // supported.
       vpu_mmio_.Write32(((m[0] & 0xfff) << 16) | (m[1] & 0xfff),
                         VPP_WRAP_OSD1_MATRIX_PRE_OFFSET0_1);

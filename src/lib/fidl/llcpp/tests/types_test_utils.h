@@ -105,7 +105,7 @@ void CannotProxyUnknownEnvelope(std::vector<uint8_t> bytes, std::vector<zx_handl
       fidl::internal::kLLCPPWireFormatVersion, encoded_bytes, ZX_CHANNEL_MAX_MSG_BYTES, result);
   ASSERT_EQ(encoded.status(), ZX_ERR_INVALID_ARGS) << encoded.status_string();
 
-  // TODO(https://fxbug.dev/35381): Test a reason enum instead of comparing strings.
+  // TODO(https://fxbug.dev/42110793): Test a reason enum instead of comparing strings.
   EXPECT_EQ(std::string(encoded.lossy_description()), "unknown union tag") << encoded.error();
 }
 

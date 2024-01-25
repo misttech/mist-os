@@ -19,7 +19,7 @@ namespace display {
 // this concept as "image handle". This name will be phased out when the
 // API is migrated from Banjo to FIDL.
 //
-// TODO(https://fxbug.dev/129092): Unify this type with `DriverCaptureImageId` when
+// TODO(https://fxbug.dev/42079544): Unify this type with `DriverCaptureImageId` when
 // unifying image ID namespaces.
 DEFINE_STRONG_INT(DriverImageId, uint64_t);
 

@@ -42,7 +42,7 @@ class HdmiTransmitter {
   // for the silicon-provider service calls. It must be valid unless
   // `HdmiTransmitter` is used for tests.
   //
-  // TODO(https://fxbug.dev/123426): Currently fake SMC resource objects are not yet
+  // TODO(https://fxbug.dev/42074342): Currently fake SMC resource objects are not yet
   // supported. Once fake SMC is supported, we should enforce
   // `silicon_provider_service_smc`  to be always valid.
   HdmiTransmitter(std::unique_ptr<designware_hdmi::HdmiTransmitterController> designware_controller,

@@ -204,7 +204,7 @@ mod tests {
     #[test_case(vec![0..10]; "single_batch_many_events")]
     #[test_case(vec![0..10, 10..20, 20..30]; "many_batches_many_events")]
     async fn fake_watcher_impl_against_shape<I: net_types::ip::Ip + FidlRouteIpExt>(
-        // TODO(https://fxbug.dev/119320): remove `_test_name` once optional.
+        // TODO(https://fxbug.dev/42070381): remove `_test_name` once optional.
         _test_name: &str,
         test_shape: Vec<std::ops::Range<u32>>,
     ) {

@@ -124,7 +124,7 @@ void EngineCommandStreamer::InitHardware() {
   uint32_t gtt_addr = magma::to_uint32(hardware_status_page()->gpu_addr());
   registers::HardwareStatusPageAddress::write(register_io(), mmio_base_, gtt_addr);
 
-  // TODO(https://fxbug.dev/80908) - switch to engine specific sequence numbers?
+  // TODO(https://fxbug.dev/42161304) - switch to engine specific sequence numbers?
   uint32_t initial_sequence_number = sequencer()->next_sequence_number();
   hardware_status_page()->write_sequence_number(initial_sequence_number);
 
@@ -499,7 +499,7 @@ void EngineCommandStreamer::ScheduleContext() {
     mapped_batch->scheduled();
     context->pending_batch_queue(id_).pop();
 
-    // TODO(https://fxbug.dev/12764) - MoveBatchToInflight should not fail.  Scheduler should verify there
+    // TODO(https://fxbug.dev/42078195) - MoveBatchToInflight should not fail.  Scheduler should verify there
     // is sufficient room in the ringbuffer before selecting a context. For now, drop the command
     // buffer and try another context.
     if (!MoveBatchToInflight(std::move(mapped_batch))) {

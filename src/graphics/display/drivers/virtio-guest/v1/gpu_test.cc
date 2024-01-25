@@ -35,7 +35,7 @@ namespace {
 // Use a stub buffer collection instead of the real sysmem since some tests may
 // require things that aren't available on the current system.
 //
-// TODO(https://fxbug.dev/121924): Consider creating and using a unified set of sysmem
+// TODO(https://fxbug.dev/42072949): Consider creating and using a unified set of sysmem
 // testing doubles instead of writing mocks for each display driver test.
 class StubBufferCollection : public fidl::testing::WireTestBase<fuchsia_sysmem::BufferCollection> {
  public:
@@ -396,7 +396,7 @@ TEST_F(VirtioGpuTest, ImportImage) {
               ZX_ERR_OUT_OF_RANGE);
   });
 
-  // TODO(https://fxbug.dev/122727): Implement fake ring-buffer based tests so that we
+  // TODO(https://fxbug.dev/42073709): Implement fake ring-buffer based tests so that we
   // can test the valid import case.
 
   // Release buffer collection.

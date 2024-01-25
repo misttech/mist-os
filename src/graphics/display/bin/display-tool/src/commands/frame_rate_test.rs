@@ -80,7 +80,7 @@ fn get_cell_color_for_frame(frame_num: u64, rows: u32, cols: u32) -> &'static [u
 //
 // `rows` must be even.
 //
-// TODO(https://fxbug.dev/134912): The precondition can be relaxed to "either `rows` or
+// TODO(https://fxbug.dev/42084641): The precondition can be relaxed to "either `rows` or
 // `cols` must be even".
 fn get_position_in_grid_for_frame(frame_num: u64, rows: u32, cols: u32) -> Point2D<u32> {
     // Assume the grid is of size 10 x 6, by connecting 00->01->...->58->59->00
@@ -107,7 +107,7 @@ fn get_position_in_grid_for_frame(frame_num: u64, rows: u32, cols: u32) -> Point
     // This construction can be generalized to any grid as long as the number
     // of rows is even.
     //
-    // TODO(https://fxbug.dev/134912): Actually it works as long as either `rows` or
+    // TODO(https://fxbug.dev/42084641): Actually it works as long as either `rows` or
     // `cols` is even. We can relax this precondition and rotate the pattern if
     // `rows` is odd and `cols` is even.
     assert!(rows % 2 == 0);
@@ -218,7 +218,7 @@ pub async fn run(
     grid_width: Option<u32>,
     grid_height: Option<u32>,
 ) -> Result<()> {
-    // TODO(https://fxbug.dev/135194): Rather than manually checking the display engine
+    // TODO(https://fxbug.dev/42084882): Rather than manually checking the display engine
     // output performance, we should add an automatic check to print error /
     // terminate the test when the frame rate drops.
     #[cfg(debug_assertions)]

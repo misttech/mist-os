@@ -135,14 +135,14 @@ impl Vmo {
         unsafe {
             let status = sys::zx_vmo_read(
                 self.raw_handle(),
-                // TODO(https://fxbug.dev/129307) use MaybeUninit::slice_as_mut_ptr when stable
+                // TODO(https://fxbug.dev/42079723) use MaybeUninit::slice_as_mut_ptr when stable
                 data.as_mut_ptr() as *mut u8,
                 offset,
                 data.len(),
             );
             ok(status)?;
         }
-        // TODO(https://fxbug.dev/129307) use MaybeUninit::slice_assume_init_mut when stable
+        // TODO(https://fxbug.dev/42079723) use MaybeUninit::slice_assume_init_mut when stable
         Ok(
             // SAFETY: We're converting &mut [MaybeUninit<u8>] back to &mut [u8], which is only
             // valid to do if all elements of `data` have actually been initialized. Here we
@@ -402,7 +402,7 @@ mod tests {
         let resource = service.get(Time::INFINITE).expect("couldn't get root resource");
         // This test and fuchsia-zircon are different crates, so we need
         // to use from_raw to convert between the fuchsia_zircon handle and this test handle.
-        // See https://fxbug.dev/91562 for details.
+        // See https://fxbug.dev/42173139 for details.
         let resource = unsafe { Resource::from(Handle::from_raw(resource.into_raw())) };
         let iommu = Iommu::create_dummy(&resource, IommuDescDummy::default()).unwrap();
         let bti = Bti::create(&iommu, 0).unwrap();

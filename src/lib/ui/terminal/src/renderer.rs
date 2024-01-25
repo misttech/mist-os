@@ -198,7 +198,7 @@ fn maybe_raster_for_char(
     let maybe_extra_raster = if flags.intersects(Flags::UNDERLINE | Flags::STRIKEOUT) {
         let mut raster_builder = context.raster_builder().expect("raster_builder");
         if flags.contains(Flags::UNDERLINE) {
-            // TODO(https://fxbug.dev/90967): Avoid glyph overlap.
+            // TODO(https://fxbug.dev/42172477): Avoid glyph overlap.
             let line_metrics = font_set.font.face.underline_metrics();
             raster_builder.add(
                 &path_for_underline(

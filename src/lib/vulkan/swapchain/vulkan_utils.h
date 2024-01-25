@@ -14,7 +14,7 @@ namespace image_pipe_swapchain {
 //   - VK_FORMAT_G8B8G8R8_422_UNORM
 //   - VK_FORMAT_G8_B8R8_2PLANE_420_UNORM
 //   - VK_FORMAT_G8_B8_R8_3PLANE_420_UNORM
-// TODO(https://fxbug.dev/24595): use of these formats is not enough to assume NV12,
+// TODO(https://fxbug.dev/42098808): use of these formats is not enough to assume NV12,
 // but they're currently the only formats we support at the sampler level.
 bool IsYuvFormat(VkFormat format);
 

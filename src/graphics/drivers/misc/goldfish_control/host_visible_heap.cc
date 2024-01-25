@@ -98,7 +98,7 @@ GetCreateColorBuffer2Params(fidl::AnyArena& allocator,
 
   ZX_DEBUG_ASSERT(image_constraints.has_pixel_format() && image_constraints.has_min_size());
 
-  // TODO(https://fxbug.dev/59804): Support other pixel formats.
+  // TODO(https://fxbug.dev/42137913): Support other pixel formats.
   const auto& pixel_format = image_constraints.pixel_format();
   ColorBufferFormatType color_buffer_format;
   switch (pixel_format) {

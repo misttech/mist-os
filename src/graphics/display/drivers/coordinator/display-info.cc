@@ -184,7 +184,7 @@ void DisplayInfo::PopulateDisplayAudio() {
     return;
   }
 
-  // TODO(https://fxbug.dev/32457): Revisit dedupe/merge logic once the audio API takes a stance.
+  // TODO(https://fxbug.dev/42107544): Revisit dedupe/merge logic once the audio API takes a stance.
   // First, this code always adds the basic audio formats before processing the SADs, which is
   // likely redundant on some hardware (the spec isn't clear about whether or not the basic audio
   // formats should also be included in the SADs). Second, this code assumes that the SADs are

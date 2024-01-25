@@ -40,7 +40,7 @@ constexpr int kTestSubsysDeviceId = 0x1af4;
 // Use a stub buffer collection instead of the real sysmem since some tests may
 // require things that aren't available on the current system.
 //
-// TODO(https://fxbug.dev/121924): Consider creating and using a unified set of sysmem
+// TODO(https://fxbug.dev/42072949): Consider creating and using a unified set of sysmem
 // testing doubles instead of writing mocks for each display driver test.
 class StubBufferCollection : public fidl::testing::WireTestBase<fuchsia_sysmem::BufferCollection> {
  public:
@@ -325,7 +325,7 @@ class VirtioGpuTest : public ::testing::Test {
         driver_.SyncCall(&fdf_testing::DriverUnderTest<virtio_display::GpuDeviceDriver>::Start,
                          std::move(start_args->start_args)));
 
-    // TODO(https://fxbug.dev/134883): This should be ZX_OK once all the mocks are in place.
+    // TODO(https://fxbug.dev/42084608): This should be ZX_OK once all the mocks are in place.
     EXPECT_EQ(ZX_ERR_PEER_CLOSED, start_result.status_value());
   }
 

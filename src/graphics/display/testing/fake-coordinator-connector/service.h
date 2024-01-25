@@ -68,7 +68,7 @@ class FakeDisplayCoordinatorConnector : public fidl::Server<fuchsia_hardware_dis
 
   // Encapsulates state for thread safety, since |display::FakeDisplayStack| invokes callbacks
   // from other threads.
-  // TODO(https://fxbug.dev/129571): The comments are vague since it lacks the thread-
+  // TODO(https://fxbug.dev/42079944): The comments are vague since it lacks the thread-
   // safety model of the struct. We need to rigorize the thread-safety model and
   // make sure that the access pattern is correct.
   struct State {

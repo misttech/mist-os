@@ -16,16 +16,16 @@ pub struct FormaImage(pub(crate) usize);
 
 #[derive(Debug)]
 pub(crate) struct VmoImage {
-    // TODO(https://fxbug.dev/84729)
+    // TODO(https://fxbug.dev/42165549)
     #[allow(unused)]
     vmo: zx::Vmo,
-    // TODO(https://fxbug.dev/84729)
+    // TODO(https://fxbug.dev/42165549)
     #[allow(unused)]
     width: u32,
-    // TODO(https://fxbug.dev/84729)
+    // TODO(https://fxbug.dev/42165549)
     #[allow(unused)]
     height: u32,
-    // TODO(https://fxbug.dev/84729)
+    // TODO(https://fxbug.dev/42165549)
     #[allow(unused)]
     len_bytes: u64,
     mapping: Arc<Mapping>,

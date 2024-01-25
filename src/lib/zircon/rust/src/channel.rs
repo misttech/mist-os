@@ -994,7 +994,7 @@ mod tests {
         // crate's concerns. The timeout is here just to prevent the tests from
         // stalling forever if a developer makes a mistake locally in this
         // crate. Tests of Zircon behavior or virtualization behavior should be
-        // covered elsewhere. See https://fxbug.dev/31235.
+        // covered elsewhere. See https://fxbug.dev/42106187.
         p1.call(Time::after(30.seconds()), b"txidcall", &mut vec![], &mut buf)
             .expect("channel call error");
         assert_eq!(&buf.bytes()[4..], b"response");
@@ -1047,7 +1047,7 @@ mod tests {
         // crate's concerns. The timeout is here just to prevent the tests from
         // stalling forever if a developer makes a mistake locally in this
         // crate. Tests of Zircon behavior or virtualization behavior should be
-        // covered elsewhere. See https://fxbug.dev/31235.
+        // covered elsewhere. See https://fxbug.dev/42106187.
         p1.call_etc(Time::after(30.seconds()), b"txidcall", &mut handle_dispositions, &mut buf)
             .expect("channel call error");
         assert_eq!(&buf.bytes()[4..], b"response");

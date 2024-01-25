@@ -132,7 +132,7 @@ mod tests {
 
     // Generates a package manifest to be used for testing. The `name` is used in the blob file
     // names to make each manifest somewhat unique.
-    // TODO(https://fxbug.dev/76993): See if we can share this with BasePackage.
+    // TODO(https://fxbug.dev/42156958): See if we can share this with BasePackage.
     fn generate_test_manifest(name: &str, file_path: impl AsRef<Path>) -> PackageManifest {
         let source_path = file_path.as_ref().to_string_lossy().into_owned();
         let file = File::open(&file_path).unwrap();

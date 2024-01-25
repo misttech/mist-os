@@ -42,7 +42,7 @@ rustc_library("lib") {
     "//src/sys/lib/component_debug",
     "//third_party/rust_crates:assert_matches",
 
-    # TODO(https://fxbug.dev/81400): Remove this dep during post-migration cleanup.
+    # TODO(https://fxbug.dev/42161852): Remove this dep during post-migration cleanup.
     "//src/sys/lib/component-events",
   ]
 

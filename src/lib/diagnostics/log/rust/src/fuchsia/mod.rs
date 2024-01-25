@@ -336,7 +336,7 @@ impl Publisher {
         })
     }
 
-    // TODO(https://fxbug.dev/71242) delete this and make Publisher private
+    // TODO(https://fxbug.dev/42150573) delete this and make Publisher private
     /// Publish the provided event for testing.
     pub fn event_for_testing(&self, record: TestRecord<'_>) {
         let filter: &InterestFilter = (&*self.inner as &dyn Subscriber).downcast_ref().unwrap();

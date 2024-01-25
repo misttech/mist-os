@@ -133,7 +133,7 @@ spinel_si_seal(struct spinel_styling_impl * const impl)
   //
   // If the host buffer is not coherent then it has to be flushed.
   //
-  // TODO(https://fxbug.dev/101416): Only flush what has changed.
+  // TODO(https://fxbug.dev/42052239): Only flush what has changed.
   //
   if (!spinel_allocator_is_coherent(&device->allocator.device.perm.hw_dr))
     {

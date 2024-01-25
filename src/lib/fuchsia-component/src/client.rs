@@ -212,7 +212,7 @@ pub fn connect_to_protocol_at_dir_svc<P: DiscoverableProtocolMarker>(
     directory: &impl AsRefDirectory,
 ) -> Result<P::Proxy, Error> {
     let protocol_path = format!("{}/{}", SVC_DIR, P::PROTOCOL_NAME);
-    // TODO(https://fxbug.dev/117079): Remove the following line when component
+    // TODO(https://fxbug.dev/42068248): Remove the following line when component
     // manager no longer mishandles leading slashes.
     let protocol_path = protocol_path.strip_prefix('/').unwrap();
     connect_to_named_protocol_at_dir_root::<P>(directory, &protocol_path)

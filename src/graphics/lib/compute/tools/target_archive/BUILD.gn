@@ -43,7 +43,7 @@ config("struct_sources.config") {
     "-Wl,--build-id=none",
     "-Wl,-T," + rebase_path(inputs[0], root_build_dir),
 
-    # TODO(https://fxbug.dev/95379): Suppress complaints about library-selection
+    # TODO(https://fxbug.dev/42177378): Suppress complaints about library-selection
     # options from standard configs that are moot with -nostdlib.
     "-Wno-unused-command-line-argument",
   ]

@@ -62,7 +62,7 @@ struct DdiPhyConfigEntry {
 // Kaby Lake: IHD-OS-KBL-Vol 12-1.17 pages 187-190
 // Skylake: IHD-OS-SKL-Vol 12-05.16 pages 181-183
 //
-// TODO(https://fxbug.dev/108252): Per-entry Iboost values.
+// TODO(https://fxbug.dev/42059656): Per-entry Iboost values.
 
 constexpr DdiPhyConfigEntry kPhyConfigDpSkylakeHs[9] = {
     {0x000000a0, 0x00002016}, {0x0000009b, 0x00005012}, {0x00000088, 0x00007011},
@@ -283,7 +283,7 @@ zx::result<DdiAuxChannel::ReplyInfo> DpAux::DoTransaction(const DdiAuxChannel::R
         zxlogf(TRACE, "DP aux: Reply was not an ack (got I2C_NACK)");
         return zx::error_result(ZX_ERR_IO_REFUSED);
       case DP_REPLY_I2C_DEFER:
-        // TODO(https://fxbug.dev/31313): Implement handling of I2C_DEFER.
+        // TODO(https://fxbug.dev/42106274): Implement handling of I2C_DEFER.
         zxlogf(TRACE, "DP aux: Received I2C_DEFER (not implemented)");
         return zx::error_result(ZX_ERR_NEXT);
       default:
@@ -357,7 +357,7 @@ zx_status_t DpAux::DpAuxWrite(uint32_t dp_cmd, uint32_t addr, const uint8_t* buf
   if (transaction_result.is_error()) {
     return transaction_result.error_value();
   }
-  // TODO(https://fxbug.dev/31313): Handle the case where the hardware did a short write,
+  // TODO(https://fxbug.dev/42106274): Handle the case where the hardware did a short write,
   // for which we could send the remaining bytes.
   if (transaction_result->reply_data_size != 0) {
     zxlogf(WARNING, "DP aux write: Unexpected reply size");
@@ -945,7 +945,7 @@ void DpDisplay::ConfigureVoltageSwingComboTigerLake(size_t phy_config_index) {
   };
 
   cpp20::span<const ComboSwingConfig> swing_configs;
-  // TODO(https://fxbug.dev/113951):
+  // TODO(https://fxbug.dev/42065201):
   const int use_edp_voltages = false;
   if (use_edp_voltages) {
     if (dp_link_rate_mhz_ <= 5'400) {  // Up to HBR2
@@ -969,7 +969,7 @@ void DpDisplay::ConfigureVoltageSwingComboTigerLake(size_t phy_config_index) {
           {.swing_select = 0b1001, .n_scalar = 0x7f, .cursor = 0x3f},
 
           // Optimized config, opt-in via VBT.
-          // TODO(https://fxbug.dev/114461): This entry is currently unused.
+          // TODO(https://fxbug.dev/42065768): This entry is currently unused.
           {.swing_select = 0b0110, .n_scalar = 0x7f, .cursor = 0x3f},
       };
       swing_configs = kEmbeddedDisplayPortHbr2Configs;
@@ -1023,7 +1023,7 @@ void DpDisplay::ConfigureVoltageSwingComboTigerLake(size_t phy_config_index) {
       swing_configs = kDisplayPortHbrConfigs;
     } else {  // Up to HBR2
       if (dp_link_rate_mhz_ >= 5'400) {
-        // TODO(https://fxbug.dev/114668): DpDisplay::ComputeDdiPllConfig() should
+        // TODO(https://fxbug.dev/42065925): DpDisplay::ComputeDdiPllConfig() should
         // reject configs that would entail HBR3 on DisplayPort. Then we can
         // have a ZX_ASSERT() / ZX_DEBUG_ASSERT() here.
         zxlogf(WARNING,
@@ -1045,7 +1045,7 @@ void DpDisplay::ConfigureVoltageSwingComboTigerLake(size_t phy_config_index) {
       // set of entries for the H SKUs.
       const uint16_t device_id = controller()->device_id();
 
-      // TODO(https://fxbug.dev/114667): PCI device ID-based selection is insufficient.
+      // TODO(https://fxbug.dev/42065924): PCI device ID-based selection is insufficient.
       // Display engines with PCI device ID 0x9a49 may be UP3 or H35 SKUs.
       if (is_tgl_u(device_id)) {
         static constexpr ComboSwingConfig kDisplayPortHbr2UConfigs[] = {
@@ -1197,7 +1197,7 @@ bool DpDisplay::LinkTrainingSetupTigerLake() {
   // Configure "Transcoder DDI Control" to select DDI and DDI mode.
   auto ddi_control = transcoder_regs.DdiControl().ReadFrom(mmio_space());
   ddi_control.set_ddi_tiger_lake(ddi_id());
-  // TODO(https://fxbug.dev/110411): Support MST (Multi-Stream).
+  // TODO(https://fxbug.dev/42061773): Support MST (Multi-Stream).
   ddi_control.set_ddi_mode(registers::TranscoderDdiControl::kModeDisplayPortSingleStream);
   ddi_control.WriteTo(mmio_space());
 
@@ -1215,7 +1215,7 @@ bool DpDisplay::LinkTrainingSetupTigerLake() {
   // Start link training at the minimum Voltage Swing level.
   ConfigureVoltageSwingTigerLake(/*phy_config_index=*/0);
 
-  // TODO(https://fxbug.dev/105240): On PRM it mentions that, for COMBO PHY, the driver
+  // TODO(https://fxbug.dev/42056448): On PRM it mentions that, for COMBO PHY, the driver
   // needs to configure PORT_CL_DW10 Static Power Down to power up the used
   // lanes of the DDI.
 
@@ -1279,7 +1279,7 @@ bool DpDisplay::LinkTrainingSetupTigerLake() {
     return false;
   }
 
-  // TODO(https://fxbug.dev/109368): The procedure above doesn't fully match that
+  // TODO(https://fxbug.dev/42060757): The procedure above doesn't fully match that
   // described in VESA DP Standard v1.4a. For example, DOWNSPREAD_CTRL and
   // MAIN_LINK_CHANNEL_CODING_SET registers are not set.
   return true;
@@ -1303,7 +1303,7 @@ bool DpDisplay::LinkTrainingSetupKabyLake() {
   //
   // Kaby Lake: IHD-OS-KBL-Vol 12-1.17 pages 187-190
   // Skylake: IHD-OS-SKL-Vol 12-05.16 pages 181-183
-  // TODO(https://fxbug.dev/31313): Read the VBT to handle unique motherboard configs for kaby lake
+  // TODO(https://fxbug.dev/42106274): Read the VBT to handle unique motherboard configs for kaby lake
   uint8_t i_boost;
   const cpp20::span<const DdiPhyConfigEntry> entries =
       controller()->igd_opregion().IsLowVoltageEdp(ddi_id())
@@ -1491,7 +1491,7 @@ bool DpDisplay::LinkTrainingStage2(dpcd::TrainingPatternSet* tp_set, dpcd::Train
     for (unsigned i = 0; i < dp_lane_count_; i++) {
       symbol_lock_done &= lane_status[i].lane_symbol_locked(i).get();
       channel_eq_done &= lane_status[i].lane_channel_eq_done(i).get();
-      // TODO(https://fxbug.dev/109368): The driver should also check interlane align
+      // TODO(https://fxbug.dev/42060757): The driver should also check interlane align
       // done bits.
     }
     if (symbol_lock_done && channel_eq_done) {
@@ -1604,7 +1604,7 @@ bool DpDisplay::ProgramDpModeTigerLake() {
 }
 
 bool DpDisplay::DoLinkTraining() {
-  // TODO(https://fxbug.dev/31313): If either of the two training steps fails, we're
+  // TODO(https://fxbug.dev/42106274): If either of the two training steps fails, we're
   // supposed to try with a reduced bit rate.
   bool result = true;
   if (is_tgl(controller()->device_id())) {
@@ -1710,7 +1710,7 @@ bool DpDisplay::Query() {
     case 1:
       break;
     default:
-      // TODO(https://fxbug.dev/31313): Add support for MST.
+      // TODO(https://fxbug.dev/42106274): Add support for MST.
       zxlogf(ERROR,
              "Multiple (%lu) DisplayPort Sink devices detected on DDI %d. DisplayPort "
              "Multi-Stream Transport is not supported yet.",
@@ -2019,7 +2019,7 @@ bool DpDisplay::PipeConfigEpilogue(const display::DisplayTiming& mode, PipeId pi
       .set_colorimetry_in_vsc_sdp(false)
       .set_colorimetry_top_bit(0);
 
-  // TODO(https://fxbug.dev/85601): Decide the color model / pixel format based on pipe
+  // TODO(https://fxbug.dev/42166519): Decide the color model / pixel format based on pipe
   //                        configuration and display capabilities.
   main_stream_attribute_misc
       .set_bits_per_component_select(registers::DisplayPortMsaBitsPerComponent::k8Bpc)
@@ -2045,7 +2045,7 @@ bool DpDisplay::PipeConfigEpilogue(const display::DisplayTiming& mode, PipeId pi
     transcoder_ddi_control.set_ddi_kaby_lake(transcoder_ddi);
   }
 
-  // TODO(https://fxbug.dev/85601): Decide the color model / pixel format based on pipe
+  // TODO(https://fxbug.dev/42166519): Decide the color model / pixel format based on pipe
   //                        configuration and display capabilities.
   transcoder_ddi_control.set_ddi_mode(registers::TranscoderDdiControl::kModeDisplayPortSingleStream)
       .set_bits_per_color(registers::TranscoderDdiControl::k8bpc)
@@ -2194,7 +2194,7 @@ bool DpDisplay::HandleHotplug(bool long_pulse) {
     }
 
     // The pulse was from a downstream monitor being connected
-    // TODO(https://fxbug.dev/31313): Add support for MST
+    // TODO(https://fxbug.dev/42106274): Add support for MST
     if (sink_count.count() > 1) {
       return true;
     }

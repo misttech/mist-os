@@ -118,7 +118,7 @@ impl ZbiBuilder {
     /// Build the ZBI.
     pub fn build(self, gendir: impl AsRef<Utf8Path>, output: impl AsRef<Utf8Path>) -> Result<()> {
         // Create the additional_boot_args.
-        // TODO(https://fxbug.dev/77387): Switch to the boot args file once we are no longer
+        // TODO(https://fxbug.dev/42157396): Switch to the boot args file once we are no longer
         // comparing to the GN build.
         let additional_boot_args_path = gendir.as_ref().join("additional_boot_args.txt");
         let mut additional_boot_args = File::create(&additional_boot_args_path)

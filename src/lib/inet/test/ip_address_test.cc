@@ -187,7 +187,7 @@ TEST(IpAddressTest, FromString) {
   EXPECT_EQ(IpAddress(1, 0, 0, 0, 0, 0, 0, 0), IpAddress::FromString("1::"));
   EXPECT_EQ(IpAddress(0, 0, 0, 0, 0, 0, 0, 0), IpAddress::FromString("::"));
 
-  // Regression test for https://fxbug.dev/103890.
+  // Regression test for https://fxbug.dev/42054986.
   EXPECT_EQ(IpAddress(0xb043, 0x5c50, 0x7f6a, 0xd804, 0x9eff, 0x47df, 0, 0),
             IpAddress::FromString("b043:5c50:7f6a:d804:9eff:47df::"));
 
@@ -299,7 +299,7 @@ TEST(IpAddressTest, FromStringView) {
   EXPECT_EQ(std::make_pair(IpAddress(0, 0, 0, 0, 0, 0, 0, 0), 2ul),
             IpAddress::FromStringView("::"));
 
-  // Regression test for https://fxbug.dev/103890.
+  // Regression test for https://fxbug.dev/42054986.
   EXPECT_EQ(std::make_pair(IpAddress(0xb043, 0x5c50, 0x7f6a, 0xd804, 0x9eff, 0x47df, 0, 0), 31ul),
             IpAddress::FromStringView("b043:5c50:7f6a:d804:9eff:47df::"));
 

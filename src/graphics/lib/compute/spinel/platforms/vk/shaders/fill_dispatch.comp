@@ -115,7 +115,7 @@ main()
 #endif
     {
       //
-      // TODO(https://fxbug.dev/101414): This eventually needs to setup the
+      // TODO(https://fxbug.dev/42052237): This eventually needs to setup the
       // dispatch based on rounded-up workgroup size and not subgroup
       // size.
       //

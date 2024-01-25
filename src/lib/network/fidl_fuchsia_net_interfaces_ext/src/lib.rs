@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-// TODO(https://fxbug.dev/110854): Provide facilities that work with a watcher
+// TODO(https://fxbug.dev/42062192): Provide facilities that work with a watcher
 // disinterested in all address properties.
 //! Extensions for the fuchsia.net.interfaces FIDL library.
 
@@ -25,7 +25,7 @@ use std::convert::TryFrom as _;
 use std::num::NonZeroU64;
 use thiserror::Error;
 
-// TODO(https://fxbug.dev/66175): Prevent this type from becoming stale.
+// TODO(https://fxbug.dev/42144953): Prevent this type from becoming stale.
 /// Properties of a network interface.
 #[derive(Clone, Debug, Eq, PartialEq, ValidFidlTable)]
 #[fidl_table_src(fnet_interfaces::Properties)]
@@ -47,7 +47,7 @@ pub struct Properties {
     pub has_default_ipv6_route: bool,
 }
 
-// TODO(https://fxbug.dev/66175): Prevent this type from becoming stale.
+// TODO(https://fxbug.dev/42144953): Prevent this type from becoming stale.
 /// An address and its properties.
 #[derive(Clone, Debug, Eq, Hash, PartialEq, ValidFidlTable)]
 #[fidl_table_src(fnet_interfaces::Address)]
@@ -59,7 +59,7 @@ pub struct Address {
     ///
     /// Its value must be greater than 0. A value of zx.time.INFINITE indicates
     /// that the address will always be valid.
-    // TODO(https://fxbug.dev/75531): Replace with zx::Time once there is support for custom
+    // TODO(https://fxbug.dev/42155335): Replace with zx::Time once there is support for custom
     // conversion functions.
     pub valid_until: zx::zx_time_t,
     /// The address's assignment state.

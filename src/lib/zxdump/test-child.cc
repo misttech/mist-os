@@ -290,7 +290,7 @@ int main(int argc, char** argv) {
   // Wait for all the crashing threads to start up and actually crash.  Then
   // keep the exception handles alive so the threads stay suspended.
   std::vector<zx::exception> thread_exceptions;
-  std::vector<zx::suspend_token> thread_suspensions;  // TODO(https://fxbug.dev/120928): see below
+  std::vector<zx::suspend_token> thread_suspensions;  // TODO(https://fxbug.dev/42071974): see below
   if (exception_channel) {
     while (thread_exceptions.size() < threads.size()) {
       zx_exception_info_t info;
@@ -306,7 +306,7 @@ int main(int argc, char** argv) {
       ZX_ASSERT(nbytes == sizeof(info));
       ZX_ASSERT(nhandles == 1);
 
-      // TODO(https://fxbug.dev/120928): That should work, but actually the kernel
+      // TODO(https://fxbug.dev/42071974): That should work, but actually the kernel
       // doesn't report a thread as suspended until after exception processing
       // completes.  Until that is fixed in the kernel, we need to do another
       // little dance here: we suspend each thread, then let it resume from the

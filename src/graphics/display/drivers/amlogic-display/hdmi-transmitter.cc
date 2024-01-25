@@ -42,14 +42,14 @@ HdmiTransmitter::HdmiTransmitter(
       silicon_provider_service_smc_(std::move(silicon_provider_service_smc)) {
   ZX_DEBUG_ASSERT(designware_controller_ != nullptr);
 
-  // TODO(https://fxbug.dev/123426): `silicon_provider_service_smc` may be invalid in
+  // TODO(https://fxbug.dev/42074342): `silicon_provider_service_smc` may be invalid in
   // tests where fake SMC resource objects are not yet supported. Once fake SMC
   // is supported, we should add an assertion to enforce
   // `silicon_provider_service_smc` to be always valid.
 }
 
 zx::result<> HdmiTransmitter::Reset() {
-  // TODO(https://fxbug.dev/69679): Add in Resets
+  // TODO(https://fxbug.dev/42148838): Add in Resets
   // reset hdmi related blocks (HIU, HDMI SYS, HDMI_TX)
   // auto reset0_result = display->reset_register_.WriteRegister32(PRESET0_REGISTER, 1 << 19, 1 <<
   // 19); if ((reset0_result.status() != ZX_OK) || reset0_result->is_error()) {
@@ -93,7 +93,7 @@ void CalculateTxParam(const display::DisplayTiming& display_timing,
   // Picture Aspect Ratio and Pixel Repetition", Table 14 "AVI InfoFrame
   // Picture Aspect Ratio Field, Data Byte 2", page 76.
   //
-  // TODO(https://fxbug.dev/136194): Revise the AVI InfoFrame naming and move the
+  // TODO(https://fxbug.dev/42085777): Revise the AVI InfoFrame naming and move the
   // values to a dedicated header.
   static constexpr uint8_t kHdmiAspectRatio4x3 = 1;
   static constexpr uint8_t kHdmiAspectRatio16x9 = 2;
@@ -114,7 +114,7 @@ void CalculateTxParam(const display::DisplayTiming& display_timing,
   // The colorimetry of SMPTE ST 170, commonly known as the "NTSC standard".
   static constexpr uint8_t kHdmiColorimetryNtsc = 1;
 
-  // TODO(https://fxbug.dev/136231): Revise AVI InfoFrame values set by the driver.
+  // TODO(https://fxbug.dev/42085819): Revise AVI InfoFrame values set by the driver.
   p->colorimetry = kHdmiColorimetryNtsc;
 }
 
@@ -150,7 +150,7 @@ zx::result<> HdmiTransmitter::ModeSet(const display::DisplayTiming& timing,
       return hdcp_initialization_result;
     }
   } else {
-    // TODO(https://fxbug.dev/123426): This could occur in tests where fake SMC
+    // TODO(https://fxbug.dev/42074342): This could occur in tests where fake SMC
     // resource objects are not yet supported. Once fake SMC is supported, we
     // should enforce `smc_` to be always valid and always issue a
     // `zx_smc_call()` syscall.

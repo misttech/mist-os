@@ -92,7 +92,7 @@ mod tests {
         let resource = service.get(Time::INFINITE).expect("couldn't get root resource");
         // This test and fuchsia-zircon are different crates, so we need
         // to use from_raw to convert between the fuchsia_zircon handle and this test handle.
-        // See https://fxbug.dev/91562 for details.
+        // See https://fxbug.dev/42173139 for details.
         let resource = unsafe { Resource::from(Handle::from_raw(resource.into_raw())) };
         let iommu = Iommu::create_dummy(&resource, IommuDescDummy::default()).unwrap();
         assert!(!iommu.as_handle_ref().is_invalid());

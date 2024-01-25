@@ -84,7 +84,7 @@ layout(buffer_reference, std430) buffer buffer_rs_indirect_info_fill
 };
 
 //
-// TODO(https://fxbug.dev/104264): Consider filling using uvec2 or uvec4 for
+// TODO(https://fxbug.dev/42055401): Consider filling using uvec2 or uvec4 for
 // improved performance.
 //
 layout(buffer_reference, std430) buffer buffer_rs_dwords

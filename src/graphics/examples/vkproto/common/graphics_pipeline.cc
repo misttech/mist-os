@@ -103,7 +103,7 @@ bool GraphicsPipeline::Init() {
   pipeline_info.layout = pipeline_layout_;
   pipeline_info.renderPass = vkp_render_pass_->get();
   pipeline_info.basePipelineIndex = -1;
-  // TODO(https://fxbug.dev/62319): Use vk::Device::createGraphicsPipelinesUnique once
+  // TODO(https://fxbug.dev/42140701): Use vk::Device::createGraphicsPipelinesUnique once
   // the invalid copy-ctor usage is fixed.
   auto [rv_pipelines, pipelines] =
       device_->createGraphicsPipelines(vk::PipelineCache(), {pipeline_info});

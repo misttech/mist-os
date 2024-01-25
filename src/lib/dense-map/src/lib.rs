@@ -1103,7 +1103,7 @@ mod tests {
 
     #[test]
     fn test_insert_gap() {
-        // Regression test for https://fxbug.dev/89714: a sequence of inserts that creates a run of
+        // Regression test for https://fxbug.dev/42171085: a sequence of inserts that creates a run of
         // free elements with size > 1 followed by removes can result in `freelist` = None even
         // though `data` contains ListLink entries.
         let mut map = DenseMap::new();

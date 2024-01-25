@@ -21,7 +21,7 @@ use {
 // Does not track present credits. Since it's limited to at most one Present() call per
 // OnNextFrameBegin() event, we're guaranteed not to run out of credits.
 //
-// TODO(https://fxbug.dev/83055): Due OnNextFrameBegin() currently only firing after acquire fences complete
+// TODO(https://fxbug.dev/42163690): Due OnNextFrameBegin() currently only firing after acquire fences complete
 // this scheduler will not manage to produce pipelined frames. This should resolve itself once
 // the bug is resolved, but testing to confirm will be necessary.
 pub struct ThroughputScheduler {
@@ -78,7 +78,7 @@ impl SchedulingLib for ThroughputScheduler {
     async fn wait_to_update(&self) -> PresentParameters {
         // Mutably borrow the wait_guard to prevent any simultaneous waits.
         // TODO: this variable triggered the `must_not_suspend` lint and may be held across an await
-        // If this is the case, it is an error. See https://fxbug.dev/87757 for more details
+        // If this is the case, it is an error. See https://fxbug.dev/42168913 for more details
         let _guard = self.wait_guard.try_borrow_mut().expect("Only one wait at a time allowed");
         // Async tracing for the waiting period
         let _trace_guard =

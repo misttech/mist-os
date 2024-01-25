@@ -346,7 +346,7 @@ bool AddressSpace<GpuMapping>::AddMapping(std::shared_ptr<GpuMapping> gpu_mappin
 template <typename GpuMapping>
 bool AddressSpace<GpuMapping>::ReleaseMapping(magma::PlatformBuffer* buffer, uint64_t gpu_addr,
                                               std::shared_ptr<GpuMapping>* mapping_out) {
-  // TODO(https://fxbug.dev/111304) - restore guard pages for adjacent mapping?
+  // TODO(https://fxbug.dev/42062621) - restore guard pages for adjacent mapping?
   auto range = mappings_by_buffer_.equal_range(buffer);
   for (auto iter = range.first; iter != range.second; iter++) {
     std::shared_ptr<GpuMapping> gpu_mapping = iter->second->second;
@@ -366,7 +366,7 @@ void AddressSpace<GpuMapping>::ReleaseBuffer(
     std::vector<std::shared_ptr<GpuMapping>>* released_mappings_out) {
   released_mappings_out->clear();
 
-  // TODO(https://fxbug.dev/111304) - restore guard pages for adjacent mapping?
+  // TODO(https://fxbug.dev/42062621) - restore guard pages for adjacent mapping?
   auto range = mappings_by_buffer_.equal_range(buffer);
   for (auto iter = range.first; iter != range.second;) {
     released_mappings_out->emplace_back(std::move(iter->second->second));

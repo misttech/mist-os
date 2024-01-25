@@ -381,7 +381,7 @@ int MsdVsiDevice::DeviceThreadLoop(bool disable_suspend) {
       default:
         MAGMA_LOG(WARNING, "device_request_semaphore_ Wait failed: %d", status.get());
         DASSERT(false);
-        // TODO(https://fxbug.dev/44475): handle wait errors.
+        // TODO(https://fxbug.dev/42120893): handle wait errors.
     }
 
     while (true) {
@@ -1355,7 +1355,7 @@ std::unique_ptr<msd::Connection> MsdVsiDevice::Open(msd::msd_client_id_t client_
 
 magma_status_t MsdVsiDevice::ChipIdentity(magma_vsi_vip_chip_identity* out_identity) {
   if (!IsValidDeviceId()) {
-    // TODO(https://fxbug.dev/37962): Read hardcoded values from features database instead.
+    // TODO(https://fxbug.dev/42113659): Read hardcoded values from features database instead.
     MAGMA_LOG(ERROR, "unhandled device id 0x%x", device_id());
     return MAGMA_STATUS_UNIMPLEMENTED;
   }
@@ -1382,7 +1382,7 @@ magma_status_t MsdVsiDevice::ChipIdentity(magma_vsi_vip_chip_identity* out_ident
 
 magma_status_t MsdVsiDevice::ChipOption(magma_vsi_vip_chip_option* out_option) {
   if (!IsValidDeviceId()) {
-    // TODO(https://fxbug.dev/37962): Read hardcoded values from features database instead.
+    // TODO(https://fxbug.dev/42113659): Read hardcoded values from features database instead.
     MAGMA_LOG(ERROR, "unhandled device id 0x%x", device_id());
     return MAGMA_STATUS_UNIMPLEMENTED;
   }
@@ -1404,7 +1404,7 @@ magma_status_t MsdVsiDevice::QuerySram(zx::vmo* out_sram) {
     return MAGMA_STATUS_INTERNAL_ERROR;
   }
 
-  // TODO(https://fxbug.dev/70430): this may fail due to delays in handling client VMO release
+  // TODO(https://fxbug.dev/42149674): this may fail due to delays in handling client VMO release
   if (external_sram_->HasChildren()) {
     MAGMA_LOG(ERROR, "External SRAM has children");
     return MAGMA_STATUS_ACCESS_DENIED;

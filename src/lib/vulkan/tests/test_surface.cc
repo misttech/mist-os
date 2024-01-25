@@ -134,13 +134,13 @@ TEST(Surface, CreateImagePipeSurface) {
 
 TEST(Surface, CreateImagePipeSurfaceDynamicSymbol) { TestSurface(false).CreateSurface(true); }
 
-// Flaking: see https://fxbug.dev/65248
+// Flaking: see https://fxbug.dev/42143937
 TEST(Surface, DISABLED_CreateFramebufferSurface) { TestSurface(true).CreateSurface(false); }
 
 TEST(Surface, CreateFramebufferSurfaceDynamicSymbol) {
   async::Loop loop(&kAsyncLoopConfigNeverAttachToThread);
   loop.StartThread();
-  // Perform a backtrace if the test takes too long to try to diagnose https://fxbug.dev/109002
+  // Perform a backtrace if the test takes too long to try to diagnose https://fxbug.dev/42060352
   async::PostDelayedTask(
       loop.dispatcher(), []() { backtrace_request_all_threads(); }, zx::sec(20));
 

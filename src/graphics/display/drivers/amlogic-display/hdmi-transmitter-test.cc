@@ -24,7 +24,7 @@ enum class HdmiTransmitterControllerCall : uint8_t {
   kSetFcScramblerCtrl,
 };
 
-// TODO(https://fxbug.dev/136257): Consider replacing the mock class with a fake
+// TODO(https://fxbug.dev/42085847): Consider replacing the mock class with a fake
 // HdmiTransmitterController implementation.
 class MockHdmiTransmitterController : public designware_hdmi::HdmiTransmitterController {
  public:
@@ -76,7 +76,7 @@ class HdmiTransmitterTest : public testing::Test {
         std::make_unique<MockHdmiTransmitterController>();
     mock_hdmitx_controller_ = mock_hdmitx_controller.get();
 
-    // TODO(https://fxbug.dev/123426): Use a fake SMC resource, when the
+    // TODO(https://fxbug.dev/42074342): Use a fake SMC resource, when the
     // implementation lands.
     dut_ = std::make_unique<HdmiTransmitter>(std::move(mock_hdmitx_controller),
                                              top_level_mmio_range_.GetMmioBuffer(),
@@ -118,7 +118,7 @@ TEST_F(HdmiTransmitterTest, ResetTest) {
 }
 
 TEST_F(HdmiTransmitterTest, ModeSetTest) {
-  // TODO(https://fxbug.dev/136159): Use valid synthetic values for timings.
+  // TODO(https://fxbug.dev/42085738): Use valid synthetic values for timings.
   display::DisplayTiming display_timing = {
       .horizontal_active_px = 0,
       .horizontal_front_porch_px = 0,

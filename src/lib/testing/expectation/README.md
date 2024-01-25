@@ -89,7 +89,7 @@ fuchsia_test_with_expectations_package("expectation-example-package") {
 
 ## Cases Generating Error Logs
 
-Due to limitations (see https://fxbug.dev/65359), the testing framework fails
+Due to limitations (see https://fxbug.dev/42144060), the testing framework fails
 any test suite in which error logs are generated, even if the test case generating
 those logs is expected to fail. There are a couple of options here.
 
@@ -152,7 +152,7 @@ to a set of cases.
 This tool converts `ExpectFailureWithErrLogs` and `ExpectPassWithErrLogs`
 to `Skip` when listing expected outcomes.
 
-TODO(https://fxbug.dev/112878): Support listing expects with error logs.
+TODO(https://fxbug.dev/42064224): Support listing expects with error logs.
 
 ### Usage
 

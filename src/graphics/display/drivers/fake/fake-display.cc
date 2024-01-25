@@ -236,7 +236,7 @@ zx_status_t FakeDisplay::DisplayControllerImplImportImage(
   }
 
   fidl::Result check_result = collection->CheckBuffersAllocated();
-  // TODO(https://fxbug.dev/121691): The sysmem FIDL error logging patterns are
+  // TODO(https://fxbug.dev/42072690): The sysmem FIDL error logging patterns are
   // inconsistent across drivers. The FIDL error handling and logging should be
   // unified.
   if (check_result.is_error()) {
@@ -251,7 +251,7 @@ zx_status_t FakeDisplay::DisplayControllerImplImportImage(
   }
 
   fidl::Result wait_result = collection->WaitForBuffersAllocated();
-  // TODO(https://fxbug.dev/121691): The sysmem FIDL error logging patterns are
+  // TODO(https://fxbug.dev/42072690): The sysmem FIDL error logging patterns are
   // inconsistent across drivers. The FIDL error handling and logging should be
   // unified.
   if (wait_result.is_error()) {
@@ -272,7 +272,7 @@ zx_status_t FakeDisplay::DisplayControllerImplImportImage(
     return ZX_ERR_OUT_OF_RANGE;
   }
 
-  // TODO(https://fxbug.dev/128891): When capture is enabled (no_buffer_access is
+  // TODO(https://fxbug.dev/42079320): When capture is enabled (no_buffer_access is
   // false), we should perform a check to ensure that the display images should
   // not be of "inaccessible" coherency domain.
 
@@ -419,7 +419,7 @@ fuchsia_sysmem::BufferCollectionConstraints FakeDisplay::CreateBufferCollectionC
       break;
   }
 
-  // TODO(https://fxbug.dev/128891): In order to support capture, both capture sources
+  // TODO(https://fxbug.dev/42079320): In order to support capture, both capture sources
   // and capture targets must not be in the "inaccessible" coherency domain.
   constraints.has_buffer_memory_constraints() = true;
   SetBufferMemoryConstraints(constraints.buffer_memory_constraints());
@@ -566,7 +566,7 @@ zx_status_t FakeDisplay::DisplayControllerImplImportImageForCapture(
   fbl::AutoLock lock(&capture_mutex_);
 
   fidl::Result check_result = collection->CheckBuffersAllocated();
-  // TODO(https://fxbug.dev/121691): The sysmem FIDL error logging patterns are
+  // TODO(https://fxbug.dev/42072690): The sysmem FIDL error logging patterns are
   // inconsistent across drivers. The FIDL error handling and logging should be
   // unified.
   if (check_result.is_error()) {
@@ -581,7 +581,7 @@ zx_status_t FakeDisplay::DisplayControllerImplImportImageForCapture(
   }
 
   fidl::Result wait_result = collection->WaitForBuffersAllocated();
-  // TODO(https://fxbug.dev/121691): The sysmem FIDL error logging patterns are
+  // TODO(https://fxbug.dev/42072690): The sysmem FIDL error logging patterns are
   // inconsistent across drivers. The FIDL error handling and logging should be
   // unified.
   if (wait_result.is_error()) {
@@ -600,7 +600,7 @@ zx_status_t FakeDisplay::DisplayControllerImplImportImageForCapture(
     return ZX_ERR_OUT_OF_RANGE;
   }
 
-  // TODO(https://fxbug.dev/128891): Capture target images should not be of
+  // TODO(https://fxbug.dev/42079320): Capture target images should not be of
   // "inaccessible" coherency domain. We should add a check here.
   display::DriverCaptureImageId driver_capture_image_id = next_imported_driver_capture_image_id_++;
   ImageMetadata capture_image_metadata = {

@@ -276,7 +276,7 @@ if (is_host && current_cpu == "x64") {
   # hardlink, we do a real copy here of libvulkan.1.dylib to update its
   # timestamp before softlinking, otherwise the timestamp of the link (an
   # output of this rule) will never be newer than the .stamp file, so this rule
-  # will always be dirty. https://fxbug.dev/65872.
+  # will always be dirty. https://fxbug.dev/42144619.
   if (is_mac) {
     action("vulkan_lib_links") {
       assert(has_prebuilt_vulkan_runtime, "Prebuilt Vulkan runtime not found.")

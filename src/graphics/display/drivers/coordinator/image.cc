@@ -156,7 +156,7 @@ void Image::ResetFences() {
 }
 
 bool Image::HasSameDisplayPropertiesAsLayer(const image_t& layer_config) const {
-  // TODO(https://fxbug.dev/126156): Currently this function only compares size and
+  // TODO(https://fxbug.dev/42076907): Currently this function only compares size and
   // usage type between current Image and a given Layer's accepted
   // configuration.
   //

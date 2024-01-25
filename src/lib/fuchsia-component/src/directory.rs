@@ -4,7 +4,7 @@
 
 //! Module for directory operations.
 //
-// TODO(https://fxbug.dev/132998): These operations can be merged into `fuchsia-fs` if Rust FIDL bindings
+// TODO(https://fxbug.dev/42083023): These operations can be merged into `fuchsia-fs` if Rust FIDL bindings
 // support making one-way calls on a client endpoint without turning it into a proxy.
 
 use anyhow::{Context, Error};

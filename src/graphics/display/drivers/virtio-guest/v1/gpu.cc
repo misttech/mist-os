@@ -99,7 +99,7 @@ zx::result<GpuDevice::BufferInfo> GpuDevice::GetAllocatedBufferInfoForImage(
   const fidl::WireSyncClient<fuchsia_sysmem::BufferCollection>& client =
       buffer_collections_.at(driver_buffer_collection_id);
   fidl::WireResult check_result = client->CheckBuffersAllocated();
-  // TODO(https://fxbug.dev/121691): The sysmem FIDL error logging patterns are
+  // TODO(https://fxbug.dev/42072690): The sysmem FIDL error logging patterns are
   // inconsistent across drivers. The FIDL error handling and logging should be
   // unified.
   if (!check_result.ok()) {
@@ -117,7 +117,7 @@ zx::result<GpuDevice::BufferInfo> GpuDevice::GetAllocatedBufferInfoForImage(
   }
 
   auto wait_result = client->WaitForBuffersAllocated();
-  // TODO(https://fxbug.dev/121691): The sysmem FIDL error logging patterns are
+  // TODO(https://fxbug.dev/42072690): The sysmem FIDL error logging patterns are
   // inconsistent across drivers. The FIDL error handling and logging should be
   // unified.
   if (!wait_result.ok()) {
@@ -520,7 +520,7 @@ namespace {
 // Returns nullopt for an unsupported format.
 std::optional<virtio_abi::ResourceFormat> To2DResourceFormat(
     fuchsia_images2::wire::PixelFormat pixel_format) {
-  // TODO(https://fxbug.dev/122802): Support more formats.
+  // TODO(https://fxbug.dev/42073721): Support more formats.
   switch (pixel_format) {
     case fuchsia_images2::PixelFormat::kBgra32:
       return virtio_abi::ResourceFormat::kBgra32;

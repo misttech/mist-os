@@ -414,7 +414,7 @@ zx_status_t Display::DisplayControllerImplImportImage(const image_t* image,
 
   const fidl::SyncClient<fuchsia_sysmem::BufferCollection>& collection_client = it->second;
   fidl::Result check_result = collection_client->CheckBuffersAllocated();
-  // TODO(https://fxbug.dev/121691): The sysmem FIDL error logging patterns are
+  // TODO(https://fxbug.dev/42072690): The sysmem FIDL error logging patterns are
   // inconsistent across drivers. The FIDL error handling and logging should be
   // unified.
   if (check_result.is_error()) {
@@ -429,7 +429,7 @@ zx_status_t Display::DisplayControllerImplImportImage(const image_t* image,
   }
 
   fidl::Result wait_result = collection_client->WaitForBuffersAllocated();
-  // TODO(https://fxbug.dev/121691): The sysmem FIDL error logging patterns are
+  // TODO(https://fxbug.dev/42072690): The sysmem FIDL error logging patterns are
   // inconsistent across drivers. The FIDL error handling and logging should be
   // unified.
   if (wait_result.is_error()) {
@@ -538,7 +538,7 @@ config_check_result_t Display::DisplayControllerImplCheckConfiguration(
 
       if (display_configs[i]->cc_flags != 0) {
         // Color Correction is not supported, but we will pretend we do.
-        // TODO(https://fxbug.dev/36184): Returning error will cause blank screen if scenic requests
+        // TODO(https://fxbug.dev/42111684): Returning error will cause blank screen if scenic requests
         // color correction. For now, lets pretend we support it, until a proper
         // fix is done (either from scenic or from core display)
         zxlogf(WARNING, "%s: Color Correction not support. No error reported", __func__);
@@ -565,7 +565,7 @@ config_check_result_t Display::DisplayControllerImplCheckConfiguration(
             .height = layer->image.height,
         };
         if (memcmp(&layer->dest_frame, &dest_frame, sizeof(frame_t)) != 0) {
-          // TODO(https://fxbug.dev/36222): Need to provide proper flag to indicate driver only
+          // TODO(https://fxbug.dev/42111727): Need to provide proper flag to indicate driver only
           // accepts full screen dest frame.
           current_display_client_composition_opcodes[0] |= CLIENT_COMPOSITION_OPCODE_FRAME_SCALE;
         }

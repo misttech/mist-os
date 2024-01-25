@@ -44,7 +44,7 @@
 namespace goldfish {
 namespace {
 
-// TODO(https://fxbug.dev/80642): Use //src/devices/lib/goldfish/fake_pipe instead.
+// TODO(https://fxbug.dev/42161009): Use //src/devices/lib/goldfish/fake_pipe instead.
 class FakePipe : public fidl::WireServer<fuchsia_hardware_goldfish_pipe::GoldfishPipe> {
  public:
   struct HeapInfo {

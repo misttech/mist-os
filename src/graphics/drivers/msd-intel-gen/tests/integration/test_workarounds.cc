@@ -186,7 +186,7 @@ class TestConnection : public magma::TestDeviceBase {
 
 }  // namespace
 
-// TODO(https://fxbug.dev/81460) - enable
+// TODO(https://fxbug.dev/42161918) - enable
 TEST(Workarounds, DISABLED_Register0x7004) { TestConnection().CheckWorkarounds(0x7004, 0x29c2); }
 
 TEST(Workarounds, Register0x7300) {

@@ -527,7 +527,7 @@ TEST_F(WireClientToNaturalServer, TryRoundTrip) {
     void TryRoundTrip(TryRoundTripRequest& request, TryRoundTripCompleter::Sync& completer) final {
       CheckNaturalDir(request.node());
       num_calls++;
-      // TODO(https://fxbug.dev/91363): ReplySuccess/ReplyError.
+      // TODO(https://fxbug.dev/42172918): ReplySuccess/ReplyError.
       if (reply_with_error) {
         completer.Reply(fit::error(ZX_ERR_INVALID_ARGS));
       } else {

@@ -88,7 +88,7 @@ namespace {
 // Returns nullopt for an unsupported format.
 std::optional<virtio_abi::ResourceFormat> To2DResourceFormat(
     fuchsia_images2::wire::PixelFormat pixel_format) {
-  // TODO(https://fxbug.dev/122802): Support more formats.
+  // TODO(https://fxbug.dev/42073721): Support more formats.
   switch (pixel_format) {
     case fuchsia_images2::PixelFormat::kBgra32:
       return virtio_abi::ResourceFormat::kBgra32;

@@ -55,7 +55,7 @@ impl ExpectationsComparer {
         let got_outcome = outcome_from_test_status(status);
         let want_outcome = self.expected_outcome(invocation);
         match (got_outcome, want_outcome) {
-            // TODO(https://fxbug.dev/113117): Determine how to handle tests skipped at runtime.
+            // TODO(https://fxbug.dev/42064419): Determine how to handle tests skipped at runtime.
             (Outcome::Skip, None | Some(Outcome::Fail | Outcome::Pass | Outcome::Skip)) => {
                 Ok(fidl_fuchsia_test::Status::Skipped)
             }
@@ -107,7 +107,7 @@ impl ExpectationsComparer {
                     match &err {
                         ExpectationError::Mismatch { got, want } => {
                             tracing::error!(
-                                // TODO(https://fxbug.dev/113119): Decide what error message to use
+                                // TODO(https://fxbug.dev/42064421): Decide what error message to use
                                 // here.
                                 "Failing test case {}: got {:?}, expected {:?}",
                                 name,

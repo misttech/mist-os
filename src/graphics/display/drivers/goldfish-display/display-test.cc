@@ -29,7 +29,7 @@ constexpr size_t kNumDisplays = 2;
 constexpr size_t kMaxLayerCount = 3;  // This is the max size of layer array.
 }  // namespace
 
-// TODO(https://fxbug.dev/121924): Consider creating and using a unified set of sysmem
+// TODO(https://fxbug.dev/42072949): Consider creating and using a unified set of sysmem
 // testing doubles instead of writing mocks for each display driver test.
 class FakeAllocator : public fidl::testing::WireTestBase<fuchsia_sysmem::Allocator> {
  public:
@@ -395,7 +395,7 @@ TEST_F(GoldfishDisplayTest, CheckConfigAllFeatures) {
   EXPECT_OK(res);
   EXPECT_EQ(actual_result_size, kNumDisplays * kNumLayersPerDisplay);
   for (size_t i = 0; i < kNumDisplays; i++) {
-    // TODO(https://fxbug.dev/130606): Driver will pretend it supports color conversion
+    // TODO(https://fxbug.dev/42080897): Driver will pretend it supports color conversion
     // for now. Instead this should contain
     // CLIENT_COMPOSITION_OPCODE_COLOR_CONVERSION bit.
     EXPECT_EQ(CLIENT_COMPOSITION_OPCODE_FRAME_SCALE | CLIENT_COMPOSITION_OPCODE_SRC_FRAME |
@@ -433,7 +433,7 @@ TEST_F(GoldfishDisplayTest, ImportBufferCollection) {
   loop_.Shutdown();
 }
 
-// TODO(https://fxbug.dev/122687): Implement a fake sysmem and a fake goldfish-pipe
+// TODO(https://fxbug.dev/42073664): Implement a fake sysmem and a fake goldfish-pipe
 // driver to test importing images using ImportImage().
 
 }  // namespace goldfish

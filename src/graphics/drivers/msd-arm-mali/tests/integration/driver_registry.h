@@ -39,12 +39,12 @@ class RegisteredTestDriver {
     }
   }
 
-  // TODO(https://fxbug.dev/124976): Unify rebind and production drivers.
+  // TODO(https://fxbug.dev/42075799): Unify rebind and production drivers.
   const char* GetRebindDriverSuffix() { return "msd_arm_rebind.cm"; }
   const char* GetTestDriverSuffix() { return "msd_arm_test.cm"; }
 
   std::optional<std::string> GetParentTopologicalPath() {
-    // TODO(https://fxbug.dev/127515): Avoid hardcoding this path.
+    // TODO(https://fxbug.dev/42078129): Avoid hardcoding this path.
     // Find any aml-gpu-composite device. 05 is PDEV_VID_AMLOGIC, and 17 is
     // PDEV_DID_AMLOGIC_MALI_INIT. The PID depends on the board.
     glob_t glob_val;

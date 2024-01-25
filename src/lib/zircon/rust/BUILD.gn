@@ -124,7 +124,7 @@ rustc_test("fuchsia-zircon-status-tests") {
 # direction, or simply move those tests into a dedicated target and redesignate
 # them as integration tests, which they appear to be.
 #
-# TODO(https://fxbug.dev/91562): untangle this web.
+# TODO(https://fxbug.dev/42173139): untangle this web.
 rustc_test("fuchsia-zircon-unittests") {
   edition = "2021"
   output_name = "fuchsia_zircon_tests"
@@ -198,7 +198,7 @@ fuchsia_test_package("fuchsia-zircon-tests") {
   ]
 
   if (current_cpu == "riscv64") {
-    # TODO(https://fxbug.dev/131011): Remove this once
+    # TODO(https://fxbug.dev/42081270): Remove this once
     # version::tests::get_version_string passes on RISC-V.
     test_specs = {
       environments = []

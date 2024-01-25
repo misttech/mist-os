@@ -13,7 +13,7 @@ import (
 	"go.fuchsia.dev/fuchsia/src/lib/component"
 )
 
-// TODO(https://fxbug.dev/102390): This test does not pass in CFv2 because it assumes the outgoing dir is
+// TODO(https://fxbug.dev/42053321): This test does not pass in CFv2 because it assumes the outgoing dir is
 // present in the startup handles, which is not true for tests run in the go test runner.
 //
 // This test is disabled to unblock CFv2 migration. Either rewrite the test, switch to

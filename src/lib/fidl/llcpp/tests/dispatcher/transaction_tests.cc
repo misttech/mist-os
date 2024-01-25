@@ -133,7 +133,7 @@ TEST(LlcppTransaction, concurrent_access_asserts) {
   SyncCompleter completer(&txn);
   std::thread t([&] { completer.Reply(""); });
   sync_completion_wait(&wait, ZX_TIME_INFINITE);
-  // TODO(https://fxbug.dev/54499): Hide assertion failed messages from output - they are confusing.
+  // TODO(https://fxbug.dev/42132024): Hide assertion failed messages from output - they are confusing.
   ASSERT_DEATH([&] { fidl_testing::RunWithLsanDisabled([&] { completer.Reply(""); }); },
                "concurrent access should crash");
   ASSERT_DEATH([&] { completer.Close(ZX_OK); }, "concurrent access should crash");

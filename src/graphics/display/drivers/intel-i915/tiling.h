@@ -23,7 +23,7 @@ constexpr int get_tile_byte_width(image_type_t tiling) {
     case IMAGE_TYPE_Y_LEGACY_TILED:
       return 128;
     case IMAGE_TYPE_YF_TILED:
-      // TODO(https://fxbug.dev/126048): For 1-byte-per-pixel formats (e.g. R8), the
+      // TODO(https://fxbug.dev/42076787): For 1-byte-per-pixel formats (e.g. R8), the
       // tile width is 64. We need to check the pixel format once we support
       // importing such formats.
       return 128;

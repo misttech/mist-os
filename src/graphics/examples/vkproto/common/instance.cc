@@ -39,7 +39,7 @@ std::vector<const char *> GetExtensionsGLFW() {
 #if __linux__
   // Linux variant of glfwGetRequiredInstanceExtensions() isn't returning
   // the required extensions.  Special case until glfw is updated / fixed.
-  // https://fxbug.dev/119341.
+  // https://fxbug.dev/42070404.
   const char *glfw_extensions[] = {"VK_KHR_surface", "VK_KHR_xcb_surface"};
   num_extensions = 2;
 #else

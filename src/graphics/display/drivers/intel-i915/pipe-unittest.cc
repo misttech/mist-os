@@ -98,7 +98,7 @@ TEST_F(PipeTest, TiedTranscoderId) {
   PipeSkylake pipe_c(&mmio_buffer_.value(), PipeId::PIPE_C, {});
   EXPECT_EQ(TranscoderId::TRANSCODER_C, pipe_c.tied_transcoder_id());
 
-  // TODO(https://fxbug.dev/109278): Add a test for transcoder D, when we support it.
+  // TODO(https://fxbug.dev/42060657): Add a test for transcoder D, when we support it.
 }
 
 // Verifies that GetVsyncConfigStamp() could return the correct config stamp

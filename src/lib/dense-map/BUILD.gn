@@ -13,7 +13,7 @@ rustc_library("dense-map") {
   deps = [
     # TODO(https://github.com/rust-lang-nursery/portability-wg/issues/11):
     # remove this module.
-    # TODO(https://fxbug.dev/134858): Remove this module once we import `ahash`
+    # TODO(https://fxbug.dev/42084580): Remove this module once we import `ahash`
     # crate and can use the `hashbrown` crate w/ a default hasher for `HashMap`
     # and `HashSet` data structures instead of `std`.
     "//src/lib/fakealloc",

@@ -334,7 +334,7 @@ fuchsia_unittest_package("zxdump-tests") {
   test_type = "system"
 
   if (current_cpu == "riscv64") {
-    # TODO(https://fxbug.dev/131012): Remove this once ZxdumpTests pass on RISC-V.
+    # TODO(https://fxbug.dev/42081271): Remove this once ZxdumpTests pass on RISC-V.
     test_specs = {
       environments = []
     }

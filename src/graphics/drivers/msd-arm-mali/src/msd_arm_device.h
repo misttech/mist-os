@@ -289,7 +289,7 @@ class MsdArmDevice : public msd::Device,
   uint64_t job_interrupt_time_ = {};
 
   async::Loop loop_{&kAsyncLoopConfigNeverAttachToThread};
-  // The watchdog loop runs WatchdogTask to help root-cause https://fxbug.dev/118466.
+  // The watchdog loop runs WatchdogTask to help root-cause https://fxbug.dev/42069578.
   async::Loop watchdog_loop_{&kAsyncLoopConfigNeverAttachToThread};
 
   std::unique_ptr<magma::PlatformSemaphore> device_request_semaphore_;

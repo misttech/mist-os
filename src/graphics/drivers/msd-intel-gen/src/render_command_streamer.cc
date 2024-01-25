@@ -128,7 +128,7 @@ bool RenderEngineCommandStreamer::WriteBatchToRingBuffer(MappedBatch* mapped_bat
 
   auto ringbuffer = context->get_ringbuffer(id());
 
-  // TODO(https://fxbug.dev/12764): don't allocate a sequence number if no space for the user interrupt
+  // TODO(https://fxbug.dev/42078195): don't allocate a sequence number if no space for the user interrupt
   if (!ringbuffer->HasSpace(MiUserInterrupt::kDwordCount * sizeof(uint32_t)))
     return DRETF(false, "ringbuffer has insufficient space");
 

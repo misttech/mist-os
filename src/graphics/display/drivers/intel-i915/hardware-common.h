@@ -61,7 +61,7 @@ constexpr cpp20::span<const DdiId> DdiIds() {
   }
 }
 
-// TODO(https://fxbug.dev/109278): Support Transcoder D on Tiger Lake.
+// TODO(https://fxbug.dev/42060657): Support Transcoder D on Tiger Lake.
 enum TranscoderId {
   TRANSCODER_A = 0,
   TRANSCODER_B,
@@ -98,7 +98,7 @@ constexpr cpp20::span<const TranscoderId> TranscoderIds() {
   }
 }
 
-// TODO(https://fxbug.dev/109278): Support Pipe D on Tiger Lake.
+// TODO(https://fxbug.dev/42060657): Support Pipe D on Tiger Lake.
 enum PipeId {
   PIPE_A = 0,
   PIPE_B,
@@ -158,7 +158,7 @@ constexpr std::array kPllIdsKabyLake = {
     DPLL_3,
 };
 
-// TODO(https://fxbug.dev/110351): Add support for DPLL4.
+// TODO(https://fxbug.dev/42061706): Add support for DPLL4.
 constexpr std::array kPllIdsTigerLake = {
     DPLL_0, DPLL_1, DPLL_2, DPLL_TC_1, DPLL_TC_2, DPLL_TC_3, DPLL_TC_4, DPLL_TC_5, DPLL_TC_6,
 };

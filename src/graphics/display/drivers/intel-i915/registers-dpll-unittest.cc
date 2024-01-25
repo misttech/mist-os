@@ -814,7 +814,7 @@ TEST(DisplayPllDcoFrequencyTigerLakeTest, GetForDpll) {
       registers::DisplayPllDcoFrequencyTigerLake::GetForDpll(PllId::DPLL_2).FromValue(0);
   EXPECT_EQ(0x16429cu, tbtpll_cfgcr0.reg_addr());
 
-  // TODO(https://fxbug.dev/110351): Add a test for DPLL 4, when we support it. The MMIO
+  // TODO(https://fxbug.dev/42061706): Add a test for DPLL 4, when we support it. The MMIO
   // address is 0x164294.
 }
 
@@ -942,7 +942,7 @@ TEST(DisplayPllDcoDividersTigerLakeTest, GetForDpll) {
       registers::DisplayPllDcoDividersTigerLake::GetForDpll(PllId::DPLL_2).FromValue(0);
   EXPECT_EQ(0x1642a0u, tbtpll_cfgcr1.reg_addr());
 
-  // TODO(https://fxbug.dev/110351): Add a test for DPLL 4, when we support it. The MMIO
+  // TODO(https://fxbug.dev/42061706): Add a test for DPLL 4, when we support it. The MMIO
   // address is 0x164298.
 }
 
@@ -1035,7 +1035,7 @@ TEST(DisplayPllDividerTest, GetForDpll) {
   auto dpll1_div0 = registers::DisplayPllDivider::GetForDpll(PllId::DPLL_1).FromValue(0);
   EXPECT_EQ(0x164c00u, dpll1_div0.reg_addr());
 
-  // TODO(https://fxbug.dev/110351): Add a test for DPLL 4, when we support it. The MMIO
+  // TODO(https://fxbug.dev/42061706): Add a test for DPLL 4, when we support it. The MMIO
   // address is 0x164e00.
 }
 
@@ -1051,7 +1051,7 @@ TEST(DisplayPllSpreadSpectrumClockingTest, GetForDpll) {
       registers::DisplayPllSpreadSpectrumClocking::GetForDpll(PllId::DPLL_1).FromValue(0);
   EXPECT_EQ(0x164c10u, dpll1_ssc.reg_addr());
 
-  // TODO(https://fxbug.dev/110351): Add a test for DPLL 4, when we support it. The MMIO
+  // TODO(https://fxbug.dev/42061706): Add a test for DPLL 4, when we support it. The MMIO
   // address is 0x164e10.
 }
 
@@ -1088,7 +1088,7 @@ TEST(PllEnableTest, GetForTigerLakeDpll) {
   auto dpll1_enable = registers::PllEnable::GetForTigerLakeDpll(PllId::DPLL_1).FromValue(0);
   EXPECT_EQ(0x46014u, dpll1_enable.reg_addr());
 
-  // TODO(https://fxbug.dev/110351): Add a test for DPLL 4, when we support it. The MMIO
+  // TODO(https://fxbug.dev/42061706): Add a test for DPLL 4, when we support it. The MMIO
   // address is 0x46018.
 
   auto tbt_pll_enable = registers::PllEnable::GetForTigerLakeDpll(PllId::DPLL_2).FromValue(0);

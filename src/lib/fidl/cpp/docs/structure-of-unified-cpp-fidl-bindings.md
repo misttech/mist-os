@@ -495,7 +495,7 @@ class fidl::Event<Method> { ... };
 * When the event does not use the error syntax:
   - When the event has a body, `fidl::Event<FooMethod>` inherits
     `FooMethodPayload`, i.e. the domain object type representing the event body.
-    See [https://fxbug.dev/90118](https://fxbug.dev/90118).
+    See [https://fxbug.dev/90118](https://fxbug.dev/42171535).
   - When the event has no body, `fidl::Event<FooMethod>` is empty.
 * When the event uses the error syntax:
   - When the success payload is not an empty struct, `fidl::Event<FooMethod>`
@@ -728,7 +728,7 @@ methods in that interface via an adaptor that we would provide.
 
 
 <!-- link labels -->
-[error-folding]: https://fxbug.dev/65489
+[error-folding]: https://fxbug.dev/42144195
 [godbolt-alt-client]: https://godbolt.org/z/z6cTWsqe4
 [hlcpp-async-clients]: https://cs.opensource.google/search?q=fidl::InterfacePtr%20-f:golden&ss=fuchsia%2Ffuchsia
 [hlcpp-sync-clients]: https://cs.opensource.google/search?q=fidl::SynchronousInterfacePtr%20-f:golden&ss=fuchsia%2Ffuchsia

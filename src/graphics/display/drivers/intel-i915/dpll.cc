@@ -610,7 +610,7 @@ bool DekelPllTigerLake::DoDisable() {
   // follow the "Display Voltage Frequency Switching - Sequence Before Frequency
   // Change".
   //
-  // TODO(https://fxbug.dev/98533): Currently it is okay to ignore this, unless we need
+  // TODO(https://fxbug.dev/42180877): Currently it is okay to ignore this, unless we need
   // to support 5K+ display where we need to change display voltage and Core
   // Display Clock.
 
@@ -630,7 +630,7 @@ bool DekelPllTigerLake::DoDisable() {
   // requirement, follow the "Display Voltage Frequency Switching - Sequence
   // After Frequency Change".
   //
-  // TODO(https://fxbug.dev/98533): Currently it is okay to ignore this, unless we need
+  // TODO(https://fxbug.dev/42180877): Currently it is okay to ignore this, unless we need
   // to support 5K+ display where we need to change display voltage and Core
   // Display Clock.
 
@@ -648,7 +648,7 @@ bool DekelPllTigerLake::DoDisable() {
 }
 
 bool DekelPllTigerLake::EnableHdmi(const DdiPllConfig& pll_config) {
-  // TODO(https://fxbug.dev/109368): Support HDMI on Type-C.
+  // TODO(https://fxbug.dev/42060757): Support HDMI on Type-C.
   zxlogf(ERROR, "Dekel PLL %s: EnableHdmi: Not implemented", name().c_str());
   return false;
 }
@@ -763,7 +763,7 @@ bool DekelPllTigerLake::EnableDp(const DdiPllConfig& pll_config) {
   // requirement, follow the "Display Voltage Frequency Switching - Sequence
   // Before Frequency Change."
   //
-  // TODO(https://fxbug.dev/98533): Currently it is okay to ignore this, unless we need
+  // TODO(https://fxbug.dev/42180877): Currently it is okay to ignore this, unless we need
   // to support 5K+ display where we need to change display voltage and Core
   // Display Clock.
 
@@ -783,7 +783,7 @@ bool DekelPllTigerLake::EnableDp(const DdiPllConfig& pll_config) {
   // requirement, follow the "Display Voltage Frequency Switching - Sequence
   // After Frequency Change".
   //
-  // TODO(https://fxbug.dev/98533): Currently it is okay to ignore this, unless we need
+  // TODO(https://fxbug.dev/42180877): Currently it is okay to ignore this, unless we need
   // to support 5K+ display where we need to change display voltage and Core
   // Display Clock.
 
@@ -811,7 +811,7 @@ DpllManagerTigerLake::DpllManagerTigerLake(fdf::MmioBuffer* mmio_space) : mmio_s
 
   constexpr std::array kDisplayPllIds = {
       PllId::DPLL_0, PllId::DPLL_1,
-      // TODO(https://fxbug.dev/110351): Add support for DPLL4.
+      // TODO(https://fxbug.dev/42061706): Add support for DPLL4.
   };
   for (const PllId display_pll_id : kDisplayPllIds) {
     const auto [plls_it, success] = plls_.try_emplace(
@@ -819,7 +819,7 @@ DpllManagerTigerLake::DpllManagerTigerLake(fdf::MmioBuffer* mmio_space) : mmio_s
     ZX_DEBUG_ASSERT_MSG(success, "Display PLL %d already inserted in map", display_pll_id);
   }
 
-  // TODO(https://fxbug.dev/99980): Add Thunderbolt PLL (DPLL 2) to the `plls_` map.
+  // TODO(https://fxbug.dev/42182480): Add Thunderbolt PLL (DPLL 2) to the `plls_` map.
 
   auto display_straps = registers::DisplayStraps::Get().ReadFrom(mmio_space_);
   reference_clock_khz_ = display_straps.reference_frequency_khz_tiger_lake();
@@ -852,7 +852,7 @@ bool DpllManagerTigerLake::SetDdiClockSource(DdiId ddi_id, PllId pll_id) {
     }
 
     case PllId::DPLL_2:
-      // TODO(https://fxbug.dev/99980): Thunderbolt support.
+      // TODO(https://fxbug.dev/42182480): Thunderbolt support.
       zxlogf(ERROR, "SetDdiClockSource() does not support DPLL 2 (for Thunderbolt) yet");
       return false;
 
@@ -864,7 +864,7 @@ bool DpllManagerTigerLake::SetDdiClockSource(DdiId ddi_id, PllId pll_id) {
 
 bool DpllManagerTigerLake::ResetDdiClockSource(DdiId ddi_id) {
   if (ddi_id >= DdiId::DDI_TC_1 && ddi_id <= DdiId::DDI_TC_6) {
-    // TODO(https://fxbug.dev/99980): Any configuration needed if the DDI uses DPLL 2
+    // TODO(https://fxbug.dev/42182480): Any configuration needed if the DDI uses DPLL 2
     // (Display PLL 2, dedicated to Thunderbolt frequencies)?
 
     return true;
@@ -981,7 +981,7 @@ DdiPllConfig DpllManagerTigerLake::LoadStateForTypeCDdi(DdiId ddi_id) {
   ZX_ASSERT(ddi_id >= DdiId::DDI_TC_1);
   ZX_ASSERT(ddi_id <= DdiId::DDI_TC_6);
 
-  // TODO(https://fxbug.dev/99980): Currently this method assume all Type-C PHYs use
+  // TODO(https://fxbug.dev/42182480): Currently this method assume all Type-C PHYs use
   // USB-C (Dekel PLL) instead of Thunderbolt. This needs to be changed once
   // we support Thunderbolt.
 
@@ -1041,7 +1041,7 @@ DdiPllConfig DpllManagerTigerLake::LoadStateForTypeCDdi(DdiId ddi_id) {
   // - 8.1 GHz
   // Tiger Lake: IHD-OS-TGL-Vol 12-1.22-Rev 2.0 "Type-C PLLs", Page 171
 
-  // TODO(https://fxbug.dev/109368): Currently we just assume all Type-C PHYs use DP Alt
+  // TODO(https://fxbug.dev/42060757): Currently we just assume all Type-C PHYs use DP Alt
   // mode, and only match the calculated bit rate to DisplayPort bit rates.
   // It could also be configured to use legacy HDMI / DVI, in which case the
   // symbol rate will fail to match any of the candidates and fail.
@@ -1086,7 +1086,7 @@ DdiPllConfig DpllManagerTigerLake::LoadState(DdiId ddi_id) {
 
 DisplayPll* DpllManagerTigerLake::FindPllFor(DdiId ddi_id, bool is_edp,
                                              const DdiPllConfig& desired_config) {
-  // TODO(https://fxbug.dev/99980): Currently we assume `ddi` is always in DisplayPort
+  // TODO(https://fxbug.dev/42182480): Currently we assume `ddi` is always in DisplayPort
   // Alt mode. We need to map `ddi` to Thunderbolt DPLL once we support
   // Thunderbolt.
   if (ddi_id >= DdiId::DDI_TC_1 && ddi_id <= DdiId::DDI_TC_6) {
@@ -1096,7 +1096,7 @@ DisplayPll* DpllManagerTigerLake::FindPllFor(DdiId ddi_id, bool is_edp,
 
   constexpr std::array kDisplayPllIds = {
       PllId::DPLL_0, PllId::DPLL_1,
-      // TODO(https://fxbug.dev/110351): Add support for DPLL4.
+      // TODO(https://fxbug.dev/42061706): Add support for DPLL4.
   };
   for (const PllId display_pll_id : kDisplayPllIds) {
     const auto plls_it = plls_.find(display_pll_id);

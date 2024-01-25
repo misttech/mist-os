@@ -16,7 +16,7 @@ impl DefineSubsystemConfiguration<DriverFrameworkConfig> for DriverFrameworkSubs
         builder: &mut dyn ConfigurationBuilder,
     ) -> anyhow::Result<()> {
         let mut disabled_drivers = driver_framework_config.disabled_drivers.clone();
-        // TODO(https://fxbug.dev/102096): Remove this once DFv2 is enabled by default and there
+        // TODO(https://fxbug.dev/42052994): Remove this once DFv2 is enabled by default and there
         // exists only one da7219 driver.
         disabled_drivers.push("fuchsia-boot:///#meta/da7219.cm".to_string());
         builder.platform_bundle("driver_framework_v2");

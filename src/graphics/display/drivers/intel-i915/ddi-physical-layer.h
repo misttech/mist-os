@@ -44,7 +44,7 @@ class DdiReference;
 //
 // The Ref-counting Is *Not* Thread-safe. `DdiPhysicalLayer`s and references to
 // `DdiPhysicalLayer`s must be accessed only by a single thread.
-// TODO(https://fxbug.dev/112849): Currently the intel-i915 driver doesn't fulfill this
+// TODO(https://fxbug.dev/42064192): Currently the intel-i915 driver doesn't fulfill this
 // requirement. The threading model of the driver needs to be fixed.
 //
 // References:
@@ -206,11 +206,11 @@ class ComboDdiTigerLake : public DdiPhysicalLayer {
   PhysicalLayerInfo GetPhysicalLayerInfo() const override;
 
   // Combo PHYs must be initialized before being enabled.
-  // TODO(https://fxbug.dev/114769): Create an initialization API in the base class.
+  // TODO(https://fxbug.dev/42066037): Create an initialization API in the base class.
   bool Initialize();
 
   // Combo PHYs must be un-initialized before entering the DC9 sleep state.
-  // TODO(https://fxbug.dev/114769): Create an initialization API in the base class.
+  // TODO(https://fxbug.dev/42066037): Create an initialization API in the base class.
   bool Deinitialize();
 
  private:

@@ -27,7 +27,7 @@
 
 namespace {
 
-// TODO(https://fxbug.dev/121924): Consider creating and using a unified set of sysmem
+// TODO(https://fxbug.dev/42072949): Consider creating and using a unified set of sysmem
 // testing doubles instead of writing mocks for each display driver test.
 class FakeBufferCollection : public fidl::testing::WireTestBase<fuchsia_sysmem2::BufferCollection> {
  public:

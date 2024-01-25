@@ -450,7 +450,7 @@ VKAPI_ATTR VkResult VKAPI_CALL AcquireNextImageKHR(VkDevice device, VkSwapchainK
                                                    VkFence fence, uint32_t* pImageIndex) {
   auto swapchain = reinterpret_cast<ImagePipeSwapchain*>(vk_swapchain);
   if (fence) {
-    // TODO(https://fxbug.dev/12882) handle this correctly
+    // TODO(https://fxbug.dev/42079241) handle this correctly
     swapchain->DebugMessage(VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT,
                             "Image pipe swapchain doesn't support fences.");
     return VK_ERROR_DEVICE_LOST;

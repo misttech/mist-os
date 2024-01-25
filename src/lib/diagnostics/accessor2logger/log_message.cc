@@ -116,7 +116,7 @@ inline fpromise::result<LogMessage, std::string> JsonToLogMessage(rapidjson::Val
   }
 
   // Flatten payloads containing a "root" node.
-  // TODO(https://fxbug.dev/63409): Remove this when "root" is omitted from logs.
+  // TODO(https://fxbug.dev/42141910): Remove this when "root" is omitted from logs.
   if (payload->value.MemberCount() == 1 && payload->value.HasMember("root")) {
     payload = payload->value.FindMember("root");
     if (!payload->value.IsObject()) {

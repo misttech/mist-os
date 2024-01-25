@@ -206,7 +206,7 @@ void DisplayDevice::ApplyConfiguration(const display_config_t* banjo_display_con
       display::ToDisplayTiming(banjo_display_config->mode);
   if (CheckNeedsModeset(display_timing_params)) {
     if (pipe_) {
-      // TODO(https://fxbug.dev/116009): When ApplyConfiguration() early returns on the
+      // TODO(https://fxbug.dev/42067272): When ApplyConfiguration() early returns on the
       // following error conditions, we should reset the DDI, pipe and transcoder
       // so that they can be possibly reused.
       if (!DdiModeset(display_timing_params)) {

@@ -13,7 +13,7 @@
 #include "scheduler.h"
 
 // The Video command streamer is similar to the Render command streamer.
-// TODO(https://fxbug.dev/80907) - refactor common scheduling code.
+// TODO(https://fxbug.dev/42161303) - refactor common scheduling code.
 class VideoCommandStreamer : public EngineCommandStreamer {
  public:
   explicit VideoCommandStreamer(EngineCommandStreamer::Owner* owner,

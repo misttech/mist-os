@@ -52,10 +52,10 @@ pub(crate) struct GroupEntry {
 
 #[derive(Debug)]
 pub(crate) struct Group {
-    // TODO(https://fxbug.dev/84729)
+    // TODO(https://fxbug.dev/42165549)
     #[allow(unused)]
     pub id: GroupId,
-    // TODO(https://fxbug.dev/84729)
+    // TODO(https://fxbug.dev/42165549)
     #[allow(unused)]
     pub label: String,
     pub members: Vec<GroupEntry>,

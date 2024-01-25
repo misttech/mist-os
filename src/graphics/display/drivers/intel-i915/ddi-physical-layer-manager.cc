@@ -81,7 +81,7 @@ DdiManagerTigerLake::DdiManagerTigerLake(Power* power, fdf::MmioBuffer* mmio_spa
 
     if (ddi_id >= DdiId::DDI_A && ddi_id <= DdiId::DDI_C) {
       auto ddi = std::make_unique<ComboDdiTigerLake>(ddi_id, mmio_space);
-      // TODO(https://fxbug.dev/114769): Create an initialization API in the base class.
+      // TODO(https://fxbug.dev/42066037): Create an initialization API in the base class.
       if (!ddi->Initialize()) {
         zxlogf(ERROR, "Failed to initialize DDI %d. It will remain unused.", ddi_id);
         continue;

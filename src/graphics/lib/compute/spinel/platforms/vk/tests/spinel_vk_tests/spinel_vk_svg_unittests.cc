@@ -605,7 +605,7 @@ param const params[] = {
       //
       // Fuchsia's `ulib/musl/.../math` trig functions produce a slightly
       // different set of rational quad control points than the trig functions
-      // in the gLinux host environment. See https://fxbug.dev/115402 for more info.
+      // in the gLinux host environment. See https://fxbug.dev/42066670 for more info.
       //
       { 0xC337DEDF, {
           { param::ARM,    { { param::ARM_MALI_G31, param::ARM_MALI_G31 } } },
@@ -616,11 +616,11 @@ param const params[] = {
         }
       },
       { 0xC2E4C2A9, {
-          { param::INTEL,  { { 0x9A49, 0x9A49 } } }, // Xe TGL GT2 - Host: https://fxbug.dev/115402
+          { param::INTEL,  { { 0x9A49, 0x9A49 } } }, // Xe TGL GT2 - Host: https://fxbug.dev/42066670
         }
       },
       { 0xC2E4C3A9, {
-          { param::INTEL,  {} }, // Xe TGL GT2 - Fuchsia: https://fxbug.dev/115402
+          { param::INTEL,  {} }, // Xe TGL GT2 - Fuchsia: https://fxbug.dev/42066670
           { param::NVIDIA, { { param::NVIDIA_VOLTA, UINT32_MAX } } },
         }
       },

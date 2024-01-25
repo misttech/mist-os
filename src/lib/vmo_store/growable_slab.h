@@ -126,7 +126,7 @@ class GrowableSlab {
     }
   }
 
-  // TODO(https://fxbug.dev/128530): Create a separate ConstIterator class for const
+  // TODO(https://fxbug.dev/42078992): Create a separate ConstIterator class for const
   // begin() and end() iterators.
   Iterator begin() { return Iterator(this); }
 

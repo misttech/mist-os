@@ -1296,7 +1296,7 @@ TEST_DECODE_WIRE(
     R"({ s: #gre#string#rst# = #red#"foober"#rst#, i32: #gre#int32#rst# = #blu#5#rst# })",
     GetStringIntTableRequest("foober", 5))
 
-// TODO(https://fxbug.dev/6274): Add a test that exercises what happens when we encounter an
+// TODO(https://fxbug.dev/42141166): Add a test that exercises what happens when we encounter an
 // unknown type in a table.
 
 // Handle Tests

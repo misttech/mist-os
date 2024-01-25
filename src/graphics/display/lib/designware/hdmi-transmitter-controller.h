@@ -13,7 +13,7 @@
 
 namespace designware_hdmi {
 
-// TODO(https://fxbug.dev/136415): The struct name is against Google C++ style guide.
+// TODO(https://fxbug.dev/42086023): The struct name is against Google C++ style guide.
 // Rename the struct.
 struct hdmi_param_tx {
   uint16_t vic;
@@ -28,7 +28,7 @@ class HdmiTransmitterController {
  public:
   virtual ~HdmiTransmitterController() = default;
 
-  // TODO(https://fxbug.dev/136258): Revise the design and naming of the class methods
+  // TODO(https://fxbug.dev/42085848): Revise the design and naming of the class methods
   // below.
 
   virtual zx_status_t InitHw() = 0;

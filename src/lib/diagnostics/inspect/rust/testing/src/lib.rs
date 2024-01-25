@@ -181,7 +181,7 @@ pub async fn emit_example_inspect_data(opts: Options) -> Result<(), Error> {
         .detach();
     });
 
-    // TODO(https://fxbug.dev/41952): remove when all clients writing VMO files today have been migrated to write
+    // TODO(https://fxbug.dev/42118092): remove when all clients writing VMO files today have been migrated to write
     // to Tree.
     inspector
         .duplicate_vmo()

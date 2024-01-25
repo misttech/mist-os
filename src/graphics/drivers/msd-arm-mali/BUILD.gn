@@ -89,7 +89,7 @@ fuchsia_driver_component("msd_arm") {
 
 # The driver framework can't use the initial composite bind rules when rebinding a driver, so the
 # "rebind" driver has different bind rules so it can be bound the second time.
-# TODO(https://fxbug.dev/124976): Unify rebind and production drivers.
+# TODO(https://fxbug.dev/42075799): Unify rebind and production drivers.
 fuchsia_driver_component("msd_arm_rebind") {
   testonly = true
   component_name = "msd_arm_rebind"

@@ -24,5 +24,5 @@ TEST(Sequencer, Next) {
 }
 
 TEST(Sequencer, Overflow) {
-  // TODO(https://fxbug.dev/12695) - test overflow
+  // TODO(https://fxbug.dev/42077572) - test overflow
 }

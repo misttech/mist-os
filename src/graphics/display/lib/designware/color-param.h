@@ -9,14 +9,14 @@
 
 namespace designware_hdmi {
 
-// TODO(https://fxbug.dev/136194): Revise the naming of the enum type and member names.
+// TODO(https://fxbug.dev/42085777): Revise the naming of the enum type and member names.
 // Add proper documentatation.
 enum class ColorFormat : uint8_t {
   kCfRgb = 0,
   kCf444 = 1,
 };
 
-// TODO(https://fxbug.dev/136194): Revise the naming of the enum type and member names.
+// TODO(https://fxbug.dev/42085777): Revise the naming of the enum type and member names.
 // Add proper documentatation.
 enum class ColorDepth : uint8_t {
   kCd24B = 4,
@@ -27,7 +27,7 @@ enum class ColorDepth : uint8_t {
 
 // Color configuration of the HDMI transmitter.
 //
-// TODO(https://fxbug.dev/136194): Revise the naming of the enum type and member names.
+// TODO(https://fxbug.dev/42085777): Revise the naming of the enum type and member names.
 // Add proper documentatation.
 struct ColorParam {
   ColorFormat input_color_format;

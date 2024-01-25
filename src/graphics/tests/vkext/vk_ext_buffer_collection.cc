@@ -38,7 +38,7 @@ class VulkanImageExtensionTest : public VulkanExtensionTest,
 
 TEST_P(VulkanImageExtensionTest, BufferCollectionNV12_1026) {
   ASSERT_TRUE(Initialize());
-  // TODO(https://fxbug.dev/59804): Enable the test when YUV sysmem images are
+  // TODO(https://fxbug.dev/42137913): Enable the test when YUV sysmem images are
   // supported on emulators.
   if (UseVirtualGpu())
     GTEST_SKIP();
@@ -58,7 +58,7 @@ TEST_P(VulkanImageExtensionTest, BufferCollectionRGBA_1026) {
 
 TEST_P(VulkanImageExtensionTest, BufferCollectionNV12) {
   ASSERT_TRUE(Initialize());
-  // TODO(https://fxbug.dev/59804): Enable the test when YUV sysmem images are
+  // TODO(https://fxbug.dev/42137913): Enable the test when YUV sysmem images are
   // supported on emulators.
   if (UseVirtualGpu())
     GTEST_SKIP();
@@ -68,7 +68,7 @@ TEST_P(VulkanImageExtensionTest, BufferCollectionNV12) {
 
 TEST_P(VulkanImageExtensionTest, BufferCollectionI420) {
   ASSERT_TRUE(Initialize());
-  // TODO(https://fxbug.dev/59804): Enable the test when YUV sysmem images are
+  // TODO(https://fxbug.dev/42137913): Enable the test when YUV sysmem images are
   // supported on emulators.
   if (UseVirtualGpu())
     GTEST_SKIP();
@@ -78,7 +78,7 @@ TEST_P(VulkanImageExtensionTest, BufferCollectionI420) {
 
 TEST_P(VulkanImageExtensionTest, BufferCollectionNV12_1280_546) {
   ASSERT_TRUE(Initialize());
-  // TODO(https://fxbug.dev/59804): Enable the test when YUV sysmem images are
+  // TODO(https://fxbug.dev/42137913): Enable the test when YUV sysmem images are
   // supported on emulators.
   if (UseVirtualGpu())
     GTEST_SKIP();
@@ -144,7 +144,7 @@ TEST_P(VulkanImageExtensionTest, R8) {
   auto [vulkan_token, sysmem_token] = MakeSharedCollection<2>();
 
   bool linear = GetParam();
-  // TODO(https://fxbug.dev/59804): Enable the test on emulators when goldfish host-visible heap
+  // TODO(https://fxbug.dev/42137913): Enable the test on emulators when goldfish host-visible heap
   // supports R8 linear images.
   if (linear && UseVirtualGpu())
     GTEST_SKIP();
@@ -180,7 +180,7 @@ TEST_P(VulkanImageExtensionTest, R8G8) {
   auto [vulkan_token] = MakeSharedCollection<1>();
 
   bool linear = GetParam();
-  // TODO(https://fxbug.dev/59804): Enable the test on emulators when goldfish host-visible heap
+  // TODO(https://fxbug.dev/42137913): Enable the test on emulators when goldfish host-visible heap
   // supports R8G8 linear images.
   if (linear && UseVirtualGpu())
     GTEST_SKIP();
@@ -206,7 +206,7 @@ TEST_P(VulkanImageExtensionTest, R8ToL8) {
   auto [vulkan_token, sysmem_token] = MakeSharedCollection<2>();
 
   bool linear = GetParam();
-  // TODO(https://fxbug.dev/59804): Enable the test on emulators when goldfish host-visible heap
+  // TODO(https://fxbug.dev/42137913): Enable the test on emulators when goldfish host-visible heap
   // supports R8/L8 linear images.
   if (linear && UseVirtualGpu())
     GTEST_SKIP();
@@ -394,7 +394,7 @@ TEST_P(VulkanImageExtensionTest, BadColorSpace) {
 
 TEST_P(VulkanImageExtensionTest, YUVProperties) {
   ASSERT_TRUE(Initialize());
-  // TODO(https://fxbug.dev/59804): Enable the test when YUV sysmem images are
+  // TODO(https://fxbug.dev/42137913): Enable the test when YUV sysmem images are
   // supported on emulators.
   if (UseVirtualGpu())
     GTEST_SKIP();
@@ -444,7 +444,7 @@ TEST_P(VulkanImageExtensionTest, YUVProperties) {
 // common format.
 TEST_P(VulkanImageExtensionTest, MultiFormat) {
   ASSERT_TRUE(Initialize());
-  // TODO(https://fxbug.dev/59804): Enable the test when YUV sysmem images are
+  // TODO(https://fxbug.dev/42137913): Enable the test when YUV sysmem images are
   // supported on emulators.
   if (UseVirtualGpu())
     GTEST_SKIP();
@@ -519,7 +519,7 @@ TEST_P(VulkanImageExtensionTest, MultiFormat) {
 
 TEST_P(VulkanImageExtensionTest, MaxBufferCountCheck) {
   ASSERT_TRUE(Initialize());
-  // TODO(https://fxbug.dev/59804): Enable the test when YUV sysmem images are
+  // TODO(https://fxbug.dev/42137913): Enable the test when YUV sysmem images are
   // supported on emulators.
   if (UseVirtualGpu())
     GTEST_SKIP();
@@ -564,7 +564,7 @@ TEST_P(VulkanImageExtensionTest, MaxBufferCountCheck) {
 
 TEST_P(VulkanImageExtensionTest, ManyIdenticalFormats) {
   ASSERT_TRUE(Initialize());
-  // TODO(https://fxbug.dev/59804): Enable the test when YUV sysmem images are
+  // TODO(https://fxbug.dev/42137913): Enable the test when YUV sysmem images are
   // supported on emulators.
   if (UseVirtualGpu())
     GTEST_SKIP();
@@ -603,7 +603,7 @@ TEST_P(VulkanImageExtensionTest, ManyIdenticalFormats) {
 // Check that createInfoIndex keeps track of multiple colorspaces properly.
 TEST_P(VulkanImageExtensionTest, ColorSpaceSubset) {
   ASSERT_TRUE(Initialize());
-  // TODO(https://fxbug.dev/59804): Enable the test when YUV sysmem images are
+  // TODO(https://fxbug.dev/42137913): Enable the test when YUV sysmem images are
   // supported on emulators.
   if (UseVirtualGpu())
     GTEST_SKIP();
@@ -665,7 +665,7 @@ TEST_P(VulkanImageExtensionTest, ColorSpaceSubset) {
 
 TEST_P(VulkanImageExtensionTest, WeirdFormat) {
   ASSERT_TRUE(Initialize());
-  // TODO(https://fxbug.dev/59804): Enable the test when YUV sysmem images are
+  // TODO(https://fxbug.dev/42137913): Enable the test when YUV sysmem images are
   // supported on emulators.
   if (UseVirtualGpu())
     GTEST_SKIP();
@@ -1328,7 +1328,7 @@ TEST_P(VulkanFormatTest, FastClear) {
                      .setAspectMask(vk::ImageAspectFlagBits::eColor)
                      .setLevelCount(1)
                      .setLayerCount(1);
-    // TODO(https://fxbug.dev/93236): Test transitioning to
+    // TODO(https://fxbug.dev/42174999): Test transitioning to
     // VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL. That's broken with SRGB on the
     // current version of Mesa.
     auto barrier = vk::ImageMemoryBarrier()

@@ -16,7 +16,7 @@ sdk_source_set("cpp") {
 
   public_deps = [ "//zircon/third_party/ulib/safemath" ]
 
-  # TODO(https://fxbug.dev/58162): delete the below and fix compiler warnings
+  # TODO(https://fxbug.dev/42136089): delete the below and fix compiler warnings
   configs += [ "//build/config:Wno-conversion" ]
 }
 
@@ -35,7 +35,7 @@ test("containers_cpp_unittests") {
     "//third_party/googletest:gtest",
   ]
 
-  # TODO(https://fxbug.dev/58162): delete the below and fix compiler warnings
+  # TODO(https://fxbug.dev/42136089): delete the below and fix compiler warnings
   configs += [ "//build/config:Wno-conversion" ]
 }
 

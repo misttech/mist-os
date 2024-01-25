@@ -14,7 +14,7 @@ use fuchsia_async as fasync;
 use fuchsia_inspect::{Inspector, Node, NumericProperty, Property, StringProperty, UintProperty};
 use fuchsia_inspect_derive::{AttachError, IDebug, IValue, Inspect, Unit, WithInspect};
 
-// TODO(https://fxbug.dev/49049): Add negative tests when compile failure tests are possible.
+// TODO(https://fxbug.dev/42125974): Add negative tests when compile failure tests are possible.
 
 #[derive(Unit, Serialize)]
 struct Yak {
@@ -82,7 +82,7 @@ struct PowerYak {
     ty: cell::RefCell<IDebug<Horse>>,
     counter: Box<UintProperty>,
     last_words: fuchsia_sync::RwLock<StringProperty>,
-    // TODO(https://fxbug.dev/69493): Remove this or explain why it's here.
+    // TODO(https://fxbug.dev/42148632): Remove this or explain why it's here.
     #[allow(dead_code)]
     inspect_node: Node,
 }

@@ -211,7 +211,7 @@ class PlaneColorControl : public hwreg::RegisterBase<PlaneColorControl, uint32_t
     kYuvtoRgbBt2020 = 3,
     kRgbBt709toBt2020 = 4,
 
-    // TODO(https://fxbug.dev/110690): Figure out modeling for invalid values 5-7.
+    // TODO(https://fxbug.dev/42062082): Figure out modeling for invalid values 5-7.
   };
 
   // Specifies the plane-level CSC (Color Space Conversion) mode.
@@ -284,7 +284,7 @@ class PlaneColorControl : public hwreg::RegisterBase<PlaneColorControl, uint32_t
 // All reserved bits are MBZ (must be zero), so this register can be written
 // safely without reading it first.
 //
-// TODO(https://fxbug.dev/111517): Split this register definitions into separate
+// TODO(https://fxbug.dev/42062857): Split this register definitions into separate
 // variants for Tiger Lake vs Kaby Lake / Skylake.
 //
 // Tiger Lake: IHD-OS-TGL-Vol 2c-1.22-Rev2.0 Part 2 pages 745-753
@@ -359,7 +359,7 @@ class PlaneControl : public hwreg::RegisterBase<PlaneControl, uint32_t> {
     kIndexed8bit = 0b1100,
     kRgb565 = 0b1110,
 
-    // TODO(https://fxbug.dev/110690): Figure out modeling for invalid values, and add
+    // TODO(https://fxbug.dev/42062082): Figure out modeling for invalid values, and add
     // a getter for the field.
   };
 
@@ -386,7 +386,7 @@ class PlaneControl : public hwreg::RegisterBase<PlaneControl, uint32_t> {
     kIndexed8bit = 0b11000,
     kRgb565 = 0b11100,
 
-    // TODO(https://fxbug.dev/110690): Figure out modeling for invalid values, and add
+    // TODO(https://fxbug.dev/42062082): Figure out modeling for invalid values, and add
     // a getter for the field.
   };
 
@@ -573,7 +573,7 @@ class PlaneControl : public hwreg::RegisterBase<PlaneControl, uint32_t> {
     // YF tiling is not supported on Tiger Lake.
     kTilingYFKabyLake = 0b101,
 
-    // TODO(https://fxbug.dev/110690): Figure out modeling for invalid values 2-3, 6-7.
+    // TODO(https://fxbug.dev/42062082): Figure out modeling for invalid values 2-3, 6-7.
   };
 
   // Indicates the tiling used by the plane's surface data.

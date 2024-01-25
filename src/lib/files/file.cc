@@ -33,7 +33,7 @@ bool ReadFileDescriptor(int fd, T* result) {
   }
   // Some (many?) file implementations on Fuchsia do not report their size.
   //
-  // See e.g. https://fxbug.dev/119418.
+  // See e.g. https://fxbug.dev/42070489.
   const size_t size = s.st_size;
   if (size != 0) {
     result->resize(size);

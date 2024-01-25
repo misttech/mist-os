@@ -237,7 +237,7 @@ fn string_literal<'a, E>(input: &'a str) -> IResult<&'a str, &'a str, E>
 where
     E: NomParseError<&'a str>,
 {
-    // TODO(https://fxbug.dev/86963): this doesn't handle escape sequences.
+    // TODO(https://fxbug.dev/42168031): this doesn't handle escape sequences.
     // Consider accepting escaped `"`: `\"` too.
     let (rest, value) = recognize(delimited(char('"'), many0(is_not("\"")), char('"')))(input)?;
     Ok((rest, &value[1..value.len() - 1]))
@@ -261,7 +261,7 @@ where
 
 /// Parses a unsigned decimal and hexadecimal numbers of 64 bits.
 /// For example: 123, 0x7b will be accepted as
-// TODO(https://fxbug.dev/86964): consider also accepting signed numbers.
+// TODO(https://fxbug.dev/42168032): consider also accepting signed numbers.
 fn number<'a, E>(input: &'a str) -> IResult<&'a str, u64, E>
 where
     E: NomParseError<&'a str>,
@@ -306,9 +306,9 @@ where
     let (rest, identifier) = spaced(identifier)(input)?;
     let (rest, operator) = spaced(operator)(rest)?;
     let (rest, value) =
-        // TODO(https://fxbug.dev/86960): similar to severities, we can probably have reserved values
+        // TODO(https://fxbug.dev/42168028): similar to severities, we can probably have reserved values
         // for lifecycle event types.
-        // TODO(https://fxbug.dev/86961): support time diferences (1h30m, 30s, etc) instead of only
+        // TODO(https://fxbug.dev/42168029): support time diferences (1h30m, 30s, etc) instead of only
         // timestamp comparison.
         spaced(alt((
             map(number, move |n| OneOrMany::One(Value::Number(n))),

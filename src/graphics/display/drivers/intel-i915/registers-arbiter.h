@@ -690,7 +690,7 @@ class MbusPipeDataBoxControl : public hwreg::RegisterBase<MbusPipeDataBoxControl
   DEF_FIELD(3, 0, arbiter_read_credits);
 
   static auto GetForPipe(i915::PipeId pipe_id) {
-    // TODO(https://fxbug.dev/109278): Accept pipe D, once we support it.
+    // TODO(https://fxbug.dev/42060657): Accept pipe D, once we support it.
     ZX_ASSERT(pipe_id >= i915::PipeId::PIPE_A);
     ZX_ASSERT(pipe_id <= i915::PipeId::PIPE_C);
     const int pipe_index = pipe_id - i915::PipeId::PIPE_A;
@@ -854,7 +854,7 @@ class PipeArbiterControl : public hwreg::RegisterBase<PipeArbiterControl, uint32
   }
 
   static auto GetForPipe(i915::PipeId pipe_id) {
-    // TODO(https://fxbug.dev/109278): Accept pipe D, once we support it.
+    // TODO(https://fxbug.dev/42060657): Accept pipe D, once we support it.
     ZX_ASSERT(pipe_id >= i915::PipeId::PIPE_A);
     ZX_ASSERT(pipe_id <= i915::PipeId::PIPE_C);
     const int pipe_index = pipe_id - i915::PipeId::PIPE_A;

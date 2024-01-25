@@ -411,7 +411,7 @@ TEST_F(PipeDeviceTest, GetBti) {
   ASSERT_FALSE(memcmp(&goldfish_bti_info, &acpi_bti_info, sizeof(zx_info_bti_t)));
 }
 
-// TODO(https://fxbug.dev/123012): Re-enable the test once the flake is fixed.
+// TODO(https://fxbug.dev/42073955): Re-enable the test once the flake is fixed.
 TEST_F(PipeDeviceTest, DISABLED_ConnectToSysmem) {
   ASSERT_OK(dut_child_->Bind(kDefaultPipeDeviceProps, kDefaultPipeDeviceName));
   dut_child_.release();

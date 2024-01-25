@@ -33,7 +33,7 @@ TEST(OneWayStatus, ConvertToFromStatus) {
   ASSERT_OK(status);
 }
 
-// TODO(https://fxbug.dev/49971): We would be able to remove the differences between
+// TODO(https://fxbug.dev/42126998): We would be able to remove the differences between
 // fuchsia/host if |zx_status_get_string| is available on host.
 std::string SelectErrorDescription(const std::string& fuchsia, const std::string& host) {
 #ifdef __Fuchsia__

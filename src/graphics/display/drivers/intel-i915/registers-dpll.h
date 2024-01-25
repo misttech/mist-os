@@ -38,7 +38,7 @@ class DisplayPllControl1 : public hwreg::RegisterBase<DisplayPllControl1, uint32
     k1080Mhz = 0b100,  // eDP rate 2. Lane clock 2.16 GHz. VCO 8640, divider 8.
     k2160Mhz = 0b101,  // eDP rate 6. Lane clock 4.32 GHz. VCO 8640, divider 4.
 
-    // TODO(https://fxbug.dev/110690): Figure out modeling for invalid values.
+    // TODO(https://fxbug.dev/42062082): Figure out modeling for invalid values.
   };
 
   DEF_BIT(23, pll3_uses_hdmi_configuration_mode);
@@ -802,7 +802,7 @@ class DisplayPllDcoFrequencyTigerLake
   static auto GetForDpll(i915::PllId pll_id) {
     ZX_ASSERT_MSG(pll_id >= i915::PllId::DPLL_0, "Unsupported DPLL %d", pll_id);
 
-    // TODO(https://fxbug.dev/110351): Allow DPLL 4, once we support it.
+    // TODO(https://fxbug.dev/42061706): Allow DPLL 4, once we support it.
     ZX_ASSERT_MSG(pll_id <= i915::PllId::DPLL_2, "Unsupported DPLL %d", pll_id);
 
     // The MMIO addresses vary across Tiger Lake, DG1, and Ice Lake.
@@ -1004,7 +1004,7 @@ class DisplayPllDcoDividersTigerLake
   static auto GetForDpll(i915::PllId pll_id) {
     ZX_ASSERT_MSG(pll_id >= i915::PllId::DPLL_0, "Unsupported DPLL %d", pll_id);
 
-    // TODO(https://fxbug.dev/110351): Allow DPLL 4, once we support it.
+    // TODO(https://fxbug.dev/42061706): Allow DPLL 4, once we support it.
     ZX_ASSERT_MSG(pll_id <= i915::PllId::DPLL_2, "Unsupported DPLL %d", pll_id);
 
     // The MMIO addresses vary across Tiger Lake, DG1, and Ice Lake.
@@ -1105,7 +1105,7 @@ class DisplayPllDivider : public hwreg::RegisterBase<DisplayPllDivider, uint32_t
   static auto GetForDpll(i915::PllId pll_id) {
     ZX_ASSERT_MSG(pll_id >= i915::PllId::DPLL_0, "Unsupported DPLL %d", pll_id);
 
-    // TODO(https://fxbug.dev/110351): Allow DPLL 4, once we support it.
+    // TODO(https://fxbug.dev/42061706): Allow DPLL 4, once we support it.
     ZX_ASSERT_MSG(pll_id <= i915::PllId::DPLL_1, "Unsupported DPLL %d", pll_id);
 
     const int dpll_index = pll_id - i915::PllId::DPLL_0;
@@ -1160,7 +1160,7 @@ class DisplayPllSpreadSpectrumClocking
   static auto GetForDpll(i915::PllId pll_id) {
     ZX_ASSERT_MSG(pll_id >= i915::PllId::DPLL_0, "Unsupported DPLL %d", pll_id);
 
-    // TODO(https://fxbug.dev/110351): Allow DPLL 4, once we support it.
+    // TODO(https://fxbug.dev/42061706): Allow DPLL 4, once we support it.
     ZX_ASSERT_MSG(pll_id <= i915::PllId::DPLL_1, "Unsupported DPLL %d", pll_id);
 
     // The MMIO addresses vary across Tiger Lake and DG1.
@@ -1269,7 +1269,7 @@ class PllEnable : public hwreg::RegisterBase<PllEnable, uint32_t> {
 
     ZX_ASSERT_MSG(pll_id >= i915::PllId::DPLL_0, "Unsupported DPLL %d", pll_id);
 
-    // TODO(https://fxbug.dev/110351): Allow DPLL 4, once we support it.
+    // TODO(https://fxbug.dev/42061706): Allow DPLL 4, once we support it.
     ZX_ASSERT_MSG(pll_id <= i915::PllId::DPLL_2, "Unsupported DPLL %d", pll_id);
 
     const int dpll_index = pll_id - i915::PllId::DPLL_0;

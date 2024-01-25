@@ -307,7 +307,7 @@ mod tests {
         assert!(pending_runs.try_lock().unwrap().is_empty());
     }
 
-    // TODO(https://fxbug.dev/60525): should_panic tests trigger LSAN
+    // TODO(https://fxbug.dev/42138715): should_panic tests trigger LSAN
     #[ignore]
     #[test]
     #[should_panic]
@@ -381,7 +381,7 @@ mod tests {
         assert!(pending_runs.try_lock().unwrap().is_empty());
     }
 
-    // TODO(https://fxbug.dev/60525): should_panic tests trigger LSAN
+    // TODO(https://fxbug.dev/42138715): should_panic tests trigger LSAN
     #[ignore]
     #[test]
     #[should_panic]

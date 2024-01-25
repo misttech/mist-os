@@ -144,7 +144,7 @@ constexpr display::DisplayTiming ToDisplayTiming(const CtaTiming& dmt) {
 }
 
 // Timings from the CTA-861 standard.
-// TODO(https://fxbug.dev/135385): Add other CTA-861-I formats.
+// TODO(https://fxbug.dev/42085022): Add other CTA-861-I formats.
 constexpr CtaTiming kCtaTimingsArray[] = {
     CtaTiming{
         .video_identification_code = 1,  // Page 44

@@ -13,7 +13,7 @@ class Sequencer {
 
   uint32_t next_sequence_number() {
     uint32_t sequence_number = next_sequence_number_++;
-    // TODO(https://fxbug.dev/43815): handle sequence number overflow.
+    // TODO(https://fxbug.dev/42120161): handle sequence number overflow.
     DASSERT(next_sequence_number_ >= sequence_number);
     return sequence_number;
   }

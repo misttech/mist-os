@@ -396,11 +396,11 @@ bool IsPixelClockSupported(int pixel_clock_khz) {
   // Video tree divisor /N0 `vid_clk_div` == 2,
   // Video tree ENCP clock selector `encp_div` == 1.
   //
-  // TODO(https://fxbug.dev/133175): Factor this out for pixel clock checking and
+  // TODO(https://fxbug.dev/42083149): Factor this out for pixel clock checking and
   // calculation logics.
   constexpr int kFixedPllDivisionFactor = 5 * 2 * 1;
 
-  // TODO(https://fxbug.dev/133175): Factor out ranges for each output frequency
+  // TODO(https://fxbug.dev/42083149): Factor out ranges for each output frequency
   // divider so that they can be used for both clock checking and calculation.
   // OD1 = OD2 = OD3 = 1.
   constexpr int kMinimumPllDivisionFactor = 1 * 1 * 1;
@@ -436,7 +436,7 @@ bool IsPixelClockSupported(int pixel_clock_khz) {
 }  // namespace
 
 bool HdmiHost::IsDisplayTimingSupported(const display::DisplayTiming& timing) const {
-  // TODO(https://fxbug.dev/124984): High-resolution display modes (4K or more) are not
+  // TODO(https://fxbug.dev/42075808): High-resolution display modes (4K or more) are not
   // supported.
   const int kMaximumAllowedWidthPixels = 2560;
   const int kMaximumAllowedHeightPixels = 1600;
@@ -446,18 +446,18 @@ bool HdmiHost::IsDisplayTimingSupported(const display::DisplayTiming& timing) co
     return false;
   }
 
-  // TODO(https://fxbug.dev/133248): Interlaced modes are not supported.
+  // TODO(https://fxbug.dev/42083230): Interlaced modes are not supported.
   if (timing.fields_per_frame == display::FieldsPerFrame::kInterlaced) {
     return false;
   }
 
-  // TODO(https://fxbug.dev/133248): Interlaced modes with alternating vblanks are not
+  // TODO(https://fxbug.dev/42083230): Interlaced modes with alternating vblanks are not
   // supported.
   if (timing.vblank_alternates) {
     return false;
   }
 
-  // TODO(https://fxbug.dev/134708): Modes with pixel repetition are not supported.
+  // TODO(https://fxbug.dev/42084414): Modes with pixel repetition are not supported.
   if (timing.pixel_repetition != 0) {
     return false;
   }
@@ -470,13 +470,13 @@ bool HdmiHost::IsDisplayTimingSupported(const display::DisplayTiming& timing) co
 }
 
 void HdmiHost::ConfigEncoder(const display::DisplayTiming& timing) {
-  // TODO(https://fxbug.dev/135218): For timings that have repetitive pixels
+  // TODO(https://fxbug.dev/42084909): For timings that have repetitive pixels
   // (for example, 1440x480p60 and 1440x480i60), the Amlogic-provided code has
   // contradictory and (in most cases) incomplete configurations. Thus, we'll
   // reject all such formats.
   ZX_DEBUG_ASSERT(timing.pixel_repetition == 0);
 
-  // TODO(https://fxbug.dev/135218): The current code assumes the timing is for
+  // TODO(https://fxbug.dev/42084909): The current code assumes the timing is for
   // progressive fields.
   ZX_DEBUG_ASSERT(timing.fields_per_frame == display::FieldsPerFrame::kProgressive);
 
@@ -634,7 +634,7 @@ void HdmiHost::ConfigPhy() {
   // 3840 x 2160. The configuration currently works for all display modes
   // supported by this driver.
   //
-  // TODO(https://fxbug.dev/124984): Set the PHY control registers properly if the
+  // TODO(https://fxbug.dev/42075808): Set the PHY control registers properly if the
   // display uses a 4k resolution (3840 x 2160 or higher).
   HhiHdmiPhyCntl0Reg::Get().FromValue(0).set_hdmi_ctl1(0x33eb).set_hdmi_ctl2(0x4242).WriteTo(
       &hhi_mmio_);

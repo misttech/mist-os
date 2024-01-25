@@ -153,7 +153,7 @@ pub enum VectorField {
     Int16Vector(Vec<i16>),
     Int32Vector(Vec<i32>),
     Int64Vector(Vec<i64>),
-    // TODO(https://fxbug.dev/88174) figure out a better api for nested vectors
+    // TODO(https://fxbug.dev/42169377) figure out a better api for nested vectors
     UInt8VectorVector(Vec<Vec<u8>>),
 }
 

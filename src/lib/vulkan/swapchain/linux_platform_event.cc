@@ -61,7 +61,7 @@ std::unique_ptr<PlatformEvent> LinuxEvent::Duplicate(VkDevice device,
     dispatch_table->DestroyFence(device, fence,
                                  nullptr  // pAllocator
     );
-    // The fd is left open; TODO(https://fxbug.dev/67565) close the fd
+    // The fd is left open; TODO(https://fxbug.dev/42146493) close the fd
     return nullptr;
   }
 
@@ -119,7 +119,7 @@ VkResult LinuxEvent::ImportToSemaphore(VkDevice device, VkLayerDispatchTable* di
   result = dispatch_table->ImportSemaphoreFdKHR(device, &import_info);
   if (result != VK_SUCCESS) {
     LOG_VERBOSE("ImportSemaphoreFdKHR failed: %d", result);
-    // The fd is left open; TODO(https://fxbug.dev/67565) close the fd
+    // The fd is left open; TODO(https://fxbug.dev/42146493) close the fd
     return result;
   }
 

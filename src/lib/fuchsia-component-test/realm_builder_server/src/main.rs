@@ -45,7 +45,7 @@ lazy_static! {
             source_dictionary: None,
             target: cm_rust::ExposeTarget::Parent,
             target_name: fcomponent::BinderMarker::DEBUG_NAME.parse().unwrap(),
-            // TODO(https://fxbug.dev/107231): Support optional exposes.
+            // TODO(https://fxbug.dev/42058594): Support optional exposes.
             availability: cm_rust::Availability::Required,
         },);
 
@@ -870,7 +870,7 @@ impl RealmNodeState {
         child_url: String,
         child_options: ftest::ChildOptions,
     ) {
-        // TODO(https://fxbug.dev/102211): Validate overrides in cm_fidl_validator before
+        // TODO(https://fxbug.dev/42053123): Validate overrides in cm_fidl_validator before
         // converting them to cm_rust.
         let config_overrides: Option<Vec<_>> = child_options
             .config_overrides
@@ -1105,7 +1105,7 @@ impl RealmNode2 {
                     let child_node =
                         RealmNode2::load_from_pkg(child.url, Clone::clone(&test_pkg_dir)).await?;
 
-                    // TODO(https://fxbug.dev/102211): Validate overrides in cm_fidl_validator before
+                    // TODO(https://fxbug.dev/42053123): Validate overrides in cm_fidl_validator before
                     // converting them to cm_rust.
                     let config_overrides: Option<Vec<_>> = child
                         .config_overrides
@@ -1609,7 +1609,7 @@ fn create_expose_decl(
                 source_dictionary: None,
                 target: cm_rust::ExposeTarget::Parent,
                 target_name,
-                // TODO(https://fxbug.dev/107231): Support optional exposes.
+                // TODO(https://fxbug.dev/42058594): Support optional exposes.
                 availability: cm_rust::Availability::Required,
             })
         }
@@ -1634,7 +1634,7 @@ fn create_expose_decl(
                 target_name,
                 rights: directory.rights,
                 subdir,
-                // TODO(https://fxbug.dev/107231): Support optional exposes.
+                // TODO(https://fxbug.dev/42058594): Support optional exposes.
                 availability: cm_rust::Availability::Required,
             })
         }
@@ -1656,7 +1656,7 @@ fn create_expose_decl(
                 source_dictionary: None,
                 target: cm_rust::ExposeTarget::Parent,
                 target_name,
-                // TODO(https://fxbug.dev/107231): Support optional exposes.
+                // TODO(https://fxbug.dev/42058594): Support optional exposes.
                 availability: cm_rust::Availability::Required,
             })
         }
@@ -4734,7 +4734,7 @@ mod tests {
         assert!(version_history::is_valid_abi_revision(abi_revision.into()));
     }
 
-    // TODO(https://fxbug.dev/88429): The following test is impossible to write until sub-realms are supported
+    // TODO(https://fxbug.dev/42169660): The following test is impossible to write until sub-realms are supported
     // #[fuchsia::test]
     // async fn replace_component_decl_where_decl_children_conflict_with_mutable_children() {
     // }

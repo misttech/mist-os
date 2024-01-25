@@ -52,7 +52,7 @@ namespace amlogic_display {
 //
 // This register is shared between multiple hardware modules, driven by
 // different drivers. It must be updated via read-modify-write operations
-// TODO(https://fxbug.dev/45193): Concurrent access from different drivers is still
+// TODO(https://fxbug.dev/42121690): Concurrent access from different drivers is still
 // racy.
 //
 // A311D datasheet Section 8.2.5 "Power/Isolation/Memory Power Down Register
@@ -99,7 +99,7 @@ class AlwaysOnGeneralPowerSleep : public hwreg::RegisterBase<AlwaysOnGeneralPowe
 //
 // This register is shared between multiple hardware modules, driven by
 // different drivers. It must be updated via read-modify-write operations
-// TODO(https://fxbug.dev/45193): Concurrent access from different drivers is still
+// TODO(https://fxbug.dev/42121690): Concurrent access from different drivers is still
 // racy.
 //
 // This register also exists on S905D2 and A311D, but its bits have entirely

@@ -88,7 +88,7 @@ class PipeDevice : public DeviceType {
   std::optional<fdf::MmioBuffer> mmio_ TA_GUARDED(mmio_lock_);
 
   fbl::Mutex pipes_lock_;
-  // TODO(https://fxbug.dev/3213): This should be std::unordered_map.
+  // TODO(https://fxbug.dev/42107181): This should be std::unordered_map.
   using PipeMap = std::map<int32_t, std::unique_ptr<Pipe>>;
   PipeMap pipes_ TA_GUARDED(pipes_lock_);
   async_dispatcher_t* const dispatcher_;

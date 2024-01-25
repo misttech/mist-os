@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-// TODO(https://fxbug.dev/126764) Remove this file when UA is turned down (July 1, 2023)
+// TODO(https://fxbug.dev/42077438) Remove this file when UA is turned down (July 1, 2023)
 
 use {
     anyhow::Result,

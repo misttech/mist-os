@@ -10,10 +10,10 @@ const GA_PROPERTY_KEY: &str = "tid";
 
 const GA_CLIENT_KEY: &str = "cid";
 
-// TODO(https://fxbug.dev/126764) Remove this file when UA is turned down (July 1, 2023)
+// TODO(https://fxbug.dev/42077438) Remove this file when UA is turned down (July 1, 2023)
 
 //
-// TODO(https://fxbug.dev/71579): match zxdb by changing category and action for analytics commands
+// TODO(https://fxbug.dev/42150946): match zxdb by changing category and action for analytics commands
 // const GA_EVENT_CATEGORY_ANALYTICS: &str = "analytics";
 // const GA_EVENT_CATEGORY_ANALYTICS_ACTION_ENABLE: &str = "manual-enable";
 // const GA_EVENT_CATEGORY_ANALYTICS_ACTION_DISABLE: &str = "disable";

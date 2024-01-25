@@ -1716,7 +1716,7 @@ impl XdgSurfaceView {
         ftrace::duration!("wayland", "XdgSurfaceView::setup_scene");
         self.root_transform.as_ref().map(|root_transform| {
             self.flatland.borrow().proxy().set_root_transform(&root_transform).expect("fidl error");
-            // TODO(https://fxbug.dev/90666): Add background color if there's no parent.
+            // TODO(https://fxbug.dev/42172143): Add background color if there's no parent.
             self.flatland
                 .borrow()
                 .proxy()

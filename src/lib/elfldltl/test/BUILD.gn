@@ -194,7 +194,7 @@ if (is_fuchsia) {
 
       exclude_toolchain_tags = [ "instrumented" ]
 
-      # TODO(https://fxbug.dev/126542): __ehdr_start bug in ld.bfd aarch64-elf
+      # TODO(https://fxbug.dev/42077192): __ehdr_start bug in ld.bfd aarch64-elf
       if (current_cpu == "arm64") {
         exclude_toolchain_tags += [ "gcc" ]
       }
@@ -292,7 +292,7 @@ foreach(sizes, loader_test_sizes) {
 loader_test_lib("elfldltl-test-symbolic") {
   sources = [ "symbolic.cc" ]
 
-  # TODO(https://fxbug.dev/117866): clang will still perform interprocedural
+  # TODO(https://fxbug.dev/42069056): clang will still perform interprocedural
   # optimization in a PIC, this flag disallows that and requires the PLT call
   # always be made so we can properly test applying plt relocations.
   if (!is_gcc) {

@@ -9,7 +9,7 @@
 #include <ddktl/device.h>
 #include <zxtest/zxtest.h>
 
-// TODO(https://fxbug.dev/51303): The negative compilation tests are broken
+// TODO(https://fxbug.dev/42128480): The negative compilation tests are broken
 // #define TEST_WILL_NOT_COMPILE 1
 
 namespace {

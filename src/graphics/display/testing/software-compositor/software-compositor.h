@@ -131,8 +131,8 @@ class SoftwareCompositor {
   //   size as `input_image`.
   // - the destination frame `canvas_frame` must fall completely within the
   //   canvas and have the same size as `input_image`.
-  // TODO(https://fxbug.dev/124683): Supports more composition properties.
-  // TODO(https://fxbug.dev/130386): Instead of providing a separate ClearCanvas()
+  // TODO(https://fxbug.dev/42075534): Supports more composition properties.
+  // TODO(https://fxbug.dev/42080652): Instead of providing a separate ClearCanvas()
   // command, we should integrate background filling into
   // CompositeImageLayers().
   void CompositeImageLayers(cpp20::span<const ImageLayerForComposition> image_layers) const;
@@ -151,7 +151,7 @@ class SoftwareCompositor {
   //   size as `input_image`.
   // - the destination frame `canvas_frame` must fall completely within the
   //   canvas and have the same size as `input_image`.
-  // TODO(https://fxbug.dev/124683): Supports more composition properties.
+  // TODO(https://fxbug.dev/42075534): Supports more composition properties.
   void CompositeImage(const InputImage& input_image,
                       const CompositionProperties& composition_properties) const;
 

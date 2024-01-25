@@ -18,7 +18,7 @@ namespace zbitl {
 // All known item types. Must be kept in sync with definitions in
 // <lib/zbi-format/zbi.h>.
 //
-// TODO(https://fxbug.dev/127846): Consider some way of generating this.
+// TODO(https://fxbug.dev/42078423): Consider some way of generating this.
 inline constexpr std::array kItemTypes = {
     ZBI_TYPE_CONTAINER,
     ZBI_TYPE_KERNEL_X64,

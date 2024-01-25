@@ -145,7 +145,7 @@ impl FilterExpression<'_> {
             ) => {
                 match_one_or_many_value!(value, Value::Number(_))
             }
-            // TODO(https://fxbug.dev/86962): it should also be possible to compare severities with a fixed
+            // TODO(https://fxbug.dev/42168030): it should also be possible to compare severities with a fixed
             // set of numbers.
             (Identifier::Severity, value) => {
                 match_one_or_many_value!(value, Value::Severity(_))
@@ -206,7 +206,7 @@ trait ValidateStringSelectorExt {
     fn validate(&self, opts: StringSelectorValidationOpts) -> Result<(), ValidationError>;
 }
 
-// TODO(https://fxbug.dev/55118): we might want to just implement this differently for FIDL and the
+// TODO(https://fxbug.dev/42132713): we might want to just implement this differently for FIDL and the
 // internal types. The parser should cover all of the string pattern requirements. Verify.
 impl<T: StringSelector> ValidateStringSelectorExt for T {
     fn validate(&self, opts: StringSelectorValidationOpts) -> Result<(), ValidationError> {
@@ -271,7 +271,7 @@ fn validate_pattern(pattern: &str) -> Result<(), ValidationError> {
 impl Selector for fdiagnostics::Selector {
     type Component = fdiagnostics::ComponentSelector;
     type Tree = fdiagnostics::TreeSelector;
-    // TODO(https://fxbug.dev/55118): placeholder implementation until we have metadata in the FIDL API.
+    // TODO(https://fxbug.dev/42132713): placeholder implementation until we have metadata in the FIDL API.
     type Metadata = ();
 
     fn component(&self) -> Option<&Self::Component> {
@@ -283,7 +283,7 @@ impl Selector for fdiagnostics::Selector {
     }
 
     fn metadata(&self) -> Option<&Self::Metadata> {
-        // TODO(https://fxbug.dev/55118): placeholder implementation until we have metadata in the FIDL API.
+        // TODO(https://fxbug.dev/42132713): placeholder implementation until we have metadata in the FIDL API.
         None
     }
 }

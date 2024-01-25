@@ -363,7 +363,7 @@ DdiAuxChannel::ReplyInfo DdiAuxChannel::ReadReplyForTesting(cpp20::span<uint8_t>
 }
 
 void DdiAuxChannel::FixConfig() {
-  // TODO(https://fxbug.dev/31313): Support interrupts
+  // TODO(https://fxbug.dev/42106274): Support interrupts
   aux_control_.set_interrupt_on_done(true);
 
   if (aux_control_.timeout_timer_select() != registers::DdiAuxControl::kTimeoutLarge) {

@@ -161,7 +161,7 @@ pub enum ResourcePathError {
     #[error("object paths must be at least 1 byte")]
     PathIsEmpty,
 
-    // TODO(https://fxbug.dev/22531) allow newline once meta/contents supports it in blob paths
+    // TODO(https://fxbug.dev/42096516) allow newline once meta/contents supports it in blob paths
     #[error(r"object names cannot contain the newline character '\n'")]
     NameContainsNewline,
 }

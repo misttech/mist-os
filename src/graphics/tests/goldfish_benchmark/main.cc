@@ -147,7 +147,7 @@ void RunPingPongBenchmark(fidl::WireSyncClient<fuchsia_hardware_goldfish::Pipe>&
 }  // namespace
 
 int main(int argc, char** argv) {
-  // TODO(https://fxbug.dev/113830): Stop hardcoding the 000 in this path.
+  // TODO(https://fxbug.dev/42065067): Stop hardcoding the 000 in this path.
   zx::result controller =
       component::Connect<fuchsia_hardware_goldfish::Controller>("/dev/class/goldfish-pipe/000");
   ZX_ASSERT_MSG(controller.is_ok(), "%s", controller.status_string());

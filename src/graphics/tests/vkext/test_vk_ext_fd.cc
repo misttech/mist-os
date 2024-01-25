@@ -86,7 +86,7 @@ TEST_F(TestVkExtSemFd, SemaphoreExportThenImport) {
     fd = export_ret.value;
   }
 
-  // TODO(https://fxbug.dev/67565) - check non negative
+  // TODO(https://fxbug.dev/42146493) - check non negative
   EXPECT_NE(0, fd);
 
   {
@@ -123,7 +123,7 @@ TEST_F(TestVkExtSemFd, FenceExportThenImport) {
     fd = export_ret.value;
   }
 
-  // TODO(https://fxbug.dev/67565) - check non negative
+  // TODO(https://fxbug.dev/42146493) - check non negative
   EXPECT_NE(0, fd);
 
   {

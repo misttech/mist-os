@@ -71,7 +71,7 @@ namespace i915 {
 
 namespace {
 
-// TODO(https://fxbug.dev/121924): Consider creating and using a unified set of sysmem
+// TODO(https://fxbug.dev/42072949): Consider creating and using a unified set of sysmem
 // testing doubles instead of writing mocks for each display driver test.
 class MockNoCpuBufferCollection
     : public fidl::testing::WireTestBase<fuchsia_sysmem::BufferCollection> {
@@ -578,13 +578,13 @@ TEST_F(IntegrationTest, InitFailsIfBootloaderGetInfoFails) {
   EXPECT_EQ(0u, addr);
 }
 
-// TODO(https://fxbug.dev/85836): Add tests for DisplayPort display enumeration by InitOp, covering the
+// TODO(https://fxbug.dev/42166779): Add tests for DisplayPort display enumeration by InitOp, covering the
 // following cases:
 //   - Display found during start up but not already powered.
 //   - Display found during start up but already powered up.
 //   - Display added and removed in a hotplug event.
-// TODO(https://fxbug.dev/86314): Add test for HDMI display enumeration by InitOp.
-// TODO(https://fxbug.dev/86315): Add test for DVI display enumeration by InitOp.
+// TODO(https://fxbug.dev/42167311): Add test for HDMI display enumeration by InitOp.
+// TODO(https://fxbug.dev/42167312): Add test for DVI display enumeration by InitOp.
 
 TEST_F(IntegrationTest, GttAllocationDoesNotOverlapBootloaderFramebuffer) {
   constexpr uint32_t kStride = 1920;

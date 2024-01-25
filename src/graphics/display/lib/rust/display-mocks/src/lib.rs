@@ -42,7 +42,7 @@ pub struct MockCoordinator {
     displays: HashMap<DisplayId, display::Info>,
 }
 
-// TODO(https://fxbug.dev/129863): Instead of defining a separate DisplayId, we should
+// TODO(https://fxbug.dev/42080268): Instead of defining a separate DisplayId, we should
 // use the same DisplayId from display_utils instead.
 #[derive(Eq, Hash, Ord, PartialOrd, PartialEq)]
 struct DisplayId(u64);
@@ -82,7 +82,7 @@ impl MockCoordinator {
     /// Sends a single OnVsync event to the client. The vsync event will appear to be sent from the
     /// given `display_id` even if a corresponding fake display has not been assigned by a call to
     /// `assign_displays`.
-    // TODO(https://fxbug.dev/129863): Currently we cannot use display_utils::DisplayId
+    // TODO(https://fxbug.dev/42080268): Currently we cannot use display_utils::DisplayId
     // here due to circular dependency. Instead of passing a raw u64 value, we
     // should use a generic and strong-typed DisplayId.
     pub fn emit_vsync_event(

@@ -32,7 +32,7 @@ std::unique_ptr<PlatformBusMapper::BusMapping> ZirconPlatformBusMapper::MapPageR
   if ((page_count == 0) || (start_page_index + page_count) * magma::page_size() > buffer->size())
     return DRETP(nullptr, "Invalid range: %lu, %lu", start_page_index, page_count);
 
-  // Pin in 256MB chunks because Zircon can't pin a 512MB buffer (https://fxbug.dev/45016)
+  // Pin in 256MB chunks because Zircon can't pin a 512MB buffer (https://fxbug.dev/42121495)
   const uint64_t kMaxPageCount = 256 * 1024 * 1024 / magma::page_size();
   uint64_t pmt_count = magma::round_up(page_count, kMaxPageCount) / kMaxPageCount;
 

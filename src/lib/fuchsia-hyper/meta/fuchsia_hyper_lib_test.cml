@@ -25,7 +25,7 @@
             from: "#netstack",
         },
 
-        // TODO(https://fxbug.dev/103980) package our own certs and remove from system test realm
+        // TODO(https://fxbug.dev/42055086) package our own certs and remove from system test realm
         {
             directory: "root-ssl-certificates",
             rights: [ "r*" ],

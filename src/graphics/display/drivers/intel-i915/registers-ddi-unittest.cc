@@ -301,7 +301,7 @@ TEST(DdiClockConfigTest, DdiClockDisplayPll) {
             ddi_clock_config.ddi_c_clock_display_pll_select());
   EXPECT_EQ(PllId::DPLL_0, ddi_clock_config.ddi_clock_display_pll(DdiId::DDI_C));
 
-  // TODO(https://fxbug.dev/110351): Add one test for DPLL4, when we support it.
+  // TODO(https://fxbug.dev/42061706): Add one test for DPLL4, when we support it.
 }
 
 TEST(DdiClockConfigTest, DdiClockDisplayPllInvalid) {
@@ -355,7 +355,7 @@ TEST(DpTransportControlTest, GetForTigerLakeTranscoder) {
           .FromValue(0);
   EXPECT_EQ(0x62540u, dp_tp_ctl_c.reg_addr());
 
-  // TODO(https://fxbug.dev/109278): Add a test for transcoder D, when we support it.
+  // TODO(https://fxbug.dev/42060657): Add a test for transcoder D, when we support it.
   // The MMIO address is 0x63540.
 }
 

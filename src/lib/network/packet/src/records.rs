@@ -1395,7 +1395,7 @@ pub mod options {
 
     impl<O: OptionBuilder> RecordBuilder for O {
         fn serialized_len(&self) -> usize {
-            // TODO(https://fxbug.dev/77981): Remove this `.expect`
+            // TODO(https://fxbug.dev/42158056): Remove this `.expect`
             <O::Layout as OptionLayout>::LENGTH_ENCODING
                 .record_length::<<O::Layout as OptionLayout>::KindLenField>(
                     OptionBuilder::serialized_len(self),
@@ -1417,7 +1417,7 @@ pub mod options {
             *BufferView::<&mut [u8]>::take_obj_front::<<O::Layout as OptionLayout>::KindLenField>(&mut data)
                 .expect("buffer too short") = self.option_kind();
             let body_len = OptionBuilder::serialized_len(self);
-            // TODO(https://fxbug.dev/77981): Remove this `.expect`
+            // TODO(https://fxbug.dev/42158056): Remove this `.expect`
             let length = <O::Layout as OptionLayout>::LENGTH_ENCODING
                 .encode_length::<<O::Layout as OptionLayout>::KindLenField>(body_len)
                 .expect("integer overflow while encoding length");
