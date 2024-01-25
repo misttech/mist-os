@@ -365,6 +365,17 @@ def _generate_component_manifest_rules(ctx, meta, relative_dir, build_file, proc
                 )
                 process_context.files_to_copy[meta["_meta_sdk_root"]].append(f)
 
+# A list of copt overrides to provide to an individual library. Care should be used
+# when adding anythying to this list as it adds copts for a library in a way that is
+# hard to find for users.
+_CC_LIBRARY_COPTS_OVERRIDES = {
+    "zxtest": [
+        # TODO(https://fxbug.dev/42085293): zxtest headers use VLA, rather than suppressing
+        # every use of zxtest headers of which there are many, we suppress it here.
+        "-Wno-vla-cxx-extension",
+    ],
+}
+
 # buildifier: disable=unused-variable
 def _generate_cc_source_library_build_rules(ctx, meta, relative_dir, build_file, process_context, parent_sdk_contents):
     tmpl = ctx.path(ctx.attr._cc_library_template)
@@ -389,6 +400,8 @@ def _generate_cc_source_library_build_rules(ctx, meta, relative_dir, build_file,
             fidl_llcpp_deps.append(dep_path + ":" + fidl + "_llcpp_cc")
 
     deps = _find_dep_paths(meta["deps"], "pkg/", ctx.attr.parent_sdk, parent_sdk_contents)
+    target_name = _get_target_name(meta["name"])
+    copts = _CC_LIBRARY_COPTS_OVERRIDES.get(target_name, [])
 
     _merge_template(
         ctx,
@@ -402,6 +415,7 @@ def _generate_cc_source_library_build_rules(ctx, meta, relative_dir, build_file,
             "{{sources}}": _get_starlark_list(meta["sources"], remove_prefix = lib_base_path),
             "{{headers}}": _get_starlark_list(meta["headers"], remove_prefix = lib_base_path),
             "{{relative_include_dir}}": meta["include_dir"][len(lib_base_path):],
+            "{{copts}}": _get_starlark_list(copts),
         },
     )
     process_context.files_to_copy[meta["_meta_sdk_root"]].extend(meta["sources"])

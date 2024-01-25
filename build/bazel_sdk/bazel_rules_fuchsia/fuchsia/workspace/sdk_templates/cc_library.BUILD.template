@@ -6,6 +6,9 @@ cc_library(
     hdrs = [
         {{headers}}
     ],
+    copts = [
+        {{copts}}
+    ],
     deps = [
         {{deps}}
         {{fidl_deps}}
