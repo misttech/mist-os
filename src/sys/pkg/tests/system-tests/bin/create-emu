@@ -87,6 +87,14 @@ are documented in that script, and can be discovered by passing -h or
     type=str,
     help='mount the disk with this type in qemu')
   parser.add_argument(
+    '--product-bundle-name',
+    help='The name of the product bundle to use to create the image')
+  parser.add_argument(
+    '--use-fxfs',
+    action='store_true',
+    default=False,
+    help='Use fxfs to create the image')
+  parser.add_argument(
     'image',
     type=pathlib.Path,
     help='create the image into this path')
@@ -135,6 +143,7 @@ are documented in that script, and can be discovered by passing -h or
       '--arch', args.arch,
       '--cmdline', cmdline_path,
       '--resize', str(args.image_size),
+      '--product-bundle-name', args.product_bundle_name,
       args.image.resolve(),
     ]
 
@@ -143,6 +152,9 @@ are documented in that script, and can be discovered by passing -h or
 
     if args.abr_size is not None:
       make_fuchsia_vol_args.extend(['--abr-size', str(args.abr_size)])
+
+    if args.use_fxfs:
+      make_fuchsia_vol_args.append('--use-fxfs')
 
     print(f'Running: {shlex.join(str(s) for s in make_fuchsia_vol_args)}')
 
