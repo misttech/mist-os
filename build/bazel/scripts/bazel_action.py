@@ -857,6 +857,14 @@ def main():
         nargs="*",
         help="Ninja output paths relative to current directory.",
     )
+
+    parser.add_argument(
+        "--build-id-dirs",
+        default=[],
+        nargs="*",
+        help="The build-id directories to copy to the root build-id dir.",
+    )
+
     parser.add_argument("--depfile", help="Ninja depfile output path.")
     parser.add_argument(
         "--allow-directory-in-outputs",
@@ -1147,6 +1155,19 @@ def main():
 
     for src_path, dst_path in zip(src_paths, args.ninja_outputs):
         copy_file_if_changed(src_path, dst_path)
+
+    # Copy all of our build_id_dir items over to the root build-id path. This
+    # checks for the standard format that our SDK supports for build ids of
+    # having the first 2 digits of the build-id be a directory. We will ignore
+    # anything that doesn't match that format.
+    for build_id_dir in args.build_id_dirs:
+        for path in os.listdir(build_id_dir):
+            bid_path = os.path.join(build_id_dir, path)
+            if len(path) == 2 and os.path.isdir(bid_path):
+                for obj in os.listdir(bid_path):
+                    src_path = os.path.join(bid_path, obj)
+                    dst_path = os.path.join(_BUILD_ID_PREFIX, path, obj)
+                    copy_file_if_changed(src_path, dst_path)
 
     if args.path_mapping:
         # When determining source path of the copied output, follow links to get

@@ -121,6 +121,42 @@ declare_args() {
 #     Type: list of paths relative to target_out_dir.
 #     Default: empty
 #
+#   build_id_directories: (optional)
+#     When build_id_directories is set the action will copy all of the debug
+#     symbols in the build-id into the root .build-id directory.
+#
+#     The directories should be relative to teh BAZEL_TARGET_OUT_DIR and will be
+#     copied into ninja at the same path.
+#
+#     The tool will look for build directories that have a 2 character name and
+#     then copy all of the contents. Thus the structure of the directory should
+#     look like:
+#     - .stamp (the stamp file for copy_outputs)
+#     - ab/
+#        - xyz.debug
+#        - 12345
+#     - oe/
+#        - abcd
+#
+#     IMPORTANT: For incremental build correctness, the build-id directory must
+#     contain a file name `.stamp` which represent the state of the entire
+#     build-id directory. The name of this file can be changed via the
+#     build_id_stamp_name variable if a different value is used.
+#
+#       # Specify where the build ids are
+#       build_id_directories = [
+#         "${package_name}/.build-id"
+#       ]
+#
+#     Type: list of strings.
+#     Default: empty
+#
+#   build_id_stamp_name: (optional)
+#     An optional name to use for the stamp file to look for when tracking
+#     a build_id_directories entry.
+#     Type: string
+#     Default: .stamp
+#
 #   extra_bazel_args: (optional)
 #     A list extra command line arguments to pass to Bazel.
 #     Type: list of string.
@@ -212,12 +248,44 @@ template("bazel_action") {
   assert(defined(invoker.command), "command must be defined!")
   assert(defined(invoker.bazel_targets), "bazel_targets must be defined!")
   assert(invoker.bazel_targets != [], "bazel_targets cannot be empty!")
+  assert(invoker.copy_outputs != [], "`copy_outputs` cannot be empty")
 
+  _needs_dir_copy = false
   _bazel_output_list = []
   _ninja_output_list = []
+  _build_id_dirs = []
+  _copy_ouputs = invoker.copy_outputs
 
-  assert(invoker.copy_outputs != [], "`copy_outputs` cannot be empty")
-  foreach(entry, invoker.copy_outputs) {
+  _directory_timestamp_outputs = []
+  if (defined(invoker.directory_timestamp_outputs)) {
+    _needs_dir_copy = true
+    _directory_timestamp_outputs += invoker.directory_timestamp_outputs
+  }
+
+  # Set up our build id directories
+  _build_id_stamp_name = ".stamp"
+  if (defined(invoker.build_id_stamp_name)) {
+    _build_id_stamp_name = invoker.build_id_stamp_name
+  }
+
+  if (defined(invoker.build_id_directories)) {
+    _needs_dir_copy = true
+    foreach(build_id_dir, invoker.build_id_directories) {
+      _build_id_dirs += [ "${target_out_dir}/${build_id_dir}" ]
+      _copy_ouputs += [
+        {
+          bazel = "{{BAZEL_TARGET_OUT_DIR}}/${build_id_dir}"
+          ninja = build_id_dir
+        },
+      ]
+      _directory_timestamp_outputs +=
+          [ "${build_id_dir}/${_build_id_stamp_name}" ]
+    }
+  } else {
+    not_needed([ "_build_id_stamp_name" ])
+  }
+
+  foreach(entry, _copy_ouputs) {
     assert("$entry" != entry,
            "`copy_outputs` items must be scopes, string found: \"$entry\"")
 
@@ -356,13 +424,15 @@ template("bazel_action") {
     depfile = "$target_gen_dir/$target_name.d"
 
     outputs = _outputs
-    if (defined(invoker.directory_timestamp_outputs)) {
+    if (_needs_dir_copy) {
       assert(
           _allow_directory_in_outputs,
           "directory_timestamp_outputs is not useful when there are no directory copies (allow_directory_in_outputs=false)")
-      foreach(path, invoker.directory_timestamp_outputs) {
+      foreach(path, _directory_timestamp_outputs) {
         outputs += [ target_out_dir + "/" + path ]
       }
+    } else {
+      not_needed([ "_directory_timestamp_outputs" ])
     }
 
     _path_mapping = "${target_out_dir}/${target_name}.path_mapping"
@@ -384,6 +454,7 @@ template("bazel_action") {
              "--bazel-outputs",
            ] + _bazel_outputs + [ "--bazel-targets" ] + _bazel_targets +
            [ "--ninja-outputs" ] + rebase_path(_outputs, root_build_dir) +
+           [ "--build-id-dirs" ] + rebase_path(_build_id_dirs, root_build_dir) +
            [
              "--depfile",
              rebase_path(depfile, root_build_dir),
