@@ -95,8 +95,12 @@ Multi-device testbeds follows a similar configuration but is out-of-scope of thi
 Every Lacewing Mobly test follows the simple scaffolding below:
 
 ```py
+import logging
+
 from fuchsia_base_test import fuchsia_base_test
 from mobly import test_runner
+
+_LOGGER = logging.getLogger(__name__)
 
 
 class MyFirstLacewingTest(fuchsia_base_test.FuchsiaBaseTest):
@@ -106,6 +110,7 @@ class MyFirstLacewingTest(fuchsia_base_test.FuchsiaBaseTest):
         self.fuchsia_dut = self.fuchsia_devices[0]
 
     def test_my_first_testcase(self):
+        _LOGGER.info("Running my first Lacewing test...")
         # Test logic goes here.
         # e.g. self.fuchsia_dut.some_api(...)
 
