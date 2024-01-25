@@ -264,7 +264,7 @@ async fn version_test() {
 }
 
 #[netstack_test]
-// TODO(https://fxbug.dev/88133): Fix memory leak and run this with Lsan.
+// TODO(https://fxbug.dev/42169332): Fix memory leak and run this with Lsan.
 #[cfg_attr(feature = "variant_asan", ignore)]
 async fn packet_test<N: Netstack>(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
@@ -283,10 +283,10 @@ async fn packet_test<N: Netstack>(name: &str) {
 }
 
 #[netstack_test]
-// TODO(https://fxbug.dev/88133): Fix memory leak and run this with Lsan.
+// TODO(https://fxbug.dev/42169332): Fix memory leak and run this with Lsan.
 #[cfg_attr(feature = "variant_asan", ignore)]
 async fn bridged_packet_test(name: &str) {
-    // TODO(https://fxbug.dev/86661): Support bridging in Netstack3.
+    // TODO(https://fxbug.dev/42167696): Support bridging in Netstack3.
     type N = netstack_testing_common::realms::Netstack2;
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
     let realm = sandbox.create_netstack_realm::<N, _>(name).expect("create realm");
@@ -410,7 +410,7 @@ async fn bridged_packet_test(name: &str) {
                 r"eth\d+\s+Out\s+IP 192\.168\.1\.1\.9876 > 192\.168\.1\.2\.1234: UDP, length 4",
             )
             .expect("parse tcpdump packet regex for packet sent through ethernet interface"),
-            // TODO(https://fxbug.dev/120145): Change the direction from `P` to
+            // TODO(https://fxbug.dev/42071238): Change the direction from `P` to
             // `In` once packets destined to a bridge that arrive at a bridged
             // member is properly marked as being a packet directed to the host.
             Regex::new(

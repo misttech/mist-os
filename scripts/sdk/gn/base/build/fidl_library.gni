@@ -554,7 +554,7 @@ template("fidl_library") {
       layer_deps = [
         "cpp_natural_types",
 
-        # TODO(https://fxbug.dev/101525): Replace with "cpp_wire_types".
+        # TODO(https://fxbug.dev/42052360): Replace with "cpp_wire_types".
         "cpp_wire",
       ]
     },

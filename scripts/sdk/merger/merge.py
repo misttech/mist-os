@@ -143,7 +143,7 @@ def _write_file_if_changed(path: Path, data: str):
         # Remove the existing file, some of them will be hard-links,
         # and writing directly will modify the timestamp of other
         # entries in the filesystem, leading to weird
-        # incrementality issues (https://fxbug.dev/133470).
+        # incrementality issues (https://fxbug.dev/42083405).
         os.unlink(path)
     else:
         _ensure_directory(path)
@@ -287,7 +287,7 @@ class ElementMeta(object):
         meta_one = self._meta
         meta_two = other._meta
 
-        # TODO(https://fxbug.dev/5362): verify that the common parts of the metadata files are in
+        # TODO(https://fxbug.dev/42131052): verify that the common parts of the metadata files are in
         # fact identical.
         type = self.type
         if type != other.type:

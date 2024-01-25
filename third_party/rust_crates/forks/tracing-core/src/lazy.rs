@@ -4,7 +4,7 @@ pub(crate) use once_cell::sync::Lazy;
 #[cfg(not(feature = "std"))]
 pub(crate) use self::spin::Lazy;
 
-// FIXME(https://fxbug.dev/132950): We can unfork tracing-core once it no longer vendors the `spin`
+// FIXME(https://fxbug.dev/42082971): We can unfork tracing-core once it no longer vendors the `spin`
 // crate.
 #[cfg(not(feature = "std"))]
 mod spin {

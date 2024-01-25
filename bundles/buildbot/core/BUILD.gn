@@ -51,7 +51,7 @@ group("core") {
   if (has_board) {
     deps += [
       "//src:e2e_tests",
-      # TODO(https://fxbug.dev/114960) Re-instate these tests when they correctly
+      # TODO(https://fxbug.dev/42066250) Re-instate these tests when they correctly
       # select the environments that they can run on.
       #
       # "//tools:e2e_tests",
@@ -96,7 +96,7 @@ group("no_e2e_dep") {
     "//third_party:tests",
 
     # Used by tests, which must not themselves add WebEngine to the product.
-    # See https://fxbug.dev/119212.
+    # See https://fxbug.dev/42070261.
     "//src/chromium:web_engine",
 
     # Used by tests

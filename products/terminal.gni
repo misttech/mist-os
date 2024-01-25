@@ -39,17 +39,17 @@ core_realm_shards += [ "//src/media/codec:codec_factory_shard" ]
 core_realm_shards += [ "//products/terminal:tiles_flatland_core_shard" ]
 
 # Add Test UI Stack for use in tests.
-# TODO(https://fxbug.dev/105105): Remove once we migrate client usage to subpackages.
+# TODO(https://fxbug.dev/42056298): Remove once we migrate client usage to subpackages.
 legacy_cache_package_labels +=
     [ "//src/ui/testing/test_ui_stack:test-ui-stack-flavors" ]
 
 # Add validator package for use in tests.
-# TODO(https://fxbug.dev/127138): Remove once we support packages in the SDK.
+# TODO(https://fxbug.dev/42077782): Remove once we support packages in the SDK.
 legacy_cache_package_labels +=
     [ "//src/diagnostics/validator/inspect:validator" ]
 
 # Add test validation packages for use in tests.
-# TODO(https://fxbug.dev/127138): Remove once we support packages in the SDK and we want to put this
+# TODO(https://fxbug.dev/42077782): Remove once we support packages in the SDK and we want to put this
 # in the SDK.
 legacy_cache_package_labels += [
   "//src/tests/fidl/dynsuite/client_suite/harness",

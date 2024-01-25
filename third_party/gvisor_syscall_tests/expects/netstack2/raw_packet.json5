@@ -12,14 +12,14 @@
         {
             type: "expect_failure",
             matchers: [
-                // https://fxbug.dev/82596
+                // https://fxbug.dev/42163179
                 "AllInetTests/RawSocketTest.SetSocketDetachFilterNoInstalledFilter/*",
                 "AllInetTests/RawPacketTest.SetSocketDetachFilterNoInstalledFilter/*",
 
-                // https://fxbug.dev/46102
+                // https://fxbug.dev/42122701
                 "RawSocketTest.ReceiveIPPacketInfo",
 
-                // https://fxbug.dev/90501
+                // https://fxbug.dev/42171961
                 "RawSocketICMPTest.IPv6ChecksumNotSupported",
                 "RawSocketICMPTest.ICMPv6FilterNotSupported",
             ],

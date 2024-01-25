@@ -15,7 +15,7 @@ Cargo.toml has been modified to depend on nix 0.26 instead of 0.26.1 which has s
 
 examples/ has been removed as it isn't required and contained unsafe codeblocks. Removing was easier than reviewing.
 
-https://fxbug.dev/121183 tracks the pull request we need to land before we can remove this fork.
+https://fxbug.dev/42072186 tracks the pull request we need to land before we can remove this fork.
 
 * Are there any restrictions to how it should be rolled?
 No.

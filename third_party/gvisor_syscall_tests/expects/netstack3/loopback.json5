@@ -50,7 +50,7 @@
                 "AllFamilies/SocketMultiProtocolInetLoopbackTest.V6EphemeralPortReserved/TCP",
                 "AllFamilies/SocketMultiProtocolInetLoopbackTest.V6OnlyV6AnyReservesV6/TCP",
 
-                // TODO(https://fxbug.dev/21198): Netstack3 doesn't have dual-stack sockets.
+                // TODO(https://fxbug.dev/42095034): Netstack3 doesn't have dual-stack sockets.
                 "All/DualStackAfMismatchTest.*/TCP",
                 "All/SocketInetLoopbackTest.TCPListenShutdown/ListenV6Any_ConnectV4MappedAny",
                 "All/SocketInetLoopbackTest.TCPListenShutdown/ListenV4MappedAny_ConnectV4Any",
@@ -105,7 +105,7 @@
                 "AllFamilies/SocketMultiProtocolInetLoopbackTest.DualStackV6AnyWithListenReservesEverything/*",
                 "AllFamilies/SocketMultiProtocolInetLoopbackTest.DualStackV6AnyReuseAddrListenReservesV4Any/*",
 
-                // TODO(https://fxbug.dev/21198): Netstack3 doesn't have dual-stack sockets.
+                // TODO(https://fxbug.dev/42095034): Netstack3 doesn't have dual-stack sockets.
                 "All/SocketInetLoopbackTest.TCPListenClose/ListenV6Any_ConnectV4MappedAny",
                 "All/SocketInetLoopbackTest.TCPListenClose/ListenV4Loopback_ConnectV4MappedLoopback",
                 "All/SocketInetLoopbackTest.TCPListenClose/ListenV4MappedAny_ConnectV4Any",
@@ -161,7 +161,7 @@
                 "All/SocketInetLoopbackTest.TCPUnblockWaitOnRemoteRdHUp/ListenV6Any_ConnectV4MappedAny",
                 "All/SocketInetLoopbackTest.TCPUnblockWaitOnRemoteRdHUp/ListenV6Any_ConnectV4MappedLoopback",
 
-                // TODO(https://fxbug.dev/118516): This test sometimes times out in CI.
+                // TODO(https://fxbug.dev/42069631): This test sometimes times out in CI.
                 "All/SocketInetLoopbackTest.TCPListenShutdownListen/*",
             ],
         },

@@ -15,7 +15,7 @@ No.
 We vendor the exact crate but remove the included copies of spin which are only
 used in no_std environments. If upstream stops shipping vendored code with
 different licenses which won't be used in our build from the main crate, we can
-un-fork (see https://fxbug.dev/132950). This should happen when
+un-fork (see https://fxbug.dev/42082971). This should happen when
 https://github.com/tokio-rs/tracing/issues/492 is resolved.
 
 # Are there any restrictions to how it should be rolled?

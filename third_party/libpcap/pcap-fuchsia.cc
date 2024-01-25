@@ -247,7 +247,7 @@ int pcap_activate_fuchsia(pcap_t *handle) {
     } else if (handlep->ifindex == kAnyDeviceIndex) {
       fprintf(stderr, "The any device does not have a promiscuous mode; ignoring...\n");
     } else {
-      // TODO(https://fxbug.dev/88038): Put the device in promiscuous mode.
+      // TODO(https://fxbug.dev/42169226): Put the device in promiscuous mode.
       pcap_strlcpy(handle->errbuf, "promiscuous mode not supported", PCAP_ERRBUF_SIZE);
       return PCAP_WARNING_PROMISC_NOTSUP;
     }
@@ -255,7 +255,7 @@ int pcap_activate_fuchsia(pcap_t *handle) {
 
   // Open a packet socket.
   //
-  // TODO(https://fxbug.dev/88035): Only open a SOCK_DGRAM packet socket if this
+  // TODO(https://fxbug.dev/42169223): Only open a SOCK_DGRAM packet socket if this
   // is the any device so that we can parse the link headers of the device we
   // are bound to.
   handle->linktype = DLT_LINUX_SLL2;
@@ -767,7 +767,7 @@ int pcap_platform_finddevs(pcap_if_list_t *devlistp, char *errbuf) {
                            *flags |= PCAP_IF_CONNECTION_STATUS_NOT_APPLICABLE;
                          }
 
-                         // TODO(https://fxbug.dev/88036): Set PCAP_IF_WIRELESS
+                         // TODO(https://fxbug.dev/42169224): Set PCAP_IF_WIRELESS
                          // and/or PCAP_IF_CONNECTION_STATUS_* if needed.
 
                          return 0;

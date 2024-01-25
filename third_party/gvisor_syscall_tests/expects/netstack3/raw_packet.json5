@@ -12,7 +12,7 @@
         {
             type: "expect_failure",
             matchers: [
-                // TODO(https://fxbug.dev/106735): Support packet sockets.
+                // TODO(https://fxbug.dev/42058078): Support packet sockets.
                 "AllInetTests/RawPacketTest.SetSocketSendBuf*",
                 "AllInetTests/RawPacketTest.GetSocketError*",
                 "AllInetTests/RawPacketTest.SetSocketDetachFilterNoInstalledFilter/*",

@@ -19,9 +19,9 @@ load("./starlark.star", "register_starlark_checks")
 def bug_urls(ctx):
     """Checks that fuchsia bug URLs are correctly formatted.
 
-    Bug URLs should use the form "https://fxbug.dev/123456"; the form
+    Bug URLs should use the form "https://fxbug.dev/42074375"; the form
     "http://fxb/123456" isn't usable by non-Google employees, and
-    "fxbug.dev/123456" doesn't automatically linkify in most editors.
+    "fxbug.dev/42074375" doesn't automatically linkify in most editors.
 
     Args:
         ctx: A ctx instance.

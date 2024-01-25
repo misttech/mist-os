@@ -12,7 +12,7 @@
         {
             type: "expect_failure",
             matchers: [
-                // https://fxbug.dev/46102
+                // https://fxbug.dev/42122701
                 "IPv4UDPSockets/IPv4UDPUnboundSocketTest.SetAndReceiveIPPKTINFO/*",
                 "IPv4UDPSockets/IPv4UDPUnboundSocketTest.IpMulticastIPPacketInfo/*",
 
@@ -21,11 +21,11 @@
                 //
                 // https://fuchsia.googlesource.com/fuchsia/+/a7a1b55/zircon/system/ulib/fdio/include/lib/fdio/limits.h#13
                 //
-                // https://fxbug.dev/33737
+                // https://fxbug.dev/42108966
                 "IPv4UDPSockets/IPv4UDPUnboundSocketNogotsanTest.UDPBindPortExhaustion/*",
                 "IPv4UDPSockets/IPv4UDPUnboundSocketNogotsanTest.UDPConnectPortExhaustion/*",
 
-                // https://fxbug.dev/67016
+                // https://fxbug.dev/42145888
                 "IPv4UDPSockets/IPv4UDPUnboundSocketTest.SetAndReceiveIPReceiveOrigDstAddr/*",
                 "IPv6UDPSockets/IPv6UDPUnboundSocketTest.SetAndReceiveIPReceiveOrigDstAddr/*",
             ],

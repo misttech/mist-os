@@ -2,7 +2,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-# TODO(https://fxbug.dev/114144): Look into generating this file with
+# TODO(https://fxbug.dev/42065416): Look into generating this file with
 # [bazel-gazelle](https://github.com/bazelbuild/bazel-gazelle).
 
 # NOTE: This file is manually maintained on a best-effort basic, the content of

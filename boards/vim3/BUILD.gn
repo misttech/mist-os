@@ -287,7 +287,7 @@ board_input_bundle("main_bundle") {
     # TODO(b/322009732): Switch to a config api for these, when available.
 
     # Prefer using the built-in NIC to the CDC-ether interface.
-    # TODO(https://fxbug.dev/117539): Update topopath when dwmac is off
+    # TODO(https://fxbug.dev/42068759): Update topopath when dwmac is off
     # netdevice migration.
     "netsvc.interface=/dwmac/dwmac/Designware-MAC/netdevice-migration/network-device",
 

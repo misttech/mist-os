@@ -15,7 +15,7 @@
         {
             type: "skip",
             matchers: [
-                // TODO(https://fxbug.dev/21198): Netstack3 does not support
+                // TODO(https://fxbug.dev/42095034): Netstack3 does not support
                 // dual-stack TCP sockets yet.
                 "All/SocketInetLoopbackIsolatedTest.TCPActiveCloseTimeWaitTest/ListenV6Any_ConnectV4Any",
                 "All/SocketInetLoopbackIsolatedTest.TCPConnectionReuseAddrConflicts/ListenV6Any_ConnectV4Any",
@@ -23,7 +23,7 @@
                 "All/SocketInetLoopbackIsolatedTest.TCPLinger2TimeoutAfterClose/ListenV6Any_ConnectV4Any",
                 "All/SocketInetLoopbackIsolatedTest.TCPPassiveCloseNoTimeWaitReuseTest/ListenV6Any_ConnectV4Any",
 
-                // TODO(https://fxbug.dev/132600): Deflake and unskip.
+                // TODO(https://fxbug.dev/42082655): Deflake and unskip.
                 "All/SocketInetLoopbackIsolatedTest.TCPLinger2TimeoutAfterClose/*",
             ],
         },
@@ -32,7 +32,7 @@
             matchers: [
                 "AllFamilies/SocketMultiProtocolInetLoopbackIsolatedTest.BindToDeviceReusePort/TCP",
 
-                // TODO(https://fxbug.dev/21198): Netstack3 does not support
+                // TODO(https://fxbug.dev/42095034): Netstack3 does not support
                 // dual-stack TCP sockets yet.
                 "All/SocketInetLoopbackIsolatedTest.*/ListenV4Any_ConnectV4MappedAny",
                 "All/SocketInetLoopbackIsolatedTest.*/ListenV4Any_ConnectV4MappedLoopback",

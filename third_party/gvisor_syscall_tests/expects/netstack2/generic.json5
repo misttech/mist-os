@@ -25,7 +25,7 @@
         {
             type: "skip",
             matchers: [
-                // https://fxbug.dev/55205
+                // https://fxbug.dev/42132810
                 //
                 // This test encodes some known incorrect behavior on gVisor.
                 // That incorrect assertion code path is also taken on Fuchsia,
@@ -35,7 +35,7 @@
                 // we have no choice but to skip this test.
                 "IPUnboundSockets/IPUnboundSocketTest.NullTOS/*",
 
-                // https://fxbug.dev/45778
+                // https://fxbug.dev/42122339
                 //
                 // [ RUN      ]
                 // AllIPSockets/TcpUdpSocketPairTest.ShutdownWrFollowedBySendIsError/11

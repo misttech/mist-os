@@ -12,15 +12,15 @@
         {
             type: "expect_failure",
             matchers: [
-                // https://fxbug.dev/35593
+                // https://fxbug.dev/42111027
                 "BadSocketPairArgs.ValidateErrForBadCallsToSocketPair",
 
-                // https://fxbug.dev/44151
+                // https://fxbug.dev/42120534
                 "All/DualStackSocketTest.AddressOperations/V4Any*",
                 "All/DualStackSocketTest.AddressOperations/V4LoopbackBindConnectSendTo",
                 "All/DualStackSocketTest.AddressOperations/V4LoopbackBindSendToConnect",
 
-                // https://fxbug.dev/135431
+                // https://fxbug.dev/42085074
                 "All/SocketInetLoopbackTest.UdpIPV6Only/*",
             ],
         },
@@ -40,18 +40,18 @@
                 "All/SocketInetLoopbackTest.TCPDeferAccept/*",
                 "All/SocketInetLoopbackTest.TCPDeferAcceptTimeout/*",
 
-                // https://fxbug.dev/112593
+                // https://fxbug.dev/42063908
                 "All/SocketInetLoopbackTest.TCPListenShutdownListen/*",
 
-                // https://fxbug.dev/35596
+                // https://fxbug.dev/42111030
                 // Deadlock? Test makes no progress even when run in isolation.
                 "All/SocketInetReusePortTest.TcpPortReuseMultiThread/*",
 
-                // https://fxbug.dev/35596
+                // https://fxbug.dev/42111030
                 // Deadlock? Test makes no progress even when run in isolation.
                 "All/SocketInetReusePortTest.UdpPortReuseMultiThreadShort/*",
 
-                // https://fxbug.dev/35596
+                // https://fxbug.dev/42111030
                 // Deadlock? Test makes no progress even when run in isolation.
                 "All/SocketInetReusePortTest.UdpPortReuseMultiThread/*",
             ],

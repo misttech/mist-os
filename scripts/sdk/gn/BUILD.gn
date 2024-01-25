@@ -34,7 +34,7 @@ template("gn_sdk") {
   action("${target_name}") {
     forward_variables_from(invoker, [ "deps" ])
 
-    # TODO(https://fxbug.dev/69444): This reads SDK files that are not declared as inputs.
+    # TODO(https://fxbug.dev/42148579): This reads SDK files that are not declared as inputs.
     # Fix this and delete this line.
     hermetic_deps = false
 

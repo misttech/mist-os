@@ -16,17 +16,17 @@
             type: "skip",
             matchers: [
                 // Tests that flake in Fuchsia's CQ.
-                // https://fxbug.dev/112588
+                // https://fxbug.dev/42063902
                 "All/SocketInetLoopbackIsolatedTest.TCPPassiveCloseNoTimeWaitReuseTest/*",
 
-                // https://fxbug.dev/112589
+                // https://fxbug.dev/42063903
                 "All/SocketInetLoopbackIsolatedTest.TCPPassiveCloseNoTimeWaitTest/*",
 
-                // https://fxbug.dev/112590
+                // https://fxbug.dev/42063905
                 "AllFamilies/SocketMultiProtocolInetLoopbackIsolatedTest.V4EphemeralPortReservedReuseAddr/*",
                 "AllFamilies/SocketMultiProtocolInetLoopbackIsolatedTest.V4MappedEphemeralPortReservedReuseAddr/*",
 
-                // https://fxbug.dev/128213
+                // https://fxbug.dev/42078700
                 "All/SocketInetLoopbackIsolatedTest.TCPConnectionReuseAddrConflicts/*"
             ],
         },

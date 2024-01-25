@@ -12,14 +12,14 @@
         {
             type: "expect_failure",
             matchers: [
-                // https://fxbug.dev/42692
+                // https://fxbug.dev/42118913
                 "BlockingTCPSockets/BlockingStreamSocketPairTest.RecvLessThanBufferWaitAll/*",
             ],
         },
         {
             type: "skip",
             matchers: [
-                // https://fxbug.dev/46211
+                // https://fxbug.dev/42122822
                 // Deadlock? Test makes no progress even when run in isolation.
                 "BlockingTCPSockets/BlockingStreamSocketPairTest.SendMsgTooLarge/*",
             ],

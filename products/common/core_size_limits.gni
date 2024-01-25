@@ -10,11 +10,11 @@
 #
 # The creep limits are chosen based on historical size increases in the 90th
 # percentile of CLs. Exceeding the creep limits does not yet block submission:
-# see https://fxbug.dev/79053.
+# see https://fxbug.dev/42159247.
 
 size_checker_input = {
   icu_data = [
-    # TODO(https://fxbug.dev/94824): remove "icudtl.dat" joinlty with size_checker.go.
+    # TODO(https://fxbug.dev/42176762): remove "icudtl.dat" joinlty with size_checker.go.
     # Previous size_checker matches by base name.
     # New size checker matches by path.
     "icudtl.dat",

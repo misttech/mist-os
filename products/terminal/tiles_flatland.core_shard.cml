@@ -4,7 +4,7 @@
 
 // Adds sl4f to core for terminal and workstation
 {
-    // TODO(https://fxbug.dev/107905) Delete once example can be launched in tiles-session.
+    // TODO(https://fxbug.dev/42059306) Delete once example can be launched in tiles-session.
     children: [
         {
             name: "flatland_view_provider_example",
@@ -18,7 +18,7 @@
         },
     ],
     offer: [
-        // TODO(https://fxbug.dev/107905) Delete once example can be launched in tiles-session.
+        // TODO(https://fxbug.dev/42059306) Delete once example can be launched in tiles-session.
         {
             protocol: "fuchsia.ui.app.ViewProvider",
             from: "#flatland_view_provider_example",

@@ -91,7 +91,7 @@ __attribute__((constructor)) void init_packet_socket_provider() {
         default:
           ZX_PANIC("component::OpenServiceRoot(): %s", zx_status_get_string(status));
       }
-      // TODO(https://fxbug.dev/72980): Avoid this type-unsafe conversion.
+      // TODO(https://fxbug.dev/42152501): Avoid this type-unsafe conversion.
       composed_svc_dir.set_fallback(
           fidl::InterfaceHandle<fuchsia::io::Directory>(original_svc_dir->TakeChannel()));
     }

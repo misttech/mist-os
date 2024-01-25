@@ -99,10 +99,10 @@ static_library("zstd") {
   # and target.
   #
   # On the host blobfs uses zstd to compress blobs during build, which we want
-  # to be fast (https://fxbug.dev/55297). On the target blobfs uses zstd to
+  # to be fast (https://fxbug.dev/42132910). On the target blobfs uses zstd to
   # compress blobs during package resolution which is often in the critical
   # path of engineers running tests, which we also want to be fast
-  # (https://fxbug.dev/65962).
+  # (https://fxbug.dev/42144717).
   configs -= [ "//build/config:default_optimize" ]
   configs += [ "//build/config:optimize_speed" ]
 }

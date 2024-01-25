@@ -280,7 +280,7 @@ assembly_input_bundle("bootstrap") {
       driver_components = [ "meta/usb-hid.cm" ]
     },
 
-    # TODO(https://fxbug.dev/131976): Carve out usb-peripheral-stack drivers for specific products/boards.
+    # TODO(https://fxbug.dev/42082105): Carve out usb-peripheral-stack drivers for specific products/boards.
     {
       package_target =
           "//src/connectivity/ethernet/drivers/rndis-function:package"
@@ -1307,7 +1307,7 @@ assembly_input_bundle("factory_reset_trigger") {
 #
 # All components here receive InspectSink and LogSink.
 #
-# TODO(https://fxbug.dev/113922) Move the contents of common_minimal to the right
+# TODO(https://fxbug.dev/42065169) Move the contents of common_minimal to the right
 # feature- or subsystem-specific AIBs (if not to the core realm AIBs).
 #
 # WARNING:  The only way to remove items from this AIB for a given product is to
@@ -1434,7 +1434,7 @@ assembly_input_bundle("common_minimal") {
                     "//src/sys/pkg/bin/system-updater/meta/system_updater.core_shard.cml",
                     "//src/recovery/factory_reset/meta/factory_reset.core_shard.cml",
 
-                    # TODO(https://fxbug.dev/80375): only include in eng builds
+                    # TODO(https://fxbug.dev/42160712): only include in eng builds
                     "//src/sys/test_manager/meta/test_manager.core_shard.cml",
                     "//src/sys/testing/meta/test_realm.core_shard.cml",
                   ],
@@ -1692,7 +1692,7 @@ assembly_input_bundle("input_group_one") {
                   [
                     "//src/media/sounds/soundplayer/meta/soundplayer.core_shard.cml",
 
-                    # TODO(https://fxbug.dev/80375): only include in eng builds
+                    # TODO(https://fxbug.dev/42160712): only include in eng builds
                     "//src/sys/fuzzing/meta/fuzzing.core-shard.cml",
                   ],
                   root_build_dir)
@@ -1792,7 +1792,7 @@ assembly_input_bundle("input_group_two") {
           component_name = "core"
           shards = rebase_path(
                   [
-                    # TODO(https://fxbug.dev/79964): eliminate this when the core_shard above can eagerly start
+                    # TODO(https://fxbug.dev/42160254): eliminate this when the core_shard above can eagerly start
                     # A2DP when it is available at startup.
                     # "eager_core_shard" should be used when the A2DP profile should be available from
                     # startup.
@@ -2368,7 +2368,7 @@ assembly_input_bundle("power_broker") {
 # valid build-types: all
 #
 assembly_input_bundle("virtualization_support") {
-  # TODO(https://fxbug.dev/128551): Move to the list above once build errors are resolved.
+  # TODO(https://fxbug.dev/42079015): Move to the list above once build errors are resolved.
   if (current_cpu != "riscv64") {
     base_packages = [ "//src/virtualization/bin/vmm_launcher" ]
     compiled_packages = [

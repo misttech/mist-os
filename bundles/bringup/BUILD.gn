@@ -11,7 +11,7 @@ group("tests") {
   deps = [ "//bundles/buildbot/bringup" ]
 }
 
-# TODO(https://fxbug.dev/122864) Remove transitional labels
+# TODO(https://fxbug.dev/42073789) Remove transitional labels
 group("manual_testing") {
 }
 

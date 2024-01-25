@@ -196,7 +196,7 @@ class FuchsiaTestCommand {
         return;
       }
 
-      // FIXME(https://fxbug.dev/107343): When running `fx test` with incremental
+      // FIXME(https://fxbug.dev/42058718): When running `fx test` with incremental
       // publishing, it's possible we could trigger a test to run before the
       // incremental publisher has published all the test packages we just
       // built. When this happens, the test could end up running the old tests.

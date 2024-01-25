@@ -24,14 +24,14 @@
             type: "skip",
             matchers: [
                 // Tests that flake in Fuchsia's CQ.
-                // https://fxbug.dev/115961
+                // https://fxbug.dev/42067218
                 "AllInetTests/UdpSocketTest.SendToAddressOtherThanConnected/*",
 
                 // Cases are either skipped entirely (0, 1) or fail (2)
                 "AllInetTests/UdpSocketControlMessagesTest.SendAndReceiveTOSorTClass/*",
 
                 // Tests that hang in Fuchsia's CQ due to indefinite poll for ICMP response.
-                // TODO(https://fxbug.dev/47321): Implement ICMP sockets in Netstack3.
+                // TODO(https://fxbug.dev/42124055): Implement ICMP sockets in Netstack3.
                 "AllInetTests/UdpSocketTest.ConnectWriteToInvalidPort/*",
                 "AllInetTests/UdpSocketTest.ConnectAndSendNoReceiver/*",
             ],
@@ -100,7 +100,7 @@
                 "AllUDPSockets/UDPSocketPairTest.SetAndGetSocketLinger/*",
                 "AllUDPSockets/UDPSocketPairTest.SetRecvTos/*",
 
-                // https://fxbug.dev/74639
+                // https://fxbug.dev/42154343
                 "AllUDPSockets/AllSocketPairTest.GetSetSocketRcvlowatOption/*",
             ],
         },

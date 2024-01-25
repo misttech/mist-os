@@ -45,10 +45,10 @@ if (current_cpu == "arm64" && (is_fuchsia || is_linux)) {
   assert(false, "unsupported OS or CPU: $current_os/$current_cpu")
 }
 
-# TODO(https://fxbug.dev/46139): remove this added source.
+# TODO(https://fxbug.dev/42122741): remove this added source.
 crypto_sources += [ "src/decrepit/xts/xts.c" ]
 
-# TODO(https://fxbug.dev/46139): Required for TPM2.0 TSS Library //third_party/tpm2-tss.
+# TODO(https://fxbug.dev/42122741): Required for TPM2.0 TSS Library //third_party/tpm2-tss.
 crypto_sources += [ "src/decrepit/cfb/cfb.c" ]
 
 ################
@@ -85,12 +85,12 @@ foreach(lib_type, lib_types) {
       configs -= [ ":export_symbols" ]
     }
     if (is_fuchsia) {
-      # TODO(https://fxbug.dev/60545): profile instrumentation significantly affects performance.
+      # TODO(https://fxbug.dev/42138737): profile instrumentation significantly affects performance.
       configs += [ "//build/config:no_profile" ]
 
       # boringssl should always be optimized for speed because otherwise performance is
       # significantly worse, impacting pave and boot times on debug builds. See
-      # https://fxbug.dev/55456.
+      # https://fxbug.dev/42133086.
       configs -= [ "//build/config:default_optimize" ]
       configs += [ "//build/config:optimize_speed" ]
 
@@ -120,7 +120,7 @@ foreach(lib_type, lib_types) {
     deps = [ ":crypto-${lib_type}" ]
     if (is_fuchsia) {
       # boringssl should always be optimized for speed because otherwise performance is significantly
-      # worse, impacting pave and boot times on debug builds (https://fxbug.dev/55456)
+      # worse, impacting pave and boot times on debug builds (https://fxbug.dev/42133086)
       configs -= [ "//build/config:default_optimize" ]
       configs += [ "//build/config:optimize_speed" ]
     }
@@ -294,7 +294,7 @@ if (!is_kernel) {
   # GNI files; we rename it to avoid colliding with the similarly-named parameter
   # on the fuzzer_package.
   #
-  # TODO(https://fxbug.dev/105707): Remove once `fuzzers` parameter is removed.
+  # TODO(https://fxbug.dev/42056966): Remove once `fuzzers` parameter is removed.
   fuzzer_names = fuzzers
   fuzzers = []
 

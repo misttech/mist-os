@@ -110,7 +110,7 @@ def update_stem_history(env):
     message("getting integration commits from %s" % integration_revs_to_update)
     # Arbitrarily truncated at the start of 2020 because sync'ing back farther
     # than that probably won't build for other reasons, and because the stem
-    # file location changed in old revisions, https://fxbug.dev/54384.
+    # file location changed in old revisions, https://fxbug.dev/42131900.
     new_integration_commits = git(
         [
             "log",
