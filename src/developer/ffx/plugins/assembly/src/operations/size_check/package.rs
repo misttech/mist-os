@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::operations::size_check::{PackageBlobSizeInfo, PackageSizeInfo};
+use crate::operations::size_check::common::{PackageBlobSizeInfo, PackageSizeInfo};
 use anyhow::anyhow;
 use anyhow::format_err;
 use anyhow::Context;
@@ -516,7 +516,7 @@ fn to_json_output(
 #[cfg(test)]
 #[allow(clippy::box_default)]
 mod tests {
-    use crate::operations::size_check_package::{
+    use crate::operations::size_check::package::{
         compute_budget_results, verify_budgets_with_tools, BlobInstance, BlobSizeAndCount,
         BudgetBlobs, BudgetConfig, BudgetResult, PackageBlobSizeInfo, PackageSizeInfo,
     };

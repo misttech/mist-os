@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::operations::size_check::PackageSizeInfo;
-use crate::operations::size_check::PackageSizeInfos;
+use crate::operations::size_check::common::PackageSizeInfo;
+use crate::operations::size_check::common::PackageSizeInfos;
 use anyhow::{format_err, Context, Result};
 use assembly_manifest::{AssemblyManifest, BlobfsContents, Image};
 use camino::Utf8Path;
@@ -16,7 +16,7 @@ use std::collections::{BTreeSet, HashMap, HashSet};
 use std::fs;
 use std::str::FromStr;
 
-use super::size_check::PackageBlobSizeInfo;
+use super::common::PackageBlobSizeInfo;
 use gcs::{client::Client, gs_url::split_gs_url};
 
 const TOTAL_BLOBFS_GERRIT_COMPONENT_NAME: &str = "Total BlobFS contents";
@@ -143,20 +143,17 @@ pub async fn verify_product_budgets(args: ProductSizeCheckArgs) -> Result<bool> 
             .context("creating d3_v3 directory for visualization")?;
         fs::write(
             visualization_dir.join("d3_v3").join("LICENSE"),
-            include_bytes!("../../../../../../../scripts/third_party/d3_v3/LICENSE"),
+            include_bytes!("../../../../../../../../scripts/third_party/d3_v3/LICENSE"),
         )
         .context("creating LICENSE file for visualization")?;
         fs::write(
             visualization_dir.join("d3_v3").join("d3.js"),
-            include_bytes!("../../../../../../../scripts/third_party/d3_v3/d3.js"),
+            include_bytes!("../../../../../../../../scripts/third_party/d3_v3/d3.js"),
         )
         .context("creating d3.js file for visualization")?;
-        fs::write(
-            visualization_dir.join("D3BlobTreeMap.js"),
-            include_bytes!("template/D3BlobTreeMap.js"),
-        )
-        .context("creating D3BlobTreeMap.js file for visualization")?;
-        fs::write(visualization_dir.join("index.html"), include_bytes!("template/index.html"))
+        fs::write(visualization_dir.join("D3BlobTreeMap.js"), include_bytes!("D3BlobTreeMap.js"))
+            .context("creating D3BlobTreeMap.js file for visualization")?;
+        fs::write(visualization_dir.join("index.html"), include_bytes!("index.html"))
             .context("creating index.html file for visualization")?;
         fs::write(
             visualization_dir.join("data.js"),
@@ -683,7 +680,7 @@ fn create_gerrit_report(
 
 #[cfg(test)]
 mod tests {
-    use crate::operations::size_check_product::{
+    use crate::operations::size_check::product::{
         build_blob_share_counts, calculate_package_diff, calculate_package_sizes,
         calculate_proportional_size, calculate_total_blobfs_size, create_gerrit_report,
         extract_blob_contents, generate_package_level_diff_output,

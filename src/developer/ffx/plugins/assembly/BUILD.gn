@@ -37,16 +37,17 @@ ffx_plugin("ffx_assembly") {
     "src/operations/product.rs",
     "src/operations/product/assembly_builder.rs",
     "src/operations/size_check.rs",
-    "src/operations/size_check_package.rs",
-    "src/operations/size_check_product.rs",
+    "src/operations/size_check/common.rs",
+    "src/operations/size_check/package.rs",
+    "src/operations/size_check/product.rs",
     "src/subpackage_blobs_package.rs",
     "src/vbmeta.rs",
     "src/vfs.rs",
     "src/zbi.rs",
   ]
   inputs = [
-    "src/operations/template/index.html",
-    "src/operations/template/D3BlobTreeMap.js",
+    "src/operations/size_check/index.html",
+    "src/operations/size_check/D3BlobTreeMap.js",
     "//scripts/third_party/d3_v3/d3.js",
     "//scripts/third_party/d3_v3/LICENSE",
   ]

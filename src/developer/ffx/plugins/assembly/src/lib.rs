@@ -50,14 +50,14 @@ impl FfxMain for AssemblyTool {
             }
             OperationClass::SizeCheck(args) => match args.op_class {
                 SizeCheckOperationClass::Package(args) => {
-                    operations::size_check_package::verify_package_budgets(args)
+                    operations::size_check::package::verify_package_budgets(args)
                         .context("Package size checker")
                 }
                 SizeCheckOperationClass::Product(args) => {
                     // verify_product_budgets() returns a boolean that indicates whether the budget was
                     // exceeded or not. We don't intend to fail the build when budgets are exceeded so the
                     // returned value is dropped.
-                    operations::size_check_product::verify_product_budgets(args)
+                    operations::size_check::product::verify_product_budgets(args)
                         .await
                         .context("Product size checker")
                         .map(|_| ())
