@@ -20,7 +20,6 @@
                 "aio01",
                 "aio02",
                 "bind02",
-                "bpf_map01",
                 "bpf_prog01",
                 "bpf_prog03",
                 "bpf_prog04",

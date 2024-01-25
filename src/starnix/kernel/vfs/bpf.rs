@@ -32,9 +32,10 @@ use starnix_uapi::{
     bpf_attr__bindgen_ty_1, bpf_attr__bindgen_ty_10, bpf_attr__bindgen_ty_12,
     bpf_attr__bindgen_ty_2, bpf_attr__bindgen_ty_4, bpf_attr__bindgen_ty_5, bpf_attr__bindgen_ty_9,
     bpf_cmd, bpf_cmd_BPF_BTF_LOAD, bpf_cmd_BPF_MAP_CREATE, bpf_cmd_BPF_MAP_GET_NEXT_KEY,
-    bpf_cmd_BPF_MAP_UPDATE_ELEM, bpf_cmd_BPF_OBJ_GET, bpf_cmd_BPF_OBJ_GET_INFO_BY_FD,
-    bpf_cmd_BPF_OBJ_PIN, bpf_cmd_BPF_PROG_ATTACH, bpf_cmd_BPF_PROG_LOAD, bpf_cmd_BPF_PROG_QUERY,
-    bpf_insn, bpf_map_info, bpf_map_type, bpf_map_type_BPF_MAP_TYPE_DEVMAP,
+    bpf_cmd_BPF_MAP_LOOKUP_ELEM, bpf_cmd_BPF_MAP_UPDATE_ELEM, bpf_cmd_BPF_OBJ_GET,
+    bpf_cmd_BPF_OBJ_GET_INFO_BY_FD, bpf_cmd_BPF_OBJ_PIN, bpf_cmd_BPF_PROG_ATTACH,
+    bpf_cmd_BPF_PROG_LOAD, bpf_cmd_BPF_PROG_QUERY, bpf_insn, bpf_map_info, bpf_map_type,
+    bpf_map_type_BPF_MAP_TYPE_ARRAY, bpf_map_type_BPF_MAP_TYPE_DEVMAP,
     bpf_map_type_BPF_MAP_TYPE_DEVMAP_HASH, bpf_prog_info,
     device_type::DeviceType,
     errno, error,
@@ -43,9 +44,13 @@ use starnix_uapi::{
     open_flags::OpenFlags,
     statfs,
     user_address::{UserAddress, UserCString, UserRef},
-    BPF_FS_MAGIC, BPF_F_RDONLY_PROG, PATH_MAX,
+    BPF_EXIST, BPF_FS_MAGIC, BPF_F_RDONLY_PROG, BPF_NOEXIST, PATH_MAX,
 };
-use std::{collections::BTreeMap, ops::Bound, sync::Arc};
+use std::{
+    collections::{btree_map::Entry, BTreeMap},
+    ops::{Bound, Deref, DerefMut, Range},
+    sync::Arc,
+};
 use ubpf::program::EbpfProgram;
 use zerocopy::{AsBytes, FromBytes};
 
@@ -103,18 +108,27 @@ struct BpfTypeFormat {
 }
 impl BpfObject for BpfTypeFormat {}
 
-/// A BPF map. This is a hashtable that can be accessed both by BPF programs and userspace.
-struct Map {
+#[derive(Debug, Clone, Copy)]
+struct MapSchema {
     map_type: bpf_map_type,
     key_size: u32,
     value_size: u32,
     max_entries: u32,
-    flags: u32,
+}
 
-    // TODO(tbodt): Linux actually has 30 different implementations of a BPF map, from hashmap to
-    // array to bloom filter. BTreeMap is probably the correct semantics for none of them. This
-    // will ultimately need to be a trait object.
-    entries: OrderedMutex<BTreeMap<Vec<u8>, Vec<u8>>, BpfMapEntries>,
+/// The underlying storage for a BPF map.
+///
+/// We will eventually need to implement a wide variety of backing stores.
+enum MapStore {
+    Hash(BTreeMap<Vec<u8>, Vec<u8>>),
+    Array(Vec<u8>),
+}
+
+/// A BPF map. This is a hashtable that can be accessed both by BPF programs and userspace.
+struct Map {
+    schema: MapSchema,
+    flags: u32,
+    entries: OrderedMutex<MapStore, BpfMapEntries>,
 }
 impl BpfObject for Map {}
 
@@ -182,6 +196,137 @@ fn get_selinux_context(path: &FsStr) -> FsString {
     }
 }
 
+impl MapSchema {
+    fn array_range_for_index(&self, index: u32) -> Range<usize> {
+        let base = index * self.value_size;
+        let limit = base + self.value_size;
+        (base as usize)..(limit as usize)
+    }
+}
+
+impl MapStore {
+    fn new(schema: &MapSchema) -> Result<Self, Errno> {
+        if schema.map_type == bpf_map_type_BPF_MAP_TYPE_ARRAY {
+            // From <https://man7.org/linux/man-pages/man2/bpf.2.html>:
+            //   The key is an array index, and must be exactly four
+            //   bytes.
+            if schema.key_size != 4 {
+                return error!(EINVAL);
+            }
+            Ok(MapStore::Array(vec![0u8; (schema.value_size * schema.max_entries) as usize]))
+        } else {
+            Ok(MapStore::Hash(Default::default()))
+        }
+    }
+}
+
+fn key_to_index(key: &[u8]) -> u32 {
+    u32::from_ne_bytes(key.try_into().expect("incorrect key length"))
+}
+
+impl Map {
+    fn lookup(
+        &self,
+        locked: &mut Locked<'_, Unlocked>,
+        current_task: &CurrentTask,
+        key: Vec<u8>,
+        user_value: UserAddress,
+    ) -> Result<(), Errno> {
+        let entries = self.entries.lock(locked);
+        match entries.deref() {
+            MapStore::Hash(ref entries) => {
+                let Some(value) = entries.get(&key) else {
+                    return error!(ENOENT);
+                };
+                current_task.write_memory(user_value, value)?;
+            }
+            MapStore::Array(entries) => {
+                let index = key_to_index(&key);
+                if index >= self.schema.max_entries {
+                    return error!(ENOENT);
+                }
+                let value = &entries[self.schema.array_range_for_index(index)];
+                current_task.write_memory(user_value, value)?;
+            }
+        }
+        Ok(())
+    }
+
+    fn update(
+        &self,
+        locked: &mut Locked<'_, Unlocked>,
+        _current_task: &CurrentTask,
+        key: Vec<u8>,
+        value: Vec<u8>,
+        flags: u64,
+    ) -> Result<(), Errno> {
+        let mut entries = self.entries.lock(locked);
+        match entries.deref_mut() {
+            MapStore::Hash(ref mut entries) => {
+                let map_is_full = entries.len() >= self.schema.max_entries as usize;
+                match entries.entry(key) {
+                    Entry::Vacant(entry) => {
+                        if map_is_full {
+                            return error!(E2BIG);
+                        }
+                        if flags == BPF_EXIST as u64 {
+                            return error!(ENOENT);
+                        }
+                        entry.insert(value);
+                    }
+                    Entry::Occupied(mut entry) => {
+                        if flags == BPF_NOEXIST as u64 {
+                            return error!(EEXIST);
+                        }
+                        entry.insert(value);
+                    }
+                }
+            }
+            MapStore::Array(ref mut entries) => {
+                let index = key_to_index(&key);
+                if index >= self.schema.max_entries {
+                    return error!(E2BIG);
+                }
+                if flags == BPF_NOEXIST as u64 {
+                    return error!(EEXIST);
+                }
+                entries[self.schema.array_range_for_index(index)].copy_from_slice(&value);
+            }
+        }
+        Ok(())
+    }
+
+    fn get_next_key(
+        &self,
+        locked: &mut Locked<'_, Unlocked>,
+        current_task: &CurrentTask,
+        key: Option<Vec<u8>>,
+        user_next_key: UserAddress,
+    ) -> Result<(), Errno> {
+        let entries = self.entries.lock(locked);
+        match entries.deref() {
+            MapStore::Hash(ref entries) => {
+                let next_entry = match key {
+                    Some(key) if entries.contains_key(&key) => {
+                        entries.range((Bound::Excluded(key), Bound::Unbounded)).next()
+                    }
+                    _ => entries.iter().next(),
+                };
+                let (next_key, _next_value) = next_entry.ok_or_else(|| errno!(ENOENT))?;
+                current_task.write_memory(user_next_key, next_key)?;
+            }
+            MapStore::Array(_) => {
+                let next_index = if let Some(key) = key { key_to_index(&key) + 1 } else { 0 };
+                if next_index >= self.schema.max_entries {
+                    return error!(ENOENT);
+                }
+                current_task.write_memory(user_next_key, &next_index.to_ne_bytes())?;
+            }
+        }
+        Ok(())
+    }
+}
+
 pub fn sys_bpf(
     locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
@@ -204,26 +349,49 @@ pub fn sys_bpf(
         bpf_cmd_BPF_MAP_CREATE => {
             let map_attr: bpf_attr__bindgen_ty_1 = read_attr(current_task, attr_addr, attr_size)?;
             log_trace!("BPF_MAP_CREATE {:?}", map_attr);
-            let mut map = Map {
+            let schema = MapSchema {
                 map_type: map_attr.map_type,
                 key_size: map_attr.key_size,
                 value_size: map_attr.value_size,
                 max_entries: map_attr.max_entries,
+            };
+            let mut map = Map {
+                schema,
                 flags: map_attr.map_flags,
-                entries: Default::default(),
+                entries: OrderedMutex::new(MapStore::new(&schema)?),
             };
 
             // To quote
             // https://cs.android.com/android/platform/superproject/+/master:system/bpf/libbpf_android/Loader.cpp;l=670;drc=28e295395471b33e662b7116378d15f1e88f0864
             // "DEVMAPs are readonly from the bpf program side's point of view, as such the kernel
             // in kernel/bpf/devmap.c dev_map_init_map() will set the flag"
-            if map.map_type == bpf_map_type_BPF_MAP_TYPE_DEVMAP
-                || map.map_type == bpf_map_type_BPF_MAP_TYPE_DEVMAP_HASH
+            if schema.map_type == bpf_map_type_BPF_MAP_TYPE_DEVMAP
+                || schema.map_type == bpf_map_type_BPF_MAP_TYPE_DEVMAP_HASH
             {
                 map.flags |= BPF_F_RDONLY_PROG;
             }
 
             install_bpf_fd(current_task, map)
+        }
+
+        bpf_cmd_BPF_MAP_LOOKUP_ELEM => {
+            if !current_task.kernel().features.bpf_v2 {
+                return error!(EINVAL);
+            }
+            let elem_attr: bpf_attr__bindgen_ty_2 = read_attr(current_task, attr_addr, attr_size)?;
+            log_trace!("BPF_MAP_LOOKUP_ELEM");
+            let map = get_bpf_fd(current_task, elem_attr.map_fd)?;
+            let map = map.downcast::<Map>().ok_or_else(|| errno!(EINVAL))?;
+
+            let key = current_task.read_memory_to_vec(
+                UserAddress::from(elem_attr.key),
+                map.schema.key_size as usize,
+            )?;
+            // SAFETY: this union object was created with FromBytes so it's safe to access any
+            // variant because all variants must be valid with all bit patterns.
+            let user_value = UserAddress::from(unsafe { elem_attr.__bindgen_anon_1.value });
+            map.lookup(locked, current_task, key, user_value)?;
+            Ok(SUCCESS)
         }
 
         // Create or update an element (key/value pair) in a specified map.
@@ -233,15 +401,18 @@ pub fn sys_bpf(
             let map = get_bpf_fd(current_task, elem_attr.map_fd)?;
             let map = map.downcast::<Map>().ok_or_else(|| errno!(EINVAL))?;
 
-            let key = current_task
-                .read_memory_to_vec(UserAddress::from(elem_attr.key), map.key_size as usize)?;
+            let flags = elem_attr.flags;
+            let key = current_task.read_memory_to_vec(
+                UserAddress::from(elem_attr.key),
+                map.schema.key_size as usize,
+            )?;
             // SAFETY: this union object was created with FromBytes so it's safe to access any
             // variant because all variants must be valid with all bit patterns.
-            let value_addr = unsafe { elem_attr.__bindgen_anon_1.value };
-            let value = current_task
-                .read_memory_to_vec(UserAddress::from(value_addr), map.value_size as usize)?;
+            let user_value = UserAddress::from(unsafe { elem_attr.__bindgen_anon_1.value });
+            let value =
+                current_task.read_memory_to_vec(user_value, map.schema.value_size as usize)?;
 
-            map.entries.lock(locked).insert(key, value);
+            map.update(locked, current_task, key, value, flags)?;
             Ok(SUCCESS)
         }
 
@@ -253,25 +424,18 @@ pub fn sys_bpf(
             let map = get_bpf_fd(current_task, elem_attr.map_fd)?;
             let map = map.downcast::<Map>().ok_or_else(|| errno!(EINVAL))?;
             let key = if elem_attr.key != 0 {
-                let key = current_task
-                    .read_memory_to_vec(UserAddress::from(elem_attr.key), map.key_size as usize)?;
+                let key = current_task.read_memory_to_vec(
+                    UserAddress::from(elem_attr.key),
+                    map.schema.key_size as usize,
+                )?;
                 Some(key)
             } else {
                 None
             };
-
-            let entries = map.entries.lock(locked);
-            let next_entry = match key {
-                Some(key) if entries.contains_key(&key) => {
-                    entries.range((Bound::Excluded(key), Bound::Unbounded)).next()
-                }
-                _ => entries.iter().next(),
-            };
-            let (next_key, _next_value) = next_entry.ok_or_else(|| errno!(ENOENT))?;
             // SAFETY: this union object was created with FromBytes so it's safe to access any
             // variant (right?)
-            let next_key_addr = unsafe { elem_attr.__bindgen_anon_1.next_key };
-            current_task.write_memory(UserAddress::from(next_key_addr), next_key)?;
+            let user_next_key = UserAddress::from(unsafe { elem_attr.__bindgen_anon_1.next_key });
+            map.get_next_key(locked, current_task, key, user_next_key)?;
             Ok(SUCCESS)
         }
 
@@ -359,11 +523,11 @@ pub fn sys_bpf(
 
             let mut info = if let Some(map) = fd.downcast::<Map>() {
                 bpf_map_info {
-                    type_: map.map_type,
+                    type_: map.schema.map_type,
                     id: 0, // not used by android as far as I can tell
-                    key_size: map.key_size,
-                    value_size: map.value_size,
-                    max_entries: map.max_entries,
+                    key_size: map.schema.key_size,
+                    value_size: map.schema.value_size,
+                    max_entries: map.schema.max_entries,
                     map_flags: map.flags,
                     ..Default::default()
                 }
