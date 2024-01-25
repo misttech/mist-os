@@ -594,6 +594,7 @@ sdk_molecule("platform_libs") {
     "//zircon/public/sysroot/sdk:sysroot_sdk",
     "//zircon/system/ulib/fbl:fbl_sdk",
     "//zircon/system/ulib/fzl:fzl_sdk",
+    "//zircon/system/ulib/zxtest:zxtest_sdk",
   ]
 }
 
