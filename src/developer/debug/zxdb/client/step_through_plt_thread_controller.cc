@@ -63,7 +63,7 @@ void StepThroughPltThreadController::InitWithThread(Thread* thread,
   // Currently ELF symbol lookup only takes mangled names, so we need to construct an identifier
   // based on the linkage name.
   //
-  // TODO(https://fxbug.dev/128935) this may fail in some cases because the destination symbol doesn't
+  // TODO(https://fxbug.dev/42079369) this may fail in some cases because the destination symbol doesn't
   // match. To properly handle this we will need to do a lot of PLT trampoline-specific work.
   // Currently failures end up in the catch_return_ handler which has the effect of stepping out of
   // them.

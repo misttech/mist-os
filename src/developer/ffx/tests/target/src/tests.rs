@@ -17,7 +17,7 @@ use std::time::Duration;
 /// The fastboot implementation used by this emulator is Gigaboot (//src/firmware/gigaboot).
 #[fixture(emulator_fixture)]
 #[fuchsia::test]
-// TODO(https://fxbug.dev/130252): test skipped when kernel won't fit for x86 UEFI
+// TODO(https://fxbug.dev/42080558): test skipped when kernel won't fit for x86 UEFI
 #[cfg_attr(feature = "big_zircon_kernel", ignore)]
 async fn test_target_flash_gigaboot(ctx: TestContext) {
     let isolate = ctx.isolate();
@@ -67,7 +67,7 @@ async fn test_target_flash_gigaboot(ctx: TestContext) {
 /// This also re-flashes the image once it is in product mode
 #[fixture(emulator_fixture)]
 #[fuchsia::test]
-// TODO(https://fxbug.dev/130252): test skipped when kernel won't fit for x86 UEFI
+// TODO(https://fxbug.dev/42080558): test skipped when kernel won't fit for x86 UEFI
 #[cfg_attr(feature = "big_zircon_kernel", ignore)]
 async fn test_target_flash_from_product(ctx: TestContext) {
     let isolate = ctx.isolate();
@@ -133,7 +133,7 @@ async fn test_target_flash_from_product(ctx: TestContext) {
 
 #[fixture(emulator_fixture)]
 #[fuchsia::test]
-// TODO(https://fxbug.dev/130252): test skipped when kernel won't fit for x86 UEFI
+// TODO(https://fxbug.dev/42080558): test skipped when kernel won't fit for x86 UEFI
 #[cfg_attr(feature = "big_zircon_kernel", ignore)]
 async fn test_target_reboot_to_bootloader_gigaboot(ctx: TestContext) {
     let isolate = ctx.isolate();
@@ -175,7 +175,7 @@ async fn test_target_reboot_to_bootloader_gigaboot(ctx: TestContext) {
 
 #[fixture(emulator_fixture)]
 #[fuchsia::test]
-// TODO(https://fxbug.dev/130252): test skipped when kernel won't fit for x86 UEFI
+// TODO(https://fxbug.dev/42080558): test skipped when kernel won't fit for x86 UEFI
 #[cfg_attr(feature = "big_zircon_kernel", ignore)]
 async fn test_target_bootloader_info(ctx: TestContext) {
     let isolate = ctx.isolate();
@@ -206,9 +206,9 @@ async fn test_target_bootloader_info(ctx: TestContext) {
 
 #[fixture(emulator_fixture)]
 #[fuchsia::test]
-// TODO(https://fxbug.dev/130252): test skipped when kernel won't fit for x86 UEFI
+// TODO(https://fxbug.dev/42080558): test skipped when kernel won't fit for x86 UEFI
 //#[cfg_attr(feature = "big_zircon_kernel", ignore)]
-// TODO(https://fxbug.dev/133530): deflake and reenable
+// TODO(https://fxbug.dev/42083467): deflake and reenable
 #[ignore]
 async fn test_target_bootloader_info_from_product(ctx: TestContext) {
     let isolate = ctx.isolate();

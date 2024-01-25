@@ -525,7 +525,7 @@ void ThreadImpl::RunNextPostStopTaskOrNotify(const StopInfo& info, bool should_s
   // processing these post-stop tasks and we shouldn't continue it. This needs extra logic to
   // detect.
   //
-  // TODO(https://fxbug.dev/80418) don't automatically continue if the user has stopped the thread.
+  // TODO(https://fxbug.dev/42160760) don't automatically continue if the user has stopped the thread.
   if (state_ == debug_ipc::ThreadRecord::State::kRunning) {
     post_stop_tasks_.clear();
     return;

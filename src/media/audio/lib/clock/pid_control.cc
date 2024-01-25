@@ -56,7 +56,7 @@ void PidControl::TuneForError(zx::time time_of_error, double error) {
   accum_error_ += (error * duration);
   current_error_ = error;
 
-  // TODO(https://fxbug.dev/83338): if needed, add low-pass filtering to the Derivative contributions
+  // TODO(https://fxbug.dev/42164004): if needed, add low-pass filtering to the Derivative contributions
   prop_contrib_ = current_error_ * proportional_factor_;
   integ_contrib_ = accum_error_ * integral_factor_;
   deriv_contrib_ = delta_error_ * derivative_factor_;

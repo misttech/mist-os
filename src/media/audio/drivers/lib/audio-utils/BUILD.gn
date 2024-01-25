@@ -30,10 +30,10 @@ zx_library("audio-utils") {
     "//zircon/system/ulib/zx",
   ]
 
-  # TODO(https://fxbug.dev/58162): delete the below and fix compiler warnings
+  # TODO(https://fxbug.dev/42136089): delete the below and fix compiler warnings
   configs += [ "//build/config:Wno-conversion" ]
 
-  # TODO(https://fxbug.dev/94768): This target uses mutable tables which are deprecated,
+  # TODO(https://fxbug.dev/42176699): This target uses mutable tables which are deprecated,
   # rather than builders.
   configs += [ "//build/cpp:fidl-wire-deprecated-mutable-tables" ]
 }

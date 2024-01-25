@@ -339,7 +339,7 @@ void MixerSource::PrepareSourceGainForNextMix(MixJobContext& ctx,
   }
 
   const auto maybe_backfill_gain_scales_fn = [&]() {
-    // TODO(https://fxbug.dev/114910): `GainType::kRamping` is misleading here, we should rename to reflect
+    // TODO(https://fxbug.dev/42066195): `GainType::kRamping` is misleading here, we should rename to reflect
     // this behavior where it only indicates that `Sampler::Gain::scale_ramp` should be used.
     if (gain_.type != GainType::kRamping) {
       // We lazily fill the previous frames only when needed.
@@ -395,7 +395,7 @@ std::optional<PipelineStage::Packet> MixerSource::ReadNextSourcePacket(MixJobCon
   return source_->Read(ctx, source_start_frame, source_frame_count.Ceiling());
 }
 
-// TODO(https://fxbug.dev/114393): Add more logging as needed from `Mixer::ReconcileClocksAndSetStepSize`.
+// TODO(https://fxbug.dev/42065692): Add more logging as needed from `Mixer::ReconcileClocksAndSetStepSize`.
 void MixerSource::UpdateSamplerState(const TimelineFunction& dest_time_to_dest_frac_frame,
                                      int64_t dest_frame) {
   auto& state = sampler_->state();

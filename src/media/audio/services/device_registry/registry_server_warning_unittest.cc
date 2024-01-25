@@ -238,7 +238,7 @@ TEST_F(RegistryServerWarningTest, CreateObserverBadObserver) {
   EXPECT_TRUE(received_callback);
 }
 
-// TODO(https://fxbug.dev/117199): If Health can change post-initialization, add a test case for:
+// TODO(https://fxbug.dev/42068381): If Health can change post-initialization, add a test case for:
 //   CreateObserver with token of device that was ready & Added, but then became unhealthy.
 
 }  // namespace

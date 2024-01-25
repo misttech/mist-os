@@ -51,7 +51,7 @@ std::optional<fuchsia::net::http::Request> BuildRequest(const std::string_view m
   }
 
   // Create the request body as a single VMO.
-  // TODO(https://fxbug.dev/59191): Consider using a zx::socket to transmit the HTTP request body to the
+  // TODO(https://fxbug.dev/42137232): Consider using a zx::socket to transmit the HTTP request body to the
   // server piecewise.
   std::vector<uint8_t> body_vec;
 

@@ -907,7 +907,7 @@ where
                 Err(e) => tracing::debug!("running cmd on {:?}: {:#?}", target_nodename, e),
             }
 
-            // TODO(https://fxbug.dev/52038): Want an exponential backoff that
+            // TODO(https://fxbug.dev/42129296): Want an exponential backoff that
             // is sync'd with an explicit "try to start this again
             // anyway" channel using a select! between the two of them.
             tracing::debug!(

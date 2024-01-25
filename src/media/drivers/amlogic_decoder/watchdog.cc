@@ -28,7 +28,7 @@ void Watchdog::Start() {
   // decoding, so the stream with bad data can get out of the way faster when HW is stuck decoding
   // the bad stream.
   //
-  // TODO(https://fxbug.dev/49526): Have the watchdog wake up sooner and more often, and have it check on
+  // TODO(https://fxbug.dev/42126504): Have the watchdog wake up sooner and more often, and have it check on
   // the stream buffer read pointer progress.  If that progress stops for even a fairly short time,
   // we can fire the watchdog fairly quickly.  And/or work toward changing the FW for the VP9 HW
   // decoder to generate an interrupt on bad input data instead of getting wedged.  And/or when

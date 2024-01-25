@@ -403,7 +403,7 @@ void Device::RetrieveStreamProperties() {
   if (state_ == State::Error) {
     return;
   }
-  // TODO(https://fxbug.dev/113429): handle command timeouts
+  // TODO(https://fxbug.dev/42064765): handle command timeouts
 
   stream_config_->GetProperties().Then(
       [this](fidl::Result<fuchsia_hardware_audio::StreamConfig::GetProperties>& result) {
@@ -470,7 +470,7 @@ void Device::RetrieveGainState() {
     return;
   }
   if (!gain_state_) {
-    // TODO(https://fxbug.dev/113429): handle command timeouts (but not on subsequent watches)
+    // TODO(https://fxbug.dev/42064765): handle command timeouts (but not on subsequent watches)
   }
 
   stream_config_->WatchGainState().Then(
@@ -516,7 +516,7 @@ void Device::RetrievePlugState() {
     return;
   }
   if (!plug_state_) {
-    // TODO(https://fxbug.dev/113429): handle command timeouts (but not on subsequent watches)
+    // TODO(https://fxbug.dev/42064765): handle command timeouts (but not on subsequent watches)
   }
 
   stream_config_->WatchPlugState().Then(
@@ -556,7 +556,7 @@ void Device::RetrievePlugState() {
       });
 }
 
-// TODO(https://fxbug.dev/117199): Decide when we proactively call GetHealthState, if at all.
+// TODO(https://fxbug.dev/42068381): Decide when we proactively call GetHealthState, if at all.
 void Device::RetrieveHealthState() {
   ADR_LOG_OBJECT(kLogStreamConfigFidlCalls);
 
@@ -564,7 +564,7 @@ void Device::RetrieveHealthState() {
     return;
   }
 
-  // TODO(https://fxbug.dev/113429): handle command timeouts
+  // TODO(https://fxbug.dev/42064765): handle command timeouts
 
   stream_config_->GetHealthState().Then(
       [this](fidl::Result<fuchsia_hardware_audio::StreamConfig::GetHealthState>& result) {
@@ -598,7 +598,7 @@ void Device::RetrieveFormats(
   if (state_ == State::Error) {
     return;
   }
-  // TODO(https://fxbug.dev/113429): handle command timeouts
+  // TODO(https://fxbug.dev/42064765): handle command timeouts
 
   stream_config_->GetSupportedFormats().Then(
       [this, callback = std::move(supported_formats_callback)](
@@ -684,7 +684,7 @@ zx::result<zx::clock> Device::GetReadOnlyClock() const {
 // Determine the full fuchsia_hardware_audio::Format needed for ConnectRingBufferFidl.
 // This method expects that the required fields are present.
 std::optional<fuchsia_hardware_audio::Format> Device::SupportedDriverFormatForClientFormat(
-    // TODO(https://fxbug.dev/117829): Consider using media_audio::Format internally.
+    // TODO(https://fxbug.dev/42069015): Consider using media_audio::Format internally.
     const fuchsia_audio::Format& client_format) {
   fuchsia_hardware_audio::SampleFormat driver_sample_format;
   uint8_t bytes_per_sample, max_valid_bits;
@@ -913,7 +913,7 @@ bool Device::ConnectRingBufferFidl(fuchsia_hardware_audio::Format driver_format)
       .sample_type = *sample_type,
       .channel_count = driver_format.pcm_format()->number_of_channels(),
       .frames_per_second = driver_format.pcm_format()->frame_rate(),
-      // TODO(https://fxbug.dev/87650): handle .channel_layout, when communicated from driver.
+      // TODO(https://fxbug.dev/42168795): handle .channel_layout, when communicated from driver.
   }};
 
   active_channels_bitmask_ = (1 << *vmo_format_.channel_count()) - 1;
@@ -1201,17 +1201,17 @@ void Device::CalculateRequiredRingBufferSizes() {
     ring_buffer_consumer_bytes_ = requested_ring_buffer_frames_ * bytes_per_frame_;
   }
 
-  // TODO(https://fxbug.dev/117826): validate this case; we don't surface this error to the caller.
+  // TODO(https://fxbug.dev/42069012): validate this case; we don't surface this error to the caller.
   if (requested_ring_buffer_frames_ > std::numeric_limits<uint32_t>::max()) {
     ADR_WARN_OBJECT() << "requested_ring_buffer_frames_ cannot exceed uint32_t::max()";
     requested_ring_buffer_frames_ = std::numeric_limits<uint32_t>::max();
   }
 }
 
-// TODO(https://fxbug.dev/117827): implement this, via hanging RingBuffer/WatchClockRecoveryPositionInfo.
+// TODO(https://fxbug.dev/42069013): implement this, via hanging RingBuffer/WatchClockRecoveryPositionInfo.
 void Device::RecoverDeviceClockFromPositionInfo() { ADR_LOG_OBJECT(kLogRingBufferMethods); }
 
-// TODO(https://fxbug.dev/117827): implement this.
+// TODO(https://fxbug.dev/42069013): implement this.
 void Device::StopDeviceClockRecovery() { ADR_LOG_OBJECT(kLogRingBufferMethods); }
 
 }  // namespace media_audio

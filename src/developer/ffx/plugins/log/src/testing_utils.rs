@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-// TODO(https://fxbug.dev/129623): Move this somewhere else and
+// TODO(https://fxbug.dev/42080002): Move this somewhere else and
 // make the logic more generic.
 
 use std::{cell::Cell, future::Future, pin::Pin, rc::Rc};

@@ -263,7 +263,7 @@ class CodecAdapterVaApiEncoder : public CodecAdapter {
       fuchsia::sysmem::ImageFormatConstraints& image_constraints =
           constraints.image_format_constraints[0];
       image_constraints.pixel_format.type = fuchsia::sysmem::PixelFormatType::NV12;
-      // TODO(https://fxbug.dev/100642): Add support for more colorspaces.
+      // TODO(https://fxbug.dev/42051379): Add support for more colorspaces.
       image_constraints.color_spaces_count = 1;
       image_constraints.color_space[0].type = fuchsia::sysmem::ColorSpaceType::REC709;
 

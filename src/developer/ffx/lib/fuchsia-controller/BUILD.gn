@@ -158,7 +158,7 @@ python_c_extension("fuchsia_controller_internal") {
     "//sdk:marker-unknown",
   ]
 
-  # TODO(https://fxbug.dev/135694): delete the below and fix compiler warnings
+  # TODO(https://fxbug.dev/42085293): delete the below and fix compiler warnings
   configs += [ "//build/config:Wno-vla-cxx-extension" ]
 }
 
@@ -218,7 +218,7 @@ group("tests") {
     "tests:fuchsia_controller_ir_test",
   ]
 
-  # TODO(https://fxbug.dev/127523): These tests fail on mac builders. This is most likely
+  # TODO(https://fxbug.dev/42078138): These tests fail on mac builders. This is most likely
   # because of the infra machines running OSX 10.15
   if (host_os != "mac") {
     deps += [
@@ -233,7 +233,7 @@ group("tests") {
       "tests:fuchsia_controller_socket_test",
     ]
 
-    # TODO(https://fxbug.dev/129633): Re-enable when the corrupt profile header
+    # TODO(https://fxbug.dev/42080013): Re-enable when the corrupt profile header
     # issue is fixed.
     if (!is_coverage) {
       deps += [ "tests:fuchsia_controller_e2e_test" ]

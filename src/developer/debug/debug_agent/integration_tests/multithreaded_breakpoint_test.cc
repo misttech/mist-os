@@ -144,10 +144,10 @@ std::pair<AddOrChangeBreakpointRequest, AddOrChangeBreakpointReply> GetBreakpoin
 }  // namespace
 
 #if defined(__x86_64__)
-// TODO(https://fxbug.dev/6298): This is flaky on X64 for an unknown reason.
+// TODO(https://fxbug.dev/42141432): This is flaky on X64 for an unknown reason.
 TEST(MultithreadedBreakpoint, DISABLED_SWBreakpoint) {
 #elif defined(__aarch64__)
-// TODO(https://fxbug.dev/6248): Arm64 has an instruction cache that makes a thread sometimes
+// TODO(https://fxbug.dev/42140878): Arm64 has an instruction cache that makes a thread sometimes
 //                hit a thread that has been removed, making this test flake.
 //                This has to be fixed in zircon.
 TEST(MultithreadedBreakpoint, DISABLED_SWBreakpoint) {

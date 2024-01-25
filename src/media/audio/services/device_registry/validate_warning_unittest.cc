@@ -559,7 +559,7 @@ TEST(ValidateWarningTest, BadPlugState) {
       ZX_ERR_INVALID_ARGS);
 }
 
-// TODO(https://fxbug.dev/117826): Negative-test ValidateDeviceInfo
+// TODO(https://fxbug.dev/42069012): Negative-test ValidateDeviceInfo
 // TEST(ValidateWarningTest, BadDeviceInfo) {}
 
 // Negative-test ValidateRingBufferProperties

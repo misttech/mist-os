@@ -54,7 +54,7 @@ pub async fn coverage(cmd: CoverageCommand) -> Result<()> {
     llvm_cov_bin.exists().then_some(()).ok_or(anyhow!("{:?} does not exist", llvm_cov_bin))?;
 
     let profraws = glob_profraws(&cmd.test_output_dir)?;
-    // TODO(https://fxbug.dev/99951): find a better place to put merged.profdata.
+    // TODO(https://fxbug.dev/42182448): find a better place to put merged.profdata.
     let merged_profile = cmd.test_output_dir.join("merged.profdata");
     merge_profraws(&llvm_profdata_bin, &profraws, &merged_profile)
         .context("failed to merge profiles")?;
@@ -155,7 +155,7 @@ fn find_binaries<F: FnMut(&Path, &Path) -> Result<String>>(
 
 /// Finds debug file in local .build-id directories from symbol index.
 //
-// TODO(https://fxbug.dev/100358): replace this with llvm-debuginfod-find when it's available.
+// TODO(https://fxbug.dev/42051063): replace this with llvm-debuginfod-find when it's available.
 fn find_debug_file(symbol_index: &SymbolIndex, binary_id: &str) -> Result<PathBuf> {
     if binary_id.len() > 2 {
         // For simplicity always return the first match. Note this is not always safe.

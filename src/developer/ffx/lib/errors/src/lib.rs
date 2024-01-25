@@ -23,7 +23,7 @@ pub mod macro_deps {
 /// other error types are printed with full context and a BUG prefix, guiding the user to file bugs
 /// to improve the error condition that they have experienced, with a goal to maximize actionable
 /// errors over time.
-// TODO(https://fxbug.dev/57592): consider extending this to allow custom types from plugins.
+// TODO(https://fxbug.dev/42135455): consider extending this to allow custom types from plugins.
 #[derive(thiserror::Error, Debug)]
 pub enum FfxError {
     #[error("{}", .0)]

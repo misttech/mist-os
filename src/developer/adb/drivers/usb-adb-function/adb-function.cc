@@ -285,7 +285,7 @@ void UsbAdbDevice::TxComplete(fuchsia_hardware_usb_endpoint::Completion completi
     }
     // Do not queue requests if status is ZX_ERR_IO_NOT_PRESENT, as the underlying connection could
     // be disconnected or USB_RESET is being processed. Calling adb_send_locked in such scenario
-    // will deadlock and crash the driver (see https://fxbug.dev/92793).
+    // will deadlock and crash the driver (see https://fxbug.dev/42174506).
     if (*completion.status() != ZX_ERR_IO_NOT_PRESENT) {
       if (!tx_pending_infos_.empty()) {
         if ((send_status = SendLocked(tx_pending_infos_.front().buf)) != ZX_ERR_SHOULD_WAIT) {

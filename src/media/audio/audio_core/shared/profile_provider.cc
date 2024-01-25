@@ -12,7 +12,7 @@
 
 namespace {
 
-// TODO(https://fxbug.dev/40858): Use embedded selectors to forward parameters to the system profile
+// TODO(https://fxbug.dev/42116876): Use embedded selectors to forward parameters to the system profile
 // provider until the new role API using FIDL parameters is implemented.
 std::string MakeRoleSelector(const std::string& role_name, const zx::duration capacity,
                              const zx::duration deadline) {

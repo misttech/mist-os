@@ -73,7 +73,7 @@ if (is_host && has_board) {
 
     environments = all_fuchsia_envs
 
-    # TODO(https://fxbug.dev/64897): The arm64 emulator is run from an arm64 host but we only
+    # TODO(https://fxbug.dev/42143551): The arm64 emulator is run from an arm64 host but we only
     # support running tests on x64 hosts.
     if (board_name == "arm64" || board_name == "qemu-arm64") {
       environments -= [ emu_env ]
@@ -93,7 +93,7 @@ if (is_host && has_board) {
       "$root_out_dir/$symbol_dir",
     ]
 
-    # TODO(https://fxbug.dev/33906): Enable software breakpoint tests on ARM64
+    # TODO(https://fxbug.dev/42109154): Enable software breakpoint tests on ARM64
     # once they are stable.
     if (target_cpu == "arm64") {
       sources += [ "scripts/hello_starnix_hardware_breakpoint.script" ]

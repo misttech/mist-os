@@ -126,20 +126,20 @@ behaves _as-implemented_.
 Below, the existing mixer-related bugs are classified in groups related to their stage in the flow
 of audio through the mixer:
 
-*   https://fxbug.dev/13373
+*   https://fxbug.dev/42083616
 
     Today, interpolation and media scheduling is performed using audio sample positions that are
 represented by a 32-bit integer, in fixed-point form: 19 bits of integer, and 13 bits of fraction.
 This by design puts a limit on the accuracy of our interpolating sample-rate converters. By
 increasing the number of fractional bits, we can improve our SRC quality.
 
-*   https://fxbug.dev/13361
+*   https://fxbug.dev/42083555
 
     When enabling NxN channel passthru in our resamplers, there was significant code duplication.
 This could be refactored to increase code reuse, leading to higher code resilience and easier future
 extensibility.
 
-*   https://fxbug.dev/13356
+*   https://fxbug.dev/42083499
 
     The Gain object contains two functions, through which clients can provide two (float) values and
 receive a (fixed-point) representation of their product. The documented behavior of this object in
@@ -147,14 +147,14 @@ multi-threaded scenarios should be clarified (might be as easy as changing a "sh
 Depending on whether single-threaded is a requirement, we will need additional product code and
 tests.
 
-*   https://fxbug.dev/13374
+*   https://fxbug.dev/42083626
 
     The AudioRenderer API schedules each incoming audio packet on an integer sample boundary,
 regardless of whether a fractional sample location would better represent the timestamp specified.
 This bug represents the investigation (and potential enabling) of scheduling these packets on
 fractional sample positions.
 
-*   https://fxbug.dev/13379
+*   https://fxbug.dev/42083681
 
     The AudioSampleFormat enum includes entries for ALL and NONE, with the intention that these
 would be used in future scenarios. Until then, however, it might clarify things for client

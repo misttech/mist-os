@@ -279,7 +279,7 @@ TEST_F(ControlCreatorServerWarningTest, IdAlreadyControlled) {
   EXPECT_EQ(ControlServer::count(), 1u);
 }
 
-// TODO(https://fxbug.dev/117199): If Health can change post-initialization, test: device becomes
+// TODO(https://fxbug.dev/42068381): If Health can change post-initialization, test: device becomes
 //   unhealthy before ControlCreator/Create. Expect Obs/Ctl/RingBuf to drop + Reg/WatcDevRemoved.
 
 }  // namespace

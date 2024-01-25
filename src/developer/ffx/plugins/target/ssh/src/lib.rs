@@ -71,7 +71,7 @@ impl FfxMain for SshTool {
 /// If we're running in an isolated environment against an emulator with user networking,
 /// pretend we're connecting to localhost because user networking is implemented as a port on the
 /// host machine.
-// TODO(https://fxbug.dev/127174) this should not be required
+// TODO(https://fxbug.dev/42077822) this should not be required
 fn get_addr(addr_info: &TargetAddrInfo) -> fho::Result<TargetAddr> {
     Ok(
         match (

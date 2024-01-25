@@ -167,7 +167,7 @@ bool CodecAdapterH264Multi::IsCoreCodecMappedBufferUseful(CodecPort port) {
     // they're possible.  However if is_secure true, we won't get a mapping and we don't really need
     // a mapping, other than for avcC.  If avcC shows up on input, we'll fail then.
     //
-    // TODO(https://fxbug.dev/35200): Add the failure when avcC shows up when is_secure, as described above.
+    // TODO(https://fxbug.dev/42110593): Add the failure when avcC shows up when is_secure, as described above.
     return true;
   } else {
     ZX_DEBUG_ASSERT(port == kOutputPort);
@@ -190,7 +190,7 @@ void CodecAdapterH264Multi::CoreCodecInit(
 
 void CodecAdapterH264Multi::CoreCodecSetSecureMemoryMode(
     CodecPort port, fuchsia::mediacodec::SecureMemoryMode secure_memory_mode) {
-  // TODO(https://fxbug.dev/40198): Ideally a codec list from the main CodecFactory would avoid reporting
+  // TODO(https://fxbug.dev/42116143): Ideally a codec list from the main CodecFactory would avoid reporting
   // support for secure output or input when !is_tee_available(), which likely will mean reporting
   // that in list from driver's local codec factory up to main factory.  The main CodecFactory could
   // also avoid handing out a codec that can't do secure output / input when the TEE isn't
@@ -629,7 +629,7 @@ CodecAdapterH264Multi::CoreCodecGetBufferCollectionConstraints(
     image_constraints.pixel_format.type = fuchsia::sysmem::PixelFormatType::NV12;
     image_constraints.pixel_format.has_format_modifier = true;
     image_constraints.pixel_format.format_modifier.value = fuchsia::sysmem::FORMAT_MODIFIER_LINEAR;
-    // TODO(https://fxbug.dev/13532): confirm that REC709 is always what we want here, or plumb
+    // TODO(https://fxbug.dev/42084950): confirm that REC709 is always what we want here, or plumb
     // actual YUV color space if it can ever be REC601_*.  Since 2020 and 2100
     // are minimum 10 bits per Y sample and we're outputting NV12, 601 is the
     // only other potential possibility here.

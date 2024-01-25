@@ -694,7 +694,7 @@ TEST_F(UsbAudioTest, DelayInfo) {
   }
 }
 
-// TODO(https://fxbug.dev/84545): Fix flakes caused by this test.
+// TODO(https://fxbug.dev/42165345): Fix flakes caused by this test.
 TEST_F(UsbAudioTest, DISABLED_RingBufferPropertiesAndStartOk) {
   incoming_.SyncCall([](IncomingNamespace<FakeDevice>* infra) {
     ASSERT_OK(UsbAudioDevice::DriverBind(infra->fake_dev->zxdev()));
@@ -759,7 +759,7 @@ TEST_F(UsbAudioTest, DISABLED_RingBufferPropertiesAndStartOk) {
   th.join();
 }
 
-// TODO(https://fxbug.dev/85160): Disabled until flakes are fixed.
+// TODO(https://fxbug.dev/42166029): Disabled until flakes are fixed.
 TEST_F(UsbAudioTest, DISABLED_RingBufferStartBeforeGetVmo) {
   incoming_.SyncCall([](IncomingNamespace<FakeDevice>* infra) {
     ASSERT_OK(UsbAudioDevice::DriverBind(infra->fake_dev->zxdev()));
@@ -792,7 +792,7 @@ TEST_F(UsbAudioTest, DISABLED_RingBufferStartBeforeGetVmo) {
   ASSERT_EQ(ZX_ERR_PEER_CLOSED, start.status());  // We get a channel close.
 }
 
-//// TODO(https://fxbug.dev/85160): Disabled until flakes are fixed.
+//// TODO(https://fxbug.dev/42166029): Disabled until flakes are fixed.
 TEST_F(UsbAudioTest, DISABLED_RingBufferStartWhileStarted) {
   incoming_.SyncCall([](IncomingNamespace<FakeDevice>* infra) {
     ASSERT_OK(UsbAudioDevice::DriverBind(infra->fake_dev->zxdev()));
@@ -854,7 +854,7 @@ TEST_F(UsbAudioTest, DISABLED_RingBufferStartWhileStarted) {
   });
 }
 
-// TODO(https://fxbug.dev/85160): Disabled until flakes are fixed.
+// TODO(https://fxbug.dev/42166029): Disabled until flakes are fixed.
 TEST_F(UsbAudioTest, DISABLED_RingBufferStopBeforeGetVmo) {
   incoming_.SyncCall([](IncomingNamespace<FakeDevice>* infra) {
     ASSERT_OK(UsbAudioDevice::DriverBind(infra->fake_dev->zxdev()));

@@ -12,7 +12,7 @@ test_deps = []
 # The qemu-x64 board does not build a UEFI partition. Switch to x64 to include
 # this test.
 #
-# TODO(https://fxbug.dev/129386): optimize shouldn't be required here but needs more
+# TODO(https://fxbug.dev/42079810): optimize shouldn't be required here but needs more
 # investigation why it's a problem
 if (is_host && target_cpu == "x64" && build_uefi_disk &&
     optimize != "sanitizer") {
@@ -34,7 +34,7 @@ if (is_host && target_cpu == "x64" && build_uefi_disk &&
     ]
 
     if (target_cpu == "x64") {
-      # TODO(https://fxbug.dev/130252): The x86 kernel gets loaded at a fixed physical
+      # TODO(https://fxbug.dev/42080558): The x86 kernel gets loaded at a fixed physical
       # address of 1MiB. The UEFI environment under QEMU has some memory
       # reserved at about 8MiB. This limits the total kernel image size that
       # can be loaded.  A larger kernel image size will get a panic in early

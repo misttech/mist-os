@@ -21,7 +21,7 @@ constexpr char kAdbDirectory[] = "/dev/class/adb";
 void Adb::ReceiveCallback(
     fidl::WireUnownedResult<fuchsia_hardware_adb::UsbAdbImpl::Receive>& result) {
   if (!result.ok()) {
-    // TODO(https://fxbug.dev/122045): improve the graceful shutdown story in tests and remove this.
+    // TODO(https://fxbug.dev/42073024): improve the graceful shutdown story in tests and remove this.
     if (result.is_peer_closed()) {
       FX_PLOGS(WARNING, result.status()) << "Connection to underlying UsbAdbImpl failed. Quitting.";
       return;

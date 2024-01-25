@@ -20,7 +20,7 @@ struct FunctionCallInfo;
 // implemented eventually:
 //  * |fn_name| resolves to multiple locations
 //  * |params| is not empty
-// These features are being tracked in https://fxbug.dev/5457.
+// These features are being tracked in https://fxbug.dev/42132103.
 //
 // An error is also returned in the case where |fn_name| resolves to no
 // locations or the function has been inlined.

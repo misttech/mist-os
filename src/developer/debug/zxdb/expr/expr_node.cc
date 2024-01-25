@@ -443,7 +443,7 @@ void FunctionCallExprNode::EmitBytecode(VmStream& stream) const {
           params_and_object.pop_back();
 
           if (params_and_object.size() != 0) {
-            // TODO(https://fxbug.dev/5457): Member functions require a |this| pointer in C++ and a
+            // TODO(https://fxbug.dev/42132103): Member functions require a |this| pointer in C++ and a
             // (typically) |self| reference in Rust.
 
             // Currently we do not support any parameters. This can be handled in the future if

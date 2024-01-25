@@ -45,7 +45,7 @@ impl FfxMain for SymbolizeTool {
             .spawn()
             .map_err(|err| ffx_error!("Failed to spawn command: {err:?}"))?;
 
-        // Return code is not used. See https://fxbug.dev/98220
+        // Return code is not used. See https://fxbug.dev/42180530
         if let Some(_exit_code) = unblock(move || cmd.wait())
             .await
             .map_err(|err| ffx_error!("Failed to wait cmd: {err:?}"))?

@@ -86,7 +86,7 @@ static_library("lib") {
       "debug_registers_arm64.cc",
     ]
   } else if (current_cpu == "riscv64") {
-    # TODO(https://fxbug.dev/123097): Implement this
+    # TODO(https://fxbug.dev/42074048): Implement this
     sources += [
       # "arch_riscv64.cc",
       # "debug_registers_riscv64.cc",
@@ -154,7 +154,7 @@ static_library("lib") {
     } else if (current_cpu == "arm64") {
       sources += [ "zircon_arch_arm64.cc" ]
     } else if (current_cpu == "riscv64") {
-      # TODO(https://fxbug.dev/123097): Implement this
+      # TODO(https://fxbug.dev/42074048): Implement this
       sources += [
         # "zircon_arch_riscv64.cc",
       ]
@@ -196,12 +196,12 @@ static_library("lib") {
     } else if (current_cpu == "arm64") {
       sources += [ "linux_arch_arm64.cc" ]
     } else if (current_cpu == "riscv64") {
-      # TODO(https://fxbug.dev/123097): Implement this:
+      # TODO(https://fxbug.dev/42074048): Implement this:
       # sources += [ "linux_arch_riscv64.cc" ]
     }
   }
 
-  # TODO(https://fxbug.dev/58162): delete the below and fix compiler warnings
+  # TODO(https://fxbug.dev/42136089): delete the below and fix compiler warnings
   configs += [ "//build/config:Wno-conversion" ]
 }
 
@@ -211,7 +211,7 @@ executable("bin") {
 
   deps = [ ":lib" ]
 
-  # TODO(https://fxbug.dev/58162): delete the below and fix compiler warnings
+  # TODO(https://fxbug.dev/42136089): delete the below and fix compiler warnings
   configs += [ "//build/config:Wno-conversion" ]
 }
 
@@ -255,12 +255,12 @@ executable("zxdb_test_app") {
   sources = [ "zxdb_test_app.cc" ]
   deps = [ "//zircon/system/ulib/zx" ]
 
-  # TODO(https://fxbug.dev/58162): delete the below and fix compiler warnings
+  # TODO(https://fxbug.dev/42136089): delete the below and fix compiler warnings
   configs += [ "//build/config:Wno-conversion" ]
 }
 
 if (current_cpu == "riscv64") {
-  # TODO(https://fxbug.dev/123097): remove this empty group
+  # TODO(https://fxbug.dev/42074048): remove this empty group
   group("debug_agent") {
   }
 } else {
@@ -319,7 +319,7 @@ source_set("test_lib") {
     "//src/developer/debug/shared:test_support",
   ]
 
-  # TODO(https://fxbug.dev/58162): delete the below and fix compiler warnings
+  # TODO(https://fxbug.dev/42136089): delete the below and fix compiler warnings
   configs += [ "//build/config:Wno-conversion" ]
 }
 
@@ -367,7 +367,7 @@ test("unit_tests") {
         "debug_registers_arm64_unittest.cc",
       ]
     } else if (current_cpu == "riscv64") {
-      # TODO(https://fxbug.dev/123097): Implement this.
+      # TODO(https://fxbug.dev/42074048): Implement this.
       sources += [
         # "arch_riscv64_unittest.cc",
         # "debug_registers_riscv64_unittest.cc",
@@ -393,7 +393,7 @@ test("unit_tests") {
     ]
   }
 
-  # TODO(https://fxbug.dev/58162): delete the below and fix compiler warnings
+  # TODO(https://fxbug.dev/42136089): delete the below and fix compiler warnings
   configs += [ "//build/config:Wno-conversion" ]
 }
 

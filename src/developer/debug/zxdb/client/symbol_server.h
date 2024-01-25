@@ -65,7 +65,7 @@ class SymbolServer : public ClientObject {
   // manipulated first, so we break this out into a separate function.
   void DoInit();
 
-  // TODO(https://fxbug.dev/61746): There are currently no use cases where different buckets have
+  // TODO(https://fxbug.dev/42140066): There are currently no use cases where different buckets have
   // different authentication mechanisms (everything is either public, or uses gcloud
   // application-default credentials). This function, and the helpers below, could be shared in the
   // base class (maybe an object?) to authenticate new servers as they are initialized, rather than

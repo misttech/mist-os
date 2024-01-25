@@ -36,7 +36,7 @@ class HermeticAudioTest : public TestFixture {
  protected:
   // Tests that require real-time response should have no data loss from overflow or underflow if
   // run in a capable environment, but known issues can prevent this.
-  // TODO(https://fxbug.dev/80003): re-enable underflow detection once outstanding bugs are resolved.
+  // TODO(https://fxbug.dev/42160300): re-enable underflow detection once outstanding bugs are resolved.
   static constexpr bool kEnableAllOverflowAndUnderflowChecksInRealtimeTests = false;
 
   // Creates a directory with an audio_core_config.json file.

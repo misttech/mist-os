@@ -23,7 +23,7 @@ test("integration_tests") {
     "multithreaded_breakpoint_test.cc",
     "watchpoint_test.cc",
 
-    # TODO(https://fxbug.dev/5753): Some HW capabilities (like HW breakpoints) are not well
+    # TODO(https://fxbug.dev/42135386): Some HW capabilities (like HW breakpoints) are not well
     #               emulated by QEMU without KVM. This will sometimes make tests
     #               fail or even crash QEMU.
     #               The tests will be re-enabled when there is way to express
@@ -40,6 +40,6 @@ test("integration_tests") {
     "//zircon/system/ulib/zx",
   ]
 
-  # TODO(https://fxbug.dev/58162): delete the below and fix compiler warnings
+  # TODO(https://fxbug.dev/42136089): delete the below and fix compiler warnings
   configs += [ "//build/config:Wno-conversion" ]
 }

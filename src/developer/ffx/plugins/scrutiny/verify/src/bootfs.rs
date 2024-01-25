@@ -92,7 +92,7 @@ pub async fn verify(cmd: &Command, recovery: bool) -> Result<HashSet<PathBuf>> {
     let bootfs_packages: BootfsPackageIndex = serde_json::from_str(&scrutiny_output)?;
     let bootfs_packages = bootfs_packages.bootfs_pkgs;
 
-    // TODO(https://fxbug.dev/97517) After the first bootfs package is migrated to a component, an
+    // TODO(https://fxbug.dev/42179754) After the first bootfs package is migrated to a component, an
     // absence of a bootfs package index is an error.
     if bootfs_packages.is_none() {
         if non_blob_files.len() != total_bootfs_file_count {

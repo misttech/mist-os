@@ -161,7 +161,7 @@ class GainControl {
   std::optional<MuteCommand> asap_mute_command_;
 
   // Sorted map of scheduled commands by their reference times.
-  // TODO(https://fxbug.dev/113389): Make sure to prevent this from growing in an unbounded way.
+  // TODO(https://fxbug.dev/42064720): Make sure to prevent this from growing in an unbounded way.
   std::multimap<zx::time, Command> scheduled_commands_;
 
   std::optional<ActiveGainRamp> active_gain_ramp_;

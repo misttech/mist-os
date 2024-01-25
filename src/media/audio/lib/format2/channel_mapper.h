@@ -14,7 +14,7 @@
 
 namespace media_audio {
 
-// TODO(https://fxbug.dev/85201): Remove this workaround, once the device properly maps channels.
+// TODO(https://fxbug.dev/42166075): Remove this workaround, once the device properly maps channels.
 inline constexpr bool kEnable4ChannelWorkaround = true;
 
 // Template to map a source frame of `SourceSampleType` with `SourceChannelCount` into each
@@ -147,7 +147,7 @@ class ChannelMapper<SourceSampleType, SourceChannelCount, DestChannelCount, /*Cu
  public:
   inline float Map(const SourceSampleType* source_frame, [[maybe_unused]] size_t dest_channel) {
     if constexpr (kEnable4ChannelWorkaround) {
-      // TODO(https://fxbug.dev/85201): Temporarily ignore the third and fourth channels.
+      // TODO(https://fxbug.dev/42166075): Temporarily ignore the third and fourth channels.
       //
       // The first two source channels are equally weighted, in the one dest channel.
       return 0.5f * (SampleConverter<SourceSampleType>::ToFloat(source_frame[0]) +
@@ -168,7 +168,7 @@ class ChannelMapper<SourceSampleType, SourceChannelCount, DestChannelCount, /*Cu
  public:
   inline float Map(const SourceSampleType* source_frame, size_t dest_channel) {
     if constexpr (kEnable4ChannelWorkaround) {
-      // TODO(https://fxbug.dev/85201): Temporarily ignore the third and fourth channels.
+      // TODO(https://fxbug.dev/42166075): Temporarily ignore the third and fourth channels.
       //
       // Source channels 0 and 1 are directly mapped to dest channels 0 and 1, without change.
       return SampleConverter<SourceSampleType>::ToFloat(source_frame[dest_channel]);
@@ -186,7 +186,7 @@ class ChannelMapper<SourceSampleType, SourceChannelCount, DestChannelCount, /*Cu
  public:
   inline float Map(const SourceSampleType* source_frame, size_t dest_channel) {
     if constexpr (kEnable4ChannelWorkaround) {
-      // TODO(https://fxbug.dev/85201): Temporarily ignore the third and fourth channels.
+      // TODO(https://fxbug.dev/42166075): Temporarily ignore the third and fourth channels.
       //
       // The first two source channels are directly mapped to dest channels 0 and 1, without change.
       // For the remaining dest channel 2, source channels 0 and 1 are equally weighted.

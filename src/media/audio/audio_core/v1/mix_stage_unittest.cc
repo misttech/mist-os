@@ -192,7 +192,7 @@ TEST_F(MixStageTest, AddInput_MixerSelection) {
                                                           Mixer::Resampler::SampleAndHold));
 }
 
-// TODO(https://fxbug.dev/50004): Add tests to verify we can read from mix stages with unaligned frames.
+// TODO(https://fxbug.dev/42127037): Add tests to verify we can read from mix stages with unaligned frames.
 
 std::shared_ptr<Clock> MixStageTest::SetPacketFactoryWithOffsetAudioClock(
     zx::duration clock_offset, testing::PacketFactory& factory) {
@@ -907,7 +907,7 @@ TEST_F(MixStageTest, PositionResetAndAdvance) {
   }
 }
 
-// This is a regression test for https://fxbug.dev/67996.
+// This is a regression test for https://fxbug.dev/42146971.
 TEST_F(MixStageTest, DontCrashOnDestOffsetRoundingError) {
   // Unused, but MixStage::ProcessMix needs this argument.
   auto input = std::make_shared<testing::FakeStream>(kDefaultFormat, context().clock_factory(),
@@ -927,7 +927,7 @@ TEST_F(MixStageTest, DontCrashOnDestOffsetRoundingError) {
 
   // The following values are derived from an actual crash. We set only the values needed by
   // MixStage::ProcessMix. The crux of the bug is that the dest clock's adjusted rate of -1 PPM
-  // caused a rounding error. See discussion at https://fxbug.dev/67996#c22.
+  // caused a rounding error. See discussion at https://fxbug.dev/42146971#c22.
   mix_stage_->cur_mix_job_.buf = &mix_stage_->output_buffer_[0];
   mix_stage_->cur_mix_job_.buf_frames = mix_stage_->output_buffer_frames_;
   mix_stage_->cur_mix_job_.dest_ref_clock_to_frac_dest_frame = TimelineFunction();

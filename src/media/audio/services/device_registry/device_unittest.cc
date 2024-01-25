@@ -147,7 +147,7 @@ TEST_F(DeviceTest, CreateDeviceInfo) {
   EXPECT_EQ(*info.clock_domain(), fuchsia_hardware_audio::kClockDomainMonotonic);
 }
 
-// TODO(https://fxbug.dev/117826): unittest RetrieveCurrentlyPermittedFormats
+// TODO(https://fxbug.dev/42069012): unittest RetrieveCurrentlyPermittedFormats
 
 TEST_F(DeviceTest, SupportedDriverFormatForClientFormat) {
   fake_driver_->set_frame_rates(0, {48000, 48001});
@@ -345,7 +345,7 @@ TEST_F(DeviceTest, DelayInfo) {
   EXPECT_EQ(*notify_->delay_info()->internal_delay(), 0);
 }
 
-// TODO(https://fxbug.dev/117826): Unittest CalculateRequiredRingBufferSizes
+// TODO(https://fxbug.dev/42069012): Unittest CalculateRequiredRingBufferSizes
 
 TEST_F(DeviceTest, RingBufferVmo) {
   InitializeDeviceForFakeDriver();
@@ -389,7 +389,7 @@ TEST_F(DeviceTest, SetActiveChannels) {
   SetActiveChannelsAndExpect(0x0002);
 }
 
-// TODO(https://fxbug.dev/117826): SetActiveChannel no change => no callback (no change in set_time)
+// TODO(https://fxbug.dev/42069012): SetActiveChannel no change => no callback (no change in set_time)
 
 TEST_F(DeviceTest, BasicStartAndStop) {
   InitializeDeviceForFakeDriver();

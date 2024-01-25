@@ -331,7 +331,7 @@ TEST_F(ControlServerTest, StreamConfigDropCausesCleanControlServerShutdown) {
   EXPECT_TRUE(control->server().WaitForShutdown(zx::sec(5)));
 }
 
-// TODO(https://fxbug.dev/117826): unittest GetCurrentlyPermittedFormats
+// TODO(https://fxbug.dev/42069012): unittest GetCurrentlyPermittedFormats
 
 }  // namespace
 }  // namespace media_audio

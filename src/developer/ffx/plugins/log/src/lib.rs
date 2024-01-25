@@ -109,7 +109,7 @@ struct DeviceConnection {
     log_settings_client: LogSettingsProxy,
 }
 
-// TODO(https://fxbug.dev/129624): Remove this once Overnet
+// TODO(https://fxbug.dev/42080003): Remove this once Overnet
 // has support for reconnect handling.
 async fn connect_to_target(
     target_collection_proxy: &TargetCollectionProxy,
@@ -194,7 +194,7 @@ where
         None => Box::new(NoOpSymoblizer {}),
     };
     let mut stream_mode = get_stream_mode(cmd.clone())?;
-    // TODO(https://fxbug.dev/129624): Add support for reconnect handling to Overnet.
+    // TODO(https://fxbug.dev/42080003): Add support for reconnect handling to Overnet.
     // This plugin needs special logic to handle reconnects as logging should tolerate
     // a device rebooting and remaining in a consistent state (automatically) after the reboot.
     // Eventually we should have direct support for this in Overnet, but for now we have to

@@ -59,7 +59,7 @@ fho::embedded_plugin!(TestTool);
 impl FfxMain for TestTool {
     type Writer = SimpleWriter;
 
-    // TODO(https://fxbug.dev/127955): use Writer when it becomes possible.
+    // TODO(https://fxbug.dev/42078544): use Writer when it becomes possible.
     async fn main(self, _writer: Self::Writer) -> fho::Result<()> {
         let writer = Box::new(stdout());
         let remote_control =
@@ -755,7 +755,7 @@ mod test {
 
     #[fuchsia::test]
     async fn test_get_test_params_count() {
-        // Regression test for https://fxbug.dev/111145: using an extremely
+        // Regression test for https://fxbug.dev/42062444: using an extremely
         // large test count should result in a modest memory allocation. If
         // that wasn't the case, this test would fail.
         const COUNT: u32 = u32::MAX;

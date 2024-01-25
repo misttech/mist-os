@@ -135,7 +135,7 @@ impl<T: AsyncRead + AsyncWrite + Unpin> FastbootImpl<T> {
         // this target cannot be in userspace fastboot, so return an error.
         let mut addr: SocketAddr =
             self.target.ssh_address().ok_or(RebootError::FailedToSendTargetReboot)?.into();
-        // TODO(https://fxbug.dev/123747): Remove this hardcoded port.
+        // TODO(https://fxbug.dev/42074638): Remove this hardcoded port.
         addr.set_port(FASTBOOT_PORT);
         // We don't want to modify the existing target object until we're
         // certain that it's actually in userspace fastboot, so create a new

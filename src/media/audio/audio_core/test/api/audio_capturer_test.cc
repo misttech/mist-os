@@ -116,7 +116,7 @@ TEST_F(AudioCapturerTestOldAPI, StopAsyncWithAllPacketsInFlight) {
 
   // Wait for over one mix period (100ms). This is not necessary for the test, however it
   // increases the chance of a mix period running before our StopAsyncCapture call, which
-  // increases our chance of finding bugs (e.g. https://fxbug.dev/72776).
+  // increases our chance of finding bugs (e.g. https://fxbug.dev/42152274).
   usleep(150 * 1000);
 
   audio_capturer()->StopAsyncCapture(AddCallback("StopAsyncCapture"));

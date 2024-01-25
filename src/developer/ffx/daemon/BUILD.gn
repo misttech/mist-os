@@ -51,7 +51,7 @@ group("tests") {
     "server:tests",
   ]
 
-  # TODO(https://fxbug.dev/113700): Flaky test disabled on coverage.
+  # TODO(https://fxbug.dev/42064995): Flaky test disabled on coverage.
   # Please fix the flake and remove the condition below.
   if (!is_coverage) {
     deps += [ "target:tests" ]

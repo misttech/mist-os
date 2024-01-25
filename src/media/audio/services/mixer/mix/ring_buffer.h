@@ -89,7 +89,7 @@ class RingBuffer : public std::enable_shared_from_this<RingBuffer> {
   const Format format_;
   const UnreadableClock reference_clock_;
 
-  // TODO(https://fxbug.dev/111798): These must be accessed with atomic instructions (std::atomic_load and
+  // TODO(https://fxbug.dev/42063096): These must be accessed with atomic instructions (std::atomic_load and
   // std::atomic_store). These can be std::atomic<std::shared_ptr<>> after C++20 is available.
   std::shared_ptr<MemoryMappedBuffer> buffer_;          // current buffer
   std::shared_ptr<MemoryMappedBuffer> pending_buffer_;  // non-nullptr if a change is requested

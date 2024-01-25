@@ -53,14 +53,14 @@ class Format {
   static Format CreateOrDie(const fuchsia_audio::Format& msg);
   static Format CreateOrDie(Args args);
 
-  // TODO(https://fxbug.dev/114919): Remove when fuchsia.audio.effects has migrated to the new types.
+  // TODO(https://fxbug.dev/42066204): Remove when fuchsia.audio.effects has migrated to the new types.
   static fpromise::result<Format, std::string> CreateLegacy(fuchsia_mediastreams::AudioFormat msg);
   static fpromise::result<Format, std::string> CreateLegacy(
       fuchsia_mediastreams::wire::AudioFormat msg);
   static Format CreateLegacyOrDie(fuchsia_mediastreams::AudioFormat msg);
   static Format CreateLegacyOrDie(fuchsia_mediastreams::wire::AudioFormat msg);
 
-  // TODO(https://fxbug.dev/115503): Remove when audio_core/v2 is deleted.
+  // TODO(https://fxbug.dev/42066782): Remove when audio_core/v2 is deleted.
   static fpromise::result<Format, std::string> CreateLegacy(fuchsia_media::AudioStreamType msg);
   static fpromise::result<Format, std::string> CreateLegacy(
       fuchsia_media::wire::AudioStreamType msg);
@@ -77,9 +77,9 @@ class Format {
   fuchsia_audio::Format ToNaturalFidl() const;
   fuchsia_hardware_audio::wire::Format ToHardwareWireFidl(fidl::AnyArena& arena) const;
   fuchsia_hardware_audio::Format ToHardwareNaturalFidl() const;
-  // TODO(https://fxbug.dev/115503): Remove when audio_core/v2 is deleted.
+  // TODO(https://fxbug.dev/42066782): Remove when audio_core/v2 is deleted.
   fuchsia_media::wire::AudioStreamType ToLegacyMediaWireFidl() const;
-  // TODO(https://fxbug.dev/114919): Remove when fuchsia.audio.effects has migrated to the new types.
+  // TODO(https://fxbug.dev/42066204): Remove when fuchsia.audio.effects has migrated to the new types.
   fuchsia_mediastreams::wire::AudioFormat ToLegacyMediastreamsWireFidl() const;
 
   fuchsia_audio::SampleType sample_type() const { return sample_type_; }
@@ -119,7 +119,7 @@ class Format {
  private:
   Format(fuchsia_audio::SampleType sample_type, int64_t channels, int64_t frames_per_second);
 
-  // TODO(https://fxbug.dev/114436): include channel_layout
+  // TODO(https://fxbug.dev/42065740): include channel_layout
   fuchsia_audio::SampleType sample_type_;
   int64_t channels_;
   int64_t frames_per_second_;

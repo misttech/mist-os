@@ -138,7 +138,7 @@ zx_status_t PartialOverlap(const fuchsia_mem::wire::Range& a, const fuchsia_mem:
 }
 
 // Make a copy of 'src' so the config can be edited. The resulting config takes ownership of
-// all handles from 'src'. https://fxbug.dev/86255 explains why this is necessary.
+// all handles from 'src'. https://fxbug.dev/42167245 explains why this is necessary.
 fuchsia_audio_effects::wire::ProcessorConfiguration CloneConfigAndTakeHandles(
     fidl::AnyArena& arena, fuchsia_audio_effects::wire::ProcessorConfiguration src) {
   fuchsia_audio_effects::wire::ProcessorConfiguration dst(arena);

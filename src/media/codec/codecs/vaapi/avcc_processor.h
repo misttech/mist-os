@@ -13,7 +13,7 @@
 
 #include "media/base/decoder_buffer.h"
 
-// TODO(https://fxbug.dev/95162): Move to a centralized location.
+// TODO(https://fxbug.dev/42177138): Move to a centralized location.
 class AvccProcessor {
  public:
   using BufferCallback = fit::function<void(media::DecoderBuffer)>;

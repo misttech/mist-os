@@ -553,7 +553,7 @@ void DriverOutput::OnDriverConfigComplete() {
 
   // Start the ring buffer running
   //
-  // TODO(https://fxbug.dev/13292) : Don't actually start things up here. We should start only when
+  // TODO(https://fxbug.dev/42082937) : Don't actually start things up here. We should start only when
   // we have clients with work to do, and we should stop when we have no work to do.
   zx_status_t res = driver()->Start();
   if (res != ZX_OK) {
@@ -597,7 +597,7 @@ void DriverOutput::OnDriverStartComplete() {
 
   // Set up the mix task in the AudioOutput.
   //
-  // TODO(https://fxbug.dev/39886): an intermediate buffer probably need not be as large as the
+  // TODO(https://fxbug.dev/42115795): an intermediate buffer probably need not be as large as the
   // entire ring buffer. Consider limiting this to be only slightly larger than a nominal mix job.
   auto format = driver()->GetFormat();
   FX_DCHECK(format);
@@ -623,7 +623,7 @@ void DriverOutput::OnDriverStartComplete() {
   // We read from async::Now and convert to reference time to simplify unit
   // tests that mock out time using async::Now.
   //
-  // TODO(https://fxbug.dev/57377): Keep reference clocks in sync with mono time under test.
+  // TODO(https://fxbug.dev/42135216): Keep reference clocks in sync with mono time under test.
   auto mono_time = async::Now(mix_domain().dispatcher());
   auto ref_time = reference_clock()->ReferenceTimeFromMonotonicTime(mono_time);
   int64_t output_frames_consumed = RefTimeToSafeWriteFrame(ref_time);

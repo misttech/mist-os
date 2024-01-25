@@ -55,7 +55,7 @@ pub async fn selftest(cmd: SelftestCommand) -> Result<()> {
     ];
 
     let mut target_tests = tests![
-        // TODO(bbosak): re-enable once proactive-logging is disabled (https://fxbug.dev/125487)
+        // TODO(bbosak): re-enable once proactive-logging is disabled (https://fxbug.dev/42076295)
         // log::include_log::test_log_run_normal,
         component::include_target::test_list,
         target::include_target::test_get_ssh_address_includes_port,

@@ -64,7 +64,7 @@ ffx("ffx") {
 }
 
 _ffx_e2e_config = [
-  # TODO(https://fxbug.dev/84938): remove log.level=DEBUG when we no longer have flake
+  # TODO(https://fxbug.dev/42165781): remove log.level=DEBUG when we no longer have flake
   "--config",
   "log.level=DEBUG",
   "--config",
@@ -87,7 +87,7 @@ host_test("ffx-e2e-without-target") {
     "//src/developer/ffx/plugins/self-test:ffx_selftest_tool_test_data",
   ]
 
-  # TODO(https://fxbug.dev/126316) ffx self-test seems to be buggy, so let's at least
+  # TODO(https://fxbug.dev/42077085) ffx self-test seems to be buggy, so let's at least
   # prevent it from affecting other tests by isolating it to its own shard.
   isolated = true
 }
@@ -110,15 +110,15 @@ host_test("ffx-e2e-with-target") {
     "//src/developer/ffx/plugins/self-test:ffx_selftest_tool_test_data",
   ]
 
-  # TODO(https://fxbug.dev/60683): split additional dimensions such as multi-device
+  # TODO(https://fxbug.dev/42138890): split additional dimensions such as multi-device
   # mac + device, etc.
   environments = [
-    # XXX(https://fxbug.dev/64897): support arm64 HTI tests
+    # XXX(https://fxbug.dev/42143551): support arm64 HTI tests
     # emu_env,
     nuc_env,
   ]
 
-  # TODO(https://fxbug.dev/126316) ffx self-test seems to be buggy, so let's at least
+  # TODO(https://fxbug.dev/42077085) ffx self-test seems to be buggy, so let's at least
   # prevent it from affecting other tests by isolating it to its own shard.
   isolated = true
 }

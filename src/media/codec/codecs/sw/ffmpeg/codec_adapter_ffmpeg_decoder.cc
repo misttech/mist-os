@@ -252,7 +252,7 @@ CodecAdapterFfmpegDecoder::CoreCodecGetBufferCollectionConstraints(
   // have the token here.
   ZX_DEBUG_ASSERT(!partial_settings.has_sysmem_token());
 
-  // TODO(https://fxbug.dev/13531): plumb/permit range of buffer count from further down,
+  // TODO(https://fxbug.dev/42084949): plumb/permit range of buffer count from further down,
   // instead of single number frame_count, and set this to the actual
   // stream-required # of reference frames + # that can concurrently decode.
   // Packets and buffers are not the same thing, and we should permit the # of
@@ -315,7 +315,7 @@ CodecAdapterFfmpegDecoder::CoreCodecGetBufferCollectionConstraints(
     result.image_format_constraints_count = 1;
     fuchsia::sysmem::ImageFormatConstraints& image_constraints = result.image_format_constraints[0];
     image_constraints.pixel_format.type = fuchsia::sysmem::PixelFormatType::YV12;
-    // TODO(https://fxbug.dev/13532): confirm that REC709 is always what we want here, or plumb
+    // TODO(https://fxbug.dev/42084950): confirm that REC709 is always what we want here, or plumb
     // actual YUV color space if it can ever be REC601_*.  Since 2020 and 2100
     // are minimum 10 bits per Y sample and we're outputting NV12, 601 is the
     // only other potential possibility here.

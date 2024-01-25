@@ -69,7 +69,7 @@ bool AudioDeviceSettings::SetGainInfo(const fuchsia::media::AudioGainInfo& req,
 fuchsia::media::AudioGainInfo AudioDeviceSettings::GetGainInfo() const {
   TRACE_DURATION("audio", "AudioDeviceSettings::GetGainInfo");
 
-  // TODO(https://fxbug.dev/35439): consider eliminating the acquisition of this lock.  In theory, the only
+  // TODO(https://fxbug.dev/42110857): consider eliminating the acquisition of this lock.  In theory, the only
   // mutation of gain state happens during SetGainInfo, which is supposed to only be called from the
   // AudioDeviceManager, which should be functionally single threaded as it is called only from the
   // main service message loop. Since GetGainInfo should only be called from the device manager as

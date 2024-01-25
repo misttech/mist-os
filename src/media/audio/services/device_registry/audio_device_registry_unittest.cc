@@ -28,7 +28,7 @@ TEST_F(AudioDeviceRegistryTest, DeviceInitialization) {
   EXPECT_EQ(adr_service_->unhealthy_devices().size(), 0u);
 }
 
-// TODO(https://fxbug.dev/117826): StreamConfigDisconnect test, after added and healthy
+// TODO(https://fxbug.dev/42069012): StreamConfigDisconnect test, after added and healthy
 
 TEST_F(AudioDeviceRegistryTest, FindDeviceByTokenId) {
   auto fake_driver = CreateFakeDriver();

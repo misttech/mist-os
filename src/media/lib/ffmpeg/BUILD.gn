@@ -16,7 +16,7 @@ declare_args() {
   # ```
   # jiri import -name third_party/ffmpeg -revision HEAD third_party/ffmpeg http://fuchsia.googlesource.com/integration
   # ```
-  # TODO(https://fxbug.dev/116951): This isn't currently working. Use the method below.
+  # TODO(https://fxbug.dev/42068172): This isn't currently working. Use the method below.
   #
   # Or, if already importing a different manifest from there, resulting in
   # errors from jiri update, it can work to just git clone (but jiri update

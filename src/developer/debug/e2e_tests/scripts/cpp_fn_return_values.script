@@ -20,7 +20,7 @@ Breakpoint 1 now matching 1 addrs for $main
 🛑 on bp 1 main() • cpp_functions.cc:??
 0
 
-# TODO(https://fxbug.dev/129958): this should also work as
+# TODO(https://fxbug.dev/42080301): this should also work as
 #        ReturnGlobalPlusOne() - 1 == SomeGlobal
 [zxdb] p SomeGlobal == ReturnGlobalPlusOne() - 1
 🛑 on bp 1 main() • cpp_functions.cc:??

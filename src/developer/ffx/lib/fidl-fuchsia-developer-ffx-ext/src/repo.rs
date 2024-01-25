@@ -295,7 +295,7 @@ impl From<RepositoryRegistrationAliasConflictMode>
 }
 
 /// The below types exist to provide definitions with Serialize.
-/// TODO(https://fxbug.dev/76041) They should be removed in favor of the
+/// TODO(https://fxbug.dev/42155902) They should be removed in favor of the
 /// corresponding fidl-fuchsia-pkg-ext types.
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub struct RepositoryConfig {

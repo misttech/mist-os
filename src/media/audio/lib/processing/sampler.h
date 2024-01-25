@@ -117,7 +117,7 @@ class Sampler {
     // Because all the initial factors are 64-bit, our denominator-scaled version must use 128-bit.
     // Even then, we might overflow depending on parameters, so we scale back denominator if needed.
     //
-    // TODO(https://fxbug.dev/86743): Generalize this (remove the scale-down denominator optimization) and
+    // TODO(https://fxbug.dev/42167787): Generalize this (remove the scale-down denominator optimization) and
     // extract the functionality into a 128-bit template specialization of `TimelineRate` and
     // `TimelineFunction`.
     zx::time MonoTimeFromRunningSource(
@@ -263,7 +263,7 @@ class Sampler {
 
   // Eagerly precomputes any needed data. If not called, that data will be lazily computed on the
   // first call to `Process`.
-  // TODO(https://fxbug.dev/45074): This is for tests only and can be removed once filter creation is eager.
+  // TODO(https://fxbug.dev/42121558): This is for tests only and can be removed once filter creation is eager.
   virtual void EagerlyPrepare() = 0;
 
   // Processes `source` into `dest` with `gain`.

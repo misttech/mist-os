@@ -13,7 +13,7 @@ pub async fn get<W: std::io::Write>(proxy: DisplayProxy, args: GetArgs, w: &mut 
 }
 
 async fn command(proxy: DisplayProxy, args: GetArgs) -> WatchOrSetResult {
-    // TODO(https://fxbug.dev/107621): Use FIDL wire format encoding and decoding once C++ supports it.
+    // TODO(https://fxbug.dev/42058991): Use FIDL wire format encoding and decoding once C++ supports it.
     // Add a Field option to return a certain field's value, otherwise, the whole display settings
     // will be returned.
     let res = proxy.watch().await;

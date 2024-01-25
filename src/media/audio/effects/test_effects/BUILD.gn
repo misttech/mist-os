@@ -26,7 +26,7 @@ source_set("test_effects_v2") {
     "//zircon/system/ulib/fzl",
   ]
 
-  # TODO(https://fxbug.dev/94768): This target uses mutable tables which are deprecated,
+  # TODO(https://fxbug.dev/42176699): This target uses mutable tables which are deprecated,
   # rather than builders.
   configs += [ "//build/cpp:fidl-wire-deprecated-mutable-tables" ]
 }

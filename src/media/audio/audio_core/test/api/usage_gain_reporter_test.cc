@@ -121,7 +121,7 @@ TEST_F(UsageGainReporterTest, SetVolumeAndMute) {
   EXPECT_FALSE(last_muted);
   EXPECT_FLOAT_EQ(last_gain_db, 0);
 
-  // TODO(https://fxbug.dev/54949): SetMute(true) events are broken
+  // TODO(https://fxbug.dev/42132524): SetMute(true) events are broken
 #if 0
   set_callback("SetMute(true)");
   c->volume_control->SetMute(true);

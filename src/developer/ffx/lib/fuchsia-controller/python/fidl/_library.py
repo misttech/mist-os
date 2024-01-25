@@ -513,7 +513,7 @@ def union_type(ir, root_ir, recurse_guard=None) -> type:
             "__fidl_type__": ir.name(),
         },
     )
-    # TODO(https://fxbug.dev/127787): Prevent unions from having more than one value set at the same time.
+    # TODO(https://fxbug.dev/42078357): Prevent unions from having more than one value set at the same time.
     # This is silently allowed during encoding, but should either be prevented during encoding, or
     # prevented from within the object itself. If it cannot be prevented there should be some hook
     # that sets the previous union variants to None.
@@ -715,7 +715,7 @@ def protocol_event_handler_type(ir: IR, root_ir) -> type:
         # We are moving towards sequence-based terminology, where "request"
         # always means the initiating message. That's why the generated type is
         # named as *Request, but we use the "response" IR fields.
-        # TODO(https://fxbug.dev/7660): Remove this comment when the IR is updated.
+        # TODO(https://fxbug.dev/42156522): Remove this comment when the IR is updated.
         if "maybe_response_payload" in method:
             ident = method.response_payload_raw_identifier()
         properties["method_map"][method.ordinal()] = MethodInfo(

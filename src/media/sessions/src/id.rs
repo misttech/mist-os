@@ -10,7 +10,7 @@ use zx::AsHandleRef;
 #[derive(Debug)]
 pub struct Id {
     id: SessionId,
-    // TODO(https://fxbug.dev/84729)
+    // TODO(https://fxbug.dev/42165549)
     #[allow(unused)]
     id_handle: zx::Event,
 }

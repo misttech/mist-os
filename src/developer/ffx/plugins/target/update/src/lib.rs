@@ -25,7 +25,7 @@ pub struct UpdateTool {
     update_manager_proxy: ManagerProxy,
     #[with(moniker("/core/system-update"))]
     channel_control_proxy: ChannelControlProxy,
-    // TODO(https://fxbug.dev/123798): remove the deprecated variant and the need of deferred once
+    // TODO(https://fxbug.dev/42074694): remove the deprecated variant and the need of deferred once
     // the move to `core/system-update/system-updater` rolls through.
     #[with(deferred(moniker("/core/system-updater")))]
     deprecated_installer_proxy: Deferred<InstallerProxy>,

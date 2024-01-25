@@ -133,7 +133,7 @@ if (is_host && has_board) {
 group("tests") {
   testonly = true
 
-  # TODO(https://fxbug.dev/124461): Support product bundle for testing on mac
+  # TODO(https://fxbug.dev/42075360): Support product bundle for testing on mac
   # For now, just test on linux.
   # Also check for has_board, since this test cannot run on a configuration without a
   # board.

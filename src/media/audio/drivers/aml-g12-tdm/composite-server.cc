@@ -56,7 +56,7 @@ AudioCompositeServer::AudioCompositeServer(
     element_completers_[ring_buffer].completer = {};
   }
 
-  // TODO(https://fxbug.dev/132252): Configure this driver with passed-in metadata.
+  // TODO(https://fxbug.dev/42082341): Configure this driver with passed-in metadata.
   for (size_t i = 0; i < kNumberOfPipelines; ++i) {
     // Default supported DAI formats.
     supported_dai_formats_[i].number_of_channels({2});
@@ -105,7 +105,7 @@ AudioCompositeServer::AudioCompositeServer(
 
 zx_status_t AudioCompositeServer::ConfigEngine(size_t index, size_t dai_index, bool input,
                                                fdf::MmioBuffer mmio) {
-  // TODO(https://fxbug.dev/132252): Configure this driver with passed-in metadata.
+  // TODO(https://fxbug.dev/42082341): Configure this driver with passed-in metadata.
 
   // Common configuration.
   engines_[index].config = {};

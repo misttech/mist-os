@@ -88,7 +88,7 @@ std::string ModifiedType::ComputeFullName() const {
     if (auto func_type = modified().Get()->As<FunctionType>();
         func_type && tag() == DwarfTag::kPointerType) {
       // Special-case pointer-to-funcion which has unusual syntax.
-      // TODO(https://fxbug.dev/5533) this doesn't handle pointers of references to pointers-to-member
+      // TODO(https://fxbug.dev/42132947) this doesn't handle pointers of references to pointers-to-member
       // functions
       return func_type->ComputeFullNameForFunctionPtr(std::string());
     } else if ((modified_type = modified().Get()->As<Type>())) {

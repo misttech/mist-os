@@ -306,7 +306,7 @@ fn load_manifests_blobs_match_budgets(budgets: &Vec<PackageSetBudget>) -> Result
 }
 
 /// Reads blob declaration file, and count how many times blobs are used.
-/// TODO(https://fxbug.dev/103906): Pass BlobsJson struct from blobfs.rs as input.
+/// TODO(https://fxbug.dev/42055004): Pass BlobsJson struct from blobfs.rs as input.
 #[allow(clippy::ptr_arg)]
 fn load_blob_info(blob_size_paths: &Vec<Utf8PathBuf>) -> Result<Vec<BlobJsonEntry>> {
     let mut result = vec![];

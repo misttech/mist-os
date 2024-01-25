@@ -64,7 +64,7 @@ void HermeticPipelineTest::WriteWavFile(const std::string& test_name,
     FX_LOGS(ERROR) << "Could not create output file " << file_name;
     return;
   }
-  // TODO(https://fxbug.dev/52161): WavWriter.Write() should take const data
+  // TODO(https://fxbug.dev/42129433): WavWriter.Write() should take const data
   auto ok =
       w.Write(
           const_cast<typename AudioBufferSlice<SampleFormat>::SampleT*>(&slice.buf()->samples()[0]),

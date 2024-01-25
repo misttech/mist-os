@@ -461,7 +461,7 @@ impl FidlProtocol for TracingProtocol {
                     if let Some(task) = tasks.nodename_to_task.remove(&nodename) {
                         task
                     } else {
-                        // TODO(https://fxbug.dev/86410)
+                        // TODO(https://fxbug.dev/42167418)
                         tracing::warn!("no task associated with trace file '{}'", name);
                         return responder
                             .send(Err(ffx::RecordingError::NoSuchTraceFile))

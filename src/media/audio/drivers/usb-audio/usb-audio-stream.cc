@@ -141,7 +141,7 @@ zx_status_t UsbAudioStream::Bind() {
 
   thrd_t tmp_thrd;
   dispatcher_loop_.StartThread("usb-audio-stream-dispatcher-loop", &tmp_thrd);
-  // TODO(johngro) : See https://fxbug.dev/30888.  Eliminate this as soon as we have a more
+  // TODO(johngro) : See https://fxbug.dev/42105800.  Eliminate this as soon as we have a more
   // official way of meeting real-time latency requirements.
   constexpr char role_name[] = "fuchsia.devices.usb.audio";
   const size_t role_name_size = strlen(role_name);
@@ -1154,7 +1154,7 @@ size_t UsbAudioStream::CompleteRequestLocked(fuchsia_hardware_usb_endpoint::Comp
 
   // If we are an input stream, copy the payload into the ring buffer.
   if (is_input()) {
-    // TODO(https://fxbug.dev/31906): for async inputs, measure and report the device's
+    // TODO(https://fxbug.dev/42106932): for async inputs, measure and report the device's
     // observed sampling rate to the client.  If the device is falling
     // behind the nominal sampling rate, it's probably a minor quality
     // issue; but if they're running faster than the nominal sampling rate,

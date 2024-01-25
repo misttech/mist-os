@@ -154,7 +154,7 @@ TEST_F(AudioLoopbackStressTest, SingleLongCapture) {
 
   if constexpr (!kEnableAllOverflowAndUnderflowChecksInRealtimeTests) {
     // In case of underflows, exit NOW (don't assess this buffer).
-    // TODO(https://fxbug.dev/80003): Remove workarounds when underflow conditions are fixed.
+    // TODO(https://fxbug.dev/42160300): Remove workarounds when underflow conditions are fixed.
     if (DeviceHasUnderflows(DeviceUniqueIdToString(kUniqueId))) {
       GTEST_SKIP() << "Skipping data checks due to underflows";
       __builtin_unreachable();

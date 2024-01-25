@@ -33,7 +33,7 @@ use std::{
 // file removal. Without PollWatcher the watcher would report a fresh file
 // as having been deleted even if it is a new file.
 //
-// See https://fxbug.dev/114564 for details on what happens when using the Default
+// See https://fxbug.dev/42065810 for details on what happens when using the Default
 // RecommendedWatcher (FsEvents).
 //
 // It's possible that in future versions of this crate this bug will be fixed,
@@ -145,7 +145,7 @@ impl notify::EventHandler for EmulatorWatcherHandler {
                     // Filter out tmp files, these have no extension
                     if let Some(ext) = p.extension() {
                         // Filter out the .log and .serial files
-                        // TODO(https://fxbug.dev/123542): Move emulator logs to ffx log directory
+                        // TODO(https://fxbug.dev/42074471): Move emulator logs to ffx log directory
                         if ext == "log" || ext == "serial" {
                             continue;
                         }

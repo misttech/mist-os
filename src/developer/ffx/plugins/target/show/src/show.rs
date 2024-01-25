@@ -8,7 +8,7 @@ use {
     serde::Serialize,
     std::default::Default,
     std::io::Write,
-    //TODO(https://fxbug.dev/72421): Consider switching to crossterm.
+    //TODO(https://fxbug.dev/42151881): Consider switching to crossterm.
     termion::{color, style},
 };
 

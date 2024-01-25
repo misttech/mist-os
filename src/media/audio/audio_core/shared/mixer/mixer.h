@@ -146,7 +146,7 @@ class Mixer {
 
   // Eagerly precompute any needed data. If not called, that data should be lazily computed on the
   // first call to Mix().
-  // TODO(https://fxbug.dev/45074): This is for tests only and can be removed once filter creation is eager.
+  // TODO(https://fxbug.dev/42121558): This is for tests only and can be removed once filter creation is eager.
   void EagerlyPrepare() { sampler_->EagerlyPrepare(); }
 
   // This object maintains gain values in the mix path, including source gain and a snapshot of

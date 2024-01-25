@@ -253,8 +253,8 @@ async fn device_play(
         )),
 
         gain_settings: Some(fidl_fuchsia_audio_controller::GainSettings {
-            mute: None, // TODO(https://fxbug.dev/121211)
-            gain: None, // TODO(https://fxbug.dev/121211)
+            mute: None, // TODO(https://fxbug.dev/42072218)
+            gain: None, // TODO(https://fxbug.dev/42072218)
             ..Default::default()
         }),
         ..Default::default()

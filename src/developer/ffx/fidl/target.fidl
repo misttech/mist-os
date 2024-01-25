@@ -179,7 +179,7 @@ type TargetConnectionError = strict enum {
     TARGET_INCOMPATIBLE = 13;
 };
 
-// TODO(https://fxbug.dev/94680): Migrate the method specifc error enums to use
+// TODO(https://fxbug.dev/42176602): Migrate the method specifc error enums to use
 // this type instead.
 type TargetError = strict enum {
     /// The specified address does not exist within the target.

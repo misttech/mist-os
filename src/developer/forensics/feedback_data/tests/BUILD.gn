@@ -49,7 +49,7 @@ executable("data_provider_unittest_exe") {
     "//zircon/system/ulib/zx",
   ]
 
-  # TODO(https://fxbug.dev/58162): delete the below and fix compiler warnings
+  # TODO(https://fxbug.dev/42136089): delete the below and fix compiler warnings
   configs += [ "//build/config:Wno-conversion" ]
 }
 
@@ -69,7 +69,7 @@ executable("inspect_data_budget_unittest_exe") {
     "//third_party/googletest:gtest",
   ]
 
-  # TODO(https://fxbug.dev/58162): delete the below and fix compiler warnings
+  # TODO(https://fxbug.dev/42136089): delete the below and fix compiler warnings
   configs += [ "//build/config:Wno-conversion" ]
 }
 

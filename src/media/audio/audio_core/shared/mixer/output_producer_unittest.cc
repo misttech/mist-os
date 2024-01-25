@@ -403,7 +403,7 @@ TEST_F(OutputProducerTest, InfinitiesFloat32) {
 }
 
 // Currently OutputProducer makes no explicit effort to detect and prevent NAN output.
-// TODO(https://fxbug.dev/84260): Consider a mode where we eliminate NANs (presumably emitting 0 instead).
+// TODO(https://fxbug.dev/42165029): Consider a mode where we eliminate NANs (presumably emitting 0 instead).
 TEST_F(OutputProducerTest, DISABLED_NanFloat32) {
   float source, output;
   auto output_producer = SelectOutputProducer(fuchsia::media::AudioSampleFormat::FLOAT, 1);
@@ -416,7 +416,7 @@ TEST_F(OutputProducerTest, DISABLED_NanFloat32) {
 }
 
 // Currently OutputProducer makes no explicit effort to detect and prevent subnormal output.
-// TODO(https://fxbug.dev/84260): Consider a mode where we detect subnormals and round to zero.
+// TODO(https://fxbug.dev/42165029): Consider a mode where we detect subnormals and round to zero.
 TEST_F(OutputProducerTest, DISABLED_SubnormalsFloat32) {
   float source, output;
   auto output_producer = SelectOutputProducer(fuchsia::media::AudioSampleFormat::FLOAT, 1);

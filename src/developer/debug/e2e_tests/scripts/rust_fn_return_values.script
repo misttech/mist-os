@@ -20,7 +20,7 @@ Breakpoint 1 now matching 1 addrs for $main
 🛑 on bp 1 rust_functions::main() • rust_functions.rs:??
 0
 
-# TODO(https://fxbug.dev/129958): this should also work as
+# TODO(https://fxbug.dev/42080301): this should also work as
 #        rust_functions::return_global_plus_one() - 1 == SOME_GLOBAL
 [zxdb] p SOME_GLOBAL == return_global_plus_one() - 1
 🛑 on bp 1 rust_functions::main() • rust_functions.rs:??

@@ -191,7 +191,7 @@ void AudioCoreServer::LoadDefaults(LoadDefaultsCompleter::Sync& completer) {
 
 void AudioCoreServer::LoadDefaults() {
   auto policy = media::audio::PolicyLoader::LoadPolicy();
-  // TODO(https://fxbug.dev/98652): update idle policy
+  // TODO(https://fxbug.dev/42181009): update idle policy
   // context_.device_router().SetIdlePowerOptionsFromPolicy(policy.idle_power_options());
   audio_admin_->SetInteractionsFromAudioPolicy(std::move(policy));
 }

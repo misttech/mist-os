@@ -59,7 +59,7 @@ class TokenBucket {
   size_t tokens_ FXL_GUARDED_BY(mutex_);
 };
 
-// To avoid overloading cobalt, throttle cobalt RPCs. See https://fxbug.dev/67416.
+// To avoid overloading cobalt, throttle cobalt RPCs. See https://fxbug.dev/42146328.
 // In a typical worst case, we might expect about 1 RPC every 10ms, or 6000 RPCs per minute.
 // Throttle to 30 per minute.
 static TokenBucket* const cobalt_token_bucket = new TokenBucket(zx::min(1), 30);

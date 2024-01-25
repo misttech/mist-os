@@ -32,7 +32,7 @@ pub enum TargetPackageSubCommand {
     Explore(ExploreCommand),
 }
 
-// TODO(https://fxbug.dev/128699) Make the explore command a separate subtool.
+// TODO(https://fxbug.dev/42079178) Make the explore command a separate subtool.
 #[derive(ArgsInfo, FromArgs, Debug, PartialEq, Eq)]
 #[argh(
     subcommand,

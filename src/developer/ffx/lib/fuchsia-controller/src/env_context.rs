@@ -52,7 +52,7 @@ impl EnvContext {
         config: Vec<FfxConfigEntry>,
         isolate_dir: Option<PathBuf>,
     ) -> Result<Self> {
-        // TODO(https://fxbug.dev/129230): This is a lot of potentially unnecessary data transformation
+        // TODO(https://fxbug.dev/42079638): This is a lot of potentially unnecessary data transformation
         // going through several layers of structured into unstructured and then back to structured
         // again. Likely the solution here is to update the input of the config runtime population
         // to accept structured data.

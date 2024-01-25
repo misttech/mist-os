@@ -330,7 +330,7 @@ class PipelineStage {
 
   // This is atomic so that any thread can call `thread()->checker()`.
   //
-  // TODO(https://fxbug.dev/111798): This must be accessed with atomic instructions (`std::atomic_load` and
+  // TODO(https://fxbug.dev/42063096): This must be accessed with atomic instructions (`std::atomic_load` and
   // `std::atomic_store`). This can be `std::atomic<std::shared_ptr<T>>` after C++20 is available.
   std::shared_ptr<PipelineThread> thread_;
 

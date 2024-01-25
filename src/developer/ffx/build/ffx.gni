@@ -44,7 +44,7 @@ template("ffx") {
       # ffx is known to be a massive, time/resource-consuming target.
       # When running locally (including RBE local and racing strategies),
       # limit its concurrency with other memory-intensive jobs.
-      # See https://fxbug.dev/111094 for context.
+      # See https://fxbug.dev/42062387 for context.
       pool = "//build/config:highmem($default_toolchain)"
 
       # Since remote workers tend to be slightly slower than the local

@@ -116,7 +116,7 @@ impl<O: OutputSink> Fuzzer<O> {
         let name = name.as_ref();
         let value = value.as_ref();
         let mut fuzz_options = fuzz::Options::default();
-        // TODO(https://fxbug.dev/90015): Add flag to read options from a JSON file.
+        // TODO(https://fxbug.dev/42171421): Add flag to read options from a JSON file.
         options::set(&mut fuzz_options, name, value)?;
         self.writer.println("Configuring fuzzer...");
         self.controller.configure(fuzz_options).await?;

@@ -20,7 +20,7 @@ using ASF = fuchsia::media::AudioSampleFormat;
 namespace media::audio::test {
 
 // Only a few test cases are enabled currently, to keep CQ run-time under 5 mins.
-// TODO(https://fxbug.dev/89243): Enable disabled cases in a long-running test environment, once available.
+// TODO(https://fxbug.dev/42170563): Enable disabled cases in a long-running test environment, once available.
 
 // Pipeline width includes the required presentation delay, so even without effects this entails
 // more than just SincSampler filter width.
@@ -404,18 +404,18 @@ TEST_F(AudioCoreSourceFormatFidelityTest, DISABLED_Float32PassThru) {
 
 //
 // Assess frequency response and sinad for non-float32 destination sample_formats
-// TODO(https://fxbug.dev/86301): Output format fidelity cases -- int24, int16, uint8, (float) for both
+// TODO(https://fxbug.dev/42167297): Output format fidelity cases -- int24, int16, uint8, (float) for both
 //   full-scale and mute; all cases single-frequency, mono float32 96k source, mono 96k dest
 
 //
 // Assess single-mix-stage frequency response and sinad, across channelization changes
-// TODO(https://fxbug.dev/86300): ChannelizationFidelity cases -- for both point and sinc samplers;
+// TODO(https://fxbug.dev/42167296): ChannelizationFidelity cases -- for both point and sinc samplers;
 //   mono stream->stereo MixStage, mono MixStage->stereo MixStage, stereo stream->mono MixStage;
 //   all cases single-frequency, float32 96k source, float32 96k dest
 
 //
 // Assess single-mix-stage frequency response and sinad, across gain changes
-// TODO(https://fxbug.dev/86302): Gain accuracy (FR) and dynamic range (SiNAD) at -30dB, -60dB, -90dB.
+// TODO(https://fxbug.dev/42167298): Gain accuracy (FR) and dynamic range (SiNAD) at -30dB, -60dB, -90dB.
 //   all cases single-frequency, mono float32 96k source, mono float32 96k dest
 
 //

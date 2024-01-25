@@ -79,7 +79,7 @@ impl TryFrom<Audio> for AudioSettings {
             ..Default::default()
         };
 
-        // TODO(https://fxbug.dev/52556): Clean up this logic once we have a detailed error return
+        // TODO(https://fxbug.dev/42129871): Clean up this logic once we have a detailed error return
         // from the FIDL.
         if result == AudioSettings::default() {
             // A Watch call request.

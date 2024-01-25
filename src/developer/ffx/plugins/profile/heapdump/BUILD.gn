@@ -41,7 +41,7 @@ if (is_host) {
     testonly = true
     deps = [ "common:ffx_profile_heapdump_common_test" ]
 
-    # TODO(https://fxbug.dev/122141): ASAN builds use a different allocator that
+    # TODO(https://fxbug.dev/42073131): ASAN builds use a different allocator that
     # heapdump's instrumentation does not support yet.
     if (!is_asan) {
       deps += [ ":verify_ffx_profile_heapdump" ]

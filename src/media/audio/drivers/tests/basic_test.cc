@@ -513,13 +513,13 @@ void RegisterBasicTestsForDevice(const DeviceEntry& device_entry) {
   }
 }
 
-// TODO(https://fxbug.dev/124865): Add testing for Composite protocol methods.
+// TODO(https://fxbug.dev/42075676): Add testing for Composite protocol methods.
 
 // TODO(b/302704556): Add tests for Watch-while-still-pending (specifically WatchGainState,
 //   WatchPlugState, WatchClockRecoveryPositionInfo, WatchDelayInfo, WatchElementState and
 //   WatchTopology).
 
-// TODO(https://fxbug.dev/126734): Add testing for SignalProcessing methods.
+// TODO(https://fxbug.dev/42077405): Add testing for SignalProcessing methods.
 //
 // Proposed test cases for fuchsia.hardware.audio.signalprocessing listed below:
 // BasicTest cases:

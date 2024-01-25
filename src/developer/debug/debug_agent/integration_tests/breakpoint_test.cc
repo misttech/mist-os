@@ -129,7 +129,7 @@ class BreakpointStreamBackend : public LocalStreamBackend {
 
 }  // namespace
 
-// TODO(https://fxbug.dev/73422): This test fails, fix and re-enable.
+// TODO(https://fxbug.dev/42152993): This test fails, fix and re-enable.
 TEST(BreakpointIntegration, DISABLED_SWBreakpoint) {
   // Uncomment for debugging the test.
   // debug::SetDebugMode(true);

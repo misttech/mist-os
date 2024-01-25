@@ -84,7 +84,7 @@ source_set("src") {
     "//src/devices/pci/lib/device-protocol-pci",
     "//src/lib/ddk",
 
-    # TODO(https://fxbug.dev/38132): Migrate to the new bind rules and delete the below
+    # TODO(https://fxbug.dev/42113849): Migrate to the new bind rules and delete the below
     "//src/lib/ddk:ddk-deprecated-binding-headers",
     "//src/media/audio/drivers/lib/intel-hda",
     "//zircon/system/ulib/fbl",
@@ -95,10 +95,10 @@ source_set("src") {
     "//zircon/system/ulib/zx",
   ]
 
-  # TODO(https://fxbug.dev/58162): delete the below and fix compiler warnings
+  # TODO(https://fxbug.dev/42136089): delete the below and fix compiler warnings
   configs += [ "//build/config:Wno-conversion" ]
 
-  # TODO(https://fxbug.dev/94768): This target uses mutable tables which are deprecated,
+  # TODO(https://fxbug.dev/42176699): This target uses mutable tables which are deprecated,
   # rather than builders.
   configs += [ "//build/cpp:fidl-wire-deprecated-mutable-tables" ]
 }
@@ -185,10 +185,10 @@ executable("intel-hda-stream-test-bin") {
     "//zircon/system/ulib/zxtest",
   ]
 
-  # TODO(https://fxbug.dev/58162): delete the below and fix compiler warnings
+  # TODO(https://fxbug.dev/42136089): delete the below and fix compiler warnings
   configs += [ "//build/config:Wno-conversion" ]
 
-  # TODO(https://fxbug.dev/94768): This target uses mutable tables which are deprecated,
+  # TODO(https://fxbug.dev/42176699): This target uses mutable tables which are deprecated,
   # rather than builders.
   configs += [ "//build/cpp:fidl-wire-deprecated-mutable-tables" ]
 }
@@ -229,7 +229,7 @@ fuchsia_library_fuzzer("nhlt-fuzzer") {
     "//zircon/system/ulib/fbl",
   ]
 
-  # TODO(https://fxbug.dev/47959): Fix the leaks and remove this.
+  # TODO(https://fxbug.dev/42124762): Fix the leaks and remove this.
   deps += [ "//build/config/sanitizers:suppress-lsan.DO-NOT-USE-THIS" ]
 }
 

@@ -344,7 +344,7 @@ void Server::SetBridgedMode(SetBridgedModeRequestView request,
 }
 
 void Server::GetDaiFormats(GetDaiFormatsCompleter::Sync& completer) {
-  // TODO(https://fxbug.dev/104023): Add handling for the other formats supported by this hardware.
+  // TODO(https://fxbug.dev/42055135): Add handling for the other formats supported by this hardware.
   fidl::Arena arena;
   static std::vector<uint32_t> kChannels = {2};
   static std::vector<fuchsia_hardware_audio::wire::DaiSampleFormat> kSampleFormats = {

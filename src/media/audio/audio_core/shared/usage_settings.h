@@ -33,7 +33,7 @@ class UsageGainSettings {
   void SetUsageGainAdjustment(fuchsia::media::Usage usage, float gain_db);
 
  private:
-  // TODO(https://fxbug.dev/36289): Determine whether mute must be tracked here
+  // TODO(https://fxbug.dev/42111800): Determine whether mute must be tracked here
 
   std::array<float, fuchsia::media::RENDER_USAGE_COUNT> render_usage_gain_ = {};
   std::array<float, fuchsia::media::CAPTURE_USAGE_COUNT> capture_usage_gain_ = {};

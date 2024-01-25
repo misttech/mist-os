@@ -106,7 +106,7 @@ impl Fastboot {
             }
         }
         // Make sure that the serial numbers are no longer in use.
-        // TODO(https://fxbug.dev/123749): Replace these with a drop guard.
+        // TODO(https://fxbug.dev/42074640): Replace these with a drop guard.
         futures::future::join3(
             self.tcp.clear_interface(),
             self.udp.clear_interface(),
@@ -154,7 +154,7 @@ impl Drop for UsbFactory {
     }
 }
 
-//TODO(https://fxbug.dev/52733) - this info will probably get rolled into the target struct
+//TODO(https://fxbug.dev/42130068) - this info will probably get rolled into the target struct
 #[derive(Debug)]
 pub struct FastbootDevice {
     pub product: String,

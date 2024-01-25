@@ -61,7 +61,7 @@ namespace audio {
 namespace audio_fidl = ::fuchsia::hardware::audio;
 namespace signal_fidl = ::fuchsia::hardware::audio::signalprocessing;
 
-// TODO(https://fxbug.dev/104023): Add handling for the other formats supported by this hardware.
+// TODO(https://fxbug.dev/42055135): Add handling for the other formats supported by this hardware.
 static const std::vector<uint32_t> kSupportedDaiNumberOfChannels = {2, 4};
 static const std::vector<SampleFormat> kSupportedDaiSampleFormats = {SampleFormat::PCM_SIGNED};
 static const std::vector<FrameFormat> kSupportedDaiFrameFormats = {FrameFormat::I2S,
@@ -844,7 +844,7 @@ zx::result<CodecFormatInfo> Tas58xx::SetDaiFormat(const DaiFormat& format) {
     WriteReg(kRegSelectPage, 0x00);
     WriteReg(kRegSelectBook, 0x00);
     // Restore the gain/mute state for cases when the initialization sequence affects it.
-    // TODO(https://fxbug.dev/116503): Create an alternative mechanism for external config to avoid
+    // TODO(https://fxbug.dev/42067677): Create an alternative mechanism for external config to avoid
     // having to restore state here.
     status = SetGain(gain_enabled_ ? gain_state_.gain : 0.0f);
     if (status != ZX_OK) {

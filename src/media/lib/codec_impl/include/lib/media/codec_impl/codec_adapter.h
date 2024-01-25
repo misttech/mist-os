@@ -101,7 +101,7 @@ class CodecAdapter {
   // VMOs can be properly pinned for DMA.  If a core codec returns true from
   // IsCoreCodecHwBased(), the core codec should also override this method.
   //
-  // TODO(https://fxbug.dev/38650): At least the VP9 decoder isn't overriding this method yet.
+  // TODO(https://fxbug.dev/42114424): At least the VP9 decoder isn't overriding this method yet.
   // Also we should enforce that this method be overridden when
   // IsCoreCodecHwBased() true.
   virtual zx::unowned_bti CoreCodecBti() { return zx::unowned_bti(); }
@@ -438,7 +438,7 @@ class CodecAdapter {
   // CodecAdapter an opportunity to set a scheduler profile on the thread. Ownership of the thread
   // remains with CodecImpl and callers should duplicate the handle if necessary (such as for
   // passing to fuchsia.media.ProfileProvider).
-  // TODO(https://fxbug.dev/70234): Generalize this mechanism for all codec_impl threads
+  // TODO(https://fxbug.dev/42149456): Generalize this mechanism for all codec_impl threads
   virtual void CoreCodecSetStreamControlProfile(zx::unowned_thread stream_control_thread) {}
 
  protected:

@@ -6,7 +6,7 @@
 ## require optimize=none
 ## set timeout 30
 
-# TODO(https://fxbug.dev/127384): attach shouldn't be necessary.
+# TODO(https://fxbug.dev/42077983): attach shouldn't be necessary.
 [zxdb] attach hello_starnix
 Waiting for process matching "hello_starnix".
 

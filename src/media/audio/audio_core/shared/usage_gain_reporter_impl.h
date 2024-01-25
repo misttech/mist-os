@@ -54,10 +54,10 @@ class UsageGainReporterImpl : public fuchsia::media::UsageGainReporter {
     size_t unacked_messages_ = 0;
   };
 
-  // TODO(https://fxbug.dev/50074): Queue a function on the async loop to periodically execute and
+  // TODO(https://fxbug.dev/42127114): Queue a function on the async loop to periodically execute and
   // clean up any listeners with too many unacked messages
 
-  // TODO(https://fxbug.dev/50596): Disconnect listeners upon device removal
+  // TODO(https://fxbug.dev/42127693): Disconnect listeners upon device removal
 
   DeviceLister& device_lister_;
   StreamVolumeManager& stream_volume_manager_;

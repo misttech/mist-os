@@ -1995,7 +1995,7 @@ mod tests {
         static ref TEST_LOCK: Arc<Mutex<()>> = Arc::new(Mutex::new(()));
     }
 
-    // FIXME(https://fxbug.dev/80740): Rust tests on host use panic=unwind, which causes all the tests to
+    // FIXME(https://fxbug.dev/42161118): Rust tests on host use panic=unwind, which causes all the tests to
     // run in the same process. Unfortunately ffx_config is global, and so each of these tests
     // could step on each others ffx_config entries if run in parallel. To avoid this, we will:
     //

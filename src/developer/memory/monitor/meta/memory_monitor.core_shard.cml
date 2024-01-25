@@ -8,7 +8,7 @@
             name: "memory_monitor",
             url: "fuchsia-pkg://fuchsia.com/memory_monitor#meta/memory_monitor.cm",
 
-            // TODO(https://fxbug.dev/78680): need to start eagerly to collect memory
+            // TODO(https://fxbug.dev/42158833): need to start eagerly to collect memory
             // stats. Find a better solution than "eager".
             startup: "eager",
             environment: "#core-env",

@@ -181,7 +181,7 @@ void Metrics::AddKmemEvents(const zx_info_kmem_stats_t& kmem,
       builder.Clone().with_event_code(Breakdown::OtherBytes).as_integer(kmem.other_bytes));
 }
 
-// TODO(https://fxbug.dev/3778): Refactor this when dedup enum is availble in generated
+// TODO(https://fxbug.dev/42113456): Refactor this when dedup enum is availble in generated
 // cobalt config source code.
 void Metrics::AddKmemEventsWithUptime(const zx_info_kmem_stats_t& kmem,
                                       const zx_time_t capture_time,

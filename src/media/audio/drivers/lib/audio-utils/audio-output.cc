@@ -67,7 +67,7 @@ zx_status_t AudioOutput::PlayPrepare(AudioSource& source) {
     return res;
   }
 
-  // TODO(https://fxbug.dev/112985): Restore QEMU support. ALSA under QEMU required huge buffers.
+  // TODO(https://fxbug.dev/42064271): Restore QEMU support. ALSA under QEMU required huge buffers.
   // Add the ability to determine what type of read-ahead the
   // HW is going to require so we can adjust our buffer size to what the HW
   // requires, not what ALSA under QEMU requires.

@@ -154,13 +154,13 @@ TEST_F(ObserverServerWarningTest, WatchPlugStateWhilePending) {
   EXPECT_EQ(observer_fidl_error_status_.value_or(ZX_OK), ZX_OK);
 }
 
-// TODO(https://fxbug.dev/117199): If Health can change post-initialization, test: device becomes
+// TODO(https://fxbug.dev/42068381): If Health can change post-initialization, test: device becomes
 //   unhealthy before WatchGainState. Expect Obs/Ctl/RingBuf to drop + Reg/WatchRemove notif.
 
-// TODO(https://fxbug.dev/117199): If Health can change post-initialization, test: device becomes
+// TODO(https://fxbug.dev/42068381): If Health can change post-initialization, test: device becomes
 //   unhealthy before WatchPlugState. Expect Obs/Ctl/RingBuf to drop + Reg/WatchRemove notif.
 
-// TODO(https://fxbug.dev/117199): If Health can change post-initialization, test: device becomes
+// TODO(https://fxbug.dev/42068381): If Health can change post-initialization, test: device becomes
 //   unhealthy before GetReferenceClock. Expect Obs/Ctl/RingBuf to drop + Reg/WatchRemove notif.
 
 }  // namespace media_audio

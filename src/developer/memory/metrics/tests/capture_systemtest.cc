@@ -29,7 +29,7 @@ TEST_F(CaptureSystemTest, KMEM) {
   EXPECT_LT(0U, c.kmem().total_bytes);
 }
 
-// TODO(https://fxbug.dev/108307): deflake and reenable.
+// TODO(https://fxbug.dev/42059717): deflake and reenable.
 TEST_F(CaptureSystemTest, DISABLED_VMO) {
   CaptureState state;
   auto ret = Capture::GetCaptureState(&state);

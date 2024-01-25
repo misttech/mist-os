@@ -82,7 +82,7 @@ class HardwareDspChannel : public DspChannel {
   class Mailbox {
    public:
     void Initialize(MMIO_PTR void* base, size_t size) {
-      // TODO(https://fxbug.dev/56253): avoid casting away the MMIO_PTR annotation.
+      // TODO(https://fxbug.dev/42133972): avoid casting away the MMIO_PTR annotation.
       base_ = (void*)base;
       size_ = size;
     }
@@ -260,7 +260,7 @@ zx_status_t HardwareDspChannel::SendIpcWait(Txn* txn) {
     return res;
   }
 
-  // TODO(https://fxbug.dev/32120): Figure out why this is needed and eliminate it.
+  // TODO(https://fxbug.dev/42107171): Figure out why this is needed and eliminate it.
   zx_nanosleep(zx_deadline_after(ZX_MSEC(1)));
   return res;
 }

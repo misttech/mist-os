@@ -22,7 +22,7 @@ struct I2cRegister : public hwreg::I2cRegisterBase<DerivedType, uint8_t, 1> {
 #endif
     zx_status_t status = ret.ReadFrom(i2c);
     if (status != ZX_OK) {
-      // TODO(https://fxbug.dev/102079): Add logging here compatible with DFv2's logger_
+      // TODO(https://fxbug.dev/42052975): Add logging here compatible with DFv2's logger_
       // requirement.
       return zx::error(status);
     }
@@ -34,7 +34,7 @@ struct I2cRegister : public hwreg::I2cRegisterBase<DerivedType, uint8_t, 1> {
     printf("Writting register 0x%02X\n",
            hwreg::I2cRegisterBase<DerivedType, uint8_t, 1>::reg_addr());
 #endif
-    // TODO(https://fxbug.dev/102079): Add logging here compatible with DFv2's logger_ requirement.
+    // TODO(https://fxbug.dev/42052975): Add logging here compatible with DFv2's logger_ requirement.
     return hwreg::I2cRegisterBase<DerivedType, uint8_t, 1>::WriteTo(i2c);
   }
   static DerivedType Get() { return hwreg::I2cRegisterAddr<DerivedType>(address).FromValue(0); }

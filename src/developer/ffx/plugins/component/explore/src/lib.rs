@@ -23,7 +23,7 @@ pub struct ExploreTool {
 
 fho::embedded_plugin!(ExploreTool);
 
-// TODO(https://fxbug.dev/102835): This plugin needs E2E tests.
+// TODO(https://fxbug.dev/42053815): This plugin needs E2E tests.
 #[async_trait(?Send)]
 impl FfxMain for ExploreTool {
     type Writer = SimpleWriter;

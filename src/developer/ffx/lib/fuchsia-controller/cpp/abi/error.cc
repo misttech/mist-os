@@ -9,7 +9,7 @@
 
 namespace error {
 
-// TODO(https://fxbug.dev/127163): This has been copied from zircon code, as vdso doesn't build this for
+// TODO(https://fxbug.dev/42077810): This has been copied from zircon code, as vdso doesn't build this for
 // host.
 const char *zx_status_get_string(zx_status_t status) {
   switch (status) {

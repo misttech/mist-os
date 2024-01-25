@@ -120,7 +120,7 @@ void AudioDevice::SetSoftwareGainInfo(const fuchsia::media::AudioGainInfo& info)
               if (muted) {
                 FX_LOGS(WARNING) << "Audio input '" << name.c_str() << "': source gain is muted";
               } else {
-                // TODO(https://fxbug.dev/51049) Logging should be removed upon creation of inspect tool or
+                // TODO(https://fxbug.dev/42128197) Logging should be removed upon creation of inspect tool or
                 // other real-time method for gain observation
                 FX_LOGS(INFO) << "Audio input '" << name.c_str() << "': source gain is "
                               << info.gain_db << " dB";

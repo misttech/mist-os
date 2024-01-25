@@ -57,7 +57,7 @@ void StreamSinkServer::PutPacket(PutPacketRequestView request,
   zx::time timestamp;
   zx::duration overflow;
 
-  // TODO(https://fxbug.dev/98652): once the mixer service populates `Packet.capture_timestamp`, we can
+  // TODO(https://fxbug.dev/42181009): once the mixer service populates `Packet.capture_timestamp`, we can
   // ignore `packet.timestamp` and instead use `packet.capture_timestamp`.
   switch (which_timestamp) {
     case Timestamp::Tag::kSpecified:

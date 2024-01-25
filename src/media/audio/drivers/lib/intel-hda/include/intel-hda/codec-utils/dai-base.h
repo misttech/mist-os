@@ -91,7 +91,7 @@ class IntelHDADaiBase : public IntelHDAStreamBase,
       __TA_REQUIRES(obj_lock()) {
     supported_formats_ = std::move(formats);
   }
-  // TODO(https://fxbug.dev/84428): As part of redesign SST add more than one format supported
+  // TODO(https://fxbug.dev/42165215): As part of redesign SST add more than one format supported
   // through this API.
   void SetSupportedDaiFormatsLocked(fuchsia_hardware_audio::wire::DaiFormat dai_format)
       __TA_REQUIRES(obj_lock()) {

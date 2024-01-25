@@ -61,7 +61,7 @@ class Device : public std::enable_shared_from_this<Device>,
   bool DropControl();
   void DropRingBuffer();
 
-  // TODO(https://fxbug.dev/117829): Consider using media_audio::Format internally.
+  // TODO(https://fxbug.dev/42069015): Consider using media_audio::Format internally.
   const fuchsia_audio::Format& ring_buffer_format() { return vmo_format_; }
   std::optional<int16_t> valid_bits_per_sample() const {
     if (!driver_format_ || !driver_format_->pcm_format()) {
@@ -78,7 +78,7 @@ class Device : public std::enable_shared_from_this<Device>,
   // can support, including valid_bits_per_sample (which clients don't specify). If the driver
   // cannot satisfy the requested format, `.pcm_format` will be missing in the returned table.
   std::optional<fuchsia_hardware_audio::Format> SupportedDriverFormatForClientFormat(
-      // TODO(https://fxbug.dev/117829): Consider using media_audio::Format internally.
+      // TODO(https://fxbug.dev/42069015): Consider using media_audio::Format internally.
       const fuchsia_audio::Format& client_format);
 
   struct RingBufferInfo {
@@ -181,7 +181,7 @@ class Device : public std::enable_shared_from_this<Device>,
   //
   // - Device health is automatically checked at initialization. This may result in OnError
   //   (detailed above). Note that a successful health check is one of the "graduation
-  //   requirements" for transitioning to the DeviceInitialized state. https://fxbug.dev/117199 tracks the
+  //   requirements" for transitioning to the DeviceInitialized state. https://fxbug.dev/42068381 tracks the
   //   work to proactively call GetHealthState at some point. This will always be surfaced to the
   //   client by an error notification, rather than their calling GetHealthState directly.
   //
@@ -263,11 +263,11 @@ class Device : public std::enable_shared_from_this<Device>,
   RingBufferErrorHandler ring_buffer_handler_;
 
   fit::callback<void(RingBufferInfo)> create_ring_buffer_callback_;
-  // TODO(https://fxbug.dev/117829): Consider using media_audio::Format internally.
+  // TODO(https://fxbug.dev/42069015): Consider using media_audio::Format internally.
   fuchsia_audio::Format vmo_format_;
   zx::vmo ring_buffer_vmo_;
 
-  // TODO(https://fxbug.dev/117828): consider using an optional<struct> to minimize separate optionals.
+  // TODO(https://fxbug.dev/42069014): consider using an optional<struct> to minimize separate optionals.
   std::optional<fuchsia_hardware_audio::RingBufferProperties> ring_buffer_properties_;
   std::optional<uint32_t> num_ring_buffer_frames_;
   std::optional<fuchsia_hardware_audio::DelayInfo> delay_info_;

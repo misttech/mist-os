@@ -109,7 +109,7 @@ fn convert_v2_bundle_to_configs(
         audio: virtual_device.hardware.audio.clone(),
         cpu: VirtualCpu {
             architecture: virtual_device.hardware.cpu.arch.clone(),
-            // TODO(https://fxbug.dev/88909): Add a count parameter to the virtual_device cpu field.
+            // TODO(https://fxbug.dev/42170191): Add a count parameter to the virtual_device cpu field.
             count: usize::default(),
         },
         memory: virtual_device.hardware.memory.clone(),

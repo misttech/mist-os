@@ -628,7 +628,7 @@ void CodecImpl::FlushEndOfStreamAndCloseStream_StreamControl(uint64_t stream_lif
       // reasonable behavior for the server if the server normally would detect
       // and report mid-stream input corruption errors without an
       // OnStreamFailed().
-      // TODO(https://fxbug.dev/43490): Cancel wait immediately on failure without waiting for
+      // TODO(https://fxbug.dev/42119800): Cancel wait immediately on failure without waiting for
       // timeout.
       if (std::cv_status::timeout ==
           output_end_of_stream_seen_.wait_for(lock, std::chrono::seconds(5))) {
@@ -2094,11 +2094,11 @@ bool CodecImpl::AddBufferCommon(CodecBuffer::Info buffer_info, CodecVmoRange vmo
   // BufferCollection VMOs until the driver has re-started and un-quarantined pinned pages (via
   // its BTI), after ensuring the HW is no longer doing DMA from/to the pages.
   //
-  // TODO(https://fxbug.dev/38650): All CodecAdapter(s) that start memory access that can continue
+  // TODO(https://fxbug.dev/42114424): All CodecAdapter(s) that start memory access that can continue
   // beyond VMO handle closure during process death/termination should have a BTI.  Resolving this
   // TODO will require updating at least the amlogic-video VP9 decoder to provide a BTI.
   //
-  // TODO(https://fxbug.dev/38651): Currently OEMCrypto's indirect (via FIDL) SMC calls that take
+  // TODO(https://fxbug.dev/42114425): Currently OEMCrypto's indirect (via FIDL) SMC calls that take
   // physical addresses are not guaranteed to be fully over/done before VMO handles are auto-closed
   // by OEMCrypto assuming OEMCryto's process dies/terminates.
   if (IsCoreCodecHwBased(port) && *core_codec_bti_) {
@@ -3290,7 +3290,7 @@ void CodecImpl::onCoreCodecFailStream(fuchsia::media::StreamError error) {
     }
     stream_->SetFailureSeen();
     // avoid hang in FlushEndOfStreamAndCloseStream_StreamControl
-    // TODO(https://fxbug.dev/43490): Clean this up.
+    // TODO(https://fxbug.dev/42119800): Clean this up.
     output_end_of_stream_seen_.notify_all();
 
     if (IsStreamErrorRecoverable(error)) {
@@ -3780,7 +3780,7 @@ CodecImpl::PortSettings::~PortSettings() {
   // Close() to avoid causing the LogicalBufferCollection to fail.  Since we're not a crashing
   // process, this is a clean close by definition.
   //
-  // TODO(https://fxbug.dev/37257): Consider _not_ sending Close() for unexpected failures initiated
+  // TODO(https://fxbug.dev/42112876): Consider _not_ sending Close() for unexpected failures initiated
   // by the server. Consider whether to have a Close() on StreamProcessor to disambiguate clean vs.
   // unexpected StreamProcessor channel close.
   if (thrd_current() != parent_->fidl_thread()) {

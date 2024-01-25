@@ -153,7 +153,7 @@ void ResolveFunction(const fxl::RefPtr<EvalContext>& eval_context, const ParsedI
 
   eval_context->FindName(opts, fn_name, &found_names);
   if (found_names.size() > 1) {
-    // TODO(https://fxbug.dev/5457): Handle overloads.
+    // TODO(https://fxbug.dev/42132103): Handle overloads.
     return cb(Err(fn_name.GetFullName() +
                   " resolved to multiple locations. Overloaded functions are not supported yet."));
   }

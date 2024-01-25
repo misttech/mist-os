@@ -307,7 +307,7 @@ TEST(DwarfSymbolFactory, Array2D) {
   EXPECT_EQ("volatile int", elt_type->GetFullName());
 }
 
-// TODO(https://fxbug.dev/136182): A recent compiler change modified the way the DWARF is
+// TODO(https://fxbug.dev/42085764): A recent compiler change modified the way the DWARF is
 // emitted for DW_AT_const_value, causing this test to fail. There's discussion going on
 // upstream (see the linked upstream llvm bug) that will restore the emitted DWARF to be the
 // same as it was before, so no action is being taken to change the behavior here until that's

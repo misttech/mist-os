@@ -564,9 +564,9 @@ uint64_t VideoDecoderRunner::QueueH264Frames(uint64_t stream_lifetime_ordinal,
 
       // Force some frames to split across packet boundary.
       //
-      // TODO(https://fxbug.dev/13483): Also cover more than one frame in a packet, and split headers.
+      // TODO(https://fxbug.dev/42084549): Also cover more than one frame in a packet, and split headers.
       //
-      // TODO(https://fxbug.dev/13483): Enable testing frames split across packets once SW decode can do
+      // TODO(https://fxbug.dev/42084549): Enable testing frames split across packets once SW decode can do
       // that, or have this be gated on whether capability was requested of decoder and try
       // requesting this capability then fall back to not this capability.
       (void)kMaxFrameBytesPerPacket;
@@ -958,7 +958,7 @@ void VideoDecoderRunner::Run() {
         // This is required for timestamp_ish values to transit the
         // Codec.
         //
-        // TODO(https://fxbug.dev/57706): We shouldn't need to promise this to have PTS(s) flow through.
+        // TODO(https://fxbug.dev/42135582): We shouldn't need to promise this to have PTS(s) flow through.
         decoder_params.set_promise_separate_access_units_on_input(true);
         if (params_.is_secure_output) {
           decoder_params.set_secure_output_mode(fuchsia::mediacodec::SecureMemoryMode::ON);

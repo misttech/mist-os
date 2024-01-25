@@ -210,7 +210,7 @@ fuchsia_test_package("use_h264_decoder_stream_switching_tests") {
         dimensions = {
           device_type = "Atlas"
         }
-        tags = [ "flaky" ]  # TODO(https://fxbug.dev/113158): Re-enable when
+        tags = [ "flaky" ]  # TODO(https://fxbug.dev/42064464): Re-enable when
                             # test is no
                             # longer flaky
       },
@@ -222,7 +222,7 @@ fuchsia_test_package("use_h264_decoder_stream_switching_tests") {
         dimensions = {
           device_type = "Intel NUC Kit NUC7i5DNHE"
         }
-        tags = [ "flaky" ]  # TODO(https://fxbug.dev/113158): Re-enable when
+        tags = [ "flaky" ]  # TODO(https://fxbug.dev/42064464): Re-enable when
                             # test is no
                             # longer flaky
       },
@@ -230,9 +230,10 @@ fuchsia_test_package("use_h264_decoder_stream_switching_tests") {
         dimensions = {
           device_type = "QEMU"
         }
-        tags = [ "flaky" ]  # TODO(https://fxbug.dev/49700): Re-enable when test
-                            # is no
-                            # longer flaky
+        tags =
+            [ "flaky" ]  # TODO(https://fxbug.dev/42126698): Re-enable when test
+                         # is no
+                         # longer flaky
       },
     ]
   }
@@ -332,7 +333,7 @@ fuchsia_unittest_package("use_h264_decoder_secure_input_output_test") {
 
   test_specs = {
     # Without ClearTVP, can't pass anywhere at the moment.
-    # TODO(https://fxbug.dev/42991): Re-enable.
+    # TODO(https://fxbug.dev/42119245): Re-enable.
     environments = []
   }
 }
@@ -410,7 +411,7 @@ fuchsia_unittest_component("vp9_decoder_fuzzer_test_comp") {
 fuchsia_test_package("vp9_decoder_fuzzer_tests") {
   test_components = [ ":vp9_decoder_fuzzer_test_comp" ]
   test_specs = {
-    # Disable on astro because not enough contiguous memory. TODO(https://fxbug.dev/41735) Re-enable
+    # Disable on astro because not enough contiguous memory. TODO(https://fxbug.dev/42117851) Re-enable
     environments = [
       sherlock_env,
       vim3_env,
@@ -594,7 +595,7 @@ fuchsia_unittest_package("use_vp9_decoder_secure_input_output_test") {
 
   test_specs = {
     # Without ClearTVP, can't pass anywhere at the moment.
-    # TODO(https://fxbug.dev/42991): Re-enable.
+    # TODO(https://fxbug.dev/42119245): Re-enable.
     environments = []
   }
 }
@@ -736,7 +737,7 @@ if (build_all_vp9_file_decoder_conformance_tests) {
       test_specs = {
         # This should pass when run on VIM2 or astro, and will fail in any env
         # that lacks VP9 decode.
-        # Disable on astro because not enough contiguous memory. TODO(https://fxbug.dev/41735) Re-enable
+        # Disable on astro because not enough contiguous memory. TODO(https://fxbug.dev/42117851) Re-enable
         environments = [
           sherlock_env,
           vim3_env,

@@ -587,7 +587,7 @@ void FindLocalVariable(const FindNameOptions& options, const CodeBlock* block,
                        const ParsedIdentifier& looking_for, std::vector<FoundName>* results) {
   FX_DCHECK(options.search_mode == FindNameOptions::kLexical);
 
-  // TODO(https://fxbug.dev/6038) lookup type names defined locally in this function.
+  // TODO(https://fxbug.dev/42138553) lookup type names defined locally in this function.
 
   // Local variables can only be simple names.
   const std::string* name = GetSingleComponentIdentifierName(looking_for);

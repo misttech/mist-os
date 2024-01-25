@@ -35,7 +35,7 @@ fuchsia_driver("tas5720-driver") {
     "//zircon/system/ulib/zx",
   ]
 
-  # TODO(https://fxbug.dev/58162): delete the below and fix compiler warnings
+  # TODO(https://fxbug.dev/42136089): delete the below and fix compiler warnings
   configs += [ "//build/config:Wno-conversion" ]
 }
 
@@ -81,7 +81,7 @@ test("tas5720-test-bin") {
     "//zircon/system/ulib/zxtest",
   ]
 
-  # TODO(https://fxbug.dev/58162): delete the below and fix compiler warnings
+  # TODO(https://fxbug.dev/42136089): delete the below and fix compiler warnings
   configs += [ "//build/config:Wno-conversion" ]
 }
 

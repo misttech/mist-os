@@ -709,7 +709,7 @@ impl ImageAssemblyConfigBuilder {
             if bootfs_repackager.has_component(component.clone()) {
                 bootfs_repackager.set_component_config(component, values.fields.into())?;
             } else {
-                // TODO(https://fxbug.dev/101556) return an error here
+                // TODO(https://fxbug.dev/42052394) return an error here
             }
         }
 
@@ -762,7 +762,7 @@ impl ImageAssemblyConfigBuilder {
                         .with_context(|| format!("parsing repackaged {package}"))?;
                     source_package_set.insert(destination, new_entry);
                 } else {
-                    // TODO(https://fxbug.dev/101556) return an error here
+                    // TODO(https://fxbug.dev/42052394) return an error here
                 }
             }
         }
@@ -813,7 +813,7 @@ impl ImageAssemblyConfigBuilder {
         }
 
         {
-            // TODO(https://fxbug.dev/98103) Make the presence of the base package an explicit parameter
+            // TODO(https://fxbug.dev/42180403) Make the presence of the base package an explicit parameter
             // Add a base drivers manifest to Bootfs containing base driver urls, if any.
             let mut driver_manifest_builder = DriverManifestBuilder::default();
             for (package_url, driver_details) in base_drivers.entries {
@@ -821,7 +821,7 @@ impl ImageAssemblyConfigBuilder {
                     .add_driver(driver_details, &package_url)
                     .with_context(|| format!("adding driver {}", &package_url))?;
             }
-            // TODO(https://fxbug.dev/128391): encapsulate manifests in a DomainConfig package.
+            // TODO(https://fxbug.dev/42078837): encapsulate manifests in a DomainConfig package.
             let manifest_path = outdir.join(BootfsDestination::BaseDriverManifest.to_string());
             driver_manifest_builder.create_manifest_file(&manifest_path)?;
             bootfs_files.add_entry(FileEntry {

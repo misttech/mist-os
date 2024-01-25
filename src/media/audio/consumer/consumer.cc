@@ -306,7 +306,7 @@ void Consumer::EndOfStream(EndOfStreamCompleter::Sync& completer) {
     return;
   }
 
-  // TODO(https://fxbug.dev/126765): May need to add logic to send OnEndOfStream, if the client needs it.
+  // TODO(https://fxbug.dev/42077439): May need to add logic to send OnEndOfStream, if the client needs it.
   fit::result<fidl::OneWayError> result = renderer_->EndOfStream();
   if (result.is_error()) {
     FX_LOGS(ERROR) << "Failed to EndOfStream: " << result.error_value().status_string();

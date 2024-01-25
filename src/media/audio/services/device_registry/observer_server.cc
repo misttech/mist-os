@@ -29,7 +29,7 @@ std::shared_ptr<ObserverServer> ObserverServer::Create(
 ObserverServer::ObserverServer(std::shared_ptr<const Device> device) : device_(device) {
   ADR_LOG_OBJECT(kLogObjectLifetimes);
 
-  // TODO(https://fxbug.dev/117199): Consider Health-check, if this can change post-initialization.
+  // TODO(https://fxbug.dev/42068381): Consider Health-check, if this can change post-initialization.
 
   ++count_;
   LogObjectCounts();

@@ -22,7 +22,7 @@
 namespace amlogic_decoder {
 namespace test {
 
-// TODO(https://fxbug.dev/104928) Remove the calls to fuchsia.device/Controller once upgraded to DFv2
+// TODO(https://fxbug.dev/42056100) Remove the calls to fuchsia.device/Controller once upgraded to DFv2
 class TestDeviceBase {
  public:
   static zx::result<TestDeviceBase> CreateFromFileName(std::string_view path) {

@@ -95,7 +95,7 @@ CodecAdapterSbcDecoder::CoreCodecGetBufferCollectionConstraints(
   // have the token here.
   ZX_DEBUG_ASSERT(!partial_settings.has_sysmem_token());
 
-  // TODO(https://fxbug.dev/13531): plumb/permit range of buffer count from further down,
+  // TODO(https://fxbug.dev/42084949): plumb/permit range of buffer count from further down,
   // instead of single number frame_count, and set this to the actual
   // stream-required # of reference frames + # that can concurrently decode.
   // Packets and buffers are not the same thing, and we should permit the # of

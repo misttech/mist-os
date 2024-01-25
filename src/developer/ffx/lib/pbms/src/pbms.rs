@@ -45,7 +45,7 @@ pub(crate) async fn local_path_helper(
     assert!(!product_url.fragment().is_none());
     if let Some(path) = &path_from_file_url(product_url) {
         if dir {
-            // TODO(https://fxbug.dev/98009): Unify the file layout between local and remote
+            // TODO(https://fxbug.dev/42180298): Unify the file layout between local and remote
             // product bundles to avoid this hack.
             if path.starts_with(sdk_root) {
                 Ok(sdk_root.to_path_buf())

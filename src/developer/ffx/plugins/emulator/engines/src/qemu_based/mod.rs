@@ -62,7 +62,7 @@ mod modules {
         // Attempts to get a host tool from the SDK manifest. If it fails, falls
         // back to attempting to derive the path to the host tool binary by simply checking
         // for its existence in `ffx`'s directory.
-        // TODO(https://fxbug.dev/99321): When issues around including aemu in the sdk are resolved, this
+        // TODO(https://fxbug.dev/42181753): When issues around including aemu in the sdk are resolved, this
         // hack can be removed.
         match sdk.get_host_tool(name) {
             Ok(path) => Ok(path),
@@ -179,7 +179,7 @@ pub(crate) trait QemuBasedEngine: EmulatorEngine {
 
         if zbi_path.exists() && reuse {
             tracing::debug!("Using existing file for {:?}", zbi_path.file_name().unwrap());
-            // TODO(https://fxbug.dev/112577): Make a decision to reuse zbi with no modifications or not.
+            // TODO(https://fxbug.dev/42063890): Make a decision to reuse zbi with no modifications or not.
             // There is the potential that the ssh keys have changed, or the ip address
             // of the host interface has changed, which will cause the connection
             // to the emulator instance to fail.

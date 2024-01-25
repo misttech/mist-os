@@ -243,7 +243,7 @@ TEST_F(AudioCapturerClockTestOldAPI, SetRefClockAfterCaptureShouldDisconnect) {
 
 // Setting the reference clock should fail, any time after capture has started (even if cancelled).
 //
-// TODO(https://fxbug.dev/57079): deflake and re-enable.
+// TODO(https://fxbug.dev/42134885): deflake and re-enable.
 TEST_F(AudioCapturerClockTestOldAPI, DISABLED_SetRefClockCaptureCancelledShouldDisconnect) {
   SetFormat();
   SetUpPayloadBuffer();

@@ -36,7 +36,7 @@ executable("crasher") {
 
   sources = [ "crasher.cc" ]
 
-  # TODO(https://fxbug.dev/118712): Remove this once the underlying issue is addressed.
+  # TODO(https://fxbug.dev/42069777): Remove this once the underlying issue is addressed.
   exclude_toolchain_tags = [ "hwasan" ]
 }
 
@@ -72,7 +72,7 @@ executable("exception_broker_integration_test_exe") {
     "//third_party/googletest:gtest",
   ]
 
-  # TODO(https://fxbug.dev/118712): Remove this once the underlying issue is addressed.
+  # TODO(https://fxbug.dev/42069777): Remove this once the underlying issue is addressed.
   exclude_toolchain_tags = [ "hwasan" ]
 }
 
@@ -105,7 +105,7 @@ executable("exception_broker_unittest_exe") {
     "//zircon/system/ulib/zx",
   ]
 
-  # TODO(https://fxbug.dev/58162): delete the below and fix compiler warnings
+  # TODO(https://fxbug.dev/42136089): delete the below and fix compiler warnings
   configs += [ "//build/config:Wno-conversion" ]
 }
 

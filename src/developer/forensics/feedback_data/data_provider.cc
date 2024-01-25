@@ -99,7 +99,7 @@ void DataProvider::GetAnnotations(fuchsia::feedback::GetAnnotationsParameters pa
                            ? zx::duration(params.collection_timeout_per_annotation())
                            : kDefaultDataTimeout;
 
-  // TODO(https://fxbug.dev/74102): Track how long GetAnnotations took via Cobalt.
+  // TODO(https://fxbug.dev/42153749): Track how long GetAnnotations took via Cobalt.
   executor_.schedule_task(GetAnnotations(timeout).and_then(
       [callback = std::move(callback)](feedback::Annotations& annotations) {
         callback(feedback::Encode<fuchsia::feedback::Annotations>(annotations));

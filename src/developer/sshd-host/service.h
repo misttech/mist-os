@@ -57,7 +57,7 @@ class Service {
 
   async_dispatcher_t* dispatcher_;
   uint16_t port_;
-  // TODO(https://fxbug.dev/21198): Replace these with a single dual-stack
+  // TODO(https://fxbug.dev/42095034): Replace these with a single dual-stack
   // socket once Netstack3 supports that.
   Socket v4_socket_, v6_socket_;
   uint64_t next_child_num_ = 0;

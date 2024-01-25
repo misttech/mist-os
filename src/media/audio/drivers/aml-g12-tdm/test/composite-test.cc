@@ -288,7 +288,7 @@ TEST_F(AmlG12CompositeTest, CompositeProperties) {
 }
 
 TEST_F(AmlG12CompositeTest, Reset) {
-  // TODO(https://fxbug.dev/132252): Add behavior to change state recovered to the configuration
+  // TODO(https://fxbug.dev/42082341): Add behavior to change state recovered to the configuration
   // below.
   fidl::Result reset_result = client_->Reset();
   ASSERT_TRUE(reset_result.is_ok());

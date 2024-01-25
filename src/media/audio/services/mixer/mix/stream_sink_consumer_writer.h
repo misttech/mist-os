@@ -97,7 +97,7 @@ class StreamSinkConsumerWriter : public ConsumerStage::Writer {
     // Callback which invokes fuchsia.audio.StreamSink/End.
     std::function<void()> call_end;
 
-    // TODO(https://fxbug.dev/114393): Callback to report overflow.
+    // TODO(https://fxbug.dev/42065692): Callback to report overflow.
 
     // Queue of objects to use for future packets. In the steady state, objects are pulled from this
     // queue, written to, forwarded to `call_put_packet`, then released back into this queue to be

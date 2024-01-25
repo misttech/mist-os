@@ -369,7 +369,7 @@ TEST_F(GraphServerTest, CreateProducerFailsBadFields) {
 TEST_F(GraphServerTest, CreateProducerFailsUnknownDataSource) {
   using ProducerDataSource = ::fuchsia_audio_mixer::wire::ProducerDataSource;
 
-  // TODO(https://fxbug.dev/109467): When this bug is fixed, this code can be simplified, and possibly
+  // TODO(https://fxbug.dev/42060867): When this bug is fixed, this code can be simplified, and possibly
   // merged with CreateProducerFailsBadFields. For now we must create an "unknown" variant manually.
   struct RawProducerDataSource {
     fidl_xunion_tag_t ordinal;

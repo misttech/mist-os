@@ -12,7 +12,7 @@ namespace media_audio {
 
 class DeviceWarningTest : public DeviceTestBase {};
 
-// TODO(https://fxbug.dev/117826): test non-compliant driver behavior (e.g. min_gain>max_gain).
+// TODO(https://fxbug.dev/42069012): test non-compliant driver behavior (e.g. min_gain>max_gain).
 
 TEST_F(DeviceWarningTest, DeviceUnhealthy) {
   fake_driver_->set_health_state(false);
@@ -27,7 +27,7 @@ TEST_F(DeviceWarningTest, DeviceUnhealthy) {
   EXPECT_EQ(fake_device_presence_watcher_->on_removal_count(), 0u);
 }
 
-// TODO(https://fxbug.dev/117199): If Health can change post-initialization, test: device becomes
+// TODO(https://fxbug.dev/42068381): If Health can change post-initialization, test: device becomes
 //   unhealthy before any Device method. Expect method-specific failure + State::Error notif.
 
 TEST_F(DeviceWarningTest, UnhealthyDeviceRemoved) {
@@ -184,8 +184,8 @@ TEST_F(DeviceWarningTest, CannotSetGainWithoutControl) {
   EXPECT_FALSE(*gain_state.agc_enabled());
 }
 
-// TODO(https://fxbug.dev/117826): CreateRingBuffer with bad format.
+// TODO(https://fxbug.dev/42069012): CreateRingBuffer with bad format.
 
-// TODO(https://fxbug.dev/117826): GetVmo size too large; min_frames too large
+// TODO(https://fxbug.dev/42069012): GetVmo size too large; min_frames too large
 
 }  // namespace media_audio

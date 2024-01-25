@@ -375,7 +375,7 @@ void PrettyTypeManager::AddDefaultRustPrettyTypes() {
                                                     {"as_mut_ptr", "data_ptr"},
                                                     {"len", "length"},
                                                     {"is_empty", "length == 0"}}));
-  // TODO(https://fxbug.dev/79506): Support Rust slices.
+  // TODO(https://fxbug.dev/42159750): Support Rust slices.
 
   // Owned version of String, OsString and Vec.
   rust_.emplace_back(InternalGlob("alloc::string::String"),

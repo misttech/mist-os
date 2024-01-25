@@ -150,7 +150,7 @@ impl Isolate {
             std::env::var("FUCHSIA_DEVICE_ADDR").ok().filter(|addr| !addr.is_empty())
         {
             // When run in infra, disable mdns discovery.
-            // TODO(https://fxbug.dev/44710): Remove when we have proper network isolation.
+            // TODO(https://fxbug.dev/42121155): Remove when we have proper network isolation.
             target_addr = Option::Some(Cow::Owned(addr.to_string() + &":0".to_string()));
             mdns_discovery = false;
         }
@@ -218,7 +218,7 @@ impl Isolate {
         )?;
 
         // NOTE: config values from this Isolate might not be found correctly,
-        // due to issues with caching.  Until this is fixed (TODO(https://fxbug.dev/124465)),
+        // due to issues with caching.  Until this is fixed (TODO(https://fxbug.dev/42075364)),
         // callers should call `ffx_config::cache_invalidate()` if they will be
         // querying config values, e.g. "log.dir".
         Ok(Isolate { tmpdir, log_dir, env_ctx })
@@ -336,7 +336,7 @@ struct UserConfigLog<'a> {
     level: Option<String>,
     // For target_levels, we'd like to use a HashMap<String, String> or even
     // a serde_json::Map<String, String>, but ffx_config doesn't returning
-    // support maps -- TODO(https://fxbug.dev/124260). So for now we're stuck with getting a
+    // support maps -- TODO(https://fxbug.dev/42075137). So for now we're stuck with getting a
     // serde_json::Value directly, and hoping it's the right type.  At least
     // we're no worse off than our caller is, since if target_levels isn't a
     // String=>String map, then nothing using this config entry was going to

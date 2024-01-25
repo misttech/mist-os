@@ -180,7 +180,7 @@ zx_status_t SelectBestFormat(const std::vector<fuchsia::hardware::audio::PcmSupp
     // OK, we have computed the best option supported by this frame rate range. Weight the score,
     // and if it is better then any of our previous best score, replace our previous best with this.
     //
-    // TODO(https://fxbug.dev/119661): reconsider this scoring formula
+    // TODO(https://fxbug.dev/42070759): reconsider this scoring formula
     uint32_t score;
     score = (sample_format_score * 100)   // format is the most important.
             + (channel_count_score * 10)  // channel count comes second.

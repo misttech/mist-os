@@ -91,7 +91,7 @@ impl FromStr for KeyEntry {
             return Err(ParseKeyError::InvalidKeyType);
         };
 
-        // TODO(https://fxbug.dev/88280): Consider requiring reasonable key sizes.
+        // TODO(https://fxbug.dev/42169495): Consider requiring reasonable key sizes.
         // OpenSSH enforces a minimum size of 1024 bits for RSA, for example
         // (which is still too low).
 

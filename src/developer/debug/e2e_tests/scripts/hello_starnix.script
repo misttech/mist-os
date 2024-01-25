@@ -6,7 +6,7 @@
 ## require optimize=none
 ## set timeout 30
 
-# TODO(https://fxbug.dev/127384): attach shouldn't be necessary.
+# TODO(https://fxbug.dev/42077983): attach shouldn't be necessary.
 [zxdb] attach hello_starnix
 Waiting for process matching "hello_starnix".
 
@@ -20,7 +20,7 @@ Attached Process 1 state=Running koid=?? name=data/bin/hello_starnix component=s
 [zxdb] next
 🛑 main() • hello_starnix.cc:10
 
-# TODO(https://fxbug.dev/131121): We should use hardware breakpoints here but they don't work on arm64.
+# TODO(https://fxbug.dev/42081338): We should use hardware breakpoints here but they don't work on arm64.
 [zxdb] b sys_exit_group
 Created Breakpoint 2 @ sys_exit_group
 

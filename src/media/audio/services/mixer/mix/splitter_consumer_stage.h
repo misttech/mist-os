@@ -46,7 +46,7 @@ class SplitterConsumerStage : public BaseConsumerStage {
   explicit SplitterConsumerStage(Args args);
 
   // Implements `PipelineStage`.
-  // TODO(https://fxbug.dev/114913): Add TA_REQ(thread()->checker()) to this declaration in `PipelineStage`.
+  // TODO(https://fxbug.dev/42066198): Add TA_REQ(thread()->checker()) to this declaration in `PipelineStage`.
   void UpdatePresentationTimeToFracFrame(std::optional<TimelineFunction> f) final;
 
   // Fills the ring buffer up to what is needed for the given mix job.
@@ -67,7 +67,7 @@ class SplitterConsumerStage : public BaseConsumerStage {
   // never changes. Hence, if the producer sees a non-nullopt value, it should not be concerned
   // about concurrent changes.
   //
-  // TODO(https://fxbug.dev/114913): Add TA_REQ(thread()->checker()) to
+  // TODO(https://fxbug.dev/42066198): Add TA_REQ(thread()->checker()) to
   // `PipelineStage::presentation_time_to_frac_frame`.
   [[nodiscard]] std::optional<TimelineFunction> presentation_time_to_frac_frame() const;
 
