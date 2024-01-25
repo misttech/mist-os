@@ -241,7 +241,7 @@ async fn inspect_counters(name: &str) {
     println!("Got inspect data: {:#?}", data);
     diagnostics_assertions::assert_data_tree!(data, "root": contains {
         "Counters": {
-            "Devices": {
+            "Device": {
                 "Rx": {
                     TotalFrames: 1u64,
                     Malformed: 0u64,
@@ -286,6 +286,8 @@ async fn inspect_counters(name: &str) {
                         ParameterProblem: 0u64,
                         PacketTooBig: 0u64,
                         Error: 0u64,
+                        ErrorDeliveredToTransportLayer: 0u64,
+                        ErrorDeliveredToSocket: 0u64,
                     },
                     "Tx": {
                         Reply: 0u64,
@@ -309,6 +311,8 @@ async fn inspect_counters(name: &str) {
                         ParameterProblem: 0u64,
                         PacketTooBig: 0u64,
                         Error: 0u64,
+                        ErrorDeliveredToTransportLayer: 0u64,
+                        ErrorDeliveredToSocket: 0u64,
                         "NDP": {
                             NeighborSolicitation: 0u64,
                             NeighborAdvertisement: 0u64,
@@ -347,6 +351,7 @@ async fn inspect_counters(name: &str) {
                 },
                 "Forwarding": {
                     Forwarded: 0u64,
+                    ForwardingDisabled: 0u64,
                     NoRouteToHost: 0u64,
                     MtuExceeded: 0u64,
                     TtlExpired: 0u64,
@@ -377,6 +382,7 @@ async fn inspect_counters(name: &str) {
                 },
                 "Forwarding": {
                     Forwarded: 0u64,
+                    ForwardingDisabled: 0u64,
                     NoRouteToHost: 0u64,
                     MtuExceeded: 0u64,
                     TtlExpired: 0u64,

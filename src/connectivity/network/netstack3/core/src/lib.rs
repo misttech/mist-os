@@ -72,6 +72,7 @@ pub mod device {
 
     // Re-exported types.
     pub use api::{RemoveDeviceResult, RemoveDeviceResultWithContext};
+    pub use arp::ArpCounters;
     pub use base::{
         DeviceCounters, DeviceLayerEventDispatcher, DeviceLayerStateTypes, DeviceSendFrameError,
         DevicesVisitor, InspectDeviceState,
@@ -152,7 +153,10 @@ pub mod ip {
 
     // Re-exported types.
     pub use crate::algorithm::STABLE_IID_SECRET_KEY_BYTES;
-    pub use base::{IpLayerEvent, ResolveRouteError};
+    pub use base::{
+        IpCountersInner as CommonIpCounters, IpLayerEvent, Ipv4Counters, Ipv6Counters,
+        ResolveRouteError,
+    };
     pub use device::{
         api::{AddIpAddrSubnetError, AddrSubnetAndManualConfigEither, SetIpAddressPropertiesError},
         config::{
@@ -162,6 +166,9 @@ pub mod ip {
         slaac::{SlaacConfiguration, TemporarySlaacAddressConfiguration},
         state::{Ipv4AddrConfig, Ipv6AddrManualConfig, Ipv6DeviceConfiguration, Lifetime},
         AddressRemovedReason, IpAddressState, IpDeviceEvent,
+    };
+    pub use icmp::{
+        IcmpRxCountersInner as IcmpRxCounters, IcmpTxCountersInner as IcmpTxCounters, NdpCounters,
     };
     pub use socket::{IpSockCreateAndSendError, IpSockCreationError, IpSockSendError};
 }
@@ -245,7 +252,7 @@ pub mod types {
 pub mod udp {
     pub use crate::transport::udp::{
         ConnInfo, ListenerInfo, SendError, SendToError, SocketId, SocketInfo, UdpBindingsContext,
-        UdpRemotePort,
+        UdpCountersInner as UdpCounters, UdpRemotePort,
     };
 }
 

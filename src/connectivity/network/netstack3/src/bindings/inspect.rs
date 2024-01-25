@@ -13,14 +13,19 @@ use crate::bindings::{
     },
     BindingsCtx, Ctx, StackTime,
 };
-use fuchsia_inspect::ArrayProperty as _;
+use fuchsia_inspect::{ArrayProperty as _, Node};
 use net_types::{
     ip::{Ip, IpAddress, IpVersion, Ipv4, Ipv6},
     Witness as _,
 };
 use netstack3_core::{
-    device::{self, DeviceId, EthernetLinkDevice, WeakDeviceId},
+    device::{self, ArpCounters, DeviceCounters, DeviceId, EthernetLinkDevice, WeakDeviceId},
+    inspect::StackCounters,
+    ip::{
+        CommonIpCounters, IcmpRxCounters, IcmpTxCounters, Ipv4Counters, Ipv6Counters, NdpCounters,
+    },
     neighbor, tcp,
+    udp::UdpCounters,
 };
 use std::{fmt::Debug, string::ToString as _};
 
@@ -256,10 +261,27 @@ pub(crate) fn neighbors(mut ctx: Ctx) -> fuchsia_inspect::Inspector {
 
 pub(crate) fn counters(ctx: &Ctx) -> fuchsia_inspect::Inspector {
     impl<'a> netstack3_core::inspect::CounterVisitor for Visitor<'a> {
-        fn visit_counters(&self, counters: netstack3_core::inspect::StackCounters<'_>) {
+        fn visit_counters(
+            &self,
+            StackCounters {
+                ipv4_common,
+                ipv6_common,
+                ipv4,
+                ipv6,
+                arp,
+                udpv4,
+                udpv6,
+                icmpv4_rx,
+                icmpv4_tx,
+                icmpv6_rx,
+                icmpv6_tx,
+                ndp,
+                devices,
+            }: StackCounters<'_>,
+        ) {
             let Self(node) = self;
-            node.record_child("Devices", |node| {
-                let netstack3_core::device::DeviceCounters {
+            node.record_child("Device", |node| {
+                let DeviceCounters {
                     recv_arp_delivered,
                     recv_frame,
                     recv_ip_delivered,
@@ -274,7 +296,7 @@ pub(crate) fn counters(ctx: &Ctx) -> fuchsia_inspect::Inspector {
                     send_queue_full,
                     send_serialize_error,
                     send_total_frames,
-                } = counters.devices;
+                } = devices;
                 node.record_child("Rx", |node| {
                     node.record_uint("TotalFrames", recv_frame.get());
                     node.record_uint("Malformed", recv_parse_error.get());
@@ -295,295 +317,108 @@ pub(crate) fn counters(ctx: &Ctx) -> fuchsia_inspect::Inspector {
                 });
             });
             node.record_child("Arp", |node| {
+                let ArpCounters {
+                    rx_dropped_non_local_target,
+                    rx_malformed_packets,
+                    rx_packets,
+                    rx_requests,
+                    rx_responses,
+                    tx_requests,
+                    tx_requests_dropped_no_local_addr,
+                    tx_responses,
+                } = arp;
                 node.record_child("Rx", |node| {
-                    node.record_uint("TotalPackets", counters.arp.rx_packets.get());
-                    node.record_uint("Requests", counters.arp.rx_requests.get());
-                    node.record_uint("Responses", counters.arp.rx_responses.get());
-                    node.record_uint("Malformed", counters.arp.rx_malformed_packets.get());
-                    node.record_uint(
-                        "NonLocalDstAddr",
-                        counters.arp.rx_dropped_non_local_target.get(),
-                    );
+                    node.record_uint("TotalPackets", rx_packets.get());
+                    node.record_uint("Requests", rx_requests.get());
+                    node.record_uint("Responses", rx_responses.get());
+                    node.record_uint("Malformed", rx_malformed_packets.get());
+                    node.record_uint("NonLocalDstAddr", rx_dropped_non_local_target.get());
                 });
                 node.record_child("Tx", |node| {
-                    node.record_uint("Requests", counters.arp.tx_requests.get());
+                    node.record_uint("Requests", tx_requests.get());
                     node.record_uint(
                         "RequestsNonLocalSrcAddr",
-                        counters.arp.tx_requests_dropped_no_local_addr.get(),
+                        tx_requests_dropped_no_local_addr.get(),
                     );
-                    node.record_uint("Responses", counters.arp.tx_responses.get());
+                    node.record_uint("Responses", tx_responses.get());
                 });
             });
             node.record_child("ICMP", |node| {
                 node.record_child("V4", |node| {
                     node.record_child("Rx", |node| {
-                        node.record_uint("EchoRequest", counters.icmpv4_rx.echo_request.get());
-                        node.record_uint("EchoReply", counters.icmpv4_rx.echo_reply.get());
-                        node.record_uint(
-                            "TimestampRequest",
-                            counters.icmpv4_rx.timestamp_request.get(),
-                        );
-                        node.record_uint(
-                            "DestUnreachable",
-                            counters.icmpv4_rx.dest_unreachable.get(),
-                        );
-                        node.record_uint("TimeExceeded", counters.icmpv4_rx.time_exceeded.get());
-                        node.record_uint(
-                            "ParameterProblem",
-                            counters.icmpv4_rx.parameter_problem.get(),
-                        );
-                        node.record_uint("PacketTooBig", counters.icmpv4_rx.packet_too_big.get());
-                        node.record_uint("Error", counters.icmpv4_rx.error.get());
+                        record_icmp_rx(node, icmpv4_rx.get());
                     });
                     node.record_child("Tx", |node| {
-                        node.record_uint("Reply", counters.icmpv4_tx.reply.get());
-                        node.record_uint(
-                            "ProtocolUnreachable",
-                            counters.icmpv4_tx.protocol_unreachable.get(),
-                        );
-                        node.record_uint(
-                            "PortUnreachable",
-                            counters.icmpv4_tx.port_unreachable.get(),
-                        );
-                        node.record_uint(
-                            "NetUnreachable",
-                            counters.icmpv4_tx.net_unreachable.get(),
-                        );
-                        node.record_uint("TtlExpired", counters.icmpv4_tx.ttl_expired.get());
-                        node.record_uint("PacketTooBig", counters.icmpv4_tx.packet_too_big.get());
-                        node.record_uint(
-                            "ParameterProblem",
-                            counters.icmpv4_tx.parameter_problem.get(),
-                        );
-                        node.record_uint(
-                            "DestUnreachable",
-                            counters.icmpv4_tx.dest_unreachable.get(),
-                        );
-                        node.record_uint("Error", counters.icmpv4_tx.error.get());
+                        record_icmp_tx(node, icmpv4_tx.get());
                     });
                 });
                 node.record_child("V6", |node| {
+                    let NdpCounters {
+                        rx_neighbor_solicitation,
+                        rx_neighbor_advertisement,
+                        rx_router_advertisement,
+                        rx_router_solicitation,
+                        tx_neighbor_advertisement,
+                        tx_neighbor_solicitation,
+                    } = ndp;
                     node.record_child("Rx", |node| {
-                        node.record_uint("EchoRequest", counters.icmpv6_rx.echo_request.get());
-                        node.record_uint("EchoReply", counters.icmpv6_rx.echo_reply.get());
-                        node.record_uint(
-                            "TimestampRequest",
-                            counters.icmpv6_rx.timestamp_request.get(),
-                        );
-                        node.record_uint(
-                            "DestUnreachable",
-                            counters.icmpv6_rx.dest_unreachable.get(),
-                        );
-                        node.record_uint("TimeExceeded", counters.icmpv6_rx.time_exceeded.get());
-                        node.record_uint(
-                            "ParameterProblem",
-                            counters.icmpv6_rx.parameter_problem.get(),
-                        );
-                        node.record_uint("PacketTooBig", counters.icmpv6_rx.packet_too_big.get());
-                        node.record_uint("Error", counters.icmpv6_rx.error.get());
+                        record_icmp_rx(node, icmpv6_rx.get());
                         node.record_child("NDP", |node| {
                             node.record_uint(
                                 "NeighborSolicitation",
-                                counters.ndp.rx_neighbor_solicitation.get(),
+                                rx_neighbor_solicitation.get(),
                             );
                             node.record_uint(
                                 "NeighborAdvertisement",
-                                counters.ndp.rx_neighbor_advertisement.get(),
+                                rx_neighbor_advertisement.get(),
                             );
-                            node.record_uint(
-                                "RouterSolicitation",
-                                counters.ndp.rx_router_solicitation.get(),
-                            );
-                            node.record_uint(
-                                "RouterAdvertisement",
-                                counters.ndp.rx_router_advertisement.get(),
-                            );
+                            node.record_uint("RouterSolicitation", rx_router_solicitation.get());
+                            node.record_uint("RouterAdvertisement", rx_router_advertisement.get());
                         });
                     });
                     node.record_child("Tx", |node| {
-                        node.record_uint("Reply", counters.icmpv6_tx.reply.get());
-                        node.record_uint(
-                            "ProtocolUnreachable",
-                            counters.icmpv6_tx.protocol_unreachable.get(),
-                        );
-                        node.record_uint(
-                            "PortUnreachable",
-                            counters.icmpv6_tx.port_unreachable.get(),
-                        );
-                        node.record_uint(
-                            "NetUnreachable",
-                            counters.icmpv6_tx.net_unreachable.get(),
-                        );
-                        node.record_uint("TtlExpired", counters.icmpv6_tx.ttl_expired.get());
-                        node.record_uint("PacketTooBig", counters.icmpv6_tx.packet_too_big.get());
-                        node.record_uint(
-                            "ParameterProblem",
-                            counters.icmpv6_tx.parameter_problem.get(),
-                        );
-                        node.record_uint(
-                            "DestUnreachable",
-                            counters.icmpv6_tx.dest_unreachable.get(),
-                        );
-                        node.record_uint("Error", counters.icmpv6_tx.error.get());
+                        record_icmp_tx(node, icmpv6_tx.get());
                         node.record_child("NDP", |node| {
                             node.record_uint(
                                 "NeighborAdvertisement",
-                                counters.ndp.tx_neighbor_advertisement.get(),
+                                tx_neighbor_advertisement.get(),
                             );
                             node.record_uint(
                                 "NeighborSolicitation",
-                                counters.ndp.tx_neighbor_solicitation.get(),
+                                tx_neighbor_solicitation.get(),
                             );
                         });
                     });
                 });
             });
             node.record_child("IPv4", |node| {
-                node.record_uint("PacketTx", counters.ipv4_common.send_ip_packet.get());
-                node.record_child("PacketRx", |node| {
-                    node.record_uint("Received", counters.ipv4_common.receive_ip_packet.get());
-                    node.record_uint(
-                        "Dispatched",
-                        counters.ipv4_common.dispatch_receive_ip_packet.get(),
-                    );
-                    node.record_uint("Delivered", counters.ipv4.deliver.get());
-                    node.record_uint(
-                        "OtherHost",
-                        counters.ipv4_common.dispatch_receive_ip_packet_other_host.get(),
-                    );
-                    node.record_uint(
-                        "ParameterProblem",
-                        counters.ipv4_common.parameter_problem.get(),
-                    );
-                    node.record_uint(
-                        "UnspecifiedDst",
-                        counters.ipv4_common.unspecified_destination.get(),
-                    );
-                    node.record_uint(
-                        "UnspecifiedSrc",
-                        counters.ipv4_common.unspecified_source.get(),
-                    );
-                    node.record_uint("Dropped", counters.ipv4_common.dropped.get());
-                });
-                node.record_child("Forwarding", |node| {
-                    node.record_uint("Forwarded", counters.ipv4_common.forward.get());
-                    node.record_uint("NoRouteToHost", counters.ipv4_common.no_route_to_host.get());
-                    node.record_uint("MtuExceeded", counters.ipv4_common.mtu_exceeded.get());
-                    node.record_uint("TtlExpired", counters.ipv4_common.ttl_expired.get());
-                });
-                node.record_uint("RxIcmpError", counters.ipv4_common.receive_icmp_error.get());
-                node.record_child("Fragments", |node| {
-                    node.record_uint(
-                        "ReassemblyError",
-                        counters.ipv4_common.fragment_reassembly_error.get(),
-                    );
-                    node.record_uint(
-                        "NeedMoreFragments",
-                        counters.ipv4_common.need_more_fragments.get(),
-                    );
-                    node.record_uint(
-                        "InvalidFragment",
-                        counters.ipv4_common.invalid_fragment.get(),
-                    );
-                    node.record_uint("CacheFull", counters.ipv4_common.fragment_cache_full.get());
+                record_ip(node, ipv4_common.get(), |node| {
+                    let Ipv4Counters { deliver } = ipv4;
+                    node.record_uint("Delivered", deliver.get());
                 });
             });
             node.record_child("IPv6", |node| {
-                node.record_uint("PacketTx", counters.ipv6_common.send_ip_packet.get());
-                node.record_child("PacketRx", |node| {
-                    node.record_uint("Received", counters.ipv6_common.receive_ip_packet.get());
-                    node.record_uint(
-                        "Dispatched",
-                        counters.ipv6_common.dispatch_receive_ip_packet.get(),
-                    );
-                    node.record_uint("DeliveredMulticast", counters.ipv6.deliver_multicast.get());
-                    node.record_uint("DeliveredUnicast", counters.ipv6.deliver_unicast.get());
-                    node.record_uint(
-                        "OtherHost",
-                        counters.ipv6_common.dispatch_receive_ip_packet_other_host.get(),
-                    );
-                    node.record_uint(
-                        "ParameterProblem",
-                        counters.ipv6_common.parameter_problem.get(),
-                    );
-                    node.record_uint(
-                        "UnspecifiedDst",
-                        counters.ipv6_common.unspecified_destination.get(),
-                    );
-                    node.record_uint(
-                        "UnspecifiedSrc",
-                        counters.ipv6_common.unspecified_source.get(),
-                    );
-                    node.record_uint("Dropped", counters.ipv6_common.dropped.get());
-                    node.record_uint("DroppedTentativeDst", counters.ipv6.drop_for_tentative.get());
-                    node.record_uint(
-                        "DroppedNonUnicastSrc",
-                        counters.ipv6.non_unicast_source.get(),
-                    );
-                    node.record_uint(
-                        "DroppedExtensionHeader",
-                        counters.ipv6.extension_header_discard.get(),
-                    );
-                });
-                node.record_child("Forwarding", |node| {
-                    node.record_uint("Forwarded", counters.ipv6_common.forward.get());
-                    node.record_uint("NoRouteToHost", counters.ipv6_common.no_route_to_host.get());
-                    node.record_uint("MtuExceeded", counters.ipv6_common.mtu_exceeded.get());
-                    node.record_uint("TtlExpired", counters.ipv6_common.ttl_expired.get());
-                });
-                node.record_uint("RxIcmpError", counters.ipv6_common.receive_icmp_error.get());
-                node.record_child("Fragments", |node| {
-                    node.record_uint(
-                        "ReassemblyError",
-                        counters.ipv6_common.fragment_reassembly_error.get(),
-                    );
-                    node.record_uint(
-                        "NeedMoreFragments",
-                        counters.ipv6_common.need_more_fragments.get(),
-                    );
-                    node.record_uint(
-                        "InvalidFragment",
-                        counters.ipv6_common.invalid_fragment.get(),
-                    );
-                    node.record_uint("CacheFull", counters.ipv6_common.fragment_cache_full.get());
+                record_ip(node, ipv6_common.get(), |node| {
+                    let Ipv6Counters {
+                        deliver_multicast,
+                        deliver_unicast,
+                        drop_for_tentative,
+                        non_unicast_source,
+                        extension_header_discard,
+                    } = ipv6;
+                    node.record_uint("DeliveredMulticast", deliver_multicast.get());
+                    node.record_uint("DeliveredUnicast", deliver_unicast.get());
+                    node.record_uint("DroppedTentativeDst", drop_for_tentative.get());
+                    node.record_uint("DroppedNonUnicastSrc", non_unicast_source.get());
+                    node.record_uint("DroppedExtensionHeader", extension_header_discard.get());
                 });
             });
             node.record_child("UDP", |node| {
                 node.record_child("V4", |node| {
-                    node.record_child("Rx", |node| {
-                        node.record_uint("Received", counters.udpv4.rx.get());
-                        node.record_child("Errors", |node| {
-                            node.record_uint("MappedAddr", counters.udpv4.rx_mapped_addr.get());
-                            node.record_uint(
-                                "UnknownDstPort",
-                                counters.udpv4.rx_unknown_dest_port.get(),
-                            );
-                            node.record_uint("Malformed", counters.udpv4.rx_malformed.get());
-                        });
-                    });
-                    node.record_child("Tx", |node| {
-                        node.record_uint("Sent", counters.udpv4.tx.get());
-                        node.record_uint("Errors", counters.udpv4.tx_error.get());
-                    });
-                    node.record_uint("IcmpErrors", counters.udpv4.rx_icmp_error.get());
+                    record_udp(node, udpv4.get());
                 });
                 node.record_child("V6", |node| {
-                    node.record_child("Rx", |node| {
-                        node.record_uint("Received", counters.udpv6.rx.get());
-                        node.record_child("Errors", |node| {
-                            node.record_uint("MappedAddr", counters.udpv4.rx_mapped_addr.get());
-                            node.record_uint(
-                                "UnknownDstPort",
-                                counters.udpv6.rx_unknown_dest_port.get(),
-                            );
-                            node.record_uint("Malformed", counters.udpv6.rx_malformed.get());
-                        });
-                    });
-                    node.record_child("Tx", |node| {
-                        node.record_uint("Sent", counters.udpv6.tx.get());
-                        node.record_uint("Errors", counters.udpv6.tx_error.get());
-                    });
-                    node.record_uint("IcmpErrors", counters.udpv6.rx_icmp_error.get());
+                    record_udp(node, udpv6.get());
                 });
             });
         }
@@ -592,4 +427,132 @@ pub(crate) fn counters(ctx: &Ctx) -> fuchsia_inspect::Inspector {
     let core_ctx = ctx.core_ctx();
     netstack3_core::inspect::inspect_counters::<_, _>(core_ctx, &Visitor(inspector.root()));
     inspector
+}
+
+fn record_icmp_rx(
+    node: &Node,
+    IcmpRxCounters {
+        error,
+        error_delivered_to_transport_layer,
+        error_delivered_to_socket,
+        echo_request,
+        echo_reply,
+        timestamp_request,
+        dest_unreachable,
+        time_exceeded,
+        parameter_problem,
+        packet_too_big,
+    }: &IcmpRxCounters,
+) {
+    node.record_uint("EchoRequest", echo_request.get());
+    node.record_uint("EchoReply", echo_reply.get());
+    node.record_uint("TimestampRequest", timestamp_request.get());
+    node.record_uint("DestUnreachable", dest_unreachable.get());
+    node.record_uint("TimeExceeded", time_exceeded.get());
+    node.record_uint("ParameterProblem", parameter_problem.get());
+    node.record_uint("PacketTooBig", packet_too_big.get());
+    node.record_uint("Error", error.get());
+    node.record_uint("ErrorDeliveredToTransportLayer", error_delivered_to_transport_layer.get());
+    node.record_uint("ErrorDeliveredToSocket", error_delivered_to_socket.get());
+}
+
+fn record_icmp_tx(
+    node: &Node,
+    IcmpTxCounters {
+        reply,
+        protocol_unreachable,
+        port_unreachable,
+        net_unreachable,
+        ttl_expired,
+        packet_too_big,
+        parameter_problem,
+        dest_unreachable,
+        error,
+    }: &IcmpTxCounters,
+) {
+    node.record_uint("Reply", reply.get());
+    node.record_uint("ProtocolUnreachable", protocol_unreachable.get());
+    node.record_uint("PortUnreachable", port_unreachable.get());
+    node.record_uint("NetUnreachable", net_unreachable.get());
+    node.record_uint("TtlExpired", ttl_expired.get());
+    node.record_uint("PacketTooBig", packet_too_big.get());
+    node.record_uint("ParameterProblem", parameter_problem.get());
+    node.record_uint("DestUnreachable", dest_unreachable.get());
+    node.record_uint("Error", error.get());
+}
+
+fn record_ip<F: FnOnce(&Node)>(
+    node: &Node,
+    CommonIpCounters {
+        dispatch_receive_ip_packet,
+        dispatch_receive_ip_packet_other_host,
+        receive_ip_packet,
+        send_ip_packet,
+        forwarding_disabled,
+        forward,
+        no_route_to_host,
+        mtu_exceeded,
+        ttl_expired,
+        receive_icmp_error,
+        fragment_reassembly_error,
+        need_more_fragments,
+        invalid_fragment,
+        fragment_cache_full,
+        parameter_problem,
+        unspecified_destination,
+        unspecified_source,
+        dropped,
+    }: &CommonIpCounters,
+    record_version_specific_rx: F,
+) {
+    node.record_uint("PacketTx", send_ip_packet.get());
+    node.record_child("PacketRx", |node| {
+        node.record_uint("Received", receive_ip_packet.get());
+        node.record_uint("Dispatched", dispatch_receive_ip_packet.get());
+        node.record_uint("OtherHost", dispatch_receive_ip_packet_other_host.get());
+        node.record_uint("ParameterProblem", parameter_problem.get());
+        node.record_uint("UnspecifiedDst", unspecified_destination.get());
+        node.record_uint("UnspecifiedSrc", unspecified_source.get());
+        node.record_uint("Dropped", dropped.get());
+        record_version_specific_rx(node);
+    });
+    node.record_child("Forwarding", |node| {
+        node.record_uint("Forwarded", forward.get());
+        node.record_uint("ForwardingDisabled", forwarding_disabled.get());
+        node.record_uint("NoRouteToHost", no_route_to_host.get());
+        node.record_uint("MtuExceeded", mtu_exceeded.get());
+        node.record_uint("TtlExpired", ttl_expired.get());
+    });
+    node.record_uint("RxIcmpError", receive_icmp_error.get());
+    node.record_child("Fragments", |node| {
+        node.record_uint("ReassemblyError", fragment_reassembly_error.get());
+        node.record_uint("NeedMoreFragments", need_more_fragments.get());
+        node.record_uint("InvalidFragment", invalid_fragment.get());
+        node.record_uint("CacheFull", fragment_cache_full.get());
+    });
+}
+
+fn record_udp(node: &fuchsia_inspect::Node, counters: &UdpCounters) {
+    let UdpCounters {
+        rx_icmp_error,
+        rx,
+        rx_mapped_addr,
+        rx_unknown_dest_port,
+        rx_malformed,
+        tx,
+        tx_error,
+    } = counters;
+    node.record_child("Rx", |node| {
+        node.record_uint("Received", rx.get());
+        node.record_child("Errors", |node| {
+            node.record_uint("MappedAddr", rx_mapped_addr.get());
+            node.record_uint("UnknownDstPort", rx_unknown_dest_port.get());
+            node.record_uint("Malformed", rx_malformed.get());
+        });
+    });
+    node.record_child("Tx", |node| {
+        node.record_uint("Sent", tx.get());
+        node.record_uint("Errors", tx_error.get());
+    });
+    node.record_uint("IcmpErrors", rx_icmp_error.get());
 }

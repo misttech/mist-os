@@ -186,10 +186,10 @@ pub type IcmpRxCounters<I> = IpMarked<I, IcmpRxCountersInner>;
 pub struct IcmpRxCountersInner {
     /// Count of error messages received.
     pub error: Counter,
-    /// Count of error messages received at the transport layer.
-    pub(crate) error_at_transport_layer: Counter,
+    /// Count of error messages delivered to the transport layer.
+    pub error_delivered_to_transport_layer: Counter,
     /// Count of error messages delivered to a socket.
-    pub(crate) error_at_socket: Counter,
+    pub error_delivered_to_socket: Counter,
     /// Count of echo request messages received.
     pub echo_request: Counter,
     /// Count of echo reply messages received.
@@ -867,7 +867,7 @@ fn receive_ip_transport_icmp_error<
     mut original_body: &[u8],
     err: I::ErrorCode,
 ) {
-    core_ctx.increment(|counters| &counters.error_at_transport_layer);
+    core_ctx.increment(|counters| &counters.error_delivered_to_transport_layer);
     trace!("IcmpIpTransportContext::receive_icmp_error({:?})", err);
 
     let echo_request =
@@ -912,7 +912,7 @@ fn receive_ip_transport_icmp_error<
                 device: None,
             }) {
                 core_ctx.increment(|counters: &IcmpRxCounters<I>| {
-                    &counters.error_at_socket
+                    &counters.error_delivered_to_socket
                 });
                 // NB: At the moment bindings has no need to consume ICMP
                 // errors, so we swallow them here.
@@ -4112,11 +4112,15 @@ mod tests {
                         .inner
                         .state
                         .icmp_rx_counters::<Ipv4>()
-                        .error_at_transport_layer
+                        .error_delivered_to_transport_layer
                         .get(),
-                    "IcmpEchoBindingsContext::receive_icmp_error" => {
-                        core_ctx.inner.inner.state.icmp_rx_counters::<Ipv4>().error_at_socket.get()
-                    }
+                    "IcmpEchoBindingsContext::receive_icmp_error" => core_ctx
+                        .inner
+                        .inner
+                        .state
+                        .icmp_rx_counters::<Ipv4>()
+                        .error_delivered_to_socket
+                        .get(),
                     c => panic!("unrecognized counter: {c}"),
                 };
                 assert_eq!(actual, *expected, "wrong count for {ctr}");
@@ -4410,13 +4414,19 @@ mod tests {
                             .inner
                             .state
                             .icmp_rx_counters::<Ipv6>()
-                            .error_at_transport_layer
+                            .error_delivered_to_transport_layer
                             .get(),
                         *count,
                         "wrong count for counter {ctr}",
                     ),
                     "IcmpEchoBindingsContext::receive_icmp_error" => assert_eq!(
-                        core_ctx.inner.inner.state.icmp_rx_counters::<Ipv6>().error_at_socket.get(),
+                        core_ctx
+                            .inner
+                            .inner
+                            .state
+                            .icmp_rx_counters::<Ipv6>()
+                            .error_delivered_to_socket
+                            .get(),
                         *count,
                         "wrong count for counter {ctr}",
                     ),

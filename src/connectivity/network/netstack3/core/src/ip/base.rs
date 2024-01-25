@@ -1420,8 +1420,8 @@ pub struct IpCountersInner {
     /// Count of sent outgoing IP packets.
     pub send_ip_packet: Counter,
     /// Count of packets to be forwarded which are instead dropped because
-    /// routing is disabled.
-    pub routing_disabled_per_device: Counter,
+    /// forwarding is disabled.
+    pub forwarding_disabled: Counter,
     /// Count of incoming packets forwarded to another host.
     pub forward: Counter,
     /// Count of incoming packets which cannot be forwarded because there is no
@@ -2704,7 +2704,7 @@ fn receive_ip_packet_action_common<
         // case is a Destination Unreachable message, we interpret the RFC text
         // to mean that, consistent with IPv4's behavior, we should silently
         // discard the packet in this case.
-        core_ctx.increment(|counters| &counters.routing_disabled_per_device);
+        core_ctx.increment(|counters| &counters.forwarding_disabled);
         ReceivePacketAction::Drop { reason: DropReason::ForwardingDisabledInboundIface }
     } else {
         match lookup_route_table(core_ctx, bindings_ctx, None, *dst_ip) {
