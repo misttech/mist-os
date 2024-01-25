@@ -412,7 +412,7 @@ pub fn complete_duration(
 /// ```
 #[macro_export]
 macro_rules! duration {
-    ($category:expr, $name:expr $(, $key:expr => $val:expr)*) => {
+    ($category:expr, $name:expr $(, $key:expr => $val:expr)* $(,)?) => {
         let mut args;
         let _scope = if let Some(context) = $crate::TraceCategoryContext::acquire($crate::cstr!($category)) {
             args = [$($crate::ArgValue::of($key, $val)),*];
@@ -456,7 +456,7 @@ pub fn duration<'a>(
 /// ```
 #[macro_export]
 macro_rules! duration_begin {
-    ($category:expr, $name:expr $(, $key:expr => $val:expr)*) => {
+    ($category:expr, $name:expr $(, $key:expr => $val:expr)* $(,)?) => {
         if let Some(context) = $crate::TraceCategoryContext::acquire($crate::cstr!($category)) {
         $crate::duration_begin(&context, $crate::cstr!($name),
             &[$($crate::ArgValue::of($key, $val)),*])
@@ -480,7 +480,7 @@ macro_rules! duration_begin {
 /// ```
 #[macro_export]
 macro_rules! duration_end {
-    ($category:expr, $name:expr $(, $key:expr => $val:expr)*) => {
+    ($category:expr, $name:expr $(, $key:expr => $val:expr)* $(,)?) => {
         if let Some(context) = $crate::TraceCategoryContext::acquire($crate::cstr!($category)) {
             $crate::duration_end(&context, $crate::cstr!($name), &[$($crate::ArgValue::of($key, $val)),*])
         }
