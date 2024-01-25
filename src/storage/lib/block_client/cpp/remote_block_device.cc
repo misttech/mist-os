@@ -9,7 +9,6 @@
 #include <fidl/fuchsia.hardware.block/cpp/wire.h>
 #include <lib/component/incoming/cpp/clone.h>
 #include <lib/fdio/cpp/caller.h>
-#include <lib/syslog/cpp/macros.h>
 #include <lib/zx/vmo.h>
 
 namespace block_client {

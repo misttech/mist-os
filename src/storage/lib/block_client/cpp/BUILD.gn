@@ -80,7 +80,6 @@ static_library("cpp") {
     "//sdk/fidl/fuchsia.io:fuchsia.io_cpp",
     "//sdk/lib/component/incoming/cpp",
     "//sdk/lib/fdio",
-    "//sdk/lib/syslog/cpp",
     "//src/lib/ddk",
     "//src/storage/lib/vfs/cpp",
     "//zircon/system/ulib/fbl",
