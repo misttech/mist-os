@@ -12,13 +12,12 @@
 
 #include "spi-banjo-child.h"
 #include "spi-child.h"
-#include "src/devices/spi/drivers/spi/spi-impl-client.h"
 
 namespace spi {
 
 void SpiDevice::DdkRelease() { delete this; }
 
-zx_status_t SpiDevice::Create(void* ctx, zx_device_t* parent, async_dispatcher_t* dispatcher) {
+zx_status_t SpiDevice::Create(void* ctx, zx_device_t* parent, fdf_dispatcher_t* dispatcher) {
   auto decoded = ddk::GetEncodedMetadata<fuchsia_hardware_spi_businfo::wire::SpiBusMetadata>(
       parent, DEVICE_METADATA_SPI_CHANNELS);
   if (!decoded.is_ok()) {
@@ -38,7 +37,7 @@ zx_status_t SpiDevice::Create(void* ctx, zx_device_t* parent, async_dispatcher_t
     return ZX_ERR_NO_MEMORY;
   }
 
-  zx_status_t status = device->Init();
+  zx_status_t status = device->Init(dispatcher);
   if (status != ZX_OK) {
     return status;
   }
@@ -53,10 +52,12 @@ zx_status_t SpiDevice::Create(void* ctx, zx_device_t* parent, async_dispatcher_t
   } else {
     zxlogf(INFO, "%zu channels supplied.", metadata.channels().count());
 
-    if (std::holds_alternative<FidlSpiImplClient>(*device->spi_impl_)) {
-      device->AddChildren<SpiChild>(dispatcher, metadata);
-    } else if (std::holds_alternative<BanjoSpiImplClient>(*device->spi_impl_)) {
-      device->AddChildren<SpiBanjoChild>(dispatcher, metadata);
+    if (std::holds_alternative<FidlClientType>(device->spi_impl_)) {
+      device->AddChildren<SpiChild>(fdf_dispatcher_get_async_dispatcher(dispatcher), metadata,
+                                    std::get<FidlClientType>(device->spi_impl_).Clone());
+    } else if (std::holds_alternative<BanjoClientType>(device->spi_impl_)) {
+      device->AddChildren<SpiBanjoChild>(fdf_dispatcher_get_async_dispatcher(dispatcher), metadata,
+                                         &std::get<BanjoClientType>(device->spi_impl_));
     } else {
       ZX_DEBUG_ASSERT_MSG(false, "Banjo and FIDL clients are both invalid");
     }
@@ -67,7 +68,7 @@ zx_status_t SpiDevice::Create(void* ctx, zx_device_t* parent, async_dispatcher_t
   return ZX_OK;
 }
 
-zx_status_t SpiDevice::Init() {
+zx_status_t SpiDevice::Init(fdf_dispatcher_t* dispatcher) {
   /// NOTE: This driver is able to bind against both of the following protocols:
   ///
   ///  Fidl: //sdk/fidl/fuchsia.hardware.spiimpl
@@ -92,13 +93,16 @@ zx_status_t SpiDevice::Init() {
     return client_end.error_value();
   }
 
-  spi_impl_ = FidlSpiImplClient(std::move(client_end.value()));
+  spi_impl_ = fdf::WireSharedClient<fuchsia_hardware_spiimpl::SpiImpl>(
+      *std::move(client_end), dispatcher,
+      fidl::ObserveTeardown(fit::bind_member<&SpiDevice::FidlClientTeardownHandler>(this)));
   return ZX_OK;
 }
 
 template <typename T>
 void SpiDevice::AddChildren(async_dispatcher_t* dispatcher,
-                            const fuchsia_hardware_spi_businfo::wire::SpiBusMetadata& metadata) {
+                            const fuchsia_hardware_spi_businfo::wire::SpiBusMetadata& metadata,
+                            typename T::ClientType client) {
   bool has_siblings = metadata.channels().count() > 1;
   for (auto& channel : metadata.channels()) {
     const auto cs = channel.has_cs() ? channel.cs() : 0;
@@ -107,7 +111,14 @@ void SpiDevice::AddChildren(async_dispatcher_t* dispatcher,
     const auto did = channel.has_did() ? channel.did() : 0;
 
     fbl::AllocChecker ac;
-    std::unique_ptr<T> dev(new (&ac) T(zxdev(), GetSpiImpl(), cs, has_siblings, dispatcher));
+
+    std::unique_ptr<T> dev;
+    if constexpr (std::is_same_v<decltype(client), FidlClientType>) {
+      dev.reset(new (&ac) T(zxdev(), client.Clone(), cs, has_siblings, dispatcher));
+    } else {
+      dev.reset(new (&ac) T(zxdev(), client, cs, has_siblings, dispatcher));
+    }
+
     if (!ac.check()) {
       zxlogf(ERROR, "Out of memory");
       return;
@@ -162,12 +173,29 @@ void SpiDevice::AddChildren(async_dispatcher_t* dispatcher,
   }
 }
 
+void SpiDevice::DdkUnbind(ddk::UnbindTxn txn) {
+  ZX_DEBUG_ASSERT_MSG(!unbind_txn_, "Unbind txn already set");
+  // Reply immediately if we don't have a FIDL client, or if it has already been torn down.
+  if (!std::holds_alternative<FidlClientType>(spi_impl_) || fidl_client_teardown_complete_) {
+    txn.Reply();
+  } else {
+    unbind_txn_ = std::move(txn);
+    std::get<FidlClientType>(spi_impl_).AsyncTeardown();
+  }
+}
+
+void SpiDevice::FidlClientTeardownHandler() {
+  fidl_client_teardown_complete_ = true;
+  if (unbind_txn_) {
+    unbind_txn_->Reply();
+  }
+}
+
 static zx_driver_ops_t driver_ops = []() {
   zx_driver_ops_t ops = {};
   ops.version = DRIVER_OPS_VERSION;
   ops.bind = [](void* ctx, zx_device_t* parent) {
-    return SpiDevice::Create(
-        ctx, parent, fdf_dispatcher_get_async_dispatcher(fdf_dispatcher_get_current_dispatcher()));
+    return SpiDevice::Create(ctx, parent, fdf_dispatcher_get_current_dispatcher());
   };
   return ops;
 }();

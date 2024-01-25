@@ -10,9 +10,29 @@
 #include <zircon/errors.h>
 
 #include <ddktl/fidl.h>
-#include <fbl/vector.h>
 
 namespace spi {
+
+template <typename T>
+inline zx_status_t FidlStatus(const T& result) {
+  if (result.ok()) {
+    return result->is_ok() ? ZX_OK : result->error_value();
+  }
+  return result.status();
+}
+
+inline fidl::VectorView<uint8_t> VectorToFidl(std::vector<uint8_t>& data) {
+  return fidl::VectorView<uint8_t>::FromExternal(data.data(), data.size());
+}
+
+inline std::vector<uint8_t> FidlToVector(const fidl::VectorView<uint8_t>& data) {
+  return std::vector<uint8_t>(data.cbegin(), data.cend());
+}
+
+inline fuchsia_hardware_sharedmemory::wire::SharedVmoBuffer BufferToWire(
+    const fuchsia_hardware_sharedmemory::SharedVmoBuffer& buffer) {
+  return {buffer.vmo_id(), buffer.offset(), buffer.size()};
+}
 
 void SpiChild::OpenSession(OpenSessionRequestView request, OpenSessionCompleter::Sync& completer) {
   Bind(dispatcher_, std::move(request->session));
@@ -20,95 +40,129 @@ void SpiChild::OpenSession(OpenSessionRequestView request, OpenSessionCompleter:
 
 void SpiChild::TransmitVector(TransmitVectorRequest& request,
                               TransmitVectorCompleter::Sync& completer) {
-  auto result = spi_->TransmitVector(cs_, request.data());
-  if (result.is_ok()) {
-    completer.Reply(ZX_OK);
+  fdf::Arena arena('SPI_');
+  auto result = spi_.sync().buffer(arena)->TransmitVector(cs_, VectorToFidl(request.data()));
+  if (zx_status_t status = FidlStatus(result); status != ZX_OK) {
+    zxlogf(ERROR, "Couldn't complete SpiImpl::TransmitVector: %s", zx_status_get_string(status));
+    completer.Reply(status);
   } else {
-    completer.Reply(result.error_value());
+    completer.Reply(ZX_OK);
   }
 }
 
 void SpiChild::ReceiveVector(ReceiveVectorRequest& request,
                              ReceiveVectorCompleter::Sync& completer) {
-  auto result = spi_->ReceiveVector(cs_, request.size());
-  if (result.is_ok() && result.value().size() == request.size()) {
-    completer.Reply({ZX_OK, std::move(result.value())});
+  fdf::Arena arena('SPI_');
+  auto result = spi_.sync().buffer(arena)->ReceiveVector(cs_, request.size());
+  if (zx_status_t status = FidlStatus(result); status != ZX_OK) {
+    zxlogf(ERROR, "Couldn't complete SpiImpl::ReceiveVector: %s", zx_status_get_string(status));
+    completer.Reply({status, std::vector<uint8_t>()});
+  } else if (result->value()->data.count() != request.size()) {
+    zxlogf(ERROR, "Expected %u bytes != received %zu bytes", request.size(),
+           result->value()->data.count());
+    completer.Reply({ZX_ERR_INTERNAL, std::vector<uint8_t>()});
   } else {
-    completer.Reply({result.status_value() == ZX_OK ? ZX_ERR_INTERNAL : result.error_value(),
-                     std::vector<uint8_t>()});
+    completer.Reply({ZX_OK, FidlToVector(result->value()->data)});
   }
 }
 
 void SpiChild::ExchangeVector(ExchangeVectorRequest& request,
                               ExchangeVectorCompleter::Sync& completer) {
-  auto result = spi_->ExchangeVector(cs_, request.txdata());
-  if (result.is_ok() && result.value().size() == request.txdata().size()) {
-    completer.Reply({ZX_OK, std::move(result.value())});
+  fdf::Arena arena('SPI_');
+  auto result = spi_.sync().buffer(arena)->ExchangeVector(cs_, VectorToFidl(request.txdata()));
+  if (zx_status_t status = FidlStatus(result); status != ZX_OK) {
+    zxlogf(ERROR, "Couldn't complete SpiImpl::ExchangeVector: %s", zx_status_get_string(status));
+    completer.Reply({status, std::vector<uint8_t>()});
+  } else if (result->value()->rxdata.count() != request.txdata().size()) {
+    zxlogf(ERROR, "Expected %zu bytes != received %zu bytes", request.txdata().size(),
+           result->value()->rxdata.count());
+    completer.Reply({ZX_ERR_INTERNAL, std::vector<uint8_t>()});
   } else {
-    completer.Reply({result.status_value() == ZX_OK ? ZX_ERR_INTERNAL : result.error_value(),
-                     std::vector<uint8_t>()});
+    completer.Reply({ZX_OK, FidlToVector(result->value()->rxdata)});
   }
 }
 
 void SpiChild::RegisterVmo(RegisterVmoRequest& request, RegisterVmoCompleter::Sync& completer) {
-  auto result =
-      spi_->RegisterVmo(cs_, request.vmo_id(), std::move(request.vmo()), request.rights());
-  if (result.is_ok()) {
-    completer.Reply(fit::ok());
+  fdf::Arena arena('SPI_');
+  auto result = spi_.sync().buffer(arena)->RegisterVmo(
+      cs_, request.vmo_id(),
+      {std::move(request.vmo().vmo()), request.vmo().offset(), request.vmo().size()},
+      request.rights());
+  if (zx_status_t status = FidlStatus(result); status != ZX_OK) {
+    zxlogf(ERROR, "Couldn't complete SpiImpl::RegisterVmo: %s", zx_status_get_string(status));
+    completer.Reply(fit::error(status));
   } else {
-    completer.Reply(fit::error(result.error_value()));
+    completer.Reply(fit::ok());
   }
 }
 
 void SpiChild::UnregisterVmo(UnregisterVmoRequest& request,
                              UnregisterVmoCompleter::Sync& completer) {
-  auto result = spi_->UnregisterVmo(cs_, request.vmo_id());
-  if (!result.is_ok()) {
-    completer.Reply(fit::error(result.error_value()));
-    return;
+  fdf::Arena arena('SPI_');
+  auto result = spi_.sync().buffer(arena)->UnregisterVmo(cs_, request.vmo_id());
+  if (zx_status_t status = FidlStatus(result); status != ZX_OK) {
+    zxlogf(ERROR, "Couldn't complete SpiImpl::UnregisterVmo: %s", zx_status_get_string(status));
+    completer.Reply(fit::error(status));
+  } else {
+    completer.Reply(fit::ok(std::move(result->value()->vmo)));
   }
-  completer.Reply(fit::ok(std::move(result.value())));
 }
 
 void SpiChild::Transmit(TransmitRequest& request, TransmitCompleter::Sync& completer) {
   TRACE_DURATION("spi", "Transmit", "cs", cs_, "size", request.buffer().size());
-  auto result = spi_->TransmitVmo(cs_, request.buffer());
-  if (result.is_ok()) {
+  fdf::Arena arena('SPI_');
+  auto result = spi_.sync().buffer(arena)->TransmitVmo(cs_, BufferToWire(request.buffer()));
+  if (zx_status_t status = FidlStatus(result); status != ZX_OK) {
+    zxlogf(ERROR, "Couldn't complete SpiImpl::TransmitVmo: %s", zx_status_get_string(status));
+    completer.Reply(fit::error(status));
+  } else {
     completer.Reply(fit::ok());
-    return;
   }
-  completer.Reply(fit::error(result.error_value()));
 }
 
 void SpiChild::Receive(ReceiveRequest& request, ReceiveCompleter::Sync& completer) {
   TRACE_DURATION("spi", "Receive", "cs", cs_, "size", request.buffer().size());
-  auto result = spi_->ReceiveVmo(cs_, request.buffer());
-  if (result.is_ok()) {
+  fdf::Arena arena('SPI_');
+  auto result = spi_.sync().buffer(arena)->ReceiveVmo(cs_, BufferToWire(request.buffer()));
+  if (zx_status_t status = FidlStatus(result); status != ZX_OK) {
+    zxlogf(ERROR, "Couldn't complete SpiImpl::ReceiveVmo: %s", zx_status_get_string(status));
+    completer.Reply(fit::error(status));
+  } else {
     completer.Reply(fit::ok());
-    return;
   }
-  completer.Reply(fit::error(result.error_value()));
 }
 
 void SpiChild::Exchange(ExchangeRequest& request, ExchangeCompleter::Sync& completer) {
   if (request.tx_buffer().size() != request.rx_buffer().size()) {
+    zxlogf(ERROR, "tx_buffer and rx_buffer size must match. %zu (tx) != %zu (rx)",
+           request.tx_buffer().size(), request.rx_buffer().size());
     completer.Reply(fit::error(ZX_ERR_INVALID_ARGS));
     return;
   }
+
   TRACE_DURATION("spi", "Exchange", "cs", cs_, "size", request.tx_buffer().size());
-  auto result = spi_->ExchangeVmo(cs_, request.tx_buffer(), request.rx_buffer());
-  if (result.is_ok()) {
+  fdf::Arena arena('SPI_');
+  auto result = spi_.sync().buffer(arena)->ExchangeVmo(cs_, BufferToWire(request.tx_buffer()),
+                                                       BufferToWire(request.rx_buffer()));
+  if (zx_status_t status = FidlStatus(result); status != ZX_OK) {
+    zxlogf(ERROR, "Couldn't complete SpiImpl::ExchangeVmo: %s", zx_status_get_string(status));
+    completer.Reply(fit::error(status));
+  } else {
     completer.Reply(fit::ok());
-    return;
   }
-  completer.Reply(fit::error(result.error_value()));
 }
 
 zx_status_t SpiChild::SpiTransmit(const uint8_t* txdata_list, size_t txdata_count) {
-  auto result = spi_->TransmitVector(
-      cs_, std::vector<uint8_t>(const_cast<uint8_t*>(txdata_list),
-                                const_cast<uint8_t*>(txdata_list) + txdata_count));
-  return result.status_value();
+  fdf::Arena arena('SPI_');
+  auto result = spi_.sync().buffer(arena)->TransmitVector(
+      cs_,
+      fidl::VectorView<uint8_t>::FromExternal(const_cast<uint8_t*>(txdata_list), txdata_count));
+  if (zx_status_t status = FidlStatus(result); status != ZX_OK) {
+    zxlogf(ERROR, "Couldn't complete SpiImpl::TransmitVector: %s", zx_status_get_string(status));
+    return status;
+  }
+
+  return ZX_OK;
 }
 
 zx_status_t SpiChild::SpiReceive(uint32_t size, uint8_t* out_rxdata_list, size_t rxdata_count,
@@ -117,16 +171,19 @@ zx_status_t SpiChild::SpiReceive(uint32_t size, uint8_t* out_rxdata_list, size_t
     return ZX_ERR_BUFFER_TOO_SMALL;
   }
 
-  auto result = spi_->ReceiveVector(cs_, size);
-  if (!result.is_ok()) {
-    return result.error_value();
+  fdf::Arena arena('SPI_');
+  auto result = spi_.sync().buffer(arena)->ReceiveVector(cs_, size);
+  if (zx_status_t status = FidlStatus(result); status != ZX_OK) {
+    zxlogf(ERROR, "Couldn't complete SpiImpl::ReceiveVector: %s", zx_status_get_string(status));
+    return status;
   }
-  if (result.value().size() != size) {
+  if (result->value()->data.count() != size) {
+    zxlogf(ERROR, "Expected %u bytes != received %zu bytes", size, result->value()->data.count());
     return ZX_ERR_INTERNAL;
   }
 
-  *out_rxdata_actual = result.value().size();
-  memcpy(out_rxdata_list, result.value().data(), *out_rxdata_actual);
+  *out_rxdata_actual = result->value()->data.count();
+  memcpy(out_rxdata_list, result->value()->data.data(), *out_rxdata_actual);
 
   return ZX_OK;
 }
@@ -138,18 +195,22 @@ zx_status_t SpiChild::SpiExchange(const uint8_t* txdata_list, size_t txdata_coun
     return ZX_ERR_INVALID_ARGS;
   }
 
-  auto result = spi_->ExchangeVector(
-      cs_, std::vector<uint8_t>(const_cast<uint8_t*>(txdata_list),
-                                const_cast<uint8_t*>(txdata_list) + txdata_count));
-  if (!result.is_ok()) {
-    return result.error_value();
+  fdf::Arena arena('SPI_');
+  auto result = spi_.sync().buffer(arena)->ExchangeVector(
+      cs_,
+      fidl::VectorView<uint8_t>::FromExternal(const_cast<uint8_t*>(txdata_list), txdata_count));
+  if (zx_status_t status = FidlStatus(result); status != ZX_OK) {
+    zxlogf(ERROR, "Couldn't complete SpiImpl::ExchangeVector: %s", zx_status_get_string(status));
+    return status;
   }
-  if (result.value().size() != rxdata_count) {
+  if (result.value()->rxdata.count() != rxdata_count) {
+    zxlogf(ERROR, "Expected %zu bytes != received %zu bytes", rxdata_count,
+           result->value()->rxdata.count());
     return ZX_ERR_INTERNAL;
   }
 
-  *out_rxdata_actual = result.value().size();
-  memcpy(out_rxdata_list, result.value().data(), *out_rxdata_actual);
+  *out_rxdata_actual = result.value()->rxdata.count();
+  memcpy(out_rxdata_list, result.value()->rxdata.data(), *out_rxdata_actual);
 
   return ZX_OK;
 }
@@ -164,7 +225,14 @@ void SpiChild::AssertCs(AssertCsCompleter::Sync& completer) {
     return;
   }
 
-  completer.Reply(spi_->LockBus(cs_).status_value());
+  fdf::Arena arena('SPI_');
+  auto result = spi_.sync().buffer(arena)->LockBus(cs_);
+  if (zx_status_t status = FidlStatus(result); status != ZX_OK) {
+    zxlogf(ERROR, "SpiImpl::LockBus failed: %s", zx_status_get_string(status));
+    completer.Reply(status);
+  } else {
+    completer.Reply(ZX_OK);
+  }
 }
 
 void SpiChild::DeassertCs(DeassertCsCompleter::Sync& completer) {
@@ -173,7 +241,14 @@ void SpiChild::DeassertCs(DeassertCsCompleter::Sync& completer) {
     return;
   }
 
-  completer.Reply(spi_->UnlockBus(cs_).status_value());
+  fdf::Arena arena('SPI_');
+  auto result = spi_.sync().buffer(arena)->UnlockBus(cs_);
+  if (zx_status_t status = FidlStatus(result); status != ZX_OK) {
+    zxlogf(ERROR, "SpiImpl::UnlockBus failed: %s", zx_status_get_string(status));
+    completer.Reply(status);
+  } else {
+    completer.Reply(ZX_OK);
+  }
 }
 
 void SpiChild::Bind(async_dispatcher_t* dispatcher,
@@ -189,7 +264,8 @@ void SpiChild::Bind(async_dispatcher_t* dispatcher,
             std::optional opt = std::exchange(self->binding_, {});
             ZX_ASSERT(opt.has_value());
 
-            self->spi_->ReleaseRegisteredVmos(self->cs_);
+            fdf::Arena arena('SPI_');
+            (void)self->spi_.sync().buffer(arena)->ReleaseRegisteredVmos(self->cs_);
 
             // If the server is unbinding because DdkUnbind is being called, then reply to the
             // unbind transaction so that it completes.

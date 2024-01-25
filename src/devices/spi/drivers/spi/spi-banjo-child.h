@@ -24,8 +24,10 @@ class SpiBanjoChild : public SpiBanjoChildType,
                       public ddk::SpiProtocol<SpiBanjoChild, ddk::base_protocol>,
                       public fidl::Server<fuchsia_hardware_spi::Device> {
  public:
-  SpiBanjoChild(zx_device_t* parent, SpiImplClient* spi, uint32_t chip_select, bool has_siblings,
-                async_dispatcher_t* dispatcher)
+  using ClientType = BanjoSpiImplClient*;
+
+  SpiBanjoChild(zx_device_t* parent, BanjoSpiImplClient* spi, uint32_t chip_select,
+                bool has_siblings, async_dispatcher_t* dispatcher)
       : SpiBanjoChildType(parent),
         spi_(spi),
         cs_(chip_select),
@@ -69,7 +71,7 @@ class SpiBanjoChild : public SpiBanjoChildType,
   zx_status_t ServeOutgoingDirectory(fidl::ServerEnd<fuchsia_io::Directory> server_end);
 
  private:
-  SpiImplClient* spi_;
+  BanjoSpiImplClient* spi_;
   const uint32_t cs_;
   // False if this child is the only device on the bus.
   const bool has_siblings_;

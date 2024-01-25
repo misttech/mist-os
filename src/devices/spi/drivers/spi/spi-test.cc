@@ -189,7 +189,7 @@ class SpiDeviceTest : public zxtest::Test {
  protected:
   SpiDeviceTest()
       : runtime_(mock_ddk::GetDriverRuntime()),
-        loop_(&kAsyncLoopConfigNoAttachToCurrentThread),
+        dispatcher_(runtime_->StartBackgroundDispatcher()),
         incoming_dispatcher_(runtime_->StartBackgroundDispatcher()),
         ns_(incoming_dispatcher_->async_dispatcher(), std::in_place) {}
 
@@ -204,7 +204,6 @@ class SpiDeviceTest : public zxtest::Test {
   void SetUp() override {
     // TODO(https://fxbug.dev/42075363): Migrate test to use dispatcher integration.
     parent_ = MockDevice::FakeRootParent();
-    ASSERT_OK(loop_.StartThread("spi-test-thread"));
 
     SetUpSpiImpl();
     SetSpiChannelMetadata(0, kSpiChannels, std::size(kSpiChannels));
@@ -213,8 +212,8 @@ class SpiDeviceTest : public zxtest::Test {
 
   void CreateSpiDevice() {
     std::latch done(1);
-    async::PostTask(loop_.dispatcher(), [&]() {
-      SpiDevice::Create(nullptr, parent_.get(), loop_.dispatcher());
+    async::PostTask(dispatcher_->async_dispatcher(), [&]() {
+      SpiDevice::Create(nullptr, parent_.get(), dispatcher_->get());
       done.count_down();
     });
     done.wait();
@@ -222,7 +221,7 @@ class SpiDeviceTest : public zxtest::Test {
 
   void RemoveDevice(MockDevice* device) {
     device_async_remove(device);
-    ASSERT_OK(mock_ddk::ReleaseFlaggedDevices(parent_.get(), loop_.dispatcher()));
+    ASSERT_OK(mock_ddk::ReleaseFlaggedDevices(parent_.get(), dispatcher_->async_dispatcher()));
   }
 
   zx::result<fidl::ClientEnd<fuchsia_hardware_spi::Device>> BindServer(
@@ -246,7 +245,7 @@ class SpiDeviceTest : public zxtest::Test {
 
   std::shared_ptr<fdf_testing::DriverRuntime> runtime_;
   std::shared_ptr<MockDevice> parent_;
-  async::Loop loop_;
+  fdf::UnownedSynchronizedDispatcher dispatcher_;
 
   // Helper Methods that access fake_spi_impl
   void set_current_test_cs(uint32_t i) {
@@ -303,7 +302,7 @@ void SpiDeviceTest<FakeSpiImplClass>::SpiTest() {
     zx::result endpoints = fidl::CreateEndpoints<fuchsia_hardware_spi::Device>();
     ASSERT_OK(endpoints);
     auto& [client, server] = endpoints.value();
-    fidl::BindServer(loop_.dispatcher(), std::move(server),
+    fidl::BindServer(dispatcher_->async_dispatcher(), std::move(server),
                      (*it)->GetDeviceContext<typename FakeSpiImplClass::ChildType>());
 
     set_test_mode(FakeSpiImplBase::SpiTestMode::kTransmit);
@@ -337,14 +336,14 @@ void SpiDeviceTest<FakeSpiImplClass>::SpiFidlVmoTest() {
     const auto& child0 = spi_bus->children().front();
     zx::result client = BindServer(child0);
     ASSERT_OK(client);
-    cs0_client.Bind(std::move(client.value()), loop_.dispatcher());
+    cs0_client.Bind(std::move(client.value()), dispatcher_->async_dispatcher());
   }
 
   {
     const auto& child1 = *++spi_bus->children().begin();
     zx::result client = BindServer(child1);
     ASSERT_OK(client);
-    cs1_client.Bind(std::move(client.value()), loop_.dispatcher());
+    cs1_client.Bind(std::move(client.value()), dispatcher_->async_dispatcher());
   }
 
   zx::vmo cs0_vmo, cs1_vmo;
@@ -444,14 +443,14 @@ void SpiDeviceTest<FakeSpiImplClass>::SpiFidlVectorTest() {
     const auto& child0 = spi_bus->children().front();
     zx::result client = BindServer(child0);
     ASSERT_OK(client);
-    cs0_client.Bind(std::move(client.value()), loop_.dispatcher());
+    cs0_client.Bind(std::move(client.value()), dispatcher_->async_dispatcher());
   }
 
   {
     const auto& child1 = *++spi_bus->children().begin();
     zx::result client = BindServer(child1);
     ASSERT_OK(client);
-    cs1_client.Bind(std::move(client.value()), loop_.dispatcher());
+    cs1_client.Bind(std::move(client.value()), dispatcher_->async_dispatcher());
   }
 
   uint8_t test_data[] = {1, 2, 3, 4, 5, 6, 7};
@@ -503,14 +502,14 @@ void SpiDeviceTest<FakeSpiImplClass>::SpiFidlVectorErrorTest() {
     const auto& child0 = spi_bus->children().front();
     zx::result client = BindServer(child0);
     ASSERT_OK(client);
-    cs0_client.Bind(std::move(client.value()), loop_.dispatcher());
+    cs0_client.Bind(std::move(client.value()), dispatcher_->async_dispatcher());
   }
 
   {
     const auto& child1 = *++spi_bus->children().begin();
     zx::result client = BindServer(child1);
     ASSERT_OK(client);
-    cs1_client.Bind(std::move(client.value()), loop_.dispatcher());
+    cs1_client.Bind(std::move(client.value()), dispatcher_->async_dispatcher());
   }
 
   set_corrupt_rx_actual(true);
@@ -562,14 +561,14 @@ void SpiDeviceTest<FakeSpiImplClass>::AssertCsWithSiblingTest() {
     const auto& child0 = spi_bus->children().front();
     zx::result client = BindServer(child0);
     ASSERT_OK(client);
-    cs0_client.Bind(std::move(client.value()), loop_.dispatcher());
+    cs0_client.Bind(std::move(client.value()), dispatcher_->async_dispatcher());
   }
 
   {
     const auto& child1 = *++spi_bus->children().begin();
     zx::result client = BindServer(child1);
     ASSERT_OK(client);
-    cs1_client.Bind(std::move(client.value()), loop_.dispatcher());
+    cs1_client.Bind(std::move(client.value()), dispatcher_->async_dispatcher());
   }
 
   {
@@ -627,7 +626,7 @@ void SpiDeviceTest<FakeSpiImplClass>::AssertCsNoSiblingTest() {
     const auto& child0 = spi_bus->children().front();
     zx::result client = BindServer(child0);
     ASSERT_OK(client);
-    cs0_client.Bind(std::move(client.value()), loop_.dispatcher());
+    cs0_client.Bind(std::move(client.value()), dispatcher_->async_dispatcher());
   }
 
   {
@@ -720,7 +719,7 @@ void SpiDeviceTest<FakeSpiImplClass>::OneClient() {
     zx::result endpoints = fidl::CreateEndpoints<fuchsia_hardware_spi::Controller>();
     ASSERT_OK(endpoints);
     auto& [controller, server] = endpoints.value();
-    fidl::BindServer(loop_.dispatcher(), std::move(server),
+    fidl::BindServer(dispatcher_->async_dispatcher(), std::move(server),
                      spi_child->GetDeviceContext<typename FakeSpiImplClass::ChildType>());
     {
       zx::result endpoints = fidl::CreateEndpoints<fuchsia_hardware_spi::Device>();
@@ -739,7 +738,7 @@ void SpiDeviceTest<FakeSpiImplClass>::OneClient() {
     zx::result endpoints = fidl::CreateEndpoints<fuchsia_hardware_spi::Controller>();
     ASSERT_OK(endpoints);
     auto& [controller, server] = endpoints.value();
-    fidl::BindServer(loop_.dispatcher(), std::move(server),
+    fidl::BindServer(dispatcher_->async_dispatcher(), std::move(server),
                      spi_child->GetDeviceContext<typename FakeSpiImplClass::ChildType>());
     {
       zx::result server = fidl::CreateEndpoints<fuchsia_hardware_spi::Device>(&device);
@@ -767,7 +766,7 @@ void SpiDeviceTest<FakeSpiImplClass>::OneClient() {
     zx::result endpoints = fidl::CreateEndpoints<fuchsia_hardware_spi::Controller>();
     ASSERT_OK(endpoints);
     auto& [controller, server] = endpoints.value();
-    fidl::BindServer(loop_.dispatcher(), std::move(server),
+    fidl::BindServer(dispatcher_->async_dispatcher(), std::move(server),
                      spi_child->GetDeviceContext<typename FakeSpiImplClass::ChildType>());
     {
       zx::result endpoints = fidl::CreateEndpoints<fuchsia_hardware_spi::Device>();
@@ -790,6 +789,8 @@ void SpiDeviceTest<FakeSpiImplClass>::OneClient() {
     if (result.ok()) {
       break;
     }
+
+    cs0_client = {};
   }
 
   EXPECT_TRUE(vmos_released_since_last_call());

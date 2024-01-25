@@ -6,12 +6,11 @@
 #define SRC_DEVICES_SPI_DRIVERS_SPI_SPI_CHILD_H_
 
 #include <fidl/fuchsia.hardware.spi/cpp/fidl.h>
+#include <fidl/fuchsia.hardware.spiimpl/cpp/driver/fidl.h>
 #include <fuchsia/hardware/spi/cpp/banjo.h>
 #include <lib/component/outgoing/cpp/outgoing_directory.h>
 
 #include <ddktl/device.h>
-
-#include "spi-impl-client.h"
 
 namespace spi {
 
@@ -26,10 +25,12 @@ class SpiChild : public SpiChildType,
                  public ddk::SpiProtocol<SpiChild, ddk::base_protocol>,
                  public fidl::Server<fuchsia_hardware_spi::Device> {
  public:
-  SpiChild(zx_device_t* parent, SpiImplClient* spi, uint32_t chip_select, bool has_siblings,
-           async_dispatcher_t* dispatcher)
+  using ClientType = fdf::WireSharedClient<fuchsia_hardware_spiimpl::SpiImpl>;
+
+  SpiChild(zx_device_t* parent, fdf::WireSharedClient<fuchsia_hardware_spiimpl::SpiImpl> spi,
+           uint32_t chip_select, bool has_siblings, async_dispatcher_t* dispatcher)
       : SpiChildType(parent),
-        spi_(spi),
+        spi_(std::move(spi)),
         cs_(chip_select),
         has_siblings_(has_siblings),
         dispatcher_(dispatcher),
@@ -71,7 +72,7 @@ class SpiChild : public SpiChildType,
   zx_status_t ServeOutgoingDirectory(fidl::ServerEnd<fuchsia_io::Directory> server_end);
 
  private:
-  SpiImplClient* spi_;
+  fdf::WireSharedClient<fuchsia_hardware_spiimpl::SpiImpl> spi_;
   const uint32_t cs_;
   // False if this child is the only device on the bus.
   const bool has_siblings_;

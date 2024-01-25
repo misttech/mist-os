@@ -17,29 +17,33 @@
 namespace spi {
 
 class SpiDevice;
-using SpiDeviceType = ddk::Device<SpiDevice>;
+using SpiDeviceType = ddk::Device<SpiDevice, ddk::Unbindable>;
 
 class SpiDevice : public SpiDeviceType {
  public:
   SpiDevice(zx_device_t* parent, uint32_t bus_id) : SpiDeviceType(parent), bus_id_(bus_id) {}
 
-  static zx_status_t Create(void* ctx, zx_device_t* parent, async_dispatcher_t* dispatcher);
-  zx_status_t Init();
+  static zx_status_t Create(void* ctx, zx_device_t* parent, fdf_dispatcher_t* dispatcher);
+  zx_status_t Init(fdf_dispatcher_t* dispatcher);
 
   void DdkRelease();
+  void DdkUnbind(ddk::UnbindTxn txn);
 
  private:
+  using FidlClientType = fdf::WireSharedClient<fuchsia_hardware_spiimpl::SpiImpl>;
+  using BanjoClientType = BanjoSpiImplClient;
+
   template <typename T>
   void AddChildren(async_dispatcher_t* dispatcher,
-                   const fuchsia_hardware_spi_businfo::wire::SpiBusMetadata& metadata);
+                   const fuchsia_hardware_spi_businfo::wire::SpiBusMetadata& metadata,
+                   typename T::ClientType client);
 
-  SpiImplClient* GetSpiImpl() {
-    return std::visit([](auto&& impl) { return static_cast<SpiImplClient*>(&impl); },
-                      spi_impl_.value());
-  }
+  void FidlClientTeardownHandler();
 
   const uint32_t bus_id_;
-  std::optional<std::variant<FidlSpiImplClient, BanjoSpiImplClient>> spi_impl_;
+  std::variant<std::nullopt_t, FidlClientType, BanjoClientType> spi_impl_ = std::nullopt;
+  std::optional<ddk::UnbindTxn> unbind_txn_;
+  bool fidl_client_teardown_complete_ = false;
 };
 
 }  // namespace spi
