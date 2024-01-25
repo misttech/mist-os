@@ -28,6 +28,7 @@ Typical Usage:
 
 import atexit
 from dataclasses import dataclass
+import io
 import os
 import shutil
 import sys
@@ -146,6 +147,9 @@ def reset():
         _last_line_count = None
 
 
+_CLEAR_SCREEN_TO_END_MODE = 0
+
+
 def write_lines(
     lines: typing.List[str],
     prepend: typing.List[str] | None = None,
@@ -167,22 +171,23 @@ def write_lines(
     with _write_lock:
         if size is None:
             size = get_size()
+
+        write_buffer = io.StringIO()
+
         if _last_line_count:
             if len(lines) > _last_line_count:
                 # Create extra space
                 for _ in range(len(lines) - _last_line_count):
-                    print("")
+                    print("", file=write_buffer)
                 _last_line_count = len(lines)
-            for _ in range(_last_line_count - 1):
-                sys.stdout.write(
-                    "\r"
-                    + colorama.ansi.clear_line()
-                    + colorama.ansi.Cursor.UP()
-                )
-            sys.stdout.write("\r" + colorama.ansi.clear_line())
+            write_buffer.write(
+                "\r"
+                + colorama.Cursor.UP(_last_line_count - 1)
+                + colorama.ansi.clear_screen(_CLEAR_SCREEN_TO_END_MODE)
+            )
 
         for line in prepend or []:
-            print(line + colorama.Style.RESET_ALL)
+            print(line + colorama.Style.RESET_ALL, file=write_buffer)
 
         formatted_lines: typing.List[str] = []
 
@@ -203,12 +208,10 @@ def write_lines(
                 max_index = index + 1
 
             formatted_lines.append(
-                "\r"
-                + colorama.ansi.clear_line()
-                + line[:max_index]
-                + colorama.Style.RESET_ALL
+                "\r" + line[:max_index] + colorama.Style.RESET_ALL
             )
 
-        sys.stdout.write("\n".join(formatted_lines))
+        write_buffer.write("\n".join(formatted_lines))
+        sys.stdout.writelines([write_buffer.getvalue()])
         sys.stdout.flush()
         _last_line_count = len(lines)

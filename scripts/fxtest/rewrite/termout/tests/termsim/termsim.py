@@ -3,7 +3,10 @@
 # found in the LICENSE file.
 
 import io
+import re
 import typing
+
+_UP_REGEX = re.compile(r"\[(\d+)A")
 
 
 class Terminal:
@@ -12,8 +15,8 @@ class Terminal:
     This class can be set as stdout to simulate a terminal. It implements only
     the bare minimum ANSI escape codes needed to test termout, as follows:
     - Style commands; ignored.
-    - Cursor up.
-    - Clear line, valid only after CR.
+    - Cursor up, with arbitrary offset.
+    - Clear remainder of screen, available only when at the beginning of a line.
     - Next line, valid only as \\n.
 
     Attributes:
@@ -37,16 +40,21 @@ class Terminal:
         """
         return self._current_write.write(value)
 
+    def writelines(self, value: typing.List[str]):
+        self.write("".join(value))
+
     def flush(self):
         """Implementation of io flush.
 
         To ensure that the library flushes appropriately, the lines field
         is updated only on flush.
         """
-        expecting_clear = False
-
         chars = [ch for ch in self._current_write.getvalue()]
         chars.reverse()
+
+        # Determine if we know that we are at the beginning of a line.
+        at_front = True
+
         while chars:
             ch = chars.pop()
             if ch == "\n":
@@ -54,7 +62,7 @@ class Terminal:
                 while len(self.lines) <= self._line_position:
                     self.lines.append("")
             elif ch == "\r":
-                expecting_clear = True
+                at_front = True
             elif ch == "\x1B":
                 # Handle escape sequences.
                 next_ch = chars.pop()
@@ -69,29 +77,27 @@ class Terminal:
                 if code[-1] == "m":
                     # Color style, skip
                     pass
-                elif code == "[1A":
-                    # Go up a line
-                    self._line_position -= 1
-                elif code == "[2K":
-                    # Clear the line
-                    if not expecting_clear:
+                elif (m := _UP_REGEX.match(code)) is not None:
+                    # Go up N lines
+                    self._line_position -= int(m.group(1))
+                elif code == "[0J":
+                    if not at_front:
                         raise TerminalError(
-                            "Cleared a line without going back to the beginning"
+                            "Can only erase to end of screen if we are at the front of a line."
                         )
-                    expecting_clear = False
-                    self.lines[self._line_position] = ""
+                    # Clear to end of screen
+                    for l in range(self._line_position, len(self.lines)):
+                        self.lines[l] = ""
                 else:
                     raise TerminalError(f"Unknown escape code \\x1B{code}")
             else:
+                at_front = False
                 if len(self.lines[self._line_position]) >= self._width:
                     # Simulate a newline to go to the next line.
                     chars.append(ch)
                     chars.append("\n")
                 else:
                     self.lines[self._line_position] += ch
-
-        if expecting_clear:
-            raise TerminalError("Expected a clear line sequence after CR")
 
         self._current_write = io.StringIO()
 
