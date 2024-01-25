@@ -8,7 +8,7 @@ using fuchsia.ui.input;
 /// Service for exposing state and events of devices, such as media buttons.
 @discoverable
 closed protocol DeviceListenerRegistry {
-    // TODO(https://fxbug.dev/41384): Remove when no longer used.
+    // TODO(https://fxbug.dev/42117461): Remove when no longer used.
     /// Registers a listener to receive media button related events, such as
     /// changes from volume buttons and mute switches.
     @transitional
@@ -31,7 +31,7 @@ closed protocol DeviceListenerRegistry {
 /// will consume this listener interface and call `OnMediaButtonsEvent` when the
 /// registered media buttons event occurs.
 closed protocol MediaButtonsListener {
-    // TODO(https://fxbug.dev/41384): Remove when no longer used.
+    // TODO(https://fxbug.dev/42117461): Remove when no longer used.
     @transitional
     @deprecated("Use OnEvent() ")
     strict OnMediaButtonsEvent(struct {

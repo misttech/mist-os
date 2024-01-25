@@ -395,7 +395,7 @@ class WireSharedClient final {
   // the provided |resource| to allocate buffers necessary for each call.
   // See documentation on |WireClient::buffer| for detailed behavior.
   //
-  // TODO(https://fxbug.dev/91107): Consider taking |const fdf::Arena&| or similar.
+  // TODO(https://fxbug.dev/42172634): Consider taking |const fdf::Arena&| or similar.
   auto buffer(const fdf::Arena& arena) const {
     ZX_ASSERT(is_valid());
     return fidl::internal::Arrow<fidl::internal::WireWeakAsyncBufferClientImpl<Protocol>>(&get(),

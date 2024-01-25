@@ -13,11 +13,11 @@ binding-specific concerns via additional binding-specific FIDL test libraries.
 
 Parts of the [compatibility test][compatibility-test] may be factorized into
 separate libraries here. Individual binding unit tests may then be written on
-top, breaking up the compatibility test into facets (https://fxbug.dev/94910).
+top, breaking up the compatibility test into facets (https://fxbug.dev/42176858).
 
 ## Relations to the dynamic test suite
 
-Dynamic test suite project: https://fxbug.dev/102339.
+Dynamic test suite project: https://fxbug.dev/42053264.
 
 Binding specific unit tests focus on testing the API of generated bindings. The
 dynamic test suite focuses on testing the ABI across different bindings. The

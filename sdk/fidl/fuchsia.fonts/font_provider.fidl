@@ -108,7 +108,7 @@ type FamilyInfo = struct {
 
 /// Provider of digital font files and metadata.
 ///
-/// TODO(https://fxbug.dev/8903): Remove deprecated methods and move to provider.fidl.
+/// TODO(https://fxbug.dev/42170326): Remove deprecated methods and move to provider.fidl.
 @discoverable
 closed protocol Provider {
 

@@ -16,7 +16,7 @@ const INTERFACE_NAME_LENGTH uint8 = 15;
 /// An interface name as a sequence of bytes.
 alias Name = string:INTERFACE_NAME_LENGTH;
 
-// TODO(https://fxbug.dev/7913): Use built-in empty struct when available.
+// TODO(https://fxbug.dev/42159332): Use built-in empty struct when available.
 type Empty = struct {};
 
 /// Information about the preferred lifetime of an IP address or delegated
@@ -59,7 +59,7 @@ type PreferredLifetimeInfo = strict union {
 /// Assignment state of an IP address.
 @available(added=HEAD)
 type AddressAssignmentState = strict enum {
-    // TODO(https://fxbug.dev/82724): Replace this comment with FIDL that
+    // TODO(https://fxbug.dev/42163322): Replace this comment with FIDL that
     // actually reserves 0.
     //
     // The value of 0 is reserved and should never be added to avoid the
@@ -112,7 +112,7 @@ type Properties = table {
         ///
         /// Optional; may be omitted due to disinterest.
         2: valid_until zx.Time;
-        // TODO(https://fxbug.dev/107618): Send this field to clients.
+        // TODO(https://fxbug.dev/42058987): Send this field to clients.
         /// Preferred lifetime information.
         ///
         /// Optional; may be omitted due to disinterest.
@@ -156,9 +156,9 @@ closed protocol State {
     strict GetWatcher(resource struct {
         /// Options for configuring the interface state watcher.
         options @generated_name("WatcherOptions") table {
-            // TODO(https://fxbug.dev/110587): Implement disinterest in address
+            // TODO(https://fxbug.dev/42061967): Implement disinterest in address
             // properties in NS3.
-            // TODO(https://fxbug.dev/110587): Add netemul integration tests
+            // TODO(https://fxbug.dev/42061967): Add netemul integration tests
             // once fuchsia.net.interfaces.admin/Control.AddAddress supports
             // address lifetimes.
             /// Bitfield for registering interest in address properties.
@@ -176,7 +176,7 @@ closed protocol State {
             /// Optional; interpreted as false if not present.
             @available(added=HEAD)
             2: include_non_assigned_addresses bool;
-            // TODO(https://fxbug.dev/110084): Add bitfield for registering
+            // TODO(https://fxbug.dev/42061481): Add bitfield for registering
             // interest in the other interface property fields.
         };
         watcher server_end:Watcher;

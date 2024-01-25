@@ -541,7 +541,7 @@ void main(List<String> args) {
     expect(results[2].values, equals([0.0]));
   });
 
-// TODO(https://fxbug.dev/73367): Modify this test to only include VsyncProcessCallback
+// TODO(https://fxbug.dev/42152931): Modify this test to only include VsyncProcessCallback
   group('DRM FPS metric for Vsync callback', () {
     final dataFiles = [
       'runtime_deps/flutter_app_vsync_process_callback.json',
@@ -560,7 +560,7 @@ void main(List<String> args) {
     }
   });
 
-// TODO(https://fxbug.dev/73367): Modify this test to only include VsyncProcessCallback
+// TODO(https://fxbug.dev/42152931): Modify this test to only include VsyncProcessCallback
   group('System DRM FPS metric for vsync callback', () {
     final dataFiles = [
       'runtime_deps/flutter_app_vsync_process_callback.json',
@@ -825,7 +825,7 @@ void main(List<String> args) {
   });
 
   test('Zero-length duration events', () async {
-    // This is a regression test for a bug (https://fxbug.dev/131863) where
+    // This is a regression test for a bug (https://fxbug.dev/42082034) where
     // trace importing fails to correctly handle zero-length trace
     // durations with the ph='X' type.
     //
@@ -863,7 +863,7 @@ void main(List<String> args) {
     // durations have the same start timestamp. The tests the case of
     // separate begin and end records (ph='B' and ph='E') in the input.
     //
-    // This is a regression test for a bug (https://fxbug.dev/131863). The
+    // This is a regression test for a bug (https://fxbug.dev/42082034). The
     // bug arose because the trace importer sorted the trace events using a
     // non-stable sort (likely quicksort). We use an example input here
     // with a moderate number of trace events (100) because the bug does

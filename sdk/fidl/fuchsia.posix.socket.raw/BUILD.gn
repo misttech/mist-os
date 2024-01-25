@@ -15,7 +15,7 @@ fidl("fuchsia.posix.socket.raw") {
     "//sdk/fidl/fuchsia.posix.socket",
   ]
 
-  # TODO(https://fxbug.dev/88443): Remove this dependency since this target does
+  # TODO(https://fxbug.dev/42169676): Remove this dependency since this target does
   # not directly depend on these libraries.
   public_deps += [ "//sdk/fidl/fuchsia.unknown" ]
 }

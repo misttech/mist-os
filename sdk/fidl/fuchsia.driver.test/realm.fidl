@@ -86,14 +86,14 @@ type RealmArgs = resource table {
     /// Default: driver-integration-test
    10: board_name string:MAX;
 
-    // TODO(https://fxbug.dev/122149): This parameter should either be updated
+    // TODO(https://fxbug.dev/42073139): This parameter should either be updated
     // or removed.
     /// Specify additional offers from the test to a driver collection
     /// Default: empty
     @available(added=HEAD)
    11: offers vector<Offer>:MAX;
 
-    // TODO(https://fxbug.dev/122149): This parameter should either be updated
+    // TODO(https://fxbug.dev/42073139): This parameter should either be updated
     // or removed.
     /// Specify services to expose from the test to a driver collection
     /// Default: empty

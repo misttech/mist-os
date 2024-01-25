@@ -70,7 +70,7 @@ closed protocol Coordinator {
     /// dropped. The resources associated with the image will be released as
     /// soon as the image is no longer in use.
     //
-    // TODO(https://fxbug.dev/130027): The precondition on capture image exists because
+    // TODO(https://fxbug.dev/42080380): The precondition on capture image exists because
     // capture images have different constraints on image reuse compared with
     // non-capture images. We should have a unified design on image reuse for
     // both capture and non-capture images.
@@ -326,7 +326,7 @@ closed protocol Coordinator {
     // CheckConfig.
     strict ApplyConfig();
 
-    // TODO(https://fxbug.dev/72588): This is a temporary solution to support old
+    // TODO(https://fxbug.dev/42152065): This is a temporary solution to support old
     // ApplyConfig() with new OnVsync() events. Remove this once the migration
     // is done.
     //
@@ -360,13 +360,13 @@ closed protocol Coordinator {
     ///     silently fail, so the client should ensure its configuration is
     ///     valid with CheckConfig().
     //
-    // TODO(https://fxbug.dev/121265): The current ApplyConfig2() API could cause delay
+    // TODO(https://fxbug.dev/42072277): The current ApplyConfig2() API could cause delay
     // when there are multiple displays with different refresh rates and vsync
     // phases. In order to better support multiple displays, we should support
     // fences to be signaled when configuration is applied to a subset of
     // displays.
     //
-    // TODO(https://fxbug.dev/121340): `signal_fences` should be renamed. The field
+    // TODO(https://fxbug.dev/42072361): `signal_fences` should be renamed. The field
     // should be named to better indicate the timing and semantics when it is
     // signaled by the display driver.
     @transitional
@@ -424,7 +424,7 @@ closed protocol Coordinator {
     ///   buffer, only the most recently received vsyncs will be stored and
     ///   older ones will be dropped.
     //
-    // TODO(https://fxbug.dev/72588): Remove "@transitional" tag after implementing
+    // TODO(https://fxbug.dev/42152065): Remove "@transitional" tag after implementing
     // OnVsync on all display clients.
     //
     strict -> OnVsync(resource struct {
@@ -467,7 +467,7 @@ closed protocol Coordinator {
     // on it so that it can be imported with a specific config.
     // Dimensions, pixel format, and image type are ignored when
     // setting constraints if set to zero.
-    // TODO(https://fxbug.dev/85320): Update this API to better support
+    // TODO(https://fxbug.dev/42166207): Update this API to better support
     // optional fields.
     strict SetBufferCollectionConstraints(struct {
         buffer_collection_id BufferCollectionId;

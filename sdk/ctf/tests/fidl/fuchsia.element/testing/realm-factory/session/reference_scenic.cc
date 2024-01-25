@@ -11,7 +11,7 @@
 
 #include <utility>
 
-// TODO(https://fxbug.dev/89476): Remove and replace with real Scenic when available.
+// TODO(https://fxbug.dev/42170821): Remove and replace with real Scenic when available.
 class ScenicImpl : public fuchsia::ui::scenic::Scenic {
  public:
   fidl::InterfaceRequestHandler<fuchsia::ui::scenic::Scenic> GetHandler() {

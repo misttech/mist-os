@@ -10,7 +10,7 @@ using fuchsia.posix;
 using fuchsia.unknown;
 using zx;
 
-// TODO(https://fxbug.dev/110021): remove once zircon signal values are defined
+// TODO(https://fxbug.dev/42061412): remove once zircon signal values are defined
 // in the zx FIDL library.
 const USER_SIGNAL_0 uint32 = 0x01000000;
 const USER_SIGNAL_1 uint32 = 0x02000000;
@@ -452,7 +452,7 @@ type OptionalUint32 = strict union {
     2: unset Empty;
 };
 
-// TODO(https://fxbug.dev/7913): Use built-in empty struct when available.
+// TODO(https://fxbug.dev/42159332): Use built-in empty struct when available.
 type Empty = struct {};
 
 /// Socket level ancillary data that can be received.
@@ -537,7 +537,7 @@ type SocketSendControlData = table {};
 /// This is currently a struct instead of a table as it is meant to match
 /// `in6_pktinfo` which is not expected to grow.
 //
-// TODO(https://fxbug.dev/109723): Consider changing this type to better reflect
+// TODO(https://fxbug.dev/42061079): Consider changing this type to better reflect
 // the optionality of its fields.
 type Ipv6PktInfoSendControlData = struct {
     /// The interface index from which the IPv6 packet should be sent.
@@ -564,7 +564,7 @@ type NetworkSocketSendControlData = table {
     2: ip @generated_name("IpSendControlData") table {
         // Reserved for `SOL_IP` -> `IP_TOS` control message, to maintain
         // a consistent order with the similar IpRecvControlData table.
-        // TODO(https://fxbug.dev/96028): Replace with `IP_TOS` cmsg.
+        // TODO(https://fxbug.dev/42178100): Replace with `IP_TOS` cmsg.
         1: reserved;
 
         /// The Time to Live value to set in the IPv4 header of an outgoing
@@ -579,7 +579,7 @@ type NetworkSocketSendControlData = table {
     3: ipv6 @generated_name("Ipv6SendControlData") table {
         // Reserved for `SOL_IPV6` -> `IPV6_TCLASS` control message, to maintain
         // a consistent order with the similar IpSendControlData table.
-        // TODO(https://fxbug.dev/96028): Replace with `IPV6_TCLASS` cmsg.
+        // TODO(https://fxbug.dev/42178100): Replace with `IPV6_TCLASS` cmsg.
         1: reserved;
 
         /// The Hop Limit value to set in the IPv6 header of an outgoing
@@ -660,7 +660,7 @@ type SendMsgMeta = table {
 /// for errors on the zircon socket in the same call.
 const FAST_UDP_WAIT_MANY_MAXIMUM_ITEMS uint32 = 63;
 
-// TODO(https://fxbug.dev/105608): Use a generated constant.
+// TODO(https://fxbug.dev/42056856): Use a generated constant.
 const DATAGRAM_SOCKET_PROTOCOL_NAME string = "fuchsia.posix.socket/DatagramSocket";
 
 /// A datagram socket.
@@ -702,7 +702,7 @@ closed protocol DatagramSocket {
         /// If absent, indicates that the stack is free to choose an appropriate
         /// outgoing route.
         //
-        // TODO(https://fxbug.dev/106644): document behavior when this field is
+        // TODO(https://fxbug.dev/42057977): document behavior when this field is
         // set and the socket is an IPv4 socket.
         2: ipv6_pktinfo Ipv6PktInfoSendControlData;
     }) -> (resource table {
@@ -755,7 +755,7 @@ closed protocol DatagramSocket {
     }) error fuchsia.posix.Errno;
 };
 
-// TODO(https://fxbug.dev/105608): Use a generated constant.
+// TODO(https://fxbug.dev/42056856): Use a generated constant.
 const SYNCHRONOUS_DATAGRAM_SOCKET_PROTOCOL_NAME string
         = "fuchsia.posix.socket/SynchronousDatagramSocket";
 
@@ -822,7 +822,7 @@ closed protocol SynchronousDatagramSocket {
     }) error fuchsia.posix.Errno;
 };
 
-// TODO(https://fxbug.dev/105608): Use a generated constant.
+// TODO(https://fxbug.dev/42056856): Use a generated constant.
 const STREAM_SOCKET_PROTOCOL_NAME string = "fuchsia.posix.socket/StreamSocket";
 
 /// A stream socket.
@@ -1176,7 +1176,7 @@ closed protocol Provider {
         s client_end:StreamSocket;
     }) error fuchsia.posix.Errno;
     /// Requests a datagram socket with the specified parameters.
-    /// TODO(https://fxbug.dev/85027): Remove this method once no more callers rely on it.
+    /// TODO(https://fxbug.dev/42165881): Remove this method once no more callers rely on it.
     @selector("fuchsia.posix.socket/Provider.DatagramSocket")
     strict DatagramSocketDeprecated(struct {
         domain Domain;

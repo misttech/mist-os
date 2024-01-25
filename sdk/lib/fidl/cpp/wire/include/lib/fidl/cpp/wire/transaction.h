@@ -170,7 +170,7 @@ class CompleterBase {
   // failed, and can be ignored in general use.
   fidl::Status result_of_reply() const;
 
-  // TODO(https://fxbug.dev/60240): Use composition instead of inheriting all completers
+  // TODO(https://fxbug.dev/42138399): Use composition instead of inheriting all completers
   // from |CompleterBase|. This method is unnecessarily exposed to the user.
   void SendReply(::fidl::OutgoingMessage* message,
                  fidl::internal::OutgoingTransportContext transport_context);

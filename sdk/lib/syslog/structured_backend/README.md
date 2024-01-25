@@ -4,7 +4,7 @@ The Fuchsia syslog structured backend allows you to write structured logs to
 Archivist. Structured logging allows you to encode more information in your log
 than just text, allowing for richer analytics and diagnostics of your component.
 This library is meant for systems integrators, not application developers.
-https://fxbug.dev/81491 tracks app development support.
+https://fxbug.dev/42161952 tracks app development support.
 
 ## Usage
 

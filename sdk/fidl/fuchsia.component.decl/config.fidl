@@ -55,7 +55,7 @@ type ConfigType = struct {
     layout ConfigTypeLayout;
     // This optional is not necessary, but without it,
     // FIDL compilation complains because of a possible include-cycle.
-    // Bug: https://fxbug.dev/66350
+    // Bug: https://fxbug.dev/42145148
     parameters vector<LayoutParameter>:<MAX, optional>;
     constraints vector<LayoutConstraint>:MAX;
 };

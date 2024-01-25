@@ -79,7 +79,7 @@ type DelayScheduleEntry = struct {
 };
 
 /// Parameters to InsertLeaf method.
-/// TODO(https://fxbug.dev/88343): Replace with anonymous tables when avaliable as
+/// TODO(https://fxbug.dev/42169565): Replace with anonymous tables when avaliable as
 /// parameter arguments.
 type InsertLeafParams = table {
     /// `label` is the location of the leaf in the tree.
@@ -98,7 +98,7 @@ type InsertLeafParams = table {
 };
 
 /// Response from the InsertLeaf method.
-/// TODO(https://fxbug.dev/88343): Replace with anonymous tables when avaliable as
+/// TODO(https://fxbug.dev/42169565): Replace with anonymous tables when avaliable as
 /// parameter arguments.
 type InsertLeafResponse = table {
     /// `root_hash` is set to the updated root hash of the tree.
@@ -110,7 +110,7 @@ type InsertLeafResponse = table {
 };
 
 /// Parameters to RemoveLeaf method.
-/// TODO(https://fxbug.dev/88343): Replace with anonymous tables when avaliable as
+/// TODO(https://fxbug.dev/42169565): Replace with anonymous tables when avaliable as
 /// parameter arguments.
 type RemoveLeafParams = table {
     /// `label` is the location of the leaf in the tree.
@@ -122,7 +122,7 @@ type RemoveLeafParams = table {
 };
 
 /// Parameters to the TryAuth method.
-/// TODO(https://fxbug.dev/88343): Replace with anonymous tables when avaliable as
+/// TODO(https://fxbug.dev/42169565): Replace with anonymous tables when avaliable as
 /// parameter arguments.
 type TryAuthParams = table {
     /// `le_secret` is the low entropy secret limited by the delay_schedule.

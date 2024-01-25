@@ -48,7 +48,7 @@ closed protocol DirectoryIterator {
     }) error zx.Status;
 };
 
-// TODO(https://fxbug.dev/105608): Use a generated constant.
+// TODO(https://fxbug.dev/42056856): Use a generated constant.
 const DIRECTORY_PROTOCOL_NAME string = "fuchsia.io/Directory";
 
 /// A [`Node2`] that is capable of containing other nodes.
@@ -344,7 +344,7 @@ closed protocol Directory2 {
         dst Name;
     }) -> () error zx.Status;
 
-    // TODO(https://fxbug.dev/77623): uncomment and implement.
+    // TODO(https://fxbug.dev/42157659): uncomment and implement.
     // /// Creates a link to a node named `src` by the name `dst`,
     // /// in a directory represented by `dst_parent_token`.
     // ///

@@ -75,7 +75,7 @@ closed protocol VolumeManager {
     /// Implementations must only respond once all child partitions of `VolumeManager` have been
     /// added to devfs, to guarantee clients can safely enumerate them.
     ///
-    /// See https://fxbug.dev/126961 for more information.
+    /// See https://fxbug.dev/42077585 for more information.
     strict GetInfo() -> (struct {
         status zx.Status;
         info box<VolumeManagerInfo>;
@@ -214,8 +214,8 @@ closed protocol Volume {
 };
 
 /// This protocol is intended to emulate a block device.
-// TODO(https://fxbug.dev/103827): Make this protocol test-only.
-// TODO(https://fxbug.dev/112484): Remove this protocol entirely.
+// TODO(https://fxbug.dev/42054916): Make this protocol test-only.
+// TODO(https://fxbug.dev/42063787): Remove this protocol entirely.
 closed protocol VolumeAndNode {
     compose Volume;
     compose io.Node;

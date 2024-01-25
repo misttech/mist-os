@@ -187,7 +187,7 @@ class Input {
   /// injected successfully. Interpretation of unrecognized values is subject to
   /// the choices of the system under test.
   ///
-  /// Per https://fxbug.dev/63532, this method will be replaced with a method that deals in
+  /// Per https://fxbug.dev/42142047, this method will be replaced with a method that deals in
   /// `fuchsia.input.Key`s, instead of HID Usage IDs.
   Future<bool> keyPress(int hidUsageId,
       {Duration keyPressDuration = const Duration(milliseconds: 1)}) async {

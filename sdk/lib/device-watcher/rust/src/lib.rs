@@ -180,7 +180,7 @@ pub async fn recursive_wait_and_open_directory(
 /// Open the path `name` within `dir`. This function waits for each directory to be available
 /// before it opens it. If the path never appears this function will wait forever. Does NOT
 /// support fio::DirectoryMarker. Use recursive_wait_and_open_directory() instead.
-/// TODO(https://fxbug.dev/121994): Specialize this function to support fio::DirectoryMarker
+/// TODO(https://fxbug.dev/42072966): Specialize this function to support fio::DirectoryMarker
 pub async fn recursive_wait_and_open<P: fidl::endpoints::ProtocolMarker>(
     dir: &fio::DirectoryProxy,
     name: &str,

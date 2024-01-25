@@ -57,7 +57,7 @@ class atomic_ref : public atomic_internal::atomic_ops<atomic_ref<T>, T>,
     return __atomic_is_lock_free(sizeof(T), ptr_);
   }
 
-  // TODO(https://fxbug.dev/104509): Implement wait/notify/notify_all for non kernel code.
+  // TODO(https://fxbug.dev/42055673): Implement wait/notify/notify_all for non kernel code.
 
  private:
   friend atomic_internal::atomic_ops<atomic_ref, T>;

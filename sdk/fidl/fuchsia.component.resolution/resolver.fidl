@@ -53,7 +53,7 @@ closed protocol Resolver {
 };
 
 /// The possible error conditions returned by ComponentResolver.
-// TODO(https://fxbug.dev/72139): API review of ResolverError.
+// TODO(https://fxbug.dev/42151567): API review of ResolverError.
 type ResolverError = strict enum {
     /// An unexpected error occurred.
     INTERNAL = 1;

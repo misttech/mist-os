@@ -34,12 +34,12 @@ type PortId = struct {
 /// *Note*: Device implementers are encouraged to propose additions to this
 /// enumeration to avoid using ill-fitting variants if there's not a good match
 /// available.
-// TODO(https://fxbug.dev/76232): Rename to PortClass once we can easily soft
+// TODO(https://fxbug.dev/42156114): Rename to PortClass once we can easily soft
 // transition through aliasing to prevent source breakages.
-// TODO(https://fxbug.dev/77697): Make this a flexible enum once HLCPP flexible
+// TODO(https://fxbug.dev/42157740): Make this a flexible enum once HLCPP flexible
 // enums don't break chromium.
 type DeviceClass = strict enum : uint16 {
-    // TODO(https://fxbug.dev/77697): Transition this variant out of zero per
+    // TODO(https://fxbug.dev/42157740): Transition this variant out of zero per
     // recommendation in
     // https://fuchsia.dev/fuchsia-src/concepts/api/fidl#enum once this is
     // a flexible enum.

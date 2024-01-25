@@ -22,7 +22,7 @@ closed protocol Control {
     ///     network cannot be added.
     strict CreateNetwork(resource struct {
         config flexible union {
-            // TODO(https://fxbug.dev/86068): Currently bridged networks are not
+            // TODO(https://fxbug.dev/42167037): Currently bridged networks are not
             // isolated from each other (they are all on the same bridge). Provide
             // isolation via VLANs.
             /// Create a bridged network.
@@ -51,7 +51,7 @@ closed protocol Control {
                         ///
                         /// The address and a subnet route will be configured.
                         1: static fuchsia.net.Ipv4AddressWithPrefix;
-                        // TODO(https://fxbug.dev/103567): Support running a DHCPv4 server.
+                        // TODO(https://fxbug.dev/42054627): Support running a DHCPv4 server.
                     };
                     /// IPv4 connectivity type.
                     ///
@@ -71,13 +71,13 @@ closed protocol Control {
                             /// going out all upstream-providing interfaces.
                             1: nat @generated_name("IPv4NatConfig") table {};
                         };
-                        // TODO(https://fxbug.dev/103561): Support Proxy ARP.
+                        // TODO(https://fxbug.dev/42054621): Support Proxy ARP.
                     };
-                    // TODO(https://fxbug.dev/103478): Support multicast routing.
+                    // TODO(https://fxbug.dev/42054528): Support multicast routing.
                 };
-                // TODO(https://fxbug.dev/103562): Support IPv6 connectivity with Proxy NDP.
-                // TODO(https://fxbug.dev/103569): Support running a DHCPv6 server.
-                // TODO(https://fxbug.dev/104062): Support running a router advertising service.
+                // TODO(https://fxbug.dev/42054622): Support IPv6 connectivity with Proxy NDP.
+                // TODO(https://fxbug.dev/42054629): Support running a DHCPv6 server.
+                // TODO(https://fxbug.dev/42055177): Support running a router advertising service.
             };
         };
         network server_end:Network;
@@ -115,7 +115,7 @@ closed protocol Network {
     });
 };
 
-// TODO(https://fxbug.dev/87111): Add a terminal event and emit it to signal
+// TODO(https://fxbug.dev/42168197): Add a terminal event and emit it to signal
 // inability to add the interface due to incompatibility, e.g. if the network
 // is bridged and the port added does not support the same L2 protocol as other
 // ports on the bridge.
@@ -130,7 +130,7 @@ closed protocol Network {
 closed protocol Interface {
     strict -> OnRemoved(struct {
         reason @generated_name("InterfaceRemovalReason") flexible enum {
-            // TODO(https://fxbug.dev/103705): Remove this variant once
+            // TODO(https://fxbug.dev/42054781): Remove this variant once
             // multiple ports in networked mode is supported.
             /// Failed to create the network because the network supports only
             /// a single port.

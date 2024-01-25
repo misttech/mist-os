@@ -7,7 +7,7 @@
         "inspect/use.shard.cml",
     ],
 
-    // TODO(https://fxbug.dev/93344): Remove diagnostics dir
+    // TODO(https://fxbug.dev/42175119): Remove diagnostics dir
     capabilities: [
         {
             directory: "diagnostics",
@@ -16,7 +16,7 @@
         },
     ],
 
-    // TODO(https://fxbug.dev/93344): Remove diagnostics dir
+    // TODO(https://fxbug.dev/42175119): Remove diagnostics dir
     expose: [
         {
             directory: "diagnostics",

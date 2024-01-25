@@ -88,13 +88,13 @@ closed protocol ClientProvider {
     ///
     /// It's not currently possible for a client with an optionally-provided
     /// protocol to check whether there's someone on the other end without
-    /// making a FIDL call (https://fxbug.dev/95554). This method provides a
+    /// making a FIDL call (https://fxbug.dev/42177573). This method provides a
     /// workaround by giving a client a method that it can call to check for
     /// liveness.
     ///
-    /// TODO(https://fxbug.dev/125773): Remove this once the DHCP out-of-stack
+    /// TODO(https://fxbug.dev/42076541): Remove this once the DHCP out-of-stack
     /// client is always being used.
-    @deprecated("For DHCP client migration only, see https://fxbug.dev/125773 for details")
+    @deprecated("For DHCP client migration only, see https://fxbug.dev/42076541 for details")
     strict CheckPresence() -> ();
 };
 

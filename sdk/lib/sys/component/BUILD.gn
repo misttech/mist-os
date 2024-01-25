@@ -23,7 +23,7 @@ group("tests") {
 # The SDK one inherits from the base shard, and extends it by declaring
 # the necessary child based off an absolute URL.
 #
-# TODO(https://fxbug.dev/89252): Remove this workaround once sub-packages
+# TODO(https://fxbug.dev/42170573): Remove this workaround once sub-packages
 # support has landed.
 sdk_component_manifests("realm_builder_shard_sdk") {
   name = "sys/component"
@@ -37,7 +37,7 @@ sdk_component_manifests("realm_builder_shard_sdk") {
 sdk_component_manifests("realm_builder_shard") {
   name = "sys/component"
 
-  # TODO(https://fxbug.dev/119428): Move `realm_builder_subpackage.shard.cml` to
+  # TODO(https://fxbug.dev/42070500): Move `realm_builder_subpackage.shard.cml` to
   # "partner" (`realm_builder_shard_sdk` target) when `realm_builder_server`
   # is exported with the SDK for subpackaging in OOT components.
   manifests = [

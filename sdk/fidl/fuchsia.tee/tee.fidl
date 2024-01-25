@@ -38,7 +38,7 @@ type Direction = strict enum : uint32 {
 
 /// An empty parameter type is used as a placeholder for elements in the parameter set that are not
 /// used.
-// TODO(https://fxbug.dev/8031): Consider making this a table once empty tables do not cause binding issues.
+// TODO(https://fxbug.dev/42160640): Consider making this a table once empty tables do not cause binding issues.
 type None = struct {};
 
 /// Represents a buffer parameter.

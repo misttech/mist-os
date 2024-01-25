@@ -11,7 +11,7 @@ using fuchsia.hardware.usb.request;
 alias UsbSpeed = uint32;
 
 // Note: the "uint64 foo_device" parameters should be interpreted as zx_device_t*.
-// TODO(https://fxbug.dev/69023): restore types.
+// TODO(https://fxbug.dev/42148112): restore types.
 @transport("Banjo")
 @banjo_layout("ddk-protocol")
 closed protocol UsbBus {

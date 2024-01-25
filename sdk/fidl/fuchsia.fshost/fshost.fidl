@@ -9,7 +9,7 @@ using fuchsia.hardware.block;
 using fuchsia.io;
 
 /// Manages the block watcher.
-/// TODO(https://fxbug.dev/110342): Gracefully handle multiple users of the BlockWatcher API.
+/// TODO(https://fxbug.dev/42061696): Gracefully handle multiple users of the BlockWatcher API.
 @discoverable
 closed protocol BlockWatcher {
     /// Pauses the block watcher. This will return when the block watcher has stopped processing
@@ -32,7 +32,7 @@ closed protocol BlockWatcher {
 type MountOptions = resource table {
     1: read_only bool;
     /// [DEPRECATED] Metrics are always enabled now.
-    // TODO(https://fxbug.dev/90702): Remove.
+    // TODO(https://fxbug.dev/42172184): Remove.
     2: collect_metrics bool;
     3: verbose bool;
     4: write_compression_algorithm string:32;
@@ -88,7 +88,7 @@ closed protocol Admin {
     ///
     /// **WARNING**: This will cause irreversible data loss. Use with caution.
     ///
-    /// TODO(https://fxbug.dev/112142): This function unbinds all child drivers of the volume to be wiped.
+    /// TODO(https://fxbug.dev/42063480): This function unbinds all child drivers of the volume to be wiped.
     /// This can race with the fshost block device manager, which attempts to bind the FVM driver
     /// and unseal the zxcrypt volume.
     strict WipeStorage(resource struct {

@@ -46,7 +46,7 @@ type DataPath = strict enum : uint8 {
 
     /// Transport audio data directly between the controller and the audio hardware.
     /// The ScoConnection protocol will not be used to send/receive data.
-    // TODO(https://fxbug.dev/62161): Document how offloading is configured.
+    // TODO(https://fxbug.dev/42140527): Document how offloading is configured.
     OFFLOAD = 2;
 
     /// The audio test mode transport. See Core Spec v5.2, Vol 4, Part E, Section 7.6.2 for details.

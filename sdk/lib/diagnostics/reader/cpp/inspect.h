@@ -63,7 +63,7 @@ class InspectData {
   // Return the content of the diagnostics data as a JSON value.
   const rapidjson::Value& content() const;
 
-  // TODO(https://fxbug.dev/77979): Switch users to use payload() and remove GetByPath()
+  // TODO(https://fxbug.dev/42158053): Switch users to use payload() and remove GetByPath()
   // Returns the value at the given path in the data contents.
   const rapidjson::Value& GetByPath(const std::vector<std::string>& path) const;
 

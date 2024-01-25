@@ -52,7 +52,7 @@ source_set("cpp_disable_synchronization_check") {
   #
   # Do not add to this allowlist without a good reason.
   #
-  # TODO(https://fxbug.dev/113997): Fix all deps in this allowlist and remove it.
+  # TODO(https://fxbug.dev/42065251): Fix all deps in this allowlist and remove it.
   visibility = [
     "//src/developer/adb/bin/adb-file-sync:adb-file-sync",
     "//src/devices/light-sensor/drivers/ams-light:ams-light-test-bin",

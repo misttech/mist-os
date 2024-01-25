@@ -128,7 +128,7 @@ group("final_fuchsia_idk.validation") {
   if (host_os == "linux") {
     deps += [
       # Run the Bazel SDK test suite against the final exported directory,
-      # TODO(https://fxbug.dev/124321): Make the Bazel SDK test suite runnable on MacOS!
+      # TODO(https://fxbug.dev/42075205): Make the Bazel SDK test suite runnable on MacOS!
       "//build/bazel/bazel_sdk:bazel_sdk_tests_idk",
     ]
   }
@@ -326,14 +326,14 @@ sdk_documentation("musl_license") {
 # Build this target to generate a NOTICE file for the SDK.
 # Uncomment the next line, build it, then manually copy the output
 # to "//tools/check-licenses/assets/sdk/NOTICE.fuchsia"
-# TODO(https://fxbug.dev/102264): Build the NOTICE file automatically during SDK generation.
+# TODO(https://fxbug.dev/42053181): Build the NOTICE file automatically during SDK generation.
 #
 #license_data("sdk_notice_gen") {
 #  target = "//sdk"
 #}
 
 # Notice file for all contents in the Fuchsia SDK.
-# TODO(https://fxbug.dev/102264): Replace this with individual notices for each SDK element.
+# TODO(https://fxbug.dev/42053181): Replace this with individual notices for each SDK element.
 sdk_documentation("sdk_notice") {
   name = "sdk_notice"
 
@@ -411,7 +411,7 @@ sdk_molecule("host_tools") {
     "//zircon/tools/merkleroot:merkleroot_sdk",
     "//zircon/tools/zbi:zbi_sdk",
 
-    # TODO(https://fxbug.dev/95661): Remove these once the emulators are available independently.
+    # TODO(https://fxbug.dev/42177692): Remove these once the emulators are available independently.
     "//src/developer/ffx/plugins/emulator:aemu_internal",
     "//src/developer/ffx/plugins/emulator:qemu_internal",
   ]
@@ -600,7 +600,7 @@ sdk_molecule("platform_libs") {
 # A collection of SDK atoms used to populate the @internal_sdk Bazel
 # repository. Only used for the GN > Bazel migration of the build system.
 # Content are bound to change a lot. Nothing else should rely on this.
-# See https://fxrev.dev/737558 and https://fxbug.dev/113063.
+# See https://fxrev.dev/737558 and https://fxbug.dev/42064359.
 sdk_collection("platform") {
   visibility += [ "*" ]
 
@@ -767,7 +767,7 @@ sdk_collection("firmware_collection") {
 
 # Tools Fuchsia driver developers used on the host platform; where host is often
 # Linux or Mac OS.
-# WARNING (https://fxbug.dev/116642): the driver SDK will soon be removed.
+# WARNING (https://fxbug.dev/42067830): the driver SDK will soon be removed.
 # DO NOT ADD anything here!
 sdk_molecule("driver_host_tools") {
   _driver_host_tools = [
@@ -775,7 +775,7 @@ sdk_molecule("driver_host_tools") {
     "//tools/bindc:bindc_sdk",
     "//tools/fidl/fidlgen_cpp:fidlgen_cpp_sdk",
 
-    # TODO(https://fxbug.dev/80525): Change to "fidlgen_cpp" once Bazel SDK uses the non-experimental name.
+    # TODO(https://fxbug.dev/42160879): Change to "fidlgen_cpp" once Bazel SDK uses the non-experimental name.
     "//tools/fidl/fidlgen_cpp:fidlgen_cpp_experimental_driver_only_toolchain_sdk",
   ]
 
@@ -795,7 +795,7 @@ sdk_molecule("driver_host_tools") {
   }
 }
 
-# WARNING (https://fxbug.dev/116642): the driver SDK will soon be removed.
+# WARNING (https://fxbug.dev/42067830): the driver SDK will soon be removed.
 # DO NOT ADD anything here!
 sdk_molecule("bind") {
   deps = [
@@ -813,7 +813,7 @@ pool("subbuild_pool") {
   depth = sdk_max_simultaneous_sub_builds
 }
 
-# WARNING (https://fxbug.dev/116642): the driver SDK will soon be removed.
+# WARNING (https://fxbug.dev/42067830): the driver SDK will soon be removed.
 # DO NOT ADD anything here!
 sdk_molecule("driver_fidl") {
   deps = [

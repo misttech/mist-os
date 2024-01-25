@@ -30,7 +30,7 @@ struct fdf_channel_read {
   async_state_t state;
   fdf_channel_read_handler_t* handler;
   fdf_handle_t channel;
-  // TODO(https://fxbug.dev/86294): Decide if we want a sticky option akin to ZX_WAIT_ASYNC_REPEATING
+  // TODO(https://fxbug.dev/42167288): Decide if we want a sticky option akin to ZX_WAIT_ASYNC_REPEATING
   // (and maybe default to it when the dispatcher is unsynchronized?).
   uint32_t options;
 };

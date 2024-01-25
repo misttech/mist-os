@@ -20,7 +20,7 @@ struct WireCodingTraits;
 // it is optimized to have the same memory layout as |T|, using the fact that
 // FIDL unions are naturally optional (an absent union consists of all zeros).
 //
-// TODO(https://fxbug.dev/109737): Consider using |fidl::WireOptional| to represent optional
+// TODO(https://fxbug.dev/42061094): Consider using |fidl::WireOptional| to represent optional
 // vectors and optional strings.
 template <typename T>
 struct WireOptional final {

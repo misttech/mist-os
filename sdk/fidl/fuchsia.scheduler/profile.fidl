@@ -14,7 +14,7 @@ type CpuSet = struct {
 closed protocol ProfileProvider {
     /// Obtain a profile handle.
     ///
-    /// TODO(https://fxbug.dev/40858): This API will be deprecated and removed in the future, use
+    /// TODO(https://fxbug.dev/42116876): This API will be deprecated and removed in the future, use
     /// SetProfileByRole instead.
     strict GetProfile(struct {
         priority uint32;
@@ -26,7 +26,7 @@ closed protocol ProfileProvider {
 
     /// Obtain a deadline profile handle.
     ///
-    /// TODO(https://fxbug.dev/40858): This API will be deprecated and removed in the future, use
+    /// TODO(https://fxbug.dev/42116876): This API will be deprecated and removed in the future, use
     /// SetProfileByRole instead.
     strict GetDeadlineProfile(struct {
         capacity uint64;
@@ -40,7 +40,7 @@ closed protocol ProfileProvider {
 
     /// Obtain a handle for a profile that sets CPU affinity.
     ///
-    /// TODO(https://fxbug.dev/40858): This API will be deprecated and removed in the future, use
+    /// TODO(https://fxbug.dev/42116876): This API will be deprecated and removed in the future, use
     /// SetProfileByRole instead.
     strict GetCpuAffinityProfile(struct {
         cpu_mask CpuSet;

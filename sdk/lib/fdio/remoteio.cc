@@ -46,7 +46,7 @@ zx_status_t fdio::zxio_allocator(zxio_object_type_t type, zxio_storage_t** out_s
                                  void** out_context) {
   fdio_ptr io;
   // The type of storage (fdio subclass) depends on the type of the object until
-  // https://fxbug.dev/43267 is resolved, so this has to switch on the type.
+  // https://fxbug.dev/42119552 is resolved, so this has to switch on the type.
   switch (type) {
     case ZXIO_OBJECT_TYPE_DATAGRAM_SOCKET:
     case ZXIO_OBJECT_TYPE_PACKET_SOCKET:
@@ -143,7 +143,7 @@ zx::result<fdio_ptr> fdio::create_with_on_open(fidl::ClientEnd<fio::Node> node) 
   EventHandler event_handler(std::move(node));
   const fidl::Status status = event_handler.HandleOneEvent(event_handler.client_end());
   if (!status.ok()) {
-    // TODO(https://fxbug.dev/30921): This should probably be ZX_ERR_IO (EIO in
+    // TODO(https://fxbug.dev/42105838): This should probably be ZX_ERR_IO (EIO in
     // POSIX) or the transformation to errno should happen differently. This
     // behavior is kept to avoid breaking tests that check for EPIPE when
     // talking to a closed server endpoint.

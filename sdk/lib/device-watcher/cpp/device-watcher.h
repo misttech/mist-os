@@ -19,7 +19,7 @@ namespace device_watcher {
 // and opens it.
 // This method does not take ownership of |dir_fd|.
 //
-// TODO(https://fxbug.dev/117188): Remove `timeout`.
+// TODO(https://fxbug.dev/42068369): Remove `timeout`.
 zx::result<zx::channel> RecursiveWaitForFile(int dir_fd, const char* path,
                                              zx::duration timeout = zx::duration::infinite());
 
@@ -27,7 +27,7 @@ zx::result<zx::channel> RecursiveWaitForFile(int dir_fd, const char* path,
 // NOTE: This only works for absolute paths,
 // otherwise it will return ZX_ERR_NOT_SUPPORTED.
 //
-// TODO(https://fxbug.dev/117188): Remove `timeout`.
+// TODO(https://fxbug.dev/42068369): Remove `timeout`.
 zx::result<zx::channel> RecursiveWaitForFile(const char* path,
                                              zx::duration timeout = zx::duration::infinite());
 
@@ -95,7 +95,7 @@ class DirWatcher {
   // Returns ZX_OK if |filename| is removed from the directory before the given timeout elapses.
   // If no filename is specified, this will wait for any file in the directory to be removed.
   //
-  // TODO(https://fxbug.dev/117188): Remove `timeout`.
+  // TODO(https://fxbug.dev/42068369): Remove `timeout`.
   zx_status_t WaitForRemoval(std::string_view filename, zx::duration timeout);
 
  private:

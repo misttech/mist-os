@@ -47,7 +47,7 @@ constexpr char kDefaultCollection[] = "realm_builder";
 // Root of a constructed Realm. This object can not be instantiated directly.
 // Instead, it can only be constructed with the Realm::Builder/Build().
 //
-// TODO(https://fxbug.dev/120115): Remove all deprecated methods below, e.g. |Connect|.
+// TODO(https://fxbug.dev/42071205): Remove all deprecated methods below, e.g. |Connect|.
 class RealmRoot final {
  public:
   RealmRoot(RealmRoot&& other) = default;

@@ -71,7 +71,7 @@ using RequestedCmsgResult = fit::result<ErrOrOutCode, std::optional<RequestedCms
 RequestedCmsgResult RequestedCmsgCache::Get(zx_wait_item_t err_wait_item,
                                             bool get_requested_cmsg_set,
                                             fidl::WireSyncClient<fsocket::DatagramSocket>& client) {
-  // TODO(https://fxbug.dev/103653): Circumvent fast-path pessimization caused by lock
+  // TODO(https://fxbug.dev/42054723): Circumvent fast-path pessimization caused by lock
   // contention between multiple fast paths.
   std::lock_guard lock(lock_);
 
@@ -147,7 +147,7 @@ RequestedCmsgResult RequestedCmsgCache::Get(zx_wait_item_t err_wait_item,
   }
 }
 
-// TODO(https://fxbug.dev/7958): remove this custom implementation when FIDL
+// TODO(https://fxbug.dev/42159831): remove this custom implementation when FIDL
 // wire types support deep equality.
 bool RouteCache::Key::operator==(const RouteCache::Key& o) const {
   if (remote_addr != o.remote_addr) {
@@ -197,7 +197,7 @@ RouteCacheResult RouteCache::Get(
     std::optional<SocketAddress>& remote_addr,
     const std::optional<std::pair<uint64_t, fuchsia_net::wire::Ipv6Address>>& local_iface_and_addr,
     const zx_wait_item_t& err_wait_item, fidl::WireSyncClient<fsocket::DatagramSocket>& client) {
-  // TODO(https://fxbug.dev/103653): Circumvent fast-path pessimization caused by lock
+  // TODO(https://fxbug.dev/42054723): Circumvent fast-path pessimization caused by lock
   // contention 1) between multiple fast paths and 2) between fast path and slow path.
   std::lock_guard lock(lock_);
 
@@ -265,7 +265,7 @@ RouteCacheResult RouteCache::Get(
         return fit::error(err);
     }
 
-    // TODO(https://fxbug.dev/103740): Avoid allocating into this arena.
+    // TODO(https://fxbug.dev/42054820): Avoid allocating into this arena.
     fidl::Arena alloc;
     const fidl::WireResult response = [&client, &alloc, &remote_addr, &local_iface_and_addr]() {
       fidl::WireTableBuilder request_builder =

@@ -289,7 +289,7 @@ type MediaAttributes = table {
     6: genre string:MAX_ATTRIBUTE_VALUE_LENGTH;
     /// The length of the media in milliseconds (ms).
     7: playing_time string:MAX_ATTRIBUTE_VALUE_LENGTH;
-    // TODO(https://fxbug.dev/1322): Add BIP cover art handle.
+    // TODO(https://fxbug.dev/42082325): Add BIP cover art handle.
 };
 
 /// Status of currently playing media on the TG.

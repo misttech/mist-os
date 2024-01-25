@@ -55,7 +55,7 @@ closed protocol AbsoluteVolumeHandler {
     /// function, otherwise it should only return when the volume has been changed.
     /// Multiple outstanding `OnVolumeChanged` requests can be made - all outstanding calls will
     /// return when the volume has been changed.
-    // TODO(https://fxbug.dev/54002): Update docs when addressed.
+    // TODO(https://fxbug.dev/42131477): Update docs when addressed.
     strict OnVolumeChanged() -> (struct {
         new_volume uint8;
     });

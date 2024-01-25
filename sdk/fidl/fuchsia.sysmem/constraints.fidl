@@ -154,7 +154,7 @@ type VmoBuffer = resource struct {
     vmo_usable_start uint64;
 };
 
-// TODO(https://fxbug.dev/32119): change struct to table
+// TODO(https://fxbug.dev/42107169): change struct to table
 /// Information about a buffer collection and its buffers.
 type BufferCollectionInfo_2 = resource struct {
     /// The total number of buffers.
@@ -287,7 +287,7 @@ type BufferMemorySettings = struct {
     heap HeapType;
 };
 
-// TODO(https://fxbug.dev/32119): change struct to table
+// TODO(https://fxbug.dev/42107169): change struct to table
 /// Describes constraints on layout of image data in buffers.
 type ImageFormatConstraints = struct {
     /// The PixelFormat for which the following constraints apply.  A
@@ -422,7 +422,7 @@ type ImageFormatConstraints = struct {
     required_max_bytes_per_row uint32;
 };
 
-// TODO(https://fxbug.dev/32119): change struct to table
+// TODO(https://fxbug.dev/42107169): change struct to table
 /// Describes how an image is represented.
 type ImageFormat_2 = struct {
     /// Pixel format.

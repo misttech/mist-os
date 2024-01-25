@@ -90,7 +90,7 @@ List<double> _computeDrmFpsValues(Iterable<DurationEvent> events) {
 /// Returns a list of results with an entry for each flutter app found.
 List<_Results> _drmFpsMetrics(Model model, {String? flutterAppName}) {
   final results = <_Results>[];
-  // TODO(https://fxbug.dev/23073): Should only iterate on flutter processes.
+  // TODO(https://fxbug.dev/42097118): Should only iterate on flutter processes.
   final flutterProcesses = model.processes;
 
   for (final process in flutterProcesses) {
@@ -103,7 +103,7 @@ List<_Results> _drmFpsMetrics(Model model, {String? flutterAppName}) {
     for (final uiThread in uiThreads) {
       final appName =
           flutterAppName ?? uiThread.name.split(RegExp(r'.ui$')).first;
-      // TODO(https://fxbug.dev/48263): Only match "VsyncProcessCallback".
+      // TODO(https://fxbug.dev/42125101): Only match "VsyncProcessCallback".
       final vsyncCallbackEvents = filterEventsTyped<DurationEvent>(
               uiThread.events,
               category: 'flutter',

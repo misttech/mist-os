@@ -15,7 +15,7 @@
 /// It should not be extended to serve other uses and, if there appears a
 /// central platform-wide mechanism to achieve this before migration is fully
 /// completed it might be deleted before then.
-// TODO(https://fxbug.dev/131335): Remove this library as soon as migration is
+// TODO(https://fxbug.dev/42081574): Remove this library as soon as migration is
 // completed.
 @available(added=14)
 library fuchsia.net.stackmigrationdeprecated;

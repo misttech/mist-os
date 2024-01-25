@@ -151,7 +151,7 @@ closed protocol StackProvider {
     /// will close the channel to active provider and will be replaced
     /// by the new provider.
     ///
-    /// TODO(https://fxbug.dev/62322): This interface may be deprecated when current
+    /// TODO(https://fxbug.dev/42140705): This interface may be deprecated when current
     /// WLAN network configuration  can be shared amongst multiple components.
     strict SetWlanNetworkConfigProvider(resource struct {
         provider client_end:WlanNetworkConfigProvider;

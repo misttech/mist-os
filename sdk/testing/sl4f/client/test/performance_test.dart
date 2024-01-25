@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-// TODO(https://fxbug.dev/84961): Fix null safety and remove this language version.
+// TODO(https://fxbug.dev/42165807): Fix null safety and remove this language version.
 // @dart=2.9
 
 import 'dart:convert';
@@ -54,7 +54,7 @@ void main(List<String> args) {
     return tempDir;
   }
 
-  // TODO(https://fxbug.dev/59861): Update this test to the new fuchsia perf json
+  // TODO(https://fxbug.dev/42137976): Update this test to the new fuchsia perf json
   // format when the migration is done.
   test('process trace', () async {
     final metricsSpecs = [

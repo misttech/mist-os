@@ -20,7 +20,7 @@ constexpr const char kCompatibleProp[] = "compatible";
 zx::result<> BindPropertyVisitor::Visit(Node& node, const devicetree::PropertyDecoder& decoder) {
   auto property = node.properties().find(kCompatibleProp);
   if (property == node.properties().end()) {
-    // TODO(https://fxbug.dev/107029): support extra "bind,..." properties as bind properties.
+    // TODO(https://fxbug.dev/42058369): support extra "bind,..." properties as bind properties.
     FDF_LOG(DEBUG, "Node '%s' has no properties.", node.name().data());
     return zx::ok();
   }

@@ -44,5 +44,5 @@ open protocol Accessor {
     });
 };
 
-// TODO(https://fxbug.dev/132355): add `RepositoryBrowser` protocol, which
+// TODO(https://fxbug.dev/42082455): add `RepositoryBrowser` protocol, which
 // would be used for browsing through a specific message repository.

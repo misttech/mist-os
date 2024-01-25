@@ -35,7 +35,7 @@ using zx;
 /// future. Scheduling happens on timestamps relative to a reference clock which
 /// must be established when this protocol is created.
 ///
-/// TODO(https://fxbug.dev/94277): scheduling semantics are subject to change
+/// TODO(https://fxbug.dev/42176154): scheduling semantics are subject to change
 closed protocol GainControl {
     /// Sets the gain knob.
     strict SetGain(table {

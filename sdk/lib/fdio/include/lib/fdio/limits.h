@@ -8,7 +8,7 @@
 #include <limits.h>
 
 // Maximum number of fds per process.
-// TODO(https://fxbug.dev/33737): Investigate making the array expand dynamically to avoid
+// TODO(https://fxbug.dev/42108966): Investigate making the array expand dynamically to avoid
 // having to increase this further.
 #define FDIO_MAX_FD 1024
 

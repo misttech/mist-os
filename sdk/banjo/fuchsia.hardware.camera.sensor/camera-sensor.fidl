@@ -52,7 +52,7 @@ type ReadoutConfig = struct {
 
 /// A sensor can support several different predefined modes.
 /// This structure keeps all necessary information about a mode.
-// TODO(https://fxbug.dev/55427): Move non-sensor-specific params out of this struct.
+// TODO(https://fxbug.dev/42133055): Move non-sensor-specific params out of this struct.
 type OperatingMode = struct {
     /// This mode's index.
     idx uint8;
@@ -89,9 +89,9 @@ type FrameRateInfo = struct {
     max_coarse_integration_time uint32;
 };
 
-// TODO(https://fxbug.dev/55428): Incorporate muting behavior into documentation. Add arg/return value info.
-// TODO(https://fxbug.dev/56558): Add a versioning mechanism.
-// TODO(https://fxbug.dev/55430): Transition methods to use [Async].
+// TODO(https://fxbug.dev/42133056): Incorporate muting behavior into documentation. Add arg/return value info.
+// TODO(https://fxbug.dev/42134307): Add a versioning mechanism.
+// TODO(https://fxbug.dev/42133059): Transition methods to use [Async].
 /// Exposes a product-agnostic interface to the camera's sensor.
 /// Allows clients to get and set sensor constraints, sensor mode,
 /// and its dynamic operating state.

@@ -331,7 +331,7 @@ closed protocol PrefixControl {
             INVALID_INTERFACE = 1;
             /// The preferred prefix length is invalid.
             INVALID_PREFIX_LENGTH = 2;
-            // TODO(https://fxbug.dev/114132): Support multiple clients
+            // TODO(https://fxbug.dev/42065403): Support multiple clients
             // requesting prefixes.
             /// An existing [`PrefixControl`] channel has already been
             /// established to acquire a prefix.

@@ -198,7 +198,7 @@ void LogState::ConnectAsync() {
     return;
   }
   if (provided_log_sink_ == ZX_HANDLE_INVALID) {
-    // TODO(https://fxbug.dev/75214): Support for custom names.
+    // TODO(https://fxbug.dev/42154983): Support for custom names.
     if (fdio_service_connect("/svc/fuchsia.logger.LogSink", logger_request.release()) != ZX_OK) {
       return;
     }
@@ -249,7 +249,7 @@ void LogState::Connect() {
       if (zx::channel::create(0, &logger, &logger_request) != ZX_OK) {
         return;
       }
-      // TODO(https://fxbug.dev/75214): Support for custom names.
+      // TODO(https://fxbug.dev/42154983): Support for custom names.
       if (fdio_service_connect("/svc/fuchsia.logger.LogSink", logger_request.release()) != ZX_OK) {
         return;
       }

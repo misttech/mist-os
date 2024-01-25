@@ -21,7 +21,7 @@ fidl("fuchsia.hardware.ethernet") {
   # New drivers should not use fuchsia.hardware.ethernet, but use
   # fuchsia.hardware.network.driver banjo instead.
   #
-  # TODO(https://fxbug.dev/74532): Migrate all of these away from
+  # TODO(https://fxbug.dev/42154225): Migrate all of these away from
   # fuchsia.hardware.ethernet.
   visibility = [
     "//sdk/banjo/fuchsia.hardware.wlan.fullmac:*",

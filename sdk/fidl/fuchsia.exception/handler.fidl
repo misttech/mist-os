@@ -40,7 +40,7 @@ closed protocol Handler {
 
 /// Basic exception information associated with a particular exception.
 /// Maps to `zx_exception_info_t`.
-// TODO(https://fxbug.dev/7755): Currently there is no good support for tables within the
+// TODO(https://fxbug.dev/42157577): Currently there is no good support for tables within the
 //                 llcpp bindings, which would make this API very cumbersome to
 //                 use. When better support lands, move this to a table.
 type ExceptionInfo = struct {
@@ -73,7 +73,7 @@ type ProcessException = resource table {
 /// Maps to the types defined in `zx_excp_type_t`.
 /// If zircon/syscalls/exception.h changes, this needs to be updates as well to
 /// reflect that.
-// TODO(https://fxbug.dev/7802): Once there is a way to better generate zx bindings, move this
+// TODO(https://fxbug.dev/42158100): Once there is a way to better generate zx bindings, move this
 //                 definitions to a common library.
 type ExceptionType = strict enum : uint32 {
     GENERAL = 0x8;

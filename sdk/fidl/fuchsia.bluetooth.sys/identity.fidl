@@ -119,7 +119,7 @@ type HostData = table {
     ///
     /// NOTE: This key is distributed to LE peers during pairing procedures. The client must take
     /// care to assign an IRK that consistent with the local bt-host identity.
-    // TODO(https://fxbug.dev/1408): Document behavior once there is a better privacy policy when `irk` is null.
+    // TODO(https://fxbug.dev/42087125): Document behavior once there is a better privacy policy when `irk` is null.
     1: irk LocalKey;
 };
 

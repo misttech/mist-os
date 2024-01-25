@@ -39,7 +39,7 @@ struct fdio_slot {
 
   void release_reservation();
 
-  // TODO(https::/https://fxbug.dev/72214): clang incorrectly rejects std::variant<.., fbl::RefPtr<fdio>> as
+  // TODO(https::/https://fxbug.dev/42151651): clang incorrectly rejects std::variant<.., fbl::RefPtr<fdio>> as
   // a non-literal type. When that is fixed, change this |fdio_t*| to |fbl::RefPtr<fdio>|.
   std::variant<available, reserved, fdio_t*> inner_;
 };

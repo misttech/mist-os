@@ -15,7 +15,7 @@ type EnableDisableInterfaceError = strict enum {
 };
 
 /// A protocol for filtering TCP/IP traffic and Network Address Translation.
-// TODO(https://fxbug.dev/91503): Modernize/upgrade filter/NAT APIs.
+// TODO(https://fxbug.dev/42173074): Modernize/upgrade filter/NAT APIs.
 @discoverable
 closed protocol Filter {
     /// Enable the filter on a specific interface.
@@ -129,7 +129,7 @@ closed protocol Filter {
         rules vector<Rdr>:MAX_RULES;
         generation uint32;
     }) -> () error strict enum {
-        // TODO(https://fxbug.dev/68279): Implement RDR API using gvisor iptables.
+        // TODO(https://fxbug.dev/42147284): Implement RDR API using gvisor iptables.
         NOT_SUPPORTED = 1;
     };
 };

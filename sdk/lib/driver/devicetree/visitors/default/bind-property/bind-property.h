@@ -12,7 +12,7 @@ namespace fdf_devicetree {
 
 // The |BindPropertyVisitor| populates the bind properties of each device tree
 // node based on the "compatible" string.
-// TODO(https://fxbug.dev/107029): support extra "bind,..." properties as bind properties.
+// TODO(https://fxbug.dev/42058369): support extra "bind,..." properties as bind properties.
 class BindPropertyVisitor : public Visitor {
  public:
   explicit BindPropertyVisitor() : Visitor() {}

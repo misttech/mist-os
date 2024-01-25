@@ -494,7 +494,7 @@ type DecoderProfileDescription = table {
 type EncoderProfileDescription = table {
     1: profile fuchsia.media.CodecProfile;
 
-    // TODO(https://fxbug.dev/122519): Add additional table fields to indicate more detailed per-codec-profile
+    // TODO(https://fxbug.dev/42073478): Add additional table fields to indicate more detailed per-codec-profile
     // encoder caps.
 };
 
@@ -555,7 +555,7 @@ closed protocol CodecFactory {
     ///
     /// Each codec in the list must be separately-described, for clean aggregation.
     //
-    // TODO(https://fxbug.dev/122622): Remove OnCodecList when possible.
+    // TODO(https://fxbug.dev/42073593): Remove OnCodecList when possible.
     @available(added=7, deprecated=11, note="use GetDetailedCodecDescriptions()")
     strict -> OnCodecList(struct {
         codecs vector<CodecDescription>:CODEC_FACTORY_CODEC_LIST_SIZE_MAX;

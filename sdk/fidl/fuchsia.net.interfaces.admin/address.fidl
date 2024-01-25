@@ -34,7 +34,7 @@ type AddressProperties = table {
 
 /// Reasons from IP address removal.
 type AddressRemovalReason = strict enum {
-    // TODO(https://fxbug.dev/82724): Replace this comment with FIDL that
+    // TODO(https://fxbug.dev/42163322): Replace this comment with FIDL that
     // actually reserves 0.
     //
     // The value of 0 is reserved and should never be added to avoid the
@@ -69,7 +69,7 @@ type AddressRemovalReason = strict enum {
 /// - Observing a closure of the server end indicates the object no longer
 ///   exists.
 closed protocol AddressStateProvider {
-    // TODO(https://fxbug.dev/80621): Currently Netstack2's implementation does
+    // TODO(https://fxbug.dev/42160986): Currently Netstack2's implementation does
     // not support this method due to lack of support for updating addresses'
     // valid and preferred lifetimes, and will send an
     // `AddressRemovalReason.USER_REMOVED` event and close the server end of
@@ -168,6 +168,6 @@ type AddressParameters = table {
     /// If the address is removed for any reason, the route will also be
     /// removed.
     @deprecated(
-            "TODO(https://fxbug.dev/123319): Do not use this without consulting with the Netstack team.")
+            "TODO(https://fxbug.dev/42074223): Do not use this without consulting with the Netstack team.")
     3: add_subnet_route bool;
 };

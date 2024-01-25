@@ -124,7 +124,7 @@ void FakeFlatland::CreateView2(
     fuchsia::ui::composition::ViewBoundProtocols view_protocols,
     fidl::InterfaceRequest<fuchsia::ui::composition::ParentViewportWatcher>
         parent_viewport_watcher) {
-  // TODO(https://fxbug.dev/85619): Handle a 2nd CreateView call
+  // TODO(https://fxbug.dev/42166538): Handle a 2nd CreateView call
   ZX_ASSERT(!pending_graph_.view.has_value());
   ZX_ASSERT(!graph_bindings_.viewport_watcher.has_value());
 

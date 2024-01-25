@@ -15,7 +15,7 @@ type RingBufferOptions = table {
     ///
     /// Required.
     //
-    // TODO(https://fxbug.dev/105130): Use a union, to accommodate non-PCM
+    // TODO(https://fxbug.dev/42056326): Use a union, to accommodate non-PCM
     1: format fuchsia.audio.Format;
 
     /// The minimum number of bytes required in the ring buffer. The actual
@@ -34,7 +34,7 @@ type RingBufferProperties = table {
     ///
     /// Required.
     //
-    // TODO(https://fxbug.dev/105130): Adopt `fuchsia.mediastreams.AudioEncoding`, and
+    // TODO(https://fxbug.dev/42056326): Adopt `fuchsia.mediastreams.AudioEncoding`, and
     // change to the following comment:
     //   Optional (Required for PCM encodings, including 'packed' formats).
     1: valid_bits_per_sample uint8;
@@ -112,7 +112,7 @@ closed protocol Control {
 
     /// Change the device's overall gain state.
     //
-    // TODO(https://fxbug.dev/102027): Remove legacy gain aspects once driver API does.
+    // TODO(https://fxbug.dev/42052918): Remove legacy gain aspects once driver API does.
     // Going forward, gain will be handled by `SignalProcessing`.
     strict SetGain(table {
         /// The gain state to be set.

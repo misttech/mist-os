@@ -127,7 +127,7 @@ type RingBuffer = resource table {
     5: reference_clock zx.Handle:CLOCK;
 
     /// Domain of `reference_clock`. See `fuchsia.hardware.audio.ClockDomain`.
-    /// TODO(https://fxbug.dev/114923): If fuchsia.hardware.audio doesn't need to import
+    /// TODO(https://fxbug.dev/42066209): If fuchsia.hardware.audio doesn't need to import
     /// fuchsia.audio, we can use that type directly below.
     ///
     /// Optional. If not specified, defaults to `CLOCK_DOMAIN_EXTERNAL`.

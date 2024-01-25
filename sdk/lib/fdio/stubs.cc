@@ -149,7 +149,7 @@ int recvmmsg(int fd, struct mmsghdr* msgvec, unsigned int vlen, unsigned int fla
 __EXPORT
 int sockatmark(int fd) {
   // ENOTTY is intentional for non-socket objects, but needs more investigation for sockets.
-  // See https://fxbug.dev/84632.
+  // See https://fxbug.dev/42165442.
   return checkfd(fd, ENOTTY);
 }
 

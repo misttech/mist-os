@@ -11,7 +11,7 @@
         runner: "elf",
         binary: "bin/driver_manager",
 
-        // TODO(https://fxbug.dev/88341): We cannot use CF lifecycle events here to suspend drivers
+        // TODO(https://fxbug.dev/42169563): We cannot use CF lifecycle events here to suspend drivers
         // until DriverFramework fixes the errors that happen when a new driver is being
         // bound in the middle of shutdown.
         // lifecycle: { stop_event: "notify" },

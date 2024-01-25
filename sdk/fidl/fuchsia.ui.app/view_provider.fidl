@@ -42,7 +42,7 @@ closed protocol ViewProvider {
     ///
     /// The args are provided as a table, for forward compatibility.  See documentation on the
     /// individual table fields.
-    // TODO(https://fxbug.dev/81959): Rename this to `CreateView()`.
+    // TODO(https://fxbug.dev/42162471): Rename this to `CreateView()`.
     @transitional
     strict CreateView2(resource struct {
         args CreateView2Args;

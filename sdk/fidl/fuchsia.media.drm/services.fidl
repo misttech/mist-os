@@ -95,7 +95,7 @@ type DataStoreParams = resource table {
     3: provisioning_fetcher client_end:ProvisioningFetcher;
 };
 
-// TODO(https://fxbug.dev/13674): Convert these protocols to services once available.
+// TODO(https://fxbug.dev/42086383): Convert these protocols to services once available.
 
 /// A service hub providing access to the ClearKey key system. This key system
 /// is defined by the [`W3C Encrypted Media Extensions`]. It uses plain-text

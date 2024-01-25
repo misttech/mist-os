@@ -231,7 +231,7 @@ closed protocol DriverHostController {
         status zx.Status;
     });
 
-    // TODO(https://fxbug.dev/68309): Currently unimplemented.
+    // TODO(https://fxbug.dev/42147318): Currently unimplemented.
     /// Request to restart the driver host. Also restarts all children devices and drivers and
     /// rebinds them once the Driver Host has restarted.
     strict Restart() -> (struct {
@@ -266,7 +266,7 @@ type AddDeviceArgs = struct {
 closed protocol Coordinator {
     /// Record the addition of a new device that can be communicated with via `device_controller`.
     /// On success, the returned `local_device_id` is the identifier assigned by devmgr.
-    // TODO(https://fxbug.dev/74654): String properties are unimplemented.
+    // TODO(https://fxbug.dev/42154360): String properties are unimplemented.
     strict AddDevice(resource struct {
         args AddDeviceArgs;
         coordinator server_end:Coordinator;
@@ -331,7 +331,7 @@ closed protocol Coordinator {
     /// Add metadata blob associated with this device and the given key.
     /// If the same key is specified multiple times, the new data will be
     /// ignored in favor of the data from first call with the specified key.
-    // TODO(https://fxbug.dev/112547): Return ZX_ERR_ALREADY_EXISTS on duplicate key
+    // TODO(https://fxbug.dev/42063857): Return ZX_ERR_ALREADY_EXISTS on duplicate key
     // instead.
     strict AddMetadata(struct {
         key uint32;
@@ -361,7 +361,7 @@ closed protocol Coordinator {
     /// in order to ascertain whether the connection has been successfully established.
     /// + |fragment_name| should be specified if the parent is a composite node.
     /// + |service_name| should be specified if attempting to connect to a service. This will be
-    ///   mandatory in the future: https://fxbug.dev/107155.
+    ///   mandatory in the future: https://fxbug.dev/42058509.
     /// * error Reports `ZX_ERR_UNAVAILABLE` if the parent (or fragment) does not have an outgoing
     ///   directory.
     /// * error Reports `ZX_ERR_NOT_FOUND` if |fragment_name| is not the name of a parent.

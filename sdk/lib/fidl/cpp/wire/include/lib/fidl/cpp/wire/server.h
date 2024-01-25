@@ -59,7 +59,7 @@ class ServerBindingBase {
  public:
   template <typename Impl, typename CloseHandler>
   static constexpr void CloseHandlerRequirement() {
-    // TODO(https://fxbug.dev/112648): Cannot use |std::is_invocable_v| as that fails on the latest clang.
+    // TODO(https://fxbug.dev/42063969): Cannot use |std::is_invocable_v| as that fails on the latest clang.
     static_assert(std::is_convertible_v<CloseHandler, IgnoreBindingClosureType> ||
                       std::is_convertible_v<CloseHandler, SimpleCloseHandler> ||
                       std::is_convertible_v<CloseHandler, InstanceCloseHandler<Impl>>,

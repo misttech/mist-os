@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-// TODO(https://fxbug.dev/84961): Fix null safety and remove this language version.
+// TODO(https://fxbug.dev/42165807): Fix null safety and remove this language version.
 // @dart=2.9
 
 import 'dart:async';
@@ -84,7 +84,7 @@ void main() {
       verifyNever(ssh.start(any));
     });
 
-    // https://fxbug.dev/4745
+    // https://fxbug.dev/42124197
     test('do not hang even if the tools do', () {
       const eventually = Duration(hours: 1);
 

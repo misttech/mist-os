@@ -38,7 +38,7 @@ const EVENT_WINDOW_SIZE uint32 = 8;
 /// All events
 const EVENT_MASK uint32 = 15;
 
-// TODO(https://fxbug.dev/105608): Use a generated constant.
+// TODO(https://fxbug.dev/42056856): Use a generated constant.
 const DEVICE_PROTOCOL_NAME string = "fuchsia.hardware.pty/Device";
 
 @discoverable

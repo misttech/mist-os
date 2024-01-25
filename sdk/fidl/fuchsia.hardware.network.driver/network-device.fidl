@@ -286,7 +286,7 @@ closed protocol NetworkPort {
     /// be null.
     ///
     /// - response `mac_ifc` mac addressing handle.
-    // TODO(https://fxbug.dev/67196): Make this an optional interface return
+    // TODO(https://fxbug.dev/42146087): Make this an optional interface return
     // once this is FIDL.
     strict GetMac() -> (resource struct {
         mac_ifc client_end:<MacAddr, optional>;

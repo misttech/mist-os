@@ -185,7 +185,7 @@ class Vmo : public HasIo {
       // ZX_VMO_CHILD_SNAPSHOT_AT_LEAST_ON_WRITE adds ZX_RIGHT_WRITE automatically, but we shouldn't
       // return a handle with that right unless requested using ZXIO_VMO_WRITE.
       //
-      // TODO(https://fxbug.dev/36877): Supporting ZXIO_VMO_PRIVATE_CLONE & ZXIO_VMO_WRITE for Vmofiles is a
+      // TODO(https://fxbug.dev/42112453): Supporting ZXIO_VMO_PRIVATE_CLONE & ZXIO_VMO_WRITE for Vmofiles is a
       // bit weird and inconsistent. See bug for more info.
       zx::vmo result;
       status = child_vmo.replace(rights, &result);

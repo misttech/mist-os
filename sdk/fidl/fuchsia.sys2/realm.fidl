@@ -191,7 +191,7 @@ type OpenDirType = flexible enum {
 type ChildLocation = flexible union {
     1: collection string:fuchsia.component.MAX_NAME_LENGTH;
 
-    // TODO(https://fxbug.dev/127338) support static children
+    // TODO(https://fxbug.dev/42077932) support static children
 };
 
 /// Offers detailed introspection into component instances under a realm.
@@ -218,7 +218,7 @@ closed protocol RealmQuery {
         iterator client_end:ManifestBytesIterator;
     }) error GetDeclarationError;
 
-    // TODO(https://fxbug.dev/127340) delete once no longer required for ffx compat window
+    // TODO(https://fxbug.dev/42077935) delete once no longer required for ffx compat window
     /// Prefer `GetResolvedDeclaration` if available for your target API level.
     @available(added=11)
     strict GetManifest(struct {
@@ -472,7 +472,7 @@ type RealmQueryError = flexible enum {
 @available(added=11, deprecated=11, removed=12)
 type RealmExplorerError = flexible enum {
     /// Could not find the scope root instance.
-    // TODO(https://fxbug.dev/108532): Close the connection when this error occurs.
+    // TODO(https://fxbug.dev/42059901): Close the connection when this error occurs.
     INSTANCE_NOT_FOUND = 1;
 };
 

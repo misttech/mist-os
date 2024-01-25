@@ -24,7 +24,7 @@ TEST(StructuredLogging, Log) {
   FX_SLOG(WARNING, "test_log", FX_KV("foo", kStringView));
   const std::string kString = "string";
   FX_SLOG(WARNING, "test_log", FX_KV("foo", kString));
-  // TODO(https://fxbug.dev/57482): Figure out how to verify this appropriately.
+  // TODO(https://fxbug.dev/42135333): Figure out how to verify this appropriately.
 }
 
 class SideEffectTracker {
@@ -105,7 +105,7 @@ TEST(StructuredLogging, BackendDirect) {
   syslog_runtime::WriteKeyValue(&buffer, "foo", static_cast<int64_t>(42));
   syslog_runtime::WriteKeyValue(&buffer, "bar", true);
   ASSERT_TRUE(syslog_runtime::FlushRecord(&buffer));
-  // TODO(https://fxbug.dev/57482): Figure out how to verify this appropriately.
+  // TODO(https://fxbug.dev/42135333): Figure out how to verify this appropriately.
 }
 
 TEST(StructuredLogging, Overflow) {

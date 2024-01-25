@@ -381,7 +381,7 @@ zx::result<fdio_ptr> opendir_containing_at(int dirfd, const char* path, NameBuff
   if (is_dir_out) {
     *is_dir_out = is_dir;
   } else if (is_dir) {
-    // TODO(https://fxbug.dev/37408): Propagate whether path is directory without using
+    // TODO(https://fxbug.dev/42113044): Propagate whether path is directory without using
     // trailing backslash to simplify server-side path parsing.
     // This might require refactoring trailing backslash checks out of
     // lower filesystem layers and associated FIDL APIs.
@@ -813,7 +813,7 @@ int dup3(int oldfd, int newfd, int flags) {
     return ERRNO(EINVAL);
   }
 
-  // TODO(https://fxbug.dev/30920) Implement O_CLOEXEC.
+  // TODO(https://fxbug.dev/42105837) Implement O_CLOEXEC.
   return dup2(oldfd, newfd);
 }
 
@@ -831,7 +831,7 @@ int fcntl(int fd, int cmd, ...) {
   switch (cmd) {
     case F_DUPFD:
     case F_DUPFD_CLOEXEC: {
-      // TODO(https://fxbug.dev/30920) Implement CLOEXEC.
+      // TODO(https://fxbug.dev/42105837) Implement CLOEXEC.
       GET_INT_ARG(starting_fd);
       if (starting_fd < 0) {
         return ERRNO(EINVAL);
@@ -864,7 +864,7 @@ int fcntl(int fd, int cmd, ...) {
         return ERRNO(EBADF);
       }
       GET_INT_ARG(flags);
-      // TODO(https://fxbug.dev/30920) Implement CLOEXEC.
+      // TODO(https://fxbug.dev/42105837) Implement CLOEXEC.
       io->ioflag() &= ~IOFLAG_FD_FLAGS;
       io->ioflag() |= static_cast<uint32_t>(flags) & IOFLAG_FD_FLAGS;
       return 0;
@@ -1663,7 +1663,7 @@ void rewinddir(DIR* dir) {
   // original file descriptor. Clients who call |rewinddir()| are expecting for that pointer to be
   // rewound.
   //
-  // TODO(https://fxbug.dev/119968): Remove this when separate |fuchsia.io/DirectoryIterator|s are
+  // TODO(https://fxbug.dev/42071039): Remove this when separate |fuchsia.io/DirectoryIterator|s are
   // used to back different zxio iterators.
   if (const zx_status_t status = lazy_init_dirent_iterator(dir, io); status != ZX_OK) {
     // This function should not modify the errno and has no way to propagate error, so drop it.
@@ -1736,7 +1736,7 @@ int ppoll(struct pollfd* fds, nfds_t n, const struct timespec* timeout_ts,
     return 0;
   }
 
-  // TODO(https://fxbug.dev/71558): investigate VLA alternatives.
+  // TODO(https://fxbug.dev/42150923): investigate VLA alternatives.
   fdio_ptr ios[n];
   // |items| is the set of handles to wait on and will contain up to |n| entries. Some
   // FDs do not contain a handle or do not have any applicable Zircon signals, so we
@@ -1848,7 +1848,7 @@ int select(int n, fd_set* __restrict rfds, fd_set* __restrict wfds, fd_set* __re
     return 0;
   }
 
-  // TODO(https://fxbug.dev/71558): investigate VLA alternatives.
+  // TODO(https://fxbug.dev/42150923): investigate VLA alternatives.
   fdio_ptr ios[n];
   zx_wait_item_t items[n];
   size_t nitems = 0;

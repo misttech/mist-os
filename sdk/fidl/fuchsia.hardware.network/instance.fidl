@@ -10,8 +10,8 @@ library fuchsia.hardware.network;
 // the "composed" implementation is always provided by the framework itself. At
 // the time of this writing it is unclear what is going to replace that or when,
 // only that there is a desire to improve the pattern. The expectation is that
-// pattern will be improved with Unified Services (https://fxbug.dev/8035) and
-// Drivers as Components (https://fxbug.dev/33183).
+// pattern will be improved with Unified Services (https://fxbug.dev/42160684) and
+// Drivers as Components (https://fxbug.dev/42108351).
 @available(added=HEAD)
 closed protocol DeviceInstance {
     /// Connects to the [`Device`] implementation.

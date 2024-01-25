@@ -1,2 +1,2 @@
-# https://fxbug.dev/47602 - visibility auditors
+# https://fxbug.dev/42124367 - visibility auditors
 per-file BUILD.gn=zarvox@google.com

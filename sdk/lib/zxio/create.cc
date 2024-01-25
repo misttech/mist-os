@@ -239,9 +239,9 @@ zx_status_t zxio_create_with_info(zx_handle_t raw_handle, const zx_info_handle_b
           }
           bool is_connected;
           const zx_status_t status =
-              // TODO(https://fxbug.dev/117428): define this and other signals in FIDL.
+              // TODO(https://fxbug.dev/42068636): define this and other signals in FIDL.
               response.socket().wait_one(ZX_USER_SIGNAL_3, zx::time::infinite_past(), nullptr);
-          // TODO(https://fxbug.dev/81448): Transferring a listening or connecting socket to another
+          // TODO(https://fxbug.dev/42161904): Transferring a listening or connecting socket to another
           // process doesn't work correctly since those states can't be observed here.
           switch (status) {
             case ZX_OK:

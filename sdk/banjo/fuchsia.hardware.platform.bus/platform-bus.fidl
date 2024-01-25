@@ -163,7 +163,7 @@ closed protocol PBus {
     /// NULL. It is not possible to set the primary fragment to "pdev" as that
     /// would cause the driver to spawn in the platform bus's driver host.
     // Note: fragments is of type device_fragment_t*.
-    // TODO(https://fxbug.dev/69023): restore type.
+    // TODO(https://fxbug.dev/42148112): restore type.
     strict CompositeDeviceAdd(struct {
         dev PbusDev;
         fragments uint64;
@@ -174,7 +174,7 @@ closed protocol PBus {
     });
 
     /// Adds a composite platform device to the bus.
-    // TODO(https://fxbug.dev/69023): Restore |fragments| to device_fragment_t* type.
+    // TODO(https://fxbug.dev/42148112): Restore |fragments| to device_fragment_t* type.
     strict AddComposite(struct {
         dev PbusDev;
         fragments uint64;

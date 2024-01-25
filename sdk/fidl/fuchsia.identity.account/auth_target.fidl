@@ -57,7 +57,7 @@ closed protocol AuthTarget {
         3: granularity AuthChangeGranularity;
     }) -> () error Error;
 
-    // TODO(https://fxbug.dev/562): Add methods that request in increase in the
+    // TODO(https://fxbug.dev/42133912): Add methods that request in increase in the
     //                      authentication state or authentication for a
     //                      particular event.
 };
@@ -107,7 +107,7 @@ closed protocol Account {
         persona server_end:Persona;
     }) -> () error Error;
 
-    // TODO(https://fxbug.dev/563): Add methods to create, delete, and manage personae.
+    // TODO(https://fxbug.dev/42134023): Add methods to create, delete, and manage personae.
 
     /// Returns all authentication mechanism enrollments.
     strict GetAuthMechanismEnrollments() -> (struct {
@@ -157,7 +157,7 @@ closed protocol Account {
     /// supported.
     ///
     /// `data_directory` The server end of a `fuchsia.io.Directory` channel
-    // TODO(https://fxbug.dev/45799): Support multiple component instance clients.
+    // TODO(https://fxbug.dev/42122362): Support multiple component instance clients.
     strict GetDataDirectory(resource struct {
         data_directory server_end:fuchsia.io.Directory;
     }) -> () error Error;

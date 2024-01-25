@@ -31,7 +31,7 @@ class DatagramSocketServer final
 
   void Query(QueryCompleter::Sync& completer) final {
     const std::string_view kProtocol = fuchsia_posix_socket::wire::kDatagramSocketProtocolName;
-    // TODO(https://fxbug.dev/101890): avoid the const cast.
+    // TODO(https://fxbug.dev/42052765): avoid the const cast.
     uint8_t* data = reinterpret_cast<uint8_t*>(const_cast<char*>(kProtocol.data()));
     completer.Reply(fidl::VectorView<uint8_t>::FromExternal(data, kProtocol.size()));
   }
@@ -71,7 +71,7 @@ class PacketSocketServer final
 
   void Query(QueryCompleter::Sync& completer) final {
     const std::string_view kProtocol = fuchsia_posix_socket_packet::wire::kSocketProtocolName;
-    // TODO(https://fxbug.dev/101890): avoid the const cast.
+    // TODO(https://fxbug.dev/42052765): avoid the const cast.
     uint8_t* data = reinterpret_cast<uint8_t*>(const_cast<char*>(kProtocol.data()));
     completer.Reply(fidl::VectorView<uint8_t>::FromExternal(data, kProtocol.size()));
   }
@@ -107,7 +107,7 @@ class RawSocketServer final : public fidl::testing::WireTestBase<fuchsia_posix_s
 
   void Query(QueryCompleter::Sync& completer) final {
     const std::string_view kProtocol = fuchsia_posix_socket_raw::wire::kSocketProtocolName;
-    // TODO(https://fxbug.dev/101890): avoid the const cast.
+    // TODO(https://fxbug.dev/42052765): avoid the const cast.
     uint8_t* data = reinterpret_cast<uint8_t*>(const_cast<char*>(kProtocol.data()));
     completer.Reply(fidl::VectorView<uint8_t>::FromExternal(data, kProtocol.size()));
   }
@@ -140,7 +140,7 @@ class StreamSocketServer final
 
   void Query(QueryCompleter::Sync& completer) final {
     const std::string_view kProtocol = fuchsia_posix_socket::wire::kStreamSocketProtocolName;
-    // TODO(https://fxbug.dev/101890): avoid the const cast.
+    // TODO(https://fxbug.dev/42052765): avoid the const cast.
     uint8_t* data = reinterpret_cast<uint8_t*>(const_cast<char*>(kProtocol.data()));
     completer.Reply(fidl::VectorView<uint8_t>::FromExternal(data, kProtocol.size()));
   }
@@ -178,7 +178,7 @@ class SynchronousDatagramSocketServer final
   void Query(QueryCompleter::Sync& completer) final {
     const std::string_view kProtocol =
         fuchsia_posix_socket::wire::kSynchronousDatagramSocketProtocolName;
-    // TODO(https://fxbug.dev/101890): avoid the const cast.
+    // TODO(https://fxbug.dev/42052765): avoid the const cast.
     uint8_t* data = reinterpret_cast<uint8_t*>(const_cast<char*>(kProtocol.data()));
     completer.Reply(fidl::VectorView<uint8_t>::FromExternal(data, kProtocol.size()));
   }

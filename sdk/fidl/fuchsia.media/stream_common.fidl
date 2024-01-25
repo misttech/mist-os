@@ -454,7 +454,7 @@ type EncryptedFormat = table {
 /// sent by the StreamProcessor server prior to the delivery of output packets.
 /// Currently, there is no additional format details for decrypted output.
 type DecryptedFormat = table {
-    // TODO(https://fxbug.dev/8031): Empty tables cause dart analysis error. Remove this
+    // TODO(https://fxbug.dev/42160640): Empty tables cause dart analysis error. Remove this
     // unused field once the issue is resolved.
     1: ignore_this_field bool;
 };

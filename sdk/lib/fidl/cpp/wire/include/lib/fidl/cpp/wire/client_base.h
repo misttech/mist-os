@@ -302,7 +302,7 @@ class ClientBase final : public std::enable_shared_from_this<ClientBase> {
     if (!transport) {
       return ReturnType(fidl::Status::Unbound());
     }
-    // TODO(https://fxbug.dev/78906): We should report errors to binding teardown
+    // TODO(https://fxbug.dev/42159083): We should report errors to binding teardown
     // by calling |HandleSendError|. A naive approach of checking the result
     // here doesn't work because the result must be a temporary.
     return sync_call(std::move(transport));

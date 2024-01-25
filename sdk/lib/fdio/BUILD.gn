@@ -55,7 +55,7 @@ fdio_public_headers = [
                         "include/lib/fdio/watcher.h",
                       ] + fdio_constants
 
-# TODO(https://fxbug.dev/38226): This is a kludge to make "foosan-fuzzer" builds actually just use
+# TODO(https://fxbug.dev/42113953): This is a kludge to make "foosan-fuzzer" builds actually just use
 # the plain "foosan" build of libfdio.  This works around the problem that
 # libfuzzer itself calls into libfdio and so its own calls pollute the data
 # it's collecting about the code under test. We explicitly depend on the build
@@ -148,7 +148,7 @@ if (is_fuzzer) {
     ldflags = [ "-Wl,--version-script=" +
                 rebase_path(fdio_version_script, root_build_dir) ]
 
-    # TODO(https://fxbug.dev/135694): delete the below and fix compiler warnings
+    # TODO(https://fxbug.dev/42085293): delete the below and fix compiler warnings
     configs += [ "//build/config:Wno-vla-cxx-extension" ]
   }
 } else {

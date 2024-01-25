@@ -70,7 +70,7 @@ type Ipv6ChecksumConfiguration = strict union {
     2: offset int32;
 };
 
-// TODO(https://fxbug.dev/105608): Use a generated constant.
+// TODO(https://fxbug.dev/42056856): Use a generated constant.
 const SOCKET_PROTOCOL_NAME string = "fuchsia.posix.socket.raw/Socket";
 
 /// A raw network socket.

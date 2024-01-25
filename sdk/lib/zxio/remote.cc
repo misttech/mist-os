@@ -161,7 +161,7 @@ class DirentIteratorImpl {
 
   // Issuing a FIDL call requires storage for both the request (16 bytes) and the largest possible
   // response message (8192 bytes of payload).
-  // TODO(https://fxbug.dev/85843): Once overlapping request and response is allowed, reduce
+  // TODO(https://fxbug.dev/42166787): Once overlapping request and response is allowed, reduce
   // this allocation to a single channel message size.
   FIDL_ALIGNDECL uint8_t
       buffer_[fidl::SyncClientMethodBufferSizeInChannel<fio::Directory::ReadDirents>()];
@@ -181,7 +181,7 @@ zxio_node_protocols_t ToZxioNodeProtocols(uint32_t mode) {
       return ZXIO_NODE_PROTOCOL_FILE;
     case fio::wire::kModeTypeService:
       // fuchsia::io has mode type service which breaks stat.
-      // TODO(https://fxbug.dev/52930): return ZXIO_NODE_PROTOCOL_CONNECTOR instead.
+      // TODO(https://fxbug.dev/42130287): return ZXIO_NODE_PROTOCOL_CONNECTOR instead.
       return ZXIO_NODE_PROTOCOL_FILE;
     case S_IFLNK:
       return ZXIO_NODE_PROTOCOL_SYMLINK;

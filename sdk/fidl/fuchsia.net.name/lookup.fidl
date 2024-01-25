@@ -22,7 +22,7 @@ type LookupError = strict enum {
 /// Maximum number of addresses that can be returned by a lookup.
 // Chosen to match libc's MAXADDRS.
 //
-// TODO(https://fxbug.dev/89912): Remove this when the client can specify the
+// TODO(https://fxbug.dev/42171305): Remove this when the client can specify the
 // maximum number of addresses it can receive.
 const MAX_ADDRESSES uint16 = 1024;
 

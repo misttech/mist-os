@@ -5,4 +5,4 @@ Banjo is an IDL used to describe device driver interfaces. As part of the
 FIDL: the libraries in this folder will become FIDL libraries under
 `//sdk/fidl`.
 
-[deprecation-ticket]: https://fxbug.dev/67196
+[deprecation-ticket]: https://fxbug.dev/42146087

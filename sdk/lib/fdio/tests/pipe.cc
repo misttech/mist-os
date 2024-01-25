@@ -66,7 +66,7 @@ TEST(Pipe, PollInAndCloseWriteEnd) {
   EXPECT_EQ(1, n);
 
 #ifdef __Fuchsia__
-  // TODO(https://fxbug.dev/47132): This should produce POLLHUP on Fuchsia.
+  // TODO(https://fxbug.dev/42123845): This should produce POLLHUP on Fuchsia.
   EXPECT_EQ(POLLIN, polls[0].revents);
 #else
   EXPECT_EQ(POLLHUP, polls[0].revents);
@@ -99,7 +99,7 @@ TEST(Pipe, PollOutEmptyPipeAndCloseReadEnd) {
   ASSERT_GE(n, 0, "%s", strerror(errno));
 
 #ifdef __Fuchsia__
-  // TODO(https://fxbug.dev/47132): This should produce one event with POLLOUT | POLLERR on Fuchsia.
+  // TODO(https://fxbug.dev/42123845): This should produce one event with POLLOUT | POLLERR on Fuchsia.
   EXPECT_EQ(0, n);
 #else
   EXPECT_EQ(1, n);
@@ -146,7 +146,7 @@ TEST(Pipe, PollOutFullPipeAndCloseReadEnd) {
   n = poll(polls, 1, kPollTimeoutMs);
   ASSERT_GE(n, 0, "%s", strerror(errno));
 #ifdef __Fuchsia__
-  // TODO(https://fxbug.dev/47132): This should produce one event with POLLERR on Fuchsia.
+  // TODO(https://fxbug.dev/42123845): This should produce one event with POLLERR on Fuchsia.
   EXPECT_EQ(0, n);
 #else
   EXPECT_EQ(1, n);
@@ -167,7 +167,7 @@ TEST(Pipe, WriteIntoReadEnd) {
   constexpr char data = 'a';
   ssize_t rv = write(read_end.get(), &data, sizeof(data));
 #if defined(__Fuchsia__)
-  // TODO(https://fxbug.dev/84354): This should fail on Fuchsia with EBADF.
+  // TODO(https://fxbug.dev/42165133): This should fail on Fuchsia with EBADF.
   EXPECT_EQ(rv, 1, "%s", strerror(errno));
 #else
   EXPECT_EQ(rv, -1);
@@ -194,7 +194,7 @@ TEST(Pipe, PollOutOnReadEnd) {
   ASSERT_GE(n, 0, "%s", strerror(errno));
 
 #if defined(__Fuchsia__)
-  // TODO(https://fxbug.dev/84354): This should produce no events on Fuchsia.
+  // TODO(https://fxbug.dev/42165133): This should produce no events on Fuchsia.
   EXPECT_EQ(1, n);
   EXPECT_EQ(read_end_pollout.revents, POLLOUT);
   read_end_pollout.revents = 0;
@@ -209,7 +209,7 @@ TEST(Pipe, PollOutOnReadEnd) {
   n = poll(&read_end_pollout, 1, kPollTimeoutMs);
   ASSERT_GE(n, 0, "%s", strerror(errno));
 #if defined(__Fuchsia__)
-  // TODO(https://fxbug.dev/84354): This should produce no events on Fuchsia.
+  // TODO(https://fxbug.dev/42165133): This should produce no events on Fuchsia.
   EXPECT_EQ(1, n);
   EXPECT_EQ(read_end_pollout.revents, POLLOUT);
   read_end_pollout.revents = 0;
@@ -223,7 +223,7 @@ TEST(Pipe, PollOutOnReadEnd) {
   n = poll(&read_end_pollout, 1, kPollTimeoutMs);
   ASSERT_GE(n, 0, "%s", strerror(errno));
 #if defined(__Fuchsia__)
-  // TODO(https://fxbug.dev/84354): This should produce POLLHUP on Fuchsia.
+  // TODO(https://fxbug.dev/42165133): This should produce POLLHUP on Fuchsia.
   EXPECT_EQ(0, n);
 #else
   EXPECT_EQ(1, n);
@@ -244,7 +244,7 @@ TEST(Pipe, ReadFromWriteEnd) {
   ssize_t rv = read(write_end.get(), buf, sizeof(buf));
   EXPECT_EQ(rv, -1);
 #if defined(__Fuchsia__)
-  // TODO(https://fxbug.dev/84354): This should fail on Fuchsia with EBADF.
+  // TODO(https://fxbug.dev/42165133): This should fail on Fuchsia with EBADF.
   EXPECT_EQ(errno, EWOULDBLOCK, "%s", strerror(errno));
 #else
   EXPECT_EQ(errno, EBADF, "%s", strerror(errno));
@@ -288,7 +288,7 @@ TEST(Pipe, PollInOnWriteEnd) {
 
   EXPECT_EQ(1, n);
 #if defined(__Fuchsia__)
-  // TODO(https://fxbug.dev/84354): This should produce POLLHUP on Fuchsia.
+  // TODO(https://fxbug.dev/42165133): This should produce POLLHUP on Fuchsia.
   EXPECT_EQ(write_end_pollin.revents, POLLIN);
 #else
   EXPECT_EQ(write_end_pollin.revents, POLLERR);

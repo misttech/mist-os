@@ -39,7 +39,7 @@ closed protocol Session {
     strict AttachVmo(resource struct {
         vmo zx.Handle:VMO;
     }) -> (struct {
-        // TODO(https://fxbug.dev/103484): consider removing the outer struct when the issue is
+        // TODO(https://fxbug.dev/42054535): consider removing the outer struct when the issue is
         // resolved.
         vmoid @generated_name("VmoId") struct {
             id uint16;
@@ -82,7 +82,7 @@ type BlockInfo = struct {
 closed protocol Block {
     /// Get information about the underlying block device.
     strict GetInfo() -> (struct {
-        // TODO(https://fxbug.dev/103484): consider removing the outer struct when the issue is
+        // TODO(https://fxbug.dev/42054535): consider removing the outer struct when the issue is
         // resolved.
         info BlockInfo;
     }) error zx.Status;
@@ -96,7 +96,7 @@ closed protocol Block {
     strict GetStats(struct {
         clear bool;
     }) -> (struct {
-        // TODO(https://fxbug.dev/103484): consider removing the outer struct when the issue is
+        // TODO(https://fxbug.dev/42054535): consider removing the outer struct when the issue is
         // resolved.
         stats @generated_name("BlockStats") struct {
             /// The stats about read from the device.

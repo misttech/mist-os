@@ -53,7 +53,7 @@ class Node {
   void AddNodeSpec(fuchsia_driver_framework::ParentSpec spec);
 
   // Publish this node.
-  // TODO(https://fxbug.dev/108070): Switch to fdf::SyncClient when it's available.
+  // TODO(https://fxbug.dev/42059490): Switch to fdf::SyncClient when it's available.
   zx::result<> Publish(fdf::WireSyncClient<fuchsia_hardware_platform_bus::PlatformBus>& pbus,
                        fidl::SyncClient<fuchsia_driver_framework::CompositeNodeManager>& mgr);
 
@@ -92,7 +92,7 @@ class Node {
   uint32_t id_;
 
   // Boolean to indicate if a composite node spec needs to added.
-  // TODO(https://fxbug.dev/129706): Add proper support for composite.
+  // TODO(https://fxbug.dev/42080094): Add proper support for composite.
   bool composite_ = false;
 
   // Storing handle to manager. This is ok as the manager always outlives the node instance.

@@ -35,7 +35,7 @@ using fdio_ptr = fbl::RefPtr<fdio>;
 //
 // The "null" transport absorbs writes and is never readable.
 //
-// TODO(https://fxbug.dev/43267): Eventually, with the exception of the "local" and "null"
+// TODO(https://fxbug.dev/42119552): Eventually, with the exception of the "local" and "null"
 // transport, the different transports should become an implementation detail
 // in zxio.
 
@@ -167,7 +167,7 @@ struct fdio : protected fbl::RefCounted<fdio>, protected fbl::Recyclable<fdio> {
   // |ioflag| contains mutable properties of this object, shared by
   // different transports. Possible values are |IOFLAG_*| in private.h.
   //
-  // TODO(https://fxbug.dev/75778): The value of this field is not preserved when fdio_fd_transfer
+  // TODO(https://fxbug.dev/42155608): The value of this field is not preserved when fdio_fd_transfer
   // is used.
   uint32_t& ioflag() { return ioflag_; }
 

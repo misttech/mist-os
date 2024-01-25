@@ -109,7 +109,7 @@ zx_status_t DeviceServer::AddMetadata(uint32_t type, const void* data, size_t si
   std::copy(begin, begin + size, metadata.begin());
   auto [_, inserted] = metadata_.emplace(type, std::move(metadata));
   if (!inserted) {
-    // TODO(https://fxbug.dev/112547): Return ZX_ERR_ALREADY_EXISTS instead once we do so in DFv1.
+    // TODO(https://fxbug.dev/42063857): Return ZX_ERR_ALREADY_EXISTS instead once we do so in DFv1.
     return ZX_OK;
   }
   return ZX_OK;
@@ -351,7 +351,7 @@ void DeviceServer::SyncInit(const std::shared_ptr<fdf::Namespace>& incoming,
       continue;
     }
 
-    // TODO(https://fxbug.dev/100985): When services stop adding extra instances
+    // TODO(https://fxbug.dev/42051759): When services stop adding extra instances
     // separated by ',' then remove this check.
     if (parent.name.find(',') != std::string::npos) {
       continue;
@@ -487,7 +487,7 @@ void DeviceServer::OnParentDevices(zx::result<std::vector<ParentDevice>> parent_
       continue;
     }
 
-    // TODO(https://fxbug.dev/100985): When services stop adding extra instances
+    // TODO(https://fxbug.dev/42051759): When services stop adding extra instances
     // separated by ',' then remove this check.
     if (parent.name.find(',') != std::string::npos) {
       continue;

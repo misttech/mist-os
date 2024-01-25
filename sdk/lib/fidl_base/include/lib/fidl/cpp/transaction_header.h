@@ -18,7 +18,7 @@ struct MessageDynamicFlags {
 
   static const MessageDynamicFlags kStrictMethod;
   static const MessageDynamicFlags kFlexibleMethod;
-  // TODO(https://fxbug.dev/114261): this feature is not yet enabled for C++ bindings - do not set this flag
+  // TODO(https://fxbug.dev/42065546): this feature is not yet enabled for C++ bindings - do not set this flag
   // outside of testing contexts!
   static const MessageDynamicFlags kByteOverflow;
 };

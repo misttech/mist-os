@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 library fuchsia.sysmem;
 
-// TODO(https://fxbug.dev/32119): change struct to table
+// TODO(https://fxbug.dev/42107169): change struct to table
 /// Describes how an image is represented.
 type ImageFormat = struct {
     /// Row width in pixels.
@@ -36,7 +36,7 @@ type ImagePlane = struct {
 };
 
 /// Describes constraints for allocating images of some desired form.
-// TODO(https://fxbug.dev/32119): change struct to table
+// TODO(https://fxbug.dev/42107169): change struct to table
 type ImageSpec = struct {
     /// Minimum width in pixels.
     min_width uint32;
@@ -55,5 +55,5 @@ type ImageSpec = struct {
     /// Color space.
     color_space ColorSpace;
 
-    // TODO(https://fxbug.dev/32128): Add tiling formats.
+    // TODO(https://fxbug.dev/42107179): Add tiling formats.
 };

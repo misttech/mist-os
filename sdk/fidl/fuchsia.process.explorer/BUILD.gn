@@ -5,7 +5,7 @@
 import("//build/fidl/fidl.gni")
 
 fidl("fuchsia.process.explorer") {
-  # TODO(https://fxbug.dev/107973): do not upgrade category without making
+  # TODO(https://fxbug.dev/42059381): do not upgrade category without making
   # the fuchsia.process.explorer.Query interface strongly typed.
   sdk_category = "internal"
   sources = [

@@ -10,7 +10,7 @@ using fuchsia.net;
 // definitions below are duplicated in the other files within this directory.
 // Prefer to edit those files rather than this one.
 
-// TODO(https://fxbug.dev/120649): Remove this file when permissible.
+// TODO(https://fxbug.dev/42071737): Remove this file when permissible.
 
 /// Maximum numbers of supported frame types for rx or tx.
 // NOTE(brunodalbo) 4 seems a sensible number for maximum number of frame types
@@ -179,12 +179,12 @@ closed protocol PortWatcher {
     });
 };
 
-// TODO(https://fxbug.dev/7913): Use built-in empty struct when available.
+// TODO(https://fxbug.dev/42159332): Use built-in empty struct when available.
 @available(removed=12)
 type Empty = struct {};
 
 /// Port creation and destruction events.
-// TODO(https://fxbug.dev/66767): `PortEvent` is probably a better name here,
+// TODO(https://fxbug.dev/42145610): `PortEvent` is probably a better name here,
 // but it causes rust binding errors.
 @available(removed=12)
 type DevicePortEvent = strict union {
@@ -414,8 +414,8 @@ type TxReturnFlags = strict bits : uint32 {
 // the "composed" implementation is always provided by the framework itself. At
 // the time of this writing it is unclear what is going to replace that or when,
 // only that there is a desire to improve the pattern. The expectation is that
-// pattern will be improved with Unified Services (https://fxbug.dev/8035) and
-// Drivers as Components (https://fxbug.dev/33183).
+// pattern will be improved with Unified Services (https://fxbug.dev/42160684) and
+// Drivers as Components (https://fxbug.dev/42108351).
 @available(removed=12)
 closed protocol DeviceInstance {
     /// Connects to the [`Device`] implementation.
@@ -455,7 +455,7 @@ closed protocol MacAddressing {
         address fuchsia.net.MacAddress;
     });
 
-    // TODO(https://fxbug.dev/44065) enable an API like the one below to be
+    // TODO(https://fxbug.dev/42120438) enable an API like the one below to be
     // notified of changes to the Unicast MAC once plumbed through the banjo
     // protocol as well. WatchUnicastAddress() -> (Mac address);
 

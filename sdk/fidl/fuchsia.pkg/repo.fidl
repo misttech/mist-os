@@ -146,7 +146,7 @@ type MirrorConfig = table {
     /// Whether or not to automatically monitor the mirror for updates. Required.
     2: subscribe bool;
 
-    // TODO(https://fxbug.dev/75789): Turn comment below into doc-comment.
+    // TODO(https://fxbug.dev/42155620): Turn comment below into doc-comment.
     //
     // Removed. Previously used for `RepositoryBlobKey blob_key`.
     3: reserved;

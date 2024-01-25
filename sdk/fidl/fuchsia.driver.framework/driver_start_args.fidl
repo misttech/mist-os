@@ -51,7 +51,7 @@ type DriverStartArgs = resource table {
     /// Outgoing directory served by the driver.
     6: outgoing_dir server_end:fuchsia.io.Directory;
 
-    // TODO(https://fxbug.dev/94716) add link to reference for the contents
+    // TODO(https://fxbug.dev/42176642) add link to reference for the contents
     /// Configuration passed to the driver.
     7: config zx.Handle:VMO;
 };

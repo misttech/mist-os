@@ -179,12 +179,12 @@ closed protocol PortWatcher {
     });
 };
 
-// TODO(https://fxbug.dev/7913): Use built-in empty struct when available.
+// TODO(https://fxbug.dev/42159332): Use built-in empty struct when available.
 @available(added=HEAD)
 type Empty = struct {};
 
 /// Port creation and destruction events.
-// TODO(https://fxbug.dev/66767): `PortEvent` is probably a better name here,
+// TODO(https://fxbug.dev/42145610): `PortEvent` is probably a better name here,
 // but it causes rust binding errors.
 @available(added=HEAD)
 type DevicePortEvent = strict union {

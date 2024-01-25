@@ -21,7 +21,7 @@ closed protocol View {
     /// had already been called before), then it should terminate the connection
     /// with an error.
     ///
-    /// TODO(https://fxbug.dev/24470): Allow re-parenting `View`s with a new `Present()` call.
+    /// TODO(https://fxbug.dev/42098670): Allow re-parenting `View`s with a new `Present()` call.
     strict Present(resource struct {
         view_token ViewToken;
     });

@@ -26,7 +26,7 @@ TEST(Pipe, WaitBegin) {
       ZX_SOCKET_PEER_WRITE_DISABLED;  // Peer can't write any more, either data is readable or
                                       // we've hit EOF
 
-  // TODO(https://fxbug.dev/47132): Understand why this does not include ZX_SOCKET_PEER_CLOSED.
+  // TODO(https://fxbug.dev/42123845): Understand why this does not include ZX_SOCKET_PEER_CLOSED.
   constexpr zx_signals_t kExpectedPollOutSignals = ZX_SOCKET_WRITABLE |       // Data can be written
                                                    ZX_SOCKET_WRITE_DISABLED;  // Write is disabled
 

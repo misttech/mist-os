@@ -32,7 +32,7 @@ OutgoingToEncodedMessage::OutgoingToEncodedMessage(OutgoingMessage& input)
 EncodedMessage OutgoingToEncodedMessage::ConversionImpl(
     OutgoingMessage& input, OutgoingMessage::CopiedBytes& buf_bytes,
     std::unique_ptr<zx_handle_t[]>& buf_handles,
-    // TODO(https://fxbug.dev/85734) Remove channel-specific logic.
+    // TODO(https://fxbug.dev/42166666) Remove channel-specific logic.
     std::unique_ptr<fidl_channel_handle_metadata_t[]>& buf_handle_metadata,
     fidl::Status& out_status) {
   ZX_ASSERT(!input.is_transactional());

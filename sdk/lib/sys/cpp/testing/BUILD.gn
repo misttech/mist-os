@@ -36,7 +36,7 @@ sdk_source_set("cpp") {
 
 # DEPRECATED, use `:cpp` instead.
 group("unit") {
-  # TODO(https://fxbug.dev/82270): Remove or refactor deprecated references to `:unit`.
+  # TODO(https://fxbug.dev/42162818): Remove or refactor deprecated references to `:unit`.
   testonly = true
 
   public_deps = [ ":cpp" ]

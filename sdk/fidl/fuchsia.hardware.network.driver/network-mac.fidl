@@ -55,7 +55,7 @@ type Features = table {
 @banjo_layout("ddk-interface")
 closed protocol MacAddr {
     /// Gets this device's MAC address.
-    // TODO(https://fxbug.dev/44065) we need an address changed event (in
+    // TODO(https://fxbug.dev/42120438) we need an address changed event (in
     // lockstep with FIDL definition).
     // TODO(brunodalbo) use fuchsia.net.MacAddress here and in SetMode when we
     // can use FIDL types in Banjo.

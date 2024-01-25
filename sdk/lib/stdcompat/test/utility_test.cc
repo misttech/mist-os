@@ -116,7 +116,7 @@ TEST(AsConstTest, DeniesRvalueReferences) {
                 "cpp17::as_const should not accept rvalue references.");
 }
 
-// TODO(https://fxbug.dev/98561)
+// TODO(https://fxbug.dev/42180908)
 // #if defined(__cpp_lib_as_const) && __cpp_lib_as_const >= 201510L &&
 // !defined(LIB_STDCOMPAT_USE_POLYFILLS)
 

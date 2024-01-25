@@ -173,7 +173,7 @@ void Directory::Open(fuchsia::io::OpenFlags open_flags, fuchsia::io::OpenFlags p
     return;
   }
 
-  // TODO(https://fxbug.dev/119413): Path handling does not conform to in-tree behavior.
+  // TODO(https://fxbug.dev/42070484): Path handling does not conform to in-tree behavior.
   zx::result result = LookupPath(path);
   if (result.is_error()) {
     return SendOnOpenEventOnError(open_flags, std::move(request), result.error_value());
@@ -207,7 +207,7 @@ void Directory::Open(fuchsia::io::OpenFlags open_flags, fuchsia::io::OpenFlags p
         ~(fuchsia::io::OpenFlags::POSIX_WRITABLE | fuchsia::io::OpenFlags::POSIX_EXECUTABLE);
   }
 
-  // TODO(https://fxbug.dev/101092): Remove this when flutter_{touch,views}_test no longer open
+  // TODO(https://fxbug.dev/42051879): Remove this when flutter_{touch,views}_test no longer open
   // these protocols with RIGHT_READABLE.
   const std::string_view protocols[] = {
       "fuchsia.logger.LogSink",

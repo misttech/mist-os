@@ -11,7 +11,7 @@ using zx;
 // Stub types for communicating between the wlan service and the MLME drivers. Based on the 802.11
 // MLME SAP interface (IEEE Std 802.11-2016 section 6.3).
 
-// TODO(https://fxbug.dev/21133): restore the commented out enum aliases
+// TODO(https://fxbug.dev/42094963): restore the commented out enum aliases
 
 // MLME-SETKEYS.request (IEEE Std 802.11-2016 6.3.19.1)
 
@@ -67,7 +67,7 @@ type ScanRequest = struct {
     /// frame to ieee80211.SSID_LIST_MAX SSIDs.
     ssid_list vector<ieee80211.Ssid>:MAX;
     probe_delay uint32; // in TimeUnits
-    // TODO(https://fxbug.dev/89933): A TimeUnit is generally limited to 2 octets, but this field
+    // TODO(https://fxbug.dev/42171328): A TimeUnit is generally limited to 2 octets, but this field
     // is 4 octets wide.
     min_channel_time uint32; // in TimeUnits
     max_channel_time uint32; // in TimeUnits
@@ -339,7 +339,7 @@ type StartRequest = struct {
     // following parameters determine what to be advertised to the peer
     // (in Beacons/ProbeResponse/AssociationResponse). Effectively this way replaces the following
     // fields originally defined in MLME-START.request.
-    // TODO(https://fxbug.dev/29529): Replace phy and cbw with full-fledged parameters below.
+    // TODO(https://fxbug.dev/42104290): Replace phy and cbw with full-fledged parameters below.
     // - Capability Information
     // - HT Capabilities
     // - HT Operation
@@ -628,7 +628,7 @@ closed protocol MLME {
     });
 
     // For SoftMAC drivers only. Let SME inform MLME about the capability negotiation outcome.
-    // TODO(https://fxbug.dev/43063): If we are able to intersect the capabilities with beacon before associating,
+    // TODO(https://fxbug.dev/42119326): If we are able to intersect the capabilities with beacon before associating,
     // remove this function and the capabilities from AssociateConfirm and use AssociateRequest.
     strict FinalizeAssociationReq(struct {
         negotiated_capabilities NegotiatedCapabilities;

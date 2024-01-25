@@ -40,7 +40,7 @@ zx::result<Namespace> CreateNamespace(fidl::ClientEnd<fuchsia_io::Directory> cli
 
 }  // namespace fdf::testing
 
-// TODO(https://fxbug.dev/114875): remove this once migration from driver to fdf is complete.
+// TODO(https://fxbug.dev/42066155): remove this once migration from driver to fdf is complete.
 namespace driver::testing {
 using namespace fdf::testing;
 }  // namespace driver::testing

@@ -32,7 +32,7 @@ type Configuration = table {
     1: ipv4 @generated_name("Ipv4Configuration") table {
         /// Controls whether or not IPv4 unicast packets may be forwarded if not
         /// destined to the host.
-        /// TODO(https://fxbug.dev/101709): Rename this field to
+        /// TODO(https://fxbug.dev/42052564): Rename this field to
         /// unicast_forwarding.
         1: forwarding bool;
 
@@ -67,7 +67,7 @@ type Configuration = table {
     2: ipv6 @generated_name("Ipv6Configuration") table {
         /// Controls whether or not IPv6 unicast packets may be forwarded if not
         /// destined to the host.
-        /// TODO(https://fxbug.dev/101709): Rename this field to
+        /// TODO(https://fxbug.dev/42052564): Rename this field to
         /// unicast_forwarding.
         1: forwarding bool;
 
@@ -120,11 +120,11 @@ type ProofOfInterfaceAuthorization = resource struct {
 /// - Observing a closure of the server end indicates the interface no longer
 ///   exists.
 closed protocol Control {
-    // TODO(https://fxbug.dev/80621): Currently Netstack2's implementation
+    // TODO(https://fxbug.dev/42160986): Currently Netstack2's implementation
     // does not support any values being present in `parameters`, and will
     // cause an event containing `AddressRemovalReason.INVALID` to be sent
     // and the server end of the protocol to be closed.
-    // TODO(https://fxbug.dev/100535): Clarify address semantics in regards to
+    // TODO(https://fxbug.dev/42051260): Clarify address semantics in regards to
     // adding and removing same address on different subnets and/or interfaces.
     /// Assigns an address to the interface.
     ///

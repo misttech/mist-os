@@ -85,7 +85,7 @@ type OpenFlags = strict bits : uint32 {
     CLONE_SAME_RIGHTS = 0x04000000;
 
     /// Open the target object as a block device.
-    // TODO(https://fxbug.dev/120898): this form of protocol negotiation is unprincipled.
+    // TODO(https://fxbug.dev/42071940): this form of protocol negotiation is unprincipled.
     BLOCK_DEVICE = 0x01000000;
 };
 

@@ -121,7 +121,7 @@ TEST_P(SocketPairShutdown, Read) {
 #ifdef __Fuchsia__
   EXPECT_EQ(read(fds()[0].get(), buf, sizeof(buf)), 0) << strerror(errno);
 #else
-  // TODO(https://fxbug.dev/79231): On Linux, this returns EAGAIN for datagram sockets.
+  // TODO(https://fxbug.dev/42159445): On Linux, this returns EAGAIN for datagram sockets.
   if (GetParam() == SOCK_DGRAM) {
     EXPECT_EQ(read(fds()[0].get(), buf, sizeof(buf)), -1);
     EXPECT_EQ(errno, EAGAIN);
@@ -169,7 +169,7 @@ TEST_P(SocketPairShutdown, ReadWrite) {
   EXPECT_EQ(read(fds()[0].get(), buf, sizeof(buf)), 0) << strerror(errno);
 #else
   if (GetParam() == SOCK_DGRAM) {
-    // TODO(https://fxbug.dev/79231): On Linux, this returns EAGAIN for datagram sockets.
+    // TODO(https://fxbug.dev/42159445): On Linux, this returns EAGAIN for datagram sockets.
     EXPECT_EQ(read(fds()[0].get(), buf, sizeof(buf)), -1);
     EXPECT_EQ(errno, EAGAIN) << strerror(errno);
   } else {
@@ -197,7 +197,7 @@ std::thread poll_for_read_with_timeout(const fbl::unique_fd& fd) {
   });
 }
 
-// TODO(https://fxbug.dev/79231): Investigate this failure and either disable on
+// TODO(https://fxbug.dev/42159445): Investigate this failure and either disable on
 // Linux and remove this TODO or get it passing and enable it on Linux.
 #ifdef __Fuchsia__
 #define MAYBE_SelfWritePoll SelfWritePoll
@@ -213,7 +213,7 @@ TEST_P(SocketPairShutdown, MAYBE_SelfWritePoll) {
   poll_thread.join();
 }
 
-// TODO(https://fxbug.dev/79231): Investigate this failure and either disable on
+// TODO(https://fxbug.dev/42159445): Investigate this failure and either disable on
 // Linux and remove this TODO or get it passing and enable it on Linux.
 #ifdef __Fuchsia__
 #define MAYBE_PeerWritePoll PeerWritePoll
@@ -245,7 +245,7 @@ TEST_P(SocketPair, SelfReadDuringRecv) {
   t.join();
 }
 
-// TODO(https://fxbug.dev/79231): Investigate this failure and either disable on
+// TODO(https://fxbug.dev/42159445): Investigate this failure and either disable on
 // Linux and remove this TODO or get it passing and enable it on Linux.
 #ifdef __Fuchsia__
 #define MAYBE_SelfWriteDuringRecv SelfWriteDuringRecv
@@ -261,7 +261,7 @@ TEST_P(SocketPair, MAYBE_SelfWriteDuringRecv) {
   t.join();
 }
 
-// TODO(https://fxbug.dev/79231): Investigate this failure and either disable on
+// TODO(https://fxbug.dev/42159445): Investigate this failure and either disable on
 // Linux and remove this TODO or get it passing and enable it on Linux.
 #ifdef __Fuchsia__
 #define MAYBE_PeerReadBeforeSend PeerReadBeforeSend
@@ -324,7 +324,7 @@ TEST_P(SocketPair, StreamRecvmsgNonblockBoundary) {
   EXPECT_EQ(recvmsg(fds()[1].get(), &msg, 0), ssize_t(sizeof(data_in1))) << strerror(errno);
 }
 
-// TODO(https://fxbug.dev/79231): Investigate this failure and either disable on
+// TODO(https://fxbug.dev/42159445): Investigate this failure and either disable on
 // Linux and remove this TODO or get it passing and enable it on Linux.
 #ifdef __Fuchsia__
 #define MAYBE_StreamSendmsgNonblockBoundary StreamSendmsgNonblockBoundary
@@ -441,7 +441,7 @@ TEST_P(SocketPair, FIONREAD) {
   EXPECT_EQ(static_cast<size_t>(num_readable), sizeof(buf));
 }
 
-// TODO(https://fxbug.dev/79231): These tests depend on Fuchsia specific primitives
+// TODO(https://fxbug.dev/42159445): These tests depend on Fuchsia specific primitives
 // to coordinate between threads. They should be modified to use cross-platform primitives
 // and run on other platforms as well, as demonstrated here:
 // https://fuchsia-review.googlesource.com/c/fuchsia/+/544785/2..3/sdk/lib/fdio/tests/fdio_socketpair.cc

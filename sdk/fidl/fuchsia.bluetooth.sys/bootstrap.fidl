@@ -23,7 +23,7 @@ closed protocol Bootstrap {
     /// Adds identities to be added to the unpopulated Bluetooth stack.
     ///
     /// Repeated calls will append identities.
-    // TODO(https://fxbug.dev/1304): If necessary, paginate bonding data to allow an arbitrary number of bonds for
+    // TODO(https://fxbug.dev/42080667): If necessary, paginate bonding data to allow an arbitrary number of bonds for
     // each identity, e.g. AddBonds(adapter_id, bonds).
     strict AddIdentities(struct {
         identities vector<Identity>:MAX;

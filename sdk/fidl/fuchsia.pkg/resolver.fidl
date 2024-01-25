@@ -7,7 +7,7 @@ using fuchsia.io;
 using zx;
 
 /// Error codes for PackageResolver operations.
-// TODO(https://fxbug.dev/46003): Use this instead of zx.Status for `GetHash`
+// TODO(https://fxbug.dev/42122591): Use this instead of zx.Status for `GetHash`
 type ResolveError = strict enum : int32 {
     /// The resolver encountered an otherwise unspecified error while handling the request.
     INTERNAL = 1;
@@ -66,7 +66,7 @@ closed protocol PackageResolver {
     ///   this package.
     /// * error indicates failure. See `ResolveError` for values and error
     ///   scenarios.
-    // TODO(https://fxbug.dev/45811) change `package_url` from string to PackageUrl
+    // TODO(https://fxbug.dev/42122377) change `package_url` from string to PackageUrl
     strict Resolve(resource struct {
         package_url string;
         dir server_end:fuchsia.io.Directory;
@@ -93,7 +93,7 @@ closed protocol PackageResolver {
     ///   of this package or subpackage.
     /// * error indicates failure. See `ResolveError` for values and error
     ///   scenarios.
-    // TODO(https://fxbug.dev/45811) change `package_url` from string to PackageUrl
+    // TODO(https://fxbug.dev/42122377) change `package_url` from string to PackageUrl
     strict ResolveWithContext(resource struct {
         package_url string;
         context ResolutionContext;

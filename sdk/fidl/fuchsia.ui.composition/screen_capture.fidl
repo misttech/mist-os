@@ -45,12 +45,12 @@ type ScreenCaptureConfig = resource table {
     /// The size of the image in pixels. Required.
     2: size fuchsia.math.SizeU;
     /// The number of buffers in the BufferCollection. Required.
-    // TODO(https://fxbug.dev/97057): Get buffer_count from the importer and remove this.
+    // TODO(https://fxbug.dev/42179243): Get buffer_count from the importer and remove this.
     3: buffer_count uint32;
     /// The rotation to be applied to the stream of images. Optional; if absent no rotation is
     /// applied.
     4: rotation Rotation;
-    // TODO(https://fxbug.dev/97057): Add an option to exclude cursor capture.
+    // TODO(https://fxbug.dev/42179243): Add an option to exclude cursor capture.
 };
 
 /// The arguments passed into the [`GetNextFrame`] call. All fields are necessary.
@@ -117,7 +117,7 @@ closed protocol ScreenCapture {
     /// MISSING_ARGS if a required argument is not present
     /// BUFFER_FULL if all buffers in the BufferCollection are in use. In this case, ReleaseFrame
     /// must be called to make a buffer available before this function can be called successfully.
-    // TODO(https://fxbug.dev/97057): Add a way to notify clients of the display
+    // TODO(https://fxbug.dev/42179243): Add a way to notify clients of the display
     // refresh rate, perhaps through the Display API.
     strict GetNextFrame(GetNextFrameArgs) -> (FrameInfo) error ScreenCaptureError;
 

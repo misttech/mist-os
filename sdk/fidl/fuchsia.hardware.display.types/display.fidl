@@ -25,7 +25,7 @@ type DisplayId = struct {
     value DisplayIdValue;
 };
 
-// TODO(https://fxbug.dev/128948): Use separate invalid ID constants for each ID type.
+// TODO(https://fxbug.dev/42079383): Use separate invalid ID constants for each ID type.
 
 /// Invalid id for displays, images, and events.
 const INVALID_DISP_ID DisplayIdValue = 0;

@@ -1,7 +1,7 @@
 // Copyright 2019 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-//TODO(https://fxbug.dev/36191): Move to fuchsia.media.audio
+//TODO(https://fxbug.dev/42111692): Move to fuchsia.media.audio
 
 library fuchsia.media;
 
@@ -52,7 +52,7 @@ closed protocol UsageReporter {
 /// A protocol for setting up watchers of usage gain.
 @discoverable
 closed protocol UsageGainReporter {
-    // TODO(https://fxbug.dev/71946): Only report volume-to-gain translation, without
+    // TODO(https://fxbug.dev/42151353): Only report volume-to-gain translation, without
     // including muting/ducking gain adjustments. Determine whether separate
     // muting/ducking gain reporting is necessary
     //
@@ -86,7 +86,7 @@ closed protocol UsageGainListener {
     /// events will eventually be disconnected.
     ///
     /// Note: This API does not have mute reporting implemented; `muted` is always false.
-    // TODO(https://fxbug.dev/54949): Update implementation to report on mute state.
+    // TODO(https://fxbug.dev/42132524): Update implementation to report on mute state.
     strict OnGainMuteChanged(struct {
         muted bool;
         gain_dbfs float32;

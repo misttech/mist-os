@@ -60,13 +60,13 @@ class TestCaseResults {
   String metric;
   // This field below is being renamed from "label" to "metric".
   // It is duplicated as a transitional measure so that it can be accessed via
-  // either name.  TODO(https://fxbug.dev/59861): Remove the "label" field."
+  // either name.  TODO(https://fxbug.dev/42137976): Remove the "label" field."
   String? label;
   Unit unit;
   List<double> values;
 
   TestCaseResults(this.metric, this.unit, this.values) {
-    // TODO(https://fxbug.dev/59861): Remove the statement below when "label" is removed.
+    // TODO(https://fxbug.dev/42137976): Remove the statement below when "label" is removed.
     label = metric;
   }
 

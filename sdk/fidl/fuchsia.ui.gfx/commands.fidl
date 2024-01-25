@@ -78,7 +78,7 @@ type Command = strict resource union {
    44: set_disable_clipping SetDisableClippingCmd;
    45: set_import_focus SetImportFocusCmdDEPRECATED;
 
-    // TODO(https://fxbug.dev/24428): Move these where they belong.  They're added to the end of
+    // TODO(https://fxbug.dev/42098623): Move these where they belong.  They're added to the end of
     // the struct temporarily until we transition to xunions.
    46: set_clip_planes SetClipPlanesCmd;
    47: set_point_light_position SetPointLightPositionCmd;
@@ -678,7 +678,7 @@ type SetColorCmd = struct {
 ///   - the UV coords occupy bytes 12-19, since no surface normal is provided.
 @available(deprecated=13, removed=17, legacy=true)
 type MeshIndexFormat = strict enum {
-    // TODO(https://fxbug.dev/23519): only kUint32 is currently supported.
+    // TODO(https://fxbug.dev/42097613): only kUint32 is currently supported.
     kUint16 = 1;
     kUint32 = 2;
 };
@@ -845,7 +845,7 @@ type SetPointLightPositionCmd = struct {
 /// value of 0.0 means that the radiance of a surface is not dependant on
 /// its distance from the light.
 ///
-// TODO(https://fxbug.dev/23755): need to formalize the units of light intensity and distance used
+// TODO(https://fxbug.dev/42097875): need to formalize the units of light intensity and distance used
 // to compute fall-off.  Currently the unit is pips; consequently a falloff of 1.0
 // causes light to attenuate far too rapidly.  Meters would be more appropriate.
 @available(deprecated=13, removed=17, legacy=true)

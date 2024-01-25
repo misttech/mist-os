@@ -8,7 +8,7 @@ using zx;
 /// Provides administration services for the device manager service and the device tree it controls.
 @discoverable
 closed protocol Administrator {
-    // TODO(https://fxbug.dev/68529): Remove this API.
+    // TODO(https://fxbug.dev/42147562): Remove this API.
     /// This is a temporary API until DriverManager can ensure that base drivers
     /// will be shut down automatically before fshost exits. This will happen
     /// once drivers-as-components is implemented.

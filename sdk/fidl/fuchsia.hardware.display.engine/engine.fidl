@@ -128,7 +128,7 @@ open protocol Engine {
     /// Returns ZX_ERR_ALREADY_EXISTS if `collection_id` is in use.
     flexible ImportBufferCollection(resource struct {
         collection_id uint64;
-        // TODO(https://fxbug.dev/89649): This is a client end channel of FIDL protocol
+        // TODO(https://fxbug.dev/42171012): This is a client end channel of FIDL protocol
         // fuchsia.sysmem.BufferCollectionToken. The raw channel needs to be
         // replaced with FIDL client end once banjo to FIDL migration finishes.
         collection_token zx.Handle:CHANNEL;

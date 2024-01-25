@@ -211,7 +211,7 @@ type RequestedNavigation = table {
 };
 
 /// Empty struct used in NavigationDecision for actions that don't hav any arguments.
-// TODO: https://fxbug.dev/7913
+// TODO: https://fxbug.dev/42159332
 type NoArgumentsAction = struct {};
 
 /// Navigation action that should be taken in response to a navigation request. Returned from

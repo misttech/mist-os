@@ -25,7 +25,7 @@ const MAX_RESOLVE_NAME_SIZE uint32 = 2048;
 /// `fdio_spawn_etc` use this interface internally when they try to run a file
 /// with a `#!resolve` directive.
 ///
-// TODO(https://fxbug.dev/105486): Delete this protocol once it is no longer needed.
+// TODO(https://fxbug.dev/42056720): Delete this protocol once it is no longer needed.
 @deprecated
 @discoverable
 closed protocol Resolver {

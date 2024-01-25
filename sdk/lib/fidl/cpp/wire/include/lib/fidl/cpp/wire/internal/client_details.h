@@ -31,7 +31,7 @@ class SyncEventHandler {
   virtual ~SyncEventHandler() = default;
 
  protected:
-  // TODO(https://fxbug.dev/85734): Event handling only works on channels.
+  // TODO(https://fxbug.dev/42166666): Event handling only works on channels.
   // We might need to support |wait_one| on a type-erased transport.
   ::fidl::Status HandleOneEventImpl_(zx::unowned_channel channel, ChannelMessageStorageView storage,
                                      IncomingEventDispatcherBase& dispatcher);

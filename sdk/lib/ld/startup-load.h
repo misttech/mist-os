@@ -343,7 +343,7 @@ struct StartupLoadModule : public StartupLoadModuleBase,
     }
     if (auto found = std::find(preloaded_modules.begin(), preloaded_modules.end(), soname);
         found != preloaded_modules.end()) {
-      // TODO(https://fxbug.dev/130483): Mark this preloaded_module as having it's symbols visible
+      // TODO(https://fxbug.dev/42080760): Mark this preloaded_module as having it's symbols visible
       // to the program.
       modules.push_back(preloaded_modules.erase(found));
       return true;

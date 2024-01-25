@@ -59,7 +59,7 @@ type Component = resource table {
     6: abi_revision fuchsia.version.AbiRevision;
 };
 
-// TODO(https://fxbug.dev/100050): Change this length to something smaller once
+// TODO(https://fxbug.dev/42050722): Change this length to something smaller once
 // fuchsia.pkg implements subpackages, assuming fuchsia.pkg implements the
 // package context value as a much smaller lookup key (such as a package hash to
 // the package containing the subpackage map).

@@ -53,7 +53,7 @@ closed protocol Arguments {
 
     /// Get all boot arguments with keys starting with
     /// `prefix`. Returns a vector with strings of the form 'key=value'.
-    /// TODO(https://fxbug.dev/33460) - remove Collect once boot arguments have been componentised.
+    /// TODO(https://fxbug.dev/42108659) - remove Collect once boot arguments have been componentised.
     strict Collect(struct {
         prefix string:MAX_ARGS_NAME_LENGTH;
     }) -> (struct {

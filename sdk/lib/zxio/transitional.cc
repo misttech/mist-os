@@ -14,7 +14,7 @@
 zx_status_t zxio_sendmsg_inner(zxio_t* io, const struct msghdr* msg, int flags,
                                size_t* out_actual) {
   if (flags) {
-    // TODO(https://fxbug.dev/67925): support MSG_OOB
+    // TODO(https://fxbug.dev/42146893): support MSG_OOB
     return ZX_ERR_NOT_SUPPORTED;
   }
 
@@ -46,7 +46,7 @@ zx_status_t zxio_recvmsg_inner(zxio_t* io, struct msghdr* msg, int flags, size_t
     flags &= ~MSG_PEEK;
   }
   if (flags) {
-    // TODO(https://fxbug.dev/67925): support MSG_OOB
+    // TODO(https://fxbug.dev/42146893): support MSG_OOB
     return ZX_ERR_NOT_SUPPORTED;
   }
 
@@ -73,9 +73,9 @@ zx_status_t zxio_recvmsg_inner(zxio_t* io, struct msghdr* msg, int flags, size_t
   return zxio_readv(io, zx_iov, msg->msg_iovlen, zxio_flags, out_actual);
 }
 
-// TODO(https://fxbug.dev/45813): This is mainly used by pipes. Consider merging this with the
+// TODO(https://fxbug.dev/42122379): This is mainly used by pipes. Consider merging this with the
 // POSIX-to-zxio signal translation in |remote::wait_begin|.
-// TODO(https://fxbug.dev/47132): Do not change the signal mapping here and in |wait_end|
+// TODO(https://fxbug.dev/42123845): Do not change the signal mapping here and in |wait_end|
 // until linked issue is resolved.
 void zxio_wait_begin_inner(zxio_t* io, uint32_t events, zx_signals_t signals,
                            zx_handle_t* out_handle, zx_signals_t* out_signals) {

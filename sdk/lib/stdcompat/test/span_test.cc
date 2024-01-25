@@ -567,7 +567,7 @@ TEST(SpanTest, EmptyWhenSizeIsZero) {
   static_assert(kEmpty.empty(), "default constructed span should be considered empty.");
 
   static constexpr std::array<int, 40> kContainer = {};
-  // TODO(https://fxbug.dev/70669): Remove cast when libc++'s std::span gets constraints correct
+  // TODO(https://fxbug.dev/42149938): Remove cast when libc++'s std::span gets constraints correct
   constexpr cpp20::span<const int> view(kContainer.data(), static_cast<size_t>(0));
 
   static_assert(view.data() == kContainer.data(),
@@ -844,7 +844,7 @@ TEST(SpanTest, LastWithDynamicExtent) {
 
 template <size_t Count, typename T, typename std::enable_if<Count == 0, bool>::type = true>
 constexpr bool span_last_check_with_static_extent_impl(T& view) {
-  // TODO(https://fxbug.dev/70523): switch to cpp20::to_address when upstream is fixed
+  // TODO(https://fxbug.dev/42149777): switch to cpp20::to_address when upstream is fixed
   auto subview = view.template last<Count>();
   return are_pointers_equal(subview.data(), cpp17::addressof(*view.end())) && subview.size() == 0 &&
          subview.extent == 0;
@@ -858,7 +858,7 @@ constexpr bool span_last_check_with_static_extent_impl(T& view) {
     return false;
   }
 
-  // TODO(https://fxbug.dev/70523): switch to cpp20::to_address when upstream is fixed
+  // TODO(https://fxbug.dev/42149777): switch to cpp20::to_address when upstream is fixed
   if (!are_pointers_equal(subview.data(), cpp17::addressof(*(view.end() - Count)))) {
     return false;
   }

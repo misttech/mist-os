@@ -16,7 +16,7 @@ zx::result<typename fidl::WireSyncClient<T>>& get_client() {
   // We can't destroy |client| at static destruction time as some multithreaded programs call exit()
   // from one thread while other threads are calling in to fdio functions either directly or
   // indirectly through libc. Destroying |client| in this scenario would result in crashes on those
-  // threads. See https://fxbug.dev/117875 for details.
+  // threads. See https://fxbug.dev/42069066 for details.
   static fbl::NoDestructor<zx::result<typename fidl::WireSyncClient<T>>> client =
       fbl::NoDestructor([]() -> zx::result<typename fidl::WireSyncClient<T>> {
         auto endpoints = fidl::CreateEndpoints<T>();

@@ -34,7 +34,7 @@ closed protocol Interfaces {
     ///
     /// + request `id` identifies the interface whose MAC is requested.
     /// - response `mac` is the interface's MAC address, if it has one.
-    // TODO(https://fxbug.dev/84984): Use an API like `fuchsia.net.interfaces`
+    // TODO(https://fxbug.dev/42165832): Use an API like `fuchsia.net.interfaces`
     // for L2 information.
     strict GetMac(struct {
         id fuchsia.net.InterfaceId;

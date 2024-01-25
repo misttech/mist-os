@@ -19,7 +19,7 @@ constexpr uint32_t kUserspaceTxidMask = 0x7FFFFFFF;
 // Enables client side error callbacks, which will eventually always be
 // enabled. This should generally not be set, but exists to provide a
 // mechanism to denylist test cases
-// TODO(https://fxbug.dev/68206) Remove this.
+// TODO(https://fxbug.dev/42147204) Remove this.
 static std::atomic<uint32_t> transitory_clientside_error_disable_count(0);
 
 }  // namespace

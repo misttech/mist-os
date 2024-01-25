@@ -5,7 +5,7 @@ library fuchsia.net;
 
 /// The maximum length of a hostname, as per
 /// [RFC 1035 section 2.3.4](https://tools.ietf.org/html/rfc1035#section-2.3.4).
-// TODO(https://fxbug.dev/84190): inline this constant below.
+// TODO(https://fxbug.dev/42164951): inline this constant below.
 const MAX_HOSTNAME_SIZE uint64 = 255;
 
 /// A hostname.
@@ -29,14 +29,14 @@ type IpVersion = strict enum {
 /// Ipv4Address is expressed in network byte order, so the most significant byte
 /// ("127" in the address "127.0.0.1") will be at index 0.
 type Ipv4Address = struct {
-    // TODO(https://fxbug.dev/21150): rename to octets.
+    // TODO(https://fxbug.dev/42094982): rename to octets.
     addr array<uint8, 4>;
 };
 
 /// Ipv6Address is expressed in network byte order, so the most significant byte
 /// ("ff" in the address "ff02::1") will be at index 0.
 type Ipv6Address = struct {
-    // TODO(https://fxbug.dev/21150): rename to octets.
+    // TODO(https://fxbug.dev/42094982): rename to octets.
     addr array<uint8, 16>;
 };
 
@@ -46,7 +46,7 @@ type IpAddress = strict union {
     2: ipv6 Ipv6Address;
 };
 
-// TODO(https://fxbug.dev/54163): rename Subnet to AddressWithPrefix when
+// TODO(https://fxbug.dev/42131655): rename Subnet to AddressWithPrefix when
 // binding support is ready, so we don't have to recursively fix all users.
 /// An IP address with its subnet prefix length.
 type Subnet = struct {
@@ -57,7 +57,7 @@ type Subnet = struct {
     ///
     /// When [`addr`] is [`IpAddress.ipv4`], must be in the range `[0, 32]`.
     /// When [`addr`] is [`IpAddress.ipv6`], must be in the range `[0, 128]`.
-    // TODO(https://fxbug.dev/21150): rename to prefix_length.
+    // TODO(https://fxbug.dev/42094982): rename to prefix_length.
     prefix_len uint8;
 };
 

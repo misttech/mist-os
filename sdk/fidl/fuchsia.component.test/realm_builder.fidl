@@ -342,7 +342,7 @@ type Config = table {
 };
 
 /// Properties that may be set on a child when it is added to a realm.
-// TODO(https://fxbug.dev/127801): Consider deprecating this type.
+// TODO(https://fxbug.dev/42078374): Consider deprecating this type.
 type ChildOptions = table {
     /// For information on this type, see
     /// https://fuchsia.dev/go/components/declaration#StartupMode.

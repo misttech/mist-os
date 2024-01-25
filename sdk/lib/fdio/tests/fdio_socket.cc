@@ -45,7 +45,7 @@ class Server final : public fidl::testing::WireTestBase<fuchsia_posix_socket::St
 
   void Query(QueryCompleter::Sync& completer) final {
     const std::string_view kProtocol = fuchsia_posix_socket::wire::kStreamSocketProtocolName;
-    // TODO(https://fxbug.dev/101890): avoid the const cast.
+    // TODO(https://fxbug.dev/42052765): avoid the const cast.
     uint8_t* data = reinterpret_cast<uint8_t*>(const_cast<char*>(kProtocol.data()));
     completer.Reply(fidl::VectorView<uint8_t>::FromExternal(data, kProtocol.size()));
   }
@@ -596,7 +596,7 @@ class TcpSocketTimeoutTest : public TcpSocketTest {
     const auto elapsed_ms = std::chrono::duration_cast<std::chrono::milliseconds>(elapsed);
     const auto timeout_ms = std::chrono::duration_cast<std::chrono::milliseconds>(timeout);
 
-    // TODO(https://fxbug.dev/40135): Only the lower bound of the elapsed time is checked. The upper bound
+    // TODO(https://fxbug.dev/42116074): Only the lower bound of the elapsed time is checked. The upper bound
     // check is ignored as the syscall could far miss the defined deadline to return.
     EXPECT_GT(elapsed, timeout - margin, "elapsed=%lld ms (which is not within %lld ms of %lld ms)",
               elapsed_ms.count(), margin.count(), timeout_ms.count());
@@ -672,7 +672,7 @@ class DatagramSocketServer final
 
   void Query(QueryCompleter::Sync& completer) final {
     const std::string_view kProtocol = fuchsia_posix_socket::wire::kDatagramSocketProtocolName;
-    // TODO(https://fxbug.dev/101890): avoid the const cast.
+    // TODO(https://fxbug.dev/42052765): avoid the const cast.
     uint8_t* data = reinterpret_cast<uint8_t*>(const_cast<char*>(kProtocol.data()));
     completer.Reply(fidl::VectorView<uint8_t>::FromExternal(data, kProtocol.size()));
   }

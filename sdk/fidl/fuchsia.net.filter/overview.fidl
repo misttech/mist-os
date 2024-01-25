@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-// TODO(https://fxbug.dev/136550): document the packet filtering flow with a
+// TODO(https://fxbug.dev/42086173): document the packet filtering flow with a
 // diagram.
 //
 /// Library providing packet filtering functionality.

@@ -2,5 +2,5 @@
   "pkg/scenic_cpp/include/lib/ui/scenic/cpp/view_creation_tokens.h": "b981a33cacda1d4886e64d656ea233bc",
   "pkg/scenic_cpp/include/lib/ui/scenic/cpp/view_identity.h": "399f6e644495eab2fb31fb98a0213882",
   "pkg/scenic_cpp/include/lib/ui/scenic/cpp/view_ref_pair.h": "df89024a4ff7689f2f3d5596cdb2c298",
-  "pkg/scenic_cpp/include/lib/ui/scenic/cpp/view_token_pair.h": "3b6c8b2c4a68c5083681f173b8e60594"
+  "pkg/scenic_cpp/include/lib/ui/scenic/cpp/view_token_pair.h": "b7ca7971e4ab042aa9b3b21414ec4fcb"
 }

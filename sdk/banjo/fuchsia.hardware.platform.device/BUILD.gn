@@ -11,7 +11,7 @@ fidl("fuchsia.hardware.platform.device") {
 
   # Please do not add to this list!
   # Use //sdk/fidl/fuchsia.hardware.platform.device instead.
-  # TODO(https://fxbug.dev/110796): Remove items from this list.
+  # TODO(https://fxbug.dev/42062127): Remove items from this list.
   visibility = [
     "//sdk/banjo/*",
     "//src/devices/bus/drivers/pci:*",

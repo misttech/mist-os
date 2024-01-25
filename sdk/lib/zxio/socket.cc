@@ -1514,7 +1514,7 @@ struct SynchronousDatagramSocket {
   static void handle_sendmsg_response(
       const fsocket::wire::SynchronousDatagramSocketSendMsgResponse& response,
       ssize_t expected_len) {
-    // TODO(https://fxbug.dev/82346): Drop len from the response as SendMsg does
+    // TODO(https://fxbug.dev/42162902): Drop len from the response as SendMsg does
     // does not perform partial writes.
     ZX_DEBUG_ASSERT_MSG(response.len == expected_len, "got SendMsg(...) = %ld, want = %ld",
                         response.len, expected_len);
@@ -1541,7 +1541,7 @@ struct RawSocket {
 
   static void handle_sendmsg_response(const frawsocket::wire::SocketSendMsgResponse& response,
                                       ssize_t expected_len) {
-    // TODO(https://fxbug.dev/82346): Drop this method once DatagramSocket.SendMsg
+    // TODO(https://fxbug.dev/42162902): Drop this method once DatagramSocket.SendMsg
     // no longer returns a length field.
   }
 };
@@ -1583,7 +1583,7 @@ struct PacketSocket {
 
   static void handle_sendmsg_response(const fpacketsocket::wire::SocketSendMsgResponse& response,
                                       ssize_t expected_len) {
-    // TODO(https://fxbug.dev/82346): Drop this method once DatagramSocket.SendMsg
+    // TODO(https://fxbug.dev/42162902): Drop this method once DatagramSocket.SendMsg
     // no longer returns a length field.
   }
 };
@@ -1756,7 +1756,7 @@ class FidlControlDataProcessor {
     size_t bytes_left = buffer_.size();
     if (bytes_left < cmsg_len) {
       // Not enough space to store the entire control message.
-      // TODO(https://fxbug.dev/86146): Add support for truncated control messages (MSG_CTRUNC).
+      // TODO(https://fxbug.dev/42167124): Add support for truncated control messages (MSG_CTRUNC).
       return 0;
     }
 
@@ -1784,7 +1784,7 @@ class FidlControlDataProcessor {
 int16_t ParseSocketLevelControlMessage(
     fidl::WireTableBuilder<fsocket::wire::SocketSendControlData>& fidl_socket, int type,
     const void* data, socklen_t len) {
-  // TODO(https://fxbug.dev/88984): Validate unsupported SOL_SOCKET control messages.
+  // TODO(https://fxbug.dev/42170274): Validate unsupported SOL_SOCKET control messages.
   return 0;
 }
 
@@ -1812,7 +1812,7 @@ int16_t ParseIpLevelControlMessage(
       return 0;
     }
     default:
-      // TODO(https://fxbug.dev/88984): Validate unsupported SOL_IP control messages.
+      // TODO(https://fxbug.dev/42170274): Validate unsupported SOL_IP control messages.
       return 0;
   }
 }
@@ -1854,7 +1854,7 @@ int16_t ParseIpv6LevelControlMessage(
       return 0;
     }
     default:
-      // TODO(https://fxbug.dev/88984): Validate unsupported SOL_IPV6 control messages.
+      // TODO(https://fxbug.dev/42170274): Validate unsupported SOL_IPV6 control messages.
       return 0;
   }
 }
@@ -2108,7 +2108,7 @@ struct socket_with_event {
   }
 
   zx_status_t sendmsg(const struct msghdr* msg, int flags, size_t* out_actual, int16_t* out_code) {
-    // TODO(https://fxbug.dev/110570) Add tests with msg as nullptr.
+    // TODO(https://fxbug.dev/42061949) Add tests with msg as nullptr.
     if (msg == nullptr) {
       *out_code = EFAULT;
       return ZX_OK;
@@ -2160,11 +2160,11 @@ struct socket_with_event {
         // that it can be gracefully handled instead of triggering a crash later
         // on.
         //
-        // TODO(https://fxbug.dev/84965): avoid this copy to catch faults.
+        // TODO(https://fxbug.dev/42165811): avoid this copy to catch faults.
         __FALLTHROUGH;
       }
       default: {
-        // TODO(https://fxbug.dev/84965): avoid this copy to linearize the buffer.
+        // TODO(https://fxbug.dev/42165811): avoid this copy to linearize the buffer.
         data = std::unique_ptr<uint8_t[]>(new uint8_t[total]);
         uint8_t* dest = data.get();
 
@@ -2181,7 +2181,7 @@ struct socket_with_event {
       }
     }
 
-    // TODO(https://fxbug.dev/58503): Use better representation of nullable union when
+    // TODO(https://fxbug.dev/42136468): Use better representation of nullable union when
     // available. Currently just using a default-initialized union with an invalid tag.
     auto response = addr.WithFIDL([&](auto address) {
       return client_->SendMsg(address, vec, cdata, to_sendmsg_flags(flags));
@@ -2603,7 +2603,7 @@ struct datagram_socket
   }
 
   zx_status_t sendmsg(const struct msghdr* msg, int flags, size_t* out_actual, int16_t* out_code) {
-    // TODO(https://fxbug.dev/110570) Add tests with msg as nullptr.
+    // TODO(https://fxbug.dev/42061949) Add tests with msg as nullptr.
     if (msg == nullptr) {
       *out_code = EFAULT;
       return ZX_OK;
@@ -2627,7 +2627,7 @@ struct datagram_socket
       }
     }
 
-    // TODO(https://fxbug.dev/103740): Avoid allocating into this arena.
+    // TODO(https://fxbug.dev/42054820): Avoid allocating into this arena.
     fidl::Arena alloc;
     fit::result cmsg_result =
         ParseControlMessages<fsocket::wire::DatagramSocketSendControlData>(alloc, msghdr_ref);
@@ -3058,7 +3058,7 @@ struct stream_socket : public socket_with_zx_socket<fidl::WireSyncClient<fsocket
 
     // Fuchsia does not support control messages on stream sockets. But we still parse the buffer
     // to check that it is valid.
-    // TODO(https://fxbug.dev/110570) Add tests with msg as nullptr.
+    // TODO(https://fxbug.dev/42061949) Add tests with msg as nullptr.
     if (msg == nullptr) {
       *out_code = EFAULT;
       return ZX_OK;

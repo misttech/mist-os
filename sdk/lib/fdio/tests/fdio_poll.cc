@@ -183,7 +183,7 @@ TEST_F(Pipe, Pipe) {
         {
             .fd = fds()[0].get(),
 #if defined(__Fuchsia__)
-            // TODO(https://fxbug.dev/47132): For Linux parity, pipe wait_begin needs to always wait
+            // TODO(https://fxbug.dev/42123845): For Linux parity, pipe wait_begin needs to always wait
             // on ZXIO_SIGNAL_PEER_CLOSED and wait_end needs to set POLLHUP on seeing this.
             .events = POLLIN,
 #endif
@@ -196,7 +196,7 @@ TEST_F(Pipe, Pipe) {
     EXPECT_EQ(n, ssize_t(std::size(pfds)));
     EXPECT_EQ(pfds[0].revents,
 #if defined(__Fuchsia__)
-              // TODO(https://fxbug.dev/47132): For Linux parity, pipe wait_begin needs to always
+              // TODO(https://fxbug.dev/42123845): For Linux parity, pipe wait_begin needs to always
               // wait on ZXIO_SIGNAL_PEER_CLOSED and wait_end needs to set POLLHUP on seeing this.
               POLLIN
 #else

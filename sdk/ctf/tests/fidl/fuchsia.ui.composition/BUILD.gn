@@ -48,7 +48,7 @@ group("tests") {
   testonly = true
   deps = [
     ":fuchsia-ui-composition-flatland-tests-package",
-    # TODO(https://fxbug.dev/118010): Release in CTF once Rust is available in the SDK
+    # TODO(https://fxbug.dev/42069218): Release in CTF once Rust is available in the SDK
     # ":fuchsia-ui-composition-flatland-tests_archive",
   ]
 }

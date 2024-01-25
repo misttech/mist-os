@@ -50,7 +50,7 @@ class Ssh {
     _log.info('SSH key path: $sshKeyPath, setting owner only');
     // Swarming does not maintain file permissions any longer, so this file will
     // be world-readable when it arrives on the tester bot. Ensure that it's not
-    // readable otherwise ssh will reject it. See https://fxbug.dev/53492 and
+    // readable otherwise ssh will reject it. See https://fxbug.dev/42130911 and
     // https://crbug.com/1092020.
     Process.run('chmod', ['og-rwx', sshKeyPath!], runInShell: true);
   }

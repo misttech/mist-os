@@ -98,7 +98,7 @@ typedef uint32_t zbi_type_t;
 
 // Device-specific factory data, stored in BOOTFS format.
 //
-// TODO(https://fxbug.dev/34597): This should not use the "STORAGE" infix.
+// TODO(https://fxbug.dev/42109921): This should not use the "STORAGE" infix.
 //
 // 'BFSF'
 #define ZBI_TYPE_STORAGE_BOOTFS_FACTORY ((zbi_type_t)(0x46534642u))

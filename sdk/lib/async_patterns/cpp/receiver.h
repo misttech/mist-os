@@ -69,7 +69,7 @@ class Receiver : private internal::ReceiverBase {
   // arguments.
   template <typename StatelessLambda>
   auto Once(StatelessLambda callable) {
-    // TODO(https://fxbug.dev/119641): We'll be able to support lambda with captures
+    // TODO(https://fxbug.dev/42070737): We'll be able to support lambda with captures
     // given compiler tooling that inspects the capture list and determine
     // they're safe.
     static_assert(internal::is_stateless<StatelessLambda>,
@@ -100,7 +100,7 @@ class Receiver : private internal::ReceiverBase {
   // arguments.
   template <typename StatelessLambda>
   auto Repeating(StatelessLambda callable) {
-    // TODO(https://fxbug.dev/119641): We'll be able to support lambda with captures
+    // TODO(https://fxbug.dev/42070737): We'll be able to support lambda with captures
     // given compiler tooling that inspects the capture list and determine
     // they're safe.
     static_assert(internal::is_stateless<StatelessLambda>,

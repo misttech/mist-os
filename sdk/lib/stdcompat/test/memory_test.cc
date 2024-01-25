@@ -59,7 +59,7 @@ TEST(MemoryTest, AddressOfReturnsAddressNotOverridenOperator) {
   ASSERT_EQ(cpp17::addressof(misleading), ptr);
 }
 
-// TODO(https://fxbug.dev/98561) Disable these tests until we can avoid taking  the address of std::
+// TODO(https://fxbug.dev/42180908) Disable these tests until we can avoid taking  the address of std::
 // functions #if __cpp_lib_addressof_constexpr >= 201603L && !defined(LIB_STDCOMPAT_USE_POLYFILLS)
 
 // template <typename T>
@@ -102,7 +102,7 @@ TEST(MemoryTest, ToAddressWithArrowReturnsRightPointer) {
   cpp17::optional<const arrow> c;
   EXPECT_EQ(&*c, cpp20::to_address(c));
 
-  // TODO(https://fxbug.dev/70523): libc++ and libstdc++ currently both have broken implementations of
+  // TODO(https://fxbug.dev/42149777): libc++ and libstdc++ currently both have broken implementations of
   // std::to_address that require specializing std::pointer_traits and don't allow operator-> to
   // return non-raw-pointers, so the chaining in this test case (which seems to be intentionally
   // allowed by the standard, given that there is a recursive path through the function) is
@@ -114,7 +114,7 @@ TEST(MemoryTest, ToAddressWithArrowReturnsRightPointer) {
   // EXPECT_EQ(&*e.value, cpp20::to_address(e));
 }
 
-// TODO(https://fxbug.dev/70523): This is only to be bug-compatible with the standard library
+// TODO(https://fxbug.dev/42149777): This is only to be bug-compatible with the standard library
 // implementations; change asserts when the linked bug is resolved.
 TEST(MemoryTest, BannedUses) {
   struct banned {
@@ -143,7 +143,7 @@ TEST(MemoryTest, BannedUses) {
   // EXPECT_EQ(&*d.value, cpp20::to_address(d));
 }
 
-// TODO(https://fxbug.dev/98561) Disable these tests until we can avoid taking  the address of std::
+// TODO(https://fxbug.dev/42180908) Disable these tests until we can avoid taking  the address of std::
 // functions #if __cpp_lib_to_address >= 201711L && !defined(LIB_STDCOMPAT_USE_POLYFILLS)
 
 // template <typename T>

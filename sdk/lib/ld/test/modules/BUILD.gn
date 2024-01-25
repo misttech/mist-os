@@ -85,7 +85,7 @@ group("modules") {
 config("semantic-interposition") {
   visibility = [ ":*" ]
 
-  # TODO(https://fxbug.dev/117866): clang will still perform interprocedural
+  # TODO(https://fxbug.dev/42069056): clang will still perform interprocedural
   # optimization in a PIC, this flag disallows that and requires the PLT call
   # always be made so we can properly test applying plt relocations.
   if (!is_gcc) {
@@ -219,7 +219,7 @@ foreach(in_process,
 group("test-module.deps") {
   visibility = [ ":*" ]
 
-  # TODO(https://fxbug.dev/135799): setting testonly seems to tickle a GN bug
+  # TODO(https://fxbug.dev/42085409): setting testonly seems to tickle a GN bug
   #testonly = true
 
   # When llvm-profdata instrumentation is in use, it may generate calls to
@@ -255,7 +255,7 @@ template("test_shared_library") {
   shared_library(shlib_target_name) {
     visibility = [ ":*" ]
 
-    # TODO(https://fxbug.dev/135799): setting testonly seems to tickle a GN bug
+    # TODO(https://fxbug.dev/42085409): setting testonly seems to tickle a GN bug
     #testonly = true
 
     deps = []
@@ -522,7 +522,7 @@ test_shared_library("tls-dep") {
     "//zircon/system/public",
   ]
 
-  # TODO(https://fxbug.dev/135809): LTO insists on using IE accesses here. Remove this
+  # TODO(https://fxbug.dev/42085421): LTO insists on using IE accesses here. Remove this
   # when the LLVM bug gets fixed and the fixed toolchain rolled into Fuchsia.
   remove_configs = [ "//build/config/lto" ]
 }
@@ -534,7 +534,7 @@ test_shared_library("tls-desc-dep") {
   configs = [ "//build/config:tlsdesc" ]
   deps = [ "//zircon/system/public" ]
 
-  # TODO(https://fxbug.dev/135809): LTO insists on using IE accesses here. Remove this
+  # TODO(https://fxbug.dev/42085421): LTO insists on using IE accesses here. Remove this
   # when the LLVM bug gets fixed and the fixed toolchain rolled into Fuchsia.
   remove_configs = [ "//build/config/lto" ]
 }
@@ -556,7 +556,7 @@ test_executable("tls-ie") {
 ifs_shared_library("tls-ie-dep-weak") {
   visibility = [ ":*" ]
 
-  # TODO(https://fxbug.dev/135799): setting testonly seems to tickle a GN bug
+  # TODO(https://fxbug.dev/42085409): setting testonly seems to tickle a GN bug
   #testonly = true
 
   abi = "tls-ie-dep-weak.ifs"
@@ -573,7 +573,7 @@ test_shared_library("tls-ie-dep") {
   sources = [ "tls-ie-dep.cc" ]
   deps = [ "//zircon/system/public" ]
 
-  # TODO(https://fxbug.dev/135809): LTO insists on using LE accesses. Remove this when
+  # TODO(https://fxbug.dev/42085421): LTO insists on using LE accesses. Remove this when
   # the LLVM bug gets fixed and the fixed toolchain rolled into Fuchsia.
   remove_configs = [ "//build/config/lto" ]
 }
@@ -608,7 +608,7 @@ test_executable("missing-sym") {
 }
 
 ifs_shared_library("missing-sym-dep-a") {
-  # TODO(https://fxbug.dev/135799): setting testonly seems to tickle a GN bug
+  # TODO(https://fxbug.dev/42085409): setting testonly seems to tickle a GN bug
   #testonly = true
   abi = "missing-sym-dep-a.ifs"
   data_deps = [ ":ld-dep-a" ]
@@ -622,7 +622,7 @@ test_executable("missing-dep") {
 }
 
 ifs_shared_library("missing-dep-dep") {
-  # TODO(https://fxbug.dev/135799): setting testonly seems to tickle a GN bug
+  # TODO(https://fxbug.dev/42085409): setting testonly seems to tickle a GN bug
   #testonly = true
   abi = "missing-dep-dep.ifs"
 }

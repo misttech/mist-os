@@ -82,7 +82,7 @@ TEST(DriverTransport, WireTwoWaySync) {
     ASSERT_EQ(kResponsePayload, result->payload);
     ASSERT_EQ(server->fdf_response_arena, result.arena().get());
 
-    // TODO(https://fxbug.dev/92489): If this call and wait is removed, the test will
+    // TODO(https://fxbug.dev/42174168): If this call and wait is removed, the test will
     // flake by leaking |AsyncServerBinding| objects.
     binding_ref.Unbind();
     server.reset();
@@ -143,7 +143,7 @@ TEST(DriverTransport, WireTwoWaySyncFreeFunction) {
       ASSERT_EQ(server->fdf_response_arena, result.arena().get());
     }
 
-    // TODO(https://fxbug.dev/92489): If this call and wait is removed, the test will
+    // TODO(https://fxbug.dev/42174168): If this call and wait is removed, the test will
     // flake by leaking |AsyncServerBinding| objects.
     binding_ref.Unbind();
     server.reset();
@@ -200,7 +200,7 @@ TEST(DriverTransport, WireTwoWaySyncViaAsyncClient) {
     ASSERT_EQ(kResponsePayload, result->payload);
     ASSERT_EQ(server->fdf_response_arena, result.arena().get());
 
-    // TODO(https://fxbug.dev/92489): If this call and wait is removed, the test will
+    // TODO(https://fxbug.dev/42174168): If this call and wait is removed, the test will
     // flake by leaking |AsyncServerBinding| objects.
     binding_ref.Unbind();
     server.reset();

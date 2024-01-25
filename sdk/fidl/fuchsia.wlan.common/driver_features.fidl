@@ -47,7 +47,7 @@ type DataPlaneType = strict enum : uint8 {
 /// Indicates where the data plane is implemented.
 /// This is a MAC sublayer extension, usable for fullmac or softmac. This
 /// extension is not part of the 802.11-2016 spec.
-// TODO(https://fxbug.dev/92660) Move/remove extension, it's not a real feature.
+// TODO(https://fxbug.dev/42174359) Move/remove extension, it's not a real feature.
 type DataPlaneExtension = struct {
     data_plane_type DataPlaneType;
 };
@@ -61,12 +61,12 @@ type MacImplementationType = strict enum : uint8 {
 /// Feature-like information specific to the device.
 /// This is a MAC sublayer extension. This extension is not part of the
 /// 802.11-2016 spec.
-// TODO(https://fxbug.dev/92660) Move/remove extension, it's not a real feature.
+// TODO(https://fxbug.dev/42174359) Move/remove extension, it's not a real feature.
 type DeviceExtension = struct {
     /// Indicates that device is not a real hardware device. This extension only
     /// exists to support the SYNTH value in
     /// fuchsia.hardware.ethernet/EthernetFeature.
-    // TODO(https://fxbug.dev/93516) Adjust/adapt for GND DeviceClass.
+    // TODO(https://fxbug.dev/42175310) Adjust/adapt for GND DeviceClass.
     is_synthetic bool;
     /// Indicates where MAC layer is implemented.
     mac_implementation_type MacImplementationType;

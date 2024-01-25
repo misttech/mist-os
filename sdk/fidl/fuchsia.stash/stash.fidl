@@ -137,7 +137,7 @@ closed protocol Store {
 };
 
 /// A copy of |Store| in all but name. Behaves identically to |Store|.
-/// See: https://fxbug.dev/48802
+/// See: https://fxbug.dev/42125700
 @discoverable
 closed protocol Store2 {
     compose Store;

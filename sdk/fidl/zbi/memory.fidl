@@ -4,7 +4,7 @@
 
 library zbi;
 
-// TODO(https://fxbug.dev/111453): Figure out documentation convention.
+// TODO(https://fxbug.dev/42062786): Figure out documentation convention.
 
 /// Unknown values should be treated as RESERVED to allow forwards compatibility.
 type MemType = flexible enum : uint32 {

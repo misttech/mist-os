@@ -19,7 +19,7 @@ type Error = strict enum {
 };
 
 /// Parameters of a voice.
-/// TODO(https://fxbug.dev/16795): Add extra voice parameters such as speech rate and  pitch.
+/// TODO(https://fxbug.dev/42090141): Add extra voice parameters such as speech rate and  pitch.
 type VoiceParameters = table {
     /// The current selected language.
     1: language fuchsia.intl.LocaleId;
@@ -38,7 +38,7 @@ type Utterance = table {
 /// An interface to produce speech output.
 /// Assistive technology use an Engine to start producing speech output and
 /// set configuration parameters that control the speech.
-/// TODO(https://fxbug.dev/17829): Implement pause, stop and resume.
+/// TODO(https://fxbug.dev/42091290): Implement pause, stop and resume.
 @discoverable
 closed protocol Engine {
     /// Enqueues  an utterance to be spoken. Speech is not started until Speak

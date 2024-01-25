@@ -36,7 +36,7 @@ closed protocol MacAddressing {
         address fuchsia.net.MacAddress;
     });
 
-    // TODO(https://fxbug.dev/44065) enable an API like the one below to be
+    // TODO(https://fxbug.dev/42120438) enable an API like the one below to be
     // notified of changes to the Unicast MAC once plumbed through the banjo
     // protocol as well. WatchUnicastAddress() -> (Mac address);
 

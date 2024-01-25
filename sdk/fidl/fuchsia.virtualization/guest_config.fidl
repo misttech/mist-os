@@ -131,7 +131,7 @@ type GuestConfig = resource table {
     ///
     /// To add a Listener after a guest starts, see HostVsockEndpoint::Listen.
    21: vsock_listeners vector<Listener>:MAX;
-    // TODO(https://fxbug.dev/100514): Model this similar to the MagmaDevice by using
+    // TODO(https://fxbug.dev/42051237): Model this similar to the MagmaDevice by using
     // the resource table to bundle all of the virtio-mem parameters into a
     // single resource table
     /// Enable virtio-mem

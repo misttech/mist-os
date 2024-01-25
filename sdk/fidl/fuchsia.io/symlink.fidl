@@ -6,7 +6,7 @@ library fuchsia.io;
 
 alias SymlinkTarget = vector<uint8>:MAX_PATH_LENGTH;
 
-// TODO(https://fxbug.dev/105608): Use a generated constant.
+// TODO(https://fxbug.dev/42056856): Use a generated constant.
 @available(added=HEAD)
 const SYMLINK_PROTOCOL_NAME string = "fuchsia.io/Symlink";
 

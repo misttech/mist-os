@@ -392,7 +392,7 @@ closed protocol RingBuffer {
     /// `clock_recovery_notifications_per_ring` frequency. These notifications are meant to be used
     /// for clock recovery.
     ///
-    // TODO(https://fxbug.dev/116353): Reconsider the `clock_recovery_notifications_per_ring` parameter,
+    // TODO(https://fxbug.dev/42067582): Reconsider the `clock_recovery_notifications_per_ring` parameter,
     // once we must recover a clock from a device being actively rate-adjusted in hardware.
     strict GetVmo(struct {
         min_frames uint32;
@@ -420,7 +420,7 @@ closed protocol RingBuffer {
     /// notifications will be sent until `Start` is called again.
     /// If `Stop` is called before `GetVmo`, or if `Stop` is called for a second time before the
     /// first call has completed, then the channel must be closed with `ZX_ERR_BAD_STATE`.
-    // TODO(https://fxbug.dev/39494): Add timestamp parameter.
+    // TODO(https://fxbug.dev/42115360): Add timestamp parameter.
     strict Stop() -> ();
 
     /// Sets which channels are active via a bitmask.

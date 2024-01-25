@@ -20,7 +20,7 @@ type Identity = table {
 
     @available(replaced=11)
     2: xpanid vector<uint8>:8;
-    // TODO(https://fxbug.dev/118274): nominally `removed=11` but FIDL requires
+    // TODO(https://fxbug.dev/42069437): nominally `removed=11` but FIDL requires
     // added < removed.
     @available(added=11, deprecated=11, removed=12, legacy=true)
     2: xpanid_deprecated vector<uint8>:8;

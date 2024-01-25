@@ -12,7 +12,7 @@ type ContextError = strict enum : int32 {
     REMOTE_DEBUGGING_PORT_NOT_OPENED = 1;
 };
 
-// TODO(https://fxbug.dev/29926): Remove ContextProvider in favor of launching Context instances directly.
+// TODO(https://fxbug.dev/42104731): Remove ContextProvider in favor of launching Context instances directly.
 /// The top-level service interface which allows for the creation of Context resources.
 @discoverable
 closed protocol ContextProvider {
@@ -163,7 +163,7 @@ type CreateContextParams = resource table {
     /// [`Context`] destruction.
     ///
     /// If set, `data_directory` must not be shared with any other [`Context`].
-    // TODO(https://fxbug.dev/29925): Provide an API to inform the caller when the `data_directory` can be safely
+    // TODO(https://fxbug.dev/42104730): Provide an API to inform the caller when the `data_directory` can be safely
     // removed.
     2: data_directory client_end:fuchsia.io.Directory;
 
@@ -253,7 +253,7 @@ closed protocol Context {
     /// - `params`: The configuration used to create the [`Frame`].
     ///   This method will fail with `ZX_ERR_INVALID_ARGS` if the table is not clonable.
     /// - `frame`: An interface request that will be bound to the created [`Frame`].
-    // TODO(https://fxbug.dev/65750): Consider removing the clonable params restriction if clients
+    // TODO(https://fxbug.dev/42144485): Consider removing the clonable params restriction if clients
     // become responsible for providing parameters for [each] popup.
     strict CreateFrameWithParams(resource struct {
         params CreateFrameParams;

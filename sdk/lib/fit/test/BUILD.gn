@@ -68,7 +68,7 @@ test("fit") {
   }
 }
 
-# TODO(https://fxbug.dev/120888): Remove -Wshadow when all SDK code builds with that flag.
+# TODO(https://fxbug.dev/42071929): Remove -Wshadow when all SDK code builds with that flag.
 config("Wshadow") {
   cflags_cc = [ "-Wshadow" ]
 }

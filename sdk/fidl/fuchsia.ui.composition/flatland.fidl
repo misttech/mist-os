@@ -167,7 +167,7 @@ type ChildViewStatus = strict enum {
     /// content ready to be displayed, and NOT that the child content has actually been shown on the
     /// screen (a common use case is for the parent to wait for the child content to be ready before
     /// attaching the child to the global scene graph).
-    // TODO(https://fxbug.dev/87800): rename to CONTENT_IS_AVAILABLE.
+    // TODO(https://fxbug.dev/42168962): rename to CONTENT_IS_AVAILABLE.
     CONTENT_HAS_PRESENTED = 1;
 };
 
@@ -254,7 +254,7 @@ type ContentId = struct {
 
 // A maximum of 16 fences is enough for the current usage of these APIs.
 const MAX_PRESENT_ARGS_FENCE_COUNT int32 = 16;
-// TODO(https://fxbug.dev/85551): delete.
+// TODO(https://fxbug.dev/42166463): delete.
 const MAX_ACQUIRE_RELEASE_FENCE_COUNT int32 = 16;
 
 /// Arguments passed into [`Present`]. All arguments are optional, and if an
@@ -315,7 +315,7 @@ type PresentArgs = resource table {
     ///
     /// The default `release_fences` value is the empty vector.
     //
-    // TODO(https://fxbug.dev/85563): when fixed, update documentation re: when it is safe to modify buffers
+    // TODO(https://fxbug.dev/42166476): when fixed, update documentation re: when it is safe to modify buffers
     //                        upon channel closure.
     3: release_fences vector<zx.Handle:EVENT>:MAX_PRESENT_ARGS_FENCE_COUNT;
 
@@ -471,7 +471,7 @@ closed protocol Flatland {
     /// they explicitly want feedback on prior frame presentation. All future frame information is
     /// given in the [`OnNextFrameBegin`] event.
     ///
-    /// TODO(https://fxbug.dev/63305): remove `num_presents_allowed` from this event.
+    /// TODO(https://fxbug.dev/42141795): remove `num_presents_allowed` from this event.
     strict -> OnFramePresented(struct {
         frame_presented_info fuchsia.scenic.scheduling.FramePresentedInfo;
     });
@@ -956,7 +956,7 @@ closed protocol Flatland {
     // Despite having a return type, this function is still feed-forward Like [`CreateView`] and
     // requires a call to [`Present`] to be executed. The ViewCreationToken will be returned after
     // the presented operations have been executed.
-    // TODO(https://fxbug.dev/81576): Consider re-linking. We can return the ViewCreationToken used to
+    // TODO(https://fxbug.dev/42162046): Consider re-linking. We can return the ViewCreationToken used to
     // establish the View. This token can then be used to establish a new View with the parent
     // Viewport.
     strict ReleaseView();
@@ -1005,14 +1005,14 @@ closed protocol Flatland {
     });
 };
 
-// TODO(https://fxbug.dev/76643):  In the future this will be replaced with something
+// TODO(https://fxbug.dev/42156570):  In the future this will be replaced with something
 // that allows control over which hardware display to use.  This API is sufficient for the purpose
 // of initial bringup of Flatland.
 /// This API connects to the singleton "primary display", and allows a tree of Flatland content to
 /// be attached underneath.  Only one FlatlandDisplay client connection is allowed at one time.
 @discoverable
 closed protocol FlatlandDisplay {
-    // TODO(https://fxbug.dev/76643): Consider whether this should be:
+    // TODO(https://fxbug.dev/42156570): Consider whether this should be:
     //   SetContent(ViewportCreationToken token) -> (ViewportCreationToken? previous_token);
     // ... this way, whoever is using the display can keep track of multiple different pieces
     // of content, and choose which to display.  OTOH, an argument could be made that this API

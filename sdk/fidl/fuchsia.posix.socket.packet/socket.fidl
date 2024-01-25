@@ -87,7 +87,7 @@ type PacketType = strict enum {
 };
 
 /// A hardware address.
-// TODO(https://fxbug.dev/84984): Move this to fuchsia.net.* once we support
+// TODO(https://fxbug.dev/42165832): Move this to fuchsia.net.* once we support
 // querying an interface's L2 properties.
 type HardwareAddress = flexible union {
     /// Indicates that the hardware does not support link-layer addressing.
@@ -98,7 +98,7 @@ type HardwareAddress = flexible union {
 };
 
 /// An interface's properties.
-// TODO(https://fxbug.dev/84984): Move this to fuchsia.net.* once we support
+// TODO(https://fxbug.dev/42165832): Move this to fuchsia.net.* once we support
 // querying an interface's L2 properties.
 type InterfaceProperties = struct {
     /// The interface's ID.
@@ -118,7 +118,7 @@ type PacketInfo = struct {
     addr HardwareAddress;
 };
 
-// TODO(https://fxbug.dev/105608): Use a generated constant.
+// TODO(https://fxbug.dev/42056856): Use a generated constant.
 const SOCKET_PROTOCOL_NAME string = "fuchsia.posix.socket.packet/Socket";
 
 /// A packet socket.
@@ -132,7 +132,7 @@ const SOCKET_PROTOCOL_NAME string = "fuchsia.posix.socket.packet/Socket";
 /// Instead, clients should use the BSD sockets API to interact with sockets.
 /// We plan to change this protocol substantially and clients that couple
 /// directly to this protocol will make those changes more difficult.
-// TODO(https://fxbug.dev/85597): Implement RFC-0109 for packet sockets.
+// TODO(https://fxbug.dev/42166513): Implement RFC-0109 for packet sockets.
 closed protocol Socket {
     compose fuchsia.posix.socket.BaseSocket;
 

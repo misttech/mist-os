@@ -78,7 +78,7 @@ class StringView final : private VectorView<const char> {
   // Returns if the string view is empty.
   bool empty() const { return size() == 0; }
 
-  // TODO(https://fxbug.dev/109737): |is_null| is used to check if an optional view type
+  // TODO(https://fxbug.dev/42061094): |is_null| is used to check if an optional view type
   // is absent. This can be removed if optional view types switch to
   // |fidl::WireOptional|.
   bool is_null() const { return data() == nullptr; }

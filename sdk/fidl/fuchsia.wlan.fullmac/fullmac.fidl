@@ -396,7 +396,7 @@ const WLAN_FULLMAC_NUM_RATES_N uint8 = 64;
 /// The number of 802.11AC rates in the WlanFullmacRxRateIndexHistogram lookup table.
 const WLAN_FULLMAC_NUM_RATES_AC uint8 = 120;
 
-// TODO(https://fxbug.dev/83621): Use wlan_stats.fidl structure after https://fxbug.dev/85462 is fixed
+// TODO(https://fxbug.dev/83621): Use wlan_stats.fidl structure after https://fxbug.dev/42166364 is fixed
 type WlanFullmacIfaceCounterStats = struct {
     rx_unicast_total uint64;
     rx_unicast_drop uint64;
@@ -405,7 +405,7 @@ type WlanFullmacIfaceCounterStats = struct {
     tx_drop uint64;
 };
 
-// TODO(https://fxbug.dev/83621): Use wlan_stats.fidl structure after https://fxbug.dev/85462 is fixed
+// TODO(https://fxbug.dev/83621): Use wlan_stats.fidl structure after https://fxbug.dev/42166364 is fixed
 type WlanFullmacIfaceHistogramStats = table {
     /// Noise floor histogram(s).
     1: noise_floor_histograms
@@ -575,7 +575,7 @@ closed protocol WlanFullmacImplBase {
         4: sae_password vector<uint8>:MAX;
 
         /// WEP key used in the authentication exchange. Only included for WEP security type.
-        // TODO(https://fxbug.dev/85462): this should be optional, but we can't because
+        // TODO(https://fxbug.dev/42166364): this should be optional, but we can't because
         // Banjo code generation would give us "a field has incomplete type" error
         5: wep_key fuchsia.wlan.common.WlanKeyConfig;
 

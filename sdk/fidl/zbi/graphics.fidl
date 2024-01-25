@@ -4,7 +4,7 @@
 
 library zbi;
 
-// TODO(https://fxbug.dev/111453): Figure out documentation convention.
+// TODO(https://fxbug.dev/42062786): Figure out documentation convention.
 
 /// Gives a pixel format representation.
 ///

@@ -11,7 +11,7 @@
 
 #include <zxtest/zxtest.h>
 
-// TODO(https://fxbug.dev/99243): These are manual tests for driver endpoints and
+// TODO(https://fxbug.dev/42181666): These are manual tests for driver endpoints and
 // encoding over the driver transport. We should support them in GIDL.
 namespace {
 

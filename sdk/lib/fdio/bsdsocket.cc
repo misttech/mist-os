@@ -87,7 +87,7 @@ int socket(int domain, int type, int protocol) {
     io->ioflag() |= IOFLAG_NONBLOCK;
   }
 
-  // TODO(https://fxbug.dev/30920): Implement CLOEXEC.
+  // TODO(https://fxbug.dev/42105837): Implement CLOEXEC.
   if (type & SOCK_CLOEXEC) {
     io->ioflag() |= IOFLAG_CLOEXEC;
   }
@@ -242,7 +242,7 @@ int accept4(int fd, struct sockaddr* __restrict addr, socklen_t* __restrict addr
   if (flags & SOCK_NONBLOCK) {
     accepted_io->ioflag() |= IOFLAG_NONBLOCK;
   }
-  // TODO(https://fxbug.dev/30920): Implement CLOEXEC.
+  // TODO(https://fxbug.dev/42105837): Implement CLOEXEC.
   if (flags & SOCK_CLOEXEC) {
     accepted_io->ioflag() |= IOFLAG_CLOEXEC;
   }
@@ -285,7 +285,7 @@ int _getaddrinfo_from_dns(struct address buf[MAXADDRS], char canon[256], const c
   fidl::WireTableExternalBuilder options = fnet_name::wire::LookupIpOptions::ExternalBuilder(
       fidl::ObjectView<fidl::WireTableFrame<fnet_name::wire::LookupIpOptions>>::FromExternal(
           &frame));
-  // TODO(https://fxbug.dev/76522): Use address sorting from the DNS service.
+  // TODO(https://fxbug.dev/42156436): Use address sorting from the DNS service.
   switch (family) {
     case AF_UNSPEC:
       options.ipv4_lookup(true);
@@ -341,7 +341,7 @@ int _getaddrinfo_from_dns(struct address buf[MAXADDRS], char canon[256], const c
         std::copy(octets.begin(), octets.end(), address.addr);
       } break;
       case fnet::wire::IpAddress::Tag::kIpv6: {
-        // TODO(https://fxbug.dev/21415): Figure out a way to expose scope ID for IPv6
+        // TODO(https://fxbug.dev/42095276): Figure out a way to expose scope ID for IPv6
         // addresses.
         address = {
             .family = AF_INET6,
@@ -501,7 +501,7 @@ void populate_ifs(struct ifaddrs_storage* ifs, sa_family_t af, const fidl::Array
 
 }  // namespace
 
-// TODO(https://fxbug.dev/30719): set ifa_ifu.ifu_broadaddr and ifa_ifu.ifu_dstaddr.
+// TODO(https://fxbug.dev/42105613): set ifa_ifu.ifu_broadaddr and ifa_ifu.ifu_dstaddr.
 //
 // AF_PACKET addresses containing lower-level details about the interfaces are not included in the
 // result list because raw sockets are not supported on Fuchsia.

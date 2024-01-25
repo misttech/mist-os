@@ -36,7 +36,7 @@ zx_status_t fdio_service_connect_by_name(const char* name, zx_handle_t request) 
   // We can't destroy |service_root| at static destruction time as some multithreaded programs call
   // exit() from one thread while other threads are calling in to fdio functions. Destroying
   // |service_root| in this scenario would result in crashes on those threads. See
-  // https://fxbug.dev/117875 for details.
+  // https://fxbug.dev/42069066 for details.
   static fbl::NoDestructor<zx::result<zx::channel>> service_root = []() -> zx::result<zx::channel> {
     zx::channel client, request;
     zx_status_t status = zx::channel::create(0, &client, &request);
@@ -69,7 +69,7 @@ zx_status_t fdio_open(const char* path, uint32_t flags, zx_handle_t request) {
 
 namespace fdio_internal {
 
-// TODO(https://fxbug.dev/97878): This should reuse the logic used by openat().
+// TODO(https://fxbug.dev/42180154): This should reuse the logic used by openat().
 zx_status_t fdio_open_at(fidl::UnownedClientEnd<fio::Directory> directory, std::string_view path,
                          fuchsia_io::wire::OpenFlags flags, fidl::ServerEnd<fio::Node> request) {
   if (!directory.is_valid()) {

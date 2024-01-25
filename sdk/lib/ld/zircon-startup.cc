@@ -113,7 +113,7 @@ zx::eventpair PublishProfdata(Diagnostics& diag, zx::unowned_vmar vmar,
       return error(status, "zx_eventpair_create");
     }
 
-    // TODO(https://fxbug.dev/130542): Send the VMO and remote_token in a
+    // TODO(https://fxbug.dev/42080826): Send the VMO and remote_token in a
     // fuchsia.debugdata.Publisher/Publish message to ... somewhere.
 
     return local_token;
@@ -172,7 +172,7 @@ extern "C" StartLdResult StartLd(zx_handle_t handle, void* vdso) {
   auto scratch = MakeStartupScratchAllocator(system_page_allocator);
   auto initial_exec = MakeStartupInitialExecAllocator(system_page_allocator);
 
-  // TODO(https://fxbug.dev/134897): We should be making an ldsvc.Config call here to get the correct shared
+  // TODO(https://fxbug.dev/42084623): We should be making an ldsvc.Config call here to get the correct shared
   // objects.
 
   // Load the main executable.

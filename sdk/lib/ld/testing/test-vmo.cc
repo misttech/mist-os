@@ -13,7 +13,7 @@ namespace ld::testing {
 
 elfldltl::Soname<> GetVdsoSoname() {
   static const std::string soname_str = []() {
-    // TODO(https://fxbug.dev/136360): Decode the Vdso name from its VMO.
+    // TODO(https://fxbug.dev/42085962): Decode the Vdso name from its VMO.
     return std::string{"libzircon.so"};
   }();
   static const elfldltl::Soname<> soname{soname_str};

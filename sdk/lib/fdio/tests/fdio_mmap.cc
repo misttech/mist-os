@@ -254,7 +254,7 @@ TEST_F(MmapTest, MapFixed) {
   ASSERT_TRUE(std::all_of(map_2, map_2 + kPageSize, [](uint8_t elem) { return elem == 0x11; }));
 }
 
-// TODO(https://fxbug.dev/96759): ASSERT_DEATH and ASSERT_NO_DEATH are only defined on Fuchsia currently.
+// TODO(https://fxbug.dev/42178911): ASSERT_DEATH and ASSERT_NO_DEATH are only defined on Fuchsia currently.
 // When available, this test should be run on both host and target builds.
 #ifdef __Fuchsia__
 // Ensure accessing unmapped pages crashes, and that mappings cannot be accessed with permissions

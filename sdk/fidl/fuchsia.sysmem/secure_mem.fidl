@@ -24,7 +24,7 @@ using zx;
 /// protocol intentionally doesn't care which heaps are dynamically-allocated
 /// and which are fixed-location.
 //
-// TODO(https://fxbug.dev/114670): Move SecureMem from fuchsia.sysmem to fuchsia.sysmem2.
+// TODO(https://fxbug.dev/42065928): Move SecureMem from fuchsia.sysmem to fuchsia.sysmem2.
 closed protocol SecureMem {
     /// Gets the physical address and length of any secure heap whose physical
     /// range is configured via the TEE.

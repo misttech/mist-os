@@ -81,7 +81,7 @@ TEST(CreateWithData, JustOverThreshold) {
   ASSERT_TRUE(data->is_buffer());
   ASSERT_EQ(data->buffer().size, data_size);
   uint64_t content_size = 0;
-  // TODO(https://fxbug.dev/85472): Use vmo.get_prop_content_size() when available.
+  // TODO(https://fxbug.dev/42166375): Use vmo.get_prop_content_size() when available.
   ASSERT_OK(data->buffer().vmo.get_property(ZX_PROP_VMO_CONTENT_SIZE, &content_size,
                                             sizeof(content_size)));
   EXPECT_EQ(content_size, data_size);
@@ -106,7 +106,7 @@ TEST(CreateWithData, LargeDataSpan) {
   ASSERT_TRUE(data->is_buffer());
   EXPECT_GE(data->buffer().size, large_data_size);
   uint64_t content_size = 0;
-  // TODO(https://fxbug.dev/85472): Use vmo.get_prop_content_size() when available.
+  // TODO(https://fxbug.dev/42166375): Use vmo.get_prop_content_size() when available.
   ASSERT_OK(data->buffer().vmo.get_property(ZX_PROP_VMO_CONTENT_SIZE, &content_size,
                                             sizeof(content_size)));
   EXPECT_EQ(content_size, large_data_size);
@@ -127,7 +127,7 @@ TEST(CreateWithData, LargeDataVector) {
   ASSERT_TRUE(data->is_buffer());
   EXPECT_GE(data->buffer().size, large_data_size);
   uint64_t content_size = 0;
-  // TODO(https://fxbug.dev/85472): Use vmo.get_prop_content_size() when available.
+  // TODO(https://fxbug.dev/42166375): Use vmo.get_prop_content_size() when available.
   ASSERT_OK(data->buffer().vmo.get_property(ZX_PROP_VMO_CONTENT_SIZE, &content_size,
                                             sizeof(content_size)));
   EXPECT_EQ(content_size, large_data_size);
@@ -147,7 +147,7 @@ TEST(CreateWithDataAndThreshold, ZeroThreshold) {
   ASSERT_TRUE(data->is_buffer());
   EXPECT_GE(data->buffer().size, 1);
   uint64_t content_size = 0;
-  // TODO(https://fxbug.dev/85472): Use vmo.get_prop_content_size() when available.
+  // TODO(https://fxbug.dev/42166375): Use vmo.get_prop_content_size() when available.
   ASSERT_OK(data->buffer().vmo.get_property(ZX_PROP_VMO_CONTENT_SIZE, &content_size,
                                             sizeof(content_size)));
   EXPECT_EQ(content_size, 1);

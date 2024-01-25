@@ -169,7 +169,7 @@ closed protocol Heap {
     /// immediately when it binds to a channel, and this event should be
     /// triggered only once per `Heap` instance.
     //
-    // TODO(https://fxbug.dev/57690): Remove this event and pass in HeapProperties when
+    // TODO(https://fxbug.dev/42135564): Remove this event and pass in HeapProperties when
     // registering sysmem Heaps after we migrate sysmem banjo proxying
     // to FIDL.
     strict -> OnRegister(struct {

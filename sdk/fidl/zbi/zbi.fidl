@@ -4,7 +4,7 @@
 
 library zbi;
 
-// TODO(https://fxbug.dev/111453): Figure out documentation convention.
+// TODO(https://fxbug.dev/42062786): Figure out documentation convention.
 
 const ALIGNMENT uint32 = 8;
 
@@ -96,7 +96,7 @@ type Type = flexible enum : uint32 {
 
     /// Device-specific factory data, stored in BOOTFS format.
     ///
-    /// TODO(https://fxbug.dev/34597): This should not use the "STORAGE" infix.
+    /// TODO(https://fxbug.dev/42109921): This should not use the "STORAGE" infix.
     ///
     /// 'BFSF'
     STORAGE_BOOTFS_FACTORY = 0x46534642;

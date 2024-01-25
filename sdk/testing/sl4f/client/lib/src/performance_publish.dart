@@ -119,7 +119,7 @@ class PerformancePublish {
   ///
   /// Check that the performance test metrics match the names listed in an
   /// expectations file.  This is currently optional.
-  /// TODO(https://fxbug.dev/105202): Make this required.
+  /// TODO(https://fxbug.dev/42056406): Make this required.
   void _checkFuchsiaPerfMetricsNaming(File fuchsiaPerfFile,
       String? expectedMetricNamesFile, Map<String, String> environment) {
     // The "test_suite" field should be all lower case.  It should start

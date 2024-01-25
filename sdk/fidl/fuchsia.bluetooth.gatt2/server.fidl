@@ -105,7 +105,7 @@ closed protocol LocalService {
     ///   themselves with this unless they are using notifications/indications for high throughput.
     ///   Optional.
     /// - response An empty response to acknowledge that the update was received.
-    @transitional("Not currently sent. Comment on https://fxbug.dev/96397 to request support")
+    @transitional("Not currently sent. Comment on https://fxbug.dev/42178509 to request support")
     strict PeerUpdate(table {
         1: peer_id bt.PeerId;
         2: mtu uint16;
@@ -114,7 +114,8 @@ closed protocol LocalService {
     /// After this event, new peers will no longer be able to discover the service, although peers
     /// which have already discovered this service may still access it. This should be sent once per
     /// service lifetime; sending more than once closes the protocol and disconnects GATT clients.
-    @transitional("Not currently supported. Comment on https://fxbug.dev/98598 to request support")
+    @transitional(
+            "Not currently supported. Comment on https://fxbug.dev/42180948 to request support")
     strict -> OnSuppressDiscovery();
 
     /// This event is used to send a notification to a peer. Notifications should be used instead of
@@ -183,7 +184,7 @@ closed protocol Server {
     ///   of a `LocalService`.
     /// - response An empty response indicates the service was successfully published.
     /// * error See `gatt2.PublishServiceError` for possible failure modes.
-    @transitional("Implementation and migration progress tracked in https://fxbug.dev/36375")
+    @transitional("Implementation and migration progress tracked in https://fxbug.dev/42111896")
     strict PublishService(resource struct {
         info ServiceInfo;
         service client_end:LocalService;

@@ -1,7 +1,7 @@
 {
   "pkg/stdcompat/include/lib/stdcompat/algorithm.h": "0b35350b791b06d1a38fd1e6ef880dc0",
   "pkg/stdcompat/include/lib/stdcompat/array.h": "0f3ef7e0f0f753b9649908442a27a2f8",
-  "pkg/stdcompat/include/lib/stdcompat/atomic.h": "cdf5812cf9106c97a7d659f663943105",
+  "pkg/stdcompat/include/lib/stdcompat/atomic.h": "6de1469a6d219761fa2e65dff5a5ad66",
   "pkg/stdcompat/include/lib/stdcompat/bit.h": "78fca85380213f18debfe02ad9946b69",
   "pkg/stdcompat/include/lib/stdcompat/cstddef.h": "004f7edb581edf002499b0a652166ce3",
   "pkg/stdcompat/include/lib/stdcompat/functional.h": "0376f808dc389226a7135ae4faef1f3c",
@@ -21,7 +21,7 @@
   "pkg/stdcompat/include/lib/stdcompat/internal/utility.h": "31b31da716826c1cfb10c6b3b4c1c46b",
   "pkg/stdcompat/include/lib/stdcompat/internal/variant.h": "beaa70f0191d0ee16457677963ea1a6c",
   "pkg/stdcompat/include/lib/stdcompat/iterator.h": "f55bf1551aa260e4fa9a6f3e588b452f",
-  "pkg/stdcompat/include/lib/stdcompat/memory.h": "19fe7ec10159f1bd4aeffe6988a4b887",
+  "pkg/stdcompat/include/lib/stdcompat/memory.h": "8f1440903e6a9ebb7bcc41bac46aeea2",
   "pkg/stdcompat/include/lib/stdcompat/optional.h": "e4a661bc80cb9d6f6057934da01a48a9",
   "pkg/stdcompat/include/lib/stdcompat/queue.h": "12f95f9632f15085710744ef0c845820",
   "pkg/stdcompat/include/lib/stdcompat/source_location.h": "292bbdd5aa3a16597ac755801392872e",

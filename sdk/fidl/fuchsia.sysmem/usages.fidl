@@ -4,7 +4,7 @@
 library fuchsia.sysmem;
 
 // Describes how a client will access the contents of a buffer.
-// TODO(https://fxbug.dev/32119): change struct to table
+// TODO(https://fxbug.dev/42107169): change struct to table
 type BufferUsage = struct {
     none uint32;
     cpu uint32;
@@ -13,7 +13,7 @@ type BufferUsage = struct {
     video uint32;
 };
 
-// TODO(https://fxbug.dev/55935): Consts should use upper snake case per FIDL style guide.
+// TODO(https://fxbug.dev/42133618): Consts should use upper snake case per FIDL style guide.
 // We should reformat the naming of consts in this FIDL file.
 
 // Flag for "none" usage.
@@ -69,10 +69,10 @@ const displayUsageLayer uint32 = 1;
 const displayUsageCursor uint32 = 2;
 
 // Flags for "video" usage.
-// TODO(https://fxbug.dev/32118): Add more specific HwDecoder flags if needed.
+// TODO(https://fxbug.dev/42107168): Add more specific HwDecoder flags if needed.
 const videoUsageHwDecoder uint32 = 1;
 const videoUsageHwEncoder uint32 = 2;
-// TODO(https://fxbug.dev/34192): This bit is redundant with secure_required and supported heaps.  This bit will
+// TODO(https://fxbug.dev/42109472): This bit is redundant with secure_required and supported heaps.  This bit will
 // not be carried forward.
 const videoUsageHwProtected uint32 = 4;
 const videoUsageCapture uint32 = 8;
@@ -80,7 +80,7 @@ const videoUsageCapture uint32 = 8;
 // encoded access units.  The decryptor output may be in secure memory (controlled separately via
 // secure_required).
 //
-// TODO(https://fxbug.dev/34192): Overhaul usage so we can add usage categories without breaking client
+// TODO(https://fxbug.dev/42109472): Overhaul usage so we can add usage categories without breaking client
 // struct init code repeatedly.  For now, this value is in the "video" category but to some degree
 // isn't really video; this usage can be used for the output of any secure decryptor.  Also, other
 // usages should include input vs. output as those are separate buffer collections and are really

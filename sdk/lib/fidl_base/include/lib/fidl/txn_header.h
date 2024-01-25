@@ -11,7 +11,7 @@
 // form to specific functions in early bootstrapping libraries (such as libc)
 // which cannot be compiled with sanitizers.
 //
-// TODO(https://fxbug.dev/121817): Make these regular C functions after the linked bug
+// TODO(https://fxbug.dev/42072830): Make these regular C functions after the linked bug
 // about libc improvements.
 
 __BEGIN_CDECLS

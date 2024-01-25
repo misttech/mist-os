@@ -59,7 +59,7 @@ fbl::RefPtr<fdio> unbind_from_fd_locked(int fd) __TA_REQUIRES(fdio_lock) {
   return slot->release();
 }
 
-// TODO(https://fxbug.dev/30921): determine complete correct mapping
+// TODO(https://fxbug.dev/42105838): determine complete correct mapping
 int fdio_status_to_errno(zx_status_t status) {
   switch (status) {
     case ZX_ERR_NOT_FOUND:

@@ -558,8 +558,8 @@ async fn test_open2() {
         assert_eq!(&buf[..CONTENT.len()], CONTENT);
         assert_eq!(&buf[CONTENT.len()..CONTENT.len() + APPEND_CONTENT.len()], APPEND_CONTENT);
 
-        // TODO(https://fxbug.dev/127341): Test create attributes.
-        // TODO(https://fxbug.dev/125830): Test for POSIX attributes.
+        // TODO(https://fxbug.dev/42077936): Test create attributes.
+        // TODO(https://fxbug.dev/42076605): Test for POSIX attributes.
     })
     .await;
 
