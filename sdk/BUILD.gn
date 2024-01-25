@@ -583,6 +583,7 @@ sdk_molecule("platform_libs") {
     "//src/developer/debug/ipc:ipc_sdk",
     "//src/developer/debug/shared:shared_sdk",
     "//src/devices/block/lib/sdmmc:sdmmc_sdk",
+    "//src/devices/testing/fake-bti:fake-bti_sdk",
     "//src/lib/containers/cpp:cpp_sdk",
     "//src/lib/diagnostics/accessor2logger:accessor2logger_sdk",
     "//src/lib/elflib:elflib_sdk",

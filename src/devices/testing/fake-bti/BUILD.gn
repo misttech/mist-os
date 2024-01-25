@@ -12,7 +12,7 @@ group("tests") {
 zx_library("fake-bti") {
   sdk = "static"
   sdk_headers = [ "lib/fake-bti/bti.h" ]
-  testonly = true
+  sdk_publishable = "internal"
 
   sources = [ "fake-bti.cc" ]
   public_deps = [
@@ -21,13 +21,12 @@ zx_library("fake-bti") {
     # not properly captured in the metadata passed to the GN build.
     # This will become moot when both libraries are migrated to that
     # build.
+    "//sdk/lib/fdio",
     "//src/devices/testing/fake-object",
   ]
   deps = [
-    "//sdk/lib/fdio",
     "//src/devices/testing/fake-object",
     "//zircon/system/ulib/zircon-internal",
     "//zircon/system/ulib/zx",
   ]
-  configs += [ "//build/config/fuchsia:static_cpp_standard_library" ]
 }

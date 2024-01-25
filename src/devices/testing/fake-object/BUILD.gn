@@ -12,20 +12,15 @@ group("tests") {
 zx_library("fake-object") {
   sdk = "static"
   sdk_headers = [ "lib/fake-object/object.h" ]
-  testonly = true
+  sdk_publishable = "internal"
 
   sources = [
     "fake-handle.cc",
     "fake-object.cc",
   ]
   public_deps = [
-    "//zircon/system/ulib/zircon-internal",
-    "//zircon/system/ulib/zx",
-  ]
-  deps = [
     "//sdk/lib/fdio",
     "//zircon/system/ulib/zircon-internal",
     "//zircon/system/ulib/zx",
   ]
-  configs += [ "//build/config/fuchsia:static_cpp_standard_library" ]
 }
