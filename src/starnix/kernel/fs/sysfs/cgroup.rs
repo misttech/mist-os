@@ -81,12 +81,15 @@ impl FsNodeOps for CgroupDirectoryNode {
         &self,
         node: &FsNode,
         current_task: &CurrentTask,
-        _name: &FsStr,
+        name: &FsStr,
         mode: FileMode,
         dev: DeviceType,
         owner: FsCred,
     ) -> Result<FsNodeHandle, Errno> {
         // TODO(lindkvist): Handle files that are not `cgroup.procs`.
+        if name != FsStr::new("cgroup.procs") {
+            return error!(EACCES);
+        }
         let ops: Box<dyn FsNodeOps> = match mode.fmt() {
             FileMode::IFREG => Box::new(ControlGroupNode::new(self.control_group.clone())),
             _ => return error!(EACCES),
