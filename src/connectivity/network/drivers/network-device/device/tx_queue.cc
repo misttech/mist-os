@@ -4,11 +4,10 @@
 
 #include "tx_queue.h"
 
-#include <lib/async/cpp/task.h>
-#include <lib/fdf/cpp/env.h>
 #include <zircon/assert.h>
 #include <zircon/compiler.h>
 #include <zircon/errors.h>
+#include <zircon/threads.h>
 #include <zircon/types.h>
 
 #include "device_interface.h"
@@ -20,10 +19,6 @@
 
 namespace network::internal {
 
-constexpr char kTxSchedulerRole[] = "fuchsia.devices.network.core.tx";
-
-std::atomic<uint32_t> TxQueue::num_instances_ = 0;
-
 TxQueue::~TxQueue() {
   // running_ is tied to the lifetime of the watch thread, it's cleared in`TxQueue::JoinThread`.
   // This assertion protects us from destruction paths where `TxQueue::JoinThread` is not called.
@@ -31,7 +26,7 @@ TxQueue::~TxQueue() {
 }
 
 void TxQueue::JoinThread() {
-  if (!dispatcher_.get()) {
+  if (!thread_.has_value()) {
     return;
   }
 
@@ -41,11 +36,7 @@ void TxQueue::JoinThread() {
 
   // Mark the queue as not running anymore.
   running_ = false;
-
-  dispatcher_.ShutdownAsync();
-  dispatcher_shutdown_.Wait();
-  dispatcher_.reset();
-  --num_instances_;
+  thrd_join(*std::exchange(thread_, std::nullopt), nullptr);
 }
 
 zx_status_t TxQueue::EnqueueUserPacket(uint64_t key) {
@@ -62,17 +53,17 @@ void TxQueue::SessionTransaction::Commit() {
   if (queued_ != 0) {
     // Send buffers in batches of at most |MAX_TX_BUFFERS| at a time to stay within the FIDL
     // channel maximum.
-    netdriver::wire::TxBuffer* buffers = buffers_.data();
+    tx_buffer_t* buffers = buffers_.data();
     while (queued_ > 0) {
       const uint32_t batch = std::min(static_cast<uint32_t>(queued_), MAX_TX_BUFFERS);
-      queue_->parent_->QueueTx(cpp20::span(buffers, batch));
+      queue_->parent_->QueueTx(buffers, batch);
       buffers += batch;
       queued_ -= batch;
     }
   }
 }
 
-fuchsia_hardware_network_driver::wire::TxBuffer* TxQueue::SessionTransaction::GetBuffer() {
+tx_buffer_t* TxQueue::SessionTransaction::GetBuffer() {
   ZX_ASSERT(available_ != 0);
   return &buffers_[queued_];
 }
@@ -85,9 +76,8 @@ void TxQueue::SessionTransaction::Push(uint16_t descriptor) {
   queued_++;
 }
 
-TxQueue::SessionTransaction::SessionTransaction(
-    cpp20::span<fuchsia_hardware_network_driver::wire::TxBuffer> buffers, TxQueue* parent,
-    Session* session)
+TxQueue::SessionTransaction::SessionTransaction(cpp20::span<tx_buffer_t> buffers, TxQueue* parent,
+                                                Session* session)
     : buffers_(buffers), queue_(parent), session_(session), queued_(0) {
   // only get available slots after lock is acquired:
   // 0 available slots if parent is not enabled.
@@ -96,7 +86,7 @@ TxQueue::SessionTransaction::SessionTransaction(
 
 zx::result<std::unique_ptr<TxQueue>> TxQueue::Create(DeviceInterface* parent) {
   // The Tx queue capacity is based on the underlying device's tx queue capacity.
-  auto capacity = parent->info().tx_depth().value_or(0);
+  auto capacity = parent->info().tx_depth;
 
   fbl::AllocChecker ac;
   std::unique_ptr<TxQueue> queue(new (&ac) TxQueue(parent));
@@ -117,23 +107,19 @@ zx::result<std::unique_ptr<TxQueue>> TxQueue::Create(DeviceInterface* parent) {
     return in_flight.take_error();
   }
   queue->in_flight_ = std::move(in_flight.value());
-  std::unique_ptr<fuchsia_hardware_network_driver::wire::TxBuffer[]> tx_buffers(
-      new (&ac) fuchsia_hardware_network_driver::wire::TxBuffer[capacity]);
+  std::unique_ptr<tx_buffer_t[]> tx_buffers(new (&ac) tx_buffer_t[capacity]);
   if (!ac.check()) {
     return zx::error(ZX_ERR_NO_MEMORY);
   }
   // TODO(https://github.com/llvm/llvm-project/issues/54497): remove unnecessary
   // type extraction once clang-format can deal with [] in template parameter.
-  using BufferParts_t = BufferParts<fuchsia_hardware_network_driver::wire::BufferRegion>[];
-  std::unique_ptr<BufferParts_t> buffer_parts(
-      new (&ac) BufferParts<fuchsia_hardware_network_driver::wire::BufferRegion>[capacity]);
+  using BufferParts_t = BufferParts<buffer_region_t>[];
+  std::unique_ptr<BufferParts_t> buffer_parts(new (&ac) BufferParts<buffer_region_t>[capacity]);
   if (!ac.check()) {
     return zx::error(ZX_ERR_NO_MEMORY);
   }
-  for (int i = 0; i < capacity; ++i) {
-    tx_buffers[i].data =
-        fidl::VectorView<fuchsia_hardware_network_driver::wire::BufferRegion>::FromExternal(
-            buffer_parts[i].data(), 0);
+  for (uint32_t i = 0; i < capacity; i++) {
+    tx_buffers[i].data_list = buffer_parts[i].data();
   }
 
   if (zx_status_t status = zx::port::create(0, &queue->port_); status != ZX_OK) {
@@ -141,45 +127,40 @@ zx::result<std::unique_ptr<TxQueue>> TxQueue::Create(DeviceInterface* parent) {
     return zx::error(status);
   }
 
-  // Make sure the driver framework allows for the creation of the necessary threads. Keep track of
-  // the number of TX queue instances globally.
-  uint32_t instances = ++num_instances_;
-  if (zx_status_t status =
-          fdf_env_set_thread_limit(kTxSchedulerRole, strlen(kTxSchedulerRole), instances);
-      status != ZX_OK && status != ZX_ERR_OUT_OF_RANGE) {
-    // ZX_ERR_OUT_OF_RANGE indicates that the value is less than the current value. This can happen
-    // if a number of threads have recently shut down or two TX queues are being created at the same
-    // time and the loading of the atomic and setting of the limit are interleaved. It's safe to
-    // ignore that in this context, the important part is that there are enough threads.
-    LOGF_ERROR("failed to update thread limit: %s", zx_status_get_string(status));
-    return zx::error(status);
+  using ThreadArgs =
+      std::tuple<TxQueue*, std::unique_ptr<tx_buffer_t[]>, std::unique_ptr<BufferParts_t>, size_t>;
+  auto* thread_args =
+      new (&ac) ThreadArgs(queue.get(), std::move(tx_buffers), std::move(buffer_parts), capacity);
+  if (!ac.check()) {
+    return zx::error(ZX_ERR_NO_MEMORY);
   }
 
-  // In order to ensure that the async::PostTask below works this has to be a synchronized
-  // dispatcher that allows synchronous calls. Any other combination of dispatcher and options could
-  // lead to the async::PostTask call being inlined, meaning the task would run on the calling
-  // thread, blocking it indefinitely. Use a unique owner to ensure inlining of calls from inside
-  // the task. Calls to a dispatcher with the same owner might not be inlined.
-  auto dispatcher = fdf_env::DispatcherBuilder::CreateSynchronizedWithOwner(
-      queue.get(), fdf::SynchronizedDispatcher::Options::kAllowSyncCalls, "netdevice:tx_watch",
-      [queue = queue.get()](fdf_dispatcher_t*) { queue->dispatcher_shutdown_.Signal(); },
-      kTxSchedulerRole);
-  if (dispatcher.is_error()) {
-    LOGF_ERROR("Failed to create tx dispatcher: %s", dispatcher.status_string());
-    return dispatcher.take_error();
+  thrd_t thread;
+  if (int result = thrd_create_with_name(
+          &thread,
+          [](void* ctx) {
+            auto* args = reinterpret_cast<ThreadArgs*>(ctx);
+            // NB: space_buffers is built with pointers to buffers in
+            // buffer_parts, so we must keep the latter alive for the lifetime
+            // of the thread, even though we don't reference it explicitly here.
+            auto [queue, space_buffers, buffer_parts, capacity] = std::move(*args);
+            delete args;
+            queue->Thread(cpp20::span(&space_buffers[0], capacity));
+            return 0;
+          },
+          thread_args, "netdevice:tx_watch");
+      result != thrd_success) {
+    LOGF_ERROR("rx queue failed to create thread: %d", result);
+    delete thread_args;
+    return zx::error(ZX_ERR_INTERNAL);
   }
-  queue->dispatcher_ = std::move(dispatcher.value());
-
-  async::PostTask(queue->dispatcher_.async_dispatcher(),
-                  [queue = queue.get(), tx_buffers = std::move(tx_buffers),
-                   buffer_parts = std::move(buffer_parts),
-                   capacity]() { queue->Thread(cpp20::span(&tx_buffers[0], capacity)); });
+  queue->thread_ = thread;
   queue->running_ = true;
 
   return zx::ok(std::move(queue));
 }
 
-void TxQueue::Thread(cpp20::span<fuchsia_hardware_network_driver::wire::TxBuffer> buffers) {
+void TxQueue::Thread(cpp20::span<tx_buffer_t> buffers) {
   for (;;) {
     zx_port_packet_t packet;
     zx_status_t status = port_.wait(zx::time::infinite(), &packet);
@@ -255,11 +236,10 @@ zx_status_t TxQueue::UpdateFifoWatches() {
   return ZX_OK;
 }
 
-zx_status_t TxQueue::HandleFifoSignal(
-    cpp20::span<fuchsia_hardware_network_driver::wire::TxBuffer> buffers, SessionKey key,
-    zx_signals_t signals) {
+zx_status_t TxQueue::HandleFifoSignal(cpp20::span<tx_buffer_t> buffers, SessionKey session_key,
+                                      zx_signals_t signals) {
   fbl::AutoLock lock(&parent_->tx_lock());
-  SessionWaiter* find_session = sessions_.Get(key);
+  SessionWaiter* find_session = sessions_.Get(session_key);
   // Session already removed from Tx queue, packet was lingering in the port.
   if (find_session == nullptr) {
     return ZX_OK;
@@ -305,7 +285,8 @@ zx_status_t TxQueue::HandleFifoSignal(
     return ZX_OK;
   }
 
-  if (zx_status_t status = fifo.wait_async(port_, key, ZX_FIFO_PEER_CLOSED | ZX_FIFO_READABLE, 0);
+  if (zx_status_t status =
+          fifo.wait_async(port_, session_key, ZX_FIFO_PEER_CLOSED | ZX_FIFO_READABLE, 0);
       status != ZX_OK) {
     LOGF_ERROR("failed to start FIFO wait for session %s: %s", session.name(),
                zx_status_get_string(status));
@@ -366,17 +347,16 @@ bool TxQueue::ReturnBuffers() {
   return was_full;
 }
 
-void TxQueue::CompleteTxList(
-    const fidl::VectorView<::fuchsia_hardware_network_driver::wire::TxResult>& tx_results) {
+void TxQueue::CompleteTxList(const tx_result_t* tx, size_t count) {
   fbl::AutoLock lock(&parent_->tx_lock());
-  for (const auto& tx : tx_results.get()) {
-    InFlightBuffer& buff = in_flight_->Get(tx.id);
-    buff.result = tx.status;
-    return_queue_->Push(tx.id);
+  while (count--) {
+    InFlightBuffer& buff = in_flight_->Get(tx->id);
+    buff.result = tx->status;
+    return_queue_->Push(tx->id);
+    tx++;
   }
   bool was_full = ReturnBuffers();
   parent_->NotifyTxReturned(was_full);
-  parent_->NotifyTxComplete();
 }
 
 TxQueue::SessionKey TxQueue::AddSession(Session* session) {
@@ -401,6 +381,13 @@ TxQueue::SessionKey TxQueue::AddSession(Session* session) {
 void TxQueue::RemoveSession(SessionKey key) {
   std::optional s = sessions_.Erase(key);
   ZX_ASSERT_MSG(s.has_value(), "attempted to remove unknown session %ld", key);
+}
+
+zx::unowned_thread TxQueue::thread_handle() {
+  if (thread_.has_value()) {
+    return zx::unowned_thread(thrd_get_zx_handle(thread_.value()));
+  }
+  return zx::unowned_thread();
 }
 
 }  // namespace network::internal

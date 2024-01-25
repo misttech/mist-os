@@ -4,18 +4,13 @@
 
 #include "rx_queue.h"
 
-#include <lib/async/cpp/task.h>
-#include <lib/fdf/cpp/env.h>
 #include <zircon/assert.h>
+#include <zircon/threads.h>
 
 #include "log.h"
 #include "session.h"
 
 namespace network::internal {
-
-constexpr char kRxSchedulerRole[] = "fuchsia.devices.network.core.rx";
-
-std::atomic<uint32_t> RxQueue::num_instances_ = 0;
 
 RxQueue::~RxQueue() {
   // running_ is tied to the lifetime of the watch thread, it's cleared in`RxQueue::JoinThread`.
@@ -47,10 +42,9 @@ zx::result<std::unique_ptr<RxQueue>> RxQueue::Create(DeviceInterface* parent) {
   }
   queue->in_flight_ = std::move(in_flight.value());
 
-  auto device_depth = parent->info().rx_depth().value_or(0);
+  auto device_depth = parent->info().rx_depth;
 
-  std::unique_ptr<fuchsia_hardware_network_driver::wire::RxSpaceBuffer[]> buffers(
-      new (&ac) fuchsia_hardware_network_driver::wire::RxSpaceBuffer[device_depth]);
+  std::unique_ptr<rx_space_buffer_t[]> buffers(new (&ac) rx_space_buffer_t[device_depth]);
   if (!ac.check()) {
     return zx::error(ZX_ERR_NO_MEMORY);
   }
@@ -59,40 +53,28 @@ zx::result<std::unique_ptr<RxQueue>> RxQueue::Create(DeviceInterface* parent) {
     return zx::error(status);
   }
 
-  // Make sure the driver framework allows for the creation of the necessary threads. Keep track of
-  // the number of RX queue instances globally.
-  uint32_t instances = ++num_instances_;
-  if (zx_status_t status =
-          fdf_env_set_thread_limit(kRxSchedulerRole, strlen(kRxSchedulerRole), instances);
-      status != ZX_OK && status != ZX_ERR_OUT_OF_RANGE) {
-    // ZX_ERR_OUT_OF_RANGE indicates that the value is less than the current value. This can happen
-    // if a number of threads have recently shut down or two RX queues are being created at the same
-    // time and the loading of the atomic and setting of the limit are interleaved. It's safe to
-    // ignore that in this context, the important part is that there are enough threads.
-    LOGF_ERROR("failed to update thread limit: %s", zx_status_get_string(status));
-    return zx::error(status);
+  using ThreadArgs = std::tuple<RxQueue*, std::unique_ptr<rx_space_buffer_t[]>>;
+  auto* thread_args = new (&ac) ThreadArgs(queue.get(), std::move(buffers));
+  if (!ac.check()) {
+    return zx::error(ZX_ERR_NO_MEMORY);
   }
 
-  // In order to ensure that the async::PostTask below works this has to be a synchronized
-  // dispatcher that allows synchronous calls. Any other combination of dispatcher and options could
-  // lead to the async::PostTask call being inlined, meaning the task would run on the calling
-  // thread, blocking it indefinitely. Use a unique owner to ensure inlining of calls from inside
-  // the task. Calls to a dispatcher with the same owner might not be inlined.
-  auto dispatcher = fdf_env::DispatcherBuilder::CreateSynchronizedWithOwner(
-      queue.get(), fdf::SynchronizedDispatcher::Options::kAllowSyncCalls, "netdevice:rx_watch",
-      [queue = queue.get()](fdf_dispatcher_t*) { queue->dispatcher_shutdown_.Signal(); },
-      kRxSchedulerRole);
-  if (dispatcher.is_error()) {
-    LOGF_ERROR("rx queue failed to create dispatcher: %s", dispatcher.status_string());
-    return dispatcher.take_error();
+  thrd_t watch_thread;
+  if (int result = thrd_create_with_name(
+          &watch_thread,
+          [](void* ctx) {
+            auto* args = reinterpret_cast<ThreadArgs*>(ctx);
+            auto [queue, space_buffers] = std::move(*args);
+            delete args;
+            return queue->WatchThread(std::move(space_buffers));
+          },
+          thread_args, "netdevice:rx_watch");
+      result != thrd_success) {
+    LOGF_ERROR("rx queue failed to create thread: %d", result);
+    delete thread_args;
+    return zx::error(ZX_ERR_INTERNAL);
   }
-  queue->dispatcher_ = std::move(dispatcher.value());
-
-  async::PostTask(queue->dispatcher_.async_dispatcher(),
-                  [queue = queue.get(), rx_buffers = std::move(buffers)]() mutable {
-                    queue->WatchThread(std::move(rx_buffers));
-                  });
-
+  queue->rx_watch_thread_ = watch_thread;
   queue->running_ = true;
   return zx::ok(std::move(queue));
 }
@@ -127,7 +109,7 @@ void RxQueue::TriggerSessionChanged() {
 }
 
 void RxQueue::JoinThread() {
-  if (dispatcher_.get()) {
+  if (rx_watch_thread_.has_value()) {
     zx_port_packet_t packet;
     packet.type = ZX_PKT_TYPE_USER;
     packet.key = kQuitWatchKey;
@@ -137,10 +119,7 @@ void RxQueue::JoinThread() {
     }
     // Mark the queue as not running anymore.
     running_ = false;
-    dispatcher_.ShutdownAsync();
-    dispatcher_shutdown_.Wait();
-    dispatcher_.reset();
-    --num_instances_;
+    thrd_join(*std::exchange(rx_watch_thread_, std::nullopt), nullptr);
   }
 }
 
@@ -189,7 +168,7 @@ std::tuple<RxQueue::InFlightBuffer*, uint32_t> RxQueue::GetBuffer() {
   return std::make_tuple(&in_flight_->Get(idx), idx);
 }
 
-zx_status_t RxQueue::PrepareBuff(fuchsia_hardware_network_driver::wire::RxSpaceBuffer* buff) {
+zx_status_t RxQueue::PrepareBuff(rx_space_buffer_t* buff) {
   auto [session_buffer, index] = GetBuffer();
   if (session_buffer == nullptr) {
     return ZX_ERR_NO_RESOURCES;
@@ -211,22 +190,22 @@ zx_status_t RxQueue::PrepareBuff(fuchsia_hardware_network_driver::wire::RxSpaceB
   return ZX_OK;
 }
 
-void RxQueue::CompleteRxList(
-    const fidl::VectorView<::fuchsia_hardware_network_driver::wire::RxBuffer>& rx_buffer_list) {
+void RxQueue::CompleteRxList(const rx_buffer_t* rx_buffer_list, size_t count) {
   fbl::AutoLock lock(&parent_->rx_lock());
   SharedAutoLock control_lock(&parent_->control_lock());
-  device_buffer_count_ -= rx_buffer_list.count();
-  for (const auto& rx_buffer : rx_buffer_list.get()) {
-    ZX_ASSERT_MSG(rx_buffer.data.count() <= MAX_BUFFER_PARTS,
-                  "too many buffer parts in rx buffer: %ld", rx_buffer.data.count());
+  device_buffer_count_ -= count;
+  for (const auto& rx_buffer : cpp20::span(rx_buffer_list, count)) {
+    ZX_ASSERT_MSG(rx_buffer.data_count <= MAX_BUFFER_PARTS,
+                  "too many buffer parts in rx buffer: %ld", rx_buffer.data_count);
+
     std::array<SessionRxBuffer, MAX_BUFFER_PARTS> session_parts;
     auto session_parts_iter = session_parts.begin();
     bool drop_frame = false;
     uint32_t total_length = 0;
 
     Session* primary_session = nullptr;
-    cpp20::span rx_parts = rx_buffer.data.get();
-    for (const fuchsia_hardware_network_driver::wire::RxBufferPart& rx_part : rx_parts) {
+    cpp20::span rx_parts(rx_buffer.data_list, rx_buffer.data_count);
+    for (const rx_buffer_part_t& rx_part : rx_parts) {
       InFlightBuffer& in_flight_buffer = in_flight_->Get(rx_part.id);
 
       total_length += rx_part.length;
@@ -246,7 +225,7 @@ void RxQueue::CompleteRxList(
         LOGF_WARN(
             "dropping chained frame with %ld buffers spanning different sessions: "
             "%s, %s",
-            rx_buffer.data.count(), primary_session->name(), in_flight_buffer.session->name());
+            rx_buffer.data_count, primary_session->name(), in_flight_buffer.session->name());
         drop_frame = true;
       }
       ZX_DEBUG_ASSERT(in_flight_buffer.session != nullptr);
@@ -261,7 +240,7 @@ void RxQueue::CompleteRxList(
 
     // Drop any frames containing no data or where inconsistencies were found above.
     if (total_length == 0 || drop_frame) {
-      for (const fuchsia_hardware_network_driver::wire::RxBufferPart& rx_part : rx_parts) {
+      for (const rx_buffer_part_t& rx_part : rx_parts) {
         InFlightBuffer& in_flight_buffer = in_flight_->Get(rx_part.id);
         in_flight_buffer.session->AssertParentRxLock(*parent_);
         if (in_flight_buffer.session->CompleteUnfulfilledRx()) {
@@ -286,11 +265,11 @@ void RxQueue::CompleteRxList(
     primary_session->AssertParentRxLock(*parent_);
     if (primary_session->CompleteRx(frame_info)) {
       std::for_each(rx_parts.begin(), rx_parts.end(),
-                    [this](const fuchsia_hardware_network_driver::wire::RxBufferPart& rx)
+                    [this](const rx_buffer_part_t& rx)
                         __TA_REQUIRES(parent_->rx_lock()) { available_queue_->Push(rx.id); });
     } else {
       std::for_each(rx_parts.begin(), rx_parts.end(),
-                    [this](const fuchsia_hardware_network_driver::wire::RxBufferPart& rx)
+                    [this](const rx_buffer_part_t& rx)
                         __TA_REQUIRES(parent_->rx_lock()) { in_flight_->Free(rx.id); });
     }
   }
@@ -300,8 +279,7 @@ void RxQueue::CompleteRxList(
   }
 }
 
-int RxQueue::WatchThread(
-    std::unique_ptr<fuchsia_hardware_network_driver::wire::RxSpaceBuffer[]> space_buffers) {
+int RxQueue::WatchThread(std::unique_ptr<rx_space_buffer_t[]> space_buffers) {
   auto loop = [this, space_buffers = std::move(space_buffers)]() -> zx_status_t {
     fbl::RefPtr<RefCountedFifo> observed_fifo(nullptr);
     bool waiting_on_fifo = false;
@@ -354,8 +332,7 @@ int RxQueue::WatchThread(
 
       fbl::AutoLock rx_lock(&parent_->rx_lock());
       SharedAutoLock control_lock(&parent_->control_lock());
-      const uint16_t rx_depth = parent_->info().rx_depth().value_or(0);
-      size_t push_count = rx_depth - device_buffer_count_;
+      size_t push_count = parent_->info().rx_depth - device_buffer_count_;
       if (parent_->IsDataPlaneOpen()) {
         for (; pushed < push_count; pushed++) {
           if (PrepareBuff(&space_buffers[pushed]) != ZX_OK) {
@@ -372,7 +349,8 @@ int RxQueue::WatchThread(
       // Otherwise, we'll trigger the loop again once the device calls CompleteRx.
       //
       // Similarly, we should not wait on the FIFO if the device has not started yet.
-      should_wait_on_fifo = device_buffer_count_ < rx_depth && parent_->IsDataPlaneOpen();
+      should_wait_on_fifo =
+          device_buffer_count_ < parent_->info().rx_depth && parent_->IsDataPlaneOpen();
 
       // We release the main rx queue and control locks before calling into the parent device so we
       // don't cause a re-entrant deadlock.
@@ -382,10 +360,10 @@ int RxQueue::WatchThread(
       if (pushed != 0) {
         // Send buffers in batches of at most |MAX_RX_SPACE_BUFFERS| at a time to stay within the
         // FIDL channel maximum.
-        netdriver::wire::RxSpaceBuffer* buffers = space_buffers.get();
+        rx_space_buffer* buffers = space_buffers.get();
         while (pushed > 0) {
           const uint32_t batch = std::min(static_cast<uint32_t>(pushed), MAX_RX_SPACE_BUFFERS);
-          parent_->QueueRxSpace(cpp20::span(buffers, static_cast<uint32_t>(batch)));
+          parent_->QueueRxSpace(buffers, static_cast<uint32_t>(batch));
           buffers += batch;
           pushed -= batch;
         }
@@ -434,6 +412,13 @@ void RxQueue::SessionTransaction::Push(Session* session, uint16_t descriptor)
   // `SessionTransaction`'s constructor and destructor.
   uint32_t idx = queue_->in_flight_->Push(InFlightBuffer(session, descriptor));
   queue_->available_queue_->Push(idx);
+}
+
+zx::unowned_thread RxQueue::thread_handle() {
+  if (rx_watch_thread_.has_value()) {
+    return zx::unowned_thread(thrd_get_zx_handle(rx_watch_thread_.value()));
+  }
+  return zx::unowned_thread();
 }
 
 }  // namespace network::internal

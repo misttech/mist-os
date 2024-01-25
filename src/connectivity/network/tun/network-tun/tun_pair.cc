@@ -5,7 +5,7 @@
 #include "tun_pair.h"
 
 #include <lib/async-loop/default.h>
-#include <lib/async/cpp/task.h>
+#include <lib/sync/completion.h>
 #include <lib/syslog/global.h>
 
 #include <fbl/auto_lock.h>
@@ -13,30 +13,27 @@
 namespace network {
 namespace tun {
 
-TunPair::TunPair(async_dispatcher_t* dispatcher, fit::callback<void(TunPair*)> teardown,
-                 DevicePairConfig config)
-    : teardown_callback_(std::move(teardown)), config_(std::move(config)) {}
+TunPair::TunPair(fit::callback<void(TunPair*)> teardown, DevicePairConfig config)
+    : teardown_callback_(std::move(teardown)),
+      config_(std::move(config)),
+      loop_(&kAsyncLoopConfigNoAttachToCurrentThread) {}
 
-zx::result<std::unique_ptr<TunPair>> TunPair::Create(const DeviceInterfaceDispatchers& dispatchers,
-                                                     const ShimDispatchers& shim_dispatchers,
-                                                     async_dispatcher_t* fidl_dispatcher,
-                                                     fit::callback<void(TunPair*)> teardown,
-                                                     DevicePairConfig&& config) {
+zx::result<std::unique_ptr<TunPair>> TunPair::Create(
+    fit::callback<void(TunPair*)> teardown, fuchsia_net_tun::wire::DevicePairConfig config) {
   fbl::AllocChecker ac;
-  std::unique_ptr<TunPair> tun(
-      new (&ac) TunPair(fidl_dispatcher, std::move(teardown), std::move(config)));
+  std::unique_ptr<TunPair> tun(new (&ac) TunPair(std::move(teardown), DevicePairConfig(config)));
   if (!ac.check()) {
     return zx::error(ZX_ERR_NO_MEMORY);
   }
 
-  zx::result left = DeviceAdapter::Create(dispatchers, shim_dispatchers, tun.get());
+  zx::result left = DeviceAdapter::Create(tun->loop_.dispatcher(), tun.get());
   if (left.is_error()) {
     FX_LOGF(ERROR, "tun", "TunDevice::Init device init left failed with %s", left.status_string());
     return left.take_error();
   }
   tun->left_ = std::move(left.value());
 
-  zx::result right = DeviceAdapter::Create(dispatchers, shim_dispatchers, tun.get());
+  zx::result right = DeviceAdapter::Create(tun->loop_.dispatcher(), tun.get());
   if (right.is_error()) {
     FX_LOGF(ERROR, "tun", "TunDevice::Init device init right failed with %s",
             right.status_string());
@@ -45,9 +42,7 @@ zx::result<std::unique_ptr<TunPair>> TunPair::Create(const DeviceInterfaceDispat
   tun->right_ = std::move(right.value());
 
   thrd_t thread;
-  if (zx_status_t status = tun->loop_.StartThread("tun-pair", &thread); status != ZX_OK) {
-    FX_LOGF(ERROR, "tun", "TunDevice::Init failed to start loop thread: %s",
-            zx_status_get_string(status));
+  if (zx_status_t status = tun->loop_.StartThread("tun-device-pair", &thread); status != ZX_OK) {
     return zx::error(status);
   }
   tun->loop_thread_ = thread;
@@ -72,7 +67,6 @@ TunPair::~TunPair() {
     // not allowed to destroy a tun pair on the loop thread, will cause deadlock
     ZX_ASSERT(loop_thread_.value() != thrd_current());
   }
-
   // make sure that both devices and mac adapters are torn down:
   sync_completion_t left_device_teardown;
   sync_completion_t right_device_teardown;
@@ -81,12 +75,12 @@ TunPair::~TunPair() {
   sync_completion_wait(&left_device_teardown, ZX_TIME_INFINITE);
   sync_completion_wait(&right_device_teardown, ZX_TIME_INFINITE);
   loop_.Shutdown();
-  FX_VLOG(1, "tun", "TunPair destroyed");
+  FX_VLOG(1, "tun", "TunDevice destroyed");
 }
 
 void TunPair::Teardown() {
   if (teardown_callback_) {
-    async::PostTask(loop_.dispatcher(), [this]() { teardown_callback_(this); });
+    teardown_callback_(this);
   }
 }
 

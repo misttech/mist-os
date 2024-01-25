@@ -5,7 +5,6 @@
 #ifndef SRC_CONNECTIVITY_NETWORK_DRIVERS_NETWORK_DEVICE_MAC_PUBLIC_NETWORK_MAC_H_
 #define SRC_CONNECTIVITY_NETWORK_DRIVERS_NETWORK_DEVICE_MAC_PUBLIC_NETWORK_MAC_H_
 
-#include <fidl/fuchsia.hardware.network.driver/cpp/driver/wire.h>
 #include <fidl/fuchsia.hardware.network/cpp/wire.h>
 #include <fuchsia/hardware/network/driver/cpp/banjo.h>
 
@@ -19,21 +18,10 @@ namespace netdev = fuchsia_hardware_network;
 
 class MacAddrDeviceInterface {
  public:
-  using OnCreated = fit::callback<void(zx::result<std::unique_ptr<MacAddrDeviceInterface>>)>;
-
   virtual ~MacAddrDeviceInterface() = default;
-
   // Creates a new MacAddrDeviceInterface that is bound to the provided parent.
   static zx::result<std::unique_ptr<MacAddrDeviceInterface>> Create(
       ddk::MacAddrProtocolClient parent);
-
-  // Creates a new MacAddrDeviceInterface that is bound to the provided parent. The creation process
-  // will make asynchronous calls into the provided parent and the resulting object will be returned
-  // asynchronously through a callback. Note that on an error the callback may be (but is not
-  // guaranteed to be) called inline from the Create call. Because of this it's a good idea to avoid
-  // acquiring locks in the on_created callback when an error is reported.
-  static void Create(fdf::WireSharedClient<fuchsia_hardware_network_driver::MacAddr> parent,
-                     OnCreated&& on_created);
 
   // Binds the request channel req to this MacAddrDeviceInterface. Requests will be handled on the
   // provided dispatcher.

@@ -10,41 +10,19 @@ use {crate::guest_ethernet, fuchsia_zircon::sys::zx_status_t};
 
 #[repr(C)]
 #[allow(non_camel_case_types)]
-pub struct guest_ethernet_context_t {
-    _unused: [u8; 0], // Required for FFI safety.
-}
-
-#[repr(C)]
-#[allow(non_camel_case_types)]
 pub struct guest_ethernet_t {
     _unused: [u8; 0], // Required for FFI safety.
 }
 
 #[link(name = "guest-ethernet")]
 extern "C" {
-    // Heap allocates a C++ GuestEthernetContext object, initializes the minimal driver runtime and
-    // dispatchers required for GuestEthernet objects to be created. If this returns an error
-    // status, the memory is reclaimed internally and calling
-    // interface::guest_ethernet_context_destroy is not necessary.
-    pub fn guest_ethernet_context_create(
-        guest_ethernet_context_out: *mut *mut guest_ethernet_context_t,
-    ) -> zx_status_t;
+    // Heap allocates a C++ GuestEthernet object, initializes a dispatch loop, and starts a new
+    // worker thread. If this returns an error status, the memory is reclaimed internally and
+    // calling interface::destroy_guest_ethernet is not necessary.
+    pub fn guest_ethernet_create(guest_ethernet_out: *mut *mut guest_ethernet_t) -> zx_status_t;
 
-    // Stops the dispatchers and deletes the C++ object. This can be called from any thread.
-    pub fn guest_ethernet_context_destroy(guest_ethernet_context: *mut guest_ethernet_context_t);
-
-    // Heap allocates a C++ GuestEthernet object using a context first created by
-    // guest_ethernet_context_create. Multiple GuestEthernet can and should share the same context,
-    // otherwise dispatcher resources might be exhausted leading to hard-to-catch bugs. The context
-    // must be kept alive for as long as the GuestEthernet object exists. If this returns an error
-    // status, the memory is reclaimed internally and calling interface::guest_ethernet_destroy is
-    // not necessary.
-    pub fn guest_ethernet_create(
-        context: *mut guest_ethernet_context_t,
-        guest_ethernet_out: *mut *mut guest_ethernet_t,
-    ) -> zx_status_t;
-
-    // Deletes the C++ object. This can be called from any thread.
+    // Stops the dispatch loop, waits for the worker thread to terminate, and deletes the C++
+    // object. This can be called from any thread.
     pub fn guest_ethernet_destroy(guest_ethernet: *mut guest_ethernet_t);
 
     // Initialize the C++ GuestEthernet object by registering it with the netstack. If bridging

@@ -52,9 +52,8 @@ class DeviceAdapter : public ddk::NetworkDeviceImplProtocol<DeviceAdapter> {
  public:
   // Creates a new `DeviceAdapter` with  `parent`, that will serve its requests through
   // `dispatcher`.
-  static zx::result<std::unique_ptr<DeviceAdapter>> Create(
-      const DeviceInterfaceDispatchers& dispatchers, const ShimDispatchers& shim_dispatchers,
-      DeviceAdapterParent* parent);
+  static zx::result<std::unique_ptr<DeviceAdapter>> Create(async_dispatcher_t* dispatcher,
+                                                           DeviceAdapterParent* parent);
 
   // Binds `req` to this adapter's `NetworkDeviceInterface`.
   zx_status_t Bind(fidl::ServerEnd<netdev::Device> req);

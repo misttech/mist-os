@@ -5,12 +5,10 @@
 #ifndef SRC_CONNECTIVITY_NETWORK_DRIVERS_NETWORK_DEVICE_DEVICE_PUBLIC_NETWORK_DEVICE_H_
 #define SRC_CONNECTIVITY_NETWORK_DRIVERS_NETWORK_DEVICE_DEVICE_PUBLIC_NETWORK_DEVICE_H_
 
-#include <fidl/fuchsia.hardware.network.driver/cpp/driver/wire.h>
 #include <fidl/fuchsia.hardware.network/cpp/wire.h>
+#include <fuchsia/hardware/network/driver/cpp/banjo.h>
 #include <lib/async/dispatcher.h>
-#include <lib/fidl_driver/cpp/transport.h>
 #include <lib/fit/function.h>
-#include <lib/sync/cpp/completion.h>
 #include <lib/zx/thread.h>
 
 #include <memory>
@@ -21,106 +19,28 @@ namespace network {
 
 namespace netdev = fuchsia_hardware_network;
 
-// TODO(https://fxbug.dev/133736): Remove this and related artifacts once all parents have migrated
-// to FIDL.
-class NetworkDeviceImplBinder {
- public:
-  enum class Synchronicity { Sync, Async };
-  virtual ~NetworkDeviceImplBinder() = default;
-  virtual zx::result<fdf::ClientEnd<fuchsia_hardware_network_driver::NetworkDeviceImpl>> Bind() = 0;
-  // Use this for binder specific teardown if needed. The return value indicates if the teardown
-  // is synchronous or asynchronous. Call |on_teardown_complete| when an asynchronous teardown has
-  // completed. If teardown is synchronous then |on_teardown_complete| should NOT be called, as seen
-  // in the base implementation here.
-  virtual Synchronicity Teardown(fit::callback<void()>&& on_teardown_complete) {
-    return Synchronicity::Sync;
-  }
-};
-
-struct DeviceInterfaceDispatchers {
-  DeviceInterfaceDispatchers() = default;
-  DeviceInterfaceDispatchers(fdf::UnsynchronizedDispatcher& impl,
-                             fdf::UnsynchronizedDispatcher& ifc,
-                             fdf::UnsynchronizedDispatcher& port)
-      : impl_(impl), ifc_(ifc), port_(port) {}
-  DeviceInterfaceDispatchers(const DeviceInterfaceDispatchers&) = default;
-  DeviceInterfaceDispatchers& operator=(const DeviceInterfaceDispatchers&) = default;
-  // Used for the NetworkDeviceImpl client as well as some async tasks and FIDL servers.
-  fdf::UnownedUnsynchronizedDispatcher impl_;
-  // Used to serve the the NetworkDeviceIfc protocol to vendor drivers.
-  fdf::UnownedUnsynchronizedDispatcher ifc_;
-  // Used for the NetworkPort client.
-  fdf::UnownedUnsynchronizedDispatcher port_;
-};
-
-struct ShimDispatchers {
-  ShimDispatchers() = default;
-  ShimDispatchers(fdf::UnsynchronizedDispatcher& shim, fdf::UnsynchronizedDispatcher& port)
-      : shim_(shim), port_(port) {}
-  ShimDispatchers(const ShimDispatchers&) = default;
-  ShimDispatchers& operator=(const ShimDispatchers&) = default;
-
-  // This is used by NetworkDeviceShim to serve the NetworkDeviceImpl protocol.
-  fdf::UnownedUnsynchronizedDispatcher shim_;
-  // This is used by NetworkDeviceShim to serve the NetworkPort protocol.
-  fdf::UnownedUnsynchronizedDispatcher port_;
-};
-
-// A class that represents a set of owned dispatchers suitable for use with a
-// NetworkDeviceInterface. The class owns the dispatchers and provides functionality for
-// synchronously shutting down the dispatchers. Shutdown has to be explicitly invoked, if the object
-// is destroyed without being shutdown assert will be triggered.
-class OwnedDeviceInterfaceDispatchers {
- public:
-  static zx::result<std::unique_ptr<OwnedDeviceInterfaceDispatchers>> Create();
-
-  DeviceInterfaceDispatchers Unowned();
-
-  void ShutdownSync();
-
- private:
-  OwnedDeviceInterfaceDispatchers();
-
-  fdf::UnsynchronizedDispatcher impl_;
-  libsync::Completion impl_shutdown_;
-  fdf::UnsynchronizedDispatcher ifc_;
-  libsync::Completion ifc_shutdown_;
-  fdf::UnsynchronizedDispatcher port_;
-  libsync::Completion port_shutdown_;
-};
-
-// A class that represents a set of owned shim dispatchers suitable for use with a
-// NetworkDeviceInterface. The class owns the dispatchers and provides functionality for
-// synchronously shutting down the dispatchers. Shutdown has to be explicitly invoked, if the object
-// is destroyed without being shutdown assert will be triggered.
-class OwnedShimDispatchers {
- public:
-  static zx::result<std::unique_ptr<OwnedShimDispatchers>> Create();
-
-  ShimDispatchers Unowned();
-
-  void ShutdownSync();
-
- private:
-  OwnedShimDispatchers();
-
-  fdf::UnsynchronizedDispatcher shim_;
-  libsync::Completion shim_shutdown_;
-  fdf::UnsynchronizedDispatcher port_;
-  libsync::Completion port_shutdown_;
-};
-
 class NetworkDeviceInterface {
  public:
+  // Abstracts system operations needed by the interface.
+  class Sys {
+   public:
+    enum class ThreadType { Tx, Rx };
+
+    // Notifies system of thread creation.
+    //
+    // Applies scheduler roles to created threads.
+    virtual void NotifyThread(zx::unowned_thread thread, ThreadType type) = 0;
+  };
+
   virtual ~NetworkDeviceInterface() = default;
-  // Creates a new NetworkDeviceInterface that will bind to the provided parent. The multiple
-  // dispatchers required should be owned externally so that components that use multiple instances
-  // of NetworkDeviceInterface can re-use these dispatchers between instances. Otherwise those
-  // components may run into the limitations on the number of dispatcher threads that can be
-  // created.
+  // Creates a new NetworkDeviceInterface that will bind to the provided parent. The dispatcher is
+  // only used for slow path operations, NetworkDevice will create and manage its own threads for
+  // fast path operations. The parent_name argument is only used for diagnostic purposes.
+  //
+  // |sys| is an unowned pointer to Sys that may be nullptr if thread roles are unneeded.
   static zx::result<std::unique_ptr<NetworkDeviceInterface>> Create(
-      const DeviceInterfaceDispatchers& dispatchers,
-      std::unique_ptr<NetworkDeviceImplBinder>&& binder);
+      async_dispatcher_t* dispatcher, ddk::NetworkDeviceImplProtocolClient parent,
+      Sys* sys = nullptr);
 
   // Tears down the NetworkDeviceInterface.
   // A NetworkDeviceInterface must not be destroyed until the callback provided to teardown is

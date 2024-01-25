@@ -4,9 +4,7 @@
 
 use {
     crate::{
-        guest_ethernet::{
-            GuestEthernetContext, GuestEthernetInterface, GuestEthernetNewResult, RxPacket,
-        },
+        guest_ethernet::{GuestEthernetInterface, GuestEthernetNewResult, RxPacket},
         wire,
     },
     anyhow::{anyhow, Error},
@@ -42,9 +40,9 @@ pub struct NetDevice<T: GuestEthernetInterface> {
 impl<T: GuestEthernetInterface> NetDevice<T> {
     // Create a NetDevice. This creates the C++ GuestEthernet object, initializes the C++ dispatch
     // loop on a new thread, etc.
-    pub fn new(context: &GuestEthernetContext) -> Result<Self, zx::Status> {
+    pub fn new() -> Result<Self, zx::Status> {
         let GuestEthernetNewResult { guest_ethernet, status_rx, notify_rx, receive_packet_rx } =
-            T::new(context)?;
+            T::new()?;
 
         Ok(Self {
             ethernet: guest_ethernet,
@@ -308,9 +306,7 @@ mod tests {
     }
 
     impl GuestEthernetInterface for TestGuestEthernet {
-        fn new(
-            _context: &GuestEthernetContext,
-        ) -> Result<GuestEthernetNewResult<TestGuestEthernet>, zx::Status> {
+        fn new() -> Result<GuestEthernetNewResult<TestGuestEthernet>, zx::Status> {
             let (status_tx, status_rx) = mpsc::unbounded::<zx::Status>();
             let (notify_tx, notify_rx) = mpsc::unbounded::<()>();
             let (receive_packet_tx, receive_packet_rx) = mpsc::unbounded::<RxPacket>();
@@ -350,8 +346,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn transmit_device_status() {
-        let context = GuestEthernetContext { context: std::ptr::null_mut() };
-        let mut device = NetDevice::<TestGuestEthernet>::new(&context).unwrap();
+        let mut device = NetDevice::<TestGuestEthernet>::new().unwrap();
 
         device.ethernet.status_tx.unbounded_send(zx::Status::OK).unwrap();
         assert!(device.ready().await.is_ok());
@@ -367,8 +362,7 @@ mod tests {
     #[should_panic(expected = "GuestEthernet shouldn't send ZX_OK once its ready")]
 
     async fn bad_device_status() {
-        let context = GuestEthernetContext { context: std::ptr::null_mut() };
-        let device = NetDevice::<TestGuestEthernet>::new(&context).unwrap();
+        let device = NetDevice::<TestGuestEthernet>::new().unwrap();
 
         // The C++ device should never send ZX_OK after its ready (which is when this channel
         // will be polled with get_error_from_guest_ethernet).
@@ -378,8 +372,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn rx_chain_too_small() {
-        let context = GuestEthernetContext { context: std::ptr::null_mut() };
-        let device = NetDevice::<TestGuestEthernet>::new(&context).unwrap();
+        let device = NetDevice::<TestGuestEthernet>::new().unwrap();
         let actual_size = wire::REQUIRED_RX_BUFFER_SIZE / 2;
 
         let mem = IdentityDriverMem::new();
@@ -417,8 +410,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn rx_chain_fragmented_multiple_descriptors() {
-        let context = GuestEthernetContext { context: std::ptr::null_mut() };
-        let device = NetDevice::<TestGuestEthernet>::new(&context).unwrap();
+        let device = NetDevice::<TestGuestEthernet>::new().unwrap();
 
         let mem = IdentityDriverMem::new();
         let mut queue_state = TestQueue::new(32, &mem);
@@ -452,8 +444,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn tx_chain_too_small() {
-        let context = GuestEthernetContext { context: std::ptr::null_mut() };
-        let device = NetDevice::<TestGuestEthernet>::new(&context).unwrap();
+        let device = NetDevice::<TestGuestEthernet>::new().unwrap();
 
         let random_bytes: Vec<u8> = rand::thread_rng()
             .sample_iter(Standard)
@@ -482,8 +473,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn tx_chain_fragmented_multiple_descriptors() {
-        let context = GuestEthernetContext { context: std::ptr::null_mut() };
-        let device = NetDevice::<TestGuestEthernet>::new(&context).unwrap();
+        let device = NetDevice::<TestGuestEthernet>::new().unwrap();
 
         let random_bytes: Vec<u8> = rand::thread_rng()
             .sample_iter(Standard)
@@ -520,8 +510,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn tx_packet_send_to_netstack() {
-        let context = GuestEthernetContext { context: std::ptr::null_mut() };
-        let device = NetDevice::<TestGuestEthernet>::new(&context).unwrap();
+        let device = NetDevice::<TestGuestEthernet>::new().unwrap();
         let data_length = 50;
 
         // Actual virtio-net header doesn't matter for TX, so it can be "included" in these
@@ -559,8 +548,7 @@ mod tests {
     #[fuchsia::test]
     fn too_many_tx_packets_resumable() {
         let mut executor = fasync::TestExecutor::new();
-        let context = GuestEthernetContext { context: std::ptr::null_mut() };
-        let device = NetDevice::<TestGuestEthernet>::new(&context).unwrap();
+        let device = NetDevice::<TestGuestEthernet>::new().unwrap();
         let header_length = std::mem::size_of::<wire::VirtioNetHeader>();
         let data_length = 50;
         let packet_length = header_length + data_length;
@@ -649,8 +637,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn rx_packet_too_large_to_send_to_guest() {
-        let context = GuestEthernetContext { context: std::ptr::null_mut() };
-        let device = NetDevice::<TestGuestEthernet>::new(&context).unwrap();
+        let device = NetDevice::<TestGuestEthernet>::new().unwrap();
 
         // Smaller than an RX buffer, but not small enough to fit the virtio-net header.
         let data_length =
@@ -696,8 +683,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn rx_packet_send_to_guest() {
-        let context = GuestEthernetContext { context: std::ptr::null_mut() };
-        let device = NetDevice::<TestGuestEthernet>::new(&context).unwrap();
+        let device = NetDevice::<TestGuestEthernet>::new().unwrap();
         let data_length = 50;
         let header_length = std::mem::size_of::<wire::VirtioNetHeader>();
         let buffer_id = 12345;

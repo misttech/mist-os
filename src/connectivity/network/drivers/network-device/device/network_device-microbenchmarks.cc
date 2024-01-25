@@ -3,14 +3,10 @@
 // found in the LICENSE file.
 
 #include <lib/async-loop/cpp/loop.h>
-#include <lib/driver/testing/cpp/driver_runtime.h>
-#include <lib/fdf/cpp/env.h>
-#include <lib/sync/cpp/completion.h>
 
 #include <perftest/perftest.h>
 
 #include "device_interface.h"
-#include "network_device_shim.h"
 #include "src/lib/fxl/strings/string_printf.h"
 #include "test_session.h"
 
@@ -207,20 +203,14 @@ bool LatencyTest(perftest::RepeatState* state, const uint16_t buffer_count) {
   ZX_ASSERT_MSG(buffer_count <= network::FakeDeviceImpl::kDepth,
                 "can't measure latency with more buffers (%d) than device depth (%d)", buffer_count,
                 network::FakeDeviceImpl::kDepth);
-
-  zx::result dispatchers = network::OwnedDeviceInterfaceDispatchers::Create();
-  ZX_ASSERT_OK(dispatchers.status_value(), "failed to create dispatchers");
-
-  zx::result shim_dispatchers = network::OwnedShimDispatchers::Create();
-  ZX_ASSERT_OK(shim_dispatchers.status_value(), "failed to create shim dispatchers");
+  async::Loop loop(&kAsyncLoopConfigNeverAttachToThread);
+  zx_status_t status = loop.StartThread("netdevice-dispatcher");
+  ZX_ASSERT_OK(status, "failed to start thread");
 
   network::FakeDeviceImpl impl(state);
 
-  std::unique_ptr shim =
-      std::make_unique<network::NetworkDeviceShim>(impl.client(), shim_dispatchers->Unowned());
-
   zx::result device_status =
-      network::internal::DeviceInterface::Create(dispatchers->Unowned(), std::move(shim));
+      network::internal::DeviceInterface::Create(loop.dispatcher(), impl.client());
   ZX_ASSERT_OK(device_status.status_value(), "failed to create device");
   std::unique_ptr device = std::move(device_status.value());
 
@@ -242,7 +232,7 @@ bool LatencyTest(perftest::RepeatState* state, const uint16_t buffer_count) {
 
   Session session;
   fidl::WireSyncClient client{std::move(device_endpoints->client)};
-  zx_status_t status =
+  status =
       session.Open(client, "session", network::netdev::wire::SessionFlags::kPrimary, buffer_count);
   ZX_ASSERT_OK(status, "failed to open session");
   status = session.AttachPort(port_id, {network::netdev::wire::FrameType::kEthernet});
@@ -281,8 +271,6 @@ bool LatencyTest(perftest::RepeatState* state, const uint16_t buffer_count) {
   device->Teardown([&completion]() { sync_completion_signal(&completion); });
   status = sync_completion_wait(&completion, zx::duration::infinite().get());
   ZX_ASSERT_OK(status, "sync_completion_wait(_, _) failed ");
-  dispatchers->ShutdownSync();
-  shim_dispatchers->ShutdownSync();
   return true;
 }
 
@@ -298,8 +286,6 @@ void RegisterTests() {
 PERFTEST_CTOR(RegisterTests)
 
 int main(int argc, char** argv) {
-  fdf_testing::DriverRuntime runtime;
-
   constexpr char kTestSuiteName[] = "fuchsia.network.device";
   return perftest::PerfTestMain(argc, argv, kTestSuiteName);
 }

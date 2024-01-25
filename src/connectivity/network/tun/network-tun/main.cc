@@ -9,18 +9,9 @@
 
 #include <iostream>
 
-#include "minimal_driver_runtime.h"
 #include "tun_ctl.h"
 
 int main(int argc, const char** argv) {
-  // In order to create the dispatchers needed by the network device implementation a minimal driver
-  // runtime implementation is needed.
-  zx::result runtime = network::tun::MinimalDriverRuntime::Create();
-  if (runtime.is_error()) {
-    std::cerr << "Failed to create driver runtime: " << runtime.status_string() << std::endl;
-    return -1;
-  }
-
   fx_logger_config_t config = {
       // TODO(brunodalbo) load severity from argc (we use this as injected-services, which doesn't
       // seem to be respecting arguments)
@@ -34,12 +25,7 @@ int main(int argc, const char** argv) {
 
   async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
   async_dispatcher_t* dispatcher = loop.dispatcher();
-  zx::result result = network::tun::TunCtl::Create(dispatcher);
-  if (result.is_error()) {
-    std::cerr << "error: TunCtl::Create: " << result.status_string() << std::endl;
-    return -1;
-  }
-  std::unique_ptr<network::tun::TunCtl> ctl(std::move(result.value()));
+  network::tun::TunCtl ctl(dispatcher);
   svc::Outgoing outgoing(dispatcher);
 
   zx_status_t status;
@@ -51,11 +37,10 @@ int main(int argc, const char** argv) {
 
   status = outgoing.svc_dir()->AddEntry(
       fidl::DiscoverableProtocolName<fuchsia_net_tun::Control>,
-      fbl::MakeRefCounted<fs::Service>(
-          [ctl = ctl.get()](fidl::ServerEnd<fuchsia_net_tun::Control> request) {
-            ctl->Connect(std::move(request));
-            return ZX_OK;
-          }));
+      fbl::MakeRefCounted<fs::Service>([&ctl](fidl::ServerEnd<fuchsia_net_tun::Control> request) {
+        ctl.Connect(std::move(request));
+        return ZX_OK;
+      }));
   if (status != ZX_OK) {
     std::cerr << "error: AddEntry: " << zx_status_get_string(status) << std::endl;
     return -1;

@@ -6,7 +6,6 @@
 #define SRC_CONNECTIVITY_NETWORK_TUN_NETWORK_TUN_TUN_CTL_H_
 
 #include <fidl/fuchsia.net.tun/cpp/wire.h>
-#include <lib/sync/cpp/completion.h>
 
 #include "tun_device.h"
 #include "tun_pair.h"
@@ -25,11 +24,10 @@ class TunTest;
 // protocol. It retains lists of created `TunDevice`s and `TunPair`s.
 class TunCtl : public fidl::WireServer<fuchsia_net_tun::Control> {
  public:
-  ~TunCtl() override;
-  static zx::result<std::unique_ptr<TunCtl>> Create(async_dispatcher_t* dispatcher);
+  TunCtl(async_dispatcher_t* dispatcher) : dispatcher_(dispatcher) {}
 
   void Connect(fidl::ServerEnd<fuchsia_net_tun::Control> req) {
-    fidl::BindServer(fidl_dispatcher_, std::move(req), this);
+    fidl::BindServer(dispatcher_, std::move(req), this);
   }
 
   void CreateDevice(CreateDeviceRequestView request,
@@ -48,12 +46,8 @@ class TunCtl : public fidl::WireServer<fuchsia_net_tun::Control> {
   const fbl::DoublyLinkedList<std::unique_ptr<TunDevice>>& devices() const { return devices_; }
 
  private:
-  explicit TunCtl(async_dispatcher_t* fidl_dispatcher) : fidl_dispatcher_(fidl_dispatcher) {}
-
   void TryFireShutdownCallback();
-  async_dispatcher_t* fidl_dispatcher_ = nullptr;
-  std::unique_ptr<network::OwnedDeviceInterfaceDispatchers> dispatchers_;
-  std::unique_ptr<network::OwnedShimDispatchers> shim_dispatchers_;
+  async_dispatcher_t* dispatcher_;
   fit::callback<void()> shutdown_callback_;
   fbl::DoublyLinkedList<std::unique_ptr<TunDevice>> devices_;
   fbl::DoublyLinkedList<std::unique_ptr<TunPair>> device_pairs_;

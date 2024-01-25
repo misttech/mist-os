@@ -13,21 +13,6 @@ source_set("shared_lock") {
   sources = [ "public/locks.h" ]
 }
 
-ddk_source_split("banjo_shims") {
-  sources = [
-    "log.h",
-    "mac_addr_shim.cc",
-    "network_device_shim.cc",
-    "network_port_shim.cc",
-  ]
-  public_deps = [
-    "//sdk/fidl/fuchsia.hardware.network.driver:fuchsia.hardware.network.driver_banjo_cpp",
-    "//sdk/fidl/fuchsia.hardware.network.driver:fuchsia.hardware.network.driver_cpp",
-    "//sdk/lib/driver/runtime:driver_runtime_env_cpp",
-    "//zircon/system/ulib/fbl",
-  ]
-}
-
 ddk_source_split("device") {
   sources = [
     "definitions.h",
@@ -54,8 +39,8 @@ ddk_source_split("device") {
   public_deps = [
     ":shared_lock",
     "//sdk/fidl/fuchsia.hardware.network:fuchsia.hardware.network_cpp",
+    "//sdk/fidl/fuchsia.hardware.network.driver:fuchsia.hardware.network.driver_banjo_cpp",
     "//sdk/fidl/fuchsia.hardware.network.driver:fuchsia.hardware.network.driver_cpp",
-    "//sdk/lib/driver/runtime:driver_runtime_env_cpp",
     "//sdk/lib/fidl",
     "//src/connectivity/lib/network-device/buffer_descriptor",
     "//src/lib/debug:backtrace-request",
@@ -86,15 +71,10 @@ test("test_bin") {
     "test_session.h",
     "test_util.cc",
     "test_util.h",
-    "test_util_banjo.cc",
-    "test_util_banjo.h",
   ]
 
   deps = [
-    ":banjo_shims",
     ":device",
-    "//sdk/lib/driver/testing/cpp:cpp",
-    "//src/connectivity/network/drivers/network-device/mac:test_util",
     "//src/lib/fxl/test:gtest_main",
     "//src/lib/testing/predicates",
     "//third_party/googletest:gmock",
@@ -126,13 +106,9 @@ test("microbenchmarks_bin") {
   ]
 
   deps = [
-    ":banjo_shims",
     ":device",
-    "//sdk/lib/driver/runtime/testing/cpp:cpp",
-    "//sdk/lib/driver/testing/cpp",
     "//src/lib/fxl",
     "//zircon/system/ulib/perftest",
-    "//zircon/system/ulib/sync:sync-cpp",
   ]
 
   # TODO(https://fxbug.dev/94768): This target uses mutable tables which are deprecated,

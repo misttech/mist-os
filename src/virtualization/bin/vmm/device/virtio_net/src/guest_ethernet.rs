@@ -25,35 +25,9 @@ pub struct RxPacket {
     pub buffer_id: u32,
 }
 
-pub struct GuestEthernetContext {
-    pub context: *mut interface::guest_ethernet_context_t,
-}
-
-impl GuestEthernetContext {
-    pub fn new() -> Result<Self, zx::Status> {
-        let mut raw_ptr: *mut interface::guest_ethernet_context_t = std::ptr::null_mut();
-        // No preconditions.
-        // On success raw_ptr will contain a pointer to the context.
-        // On error no cleanup or additional action is needed.
-        zx::Status::ok(unsafe { interface::guest_ethernet_context_create(&mut raw_ptr) })?;
-
-        Ok(Self { context: raw_ptr })
-    }
-}
-
-impl Drop for GuestEthernetContext {
-    fn drop(&mut self) {
-        // Requires that self.context is either a valid pointer to a GuestEthernetContext or null.
-        // As long as precondition is met the call cannot fail.
-        unsafe {
-            interface::guest_ethernet_context_destroy(self.context);
-        }
-    }
-}
-
 // A trait is used to allow mocking out the FFI wrapper when unit testing.
 pub trait GuestEthernetInterface {
-    fn new(context: &GuestEthernetContext) -> Result<GuestEthernetNewResult<Self>, zx::Status>
+    fn new() -> Result<GuestEthernetNewResult<Self>, zx::Status>
     where
         Self: Sized;
     fn initialize(&self, mac_address: MacAddress, enable_bridge: bool) -> Result<(), zx::Status>;
@@ -86,14 +60,9 @@ pub struct GuestEthernet {
 }
 
 impl GuestEthernetInterface for GuestEthernet {
-    fn new(
-        context: &GuestEthernetContext,
-    ) -> Result<GuestEthernetNewResult<GuestEthernet>, zx::Status> {
+    fn new() -> Result<GuestEthernetNewResult<GuestEthernet>, zx::Status> {
         let mut raw_ptr: *mut interface::guest_ethernet_t = std::ptr::null_mut();
-        // Requires that context.context is a pointer to a fully constructed GuestEthernetContext.
-        // On success raw_ptr will contain a pointer to the GuestEthernet object.
-        // On error no cleanup or additional action is needed.
-        zx::Status::ok(unsafe { interface::guest_ethernet_create(context.context, &mut raw_ptr) })?;
+        zx::Status::ok(unsafe { interface::guest_ethernet_create(&mut raw_ptr) })?;
 
         let (status_tx, status_rx) = mpsc::unbounded::<zx::Status>();
         let (notify_tx, notify_rx) = mpsc::unbounded::<()>();
