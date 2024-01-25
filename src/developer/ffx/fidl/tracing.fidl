@@ -5,6 +5,11 @@ library fuchsia.developer.ffx;
 
 using fuchsia.tracing.controller;
 
+/// The maximum length allowed for paths passed to tracing commands.
+///
+/// We choose the value of 4096 here to match Linux's maximum path length.
+const MAX_PATH_LENGTH uint32 = 4096;
+
 /// This covers erorr from using the `Tracing` protocol below (specifically
 /// trace recording errors).
 type RecordingError = strict enum {
@@ -80,7 +85,7 @@ closed protocol Tracing {
     /// On success, returns the target on which the trace is running.
     strict StartRecording(struct {
         target_query TargetQuery;
-        output_file string:255;
+        output_file string:MAX_PATH_LENGTH;
         options TraceOptions;
         target_config fuchsia.tracing.controller.TraceConfig;
     }) -> (struct {
@@ -116,7 +121,7 @@ closed protocol Tracing {
     /// proxy.stop_recording("output_file.fxt");
     /// ```
     strict StopRecording(struct {
-        name string:255;
+        name string:MAX_PATH_LENGTH;
     }) -> (struct {
         target TargetInfo;
         result fuchsia.tracing.controller.TerminateResult;
@@ -133,7 +138,7 @@ type TraceInfo = table {
     1: target TargetInfo;
 
     /// Path to the output file.
-    2: output_file string:255;
+    2: output_file string:MAX_PATH_LENGTH;
 
     /// The total duration of the command in fractional seconds. This will not
     /// be set if the command is supposed to run indefinitely.

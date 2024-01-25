@@ -1237,6 +1237,50 @@ Current tracing status:
     }
 
     #[fuchsia_async::run_singlethreaded(test)]
+    async fn test_start_with_long_path() {
+        let env = ffx_config::test_init().await.unwrap();
+        let test_buffers = TestBuffers::default();
+        let writer = Writer::new_test(None, &test_buffers);
+        run_trace_test(
+            env.context.clone(),
+            TraceCommand {
+                sub_cmd: TraceSubCommand::Start(Start {
+                    buffer_size: 2,
+                    categories: vec!["platypus".to_string(), "beaver".to_string()],
+                    duration: None,
+                    buffering_mode: tracing::BufferingMode::Oneshot,
+                    output: "long_directory_name_0123456789abcdef_1123456789abcdef_2123456789abcdef_3123456789abcdef_4123456789abcdef_5123456789abcdef_6123456789abcdef_7123456789abcdef_8123456789abcdef_9123456789abcdef_a123456789abcdef_b123456789abcdef_c123456789abcdef_d123456789abcdef_e123456789abcdef_f123456789abcdef/trace.fxt".to_string(),
+                    background: true,
+                    verbose: false,
+                    trigger: vec![],
+                }),
+            },
+            writer,
+        )
+        .await;
+        let output = test_buffers.into_stdout_str();
+        // This doesn't find `/.../foo.txt` for the tracing status, since the faked
+        // proxy has no state.
+        let regex_str = "Tracing started successfully on \"foo\" for categories: \\[ beaver,platypus \\].\nWriting to /([^/]+/)+?trace.fxt
+To manually stop the trace, use `ffx trace stop`
+Current tracing status:
+- foo:
+  - Output file: /foo/bar.fxt
+  - Duration: indefinite
+- Unknown Target 1:
+  - Output file: /foo/bar/baz.fxt
+  - Duration: indefinite
+- Unknown Target 2:
+  - Output file: /florp/o/matic.txt
+  - Duration: indefinite
+  - Triggers:
+    - foo : Terminate
+    - bar : Terminate\n";
+        let want = Regex::new(regex_str).unwrap();
+        assert!(want.is_match(&output), "\"{}\" didn't match regex /{}/", output, regex_str);
+    }
+
+    #[fuchsia_async::run_singlethreaded(test)]
     async fn test_status() {
         let env = ffx_config::test_init().await.unwrap();
         let test_buffers = TestBuffers::default();
@@ -1281,6 +1325,28 @@ Current tracing status:
         .await;
         let output = test_buffers.into_stdout_str();
         let regex_str = "Tracing stopped successfully on \"foo\".\nResults written to /([^/]+/)+?foo.txt\nUpload to https://ui.perfetto.dev/#!/ to view.";
+        let want = Regex::new(regex_str).unwrap();
+        assert!(want.is_match(&output), "\"{}\" didn't match regex /{}/", output, regex_str);
+    }
+
+    #[fuchsia_async::run_singlethreaded(test)]
+    async fn test_stop_with_long_path() {
+        let env = ffx_config::test_init().await.unwrap();
+        let test_buffers = TestBuffers::default();
+        let writer = Writer::new_test(None, &test_buffers);
+        run_trace_test(
+            env.context.clone(),
+            TraceCommand {
+                sub_cmd: TraceSubCommand::Stop(Stop {
+                    output: Some("long_directory_name_0123456789abcdef_1123456789abcdef_2123456789abcdef_3123456789abcdef_4123456789abcdef_5123456789abcdef_6123456789abcdef_7123456789abcdef_8123456789abcdef_9123456789abcdef_a123456789abcdef_b123456789abcdef_c123456789abcdef_d123456789abcdef_e123456789abcdef_f123456789abcdef/trace.fxt".to_string()),
+                    verbose: false,
+                }),
+            },
+            writer,
+        )
+        .await;
+        let output = test_buffers.into_stdout_str();
+        let regex_str = "Tracing stopped successfully on \"foo\".\nResults written to /([^/]+/)+?trace.fxt\nUpload to https://ui.perfetto.dev/#!/ to view.";
         let want = Regex::new(regex_str).unwrap();
         assert!(want.is_match(&output), "\"{}\" didn't match regex /{}/", output, regex_str);
     }
