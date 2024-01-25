@@ -1,9 +1,10 @@
 # Copyright 2024 The Fuchsia Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
-package(default_visibility = ["//tools/orchestrate:__subpackages__"])
 
 load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+
+package(default_visibility = ["//tools/orchestrate:__subpackages__"])
 
 go_library(
     name = "orchestrate",
@@ -11,6 +12,7 @@ go_library(
         "config.go",
     ],
     importpath = "go.fuchsia.dev/fuchsia/tools/orchestrate",
+    visibility = ["//visibility:public"],
 )
 
 go_test(
