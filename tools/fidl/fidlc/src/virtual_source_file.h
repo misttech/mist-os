@@ -16,7 +16,7 @@
 
 namespace fidlc {
 
-// TODO(https://fxbug.dev/8027): Remove this class.
+// TODO(https://fxbug.dev/42160595): Remove this class.
 class VirtualSourceFile : public SourceFile {
  public:
   explicit VirtualSourceFile(std::string filename) : SourceFile(std::move(filename), "") {}

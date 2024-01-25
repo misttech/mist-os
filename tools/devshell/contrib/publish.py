@@ -19,7 +19,7 @@ from terminal import Terminal
 DESCRIPTION = """
 Publishes a given set of packages.
 
-TODO(https://fxbug.dev/127875): Currently only cache packages are supported by this
+TODO(https://fxbug.dev/42078455): Currently only cache packages are supported by this
 tool.
 """
 

@@ -452,7 +452,7 @@ func ninjaNoopFailureMessage(platform, ninjaMsg string) string {
 	if hostplatform.IsMac(platform) {
 		summaryLines = append(
 			summaryLines,
-			"If this failure is specific to Mac, confirm that it's not related to https://fxbug.dev/61784.",
+			"If this failure is specific to Mac, confirm that it's not related to https://fxbug.dev/42140108.",
 		)
 	}
 	if ninjaMsg != "" {
@@ -515,7 +515,7 @@ func constructNinjaTargets(
 			}
 		}
 
-		// TODO(https://fxbug.dev/43568): Remove once it is always false, and move
+		// TODO(https://fxbug.dev/42119886): Remove once it is always false, and move
 		// "build/images/updates" into `extraTargetsForImages`.
 		if staticSpec.IncludeArchives {
 			archivesToBuild := []string{
@@ -537,7 +537,7 @@ func constructNinjaTargets(
 
 	if staticSpec.IncludeGeneratedSources {
 		for _, f := range modules.GeneratedSources() {
-			// TODO(https://fxbug.dev/115554): Remove support for building generated
+			// TODO(https://fxbug.dev/42066838): Remove support for building generated
 			// sources directly. It's only necessary to make generated FIDL
 			// files available when running Clang-Tidy in presubmit, but
 			// Clang-Tidy should be integrated into the build system so that the

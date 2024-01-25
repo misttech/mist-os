@@ -46,7 +46,7 @@ type Connector interface {
 
 	// Returns an InstanceCmd representing the command to be run on the instance. Only one
 	// command should be active at a time.
-	// TODO(https://fxbug.dev/47479): In some cases, we should be able to relax the above restriction
+	// TODO(https://fxbug.dev/42124229): In some cases, we should be able to relax the above restriction
 	Command(name string, args ...string) InstanceCmd
 
 	// Copies targetSrc (may include globs) to hostDst, which is always assumed
@@ -213,7 +213,7 @@ func (c *SSHConnector) initializeFfx() (returnErr error) {
 // This is called from Connect, but split out separately here so that it can
 // also be initialized in cases where we need to use the tempdir but don't
 // actually need to connect to SSH/SFTP.
-// TODO(https://fxbug.dev/106110): This logic can be cleaner once we drop v1
+// TODO(https://fxbug.dev/42057415): This logic can be cleaner once we drop v1
 // support and do an initial ffx connection on Instance start.
 func (c *SSHConnector) initializeTmpDirIfNecessary() error {
 	if c.TmpDir != "" {
@@ -270,7 +270,7 @@ func (c *SSHConnector) Connect() (returnErr error) {
 		}
 		first = false
 
-		// TODO(https://fxbug.dev/45424): dial timeout
+		// TODO(https://fxbug.dev/42121947): dial timeout
 		if client, err = ssh.Dial("tcp", address, config); err != nil {
 			glog.Warningf("Got error during attempt %d: %s", j, err)
 			continue
@@ -297,7 +297,7 @@ func (c *SSHConnector) Connect() (returnErr error) {
 func (c *SSHConnector) Close() {
 	glog.Info("Closing SSH/SFTP")
 
-	// TODO(https://fxbug.dev/47316): Look into errors thrown by these Closes when
+	// TODO(https://fxbug.dev/42124049): Look into errors thrown by these Closes when
 	// disconnecting from in-memory SSH server
 	if c.client != nil {
 		if err := c.client.Close(); err != nil {
@@ -316,7 +316,7 @@ func (c *SSHConnector) Close() {
 
 // Command returns an InstanceCmd that can be used to given command over SSH
 func (c *SSHConnector) Command(name string, args ...string) InstanceCmd {
-	// TODO(https://fxbug.dev/45424): Would be best to shell escape
+	// TODO(https://fxbug.dev/42121947): Would be best to shell escape
 	cmdline := strings.Join(append([]string{name}, args...), " ")
 	return &SSHInstanceCmd{connector: c, cmdline: cmdline}
 }
@@ -636,7 +636,7 @@ func (c *SSHConnector) FfxRun(outputDir string, args ...string) (string, error) 
 // FfxCommand returns an exec.Cmd object that can be used to run the specified
 // command via ffx.
 func (c *SSHConnector) FfxCommand(outputDir string, args ...string) (*exec.Cmd, error) {
-	// TODO(https://fxbug.dev/106110): Once we only support v2 fuzzer builds, we could
+	// TODO(https://fxbug.dev/42057415): Once we only support v2 fuzzer builds, we could
 	// safely connect earlier.
 	if c.ffxPath == "" {
 		if err := c.initializeFfx(); err != nil {

@@ -29,7 +29,7 @@ fx-config-read
 
 fx-warn "DEPRECATION WARNING"
 fx-warn "\`fx pave\` is deprecated and will be removed soon, please use \`fx flash\`."
-fx-warn "See https://fxbug.dev/131144.\n"
+fx-warn "See https://fxbug.dev/42081363.\n"
 
 function main {
   local single_run=true

@@ -51,7 +51,7 @@ void RawLiteralConstant::Accept(TreeVisitor* visitor) const {
 }
 
 void RawBinaryOperatorConstant::Accept(TreeVisitor* visitor) const {
-  // TODO(https://fxbug.dev/43758): Visit the operator as well.
+  // TODO(https://fxbug.dev/42120097): Visit the operator as well.
   SourceElementMark sem(visitor, *this);
   visitor->OnConstant(left_operand);
   visitor->OnConstant(right_operand);

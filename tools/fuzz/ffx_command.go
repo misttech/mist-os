@@ -17,7 +17,7 @@ type FfxInstanceCmd struct {
 }
 
 func (c *FfxInstanceCmd) SetTimeout(duration time.Duration) {
-	// TODO(https://fxbug.dev/106110): This is not currently used for fuzzer commands,
+	// TODO(https://fxbug.dev/42057415): This is not currently used for fuzzer commands,
 	// since timeouts are enforced by both libFuzzer and ClusterFuzz, and is
 	// only used for non-fuzzer SSH instance commands. In the future it could
 	// be implemented using exec.CommandContext, but may also simply be removed

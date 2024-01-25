@@ -25,7 +25,7 @@
 ## Run `fx build -h` to see Ninja argument details.
 
 # Note: Do not use $(dirname "${BASH_SOURCE[0]}") to locate the script's
-# directory to save about 7ms of startup time. See https://fxbug.dev/136106
+# directory to save about 7ms of startup time. See https://fxbug.dev/42085680
 # The fallback is only needed when invoking directly with bash as in:
 # `(cd tools/devshell && bash build)`
 _script_dir="${BASH_SOURCE[0]%/*}"; if [[ "${_script_dir}" == "${BASH_SOURCE[0]}" ]]; then _script_dir=.; fi

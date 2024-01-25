@@ -77,7 +77,7 @@ protocol P {
 )FIDL");
   library.UseLibraryZx();
 
-  // NOTE(https://fxbug.dev/72924): we provide a more general error because there are multiple
+  // NOTE(https://fxbug.dev/42152439): we provide a more general error because there are multiple
   // possible interpretations.
   library.ExpectFail(ErrTypeCannotBeConvertedToType, "1", "untyped numeric", "zx/Rights");
   library.ExpectFail(ErrUnexpectedConstraint, "Handle");

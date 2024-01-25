@@ -95,7 +95,7 @@ pub struct Report {
     /// Timestamp, in microseconds, in Zedmon's clock domain.
     ///
     /// At time of writing the timestamp is zero when Zedmon boots, but that is not a guarantee.
-    // TODO(https://fxbug.dev/60030): Use one of power_manager's newtypes, or similar.
+    // TODO(https://fxbug.dev/42138166): Use one of power_manager's newtypes, or similar.
     pub timestamp_micros: u64,
 
     /// Reported values for this sample.

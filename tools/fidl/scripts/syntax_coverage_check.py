@@ -182,7 +182,7 @@ if __name__ == "__main__":
                     is_converted = True
                     continue
 
-                if "NOTE(https://fxbug.dev/72924)" in line:
+                if "NOTE(https://fxbug.dev/42152439)" in line:
                     assert not current.name.startswith("Good")
                     note.append(line.strip().lstrip("// "))
                     in_note = True

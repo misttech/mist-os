@@ -22,7 +22,7 @@ const kEpitaphSize = 8
 
 // hlMessagingDetails represents the various generated definitions associated
 // with a protocol, in the high-level C++ bindings.
-// TODO(https://fxbug.dev/72798): Use the same approach to pass wireTypeNames and
+// TODO(https://fxbug.dev/42152298): Use the same approach to pass wireTypeNames and
 // hlMessagingDetails to the templates.
 type hlMessagingDetails struct {
 	// ProtocolMarker is a pure-virtual interface corresponding to methods in
@@ -226,7 +226,7 @@ var (
 type wireTypeNames struct {
 	// WireProtocolMarker is a class only used for containing other definitions
 	// related to this protocol.
-	// TODO(https://fxbug.dev/72798): Golang template should use this instead of the
+	// TODO(https://fxbug.dev/42152298): Golang template should use this instead of the
 	// nameVariants embedded in Protocol.
 	WireProtocolMarker             name
 	WireSyncClient                 name
@@ -323,14 +323,14 @@ var transports = map[string]*Transport{
 // filled out by the compiler.
 type protocolInner struct {
 	Attributes
-	// TODO(https://fxbug.dev/72798): This should be replaced by ProtocolMarker in hlMessagingDetails
+	// TODO(https://fxbug.dev/42152298): This should be replaced by ProtocolMarker in hlMessagingDetails
 	// and wireMessagingDetails. In particular, the unified bindings do not declare
 	// protocol marker classes.
 	nameVariants
 
 	// [Discoverable] protocols are exported to the outgoing namespace under this
 	// name. This is deprecated by FTP-041 unified services.
-	// TODO(https://fxbug.dev/8035): Remove.
+	// TODO(https://fxbug.dev/42160684): Remove.
 	DiscoverableName string
 
 	HlMessaging hlMessagingDetails
@@ -752,7 +752,7 @@ func (m Method) HasFrameworkError() bool {
 //
 // Note this naming different from the naming of HasResponsePayload and
 // ResponsePayload. It is part of an ongoing change, see
-// https://fxbug.dev/90118.
+// https://fxbug.dev/42171535.
 func (m Method) HasNonEmptyPayload() bool {
 	if m.HasResponsePayload {
 		if m.Result == nil {
@@ -924,7 +924,7 @@ func (m Method) DynamicFlags() string {
 // CtsMethodAnnotation generates a comment containing information about the FIDL
 // method that is covered by the C++ generated method. It is primarily meant
 // to be parsed by machines, but can serve as human readable documentation too.
-// For more information see https://fxbug.dev/84332.
+// For more information see https://fxbug.dev/42165109.
 func (m Method) CtsMethodAnnotation() string {
 	// If the formatting of this comment needs to change, it should be done
 	// with consulting the CTS team.
@@ -1162,7 +1162,7 @@ func (c *compiler) compileProtocol(p fidlgen.Protocol) *Protocol {
 			IncomingMessageStorageForResponse:       IncomingMessageStorage.template(wireMethod.WireTransactionalResponse),
 			IncomingMessageHandleStorageForResponse: IncomingMessageHandleStorage.template(wireMethod.WireTransactionalResponse),
 			Attributes:                              Attributes{v.Attributes},
-			// TODO(https://fxbug.dev/84834): Use the functionality in //tools/fidl/lib/fidlgen/identifiers.go
+			// TODO(https://fxbug.dev/42165666): Use the functionality in //tools/fidl/lib/fidlgen/identifiers.go
 			FullyQualifiedName:        fmt.Sprintf("%s.%s", p.Name, v.Name),
 			Ordinal:                   v.Ordinal,
 			IsStrict:                  v.IsStrict(),

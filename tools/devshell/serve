@@ -188,7 +188,7 @@ repo_dir="${FUCHSIA_BUILD_DIR}/amber-files"
 if is_feature_enabled "incremental" || is_feature_enabled "incremental_new" || is_feature_enabled "incremental_legacy"; then
   if is_feature_enabled "incremental_legacy"; then
     fx-info "Using incremental legacy fallback."
-    # FIXME(https://fxbug.dev/79636): use `incremental_legacy` as a safety fallback.
+    # FIXME(https://fxbug.dev/42159894): use `incremental_legacy` as a safety fallback.
     server_mode="pm"
   fi
 
@@ -252,7 +252,7 @@ if [[ "${server_mode}" = "pm" ]]; then
 elif is_feature_enabled "incremental_legacy"; then
   fx-error "The 'incremental_legacy' is not supported by ffx."
   fx-error ""
-  fx-error "See https://fxbug.dev/79636 for more details."
+  fx-error "See https://fxbug.dev/42159894 for more details."
   exit 1
 fi
 

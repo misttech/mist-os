@@ -25,7 +25,7 @@ struct TypeConstraints;
 // `vector<uint8>:7` may appear multiple times in source, these all indicate
 // the same type.
 //
-// TODO(https://fxbug.dev/76219): Implement canonicalization.
+// TODO(https://fxbug.dev/42156099): Implement canonicalization.
 class Typespace final {
  public:
   // Initializes the typespace with builtin types from the root library.

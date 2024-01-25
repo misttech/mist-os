@@ -52,7 +52,7 @@ func parseTrfTest(lines [][]byte) []runtests.TestCaseResult {
 
 	for _, line := range lines {
 		line := string(line)
-		// Stop parsing if running legacy_test, see: https://fxbug.dev/91055
+		// Stop parsing if running legacy_test, see: https://fxbug.dev/42172576
 		if trfLegacyTest.MatchString(line) {
 			return []runtests.TestCaseResult{}
 		}

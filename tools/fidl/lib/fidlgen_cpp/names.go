@@ -266,7 +266,7 @@ func primitiveNameVariants(primitive string) nameVariants {
 //	|-templateNP---------------------------|  |-stringNP---|
 //	|-stringNP---|-Name--------------------|
 //
-// TODO(https://fxbug.dev/118283): rename to idPart
+// TODO(https://fxbug.dev/42069447): rename to idPart
 type namePart interface {
 	// String returns the full name.
 	String() string
@@ -386,7 +386,7 @@ func (n templateNamePart) appendName(suffix string) namePart {
 // name holds a C++ qualified identifier.
 // See: https://en.cppreference.com/w/cpp/language/identifiers#Qualified_identifiers
 // It consists of a Namespace and a namePart.
-// TODO(https://fxbug.dev/118283): move this to the top of the file since it's the most important type.
+// TODO(https://fxbug.dev/42069447): move this to the top of the file since it's the most important type.
 type name struct {
 	name namePart
 	ns   namespace
@@ -438,7 +438,7 @@ func (n name) Self() string {
 	return n.name.Self()
 }
 
-// TODO(https://fxbug.dev/118283): probably make this the default
+// TODO(https://fxbug.dev/42069447): probably make this the default
 func (n name) NoLeading() string {
 	ns := n.ns.NoLeading()
 	if len(ns) > 0 {

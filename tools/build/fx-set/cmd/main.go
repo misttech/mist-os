@@ -487,7 +487,7 @@ func constructStaticSpec(ctx context.Context, fx fxRunner, checkoutDir string, a
 func fuzzerVariants(sanitizer string) []string {
 	return []string{
 		fmt.Sprintf(`{variant="%s-fuzzer" target_type=["fuzzed_executable"]}`, sanitizer),
-		// TODO(https://fxbug.dev/38226): Fuzzers need a version of libfdio.so that is sanitized,
+		// TODO(https://fxbug.dev/42113953): Fuzzers need a version of libfdio.so that is sanitized,
 		// but doesn't collect coverage data.
 		fmt.Sprintf(`{variant="%s" label=["//sdk/lib/fdio"]}`, sanitizer),
 	}

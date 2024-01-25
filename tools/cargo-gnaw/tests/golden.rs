@@ -5,7 +5,7 @@
 //! This file contains "golden" tests, which compare the output of known sample
 //! `Cargo.toml` files with known fixed reference output files.
 //!
-//! TODO(https://fxbug.dev/96111) move these golden specs into GN
+//! TODO(https://fxbug.dev/42178193) move these golden specs into GN
 
 use {
     anyhow::Context,

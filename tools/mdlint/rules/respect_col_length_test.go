@@ -54,7 +54,7 @@ Or here:
 }
 
 func TestRespectColLength_longWordsCont(t *testing.T) {
-	// TODO(https://fxbug.dev/62964): See https://spec.commonmark.org/0.29/#block-quotes
+	// TODO(https://fxbug.dev/42141415): See https://spec.commonmark.org/0.29/#block-quotes
 	t.Skip("block quotes are not yet recognized, when they are, combine with previous test")
 
 	ruleTestCase{
@@ -74,7 +74,7 @@ properly.)
 }
 
 func TestRespectColLength_indentedCodeBlock(t *testing.T) {
-	// TODO(https://fxbug.dev/62964): See https://spec.commonmark.org/0.29/#indented-code-blocks
+	// TODO(https://fxbug.dev/42141415): See https://spec.commonmark.org/0.29/#indented-code-blocks
 	t.Skip("code blocks are not yet recognized, when they are, combine with next test")
 
 	ruleTestCase{

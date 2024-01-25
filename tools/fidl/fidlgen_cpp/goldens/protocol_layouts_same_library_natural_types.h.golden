@@ -109,7 +109,7 @@ class TablePayload {
     ::std::optional<uint16_t> a;
   };
 
-  // TODO(https://fxbug.dev/91252): Box the storage.
+  // TODO(https://fxbug.dev/42172795): Box the storage.
   Storage_ storage_;
   Storage_ CloneStorage_() const;
   friend struct ::fidl::internal::NaturalTableCodingTraits<::test_protocollayoutssamelibrary::TablePayload>;
@@ -250,7 +250,7 @@ class ComposedProtocolOneWayAnonComposedRequest {
     ::std::optional<uint16_t> a;
   };
 
-  // TODO(https://fxbug.dev/91252): Box the storage.
+  // TODO(https://fxbug.dev/42172795): Box the storage.
   Storage_ storage_;
   Storage_ CloneStorage_() const;
   friend struct ::fidl::internal::NaturalTableCodingTraits<::test_protocollayoutssamelibrary::ComposedProtocolOneWayAnonComposedRequest>;
@@ -391,7 +391,7 @@ class ComposedProtocolTwoWayAnonComposedResponse {
     ::std::optional<uint16_t> a;
   };
 
-  // TODO(https://fxbug.dev/91252): Box the storage.
+  // TODO(https://fxbug.dev/42172795): Box the storage.
   Storage_ storage_;
   Storage_ CloneStorage_() const;
   friend struct ::fidl::internal::NaturalTableCodingTraits<::test_protocollayoutssamelibrary::ComposedProtocolTwoWayAnonComposedResponse>;
@@ -437,7 +437,7 @@ class ComposedProtocolTwoWayAnonComposedWithErrorRequest {
     ::std::optional<uint16_t> a;
   };
 
-  // TODO(https://fxbug.dev/91252): Box the storage.
+  // TODO(https://fxbug.dev/42172795): Box the storage.
   Storage_ storage_;
   Storage_ CloneStorage_() const;
   friend struct ::fidl::internal::NaturalTableCodingTraits<::test_protocollayoutssamelibrary::ComposedProtocolTwoWayAnonComposedWithErrorRequest>;
@@ -794,7 +794,7 @@ class ComposedProtocolOnAnonComposedWithErrorResponse {
     ::std::optional<uint16_t> a;
   };
 
-  // TODO(https://fxbug.dev/91252): Box the storage.
+  // TODO(https://fxbug.dev/42172795): Box the storage.
   Storage_ storage_;
   Storage_ CloneStorage_() const;
   friend struct ::fidl::internal::NaturalTableCodingTraits<::test_protocollayoutssamelibrary::ComposedProtocolOnAnonComposedWithErrorResponse>;
@@ -1445,7 +1445,7 @@ class MainProtocolOneWayAnonRequest {
     ::std::optional<uint16_t> a;
   };
 
-  // TODO(https://fxbug.dev/91252): Box the storage.
+  // TODO(https://fxbug.dev/42172795): Box the storage.
   Storage_ storage_;
   Storage_ CloneStorage_() const;
   friend struct ::fidl::internal::NaturalTableCodingTraits<::test_protocollayoutssamelibrary::MainProtocolOneWayAnonRequest>;
@@ -1589,7 +1589,7 @@ class MainProtocolTwoWayAnonResponse {
     ::std::optional<uint16_t> a;
   };
 
-  // TODO(https://fxbug.dev/91252): Box the storage.
+  // TODO(https://fxbug.dev/42172795): Box the storage.
   Storage_ storage_;
   Storage_ CloneStorage_() const;
   friend struct ::fidl::internal::NaturalTableCodingTraits<::test_protocollayoutssamelibrary::MainProtocolTwoWayAnonResponse>;
@@ -1635,7 +1635,7 @@ class MainProtocolTwoWayAnonWithErrorRequest {
     ::std::optional<uint16_t> a;
   };
 
-  // TODO(https://fxbug.dev/91252): Box the storage.
+  // TODO(https://fxbug.dev/42172795): Box the storage.
   Storage_ storage_;
   Storage_ CloneStorage_() const;
   friend struct ::fidl::internal::NaturalTableCodingTraits<::test_protocollayoutssamelibrary::MainProtocolTwoWayAnonWithErrorRequest>;
@@ -1998,7 +1998,7 @@ class MainProtocolOnAnonWithErrorResponse {
     ::std::optional<uint16_t> a;
   };
 
-  // TODO(https://fxbug.dev/91252): Box the storage.
+  // TODO(https://fxbug.dev/42172795): Box the storage.
   Storage_ storage_;
   Storage_ CloneStorage_() const;
   friend struct ::fidl::internal::NaturalTableCodingTraits<::test_protocollayoutssamelibrary::MainProtocolOnAnonWithErrorResponse>;

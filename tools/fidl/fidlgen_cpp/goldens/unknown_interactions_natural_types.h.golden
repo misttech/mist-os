@@ -830,7 +830,7 @@ class UnknownInteractionsProtocolStrictTwoWayTableResponse {
       ::std::optional<int32_t> some_field;
   };
 
-  // TODO(https://fxbug.dev/91252): Box the storage.
+  // TODO(https://fxbug.dev/42172795): Box the storage.
   Storage_ storage_;
     Storage_ CloneStorage_() const;
   friend struct ::fidl::internal::NaturalTableCodingTraits<::test_unknowninteractions::UnknownInteractionsProtocolStrictTwoWayTableResponse>;
@@ -1520,7 +1520,7 @@ class UnknownInteractionsProtocolStrictTwoWayTableErrResponse {
       ::std::optional<int32_t> some_field;
   };
 
-  // TODO(https://fxbug.dev/91252): Box the storage.
+  // TODO(https://fxbug.dev/42172795): Box the storage.
   Storage_ storage_;
     Storage_ CloneStorage_() const;
   friend struct ::fidl::internal::NaturalTableCodingTraits<::test_unknowninteractions::UnknownInteractionsProtocolStrictTwoWayTableErrResponse>;
@@ -2340,7 +2340,7 @@ class UnknownInteractionsProtocolFlexibleTwoWayTableResponse {
       ::std::optional<int32_t> some_field;
   };
 
-  // TODO(https://fxbug.dev/91252): Box the storage.
+  // TODO(https://fxbug.dev/42172795): Box the storage.
   Storage_ storage_;
     Storage_ CloneStorage_() const;
   friend struct ::fidl::internal::NaturalTableCodingTraits<::test_unknowninteractions::UnknownInteractionsProtocolFlexibleTwoWayTableResponse>;
@@ -3238,7 +3238,7 @@ class UnknownInteractionsProtocolFlexibleTwoWayTableErrResponse {
       ::std::optional<int32_t> some_field;
   };
 
-  // TODO(https://fxbug.dev/91252): Box the storage.
+  // TODO(https://fxbug.dev/42172795): Box the storage.
   Storage_ storage_;
     Storage_ CloneStorage_() const;
   friend struct ::fidl::internal::NaturalTableCodingTraits<::test_unknowninteractions::UnknownInteractionsProtocolFlexibleTwoWayTableErrResponse>;
@@ -3625,7 +3625,7 @@ class UnknownInteractionsProtocolStrictEventTableRequest {
       ::std::optional<int32_t> some_field;
   };
 
-  // TODO(https://fxbug.dev/91252): Box the storage.
+  // TODO(https://fxbug.dev/42172795): Box the storage.
   Storage_ storage_;
     Storage_ CloneStorage_() const;
   friend struct ::fidl::internal::NaturalTableCodingTraits<::test_unknowninteractions::UnknownInteractionsProtocolStrictEventTableRequest>;
@@ -4315,7 +4315,7 @@ class UnknownInteractionsProtocolStrictEventTableErrResponse {
       ::std::optional<int32_t> some_field;
   };
 
-  // TODO(https://fxbug.dev/91252): Box the storage.
+  // TODO(https://fxbug.dev/42172795): Box the storage.
   Storage_ storage_;
     Storage_ CloneStorage_() const;
   friend struct ::fidl::internal::NaturalTableCodingTraits<::test_unknowninteractions::UnknownInteractionsProtocolStrictEventTableErrResponse>;
@@ -4676,7 +4676,7 @@ class UnknownInteractionsProtocolFlexibleEventTableRequest {
       ::std::optional<int32_t> some_field;
   };
 
-  // TODO(https://fxbug.dev/91252): Box the storage.
+  // TODO(https://fxbug.dev/42172795): Box the storage.
   Storage_ storage_;
     Storage_ CloneStorage_() const;
   friend struct ::fidl::internal::NaturalTableCodingTraits<::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventTableRequest>;
@@ -5366,7 +5366,7 @@ class UnknownInteractionsProtocolFlexibleEventTableErrResponse {
       ::std::optional<int32_t> some_field;
   };
 
-  // TODO(https://fxbug.dev/91252): Box the storage.
+  // TODO(https://fxbug.dev/42172795): Box the storage.
   Storage_ storage_;
     Storage_ CloneStorage_() const;
   friend struct ::fidl::internal::NaturalTableCodingTraits<::test_unknowninteractions::UnknownInteractionsProtocolFlexibleEventTableErrResponse>;
@@ -5730,7 +5730,7 @@ class UnknownInteractionsAjarProtocolStrictTwoWayTableResponse {
       ::std::optional<int32_t> some_field;
   };
 
-  // TODO(https://fxbug.dev/91252): Box the storage.
+  // TODO(https://fxbug.dev/42172795): Box the storage.
   Storage_ storage_;
     Storage_ CloneStorage_() const;
   friend struct ::fidl::internal::NaturalTableCodingTraits<::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictTwoWayTableResponse>;
@@ -6420,7 +6420,7 @@ class UnknownInteractionsAjarProtocolStrictTwoWayTableErrResponse {
       ::std::optional<int32_t> some_field;
   };
 
-  // TODO(https://fxbug.dev/91252): Box the storage.
+  // TODO(https://fxbug.dev/42172795): Box the storage.
   Storage_ storage_;
     Storage_ CloneStorage_() const;
   friend struct ::fidl::internal::NaturalTableCodingTraits<::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictTwoWayTableErrResponse>;
@@ -6781,7 +6781,7 @@ class UnknownInteractionsAjarProtocolStrictEventTableRequest {
       ::std::optional<int32_t> some_field;
   };
 
-  // TODO(https://fxbug.dev/91252): Box the storage.
+  // TODO(https://fxbug.dev/42172795): Box the storage.
   Storage_ storage_;
     Storage_ CloneStorage_() const;
   friend struct ::fidl::internal::NaturalTableCodingTraits<::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictEventTableRequest>;
@@ -7471,7 +7471,7 @@ class UnknownInteractionsAjarProtocolStrictEventTableErrResponse {
       ::std::optional<int32_t> some_field;
   };
 
-  // TODO(https://fxbug.dev/91252): Box the storage.
+  // TODO(https://fxbug.dev/42172795): Box the storage.
   Storage_ storage_;
     Storage_ CloneStorage_() const;
   friend struct ::fidl::internal::NaturalTableCodingTraits<::test_unknowninteractions::UnknownInteractionsAjarProtocolStrictEventTableErrResponse>;
@@ -7832,7 +7832,7 @@ class UnknownInteractionsAjarProtocolFlexibleEventTableRequest {
       ::std::optional<int32_t> some_field;
   };
 
-  // TODO(https://fxbug.dev/91252): Box the storage.
+  // TODO(https://fxbug.dev/42172795): Box the storage.
   Storage_ storage_;
     Storage_ CloneStorage_() const;
   friend struct ::fidl::internal::NaturalTableCodingTraits<::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventTableRequest>;
@@ -8522,7 +8522,7 @@ class UnknownInteractionsAjarProtocolFlexibleEventTableErrResponse {
       ::std::optional<int32_t> some_field;
   };
 
-  // TODO(https://fxbug.dev/91252): Box the storage.
+  // TODO(https://fxbug.dev/42172795): Box the storage.
   Storage_ storage_;
     Storage_ CloneStorage_() const;
   friend struct ::fidl::internal::NaturalTableCodingTraits<::test_unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventTableErrResponse>;
@@ -8886,7 +8886,7 @@ class UnknownInteractionsClosedProtocolStrictTwoWayTableResponse {
       ::std::optional<int32_t> some_field;
   };
 
-  // TODO(https://fxbug.dev/91252): Box the storage.
+  // TODO(https://fxbug.dev/42172795): Box the storage.
   Storage_ storage_;
     Storage_ CloneStorage_() const;
   friend struct ::fidl::internal::NaturalTableCodingTraits<::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictTwoWayTableResponse>;
@@ -9576,7 +9576,7 @@ class UnknownInteractionsClosedProtocolStrictTwoWayTableErrResponse {
       ::std::optional<int32_t> some_field;
   };
 
-  // TODO(https://fxbug.dev/91252): Box the storage.
+  // TODO(https://fxbug.dev/42172795): Box the storage.
   Storage_ storage_;
     Storage_ CloneStorage_() const;
   friend struct ::fidl::internal::NaturalTableCodingTraits<::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictTwoWayTableErrResponse>;
@@ -9937,7 +9937,7 @@ class UnknownInteractionsClosedProtocolStrictEventTableRequest {
       ::std::optional<int32_t> some_field;
   };
 
-  // TODO(https://fxbug.dev/91252): Box the storage.
+  // TODO(https://fxbug.dev/42172795): Box the storage.
   Storage_ storage_;
     Storage_ CloneStorage_() const;
   friend struct ::fidl::internal::NaturalTableCodingTraits<::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventTableRequest>;
@@ -10627,7 +10627,7 @@ class UnknownInteractionsClosedProtocolStrictEventTableErrResponse {
       ::std::optional<int32_t> some_field;
   };
 
-  // TODO(https://fxbug.dev/91252): Box the storage.
+  // TODO(https://fxbug.dev/42172795): Box the storage.
   Storage_ storage_;
     Storage_ CloneStorage_() const;
   friend struct ::fidl::internal::NaturalTableCodingTraits<::test_unknowninteractions::UnknownInteractionsClosedProtocolStrictEventTableErrResponse>;
@@ -10991,7 +10991,7 @@ class UnknownInteractionsDriverProtocolStrictTwoWayTableResponse {
       ::std::optional<int32_t> some_field;
   };
 
-  // TODO(https://fxbug.dev/91252): Box the storage.
+  // TODO(https://fxbug.dev/42172795): Box the storage.
   Storage_ storage_;
     Storage_ CloneStorage_() const;
   friend struct ::fidl::internal::NaturalTableCodingTraits<::test_unknowninteractions::UnknownInteractionsDriverProtocolStrictTwoWayTableResponse>;
@@ -11681,7 +11681,7 @@ class UnknownInteractionsDriverProtocolStrictTwoWayTableErrResponse {
       ::std::optional<int32_t> some_field;
   };
 
-  // TODO(https://fxbug.dev/91252): Box the storage.
+  // TODO(https://fxbug.dev/42172795): Box the storage.
   Storage_ storage_;
     Storage_ CloneStorage_() const;
   friend struct ::fidl::internal::NaturalTableCodingTraits<::test_unknowninteractions::UnknownInteractionsDriverProtocolStrictTwoWayTableErrResponse>;
@@ -12501,7 +12501,7 @@ class UnknownInteractionsDriverProtocolFlexibleTwoWayTableResponse {
       ::std::optional<int32_t> some_field;
   };
 
-  // TODO(https://fxbug.dev/91252): Box the storage.
+  // TODO(https://fxbug.dev/42172795): Box the storage.
   Storage_ storage_;
     Storage_ CloneStorage_() const;
   friend struct ::fidl::internal::NaturalTableCodingTraits<::test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayTableResponse>;
@@ -13399,7 +13399,7 @@ class UnknownInteractionsDriverProtocolFlexibleTwoWayTableErrResponse {
       ::std::optional<int32_t> some_field;
   };
 
-  // TODO(https://fxbug.dev/91252): Box the storage.
+  // TODO(https://fxbug.dev/42172795): Box the storage.
   Storage_ storage_;
     Storage_ CloneStorage_() const;
   friend struct ::fidl::internal::NaturalTableCodingTraits<::test_unknowninteractions::UnknownInteractionsDriverProtocolFlexibleTwoWayTableErrResponse>;
@@ -13789,7 +13789,7 @@ class UnknownInteractionsAjarDriverProtocolStrictTwoWayTableResponse {
       ::std::optional<int32_t> some_field;
   };
 
-  // TODO(https://fxbug.dev/91252): Box the storage.
+  // TODO(https://fxbug.dev/42172795): Box the storage.
   Storage_ storage_;
     Storage_ CloneStorage_() const;
   friend struct ::fidl::internal::NaturalTableCodingTraits<::test_unknowninteractions::UnknownInteractionsAjarDriverProtocolStrictTwoWayTableResponse>;
@@ -14479,7 +14479,7 @@ class UnknownInteractionsAjarDriverProtocolStrictTwoWayTableErrResponse {
       ::std::optional<int32_t> some_field;
   };
 
-  // TODO(https://fxbug.dev/91252): Box the storage.
+  // TODO(https://fxbug.dev/42172795): Box the storage.
   Storage_ storage_;
     Storage_ CloneStorage_() const;
   friend struct ::fidl::internal::NaturalTableCodingTraits<::test_unknowninteractions::UnknownInteractionsAjarDriverProtocolStrictTwoWayTableErrResponse>;
@@ -14843,7 +14843,7 @@ class UnknownInteractionsClosedDriverProtocolStrictTwoWayTableResponse {
       ::std::optional<int32_t> some_field;
   };
 
-  // TODO(https://fxbug.dev/91252): Box the storage.
+  // TODO(https://fxbug.dev/42172795): Box the storage.
   Storage_ storage_;
     Storage_ CloneStorage_() const;
   friend struct ::fidl::internal::NaturalTableCodingTraits<::test_unknowninteractions::UnknownInteractionsClosedDriverProtocolStrictTwoWayTableResponse>;
@@ -15533,7 +15533,7 @@ class UnknownInteractionsClosedDriverProtocolStrictTwoWayTableErrResponse {
       ::std::optional<int32_t> some_field;
   };
 
-  // TODO(https://fxbug.dev/91252): Box the storage.
+  // TODO(https://fxbug.dev/42172795): Box the storage.
   Storage_ storage_;
     Storage_ CloneStorage_() const;
   friend struct ::fidl::internal::NaturalTableCodingTraits<::test_unknowninteractions::UnknownInteractionsClosedDriverProtocolStrictTwoWayTableErrResponse>;

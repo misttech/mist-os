@@ -153,7 +153,7 @@ func (c *mockConnector) GetSysLog(pid int) (string, error) {
 		return "", nil
 	}
 
-	// TODO(https://fxbug.dev/45425): more realistic test data
+	// TODO(https://fxbug.dev/42121948): more realistic test data
 	lines := []string{
 		fmt.Sprintf("syslog for %d", pid),
 		"[1234.5][klog] INFO: {{{0x41}}}",

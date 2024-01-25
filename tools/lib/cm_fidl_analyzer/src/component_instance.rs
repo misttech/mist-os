@@ -185,7 +185,7 @@ impl ComponentInstanceInterface for ComponentInstanceForAnalyzer {
     }
 
     fn config_parent_overrides(&self) -> Option<&Vec<cm_rust::ConfigOverride>> {
-        // TODO(https://fxbug.dev/126578) ensure static parent overrides are captured
+        // TODO(https://fxbug.dev/42077231) ensure static parent overrides are captured
         None
     }
 
@@ -198,7 +198,7 @@ impl ComponentInstanceInterface for ComponentInstanceForAnalyzer {
     // return immediately for `ComponentInstanceForAnalyzer` (see
     // `ComponentModelForAnalyzer::route_capability_sync()`).
     //
-    // TODO(https://fxbug.dev/87204): Remove this comment when Scrutiny's `DataController` can make async
+    // TODO(https://fxbug.dev/42168300): Remove this comment when Scrutiny's `DataController` can make async
     // function calls.
     async fn lock_resolved_state<'a>(
         self: &'a Arc<Self>,

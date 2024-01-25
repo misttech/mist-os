@@ -38,7 +38,7 @@ func (rule *verifyInternalLinks) OnLinkByXref(xref core.Token) {
 }
 
 func (rule *verifyInternalLinks) OnXrefDefinition(xref, url core.Token) {
-	// TODO(https://fxbug.dev/62964): internal or external? if external, need to check presence
+	// TODO(https://fxbug.dev/42141415): internal or external? if external, need to check presence
 	normalized := normalizeLinkLabel(xref.Content)
 	if _, ok := rule.xrefs[normalized]; ok {
 		rule.reporter.Warnf(xref, "internal reference defined multiple times")

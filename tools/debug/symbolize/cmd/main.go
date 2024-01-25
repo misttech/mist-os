@@ -72,7 +72,7 @@ func init() {
 	flag.StringVar(&jsonOutput, "json-output", "", "outputs trigger information to the specified file")
 	flag.BoolVar(&idsRel, "ids-rel", false, "tells the symbolizer to always use ids.txt relative paths")
 	flag.UintVar(&llvmSymboRestartInterval, "llvm-symbolizer-restart-interval", 15,
-		"How many queries to make to the llvm-symbolizer tool before restarting it. 0 means never restart it. Use to control memory usage. See https://fxbug.dev/42018.")
+		"How many queries to make to the llvm-symbolizer tool before restarting it. 0 means never restart it. Use to control memory usage. See https://fxbug.dev/42118166.")
 	flag.DurationVar(&cloudFetchTimeout, "symbol-server-timeout", defaultTimeout, "Symbol server timeout for fetching an object from gs")
 }
 

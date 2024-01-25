@@ -503,21 +503,21 @@ fn check_path(
 }
 
 fn check_areas(filename: &Path, yaml_value: &Value) -> Option<Vec<DocCheckError>> {
-    //TODO(https://fxbug.dev/113634): Align _areas.yaml on same schema.
+    //TODO(https://fxbug.dev/42064921): Align _areas.yaml on same schema.
     if filename.ends_with("contribute/governance/areas/_areas.yaml") {
         let (_items, errors) = parse_entries::<AreaEntry>(filename, yaml_value);
-        //TODO(https://fxbug.dev/113635): other checks for AreaEntry?
+        //TODO(https://fxbug.dev/42064922): other checks for AreaEntry?
         errors
     } else {
         let (_items, errors) = parse_entries::<String>(filename, yaml_value);
-        //TODO(https://fxbug.dev/113635): other checks for AreaEntry?
+        //TODO(https://fxbug.dev/42064922): other checks for AreaEntry?
         errors
     }
 }
 
 fn check_deprecated_docs(filename: &Path, yaml_value: &Value) -> Option<Vec<DocCheckError>> {
     let result = serde_yaml::from_value::<Deprecations>(yaml_value.clone());
-    //TODO(https://fxbug.dev/113636): Add a check that the to: doc exists.
+    //TODO(https://fxbug.dev/42064923): Add a check that the to: doc exists.
     match result {
         Ok(_) => None,
         Err(e) => Some(vec![DocCheckError::new_error(
@@ -530,7 +530,7 @@ fn check_deprecated_docs(filename: &Path, yaml_value: &Value) -> Option<Vec<DocC
 
 fn check_drivers_areas(filename: &Path, yaml_value: &Value) -> Option<Vec<DocCheckError>> {
     let result = serde_yaml::from_value::<Vec<String>>(yaml_value.clone());
-    //TODO(https://fxbug.dev/113634): Align on common _areas.yaml structure
+    //TODO(https://fxbug.dev/42064921): Align on common _areas.yaml structure
     match result {
         Ok(_redirects) => None,
         Err(e) => Some(vec![DocCheckError::new_error(
@@ -543,7 +543,7 @@ fn check_drivers_areas(filename: &Path, yaml_value: &Value) -> Option<Vec<DocChe
 
 fn check_drivers_epitaphs(filename: &Path, yaml_value: &Value) -> Option<Vec<DocCheckError>> {
     let (_items, errors) = parse_entries::<DriverEpitaph>(filename, yaml_value);
-    //TODO(https://fxbug.dev/113637): other checks for DriverEpitaph?
+    //TODO(https://fxbug.dev/42064924): other checks for DriverEpitaph?
     errors
 }
 
@@ -561,13 +561,13 @@ fn check_eng_council(filename: &Path, yaml_value: &Value) -> Option<Vec<DocCheck
 
 fn check_glossary(filename: &Path, yaml_value: &Value) -> Option<Vec<DocCheckError>> {
     let (_items, errors) = parse_entries::<GlossaryTerm>(filename, yaml_value);
-    //TODO(https://fxbug.dev/113639): other checks for GlossaryTerm?
+    //TODO(https://fxbug.dev/42064926): other checks for GlossaryTerm?
     errors
 }
 
 fn check_metadata(filename: &Path, yaml_value: &Value) -> Option<Vec<DocCheckError>> {
     let result = serde_yaml::from_value::<Metadata>(yaml_value.clone());
-    //TODO(https://fxbug.dev/113640): Add checks for metadata.
+    //TODO(https://fxbug.dev/42064928): Add checks for metadata.
     match result {
         Ok(_redirects) => None,
         Err(e) => Some(vec![DocCheckError::new_error(
@@ -580,13 +580,13 @@ fn check_metadata(filename: &Path, yaml_value: &Value) -> Option<Vec<DocCheckErr
 
 fn check_problems(filename: &Path, yaml_value: &Value) -> Option<Vec<DocCheckError>> {
     let (_items, errors) = parse_entries::<ProblemEntry>(filename, yaml_value);
-    //TODO(https://fxbug.dev/113641): other checks for ProblemEntry?
+    //TODO(https://fxbug.dev/42064929): other checks for ProblemEntry?
     errors
 }
 
 fn check_redirects(filename: &Path, yaml_value: &Value) -> Option<Vec<DocCheckError>> {
     let result = serde_yaml::from_value::<Redirects>(yaml_value.clone());
-    //TODO(https://fxbug.dev/113642): add valication to redirects.
+    //TODO(https://fxbug.dev/42064930): add valication to redirects.
     match result {
         Ok(_) => None,
         Err(e) => Some(vec![DocCheckError::new_error(
@@ -599,13 +599,13 @@ fn check_redirects(filename: &Path, yaml_value: &Value) -> Option<Vec<DocCheckEr
 
 fn check_rfcs(filename: &Path, yaml_value: &Value) -> Option<Vec<DocCheckError>> {
     let (_items, errors) = parse_entries::<RfcEntry>(filename, yaml_value);
-    //TODO(https://fxbug.dev/113643): other checks for RfcEntry?
+    //TODO(https://fxbug.dev/42064931): other checks for RfcEntry?
     errors
 }
 
 fn check_roadmap(filename: &Path, yaml_value: &Value) -> Option<Vec<DocCheckError>> {
     let (_items, errors) = parse_entries::<RoadmapEntry>(filename, yaml_value);
-    //TODO(https://fxbug.dev/113644): other checks for RoadmapEntry?
+    //TODO(https://fxbug.dev/42064932): other checks for RoadmapEntry?
     errors
 }
 
@@ -614,7 +614,7 @@ fn check_supported_cpu_architecture(
     yaml_value: &Value,
 ) -> Option<Vec<DocCheckError>> {
     let result = serde_yaml::from_value::<Vec<String>>(yaml_value.clone());
-    //TODO(https://fxbug.dev/113645): Add validation
+    //TODO(https://fxbug.dev/42064933): Add validation
     match result {
         Ok(_redirects) => None,
         Err(e) => Some(vec![DocCheckError::new_error(
@@ -630,13 +630,13 @@ fn check_supported_cpu_architecture(
 
 fn check_supported_sys_config(filename: &Path, yaml_value: &Value) -> Option<Vec<DocCheckError>> {
     let (_items, errors) = parse_entries::<SysConfigEntry>(filename, yaml_value);
-    //TODO(https://fxbug.dev/113646): other checks for SysConfigEntry?
+    //TODO(https://fxbug.dev/42064934): other checks for SysConfigEntry?
     errors
 }
 
 fn check_tools(filename: &Path, yaml_value: &Value) -> Option<Vec<DocCheckError>> {
     let (_items, errors) = parse_entries::<ToolsEntry>(filename, yaml_value);
-    //TODO(https://fxbug.dev/113647): other checks for ToolsEntry?
+    //TODO(https://fxbug.dev/42064935): other checks for ToolsEntry?
     errors
 }
 
@@ -763,7 +763,7 @@ mod test {
     #[test]
     fn test_check_areas() -> Result<()> {
         // Test is more complex because of todo
-        //TODO(https://fxbug.dev/113634): Align _areas.yaml on same schema.
+        //TODO(https://fxbug.dev/42064921): Align _areas.yaml on same schema.
         let filename = "/some/docs/contribute/governance/areas/_areas.yaml";
         let yaml_value: Value = serde_yaml::from_str(
             r#"

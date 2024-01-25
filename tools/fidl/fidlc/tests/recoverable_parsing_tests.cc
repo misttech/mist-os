@@ -178,7 +178,7 @@ protocol P {
     Method() -> (struct { num uint16; }) error;  // Error
 };
 )FIDL");
-  // NOTE(https://fxbug.dev/72924): the difference in errors is due to the change in
+  // NOTE(https://fxbug.dev/42152439): the difference in errors is due to the change in
   // test input (for the TypeWithoutParams and MissingParen cases) rather than
   // any real behavior change
   library.ExpectFail(ErrUnexpectedTokenOfKind, Token::KindAndSubkind(Token::Kind::kIdentifier),
@@ -285,7 +285,7 @@ type Table = table {
                      Token::KindAndSubkind(Token::Kind::kSemicolon));
   library.ExpectFail(ErrUnexpectedTokenOfKind, Token::KindAndSubkind(Token::Subkind::kVector),
                      Token::KindAndSubkind(Token::Kind::kSemicolon));
-  // NOTE(https://fxbug.dev/72924): the difference here is just due to the type/member
+  // NOTE(https://fxbug.dev/42152439): the difference here is just due to the type/member
   // reordering, not a behavior change
   library.ExpectFail(ErrMissingOrdinalBeforeMember);
   ASSERT_COMPILER_DIAGNOSTICS(library);
@@ -414,7 +414,7 @@ TEST(RecoverableParsingTests, UnexpectedControlCharacter) {
 TEST(RecoverableParsingTests, InvalidEscapeSequenceInLiteral) {
   TestLibrary library;
   library.AddFile("bad/fi-0003.test.fidl");
-  // TODO(https://fxbug.dev/111982): fidlc should recover from all three failures
+  // TODO(https://fxbug.dev/42063301): fidlc should recover from all three failures
   library.ExpectFail(ErrInvalidEscapeSequence, "\\ ");
   library.ExpectFail(ErrInvalidEscapeSequence, "\\i");
   ASSERT_COMPILER_DIAGNOSTICS(library);

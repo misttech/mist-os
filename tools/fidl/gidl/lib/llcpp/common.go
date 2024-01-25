@@ -88,6 +88,6 @@ func LlcppErrorCode(code ir.ErrorCode) string {
 	if code == ir.TooFewBytesInPrimaryObject || code == ir.TooFewBytes || code == ir.EnvelopeBytesExceedMessageLength {
 		return "ZX_ERR_BUFFER_TOO_SMALL"
 	}
-	// TODO(https://fxbug.dev/35381) Implement different codes for different FIDL error cases.
+	// TODO(https://fxbug.dev/42110793) Implement different codes for different FIDL error cases.
 	return "ZX_ERR_INVALID_ARGS"
 }

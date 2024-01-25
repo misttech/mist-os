@@ -118,7 +118,7 @@ func init() {
 	flag.BoolVar(&noBind, "no-bind", false, "do not bind to bootserver port. Should be used with -a <IPV6>")
 	flag.IntVar(&windowSize, "w", 0, "tftp window size, ignored with --netboot")
 
-	//  TODO(https://fxbug.dev/38517): Implement the following unsupported flags.
+	//  TODO(https://fxbug.dev/42114276): Implement the following unsupported flags.
 	flag.IntVar(&packetInterval, "i", defaultMicrosecBetweenPackets, "number of microseconds between packets; ignored with --tftp")
 	// We currently always default to tftp
 	flag.BoolVar(&useNetboot, "netboot", false, "use the netboot protocol")

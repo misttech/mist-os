@@ -67,7 +67,7 @@ class TableWithHandle {
     ::std::optional<::zx::vmo> h;
   };
 
-  // TODO(https://fxbug.dev/91252): Box the storage.
+  // TODO(https://fxbug.dev/42172795): Box the storage.
   Storage_ storage_;
   friend struct ::fidl::internal::NaturalTableCodingTraits<::test_handlesintypes::TableWithHandle>;
   friend struct ::fidl::internal::MemberVisitor<::test_handlesintypes::TableWithHandle>;
@@ -371,7 +371,7 @@ class EmptyResourceTable {
   struct Storage_ final {
   };
 
-  // TODO(https://fxbug.dev/91252): Box the storage.
+  // TODO(https://fxbug.dev/42172795): Box the storage.
   Storage_ storage_;
   friend struct ::fidl::internal::NaturalTableCodingTraits<::test_handlesintypes::EmptyResourceTable>;
   friend struct ::fidl::internal::MemberVisitor<::test_handlesintypes::EmptyResourceTable>;

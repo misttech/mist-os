@@ -156,7 +156,7 @@ alias MyAlias_Abcdefghijklmnopqr = bool;
   ASSERT_FORMATTED(unformatted, formatted);
 }
 
-// TODO(https://fxbug.dev/78236): more tests need to be added here once multiple arguments are
+// TODO(https://fxbug.dev/42158340): more tests need to be added here once multiple arguments are
 // supported for
 //  attributes.
 
@@ -2585,7 +2585,7 @@ protocol Populated_Abcdefghijklmnopqrs {
   ASSERT_FORMATTED(unformatted, formatted);
 }
 
-// https://fxbug.dev/78688
+// https://fxbug.dev/42158841
 TEST(FormatterTests, ProtocolMethodBeforeCompose) {
   // ---------------40---------------- |
   std::string unformatted = R"FIDL(
@@ -3793,7 +3793,7 @@ using baz.qux; // C4
   ASSERT_FORMATTED(noop, noop);
 }
 
-// Regression test for https://fxbug.dev/107841.
+// Regression test for https://fxbug.dev/42059235.
 TEST(FormatterTests, CommentsBeforeStatementOverflow) {
   // ---------------40---------------- |
   std::string unformatted = R"FIDL(
@@ -4039,7 +4039,7 @@ type // C8
   ASSERT_FORMATTED(unformatted, formatted);
 }
 
-// TODO(https://fxbug.dev/88107): This test currently behaves correctly per the specified
+// TODO(https://fxbug.dev/42169303): This test currently behaves correctly per the specified
 // line-wrapping algorithm, but the output is unintuitive and unexpected. Once the referenced bug is
 // fixed, this test should result in the `unformatted` input being unmodified.
 TEST(FormatterTests, DISABLED_CommentsEmptyLayout) {
@@ -4910,7 +4910,7 @@ alias constrained_handle
   ASSERT_FORMATTED(unformatted, formatted);
 }
 
-// Regression test for https://fxbug.dev/82455.
+// Regression test for https://fxbug.dev/42163023.
 TEST(FormatterTests, DocCommentThenCommentThenChildComment) {
   // ---------------40---------------- |
   std::string unformatted = R"FIDL(
@@ -5194,7 +5194,7 @@ open protocol Test {
   ASSERT_FORMATTED(unformatted, formatted);
 }
 
-// Regression test for https://fxbug.dev/90644.
+// Regression test for https://fxbug.dev/42172119.
 TEST(FormatterTests, AliasAnonymousLayoutInLayoutParameterAlreadyFormattedNoop) {
   // ---------------40---------------- |
   std::string formatted = R"FIDL(
@@ -5213,7 +5213,7 @@ alias MyEmptyArr = array<struct {}, 1>;
   ASSERT_FORMATTED(formatted, formatted);
 }
 
-// Regression test for https://fxbug.dev/90644.
+// Regression test for https://fxbug.dev/42172119.
 TEST(FormatterTests, AliasAnonymousLayoutInLayoutParameterOverflow) {
   // ---------------40---------------- |
   std::string unformatted = R"FIDL(
@@ -5250,7 +5250,7 @@ alias MyEmptyArr_a
   ASSERT_FORMATTED(unformatted, formatted);
 }
 
-// Regression test for https://fxbug.dev/90644.
+// Regression test for https://fxbug.dev/42172119.
 TEST(FormatterTests, LayoutMemberAnonymousLayoutInLayoutParameterAlreadyFormattedNoop) {
   // ---------------40---------------- |
   std::string formatted = R"FIDL(
@@ -5286,7 +5286,7 @@ type MyEmptyUnion = union {
   ASSERT_FORMATTED(formatted, formatted);
 }
 
-// Regression test for https://fxbug.dev/90644.
+// Regression test for https://fxbug.dev/42172119.
 TEST(FormatterTests, LayoutMemberAnonymousLayoutInLayoutParameterOverflow) {
   // ---------------40---------------- |
   std::string unformatted = R"FIDL(
@@ -5359,7 +5359,7 @@ type MyEmptyUnion = union {
   ASSERT_FORMATTED(unformatted, formatted);
 }
 
-// Regression test for https://fxbug.dev/113349.
+// Regression test for https://fxbug.dev/42064676.
 TEST(FormatterTests, ConstraintOnInlineAnonymousLayoutNormal) {
   // ---------------40---------------- |
   std::string unformatted = R"FIDL(
@@ -5382,7 +5382,7 @@ type MyStruct = struct {
   ASSERT_FORMATTED(unformatted, formatted);
 }
 
-// Regression test for https://fxbug.dev/113349.
+// Regression test for https://fxbug.dev/42064676.
 TEST(FormatterTests, ConstraintOnInlineAnonymousLayoutOverflow) {
   // ---------------40---------------- |
   std::string unformatted = R"FIDL(
@@ -5406,7 +5406,7 @@ type MyStruct = struct {
   ASSERT_FORMATTED(unformatted, formatted);
 }
 
-// Regression test for https://fxbug.dev/112547.
+// Regression test for https://fxbug.dev/42063857.
 TEST(FormatterTests, InlineCommentTrailingNewlineAlreadyFormattedNoop) {
   // ---------------40---------------- |
   std::string formatted = R"FIDL(
@@ -5418,7 +5418,7 @@ alias MyAlias = uint8;
   ASSERT_FORMATTED(formatted, formatted);
 }
 
-// Regression test for https://fxbug.dev/112547.
+// Regression test for https://fxbug.dev/42063857.
 TEST(FormatterTests, InlineCommentTrailingNewlineOverflow) {
   // ---------------40---------------- |
   std::string unformatted = R"FIDL(

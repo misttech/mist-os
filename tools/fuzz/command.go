@@ -16,7 +16,7 @@ import (
 
 // An InstanceCmd represents a remote command to be run on an Instance
 // This interface is a superset of os.exec.Cmd
-// TODO(https://fxbug.dev/45424): use timeout for all methods
+// TODO(https://fxbug.dev/42121947): use timeout for all methods
 type InstanceCmd interface {
 	// Output runs the command and returns its combined output.
 	Output() ([]byte, error)
@@ -152,7 +152,7 @@ func (c *SSHInstanceCmd) Start() error {
 	glog.Infof("Running ssh command: %s", c.cmdline)
 
 	// Log stderr in case the command fails.
-	// TODO(https://fxbug.dev/45424): limit size of errlog, we only really want the
+	// TODO(https://fxbug.dev/42121947): limit size of errlog, we only really want the
 	// tail for debugging
 	if !c.stderrpipe {
 		if c.session.Stderr == nil {
@@ -262,7 +262,7 @@ func (c *SSHInstanceCmd) Wait() error {
 
 		return err
 	case <-timeoutCh:
-		// TODO(https://fxbug.dev/45424): clean up the ssh command
+		// TODO(https://fxbug.dev/42121947): clean up the ssh command
 		return fmt.Errorf("timeout waiting for command to complete")
 	}
 }

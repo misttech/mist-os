@@ -92,7 +92,7 @@ compiled_action("invoke_clidoc") {
       "//src/developer/ffx/frontends/ffx:ffx_bin_unversioned($host_toolchain)",
       "//src/developer/ffx/tools($host_toolchain)",
 
-      # TODO(https://fxbug.dev/86553) check if triage belongs in sdk docs.
+      # TODO(https://fxbug.dev/42167576) check if triage belongs in sdk docs.
       "//src/diagnostics/triage:triage_bin",
     ]
   }
@@ -150,7 +150,7 @@ python_binary(_docsgen_transforms_script_target) {
 
 # Runs one time python helpdoc generation script.
 action("invoke_helpdoc") {
-  # TODO(https://fxbug.dev/87512): Remove this exception when this action no
+  # TODO(https://fxbug.dev/42168642): Remove this exception when this action no
   # longer executes fx tools.
   hermetic_deps = false
 

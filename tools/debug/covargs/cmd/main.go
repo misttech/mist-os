@@ -450,7 +450,7 @@ func fetchFromSymbolServer(ctx context.Context, mergedProfileFile string, tempDi
 		modules = append(modules, f)
 	}
 
-	// Write the malformed modules to a file in order to keep track of the tests affected by https://fxbug.dev/74189.
+	// Write the malformed modules to a file in order to keep track of the tests affected by https://fxbug.dev/42153844.
 	if err := os.WriteFile(filepath.Join(tempDir, "malformed_binaries.txt"), []byte(strings.Join(malformed, "\n")), os.ModePerm); err != nil {
 		return modules, fmt.Errorf("failed to write malformed binaries to a file: %w", err)
 	}

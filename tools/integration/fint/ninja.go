@@ -68,7 +68,7 @@ var (
 	// Allow dirty no-op builds, but only if they appear to be failing on these
 	// paths on Mac where the filesystem has a bug that causes it to erroneously
 	// report that system files do not exist when referenced via relative paths.
-	// See https://fxbug.dev/61784.
+	// See https://fxbug.dev/42140108.
 	brokenMacPaths = []string{
 		"/usr/bin/env",
 		"/bin/ln",
@@ -80,7 +80,7 @@ var (
 	// The following tests should never be considered affected. These tests use
 	// a system image as data, so they appear affected by a broad range of
 	// changes, but they're almost never actually sensitive to said changes.
-	// https://fxbug.dev/67305 tracks generating this list automatically.
+	// https://fxbug.dev/42146209 tracks generating this list automatically.
 	neverAffectedTestLabels = []string{
 		"//src/recovery/simulator:recovery_simulator_boot_test",
 		"//src/recovery/simulator:recovery_simulator_serial_test",
@@ -403,7 +403,7 @@ func checkNinjaNoop(
 	allStdio := strings.Join([]string{stdout, stderr}, "\n\n")
 	if !strings.Contains(allStdio, noWorkString) {
 		if isMac {
-			// TODO(https://fxbug.dev/61784): Dirty builds should be an error even on Mac.
+			// TODO(https://fxbug.dev/42140108): Dirty builds should be an error even on Mac.
 			for _, path := range brokenMacPaths {
 				if strings.Contains(allStdio, path) {
 					return true, "", nil, nil

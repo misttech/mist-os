@@ -137,7 +137,7 @@ func getQemuInvocation(config qemuConfig) ([]string, error) {
 	qemuCmd.SetFlag("-monitor", "none")
 
 	// Disable kernel lockup detector in emulated environments to prevent false alarms from
-	// potentially oversubscribed hosts. (https://fxbug.dev/92109)
+	// potentially oversubscribed hosts. (https://fxbug.dev/42173747)
 	qemuCmd.AddKernelArg("kernel.lockup-detector.critical-section-threshold-ms=0")
 	qemuCmd.AddKernelArg("kernel.lockup-detector.critical-section-fatal-threshold-ms=0")
 	qemuCmd.AddKernelArg("kernel.lockup-detector.heartbeat-period-ms=0")
@@ -449,7 +449,7 @@ func (q *QemuLauncher) Kill() error {
 	if q.Pid != 0 {
 		glog.Infof("Killing PID %d", q.Pid)
 
-		// TODO(https://fxbug.dev/45431): More gracefully, with timeout
+		// TODO(https://fxbug.dev/42121955): More gracefully, with timeout
 		if err := syscall.Kill(q.Pid, syscall.SIGKILL); err != nil {
 			glog.Warningf("failed to kill instance: %s", err)
 		}

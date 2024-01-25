@@ -114,7 +114,7 @@ func (m *method) Serialize() ElementStr {
 		}
 	} else if !m.method.HasRequest && m.method.HasResponse {
 		e.Direction = isEvent
-		// TODO(https://fxbug.dev/7660): This looks like a typo, but it's not. We set
+		// TODO(https://fxbug.dev/42156522): This looks like a typo, but it's not. We set
 		// e.Request because we're moving towards terminology where "request"
 		// means "initial message", not "client-to-server message". But the JSON
 		// IR models an event as a method that has a response but no request.

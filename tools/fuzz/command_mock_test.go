@@ -219,7 +219,7 @@ func (c *mockInstanceCmd) Wait() error {
 		return fmt.Errorf("Wait called when not running")
 	}
 	c.running = false
-	// TODO(https://fxbug.dev/45425): also check 'hasRun'
+	// TODO(https://fxbug.dev/42121948): also check 'hasRun'
 
 	if c.errCh != nil {
 		if err := <-c.errCh; err != nil {

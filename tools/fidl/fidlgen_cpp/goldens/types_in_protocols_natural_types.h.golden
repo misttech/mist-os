@@ -234,7 +234,7 @@ class Table {
   struct Storage_ final {
   };
 
-  // TODO(https://fxbug.dev/91252): Box the storage.
+  // TODO(https://fxbug.dev/42172795): Box the storage.
   Storage_ storage_;
     Storage_ CloneStorage_() const;
   friend struct ::fidl::internal::NaturalTableCodingTraits<::test_typesinprotocols::Table>;
@@ -442,7 +442,7 @@ class ResourceTable {
   struct Storage_ final {
   };
 
-  // TODO(https://fxbug.dev/91252): Box the storage.
+  // TODO(https://fxbug.dev/42172795): Box the storage.
   Storage_ storage_;
   friend struct ::fidl::internal::NaturalTableCodingTraits<::test_typesinprotocols::ResourceTable>;
   friend struct ::fidl::internal::MemberVisitor<::test_typesinprotocols::ResourceTable>;

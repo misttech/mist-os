@@ -148,7 +148,7 @@ class Typespace::Creator {
 const Type* Typespace::Create(TypeResolver* resolver, const Reference& layout,
                               const LayoutParameterList& parameters,
                               const TypeConstraints& constraints, LayoutInvocation* out_params) {
-  // TODO(https://fxbug.dev/76219): lookup whether we've already created the type, and
+  // TODO(https://fxbug.dev/42156099): lookup whether we've already created the type, and
   // return it rather than create a new one. Lookup must be by name, arg_type,
   // size, and nullability.
   return Creator(this, resolver, layout, parameters, constraints, out_params).Create();
@@ -360,7 +360,7 @@ const Type* Typespace::Creator::CreateHandleType(Resource* resource) {
   return typespace_->Intern(std::move(constrained_type));
 }
 
-// TODO(https://fxbug.dev/56727): Support more transports.
+// TODO(https://fxbug.dev/42134495): Support more transports.
 static constexpr std::string_view kChannelTransport = "Channel";
 
 const Type* Typespace::Creator::CreateTransportSideType(TransportSide end) {

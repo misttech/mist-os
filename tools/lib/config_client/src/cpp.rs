@@ -27,7 +27,7 @@ pub struct CppSource {
 #[derive(Clone, Copy, PartialEq, Debug)]
 pub enum Flavor {
     ElfProcess,
-    // TODO(https://fxbug.dev/108880) delete once unified FIDL available OOT
+    // TODO(https://fxbug.dev/42060287) delete once unified FIDL available OOT
     ElfHlcpp,
 }
 
@@ -96,7 +96,7 @@ struct TemplateVars {
     expected_checksum: Vec<u8>,
     fields: Vec<Field>,
 
-    // TODO(https://fxbug.dev/108880) delete once unified FIDL available OOT
+    // TODO(https://fxbug.dev/42060287) delete once unified FIDL available OOT
     fidl_cpp_header_prefix: String,
 }
 

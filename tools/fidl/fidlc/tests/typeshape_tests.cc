@@ -1533,7 +1533,7 @@ type TableWithNullableHandleArray = resource table {
                                                       }));
 }
 
-// TODO(https://fxbug.dev/118282): write a "unions_with_handles" test case.
+// TODO(https://fxbug.dev/42069446): write a "unions_with_handles" test case.
 
 TEST(TypeshapeTests, GoodFlexibleUnions) {
   TestLibrary test_library(R"FIDL(
@@ -1635,7 +1635,7 @@ type PaddingCheck = flexible union {
                         .alignment = 8,
                         .max_out_of_line = 56,
                         .depth = 1,
-                        // TODO(https://fxbug.dev/36332): Unions currently return true for
+                        // TODO(https://fxbug.dev/42111849): Unions currently return true for
                         // has_padding in all cases, which should be fixed.
                         .has_padding = true,
                         .has_flexible_envelope = true,

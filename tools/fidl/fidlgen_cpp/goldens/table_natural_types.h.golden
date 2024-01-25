@@ -66,7 +66,7 @@ class EmptyTable {
   struct Storage_ final {
   };
 
-  // TODO(https://fxbug.dev/91252): Box the storage.
+  // TODO(https://fxbug.dev/42172795): Box the storage.
   Storage_ storage_;
   Storage_ CloneStorage_() const;
   friend struct ::fidl::internal::NaturalTableCodingTraits<::test_table::EmptyTable>;
@@ -120,7 +120,7 @@ class SimpleTable {
     ::std::optional<int64_t> y;
   };
 
-  // TODO(https://fxbug.dev/91252): Box the storage.
+  // TODO(https://fxbug.dev/42172795): Box the storage.
   Storage_ storage_;
   Storage_ CloneStorage_() const;
   friend struct ::fidl::internal::NaturalTableCodingTraits<::test_table::SimpleTable>;
@@ -167,7 +167,7 @@ class OlderSimpleTable {
     ::std::optional<int64_t> x;
   };
 
-  // TODO(https://fxbug.dev/91252): Box the storage.
+  // TODO(https://fxbug.dev/42172795): Box the storage.
   Storage_ storage_;
   Storage_ CloneStorage_() const;
   friend struct ::fidl::internal::NaturalTableCodingTraits<::test_table::OlderSimpleTable>;
@@ -231,7 +231,7 @@ class NewerSimpleTable {
     ::std::optional<int64_t> z;
   };
 
-  // TODO(https://fxbug.dev/91252): Box the storage.
+  // TODO(https://fxbug.dev/42172795): Box the storage.
   Storage_ storage_;
   Storage_ CloneStorage_() const;
   friend struct ::fidl::internal::NaturalTableCodingTraits<::test_table::NewerSimpleTable>;
@@ -296,7 +296,7 @@ class ReverseOrdinalTable {
     ::std::optional<int64_t> x;
   };
 
-  // TODO(https://fxbug.dev/91252): Box the storage.
+  // TODO(https://fxbug.dev/42172795): Box the storage.
   Storage_ storage_;
   Storage_ CloneStorage_() const;
   friend struct ::fidl::internal::NaturalTableCodingTraits<::test_table::ReverseOrdinalTable>;
@@ -343,7 +343,7 @@ class TableWithAttributes {
     ::std::optional<int64_t> x;
   };
 
-  // TODO(https://fxbug.dev/91252): Box the storage.
+  // TODO(https://fxbug.dev/42172795): Box the storage.
   Storage_ storage_;
   Storage_ CloneStorage_() const;
   friend struct ::fidl::internal::NaturalTableCodingTraits<::test_table::TableWithAttributes>;
@@ -380,7 +380,7 @@ class ExtensionTable {
   struct Storage_ final {
   };
 
-  // TODO(https://fxbug.dev/91252): Box the storage.
+  // TODO(https://fxbug.dev/42172795): Box the storage.
   Storage_ storage_;
   Storage_ CloneStorage_() const;
   friend struct ::fidl::internal::NaturalTableCodingTraits<::test_table::ExtensionTable>;
@@ -992,7 +992,7 @@ class SixtyFourOrdinalTable {
     ::std::optional<::test_table::ExtensionTable> v64;
   };
 
-  // TODO(https://fxbug.dev/91252): Box the storage.
+  // TODO(https://fxbug.dev/42172795): Box the storage.
   Storage_ storage_;
   Storage_ CloneStorage_() const;
   friend struct ::fidl::internal::NaturalTableCodingTraits<::test_table::SixtyFourOrdinalTable>;

@@ -135,7 +135,7 @@ func processGenOutput(gen *util.Gen, fileMap map[string]*Project) (*Project, err
 
 	rootProject := fileMap[Config.Target]
 	if rootProject == nil {
-		// TODO(https://fxbug.dev/115657): Understand why sometimes //:default is not found in the fileMap
+		// TODO(https://fxbug.dev/42066952): Understand why sometimes //:default is not found in the fileMap
 		//return nil, fmt.Errorf("failed to find root project using target [%s]", Config.Target)
 		rootProject = AllProjects["."]
 	}

@@ -539,8 +539,8 @@ fn toolchain_suffixed_targets(versioned: &str, top_level: Option<&str>) -> Vec<S
 }
 
 fn add_all_toolchain_suffices(target: &str, targets: &mut Vec<String>) {
-    // TODO(https://fxbug.dev/73485) support querying explicitly for both linux and mac
-    // TODO(https://fxbug.dev/71352) support querying explicitly for both x64 and arm64
+    // TODO(https://fxbug.dev/42153062) support querying explicitly for both linux and mac
+    // TODO(https://fxbug.dev/42150695) support querying explicitly for both x64 and arm64
     #[cfg(target_arch = "x86_64")]
     const HOST_ARCH_SUFFIX: &str = "x64";
     #[cfg(target_arch = "aarch64")]
@@ -557,10 +557,10 @@ fn add_all_toolchain_suffices(target: &str, targets: &mut Vec<String>) {
 enum OwnersSource {
     /// file is computed from reverse deps and they are listed here
     ReverseDependencies {
-        // TODO(https://fxbug.dev/84729)
+        // TODO(https://fxbug.dev/42165549)
         #[allow(unused)]
         targets: Vec<String>,
-        // TODO(https://fxbug.dev/84729)
+        // TODO(https://fxbug.dev/42165549)
         #[allow(unused)]
         deps: BTreeSet<String>,
     },
@@ -576,7 +576,7 @@ impl OwnersSource {
 
 #[derive(Debug)]
 struct OwnersFile {
-    // TODO(https://fxbug.dev/84729)
+    // TODO(https://fxbug.dev/42165549)
     #[allow(unused)]
     path: Utf8PathBuf,
     includes: BTreeSet<Utf8PathBuf>,
@@ -1090,14 +1090,14 @@ mod tests {
     #[derive(Debug)]
     struct Paths {
         /// `.../host_x64`
-        // TODO(https://fxbug.dev/84729)
+        // TODO(https://fxbug.dev/42165549)
         #[allow(unused)]
         test_root_dir: Utf8PathBuf,
 
         /// `.../host_x64/test_data`, this is the root of the runfiles tree, a
         /// path //foo/bar will be copied at `.../host_x64/test_data/foo/bar` for
         /// this test.
-        // TODO(https://fxbug.dev/84729)
+        // TODO(https://fxbug.dev/42165549)
         #[allow(unused)]
         test_data_dir: Utf8PathBuf,
 
@@ -1107,7 +1107,7 @@ mod tests {
 
         /// `.../host_x64/test_data/tools/auto_owners/runfiles`: this is the directory
         /// where the binary runfiles live.
-        // TODO(https://fxbug.dev/84729)
+        // TODO(https://fxbug.dev/42165549)
         #[allow(unused)]
         runfiles_dir: Utf8PathBuf,
 

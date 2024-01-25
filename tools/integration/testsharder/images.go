@@ -44,7 +44,7 @@ func AddImageDeps(ctx context.Context, s *Shard, buildDir string, images []build
 		return nil
 	}
 
-	// TODO(https://fxbug.dev/133725): Remove these images when product bundles are used as soon
+	// TODO(https://fxbug.dev/42083611): Remove these images when product bundles are used as soon
 	// as ffx emu and flash are enabled by default. Otherwise we need to provide
 	// images from both images.json and product_bundles.json since either can be used
 	// depending on what ffx experiment level is being run and whether the device that's
@@ -127,8 +127,8 @@ func isUsedForTesting(s *Shard, image build.Image, pave bool) bool {
 			return true
 		}
 
-		// TODO(https://fxbug.dev/47531): Remove zedboot images once we switch to flashing.
-		// TODO(https://fxbug.dev/124946): Remove flashing deps once we no longer need to fastboot boot zedboot
+		// TODO(https://fxbug.dev/42124288): Remove zedboot images once we switch to flashing.
+		// TODO(https://fxbug.dev/42075766): Remove flashing deps once we no longer need to fastboot boot zedboot
 		// for release branches.
 		return !s.Env.TargetsEmulator() && (len(image.PaveZedbootArgs) != 0 || isFlashingDep(image))
 	}
@@ -142,7 +142,7 @@ func isUsedForTesting(s *Shard, image build.Image, pave bool) bool {
 	if isFlashingDep(image) {
 		return true
 	}
-	// TODO(https://fxbug.dev/47531): Remove zedboot/paving images once we switch to flashing.
+	// TODO(https://fxbug.dev/42124288): Remove zedboot/paving images once we switch to flashing.
 	return ((pave && len(image.PaveArgs) != 0) ||
 		(!pave && len(image.NetbootArgs) != 0) ||
 		(len(image.PaveZedbootArgs) != 0) ||

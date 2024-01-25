@@ -59,7 +59,7 @@ RawOrdinal64 GetGeneratedOrdinal64(const std::vector<std::string_view>& library_
   if (selector_name.find('/') != std::string_view::npos)
     return RawOrdinal64(source_element, CalcOrdinal(selector_name));
 
-  // TODO(https://fxbug.dev/118282): Move this closer (code wise) to NameFlatName, ideally sharing
+  // TODO(https://fxbug.dev/42069446): Move this closer (code wise) to NameFlatName, ideally sharing
   // code.
   std::string full_name;
   bool once = false;

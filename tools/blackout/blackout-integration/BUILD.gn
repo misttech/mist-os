@@ -70,7 +70,7 @@ if (is_host) {
         dimensions = {
           device_type = "Intel NUC Kit NUC7i5DNHE"
         }
-        tags = [ "flaky" ]  # https://fxbug.dev/123763
+        tags = [ "flaky" ]  # https://fxbug.dev/42074656
       },
     ]
   }

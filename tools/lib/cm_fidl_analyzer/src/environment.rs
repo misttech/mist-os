@@ -81,7 +81,7 @@ pub struct EnvironmentForAnalyzer {
 }
 
 impl EnvironmentForAnalyzer {
-    // TODO(https://fxbug.dev/61861): This parallel implementation of component manager's builtin environment
+    // TODO(https://fxbug.dev/42140194): This parallel implementation of component manager's builtin environment
     // setup will do for now, but is fragile and should be replaced soon. In particular, it doesn't provide a
     // way to register builtin runners or resolvers that appear in the `builtin_capabilities` field of the
     // RuntimeConfig but are not one of these hard-coded built-ins.

@@ -179,7 +179,7 @@ func functionHtmlId(f *clangdoc.FunctionInfo) string {
 	// overloading but we don't have a way to differentiate this other than making all
 	// references by USR, which makes manual linking impossible.
 	//
-	// TODO(https://fxbug.dev/119085) it would be nice to allow links to functions overloads and
+	// TODO(https://fxbug.dev/42070119) it would be nice to allow links to functions overloads and
 	// template specializations (the same name). If this function took an Index parameter, it
 	// could check for this case and use the USR id for all but the first instance.
 	return getScopeQualifier(f.Namespace, true) + f.Name

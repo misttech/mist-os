@@ -42,7 +42,7 @@ pub struct Opt {
 
     /// already generated configs from cargo build scripts
     #[argh(option, short = 'p')]
-    // TODO(https://fxbug.dev/84729)
+    // TODO(https://fxbug.dev/42165549)
     #[allow(unused)]
     cargo_configs: Option<PathBuf>,
 

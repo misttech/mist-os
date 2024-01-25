@@ -17,7 +17,7 @@ use std::collections::BTreeMap;
 
 /// Create a configuration value file from the compiled manifest's config declaration and a map of
 /// configuration keys to JSON values.
-// TODO(https://fxbug.dev/86797) decide on a better interface than json values?
+// TODO(https://fxbug.dev/42167846) decide on a better interface than json values?
 pub fn populate_value_file(
     config_decl: &ConfigDecl,
     mut json_values: BTreeMap<String, JsonValue>,

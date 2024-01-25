@@ -171,11 +171,11 @@ pub enum Commands {
         file: PathBuf,
 
         #[structopt(short = "p", long = "pretty")]
-        /// deprecated and ignored. Please do not use (https://fxbug.dev/109014).
+        /// deprecated and ignored. Please do not use (https://fxbug.dev/42060365).
         pretty: bool,
 
         #[structopt(long = "cml")]
-        /// deprecated and ignored. Please do not use (https://fxbug.dev/109014).
+        /// deprecated and ignored. Please do not use (https://fxbug.dev/42060365).
         cml: bool,
 
         #[structopt(short = "i", long = "in-place")]

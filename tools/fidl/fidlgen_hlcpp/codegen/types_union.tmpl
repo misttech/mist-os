@@ -508,7 +508,7 @@ struct CodingTraits<std::unique_ptr<{{ . }}>> {
 
   static void Encode(Encoder* encoder, std::unique_ptr<{{ . }}>* value, size_t offset,
                      cpp17::optional<::fidl::HandleInformation> maybe_handle_info = cpp17::nullopt) {
-    {{/* TODO(https://fxbug.dev/7805): Disallow empty xunions (but permit nullable/optional
+    {{/* TODO(https://fxbug.dev/42158133): Disallow empty xunions (but permit nullable/optional
          xunions). */ -}}
 
     auto&& p_xunion = *value;

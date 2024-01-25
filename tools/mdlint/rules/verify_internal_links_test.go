@@ -40,7 +40,7 @@ func TestVerifyInternalLinks_validLinkLabel(t *testing.T) {
 	}.runOverPatterns(t, newVerifyInternalLinks)
 }
 
-// TODO(https://fxbug.dev/62964): Improve verifyInternalLinks rule.
+// TODO(https://fxbug.dev/42141415): Improve verifyInternalLinks rule.
 func Ignore_TestVerifyInternalLinks_unknownFile(t *testing.T) {
 	ruleTestCase{
 		files: map[string]string{
@@ -49,7 +49,7 @@ func Ignore_TestVerifyInternalLinks_unknownFile(t *testing.T) {
 	}.runOverPatterns(t, newVerifyInternalLinks)
 }
 
-// TODO(https://fxbug.dev/62964): Improve verifyInternalLinks rule.
+// TODO(https://fxbug.dev/42141415): Improve verifyInternalLinks rule.
 func Ignore_TestVerifyInternalLinks_unknownAnchor(t *testing.T) {
 	ruleTestCase{
 		files: map[string]string{

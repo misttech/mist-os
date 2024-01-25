@@ -88,7 +88,7 @@ func Interleave(mainTraces []chrometrace.Trace, rbeTraces []chrometrace.Trace) (
 		// considered as outputs by Ninja. By convention depfiles always match
 		// output names without the `.d` suffix.
 		//
-		// TODO(https://fxbug.dev/85536): find a better way to handle this.
+		// TODO(https://fxbug.dev/42166446): find a better way to handle this.
 		output = strings.TrimSuffix(output, ".d")
 
 		t, ok := rbeTraceByOutputs[output]

@@ -36,7 +36,7 @@ fx-config-read
 
 fx-warn "DEPRECATION WARNING"
 fx-warn "\`fx pave-remote\` is deprecated and will be removed soon, please use \`fx flash-remote\`."
-fx-warn "See https://fxbug.dev/131144.\n"
+fx-warn "See https://fxbug.dev/42081363.\n"
 
 build=true
 pave=true

@@ -1082,7 +1082,7 @@ fn translate_nested_value_type(nested_type: &ConfigNestedValueType) -> fdecl::Co
         constraints,
         // This optional is not necessary, but without it,
         // FIDL compilation complains because of a possible include-cycle.
-        // Bug: https://fxbug.dev/66350
+        // Bug: https://fxbug.dev/42145148
         parameters: Some(vec![]),
     }
 }
@@ -1131,7 +1131,7 @@ fn translate_value_type(
             constraints,
             // This optional is not necessary, but without it,
             // FIDL compilation complains because of a possible include-cycle.
-            // Bug: https://fxbug.dev/66350
+            // Bug: https://fxbug.dev/42145148
             parameters: Some(parameters),
         },
         mutability,

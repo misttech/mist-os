@@ -32,7 +32,7 @@ func str2int(what string) uint64 {
 	// If we come across anything else and it still matched one of dec or ptr
 	// regexes then we want to trim leading zeros. This lets us match things like
 	// "01234" which is important for pids and things like that but also prevents
-	// panics like those seen in https://fxbug.dev/27032.
+	// panics like those seen in https://fxbug.dev/42101517.
 	if !strings.HasPrefix(what, "0x") {
 		what = strings.TrimLeft(what, "0")
 		if len(what) == 0 {

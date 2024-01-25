@@ -226,7 +226,7 @@ function check-for-package-server {
       fi
     fi
 
-    # FIXME(https://fxbug.dev/80431): Check if the current `devhost` points at
+    # FIXME(https://fxbug.dev/42160775): Check if the current `devhost` points at
     # '${FUCHSIA_BUILD_DIR}/amber-files'.
   fi
 
@@ -234,7 +234,7 @@ function check-for-package-server {
 }
 
 function check-for-incremental-publisher {
-  # FIXME(https://fxbug.dev/122899) During the transition to the new incremental
+  # FIXME(https://fxbug.dev/42073827) During the transition to the new incremental
   # publisher, we should check for both the new and the old one, since both
   # should result in packages being published.
   if is_feature_enabled "incremental" || is_feature_enabled "incremental_new" || is_feature_enabled "incremental_legacy"; then
@@ -372,7 +372,7 @@ function ffx-register-repository {
   # it in the foreground gives us better error messages.
   ffx-start-server "${ip}" "${port}" || return $?
 
-  # FIXME(https://fxbug.dev/98589): ffx cannot yet parse targets that may
+  # FIXME(https://fxbug.dev/42180938): ffx cannot yet parse targets that may
   # include the ssh port. We'll explicitly specify the target here with
   # `get-device-name`, which strips out the port if present.
   fx-command-run ffx \

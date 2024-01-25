@@ -76,7 +76,7 @@ type EndpointDeclaration interface {
 	Declaration
 
 	// ProtocolName returns the fully qualified name of the protocol.
-	// TODO(https://fxbug.dev/39407): Return common.DeclName.
+	// TODO(https://fxbug.dev/42115264): Return common.DeclName.
 	ProtocolName() string
 }
 
@@ -90,7 +90,7 @@ type NamedDeclaration interface {
 
 	// Name returns the fully qualified name of this declaration, e.g.
 	// "the.library.name/TheTypeName".
-	// TODO(https://fxbug.dev/39407): Return common.DeclName.
+	// TODO(https://fxbug.dev/42115264): Return common.DeclName.
 	Name() string
 }
 
@@ -579,7 +579,7 @@ func (decl *StructDecl) conforms(value ir.Value, ctx context) error {
 		provided[field.Key.Name] = struct{}{}
 	}
 	for _, member := range decl.structDecl.Members {
-		// TODO(https://fxbug.dev/49939) Allow omitted non-nullable fields that have defaults.
+		// TODO(https://fxbug.dev/42126962) Allow omitted non-nullable fields that have defaults.
 		if _, ok := provided[string(member.Name)]; !ok && !member.Type.Nullable {
 			return fmt.Errorf("missing non-nullable field %s in struct %s",
 				member.Name, decl.Name())
@@ -851,11 +851,11 @@ func (decl *VectorDecl) conforms(value ir.Value, ctx context) error {
 // Schema is the GIDL-level concept of a FIDL library. It provides functions to
 // lookup types and return the corresponding Declaration.
 type Schema struct {
-	// TODO(https://fxbug.dev/39407): Use common.LibraryName.
+	// TODO(https://fxbug.dev/42115264): Use common.LibraryName.
 	libraryName string
 	// Maps fully qualified type names to fidl data structures:
 	// *fidl.Struct, *fidl.Table, or *fidl.Union.
-	// TODO(https://fxbug.dev/39407): Use common.DeclName.
+	// TODO(https://fxbug.dev/42115264): Use common.DeclName.
 	types map[string]interface{}
 }
 
@@ -951,12 +951,12 @@ func (s Schema) lookupDeclByName(unqualifiedName string, nullable bool) (Declara
 	return s.lookupDeclByQualifiedName(s.qualifyName(unqualifiedName), nullable)
 }
 
-// TODO(https://fxbug.dev/39407): Take common.MemberName, return common.DeclName.
+// TODO(https://fxbug.dev/42115264): Take common.MemberName, return common.DeclName.
 func (s Schema) qualifyName(unqualifiedName string) string {
 	return fmt.Sprintf("%s/%s", s.libraryName, unqualifiedName)
 }
 
-// TODO(https://fxbug.dev/39407): Take common.DeclName.
+// TODO(https://fxbug.dev/42115264): Take common.DeclName.
 func (s Schema) lookupDeclByQualifiedName(name string, nullable bool) (Declaration, bool) {
 	typ, ok := s.types[name]
 	if !ok {

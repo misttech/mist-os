@@ -18,7 +18,7 @@ import (
 type EncodedCompoundIdentifier = fidlgen.EncodedCompoundIdentifier
 
 type Type struct {
-	// TODO(https://fxbug.dev/7660): Remove Resourceness once stored on fidlgen.Type.
+	// TODO(https://fxbug.dev/42156522): Remove Resourceness once stored on fidlgen.Type.
 	fidlgen.Resourceness
 
 	// Information extracted from fidlgen.Type.
@@ -34,7 +34,7 @@ type Type struct {
 	// The associated type fidl::encoding::Type::Owned.
 	Owned string
 	// The type to use when this occurs as a method parameter.
-	// TODO(https://fxbug.dev/122199): Once the transition to the new types if complete,
+	// TODO(https://fxbug.dev/42073194): Once the transition to the new types if complete,
 	// document this as being {Value,Resource}Type::Borrowed.
 	Param string
 }
@@ -217,7 +217,7 @@ type Payload struct {
 	TupleType string
 	// For methods that use error syntax, TupleType is an alias that refers
 	// to TupleTypeAliasRhs. Otherwise, TupleTypeAliasRhs is empty.
-	// TODO(https://fxbug.dev/122199): Remove.
+	// TODO(https://fxbug.dev/42073194): Remove.
 	TupleTypeAliasRhs string
 	// Parameters for sending this payload. For an empty payload, this is nil.
 	// For a struct without error syntax, it contains one element per struct
@@ -230,14 +230,14 @@ type Payload struct {
 	// fidl::encoding::Flexible or fidl::encoding::FlexibleResult, expects the
 	// input variable to be the Ok return value of .into_result(). Otherwise,
 	// expects the input variable to be of type OwnedType.
-	// TODO(https://fxbug.dev/122199): Remove.
+	// TODO(https://fxbug.dev/42073194): Remove.
 	ConvertToTuple func(string) string
 	// Like ConvertToTuple, but uses names from Parameters for inclusion in a
 	// struct. Examples for ConvertToFields("v"):
 	//     ""
 	//     "param1: v.param1, param2: v.param2,"
 	//     "result: v.map(|x| x.param1),"
-	// TODO(https://fxbug.dev/122199): Remove.
+	// TODO(https://fxbug.dev/42073194): Remove.
 	ConvertToFields func(string) string
 }
 
@@ -400,7 +400,7 @@ var reservedWords = map[string]struct{}{
 	"async":   {},
 	"on_open": {},
 	"OnOpen":  {},
-	// TODO(https://fxbug.dev/66767): Remove "WaitForEvent".
+	// TODO(https://fxbug.dev/42145610): Remove "WaitForEvent".
 	"wait_for_event": {},
 	"WaitForEvent":   {},
 }
@@ -553,19 +553,19 @@ func compileLibraryName(library fidlgen.LibraryIdentifier) string {
 	return changeIfReserved(fidlgen.Identifier(strings.Join(parts, "_")))
 }
 
-// TODO(https://fxbug.dev/66767): Escaping reserved words should happen *after*
+// TODO(https://fxbug.dev/42145610): Escaping reserved words should happen *after*
 // converting to CamelCase.
 func compileCamelIdentifier(val fidlgen.Identifier) string {
 	return fidlgen.ToUpperCamelCase(changeIfReserved(val))
 }
 
-// TODO(https://fxbug.dev/66767): Escaping reserved words should happen *after*
+// TODO(https://fxbug.dev/42145610): Escaping reserved words should happen *after*
 // converting to snake_case.
 func compileSnakeIdentifier(val fidlgen.Identifier) string {
 	return fidlgen.ToSnakeCase(changeIfReserved(val))
 }
 
-// TODO(https://fxbug.dev/66767): Escaping reserved words should happen *after*
+// TODO(https://fxbug.dev/42145610): Escaping reserved words should happen *after*
 // converting to SCREAMING_SNAKE_CASE.
 func compileScreamingSnakeIdentifier(val fidlgen.Identifier) string {
 	return fidlgen.ConstNameToAllCapsSnake(changeIfReserved(val))
@@ -603,7 +603,7 @@ func (c *compiler) compileDeclIdentifier(val fidlgen.EncodedCompoundIdentifier) 
 	} else {
 		name = compileCamelIdentifier(ci.Name)
 	}
-	// TODO(https://fxbug.dev/66767): This is incorrect. We're calling changeIfReserved
+	// TODO(https://fxbug.dev/42145610): This is incorrect. We're calling changeIfReserved
 	// a second time, after compileScreamingSnakeIdentifier or
 	// compileCamelIdentifier already did. We should only call it once.
 	name = changeIfReserved(fidlgen.Identifier(name))
@@ -706,7 +706,7 @@ func (c *compiler) compileConstant(val fidlgen.Constant, typ fidlgen.Type) strin
 		default:
 			panic(fmt.Sprintf("unexpected decl type: %s", declType))
 		}
-		// TODO(https://fxbug.dev/62520): fidlc allows conversions between primitive
+		// TODO(https://fxbug.dev/42140924): fidlc allows conversions between primitive
 		// types. Ideally the JSON IR would model these conversions explicitly.
 		// In the meantime, just assume that a cast is always necessary.
 		if typ.Kind == fidlgen.PrimitiveType {
@@ -907,7 +907,7 @@ func (c *compiler) compileType(val fidlgen.Type) Type {
 // convertParamToEncodeExpr returns an expression that converts a variable v
 // from t.Param to a type implementing fidl::encoding::Encode<t.Fidl>.
 //
-// TODO(https://fxbug.dev/122199): Remove this once the transition to the new types is
+// TODO(https://fxbug.dev/42073194): Remove this once the transition to the new types is
 // complete, since parameter types will be encodable as is.
 func convertParamToEncodeExpr(v string, t Type) string {
 	switch t.Kind {
@@ -987,7 +987,7 @@ func convertResultToEncodeExpr(v string, t Type, p Payload) string {
 // convertMutRefParamToEncodeExpr returns an expression that converts a variable
 // v from &mut t.Param to a type implementing fidl::encoding::Encode<t.Fidl>.
 //
-// TODO(https://fxbug.dev/122199): Remove this once the transition to the new types is
+// TODO(https://fxbug.dev/42073194): Remove this once the transition to the new types is
 // complete. This is only needed for convertResultToEncodeExpr.
 func convertMutRefParamToEncodeExpr(v string, t Type) string {
 	switch t.Kind {
@@ -1008,7 +1008,7 @@ func convertMutRefParamToEncodeExpr(v string, t Type) string {
 // convertMutRefOwnedToEncodeExpr returns an expression that converts a variable
 // v from &mut t.Owned to a type implementing fidl::encoding::Encode<t.Fidl>.
 //
-// TODO(https://fxbug.dev/122199): Remove this once the transition to the new types is
+// TODO(https://fxbug.dev/42073194): Remove this once the transition to the new types is
 // complete. This is only needed for convertMutRefResultToEncodeExpr.
 func convertMutRefOwnedToEncodeExpr(v string, t Type) string {
 	switch t.Kind {
@@ -1346,13 +1346,13 @@ func (c *compiler) compileProtocol(val fidlgen.Protocol) Protocol {
 	}
 	if discoverableName := strings.Trim(val.GetProtocolName(), "\""); discoverableName != "" {
 		r.Discoverable = true
-		// TODO(https://fxbug.dev/100767): Currently discoverable protocols get
+		// TODO(https://fxbug.dev/42051517): Currently discoverable protocols get
 		// PROTOCOL_NAME set equal to DEBUG_NAME, and we change both to use the
 		// "fuchsia.foo.Bar" format. We should instead use distinct formats for
 		// DEBUG_NAME and PROTOCOL_NAME.
 		r.DebugName = discoverableName
 	} else {
-		// TODO(https://fxbug.dev/100767): Include the library name in DEBUG_NAME, i.e.
+		// TODO(https://fxbug.dev/42051517): Include the library name in DEBUG_NAME, i.e.
 		// "fuchsia.foo/Bar" rather than just "Bar".
 		r.DebugName = "(anonymous) " + name
 	}
@@ -1672,7 +1672,7 @@ func (c *compiler) fillDerives(ir *Root) {
 func (dc *derivesCompiler) fillDerivesForECI(eci EncodedCompoundIdentifier) derives {
 	declInfo := dc.lookupDeclInfo(eci)
 
-	// TODO(https://fxbug.dev/61760): Make external type information available here.
+	// TODO(https://fxbug.dev/42140082): Make external type information available here.
 	// Currently, we conservatively assume external structs, tables, and unions
 	// only derive a minimal set of traits, which includes Clone for value types
 	// (not having Clone is especially annoying, so we put resourceness of

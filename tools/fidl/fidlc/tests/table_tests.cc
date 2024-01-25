@@ -388,7 +388,7 @@ TEST(TableTests, BadTooManyOrdinals) {
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
-// TODO(https://fxbug.dev/35218): This should work once recursive types are fully supported.
+// TODO(https://fxbug.dev/42110612): This should work once recursive types are fully supported.
 TEST(TableTests, BadRecursionDisallowed) {
   TestLibrary library;
   library.AddFile("bad/fi-0057-d.test.fidl");

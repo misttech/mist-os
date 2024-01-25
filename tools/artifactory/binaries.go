@@ -38,7 +38,7 @@ func debugBinaryUploads(ctx context.Context, mods binModules, debugNamespace, bu
 		if os.IsNotExist(err) {
 			continue
 		} else if err != nil {
-			// TODO(https://fxbug.dev/91924): Remove this debugging info once invalid
+			// TODO(https://fxbug.dev/42173541): Remove this debugging info once invalid
 			// prebuilt binary manifests are fixed.
 			if b, err := os.ReadFile(filepath.Join(mods.BuildDir(), pb.Manifest)); err == nil {
 				logger.Debugf(ctx, "Contents of invalid prebuilt binary manifest %s: %s", pb.Manifest, b)

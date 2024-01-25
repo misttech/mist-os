@@ -5181,7 +5181,7 @@ mod tests {
     fn test_merge_from_program_without_runner() {
         let mut some =
             document(json!({ "program": { "binary": "bin/hello_world", "runner": "elf" } }));
-        // https://fxbug.dev/79951: merging with a document that doesn't have a runner doesn't override the
+        // https://fxbug.dev/42160240: merging with a document that doesn't have a runner doesn't override the
         // runner that we already have assigned.
         let mut other = document(json!({ "program": {} }));
         some.merge_from(&mut other, &Path::new("some/path")).unwrap();

@@ -14,7 +14,7 @@ struct {{ .WireResultUnwrap }} {
 };
 {{- end }}
 
-{{/* TODO(https://fxbug.dev/105375): This type should probably actually just be called
+{{/* TODO(https://fxbug.dev/42056597): This type should probably actually just be called
 * WireResult since it owns and fdf::Arena and uses DecodedValue to own the
 * handles in the decoded message. */}}
 template<>
@@ -83,7 +83,7 @@ class [[nodiscard]] {{ .WireUnownedResult }} final : public {{ .BaseWireResult }
 {{- $args = (List $args "const ::fdf::Arena& arena") }}
 {{- $args = (List $args (printf "%s* request" .WireTransactionalRequest)) }}
 {{ .WireUnownedResult }}::{{ .WireUnownedResult.Self }}({{ RenderParams $args }}) {
-  {{/* TODO(https://fxbug.dev/86367): Factor out common buffer allocation logic once we have other instances
+  {{/* TODO(https://fxbug.dev/42167369): Factor out common buffer allocation logic once we have other instances
   of this pattern. */ -}}
 
   constexpr uint32_t buffer_size =

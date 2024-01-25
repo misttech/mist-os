@@ -40,8 +40,8 @@
         "is_virtual": false,
         "file": "../../tools/fidl/fidlc/testdata/transitive_dependencies/middle.test.fidl",
         "data": "Bar",
-        "start_offset": 192,
-        "end_offset": 195
+        "start_offset": 195,
+        "end_offset": 198
       }
     }
   ],
@@ -57,8 +57,8 @@
         "is_virtual": false,
         "file": "../../tools/fidl/fidlc/testdata/transitive_dependencies/top.test.fidl",
         "data": "Baz",
-        "start_offset": 208,
-        "end_offset": 211
+        "start_offset": 211,
+        "end_offset": 214
       },
       "members": [
         {
@@ -67,8 +67,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/transitive_dependencies/top.test.fidl",
             "data": "g",
-            "start_offset": 227,
-            "end_offset": 228
+            "start_offset": 230,
+            "end_offset": 231
           },
           "type": {
             "kind": "identifier",
@@ -78,8 +78,8 @@
               "is_virtual": false,
               "file": "../../tools/fidl/fidlc/testdata/transitive_dependencies/top.test.fidl",
               "data": "test.middle.Bar",
-              "start_offset": 229,
-              "end_offset": 244
+              "start_offset": 232,
+              "end_offset": 247
             }
           }
         }

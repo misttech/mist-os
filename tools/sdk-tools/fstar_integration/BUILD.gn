@@ -10,7 +10,7 @@ import("//build/testing/host_test_data.gni")
 group("tests") {
   testonly = true
   # Disabled due to excessive flakes.
-  # TODO(https://fxbug.dev/88194): Reenable
+  # TODO(https://fxbug.dev/42169399): Reenable
   # deps = [ ":fstar_integration_test($host_toolchain)" ]
 }
 

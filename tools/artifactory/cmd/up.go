@@ -46,7 +46,7 @@ const (
 
 	// A record of all of the fuchsia debug symbols processed.
 	// This is eventually consumed by crash reporting infrastructure.
-	// TODO(https://fxbug.dev/75356): Have the crash reporting infrastructure
+	// TODO(https://fxbug.dev/42155140): Have the crash reporting infrastructure
 	// consume build-ids.json instead.
 	buildIDsTxt = "build-ids.txt"
 

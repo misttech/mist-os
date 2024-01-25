@@ -185,7 +185,7 @@ class TableSmallArray {
     ::std::optional<::std::array<uint32_t, 2>> a;
   };
 
-  // TODO(https://fxbug.dev/91252): Box the storage.
+  // TODO(https://fxbug.dev/42172795): Box the storage.
   Storage_ storage_;
   Storage_ CloneStorage_() const;
   friend struct ::fidl::internal::NaturalTableCodingTraits<::test_arrays::TableSmallArray>;
@@ -231,7 +231,7 @@ class TableLargeArray {
     ::std::optional<::std::array<uint32_t, 100>> a;
   };
 
-  // TODO(https://fxbug.dev/91252): Box the storage.
+  // TODO(https://fxbug.dev/42172795): Box the storage.
   Storage_ storage_;
   Storage_ CloneStorage_() const;
   friend struct ::fidl::internal::NaturalTableCodingTraits<::test_arrays::TableLargeArray>;

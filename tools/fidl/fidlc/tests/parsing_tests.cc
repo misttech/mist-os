@@ -14,7 +14,7 @@ namespace fidlc {
 namespace {
 
 // Test that an invalid compound identifier fails parsing. Regression
-// test for https://fxbug.dev/7600.
+// test for https://fxbug.dev/42155856.
 TEST(ParsingTests, BadCompoundIdentifierTest) {
   // The leading 0 in the library name causes parsing an Identifier
   // to fail, and then parsing a CompoundIdentifier to fail.

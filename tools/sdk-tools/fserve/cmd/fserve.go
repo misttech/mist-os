@@ -232,7 +232,7 @@ func main() {
 		}
 
 		if *privateKeyFlag != "" {
-			// TODO(https://fxbug.dev/95589): We switched this flag from being an error
+			// TODO(https://fxbug.dev/42177611): We switched this flag from being an error
 			// to a warning with the ffx repository server to fix some integration
 			// tests.  Once that is fixed we should switch these back to being an
 			// error.
@@ -243,7 +243,7 @@ func main() {
 		}
 
 		if *sshConfigFlag != "" {
-			// TODO(https://fxbug.dev/95589): We switched this flag from being an error
+			// TODO(https://fxbug.dev/42177611): We switched this flag from being an error
 			// to a warning with the ffx repository server to fix some integration
 			// tests.  Once that is fixed we should switch these back to being an
 			// error.
@@ -416,7 +416,7 @@ func (s *pmServer) registerRepository(ctx context.Context, sdk sdkProvider) erro
 }
 
 func killFFXServer(ctx context.Context, sdk sdkProvider) error {
-	// TODO(https://fxbug.dev/83720): We need `ffx_repository=true` until
+	// TODO(https://fxbug.dev/42164429): We need `ffx_repository=true` until
 	// ffx repository has graduated from experimental.
 	args := []string{"--config", "ffx_repository=true", "repository", "server", "stop"}
 	logger.Debugf(ctx, "running %v", args)
@@ -473,7 +473,7 @@ type ffxServer struct {
 }
 
 func (s *ffxServer) startServer(ctx context.Context, sdk sdkProvider) error {
-	// TODO(https://fxbug.dev/83720): We need `ffx_repository=true` until
+	// TODO(https://fxbug.dev/42164429): We need `ffx_repository=true` until
 	// ffx repository has graduated from experimental.
 
 	args := []string{"--config", "ffx_repository=true", "repository", "server", "start"}
@@ -506,7 +506,7 @@ func (s *ffxServer) registerRepository(ctx context.Context, sdk sdkProvider) err
 		targetAddress = net.JoinHostPort(targetAddress, s.sshPort)
 	}
 
-	// TODO(https://fxbug.dev/83720): We need `ffx_repository=true` until
+	// TODO(https://fxbug.dev/42164429): We need `ffx_repository=true` until
 	// ffx repository has graduated from experimental.
 	args := []string{
 		"--config", "ffx_repository=true",

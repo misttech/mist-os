@@ -180,7 +180,7 @@ constexpr ErrorDef<81, SourceSpan> ErrDuplicateMethodOrdinal(
 constexpr ErrorDef<82> ErrInvalidSelectorValue(
     "invalid selector value, must be a method name or a fully qualified method name");
 constexpr ErrorDef<83> ErrFuchsiaIoExplicitOrdinals(
-    "fuchsia.io must have explicit ordinals (https://fxbug.dev/77623)");
+    "fuchsia.io must have explicit ordinals (https://fxbug.dev/42157659)");
 constexpr ErrorDef<84> ErrPayloadStructHasDefaultMembers(
     "default values are not allowed on members of request/response structs");
 constexpr RetiredDef<85> ErrDuplicateServiceMemberName;
@@ -244,7 +244,7 @@ constexpr ErrorDef<118, std::string_view, std::string_view, const Decl *>
         "client_end / server_end of transport type {0} may not be sent over "
         "transport {1} used by {2}");
 constexpr ErrorDef<119, std::string_view> ErrEventErrorSyntaxDeprecated(
-    "Event '{0}' uses the error syntax. This is deprecated (see https://fxbug.dev/99924)");
+    "Event '{0}' uses the error syntax. This is deprecated (see https://fxbug.dev/42182418)");
 constexpr ErrorDef<120, const Attribute *> ErrInvalidAttributePlacement(
     "placement of attribute '{0}' disallowed here");
 constexpr ErrorDef<121, const Attribute *> ErrDeprecatedAttribute("attribute '{0}' is deprecated");

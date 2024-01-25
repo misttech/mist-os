@@ -539,7 +539,7 @@ TEST(ConstsTests, BadConstTestAssignBuiltinType) {
     ss << "const FOO uint32 = " << builtin << ";\n";
 
     TestLibrary library(ss.str());
-    // TODO(https://fxbug.dev/99665): Should have a better error message.
+    // TODO(https://fxbug.dev/42182133): Should have a better error message.
     library.ExpectFail(ErrCannotResolveConstantValue);
     ASSERT_COMPILER_DIAGNOSTICS(library);
   }
@@ -552,7 +552,7 @@ TEST(ConstsTests, BadConstTestAssignBuiltinNonType) {
     ss << "const FOO uint32 = " << builtin << ";\n";
 
     TestLibrary library(ss.str());
-    // TODO(https://fxbug.dev/99665): Should have a better error message.
+    // TODO(https://fxbug.dev/42182133): Should have a better error message.
     library.ExpectFail(ErrCannotResolveConstantValue);
     ASSERT_COMPILER_DIAGNOSTICS(library);
   }

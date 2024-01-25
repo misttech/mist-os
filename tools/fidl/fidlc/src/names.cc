@@ -141,7 +141,7 @@ std::string NameFlatTypeKind(const Type* type) {
     case Type::Kind::kHandle:
       return "handle";
     case Type::Kind::kTransportSide: {
-      // TODO(https://fxbug.dev/70186): transition the JSON and other backends to using
+      // TODO(https://fxbug.dev/42149402): transition the JSON and other backends to using
       // client/server end
       auto channel_end = static_cast<const TransportSideType*>(type);
       return (channel_end->end == TransportSide::kClient) ? "identifier" : "request";
@@ -150,7 +150,7 @@ std::string NameFlatTypeKind(const Type* type) {
       return "primitive";
     case Type::Kind::kInternal:
       return "internal";
-    // TODO(https://fxbug.dev/70186): transition the JSON and other backends to using box
+    // TODO(https://fxbug.dev/42149402): transition the JSON and other backends to using box
     case Type::Kind::kBox:
     case Type::Kind::kIdentifier:
       return "identifier";
@@ -322,7 +322,7 @@ void NameFlatTypeHelper(std::ostringstream& buf, const Type* type) {
       // Like Stars, they are known by name.
       break;
   }  // switch
-  // TODO(https://fxbug.dev/93999): Use the new syntax, `:optional`.
+  // TODO(https://fxbug.dev/42175844): Use the new syntax, `:optional`.
   if (type->IsNullable()) {
     buf << '?';
   }

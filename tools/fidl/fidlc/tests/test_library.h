@@ -200,7 +200,7 @@ class TestLibrary final : public SharedInterface {
   // any were found.
   bool CheckDiagnostics();
 
-  // TODO(https://fxbug.dev/118282): remove (or rename this class to be more general), as this does
+  // TODO(https://fxbug.dev/42069446): remove (or rename this class to be more general), as this does
   // not use a library.
   bool Parse(std::unique_ptr<File>* out_ast_ptr);
 

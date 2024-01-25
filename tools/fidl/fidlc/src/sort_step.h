@@ -13,7 +13,7 @@ namespace fidlc {
 // cycle. It stores the result in library_->declaration_order_. See also
 // Libraries::DeclarationOrder() which includes all transitive dependencies.
 //
-// TODO(https://fxbug.dev/7660): This is only used by C/C++ backends. We should remove
+// TODO(https://fxbug.dev/42156522): This is only used by C/C++ backends. We should remove
 // it and the JSON IR field "declaration_order", preferring to calculate this in
 // fidlgenlib whe needed. We would still have to detect cycles, but this can be
 // done in CompileStep recursion, e.g. compiling the TypeConstructor layout

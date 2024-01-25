@@ -153,7 +153,7 @@ func declName(decl mixer.NamedDeclaration) string {
 	return identifierName(decl.Name())
 }
 
-// TODO(https://fxbug.dev/39407): Move into a common library outside GIDL.
+// TODO(https://fxbug.dev/42115264): Move into a common library outside GIDL.
 func identifierName(qualifiedName string) string {
 	parts := strings.Split(qualifiedName, "/")
 	library_parts := strings.Split(parts[0], ".")

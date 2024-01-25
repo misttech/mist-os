@@ -55,10 +55,10 @@ fidl_testdata_info = [
     name = "anonymous"
     target = "//tools/fidl/fidlc/testdata:test.anonymous"
     host_build_denylist = [
-      # TODO(https://fxbug.dev/62573): Add ifdefs so that protocols compile on host.
+      # TODO(https://fxbug.dev/42140981): Add ifdefs so that protocols compile on host.
       "fidlgen_cpp",
 
-      # TODO(https://fxbug.dev/72247): Encode libfuzzer dependency on HLCPP and LLCPP.
+      # TODO(https://fxbug.dev/42151687): Encode libfuzzer dependency on HLCPP and LLCPP.
       "fidlgen_libfuzzer",
     ]
   },
@@ -71,10 +71,10 @@ fidl_testdata_info = [
     target =
         "//tools/fidl/fidlc/testdata/bindings_denylist:test.bindingsdenylist"
     host_build_denylist = [
-      # TODO(https://fxbug.dev/62573): Add ifdefs so that protocols compile on host.
+      # TODO(https://fxbug.dev/42140981): Add ifdefs so that protocols compile on host.
       "fidlgen_cpp",
 
-      # TODO(https://fxbug.dev/72247): Encode libfuzzer dependency on HLCPP and LLCPP.
+      # TODO(https://fxbug.dev/42151687): Encode libfuzzer dependency on HLCPP and LLCPP.
       "fidlgen_libfuzzer",
     ]
   },
@@ -90,7 +90,7 @@ fidl_testdata_info = [
     name = "consts"
     target = "//tools/fidl/fidlc/testdata:test.consts"
     build_denylist = [
-      # TODO(https://fxbug.dev/62520): Insert enum/bits <-> primitive conversions.
+      # TODO(https://fxbug.dev/42140924): Insert enum/bits <-> primitive conversions.
       "fidlgen_hlcpp",
       "fidlgen_libfuzzer",
       "fidlgen_cpp",
@@ -101,7 +101,7 @@ fidl_testdata_info = [
     name = "constants"
     target = "//tools/fidl/fidlc/testdata:test.constants"
     denylist = [
-      # TODO(https://fxbug.dev/45006): Implement const expressions in fidlgen.
+      # TODO(https://fxbug.dev/42121484): Implement const expressions in fidlgen.
       "fidlgen_hlcpp",
       "fidlgen_libfuzzer",
       "fidlgen_cpp",
@@ -116,12 +116,12 @@ fidl_testdata_info = [
     name = "doc_comments"
     target = "//tools/fidl/fidlc/testdata:test.doccomments"
     build_denylist = [
-      # TODO(https://fxbug.dev/62523): Make protocol named "Interface" compile.
+      # TODO(https://fxbug.dev/42140927): Make protocol named "Interface" compile.
       "fidlgen_cpp",
       "fidlgen_libfuzzer",
     ]
     host_build_denylist = [
-      # TODO(https://fxbug.dev/62573): Add ifdefs so that protocols compile on host.
+      # TODO(https://fxbug.dev/42140981): Add ifdefs so that protocols compile on host.
       "fidlgen_cpp",
     ]
   },
@@ -129,7 +129,7 @@ fidl_testdata_info = [
     name = "driver_handle"
     target = "//tools/fidl/fidlc/testdata:test.driverhandle"
     build_denylist = [
-      # TODO(https://fxbug.dev/116986): Unused import error.
+      # TODO(https://fxbug.dev/42068210): Unused import error.
       "fidlgen_go",
     ]
   },
@@ -137,7 +137,7 @@ fidl_testdata_info = [
     name = "driver_one_way"
     target = "//tools/fidl/fidlc/testdata:test.driveroneway"
     build_denylist = [
-      # TODO(https://fxbug.dev/101744): Fix.
+      # TODO(https://fxbug.dev/42052603): Fix.
       "fidlgen_libfuzzer",
     ]
   },
@@ -145,7 +145,7 @@ fidl_testdata_info = [
     name = "driver_service"
     target = "//tools/fidl/fidlc/testdata:test.driverservice"
     build_denylist = [
-      # TODO(https://fxbug.dev/105845): These bindings don't support driver protocols in
+      # TODO(https://fxbug.dev/42057119): These bindings don't support driver protocols in
       # services.
       "fidlgen_go",
       "fidlgen_hlcpp",
@@ -157,7 +157,7 @@ fidl_testdata_info = [
     name = "driver_two_way"
     target = "//tools/fidl/fidlc/testdata:test.drivertwoway"
     build_denylist = [
-      # TODO(https://fxbug.dev/101744): Fix.
+      # TODO(https://fxbug.dev/42052603): Fix.
       "fidlgen_libfuzzer",
     ]
   },
@@ -165,10 +165,10 @@ fidl_testdata_info = [
     name = "empty_struct"
     target = "//tools/fidl/fidlc/testdata:test.emptystruct"
     host_build_denylist = [
-      # TODO(https://fxbug.dev/62573): Add ifdefs so that protocols compile on host.
+      # TODO(https://fxbug.dev/42140981): Add ifdefs so that protocols compile on host.
       "fidlgen_cpp",
 
-      # TODO(https://fxbug.dev/72247): Encode libfuzzer dependency on HLCPP and LLCPP.
+      # TODO(https://fxbug.dev/42151687): Encode libfuzzer dependency on HLCPP and LLCPP.
       "fidlgen_libfuzzer",
     ]
   },
@@ -180,20 +180,20 @@ fidl_testdata_info = [
     name = "enum"
     target = "//tools/fidl/fidlc/testdata:test.enum"
     build_denylist = [
-      # TODO(https://fxbug.dev/101713): Make libfuzzer work with empty flexible enums.
+      # TODO(https://fxbug.dev/42052569): Make libfuzzer work with empty flexible enums.
       "fidlgen_libfuzzer",
     ]
   },
 
-  # TODO(https://fxbug.dev/64992): Remove, use only error_syntax example.
+  # TODO(https://fxbug.dev/42143655): Remove, use only error_syntax example.
   {
     name = "error"
     target = "//tools/fidl/fidlc/testdata:test.error"
     host_build_denylist = [
-      # TODO(https://fxbug.dev/62573): Add ifdefs so that protocols compile on host.
+      # TODO(https://fxbug.dev/42140981): Add ifdefs so that protocols compile on host.
       "fidlgen_cpp",
 
-      # TODO(https://fxbug.dev/72247): Encode libfuzzer dependency on HLCPP and LLCPP.
+      # TODO(https://fxbug.dev/42151687): Encode libfuzzer dependency on HLCPP and LLCPP.
       "fidlgen_libfuzzer",
     ]
   },
@@ -209,7 +209,7 @@ fidl_testdata_info = [
     name = "experimental_maybe_from_alias"
     target = "//tools/fidl/fidlc/testdata:test.experimentalmaybefromalias"
     denylist = [
-      # TODO(https://fxbug.dev/62533): Fix many issues.
+      # TODO(https://fxbug.dev/42140938): Fix many issues.
       "fidlgen_hlcpp",
       "fidlgen_libfuzzer",
       "fidlgen_cpp",
@@ -219,14 +219,14 @@ fidl_testdata_info = [
     name = "foreign_type_in_response_used_through_compose"
     target = "//tools/fidl/fidlc/testdata/foreign_type_in_response_used_through_compose:test.foreigntypeinresponseusedthroughcompose"
     build_denylist = [
-      # TODO(https://fxbug.dev/116985): Unused import.
+      # TODO(https://fxbug.dev/42068209): Unused import.
       "fidlgen_go",
     ]
     host_build_denylist = [
-      # TODO(https://fxbug.dev/62573): Add ifdefs so that protocols compile on host.
+      # TODO(https://fxbug.dev/42140981): Add ifdefs so that protocols compile on host.
       "fidlgen_cpp",
 
-      # TODO(https://fxbug.dev/72247): Encode libfuzzer dependency on HLCPP and LLCPP.
+      # TODO(https://fxbug.dev/42151687): Encode libfuzzer dependency on HLCPP and LLCPP.
       "fidlgen_libfuzzer",
     ]
   },
@@ -247,10 +247,10 @@ fidl_testdata_info = [
     name = "inheritance"
     target = "//tools/fidl/fidlc/testdata:test.inheritance"
     host_build_denylist = [
-      # TODO(https://fxbug.dev/62573): Add ifdefs so that protocols compile on host.
+      # TODO(https://fxbug.dev/42140981): Add ifdefs so that protocols compile on host.
       "fidlgen_cpp",
 
-      # TODO(https://fxbug.dev/72247): Encode libfuzzer dependency on HLCPP and LLCPP.
+      # TODO(https://fxbug.dev/42151687): Encode libfuzzer dependency on HLCPP and LLCPP.
       "fidlgen_libfuzzer",
     ]
   },
@@ -258,10 +258,10 @@ fidl_testdata_info = [
     name = "inheritance_with_recursive_decl"
     target = "//tools/fidl/fidlc/testdata:test.inheritancewithrecursivedecl"
     host_build_denylist = [
-      # TODO(https://fxbug.dev/62573): Add ifdefs so that protocols compile on host.
+      # TODO(https://fxbug.dev/42140981): Add ifdefs so that protocols compile on host.
       "fidlgen_cpp",
 
-      # TODO(https://fxbug.dev/72247): Encode libfuzzer dependency on HLCPP and LLCPP.
+      # TODO(https://fxbug.dev/42151687): Encode libfuzzer dependency on HLCPP and LLCPP.
       "fidlgen_libfuzzer",
     ]
   },
@@ -269,7 +269,7 @@ fidl_testdata_info = [
     name = "new_type"
     target = "//tools/fidl/fidlc/testdata:test.newtype"
     denylist = [
-      # TODO(https://fxbug.dev/7807): Handle the IR changes for each language binding and other tools
+      # TODO(https://fxbug.dev/42158155): Handle the IR changes for each language binding and other tools
       "fidldoc",
       "fidlgen_banjo",
       "fidlgen_go",
@@ -284,7 +284,7 @@ fidl_testdata_info = [
     name = "nullable"
     target = "//tools/fidl/fidlc/testdata:test.nullable"
     host_build_denylist = [
-      # TODO(https://fxbug.dev/62573): Add ifdefs so that protocols compile on host.
+      # TODO(https://fxbug.dev/42140981): Add ifdefs so that protocols compile on host.
       "fidlgen_cpp",
     ]
   },
@@ -296,10 +296,10 @@ fidl_testdata_info = [
     name = "placement_of_attributes"
     target = "//tools/fidl/fidlc/testdata/placement_of_attributes:test.placementofattributes"
     host_build_denylist = [
-      # TODO(https://fxbug.dev/62573): Add ifdefs so that protocols compile on host.
+      # TODO(https://fxbug.dev/42140981): Add ifdefs so that protocols compile on host.
       "fidlgen_cpp",
 
-      # TODO(https://fxbug.dev/72247): Encode libfuzzer dependency on HLCPP and LLCPP.
+      # TODO(https://fxbug.dev/42151687): Encode libfuzzer dependency on HLCPP and LLCPP.
       "fidlgen_libfuzzer",
     ]
   },
@@ -308,10 +308,10 @@ fidl_testdata_info = [
     target = "//tools/fidl/fidlc/testdata/protocol_layouts:test.protocollayouts"
 
     denylist = [
-      # TODO(https://fxbug.dev/96310): Possibly add backend support for syzkaller.
+      # TODO(https://fxbug.dev/42178414): Possibly add backend support for syzkaller.
       "fidlgen_syzkaller",
 
-      # TODO(https://fxbug.dev/116983): Re-enable when fixed.
+      # TODO(https://fxbug.dev/42068207): Re-enable when fixed.
       "fidlgen_go",
     ]
   },
@@ -320,7 +320,7 @@ fidl_testdata_info = [
     target = "//tools/fidl/fidlc/testdata/protocol_layouts_same_library:test.protocollayoutssamelibrary"
 
     denylist = [
-      # TODO(https://fxbug.dev/96310): Possibly add backend support for syzkaller.
+      # TODO(https://fxbug.dev/42178414): Possibly add backend support for syzkaller.
       "fidlgen_syzkaller",
     ]
   },
@@ -333,17 +333,17 @@ fidl_testdata_info = [
     name = "protocol_request"
     target = "//tools/fidl/fidlc/testdata:test.protocolrequest"
     build_denylist = [
-      # TODO(https://fxbug.dev/62532): Fix many issues.
+      # TODO(https://fxbug.dev/42140937): Fix many issues.
       "fidlgen_cpp",
 
-      # TODO(https://fxbug.dev/72247): Encode libfuzzer dependency on HLCPP and LLCPP.
+      # TODO(https://fxbug.dev/42151687): Encode libfuzzer dependency on HLCPP and LLCPP.
       "fidlgen_libfuzzer",
     ]
     host_build_denylist = [
-      # TODO(https://fxbug.dev/62573): Add ifdefs so that protocols compile on host.
+      # TODO(https://fxbug.dev/42140981): Add ifdefs so that protocols compile on host.
       "fidlgen_cpp",
 
-      # TODO(https://fxbug.dev/72247): Encode libfuzzer dependency on HLCPP and LLCPP.
+      # TODO(https://fxbug.dev/42151687): Encode libfuzzer dependency on HLCPP and LLCPP.
       "fidlgen_libfuzzer",
     ]
   },
@@ -351,14 +351,14 @@ fidl_testdata_info = [
     name = "protocols"
     target = "//tools/fidl/fidlc/testdata:test.protocols"
     build_denylist = [
-      # TODO(https://fxbug.dev/101744): Fix.
+      # TODO(https://fxbug.dev/42052603): Fix.
       "fidlgen_libfuzzer",
     ]
     host_build_denylist = [
-      # TODO(https://fxbug.dev/62573): Add ifdefs so that protocols compile on host.
+      # TODO(https://fxbug.dev/42140981): Add ifdefs so that protocols compile on host.
       "fidlgen_cpp",
 
-      # TODO(https://fxbug.dev/72247): Encode libfuzzer dependency on HLCPP and LLCPP.
+      # TODO(https://fxbug.dev/42151687): Encode libfuzzer dependency on HLCPP and LLCPP.
       "fidlgen_libfuzzer",
     ]
   },
@@ -366,7 +366,7 @@ fidl_testdata_info = [
     name = "request_flexible_envelope"
     target = "//tools/fidl/fidlc/testdata:test.requestflexibleenvelope"
     host_build_denylist = [
-      # TODO(https://fxbug.dev/62573): Add ifdefs so that protocols compile on host.
+      # TODO(https://fxbug.dev/42140981): Add ifdefs so that protocols compile on host.
       "fidlgen_cpp",
     ]
   },
@@ -374,10 +374,10 @@ fidl_testdata_info = [
     name = "service"
     target = "//tools/fidl/fidlc/testdata:test.service"
     host_build_denylist = [
-      # TODO(https://fxbug.dev/62573): Add ifdefs so that protocols compile on host.
+      # TODO(https://fxbug.dev/42140981): Add ifdefs so that protocols compile on host.
       "fidlgen_cpp",
 
-      # TODO(https://fxbug.dev/72247): Encode libfuzzer dependency on HLCPP and LLCPP.
+      # TODO(https://fxbug.dev/42151687): Encode libfuzzer dependency on HLCPP and LLCPP.
       "fidlgen_libfuzzer",
     ]
   },
@@ -389,7 +389,7 @@ fidl_testdata_info = [
     name = "struct_default_value_enum_library_reference"
     target = "//tools/fidl/fidlc/testdata/struct_default_value_enum_library_reference:test.structdefaultvalueenumlibraryreference"
     denylist = [
-      # TODO(https://fxbug.dev/45007): Syzkaller does not support enum member references
+      # TODO(https://fxbug.dev/42121485): Syzkaller does not support enum member references
       # in struct defaults.
       "fidlgen_syzkaller",
     ]
@@ -406,10 +406,10 @@ fidl_testdata_info = [
     name = "transitive_dependencies_compose"
     target = "//tools/fidl/fidlc/testdata/transitive_dependencies_compose:test.transitivedependenciescompose"
     host_build_denylist = [
-      # TODO(https://fxbug.dev/62573): Add ifdefs so that protocols compile on host.
+      # TODO(https://fxbug.dev/42140981): Add ifdefs so that protocols compile on host.
       "fidlgen_cpp",
 
-      # TODO(https://fxbug.dev/72247): Encode libfuzzer dependency on HLCPP and LLCPP.
+      # TODO(https://fxbug.dev/42151687): Encode libfuzzer dependency on HLCPP and LLCPP.
       "fidlgen_libfuzzer",
     ]
   },
@@ -421,7 +421,7 @@ fidl_testdata_info = [
     name = "union"
     target = "//tools/fidl/fidlc/testdata:test.union"
     host_build_denylist = [
-      # TODO(https://fxbug.dev/62573): Add ifdefs so that protocols compile on host.
+      # TODO(https://fxbug.dev/42140981): Add ifdefs so that protocols compile on host.
       "fidlgen_cpp",
     ]
   },
@@ -429,7 +429,7 @@ fidl_testdata_info = [
     name = "union_sandwich"
     target = "//tools/fidl/fidlc/testdata:test.unionsandwich"
     host_build_denylist = [
-      # TODO(https://fxbug.dev/62573): Add ifdefs so that protocols compile on host.
+      # TODO(https://fxbug.dev/42140981): Add ifdefs so that protocols compile on host.
       "fidlgen_cpp",
     ]
   },
@@ -445,7 +445,7 @@ fidl_testdata_info = [
     name = "versions"
     target = "//tools/fidl/fidlc/testdata:test.versions"
     host_build_denylist = [
-      # TODO(https://fxbug.dev/62573): Add ifdefs so that protocols compile on host.
+      # TODO(https://fxbug.dev/42140981): Add ifdefs so that protocols compile on host.
       "fidlgen_cpp",
     ]
   },

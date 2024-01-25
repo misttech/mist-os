@@ -458,7 +458,7 @@ void ResolveStep::ParseSyntheticReference(Reference& ref, Context context) {
 }
 
 void ResolveStep::ParseSourcedReference(Reference& ref, Context context) {
-  // TOOD(https://fxbug.dev/77561): Move this information to the FIDL language spec.
+  // TOOD(https://fxbug.dev/42157590): Move this information to the FIDL language spec.
   //
   // Below is an outline of FIDL scoping semantics. We navigate it by moving
   // down and to the right. That is, if a rule succeeds, we proceed to the
@@ -640,7 +640,7 @@ Decl* ResolveStep::LookupDeclByKey(const Reference& ref, Context context) {
         return decl;
       }
     }
-    // TODO(https://fxbug.dev/67858): Provide a nicer error message in the case where a
+    // TODO(https://fxbug.dev/42146818): Provide a nicer error message in the case where a
     // decl with that name does exist, but in a different version range.
     reporter()->Fail(ErrNameNotFound, ref.span(), key.decl_name, key.library->name);
     return nullptr;
@@ -653,7 +653,7 @@ Decl* ResolveStep::LookupDeclByKey(const Reference& ref, Context context) {
       return decl;
     }
   }
-  // TODO(https://fxbug.dev/67858): Provide a nicer error message in the case where
+  // TODO(https://fxbug.dev/42146818): Provide a nicer error message in the case where
   // a decl with that name does exist, but in a different version range.
   reporter()->Fail(ErrNameNotFound, ref.span(), key.decl_name, key.library->name);
   return nullptr;
@@ -680,7 +680,7 @@ void ResolveStep::ValidateReference(const Reference& ref, Context context) {
   auto source_deprecated = source->availability.is_deprecated();
   auto target_deprecated = target->availability.is_deprecated();
 
-  // TODO(https://fxbug.dev/101849): The check below is a stopgap solution to allow
+  // TODO(https://fxbug.dev/42052719): The check below is a stopgap solution to allow
   // @deprecated elements to reference @available(deprecated=...) elements. We
   // should solve this in a more principled way by layering the latter on the
   // former. For example, that would also ensure that the following works:

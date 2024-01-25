@@ -110,7 +110,7 @@ private:
     return *this;
   }
   {{- else }}
-  {{- /* TODO(https://fxbug.dev/7999): The elem pointer should be const if it has no handles. */}}
+  {{- /* TODO(https://fxbug.dev/42160282): The elem pointer should be const if it has no handles. */}}
   {{ $.Name }}& set_{{ .Name }}(::fidl::ObjectView<{{ .Type }}> elem) {
     ZX_DEBUG_ASSERT(frame_ptr_ != nullptr);
     frame_ptr_->{{ .Name }}_.set_data(elem);
@@ -220,7 +220,7 @@ class ::fidl::internal::WireTableBaseBuilder<{{ . }}, BuilderImpl> {
         return *static_cast<BuilderImpl*>(this);
       }
     {{- else }}
-      {{- /* TODO(https://fxbug.dev/7999): The elem pointer should be const if it has no handles. */}}
+      {{- /* TODO(https://fxbug.dev/42160282): The elem pointer should be const if it has no handles. */}}
       BuilderImpl& {{ .Name }}(Wrapper_Ignore_Me_<::fidl::ObjectView<{{ .Type }}>> elem) {
         ZX_DEBUG_ASSERT(table_.frame_ptr_ != nullptr);
         ZX_DEBUG_ASSERT(elem.value.get() != nullptr);

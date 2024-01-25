@@ -18,7 +18,7 @@ var (
 		"fvm":      "fvm",
 		"blobfs":   "blobfs",
 		"encipher": "encipher",
-		// TODO(https://fxbug.dev/38517): We can remove this different destination
+		// TODO(https://fxbug.dev/42114276): We can remove this different destination
 		// name once the go bootserver has replaced the old c bootserver
 		// and is called bootserver instead of bootserver_new.
 		"bootserver_new": "bootserver",

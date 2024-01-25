@@ -215,7 +215,7 @@ func (c *compiler) compileEnum(v fidlgen.Enum) enum {
 	}
 	var values []string
 	for _, m := range v.Members {
-		// TODO(https://fxbug.dev/136483): Centralize C++ integer literal logic.
+		// TODO(https://fxbug.dev/42086098): Centralize C++ integer literal logic.
 		var expr string
 		if m.Value.Value == "-9223372036854775808" {
 			expr = "-9223372036854775807 - 1"

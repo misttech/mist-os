@@ -424,7 +424,7 @@ std::unique_ptr<RawConstant> Parser::ParseConstant() {
   std::unique_ptr<RawConstant> constant;
 
   switch (Peek().combined()) {
-  // TODO(https://fxbug.dev/77561): by placing this before the kIdentifier check below, we are
+  // TODO(https://fxbug.dev/42157590): by placing this before the kIdentifier check below, we are
   // implicitly
   //  stating that the tokens "true" and "false" will always be interpreted as their literal
   //  constants.  Consider the following example:

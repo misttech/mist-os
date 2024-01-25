@@ -238,7 +238,7 @@ void Linter::NewFile(const File& element) {
       DefineCheck("invalid-case-for-decl-name", "${TYPE} must be named in UpperCamelCase");
 
   if (!library_is_platform_source_library_) {
-    // TODO(https://fxbug.dev/7871): Implement more specific test,
+    // TODO(https://fxbug.dev/42158866): Implement more specific test,
     // comparing proposed library prefix to actual
     // source path.
     std::string replacement = "fuchsia, perhaps?";
@@ -302,7 +302,7 @@ void Linter::AddInvalidCopyrightFinding(SourceSpan span) {
 void Linter::CheckInvalidCopyright(SourceSpan span, std::string line_comment,
                                    std::string line_to_match) {
   if (line_comment == line_to_match ||
-      // TODO(https://fxbug.dev/66908): Remove this branch once all platform FIDL files are updated.
+      // TODO(https://fxbug.dev/42145767): Remove this branch once all platform FIDL files are updated.
       line_comment == line_to_match + " All rights reserved.") {
     good_copyright_lines_found_++;
     return;
@@ -576,7 +576,7 @@ Linter::Linter()
       (const RawTypeDeclaration& element) {
         auto* layout_ref = element.type_ctor->layout_ref.get();
 
-        // TODO(https://fxbug.dev/7807): Delete this check once new-types are supported. Instead, we
+        // TODO(https://fxbug.dev/42158155): Delete this check once new-types are supported. Instead, we
         // should have new-type specific language to report the invalid naming case to the user.
         if (layout_ref->kind == RawLayoutReference::Kind::kNamed) {
           return;
@@ -695,7 +695,7 @@ Linter::Linter()
                 has_size = true;
               }
             } else if (first_constraint->kind == RawConstant::Kind::kIdentifier && first_constraint->span().data() != "optional") {
-              // TODO(https://fxbug.dev/77561): This check currently fails to recognize a shadowing const
+              // TODO(https://fxbug.dev/42157590): This check currently fails to recognize a shadowing const
               //  named optional, like:
               //
               //    const optional uint16 = 1234;

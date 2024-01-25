@@ -69,7 +69,7 @@ function _build_gn_label {
   # E.g. //src/foo(//build/toolchain/fuchsia:x64) --> //src/foo
   target="$(printf %s "${target}" | cut -d'(' -f1)"
   # Important: redirect stdout to stderr to avoid polluting this script's
-  # output. See https://fxbug.dev/125439
+  # output. See https://fxbug.dev/42076242
   >&2 fx-command-run build "${target}"
 }
 

@@ -820,7 +820,7 @@ library example;
 @foo(bar="abc", "def")
 type MyStruct = struct {};
 )FIDL");
-  // TODO(https://fxbug.dev/112219): If an unnamed string argument follows a named
+  // TODO(https://fxbug.dev/42063565): If an unnamed string argument follows a named
   // argument, it incorrectly produces ErrUnexpectedTokenOfKind instead of
   // ErrAttributeArgsMustAllBeNamed.
   library.ExpectFail(ErrUnexpectedTokenOfKind, Token::KindAndSubkind(Token::Kind::kStringLiteral),
@@ -846,7 +846,7 @@ library example;
 @foo(bar="abc", def)
 type MyStruct = struct {};
 )FIDL");
-  // TODO(https://fxbug.dev/112219): If an unnamed identifier argument follows a named
+  // TODO(https://fxbug.dev/42063565): If an unnamed identifier argument follows a named
   // argument, it incorrectly produces ErrUnexpectedTokenOfKind and
   // ErrUnexpectedToken instead of ErrAttributeArgsMustAllBeNamed.
   library.ExpectFail(ErrUnexpectedTokenOfKind, Token::KindAndSubkind(Token::Kind::kRightParen),

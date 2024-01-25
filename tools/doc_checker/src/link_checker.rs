@@ -41,7 +41,7 @@ pub(crate) const PUBLISHED_DOCS_HOST: &str = "fuchsia.dev";
 /// This is a pretty small list (n < 5), but if it grows large, it might be
 /// better to manages as an external file vs. inline.
 const DISALLOWED_ALT_IMAGE_TEXT: [&str; 1] = [""];
-// TODO(https://fxbug.dev/113039): disallow "drawing, "image" for alt text";
+// TODO(https://fxbug.dev/42064332): disallow "drawing, "image" for alt text";
 
 /// List of active repos under fuchsia.googlesource.com which can be linked to.
 const VALID_PROJECTS: [&str; 21] = [

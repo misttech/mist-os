@@ -82,7 +82,7 @@ pub(crate) fn validate_hermeticity(
 /// Given a TestPackageInfo, locate the package manifest, and from it, the
 /// meta.far, and from it, the component manifest, and then validate that it
 /// doesn't specify a non-hermetic test realm in the component facets.
-// TODO(https://fxbug.dev/118042), TODO(https://fxbug.dev/117504): Remove these checks when hermeticity no longer
+// TODO(https://fxbug.dev/118042), TODO(https://fxbug.dev/42068721): Remove these checks when hermeticity no longer
 // depends on component manifest
 fn check_manifest_hermeticity(
     test: &TestPackageInfo,

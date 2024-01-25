@@ -887,7 +887,7 @@ mod tests {
             },
         },
 
-        // TODO(https://fxbug.dev/127214): Add a test where different availabilities aggregated by
+        // TODO(https://fxbug.dev/42077867): Add a test where different availabilities aggregated by
         // several service expose declarations is an error.
     }}
 

@@ -526,7 +526,7 @@ struct Struct;
 // this was made a top-level class since it's not possible to forward-declare nested classes in
 // C++. For backward-compatibility, Struct::Member is now an alias for this top-level
 // StructMember.
-// TODO(https://fxbug.dev/37535): Move this to a nested class inside Struct.
+// TODO(https://fxbug.dev/42113185): Move this to a nested class inside Struct.
 struct StructMember : public Element, public Object, public HasCopy<StructMember> {
   StructMember(std::unique_ptr<TypeConstructor> type_ctor, SourceSpan name,
                std::unique_ptr<Constant> maybe_default_value,
@@ -573,7 +573,7 @@ struct Struct final : public TypeDecl {
 struct Table;
 
 // See the comment on the StructMember class for why this is a top-level class.
-// TODO(https://fxbug.dev/37535): Move this to a nested class inside Table::Member.
+// TODO(https://fxbug.dev/42113185): Move this to a nested class inside Table::Member.
 struct TableMemberUsed : public Object, public HasClone<TableMemberUsed> {
   TableMemberUsed(std::unique_ptr<TypeConstructor> type_ctor, SourceSpan name)
       : type_ctor(std::move(type_ctor)), name(name) {}
@@ -590,7 +590,7 @@ struct TableMemberUsed : public Object, public HasClone<TableMemberUsed> {
 };
 
 // See the comment on the StructMember class for why this is a top-level class.
-// TODO(https://fxbug.dev/37535): Move this to a nested class inside Table.
+// TODO(https://fxbug.dev/42113185): Move this to a nested class inside Table.
 struct TableMember : public Element, public Object, public HasCopy<TableMember> {
   using Used = TableMemberUsed;
 
@@ -646,7 +646,7 @@ struct Table final : public TypeDecl {
 struct Union;
 
 // See the comment on the StructMember class for why this is a top-level class.
-// TODO(https://fxbug.dev/37535): Move this to a nested class inside Union.
+// TODO(https://fxbug.dev/42113185): Move this to a nested class inside Union.
 struct UnionMemberUsed : public Object, public HasClone<UnionMemberUsed> {
   UnionMemberUsed(std::unique_ptr<TypeConstructor> type_ctor, SourceSpan name)
       : type_ctor(std::move(type_ctor)), name(name) {}
@@ -665,7 +665,7 @@ struct UnionMemberUsed : public Object, public HasClone<UnionMemberUsed> {
 };
 
 // See the comment on the StructMember class for why this is a top-level class.
-// TODO(https://fxbug.dev/37535): Move this to a nested class inside Union.
+// TODO(https://fxbug.dev/42113185): Move this to a nested class inside Union.
 struct UnionMember : public Element, public Object, public HasCopy<UnionMember> {
   using Used = UnionMemberUsed;
 
@@ -939,7 +939,7 @@ struct Alias final : public Decl {
   // The constraints on the other hand are indeed "partial" - any alias
   // at any point in an "alias chain" can specify a constraint, but any
   // constraint can only specified once. This behavior will change in
-  // https://fxbug.dev/74193.
+  // https://fxbug.dev/42153849.
   std::unique_ptr<TypeConstructor> partial_type_ctor;
 
  private:

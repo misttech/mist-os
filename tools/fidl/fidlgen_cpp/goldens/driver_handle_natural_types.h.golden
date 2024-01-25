@@ -176,7 +176,7 @@ class T {
     ::std::optional<::fdf::ClientEnd<::test_driverhandle::DriverProtocol>> fdf_handle;
   };
 
-  // TODO(https://fxbug.dev/91252): Box the storage.
+  // TODO(https://fxbug.dev/42172795): Box the storage.
   Storage_ storage_;
   friend struct ::fidl::internal::NaturalTableCodingTraits<::test_driverhandle::T>;
   friend struct ::fidl::internal::MemberVisitor<::test_driverhandle::T>;

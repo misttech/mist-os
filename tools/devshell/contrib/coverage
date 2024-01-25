@@ -67,7 +67,7 @@ function main() {
     ffx_cov_args+=" --export-html ${html_output_dir}"
   fi
 
-  # TODO(https://fxbug.dev/103896): realpath is not available on Mac, use a
+  # TODO(https://fxbug.dev/42054992): realpath is not available on Mac, use a
   # platform-neutral implementation instead.
   readonly _REL_BUILD_DIR="$(realpath -s --relative-to="${FUCHSIA_BUILD_DIR}" "${FUCHSIA_DIR}")"
 

@@ -699,7 +699,7 @@ popd
 		return retMap, nil
 	}
 
-	// TODO(https://fxbug.dev/99600): Consider to remove this extra layer once builders
+	// TODO(https://fxbug.dev/42182062): Consider to remove this extra layer once builders
 	// migrate to this new SDK package.
 	jsonOutputWrapper := func(envvar map[string][][]string) map[string]map[string][][]string {
 		retMap := make(map[string]map[string][][]string)

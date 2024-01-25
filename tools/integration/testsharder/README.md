@@ -30,7 +30,7 @@ testsharder has two flags to control the size of shards:
 *   `-max-shard-size` specifies a target number of tests for each shard. If set,
     testsharder will divide the input tests.json into shards of approximately
     this size.
-    <!-- TODO(https://fxbug.dev/49286): Rename this to `-target-test-count` -->
+    <!-- TODO(https://fxbug.dev/42126237): Rename this to `-target-test-count` -->
 
 *   `-target-duration-secs` specifies a target duration for each shard. If set,
     testsharder will divide the input tests.json into shards whose tests are

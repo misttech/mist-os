@@ -17,7 +17,7 @@ import (
 // serial. This means ordering is not guaranteed, but this is no different
 // than what would happen if we redirected stderr to stdout in any other
 // way.
-// TODO(https://fxbug.dev/106110): Once we are using only exec.Cmd and not ssh.Session
+// TODO(https://fxbug.dev/42057415): Once we are using only exec.Cmd and not ssh.Session
 // we may be able to simply assign the same pipe object to Stdout and Stderr,
 // but this does not work for ssh.Session (see comments about KillCloser)
 func parallelMultiReader(readers ...io.Reader) io.ReadCloser {

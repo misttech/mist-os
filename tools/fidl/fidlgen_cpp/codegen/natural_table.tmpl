@@ -72,7 +72,7 @@ class {{ .Name }} {
     {{- end }}
   };
 
-  // TODO(https://fxbug.dev/91252): Box the storage.
+  // TODO(https://fxbug.dev/42172795): Box the storage.
   Storage_ storage_;
   {{- if not .IsResourceType }}
     Storage_ CloneStorage_() const;

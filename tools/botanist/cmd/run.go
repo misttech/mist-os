@@ -236,7 +236,7 @@ func (r *RunCommand) setupFFX(ctx context.Context, fuchsiaTargets []targets.Fuch
 		cmdWait <- err
 	}()
 	cleanup = func() {
-		// TODO(https://fxbug.dev/120758): Clean up daemon by sending a SIGTERM to the
+		// TODO(https://fxbug.dev/42071857): Clean up daemon by sending a SIGTERM to the
 		// process once that is supported.
 		if err := ffx.Stop(); err != nil {
 			logger.Errorf(ctx, "failed to stop ffx daemon: %s", err)
@@ -282,7 +282,7 @@ func (r *RunCommand) setupSerialLog(ctx context.Context, eg *errgroup.Group, fuc
 
 			// Create a new file to capture the serial log for this nodename.
 			serialLogName := fmt.Sprintf("%s_serial_log.txt", t.Nodename())
-			// TODO(https://fxbug.dev/71529): Remove once there are no dependencies on this filename.
+			// TODO(https://fxbug.dev/42150891): Remove once there are no dependencies on this filename.
 			if len(fuchsiaTargets) == 1 {
 				serialLogName = "serial_log.txt"
 			}
@@ -333,7 +333,7 @@ func (r *RunCommand) dispatchTests(ctx context.Context, cancel context.CancelFun
 	// TODO(rudymathu): Remove this once stability is achieved.
 	r.zirconArgs = append(r.zirconArgs, "driver.usb_mass_storage.disable")
 
-	// TODO(https://fxbug.dev/88370#c74): Remove this once CDC-ether flakiness
+	// TODO(https://fxbug.dev/42169595#c74): Remove this once CDC-ether flakiness
 	// has been resolved.
 	r.zirconArgs = append(r.zirconArgs, "driver.usb_cdc.log=debug")
 
@@ -411,7 +411,7 @@ func (r *RunCommand) dispatchTests(ctx context.Context, cancel context.CancelFun
 					}
 					go func() {
 						syslogName := fmt.Sprintf("%s_syslog.txt", t.Nodename())
-						// TODO(https://fxbug.dev/71529): Remove when there are no dependencies on this filename.
+						// TODO(https://fxbug.dev/42150891): Remove when there are no dependencies on this filename.
 						if len(fuchsiaTargets) == 1 {
 							syslogName = "syslog.txt"
 						}
@@ -634,7 +634,7 @@ func (r *RunCommand) runAgainstTarget(ctx context.Context, t targets.FuchsiaTarg
 	// there are some tests that attempt to SSH into a netbooted image that
 	// has our SSH keys baked into it. Therefore, we add the SSH key to the
 	// environment unconditionally. Additionally, some tools like FFX often
-	// require the SSH key path to be absolute (https://fxbug.dev/101081).
+	// require the SSH key path to be absolute (https://fxbug.dev/42051867).
 	if t.SSHKey() != "" {
 		absKeyPath, err := filepath.Abs(t.SSHKey())
 		if err != nil {
@@ -643,7 +643,7 @@ func (r *RunCommand) runAgainstTarget(ctx context.Context, t targets.FuchsiaTarg
 		testrunnerEnv[constants.SSHKeyEnvKey] = absKeyPath
 	}
 
-	// TODO(https://fxbug.dev/111922): testrunner does heavy use of env
+	// TODO(https://fxbug.dev/42063235): testrunner does heavy use of env
 	// variables. Setting these env variables is temporary until we refactor
 	// testrunner to take these variables as arguments or flags.
 	for k, v := range testrunnerEnv {
@@ -703,7 +703,7 @@ func (r *RunCommand) Execute(ctx context.Context, f *flag.FlagSet, _ ...interfac
 		defer func() {
 			if skippedFiles, err := osmisc.CopyDir(tmpOutDir, testOutDir, osmisc.SkipUnknownFiles); err != nil {
 				logger.Errorf(ctx, "failed to copy outputs to %s: %s", testOutDir, err)
-				// TODO(https://fxbug.dev/128608): If we fail to copy outputs, at least copy
+				// TODO(https://fxbug.dev/42079078): If we fail to copy outputs, at least copy
 				// the ffx logs over so we can debug. Remove when attached bug is
 				// fixed.
 				if r.ffxPath != "" {

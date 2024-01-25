@@ -64,7 +64,7 @@ if (is_host) {
       "//zircon/system/public",
     ]
 
-    # TODO(https://fxbug.dev/58162): delete the below and fix compiler warnings
+    # TODO(https://fxbug.dev/42136089): delete the below and fix compiler warnings
     configs += [ "//build/config:Wno-conversion" ]
   }
 
@@ -82,7 +82,7 @@ if (is_host) {
       "//third_party/rapidjson",
     ]
 
-    # TODO(https://fxbug.dev/58162): delete the below and fix compiler warnings
+    # TODO(https://fxbug.dev/42136089): delete the below and fix compiler warnings
     configs += [ "//build/config:Wno-conversion" ]
   }
 

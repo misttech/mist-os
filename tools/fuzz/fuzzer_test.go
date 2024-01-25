@@ -546,7 +546,7 @@ func TestRunWithFuzzerErrorUsingFfxFuzz(t *testing.T) {
 
 	_, _, err = runWithConnector(t, build, conn, "cff/broken", nil)
 
-	// TODO(https://fxbug.dev/112048): Validate the specific expected error.
+	// TODO(https://fxbug.dev/42063375): Validate the specific expected error.
 	if err == nil {
 		t.Fatalf("expected failure to run but got: %s", err)
 	}

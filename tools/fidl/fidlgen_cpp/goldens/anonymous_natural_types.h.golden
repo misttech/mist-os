@@ -188,7 +188,7 @@ class FunctionApplication {
     ::std::optional<::test_anonymous::Flags> flags;
   };
 
-  // TODO(https://fxbug.dev/91252): Box the storage.
+  // TODO(https://fxbug.dev/42172795): Box the storage.
   Storage_ storage_;
   Storage_ CloneStorage_() const;
   friend struct ::fidl::internal::NaturalTableCodingTraits<::test_anonymous::FunctionApplication>;
@@ -540,7 +540,7 @@ class TableMember {
     ::std::optional<::std::vector<::test_anonymous::TableData>> table_data;
   };
 
-  // TODO(https://fxbug.dev/91252): Box the storage.
+  // TODO(https://fxbug.dev/42172795): Box the storage.
   Storage_ storage_;
   Storage_ CloneStorage_() const;
   friend struct ::fidl::internal::NaturalTableCodingTraits<::test_anonymous::TableMember>;

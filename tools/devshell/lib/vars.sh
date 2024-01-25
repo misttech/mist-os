@@ -84,7 +84,7 @@ function fx-rbe-enabled {
 }
 
 # At the moment, direct use of RBE uses gcloud to authenticate.
-# TODO(https://fxbug.dev/91579): simplify this process with an auth script
+# TODO(https://fxbug.dev/42173157): simplify this process with an auth script
 #   without depending on a locally installed gcloud.
 function fx-check-rbe-setup {
   if ! fx-rbe-enabled ; then return ; fi

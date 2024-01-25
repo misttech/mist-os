@@ -95,7 +95,7 @@ cpp_config_client_lib_source("cpp_elf_config_lib") {
   testonly = true
 }
 
-# TODO(https://fxbug.dev/108880) delete the HLCPP goldens once no longer needed
+# TODO(https://fxbug.dev/42060287) delete the HLCPP goldens once no longer needed
 cpp_config_client_lib_source("cpp_elf_hlcpp_config_lib") {
   manifest_outputs = get_target_outputs(":config_manifest")
   compiled_manifest = manifest_outputs[0]
@@ -151,7 +151,7 @@ golden_files("golden_tests") {
       candidate = cpp_elf_lib_outputs[1]
     },
 
-    # TODO(https://fxbug.dev/108880) delete the HLCPP goldens once no longer needed
+    # TODO(https://fxbug.dev/42060287) delete the HLCPP goldens once no longer needed
     {
       golden = "goldens/config.cc.elf.hlcpp.golden"
       candidate = cpp_elf_hlcpp_lib_outputs[0]

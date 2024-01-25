@@ -63,7 +63,7 @@ protocol CapturesDependencyThroughCompose {
   }
 }
 
-// TODO(https://fxbug.dev/7807): Reconsider this. Will likely need to follow aliases,
+// TODO(https://fxbug.dev/42158155): Reconsider this. Will likely need to follow aliases,
 // which would mean expecting the result to include both dep1 and dep2 here.
 TEST(DirectDependenciesTests, GoodDoesNotFollowAlias) {
   SharedAmongstLibraries shared;

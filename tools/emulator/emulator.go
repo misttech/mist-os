@@ -158,7 +158,7 @@ func DefaultVirtualDevice(arch string) *fvdpb.VirtualDevice {
 			"kernel.halt-on-panic=true",
 			// Disable lockup detector heartbeats. In emulated environments, virtualized
 			// CPUs may be starved or fail to execute in a timely fashion, resulting in
-			// apparent lockups. See https://fxbug.dev/65990.
+			// apparent lockups. See https://fxbug.dev/42144748.
 			"kernel.lockup-detector.heartbeat-period-ms=0",
 			"kernel.lockup-detector.heartbeat-age-threshold-ms=0",
 		),
@@ -354,8 +354,8 @@ func (d *Distribution) create(
 	}
 	// QEMU looks in the cwd for some specially named files, in particular
 	// multiboot.bin, so avoid picking those up accidentally. See
-	// https://fxbug.dev/53751.
-	// TODO(https://fxbug.dev/58804): Remove this.
+	// https://fxbug.dev/42131198.
+	// TODO(https://fxbug.dev/42136802): Remove this.
 	i.cmd.Dir = "/"
 
 	return i, nil
@@ -616,8 +616,8 @@ dm poweroff
 		cmd.Stderr = os.Stderr
 		// QEMU looks in the cwd for some specially named files, in particular
 		// multiboot.bin, so avoid picking those up accidentally. See
-		// https://fxbug.dev/53751.
-		// TODO(https://fxbug.dev/58804): Remove this.
+		// https://fxbug.dev/42131198.
+		// TODO(https://fxbug.dev/42136802): Remove this.
 		cmd.Dir = "/"
 		if err := cmd.Run(); err != nil {
 			return "", "", fmt.Errorf("error running %q: %w", cmd, err)

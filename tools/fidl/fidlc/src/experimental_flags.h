@@ -24,22 +24,22 @@ class ExperimentalFlags {
     kAllowNewTypes = 1 << 1,
     kOutputIndexJson = 1 << 3,
 
-    // TODO(https://fxbug.dev/110021): A temporary measure describe in
-    // https://fxbug.dev/110294.
+    // TODO(https://fxbug.dev/42061412): A temporary measure describe in
+    // https://fxbug.dev/42061642.
     kZxCTypes = 1 << 4,
 
     // These experiments control the migration to Unknown Interactions support.
 
     // This flag enables support for Unknown Interactions. By default, unknown
     // interactions are enabled with the legacy defaults of closed and strict.
-    // TODO(https://fxbug.dev/88366): Remove once unknown interactions are supported.
+    // TODO(https://fxbug.dev/42169590): Remove once unknown interactions are supported.
     kUnknownInteractions = 1 << 7,
 
     // This flag enables the temporary mode where unknown interaction modifiers
     // are mandatory. This flag does not cause unknown interactions support to
     // be enabled and has no effect if the kUnknownInteractions flag is not
     // enabled.
-    // TODO(https://fxbug.dev/88366): Remove once unknown interactions are supported.
+    // TODO(https://fxbug.dev/42169590): Remove once unknown interactions are supported.
     kUnknownInteractionsMandate = 1 << 8,
 
     // This flag changes unknown interactions to use the new defaults of open
@@ -47,7 +47,7 @@ class ExperimentalFlags {
     // has no effect if the kUnknownInteractions flag is not enabled. If the
     // kUnknownInteractions mandate flag is also enabled, the defaults cannot be
     // used, so this has no effect.
-    // TODO(https://fxbug.dev/88366): Remove once unknown interactions are supported.
+    // TODO(https://fxbug.dev/42169590): Remove once unknown interactions are supported.
     kUnknownInteractionsNewDefaults = 1 << 9,
 
     // Allow any types in error syntax, not just (u)int32 or enums thereof.
