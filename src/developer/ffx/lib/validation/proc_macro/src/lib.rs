@@ -99,9 +99,15 @@ fn stringify_ident(id: &Ident) -> String {
     s
 }
 
+/// Parser & container for struct fields & json object elements in the form `K: V`.
 struct SchemaField<K, V = K> {
     key: K,
     value: V,
+}
+
+struct SchemaStructKey {
+    name: Ident,
+    optional: bool,
 }
 
 struct SchemaEnumVariant {
@@ -156,7 +162,7 @@ enum SchemaType {
     Literal(SchemaLiteral),
     Struct {
         // TODO(b/316035130): Support string literals as field keys
-        fields: Punctuated<SchemaField<syn::Ident, SchemaType>, Token![,]>,
+        fields: Punctuated<SchemaField<SchemaStructKey, SchemaType>, Token![,]>,
         // TODO(b/316035760): Spread syntax (needs SchemaStructField enum)
         // TODO(b/316035686): Struct attributes (for #[strict])
     },
@@ -425,6 +431,15 @@ impl Parse for SchemaLiteral {
 }
 
 // Parses:
+// identifier
+// identifier?
+impl Parse for SchemaStructKey {
+    fn parse(input: syn::parse::ParseStream<'_>) -> syn::Result<Self> {
+        Ok(Self { name: input.parse()?, optional: input.parse::<Option<Token![?]>>()?.is_some() })
+    }
+}
+
+// Parses:
 // Variant
 // Variant( `SchemaType,...` )
 // Variant { `field: SchemaType,...` }
@@ -472,6 +487,12 @@ impl<K: Parse, V: Parse> Parse for SchemaField<K, V> {
 impl Parse for SchemaType {
     fn parse(input: syn::parse::ParseStream<'_>) -> syn::Result<Self> {
         let lookahead = input.lookahead1();
+
+        let plain_literal = lookahead.peek(syn::LitStr)
+            || lookahead.peek(syn::LitBool)
+            || lookahead.peek(syn::LitInt)
+            || lookahead.peek(syn::LitFloat);
+
         let mut ty = if lookahead.peek(Token![struct]) {
             input.parse::<Token![struct]>()?;
             let braced;
@@ -482,8 +503,10 @@ impl Parse for SchemaType {
             let braced;
             syn::braced!(braced in input);
             Self::Enum { variants: braced.parse_terminated(SchemaEnumVariant::parse)? }
-        } else if lookahead.peek(Token![const]) {
-            input.parse::<Token![const]>()?;
+        } else if lookahead.peek(Token![const]) || plain_literal {
+            if !plain_literal {
+                input.parse::<Token![const]>()?;
+            }
             Self::Literal(input.parse()?)
         } else if lookahead.peek(Token![fn]) {
             input.parse::<Token![fn]>()?;
@@ -533,13 +556,23 @@ impl SchemaType {
                 }
             }
             Self::Struct { fields } => {
-                let fields: proc_macro2::TokenStream = fields.iter().map(|field| {
-                    let ty = field.value.build(walker);
-                    let key_str = stringify_ident(&field.key);
-                    quote! {
-                        ::ffx_validation::schema::Field { key: #key_str, value: |#walker| { #ty walker.ok() }, ..::ffx_validation::schema::FIELD },
-                    }
-                }).collect();
+                let fields: proc_macro2::TokenStream = fields
+                    .iter()
+                    .map(|field| {
+                        let SchemaField { key, value } = field;
+                        let SchemaStructKey { name, optional } = key;
+                        let ty = value.build(walker);
+                        let key_str = stringify_ident(name);
+                        quote! {
+                            ::ffx_validation::schema::Field {
+                                key: #key_str,
+                                value: |#walker| { #ty walker.ok() },
+                                optional: #optional, ..::ffx_validation::schema::FIELD
+                            },
+                        }
+                    })
+                    .collect();
+
                 quote! {
                     #walker.add_struct(
                         &[#fields],
