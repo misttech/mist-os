@@ -1336,11 +1336,9 @@ mod tests {
             let (timer, time_stream) = create_timer();
             let (fake_device, fake_device_state) = FakeDevice::new_with_config(
                 executor,
-                FakeDeviceConfig {
-                    mac_role: fidl_common::WlanMacRole::Client,
-                    sta_addr: Bssid::from(*IFACE_MAC),
-                    ..Default::default()
-                },
+                FakeDeviceConfig::default()
+                    .with_mock_mac_role(fidl_common::WlanMacRole::Client)
+                    .with_mock_sta_addr((*IFACE_MAC).to_array()),
             );
             Self { fake_device, fake_device_state, timer: Some(timer), time_stream }
         }
@@ -2488,13 +2486,9 @@ mod tests {
     }
 
     #[test]
-    fn client_send_scan_end_on_offload_scan_busy() {
+    fn client_send_scan_end_on_scan_busy() {
         let exec = fasync::TestExecutor::new();
         let mut m = MockObjects::new(&exec);
-
-        // Configure the fake device to offload scan
-        m.fake_device_state.lock().discovery_support.as_mut().unwrap().scan_offload.supported =
-            true;
         let mut me = m.make_mlme();
         me.make_client_station();
 
@@ -2541,13 +2535,9 @@ mod tests {
     }
 
     #[test]
-    fn client_send_scan_end_on_offload_scan_invalid_args() {
+    fn client_send_scan_end_on_scan_invalid_args() {
         let exec = fasync::TestExecutor::new();
         let mut m = MockObjects::new(&exec);
-
-        // Configure the fake device to offload scan
-        m.fake_device_state.lock().discovery_support.as_mut().unwrap().scan_offload.supported =
-            true;
         let mut me = m.make_mlme();
 
         me.make_client_station();
@@ -2572,13 +2562,9 @@ mod tests {
     }
 
     #[test]
-    fn client_send_scan_end_on_offload_scan_fails() {
+    fn client_send_scan_end_on_passive_scan_fails() {
         let exec = fasync::TestExecutor::new();
         let mut m = MockObjects::new(&exec);
-
-        // Configure the fake device to offload scan and fail on passive scans
-        m.fake_device_state.lock().discovery_support.as_mut().unwrap().scan_offload.supported =
-            true;
         m.fake_device_state.lock().config.start_passive_scan_fails = true;
         let mut me = m.make_mlme();
 

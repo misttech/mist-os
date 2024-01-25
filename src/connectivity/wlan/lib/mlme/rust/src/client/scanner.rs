@@ -187,9 +187,7 @@ impl<'a, D: DeviceOps> BoundScanner<'a, D> {
             .map_err(|status| Error::Status(String::from("Failed to query device."), status))?;
         let discovery_support = device::try_query_discovery_support(&mut self.ctx.device)?;
 
-        // The else of this branch is an "MLME scan" which is implemented by calling SetChannel
-        // multiple times to visit each channel. It's only used in hw-sim tests and is not supported
-        // by any SoftMAC device drivers.
+        // TODO(https://fxbug.dev/321627682): MLME only supports offloaded scanning.
         if discovery_support.scan_offload.supported {
             match req.scan_type {
                 fidl_mlme::ScanTypes::Passive => self.start_passive_scan(req),
@@ -738,8 +736,6 @@ mod tests {
         let exec = fasync::TestExecutor::new();
         let mut m = MockObjects::new(&exec);
         let mut ctx = m.make_ctx();
-        m.fake_device_state.lock().discovery_support.as_mut().unwrap().scan_offload.supported =
-            true;
         let mut scanner = Scanner::new(*IFACE_MAC);
         let test_start_timestamp_nanos = zx::Time::get_monotonic().into_nanos();
 
@@ -843,8 +839,6 @@ mod tests {
         let exec = fasync::TestExecutor::new();
         let mut m = MockObjects::new(&exec);
         let mut ctx = m.make_ctx();
-        m.fake_device_state.lock().discovery_support.as_mut().unwrap().scan_offload.supported =
-            true;
         let mut scanner = Scanner::new(*IFACE_MAC);
         let test_start_timestamp_nanos = zx::Time::get_monotonic().into_nanos();
 
@@ -929,8 +923,6 @@ mod tests {
         let mut m = MockObjects::new(&exec);
         m.fake_device_state.lock().config.start_passive_scan_fails = true;
         let mut ctx = m.make_ctx();
-        m.fake_device_state.lock().discovery_support.as_mut().unwrap().scan_offload.supported =
-            true;
         let mut scanner = Scanner::new(*IFACE_MAC);
 
         let result = scanner.bind(&mut ctx).on_sme_scan(passive_scan_req());
@@ -950,8 +942,6 @@ mod tests {
         let mut m = MockObjects::new(&exec);
         m.fake_device_state.lock().config.start_active_scan_fails = true;
         let mut ctx = m.make_ctx();
-        m.fake_device_state.lock().discovery_support.as_mut().unwrap().scan_offload.supported =
-            true;
         let mut scanner = Scanner::new(*IFACE_MAC);
 
         let result = scanner.bind(&mut ctx).on_sme_scan(active_scan_req(&[6]));
@@ -970,8 +960,6 @@ mod tests {
         let exec = fasync::TestExecutor::new();
         let mut m = MockObjects::new(&exec);
         let mut ctx = m.make_ctx();
-        m.fake_device_state.lock().discovery_support.as_mut().unwrap().scan_offload.supported =
-            true;
         let mut scanner = Scanner::new(*IFACE_MAC);
         let test_start_timestamp_nanos = zx::Time::get_monotonic().into_nanos();
 
@@ -1014,8 +1002,6 @@ mod tests {
         let exec = fasync::TestExecutor::new();
         let mut m = MockObjects::new(&exec);
         let mut ctx = m.make_ctx();
-        m.fake_device_state.lock().discovery_support.as_mut().unwrap().scan_offload.supported =
-            true;
         let mut scanner = Scanner::new(*IFACE_MAC);
         let test_start_timestamp_nanos = zx::Time::get_monotonic().into_nanos();
 

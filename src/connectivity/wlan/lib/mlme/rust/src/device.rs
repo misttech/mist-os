@@ -10,7 +10,7 @@ use {
     fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_mlme as fidl_mlme,
     fidl_fuchsia_wlan_softmac as fidl_softmac, fuchsia_trace as trace, fuchsia_zircon as zx,
     futures::channel::mpsc,
-    ieee80211::{MacAddr, MacAddrBytes},
+    ieee80211::MacAddr,
     std::{ffi::c_void, fmt::Display, sync::Arc},
     tracing::error,
     wlan_common::{mac::FrameControl, tx_vector, TimeUnit},
@@ -731,7 +731,7 @@ pub mod test_utils {
         fuchsia_async as fasync,
         fuchsia_sync::Mutex,
         fuchsia_zircon::HandleBased,
-        ieee80211::Bssid,
+        paste::paste,
         std::{collections::VecDeque, sync::Arc},
         wlan_sme,
     };
@@ -827,9 +827,13 @@ pub mod test_utils {
     }
 
     pub struct FakeDeviceConfig {
-        pub mac_role: fidl_common::WlanMacRole,
-        pub sta_addr: Bssid,
-        pub start_result_override: Option<Result<zx::Handle, zx::Status>>,
+        mock_start_result: Option<Result<zx::Handle, zx::Status>>,
+        mock_query_response: Option<Result<fidl_softmac::WlanSoftmacQueryResponse, zx::Status>>,
+        mock_discovery_support: Option<Result<fidl_common::DiscoverySupport, zx::Status>>,
+        mock_mac_sublayer_support: Option<Result<fidl_common::MacSublayerSupport, zx::Status>>,
+        mock_security_support: Option<Result<fidl_common::SecuritySupport, zx::Status>>,
+        mock_spectrum_management_support:
+            Option<Result<fidl_common::SpectrumManagementSupport, zx::Status>>,
         pub start_passive_scan_fails: bool,
         pub start_active_scan_fails: bool,
         pub send_wlan_frame_fails: bool,
@@ -838,13 +842,160 @@ pub mod test_utils {
     impl Default for FakeDeviceConfig {
         fn default() -> Self {
             Self {
-                mac_role: fidl_common::WlanMacRole::Client,
-                sta_addr: [7u8; 6].into(),
-                start_result_override: None,
+                mock_start_result: None,
+                mock_query_response: None,
+                mock_discovery_support: None,
+                mock_mac_sublayer_support: None,
+                mock_security_support: None,
+                mock_spectrum_management_support: None,
                 start_passive_scan_fails: false,
                 start_active_scan_fails: false,
                 send_wlan_frame_fails: false,
             }
+        }
+    }
+
+    /// Generates a public [<with_mock_ $mock_name>]() function to specify a mock value for corresponding
+    /// DeviceOps method. When called, the generated function will overwrite whatever mocked value already
+    /// exists, if any, including mocked fields.
+    macro_rules! with_mock_func {
+        ( $mock_name: ident, $mock_type: path ) => {
+            paste! {
+                pub fn [<with_mock_ $mock_name>](
+                    mut self,
+                    mock_value: Result<$mock_type, zx::Status>
+                ) -> Self {
+                    self.[<mock_ $mock_name>] = Some(mock_value);
+                    self
+                }
+            }
+        };
+    }
+
+    impl FakeDeviceConfig {
+        with_mock_func!(start_result, zx::Handle);
+        with_mock_func!(query_response, fidl_softmac::WlanSoftmacQueryResponse);
+        with_mock_func!(discovery_support, fidl_common::DiscoverySupport);
+        with_mock_func!(mac_sublayer_support, fidl_common::MacSublayerSupport);
+        with_mock_func!(security_support, fidl_common::SecuritySupport);
+        with_mock_func!(spectrum_management_support, fidl_common::SpectrumManagementSupport);
+
+        pub fn with_mock_sta_addr(mut self, mock_field: [u8; 6]) -> Self {
+            if let None = self.mock_query_response {
+                let mut mock_value = Self::default_mock_query_response();
+                mock_value.as_mut().unwrap().sta_addr = Some(mock_field);
+                return self.with_mock_query_response(mock_value);
+            }
+            let mock_value = self
+                .mock_query_response
+                .as_mut()
+                .unwrap()
+                .as_mut()
+                .expect("Cannot overwrite an Err value mock");
+            mock_value.sta_addr = Some(mock_field);
+            self
+        }
+
+        pub fn with_mock_mac_role(mut self, mock_field: fidl_common::WlanMacRole) -> Self {
+            if let None = self.mock_query_response {
+                let mut mock_value = Self::default_mock_query_response();
+                mock_value.as_mut().unwrap().mac_role = Some(mock_field);
+                return self.with_mock_query_response(mock_value);
+            }
+            let mock_value = self
+                .mock_query_response
+                .as_mut()
+                .unwrap()
+                .as_mut()
+                .expect("Cannot overwrite an Err value mock");
+            mock_value.mac_role = Some(mock_field);
+            self
+        }
+
+        fn default_mock_query_response(
+        ) -> Result<fidl_softmac::WlanSoftmacQueryResponse, zx::Status> {
+            Ok(fidl_softmac::WlanSoftmacQueryResponse {
+                sta_addr: Some([7u8; 6]),
+                mac_role: Some(fidl_common::WlanMacRole::Client),
+                supported_phys: Some(vec![
+                    fidl_common::WlanPhyType::Dsss,
+                    fidl_common::WlanPhyType::Hr,
+                    fidl_common::WlanPhyType::Ofdm,
+                    fidl_common::WlanPhyType::Erp,
+                    fidl_common::WlanPhyType::Ht,
+                    fidl_common::WlanPhyType::Vht,
+                ]),
+                hardware_capability: Some(0),
+                band_caps: Some(fake_band_caps()),
+                ..Default::default()
+            })
+        }
+
+        pub fn with_mock_probe_response_offload(
+            mut self,
+            mock_field: fidl_common::ProbeResponseOffloadExtension,
+        ) -> Self {
+            if let None = self.mock_discovery_support {
+                let mut mock_value = Self::default_mock_discovery_support();
+                mock_value.as_mut().unwrap().probe_response_offload = mock_field;
+                return self.with_mock_discovery_support(mock_value);
+            }
+            let mock_value = self
+                .mock_discovery_support
+                .as_mut()
+                .unwrap()
+                .as_mut()
+                .expect("Cannot overwrite an Err value mock");
+            mock_value.probe_response_offload = mock_field;
+            self
+        }
+
+        fn default_mock_discovery_support() -> Result<fidl_common::DiscoverySupport, zx::Status> {
+            Ok(fidl_common::DiscoverySupport {
+                scan_offload: fidl_common::ScanOffloadExtension {
+                    supported: true,
+                    scan_cancel_supported: false,
+                },
+                probe_response_offload: fidl_common::ProbeResponseOffloadExtension {
+                    supported: false,
+                },
+            })
+        }
+
+        pub fn with_mock_mac_implementation_type(
+            mut self,
+            mock_field: fidl_common::MacImplementationType,
+        ) -> Self {
+            if let None = self.mock_mac_sublayer_support {
+                let mut mock_value = Self::default_mock_mac_sublayer_support();
+                mock_value.as_mut().unwrap().device.mac_implementation_type = mock_field;
+                return self.with_mock_mac_sublayer_support(mock_value);
+            }
+            let mock_value = self
+                .mock_mac_sublayer_support
+                .as_mut()
+                .unwrap()
+                .as_mut()
+                .expect("Cannot overwrite an Err value mock");
+            mock_value.device.mac_implementation_type = mock_field;
+            self
+        }
+
+        fn default_mock_mac_sublayer_support() -> Result<fidl_common::MacSublayerSupport, zx::Status>
+        {
+            Ok(fidl_common::MacSublayerSupport {
+                rate_selection_offload: fidl_common::RateSelectionOffloadExtension {
+                    supported: false,
+                },
+                data_plane: fidl_common::DataPlaneExtension {
+                    data_plane_type: fidl_common::DataPlaneType::EthernetDevice,
+                },
+                device: fidl_common::DeviceExtension {
+                    is_synthetic: true,
+                    mac_implementation_type: fidl_common::MacImplementationType::Softmac,
+                    tx_status_report_supported: true,
+                },
+            })
         }
     }
 
@@ -876,11 +1027,7 @@ pub mod test_utils {
         pub captured_passive_scan_request:
             Option<fidl_softmac::WlanSoftmacBaseStartPassiveScanRequest>,
         pub captured_active_scan_request: Option<fidl_softmac::WlanSoftmacStartActiveScanRequest>,
-        pub query_response: Result<fidl_softmac::WlanSoftmacQueryResponse, zx::Status>,
-        pub discovery_support: Result<fidl_common::DiscoverySupport, zx::Status>,
-        pub mac_sublayer_support: Result<fidl_common::MacSublayerSupport, zx::Status>,
-        pub security_support: Result<fidl_common::SecuritySupport, zx::Status>,
-        pub spectrum_management_support: Result<fidl_common::SpectrumManagementSupport, zx::Status>,
+
         pub join_bss_request: Option<fidl_common::JoinBssRequest>,
         pub beacon_config: Option<(Vec<u8>, usize, TimeUnit)>,
         pub link_status: LinkStatus,
@@ -895,26 +1042,11 @@ pub mod test_utils {
         pub fn new(executor: &fasync::TestExecutor) -> (FakeDevice, Arc<Mutex<FakeDeviceState>>) {
             Self::new_with_config(executor, FakeDeviceConfig::default())
         }
+
         pub fn new_with_config(
             _executor: &fasync::TestExecutor,
             config: FakeDeviceConfig,
         ) -> (FakeDevice, Arc<Mutex<FakeDeviceState>>) {
-            let query_response = fidl_softmac::WlanSoftmacQueryResponse {
-                sta_addr: Some(config.sta_addr.to_array()),
-                mac_role: Some(config.mac_role),
-                supported_phys: Some(vec![
-                    fidl_common::WlanPhyType::Dsss,
-                    fidl_common::WlanPhyType::Hr,
-                    fidl_common::WlanPhyType::Ofdm,
-                    fidl_common::WlanPhyType::Erp,
-                    fidl_common::WlanPhyType::Ht,
-                    fidl_common::WlanPhyType::Vht,
-                ]),
-                hardware_capability: Some(0),
-                band_caps: Some(fake_band_caps()),
-                ..Default::default()
-            };
-
             // Create a channel for SME requests, to be surfaced by start().
             let (usme_bootstrap_client_end, usme_bootstrap_server_end) =
                 fidl::endpoints::create_endpoints::<fidl_sme::UsmeBootstrapMarker>();
@@ -939,11 +1071,6 @@ pub mod test_utils {
                 next_scan_id: 0,
                 captured_passive_scan_request: None,
                 captured_active_scan_request: None,
-                query_response: Ok(query_response),
-                discovery_support: Ok(fake_discovery_support()),
-                mac_sublayer_support: Ok(fake_mac_sublayer_support()),
-                security_support: Ok(fake_security_support()),
-                spectrum_management_support: Ok(fake_spectrum_management_support()),
                 keys: vec![],
                 join_bss_request: None,
                 beacon_config: None,
@@ -989,9 +1116,8 @@ pub mod test_utils {
         ) -> Result<zx::Handle, zx::Status> {
             let mut state = self.state.lock();
 
-            match state.config.start_result_override.take() {
-                Some(v) => return v,
-                None => (),
+            if let Some(mock_start_result) = state.config.mock_start_result.take() {
+                return mock_start_result;
             }
 
             state.wlan_softmac_ifc_bridge_proxy =
@@ -1007,25 +1133,53 @@ pub mod test_utils {
         fn wlan_softmac_query_response(
             &mut self,
         ) -> Result<fidl_softmac::WlanSoftmacQueryResponse, zx::Status> {
-            self.state.lock().query_response.clone()
+            let state = self.state.lock();
+            match state.config.mock_query_response.as_ref() {
+                Some(query_response) => query_response.clone(),
+                None => FakeDeviceConfig::default_mock_query_response(),
+            }
         }
 
         fn discovery_support(&mut self) -> Result<fidl_common::DiscoverySupport, zx::Status> {
-            self.state.lock().discovery_support
+            let state = self.state.lock();
+            match state.config.mock_discovery_support.as_ref() {
+                Some(discovery_support) => discovery_support.clone(),
+                None => FakeDeviceConfig::default_mock_discovery_support(),
+            }
         }
 
         fn mac_sublayer_support(&mut self) -> Result<fidl_common::MacSublayerSupport, zx::Status> {
-            self.state.lock().mac_sublayer_support
+            let state = self.state.lock();
+            match state.config.mock_mac_sublayer_support.as_ref() {
+                Some(mac_sublayer_support) => mac_sublayer_support.clone(),
+                None => FakeDeviceConfig::default_mock_mac_sublayer_support(),
+            }
         }
 
         fn security_support(&mut self) -> Result<fidl_common::SecuritySupport, zx::Status> {
-            self.state.lock().security_support
+            let state = self.state.lock();
+            match state.config.mock_security_support.as_ref() {
+                Some(security_support) => security_support.clone(),
+                None => Ok(fidl_common::SecuritySupport {
+                    mfp: fidl_common::MfpFeature { supported: false },
+                    sae: fidl_common::SaeFeature {
+                        driver_handler_supported: false,
+                        sme_handler_supported: false,
+                    },
+                }),
+            }
         }
 
         fn spectrum_management_support(
             &mut self,
         ) -> Result<fidl_common::SpectrumManagementSupport, zx::Status> {
-            self.state.lock().spectrum_management_support
+            let state = self.state.lock();
+            match state.config.mock_spectrum_management_support.as_ref() {
+                Some(spectrum_management_support) => spectrum_management_support.clone(),
+                None => Ok(fidl_common::SpectrumManagementSupport {
+                    dfs: fidl_common::DfsFeature { supported: true },
+                }),
+            }
         }
 
         fn deliver_eth_frame(&mut self, data: &[u8]) -> Result<(), zx::Status> {
@@ -1245,44 +1399,6 @@ pub mod test_utils {
             .collect::<Result<_, _>>()
             .expect("Failed to convert softmac driver band capabilities.")
     }
-
-    pub fn fake_discovery_support() -> fidl_common::DiscoverySupport {
-        fidl_common::DiscoverySupport {
-            scan_offload: fidl_common::ScanOffloadExtension {
-                supported: true,
-                scan_cancel_supported: false,
-            },
-            probe_response_offload: fidl_common::ProbeResponseOffloadExtension { supported: false },
-        }
-    }
-
-    pub fn fake_mac_sublayer_support() -> fidl_common::MacSublayerSupport {
-        fidl_common::MacSublayerSupport {
-            rate_selection_offload: fidl_common::RateSelectionOffloadExtension { supported: false },
-            data_plane: fidl_common::DataPlaneExtension {
-                data_plane_type: fidl_common::DataPlaneType::EthernetDevice,
-            },
-            device: fidl_common::DeviceExtension {
-                is_synthetic: true,
-                mac_implementation_type: fidl_common::MacImplementationType::Softmac,
-                tx_status_report_supported: true,
-            },
-        }
-    }
-
-    pub fn fake_security_support() -> fidl_common::SecuritySupport {
-        fidl_common::SecuritySupport {
-            mfp: fidl_common::MfpFeature { supported: false },
-            sae: fidl_common::SaeFeature {
-                driver_handler_supported: false,
-                sme_handler_supported: false,
-            },
-        }
-    }
-
-    pub fn fake_spectrum_management_support() -> fidl_common::SpectrumManagementSupport {
-        fidl_common::SpectrumManagementSupport { dfs: fidl_common::DfsFeature { supported: true } }
-    }
 }
 
 #[cfg(test)]
@@ -1458,14 +1574,15 @@ mod tests {
     #[test]
     fn test_can_dynamically_change_fake_device_state() {
         let exec = fasync::TestExecutor::new();
-        let (mut fake_device, fake_device_state) = FakeDevice::new(&exec);
+        let (mut fake_device, fake_device_state) = FakeDevice::new_with_config(
+            &exec,
+            FakeDeviceConfig::default().with_mock_mac_role(fidl_common::WlanMacRole::Client),
+        );
         let query_response = fake_device.wlan_softmac_query_response().unwrap();
         assert_eq!(query_response.mac_role, Some(fidl_common::WlanMacRole::Client));
 
-        fake_device_state.lock().query_response = Ok(fidl_softmac::WlanSoftmacQueryResponse {
-            mac_role: Some(fidl_common::WlanMacRole::Ap),
-            ..query_response
-        });
+        fake_device_state.lock().config =
+            FakeDeviceConfig::default().with_mock_mac_role(fidl_common::WlanMacRole::Ap);
 
         let query_response = fake_device.wlan_softmac_query_response().unwrap();
         assert_eq!(query_response.mac_role, Some(fidl_common::WlanMacRole::Ap));

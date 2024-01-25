@@ -623,7 +623,7 @@ mod tests {
         crate::{
             ap::remote_client::{ClientEvent, ClientRejection},
             buffer::FakeBufferProvider,
-            device::{FakeDevice, FakeDeviceState},
+            device::{FakeDevice, FakeDeviceConfig, FakeDeviceState},
         },
         fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211, fuchsia_async as fasync,
         fuchsia_sync::Mutex,
@@ -2107,14 +2107,12 @@ mod tests {
     #[test]
     fn handle_probe_req_has_offload() {
         let exec = fasync::TestExecutor::new();
-        let (fake_device, fake_device_state) = FakeDevice::new(&exec);
-        fake_device_state
-            .lock()
-            .discovery_support
-            .as_mut()
-            .unwrap()
-            .probe_response_offload
-            .supported = true;
+        let (fake_device, _fake_device_state) = FakeDevice::new_with_config(
+            &exec,
+            FakeDeviceConfig::default().with_mock_probe_response_offload(
+                fidl_common::ProbeResponseOffloadExtension { supported: true },
+            ),
+        );
 
         let (mut ctx, _) = make_context(fake_device);
         let mut bss = InfraBss::new(

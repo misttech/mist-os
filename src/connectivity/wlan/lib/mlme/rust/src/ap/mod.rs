@@ -517,11 +517,9 @@ mod tests {
         let (timer, time_stream) = timer::create_timer();
         let (fake_device, fake_device_state) = FakeDevice::new_with_config(
             &exec,
-            FakeDeviceConfig {
-                mac_role: fidl_common::WlanMacRole::Ap,
-                sta_addr: *BSSID,
-                ..Default::default()
-            },
+            FakeDeviceConfig::default()
+                .with_mock_mac_role(fidl_common::WlanMacRole::Ap)
+                .with_mock_sta_addr((*BSSID).to_array()),
         );
         (
             Ap::new(fake_device, FakeBufferProvider::new(), timer, *BSSID),

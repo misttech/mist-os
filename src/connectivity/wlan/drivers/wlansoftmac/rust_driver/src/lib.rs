@@ -463,10 +463,7 @@ mod tests {
         let mut exec = fasync::TestExecutor::new();
         let (mut fake_device, _fake_device_state) = FakeDevice::new_with_config(
             &exec,
-            FakeDeviceConfig {
-                start_result_override: Some(Err(zx::Status::INTERRUPTED_RETRY)),
-                ..Default::default()
-            },
+            FakeDeviceConfig::default().with_mock_start_result(Err(zx::Status::INTERRUPTED_RETRY)),
         );
 
         // Create WlanSoftmacIfcProtocol FFI and WlanSoftmacIfcBridge client to bootstrap USME.
@@ -488,7 +485,7 @@ mod tests {
     fn boostrap_generic_sme_fails_on_error_from_bootstrap_stream() {
         let mut exec = fasync::TestExecutor::new();
         let (mut fake_device, fake_device_state) =
-            FakeDevice::new_with_config(&exec, FakeDeviceConfig { ..Default::default() });
+            FakeDevice::new_with_config(&exec, FakeDeviceConfig::default());
 
         // Create WlanSoftmacIfcProtocol FFI and WlanSoftmacIfcBridge client to bootstrap USME.
         let (driver_event_sink, _driver_event_stream) = mpsc::unbounded();
@@ -511,7 +508,7 @@ mod tests {
     fn boostrap_generic_sme_fails_on_closed_bootstrap_stream() {
         let mut exec = fasync::TestExecutor::new();
         let (mut fake_device, fake_device_state) =
-            FakeDevice::new_with_config(&exec, FakeDeviceConfig { ..Default::default() });
+            FakeDevice::new_with_config(&exec, FakeDeviceConfig::default());
 
         // Create WlanSoftmacIfcProtocol FFI and WlanSoftmacIfcBridge client to bootstrap USME.
         let (driver_event_sink, _driver_event_stream) = mpsc::unbounded();
@@ -532,7 +529,7 @@ mod tests {
     fn boostrap_generic_sme_succeeds() {
         let mut exec = fasync::TestExecutor::new();
         let (mut fake_device, fake_device_state) =
-            FakeDevice::new_with_config(&exec, FakeDeviceConfig { ..Default::default() });
+            FakeDevice::new_with_config(&exec, FakeDeviceConfig::default());
 
         // Create WlanSoftmacIfcProtocol FFI and WlanSoftmacIfcBridge client to bootstrap USME.
         let (driver_event_sink, _driver_event_stream) = mpsc::unbounded();
@@ -714,14 +711,11 @@ mod tests {
     #[test]
     fn wlansoftmac_fails_startup_with_wrong_mac_implementation_type() {
         let mut exec = fasync::TestExecutor::new();
-        let (fake_device, fake_device_state) = FakeDevice::new(&exec);
-        {
-            let mut fake_device_state = fake_device_state.lock();
-            let mac_sublayer_support = fake_device_state.mac_sublayer_support.as_mut().unwrap();
-            mac_sublayer_support.device.is_synthetic = true;
-            mac_sublayer_support.device.mac_implementation_type =
-                fidl_common::MacImplementationType::Fullmac;
-        }
+        let (fake_device, _fake_device_state) = FakeDevice::new_with_config(
+            &exec,
+            FakeDeviceConfig::default()
+                .with_mock_mac_implementation_type(fidl_common::MacImplementationType::Fullmac),
+        );
 
         match start_and_serve_with_device(&mut exec, fake_device) {
             Ok(_) => panic!(
