@@ -289,7 +289,7 @@ void RdmaEngine::ExecRdmaTable(uint32_t next_table_idx, display::ConfigStamp con
 
 zx_status_t RdmaEngine::SetupRdma() {
   zx_status_t status = ZX_OK;
-  zxlogf(INFO, "Setting up Display RDMA");
+  zxlogf(DEBUG, "Setting up Display RDMA");
 
   // First, clean up any ongoing DMA that a previous incarnation of this driver
   // may have started, and tell the BTI to drop its quarantine list.
@@ -398,9 +398,10 @@ void RdmaEngine::FlushAfbcRdmaTable() const {
 
 // TODO(https://fxbug.dev/57633): stop all channels for safer reloads.
 void RdmaEngine::StopRdma() {
-  zxlogf(INFO, "Stopping RDMA");
+  // TODO(https://fxbug.dev/322296668): Make StopRdma() idempotent.
+  zxlogf(DEBUG, "Stopping RDMA");
 
-  fbl::AutoLock l(&rdma_lock_);
+  fbl::AutoLock lock(&rdma_lock_);
 
   // Grab a copy of active DMA channels before clearing it
   const uint32_t aa = RdmaAccessAutoReg::Get().ReadFrom(&vpu_mmio_).reg_value();
