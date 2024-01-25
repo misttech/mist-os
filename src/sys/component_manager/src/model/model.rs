@@ -218,15 +218,20 @@ pub mod tests {
                 resolve::sandbox_construction::ComponentInput, ActionSet, ShutdownAction,
                 ShutdownType, UnresolveAction,
             },
+            error::ModelError,
+            hooks::{Event, EventType, Hook, HooksRegistration},
+            model::Model,
             testing::test_helpers::{
                 component_decl_with_test_runner, ActionsTest, TestEnvironmentBuilder,
                 TestModelResult,
             },
         },
         assert_matches::assert_matches,
+        async_trait::async_trait,
         cm_rust_testing::ComponentDeclBuilder,
         fidl_fuchsia_component_decl as fdecl,
         moniker::{Moniker, MonikerBase},
+        std::sync::{Arc, Weak},
     };
 
     #[fuchsia::test]
@@ -275,12 +280,38 @@ pub mod tests {
         let TestModelResult { model, .. } =
             TestEnvironmentBuilder::new().set_components(components).build().await;
 
-        // This returns a Future that does not need to be polled.
-        let _ = model
-            .root()
-            .lock_actions()
-            .await
-            .register_inner(&model.root, ShutdownAction::new(ShutdownType::Instance));
+        // Wait for the child to be discovered -- this happens in the middle of starting
+        // the root component (eagerly starting children), then register the shutdown
+        // action. This means the root will already be scheduled for shutdown after
+        // start inevitably fails.
+        struct RegisterShutdown {
+            model: Arc<Model>,
+        }
+
+        #[async_trait]
+        impl Hook for RegisterShutdown {
+            async fn on(self: Arc<Self>, event: &Event) -> Result<(), ModelError> {
+                if event.target_moniker != "bad-scheme".parse::<Moniker>().unwrap().into() {
+                    return Ok(());
+                }
+                let _ =
+                    self.model.root().lock_actions().await.register_inner(
+                        &self.model.root,
+                        ShutdownAction::new(ShutdownType::Instance),
+                    );
+                Ok(())
+            }
+        }
+
+        let root = model.find(&Moniker::default()).await.unwrap();
+        let hook = Arc::new(RegisterShutdown { model: model.clone() });
+        root.hooks
+            .install(vec![HooksRegistration::new(
+                "shutdown_root_on_child_discover",
+                vec![EventType::Discovered],
+                Arc::downgrade(&hook) as Weak<dyn Hook>,
+            )])
+            .await;
 
         model.start(ComponentInput::empty()).await;
     }

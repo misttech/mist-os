@@ -24,6 +24,7 @@ use {
     async_trait::async_trait,
     cm_logger::scoped::ScopedLogger,
     cm_rust::ComponentDecl,
+    cm_util::{AbortError, AbortFutureExt, AbortHandle, AbortableScope},
     config_encoder::ConfigFields,
     fidl::{
         endpoints::{create_proxy, DiscoverableProtocolMarker},
@@ -47,6 +48,8 @@ pub struct StartAction {
     execution_controller_task: Option<controller::ExecutionControllerTask>,
     numbered_handles: Vec<fprocess::HandleInfo>,
     additional_namespace_entries: Vec<NamespaceEntry>,
+    abort_handle: AbortHandle,
+    abortable_scope: AbortableScope,
 }
 
 impl StartAction {
@@ -56,11 +59,14 @@ impl StartAction {
         numbered_handles: Vec<fprocess::HandleInfo>,
         additional_namespace_entries: Vec<NamespaceEntry>,
     ) -> Self {
+        let (abortable_scope, abort_handle) = AbortableScope::new();
         Self {
             start_reason,
             execution_controller_task,
             numbered_handles,
             additional_namespace_entries,
+            abort_handle,
+            abortable_scope,
         }
     }
 }
@@ -74,6 +80,7 @@ impl Action for StartAction {
             self.execution_controller_task,
             self.numbered_handles,
             self.additional_namespace_entries,
+            self.abortable_scope,
         )
         .await
         .map_err(Into::into)
@@ -81,6 +88,10 @@ impl Action for StartAction {
 
     fn key(&self) -> ActionKey {
         ActionKey::Start
+    }
+
+    fn abort_handle(&self) -> Option<AbortHandle> {
+        Some(self.abort_handle.clone())
     }
 }
 
@@ -99,24 +110,36 @@ async fn do_start(
     execution_controller_task: Option<controller::ExecutionControllerTask>,
     numbered_handles: Vec<fprocess::HandleInfo>,
     additional_namespace_entries: Vec<NamespaceEntry>,
+    abortable_scope: AbortableScope,
 ) -> Result<(), StartActionError> {
+    // Translates the error when a long running future is aborted.
+    let abort_error =
+        |_: AbortError| StartActionError::Aborted { moniker: component.moniker.clone() };
+
     // Resolve the component and find the runner to use.
     let (runner, resolved_component) = {
         // Obtain the runner declaration under a short lock, as `open_runner` may lock the
         // resolved state re-entrantly.
-        let resolved_state = component.lock_resolved_state().await.map_err(|err| {
-            StartActionError::ResolveActionError {
+        let resolved_state = component
+            .lock_resolved_state()
+            .with(&abortable_scope)
+            .await
+            .map_err(abort_error)?
+            .map_err(|err| StartActionError::ResolveActionError {
                 moniker: component.moniker.clone(),
                 err: Box::new(err),
-            }
-        })?;
+            })?;
         (resolved_state.decl().get_runner(), resolved_state.resolved_component.clone())
     };
     let runner = match runner {
-        Some(runner) => open_runner(component, runner).await.map_err(|err| {
-            warn!(moniker = %component.moniker, %err, "Failed to resolve runner.");
-            err
-        })?,
+        Some(runner) => open_runner(component, runner)
+            .with(&abortable_scope)
+            .await
+            .map_err(abort_error)?
+            .map_err(|err| {
+                warn!(moniker = %component.moniker, %err, "Failed to resolve runner.");
+                err
+            })?,
         None => None,
     };
 
@@ -157,7 +180,10 @@ async fn do_start(
     let encoded_config = match resolved_component.config.clone() {
         Some(mut config) => {
             if has_config_capabilities(decl) {
-                update_config_with_capabilities(&mut config, decl, &component).await?;
+                update_config_with_capabilities(&mut config, decl, &component)
+                    .with(&abortable_scope)
+                    .await
+                    .map_err(abort_error)??;
                 update_component_config(&component, config.clone()).await?;
             }
             Some(encode_config(config, &component.moniker).await?)
@@ -503,7 +529,7 @@ mod tests {
         crate::model::{
             actions::{
                 resolve::sandbox_construction::ComponentInput, start::should_return_early,
-                ActionSet, ShutdownAction, ShutdownType, StartAction, StopAction,
+                ActionError, ActionSet, ShutdownAction, ShutdownType, StartAction, StopAction,
             },
             component::{
                 Component, ComponentInstance, ComponentRuntime, ExecutionState, InstanceState,
@@ -512,6 +538,7 @@ mod tests {
             error::{ModelError, StartActionError},
             hooks::{Event, EventType, Hook, HooksRegistration},
             testing::{
+                routing_test_helpers::RoutingTestBuilder,
                 test_helpers::{self, ActionsTest},
                 test_hook::Lifecycle,
             },
@@ -521,8 +548,9 @@ mod tests {
         cm_rust::ComponentDecl,
         cm_rust_testing::{ChildDeclBuilder, ComponentDeclBuilder},
         fuchsia, fuchsia_async as fasync, fuchsia_zircon as zx,
-        futures::{channel::mpsc, StreamExt},
+        futures::{channel::mpsc, stream::FuturesUnordered, FutureExt, StreamExt},
         moniker::Moniker,
+        rand::seq::SliceRandom,
         routing::resolving::ComponentAddress,
         std::sync::{Arc, Mutex, Weak},
     };
@@ -659,6 +687,78 @@ mod tests {
                 Lifecycle::Stop(vec![format!("{}", TEST_CHILD_NAME).as_str()].try_into().unwrap())
             ]
         );
+    }
+
+    #[fuchsia::test]
+    /// If start and stop happens concurrently, the component should either end up as
+    /// started or stopped, without deadlocking.
+    async fn concurrent_start_stop() {
+        let (test_topology, child) = build_tree_with_single_child(TEST_CHILD_NAME).await;
+
+        // Run start and stop in random order.
+        let start_fut = ActionSet::register(
+            child.clone(),
+            StartAction::new(StartReason::Debug, None, vec![], vec![]),
+        );
+        let stop_fut = ActionSet::register(child.clone(), StopAction::new(false));
+        let mut futs = vec![start_fut.boxed(), stop_fut.boxed()];
+        futs.shuffle(&mut rand::thread_rng());
+        let stream: FuturesUnordered<_> = futs.into_iter().collect();
+        let _: Vec<_> = stream.collect().await;
+
+        let events: Vec<_> = test_topology
+            .test_hook
+            .lifecycle()
+            .into_iter()
+            .filter(|event| match event {
+                Lifecycle::Start(_) | Lifecycle::Stop(_) => true,
+                _ => false,
+            })
+            .collect();
+
+        let start_event =
+            Lifecycle::Start(vec![format!("{}", TEST_CHILD_NAME).as_str()].try_into().unwrap());
+        let stop_event =
+            Lifecycle::Stop(vec![format!("{}", TEST_CHILD_NAME).as_str()].try_into().unwrap());
+        assert!(events.contains(&start_event) || events.contains(&stop_event));
+    }
+
+    /// If start is blocked during resolving then stop can interrupt it.
+    #[fuchsia::test]
+    async fn start_aborted_by_stop() {
+        let root_name = "root";
+        let components = vec![
+            (root_name, ComponentDeclBuilder::new().add_lazy_child(TEST_CHILD_NAME).build()),
+            (TEST_CHILD_NAME, test_helpers::component_decl_with_test_runner()),
+        ];
+        let builder = RoutingTestBuilder::new(components[0].0, components);
+
+        // Add a blocker to the resolver that will cause resolving the child to block.
+        let (resolved_tx, resolved_rx) = oneshot::channel::<()>();
+        let (continue_tx, continue_rx) = oneshot::channel::<()>();
+        let test_topology =
+            builder.add_blocker(TEST_CHILD_NAME, resolved_tx, continue_rx).build().await;
+
+        let _root = test_topology.model.find_and_maybe_resolve(&Moniker::default()).await.unwrap();
+        let child = test_topology.model.find(&TEST_CHILD_NAME.try_into().unwrap()).await.unwrap();
+
+        let start_fut = child
+            .lock_actions()
+            .await
+            .register_no_wait(&child, StartAction::new(StartReason::Debug, None, vec![], vec![]));
+
+        // Wait until start is blocked.
+        resolved_rx.await.unwrap();
+
+        // Stop should cancel start.
+        let stop_fut = child.lock_actions().await.register_no_wait(&child, StopAction::new(false));
+        assert_matches!(
+            start_fut.await.unwrap_err(),
+            ActionError::StartError { err: StartActionError::Aborted { .. } }
+        );
+
+        continue_tx.send(()).unwrap();
+        stop_fut.await.unwrap();
     }
 
     #[fuchsia::test]

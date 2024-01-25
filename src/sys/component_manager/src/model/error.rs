@@ -792,6 +792,8 @@ pub enum StartActionError {
         #[source]
         err: Box<ActionError>,
     },
+    #[error("Couldn't start `{moniker}` because it is interrupted by a stop request")]
+    Aborted { moniker: Moniker },
 }
 
 impl StartActionError {
@@ -807,6 +809,7 @@ impl StartActionError {
             StartActionError::ResolveRunnerError { err, .. } => err.as_zx_status(),
             StartActionError::CreateNamespaceError { err, .. } => err.as_zx_status(),
             StartActionError::ResolveActionError { err, .. } => err.as_zx_status(),
+            StartActionError::Aborted { .. } => zx::Status::NOT_FOUND,
         }
     }
 }

@@ -69,6 +69,7 @@ pub use {
 use {
     crate::model::{component::ComponentInstance, error::ActionError},
     async_trait::async_trait,
+    cm_util::AbortHandle,
     fuchsia_async as fasync,
     futures::{
         channel::oneshot,
@@ -89,12 +90,22 @@ use {
 /// A action on a component that must eventually be fulfilled.
 #[async_trait]
 pub trait Action: Send + Sync + 'static {
+    /// Run the action.
     async fn handle(self, component: &Arc<ComponentInstance>) -> Result<(), ActionError>;
+
+    /// `key` identifies the action.
     fn key(&self) -> ActionKey;
+
+    /// If the action supports cooperative cancellation, return a handle for this purpose.
+    ///
+    /// The action may monitor the handle and bail early when it is safe to do so.
+    fn abort_handle(&self) -> Option<AbortHandle> {
+        None
+    }
 }
 
 /// A key that uniquely identifies an action.
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum ActionKey {
     Discover,
     Resolve,
@@ -124,19 +135,28 @@ pub struct ActionNotifier {
     fut: Shared<BoxFuture<'static, Result<(), ActionError>>>,
     /// How many clones of this ActionNotifier are live, useful for testing.
     refcount: Arc<AtomicUsize>,
+    /// If supported, a handle to abort the action.
+    abort_handle: Option<AbortHandle>,
 }
 
 impl ActionNotifier {
     /// Instantiate an `ActionNotifier` wrapping `fut`.
-    pub fn new(fut: BoxFuture<'static, Result<(), ActionError>>) -> Self {
-        Self { fut: fut.shared(), refcount: Arc::new(AtomicUsize::new(1)) }
+    pub fn new(
+        fut: BoxFuture<'static, Result<(), ActionError>>,
+        abort_handle: Option<AbortHandle>,
+    ) -> Self {
+        Self { fut: fut.shared(), refcount: Arc::new(AtomicUsize::new(1)), abort_handle }
     }
 }
 
 impl Clone for ActionNotifier {
     fn clone(&self) -> Self {
         self.refcount.fetch_add(1, Ordering::Relaxed);
-        Self { fut: self.fut.clone(), refcount: self.refcount.clone() }
+        Self {
+            fut: self.fut.clone(),
+            refcount: self.refcount.clone(),
+            abort_handle: self.abort_handle.clone(),
+        }
     }
 }
 
@@ -188,7 +208,7 @@ impl ActionSet {
 
     #[cfg(test)]
     pub fn mock_result(&mut self, key: ActionKey, result: Result<(), ActionError>) {
-        let notifier = ActionNotifier::new(async move { result }.boxed());
+        let notifier = ActionNotifier::new(async move { result }.boxed(), None);
         self.rep.insert(key, notifier);
     }
 
@@ -289,12 +309,17 @@ impl ActionSet {
         }
 
         // Otherwise we spin up the new Action
-        let prereq = self.get_prereq_action(&action);
+        let maybe_abort_handle = action.abort_handle();
+        let prereq = self.get_prereq_action(action.key());
+        let abort_handles = self.get_abort_action(action.key());
 
         let component = component.clone();
 
         let action_fut = async move {
-            if let Some(prereq) = prereq {
+            for abort in abort_handles {
+                abort.abort();
+            }
+            for prereq in prereq {
                 let _ = prereq.await;
             }
             let key = action.key();
@@ -320,23 +345,53 @@ impl ActionSet {
                 }
             }
             .boxed(),
+            maybe_abort_handle,
         );
         self.rep.insert(key.clone(), notifier.clone());
         (Some(task), notifier)
     }
 
-    /// Return a future that waits for any Action that must be waited on before
-    /// executing the target Action. If none is required the returned future is
+    /// Return futures that waits for any Action that must be waited on before
+    /// executing the target Action. If none is required the returned vector is
     /// empty.
-    fn get_prereq_action<'a, A: Action>(&'a mut self, action: &'a A) -> Option<ActionNotifier> {
-        // If the current action is Stop/Shutdown, ensure that
-        // we block on the completion of Shutdown/Stop if it is
-        // currently in progress.
-        match action.key() {
-            ActionKey::Shutdown => self.rep.get(&ActionKey::Stop).cloned(),
-            ActionKey::Stop => self.rep.get(&ActionKey::Shutdown).cloned(),
-            _ => None,
+    fn get_prereq_action(&self, key: ActionKey) -> Vec<ActionNotifier> {
+        // Start, Stop, and Shutdown are all serialized with respect to one another.
+        match key {
+            ActionKey::Shutdown => vec![
+                self.rep.get(&ActionKey::Stop).cloned(),
+                self.rep.get(&ActionKey::Start).cloned(),
+            ],
+            ActionKey::Stop => vec![
+                self.rep.get(&ActionKey::Shutdown).cloned(),
+                self.rep.get(&ActionKey::Start).cloned(),
+            ],
+            ActionKey::Start => vec![
+                self.rep.get(&ActionKey::Stop).cloned(),
+                self.rep.get(&ActionKey::Shutdown).cloned(),
+            ],
+            _ => vec![],
         }
+        .into_iter()
+        .flatten()
+        .collect()
+    }
+
+    /// Return abort handles for any Action that may be canceled by the target Action.
+    ///
+    /// This is useful for stopping unnecessary work e.g. if Stop is requested while
+    /// Start is running.
+    fn get_abort_action(&self, key: ActionKey) -> Vec<AbortHandle> {
+        // Stop and Shutdown will attempt to cancel an in-progress Start.
+        match key {
+            ActionKey::Shutdown | ActionKey::Stop => {
+                vec![self.rep.get(&ActionKey::Start).map(|notifier| notifier.abort_handle.clone())]
+            }
+            _ => vec![],
+        }
+        .into_iter()
+        .flatten()
+        .flatten()
+        .collect()
     }
 }
 
