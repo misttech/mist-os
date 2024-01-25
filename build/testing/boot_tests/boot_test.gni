@@ -4,6 +4,7 @@
 
 import("//build/sdk/product_bundle.gni")
 import("//build/testing/test_spec.gni")
+import("//zircon/kernel/phys/qemu.gni")
 
 declare_args() {
   # Default value for `disabled` parameter for generated `boot_test()`.
@@ -258,8 +259,14 @@ template("boot_test") {
     if (defined(vbmeta)) {
       deps += [ vbmeta ]
     }
+
+    # For general QEMU support it is convenient to include the default QEMU boot
+    # shim when one is not explicitly specified, unless we expect to boot an EFI
+    # disk image.
     if (defined(qemu_kernel)) {
       deps += [ qemu_kernel ]
+    } else if (!defined(invoker.efi_disk)) {
+      deps += qemu_boot_shim.deps
     }
 
     outputs = [ image_manifest ]

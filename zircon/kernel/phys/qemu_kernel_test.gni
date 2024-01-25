@@ -4,6 +4,7 @@
 # license that can be found in the LICENSE file or at
 # https://opensource.org/licenses/MIT
 
+import("//build/testing/boot_tests/boot_test.gni")
 import("qemu.gni")
 
 # Defines a boot test that runs a QEMU kernel directly, for each supported
