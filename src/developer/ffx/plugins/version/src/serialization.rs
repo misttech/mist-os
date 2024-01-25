@@ -3,10 +3,11 @@
 // found in the LICENSE file.
 
 use chrono::{Offset, TimeZone};
+use ffx_validation::schema;
 use fho::FfxContext;
 use fho::Result;
 use fidl_fuchsia_developer_ffx::{self as ffx};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::{fmt::Display, io::Write};
 
 const UNKNOWN_BUILD_HASH: &str = "(unknown)";
@@ -15,7 +16,7 @@ const UNKNOWN_BUILD_HASH: &str = "(unknown)";
 /// and it uses a private member to make it non_exhaustive, we can't
 /// really use the serde remote serializer mechanism. So this is just a simple
 /// serializeable copy of VersionInfo.
-#[derive(Serialize, Debug, Default, PartialEq, Eq)]
+#[derive(Serialize, Deserialize, Debug, Default, PartialEq, Eq)]
 pub struct VersionInfo {
     pub commit_hash: Option<String>,
     pub commit_timestamp: Option<u64>,
@@ -24,6 +25,18 @@ pub struct VersionInfo {
     pub api_level: Option<u64>,
     pub exec_path: Option<String>,
     pub build_id: Option<String>,
+}
+
+schema! {
+    type VersionInfo = struct {
+        commit_hash: Option<String>,
+        commit_timestamp: Option<u64>,
+        build_version: Option<String>,
+        abi_revision: Option<u64>,
+        api_level: Option<u64>,
+        exec_path: Option<String>,
+        build_id: Option<String>,
+    };
 }
 
 impl From<ffx::VersionInfo> for VersionInfo {
@@ -75,11 +88,18 @@ impl From<VersionInfo> for ffx::VersionInfo {
     }
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize, PartialEq, Eq, Debug)]
 pub struct Versions {
     pub tool_version: VersionInfo,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub daemon_version: Option<VersionInfo>,
+}
+
+schema! {
+    type Versions = struct {
+        tool_version: VersionInfo,
+        daemon_version?: Option<VersionInfo>,
+    };
 }
 
 pub fn format_version_info<O: Offset + Display>(
@@ -231,5 +251,46 @@ mod test {
                 "  integration-commit-time: (unknown commit time)".to_string(),
             ],
         );
+    }
+
+    #[test]
+    fn test_schema_validation() {
+        let example_version = serde_json::json! {
+            {
+                "commit_hash": "abcdef01",
+                "commit_timestamp": 1699991931,
+                "build_version": "2023-11-14...",
+                "abi_revision": 6226564421796955434u64,
+                "api_level": 16,
+                "exec_path": "/some/path/here",
+                "build_id": "1234",
+            }
+        };
+
+        let empty_version = serde_json::json! {
+            {
+                "commit_hash": null,
+                "commit_timestamp": null,
+                "build_version": null,
+                "abi_revision": null,
+                "api_level": null,
+                "exec_path": null,
+                "build_id": null,
+            }
+        };
+
+        ffx_validation::validation_test::<Versions, Versions>(&[
+            serde_json::json! {
+                {
+                    "tool_version": &example_version,
+                }
+            },
+            serde_json::json! {
+                {
+                    "tool_version": &empty_version,
+                    "daemon_version": &example_version,
+                }
+            },
+        ]);
     }
 }
