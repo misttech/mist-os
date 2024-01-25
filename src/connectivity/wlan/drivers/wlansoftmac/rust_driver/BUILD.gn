@@ -36,6 +36,7 @@ rustc_library("wlansoftmac-rust") {
     "//src/lib/diagnostics/testing/diagnostics-assertions/rust:diagnostics-assertions",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:pin-utils",
+    "//third_party/rust_crates:test-case",
   ]
 }
 

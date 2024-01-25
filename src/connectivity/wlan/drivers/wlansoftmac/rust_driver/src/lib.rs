@@ -448,14 +448,16 @@ mod tests {
         diagnostics_assertions::assert_data_tree,
         fidl::endpoints::Proxy,
         fuchsia_inspect::InspectorConfig,
-        futures::{channel::oneshot, task::Poll},
+        futures::{channel::oneshot, stream::FuturesUnordered, task::Poll},
         pin_utils::pin_mut,
         std::sync::Arc,
+        test_case::test_case,
         wlan_common::assert_variant,
         wlan_mlme::{
             self,
             device::test_utils::{FakeDevice, FakeDeviceConfig},
         },
+        zx::Vmo,
     };
 
     #[test]
@@ -593,6 +595,175 @@ mod tests {
         });
     }
 
+    struct StartTestHarness {
+        #[allow(dead_code)]
+        pub mlme_init_receiver: Pin<Box<oneshot::Receiver<Result<(), zx::Status>>>>,
+        #[allow(dead_code)]
+        pub driver_event_sink: mpsc::UnboundedSender<DriverEvent>,
+    }
+
+    impl StartTestHarness {
+        fn new(
+            fake_device: FakeDevice,
+        ) -> (
+            Pin<
+                Box<
+                    impl Future<
+                        Output = Result<
+                            StartedDriver<
+                                Pin<Box<dyn Future<Output = Result<(), Error>>>>,
+                                Pin<Box<impl Future<Output = Result<(), Error>>>>,
+                            >,
+                            zx::Status,
+                        >,
+                    >,
+                >,
+            >,
+            StartTestHarness,
+        ) {
+            let (mlme_init_sender, mlme_init_receiver) = oneshot::channel();
+            let (driver_event_sink, driver_event_stream) = mpsc::unbounded();
+            let fake_buf_provider = wlan_mlme::buffer::FakeBufferProvider::new();
+
+            (
+                Box::pin(start(
+                    mlme_init_sender,
+                    driver_event_sink.clone(),
+                    driver_event_stream,
+                    fake_device,
+                    fake_buf_provider,
+                )),
+                StartTestHarness {
+                    mlme_init_receiver: Box::pin(mlme_init_receiver),
+                    driver_event_sink,
+                },
+            )
+        }
+    }
+
+    #[test]
+    fn start_fails_on_bad_bootstrap() {
+        let mut exec = fasync::TestExecutor::new();
+        let (fake_device, _fake_device_state) = FakeDevice::new_with_config(
+            &exec,
+            FakeDeviceConfig::default().with_mock_start_result(Err(zx::Status::INTERRUPTED_RETRY)),
+        );
+        let (mut start_fut, _harness) = StartTestHarness::new(fake_device);
+
+        assert!(matches!(
+            exec.run_until_stalled(&mut start_fut),
+            Poll::Ready(Err(zx::Status::INTERRUPTED_RETRY))
+        ));
+    }
+
+    fn bootstrap_generic_sme_proxy_and_inspect_vmo(
+        usme_bootstrap_client_end: fidl::endpoints::ClientEnd<fidl_sme::UsmeBootstrapMarker>,
+    ) -> (fidl_sme::GenericSmeProxy, impl Future<Output = Result<Vmo, fidl::Error>>) {
+        let usme_client_proxy = usme_bootstrap_client_end
+            .into_proxy()
+            .expect("Failed to set up the USME client proxy.");
+
+        let legacy_privacy_support =
+            fidl_sme::LegacyPrivacySupport { wep_supported: false, wpa1_supported: false };
+        let (generic_sme_proxy, generic_sme_server) =
+            fidl::endpoints::create_proxy::<fidl_sme::GenericSmeMarker>().unwrap();
+        (generic_sme_proxy, usme_client_proxy.start(generic_sme_server, &legacy_privacy_support))
+    }
+
+    #[test_case(FakeDeviceConfig::default().with_mock_query_response(Err(zx::Status::IO_DATA_INTEGRITY)), zx::Status::IO_DATA_INTEGRITY)]
+    #[test_case(FakeDeviceConfig::default().with_mock_mac_sublayer_support(Err(zx::Status::IO_DATA_INTEGRITY)), zx::Status::IO_DATA_INTEGRITY)]
+    #[test_case(FakeDeviceConfig::default().with_mock_mac_implementation_type(fidl_common::MacImplementationType::Fullmac), zx::Status::INTERNAL)]
+    #[test_case(FakeDeviceConfig::default().with_mock_security_support(Err(zx::Status::IO_DATA_INTEGRITY)), zx::Status::IO_DATA_INTEGRITY)]
+    #[test_case(FakeDeviceConfig::default().with_mock_spectrum_management_support(Err(zx::Status::IO_DATA_INTEGRITY)), zx::Status::IO_DATA_INTEGRITY)]
+    #[test_case(FakeDeviceConfig::default().with_mock_mac_role(fidl_common::WlanMacRole::__SourceBreaking { unknown_ordinal: 0 }), zx::Status::INTERNAL)]
+    fn start_fails_on_query_error(
+        fake_device_config: FakeDeviceConfig,
+        expected_status: zx::Status,
+    ) {
+        let mut exec = fasync::TestExecutor::new();
+        let (fake_device, fake_device_state) =
+            FakeDevice::new_with_config(&exec, fake_device_config);
+        let (mut start_fut, _harness) = StartTestHarness::new(fake_device);
+
+        let usme_bootstrap_client_end =
+            fake_device_state.lock().usme_bootstrap_client_end.take().unwrap();
+        let (_generic_sme_proxy, _inspect_vmo_fut) =
+            bootstrap_generic_sme_proxy_and_inspect_vmo(usme_bootstrap_client_end);
+
+        match exec.run_until_stalled(&mut start_fut) {
+            Poll::Ready(Err(status)) => assert_eq!(status, expected_status),
+            Poll::Pending => panic!("start_fut still pending!"),
+            Poll::Ready(Ok(_)) => panic!("start_fut completed with Ok value"),
+        }
+    }
+
+    #[test]
+    fn start_fail_on_dropped_mlme_event_stream() {
+        let mut exec = fasync::TestExecutor::new();
+        let (fake_device, fake_device_state) = FakeDevice::new(&exec);
+        let (mut start_fut, _harness) = StartTestHarness::new(fake_device);
+
+        let usme_bootstrap_client_end =
+            fake_device_state.lock().usme_bootstrap_client_end.take().unwrap();
+        let (_generic_sme_proxy, _inspect_vmo_fut) =
+            bootstrap_generic_sme_proxy_and_inspect_vmo(usme_bootstrap_client_end);
+
+        let _ = fake_device_state.lock().mlme_event_stream.take();
+        match exec.run_until_stalled(&mut start_fut) {
+            Poll::Ready(Err(status)) => assert_eq!(status, zx::Status::INTERNAL),
+            Poll::Pending => panic!("start_fut still pending!"),
+            Poll::Ready(Ok(_)) => panic!("start_fut completed with Ok value"),
+        }
+    }
+
+    #[test]
+    fn start_succeeds() {
+        let mut exec = fasync::TestExecutor::new();
+        let (fake_device, fake_device_state) = FakeDevice::new_with_config(
+            &exec,
+            FakeDeviceConfig::default()
+                .with_mock_sta_addr([2u8; 6])
+                .with_mock_mac_role(fidl_common::WlanMacRole::Client),
+        );
+        let (mut start_fut, mut harness) = StartTestHarness::new(fake_device);
+
+        let usme_bootstrap_client_end =
+            fake_device_state.lock().usme_bootstrap_client_end.take().unwrap();
+        let (generic_sme_proxy, _inspect_vmo_fut) =
+            bootstrap_generic_sme_proxy_and_inspect_vmo(usme_bootstrap_client_end);
+
+        let StartedDriver { mlme: mut mlme_fut, sme: sme_fut } =
+            match exec.run_until_stalled(&mut start_fut) {
+                Poll::Ready(Ok(x)) => x,
+                Poll::Ready(Err(status)) => {
+                    panic!("start_fut unexpectedly failed; {}", status)
+                }
+                Poll::Pending => panic!("start_fut still pending!"),
+            };
+
+        assert_variant!(exec.run_until_stalled(&mut mlme_fut), Poll::Pending);
+        assert!(matches!(
+            exec.run_until_stalled(&mut harness.mlme_init_receiver),
+            Poll::Ready(Ok(Ok(())))
+        ));
+
+        let resp_fut = generic_sme_proxy.query();
+        pin_mut!(resp_fut);
+        assert_variant!(exec.run_until_stalled(&mut resp_fut), Poll::Pending);
+
+        let sme_and_mlme_fut = [sme_fut, mlme_fut].into_iter().collect::<FuturesUnordered<_>>();
+        pin_mut!(sme_and_mlme_fut);
+        assert!(matches!(exec.run_until_stalled(&mut sme_and_mlme_fut.next()), Poll::Pending));
+
+        assert!(matches!(
+            exec.run_until_stalled(&mut resp_fut),
+            Poll::Ready(Ok(fidl_sme::GenericSmeQuery {
+                role: fidl_common::WlanMacRole::Client,
+                sta_addr: [2, 2, 2, 2, 2, 2],
+            }))
+        ));
+    }
+
     #[derive(Debug)]
     struct SoftmacHarness<F> {
         pub start_and_serve_fut: F,
@@ -656,17 +827,8 @@ mod tests {
             // Simulate the normal initialization case where the the UsmeBootstrap client end is active
             // during initialization.
             Some(usme_bootstrap_client_end) => {
-                let usme_client_proxy = usme_bootstrap_client_end
-                    .into_proxy()
-                    .expect("Failed to set up the USME client proxy.");
-
-                let legacy_privacy_support =
-                    fidl_sme::LegacyPrivacySupport { wep_supported: false, wpa1_supported: false };
-                let (generic_sme_proxy, generic_sme_server) =
-                    fidl::endpoints::create_proxy::<fidl_sme::GenericSmeMarker>().unwrap();
-                let inspect_vmo_fut =
-                    usme_client_proxy.start(generic_sme_server, &legacy_privacy_support);
-
+                let (generic_sme_proxy, inspect_vmo_fut) =
+                    bootstrap_generic_sme_proxy_and_inspect_vmo(usme_bootstrap_client_end);
                 let start_and_serve_fut = match exec.run_until_stalled(&mut start_and_serve_fut) {
                     Poll::Pending => start_and_serve_fut,
                     Poll::Ready(result) => {
