@@ -2604,7 +2604,7 @@ TODO(https://fxbug.dev/320511796): Cleanup when no longer necessary.
 
 **Current value (from the default):** `false`
 
-From //build/testing/boot_tests/boot_test.gni:11
+From //build/testing/boot_tests/boot_test.gni:12
 
 ### disable_cuckoo_tests
 
@@ -7177,7 +7177,7 @@ Valid alternatives vary by machine, but include "linuxboot".
 
 **Current value (from the default):** `"linuxboot"`
 
-From //zircon/kernel/phys/qemu.gni:94
+From //zircon/kernel/phys/qemu.gni:93
 
 ### qr_codes_path
 
