@@ -139,6 +139,17 @@ declare_args() {
 #     Type: boolean
 #     Default: `enable_bazel_remote_rbe` (global)
 #
+#   output_groups: (optional)
+#     A list of values to pass to the --output_groups flag when calling bazel.
+#     This value will follow the conventions defined by bazel which can be found
+#     at https://bazel.build/reference/command-line-reference#flag--output_groups.
+#     Passing ["foo"] will only build the "foo" group and will omit the default
+#     set of files. If you want the union of the default set and the "foo" set
+#     then pass ["+foo"].
+#     The output_groups flag affects the execution phase and so should only be
+#     added to commands that execute a build.
+#     Type: list of string.
+#
 #   deps:
 #   metadata:
 #   no_output_dir_leaks:
@@ -497,6 +508,16 @@ template("bazel_action") {
       args += [ "--compilation_mode=opt" ]
     } else {
       assert("Unsupported mode optimize = $optimize")
+    }
+
+    # Pass in the output groups if defined
+    if (defined(invoker.output_groups)) {
+      foreach(output_group, invoker.output_groups) {
+        # output groups can be a comma separated list or accumulated from
+        # multiple --output_groups flags. The logic is easier if we just pass
+        # multiple flags.
+        args += [ "--output_groups=${output_group}" ]
+      }
     }
 
     if (!defined(deps)) {
