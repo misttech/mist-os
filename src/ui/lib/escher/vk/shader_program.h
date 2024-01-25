@@ -48,9 +48,9 @@ class ShaderProgram : public Resource, private ShaderModuleListener {
   // Return the pipeline layout for this program, operating with the optional
   // immutable sampler passed in (pass the null vk::Sampler handle to opt-out).
   //
-  // TODO(https://fxbug.dev/7291): This code-flow assumes that ShaderPrograms source from, at
+  // TODO(https://fxbug.dev/42152423): This code-flow assumes that ShaderPrograms source from, at
   // most, a single sampler. This is a blocking bug for implementing, e.g.,
-  // https://fxbug.dev/7250.
+  // https://fxbug.dev/42151968.
   PipelineLayoutPtr ObtainPipelineLayout(impl::PipelineLayoutCache* pipeline_layout_cache,
                                          const SamplerPtr& immutable_sampler);
 
@@ -80,7 +80,7 @@ class ShaderProgram : public Resource, private ShaderModuleListener {
 
   std::array<ShaderModulePtr, EnumCount<ShaderStage>()> shader_modules_;
 
-  // TODO(https://fxbug.dev/7290): These are effectively strong references to vk::Pipelines --
+  // TODO(https://fxbug.dev/42152412): These are effectively strong references to vk::Pipelines --
   // it is assumed that this object will be responsible for deleting them when
   // they go out of scope. During normal execution (e.g., without a shader
   // refresh) this cache is never cleared.

@@ -45,7 +45,7 @@
         {
             // Expose FlatlandDisplay to the V1 realm for the benefit of
             // flatland_benchmark.
-            // TODO(https://fxbug.dev/104906): Remove this when no longer needed.
+            // TODO(https://fxbug.dev/42056076): Remove this when no longer needed.
             protocol: [ "fuchsia.ui.composition.FlatlandDisplay" ],
             from: "#scenic",
         },

@@ -18,7 +18,7 @@
 #include "src/ui/scenic/lib/flatland/renderer/null_renderer.h"
 #include "src/ui/scenic/lib/flatland/renderer/tests/common.h"
 #include "src/ui/scenic/lib/flatland/renderer/vk_renderer.h"
-// TODO(https://fxbug.dev/97242): Remove dependency on screen_capture.
+// TODO(https://fxbug.dev/42179449): Remove dependency on screen_capture.
 #include "gmock/gmock.h"
 #include "src/ui/scenic/lib/screen_capture/screen_capture.h"
 #include "src/ui/scenic/lib/utils/helpers.h"
@@ -38,7 +38,7 @@ using allocation::ImageMetadata;
 using fuchsia::ui::composition::ImageFlip;
 using fuchsia::ui::composition::Orientation;
 
-// TODO(https://fxbug.dev/52632): Move common functions to testing::WithParamInterface instead of function
+// TODO(https://fxbug.dev/42129956): Move common functions to testing::WithParamInterface instead of function
 // calls.
 using NullRendererTest = RendererTest;
 using VulkanRendererTest = RendererTest;
@@ -659,7 +659,7 @@ VK_TEST_F(VulkanRendererTest, DeregistrationTest) {
   DeregistrationTest(renderer.get(), sysmem_allocator_.get(), /*use_vulkan*/ true);
 }
 
-// TODO(https://fxbug.dev/66216) This test is flaking on FEMU.
+// TODO(https://fxbug.dev/42144999) This test is flaking on FEMU.
 VK_TEST_F(VulkanRendererTest, DISABLED_RenderImageAfterBufferCollectionReleasedTest) {
   auto [escher, renderer] = CreateEscherAndPrewarmedRenderer();
   RenderImageAfterBufferCollectionReleasedTest(renderer.get(), sysmem_allocator_.get(),
@@ -667,7 +667,7 @@ VK_TEST_F(VulkanRendererTest, DISABLED_RenderImageAfterBufferCollectionReleasedT
 }
 
 VK_TEST_F(VulkanRendererTest, RenderAfterImageReleasedTest) {
-  // TODO(https://fxbug.dev/96541): Re-enable on FEMU once it doesn't flake.
+  // TODO(https://fxbug.dev/42178670): Re-enable on FEMU once it doesn't flake.
   SKIP_TEST_IF_ESCHER_USES_DEVICE(VirtualGpu);
   auto [escher, renderer] = CreateEscherAndPrewarmedRenderer();
   RenderAfterImageReleasedTest(renderer.get(), sysmem_allocator_.get(), /*use_vulkan*/ true);

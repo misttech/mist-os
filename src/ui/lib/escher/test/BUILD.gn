@@ -146,7 +146,7 @@ if (is_host && !has_prebuilt_vulkan_runtime) {
       "//src/ui/lib/escher",
     ]
 
-    # TODO(https://fxbug.dev/58162): delete the below and fix compiler warnings
+    # TODO(https://fxbug.dev/42136089): delete the below and fix compiler warnings
     configs += [ "//build/config:Wno-conversion" ]
   }
 
@@ -174,7 +174,7 @@ if (is_host && !has_prebuilt_vulkan_runtime) {
       deps += [ "//src/ui/lib/escher/shaders:host_shader_data" ]
     }
 
-    # TODO(https://fxbug.dev/58162): delete the below and fix compiler warnings
+    # TODO(https://fxbug.dev/42136089): delete the below and fix compiler warnings
     configs += [ "//build/config:Wno-conversion" ]
   }
 
@@ -199,7 +199,7 @@ if (is_host && !has_prebuilt_vulkan_runtime) {
           [ "//src/ui/lib/escher/shaders:host_shader_data($host_toolchain)" ]
     }
 
-    # TODO(https://fxbug.dev/58162): delete the below and fix compiler warnings
+    # TODO(https://fxbug.dev/42136089): delete the below and fix compiler warnings
     configs += [ "//build/config:Wno-conversion" ]
   }
 }

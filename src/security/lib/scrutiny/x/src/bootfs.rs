@@ -223,7 +223,7 @@ impl AdditionalBootConfiguration {
     // See https://fuchsia.dev/fuchsia-src/reference/kernel/kernel_cmdline for the expected format,
     // and //src/sys/component_manager/src/builtin/arguments.rs for the runtime parser. This impl is
     // mostly copied from the runtime parser, but makes the format validation strict.
-    // TODO(https://fxbug.dev/133260): Consider making this shared code with component manager's parser.
+    // TODO(https://fxbug.dev/42083244): Consider making this shared code with component manager's parser.
     fn new(blob: &VerifiedMemoryBlob) -> Result<Self, AdditionalBootConfigurationError> {
         let mut data = HashMap::<String, String>::new();
 

@@ -36,7 +36,7 @@ constexpr double kPixelEpsilon = 0.5f;
 // Epsilon for floating error.
 constexpr double kEpsilon = 0.0001f;
 
-// TODO(https://fxbug.dev/125831): Two coordinates (x/y) systems can differ in scale (size of
+// TODO(https://fxbug.dev/42076606): Two coordinates (x/y) systems can differ in scale (size of
 // pixels).
 void ExpectLocationAndPhase(
     const std::string& scoped_message,

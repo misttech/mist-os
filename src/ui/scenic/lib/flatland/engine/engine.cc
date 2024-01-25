@@ -15,7 +15,7 @@
 #include "src/ui/scenic/lib/utils/helpers.h"
 #include "src/ui/scenic/lib/utils/logging.h"
 
-// TODO(https://fxbug.dev/77414): for hacky invocation of OnVsync() at the end of RenderScheduledFrame().
+// TODO(https://fxbug.dev/42157427): for hacky invocation of OnVsync() at the end of RenderScheduledFrame().
 #include <lib/trace/event.h>
 #include <lib/zx/time.h>
 
@@ -24,7 +24,7 @@
 #include <unordered_set>
 
 // Hardcoded double buffering.
-// TODO(https://fxbug.dev/76640): make this configurable.  Even fancier: is it worth considering sharing a
+// TODO(https://fxbug.dev/42156567): make this configurable.  Even fancier: is it worth considering sharing a
 // pool of framebuffers between multiple displays?  (assuming that their dimensions are similar,
 // etc.)
 static constexpr uint32_t kNumDisplayFramebuffers = 2;
@@ -120,7 +120,7 @@ void Engine::RenderScheduledFrame(uint64_t frame_number, zx::time presentation_t
                             scene_state.topology_data.live_handles, scene_state.global_matrices,
                             hw_display->device_pixel_ratio(), scene_state.snapshot);
 
-  // TODO(https://fxbug.dev/76640): hack!  need a better place to call AddDisplay().
+  // TODO(https://fxbug.dev/42156567): hack!  need a better place to call AddDisplay().
   if (hack_seen_display_id_values_.find(hw_display->display_id().value) ==
       hack_seen_display_id_values_.end()) {
     // This display hasn't been added to the DisplayCompositor yet.
@@ -182,7 +182,7 @@ view_tree::SubtreeSnapshot Engine::GenerateViewTreeSnapshot(
       link_child_to_parent_transform_map);
 }
 
-// TODO(https://fxbug.dev/81842) If we put Screenshot on its own thread, we should make this call thread
+// TODO(https://fxbug.dev/42162342) If we put Screenshot on its own thread, we should make this call thread
 // safe.
 Renderables Engine::GetRenderables(const FlatlandDisplay& display) {
   TransformHandle root = display.root_transform();

@@ -15,7 +15,7 @@ use {
     tracing::{error, info},
 };
 
-// TODO(didis): Use netstack API after https://fxbug.dev/111228 is implemented.
+// TODO(didis): Use netstack API after https://fxbug.dev/42062536 is implemented.
 const NETWORK_SERVICE_DIR: &str = "/dev/class/network";
 
 // TODO(didis): This assumes the wifi device instance is already there. We should not depend on
@@ -52,7 +52,7 @@ async fn watch_and_update_ports(
     device: &fhwnet::DeviceProxy,
     ports: Rc<RefCell<HashMap<u8, fhwnet::PortProxy>>>,
 ) {
-    // TODO(https://fxbug.dev/110111): Return `RecorderError::INTERNAL` instead of unwrap.
+    // TODO(https://fxbug.dev/42061512): Return `RecorderError::INTERNAL` instead of unwrap.
     let (port_watcher, port_watcher_server_end) =
         fidl::endpoints::create_proxy::<fhwnet::PortWatcherMarker>().unwrap();
     device.get_port_watcher(port_watcher_server_end).unwrap();

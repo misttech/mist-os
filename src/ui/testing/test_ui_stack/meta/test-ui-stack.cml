@@ -58,7 +58,7 @@
             protocol: [
                 "fuchsia.accessibility.semantics.SemanticsManager",
 
-                // TODO(https://fxbug.dev/112819): Dismiss() is only implemented for
+                // TODO(https://fxbug.dev/42064159): Dismiss() is only implemented for
                 // GFX; support is still needed for Flatland.
                 "fuchsia.element.GraphicalPresenter",
                 "fuchsia.ui.composition.Allocator",

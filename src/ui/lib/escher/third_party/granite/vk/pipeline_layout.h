@@ -102,7 +102,7 @@ struct PipelineLayoutSpec : public Hashable {
 
   SamplerPtr immutable_sampler_;
   uint32_t attribute_mask_ = 0;
-  // TODO(https://fxbug.dev/7174): document.
+  // TODO(https://fxbug.dev/42151125): document.
   uint32_t render_target_mask_ = 0;
   uint32_t descriptor_set_mask_ = 0;
   std::array<DescriptorSetLayout, VulkanLimits::kNumDescriptorSets> descriptor_set_layouts_ = {};
@@ -111,12 +111,12 @@ struct PipelineLayoutSpec : public Hashable {
 
   // Allows quick comparison to decide whether the push constant ranges have
   // changed.  If so, all descriptor sets are invalidated.
-  // TODO(https://fxbug.dev/7174): I remember reading why this is necessary... we should
+  // TODO(https://fxbug.dev/42151125): I remember reading why this is necessary... we should
   // make note of the section of the Vulkan spec that requires this.
   Hash push_constant_layout_hash_ = {0};
 };
 
-// TODO(https://fxbug.dev/7174): extend downward to enclose PipelineLayout.  Cannot do this yet
+// TODO(https://fxbug.dev/42151125): extend downward to enclose PipelineLayout.  Cannot do this yet
 // because there is already a PipelineLayout in impl/vk.
 }  // namespace impl
 
@@ -125,7 +125,7 @@ struct PipelineLayoutSpec : public Hashable {
 // sets that match the sets required, at each index, by pipelines with this
 // layout.
 //
-// TODO(https://fxbug.dev/7174): does this need to be a Resource?  If these are always
+// TODO(https://fxbug.dev/42151125): does this need to be a Resource?  If these are always
 // reffed by pipelines that use them, then it should suffice to keep those
 // pipelines alive, right?
 class PipelineLayout : public Resource {

@@ -127,7 +127,7 @@ impl DataController for VerifyStructuredConfigController {
     }
 }
 
-// TODO(https://fxbug.dev/107706) Use a type that constrains values to valid component URLs.
+// TODO(https://fxbug.dev/42059085) Use a type that constrains values to valid component URLs.
 type ComponentUrl = String;
 
 /// Schema for a given product's structured configuration policy.

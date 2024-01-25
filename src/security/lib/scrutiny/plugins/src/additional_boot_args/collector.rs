@@ -26,7 +26,7 @@ use {
 // The purpose of loading the additional boot config is to parse bootstrapping information such as the system
 // image merkle root used to bootstrap the software delivery stack.
 //
-// TODO(https://fxbug.dev/98030): This function should support the update package -> images package -> ...
+// TODO(https://fxbug.dev/42180322): This function should support the update package -> images package -> ...
 // flow.
 fn load_additional_boot_args<P1: AsRef<Path>, P2: AsRef<Path>>(
     model: Arc<DataModel>,

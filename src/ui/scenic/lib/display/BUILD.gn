@@ -37,8 +37,8 @@ source_set("display") {
     "//zircon/system/ulib/zx",
   ]
   deps = [
-    # TODO(https://fxbug.dev/24590): For displayOwned/NotOwnedSignal.
-    # TODO(https://fxbug.dev/23686): Remove this when we externalize Displays.
+    # TODO(https://fxbug.dev/42098803): For displayOwned/NotOwnedSignal.
+    # TODO(https://fxbug.dev/42097798): Remove this when we externalize Displays.
     "//sdk/fidl/fuchsia.ui.scenic:fuchsia.ui.scenic_hlcpp",
     "//src/ui/scenic/lib/allocation",
     "//src/ui/scenic/lib/scheduling:vsync_timing",

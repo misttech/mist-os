@@ -38,7 +38,7 @@ struct MutableState {
 /// pixel.
 const PIXELS_PER_TICK: f32 = 120.0;
 
-/// TODO(https://fxbug.dev/108541): Temporary apply a linear scale factor to scroll to make it feel
+/// TODO(https://fxbug.dev/42059911): Temporary apply a linear scale factor to scroll to make it feel
 /// faster.
 const SCALE_SCROLL: f32 = 2.0;
 
@@ -187,7 +187,7 @@ impl UnhandledInputHandler for PointerSensorScaleHandler {
 //   backlogged.
 // * Is set to accommodate up to 10 kHZ event reporting.
 //
-// TODO(https://fxbug.dev/98920): Use the polling rate instead of event timestamps.
+// TODO(https://fxbug.dev/42181307): Use the polling rate instead of event timestamps.
 const MIN_PLAUSIBLE_EVENT_DELAY: zx::Duration = zx::Duration::from_micros(100);
 
 // The maximum reasonable delay between intentional mouse movements.
@@ -200,7 +200,7 @@ const MIN_PLAUSIBLE_EVENT_DELAY: zx::Duration = zx::Duration::from_micros(100);
 // 2. Wait until a second report comes in. However, older mice generate
 //    reports at 125 HZ, which would mean an 8 msec delay.
 //
-// TODO(https://fxbug.dev/98920): Use the polling rate instead of event timestamps.
+// TODO(https://fxbug.dev/42181307): Use the polling rate instead of event timestamps.
 const MAX_PLAUSIBLE_EVENT_DELAY: zx::Duration = zx::Duration::from_millis(50);
 
 const MAX_SENSOR_COUNTS_PER_INCH: f32 = 20_000.0; // From https://sensor.fyi/sensors
@@ -352,7 +352,7 @@ impl PointerSensorScaleHandler {
                 // That manifests as the pointer becoming invisible, and never
                 // moving again.
                 //
-                // TODO(https://fxbug.dev/98995) Add a triage rule to highlight the
+                // TODO(https://fxbug.dev/42181389) Add a triage rule to highlight the
                 // implications of this message.
                 self.metrics_logger.log_error(
                     InputPipelineErrorMetricDimensionEvent::PointerSensorScaleHandlerScaledMotionInvalid,

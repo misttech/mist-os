@@ -398,11 +398,11 @@ const PaperShapeCacheEntry& PaperShapeCache::GetShapeMesh(const Hash& shape_hash
   }
 
   // Attempt to find a pre-clipped shape in the cache.
-  // TODO(https://fxbug.dev/7233): do we need to quantize the clip_planes to avoid
+  // TODO(https://fxbug.dev/42151779): do we need to quantize the clip_planes to avoid
   // numerical precision errors when the planes are transformed into the
   // object's coordinate system?  Seems like this should perhaps be the
   // responsibility of the caller.
-  // TODO(https://fxbug.dev/7233): similarly, the caller should be responsible for
+  // TODO(https://fxbug.dev/42151779): similarly, the caller should be responsible for
   // sorting the planes if desired.  For example, if the same planes are
   // provided in a different order, the cache would fail to find the pre-clipped
   // mesh.
@@ -472,7 +472,7 @@ const PaperShapeCacheEntry& PaperShapeCache::GetShapeMesh(const Hash& shape_hash
       ++cache_hit_after_plane_culling_count_;
       AddEntry(lookup_hash, *entry);
 
-      // TODO(https://fxbug.dev/7233): by caching under |lookup_hash| here, there is the
+      // TODO(https://fxbug.dev/42151779): by caching under |lookup_hash| here, there is the
       // possibility of pathological behavior under "stop and go" motion.  For
       // example, if an unclipped mesh stops for a few frames then it will be
       // looked up successfully via |lookup_hash|, but when it starts to move
@@ -541,7 +541,7 @@ void PaperShapeCache::AddEntry(const Hash& hash, PaperShapeCacheEntry entry) {
   cache_.insert({hash, std::move(entry)});
 }
 
-// TODO(https://fxbug.dev/24173): rather than rolling our own ad-hoc cache eviction strategy,
+// TODO(https://fxbug.dev/42098340): rather than rolling our own ad-hoc cache eviction strategy,
 // (which is already a performance bottleneck) we should plug in a reusable
 // cache that performs better and is well-tested.
 void PaperShapeCache::TrimCache() {

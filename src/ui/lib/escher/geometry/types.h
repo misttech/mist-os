@@ -52,7 +52,7 @@ struct Rectangle2D {
   std::array<vec2, 4> clockwise_uvs = {vec2(0, 0), vec2(1, 0), vec2(1, 1), vec2(0, 1)};
 
   bool operator==(const Rectangle2D& other) const {
-    // TODO(https://fxbug.dev/7228): This epsilon should be unified with the one below, along with
+    // TODO(https://fxbug.dev/42151723): This epsilon should be unified with the one below, along with
     // everywhere else we are using an epsilon value in Escher code.
     constexpr float kRectangleEpislon = 0.001f;
     return glm::all(glm::epsilonEqual(origin, other.origin, kRectangleEpislon)) &&

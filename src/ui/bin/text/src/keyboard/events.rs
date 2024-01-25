@@ -169,7 +169,7 @@ impl TryFrom<KeyEvent> for ui_input::KeyboardEvent {
             ui_input::MODIFIER_NONE
         };
 
-        // TODO(https://fxbug.dev/76806): Should `NonPrintableKey`s be converted to hid_usage when key is
+        // TODO(https://fxbug.dev/42156751): Should `NonPrintableKey`s be converted to hid_usage when key is
         // missing?
         let hid_usage = match event.key() {
             Some(key) => input3_key_to_hid_usage(key),

@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-// TODO(https://fxbug.dev/111242): Exercise production package implementations to eliminate dead code
+// TODO(https://fxbug.dev/42062552): Exercise production package implementations to eliminate dead code
 // warnings.
 #![allow(dead_code)]
 

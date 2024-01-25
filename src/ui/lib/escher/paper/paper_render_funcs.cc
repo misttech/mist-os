@@ -42,7 +42,7 @@ void PaperRenderFuncs::RenderMesh(CommandBuffer* cb, const RenderQueueContext* c
   // Set up per-object state.
   mesh_data->Bind(cb);
 
-  // TODO(https://fxbug.dev/7249): this assumes that all meshes in this render-queue pass are
+  // TODO(https://fxbug.dev/42151956): this assumes that all meshes in this render-queue pass are
   // drawn exactly the same way.  We will need something better soon.
   const SamplerPtr& sampler =
       mesh_data->texture->sampler()->is_immutable() ? mesh_data->texture->sampler() : nullptr;
@@ -69,7 +69,7 @@ PaperRenderFuncs::MeshData* PaperRenderFuncs::NewMeshData(const FramePtr& frame,
   FX_DCHECK(texture);
   auto& mesh_spec = mesh->spec();
 
-  // TODO(https://fxbug.dev/7194): avoid reaching in to impl::CommandBuffer for keep-alive.
+  // TODO(https://fxbug.dev/42151346): avoid reaching in to impl::CommandBuffer for keep-alive.
   frame->cmds()->KeepAlive(mesh);
   frame->cmds()->KeepAlive(texture.get());
 
@@ -88,7 +88,7 @@ PaperRenderFuncs::MeshData* PaperRenderFuncs::NewMeshData(const FramePtr& frame,
     uint32_t binding_count = 0;
     for (uint32_t i = 0; i < VulkanLimits::kNumVertexBuffers; ++i) {
       if (auto& attribute_buffer = mesh->attribute_buffer(i)) {
-        // TODO(https://fxbug.dev/7194): avoid reaching in to impl::CommandBuffer for keep-alive.
+        // TODO(https://fxbug.dev/42151346): avoid reaching in to impl::CommandBuffer for keep-alive.
         frame->cmds()->KeepAlive(attribute_buffer.buffer);
 
         obj->vertex_bindings[binding_count++] =
@@ -121,7 +121,7 @@ PaperRenderFuncs::MeshDrawData* PaperRenderFuncs::NewMeshDrawData(
   writable_binding.first->model_transform = transform;
   writable_binding.first->color = color;
   writable_binding.first->gamma_power = gamma_power;
-  // TODO(https://fxbug.dev/7243): populate field for vertex-shader clip-planes.
+  // TODO(https://fxbug.dev/42151890): populate field for vertex-shader clip-planes.
 
   draw_data->object_properties = writable_binding.second;
   draw_data->shader_list = shader_list;

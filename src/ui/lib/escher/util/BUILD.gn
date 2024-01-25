@@ -8,7 +8,7 @@ source_set("check_vulkan_support") {
     "check_vulkan_support.h",
   ]
 
-  # TODO(https://fxbug.dev/135435) Remove -Wno-unknown-warning-option after next clang roll.
+  # TODO(https://fxbug.dev/42085078) Remove -Wno-unknown-warning-option after next clang roll.
   # After that, the toolchain will properly support the new flag.
   cflags = [ "-Wno-unknown-warning-option" ]
   public_deps = [ "//src/lib/vulkan" ]

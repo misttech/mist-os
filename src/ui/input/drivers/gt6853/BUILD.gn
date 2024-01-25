@@ -75,7 +75,7 @@ driver_bind_rules("gt6853-bind") {
   rules = "gt6853.bind"
   tests = "gt6853-bind-test.json"
 
-  # TODO(https://fxbug.dev/115757): Remove this once we no longer need to generate
+  # TODO(https://fxbug.dev/42067063): Remove this once we no longer need to generate
   # fragments for composite bind rules.
   disable_fragment_gen = true
 
@@ -127,7 +127,7 @@ test("gt6853-test") {
     "//sdk/fidl/fuchsia.hardware.gpio:fuchsia.hardware.gpio_cpp",
     "//src/devices/gpio/testing/fake-gpio",
 
-    # TODO(https://fxbug.dev/113997): Fix thread unsafety and switch to
+    # TODO(https://fxbug.dev/42065251): Fix thread unsafety and switch to
     # "//sdk/lib/component/outgoing/cpp".
     "//sdk/lib/async_patterns/testing/cpp",
     "//sdk/lib/component/outgoing/cpp:cpp_disable_synchronization_check",

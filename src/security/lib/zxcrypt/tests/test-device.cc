@@ -256,7 +256,7 @@ void TestDevice::WriteVmo(zx_off_t off, size_t len) {
 void TestDevice::Corrupt(uint64_t blkno, key_slot_t slot) {
   uint8_t block[block_size_];
 
-  // TODO(https://fxbug.dev/129956): Update this API to take a volume channel instead.
+  // TODO(https://fxbug.dev/42080299): Update this API to take a volume channel instead.
   ASSERT_OK(block_client::SingleReadBytes(
       fidl::UnownedClientEnd<fuchsia_hardware_block::Block>(parent_volume().channel()), block,
       block_size_, blkno * block_size_));
@@ -271,7 +271,7 @@ void TestDevice::Corrupt(uint64_t blkno, key_slot_t slot) {
   int flip = 1U << (rand() % 8);
   block[off] ^= static_cast<uint8_t>(flip);
 
-  // TODO(https://fxbug.dev/129956): Update this API to take a volume channel instead.
+  // TODO(https://fxbug.dev/42080299): Update this API to take a volume channel instead.
   ASSERT_OK(block_client::SingleWriteBytes(
       fidl::UnownedClientEnd<fuchsia_hardware_block::Block>(parent_volume().channel()), block,
       block_size_, blkno * block_size_));

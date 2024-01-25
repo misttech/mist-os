@@ -46,7 +46,7 @@ impl<T> CcdRequest<T> {
         }
     }
 
-    #[allow(dead_code)] // TODO(https://fxbug.dev/82504): remove when passwords are supported.
+    #[allow(dead_code)] // TODO(https://fxbug.dev/42163078): remove when passwords are supported.
     pub fn new_with_password(cmd: CcdCommand, password: &str) -> Result<Self, NulError> {
         Ok(CcdRequest::<T> {
             header: Header::new(Subcommand::Ccd),

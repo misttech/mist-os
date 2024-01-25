@@ -24,7 +24,7 @@
 
 // This test exercises the fuchsia.ui.observation.test.Registry protocol implemented by Scenic.
 
-// TODO(https://fxbug.dev/105706): This test duplicate lots of code in
+// TODO(https://fxbug.dev/42056965): This test duplicate lots of code in
 // observer_registry_integration_test.cc. We should factor the shard pieces into
 // a base test class and/or util library.
 

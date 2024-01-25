@@ -75,7 +75,7 @@ void FenceSetListener::OnFenceSignalled(size_t waiter_index, zx_status_t status,
                       "error status code: "
                    << status;
 
-    // TODO(https://fxbug.dev/23426): Close the session if there is an error, or if the fence
+    // TODO(https://fxbug.dev/42097510): Close the session if there is an error, or if the fence
     // is closed.
   }
 }

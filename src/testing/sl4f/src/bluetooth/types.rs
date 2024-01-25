@@ -35,7 +35,7 @@ use crate::common_utils::common::macros::parse_arg;
 pub type PeerFactoryMap = HashMap<String, PeerControllerProxy>;
 
 /// BleScan result type
-/// TODO(https://fxbug.dev/875): Add support for RemoteDevices when clone() is implemented
+/// TODO(https://fxbug.dev/42168627): Add support for RemoteDevices when clone() is implemented
 #[derive(Serialize, Clone, Debug)]
 pub struct BleScanResponse {
     pub id: String,
@@ -50,7 +50,7 @@ impl BleScanResponse {
 }
 
 /// BleAdvertise result type (only uuid)
-/// TODO(https://fxbug.dev/875): Add support for AdvertisingData when clone() is implemented
+/// TODO(https://fxbug.dev/42168627): Add support for AdvertisingData when clone() is implemented
 #[derive(Serialize, Clone, Debug)]
 pub struct BleAdvertiseResponse {
     pub name: Option<String>,
@@ -166,7 +166,7 @@ impl GattcDiscoverCharacteristicResponse {
 }
 
 /// BleConnectPeripheral response (aka ServiceInfo)
-/// TODO(https://fxbug.dev/875): Add support for ServiceInfo when clone(), serialize(), derived
+/// TODO(https://fxbug.dev/42168627): Add support for ServiceInfo when clone(), serialize(), derived
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct BleConnectPeripheralResponse {
     pub id: u64,
@@ -1082,7 +1082,7 @@ impl TryInto<ServiceInfo> for FacadeArg {
             handle: Some(handle),
             kind: Some(kind),
             type_: Some(type_),
-            // TODO(https://fxbug.dev/883): Add support for GATT characteristics and includes
+            // TODO(https://fxbug.dev/42169516): Add support for GATT characteristics and includes
             ..Default::default()
         })
     }

@@ -31,7 +31,7 @@ pub struct DisplayMetrics {
 
     /// The pixel density of the display. This is either supplied by the client constructing
     /// the display metrics, or a hard-coded default is used based on the display dimensions.
-    // TODO(https://fxbug.dev/84729)
+    // TODO(https://fxbug.dev/42165549)
     #[allow(unused)]
     density_in_pixels_per_mm: f32,
 
@@ -294,11 +294,11 @@ impl DisplayMetrics {
     /// The display pixel density used for a 24 inch monitor.
     const MONITOR_24_IN_DENSITY: f32 = 4.16;
 
-    // TODO(https://fxbug.dev/42794): Allow Root Presenter clients to specify exact pixel ratio
+    // TODO(https://fxbug.dev/42119026): Allow Root Presenter clients to specify exact pixel ratio
     /// The display pixel density used for a 27 inch monitor.
     const MONITOR_27_IN_2K_DENSITY: f32 = 5.22;
 
-    // TODO(https://fxbug.dev/23621): Don't lie.
+    // TODO(https://fxbug.dev/42097727): Don't lie.
     /// The display pixel density used as default when no other default device matches.
     /// This results in a logical to physical pixel ratio of 1.0.
     const DEFAULT_DENSITY: f32 = 5.24;

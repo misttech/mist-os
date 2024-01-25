@@ -36,7 +36,7 @@ void ClipWorldSpaceAndOutputScreenSpaceCoords(vec4 world_pos) {
 }
 
 #ifdef SHADOW_MAP_LIGHTING_PASS
-// TODO(https://fxbug.dev/7200):
+// TODO(https://fxbug.dev/42151414):
 // |light_transform| is not currently defined.  There should be a light
 // transform per light.  In the untested/unfinished code below, the transform is
 // applied to the model-space vertex position; this requires the CPU to compute

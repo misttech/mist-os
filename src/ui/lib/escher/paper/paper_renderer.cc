@@ -7,7 +7,7 @@
 #include "src/ui/lib/escher/debug/debug_font.h"
 #include "src/ui/lib/escher/debug/debug_rects.h"
 #include "src/ui/lib/escher/escher.h"
-// TODO(https://fxbug.dev/44894): try to avoid including an "impl" file.
+// TODO(https://fxbug.dev/42121358): try to avoid including an "impl" file.
 #include "src/ui/lib/escher/impl/vulkan_utils.h"
 #include "src/ui/lib/escher/mesh/tessellation.h"
 #include "src/ui/lib/escher/paper/paper_render_queue_context.h"
@@ -255,7 +255,7 @@ void PaperRenderer::FinalizeFrame() {
   // We may need to lazily instantiate |debug_font|, or delete it. If the former, this needs to be
   // done before we submit the GPU uploader's tasks.
 
-  // TODO(https://fxbug.dev/7313): Clean up lazy instantiation. Right now, DebugFont and DebugRects are
+  // TODO(https://fxbug.dev/42152668): Clean up lazy instantiation. Right now, DebugFont and DebugRects are
   // created/destroyed from frame-to-frame.
   if (config_.debug_frame_number) {
     DrawDebugText(std::to_string(frame_data_->frame->frame_number()), {10, 10}, 4);
@@ -326,7 +326,7 @@ void PaperRenderer::DrawDebugText(std::string text, vk::Offset2D offset, int32_t
   FX_DCHECK(frame_data_);
   FX_DCHECK(!frame_data_->scene_finalized);
 
-  // TODO(https://fxbug.dev/7334): Add error checking to make sure math will not cause negative
+  // TODO(https://fxbug.dev/42152901): Add error checking to make sure math will not cause negative
   // values or the bars to go off screen.
   frame_data_->texts.push_back({text, offset, scale});
 }
@@ -461,7 +461,7 @@ void PaperRenderer::DrawBoundingBox(const BoundingBox& box, const PaperMaterialP
     return;
   }
   if (material->texture()) {
-    FX_LOGS(ERROR) << "TODO(https://fxbug.dev/7307): Box meshes do not currently support textures.";
+    FX_LOGS(ERROR) << "TODO(https://fxbug.dev/42152601): Box meshes do not currently support textures.";
     return;
   }
 
@@ -484,7 +484,7 @@ void PaperRenderer::DrawMesh(const MeshPtr& mesh, const PaperMaterialPtr& materi
   draw_call_factory_.DrawMesh(mesh, *material.get(), flags);
 }
 
-// TODO(https://fxbug.dev/7245): in "no shadows" mode, should we:
+// TODO(https://fxbug.dev/42151912): in "no shadows" mode, should we:
 // - not use the other lights, and boost the ambient intensity?
 // - still use the lights, allowing a BRDF, distance-based-falloff etc.
 // The right answer is probably to separate the shadow algorithm from the
@@ -850,7 +850,7 @@ void PaperRenderer::WarmPipelineAndRenderPassCaches(
 
   // Obtain and set the render pass; this is the only render pass that is used, so we just need to
   // set it once.
-  // TODO(https://fxbug.dev/44894): try to avoid using this "impl" type directly.
+  // TODO(https://fxbug.dev/42121358): try to avoid using this "impl" type directly.
   impl::RenderPassPtr render_pass =
       WarmRenderPassCache(escher->render_pass_cache(), config, output_format,
                           output_swapchain_layout, use_transient_attachments);
@@ -868,7 +868,7 @@ void PaperRenderer::WarmPipelineAndRenderPassCaches(
   // NOTE: different mesh specs are used depending on whether stencil shadows
   // are enabled.  But it doesn't matter, because CommandBuffer will only use whichever attributes
   // are required for the specified shader.
-  // TODO(https://fxbug.dev/44898): once kShadowVolumeMeshSpec and kStandardMeshSpec are constexpr, we
+  // TODO(https://fxbug.dev/42121362): once kShadowVolumeMeshSpec and kStandardMeshSpec are constexpr, we
   // should be able to use static_assert() here.
   FX_DCHECK(PaperShapeCache::kShadowVolumeMeshSpec().attributes[0] ==
             PaperShapeCache::kStandardMeshSpec().attributes[0]);

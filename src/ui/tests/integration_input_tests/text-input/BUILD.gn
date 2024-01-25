@@ -22,7 +22,7 @@ group("tests") {
     "//src/ui/testing/test_ui_stack:test-ui-stack-flavors",
 
     # The deps below are necessary on minimal product configs.
-    # TODO(https://fxbug.dev/119212): These should be provided by the Product
+    # TODO(https://fxbug.dev/42070261): These should be provided by the Product
     # configurations on which these tests run rather than as deps.
     "//src/chromium:web_context_provider_for_test",
   ]
@@ -94,9 +94,9 @@ fuchsia_test_package("text-input-test") {
   deps = [
     "text-input-chromium:text-input-chromium-component",
 
-    # TODO(https://fxbug.dev/119212): These should be provided by the Product
+    # TODO(https://fxbug.dev/42070261): These should be provided by the Product
     # configurations on which these tests run rather than as deps.
-    # TODO(https://fxbug.dev/119212): Should these be deps of the individual test
+    # TODO(https://fxbug.dev/42070261): Should these be deps of the individual test
     # targets above?
     "//src/chromium:web_context_provider_for_test",
     "//src/cobalt/bin/testing/mock_cobalt",

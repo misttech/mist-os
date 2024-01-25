@@ -177,7 +177,7 @@ if (is_host) {
       sources = [ "src/lib.rs" ]
       configs += [ ":config" ]
 
-      # TODO(https://fxbug.dev/97055): LSAN says that Scrutiny has a leak, disable this test in ASAN
+      # TODO(https://fxbug.dev/42179241): LSAN says that Scrutiny has a leak, disable this test in ASAN
       if (is_asan) {
         test_environments = []
       }

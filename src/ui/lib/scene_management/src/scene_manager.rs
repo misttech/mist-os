@@ -55,7 +55,7 @@ pub type PresentationReceiver = UnboundedReceiver<PresentationMessage>;
 const _CURSOR_SIZE: (u32, u32) = (18, 29);
 const CURSOR_HOTSPOT: (u32, u32) = (2, 4);
 
-// TODO(https://fxbug.dev/78201): Remove hardcoded scale when Flatland provides
+// TODO(https://fxbug.dev/42158302): Remove hardcoded scale when Flatland provides
 // what is needed to determine the cursor scale factor.
 const CURSOR_SCALE_MULTIPLIER: u32 = 5;
 const CURSOR_SCALE_DIVIDER: u32 = 4;
@@ -78,7 +78,7 @@ struct TransformContentIdPair {
 /// For example, a view is created during initialization, and so FlatlandInstance stores the
 /// corresponding ViewRef and a ParentViewportWatcher FIDL connection.
 struct FlatlandInstance {
-    // TODO(https://fxbug.dev/87156): Arc<Mutex<>>, yuck.
+    // TODO(https://fxbug.dev/42168246): Arc<Mutex<>>, yuck.
     flatland: FlatlandPtr,
     view_ref: ui_views::ViewRef,
     root_transform_id: TransformId,
@@ -229,7 +229,7 @@ pub struct SceneManager {
     viewport_hanging_get: Arc<Mutex<InjectorViewportHangingGet>>,
 
     // Used to publish viewport changes to subscribers of |viewport_hanging_get|.
-    // TODO(https://fxbug.dev/87517): use this to publish changes to screen resolution.
+    // TODO(https://fxbug.dev/42168647): use this to publish changes to screen resolution.
     _viewport_publisher: Arc<Mutex<InjectorViewportPublisher>>,
 
     // Used to position the cursor.
@@ -799,7 +799,7 @@ pub fn create_viewport_hanging_get(
         if let Err(fidl_error) = responder.send(&(*viewport_spec).into()) {
             info!("Viewport hanging get notification, FIDL error: {}", fidl_error);
         }
-        // TODO(https://fxbug.dev/87670): the HangingGet docs don't explain what value to return.
+        // TODO(https://fxbug.dev/42168817): the HangingGet docs don't explain what value to return.
         true
     });
 

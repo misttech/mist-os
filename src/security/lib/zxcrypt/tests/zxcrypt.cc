@@ -34,7 +34,7 @@ void TestBind(Volume::Version version, bool fvm) {
 }
 DEFINE_EACH_DEVICE(ZxcryptTest, TestBind)
 
-// TODO(aarongreen): When https://fxbug.dev/31073 is resolved, add tests that check zxcrypt_rekey and
+// TODO(aarongreen): When https://fxbug.dev/42106007 is resolved, add tests that check zxcrypt_rekey and
 // zxcrypt_shred.
 
 // FIDL tests
@@ -395,7 +395,7 @@ void TestVmoManyToOne(Volume::Version version, bool fvm) {
 }
 DEFINE_EACH_DEVICE(ZxcryptTest, TestVmoManyToOne)
 
-// Disabled due to flakiness (see https://fxbug.dev/31974).
+// Disabled due to flakiness (see https://fxbug.dev/42107007).
 void DISABLED_TestVmoStall(Volume::Version version, bool fvm) {
   TestDevice device;
   ASSERT_NO_FATAL_FAILURE(device.SetupDevmgr());
@@ -404,7 +404,7 @@ void DISABLED_TestVmoStall(Volume::Version version, bool fvm) {
   // The device can have up to 4 * max_transfer_size bytes in flight before it begins queuing them
   // internally.
   //
-  // TODO(https://fxbug.dev/31974): the result of this call is unused. Why?
+  // TODO(https://fxbug.dev/42107007): the result of this call is unused. Why?
   const fidl::WireResult result = fidl::WireCall(device.zxcrypt_block())->GetInfo();
   ASSERT_OK(result.status());
   const fit::result response = result.value();

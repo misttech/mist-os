@@ -50,7 +50,7 @@ source_set("demo_base") {
   ]
   public_deps = [ "//src/ui/lib/escher:escher_with_glslang" ]
 
-  # TODO(https://fxbug.dev/58162): delete the below and fix compiler warnings
+  # TODO(https://fxbug.dev/42136089): delete the below and fix compiler warnings
   configs += [ "//build/config:Wno-conversion" ]
 }
 
@@ -74,7 +74,7 @@ source_set("demo_harness_fuchsia") {
     ":headers",
   ]
 
-  # TODO(https://fxbug.dev/58162): delete the below and fix compiler warnings
+  # TODO(https://fxbug.dev/42136089): delete the below and fix compiler warnings
   configs += [ "//build/config:Wno-conversion" ]
 
   configs += [ ":vulkan_no_nodiscard" ]
@@ -92,7 +92,7 @@ source_set("demo_harness_glfw") {
     ":headers",
   ]
 
-  # TODO(https://fxbug.dev/58162): delete the below and fix compiler warnings
+  # TODO(https://fxbug.dev/42136089): delete the below and fix compiler warnings
   configs += [ "//build/config:Wno-conversion" ]
 }
 

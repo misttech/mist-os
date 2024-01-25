@@ -33,7 +33,7 @@ struct GlobalTopologyData {
     topology_vector = std::move(other.topology_vector);
     child_counts = std::move(other.child_counts);
     parent_indices = std::move(other.parent_indices);
-    // TODO(https://fxbug.dev/125315): Investigate why move is slow.
+    // TODO(https://fxbug.dev/42076105): Investigate why move is slow.
     {
       TRACE_DURATION("gfx", "GlobalTopologyData[move]", "length", other.live_handles.size());
       live_handles = std::move(other.live_handles);

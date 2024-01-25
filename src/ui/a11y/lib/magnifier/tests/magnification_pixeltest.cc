@@ -92,7 +92,7 @@ class MagnificationPixelTest : public gtest::RealLoopFixture {
 
   void SetClipSpaceTransform(float scale, float x, float y) {
     // HACK HACK HACK
-    // TODO(https://fxbug.dev/131440): Remove this when we move to the new gesture
+    // TODO(https://fxbug.dev/42081619): Remove this when we move to the new gesture
     // disambiguation protocols.
     //
     // Because the FlatlandAcessibilityView::SetMagnificationTransform

@@ -325,7 +325,7 @@ ImagePtr NewGradientImage(ImageFactory* image_factory, BatchGpuUploader* gpu_upl
   FX_DCHECK(gpu_uploader);
 
   auto pixels = NewGradientPixels(width, height);
-  // TODO(https://fxbug.dev/24056): are SRGB formats slow on Mali?
+  // TODO(https://fxbug.dev/42098210): are SRGB formats slow on Mali?
   auto image = NewImage(image_factory, vk::Format::eR8G8B8A8Srgb, ColorSpace::kSrgb, width, height);
 
   WritePixelsToImage(gpu_uploader, pixels.get(), image);

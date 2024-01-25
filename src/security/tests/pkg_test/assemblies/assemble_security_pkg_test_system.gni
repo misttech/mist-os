@@ -215,7 +215,7 @@ template("assemble_security_pkg_test_system") {
   }
 
   # Collect the build-info files using the default, but override the version.
-  # TODO(https://fxbug.dev/88453): invoker should be able to override the product name
+  # TODO(https://fxbug.dev/42169686): invoker should be able to override the product name
   # to match the configured product.
   _build_info = default_product_build_info
   _build_info.version = rebase_path(invoker.system_version_file, root_build_dir)
@@ -277,7 +277,7 @@ template("assemble_security_pkg_test_system") {
   packages_for_assembly = [
                             ":${labels.root_ssl_certificates}",
 
-                            # TODO(https://fxbug.dev/88453): There should be a contract for
+                            # TODO(https://fxbug.dev/42169686): There should be a contract for
                             # determining the correct configuration for every product.
                             # For now, this appears to be the only configuration in
                             # use.

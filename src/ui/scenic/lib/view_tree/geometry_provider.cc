@@ -139,7 +139,7 @@ fuog_ViewTreeSnapshotPtr GeometryProvider::ExtractObservationSnapshot(
         views.push_back(ExtractViewDescriptor(view_node, context_view, snapshot));
       }
     } else {
-      // TODO(https://fxbug.dev/121166): Not obvious what the correct action is for 0x0 views.
+      // TODO(https://fxbug.dev/42072167): Not obvious what the correct action is for 0x0 views.
       // For now, we skip them, fingers crossed.
       FX_DLOGS(WARNING) << "found a 0x0 view in the view tree, skipping: " << view_node;
     }
@@ -195,7 +195,7 @@ fuog_ViewDescriptor GeometryProvider::ExtractViewDescriptor(
   auto extent_in_context_dx = extent_in_context_top_right[0] - extent_in_context_top_left[0];
   auto extent_in_context_dy = extent_in_context_top_right[1] - extent_in_context_top_left[1];
 
-  // TODO(https://fxbug.dev/92869) : Handle floating point precision errors in calculating the angle.
+  // TODO(https://fxbug.dev/42174590) : Handle floating point precision errors in calculating the angle.
   // Angle of a line segment with coordinates (x1,y1) and (x2,y2) is defined as tan inverse
   // (y2-y1/x2-x1). As the return value is in radians multiply it by 180/PI.
   FX_DCHECK(extent_in_context_dx != 0 || extent_in_context_dy != 0)
@@ -241,7 +241,7 @@ fuog_ViewDescriptor GeometryProvider::ExtractViewDescriptor(
   FX_DCHECK(extent_in_parent_dx != 0 || extent_in_parent_dy != 0)
       << "top left and top right coordinates cannot be the same";
 
-  // TODO(https://fxbug.dev/92869) : Handle floating point precision errors in calculating the angle.
+  // TODO(https://fxbug.dev/42174590) : Handle floating point precision errors in calculating the angle.
   auto angle_parent = atan2(extent_in_parent_dy, extent_in_parent_dx) * (180. / M_PI);
 
   // Change the range of |angle_parent| from [-pi,pi] to [0,2*pi).

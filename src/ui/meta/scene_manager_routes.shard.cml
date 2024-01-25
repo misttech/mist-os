@@ -64,7 +64,7 @@
             protocol: [
                 "fuchsia.accessibility.ColorTransform",
 
-                // TODO(https://fxbug.dev/100268) Magnifier is only used by gfx, not
+                // TODO(https://fxbug.dev/42050963) Magnifier is only used by gfx, not
                 // flatland. Remove when gfx is gone.
                 "fuchsia.accessibility.Magnifier",
                 "fuchsia.accessibility.scene.Provider",

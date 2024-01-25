@@ -32,7 +32,7 @@ VulkanInstance::ProcAddrs::ProcAddrs(vk::Instance instance, bool requires_surfac
 fxl::RefPtr<VulkanInstance> VulkanInstance::New(Params params) {
   params.extension_names.insert(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
 #ifdef __Fuchsia__
-  // TODO(https://fxbug.dev/7234): It's quite possible that this would work on Linux if we
+  // TODO(https://fxbug.dev/42151790): It's quite possible that this would work on Linux if we
   // uploaded a new Vulkan SDK to the cloud, but there are obstacles to doing
   // this immediately, hence this workaround.  Or, it may be the NVIDIA Vulkan
   // driver itself.
@@ -90,7 +90,7 @@ vk::Result VulkanInstance::Initialize() {
   bool supports_initial_debug_utils_message = true;
 #if defined(__x86_64__)
   // Chaining VkDebugUtilsMessengerCreateInfoEXT onto VkInstanceCreateInfo can crash AEMU.
-  // TODO(https://fxbug.dev/78625): Fix.
+  // TODO(https://fxbug.dev/42158772): Fix.
   supports_initial_debug_utils_message = false;
 #endif
   if (HasDebugUtilsExt() && supports_initial_debug_utils_message) {

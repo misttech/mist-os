@@ -201,14 +201,14 @@ zx_status_t FdioVolume::DoBlockFvmExtend(uint64_t start_slice, uint64_t slice_co
 }
 
 zx_status_t FdioVolume::Read() {
-  // TODO(https://fxbug.dev/129956): Update this API to take a volume channel instead.
+  // TODO(https://fxbug.dev/42080299): Update this API to take a volume channel instead.
   return block_client::SingleReadBytes(
       fidl::UnownedClientEnd<fuchsia_hardware_block::Block>(device_.channel().borrow()),
       block_.get(), block_.len(), offset_);
 }
 
 zx_status_t FdioVolume::Write() {
-  // TODO(https://fxbug.dev/129956): Update this API to take a volume channel instead.
+  // TODO(https://fxbug.dev/42080299): Update this API to take a volume channel instead.
   return block_client::SingleWriteBytes(
       fidl::UnownedClientEnd<fuchsia_hardware_block::Block>(device_.channel().borrow()),
       block_.get(), block_.len(), offset_);

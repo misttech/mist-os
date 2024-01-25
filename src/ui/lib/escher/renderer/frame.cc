@@ -48,7 +48,7 @@ Frame::Frame(impl::FrameManager* manager, escher::CommandBuffer::Type requested_
       // protected command buffer.
       // https://www.khronos.org/registry/vulkan/specs/1.1-extensions/man/html/vkCmdBeginQuery.html
       //
-      // TODO(https://fxbug.dev/66003): instantiation of the profiler shouldn't depend on
+      // TODO(https://fxbug.dev/42144764): instantiation of the profiler shouldn't depend on
       // |enable_gpu_logging|.
       profiler_((escher()->supports_timer_queries() && enable_gpu_logging && !use_protected_memory)
                     ? fxl::MakeRefCounted<TimestampProfiler>(escher()->vk_device(),
@@ -180,8 +180,8 @@ void Frame::EndFrame(const std::vector<SemaphorePtr>& semaphores,
 
   // Keep per-frame uniform buffers alive until frame is finished rendering.
   for (auto& buf : uniform_block_allocator_.TakeBuffers()) {
-    // TODO(https://fxbug.dev/7194): reconsider this keep-alive scheme.
-    // TODO(https://fxbug.dev/7197): test that blocks make it back to the pool but only after
+    // TODO(https://fxbug.dev/42151346): reconsider this keep-alive scheme.
+    // TODO(https://fxbug.dev/42151379): test that blocks make it back to the pool but only after
     // the frame is finished rendering.
     KeepAlive(std::move(buf));
   }

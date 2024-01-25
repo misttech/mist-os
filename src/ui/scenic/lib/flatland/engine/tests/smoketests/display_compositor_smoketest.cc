@@ -65,7 +65,7 @@ class DisplayCompositorSmokeTest : public DisplayCompositorTestBase {
 
     display_manager_ = std::make_unique<scenic_impl::display::DisplayManager>([]() {});
 
-    // TODO(https://fxbug.dev/122131): This reuses the display coordinator from previous
+    // TODO(https://fxbug.dev/42073120): This reuses the display coordinator from previous
     // test cases in the same test component, so the display coordinator may be
     // in a dirty state. Tests should request a reset of display coordinator
     // here.
@@ -228,7 +228,7 @@ VK_TEST_P(DisplayCompositorParameterizedSmokeTest, FullscreenRectangleTest) {
       {}, [](const scheduling::Timestamps&) {});
 }
 
-// TODO(https://fxbug.dev/74363): Add YUV formats when they are supported by fake or real display.
+// TODO(https://fxbug.dev/42154038): Add YUV formats when they are supported by fake or real display.
 INSTANTIATE_TEST_SUITE_P(PixelFormats, DisplayCompositorParameterizedSmokeTest,
                          ::testing::Values(fuchsia::sysmem::PixelFormatType::BGRA32,
                                            fuchsia::sysmem::PixelFormatType::R8G8B8A8));

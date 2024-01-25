@@ -118,7 +118,7 @@ class Frame : public Resource {
 
   // Called by BatchGpuUploader and BatchGpuDownloader to write to the
   // new_command_buffer_ and gather work to post to the GPU.
-  // TODO(https://fxbug.dev/24063) Remove these functions once BatchGpuUploader::Writers are
+  // TODO(https://fxbug.dev/42098218) Remove these functions once BatchGpuUploader::Writers are
   // backed by secondary buffers, and the frame's primary command buffer is not
   // moved into the Writer.
   friend class BatchGpuUploader;
@@ -161,7 +161,7 @@ class Frame : public Resource {
 
   BlockAllocator block_allocator_;
 
-  // TODO(https://fxbug.dev/42570): investigate whether this memory is host-coherent, and whether it should be
+  // TODO(https://fxbug.dev/42118778): investigate whether this memory is host-coherent, and whether it should be
   // (it seems like it isn't and should be).  Document the usage guarantees/requirements in
   // AllocateUniform(), above.
   UniformBlockAllocator uniform_block_allocator_;
@@ -169,7 +169,7 @@ class Frame : public Resource {
   TimestampProfilerPtr profiler_;
   uint32_t submission_count_ = 0;
 
-  // TODO(https://fxbug.dev/7194): ideally we can move away from explicitly retaining used
+  // TODO(https://fxbug.dev/42151346): ideally we can move away from explicitly retaining used
   // resources in the Frame.  For now, this approach is easy and relatively
   // fool-proof.
   std::vector<ResourcePtr> keep_alive_;

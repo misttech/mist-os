@@ -34,7 +34,7 @@ executable("magnifier_tests") {
     "//zircon/system/ulib/zx",
   ]
 
-  # TODO(https://fxbug.dev/58162): delete the below and fix compiler warnings
+  # TODO(https://fxbug.dev/42136089): delete the below and fix compiler warnings
   configs += [ "//build/config:Wno-conversion" ]
 }
 
@@ -66,7 +66,7 @@ fuchsia_test_package("magnification-pixeltest") {
   test_components = [ ":magnification-pixeltest-component" ]
   test_specs = {
     log_settings = {
-      # TODO(https://fxbug.dev/93081): Investigate flakes and remove allowing ERROR severity.
+      # TODO(https://fxbug.dev/42174827): Investigate flakes and remove allowing ERROR severity.
       max_severity = "ERROR"
     }
     environments = [

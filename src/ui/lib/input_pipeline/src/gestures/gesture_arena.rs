@@ -69,7 +69,7 @@ pub fn make_input_handler(
     inspect_node: &InspectNode,
     input_handlers_node: &InspectNode,
 ) -> std::rc::Rc<dyn crate::input_handler::InputHandler> {
-    // TODO(https://fxbug.dev/105092): Remove log message.
+    // TODO(https://fxbug.dev/42056283): Remove log message.
     tracing::info!("touchpad: created input handler");
     std::rc::Rc::new(GestureArena::new_internal(
         Box::new(GestureArenaInitialContenders {}),
@@ -82,12 +82,12 @@ pub fn make_input_handler(
 pub(super) const PRIMARY_BUTTON: mouse_binding::MouseButton = 1;
 pub(super) const SECONDARY_BUTTON: mouse_binding::MouseButton = 2;
 
-// TODO(https://fxbug.dev/102654): check that we've removed all leading `_` from types
+// TODO(https://fxbug.dev/42053614): check that we've removed all leading `_` from types
 // and variables in this file.
 #[derive(Debug, Clone, PartialEq)]
 pub(super) struct TouchpadEvent {
     pub(super) timestamp: zx::Time,
-    // TODO(https://fxbug.dev/102655): replace these fields with a field that embeds
+    // TODO(https://fxbug.dev/42053615): replace these fields with a field that embeds
     // `touch_data: super::touch_binding::TouchpadEvent`.
     pub(super) pressed_buttons: Vec<u8>,
     pub(super) contacts: Vec<touch_binding::TouchContact>,
@@ -538,7 +538,7 @@ const COUNTS_PER_MM: u32 = 12;
 impl std::convert::From<MouseEvent> for input_device::InputEvent {
     fn from(mouse_event: MouseEvent) -> input_device::InputEvent {
         input_device::InputEvent {
-            // TODO(https://fxbug.dev/104890): Convert `mouse_event.mouse_data.wheel_delta_v`
+            // TODO(https://fxbug.dev/42056058): Convert `mouse_event.mouse_data.wheel_delta_v`
             // and `mouse_event.mouse_data.wheel_delta_h` from micrometers to counts.
             device_event: input_device::InputDeviceEvent::Mouse(mouse_event.mouse_data),
             device_descriptor: input_device::InputDeviceDescriptor::Mouse(
@@ -563,7 +563,7 @@ impl std::convert::From<MouseEvent> for input_device::InputEvent {
                         // probably won't swipe all the way up/down the pad in a single
                         // sampling interval (8msec).
                         //
-                        // TODO(https://fxbug.dev/104890): Adjust this range to reflect
+                        // TODO(https://fxbug.dev/42056058): Adjust this range to reflect
                         // the range in counts instead of micrometers.
                         range: fidl_input_report::Range { min: -65535, max: 65535 },
                         unit: fidl_input_report::Unit {
@@ -574,7 +574,7 @@ impl std::convert::From<MouseEvent> for input_device::InputEvent {
                     wheel_h_range: None,
                     buttons: Some(vec![PRIMARY_BUTTON, SECONDARY_BUTTON]),
                     // Downstream stages ignore `counts_per_mm`, so any value is fine.
-                    // TODO(https://fxbug.dev/121127): remove `counts_per_mm` from descriptor.
+                    // TODO(https://fxbug.dev/42072124): remove `counts_per_mm` from descriptor.
                     counts_per_mm: COUNTS_PER_MM,
                 },
             ),

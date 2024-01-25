@@ -49,7 +49,7 @@ class DisplayTest : public gtest::RealLoopFixture {
 
     display_manager_ = std::make_unique<scenic_impl::display::DisplayManager>([]() {});
 
-    // TODO(https://fxbug.dev/122131): This reuses the display coordinator from previous
+    // TODO(https://fxbug.dev/42073120): This reuses the display coordinator from previous
     // test cases in the same test component, so the display coordinator may be
     // in a dirty state. Tests should request a reset of display coordinator
     // here.
@@ -213,7 +213,7 @@ VK_TEST_F(DisplayTest, SetAllConstraintsTest) {
 // then setting the second image on the layer which has a wait event. When the wait event is
 // signaled, this will cause the second layer image to go up, which in turn will cause the first
 // layer image's event to be signaled.
-// TODO(https://fxbug.dev/55167): Check to see if there is a more appropriate place to test display
+// TODO(https://fxbug.dev/42132767): Check to see if there is a more appropriate place to test display
 // coordinator events and/or if there already exist adequate tests that cover all of the use cases
 // being covered by this test.
 VK_TEST_F(DisplayTest, SetDisplayImageTest) {

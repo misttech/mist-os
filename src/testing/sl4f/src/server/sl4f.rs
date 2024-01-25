@@ -183,7 +183,7 @@ impl Sl4f {
                 "audio_facade" => AudioFacade::new()?,
                 "avdtp_facade" => AvdtpFacade::new(),
                 "avrcp_facade" => AvrcpFacade::new(),
-                // TODO(https://fxbug.dev/77551): Remove basemgr_facade in favor of modular_facade
+                // TODO(https://fxbug.dev/42157579): Remove basemgr_facade in favor of modular_facade
                 "basemgr_facade" => ModularFacade::new(),
                 "modular_facade" => ModularFacade::new(),
                 "ble_advertise_facade" => BleAdvertiseFacade::new(),

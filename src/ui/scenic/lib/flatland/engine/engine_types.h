@@ -30,7 +30,7 @@ struct DisplayInfo {
 struct RenderData {
   std::vector<ImageRect> rectangles;
   std::vector<allocation::ImageMetadata> images;
-  // TODO(https://fxbug.dev/70464): should we remove this, and pass to RenderFrame() as a std::map of
+  // TODO(https://fxbug.dev/42149711): should we remove this, and pass to RenderFrame() as a std::map of
   // RenderData keyed by display_id?  That would have the benefit of guaranteeing by construction
   // that each display_id could only appear once.
   fuchsia::hardware::display::types::DisplayId display_id;

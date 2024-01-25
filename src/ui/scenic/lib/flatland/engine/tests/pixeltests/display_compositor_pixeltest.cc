@@ -63,7 +63,7 @@ namespace {
 // The compare ranges of the captured image and the golden image specified in
 // the struct must be valid.
 //
-// TODO(https://fxbug.dev/125394): This should be moved to a standalone library that
+// TODO(https://fxbug.dev/42076192): This should be moved to a standalone library that
 // supports generic image comparison against captured images and golden images.
 struct CompareConfig {
   // The index of the first row in the captured image that will be compared
@@ -146,7 +146,7 @@ CompareConfig GetCompareConfigForBoard(std::string_view board_name, int display_
         .start_row = 1,
         .start_column = 0,
 
-        // TODO(https://fxbug.dev/125842): The last 5 rows of the captured image on
+        // TODO(https://fxbug.dev/42076618): The last 5 rows of the captured image on
         // sherlock may contain only zeroes; so we ignore these rows.
         .end_row = display_height - 5,
         .end_column = display_width,
@@ -179,7 +179,7 @@ CompareConfig GetCompareConfigForBoard(std::string_view board_name, int display_
   }
 
   if (board_name == "vim3") {
-    // TODO(https://fxbug.dev/125842): For VIM3 with 1920-width displays, the last 2
+    // TODO(https://fxbug.dev/42076618): For VIM3 with 1920-width displays, the last 2
     // rows of the captured image may contain only zeroes; so we ignore these
     // rows.
     const int end_row = (display_width == 1920) ? (display_height - 2) : display_height;
@@ -326,7 +326,7 @@ class DisplayCompositorPixelTest : public DisplayCompositorTestBase {
   }
 
  protected:
-  // TODO(https://fxbug.dev/125447): This is unnecesarily hardcoded. We should consider
+  // TODO(https://fxbug.dev/42076251): This is unnecesarily hardcoded. We should consider
   // making display pixel format a test parameter as well.
   static constexpr fuchsia_images2::PixelFormat kDisplayPixelFormat =
       fuchsia_images2::PixelFormat::kBgra32;
@@ -395,7 +395,7 @@ class DisplayCompositorPixelTest : public DisplayCompositorTestBase {
   //
   // `image_id` must be an unique image ID not used by any other image.
   //
-  // TODO(https://fxbug.dev/125735): Instead of providing hardcoded pixel type for
+  // TODO(https://fxbug.dev/42076499): Instead of providing hardcoded pixel type for
   // capture buffer, tests should let display driver make decision for the
   // capture buffer format, and use the sysmem format in BufferCollectionInfo
   // for capture-and-golden comparison.
@@ -584,7 +584,7 @@ class DisplayCompositorPixelTest : public DisplayCompositorTestBase {
     }
   }
 
-  // TODO(https://fxbug.dev/125394): This is taken from //src/graphics/display/bin/
+  // TODO(https://fxbug.dev/42076192): This is taken from //src/graphics/display/bin/
   // display-test and modified for Scenic testing purposes; instead of making a
   // copy and make modifications, we should make this into a generic library.
 #ifdef FAKE_DISPLAY
@@ -643,11 +643,11 @@ class DisplayCompositorPixelTest : public DisplayCompositorTestBase {
 
     // The AMLogic display engine always use formats with 3 bytes per pixel for
     // captured images.
-    // TODO(https://fxbug.dev/125394): This should not be hardcoded, instead sysmem
+    // TODO(https://fxbug.dev/42076192): This should not be hardcoded, instead sysmem
     // should calculate it from sysmem BufferCollectionInfo of allocated capture
     // buffer.
     constexpr uint32_t kCaptureImageBytesPerPixel = 3;
-    // TODO(https://fxbug.dev/125394): This should not be hardcoded, instead sysmem
+    // TODO(https://fxbug.dev/42076192): This should not be hardcoded, instead sysmem
     // should read it from the sysmem BufferCollectionInfo of allocated capture
     // buffer.
     constexpr uint32_t kCaptureImageRowByteAlignment = 64;
@@ -660,7 +660,7 @@ class DisplayCompositorPixelTest : public DisplayCompositorTestBase {
           .value = 0,
         }};
     const uint32_t input_image_bytes_per_pixel = ImageFormatStrideBytesPerWidthPixel(pixel_format);
-    // TODO(https://fxbug.dev/125394): This should not be hardcoded, instead sysmem
+    // TODO(https://fxbug.dev/42076192): This should not be hardcoded, instead sysmem
     // should read it from the sysmem BufferCollectionInfo of allocated input
     // image buffer.
     constexpr uint32_t kInputImageRowByteAlignment = 64;
@@ -918,7 +918,7 @@ VK_TEST_P(DisplayCompositorParameterizedPixelTest, FullscreenRectangleTest) {
 
 // Test color conversion on the display hardware.
 //
-// TODO(https://fxbug.dev/125530): Currently this test is skipped on all of the
+// TODO(https://fxbug.dev/42076344): Currently this test is skipped on all of the
 // display platforms Fuchsia supports, because none of the display drivers
 // fully supports the features required by the test.
 VK_TEST_P(DisplayCompositorParameterizedPixelTest, ColorConversionTest) {
@@ -1125,7 +1125,7 @@ VK_TEST_P(DisplayCompositorParameterizedPixelTest, FullscreenSolidColorRectangle
   EXPECT_TRUE(images_are_same);
 }
 
-// TODO(https://fxbug.dev/125530): Currently this test is skipped on all of the
+// TODO(https://fxbug.dev/42076344): Currently this test is skipped on all of the
 // display platforms Fuchsia supports, because none of the display drivers
 // fully supports the features required by the test.
 VK_TEST_P(DisplayCompositorParameterizedPixelTest, SetMinimumRGBTest) {
@@ -1244,7 +1244,7 @@ VK_TEST_P(DisplayCompositorParameterizedPixelTest, SetMinimumRGBTest) {
   EXPECT_TRUE(images_are_same);
 }
 
-// TODO(https://fxbug.dev/74363): Add YUV formats when they are supported by fake or real display.
+// TODO(https://fxbug.dev/42154038): Add YUV formats when they are supported by fake or real display.
 INSTANTIATE_TEST_SUITE_P(PixelFormats, DisplayCompositorParameterizedPixelTest,
                          ::testing::Values(fuchsia::sysmem::PixelFormatType::BGRA32,
                                            fuchsia::sysmem::PixelFormatType::R8G8B8A8));
@@ -1614,7 +1614,7 @@ class DisplayCompositorParameterizedTest
     : public DisplayCompositorPixelTest,
       public ::testing::WithParamInterface<fuchsia::sysmem::PixelFormatType> {};
 
-// TODO(https://fxbug.dev/74363): Add YUV formats when they are supported by fake or real display.
+// TODO(https://fxbug.dev/42154038): Add YUV formats when they are supported by fake or real display.
 INSTANTIATE_TEST_SUITE_P(PixelFormats, DisplayCompositorParameterizedTest,
                          ::testing::Values(fuchsia::sysmem::PixelFormatType::BGRA32));
 

@@ -145,7 +145,7 @@ impl Cr50 {
                 }
                 PinWeaverRequest::ResetTree { bits_per_level, height, responder } => {
                     let request = PinweaverResetTree::new(bits_per_level, height);
-                    // TODO(https://fxbug.dev/90618): what is the correct way to handle errors in the
+                    // TODO(https://fxbug.dev/42172090): what is the correct way to handle errors in the
                     // underlying TPM transport?
                     let result =
                         request.execute(&self.proxy).await.context("Executing TPM command")?;

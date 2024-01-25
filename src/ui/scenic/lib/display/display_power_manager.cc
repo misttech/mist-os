@@ -28,7 +28,7 @@ void DisplayPowerManager::SetDisplayPower(bool power_on, SetDisplayPowerCallback
     return;
   }
 
-  // TODO(https://fxbug.dev/95196): Since currently Scenic only supports one display,
+  // TODO(https://fxbug.dev/42177175): Since currently Scenic only supports one display,
   // the DisplayPowerManager will only control power of the default display.
   // Once Scenic and DisplayManager supports multiple displays, this needs to
   // be updated to control power of all available displays.

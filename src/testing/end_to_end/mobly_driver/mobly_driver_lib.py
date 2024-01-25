@@ -87,7 +87,7 @@ def _execute_test(
                     f"Mobly test timed out after {timeout_sec} seconds."
                 )
         if return_code != 0:
-            # TODO(https://fxbug.dev/119651) - differentiate between legitimate
+            # TODO(https://fxbug.dev/42070748) - differentiate between legitimate
             # test failures vs unexpected crashes.
             raise MoblyTestFailureException("Mobly test failed.")
 

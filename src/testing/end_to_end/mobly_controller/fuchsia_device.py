@@ -260,7 +260,7 @@ def _get_log_directory() -> str:
     Returns:
         Directory path.
     """
-    # TODO(https://fxbug.dev/128450): Read log path from config once this issue is fixed
+    # TODO(https://fxbug.dev/42078903): Read log path from config once this issue is fixed
     return getattr(
         logging,
         "log_path",  # Set by Mobly in base_test.BaseTestClass.run.

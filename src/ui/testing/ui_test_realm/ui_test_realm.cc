@@ -52,7 +52,7 @@ using component_testing::Ref;
 using component_testing::Route;
 using component_testing::Storage;
 
-// TODO(https://fxbug.dev/114001): Remove hard-coded values.
+// TODO(https://fxbug.dev/42065258): Remove hard-coded values.
 // Fake display dimensions.
 constexpr auto kDisplayWidthPhysicalPixels = 1280;
 constexpr auto kDisplayHeightPhysicalPixels = 800;
@@ -233,7 +233,7 @@ void UITestRealm::ConfigureClientSubrealm() {
                   /* targets = */ {ParentRef()});
   }
 
-  // TODO(https://fxbug.dev/98545): Remove this escape hatch, or generalize to any
+  // TODO(https://fxbug.dev/42180890): Remove this escape hatch, or generalize to any
   // capability.
   //
   // Allow child realm components to access to config-data directory by default.

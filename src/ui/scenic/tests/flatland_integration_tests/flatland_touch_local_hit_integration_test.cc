@@ -28,7 +28,7 @@
 // - Target(s) specified by View (using view ref koids)
 // - Dispatch done to fuchsia.ui.pointer.TouchSourceWithLocalHit in receiver(s') View Space.
 
-// TODO(https://fxbug.dev/120775): Investigate GFX view tree getting tickled.
+// TODO(https://fxbug.dev/42071876): Investigate GFX view tree getting tickled.
 
 namespace integration_tests {
 

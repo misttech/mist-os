@@ -7,7 +7,7 @@
         "inspect/client.shard.cml",
 
         // Depends on fuchsia.hardware.pty.Device which is a system capability.
-        // TODO(https://fxbug.dev/97992): Remove this once the test is hermetic.
+        // TODO(https://fxbug.dev/42180278): Remove this once the test is hermetic.
         "syslog/client.shard.cml",
     ],
     program: {

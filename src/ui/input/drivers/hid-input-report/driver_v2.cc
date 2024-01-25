@@ -129,7 +129,7 @@ class InputReportDriver : public fdf::DriverBase {
 
 }  // namespace
 
-// TODO(https://fxbug.dev/94884): Figure out how to get logging working.
+// TODO(https://fxbug.dev/42176828): Figure out how to get logging working.
 zx_driver_rec_t __zircon_driver_rec__ = {};
 
 void driver_logf_internal(const zx_driver_t* drv, fx_log_severity_t severity, const char* tag,

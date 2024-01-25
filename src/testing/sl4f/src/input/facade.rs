@@ -313,7 +313,7 @@ impl InputFacade {
     /// * `Err(Error)` otherwise.
     ///
     /// # Future directions
-    /// Per https://fxbug.dev/63532, this method will be replaced with a method that deals in
+    /// Per https://fxbug.dev/42142047, this method will be replaced with a method that deals in
     /// `fuchsia.input.Key`s, instead of HID Usage IDs.
     ///
     /// # Example

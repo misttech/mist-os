@@ -287,7 +287,7 @@ TEST_P(ParameterizedYUVPixelTest, YUVTest) {
   root_flatland_->SetContent(kRootTransform, kImageContentId);
   BlockingPresent(this, root_flatland_);
 
-  // TODO(https://fxbug.dev/65765): provide reasoning for why this is the correct expected color.
+  // TODO(https://fxbug.dev/42144501): provide reasoning for why this is the correct expected color.
   const utils::Pixel expected_pixel(255, 85, 249, 255);
 
   auto screenshot = TakeScreenshot(screenshotter_, display_width_, display_height_);
@@ -650,7 +650,7 @@ TEST_P(ParameterizedFlipAndOrientationTest, FlipAndOrientationRenderTest) {
   // Verify that the number of pixels is the same (i.e. the image hasn't changed).
   auto histogram = screenshot.Histogram();
   const uint32_t pixel_color_count = num_pixels / 4;
-  // TODO(https://fxbug.dev/116631): Switch to exact comparisons after Astro precision issues are
+  // TODO(https://fxbug.dev/42067818): Switch to exact comparisons after Astro precision issues are
   // resolved.
   EXPECT_NEAR(histogram[utils::kBlue], pixel_color_count, display_width_);
   EXPECT_NEAR(histogram[utils::kGreen], pixel_color_count, display_width_);

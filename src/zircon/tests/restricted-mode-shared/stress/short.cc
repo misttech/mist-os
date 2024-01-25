@@ -10,7 +10,7 @@ TEST(RestrictedModeUnifiedStress, SharedRegionTestShort) {
   Orchestrator(zx::sec(10), zx::sec(1), TestMode::Shared);
 }
 
-// TODO(https://fxbug.dev/132980): Enable on other architectures as they support unified aspaces.
+// TODO(https://fxbug.dev/42083004): Enable on other architectures as they support unified aspaces.
 #if defined(__x86_64__) || defined(__aarch64__)
 TEST(RestrictedModeUnifiedStress, RestrictedRegionTestShort) {
   Orchestrator(zx::sec(10), zx::sec(1), TestMode::Restricted);

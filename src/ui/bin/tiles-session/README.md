@@ -26,7 +26,7 @@ ffx session add fuchsia-pkg://fuchsia.com/flatland-examples#meta/flatland-view-p
 ```
 
 ## Current limitations
-*TODO(https://fxbug.dev/88656): update the following as features are added, and delete when fully-featured.*
+*TODO(https://fxbug.dev/42169911): update the following as features are added, and delete when fully-featured.*
 Only one view is supported. Adding an additional view replaces the existing one.
 
 # Use cases

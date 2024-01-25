@@ -586,7 +586,7 @@ func (b *ProductBundleDirBuild) GetFlashManifest(ctx context.Context) (string, e
 }
 
 func (b *ProductBundleDirBuild) GetPackageRepository(ctx context.Context, blobFetchMode BlobFetchMode, ffx *ffx.FFXTool) (*packages.Repository, error) {
-	// TODO(https://fxbug.dev/114760) Change to use ffx tool to start package server
+	// TODO(https://fxbug.dev/42066028) Change to use ffx tool to start package server
 	pbJSON := filepath.Join(b.dir, ProductBundleManifest)
 	f, err := os.Open(pbJSON)
 	if err != nil {
@@ -610,7 +610,7 @@ func (b *ProductBundleDirBuild) GetPackageRepository(ctx context.Context, blobFe
 		}
 		ffx = build_ffx
 	}
-	// TODO(https://fxbug.dev/126107): Read delivery blob type from product bundle.
+	// TODO(https://fxbug.dev/42076853): Read delivery blob type from product bundle.
 	return packages.NewRepository(ctx, b.dir, blobFS, ffx, nil)
 }
 

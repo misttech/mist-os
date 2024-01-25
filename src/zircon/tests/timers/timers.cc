@@ -178,7 +178,7 @@ TEST(TimersTest, SignalsAssertedImmediately) {
 // nearby |deadline_1| or |deadline_2| and as such the test will fire either earlier or later than
 // expected. The precise behavior is still tested by the "k timer tests" command.
 //
-// See https://fxbug.dev/31030 for the current owner.
+// See https://fxbug.dev/42105960 for the current owner.
 void CheckCoalescing(uint32_t mode) {
   // The second timer will coalesce to the first one for ZX_TIMER_SLACK_LATE
   // but not for  ZX_TIMER_SLACK_EARLY. This test is not precise because the

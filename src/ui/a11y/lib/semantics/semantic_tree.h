@@ -96,7 +96,7 @@ class SemanticTree {
 
   // Returns the next node for which |filter| returns true (in depth first manner) from the node
   // with |node_id|, or nullptr if none exists.
-  // Note: Currently O(N). TODO(https://fxbug.dev/109128): improve this.
+  // Note: Currently O(N). TODO(https://fxbug.dev/42060491): improve this.
   virtual const fuchsia::accessibility::semantics::Node* GetNextNode(uint32_t node_id,
                                                                      a11y::NodeFilter filter) const;
 
@@ -105,7 +105,7 @@ class SemanticTree {
 
   // Returns the previous node for which |filter| returns true (in depth first manner) from the node
   // with |node_id|, or nullptr if none exists.
-  // Note: Currently O(N). TODO(https://fxbug.dev/109128): improve this.
+  // Note: Currently O(N). TODO(https://fxbug.dev/42060491): improve this.
   virtual const fuchsia::accessibility::semantics::Node* GetPreviousNode(
       uint32_t node_id, a11y::NodeFilter filter) const;
 
@@ -113,7 +113,7 @@ class SemanticTree {
       uint32_t node_id, a11y::NodeFilterWithParent filter) const;
 
   // Returns the parent node of the node with |node_id| if found, nullptr otherwise.
-  // Currently O(N). TODO(https://fxbug.dev/108397): improve this.
+  // Currently O(N). TODO(https://fxbug.dev/42059816): improve this.
   virtual const fuchsia::accessibility::semantics::Node* GetParentNode(uint32_t node_id) const;
 
   // Returns a SemanticTransform to transform node-local coordinates to

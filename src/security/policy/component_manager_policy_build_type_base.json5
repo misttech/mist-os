@@ -31,7 +31,7 @@
                 source_name: "data",
                 capability: "directory",
                 target_monikers: [
-                    // TODO(https://fxbug.dev/126266): Remove once session_manager gets autolaunch override
+                    // TODO(https://fxbug.dev/42077029): Remove once session_manager gets autolaunch override
                     // from structured configuration
                     "/core/session-manager",
                 ],
@@ -94,7 +94,7 @@
                 target_monikers: [
                     "/core/system-updater",
 
-                    // TODO(https://fxbug.dev/123124) Use optional routing to remove these three routes on
+                    // TODO(https://fxbug.dev/42074079) Use optional routing to remove these three routes on
                     // non-eng builds.
                     // Use of this capability is controlled by driver_index's structured config
                     // flag enable_ephemeral_drivers, which is disabled on non-eng builds.

@@ -19,7 +19,7 @@ ScreenReaderContext::SemanticLevel NextSemanticLevelInDirection(
     ChangeSemanticLevelAction::Direction direction) {
   // In the first semantic level list, all semantic levels are present. In the second, all but
   // kAdjustValue, which is not present if the focused semantic node is a slider.
-  // TODO(https://fxbug.dev/63293): Add word and character navigation here when implemented.
+  // TODO(https://fxbug.dev/42141781): Add word and character navigation here when implemented.
   static const std::vector<ScreenReaderContext::SemanticLevel> semantic_level_list = {
       ScreenReaderContext::SemanticLevel::kDefault,
       ScreenReaderContext::SemanticLevel::kAdjustValue};

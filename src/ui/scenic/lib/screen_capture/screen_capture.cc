@@ -142,7 +142,7 @@ void ScreenCapture::GetNextFrame(fuchsia::ui::composition::GetNextFrameArgs args
   }
 
   // Get renderables from the engine.
-  // TODO(https://fxbug.dev/97057): Ensure this does not happen more than once in the same vsync.
+  // TODO(https://fxbug.dev/42179243): Ensure this does not happen more than once in the same vsync.
   auto renderables = get_renderables_();
 
   const auto& rects = renderables.first;

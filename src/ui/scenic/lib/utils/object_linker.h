@@ -209,7 +209,7 @@ class ObjectLinkerBase {
 //
 // Attempts to register either half of the kernel object multiple times, even
 // through cloned handles, will result in an error.
-// TODO(https://fxbug.dev/23989): Allow multiple Imports.
+// TODO(https://fxbug.dev/42098134): Allow multiple Imports.
 //
 // Thread-safety: this class is thread-safe. Links may be created and used on multiple threads.
 // Links must be destroyed before their dispatcher is destroyed (i.e. the default dispatcher when
@@ -234,7 +234,7 @@ class ObjectLinker : public ObjectLinkerBase,
       auto access = GetLinkerScopedAccess();
       Invalidate(/*on_destruction=*/true, /*invalidate_peer=*/true);
     }
-    // TODO(https://fxbug.dev/80550): Make this immovable type.
+    // TODO(https://fxbug.dev/42160907): Make this immovable type.
     Link(Link&& other) noexcept {
       FX_CHECK(!linker_ || !other.linker_ || linker_ == other.linker_);
       auto access = GetLinkerScopedAccess();

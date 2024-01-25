@@ -438,7 +438,7 @@ fuchsia_test_component("pixeltest_yuv") {
 fuchsia_test_package("flatland_pixeltest_yuv") {
   test_components = [ ":pixeltest_yuv" ]
   test_specs = {
-    # TODO(https://fxbug.dev/59804): Skip this test for AEMU as YUV Sysmem images are not supported yet.
+    # TODO(https://fxbug.dev/42137913): Skip this test for AEMU as YUV Sysmem images are not supported yet.
     environments = magma_libvulkan_hardware_envs
     log_settings = {
       max_severity = "ERROR"

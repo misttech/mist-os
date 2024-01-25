@@ -39,7 +39,7 @@ use {
 /// signalling that the event is no longer directed towards the receiver.
 #[derive(Clone, Debug, PartialEq)]
 pub struct TouchScreenEvent {
-    /// Deprecated. To be removed with https://fxbug.dev/75817.
+    /// Deprecated. To be removed with https://fxbug.dev/42155652.
     /// The contacts associated with the touch event. For example, a two-finger touch would result
     /// in one touch event with two [`TouchContact`]s.
     ///
@@ -432,7 +432,7 @@ impl TouchBinding {
                 report.touch = Some(touch);
                 match self.device_proxy.set_feature_report(&report).await? {
                     Ok(()) => {
-                        // TODO(https://fxbug.dev/105092): Remove log message.
+                        // TODO(https://fxbug.dev/42056283): Remove log message.
                         tracing::info!("touchpad: set touchpad_enabled to {}", enable);
                         Ok(())
                     }

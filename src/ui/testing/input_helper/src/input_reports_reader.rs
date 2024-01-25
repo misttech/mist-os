@@ -255,7 +255,7 @@ mod tests {
             Ok(())
         }
 
-        /* TODO(https://fxbug.dev/124918): Re-enable this test
+        /* TODO(https://fxbug.dev/42075735): Re-enable this test
         #[fasync::run_until_stalled(test)]
         async fn resolves_to_err_if_send_fails() -> Result<(), Error> {
             let (proxy, request_stream) =

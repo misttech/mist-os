@@ -303,7 +303,7 @@ impl TerminalViewAssistant {
         if TerminalViewAssistant::needs_resize(&self.last_known_size, new_size) {
             let term_size = new_size.floor();
 
-            // TODO(https://fxbug.dev/91053): Use physical size relative to largest display that
+            // TODO(https://fxbug.dev/42172574): Use physical size relative to largest display that
             // terminal is visible on determine DPI.
             //
             // const MM_PER_INCH: f32 = 25.4;
@@ -445,7 +445,7 @@ impl TerminalViewAssistant {
                     break;
                 }
             }
-            // TODO(https://fxbug.dev/60181): Exit by using Carnelian, when implemented.
+            // TODO(https://fxbug.dev/42138333): Exit by using Carnelian, when implemented.
             std::process::exit(
                 match process
                     .process_info()
@@ -818,7 +818,7 @@ mod tests {
         // we want to make sure that the values are floored and that they
         // match what the scene will render the terminal as.
 
-        // TODO(https://fxbug.dev/106720): Remove calculations' dependency on precise font metrics
+        // TODO(https://fxbug.dev/42058062): Remove calculations' dependency on precise font metrics
         // assert_eq!(size_info.width, 100.0);
         // assert_eq!(size_info.height, 100.0);
 
@@ -880,7 +880,7 @@ mod tests {
 
         let event = receiver.next().await.expect("failed to receive pty event");
 
-        // TODO(https://fxbug.dev/106720): Remove calculations' dependency on precise font metrics
+        // TODO(https://fxbug.dev/42058062): Remove calculations' dependency on precise font metrics
         // assert_eq!(event.window_size.width, 80);
         // assert_eq!(event.window_size.height, 80);
 
@@ -982,7 +982,7 @@ mod tests {
     }
 
     #[fasync::run_singlethreaded(test)]
-    #[ignore] // TODO(https://fxbug.dev/52560) re-enable this test when de-flaked
+    #[ignore] // TODO(https://fxbug.dev/42129876) re-enable this test when de-flaked
     async fn bytes_written_are_processed_by_term() -> Result<(), Error> {
         let (mut view, mut receiver) = make_test_view_with_spawned_pty_loop().await?;
 
@@ -996,7 +996,7 @@ mod tests {
             .context(":bytes_written_are_processed_by_term after resize_if_needed")?;
 
         // TODO: this variable triggered the `must_not_suspend` lint and may be held across an await
-        // If this is the case, it is an error. See https://fxbug.dev/87757 for more details
+        // If this is the case, it is an error. See https://fxbug.dev/42168913 for more details
         let term = view.term.borrow();
 
         let col_pos_before = term.cursor().point.col;
@@ -1046,7 +1046,7 @@ mod tests {
     async fn wait_until_update_received_or_timeout(
         receiver: &mut mpsc::UnboundedReceiver<Message>,
     ) -> Result<(), Error> {
-        #[allow(clippy::never_loop)] // TODO(https://fxbug.dev/95065)
+        #[allow(clippy::never_loop)] // TODO(https://fxbug.dev/42177030)
         loop {
             let timeout = Timer::new(5000_i64.millis().after_now());
             let either = futures::future::select(timeout, receiver.next());

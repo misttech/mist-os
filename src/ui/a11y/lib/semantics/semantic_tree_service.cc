@@ -67,7 +67,7 @@ void SemanticTreeService::CommitUpdates(CommitUpdatesCallback callback) {
     callback();
     updates_.clear();
   } else {
-    // Work around https://fxbug.dev/70758
+    // Work around https://fxbug.dev/42150037
     std::string tree_str = tree_->ToString();
     constexpr size_t kMaxLength = 30000;
     if (tree_str.size() > kMaxLength) {

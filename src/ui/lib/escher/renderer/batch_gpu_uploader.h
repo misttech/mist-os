@@ -36,7 +36,7 @@ namespace escher {
 // being signaled when command buffer finishes execution, which can be used for
 // synchronization.
 //
-// TODO(https://fxbug.dev/24401) Add memory barriers so the BatchGpuUploader and
+// TODO(https://fxbug.dev/42098594) Add memory barriers so the BatchGpuUploader and
 // BatchGpuDownloader can handle synchronization of reads and writes on the same
 // Resource.
 //
@@ -171,7 +171,7 @@ class BatchGpuUploader {
   // Callback function will be called after all work is done.
   //
   // Note that Submit must be called on all BatchGpuUploaders, even if no work was scheduled.
-  // TODO(https://fxbug.dev/7206): Remove this restriction.
+  // TODO(https://fxbug.dev/42151479): Remove this restriction.
   void Submit(fit::function<void()> callback = nullptr);
 
   // Submit() and GenerateCommands() will wait on all semaphores added by

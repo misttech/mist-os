@@ -15,7 +15,7 @@ const ResourceTypeInfo Resource::kTypeInfo("Resource", ResourceType::kResource);
 
 Resource::Resource(ResourceManager* owner)
     : escher_(owner ? owner->escher() : nullptr), uid_(GetUniqueId()) {
-  // TODO(https://fxbug.dev/7263): It is hard to make a functional ResourceManager in a unit
+  // TODO(https://fxbug.dev/42152112): It is hard to make a functional ResourceManager in a unit
   // test without bringing up an entire Escher instance. This branch supports
   // some tests, for now, but if it becomes easier to create an owner (i.e. if
   // ResourceManager stops depending on Vulkan and Escher), then this

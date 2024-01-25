@@ -23,7 +23,7 @@ pub struct CpuRenderer {
 
 const IMAGE_WIDTH: u32 = 2;
 const IMAGE_HEIGHT: u32 = 2;
-// TODO(https://fxbug.dev/104692): it would be better to let sysmem choose between several pixel formats.
+// TODO(https://fxbug.dev/42055867): it would be better to let sysmem choose between several pixel formats.
 const PIXEL_FORMAT: fsysmem::PixelFormatType = fsysmem::PixelFormatType::Bgra32;
 
 impl Renderer for CpuRenderer {
@@ -62,7 +62,7 @@ impl Renderer for CpuRenderer {
             )
             .expect("failed to map VMO");
 
-            // TODO(https://fxbug.dev/104692): we're smashing RGBA pixels into a BGRA-format image, oops.
+            // TODO(https://fxbug.dev/42055867): we're smashing RGBA pixels into a BGRA-format image, oops.
             // Given the desired aesthetic (cycling through the color wheel), it's unimportant.
             mapping.write_at(0, &colors[0]);
             mapping.write_at(4, &colors[1]);

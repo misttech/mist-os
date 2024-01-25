@@ -33,7 +33,7 @@ fuchsia_test_package("display_rotation_pixel_test") {
   test_components = [ ":display_rotation_pixel_test_component" ]
   test_specs = {
     log_settings = {
-      # TODO(https://fxbug.dev/93081): Investigate flakes and remove allowing ERROR severity.
+      # TODO(https://fxbug.dev/42174827): Investigate flakes and remove allowing ERROR severity.
       max_severity = "ERROR"
     }
     environments = vulkan_envs

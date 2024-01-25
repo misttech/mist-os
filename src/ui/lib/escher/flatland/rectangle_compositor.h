@@ -100,7 +100,7 @@ class RectangleCompositor {
   ShaderProgramPtr color_conversion_program_ = nullptr;
 
   // Mapping of targets for the first subpass, to act as a cache.
-  // TODO(https://fxbug.dev/94242): Make sure this doesn't bloat.
+  // TODO(https://fxbug.dev/42176116): Make sure this doesn't bloat.
   HashMap<ImageInfo, ImagePtr> transient_image_map_;
 
   // Color conversion values.

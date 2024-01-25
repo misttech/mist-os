@@ -98,7 +98,7 @@ config("vk_mem_alloc_error_suppression") {
   ]
 
   if (is_mac) {
-    # TODO(https://fxbug.dev/62261): Current vk_mem_alloc.h has a possible naming
+    # TODO(https://fxbug.dev/42140638): Current vk_mem_alloc.h has a possible naming
     # conflict for aligned_alloc() method which is implemented natively on
     # macOS 10.15 SDK and above. We should update vk_mem_alloc.h to upstream
     # to fix this.

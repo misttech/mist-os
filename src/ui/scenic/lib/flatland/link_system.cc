@@ -259,7 +259,7 @@ void LinkSystem::UpdateDevicePixelRatio(const fuchsia::math::VecF& device_pixel_
   }
 
   // We update DPR info for every single View in the scene graph.
-  // TODO(https://fxbug.dev/108608): This assumes the same DPR for every client. Need to fix it for
+  // TODO(https://fxbug.dev/42059985): This assumes the same DPR for every client. Need to fix it for
   // multi-display.
   for (const auto& [handle, child_end] : parent_to_child_map_) {
     child_end.parent_viewport_watcher->UpdateDevicePixelRatio(device_pixel_ratio);

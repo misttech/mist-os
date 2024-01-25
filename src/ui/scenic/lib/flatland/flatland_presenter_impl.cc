@@ -49,7 +49,7 @@ void FlatlandPresenterImpl::ScheduleUpdateForSession(zx::time requested_presenta
                                                      scheduling::SchedulingIdPair id_pair,
                                                      bool unsquashable,
                                                      std::vector<zx::event> release_fences) {
-  // TODO(https://fxbug.dev/61178): The FrameScheduler is not thread-safe, but a lock is not sufficient
+  // TODO(https://fxbug.dev/42139440): The FrameScheduler is not thread-safe, but a lock is not sufficient
   // since GFX sessions may access the FrameScheduler without passing through this object. Post a
   // task to the main thread, which is where GFX runs, to account for thread safety.
   async::PostTask(

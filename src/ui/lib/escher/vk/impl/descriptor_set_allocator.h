@@ -31,7 +31,7 @@ class DescriptorSetAllocator {
   // element of the pair is true if the descriptor set already contains valid
   // data, and false if new descriptor values must be written.
   std::pair<vk::DescriptorSet, bool> Get(Hash hash) {
-    // TODO(https://fxbug.dev/7167): track cache hit/miss rates.
+    // TODO(https://fxbug.dev/42151047): track cache hit/miss rates.
     auto pair = cache_.Obtain(hash);
     return std::make_pair(pair.first->set, pair.second);
   }

@@ -61,7 +61,7 @@ pub enum MicStates {
 
 /// Types used for fuchsia.intl FIDL calls.
 /// Implementation is copied from /src/settings/service/src/switchboard/intl_types.rs
-/// TODO(https://fxbug.dev/53501) Remove this once intl_types is defined in a rust_library.
+/// TODO(https://fxbug.dev/42130922) Remove this once intl_types is defined in a rust_library.
 #[derive(PartialEq, Eq, Debug, Clone, Serialize, Deserialize)]
 pub struct IntlInfo {
     pub locales: Option<Vec<LocaleId>>,

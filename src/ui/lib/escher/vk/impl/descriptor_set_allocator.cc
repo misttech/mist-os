@@ -47,7 +47,7 @@ DescriptorSetAllocator::PoolPolicy::PoolPolicy(vk::Device device, DescriptorSetL
       continue;
     }
 
-    // TODO(https://fxbug.dev/23921): Consider allowing both static and dynamic offsets for
+    // TODO(https://fxbug.dev/42098060): Consider allowing both static and dynamic offsets for
     // uniform buffers.
     if (index_mask & layout.uniform_buffer_mask) {
       bindings[num_bindings++] = {i, vk::DescriptorType::eUniformBufferDynamic, 1, layout.stages,
@@ -56,7 +56,7 @@ DescriptorSetAllocator::PoolPolicy::PoolPolicy(vk::Device device, DescriptorSetL
       continue;
     }
 
-    // TODO(https://fxbug.dev/23921): Consider allowing both static and dynamic offsets for
+    // TODO(https://fxbug.dev/42098060): Consider allowing both static and dynamic offsets for
     // storage buffers.
     if (index_mask & layout.storage_buffer_mask) {
       bindings[num_bindings++] = {i, vk::DescriptorType::eStorageBuffer, 1, layout.stages, nullptr};
@@ -73,8 +73,8 @@ DescriptorSetAllocator::PoolPolicy::PoolPolicy(vk::Device device, DescriptorSetL
   }
 
   if (immutable_sampler && has_sampled_image) {
-    // TODO(https://fxbug.dev/7288): Leaving this log in for now, so we can detect when systems
-    // are OOMing due to https://fxbug.dev/7288. For most use cases, this log will trigger once.
+    // TODO(https://fxbug.dev/42152389): Leaving this log in for now, so we can detect when systems
+    // are OOMing due to https://fxbug.dev/42152389. For most use cases, this log will trigger once.
     FX_LOGS(INFO) << "Allocating immutable descriptor set layout, sampler = "
                   << immutable_sampler->vk();
   }

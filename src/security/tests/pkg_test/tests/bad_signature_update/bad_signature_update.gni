@@ -224,7 +224,7 @@ template("bad_signature_update") {
              ":${test_name}_v1_update_package_resource",
            ]
 
-    # TODO(https://fxbug.dev/88453): Complete test dependency composition to eliminate
+    # TODO(https://fxbug.dev/42169686): Complete test dependency composition to eliminate
     # error logs:
     # - system-updater: "Failed to read vbmeta hash: while opening the file:
     #   open failed with status: NOT_FOUND: NOT_FOUND".

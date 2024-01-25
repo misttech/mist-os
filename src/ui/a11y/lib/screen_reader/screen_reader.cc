@@ -209,7 +209,7 @@ void ScreenReader::BindGestures(a11y::GestureHandlerV2* gesture_handler) {
           SimulateTapDown(context);
           SimulateTapUp(context);
         }
-        // TODO(https://fxbug.dev/80277): Default action should not be needed after a simulated tap down /
+        // TODO(https://fxbug.dev/42160603): Default action should not be needed after a simulated tap down /
         // up.
         ExecuteAction(kDefaultActionLabel, std::move(context));
       });

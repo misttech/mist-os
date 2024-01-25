@@ -68,7 +68,7 @@ void InputReport::HidReportListenerReceiveReport(const uint8_t* report, size_t r
       continue;
     }
 
-    // TODO(https://fxbug.dev/136154): For Devices accepting input reports, there are
+    // TODO(https://fxbug.dev/42085733): For Devices accepting input reports, there are
     // two possible cases: [1] the Device may have its dedicated report ID,
     // which can be any integer value in [1, 255]; or [2] the Device doesn't
     // have its dedicated report ID which is allowed if there is only one

@@ -33,7 +33,7 @@ using OnFramePresented = fit::function<void(
 using RenderScheduledFrame =
     fit::function<void(uint64_t frame_number, zx::time presentation_time, FramePresentedCallback)>;
 
-// TODOs can be found in the frame scheduler epic: https://fxbug.dev/24406. Any new bugs filed concerning
+// TODOs can be found in the frame scheduler epic: https://fxbug.dev/42098599. Any new bugs filed concerning
 // the frame scheduler should be added to it as well.
 
 // DefaultFrameScheduler is the source of a number of events:

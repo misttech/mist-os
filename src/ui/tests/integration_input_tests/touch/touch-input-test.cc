@@ -123,7 +123,7 @@ constexpr auto kMoveEventCount = 5;
 // between any two tap events present in the response to a swipe event.
 // Note: These values are currently hard coded in the fake display and should be changed
 // accordingly.
-// TODO(https://fxbug.dev/111483): Remove the dependency of the tests on these hard coded values.
+// TODO(https://fxbug.dev/42062819): Remove the dependency of the tests on these hard coded values.
 constexpr auto kDisplayWidth = 1280;
 constexpr auto kDisplayHeight = 800;
 
@@ -146,7 +146,7 @@ void ExpectLocationAndPhase(
 
 std::vector<float> ConfigsToTest() {
   std::vector<float> configs;
-  // TODO: https://fxbug.dev/132413 - Test for DPR=2.0, too.
+  // TODO: https://fxbug.dev/42082519 - Test for DPR=2.0, too.
   configs.push_back(2.f);
   return configs;
 }
@@ -489,7 +489,7 @@ class TouchInputBase : public ui_testing::PortableUITest,
   uint32_t display_height() { return display_size().height; }
   uint32_t display_rotation() override { return 90; }
 
-  // TODO: https://fxbug.dev/132413 - Test for DPR=2.0, too.
+  // TODO: https://fxbug.dev/42082519 - Test for DPR=2.0, too.
   float device_pixel_ratio() override { return 1.f; }
 
   std::shared_ptr<ResponseState> response_state() const { return response_state_; }

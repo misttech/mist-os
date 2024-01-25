@@ -31,7 +31,7 @@ struct SysmemTokens {
   }
 };
 
-// TODO(https://fxbug.dev/55193): The default memory constraints set by Sysmem only allows using
+// TODO(https://fxbug.dev/42132796): The default memory constraints set by Sysmem only allows using
 // CPU domain for buffers with CPU usage, while Mali driver asks for only
 // RAM and Inaccessible domains for buffer allocation, which caused failure in
 // sysmem allocation. So here we add RAM domain support to clients in order

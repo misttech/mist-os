@@ -129,7 +129,7 @@ INSTANTIATE_TEST_SUITE_P(DisplayPixelRatioTestWithParams, DisplayPixelRatioTest,
 TEST_P(DisplayPixelRatioTest, TestScale) {
   const auto expected_dpr = GetParam();
 
-  // TODO(https://fxbug.dev/112999): Run this check when we update ClientScaleFactor()
+  // TODO(https://fxbug.dev/42064286): Run this check when we update ClientScaleFactor()
   // to work with Flatland.
   // EXPECT_NEAR(ClientViewScaleFactor(), expected_dpr, kEpsilon);
   EXPECT_NEAR(display_width_ / test_view_access_->view()->width(), expected_dpr, kEpsilon);

@@ -37,9 +37,9 @@ group("tests") {
     "web:simple_audio_web_system_validation_test_pkg",
     "web:simple_png_web_system_validation_test_pkg",
 
-    # TODO(https://fxbug.dev/119212): These should be provided by the Product
+    # TODO(https://fxbug.dev/42070261): These should be provided by the Product
     # configurations on which these tests run rather than as deps.
-    # TODO(https://fxbug.dev/119212): Should these be deps of the individual test
+    # TODO(https://fxbug.dev/42070261): Should these be deps of the individual test
     # targets above?
     "//src/chromium:web_context_provider_for_test",
   ]

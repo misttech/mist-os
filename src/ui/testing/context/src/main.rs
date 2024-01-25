@@ -23,7 +23,7 @@ use {
     futures::{StreamExt, TryStreamExt},
 };
 
-// TODO(https://fxbug.dev/117852): Use subpackages here.
+// TODO(https://fxbug.dev/42069041): Use subpackages here.
 const TEST_UI_STACK: &str = "ui";
 const TEST_UI_STACK_URL: &str = "#meta/test-ui-stack.cm";
 

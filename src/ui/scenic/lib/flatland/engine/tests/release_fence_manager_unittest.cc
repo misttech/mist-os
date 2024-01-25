@@ -262,7 +262,7 @@ TEST_F(ReleaseFenceManagerTest, FramePresentedCallbackForDirectScanoutFrame) {
 
   manager.OnVsync(/*frame_number*/ 1, kVsyncTime);
   EXPECT_TRUE(callback_invoked);
-  // TODO(https://fxbug.dev/74455): what should the render_done_time be?
+  // TODO(https://fxbug.dev/42154139): what should the render_done_time be?
   EXPECT_EQ(callback_timestamps.render_done_time, kFrameStartTime);
   EXPECT_EQ(callback_timestamps.actual_presentation_time, kVsyncTime);
 }

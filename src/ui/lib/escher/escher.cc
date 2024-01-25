@@ -264,9 +264,9 @@ FramePtr Escher::NewFrame(const char* trace_literal, uint64_t frame_number, bool
   // Check the type before cycling the framebuffer/descriptor-set allocators.
   // Without these checks it is possible to write into a Vulkan resource before
   // it is finished being used in a previous frame.
-  // TODO(https://fxbug.dev/7194): The correct solution is not to use multiple Frames per frame.
+  // TODO(https://fxbug.dev/42151346): The correct solution is not to use multiple Frames per frame.
   if (requested_type != CommandBuffer::Type::kTransfer) {
-    // TODO(https://fxbug.dev/7288): Nothing calls Clear() on the DescriptorSetAllocators, so
+    // TODO(https://fxbug.dev/42152389): Nothing calls Clear() on the DescriptorSetAllocators, so
     // their internal allocations are currently able to grow without bound.
     // DescriptorSets are not managed by ResourceRecyclers, so just
     // adding a call to Clear() here would be dangerous.

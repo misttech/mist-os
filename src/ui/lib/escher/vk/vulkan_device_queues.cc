@@ -470,7 +470,7 @@ fxl::RefPtr<VulkanDeviceQueues> VulkanDeviceQueues::New(VulkanInstancePtr instan
 
   // Specify the required physical device features, and verify that they are all
   // supported.
-  // TODO(https://fxbug.dev/7202): instead of hard-coding the required features here, provide a
+  // TODO(https://fxbug.dev/42151436): instead of hard-coding the required features here, provide a
   // mechanism for Escher clients to specify additional required features.
   vk::PhysicalDeviceFeatures supported_device_features;
   physical_device.getFeatures(&supported_device_features);
@@ -490,7 +490,7 @@ fxl::RefPtr<VulkanDeviceQueues> VulkanDeviceQueues::New(VulkanInstancePtr instan
     device_has_all_required_features = false;                                 \
   }
 
-  // TODO(https://fxbug.dev/13086): We would like to make 'shaderClipDistance' a requirement on
+  // TODO(https://fxbug.dev/42081100): We would like to make 'shaderClipDistance' a requirement on
   // all Scenic platforms.  For now, treat it as a DESIRED_FEATURE.
   ADD_DESIRED_FEATURE(shaderClipDistance);
   ADD_DESIRED_FEATURE(fillModeNonSolid);

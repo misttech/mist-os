@@ -35,7 +35,7 @@ namespace {
 using allocation::BufferCollectionUsage;
 using fuchsia::ui::composition::ImageFlip;
 
-// TODO(https://fxbug.dev/121328): We support two framebuffer formats and warmup for both.
+// TODO(https://fxbug.dev/42072347): We support two framebuffer formats and warmup for both.
 // * RGBA is the only supported format for AFBC on mali. Should be the default in production.
 // * BGRA is the only format that allows screen capture and testing on mali. It is also used as
 // default on screenshots.
@@ -401,7 +401,7 @@ bool VkRenderer::ImportBufferCollection(
   FX_DCHECK(collection_id != allocation::kInvalidId);
   FX_DCHECK(token.is_valid());
 
-  // TODO(https://fxbug.dev/51213): See if this can become asynchronous.
+  // TODO(https://fxbug.dev/42128380): See if this can become asynchronous.
   fuchsia::sysmem::BufferCollectionTokenSyncPtr local_token = token.BindSync();
   fuchsia::sysmem::BufferCollectionTokenSyncPtr vulkan_token;
   if (auto dup_token = Duplicate(local_token)) {
@@ -430,7 +430,7 @@ bool VkRenderer::ImportBufferCollection(
     return false;
   }
 
-  // TODO(https://fxbug.dev/44335): Convert this to a lock-free structure.
+  // TODO(https://fxbug.dev/42120738): Convert this to a lock-free structure.
   std::scoped_lock lock(lock_);
 
   std::unordered_map<GlobalBufferCollectionId, CollectionData>& collections =
@@ -452,7 +452,7 @@ void VkRenderer::ReleaseBufferCollection(GlobalBufferCollectionId collection_id,
   FX_DCHECK(main_dispatcher_ == async_get_default_dispatcher());
   TRACE_DURATION("gfx", "flatland::VkRenderer::ReleaseBufferCollection");
 
-  // TODO(https://fxbug.dev/44335): Convert this to a lock-free structure.
+  // TODO(https://fxbug.dev/42120738): Convert this to a lock-free structure.
   std::scoped_lock lock(lock_);
 
   std::unordered_map<GlobalBufferCollectionId, CollectionData>& collections =
@@ -623,7 +623,7 @@ escher::ImagePtr VkRenderer::ExtractImage(const allocation::ImageMetadata& metad
   auto vk_loader = escher_->device()->dispatch_loader();
 
   // Grab the collection Properties from Vulkan.
-  // TODO(https://fxbug.dev/102299): Add unittests to cover the case where sysmem client
+  // TODO(https://fxbug.dev/42053219): Add unittests to cover the case where sysmem client
   // token gets invalidated when importing images.
   vk::BufferCollectionPropertiesFUCHSIA properties;
   if (const auto properties_results =
@@ -799,7 +799,7 @@ void VkRenderer::Render(const ImageMetadata& render_target,
   }
 
   // Transition pending images to their correct layout
-  // TODO(https://fxbug.dev/52196): The way we are transitioning image layouts here and in the rest of
+  // TODO(https://fxbug.dev/42129471): The way we are transitioning image layouts here and in the rest of
   // Scenic is incorrect for "external" images. It just happens to be working by luck on our current
   // hardware.
   for (auto texture_id : local_pending_textures) {
@@ -904,7 +904,7 @@ void VkRenderer::Render(const ImageMetadata& render_target,
 
     semaphores.emplace_back(sema);
 
-    // TODO(https://fxbug.dev/93069): Semaphore lifetime should be guaranteed by Escher. This wait is a
+    // TODO(https://fxbug.dev/42174813): Semaphore lifetime should be guaranteed by Escher. This wait is a
     // workaround for the issue where we destroy semaphores before they are signalled.
     TRACE_DURATION("gfx", "VkRenderer::Render[WaitOnce]");
     auto wait = std::make_shared<async::WaitOnce>(fence_original.get(), ZX_EVENT_SIGNALED,

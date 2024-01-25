@@ -15,8 +15,8 @@
 #include <glm/gtx/matrix_transform_2d.hpp>
 
 static void ReportError() {
-  // TODO(https://fxbug.dev/77035): investigate how to propagate errors back to clients.
-  // TODO(https://fxbug.dev/76640): OK to crash until we have error propagation?  Probably so: better that
+  // TODO(https://fxbug.dev/42157006): investigate how to propagate errors back to clients.
+  // TODO(https://fxbug.dev/42156567): OK to crash until we have error propagation?  Probably so: better that
   // clients get feedback that they've done something wrong.  These are all in-tree clients, anyway.
   FX_CHECK(false) << "Crashing on error.";
 }
@@ -88,7 +88,7 @@ void FlatlandDisplay::SetContent(ViewportCreationToken token,
     return;
   }
 
-  // TODO(https://fxbug.dev/76640): In order to replace content from a previous call to SetContent(), need
+  // TODO(https://fxbug.dev/42156567): In order to replace content from a previous call to SetContent(), need
   // to detach from root_transform_, and otherwise clean up.  Flatland::ReleaseViewport() seems like
   // a good place to start.
   FX_CHECK(link_to_child_.parent_transform_handle == flatland::TransformHandle())
@@ -124,7 +124,7 @@ void FlatlandDisplay::SetContent(ViewportCreationToken token,
         FX_CHECK(dispatcher_holder->dispatcher() == async_get_default_dispatcher())
             << "Link protocol error reported on the wrong dispatcher.";
 
-        // TODO(https://fxbug.dev/77035): FlatlandDisplay currently has no way to notify clients of errors.
+        // TODO(https://fxbug.dev/42157006): FlatlandDisplay currently has no way to notify clients of errors.
         FX_LOGS(ERROR) << "FlatlandDisplay illegal client usage: " << error_log;
       });
   FX_CHECK(child_transform == link_to_child_.parent_transform_handle);
@@ -138,9 +138,9 @@ void FlatlandDisplay::SetContent(ViewportCreationToken token,
   child_added = transform_graph_.AddChild(root_transform_, link_to_child_.parent_transform_handle);
   FX_DCHECK(child_added);
 
-  // TODO(https://fxbug.dev/76640): given this fixed topology, we probably don't need to use
+  // TODO(https://fxbug.dev/42156567): given this fixed topology, we probably don't need to use
   // ComputeAndCleanup(), we can just stamp something out based on a fixed template.
-  // TODO(https://fxbug.dev/40818): Decide on a proper limit on compute time for topological sorting.
+  // TODO(https://fxbug.dev/42116832): Decide on a proper limit on compute time for topological sorting.
   auto data =
       transform_graph_.ComputeAndCleanup(root_transform_, std::numeric_limits<uint64_t>::max());
   FX_DCHECK(data.iterations != std::numeric_limits<uint64_t>::max());
@@ -167,7 +167,7 @@ void FlatlandDisplay::SetContent(ViewportCreationToken token,
   flatland_presenter_->ScheduleUpdateForSession(zx::time(0), {session_id_, present_id},
                                                 /*squashable=*/true, /*release_fences=*/{});
 
-  // TODO(https://fxbug.dev/76640): Flatland::Present() does:
+  // TODO(https://fxbug.dev/42156567): Flatland::Present() does:
   //    for (auto& operation : link_operations) { operation(); }
   // ... we should do something similar?  I believe that this will become necessary when we allow
   // SetContent() to be called more than once.

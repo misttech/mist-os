@@ -121,7 +121,7 @@ pub enum SystemVariant {
     Recovery,
 }
 
-// TODO(https://fxbug.dev/112121): This is over-fitted to the "inspect bootfs" use case, and should probably be in terms of
+// TODO(https://fxbug.dev/42063457): This is over-fitted to the "inspect bootfs" use case, and should probably be in terms of
 // the various types of ZBI sections.
 
 /// Model of the system's Zircon Boot Image (ZBI) used for Zircon kernel to userspace bootstrapping
@@ -199,7 +199,7 @@ pub trait KernelFlags {
     fn iter(&self) -> Box<dyn Iterator<Item = (String, String)>>;
 }
 
-// TODO(https://fxbug.dev/112121): What should this API look like?
+// TODO(https://fxbug.dev/42063457): What should this API look like?
 
 /// Model of the Verified Boot Metadata (vbmeta).
 pub trait VbMeta {}
@@ -233,7 +233,7 @@ pub trait ComponentManager {
     fn builtin_capabilities(&self) -> Box<dyn Iterator<Item = CapabilityDecl>>;
 }
 
-// TODO(https://fxbug.dev/112121): What should this API look like? This is just a starting point to
+// TODO(https://fxbug.dev/42063457): What should this API look like? This is just a starting point to
 // get something plumbed through from the data source.
 
 /// Model of the component manager configuration. This configuration file controls various
@@ -402,13 +402,13 @@ pub enum DataSourceKind {
     /// Multiple kinds are associated with underlying data source(s).
     Multiple(Vec<DataSourceKind>),
 
-    // TODO(https://fxbug.dev/112121): Are there other data sources to consume?
+    // TODO(https://fxbug.dev/42063457): Are there other data sources to consume?
     /// An artifact that was passed to a [`Scrutiny`] instance, but either its kind was not
     /// recognized, or the artifact was not a well-formed instance of the kind passed in.
     Unknown,
 }
 
-// TODO(https://fxbug.dev/112121): What varieties of versioning do formats need?
+// TODO(https://fxbug.dev/42063457): What varieties of versioning do formats need?
 
 /// A version identifier associated with an artifact or unit of software used to interpret
 /// artifacts.
@@ -595,7 +595,7 @@ pub enum PackageComponentsError {
     Read(#[from] std::io::Error),
 }
 
-// TODO(https://fxbug.dev/112121): Define API consistent with fuchsia_pkg::MetaPackage.
+// TODO(https://fxbug.dev/42063457): Define API consistent with fuchsia_pkg::MetaPackage.
 
 /// Model of a Fuchsia package's "meta/package" file. See
 /// https://fuchsia.dev/fuchsia-src/concepts/packages/package#structure-of-a-package for details.
@@ -613,14 +613,14 @@ impl PartialEq for dyn MetaPackage {
 
 impl Eq for dyn MetaPackage {}
 
-// TODO(https://fxbug.dev/112121): Expose data related to fuchsia_pkg::MetaPackage.
+// TODO(https://fxbug.dev/42063457): Expose data related to fuchsia_pkg::MetaPackage.
 impl Debug for dyn MetaPackage {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str("MetaPackage")
     }
 }
 
-// TODO(https://fxbug.dev/112121): Define API consistent with fuchsia_pkg::MetaContents.
+// TODO(https://fxbug.dev/42063457): Define API consistent with fuchsia_pkg::MetaContents.
 
 /// Model of a Fuchsia package's "meta/contents" file. See
 /// https://fuchsia.dev/fuchsia-src/concepts/packages/package#structure-of-a-package for details.
@@ -665,7 +665,7 @@ pub trait PackageResolver {
 }
 
 /// The variety of URLs that [`PackageResolver`] can resolve to package hashes.
-// TODO(https://fxbug.dev/112121): Define varieties of URL that PackageResolver supports, choose types
+// TODO(https://fxbug.dev/42063457): Define varieties of URL that PackageResolver supports, choose types
 // for those URLs, and have each of these variants wrap a representation of a URL.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum PackageResolverUrl {
@@ -817,14 +817,14 @@ pub trait ComponentInstance {
     fn ancestors(&self) -> Box<dyn Iterator<Item = Box<dyn ComponentInstance>>>;
 }
 
-// TODO(https://fxbug.dev/112121): Define API compatible with moniker::Moniker.
+// TODO(https://fxbug.dev/42063457): Define API compatible with moniker::Moniker.
 
 /// Model of a component instance moniker, the instance's identifier in the context of
 /// the component tree constructed by the underlying [`Scrutiny`] instance. See
 /// https://fuchsia.dev/fuchsia-src/concepts/components/v2/identifiers#monikers for details.
 pub trait Moniker {}
 
-// TODO(https://fxbug.dev/112121): Define API compatible with notion of bound environment in a component tree.
+// TODO(https://fxbug.dev/42063457): Define API compatible with notion of bound environment in a component tree.
 
 /// Model of a component instance environment that is realized in the context of the component
 /// the component tree constructed by the underlying [`Scrutiny`] instance. See

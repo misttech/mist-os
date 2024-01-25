@@ -562,7 +562,7 @@ impl<TCRS: 'static + TryClone + Read + Seek> BlobFsReader<TCRS> {
             .get(blob_path.as_ref())
             .ok_or_else(|| anyhow!("Blobfs blob not found: {:?}", blob_path.as_ref()))?;
         if metadata.prelude.is_chunk_compressed() {
-            // TODO(https://fxbug.dev/102061): Eliminate in-memory copy of compressed blob and/or leverage
+            // TODO(https://fxbug.dev/42052956): Eliminate in-memory copy of compressed blob and/or leverage
             // memory mapped files.
             let mut buffer = vec![0u8; metadata.data_length as usize];
             self.reader_seeker.seek(SeekFrom::Start(metadata.data_start))?;

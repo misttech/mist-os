@@ -1523,7 +1523,7 @@ TEST(GlobalCullRectanglesTest, MultipleFullScreenRectsWithTransparency) {
 // matrices, where child values are the product of their local values and their
 // ancestors' values.
 //
-// TODO(https://fxbug.dev/73516): Since the logic between matrices and opacity is very similar, in the
+// TODO(https://fxbug.dev/42153097): Since the logic between matrices and opacity is very similar, in the
 // future we may want to consolidate |ComputeGlobalMatrices| and |ComputeGlobalOpacityValues| into a
 // single (potentially templated) function, which would allow us to consolidate these tests into
 // one. But for now, we have to keep them separate.

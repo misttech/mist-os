@@ -95,7 +95,7 @@ impl api::Scrutiny for Scrutiny {
     }
 
     fn component_manager(&self) -> Box<dyn api::ComponentManager> {
-        todo!("TODO(https://fxbug.dev/111251): Integrate with production system API")
+        todo!("TODO(https://fxbug.dev/42062562): Integrate with production system API")
     }
 
     fn data_sources(&self) -> Box<dyn Iterator<Item = Box<dyn api::DataSource>>> {
@@ -114,11 +114,11 @@ impl api::Scrutiny for Scrutiny {
     }
 
     fn component_manifests(&self) -> Box<dyn Iterator<Item = ComponentDecl>> {
-        todo!("TODO(https://fxbug.dev/111243): Integrate with production component API")
+        todo!("TODO(https://fxbug.dev/42062553): Integrate with production component API")
     }
 
     fn component_instances(&self) -> Box<dyn Iterator<Item = Box<dyn api::ComponentInstance>>> {
-        todo!("TODO(https://fxbug.dev/111245): Integrate with production component instance API")
+        todo!("TODO(https://fxbug.dev/42062555): Integrate with production component instance API")
     }
 }
 

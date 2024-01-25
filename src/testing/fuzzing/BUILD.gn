@@ -8,13 +8,13 @@ group("fuzzing") {
     ":tests",
     "go",
 
-    # TODO(https://fxbug.dev/72439): syzkaller needs to update ddk include paths.
+    # TODO(https://fxbug.dev/42151900): syzkaller needs to update ddk include paths.
     # "syzkaller",
   ]
 }
 
 group("tests") {
   testonly = true
-  # TODO(https://fxbug.dev/72439): syzkaller needs to update ddk include paths.
+  # TODO(https://fxbug.dev/42151900): syzkaller needs to update ddk include paths.
   # deps = [ "syzkaller:tests" ]
 }

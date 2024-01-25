@@ -86,7 +86,7 @@ fuchsia_test_package("flatland-a11y-view-test") {
   test_components = [ ":flatland-a11y-view-test-component" ]
   test_specs = {
     log_settings = {
-      # TODO(https://fxbug.dev/93081): Investigate flakes and remove allowing ERROR severity.
+      # TODO(https://fxbug.dev/42174827): Investigate flakes and remove allowing ERROR severity.
       max_severity = "ERROR"
     }
     environments = [
@@ -135,7 +135,7 @@ fuchsia_test_package("flatland-scene-integration-test") {
   test_components = [ ":flatland-scene-integration-test-component" ]
   test_specs = {
     log_settings = {
-      # TODO(https://fxbug.dev/93081): Investigate flakes and remove allowing ERROR severity.
+      # TODO(https://fxbug.dev/42174827): Investigate flakes and remove allowing ERROR severity.
       max_severity = "ERROR"
     }
     environments = [

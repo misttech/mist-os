@@ -55,7 +55,7 @@ pub async fn map_topo_paths_to_class_paths(
 
 /// Find driver alias using its full topological path from the provided map from topological path
 /// suffixes to aliases.
-/// TODO(https://fxbug.dev/113837): Remove mapping from topological path to alias.
+/// TODO(https://fxbug.dev/42065074): Remove mapping from topological path to alias.
 pub fn get_driver_alias(
     topo_suffix_to_aliases: &HashMap<String, String>,
     topo_path: &str,

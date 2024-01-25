@@ -53,7 +53,7 @@ pub async fn take_screenshot() {
     if is_image_blank(&image_data) {
         panic!("Captured screenshot is blank.");
     }
-    // NOTE: Remove once https://fxbug.dev/108647 is added.
+    // NOTE: Remove once https://fxbug.dev/42060028 is added.
     bgra_to_rbga(&mut image_data);
     writer.write_image_data(&image_data).expect("failed to write image data as PNG");
 }

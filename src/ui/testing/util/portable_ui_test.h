@@ -77,7 +77,7 @@ class PortableUITest : public ::loop_fixture::RealLoop, public ::testing::Test {
   // the view is ready. If the viewport is not ready in Input Pipeline at that time, it will
   // drop the touch event.
   //
-  // TODO(https://fxbug.dev/96986): Improve synchronization and remove retry logic.
+  // TODO(https://fxbug.dev/42179163): Improve synchronization and remove retry logic.
   void InjectTapWithRetry(int32_t x, int32_t y);
 
   // Injects a swipe from the given starting location to the given end location

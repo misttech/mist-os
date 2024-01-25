@@ -348,15 +348,15 @@ void Convert(rapidjson::Document* input, rapidjson::Document* output, const Conv
     if (element.HasMember("test_name")) {
       name = element["test_name"].GetString();
     } else if (element.HasMember("label")) {
-      // TODO(https://fxbug.dev/59861): remove this when producers have been converted.
+      // TODO(https://fxbug.dev/42137976): remove this when producers have been converted.
       name = element["label"].GetString();
     } else {
       fprintf(stderr,
               "Expect json element to have either label field (old version) or test_name field "
-              "(new version). (http://https://fxbug.dev/59861)\n");
+              "(new version). (http://https://fxbug.dev/42137976)\n");
       exit(1);
     }
-    // TODO(https://fxbug.dev/59861): Make "metric" field required once all the producers provide it.
+    // TODO(https://fxbug.dev/42137976): Make "metric" field required once all the producers provide it.
     if (element.HasMember("metric")) {
       std::string metric = element["metric"].GetString();
       if (metric != "real_time") {

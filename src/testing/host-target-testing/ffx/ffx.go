@@ -124,7 +124,7 @@ func (f *FFXTool) SupportsZedbootDiscovery(ctx context.Context) (bool, error) {
 		return false, fmt.Errorf("ffx config get failed: %w: %s", err, string(stderr))
 	}
 
-	// FIXME(https://fxbug.dev/109280): Unfortunately we need to parse the raw string to see if it's true.
+	// FIXME(https://fxbug.dev/42060660): Unfortunately we need to parse the raw string to see if it's true.
 	if string(stdout) == "true\n" {
 		return true, nil
 	}

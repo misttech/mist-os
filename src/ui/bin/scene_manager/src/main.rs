@@ -84,7 +84,7 @@ async fn main() -> Result<(), Error> {
 
 const LIGHT_SENSOR_CONFIGURATION: &'static str = "/sensor-config/config.json";
 
-// TODO(https://fxbug.dev/89425): Ideally we wouldn't need to have separate inner_main() and main()
+// TODO(https://fxbug.dev/42170765): Ideally we wouldn't need to have separate inner_main() and main()
 // functions in order to catch and log top-level errors.  Instead, the #[fuchsia::main] macro
 // could catch and log the error.
 async fn inner_main() -> Result<(), Error> {

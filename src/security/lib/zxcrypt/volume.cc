@@ -42,7 +42,7 @@ const Volume::Version Volume::kDefaultVersion = Volume::kAES256_XTS_SHA256;
 // The amount of data that can "in-flight" to the underlying block device before the zxcrypt
 // driver begins queuing transactions
 //
-// TODO(aarongreen): See https://fxbug.dev/31498.  Tune this value.  Possibly break into several smaller
+// TODO(aarongreen): See https://fxbug.dev/42106478.  Tune this value.  Possibly break into several smaller
 // VMOs if we want to allow some to be recycled; support for this doesn't currently exist. Up to 64
 // MB may be in flight at once.  The device's max_transfer_size will be capped at 1/4 of this value.
 __EXPORT

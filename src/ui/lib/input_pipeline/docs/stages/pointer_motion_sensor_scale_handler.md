@@ -95,7 +95,7 @@ the [count scaling section](#count-scaling).
 2. The "primarily" hedge in point 1 hides the fact that the
    speed of motion for a given event is computed based on the
    delta between the event's timestamp, and the previous event's
-   timestamp. Improving this is tracked in https://fxbug.dev/98920.
+   timestamp. Improving this is tracked in https://fxbug.dev/42181307.
 3. This handler deliberately deals only in `UnhandledInputEvent`s.
    That's because most handlers send an event to a FIDL peer
    before marking the event as handled. Scaling an event that has

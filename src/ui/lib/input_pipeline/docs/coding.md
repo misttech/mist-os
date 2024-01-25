@@ -126,7 +126,7 @@ For example, consider [`MediaButtonsHandler`][media-buttons-handler], which
 handles [`ConsumerControlsEvent`][consumer-controls-event]s by sending events to
 [`fuchsia.ui.policy.MediaButtonsListener`][media-buttons-listener] channels.
 
-After https://fxbug.dev/106843 is resolved, we will consider a [`ConsumerControlsEvent`][consumer-controls-event]
+After https://fxbug.dev/42058162 is resolved, we will consider a [`ConsumerControlsEvent`][consumer-controls-event]
 handled when the [`MediaButtonsHandler`][media-buttons-handler]
 has invoked the [`OnEvent()`][on-event-fidl] method on all listeners, even if the
 listeners have not yet acknowledged the call.

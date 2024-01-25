@@ -86,7 +86,7 @@ icu_fuchsia_component("scene_manager_component") {
   ]
 }
 
-# TODO(https://fxbug.dev/106573): Remove test-only target when
+# TODO(https://fxbug.dev/42057898): Remove test-only target when
 # default config values are available.
 group("scene_manager_component_for_test") {
   deps = [

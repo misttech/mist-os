@@ -6,7 +6,7 @@ use fidl_fuchsia_ui_composition as fland;
 
 pub trait Renderer {
     // Fill 4 quadrants of the specified buffer with the 4 provided colors.
-    // TODO(https://fxbug.dev/104692): this function should return a `zx::event` which will be signaled when
+    // TODO(https://fxbug.dev/42055867): this function should return a `zx::event` which will be signaled when
     // rendering is done, so that it can be as passed to `Flatland.PresentArgs` via
     // `PresentArgs.server_wait_fences`.
     fn render_rgba(&self, buffer_index: usize, colors: [[u8; 4]; 4]);

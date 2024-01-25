@@ -438,7 +438,7 @@ const MAX_SATURATION_GREEN: u16 = 20_395;
 const MAX_SATURATION_BLUE: u16 = 20_939;
 const MAX_SATURATION_CLEAR: u16 = 65_085;
 
-// TODO(https://fxbug.dev/65167) Update when sensor reports include saturation
+// TODO(https://fxbug.dev/42143847) Update when sensor reports include saturation
 // information.
 fn saturated(reading: Rgbc<u16>) -> bool {
     reading.red == MAX_SATURATION_RED
@@ -451,7 +451,7 @@ fn saturated(reading: Rgbc<u16>) -> bool {
 // following calculation.
 /// Returns `None` when the reading is under or over saturated.
 fn correlated_color_temperature(reading: Rgbc<f32>) -> Option<f32> {
-    // TODO(https://fxbug.dev/121854): Move color_temp calculation out of common code
+    // TODO(https://fxbug.dev/42072871): Move color_temp calculation out of common code
     let big_x = -0.7687 * reading.red + 9.7764 * reading.green + -7.4164 * reading.blue;
     let big_y = -1.7475 * reading.red + 9.9603 * reading.green + -5.6755 * reading.blue;
     let big_z = -3.6709 * reading.red + 4.8637 * reading.green + 4.3682 * reading.blue;

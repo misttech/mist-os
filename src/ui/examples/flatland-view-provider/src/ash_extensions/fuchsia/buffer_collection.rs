@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use {
-    // TODO(https://fxbug.dev/104743): when this is upstreamed into ash, this should say `crate::*` instead
+    // TODO(https://fxbug.dev/42055924): when this is upstreamed into ash, this should say `crate::*` instead
     // of `ash::*`.
     ash::{prelude::*, vk, Device, Instance, RawPtr},
     std::mem,
@@ -55,7 +55,7 @@ impl BufferCollection {
     }
 
     /// <https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkSetBufferCollectionBufferConstraintsFUCHSIA.html>
-    // TODO(https://fxbug.dev/104743): remove this #[allow(dead_code)] when we subsequently upstream
+    // TODO(https://fxbug.dev/42055924): remove this #[allow(dead_code)] when we subsequently upstream
     // this extension to ash.
     #[allow(dead_code)]
     pub unsafe fn set_buffer_collection_buffer_constraints(

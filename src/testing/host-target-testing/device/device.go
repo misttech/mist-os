@@ -126,12 +126,12 @@ func (c *Client) Close() {
 
 // Run all setup steps after we've connected to a device.
 func (c *Client) postConnectSetup(ctx context.Context) error {
-	// TODO(https://fxbug.dev/74942): The device might drop connections
+	// TODO(https://fxbug.dev/42154680): The device might drop connections
 	// early after boot when the RTC is updated, which typically happens
 	// about 10 seconds after boot. To avoid this, if we find that we
 	// connected before 15s, we'll disconnect, sleep, then connect again.
 	if c.workaroundBrokenTimeSkip {
-		logger.Infof(ctx, "Sleeping 15s in case https://fxbug.dev/74947 causes a spurious disconnection")
+		logger.Infof(ctx, "Sleeping 15s in case https://fxbug.dev/42154685 causes a spurious disconnection")
 		time.Sleep(15 * time.Second)
 
 		if err := c.sshClient.Reconnect(ctx); err != nil {
@@ -508,7 +508,7 @@ func (c *Client) RegisterPackageRepository(
 
 	logger.Infof(ctx, "registering package repository: %s", repo.Dir)
 
-	// TODO(https://fxbug.dev/74493): Remove amberctl path after the oldest supported build has
+	// TODO(https://fxbug.dev/42154181): Remove amberctl path after the oldest supported build has
 	// moved beyond commit 99fb3d62a991ecc19919f67201fee1d208be7f32.
 	//
 	// amberctl path - before pkgctl gained the 'url' argument.

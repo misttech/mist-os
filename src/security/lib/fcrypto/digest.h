@@ -9,7 +9,7 @@
 #include <zircon/types.h>
 
 // |crypto::digest| is a cryptographic message digest algorithm.
-// TODO(aarongreen): https://fxbug.dev/31188: Merge ulib/digest with ulib/crypto
+// TODO(aarongreen): https://fxbug.dev/42106134: Merge ulib/digest with ulib/crypto
 namespace crypto {
 namespace digest {
 

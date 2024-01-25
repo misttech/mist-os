@@ -61,7 +61,7 @@ fn new_fake_device_info() -> DeviceInfo {
 /// assert_eq!(key_sequence.len(), 3);
 /// ```
 ///
-/// TODO(https://fxbug.dev/108530): Simplify the logic in this test.
+/// TODO(https://fxbug.dev/42059899): Simplify the logic in this test.
 fn derive_key_sequence(keymap: &keymaps::Keymap<'_>, input: &str) -> Option<Vec<KeyboardReport>> {
     let inverse_keymap = InverseKeymap::new(keymap);
     let mut reports = vec![];
@@ -622,7 +622,7 @@ mod tests {
     use super::{derive_key_sequence, KeyboardReport, Usages};
     use pretty_assertions::assert_eq;
 
-    // TODO(https://fxbug.dev/108530): Remove this macro.
+    // TODO(https://fxbug.dev/42059899): Remove this macro.
     macro_rules! reports {
         ( $( [ $( $usages:expr ),* ] ),* $( , )? ) => {
             Some(vec![

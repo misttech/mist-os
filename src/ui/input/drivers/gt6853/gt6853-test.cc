@@ -529,7 +529,7 @@ TEST_F(Gt6853Test, ReadReport) {
   auto reader_endpoints = fidl::CreateEndpoints<fuchsia_input_report::InputReportsReader>();
   ASSERT_TRUE(reader_endpoints.is_ok());
   auto [reader_client, reader_server] = std::move(reader_endpoints.value());
-  // TODO(https://fxbug.dev/97955) Consider handling the error instead of ignoring it.
+  // TODO(https://fxbug.dev/42180237) Consider handling the error instead of ignoring it.
   (void)client->GetInputReportsReader(std::move(reader_server));
   fidl::WireSyncClient<fuchsia_input_report::InputReportsReader> reader(std::move(reader_client));
   WaitForNextReader();
@@ -791,7 +791,7 @@ TEST_F(Gt6853Test, LatencyMeasurements) {
   auto reader_endpoints = fidl::CreateEndpoints<fuchsia_input_report::InputReportsReader>();
   ASSERT_TRUE(reader_endpoints.is_ok());
   auto [reader_client, reader_server] = std::move(reader_endpoints.value());
-  // TODO(https://fxbug.dev/97955) Consider handling the error instead of ignoring it.
+  // TODO(https://fxbug.dev/42180237) Consider handling the error instead of ignoring it.
   (void)client->GetInputReportsReader(std::move(reader_server));
   fidl::WireSyncClient<fuchsia_input_report::InputReportsReader> reader(std::move(reader_client));
   WaitForNextReader();

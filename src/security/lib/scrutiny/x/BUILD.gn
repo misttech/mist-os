@@ -48,7 +48,7 @@ if (is_host) {
       "//third_party/rust_crates:thiserror",
       "//third_party/rust_crates:tracing",
 
-      # TODO(https://fxbug.dev/112505): This dependency was introduced for accessing blobfs archives via
+      # TODO(https://fxbug.dev/42063811): This dependency was introduced for accessing blobfs archives via
       # bespoke code that is not owned by the storage team. `scrutiny_x` should contain its own
       # implementation of blobfs access via a storage team-owned API.
       "//src/security/lib/scrutiny/utils",

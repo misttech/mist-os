@@ -5464,7 +5464,7 @@ TEST_F(FlatlandTest, CreateAndReleaseFilledRect) {
   PRESENT(flatland, true);
 }
 
-// TODO(https://fxbug.dev/76640): other FlatlandDisplayTests that should be written:
+// TODO(https://fxbug.dev/42156567): other FlatlandDisplayTests that should be written:
 // - version of SimpleSetContent where the child presents before SetDisplayContent() is called.
 // - call SetDisplayContent() multiple times.
 

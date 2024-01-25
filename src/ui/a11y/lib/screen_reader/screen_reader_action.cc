@@ -189,7 +189,7 @@ ScreenReaderMessageGenerator::ScreenReaderMessageContext ScreenReaderAction::Get
   // We need to report out what has changed during this navigation:
   // - which containers, if any, were entered (i.e., they are only in new_navigation_context)
   // - which containers, if any, were exited (i.e., they are only in old_navigation_context)
-  // - TODO(https://fxbug.dev/99248): Eventually, we will likely want to report 'whether anything changed
+  // - TODO(https://fxbug.dev/42181671): Eventually, we will likely want to report 'whether anything changed
   //   about our context in the deepest common container' (e.g., table row/column index changes)
   auto previous_containers_iter = old_navigation_context.containers.begin();
   auto current_containers_iter = new_navigation_context.containers.begin();

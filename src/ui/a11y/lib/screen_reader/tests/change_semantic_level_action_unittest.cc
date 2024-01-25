@@ -61,7 +61,7 @@ TEST_F(ChangeSemanticLevelAction, NoChangeForNonSliderNode) {
                           MessageIds::DEFAULT_NAVIGATION_GRANULARITY));
 }
 
-// TODO(https://fxbug.dev/63293): Enable when word and character navigation exist.
+// TODO(https://fxbug.dev/42141781): Enable when word and character navigation exist.
 TEST_F(ChangeSemanticLevelAction, DISABLED_CyclesForwardThroughLevelsForNonSliderNode) {
   // The focus is not important when it is not a slider node.
   mock_a11y_focus_manager()->set_should_get_a11y_focus_fail(true);
@@ -86,7 +86,7 @@ TEST_F(ChangeSemanticLevelAction, DISABLED_CyclesForwardThroughLevelsForNonSlide
                           MessageIds::DEFAULT_NAVIGATION_GRANULARITY));
 }
 
-// TODO(https://fxbug.dev/63293): Enable when word and character navigation exist.
+// TODO(https://fxbug.dev/42141781): Enable when word and character navigation exist.
 TEST_F(ChangeSemanticLevelAction, DISABLED_CyclesBackwardThroughLevelsForNonSliderNode) {
   // The focus is not important when it is not a slider node.
   mock_a11y_focus_manager()->set_should_get_a11y_focus_fail(true);
@@ -120,7 +120,7 @@ TEST_F(ChangeSemanticLevelAction, CyclesForwardThroughLevelsForSliderNode) {
   RunLoopUntilIdle();
   EXPECT_EQ(mock_screen_reader_context()->semantic_level(),
             ScreenReaderContext::SemanticLevel::kAdjustValue);
-  /* TODO(https://fxbug.dev/63293): Uncomment when word and character navigation exist.
+  /* TODO(https://fxbug.dev/42141781): Uncomment when word and character navigation exist.
   action.Run(action_data);
   RunLoopUntilIdle();
   EXPECT_EQ(mock_screen_reader_context()->semantic_level(),
@@ -144,7 +144,7 @@ TEST_F(ChangeSemanticLevelAction, CyclesBackwardThroughLevelsForSliderNode) {
                                          action_context(), mock_screen_reader_context());
   a11y::gesture_util_v2::GestureContext gesture_context;
   gesture_context.view_ref_koid = mock_semantic_provider()->koid();
-  /* TODO(https://fxbug.dev/63293): Uncomment when word and character navigation exist.
+  /* TODO(https://fxbug.dev/42141781): Uncomment when word and character navigation exist.
   action.Run(action_data);
   RunLoopUntilIdle();
   EXPECT_EQ(mock_screen_reader_context()->semantic_level(),
@@ -179,7 +179,7 @@ TEST_F(ChangeSemanticLevelAction, CyclesForwardThroughLevelsForSliderNodeNoRange
   RunLoopUntilIdle();
   EXPECT_EQ(mock_screen_reader_context()->semantic_level(),
             ScreenReaderContext::SemanticLevel::kAdjustValue);
-  /* TODO(https://fxbug.dev/63293): Uncomment when word and character navigation exist.
+  /* TODO(https://fxbug.dev/42141781): Uncomment when word and character navigation exist.
   action.Run(action_data);
   RunLoopUntilIdle();
   EXPECT_EQ(mock_screen_reader_context()->semantic_level(),

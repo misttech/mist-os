@@ -35,7 +35,7 @@ fuchsia_unittest_component("injector-component") {
 }
 
 fuchsia_test_package("injector-tests") {
-  # TODO(https://fxbug.dev/77467): Implement unit test for Injector.
+  # TODO(https://fxbug.dev/42157485): Implement unit test for Injector.
   test_components = [ ":injector-component" ]
 
   test_specs = {

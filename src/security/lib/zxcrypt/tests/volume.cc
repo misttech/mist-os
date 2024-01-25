@@ -30,7 +30,7 @@ namespace {
 // See test-device.h; the following macros allow reusing tests for each of the supported versions.
 #define EACH_PARAM(OP, TestSuite, Test) OP(TestSuite, Test, Volume, AES256_XTS_SHA256)
 
-// https://fxbug.dev/31814: Dump extra information if encountering an unexpected error during volume
+// https://fxbug.dev/42106830: Dump extra information if encountering an unexpected error during volume
 // creation.
 void VolumeCreate(fidl::ClientEnd<fuchsia_hardware_block_volume::Volume> device,
                   const fbl::unique_fd& devfs_root, const crypto::Secret& key, bool fvm,
@@ -141,7 +141,7 @@ void TestUnlock(Volume::Version version, bool fvm) {
   uint8_t after[sizeof(before)];
   const size_t num_blocks = volume.value()->reserved_blocks();
 
-  // TODO(https://fxbug.dev/130150): This code is broken as devices no longer support fds.
+  // TODO(https://fxbug.dev/42080445): This code is broken as devices no longer support fds.
   // Please either fix this code or delete it.
   int bad_fd = -1;
 

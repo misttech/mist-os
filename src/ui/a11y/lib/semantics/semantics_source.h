@@ -27,7 +27,7 @@ class SemanticsSource {
   virtual bool ViewHasSemantics(zx_koid_t view_ref_koid) = 0;
 
   // Returns a clone of the ViewRef referenced by |view_ref_koid| if it is known.
-  // TODO(https://fxbug.dev/47136): Move ViewRefClone from SemanticsSource to ViewRefWrapper.
+  // TODO(https://fxbug.dev/42123849): Move ViewRefClone from SemanticsSource to ViewRefWrapper.
   virtual std::optional<fuchsia::ui::views::ViewRef> ViewRefClone(zx_koid_t view_ref_koid) = 0;
 
   // Returns the semantic node with id |node_id| in the semantic tree with koid |koid|, if one
@@ -37,7 +37,7 @@ class SemanticsSource {
 
   // Returns the parent of the node with id |node_id|. Returns nullptr if the
   // input node is the root.
-  // Currently O(N). TODO(https://fxbug.dev/108397): improve this.
+  // Currently O(N). TODO(https://fxbug.dev/42059816): improve this.
   virtual const fuchsia::accessibility::semantics::Node* GetParentNode(zx_koid_t koid,
                                                                        uint32_t node_id) const = 0;
 
@@ -51,13 +51,13 @@ class SemanticsSource {
       zx_koid_t koid, uint32_t node_id, a11y::NodeFilterWithParent filter) const = 0;
 
   // Returns the previous node in traversal-order neighbors relative to the node with id |node_id|.
-  // Note: Currently O(N). TODO(https://fxbug.dev/109128): improve this.
+  // Note: Currently O(N). TODO(https://fxbug.dev/42060491): improve this.
   virtual const fuchsia::accessibility::semantics::Node* GetPreviousNode(
       zx_koid_t koid, uint32_t node_id, a11y::NodeFilter filter) const = 0;
 
   // Returns the previous node in traversal-order neighbors relative to the node with id |node_id|.
   // This version provides both the node and its parent to the 'filter' function, for convenience.
-  // Note: Currently O(N). TODO(https://fxbug.dev/109128): improve this.
+  // Note: Currently O(N). TODO(https://fxbug.dev/42060491): improve this.
   virtual const fuchsia::accessibility::semantics::Node* GetPreviousNode(
       zx_koid_t koid, uint32_t node_id, a11y::NodeFilterWithParent filter) const = 0;
 

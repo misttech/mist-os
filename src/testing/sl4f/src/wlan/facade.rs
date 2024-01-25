@@ -24,7 +24,7 @@ use wlan_common::scan::ScanResult;
 // Use: Create once per server instantiation.
 #[derive(Debug)]
 struct InnerWlanFacade {
-    // TODO(https://fxbug.dev/84729)
+    // TODO(https://fxbug.dev/42165549)
     #[allow(unused)]
     scan_results: bool,
 }
@@ -32,7 +32,7 @@ struct InnerWlanFacade {
 #[derive(Debug)]
 pub(crate) struct WlanFacade {
     monitor_svc: DeviceMonitorProxy,
-    // TODO(https://fxbug.dev/84729)
+    // TODO(https://fxbug.dev/42165549)
     #[allow(unused)]
     inner: RwLock<InnerWlanFacade>,
 }

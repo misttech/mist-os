@@ -155,7 +155,7 @@ void TimestampProfiler::TraceGpuQueryResults(
   // Shift the vthread events by kCleanupDelay / 2. This is specifically chosen
   // because we know CleanupEscher() (and therefore us, too) runs every 1ms,
   // so by setting the "end" to be 0.5ms ago, we know we cannot be off by more than
-  // +/- 0.5ms. See https://fxbug.dev/24648 for more details.
+  // +/- 0.5ms. See https://fxbug.dev/42098867 for more details.
   kCleanupDelay /= 2;
 
   static const uint64_t kCleanupRatio = zx::msec(1).get() / kCleanupDelay.get();

@@ -47,7 +47,7 @@ bool NullRenderer::ImportBufferCollection(
 
   // Multiple threads may be attempting to read/write from |map| so we
   // lock this function here.
-  // TODO(https://fxbug.dev/44335): Convert this to a lock-free structure.
+  // TODO(https://fxbug.dev/42120738): Convert this to a lock-free structure.
   map[collection_id] = std::move(result.value());
   return true;
 }
@@ -56,7 +56,7 @@ void NullRenderer::ReleaseBufferCollection(allocation::GlobalBufferCollectionId 
                                            BufferCollectionUsage usage) {
   // Multiple threads may be attempting to read/write from the various maps,
   // lock this function here.
-  // TODO(https://fxbug.dev/44335): Convert this to a lock-free structure.
+  // TODO(https://fxbug.dev/42120738): Convert this to a lock-free structure.
   std::scoped_lock lock(lock_);
   auto& map = GetBufferCollectionInfosFor(usage);
 

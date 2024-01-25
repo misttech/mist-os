@@ -124,11 +124,11 @@ group("tests") {
     ":core_bad_signature_update_fxblob-package($target_toolchain)",
   ]
   if (!is_coverage) {
-    # TODO(https://fxbug.dev/112796): Re-enable this test in coverage when it no
+    # TODO(https://fxbug.dev/42064133): Re-enable this test in coverage when it no
     # longer fails with coverage enabled.
     deps += [
       ":core_access_ota_blob_as_executable-package($target_toolchain)",
-      # TODO(https://fxbug.dev/129587): Fix issue with fxfs update package creation.
+      # TODO(https://fxbug.dev/42079961): Fix issue with fxfs update package creation.
       # ":core_access_ota_blob_as_executable_fxblob-package($target_toolchain)",
     ]
   }

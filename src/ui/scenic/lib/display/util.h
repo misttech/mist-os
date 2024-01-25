@@ -44,7 +44,7 @@ bool IsCaptureSupported(const fuchsia::hardware::display::CoordinatorSyncPtr& di
 //
 // On failure, this function returns the error value.
 //
-// TODO(https://fxbug.dev/130268): Unify this method with ImportBufferImage().
+// TODO(https://fxbug.dev/42080575): Unify this method with ImportBufferImage().
 zx_status_t ImportImageForCapture(
     const fuchsia::hardware::display::CoordinatorSyncPtr& display_coordinator,
     const fuchsia::hardware::display::types::ImageConfig& image_config,

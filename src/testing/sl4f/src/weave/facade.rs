@@ -307,7 +307,7 @@ mod tests {
         future::join(facade_fut, pairing_state_fut).await;
     }
 
-    #[allow(clippy::unit_cmp)] // TODO(https://fxbug.dev/95034)
+    #[allow(clippy::unit_cmp)] // TODO(https://fxbug.dev/42176996)
     #[fasync::run_singlethreaded(test)]
     async fn test_reset_config() {
         let flags: ResetConfigFlags = fidl_fuchsia_weave::ResetConfigFlags::NETWORK_CONFIG

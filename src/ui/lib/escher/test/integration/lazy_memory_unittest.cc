@@ -43,7 +43,7 @@ static void DrawSceneContent(PaperRenderer* renderer, uint32_t width, uint32_t h
   }
 }
 
-// TODO(https://fxbug.dev/63702): vkGetDeviceMemoryCommitment() is not properly implemented; it
+// TODO(https://fxbug.dev/42142233): vkGetDeviceMemoryCommitment() is not properly implemented; it
 // returns non-zero commitment even when `fx shell memgraph -v` shows that the corresponding VMO
 // has not committed memory.  Hence, this test is disabled.  Note that, even after 63696 is fixed,
 // this test is overly optimistic.  For example, Vulkan doens't *guarantee* that lazily-allocated

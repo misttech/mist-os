@@ -356,7 +356,7 @@ impl gesture_arena::Winner for DragWinner {
     fn process_new_event(self: Box<Self>, event: TouchpadEvent) -> ProcessNewEventResult {
         let num_pressed_buttons = event.pressed_buttons.len();
         match num_pressed_buttons {
-            // TODO(https://fxbug.dev/93688): may want to handle contact > 1 with different logic.
+            // TODO(https://fxbug.dev/42175500): may want to handle contact > 1 with different logic.
             // Motion in button up event is ignored.
             0 => ProcessNewEventResult::ContinueGesture(
                 Some(touchpad_event_to_mouse_up_event(&event)),

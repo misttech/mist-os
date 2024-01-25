@@ -1,6 +1,6 @@
 // Defines the names and types of vertex attributes attached to this program.
 
-// TODO(https://fxbug.dev/7244): Should split this into another CL atop the current one, but
+// TODO(https://fxbug.dev/42151901): Should split this into another CL atop the current one, but
 // I'm exhausted right now.
 #error NOT_IMPLEMENTED
 

@@ -122,7 +122,7 @@ impl InputDeviceRegistry {
         //   the value 0x00070065 sits between `NonUsBackslash` (0x00070064), and
         //   `KeypadEquals` (0x00070067). Such primitives are removed by `filter_map()`.
         //
-        // TODO(https://fxbug.dev/108531): Extend to include all values of the Key enum.
+        // TODO(https://fxbug.dev/42059900): Extend to include all values of the Key enum.
         let all_keys: Vec<Key> = (Key::A.into_primitive()
             ..=Key::MediaVolumeDecrement.into_primitive())
             .filter_map(Key::from_primitive)

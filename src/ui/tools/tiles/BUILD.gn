@@ -9,7 +9,7 @@ fuchsia_component("tiles-flatland") {
   deps = [ "flatland:bin" ]
 }
 
-# TODO(https://fxbug.dev/107904) delete once tiles-session in use everywhere
+# TODO(https://fxbug.dev/42059305) delete once tiles-session in use everywhere
 fuchsia_package("tiles") {
   deps = [ ":tiles-flatland" ]
 }

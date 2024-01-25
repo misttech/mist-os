@@ -15,7 +15,7 @@ int main(int argc, const char* argv[], char* envp[]) {
   // NOTE: Currently `ffx session add` doesn't support argument passing for .cm.
   // Until its supported, you'll have to change the arg in the .cml file.
   //
-  // TODO(https://fxbug.dev/96004): Update instruction once `ffx session add` supports argument passing.
+  // TODO(https://fxbug.dev/42178074): Update instruction once `ffx session add` supports argument passing.
   if (argc == 2) {
     if (!strcmp(argv[1], "--png")) {
       type = sysmem_example::RenderType::PNG;

@@ -181,13 +181,13 @@ void FlatlandManager::CreateFlatlandDisplay(
   FX_DCHECK(flatland_instances_.find(id) == flatland_instances_.end());
   FX_DCHECK(flatland_display_instances_.find(id) == flatland_display_instances_.end());
 
-  // TODO(https://fxbug.dev/76985): someday there will be a DisplayToken or something for the client
+  // TODO(https://fxbug.dev/42156949): someday there will be a DisplayToken or something for the client
   // to identify which hardware display this FlatlandDisplay is associated with.  For now:
   // hard-coded.
   auto hw_display = primary_display_;
 
   if (hw_display->is_claimed()) {
-    // TODO(https://fxbug.dev/76640): error reporting direct to client somehow?
+    // TODO(https://fxbug.dev/42156567): error reporting direct to client somehow?
     FX_LOGS(ERROR) << "Display id=" << hw_display->display_id().value
                    << " is already claimed, cannot instantiate FlatlandDisplay.";
     return;
@@ -243,7 +243,7 @@ void FlatlandManager::UpdateInstances(
     FX_DCHECK((flatland_instances_.find(session_id) != flatland_instances_.end()) ||
               (flatland_display_instances_.find(session_id) != flatland_display_instances_.end()));
 
-    // TODO(https://fxbug.dev/76640): we currently only keep track of present tokens for Flatland
+    // TODO(https://fxbug.dev/42156567): we currently only keep track of present tokens for Flatland
     // sessions, not FlatlandDisplay sessions.  It's not clear what we could do with them for
     // FlatlandDisplay: there is no API that would allow sending them to the client.  Maybe the
     // current approach is OK?  Maybe we should DCHECK that |present_credits_returned| is only

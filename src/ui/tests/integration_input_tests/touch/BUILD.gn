@@ -77,7 +77,7 @@ fuchsia_test_package("touch-input-test") {
   ]
   test_specs = {
     log_settings = {
-      # TODO(https://fxbug.dev/93081): Investigate flakes and remove allowing ERROR severity.
+      # TODO(https://fxbug.dev/42174827): Investigate flakes and remove allowing ERROR severity.
       max_severity = "ERROR"
     }
     environments = [
@@ -128,7 +128,7 @@ fuchsia_test_package("pointerinjector-config-test") {
   deps = [ "//src/ui/tests/integration_input_tests/touch/touch-flatland-client:component" ]
   test_specs = {
     log_settings = {
-      # TODO(https://fxbug.dev/93081): Investigate flakes and remove allowing ERROR severity.
+      # TODO(https://fxbug.dev/42174827): Investigate flakes and remove allowing ERROR severity.
       max_severity = "ERROR"
     }
     environments = [
@@ -149,9 +149,9 @@ group("tests") {
     ":touch-input-test",
 
     # The deps below are necessary on minimal product configs.
-    # TODO(https://fxbug.dev/119212): These should be provided by the Product
+    # TODO(https://fxbug.dev/42070261): These should be provided by the Product
     # configurations on which these tests run rather than as deps.
-    # TODO(https://fxbug.dev/119212): Should these be deps of the individual test
+    # TODO(https://fxbug.dev/42070261): Should these be deps of the individual test
     # targets above?
     "///src/graphics/display/testing/fake-coordinator-connector",
     "//src/cobalt/bin/testing/mock_cobalt",

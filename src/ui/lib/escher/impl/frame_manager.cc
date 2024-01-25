@@ -12,10 +12,10 @@ namespace impl {
 
 FrameManager::FrameManager(EscherWeakPtr escher)
     : ResourceManager(escher),
-      // TODO(https://fxbug.dev/7194): the intention here was to use UniformBufferPool's
+      // TODO(https://fxbug.dev/42151346): the intention here was to use UniformBufferPool's
       // recently-added ring-based recycling to manage resource reclamation.
       // However, this would conflict with upcoming GpuUploader changes; see
-      // https://fxbug.dev/24059.
+      // https://fxbug.dev/42098213.
       // For now, clients must use an approach like ModelDisplayListBuilder's,
       // which takes additional steps to retain uniform buffers to prevent them
       // from being returned to the pool too early, resulting in the current

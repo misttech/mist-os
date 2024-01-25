@@ -7,7 +7,7 @@
 
 #include <array>
 
-// TODO(https://fxbug.dev/7238): move EnumCast and EnumCount into this file, and update clients.
+// TODO(https://fxbug.dev/42151834): move EnumCast and EnumCount into this file, and update clients.
 #include "src/ui/lib/escher/util/enum_cast.h"
 #include "src/ui/lib/escher/util/enum_count.h"
 

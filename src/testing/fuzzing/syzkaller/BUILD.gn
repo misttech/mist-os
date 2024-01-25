@@ -125,7 +125,7 @@ if (is_host) {
     name = "github.com/google/syzkaller/..."
     source_dir = syzkaller_dir
     if (source_dir != _default_syzkaller_dir) {
-      # TODO(https://fxbug.dev/80334): Figure out a way to support building
+      # TODO(https://fxbug.dev/42160667): Figure out a way to support building
       # syzkaller-go without globbing.
       allow_globbing = true
     } else {

@@ -47,7 +47,7 @@ class PaperShapeCache {
   static MeshSpec kShadowVolumeMeshSpec() {
     return {{MeshAttribute::kPosition2D, MeshAttribute::kUV, MeshAttribute::kBlendWeight1}};
   }
-  // TODO(https://fxbug.dev/44898): use constexpr instead, when vulkan.hpp is new enough.
+  // TODO(https://fxbug.dev/42121362): use constexpr instead, when vulkan.hpp is new enough.
   // static constexpr MeshSpec kStandardMeshSpec{{MeshAttribute::kPosition2D, MeshAttribute::kUV}};
   // static constexpr MeshSpec kShadowVolumeMeshSpec{
   //     {MeshAttribute::kPosition2D, MeshAttribute::kUV, MeshAttribute::kBlendWeight1}};

@@ -36,10 +36,10 @@ class MouseSourceBase {
  protected:
   void WatchBase(fit::function<void(std::vector<fuchsia::ui::pointer::MouseEvent>)> callback);
 
-  // TODO(https://fxbug.dev/70182): Add clean up methods for when streams end or devices go away. When we
+  // TODO(https://fxbug.dev/42149398): Add clean up methods for when streams end or devices go away. When we
   // know exactly what that will look like.
 
-  // TODO(https://fxbug.dev/78951): Implement ANR.
+  // TODO(https://fxbug.dev/42159133): Implement ANR.
 
  private:
   void SendPendingIfWaiting();

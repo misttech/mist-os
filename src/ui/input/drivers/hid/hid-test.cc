@@ -131,7 +131,7 @@ class HidDeviceTest : public zxtest::Test {
  public:
   HidDeviceTest() = default;
   void SetUp() override {
-    // TODO(https://fxbug.dev/124464): Migrate test to use dispatcher integration.
+    // TODO(https://fxbug.dev/42075363): Migrate test to use dispatcher integration.
     fake_root_ = MockDevice::FakeRootParent();
     client_ = ddk::HidbusProtocolClient(fake_hidbus_.GetProto());
     device_ = new HidDevice(fake_root_.get());

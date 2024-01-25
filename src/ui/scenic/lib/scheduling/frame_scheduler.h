@@ -28,10 +28,10 @@ struct FuturePresentationInfo {
 using SessionsWithFailedUpdates = std::unordered_set<SessionId>;
 
 // The timestamp data that is expected to be delivered after rendering and presenting a frame.
-// TODO(https://fxbug.dev/24669): If there are multiple render passes, |render_done_time| is the time
+// TODO(https://fxbug.dev/42098890): If there are multiple render passes, |render_done_time| is the time
 // furthest forward in time. Solving 24669 may involve expanding this struct to support multiple
 // passes in data.
-// TODO(https://fxbug.dev/70283): when there are multiple displays, there is no single "actual
+// TODO(https://fxbug.dev/42149510): when there are multiple displays, there is no single "actual
 // presentation time" that the FrameRenderer can return.
 struct Timestamps {
   zx::time render_done_time;
@@ -82,7 +82,7 @@ class FrameScheduler {
 
   // Clients cannot call Present() anymore when |presents_in_flight_| reaches this value. Scenic
   // uses this to apply backpressure to clients.
-  // TODO(https://fxbug.dev/44211): Move into implementation.
+  // TODO(https://fxbug.dev/42120601): Move into implementation.
   static constexpr int64_t kMaxPresentsInFlight = 5;
 };
 

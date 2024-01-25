@@ -70,7 +70,7 @@ pub struct PartialPackageDefinition {
     pub cvfs: HashMap<String, Vec<u8>>,
 }
 
-// TODO(https://fxbug.dev/134100): Use cm_rust type or ComponentDecl type.
+// TODO(https://fxbug.dev/42083956): Use cm_rust type or ComponentDecl type.
 #[allow(dead_code)]
 #[cfg_attr(test, derive(Clone))]
 pub enum ComponentManifest {

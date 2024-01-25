@@ -6,7 +6,7 @@ import("//build/bazel/bazel_inputs.gni")
 import("//build/components.gni")
 import("//build/rust/rustc_binary.gni")
 
-# TODO(https://fxbug.dev/88656): add some tests.  Add these to //src/session/examples:tests
+# TODO(https://fxbug.dev/42169911): add some tests.  Add these to //src/session/examples:tests
 # group("tests") {}
 
 rustc_binary("bin") {
@@ -68,7 +68,7 @@ fuchsia_package("tiles-session") {
 
 # Make `tiles_session` available to products assembled with Bazel.
 #
-# TODO(https://fxbug.dev/122492): Make this less verbose.
+# TODO(https://fxbug.dev/42073448): Make this less verbose.
 fuchsia_package_archive("tiles_session_archive") {
   package = ":tiles-session"
 }
