@@ -19,7 +19,7 @@ pub struct PeerWatcher {
 }
 
 impl PeerWatcher {
-    // TODO(https://fxbug.dev/46830) - We need to define and determine sensible pagination. There's a maximum
+    // TODO(https://fxbug.dev/42123509) - We need to define and determine sensible pagination. There's a maximum
     // channel message size (currently 64kb) on Fuchsia; we need to fit our response within that.
     // Currently we don't have maximum vector sizes on the fields within the `Peer` table (nor on
     // the response to this message), which makes it hard to measure accurately and usefully.

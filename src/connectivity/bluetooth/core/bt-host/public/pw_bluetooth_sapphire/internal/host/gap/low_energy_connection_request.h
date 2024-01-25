@@ -17,7 +17,7 @@
 namespace bt::gap {
 
 // Connection options for a LowEnergyConnectionRequest.
-// TODO(https://fxbug.dev/66696): Move back into LowEnergyConnectionManager
+// TODO(https://fxbug.dev/42145531): Move back into LowEnergyConnectionManager
 // after dependency removed from LowEnergyConnection.
 struct LowEnergyConnectionOptions {
   // The sm::BondableMode to connect with.

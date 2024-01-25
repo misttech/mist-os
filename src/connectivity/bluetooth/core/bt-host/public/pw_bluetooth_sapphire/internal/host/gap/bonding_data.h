@@ -20,7 +20,7 @@ struct BondingData {
   DeviceAddress address;
   std::optional<std::string> name;
 
-  // TODO(https://fxbug.dev/2761): This should be optional to represent whether
+  // TODO(https://fxbug.dev/42102158): This should be optional to represent whether
   // the FIDL bonding data has LE data, instead of using DeviceAddresss's type()
   sm::PairingData le_pairing_data;
   std::optional<sm::LTK> bredr_link_key;

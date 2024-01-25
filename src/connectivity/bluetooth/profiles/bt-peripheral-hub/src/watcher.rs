@@ -26,7 +26,7 @@ impl Watcher {
     fn handle_watcher_request(&mut self, watch: WatcherRequest) -> Result<(), Error> {
         debug!("Received Watcher::Watch request: {:?}", watch);
         // There is only one method in the `power.Watcher` protocol.
-        // TODO(https://fxbug.dev/86556): Filter responses by `_ids`.
+        // TODO(https://fxbug.dev/42167579): Filter responses by `_ids`.
         let (_ids, responder) = watch.into_watch().expect("Watcher::Watch request");
         self.subscriber.register(responder)?;
         Ok(())

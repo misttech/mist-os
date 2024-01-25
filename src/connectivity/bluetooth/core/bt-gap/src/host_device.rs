@@ -36,7 +36,7 @@ impl Drop for HostDiscoverySession {
         trace!("HostDiscoverySession ended");
         if let Some(host) = self.host.upgrade() {
             if let Err(err) = host.proxy.stop_discovery() {
-                // TODO(https://fxbug.dev/45325) - we should close the host channel if an error is returned
+                // TODO(https://fxbug.dev/42121837) - we should close the host channel if an error is returned
                 warn!("Unexpected error response when stopping discovery: {:?}", err);
             }
         }
@@ -57,7 +57,7 @@ impl Drop for HostDiscoverableSession {
             let await_response = host.proxy.set_discoverable(false);
             fasync::Task::spawn(async move {
                 if let Err(err) = await_response.await {
-                    // TODO(https://fxbug.dev/45325) - we should close the host channel if an error is returned
+                    // TODO(https://fxbug.dev/42121837) - we should close the host channel if an error is returned
                     warn!("Unexpected error response when disabling discoverable: {:?}", err);
                 }
             })
@@ -79,13 +79,13 @@ pub struct HostDeviceState {
 /// path, the host address and the host id.
 #[derive(Clone, Debug)]
 pub struct HostDebugIdentifiers {
-    // TODO(https://fxbug.dev/84729)
+    // TODO(https://fxbug.dev/42165549)
     #[allow(unused)]
     id: HostId,
-    // TODO(https://fxbug.dev/84729)
+    // TODO(https://fxbug.dev/42165549)
     #[allow(unused)]
     address: Address,
-    // TODO(https://fxbug.dev/84729)
+    // TODO(https://fxbug.dev/42165549)
     #[allow(unused)]
     path: String,
 }
@@ -179,7 +179,7 @@ impl HostDevice {
         &self,
         bonds: Vec<BondingData>,
     ) -> impl Future<Output = types::Result<Vec<sys::BondingData>>> {
-        // TODO(https://fxbug.dev/80564): Due to the maximum message size, the RestoreBonds call has an
+        // TODO(https://fxbug.dev/42160922): Due to the maximum message size, the RestoreBonds call has an
         // upper limit on the number of bonds that may be restored at once. However, this limit is
         // based on the complexity of fields packed into sys::BondingData, which can be measured
         // dynamically with measure-tape as the vector is built. Maximizing the number of bonds per

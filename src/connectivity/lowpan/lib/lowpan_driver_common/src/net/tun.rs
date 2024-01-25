@@ -36,7 +36,7 @@ pub struct TunNetworkInterface {
     tun_dev: ftun::DeviceProxy,
     tun_port: ftun::PortProxy,
     #[allow(unused)]
-    // TODO(https://fxbug.dev/64704): use `control` after converting methods to async.
+    // TODO(https://fxbug.dev/42143339): use `control` after converting methods to async.
     control: fnetifext::admin::Control,
     control_sync: Mutex<fnetifadmin::ControlSynchronousProxy>,
     stack_sync: Mutex<fnetstack::StackSynchronousProxy>,

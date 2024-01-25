@@ -43,7 +43,7 @@ impl LoggingFixture for ChanFixture {
     }
 }
 
-#[ignore = "TODO(https://fxbug.dev/103932): deflake and enable"]
+#[ignore = "TODO(https://fxbug.dev/42055033): deflake and enable"]
 #[fuchsia::test]
 async fn fidl_channel_tests_no_transfer(run: usize) {
     let node_id_gen = NodeIdGenerator::new("fidl_channel_tests_no_transfer", run);
@@ -55,7 +55,7 @@ async fn fidl_channel_tests_no_transfer(run: usize) {
     channel::run(fixture).await
 }
 
-#[ignore = "TODO(https://fxbug.dev/103932): deflake and enable"]
+#[ignore = "TODO(https://fxbug.dev/42055033): deflake and enable"]
 #[fuchsia::test]
 async fn fidl_channel_tests_all_to_b(run: usize) {
     let node_id_gen = NodeIdGenerator::new("fidl_channel_tests_all_to_b", run);
@@ -63,7 +63,7 @@ async fn fidl_channel_tests_all_to_b(run: usize) {
     channel::run(fixture).await
 }
 
-#[ignore = "TODO(https://fxbug.dev/103932): deflake and enable"]
+#[ignore = "TODO(https://fxbug.dev/42055033): deflake and enable"]
 #[fuchsia::test]
 async fn fidl_channel_tests_b_then_c(run: usize) {
     let node_id_gen = NodeIdGenerator::new("fidl_channel_tests_b_then_c", run);

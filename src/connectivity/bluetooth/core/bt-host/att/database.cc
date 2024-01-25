@@ -312,7 +312,7 @@ void Database::ExecuteWriteQueue(PeerId peer_id,
       break;
     }
 
-    // TODO(https://fxbug.dev/97458): Consider removing the boolean return value
+    // TODO(https://fxbug.dev/42179688): Consider removing the boolean return value
     // in favor of always reporting errors using the callback. That would
     // simplify the pattern here.
     if (!attr->WriteAsync(

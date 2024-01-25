@@ -284,7 +284,7 @@ TEST_F(PlatformAuthDelegateTest, CASEAuth_EncodeNodeCertInfoInvalidCert) {
             WEAVE_ERROR_INVALID_ARGUMENT);
   EXPECT_EQ(writer.Finalize(), WEAVE_NO_ERROR);
 
-  // TODO(https://fxbug.dev/51891): Test when manufacturer certificate does not exist. This
+  // TODO(https://fxbug.dev/42129132): Test when manufacturer certificate does not exist. This
   // requires initializing ConfigurationMgr from this test, or removing the lazy
   // init from the factory certificate read operation.
 
@@ -590,6 +590,6 @@ TEST_F(PlatformAuthDelegateTest, KeyExport_HandleCertValidationResult) {
   *valid_ctx.SigningCert = valid_signing_cert;
 }
 
-// TODO(https://fxbug.dev/51892): Add tests for intermediate CA certs.
+// TODO(https://fxbug.dev/42129133): Add tests for intermediate CA certs.
 
 }  // namespace weave::adaptation::testing

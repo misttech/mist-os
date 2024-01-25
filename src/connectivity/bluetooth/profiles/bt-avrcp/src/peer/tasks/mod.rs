@@ -39,7 +39,7 @@ use crate::types::PeerError as Error;
 async fn get_available_players(
     peer: Arc<RwLock<RemotePeer>>,
 ) -> Result<Vec<MediaPlayerItem>, Error> {
-    // TODO(https://fxbug.dev/130791): get all the available players instead of just 10.
+    // TODO(https://fxbug.dev/42081024): get all the available players instead of just 10.
     let command = GetFolderItemsCommand::new_media_player_list(0, 9);
     let mut payload = vec![0; command.encoded_len()];
     let _ = command.encode(&mut payload[..])?;
@@ -67,7 +67,7 @@ async fn get_available_players(
     }
 }
 
-// TODO(https://fxbug.dev/105464): consider calling this function on available players
+// TODO(https://fxbug.dev/42056696): consider calling this function on available players
 // changed notification event instead of on browse connection setup completion.
 async fn set_browsed_player(peer: Arc<RwLock<RemotePeer>>) -> Result<(), Error> {
     if peer.read().target_descriptor.is_none() {
@@ -261,7 +261,7 @@ fn handle_notification(
 
 /// Attempt an outgoing L2CAP connection to remote's AVRCP control channel.
 /// The control channel should be in `Connecting` state before spawning this task.
-/// TODO(https://fxbug.dev/85761): Refactor logic into RemotePeer to avoid multiple lock accesses.
+/// TODO(https://fxbug.dev/42166696): Refactor logic into RemotePeer to avoid multiple lock accesses.
 async fn make_connection(peer: Arc<RwLock<RemotePeer>>, conn_type: AVCTPConnectionType) {
     let random_delay: zx::Duration = zx::Duration::from_nanos(
         rand::thread_rng()

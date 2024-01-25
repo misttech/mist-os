@@ -1074,7 +1074,7 @@ void FakeController::OnWriteSecureConnectionsHostSupport(
 }
 
 void FakeController::OnReset() {
-  // TODO(https://fxbug.dev/78955): actually do some resetting of stuff here
+  // TODO(https://fxbug.dev/42159137): actually do some resetting of stuff here
   RespondWithCommandComplete(hci_spec::kReset,
                              pw::bluetooth::emboss::StatusCode::SUCCESS);
 }
@@ -1470,7 +1470,7 @@ void FakeController::OnReadBRADDR() {
 
 void FakeController::OnLESetAdvertisingEnable(
     const pw::bluetooth::emboss::LESetAdvertisingEnableCommandView& params) {
-  // TODO(https://fxbug.dev/81444): if own address type is random, check that a
+  // TODO(https://fxbug.dev/42161900): if own address type is random, check that a
   // random address is set
 
   legacy_advertising_state_.enabled =
@@ -2282,7 +2282,7 @@ void FakeController::OnLESetExtendedAdvertisingParameters(
     return;
   }
 
-  // TODO(https://fxbug.dev/80049): Core spec Volume 4, Part E, Section 7.8.53:
+  // TODO(https://fxbug.dev/42160350): Core spec Volume 4, Part E, Section 7.8.53:
   // if legacy advertising PDUs are being used, the Primary_Advertising_PHY
   // shall indicate the LE 1M PHY.
   if (params.primary_advertising_phy().Read() !=
@@ -2614,7 +2614,7 @@ void FakeController::OnLESetExtendedAdvertisingEnable(
       return;
     }
 
-    // TODO(https://fxbug.dev/81444): if own address type is random, check that
+    // TODO(https://fxbug.dev/42161900): if own address type is random, check that
     // a random address is set
     state.enabled = true;
   }
@@ -2628,7 +2628,7 @@ void FakeController::OnLEReadMaximumAdvertisingDataLength() {
   hci_spec::LEReadMaxAdvertisingDataLengthReturnParams params;
   params.status = pw::bluetooth::emboss::StatusCode::SUCCESS;
 
-  // TODO(https://fxbug.dev/77476): Extended advertising supports sending larger
+  // TODO(https://fxbug.dev/42157495): Extended advertising supports sending larger
   // amounts of data, but they have to be fragmented across multiple commands to
   // the controller. This is not yet supported in this implementation. We should
   // support larger than kMaxLEExtendedAdvertisingDataLength advertising data
@@ -3501,7 +3501,7 @@ void FakeController::HandleReceivedCommandPacket(
     return;
   }
 
-  // TODO(https://fxbug.dev/937): Validate size of payload to be the correct
+  // TODO(https://fxbug.dev/42175513): Validate size of payload to be the correct
   // length below.
   switch (opcode) {
     case hci_spec::kReadLocalVersionInfo: {

@@ -1,5 +1,5 @@
 # Comments are ignored
-# TODO(https://fxbug.dev/61617) Move these to real tests
+# TODO(https://fxbug.dev/42139923) Move these to real tests
 
 # Execute command with no arguments
 command { ATTESTEX }

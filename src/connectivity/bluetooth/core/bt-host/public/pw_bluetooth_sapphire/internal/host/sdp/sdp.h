@@ -253,7 +253,7 @@ constexpr AttributeId kBluetoothProfileDescriptorList = 0x0009;
 //     - 8 LSbits minor version
 using BluetoothProfileDescriptorListValueType = std::vector<DataElement>;
 
-// TODO(https://fxbug.dev/128186): Documentation URL, ClientExecutableURL,
+// TODO(https://fxbug.dev/42078669): Documentation URL, ClientExecutableURL,
 // IconURL When we support the URL type.
 
 // ##### Language Attribute Offsets #####

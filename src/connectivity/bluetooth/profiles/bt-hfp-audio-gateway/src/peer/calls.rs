@@ -98,7 +98,7 @@ impl CallEntry {
         }
     }
 
-    // TODO(https://fxbug.dev/64550): Remove when call requests are initiated
+    // TODO(https://fxbug.dev/42143169): Remove when call requests are initiated
     #[allow(unused)]
     pub fn is_active(&self) -> bool {
         self.state == CallState::OngoingActive
@@ -145,7 +145,7 @@ fn call_state_to_request(
 /// A stream of updates to the state of calls. Each update contains the `Number` and the
 /// `CallState`. When the channel for a given call is closed, an epitaph is returned with the
 /// `Number`.
-/// The `Number` uniquely identifies a call. TODO(https://fxbug.dev/64558): Handle multi-party calls.
+/// The `Number` uniquely identifies a call. TODO(https://fxbug.dev/42143177): Handle multi-party calls.
 type CallStateUpdates = StreamMap<
     CallIdx,
     StreamWithEpitaph<Tagged<CallIdx, HangingGetStream<CallProxy, CallState>>, CallIdx>,
@@ -621,7 +621,7 @@ impl Calls {
     }
 
     /// Compute the call indicators to send after changes to calls have been polled and the call state updated.
-    /// TODO(https://fxbug.dev/96764) Move this to call_changes.
+    /// TODO(https://fxbug.dev/42178917) Move this to call_changes.
     fn call_indicators_updates(
         &mut self,
         call_was_active: bool,
@@ -1052,7 +1052,7 @@ mod tests {
 
     /// Poll the calls  driving async execution, until there are no more updates and and we receive
     /// Pending.  Returns the most recent indicators if any were sent.
-    // TODO(https://fxbug.dev/129297): fix this to do what it actually says is does or rework tests.
+    // TODO(https://fxbug.dev/42079711): fix this to do what it actually says is does or rework tests.
     #[track_caller]
     fn poll_calls_until_pending(exec: &mut fasync::TestExecutor, calls: &mut Calls) {
         match exec.run_until_stalled(&mut calls.next()) {
@@ -1144,7 +1144,7 @@ mod tests {
 
     #[fuchsia::test]
     #[ignore]
-    // TODO(https://fxbug.dev/129297) Fix this test
+    // TODO(https://fxbug.dev/42079711) Fix this test
     fn calls_swap_produce_indicators() {
         let mut exec = fasync::TestExecutor::new();
 
@@ -1224,7 +1224,7 @@ mod tests {
 
     #[fuchsia::test]
     #[ignore]
-    // TODO(https://fxbug.dev/129297) Fix this test
+    // TODO(https://fxbug.dev/42079711) Fix this test
     fn calls_stream_lifecycle() {
         // Test the Stream for items when a single call is tracked, then a second call is added,
         // when the states of those calls are modified, and finally, when both calls have been

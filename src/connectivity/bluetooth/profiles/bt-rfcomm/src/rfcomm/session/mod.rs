@@ -97,7 +97,7 @@ impl OutstandingFrames {
             if self.commands.contains_key(&frame.dlci) {
                 // There can only be one outstanding command frame with P/F = 1 per
                 // DLCI.
-                // TODO(https://fxbug.dev/60900): Our implementation should never try to send
+                // TODO(https://fxbug.dev/42139132): Our implementation should never try to send
                 // more than one command frame on the same DLCI. However, it may make
                 // sense to make this more intelligent and queue for later.
                 return Err(Error::Other(format_err!("Command Frame outstanding")));
@@ -493,7 +493,7 @@ impl SessionInner {
                     // We're currently negotiating the multiplexer role. We should send a DM, and
                     // attempt to restart the multiplexer after a random interval. See RFCOMM 5.2.1
                     self.send_dm_response(dlci).await
-                    // TODO(https://fxbug.dev/61852): We can improve this by restarting the multiplexer.
+                    // TODO(https://fxbug.dev/42140184): We can improve this by restarting the multiplexer.
                 }
                 _role => {
                     // Remote device incorrectly trying to start up the multiplexer when it has

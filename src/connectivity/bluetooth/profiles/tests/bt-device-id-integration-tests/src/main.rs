@@ -139,7 +139,7 @@ async fn piconet_member_discovers_di_component_advertisement() {
     // We do expect the (optional) documentation attribute.
     assert_eq!(attributes.iter().filter(|a| a.id == 0x000A).count(), 1);
 
-    // TODO(https://fxbug.dev/88050): Add a service description and verify the attribute once the MPS
+    // TODO(https://fxbug.dev/42169240): Add a service description and verify the attribute once the MPS
     // supports parsing the `information` field of a bredr.ServiceDefinition.
 
     // DI client is done - DI component should process request and resolve it.

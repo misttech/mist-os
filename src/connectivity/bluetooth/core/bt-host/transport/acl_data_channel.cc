@@ -488,7 +488,7 @@ AclDataChannelImpl::NumberOfCompletedPacketsCallback(const EventPacket& event) {
     uint16_t comp_packets = le16toh(data->hc_num_of_completed_packets);
 
     if (iter->second.count < comp_packets) {
-      // TODO(https://fxbug.dev/2795): This can be caused by the controller
+      // TODO(https://fxbug.dev/42102535): This can be caused by the controller
       // reusing the connection handle of a connection that just disconnected.
       // We should somehow avoid sending the controller packets for a connection
       // that has disconnected. AclDataChannel already dequeues such packets,
@@ -564,7 +564,7 @@ void AclDataChannelImpl::OnRxPacket(pw::span<const std::byte> buffer) {
   BT_ASSERT(rx_callback_);
 
   if (buffer.size() < sizeof(hci_spec::ACLDataHeader)) {
-    // TODO(https://fxbug.dev/97362): Handle these types of errors by signaling
+    // TODO(https://fxbug.dev/42179582): Handle these types of errors by signaling
     // Transport.
     bt_log(ERROR,
            "hci",
@@ -583,7 +583,7 @@ void AclDataChannelImpl::OnRxPacket(pw::span<const std::byte> buffer) {
   packet->InitializeFromBuffer();
 
   if (packet->view().header().data_total_length != payload_size) {
-    // TODO(https://fxbug.dev/97362): Handle these types of errors by signaling
+    // TODO(https://fxbug.dev/42179582): Handle these types of errors by signaling
     // Transport.
     bt_log(ERROR,
            "hci",

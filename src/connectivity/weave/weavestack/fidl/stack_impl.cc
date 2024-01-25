@@ -213,8 +213,8 @@ void StackImpl::HandleWeaveDeviceEvent(const WeaveDeviceEvent* event) {
         // for updates to their service directory entries.
         NotifySvcDirectory();
       }
-      // TODO(https://fxbug.dev/52935): Add event for Thread provisioning.
-      // TODO(https://fxbug.dev/52936): Add event for WiFi provisioning.
+      // TODO(https://fxbug.dev/42130292): Add event for Thread provisioning.
+      // TODO(https://fxbug.dev/42130293): Add event for WiFi provisioning.
       __FALLTHROUGH;
     case kFabricMembershipChange:
     case kServiceProvisioningChange:

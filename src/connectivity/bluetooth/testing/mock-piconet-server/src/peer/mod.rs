@@ -55,7 +55,7 @@ pub struct MockPeer {
 
 impl MockPeer {
     pub fn new(id: PeerId, observer: Option<bredr::PeerObserverProxy>) -> Self {
-        // TODO(https://fxbug.dev/55462): If provided, take event stream of `observer` and listen for close.
+        // TODO(https://fxbug.dev/42133093): If provided, take event stream of `observer` and listen for close.
         Self {
             id,
             observer,

@@ -493,7 +493,7 @@ impl Ip for Ipv4 {
     const VERSION: IpVersion = IpVersion::V4;
     const VERSION_MARKER: IpVersionMarker<Self> = IpVersionMarker::new();
 
-    // TODO(https://fxbug.dev/83331): Document the standard in which this
+    // TODO(https://fxbug.dev/42163997): Document the standard in which this
     // constant is defined.
     const UNSPECIFIED_ADDRESS: Ipv4Addr = Ipv4Addr::new([0, 0, 0, 0]);
     /// The default IPv4 address used for loopback, defined in [RFC 5735 Section
@@ -4558,7 +4558,7 @@ mod macro_test {
         trait IpExtensionTraitWithVeryLongName {}
         trait OtherIpExtensionTraitWithVeryLongName {}
         trait LongNameToForceFormatterToBreakLineAndAddTrailingComma {}
-        // Regression test for https://fxbug.dev/129815
+        // Regression test for https://fxbug.dev/42080215
         #[allow(dead_code)]
         #[derive(GenericOverIp)]
         #[generic_over_ip(I, Ip)]

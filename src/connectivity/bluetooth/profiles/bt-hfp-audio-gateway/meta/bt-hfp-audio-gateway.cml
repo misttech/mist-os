@@ -57,11 +57,11 @@
         reject_incoming_voice_call: { type: "bool" },
 
         // Three way calling support
-        // TODO(https://fxbug.dev/74091): limited support for three-way calls implemented
+        // TODO(https://fxbug.dev/42153736): limited support for three-way calls implemented
         three_way_calling: { type: "bool" },
 
         // In band ringtone support
-        // TODO(https://fxbug.dev/75538): in-band ringtone is not supported yet, setting to true will have no
+        // TODO(https://fxbug.dev/42155342): in-band ringtone is not supported yet, setting to true will have no
         // effect yet.
         in_band_ringtone: { type: "bool" },
 
@@ -72,7 +72,7 @@
 
         // Voice Recognition
         // If set to true, the headset will be able to activate voice recognition actions
-        // TODO(https://fxbug.dev/66016): unimplememented. setting this to true will be ignored
+        // TODO(https://fxbug.dev/42144778): unimplememented. setting this to true will be ignored
         voice_recognition: { type: "bool" },
 
         // Attach Phone Number to Voice Tag
@@ -82,7 +82,7 @@
         // Respond and hold support
         // Signals to the handsfree that you can put an ongoing call on hold to respond to an incoming
         // call.
-        // TODO(https://fxbug.dev/74091): not implemented yet. ignored if true
+        // TODO(https://fxbug.dev/42153736): not implemented yet. ignored if true
         respond_and_hold: { type: "bool" },
 
         // Enhanced Call Controls
@@ -91,7 +91,7 @@
 
         // Enhanced Voice Recognition
         // See HFP Spec v1.8 Sec 4.25
-        // TODO(https://fxbug.dev/66016): unimplemented, ignored for now
+        // TODO(https://fxbug.dev/42144778): unimplemented, ignored for now
         enhanced_voice_recognition: { type: "bool" },
 
         // Wide Band Speech
@@ -102,7 +102,7 @@
         // Provides textual versions of the voice responses, to be displayed on a visual screen for
         // example.
         // See HFP Spec v1.8 Sec 4.26
-        // TODO(https://fxbug.dev/66016): unimplemented, ignored for now
+        // TODO(https://fxbug.dev/42144778): unimplemented, ignored for now
         enhanced_voice_recognition_with_text: { type: "bool" },
 
         // Whether the controller on this product supports encoding in each of these codecs.

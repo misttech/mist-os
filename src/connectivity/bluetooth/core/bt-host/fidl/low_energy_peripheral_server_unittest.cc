@@ -523,7 +523,7 @@ TEST_F(LowEnergyPeripheralServerTest, RestartStartAdvertisingDuringInboundConnKe
       [&](fit::closure trigger) { complete_start_advertising = std::move(trigger); });
 
   // Restart advertising during inbound connection, simulating the race seen in
-  // https://fxbug.dev/72825.
+  // https://fxbug.dev/42152329.
   result = std::nullopt;
   server()->StartAdvertising(fble::AdvertisingParameters{}, second_token.NewRequest(),
                              [&](auto cb_result) { result = std::move(cb_result); });
@@ -592,7 +592,7 @@ TEST_F(LowEnergyPeripheralServerTest, RestartAdvertiseDuringInboundConnKeepsNewA
       [&](fit::closure trigger) { complete_start_advertising = std::move(trigger); });
 
   // Restart advertising during inbound connection, simulating the race seen in
-  // https://fxbug.dev/72825.
+  // https://fxbug.dev/42152329.
   fble::AdvertisedPeripheralHandle adv_peripheral_handle_1;
   FakeAdvertisedPeripheral adv_peripheral_server_1(adv_peripheral_handle_1.NewRequest());
   bool server_1_closed = false;

@@ -239,7 +239,7 @@ impl Future for Task {
         let inner = &Pin::into_inner(self).inner;
         loop {
             let mut all_pending = true;
-            // TODO(https://fxbug.dev/78342): poll once for all completed
+            // TODO(https://fxbug.dev/42158458): poll once for all completed
             // descriptors if this becomes a performance bottleneck.
             while inner.poll_complete_tx(cx)?.is_ready_checked::<()>() {
                 all_pending = false;
@@ -542,7 +542,7 @@ impl<K: AllocKind> Pending<K> {
             return Poll::Pending;
         }
 
-        // TODO(https://fxbug.dev/32098): We're assuming that writing to the
+        // TODO(https://fxbug.dev/42107145): We're assuming that writing to the
         // FIFO here is a sufficient memory barrier for the other end to access
         // the data. That is currently true but not really guaranteed by the
         // API.
@@ -799,7 +799,7 @@ mod tests {
         which_fifo: TxOrRx,
         right_to_remove: fuchsia_zircon::Rights,
     ) {
-        // This is a regression test for https://fxbug.dev/121478. The flake
+        // This is a regression test for https://fxbug.dev/42072513. The flake
         // that caused that bug occurred because the Zircon channel was closed
         // but the error returned by a failed attempt to write to it wasn't
         // being propagated upwards. This test produces a similar situation by

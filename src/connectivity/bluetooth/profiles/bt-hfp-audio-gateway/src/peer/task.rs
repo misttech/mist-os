@@ -474,7 +474,7 @@ impl PeerTask {
                     // Drop existing SCO connection.
                     self.sco_state.iset(ScoState::SettingUp);
                 }
-                // TODO(https://fxbug.dev/72681): Because we may need to send an OK response to the HF
+                // TODO(https://fxbug.dev/42152169): Because we may need to send an OK response to the HF
                 // just before setting up the synchronous connection, we send it here by routing
                 // through the procedure.
                 self.connection.receive_ag_request(marker, AgUpdate::Ok).await;
@@ -583,7 +583,7 @@ impl PeerTask {
                 update = self.calls.select_next_some() => {
                     drop(sco_state);
                     info!(peer = %self.id, ?update, "Handling call");
-                    // TODO(https://fxbug.dev/75538): for in-band ring  setup audio if should_ring is true
+                    // TODO(https://fxbug.dev/42155342): for in-band ring  setup audio if should_ring is true
                     self.ringer.ring(self.calls.should_ring());
                     if update.callwaiting {
                         if let Some(call) = self.calls.waiting() {
@@ -764,7 +764,7 @@ impl PeerTask {
             let codec_id = self.codec_for_parameter_set(&sco_connection.params.parameter_set);
             if let Err(e) = audio.start(self.id.clone(), sco_connection, codec_id) {
                 // Cancel the SCO connection, we can't send audio.
-                // TODO(https://fxbug.dev/79784): this probably means we should just cancel out of HFP and
+                // TODO(https://fxbug.dev/42160054): this probably means we should just cancel out of HFP and
                 // this peer's connection entirely.
                 warn!(%peer_id, ?e, "Couldn't start Audio - dropping audio connection");
                 return Err(Error::system(format!("Couldn't start audio"), e));
@@ -2034,7 +2034,7 @@ mod tests {
 
         // Drop the peer task sender and run PeerTask's run future until it stalls.
         drop(sender);
-        // TODO(https://fxbug.dev/130591): This future should complete but doesn't seem to.
+        // TODO(https://fxbug.dev/42080880): This future should complete but doesn't seem to.
         let _ = exec.run_until_stalled(&mut run_fut);
     }
 

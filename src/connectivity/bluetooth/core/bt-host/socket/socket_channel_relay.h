@@ -157,7 +157,7 @@ class SocketChannelRelay final {
   // SDU). This comes, however, at the cost of higher memory usage when the
   // number of SDUs is small. (libc++ uses a minimum of 4KB per deque.)
   //
-  // TODO(https://fxbug.dev/709): We should set an upper bound on the size of this queue.
+  // TODO(https://fxbug.dev/42150194): We should set an upper bound on the size of this queue.
   std::deque<ByteBufferPtr> socket_write_queue_;
 
   // Read buffer. This must be larger than the max_tx_sdu_size so that we can detect truncated
@@ -341,7 +341,7 @@ void SocketChannelRelay<ChannelT>::OnChannelDataReceived(ByteBufferPtr rx_data) 
   // as voice calls. In the future, we may want to make the drop-head vs.
   // drop-tail choice configurable.
   if (socket_write_queue_.size() == socket_write_queue_max_frames_) {
-    // TODO(https://fxbug.dev/1325): Add a metric for number of dropped frames.
+    // TODO(https://fxbug.dev/42082614): Add a metric for number of dropped frames.
     socket_write_queue_.pop_front();
     // Cancel the threshold wait, as the packet it corresponds to has been dropped.
     // ServiceSocketWriteQueue() will start a new wait if necessary.
@@ -382,7 +382,7 @@ bool SocketChannelRelay<ChannelT>::CopyFromSocketToChannel() {
   if (channel_->max_tx_sdu_size() > read_buf_.size()) {
     read_buf_ = DynamicByteBuffer(channel_->max_tx_sdu_size() + 1);
   }
-  // TODO(https://fxbug.dev/735): Consider yielding occasionally. As-is, we run the risk of
+  // TODO(https://fxbug.dev/42153078): Consider yielding occasionally. As-is, we run the risk of
   // starving other SocketChannelRelays on the same |dispatcher| (and anyone
   // else on |dispatcher|), if a misbehaving process spams its zx::socket. And
   // even if starvation isn't an issue, latency/jitter might be.
@@ -413,7 +413,7 @@ bool SocketChannelRelay<ChannelT>::CopyFromSocketToChannel() {
       return false;
     }
 
-    // TODO(https://fxbug.dev/734): For low latency and low jitter, IWBN to avoid allocating
+    // TODO(https://fxbug.dev/42152967): For low latency and low jitter, IWBN to avoid allocating
     // dynamic memory on every read.
     bool write_success =
         channel_->Send(std::make_unique<DynamicByteBuffer>(read_buf_.view(0, n_bytes_read)));
@@ -429,7 +429,7 @@ bool SocketChannelRelay<ChannelT>::CopyFromSocketToChannel() {
 
 template <typename ChannelT>
 void SocketChannelRelay<ChannelT>::ServiceSocketWriteQueue() {
-  // TODO(https://fxbug.dev/708): Similarly to CopyFromSocketToChannel(), we may want to
+  // TODO(https://fxbug.dev/42150083): Similarly to CopyFromSocketToChannel(), we may want to
   // consider yielding occasionally. The data-rate from the Channel into the
   // socket write queue should be bounded by PHY layer data rates, which are
   // much lower than the CPU's data processing throughput, so starvation

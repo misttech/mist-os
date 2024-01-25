@@ -159,7 +159,7 @@ void DynamicChannelRegistry::ActivateChannel(DynamicChannel* channel,
             channel->remote_cid(),
             channel->psm());
 
-        // TODO(https://fxbug.dev/1059): Maybe negotiate channel parameters
+        // TODO(https://fxbug.dev/42057179): Maybe negotiate channel parameters
         // here? For now, just disconnect the channel. Move the callback to the
         // stack to prepare for channel destruction.
         auto pass_failure = [open_cb = std::move(open_cb), pass_failed] {

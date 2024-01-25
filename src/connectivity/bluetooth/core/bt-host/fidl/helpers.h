@@ -40,7 +40,7 @@ class DiscoveryFilter;
 
 namespace bthost::fidl_helpers {
 
-// TODO(https://fxbug.dev/898): Temporary logic for converting between the stack identifier
+// TODO(https://fxbug.dev/42171179): Temporary logic for converting between the stack identifier
 // type (integer) and FIDL identifier type (string). Remove these once all FIDL
 // interfaces have been converted to use integer IDs.
 std::optional<bt::PeerId> PeerIdFromString(const std::string& id);
@@ -174,7 +174,7 @@ fuchsia::bluetooth::le::Peer PeerToFidlLe(const bt::gap::Peer& peer);
 // Functions that convert FIDL GATT types to library objects.
 bt::gatt::ReliableMode ReliableModeFromFidl(
     const fuchsia::bluetooth::gatt::WriteOptions& write_options);
-// TODO(https://fxbug.dev/63438): The 64 bit `fidl_gatt_id` can overflow the 16 bits of a
+// TODO(https://fxbug.dev/42141942): The 64 bit `fidl_gatt_id` can overflow the 16 bits of a
 // bt:att::Handle that underlies Characteristic/DescriptorHandles when directly casted. Fix this.
 bt::gatt::CharacteristicHandle CharacteristicHandleFromFidl(uint64_t fidl_gatt_id);
 bt::gatt::DescriptorHandle DescriptorHandleFromFidl(uint64_t fidl_gatt_id);

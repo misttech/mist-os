@@ -151,7 +151,7 @@ Fuchsia emulator (FEMU) using the same commands as above. See the
 
 #### Integration Tests
 
-`TODO(https://fxbug.dev/96421): Updated Integration Documentation`
+`TODO(https://fxbug.dev/42178537): Updated Integration Documentation`
 
 ### Controlling Log Verbosity
 
@@ -205,7 +205,7 @@ documentation includes an example of the expected inspect tree.
 See the [ffx documentation](/docs/reference/tools/sdk/ffx) for complete instructions
 on using `inspect`.
 
-`TODO(https://fxbug.dev/54127): Find a better link for ffx inspect usage`
+`TODO(https://fxbug.dev/42131615): Find a better link for ffx inspect usage`
 
 ### Respectful Code
 

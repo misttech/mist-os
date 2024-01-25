@@ -44,7 +44,7 @@ const UNSPECIFIED_V6: fidl_fuchsia_net::Subnet = fidl_subnet!("::0/0");
 const GSTATIC: &'static str = "www.gstatic.com";
 // Gstatic has a TTL of 300 seconds, therefore, we will perform a lookup every
 // 300 seconds since we won't get any better indication of DNS function.
-// TODO(https://fxbug.dev/121010): Dynamically query TTL based on the domain's DNS record
+// TODO(https://fxbug.dev/42072067): Dynamically query TTL based on the domain's DNS record
 const DNS_PROBE_PERIOD: zx::Duration = zx::Duration::from_seconds(300);
 
 // Timeout ID for the fake clock component that restrains the integration tests from reaching the
@@ -586,7 +586,7 @@ struct NetworkCheckContext {
     gateway_pingable: bool,
     // Context that persists between check cycles
     persistent_context: PersistentNetworkCheckContext,
-    // TODO(https://fxbug.dev/123591): Add tombstone marker to inform NetworkCheck that the interface has
+    // TODO(https://fxbug.dev/42074525): Add tombstone marker to inform NetworkCheck that the interface has
     // been removed and we no longer need to run checks on this interface. This can occur when
     // receiving an interface remote event, but a network check for that interface is still in
     // progress.
@@ -932,7 +932,7 @@ impl NetworkChecker for Monitor {
             return self.update_state_from_context(id, name);
         }
 
-        // TODO(https://fxbug.dev/74517) Check if packet count has increased, and if so upgrade the
+        // TODO(https://fxbug.dev/42154208) Check if packet count has increased, and if so upgrade the
         // state to LinkLayerUp.
         let device_routes: Vec<_> = routes.device_routes(id).collect();
 
@@ -1016,7 +1016,7 @@ impl NetworkChecker for Monitor {
                 // Setup to ping internet addresses, skipping over gateway pings.
                 // Internet can be pinged when either an online router is discovered or the gateway
                 // is pingable. In this case, the discovery of a router enables the internet ping.
-                // TODO(https://fxbug.dev/124034): Create an occurrence metric for this case
+                // TODO(https://fxbug.dev/42074958): Create an occurrence metric for this case
                 ctx.initiate_ping(
                     id,
                     name,

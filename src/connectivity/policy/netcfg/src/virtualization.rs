@@ -28,7 +28,7 @@ use crate::{
 /// Network identifier.
 #[derive(Debug, Clone)]
 pub(super) enum NetworkId {
-    // TODO(https://fxbug.dev/86068): Implement isolation between bridged
+    // TODO(https://fxbug.dev/42167037): Implement isolation between bridged
     // networks and change this to represent more than a single bridged
     // network.
     /// The unique bridged network consisting of an upstream-providing
@@ -56,7 +56,7 @@ pub(super) enum Event {
 
 pub(super) type EventStream = Pin<Box<dyn futures::stream::Stream<Item = Event>>>;
 
-// TODO(https://fxbug.dev/88017): `guests` must always be non-empty. Explore using a non-empty set
+// TODO(https://fxbug.dev/42169203): `guests` must always be non-empty. Explore using a non-empty set
 // type to encode this invariant in the type system.
 enum BridgeState {
     Init,
@@ -115,7 +115,7 @@ fn take_any<T: std::marker::Copy + std::cmp::Eq + std::hash::Hash>(
 
 pub(super) struct Virtualization<'a, B: BridgeHandler> {
     installer: fnet_interfaces_admin::InstallerProxy,
-    // TODO(https://fxbug.dev/101224): Use this field as the allowed upstream
+    // TODO(https://fxbug.dev/42052026): Use this field as the allowed upstream
     // device classes when NAT is supported.
     _allowed_upstream_device_classes: &'a HashSet<DeviceClass>,
     bridge: Bridge<B>,
@@ -151,7 +151,7 @@ impl<'a, B: BridgeHandler> Virtualization<'a, B> {
                 fnet_virtualization::NetworkRequest::AddPort { port, interface, control_handle: _ },
                 mut network_close_rx,
             ) => {
-                // TODO(https://fxbug.dev/87111): send a terminal event on the channel if
+                // TODO(https://fxbug.dev/42168197): send a terminal event on the channel if
                 // the device could not be added to the network due to incompatibility; for
                 // example, if the network is bridged and the device does not support the
                 // same L2 protocol as other devices on the bridge.

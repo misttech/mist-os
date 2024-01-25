@@ -11,7 +11,7 @@ use std::{
     sync::{Arc, Weak},
 };
 
-// TODO(https://fxbug.dev/74427): This would be so so much easier with Arc::new_cyclic.
+// TODO(https://fxbug.dev/42154109): This would be so so much easier with Arc::new_cyclic.
 
 /// A weak reference to an entry in a DetachableMap. This is a weak reference, if the entry is
 /// detached before it is upgraded, the entry can be gone.

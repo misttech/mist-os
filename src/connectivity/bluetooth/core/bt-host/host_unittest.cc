@@ -69,7 +69,7 @@ class HostTest : public TestingBase {
   fbl::RefPtr<Host> host_;
 
   // The channels that are provided to the device on initialization.
-  // TODO(https://fxbug.dev/90952): Optionally wire these up to a TestController or MockController.
+  // TODO(https://fxbug.dev/42172461): Optionally wire these up to a TestController or MockController.
   std::optional<zx_handle_t> cmd_channel_;
   std::optional<zx_handle_t> acl_channel_;
   std::optional<zx_handle_t> snoop_channel_;

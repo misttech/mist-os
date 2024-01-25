@@ -423,7 +423,7 @@ zx_status_t BtTransportUart::HciOpenChannel(zx::channel* in_channel, zx_handle_t
     wait = &sco_channel_wait_;
   } else if (in_channel == &snoop_channel_) {
     zxlogf(DEBUG, "opening snoop channel");
-    // TODO(https://fxbug.dev/91348): Handle snoop channel closed signal.
+    // TODO(https://fxbug.dev/42172901): Handle snoop channel closed signal.
     return ZX_OK;
   }
   ZX_ASSERT(wait);

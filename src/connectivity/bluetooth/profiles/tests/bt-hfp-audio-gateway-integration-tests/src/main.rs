@@ -393,7 +393,7 @@ async fn send_command_and_expect_response(
     expect_data(channel, expected).await;
 }
 
-// TODO(https://fxbug.dev/71668) Stop using raw bytes.
+// TODO(https://fxbug.dev/42151045) Stop using raw bytes.
 const CIND_TEST_RESPONSE_BYTES: &[u8] = b"+CIND: \
 (\"service\",(0,1)),\
 (\"call\",(0,1)),\

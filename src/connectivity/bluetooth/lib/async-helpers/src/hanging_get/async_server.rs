@@ -269,7 +269,7 @@ where
 
 /// *Deprecated*: New code should use [`async_utils::hanging_get::server::HangingGet`].
 ///
-/// TODO(<https://fxbug.dev/104570>): Remove this struct.
+/// TODO(<https://fxbug.dev/42055741>): Remove this struct.
 ///
 /// A `HangingGet` object manages some internal state `S` and notifies observers of type `O`
 /// when their view of the state is outdated.

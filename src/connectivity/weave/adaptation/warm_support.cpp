@@ -246,7 +246,7 @@ std::string_view AddressAssignmentStateToString(
 // circumvents the strong ownership model of the `fuchsia.net.interfaces.api`.
 // This pattern is discouraged, but approved for this use case in Weavestack,
 // see (https://bugs.fuchsia.dev/p/fuchsia/issues/detail?id=92768#c6).
-// TODO(https://fxbug.dev/111695) Delete the usage of the root API once an
+// TODO(https://fxbug.dev/42062982) Delete the usage of the root API once an
 // alternative API is available.
 std::optional<fidl::SyncClient<fuchsia_net_interfaces_admin::Control>> GetInterfaceControlViaRoot(
     uint64_t interface_id) {
@@ -633,7 +633,7 @@ PlatformResult AddRemoveRouteInternal(InterfaceType interface_type, const Inet::
   // be added and removed over time, so do not thrash the forwarding state
   // during these transitions.
   //
-  // TODO(https://fxbug.dev/78254): Enabling V6 forwarding should ideally happen
+  // TODO(https://fxbug.dev/42158360): Enabling V6 forwarding should ideally happen
   // elsewhere, as this function's contract does not make any specific mention about
   // forwarding. However, implementations must enable forwarding when border routing
   // is enabled, signaled by ThreadThreadRouteAction and ThreadThreadPriorityAction
@@ -641,7 +641,7 @@ PlatformResult AddRemoveRouteInternal(InterfaceType interface_type, const Inet::
   // now. Long term, this bug tracks proposing upstream changes that would create a
   // targeted action to enable forwarding / border-routing to clarify this contract.
   if (add && ShouldEnableV6Forwarding(interface_type)) {
-    // TODO(https://fxbug.dev/94540): Migrate to
+    // TODO(https://fxbug.dev/42176447): Migrate to
     // fuchsia.net.interfaces.admin/Control.SetConfiguration.
     fuchsia::net::stack::Stack_SetInterfaceIpForwardingDeprecated_Result forwarding_result;
     if (zx_status_t status = net_stack_sync_ptr->SetInterfaceIpForwardingDeprecated(

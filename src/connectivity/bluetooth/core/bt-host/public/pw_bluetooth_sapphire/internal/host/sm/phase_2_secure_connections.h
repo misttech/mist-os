@@ -76,7 +76,7 @@ class Phase2SecureConnections final : public PairingPhase,
   // After exchanging ECDH Public Keys, the devices perform one of four possible
   // authentication protocols to prove who they are to each other in Stage 1.
   // (SMP Section 2.3.5.6.2-3).
-  // TODO(https://fxbug.dev/601): Implement Stage 1 OOB pairing (SMP
+  // TODO(https://fxbug.dev/42138242): Implement Stage 1 OOB pairing (SMP
   // Section 2.3.6.5.4).
   void StartAuthenticationStage1();
   void OnAuthenticationStage1Complete(

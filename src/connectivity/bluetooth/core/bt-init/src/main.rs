@@ -27,10 +27,10 @@ const BT_FASTPAIR_PROVIDER_CHILD_NAME: &str = "bt-fastpair-provider";
 
 const BT_HOST_COLLECTION: &str = "bt-host-collection";
 const BT_HOST: &str = "bt-host";
-// TODO(https://fxbug.dev/135650): Eventually change to fuchsia-pkg://fuchsia.com/bt-host#meta/bt-host.cm
+// TODO(https://fxbug.dev/42085245): Eventually change to fuchsia-pkg://fuchsia.com/bt-host#meta/bt-host.cm
 const BT_HOST_URL: &str = "fuchsia-pkg://fuchsia.com/bt-host-component#meta/bt-host.cm";
 
-// TODO(https://fxbug.dev/135650): Remove flag once bt-host is successfully migrated to component
+// TODO(https://fxbug.dev/42085245): Remove flag once bt-host is successfully migrated to component
 const IS_BT_HOST_COMPONENT: bool = false;
 
 #[async_trait]
@@ -56,7 +56,7 @@ impl ComponentClientAdapter for ComponentClient {
 /// Open the directory of the child which will underlie any services. The specified child is the
 /// preferred service provider if present, but if unavailable, fall back to `bt-gap`.
 //
-// TODO(https://fxbug.dev/71315): A single child instance won't function correctly in the presence
+// TODO(https://fxbug.dev/42150654): A single child instance won't function correctly in the presence
 // of multiple bt-host devices during its lifetime. When handling this is a priority, we will
 // likely need to either launch an instance of the child per-bt-host (e.g. inside bt-gap), or
 // modify the child component to accommodate this issue.

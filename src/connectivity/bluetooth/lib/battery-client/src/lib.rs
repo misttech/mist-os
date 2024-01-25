@@ -185,7 +185,7 @@ impl BatteryClient {
         debug!("Received battery update from system: {:?}", info);
         responder.send()?;
 
-        // TODO(https://fxbug.dev/89894): Invalid upstream information likely indicates a bug or a mismatch
+        // TODO(https://fxbug.dev/42171284): Invalid upstream information likely indicates a bug or a mismatch
         // between this library and the battery manager. Close the watcher channel and attempt to
         // re-register for updates.
         let converted_result: Result<BatteryInfo, BatteryClientError> = info.try_into();

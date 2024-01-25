@@ -491,7 +491,7 @@ async fn main() -> Result<(), anyhow::Error> {
     Ok(())
 }
 
-// TODO(https://fxbug.dev/55461): Add unit tests for the `TestProfileSeverInner`.
+// TODO(https://fxbug.dev/42133092): Add unit tests for the `TestProfileSeverInner`.
 #[cfg(test)]
 mod tests {
     use super::*;

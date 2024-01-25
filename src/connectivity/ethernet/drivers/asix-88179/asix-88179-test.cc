@@ -207,7 +207,7 @@ TEST_F(UsbAx88179Test, DISABLED_SetOnlineAfterStart) {
   ASSERT_NO_FATAL_FAILURE(WaitDeviceOnline());
 }
 
-// This is for https://fxbug.dev/40786#c41.
+// This is for https://fxbug.dev/42116796#c41.
 // TODO(b/316176095): Re-enable test after ensuring it works with DFv2.
 TEST_F(UsbAx88179Test, DISABLED_SetOnlineBeforeStart) {
   ASSERT_NO_FATAL_FAILURE(ConnectNetdeviceClient());

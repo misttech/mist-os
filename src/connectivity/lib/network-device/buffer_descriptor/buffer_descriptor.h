@@ -92,7 +92,7 @@ typedef struct buffer_descriptor {
 } buffer_descriptor_t;
 
 // Notify humans to update Rust bindings because there's no bindgen automation.
-// TODO(https://fxbug.dev/73858): Remove lint when no longer necessary.
+// TODO(https://fxbug.dev/42153476): Remove lint when no longer necessary.
 // LINT.ThenChange(/src/connectivity/lib/network-device/rust/src/session/buffer/sys.rs)
 
 #endif  // SRC_CONNECTIVITY_LIB_NETWORK_DEVICE_BUFFER_DESCRIPTOR_BUFFER_DESCRIPTOR_H_

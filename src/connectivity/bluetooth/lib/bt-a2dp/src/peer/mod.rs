@@ -808,7 +808,7 @@ impl PeerInner {
 
         info!(%peer_id, ?stream, "Starting");
         let stream_finished = stream.start().map_err(|c| avdtp::Error::RequestInvalid(c))?;
-        // TODO(https://fxbug.dev/68238): if streaming stops unexpectedly, send a suspend to match to peer
+        // TODO(https://fxbug.dev/42147239): if streaming stops unexpectedly, send a suspend to match to peer
         let watched_stream = WatchedStream::new(permit, stream_finished);
         if self.started.insert(local_id.clone(), watched_stream).is_some() {
             warn!(%peer_id, %local_id, "Stream that was already started");

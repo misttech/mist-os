@@ -619,7 +619,7 @@ impl<B: ByteSlice> Ipv6Packet<B> {
             }
         }
 
-        // TODO(https://fxbug.dev/92381): Add support for fragmented packets
+        // TODO(https://fxbug.dev/42174049): Add support for fragmented packets
         // forwarding.
         if self.fragment_header_present() {
             return Nat64TranslationResult::Err(Nat64Error::NotImplemented);
@@ -644,7 +644,7 @@ impl<B: ByteSlice> Ipv6Packet<B> {
             //        otherwise, it is set to one."
             builder.df_flag(self.body().len() + IPV4_HEADER_LEN_BYTES > 1260);
 
-            // TODO(https://fxbug.dev/92381): This needs an update once
+            // TODO(https://fxbug.dev/42174049): This needs an update once
             // we don't return early for fragment_header_present case.
             builder.fragment_offset(0);
             builder.mf_flag(false);
@@ -656,7 +656,7 @@ impl<B: ByteSlice> Ipv6Packet<B> {
             Ipv6Proto::Proto(IpProto::Tcp) => {
                 let v4_pkt_builder = v4_builder(Ipv4Proto::Proto(IpProto::Tcp));
                 let args = TcpParseArgs::new(self.src_ip(), self.dst_ip());
-                // TODO(https://fxbug.dev/92701): We're doing roughly similar work
+                // TODO(https://fxbug.dev/42174405): We're doing roughly similar work
                 // in valid/invalid parsing case. Remove match statement and
                 // update the checksum in place without needing to parse the TCP
                 // segment once we have ability to update the checksum.
@@ -689,7 +689,7 @@ impl<B: ByteSlice> Ipv6Packet<B> {
                 }
             }
 
-            // TODO(https://fxbug.dev/92701): We're doing roughly similar work
+            // TODO(https://fxbug.dev/42174405): We're doing roughly similar work
             // in valid/invalid parsing case. Remove match statement and
             // update the checksum in place without needing to parse the UDP segment
             // once we have ability to update checksum.
@@ -726,7 +726,7 @@ impl<B: ByteSlice> Ipv6Packet<B> {
                 }
             }
 
-            // TODO(https://fxbug.dev/92383): Implement ICMP packet translation
+            // TODO(https://fxbug.dev/42174051): Implement ICMP packet translation
             // support here.
             Ipv6Proto::Icmpv6 => Nat64TranslationResult::Err(Nat64Error::NotImplemented),
 

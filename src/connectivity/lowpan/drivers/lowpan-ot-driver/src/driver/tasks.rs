@@ -143,7 +143,7 @@ where
 
         // SCAN WATCHDOG. Scans are somewhat blocking operations---the device cannot
         // actively participate on the network while one is in progress. Occasionally
-        // we can run into bugs like <https://fxbug.dev/106509>, where the scan never finishes.
+        // we can run into bugs like <https://fxbug.dev/42057827>, where the scan never finishes.
         // Because there is no way to cancel an ongoing scan in OpenThread, the only
         // way to get ourselves out of this state is to reset OpenThread. And that's
         // what the `scan_watchdog`, defined below, is supposed to do. It monitors

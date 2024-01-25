@@ -124,7 +124,7 @@ class Gvnic : public DeviceType,
   __WARN_UNUSED_RESULT zx_status_t StartRXThread();
   int RXThread();
 
-  // TODO(https://fxbug.dev/107757): Find a clever way to get zerocopy rx and tx working, and then
+  // TODO(https://fxbug.dev/42059141): Find a clever way to get zerocopy rx and tx working, and then
   // delete both of these methods.
   void WritePacketToBufferSpace(const rx_space_buffer_t& buffer, uint8_t* data, uint32_t len);
   void WriteBufferToCard(const tx_buffer_t& buffer, uint8_t* data);
@@ -198,7 +198,7 @@ class Gvnic : public DeviceType,
   ddk::NetworkDeviceIfcProtocolClient ifc_ __TA_GUARDED(ifc_lock_);
   mac_addr_protocol_t mac_addr_proto_;
 
-  // TODO(https://fxbug.dev/107757): Consider replacing with VmoStore when zerocopy is implemented.
+  // TODO(https://fxbug.dev/42059141): Consider replacing with VmoStore when zerocopy is implemented.
   network::SharedLock vmo_lock_;
   std::unordered_map<uint32_t, zx::vmo> vmo_map_ __TA_GUARDED(vmo_lock_);
 

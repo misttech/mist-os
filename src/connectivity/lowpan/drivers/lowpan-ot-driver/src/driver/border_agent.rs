@@ -173,9 +173,9 @@ fn publish_border_agent_service(
                 "publish_border_agent_service: publication: {:?}", &publication
             );
 
-            // Due to https://fxbug.dev/99755, the publication responder channel will close
+            // Due to https://fxbug.dev/42182233, the publication responder channel will close
             // if the publisher that created it is closed.
-            // TODO(https://fxbug.dev/99755): Remove this line once https://fxbug.dev/99755 is fixed.
+            // TODO(https://fxbug.dev/99755): Remove this line once https://fxbug.dev/42182233 is fixed.
             let _ = publisher.clone();
 
             let result = if subtype.is_some() {

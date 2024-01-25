@@ -167,7 +167,7 @@ impl PairingDispatcher {
                         );
                         if let Err(e) = downstream.send(accept, passkey) {
                             warn!("Error replying to pairing request from bt-host: {}", e);
-                            // TODO(https://fxbug.dev/45325) - when errors occur communicating with a downstream
+                            // TODO(https://fxbug.dev/42121837) - when errors occur communicating with a downstream
                             // host, we should unregister and remove that host
                         }
                         false
@@ -196,7 +196,7 @@ impl PairingDispatcher {
             },
             event = self.upstream_events.next() => {
                 match event {
-                     // TODO(https://fxbug.dev/76133): Handle OnLocalKeypress event.
+                     // TODO(https://fxbug.dev/42156004): Handle OnLocalKeypress event.
                      Some(Ok(PairingDelegateEvent::OnLocalKeypress {id: _, keypress: _})) => {
                          warn!("Ignoring pairing delegate local keypress (unimplemented)");
                          false
@@ -233,7 +233,7 @@ impl PairingDispatcher {
                         warn!("PairingRequest received with invalid Peer: {:?}", e);
                         if let Err(e) = responder.send(false, 0) {
                             warn!("Error communicating with downstream bt-host {}: {:?}", host, e);
-                            // TODO(https://fxbug.dev/45325) - when errors occur communicating with a downstream
+                            // TODO(https://fxbug.dev/42121837) - when errors occur communicating with a downstream
                             // host, we should unregister and remove that host
                         }
                     }

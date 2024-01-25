@@ -24,7 +24,7 @@ using EventFixedSizedPacket =
     allocators::internal::FixedSizePacket<hci_spec::EventHeader,
                                           allocators::kLargeControlPacketSize>;
 
-// TODO(https://fxbug.dev/106841): Use Pigweed's slab allocator
+// TODO(https://fxbug.dev/42058160): Use Pigweed's slab allocator
 std::unique_ptr<CommandPacket> NewCommandPacket(size_t payload_size) {
   BT_DEBUG_ASSERT(payload_size <= allocators::kLargeControlPayloadSize);
 
@@ -127,7 +127,7 @@ void CommandPacket::WriteHeader(hci_spec::OpCode opcode) {
 
 // static
 std::unique_ptr<EventPacket> EventPacket::New(size_t payload_size) {
-  // TODO(https://fxbug.dev/106841): Use Pigweed's slab allocator
+  // TODO(https://fxbug.dev/42058160): Use Pigweed's slab allocator
   return std::make_unique<EventFixedSizedPacket>(payload_size);
 }
 

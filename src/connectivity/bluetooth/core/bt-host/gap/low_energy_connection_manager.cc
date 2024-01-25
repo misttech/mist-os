@@ -185,16 +185,16 @@ void LowEnergyConnectionManager::Connect(
           "%s)",
           bt_str(peer_id));
     }
-    // TODO(https://fxbug.dev/65592): Merge connection_options with the options
+    // TODO(https://fxbug.dev/42144310): Merge connection_options with the options
     // of the pending request.
     pending_iter->second.AddCallback(std::move(callback));
-    // TODO(https://fxbug.dev/69621): Try to create this connection.
+    // TODO(https://fxbug.dev/42148775): Try to create this connection.
     return;
   }
 
   // Add callback to connecting request if |peer_id| matches.
   if (current_request_ && current_request_->request.peer_id() == peer_id) {
-    // TODO(https://fxbug.dev/65592): Merge connection_options with the options
+    // TODO(https://fxbug.dev/42144310): Merge connection_options with the options
     // of the current request.
     current_request_->request.AddCallback(std::move(callback));
     return;
@@ -202,7 +202,7 @@ void LowEnergyConnectionManager::Connect(
 
   auto conn_iter = connections_.find(peer_id);
   if (conn_iter != connections_.end()) {
-    // TODO(https://fxbug.dev/65592): Handle connection_options that conflict
+    // TODO(https://fxbug.dev/42144310): Handle connection_options that conflict
     // with the existing connection.
     callback(fit::ok(conn_iter->second->AddRef()));
     return;
@@ -380,7 +380,7 @@ void LowEnergyConnectionManager::RegisterRemoteInitiatedLink(
          bt_str(link->local_address()),
          bt_str(*link));
 
-  // TODO(https://fxbug.dev/653): Use own address when storing the connection.
+  // TODO(https://fxbug.dev/42143994): Use own address when storing the connection.
   // Currently this will refuse the connection and disconnect the link if |peer|
   // is already connected to us by a different local address.
   if (connections_.find(peer_id) != connections_.end()) {
@@ -434,7 +434,7 @@ void LowEnergyConnectionManager::RegisterRemoteInitiatedLink(
 
 void LowEnergyConnectionManager::SetPairingDelegate(
     const PairingDelegate::WeakPtr& delegate) {
-  // TODO(armansito): Add a test case for this once https://fxbug.dev/886 is
+  // TODO(armansito): Add a test case for this once https://fxbug.dev/42169848 is
   // done.
   pairing_delegate_ = delegate;
 
@@ -528,7 +528,7 @@ void LowEnergyConnectionManager::TryCreateNextConnection() {
            "deferring connection attempt (peer: %s)",
            bt_str(peer_id));
 
-    // TODO(https://fxbug.dev/908): For now the requests for this peer won't
+    // TODO(https://fxbug.dev/42172291): For now the requests for this peer won't
     // complete until the next peer discovery. This will no longer be an issue
     // when we use background scanning.
   }
@@ -632,7 +632,7 @@ bool LowEnergyConnectionManager::InitializeConnection(
 
   auto peer_id = connection->peer_id();
 
-  // TODO(https://fxbug.dev/653): For now reject having more than one link with
+  // TODO(https://fxbug.dev/42143994): For now reject having more than one link with
   // the same peer. This should change once this has more context on the local
   // destination for remote initiated connections.
   if (connections_.find(peer_id) != connections_.end()) {

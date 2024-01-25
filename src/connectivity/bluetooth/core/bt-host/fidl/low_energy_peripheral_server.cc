@@ -207,7 +207,7 @@ void LowEnergyPeripheralServer::Advertise(
     return;
   }
 
-  // TODO(https://fxbug.dev/76557): As a temporary hack until multiple advertisements is supported,
+  // TODO(https://fxbug.dev/42156474): As a temporary hack until multiple advertisements is supported,
   // don't allow more than one advertisement. The current behavior of hci::LegacyLowEnergyAdvertiser
   // is to replace the current advertisement, which is not the intended behavior of `Advertise`.
   // NOTE: This is insufficient  when there are multiple Peripheral clients advertising, but that is
@@ -401,7 +401,7 @@ void LowEnergyPeripheralServer::StartAdvertisingInternal(
   // Per the API contract of `AdvertisingParameters` FIDL, if `connection_options` is present or
   // the deprecated `connectable` parameter is true, advertisements will be connectable.
   // `connectable_parameter` was the predecessor of `connection_options` and
-  // TODO(https://fxbug.dev/44749): will be removed once all consumers of it have migrated to
+  // TODO(https://fxbug.dev/42121197): will be removed once all consumers of it have migrated to
   // `connection_options`.
   bool connectable = parameters.has_connection_options() ||
                      (parameters.has_connectable() && parameters.connectable());

@@ -222,7 +222,7 @@ class NetworkDeviceInterface {
   uint32_t rx_depth_;
   std::optional<size_t> mtu_;
 
-  // TODO(https://fxbug.dev/114107): remove this hand-rolled implementation (adapted
+  // TODO(https://fxbug.dev/42065375): remove this hand-rolled implementation (adapted
   // from //zircon/system/ulib/async-loop/testing/real_loop.cc) once `loop_fixture::RealLoop`
   // supports configuration.
   void RunLoopUntil(fit::function<bool()> condition) {
@@ -377,7 +377,7 @@ TEST_F(UsbCdcEcmTest, DISABLED_TransmitReceive) {
     // at a distance here, but basically we don't want to send more than the
     // actual underlying device's depth, which makes the transfer racy/fallible.
     //
-    // TODO(https://fxbug.dev/116278): Improve this when we add a signal that we
+    // TODO(https://fxbug.dev/42067498): Improve this when we add a signal that we
     // can observe for buffer readiness.
     return std::min(sender.tx_depth(), receiver.rx_depth() / 2);
   };

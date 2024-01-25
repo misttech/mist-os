@@ -141,7 +141,7 @@ void CommandChannel::SendCommandSync(const ::bt::PacketView<::bt::hci_spec::Comm
   // Wait up to 500ms for a response.
   timeout.set(zx::deadline_after(zx::msec(500)), zx::msec(50));
   for (;;) {
-    // TODO(https://fxbug.dev/1077): Don't use the message loop modally.
+    // TODO(https://fxbug.dev/42059077): Don't use the message loop modally.
     async_loop_run(async_loop_from_dispatcher(async_get_default_dispatcher()),
                    zx_deadline_after(ZX_MSEC(10)), true);
     if (received) {

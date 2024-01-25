@@ -225,7 +225,7 @@ impl TryFrom<u16> for OptionCode {
 /// options can be found [here][options].
 ///
 /// [options]: https://www.iana.org/assignments/dhcpv6-parameters/dhcpv6-parameters.xhtml#dhcpv6-parameters-2
-// TODO(https://fxbug.dev/75612): replace `ParsedDhcpOption` and `DhcpOption` with a single type.
+// TODO(https://fxbug.dev/42155425): replace `ParsedDhcpOption` and `DhcpOption` with a single type.
 #[allow(missing_docs)]
 #[derive(Debug, PartialEq)]
 pub enum ParsedDhcpOption<'a> {
@@ -234,15 +234,15 @@ pub enum ParsedDhcpOption<'a> {
     // https://tools.ietf.org/html/rfc8415#section-21.3
     ServerId(&'a Duid),
     // https://tools.ietf.org/html/rfc8415#section-21.4
-    // TODO(https://fxbug.dev/74340): add validation; not all option codes can
+    // TODO(https://fxbug.dev/42154013): add validation; not all option codes can
     // be present in an IA_NA option.
     Iana(IanaData<&'a [u8]>),
     // https://tools.ietf.org/html/rfc8415#section-21.6
-    // TODO(https://fxbug.dev/74340): add validation; not all option codes can
+    // TODO(https://fxbug.dev/42154013): add validation; not all option codes can
     // be present in an IA Address option.
     IaAddr(IaAddrData<&'a [u8]>),
     // https://tools.ietf.org/html/rfc8415#section-21.7
-    // TODO(https://fxbug.dev/74340): add validation; not all option codes can
+    // TODO(https://fxbug.dev/42154013): add validation; not all option codes can
     // be present in an ORO option.
     // See https://www.iana.org/assignments/dhcpv6-parameters/dhcpv6-parameters.xhtml#dhcpv6-parameters-2
     Oro(Vec<OptionCode>),
@@ -253,11 +253,11 @@ pub enum ParsedDhcpOption<'a> {
     // https://tools.ietf.org/html/rfc8415#section-21.13
     StatusCode(U16, &'a str),
     // https://tools.ietf.org/html/rfc8415#section-21.21
-    // TODO(https://fxbug.dev/74340): add validation; not all option codes can
+    // TODO(https://fxbug.dev/42154013): add validation; not all option codes can
     // be present in an IA_PD option.
     IaPd(IaPdData<&'a [u8]>),
     // ttps://tools.ietf.org/html/rfc8415#section-21.22
-    // TODO(https://fxbug.dev/74340): add validation; not all option codes can
+    // TODO(https://fxbug.dev/42154013): add validation; not all option codes can
     // be present in an IA Prefix option.
     IaPrefix(IaPrefixData<&'a [u8]>),
     // https://tools.ietf.org/html/rfc8415#section-21.23
@@ -710,7 +710,7 @@ impl<'a> RecordsImpl<'a> for ParsedDhcpOptionImpl {
 
         let opt_code = match OptionCode::try_from(opt_code.get()) {
             Ok(opt_code) => opt_code,
-            // TODO(https://fxbug.dev/57177): surface skipped codes so we know which ones are not
+            // TODO(https://fxbug.dev/42134994): surface skipped codes so we know which ones are not
             // supported.
             Err(ParseError::InvalidOpCode(_)) => {
                 // Skip unknown option codes to keep useful information.
@@ -837,7 +837,7 @@ pub fn duid_uuid() -> [u8; 18] {
 /// options can be found [here][options].
 ///
 /// [options]: https://www.iana.org/assignments/dhcpv6-parameters/dhcpv6-parameters.xhtml#dhcpv6-parameters-2
-// TODO(https://fxbug.dev/75612): replace `DhcpOption` and `ParsedDhcpOption` with a single type.
+// TODO(https://fxbug.dev/42155425): replace `DhcpOption` and `ParsedDhcpOption` with a single type.
 #[allow(missing_docs)]
 #[derive(Debug)]
 pub enum DhcpOption<'a> {
@@ -846,15 +846,15 @@ pub enum DhcpOption<'a> {
     // https://tools.ietf.org/html/rfc8415#section-21.3
     ServerId(&'a Duid),
     // https://tools.ietf.org/html/rfc8415#section-21.4
-    // TODO(https://fxbug.dev/74340): add validation; not all option codes can
+    // TODO(https://fxbug.dev/42154013): add validation; not all option codes can
     // be present in an IA_NA option.
     Iana(IanaSerializer<'a>),
     // https://tools.ietf.org/html/rfc8415#section-21.6
-    // TODO(https://fxbug.dev/74340): add validation; not all option codes can
+    // TODO(https://fxbug.dev/42154013): add validation; not all option codes can
     // be present in an IA Address option.
     IaAddr(IaAddrSerializer<'a>),
     // https://tools.ietf.org/html/rfc8415#section-21.7
-    // TODO(https://fxbug.dev/74340): add validation; not all option codes can
+    // TODO(https://fxbug.dev/42154013): add validation; not all option codes can
     // be present in an ORO option.
     // See https://www.iana.org/assignments/dhcpv6-parameters/dhcpv6-parameters.xhtml#dhcpv6-parameters-2
     Oro(&'a [OptionCode]),

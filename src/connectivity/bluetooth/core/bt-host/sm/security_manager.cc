@@ -895,7 +895,7 @@ void SecurityManagerImpl::OnPairingFailed(Error error) {
          bt_str(error),
          phase_status.c_str());
   StopTimer();
-  // TODO(https://fxbug.dev/910): implement "waiting interval" to prevent
+  // TODO(https://fxbug.dev/42172514): implement "waiting interval" to prevent
   // repeated attempts as described in Vol 3, Part H, 2.3.6.
 
   BT_ASSERT(delegate_.is_alive());

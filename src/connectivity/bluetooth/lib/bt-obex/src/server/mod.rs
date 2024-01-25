@@ -215,7 +215,7 @@ impl ObexServer {
         self.set_max_packet_size(peer_max_packet_size);
 
         let headers = HeaderSet::from(request);
-        // TODO(https://fxbug.dev/129950): Check `headers` for Target header. If present, generate a
+        // TODO(https://fxbug.dev/42080293): Check `headers` for Target header. If present, generate a
         // ConnectionId for a directed OBEX connection.
         let (code, response_headers) = match self.handler.connect(headers).await {
             Ok(headers) => {

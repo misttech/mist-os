@@ -23,7 +23,7 @@ group("bluetooth") {
 group("drivers") {
   testonly = true
   deps = [
-    "core/bt-host:driver",  # TODO(https://fxbug.dev/135645): Remove bt-host
+    "core/bt-host:driver",  # TODO(https://fxbug.dev/42085239): Remove bt-host
                             # driver code
     "hci/passthrough:driver",
     "hci/transport/uart:bt-transport-uart",
@@ -64,7 +64,7 @@ group("core-drivers") {
   deps = [ "core/bt-host" ]
 }
 
-# TODO(https://fxbug.dev/69738): Remove core-system once it is not longer referenced.
+# TODO(https://fxbug.dev/42148904): Remove core-system once it is not longer referenced.
 # This is the part of core group which must go into the system package.
 group("core-system") {
   deps = [ "core/bt-host" ]

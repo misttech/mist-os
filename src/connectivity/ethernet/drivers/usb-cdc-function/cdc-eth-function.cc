@@ -586,7 +586,7 @@ static void cdc_tx_complete(void* ctx, usb_request_t* req) {
 
   // Do not queue requests if status is ZX_ERR_IO_NOT_PRESENT, as the underlying connection could be
   // disconnected or USB_RESET is being processed. Calling cdc_send_locked in such scenario will
-  // deadlock and crash the driver (see https://fxbug.dev/92793).
+  // deadlock and crash the driver (see https://fxbug.dev/42174506).
   if (req->response.status != ZX_ERR_IO_NOT_PRESENT) {
     if ((txn = list_peek_head_type(cdc->tx_pending_infos(), txn_info_t, node))) {
       if ((send_status = cdc_send_locked(cdc, &txn->netbuf)) != ZX_ERR_SHOULD_WAIT) {

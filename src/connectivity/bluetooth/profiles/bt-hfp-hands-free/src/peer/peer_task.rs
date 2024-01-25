@@ -102,7 +102,7 @@ impl PeerTask {
                         number,
                     });
                 self.procedure_manager.enqueue(procedure_input);
-                // TODO(fxbug.dev/136796) asynchronously respond to this request when the procedure
+                // TODO(fxbug.dev/42086445) asynchronously respond to this request when the procedure
                 // completes.
                 let send_result = responder.send(Ok(()));
                 if let Err(err) = send_result {
@@ -117,13 +117,13 @@ impl PeerTask {
     }
 
     fn handle_at_response(&mut self, at_response: at::Response) {
-        // TODO(https://fxbug.dev/127362) Handle unsolicited responses separately.
+        // TODO(https://fxbug.dev/42077959) Handle unsolicited responses separately.
 
         let procedure_input = ProcedureInput::AtResponseFromAg(at_response);
         self.procedure_manager.enqueue(procedure_input);
     }
 
-    // TODO(https://fxbug.dev/127025) Handle procedure outputs.
+    // TODO(https://fxbug.dev/42077657) Handle procedure outputs.
     fn handle_procedure_output(&self, _procedure_output: ProcedureOutput) {
         unimplemented!("handle_procedure_output");
     }

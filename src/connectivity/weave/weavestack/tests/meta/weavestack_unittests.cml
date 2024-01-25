@@ -31,7 +31,7 @@
             protocol: [
                 "fuchsia.net.interfaces.admin.Installer",
 
-                // TODO(https://fxbug.dev/111695) Don't use the Root API once
+                // TODO(https://fxbug.dev/42062982) Don't use the Root API once
                 // Weavestack no longer needs it.
                 "fuchsia.net.root.Interfaces_OnlyForWeavestack",
                 "fuchsia.net.stack.Stack",

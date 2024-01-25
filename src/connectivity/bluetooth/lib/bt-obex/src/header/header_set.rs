@@ -185,13 +185,13 @@ impl Encodable for HeaderSet {
             start_idx += header.encoded_len();
         }
 
-        // TODO(https://fxbug.dev/125508): Encode ActionId immediately after ConnectionId when the ACTION
+        // TODO(https://fxbug.dev/42076319): Encode ActionId immediately after ConnectionId when the ACTION
         // operation is supported. See OBEX 1.5 Section 2.2.20.
 
-        // TODO(https://fxbug.dev/125507): Encode Session Parameters before other headers when Reliable
+        // TODO(https://fxbug.dev/42076318): Encode Session Parameters before other headers when Reliable
         // Sessions are supported. See OBEX 1.5 Section 2.2.18.
 
-        // TODO(https://fxbug.dev/128926): Encode SRMP after the SRM header when the SRMP feature is
+        // TODO(https://fxbug.dev/42079359): Encode SRMP after the SRM header when the SRMP feature is
         // supported. See OBEX 1.5 Sections 2.2.23, 2.2.24.
 
         // All other headers can be encoded in any order.

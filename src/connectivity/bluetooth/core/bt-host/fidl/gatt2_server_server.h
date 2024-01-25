@@ -18,9 +18,9 @@
 namespace bthost {
 
 // Implements the gatt2::Server FIDL interface.
-// TODO(https://fxbug.dev/103855): Support sending gatt2::LocalService::PeerUpdate.
-// TODO(https://fxbug.dev/685): Support GATT service includes.
-// TODO(https://fxbug.dev/98598): Support OnSuppressDiscovery
+// TODO(https://fxbug.dev/42054947): Support sending gatt2::LocalService::PeerUpdate.
+// TODO(https://fxbug.dev/42147529): Support GATT service includes.
+// TODO(https://fxbug.dev/42180948): Support OnSuppressDiscovery
 class Gatt2ServerServer : public GattServerBase<fuchsia::bluetooth::gatt2::Server> {
  public:
   // Arbitrary; we only refresh credits when the peer starts to get low.
@@ -91,7 +91,7 @@ class Gatt2ServerServer : public GattServerBase<fuchsia::bluetooth::gatt2::Serve
   std::unordered_map<InternalServiceId, Service> services_;
 
   // Mapping between client-provided Service IDs and internally-generated IDs.
-  // TODO(https://fxbug.dev/685): This will be necessary for supporting service includes.
+  // TODO(https://fxbug.dev/42147529): This will be necessary for supporting service includes.
   std::unordered_map<ClientServiceId, InternalServiceId> service_id_mapping_;
 
   // Keep this as the last member to make sure that all weak pointers are invalidated before other

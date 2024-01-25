@@ -365,7 +365,7 @@ struct Config {
     pub allowed_upstream_device_classes: AllowedDeviceClasses,
     #[serde(default)]
     pub allowed_bridge_upstream_device_classes: AllowedDeviceClasses,
-    // TODO(https://fxbug.dev/92096): default to false.
+    // TODO(https://fxbug.dev/42173732): default to false.
     #[serde(default = "dhcpv6_enabled_default")]
     pub enable_dhcpv6: bool,
     #[serde(default)]
@@ -588,7 +588,7 @@ pub struct NetCfg<'a> {
 
     filter_enabled_state: FilterEnabledState,
 
-    // TODO(https://fxbug.dev/67407): These hashmaps are all indexed by
+    // TODO(https://fxbug.dev/42146318): These hashmaps are all indexed by
     // interface ID and store per-interface state, and should be merged.
     interface_states: HashMap<NonZeroU64, InterfaceState>,
     interface_properties: HashMap<NonZeroU64, fnet_interfaces_ext::PropertiesAndState<()>>,
@@ -709,7 +709,7 @@ fn start_dhcpv6_client(
         // now because we do not use the prefix variant, but if we did we need
         // to support pretty-printing prefixes as it is considered PII and only
         // pretty-printed prefixes/addresses are properly redacted.
-        todo!("https://fxbug.dev/117848: Support pretty-printing configured prefix");
+        todo!("https://fxbug.dev/42069036: Support pretty-printing configured prefix");
     }
 
     let source = DnsServersUpdateSource::Dhcpv6 { interface_id: id.get() };
@@ -891,7 +891,7 @@ impl<'a> NetCfg<'a> {
         if !rdr_rules.is_empty() {
             let rdr_rules = netfilter::parser::parse_str_to_rdr_rules(&rdr_rules.join(""))
                 .context("error parsing RDR rules")?;
-            // TODO(https://fxbug.dev/68279): Change this to cas_filter_rules once update is supported.
+            // TODO(https://fxbug.dev/42147284): Change this to cas_filter_rules once update is supported.
             no_update_filter_rules!(
                 self.filter,
                 get_rdr_rules,
@@ -1224,7 +1224,7 @@ impl<'a> NetCfg<'a> {
                 let servers = match res {
                     Ok(s) => s,
                     Err(e) => {
-                        // TODO(https://fxbug.dev/57484): Restart the DNS server watcher.
+                        // TODO(https://fxbug.dev/42135335): Restart the DNS server watcher.
                         warn!(
                             "non-fatal error getting next event from DNS server watcher stream
                             with source = {:?}: {:?}",
@@ -1246,7 +1246,7 @@ impl<'a> NetCfg<'a> {
 
                 self.update_dns_servers(source, servers).await;
             }
-            // TODO(https://fxbug.dev/130449): Add tests to ensure we do not offer
+            // TODO(https://fxbug.dev/42080722): Add tests to ensure we do not offer
             // these services when interface has ProvisioningAction::Delegated
             // state.
             ProvisioningEvent::RequestStream(req_stream) => {
@@ -1687,7 +1687,7 @@ impl<'a> NetCfg<'a> {
                         config: InterfaceConfigState::WlanAp(WlanApInterfaceState {}),
                         ..
                     }) => {
-                        // TODO(https://fxbug.dev/55879): Stop the DHCP server when the address it is
+                        // TODO(https://fxbug.dev/42133555): Stop the DHCP server when the address it is
                         // listening on is removed.
                         let dhcp_server = if let Some(dhcp_server) = dhcp_server {
                             dhcp_server
@@ -1905,7 +1905,7 @@ impl<'a> NetCfg<'a> {
                 }
             };
 
-        // TODO(https://fxbug.dev/136968): Add metrics/inspect data for devices
+        // TODO(https://fxbug.dev/42086636): Add metrics/inspect data for devices
         // that encounter the situations below
         // Check if this device is known to Netcfg.
         // The device creation process removes an existing interface with
@@ -2566,7 +2566,7 @@ impl<'a> NetCfg<'a> {
                     continue;
                 };
 
-            // TODO(https://fxbug.dev/117651): Reload configuration in-place rather than
+            // TODO(https://fxbug.dev/42068818): Reload configuration in-place rather than
             // restarting the DHCPv6 client with different configuration.
             // Stop DHCPv6 client if it's running.
             if let Some::<dhcpv6::ClientState>(_) = dhcpv6_client_state.take() {
@@ -2679,7 +2679,7 @@ impl<'a> NetCfg<'a> {
                 }
             };
 
-            // TODO(https://fxbug.dev/117651): Reload configuration in-place rather than
+            // TODO(https://fxbug.dev/42068818): Reload configuration in-place rather than
             // restarting the DHCPv6 client with different configuration.
             // Stop DHCPv6 client if it's running.
             dhcpv6::stop_client(
@@ -2888,12 +2888,12 @@ pub async fn run<M: Mode>() -> Result<(), anyhow::Error> {
     .await
     .context("error creating new netcfg instance")?;
 
-    // TODO(https://fxbug.dev/130394): Once non-Fuchsia components can control filtering rules, disable
+    // TODO(https://fxbug.dev/42080661): Once non-Fuchsia components can control filtering rules, disable
     // setting filters when interfaces are in Delegated provisioning mode.
     let () =
         netcfg.update_filters(filter_config).await.context("update filters based on config")?;
 
-    // TODO(https://fxbug.dev/129708): Once non-Fuchsia components can control DNS servers, disable
+    // TODO(https://fxbug.dev/42080096): Once non-Fuchsia components can control DNS servers, disable
     // setting default DNS servers when interfaces are in Delegated provisioning mode.
     let servers = servers.into_iter().map(static_source_from_ip).collect();
     debug!("updating default servers to {:?}", servers);
@@ -2995,7 +2995,7 @@ fn map_address_state_provider_error(
         let severity = match &e {
             fnet_interfaces_ext::admin::AddressStateProviderError::Fidl(e) => {
                 if e.is_closed() {
-                    // TODO(https://fxbug.dev/89290): Reconsider whether this
+                    // TODO(https://fxbug.dev/42170615): Reconsider whether this
                     // should be a fatal error, as it can be caused by a
                     // netstack bug.
                     errors::Error::NonFatal
@@ -3004,7 +3004,7 @@ fn map_address_state_provider_error(
                 }
             }
             fnet_interfaces_ext::admin::AddressStateProviderError::ChannelClosed => {
-                // TODO(https://fxbug.dev/89290): Reconsider whether this should
+                // TODO(https://fxbug.dev/42170615): Reconsider whether this should
                 // be a fatal error, as it can be caused by a netstack bug.
                 errors::Error::NonFatal
             }
@@ -3026,7 +3026,7 @@ fn map_address_state_provider_error(
 
 /// If we can't reach netstack via fidl, log an error and exit.
 //
-// TODO(https://fxbug.dev/119295): add a test that works as intended.
+// TODO(https://fxbug.dev/42070352): add a test that works as intended.
 fn exit_with_fidl_error(cause: fidl::Error) -> ! {
     error!(%cause, "exiting due to fidl error");
     std::process::exit(1);

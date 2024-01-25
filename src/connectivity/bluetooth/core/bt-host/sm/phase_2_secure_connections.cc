@@ -116,7 +116,7 @@ void Phase2SecureConnections::OnPeerPublicKey(
   BT_ASSERT(local_ecdh_.has_value());
   if (peer_key.GetPublicKeyX() == local_ecdh_->GetPublicKeyX() &&
       peer_key.GetPublicKeyY() == local_ecdh_->GetPublicKeyY()) {
-    // NOTE(https://fxbug.dev/80650): When passkey entry is used, the
+    // NOTE(https://fxbug.dev/42161018): When passkey entry is used, the
     // non-initiating device can reflect our public key (which we send in
     // plaintext). The inputs to the hash that we disclose bit- by-bit in
     // ScStage1Passkey are the two public keys, our nonce, and one bit of our
@@ -168,7 +168,7 @@ void Phase2SecureConnections::StartAuthenticationStage1() {
                                                  sm_chan().GetWeakPtr(),
                                                  std::move(complete_cb));
   } else {  // method == kOutOfBand
-    // TODO(https://fxbug.dev/601): OOB would require significant extra plumbing
+    // TODO(https://fxbug.dev/42138242): OOB would require significant extra plumbing
     // & add security exposure not necessary for current goals. This is not
     // spec-compliant but should allow us to pass PTS.
     bt_log(WARN, "sm", "Received unsupported request for OOB pairing");

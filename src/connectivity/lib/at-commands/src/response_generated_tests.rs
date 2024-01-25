@@ -31,7 +31,7 @@ fn test_roundtrips(highlevel: highlevel::Response, lowlevel: lowlevel::Response,
     // Do round trip
     let lowlevel_from_highlevel = translate::lower_response(&highlevel);
     lowlevel_from_highlevel.write_to(&mut bytes_from_lowlevel).expect("Failed to write lowlevel.");
-    // TODO(https://fxbug.dev/66041) Convert parse to use Read rather than strings.
+    // TODO(https://fxbug.dev/42144806) Convert parse to use Read rather than strings.
     let string_from_lowlevel =
         String::from_utf8(bytes_from_lowlevel).expect("Failed to convert bytes to UTF8.");
     let lowlevel_from_bytes =
@@ -68,7 +68,7 @@ fn test_roundtrips(highlevel: highlevel::Response, lowlevel: lowlevel::Response,
     let mut bytes_from_lowlevel = Vec::new();
 
     // Do round trip
-    // TODO(https://fxbug.dev/66041) Convert parse to use Read rather than strings.
+    // TODO(https://fxbug.dev/42144806) Convert parse to use Read rather than strings.
     let lowlevel_from_bytes = response_parser::parse(&string).expect("Failed to parse string.");
     let highlevel_from_lowlevel =
         translate::raise_response(&lowlevel_from_bytes).expect("Failed to raise lowlevel.");

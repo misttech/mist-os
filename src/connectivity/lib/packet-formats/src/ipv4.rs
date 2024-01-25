@@ -262,7 +262,7 @@ impl<B: ByteSlice> FromRaw<Ipv4PacketRaw<B>, ()> for Ipv4Packet<B> {
     type Error = IpParseError<Ipv4>;
 
     fn try_from_raw_with(raw: Ipv4PacketRaw<B>, _args: ()) -> Result<Self, Self::Error> {
-        // TODO(https://fxbug.dev/77598): Some of the errors below should return an
+        // TODO(https://fxbug.dev/42157630): Some of the errors below should return an
         // `IpParseError::ParameterProblem` instead of a `ParseError`.
         let hdr_prefix = raw.hdr_prefix;
         let hdr_bytes = (hdr_prefix.ihl() * 4) as usize;

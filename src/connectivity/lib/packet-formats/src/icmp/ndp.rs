@@ -813,7 +813,7 @@ pub mod options {
         ///
         /// The number of valid leading bits in this prefix is available
         /// from [`PrefixInformation::prefix_length`];
-        // TODO(https://fxbug.dev/91764): Consider merging prefix and prefix_length and return a
+        // TODO(https://fxbug.dev/42173363): Consider merging prefix and prefix_length and return a
         // Subnet.
         pub fn prefix(&self) -> &Ipv6Addr {
             &self.prefix
@@ -869,7 +869,7 @@ pub mod options {
     }
 
     impl OptionParseLayout for NdpOptionsImpl {
-        // TODO(https://fxbug.dev/52288): Return more verbose logs on parsing errors.
+        // TODO(https://fxbug.dev/42129573): Return more verbose logs on parsing errors.
         type Error = OptionParseErr;
 
         // NDP options don't have END_OF_OPTIONS or NOP.

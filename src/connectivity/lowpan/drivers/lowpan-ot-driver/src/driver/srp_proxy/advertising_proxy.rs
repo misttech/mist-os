@@ -233,7 +233,7 @@ impl AdvertisingProxyInner {
             })
             .collect::<Vec<_>>();
 
-        // If there is already a host, check to make sure the addresses match (<https://fxbug.dev/115170>)
+        // If there is already a host, check to make sure the addresses match (<https://fxbug.dev/42066484>)
         // and that the service publisher FIDL is not closed.
         if let Some(host) = self.hosts.get_mut(srp_host.full_name_cstr()) {
             if host.addresses != addresses {

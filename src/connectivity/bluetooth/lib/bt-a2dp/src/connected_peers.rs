@@ -193,7 +193,7 @@ pub struct ConnectedPeers {
     /// Listeners for new connected peers
     connected_peer_senders: Vec<mpsc::Sender<DetachableWeak<PeerId, Peer>>>,
     /// Task handles for newly connected peer stream starts.
-    // TODO(https://fxbug.dev/67947): Completed tasks aren't garbage-collected yet.
+    // TODO(https://fxbug.dev/42146917): Completed tasks aren't garbage-collected yet.
     start_stream_tasks: HashMap<PeerId, fasync::Task<()>>,
 }
 

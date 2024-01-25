@@ -199,7 +199,7 @@ impl DiscoveryProxy {
                     let dnssd_update = DnssdUpdate::Host {
                         host_name: name_srp_domain_copy,
                         addresses,
-                        ttl: DEFAULT_MDNS_TTL, // TODO(https://fxbug.dev/94352): Change when available.
+                        ttl: DEFAULT_MDNS_TTL, // TODO(https://fxbug.dev/42176238): Change when available.
                         name_local_domain: name_local_domain_copy_0.clone(),
                     };
                     debug!(
@@ -213,16 +213,16 @@ impl DiscoveryProxy {
                 },
             )
             .inspect_err(move |err| {
-                // Due to https://fxbug.dev/99755, the subscription will close
+                // Due to https://fxbug.dev/42182233, the subscription will close
                 // if the servicesubscriber that created it is closed.
-                // TODO(https://fxbug.dev/99755): Remove this line once https://fxbug.dev/99755 is fixed.
+                // TODO(https://fxbug.dev/99755): Remove this line once https://fxbug.dev/42182233 is fixed.
                 #[allow(clippy::redundant_clone)]
                 let _ = subscriber.clone();
 
                 error!(tag = "srp_discovery_proxy", "host_name_subscription: {:?}", err);
             });
 
-        // TODO(https://fxbug.dev/94368): It is unclear why this step still appears to be necessary,
+        // TODO(https://fxbug.dev/42176255): It is unclear why this step still appears to be necessary,
         //                        but we don't seem to get a response otherwise.
         match connect_to_protocol::<HostNameResolverMarker>() {
             Ok(resolver) => {
@@ -240,7 +240,7 @@ impl DiscoveryProxy {
                             .send(DnssdUpdate::Host {
                                 host_name: name_srp_domain_copy,
                                 addresses: host_addresses,
-                                ttl: DEFAULT_MDNS_TTL, // TODO(https://fxbug.dev/94352): Change when available.
+                                ttl: DEFAULT_MDNS_TTL, // TODO(https://fxbug.dev/42176238): Change when available.
                                 name_local_domain: name_local_domain_copy_1,
                             })
                             .await?;
@@ -321,10 +321,10 @@ impl DiscoveryProxy {
                 }
             })
             .inspect_err(move |err| {
-                // Due to https://fxbug.dev/99755, the subscription will close
+                // Due to https://fxbug.dev/42182233, the subscription will close
                 // if the servicesubscriber that created it is closed.
                 // The bug tracking the specific issue this fixes is <b/241818894>.
-                // TODO(https://fxbug.dev/99755): Remove this line once https://fxbug.dev/99755 is fixed.
+                // TODO(https://fxbug.dev/99755): Remove this line once https://fxbug.dev/42182233 is fixed.
                 #[allow(clippy::redundant_clone)]
                 let _ = subscriber.clone();
 
@@ -453,7 +453,7 @@ impl DiscoveryProxy {
                     host_name_srp.as_c_str(),
                     port.unwrap_or(0),
                     srv_priority,
-                    DEFAULT_MDNS_TTL, // TODO(https://fxbug.dev/94352): Change when available.
+                    DEFAULT_MDNS_TTL, // TODO(https://fxbug.dev/42176238): Change when available.
                     &flatten_txt(text_strings),
                     srv_weight,
                 );
@@ -497,7 +497,7 @@ impl DiscoveryProxy {
                 responder,
                 ..
             } => {
-                // TODO(https://fxbug.dev/94362): It is not entirely clear how to handle this case,
+                // TODO(https://fxbug.dev/42176249): It is not entirely clear how to handle this case,
                 //                        so for the time being we are ignoring it.
                 info!(
                     tag = "srp_discovery_proxy",

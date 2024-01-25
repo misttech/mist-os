@@ -155,7 +155,7 @@ class BtHciBroadcomTest : public TestBase {
     ASSERT_EQ(BtHciBroadcom::Create(/*ctx=*/nullptr, root_device_.get(), dispatcher()), ZX_OK);
     ASSERT_TRUE(dut());
 
-    // TODO(https://fxbug.dev/91487): Due to Mock DDK limitations, we need to add the BT_VENDOR protocol to
+    // TODO(https://fxbug.dev/42173055): Due to Mock DDK limitations, we need to add the BT_VENDOR protocol to
     // the BtTransportUart MockDevice so that BtHciProtocolClient (and device_get_protocol) work.
     bt_vendor_protocol_t vendor_proto;
     dut()->GetDeviceContext<BtHciBroadcom>()->DdkGetProtocol(ZX_PROTOCOL_BT_VENDOR, &vendor_proto);

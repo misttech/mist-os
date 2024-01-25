@@ -61,7 +61,7 @@ impl Procedure for VolumeSynchronizationProcedure {
         ProcedureMarker::VolumeSynchronization
     }
 
-    // TODO(https://fxbug.dev/72681): This procedure is a good example of some room for improvement in the
+    // TODO(https://fxbug.dev/42152169): This procedure is a good example of some room for improvement in the
     // procedure design. See bug for details.
     fn hf_update(&mut self, update: at::Command, _state: &mut SlcState) -> ProcedureRequest {
         match (self.state, &update) {

@@ -22,7 +22,7 @@ using nl::Weave::DeviceLayer::PlatformMgrImpl;
 using nl::Weave::DeviceLayer::WeaveDeviceEvent;
 }  // namespace
 
-// TODO(https://fxbug.dev/59699): Implement system/platform timer in openweave
+// TODO(https://fxbug.dev/42137795): Implement system/platform timer in openweave
 // and revert this to 10 seconds.
 constexpr struct timeval MAX_SELECT_SLEEP_TIME = {.tv_sec = 1};
 
@@ -179,7 +179,7 @@ zx_status_t App::WaitForFd(int fd, uint32_t events) {
   return ZX_OK;
 }
 
-// TODO(https://fxbug.dev/47096): tracks the integration test.
+// TODO(https://fxbug.dev/42123804): tracks the integration test.
 zx_status_t App::StartFdWaiters() {
   struct timeval sleep_time;
   memcpy(&sleep_time, &MAX_SELECT_SLEEP_TIME, sizeof(sleep_time));

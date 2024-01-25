@@ -21,7 +21,7 @@ pub(crate) struct TrelInstance {
     instance_name: String,
     peer_instance_sockaddr_map: HashMap<String, ot::SockAddr>,
 
-    #[allow(dead_code)] // This field must be kept around for <https://fxbug.dev/99755>
+    #[allow(dead_code)] // This field must be kept around for <https://fxbug.dev/42182233>
     subscriber: ServiceSubscriber2Proxy,
 
     subscriber_request_stream: ServiceSubscriptionListenerRequestStream,

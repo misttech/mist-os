@@ -55,7 +55,7 @@ where
     /// Stream of incoming HandsFree FIDL protocol Requests
     hands_free_request_maybe_stream: MaybeStream<fidl_hfp::HandsFreeRequestStream>,
     /// A collection of discovered and/or connected Bluetooth peers that support the AG role.
-    // TODO(https://fxbug.dev/132337) Convert this to a FutureMap and await peer tasks finishing and clean up.
+    // TODO(https://fxbug.dev/42082435) Convert this to a FutureMap and await peer tasks finishing and clean up.
     peers: HashMap<PeerId, Peer>,
     // TODO(fxb/127364) Update HangingGet with peer, and delete this which just keeps the proxy
     // around to make tests pass.

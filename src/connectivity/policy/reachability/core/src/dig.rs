@@ -12,7 +12,7 @@ const DNS_FIDL_TIMEOUT: zx::Duration = zx::Duration::from_seconds(90);
 
 async fn dig<F: Fn() -> anyhow::Result<fnet_name::LookupProxy>>(
     name_lookup_connector: &F,
-    // TODO(https://fxbug.dev/137138): DNS fetching should be done over the
+    // TODO(https://fxbug.dev/42182624): DNS fetching should be done over the
     // specified interface. The current implementation of
     // fidl::fuchsia::net::name::LookupIp does not support this.
     _interface_name: &str,

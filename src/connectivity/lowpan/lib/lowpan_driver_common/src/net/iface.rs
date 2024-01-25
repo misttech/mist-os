@@ -46,37 +46,37 @@ pub trait NetworkInterface: Send + Sync {
     async fn set_enabled(&self, enabled: bool) -> Result<(), Error>;
 
     /// Adds the given IPv6 address of Spinel::Subnet type to this interface.
-    // TODO(https://fxbug.dev/64704): Consider making this method async. This method is
+    // TODO(https://fxbug.dev/42143339): Consider making this method async. This method is
     //       currently synchronous so that it can be used directly from
     //       `Driver::on_prop_value_is`, which is also synchronous.
     fn add_address_from_spinel_subnet(&self, addr: &Subnet) -> Result<(), Error>;
 
     /// Adds the given address to this interface.
-    // TODO(https://fxbug.dev/64704): Consider making this method async. This method is
+    // TODO(https://fxbug.dev/42143339): Consider making this method async. This method is
     //       currently synchronous so that it can be used directly from
     //       `Driver::on_prop_value_is`, which is also synchronous.
     fn add_address(&self, addr: fidl_fuchsia_net::Subnet) -> Result<(), Error>;
 
     /// Removes the given address of Spinel::Subnet type from this interface.
-    // TODO(https://fxbug.dev/64704): Consider making this method async. This method is
+    // TODO(https://fxbug.dev/42143339): Consider making this method async. This method is
     //       currently synchronous so that it can be used directly from
     //       `Driver::on_prop_value_is`, which is also synchronous.
     fn remove_address_from_spinel_subnet(&self, addr: &Subnet) -> Result<(), Error>;
 
     /// Removes the given address from this interface.
-    // TODO(https://fxbug.dev/64704): Consider making this method async. This method is
+    // TODO(https://fxbug.dev/42143339): Consider making this method async. This method is
     //       currently synchronous so that it can be used directly from
     //       `Driver::on_prop_value_is`, which is also synchronous.
     fn remove_address(&self, addr: fidl_fuchsia_net::Subnet) -> Result<(), Error>;
 
     /// Indicates to the net stack that this subnet is accessible through this interface.
-    // TODO(https://fxbug.dev/64704): Consider making this method async. This method is
+    // TODO(https://fxbug.dev/42143339): Consider making this method async. This method is
     //       currently synchronous so that it can be used directly from
     //       `Driver::on_prop_value_is`, which is also synchronous.
     fn add_external_route(&self, addr: &Subnet) -> Result<(), Error>;
 
     /// Removes the given subnet from being considered routable over this interface.
-    // TODO(https://fxbug.dev/64704): Consider making this method async. This method is
+    // TODO(https://fxbug.dev/42143339): Consider making this method async. This method is
     //       currently synchronous so that it can be used directly from
     //       `Driver::on_prop_value_is`, which is also synchronous.
     fn remove_external_route(&self, addr: &Subnet) -> Result<(), Error>;

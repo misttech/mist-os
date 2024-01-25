@@ -469,7 +469,7 @@ bool BrEdrConnectionManager::Disconnect(PeerId peer_id,
          ReasonAsString(reason).c_str(),
          bt_str(peer_id));
 
-  // TODO(https://fxbug.dev/65157) - If a disconnect request is received when we
+  // TODO(https://fxbug.dev/42143836) - If a disconnect request is received when we
   // have a pending connection, we should instead abort the connection, by
   // either:
   //   * removing the request if it has not yet been processed
@@ -855,7 +855,7 @@ void BrEdrConnectionManager::CompleteConnectionSetup(
         self->Disconnect(peer_id, DisconnectReason::kAclLinkError);
       };
 
-  // TODO(https://fxbug.dev/37650): Implement this callback as a call to
+  // TODO(https://fxbug.dev/42113313): Implement this callback as a call to
   // InitiatePairing().
   auto security_callback = [peer_id](hci_spec::ConnectionHandle handle,
                                      sm::SecurityLevel level,
@@ -1124,7 +1124,7 @@ void BrEdrConnectionManager::CompleteRequest(
     // This incoming connection arrived while we're trying to make an outgoing
     // connection; not an impossible coincidence but log it in case it's
     // interesting.
-    // TODO(https://fxbug.dev/92299): Added to investigate timing and can be
+    // TODO(https://fxbug.dev/42173957): Added to investigate timing and can be
     // removed if it adds no value
     if (pending_request_.has_value()) {
       bt_log(
@@ -1252,11 +1252,11 @@ BrEdrConnectionManager::OnIoCapabilityRequest(
 
   const pw::bluetooth::emboss::IoCapability io_capability = *reply;
 
-  // TODO(https://fxbug.dev/601): Add OOB status from PeerCache.
+  // TODO(https://fxbug.dev/42138242): Add OOB status from PeerCache.
   const pw::bluetooth::emboss::OobDataPresent oob_data_present =
       pw::bluetooth::emboss::OobDataPresent::NOT_PRESENT;
 
-  // TODO(https://fxbug.dev/1249): Determine this based on the service
+  // TODO(https://fxbug.dev/42075714): Determine this based on the service
   // requirements.
   const pw::bluetooth::emboss::AuthenticationRequirements auth_requirements =
       io_capability == pw::bluetooth::emboss::IoCapability::NO_INPUT_NO_OUTPUT

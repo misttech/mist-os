@@ -77,7 +77,7 @@ void BrEdrConnectionRequest::CreateConnection(
       // Both CommandChannel and the controller perform some scheduling, so log
       // when the controller finally acknowledges Create Connection to observe
       // outgoing connection sequencing.
-      // TODO(https://fxbug.dev/92299): Added to investigate timing and can be
+      // TODO(https://fxbug.dev/42173957): Added to investigate timing and can be
       // removed if it adds no value
       bt_log(INFO,
              "hci-bredr",
@@ -156,7 +156,7 @@ bool BrEdrConnectionRequest::Cancel() {
            bt_str(peer_id_));
     return false;
   }
-  // TODO(https://fxbug.dev/65157) - We should correctly handle cancels due to a
+  // TODO(https://fxbug.dev/42143836) - We should correctly handle cancels due to a
   // disconnect call during a pending connection creation attempt
   bt_log(INFO,
          "hci-bredr",

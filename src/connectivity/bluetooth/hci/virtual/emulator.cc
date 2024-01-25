@@ -356,7 +356,7 @@ void EmulatorDevice::WatchControllerParameters(WatchControllerParametersCallback
 }
 
 void EmulatorDevice::WatchLeScanStates(WatchLeScanStatesCallback callback) {
-  // TODO(https://fxbug.dev/822): Implement
+  // TODO(https://fxbug.dev/42162739): Implement
 }
 
 void EmulatorDevice::WatchLegacyAdvertisingStates(WatchLegacyAdvertisingStatesCallback callback) {

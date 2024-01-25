@@ -292,7 +292,7 @@ impl SessionMultiplexer {
     }
 }
 
-// TODO(https://fxbug.dev/61923): IWBN to have focused tests for the `SessionMultiplexer`. Currently, it's
+// TODO(https://fxbug.dev/42140263): IWBN to have focused tests for the `SessionMultiplexer`. Currently, it's
 // transitively tested by the tests for `SessionInner`.
 #[cfg(test)]
 mod tests {

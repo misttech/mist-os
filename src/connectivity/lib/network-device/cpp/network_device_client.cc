@@ -692,7 +692,7 @@ void NetworkDeviceClient::FlushRx() {
   size_t flush = std::min(rx_out_queue_.size(), static_cast<size_t>(device_info_.rx_depth));
   ZX_ASSERT(flush != 0);
 
-  // TODO(https://fxbug.dev/32098): We're assuming that writing to the FIFO here
+  // TODO(https://fxbug.dev/42107145): We're assuming that writing to the FIFO here
   // is a sufficient memory barrier for the other end to access the data. That
   // is currently true but not really guaranteed by the API.
   zx_status_t status = rx_fifo_.write(sizeof(uint16_t), rx_out_queue_.data(), flush, &flush);
@@ -713,7 +713,7 @@ void NetworkDeviceClient::FlushTx() {
   size_t flush = std::min(tx_out_queue_.size(), static_cast<size_t>(device_info_.tx_depth));
   ZX_ASSERT(flush != 0);
 
-  // TODO(https://fxbug.dev/32098): We're assuming that writing to the FIFO here
+  // TODO(https://fxbug.dev/42107145): We're assuming that writing to the FIFO here
   // is a sufficient memory barrier for the other end to access the data. That
   // is currently true but not really guaranteed by the API.
   zx_status_t status = tx_fifo_.write(sizeof(uint16_t), tx_out_queue_.data(), flush, &flush);

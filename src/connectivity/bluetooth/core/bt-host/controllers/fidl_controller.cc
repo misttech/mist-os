@@ -100,7 +100,7 @@ void FidlController::SendAclData(pw::span<const std::byte> data) {
 }
 
 void FidlController::GetFeatures(pw::Callback<void(FidlController::FeaturesBits)> callback) {
-  // TODO(https://fxbug.dev/136230): Implement GetFeatures()
+  // TODO(https://fxbug.dev/42085818): Implement GetFeatures()
   bt_log(DEBUG, "controllers", "GetFeatures()");
   FidlController::FeaturesBits features = pw::bluetooth::Controller::FeaturesBits::kHciSco;
   callback(features);

@@ -169,7 +169,7 @@ void HostServer::SetLocalName(::std::string local_name, SetLocalNameCallback cal
   });
 }
 
-// TODO(https://fxbug.dev/35008): Add a unit test for this method.
+// TODO(https://fxbug.dev/42110379): Add a unit test for this method.
 void HostServer::SetDeviceClass(fbt::DeviceClass device_class, SetDeviceClassCallback callback) {
   // Device Class values must only contain data in the lower 3 bytes.
   if (device_class.value >= 1 << 24) {
@@ -341,7 +341,7 @@ void HostServer::RestoreBonds(::std::vector<fsys::BondingData> bonds,
       bd.bredr_services = fidl_helpers::BredrServicesFromFidl(bond.bredr_bond());
     }
 
-    // TODO(https://fxbug.dev/59645): Convert bond.bredr.services to BondingData::bredr_services
+    // TODO(https://fxbug.dev/42137736): Convert bond.bredr.services to BondingData::bredr_services
     if (!adapter()->AddBondedPeer(bd)) {
       bt_log(ERROR, "fidl", "%s: failed to restore bonding data entry", __FUNCTION__);
       errors.push_back(std::move(bond));
@@ -379,7 +379,7 @@ void HostServer::RegisterLowEnergyConnection(
 
 void HostServer::SetDiscoverable(bool discoverable, SetDiscoverableCallback callback) {
   bt_log(INFO, "fidl", "%s(%s)", __FUNCTION__, discoverable ? "true" : "false");
-  // TODO(https://fxbug.dev/955): advertise LE here
+  // TODO(https://fxbug.dev/42177512): advertise LE here
   if (!discoverable) {
     bredr_discoverable_session_ = nullptr;
     NotifyInfoChange();
@@ -539,7 +539,7 @@ void HostServer::Connect(fbt::PeerId peer_id, ConnectCallback callback) {
     return;
   }
 
-  // TODO(https://fxbug.dev/1242): Dual-mode currently not supported; if the peer supports
+  // TODO(https://fxbug.dev/42075069): Dual-mode currently not supported; if the peer supports
   // BR/EDR we prefer BR/EDR. If a dual-mode peer, we should attempt to connect
   // both protocols.
   if (peer->bredr()) {
@@ -711,7 +711,7 @@ void HostServer::PairBrEdr(PeerId peer_id, PairCallback callback) {
       callback(fpromise::ok());
     }
   };
-  // TODO(https://fxbug.dev/57991): Add security parameter to Pair and use that here instead of
+  // TODO(https://fxbug.dev/42135898): Add security parameter to Pair and use that here instead of
   // hardcoding default.
   bt::gap::BrEdrSecurityRequirements security{.authentication = false, .secure_connections = false};
   BT_ASSERT(adapter()->bredr());

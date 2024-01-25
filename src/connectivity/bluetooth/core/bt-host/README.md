@@ -151,7 +151,7 @@ adapter:
     sdp_server:
         record_0x2:
             record
-            // TODO(https://fxbug.dev/51995): Migrate this to UIntArray when support is better.
+            // TODO(https://fxbug.dev/42129247): Migrate this to UIntArray when support is better.
             registered_psms:
                 psm_0x0:
                     psm

@@ -40,7 +40,7 @@
 #define CMD_BUF_SIZE 258    // 3 byte header + 255 byte payload
 #define EVENT_BUF_SIZE 257  // 2 byte header + 255 byte payload
 
-// TODO(https://fxbug.dev/90072): move these to hw/usb.h (or hw/bluetooth.h if that exists)
+// TODO(https://fxbug.dev/42171484): move these to hw/usb.h (or hw/bluetooth.h if that exists)
 #define USB_SUBCLASS_BLUETOOTH 1
 #define USB_PROTOCOL_BLUETOOTH 1
 
@@ -1062,7 +1062,7 @@ void Device::HciHandleScoReadEvents(zx_signals_t signals) {
   // If the alt setting is kIsocAltSettingInactive, packets may remain queued in the SCO
   // channel until the next connection. The packets can't just be dropped because then the host
   // wouldn't receive a HCI_Number_Of_Completed_Packets event.
-  // TODO(https://fxbug.dev/90844): Maybe default to alt setting 1 to mitigate this (ensures packets drain).
+  // TODO(https://fxbug.dev/42172341): Maybe default to alt setting 1 to mitigate this (ensures packets drain).
   if (isoc_alt_setting_ == kIsocAltSettingInactive) {
     zxlogf(DEBUG, "outbound SCO packets queued because not alt setting is selected");
     return;
@@ -1161,7 +1161,7 @@ zx_status_t Device::BtHciOpenScoChannel(zx::channel channel) {
   return HciOpenChannel(&sco_channel_, std::move(channel));
 }
 
-// TODO(https://fxbug.dev/88491): Dispatch to a different thread to avoid blocking the caller.
+// TODO(https://fxbug.dev/42169728): Dispatch to a different thread to avoid blocking the caller.
 void Device::BtHciConfigureSco(sco_coding_format_t coding_format, sco_encoding_t encoding,
                                sco_sample_rate_t sample_rate,
                                bt_hci_configure_sco_callback callback, void* cookie) {

@@ -19,7 +19,7 @@
 namespace bt::internal {
 
 // This class is not thread-safe.
-// TODO(https://fxbug.dev/71341): Store each retirement's timestamp in order to
+// TODO(https://fxbug.dev/42150683): Store each retirement's timestamp in order to
 // provide information like how much time the log depth represents and overall
 // throughput (bytes/sec and packets/sec)
 class RetireLog final {
@@ -55,7 +55,7 @@ class RetireLog final {
   // log depth, a biased median is returned rather than the average of the true
   // median samples).
   //
-  // TODO(https://fxbug.dev/71341): Add a |max_age| parameter to window to only
+  // TODO(https://fxbug.dev/42150683): Add a |max_age| parameter to window to only
   // samples that are recent enough to be relevant
   template <size_t NumQuantiles>
   [[nodiscard]] std::optional<std::array<size_t, NumQuantiles>>

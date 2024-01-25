@@ -388,7 +388,7 @@ impl From<&fidl_avrcp::PlayerFeatureBits> for BrowseLevel {
 
 /// The response parameters for a Media Player Item.
 /// Defined in AVRCP 1.6.2, Section 6.10.2.1.
-// TODO(https://fxbug.dev/45904): Maybe wrap major_player_type, player_sub_type,
+// TODO(https://fxbug.dev/42122480): Maybe wrap major_player_type, player_sub_type,
 // and feature_bit_mask into strongly typed variables.
 #[derive(Clone, Debug, PartialEq)]
 pub struct MediaPlayerItem {

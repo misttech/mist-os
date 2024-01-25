@@ -27,7 +27,7 @@ Tools used to pass A2DP tests in PTS:
 4. (PTS) Yes
 5. PTS: `Tester could not find the optional SDP attribute named 'Provider Name'. Is this correct?`
 6. (PTS) Yes
-    * *Note that this behavior may change with the implementation of https://fxbug.dev/103814*
+    * *Note that this behavior may change with the implementation of https://fxbug.dev/42054902*
 
 ### A2DP/SNK/SDP/BV-02-I
 1. PTS: `Tester could not find the optional SDP attribute named 'Supported Features'. Is this correct?`
@@ -36,7 +36,7 @@ Tools used to pass A2DP tests in PTS:
 4. (PTS) Yes
 5. PTS: `Tester could not find the optional SDP attribute named 'Provider Name'. Is this correct?`
 6. (PTS) Yes
-    * *Note that this behavior may change with the implementation of https://fxbug.dev/103814*
+    * *Note that this behavior may change with the implementation of https://fxbug.dev/42054902*
 
 ### A2DP/SNK/CC/BV-01-I
 1. PTS: `Is the IUT receiving streaming media from PTS?`

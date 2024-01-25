@@ -37,7 +37,7 @@
         {
             protocol: "fuchsia.net.dhcp.ClientProvider",
 
-            // TODO(https://fxbug.dev/125773): Mark this as "required" once all
+            // TODO(https://fxbug.dev/42076541): Mark this as "required" once all
             // products are using the out-of-stack DHCP client component.
             availability: "optional",
         },

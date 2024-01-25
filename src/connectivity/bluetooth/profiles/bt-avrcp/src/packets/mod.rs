@@ -84,7 +84,7 @@ pub type PacketResult<T> = result::Result<T, Error>;
 decodable_enum! {
     /// Common charset IDs from the MIB Enum we may see in AVRCP. See:
     /// https://www.iana.org/assignments/character-sets/character-sets.xhtml
-    /// TODO(https://fxbug.dev/102060): we ideally would not want to return OutOfRange error
+    /// TODO(https://fxbug.dev/42052955): we ideally would not want to return OutOfRange error
     /// but instead return a default value (i.e. 0 => Unknown).
     pub enum CharsetId<u16, Error, OutOfRange> {
         Ascii = 3,
@@ -105,7 +105,7 @@ impl CharsetId {
         }
     }
 
-    /// TODO(https://fxbug.dev/102060): once we change CharsetId to be infalliable we can
+    /// TODO(https://fxbug.dev/42052955): once we change CharsetId to be infalliable we can
     /// change or remove this method.
     pub(crate) fn is_utf8_charset_id(id_buf: &[u8; 2]) -> bool {
         let raw_val = u16::from_be_bytes(*id_buf);
@@ -529,7 +529,7 @@ impl VendorDependentPdu for RawVendorDependentPacket {
     }
 }
 
-// TODO(https://fxbug.dev/41343): Specify the command type with the REPL when sending raw packets.
+// TODO(https://fxbug.dev/42117416): Specify the command type with the REPL when sending raw packets.
 // For now, default to Control.
 /// Specifies the AVC command type for this AVC command packet
 impl VendorCommand for RawVendorDependentPacket {

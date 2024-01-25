@@ -4,7 +4,7 @@
 
 #![warn(missing_debug_implementations)]
 #![warn(rust_2018_idioms)]
-// TODO(https://fxbug.dev/126170): remove after the lint is fixed
+// TODO(https://fxbug.dev/42076923): remove after the lint is fixed
 #![allow(unknown_lints, clippy::items_after_test_module)]
 
 mod async_condition;

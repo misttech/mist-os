@@ -12,7 +12,7 @@ group("lowpan") {
 
 # This group is for components, since they cannot depend on source sets
 # and libraries, only on linked binaries (e.g. executables, shared libraries,
-# loadable modules which include drivers). See https://fxbug.dev/91860
+# loadable modules which include drivers). See https://fxbug.dev/42173470
 group("lowpan_for_components") {
   deps = [
     "drivers",

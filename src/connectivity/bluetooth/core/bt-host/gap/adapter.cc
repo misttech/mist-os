@@ -667,7 +667,7 @@ bool AdapterImpl::IsDiscoverable() const {
   }
 
   // If LE Privacy is enabled, then we are not discoverable.
-  // TODO(https://fxbug.dev/109132): Make this dependent on whether the LE
+  // TODO(https://fxbug.dev/42060496): Make this dependent on whether the LE
   // Public advertisement is active or not.
   if (le_address_manager_ && le_address_manager_->PrivacyEnabled()) {
     return false;
@@ -683,7 +683,7 @@ bool AdapterImpl::IsDiscovering() const {
 
 void AdapterImpl::SetLocalName(std::string name,
                                hci::ResultFunction<> callback) {
-  // TODO(https://fxbug.dev/40836): set the public LE advertisement name from
+  // TODO(https://fxbug.dev/42116852): set the public LE advertisement name from
   // |name| If BrEdr is not supported, skip the name update.
   if (!bredr_discovery_manager_) {
     callback(ToResult(bt::HostError::kNotSupported));
@@ -1082,7 +1082,7 @@ void AdapterImpl::InitializeStep3() {
   // The controller may not support SCO flow control (as implied by not
   // supporting HCI_Write_Synchronous_Flow_Control_Enable), in which case we
   // don't support HCI SCO on this controller yet.
-  // TODO(https://fxbug.dev/89689): Support controllers that don't support SCO
+  // TODO(https://fxbug.dev/42171056): Support controllers that don't support SCO
   // flow control.
   bool sco_flow_control_supported = state_.IsCommandSupported(
       /*octet=*/10,
@@ -1286,7 +1286,7 @@ void AdapterImpl::InitializeStep4() {
   // connection request PDUs. LE central privacy is still preserved during an
   // active scan, i.e. in LL scan request PDUs.
   //
-  // TODO(https://fxbug.dev/63123): Remove this temporary fix once we determine
+  // TODO(https://fxbug.dev/42141593): Remove this temporary fix once we determine
   // the root cause for authentication failures.
   hci_le_connector_->UseLocalIdentityAddress();
 
@@ -1298,7 +1298,7 @@ void AdapterImpl::InitializeStep4() {
   auto self = weak_self_.GetWeakPtr();
   SetLocalName(kDefaultLocalName, [self](auto status) mutable {
     // Set the default device class - a computer with audio.
-    // TODO(https://fxbug.dev/1234): set this from a platform configuration file
+    // TODO(https://fxbug.dev/42074312): set this from a platform configuration file
     DeviceClass dev_class(DeviceClass::MajorClass::kComputer);
     dev_class.SetServiceClasses({DeviceClass::ServiceClass::kAudio});
     self->SetDeviceClass(dev_class, [self](const auto&) {

@@ -112,7 +112,7 @@ class ByteBuffer {
   //
   // This or ReadMember should always be used in place of reinterpret_cast on
   // raw pointers because of dangerous UB related to object lifetimes and
-  // alignment issues (see https://fxbug.dev/46637). Moreover, this will perform
+  // alignment issues (see https://fxbug.dev/42123294). Moreover, this will perform
   // bounds checking on the data being read.
   template <typename T>
   [[nodiscard]] auto To() const {

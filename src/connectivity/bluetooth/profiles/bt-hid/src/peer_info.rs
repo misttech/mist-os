@@ -50,14 +50,14 @@ pub enum PeerInfoError {
 
 #[derive(Clone, Copy, Debug, FromPrimitive)]
 enum HidAttribute {
-    // TODO(https://fxbug.dev/97186) Parse the rest of the SDP record if necessary.
+    // TODO(https://fxbug.dev/42179386) Parse the rest of the SDP record if necessary.
     ParserVersion = 0x201,
     DeviceSubclass = 0x202,
     CountryCode = 0x203,
     VirtualCable = 0x204,
     ReconnectInitiate = 0x205,
     DescriptorList = 0x206,
-    // TODO(https://fxbug.dev/96992) implement HIDLangIDBase
+    // TODO(https://fxbug.dev/42179170) implement HIDLangIDBase
     BatteryPower = 0x209,
     RemoteWake = 0x20A,
     SupervisionTimeout = 0x20C,
@@ -70,14 +70,14 @@ enum HidAttribute {
 /// Info parsed from the SDP record for the peer.
 #[derive(Debug, Default, PartialEq)]
 pub struct PeerInfo {
-    // TODO(https://fxbug.dev/97186) Parse the rest of the SDP record if necessary.
+    // TODO(https://fxbug.dev/42179386) Parse the rest of the SDP record if necessary.
     pub parser_version: Option<u16>,
     pub device_subclass: Option<u8>,
     pub country_code: Option<u8>,
     pub virtual_cable: Option<bool>,
     pub reconnect_initiate: Option<bool>,
     pub descriptor_list: Option<DescriptorList>,
-    //TODO(https://fxbug.dev/96992) implement HIDLangIDBase
+    //TODO(https://fxbug.dev/42179170) implement HIDLangIDBase
     pub battery_power: Option<bool>,
     pub remote_wake: Option<bool>,
     pub supervision_timeout: Option<u16>,
@@ -90,14 +90,14 @@ pub struct PeerInfo {
 impl PeerInfo {
     fn is_complete(&self) -> bool {
         let complete =
-            // TODO(https://fxbug.dev/97186) Parse the rest of the SDP record if necessary.
+            // TODO(https://fxbug.dev/42179386) Parse the rest of the SDP record if necessary.
             self.parser_version.is_some()
             && self.device_subclass.is_some()
             && self.country_code.is_some()
             && self.virtual_cable.is_some()
             && self.reconnect_initiate.is_some()
             && self.descriptor_list.is_some()
-            // TODO(https://fxbug.dev/96992) implement HIDLangIDBase
+            // TODO(https://fxbug.dev/42179170) implement HIDLangIDBase
             // battery_power is optional
             // remote_wake is optional
             // supervision_timeout is optional
@@ -174,7 +174,7 @@ impl PeerInfo {
     }
 
     fn get_attribute_id_and_set_attribute(&mut self, attribute: Attribute, peer_id: PeerId) {
-        // TODO(https://fxbug.dev/97186) Parse the rest of the SDP record if necessary.
+        // TODO(https://fxbug.dev/42179386) Parse the rest of the SDP record if necessary.
         let attribute_id = match HidAttribute::from_u16(attribute.id) {
             Some(attr) => attr,
             None => {

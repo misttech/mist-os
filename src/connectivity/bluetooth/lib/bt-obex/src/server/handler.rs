@@ -72,7 +72,7 @@ pub trait ObexServerHandler {
     /// Returns `Err` with a rejection code and optional headers if rejected.
     async fn delete(&mut self, headers: HeaderSet) -> ObexResult<()>;
 
-    // TODO(https://fxbug.dev/125307): Add other operation types.
+    // TODO(https://fxbug.dev/42076096): Add other operation types.
 }
 
 #[cfg(test)]

@@ -158,7 +158,7 @@ void ScoDataChannelImpl::OnOutboundPacketReadable() { TrySendNextPackets(); }
 
 void ScoDataChannelImpl::OnRxPacket(pw::span<const std::byte> buffer) {
   if (buffer.size() < sizeof(hci_spec::SynchronousDataHeader)) {
-    // TODO(https://fxbug.dev/97362): Handle these types of errors by signaling
+    // TODO(https://fxbug.dev/42179582): Handle these types of errors by signaling
     // Transport.
     bt_log(ERROR,
            "hci",
@@ -177,7 +177,7 @@ void ScoDataChannelImpl::OnRxPacket(pw::span<const std::byte> buffer) {
   packet->InitializeFromBuffer();
 
   if (packet->view().header().data_total_length != payload_size) {
-    // TODO(https://fxbug.dev/97362): Handle these types of errors by signaling
+    // TODO(https://fxbug.dev/42179582): Handle these types of errors by signaling
     // Transport.
     bt_log(ERROR,
            "hci",
@@ -242,7 +242,7 @@ ScoDataChannelImpl::OnNumberOfCompletedPacketsEvent(const EventPacket& event) {
     uint16_t comp_packets = le16toh(data->hc_num_of_completed_packets);
 
     if (iter->second < comp_packets) {
-      // TODO(https://fxbug.dev/2795): This can be caused by the controller
+      // TODO(https://fxbug.dev/42102535): This can be caused by the controller
       // reusing the connection handle of a connection that just disconnected.
       // We should somehow avoid sending the controller packets for a connection
       // that has disconnected. ScoDataChannel already dequeues such packets,
@@ -283,7 +283,7 @@ void ScoDataChannelImpl::TrySendNextPackets() {
 
   // Even though we only expect to have enough bandwidth for the 1
   // active/configured SCO connection (especially for USB, see
-  // https://fxbug.dev/91560), try to service all connections.
+  // https://fxbug.dev/42173137), try to service all connections.
   for (auto& [conn_handle, conn_data] : connections_) {
     for (size_t num_free_packets = GetNumFreePackets(); num_free_packets != 0u;
          num_free_packets--) {

@@ -212,7 +212,7 @@ impl EventLoop {
         let if_watcher_stream = {
             let interface_state = connect_to_protocol::<fnet_interfaces::StateMarker>()
                 .context("network_manager failed to connect to interface state")?;
-            // TODO(https://fxbug.dev/110445): Don't register interest in
+            // TODO(https://fxbug.dev/42061810): Don't register interest in
             // valid-until. Note that the event stream returned by the extension
             // crate is created from a watcher with interest in all fields.
             fnet_interfaces_ext::event_stream_from_state(
@@ -433,7 +433,7 @@ impl EventLoop {
                     },
                 state: _,
             } => {
-                // TODO(https://fxbug.dev/110445): Don't register interest in
+                // TODO(https://fxbug.dev/42061810): Don't register interest in
                 // valid-until instead of filtering out address property
                 // changes manually here.
                 if online.is_some()
@@ -537,7 +537,7 @@ impl EventLoop {
             neighbors: neighbor_cache.get_interface_neighbors(properties.id.get()),
         };
 
-        // TODO(https://fxbug.dev/123564): Move watchdog into its own future in the eventloop to prevent
+        // TODO(https://fxbug.dev/42074495): Move watchdog into its own future in the eventloop to prevent
         // network check reliance on the watchdog completing.
         let () = watchdog
             .check_interface_state(zx::Time::get_monotonic(), &SystemDispatcher {}, view)
@@ -564,7 +564,7 @@ impl EventLoop {
             .await;
     }
 
-    // TODO(https://fxbug.dev/125657): handle_netcheck_response and handle_network_check_message are missing
+    // TODO(https://fxbug.dev/42076412): handle_netcheck_response and handle_network_check_message are missing
     // tests because they reply on NetworkCheckCookie, which cannot be created in the event loop.
     async fn handle_netcheck_response(
         &mut self,
@@ -597,7 +597,7 @@ impl EventLoop {
 
 /// If we can't reach netstack via fidl, log an error and exit.
 //
-// TODO(https://fxbug.dev/119295): add a test that works as intended.
+// TODO(https://fxbug.dev/42070352): add a test that works as intended.
 fn exit_with_fidl_error(cause: fidl::Error) -> ! {
     error!(%cause, "exiting due to fidl error");
     std::process::exit(1);
@@ -605,7 +605,7 @@ fn exit_with_fidl_error(cause: fidl::Error) -> ! {
 
 /// If we can't get route events from netstack, log an error and exit.
 //
-// TODO(https://fxbug.dev/119295): add a test that works as intended.
+// TODO(https://fxbug.dev/42070352): add a test that works as intended.
 fn exit_with_route_watch_error(cause: fnet_routes_ext::WatchError) -> ! {
     error!(%cause, "exiting due to route watch error");
     std::process::exit(1);

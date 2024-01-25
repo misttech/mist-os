@@ -151,7 +151,7 @@ class FakeAddressStateProvider
       // Send the OnAddressAdded event prior the `OnAddressRemoved`, so that the
       // `AddressStateProviderEventHandler` has to handle two events before
       // knowing the removal reason. This is a regression test for
-      // https://fxbug.dev/136245.
+      // https://fxbug.dev/42085834.
       SendOnAddressAdded();
       SendOnAddressRemoved(
           fuchsia::net::interfaces::admin::AddressRemovalReason::INTERFACE_REMOVED);
@@ -334,7 +334,7 @@ class FakeNetstack : public fuchsia::net::root::testing::Interfaces_TestBase,
   // Default implementation for any API method not explicitly overridden.
   void NotImplemented_(const std::string& name) override { FAIL() << "Not implemented: " << name; }
 
-  // TODO(https://fxbug.dev/111695) Delete this once Weavestack no longer relies
+  // TODO(https://fxbug.dev/42062982) Delete this once Weavestack no longer relies
   // on the root API.
   void GetAdmin(
       uint64_t id,
@@ -481,7 +481,7 @@ class FakeNetstack : public fuchsia::net::root::testing::Interfaces_TestBase,
     return it != route_table_.end();
   }
 
-  // TODO(https://fxbug.dev/111695) Delete this once Weavestack no longer relies
+  // TODO(https://fxbug.dev/42062982) Delete this once Weavestack no longer relies
   // on the root API.
   fidl::InterfaceRequestHandler<fuchsia::net::root::Interfaces> GetRootHandler(
       async_dispatcher_t* dispatcher) {
@@ -492,7 +492,7 @@ class FakeNetstack : public fuchsia::net::root::testing::Interfaces_TestBase,
   }
 
  private:
-  // TODO(https://fxbug.dev/111695) Delete this once Weavestack no longer relies
+  // TODO(https://fxbug.dev/42062982) Delete this once Weavestack no longer relies
   // on the root API.
   fidl::Binding<fuchsia::net::root::Interfaces> root_binding_{this};
   fidl::Binding<fuchsia::net::stack::Stack> stack_binding_{this};
@@ -515,7 +515,7 @@ class WarmTest : public testing::WeaveTestFixture<> {
         fake_net_interfaces_.GetHandler(dispatcher()));
     context_provider_.service_directory_provider()->AddService(
         fake_net_stack_.GetStackHandler(dispatcher()));
-    // TODO(https://fxbug.dev/111695) Delete this once Weavestack no longer
+    // TODO(https://fxbug.dev/42062982) Delete this once Weavestack no longer
     // relies on the root API.
     context_provider_.service_directory_provider()->AddService(
         fake_net_stack_.GetRootHandler(dispatcher()),

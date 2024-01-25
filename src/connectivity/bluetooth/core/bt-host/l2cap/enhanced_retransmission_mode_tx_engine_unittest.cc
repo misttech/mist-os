@@ -107,7 +107,7 @@ TEST_F(EnhancedRetransmissionModeTxEngineTest,
 }
 
 TEST_F(EnhancedRetransmissionModeTxEngineTest, QueueSduSurvivesOversizedSdu) {
-  // TODO(https://fxbug.dev/1033): Update this test when we add support for
+  // TODO(https://fxbug.dev/42054330): Update this test when we add support for
   // segmentation.
   constexpr size_t kMtu = 1;
   TxEngine(kTestChannelId,

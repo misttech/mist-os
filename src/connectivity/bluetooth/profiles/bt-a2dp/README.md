@@ -46,7 +46,7 @@ Manual starting of the component is done via the `ffx` tool. To run the componen
 is offered to the component in this case, and should primarily be used for debugging.
 
 In the future, we plan to allow product integrators the ability to specify
-[startup on boot](https://fxbug.dev/78801). This can be done by marking the component as `eager`
+[startup on boot](https://fxbug.dev/42158968). This can be done by marking the component as `eager`
 in the `core_shard`.
 
 ## Inspection
@@ -123,7 +123,7 @@ start the component, then connect and pair to headphones or a speaker.
        If you know the name of the device, you can filter the results by adding part of the name
        as an argument.  Repeat until your device shows up.
     1. Run `stop-discovery` when your device shows up to stop discovery.
-    1. Wait 10 seconds. (this is a (known bug)[https://fxbug.dev/2758] and will not be necessary soon)
+    1. Wait 10 seconds. (this is a (known bug)[https://fxbug.dev/42102124] and will not be necessary soon)
     1. Run `connect <BT address>` - you can type a partial address and use tab completion
 1. You should be connected to the headphones/speaker - you may hear a tone on them to confirm.
 1. You should be able to play some audio on Fuchsia and hear it from your Bluetooth device:

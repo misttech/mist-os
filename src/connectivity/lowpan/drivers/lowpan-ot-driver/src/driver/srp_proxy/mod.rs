@@ -14,7 +14,7 @@ pub use discovery_proxy::*;
 const LOCAL_DOMAIN: &str = "local.";
 
 /// Placeholder for real TTL values, the addition of which
-/// is being tracked by <https://fxbug.dev/94352>. Value is in seconds.
+/// is being tracked by <https://fxbug.dev/42176238>. Value is in seconds.
 ///
 /// The TTL value determines the number of seconds that a returned
 /// record can be assumed to be accurate for caching purposes.

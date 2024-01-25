@@ -192,7 +192,7 @@ fn fuzz_parse_packet(input: &[u8]) {
                 Dhcpv6Message::parse_and_ignore(&mut input, ());
             }
             DhcpPacketType::Dhcpv4Message => {
-                // TODO(https://fxbug.dev/122602): Migrate dhcp_protocol to packet-formats APIs
+                // TODO(https://fxbug.dev/42073571): Migrate dhcp_protocol to packet-formats APIs
                 // and make this use `parse_and_ignore` instead.
                 let _: Result<dhcp_protocol::Message, dhcp_protocol::ProtocolError> =
                     dhcp_protocol::Message::from_buffer(input);

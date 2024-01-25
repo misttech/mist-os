@@ -289,7 +289,7 @@ Bearer::Bearer(l2cap::Channel::WeakPtr chan, pw::async::Dispatcher& dispatcher)
   }
 
   mtu_ = min_mtu();
-  // TODO(https://fxbug.dev/1447): Dynamically configure preferred MTU value.
+  // TODO(https://fxbug.dev/42087558): Dynamically configure preferred MTU value.
   preferred_mtu_ = kLEMaxMTU;
 }
 

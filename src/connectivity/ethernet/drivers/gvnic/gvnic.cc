@@ -624,7 +624,7 @@ uint32_t Gvnic::ReadCounter(uint32_t index) {
   return counter_base[index];
 }
 
-// TODO(https://fxbug.dev/107757): Find a clever way to get zerocopy rx to work, and then delete
+// TODO(https://fxbug.dev/42059141): Find a clever way to get zerocopy rx to work, and then delete
 // this method.
 void Gvnic::WritePacketToBufferSpace(const rx_space_buffer_t& buffer, uint8_t* data, uint32_t len) {
   network::SharedAutoLock lock(&vmo_lock_);
@@ -695,7 +695,7 @@ int Gvnic::RXThread() {
           .data_list = &completed_rx_parts[packets_written],
           .data_count = 1,
       };
-      // TODO(https://fxbug.dev/107757): Find a clever way to get zerocopy rx to work, instead of
+      // TODO(https://fxbug.dev/42059141): Find a clever way to get zerocopy rx to work, instead of
       // calling this.
       WritePacketToBufferSpace(buffer, data, len);
       rx_space_buffer_queue_.Dequeue();
@@ -828,7 +828,7 @@ void Gvnic::NetworkDeviceImplGetInfo(device_impl_info_t* out_info) {
   out_info->min_rx_buffer_length = rounded_mtu_;
 }
 
-// TODO(https://fxbug.dev/107757): Find a clever way to get zerocopy tx to work, and then delete
+// TODO(https://fxbug.dev/42059141): Find a clever way to get zerocopy tx to work, and then delete
 // this method.
 void Gvnic::WriteBufferToCard(const tx_buffer_t& buffer, uint8_t* data) {
   ZX_ASSERT_MSG(buffer.data_count == 1, "Data count (%lu), should be 1.", buffer.data_count);
@@ -851,7 +851,7 @@ void Gvnic::SendTXBuffers(const tx_buffer_t* buf_list, size_t buf_count) {
     ZX_ASSERT_MSG(buf_list[i].tail_length == 0, "Tail length (%u) should be 0.",
                   buf_list[i].tail_length);
     uint32_t offset = tx_ring_index_ * rounded_mtu_;
-    // TODO(https://fxbug.dev/107757): Find a clever way to get zerocopy tx to work, instead of
+    // TODO(https://fxbug.dev/42059141): Find a clever way to get zerocopy tx to work, instead of
     // calling this.
     WriteBufferToCard(buf_list[i], pagelist_base + offset);
 

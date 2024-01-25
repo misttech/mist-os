@@ -62,10 +62,10 @@ source_set("qmi_driver_src") {
   ]
 
   configs += [
-    # TODO(https://fxbug.dev/58162): delete below and fix conversion warnings.
+    # TODO(https://fxbug.dev/42136089): delete below and fix conversion warnings.
     "//build/config:Wno-conversion",
 
-    # TODO(https://fxbug.dev/135694): delete below and fix VLA warnings.
+    # TODO(https://fxbug.dev/42085293): delete below and fix VLA warnings.
     "//build/config:Wno-vla-cxx-extension",
   ]
 }

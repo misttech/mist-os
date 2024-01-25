@@ -614,7 +614,7 @@ class AttBasedServer final : public Server {
       return;
     }
 
-    // TODO(https://fxbug.dev/636): Add a timeout to this
+    // TODO(https://fxbug.dev/42142121): Add a timeout to this
     if (!attr->ReadAsync(peer_id_, offset, callback)) {
       att_->ReplyWithError(tid, handle, att::ErrorCode::kReadNotPermitted);
     }

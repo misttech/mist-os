@@ -432,7 +432,7 @@ impl ServiceLevelConnection {
 
     /// Handles an error received as a result of operating a procedure.
     fn procedure_error(&mut self, error: ProcedureError) {
-        // TODO(https://fxbug.dev/73027): Right now, we only send an Error AT response to the peer.
+        // TODO(https://fxbug.dev/42152554): Right now, we only send an Error AT response to the peer.
         // Different error cases may warrant different SLC behavior. For example, errors
         // before the SLC is initialized may warrant complete channel shutdown. Fix this method
         // to make the error handling policy decisions.
@@ -493,7 +493,7 @@ impl ServiceLevelConnection {
         let info_request = match self.procedure_request(request) {
             Some(r) => r,
             None => {
-                // TODO(https://fxbug.dev/73027): Propagate this error to PeerTask to be handled.
+                // TODO(https://fxbug.dev/42152554): Propagate this error to PeerTask to be handled.
                 if let Err(e) = self.send_queued().await {
                     warn!("Error sending queued messages: {:?}", e);
                 }
@@ -963,7 +963,7 @@ pub(crate) mod tests {
         expect_slc_ready(&mut exec, &mut slc, std::mem::discriminant(&dtmf_request));
     }
 
-    // TODO(https://fxbug.dev/73027): Re-enable this test after error handling policies are implemented.
+    // TODO(https://fxbug.dev/42152554): Re-enable this test after error handling policies are implemented.
     #[fuchsia::test]
     #[ignore]
     fn unexpected_command_before_initialization_closes_channel() {

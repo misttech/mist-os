@@ -52,7 +52,7 @@ impl StagedData {
         // To many headers provided.
         if headers_size > max_headers_size {
             warn!("Too many headers in GET");
-            // TODO(https://fxbug.dev/132595): It's probably reasonable to support this case by splitting
+            // TODO(https://fxbug.dev/42082648): It's probably reasonable to support this case by splitting
             // the headers across multiple responses.
             return Err(Error::operation(OpCode::Get, "too many headers"));
         }
@@ -830,7 +830,7 @@ mod tests {
         );
 
         // Cannot build and stage data if the header size is larger than the max.
-        // TODO(https://fxbug.dev/132595): Delete this case when headers can be split across packets.
+        // TODO(https://fxbug.dev/42082648): Delete this case when headers can be split across packets.
         let small_max = 10;
         let large_header_size = 20;
         assert_matches!(

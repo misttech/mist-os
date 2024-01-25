@@ -120,7 +120,7 @@ class SocketChannelRelayTest : public ::testing::Test {
   zx::socket local_socket_;
   zx::socket remote_socket_;
   zx::unowned_socket local_socket_unowned_;
-  // TODO(https://fxbug.dev/716): Move to FakeChannelTest, which wraps pw_async.
+  // TODO(https://fxbug.dev/42150969): Move to FakeChannelTest, which wraps pw_async.
   async::Loop loop_;
   pw::async::fuchsia::FuchsiaDispatcher pw_dispatcher_;
 };

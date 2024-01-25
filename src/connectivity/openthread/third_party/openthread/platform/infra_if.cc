@@ -119,14 +119,14 @@ int CreateIcmp6Socket(void) {
             "IPPROTO_ICMPV6, ICMP6_FILTER ret_val:%lld, errno:%s", rval, strerror(errno));
   VERIFY_OR_ASSERT(rval == 0, OT_EXIT_ERROR_ERRNO);
 
-  // TODO(https://fxbug.dev/52565): Re-enable once we have IPV6_RECVPKTINFO
+  // TODO(https://fxbug.dev/42129881): Re-enable once we have IPV6_RECVPKTINFO
   // We want a source address and interface index.
   // rval = setsockopt(sock, IPPROTO_IPV6, IPV6_RECVPKTINFO, &kEnable, sizeof(kEnable));
   // otPlatLog(OT_LOG_LEVEL_WARN, OT_LOG_REGION_PLATFORM, "IPPROTO_IPV6, IPV6_RECVPKTINFO
   // ret_val:%lld, errno:%s", rval, strerror(errno)); VERIFY_OR_ASSERT(rval == 0,
   // OT_EXIT_ERROR_ERRNO);
 
-  // TODO(https://fxbug.dev/82535): re-enable once we have IPV6_RECVHOPLIMIT
+  // TODO(https://fxbug.dev/42163112): re-enable once we have IPV6_RECVHOPLIMIT
   // We need to be able to reject RAs arriving from off-link.
   // rval = setsockopt(sock, IPPROTO_IPV6, IPV6_RECVHOPLIMIT, &kEnable, sizeof(kEnable));
   // otPlatLog(OT_LOG_LEVEL_WARN, OT_LOG_REGION_PLATFORM, "IPPROTO_IPV6, IPV6_RECVHOPLIMIT
@@ -333,7 +333,7 @@ void InfraNetif::ReceiveIcmp6Message(otInstance *a_instance) {
   }
   bufferLength = static_cast<uint16_t>(rval);
 
-  // TODO(https://fxbug.dev/52565): Re-enable once we have IPV6_RECVPKTINFO
+  // TODO(https://fxbug.dev/42129881): Re-enable once we have IPV6_RECVPKTINFO
   for (cmh = CMSG_FIRSTHDR(&msg); cmh; cmh = CMSG_NXTHDR(&msg, cmh)) {
     // if (cmh->cmsg_level == IPPROTO_IPV6 && cmh->cmsg_type == IPV6_PKTINFO &&
     //     cmh->cmsg_len == CMSG_LEN(sizeof(struct in6_pktinfo))) {

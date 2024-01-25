@@ -16,10 +16,10 @@ use super::{
 
 use crate::features::{AgFeatures, CodecId};
 
-// TODO(https://fxbug.dev/74091): Add multiparty support.
-// TODO(https://fxbug.dev/74093): Add Explicit Call Transfer support.
+// TODO(https://fxbug.dev/42153736): Add multiparty support.
+// TODO(https://fxbug.dev/42153738): Add Explicit Call Transfer support.
 
-// TODO(https://fxbug.dev/71668) Stop using raw bytes.
+// TODO(https://fxbug.dev/42151045) Stop using raw bytes.
 const CIND_TEST_RESPONSE_BYTES: &[u8] = b"+CIND: \
 (\"service\",(0,1)),\
 (\"call\",(0,1)),\
@@ -143,7 +143,7 @@ impl From<AgUpdate> for ProcedureRequest {
                 at::success(at::Success::Cops {
                     format,
                     zero: 0,
-                    // TODO(https://fxbug.dev/72112) Make this optional if it's not set.
+                    // TODO(https://fxbug.dev/42151538) Make this optional if it's not set.
                     operator: name,
                 }),
                 at::Response::Ok,

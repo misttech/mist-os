@@ -177,7 +177,7 @@ TEST_F(BLEManagerTest, EnableAndDisableAdvertising) {
   EXPECT_EQ(IsBLEMgrAdvertising(), true);
 }
 
-// TODO(https://fxbug.dev/136172): Re-enable this test once the GATT Write / Indicate flakes are fixed.
+// TODO(https://fxbug.dev/42085753): Re-enable this test once the GATT Write / Indicate flakes are fixed.
 TEST_F(BLEManagerTest, DISABLED_TestWeaveConnect) { WeaveConnect(); }
 
 }  // namespace nl::Weave::DeviceLayer::Internal::testing

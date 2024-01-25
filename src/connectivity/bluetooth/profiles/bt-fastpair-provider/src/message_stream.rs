@@ -102,7 +102,7 @@ impl MessageStream {
     fn handle_rfcomm_data(&mut self, data: Vec<u8>) {
         info!(?data, "Received Message Stream request");
         // We don't support any Message Stream requests.
-        // TODO(https://fxbug.dev/111268): Parse and handle Message Stream requests.
+        // TODO(https://fxbug.dev/42062580): Parse and handle Message Stream requests.
     }
 }
 

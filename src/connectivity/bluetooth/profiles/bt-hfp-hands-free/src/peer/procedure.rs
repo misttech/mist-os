@@ -57,7 +57,7 @@ pub enum CommandFromHf {
 #[derive(Clone, Debug, PartialEq)]
 pub enum ProcedureInput {
     AtResponseFromAg(at::Response),
-    // TODO(https://fxbug.dev/127025) Use this in task.rs.
+    // TODO(https://fxbug.dev/42077657) Use this in task.rs.
     #[allow(unused)]
     CommandFromHf(CommandFromHf),
 }
@@ -68,7 +68,7 @@ pub enum CommandToHf {}
 #[derive(Clone, Debug, PartialEq)]
 pub enum ProcedureOutput {
     AtCommandToAg(at::Command),
-    // TODO(https://fxbug.dev/127025) use this in PeerTask and procedures.
+    // TODO(https://fxbug.dev/42077657) use this in PeerTask and procedures.
     #[allow(unused)]
     CommandToHf(CommandToHf),
 }
@@ -83,7 +83,7 @@ impl ProcedureInputT<ProcedureOutput> for ProcedureInput {
     /// Matches a specific input to procedure
     fn to_initialized_procedure(&self) -> Option<Box<dyn Procedure<Self, ProcedureOutput>>> {
         match self {
-            // TODO(https://fxbug.dev/130999) This is wrong--we need to start SLCI ourselves, not wait for an AT command.
+            // TODO(https://fxbug.dev/42081254) This is wrong--we need to start SLCI ourselves, not wait for an AT command.
             at_resp!(Brsf) => Some(Box::new(SlcInitProcedure::new())),
             at_resp!(Ciev) => Some(Box::new(PhoneStatusProcedure::new())),
             at_resp!(Bcs) => Some(Box::new(CodecConnectionSetupProcedure::new())),

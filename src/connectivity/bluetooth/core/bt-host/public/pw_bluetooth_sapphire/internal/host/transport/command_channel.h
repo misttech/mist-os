@@ -47,7 +47,7 @@ class CommandChannel final {
   // `CommandPacket` are replaced by `EmbossCommandPacket`, command packet
   // transmission will support both versions.
   //
-  // TODO(https://fxbug.dev/86811): Finish migration away from
+  // TODO(https://fxbug.dev/42167863): Finish migration away from
   // std::unique_ptr<CommandPacket> and replace with EmbossCommandPacket.
   using CommandPacketVariant =
       std::variant<std::unique_ptr<CommandPacket>, EmbossCommandPacket>;
@@ -170,7 +170,7 @@ class CommandChannel final {
   // Callbacks invoked to report generic HCI events excluding CommandComplete
   // and CommandStatus events.
   //
-  // TODO(https://fxbug.dev/86811): Finish migration away from EventCallback and
+  // TODO(https://fxbug.dev/42167863): Finish migration away from EventCallback and
   // replace with EmbossEventCallback (renamed to EventCallback).
   using EventCallback =
       fit::function<EventCallbackResult(const EventPacket& event_packet)>;

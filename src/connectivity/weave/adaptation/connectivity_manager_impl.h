@@ -190,7 +190,7 @@ class NL_DLL_EXPORT ConnectivityManagerImpl final
   std::unique_ptr<Delegate> delegate_;
 };
 
-// TODO(https://fxbug.dev/59955): These functions temporarily report that the network is
+// TODO(https://fxbug.dev/42138080): These functions temporarily report that the network is
 // always enabled and always provisioned. These should be properly implemented
 // by reaching out to the WLAN FIDLs.
 inline ConnectivityManager::WiFiStationMode ConnectivityManagerImpl::_GetWiFiStationMode(void) {
@@ -213,7 +213,7 @@ inline bool ConnectivityManagerImpl::_CanStartWiFiScan() { return true; }
 inline void ConnectivityManagerImpl::_OnWiFiScanDone() {}
 inline void ConnectivityManagerImpl::_OnWiFiStationProvisionChange() {}
 
-// TODO(https://fxbug.dev/59956): These functions temporarily report that AP mode is
+// TODO(https://fxbug.dev/42138081): These functions temporarily report that AP mode is
 // disabled and unsupported. These should be properly implemented by reaching
 // out the the WLAN FIDLs.
 inline WEAVE_ERROR ConnectivityManagerImpl::_SetWiFiAPMode(WiFiAPMode val) {

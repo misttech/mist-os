@@ -316,7 +316,7 @@ void LowEnergyConnector::RequestCreateConnection() {
 
   state_.Set(State::kConnecting);
 
-  // TODO(https://fxbug.dev/70199): Use slow interval & window for auto
+  // TODO(https://fxbug.dev/42149416): Use slow interval & window for auto
   // connections during background scan.
   BT_ASSERT(hci_connector_->CreateConnection(
       /*use_accept_list=*/false,

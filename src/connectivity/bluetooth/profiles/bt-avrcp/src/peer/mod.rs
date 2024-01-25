@@ -151,7 +151,7 @@ impl AVCTPConnectionType {
     /// Get the the correct L2cap ChannelParameters for this connection type.
     /// (basic for control, enhanced retransmission for browsing)
     pub fn parameters(&self) -> bredr::ChannelParameters {
-        // TODO(https://fxbug.dev/101260): set minimum MTU to 335.
+        // TODO(https://fxbug.dev/42052066): set minimum MTU to 335.
         match self {
             AVCTPConnectionType::Control => bredr::ChannelParameters::default(),
             AVCTPConnectionType::Browse => bredr::ChannelParameters {

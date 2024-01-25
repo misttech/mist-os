@@ -78,7 +78,7 @@ pub struct CallEntryInspect {
     is_incoming: inspect::BoolProperty,
     call_state: inspect::StringProperty,
     inspect_node: inspect::Node,
-    //TODO(https://fxbug.dev/91250): Persist previous states, record their associated change times
+    //TODO(https://fxbug.dev/42172793): Persist previous states, record their associated change times
 }
 
 impl Inspect for &mut CallEntryInspect {

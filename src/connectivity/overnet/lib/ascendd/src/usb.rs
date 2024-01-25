@@ -20,7 +20,7 @@ pub async fn listen_for_usb_devices(router: Weak<Router>) -> Result<(), Error> {
     tracing::info!("Listening for USB devices");
     let mut stream = usb_rs::wait_for_devices(true, false)?;
     while let Some(device) = stream.next().await.transpose()? {
-        let usb_rs::DeviceEvent::Added(device) = device  else {
+        let usb_rs::DeviceEvent::Added(device) = device else {
             continue;
         };
 
@@ -183,7 +183,7 @@ async fn run_usb_link(
 
     let tx = async move {
         loop {
-            // TODO(sadmac): Change to MTU when https://fxbug.dev/124327 is fixed
+            // TODO(sadmac): Change to MTU when https://fxbug.dev/42075211 is fixed
             let mut out = [0u8; 496];
 
             // TODO: We could save a copy here by having a version of `read` with an async body.

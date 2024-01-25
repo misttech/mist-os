@@ -244,7 +244,7 @@ void LowEnergyCentralServer::ScanInstance::FilterAndAddPeers(std::unordered_set<
     }
     bool matches_any = false;
     for (const bt::gap::DiscoveryFilter& filter : filters_) {
-      // TODO(https://fxbug.dev/36373): Match peer names that are not in advertising data.
+      // TODO(https://fxbug.dev/42111894): Match peer names that are not in advertising data.
       // This might require implementing a new peer filtering class, as
       // DiscoveryFilter only filters advertising data.
       if (filter.MatchLowEnergyResult(peer->le()->parsed_advertising_data(), peer->connectable(),

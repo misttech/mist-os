@@ -43,7 +43,7 @@ class RemoteServiceManager final {
   // occur before initialization completes. If |services| is empty, discover all
   // services. If |services| is not empty, only discover services that match the
   // UUIDs in |services|.
-  // TODO(https://fxbug.dev/65592): Support initiating multiple service
+  // TODO(https://fxbug.dev/42144310): Support initiating multiple service
   // discoveries for different service UUIDs.
   void Initialize(att::ResultFunction<> callback,
                   fit::callback<void(uint16_t)> mtu_cb,

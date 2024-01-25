@@ -130,7 +130,7 @@ impl PlatTrel for Instance {
         unsafe {
             otPlatTrelHandleReceived(
                 self.as_ot_ptr(),
-                // TODO(https://fxbug.dev/93684): Make sure they won't actually mutate.
+                // TODO(https://fxbug.dev/42175496): Make sure they won't actually mutate.
                 packet.as_ptr() as *mut u8,
                 packet.len().try_into().unwrap(),
             )

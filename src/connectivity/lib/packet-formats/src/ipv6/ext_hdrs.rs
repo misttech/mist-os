@@ -394,7 +394,7 @@ impl<'a> RecordsImpl<'a> for Ipv6ExtensionHeaderImpl {
                 //   Pointer field containing the offset of the unrecognized value
                 //   within the original packet.
                 Err(Ipv6ExtensionHeaderParsingError::UnrecognizedNextHeader {
-                    // TODO(https://fxbug.dev/78130): When overhauling packet
+                    // TODO(https://fxbug.dev/42158223): When overhauling packet
                     // validation, return the right values for `pointer` and
                     // `header_len`.
                     pointer: u32::MAX,

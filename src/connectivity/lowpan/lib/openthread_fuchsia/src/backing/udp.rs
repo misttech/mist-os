@@ -11,7 +11,7 @@ use std::ffi::c_void;
 use std::ptr::NonNull;
 use std::task::Poll;
 
-// TODO(https://fxbug.dev/93438): At some point plumb this to OPENTHREAD_CONFIG_IP6_HOP_LIMIT_DEFAULT
+// TODO(https://fxbug.dev/42175223): At some point plumb this to OPENTHREAD_CONFIG_IP6_HOP_LIMIT_DEFAULT
 const DEFAULT_HOP_LIMIT: u8 = 64;
 
 pub(crate) fn poll_ot_udp_socket(
@@ -60,8 +60,8 @@ pub(crate) fn poll_ot_udp_socket(
                     info.set_host_interface(scope_id == host_iface);
                 }
 
-                // TODO(https://fxbug.dev/93438): Set hop count. Figure out how to get this info.
-                // TODO(https://fxbug.dev/93438): Set ECN. Need to figure out how to get this info.
+                // TODO(https://fxbug.dev/42175223): Set hop count. Figure out how to get this info.
+                // TODO(https://fxbug.dev/42175223): Set ECN. Need to figure out how to get this info.
                 ot_udp_socket.handle_receive(&message, &info);
             }
             Poll::Ready(Err(err)) => {
@@ -296,7 +296,7 @@ impl UdpSocketHelpers for ot::UdpSocket<'_> {
 
         debug!(tag = "udp", "otPlatUdp:{:?}: Connect to {:?}", self.as_ot_ptr(), self.peer_name());
 
-        // TODO(https://fxbug.dev/93438): Investigate implications of leaving this unimplemented.
+        // TODO(https://fxbug.dev/42175223): Investigate implications of leaving this unimplemented.
         //                        It's not entirely clear why we have this call to connect
         //                        when we always specify a destination for `send`.
 

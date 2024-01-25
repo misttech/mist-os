@@ -568,7 +568,7 @@ impl<T> Chained<T> {
         // Create an uninitialized array of `MaybeUninit`. The `assume_init` is
         // safe because the type we are claiming to have initialized here is a
         // bunch of `MaybeUninit`s, which do not require initialization.
-        // TODO(https://fxbug.dev/80114): use MaybeUninit::uninit_array once it
+        // TODO(https://fxbug.dev/42160423): use MaybeUninit::uninit_array once it
         // is stablized.
         // https://doc.rust-lang.org/std/mem/union.MaybeUninit.html#method.uninit_array
         Self { storage: unsafe { MaybeUninit::uninit().assume_init() }, len: ChainLength::ZERO }
@@ -606,7 +606,7 @@ impl<T> IntoIterator for Chained<T> {
         // the values and set them to be uninitialized. The `assume_init` is
         // safe because the type we are claiming to have initialized here is a
         // bunch of `MaybeUninit`s, which do not require initialization.
-        // TODO(https://fxbug.dev/80114): use MaybeUninit::uninit_array once it
+        // TODO(https://fxbug.dev/42160423): use MaybeUninit::uninit_array once it
         // is stablized.
         #[allow(clippy::uninit_assumed_init)]
         let storage =

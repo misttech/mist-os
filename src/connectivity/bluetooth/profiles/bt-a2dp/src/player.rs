@@ -203,7 +203,7 @@ impl AsyncWrite for AudioConsumerSink {
     }
 
     fn poll_close(self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<io::Result<()>> {
-        // TODO(https://fxbug.dev/48584): Actually close the stream.
+        // TODO(https://fxbug.dev/42125457): Actually close the stream.
         Poll::Ready(Ok(()))
     }
 }
@@ -429,7 +429,7 @@ impl Player {
 
         let mut offset = RtpHeader::LENGTH;
 
-        // TODO(https://fxbug.dev/40918) Handle SBC packet header
+        // TODO(https://fxbug.dev/42116943) Handle SBC packet header
         offset += self.codec_config.rtp_frame_header().len();
 
         while offset < payload.len() {

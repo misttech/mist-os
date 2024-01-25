@@ -563,7 +563,7 @@ mod tests {
         );
 
         let mut buffer = [UNWRITTEN_BYTE; ETHERNET_MIN_FRAME_LEN];
-        // TODO(https://fxbug.dev/129396): Don't use this `#[doc(hidden)]`
+        // TODO(https://fxbug.dev/42079821): Don't use this `#[doc(hidden)]`
         // method, and use the public API instead.
         GrowBufferMut::serialize(
             &mut Buf::new(&mut buffer[..], ETHERNET_HDR_LEN_NO_TAG..ETHERNET_HDR_LEN_NO_TAG),

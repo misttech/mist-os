@@ -105,7 +105,7 @@ impl MulticastRoutingManager {
                     // we proceed to add route. Otherwise continue to wait for the next event.
                     let source_list_matching_dest_address = match event {
                         fnet_mcast::RoutingEvent::MissingRoute(fnet_mcast::Empty {}) => {
-                            // TODO(https://fxbug.dev/116533) - investigate posix for packets going
+                            // TODO(https://fxbug.dev/42067710) - investigate posix for packets going
                             // from thread interface to backbone interface and why routes aren't
                             // added there. Route need to be added for any outbound multicast
                             // packet (ie packets going from this thread network to multicast
@@ -202,7 +202,7 @@ impl MulticastRoutingManager {
         multicast_forwarding_cache.insert(insert_address, Vec::new());
     }
 
-    // TODO(https://fxbug.dev/116533) - add function remove_forwarding_route
+    // TODO(https://fxbug.dev/42067710) - add function remove_forwarding_route
     // which does clean-up of addresses similar to:
     // https://github.com/openthread/openthread/blob/main/src/posix/platform/multicast_routing.cpp#L589
 }

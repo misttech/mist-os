@@ -96,7 +96,7 @@ impl FrameVmo {
         self.format = Some(format);
         self.frames_per_second = frames_per_second;
         if notifications_per_ring > 0 {
-            // TODO(https://fxbug.dev/92947) : consider rounding this up to avoid delivering an extra
+            // TODO(https://fxbug.dev/42174677) : consider rounding this up to avoid delivering an extra
             // notification sometimes.
             // (and always align the frames notified to the beginning of the buffer)
             self.frames_between_notifications = frames / notifications_per_ring as usize;
@@ -182,7 +182,7 @@ impl FrameVmo {
     /// Returns a pair (low, high) of the set of frames within the "safe window" where the
     /// client of the VMO is guaranteed to be able to read/write from, as of `time`.
     /// The safe frame window advances forward through time.
-    /// TODO(https://fxbug.dev/122466): currently this just returns the whole buffer
+    /// TODO(https://fxbug.dev/42073419): currently this just returns the whole buffer
     /// it should only return the moving window we've reserved for ourselves.
     fn safe_frames_at(&self, time: fasync::Time) -> (usize, usize) {
         let youngest_frame_count = self.frames_before(time);
@@ -572,7 +572,7 @@ mod tests {
 
         // Should be able to get frames that span from the middle of the buffer to the middle of the
         // buffer (from index 12000 to index 11999).  This should be 24000 frames.
-        // TODO(https://fxbug.dev/90313): should mark the buffer somehow to confirm that the data is correct
+        // TODO(https://fxbug.dev/42171752): should mark the buffer somehow to confirm that the data is correct
         let res = vmo.poll_read(TEST_FRAMES / 2, &mut full_buf, &mut no_wake_cx);
         let (frame_idx, missed) = res.expect("frames should be ready").expect("no error");
 
@@ -724,7 +724,8 @@ mod tests {
             exec.set_fake_time(moment_end);
             total_duration += moment_length;
             // the cx here will never be woken since we never wake timers
-            let Poll::Ready(res) = vmo.poll_read(next_index, &mut ten_frames_buf, &mut no_wake_cx) else {
+            let Poll::Ready(res) = vmo.poll_read(next_index, &mut ten_frames_buf, &mut no_wake_cx)
+            else {
                 continue;
             };
             let (last_idx, missed) = res.expect("no error");
@@ -769,7 +770,7 @@ mod tests {
         assert_eq!(frame_idx, QUART_FRAMES);
 
         // After a quarter_duration, we should be able to write to the whole buffer
-        // TODO(https://fxbug.dev/122466): this should only be the safe space and not the whole
+        // TODO(https://fxbug.dev/42073419): this should only be the safe space and not the whole
         // buffer, there is a no-go-space just past the read pointer.
         exec.set_fake_time(fasync::Time::after(half_dur / 2));
 
@@ -788,7 +789,7 @@ mod tests {
 
         // Should be able to write frames frames that span from the quarter of the buffer to the
         // read pointer again (from index 6000 to index 5999).  This should be 24000 frames.
-        // TODO(https://fxbug.dev/90313): should mark the buffer somehow to confirm that the data is correct
+        // TODO(https://fxbug.dev/42171752): should mark the buffer somehow to confirm that the data is correct
         let res = vmo.poll_write(frame_idx, &full_buf, &mut no_wake_cx);
         let (frame_idx, missed) = res.expect("frames should be ready").expect("no error");
 
@@ -830,7 +831,7 @@ mod tests {
         assert_eq!(count, 1);
 
         // Should be able to write a whole buffer right after start.
-        // TODO(https://fxbug.dev/122466): this should only be the safe space and not the whole
+        // TODO(https://fxbug.dev/42073419): this should only be the safe space and not the whole
         // buffer, there is a no-go-space just past the read pointer.
         let mut idx = 0;
         for _ in 0..4 {

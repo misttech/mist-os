@@ -291,7 +291,7 @@ where
             remote_address: Subnet { addr: LINK_LOCAL_MDNS_MULTICAST_GROUP, prefix_len: 128 },
         };
 
-        // TODO(https://fxbug.dev/93289): Once bug 93289 is addressed, we can remove this filter.
+        // TODO(https://fxbug.dev/42175057): Once bug 93289 is addressed, we can remove this filter.
         if MDNS_MATCHER.match_outbound_packet(packet_bytes) {
             fn ascii_dump(data: &[u8]) -> String {
                 let vec = data

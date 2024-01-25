@@ -190,7 +190,7 @@ class Peer final {
     // Note that it is possible for `advertising_data()` to return a non-empty
     // buffer while this method returns std::nullopt, as AdvertisingData is only
     // stored if it is parsed correctly.
-    // TODO(https://fxbug.dev/85368): Migrate clients off of advertising_data,
+    // TODO(https://fxbug.dev/42166259): Migrate clients off of advertising_data,
     // so that we do not need to store the raw buffer after parsing it.
     const std::optional<std::reference_wrapper<const AdvertisingData>>
     parsed_advertising_data() const {
@@ -714,7 +714,7 @@ class Peer final {
   bool identity_known_;
 
   StringInspectable<std::optional<PeerName>> name_;
-  // TODO(https://fxbug.dev/95912): Coordinate this field with the appearance
+  // TODO(https://fxbug.dev/42177971): Coordinate this field with the appearance
   // read from advertising data.
   std::optional<uint16_t> appearance_;
   StringInspectable<

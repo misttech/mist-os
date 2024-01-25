@@ -287,10 +287,10 @@ mod tests {
     fn debug_string() {
         #[derive(Debug)]
         struct Foo {
-            // TODO(https://fxbug.dev/84729)
+            // TODO(https://fxbug.dev/42165549)
             #[allow(unused)]
             bar: u8,
-            // TODO(https://fxbug.dev/84729)
+            // TODO(https://fxbug.dev/42165549)
             #[allow(unused)]
             baz: &'static str,
         }

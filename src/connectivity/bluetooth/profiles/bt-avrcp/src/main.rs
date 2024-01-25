@@ -76,7 +76,7 @@ async fn main() -> Result<(), Error> {
 
     // Create a channel that peer manager will receive requests for peer controllers from the FIDL
     // service runner.
-    // TODO(https://fxbug.dev/44330) handle back pressure correctly and reduce mpsc::channel buffer sizes.
+    // TODO(https://fxbug.dev/42120733) handle back pressure correctly and reduce mpsc::channel buffer sizes.
     let (client_sender, mut service_request_receiver) = mpsc::channel(512);
 
     let inspect = inspect::Inspector::default();

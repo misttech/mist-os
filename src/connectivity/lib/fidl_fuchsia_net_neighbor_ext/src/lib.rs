@@ -27,7 +27,7 @@ pub struct Entry {
     #[fidl_field_type(optional)]
     pub mac: Option<fnet::MacAddress>,
     /// Timestamp when this entry has changed `state`.
-    // TODO(https://fxbug.dev/75531): Replace with zx::Time once there is
+    // TODO(https://fxbug.dev/42155335): Replace with zx::Time once there is
     // support for custom conversion functions.
     pub updated_at: zx::zx_time_t,
 }
