@@ -1414,7 +1414,7 @@ From //third_party/pigweed/src/pw_build/gn_internal/defaults.gni:35
 ### delegated_network_provisioning
 
 DO NOT SET THIS IN A PRODUCT DEFINITION!!  FOR DEVELOPER USE ONLY
-TODO(https://fxbug.dev/42082693): Remove this when we have a solution for
+TODO(https://fxbug.dev/132635): Remove this when we have a solution for
 changing the netcfg configuration at runtime.
 
 **Current value (from the default):** `false`
@@ -2613,7 +2613,7 @@ TODO(https://fxbug.dev/320511796): Cleanup when no longer necessary.
 
 **Current value (from the default):** `false`
 
-From //build/testing/boot_tests/kernel_zbi_test.gni:20
+From //build/testing/boot_tests/kernel_zbi_test.gni:21
 
 ### disable_elf_checks
 
@@ -3379,7 +3379,7 @@ which is a full system image generated for exfiltrating instrumentation data fro
 
 **Current value (from the default):** `false`
 
-From //build/testing/boot_tests/kernel_zbi_test.gni:16
+From //build/testing/boot_tests/kernel_zbi_test.gni:17
 
 ### generate_legacy_ninja_build_outputs_licenses_spdx
 
@@ -9090,7 +9090,7 @@ From //src/graphics/drivers/arm-mali/icd/prebuilt_arm_mali.gni:8
 
 ### anv_enable_external_sync_fd
 
-TODO(fxbug.dev/42146493) - remove once external sync FD extensions fully supported
+TODO(fxbug.dev/67565) - remove once external sync FD extensions fully supported
 
 **Current value (from the default):** `false`
 
