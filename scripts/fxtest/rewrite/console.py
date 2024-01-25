@@ -121,8 +121,10 @@ async def console_printer(
         if do_status_output_event.is_set():
             status_lines = _create_status_lines_from_state(flags, state)
 
+            # Print status output, leaving an extra line to separate
+            # from prepended lines.
             termout.write_lines(
-                status_lines[: flags.status_lines], lines_to_print
+                [""] + status_lines[: flags.status_lines], lines_to_print
             )
         elif lines_to_print:
             print("\n".join(lines_to_print))
