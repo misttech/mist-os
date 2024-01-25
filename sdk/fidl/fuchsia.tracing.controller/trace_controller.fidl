@@ -1,6 +1,7 @@
 // Copyright 2016 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+
 library fuchsia.tracing.controller;
 
 using fuchsia.tracing;
@@ -12,9 +13,12 @@ const MAX_NUM_PROVIDERS uint32 = 100;
 /// The maximum length of an alert name.
 const MAX_ALERT_NAME_LENGTH uint32 = 14;
 
+/// aliases
+alias AlertName = string:MAX_ALERT_NAME_LENGTH;
+
 /// The state of the tracing session.
 /// A "session" is everything between `Initialize` and `Terminate`.
-type SessionState = strict enum {
+type SessionState = flexible enum {
     /// The tracing system is ready for a new session.
     /// There can be only one session at a time.
     READY = 1;
@@ -46,7 +50,7 @@ type SessionState = strict enum {
 /// events.  This ensures that the trace format can be extended without needing
 /// to modify the trace controller.
 @discoverable
-closed protocol Controller {
+protocol Controller {
     /// Requests to initialize tracing with the specified `config`.
     ///
     /// A bad request will terminate the connection.
@@ -54,7 +58,7 @@ closed protocol Controller {
     /// The trace controller emits trace data to `output` as a sequence of
     /// binary formatted trace records.  Traces obtained from different providers
     /// are delimited by metadata records within the stream.
-    strict InitializeTracing(resource struct {
+    flexible InitializeTracing(resource struct {
         config TraceConfig;
         output zx.Handle:SOCKET;
     });
@@ -112,48 +116,50 @@ closed protocol Controller {
 
     /// Returns the next alert when it arrives.
     strict WatchAlert() -> (struct {
-        alert_name string:MAX_ALERT_NAME_LENGTH;
+        alert_name AlertName;
     });
 };
 
 // Individual providers can be tuned with this.
 type ProviderSpec = table {
-    1: name string:fuchsia.tracing.MAX_PROVIDER_NAME_LENGTH;
+    1: name fuchsia.tracing.ProviderName;
     2: buffer_size_megabytes_hint uint32;
-    3: categories
-            vector<string:fuchsia.tracing.MAX_CATEGORY_NAME_LENGTH>:fuchsia.tracing.MAX_NUM_ENABLED_CATEGORIES;
+    3: categories fuchsia.tracing.EnabledCategoryList;
 };
 
 /// Provides options for the trace.
 type TraceConfig = table {
     /// The trace categories to record, or an empty array for all.
-    1: categories
-            vector<string:fuchsia.tracing.MAX_CATEGORY_NAME_LENGTH>:fuchsia.tracing.MAX_NUM_ENABLED_CATEGORIES;
+    1: categories fuchsia.tracing.EnabledCategoryList;
 
     /// Suggested size of trace buffer which each provider should receive.
-    // TODO(https://fxbug.dev/7932): Default to 4.
+    // If table defaults were supported, this would default to 4.
     2: buffer_size_megabytes_hint uint32;
 
     /// Acknowledge start request after at most `start_timeout_milliseconds`.
-    // TODO(https://fxbug.dev/7932): Default to 5000.
+    // If table defaults were supported, this would default to 5000.
     3: start_timeout_milliseconds uint64;
 
-    // TODO(https://fxbug.dev/7932), TODO(https://fxbug.dev/7810): Default to BufferingMode.ONESHOT.
+    // If table defaults were supported, this would default to BufferingMode.ONESHOT.
     4: buffering_mode fuchsia.tracing.BufferingMode;
 
     /// Overrides for particular providers.
     5: provider_specs vector<ProviderSpec>:MAX_NUM_PROVIDERS;
 };
 
-/// Terminate options.
+/// Options to be passed with the TerminateTracing request.
+/// This determines whether any pending data is written to the output
+/// socket before it is closed.
 type TerminateOptions = table {
     /// If true then write trace results.
     /// If false then discard trace results.
     1: write_results bool;
 };
 
+/// Statistics data per provider collected over the course of the tracing session
+/// that is returned once the session is terminated.
 type ProviderStats = table {
-    1: name string:fuchsia.tracing.MAX_PROVIDER_NAME_LENGTH;
+    1: name fuchsia.tracing.ProviderName;
     2: pid zx.Koid;
     3: buffering_mode fuchsia.tracing.BufferingMode;
     4: buffer_wrapped_count uint32;
@@ -168,7 +174,7 @@ type TerminateResult = table {
 };
 
 /// Error codes from Start operations.
-type StartErrorCode = strict enum {
+type StartErrorCode = flexible enum {
     /// Tracing hasn't been initialized, not ready to start.
     NOT_INITIALIZED = 1;
     /// Tracing has already been started.
@@ -193,8 +199,7 @@ type StartOptions = table {
     /// The trace categories to add to the initial set provided in
     /// `TraceConfig`. If the combined number of categories goes over the
     /// limit then the extra categories past the limit are discarded.
-    2: additional_categories
-            vector<string:fuchsia.tracing.MAX_CATEGORY_NAME_LENGTH>:fuchsia.tracing.MAX_NUM_ENABLED_CATEGORIES;
+    2: additional_categories fuchsia.tracing.EnabledCategoryList;
 };
 
 /// Additional options to control stopping of a trace.
@@ -209,11 +214,11 @@ type StopOptions = table {
 /// Result of `GetProviders`.
 type ProviderInfo = table {
     /// The provider's ID, assigned by trace-manager.
-    1: id uint32;
+    1: id fuchsia.tracing.ProviderId;
 
     /// The provider's pid.
     2: pid zx.Koid;
 
     /// The name of the provider.
-    3: name string:fuchsia.tracing.MAX_PROVIDER_NAME_LENGTH;
+    3: name fuchsia.tracing.ProviderName;
 };

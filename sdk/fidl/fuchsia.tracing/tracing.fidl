@@ -19,12 +19,30 @@ const MAX_CATEGORY_NAME_LENGTH uint32 = 100;
 /// The maximum length of a category description.
 const MAX_CATEGORY_DESCRIPTION_LENGTH uint32 = 400;
 
+/// aliases
+@available(added=18)
+alias CategoryName = string:MAX_CATEGORY_NAME_LENGTH;
+@available(added=18)
+alias CategoryDescription = string:MAX_CATEGORY_DESCRIPTION_LENGTH;
+@available(added=18)
+alias EnabledCategoryList = vector<CategoryName>:MAX_NUM_ENABLED_CATEGORIES;
+@available(added=18)
+alias ProviderName = string:MAX_PROVIDER_NAME_LENGTH;
+@available(added=18)
+alias ProviderId = uint32;
+
 /// The value returned by `GetKnownCategories`.
 type KnownCategory = struct {
     // Category name.
+    @available(replaced=18)
     name string:MAX_CATEGORY_NAME_LENGTH;
+    @available(added=18)
+    name CategoryName;
     // Category description.
+    @available(replaced=18)
     description string:MAX_CATEGORY_DESCRIPTION_LENGTH;
+    @available(added=18)
+    description CategoryDescription;
 };
 
 /// Choices for clearing/retaining trace buffer contents at Start.

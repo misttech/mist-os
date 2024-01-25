@@ -49,6 +49,7 @@ class TraceManager : public controller::Controller, public provider::Registry {
   void GetProviders(GetProvidersCallback cb) override;
   void GetKnownCategories(GetKnownCategoriesCallback callback) override;
   void WatchAlert(WatchAlertCallback cb) override;
+  void handle_unknown_method(uint64_t ordinal, bool method_has_response) override;
 
   // |TraceRegistry| implementation.
   void RegisterProviderWorker(fidl::InterfaceHandle<provider::Provider> provider, uint64_t pid,

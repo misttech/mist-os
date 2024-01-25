@@ -86,6 +86,11 @@ void TraceManager::OnEmptyControllerSet() {
 }
 
 // fidl
+void TraceManager::handle_unknown_method(uint64_t ordinal, bool method_has_response) {
+  FX_LOGS(WARNING) << "Received an unknown method with ordinal " << ordinal;
+}
+
+// fidl
 void TraceManager::InitializeTracing(controller::TraceConfig config, zx::socket output) {
   FX_VLOGS(2) << "InitializeTracing";
 

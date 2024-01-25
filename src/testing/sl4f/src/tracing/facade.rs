@@ -129,6 +129,7 @@ impl TracingFacade {
                 StartErrorCode::AlreadyStarted => Err(format_err!("Trace already started")),
                 StartErrorCode::Stopping => Err(format_err!("Trace is stopping")),
                 StartErrorCode::Terminating => Err(format_err!("Trace is terminating")),
+                _ => Err(format_err!("Unhandled error code during trace start")),
             },
         }
     }
