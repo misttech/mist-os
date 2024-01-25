@@ -1042,10 +1042,10 @@ impl<I: IpSockAddrExt + IpExt> RequestHandler<'_, I> {
                     .unwrap_or_else(|e| tracing::error!("failed to respond: {e:?}"));
             }
             fposix_socket::StreamSocketRequest::SetBroadcast { value: _, responder } => {
-                respond_not_supported!(responder);
+                respond_not_supported!("stream::SetBroadcast", responder);
             }
             fposix_socket::StreamSocketRequest::GetBroadcast { responder } => {
-                respond_not_supported!(responder);
+                respond_not_supported!("stream::GetBroadcast", responder);
             }
             fposix_socket::StreamSocketRequest::SetSendBuffer { value_bytes, responder } => {
                 self.set_send_buffer_size(value_bytes);
@@ -1081,44 +1081,44 @@ impl<I: IpSockAddrExt + IpExt> RequestHandler<'_, I> {
                     .unwrap_or_else(|e| tracing::error!("failed to respond: {e:?}"));
             }
             fposix_socket::StreamSocketRequest::SetOutOfBandInline { value: _, responder } => {
-                respond_not_supported!(responder);
+                respond_not_supported!("stream::SetOutOfBandInline", responder);
             }
             fposix_socket::StreamSocketRequest::GetOutOfBandInline { responder } => {
-                respond_not_supported!(responder);
+                respond_not_supported!("stream::GetOutOfBandInline", responder);
             }
             fposix_socket::StreamSocketRequest::SetNoCheck { value: _, responder } => {
-                respond_not_supported!(responder);
+                respond_not_supported!("stream::SetNoCheck", responder);
             }
             fposix_socket::StreamSocketRequest::GetNoCheck { responder } => {
-                respond_not_supported!(responder);
+                respond_not_supported!("stream::GetNoCheck", responder);
             }
             fposix_socket::StreamSocketRequest::SetLinger {
                 linger: _,
                 length_secs: _,
                 responder,
             } => {
-                respond_not_supported!(responder);
+                respond_not_supported!("stream::SetLinger", responder);
             }
             fposix_socket::StreamSocketRequest::GetLinger { responder } => {
-                respond_not_supported!(responder);
+                respond_not_supported!("stream::GetLinger", responder);
             }
             fposix_socket::StreamSocketRequest::SetReusePort { value: _, responder } => {
-                respond_not_supported!(responder);
+                respond_not_supported!("stream::SetReusePort", responder);
             }
             fposix_socket::StreamSocketRequest::GetReusePort { responder } => {
-                respond_not_supported!(responder);
+                respond_not_supported!("stream::GetReusePort", responder);
             }
             fposix_socket::StreamSocketRequest::GetAcceptConn { responder } => {
-                respond_not_supported!(responder);
+                respond_not_supported!("stream::GetAcceptConn", responder);
             }
             fposix_socket::StreamSocketRequest::GetBindToDevice { responder } => {
-                respond_not_supported!(responder);
+                respond_not_supported!("stream::GetBindToDevice", responder);
             }
             fposix_socket::StreamSocketRequest::SetTimestamp { value: _, responder } => {
-                respond_not_supported!(responder);
+                respond_not_supported!("stream::SetTimestamp", responder);
             }
             fposix_socket::StreamSocketRequest::GetTimestamp { responder } => {
-                respond_not_supported!(responder);
+                respond_not_supported!("stream::GetTimestamp", responder);
             }
             fposix_socket::StreamSocketRequest::GetOriginalDestination { responder } => {
                 // When we support NAT, we should return the original address.
@@ -1127,7 +1127,7 @@ impl<I: IpSockAddrExt + IpExt> RequestHandler<'_, I> {
                     .unwrap_or_else(|e| tracing::error!("failed to respond: {e:?}"));
             }
             fposix_socket::StreamSocketRequest::Disconnect { responder } => {
-                respond_not_supported!(responder);
+                respond_not_supported!("stream::Disconnect", responder);
             }
             fposix_socket::StreamSocketRequest::GetSockName { responder } => {
                 responder
@@ -1145,125 +1145,125 @@ impl<I: IpSockAddrExt + IpExt> RequestHandler<'_, I> {
                     .unwrap_or_else(|e| tracing::error!("failed to respond: {e:?}"));
             }
             fposix_socket::StreamSocketRequest::SetIpTypeOfService { value: _, responder } => {
-                respond_not_supported!(responder);
+                respond_not_supported!("stream::SetIpTypeOfService", responder);
             }
             fposix_socket::StreamSocketRequest::GetIpTypeOfService { responder } => {
-                respond_not_supported!(responder);
+                respond_not_supported!("stream::GetIpTypeOfService", responder);
             }
             fposix_socket::StreamSocketRequest::SetIpTtl { value: _, responder } => {
-                respond_not_supported!(responder);
+                respond_not_supported!("stream::SetIpTtl", responder);
             }
             fposix_socket::StreamSocketRequest::GetIpTtl { responder } => {
-                respond_not_supported!(responder);
+                respond_not_supported!("stream::GetIpTtl", responder);
             }
             fposix_socket::StreamSocketRequest::SetIpPacketInfo { value: _, responder } => {
-                respond_not_supported!(responder);
+                respond_not_supported!("stream::SetIpPacketInfo", responder);
             }
             fposix_socket::StreamSocketRequest::GetIpPacketInfo { responder } => {
-                respond_not_supported!(responder);
+                respond_not_supported!("stream::GetIpPacketInfo", responder);
             }
             fposix_socket::StreamSocketRequest::SetIpReceiveTypeOfService {
                 value: _,
                 responder,
             } => {
-                respond_not_supported!(responder);
+                respond_not_supported!("stream::SetIpReceiveTypeOfService", responder);
             }
             fposix_socket::StreamSocketRequest::GetIpReceiveTypeOfService { responder } => {
-                respond_not_supported!(responder);
+                respond_not_supported!("stream::GetIpReceiveTypeOfService", responder);
             }
             fposix_socket::StreamSocketRequest::SetIpReceiveTtl { value: _, responder } => {
-                respond_not_supported!(responder);
+                respond_not_supported!("stream::SetIpReceiveTtl", responder);
             }
             fposix_socket::StreamSocketRequest::GetIpReceiveTtl { responder } => {
-                respond_not_supported!(responder);
+                respond_not_supported!("stream::GetIpReceiveTtl", responder);
             }
             fposix_socket::StreamSocketRequest::SetIpMulticastInterface {
                 iface: _,
                 address: _,
                 responder,
             } => {
-                respond_not_supported!(responder);
+                respond_not_supported!("stream::SetIpMulticastInterface", responder);
             }
             fposix_socket::StreamSocketRequest::GetIpMulticastInterface { responder } => {
-                respond_not_supported!(responder);
+                respond_not_supported!("stream::GetIpMulticastInterface", responder);
             }
             fposix_socket::StreamSocketRequest::SetIpMulticastTtl { value: _, responder } => {
-                respond_not_supported!(responder);
+                respond_not_supported!("stream::SetIpMulticastTtl", responder);
             }
             fposix_socket::StreamSocketRequest::GetIpMulticastTtl { responder } => {
-                respond_not_supported!(responder);
+                respond_not_supported!("stream::GetIpMulticastTtl", responder);
             }
             fposix_socket::StreamSocketRequest::SetIpMulticastLoopback { value: _, responder } => {
-                respond_not_supported!(responder);
+                respond_not_supported!("stream::SetIpMulticastLoopback", responder);
             }
             fposix_socket::StreamSocketRequest::GetIpMulticastLoopback { responder } => {
-                respond_not_supported!(responder);
+                respond_not_supported!("stream::GetIpMulticastLoopback", responder);
             }
             fposix_socket::StreamSocketRequest::AddIpMembership { membership: _, responder } => {
-                respond_not_supported!(responder);
+                respond_not_supported!("stream::AddIpMembership", responder);
             }
             fposix_socket::StreamSocketRequest::DropIpMembership { membership: _, responder } => {
-                respond_not_supported!(responder);
+                respond_not_supported!("stream::DropIpMembership", responder);
             }
             fposix_socket::StreamSocketRequest::SetIpTransparent { value: _, responder } => {
                 // In theory this can be used on stream sockets, but we don't need it right now.
-                respond_not_supported!(responder);
+                respond_not_supported!("stream::SetIpTransparent", responder);
             }
             fposix_socket::StreamSocketRequest::GetIpTransparent { responder } => {
-                respond_not_supported!(responder);
+                respond_not_supported!("stream::GetIpTransparent", responder);
             }
             fposix_socket::StreamSocketRequest::SetIpReceiveOriginalDestinationAddress {
                 value: _,
                 responder,
             } => {
-                respond_not_supported!(responder);
+                respond_not_supported!("stream::SetIpReceiveOriginalDestinationAddress", responder);
             }
             fposix_socket::StreamSocketRequest::GetIpReceiveOriginalDestinationAddress {
                 responder,
             } => {
-                respond_not_supported!(responder);
+                respond_not_supported!("stream::GetIpReceiveOriginalDestinationAddress", responder);
             }
             fposix_socket::StreamSocketRequest::AddIpv6Membership { membership: _, responder } => {
-                respond_not_supported!(responder);
+                respond_not_supported!("stream::AddIpv6Membership", responder);
             }
             fposix_socket::StreamSocketRequest::DropIpv6Membership { membership: _, responder } => {
-                respond_not_supported!(responder);
+                respond_not_supported!("stream::DropIpv6Membership", responder);
             }
             fposix_socket::StreamSocketRequest::SetIpv6MulticastInterface {
                 value: _,
                 responder,
             } => {
-                respond_not_supported!(responder);
+                respond_not_supported!("stream::SetIpv6MulticastInterface", responder);
             }
             fposix_socket::StreamSocketRequest::GetIpv6MulticastInterface { responder } => {
-                respond_not_supported!(responder);
+                respond_not_supported!("stream::GetIpv6MulticastInterface", responder);
             }
             fposix_socket::StreamSocketRequest::SetIpv6UnicastHops { value: _, responder } => {
-                respond_not_supported!(responder);
+                respond_not_supported!("stream::SetIpv6UnicastHops", responder);
             }
             fposix_socket::StreamSocketRequest::GetIpv6UnicastHops { responder } => {
-                respond_not_supported!(responder);
+                respond_not_supported!("stream::GetIpv6UnicastHops", responder);
             }
             fposix_socket::StreamSocketRequest::SetIpv6ReceiveHopLimit { value: _, responder } => {
-                respond_not_supported!(responder);
+                respond_not_supported!("stream::SetIpv6ReceiveHopLimit", responder);
             }
             fposix_socket::StreamSocketRequest::GetIpv6ReceiveHopLimit { responder } => {
-                respond_not_supported!(responder);
+                respond_not_supported!("stream::GetIpv6ReceiveHopLimit", responder);
             }
             fposix_socket::StreamSocketRequest::SetIpv6MulticastHops { value: _, responder } => {
-                respond_not_supported!(responder);
+                respond_not_supported!("stream::SetIpv6MulticastHops", responder);
             }
             fposix_socket::StreamSocketRequest::GetIpv6MulticastHops { responder } => {
-                respond_not_supported!(responder);
+                respond_not_supported!("stream::GetIpv6MulticastHops", responder);
             }
             fposix_socket::StreamSocketRequest::SetIpv6MulticastLoopback {
                 value: _,
                 responder,
             } => {
-                respond_not_supported!(responder);
+                respond_not_supported!("stream::SetIpv6MulticastLoopback", responder);
             }
             fposix_socket::StreamSocketRequest::GetIpv6MulticastLoopback { responder } => {
-                respond_not_supported!(responder);
+                respond_not_supported!("stream::GetIpv6MulticastLoopback", responder);
             }
             fposix_socket::StreamSocketRequest::SetIpv6Only { value, responder } => {
                 // TODO(https://fxbug.dev/21198): support dual-stack sockets.
@@ -1279,34 +1279,34 @@ impl<I: IpSockAddrExt + IpExt> RequestHandler<'_, I> {
                     .unwrap_or_else(|e| tracing::error!("failed to respond: {e:?}"));
             }
             fposix_socket::StreamSocketRequest::GetIpv6Only { responder } => {
-                respond_not_supported!(responder);
+                respond_not_supported!("stream::GetIpv6Only", responder);
             }
             fposix_socket::StreamSocketRequest::SetIpv6ReceiveTrafficClass {
                 value: _,
                 responder,
             } => {
-                respond_not_supported!(responder);
+                respond_not_supported!("stream::SetIpv6ReceiveTrafficClass", responder);
             }
             fposix_socket::StreamSocketRequest::GetIpv6ReceiveTrafficClass { responder } => {
-                respond_not_supported!(responder);
+                respond_not_supported!("stream::GetIpv6ReceiveTrafficClass", responder);
             }
             fposix_socket::StreamSocketRequest::SetIpv6TrafficClass { value: _, responder } => {
-                respond_not_supported!(responder);
+                respond_not_supported!("stream::SetIpv6TrafficClass", responder);
             }
             fposix_socket::StreamSocketRequest::GetIpv6TrafficClass { responder } => {
-                respond_not_supported!(responder);
+                respond_not_supported!("stream::GetIpv6TrafficClass", responder);
             }
             fposix_socket::StreamSocketRequest::SetIpv6ReceivePacketInfo {
                 value: _,
                 responder,
             } => {
-                respond_not_supported!(responder);
+                respond_not_supported!("stream::SetIpv6ReceivePacketInfo", responder);
             }
             fposix_socket::StreamSocketRequest::GetIpv6ReceivePacketInfo { responder } => {
-                respond_not_supported!(responder);
+                respond_not_supported!("stream::GetIpv6ReceivePacketInfo", responder);
             }
             fposix_socket::StreamSocketRequest::GetInfo { responder } => {
-                respond_not_supported!(responder);
+                respond_not_supported!("stream::GetInfo", responder);
             }
             // Note for the following two options:
             // Nagle enabled means TCP delays sending segment, thus meaning
@@ -1326,16 +1326,16 @@ impl<I: IpSockAddrExt + IpExt> RequestHandler<'_, I> {
                     .unwrap_or_else(|e| tracing::error!("failed to respond: {e:?}"));
             }
             fposix_socket::StreamSocketRequest::SetTcpMaxSegment { value_bytes: _, responder } => {
-                respond_not_supported!(responder);
+                respond_not_supported!("stream::SetTcpMaxSegment", responder);
             }
             fposix_socket::StreamSocketRequest::GetTcpMaxSegment { responder } => {
-                respond_not_supported!(responder);
+                respond_not_supported!("stream::GetTcpMaxSegment", responder);
             }
             fposix_socket::StreamSocketRequest::SetTcpCork { value: _, responder } => {
-                respond_not_supported!(responder);
+                respond_not_supported!("stream::SetTcpCork", responder);
             }
             fposix_socket::StreamSocketRequest::GetTcpCork { responder } => {
-                respond_not_supported!(responder);
+                respond_not_supported!("stream::GetTcpCork", responder);
             }
             fposix_socket::StreamSocketRequest::SetTcpKeepAliveIdle { value_secs, responder } => {
                 match NonZeroU64::new(value_secs.into())
@@ -1459,19 +1459,19 @@ impl<I: IpSockAddrExt + IpExt> RequestHandler<'_, I> {
                     .unwrap_or_else(|e| tracing::error!("failed to respond: {e:?}"));
             }
             fposix_socket::StreamSocketRequest::SetTcpDeferAccept { value_secs: _, responder } => {
-                respond_not_supported!(responder);
+                respond_not_supported!("stream::SetTcpDeferAccept", responder);
             }
             fposix_socket::StreamSocketRequest::GetTcpDeferAccept { responder } => {
-                respond_not_supported!(responder);
+                respond_not_supported!("stream::GetTcpDeferAccept", responder);
             }
             fposix_socket::StreamSocketRequest::SetTcpWindowClamp { value: _, responder } => {
-                respond_not_supported!(responder);
+                respond_not_supported!("stream::SetTcpWindowClamp", responder);
             }
             fposix_socket::StreamSocketRequest::GetTcpWindowClamp { responder } => {
-                respond_not_supported!(responder);
+                respond_not_supported!("stream::GetTcpWindowClamp", responder);
             }
             fposix_socket::StreamSocketRequest::GetTcpInfo { responder } => {
-                respond_not_supported!(responder);
+                respond_not_supported!("stream::GetTcpInfo", responder);
             }
             fposix_socket::StreamSocketRequest::SetTcpQuickAck { value, responder } => {
                 self.with_socket_options_mut(|so| so.delayed_ack = !value);
@@ -1486,10 +1486,10 @@ impl<I: IpSockAddrExt + IpExt> RequestHandler<'_, I> {
                     .unwrap_or_else(|e| tracing::error!("failed to respond: {e:?}"));
             }
             fposix_socket::StreamSocketRequest::SetTcpCongestion { value: _, responder } => {
-                respond_not_supported!(responder);
+                respond_not_supported!("stream::SetTcpCongestion", responder);
             }
             fposix_socket::StreamSocketRequest::GetTcpCongestion { responder } => {
-                respond_not_supported!(responder);
+                respond_not_supported!("stream::GetTcpCongestion", responder);
             }
             fposix_socket::StreamSocketRequest::SetTcpUserTimeout { value_millis, responder } => {
                 let user_timeout =

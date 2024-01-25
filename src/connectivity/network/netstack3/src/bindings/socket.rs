@@ -39,11 +39,12 @@ use crate::bindings::{
 };
 
 macro_rules! respond_not_supported {
-    ($responder:expr) => {
+    ($name:expr, $responder:expr) => {{
+        tracing::debug!("{} not supported", $name);
         $responder
             .send(Err(fidl_fuchsia_posix::Errno::Eopnotsupp))
             .unwrap_or_else(|e| tracing::error!("failed to respond: {e:?}"))
-    };
+    }};
 }
 
 pub(crate) mod datagram;

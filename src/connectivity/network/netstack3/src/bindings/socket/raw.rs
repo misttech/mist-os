@@ -110,208 +110,224 @@ impl<'a> RequestHandler<'a> {
                 .send(fpraw::SOCKET_PROTOCOL_NAME.as_bytes())
                 .unwrap_or_else(|e| error!("failed to respond: {e:?}")),
             fpraw::SocketRequest::SetReuseAddress { value: _, responder } => {
-                respond_not_supported!(responder)
+                respond_not_supported!("raw::SetReuseAddress", responder)
             }
             fpraw::SocketRequest::GetReuseAddress { responder } => {
-                respond_not_supported!(responder)
+                respond_not_supported!("raw::GetReuseAddress", responder)
             }
-            fpraw::SocketRequest::GetError { responder } => respond_not_supported!(responder),
+            fpraw::SocketRequest::GetError { responder } => {
+                respond_not_supported!("raw::GetError", responder)
+            }
             fpraw::SocketRequest::SetBroadcast { value: _, responder } => {
-                respond_not_supported!(responder)
+                respond_not_supported!("raw::SetBroadcast", responder)
             }
             fpraw::SocketRequest::GetBroadcast { responder } => {
-                respond_not_supported!(responder)
+                respond_not_supported!("raw::GetBroadcast", responder)
             }
             fpraw::SocketRequest::SetSendBuffer { value_bytes: _, responder } => {
-                respond_not_supported!(responder)
+                respond_not_supported!("raw::SetSendBuffer", responder)
             }
             fpraw::SocketRequest::GetSendBuffer { responder } => {
-                respond_not_supported!(responder)
+                respond_not_supported!("raw::GetSendBuffer", responder)
             }
             fpraw::SocketRequest::SetReceiveBuffer { value_bytes: _, responder } => {
-                respond_not_supported!(responder)
+                respond_not_supported!("raw::SetReceiveBuffer", responder)
             }
             fpraw::SocketRequest::GetReceiveBuffer { responder } => {
-                respond_not_supported!(responder)
+                respond_not_supported!("raw::GetReceiveBuffer", responder)
             }
             fpraw::SocketRequest::SetKeepAlive { value: _, responder } => {
-                respond_not_supported!(responder)
+                respond_not_supported!("raw::SetKeepAlive", responder)
             }
             fpraw::SocketRequest::GetKeepAlive { responder } => {
-                respond_not_supported!(responder)
+                respond_not_supported!("raw::GetKeepAlive", responder)
             }
             fpraw::SocketRequest::SetOutOfBandInline { value: _, responder } => {
-                respond_not_supported!(responder)
+                respond_not_supported!("raw::SetOutOfBandInline", responder)
             }
             fpraw::SocketRequest::GetOutOfBandInline { responder } => {
-                respond_not_supported!(responder)
+                respond_not_supported!("raw::GetOutOfBandInline", responder)
             }
             fpraw::SocketRequest::SetNoCheck { value: _, responder } => {
-                respond_not_supported!(responder)
+                respond_not_supported!("raw::SetNoCheck", responder)
             }
-            fpraw::SocketRequest::GetNoCheck { responder } => respond_not_supported!(responder),
+            fpraw::SocketRequest::GetNoCheck { responder } => {
+                respond_not_supported!("raw::GetNoCheck", responder)
+            }
             fpraw::SocketRequest::SetLinger { linger: _, length_secs: _, responder } => {
-                respond_not_supported!(responder)
+                respond_not_supported!("raw::SetLinger", responder)
             }
-            fpraw::SocketRequest::GetLinger { responder } => respond_not_supported!(responder),
+            fpraw::SocketRequest::GetLinger { responder } => {
+                respond_not_supported!("raw::GetLinger", responder)
+            }
             fpraw::SocketRequest::SetReusePort { value: _, responder } => {
-                respond_not_supported!(responder)
+                respond_not_supported!("raw::SetReusePort", responder)
             }
             fpraw::SocketRequest::GetReusePort { responder } => {
-                respond_not_supported!(responder)
+                respond_not_supported!("raw::GetReusePort", responder)
             }
             fpraw::SocketRequest::GetAcceptConn { responder } => {
-                respond_not_supported!(responder)
+                respond_not_supported!("raw::GetAcceptConn", responder)
             }
             fpraw::SocketRequest::SetBindToDevice { value: _, responder } => {
-                respond_not_supported!(responder)
+                respond_not_supported!("raw::SetBindToDevice", responder)
             }
             fpraw::SocketRequest::GetBindToDevice { responder } => {
-                respond_not_supported!(responder)
+                respond_not_supported!("raw::GetBindToDevice", responder)
             }
             fpraw::SocketRequest::SetTimestamp { value: _, responder } => {
-                respond_not_supported!(responder)
+                respond_not_supported!("raw::SetTimestamp", responder)
             }
             fpraw::SocketRequest::GetTimestamp { responder } => {
-                respond_not_supported!(responder)
+                respond_not_supported!("raw::GetTimestamp", responder)
             }
             fpraw::SocketRequest::Bind { addr: _, responder } => {
-                respond_not_supported!(responder)
+                respond_not_supported!("raw::Bind", responder)
             }
             fpraw::SocketRequest::Connect { addr: _, responder } => {
-                respond_not_supported!(responder)
+                respond_not_supported!("raw::Connect", responder)
             }
-            fpraw::SocketRequest::Disconnect { responder } => respond_not_supported!(responder),
-            fpraw::SocketRequest::GetSockName { responder } => respond_not_supported!(responder),
-            fpraw::SocketRequest::GetPeerName { responder } => respond_not_supported!(responder),
+            fpraw::SocketRequest::Disconnect { responder } => {
+                respond_not_supported!("raw::Disconnect", responder)
+            }
+            fpraw::SocketRequest::GetSockName { responder } => {
+                respond_not_supported!("raw::GetSockName", responder)
+            }
+            fpraw::SocketRequest::GetPeerName { responder } => {
+                respond_not_supported!("raw::GetPeerName", responder)
+            }
             fpraw::SocketRequest::Shutdown { mode: _, responder } => {
-                respond_not_supported!(responder)
+                respond_not_supported!("raw::Shutdown", responder)
             }
             fpraw::SocketRequest::SetIpTypeOfService { value: _, responder } => {
-                respond_not_supported!(responder)
+                respond_not_supported!("raw::SetIpTypeOfService", responder)
             }
             fpraw::SocketRequest::GetIpTypeOfService { responder } => {
-                respond_not_supported!(responder)
+                respond_not_supported!("raw::GetIpTypeOfService", responder)
             }
             fpraw::SocketRequest::SetIpTtl { value: _, responder } => {
-                respond_not_supported!(responder)
+                respond_not_supported!("raw::SetIpTtl", responder)
             }
-            fpraw::SocketRequest::GetIpTtl { responder } => respond_not_supported!(responder),
+            fpraw::SocketRequest::GetIpTtl { responder } => {
+                respond_not_supported!("raw::GetIpTtl", responder)
+            }
             fpraw::SocketRequest::SetIpPacketInfo { value: _, responder } => {
-                respond_not_supported!(responder)
+                respond_not_supported!("raw::SetIpPacketInfo", responder)
             }
             fpraw::SocketRequest::GetIpPacketInfo { responder } => {
-                respond_not_supported!(responder)
+                respond_not_supported!("raw::GetIpPacketInfo", responder)
             }
             fpraw::SocketRequest::SetIpReceiveTypeOfService { value: _, responder } => {
-                respond_not_supported!(responder)
+                respond_not_supported!("raw::SetIpReceiveTypeOfService", responder)
             }
             fpraw::SocketRequest::GetIpReceiveTypeOfService { responder } => {
-                respond_not_supported!(responder)
+                respond_not_supported!("raw::GetIpReceiveTypeOfService", responder)
             }
             fpraw::SocketRequest::SetIpReceiveTtl { value: _, responder } => {
-                respond_not_supported!(responder)
+                respond_not_supported!("raw::SetIpReceiveTtl", responder)
             }
             fpraw::SocketRequest::GetIpReceiveTtl { responder } => {
-                respond_not_supported!(responder)
+                respond_not_supported!("raw::GetIpReceiveTtl", responder)
             }
             fpraw::SocketRequest::SetIpMulticastInterface { iface: _, address: _, responder } => {
-                respond_not_supported!(responder)
+                respond_not_supported!("raw::SetIpMulticastInterface", responder)
             }
             fpraw::SocketRequest::GetIpMulticastInterface { responder } => {
-                respond_not_supported!(responder)
+                respond_not_supported!("raw::GetIpMulticastInterface", responder)
             }
             fpraw::SocketRequest::SetIpMulticastTtl { value: _, responder } => {
-                respond_not_supported!(responder)
+                respond_not_supported!("raw::SetIpMulticastTtl", responder)
             }
             fpraw::SocketRequest::GetIpMulticastTtl { responder } => {
-                respond_not_supported!(responder)
+                respond_not_supported!("raw::GetIpMulticastTtl", responder)
             }
             fpraw::SocketRequest::SetIpMulticastLoopback { value: _, responder } => {
-                respond_not_supported!(responder)
+                respond_not_supported!("raw::SetIpMulticastLoopback", responder)
             }
             fpraw::SocketRequest::GetIpMulticastLoopback { responder } => {
-                respond_not_supported!(responder)
+                respond_not_supported!("raw::GetIpMulticastLoopback", responder)
             }
             fpraw::SocketRequest::AddIpMembership { membership: _, responder } => {
-                respond_not_supported!(responder)
+                respond_not_supported!("raw::AddIpMembership", responder)
             }
             fpraw::SocketRequest::DropIpMembership { membership: _, responder } => {
-                respond_not_supported!(responder)
+                respond_not_supported!("raw::DropIpMembership", responder)
             }
             fpraw::SocketRequest::SetIpTransparent { value: _, responder } => {
-                respond_not_supported!(responder)
+                respond_not_supported!("raw::SetIpTransparent", responder)
             }
             fpraw::SocketRequest::GetIpTransparent { responder } => {
-                respond_not_supported!(responder)
+                respond_not_supported!("raw::GetIpTransparent", responder)
             }
             fpraw::SocketRequest::SetIpReceiveOriginalDestinationAddress {
                 value: _,
                 responder,
-            } => respond_not_supported!(responder),
+            } => respond_not_supported!("raw::SetIpReceiveOriginalDestinationAddress", responder),
             fpraw::SocketRequest::GetIpReceiveOriginalDestinationAddress { responder } => {
-                respond_not_supported!(responder)
+                respond_not_supported!("raw::GetIpReceiveOriginalDestinationAddress", responder)
             }
             fpraw::SocketRequest::AddIpv6Membership { membership: _, responder } => {
-                respond_not_supported!(responder)
+                respond_not_supported!("raw::AddIpv6Membership", responder)
             }
             fpraw::SocketRequest::DropIpv6Membership { membership: _, responder } => {
-                respond_not_supported!(responder)
+                respond_not_supported!("raw::DropIpv6Membership", responder)
             }
             fpraw::SocketRequest::SetIpv6MulticastInterface { value: _, responder } => {
-                respond_not_supported!(responder)
+                respond_not_supported!("raw::SetIpv6MulticastInterface", responder)
             }
             fpraw::SocketRequest::GetIpv6MulticastInterface { responder } => {
-                respond_not_supported!(responder)
+                respond_not_supported!("raw::GetIpv6MulticastInterface", responder)
             }
             fpraw::SocketRequest::SetIpv6UnicastHops { value: _, responder } => {
-                respond_not_supported!(responder)
+                respond_not_supported!("raw::SetIpv6UnicastHops", responder)
             }
             fpraw::SocketRequest::GetIpv6UnicastHops { responder } => {
-                respond_not_supported!(responder)
+                respond_not_supported!("raw::GetIpv6UnicastHops", responder)
             }
             fpraw::SocketRequest::SetIpv6ReceiveHopLimit { value: _, responder } => {
-                respond_not_supported!(responder)
+                respond_not_supported!("raw::SetIpv6ReceiveHopLimit", responder)
             }
             fpraw::SocketRequest::GetIpv6ReceiveHopLimit { responder } => {
-                respond_not_supported!(responder)
+                respond_not_supported!("raw::GetIpv6ReceiveHopLimit", responder)
             }
             fpraw::SocketRequest::SetIpv6MulticastHops { value: _, responder } => {
-                respond_not_supported!(responder)
+                respond_not_supported!("raw::SetIpv6MulticastHops", responder)
             }
             fpraw::SocketRequest::GetIpv6MulticastHops { responder } => {
-                respond_not_supported!(responder)
+                respond_not_supported!("raw::GetIpv6MulticastHops", responder)
             }
             fpraw::SocketRequest::SetIpv6MulticastLoopback { value: _, responder } => {
-                respond_not_supported!(responder)
+                respond_not_supported!("raw::SetIpv6MulticastLoopback", responder)
             }
             fpraw::SocketRequest::GetIpv6MulticastLoopback { responder } => {
-                respond_not_supported!(responder)
+                respond_not_supported!("raw::GetIpv6MulticastLoopback", responder)
             }
             fpraw::SocketRequest::SetIpv6Only { value: _, responder } => {
-                respond_not_supported!(responder)
+                respond_not_supported!("raw::SetIpv6Only", responder)
             }
-            fpraw::SocketRequest::GetIpv6Only { responder } => respond_not_supported!(responder),
+            fpraw::SocketRequest::GetIpv6Only { responder } => {
+                respond_not_supported!("raw::GetIpv6Only", responder)
+            }
             fpraw::SocketRequest::SetIpv6ReceiveTrafficClass { value: _, responder } => {
-                respond_not_supported!(responder)
+                respond_not_supported!("raw::SetIpv6ReceiveTrafficClass", responder)
             }
             fpraw::SocketRequest::GetIpv6ReceiveTrafficClass { responder } => {
-                respond_not_supported!(responder)
+                respond_not_supported!("raw::GetIpv6ReceiveTrafficClass", responder)
             }
             fpraw::SocketRequest::SetIpv6TrafficClass { value: _, responder } => {
-                respond_not_supported!(responder)
+                respond_not_supported!("raw::SetIpv6TrafficClass", responder)
             }
             fpraw::SocketRequest::GetIpv6TrafficClass { responder } => {
-                respond_not_supported!(responder)
+                respond_not_supported!("raw::GetIpv6TrafficClass", responder)
             }
             fpraw::SocketRequest::SetIpv6ReceivePacketInfo { value: _, responder } => {
-                respond_not_supported!(responder)
+                respond_not_supported!("raw::SetIpv6ReceivePacketInfo", responder)
             }
             fpraw::SocketRequest::GetIpv6ReceivePacketInfo { responder } => {
-                respond_not_supported!(responder)
+                respond_not_supported!("raw::GetIpv6ReceivePacketInfo", responder)
             }
             fpraw::SocketRequest::GetOriginalDestination { responder } => {
-                respond_not_supported!(responder)
+                respond_not_supported!("raw::GetOriginalDestination", responder)
             }
             fpraw::SocketRequest::RecvMsg {
                 want_addr: _,
@@ -319,28 +335,30 @@ impl<'a> RequestHandler<'a> {
                 want_control: _,
                 flags: _,
                 responder,
-            } => respond_not_supported!(responder),
+            } => respond_not_supported!("raw::RecvMsg", responder),
             fpraw::SocketRequest::SendMsg { addr: _, data: _, control: _, flags: _, responder } => {
-                respond_not_supported!(responder)
+                respond_not_supported!("raw::SendMsg", responder)
             }
-            fpraw::SocketRequest::GetInfo { responder } => respond_not_supported!(responder),
+            fpraw::SocketRequest::GetInfo { responder } => {
+                respond_not_supported!("raw::GetInfo", responder)
+            }
             fpraw::SocketRequest::SetIpHeaderIncluded { value: _, responder } => {
-                respond_not_supported!(responder)
+                respond_not_supported!("raw::SetIpHeaderIncluded", responder)
             }
             fpraw::SocketRequest::GetIpHeaderIncluded { responder } => {
-                respond_not_supported!(responder)
+                respond_not_supported!("raw::GetIpHeaderIncluded", responder)
             }
             fpraw::SocketRequest::SetIcmpv6Filter { filter: _, responder } => {
-                respond_not_supported!(responder)
+                respond_not_supported!("raw::SetIcmpv6Filter", responder)
             }
             fpraw::SocketRequest::GetIcmpv6Filter { responder } => {
-                respond_not_supported!(responder)
+                respond_not_supported!("raw::GetIcmpv6Filter", responder)
             }
             fpraw::SocketRequest::SetIpv6Checksum { config: _, responder } => {
-                respond_not_supported!(responder)
+                respond_not_supported!("raw::SetIpv6Checksum", responder)
             }
             fpraw::SocketRequest::GetIpv6Checksum { responder } => {
-                respond_not_supported!(responder)
+                respond_not_supported!("raw::GetIpv6Checksum", responder)
             }
         }
         ControlFlow::Continue(None)

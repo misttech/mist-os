@@ -1202,13 +1202,13 @@ where
                 .send(self.get_sock_info())
                 .unwrap_or_else(|e| error!("failed to respond: {e:?}")),
             fposix_socket::SynchronousDatagramSocketRequest::GetTimestamp { responder } => {
-                respond_not_supported!(responder)
+                respond_not_supported!("syncudp::GetTimestamp", responder)
             }
             fposix_socket::SynchronousDatagramSocketRequest::SetTimestamp {
                 value: _,
                 responder,
             } => {
-                respond_not_supported!(responder)
+                respond_not_supported!("syncudp::SetTimestamp", responder)
             }
             fposix_socket::SynchronousDatagramSocketRequest::GetOriginalDestination {
                 responder
@@ -1218,7 +1218,7 @@ where
                     .unwrap_or_else(|e| error!("failed to respond: {e:?}"));
             }
             fposix_socket::SynchronousDatagramSocketRequest::GetError { responder } => {
-                respond_not_supported!(responder)
+                respond_not_supported!("syncudp::GetError", responder)
             }
             fposix_socket::SynchronousDatagramSocketRequest::SetSendBuffer {
                 value_bytes: _,
@@ -1231,7 +1231,7 @@ where
                 responder.send(Ok(())).unwrap_or_else(|e| error!("failed to respond: {e:?}"));
             }
             fposix_socket::SynchronousDatagramSocketRequest::GetSendBuffer { responder } => {
-                respond_not_supported!(responder)
+                respond_not_supported!("syncudp::GetSendBuffer",responder)
             }
             fposix_socket::SynchronousDatagramSocketRequest::SetReceiveBuffer {
                 value_bytes,
@@ -1260,7 +1260,7 @@ where
                 responder.send(Ok(())).unwrap_or_else(|e| error!("failed to respond: {e:?}"));
             }
             fposix_socket::SynchronousDatagramSocketRequest::GetReuseAddress { responder } => {
-                respond_not_supported!(responder)
+                respond_not_supported!("syncudp::GetReuseAddress", responder)
             }
             fposix_socket::SynchronousDatagramSocketRequest::SetReusePort { value, responder } => {
                 responder
@@ -1273,7 +1273,7 @@ where
                     .unwrap_or_else(|e| error!("failed to respond: {e:?}"));
             }
             fposix_socket::SynchronousDatagramSocketRequest::GetAcceptConn { responder } => {
-                respond_not_supported!(responder)
+                respond_not_supported!("syncudp::GetAcceptConn", responder)
             }
             fposix_socket::SynchronousDatagramSocketRequest::SetBindToDevice {
                 value,
@@ -1303,41 +1303,41 @@ where
                 responder.send(response).unwrap_or_else(|e| error!("failed to respond: {e:?}"));
             }
             fposix_socket::SynchronousDatagramSocketRequest::GetBroadcast { responder } => {
-                respond_not_supported!(responder)
+                respond_not_supported!("syncudp::GetBroadcast", responder)
             }
             fposix_socket::SynchronousDatagramSocketRequest::SetKeepAlive {
                 value: _,
                 responder,
             } => {
-                respond_not_supported!(responder)
+                respond_not_supported!("syncudp::SetKeepAlive", responder)
             }
             fposix_socket::SynchronousDatagramSocketRequest::GetKeepAlive { responder } => {
-                respond_not_supported!(responder)
+                respond_not_supported!("syncudp::GetKeepAlive", responder)
             }
             fposix_socket::SynchronousDatagramSocketRequest::SetLinger {
                 linger: _,
                 length_secs: _,
                 responder,
             } => {
-                respond_not_supported!(responder)
+                respond_not_supported!("syncudp::SetLinger", responder)
             }
             fposix_socket::SynchronousDatagramSocketRequest::GetLinger { responder } => {
-                respond_not_supported!(responder)
+                respond_not_supported!("syncudp::GetLinger", responder)
             }
             fposix_socket::SynchronousDatagramSocketRequest::SetOutOfBandInline {
                 value: _,
                 responder,
             } => {
-                respond_not_supported!(responder)
+                respond_not_supported!("syncudp::SetOutOfBandInline", responder)
             }
             fposix_socket::SynchronousDatagramSocketRequest::GetOutOfBandInline { responder } => {
-                respond_not_supported!(responder)
+                respond_not_supported!("syncudp::GetOutOfBandInline", responder)
             }
             fposix_socket::SynchronousDatagramSocketRequest::SetNoCheck { value: _, responder } => {
-                respond_not_supported!(responder)
+                respond_not_supported!("syncudp::value", responder)
             }
             fposix_socket::SynchronousDatagramSocketRequest::GetNoCheck { responder } => {
-                respond_not_supported!(responder)
+                respond_not_supported!("syncudp::GetNoCheck", responder)
             }
             fposix_socket::SynchronousDatagramSocketRequest::SetIpv6Only { value, responder } => {
                 responder.send(self.set_dual_stack_enabled(!value))
@@ -1351,10 +1351,10 @@ where
                 value: _,
                 responder,
             } => {
-                respond_not_supported!(responder)
+                respond_not_supported!("syncudp::SetIpv6TrafficClass", responder)
             }
             fposix_socket::SynchronousDatagramSocketRequest::GetIpv6TrafficClass { responder } => {
-                respond_not_supported!(responder)
+                respond_not_supported!("syncudp::GetIpv6TrafficClass", responder)
             }
             fposix_socket::SynchronousDatagramSocketRequest::SetIpv6MulticastInterface {
                 value: _,
@@ -1366,7 +1366,7 @@ where
             fposix_socket::SynchronousDatagramSocketRequest::GetIpv6MulticastInterface {
                 responder,
             } => {
-                respond_not_supported!(responder)
+                respond_not_supported!("syncudp::GetIpv6MulticastInterface", responder)
             }
             fposix_socket::SynchronousDatagramSocketRequest::SetIpv6UnicastHops {
                 value,
@@ -1403,7 +1403,7 @@ where
             fposix_socket::SynchronousDatagramSocketRequest::GetIpv6MulticastLoopback {
                 responder,
             } => {
-                respond_not_supported!(responder)
+                respond_not_supported!("syncudp::GetIpv6MulticastLoopback", responder)
             }
             fposix_socket::SynchronousDatagramSocketRequest::SetIpTtl { value, responder } => {
                 responder
@@ -1429,32 +1429,32 @@ where
                 address: _,
                 responder,
             } => {
-                respond_not_supported!(responder)
+                respond_not_supported!("syncudp::SetIpMulticastInterface", responder)
             }
             fposix_socket::SynchronousDatagramSocketRequest::GetIpMulticastInterface {
                 responder,
             } => {
-                respond_not_supported!(responder)
+                respond_not_supported!("syncudp::GetIpMulticastInterface", responder)
             }
             fposix_socket::SynchronousDatagramSocketRequest::SetIpMulticastLoopback {
                 value: _,
                 responder,
             } => {
-                respond_not_supported!(responder)
+                respond_not_supported!("syncudp::SetIpMulticastLoopback", responder)
             }
             fposix_socket::SynchronousDatagramSocketRequest::GetIpMulticastLoopback {
                 responder,
             } => {
-                respond_not_supported!(responder)
+                respond_not_supported!("syncudp::GetIpMulticastLoopback", responder)
             }
             fposix_socket::SynchronousDatagramSocketRequest::SetIpTypeOfService {
                 value: _,
                 responder,
             } => {
-                respond_not_supported!(responder)
+                respond_not_supported!("syncudp::SetIpTypeOfService", responder)
             }
             fposix_socket::SynchronousDatagramSocketRequest::GetIpTypeOfService { responder } => {
-                respond_not_supported!(responder)
+                respond_not_supported!("syncudp::GetIpTypeOfService", responder)
             }
             fposix_socket::SynchronousDatagramSocketRequest::AddIpMembership {
                 membership,
@@ -1523,63 +1523,63 @@ where
                 value: _,
                 responder,
             } => {
-                respond_not_supported!(responder)
+                respond_not_supported!("syncudp::SetIpv6ReceiveTrafficClass", responder)
             }
             fposix_socket::SynchronousDatagramSocketRequest::GetIpv6ReceiveTrafficClass {
                 responder,
             } => {
-                respond_not_supported!(responder)
+                respond_not_supported!("syncudp::GetIpv6ReceiveTrafficClass", responder)
             }
             fposix_socket::SynchronousDatagramSocketRequest::SetIpv6ReceiveHopLimit {
                 value: _,
                 responder,
             } => {
-                respond_not_supported!(responder)
+                respond_not_supported!("syncudp::SetIpv6ReceiveHopLimit", responder)
             }
             fposix_socket::SynchronousDatagramSocketRequest::GetIpv6ReceiveHopLimit {
                 responder,
             } => {
-                respond_not_supported!(responder)
+                respond_not_supported!("syncudp::GetIpv6ReceiveHopLimit", responder)
             }
             fposix_socket::SynchronousDatagramSocketRequest::SetIpReceiveTypeOfService {
                 value: _,
                 responder,
             } => {
-                respond_not_supported!(responder)
+                respond_not_supported!("syncudp::SetIpReceiveTypeOfService", responder)
             }
             fposix_socket::SynchronousDatagramSocketRequest::GetIpReceiveTypeOfService {
                 responder,
             } => {
-                respond_not_supported!(responder)
+                respond_not_supported!("syncudp::GetIpReceiveTypeOfService", responder)
             }
             fposix_socket::SynchronousDatagramSocketRequest::SetIpv6ReceivePacketInfo {
                 value: _,
                 responder,
             } => {
-                respond_not_supported!(responder)
+                respond_not_supported!("syncudp::SetIpv6ReceivePacketInfo", responder)
             }
             fposix_socket::SynchronousDatagramSocketRequest::GetIpv6ReceivePacketInfo {
                 responder,
             } => {
-                respond_not_supported!(responder)
+                respond_not_supported!("syncudp::GetIpv6ReceivePacketInfo", responder)
             }
             fposix_socket::SynchronousDatagramSocketRequest::SetIpReceiveTtl {
                 value: _,
                 responder,
             } => {
-                respond_not_supported!(responder)
+                respond_not_supported!("syncudp::SetIpReceiveTtl", responder)
             }
             fposix_socket::SynchronousDatagramSocketRequest::GetIpReceiveTtl { responder } => {
-                respond_not_supported!(responder)
+                respond_not_supported!("syncudp::GetIpReceiveTtl", responder)
             }
             fposix_socket::SynchronousDatagramSocketRequest::SetIpPacketInfo {
                 value: _,
                 responder,
             } => {
-                respond_not_supported!(responder)
+                respond_not_supported!("syncudp::SetIpPacketInfo", responder)
             }
             fposix_socket::SynchronousDatagramSocketRequest::GetIpPacketInfo { responder } => {
-                respond_not_supported!(responder)
+                respond_not_supported!("syncudp::GetIpPacketInfo", responder)
             }
         }
         ControlFlow::Continue(None)

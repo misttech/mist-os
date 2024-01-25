@@ -408,23 +408,25 @@ impl<'a> RequestHandler<'a> {
                     .unwrap_or_else(|e| error!("failed to respond: {e:?}"));
             }
             fppacket::SocketRequest::SetReuseAddress { value: _, responder } => {
-                respond_not_supported!(responder)
+                respond_not_supported!("packet::SetReuseAddress", responder)
             }
             fppacket::SocketRequest::GetReuseAddress { responder } => {
-                respond_not_supported!(responder)
+                respond_not_supported!("packet::GetReuseAddress", responder)
             }
-            fppacket::SocketRequest::GetError { responder } => respond_not_supported!(responder),
+            fppacket::SocketRequest::GetError { responder } => {
+                respond_not_supported!("packet::GetError", responder)
+            }
             fppacket::SocketRequest::SetBroadcast { value: _, responder } => {
-                respond_not_supported!(responder)
+                respond_not_supported!("packet::SetBroadcast", responder)
             }
             fppacket::SocketRequest::GetBroadcast { responder } => {
-                respond_not_supported!(responder)
+                respond_not_supported!("packet::GetBroadcast", responder)
             }
             fppacket::SocketRequest::SetSendBuffer { value_bytes: _, responder } => {
-                respond_not_supported!(responder)
+                respond_not_supported!("packet::SetSendBuffer", responder)
             }
             fppacket::SocketRequest::GetSendBuffer { responder } => {
-                respond_not_supported!(responder)
+                respond_not_supported!("packet::GetSendBuffer", responder)
             }
             fppacket::SocketRequest::SetReceiveBuffer { value_bytes, responder } => {
                 responder
@@ -437,47 +439,51 @@ impl<'a> RequestHandler<'a> {
                     .unwrap_or_else(|e| error!("failed to respond: {e:?}"));
             }
             fppacket::SocketRequest::SetKeepAlive { value: _, responder } => {
-                respond_not_supported!(responder)
+                respond_not_supported!("packet::SetKeepAlive", responder)
             }
             fppacket::SocketRequest::GetKeepAlive { responder } => {
-                respond_not_supported!(responder)
+                respond_not_supported!("packet::GetKeepAlive", responder)
             }
             fppacket::SocketRequest::SetOutOfBandInline { value: _, responder } => {
-                respond_not_supported!(responder)
+                respond_not_supported!("packet::SetOutOfBandInline", responder)
             }
             fppacket::SocketRequest::GetOutOfBandInline { responder } => {
-                respond_not_supported!(responder)
+                respond_not_supported!("packet::GetOutOfBandInline", responder)
             }
             fppacket::SocketRequest::SetNoCheck { value: _, responder } => {
-                respond_not_supported!(responder)
+                respond_not_supported!("packet::SetNoCheck", responder)
             }
-            fppacket::SocketRequest::GetNoCheck { responder } => respond_not_supported!(responder),
+            fppacket::SocketRequest::GetNoCheck { responder } => {
+                respond_not_supported!("packet::GetNoCheck", responder)
+            }
             fppacket::SocketRequest::SetLinger { linger: _, length_secs: _, responder } => {
                 responder
                     .send(Err(fposix::Errno::Eopnotsupp))
                     .unwrap_or_else(|e| error!("failed to respond: {e:?}"))
             }
-            fppacket::SocketRequest::GetLinger { responder } => respond_not_supported!(responder),
+            fppacket::SocketRequest::GetLinger { responder } => {
+                respond_not_supported!("packet::GetLinger", responder)
+            }
             fppacket::SocketRequest::SetReusePort { value: _, responder } => {
-                respond_not_supported!(responder)
+                respond_not_supported!("packet::SetReusePort", responder)
             }
             fppacket::SocketRequest::GetReusePort { responder } => {
-                respond_not_supported!(responder)
+                respond_not_supported!("packet::GetReusePort", responder)
             }
             fppacket::SocketRequest::GetAcceptConn { responder } => {
-                respond_not_supported!(responder)
+                respond_not_supported!("packet::GetAcceptConn", responder)
             }
             fppacket::SocketRequest::SetBindToDevice { value: _, responder } => {
-                respond_not_supported!(responder)
+                respond_not_supported!("packet::SetBindToDevice", responder)
             }
             fppacket::SocketRequest::GetBindToDevice { responder } => {
-                respond_not_supported!(responder)
+                respond_not_supported!("packet::GetBindToDevice", responder)
             }
             fppacket::SocketRequest::SetTimestamp { value: _, responder } => {
-                respond_not_supported!(responder)
+                respond_not_supported!("packet::SetTimestamp", responder)
             }
             fppacket::SocketRequest::GetTimestamp { responder } => {
-                respond_not_supported!(responder)
+                respond_not_supported!("packet::GetTimestamp", responder)
             }
             fppacket::SocketRequest::Describe { responder } => {
                 responder
