@@ -52,7 +52,7 @@ pub struct Command {
 #[derive(ArgsInfo, FromArgs, Debug, PartialEq)]
 #[argh(subcommand)]
 pub enum CommandEnum {
-    Filter(Filter),
+    FilterDeprecated(FilterDeprecated),
     If(If),
     Log(Log),
     Neigh(Neigh),
@@ -64,16 +64,16 @@ pub enum CommandEnum {
 }
 
 #[derive(ArgsInfo, FromArgs, Clone, Debug, PartialEq)]
-#[argh(subcommand, name = "filter")]
-/// commands for packet filter
-pub struct Filter {
+#[argh(subcommand, name = "filter-deprecated")]
+/// commands for configuring packet filtering with the deprecated API
+pub struct FilterDeprecated {
     #[argh(subcommand)]
-    pub filter_cmd: FilterEnum,
+    pub filter_cmd: FilterDeprecatedEnum,
 }
 
 #[derive(ArgsInfo, FromArgs, Clone, Debug, PartialEq)]
 #[argh(subcommand)]
-pub enum FilterEnum {
+pub enum FilterDeprecatedEnum {
     GetNatRules(FilterGetNatRules),
     GetRdrRules(FilterGetRdrRules),
     GetRules(FilterGetRules),
