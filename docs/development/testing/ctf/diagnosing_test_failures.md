@@ -38,7 +38,7 @@ validates.
 
 If all else fails, please feel free to reach out to the [CTF team][ctf team].
 
-Note: TODO(https://fxbug.dev/85409): Test names may not clearly describe which
+Note: TODO(https://fxbug.dev/42166305): Test names may not clearly describe which
 PlaSA elements they exercise. Link here a map of CTF test -> PlaSA elements.
 
 Once you've located the test code, you can use it to understand why your CL
@@ -92,7 +92,7 @@ details), or some other unique situation requires modifying the Fuchsia PlaSA
 more frequently than the CTF release window supports, then the CTF tests in the
 active CTF releases will need to be modified.
 
-Note: TODO(https://fxbug.dev/86421): Needs design
+Note: TODO(https://fxbug.dev/42167430): Needs design
 
 Please reach out to the [CTF team][ctf team] if this is required.
 

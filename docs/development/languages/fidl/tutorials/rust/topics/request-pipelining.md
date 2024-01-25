@@ -9,7 +9,7 @@ of writing and running FIDL clients and servers, which is covered in the
 
 ## Overview
 
-<!-- TODO(https://fxbug.dev/58758): <<../../common/pipelining/overview.md>> -->
+<!-- TODO(https://fxbug.dev/42136750): <<../../common/pipelining/overview.md>> -->
 
 A common aspect of using FIDL on Fuchsia is passing protocols themselves across
 protocols. Many FIDL messages include either the client end or
@@ -30,7 +30,7 @@ The full example code for this tutorial is located at
 
 ### The FIDL protocol
 
-<!-- TODO(https://fxbug.dev/58758) <<../../common/pipelining/launcher.md>> -->
+<!-- TODO(https://fxbug.dev/42136750) <<../../common/pipelining/launcher.md>> -->
 
 This tutorial implements the `EchoLauncher` protocol from the
 [fuchsia.examples library][examples-fidl]:

@@ -4,7 +4,7 @@ Fuchsia is in the process of migrating to a wire format for structured logs insp
 [trace format]. This new transmission format for logs allows consumption and propagation of
 arbitrary data structures as log records.
 
-<!-- TODO(https://fxbug.dev/34899) update this when more implementations have landed -->
+<!-- TODO(https://fxbug.dev/42110256) update this when more implementations have landed -->
 
 ## Validation
 

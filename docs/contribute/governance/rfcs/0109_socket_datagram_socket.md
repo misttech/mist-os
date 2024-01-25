@@ -17,7 +17,7 @@ Implement client-side argument validation using client-cached network state.
 
 Increase datagram socket throughput and reduce CPU utilization.
 
-Prior to <https://fxbug.dev/21123> datagram network sockets were implemented
+Prior to <https://fxbug.dev/42094952> datagram network sockets were implemented
 using zircon sockets; clients would `zx_socket_write` to send data and
 `zx_socket_read` to receive data. A minimal protocol was used to carry metadata
 such as the destination address, if one was provided by the calling
@@ -492,7 +492,7 @@ resource union NodeInfo {
 };
 
 /// A [`NodeInfo`] variant.
-// TODO(https://fxbug.dev/74683): replace with an anonymous struct inline.
+// TODO(https://fxbug.dev/42154392): replace with an anonymous struct inline.
 resource struct DatagramSocket {
     zx.handle:<SOCKET, zx.RIGHTS_BASIC | zx.RIGHTS_IO> socket;
 };
@@ -527,7 +527,7 @@ The initial implementation is expected to supply two elements in each
 
 Throughput of `SOCK_DGRAM` sockets is expected to approximately double; this
 estimate is based on the performance regression seen after
-<https://fxbug.dev/21123>.
+<https://fxbug.dev/42094952>.
 
 CPU utilization is expected to decrease by a meaningful but unknown magnitude.
 

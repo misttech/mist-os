@@ -840,7 +840,7 @@ Linked at relevant points in the document.
 [core-bluetooth]: https://cs.opensource.google/fuchsia/fuchsia/+/main:products/common/core.gni;l=20;drc=c1946eee7aef8fe008361979a4d380e41809ca5e
 [core-driver-playground]: https://cs.opensource.google/fuchsia/fuchsia/+/main:products/common/core.gni;l=20;drc=c1946eee7aef8fe008361979a4d380e41809ca5e
 [core-fuzzing]: https://cs.opensource.google/fuchsia/fuchsia/+/main:products/common/core.gni;l=42;drc=c1946eee7aef8fe008361979a4d380e41809ca5e
-[core-size-limits-infra]: https://fxbug.dev/79053
+[core-size-limits-infra]: https://fxbug.dev/42159247
 [core-ssh]: https://cs.opensource.google/fuchsia/fuchsia/+/main:products/common/core.gni;l=69;drc=c1946eee7aef8fe008361979a4d380e41809ca5e
 [core-starnix-manager]: https://cs.opensource.google/fuchsia/fuchsia/+/main:products/common/core.gni;l=32;drc=c1946eee7aef8fe008361979a4d380e41809ca5e
 [core-storage]: https://cs.opensource.google/fuchsia/fuchsia/+/main:products/common/core.gni;l=74;drc=c1946eee7aef8fe008361979a4d380e41809ca5e

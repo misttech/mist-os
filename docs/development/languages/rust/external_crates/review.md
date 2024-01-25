@@ -363,7 +363,7 @@ To request an unsafe code review:
     -   The total number of lines changed (located at the bottom of your files
         list in Gerrit).
     -   The constituent crates that have been added or updated.
-    -   Here's [an example](https://fxbug.dev/121497) for reference.
+    -   Here's [an example](https://fxbug.dev/42072534) for reference.
 1.  Add "Fuchsia Rust Unsafe Reviews <fuchsia-rust-unsafe-reviews@google.com>"
     as a reviewer to your CL. A reviewer will be chosen at random and assigned
     to your CL.

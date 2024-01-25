@@ -219,7 +219,7 @@ When combining component dependencies into a single package, all components
 share a single, flat namespace, and transitive dependencies must also be
 included.
 
-<!-- TODO(https://fxbug.dev/116980): Add a diagram to help visualize this example. -->
+<!-- TODO(https://fxbug.dev/42068204): Add a diagram to help visualize this example. -->
 
 For example, if single package `SP` bundles component `A` and component `B`, but
 `B` also depends on `C` by relative URI fragment (`#meta/C.cm`), package `SP`

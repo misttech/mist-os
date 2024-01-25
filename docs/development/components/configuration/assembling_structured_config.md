@@ -79,7 +79,7 @@ specified in size limits as:
 ```
 
 [sc-docs]: structured_config.md
-<!-- TODO(https://fxbug.dev/104819) update link to match proper docs -->
+<!-- TODO(https://fxbug.dev/42055979) update link to match proper docs -->
 [build-types]: /docs/contribute/governance/rfcs/0115_build_types.md
 [sa-email]: mailto:software-assembly@fuchsia.dev
 [config-schema]: /src/lib/assembly/config_schema/src/product_config.rs

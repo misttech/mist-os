@@ -249,7 +249,7 @@ becomes:
 
 The `"maybe_request_payload"` field already exists that matches this shape but
 is not yet specified in the JSON IR as part of the work for ["Changing our
-representation of messages"][https://fxbug.dev/7704]. In practice, the JSON IR change
+representation of messages"][https://fxbug.dev/42157011]. In practice, the JSON IR change
 for this RFC will involve completing the migration from `"maybe_request"` to the
 `"maybe_request_payload"` (see [Implementation](#ir-implementation)).
 
@@ -288,7 +288,7 @@ top level type is a struct, there are two possible approaches:
 
 ### JSON IR {#ir-implementation}
 
-As part of [https://fxbug.dev/7704], a
+As part of [https://fxbug.dev/42157011], a
 migration was already in progress to move the `"maybe_request"` and
 `"maybe_response"` fields out of the JSON IR so that any special treatment of
 request and response types occur only in FIDL backends. This work was paused
@@ -389,7 +389,7 @@ ordinals.
 
 [RFC-0050]: /docs/contribute/governance/rfcs/0050_syntax_revamp.md
 [traits]: /sdk/lib/fidl/cpp/wire/include/lib/fidl/cpp/wire/traits.h
-[https://fxbug.dev/7704]: https://bugs.fuchsia.dev/p/fuchsia/issues/detail?id=7704
+[https://fxbug.dev/42157011]: https://bugs.fuchsia.dev/p/fuchsia/issues/detail?id=7704
 [extensible-method-args]: /docs/contribute/governance/rfcs/0050_syntax_revamp.md#extensible-method-args
 [flattened-name]: /docs/contribute/governance/rfcs/0050_syntax_revamp.md#flattened-name
 [grammar]: /docs/contribute/governance/rfcs/0050_syntax_revamp.md#grammar

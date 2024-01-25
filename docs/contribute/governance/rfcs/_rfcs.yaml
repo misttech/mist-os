@@ -2715,7 +2715,7 @@
   authors: ['crjohns@google.com']
   file: '0208_distributing_packages_with_the_sdk.md'
   area: ['Software Delivery', 'Testing']
-  issue: ['https://fxbug.dev/119425']
+  issue: ['https://fxbug.dev/42070497']
   gerrit_change_id: ['724843']
   status: 'Accepted'
   reviewers: ['aaronwood@google.com', 'dschuyler@google.com', 'jsankey@google.com', 'richkadel@google.com', 'yuxiaosun@google.com']

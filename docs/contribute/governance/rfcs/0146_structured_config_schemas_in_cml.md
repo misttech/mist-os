@@ -444,7 +444,7 @@ The implementation of this design will be done in three incremental stages.
 ## Performance
 
 *   We will be benchmarking the added performance hit to component start time due to structured
-configuration. A [bug](https://fxbug.dev/86321) has been filed for this.
+configuration. A [bug](https://fxbug.dev/42167319) has been filed for this.
 *   This design uses FIDL tables to encode the schema, which means some added overhead when
 parsing `ComponentDecl` FIDL objects compared to declaring structs. We anticipate this overhead is
 negligible compared with overall component start time.
@@ -462,7 +462,7 @@ the hashes in the schema and value files.
 *   Component Manager will be storing the configuration schema in the hub filesystem. This may
 have an additional non-negligible impact on the memory usage of Component Manager.
     *   Making the hub pull-based rather than push-based would address this concern. A
-    [bug](https://fxbug.dev/77190) has been filed for this feature request.
+    [bug](https://fxbug.dev/42157178) has been filed for this feature request.
 
 ## Security Considerations
 

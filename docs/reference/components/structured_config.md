@@ -30,7 +30,7 @@ knowledge of the component instance's context.
 Component Manager will resolve a value for each configuration field, preferring
 each source in this order:
 
-1. values from a developer override service ([WIP](https://fxbug.dev/96260))
+1. values from a developer override service ([WIP](https://fxbug.dev/42178358))
 2. values from a component's parent
 3. values from the component's own package
 
@@ -110,7 +110,7 @@ values.
 
 Note: There is currently no mechanism to verify the version of the
 [generated client library][client-lib] against the compiled manifest. Please star
-https://fxbug.dev/128856 for updates.
+https://fxbug.dev/42079281 for updates.
 
 [configuration value file]: #configuration-value-files
 [resolved VMO]: #resolved-vmo

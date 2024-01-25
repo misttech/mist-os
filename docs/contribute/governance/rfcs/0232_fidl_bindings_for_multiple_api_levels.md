@@ -112,7 +112,7 @@ This also eliminates the need to mark individual APIs with `legacy=true`.
 * If an element marked `@available(..., deprecated=D, ...)` is included in
   bindings by the rules above, it is considered deprecated in bindings if
   `<target_versions>` intersects `{v | v >= D}`. This has no impact on generated
-  code today, but may in the future (https://fxbug.dev/7692).
+  code today, but may in the future (https://fxbug.dev/42156877).
 
 * As before, the `--available` flag can be used more than once for multiple
   platforms. There is no significant interaction between these two features

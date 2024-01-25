@@ -325,6 +325,6 @@ codegen_dir = get_label_info(":bogus($default_toolchain)", "target_gen_dir")
 Do not create a toolchain for a particular programming language. We did this
 early on, and it turned out to be a bad idea. For example, we used to have
 `rust_toolchain` but later removed it. We are also [planning to
-remove](https://fxbug.dev/108355) the `fidl_toolchain`.
+remove](https://fxbug.dev/42059770) the `fidl_toolchain`.
 
 [gn-toolchains-overview]: /docs//development/build/build_system/internals/toolchains/gn_toolchains_overview.md

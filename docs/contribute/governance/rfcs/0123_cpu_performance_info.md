@@ -237,7 +237,7 @@ call to `zx_system_set_performance_info`. If the frequency cannot be determined
 (e.g. if an associated driver has failed outright), the caller should make a
 pessimistic (low) guess as to the resulting CPU speed. This recommendation may
 evolve as it is given further consideration; see for example
-[https://fxbug.dev/84685](https://fxbug.dev/84685).
+[https://fxbug.dev/84685](https://fxbug.dev/42165500).
 
 The new API will ultimately be utilized by a to-be-developed "CPU Manager"
 component that will be responsible for userspace administration of CPUs. Rather

@@ -561,7 +561,7 @@ child (assuming a post-boot environment) follows:
   at development time), or vice-versa. Allowing this kind of behavior could
   reduce some of the intended benefits of subpackages, including reliability and
   security. Additionally, there are known gaps in how Component Manager resolves
-  and reloads a new version of a component (see https://fxbug.dev/66381). If
+  and reloads a new version of a component (see https://fxbug.dev/42145182). If
   these known issues are resolved, subpackage dependency constraints could be
   revised (in a future proposal) to allow a parent package to declare certain
   dependencies based on a looser contract (behavior, API, and/or ABI guarantees,

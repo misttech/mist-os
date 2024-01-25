@@ -159,7 +159,7 @@ objects in the new C++ bindings.
 </table>
 </div>
 
-<!-- TODO(https://fxbug.dev/111281): Replace the canvas reference with key value store
+<!-- TODO(https://fxbug.dev/42062595): Replace the canvas reference with key value store
      to align with the above, once the key value store example has landed. -->
 
 Here's the most common way to set up a client:

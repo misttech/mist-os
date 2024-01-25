@@ -457,7 +457,7 @@ Some precisions:[^rename-to-framework-err]
 
 [^rename-to-framework-err]: We later renamed `transport_err` and `TransportErr`
     to `framework_err` and `FrameworkErr`, respectively. See
-    https://fxbug.dev/109789 for details.
+    https://fxbug.dev/42061151 for details.
 
 ### Changes to the JSON IR
 

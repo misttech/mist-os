@@ -124,7 +124,7 @@ Add a `BUILD.gn` file with the following contents to declare the library target:
 
 Add the library target to the build configuration:
 
-<!-- TODO(https://fxbug.dev/108355): Update this when fidl_toolchain is removed. -->
+<!-- TODO(https://fxbug.dev/42059770): Update this when fidl_toolchain is removed. -->
 
 * {Rust}
 

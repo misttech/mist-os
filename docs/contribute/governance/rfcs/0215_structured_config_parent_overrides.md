@@ -488,7 +488,7 @@ make future debugging easier.
 ### Fuzz config resolution
 
 In the future we will add a fuzzer for Component Manager's manifest parsing and
-component resolution. When [that](https://fxbug.dev/118070) happens, we will
+component resolution. When [that](https://fxbug.dev/42069284) happens, we will
 extend the fuzzer to include configuration values from a parent component and
 assert that mutability modifiers are respected.
 

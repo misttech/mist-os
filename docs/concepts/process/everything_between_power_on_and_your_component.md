@@ -142,7 +142,7 @@ filesystems, eventually culminating in pkgfs running. At this point fshost
 starts responding to requests on the `/pkgfs` handle, and component manager
 proceeds to start the rest of userspace.
 
-TODO(https://fxbug.dev/102390): This diagram is no longer accurate as of
+TODO(https://fxbug.dev/42053321): This diagram is no longer accurate as of
 https://cs.opensource.google/fuchsia/fuchsia/+/124f955ae0d1db1c7e991684c7e8a9b4528d6806.
 
 ![A sequence diagram showing the startup sequence between fshost and driver

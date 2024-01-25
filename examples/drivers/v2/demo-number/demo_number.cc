@@ -103,12 +103,12 @@ class DemoNumber : public fdf::DriverBase {
         key, dispatcher(), std::move(request), [this, key](fidl::UnbindInfo info) {
           FDF_LOG(INFO, "Client connection unbound: %s", info.FormatDescription().c_str());
           size_t erase_count = servers_.erase(key);
-          // TODO(https://fxbug.dev/118019): Use FATAL log when its supported.
+          // TODO(https://fxbug.dev/42069227): Use FATAL log when its supported.
           ZX_ASSERT_MSG(erase_count == 1,
                         "Failed to erase connection with key: %d, erased %ld connections", key,
                         erase_count);
         });
-    // TODO(https://fxbug.dev/118019): Use FATAL log when its supported.
+    // TODO(https://fxbug.dev/42069227): Use FATAL log when its supported.
     ZX_ASSERT_MSG(inserted, "Failed to insert connection with key: %d", key);
   }
 

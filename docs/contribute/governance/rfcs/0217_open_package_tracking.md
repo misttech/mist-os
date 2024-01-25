@@ -358,8 +358,8 @@ found (which is generally straightforward using console commands like `k zx ch`)
 and fixed. This will not be a problem for user devices because on user devices
 only the system-updater uses ephemeral resolution.
 
-[bug_consecutive_test]: https://fxbug.dev/78013
-[bug_repeated_test]: https://fxbug.dev/96010
+[bug_consecutive_test]: https://fxbug.dev/42158093
+[bug_repeated_test]: https://fxbug.dev/42178081
 
 [rfc_0170]: /docs/contribute/governance/rfcs/0170_remove_binary_images_from_the_update_package.md
 [rfc_0212]: /docs/contribute/governance/rfcs/0212_package_sets.md

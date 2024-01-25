@@ -31,7 +31,7 @@ bootloaders because UEFI bootloaders vary in quality and in some
 fastboot would not be reliable enough. This is less of a problem for
 targets currently supported by Fuchsia with good enough support or
 support in the works
-(e.g. [https://fxbug.dev/59695](https://fxbug.dev/59695)).  Platforms where
+(e.g. [https://fxbug.dev/59695](https://fxbug.dev/42137791)).  Platforms where
 fastboot is not available have the backup option of flashing Fuchsia
 to a USB device and booting from it.
 
@@ -45,12 +45,12 @@ protocol](https://android.googlesource.com/platform/system/core/+/refs/heads/mas
 
 * Bootloaders will need to be updated for example, Gigaboot will need
   to be modified to implement `fastboot boot`
-  [https://fxbug.dev/59695](https://fxbug.dev/59695).
+  [https://fxbug.dev/59695](https://fxbug.dev/42137791).
 * fx scripts will need to be updated to redirect `fx netboot` users to
   `fastboot boot` (we likely want to wrap these flows in an fx/ffx
   helper command to make it as straightforward as possible).
 * Infra will need to be transitioned to fastboot
-  [https://fxbug.dev/47531](https://fxbug.dev/47531).
+  [https://fxbug.dev/47531](https://fxbug.dev/42124288).
 * Zedboot deprecation as described in RFC [Deprecate Zedboot-based
   paving for provisioning
   devices](/docs/contribute/governance/rfcs/0075_deprecate_zedboot_paving.md).
@@ -78,7 +78,7 @@ other Fuchsia bootloaders besides those that already support it. This
 means, as new boards are brought up in Fuchsia, fastboot support is
 required during early bringup. This includes support for `fastboot
 boot` on Gigaboot bootloaders used on Intel NUCs
-([https://fxbug.dev/59695](https://fxbug.dev/59695)) and on coreboot based
+([https://fxbug.dev/59695](https://fxbug.dev/42137791)) and on coreboot based
 systems like Pixelbooks.
 
 ## Prior art and references

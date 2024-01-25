@@ -162,7 +162,7 @@ The term "swapping" should also be removed in favor of "replaced".
 
 The [fidldoc] tool currently operates on the JSON IR for a single API level, so
 it never sees `removed` arguments, and will not see `replaced` either
-(https://fxbug.dev/134218). When this is fixed, fidldoc should be updated to
+(https://fxbug.dev/42084086). When this is fixed, fidldoc should be updated to
 clearly indicate when something is replaced as opposed to removed.
 
 ## Drawbacks, alternatives, and unknowns

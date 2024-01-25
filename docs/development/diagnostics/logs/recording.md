@@ -19,7 +19,7 @@ reset. `log_listener` [prints a warning] when it's aware of dropped messages.
 
 The `LogSink` service must drain all of the sockets it receives quickly enough to prevent messages
 being dropped on the writer-side. `LogSink` is responsible for draining those sockets to fill
-internal buffers (TODO(https://fxbug.dev/47661): No longer true since https://fxrev.dev/490158).
+internal buffers (TODO(https://fxbug.dev/42124432): No longer true since https://fxrev.dev/490158).
 This can result in high CPU usage in both the writing component and the `LogSink` when logging
 heavily.
 

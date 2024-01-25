@@ -41,7 +41,7 @@ need for the aforementioned state tracking in fdio.
 
 Socket shutdown can be fully mediated by the network stack, initiated by client
 FIDL calls, eliminating race conditions that exist today (e.g.
-https://fxbug.dev/61714).
+https://fxbug.dev/42140031).
 
 ## Design
 

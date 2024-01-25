@@ -8,7 +8,7 @@
 toc:
 - title: "Run Fuchsia tests"
   path: /docs/development/testing/run_fuchsia_tests.md
-# TODO(https://fxbug.dev/60809)
+# TODO(https://fxbug.dev/42139030)
 # - title: "Test with Diagnostics"
 #   path: /docs/development/testing/diagnostics.md
 - title: "Testing Scenic and Escher"

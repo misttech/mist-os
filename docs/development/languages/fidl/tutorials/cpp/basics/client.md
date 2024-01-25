@@ -1,6 +1,6 @@
 # Implement a C++ FIDL client
 
-<!-- TODO(https://fxbug.dev/58758) <<../../common/client/overview.md>> -->
+<!-- TODO(https://fxbug.dev/42136750) <<../../common/client/overview.md>> -->
 
 ## Prerequisites
 

@@ -93,7 +93,7 @@ Often this metadata needs to be calculated iteratively starting from the leaves
 of the library dependency tree (the "base libraries"), with the metadata
 percolating to the root (the library being compiled).
 
-For instance, [`fidlgen_rust`] [would like to know](https://fxbug.dev/61760)
+For instance, [`fidlgen_rust`] [would like to know](https://fxbug.dev/42140082)
 whether a type may ever contain a floating point number to determine which
 traits can be safely derived. A `struct` which does not contain any floating
 point number could have an `Eq`, a `strict union` where none of the variants
@@ -179,7 +179,7 @@ the validity of doc comments in `fidldoc` and rejecting to generate reference
 documents. (In both examples, graceful degradation is what is expected.)
 
 Allowing late validation invites an unpleasant kind of breakage-at-a-distance
-(e.g. [https://fxbug.dev/65465](https://fxbug.dev/65465)): in a world where FIDL
+(e.g. [https://fxbug.dev/65465](https://fxbug.dev/42144169)): in a world where FIDL
 libraries are provided as SDK artifacts, and integrated into downstream
 repositories, the developer running the backend is likely different from the
 FIDL library author. As a result, providing warnings or errors to the developer
@@ -220,7 +220,7 @@ changed and evolved. Keeping the IR and the downstream ecosystem thriving is
 already a large amount of scope (pragmatically speaking, i.e. number of people
 making changes to support this area). As the source language stabilizes,
 allowing tools or APIs to do direct source manipulation is something we might
-look at (e.g. [https://fxbug.dev/75672](https://fxbug.dev/75672)), and work to enable.
+look at (e.g. [https://fxbug.dev/75672](https://fxbug.dev/42155491)), and work to enable.
 
 ### Scaling compilation {#scaling-compilation}
 
@@ -256,7 +256,7 @@ compilation unit (e.g. a library for FIDL), and produce an intermediary result
 and intermediate results of direct dependencies. This makes it possible to limit
 total compilation time (assuming infinite parallelism) to the dependency chain
 which is the longest to compile. This also simplifies build rules, a topic [du
-jour](https://fxbug.dev/75125).
+jour](https://fxbug.dev/42154884).
 
 ## Design
 
@@ -274,7 +274,7 @@ Note: A key enabler to a saner toolchain as described here is a well structured
 IR (see some of the [guiding principles](#guiding-principles) below). The
 current IR has organically evolved, experimental features became core (though
 not used outside of the Fuchsia Source Tree). While the current IR supports the
-use cases we have ([mostly](https://fxbug.dev/64992)), decisions about its shape
+use cases we have ([mostly](https://fxbug.dev/42143655)), decisions about its shape
 have been made in the moment, all the while requirements have grown steadily.
 
 ### Guiding principles {#guiding-principles}
@@ -308,7 +308,7 @@ To exemplify this principle, consider the current anti-pattern of calculating a
 compiler. It also muddies the water as to why such an order is needed, and has
 often caused confusion. This is also inflexible since backends ought to evolve
 independently from the core compiler – this has been a [hindrance to progress on
-supporting recursive types](https://fxbug.dev/35218) for instance.
+supporting recursive types](https://fxbug.dev/42110612) for instance.
 
 #### The IR must not contain source {#ir-does-not-contain-source}
 

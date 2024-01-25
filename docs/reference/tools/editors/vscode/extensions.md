@@ -144,7 +144,7 @@ to your `settings.json`:
   "rust-analyzer.checkOnSave.enable": false,
   "rust-analyzer.checkOnSave.allTargets": false,
 
-  // workaround for https://fxbug.dev/102739
+  // workaround for https://fxbug.dev/42053708
   // needed if you see errors about extension host crashing
   "rust-analyzer.files.watcher": "server",
 ```

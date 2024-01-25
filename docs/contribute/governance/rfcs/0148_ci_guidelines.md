@@ -116,7 +116,7 @@ The same goes for builds which are difficult to reproduce or cannot be
 reproduced locally. The infrastructure should not be configuring builds in a way
 that diverges heavily from developer workflows in non-obvious ways. For example,
 as of this writing, the
-[Fuchsia SDK remains difficult to build locally](https://fxbug.dev/44889#c18).
+[Fuchsia SDK remains difficult to build locally](https://fxbug.dev/42121352#c18).
 The infrastructure maintains its own [logic][sdk-recipe] which significantly
 differs from the internal-only fx script, and there is no automation which
 checks that they produce the same output.

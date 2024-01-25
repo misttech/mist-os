@@ -234,4 +234,4 @@ N/A
 
 [cts]: /docs/development/testing/ctf/overview.md
 [inspect-discovery]: /docs/reference/diagnostics/inspect/tree.md
-[tree-llcpp-bug]: https://fxbug.dev/95806
+[tree-llcpp-bug]: https://fxbug.dev/42177853

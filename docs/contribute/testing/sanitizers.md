@@ -188,11 +188,11 @@ your executable target as follows:
 ```gn
 executable("please_fix_the_bugs") {
   ...
-  # TODO(https://fxbug.dev/12345): delete the below and fix the memory bug.
+  # TODO(https://fxbug.dev/42074368): delete the below and fix the memory bug.
   deps += [ "//build/config/sanitizers:suppress-asan-stack-use-after-return" ]
-  # TODO(https://fxbug.dev/12345): delete the below and fix the memory bug.
+  # TODO(https://fxbug.dev/42074368): delete the below and fix the memory bug.
   deps += [ "//build/config/sanitizers:suppress-asan-container-overflow" ]
-  # TODO(https://fxbug.dev/12345): delete the below and fix the memory leak.
+  # TODO(https://fxbug.dev/42074368): delete the below and fix the memory leak.
   deps += [ "//build/config/sanitizers:suppress-lsan.DO-NOT-USE-THIS" ]
 }
 ```
@@ -229,7 +229,7 @@ For Rust, you can follow this pattern:
 #[cfg(test)]
 mod tests {
     #[test]
-    // TODO(https://fxbug.dev/12345): delete the below and fix the leak
+    // TODO(https://fxbug.dev/42074368): delete the below and fix the leak
     #[cfg_attr(feature = "variant_asan", ignore)]
     fn test_that_leaks() {
         // ...

@@ -32,7 +32,7 @@ it. For instance for I2C, from
 Note: [Banjo](/docs/development/drivers/tutorials/banjo-tutorial.md) should not be used for
 driver utilities application to driver communication.
 
-TODO(https://fxbug.dev/45662): Add inspect usage description.
+TODO(https://fxbug.dev/42122211): Add inspect usage description.
 
 ## Discovery
 

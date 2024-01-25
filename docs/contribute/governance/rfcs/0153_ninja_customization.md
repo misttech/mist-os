@@ -25,7 +25,7 @@ In particular, doing this would allow to:
   algorithm used by Ninja.
 
 - Improve the status reporting and logging, as well as solving a
-  [serious usability issue](https://fxbug.dev/92532) that routinely
+  [serious usability issue](https://fxbug.dev/42174217) that routinely
   triggers in our CI builds.
 
 - Improve the responsiveness and general performance of Ninja without
@@ -161,7 +161,7 @@ running then:
   see what is really going on is to use "ps" in another terminal, but few
   people actually know that.
 
-The first point is [a problem for the Fuchsia build](https://fxbug.dev/92532),
+The first point is [a problem for the Fuchsia build](https://fxbug.dev/42174217),
 that cannot be solved without modifying Ninja. The second one is a usability
 annoyance that has been bugging users for several years, to the point where
 there exist several pull requests to fix it in different ways:

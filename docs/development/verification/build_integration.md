@@ -169,7 +169,7 @@ And the final policy file for a **new field** for an **existing component** look
 Once these changes land, assuming work on the new component or feature is complete, it is safe to
 close the bug mentioned in Step 2.
 
-<!-- TODO(https://fxbug.dev/104819): Link to fxbug.dev page when better documentation is available.  -->
+<!-- TODO(https://fxbug.dev/42055979): Link to fxbug.dev page when better documentation is available.  -->
 [build-types]: /docs/contribute/governance/rfcs/0115_build_types.md
 [ffx-scrutiny]: https://fuchsia.dev/reference/tools/sdk/ffx#scrutiny
 [scrutiny-verifiers]: https://cs.opensource.google/fuchsia/fuchsia/+/main:build/security/verifier/

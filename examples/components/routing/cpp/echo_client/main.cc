@@ -17,7 +17,7 @@
 // [START main_body]
 int main(int argc, const char* argv[], char* envp[]) {
   // [START_EXCLUDE silent]
-  // TODO(https://fxbug.dev/97170): Consider migrating to async FIDL API
+  // TODO(https://fxbug.dev/42179369): Consider migrating to async FIDL API
   // [END_EXCLUDE]
   // Set tags for logging.
   fuchsia_logging::SetTags({"echo_client"});

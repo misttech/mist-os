@@ -132,7 +132,7 @@ Sample test realm:
                   runner: "fuchsia_oot_runner",
                   from: "parent",
               },
-              // TODO(https://fxbug.dev/112381): Abstract out into a shard.
+              // TODO(https://fxbug.dev/42063673): Abstract out into a shard.
               // This is important so that Realm Builder can work.
               {
                   runner: "realm_builder",

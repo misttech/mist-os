@@ -83,7 +83,7 @@ signatures that use the `Wire` counterparts e.g. `fidl::WireClient`. One may
 also depend on only the wire parts of the bindings by depending on the
 `fuchsia.my.lib_cpp_wire` target instead of the `fuchsia.my.lib_cpp` GN target.
 
-<!-- TODO(https://fxbug.dev/98989): Talk about Bazel targets -->
+<!-- TODO(https://fxbug.dev/42181382): Talk about Bazel targets -->
 
 Note: the wire types portions of the bindings was historically named "Low-Level
 C++ bindings", or LLCPP.

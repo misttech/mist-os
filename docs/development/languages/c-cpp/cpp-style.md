@@ -13,7 +13,7 @@ with these guidelines.
 ### TODO comments
 
 The Google C++ style guide requires referencing a bug number in TODO comments.
-On Fuchsia this is done in the format: `TODO(https://fxbug.dev/12345)`.
+On Fuchsia this is done in the format: `TODO(https://fxbug.dev/42074368)`.
 
 ### Compilation flags
 
@@ -47,7 +47,7 @@ source_set("my_sources") {
   ...
   cflags = [
     # We don't want any write-only params/vars in our code.
-    # TODO(https://fxbug.dev/56202): delete the below when these warnings are
+    # TODO(https://fxbug.dev/42133916): delete the below when these warnings are
     # enabled globally.
     "-Wunused-but-set-parameter",
     "-Wunused-but-set-variable",

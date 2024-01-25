@@ -8,7 +8,7 @@ child nodes (a "branch"). In the latter case, the node recursively contains a
 nested tree definition, repeating to as great of a depth as necessary.
 
 Warning: Support for recursive types is currently a [work in
-progress](https://fxbug.dev/35218), with only some forms of cycle breakage being
+progress](https://fxbug.dev/42110612), with only some forms of cycle breakage being
 recognized today.
 
 FIDL supports recursive types, as long as at least one chain in the includes

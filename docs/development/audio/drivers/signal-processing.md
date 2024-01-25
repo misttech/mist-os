@@ -235,7 +235,7 @@ The PEs of type `CONNECTION_POINT` allow for:
 1. Expanding a single pipeline into multiple pipelines ones (scatter).
 
 {% comment %}
-// TODO(https://fxbug.dev/64877): Add extra context for multi-pipeline construction.
+// TODO(https://fxbug.dev/42143529): Add extra context for multi-pipeline construction.
 {% endcomment %}
 
 ## Endpoints {#endpoints}

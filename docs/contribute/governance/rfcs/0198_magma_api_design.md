@@ -245,11 +245,11 @@ FIDL tables have been used in various places where future extensibility has been
 ## Security
 
 The Magma API lets applications run unvalidated programs on an important shared system resource,
-so security is an important topic.  A security review was completed 06/2021: see https://fxbug.dev/67673.
+so security is an important topic.  A security review was completed 06/2021: see https://fxbug.dev/42146613.
 
 It is possible for clients to submit long-running programs which deny access to the hardware to
 other clients.  The Magma system driver ensures that long running programs are aborted with an
-[acceptable](https://fxbug.dev/94071) degree of system disruption, similar to the behavior of other
+[acceptable](https://fxbug.dev/42175926) degree of system disruption, similar to the behavior of other
 systems.
 
 Graphics memory can contain sensitive information such as passwords, so it's important that

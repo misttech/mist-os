@@ -466,7 +466,7 @@ not enabled for userspace in macOS. [apple-xom]
 [elf-segment-perm]: https://www.sco.com/developers/gabi/latest/ch5.pheader.html
 [posix-mmap]: https://pubs.opengroup.org/onlinepubs/9699919799/functions/mmap.html
 [rtl-attack]: https://dl.acm.org/doi/10.1145/1315245.1315313
-[pan-fxb]: https://fxbug.dev/59284
+[pan-fxb]: https://fxbug.dev/42137335
 [pan-issue]: https://blog.siguza.net/PAN/
 [linux-revert]: https://github.com/torvalds/linux/commit/cab15ce604e550020bb7115b779013b91bcdbc21
 [linux-re-land]: https://github.com/torvalds/linux/commit/18107f8a2df6bf1c6cac8d0713f757f866d5af51

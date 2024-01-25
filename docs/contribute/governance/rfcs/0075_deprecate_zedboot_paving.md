@@ -174,7 +174,7 @@ boards are brought up in Fuchsia, fastboot support is required during
 early bringup.
 
  * Support for Gigaboot bootloaders on the Intel NUC product is not fully complete
-   but is in progress: [https://fxbug.dev/68692: NUC: support full device flashing](http://https://fxbug.dev/68692).
+   but is in progress: [https://fxbug.dev/68692: NUC: support full device flashing](http://https://fxbug.dev/42147743).
 
  * SeaBIOS is the default bootloader for qemu but there are no paving workflows
    supported in qemu. Thus, fastboot support is not required.

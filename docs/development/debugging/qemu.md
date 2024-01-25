@@ -234,7 +234,7 @@ It provides several things:
 
 Heads up: This script isn't always updated as zircon changes.
 
-**NOTE**: due to [bug 67893](https://fxbug.dev/67893), the KASLR part might not work if using qemu with kvm.
+**NOTE**: due to [bug 67893](https://fxbug.dev/42146857), the KASLR part might not work if using qemu with kvm.
   As a workaround, you can execute the following in gdb:
 
 ```

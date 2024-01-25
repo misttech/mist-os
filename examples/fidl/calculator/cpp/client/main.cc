@@ -179,7 +179,7 @@ int main(int argc, const char** argv) {
 
   if (!myfile.is_open()) {
     FX_LOGS(ERROR) << "Failed opening the input file: '" << input_filename << "'";
-    // TODO(https://fxbug.dev/96667): Remove sleep once the logging bug is fixed.
+    // TODO(https://fxbug.dev/42178809): Remove sleep once the logging bug is fixed.
     sleep(1);
     return 0;
   }
@@ -212,7 +212,7 @@ int main(int argc, const char** argv) {
 
   // Check if the client initialized correctly
   if (!client_instance.IsValid()) {
-    // TODO(https://fxbug.dev/96667): Remove sleep once the logging bug is fixed.
+    // TODO(https://fxbug.dev/42178809): Remove sleep once the logging bug is fixed.
     sleep(1);
     return -1;
   }
@@ -233,7 +233,7 @@ int main(int argc, const char** argv) {
   }
   // Run() the async loop dispatcher to handle callbacks
   loop.Run();
-  // TODO(https://fxbug.dev/96667): Remove sleep once the logging bug is fixed.
+  // TODO(https://fxbug.dev/42178809): Remove sleep once the logging bug is fixed.
   sleep(1);
   return 0;
 }

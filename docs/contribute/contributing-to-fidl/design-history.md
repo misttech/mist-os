@@ -141,7 +141,7 @@ the FIDL language. It only includes current features, not obsolete ones.
 | `Method(table { ... })`  | [RFC-0087] | Tables and unions as top-level request/response types
 | `open`, `closed`, `ajar` | [RFC-0138] | Open and closed interactions
 
-<!-- TODO(https://fxbug.dev/93457): Uncomment when accepted. -->
+<!-- TODO(https://fxbug.dev/42175244): Uncomment when accepted. -->
 <!-- | `terminal`        | [RFC-NNNN] | Terminal events -->
 
 ## Current status
@@ -169,7 +169,7 @@ _Legend:_
 | [RFC-0022] | Default values for struct members | Superseded by [RFC-0160]
 | [RFC-0051] | Safer structs for C++ | Rejected
 | [RFC-0062] | Method impossible | Rejected
-| [RFC-0053] | Epitaphs | Implemented <!-- TODO(https://fxbug.dev/93457): Change to "Superseded" when we have terminal events. -->
+| [RFC-0053] | Epitaphs | Implemented <!-- TODO(https://fxbug.dev/42175244): Change to "Superseded" when we have terminal events. -->
 | [RFC-0066] | Programmer advisory explicit defaults | Implemented
 | [RFC-0047] | Tables | Amended by [RFC-0116], [RFC-0132]
 | [RFC-0055] | Documentation comments | Amended by [RFC-0043]
@@ -205,7 +205,7 @@ _Legend:_
 | [RFC-0042] | Non nullable types | Rejected (April Fools)
 | [RFC-0024] | Mandatory source compatibility | Implemented; see also [source_compatibility]
 | [RFC-0040] | Identifier uniqueness | Implemented (rejected at first, later accepted)
-| [RFC-0041] | Support for unifying services and devices | [Partially implemented](https://fxbug.dev/8035#c36): only in C++, Rust
+| [RFC-0041] | Support for unifying services and devices | [Partially implemented](https://fxbug.dev/42160684#c36): only in C++, Rust
 | [RFC-0044] | Extensible method arguments | Rejected; Superseded by [RFC-0087]
 | [RFC-0043] | Documentation comment format | Implemented
 | &ndash;    | Versioning | Unpublished; Superseded by [RFC-0083]
@@ -215,7 +215,7 @@ _Legend:_
 | &ndash;    | Unified view of optionality | Unpublished
 | &ndash;    | Iterators | Unpublished; see also [measure-tape] (a pragmatic solution)
 | [RFC-0054] | Parameter attributes | Superseded by [RFC-0050]
-| [RFC-0052] | Type aliasing and new types | [Implementation in progress](https://fxbug.dev/7807)
+| [RFC-0052] | Type aliasing and new types | [Implementation in progress](https://fxbug.dev/42158155)
 | &ndash;    | Restrict non-numeric floating point values | Unpublished
 | &ndash;    | Constant expressions | Unpublished
 | [RFC-0057] | Default no handles | Implemented
@@ -225,23 +225,23 @@ _Legend:_
 | [RFC-0017] | The FTP Process is dead, long live the RFC Process! | Implemented
 | &ndash;    | FIDL Large message support | [Withdrawn][large-message-cl]; Superseded by [RFC-0196]
 | [RFC-0076] | FIDL API summaries | Implemented
-| [RFC-0083] | FIDL versioning | [Implementation in progress](https://fxbug.dev/67858)
+| [RFC-0083] | FIDL versioning | [Implementation in progress](https://fxbug.dev/42146818)
 | [RFC-0086] | Updates to RFC-0050: FIDL attributes syntax | Implemented
 | [RFC-0088] | Updates to RFC-0050: FIDL bits, enum, and constraints syntax | Rejected
-| [RFC-0087] | Updates to RFC-0050: FIDL method parameter syntax | [Implementation in progress](https://fxbug.dev/76349)
-| [RFC-0097] | FIDL Toolchain | [Implementation in progress](https://fxbug.dev/39407)
+| [RFC-0087] | Updates to RFC-0050: FIDL method parameter syntax | [Implementation in progress](https://fxbug.dev/42156243)
+| [RFC-0097] | FIDL Toolchain | [Implementation in progress](https://fxbug.dev/42115264)
 | [RFC-0113] | Efficient envelopes | Implemented
 | [RFC-0114] | Inlining small values in FIDL envelopes | Implemented
 | [RFC-0116] | Wire format support for sparser FIDL tables | Rejected
-| [RFC-0120] | Standalone use of the FIDL wire format | [Implementation in progress](https://fxbug.dev/45252)
+| [RFC-0120] | Standalone use of the FIDL wire format | [Implementation in progress](https://fxbug.dev/42121756)
 | [RFC-0131] | Design principles of the FIDL wire format | Implemented
 | [RFC-0132] | FIDL table size limit | [Implemented](https://fuchsia-review.googlesource.com/c/fuchsia/+/583988)
-| [RFC-0137] | Discard unknown data in FIDL | [Implementation in progress](https://fxbug.dev/85383)
-| [RFC-0138] | Handling unknown interactions | [Implementation in progress](https://fxbug.dev/88366)
+| [RFC-0137] | Discard unknown data in FIDL | [Implementation in progress](https://fxbug.dev/42166276)
+| [RFC-0138] | Handling unknown interactions | [Implementation in progress](https://fxbug.dev/42169590)
 | [RFC-0149] | FIDL encode validation not mandatory | Implemented
 | [RFC-0160] | Remove support for FIDL struct defaults | Implemented
-| [RFC-0190] | FIDL support for syscalls | [Implementation in progress](https://fxbug.dev/110021)
-| [RFC-0196] | FIDL large messages | [Implementation in progress](https://fxbug.dev/100478)
+| [RFC-0190] | FIDL support for syscalls | [Implementation in progress](https://fxbug.dev/42061412)
+| [RFC-0196] | FIDL large messages | [Implementation in progress](https://fxbug.dev/42051196)
 | &ndash;    | A JSON representation for FIDL | [In review](https://fuchsia-review.googlesource.com/c/fuchsia/+/688226)
 | &ndash;    | FIDL complex constants | [In review](https://fuchsia-review.googlesource.com/c/fuchsia/+/690449)
 | &ndash;    | FIDL language support plans | [In review](https://fuchsia-review.googlesource.com/c/fuchsia/+/705622)

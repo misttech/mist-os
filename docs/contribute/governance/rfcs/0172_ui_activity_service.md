@@ -67,8 +67,8 @@ _Socialization:_
 This RFC was discussed during doc review with the Fuchsia Input team, and
 requested reviews for [privacy][2] and [security][3].
 
-[2]: https://fxbug.dev/99288
-[3]: https://fxbug.dev/99287
+[2]: https://fxbug.dev/42181715
+[3]: https://fxbug.dev/42181714
 
 ## Design
 

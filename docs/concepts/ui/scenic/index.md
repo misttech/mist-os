@@ -92,7 +92,7 @@ challenged users.
 Scenic provides diagnostic interfaces to help developers debug their models and
 measure performance.
 
-{# TODO(https://fxbug.dev/109267): Link to a not-yet-existing page with more details. #}
+{# TODO(https://fxbug.dev/42060645): Link to a not-yet-existing page with more details. #}
 
 ### Screen capture {#responsibility-screen-capture}
 

@@ -309,7 +309,7 @@ unsafe impl UniqueLabeler for SequentialLabeler {
 #### Unsafe operations are always in an `unsafe` block
 
 Note: This guideline depends on a change to linting behavior and cannot yet be followed
-([tracking issue](https://fxbug.dev/94323)). Continue to adhere to other guidelines in this section.
+([tracking issue](https://fxbug.dev/42176206)). Continue to adhere to other guidelines in this section.
 
 `unsafe` functions are not considered unsafe contexts in Fuchsia. Unsafe operations must always be
 located inside an `unsafe` block, even if they are in an `unsafe` function body.

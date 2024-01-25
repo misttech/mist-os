@@ -46,7 +46,7 @@ locations. This allows different SDKs to be hermetic.
 
 Tools should be written to make writing environment-specific scripts as simple
 as possible. For example, the debugger should automatically retry connections
-(https://fxbug.dev/5931) so the current behavior of waiting for the port to be open in
+(https://fxbug.dev/42137364) so the current behavior of waiting for the port to be open in
 the launch scripts can be removed.
 
 Tool authors are responsible for:
@@ -55,5 +55,5 @@ Tool authors are responsible for:
 *   Providing documentation on this interface in
     //docs/development/idk/documentation.
 *   Currently please reach out to get bugs filed on individual SDKs. We are
-    working on a better process for this (https://fxbug.dev/5908).
+    working on a better process for this (https://fxbug.dev/42137108).
 

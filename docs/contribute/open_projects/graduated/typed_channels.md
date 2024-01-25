@@ -62,11 +62,11 @@ opposed to locally casting from a raw channel.
 
 ### Picking a task
 
-Search for a BUILD.gn file that contains the string `TODO(https://fxbug.dev/69585)`. It
+Search for a BUILD.gn file that contains the string `TODO(https://fxbug.dev/42148734)`. It
 would look similar to this:
 
 ```gn
-# TODO(https://fxbug.dev/69585): This target uses raw zx::channel with LLCPP which is deprecated.
+# TODO(https://fxbug.dev/42148734): This target uses raw zx::channel with LLCPP which is deprecated.
 # Please migrate to typed channel APIs (fidl::ClientEnd<T>, fidl::ServerEnd<T>).
 # See linked bug for details.
 configs += [ "//build/cpp:fidl-llcpp-deprecated-raw-channels" ]

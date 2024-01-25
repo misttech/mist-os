@@ -222,9 +222,9 @@ by clients. Drivers with `CAN_ASYNC_NOTIFY` set will reply to the first
 |WatchPlugState| calls until the plug state changes from what was most recently reported.
 
 {% comment %}
-> TODO(https://fxbug.dev/63522): Add support for power control.
-> TODO(https://fxbug.dev/64878): Add support for peripheral control.
-> TODO(https://fxbug.dev/63523): Add support for content protection.
+> TODO(https://fxbug.dev/42142036): Add support for power control.
+> TODO(https://fxbug.dev/42143530): Add support for peripheral control.
+> TODO(https://fxbug.dev/42142037): Add support for content protection.
 {% endcomment %}
 
 ### Signal processing {#signal-processing}

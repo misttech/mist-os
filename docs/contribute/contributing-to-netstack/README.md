@@ -90,7 +90,7 @@ revisions).
 
 When writing TODOs:
 
-1. Include an issue reference using the format `TODO(https://fxbug.dev/1245):`
+1. Include an issue reference using the format `TODO(https://fxbug.dev/42075402):`
 1. Phrase the text as an action that is to be taken; it should be possible for
    another contributor to pick up the TODO without consulting any external
    sources, including the referenced issue.

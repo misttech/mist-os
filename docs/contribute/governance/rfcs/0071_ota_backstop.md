@@ -119,7 +119,7 @@ In order to safely bump the epoch, let's also introduce an `epoch_history` file 
 into `epoch.json` via the build system. The `epoch_history` file could be in the form:
 
 ```
-0=Initial epoch (https://fxbug.dev/66089)
+0=Initial epoch (https://fxbug.dev/42144857)
 1=Storage format migration (https://fxbug.dev/XXXXX)
 ...
 N=Most recent change (https://fxbug.dev/YYYYY)

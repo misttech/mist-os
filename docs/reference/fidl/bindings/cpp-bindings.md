@@ -523,7 +523,7 @@ client:
 
 #### WireClient {#async-client}
 
-<!-- TODO(https://fxbug.dev/58672) fidl::WireClient should be covered by generated docs -->
+<!-- TODO(https://fxbug.dev/42136655) fidl::WireClient should be covered by generated docs -->
 
 `fidl::WireClient` is thread-safe and supports both synchronous and asynchronous
 calls as well as asynchronous event handling.
@@ -1182,7 +1182,7 @@ Name[]` field on the protocol class, containing the full protocol name.
 ## Persistence, and standalone use of the FIDL wire format
 
 Standalone use of the FIDL wire format, such as encoding and decoding individual
-FIDL domain objects, are not yet supported (https://fxbug.dev/82681).
+FIDL domain objects, are not yet supported (https://fxbug.dev/42163274).
 
 ## Test scaffolding {#test-scaffolding}
 

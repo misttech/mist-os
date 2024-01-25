@@ -176,7 +176,7 @@ Manager it temporarily runs as a standalone component.
 Currently Scene Manager lacks a number of features present in Root
 Presenter. The work to bring Scene Manager to feature parity with Root Presenter
 is tracked in
-[https://fxbug.dev/98687](https://bugs.fuchsia.dev/p/fuchsia/issues/detail?id=98687).
+[https://fxbug.dev/42181047](https://bugs.fuchsia.dev/p/fuchsia/issues/detail?id=98687).
 Once this is completed and all features are covered by platform integration
 tests we will transition any remaining products to use Scene Manager + GFX.
 
@@ -189,7 +189,7 @@ responsibilities.
 
 There is additional work in Flatland to cover all features supported in
 GFX. This work is tracked in
-[https://fxbug.dev/93979](https://bugs.fuchsia.dev/p/fuchsia/issues/detail?id=93979).
+[https://fxbug.dev/42175822](https://bugs.fuchsia.dev/p/fuchsia/issues/detail?id=93979).
 Once this work is completed and fully covered by platform integration tests we
 will transition remaining products to Flatland.
 

@@ -689,7 +689,7 @@ fx exec $FUCHSIA_DIR/third_party/go/regen-fidl
 
 ### Why is the C back-end different than all other back-ends?
 
-The current C bindings are deprecated. See <https://fxbug.dev/79003> for more
+The current C bindings are deprecated. See <https://fxbug.dev/42159192> for more
 information on the future of using FIDL in C.
 
 ### Why aren't all back-ends in one tool?

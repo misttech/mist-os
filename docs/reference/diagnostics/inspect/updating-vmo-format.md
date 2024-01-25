@@ -328,13 +328,13 @@ This section describes how to implement the wrapper methods declared previously.
 ## Update Dart {#update-dart}
 
 {% comment %}
-TODO([https://fxbug.dev/43131][update-this-doc-bug])
+TODO([https://fxbug.dev/42119402][update-this-doc-bug])
 {% endcomment %}
 
 ## Add to validator tests {#update-validator-tests}
 
 {% comment %}
-TODO([https://fxbug.dev/43131][update-this-doc-bug])
+TODO([https://fxbug.dev/42119402][update-this-doc-bug])
 {% endcomment %}
 
 ## Example change chain
@@ -344,9 +344,9 @@ TODO([https://fxbug.dev/43131][update-this-doc-bug])
 1. [Rust Writer](https://fuchsia-review.googlesource.com/c/fuchsia/+/599947)
 
 {% comment %}
-1. TODO([https://fxbug.dev/43131][update-this-doc-bug]): add C++ writer example
-1. TODO([https://fxbug.dev/43131][update-this-doc-bug]): add validator changes
-1. TODO([https://fxbug.dev/43131][update-this-doc-bug]): add documentation changes
+1. TODO([https://fxbug.dev/42119402][update-this-doc-bug]): add C++ writer example
+1. TODO([https://fxbug.dev/42119402][update-this-doc-bug]): add validator changes
+1. TODO([https://fxbug.dev/42119402][update-this-doc-bug]): add documentation changes
 {% endcomment %}
 
 

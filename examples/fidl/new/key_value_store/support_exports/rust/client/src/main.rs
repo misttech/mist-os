@@ -83,7 +83,7 @@ async fn main() -> Result<(), Error> {
     }
     // [END diff_2]
 
-    // TODO(https://fxbug.dev/76579): We need to sleep here to make sure all logs get drained. Once the
+    // TODO(https://fxbug.dev/42156498): We need to sleep here to make sure all logs get drained. Once the
     // referenced bug has been resolved, we can remove the sleep.
     thread::sleep(time::Duration::from_secs(2));
     Ok(())

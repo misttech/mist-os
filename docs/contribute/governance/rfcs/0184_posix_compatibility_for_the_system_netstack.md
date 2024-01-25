@@ -285,4 +285,4 @@ behavior depending on whether the option is set on a socket before calling
 invisible system state and poorly-defined behavior inform a decision not to
 emulate Linux's behavior.
 
-More details are available in https://fxbug.dev/100840.
+More details are available in https://fxbug.dev/42051599.

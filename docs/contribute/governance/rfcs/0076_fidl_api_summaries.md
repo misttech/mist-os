@@ -14,7 +14,7 @@ Note: The format presented in this RFC at this time aligns to the current
 syntax of FIDL. There is active and ongoing work to
 [update the syntax][rfc-0050], and the tool output will be similarly updated
 (before it is used to automatically detect backwards-incompatible changes
-via API hashing). See: [https://fxbug.dev/72411][bug72411].
+via API hashing). See: [https://fxbug.dev/42151870][bug72411].
 
 > *Amendment (Aug 2022).* This RFC describes a human-readable text format with
 > each API element on a single line. During implementation, a JSON format
@@ -326,7 +326,7 @@ The go language API regularly produces [API surface summaries][gapi].
 
 [ast]: https://en.wikipedia.org/wiki/Abstract_syntax_tree
 [bnf]: https://en.wikipedia.org/wiki/Backus%E2%80%93Naur_form
-[bug72411]: https://fxbug.dev/72411
+[bug72411]: https://fxbug.dev/42151870
 [fas]: /tools/fidl/fidl_api_summarize/README.md
 [fbs]: /docs/reference/fidl/language/bindings-spec.md
 [fidl]: /docs/development/languages/fidl

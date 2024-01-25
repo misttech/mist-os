@@ -21,7 +21,7 @@ Only `JSON` is currently supported.
 
 ### [ClientSelectorConfiguration]
 
-Only `select_all=true` is [currently supported](https://fxbug.dev/62650).
+Only `select_all=true` is [currently supported](https://fxbug.dev/42141067).
 
 ### `batch_retrieval_timeout_seconds`
 
@@ -35,7 +35,7 @@ matching the requested [Format], although JSON is the only currently supported f
 
 ### Buffer contents
 
-<!-- TODO(https://fxbug.dev/65241) link to JSON schema when available -->
+<!-- TODO(https://fxbug.dev/42143930) link to JSON schema when available -->
 
 Each buffer contains a top-level array with all of its elements as objects:
 
@@ -59,7 +59,7 @@ VMOs.
 
 ### JSON object contents
 
-<!-- TODO(https://fxbug.dev/65241) link to JSON schema when available -->
+<!-- TODO(https://fxbug.dev/42143930) link to JSON schema when available -->
 
 Each JSON object in the array is one log message or event. Like other data types in ArchiveAccessor,
 each object consists of several fields, although the contents of `metadata` and `payload` differ
@@ -86,11 +86,11 @@ from other sources:
 }
 ```
 
-Note: version 1 of this format is [not yet stable](https://fxbug.dev/63883) and taking a dependency
+Note: version 1 of this format is [not yet stable](https://fxbug.dev/42142433) and taking a dependency
 on it may require some small migrations in the future. These migrations will be transparent to users
 of the [Rust](/src/lib/diagnostics/reader/rust) client library.
 
-Caution: messages with multiple tags [currently have the `tag` field repeated](https://fxbug.dev/63883)
+Caution: messages with multiple tags [currently have the `tag` field repeated](https://fxbug.dev/42142433)
 in the same object. Most JSON parsers consider this invalid by default, and will be resolved soon.
 
 #### Timestamps
@@ -104,7 +104,7 @@ not possible in today's system to *guarantee* the timestamps in the metadata of 
 
 #### Dropped logs
 
-<!-- TODO(https://fxbug.dev/65241) link to JSON schema when available -->
+<!-- TODO(https://fxbug.dev/42143930) link to JSON schema when available -->
 
 Dropped logs are conveyed in the `metadata.errors` field of the results object, which is an array
 when present:
@@ -124,7 +124,7 @@ when present:
 }
 ```
 
-Note: version 1 of this format is [not yet stable](https://fxbug.dev/63883) and taking a dependency
+Note: version 1 of this format is [not yet stable](https://fxbug.dev/42142433) and taking a dependency
 on it may require some small migrations in the future. These migrations will be transparent to users
 of the [Rust](/src/lib/diagnostics/reader/rust) client library.
 
@@ -148,7 +148,7 @@ format. This API is superseded by `fuchsia.diagnostics.ArchiveAccessor` and will
 future.
 
 Note: Prefer `Log.ListenSafe` and `Log.DumpLogsSafe` to avoid channel overflow issues. Deletion of
-the unsafe `fuchsia.logger.LogListener` API is [planned](https://fxbug.dev/48758).
+the unsafe `fuchsia.logger.LogListener` API is [planned](https://fxbug.dev/42125650).
 
 [ArchiveAccessor]: https://fuchsia.dev/reference/fidl/fuchsia.diagnostics#ArchiveAccessor
 [ArchiveAccessor reference]: /src/diagnostics/docs/reference/access.md

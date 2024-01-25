@@ -17,7 +17,7 @@
         // "WAIT". The former builds entries for a call to  `AddLines(...)`, "PUSH" makes the
         // `AddLines` call, and "WAIT" execution until the next `->OnDrawn(...)` event is received.
         //
-        // TODO(https://fxbug.dev/96264): It would absolve individual language implementations of a great
+        // TODO(https://fxbug.dev/42178362): It would absolve individual language implementations of a great
         //   deal of string parsing if we were able to use a vector of `union { Point; Push, Wait}`
         //   here.
         script: {

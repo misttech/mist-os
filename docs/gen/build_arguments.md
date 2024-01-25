@@ -384,7 +384,7 @@ From //build/bazel/remote_services.gni:27
 
 ### bless_goldens
 
-TODO(https://fxbug.dev/100321): delete bless_goldens, to give users time to switch to new gn arg, update_goldens
+TODO(https://fxbug.dev/42051023): delete bless_goldens, to give users time to switch to new gn arg, update_goldens
 
 **Current value (from the default):** `false`
 
@@ -1414,7 +1414,7 @@ From //third_party/pigweed/src/pw_build/gn_internal/defaults.gni:35
 ### delegated_network_provisioning
 
 DO NOT SET THIS IN A PRODUCT DEFINITION!!  FOR DEVELOPER USE ONLY
-TODO(https://fxbug.dev/132635): Remove this when we have a solution for
+TODO(https://fxbug.dev/42082693): Remove this when we have a solution for
 changing the netcfg configuration at runtime.
 
 **Current value (from the default):** `false`
@@ -2735,7 +2735,7 @@ This reduces performance but increases the ability to generate good
 stack traces, especially when we have bugs around unwind table generation.
 It applies only for Fuchsia targets (see below where it is unset).
 
-TODO(https://fxbug.dev/32216): Theoretically unwind tables should be good enough so we can
+TODO(https://fxbug.dev/42107277): Theoretically unwind tables should be good enough so we can
 remove this option when the issues are addressed.
 
 **Current value (from the default):** `false`
@@ -3202,7 +3202,7 @@ or `ffx commands` output.
 
 When all subtools that will be migrated to the SDK have been migrated,
 this config flag will be set to true by default, deprecated, and eventually
-removed: https://fxbug.dev/117339
+removed: https://fxbug.dev/42068537
 
 **Current value (from the default):** `false`
 
@@ -3291,7 +3291,7 @@ From //build/config/fuchsia/platform_version.gni:24
 
 Determines whether the fuchsia_async library used by many Rust targets will be compiled
 with TRACE level log statements that increase binary size a measurable amount.
-TODO(https://fxbug.dev/80742) move this to a toolchain to allow multiple products to build together
+TODO(https://fxbug.dev/42161120) move this to a toolchain to allow multiple products to build together
 
 **Current value (from the default):** `true`
 
@@ -3384,7 +3384,7 @@ From //build/testing/boot_tests/kernel_zbi_test.gni:16
 ### generate_legacy_ninja_build_outputs_licenses_spdx
 
 Deprecated. No-op.
-TODO(https://fxbug.dev/132725): Remove once unused downstream.
+TODO(https://fxbug.dev/42082793): Remove once unused downstream.
 
 **Current value (from the default):** `false`
 
@@ -3393,7 +3393,7 @@ From //build/bazel/licenses/BUILD.gn:19
 ### generate_legacy_ninja_build_outputs_licenses_spdx_from_metadata
 
 Deprecated. No-op.
-TODO(https://fxbug.dev/132725): Remove once unused downstream.
+TODO(https://fxbug.dev/42082793): Remove once unused downstream.
 
 **Current value (from the default):** `true`
 
@@ -3719,7 +3719,7 @@ From //build/config/sanitizers/sanitizer_default_options.gni:94
 ### i_can_haz_atlas_camera
 
 If true, power on the Atlas camera at boot.
-TODO(https://fxbug.dev/81684): remove once we have a better way to manage ACPI device power.
+TODO(https://fxbug.dev/42162166): remove once we have a better way to manage ACPI device power.
 
 **Current value (from the default):** `false`
 
@@ -4052,7 +4052,7 @@ Enables various kernel debugging and diagnostic features.  Valid
 values are between 0-3.  The higher the value, the more that are
 enabled.  A value of 0 disables all of them.
 
-TODO(https://fxbug.dev/41790): This value is derived from assert_level.  Decouple
+TODO(https://fxbug.dev/42117912): This value is derived from assert_level.  Decouple
 the two and set kernel_debug_level independently.
 
 **Current value (from the default):** `2`
@@ -7972,7 +7972,7 @@ From //src/starnix/kernel/args.gni:21
 ### starnix_unified_aspace
 
 Whether or not unified address spaces are leveraged.
-TODO(https://fxbug.dev/132980): Enable on other platforms once Zircon
+TODO(https://fxbug.dev/42083004): Enable on other platforms once Zircon
 support is available.
 
 **Current value (from the default):** `true`
@@ -8275,7 +8275,7 @@ their own `__tsan_default_options` C function.  Instead, they can use a
 sanitizer_extra_options() target in their `deps` and then any options
 injected that way can override that option's setting in this list.
 
-TODO(https://fxbug.dev/89981): `ignore_noninstrumented_modules=1` can be reevaluated
+TODO(https://fxbug.dev/42171381): `ignore_noninstrumented_modules=1` can be reevaluated
 when/if we have an instrumented libstd for Rust.
 
 **Current value (from the default):** `["ignore_noninstrumented_modules=1"]`
@@ -8584,7 +8584,7 @@ requires:
 ```
 jiri import -name third_party/ffmpeg -revision HEAD third_party/ffmpeg http://fuchsia.googlesource.com/integration
 ```
-TODO(https://fxbug.dev/116951): This isn't currently working. Use the method below.
+TODO(https://fxbug.dev/42068172): This isn't currently working. Use the method below.
 
 Or, if already importing a different manifest from there, resulting in
 errors from jiri update, it can work to just git clone (but jiri update
@@ -8783,7 +8783,7 @@ From //zircon/kernel/lib/virtual_alloc/BUILD.gn:13
 
 ### virtual_device_name_prefix
 
-TODO(https://fxbug.dev/94051): move to board definitions.
+TODO(https://fxbug.dev/42175904): move to board definitions.
 Adds a prefix to the start of the virtual device name. Used to distinguish
 between similar virtual device's using different configuration's such as
 `emu_window_size`.
@@ -9071,7 +9071,7 @@ From //src/media/drivers/amlogic_decoder/BUILD.gn:12
 ### arm_use_neon
 
 Whether to use the neon FPU instruction set or not.
-TODO(https://fxbug.dev/87237): move this to boards.
+TODO(https://fxbug.dev/42168336): move this to boards.
 
 **Current value (from the default):** `true`
 
@@ -9090,7 +9090,7 @@ From //src/graphics/drivers/arm-mali/icd/prebuilt_arm_mali.gni:8
 
 ### anv_enable_external_sync_fd
 
-TODO(fxbug.dev/67565) - remove once external sync FD extensions fully supported
+TODO(fxbug.dev/42146493) - remove once external sync FD extensions fully supported
 
 **Current value (from the default):** `false`
 

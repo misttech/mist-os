@@ -7,7 +7,7 @@ build and test on your development machine without needing to build all of
 Fuchsia or run it in a virtual machine. You can just use your normal `cargo`
 development workflow (`cargo check`, `cargo test`, etc).
 
-<!-- TODO(https://fxbug.dev/70286): Make shortlinks for these Monorail search
+<!-- TODO(https://fxbug.dev/42149513): Make shortlinks for these Monorail search
 URLs -->
 
 You can find a list of good bugs to get started with in our [good first bugs

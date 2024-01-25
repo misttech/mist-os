@@ -249,7 +249,7 @@ Currently, test coverage is collected only if:
 
 - The code is written in C, C++, or Rust.
 - The code runs on Fuchsia in usermode, or runs on the host. Kernel coverage is
-  not yet supported ([tracking bug](https://fxbug.dev/34196)).
+  not yet supported ([tracking bug](https://fxbug.dev/42109476)).
 - The test runs on qemu. Testing on hardware is not yet supported.
 - The test runs as part of the `core` product configuration.
 - End-to-end (e2e) tests are [not supported](#end-to-end_e2e_tests_exclusion).
@@ -275,7 +275,7 @@ A check will appear. Once it turns from pending to done, refresh Gerrit to see
 the coverage results.
 
 See also:
-[Issue 91893: Incremental coverage in Gerrit only collected for x64](https://fxbug.dev/91893)
+[Issue 91893: Incremental coverage in Gerrit only collected for x64](https://fxbug.dev/42173506)
 
 ### Upcoming features
 
@@ -341,7 +341,7 @@ fuchsia_test_package("foo_test") {
   test_components = [ ":test" ]
   deps = [ ":foo" ]
 
-  # TODO(https://fxbug.dev/12345): This test is intentionally disabled on coverage.
+  # TODO(https://fxbug.dev/42074368): This test is intentionally disabled on coverage.
   if (is_coverage) {
     test_specs = {
       environments = [

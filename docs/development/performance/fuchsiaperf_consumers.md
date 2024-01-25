@@ -18,7 +18,7 @@ performance tests.
         results data from CI builds and not from CQ builds.
 
         An example of a regression alert issue filed by Chromeperf is
-        [https://fxbug.dev/114180](https://fxbug.dev/114180).
+        [https://fxbug.dev/114180](https://fxbug.dev/42065456).
 
     *   **Web UI for graphing performance results**: Chromeperf's
         graphs show results by revision/time.

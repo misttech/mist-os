@@ -33,12 +33,12 @@ contain a leaf with pure data (in this case, a string), or a sub-tree with more
 nodes. This requires recursion: the definition of `Item` is now transitively
 dependent on itself! Representing *recursive types* in FIDL can be a bit tricky,
 especially because support is currently [somewhat
-limited](https://fxbug.dev/35218). We can support such types as long as there is
+limited](https://fxbug.dev/42110612). We can support such types as long as there is
 at least one optional type in the cycle created by the self-reference. For
 instance, here we define the `items` `struct` member to be a `box<Item>`,
 thereby breaking the includes cycle.
 
-<!-- TODO(https://fxbug.dev/35218): remove box<Item> once this lands -->
+<!-- TODO(https://fxbug.dev/42110612): remove box<Item> once this lands -->
 
 These changes also make heavy use of *anonymous types*, or types whose
 declarations are inlined at their sole point of use, rather than being named,

@@ -82,7 +82,7 @@ To create a component:
    {% includecode gerrit_repo="fuchsia/fuchsia" gerrit_path="examples/fidl/hlcpp/server/meta/server.cml" region_tag="example_snippet" %}
    ```
 
-   <!-- TODO(https://fxbug.dev/58758) <<../../common/server/qemu.md>> -->
+   <!-- TODO(https://fxbug.dev/42136750) <<../../common/server/qemu.md>> -->
 
 1. Add the server to your build configuration:
 

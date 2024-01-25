@@ -12,11 +12,11 @@ toc:
     path: /docs/development/diagnostics/inspect
   - title: "Quickstart"
     path: /docs/development/diagnostics/inspect/quickstart.md
-  # TODO(https://fxbug.dev/60767)
+  # TODO(https://fxbug.dev/42138983)
   # - title: "Overview"
   #   path: /docs/development/diagnostics/inspect/README.md
 
-  # TODO(https://fxbug.dev/60764)
+  # TODO(https://fxbug.dev/42138980)
   # - title: "Principles"
   #   path: /docs/development/diagnostics/inspect/principles.md
   - title: "Health"

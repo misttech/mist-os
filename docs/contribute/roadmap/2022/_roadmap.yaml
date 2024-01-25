@@ -20,14 +20,14 @@
     Enable Rust development via SDK and improve automated testing of Rust support.
   area: Rust
   category: [Platform Evolution, Product Support, Simplicity and Tech Debt]
-  bug: [https://fxbug.dev/102246]
+  bug: [https://fxbug.dev/42053161]
 
 - workstream: |
     Driver Framework (DFv2) and Driver Runtime enablement and migrating drivers
     to DFv2.
   area: Driver Framework
   category: [Platform Evolution]
-  bug: [https://fxbug.dev/33183]
+  bug: [https://fxbug.dev/42108351]
 
 - workstream: |
     Migrating Intel WLAN driver out-of-tree and transitioning to DFv2.
@@ -48,7 +48,7 @@
     FIDL versioning support and various system components using FIDL interfaces.
   area: Driver Framework
   category: [Quality]
-  bug: [https://fxbug.dev/102231, https://fxbug.dev/102236]
+  bug: [https://fxbug.dev/102231, https://fxbug.dev/42053150]
 
 - workstream: |
     UEFI productionization (including Secure Boot).
@@ -76,13 +76,13 @@
     Packaging workflows for out-of-tree development.
   area: Software Delivery
   category: [Platform Evolution]
-  bug: [https://fxbug.dev/102601]
+  bug: [https://fxbug.dev/42053556]
 
 - workstream: |
     Fxfs and storage performance.
   area: Storage
   category: [Performance, Quality]
-  bug: [https://fxbug.dev/102657, https://fxbug.dev/102659, https://fxbug.dev/102661]
+  bug: [https://fxbug.dev/102657, https://fxbug.dev/102659, https://fxbug.dev/42053622]
 
 - workstream: |
     Continuous improvements to virtualization stack including an execution model
@@ -90,7 +90,7 @@
     Rust.
   area: Virtualization
   category: [Platform Evolution, Simplicity and Tech Debt]
-  bug: [https://fxbug.dev/102873, https://fxbug.dev/102872]
+  bug: [https://fxbug.dev/102873, https://fxbug.dev/42053855]
 
 - workstream: |
     Fuchsia toolchain improvements such as using LLVM IFS for ELF ABI tracking,

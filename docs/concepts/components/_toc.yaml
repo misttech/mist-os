@@ -62,33 +62,33 @@ toc:
   - title: "Object-Oriented Design for Components"
     path: /docs/concepts/components/v2/components_as_classes.md
 
-# TODO(https://fxbug.dev/60771)
+# TODO(https://fxbug.dev/42138988)
 # - title: "Overview"
 #   path: /docs/concepts/components/diagnostics/README.md
 
-# TODO(https://fxbug.dev/60763)
+# TODO(https://fxbug.dev/42138979)
 # - title: "ArchiveAccessor"
 #   path: /docs/concepts/components/diagnostics/accessor.md
 
-# TODO(https://fxbug.dev/60768)
+# TODO(https://fxbug.dev/42138984)
 # - title: "Component Lifecycle"
 #   path: /docs/concepts/components/diagnostics/lifecycle.md
-  # TODO(https://fxbug.dev/60767)
+  # TODO(https://fxbug.dev/42138983)
   # - title: "Overview"
   #   path: /docs/concepts/components/diagnostics/inspect/README.md
 
-  # TODO(https://fxbug.dev/60764)
+  # TODO(https://fxbug.dev/42138980)
   # - title: "Principles"
   #   path: /docs/concepts/components/diagnostics/inspect/principles.md
 
 
-  # TODO(https://fxbug.dev/60766)
+  # TODO(https://fxbug.dev/42138982)
   # - title: "Principles"
   #   path: /docs/concepts/components/diagnostics/logs/principles.md
 
-  # TODO(https://fxbug.dev/60767)
+  # TODO(https://fxbug.dev/42138983)
   # - title: "Severity"
   #   path: /docs/concepts/components/diagnostics/logs/severity.md
-# TODO(https://fxbug.dev/60772)
+# TODO(https://fxbug.dev/42138989)
 # - title: "Triage & Detect"
 #   path: /docs/concepts/components/diagnostics/triage.md

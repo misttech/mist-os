@@ -20,7 +20,7 @@ scene as desired.
 
 Fuchsia currently has minimal support for multiple displays. However, Scenic
 will play a large role in this support. APIs will need to be added
-([https://fxbug.dev/76985](https://fxbug.dev/76985), [https://fxbug.dev/117830](https://fxbug.dev/117830))
+([https://fxbug.dev/76985](https://fxbug.dev/76985), [https://fxbug.dev/117830](https://fxbug.dev/42069017))
 to allow clients (including the System UI) to:
 
 * enumerate the available displays

@@ -9,26 +9,26 @@ toc:
 - title: "Overview"
   path: /docs/reference/diagnostics/README.md
 
-# TODO(https://fxbug.dev/60819)
+# TODO(https://fxbug.dev/42139041)
 # - title: "Glossary"
 #   path: /docs/reference/diagnostics/glossary.md
 
-# TODO(https://fxbug.dev/60821)
+# TODO(https://fxbug.dev/42139044)
 # - title: "Data"
 #   path: /docs/reference/diagnostics/data.md
 
-# TODO(https://fxbug.dev/60763)
+# TODO(https://fxbug.dev/42138979)
 # - title: "Access"
 #   path: /docs/reference/diagnostics/access.md
 
 - title: "Selectors"
   path: /docs/reference/diagnostics/selectors.md
 
-# TODO(https://fxbug.dev/60812)
+# TODO(https://fxbug.dev/42139034)
 # - title: "Product Integration"
 #   path: /docs/reference/diagnostics/products.md
 
-# TODO(https://fxbug.dev/60768)
+# TODO(https://fxbug.dev/42138984)
 # - title: "Component Lifecycle"
 #   path: /docs/reference/diagnostics/lifecycle.md
 
@@ -37,14 +37,14 @@ toc:
   - title: "Overview"
     path: /docs/reference/diagnostics/inspect
 
-  # TODO(https://fxbug.dev/60817)
+  # TODO(https://fxbug.dev/42139039)
   # - title: "Access"
   #   path: /docs/reference/diagnostics/inspect/access.md
 
   - title: "Extending the VMO file format"
     path: /docs/reference/diagnostics/inspect/updating-vmo-format.md
 
-  # TODO(https://fxbug.dev/60816)
+  # TODO(https://fxbug.dev/42139038)
   # - title: "VMO Lifecycle"
   #   path: /docs/reference/diagnostics/inspect/lifecycle.md
 
@@ -64,7 +64,7 @@ toc:
   - title: "Access"
     path: /docs/reference/diagnostics/logs/access.md
 
-# TODO(https://fxbug.dev/60813)
+# TODO(https://fxbug.dev/42139035)
 # - title: "Producers"
 #   path: /docs/reference/diagnostics/producers.md
 
@@ -74,11 +74,11 @@ toc:
   # - title: "Forwarding"
   #   section:
 
-  # TODO(https://fxbug.dev/60825)
+  # TODO(https://fxbug.dev/42139048)
   #   - title: "Forensics"
   #     path: /docs/reference/diagnostics/consumers/forensics.md
 
-  # TODO(https://fxbug.dev/60823)
+  # TODO(https://fxbug.dev/42139046)
   #   - title: "System Monitor"
   #     path: /docs/reference/diagnostics/consumers/system-monitor.md
 
@@ -90,6 +90,6 @@ toc:
     - title: "log_listener CLI"
       path: /docs/reference/diagnostics/consumers/log_listener.md
 
-    # TODO(https://fxbug.dev/60828)
+    # TODO(https://fxbug.dev/42139051)
     # - title: "triage tool"
     #   path: /docs/reference/diagnostics/consumers/triage.md

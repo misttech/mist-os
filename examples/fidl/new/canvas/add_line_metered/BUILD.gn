@@ -23,7 +23,7 @@ fuchsia_structured_config_values("client_config_values") {
   }
 }
 
-# TODO(https://fxbug.dev/111273): Add per-binding `:tests` target after building out each implementation.
+# TODO(https://fxbug.dev/42062586): Add per-binding `:tests` target after building out each implementation.
 group("tests") {
   testonly = true
 

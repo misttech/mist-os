@@ -47,7 +47,7 @@ warnings suppressed may look as follows:
 ```gn
 source_set("foo") {
   ...
-  # TODO(https://fxbug.dev/58162): delete the below and fix compiler warnings
+  # TODO(https://fxbug.dev/42136089): delete the below and fix compiler warnings
   configs += [ "//build/config:Wno-conversion" ]
 }
 ```

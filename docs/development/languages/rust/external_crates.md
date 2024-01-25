@@ -69,7 +69,7 @@ To add an external crate, do the following:
       See [cargo-gnaw's README][cargo-gnaw-readme]
       for more details.
 
-      <!-- TODO(https://fxbug.dev/59592) remove this step -->
+      <!-- TODO(https://fxbug.dev/42137677) remove this step -->
       After committing your change locally, run `fx update-rustc-third-party`
       a second time and ensure it completes successfully without producing any
       changes. You can run `git status` to be certain.
@@ -149,7 +149,7 @@ To update an external crate, do the following:
       the `Cargo.toml` file.
       See [cargo-gnaw's README][cargo-gnaw-readme] for more details.
 
-      <!-- TODO(https://fxbug.dev/59592) remove this step -->
+      <!-- TODO(https://fxbug.dev/42137677) remove this step -->
       After committing your change locally, run `fx update-rustc-third-party`
       a second time and ensure it completes successfully without producing any
       changes. You can run `git status` to be certain.
@@ -334,7 +334,7 @@ paths.
 ### Update frequency
 
 A member of the Rust on Fuchsia team is currently responsible for running the
-tool on a regular cadence. See [https://fxbug.dev/73348](https://fxbug.dev/73348)
+tool on a regular cadence. See [https://fxbug.dev/73348](https://fxbug.dev/42152910)
 to track the process of automating updates to OWNERS files.
 
 ## Overriding locally

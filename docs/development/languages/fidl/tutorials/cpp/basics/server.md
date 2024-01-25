@@ -7,7 +7,7 @@ full set of FIDL tutorials, refer to the [overview][overview].
 
 ## Overview
 
-<!-- TODO(https://fxbug.dev/58758) <<../../common/server/overview.md>> -->
+<!-- TODO(https://fxbug.dev/42136750) <<../../common/server/overview.md>> -->
 
 This tutorial shows you how to implement a server for a FIDL protocol
 (`fuchsia.examples/Echo`) and run it on Fuchsia. This protocol has one method
