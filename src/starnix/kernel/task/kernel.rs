@@ -54,6 +54,11 @@ use std::{
     },
 };
 
+#[derive(Debug, Default, Clone, Copy)]
+pub struct KernelFeatures {
+    pub bpf_v2: bool,
+}
+
 /// The shared, mutable state for the entire Starnix kernel.
 ///
 /// The `Kernel` object holds all kernel threads, userspace tasks, and file system resources for a
@@ -66,6 +71,9 @@ use std::{
 pub struct Kernel {
     /// The kernel threads running on behalf of this kernel.
     pub kthreads: KernelThreads,
+
+    /// The feaures enabled for this kernel.
+    pub features: KernelFeatures,
 
     /// The processes and threads running in this kernel, organized by pid_t.
     pub pids: RwLock<PidTable>,
@@ -270,6 +278,7 @@ impl InterfacesHandler for InterfacesHandlerImpl {
 impl Kernel {
     pub fn new(
         cmdline: BString,
+        features: KernelFeatures,
         container_svc: Option<fio::DirectoryProxy>,
         container_data_dir: Option<fio::DirectorySynchronousProxy>,
         profile_provider: Option<ProfileProviderSynchronousProxy>,
@@ -288,6 +297,7 @@ impl Kernel {
 
         let this = Arc::new_cyclic(|kernel| Kernel {
             kthreads: KernelThreads::new(kernel.clone()),
+            features,
             pids: RwLock::new(PidTable::new()),
             default_abstract_socket_namespace: AbstractUnixSocketNamespace::new(unix_address_maker),
             default_abstract_vsock_namespace: AbstractVsockSocketNamespace::new(

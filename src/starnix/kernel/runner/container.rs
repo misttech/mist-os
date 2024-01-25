@@ -353,6 +353,7 @@ async fn create_container(
     };
     let kernel = Kernel::new(
         kernel_cmdline,
+        features.kernel,
         svc_dir,
         data_dir,
         profile_provider,

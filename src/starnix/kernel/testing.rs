@@ -71,9 +71,17 @@ fn create_kernel_task_and_unlocked_with_fs<'l>(
     create_fs: impl FnOnce(&Arc<Kernel>) -> FileSystemHandle,
 ) -> (Arc<Kernel>, AutoReleasableTask, Locked<'l, Unlocked>) {
     let mut locked = Unlocked::new();
-    let kernel =
-        Kernel::new(b"".into(), None, None, None, fuchsia_inspect::Node::default(), None, None)
-            .expect("failed to create kernel");
+    let kernel = Kernel::new(
+        b"".into(),
+        Default::default(),
+        None,
+        None,
+        None,
+        fuchsia_inspect::Node::default(),
+        None,
+        None,
+    )
+    .expect("failed to create kernel");
 
     let init_pid = kernel.pids.write().allocate_pid();
     assert_eq!(init_pid, 1);

@@ -15,7 +15,7 @@ use starnix_core::{
         magma::magma_device_init,
         perfetto_consumer::start_perfetto_consumer_thread,
     },
-    task::{CurrentTask, Kernel},
+    task::{CurrentTask, Kernel, KernelFeatures},
     vfs::FsString,
 };
 use starnix_uapi::{error, errors::Errno};
@@ -31,6 +31,8 @@ use fidl_fuchsia_ui_views as fuiviews;
 /// A collection of parsed features, and their arguments.
 #[derive(Default, Debug)]
 pub struct Features {
+    pub kernel: KernelFeatures,
+
     /// Configures whether SELinux is fully enabled, faked, or unavailable.
     pub selinux: Option<security_server::Mode>,
 
@@ -85,6 +87,7 @@ pub fn parse_features(entries: &Vec<String>) -> Result<Features, Error> {
             ("framebuffer", _) => features.framebuffer = true,
             ("gralloc", _) => features.gralloc = true,
             ("magma", _) => features.magma = true,
+            ("bpf", Some(version)) => features.kernel.bpf_v2 = version == "v2",
             ("perfetto", Some(socket_path)) => {
                 features.perfetto = Some(socket_path.into());
             }
