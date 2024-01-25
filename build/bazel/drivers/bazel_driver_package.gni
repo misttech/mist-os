@@ -58,6 +58,8 @@ template("bazel_driver_package") {
                              "visibility",
                            ])
     command = "build"
+    output_groups = [ "+build_id_dir" ]
+    allow_directory_in_outputs = true
     bazel_targets = [ bazel_target + "_fuchsia_package" ]
     copy_outputs = [
       {
@@ -69,6 +71,7 @@ template("bazel_driver_package") {
         ninja = "$package_name.far"
       },
     ]
+    build_id_directories = [ "${package_name}/.build-id" ]
   }
 
   if (defined(invoker.gn_driver_package_for_verification)) {

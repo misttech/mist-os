@@ -68,6 +68,10 @@ template("bazel_fuchsia_package") {
                            ])
     command = "build"
 
+    output_groups = [ "+build_id_dir" ]
+
+    allow_directory_in_outputs = true
+
     bazel_targets = [ bazel_target + "_fuchsia_package" ]
     copy_outputs = [
       {
@@ -75,6 +79,7 @@ template("bazel_fuchsia_package") {
         ninja = "$package_name.far"
       },
     ]
+    build_id_directories = [ "${package_name}/.build-id" ]
   }
 
   # From the perspective of GN/Ninja, this package is a prebuilt

@@ -305,8 +305,13 @@ def _build_fuchsia_package_impl(ctx):
         else:
             fail("Unknown dependency type being added to package: %s" % dep.label)
 
+    # This build-id directory is used for the in-tree build
+    # LINT.IfChange
+    build_id_path = ctx.attr.package_name + "/.build-id"
+    # LINT.ThenChange(//build/bazel/bazel_fuchsia_package.gni)
+
     # Grab all of our stripped resources
-    stripped_resources, _debug_info = strip_resources(ctx, resources_to_strip)
+    stripped_resources, _debug_info = strip_resources(ctx, resources_to_strip, build_id_path = build_id_path)
     package_resources.extend(stripped_resources)
 
     # Write our package_manifest file
