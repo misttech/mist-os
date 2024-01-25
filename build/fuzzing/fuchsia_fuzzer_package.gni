@@ -49,14 +49,14 @@ template("fuchsia_fuzzer_package") {
     # advertise one or more fuzzer tests as fuzzers, which will produce a descriptive error message
     # if run.
     #
-    # TODO(https://fxbug.dev/105708): Make this less eager, e.g. by extending test_spec to include metadata
+    # TODO(https://fxbug.dev/42056967): Make this less eager, e.g. by extending test_spec to include metadata
     # from the binary itself, or by making the fuzzer vs test a runtime determination.
     can_fuzz_cpp = false
     can_fuzz_rust = false
     foreach(selector, select_variant_canonical) {
       selector_host = defined(selector.host) && selector.host
 
-      # TODO(https://fxbug.dev/48118): Add LSan.
+      # TODO(https://fxbug.dev/42124940): Add LSan.
       if (!selector_host && selector.variant == "asan-fuzzer") {
         can_fuzz_cpp = true
         can_fuzz_rust = true

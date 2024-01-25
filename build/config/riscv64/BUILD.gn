@@ -22,7 +22,7 @@ config("riscv64") {
     "-mabi=$fuchsia_riscv_abi",
   ]
 
-  # TODO(https://fxbug.dev/125867): Clang should do this everywhere for Fuchsia
+  # TODO(https://fxbug.dev/42076645): Clang should do this everywhere for Fuchsia
   # targets. When it does, put this under `if (is_gcc)`.
   #
   # Don't use .sdata/.sbss sections. Even though linker gp relaxation is

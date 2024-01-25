@@ -4,7 +4,7 @@
 
 # ubsan-trap is pure instrumentation with no runtime.
 config("ubsan-trap") {
-  # TODO(https://fxbug.dev/121737): Reenable ubsan-trap for GCC.
+  # TODO(https://fxbug.dev/42072741): Reenable ubsan-trap for GCC.
   if (!is_gcc) {
     compiler_flags = [ "-fsanitize=undefined" ]
     if (is_gcc) {

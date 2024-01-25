@@ -408,7 +408,7 @@ template("go_build") {
       inputs += go_deps_inputs
     }
 
-    # TODO(https://fxbug.dev/58755): Delete `gopackages` in favor of `library`.
+    # TODO(https://fxbug.dev/42136747): Delete `gopackages` in favor of `library`.
     if (defined(invoker.gopackages) == defined(invoker.library)) {
       assert(false, "Exactly one of gopackages or library must be set")
     } else if (defined(invoker.gopackages)) {
@@ -416,7 +416,7 @@ template("go_build") {
       gopackages = invoker.gopackages
 
       # Multi-package support was never implemented and is no longer planned as
-      # `gopackages` is slated for deletion as part of https://fxbug.dev/58755.
+      # `gopackages` is slated for deletion as part of https://fxbug.dev/42136747.
       assert(gopackages == [ gopackages[0] ],
              "gopackages only supports one package")
       foreach(gopackage, gopackages) {

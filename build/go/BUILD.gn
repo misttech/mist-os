@@ -21,7 +21,7 @@ if (is_host) {
 }
 
 # Used to restrict the set of `go_build` targets that can set `gopackages`.
-# TODO(https://fxbug.dev/73815): Enforce that only third-party libraries can use
+# TODO(https://fxbug.dev/42153429): Enforce that only third-party libraries can use
 # `gopackages` and recursive sources.
 group("allow_gopackages") {
   # WARNING: Only third-party libraries should be added here.

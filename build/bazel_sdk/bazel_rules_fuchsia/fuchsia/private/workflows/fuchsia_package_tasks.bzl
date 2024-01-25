@@ -93,8 +93,8 @@ def _fuchsia_package_default_task_impl(ctx, make_workflow):
         ctx.attr.package[FuchsiaPackageInfo],
         ctx.attr.package[FuchsiaDebugSymbolInfo],
         # Expose the generated far file and debug symbols.
-        # This is also used in fuchsia.git, see https://fxbug.dev/115699 and
-        # https://fxbug.dev/119049.
+        # This is also used in fuchsia.git, see https://fxbug.dev/42066998 and
+        # https://fxbug.dev/42070079.
         OutputGroupInfo(
             far_file = depset([ctx.attr.package[FuchsiaPackageInfo].far_file]),
             build_id_dirs = depset(transitive = ctx.attr.package[FuchsiaDebugSymbolInfo].build_id_dirs.values()),
@@ -159,7 +159,7 @@ def fuchsia_package_tasks(
         disable_repository_name = None,
         test_realm = None,
         **kwargs):
-    # TODO(https://fxbug.dev/98996): Use ffx isolation. ffx test run currently needs
+    # TODO(https://fxbug.dev/42181390): Use ffx isolation. ffx test run currently needs
     # to access ~/.local/share/Fuchsia/ffx/ or else it crashes.
     top_level_tags = tags + (["no-sandbox", "no-cache"] if is_test else [])
 

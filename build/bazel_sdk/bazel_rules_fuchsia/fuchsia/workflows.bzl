@@ -55,7 +55,7 @@ fuchsia_shell_task = _fuchsia_shell_task
 fuchsia_task_ffx = _fuchsia_task_ffx
 verbs = _verbs
 
-# TODO(https://fxbug.dev/113205): Expose these rules once implementation/API is complete.
+# TODO(https://fxbug.dev/42064517): Expose these rules once implementation/API is complete.
 
 # fuchsia_remote_product_bundle = _fuchsia_remote_product_bundle
 # fuchsia_task_flash = _fuchsia_task_flash

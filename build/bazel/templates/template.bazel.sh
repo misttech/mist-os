@@ -107,7 +107,7 @@ build_metadata_opts=()
   # search for siblings
 
 # Setting $USER so `bazel` won't fail in environments with fake UIDs. Even if
-# the USER is not actually used. See https://fxbug.dev/112206#c9.
+# the USER is not actually used. See https://fxbug.dev/42063551#c9.
 # In developer environments, use the real username so that authentication
 # and credential helpers will work, e.g. go/bazel-google-sso.
 #

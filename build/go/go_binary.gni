@@ -17,7 +17,7 @@ import("//build/go/go_build.gni")
 #
 template("go_binary") {
   go_build(target_name) {
-    # TODO(https://fxbug.dev/58755): Deprecate `gopackage` in favor of `library`.
+    # TODO(https://fxbug.dev/42136747): Deprecate `gopackage` in favor of `library`.
     if (defined(invoker.gopackage)) {
       gopackages = [ invoker.gopackage ]
     }

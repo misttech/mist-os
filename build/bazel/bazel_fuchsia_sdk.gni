@@ -24,7 +24,7 @@ declare_args() {
 #   elements.
 #
 #   This is due to a current but important limitations of our build system
-#   at the GN / Bazel boundary. See https://fxbug.dev/119057
+#   at the GN / Bazel boundary. See https://fxbug.dev/42070088
 #
 # - "driver" corresponds to the "core" set above augmented with experimental
 #   driver-related atoms. These are currently not officially supported and their
@@ -36,7 +36,7 @@ valid_bazel_fuchsia_sdk_content_values = [
 ]
 
 # A scope used to map a content set name to a single sdk_collection label. Note
-# that these lists cannot include testonly SDK atoms (https://fxbug.dev/119057)
+# that these lists cannot include testonly SDK atoms (https://fxbug.dev/42070088)
 _fuchsia_sdk_collection_map = {
   core = "//sdk:core"
   driver = "//sdk:driver"

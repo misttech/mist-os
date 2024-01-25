@@ -46,7 +46,7 @@ fx clippy --all --raw > lints.json
 fx build host-tools/shush
 fx shush lints.json --lint rust-2021-compatibility fix
 
-# Pending https://fxbug.dev/101439 fix
+# Pending https://fxbug.dev/42052264 fix
 git restore src/settings/service
 
 git commit -a -m "[rust] Edition 2021 fixes"

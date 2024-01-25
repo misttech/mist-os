@@ -51,7 +51,7 @@ def main():
     # Set the following options to make the output as stable as possible:
     # - GIT_CONFIG_NOSYSTEM=1   - Don't check /etc/gitconfig
     # - --no-optional-locks     - Do not update the git index during read-only operations
-    #                             (see https://fxbug.dev/93875).
+    #                             (see https://fxbug.dev/42175708).
     # - --date=unix             - Format date as a unix timestamp
     # - --format=%H\n%cd        - Print the hash and CommitDate fields only, on separate lines
     git_cmd = [

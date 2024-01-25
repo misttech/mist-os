@@ -324,7 +324,7 @@ shutdown() {
     # This script uses the 'bq' CLI tool, which is installed in the
     # same path as `gcloud`.
     # This is experimental and runs a bit noisily for the moment.
-    # TODO(https://fxbug.dev/93886): make this run silently
+    # TODO(https://fxbug.dev/42175720): make this run silently
     cloud_project=fuchsia-engprod-metrics-prod
     dataset=metrics
     "$script_dir"/upload_reproxy_logs.sh \

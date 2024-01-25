@@ -5,7 +5,7 @@
 if (current_cpu == "arm" || current_cpu == "arm64") {
   declare_args() {
     # Whether to use the neon FPU instruction set or not.
-    # TODO(https://fxbug.dev/87237): move this to boards.
+    # TODO(https://fxbug.dev/42168336): move this to boards.
     arm_use_neon = true
   }
 }

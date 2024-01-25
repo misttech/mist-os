@@ -76,7 +76,7 @@ import("//tools/configc/build/config.gni")
 #   values_source -or- values (required)
 #     file: The JSON5 file containing the concrete values for the generated file.
 #     values: A GN scope containing literal values for the generated file.
-#     TODO(https://fxbug.dev/87988) document this format properly.
+#     TODO(https://fxbug.dev/42169169) document this format properly.
 #     Type: path or scope
 #
 #   component_name (optional)

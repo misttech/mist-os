@@ -14,7 +14,7 @@ import("//build/components/fuchsia_test_package.gni")
 # additional parameters are all required so that FHCP tests are properly
 # categorized.
 #
-# TODO(https://fxbug.dev/108539): Link to further documentation about these parameters.
+# TODO(https://fxbug.dev/42059908): Link to further documentation about these parameters.
 #
 # Parameters
 #

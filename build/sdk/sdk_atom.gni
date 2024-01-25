@@ -195,7 +195,7 @@ template("sdk_atom") {
     assert(defined(meta_content.source), "Meta scope needs a source or value")
 
     # Copy the file to a canonical location for access by other rules.
-    # TODO(https://fxbug.dev/5364): instead, make sure that all atoms generate their metadata
+    # TODO(https://fxbug.dev/42131074): instead, make sure that all atoms generate their metadata
     # file in the right location.
     copy(meta_copy_target_name) {
       forward_variables_from(invoker, [ "testonly" ])
@@ -307,7 +307,7 @@ template("sdk_atom") {
 
     type = meta.schema
 
-    # TODO(https://fxbug.dev/85082): Read the type from the schema file.
+    # TODO(https://fxbug.dev/42165942): Read the type from the schema file.
     if (defined(meta.type)) {
       type = meta.type
     }

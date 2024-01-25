@@ -312,7 +312,7 @@ template("bind_test") {
 #     a user's request. If this is set to true, then the rules parameter becomes optional and when
 #     it's omitted the driver will bind unconditionally (but must be bound manually.) Defaults to
 #     false.
-#     TODO(https://fxbug.dev/43400): Eventually this option should be removed when we can define this
+#     TODO(https://fxbug.dev/42119701): Eventually this option should be removed when we can define this
 #     configuration in the driver's component manifest.
 #
 #   generate_bytecode (optional)
@@ -463,7 +463,7 @@ template("bindc") {
 #     a user's request. If this is set to true, then the rules parameter becomes optional and when
 #     it's omitted the driver will bind unconditionally (but must be bound manually.) Defaults to
 #     false.
-#     TODO(https://fxbug.dev/43400): Eventually this option should be removed when we can define this
+#     TODO(https://fxbug.dev/42119701): Eventually this option should be removed when we can define this
 #     configuration in the driver's component manifest.
 #
 #   applicable_licenses, testonly, visibility

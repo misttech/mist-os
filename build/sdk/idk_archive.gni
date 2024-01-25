@@ -67,7 +67,7 @@ template("idk_archive") {
         {
           name = _idk_output_name
 
-          # TODO(https://fxbug.dev/126262): Determine which values are
+          # TODO(https://fxbug.dev/42077025): Determine which values are
           # appropriate, since the archive contains binaries for all
           # Fuchsia CPU architectures (but only one, or even two in
           # the case of Linux) host CPU architectures!

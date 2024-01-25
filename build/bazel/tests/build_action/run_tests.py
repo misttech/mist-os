@@ -78,7 +78,7 @@ def compare_directories(expected_dir, actual_dir):
         success = False
 
     # Verify that the files in |actual_dir| are not read-only.
-    # See https://fxbug.dev/121003
+    # See https://fxbug.dev/42072059
     readonly_files = []
     for out_file in dcmp.right_list:
         out_path = os.path.join(actual_dir, out_file)

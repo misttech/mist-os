@@ -157,7 +157,7 @@ function diff_file_relpath() {
 
     # Rust libraries (binary)
     # There may be unexpected rmeta mismatches.
-    # See http//https://fxbug.dev/129074, https://github.com/rust-lang/rust/issues/113584
+    # See http//https://fxbug.dev/42079524, https://github.com/rust-lang/rust/issues/113584
     *.rlib) expect=match; diff_binary "$left" "$right" ;;
     *.rmeta) expect=match; diff_binary "$left" "$right" ;;
 

@@ -14,7 +14,7 @@ config("clippy_warn_all") {
   rustflags = [ "-Wclippy::all" ]
 }
 
-# TODO(https://fxbug.dev/104019): Delete this config when all unused
+# TODO(https://fxbug.dev/42055130): Delete this config when all unused
 # dependencies are removed.
 #
 # PLEASE DO NOT USE.
@@ -42,7 +42,7 @@ config("allow_unused_results") {
   # This visibility list allows for targets to opt out of denying unused results.
   #
   # There is currently no platform mandate to adopt the unused_results lint and it's opt-in for
-  # developers that want to use it. See https://fxbug.dev/73468 for more context.
+  # developers that want to use it. See https://fxbug.dev/42153043 for more context.
   #
   # To adopt the lint, add the following to your rust target:
   #   configs -= ["//build/config/rust/lints:allow_unused_results"]

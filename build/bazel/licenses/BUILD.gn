@@ -15,15 +15,15 @@ import("//tools/check-licenses/build/license_data.gni")
 
 declare_args() {
   # Deprecated. No-op.
-  # TODO(https://fxbug.dev/132725): Remove once unused downstream.
+  # TODO(https://fxbug.dev/42082793): Remove once unused downstream.
   generate_legacy_ninja_build_outputs_licenses_spdx = false
 
   # Deprecated. No-op.
-  # TODO(https://fxbug.dev/132725): Remove once unused downstream.
+  # TODO(https://fxbug.dev/42082793): Remove once unused downstream.
   generate_legacy_ninja_build_outputs_licenses_spdx_from_metadata = true
 }
 
-# TODO(https://fxbug.dev/117740): We only need to cover bazel inputs that end up in the product,
+# TODO(https://fxbug.dev/42068917): We only need to cover bazel inputs that end up in the product,
 # e.g. not tests or build tools. This can be achieved by adding metadata to
 # the bazel inputs list (i.e. converting it into some dictionary) or by
 # splitting into more granular lists.
@@ -32,7 +32,7 @@ _excluded_bazel_inputs = [
   # Remove a potential circular dependency on the spdx bazel_input_resource itself.
   "//build/bazel/licenses:legacy_ninja_build_outputs_licenses_spdx",
 
-  # See https://fxbug.dev/126949#c15. Zedboot is only used in eng builds and is testonly, so can't
+  # See https://fxbug.dev/42077571#c15. Zedboot is only used in eng builds and is testonly, so can't
   # be used in license calculations.
   "//build/images/zedboot:zedboot.bazel_legacy_aib",
 
@@ -49,7 +49,7 @@ _excluded_bazel_inputs += user_platform_aib_labels
 _excluded_bazel_inputs -= user_platform_aib_labels
 
 if (fuchsia_zbi_testonly) {
-  # Remove fuchsia_zbi_testonly=true targets. See https://fxbug.dev/126949#c18 for why that is ok.
+  # Remove fuchsia_zbi_testonly=true targets. See https://fxbug.dev/42077571#c18 for why that is ok.
   _excluded_bazel_inputs +=
       [ "//build/images/fuchsia:fuchsia.bazel_legacy_aib" ]
 }

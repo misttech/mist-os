@@ -16,7 +16,7 @@ def main(command: List[str]) -> int:
         if sys.stdout.isatty() and sys.stderr.isatty():
             return subprocess.run(command).returncode
         else:
-            # https://fxbug.dev/119214: Force process not to buffer by faking a tty.
+            # https://fxbug.dev/42070263: Force process not to buffer by faking a tty.
             # Running test targets in a non-tty environment (eg: via `bazel run`,
             # `bazel test`, or via infra) implicitly enables stdout buffering for all
             # subprocesses while leaving stderr unbuffered, causing stderr/stdout to

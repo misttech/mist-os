@@ -78,7 +78,7 @@ def main():
         basename = os.path.basename(source)
         if basename == "__main__.py":
             print(
-                "__main__.py in sources of python_binary is not supported, see https://fxbug.dev/73576",
+                "__main__.py in sources of python_binary is not supported, see https://fxbug.dev/42153163",
                 file=sys.stderr,
             )
             return 1
@@ -111,7 +111,7 @@ def main():
     # from the main module (create_archive only `import pkg`), which is
     # necessary for including all test cases for unit tests.
     #
-    # TODO(https://fxbug.dev/73576): figure out another way to support unit
+    # TODO(https://fxbug.dev/42153163): figure out another way to support unit
     # tests when users need to provide their own custom __main__.py.
     main_file = os.path.join(app_dir, "__main__.py")
     with open(main_file, "w") as f:

@@ -602,7 +602,7 @@ def main():
         "--tool_java_runtime_version=embedded_jdk",
         # Ensure outputs are writable (umask 0755) instead of readonly (0555),
         # which prevent removing output directories with `rm -rf`.
-        # See https://fxbug.dev/121003
+        # See https://fxbug.dev/42072059
         "--experimental_writable_outputs",
     ]
 

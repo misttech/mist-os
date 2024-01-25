@@ -55,7 +55,7 @@ import("//build/sdk/sdk_atom_alias.gni")
 #     When enumerating the platform surface area (PlaSA), these headers will
 #     be excluded. See /build/sdk/plasa/plasa_fragment_cc.gni.
 #
-#     See https://fxbug.dev/117085 for more details about this field.
+#     See https://fxbug.dev/42068255 for more details about this field.
 
 # The defaults for a sdk_static_library should match that of a shared_library.
 set_defaults("sdk_static_library") {

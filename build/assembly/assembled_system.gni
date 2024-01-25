@@ -1185,7 +1185,7 @@ template("assembled_system") {
     #######
     # Check the golden files.
     #
-    # TODO(https://fxbug.dev/101283): These checks are no longer a part of
+    # TODO(https://fxbug.dev/42052091): These checks are no longer a part of
     # `assembled_system()`. Remove `not_needed(...)` once all build configurations
     # no longer specify scrutiny verifier configuration.
 

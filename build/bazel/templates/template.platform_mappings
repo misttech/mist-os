@@ -10,7 +10,7 @@
 # Set the value of --cpu properly when a specific --platforms value is
 # used. This is required by the SDK Bazel rules, otherwise weird errors
 # will happen, like x64 runtime dependencies being looked up in
-# the sysroot for arm64 Fuchsia binaries. See https://fxbug.dev/116571#c19.
+# the sysroot for arm64 Fuchsia binaries. See https://fxbug.dev/42067752#c19.
 #
 # Note that for the arm64 case, the --cpu=aarch64 value is
 # required by the SDK Bazel rules, but other rulesets (e.g. rules_go)

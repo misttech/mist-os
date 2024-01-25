@@ -7,7 +7,7 @@ import("//build/rust/rustc_test.gni")
 
 # Defines a Rust dynamic library.
 #
-# NOTE: Support for Rust dylibs is very limited. See https://fxbug.dev/59286#c17.
+# NOTE: Support for Rust dylibs is very limited. See https://fxbug.dev/42137337#c17.
 #
 # Parameters
 #
@@ -104,7 +104,7 @@ template("rustc_dylib") {
   }
 
   # if "with_unit_tests" is set to true, generate an additional rust test target
-  # TODO(https://fxbug.dev/72931): accept a string.
+  # TODO(https://fxbug.dev/42152447): accept a string.
   if (defined(invoker.with_unit_tests) && invoker.with_unit_tests == true) {
     rustc_test_internal("${target_name}_test") {
       name = invoker.target_name + "_dylib_test"
@@ -160,7 +160,7 @@ template("rustc_dylib") {
       output_name = _crate_name
       crate_type = "dylib"
 
-      # TODO(https://fxbug.dev/117949): Remove "--undefined-version" logic when
+      # TODO(https://fxbug.dev/42069148): Remove "--undefined-version" logic when
       # issue resolved upstream.
       if (is_fuchsia) {
         rustflags = [ "-Clink-arg=--undefined-version" ]

@@ -56,7 +56,7 @@ import("//build/sdk/sdk_atom.gni")
 #     When enumerating the platform surface area (PlaSA), these headers will
 #     be excluded. See /build/sdk/plasa/plasa_fragment_cc.gni.
 #
-#     See https://fxbug.dev/117085 for more details about this field.
+#     See https://fxbug.dev/42068255 for more details about this field.
 template("sdk_source_set") {
   assert(defined(invoker.category), "Must define an SDK category")
   is_internal = invoker.category == "internal"
@@ -127,13 +127,13 @@ template("sdk_source_set") {
     # 'source_set()' targets in the 'partner' or 'public' category that are not
     # testonly must be tracked by
     # //build/sdk:sdk_versioned_source_sets_allowlist for SDK consistency
-    # checks (see https://fxbug.dev/118903).
+    # checks (see https://fxbug.dev/42069989).
     if ((!defined(invoker.testonly) || !invoker.testonly) &&
         (invoker.category == "partner" || invoker.category == "public")) {
       deps += [ "//build/sdk:sdk_versioned_source_sets_allowlist" ]
     }
 
-    # TODO(https://fxbug.dev/129182): All SDK libraries should compile with `sdk_extra_warnings`.
+    # TODO(https://fxbug.dev/42079584): All SDK libraries should compile with `sdk_extra_warnings`.
     if (invoker.category == "partner" || invoker.category == "public") {
       configs += [ "//build/config:sdk_extra_warnings" ]
     }

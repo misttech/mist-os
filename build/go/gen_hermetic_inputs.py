@@ -25,7 +25,7 @@ def go_dep_files_inputs(go_dep_files, is_test):
             inputs.append(src)
             continue
 
-        # TODO(https://fxbug.dev/80334): always expect files after we deprecate
+        # TODO(https://fxbug.dev/42160667): always expect files after we deprecate
         # support for globbing.
         #
         # Currently globbing is only used by syzkaller-go (see bug above), which

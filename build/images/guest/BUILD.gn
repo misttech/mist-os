@@ -48,7 +48,7 @@ import("//src/sys/core/build/core.gni")
 # to make these targets fall out of the build graph in these situations, which
 # reduces build times and flake rates.
 #
-# See:  https://fxbug.dev/110852 for context.
+# See:  https://fxbug.dev/42062190 for context.
 
 if (labels.images == "//build/images/bringup") {
   group("guest") {

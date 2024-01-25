@@ -14,7 +14,7 @@ group("tests") {
     ":tracer_test",
 
     # There are known platforms where fsatrace_test fails.
-    # TODO(https://fxbug.dev/70879): enable when test passes on all of them
+    # TODO(https://fxbug.dev/42150171): enable when test passes on all of them
     # ":fsatrace_test",
   ]
 }

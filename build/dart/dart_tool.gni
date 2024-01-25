@@ -228,7 +228,7 @@ template("dart_tool") {
     outputs = [ snapshot_path ]
 
     # Dart writes absolute paths to depfiles, convert them to relative.
-    # See more information in https://fxbug.dev/75451.
+    # See more information in https://fxbug.dev/42155246.
     script = "//build/depfile_path_to_relative.py"
 
     main_uri = rebase_path(invoker.main_dart, root_build_dir)

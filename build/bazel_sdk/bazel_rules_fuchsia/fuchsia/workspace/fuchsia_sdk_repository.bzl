@@ -119,7 +119,7 @@ def _fuchsia_sdk_repository_impl(ctx):
         executable = False,
     )
 
-    # TODO(https://fxbug.dev/117511): Allow generate_sdk_build_rules to provide
+    # TODO(https://fxbug.dev/42068729): Allow generate_sdk_build_rules to provide
     # substitutions directly to the call to ctx.template above.
     generate_sdk_build_rules(ctx, manifests, copy_content_strategy, constants)
 

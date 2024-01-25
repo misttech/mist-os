@@ -5,7 +5,7 @@
 import("//build/images/args.gni")
 import("//src/storage/fshost/generated_fshost_config.gni")
 
-# TODO(https://fxbug.dev/81569): Burn this down.
+# TODO(https://fxbug.dev/42162038): Burn this down.
 
 # For //build/images/fuchsia:fuchsia_assembly.
 legacy_fuchsia_image_metadata_overrides = {
@@ -16,7 +16,7 @@ legacy_fuchsia_image_metadata_overrides = {
     if (!sign_zbi) {
       bootserver_pave += [
         "--zircona",
-        # TODO(https://fxbug.dev/32475): `dm reboot-recovery` boots from zircon-b instead of
+        # TODO(https://fxbug.dev/42107564): `dm reboot-recovery` boots from zircon-b instead of
         # zircon-r, so for now zedboot is being paved to this slot.
         # "--zirconb",
       ]
@@ -115,7 +115,7 @@ legacy_bringup_image_metadata_overrides = {
     if (!sign_zbi) {
       bootserver_pave += [
         "--zircona",
-        # TODO(https://fxbug.dev/32475): `dm reboot-recovery` boots from zircon-b instead of
+        # TODO(https://fxbug.dev/42107564): `dm reboot-recovery` boots from zircon-b instead of
         # zircon-r, so for now zedboot is being paved to this slot.
         # "--zirconb",
       ]

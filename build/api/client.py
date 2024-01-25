@@ -5,7 +5,7 @@
 
 """A tool providing information about the Fuchsia build graph(s).
 
-See https://fxbug.dev/134999 for context.
+See https://fxbug.dev/42084664 for context.
 """
 
 # TECHNICAL NOTE: Reduce imports to a strict minimum to keep startup time

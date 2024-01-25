@@ -101,7 +101,7 @@ template("resource") {
   }
 
   # Prevent binaries to be copied to bin/ or test/ with resource() to prevent
-  # build breaks with instrumented builds. See https://fxbug.dev/89436
+  # build breaks with instrumented builds. See https://fxbug.dev/42170777
   #
   _allow_binary_output_dir = defined(invoker.allow_binary_output_dir) &&
                              invoker.allow_binary_output_dir
@@ -219,7 +219,7 @@ template("resource_group") {
   if (!(defined(invoker.allow_binary_output_dir) &&
         invoker.allow_binary_output_dir)) {
     # Prevent binaries to be copied to bin/ or test/ with resource() to prevent
-    # build breaks with instrumented builds. See https://fxbug.dev/89436
+    # build breaks with instrumented builds. See https://fxbug.dev/42170777
     #
     # NOTE: This check cannot be performed in the metadata definition below
     # because GN will complain that the _dest_with_prefix temporary variable

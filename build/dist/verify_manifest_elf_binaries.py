@@ -396,7 +396,7 @@ def main():
     if args.check_unstripped_files:
         for target, source_file in manifest_entries.items():
             # Prebuilts are allowed to have missing debug files.
-            # See: https://fxbug.dev/89174
+            # See: https://fxbug.dev/42170486
             if "/prebuilt/" in source_file:
                 continue
             if target in elf_entries:

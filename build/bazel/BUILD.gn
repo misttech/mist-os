@@ -102,7 +102,7 @@ action("generate_main_workspace") {
 
   # This dependency is needed to properly populate the @internal_sdk repository
   # used experimentally to migrate non-SDK GN targets to Bazel
-  # (see https://fxbug.dev/112028).
+  # (see https://fxbug.dev/42063353).
   deps += [ "//sdk:platform" ]
 
   depfile = "${target_gen_dir}/${target_name}.d"

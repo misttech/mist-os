@@ -125,7 +125,7 @@ def main():
             "{}: {}\n".format(
                 args.out,
                 # Always write relative paths to depfiles. See more information
-                # from https://fxbug.dev/75451.
+                # from https://fxbug.dev/42155246.
                 " ".join(os.path.relpath(source) for _, source in extra_files),
             ),
         )

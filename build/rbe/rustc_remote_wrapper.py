@@ -134,7 +134,7 @@ def accompany_rlib_with_so(deps: Iterable[Path]) -> Iterable[Path]:
     dynamic linking is requested and intended.  This can result in a mismatch
     between local and remote building.
     See https://github.com/rust-lang/rust/issues/90106
-    Workaround (https://fxbug.dev/86896): check for existence of .so and include it.
+    Workaround (https://fxbug.dev/42167956): check for existence of .so and include it.
 
     Yields:
       original sequence, plus potentially additional .so libs.
@@ -464,7 +464,7 @@ class RustRemoteAction(object):
             # else
             yield tok
 
-        # TODO(https://fxbug.dev/105799): relocate rust sysroot to
+        # TODO(https://fxbug.dev/42057067): relocate rust sysroot to
         # be indepedent of host-platform to make remote commands
         # match for better caching.
         # The rust sysroot is home to the standard libraries for

@@ -21,7 +21,7 @@ py_runtime(
     # Set stub_shebang so the Python wrapper can find the prebuilt Python
     # interpreter.
     #
-    # See details about this shebang line in https://fxbug.dev/115164#c29, and
+    # See details about this shebang line in https://fxbug.dev/42066477#c29, and
     # general information about the underlying issue in that bug.
     stub_shebang = """\
 #!/bin/bash

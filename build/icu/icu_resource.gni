@@ -18,7 +18,7 @@ template("icu_resource") {
                              "*",
                              [
                                "target_name",  # Workaround for
-                                               # https://fxbug.dev/133723.
+                                               # https://fxbug.dev/42083609.
                                "testonly",
                                "visibility",
                              ])

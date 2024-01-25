@@ -89,7 +89,7 @@ filegroup(
         srcs = glob([
             "include/c++/v1/**",
         ]) + glob([
-            # TODO(https://fxbug.dev/91180): Try not to hard code this path.
+            # TODO(https://fxbug.dev/42172715): Try not to hard code this path.
             "lib/clang/%{CLANG_VERSION}/include/**",
         ]) + glob([
             "include/%s-unknown-fuchsia/c++/v1/*" % cpu,
@@ -200,7 +200,7 @@ filegroup(
     filegroup(
         name = "runtime-" + cpu,
         srcs = [
-            # TODO(https://fxbug.dev/91180): Don't hard code this path.
+            # TODO(https://fxbug.dev/42172715): Don't hard code this path.
             "//:lib/clang/%{CLANG_VERSION}/lib/%s-unknown-fuchsia/libclang_rt.builtins.a" % cpu,
         ],
     )

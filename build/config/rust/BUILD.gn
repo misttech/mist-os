@@ -76,7 +76,7 @@ config("incremental") {
 config("one_codegen_unit") {
   # Disable codegen parallelism.
   # Trades incremental rebuild speed for smaller code size.
-  # See: https://fxbug.dev/74435, https://fxbug.dev/80514
+  # See: https://fxbug.dev/74435, https://fxbug.dev/42160867
   if (rust_incremental == "") {
     rustflags = [ "-Ccodegen-units=1" ]
   }
@@ -125,20 +125,20 @@ config("lto_thin") {
 # Best practices for Rust binaries that go into size-constrained bootfs.
 config("bootfs") {
   # Optimize for size.
-  # TODO(https://fxbug.dev/84386): use "z" when resolved.
+  # TODO(https://fxbug.dev/42165168): use "z" when resolved.
   rustflags = [ "-Copt-level=s" ]
 
   if (target_cpu == "arm64" && is_debug) {
     # Debug builds produce large Rust binaries.
     # So large they might not fit in the ZBI.
     # Force ThinLTO to squeeze Rust binaries further.
-    # See: https://fxbug.dev/80514
-    # See: https://fxbug.dev/91325
+    # See: https://fxbug.dev/42160867
+    # See: https://fxbug.dev/42172876
     configs = [ "//build/config/lto:thinlto" ]
   }
 
   # Can't dynamically link libstd and libtest for ZBI binaries.
-  # TODO(https://fxbug.dev/83081): reconsider this.
+  # TODO(https://fxbug.dev/42163719): reconsider this.
   rustflags += [ "-Cprefer-dynamic=no" ]
 }
 
@@ -179,7 +179,7 @@ config("allow_unknown_lints") {
   rustflags = [ "-Aunknown-lints" ]
 }
 
-# TODO(https://fxbug.dev/69442) remove this allowance
+# TODO(https://fxbug.dev/42148577) remove this allowance
 config("allow_legacy_derive_helpers") {
   rustflags = [ "-Alegacy-derive-helpers" ]
 }
@@ -188,7 +188,7 @@ config("coverage") {
   rustflags = [ "-Cinstrument-coverage" ]
 }
 
-# TODO(https://fxbug.dev/94355): Eliminate or identify all sources of output dir leaks.
+# TODO(https://fxbug.dev/42176241): Eliminate or identify all sources of output dir leaks.
 # This option makes it explicit that a particular build action is sensitive
 # to the output dir path, and informs remote execution to refrain from
 # normalizing the output dir, which improves caching.
@@ -247,16 +247,16 @@ config("no_download") {
 # When adding a new config, make sure to add a TODO with a link to the tracking
 # issue.
 
-# TODO(https://fxbug.dev/94237)
+# TODO(https://fxbug.dev/42176110)
 config("allow_simd") {
   rustflags = [ "-Zallow-features=stdsimd,aarch64_target_feature" ]
 }
 
-# TODO(https://fxbug.dev/123519)
+# TODO(https://fxbug.dev/42074445)
 config("async_fn_in_trait") {
   rustflags = [ "-Zallow-features=async_fn_in_trait" ]
 
-  # Per https://fxbug.dev/123519#c1, any additions to this list must also
+  # Per https://fxbug.dev/42074445#c1, any additions to this list must also
   # include a point of contact for assisting with refactors or removal of usages
   # of the feature.
   visibility = []

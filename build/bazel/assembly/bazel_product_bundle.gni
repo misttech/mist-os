@@ -155,7 +155,7 @@ template("bazel_product_bundle") {
 
     # NOTE: transfer.json MUST live in the parent directory of
     # `product_bundle_out_dir` for `ffx product download` to work.
-    # See details in https://fxbug.dev/128934.
+    # See details in https://fxbug.dev/42079368.
     transfer_json = "${out_dir}/transfer.json"
 
     if (defined(invoker.bazel_product_image_target)) {
@@ -504,7 +504,7 @@ template("bazel_product_bundle") {
       product_version = sdk_id
       assert(product_version != "")
 
-      # TODO(https://fxbug.dev/127440): Add metadata for recovery image as well.
+      # TODO(https://fxbug.dev/42078046): Add metadata for recovery image as well.
       metadata = {
         images = [
           {

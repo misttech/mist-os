@@ -120,7 +120,7 @@ template("rustc_staticlib") {
          "Only one of output_name and name may be specified.")
 
   # if "with_unit_tests" is set to true, generate an additional rust test target
-  # TODO(https://fxbug.dev/72931): accept a string.
+  # TODO(https://fxbug.dev/42152447): accept a string.
   if (defined(invoker.with_unit_tests) && invoker.with_unit_tests) {
     rustc_test_internal("${target_name}_test") {
       not_needed(invoker, [ "public" ])
@@ -181,7 +181,7 @@ template("rustc_staticlib") {
       deps += invoker.deps
     }
 
-    # TODO(https://fxbug.dev/43781) remove "non_rust_deps"
+    # TODO(https://fxbug.dev/42120123) remove "non_rust_deps"
     if (defined(invoker.non_rust_deps)) {
       deps += invoker.non_rust_deps
     }
@@ -220,7 +220,7 @@ template("rustc_staticlib") {
     visibility = [ ":${group_target}" ]
     deps = []
     if (defined(invoker.non_rust_deps)) {
-      # TODO(https://fxbug.dev/43781): This allows propagating non rust dependencies through a
+      # TODO(https://fxbug.dev/42120123): This allows propagating non rust dependencies through a
       # single level of indirection, but does not handle propagating
       # dependencies through an intermediate Rust target.
       deps += invoker.non_rust_deps

@@ -162,7 +162,7 @@ class CxxRemoteAction(object):
 
         if self._main_args.fsatrace_path:
             msg(
-                "Warning: Due to https://fxbug.dev/128947, remote fsatrace does not work with C++ mode as-is, because the fsatrace prefix confuses the re-client C++ input processor.  Automatically disabling --fsatrace-path."
+                "Warning: Due to https://fxbug.dev/42079382, remote fsatrace does not work with C++ mode as-is, because the fsatrace prefix confuses the re-client C++ input processor.  Automatically disabling --fsatrace-path."
             )
             self._main_args.fsatrace_path = None
 
@@ -484,7 +484,7 @@ class CxxRemoteAction(object):
             output_files = self._remote_output_files()
 
             max_attempts = self.determinism_attempts
-            # For https://fxbug.dev/130161, increase repetition count for
+            # For https://fxbug.dev/42080457, increase repetition count for
             # known difficult-to-reproduce cases.
             override_attempts = fuchsia.determinism_repetitions(output_files)
             if override_attempts is not None:

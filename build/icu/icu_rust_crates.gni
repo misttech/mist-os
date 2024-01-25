@@ -72,7 +72,7 @@ template("icu_rust_library") {
                                "visibility",
                                "testonly",
                                "target_name",  # Workaround for
-                                               # https://fxbug.dev/133723.
+                                               # https://fxbug.dev/42083609.
                              ])
       forward_variables_from(invoker,
                              [

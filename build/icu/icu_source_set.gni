@@ -29,7 +29,7 @@ template("icu_source_set") {
                                "icu_deps",
                                "icu_public_deps",
                                "target_name",  # Workaround for
-                                               # https://fxbug.dev/133723.
+                                               # https://fxbug.dev/42083609.
                              ])
       forward_variables_from(invoker,
                              [

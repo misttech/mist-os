@@ -174,7 +174,7 @@ class GnLicenseMetadataDB:
     ):
         assert (
             application.target_label not in self.applicable_licenses_by_target
-        ), f"Multiple applicable_licenses metadata entries for {application.target_label} ({application.target_type}), probably due to https://fxbug.dev/133723)."
+        ), f"Multiple applicable_licenses metadata entries for {application.target_label} ({application.target_type}), probably due to https://fxbug.dev/42083609)."
         self.applicable_licenses_by_target[
             application.target_label
         ] = application

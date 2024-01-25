@@ -19,7 +19,7 @@ from gen_library_metadata import FUCHSIA_MODULE, get_sources
 
 # rmtree manually removes all subdirectories and files instead of using
 # shutil.rmtree, to avoid registering spurious reads on stale
-# subdirectories. See https://fxbug.dev/74084.
+# subdirectories. See https://fxbug.dev/42153728.
 def rmtree(dir):
     if not os.path.exists(dir):
         return
@@ -235,7 +235,7 @@ def main():
             # hardlink regular files instead of symlinking to handle non-Go
             # files that we want to embed using //go:embed, which doesn't
             # support symlinks.
-            # TODO(https://fxbug.dev/81748): Add a separate mechanism for
+            # TODO(https://fxbug.dev/42162237): Add a separate mechanism for
             # declaring embedded files, and only hardlink those files
             # instead of hardlinking all sources.
             if os.path.isdir(src):
@@ -259,7 +259,7 @@ def main():
         ldflags.extend(
             [
                 "-stdlib=libc++",
-                # TODO(https://fxbug.dev/64336): the following flags are not recognized by CGo.
+                # TODO(https://fxbug.dev/42142932): the following flags are not recognized by CGo.
                 # '-rtlib=compiler-rt',
                 # '-unwindlib=libunwind',
             ]

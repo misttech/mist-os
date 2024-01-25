@@ -25,7 +25,7 @@ main() {
   root_dir=$( cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd )
 
   # Bootstrapping bazel must be done from inside a Bazel workspace,
-  # or it will fail silently. https://fxbug.dev/111280
+  # or it will fail silently. https://fxbug.dev/42062594
   pushd "${root_dir}" > /dev/null
 
   tool_name=$( basename "${BASH_SOURCE[0]}" )

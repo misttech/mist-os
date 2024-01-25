@@ -14,7 +14,7 @@ import("//build/rust/rustc_artifact.gni")
 #     assumed to be the same as the target name. All dashes will be replaced
 #     with underscores in the library name: <name_underscored>
 #
-#     Note: This is required for now, see https://fxbug.dev/97058.
+#     Note: This is required for now, see https://fxbug.dev/42179244.
 #
 #   edition
 #     Edition of the Rust language to be used. See

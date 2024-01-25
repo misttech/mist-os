@@ -79,7 +79,7 @@ template("dart_test") {
     infer_package_name = true
     testonly = true
 
-    # TODO(https://fxbug.dev/71902): replace the enclosing dart_library with an analysis
+    # TODO(https://fxbug.dev/42151305): replace the enclosing dart_library with an analysis
     # target when they are decoupled.
     #
     # Skip source verification because the purpose of this target is to run
@@ -138,7 +138,7 @@ template("dart_test") {
     outputs = [ _snapshot ]
 
     # Dart writes absolute paths to depfiles, convert them to relative.
-    # See more information in https://fxbug.dev/75451.
+    # See more information in https://fxbug.dev/42155246.
     script = "//build/depfile_path_to_relative.py"
     inputs = [ prebuilt_dart ]
 

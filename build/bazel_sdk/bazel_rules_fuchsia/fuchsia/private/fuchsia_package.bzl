@@ -466,7 +466,7 @@ _build_fuchsia_package, _build_fuchsia_package_test = rule_variants(
         "archive_name": attr.string(
             doc = "What to name the archive. The .far file will be appended if not in this name. Defaults to package_name",
         ),
-        # TODO(https://fxbug.dev/114334): Improve doc for this field when we
+        # TODO(https://fxbug.dev/42065627): Improve doc for this field when we
         # have more clarity from the bug.
         "package_repository_name": attr.string(
             doc = "Repository name of this package, defaults to None",

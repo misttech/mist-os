@@ -33,7 +33,7 @@ template("_common") {
                            "*",
                            [
                              "target_name",  # Workaround for
-                                             # https://fxbug.dev/133723.
+                                             # https://fxbug.dev/42083609.
                              "testonly",
                              "visibility",
                              "icu_deps",

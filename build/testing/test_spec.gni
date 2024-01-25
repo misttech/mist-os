@@ -273,7 +273,7 @@ template("test_spec") {
         is_v2_component = s == ""
       }
 
-      # Running test cases in parallel is slow (https://fxbug.dev/86107) for
+      # Running test cases in parallel is slow (https://fxbug.dev/42167081) for
       # "coverage" variant. Run cases serially for that variant by default.
       # Also let devs override the default if needed.
       if (!defined(invoker.parallel) && is_v2_component &&

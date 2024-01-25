@@ -225,7 +225,7 @@ _clangd_compilation_database = rule(
     },
 )
 
-# TODO(https://fxbug.dev/92380): Revisit the compilation database implementation after a review of alternatives
+# TODO(https://fxbug.dev/42174048): Revisit the compilation database implementation after a review of alternatives
 def clangd_compilation_database(**kwargs):
     _clangd_compilation_database(
         filename = kwargs.pop("filename", "compile_commands.json"),

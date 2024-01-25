@@ -120,7 +120,7 @@ template("rustc_artifact") {
   }
   _local_inputs = _remote_inputs
 
-  # TODO(https://fxbug.dev/113157): Remove this cfg once soft transitions are done.
+  # TODO(https://fxbug.dev/42064463): Remove this cfg once soft transitions are done.
   _rustflags =
       [ "--cfg=fidl_rust_transition_step=\"${fidl_rust_transition_step}\"" ]
   if (defined(invoker.features)) {

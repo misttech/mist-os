@@ -61,7 +61,7 @@ template("fuchsia_test") {
 
     assert(
         get_path_info(manifest_name, "extension") == "cm",
-        "`manifest_name` must end with '.cm'. Refer https://fxbug.dev/84888 for more information.")
+        "`manifest_name` must end with '.cm'. Refer https://fxbug.dev/42165725 for more information.")
 
     test_spec(target_name) {
       forward_variables_from(invoker, "*")

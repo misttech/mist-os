@@ -413,7 +413,7 @@ template("bazel_action") {
 
     # Rebuild on any change known to git and let Bazel
     # figure out if it actually needs to do work.
-    # See: https://fxbug.dev/117818#c2
+    # See: https://fxbug.dev/42069003#c2
     inputs += [
       "//.git/HEAD",
       "//.git/index",
@@ -498,7 +498,7 @@ template("bazel_action") {
     } else {
       if (_filter_bazel_info_logs) {
         # Disable INFO lines and printing results, this makes Bazel output much
-        # less chatty when invoked from Ninja. https://fxbug.dev/126548
+        # less chatty when invoked from Ninja. https://fxbug.dev/42077198
         args += [ "--ui_event_filters=-info" ]
       }
 

@@ -221,7 +221,7 @@ foreach(named_env, _all_named_fuchsia_envs) {
   all_fuchsia_envs += [ named_env.env ]
 }
 
-# TODO(https://fxbug.dev/80243): allow these tests to run on emulators.
+# TODO(https://fxbug.dev/42160566): allow these tests to run on emulators.
 #
 # On ARM nested virtualization is unsupported before ARMv8.2. None of our
 # testbeds are ARM8.2 or above.

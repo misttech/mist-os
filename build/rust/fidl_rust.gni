@@ -137,7 +137,7 @@ template("fidl_rust") {
         deps += invoker.deps
       }
 
-      # TODO(https://fxbug.dev/104019): Avoid this suppression. At the time of
+      # TODO(https://fxbug.dev/42055130): Avoid this suppression. At the time of
       # writing it is needed because this target might depend on another FIDL
       # library *only* for type aliases; the generated Rust code will not
       # reference this external alias, producing an unused crate dependency. We

@@ -268,7 +268,7 @@ def scan_leaks(argv: Sequence[str], exec_root: Path, working_dir: Path) -> int:
     Leaks of the build-dir in commands and their output artifacts
     are harmful to action caching.
 
-    TODO(https://fxbug.dev/92670): accept additional patterns to scan,
+    TODO(https://fxbug.dev/42174370): accept additional patterns to scan,
     e.g. 'set_by_reclient/...'
 
     Args:

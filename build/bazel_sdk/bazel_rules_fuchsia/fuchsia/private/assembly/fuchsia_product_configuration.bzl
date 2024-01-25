@@ -180,7 +180,7 @@ def fuchsia_product_configuration(
 
     Args:
         name: Name of the rule.
-        TODO(https://fxbug.dev/122898): Point to document instead of Rust definition
+        TODO(https://fxbug.dev/42073826): Point to document instead of Rust definition
         json_config: product assembly json config, as a starlark dictionary.
             Format of this JSON config can be found in this Rust definitions:
                //src/lib/assembly/config_schema/src/assembly_config.rs

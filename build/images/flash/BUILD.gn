@@ -149,7 +149,7 @@ foreach(file, bootstrap_files) {
 ### Paver and flash scripts, and archives using those images and zedboot's images.
 ###
 
-# TODO(https://fxbug.dev/82862): Move the construction of the flash archive/manifest
+# TODO(https://fxbug.dev/42163475): Move the construction of the flash archive/manifest
 # into a separate BUILD.gn file.
 flash_script_outputs = [ "$root_out_dir/flash.sh" ]
 

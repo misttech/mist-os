@@ -43,7 +43,7 @@ if (enable_netboot) {
 
       deps = [ "//build/images/tools:bootserver" ]
 
-      # TODO(https://fxbug.dev/46415): The build graph for "bringup" (use_bringup_assembly) MUST only
+      # TODO(https://fxbug.dev/42123048): The build graph for "bringup" (use_bringup_assembly) MUST only
       # contain one zircon-a metadata target, which means that anything
       # reaching fuchsia.zbi must be excluded from the build graph.
       if (use_bringup_assembly) {

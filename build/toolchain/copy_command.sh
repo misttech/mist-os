@@ -63,7 +63,7 @@ DESTINATION="${ARGS[1]}"
 # mtime on directories may not reflect the latest of a directory. For example in
 # popular file systems, modifying a file in a directory does not affect mtime of
 # the directory. Because of this, disable directory copy for incremental
-# correctness. See https://fxbug.dev/73250.
+# correctness. See https://fxbug.dev/42152802.
 if [[ -d "${SOURCE}" ]]; then
   die "Tool \"copy\" does not support directory copies"
 fi
@@ -89,7 +89,7 @@ ln -f "${SOURCE}" "${DESTINATION}" 2>/dev/null && exit 0
 
 # On Mac, `cp -af` does not correctly preserves mtime (the nanoseconds are
 # truncated to microseconds) which causes spurious ninja rebuilds. As a result,
-# shell to a helper to copy rather than calling cp -r. See https://fxbug.dev/56376#c5
+# shell to a helper to copy rather than calling cp -r. See https://fxbug.dev/42134108#c5
 case "${OSTYPE}" in
   darwin*)
     "${PYTHON_EXE}" "${PROGDIR}/copy.py" "${SOURCE}" "${DESTINATION}"

@@ -207,7 +207,7 @@ template("sdk_fuchsia_package") {
         rebase_path(depfile, root_build_dir),
       ]
 
-      # FIXME(https://fxbug.dev/132644)
+      # FIXME(https://fxbug.dev/42082703)
       if (is_coverage) {
         args += [ "--is-coverage" ]
       }

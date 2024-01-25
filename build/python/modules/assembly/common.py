@@ -18,7 +18,7 @@ __all__ = ["FileEntry", "FilePath", "fast_copy"]
 FilePath = Union[str, os.PathLike]
 
 
-# TODO(https://fxbug.dev/89571) Move to python module at //build/python/modules/file_entry
+# TODO(https://fxbug.dev/42170926) Move to python module at //build/python/modules/file_entry
 @total_ordering
 @dataclass
 @serialization.serialize_dict
@@ -28,7 +28,7 @@ class FileEntry:
     This is a source_path=destination_path mapping type
     """
 
-    # TODO(https://fxbug.dev/98573) Mark these fields to `kw_only=True` after switching
+    # TODO(https://fxbug.dev/42180921) Mark these fields to `kw_only=True` after switching
     #   to python 3.10 or later.
     source: FilePath
     destination: FilePath
@@ -63,7 +63,7 @@ class FileEntry:
         )
         return result
 
-    # TODO(https://fxbug.dev/89571) Move to python module at //build/python/modules/fini_manfest
+    # TODO(https://fxbug.dev/42170926) Move to python module at //build/python/modules/fini_manfest
     @staticmethod
     def write_fini_manifest(
         entries: Iterable["FileEntry"], file: TextIO

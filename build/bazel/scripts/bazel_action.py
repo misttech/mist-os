@@ -135,7 +135,7 @@ _BAZEL_NO_CONTENT_HASH_REPOSITORIES = ("@fuchsia_build_config//",)
 #   Most of the time, this will create un-necessary build actions on the next
 #   Ninja invocation, and in rare cases, may even break the build. However,
 #   this is no different from regular Ninja issues with depfiles (see
-#   https://fxbug.dev/83397), which cannot guarantee, by design, correct
+#   https://fxbug.dev/42164069), which cannot guarantee, by design, correct
 #   incremental build.
 #
 #   So resolving the symlink seems an acceptable solution, as it would not be
@@ -242,7 +242,7 @@ def copy_file_if_changed(src_path: str, dst_path: str):
         else:
             os.remove(dst_path)
 
-    # See https://fxbug.dev/121003 for context. This logic is kept here
+    # See https://fxbug.dev/42072059 for context. This logic is kept here
     # to avoid incremental failures when performing copies across
     # different revisions of the Fuchsia checkout (e.g. when bisecting
     # or simply in CQ).

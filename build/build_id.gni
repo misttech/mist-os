@@ -29,7 +29,7 @@ template("build_id_entry") {
     stamp = "${invoker.debug}.build-id.stamp"
     outputs = [ stamp ]
 
-    # TODO(https://fxbug.dev/109382): Re-enable when fsatrace is fixed to not hang when running this tool.
+    # TODO(https://fxbug.dev/42060773): Re-enable when fsatrace is fixed to not hang when running this tool.
     hermetic_deps = false
 
     script = "//prebuilt/tools/buildidtool/${host_platform}/buildidtool"

@@ -20,7 +20,7 @@ def walk_rmtree(directory):
     """Manually remove all subdirectories and files of a directory
     via os.walk instead of using
     shutil.rmtree, to avoid registering spurious reads on stale
-    subdirectories. See https://fxbug.dev/74084.
+    subdirectories. See https://fxbug.dev/42153728.
 
     Args:
         directory: path to directory which should have tree removed.

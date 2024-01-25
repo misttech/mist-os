@@ -20,7 +20,7 @@ def zip_dir(dir, zip_file):
 
 # rmtree manually removes all subdirectories and files instead of using
 # shutil.rmtree, to avoid registering spurious reads on stale
-# subdirectories. See https://fxbug.dev/74084.
+# subdirectories. See https://fxbug.dev/42153728.
 def rmtree(dir):
     if not os.path.exists(dir):
         return

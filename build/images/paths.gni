@@ -87,7 +87,7 @@ files = {
     manifests_from_metadata =
         "$root_build_dir/package_manifests_from_metadata.list"
 
-    # TODO(https://fxbug.dev/98480) move these to image-relative paths along with tools' usages
+    # TODO(https://fxbug.dev/42180818) move these to image-relative paths along with tools' usages
     base_package_manifests = "$root_build_dir/base_package_manifests.list"
     cache_package_manifests = "$root_build_dir/cache_package_manifests.list"
     universe_package_manifests =
@@ -95,7 +95,7 @@ files = {
     assembly_cache_package_manifests =
         "$root_build_dir/assembly_cache_packages.list"
 
-    # TODO(https://fxbug.dev/123120): Audit and add the following paths when
+    # TODO(https://fxbug.dev/42074075): Audit and add the following paths when
     # only Bazel assembly is enabled.
     if (!use_bazel_images_only) {
       flash_manifest = "${_images_outdir}/flash_manifest/flash.json"

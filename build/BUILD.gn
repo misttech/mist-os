@@ -60,13 +60,13 @@ group("non_hermetic_deps") {
   # See: fxrev.dev/528291
   visibility += [ "//build/rust:*" ]
 
-  # See: https://fxbug.dev/69444
+  # See: https://fxbug.dev/42148579
   visibility += [ "//sdk:cts_generate" ]
 
-  # See: https://fxbug.dev/44889
+  # See: https://fxbug.dev/42121352
   visibility += [ "//sdk:*" ]
 
-  # TODO(https://fxbug.dev/92612): Remove entries when
+  # TODO(https://fxbug.dev/42174306): Remove entries when
   # assembly and board input bundle creation no longer triggers false-positives
   # in the action_tracer.py due to how it cleans it's dynamic outputs.
   visibility += [
@@ -92,10 +92,10 @@ group("non_hermetic_deps") {
     "//zircon/system/*",
   ]
 
-  # TODO(https://fxbug.dev/94463): Remove entry when action tracer can handle ld.lld invocations.
+  # TODO(https://fxbug.dev/42176361): Remove entry when action tracer can handle ld.lld invocations.
   visibility += [ "//src/graphics/lib/magma/src/libmagma:*" ]
 
-  # TODO(https://fxbug.dev/109382): Hermetic deps checking is disabled on build_id_entry
+  # TODO(https://fxbug.dev/42060773): Hermetic deps checking is disabled on build_id_entry
   visibility += [ "//third_party/intel/media-driver/fuchsia:*" ]
 
   # These repos are not in the default checkout.
@@ -105,7 +105,7 @@ group("non_hermetic_deps") {
     "//third_party/vulkan-cts/fuchsia/*",
   ]
 
-  # TODO(https://fxbug.dev/87512): Remove this entry when it no longer executes
+  # TODO(https://fxbug.dev/42168642): Remove this entry when it no longer executes
   # fx tools.
   visibility += [ "//tools/docsgen:invoke_helpdoc" ]
 
@@ -136,7 +136,7 @@ group("non_hermetic_deps") {
     "//products/workbench:*",
   ]
 
-  # FIXME(https://fxbug.dev/121915): //build/packages/prebuilt_packages.gni
+  # FIXME(https://fxbug.dev/42072939): //build/packages/prebuilt_packages.gni
   # needs `hermetic_action_ignored_prefixes`. Remove these entries when
   # `prebuilt_package` is hermetic.
   visibility += [
@@ -162,7 +162,7 @@ group("non_hermetic_deps") {
     "//src/ui/backlight/drivers:chromebook-keyboard-backlight",
   ]
 
-  # TODO(https://fxbug.dev/84924): License analysis uses the output of 'fx gn gen', which
+  # TODO(https://fxbug.dev/42165766): License analysis uses the output of 'fx gn gen', which
   # can potentially touch every file in the repository. Remove this entry when license
   # management becomes a hermetic process.
   visibility += [ "//tools/check-licenses/util/cmd/gn/*" ]
@@ -347,7 +347,7 @@ group("deprecated_zx_wrapper_allowlist") {
   ]
 }
 
-# TODO(https://fxbug.dev/94952): to be populated.
+# TODO(https://fxbug.dev/42176904): to be populated.
 group("output_dir_leaking_allowlist") {
   visibility = [ "*" ]
 }

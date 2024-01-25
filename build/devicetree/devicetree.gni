@@ -283,7 +283,7 @@ template("dts") {
 #   * sources
 #     - Required: Device tree visitor source files (.cc and .h) that will be
 #       used to parse the devicetree related to the schema.
-#       TODO(https://fxbug.dev/133362) Generate the visitor from schema file.
+#       TODO(https://fxbug.dev/42083285) Generate the visitor from schema file.
 #     - Type: List(path).
 #
 #   * deps

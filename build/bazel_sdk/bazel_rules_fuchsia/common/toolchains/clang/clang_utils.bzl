@@ -64,7 +64,7 @@ def process_clang_builtins_output(probe_output):
                 # our build system. Note that some users have their home
                 # directory under /usr/local/something/.... and such paths
                 # should not be filtered out.
-                # See https://fxbug.dev/110637 for details.
+                # See https://fxbug.dev/42062023 for details.
                 continue
             builtin_include_paths.append(line.strip())
 

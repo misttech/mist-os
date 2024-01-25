@@ -10,7 +10,7 @@ import("//build/toolchain/variant.gni")
 variant("asan") {
   common_flags = [ "-fsanitize=address" ]
   cflags = [
-    # See https://fxbug.dev/66129 and
+    # See https://fxbug.dev/42144902 and
     # https://github.com/google/sanitizers/issues/1017.
     "-mllvm",
     "-asan-use-private-alias=1",
@@ -69,7 +69,7 @@ variant("asan") {
   # Expose the presence of sanitizers as a compile-time condition.
   # This allows conditional compilation of code for this variant,
   # for instance in order to disable a specific test case.
-  # TODO(https://fxbug.dev/87239): use cfg_sanitize instead.
+  # TODO(https://fxbug.dev/42168338): use cfg_sanitize instead.
   rustflags += [ "--cfg=feature=\"variant_asan\"" ]
 }
 
@@ -85,7 +85,7 @@ sanitizer_default_options("asan_default_options") {
 sanitizer_default_options("lsan_default_options") {
 }
 
-# TODO(https://fxbug.dev/45047): Temporary while leaks are plugged.
+# TODO(https://fxbug.dev/42121528): Temporary while leaks are plugged.
 # As leak bugs are found, file a bug #nnnnn for the leaky test/component,
 # and then add:
 # ```
@@ -151,7 +151,7 @@ config("no_sanitizers") {
 }
 
 # rustc flags for AddressSanitizer, primarily used for fuzzing Rust code.
-# TODO(https://fxbug.dev/45102): This is technically wrong; it will use clang's ASan.
+# TODO(https://fxbug.dev/42121590): This is technically wrong; it will use clang's ASan.
 # rustc is built from a different fork of LLVM and should use a matching ASan.
 # However, Fuchsia's libc and dynamic linker cooperate to set up the shadow
 # memory and currently always link against clang's ASan. Using both rustc and
@@ -170,7 +170,7 @@ variant("rust-asan") {
   rustflags = [ "-Zsanitizer=address" ]
 }
 
-# TODO(https://fxbug.dev/43710): Building with this variant alone can still lead to
+# TODO(https://fxbug.dev/42120045): Building with this variant alone can still lead to
 # some build errors, but this is still needed for lsan tests (see
 # //zircon/system/ulib/c/test/sanitizer:lsan-test).
 variant("lsan") {
@@ -210,7 +210,7 @@ variant("ubsan") {
   }
 
   if (is_host) {
-    # TODO(https://fxbug.dev/60446): remove this once LLVM prebuilts have variants
+    # TODO(https://fxbug.dev/42138627): remove this once LLVM prebuilts have variants
     # Disable vptr checks on host binaries.
     # This is a temporary hack around the facts that:
     # 1) UBSan's vptr check requires RTTI, and mixing RTTI and no-RTTI TUs in
@@ -272,7 +272,7 @@ variant("tsan") {
   # Expose the presence of sanitizers as a compile-time condition.
   # This allows conditional compilation of code for this variant,
   # for instance in order to disable a specific test case.
-  # TODO(https://fxbug.dev/87239): use cfg_sanitize instead.
+  # TODO(https://fxbug.dev/42168338): use cfg_sanitize instead.
   rustflags += [ "--cfg=feature=\"variant_tsan\"" ]
 }
 
@@ -318,7 +318,7 @@ variant("hwasan") {
   # Expose the presence of sanitizers as a compile-time condition.
   # This allows conditional compilation of code for this variant,
   # for instance in order to disable a specific test case.
-  # TODO(https://fxbug.dev/87239): use cfg_sanitize instead.
+  # TODO(https://fxbug.dev/42168338): use cfg_sanitize instead.
   rustflags += [ "--cfg=feature=\"variant_hwasan\"" ]
 }
 

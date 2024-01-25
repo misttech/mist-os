@@ -55,7 +55,7 @@ _REMOTE_PROJECT_ROOT = Path("/b/f/w")
 
 # Extended attributes can be used to tell reproxy (filemetadata cache)
 # that an artifact already exists in the CAS.
-# TODO(https://fxbug.dev/123178): use 'xattr' for greater portability.
+# TODO(https://fxbug.dev/42074138): use 'xattr' for greater portability.
 _HAVE_XATTR = hasattr(os, "setxattr")
 
 # Wrapper script to capture remote stdout/stderr, co-located with this script.
@@ -1022,7 +1022,7 @@ class RemoteAction(object):
             self._output_files.append(self._remote_log_name)
             self._inputs.append(self._remote_log_script_path)
 
-        # TODO(https://fxbug.dev/125627): support remote tracing from Macs
+        # TODO(https://fxbug.dev/42076379): support remote tracing from Macs
         self._fsatrace_path = fsatrace_path  # relative to working dir
         if self._fsatrace_path == Path(""):  # then use the default prebuilt
             self._fsatrace_path = self.exec_root_rel / fuchsia.FSATRACE_PATH
@@ -1295,7 +1295,7 @@ class RemoteAction(object):
         yield from self.options
 
         if self._inputs or self.input_list_paths:
-            # TODO(https://fxbug.dev/124186): use --input_list_paths only if
+            # TODO(https://fxbug.dev/42075054): use --input_list_paths only if
             # list is sufficiently long, and save writing an extra file.
             generated_inputs_list_file = self._generated_inputs_list_file()
             self._cleanup_files.append(generated_inputs_list_file)
@@ -1840,7 +1840,7 @@ class RemoteAction(object):
         """
         # TODO: support passing in filters from application-specific code.
         if local_file.suffix == ".map":  # intended for linker map files
-            # Workaround https://fxbug.dev/89245: relative-ize absolute path of
+            # Workaround https://fxbug.dev/42170565: relative-ize absolute path of
             # current working directory in linker map files.
             # These files are only used for local debugging.
             _transform_file_by_lines(

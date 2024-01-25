@@ -101,7 +101,7 @@ def _fuchsia_transition_impl(settings, attr):
     # run in the config setting rule
     fuchsia_api_level = _update_fuchsia_api_level(settings, attr)
     if fuchsia_api_level != "":
-        # TODO(https://fxbug.dev/104513) upstream clang support for HEAD
+        # TODO(https://fxbug.dev/42055678) upstream clang support for HEAD
         # Emulate a "HEAD" API level since it is not supported directly by clang.
         # Fuchsia API levels are unsigned 64-bit integers, but clang stores API levels as 32-bit,
         # so we define this as `((uint32_t)-1)`. clang expects API levels to be integer literals.

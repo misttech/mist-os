@@ -27,7 +27,7 @@ declare_args() {
     # stack traces, especially when we have bugs around unwind table generation.
     # It applies only for Fuchsia targets (see below where it is unset).
     #
-    # TODO(https://fxbug.dev/32216): Theoretically unwind tables should be good enough so we can
+    # TODO(https://fxbug.dev/42107277): Theoretically unwind tables should be good enough so we can
     # remove this option when the issues are addressed.
     enable_frame_pointers = is_debug
   }
@@ -165,7 +165,7 @@ config("clang_defaults") {
 }
 
 config("ffp_contract") {
-  # TODO(https://fxbug.dev/88681): This was the default for -ffp-model=precise until
+  # TODO(https://fxbug.dev/42169939): This was the default for -ffp-model=precise until
   # LLVM revision f04e387055e495e3e14570087d68e93593cf2918 when Clang switched
   # to -ffp-contract=on.
   cflags = [ "-ffp-contract=off" ]
@@ -192,7 +192,7 @@ config("toolchain_version_stamp") {
 config("relative_paths") {
   if (is_gcc) {
     if (use_goma) {
-      # TODO(https://fxbug.dev/27308): `-fdebug-prefix-map` is also used by Goma to canonicalize
+      # TODO(https://fxbug.dev/42101823): `-fdebug-prefix-map` is also used by Goma to canonicalize
       # build commands, allowing it to reuse compilation results for users running
       # out of different working directories. However, it only supports a single
       # "-fdebug-prefix-map" prefix. Attempting to provide more than one causes
@@ -379,7 +379,7 @@ config("optimize_size") {
   if (!is_gcc && use_oz) {
     cflags = [ "-Oz" ]
   } else {
-    # TODO(https://fxbug.dev/84386): We would ideally be using -Oz by default but that
+    # TODO(https://fxbug.dev/42165168): We would ideally be using -Oz by default but that
     # currently frequently results in binaries that are larger than -Oz.
     cflags = [ "-Os" ]
   }
@@ -396,7 +396,7 @@ config("optimize_size") {
   if (use_oz) {
     rustflags = [ "-Copt-level=z" ]
   } else {
-    # TODO(https://fxbug.dev/84386): We would ideally be using -Oz by default but that
+    # TODO(https://fxbug.dev/42165168): We would ideally be using -Oz by default but that
     # currently frequently results in binaries that are larger than -Oz.
     rustflags = [ "-Copt-level=s" ]
   }
@@ -424,7 +424,7 @@ config("optimize_profile") {
   if (zircon_toolchain != false) {
     # For Zircon artifacts, this must always enable optimizations
     # to ensure userboot.so is compiled with -O2
-    # See https://fxbug.dev/67467 for more context.
+    # See https://fxbug.dev/42146384 for more context.
     configs = [ ":optimize_default" ]
   } else {
     cflags = [ "-O1" ]
@@ -437,7 +437,7 @@ config("optimize_coverage") {
   if (zircon_toolchain != false) {
     # For Zircon artifacts, this must always enable optimizations
     # to ensure userboot.so is compiled with -O2
-    # See https://fxbug.dev/67467 for more context.
+    # See https://fxbug.dev/42146384 for more context.
     configs = [ ":optimize_default" ]
   } else {
     cflags = [ "-O1" ]
@@ -528,7 +528,7 @@ config("default_debuginfo") {
       ]
     }
   } else if (debuginfo != "none" && current_os == "win") {
-    # TODO(https://fxbug.dev/55244): This produces the .pdb file, but it doesn't seem
+    # TODO(https://fxbug.dev/42132853): This produces the .pdb file, but it doesn't seem
     # to get the DWARF data out of the main output file.
     ldflags += [ "-Wl,/debug:full" ]
   }
@@ -595,7 +595,7 @@ config("default_warnings") {
     "-Wno-unused-parameter",
     "-Wnonportable-system-include-path",
 
-    # TODO(https://fxbug.dev/64272): Disable "-Wmissing-field-initializers" which
+    # TODO(https://fxbug.dev/42142861): Disable "-Wmissing-field-initializers" which
     # warns when designated initializers are used on some (but not all)
     # fields in C++, but not C.
     #
@@ -606,12 +606,12 @@ config("default_warnings") {
 
   cflags_cc = []
   if (fuchsia_cxx_version == 20) {
-    # TODO(https://fxbug.dev/113689): Remove these after we switch to C++20.
+    # TODO(https://fxbug.dev/42064981): Remove these after we switch to C++20.
     cflags_cc += [
       "-Wc++20-compat",
       "-Wno-error=c++20-compat",
 
-      # TODO(https://fxbug.dev/122568): The use of implicit capture of this via [=] has
+      # TODO(https://fxbug.dev/42073532): The use of implicit capture of this via [=] has
       # been deprecated in C++20, but we cannot address this because adding an
       # explicit capture of 'this' to capture '*this' by reference is a C++20
       # extension and not valid in C++17.
@@ -635,7 +635,7 @@ config("default_warnings") {
     ]
 
     cflags += [
-      # TODO(https://fxbug.dev/101358): -Warray-bounds has false positives in GCC 12.
+      # TODO(https://fxbug.dev/42052174): -Warray-bounds has false positives in GCC 12.
       # When https://gcc.gnu.org/bugzilla/show_bug.cgi?id=105762 is fixed,
       # remove this.
       "-Wno-array-bounds",
@@ -645,7 +645,7 @@ config("default_warnings") {
       # warning on gcc to make it easier to see actual errors.
       "-Wno-deprecated-declarations",
 
-      # TODO(https://fxbug.dev/126220): -Wstringop-overread has false positives in GCC
+      # TODO(https://fxbug.dev/42076979): -Wstringop-overread has false positives in GCC
       # 13.  Needs to be pursued upstream.
       "-Wno-stringop-overread",
     ]
@@ -660,7 +660,7 @@ config("sdk_extra_warnings") {
     "-Wnon-virtual-dtor",
     "-Wctad-maybe-unsupported",
   ]
-  # TODO(https://fxbug.dev/120888): Add -Wshadow
+  # TODO(https://fxbug.dev/42071929): Add -Wshadow
 }
 
 # Same as `sdk_extra_warnings`, but intended to be added to the configuration of
@@ -670,7 +670,7 @@ config("test_exercising_sdk_headers") {
   configs = [ ":sdk_extra_warnings" ]
 }
 
-# TODO(https://fxbug.dev/58161): clean up instances of this outside of third party code.
+# TODO(https://fxbug.dev/42136088): clean up instances of this outside of third party code.
 config("Wno-unused-function") {
   cflags = [ "-Wno-unused-function" ]
   visibility = [
@@ -718,7 +718,7 @@ config("Wno-undef") {
 
 config("Wno-bitfield-conversion") {
   cflags = [
-    # TODO(https://fxbug.dev/135166): Remove -Wno-unknown-warning-option after the next Clang roll.
+    # TODO(https://fxbug.dev/42084851): Remove -Wno-unknown-warning-option after the next Clang roll.
     "-Wno-unknown-warning-option",
     "-Wno-bitfield-conversion",
   ]
@@ -728,7 +728,7 @@ config("Wno-bitfield-conversion") {
   ]
 }
 
-# TODO(https://fxbug.dev/135694): Remove the use of variable length arrays.
+# TODO(https://fxbug.dev/42085293): Remove the use of variable length arrays.
 #
 # NOTE: Do not add this to public_configs under any circumstances. Public
 # configs are viral and will infect unsuspecting targets.
@@ -736,7 +736,7 @@ config("Wno-bitfield-conversion") {
 config("Wno-vla-cxx-extension") {
   if (!is_gcc) {
     cflags_cc = [
-      # TODO(https://fxbug.dev/135166): Remove -Wno-unknown-warning-option after the next Clang roll.
+      # TODO(https://fxbug.dev/42084851): Remove -Wno-unknown-warning-option after the next Clang roll.
       "-Wno-unknown-warning-option",
       "-Wno-vla-cxx-extension",
     ]
@@ -813,7 +813,7 @@ config("Wno-vla-cxx-extension") {
   ]
 }
 
-# TODO(https://fxbug.dev/58162): clean up instances of this outside of third party code.
+# TODO(https://fxbug.dev/42136089): clean up instances of this outside of third party code.
 #
 # NOTE: Do not add this to public_configs under any circumstances. Public
 # configs are viral and will infect unsuspecting targets.
@@ -1200,7 +1200,7 @@ config("werror") {
     "-Dunused-must-use",
   ]
 
-  # TODO(https://fxbug.dev/118368): Remove blanket allow once lint is actionable.
+  # TODO(https://fxbug.dev/42069541): Remove blanket allow once lint is actionable.
   rustflags += [ "-Awhere_clauses_object_safety" ]
   if (deny_warnings) {
     rustflags += [ "-Dwarnings" ]
@@ -1280,7 +1280,7 @@ config("thread_safety_annotations") {
     cflags = [
       "-Wthread-safety",
 
-      # TODO(https://fxbug.dev/135657): Clang is catching instances of these in the kernel and drivers.
+      # TODO(https://fxbug.dev/42085252): Clang is catching instances of these in the kernel and drivers.
       # Temporarily disable them for now to facilitate the roll then come back and
       # fix them.
       "-Wno-unknown-warning-option",
@@ -1325,7 +1325,7 @@ if (current_toolchain == default_toolchain) {
 
   # For actions that consume exceptionally large amounts of memory.
   # The largest LTO link actions may fall into this category.
-  # See https://fxbug.dev/111094 for context.
+  # See https://fxbug.dev/42062387 for context.
   pool("highmem") {
     depth = 1
   }

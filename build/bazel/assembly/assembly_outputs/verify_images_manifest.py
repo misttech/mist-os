@@ -27,7 +27,7 @@ def file_sha1(path):
 def get_file_hash(path):
     """Get a SHA1 hash value of a file, and update extra_files_read"""
     hash_value = file_sha1(path)
-    # Follow links for depfile entry. See https://fxbug.dev/122513.
+    # Follow links for depfile entry. See https://fxbug.dev/42073472.
     p = os.path.relpath(os.path.realpath(path))
     return hash_value
 

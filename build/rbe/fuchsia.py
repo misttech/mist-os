@@ -126,7 +126,7 @@ REMOTE_RUSTC_SUBDIR = Path("prebuilt", "third_party", "rust", REMOTE_PLATFORM)
 REMOTE_CLANG_SUBDIR = Path("prebuilt", "third_party", "clang", REMOTE_PLATFORM)
 REMOTE_GCC_SUBDIR = Path("prebuilt", "third_party", "gcc", REMOTE_PLATFORM)
 
-# TODO(https://fxbug.dev/125627): use platform-dependent location
+# TODO(https://fxbug.dev/42076379): use platform-dependent location
 # Until then, this remote fsatrace only works from linux-x64 hosts.
 FSATRACE_PATH = Path("prebuilt", "fsatrace", "fsatrace")
 
@@ -181,7 +181,7 @@ def check_determinism_command(
 
 def determinism_repetitions(paths: Iterable[Path]) -> Optional[int]:
     """Override the maximum number of determinism repetitions for specific files."""
-    # For https://fxbug.dev/130161: Increase repetition count to increase
+    # For https://fxbug.dev/42080457: Increase repetition count to increase
     # chances of repro in infra.
     if any("libminfs.vnode.cc" in str(path) for path in paths):
         # Historically, this failed around 5% of the time in infra.
@@ -270,7 +270,7 @@ def rust_stdlib_subdir(target_triple: str) -> str:
 
     This depends on where target libdirs live relative to the rustc compiler.
     It is possible that the target libdirs may move to a location separate
-    from where the host tools reside.  See https://fxbug.dev/111727.
+    from where the host tools reside.  See https://fxbug.dev/42063018.
     """
     return Path("lib") / "rustlib" / target_triple / "lib"
 
@@ -401,7 +401,7 @@ def remote_clang_linker_toolchain_inputs(
 
     Kludge: partially hardcode built-in libraries until linker tools can
     quickly discover the needed libraries to link remotely.
-    See https://fxbug.dev/135168
+    See https://fxbug.dev/42084853
 
     Yields:
       Paths to libraries needed for linking.

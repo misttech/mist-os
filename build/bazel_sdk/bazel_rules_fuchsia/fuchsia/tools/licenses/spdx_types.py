@@ -67,7 +67,7 @@ class SpdxLicenseExpression:
                 location_for_error,
             )
 
-        # Temporary workaround for https://fxbug.dev/117652#c3. Only the last ref is meaningful
+        # Temporary workaround for https://fxbug.dev/42068819#c3. Only the last ref is meaningful
         if len(license_refs) > 1:
             key_list = list(license_refs.keys())
             if key_list[0].endswith("NOTICE.txt-0") and key_list[-1].endswith(

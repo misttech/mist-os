@@ -62,7 +62,7 @@ if (use_bringup_assembly) {
     "keys/targets.json",
     "keys/timestamp.json",
 
-    # Extra metadata files for TUF-1.0 compliance (https://fxbug.dev/38262)
+    # Extra metadata files for TUF-1.0 compliance (https://fxbug.dev/42113993)
     "repository/1.root.json",
     "repository/2.root.json",
     "repository/3.root.json",

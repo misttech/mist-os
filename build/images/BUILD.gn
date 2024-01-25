@@ -119,7 +119,7 @@ group("fuchsia.vbmeta") {
 
 # Pseudo-target to record information about the sizes of filesystems assembled
 # during the build for later analysis.
-# TODO(https://fxbug.dev/81871): Only include this for builds that generate blobfs
+# TODO(https://fxbug.dev/42162374): Only include this for builds that generate blobfs
 # once this targets is no longer hardcoded in infra.
 group("record_filesystem_sizes") {
   testonly = true
@@ -206,7 +206,7 @@ compiled_action("uefi-disk") {
   if (is_coverage) {
     # Images are larger due to coverage overheads, so leave more room.
     #
-    # TODO(https://fxbug.dev/131960): Remove unnecessary packages from coverage
+    # TODO(https://fxbug.dev/42082088): Remove unnecessary packages from coverage
     # builds and reduce image size.
     args += [ "12000000000" ]  # 12GB
   } else {
@@ -319,7 +319,7 @@ group("default-images") {
     deps += [ "archive:netboot-script" ]
   }
 
-  # TODO(https://fxbug.dev/46415): The build graph for "bringup" (use_bringup_assembly)
+  # TODO(https://fxbug.dev/42123048): The build graph for "bringup" (use_bringup_assembly)
   # MUST only contain one zircon-a metadata target, which means that anything
   # reaching fuchsia.zbi must be excluded from the build graph.
   if (!use_bringup_assembly) {

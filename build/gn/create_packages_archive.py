@@ -127,7 +127,7 @@ def main():
         depfile_inputs.add(package_manifest_path)
         with open(package_manifest_path) as f:
             package_manifest = json_load(PackageManifest, f)
-        # TODO(https://fxbug.dev/98482) extract this into a constructor for PackageManifest?
+        # TODO(https://fxbug.dev/42180820) extract this into a constructor for PackageManifest?
         for blob_entry in package_manifest.blobs:
             src = blob_entry.source_path
             if package_manifest.blob_sources_relative == "file":

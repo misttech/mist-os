@@ -198,7 +198,7 @@ template("_fidl_cpp_library_impl") {
     # the generated code with potentially stricter warnings, so we need to ensure
     # that the code works in their diverse environments.
     #
-    # TODO(https://fxbug.dev/120888): Remove -Wshadow when all SDK code builds with that flag.
+    # TODO(https://fxbug.dev/42071929): Remove -Wshadow when all SDK code builds with that flag.
     cflags_cc = [ "-Wshadow" ]
     configs += [ "//build/config:sdk_extra_warnings" ]
 

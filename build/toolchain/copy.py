@@ -3,7 +3,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 """Emulation of `rm -f out && cp -af` in out. This is necessary on Mac in order
-to preserve nanoseconds of mtime. See https://fxbug.dev/56376#c5."""
+to preserve nanoseconds of mtime. See https://fxbug.dev/42134108#c5."""
 
 import os
 import shutil

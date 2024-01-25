@@ -35,7 +35,7 @@ def main():
         ] = f"{_BAZEL_INPUT_WORKSPACE_ROOT}/{args.key_dir}/key_metadata.bin"
 
     # It is possible for `--output` to be a hardlink of `--images-config`
-    # (input), so unlink to avoid writing inputs. See https://fxbug.dev/122948.
+    # (input), so unlink to avoid writing inputs. See https://fxbug.dev/42073882.
     if os.path.exists(args.output):
         os.unlink(args.output)
     with open(args.output, "w") as f:
