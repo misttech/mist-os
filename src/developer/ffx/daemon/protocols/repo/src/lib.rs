@@ -12,7 +12,8 @@ use {
     fidl::endpoints::ServerEnd,
     fidl_fuchsia_developer_ffx as ffx,
     fidl_fuchsia_developer_ffx_ext::{
-        RepositoryRegistrationAliasConflictMode, RepositorySpec, RepositoryTarget, ServerStatus,
+        self as ffx_ext, PackageEntry, RepositoryPackage, RepositoryRegistrationAliasConflictMode,
+        RepositoryTarget, ServerStatus,
     },
     fidl_fuchsia_net_ext::SocketAddress,
     fidl_fuchsia_pkg::RepositoryManagerMarker,
@@ -21,7 +22,7 @@ use {
     fuchsia_async as fasync,
     fuchsia_repo::{
         repo_client::RepoClient,
-        repository::{self, FileSystemRepository, HttpRepository, PmRepository, RepoProvider},
+        repository::{self, RepoProvider, RepositorySpec},
     },
     fuchsia_zircon_types::ZX_CHANNEL_MAX_MSG_BYTES,
     futures::{FutureExt as _, StreamExt as _},
@@ -29,19 +30,12 @@ use {
     pkg::config as pkg_config,
     pkg::metrics,
     pkg::repo::{
-        aliases_to_rules, create_repo_host, register_target_with_fidl_proxies, update_repository,
-        Registrar, RepoInner, SaveConfig, ServerState,
+        aliases_to_rules, create_repo_host, register_target_with_fidl_proxies,
+        repo_spec_to_backend, update_repository, Registrar, RepoInner, SaveConfig, ServerState,
     },
     protocols::prelude::*,
     shared_child::SharedChild,
-    std::{
-        convert::{TryFrom, TryInto},
-        net::SocketAddr,
-        rc::Rc,
-        sync::Arc,
-        time::Duration,
-    },
-    url::Url,
+    std::{net::SocketAddr, rc::Rc, sync::Arc, time::Duration},
 };
 
 const PKG_RESOLVER_MONIKER: &str = "/core/pkg-resolver";
@@ -428,51 +422,6 @@ async fn start_tunnel(
     inner.read().await.server.start_tunnel(&cx, &target_nodename).await
 }
 
-async fn repo_spec_to_backend(
-    repo_spec: &RepositorySpec,
-    inner: &Arc<RwLock<RepoInner>>,
-) -> Result<Box<dyn RepoProvider>, ffx::RepositoryError> {
-    match repo_spec {
-        RepositorySpec::FileSystem { metadata_repo_path, blob_repo_path, aliases } => Ok(Box::new(
-            FileSystemRepository::builder(metadata_repo_path.into(), blob_repo_path.into())
-                .aliases(aliases.clone())
-                .build(),
-        )),
-        RepositorySpec::Pm { path, aliases } => {
-            Ok(Box::new(PmRepository::builder(path.into()).aliases(aliases.clone()).build()))
-        }
-        RepositorySpec::Http { metadata_repo_url, blob_repo_url, aliases } => {
-            let metadata_repo_url = Url::parse(metadata_repo_url.as_str()).map_err(|err| {
-                tracing::error!(
-                    "Unable to parse metadata repo url {}: {:#}",
-                    metadata_repo_url,
-                    err
-                );
-                ffx::RepositoryError::InvalidUrl
-            })?;
-
-            let blob_repo_url = Url::parse(blob_repo_url.as_str()).map_err(|err| {
-                tracing::error!("Unable to parse blob repo url {}: {:#}", blob_repo_url, err);
-                ffx::RepositoryError::InvalidUrl
-            })?;
-
-            let https_client = inner.read().await.https_client.clone();
-
-            Ok(Box::new(HttpRepository::new(
-                https_client,
-                metadata_repo_url,
-                blob_repo_url,
-                aliases.clone(),
-            )))
-        }
-        RepositorySpec::Gcs { .. } => {
-            // FIXME(https://fxbug.dev/98994): Implement support for daemon-side GCS repositories.
-            tracing::error!("Trying to register a GCS repository, but that's not supported yet");
-            Err(ffx::RepositoryError::UnknownRepositorySpec)
-        }
-    }
-}
-
 async fn add_repository(
     repo_name: &str,
     repo_spec: &RepositorySpec,
@@ -482,7 +431,9 @@ async fn add_repository(
     tracing::info!("Adding repository {} {:?}", repo_name, repo_spec);
 
     // Create the repository.
-    let backend = repo_spec_to_backend(&repo_spec, &inner).await?;
+    let http_client = inner.read().await.https_client.clone();
+    let backend = repo_spec_to_backend(repo_spec, http_client)?;
+
     let repo = RepoClient::from_trusted_remote(backend).await.map_err(|err| {
         tracing::error!("Unable to create repository: {:#?}", err);
 
@@ -496,7 +447,7 @@ async fn add_repository(
 
     if save_config == SaveConfig::Save {
         // Save the filesystem configuration.
-        pkg::config::set_repository(repo_name, &repo_spec).await.map_err(|err| {
+        pkg::config::set_repository(repo_name, repo_spec).await.map_err(|err| {
             tracing::error!("Failed to save repository: {:#?}", err);
             ffx::RepositoryError::IoError
         })?;
@@ -506,7 +457,7 @@ async fn add_repository(
     let inner = inner.write().await;
     inner.manager.add(repo_name, repo);
 
-    metrics::add_repository_event(&repo_spec).await;
+    metrics::add_repository_event(repo_spec).await;
 
     Ok(())
 }
@@ -632,12 +583,12 @@ impl<T: EventHandlerProvider<R>, R: Registrar> Repo<T, R> {
         &self,
         repository_name: &str,
         iterator: ServerEnd<ffx::RepositoryPackagesIteratorMarker>,
-        include_fields: ffx::ListFields,
+        _include_fields: ffx::ListFields,
     ) -> Result<(), ffx::RepositoryError> {
         let mut stream = match iterator.into_stream() {
             Ok(s) => s,
             Err(e) => {
-                tracing::warn!("error converting iterator to stream: {}", e);
+                tracing::warn!("error converting iterator to stream: {:#?}", e);
                 return Err(ffx::RepositoryError::InternalError);
             }
         };
@@ -651,8 +602,8 @@ impl<T: EventHandlerProvider<R>, R: Registrar> Repo<T, R> {
         // Make sure the repository is up to date.
         update_repository(repository_name, &repo).await?;
 
-        let mut values = repo.read().await.list_packages(include_fields).await.map_err(|err| {
-            tracing::error!("Unable to list packages: {:#?}", err);
+        let packages = repo.read().await.list_packages().await.map_err(|err| {
+            tracing::error!("Unable to list packages: {:#}", err);
 
             match err {
                 repository::Error::Tuf(tuf::Error::ExpiredMetadata(_)) => {
@@ -662,8 +613,13 @@ impl<T: EventHandlerProvider<R>, R: Registrar> Repo<T, R> {
             }
         })?;
 
+        let mut packages = packages
+            .into_iter()
+            .map(|package| RepositoryPackage::from(package).into())
+            .collect::<Vec<ffx::RepositoryPackage>>();
+
         fasync::Task::spawn(async move {
-            let mut chunks = SliceChunker::new(&mut values);
+            let mut chunks = SliceChunker::new(&mut packages);
 
             while let Some(request) = stream.next().await {
                 match request {
@@ -720,17 +676,22 @@ impl<T: EventHandlerProvider<R>, R: Registrar> Repo<T, R> {
         // Make sure the repository is up to date.
         update_repository(repository_name, &repo).await?;
 
-        let values =
-            repo.read().await.show_package(package_name.to_owned()).await.map_err(|err| {
-                tracing::error!("Unable to list package contents {:?}: {}", package_name, err);
-                ffx::RepositoryError::IoError
-            })?;
-        let Some(mut values) = values else {
+        let entries = repo.read().await.show_package(&package_name).await.map_err(|err| {
+            tracing::error!("Unable to list package contents {:?}: {:#}", package_name, err);
+            ffx::RepositoryError::IoError
+        })?;
+
+        let Some(entries) = entries else {
             return Err(ffx::RepositoryError::NoMatchingPackage);
         };
 
+        let mut entries = entries
+            .into_iter()
+            .map(|entry| ffx::PackageEntry::from(PackageEntry::from(entry)))
+            .collect::<Vec<_>>();
+
         fasync::Task::spawn(async move {
-            let mut chunks = SliceChunker::new(&mut values);
+            let mut chunks = SliceChunker::new(&mut entries);
 
             while let Some(request) = stream.next().await {
                 match request {
@@ -876,8 +837,9 @@ impl<
                 Ok(())
             }
             ffx::RepositoryRegistryRequest::AddRepository { name, repository, responder } => {
-                let res = match repository.try_into() {
+                let res = match ffx_ext::RepositorySpec::try_from(repository) {
                     Ok(repo_spec) => {
+                        let repo_spec = RepositorySpec::from(repo_spec);
                         add_repository(&name, &repo_spec, SaveConfig::Save, Arc::clone(&self.inner))
                             .await
                     }
@@ -964,7 +926,9 @@ impl<
                 for (name, repo) in repositories {
                     values.push(ffx::RepositoryConfig {
                         name,
-                        spec: repo.read().await.spec().into(),
+                        spec: ffx::RepositorySpec::from(ffx_ext::RepositorySpec::from(
+                            repo.read().await.spec(),
+                        )),
                     });
                 }
 
@@ -1349,7 +1313,6 @@ mod tests {
         },
         fidl_fuchsia_pkg_rewrite_ext::Rule,
         fidl_fuchsia_posix_socket as fsock,
-        fuchsia_repo::{manager::RepositoryManager, server::RepositoryServer},
         futures::TryStreamExt,
         pretty_assertions::assert_eq,
         protocols::testing::FakeDaemonBuilder,
@@ -1959,19 +1922,8 @@ mod tests {
         }
     }
 
-    fn filesystem_repo_spec() -> RepositorySpec {
-        let repo = fs::canonicalize(EMPTY_REPO_PATH).unwrap();
-        let metadata_repo_path = repo.join("repository");
-        let blob_repo_path = metadata_repo_path.join("blobs");
-        RepositorySpec::FileSystem {
-            metadata_repo_path: metadata_repo_path.try_into().unwrap(),
-            blob_repo_path: blob_repo_path.try_into().unwrap(),
-            aliases: BTreeSet::new(),
-        }
-    }
-
     async fn add_repo(proxy: &ffx::RepositoryRegistryProxy, repo_name: &str) {
-        let spec = pm_repo_spec();
+        let spec = ffx_ext::RepositorySpec::from(pm_repo_spec());
         proxy
             .add_repository(repo_name, &spec.into())
             .await
@@ -4744,83 +4696,5 @@ mod tests {
                 );
             }
         }
-    }
-
-    #[test]
-    fn test_pm_repo_spec_to_backend() {
-        run_test(TestRunMode::Fidl, async {
-            let repo = RepoInner::new();
-            let spec = pm_repo_spec();
-            let backend = repo_spec_to_backend(&spec, &repo).await.unwrap();
-            assert_eq!(spec, backend.spec());
-        })
-    }
-
-    #[test]
-    fn test_filesystem_repo_spec_to_backend() {
-        run_test(TestRunMode::Fidl, async {
-            let repo = RepoInner::new();
-            let spec = filesystem_repo_spec();
-            let backend = repo_spec_to_backend(&spec, &repo).await.unwrap();
-            assert_eq!(spec, backend.spec());
-        })
-    }
-
-    #[test]
-    fn test_http_repo_spec_to_backend() {
-        run_test(TestRunMode::Fidl, async {
-            // Serve the empty repository
-            let repo_path = fs::canonicalize(EMPTY_REPO_PATH).unwrap();
-            let pm_backend = PmRepository::new(repo_path.try_into().unwrap());
-
-            let pm_repo =
-                RepoClient::from_trusted_remote(Box::new(pm_backend) as Box<_>).await.unwrap();
-            let manager = RepositoryManager::new();
-            manager.add("tuf", pm_repo);
-
-            let addr = (Ipv4Addr::LOCALHOST, 0).into();
-            let (server_fut, _, server) =
-                RepositoryServer::builder(addr, Arc::clone(&manager)).start().await.unwrap();
-
-            // Run the server in the background.
-            let _task = fasync::Task::local(server_fut);
-
-            let http_spec = RepositorySpec::Http {
-                metadata_repo_url: server.local_url() + "/tuf/",
-                blob_repo_url: server.local_url() + "/tuf/blobs/",
-                aliases: BTreeSet::new(),
-            };
-
-            let repo = RepoInner::new();
-            let http_backend = repo_spec_to_backend(&http_spec, &repo).await.unwrap();
-            assert_eq!(http_spec, http_backend.spec());
-
-            // It rejects invalid urls.
-            assert_matches!(
-                repo_spec_to_backend(
-                    &RepositorySpec::Http {
-                        metadata_repo_url: "hello there".to_string(),
-                        blob_repo_url: server.local_url() + "/tuf/blobs",
-                        aliases: BTreeSet::new(),
-                    },
-                    &repo
-                )
-                .await,
-                Err(ffx::RepositoryError::InvalidUrl)
-            );
-
-            assert_matches!(
-                repo_spec_to_backend(
-                    &RepositorySpec::Http {
-                        metadata_repo_url: server.local_url() + "/tuf",
-                        blob_repo_url: "hello there".to_string(),
-                        aliases: BTreeSet::new(),
-                    },
-                    &repo
-                )
-                .await,
-                Err(ffx::RepositoryError::InvalidUrl)
-            );
-        })
     }
 }

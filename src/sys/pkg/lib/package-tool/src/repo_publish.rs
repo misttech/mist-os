@@ -10,16 +10,13 @@ use {
     anyhow::{format_err, Context, Result},
     camino::{Utf8Path, Utf8PathBuf},
     chrono::{TimeZone, Utc},
-    fidl_fuchsia_developer_ffx::ListFields,
-    fidl_fuchsia_developer_ffx_ext::RepositoryPackage,
     fuchsia_async as fasync,
-    fuchsia_hash::Hash,
     fuchsia_lockfile::Lockfile,
     fuchsia_pkg::{PackageManifest, PackageManifestError, PackageManifestList},
     fuchsia_repo::{
         package_manifest_watcher::PackageManifestWatcher,
         repo_builder::RepoBuilder,
-        repo_client::RepoClient,
+        repo_client::{RepoClient, RepositoryPackage},
         repo_keys::RepoKeys,
         repository::{Error as RepoError, PmRepository},
     },
@@ -29,7 +26,6 @@ use {
         collections::BTreeSet,
         fs::{create_dir_all, File},
         io::{BufReader, BufWriter},
-        str::FromStr,
     },
     tracing::{error, info, warn},
     tuf::{
@@ -170,20 +166,17 @@ pub async fn repo_package_manifest_list(
 
         client.update().await.context("updating the src repo metadata")?;
 
-        let packages =
-            client.list_packages(ListFields::empty()).await.context("listing packages")?;
+        let packages = client.list_packages().await.context("listing packages")?;
 
         for package in packages {
             let package = RepositoryPackage::from(package);
 
-            let hash = package.hash.clone().expect("package should have hash for meta.far");
-
             let package_manifest_path =
-                manifests_dir.join(format!("{}_package_manifest.json", hash));
+                manifests_dir.join(format!("{}_package_manifest.json", package.hash));
 
             let package_manifest = PackageManifest::from_blobs_dir(
                 blobs_dir.as_std_path(),
-                Hash::from_str(&hash)?,
+                package.hash,
                 manifests_dir.as_std_path(),
             )?;
 

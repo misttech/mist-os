@@ -8,7 +8,7 @@ use {
     ffx_core::ffx_plugin,
     ffx_repository_add_args::AddCommand,
     fidl_fuchsia_developer_ffx::RepositoryRegistryProxy,
-    fidl_fuchsia_developer_ffx_ext::RepositoryError,
+    fidl_fuchsia_developer_ffx_ext::{RepositoryError, RepositorySpec},
     fuchsia_repo::repository::RepoProvider,
     fuchsia_url::RepositoryUrl,
     sdk_metadata::get_repositories,
@@ -35,7 +35,9 @@ pub async fn add_from_product(cmd: AddCommand, repos: RepositoryRegistryProxy) -
 
         let repo_name = repo_url.host();
 
-        match repos.add_repository(repo_name, &repository.spec().into()).await? {
+        let repo_spec = RepositorySpec::from(repository.spec().clone()).into();
+
+        match repos.add_repository(repo_name, &repo_spec).await? {
             Ok(()) => {
                 println!("added repository {}", repo_name);
             }

@@ -23,7 +23,6 @@ use anyhow::{anyhow, Context, Result};
 use assembly_manifest::Image;
 use assembly_partitions_config::PartitionsConfig;
 use camino::{Utf8Path, Utf8PathBuf};
-use fidl_fuchsia_developer_ffx::ListFields;
 use fuchsia_merkle::Hash;
 use fuchsia_repo::{repo_client::RepoClient, repository::FileSystemRepository};
 use pathdiff::diff_utf8_paths;
@@ -121,15 +120,14 @@ impl Repository {
         let mut client =
             RepoClient::from_trusted_remote(&repo).await.context("creating the repo client")?;
         client.update().await.context("updating the repo metadata")?;
-        let packages =
-            client.list_packages(ListFields::empty()).await.context("listing packages")?;
+        let packages = client.list_packages().await.context("listing packages")?;
         for package in &packages {
-            if let Some(name) = &package.name {
-                if let Some(blobs) =
-                    client.show_package(name.clone()).await.context("showing package")?
-                {
-                    all_blobs.extend(blobs.iter().filter_map(|e| e.hash.clone()).map(|p| p.into()));
-                }
+            if let Some(blobs) =
+                client.show_package(&package.name).await.context("showing package")?
+            {
+                all_blobs.extend(
+                    blobs.iter().filter_map(|e| e.hash.map(|hash| hash.to_string().into())),
+                );
             }
         }
         Ok(all_blobs)

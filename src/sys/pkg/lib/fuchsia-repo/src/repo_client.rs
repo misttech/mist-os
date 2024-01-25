@@ -5,17 +5,17 @@
 use {
     crate::{
         range::Range,
-        repository::{Error, RepoProvider},
+        repository::{Error, RepoProvider, RepositorySpec},
         resource::Resource,
     },
     anyhow::{anyhow, Context as _, Result},
     chrono::{DateTime, Utc},
-    fidl_fuchsia_developer_ffx::{ListFields, PackageEntry, RepositoryPackage},
     fidl_fuchsia_pkg_ext::{
         MirrorConfigBuilder, RepositoryConfig, RepositoryConfigBuilder, RepositoryKey,
         RepositoryStorageType,
     },
     fuchsia_fs::file::Adapter,
+    fuchsia_hash::Hash,
     fuchsia_pkg::MetaContents,
     fuchsia_url::RepositoryUrl,
     futures::{
@@ -25,7 +25,7 @@ use {
         AsyncRead, AsyncReadExt as _, FutureExt as _, StreamExt as _, TryStreamExt as _,
     },
     std::{
-        collections::BTreeSet,
+        collections::{BTreeSet, HashMap},
         fmt::{self, Debug},
         time::SystemTime,
     },
@@ -45,9 +45,6 @@ use {
         Database,
     },
 };
-
-#[cfg(not(target_os = "fuchsia"))]
-use fidl_fuchsia_developer_ffx_ext::RepositorySpec;
 
 const LIST_PACKAGE_CONCURRENCY: usize = 5;
 
@@ -214,111 +211,94 @@ where
         Ok(repo_config)
     }
 
-    async fn get_components_for_package(
-        &self,
-        trusted_targets: &Verified<TargetsMetadata>,
-        package: &RepositoryPackage,
-    ) -> Result<Option<Vec<PackageEntry>>> {
-        let package_entries = self
-            .show_target_package(trusted_targets, package.name.as_ref().unwrap().to_string())
-            .await?;
-
-        if package_entries.is_none() {
-            return Ok(None);
-        }
-
-        let components = package_entries
-            .unwrap()
-            .into_iter()
-            .filter(|e| is_component_manifest(e.path.as_ref().unwrap()))
-            .collect();
-
-        Ok(Some(components))
-    }
-
-    pub async fn list_packages(
-        &self,
-        include_fields: ListFields,
-    ) -> Result<Vec<RepositoryPackage>, Error> {
+    pub async fn list_packages(&self) -> Result<Vec<RepositoryPackage>, Error> {
         let trusted_targets =
             self.tuf_client.database().trusted_targets().context("missing target information")?;
 
         let mut packages = vec![];
         for (package_name, package_description) in trusted_targets.targets() {
             let meta_far_size = package_description.length();
-            let meta_far_hash =
-                if let Some(meta_far_hash) = package_description.custom().get("merkle") {
-                    meta_far_hash.as_str().unwrap_or("").to_string()
-                } else {
-                    continue;
-                };
+            let Some(meta_far_hash_str) = package_description.custom().get("merkle") else {
+                continue;
+            };
+
+            let meta_far_hash_str = meta_far_hash_str.as_str().ok_or_else(|| {
+                anyhow!(
+                    "package {:?} hash should be a string, not {:?}",
+                    package_name,
+                    meta_far_hash_str
+                )
+            })?;
+
+            let meta_far_hash = Hash::try_from(meta_far_hash_str)?;
 
             let mut bytes = vec![];
-            self.fetch_blob(&meta_far_hash)
+            self.fetch_blob(&meta_far_hash_str)
                 .await
-                .with_context(|| format!("fetching blob {meta_far_hash}"))?
+                .with_context(|| format!("fetching meta.far blob {meta_far_hash_str}"))?
                 .read_to_end(&mut bytes)
                 .await
-                .with_context(|| format!("reading blob {meta_far_hash}"))?;
+                .with_context(|| format!("reading meta.far blob {meta_far_hash_str}"))?;
 
             let mut archive =
                 fuchsia_archive::AsyncUtf8Reader::new(Adapter::new(Cursor::new(bytes))).await?;
-            let contents = archive.read_file("meta/contents").await?;
-            let contents = MetaContents::deserialize(contents.as_slice())?;
+
+            let contents = archive
+                .read_file("meta/contents")
+                .await
+                .with_context(|| format!("reading 'meta/contents' from {meta_far_hash_str}"))?;
+
+            let contents = MetaContents::deserialize(contents.as_slice()).with_context(|| {
+                format!("deserializing 'meta/contents' from {meta_far_hash_str}")
+            })?;
 
             // Concurrently fetch the package blob sizes.
             // FIXME(https://fxbug.dev/97192): Use work queue so we can globally control the
             // concurrency here, rather than limiting fetches per call.
             let mut tasks = stream::iter(contents.contents().iter().map(|(_, hash)| async move {
-                self.tuf_client.remote_repo().blob_len(&hash.to_string()).await
+                let blob_size = self
+                    .tuf_client
+                    .remote_repo()
+                    .blob_len(&hash.to_string())
+                    .await
+                    .with_context(|| format!("fetching length of blob {hash}"))?;
+                Ok::<_, anyhow::Error>((hash, blob_size))
             }))
             .buffer_unordered(LIST_PACKAGE_CONCURRENCY);
 
+            let mut blob_sizes = HashMap::new();
+            while let Some((blob, blob_size)) = tasks.try_next().await? {
+                blob_sizes.insert(blob, blob_size);
+            }
             let mut size = meta_far_size;
-            while let Some(blob_len) = tasks.try_next().await? {
-                size += blob_len;
+            for blob_size in blob_sizes.values() {
+                size += blob_size;
             }
 
             // Determine when the meta.far was created.
             let meta_far_modified = self
                 .tuf_client
                 .remote_repo()
-                .blob_modification_time(&meta_far_hash)
+                .blob_modification_time(&meta_far_hash_str)
                 .await
-                .with_context(|| format!("fetching blob modification time {meta_far_hash}"))?
+                .with_context(|| format!("fetching blob modification time {meta_far_hash_str}"))?
                 .map(|x| -> anyhow::Result<u64> {
                     Ok(x.duration_since(SystemTime::UNIX_EPOCH)?.as_secs())
                 })
                 .transpose()?;
 
             packages.push(RepositoryPackage {
-                name: Some(package_name.to_string()),
+                name: package_name.to_string(),
+                hash: meta_far_hash,
                 size: Some(size),
-                hash: Some(meta_far_hash),
                 modified: meta_far_modified,
-                ..Default::default()
             });
-        }
-
-        if include_fields.intersects(ListFields::COMPONENTS) {
-            for package in packages.iter_mut() {
-                match self.get_components_for_package(trusted_targets, package).await {
-                    Ok(components) => package.entries = components,
-                    Err(e) => {
-                        tracing::error!(
-                            "failed to get components for package '{}': {}",
-                            package.name.as_ref().unwrap_or(&String::from("<unknown>")),
-                            e
-                        )
-                    }
-                };
-            }
         }
 
         Ok(packages)
     }
 
-    pub async fn show_package(&self, package_name: String) -> Result<Option<Vec<PackageEntry>>> {
+    pub async fn show_package(&self, package_name: &str) -> Result<Option<Vec<PackageEntry>>> {
         let trusted_targets =
             self.tuf_client.database().trusted_targets().context("expected targets information")?;
 
@@ -328,9 +308,9 @@ where
     async fn show_target_package(
         &self,
         trusted_targets: &Verified<TargetsMetadata>,
-        package_name: String,
+        package_name: &str,
     ) -> Result<Option<Vec<PackageEntry>>> {
-        let target_path = TargetPath::new(&package_name)?;
+        let target_path = TargetPath::new(package_name)?;
         let target = if let Some(target) = trusted_targets.targets().get(&target_path) {
             target
         } else {
@@ -340,20 +320,19 @@ where
         let size = target.length();
         let custom = target.custom();
 
-        let hash = custom
+        let hash_str = custom
             .get("merkle")
             .ok_or_else(|| anyhow!("package {:?} is missing the `merkle` field", package_name))?;
 
-        let hash = hash
-            .as_str()
-            .ok_or_else(|| {
-                anyhow!("package {:?} hash should be a string, not {:?}", package_name, hash)
-            })?
-            .to_string();
+        let hash_str = hash_str.as_str().ok_or_else(|| {
+            anyhow!("package {:?} hash should be a string, not {:?}", package_name, hash_str)
+        })?;
+
+        let hash = Hash::try_from(hash_str)?;
 
         // Read the meta.far.
         let mut meta_far_bytes = vec![];
-        self.fetch_blob(&hash)
+        self.fetch_blob(&hash_str)
             .await
             .with_context(|| format!("fetching blob {hash}"))?
             .read_to_end(&mut meta_far_bytes)
@@ -367,7 +346,7 @@ where
         let modified = self
             .tuf_client
             .remote_repo()
-            .blob_modification_time(&hash)
+            .blob_modification_time(&hash_str)
             .await?
             .map(|x| -> anyhow::Result<u64> {
                 Ok(x.duration_since(SystemTime::UNIX_EPOCH)?.as_secs())
@@ -376,15 +355,14 @@ where
 
         // Add entry for meta.far
         let mut entries = vec![PackageEntry {
-            path: Some("meta.far".to_string()),
+            path: "meta.far".to_string(),
             hash: Some(hash),
             size: Some(size),
             modified,
-            ..Default::default()
         }];
 
         entries.extend(archive.list().map(|item| PackageEntry {
-            path: Some(item.path().to_string()),
+            path: item.path().to_string(),
             size: Some(item.length()),
             modified,
             ..Default::default()
@@ -394,12 +372,13 @@ where
             Ok(c) => {
                 let contents = MetaContents::deserialize(c.as_slice())?;
                 for (name, hash) in contents.contents() {
-                    let hash_string = hash.to_string();
-                    let size = self.tuf_client.remote_repo().blob_len(&hash_string).await?;
+                    let hash_str = hash.to_string();
+                    let size = self.tuf_client.remote_repo().blob_len(&hash_str).await?;
+
                     let modified = self
                         .tuf_client
                         .remote_repo()
-                        .blob_modification_time(&hash_string)
+                        .blob_modification_time(&hash_str)
                         .await?
                         .map(|x| -> anyhow::Result<u64> {
                             Ok(x.duration_since(SystemTime::UNIX_EPOCH)?.as_secs())
@@ -407,11 +386,10 @@ where
                         .transpose()?;
 
                     entries.push(PackageEntry {
-                        path: Some(name.to_owned()),
-                        hash: Some(hash_string),
+                        path: name.to_owned(),
+                        hash: Some(*hash),
                         size: Some(size),
                         modified,
-                        ..Default::default()
                     });
                 }
             }
@@ -523,10 +501,6 @@ where
     }
 }
 
-fn is_component_manifest(s: &str) -> bool {
-    s.ends_with(".cm")
-}
-
 pub(crate) async fn get_tuf_client<R>(
     tuf_repo: R,
 ) -> Result<TufClient<Pouf1, EphemeralRepository<Pouf1>, R>, Error>
@@ -560,6 +534,38 @@ where
             .await?;
 
     Ok(client)
+}
+
+/// This describes the metadata about a package.
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, serde::Serialize)]
+pub struct RepositoryPackage {
+    /// The package name.
+    pub name: String,
+
+    /// The package merkle hash (the hash of the `meta.far`).
+    pub hash: Hash,
+
+    /// The total size in bytes of all the blobs in this package if known.
+    pub size: Option<u64>,
+
+    /// The last modification timestamp (seconds since UNIX epoch) if known.
+    pub modified: Option<u64>,
+}
+
+/// This describes the metadata about a blob in a package.
+#[derive(Debug, Default, PartialEq, Eq, PartialOrd, Ord, serde::Serialize)]
+pub struct PackageEntry {
+    /// The path inside the package namespace.
+    pub path: String,
+
+    /// The merkle hash of the file. If `None`, the file is in the `meta.far`.
+    pub hash: Option<Hash>,
+
+    /// The size of the blob, if known.
+    pub size: Option<u64>,
+
+    /// The last modification timestamp (seconds since UNIX epoch) if known.
+    pub modified: Option<u64>,
 }
 
 #[cfg(test)]
@@ -667,7 +673,7 @@ mod tests {
         let pkg1_modified = get_modtime(dir.join("repository").join("blobs").join(PKG1_HASH));
         let pkg2_modified = get_modtime(dir.join("repository").join("blobs").join(PKG2_HASH));
 
-        let mut packages = repo.list_packages(ListFields::empty()).await.unwrap();
+        let mut packages = repo.list_packages().await.unwrap();
 
         // list_packages returns the contents out of order. Sort the entries so they are consistent.
         packages.sort_unstable_by(|lhs, rhs| lhs.name.cmp(&rhs.name));
@@ -676,73 +682,16 @@ mod tests {
             packages,
             vec![
                 RepositoryPackage {
-                    name: Some("package1/0".into()),
-                    hash: Some(PKG1_HASH.into()),
+                    name: "package1/0".into(),
+                    hash: PKG1_HASH.try_into().unwrap(),
                     size: Some(24603),
                     modified: Some(pkg1_modified),
-                    entries: None,
-                    ..Default::default()
                 },
                 RepositoryPackage {
-                    name: Some("package2/0".into()),
-                    hash: Some(PKG2_HASH.into()),
+                    name: "package2/0".into(),
+                    hash: PKG2_HASH.try_into().unwrap(),
                     size: Some(24603),
                     modified: Some(pkg2_modified),
-                    entries: None,
-                    ..Default::default()
-                },
-            ],
-        );
-    }
-
-    #[fuchsia_async::run_singlethreaded(test)]
-    async fn test_list_packages_with_components() {
-        let tmp = tempfile::tempdir().unwrap();
-        let dir = Utf8Path::from_path(tmp.path()).unwrap();
-
-        let backend = make_pm_repository(&dir).await;
-        let mut repo = RepoClient::from_trusted_remote(backend).await.unwrap();
-        repo.update().await.unwrap();
-
-        // Look up the timestamp for the meta.far for the modified setting.
-        let pkg1_modified = get_modtime(dir.join("repository").join("blobs").join(PKG1_HASH));
-        let pkg2_modified = get_modtime(dir.join("repository").join("blobs").join(PKG2_HASH));
-
-        let mut packages = repo.list_packages(ListFields::COMPONENTS).await.unwrap();
-
-        // list_packages returns the contents out of order. Sort the entries so they are consistent.
-        packages.sort_unstable_by(|lhs, rhs| lhs.name.cmp(&rhs.name));
-
-        assert_eq!(
-            packages,
-            vec![
-                RepositoryPackage {
-                    name: Some("package1/0".into()),
-                    hash: Some(PKG1_HASH.into()),
-                    size: Some(24603),
-                    modified: Some(pkg1_modified),
-                    entries: Some(vec![PackageEntry {
-                        path: Some("meta/package1.cm".into()),
-                        hash: None,
-                        size: Some(11),
-                        modified: Some(pkg1_modified),
-                        ..Default::default()
-                    },]),
-                    ..Default::default()
-                },
-                RepositoryPackage {
-                    name: Some("package2/0".into()),
-                    hash: Some(PKG2_HASH.into()),
-                    size: Some(24603),
-                    modified: Some(pkg2_modified),
-                    entries: Some(vec![PackageEntry {
-                        path: Some("meta/package2.cm".into()),
-                        hash: None,
-                        size: Some(11),
-                        modified: Some(pkg2_modified),
-                        ..Default::default()
-                    },]),
-                    ..Default::default()
                 },
             ],
         );
@@ -816,60 +765,52 @@ mod tests {
             entries,
             vec![
                 PackageEntry {
-                    path: Some("bin/package1".into()),
-                    hash: Some(PKG1_BIN_HASH.into()),
+                    path: "bin/package1".into(),
+                    hash: Some(PKG1_BIN_HASH.try_into().unwrap()),
                     size: Some(15),
                     modified: Some(bin_modified),
-                    ..Default::default()
                 },
                 PackageEntry {
-                    path: Some("lib/package1".into()),
-                    hash: Some(PKG1_LIB_HASH.into()),
+                    path: "lib/package1".into(),
+                    hash: Some(PKG1_LIB_HASH.try_into().unwrap()),
                     size: Some(12),
                     modified: Some(lib_modified),
-                    ..Default::default()
                 },
                 PackageEntry {
-                    path: Some("meta.far".into()),
-                    hash: Some(PKG1_HASH.into()),
+                    path: "meta.far".into(),
+                    hash: Some(PKG1_HASH.try_into().unwrap()),
                     size: Some(24576),
                     modified: Some(meta_far_modified),
-                    ..Default::default()
                 },
                 PackageEntry {
-                    path: Some("meta/contents".into()),
+                    path: "meta/contents".into(),
                     hash: None,
                     size: Some(156),
                     modified: Some(meta_far_modified),
-                    ..Default::default()
                 },
                 PackageEntry {
-                    path: Some("meta/fuchsia.abi/abi-revision".into()),
+                    path: "meta/fuchsia.abi/abi-revision".into(),
                     hash: None,
                     size: Some(8),
                     modified: Some(meta_far_modified),
-                    ..Default::default()
                 },
                 PackageEntry {
-                    path: Some("meta/package".into()),
+                    path: "meta/package".into(),
                     hash: None,
                     size: Some(33),
                     modified: Some(meta_far_modified),
-                    ..Default::default()
                 },
                 PackageEntry {
-                    path: Some("meta/package1.cm".into()),
+                    path: "meta/package1.cm".into(),
                     hash: None,
                     size: Some(11),
                     modified: Some(meta_far_modified),
-                    ..Default::default()
                 },
                 PackageEntry {
-                    path: Some("meta/package1.cmx".into()),
+                    path: "meta/package1.cmx".into(),
                     hash: None,
                     size: Some(12),
                     modified: Some(meta_far_modified),
-                    ..Default::default()
                 },
             ]
         );

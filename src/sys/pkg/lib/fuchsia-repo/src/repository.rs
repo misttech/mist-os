@@ -8,6 +8,7 @@ use {
     camino::{Utf8Path, Utf8PathBuf},
     fuchsia_merkle::Hash,
     futures::{future::BoxFuture, stream::BoxStream},
+    serde::{Deserialize, Serialize},
     std::{collections::BTreeSet, fmt::Debug, io, sync::Arc, time::SystemTime},
     tuf::{
         pouf::Pouf1, repository::RepositoryProvider as TufRepositoryProvider,
@@ -15,9 +16,6 @@ use {
     },
     url::ParseError,
 };
-
-#[cfg(not(target_os = "fuchsia"))]
-use fidl_fuchsia_developer_ffx_ext::RepositorySpec;
 
 mod file_system;
 mod pm;
@@ -70,6 +68,8 @@ pub enum Error {
     Other(#[from] anyhow::Error),
     #[error("range not satisfiable")]
     RangeNotSatisfiable,
+    #[error(transparent)]
+    Hash(#[from] fuchsia_hash::ParseHashError),
 }
 
 impl From<ParseError> for Error {
@@ -210,3 +210,35 @@ impl_storage!(<T: RepoStorage + ?Sized> RepoStorage for &T);
 impl_storage!(<T: RepoStorage + ?Sized> RepoStorage for &mut T);
 impl_storage!(<T: RepoStorage + ?Sized> RepoStorage for Box<T>);
 impl_storage!(<T: RepoStorage + ?Sized> RepoStorage for Arc<T>);
+
+/// RepositorySpec describes all the different supported repositories.
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[serde(tag = "type", rename_all = "snake_case")]
+pub enum RepositorySpec {
+    FileSystem {
+        metadata_repo_path: Utf8PathBuf,
+        blob_repo_path: Utf8PathBuf,
+        #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
+        aliases: BTreeSet<String>,
+    },
+
+    Pm {
+        path: Utf8PathBuf,
+        #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
+        aliases: BTreeSet<String>,
+    },
+
+    Http {
+        metadata_repo_url: String,
+        blob_repo_url: String,
+        #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
+        aliases: BTreeSet<String>,
+    },
+
+    Gcs {
+        metadata_repo_url: String,
+        blob_repo_url: String,
+        #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
+        aliases: BTreeSet<String>,
+    },
+}

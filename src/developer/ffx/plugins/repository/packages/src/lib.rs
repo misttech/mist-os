@@ -2,22 +2,25 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use anyhow::{anyhow, Context, Result};
-use chrono::{offset::Utc, DateTime};
-use errors::ffx_bail;
-use ffx_core::ffx_plugin;
-use ffx_repository_packages_args::{
-    ListSubCommand, PackagesCommand, PackagesSubCommand, ShowSubCommand,
+use {
+    anyhow::{Context as _, Result},
+    chrono::{offset::Utc, DateTime},
+    errors::ffx_bail,
+    ffx_core::ffx_plugin,
+    ffx_repository_packages_args::{
+        ListSubCommand, PackagesCommand, PackagesSubCommand, ShowSubCommand,
+    },
+    ffx_writer::Writer,
+    fuchsia_hyper::new_https_client,
+    fuchsia_repo::{
+        repo_client::{PackageEntry, RepoClient},
+        repository::RepoProvider,
+    },
+    humansize::{file_size_opts, FileSize},
+    pkg::repo::repo_spec_to_backend,
+    prettytable::{cell, format::TableFormat, row, Row, Table},
+    std::time::{Duration, SystemTime},
 };
-use ffx_writer::Writer;
-use fidl_fuchsia_developer_ffx::{
-    ListFields, PackageEntryIteratorMarker, RepositoryPackagesIteratorMarker,
-    RepositoryRegistryProxy,
-};
-use fidl_fuchsia_developer_ffx_ext::{PackageEntry, RepositoryError, RepositoryPackage};
-use humansize::{file_size_opts, FileSize};
-use prettytable::{cell, format::TableFormat, row, Row, Table};
-use std::time::{Duration, SystemTime};
 
 const MAX_HASH: usize = 11;
 
@@ -29,26 +32,31 @@ pub enum PackagesOutput {
     List(RepositoryPackage),
 }
 
+#[derive(PartialEq, Eq, PartialOrd, Ord, serde::Serialize)]
+pub struct RepositoryPackage {
+    name: String,
+    hash: String,
+    size: Option<u64>,
+    modified: Option<u64>,
+    entries: Option<Vec<PackageEntry>>,
+}
+
 #[ffx_plugin(RepositoryRegistryProxy = "daemon::protocol")]
 pub async fn packages(
     cmd: PackagesCommand,
-    repos: RepositoryRegistryProxy,
     #[ffx(machine = Vec<PackagesOutput>)] mut writer: Writer,
 ) -> Result<()> {
     match cmd.subcommand {
-        PackagesSubCommand::List(subcmd) => list_impl(subcmd, repos, None, &mut writer).await,
-        PackagesSubCommand::Show(subcmd) => show_impl(subcmd, repos, None, &mut writer).await,
+        PackagesSubCommand::List(subcmd) => list_impl(subcmd, None, &mut writer).await,
+        PackagesSubCommand::Show(subcmd) => show_impl(subcmd, None, &mut writer).await,
     }
 }
 
 async fn show_impl(
     cmd: ShowSubCommand,
-    repos_proxy: RepositoryRegistryProxy,
     table_format: Option<TableFormat>,
     writer: &mut Writer,
 ) -> Result<()> {
-    let (client, server) = fidl::endpoints::create_endpoints::<PackageEntryIteratorMarker>();
-
     let repo_name = if let Some(repo_name) = cmd.repository.clone() {
         repo_name
     } else if let Some(repo_name) = pkg::config::get_default_repository().await? {
@@ -60,29 +68,15 @@ async fn show_impl(
         )
     };
 
-    match repos_proxy.show_package(&repo_name, &cmd.package, server).await? {
-        Ok(()) => {}
-        Err(err) => match RepositoryError::from(err) {
-            RepositoryError::NoMatchingRepository => {
-                ffx_bail!("repository {:?} does not exist", repo_name)
-            }
-            err => ffx_bail!("error listing contents: {:#}", anyhow!(err)),
-        },
-    }
+    let repo = connect(&repo_name).await?;
 
-    let client = client.into_proxy()?;
-
-    let mut blobs: Vec<PackageEntry> = vec![];
-    loop {
-        let batch = client.next().await.context("fetching next batch of blobs")?;
-        if batch.is_empty() {
-            break;
-        }
-
-        for blob in &batch {
-            blobs.push(blob.into());
-        }
-    }
+    let Some(mut blobs) = repo
+        .show_package(&cmd.package)
+        .await
+        .with_context(|| format!("showing package {}", cmd.package))?
+    else {
+        ffx_bail!("repository {:?} does not contain package {}", repo_name, cmd.package)
+    };
 
     blobs.sort();
 
@@ -113,13 +107,13 @@ fn print_blob_table(
 
     for blob in blobs {
         let row = row!(
-            blob.path.as_deref().unwrap_or("<unknown>"),
+            blob.path,
             blob.size
                 .map(|s| s
                     .file_size(file_size_opts::CONVENTIONAL)
                     .unwrap_or_else(|_| format!("{}b", s)))
                 .unwrap_or_else(|| "<unknown>".to_string()),
-            format_hash(&blob.hash, cmd.full_hash),
+            format_hash(&blob.hash.map(|hash| hash.to_string()), cmd.full_hash),
             blob.modified
                 .and_then(|m| SystemTime::UNIX_EPOCH.checked_add(Duration::from_secs(m)))
                 .map(|m| DateTime::<Utc>::from(m).to_rfc2822())
@@ -138,12 +132,9 @@ fn print_blob_table(
 
 async fn list_impl(
     cmd: ListSubCommand,
-    repos_proxy: RepositoryRegistryProxy,
     table_format: Option<TableFormat>,
     writer: &mut Writer,
 ) -> Result<()> {
-    let (client, server) = fidl::endpoints::create_endpoints::<RepositoryPackagesIteratorMarker>();
-
     let repo_name = if let Some(repo_name) = cmd.repository.clone() {
         repo_name
     } else if let Some(repo_name) = pkg::config::get_default_repository().await? {
@@ -155,35 +146,25 @@ async fn list_impl(
         )
     };
 
-    match repos_proxy
-        .list_packages(
-            &repo_name,
-            server,
-            if cmd.include_components { ListFields::COMPONENTS } else { ListFields::empty() },
-        )
-        .await?
-    {
-        Ok(()) => {}
-        Err(err) => match RepositoryError::from(err) {
-            RepositoryError::NoMatchingRepository => {
-                ffx_bail!("repository {:?} does not exist", repo_name)
-            }
-            err => ffx_bail!("error listing packages: {}", err),
-        },
-    }
+    let repo = connect(&repo_name).await?;
 
-    let client = client.into_proxy()?;
+    let mut packages = vec![];
+    for package in repo.list_packages().await? {
+        let mut package = RepositoryPackage {
+            name: package.name,
+            hash: package.hash.to_string(),
+            size: package.size,
+            modified: package.modified,
+            entries: None,
+        };
 
-    let mut packages: Vec<RepositoryPackage> = vec![];
-    loop {
-        let batch = client.next().await.context("fetching next batch of packages")?;
-        if batch.is_empty() {
-            break;
-        }
+        if cmd.include_components {
+            package.entries = repo.show_package(&package.name).await?.map(|entries| {
+                entries.into_iter().filter(|entry| entry.path.ends_with(".cm")).collect()
+            });
+        };
 
-        for package in batch {
-            packages.push(package.try_into().context("converting repository package")?);
-        }
+        packages.push(package);
     }
 
     packages.sort();
@@ -192,16 +173,38 @@ async fn list_impl(
         let packages = Vec::from_iter(packages.into_iter().map(PackagesOutput::List));
         writer.machine(&packages).context("writing machine representation of packages")?;
     } else {
-        print_package_table(&cmd, &packages, table_format, writer)
+        print_package_table(&cmd, packages, table_format, writer)
             .context("printing repository table")?
     }
 
     Ok(())
 }
 
+async fn connect(repo_name: &str) -> Result<RepoClient<Box<dyn RepoProvider>>> {
+    let Some(repo_spec) = pkg::config::get_repository(&repo_name)
+        .await
+        .with_context(|| format!("Finding repo spec for {repo_name}"))?
+    else {
+        ffx_bail!("No configuration found for {repo_name}")
+    };
+
+    let https_client = new_https_client();
+    let backend = repo_spec_to_backend(&repo_spec, https_client)
+        .with_context(|| format!("Creating a repo backend for {repo_name}"))?;
+
+    let mut repo = RepoClient::from_trusted_remote(backend)
+        .await
+        .with_context(|| format!("Connecting to {repo_name}"))?;
+
+    // Make sure the repository is up to date.
+    repo.update().await.with_context(|| format!("Updating repository {repo_name}"))?;
+
+    Ok(repo)
+}
+
 fn print_package_table(
     cmd: &ListSubCommand,
-    packages: &[RepositoryPackage],
+    packages: Vec<RepositoryPackage>,
     table_format: Option<TableFormat>,
     writer: &mut Writer,
 ) -> Result<()> {
@@ -219,29 +222,26 @@ fn print_package_table(
 
     for pkg in packages {
         let mut row = row!(
-            pkg.name.as_deref().unwrap_or("<unknown>"),
+            pkg.name,
             pkg.size
                 .map(|s| s
                     .file_size(file_size_opts::CONVENTIONAL)
                     .unwrap_or_else(|_| format!("{}b", s)))
                 .unwrap_or_else(|| "<unknown>".to_string()),
-            format_hash(&pkg.hash, cmd.full_hash),
+            format_hash(&Some(pkg.hash), cmd.full_hash),
             pkg.modified
                 .and_then(|m| SystemTime::UNIX_EPOCH.checked_add(Duration::from_secs(m)))
-                .map(|m| DateTime::<Utc>::from(m).to_rfc2822())
+                .map(to_rfc2822)
                 .unwrap_or_else(String::new)
         );
         if cmd.include_components {
-            row.add_cell(cell!(pkg
-                .entries
-                .iter()
-                .map(|p| p
-                    .path
-                    .as_ref()
-                    .cloned()
-                    .unwrap_or_else(|| String::from("<missing manifest path>")))
-                .collect::<Vec<_>>()
-                .join("\n")));
+            if let Some(entries) = pkg.entries {
+                row.add_cell(cell!(entries
+                    .into_iter()
+                    .map(|entry| entry.path)
+                    .collect::<Vec<_>>()
+                    .join("\n")));
+            }
         }
         rows.push(row);
     }
@@ -260,159 +260,55 @@ fn format_hash(hash_value: &Option<String>, full: bool) -> String {
         if full {
             value.to_string()
         } else {
-            let clone = value.to_string();
-            format!("{}...", &clone[..MAX_HASH])
+            value[..MAX_HASH].to_string()
         }
     } else {
-        "unknown".to_string()
+        "<unknown>".to_string()
     }
+}
+
+fn to_rfc2822(time: SystemTime) -> String {
+    DateTime::<Utc>::from(time).to_rfc2822()
 }
 
 #[cfg(test)]
 mod test {
-    use fidl_fuchsia_developer_ffx::PackageEntryIteratorRequest;
-
-    use super::*;
-    use fidl_fuchsia_developer_ffx::{
-        PackageEntry, RepositoryPackage, RepositoryPackagesIteratorRequest,
-        RepositoryRegistryRequest,
+    use {
+        super::*, ffx_config::ConfigLevel, fuchsia_async as fasync, fuchsia_repo::test_utils,
+        pretty_assertions::assert_eq, prettytable::format::FormatBuilder, std::path::Path,
     };
-    use fuchsia_async as fasync;
-    use futures::StreamExt;
-    use prettytable::format::FormatBuilder;
 
-    fn component(names: Vec<&str>) -> Vec<PackageEntry> {
-        names
-            .iter()
-            .map(|n| PackageEntry { path: Some(n.to_string()), ..Default::default() })
-            .collect()
-    }
-    async fn setup_repo_proxy(expected_include_fields: ListFields) -> RepositoryRegistryProxy {
-        setup_fake_repos(move |req| match req {
-            RepositoryRegistryRequest::ListPackages {
-                name,
-                iterator,
-                responder,
-                include_fields,
-            } => {
-                assert_eq!(name, "devhost");
-                assert_eq!(include_fields, expected_include_fields);
+    const PKG1_HASH: &str = "2881455493b5870aaea36537d70a2adc635f516ac2092598f4b6056dabc6b25d";
+    const PKG2_HASH: &str = "050907f009ff634f9aa57bff541fb9e9c2c62b587c23578e77637cda3bd69458";
 
-                fasync::Task::spawn(async move {
-                    let mut sent = false;
-                    let mut iterator = iterator.into_stream().unwrap();
-                    while let Some(Ok(req)) = iterator.next().await {
-                        match req {
-                            RepositoryPackagesIteratorRequest::Next { responder } => {
-                                if !sent {
-                                    sent = true;
-                                    let pkg1_components =
-                                        if include_fields.intersects(ListFields::COMPONENTS) {
-                                            Some(component(vec!["component1"]))
-                                        } else {
-                                            None
-                                        };
-                                    let pkg2_components =
-                                        if include_fields.intersects(ListFields::COMPONENTS) {
-                                            Some(component(vec!["component2", "component3"]))
-                                        } else {
-                                            None
-                                        };
-                                    responder
-                                        .send(&[
-                                            RepositoryPackage {
-                                                name: Some("package1".to_string()),
-                                                size: Some(1),
-                                                hash: Some(
-                                                    "longhashlonghashlonghashlonghash".to_string(),
-                                                ),
-                                                modified: Some(60 * 60 * 24),
-                                                entries: pkg1_components,
-                                                ..Default::default()
-                                            },
-                                            RepositoryPackage {
-                                                name: Some("package2".to_string()),
-                                                size: Some(2048),
-                                                hash: Some(
-                                                    "secondhashsecondhashsecondhash".to_string(),
-                                                ),
-                                                entries: pkg2_components,
-                                                ..Default::default()
-                                            },
-                                        ])
-                                        .unwrap()
-                                } else {
-                                    responder.send(&[]).unwrap()
-                                }
-                            }
-                        }
-                    }
-                })
-                .detach();
-                responder.send(Ok(())).unwrap();
-            }
-            RepositoryRegistryRequest::ShowPackage {
-                repository_name,
-                package_name,
-                iterator,
-                responder,
-            } => {
-                assert_eq!(repository_name, "devhost");
-                assert_eq!(package_name, "package");
+    const PKG1_BIN_HASH: &str = "72e1e7a504f32edf4f23e7e8a3542c1d77d12541142261cfe272decfa75f542d";
+    const PKG1_LIB_HASH: &str = "8a8a5f07f935a4e8e1fd1a1eda39da09bb2438ec0adfb149679ddd6e7e1fbb4f";
 
-                fasync::Task::spawn(async move {
-                    let mut sent = false;
-                    let mut iterator = iterator.into_stream().unwrap();
-                    while let Some(Ok(req)) = iterator.next().await {
-                        match req {
-                            PackageEntryIteratorRequest::Next { responder } => {
-                                if !sent {
-                                    sent = true;
-                                    responder
-                                        .send(&[
-                                            PackageEntry {
-                                                path: Some("meta.far".to_string()),
-                                                size: Some(1),
-                                                hash: Some(
-                                                    "longhashlonghashlonghashlonghash".to_string(),
-                                                ),
-                                                modified: Some(60 * 60 * 24),
-                                                ..Default::default()
-                                            },
-                                            PackageEntry {
-                                                path: Some("blob2".to_string()),
-                                                size: Some(2048),
-                                                hash: Some(
-                                                    "secondhashsecondhashsecondhash".to_string(),
-                                                ),
-                                                ..Default::default()
-                                            },
-                                        ])
-                                        .unwrap()
-                                } else {
-                                    responder.send(&[]).unwrap()
-                                }
-                            }
-                        }
-                    }
-                })
-                .detach();
-                responder.send(Ok(())).unwrap();
-            }
-            other => panic!("Unexpected request: {:?}", other),
-        })
+    async fn setup_repo(path: &Path) -> ffx_config::TestEnv {
+        test_utils::make_pm_repo_dir(path).await;
+
+        let env = ffx_config::test_init().await.unwrap();
+        env.context
+            .query("repository.repositories.devhost.path")
+            .level(Some(ConfigLevel::User))
+            .set(path.to_str().unwrap().into())
+            .await
+            .unwrap();
+
+        env.context
+            .query("repository.repositories.devhost.type")
+            .level(Some(ConfigLevel::User))
+            .set("pm".into())
+            .await
+            .unwrap();
+
+        env
     }
 
     async fn run_impl(cmd: ListSubCommand, writer: &mut Writer) {
-        let repos = setup_repo_proxy(if cmd.include_components {
-            ListFields::COMPONENTS
-        } else {
-            ListFields::empty()
-        })
-        .await;
         timeout::timeout(
             std::time::Duration::from_millis(1000),
-            list_impl(cmd, repos, Some(FormatBuilder::new().padding(1, 1).build()), writer),
+            list_impl(cmd, Some(FormatBuilder::new().padding(1, 1).build()), writer),
         )
         .await
         .unwrap()
@@ -420,11 +316,9 @@ mod test {
     }
 
     async fn run_impl_for_show_command(cmd: ShowSubCommand, writer: &mut Writer) {
-        let repos = setup_repo_proxy(ListFields::empty()).await;
-
         timeout::timeout(
             std::time::Duration::from_millis(1000),
-            show_impl(cmd, repos, Some(FormatBuilder::new().padding(1, 1).build()), writer),
+            show_impl(cmd, Some(FormatBuilder::new().padding(1, 1).build()), writer),
         )
         .await
         .unwrap()
@@ -432,7 +326,10 @@ mod test {
     }
 
     #[fasync::run_singlethreaded(test)]
-    async fn test_package_list_truncated_hash() -> Result<()> {
+    async fn test_package_list_truncated_hash() {
+        let tmp = tempfile::tempdir().unwrap();
+        let _env = setup_repo(tmp.path()).await;
+
         let mut writer = Writer::new_test(None);
 
         run_impl(
@@ -444,19 +341,35 @@ mod test {
             &mut writer,
         )
         .await;
-        let actual = writer.test_output()?;
+
+        let blobs_path = tmp.path().join("repository/blobs");
+
+        let pkg1_hash = &PKG1_HASH[..MAX_HASH];
+        let pkg1_path = blobs_path.join(PKG1_HASH);
+        let pkg1_modified = to_rfc2822(std::fs::metadata(pkg1_path).unwrap().modified().unwrap());
+
+        let pkg2_hash = &PKG2_HASH[..MAX_HASH];
+        let pkg2_path = blobs_path.join(PKG2_HASH);
+        let pkg2_modified = to_rfc2822(std::fs::metadata(pkg2_path).unwrap().modified().unwrap());
+
+        let actual = writer.test_output().unwrap();
         assert_eq!(
             actual,
-            " NAME      SIZE  HASH            MODIFIED \n \
-                          package1  1 B   longhashlon...  Fri, 02 Jan 1970 00:00:00 +0000 \n \
-                          package2  2 KB  secondhashs...   \n"
+            format!(
+                " NAME        SIZE      HASH         MODIFIED \n \
+                package1/0  24.03 KB  {pkg1_hash}  {pkg1_modified} \n \
+                package2/0  24.03 KB  {pkg2_hash}  {pkg2_modified} \n",
+            ),
         );
-        assert!(writer.test_error()?.is_empty());
-        Ok(())
+
+        assert_eq!(writer.test_error().unwrap(), "");
     }
 
     #[fasync::run_singlethreaded(test)]
-    async fn test_package_list_full_hash() -> Result<()> {
+    async fn test_package_list_full_hash() {
+        let tmp = tempfile::tempdir().unwrap();
+        let _env = setup_repo(tmp.path()).await;
+
         let mut writer = Writer::new_test(None);
 
         run_impl(
@@ -468,19 +381,35 @@ mod test {
             &mut writer,
         )
         .await;
-        let actual = writer.test_output()?;
+
+        let blobs_path = tmp.path().join("repository/blobs");
+
+        let pkg1_hash = &PKG1_HASH;
+        let pkg1_path = blobs_path.join(PKG1_HASH);
+        let pkg1_modified = to_rfc2822(std::fs::metadata(pkg1_path).unwrap().modified().unwrap());
+
+        let pkg2_hash = &PKG2_HASH;
+        let pkg2_path = blobs_path.join(PKG2_HASH);
+        let pkg2_modified = to_rfc2822(std::fs::metadata(pkg2_path).unwrap().modified().unwrap());
+
+        let actual = writer.test_output().unwrap();
         assert_eq!(
             actual,
-            " NAME      SIZE  HASH                              MODIFIED \n \
-            package1  1 B   longhashlonghashlonghashlonghash  Fri, 02 Jan 1970 00:00:00 +0000 \n \
-            package2  2 KB  secondhashsecondhashsecondhash     \n"
+            format!(
+                " NAME        SIZE      HASH                                                              MODIFIED \n \
+                package1/0  24.03 KB  {pkg1_hash}  {pkg1_modified} \n \
+                package2/0  24.03 KB  {pkg2_hash}  {pkg2_modified} \n",
+            ),
         );
-        assert!(writer.test_error()?.is_empty());
-        Ok(())
+
+        assert_eq!(writer.test_error().unwrap(), "");
     }
 
     #[fasync::run_singlethreaded(test)]
-    async fn test_package_list_including_components() -> Result<()> {
+    async fn test_package_list_including_components() {
+        let tmp = tempfile::tempdir().unwrap();
+        let _env = setup_repo(tmp.path()).await;
+
         let mut writer = Writer::new_test(None);
 
         run_impl(
@@ -493,61 +422,130 @@ mod test {
         )
         .await;
 
-        let actual = writer.test_output()?;
+        let blobs_path = tmp.path().join("repository/blobs");
 
-        assert_eq!(actual, " NAME      SIZE  HASH            MODIFIED                         COMPONENTS \n \
-                          package1  1 B   longhashlon...  Fri, 02 Jan 1970 00:00:00 +0000  component1 \n \
-                          package2  2 KB  secondhashs...                                   component2 \n                                                                  \
-                                                                                           component3 \n");
-        assert!(writer.test_error()?.is_empty());
-        Ok(())
+        let pkg1_hash = &PKG1_HASH[..MAX_HASH];
+        let pkg1_path = blobs_path.join(PKG1_HASH);
+        let pkg1_modified = to_rfc2822(std::fs::metadata(pkg1_path).unwrap().modified().unwrap());
+
+        let pkg2_hash = &PKG2_HASH[..MAX_HASH];
+        let pkg2_path = blobs_path.join(PKG2_HASH);
+        let pkg2_modified = to_rfc2822(std::fs::metadata(pkg2_path).unwrap().modified().unwrap());
+
+        let actual = writer.test_output().unwrap();
+        assert_eq!(
+            actual,
+            format!(
+                " NAME        SIZE      HASH         MODIFIED                         COMPONENTS \n \
+                package1/0  24.03 KB  {pkg1_hash}  {pkg1_modified}  meta/package1.cm \n \
+                package2/0  24.03 KB  {pkg2_hash}  {pkg2_modified}  meta/package2.cm \n",
+            ),
+        );
+
+        assert_eq!(writer.test_error().unwrap(), "");
     }
 
     #[fasync::run_singlethreaded(test)]
-    async fn test_show_package_truncated_hash() -> Result<()> {
+    async fn test_show_package_truncated_hash() {
+        let tmp = tempfile::tempdir().unwrap();
+        let _env = setup_repo(tmp.path()).await;
+
         let mut writer = Writer::new_test(None);
 
         run_impl_for_show_command(
             ShowSubCommand {
                 repository: Some("devhost".to_string()),
                 full_hash: false,
-                package: "package".to_string(),
+                package: "package1/0".to_string(),
             },
             &mut writer,
         )
         .await;
-        let actual = writer.test_output()?;
+
+        let blobs_path = tmp.path().join("repository/blobs");
+
+        let pkg1_hash = &PKG1_HASH[..MAX_HASH];
+        let pkg1_path = blobs_path.join(PKG1_HASH);
+        let pkg1_modified = to_rfc2822(std::fs::metadata(pkg1_path).unwrap().modified().unwrap());
+
+        let pkg1_bin_hash = &PKG1_BIN_HASH[..MAX_HASH];
+        let pkg1_bin_path = blobs_path.join(PKG1_BIN_HASH);
+        let pkg1_bin_modified =
+            to_rfc2822(std::fs::metadata(pkg1_bin_path).unwrap().modified().unwrap());
+
+        let pkg1_lib_hash = &PKG1_LIB_HASH[..MAX_HASH];
+        let pkg1_lib_path = blobs_path.join(PKG1_LIB_HASH);
+        let pkg1_lib_modified =
+            to_rfc2822(std::fs::metadata(pkg1_lib_path).unwrap().modified().unwrap());
+
+        let actual = writer.test_output().unwrap();
         assert_eq!(
             actual,
-            " NAME      SIZE  HASH            MODIFIED \n \
-            blob2     2 KB  secondhashs...   \n \
-            meta.far  1 B   longhashlon...  Fri, 02 Jan 1970 00:00:00 +0000 \n"
+            format!(
+                " NAME                           SIZE   HASH         MODIFIED \n \
+                  bin/package1                   15 B   {pkg1_bin_hash}  {pkg1_bin_modified} \n \
+                  lib/package1                   12 B   {pkg1_lib_hash}  {pkg1_lib_modified} \n \
+                  meta.far                       24 KB  {pkg1_hash}  {pkg1_modified} \n \
+                  meta/contents                  156 B  <unknown>    {pkg1_modified} \n \
+                  meta/fuchsia.abi/abi-revision  8 B    <unknown>    {pkg1_modified} \n \
+                  meta/package                   33 B   <unknown>    {pkg1_modified} \n \
+                  meta/package1.cm               11 B   <unknown>    {pkg1_modified} \n \
+                  meta/package1.cmx              12 B   <unknown>    {pkg1_modified} \n"
+            ),
         );
-        assert!(writer.test_error()?.is_empty());
-        Ok(())
+
+        assert_eq!(writer.test_error().unwrap(), "");
     }
 
     #[fasync::run_singlethreaded(test)]
-    async fn test_show_package_full_hash() -> Result<()> {
+    async fn test_show_package_full_hash() {
+        let tmp = tempfile::tempdir().unwrap();
+        let _env = setup_repo(tmp.path()).await;
+
         let mut writer = Writer::new_test(None);
 
         run_impl_for_show_command(
             ShowSubCommand {
                 repository: Some("devhost".to_string()),
                 full_hash: true,
-                package: "package".to_string(),
+                package: "package1/0".to_string(),
             },
             &mut writer,
         )
         .await;
-        let actual = writer.test_output()?;
+
+        let blobs_path = tmp.path().join("repository/blobs");
+
+        let pkg1_hash = &PKG1_HASH;
+        let pkg1_path = blobs_path.join(PKG1_HASH);
+        let pkg1_modified = to_rfc2822(std::fs::metadata(pkg1_path).unwrap().modified().unwrap());
+
+        let pkg1_bin_hash = &PKG1_BIN_HASH;
+        let pkg1_bin_path = blobs_path.join(PKG1_BIN_HASH);
+        let pkg1_bin_modified =
+            to_rfc2822(std::fs::metadata(pkg1_bin_path).unwrap().modified().unwrap());
+
+        let pkg1_lib_hash = &PKG1_LIB_HASH;
+        let pkg1_lib_path = blobs_path.join(PKG1_LIB_HASH);
+        let pkg1_lib_modified =
+            to_rfc2822(std::fs::metadata(pkg1_lib_path).unwrap().modified().unwrap());
+
+        let actual = writer.test_output().unwrap();
         assert_eq!(
             actual,
-            " NAME      SIZE  HASH                              MODIFIED \n \
-            blob2     2 KB  secondhashsecondhashsecondhash     \n \
-            meta.far  1 B   longhashlonghashlonghashlonghash  Fri, 02 Jan 1970 00:00:00 +0000 \n"
+            format!(
+                " NAME                           SIZE   HASH                                                              MODIFIED \n \
+                  bin/package1                   15 B   {pkg1_bin_hash}  {pkg1_bin_modified} \n \
+                  lib/package1                   12 B   {pkg1_lib_hash}  {pkg1_lib_modified} \n \
+                  meta.far                       24 KB  {pkg1_hash}  {pkg1_modified} \n \
+                  meta/contents                  156 B  <unknown>                                                         {pkg1_modified} \n \
+                  meta/fuchsia.abi/abi-revision  8 B    <unknown>                                                         {pkg1_modified} \n \
+                  meta/package                   33 B   <unknown>                                                         {pkg1_modified} \n \
+                  meta/package1.cm               11 B   <unknown>                                                         {pkg1_modified} \n \
+                  meta/package1.cmx              12 B   <unknown>                                                         {pkg1_modified} \n"
+            ),
         );
-        assert!(writer.test_error()?.is_empty());
-        Ok(())
+
+        assert_eq!(writer.test_error().unwrap(), "");
     }
 }

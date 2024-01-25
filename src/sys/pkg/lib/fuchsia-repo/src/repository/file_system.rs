@@ -36,7 +36,7 @@ use {
 
 #[cfg(not(target_os = "fuchsia"))]
 use {
-    fidl_fuchsia_developer_ffx_ext::RepositorySpec,
+    crate::repository::RepositorySpec,
     futures::{stream::BoxStream, Stream, StreamExt as _},
     notify::{recommended_watcher, RecursiveMode, Watcher as _},
     std::{

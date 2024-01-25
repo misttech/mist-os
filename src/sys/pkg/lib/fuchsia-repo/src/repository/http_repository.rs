@@ -10,11 +10,10 @@
 use {
     crate::{
         range::{ContentRange, Range},
-        repository::{Error, RepoProvider},
+        repository::{Error, RepoProvider, RepositorySpec},
         resource::Resource,
     },
     anyhow::{anyhow, Context as _, Result},
-    fidl_fuchsia_developer_ffx_ext::RepositorySpec,
     futures::{future::BoxFuture, AsyncRead, FutureExt as _, TryStreamExt as _},
     hyper::{
         client::{connect::Connect, Client},

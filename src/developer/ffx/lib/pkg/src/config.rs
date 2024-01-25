@@ -4,7 +4,8 @@
 
 use anyhow::{anyhow, Context, Result};
 use ffx_config::{self, ConfigLevel};
-use fidl_fuchsia_developer_ffx_ext::{RepositorySpec, RepositoryTarget};
+use fidl_fuchsia_developer_ffx_ext::RepositoryTarget;
+use fuchsia_repo::repository::RepositorySpec;
 use percent_encoding::{percent_decode_str, percent_encode, AsciiSet, CONTROLS};
 use serde_json::Value;
 use std::collections::{BTreeMap, BTreeSet};

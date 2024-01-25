@@ -162,6 +162,48 @@ impl From<RepositorySpec> for fidl::RepositorySpec {
     }
 }
 
+impl From<RepositorySpec> for fuchsia_repo::repository::RepositorySpec {
+    fn from(repo: RepositorySpec) -> Self {
+        match repo {
+            RepositorySpec::FileSystem { metadata_repo_path, blob_repo_path, aliases } => {
+                Self::FileSystem { metadata_repo_path, blob_repo_path, aliases }
+            }
+            RepositorySpec::Pm { path, aliases } => Self::Pm { path, aliases },
+            RepositorySpec::Http { metadata_repo_url, blob_repo_url, aliases } => {
+                Self::Http { metadata_repo_url, blob_repo_url, aliases }
+            }
+            RepositorySpec::Gcs { metadata_repo_url, blob_repo_url, aliases } => {
+                Self::Gcs { metadata_repo_url, blob_repo_url, aliases }
+            }
+        }
+    }
+}
+
+impl From<fuchsia_repo::repository::RepositorySpec> for RepositorySpec {
+    fn from(repo: fuchsia_repo::repository::RepositorySpec) -> Self {
+        match repo {
+            fuchsia_repo::repository::RepositorySpec::FileSystem {
+                metadata_repo_path,
+                blob_repo_path,
+                aliases,
+            } => RepositorySpec::FileSystem { metadata_repo_path, blob_repo_path, aliases },
+            fuchsia_repo::repository::RepositorySpec::Pm { path, aliases } => {
+                RepositorySpec::Pm { path, aliases }
+            }
+            fuchsia_repo::repository::RepositorySpec::Http {
+                metadata_repo_url,
+                blob_repo_url,
+                aliases,
+            } => RepositorySpec::Http { metadata_repo_url, blob_repo_url, aliases },
+            fuchsia_repo::repository::RepositorySpec::Gcs {
+                metadata_repo_url,
+                blob_repo_url,
+                aliases,
+            } => RepositorySpec::Gcs { metadata_repo_url, blob_repo_url, aliases },
+        }
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum RepositoryStorageType {
@@ -455,11 +497,34 @@ pub struct PackageEntry {
     pub modified: Option<u64>,
 }
 
-impl From<&fidl::PackageEntry> for PackageEntry {
-    fn from(entry: &fidl::PackageEntry) -> Self {
+impl From<fidl::PackageEntry> for PackageEntry {
+    fn from(entry: fidl::PackageEntry) -> Self {
         PackageEntry {
-            path: entry.path.clone(),
-            hash: entry.hash.clone(),
+            path: entry.path,
+            hash: entry.hash,
+            size: entry.size,
+            modified: entry.modified,
+        }
+    }
+}
+
+impl From<PackageEntry> for fidl::PackageEntry {
+    fn from(entry: PackageEntry) -> Self {
+        fidl::PackageEntry {
+            path: entry.path,
+            hash: entry.hash,
+            size: entry.size,
+            modified: entry.modified,
+            ..Default::default()
+        }
+    }
+}
+
+impl From<fuchsia_repo::repo_client::PackageEntry> for PackageEntry {
+    fn from(entry: fuchsia_repo::repo_client::PackageEntry) -> Self {
+        PackageEntry {
+            path: Some(entry.path),
+            hash: entry.hash.map(|hash| hash.into()),
             size: entry.size,
             modified: entry.modified,
         }
@@ -489,9 +554,38 @@ impl From<fidl::RepositoryPackage> for RepositoryPackage {
             size: repo_package.size,
             modified: repo_package.modified,
             entries: match repo_package.entries {
-                Some(list) => list.iter().map(|p| p.into()).collect(),
+                Some(list) => list.into_iter().map(PackageEntry::from).collect(),
                 None => vec![],
             },
+        }
+    }
+}
+
+impl From<RepositoryPackage> for fidl::RepositoryPackage {
+    fn from(repo_package: RepositoryPackage) -> Self {
+        fidl::RepositoryPackage {
+            name: repo_package.name,
+            hash: repo_package.hash,
+            size: repo_package.size,
+            modified: repo_package.modified,
+            entries: if repo_package.entries.is_empty() {
+                None
+            } else {
+                Some(repo_package.entries.into_iter().map(fidl::PackageEntry::from).collect())
+            },
+            ..Default::default()
+        }
+    }
+}
+
+impl From<fuchsia_repo::repo_client::RepositoryPackage> for RepositoryPackage {
+    fn from(repo_package: fuchsia_repo::repo_client::RepositoryPackage) -> Self {
+        RepositoryPackage {
+            name: Some(repo_package.name),
+            hash: Some(repo_package.hash.into()),
+            size: repo_package.size,
+            modified: repo_package.modified,
+            entries: vec![],
         }
     }
 }

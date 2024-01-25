@@ -19,7 +19,9 @@ use {
     fuchsia_repo::{
         manager::RepositoryManager,
         repo_client::RepoClient,
-        repository::{self, RepoProvider},
+        repository::{
+            self, FileSystemRepository, HttpRepository, PmRepository, RepoProvider, RepositorySpec,
+        },
         server::RepositoryServer,
     },
     fuchsia_url::RepositoryUrl,
@@ -32,6 +34,7 @@ use {
         sync::Arc,
         time::Duration,
     },
+    url::Url,
 };
 
 const SHUTDOWN_TIMEOUT: Duration = Duration::from_secs(5);
@@ -92,7 +95,7 @@ impl ServerState {
         }
     }
 
-    pub async fn stop(&mut self) -> Result<(), ffx::RepositoryError> {
+    pub async fn stop(&mut self) -> Result<(), RepositoryError> {
         match std::mem::replace(self, ServerState::Disabled) {
             ServerState::Running(server_info) => {
                 *self = ServerState::Stopped;
@@ -115,7 +118,7 @@ impl ServerState {
             state => {
                 *self = state;
 
-                Err(ffx::RepositoryError::ServerNotRunning)
+                Err(RepositoryError::ServerNotRunning)
             }
         }
     }
@@ -266,6 +269,49 @@ pub trait Registrar {
         inner: Arc<RwLock<RepoInner>>,
         alias_conflict_mode: RepositoryRegistrationAliasConflictMode,
     ) -> Result<(), ffx::RepositoryError>;
+}
+
+pub fn repo_spec_to_backend(
+    repo_spec: &RepositorySpec,
+    https_client: HttpsClient,
+) -> Result<Box<dyn RepoProvider>, RepositoryError> {
+    match repo_spec {
+        RepositorySpec::FileSystem { metadata_repo_path, blob_repo_path, aliases } => Ok(Box::new(
+            FileSystemRepository::builder(metadata_repo_path.into(), blob_repo_path.into())
+                .aliases(aliases.clone())
+                .build(),
+        )),
+        RepositorySpec::Pm { path, aliases } => {
+            Ok(Box::new(PmRepository::builder(path.into()).aliases(aliases.clone()).build()))
+        }
+        RepositorySpec::Http { metadata_repo_url, blob_repo_url, aliases } => {
+            let metadata_repo_url = Url::parse(metadata_repo_url.as_str()).map_err(|err| {
+                tracing::error!(
+                    "Unable to parse metadata repo url {}: {:#}",
+                    metadata_repo_url,
+                    err
+                );
+                ffx::RepositoryError::InvalidUrl
+            })?;
+
+            let blob_repo_url = Url::parse(blob_repo_url.as_str()).map_err(|err| {
+                tracing::error!("Unable to parse blob repo url {}: {:#}", blob_repo_url, err);
+                ffx::RepositoryError::InvalidUrl
+            })?;
+
+            Ok(Box::new(HttpRepository::new(
+                https_client,
+                metadata_repo_url,
+                blob_repo_url,
+                aliases.clone(),
+            )))
+        }
+        RepositorySpec::Gcs { .. } => {
+            // FIXME(https://fxbug.dev/98994): Implement support for daemon-side GCS repositories.
+            tracing::error!("Trying to register a GCS repository, but that's not supported yet");
+            Err(RepositoryError::UnknownRepositorySpec)
+        }
+    }
 }
 
 pub async fn update_repository(
@@ -499,4 +545,98 @@ pub fn create_repo_host(
     };
 
     (false, repo_host)
+}
+
+#[cfg(test)]
+mod tests {
+    use {super::*, assert_matches::assert_matches, std::fs, std::net::Ipv4Addr};
+
+    const EMPTY_REPO_PATH: &str = "host_x64/test_data/ffx_lib_pkg/empty-repo";
+
+    fn pm_repo_spec() -> RepositorySpec {
+        let path = fs::canonicalize(EMPTY_REPO_PATH).unwrap();
+        RepositorySpec::Pm {
+            path: path.try_into().unwrap(),
+            aliases: BTreeSet::from(["anothercorp.com".into(), "mycorp.com".into()]),
+        }
+    }
+
+    fn filesystem_repo_spec() -> RepositorySpec {
+        let repo = fs::canonicalize(EMPTY_REPO_PATH).unwrap();
+        let metadata_repo_path = repo.join("repository");
+        let blob_repo_path = metadata_repo_path.join("blobs");
+        RepositorySpec::FileSystem {
+            metadata_repo_path: metadata_repo_path.try_into().unwrap(),
+            blob_repo_path: blob_repo_path.try_into().unwrap(),
+            aliases: BTreeSet::new(),
+        }
+    }
+
+    #[fuchsia_async::run_singlethreaded(test)]
+    async fn test_pm_repo_spec_to_backend() {
+        let spec = pm_repo_spec();
+        let backend = repo_spec_to_backend(&spec, new_https_client()).unwrap();
+        assert_eq!(spec, backend.spec());
+    }
+
+    #[fuchsia_async::run_singlethreaded(test)]
+    async fn test_filesystem_repo_spec_to_backend() {
+        let spec = filesystem_repo_spec();
+        let backend = repo_spec_to_backend(&spec, new_https_client()).unwrap();
+        assert_eq!(spec, backend.spec());
+    }
+
+    #[fuchsia_async::run_singlethreaded(test)]
+    async fn test_http_repo_spec_to_backend() {
+        // Serve the empty repository
+        let repo_path = fs::canonicalize(EMPTY_REPO_PATH).unwrap();
+        let pm_backend = PmRepository::new(repo_path.try_into().unwrap());
+
+        let pm_repo =
+            RepoClient::from_trusted_remote(Box::new(pm_backend) as Box<_>).await.unwrap();
+        let manager = RepositoryManager::new();
+        manager.add("tuf", pm_repo);
+
+        let addr = (Ipv4Addr::LOCALHOST, 0).into();
+        let (server_fut, _, server) =
+            RepositoryServer::builder(addr, Arc::clone(&manager)).start().await.unwrap();
+
+        // Run the server in the background.
+        let _task = fasync::Task::local(server_fut);
+
+        let http_spec = RepositorySpec::Http {
+            metadata_repo_url: server.local_url() + "/tuf/",
+            blob_repo_url: server.local_url() + "/tuf/blobs/",
+            aliases: BTreeSet::new(),
+        };
+
+        let https_client = new_https_client();
+        let http_backend = repo_spec_to_backend(&http_spec, https_client.clone()).unwrap();
+        assert_eq!(http_spec, http_backend.spec());
+
+        // It rejects invalid urls.
+        assert_matches!(
+            repo_spec_to_backend(
+                &RepositorySpec::Http {
+                    metadata_repo_url: "hello there".to_string(),
+                    blob_repo_url: server.local_url() + "/tuf/blobs",
+                    aliases: BTreeSet::new(),
+                },
+                https_client.clone(),
+            ),
+            Err(RepositoryError::InvalidUrl)
+        );
+
+        assert_matches!(
+            repo_spec_to_backend(
+                &RepositorySpec::Http {
+                    metadata_repo_url: server.local_url() + "/tuf",
+                    blob_repo_url: "hello there".to_string(),
+                    aliases: BTreeSet::new(),
+                },
+                https_client.clone(),
+            ),
+            Err(RepositoryError::InvalidUrl)
+        );
+    }
 }

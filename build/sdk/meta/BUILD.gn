@@ -84,7 +84,6 @@ if (is_host) {
     edition = "2021"
 
     deps = [
-      "//src/developer/ffx/fidl:fuchsia.developer.ffx_rust",
       "//src/lib/assembly/assembly_manifest",
       "//src/lib/assembly/partitions_config",
       "//src/sys/pkg/lib/fuchsia-merkle",

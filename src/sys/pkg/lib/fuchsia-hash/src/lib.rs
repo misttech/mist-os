@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use hex::{FromHex, FromHexError, ToHex};
+use hex::{FromHex, FromHexError, ToHex as _};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::fmt;
 use std::ops::Deref;
@@ -65,6 +65,28 @@ impl TryFrom<&[u8]> for Hash {
 
     fn try_from(bytes: &[u8]) -> Result<Self, Self::Error> {
         Ok(Self(bytes.try_into()?))
+    }
+}
+
+impl TryFrom<&str> for Hash {
+    type Error = ParseHashError;
+
+    fn try_from(s: &str) -> Result<Self, Self::Error> {
+        Ok(Self(FromHex::from_hex(s)?))
+    }
+}
+
+impl TryFrom<String> for Hash {
+    type Error = ParseHashError;
+
+    fn try_from(s: String) -> Result<Self, Self::Error> {
+        Self::try_from(s.as_str())
+    }
+}
+
+impl From<Hash> for String {
+    fn from(h: Hash) -> Self {
+        hex::encode(&h.0)
     }
 }
 

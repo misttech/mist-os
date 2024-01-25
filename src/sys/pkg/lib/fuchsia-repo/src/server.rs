@@ -13,7 +13,6 @@ use {
     async_lock::RwLock as AsyncRwLock,
     async_net::{TcpListener, TcpStream},
     chrono::Utc,
-    fidl_fuchsia_developer_ffx::ListFields,
     fuchsia_async as fasync,
     fuchsia_url::RepositoryUrl,
     futures::{future::Shared, prelude::*, AsyncRead, AsyncWrite, TryStreamExt},
@@ -557,7 +556,7 @@ async fn generate_package_html(
         return status_response(StatusCode::BAD_REQUEST);
     }
 
-    match repo.read().await.list_packages(ListFields::empty()).await {
+    match repo.read().await.list_packages().await {
         Err(_) => status_response(StatusCode::BAD_REQUEST),
         Ok(mut packages) => {
             packages.sort_by(|a, b| a.name.partial_cmp(&b.name).unwrap());
@@ -570,9 +569,7 @@ async fn generate_package_html(
             <td><a href=\"fuchsia-pkg://fuchsia-pkg://{0}/{1}\">{1}</a></td>
             <td class=merkle>{2}</td>
           </tr>",
-                        repo_name,
-                        p.name.unwrap_or("no name".to_string()),
-                        p.hash.unwrap_or("no hash".to_string())
+                        repo_name, p.name, p.hash,
                     ))
                 })
                 .collect::<Vec<Result<String, std::io::Error>>>();
