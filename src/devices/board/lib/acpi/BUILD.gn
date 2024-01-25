@@ -23,6 +23,7 @@ shared_public_deps = [
   "//src/devices/bind/fuchsia.acpi:fuchsia.acpi_cpp",
   "//src/devices/lib/iommu",
   "//src/lib/ddk:ddk-deprecated-binding-headers",
+  "//src/lib/ddktl",
   "//third_party/acpica",
 ]
 
@@ -46,6 +47,12 @@ shared_fuchsia_public_deps = [
 
 shared_deps = [
   "//sdk/banjo/fuchsia.hardware.pciroot:fuchsia.hardware.pciroot_banjo_cpp",
+  "//sdk/fidl/fuchsia.hardware.interrupt:fuchsia.hardware.interrupt_bindlib_cpp",
+  "//src/devices/bind/fuchsia:fuchsia_cpp",
+  "//src/devices/bind/fuchsia.i2c:fuchsia.i2c_cpp",
+  "//src/devices/bind/fuchsia.pci:fuchsia.pci_cpp",
+  "//src/devices/bind/fuchsia.spi:fuchsia.spi_cpp",
+  "//src/devices/bind/fuchsia.sysmem:fuchsia.sysmem_cpp",
   "//zircon/system/ulib/fbl",
   "//zircon/system/ulib/zx",
 ]
@@ -54,7 +61,6 @@ shared_fuchsia_deps = [
   "//sdk/banjo/fuchsia.hardware.sysmem:fuchsia.hardware.sysmem_banjo_cpp",
   "//sdk/fidl/fuchsia.hardware.acpi:fuchsia.hardware.acpi_cpp",
   "//sdk/fidl/fuchsia.hardware.interrupt:fuchsia.hardware.interrupt_cpp",
-  "//src/devices/bind/fuchsia.acpi:fuchsia.acpi_cpp",
   "//src/devices/lib/acpi",
   "//src/devices/pci/lib/pci",
   "//zircon/system/ulib/sync:sync-cpp",
@@ -123,6 +129,7 @@ test("acpi-test") {
   sources = [
     "acpi-test.cc",
     "acpi.cc",
+    "device-builder-test.cc",
     "device-builder.cc",
     "device-test.cc",
     "device.cc",

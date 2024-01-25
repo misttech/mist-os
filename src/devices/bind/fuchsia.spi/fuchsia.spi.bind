@@ -8,3 +8,7 @@ extend uint fuchsia.BIND_PROTOCOL {
   DEVICE = 0x79,
   IMPL = 0x7A,
 };
+
+extend uint fuchsia.BIND_FIDL_PROTOCOL {
+  DEVICE = 0x08,
+};

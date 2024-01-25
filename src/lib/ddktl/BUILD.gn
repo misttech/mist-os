@@ -144,6 +144,7 @@ source_set("ddktl") {
     "//src/devices/board/drivers/sherlock:*",
     "//src/devices/board/drivers/vim3:*",
     "//src/devices/board/drivers/x86:*",
+    "//src/devices/board/lib/acpi:*",
     "//src/devices/bus/drivers/pci:*",
     "//src/devices/bus/drivers/pci/test:*",
     "//src/devices/bus/drivers/platform:*",

@@ -4,15 +4,18 @@
 
 #include "src/devices/board/lib/acpi/device-builder.h"
 
-#include <fidl/fuchsia.hardware.spi.businfo/cpp/wire.h>
 #include <lib/ddk/debug.h>
-#include <lib/ddk/driver.h>
 #include <zircon/compiler.h>
 
 #include <bind/fuchsia/acpi/cpp/bind.h>
+#include <bind/fuchsia/cpp/bind.h>
+#include <bind/fuchsia/hardware/interrupt/cpp/bind.h>
+#include <bind/fuchsia/i2c/cpp/bind.h>
+#include <bind/fuchsia/pci/cpp/bind.h>
+#include <bind/fuchsia/spi/cpp/bind.h>
+#include <bind/fuchsia/sysmem/cpp/bind.h>
 #include <fbl/string_printf.h>
 
-#include "src/devices/board/lib/acpi/acpi.h"
 #ifdef __Fuchsia__
 #include "src/devices/board/lib/acpi/device.h"
 #include "src/devices/board/lib/acpi/irq-fragment.h"
@@ -28,6 +31,12 @@ namespace {
 static const zx_bind_inst_t kSysmemFragment[] = {
     BI_MATCH_IF(EQ, BIND_FIDL_PROTOCOL, ZX_FIDL_PROTOCOL_SYSMEM),
 };
+
+const std::vector<ddk::BindRule> kSysmemBindRules = {
+    ddk::MakeAcceptBindRule(bind_fuchsia::PROTOCOL, bind_fuchsia_sysmem::BIND_PROTOCOL_DEVICE)};
+
+const std::vector<device_bind_prop_t> kSysmemProperties = {
+    ddk::MakeProperty(bind_fuchsia::PROTOCOL, bind_fuchsia_sysmem::BIND_PROTOCOL_DEVICE)};
 
 }  // namespace
 
@@ -299,6 +308,32 @@ zx::result<> DeviceBuilder::BuildComposite(acpi::Manager* manager,
   auto fragments = std::make_unique<device_fragment_t[]>(fragment_count);
   std::unordered_map<BusType, uint32_t> parent_types;
 
+  auto [acpi_bind_rules, acpi_properties] = GetFragmentBindRulesAndPropertiesForSelf();
+  for (const auto& str_prop : str_props) {
+    switch (str_prop.property_value.data_type) {
+      case ZX_DEVICE_PROPERTY_VALUE_STRING:
+        acpi_properties.emplace_back(
+            ddk::MakeProperty(str_prop.key, str_prop.property_value.data.str_val));
+        break;
+      case ZX_DEVICE_PROPERTY_VALUE_BOOL:
+        acpi_properties.emplace_back(
+            ddk::MakeProperty(str_prop.key, str_prop.property_value.data.bool_val));
+        break;
+      case ZX_DEVICE_PROPERTY_VALUE_INT:
+        acpi_properties.emplace_back(
+            ddk::MakeProperty(str_prop.key, str_prop.property_value.data.int_val));
+        break;
+      case ZX_DEVICE_PROPERTY_VALUE_ENUM:
+        acpi_properties.emplace_back(
+            ddk::MakeProperty(str_prop.key, str_prop.property_value.data.enum_val));
+        break;
+      default:
+        ZX_PANIC("Unknown property type: %d", str_prop.property_value.data_type);
+    }
+  }
+  auto composite_node_spec = ddk::CompositeNodeSpec(acpi_bind_rules, acpi_properties)
+                                 .AddParentSpec(kSysmemBindRules, kSysmemProperties);
+
   size_t bus_index = 0;
   // Generate fragments for every device we use.
   for (auto& pair : buses_) {
@@ -322,17 +357,21 @@ zx::result<> DeviceBuilder::BuildComposite(acpi::Manager* manager,
     };
 
     bus_index++;
+
+    auto [bind_rules, properties] = parent->GetFragmentBindRulesAndPropertiesForChild(child_index);
+    composite_node_spec.AddParentSpec(bind_rules, properties);
   }
 
   for (uint32_t i = 0; i < irq_count_; i++) {
     fragment_names[bus_index] = fbl::StringPrintf("irq%03u", i);
+    auto bind_platform_dev_interrupt_id = i + 1;
 
     // Make sure that the bind rules here stay in sync
     // with the properties in irq-fragment.cc
     // LINT.IfChange
     std::vector<zx_bind_inst_t> insns{
         BI_ABORT_IF(NE, BIND_ACPI_ID, device_id_),
-        BI_ABORT_IF(NE, BIND_PLATFORM_DEV_INTERRUPT_ID, i + 1),
+        BI_ABORT_IF(NE, BIND_PLATFORM_DEV_INTERRUPT_ID, bind_platform_dev_interrupt_id),
         BI_MATCH(),
     };
     // LINT.ThenChange(irq-fragment.cc)
@@ -349,6 +388,20 @@ zx::result<> DeviceBuilder::BuildComposite(acpi::Manager* manager,
     };
 
     bus_index++;
+
+    composite_node_spec.AddParentSpec(
+        std::vector<ddk::BindRule>{
+            ddk::MakeAcceptBindRule(bind_fuchsia::ACPI_ID, device_id_),
+            ddk::MakeAcceptBindRule(bind_fuchsia::PLATFORM_DEV_INTERRUPT_ID,
+                                    bind_platform_dev_interrupt_id),
+            ddk::MakeAcceptBindRule(bind_fuchsia_hardware_interrupt::SERVICE,
+                                    bind_fuchsia_hardware_interrupt::SERVICE_ZIRCONTRANSPORT)},
+        std::vector<device_bind_prop_t>{
+            ddk::MakeProperty(bind_fuchsia::ACPI_ID, device_id_),
+            ddk::MakeProperty(bind_fuchsia::PLATFORM_DEV_INTERRUPT_ID,
+                              bind_platform_dev_interrupt_id),
+            ddk::MakeProperty(bind_fuchsia_hardware_interrupt::SERVICE,
+                              bind_fuchsia_hardware_interrupt::SERVICE_ZIRCONTRANSPORT)});
   }
 
   // Generate the ACPI fragment.
@@ -388,22 +441,44 @@ zx::result<> DeviceBuilder::BuildComposite(acpi::Manager* manager,
       .spawn_colocated = true,
   };
 
-  zx_status_t status = ZX_OK;
 #if !defined(IS_TEST)
   // TODO(https://fxbug.dev/79923): re-enable this in tests once mock_ddk supports composites.
   auto composite_name = fbl::StringPrintf("%s-composite", name());
   // Don't worry about any metadata, since it's present in the "acpi" parent.
   DeviceArgs args(parent_->zx_device_, manager, device_dispatcher, handle_);
   auto composite_device = std::make_unique<Device>(args);
-  status = composite_device->DdkAddComposite(composite_name.data(), &composite_desc);
+  zx_status_t status = composite_device->DdkAddComposite(composite_name.data(), &composite_desc);
 
-  if (status == ZX_OK) {
-    // The DDK takes ownership of the device, but only if DdkAddComposite succeeded.
-    [[maybe_unused]] auto unused = composite_device.release();
+  if (status != ZX_OK) {
+#ifdef __Fuchsia__
+    zxlogf(ERROR, "Failed to add composite: %s", zx_status_get_string(status));
+#else
+    zxlogf(ERROR, "Failed to add composite");
+#endif
+    return zx::error(status);
   }
+  // The DDK takes ownership of the device.
+  [[maybe_unused]] auto unused = composite_device.release();
+
+  auto composite_node_spec_name = fbl::StringPrintf("%s-composite-spec", name());
+  DeviceArgs composite_node_spec_args(parent_->zx_device_, manager, device_dispatcher, handle_);
+  auto composite_node_spec_device = std::make_unique<Device>(composite_node_spec_args);
+  status = composite_node_spec_device->DdkAddCompositeNodeSpec(composite_node_spec_name.data(),
+                                                               composite_node_spec);
+  if (status != ZX_OK) {
+#ifdef __Fuchsia__
+    zxlogf(ERROR, "Failed to add composite node spec: %s", zx_status_get_string(status));
+#else
+    zxlogf(ERROR, "Failed to add composite node spec");
+#endif
+    return zx::error(status);
+  }
+
+  // The DDK takes ownership of the device.
+  unused = composite_node_spec_device.release();
 #endif
 
-  return zx::make_result(status);
+  return zx::ok();
 }
 
 std::vector<zx_bind_inst_t> DeviceBuilder::GetFragmentBindInsnsForChild(size_t child_index) {
@@ -419,7 +494,7 @@ std::vector<zx_bind_inst_t> DeviceBuilder::GetFragmentBindInsnsForChild(size_t c
       ret.push_back(BI_ABORT_IF(NE, BIND_FIDL_PROTOCOL, ZX_FIDL_PROTOCOL_SPI));
       break;
     case BusType::kUnknown:
-      ZX_ASSERT(bus_type_ != BusType::kUnknown);
+      ZX_PANIC("Bus type is unknown");
   }
 
   std::visit(
@@ -449,6 +524,63 @@ std::vector<zx_bind_inst_t> DeviceBuilder::GetFragmentBindInsnsForChild(size_t c
   return ret;
 }
 
+std::pair<std::vector<ddk::BindRule>, std::vector<device_bind_prop_t>>
+DeviceBuilder::GetFragmentBindRulesAndPropertiesForChild(size_t child_index) {
+  std::vector<ddk::BindRule> bind_rules;
+  std::vector<device_bind_prop_t> properties;
+
+  switch (bus_type_) {
+    case BusType::kPci:
+      bind_rules.emplace_back(
+          ddk::MakeAcceptBindRule(bind_fuchsia::PROTOCOL, bind_fuchsia_pci::BIND_PROTOCOL_DEVICE));
+      properties.emplace_back(
+          ddk::MakeProperty(bind_fuchsia::PROTOCOL, bind_fuchsia_pci::BIND_PROTOCOL_DEVICE));
+      break;
+    case BusType::kI2c:
+      // No Banjo protocol needed for I2C.
+      break;
+    case BusType::kSpi:
+      bind_rules.emplace_back(ddk::MakeAcceptBindRule(bind_fuchsia::FIDL_PROTOCOL,
+                                                      bind_fuchsia_spi::BIND_FIDL_PROTOCOL_DEVICE));
+      properties.emplace_back(ddk::MakeProperty(bind_fuchsia::FIDL_PROTOCOL,
+                                                bind_fuchsia_spi::BIND_FIDL_PROTOCOL_DEVICE));
+      break;
+    case BusType::kUnknown:
+      ZX_PANIC("Bus type is unknown");
+  }
+
+  std::visit(
+      [&bind_rules, &properties, child_index, bus_id = GetBusId()](auto&& arg) {
+        using T = std::decay_t<decltype(arg)>;
+        using SpiChannel = fuchsia_hardware_spi_businfo::wire::SpiChannel;
+        using I2CChannel = fuchsia_hardware_i2c_businfo::wire::I2CChannel;
+        if constexpr (std::is_same_v<T, std::monostate>) {
+          ZX_PANIC("Bus should have children");
+        } else if constexpr (std::is_same_v<T, std::vector<SpiChannel>>) {
+          SpiChannel& chan = arg[child_index];
+          bind_rules.emplace_back(ddk::MakeAcceptBindRule(bind_fuchsia::SPI_BUS_ID, bus_id));
+          bind_rules.emplace_back(
+              ddk::MakeAcceptBindRule(bind_fuchsia::SPI_CHIP_SELECT, chan.cs()));
+          properties.emplace_back(ddk::MakeProperty(bind_fuchsia::SPI_BUS_ID, bus_id));
+          properties.emplace_back(ddk::MakeProperty(bind_fuchsia::SPI_CHIP_SELECT, chan.cs()));
+        } else if constexpr (std::is_same_v<T, std::vector<I2CChannel>>) {
+          I2CChannel& chan = arg[child_index];
+          auto chan_addr = static_cast<uint32_t>(chan.address());
+          bind_rules.emplace_back(ddk::MakeAcceptBindRule(bind_fuchsia::I2C_BUS_ID, bus_id));
+          bind_rules.emplace_back(ddk::MakeAcceptBindRule(bind_fuchsia::I2C_ADDRESS, chan_addr));
+          bind_rules.emplace_back(ddk::MakeAcceptBindRule(
+              bind_fuchsia::FIDL_PROTOCOL, bind_fuchsia_i2c::BIND_FIDL_PROTOCOL_DEVICE));
+          properties.emplace_back(ddk::MakeProperty(bind_fuchsia::I2C_BUS_ID, bus_id));
+          properties.emplace_back(ddk::MakeProperty(bind_fuchsia::I2C_ADDRESS, chan_addr));
+          properties.emplace_back(ddk::MakeProperty(bind_fuchsia::FIDL_PROTOCOL,
+                                                    bind_fuchsia_i2c::BIND_FIDL_PROTOCOL_DEVICE));
+        }
+      },
+      bus_children_);
+
+  return {bind_rules, properties};
+}
+
 std::vector<zx_bind_inst_t> DeviceBuilder::GetFragmentBindInsnsForSelf() {
   std::vector<zx_bind_inst_t> ret;
   ret.push_back(BI_ABORT_IF(NE, BIND_PROTOCOL, ZX_PROTOCOL_ACPI));
@@ -459,6 +591,23 @@ std::vector<zx_bind_inst_t> DeviceBuilder::GetFragmentBindInsnsForSelf() {
   ret.push_back(BI_ABORT_IF(NE, BIND_COMPOSITE, 0));
   ret.push_back(BI_MATCH());
   return ret;
+}
+
+std::pair<std::vector<ddk::BindRule>, std::vector<device_bind_prop_t>>
+DeviceBuilder::GetFragmentBindRulesAndPropertiesForSelf() {
+  std::vector<ddk::BindRule> bind_rules = {
+      ddk::MakeAcceptBindRule(bind_fuchsia::PROTOCOL, bind_fuchsia_acpi::BIND_PROTOCOL_DEVICE),
+  };
+  std::vector<device_bind_prop_t> properties = {
+      ddk::MakeProperty(bind_fuchsia::PROTOCOL, bind_fuchsia_acpi::BIND_PROTOCOL_DEVICE),
+  };
+
+  for (auto& prop : dev_props_) {
+    bind_rules.emplace_back(ddk::MakeAcceptBindRule(static_cast<uint32_t>(prop.id), prop.value));
+    properties.emplace_back(ddk::MakeProperty(static_cast<uint32_t>(prop.id), prop.value));
+  }
+
+  return {bind_rules, properties};
 }
 
 bool DeviceBuilder::CheckForDeviceTreeCompatible(acpi::Acpi* acpi) {

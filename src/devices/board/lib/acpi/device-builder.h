@@ -15,6 +15,8 @@
 
 #include <string>
 
+#include <ddktl/composite-node-spec.h>
+
 #include "src/devices/board/lib/acpi/acpi.h"
 #include "src/devices/board/lib/acpi/bus-type.h"
 
@@ -165,8 +167,14 @@ class DeviceBuilder {
   // Get bind instructions for the |child_index|th child of this bus.
   // Used by |BuildComposite| to generate the bus bind rules.
   std::vector<zx_bind_inst_t> GetFragmentBindInsnsForChild(size_t child_index);
+  // Get bind rules and node properties for the |child_index|th child of this bus.
+  std::pair<std::vector<ddk::BindRule>, std::vector<device_bind_prop_t>>
+  GetFragmentBindRulesAndPropertiesForChild(size_t child_index);
   // Get bind instructions for this device, used for generating the ACPI bind rules.
   std::vector<zx_bind_inst_t> GetFragmentBindInsnsForSelf();
+  // Get bind rules and node properties for this device.
+  std::pair<std::vector<ddk::BindRule>, std::vector<device_bind_prop_t>>
+  GetFragmentBindRulesAndPropertiesForSelf();
 
   // Check for "Device Properties for _DSD" containing a "compatible" key.
   // If found, the first value is added as the first_cid bind property.
@@ -201,8 +209,8 @@ class DeviceBuilder {
   // ACPI_STA_* flags for this device.
   uint64_t state_;
 
-  // TODO(https://fxbug.dev/91510): remove device_id and use dynamic binding to bind against string props
-  // once that is supported.
+  // TODO(https://fxbug.dev/91510): remove device_id and use dynamic binding to bind against string
+  // props once that is supported.
   uint32_t device_id_;
 
   // Number of IRQs this device has, used to generate the interrupt fragments.

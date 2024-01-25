@@ -26,6 +26,12 @@ class Device {
     delete this;
     return ZX_OK;
   }
+
+  zx_status_t DdkAddCompositeNodeSpec(const char* name, const ddk::CompositeNodeSpec& spec) {
+    // Delete ourselves, because device-builder will immediately release the unique_ptr.
+    delete this;
+    return ZX_OK;
+  }
   zx_device_t* zxdev();
 };
 
