@@ -5,6 +5,7 @@
 """Bluetooth Common affordance implementation using SL4F."""
 
 from enum import StrEnum
+from typing import Any
 
 from honeydew.interfaces.affordances.bluetooth import bluetooth_common
 from honeydew.interfaces.device_classes import affordances_capable
@@ -153,7 +154,7 @@ class BluetoothCommon(bluetooth_common.BluetoothCommon):
                 connected_devices.append(value["id"])
         return connected_devices
 
-    def get_known_remote_devices(self) -> dict:
+    def get_known_remote_devices(self) -> dict[str, Any]:
         """Retrieves all known remote devices received by device.
 
         Returns:

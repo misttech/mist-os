@@ -85,7 +85,7 @@ class NetworkConfig:
     credential_type: str
     credential_value: str
 
-    def __lt__(self, other) -> bool:
+    def __lt__(self, other: NetworkConfig) -> bool:
         return self.ssid < other.ssid
 
 
@@ -100,7 +100,7 @@ class NetworkIdentifier:
     ssid: str
     security_type: SecurityType
 
-    def __lt__(self, other) -> bool:
+    def __lt__(self, other: NetworkIdentifier) -> bool:
         return self.ssid < other.ssid
 
 
@@ -115,7 +115,7 @@ class NetworkState:
     connection_state: ConnectionState
     disconnect_status: DisconnectStatus
 
-    def __lt__(self, other) -> bool:
+    def __lt__(self, other: NetworkState) -> bool:
         return self.network_identifier < other.network_identifier
 
 
@@ -132,7 +132,9 @@ class ClientStateSummary:
     state: WlanClientState
     networks: list[NetworkState]
 
-    def __eq__(self, other) -> bool:
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, ClientStateSummary):
+            return NotImplemented
         return self.state == other.state and sorted(self.networks) == sorted(
             other.networks
         )

@@ -84,7 +84,7 @@ def send_http_request(
             _LOGGER.debug(
                 "HTTP response received from url=%s is '%s'", url, response_body
             )
-            return json.loads(response_body)
+            return json.loads(response_body)  # Revealed type is 'Any'
         except Exception as err:  # pylint: disable=broad-except
             for exception_to_skip in exceptions_to_skip:
                 if isinstance(err, exception_to_skip):

@@ -5,6 +5,7 @@
 """Abstract base class for Bluetooth AVRCP Profile affordance."""
 
 import abc
+from typing import Any
 
 from honeydew.interfaces.affordances.bluetooth import bluetooth_common
 from honeydew.typing import bluetooth
@@ -21,7 +22,7 @@ class BluetoothAvrcp(bluetooth_common.BluetoothCommon):
         """Initialize AVRCP service from the sink device."""
 
     @abc.abstractmethod
-    def list_received_requests(self) -> list:
+    def list_received_requests(self) -> list[Any]:
         """List received requests received from source device."""
 
     @abc.abstractmethod

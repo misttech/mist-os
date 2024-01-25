@@ -282,7 +282,7 @@ class Tracing(tracing.Tracing):
         """
         assert self._trace_controller_proxy is not None
 
-        drain_task: asyncio.Task | None = None
+        drain_task: asyncio.Task | None = None  # type: ignore[type-arg]
         async with asyncio.TaskGroup() as tg:
             if download:
                 drain_task = tg.create_task(self._drain_socket_async())

@@ -5,6 +5,7 @@
 """Abstract base class for Bluetooth Common affordance."""
 
 import abc
+from typing import Any
 
 from honeydew.typing import bluetooth
 
@@ -64,7 +65,7 @@ class BluetoothCommon(abc.ABC):
         """
 
     @abc.abstractmethod
-    def get_connected_devices(self) -> list:
+    def get_connected_devices(self) -> list[str]:
         """Retrieves all connected remote devices.
 
         Returns:
@@ -72,7 +73,7 @@ class BluetoothCommon(abc.ABC):
         """
 
     @abc.abstractmethod
-    def get_known_remote_devices(self) -> dict:
+    def get_known_remote_devices(self) -> dict[str, Any]:
         """Retrieves all known remote devices received by device.
 
         Returns:

@@ -22,7 +22,7 @@ class ScreenshotImage:
     size: custom_types.Size
     data: bytes
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         """Validates image size and data length.
 
         Raises:
@@ -110,7 +110,7 @@ class ScreenshotImage:
         height = 1
         return ScreenshotImage(custom_types.Size(width, height), data)
 
-    def save(self, path: str):
+    def save(self, path: str) -> None:
         """Saves the image to the given path.
 
         Raises:

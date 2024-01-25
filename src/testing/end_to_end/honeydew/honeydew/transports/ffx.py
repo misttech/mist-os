@@ -426,7 +426,7 @@ class FFX:
             name_entry: dict[str, Any] = self._get_label_entry(
                 target_entry["child"], label_value="name"
             )
-            return name_entry["value"]
+            return str(name_entry["value"])
         except Exception as err:  # pylint: disable=broad-except
             raise errors.FfxCommandError(
                 f"Failed to get the target name of {self._target_name}"
@@ -521,7 +521,7 @@ class FFX:
         board_entry: dict[str, Any] = self._get_label_entry(
             build_entry["child"], label_value="board"
         )
-        return board_entry["value"]
+        return str(board_entry["value"])
 
     # pylint: disable=missing-raises-doc
     # To handle below pylint warning:
@@ -598,11 +598,11 @@ class FFX:
 
     # pylint: enable=missing-raises-doc
 
-    def popen(
+    def popen(  # type: ignore[no-untyped-def]
         self,
         cmd: list[str],
         **kwargs,
-    ) -> subprocess.Popen:
+    ) -> subprocess.Popen:  # type: ignore[type-arg]
         """Executes the command `ffx -t {target} ... {cmd}` via `subprocess.Popen`.
 
         Intended for executing daemons or processing streamed output. Given

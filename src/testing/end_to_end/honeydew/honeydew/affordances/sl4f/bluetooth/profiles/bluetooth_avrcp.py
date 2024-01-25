@@ -40,7 +40,7 @@ class BluetoothAvrcp(
             method=Sl4fMethods.INIT_AVRCP, params={"target_id": target_id}
         )
 
-    def list_received_requests(self) -> list:
+    def list_received_requests(self) -> list[object]:
         """List received requests received from source device.
 
         Returns:
