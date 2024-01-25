@@ -403,7 +403,7 @@ impl HostPipeChild {
                     }
 
                     if let Some(status) = ssh.try_wait()? {
-                        tracing::error!("Target pipe exited with {status}");
+                        tracing::error!("Target pipe exited with {status} due to {e:?}");
                     } else {
                         tracing::error!(
                             "ssh child has not ended, trying one more time then ignoring it."
@@ -699,8 +699,8 @@ async fn parse_ssh_error<R: AsyncBufRead + Unpin>(stderr: &mut R, verbose: bool)
         if l.starts_with("Authenticated to ") {
             continue;
         }
-        // Additional debugging messages will begin with "debug1".
-        if l.starts_with("debug1:") {
+        // Additional debugging messages will begin with "debug1" or "debug2".
+        if l.starts_with("debug1:") || l.starts_with("debug2:") {
             continue;
         }
         // At this point, we just want to look at one line to see if it is the compatibility
