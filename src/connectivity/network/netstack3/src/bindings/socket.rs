@@ -32,7 +32,7 @@ use netstack3_core::{
 use crate::bindings::{
     devices::{
         BindingId, DeviceIdAndName, DeviceSpecificInfo, Devices, DynamicCommonInfo,
-        DynamicNetdeviceInfo, LoopbackInfo, NetdeviceInfo,
+        DynamicNetdeviceInfo, LoopbackInfo, NetdeviceInfo, PureIpDeviceInfo,
     },
     util::{DeviceNotFoundError, IntoCore as _, IntoFidl as _, TryIntoCoreWithContext},
     Ctx, DeviceIdExt as _,
@@ -258,6 +258,16 @@ fn flags_for_device(info: &DeviceSpecificInfo<'_>) -> psocket::InterfaceFlags {
         }) => {
             physical_up = true;
             loopback = true;
+            (&*dynamic_common_info.read().unwrap()).into()
+        }
+        DeviceSpecificInfo::PureIp(PureIpDeviceInfo {
+            static_common_info: _,
+            dynamic_common_info,
+        }) => {
+            // TODO(https://fxbug.dev/42051633): Properly account for phys up on
+            // pure IP devices.
+            physical_up = false;
+            loopback = false;
             (&*dynamic_common_info.read().unwrap()).into()
         }
     };

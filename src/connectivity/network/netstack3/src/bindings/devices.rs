@@ -21,6 +21,7 @@ use net_types::{
 use netstack3_core::{
     device::{
         DeviceId, DeviceSendFrameError, EthernetLinkDevice, LoopbackDevice, LoopbackDeviceId,
+        PureIpDevice,
     },
     sync::{Mutex as CoreMutex, RwLock as CoreRwLock},
     types::WorkQueueReport,
@@ -119,6 +120,7 @@ impl Devices<DeviceId<BindingsCtx>> {
 pub(crate) enum DeviceSpecificInfo<'a> {
     Netdevice(&'a NetdeviceInfo),
     Loopback(&'a LoopbackInfo),
+    PureIp(&'a PureIpDeviceInfo),
 }
 
 impl DeviceSpecificInfo<'_> {
@@ -126,6 +128,7 @@ impl DeviceSpecificInfo<'_> {
         match self {
             Self::Netdevice(i) => &i.static_common_info,
             Self::Loopback(i) => &i.static_common_info,
+            Self::PureIp(i) => &i.static_common_info,
         }
     }
 
@@ -137,6 +140,7 @@ impl DeviceSpecificInfo<'_> {
                 },
             ),
             Self::Loopback(i) => i.with_dynamic_info(cb),
+            Self::PureIp(i) => i.with_dynamic_info(cb),
         }
     }
 
@@ -151,6 +155,7 @@ impl DeviceSpecificInfo<'_> {
                 },
             ),
             Self::Loopback(i) => i.with_dynamic_info_mut(cb),
+            Self::PureIp(i) => i.with_dynamic_info_mut(cb),
         }
     }
 }
@@ -201,6 +206,9 @@ pub(crate) fn spawn_tx_task(
                         .api()
                         .transmit_queue::<LoopbackDevice>()
                         .transmit_queued_frames(device_id),
+                    DeviceId::PureIp(device_id) => {
+                        ctx.api().transmit_queue::<PureIpDevice>().transmit_queued_frames(device_id)
+                    }
                 }
                 .unwrap_or_else(|DeviceSendFrameError::DeviceNotReady(())| {
                     warn!(
@@ -314,6 +322,25 @@ impl NetdeviceInfo {
     ) -> O {
         let mut dynamic = self.dynamic.write().unwrap();
         cb(dynamic.deref_mut())
+    }
+}
+
+#[derive(Debug)]
+pub(crate) struct PureIpDeviceInfo {
+    pub(crate) static_common_info: StaticCommonInfo,
+    pub(crate) dynamic_common_info: std::sync::RwLock<DynamicCommonInfo>,
+}
+
+impl PureIpDeviceInfo {
+    pub(crate) fn with_dynamic_info<O, F: FnOnce(&DynamicCommonInfo) -> O>(&self, cb: F) -> O {
+        cb(self.dynamic_common_info.read().unwrap().deref())
+    }
+
+    pub(crate) fn with_dynamic_info_mut<O, F: FnOnce(&mut DynamicCommonInfo) -> O>(
+        &self,
+        cb: F,
+    ) -> O {
+        cb(self.dynamic_common_info.write().unwrap().deref_mut())
     }
 }
 

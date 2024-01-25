@@ -719,7 +719,7 @@ async fn remove_interface(ctx: &mut Ctx, id: BindingId) {
         match core_id {
             DeviceId::Ethernet(core_id) => {
                 // We want to remove the routes on the device _after_ we mark
-                // the device for deletion (by calling `remove_..._device`) so
+                // the device for deletion (by calling `remove_device`) so
                 // that we don't race with any new routes being added through
                 // that device.
                 let result = ctx.api().device().remove_device(core_id);
@@ -729,7 +729,7 @@ async fn remove_interface(ctx: &mut Ctx, id: BindingId) {
             }
             DeviceId::Loopback(core_id) => {
                 // We want to remove the routes on the device _after_ we mark
-                // the device for deletion (by calling `remove_..._device`) so
+                // the device for deletion (by calling `remove_device`) so
                 // that we don't race with any new routes being added through
                 // that device.
                 let result = ctx.api().device().remove_device(core_id);
@@ -742,6 +742,18 @@ async fn remove_interface(ctx: &mut Ctx, id: BindingId) {
                 // Allow the loopback interface to be removed as part of clean
                 // shutdown, but emit a warning about it.
                 tracing::warn!("loopback interface was removed");
+                return;
+            }
+            DeviceId::PureIp(core_id) => {
+                // We want to remove the routes on the device _after_ we mark
+                // the device for deletion (by calling `remove_device`) so
+                // that we don't race with any new routes being added through
+                // that device.
+                let result = ctx.api().device().remove_device(core_id);
+                ctx.bindings_ctx().remove_routes_on_device(&weak_id).await;
+                let devices::PureIpDeviceInfo { static_common_info: _, dynamic_common_info: _ } =
+                    wait_for_device_removal(id, result, &weak_id).await;
+                tracing::info!("pure IP device {id:?} removal complete");
                 return;
             }
         }
@@ -1723,6 +1735,15 @@ mod enabled {
                         mac: _,
                         dynamic,
                     }) => Info::Netdevice((dynamic.write().unwrap(), Some(handler))),
+                    // TODO(https://fxbug.dev/42051633): Support enabling
+                    // pure IP devices.
+                    devices::DeviceSpecificInfo::PureIp(devices::PureIpDeviceInfo {
+                        static_common_info: _,
+                        dynamic_common_info: _,
+                    }) => {
+                        tracing::warn!("enabling/disabling pure IP devices is not yet supported");
+                        return false;
+                    }
                 };
                 let (common_info, port_handler) = match info {
                     Info::Loopback((ref mut common_info, port_handler)) => {
@@ -1786,6 +1807,12 @@ mod enabled {
                 i @ devices::DeviceSpecificInfo::Loopback(_) => {
                     unreachable!("unexpected device info {:?} for interface {}", i, *id)
                 }
+                // TODO(https://fxbug.dev/42051633): Support enabling the
+                // underlying port for pure IP devices.
+                devices::DeviceSpecificInfo::PureIp(_) => {
+                    tracing::warn!("enabling/disabling pure IP devices is not yet supported");
+                    return;
+                }
             };
             // Enable or disable interface with context depending on new
             // online status. The helper functions take care of checking if
@@ -1832,6 +1859,12 @@ mod enabled {
                          addresses: _,
                      }| { *admin_enabled },
                 ),
+                // TODO(https://fxbug.dev/42051633): Support enabling pure IP
+                // devices.
+                DeviceSpecificInfo::PureIp(_) => {
+                    tracing::warn!("enabling/disabling pure IP devices is not yet supported");
+                    return;
+                }
             };
 
             let ip_config = Some(IpDeviceConfigurationUpdate {

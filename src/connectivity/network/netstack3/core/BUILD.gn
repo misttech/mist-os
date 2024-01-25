@@ -38,6 +38,8 @@ rustc_library_with_features("netstack3-core") {
     "src/device/link.rs",
     "src/device/loopback.rs",
     "src/device/ndp.rs",
+    "src/device/pure_ip.rs",
+    "src/device/pure_ip/integration.rs",
     "src/device/queue.rs",
     "src/device/queue/api.rs",
     "src/device/queue/fifo.rs",

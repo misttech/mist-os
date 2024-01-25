@@ -42,6 +42,9 @@ fn handle_get_port(
     let port_handler = port_handler.as_ref().map_err(Clone::clone).and_then(|state| match state {
         DeviceSpecificInfo::Loopback(_) => Err(zx::Status::NOT_SUPPORTED),
         DeviceSpecificInfo::Netdevice(info) => Ok(&info.handler),
+        // TODO(https://fxbug.dev/42051633): Support GetPort for pure IP
+        // devices.
+        DeviceSpecificInfo::PureIp(_) => Err(zx::Status::NOT_SUPPORTED),
     });
     match port_handler {
         Ok(port_handler) => port_handler.connect_port(port).unwrap_or_else(

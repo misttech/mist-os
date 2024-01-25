@@ -194,6 +194,11 @@ pub(crate) fn devices(ctx: &Ctx) -> fuchsia_inspect::Inspector {
                         DeviceSpecificInfo::Loopback(_info) => {
                             node.record_bool("Loopback", true);
                         }
+                        // TODO(https://fxbug.dev/42051633): Add relevant
+                        // inspect data for pure IP devices.
+                        DeviceSpecificInfo::PureIp(_info) => {
+                            node.record_bool("loopback", false);
+                        }
                     }
                 })
             }
@@ -241,7 +246,8 @@ pub(crate) fn neighbors(mut ctx: Ctx) -> fuchsia_inspect::Inspector {
         devices
             .filter_map(|d| match d {
                 DeviceId::Ethernet(d) => Some(d.clone()),
-                DeviceId::Loopback(_) => None,
+                // NUD is not supported on Loopback or pure IP devices.
+                DeviceId::Loopback(_) | DeviceId::PureIp(_) => None,
             })
             .collect::<Vec<_>>()
     });

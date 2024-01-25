@@ -405,7 +405,8 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpDeviceConfigurat
             DeviceId::Ethernet(id) => {
                 nud::confirm_reachable::<Ipv4, _, _, _>(self, bindings_ctx, id, neighbor)
             }
-            DeviceId::Loopback(_) => {}
+            // NUD is not supported on Loopback or pure IP devices.
+            DeviceId::Loopback(_) | DeviceId::PureIp(_) => {}
         }
     }
 }
@@ -503,7 +504,8 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpDeviceConfigurat
             DeviceId::Ethernet(id) => {
                 nud::confirm_reachable::<Ipv6, _, _, _>(self, bindings_ctx, id, neighbor)
             }
-            DeviceId::Loopback(_) => {}
+            // NUD is not supported on Loopback or pure IP devices.
+            DeviceId::Loopback(_) | DeviceId::PureIp(_) => {}
         }
     }
 }

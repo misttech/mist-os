@@ -139,6 +139,7 @@ where
                 return Err(zx::Status::ADDRESS_UNREACHABLE);
             }
         }
+        DeviceId::PureIp(_device) => None,
     };
 
     let destination = {

@@ -7,6 +7,7 @@
 #[cfg(test)]
 use alloc::vec;
 use alloc::{borrow::ToOwned, collections::HashMap, sync::Arc, vec::Vec};
+use assert_matches::assert_matches;
 #[cfg(test)]
 use core::time::Duration;
 use core::{
@@ -1237,6 +1238,7 @@ impl crate::device::socket::DeviceSocketBindingsContext<DeviceId<Self>> for Fake
 impl DeviceLayerStateTypes for FakeBindingsCtx {
     type LoopbackDeviceState = ();
     type EthernetDeviceState = ();
+    type PureIpDeviceState = ();
     type DeviceIdentifier = MonotonicIdentifier;
 }
 
@@ -1481,10 +1483,7 @@ pub fn clear_routes_and_remove_ethernet_device<BC: crate::BindingsContext>(
 ) {
     let device_id = crate::device::DeviceId::Ethernet(ethernet_device);
     del_device_routes(core_ctx, bindings_ctx, &device_id);
-    let ethernet_device = match device_id {
-        crate::device::DeviceId::Ethernet(ethernet_device) => ethernet_device,
-        crate::device::DeviceId::Loopback(_) => unreachable!(),
-    };
+    let ethernet_device = assert_matches!(device_id, crate::device::DeviceId::Ethernet(id) => id);
     match crate::CoreApi::with_contexts(core_ctx, bindings_ctx)
         .device()
         .remove_device(ethernet_device)

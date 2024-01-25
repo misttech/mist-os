@@ -57,6 +57,7 @@ pub mod device {
     pub(crate) mod link;
     pub(crate) mod loopback;
     pub(crate) mod ndp;
+    pub(crate) mod pure_ip;
     pub(crate) mod queue;
     pub(crate) mod socket;
     mod state;
@@ -86,6 +87,7 @@ pub mod device {
     };
     pub use id::{DeviceId, EthernetDeviceId, EthernetWeakDeviceId, WeakDeviceId};
     pub use loopback::{LoopbackCreationProperties, LoopbackDevice, LoopbackDeviceId};
+    pub use pure_ip::PureIpDevice;
     pub use queue::tx::TransmitQueueConfiguration;
 }
 

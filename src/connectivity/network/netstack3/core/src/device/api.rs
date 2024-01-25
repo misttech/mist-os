@@ -21,6 +21,7 @@ use crate::{
         ethernet::EthernetLinkDevice,
         for_any_device_id,
         loopback::LoopbackDevice,
+        pure_ip::PureIpDevice,
         state::{BaseDeviceState, DeviceStateSpec, IpLinkDeviceStateInner},
         AnyDevice, BaseDeviceId, BasePrimaryDeviceId, Device, DeviceCollectionContext, DeviceId,
         DeviceIdContext, DeviceLayerStateTypes, DeviceLayerTypes, DeviceReceiveFrameSpec,
@@ -306,7 +307,8 @@ impl<C> DeviceAnyApi<C>
 where
     C: ContextPair,
     C::CoreContext: DeviceApiCoreContext<EthernetLinkDevice, C::BindingsContext>
-        + DeviceApiCoreContext<LoopbackDevice, C::BindingsContext>,
+        + DeviceApiCoreContext<LoopbackDevice, C::BindingsContext>
+        + DeviceApiCoreContext<PureIpDevice, C::BindingsContext>,
     C::BindingsContext: DeviceApiBindingsContext,
 {
     fn device<D>(&mut self) -> DeviceApi<D, &mut C> {

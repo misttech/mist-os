@@ -14,6 +14,7 @@ use crate::{
     device::{
         ethernet::EthernetLinkDevice,
         loopback::{LoopbackDevice, LoopbackDeviceId, LoopbackWeakDeviceId},
+        pure_ip::{PureIpDevice, PureIpDeviceId, PureIpWeakDeviceId},
         state::{BaseDeviceState, DeviceStateSpec, IpLinkDeviceState, WeakCookie},
         DeviceLayerTypes,
     },
@@ -54,6 +55,7 @@ pub trait WeakId: Id + PartialEq<Self::Strong> {
 pub enum WeakDeviceId<BT: DeviceLayerTypes> {
     Ethernet(EthernetWeakDeviceId<BT>),
     Loopback(LoopbackWeakDeviceId<BT>),
+    PureIp(PureIpWeakDeviceId<BT>),
 }
 
 impl<BT: DeviceLayerTypes> PartialEq<DeviceId<BT>> for WeakDeviceId<BT> {
@@ -71,6 +73,12 @@ impl<BT: DeviceLayerTypes> From<EthernetWeakDeviceId<BT>> for WeakDeviceId<BT> {
 impl<BT: DeviceLayerTypes> From<LoopbackWeakDeviceId<BT>> for WeakDeviceId<BT> {
     fn from(id: LoopbackWeakDeviceId<BT>) -> WeakDeviceId<BT> {
         WeakDeviceId::Loopback(id)
+    }
+}
+
+impl<BT: DeviceLayerTypes> From<PureIpWeakDeviceId<BT>> for WeakDeviceId<BT> {
+    fn from(id: PureIpWeakDeviceId<BT>) -> WeakDeviceId<BT> {
+        WeakDeviceId::PureIp(id)
     }
 }
 
@@ -98,6 +106,7 @@ impl<BT: DeviceLayerTypes> WeakDeviceId<BT> {
 enum DebugReferencesInner<BT: DeviceLayerTypes> {
     Loopback(crate::sync::DebugReferences<BaseDeviceState<LoopbackDevice, BT>>),
     Ethernet(crate::sync::DebugReferences<BaseDeviceState<EthernetLinkDevice, BT>>),
+    PureIp(crate::sync::DebugReferences<BaseDeviceState<PureIpDevice, BT>>),
 }
 
 impl<BT: DeviceLayerTypes> From<crate::sync::DebugReferences<BaseDeviceState<LoopbackDevice, BT>>>
@@ -117,6 +126,14 @@ impl<BT: DeviceLayerTypes>
     }
 }
 
+impl<BT: DeviceLayerTypes> From<crate::sync::DebugReferences<BaseDeviceState<PureIpDevice, BT>>>
+    for DebugReferencesInner<BT>
+{
+    fn from(inner: crate::sync::DebugReferences<BaseDeviceState<PureIpDevice, BT>>) -> Self {
+        DebugReferencesInner::PureIp(inner)
+    }
+}
+
 /// A type offering a [`Debug`] implementation that helps debug dangling device
 /// references.
 pub struct DebugReferences<BT: DeviceLayerTypes>(DebugReferencesInner<BT>);
@@ -127,6 +144,7 @@ impl<BT: DeviceLayerTypes> Debug for DebugReferences<BT> {
         match inner {
             DebugReferencesInner::Loopback(d) => write!(f, "Loopback({d:?})"),
             DebugReferencesInner::Ethernet(d) => write!(f, "Ethernet({d:?})"),
+            DebugReferencesInner::PureIp(d) => write!(f, "PureIp({d:?})"),
         }
     }
 }
@@ -135,7 +153,7 @@ impl<BT: DeviceLayerTypes> Id for WeakDeviceId<BT> {
     fn is_loopback(&self) -> bool {
         match self {
             WeakDeviceId::Loopback(_) => true,
-            WeakDeviceId::Ethernet(_) => false,
+            WeakDeviceId::Ethernet(_) | WeakDeviceId::PureIp(_) => false,
         }
     }
 }
@@ -162,6 +180,7 @@ impl<BT: DeviceLayerTypes> Debug for WeakDeviceId<BT> {
 pub enum DeviceId<BT: DeviceLayerTypes> {
     Ethernet(EthernetDeviceId<BT>),
     Loopback(LoopbackDeviceId<BT>),
+    PureIp(PureIpDeviceId<BT>),
 }
 
 /// Evaluates the expression for the given device_id, regardless of its variant.
@@ -173,6 +192,7 @@ macro_rules! for_any_device_id {
         match $device_id {
             $device_id_enum_type::Loopback($variable) => $expression,
             $device_id_enum_type::Ethernet($variable) => $expression,
+            $device_id_enum_type::PureIp($variable) => $expression,
         }
     };
 }
@@ -190,8 +210,10 @@ impl<BT: DeviceLayerTypes> PartialEq<WeakDeviceId<BT>> for DeviceId<BT> {
         match (self, other) {
             (DeviceId::Ethernet(strong), WeakDeviceId::Ethernet(weak)) => strong == weak,
             (DeviceId::Loopback(strong), WeakDeviceId::Loopback(weak)) => strong == weak,
-            (DeviceId::Loopback(_), WeakDeviceId::Ethernet(_))
-            | (DeviceId::Ethernet(_), WeakDeviceId::Loopback(_)) => false,
+            (DeviceId::PureIp(strong), WeakDeviceId::PureIp(weak)) => strong == weak,
+            (DeviceId::Ethernet(_), _) | (DeviceId::Loopback(_), _) | (DeviceId::PureIp(_), _) => {
+                false
+            }
         }
     }
 }
@@ -204,11 +226,23 @@ impl<BT: DeviceLayerTypes> PartialOrd for DeviceId<BT> {
 
 impl<BT: DeviceLayerTypes> Ord for DeviceId<BT> {
     fn cmp(&self, other: &Self) -> core::cmp::Ordering {
+        // Assigns an arbitrary but orderable identifier, `u8`, to each variant
+        // of `DeviceId`.
+        fn discriminant<BT: DeviceLayerTypes>(d: &DeviceId<BT>) -> u8 {
+            match d {
+                // Each variant must provide a unique discriminant!
+                DeviceId::Ethernet(_) => 0,
+                DeviceId::Loopback(_) => 1,
+                DeviceId::PureIp(_) => 2,
+            }
+        }
         match (self, other) {
             (DeviceId::Ethernet(me), DeviceId::Ethernet(other)) => me.cmp(other),
             (DeviceId::Loopback(me), DeviceId::Loopback(other)) => me.cmp(other),
-            (DeviceId::Loopback(_), DeviceId::Ethernet(_)) => core::cmp::Ordering::Less,
-            (DeviceId::Ethernet(_), DeviceId::Loopback(_)) => core::cmp::Ordering::Greater,
+            (DeviceId::PureIp(me), DeviceId::PureIp(other)) => me.cmp(other),
+            (me @ DeviceId::Ethernet(_), other)
+            | (me @ DeviceId::Loopback(_), other)
+            | (me @ DeviceId::PureIp(_), other) => discriminant(me).cmp(&discriminant(other)),
         }
     }
 }
@@ -222,6 +256,12 @@ impl<BT: DeviceLayerTypes> From<EthernetDeviceId<BT>> for DeviceId<BT> {
 impl<BT: DeviceLayerTypes> From<LoopbackDeviceId<BT>> for DeviceId<BT> {
     fn from(id: LoopbackDeviceId<BT>) -> DeviceId<BT> {
         DeviceId::Loopback(id)
+    }
+}
+
+impl<BT: DeviceLayerTypes> From<PureIpDeviceId<BT>> for DeviceId<BT> {
+    fn from(id: PureIpDeviceId<BT>) -> DeviceId<BT> {
+        DeviceId::PureIp(id)
     }
 }
 
@@ -246,7 +286,7 @@ impl<BT: DeviceLayerTypes> Id for DeviceId<BT> {
     fn is_loopback(&self) -> bool {
         match self {
             DeviceId::Loopback(_) => true,
-            DeviceId::Ethernet(_) => false,
+            DeviceId::Ethernet(_) | DeviceId::PureIp(_) => false,
         }
     }
 }

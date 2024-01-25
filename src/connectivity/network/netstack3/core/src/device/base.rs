@@ -30,6 +30,7 @@ use crate::{
             StrongId, WeakId,
         },
         loopback::{LoopbackDeviceId, LoopbackPrimaryDeviceId},
+        pure_ip::{PureIpDeviceId, PureIpPrimaryDeviceId},
         socket::{self, HeldSockets},
         state::DeviceStateSpec,
     },
@@ -143,7 +144,8 @@ pub(crate) fn snapshot_device_ids<T, BC: BindingsContext, F: FnMut(DeviceId<BC>)
 ) -> impl IntoIterator<Item = T> {
     let mut core_ctx = CoreCtx::new_deprecated(core_ctx);
     let devices = core_ctx.read_lock::<crate::lock_ordering::DeviceLayerState>();
-    let Devices { ethernet, loopback } = &*devices;
+    let Devices { ethernet, pure_ip: _, loopback } = &*devices;
+    // TODO(https://fxbug.dev/42051633): Include Pure IP devices.
     DevicesIter { ethernet: ethernet.values(), loopback: loopback.iter() }
         .filter_map(filter_map)
         .collect::<SmallVec<[T; 32]>>()
@@ -310,6 +312,7 @@ impl From<MulticastAddr<Mac>> for FrameDestination {
 #[derivative(Default(bound = ""))]
 pub struct Devices<BT: DeviceLayerTypes> {
     pub(super) ethernet: HashMap<EthernetDeviceId<BT>, EthernetPrimaryDeviceId<BT>>,
+    pub(super) pure_ip: HashMap<PureIpDeviceId<BT>, PureIpPrimaryDeviceId<BT>>,
     pub(super) loopback: Option<LoopbackPrimaryDeviceId<BT>>,
 }
 
@@ -470,6 +473,9 @@ pub trait DeviceLayerStateTypes: InstantContext {
     /// The state associated with ethernet devices.
     type EthernetDeviceState: Send + Sync;
 
+    /// The state associated with pure IP devices.
+    type PureIpDeviceState: Send + Sync;
+
     /// An opaque identifier that is available from both strong and weak device
     /// references.
     type DeviceIdentifier: Send + Sync + Debug + Display;
@@ -553,7 +559,9 @@ pub(crate) fn set_promiscuous_mode<BC: BindingsContext>(
             id,
             enabled,
         )),
-        DeviceId::Loopback(LoopbackDeviceId { .. }) => Err(NotSupportedError),
+        DeviceId::Loopback(LoopbackDeviceId { .. }) | DeviceId::PureIp(PureIpDeviceId { .. }) => {
+            Err(NotSupportedError)
+        }
     }
 }
 
@@ -733,6 +741,7 @@ mod tests {
         device::{
             ethernet::{EthernetCreationProperties, MaxEthernetFrameSize},
             loopback::{LoopbackCreationProperties, LoopbackDevice},
+            pure_ip::PureIpDevice,
             queue::tx::TransmitQueueConfiguration,
         },
         error,
@@ -949,6 +958,10 @@ mod tests {
                     .core_api()
                     .transmit_queue::<LoopbackDevice>()
                     .set_configuration(device, TransmitQueueConfiguration::Fifo),
+                DeviceId::PureIp(device) => ctx
+                    .core_api()
+                    .transmit_queue::<PureIpDevice>()
+                    .set_configuration(device, TransmitQueueConfiguration::Fifo),
             }
         }
 
@@ -989,6 +1002,9 @@ mod tests {
                     .transmit_queued_frames(device),
                 DeviceId::Loopback(device) => {
                     ctx.core_api().transmit_queue::<LoopbackDevice>().transmit_queued_frames(device)
+                }
+                DeviceId::PureIp(device) => {
+                    ctx.core_api().transmit_queue::<PureIpDevice>().transmit_queued_frames(device)
                 }
             };
             assert_eq!(result, Ok(WorkQueueReport::AllDone));

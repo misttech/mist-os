@@ -1049,6 +1049,7 @@ mod testutil {
     {
         type EthernetDeviceState = ();
         type LoopbackDeviceState = ();
+        type PureIpDeviceState = ();
         type DeviceIdentifier = MonotonicIdentifier;
     }
 

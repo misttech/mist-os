@@ -3931,6 +3931,7 @@ mod tests {
     impl<D: FakeStrongDeviceId> DeviceLayerStateTypes for TcpBindingsCtx<D> {
         type LoopbackDeviceState = ();
         type EthernetDeviceState = ();
+        type PureIpDeviceState = ();
         type DeviceIdentifier = MonotonicIdentifier;
     }
 

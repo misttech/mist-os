@@ -54,7 +54,7 @@ use util::{ConversionContext, IntoFidl as _};
 
 use devices::{
     BindingId, DeviceIdAndName, DeviceSpecificInfo, Devices, DynamicCommonInfo,
-    DynamicNetdeviceInfo, LoopbackInfo, NetdeviceInfo, StaticCommonInfo,
+    DynamicNetdeviceInfo, LoopbackInfo, NetdeviceInfo, PureIpDeviceInfo, StaticCommonInfo,
 };
 use interfaces_watcher::{InterfaceEventProducer, InterfaceProperties, InterfaceUpdate};
 use timers::TimerDispatcher;
@@ -217,6 +217,7 @@ impl DeviceIdExt for DeviceId<BindingsCtx> {
         match self {
             DeviceId::Ethernet(d) => DeviceSpecificInfo::Netdevice(d.external_state()),
             DeviceId::Loopback(d) => DeviceSpecificInfo::Loopback(d.external_state()),
+            DeviceId::PureIp(d) => DeviceSpecificInfo::PureIp(d.external_state()),
         }
     }
 }
@@ -482,6 +483,7 @@ impl TimerContext<TimerId<BindingsCtx>> for BindingsCtx {
 impl DeviceLayerStateTypes for BindingsCtx {
     type LoopbackDeviceState = LoopbackInfo;
     type EthernetDeviceState = NetdeviceInfo;
+    type PureIpDeviceState = PureIpDeviceInfo;
     type DeviceIdentifier = DeviceIdAndName;
 }
 

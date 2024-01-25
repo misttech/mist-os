@@ -550,6 +550,7 @@ fn iface_type(device: &DeviceId<BindingsCtx>) -> fppacket::HardwareType {
     match device {
         DeviceId::Ethernet(_) => fppacket::HardwareType::Ethernet,
         DeviceId::Loopback(_) => fppacket::HardwareType::Loopback,
+        DeviceId::PureIp(_) => fppacket::HardwareType::NetworkOnly,
     }
 }
 
@@ -569,6 +570,10 @@ impl TryIntoFidlWithContext<fppacket::InterfaceProperties> for WeakDeviceId<Bind
                 // Pretend that the loopback interface has an all-zeroes MAC
                 // address to match Linux behavior.
                 fppacket::HardwareAddress::Eui48(fidl_fuchsia_net::MacAddress { octets: [0; 6] })
+            }
+            DeviceId::PureIp(_) => {
+                // Pure IP devices don't support link-layer addressing.
+                fppacket::HardwareAddress::None(fppacket::Empty)
             }
         };
         let id = ctx.get_binding_id(device).get();

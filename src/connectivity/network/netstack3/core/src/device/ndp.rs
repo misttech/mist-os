@@ -258,7 +258,7 @@ mod tests {
         {
             match id {
                 DeviceId::Ethernet(id) => Ok(id),
-                DeviceId::Loopback(_) => Err(id),
+                DeviceId::Loopback(_) | DeviceId::PureIp(_) => Err(id),
             }
         }
     }

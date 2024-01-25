@@ -29,6 +29,7 @@ use crate::{
         },
         for_any_device_id,
         loopback::{self, LoopbackDevice, LoopbackDeviceId, LoopbackPrimaryDeviceId},
+        pure_ip::PureIpDeviceId,
         queue::tx::TransmitQueueHandler,
         socket,
         state::{DeviceStateSpec, IpLinkDeviceState},
@@ -107,7 +108,9 @@ where
                     )
                 }
             }
-            DeviceId::Loopback(LoopbackDeviceId { .. }) => {}
+            // NUD is not supported on Loopback and Pure IP devices.
+            DeviceId::Loopback(LoopbackDeviceId { .. })
+            | DeviceId::PureIp(PureIpDeviceId { .. }) => {}
         }
     }
 
@@ -132,7 +135,9 @@ where
                     )
                 }
             }
-            DeviceId::Loopback(LoopbackDeviceId { .. }) => {}
+            // NUD is not supported on Loopback and Pure IP devices.
+            DeviceId::Loopback(LoopbackDeviceId { .. })
+            | DeviceId::PureIp(PureIpDeviceId { .. }) => {}
         }
     }
 
@@ -141,7 +146,9 @@ where
             DeviceId::Ethernet(id) => {
                 NudHandler::<I, EthernetLinkDevice, _>::flush(self, bindings_ctx, &id)
             }
-            DeviceId::Loopback(LoopbackDeviceId { .. }) => {}
+            // NUD is not supported on Loopback and Pure IP devices.
+            DeviceId::Loopback(LoopbackDeviceId { .. })
+            | DeviceId::PureIp(PureIpDeviceId { .. }) => {}
         }
     }
 }
@@ -234,8 +241,9 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpDeviceConfigurat
         cb: F,
     ) -> O {
         let (devices, locked) = self.read_lock_and::<crate::lock_ordering::DeviceLayerState>();
-        let Devices { ethernet, loopback } = &*devices;
+        let Devices { ethernet, pure_ip: _, loopback } = &*devices;
 
+        // TODO(https://fxbug.dev/42051633): Include pure IP devices.
         cb(DevicesIter { ethernet: ethernet.values(), loopback: loopback.iter() }, locked)
     }
 
@@ -518,8 +526,9 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpDeviceConfigurat
         cb: F,
     ) -> O {
         let (devices, locked) = self.read_lock_and::<crate::lock_ordering::DeviceLayerState>();
-        let Devices { ethernet, loopback } = &*devices;
+        let Devices { ethernet, pure_ip: _, loopback } = &*devices;
 
+        // TODO(https://fxbug.dev/42051633): Include pure IP devices.
         cb(DevicesIter { ethernet: ethernet.values(), loopback: loopback.iter() }, locked)
     }
 
@@ -704,7 +713,8 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpDeviceAddresses<
             DeviceId::Ethernet(id) => {
                 Some(Ipv6DeviceLinkLayerAddr::Mac(ethernet::get_mac(self, &id).get()))
             }
-            DeviceId::Loopback(LoopbackDeviceId { .. }) => None,
+            DeviceId::Loopback(LoopbackDeviceId { .. })
+            | DeviceId::PureIp(PureIpDeviceId { .. }) => None,
         }
     }
 
@@ -713,7 +723,8 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpDeviceAddresses<
             DeviceId::Ethernet(id) => {
                 Some(ethernet::get_mac(self, &id).to_eui64_with_magic(Mac::DEFAULT_EUI_MAGIC))
             }
-            DeviceId::Loopback(LoopbackDeviceId { .. }) => None,
+            DeviceId::Loopback(LoopbackDeviceId { .. })
+            | DeviceId::PureIp(PureIpDeviceId { .. }) => None,
         }
     }
 
@@ -725,6 +736,8 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpDeviceAddresses<
         match device_id {
             DeviceId::Ethernet(id) => ethernet::set_mtu(self, &id, mtu),
             DeviceId::Loopback(LoopbackDeviceId { .. }) => {}
+            // TODO(https://fxbug.dev/42051633): Support MTU updates.
+            DeviceId::PureIp(_id) => {}
         }
     }
 
@@ -821,7 +834,8 @@ impl<BC: BindingsContext, L> SendFrameContext<BC, socket::DeviceSocketMetadata<D
     for CoreCtx<'_, BC, L>
 where
     Self: SendFrameContext<BC, socket::DeviceSocketMetadata<EthernetDeviceId<BC>>>
-        + SendFrameContext<BC, socket::DeviceSocketMetadata<LoopbackDeviceId<BC>>>,
+        + SendFrameContext<BC, socket::DeviceSocketMetadata<LoopbackDeviceId<BC>>>
+        + SendFrameContext<BC, socket::DeviceSocketMetadata<PureIpDeviceId<BC>>>,
 {
     fn send_frame<S>(
         &mut self,
@@ -1011,6 +1025,11 @@ fn get_mtu<BC: BindingsContext, L: LockBefore<crate::lock_ordering::DeviceLayerS
     match device {
         DeviceId::Ethernet(id) => self::ethernet::get_mtu(core_ctx, &id),
         DeviceId::Loopback(id) => self::loopback::get_mtu(core_ctx, id),
+        DeviceId::PureIp(id) => {
+            crate::device::integration::with_device_state(core_ctx, id, |mut state| {
+                state.cast_with(|s| &s.link.mtu).copied()
+            })
+        }
     }
 }
 
@@ -1031,7 +1050,7 @@ fn join_link_multicast_group<
             &id,
             MulticastAddr::from(&multicast_addr),
         ),
-        DeviceId::Loopback(LoopbackDeviceId { .. }) => {}
+        DeviceId::Loopback(LoopbackDeviceId { .. }) | DeviceId::PureIp(PureIpDeviceId { .. }) => {}
     }
 }
 
@@ -1052,7 +1071,7 @@ fn leave_link_multicast_group<
             &id,
             MulticastAddr::from(&multicast_addr),
         ),
-        DeviceId::Loopback(LoopbackDeviceId { .. }) => {}
+        DeviceId::Loopback(LoopbackDeviceId { .. }) | DeviceId::PureIp(PureIpDeviceId { .. }) => {}
     }
 }
 
@@ -1082,6 +1101,8 @@ where
         DeviceId::Loopback(id) => {
             loopback::send_ip_frame::<_, A, _, _>(core_ctx, bindings_ctx, id, local_addr, body)
         }
+        // TODO(https://fxbug.dev/42051633): Support sending on pure IP devices.
+        DeviceId::PureIp(_id) => Ok(()),
     }
 }
 
