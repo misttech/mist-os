@@ -146,8 +146,10 @@ TEST_F(VirtioInputTest, MultiTouchFingerEvents) {
     ASSERT_TRUE(touch_report.has_contacts());
     ASSERT_EQ(touch_report.contacts().count(), 1);
     EXPECT_EQ(touch_report.contacts()[0].contact_id(), 0);
-    EXPECT_EQ(touch_report.contacts()[0].position_x(), X_VAL * HidTouch::kXLogicalMax / VAL_MAX);
-    EXPECT_EQ(touch_report.contacts()[0].position_y(), Y_VAL * HidTouch::kYLogicalMax / VAL_MAX);
+    EXPECT_EQ(touch_report.contacts()[0].position_x(),
+              X_VAL * HidTouch::kXPhysicalMaxMicrometer / VAL_MAX);
+    EXPECT_EQ(touch_report.contacts()[0].position_y(),
+              Y_VAL * HidTouch::kYPhysicalMaxMicrometer / VAL_MAX);
 
     input_report_loop_.Quit();
   });
@@ -175,8 +177,10 @@ TEST_F(VirtioInputTest, MultiTouchFingerEvents) {
     ASSERT_TRUE(touch_report.has_contacts());
     ASSERT_EQ(touch_report.contacts().count(), 2);
     EXPECT_EQ(touch_report.contacts()[0].contact_id(), 0);
-    EXPECT_EQ(touch_report.contacts()[0].position_x(), X_VAL * HidTouch::kXLogicalMax / VAL_MAX);
-    EXPECT_EQ(touch_report.contacts()[0].position_y(), Y_VAL * HidTouch::kYLogicalMax / VAL_MAX);
+    EXPECT_EQ(touch_report.contacts()[0].position_x(),
+              X_VAL * HidTouch::kXPhysicalMaxMicrometer / VAL_MAX);
+    EXPECT_EQ(touch_report.contacts()[0].position_y(),
+              Y_VAL * HidTouch::kYPhysicalMaxMicrometer / VAL_MAX);
     EXPECT_EQ(touch_report.contacts()[1].contact_id(), 1);
 
     input_report_loop_.Quit();
@@ -207,8 +211,10 @@ TEST_F(VirtioInputTest, MultiTouchFingerEvents) {
     ASSERT_TRUE(touch_report.has_contacts());
     ASSERT_EQ(touch_report.contacts().count(), 1);
     EXPECT_EQ(touch_report.contacts()[0].contact_id(), 0);
-    EXPECT_EQ(touch_report.contacts()[0].position_x(), X_VAL * HidTouch::kXLogicalMax / VAL_MAX);
-    EXPECT_EQ(touch_report.contacts()[0].position_y(), Y_VAL * HidTouch::kYLogicalMax / VAL_MAX);
+    EXPECT_EQ(touch_report.contacts()[0].position_x(),
+              X_VAL * HidTouch::kXPhysicalMaxMicrometer / VAL_MAX);
+    EXPECT_EQ(touch_report.contacts()[0].position_y(),
+              Y_VAL * HidTouch::kYPhysicalMaxMicrometer / VAL_MAX);
 
     input_report_loop_.Quit();
   });
@@ -242,8 +248,10 @@ TEST_F(VirtioInputTest, MultiTouchFingerEvents) {
     ASSERT_TRUE(touch_report.has_contacts());
     ASSERT_EQ(touch_report.contacts().count(), 1);
     EXPECT_EQ(touch_report.contacts()[0].contact_id(), 0);
-    EXPECT_EQ(touch_report.contacts()[0].position_x(), X_VAL * HidTouch::kXLogicalMax / VAL_MAX);
-    EXPECT_EQ(touch_report.contacts()[0].position_y(), Y_VAL * HidTouch::kYLogicalMax / VAL_MAX);
+    EXPECT_EQ(touch_report.contacts()[0].position_x(),
+              X_VAL * HidTouch::kXPhysicalMaxMicrometer / VAL_MAX);
+    EXPECT_EQ(touch_report.contacts()[0].position_y(),
+              Y_VAL * HidTouch::kYPhysicalMaxMicrometer / VAL_MAX);
 
     input_report_loop_.Quit();
   });

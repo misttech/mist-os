@@ -37,11 +37,9 @@ class HidTouch : public HidDevice<TouchReport> {
   void ReceiveEvent(virtio_input_event_t* event) override;
 
   // These numbers are used by the touch descriptor of the Google Pixelbook (Eve) touchscreen. We
-  // use these physical/logical sizes to emulate a real touch device on the emulator.
+  // use these physical sizes to emulate a real touch device on the emulator.
   static constexpr int64_t kXPhysicalMaxMicrometer = 259200;
   static constexpr int64_t kYPhysicalMaxMicrometer = 172800;
-  static constexpr int64_t kXLogicalMax = 10368;
-  static constexpr int64_t kYLogicalMax = 6912;
 
  private:
   virtio_input_absinfo_t x_info_;

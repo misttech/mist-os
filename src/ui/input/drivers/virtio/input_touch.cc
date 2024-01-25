@@ -100,15 +100,17 @@ void HidTouch::ReceiveEvent(virtio_input_event_t* event) {
       // If tracking id is -1 we have to remove the finger from being tracked.
       report_.contacts[active_finger_index_].exists = static_cast<int32_t>(event->value) != -1;
     } else if (event->code == VIRTIO_INPUT_EV_MT_POSITION_X) {
-      // By guaranteeing `event->value` <= max, the product will be <= kLogicalMax, where both
-      // kLogicalMax and the product are int64_t, so we are guaranteed to not overflow.
+      // By guaranteeing `event->value` <= max, the product will be <= kPhysicalMax, where both
+      // kPhysicalMax and the product are int64_t, so we are guaranteed to not overflow.
       ZX_DEBUG_ASSERT(event->value <= x_info_.max);
-      report_.contacts[active_finger_index_].x = event->value * kXLogicalMax / x_info_.max;
+      report_.contacts[active_finger_index_].x =
+          event->value * kXPhysicalMaxMicrometer / x_info_.max;
     } else if (event->code == VIRTIO_INPUT_EV_MT_POSITION_Y) {
-      // By guaranteeing `event->value` <= max, the product will be <= kLogicalMax, where both
-      // kLogicalMax and the product are int64_t, so we are guaranteed to not overflow.
+      // By guaranteeing `event->value` <= max, the product will be <= kPhysicalMax, where both
+      // kPhysicalMax and the product are int64_t, so we are guaranteed to not overflow.
       ZX_DEBUG_ASSERT(event->value <= y_info_.max);
-      report_.contacts[active_finger_index_].y = event->value * kYLogicalMax / y_info_.max;
+      report_.contacts[active_finger_index_].y =
+          event->value * kYPhysicalMaxMicrometer / y_info_.max;
     }
   }
 }
