@@ -94,7 +94,7 @@ void DeviceServer::MessageDispatcher::Node::Close(CloseCompleter::Sync& complete
 
 void DeviceServer::MessageDispatcher::Node::Query(QueryCompleter::Sync& completer) {
   const std::string_view kProtocol = fuchsia_io::wire::kNodeProtocolName;
-  // TODO(https://fxbug.dev/101890): avoid the const cast.
+  // TODO(https://fxbug.dev/42052765): avoid the const cast.
   uint8_t* data = reinterpret_cast<uint8_t*>(const_cast<char*>(kProtocol.data()));
   completer.Reply(fidl::VectorView<uint8_t>::FromExternal(data, kProtocol.size()));
 }
@@ -170,7 +170,7 @@ DeviceServer::MessageDispatcher::MessageDispatcher(DeviceServer& parent, bool mu
 
 namespace {
 
-// TODO(https://fxbug.dev/85473): This target uses uses internal FIDL machinery to ad-hoc compose protocols.
+// TODO(https://fxbug.dev/42166376): This target uses uses internal FIDL machinery to ad-hoc compose protocols.
 // Ad-hoc composition of protocols (try to match a method against protocol A, then B, etc.) is not
 // supported by FIDL. We should move to public supported APIs.
 template <typename FidlProtocol>

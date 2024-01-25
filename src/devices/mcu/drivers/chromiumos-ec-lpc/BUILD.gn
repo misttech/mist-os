@@ -23,7 +23,7 @@ common_deps = [
   "//sdk/fidl/fuchsia.hardware.acpi:fuchsia.hardware.acpi_cpp",
   "//sdk/fidl/fuchsia.hardware.google.ec:fuchsia.hardware.google.ec_cpp",
 
-  # TODO(https://fxbug.dev/113997): Fix thread unsafety and switch to
+  # TODO(https://fxbug.dev/42065251): Fix thread unsafety and switch to
   # "//sdk/lib/component/outgoing/cpp".
   "//sdk/lib/component/outgoing/cpp:cpp_disable_synchronization_check",
   "//src/devices/lib/driver",

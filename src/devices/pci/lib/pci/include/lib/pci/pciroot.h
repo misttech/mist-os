@@ -234,7 +234,7 @@ class PcirootBase : public ddk::Device<PcirootBase>,
   void DdkRelease() { delete this; }
 
  private:
-  // TODO(https://fxbug.dev/32978): presently, pciroot instances will always outlive the root host
+  // TODO(https://fxbug.dev/42108122): presently, pciroot instances will always outlive the root host
   // it references here because it exists within the same devhost process as a
   // singleton. This will be updated when the pciroot implementation changes to
   // move away from a standalone banjo protocol.

@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-// TODO(https://fxbug.dev/84961): Fix null safety and remove this language version.
+// TODO(https://fxbug.dev/42165807): Fix null safety and remove this language version.
 // @dart=2.9
 
 import 'dart:async';
@@ -19,7 +19,7 @@ import 'package:retry/retry.dart';
 import 'package:sl4f/sl4f.dart' as sl4f;
 import 'package:test/test.dart';
 
-// TODO(https://fxbug.dev/53292): update to use test size.
+// TODO(https://fxbug.dev/42130689): update to use test size.
 const _timeout = Timeout(Duration(minutes: 5));
 
 void printErrorHelp() {

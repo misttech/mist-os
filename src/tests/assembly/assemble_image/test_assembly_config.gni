@@ -154,7 +154,7 @@ template("test_assembly_config") {
 
     # This is an action rather than a host test because enumerating all the inputs to assembly
     # for the host_test_data() template is very difficult right now.
-    # TODO(https://fxbug.dev/96877) archive the AIB into a tgz for host_test_data()
+    # TODO(https://fxbug.dev/42179042) archive the AIB into a tgz for host_test_data()
     #
     # NOTE:  This action should only occur in the target toolchain, not in the
     # host toolchain.

@@ -37,7 +37,7 @@ fuchsia_driver("shtv3-driver") {
   sources = [ "shtv3.cc" ]
   deps = [ ":common" ]
 
-  # TODO(https://fxbug.dev/58162): delete the below and fix compiler warnings
+  # TODO(https://fxbug.dev/42136089): delete the below and fix compiler warnings
   configs += [ "//build/config:Wno-conversion" ]
 }
 
@@ -69,7 +69,7 @@ test("shtv3-test-bin") {
     "//zircon/system/ulib/zxtest",
   ]
 
-  # TODO(https://fxbug.dev/58162): delete the below and fix compiler warnings
+  # TODO(https://fxbug.dev/42136089): delete the below and fix compiler warnings
   configs += [ "//build/config:Wno-conversion" ]
 }
 

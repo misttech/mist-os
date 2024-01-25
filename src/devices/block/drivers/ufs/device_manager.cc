@@ -143,8 +143,8 @@ zx::result<> DeviceManager::SetReferenceClock() {
 }
 
 zx::result<> DeviceManager::SetUicPowerMode() {
-  // TODO(https://fxbug.dev/124835): Get the max gear level using DME_GET command.
-  // TODO(https://fxbug.dev/124835): Set the gear level for tx/rx lanes.
+  // TODO(https://fxbug.dev/42075643): Get the max gear level using DME_GET command.
+  // TODO(https://fxbug.dev/42075643): Set the gear level for tx/rx lanes.
 
   // Get connected lanes.
   DmeGetUicCommand dme_get_connected_tx_lanes_command(controller_, PA_ConnectedTxDataLanes, 0);

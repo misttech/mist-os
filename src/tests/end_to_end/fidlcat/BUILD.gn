@@ -22,7 +22,7 @@ if (is_host) {
 
     # Runs on "main" builders (try and ci) in QEMU environments, but only on x64, as we don't
     # support running host test on arm64 host.
-    # TODO(https://fxbug.dev/100888): fix the timeout issue with asan on.
+    # TODO(https://fxbug.dev/42051651): fix the timeout issue with asan on.
     # TODO: enable the test on other arm64 targets.
     environments = []
     if (target_cpu == "x64" && !is_asan) {

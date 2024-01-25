@@ -381,10 +381,10 @@ decode_failure("GoldenStringStructNullBody") {
 
 // Golden test for the decode() function.
 encode_success("GoldenHandleBasicRightsStructReEncode") {
-    // TODO(https://fxbug.dev/116276): Implement the decode function in all backends.
+    // TODO(https://fxbug.dev/42067496): Implement the decode function in all backends.
     bindings_allowlist = [rust],
     handle_defs = {
-        // TODO(https://fxbug.dev/118275): This has to have basic rights. If we use
+        // TODO(https://fxbug.dev/42069438): This has to have basic rights. If we use
         // event_default, the rights will get reduced in the decode() function,
         // and the assertion on the handle_dispositions raw handle will fail.
         #0 = event(rights: basic),
@@ -417,7 +417,7 @@ encode_success("GoldenHandleBasicRightsStructReEncode") {
 // Example where a handle occurs in the input but not in the decoded output.
 // Backends should assert that the handle gets closed.
 decode_success("GoldenTableUnknownDropped") {
-    // TODO(https://fxbug.dev/85383): Drop unknown data in all bindings.
+    // TODO(https://fxbug.dev/42166276): Drop unknown data in all bindings.
     bindings_denylist = [dart, go],
     handle_defs = {
         #0 = event(),

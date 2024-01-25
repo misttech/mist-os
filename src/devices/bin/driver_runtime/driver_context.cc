@@ -31,7 +31,7 @@ static thread_local std::optional<zx_status_t> g_role_profile_status;
 namespace driver_context {
 
 void PushDriver(const void* driver, driver_runtime::Dispatcher* dispatcher) {
-  // TODO(https://fxbug.dev/88520): re-enable this once driver host v1 is deprecated.
+  // TODO(https://fxbug.dev/42169761): re-enable this once driver host v1 is deprecated.
   // ZX_DEBUG_ASSERT(IsDriverInCallStack(driver) == false);
   if (IsDriverInCallStack(driver)) {
     LOGF(TRACE, "DriverContext: tried to push driver %p that was already in stack\n", driver);

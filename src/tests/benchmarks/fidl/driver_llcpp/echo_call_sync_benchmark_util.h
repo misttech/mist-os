@@ -80,7 +80,7 @@ bool EchoCallSyncBenchmark(perftest::RepeatState* state, BuilderFunc builder) {
       ZX_ASSERT(result.ok());
     }
 
-    // TODO(https://fxbug.dev/92489): If this call and wait is removed, the test will
+    // TODO(https://fxbug.dev/42174168): If this call and wait is removed, the test will
     // flake by leaking |AsyncServerBinding| objects.
     binding_ref.Unbind();
 

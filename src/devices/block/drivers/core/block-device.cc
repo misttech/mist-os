@@ -176,7 +176,7 @@ void BlockDevice::OpenSession(OpenSessionRequestView request,
     return;
   }
 
-  // TODO(https://fxbug.dev/115950): Avoid running a thread per session; make `Server` async
+  // TODO(https://fxbug.dev/42067206): Avoid running a thread per session; make `Server` async
   // instead.
   thrd_t thread;
   if (thrd_create_with_name(

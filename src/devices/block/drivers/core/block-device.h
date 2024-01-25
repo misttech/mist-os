@@ -44,7 +44,7 @@
 // To maintain stats related to time taken by a command or its success/failure, we need to
 // intercept command completion with a callback routine. This might introduce memory
 // overhead.
-// TODO(https://fxbug.dev/121589): We should be able to turn on/off stats either at compile-time or
+// TODO(https://fxbug.dev/42072576): We should be able to turn on/off stats either at compile-time or
 // load-time.
 struct StatsCookie {
   zx::ticks start_tick;
@@ -131,7 +131,7 @@ class BlockDevice : public BlockDeviceType,
   std::unique_ptr<uint8_t[]> io_op_;
 
   fbl::Mutex stat_lock_;
-  // TODO(https://fxbug.dev/121589): We should consider adding the ability to toggle stats, or remove this
+  // TODO(https://fxbug.dev/42072576): We should consider adding the ability to toggle stats, or remove this
   // boolean if we aren't going to.
   bool enable_stats_ TA_GUARDED(stat_lock_) = true;
   storage_metrics::BlockDeviceMetrics stats_ TA_GUARDED(stat_lock_) = {};
@@ -139,7 +139,7 @@ class BlockDevice : public BlockDeviceType,
   // To maintain stats related to time taken by a command or its success/failure, we need to
   // intercept command completion with a callback routine. This might introduce cpu
   // overhead.
-  // TODO(https://fxbug.dev/121589): We should be able to turn on/off stats at run-time.
+  // TODO(https://fxbug.dev/42072576): We should be able to turn on/off stats at run-time.
   //                 Create fidl interface to control how stats are maintained.
   bool completion_status_stats_ = true;
 };

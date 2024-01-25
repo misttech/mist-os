@@ -9,7 +9,7 @@
     program: {
         binary: "bin/i2c-channel-test",
 
-        // TODO(https://fxbug.dev/92563): Remove shuffle disable flag after fixing the test.
+        // TODO(https://fxbug.dev/42174251): Remove shuffle disable flag after fixing the test.
         args: [
             "--gtest_shuffle",
             "false",

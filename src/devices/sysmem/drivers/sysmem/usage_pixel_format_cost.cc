@@ -17,7 +17,7 @@
 #include "macros.h"
 #include "utils.h"
 
-// TODO(https://fxbug.dev/68491): This platform/board/etc-specific allocation/creation
+// TODO(https://fxbug.dev/42147520): This platform/board/etc-specific allocation/creation
 // policy code belongs in a platform/board/etc-specific binary.
 
 namespace sysmem_driver {

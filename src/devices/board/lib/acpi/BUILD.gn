@@ -8,7 +8,7 @@ import("//src/devices/bus/drivers/pci/pci.gni")
 
 declare_args() {
   # If true, power on the Atlas camera at boot.
-  # TODO(https://fxbug.dev/81684): remove once we have a better way to manage ACPI device power.
+  # TODO(https://fxbug.dev/42162166): remove once we have a better way to manage ACPI device power.
   i_can_haz_atlas_camera = false
 }
 
@@ -32,7 +32,7 @@ shared_public_deps = [
 # array member; inheritance is not permitted in such cases, and compilation fails. Properly fixing
 # this is a problem for another day.
 #
-# TODO(https://fxbug.dev/125071): Remove this and the #ifndef guard around ACPI_FLEX_ARRAY in
+# TODO(https://fxbug.dev/42075906): Remove this and the #ifndef guard around ACPI_FLEX_ARRAY in
 # https://cs.opensource.google/fuchsia/fuchsia/+/main:third_party/acpica/source/include/platform/acgcc.h.
 #
 # See https://github.com/acpica/acpica/blob/4578e0e94d945e56547/source/include/platform/acgcc.h#L214-L223
@@ -81,7 +81,7 @@ source_set("host-acpi") {
   deps = shared_deps
   defines = shared_defines
 
-  # TODO(https://fxbug.dev/94768): This target uses mutable tables which are deprecated,
+  # TODO(https://fxbug.dev/42176699): This target uses mutable tables which are deprecated,
   # rather than builders.
   configs += [ "//build/cpp:fidl-wire-deprecated-mutable-tables" ]
 }
@@ -120,7 +120,7 @@ source_set("acpi") {
   deps = shared_deps + shared_fuchsia_deps + [ "//src/lib/ddk" ]
   defines += shared_defines
 
-  # TODO(https://fxbug.dev/94768): This target uses mutable tables which are deprecated,
+  # TODO(https://fxbug.dev/42176699): This target uses mutable tables which are deprecated,
   # rather than builders.
   configs += [ "//build/cpp:fidl-wire-deprecated-mutable-tables" ]
 }
@@ -159,7 +159,7 @@ test("acpi-test") {
          ]
   defines += shared_defines
 
-  # TODO(https://fxbug.dev/94768): This target uses mutable tables which are deprecated,
+  # TODO(https://fxbug.dev/42176699): This target uses mutable tables which are deprecated,
   # rather than builders.
   configs += [ "//build/cpp:fidl-wire-deprecated-mutable-tables" ]
 }

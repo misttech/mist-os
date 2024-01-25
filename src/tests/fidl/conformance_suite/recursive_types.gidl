@@ -20,7 +20,7 @@ success("RecursiveOptionalStruct") {
 }
 
 success("RecursiveVectorStruct") {
-    // TODO(https://fxbug.dev/88725) Enable this test for Rust.
+    // TODO(https://fxbug.dev/42169988) Enable this test for Rust.
     bindings_denylist = [rust],
     value = RecursiveVectorStruct{
         vec: [

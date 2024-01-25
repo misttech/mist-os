@@ -74,7 +74,7 @@ impl<'a> Statement<'a> {
     }
 }
 
-// TODO(https://fxbug.dev/35146): Improve error reporting here.
+// TODO(https://fxbug.dev/42110532): Improve error reporting here.
 impl<'a> TryFrom<&'a str> for Ast<'a> {
     type Error = BindParserError;
 
@@ -488,7 +488,7 @@ mod test {
             );
 
             // Blocks must not be empty.
-            // TODO(https://fxbug.dev/35146): Improve this error message, it currently reports a failure to parse
+            // TODO(https://fxbug.dev/42110532): Improve this error message, it currently reports a failure to parse
             // an accept statement due to the way the combinator works for the statement parser.
             assert!(if_statement(NomSpan::new("if a == b { } else { c == 1; }")).is_err());
             assert!(if_statement(NomSpan::new("if a == b { c == 1; } else { }")).is_err());
@@ -761,7 +761,7 @@ mod test {
 
         #[test]
         fn requires_semicolons() {
-            // TODO(https://fxbug.dev/35146): Improve the error type that is returned here.
+            // TODO(https://fxbug.dev/42110532): Improve the error type that is returned here.
             assert_eq!(
                 rules(NomSpan::new("x == 1")),
                 Err(nom::Err::Error(BindParserError::TrueKeyword("x == 1".to_string())))

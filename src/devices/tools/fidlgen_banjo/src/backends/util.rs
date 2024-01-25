@@ -42,7 +42,7 @@ pub fn get_declarations<'b>(ir: &'b FidlIr) -> Result<Vec<Decl<'b>>, Error> {
                 data: ir.protocol_declarations.iter().filter(|e| e.name == *ident).next()?,
             })),
             Declaration::Struct => {
-                // TODO(https://fxbug.dev/120909): Remove softmac specific hack. It is necessary to avoid
+                // TODO(https://fxbug.dev/42071953): Remove softmac specific hack. It is necessary to avoid
                 // migrating a lot of wlan specific drivers.
                 let matched = ir.struct_declarations.iter().find_map(|e| {
                     match (
@@ -71,7 +71,7 @@ pub fn get_declarations<'b>(ir: &'b FidlIr) -> Result<Vec<Decl<'b>>, Error> {
                 data: ir.alias_declarations.iter().filter(|e| e.name == *ident).next()?,
             })),
             Declaration::Union => {
-                // TODO(https://fxbug.dev/120909): Remove softmac specific hack.
+                // TODO(https://fxbug.dev/42071953): Remove softmac specific hack.
                 let matched = ir.union_declarations.iter().find_map(|e| {
                     match (
                         e.name == *ident,
@@ -625,7 +625,7 @@ pub fn get_out_params(
 }
 
 pub fn doesnt_use_error_syntax(m: &Method, ir: &FidlIr) -> bool {
-    // TODO(https://fxbug.dev/120909): Remove softmac specific hack. It is necessary to avoid
+    // TODO(https://fxbug.dev/42071953): Remove softmac specific hack. It is necessary to avoid
     // migrating a lot of wlan specific drivers.
     if ir.name == LibraryIdentifier("fuchsia.wlan.softmac".to_string()) {
         return true;

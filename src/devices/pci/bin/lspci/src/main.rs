@@ -154,7 +154,7 @@ async fn find_buses(path: &str) -> Result<Vec<BusProxy>, Error> {
         Err(anyhow!(format!(
             "Couldn't find a PCI bus service in {}
        You may be able to manually specify the platform directory manually.
-       Otherwise, due to https://fxbug.dev/32978 you may have success using `k lspci` instead of `lspci`.",
+       Otherwise, due to https://fxbug.dev/42108122 you may have success using `k lspci` instead of `lspci`.",
             path
         )))
     } else {

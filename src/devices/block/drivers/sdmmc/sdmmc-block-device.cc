@@ -271,7 +271,7 @@ void SdmmcBlockDevice::ReadWrite(std::vector<BlockOperation>& btxns, const EmmcP
   sdmmc_buffer_region_t* buffer_region_ptr = entry->buffer_regions.get();
   std::vector<sdmmc_req_t> reqs;
   if (!command_packing) {
-    // TODO(https://fxbug.dev/126205): Consider using SDMMC_CMD_AUTO23, which is likely to enhance
+    // TODO(https://fxbug.dev/42076962): Consider using SDMMC_CMD_AUTO23, which is likely to enhance
     // performance.
     reqs.push_back({
         .cmd_idx = SDMMC_SET_BLOCK_COUNT,
@@ -299,7 +299,7 @@ void SdmmcBlockDevice::ReadWrite(std::vector<BlockOperation>& btxns, const EmmcP
     // Safe because btxns.size() <= kMaxPackedCommandsFor512ByteBlockSize.
     entry->packed_command_header_data->num_entries = safemath::checked_cast<uint8_t>(btxns.size());
 
-    // TODO(https://fxbug.dev/133112): Consider pre-registering the packed command header VMO with
+    // TODO(https://fxbug.dev/42083080): Consider pre-registering the packed command header VMO with
     // the SDMMC driver to avoid pinning and unpinning for each transfer. Also handle the cache ops
     // here.
     *buffer_region_ptr = {
@@ -384,7 +384,7 @@ zx_status_t SdmmcBlockDevice::Flush() {
     return ZX_OK;
   }
 
-  // TODO(https://fxbug.dev/124654): Enable the cache and add flush support for SD.
+  // TODO(https://fxbug.dev/42075502): Enable the cache and add flush support for SD.
   ZX_ASSERT(!is_sd_);
 
   zx_status_t st = MmcDoSwitch(MMC_EXT_CSD_FLUSH_CACHE, MMC_EXT_CSD_FLUSH_MASK);
@@ -465,7 +465,7 @@ zx_status_t SdmmcBlockDevice::Trim(const block_trim_t& txn, const EmmcPartition 
 }
 
 zx_status_t SdmmcBlockDevice::RpmbRequest(const RpmbRequestInfo& request) {
-  // TODO(https://fxbug.dev/85455): Find out if RPMB requests can be retried.
+  // TODO(https://fxbug.dev/42166356): Find out if RPMB requests can be retried.
   using fuchsia_hardware_rpmb::wire::kFrameSize;
 
   const uint64_t tx_frame_count = request.tx_frames.size / kFrameSize;
@@ -689,7 +689,7 @@ void SdmmcBlockDevice::HandleBlockOps(block::BorrowedOperationQueue<PartitionInf
         uint64_t cum_transfer_bytes = (bop.rw.length * block_info_.block_size) +
                                       zx_system_get_page_size();  // +1 page for header block.
         while (btxns.size() < max_command_packing) {
-          // TODO(https://fxbug.dev/133112): It's inefficient to pop() here only to push() later in
+          // TODO(https://fxbug.dev/42083080): It's inefficient to pop() here only to push() later in
           // the case of packing ineligibility. Later on, we'll likely move away from using
           // block::BorrowedOperationQueue once we start using the FIDL driver transport arena (at
           // which point, use something like peek() instead).
@@ -700,7 +700,7 @@ void SdmmcBlockDevice::HandleBlockOps(block::BorrowedOperationQueue<PartitionInf
           }
 
           cum_transfer_bytes += pack_candidate_txn->operation()->rw.length * block_info_.block_size;
-          // TODO(https://fxbug.dev/133112): Explore reordering commands for more command packing.
+          // TODO(https://fxbug.dev/42083080): Explore reordering commands for more command packing.
           if (pack_candidate_txn->operation()->command.opcode != bop.command.opcode ||
               pack_candidate_txn->private_storage()->partition != partition ||
               cum_transfer_bytes > block_info_.max_transfer_size) {

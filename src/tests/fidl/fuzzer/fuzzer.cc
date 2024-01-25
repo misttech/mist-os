@@ -138,7 +138,7 @@ void ReportTestCase(const DecoderEncoderInput& input,
   const std::vector<uint8_t>& second_encoded_bytes = status.second_encoded_bytes;
   REPORT_BYTE_ARRAY_DIFF(first_encoded_bytes, second_encoded_bytes);
 
-  // TODO(https://fxbug.dev/136523): Report second handle data.
+  // TODO(https://fxbug.dev/42086143): Report second handle data.
 }
 
 #define ASSERT_TEST_CASE(cond, input, decoder_encoder_for_type, status)  \
@@ -170,7 +170,7 @@ void CheckDecoderEncoderDoubleRoundTrip(const DecoderEncoderInput& input,
                       status.first_encoded_bytes.size()) == 0);
 #undef ASSERT_LOCAL
 
-  // TODO(https://fxbug.dev/136523): Check handle koids.
+  // TODO(https://fxbug.dev/42086143): Check handle koids.
 }
 
 // If initial decoding succeeded, then check that a decode/encode round-trip succeeded, and
@@ -197,7 +197,7 @@ void CheckDecoderEncoderRoundTrip(const DecoderEncoderInput& raw_input,
   ASSERT_LOCAL(memcmp(input.data(), status.first_encoded_bytes.data(), input.size()) == 0);
 #undef ASSERT_LOCAL
 
-  // TODO(https://fxbug.dev/136523): Check handle koids.
+  // TODO(https://fxbug.dev/42086143): Check handle koids.
 }
 
 #undef ASSERT_TEST_CASE

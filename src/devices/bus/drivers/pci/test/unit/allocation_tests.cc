@@ -41,7 +41,7 @@ TEST(PciAllocationTest, BalancedAllocation) {
     EXPECT_EQ(2, fake_impl->allocation_eps().size());
   }
 
-  // TODO(https://fxbug.dev/32978): Rework this with the new eventpair model of GetAddressSpace
+  // TODO(https://fxbug.dev/42108122): Rework this with the new eventpair model of GetAddressSpace
   // EXPECT_EQ(0, fake_impl->allocation_cnt());
 }
 

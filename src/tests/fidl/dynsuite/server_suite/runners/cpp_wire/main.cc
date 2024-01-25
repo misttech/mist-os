@@ -19,7 +19,7 @@ namespace {
 const std::set<fidl_serversuite::Test> kDisabledTests = {
     // This is for testing the test disabling functionality itself.
     fidl_serversuite::Test::kIgnoreDisabled,
-    // TODO(https://fxbug.dev/129824): Should validate txid.
+    // TODO(https://fxbug.dev/42080225): Should validate txid.
     fidl_serversuite::Test::kOneWayWithNonZeroTxid,
     fidl_serversuite::Test::kTwoWayNoPayloadWithZeroTxid,
 };

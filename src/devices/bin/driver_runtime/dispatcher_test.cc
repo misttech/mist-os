@@ -1423,7 +1423,7 @@ TEST_F(DispatcherTest, CancelWaitFromWithinCanceledWait) {
 }
 
 TEST_F(DispatcherTest, CancelWaitRaceCondition) {
-  // Regression test for https://fxbug.dev/109988, a tricky race condition when cancelling a wait.
+  // Regression test for https://fxbug.dev/42061372, a tricky race condition when cancelling a wait.
   fdf_dispatcher_t* dispatcher;
   ASSERT_NO_FATAL_FAILURE(CreateDispatcher(0, __func__, "", CreateFakeDriver(), &dispatcher));
 
@@ -1907,7 +1907,7 @@ TEST_F(DispatcherTest, UnbindIrqImmediatelyAfterTriggering) {
   static constexpr uint32_t kNumIrqs = 3000;
   static constexpr uint32_t kNumThreads = 10;
 
-  // TODO(https://fxbug.dev/102878): this can be replaced by |fdf_env::DriverShutdown| once it works
+  // TODO(https://fxbug.dev/42053861): this can be replaced by |fdf_env::DriverShutdown| once it works
   // properly.
   libsync::Completion shutdown_completion;
   std::atomic_int num_destructed = 0;

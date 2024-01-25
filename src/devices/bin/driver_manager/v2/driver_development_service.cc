@@ -72,7 +72,7 @@ zx::result<fdd::wire::NodeInfo> CreateDeviceInfo(fidl::AnyArena& allocator,
     v2_info_builder.node_property_list(node_properties);
   }
 
-  // TODO(https://fxbug.dev/90735): Get topological path
+  // TODO(https://fxbug.dev/42172220): Get topological path
 
   auto driver_host = node->driver_host();
   if (node->is_bound() && driver_host) {

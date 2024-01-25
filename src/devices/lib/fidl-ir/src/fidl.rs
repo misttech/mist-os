@@ -847,7 +847,7 @@ fn get_payload_parameters<'a>(
             Ok(Some(out))
         }
         Declaration::Table => {
-            // TODO(https://fxbug.dev/82088): Handle tables correctly. This is currently a hack to get
+            // TODO(https://fxbug.dev/42162615): Handle tables correctly. This is currently a hack to get
             // parsing to work, as no backends which use this lib actually require support for
             // tables as parameters.
             let mut out = vec![];

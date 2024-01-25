@@ -29,7 +29,7 @@ executable("bin") {
     "padded_struct_tree.cc",
     "struct_tree.cc",
 
-    # TODO(https://fxbug.dev/84116) Re-enable once v2 wire format migration is complete.
+    # TODO(https://fxbug.dev/42164869) Re-enable once v2 wire format migration is complete.
     #"uint8_table.cc",
   ]
   deps = [

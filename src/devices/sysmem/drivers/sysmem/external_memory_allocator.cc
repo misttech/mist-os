@@ -31,7 +31,7 @@ zx_status_t ExternalMemoryAllocator::Allocate(uint64_t size,
   ZX_DEBUG_ASSERT_MSG(
       fbl::round_up(*settings.buffer_settings()->size_bytes(), zx_system_get_page_size()) == size,
       "size_bytes: %" PRIu64 " size: 0x%" PRIx64, *settings.buffer_settings()->size_bytes(), size);
-  // TODO(https://fxbug.dev/57690): We're currently using WireSharedClient for the combination of "shared"
+  // TODO(https://fxbug.dev/42135564): We're currently using WireSharedClient for the combination of "shared"
   // and sync() being available, but once we remove OnRegister we should also evaluate whether we
   // can just use fidl::SyncClient.
   fidl::Arena arena;

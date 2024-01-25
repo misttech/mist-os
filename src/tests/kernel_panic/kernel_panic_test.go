@@ -54,7 +54,7 @@ func TestReadUserMemoryViolation(t *testing.T) {
 	})
 	arch := distro.TargetCPU()
 	if arch != emulator.X64 {
-		// TODO(https://fxbug.dev/59284): Enable this test once we have PAN support.
+		// TODO(https://fxbug.dev/42137335): Enable this test once we have PAN support.
 		t.Skip("Skipping test. This test only supports x64 targets.")
 	}
 

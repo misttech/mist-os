@@ -16,7 +16,7 @@ def use(func):
     USES.append(Use(func.__name__.replace("_", "."), (func,)))
 
 
-# TODO(https://fxbug.dev/77561): we probably want to add a "constraints" test, for cases
+# TODO(https://fxbug.dev/42157590): we probably want to add a "constraints" test, for cases
 #  like `vector<Foo>:true` etc.
 
 
@@ -30,7 +30,7 @@ def constants(f, idents: List[ScopedIdentifier]):
 @use
 def using(f, idents: List[ScopedIdentifier]):
     for ident in idents:
-        # TODO(https://fxbug.dev/8042): Having a declaration with same same name as what is
+        # TODO(https://fxbug.dev/42160762): Having a declaration with same same name as what is
         # aliased causes a cycle.
         if ident.name == "string":
             continue

@@ -23,7 +23,7 @@ TEST(MetadataTest, RunTests) {
   // NB: this loop is never run. RealmBuilder::Build is in the call stack, and insists on a non-null
   // dispatcher.
   //
-  // TODO(https://fxbug.dev/114254): Remove this.
+  // TODO(https://fxbug.dev/42065538): Remove this.
   async::Loop loop(&kAsyncLoopConfigNeverAttachToThread);
   zx::result devmgr = IsolatedDevmgr::Create(std::move(args), loop.dispatcher());
   ASSERT_OK(devmgr.status_value());

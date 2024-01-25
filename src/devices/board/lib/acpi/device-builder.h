@@ -76,7 +76,7 @@ using PciTopo = uint64_t;
 // The below types are used to enforce that a device can only have one type of child (i.e. a device
 // can't be an SPI and an I2C bus at the same time).
 // Every T in `DeviceChildEntry` should also have a std::vector<T> in DeviceChildData.
-// TODO(https://fxbug.dev/78198): support more child bus types.
+// TODO(https://fxbug.dev/42158297): support more child bus types.
 using DeviceChildData = std::variant<std::monostate, std::vector<PciTopo>,
                                      std::vector<fuchsia_hardware_spi_businfo::wire::SpiChannel>,
                                      std::vector<fuchsia_hardware_i2c_businfo::wire::I2CChannel>>;
@@ -209,7 +209,7 @@ class DeviceBuilder {
   // ACPI_STA_* flags for this device.
   uint64_t state_;
 
-  // TODO(https://fxbug.dev/91510): remove device_id and use dynamic binding to bind against string
+  // TODO(https://fxbug.dev/42173082): remove device_id and use dynamic binding to bind against string
   // props once that is supported.
   uint32_t device_id_;
 

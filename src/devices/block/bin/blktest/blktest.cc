@@ -237,7 +237,7 @@ TEST(BlkdevTests, blkdev_test_fifo_basic) {
   ASSERT_EQ(block_client.Transaction(requests, 1), ZX_OK);
 }
 
-// TODO(https://fxbug.dev/44600): enable.
+// TODO(https://fxbug.dev/42121033): enable.
 //
 // This test has been disabled since its introduction in 4ef35f3b8366d64cccb0fe6e240fb101238d7dfb.
 TEST(BlkdevTests, DISABLED_blkdev_test_fifo_whole_disk) {

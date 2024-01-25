@@ -19,7 +19,7 @@ enum Condition {
     Inequal,
 }
 
-// TODO(https://fxbug.dev/71834): Currently, the driver manager only supports number-based
+// TODO(https://fxbug.dev/42151229): Currently, the driver manager only supports number-based
 // device properties. It will support string-based properties soon. We should
 // support other device property types in the future.
 #[derive(Clone, Debug, Hash, Eq, Ord, PartialEq, PartialOrd)]

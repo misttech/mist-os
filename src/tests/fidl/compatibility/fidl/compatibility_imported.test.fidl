@@ -40,7 +40,7 @@ type ErrorableRequestStruct = struct {
 // This protocol exists solely to be composed into the `Echo` protocol in `library
 // fidl.test.compatibility` as a means of testing the behavior and code generation of protocol
 // composition.
-// TODO(https://fxbug.dev/94910): Only test these tests in "N+M" mode, and move them into their
+// TODO(https://fxbug.dev/42176858): Only test these tests in "N+M" mode, and move them into their
 // own file, as they are not specifically concerned with wire compatibility across bindings.
 closed protocol Composed {
     strict EchoTableRequestComposed(table {

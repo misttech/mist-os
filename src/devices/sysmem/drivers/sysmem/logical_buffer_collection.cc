@@ -95,7 +95,7 @@ bool IsNonZeroPowerOf2(T value) {
   return true;
 }
 
-// TODO(https://fxbug.dev/50590): It'd be nice if this could be a function template over FIDL scalar
+// TODO(https://fxbug.dev/42127687): It'd be nice if this could be a function template over FIDL scalar
 // field types.
 #define FIELD_DEFAULT_1(table_ref_name, field_name)                                         \
   do {                                                                                      \
@@ -109,7 +109,7 @@ bool IsNonZeroPowerOf2(T value) {
     ZX_DEBUG_ASSERT(table_ref.field_name().has_value());                                    \
   } while (false)
 
-// TODO(https://fxbug.dev/50590): It'd be nice if this could be a function template over FIDL scalar
+// TODO(https://fxbug.dev/42127687): It'd be nice if this could be a function template over FIDL scalar
 // field types.
 #define FIELD_DEFAULT_MAX(table_ref_name, field_name)                                           \
   do {                                                                                          \
@@ -123,7 +123,7 @@ bool IsNonZeroPowerOf2(T value) {
     ZX_DEBUG_ASSERT(table_ref.field_name().has_value());                                        \
   } while (false)
 
-// TODO(https://fxbug.dev/50590): It'd be nice if this could be a function template over FIDL scalar
+// TODO(https://fxbug.dev/42127687): It'd be nice if this could be a function template over FIDL scalar
 // field types.
 #define FIELD_DEFAULT_ZERO(table_ref_name, field_name)                                      \
   do {                                                                                      \
@@ -138,7 +138,7 @@ bool IsNonZeroPowerOf2(T value) {
     ZX_DEBUG_ASSERT(table_ref.field_name().has_value());                                    \
   } while (false)
 
-// TODO(https://fxbug.dev/50590): It'd be nice if this could be a function template over FIDL scalar
+// TODO(https://fxbug.dev/42127687): It'd be nice if this could be a function template over FIDL scalar
 // field types.
 #define FIELD_DEFAULT_ZERO_64_BIT(table_ref_name, field_name)                               \
   do {                                                                                      \
@@ -237,7 +237,7 @@ T AlignUp(T value, T divisor) {
 }
 
 bool IsSecureHeap(const fuchsia_sysmem2::HeapType heap_type) {
-  // TODO(https://fxbug.dev/37452): Generalize this by finding if the heap_type maps to secure
+  // TODO(https://fxbug.dev/42113093): Generalize this by finding if the heap_type maps to secure
   // MemoryAllocator.
   return heap_type == fuchsia_sysmem2::HeapType::kAmlogicSecure ||
          heap_type == fuchsia_sysmem2::HeapType::kAmlogicSecureVdec;
@@ -2325,7 +2325,7 @@ static bool IsHeapPermitted(const fuchsia_sysmem2::BufferMemoryConstraints& cons
 }
 
 static bool IsSecurePermitted(const fuchsia_sysmem2::BufferMemoryConstraints& constraints) {
-  // TODO(https://fxbug.dev/37452): Generalize this by finding if there's a heap that maps to secure
+  // TODO(https://fxbug.dev/42113093): Generalize this by finding if there's a heap that maps to secure
   // MemoryAllocator in the permitted heaps.
   return constraints.inaccessible_domain_supported().value() &&
          (IsHeapPermitted(constraints, fuchsia_sysmem2::HeapType::kAmlogicSecure) ||
@@ -3310,7 +3310,7 @@ bool LogicalBufferCollection::IsColorSpaceEqual(const fuchsia_images2::ColorSpac
 static fpromise::result<fuchsia_sysmem2::HeapType, zx_status_t> GetHeap(
     const fuchsia_sysmem2::BufferMemoryConstraints& constraints, Device* device) {
   if (*constraints.secure_required()) {
-    // TODO(https://fxbug.dev/37452): Generalize this.
+    // TODO(https://fxbug.dev/42113093): Generalize this.
     //
     // checked previously
     ZX_DEBUG_ASSERT(!*constraints.secure_required() || IsSecurePermitted(constraints));
@@ -4657,7 +4657,7 @@ LogicalBuffer::LogicalBuffer(fbl::RefPtr<LogicalBufferCollection> logical_buffer
   // pre-zeroed VMOs.  And/or zero allocator backing space async during deallocation, but wait on
   // deallocations to be done before failing a new allocation.
   //
-  // TODO(https://fxbug.dev/34590): Zero secure/protected VMOs.
+  // TODO(https://fxbug.dev/42109914): Zero secure/protected VMOs.
   const auto& heap_properties = allocator->heap_properties();
   ZX_DEBUG_ASSERT(heap_properties.coherency_domain_support().has_value());
   ZX_DEBUG_ASSERT(heap_properties.need_clear().has_value());

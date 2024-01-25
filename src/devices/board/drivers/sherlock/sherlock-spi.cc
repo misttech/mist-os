@@ -147,7 +147,7 @@ zx_status_t Sherlock::SpiInit() {
 
   spi_dev.metadata() = std::move(spi_metadata);
 
-  // TODO(https://fxbug.dev/34010): fix this clock enable block when the clock driver can handle the
+  // TODO(https://fxbug.dev/42109271): fix this clock enable block when the clock driver can handle the
   // dividers
   {
     zx::unowned_resource resource(get_mmio_resource(parent()));

@@ -202,7 +202,7 @@ class SpiDeviceTest : public zxtest::Test {
   virtual void SetUpSpiImpl() = 0;
 
   void SetUp() override {
-    // TODO(https://fxbug.dev/124464): Migrate test to use dispatcher integration.
+    // TODO(https://fxbug.dev/42075363): Migrate test to use dispatcher integration.
     parent_ = MockDevice::FakeRootParent();
     ASSERT_OK(loop_.StartThread("spi-test-thread"));
 

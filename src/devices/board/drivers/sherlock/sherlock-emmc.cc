@@ -154,7 +154,7 @@ zx_status_t Sherlock::EmmcInit() {
           // Maintain the current Sherlock behavior until we determine that eMMC Packed Commands are
           // needed.
           .max_command_packing(0)
-          // TODO(https://fxbug.dev/134787): Use the FIDL SDMMC protocol.
+          // TODO(https://fxbug.dev/42084501): Use the FIDL SDMMC protocol.
           .use_fidl(false)
           .Build());
   if (!sdmmc_metadata.is_ok()) {

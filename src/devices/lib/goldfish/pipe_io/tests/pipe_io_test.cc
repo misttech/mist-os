@@ -315,7 +315,7 @@ TEST_F(PipeIoTest, NonBlockingCall) {
   ASSERT_EQ(result.error_value(), ZX_ERR_SHOULD_WAIT);
 }
 
-// TODO(https://fxbug.dev/102293): Use a single test loop and async FIDL client.
+// TODO(https://fxbug.dev/42053213): Use a single test loop and async FIDL client.
 class PipeAutoReaderTest : public gtest::TestLoopFixture {
  public:
   PipeAutoReaderTest() : loop_(&kAsyncLoopConfigNeverAttachToThread) {}

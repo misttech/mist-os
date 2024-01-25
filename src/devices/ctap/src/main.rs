@@ -19,7 +19,7 @@ pub use crate::ctap_device::CtapDevice;
 
 // An implementation of the Authenticator stream, which handles a stream of
 // AuthenticatorRequests.
-// TODO(https://fxbug.dev/108425): look for a device to talk to and check it's capabilities before executing
+// TODO(https://fxbug.dev/42059848): look for a device to talk to and check it's capabilities before executing
 // the request.
 pub async fn handle_request_for_stream(
     _agent: &CtapAgent,

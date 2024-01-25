@@ -48,7 +48,7 @@ class PciDeviceTests : protected inspect::InspectTestHelper, public zxtest::Test
   void ConfigureDownstreamDevices() { return upstream_.ConfigureDownstreamDevices(); }
 
  protected:
-  // TODO(https://fxbug.dev/124464): Migrate test to use dispatcher integration.
+  // TODO(https://fxbug.dev/42075363): Migrate test to use dispatcher integration.
   PciDeviceTests()
       : pciroot_(0, 1),
         client_(pciroot_.proto()),

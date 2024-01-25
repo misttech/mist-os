@@ -119,7 +119,7 @@ class ShutdownManager : public fidl::WireServer<fuchsia_device_manager::Administ
   void SignalBootShutdown(fit::callback<void(zx_status_t)> cb);
 
   // fuchsia.device.manager/Administrator interface
-  // TODO(https://fxbug.dev/68529): Remove this API.
+  // TODO(https://fxbug.dev/42147562): Remove this API.
   // This is a temporary API until DriverManager can ensure that base drivers
   // will be shut down automatically before fshost exits. This will happen
   // once drivers-as-components is implemented.
@@ -154,7 +154,7 @@ class ShutdownManager : public fidl::WireServer<fuchsia_device_manager::Administ
   void OnUnbound(const char* connection, fidl::UnbindInfo info);
 
   // The driver runner should always be valid while the shutdown manager exists.
-  // TODO(https://fxbug.dev/114374): ensure that this pointer is valid
+  // TODO(https://fxbug.dev/42065671): ensure that this pointer is valid
   NodeRemover* node_remover_;
 
   // Tracks when the devfs component is stopped by component manager. We shutdown all drivers upon

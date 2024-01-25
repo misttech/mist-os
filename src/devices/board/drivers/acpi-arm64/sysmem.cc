@@ -32,7 +32,7 @@ zx::result<> AcpiArm64::SysmemInit() {
       .protected_memory_size = 0,
       // -5 means 5% of physical RAM
       // we allocate a small amount of contiguous RAM to keep the sysmem tests from flaking,
-      // see https://fxbug.dev/67703.
+      // see https://fxbug.dev/42146647.
       .contiguous_memory_size = -5,
   };
 

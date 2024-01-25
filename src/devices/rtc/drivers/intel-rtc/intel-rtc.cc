@@ -155,7 +155,7 @@ void RtcDevice::WriteTime(FidlRtc::wire::Time time) {
 }
 
 void RtcDevice::Get(GetCompleter::Sync& completer) {
-  // TODO(https://fxbug.dev/123155): Reply with error if RTC time is known to be invalid.
+  // TODO(https://fxbug.dev/42074113): Reply with error if RTC time is known to be invalid.
   completer.ReplySuccess(ReadTime());
 }
 

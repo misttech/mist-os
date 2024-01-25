@@ -15,7 +15,7 @@
 
 #define ACPI_UUID_SIZE 16u
 
-// TODO(https://fxbug.dev/78349): delete these methods once users are in their own drivers.
+// TODO(https://fxbug.dev/42158465): delete these methods once users are in their own drivers.
 
 // Call the ACPI _OSC method on a device object.
 //

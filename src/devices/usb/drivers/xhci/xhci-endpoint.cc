@@ -250,7 +250,7 @@ zx_status_t Endpoint::ControlRequestDataPhase(UsbRequestState* state) {
                         ->setup()
                         ->bm_request_type();
           // Control transfers always get interrupter 0 (we consider those to be low-priority)
-          // TODO(https://fxbug.dev/34068): Change bus snooping options based on input from higher-level
+          // TODO(https://fxbug.dev/42109334): Change bus snooping options based on input from higher-level
           // drivers.
           data->set_CHAIN(next != nullptr)
               .set_DIRECTION((bm_request_type & USB_DIR_IN) != 0)

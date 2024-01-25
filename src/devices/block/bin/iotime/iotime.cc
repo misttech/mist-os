@@ -228,7 +228,7 @@ int main(int argc, char** argv) {
     ramdisk = std::move(result.value());
     zx_handle_t handle = ramdisk_get_block_interface(ramdisk.client());
     fidl::UnownedClientEnd<fuchsia_hardware_block::Block> block(handle);
-    // TODO(https://fxbug.dev/112484): this relies on multiplexing.
+    // TODO(https://fxbug.dev/42063787): this relies on multiplexing.
     zx::result cloned = component::Clone(block, component::AssumeProtocolComposesNode);
     if (cloned.is_error()) {
       fprintf(stderr, "error: cannot create ramdisk fd: %s\n", cloned.status_string());

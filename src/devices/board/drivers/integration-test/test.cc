@@ -89,7 +89,7 @@ class TestBoard : public TestBoardType {
 
   fbl::Vector<fpbus::Node> devices_;
 
-  // TODO(https://fxbug.dev/108070): Switch to fdf::SyncClient when it's available.
+  // TODO(https://fxbug.dev/42059490): Switch to fdf::SyncClient when it's available.
   fdf::WireSyncClient<fpbus::PlatformBus> pbus_;
   thrd_t thread_;
 };

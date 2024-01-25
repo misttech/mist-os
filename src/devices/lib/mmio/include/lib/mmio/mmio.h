@@ -82,7 +82,7 @@
 // <...>
 //
 
-// TODO(https://fxbug.dev/95874): Remove once drivers in other repos are migrated
+// TODO(https://fxbug.dev/42177928): Remove once drivers in other repos are migrated
 namespace ddk {
 using ::fdf::MmioBuffer;
 }

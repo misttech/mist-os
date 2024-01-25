@@ -106,7 +106,7 @@ var cases = []interface{}{
 	// UTF-8 BOM
 	exclude{
 		validCase{"\xef\xbb\xbf", "UTF-8 BOM"},
-		[]exclusion{{"dart", "TODO(https://fxbug.dev/52104): Dart consumes the UTF-8 BOM."}},
+		[]exclusion{{"dart", "TODO(https://fxbug.dev/42129370): Dart consumes the UTF-8 BOM."}},
 	},
 	invalidCase{"\xef", "Partial UTF-8 BOM (1)"},
 	invalidCase{"\xef\xbb", "Partial UTF-8 BOM (2)"},
@@ -130,7 +130,7 @@ var cases = []interface{}{
 	validCase{"\xf1\x80\xa0\xbf", ""},
 	exclude{
 		validCase{"\xef\xbb\xbf", "UTF-8 BOM"},
-		[]exclusion{{"dart", "TODO(https://fxbug.dev/52104): Dart consumes the UTF-8 BOM."}},
+		[]exclusion{{"dart", "TODO(https://fxbug.dev/42129370): Dart consumes the UTF-8 BOM."}},
 	},
 
 	// always invalid bytes
@@ -210,7 +210,7 @@ success("StringsValidCase{{ .index }}") {
 var decodeFailureTmpl = template.Must(template.New("decodeFailureTmpl").Parse(
 	`{{ if .comment }}// {{ .comment }}{{ end }}
 encode_failure("StringsInvalidCase{{ .index }}") {
-    // TODO(https://fxbug.dev/52104): UTF8 encoding and decoding is not conformant in Dart.
+    // TODO(https://fxbug.dev/42129370): UTF8 encoding and decoding is not conformant in Dart.
     // Rust is excluded since std::string::String is always valid UTF-8.
     bindings_denylist = [dart, rust],
     value = StringWrapper {
@@ -221,7 +221,7 @@ encode_failure("StringsInvalidCase{{ .index }}") {
 
 {{ if .comment }}// {{ .comment }}{{ end }}
 decode_failure("StringsInvalidCase{{ .index }}") {
-    // TODO(https://fxbug.dev/52104): UTF8 encoding and decoding is not conformant in Dart.
+    // TODO(https://fxbug.dev/42129370): UTF8 encoding and decoding is not conformant in Dart.
     bindings_denylist = [dart],
     type = StringWrapper,
     bytes = {

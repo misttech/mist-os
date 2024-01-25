@@ -86,7 +86,7 @@ __BEGIN_CDECLS
 #define USB_VIDEO_VS_UPDATE_FRAME_SEGMENT_CONTROL  0x08
 #define USB_VIDEO_VS_SYNCH_DELAY_CONTROL           0x09
 
-// TODO(https://fxbug.dev/110009): Change fields to use snake_case naming convention.
+// TODO(https://fxbug.dev/42061398): Change fields to use snake_case naming convention.
 
 // header for usb_video_vc_* below
 typedef struct {

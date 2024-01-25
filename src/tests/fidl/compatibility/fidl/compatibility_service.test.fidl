@@ -672,7 +672,7 @@ closed protocol Echo {
     }) error default_enum;
 
 
-    // TODO(https://fxbug.dev/88343): renamed these tests to make clearer the difference between these and
+    // TODO(https://fxbug.dev/42169565): renamed these tests to make clearer the difference between these and
     // the payload tests below.
     strict EchoXunions(resource struct {
         value vector<AllTypesXunion>;

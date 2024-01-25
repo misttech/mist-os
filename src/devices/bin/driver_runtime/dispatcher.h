@@ -247,7 +247,7 @@ class Dispatcher : public async_dispatcher_t,
     // Tracks the number of threads we've spawned via |loop_|.
     uint32_t num_threads_ __TA_GUARDED(&lock_) = 0;
     // Total number of threads we will spawn.
-    // TODO(https://fxbug.dev/135980): We are clamping number_threads_ to 10 to avoid spawning too many
+    // TODO(https://fxbug.dev/42085539): We are clamping number_threads_ to 10 to avoid spawning too many
     // threads. Technically this can result in a deadlock scenario in a very complex driver host. We
     // need better support for dynamically starting threads as necessary.
     uint32_t max_threads_ __TA_GUARDED(&lock_) = 10;
@@ -421,7 +421,7 @@ class Dispatcher : public async_dispatcher_t,
   // Queues a |CallbackRequest| for the token transfer callback and removes |token|
   // from the pending list. This is called when |fdf_token_register| and |fdf_token_transfer|
   // have been called for the same token.
-  // TODO(https://fxbug.dev/105578): replace fdf::Channel with a generic C++ handle type when available.
+  // TODO(https://fxbug.dev/42056822): replace fdf::Channel with a generic C++ handle type when available.
   zx_status_t ScheduleTokenCallback(fdf_token_t* token, zx_status_t status, fdf::Channel channel);
 
   // Dumps the dispatcher state as a vector of formatted strings.
@@ -452,7 +452,7 @@ class Dispatcher : public async_dispatcher_t,
   }
 
  private:
-  // TODO(https://fxbug.dev/87834): determine an appropriate size.
+  // TODO(https://fxbug.dev/42168999): determine an appropriate size.
   static constexpr uint32_t kBatchSize = 10;
 
   class EventWaiter : public AsyncLoopOwnedEventHandler<EventWaiter> {
@@ -568,7 +568,7 @@ class Dispatcher : public async_dispatcher_t,
     // has not yet been invoked. AsyncWait wraps the underlying async_wait_t callback in its own
     // custom callback (OnSignal), so there is an interval between when OnSignal is invoked and the
     // underlying callback is invoked during which a race with Dispatcher::CancelWait() can occur.
-    // See https://fxbug.dev/109988 for details.
+    // See https://fxbug.dev/42061372 for details.
     bool pending_cancellation_ = false;
 
     // driver_runtime::Callback can store only 2 pointers, so we store other state in the async
@@ -740,7 +740,7 @@ class Dispatcher : public async_dispatcher_t,
   // This is only relevant in the synchronized mode.
   bool dispatching_sync_ __TA_GUARDED(&callback_lock_) = false;
 
-  // TODO(https://fxbug.dev/97753): consider using std::atomic.
+  // TODO(https://fxbug.dev/42180016): consider using std::atomic.
   DispatcherState state_ __TA_GUARDED(&callback_lock_) = DispatcherState::kRunning;
 
   // Number of threads currently servicing callbacks.

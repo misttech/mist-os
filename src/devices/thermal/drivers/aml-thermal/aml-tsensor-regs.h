@@ -41,7 +41,7 @@
 #define AML_TS_TEMP_MASK        0xfff
 #define AML_TS_CH_SEL           0x3 /* set 3'b011 for work */
 #define AML_TS_VALUE_CONT       0x10
-#define AML_TS_REBOOT_TIME      0xff  // TODO(https://fxbug.dev/62972): Reconsider this setting
+#define AML_TS_REBOOT_TIME      0xff  // TODO(https://fxbug.dev/42141424): Reconsider this setting
 
 //clang-format on
 

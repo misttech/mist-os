@@ -20,7 +20,7 @@ class PDevFidl {
   PDevFidl() = default;
   explicit PDevFidl(fidl::ClientEnd<fuchsia_hardware_platform_device::Device> client);
 
-  // TODO(https://fxbug.dev/122534): Remove these.
+  // TODO(https://fxbug.dev/42073495): Remove these.
   // These constructors exist to match the PDev class. They can fail, so `is_valid` must
   // be checked on the object after being created. Please prefer using the `Create` methods.
   explicit PDevFidl(zx_device_t* parent);
@@ -29,7 +29,7 @@ class PDevFidl {
   static zx::result<PDevFidl> Create(zx_device_t* parent);
   static zx::result<PDevFidl> Create(zx_device_t* parent, const char* fragment_name);
 
-  // TODO(https://fxbug.dev/122534): Remove these.
+  // TODO(https://fxbug.dev/42073495): Remove these.
   static PDevFidl FromFragment(zx_device_t* parent);
   static zx_status_t FromFragment(zx_device_t* parent, PDevFidl* out);
 

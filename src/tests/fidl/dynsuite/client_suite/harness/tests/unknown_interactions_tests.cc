@@ -275,7 +275,7 @@ CLIENT_TEST(14, TwoWayFlexibleSendUnknownMethodResponse) {
   WAIT_UNTIL_CALLBACK_RUN();
 }
 
-// TODO(https://fxbug.dev/133435): This test is incorrect. The client should tear down
+// TODO(https://fxbug.dev/42083366): This test is incorrect. The client should tear down
 // because the response message is inconsistent. Once fixed, comment should be:
 // > The client should tear down when it calls a flexible two-way method and
 // > receives an "unknown method" response (with strict dynamic flag).
@@ -449,7 +449,7 @@ CLIENT_TEST(21, TwoWayFlexibleErrorSyntaxSendUnknownMethodResponse) {
   WAIT_UNTIL_CALLBACK_RUN();
 }
 
-// TODO(https://fxbug.dev/133435): This test is incorrect. The client should tear down
+// TODO(https://fxbug.dev/42083366): This test is incorrect. The client should tear down
 // because the response message is inconsistent. Once fixed, comment should be:
 // > The client should tear down when it calls a flexible fallible two-way method
 // > and receives an "unknown method" response (with strict dynamic flag).
@@ -632,7 +632,7 @@ CLIENT_TEST(30, UnknownStrictEventOpenProtocol) {
   ASSERT_EQ(reporter_event.fidl_error().value(),
             fidl_clientsuite::FidlErrorKind::kUnexpectedMessage);
 
-  // TODO(https://fxbug.dev/78906, https://fxbug.dev/74241): Clients should close the channel
+  // TODO(https://fxbug.dev/78906, https://fxbug.dev/42153903): Clients should close the channel
   // when they receive an unsupported unknown event, but many of them don't
   // actually.
   // ASSERT_TRUE(server_end().is_signal_present(ZX_CHANNEL_PEER_CLOSED));
@@ -670,7 +670,7 @@ CLIENT_TEST(32, UnknownStrictEventAjarProtocol) {
   ASSERT_EQ(reporter_event.fidl_error().value(),
             fidl_clientsuite::FidlErrorKind::kUnexpectedMessage);
 
-  // TODO(https://fxbug.dev/78906, https://fxbug.dev/74241): Clients should close the channel
+  // TODO(https://fxbug.dev/78906, https://fxbug.dev/42153903): Clients should close the channel
   // when they receive an unsupported unknown event, but many of them don't
   // actually.
   // ASSERT_TRUE(server_end().is_signal_present(ZX_CHANNEL_PEER_CLOSED));
@@ -708,7 +708,7 @@ CLIENT_TEST(34, UnknownStrictEventClosedProtocol) {
   ASSERT_EQ(reporter_event.fidl_error().value(),
             fidl_clientsuite::FidlErrorKind::kUnexpectedMessage);
 
-  // TODO(https://fxbug.dev/78906, https://fxbug.dev/74241): Clients should close the channel
+  // TODO(https://fxbug.dev/78906, https://fxbug.dev/42153903): Clients should close the channel
   // when they receive an unsupported unknown event, but many of them don't
   // actually.
   // ASSERT_TRUE(server_end().is_signal_present(ZX_CHANNEL_PEER_CLOSED));
@@ -731,7 +731,7 @@ CLIENT_TEST(35, UnknownFlexibleEventClosedProtocol) {
   ASSERT_EQ(reporter_event.fidl_error().value(),
             fidl_clientsuite::FidlErrorKind::kUnexpectedMessage);
 
-  // TODO(https://fxbug.dev/78906, https://fxbug.dev/74241): Clients should close the channel
+  // TODO(https://fxbug.dev/78906, https://fxbug.dev/42153903): Clients should close the channel
   // when they receive an unsupported unknown event, but many of them don't
   // actually.
   // ASSERT_TRUE(server_end().is_signal_present(ZX_CHANNEL_PEER_CLOSED));
@@ -751,7 +751,7 @@ CLIENT_TEST(36, UnknownStrictServerInitiatedTwoWay) {
   ASSERT_EQ(reporter_event.fidl_error().value(),
             fidl_clientsuite::FidlErrorKind::kUnexpectedMessage);
 
-  // TODO(https://fxbug.dev/78906, https://fxbug.dev/74241): Clients should close the channel
+  // TODO(https://fxbug.dev/78906, https://fxbug.dev/42153903): Clients should close the channel
   // when they receive an unsupported unknown event, but many of them don't
   // actually.
   // ASSERT_TRUE(server_end().is_signal_present(ZX_CHANNEL_PEER_CLOSED));
@@ -775,7 +775,7 @@ CLIENT_TEST(37, UnknownFlexibleServerInitiatedTwoWay) {
   ASSERT_EQ(reporter_event.fidl_error().value(),
             fidl_clientsuite::FidlErrorKind::kUnexpectedMessage);
 
-  // TODO(https://fxbug.dev/78906, https://fxbug.dev/74241): Clients should close the channel
+  // TODO(https://fxbug.dev/78906, https://fxbug.dev/42153903): Clients should close the channel
   // when they receive an unsupported unknown event, but many of them don't
   // actually.
   // ASSERT_TRUE(server_end().is_signal_present(ZX_CHANNEL_PEER_CLOSED));

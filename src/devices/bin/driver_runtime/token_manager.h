@@ -143,7 +143,7 @@ class TokenManager {
     }
 
    private:
-    // TODO(https://fxbug.dev/105578): replace fdf::Channel with a generic C++ handle type when available.
+    // TODO(https://fxbug.dev/42056822): replace fdf::Channel with a generic C++ handle type when available.
     fdf::Channel channel_;
   };
 

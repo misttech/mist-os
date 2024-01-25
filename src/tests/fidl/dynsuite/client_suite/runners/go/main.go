@@ -130,10 +130,10 @@ func (*runnerImpl) IsTestEnabled(_ fidl.Context, test clientsuite.Test) (bool, e
 		case clientsuite.TestUnknownFlexibleServerInitiatedTwoWay:
 			return false
 		case clientsuite.TestV1TwoWayNoPayload, clientsuite.TestV1TwoWayStructPayload:
-			// TODO(https://fxbug.dev/99738): Go bindings should reject V1 wire format.
+			// TODO(https://fxbug.dev/42182214): Go bindings should reject V1 wire format.
 			return false
 		case clientsuite.TestOneWayCallDoNotReportPeerClosed:
-			// TODO(https://fxbug.dev/113160): Peer-closed errors should be
+			// TODO(https://fxbug.dev/42064467): Peer-closed errors should be
 			// hidden from one-way calls.
 			return false
 		default:

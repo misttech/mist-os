@@ -38,7 +38,7 @@ class QemuArm64 : public ddk::Device<QemuArm64> {
   zx_status_t RtcInit();
   zx_status_t SysmemInit();
 
-  // TODO(https://fxbug.dev/108070): Switch to fdf::SyncClient once it's supported.
+  // TODO(https://fxbug.dev/42059490): Switch to fdf::SyncClient once it's supported.
   fdf::WireSyncClient<fuchsia_hardware_platform_bus::PlatformBus> pbus_;
   PciRootHost pci_root_host_;
   thrd_t thread_;

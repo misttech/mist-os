@@ -36,7 +36,7 @@ class DefaultRadarDeviceConnector : public RadarDeviceConnector {
   }
 
   void ConnectToFirstRadarDevice(ConnectDeviceCallback connect_device) override {
-    // TODO(https://fxbug.dev/113882): Use device_watcher's waiting helper when it exists.
+    // TODO(https://fxbug.dev/42065124): Use device_watcher's waiting helper when it exists.
     DIR* const devices_dir = opendir(RadarProxy::kRadarDeviceDirectory);
     if (!devices_dir) {
       return;

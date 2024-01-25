@@ -36,7 +36,7 @@ encode_failure("VectorExceedsLimit") {
 }
 
 decode_failure("EmptyVectorWithNullPtrBody") {
-    // TODO(https://fxbug.dev/88792) Rust does not produce the correct error.
+    // TODO(https://fxbug.dev/42170062) Rust does not produce the correct error.
     bindings_denylist = [rust],
     type = VectorWrapper,
     bytes = {
@@ -61,7 +61,7 @@ success("EmptyOptionalVectorWithNullPtrBody") {
 }
 
 decode_failure("NonEmptyVectorWithNullPtrBody") {
-    // TODO(https://fxbug.dev/88793) Fix this on dart.
+    // TODO(https://fxbug.dev/42170063) Fix this on dart.
     bindings_denylist = [dart],
     type = VectorWrapper,
     bytes = {
@@ -74,7 +74,7 @@ decode_failure("NonEmptyVectorWithNullPtrBody") {
 }
 
 decode_failure("NonEmptyOptionalVectorWithNullPtrBody") {
-    // TODO(https://fxbug.dev/88793) Fix this on dart.
+    // TODO(https://fxbug.dev/42170063) Fix this on dart.
     bindings_denylist = [dart],
     type = OptionalVectorWrapper,
     bytes = {
@@ -87,7 +87,7 @@ decode_failure("NonEmptyOptionalVectorWithNullPtrBody") {
 }
 
 decode_failure("VectorWrongPointerValue") {
-    // TODO(https://fxbug.dev/88793) Fix this on dart.
+    // TODO(https://fxbug.dev/42170063) Fix this on dart.
     bindings_denylist = [dart],
     type = VectorWrapper,
     bytes = {
@@ -100,7 +100,7 @@ decode_failure("VectorWrongPointerValue") {
 }
 
 decode_failure("OptionalVectorWrongPointerValue") {
-    // TODO(https://fxbug.dev/88793) Fix this on dart.
+    // TODO(https://fxbug.dev/42170063) Fix this on dart.
     bindings_denylist = [dart],
     type = OptionalVectorWrapper,
     bytes = {
@@ -396,7 +396,7 @@ success("LotsOfVectors_AFewVectors") {
 // specific, but in many cases this test will result in exactly 16 iovecs
 // (1 for primary object and 1 for each of the 15 byte vectors).
 success("ByteVectors15") {
-    // TODO(https://fxbug.dev/101219) Fix for CPP / HLCPP.
+    // TODO(https://fxbug.dev/42052020) Fix for CPP / HLCPP.
     bindings_denylist = [cpp, hlcpp],
     value = VectorOfByteVector{
         v: [
@@ -479,7 +479,7 @@ success("ByteVectors15") {
 // the bindings ability to handle more iovecs than are supported by its iovec
 // buffer.
 success("ByteVectors16") {
-    // TODO(https://fxbug.dev/101219) Fix for CPP / HLCPP.
+    // TODO(https://fxbug.dev/42052020) Fix for CPP / HLCPP.
     bindings_denylist = [cpp, hlcpp],
     value = VectorOfByteVector{
         v: [

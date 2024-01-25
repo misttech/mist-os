@@ -6,7 +6,7 @@
         {
             directory: "dev",
 
-            // TODO(https://fxbug.dev/85030): make this read-only when /dev/null
+            // TODO(https://fxbug.dev/42165885): make this read-only when /dev/null
             // and /dev/zero are no longer implemented by this component.
             rights: [ "rw*" ],
             path: "/dev",

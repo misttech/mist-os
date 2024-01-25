@@ -93,12 +93,12 @@ zx_status_t TokenManager::Transfer(zx_handle_t token, fdf_handle_t handle) {
 
   fbl::AutoLock lock(&lock_);
 
-  // TODO(https://fxbug.dev/86309): we should also check the correct driver owns the handle once possible.
+  // TODO(https://fxbug.dev/42167305): we should also check the correct driver owns the handle once possible.
   if (!Handle::HandleExists(handle)) {
     return ZX_ERR_BAD_HANDLE;
   }
 
-  // TODO(https://fxbug.dev/105578): replace fdf::Channel with a generic C++ handle type when available.
+  // TODO(https://fxbug.dev/42056822): replace fdf::Channel with a generic C++ handle type when available.
   fdf::Channel validated_fdf_channel = fdf::Channel(handle);
 
   auto registered_callback = pending_tokens_.find(token_id);

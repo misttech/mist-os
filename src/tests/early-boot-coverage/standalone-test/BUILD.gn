@@ -17,7 +17,7 @@ if (is_fuchsia) {
 
     if (toolchain_variant.tags + [ "hwasan" ] - [ "hwasan" ] !=
         toolchain_variant.tags) {
-      # TODO(https://fxbug.dev/107896): We run into a linker error where a tagged
+      # TODO(https://fxbug.dev/42059295): We run into a linker error where a tagged
       # definition of __llvm_profile_counter_bias is provided in this executable,
       # but the statically-linked profile runtime is not hwasan instrumented, so
       # any reference to the tagged __llvm_profile_counter_bias fails during an
@@ -60,7 +60,7 @@ if (is_fuchsia) {
     generate_cuckoo = true
     deps = [ ":standalone-main-bin" ]
 
-    # TODO(https://fxbug.dev/115209): This ZBI is not actually a ZBI test, but relies
+    # TODO(https://fxbug.dev/42066527): This ZBI is not actually a ZBI test, but relies
     # on the specification just for the `images` metadata implicitly set by
     # `zbi_test()` and not `zbi()`. Investigate whether we can have `zbi()`
     # targets set this metadata and update this target accordingly - and

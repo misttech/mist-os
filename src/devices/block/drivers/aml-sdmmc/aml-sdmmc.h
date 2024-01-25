@@ -274,7 +274,7 @@ class AmlSdmmc : public fdf::DriverBase,
   bool power_suspended_ TA_GUARDED(lock_) = false;
   uint32_t clk_div_saved_ = 0;
 
-  // TODO(https://fxbug.dev/134787): Remove redundant locking when Banjo is removed.
+  // TODO(https://fxbug.dev/42084501): Remove redundant locking when Banjo is removed.
   fbl::Mutex lock_ TA_ACQ_AFTER(tuning_lock_);
   fbl::Mutex tuning_lock_ TA_ACQ_BEFORE(lock_);
   bool shutdown_ TA_GUARDED(lock_) = false;

@@ -48,7 +48,7 @@ fuchsia_driver("fuchsia_driver") {
   deps = common_deps
   sources = [ "intel-spi-flash.cc" ]
 
-  # TODO(https://fxbug.dev/58162): delete the below and fix compiler warnings
+  # TODO(https://fxbug.dev/42136089): delete the below and fix compiler warnings
   configs += [ "//build/config:Wno-conversion" ]
 }
 
@@ -79,7 +79,7 @@ test("intel-spi-flash-test-bin") {
            "//zircon/system/ulib/zxtest",
          ]
 
-  # TODO(https://fxbug.dev/58162): delete the below and fix compiler warnings
+  # TODO(https://fxbug.dev/42136089): delete the below and fix compiler warnings
   configs += [ "//build/config:Wno-conversion" ]
 }
 

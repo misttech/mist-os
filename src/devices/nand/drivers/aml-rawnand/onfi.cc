@@ -14,7 +14,7 @@
 // the Samsung NAND, and 20us for the Toshiba NAND. It turns out that a value
 // of 25us works better for the Micron NAND (25us reduces the number of ECC
 // errors significantly).
-// TODO(https://fxbug.dev/32545): Determine the value of chip delay more scientifically.
+// TODO(https://fxbug.dev/42107642): Determine the value of chip delay more scientifically.
 static struct nand_chip_table nand_chip_table[] = {
     {0x2C,
      0xDC,

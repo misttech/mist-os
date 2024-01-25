@@ -94,7 +94,7 @@ zx_status_t Channel::CheckWriteArgs(uint32_t options, fdf_arena_t* arena, void* 
       if (transfer_channel.get() == this) {
         return ZX_ERR_NOT_SUPPORTED;
       }
-      // TODO(https://fxbug.dev/87278): we should change ownership of the handle to disallow
+      // TODO(https://fxbug.dev/42168381): we should change ownership of the handle to disallow
       // the user calling wait right after we check it.
       if (transfer_channel->HasIncompleteWaitAsync()) {
         return ZX_ERR_INVALID_ARGS;

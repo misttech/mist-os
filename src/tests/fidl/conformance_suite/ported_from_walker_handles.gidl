@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-// TODO(https://fxbug.dev/88460): Audit each test and merge into the regular `strings.gidl`.
+// TODO(https://fxbug.dev/42169694): Audit each test and merge into the regular `strings.gidl`.
 // These were ported from a legacy set of manual C/C++ tests termed `walker_tests`.
 
 success("SinglePresentHandle") {
@@ -24,9 +24,9 @@ success("SinglePresentHandle") {
     },
 }
 
-// TODO(https://fxbug.dev/88957): The following 4 tests can be auto-generated using padding metadata.
+// TODO(https://fxbug.dev/42170244): The following 4 tests can be auto-generated using padding metadata.
 decode_failure("SinglePresentHandleCheckTrailingPadding_0") {
-    // TODO(https://fxbug.dev/58385): Close handles on encode/decode failure.
+    // TODO(https://fxbug.dev/42136336): Close handles on encode/decode failure.
     bindings_denylist = [dart],
     handle_defs = {
         #0 = event(),
@@ -46,7 +46,7 @@ decode_failure("SinglePresentHandleCheckTrailingPadding_0") {
 }
 
 decode_failure("SinglePresentHandleCheckTrailingPadding_1") {
-    // TODO(https://fxbug.dev/58385): Close handles on encode/decode failure.
+    // TODO(https://fxbug.dev/42136336): Close handles on encode/decode failure.
     bindings_denylist = [dart],
     handle_defs = {
         #0 = event(),
@@ -66,7 +66,7 @@ decode_failure("SinglePresentHandleCheckTrailingPadding_1") {
 }
 
 decode_failure("SinglePresentHandleCheckTrailingPadding_2") {
-    // TODO(https://fxbug.dev/58385): Close handles on encode/decode failure.
+    // TODO(https://fxbug.dev/42136336): Close handles on encode/decode failure.
     bindings_denylist = [dart],
     handle_defs = {
         #0 = event(),
@@ -86,7 +86,7 @@ decode_failure("SinglePresentHandleCheckTrailingPadding_2") {
 }
 
 decode_failure("SinglePresentHandleCheckTrailingPadding_3") {
-    // TODO(https://fxbug.dev/58385): Close handles on encode/decode failure.
+    // TODO(https://fxbug.dev/42136336): Close handles on encode/decode failure.
     bindings_denylist = [dart],
     handle_defs = {
         #0 = event(),
@@ -125,8 +125,8 @@ decode_failure("TooManyHandlesSpecifiedError") {
 }
 
 decode_failure("TooManyBytesSpecifiedError") {
-    // TODO(https://fxbug.dev/58385): Close handles on encode/decode failure for Rust.
-    // TODO(https://fxbug.dev/88808) Add validation in Dart and go.
+    // TODO(https://fxbug.dev/42136336): Close handles on encode/decode failure for Rust.
+    // TODO(https://fxbug.dev/42170080) Add validation in Dart and go.
     bindings_denylist = [dart],
     handle_defs = {
         #0 = event(),
@@ -232,7 +232,7 @@ success("ArrayOfPresentHandles") {
 }
 
 decode_failure("ArrayOfPresentHandlesTooFewError") {
-    // TODO(https://fxbug.dev/58385): Close handles on encode/decode failure.
+    // TODO(https://fxbug.dev/42136336): Close handles on encode/decode failure.
     bindings_denylist = [dart],
     handle_defs = {
         #0 = event(),
@@ -256,7 +256,7 @@ decode_failure("ArrayOfPresentHandlesTooFewError") {
 }
 
 decode_failure("ArrayOfNonnullableHandlesSomeAbsentError") {
-    // TODO(https://fxbug.dev/58385): Close handles on encode/decode failure.
+    // TODO(https://fxbug.dev/42136336): Close handles on encode/decode failure.
     bindings_denylist = [dart],
     handle_defs = {
         #0 = event(),
@@ -307,7 +307,7 @@ success("ArrayOfNullableHandles") {
 }
 
 decode_failure("ArrayOfNullableHandlesWithInsufficientHandlesError") {
-    // TODO(https://fxbug.dev/58385): Close handles on encode/decode failure.
+    // TODO(https://fxbug.dev/42136336): Close handles on encode/decode failure.
     bindings_denylist = [dart],
     handle_defs = {
         #0 = event(),
@@ -380,7 +380,7 @@ success("ArrayOfArrayOfPresentHandles") {
 }
 
 success("OutOfLineArrayOfNonnullableHandles") {
-    // TODO(https://fxbug.dev/88979): generated Rust test does not compile.
+    // TODO(https://fxbug.dev/42170268): generated Rust test does not compile.
     bindings_denylist = [rust],
     handle_defs = {
         #0 = event(),

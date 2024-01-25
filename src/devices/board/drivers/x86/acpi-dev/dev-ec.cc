@@ -351,7 +351,7 @@ void EcDevice::QueryThread() {
       last_query_.Set(method);
 
       // Log lid close events.
-      // TODO(https://fxbug.dev/111460): Remove this logging when bug is fixed.
+      // TODO(https://fxbug.dev/42062794): Remove this logging when bug is fixed.
       if (event == 1) {
         zxlogf(INFO, "received event: %s", method);
       }

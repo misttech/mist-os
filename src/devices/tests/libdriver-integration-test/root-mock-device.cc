@@ -152,7 +152,7 @@ zx_status_t RootMockDevice::CreateFromTestRoot(
   controller_client->Bind(kMockDeviceLib)
       .Then([client = controller_client.Clone()](
                 fidl::WireUnownedResult<fuchsia_device::Controller::Bind>& result) {
-        // TODO(https://fxbug.dev/120616): Since no one waits for this call, there's a good chance
+        // TODO(https://fxbug.dev/42071701): Since no one waits for this call, there's a good chance
         // the test will exit before we get a callback.
         if (result.is_dispatcher_shutdown()) {
           return;

@@ -46,7 +46,7 @@ typedef struct BlockFifoResponse {
 // NOLINTEND(modernize-use-using)
 
 // Notify humans to update Rust bindings because there's no bindgen automation.
-// TODO(https://fxbug.dev/73858): Remove lint when no longer necessary.
+// TODO(https://fxbug.dev/42153476): Remove lint when no longer necessary.
 // LINT.ThenChange(/src/storage/lib/block_client/rust/src/fifo.rs)
 
 #endif  // SRC_DEVICES_BLOCK_DRIVERS_CORE_BLOCK_FIFO_H_

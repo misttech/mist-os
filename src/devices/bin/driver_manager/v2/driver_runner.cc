@@ -245,7 +245,7 @@ DriverRunner::DriverRunner(fidl::ClientEnd<fcomponent::Realm> realm,
       removal_tracker_(dispatcher),
       enable_test_shutdown_delays_(enable_test_shutdown_delays) {
   if (enable_test_shutdown_delays_) {
-    // TODO(https://fxbug.dev/134783): Allow the seed to be set from the configuration.
+    // TODO(https://fxbug.dev/42084497): Allow the seed to be set from the configuration.
     auto seed = std::chrono::system_clock::now().time_since_epoch().count();
     LOGF(INFO, "Shutdown test delays enabled. Using seed %u", seed);
     shutdown_test_delay_rng_ = std::make_shared<std::mt19937>(static_cast<uint32_t>(seed));
@@ -321,7 +321,7 @@ void DriverRunner::AddSpecToDriverIndex(fuchsia_driver_framework::wire::Composit
       });
 }
 
-// TODO(https://fxbug.dev/121999): Add information for composite node specs.
+// TODO(https://fxbug.dev/42072971): Add information for composite node specs.
 fpromise::promise<inspect::Inspector> DriverRunner::Inspect() const {
   // Create our inspector.
   // The default maximum size was too small, and so this is double the default size.

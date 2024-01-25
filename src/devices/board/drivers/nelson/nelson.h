@@ -158,7 +158,7 @@ class Nelson : public NelsonType {
     return fuchsia_hardware_gpioimpl::wire::InitCall::WithDriveStrengthUa(init_arena_, ds_ua);
   }
 
-  // TODO(https://fxbug.dev/108070): Switch to fdf::SyncClient when it is available.
+  // TODO(https://fxbug.dev/42059490): Switch to fdf::SyncClient when it is available.
   fdf::WireSyncClient<fuchsia_hardware_platform_bus::PlatformBus> pbus_;
   ddk::IommuProtocolClient iommu_;
   fidl::Arena<> init_arena_;

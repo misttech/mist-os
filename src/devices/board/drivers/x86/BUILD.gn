@@ -100,7 +100,7 @@ fuchsia_driver("platform-bus-x86-driver") {
     "//src/devices/pci/lib/pci",
     "//src/lib/ddk",
 
-    # TODO(https://fxbug.dev/38132): Migrate to the new bind rules and delete the below
+    # TODO(https://fxbug.dev/42113849): Migrate to the new bind rules and delete the below
     "//sdk/lib/fit",
     "//src/lib/ddk:ddk-deprecated-binding-headers",
     "//src/lib/ddktl",
@@ -118,7 +118,7 @@ fuchsia_driver("platform-bus-x86-driver") {
     "//zircon/third_party/ulib/chromiumos-platform-ec",
   ]
 
-  # TODO(https://fxbug.dev/58162): delete the below and fix compiler warnings
+  # TODO(https://fxbug.dev/42136089): delete the below and fix compiler warnings
   configs += [ "//build/config:Wno-conversion" ]
 }
 

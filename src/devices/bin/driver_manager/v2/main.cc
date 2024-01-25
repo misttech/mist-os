@@ -95,7 +95,7 @@ int RunDfv2(driver_manager_config::Config config) {
         if (client.is_error()) {
           return client.take_error();
         }
-    // TODO(https://fxbug.dev/125244): Find a better way to set this config.
+    // TODO(https://fxbug.dev/42076026): Find a better way to set this config.
 #ifdef DRIVERHOST_LDSVC_CONFIG
         // Inform the loader service to look for libraries of the right variant.
         fidl::WireResult result = fidl::WireCall(client.value())->Config(DRIVERHOST_LDSVC_CONFIG);
@@ -130,7 +130,7 @@ int RunDfv2(driver_manager_config::Config config) {
   dfv2::ShutdownManager shutdown_manager(&driver_runner, loop.dispatcher());
   shutdown_manager.Publish(outgoing);
 
-  // TODO(https://fxbug.dev/99076) Remove this when this issue is fixed.
+  // TODO(https://fxbug.dev/42181480) Remove this when this issue is fixed.
   LOGF(INFO, "driver_manager loader loop started");
 
   fs::SynchronousVfs vfs(loop.dispatcher());

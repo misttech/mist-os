@@ -33,7 +33,7 @@
 // The kernel's bookkeeping for the regions will be handled by the resource
 // handles themselves being closed.
 //
-// TODO(https://fxbug.dev/32978): This more complicated book-keeping will be simplified when we
+// TODO(https://fxbug.dev/42108122): This more complicated book-keeping will be simplified when we
 // have devhost isolation between the root host and root implemtnations and will
 // be able to use channel endpoints closing for similar notifications.
 zx::result<zx_paddr_t> PciRootHost::Allocate(AllocationType type, uint32_t kind, zx_paddr_t base,

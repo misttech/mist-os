@@ -97,7 +97,7 @@ zx_status_t Nelson::SpiInit() {
       // SPICC1 clock enable (666 MHz)
       spicc1_clk_sel_fclk_div3 | spicc1_clk_en | spicc1_clk_div(1);
 
-  // TODO(https://fxbug.dev/34010): fix this clock enable block when the clock driver can handle the
+  // TODO(https://fxbug.dev/42109271): fix this clock enable block when the clock driver can handle the
   // dividers
   {
     zx::unowned_resource resource(get_mmio_resource(parent()));

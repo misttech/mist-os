@@ -58,7 +58,7 @@ class OneWayTest {
     for (uint32_t i = 0; i < msg_count_; i++) {
       msgs_.push_back(arena_.Allocate(msg_size_));
     }
-    // TODO(https://fxbug.dev/119188) migrate off this once setting a default dispatcher
+    // TODO(https://fxbug.dev/42070233) migrate off this once setting a default dispatcher
     // with managed threads is possible.
     fdf_env_register_driver_entry(reinterpret_cast<const void*>(client_fake_driver_));
   }

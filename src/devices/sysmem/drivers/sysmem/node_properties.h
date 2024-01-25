@@ -210,7 +210,7 @@ class NodeProperties : public std::enable_shared_from_this<NodeProperties> {
   // the current NodeProperties.  For LogicalBufferCollection::root_, these counts are for the whole
   // tree.
   //
-  // TODO(https://fxbug.dev/71454): Limit node_count() of root_, but instead of failing root_ when
+  // TODO(https://fxbug.dev/42150808): Limit node_count() of root_, but instead of failing root_ when
   // limit reached, prune a sub-tree selected to prefer more-nested over less nested, and larger
   // node count over smaller node count (lexicographically).
   uint32_t node_count() const;

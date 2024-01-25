@@ -26,7 +26,7 @@ int main(int argc, const char** argv) {
   if (zx::result result = component::Connect(std::move(component_lifecycle_request),
                                              "/svc/fuchsia.device.fs.lifecycle.Lifecycle");
       result.is_error()) {
-    // TODO(https://fxbug.dev/101928): Standardize status emission.
+    // TODO(https://fxbug.dev/42052807): Standardize status emission.
     FX_SLOG(FATAL, "Failed to connect to fuchsia.device.fs.lifecycle",
             FX_KV("status", result.status_string()));
   }
@@ -37,7 +37,7 @@ int main(int argc, const char** argv) {
   {
     fdio_flat_namespace_t* ns;
     if (zx_status_t status = fdio_ns_export_root(&ns); status != ZX_OK) {
-      // TODO(https://fxbug.dev/101928): Standardize status emission.
+      // TODO(https://fxbug.dev/42052807): Standardize status emission.
       FX_SLOG(FATAL, "Failed to export flat namespace",
               FX_KV("status", zx_status_get_string(status)));
     }
@@ -59,7 +59,7 @@ int main(int argc, const char** argv) {
       fidl::ClientEnd<fuchsia_io::Directory> client_end{zx::channel{handle}};
       if (zx::result result = outgoing.AddDirectory(std::move(client_end), path);
           result.is_error()) {
-        // TODO(https://fxbug.dev/101928): Standardize status emission.
+        // TODO(https://fxbug.dev/42052807): Standardize status emission.
         FX_SLOG(FATAL, "Failed to expose", FX_KV("path", path),
                 FX_KV("status", result.status_string()));
       }
@@ -71,14 +71,14 @@ int main(int argc, const char** argv) {
   }
 
   if (zx::result result = outgoing.ServeFromStartupInfo(); result.is_error()) {
-    // TODO(https://fxbug.dev/101928): Standardize status emission.
+    // TODO(https://fxbug.dev/42052807): Standardize status emission.
     FX_SLOG(FATAL, "Failed to serve from startup info", FX_KV("status", result.status_string()));
   }
 
   FX_SLOG(DEBUG, "Initialized.");
 
   if (zx_status_t status = loop.Run(); status != ZX_OK) {
-    // TODO(https://fxbug.dev/101928): Standardize status emission.
+    // TODO(https://fxbug.dev/42052807): Standardize status emission.
     FX_SLOG(FATAL, "Failed to run async loop", FX_KV("status", zx_status_get_string(status)));
   }
 

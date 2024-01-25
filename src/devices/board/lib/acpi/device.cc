@@ -252,7 +252,7 @@ void Device::GetMmio(GetMmioRequestView request, GetMmioCompleter::Sync& complet
   }
 
   const DeviceMmioResource& res = mmio_resources_[request->index];
-  // TODO(https://fxbug.dev/67899): This check becomes overly pessimistic at larger page sizes.
+  // TODO(https://fxbug.dev/42146863): This check becomes overly pessimistic at larger page sizes.
   if (((res.base_address & (zx_system_get_page_size() - 1)) != 0) ||
       ((res.address_length & (zx_system_get_page_size() - 1)) != 0)) {
     zxlogf(ERROR, "acpi-bus: memory id=%d addr=0x%08x len=0x%x is not page aligned", request->index,
@@ -292,7 +292,7 @@ void Device::GetBti(GetBtiRequestView request, GetBtiCompleter::Sync& completer)
   // We assume that the device will never get an actual BTI
   // because it is a pure ACPI device.
   //
-  // TODO(https://fxbug.dev/92140): check the DMAR for ACPI entries.
+  // TODO(https://fxbug.dev/42173782): check the DMAR for ACPI entries.
   auto path = acpi_->GetPath(acpi_handle_);
   if (path.is_error()) {
     completer.ReplyError(path.zx_status_value());

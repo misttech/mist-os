@@ -273,13 +273,13 @@ void ConsoleDevice::Clone2(Clone2RequestView request, Clone2Completer::Sync& com
 
 void ConsoleDevice::Close(CloseCompleter::Sync& completer) {
   completer.ReplySuccess();
-  // TODO(https://fxbug.dev/116481): this does not correctly close the channel.
+  // TODO(https://fxbug.dev/42067652): this does not correctly close the channel.
   completer.Close(ZX_OK);
 }
 
 void ConsoleDevice::Query(QueryCompleter::Sync& completer) {
   const std::string_view kProtocol = fuchsia_hardware_pty::wire::kDeviceProtocolName;
-  // TODO(https://fxbug.dev/101890): avoid the const cast.
+  // TODO(https://fxbug.dev/42052765): avoid the const cast.
   uint8_t* data = reinterpret_cast<uint8_t*>(const_cast<char*>(kProtocol.data()));
   completer.Reply(fidl::VectorView<uint8_t>::FromExternal(data, kProtocol.size()));
 }

@@ -24,7 +24,7 @@ encode_failure("StringExceedsLimit") {
 }
 
 decode_failure("EmptyStringWithNullPtrBody") {
-    // TODO(https://fxbug.dev/88792) Rust does not produce the correct error.
+    // TODO(https://fxbug.dev/42170062) Rust does not produce the correct error.
     bindings_denylist = [rust],
     type = StringWrapper,
     bytes = {
@@ -83,7 +83,7 @@ decode_failure("NonEmptyOptionalStringWithNullPtrBody") {
 }
 
 decode_failure("StringWrongPointerValue") {
-    // TODO(https://fxbug.dev/88793) Fix this on dart.
+    // TODO(https://fxbug.dev/42170063) Fix this on dart.
     bindings_denylist = [dart],
     type = StringWrapper,
     bytes = {
@@ -96,7 +96,7 @@ decode_failure("StringWrongPointerValue") {
 }
 
 decode_failure("OptionalStringWrongPointerValue") {
-    // TODO(https://fxbug.dev/88793) Fix this on dart.
+    // TODO(https://fxbug.dev/42170063) Fix this on dart.
     bindings_denylist = [dart],
     type = OptionalStringWrapper,
     bytes = {

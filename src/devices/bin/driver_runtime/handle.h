@@ -62,7 +62,7 @@ class Handle : public fbl::SinglyLinkedListable<Handle*> {
   // Returns the object corresponding to |value_|.
   template <typename T>
   zx_status_t GetObject(fbl::RefPtr<T>* out_object) {
-    // TODO(https://fxbug.dev/86542): we should add some type checking once we support more object types.
+    // TODO(https://fxbug.dev/42167564): we should add some type checking once we support more object types.
     *out_object = fbl::RefPtr<T>::Downcast(object());
     if (!*out_object) {
       return ZX_ERR_WRONG_TYPE;
@@ -98,7 +98,7 @@ class Handle : public fbl::SinglyLinkedListable<Handle*> {
 // This class is thread-safe.
 class HandleTableArena {
  public:
-  // TODO(https://fxbug.dev/86594): fine-tune this numbers, they were randomly selected.
+  // TODO(https://fxbug.dev/42167621): fine-tune this numbers, they were randomly selected.
   static constexpr size_t kMaxNumHandles = 64ull * 1024;
   // The number of tables stored in |handle_table_dir_|.
   static constexpr size_t kNumTables = 64;

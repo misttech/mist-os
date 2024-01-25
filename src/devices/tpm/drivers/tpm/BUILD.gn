@@ -31,7 +31,7 @@ fuchsia_driver("fuchsia_driver") {
   sources = [ "tpm.cc" ]
   deps = common_deps
 
-  # TODO(https://fxbug.dev/58162): delete the below and fix compiler warnings
+  # TODO(https://fxbug.dev/42136089): delete the below and fix compiler warnings
   configs += [ "//build/config:Wno-conversion" ]
 }
 
@@ -57,7 +57,7 @@ test("tpm-driver-test-bin") {
            "//zircon/system/ulib/zxtest",
          ]
 
-  # TODO(https://fxbug.dev/58162): delete the below and fix compiler warnings
+  # TODO(https://fxbug.dev/42136089): delete the below and fix compiler warnings
   configs += [ "//build/config:Wno-conversion" ]
 }
 

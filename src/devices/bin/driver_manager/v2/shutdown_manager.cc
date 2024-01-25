@@ -66,7 +66,7 @@ zx::result<MexecVmos> GetMexecZbis(zx::unowned_resource mexec_resource) {
   for (uint32_t type : kItemsToAppend) {
     std::string_view name = zbitl::TypeName(type);
 
-    // TODO(https://fxbug.dev/102804): Use a method that returns all matching items of
+    // TODO(https://fxbug.dev/42053781): Use a method that returns all matching items of
     // a given type instead of guessing possible `extra` values.
     for (uint32_t extra : std::array{0, 1, 2}) {
       fidl::WireResult result = items->Get(type, extra);

@@ -24,10 +24,10 @@ class RunnerServer : public fidl::WireServer<fidl_clientsuite::Runner> {
   void IsTestEnabled(IsTestEnabledRequestView request,
                      IsTestEnabledCompleter::Sync& completer) override {
     switch (request->test) {
-      // TODO(https://fxbug.dev/116294): Should validate response ordinal matches.
+      // TODO(https://fxbug.dev/42067516): Should validate response ordinal matches.
       case fidl_clientsuite::Test::kReceiveResponseWrongOrdinalKnown:
       case fidl_clientsuite::Test::kReceiveResponseWrongOrdinalUnknown:
-      // TODO(https://fxbug.dev/129824): Should validate that event txid is 0.
+      // TODO(https://fxbug.dev/42080225): Should validate that event txid is 0.
       case fidl_clientsuite::Test::kReceiveEventUnexpectedTxid:
         completer.Reply(false);
         return;

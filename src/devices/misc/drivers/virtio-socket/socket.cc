@@ -276,7 +276,7 @@ void SocketDevice::IrqRingUpdate() {
         if (conn != connections_.end()) {
           if (conn->NotifyVmoTxComplete(payload)) {
             if (callbacks_.is_valid()) {
-              // TODO(https://fxbug.dev/97955) Consider handling the error instead of
+              // TODO(https://fxbug.dev/42180237) Consider handling the error instead of
               // ignoring it.
               [[maybe_unused]] auto _ = callbacks_->SendVmoComplete(conn->GetKey().addr);
             }
@@ -376,7 +376,7 @@ void SocketDevice::RxOpLocked(ConnectionIterator conn, const ConnectionKey& key,
       // Don't care if we have a connection or not, just send it to the
       // service.
       if (callbacks_.is_valid()) {
-        // TODO(https://fxbug.dev/97955) Consider handling the error instead of ignoring it.
+        // TODO(https://fxbug.dev/42180237) Consider handling the error instead of ignoring it.
         [[maybe_unused]] auto _ = callbacks_->Request(key.addr);
       }
       break;
@@ -391,7 +391,7 @@ void SocketDevice::RxOpLocked(ConnectionIterator conn, const ConnectionKey& key,
       // Upgrade the channel.
       conn->MakeActive(dispatcher_);
       if (callbacks_.is_valid()) {
-        // TODO(https://fxbug.dev/97955) Consider handling the error instead of ignoring it.
+        // TODO(https://fxbug.dev/42180237) Consider handling the error instead of ignoring it.
         [[maybe_unused]] auto _ = callbacks_->Response(key.addr);
       }
       break;
@@ -401,7 +401,7 @@ void SocketDevice::RxOpLocked(ConnectionIterator conn, const ConnectionKey& key,
         CleanupConLocked(conn.CopyPointer());
       }
       if (callbacks_.is_valid()) {
-        // TODO(https://fxbug.dev/97955) Consider handling the error instead of ignoring it.
+        // TODO(https://fxbug.dev/42180237) Consider handling the error instead of ignoring it.
         [[maybe_unused]] auto _ = callbacks_->Rst(key.addr);
       }
       break;
@@ -414,7 +414,7 @@ void SocketDevice::RxOpLocked(ConnectionIterator conn, const ConnectionKey& key,
         DequeueOpLocked(conn.CopyPointer());
       }
       if (callbacks_.is_valid()) {
-        // TODO(https://fxbug.dev/97955) Consider handling the error instead of ignoring it.
+        // TODO(https://fxbug.dev/42180237) Consider handling the error instead of ignoring it.
         [[maybe_unused]] auto _ = callbacks_->Shutdown(key.addr);
       }
       break;
@@ -512,7 +512,7 @@ void SocketDevice::CleanupConLocked(fbl::RefPtr<Connection> conn) {
 
 void SocketDevice::NotifyAndCleanupConLocked(fbl::RefPtr<Connection> conn) {
   if (callbacks_.is_valid()) {
-    // TODO(https://fxbug.dev/97955) Consider handling the error instead of ignoring it.
+    // TODO(https://fxbug.dev/42180237) Consider handling the error instead of ignoring it.
     [[maybe_unused]] auto _ = callbacks_->Rst(conn->GetKey().addr);
   }
   SendOpLocked(conn, VIRTIO_VSOCK_OP_RST);
@@ -662,7 +662,7 @@ void SocketDevice::TransportResetLocked() {
   has_pending_op_.clear();
   UpdateCidLocked();
   if (callbacks_.is_valid()) {
-    // TODO(https://fxbug.dev/97955) Consider handling the error instead of ignoring it.
+    // TODO(https://fxbug.dev/42180237) Consider handling the error instead of ignoring it.
     [[maybe_unused]] auto _ = callbacks_->TransportReset(cid_);
   }
 }

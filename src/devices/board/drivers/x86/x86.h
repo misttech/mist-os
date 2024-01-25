@@ -93,7 +93,7 @@ class X86 : public DeviceType {
         zxlogvf_etc(severity, nullptr, file, line, msg, args);
       }};
 
-  // TODO(https://fxbug.dev/108070): migrate to fdf::SyncClient when it is available.
+  // TODO(https://fxbug.dev/42059490): migrate to fdf::SyncClient when it is available.
   fdf::WireSyncClient<fuchsia_hardware_platform_bus::PlatformBus> pbus_;
 
   std::unique_ptr<acpi::Manager> acpi_manager_;

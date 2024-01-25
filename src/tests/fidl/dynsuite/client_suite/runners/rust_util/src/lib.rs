@@ -46,7 +46,7 @@ pub fn classify_error(error: fidl::Error) -> FidlErrorKind {
 }
 
 /// Returns the FIDL method name for a request/event enum value.
-// TODO(https://fxbug.dev/127952): Provide this in FIDL bindings.
+// TODO(https://fxbug.dev/42078541): Provide this in FIDL bindings.
 pub fn method_name(request_or_event: &impl std::fmt::Debug) -> String {
     let mut string = format!("{:?}", request_or_event);
     let len = string.find('{').unwrap_or(string.len());

@@ -97,7 +97,7 @@ impl<'a> Debugger<'a> {
             return Ok(DeviceProperty { key: *key, value: *value });
         }
 
-        // TODO(https://fxbug.dev/45663): The behavior of setting missing properties to 0 is implemented to be
+        // TODO(https://fxbug.dev/42122212): The behavior of setting missing properties to 0 is implemented to be
         // consistent with binding.cc. This behavior should eventually be changed to deal with
         // missing properties in a better way.
         match key {

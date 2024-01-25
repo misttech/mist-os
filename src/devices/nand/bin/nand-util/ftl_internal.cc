@@ -311,7 +311,7 @@ void NdmData::DumpPartitions(const NdmHeader& header, const char* data, int num_
       memcpy(&partition_data, data, sizeof(partition_data));
       data += sizeof(partition_data);
 
-      // TODO(https://fxbug.dev/40208): Dump the partition parameters.
+      // TODO(https://fxbug.dev/42116155): Dump the partition parameters.
       data += partition_data.data_size;
     }
   }

@@ -53,7 +53,7 @@ async fn wait_for_instance(realm: &fuchsia_component_test::RealmInstance) -> Res
     let service = client::open_service_at_dir::<fcdt::DeviceMarker>(realm.root.get_exposed_dir())
         .context("Failed to open service")?;
     loop {
-        // TODO(https://fxbug.dev/4776): Once component manager supports watching for
+        // TODO(https://fxbug.dev/42124541): Once component manager supports watching for
         // service instances, this loop shousld be replaced by a watcher.
         let entries = fuchsia_fs::directory::readdir(&service)
             .await

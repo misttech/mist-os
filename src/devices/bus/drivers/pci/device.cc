@@ -107,7 +107,7 @@ Device::~Device() {
   DisableInterrupts();
   SetBusMastering(false);
   ModifyCmd(/*clr_bits=*/PCI_CONFIG_COMMAND_IO_EN | PCI_CONFIG_COMMAND_MEM_EN, /*set_bits=*/0);
-  // TODO(cja/https://fxbug.dev/32979): Remove this after porting is finished.
+  // TODO(cja/https://fxbug.dev/42108123): Remove this after porting is finished.
   zxlogf(TRACE, "%s [%s] dtor finished", is_bridge() ? "bridge" : "device", cfg_->addr());
 }
 

@@ -220,7 +220,7 @@ class DevfsDevice {
 
  private:
   std::optional<Devnode> topological_;
-  // TODO(https://fxbug.dev/111253): These protocol nodes are currently always empty directories.
+  // TODO(https://fxbug.dev/42062564): These protocol nodes are currently always empty directories.
   // Change this to a pure `RemoteNode` that doesn't expose a directory.
   std::optional<Devnode> protocol_;
 };
@@ -246,7 +246,7 @@ class Devfs {
   Devnode& root_;
 
   fbl::RefPtr<PseudoDir> class_ = fbl::MakeRefCounted<PseudoDir>();
-  // TODO(https://fxbug.dev/113679): Unbox the unique_ptr when ProtoNode is no longer abstract.
+  // TODO(https://fxbug.dev/42064970): Unbox the unique_ptr when ProtoNode is no longer abstract.
   std::unordered_map<uint32_t, std::unique_ptr<ProtoNode>> proto_info_nodes;
 };
 

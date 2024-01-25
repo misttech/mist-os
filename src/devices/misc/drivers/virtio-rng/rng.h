@@ -32,7 +32,7 @@ class RngDevice : public Device, public ddk::Device<RngDevice> {
 
  protected:
  private:
-  // TODO(https://fxbug.dev/24760): The kernel should trigger entropy requests, instead of relying on this
+  // TODO(https://fxbug.dev/42098992): The kernel should trigger entropy requests, instead of relying on this
   // userspace thread to push entropy whenever it wants to. As a temporary hack, this thread
   // pushes entropy to the kernel every 300 seconds instead.
 

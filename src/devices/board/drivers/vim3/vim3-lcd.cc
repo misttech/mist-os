@@ -14,7 +14,7 @@ bool Vim3::HasLcd() {
   // It checks the availability of DSI display by checking the boot variable set
   // by the bootloader (or overridden by build configuration).
   //
-  // TODO(https://fxbug.dev/125228): Currently either this is hardcoded at build-time or
+  // TODO(https://fxbug.dev/42076008): Currently either this is hardcoded at build-time or
   // it relies on the bootloader to set up the value. We should support probing
   // LCD display availability directly in Fuchsia instead.
 

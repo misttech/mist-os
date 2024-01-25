@@ -38,7 +38,7 @@
 			// * "A311D Quick Reference Manual" revision 01, pages 2-3
 			// * "A311D Datasheet" revision 08, section 2.2 "Features", pages 4-5
 			//
-			// TODO(https://fxbug.dev/121456): Reserving this much memory seems wasteful. The
+			// TODO(https://fxbug.dev/42072489): Reserving this much memory seems wasteful. The
 			// quantity below is 10% of RAM on a VIM3 Basic and 5% of RAM on a VIM3 Pro.
 			size = <0x00 (200*1024*1024)>;
 		};

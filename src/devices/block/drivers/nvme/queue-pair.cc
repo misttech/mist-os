@@ -131,7 +131,7 @@ zx_status_t QueuePair::Submit(cpp20::span<uint8_t> submission_data,
   size_t index = submission_.NextIndex();
   TransactionData& txn_data = txns_[index];
   if (txn_data.active) {
-    // TODO(https://fxbug.dev/102133): Consider decoupling the submission queue from the tracking of
+    // TODO(https://fxbug.dev/42053036): Consider decoupling the submission queue from the tracking of
     // outstanding transactions.
     // We tie a transaction's state to its submission queue slot, even if the submission entry has
     // already been consumed by the controller.
@@ -214,7 +214,7 @@ zx_status_t QueuePair::Submit(cpp20::span<uint8_t> submission_data,
 zx_status_t QueuePair::PreparePrpList(ddk::IoBuffer& buf, cpp20::span<const zx_paddr_t> pages) {
   const size_t addresses_per_page = zx_system_get_page_size() / sizeof(zx_paddr_t);
   size_t page_count = 0;
-  // TODO(https://fxbug.dev/102133): improve this in cases where we would allocate a page with only one
+  // TODO(https://fxbug.dev/42053036): improve this in cases where we would allocate a page with only one
   // entry.
   page_count = pages.size() / (addresses_per_page - 1);
   page_count += 1;

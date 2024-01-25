@@ -291,7 +291,7 @@ struct MockDevice : public std::enable_shared_from_this<MockDevice> {
                                          size_t size, size_t* size_actual);
 
   // Default constructor for making deprecated root parent without dispatcher integration.
-  // TODO(https://fxbug.dev/124464): Remove when all tests migrated.
+  // TODO(https://fxbug.dev/42075363): Remove when all tests migrated.
   explicit MockDevice() : driver_runtime_(nullptr) {}
 
   // Constructor for root parent.

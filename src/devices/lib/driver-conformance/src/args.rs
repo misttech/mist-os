@@ -205,7 +205,7 @@ pub struct TestCommand {
     #[argh(option)]
     pub licenses: Option<PathBuf>,
 
-    // TODO(https://fxbug.dev/115097): Separate this logic into its own subcommand.
+    // TODO(https://fxbug.dev/42066402): Separate this logic into its own subcommand.
     /// generate submission package.
     ///
     /// To be used for uploading to the Fuchsia Hardware Portal.

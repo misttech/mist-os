@@ -41,7 +41,7 @@ constexpr size_t kMaxNamespacesToBind = 4;
 // c.f. NVMe Base Specification 2.0, section 3.1.3.8 "AQA - Admin Queue Attributes"
 constexpr size_t kAdminQueueMaxEntries = 4096;
 
-// TODO(https://fxbug.dev/102133): Consider using interrupt vector - dedicated interrupt (and IO thread) per
+// TODO(https://fxbug.dev/42053036): Consider using interrupt vector - dedicated interrupt (and IO thread) per
 // namespace/queue.
 int Nvme::IrqLoop() {
   while (true) {
@@ -346,7 +346,7 @@ static void PopulateCapabilitiesInspect(const CapabilityReg& caps_reg,
   caps.RecordBool("nvm_command_set_support", caps_reg.nvm_command_set_support());
   caps.RecordBool("nvm_subsystem_reset_supported", caps_reg.nvm_subsystem_reset_supported());
   caps.RecordInt("doorbell_stride_bytes", caps_reg.doorbell_stride_bytes());
-  // TODO(https://fxbug.dev/102133): interpret CRTO register if version > 1.4
+  // TODO(https://fxbug.dev/42053036): interpret CRTO register if version > 1.4
   caps.RecordInt("ready_timeout_ms", caps_reg.timeout_ms());
   caps.RecordBool("vendor_specific_arbitration_supported",
                   caps_reg.vendor_specific_arbitration_supported());

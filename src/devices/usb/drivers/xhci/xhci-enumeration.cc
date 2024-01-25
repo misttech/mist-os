@@ -92,7 +92,7 @@ fpromise::promise<void, zx_status_t> RetryEnumeration(UsbXhci* hci, uint8_t port
   uint8_t old_slot = *state->slot;
   state->slot = std::nullopt;
 
-  // Disabling the slot is required due to https://fxbug.dev/41924
+  // Disabling the slot is required due to https://fxbug.dev/42118061
   return hci->DisableSlotCommand(old_slot)
       .and_then([=]() -> TRBPromise {
         // DisableSlotCommand will never return an error in the TRB.

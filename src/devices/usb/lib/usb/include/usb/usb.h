@@ -157,7 +157,7 @@ typedef uint32_t usb_mode_t;
 #define USB_MODE_PERIPHERAL UINT32_C(2)
 #define USB_MODE_OTG UINT32_C(3)
 
-// TODO(https://fxbug.dev/111397) : Some of these structs are duplicates of usb banjo. Remove and
+// TODO(https://fxbug.dev/42062723) : Some of these structs are duplicates of usb banjo. Remove and
 // consolidate them.
 /* general USB defines */
 typedef struct {

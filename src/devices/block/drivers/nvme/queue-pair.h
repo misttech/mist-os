@@ -51,7 +51,7 @@ struct TransactionData {
 // This class is thread-unsafe.
 class QueuePair {
  public:
-  // TODO(https://fxbug.dev/102133): Tune kMaxTransferPages vs. preallocated PRP buffer usage.
+  // TODO(https://fxbug.dev/42053036): Tune kMaxTransferPages vs. preallocated PRP buffer usage.
   // Limits the PRP buffer size to a single page.
   static constexpr uint32_t kMaxTransferPages = 256;
 
@@ -100,7 +100,7 @@ class QueuePair {
   zx_status_t Submit(cpp20::span<uint8_t> submission, std::optional<zx::unowned_vmo> data,
                      zx_off_t vmo_offset, size_t bytes, IoCommand* io_cmd);
 
-  // TODO(https://fxbug.dev/102133): Use this if setting up PRP lists that span more than one page. See
+  // TODO(https://fxbug.dev/42053036): Use this if setting up PRP lists that span more than one page. See
   // QueuePair::kMaxTransferPages.
   // Puts a PRP list in |buf| containing the given addresses.
   zx_status_t PreparePrpList(ddk::IoBuffer& buf, cpp20::span<const zx_paddr_t> pages);

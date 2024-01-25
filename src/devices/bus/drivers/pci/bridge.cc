@@ -187,7 +187,7 @@ zx::result<> Bridge::AllocateBridgeWindowsLocked() {
   // bridges and device endpoints further downstream.
   //
   // TODO(cja) : support dynamic configuration of bridge windows.  It's going
-  // to be important when we need to support hot-plugging.  See https://fxbug.dev/30281
+  // to be important when we need to support hot-plugging.  See https://fxbug.dev/42105127
 
   // Every window is configured the same but with different allocators and registers.
   auto configure_window = [&](auto& upstream_alloc, auto& dest_alloc, uint64_t base, size_t limit,

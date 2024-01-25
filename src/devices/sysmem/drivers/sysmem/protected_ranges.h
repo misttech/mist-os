@@ -245,7 +245,7 @@ class ProtectedRangesCoreControl {
   // If the system is too broken to add a range, ZX_PANIC() instead of returning.  A hard reboot
   // will result (after which all ranges are cleared).
   //
-  // TODO(https://fxbug.dev/96061): When possible, configure sysmem to trigger reboot on driver remove.
+  // TODO(https://fxbug.dev/42178137): When possible, configure sysmem to trigger reboot on driver remove.
   //
   // Add a range, which may overlap with existing ranges, but which will have a unique (begin, end).
   // By the time this returns, the new range is usable.  Any portions of this range which overlap
@@ -265,7 +265,7 @@ class ProtectedRangesCoreControl {
   // ZX_PANIC() instead of returning.  A hard reboot will result (after which all ranges are
   // cleared).
   //
-  // TODO(https://fxbug.dev/96061): When possible, configure sysmem to trigger reboot on driver remove.
+  // TODO(https://fxbug.dev/42178137): When possible, configure sysmem to trigger reboot on driver remove.
   //
   // It is acceptable for the entire range to become unusable during delete iff any portion of the
   // range is not covered by any other range(s).  This applies even if some of the range is also
@@ -293,7 +293,7 @@ class ProtectedRangesCoreControl {
   // If the system is too broken to modify a range, ZX_PANIC() instead of returning.  A hard reboot
   // will result (after which all ranges are cleared).
   //
-  // TODO(https://fxbug.dev/96061): When possible, configure sysmem to trigger reboot on driver remove.
+  // TODO(https://fxbug.dev/42178137): When possible, configure sysmem to trigger reboot on driver remove.
   //
   // If a range is being shortened, it is acceptable for the entire old range to become temporarily
   // unusable during the shortening iff any offsets no longer covered by this range are also not
@@ -352,7 +352,7 @@ class ProtectedRangesCoreControl {
 // much memory that small allocations and faulting in a page start failing; a reboot is overall
 // better than getting stuck in that state.
 //
-// TODO(https://fxbug.dev/96061): When possible, configure sysmem to trigger reboot on driver remove.
+// TODO(https://fxbug.dev/42178137): When possible, configure sysmem to trigger reboot on driver remove.
 class ProtectedRangesControl : public ProtectedRangesCoreControl {
  public:
   // Lowest begin() possible for any requested range.
@@ -379,7 +379,7 @@ class ProtectedRangesControl : public ProtectedRangesCoreControl {
   // This can't fail.  If the system is too broken to UnUseRange(), then ZX_PANIC() instead.  A hard
   // reboot will result.
   //
-  // TODO(https://fxbug.dev/96061): When possible, configure sysmem to trigger reboot on driver remove.
+  // TODO(https://fxbug.dev/42178137): When possible, configure sysmem to trigger reboot on driver remove.
   //
   // This is called shortly after an offset stops being part of any protected range, and will not be
   // called on a given offset more than once without any intervening use_range that covers the same

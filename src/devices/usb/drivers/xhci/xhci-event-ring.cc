@@ -844,7 +844,7 @@ void EventRing::HandleTransferInterrupt() {
   std::unique_ptr<TRBContext> context;
   zx_status_t status = ring.CompleteTRB(trb, &context);
 
-  // TODO(https://fxbug.dev/107934): Once we reliably keep track of TRBs, this error handling should be
+  // TODO(https://fxbug.dev/42059338): Once we reliably keep track of TRBs, this error handling should be
   // removed and replaced by: ZX_ASSERT(status == ZX_OK).
   if (status != ZX_OK) {
     zxlogf(ERROR, "Lost a TRB! Completion code is %u", transfer_event->CompletionCode());

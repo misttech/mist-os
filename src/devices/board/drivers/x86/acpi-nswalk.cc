@@ -102,7 +102,7 @@ zx_status_t publish_acpi_devices(acpi::Manager* manager, zx_device_t* platform_b
 
   // Now walk the ACPI namespace looking for devices we understand, and publish
   // them.  For now, publish only the first PCI bus we encounter.
-  // TODO(https://fxbug.dev/78349): remove this when all drivers are removed from the x86 board driver.
+  // TODO(https://fxbug.dev/42158465): remove this when all drivers are removed from the x86 board driver.
   acpi::status<> acpi_status =
       acpi->WalkNamespace(ACPI_TYPE_DEVICE, ACPI_ROOT_OBJECT, MAX_NAMESPACE_DEPTH,
                           [acpi_root, acpi](ACPI_HANDLE object, uint32_t level,

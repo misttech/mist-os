@@ -406,7 +406,7 @@ Devfs::Devfs(std::optional<Devnode>& root,
     MustAddEntry(pd, "builtin", std::move(builtin));
   }
 
-  // TODO(https://fxbug.dev/113679): shrink this list to zero.
+  // TODO(https://fxbug.dev/42064970): shrink this list to zero.
   //
   // Do not add to this list.
   //
@@ -416,53 +416,53 @@ Devfs::Devfs(std::optional<Devnode>& root,
   // rg -IoN --no-ignore -g '!out/' -g '!*.md' '\bclass/[^/]+/[0-9]{3}\b' | \
   // sed -E 's|class/(.*)/[0-9]{3}|"\1",|g' | sort | uniq
   const std::unordered_set<std::string_view> classes_that_assume_ordering({
-      // TODO(https://fxbug.dev/113716): Remove.
+      // TODO(https://fxbug.dev/42065012): Remove.
       "adc",
 
-      // TODO(https://fxbug.dev/113717): Remove.
+      // TODO(https://fxbug.dev/42065013): Remove.
       "aml-ram",
 
-      // TODO(https://fxbug.dev/113718): Remove.
-      // TODO(https://fxbug.dev/113842): Remove.
+      // TODO(https://fxbug.dev/42065014): Remove.
+      // TODO(https://fxbug.dev/42065080): Remove.
       "backlight",
 
-      // TODO(https://fxbug.dev/117160): Remove.
+      // TODO(https://fxbug.dev/42068339): Remove.
       "block",
 
-      // TODO(https://fxbug.dev/113719): Remove.
+      // TODO(https://fxbug.dev/42065015): Remove.
       "bt-hci",
 
-      // TODO(https://fxbug.dev/113828): Remove.
+      // TODO(https://fxbug.dev/42065064): Remove.
       "cpu-ctrl",
 
-      // TODO(https://fxbug.dev/113829): Remove.
+      // TODO(https://fxbug.dev/42065065): Remove.
       "display-coordinator",
 
-      // TODO(https://fxbug.dev/113830): Remove.
+      // TODO(https://fxbug.dev/42065067): Remove.
       "goldfish-address-space",
       "goldfish-control",
       "goldfish-pipe",
 
-      // TODO(https://fxbug.dev/113835): Remove.
+      // TODO(https://fxbug.dev/42065072): Remove.
       "ot-radio",
 
-      // TODO(https://fxbug.dev/113842): Remove.
+      // TODO(https://fxbug.dev/42065080): Remove.
       "power-sensor",
 
-      // TODO(https://fxbug.dev/113839): Remove.
+      // TODO(https://fxbug.dev/42065076): Remove.
       "securemem",
 
-      // TODO(https://fxbug.dev/113713): Remove.
-      // TODO(https://fxbug.dev/113842): Remove.
+      // TODO(https://fxbug.dev/42065009): Remove.
+      // TODO(https://fxbug.dev/42065080): Remove.
       "temperature",
 
-      // TODO(https://fxbug.dev/113841): Remove.
+      // TODO(https://fxbug.dev/42065079): Remove.
       "test",
 
-      // TODO(https://fxbug.dev/113842): Remove.
+      // TODO(https://fxbug.dev/42065080): Remove.
       "thermal",
 
-      // TODO(https://fxbug.dev/113845): Remove.
+      // TODO(https://fxbug.dev/42065083): Remove.
       "zxcrypt",
   });
   // Pre-populate the class directories.

@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-// TODO(https://fxbug.dev/95933): Use extended values on the right when extending is fixed.
+// TODO(https://fxbug.dev/42177994): Use extended values on the right when extending is fixed.
 
 using bindlib.codegen.testlib;
 using bindlibparent.codegen.testlib as parent;

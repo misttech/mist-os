@@ -55,7 +55,7 @@ fuchsia_driver("qemu-arm64-driver") {
   }
 
   if (current_cpu == "arm64") {
-    # TODO(https://fxbug.dev/47406): restore some form of data dependency on qemu
+    # TODO(https://fxbug.dev/42124149): restore some form of data dependency on qemu
     # boot shims.
   }
 }

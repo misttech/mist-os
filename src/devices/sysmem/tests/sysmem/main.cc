@@ -7,7 +7,7 @@
 #include "test_observer.h"
 
 int main(int argc, char** argv) {
-  // TODO(https://fxbug.dev/122526): Remove this once the elf runner no longer
+  // TODO(https://fxbug.dev/42073486): Remove this once the elf runner no longer
   // fools libc into block-buffering stdout.
   setlinebuf(stdout);
   zxtest::Runner::GetInstance()->AddObserver(&test_observer);

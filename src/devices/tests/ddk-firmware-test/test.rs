@@ -215,7 +215,7 @@ async fn create_realm(
     Ok(realm)
 }
 
-// TODO(https://fxbug.dev/116950): Re-enable after merging test into driver test realm proper.
+// TODO(https://fxbug.dev/42068171): Re-enable after merging test into driver test realm proper.
 #[ignore]
 #[fuchsia::test]
 async fn load_package_firmware_test() -> Result<(), Error> {

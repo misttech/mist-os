@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-// TODO(https://fxbug.dev/88460): Audit each test and merge into the regular `strings.gidl`.
+// TODO(https://fxbug.dev/42169694): Audit each test and merge into the regular `strings.gidl`.
 // These were ported from a legacy set of manual C/C++ tests termed `walker_tests`.
 
 decode_failure("VectorWithHugeCount") {
@@ -50,7 +50,7 @@ success("PresentNonnullableVectorOfHandles") {
 }
 
 success("PresentNullableVectorOfHandles") {
-    // TODO(https://fxbug.dev/88979): generated Rust test does not compile.
+    // TODO(https://fxbug.dev/42170268): generated Rust test does not compile.
     bindings_denylist = [rust],
     handle_defs = {
         #0 = event(),
@@ -80,7 +80,7 @@ success("PresentNullableVectorOfHandles") {
 }
 
 decode_failure("AbsentNonnullableVectorOfHandlesError") {
-    // TODO(https://fxbug.dev/58385): Close handles on encode/decode failure.
+    // TODO(https://fxbug.dev/42136336): Close handles on encode/decode failure.
     bindings_denylist = [dart],
     handle_defs = {
         #0 = event(),
@@ -104,7 +104,7 @@ decode_failure("AbsentNonnullableVectorOfHandlesError") {
 }
 
 decode_failure("InvalidAbsentNonnullableVectorOfHandlesError") {
-    // TODO(https://fxbug.dev/58385): Close handles on encode/decode failure.
+    // TODO(https://fxbug.dev/42136336): Close handles on encode/decode failure.
     bindings_denylist = [dart],
     handle_defs = {
         #0 = event(),
@@ -171,7 +171,7 @@ success("PresentNonnullableBoundedVectorOfHandles") {
 }
 
 success("PresentNullableBoundedVectorOfHandles") {
-    // TODO(https://fxbug.dev/88979): generated Rust test does not compile.
+    // TODO(https://fxbug.dev/42170268): generated Rust test does not compile.
     bindings_denylist = [rust],
     handle_defs = {
         #0 = event(),
@@ -201,7 +201,7 @@ success("PresentNullableBoundedVectorOfHandles") {
 }
 
 decode_failure("AbsentNonnullableBoundedVectorOfHandlesError") {
-    // TODO(https://fxbug.dev/58385): Close handles on encode/decode failure.
+    // TODO(https://fxbug.dev/42136336): Close handles on encode/decode failure.
     bindings_denylist = [dart],
     handle_defs = {
         #0 = event(),
@@ -225,7 +225,7 @@ decode_failure("AbsentNonnullableBoundedVectorOfHandlesError") {
 }
 
 decode_failure("InvalidAbsentNonnullableBoundedVectorOfHandlesError") {
-    // TODO(https://fxbug.dev/58385): Close handles on encode/decode failure.
+    // TODO(https://fxbug.dev/42136336): Close handles on encode/decode failure.
     bindings_denylist = [dart],
     handle_defs = {
         #0 = event(),
@@ -264,7 +264,7 @@ success("AbsentNullableBoundedVectorOfHandles") {
 }
 
 decode_failure("PresentNonnullableBoundedVectorOfHandlesShortError") {
-    // TODO(https://fxbug.dev/58385): Close handles on encode/decode failure.
+    // TODO(https://fxbug.dev/42136336): Close handles on encode/decode failure.
     bindings_denylist = [dart],
     handle_defs = {
         #0 = event(),
@@ -304,7 +304,7 @@ decode_failure("PresentNonnullableBoundedVectorOfHandlesShortError") {
 }
 
 decode_failure("PresentNullableBoundedVectorOfHandlesShortError") {
-    // TODO(https://fxbug.dev/58385): Close handles on encode/decode failure.
+    // TODO(https://fxbug.dev/42136336): Close handles on encode/decode failure.
     bindings_denylist = [dart],
     handle_defs = {
         #0 = event(),
@@ -361,7 +361,7 @@ success("PresentNonnullableVectorOfUint32") {
 }
 
 success("PresentNullableVectorOfUint32") {
-    // TODO(https://fxbug.dev/88979): generated Rust test does not compile.
+    // TODO(https://fxbug.dev/42170268): generated Rust test does not compile.
     bindings_denylist = [rust],
     value = UnboundedNullableVectorOfUint32s{
         vu0: [1, 2, 3, 4],
@@ -429,7 +429,7 @@ success("PresentNonnullableBoundedVectorOfUint32") {
 }
 
 success("PresentNullableBoundedVectorOfUint32") {
-    // TODO(https://fxbug.dev/88979): generated Rust test does not compile.
+    // TODO(https://fxbug.dev/42170268): generated Rust test does not compile.
     bindings_denylist = [rust],
     value = Bounded32NullableVectorOfUint32s{
         vu0: [1, 2, 3, 4],

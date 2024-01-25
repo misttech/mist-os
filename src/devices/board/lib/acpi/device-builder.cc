@@ -54,7 +54,7 @@ acpi::status<> DeviceBuilder::GatherResources(acpi::Acpi* acpi, fidl::AnyArena& 
     return acpi::ok();
   }
 
-  // TODO(https://fxbug.dev/78565): Handle other resources like serial buses.
+  // TODO(https://fxbug.dev/42158705): Handle other resources like serial buses.
   auto result = acpi->WalkResources(
       handle_, "_CRS",
       [this, acpi, manager, &allocator, &callback](ACPI_RESOURCE* res) -> acpi::status<> {
@@ -442,7 +442,7 @@ zx::result<> DeviceBuilder::BuildComposite(acpi::Manager* manager,
   };
 
 #if !defined(IS_TEST)
-  // TODO(https://fxbug.dev/79923): re-enable this in tests once mock_ddk supports composites.
+  // TODO(https://fxbug.dev/42160209): re-enable this in tests once mock_ddk supports composites.
   auto composite_name = fbl::StringPrintf("%s-composite", name());
   // Don't worry about any metadata, since it's present in the "acpi" parent.
   DeviceArgs args(parent_->zx_device_, manager, device_dispatcher, handle_);

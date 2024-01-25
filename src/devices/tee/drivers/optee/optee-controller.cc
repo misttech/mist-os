@@ -482,7 +482,7 @@ zx_status_t OpteeController::Bind() {
     return status;
   }
 
-  // TODO(https://fxbug.dev/13426): Remove this once we have a tee core driver that will discover the TEE OS
+  // TODO(https://fxbug.dev/42084132): Remove this once we have a tee core driver that will discover the TEE OS
   status = ValidateApiUid();
   if (status != ZX_OK) {
     LOG(ERROR, "API UID does not match");

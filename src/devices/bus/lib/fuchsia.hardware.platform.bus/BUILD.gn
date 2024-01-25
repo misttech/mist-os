@@ -28,7 +28,7 @@ source_set("fuchsia.hardware.platform.bus_banjo_cpp") {
     "//src/lib/ddktl",
   ]
 
-  # TODO(https://fxbug.dev/107030): remove this shim and migrate users to using FIDL directly.
+  # TODO(https://fxbug.dev/42058371): remove this shim and migrate users to using FIDL directly.
   visibility = [
     "//src/devices/board/drivers/av400:*",
     "//vendor/*",

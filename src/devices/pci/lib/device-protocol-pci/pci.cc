@@ -289,7 +289,7 @@ zx_status_t Pci::ConfigureInterruptMode(uint32_t requested_irq_count,
   // temporarily coexisting while we migrate PCI from Banjo to FIDL. Eventually
   // the C version will go away.
   //
-  // TODO(https://fxbug.dev/99914): Remove this notice once PCI over Banjo is removed.
+  // TODO(https://fxbug.dev/42182407): Remove this notice once PCI over Banjo is removed.
   if (requested_irq_count == 0) {
     return ZX_ERR_INVALID_ARGS;
   }

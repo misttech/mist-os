@@ -89,7 +89,7 @@ func testLockupWithCommand(t *testing.T, i *emulatortest.Instance, arch emulator
 	i.WaitForLogMessage("{{{bt:0:")
 	i.WaitForLogMessage("welcome to Zircon")
 
-	// TODO(https://fxbug.dev/81295): Our emulated x64 environment does not currently
+	// TODO(https://fxbug.dev/42161734): Our emulated x64 environment does not currently
 	// support crashlogs, however our ARM64 environment does.  If we are on ARM,
 	// check the crashlog startup banner to make certain that the system didn't
 	// just reboot, but that it did so because of a SOFTWARE WATCHDOG event.

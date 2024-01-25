@@ -29,7 +29,7 @@ namespace {
 
 const std::string kUnboundUrl = "unbound";
 
-// TODO(https://fxbug.dev/124976): Remove this flag once composite node spec rebind once all clients
+// TODO(https://fxbug.dev/42075799): Remove this flag once composite node spec rebind once all clients
 // are updated to the new Rebind() behavior and this is fully implemented on both DFv1 and DFv2.
 constexpr bool kEnableCompositeNodeSpecRebind = false;
 
@@ -351,7 +351,7 @@ zx::result<std::shared_ptr<Node>> Node::CreateCompositeNode(
 }
 
 Node::~Node() {
-  // TODO(https://fxbug.dev/135416): Notify the NodeRemovalTracker if the node is deallocated before
+  // TODO(https://fxbug.dev/42085057): Notify the NodeRemovalTracker if the node is deallocated before
   // shutdown is complete.
   if (GetNodeState() != NodeState::kStopped) {
     LOGF(INFO, "Node %s deallocating while at state %s", MakeComponentMoniker().c_str(),
@@ -393,7 +393,7 @@ std::string Node::MakeComponentMoniker() const {
   // The driver's component name is based on the node name, which means that the
   // node name cam only have [a-z0-9-_.] characters. DFv1 composites contain ':'
   // which is not allowed, so replace those characters.
-  // TODO(https://fxbug.dev/111156): Migrate driver names to only use CF valid characters.
+  // TODO(https://fxbug.dev/42062456): Migrate driver names to only use CF valid characters.
   std::replace(topo_path.begin(), topo_path.end(), ':', '_');
   std::replace(topo_path.begin(), topo_path.end(), '/', '.');
   return topo_path;
@@ -462,7 +462,7 @@ ShutdownHelper& Node::GetShutdownHelper() {
   return *shutdown_helper_.get();
 }
 
-// TODO(https://fxbug.dev/124976): If the node invoking this function cannot multibind to
+// TODO(https://fxbug.dev/42075799): If the node invoking this function cannot multibind to
 // composites, is parenting one composite node, and is not in a state for removal, then it should
 // attempt to bind to something else.
 void Node::RemoveChild(const std::shared_ptr<Node>& child) {
@@ -573,7 +573,7 @@ void Node::RestartNode() {
   Remove(RemovalSet::kAll, nullptr);
 }
 
-// TODO(https://fxbug.dev/132254): Handle the case in which this function is called during node
+// TODO(https://fxbug.dev/42082343): Handle the case in which this function is called during node
 // removal.
 void Node::RestartNodeWithRematch(std::optional<std::string> restart_driver_url_suffix,
                                   fit::callback<void(zx::result<>)> completer) {
@@ -591,7 +591,7 @@ void Node::RestartNodeWithRematch() {
   RestartNodeWithRematch("", [](zx::result<> result) {});
 }
 
-// TODO(https://fxbug.dev/132254): Handle the case in which this function is called during node
+// TODO(https://fxbug.dev/42082343): Handle the case in which this function is called during node
 // removal.
 void Node::RemoveCompositeNodeForRebind(fit::callback<void(zx::result<>)> completer) {
   if (composite_rebind_completer_.has_value()) {

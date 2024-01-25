@@ -11,7 +11,7 @@
 
 namespace {
 
-// TODO(https://fxbug.dev/75983): Read this list from a config file instead of having an array.
+// TODO(https://fxbug.dev/42155836): Read this list from a config file instead of having an array.
 constexpr std::array kDriverAllowlist{
     "libasync-default.so",
     "libclang_rt.asan.so",

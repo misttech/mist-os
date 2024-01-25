@@ -99,7 +99,7 @@ class IommuManager : public iommu::IommuManagerInterface {
 
   // Returns a handle to the IOMMU that is responsible for the given BDF.
   zx::unowned_iommu IommuForPciDevice(uint32_t bdf) override;
-  // TODO(https://fxbug.dev/92140): parse ANDD for this information.
+  // TODO(https://fxbug.dev/42173782): parse ANDD for this information.
   zx::unowned_iommu IommuForAcpiDevice(std::string_view path) override { return DummyIommu(); }
 
   zx::unowned_iommu DummyIommu() { return zx::unowned_iommu(dummy_iommu_); }

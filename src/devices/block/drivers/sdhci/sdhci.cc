@@ -373,7 +373,7 @@ zx_status_t Sdhci::SdmmcRequest(const sdmmc_req_t* req, uint32_t out_response[4]
     return ZX_ERR_OUT_OF_RANGE;
   }
   if (!SupportsAdma2()) {
-    // TODO(https://fxbug.dev/106851): Add support for PIO requests.
+    // TODO(https://fxbug.dev/42058171): Add support for PIO requests.
     return ZX_ERR_NOT_SUPPORTED;
   }
 

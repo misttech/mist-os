@@ -43,7 +43,7 @@ class QemuRiscv64 : public QemuRiscv64Type {
   void SysinfoInit();
   zx::result<> SysmemInit();
 
-  // TODO(https://fxbug.dev/108070): Switch to fdf::SyncClient once it's supported.
+  // TODO(https://fxbug.dev/42059490): Switch to fdf::SyncClient once it's supported.
   fdf::WireSyncClient<fuchsia_hardware_platform_bus::PlatformBus> pbus_;
   PciRootHost pci_root_host_;
 };

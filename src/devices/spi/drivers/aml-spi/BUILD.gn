@@ -12,7 +12,7 @@ driver_bind_rules("aml_spi_bind") {
   bind_output = "aml-spi.bindbc"
   tests = "bind_tests.json"
 
-  # TODO(https://fxbug.dev/115757): Remove this once we no longer need to generate
+  # TODO(https://fxbug.dev/42067063): Remove this once we no longer need to generate
   # fragments for composite bind rules.
   disable_fragment_gen = true
 
@@ -66,7 +66,7 @@ test("aml-spi-test-bin") {
     "//zircon/system/ulib/zxtest",
   ]
 
-  # TODO(https://fxbug.dev/58162): delete the below and fix compiler warnings
+  # TODO(https://fxbug.dev/42136089): delete the below and fix compiler warnings
   configs += [ "//build/config:Wno-conversion" ]
 }
 
@@ -97,7 +97,7 @@ fuchsia_driver("aml-spi-driver") {
   sources = [ "aml-spi.cc" ]
   deps = [ ":common" ]
 
-  # TODO(https://fxbug.dev/58162): delete the below and fix compiler warnings
+  # TODO(https://fxbug.dev/42136089): delete the below and fix compiler warnings
   configs += [ "//build/config:Wno-conversion" ]
 }
 

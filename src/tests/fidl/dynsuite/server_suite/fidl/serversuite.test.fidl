@@ -239,7 +239,7 @@ open protocol OpenTarget {
     }) error int32;
 };
 
-// TODO(https://fxbug.dev/7913): Add a built-in unit type to FIDL.
+// TODO(https://fxbug.dev/42159332): Add a built-in unit type to FIDL.
 type Empty = struct {};
 
 type Test = flexible enum : uint32 {

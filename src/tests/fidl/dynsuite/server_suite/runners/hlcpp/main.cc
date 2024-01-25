@@ -28,13 +28,13 @@ namespace {
 const std::set<fidl::serversuite::Test> kDisabledTests = {
     // This is for testing the test disabling functionality itself.
     fidl::serversuite::Test::IGNORE_DISABLED,
-    // TODO(https://fxbug.dev/133376): Should close the channel when replying fails.
+    // TODO(https://fxbug.dev/42083300): Should close the channel when replying fails.
     fidl::serversuite::Test::SERVER_SENDS_WRONG_HANDLE_TYPE,
     fidl::serversuite::Test::SERVER_SENDS_TOO_FEW_RIGHTS,
     fidl::serversuite::Test::RESPONSE_EXCEEDS_BYTE_LIMIT,
     fidl::serversuite::Test::RESPONSE_EXCEEDS_HANDLE_LIMIT,
     fidl::serversuite::Test::SERVER_SENDS_WRONG_HANDLE_TYPE,
-    // TODO(https://fxbug.dev/132059): Should validate the header even when there's no payload.
+    // TODO(https://fxbug.dev/42082198): Should validate the header even when there's no payload.
     fidl::serversuite::Test::V1_TWO_WAY_NO_PAYLOAD,
     // TODO(fxubg.dev/133377): Server should not be allowed to receive epitaphs.
     fidl::serversuite::Test::SERVER_RECEIVES_EPITAPH_INVALID,

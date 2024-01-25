@@ -96,7 +96,7 @@ func TestKernelCrashlog(t *testing.T) {
 
 	// See that the crash report contains ESR and FAR.
 	//
-	// This is a regression test for https://fxbug.dev/52182. 'k crash' is going to
+	// This is a regression test for https://fxbug.dev/42129456. 'k crash' is going to
 	// attempt to store a value at a bad address in order to trigger its
 	// exception.  While we cannot always rely on the lower bits of the ESR being
 	// consistent, we should be able to rely on the top byte being consistent in

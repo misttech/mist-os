@@ -44,7 +44,7 @@ class IsolatedDevmgr {
 
   // Launch a new isolated devmgr.
   //
-  // TODO(https://fxbug.dev/114254): Remove |dispatcher| once RealmBuilder::Build no longer requires
+  // TODO(https://fxbug.dev/42065538): Remove |dispatcher| once RealmBuilder::Build no longer requires
   // it.
   static zx::result<IsolatedDevmgr> Create(devmgr_launcher::Args args,
                                            async_dispatcher_t* dispatcher);

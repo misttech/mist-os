@@ -164,7 +164,7 @@ AmlRam::AmlRam(zx_device_t* parent, fdf::MmioBuffer mmio, fdf::MmioBuffer clk_mm
       port_(std::move(port)),
       smc_monitor_(std::move(smc_monitor)),
       device_pid_(device_pid) {
-  // TODO(https://fxbug.dev/53325): ALL_GRANT counter is broken on S905D2.
+  // TODO(https://fxbug.dev/42130726): ALL_GRANT counter is broken on S905D2.
   all_grant_broken_ = device_pid == PDEV_PID_AMLOGIC_S905D2;
 
   // Read windowing data:

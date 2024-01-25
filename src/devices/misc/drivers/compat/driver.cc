@@ -782,7 +782,7 @@ fpromise::promise<void, zx_status_t> Driver::ConnectToParentDevices() {
             continue;
           }
 
-          // TODO(https://fxbug.dev/100985): When services stop adding extra instances
+          // TODO(https://fxbug.dev/42051759): When services stop adding extra instances
           // separated by ',' then remove this check.
           if (device.name.find(',') != std::string::npos) {
             continue;

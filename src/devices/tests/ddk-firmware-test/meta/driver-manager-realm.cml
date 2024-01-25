@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-// TODO(https://fxbug.dev/116950): Merge this into the driver-test-realm.cml
+// TODO(https://fxbug.dev/42068171): Merge this into the driver-test-realm.cml
 {
     include: [
         "inspect/offer.shard.cml",

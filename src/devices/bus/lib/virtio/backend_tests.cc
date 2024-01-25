@@ -485,7 +485,7 @@ TEST_F(VirtioTests, LegacyMsiX) {
 }
 
 int main(int argc, char* argv[]) {
-  // TODO(https://fxbug.dev/85835): Remove custom main once mock-ddk works with
+  // TODO(https://fxbug.dev/42166778): Remove custom main once mock-ddk works with
   // --min-severity-logs.
   int opt;
   int v_position = 0;
