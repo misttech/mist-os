@@ -73,7 +73,7 @@ use {
     fuchsia_async as fasync,
     futures::{
         channel::oneshot,
-        future::{pending, BoxFuture, FutureExt, Shared},
+        future::{join_all, pending, BoxFuture, FutureExt, Shared},
         task::{Context, Poll},
         Future,
     },
@@ -310,7 +310,7 @@ impl ActionSet {
 
         // Otherwise we spin up the new Action
         let maybe_abort_handle = action.abort_handle();
-        let prereq = self.get_prereq_action(action.key());
+        let prereqs = self.get_prereq_action(action.key());
         let abort_handles = self.get_abort_action(action.key());
 
         let component = component.clone();
@@ -319,9 +319,7 @@ impl ActionSet {
             for abort in abort_handles {
                 abort.abort();
             }
-            for prereq in prereq {
-                let _ = prereq.await;
-            }
+            _ = join_all(prereqs).await;
             let key = action.key();
             let res = action.handle(&component).await;
             Self::finish(&component, &key).await;
