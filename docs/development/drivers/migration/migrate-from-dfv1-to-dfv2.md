@@ -63,6 +63,30 @@ or edge cases that may apply to your driver.
   - `compat::ConnectBanjo` makes it easier to connect to Banjo
     (see [`banjo_client.h`][banjo-client-h]).
 
+- **Can DFv2 drivers use the compatibility shim for composite nodes?**
+
+  The migration process for composite drivers are nearly identical to
+  normal drivers, but composite drivers have slightly different
+  ways for connecting to Banjo or FIDL protocols from parent nodes.
+
+  Because composite nodes have multiple parents, composite drivers need
+  to identify the parent’s name when connecting to it. For example,
+  below is a normal driver establishing a Banjo connection with its
+  parent:
+
+  ```cpp
+  zx::result client_result =
+      compat::ConnectBanjo<ddk::HidDeviceProtocolClient>(incoming());
+  ```
+
+  The composite driver’s method is almost identical, except the parent
+  name needs to be added:
+
+  ```cpp
+  zx::result client_result =
+      compat::ConnectBanjo<ddk::HidDeviceProtocolClient>(incoming(), "gpio-int")
+  ```
+
 - **What has changed in the new DFv2 driver interfaces?**
 
   One major change in DFv2 is that drivers take control of the life cycle
@@ -137,6 +161,9 @@ or edge cases that may apply to your driver.
 
   DFv2 nodes contain additional
   [node properties generated from their FIDL service offers](#use-the-node-properties-generated-from-fidl-service-offers).
+
+  However, it is unlikely that you will need to modify bind rules when
+  migrating an existing DFv1 driver to DFv2.
 
 - **What has changed in logging in DFv2?**
 
