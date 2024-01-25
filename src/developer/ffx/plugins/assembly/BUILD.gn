@@ -40,6 +40,7 @@ ffx_plugin("ffx_assembly") {
     "src/operations/size_check/common.rs",
     "src/operations/size_check/package.rs",
     "src/operations/size_check/product.rs",
+    "src/operations/size_check/visualization.rs",
     "src/subpackage_blobs_package.rs",
     "src/vbmeta.rs",
     "src/vfs.rs",
