@@ -180,7 +180,7 @@ async fn set_interest_before_startup() {
         .expect("connect to log settings");
 
     // Set the minimum severity to Severity::Debug.
-    let component_log_settings = ComponentLogSettings::new("**");
+    let component_log_settings = ComponentLogSettings::new(PUPPET_NAME);
     component_log_settings.set_interest(&log_settings, Severity::Debug).await.unwrap();
 
     // Start listening for logs.
