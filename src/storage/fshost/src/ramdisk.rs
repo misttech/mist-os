@@ -50,7 +50,7 @@ async fn create_ramdisk(zbi_vmo: zx::Vmo) -> Result<String, Error> {
         "invalid ZBI_TYPE_STORAGE_RAMDISK item header: type"
     );
 
-    // TODO(https://fxbug.dev/34597): The old code ignored uncompressed items too, and silently.  Really
+    // TODO(https://fxbug.dev/42109921): The old code ignored uncompressed items too, and silently.  Really
     // the protocol should be cleaned up so the VMO arrives without the header in it and then it
     // could just be used here directly if uncompressed (or maybe bootsvc deals with decompression
     // in the first place so the uncompressed VMO is always what we get).

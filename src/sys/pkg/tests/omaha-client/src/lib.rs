@@ -765,7 +765,7 @@ async fn expect_states(stream: &mut MonitorRequestStream, expected_states: &[Sta
 }
 
 fn update_info() -> Option<UpdateInfo> {
-    // TODO(https://fxbug.dev/47469): version_available should be `Some("0.1.2.3".to_string())` once omaha-client
+    // TODO(https://fxbug.dev/42124218): version_available should be `Some("0.1.2.3".to_string())` once omaha-client
     // returns version_available.
     Some(UpdateInfo {
         version_available: None,

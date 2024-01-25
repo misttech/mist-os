@@ -572,7 +572,7 @@ impl<'a> ScannedStore<'a> {
                 ObjectDescriptor::Directory,
             ) => {
                 if parent.is_some() {
-                    // TODO(https://fxbug.dev/87381): Accumulating and reporting all parents
+                    // TODO(https://fxbug.dev/42168496): Accumulating and reporting all parents
                     // might be useful.
                     self.fsck
                         .error(FsckError::MultipleLinksToDirectory(self.store_id, child_id))?;
@@ -775,7 +775,7 @@ impl<'a> ScannedStore<'a> {
 // Scans extents and directory child entries in the store, emitting synthesized allocations into
 // |fsck.allocations|, updating the sizes for files in |scanned| and performing checks on directory
 // children.
-// TODO(https://fxbug.dev/95475): Roll the extent scanning back into main function.
+// TODO(https://fxbug.dev/42177485): Roll the extent scanning back into main function.
 async fn scan_extents_and_directory_children<'a>(
     store: &ObjectStore,
     scanned: &mut ScannedStore<'a>,

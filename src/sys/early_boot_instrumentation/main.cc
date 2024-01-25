@@ -47,7 +47,7 @@ int main(int argc, char** argv) {
     fidl::WireSyncClient client(std::move(client_end.value()));
     const fidl::WireResult result = client->Get();
     if (!result.ok()) {
-      // TODO(https://fxbug.dev/124407): s/WARNING/ERROR/.
+      // TODO(https://fxbug.dev/42075300): s/WARNING/ERROR/.
       FX_PLOGS(WARNING, result.status()) << "Failed to call fuchsia.boot/SvcStashProvider.Get";
       return;
     }

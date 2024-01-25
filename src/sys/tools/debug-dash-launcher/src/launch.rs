@@ -22,7 +22,7 @@ pub mod package;
 // -s: force input from stdin
 // -i: force interactive
 const DASH_ARGS_FOR_INTERACTIVE: [&[u8]; 2] = ["-i".as_bytes(), "-s".as_bytes()];
-// TODO(https://fxbug.dev/104634): Verbose (-v) or write-commands-to-stderr (-x) is required if a command is
+// TODO(https://fxbug.dev/42055812): Verbose (-v) or write-commands-to-stderr (-x) is required if a command is
 // given, else it errors with `Can't open <cmd>`. -c: execute command
 const DASH_ARGS_FOR_COMMAND: [&[u8]; 2] = ["-v".as_bytes(), "-c".as_bytes()];
 

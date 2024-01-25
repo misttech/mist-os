@@ -468,7 +468,7 @@ async fn test_blobfs_out_of_space_does_not_fall_back_to_previous_ephemeral_packa
 
 // The package is in the cache but not known to the repository. Don't fall back.
 #[fuchsia::test]
-#[ignore] // TODO(https://fxbug.dev/50764): reenable this after we've normalized SDK client behavior wrt cache fallback.
+#[ignore] // TODO(https://fxbug.dev/42127880): reenable this after we've normalized SDK client behavior wrt cache fallback.
 async fn test_resolve_fails_not_in_repo() {
     let pkg_name = "test_resolve_fails_not_in_repo";
     let pkg = test_package(pkg_name, "stuff").await;
@@ -502,7 +502,7 @@ async fn test_resolve_fails_not_in_repo() {
 }
 
 // The package is in the cache but not known to the repository. Fall back to the on-disk package.
-// TODO(https://fxbug.dev/50764): This is the wrong behavior. Delete this after we've normalized SDK client behavior
+// TODO(https://fxbug.dev/42127880): This is the wrong behavior. Delete this after we've normalized SDK client behavior
 // wrt cache fallback.
 #[fuchsia::test]
 async fn test_resolve_falls_back_not_in_repo() {

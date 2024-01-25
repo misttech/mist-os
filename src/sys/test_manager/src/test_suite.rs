@@ -151,7 +151,7 @@ impl TestRunBuilder {
                     warn!(?diagnostics, "Error sending events for RunController: {:?}", e);
                 }
                 // Wait for the client to close the channel.
-                // TODO(https://fxbug.dev/87976) once https://fxbug.dev/87890 is fixed, this is no longer
+                // TODO(https://fxbug.dev/87976) once https://fxbug.dev/42169061 is fixed, this is no longer
                 // necessary.
                 if let Err(e) = serve_fut.await {
                     warn!(?diagnostics, "Error serving RunController: {:?}", e);
@@ -270,7 +270,7 @@ impl TestRunBuilder {
 }
 
 // max events to send so that we don't cross fidl limits.
-// TODO(https://fxbug.dev/100462): Use tape measure to calculate limit.
+// TODO(https://fxbug.dev/42051179): Use tape measure to calculate limit.
 const EVENTS_THRESHOLD: usize = 50;
 
 impl Suite {
@@ -356,7 +356,7 @@ impl Suite {
             Either::Right((get_events_result, serve_fut)) => {
                 get_events_result?;
                 // Wait for the client to close the channel.
-                // TODO(https://fxbug.dev/87976) once https://fxbug.dev/87890 is fixed, this is no longer
+                // TODO(https://fxbug.dev/87976) once https://fxbug.dev/42169061 is fixed, this is no longer
                 // necessary.
                 serve_fut.await
             }

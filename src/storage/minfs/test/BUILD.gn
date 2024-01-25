@@ -55,7 +55,7 @@ test("minfs_unit") {
     "//zircon/third_party/ulib/safemath",
   ]
 
-  # TODO(https://fxbug.dev/135694): delete the below and fix compiler warnings
+  # TODO(https://fxbug.dev/42085293): delete the below and fix compiler warnings
   configs += [ "//build/config:Wno-vla-cxx-extension" ]
 }
 
@@ -137,7 +137,7 @@ test("fs_tests") {
     "//zircon/system/ulib/fdio-caller",
   ]
 
-  # TODO(https://fxbug.dev/135694): delete the below and fix compiler warnings
+  # TODO(https://fxbug.dev/42085293): delete the below and fix compiler warnings
   configs += [ "//build/config:Wno-vla-cxx-extension" ]
 }
 
@@ -243,13 +243,13 @@ fs_test_suite("minfs") {
     ":minfs-unit-test",
   ]
 
-  # TODO(https://fxbug.dev/84622): Flaky test disabled on coverage.
+  # TODO(https://fxbug.dev/42165431): Flaky test disabled on coverage.
   # Please fix the flake and remove the condition below.
   if (!is_coverage) {
     deps += [ ":minfs-integration-test" ]
   }
 
-  # TODO(https://fxbug.dev/84623): Flaky test disabled on coverage.
+  # TODO(https://fxbug.dev/42165432): Flaky test disabled on coverage.
   # Please fix the flake and remove the condition below.
   if (!is_coverage) {
     deps += [ ":minfs-power-test" ]

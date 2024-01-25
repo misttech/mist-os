@@ -184,7 +184,7 @@ typedef struct {
 } NDMPartitionUserData;
 
 // Partition information version 2.
-// TODO(https://fxbug.dev/40208): Merge with NDMPartition once the transition is made and the code
+// TODO(https://fxbug.dev/42116155): Merge with NDMPartition once the transition is made and the code
 // stops writing version 1 data.
 typedef struct {
   NDMPartition basic_data;

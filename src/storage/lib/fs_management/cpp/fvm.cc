@@ -126,7 +126,7 @@ zx_status_t FvmOverwriteImpl(fidl::UnownedClientEnd<fuchsia_hardware_block::Bloc
   }
 
   {
-    // TODO(https://fxbug.dev/112484): this relies on multiplexing.
+    // TODO(https://fxbug.dev/42063787): this relies on multiplexing.
     const fidl::WireResult result =
         fidl::WireCall(fidl::UnownedClientEnd<fuchsia_device::Controller>(device.channel()))
             ->Rebind({});
@@ -175,7 +175,7 @@ zx::result<fidl::ClientEnd<fuchsia_device::Controller>> OpenPartitionImpl(
     return std::move(*watch_result);
   }
 
-  // TODO(https://fxbug.dev/124643): Create a C++ wrapper for channel-oriented readdir and use it
+  // TODO(https://fxbug.dev/42075490): Create a C++ wrapper for channel-oriented readdir and use it
   // here.
   int fd;
   if (zx_status_t status = fdio_fd_create(directory.TakeChannel().release(), &fd);
@@ -302,7 +302,7 @@ zx::result<bool> PartitionMatches(fidl::UnownedClientEnd<fuchsia_device::Control
     }
   }
   if (!matcher.detected_formats.empty()) {
-    // TODO(https://fxbug.dev/122007): avoid this cast
+    // TODO(https://fxbug.dev/42072982): avoid this cast
     const DiskFormat part_format =
         DetectDiskFormat(fidl::UnownedClientEnd<fuchsia_hardware_block::Block>(
             partition_client_end.borrow().channel()));
@@ -338,7 +338,7 @@ zx_status_t FvmInitPreallocated(fidl::UnownedClientEnd<fuchsia_hardware_block::B
   }
 
   // This buffer needs to hold both copies of the metadata.
-  // TODO(https://fxbug.dev/60709): Eliminate layout assumptions.
+  // TODO(https://fxbug.dev/42138919): Eliminate layout assumptions.
   size_t metadata_allocated_bytes = header.GetMetadataAllocatedBytes();
   size_t dual_metadata_bytes = metadata_allocated_bytes * 2;
   std::unique_ptr<uint8_t[]> mvmo(new uint8_t[dual_metadata_bytes]);

@@ -42,7 +42,7 @@ fuchsia_unittest_package("component-v2-time-unittests") {
   deps = [
     ":component-time-test",
 
-    # https://fxbug.dev/101490: Dep included for affected tests presubmit
+    # https://fxbug.dev/42052321: Dep included for affected tests presubmit
     "//src/sys/component_manager:component-manager-realm-builder-cmp",
   ]
 }

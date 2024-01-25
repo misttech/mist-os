@@ -23,7 +23,7 @@ pub(crate) struct LogDisplayConfiguration {
     pub text_options: LogTextDisplayOptions,
 }
 
-// TODO(https://fxbug.dev/54198, https://fxbug.dev/70581): deprecate this when implementing metadata selectors for
+// TODO(https://fxbug.dev/54198, https://fxbug.dev/42149841): deprecate this when implementing metadata selectors for
 // logs or when we support automatically sending interest updates to all test components on startup.
 // We currently don't have a way of setting the interest of a test realm before creating that realm.
 #[derive(Clone, Default)]
@@ -48,7 +48,7 @@ impl LogCollectionOptions {
         let mut found_matching_selector = false;
         for LogInterestSelector { interest, selector } in &self.format.interest {
             let Some(min_severity) = interest.min_severity.as_ref() else {
-                    continue;
+                continue;
             };
             if selectors::match_moniker_against_component_selector(
                 log.moniker.split('/'),

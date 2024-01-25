@@ -207,7 +207,7 @@ mod tests {
         assert!(event_stream.wait_until(EventType::Started, moniker.clone()).await.is_some());
     }
 
-    // TODO(https://fxbug.dev/122226): Figure out a way to test this behavior.
+    // TODO(https://fxbug.dev/42073225): Figure out a way to test this behavior.
     #[ignore]
     #[fuchsia::test]
     async fn channel_is_closed_if_component_does_not_exist() {

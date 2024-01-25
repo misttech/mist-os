@@ -343,7 +343,7 @@ async fn partition_max_size_set() {
     fixture.check_fs_type("data", data_fs_type()).await;
 
     // Get the blobfs instance guid.
-    // TODO(https://fxbug.dev/121274): Remove hardcoded paths
+    // TODO(https://fxbug.dev/42072287): Remove hardcoded paths
     let volume_proxy_data = connect_to_named_protocol_at_dir_root::<VolumeMarker>(
         &fixture.dir("dev-topological", fio::OpenFlags::empty()),
         "sys/platform/00:00:2d/ramctl/ramdisk-0/block/fvm/blobfs-p-1/block",
@@ -375,7 +375,7 @@ async fn partition_max_size_set() {
     zx::Status::ok(status).unwrap();
     let mut data_instance_guid = data_instance_guid.unwrap();
 
-    // TODO(https://fxbug.dev/121274): Remove hardcoded paths
+    // TODO(https://fxbug.dev/42072287): Remove hardcoded paths
     let fvm_proxy = connect_to_named_protocol_at_dir_root::<VolumeManagerMarker>(
         &fixture.dir("dev-topological", fio::OpenFlags::empty()),
         "sys/platform/00:00:2d/ramctl/ramdisk-0/block/fvm",

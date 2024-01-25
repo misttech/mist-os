@@ -43,7 +43,7 @@ void Dictionary::Add(Word&& word, uint16_t level) {
 }
 
 bool Dictionary::Parse(const Input& input) {
-  // TODO(https://fxbug.dev/89119): Support parsing utf8.
+  // TODO(https://fxbug.dev/42170425): Support parsing utf8.
   re2::RE2 blank("^\\s*(?:#.*)?$");
   re2::RE2 value("^\\s*(?:\\w+(?:@(\\d+))?\\s*=)?\\s*\"(.*)$");
   const auto* c_str = reinterpret_cast<const char*>(input.data());

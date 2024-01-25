@@ -359,7 +359,7 @@ fs::VnodeProtocolSet Blob::GetProtocols() const { return fs::VnodeProtocol::kFil
 bool Blob::ValidateRights(fs::Rights rights) const {
   // To acquire write access to a blob, it must be empty.
   //
-  // TODO(https://fxbug.dev/67659) If we run FIDL on multiple threads (we currently don't) there is
+  // TODO(https://fxbug.dev/42146597) If we run FIDL on multiple threads (we currently don't) there is
   // a race condition here where another thread could start writing at the same time. Decide whether
   // we support FIDL from multiple threads and if so, whether this condition is important.
   std::lock_guard lock(mutex_);

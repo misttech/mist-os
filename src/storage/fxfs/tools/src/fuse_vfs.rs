@@ -885,8 +885,8 @@ impl FuseFilesystem for FuseFs {
 
     /// Forget an object with id `inode`.
     /// This is only called for objects with a limited lifetime, and hence not needed in Fxfs.
-    /// TODO(https://fxbug.dev/117461): Implement this after Fxfs objects support limied lifetime.
-    /// TODO(https://fxbug.dev/122115): Some applications may call this function to remove objects.
+    /// TODO(https://fxbug.dev/42068673): Implement this after Fxfs objects support limied lifetime.
+    /// TODO(https://fxbug.dev/42073102): Some applications may call this function to remove objects.
     async fn forget(&self, _req: Request, inode: u64, _nlookup: u64) {
         let inode = self.fuse_inode_to_object_id(inode);
         info!("forget (inode={:?})", inode);
@@ -927,7 +927,7 @@ impl FuseFilesystem for FuseFs {
 
     /// Set an extended attribute of an object with id `inode`.
     /// Fxfs currently doesn't support this feature.
-    /// TODO(https://fxbug.dev/121634): Add support for setting extended attributes.
+    /// TODO(https://fxbug.dev/42072627): Add support for setting extended attributes.
     async fn setxattr(
         &self,
         _req: Request,
@@ -943,7 +943,7 @@ impl FuseFilesystem for FuseFs {
 
     /// Get an extended attribute of an object with id `inode`.
     /// Fxfs currently doesn't support this feature.
-    /// TODO(https://fxbug.dev/121634): Add support for getting extended attributes.
+    /// TODO(https://fxbug.dev/42072627): Add support for getting extended attributes.
     async fn getxattr(
         &self,
         _req: Request,

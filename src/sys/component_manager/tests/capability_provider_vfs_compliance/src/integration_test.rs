@@ -58,7 +58,7 @@ async fn validate_open_with_node_reference_and_describe(path: &str) -> Result<()
     // The Rust VFS defines the only valid call for DESCRIBE on a service node to be one
     // that includes the NODE_REFERENCE flag. Component framework aims to adhere to the rust
     // VFS implementation of the io protocol.
-    // TODO(https://fxbug.dev/104406): If the rust VFS interpretation of the DESCRIBE
+    // TODO(https://fxbug.dev/42055559): If the rust VFS interpretation of the DESCRIBE
     // flag behavior on service nodes is incorrect, update this call.
     let node = fuchsia_fs::node::open_in_namespace(
         path,

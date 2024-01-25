@@ -141,7 +141,7 @@ pub trait DirectlyMutable: Directory + Send + Sync {
     /// This should only be called by the rename implementation below, which will establish the
     /// global order and will call proper method.
     ///
-    /// See https://fxbug.dev/99061: unsafe is not for visibility reduction.
+    /// See https://fxbug.dev/42181464: unsafe is not for visibility reduction.
     fn rename_from(
         &self,
         src: String,
@@ -162,7 +162,7 @@ pub trait DirectlyMutable: Directory + Send + Sync {
     /// This should only be called by the rename implementation below, which will establish the
     /// global order and will call proper method.
     ///
-    /// See https://fxbug.dev/99061: unsafe is not for visibility reduction.
+    /// See https://fxbug.dev/42181464: unsafe is not for visibility reduction.
     fn rename_to(
         &self,
         dst: String,
@@ -188,7 +188,7 @@ impl<T: DirectlyMutable> MutableDirectory for T {
         }
     }
 
-    // TODO(https://fxbug.dev/72801)
+    // TODO(https://fxbug.dev/42152303)
     async fn set_attrs(
         &self,
         _flags: fio::NodeAttributeFlags,
@@ -197,7 +197,7 @@ impl<T: DirectlyMutable> MutableDirectory for T {
         Err(Status::NOT_SUPPORTED)
     }
 
-    // TODO(https://fxbug.dev/72801)
+    // TODO(https://fxbug.dev/42152303)
     async fn update_attributes(
         &self,
         _attributes: fio::MutableNodeAttributes,

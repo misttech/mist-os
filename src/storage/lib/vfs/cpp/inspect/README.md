@@ -22,7 +22,7 @@ For a reference implementation that is fully thread-safe, see `BlobfsInspectTree
 `src/storage/blobfs/blobfs_inspect_tree.h`.
 
 
-TODO(https://fxbug.dev/85419): Support for tracking performance/latency and failure rates is in progress.
+TODO(https://fxbug.dev/42166316): Support for tracking performance/latency and failure rates is in progress.
 
 ## Usage
 

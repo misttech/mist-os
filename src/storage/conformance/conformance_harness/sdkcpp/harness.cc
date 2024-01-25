@@ -54,7 +54,7 @@ class SdkCppHarness : public fio_test::Io1Harness {
     config.set_supports_directory_watchers(false);  // watchers are not supported.
     config.set_supports_append(false);              // append mode is not supported.
 
-    // TODO(https://fxbug.dev/45287): Support ExecutableFile
+    // TODO(https://fxbug.dev/42121794): Support ExecutableFile
     config.set_supports_executable_file(false);
 
     callback(std::move(config));

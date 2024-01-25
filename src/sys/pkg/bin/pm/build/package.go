@@ -70,7 +70,7 @@ type packageManifestMaybeRelative struct {
 	Package     pkg.Package             `json:"package"`
 	Blobs       []PackageBlobInfo       `json:"blobs"`
 	Subpackages []PackageSubpackageInfo `json:"subpackages,omitempty"`
-	// TODO(https://fxbug.dev/114780): rename the json field to `paths_relative` since it
+	// TODO(https://fxbug.dev/42066050): rename the json field to `paths_relative` since it
 	// applies to both blobs and subpackages.
 	PathsRelativeTo string `json:"blob_sources_relative"`
 }
@@ -255,7 +255,7 @@ func writeABIRevision(cfg *Config, manifest *Manifest) error {
 	}
 
 	if manifestABIRevision == nil && cfg.PkgABIRevision == 0 {
-		// FIXME(https://fxbug.dev/87308): We can stop treating the ABI
+		// FIXME(https://fxbug.dev/42168415): We can stop treating the ABI
 		// revision as optional once the ecosystem has migrated to
 		// specifying it everywhere.
 		//return fmt.Errorf("the Fuchsia SDK version must be specified with either the -api-level or -abi-revision arguments, or manually creating meta/fuchsia.abi/abi-revision in the package directory")

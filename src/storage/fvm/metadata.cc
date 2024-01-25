@@ -133,7 +133,7 @@ zx::result<Metadata> Metadata::CopyWithNewDimensions(const Header& dimensions) c
   new_header.vpartition_table_size = dimensions.vpartition_table_size;
   new_header.allocation_table_size = dimensions.allocation_table_size;
 
-  // TODO(https://fxbug.dev/59980) The first entries in the partition/slice tables must be unused.
+  // TODO(https://fxbug.dev/42138108) The first entries in the partition/slice tables must be unused.
   // |Synthesize()| expects an array that does *not* include the empty zero entries.
   // Remove this after we support zero-indexing.
   const VPartitionEntry* partitions = nullptr;
@@ -215,7 +215,7 @@ zx::result<Metadata> Metadata::Synthesize(const fvm::Header& header,
   size_t buffer_size = BytesNeeded(header);
   std::unique_ptr<uint8_t[]> buf(new uint8_t[buffer_size]);
 
-  // TODO(https://fxbug.dev/59980) The first entries in the partition/slice tables must be unused.
+  // TODO(https://fxbug.dev/42138108) The first entries in the partition/slice tables must be unused.
   // Remove this after we support zero-indexing.
   std::vector<VPartitionEntry> actual_partitions(0);
   if (num_partitions > 0) {
@@ -254,7 +254,7 @@ zx::result<Metadata> Metadata::Synthesize(const fvm::Header& header,
                  partitions_span);
   write_metadata(header.GetAllocationTableOffset(), header.GetAllocationTableAllocatedByteSize(),
                  slices_span);
-  // TODO(https://fxbug.dev/59567): Synthesize snapshot metadata.
+  // TODO(https://fxbug.dev/42137649): Synthesize snapshot metadata.
 
   ::fvm::UpdateHash(buf.get(), header.GetMetadataUsedBytes());
 

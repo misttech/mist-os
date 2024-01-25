@@ -201,7 +201,7 @@ fuchsia_structured_config_rust_lib("config_lib") {
 
 # LINT.IfChange
 structured_config_values = {
-  # TODO(https://fxbug.dev/124299) support other delivery blob types in pkg-resolver.
+  # TODO(https://fxbug.dev/42075179) support other delivery blob types in pkg-resolver.
   assert(delivery_blob_type == 1)
   fetch_delivery_blob = true
   delivery_blob_fallback = true
@@ -211,7 +211,7 @@ structured_config_values = {
   # HttpRepository) results in a duration of (10 * 100,000 B) / (4,096 B/s) = 244 seconds.
   # Round to the minute boundary to make it more clear when reconstructing logs
   # that there is a designed timeout involved.
-  # TODO(https://fxbug.dev/62300) replace with granular timeouts in rust-tuf.
+  # TODO(https://fxbug.dev/42140681) replace with granular timeouts in rust-tuf.
   tuf_metadata_timeout_seconds = 240
   blob_network_header_timeout_seconds = 30
   blob_network_body_timeout_seconds = 30

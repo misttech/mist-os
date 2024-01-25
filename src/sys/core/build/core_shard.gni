@@ -64,7 +64,7 @@ template("core_shard") {
     metadata = {
       shard_files = [ rebase_path(invoker.shard_file, root_build_dir) ]
 
-      # TODO(https://fxbug.dev/104830): Make shard_includes required
+      # TODO(https://fxbug.dev/42055992): Make shard_includes required
       if (defined(invoker.includes)) {
         shard_includes = []
         foreach(include, invoker.includes) {

@@ -21,7 +21,7 @@ use {
 /// delayed response here. A request may never return a response, if the component is simply holding
 /// onto the directory handle without serving or dropping it. We should choose a value that balances
 /// a reasonable expectation from the component without making the user wait for too long.
-// TODO(https://fxbug.dev/99927): Get network latency info from ffx to choose a better timeout.
+// TODO(https://fxbug.dev/42182421): Get network latency info from ffx to choose a better timeout.
 static DIR_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(1);
 
 #[cfg(feature = "serde")]
@@ -344,7 +344,7 @@ pub async fn get_resolved_declaration(
     realm_query: &fsys::RealmQueryProxy,
 ) -> Result<ComponentDecl, GetDeclarationError> {
     let moniker_str = moniker.to_string();
-    // TODO(https://fxbug.dev/127340) switch to get_resolved_declaration once OK for ffx compat
+    // TODO(https://fxbug.dev/42077935) switch to get_resolved_declaration once OK for ffx compat
     let iterator = match realm_query.get_manifest(&moniker_str).await? {
         Ok(iterator) => Ok(iterator),
         Err(fsys::GetDeclarationError::InstanceNotFound) => {

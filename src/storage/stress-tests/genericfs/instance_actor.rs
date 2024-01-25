@@ -41,7 +41,7 @@ impl Actor for InstanceActor {
                 Either::Left(fs) => {
                     let _ = fs.kill().await;
                 }
-                // TODO(https://fxbug.dev/105888): Make termination more abrupt.
+                // TODO(https://fxbug.dev/42057166): Make termination more abrupt.
                 Either::Right(fs) => {
                     let _ = fs.shutdown().await;
                 }

@@ -91,7 +91,7 @@ impl Instance {
                 Ok(())
             }
             .unwrap_or_else(|err: anyhow::Error| {
-                // TODO(https://fxbug.dev/62386) - This is currently set to warning so that error logs
+                // TODO(https://fxbug.dev/42140775) - This is currently set to warning so that error logs
                 // aren't produced when a component in test is torn down. This should
                 // distinguish between channel closed errors and actual stash failures and
                 // set the appropriate log level.

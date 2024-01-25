@@ -12,7 +12,7 @@ use {
 /// This alleviates an issue where for n suites run on a single RunBuilder
 /// connection, n channels must be opened up front. This can cause some
 /// issues with resource limitations when a large number of tests is
-/// specified (see https://fxbug.dev/111145).
+/// specified (see https://fxbug.dev/42062444).
 #[async_trait::async_trait]
 pub trait RunBuilderConnector {
     /// Create a new connection to RunBuilder.

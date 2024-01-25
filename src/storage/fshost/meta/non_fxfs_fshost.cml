@@ -7,7 +7,7 @@
 // will result in a hang).  This is subpar because it means we don't get the benefits of the static
 // routing checks, but component manifests aren't sufficiently expressive and integrated with the
 // build system to avoid this (since we can't have "optional" intermediate routing hops very
-// easily, see https://fxbug.dev/107231).
+// easily, see https://fxbug.dev/42058594).
 //
 // Besides, all of this should go away if and when we standardize the platform on Fxfs.
 {

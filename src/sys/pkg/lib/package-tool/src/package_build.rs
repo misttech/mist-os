@@ -81,7 +81,7 @@ pub async fn cmd_package_build(cmd: PackageBuildCommand) -> Result<()> {
         .build(gendir.path(), &meta_far_path)
         .with_context(|| format!("creating package manifest {meta_far_path}"))?;
 
-    // FIXME(https://fxbug.dev/101306): We're replicating `pm build --depfile` here, and directly expressing
+    // FIXME(https://fxbug.dev/42052117): We're replicating `pm build --depfile` here, and directly expressing
     // that the `meta.far` depends on all the package contents. However, I think this should
     // ultimately be unnecessary, since the build systems should be separately tracking that the
     // creation manifest already depends on the package contents. We should make sure all build
@@ -118,7 +118,7 @@ pub async fn cmd_package_build(cmd: PackageBuildCommand) -> Result<()> {
         write_depfile(depfile_path.as_std_path(), meta_far_path.as_path(), dep_paths.into_iter())?;
     }
 
-    // FIXME(https://fxbug.dev/101304): Some tools still depend on the legacy `blobs.json` file. We
+    // FIXME(https://fxbug.dev/42052115): Some tools still depend on the legacy `blobs.json` file. We
     // should migrate them over to using `package_manifest.json` so we can stop producing this file.
     if cmd.blobs_json {
         let blobs_json_path = cmd.out.join(BLOBS_JSON_NAME);
@@ -133,7 +133,7 @@ pub async fn cmd_package_build(cmd: PackageBuildCommand) -> Result<()> {
             .with_context(|| format!("creating {blobs_json_path}"))?;
     }
 
-    // FIXME(https://fxbug.dev/101304): Some tools still depend on the legacy `blobs.manifest` file. We
+    // FIXME(https://fxbug.dev/42052115): Some tools still depend on the legacy `blobs.manifest` file. We
     // should migrate them over to using `package_manifest.json` so we can stop producing this file.
     if cmd.blobs_manifest {
         let blobs_manifest_path = cmd.out.join(BLOBS_MANIFEST_NAME);

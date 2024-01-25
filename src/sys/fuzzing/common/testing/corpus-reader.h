@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-// TODO(https://fxbug.dev/92490): Rename this when |Controller| is migrated.
+// TODO(https://fxbug.dev/42174170): Rename this when |Controller| is migrated.
 #ifndef SRC_SYS_FUZZING_COMMON_TESTING_CORPUS_READER_H_
 #define SRC_SYS_FUZZING_COMMON_TESTING_CORPUS_READER_H_
 

@@ -206,7 +206,7 @@ impl BlobDirectory {
         let store = self.store();
         let fs = store.filesystem();
 
-        // TODO(https://fxbug.dev/122125): Create the transaction here if we might need to create the object
+        // TODO(https://fxbug.dev/42073113): Create the transaction here if we might need to create the object
         // so that we have a lock in place.
         let keys = lock_keys![LockKey::object(store.store_object_id(), self.directory.object_id())];
 
@@ -248,7 +248,7 @@ impl BlobDirectory {
                     }
                     _ => bail!(FxfsError::Inconsistent),
                 }
-                // TODO(https://fxbug.dev/122125): Test that we can't open a blob while still writing it.
+                // TODO(https://fxbug.dev/42073113): Test that we can't open a blob while still writing it.
                 Ok(OpenedNode::new(node))
             }
             None => {

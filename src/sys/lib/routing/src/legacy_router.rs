@@ -164,7 +164,7 @@ where
                 if offer_service_decl.source_instance_filter.is_some()
                     || offer_service_decl.renamed_instances.is_some()
                 {
-                    // TODO(https://fxbug.dev/97147) support collection sources as well.
+                    // TODO(https://fxbug.dev/42179343) support collection sources as well.
                     if let CapabilitySource::Component { capability, component } = capability_source
                     {
                         let source_name = offer_service_decl.source_name.clone();
@@ -266,7 +266,7 @@ where
                     (o.source_name().clone(), decls)
                 },
             );
-            // TODO(https://fxbug.dev/71881) Make the Collection CapabilitySource type generic
+            // TODO(https://fxbug.dev/42151281) Make the Collection CapabilitySource type generic
             // for other types of aggregations.
             Ok(CapabilitySource::<C>::FilteredAggregate {
                 capability: AggregateCapability::Service(source_name),
@@ -487,7 +487,7 @@ impl Sources {
 
     /// Checks whether capability sources are supported, returning [`RoutingError::UnsupportedRouteSource`]
     /// if they are not.
-    // TODO(https://fxbug.dev/61861): Add route mapping for capability sources.
+    // TODO(https://fxbug.dev/42140194): Add route mapping for capability sources.
     pub fn capability_source(&self) -> Result<(), RoutingError> {
         if self.0.capability {
             Ok(())
@@ -913,7 +913,7 @@ impl Offer {
             let visit_offer = match &offer_bundle {
                 RouteBundle::Single(offer) => Some(offer),
                 RouteBundle::Aggregate(offers) => {
-                    // TODO(https://fxbug.dev/4776): Visit routes in all aggregates.
+                    // TODO(https://fxbug.dev/42124541): Visit routes in all aggregates.
                     if offers.len() == 1 {
                         Some(&offers[0])
                     } else {
@@ -1339,7 +1339,7 @@ impl Expose {
             let visit_expose = match &expose_bundle {
                 RouteBundle::Single(expose) => Some(expose),
                 RouteBundle::Aggregate(exposes) => {
-                    // TODO(https://fxbug.dev/4776): Visit routes in all aggregates.
+                    // TODO(https://fxbug.dev/42124541): Visit routes in all aggregates.
                     if exposes.len() == 1 {
                         Some(&exposes[0])
                     } else {

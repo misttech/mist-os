@@ -691,7 +691,7 @@ fn find_offer_sources(instance: &impl Component, source: &OfferSource) -> Vec<Co
         }
         OfferSource::Self_ => vec![ComponentRef::Self_],
         OfferSource::Collection(_) => {
-            // TODO(https://fxbug.dev/84766): Consider services routed from collections
+            // TODO(https://fxbug.dev/42165590): Consider services routed from collections
             // in shutdown order.
             vec![]
         }

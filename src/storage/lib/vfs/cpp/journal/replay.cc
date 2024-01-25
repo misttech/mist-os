@@ -125,7 +125,7 @@ zx_status_t ParseJournalEntries(const JournalSuperblock* info, storage::VmoBuffe
       break;
 
     if (entry->header().ObjectType() == JournalObjectType::kRevocation) {
-      // TODO(https://fxbug.dev/34525): Revocation records advise us to avoid replaying the provided
+      // TODO(https://fxbug.dev/42109842): Revocation records advise us to avoid replaying the provided
       // operations.
       //
       // We should implement this by:
@@ -253,7 +253,7 @@ zx::result<JournalSuperblock> ReplayJournal(fs::TransactionHandler* transaction_
 
     // Parse the journal, deciding which entries should be replayed.
     //
-    // NOTE(https://fxbug.dev/34510): This current implementation of replay is built against the
+    // NOTE(https://fxbug.dev/42109826): This current implementation of replay is built against the
     // specification of the journaling format, not against how the journaling writeback code happens
     // to be implemented. In the current implementation, "write to journal" and "write to final
     // location" are tightly coupled, so although we will replay a multi-entry journal, it is

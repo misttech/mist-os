@@ -186,7 +186,7 @@ pub fn decode_extended_attribute_value(
     }
 }
 
-// TODO(https://fxbug.dev/124432): Consolidate with other implementations that do the same thing.
+// TODO(https://fxbug.dev/42075328): Consolidate with other implementations that do the same thing.
 pub(crate) mod io2_conversions {
     use super::fio;
 

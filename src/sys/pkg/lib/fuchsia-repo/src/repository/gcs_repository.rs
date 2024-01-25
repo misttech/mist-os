@@ -112,7 +112,7 @@ where
                 url.host_str().ok_or_else(|| anyhow!("url must include a bucket: {}", url))?;
             let object = url.path();
 
-            // FIXME(https://fxbug.dev/98991): The gcs library does not yet support range requests, so
+            // FIXME(https://fxbug.dev/42181385): The gcs library does not yet support range requests, so
             // always fetch the full range.
             let resp = self.client.stream(bucket, object).await?;
 
@@ -251,7 +251,7 @@ where
     }
 
     fn blob_len<'a>(&'a self, path: &str) -> BoxFuture<'a, Result<u64, anyhow::Error>> {
-        // FIXME(https://fxbug.dev/98993): The gcs library does not expose a more efficient API for
+        // FIXME(https://fxbug.dev/42181387): The gcs library does not expose a more efficient API for
         // determining the blob size.
         let fut = self.fetch_blob_range(path, Range::Full);
         async move { Ok(fut.await?.total_len()) }.boxed()
@@ -261,7 +261,7 @@ where
         &'a self,
         _path: &str,
     ) -> BoxFuture<'a, Result<Option<SystemTime>, anyhow::Error>> {
-        // FIXME(https://fxbug.dev/98993): The gcs library does not expose an API to determine the
+        // FIXME(https://fxbug.dev/42181387): The gcs library does not expose an API to determine the
         // blob modification time.
         async move { Ok(None) }.boxed()
     }

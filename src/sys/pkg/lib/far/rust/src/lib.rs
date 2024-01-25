@@ -46,7 +46,7 @@
 //! ```
 
 #![allow(clippy::let_unit_value)]
-// TODO(https://fxbug.dev/122028): Remove this allow once the lint is fixed.
+// TODO(https://fxbug.dev/42073005): Remove this allow once the lint is fixed.
 #![allow(unknown_lints, clippy::extra_unused_type_parameters)]
 
 use zerocopy::byteorder::little_endian::{U16, U32, U64};
@@ -349,7 +349,7 @@ impl SafeIntegerConversion for u32 {
 
 // Returns the least multiple of `multiple` that is greater than or equal to `unrounded_value`.
 // Panics if `multiple` is zero.
-// TODO(https://fxbug.dev/103981) Replace next_multiple_of with std methods once available.
+// TODO(https://fxbug.dev/42055087) Replace next_multiple_of with std methods once available.
 fn next_multiple_of(unrounded_value: u64, multiple: u64) -> u64 {
     let rem = unrounded_value.checked_rem(multiple).expect("never called with multiple = 0");
     if rem > 0 {

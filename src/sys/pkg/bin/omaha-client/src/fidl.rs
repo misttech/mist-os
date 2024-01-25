@@ -514,7 +514,7 @@ where
                 }
                 warn!("setting device to default channel: '{}' with app id: '{:?}'", name, appid);
             }
-            // TODO(https://fxbug.dev/58887): only OTA that follows can change the current channel.
+            // TODO(https://fxbug.dev/42136893): only OTA that follows can change the current channel.
             // Simplify this logic.
             app_set.lock().await.set_system_target_channel(channel_name, appid);
         } else {

@@ -1405,7 +1405,7 @@ impl NativeIntoFidl<fdecl::ConfigType> for ConfigValueType {
 
 bitflags::bitflags! {
     #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
-    // TODO(https://fxbug.dev/124335) uncomment once bitflags is updated
+    // TODO(https://fxbug.dev/42075220) uncomment once bitflags is updated
     // pub struct ConfigMutability: <fdecl::ConfigMutability as bitflags::BitFlags>::Bits {
     pub struct ConfigMutability: u32 {
         const PARENT = fdecl::ConfigMutability::PARENT.bits();
@@ -2027,7 +2027,7 @@ impl FidlIntoNative<DictionaryValue> for Option<Box<fdata::DictionaryValue>> {
     fn fidl_into_native(self) -> DictionaryValue {
         // Temporarily allow unreachable patterns while fuchsia.data.DictionaryValue
         // is migrated from `strict` to `flexible`.
-        // TODO(https://fxbug.dev/92247): Remove this.
+        // TODO(https://fxbug.dev/42173900): Remove this.
         #[allow(unreachable_patterns)]
         match self {
             Some(v) => match *v {

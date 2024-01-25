@@ -118,7 +118,7 @@ impl PackageIndex {
         let retained_packages = index.retained_packages().copied().collect::<Vec<_>>();
         for hash in retained_packages {
             if let Some(blobs) = self.dynamic.lookup_content_blobs(&hash) {
-                // TODO(https://fxbug.dev/112769) Consider replacing this panic with an error, or e.g.
+                // TODO(https://fxbug.dev/42064103) Consider replacing this panic with an error, or e.g.
                 // adding a method to the retained index that makes both unnecessary.
                 assert!(index.add_blobs(&hash, blobs));
             }

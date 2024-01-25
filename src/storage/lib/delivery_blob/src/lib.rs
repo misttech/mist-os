@@ -161,7 +161,7 @@ impl Type1Blob {
     /// Generate a Type 1 delivery blob for `data` using the specified `mode`.
     ///
     /// **WARNING**: This function will panic on error.
-    // TODO(https://fxbug.dev/122054): Bubble up library/compression errors.
+    // TODO(https://fxbug.dev/42073034): Bubble up library/compression errors.
     pub fn generate(data: &[u8], mode: CompressionMode) -> Vec<u8> {
         let mut delivery_blob: Vec<u8> = vec![];
         Self::generate_to(data, mode, &mut delivery_blob).unwrap();
@@ -172,7 +172,7 @@ impl Type1Blob {
     /// directly into `writer`.
     ///
     /// **WARNING**: This function will panic on compression errors.
-    // TODO(https://fxbug.dev/122054): Bubble up library/compression errors.
+    // TODO(https://fxbug.dev/42073034): Bubble up library/compression errors.
     pub fn generate_to(
         data: &[u8],
         mode: CompressionMode,
@@ -215,9 +215,10 @@ impl Type1Blob {
     /// header and metadata portion of a delivery blob are required to be present in `data`.
     pub fn parse(data: &[u8]) -> Result<Option<(Type1Blob, &[u8])>, DeliveryBlobError> {
         let Some((serialized_header, payload)) =
-            Ref::<_, SerializedType1Blob>::new_unaligned_from_prefix(data) else {
-                return Ok(None);
-            };
+            Ref::<_, SerializedType1Blob>::new_unaligned_from_prefix(data)
+        else {
+            return Ok(None);
+        };
         serialized_header.decode().map(|metadata| Some((metadata, payload)))
     }
 }

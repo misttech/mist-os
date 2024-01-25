@@ -101,7 +101,7 @@ pub struct CobaltDiagnostics {
     primary_clock: Arc<zx::Clock>,
     /// The UTC clock used in the monitor track.
     monitor_clock: Option<Arc<zx::Clock>>,
-    // TODO(https://fxbug.dev/57677): Move back to an owned fasync::Task instead of detaching the spawned
+    // TODO(https://fxbug.dev/42135549): Move back to an owned fasync::Task instead of detaching the spawned
     // Task once the lifecycle of timekeeper ensures CobaltDiagnostics objects will last long enough
     // to finish their logging.
 }

@@ -166,7 +166,7 @@ impl Accessor {
                 Ok(())
             }
             .unwrap_or_else(|err: anyhow::Error| {
-                // TODO(https://fxbug.dev/62386) - determine which errors are stash failures and log them
+                // TODO(https://fxbug.dev/42140775) - determine which errors are stash failures and log them
                 // with error severity
                 warn!(?err, "error running list prefix interface")
             }),
@@ -255,7 +255,7 @@ impl Accessor {
                 Ok(())
             }
             .unwrap_or_else(|err: anyhow::Error| {
-                // TODO(https://fxbug.dev/62386) - determine which errors are stash failures and log them
+                // TODO(https://fxbug.dev/42140775) - determine which errors are stash failures and log them
                 // with error severity
                 warn!(?err, "error running get prefix interface");
             }),

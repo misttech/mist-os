@@ -270,7 +270,7 @@ impl PagerBacked for FxBlob {
             ensure!(decompressed_size == len, FxfsError::IntegrityError);
             len
         };
-        // TODO(https://fxbug.dev/122055): This should be offloaded to the kernel at which point we can
+        // TODO(https://fxbug.dev/42073035): This should be offloaded to the kernel at which point we can
         // delete this.
         let hashes = &self.merkle_tree.as_ref()[0];
         let mut offset = range.start as usize;

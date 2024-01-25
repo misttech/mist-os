@@ -41,5 +41,5 @@ $ Ctrl + C
 ```
 
 **KNOWN ISSUES**
-1. Performance is not as good as native filesystems like ext4 (https://fxbug.dev/121639)
-2. Extended attributes are not supported yet (https://fxbug.dev/121634)
+1. Performance is not as good as native filesystems like ext4 (https://fxbug.dev/42072632)
+2. Extended attributes are not supported yet (https://fxbug.dev/42072627)

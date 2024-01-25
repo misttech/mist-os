@@ -398,7 +398,7 @@ zx_status_t VPartitionManager::Load() {
       .slice_size = header->slice_size,
       .num_slices = header->pslice_count,
       .partition_table_entries = header->GetPartitionTableEntryCount(),
-      // TODO(https://fxbug.dev/40192): Set to the actual value when partition table size is configurable
+      // TODO(https://fxbug.dev/42116137): Set to the actual value when partition table size is configurable
       .partition_table_reserved_entries = header->GetPartitionTableEntryCount(),
       .allocation_table_entries = header->GetAllocationTableUsedEntryCount(),
       .allocation_table_reserved_entries = header->GetAllocationTableAllocatedEntryCount(),
@@ -884,7 +884,7 @@ void VPartitionManager::AllocatePartition(AllocatePartitionRequestView request,
 void VPartitionManager::GetInfo(GetInfoCompleter::Sync& completer) {
   // **IMPORTANT**: GetInfo() is used to synchronize visibility of partitions in devfs with clients.
   // Responses to GetInfo() must only be sent once *all* child partitions have been bound and have
-  // been made visible. See https://fxbug.dev/126961 for more information.
+  // been made visible. See https://fxbug.dev/42077585 for more information.
   {
     fbl::AutoLock lock(&lock_);
     if (get_info_requests_) {

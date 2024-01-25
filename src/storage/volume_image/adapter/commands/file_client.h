@@ -7,7 +7,7 @@
 
 #include <fidl/fuchsia.io/cpp/wire.h>
 
-// TODO(https://fxbug.dev/115641): Remove this when a more robust alternative exists.
+// TODO(https://fxbug.dev/42066935): Remove this when a more robust alternative exists.
 zx::result<fidl::ClientEnd<fuchsia_io::File>> OpenFile(const char* path);
 
 #endif  // SRC_STORAGE_VOLUME_IMAGE_ADAPTER_COMMANDS_FILE_CLIENT_H_

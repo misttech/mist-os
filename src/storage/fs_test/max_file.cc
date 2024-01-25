@@ -35,7 +35,7 @@ class MaxFileTest : public BaseFilesystemTest, public testing::WithParamInterfac
 
 // Test writing as much as we can to a file until we run out of space.
 TEST_P(MaxFileTest, ReadAfterWriteMaxFileSucceeds) {
-  // TODO(https://fxbug.dev/31604): We avoid making files that consume more than half
+  // TODO(https://fxbug.dev/42106597): We avoid making files that consume more than half
   // of physical memory. When we can page out files, this restriction
   // should be removed.
   const size_t physmem = zx_system_get_physmem();
@@ -140,7 +140,7 @@ TEST_P(MaxFileTest, WritingBeyondMaxSupportedOffset) {
     return;
   }
   if (fs().GetTraits().name == "memfs") {
-    // TODO(https://fxbug.dev/116484): Remove this when the memfs file size limit is back under off_t::max.
+    // TODO(https://fxbug.dev/42067655): Remove this when the memfs file size limit is back under off_t::max.
     return;
   }
   fbl::unique_fd fd(open(GetPath("foo").c_str(), O_CREAT | O_RDWR, S_IRUSR | S_IWUSR));
@@ -171,7 +171,7 @@ TEST_P(MaxFileTest, TruncatingBeyondMaxSupportedOffset) {
 // block allocation policies, this will create two large files with non-contiguous block
 // allocations.
 TEST_P(MaxFileTest, ReadAfterNonContiguousWritesSuceeds) {
-  // TODO(https://fxbug.dev/31604): We avoid making files that consume more than half
+  // TODO(https://fxbug.dev/42106597): We avoid making files that consume more than half
   // of physical memory. When we can page out files, this restriction
   // should be removed.
   const size_t physmem = zx_system_get_physmem();

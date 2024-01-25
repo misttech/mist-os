@@ -598,7 +598,7 @@ impl Environment for FshostEnvironment {
                 .context("failed to connect to the VolumeManager")?;
 
         // **NOTE**: We must call VolumeManager::GetInfo() to ensure all partitions are visible when
-        // we enumerate them below. See https://fxbug.dev/126961 for more information.
+        // we enumerate them below. See https://fxbug.dev/42077585 for more information.
         zx::ok(fvm_volume_manager_proxy.get_info().await.context("transport error on get_info")?.0)
             .context("get_info failed")?;
 
@@ -1058,7 +1058,7 @@ impl FilesystemLauncher {
                 .context("Failed to connect to the fvm VolumeManagerProxy")?;
 
         // **NOTE**: We must call VolumeManager::GetInfo() to ensure all partitions are visible when
-        // we enumerate them below. See https://fxbug.dev/126961 for more information.
+        // we enumerate them below. See https://fxbug.dev/42077585 for more information.
         zx::ok(fvm_volume_manager_proxy.get_info().await.context("transport error on get_info")?.0)
             .context("get_info failed")?;
 

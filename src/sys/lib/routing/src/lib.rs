@@ -464,7 +464,7 @@ async fn route_service_from_offer<C>(
 where
     C: ComponentInstanceInterface + 'static,
 {
-    // TODO(https://fxbug.dev/4776): Figure out how to set the availability when `offer_bundle` contains
+    // TODO(https://fxbug.dev/42124541): Figure out how to set the availability when `offer_bundle` contains
     // multiple routes with different availabilities. It's possible that manifest validation should
     // disallow this. For now, just pick the first.
     let mut availability_visitor =

@@ -139,7 +139,7 @@ where
                 control_handle: _,
             } => {
                 trace::duration!("storage", "Directory::Reopen");
-                // TODO(https://fxbug.dev/77623): Handle unimplemented io2 method.
+                // TODO(https://fxbug.dev/42157659): Handle unimplemented io2 method.
                 // Suppress any errors in the event a bad `object_request` channel was provided.
                 let _: Result<_, _> = object_request.close_with_epitaph(Status::NOT_SUPPORTED);
             }
@@ -150,8 +150,8 @@ where
             }
             fio::DirectoryRequest::GetConnectionInfo { responder } => {
                 trace::duration!("storage", "Directory::GetConnectionInfo");
-                // TODO(https://fxbug.dev/77623): Restrict GET_ATTRIBUTES, ENUMERATE, and TRAVERSE.
-                // TODO(https://fxbug.dev/77623): Implement MODIFY_DIRECTORY and UPDATE_ATTRIBUTES.
+                // TODO(https://fxbug.dev/42157659): Restrict GET_ATTRIBUTES, ENUMERATE, and TRAVERSE.
+                // TODO(https://fxbug.dev/42157659): Implement MODIFY_DIRECTORY and UPDATE_ATTRIBUTES.
                 responder.send(fio::ConnectionInfo {
                     rights: Some(self.options.rights),
                     ..Default::default()
@@ -200,7 +200,7 @@ where
             }
             fio::DirectoryRequest::UpdateAttributes { payload: _, responder } => {
                 trace::duration!("storage", "Directory::UpdateAttributes");
-                // TODO(https://fxbug.dev/77623): Handle unimplemented io2 method.
+                // TODO(https://fxbug.dev/42157659): Handle unimplemented io2 method.
                 responder.send(Err(Status::NOT_SUPPORTED.into_raw()))?;
             }
             fio::DirectoryRequest::ListExtendedAttributes { iterator, .. } => {
@@ -300,7 +300,7 @@ where
             }
             fio::DirectoryRequest::Enumerate { options: _, iterator, control_handle: _ } => {
                 trace::duration!("storage", "Directory::Enumerate");
-                // TODO(https://fxbug.dev/77623): Handle unimplemented io2 method.
+                // TODO(https://fxbug.dev/42157659): Handle unimplemented io2 method.
                 // Suppress any errors in the event a bad `iterator` channel was provided.
                 let _ = iterator.close_with_epitaph(Status::NOT_SUPPORTED);
             }

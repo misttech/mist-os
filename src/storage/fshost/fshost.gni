@@ -67,7 +67,7 @@ template("fshost_cml") {
 
       # These are components that must be included in the package depending on the data filesystem
       # format.
-      # TODO(https://fxbug.dev/112753):  Remove these dep when adding fshost to the common platform AIB,
+      # TODO(https://fxbug.dev/42064086):  Remove these dep when adding fshost to the common platform AIB,
       # and add these component to the AIB at the same time.
       deps = [
         "//src/storage/blobfs/bin:component",

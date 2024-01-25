@@ -4,7 +4,7 @@
 
 use {fidl_fuchsia_io as fio, fuchsia_fs::directory::clone_no_describe};
 
-// TODO(https://fxbug.dev/94654): We should probably preserve the original error messages
+// TODO(https://fxbug.dev/42176573): We should probably preserve the original error messages
 // instead of dropping them.
 pub fn clone_dir(dir: Option<&fio::DirectoryProxy>) -> Option<fio::DirectoryProxy> {
     dir.and_then(|d| clone_no_describe(d, None).ok())

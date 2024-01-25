@@ -359,7 +359,7 @@ impl RunningSuite {
         &mut self,
         sender: &mut mpsc::Sender<Result<FidlSuiteEvent, LaunchError>>,
     ) -> Result<(), Error> {
-        // TODO(https://fxbug.dev/123478): Support custom artifacts when test is running in outside
+        // TODO(https://fxbug.dev/42074399): Support custom artifacts when test is running in outside
         // realm.
         let artifact_storage_admin = self.connect_to_storage_admin()?;
 
@@ -432,7 +432,7 @@ impl RunningSuite {
         });
 
         // before destroying the realm, wait for any clients to finish accessing storage.
-        // TODO(https://fxbug.dev/84882): Remove signal for USER_0, this is used while Overnet does not support
+        // TODO(https://fxbug.dev/42165719): Remove signal for USER_0, this is used while Overnet does not support
         // signalling ZX_EVENTPAIR_CLOSED when the eventpair is closed.
         let tokens_closed_signals = self.custom_artifact_tokens.iter().map(|token| {
             fasync::OnSignals::new(token, zx::Signals::EVENTPAIR_PEER_CLOSED | zx::Signals::USER_0)
@@ -440,7 +440,7 @@ impl RunningSuite {
         });
         // Before destroying the realm, ensure archivist has responded to a query. This ensures
         // that the server end of the log iterator served to the client will be received by
-        // archivist. TODO(https://fxbug.dev/105308): Remove this hack once component events are ordered.
+        // archivist. TODO(https://fxbug.dev/42056523): Remove this hack once component events are ordered.
         if let Some(archivist_ready_task) = self.archivist_ready_task {
             archivist_ready_task.await;
         }
@@ -451,7 +451,7 @@ impl RunningSuite {
 
         exposed_dir_close_task.await;
 
-        // TODO(https://fxbug.dev/92769) Remove timeout once component manager hangs are removed.
+        // TODO(https://fxbug.dev/42174479) Remove timeout once component manager hangs are removed.
         // This value is set to be slightly longer than the shutdown timeout for tests (30 sec).
         const TEARDOWN_TIMEOUT: zx::Duration = zx::Duration::from_seconds(32);
 
@@ -615,7 +615,7 @@ fn get_allowed_package_value(suite_facet: &facet::SuiteFacets) -> AllowedPackage
 /// Create a RealmBuilder and populate it with local components and routes needed to run a
 /// test. Returns a populated RealmBuilder instance, and an Event which is signalled when
 /// the debug_data local component is ready to accept connection requests.
-// TODO(https://fxbug.dev/105308): The returned event is part of a synchronization mechanism to
+// TODO(https://fxbug.dev/42056523): The returned event is part of a synchronization mechanism to
 // work around cases when a component is destroyed before starting, even though there is a
 // request. In this case debug data can be lost. Remove the synchronization once it is
 // provided by cm.
@@ -675,7 +675,7 @@ async fn get_realm(
                 ))
             },
             // This component is launched eagerly so that debug_data always signals ready, even
-            // in absence of a connection request. TODO(https://fxbug.dev/105308): Remove once
+            // in absence of a connection request. TODO(https://fxbug.dev/42056523): Remove once
             // synchronization is provided by cm.
             ChildOptions::new().eager(),
         )

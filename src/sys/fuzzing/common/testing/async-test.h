@@ -128,7 +128,7 @@ class AsyncTest : public ::testing::Test {
 
   // Runs the test async loop.
   void RunUntilIdle() {
-    // TODO(https://fxbug.dev/92490): This is a transitional implementation to be used while the code has
+    // TODO(https://fxbug.dev/42174170): This is a transitional implementation to be used while the code has
     // multiple dispatchers. It treats the test loop as not being idle until all its outstanding
     // tasks have completed. This is useful in unit tests where the test loop's dispatcher may be
     // distinct from an existing dispatcher running on a dedicated thread. When the migration to a

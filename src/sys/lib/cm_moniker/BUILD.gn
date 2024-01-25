@@ -16,7 +16,7 @@ rustc_library("cm_moniker") {
     "//src/sys/component_manager/*",
     "//src/sys/lib/cm_moniker/*",
 
-    # TODO(https://fxbug.dev/92611): Have StorageAdminRequest pass a non-InstancedMoniker.
+    # TODO(https://fxbug.dev/42174305): Have StorageAdminRequest pass a non-InstancedMoniker.
     "//src/sys/lib/routing/*",
     "//src/sys/test_manager/*",
     "//tools/lib/cm_fidl_analyzer/*",

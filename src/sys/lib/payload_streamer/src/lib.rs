@@ -166,7 +166,7 @@ pub struct BlockDevicePayloadStreamer {
     inner: Mutex<BlockDevicePayloadStreamerInner>,
 }
 
-//TODO(https://fxbug.dev/107831): Increasing this may speed up the transfer once the UMS crash is fixed.
+//TODO(https://fxbug.dev/42059224): Increasing this may speed up the transfer once the UMS crash is fixed.
 const DEVICE_VMO_SIZE: usize = 8192 * 16;
 
 impl BlockDevicePayloadStreamer {
@@ -463,7 +463,7 @@ mod tests {
 
         let streamer: Box<dyn PayloadStreamer> = if use_block_device_streamer {
             ramdisk_client = create_ramdisk(buf).await?;
-            // TODO(https://fxbug.dev/112484): Once ramdisk.open() no longer provides a
+            // TODO(https://fxbug.dev/42063787): Once ramdisk.open() no longer provides a
             // multiplexing channel, use open() to acquire the BlockProxy here.
             let ramdisk_controller = ramdisk_client
                 .as_controller()
@@ -556,7 +556,7 @@ mod tests {
         let byte: u8 = 0xab;
         let buf: Vec<u8> = vec![byte; src_size];
         let ramdisk_client = create_ramdisk(buf).await?;
-        // TODO(https://fxbug.dev/112484): Once ramdisk.open() no longer provides a multiplexing
+        // TODO(https://fxbug.dev/42063787): Once ramdisk.open() no longer provides a multiplexing
         // channel, use open() to acquire the BlockProxy here.
         let ramdisk_controller =
             ramdisk_client.as_controller().ok_or_else(|| anyhow!("invalid ramdisk controller"))?;

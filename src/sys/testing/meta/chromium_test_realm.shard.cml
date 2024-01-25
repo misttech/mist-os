@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-// TODO(https://fxbug.dev/91934): This shard defines a realm for tests in chromium. Once we are able
+// TODO(https://fxbug.dev/42173552): This shard defines a realm for tests in chromium. Once we are able
 // to define these out of tree this definition should be moved to chromium.
 {
     collections: [
@@ -26,7 +26,7 @@
         },
 
         // These system capabilities are offered for use by the chromium tests.
-        // TODO(https://fxbug.dev/91934): Drive down this list via fakes and similar.
+        // TODO(https://fxbug.dev/42173552): Drive down this list via fakes and similar.
         {
             protocol: [
                 // "fuchsia.buildinfo.Provider" is faked.
@@ -54,7 +54,7 @@
 
                 // Tests of the media system change their behavior based on
                 // board.
-                // TODO(https://fxbug.dev/83512): Remove when specialized test realms
+                // TODO(https://fxbug.dev/42164198): Remove when specialized test realms
                 // are ready.
                 "fuchsia.sysinfo.SysInfo",
                 "fuchsia.sysmem.Allocator",
@@ -134,7 +134,7 @@
 
                 // Tests of the media system want to test against the real hardware.
                 //
-                // TODO(https://fxbug.dev/83512): Remove when specialized test realms are ready.
+                // TODO(https://fxbug.dev/42164198): Remove when specialized test realms are ready.
                 "dev-mediacodec",
             ],
             from: "parent",

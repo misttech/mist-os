@@ -27,7 +27,7 @@ extern "C" {
 
 /// Formats the block device at `block_device` to be an empty FVM instance.
 pub fn format_for_fvm(block_device: &fio::DirectoryProxy, fvm_slice_size: usize) -> Result<()> {
-    // TODO(https://fxbug.dev/121896): In order to remove multiplexing, callers of this function
+    // TODO(https://fxbug.dev/42072917): In order to remove multiplexing, callers of this function
     // should directly pass in a BlockProxy. Callers holding onto a ramdisk should replace as_dir()
     // with a connect_to_device_fidl() call. This requires work downstream.
     let device = connect_to_named_protocol_at_dir_root::<BlockMarker>(block_device, ".")?;

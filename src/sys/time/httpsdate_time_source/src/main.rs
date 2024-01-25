@@ -42,7 +42,7 @@ const RETRY_STRATEGY: RetryStrategy = RetryStrategy {
 };
 
 /// URI used to obtain time samples.
-// TODO(https://fxbug.dev/68621): Allow configuration per product.
+// TODO(https://fxbug.dev/42147665): Allow configuration per product.
 const REQUEST_URI: &str = "https://clients3.google.com/generate_204";
 
 /// HttpsDate config, populated from build-time generated structured config.

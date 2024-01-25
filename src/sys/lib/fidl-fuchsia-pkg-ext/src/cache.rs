@@ -621,7 +621,7 @@ pub enum TruncateBlobError {
     #[error("already truncated, currently in state {0}")]
     AlreadyTruncated(&'static str),
 
-    // TODO(https://fxbug.dev/130001) Add error variants to BlobWriter.
+    // TODO(https://fxbug.dev/42080352) Add error variants to BlobWriter.
     #[error("unspecified error")]
     Other(#[source] anyhow::Error),
 
@@ -651,7 +651,7 @@ pub enum WriteBlobError {
     #[error("bytes were written but not needed in state {0}")]
     BytesNotNeeded(&'static str),
 
-    // TODO(https://fxbug.dev/130001) Add error variants to BlobWriter.
+    // TODO(https://fxbug.dev/42080352) Add error variants to BlobWriter.
     #[error("unspecified error")]
     Other(#[source] anyhow::Error),
 }

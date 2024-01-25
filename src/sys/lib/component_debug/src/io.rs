@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-// TODO(https://fxbug.dev/66157): Migrate to the new library that substitutes io_utils and fuchsia_fs::directory.
+// TODO(https://fxbug.dev/42144933): Migrate to the new library that substitutes io_utils and fuchsia_fs::directory.
 // Ask for host-side support on the new library (fxr/467217).
 
 use {
@@ -345,7 +345,7 @@ impl Directory for RemoteDirectory {
             .find(|e| e.name == filename)
             .map(|e| {
                 match e.kind {
-                    // TODO(https://fxbug.dev/127335): Update component_manager vfs to assign proper DirentType when installing the directory tree.
+                    // TODO(https://fxbug.dev/42077929): Update component_manager vfs to assign proper DirentType when installing the directory tree.
                     fio::DirentType::Directory | fio::DirentType::Unknown => {
                         Ok(Some(DirentKind::Directory))
                     }

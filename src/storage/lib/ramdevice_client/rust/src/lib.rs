@@ -180,7 +180,7 @@ impl RamdiskClient {
     ) -> Result<fidl::endpoints::ClientEnd<fhardware_block::BlockMarker>, Error> {
         // At this point, we have already waited on the block path to appear so
         // we can directly open a connection to the ramdevice.
-        // TODO(https://fxbug.dev/112484): In order to allow multiplexing to be removed, use
+        // TODO(https://fxbug.dev/42063787): In order to allow multiplexing to be removed, use
         // connect_to_device_fidl to connect to the BlockProxy instead of connect_to_.._dir_root.
         // Requires downstream work.
         let block_dir = self.as_dir().ok_or_else(|| anyhow!("directory is invalid"))?;
@@ -349,7 +349,7 @@ mod tests {
 
         // Ask it to describe itself using the Node interface.
         //
-        // TODO(https://fxbug.dev/112484): this relies on multiplexing.
+        // TODO(https://fxbug.dev/42063787): this relies on multiplexing.
         let client_end =
             fidl::endpoints::ClientEnd::<fio::NodeMarker>::new(client_end.into_channel());
         let proxy = client_end.into_proxy().unwrap();

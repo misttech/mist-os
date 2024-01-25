@@ -55,7 +55,7 @@ use {
     vfs::directory::entry::DirectoryEntry,
 };
 
-// TODO(https://fxbug.dev/61861): remove type aliases once the routing_test_helpers lib has a stable
+// TODO(https://fxbug.dev/42140194): remove type aliases once the routing_test_helpers lib has a stable
 // API.
 pub type ExpectedResult = ::routing_test_helpers::ExpectedResult;
 pub type CheckUse = ::routing_test_helpers::CheckUse;
@@ -1168,7 +1168,7 @@ pub mod capability_util {
         member: &str,
     ) -> Result<T::Proxy, fidl::Error> {
         let dir_proxy = take_dir_from_namespace(namespace, path.dirname()).await;
-        // TODO(https://fxbug.dev/118249): Utilize the new fuchsia_component::client method to connect to
+        // TODO(https://fxbug.dev/42069409): Utilize the new fuchsia_component::client method to connect to
         // the service instance, passing in the service_dir, instance name, and member path.
         let service_dir = fuchsia_fs::directory::open_directory(
             &dir_proxy,
@@ -1384,7 +1384,7 @@ pub mod capability_util {
     ) {
         let (node_proxy, server_end) = endpoints::create_proxy::<fio::NodeMarker>().unwrap();
         open_exposed_dir(&path, moniker, model, true, server_end).await;
-        // TODO(https://fxbug.dev/118249): Utilize the new fuchsia_component::client method to connect to
+        // TODO(https://fxbug.dev/42069409): Utilize the new fuchsia_component::client method to connect to
         // the service instance, passing in the service_dir, instance name, and member path.
         let service_dir = fio::DirectoryProxy::from_channel(node_proxy.into_channel().unwrap());
         let instance_dir = fuchsia_fs::directory::open_directory(
@@ -1407,7 +1407,7 @@ pub mod capability_util {
     ) -> Vec<String> {
         let (node_proxy, server_end) = endpoints::create_proxy::<fio::NodeMarker>().unwrap();
         open_exposed_dir(&path, moniker, model, true, server_end).await;
-        // TODO(https://fxbug.dev/118249): Utilize the new fuchsia_component::client method to connect to
+        // TODO(https://fxbug.dev/42069409): Utilize the new fuchsia_component::client method to connect to
         // the service instance, passing in the service_dir, instance name, and member path.
         let service_dir = fio::DirectoryProxy::from_channel(node_proxy.into_channel().unwrap());
         let entries = fuchsia_fs::directory::readdir(&service_dir)
@@ -1455,7 +1455,7 @@ pub mod capability_util {
         dir_proxy: fio::DirectoryProxy,
     ) {
         let mut ns = namespace.lock().await;
-        // TODO(https://fxbug.dev/108786): Use Proxy::into_client_end when available.
+        // TODO(https://fxbug.dev/42060182): Use Proxy::into_client_end when available.
         let client_end = ClientEnd::new(dir_proxy.into_channel().unwrap().into_zx_channel());
         ns.add(&NamespacePath::new(dir_path).unwrap(), client_end).unwrap();
     }

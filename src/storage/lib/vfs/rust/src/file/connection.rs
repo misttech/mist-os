@@ -197,7 +197,7 @@ impl<T: 'static + File + FileIo> IoOpHandler for FidlIoConnection<T> {
     }
 
     async fn seek(&mut self, offset: i64, origin: fio::SeekOrigin) -> Result<u64, Status> {
-        // TODO(https://fxbug.dev/109832) Use mixed_integer_ops when available.
+        // TODO(https://fxbug.dev/42061200) Use mixed_integer_ops when available.
         let new_seek = match origin {
             fio::SeekOrigin::Start => offset as i128,
             fio::SeekOrigin::Current => {
@@ -211,7 +211,7 @@ impl<T: 'static + File + FileIo> IoOpHandler for FidlIoConnection<T> {
             }
         };
 
-        // TODO(https://fxbug.dev/100754): There is an undocumented constraint that the seek offset can
+        // TODO(https://fxbug.dev/42051503): There is an undocumented constraint that the seek offset can
         // never exceed 63 bits, but this is not currently enforced. For now we just ensure that
         // the values remain consistent internally with a 64-bit unsigned seek offset.
         if let Ok(new_seek) = u64::try_from(new_seek) {
@@ -504,7 +504,7 @@ impl<T: 'static + File, U: Deref<Target = OpenNode<T>> + DerefMut + IoOpHandler>
             }
             fio::FileRequest::Reopen { rights_request: _, object_request, control_handle: _ } => {
                 trace::duration!("storage", "File::Reopen");
-                // TODO(https://fxbug.dev/77623): Handle unimplemented io2 method.
+                // TODO(https://fxbug.dev/42157659): Handle unimplemented io2 method.
                 // Suppress any errors in the event a bad `object_request` channel was provided.
                 let _: Result<_, _> = object_request.close_with_epitaph(Status::NOT_SUPPORTED);
             }
@@ -555,7 +555,7 @@ impl<T: 'static + File, U: Deref<Target = OpenNode<T>> + DerefMut + IoOpHandler>
             }
             fio::FileRequest::GetConnectionInfo { responder } => {
                 trace::duration!("storage", "File::GetConnectionInfo");
-                // TODO(https://fxbug.dev/77623): Restrict GET_ATTRIBUTES.
+                // TODO(https://fxbug.dev/42157659): Restrict GET_ATTRIBUTES.
                 responder.send(fio::ConnectionInfo {
                     rights: Some(self.options.rights),
                     ..Default::default()
@@ -987,7 +987,7 @@ impl<T: 'static + File, U: Deref<Target = OpenNode<T>> + IoOpHandler> Representa
         &self,
         requested_attributes: fio::NodeAttributesQuery,
     ) -> Result<fio::Representation, Status> {
-        // TODO(https://fxbug.dev/77623): Add support for connecting as Node.
+        // TODO(https://fxbug.dev/42157659): Add support for connecting as Node.
         Ok(fio::Representation::File(fio::FileInfo {
             is_append: Some(self.options.is_append),
             observer: self.file.event()?,

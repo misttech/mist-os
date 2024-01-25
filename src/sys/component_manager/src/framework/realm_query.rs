@@ -46,11 +46,11 @@ lazy_static! {
 }
 
 // Number of bytes the header of a vector occupies in a fidl message.
-// TODO(https://fxbug.dev/98653): This should be a constant in a FIDL library.
+// TODO(https://fxbug.dev/42181010): This should be a constant in a FIDL library.
 const FIDL_VECTOR_HEADER_BYTES: usize = 16;
 
 // Number of bytes the header of a fidl message occupies.
-// TODO(https://fxbug.dev/98653): This should be a constant in a FIDL library.
+// TODO(https://fxbug.dev/42181010): This should be a constant in a FIDL library.
 const FIDL_HEADER_BYTES: usize = 16;
 
 // Number of bytes of a manifest that can fit in a single message
@@ -222,7 +222,7 @@ pub async fn get_instance(
     let moniker = Moniker::try_from(moniker_str).map_err(|_| fsys::GetInstanceError::BadMoniker)?;
     let moniker = scope_moniker.concat(&moniker);
 
-    // TODO(https://fxbug.dev/108532): Close the connection if the scope root cannot be found.
+    // TODO(https://fxbug.dev/42059901): Close the connection if the scope root cannot be found.
     let instance = model.find(&moniker).await.ok_or(fsys::GetInstanceError::InstanceNotFound)?;
     let instance_id = model.component_id_index().id_for_moniker(&instance.moniker).cloned();
 
@@ -278,7 +278,7 @@ pub async fn get_resolved_declaration(
         Moniker::try_from(moniker_str).map_err(|_| fsys::GetDeclarationError::BadMoniker)?;
     let moniker = scope_moniker.concat(&moniker);
 
-    // TODO(https://fxbug.dev/108532): Close the connection if the scope root cannot be found.
+    // TODO(https://fxbug.dev/42059901): Close the connection if the scope root cannot be found.
     let instance = model.find(&moniker).await.ok_or(fsys::GetDeclarationError::InstanceNotFound)?;
 
     let state = instance.lock_state().await;
@@ -327,7 +327,7 @@ async fn resolve_declaration(
 
     trace!(parent=%parent_moniker, %collection, %url, "getting manifest for url in collection");
 
-    // TODO(https://fxbug.dev/108532): Close the connection if the scope root cannot be found.
+    // TODO(https://fxbug.dev/42059901): Close the connection if the scope root cannot be found.
     let instance =
         model.find(&parent_moniker).await.ok_or(fsys::GetDeclarationError::InstanceNotFound)?;
 
@@ -397,7 +397,7 @@ pub async fn get_structured_config(
         Moniker::try_from(moniker_str).map_err(|_| fsys::GetStructuredConfigError::BadMoniker)?;
     let moniker = scope_moniker.concat(&moniker);
 
-    // TODO(https://fxbug.dev/108532): Close the connection if the scope root cannot be found.
+    // TODO(https://fxbug.dev/42059901): Close the connection if the scope root cannot be found.
     let instance =
         model.find(&moniker).await.ok_or(fsys::GetStructuredConfigError::InstanceNotFound)?;
 
@@ -423,7 +423,7 @@ async fn construct_namespace(
         Moniker::try_from(moniker_str).map_err(|_| fsys::ConstructNamespaceError::BadMoniker)?;
     let moniker = scope_moniker.concat(&moniker);
 
-    // TODO(https://fxbug.dev/108532): Close the connection if the scope root cannot be found.
+    // TODO(https://fxbug.dev/42059901): Close the connection if the scope root cannot be found.
     let instance =
         model.find(&moniker).await.ok_or(fsys::ConstructNamespaceError::InstanceNotFound)?;
     let mut state = instance.lock_state().await;
@@ -454,7 +454,7 @@ async fn open(
     let moniker = Moniker::try_from(moniker_str).map_err(|_| fsys::OpenError::BadMoniker)?;
     let moniker = scope_moniker.concat(&moniker);
 
-    // TODO(https://fxbug.dev/108532): Close the connection if the scope root cannot be found.
+    // TODO(https://fxbug.dev/42059901): Close the connection if the scope root cannot be found.
     let instance = model.find(&moniker).await.ok_or(fsys::OpenError::InstanceNotFound)?;
 
     match dir_type {
@@ -539,7 +539,7 @@ async fn connect_to_storage_admin(
         Moniker::try_from(moniker_str).map_err(|_| fsys::ConnectToStorageAdminError::BadMoniker)?;
     let moniker = scope_moniker.concat(&moniker);
 
-    // TODO(https://fxbug.dev/108532): Close the connection if the scope root cannot be found.
+    // TODO(https://fxbug.dev/42059901): Close the connection if the scope root cannot be found.
     let instance =
         model.find(&moniker).await.ok_or(fsys::ConnectToStorageAdminError::InstanceNotFound)?;
 
@@ -675,7 +675,7 @@ async fn serve_instance_iterator(
         let mut instance_count = 0;
 
         // Determine how many info objects can be sent in a single FIDL message.
-        // TODO(https://fxbug.dev/98653): This logic should be handled by FIDL.
+        // TODO(https://fxbug.dev/42181010): This logic should be handled by FIDL.
         for instance in remaining_instances {
             bytes_used += instance.measure().num_bytes;
             if bytes_used > ZX_CHANNEL_MAX_MSG_BYTES as usize {

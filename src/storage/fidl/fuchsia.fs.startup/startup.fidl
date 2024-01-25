@@ -67,7 +67,7 @@ type FormatOptions = table {
 /// Options for running consistency checks on filesystems.
 type CheckOptions = resource struct {};
 
-// TODO(https://fxbug.dev/90702): Figure out a more flexible configuration option strategy.
+// TODO(https://fxbug.dev/42172184): Figure out a more flexible configuration option strategy.
 @discoverable
 closed protocol Startup {
     /// Start this filesystem, using the provided block device and Start options. When start is

@@ -780,7 +780,7 @@ impl<S: HandleOwner> StoreObjectHandle<S> {
         let (mut buffer, size) = match iter.get() {
             Some(item) if item.key == &key => match item.value {
                 ObjectValue::Attribute { size } => {
-                    // TODO(https://fxbug.dev/122125): size > max buffer size
+                    // TODO(https://fxbug.dev/42073113): size > max buffer size
                     (
                         store
                             .device
@@ -861,7 +861,7 @@ impl<S: HandleOwner> StoreObjectHandle<S> {
             };
 
         if let Some(keys) = self.get_keys().await? {
-            // TODO(https://fxbug.dev/92975): Support key_id != 0.
+            // TODO(https://fxbug.dev/42174708): Support key_id != 0.
             keys.encrypt(range.start, 0, transfer_buf_ref.as_mut_slice())?;
         }
 
@@ -895,7 +895,7 @@ impl<S: HandleOwner> StoreObjectHandle<S> {
             for r in ranges {
                 let l = r.end - r.start;
                 let (head, tail) = slice.split_at_mut(l as usize);
-                // TODO(https://fxbug.dev/92975): Support key_id != 0.
+                // TODO(https://fxbug.dev/42174708): Support key_id != 0.
                 keys.encrypt(r.start, 0, head)?;
                 slice = tail;
             }

@@ -414,7 +414,7 @@ zx_status_t F2fs::LoadSuper(std::unique_ptr<Superblock> sb) {
     RecoverFsyncData();
   }
 
-  // TODO(https://fxbug.dev/119887): enable a thread for background gc
+  // TODO(https://fxbug.dev/42070949): enable a thread for background gc
   // After POR, we can run background GC thread
   // err = StartGcThread(superblock_info);
   // if (err)

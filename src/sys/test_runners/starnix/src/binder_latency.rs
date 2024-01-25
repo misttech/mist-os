@@ -36,7 +36,7 @@ pub async fn run_binder_latency(
 #[derive(Debug, Deserialize)]
 struct BinderLatencyResults {
     cfg: BenchmarkConfig,
-    #[allow(unused)] // TODO(https://fxbug.dev/123346) require that inheritance passes
+    #[allow(unused)] // TODO(https://fxbug.dev/42074253) require that inheritance passes
     inheritance: InheritanceResult,
     #[serde(flatten)]
     pairs: BTreeMap<String, PairResult>,
@@ -49,7 +49,7 @@ struct BenchmarkConfig {
 
 #[derive(Debug, Deserialize)]
 struct PairResult {
-    #[allow(unused)] // TODO(https://fxbug.dev/123347) require a good sync ratio?
+    #[allow(unused)] // TODO(https://fxbug.dev/42074254) require a good sync ratio?
     #[serde(rename = "SYNC")]
     sync: SyncResult,
     other_ms: Timing,
@@ -65,7 +65,7 @@ struct Timing {
     min: f64,
 }
 
-#[allow(unused)] // TODO(https://fxbug.dev/123347) require a good sync ratio?
+#[allow(unused)] // TODO(https://fxbug.dev/42074254) require a good sync ratio?
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "UPPERCASE")]
 enum SyncResult {
@@ -73,7 +73,7 @@ enum SyncResult {
     Poor,
 }
 
-#[allow(unused)] // TODO(https://fxbug.dev/123346) require that inheritance passes
+#[allow(unused)] // TODO(https://fxbug.dev/42074253) require that inheritance passes
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "UPPERCASE")]
 enum InheritanceResult {

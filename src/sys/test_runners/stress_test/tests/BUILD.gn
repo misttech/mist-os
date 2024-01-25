@@ -37,7 +37,7 @@ fuchsia_test_package("stress-runner-integration-test") {
 
   subpackages = [ "//src/sys/test_manager:pkg" ]
 
-  # TODO(https://fxbug.dev/114727): Flaky test disabled on coverage.
+  # TODO(https://fxbug.dev/42065991): Flaky test disabled on coverage.
   # Please fix the flake and remove the condition below.
   if (is_coverage) {
     test_specs = {

@@ -124,7 +124,7 @@ impl ConfigFields {
                     structure.field(Field::Basic(BasicField::Int64(n)))
                 }
                 ConfigValue::Single(ConfigSingleValue::String(s)) => {
-                    // TODO(https://fxbug.dev/88174) improve string representation too
+                    // TODO(https://fxbug.dev/42169377) improve string representation too
                     structure.field(Field::Vector(VectorField::UInt8Vector(s.into_bytes())))
                 }
                 ConfigValue::Vector(ConfigVectorValue::BoolVector(b)) => {
@@ -156,7 +156,7 @@ impl ConfigFields {
                 }
                 ConfigValue::Vector(ConfigVectorValue::StringVector(s)) => {
                     structure.field(Field::Vector(
-                        // TODO(https://fxbug.dev/88174) improve string representation too
+                        // TODO(https://fxbug.dev/42169377) improve string representation too
                         VectorField::UInt8VectorVector(
                             s.into_iter().map(|s| s.into_bytes()).collect(),
                         ),

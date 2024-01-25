@@ -27,7 +27,7 @@ use {
 /// Errors produced by `Model`.
 #[derive(Debug, Error, Clone)]
 pub enum ModelError {
-    // TODO(https://fxbug.dev/117080): Remove this error by using the `camino` library
+    // TODO(https://fxbug.dev/42068250): Remove this error by using the `camino` library
     #[error("path is not utf-8: {:?}", path)]
     PathIsNotUtf8 { path: PathBuf },
     #[error("Moniker error: {}", err)]
@@ -488,7 +488,7 @@ pub enum ResolveActionError {
         err: ResolverError,
     },
     #[error("error in expose dir VFS for component {moniker}: {err}")]
-    // TODO(https://fxbug.dev/120627): Determine whether this is expected to fail.
+    // TODO(https://fxbug.dev/42071713): Determine whether this is expected to fail.
     ExposeDirError {
         moniker: Moniker,
 
@@ -681,7 +681,7 @@ impl CapabilityProviderError {
 pub enum OpenError {
     #[error("failed to get default capability provider: {err}")]
     GetDefaultProviderError {
-        // TODO(https://fxbug.dev/116855): This will get fixed when we untangle ModelError
+        // TODO(https://fxbug.dev/42068065): This will get fixed when we untangle ModelError
         #[source]
         err: Box<ModelError>,
     },
@@ -696,7 +696,7 @@ pub enum OpenError {
     },
     #[error("failed to open storage capability: {err}")]
     OpenStorageError {
-        // TODO(https://fxbug.dev/116855): This will get fixed when we untangle ModelError
+        // TODO(https://fxbug.dev/42068065): This will get fixed when we untangle ModelError
         #[source]
         err: Box<ModelError>,
     },

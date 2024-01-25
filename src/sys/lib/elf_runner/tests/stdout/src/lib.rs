@@ -46,7 +46,7 @@ impl Expected {
 #[test_case("#meta/logs-stderr-rust.cm", "logs_stderr_rust", Expected::Stderr; "rust logs to stderr")]
 #[fuchsia::test(add_test_attr = false)]
 fn launch_component_and_check_messages(url: &str, moniker: &str, expected_messages: Expected) {
-    // TODO(https://fxbug.dev/94784) inline `test_inner` once the fuchsia test macro supports it
+    // TODO(https://fxbug.dev/42176717) inline `test_inner` once the fuchsia test macro supports it
     TestExecutor::new().run_singlethreaded(test_inner(url, moniker, expected_messages));
 }
 
@@ -64,7 +64,7 @@ fn launch_component_and_check_messages_go_lang(
     moniker: &str,
     expected_messages: Expected,
 ) {
-    // TODO(https://fxbug.dev/94784) inline `test_inner` once the fuchsia test macro supports it
+    // TODO(https://fxbug.dev/42176717) inline `test_inner` once the fuchsia test macro supports it
     TestExecutor::new().run_singlethreaded(test_inner(url, moniker, expected_messages));
 }
 
@@ -82,7 +82,7 @@ async fn test_inner(url: &str, moniker: &str, expected: Expected) {
 
     // Golang prints messages to stdout and stderr when it finds it's missing any of the stdio
     // handles. Ignore messages that come from the runtime so we can match on our expectations.
-    // TODO(https://fxbug.dev/69588): Remove this workaround.
+    // TODO(https://fxbug.dev/42148737): Remove this workaround.
     let num_expected = if moniker.ends_with("go") {
         // wait for the expected number of additional messages from the go runtime
         expected.len() + if expected.stderr() { 2 } else { 1 }
@@ -108,7 +108,7 @@ async fn test_inner(url: &str, moniker: &str, expected: Expected) {
         .unwrap()
         .into_iter()
         .filter(|log| {
-            // TODO(https://fxbug.dev/69588): Remove this workaround.
+            // TODO(https://fxbug.dev/42148737): Remove this workaround.
             !log.msg()
                 .map(|m| m.starts_with("runtime") || m.starts_with("syscall"))
                 .unwrap_or_default()

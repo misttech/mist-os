@@ -331,7 +331,7 @@ impl QueuedResolver {
                 // If we can get metadata but the repo doesn't know about the package,
                 // it shouldn't be in the cache, BUT some SDK customers currently rely on this
                 // behavior.
-                // TODO(https://fxbug.dev/50764): remove this behavior.
+                // TODO(https://fxbug.dev/42127880): remove this behavior.
                 match missing_cache_package_disk_fallback(
                     rewritten_url,
                     pkg_url,
@@ -602,7 +602,7 @@ fn missing_cache_package_disk_fallback(
             repository may not be configured to serve the package correctly, or may \
             be overriding the domain for the repository which would normally serve \
             this package. This will be an error in a future version of Fuchsia, see \
-            https://fxbug.dev/50748.",
+            https://fxbug.dev/42127862.",
             rewritten_url.name(),
             rewritten_url
         );
@@ -693,7 +693,7 @@ async fn hash_from_repo_or_cache(
         Err(e @ GetPackageHashError::MerkleFor(MerkleForError::TargetNotFound(_))) => {
             // If we can get metadata but the repo doesn't know about the package,
             // it shouldn't be in the cache, BUT some SDK customers currently rely on this behavior.
-            // TODO(https://fxbug.dev/50764): remove this behavior.
+            // TODO(https://fxbug.dev/42127880): remove this behavior.
             match missing_cache_package_disk_fallback(
                 rewritten_url,
                 pkg_url,

@@ -163,7 +163,7 @@ zx::result<> File::BlocksSwap(Transaction* transaction, blk_t start, blk_t count
     const blk_t file_block = static_cast<blk_t>(iterator.file_block());
     ZX_DEBUG_ASSERT(allocation_state_.IsPending(file_block));
     blk_t old_block = iterator.Blk();
-    // TODO(https://fxbug.dev/51587): A value of zero for the block pointer has special meaning: the block
+    // TODO(https://fxbug.dev/42128794): A value of zero for the block pointer has special meaning: the block
     // is sparse or unmapped. We should add something for this magic constant and fix all places
     // that currently hard code zero.
     if (old_block == 0) {

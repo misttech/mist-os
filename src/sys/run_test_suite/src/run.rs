@@ -248,7 +248,7 @@ async fn run_test_chunk<'a, F: 'a + Future<Output = ()> + Unpin>(
             for event in events.into_iter() {
                 let ftest_manager::RunEvent { payload, .. } = event;
                 match payload {
-                    // TODO(https://fxbug.dev/91151): Add support for RunStarted and RunStopped when test_manager sends them.
+                    // TODO(https://fxbug.dev/42172683): Add support for RunStarted and RunStopped when test_manager sends them.
                     Some(ftest_manager::RunEventPayload::Artifact(artifact)) => {
                         let artifact_fut = artifacts::drain_artifact(
                             run_reporter,
@@ -476,7 +476,7 @@ mod test {
         },
     };
 
-    // TODO(https://fxbug.dev/98222): add unit tests for suite artifacts too.
+    // TODO(https://fxbug.dev/42180532): add unit tests for suite artifacts too.
 
     async fn fake_running_all_suites_and_return_run_events(
         mut stream: ftest_manager::RunBuilderRequestStream,

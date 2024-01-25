@@ -371,7 +371,7 @@ macro_rules! instantiate_common_routing_tests {
         instantiate_common_routing_tests! { $builder_impl, $($remaining),+ }
     };
     ($builder_impl:path, $test:ident) => {
-        // TODO(https://fxbug.dev/77647): #[fuchsia::test] did not work inside a declarative macro, so this
+        // TODO(https://fxbug.dev/42157685): #[fuchsia::test] did not work inside a declarative macro, so this
         // falls back on fuchsia_async and manual logging initialization for now.
         #[fuchsia_async::run_singlethreaded(test)]
         async fn $test() {
@@ -3010,7 +3010,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
     }
 
     /*
-        TODO(https://fxbug.dev/107902): Allow exposing from parent.
+        TODO(https://fxbug.dev/42059303): Allow exposing from parent.
 
         /// Tests exposing an event_stream from a child through its parent down to another
         /// unrelated child.

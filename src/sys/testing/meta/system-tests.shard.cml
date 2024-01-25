@@ -54,7 +54,7 @@
                 "fuchsia.exception.Handler",
 
                 // fuchsia.hardware.pty.Device is needed for terminal_tests.
-                // TODO(https://fxbug.dev/97992): Remove this once the test is hermetic.
+                // TODO(https://fxbug.dev/42180278): Remove this once the test is hermetic.
                 "fuchsia.hardware.pty.Device",
                 "fuchsia.kernel.Counter",
                 "fuchsia.kernel.CpuResource",
@@ -78,11 +78,11 @@
                 "fuchsia.media.ProfileProvider",
 
                 // Needed for Bluetooth streaming E2E tests.
-                // TODO(https://fxbug.dev/90434): Consider removing when mediaplayer is v2.
+                // TODO(https://fxbug.dev/42171886): Consider removing when mediaplayer is v2.
                 "fuchsia.media.SessionAudioConsumerFactory",
 
                 // Needed for //src/cobalt/bin/meta/cobalt_testapp_for_prober_do_not_run_manually.cml
-                // TODO(https://fxbug.dev/83038): Remove once e2e is better supported.
+                // TODO(https://fxbug.dev/42163671): Remove once e2e is better supported.
                 "fuchsia.net.http.Loader",
                 "fuchsia.posix.socket.Provider",
                 "fuchsia.scheduler.ProfileProvider",
@@ -229,7 +229,7 @@
         },
 
         // Tests of the media system want to test against the real hardware
-        // TODO(https://fxbug.dev/83512): Remove when specialized test realms are ready.
+        // TODO(https://fxbug.dev/42164198): Remove when specialized test realms are ready.
         {
             directory: "dev-mediacodec",
             from: "parent",
@@ -256,7 +256,7 @@
         },
 
         // Tests of the media system change their behavior based on board
-        // TODO(https://fxbug.dev/83512): Remove when specialized test realms are ready.
+        // TODO(https://fxbug.dev/42164198): Remove when specialized test realms are ready.
         {
             protocol: "fuchsia.sysinfo.SysInfo",
             from: "parent",

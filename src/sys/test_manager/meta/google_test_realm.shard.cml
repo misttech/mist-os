@@ -1,7 +1,7 @@
 // Copyright 2022 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-// TODO(https://fxbug.dev/98006): Once we are able to define these out of tree this
+// TODO(https://fxbug.dev/42180295): Once we are able to define these out of tree this
 // definition should be moved to indivisual products.
 {
     collections: [

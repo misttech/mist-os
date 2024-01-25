@@ -243,7 +243,7 @@ pub async fn report_routing_failure(
                     // they build and/or assemble different product
                     // configurations so declared routes are always end-to-end
                     // complete routes.
-                    // TODO(https://fxbug.dev/109112): if we change the log for
+                    // TODO(https://fxbug.dev/42060474): if we change the log for
                     // `Required` capabilities to `error!()`, consider also
                     // changing this log for `Optional` to `warn!()`.
                     info!(
@@ -256,7 +256,7 @@ pub async fn report_routing_failure(
                     );
                 }
                 _ => {
-                    // TODO(https://fxbug.dev/109112): consider changing this to `error!()`
+                    // TODO(https://fxbug.dev/42060474): consider changing this to `error!()`
                     warn!(
                         "Required {} `{}` was not available for target component `{}`: {}\n{}",
                         cap.type_name(),

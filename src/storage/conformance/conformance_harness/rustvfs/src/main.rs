@@ -125,9 +125,9 @@ async fn run(mut stream: Io1HarnessRequestStream) -> Result<(), Error> {
 
                     // Unsupported options:
                     supports_link: Some(false), // Link is not supported using a pseudo filesystem.
-                    // TODO(https://fxbug.dev/72801): SetAttr should work, investigate why the test fails.
+                    // TODO(https://fxbug.dev/42152303): SetAttr should work, investigate why the test fails.
                     supports_set_attr: Some(false),
-                    // TODO(https://fxbug.dev/72801): same issue as SetAttr not working.
+                    // TODO(https://fxbug.dev/42152303): same issue as SetAttr not working.
                     supports_update_attributes: Some(false),
                     // TODO(https://fxbug.dev/315357754): Pseudo-directories don't seem to generate watch
                     // events even though the machinery is available.

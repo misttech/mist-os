@@ -18,7 +18,7 @@ group("go") {
 # Go programs panic when writing to an unbounded file descriptor (stdout or stderr).
 # In order to pass the tests, we create a binary for each test case instead
 # of using one for all 3 like we do for Rust and C++.
-# See https://fxbug.dev/72108 for more details.
+# See https://fxbug.dev/42151533 for more details.
 template("test_case_binary") {
   assert(defined(invoker.test_case), "Parameter 'test_case' is required")
 

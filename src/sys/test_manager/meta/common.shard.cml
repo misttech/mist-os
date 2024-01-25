@@ -151,7 +151,7 @@
             storage_id: "static_instance_id_or_moniker",
         },
 
-        // TODO(https://fxbug.dev/124393): Adding dummy capability to make cmc tool
+        // TODO(https://fxbug.dev/42075284): Adding dummy capability to make cmc tool
         // happy. This capability is not routed to any component.
         {
             storage: "data",
@@ -173,7 +173,7 @@
             availability: "optional",
         },
 
-        // TODO(https://fxbug.dev/86464): Clean this up
+        // TODO(https://fxbug.dev/42167477): Clean this up
         { protocol: "fuchsia.component.resolution.Resolver" },
         {
             directory: "debugdata",
@@ -267,7 +267,7 @@
                 "fuchsia.exception.Handler",
 
                 // fuchsia.hardware.pty.Device is needed for terminal_tests.
-                // TODO(https://fxbug.dev/97992): Remove this once the test is hermetic.
+                // TODO(https://fxbug.dev/42180278): Remove this once the test is hermetic.
                 "fuchsia.hardware.pty.Device",
                 "fuchsia.kernel.Counter",
                 "fuchsia.kernel.CpuResource",
@@ -291,7 +291,7 @@
                 "fuchsia.media.ProfileProvider",
 
                 // Needed for //src/cobalt/bin/meta/cobalt_testapp_for_prober_do_not_run_manually.cml
-                // TODO(https://fxbug.dev/83038): Remove once e2e is better supported.
+                // TODO(https://fxbug.dev/42163671): Remove once e2e is better supported.
                 "fuchsia.net.http.Loader",
 
                 // Dart runners allow connections from the Dart Observatory,
@@ -533,7 +533,7 @@
         },
 
         // Tests of the media system want to test against the real hardware
-        // TODO(https://fxbug.dev/83512): Remove when specialized test realms are ready.
+        // TODO(https://fxbug.dev/42164198): Remove when specialized test realms are ready.
         {
             directory: "dev-mediacodec",
             from: "parent",
@@ -571,7 +571,7 @@
         },
 
         // Tests of the media system change their behavior based on board
-        // TODO(https://fxbug.dev/83512): Remove when specialized test realms are ready.
+        // TODO(https://fxbug.dev/42164198): Remove when specialized test realms are ready.
         {
             protocol: "fuchsia.sysinfo.SysInfo",
             from: "parent",

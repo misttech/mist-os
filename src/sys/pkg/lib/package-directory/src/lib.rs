@@ -187,7 +187,7 @@ fn get_dir_children<'a>(
         if let Some(path) = path.strip_prefix(dir) {
             match path.split_once('/') {
                 None => {
-                    // TODO(https://fxbug.dev/81370) Replace .contains/.insert with .get_or_insert_owned when non-experimental.
+                    // TODO(https://fxbug.dev/42161818) Replace .contains/.insert with .get_or_insert_owned when non-experimental.
                     if !added_entries.contains(path) {
                         res.push((
                             EntryInfo::new(fio::INO_UNKNOWN, fio::DirentType::File),
@@ -209,7 +209,7 @@ fn get_dir_children<'a>(
         }
     }
 
-    // TODO(https://fxbug.dev/82290) Remove this sort
+    // TODO(https://fxbug.dev/42162840) Remove this sort
     res.sort_by(|a, b| a.1.cmp(&b.1));
     res
 }

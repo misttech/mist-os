@@ -13,7 +13,7 @@ use {
     tracing::info,
 };
 
-// TODO(https://fxbug.dev/67497): This actor is very basic. At the moment, this is fine, since this is a
+// TODO(https://fxbug.dev/42146417): This actor is very basic. At the moment, this is fine, since this is a
 // v0 implementation of minfs stress tests. Eventually, we should write stress tests that exercise
 // minfs as a true POSIX filesystem.
 pub struct FileActor {

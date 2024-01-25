@@ -114,8 +114,8 @@ zx::result<> Blob::Writer::Prepare(Blob& blob, uint64_t data_size) {
   if (compress) {
     compressor_ = BlobCompressor::Create(blobfs().write_compression_settings(), data_size);
     if (!compressor_) {
-      // TODO(https://fxbug.dev/70356): Make `BlobCompressor::Create()` return the actual error instead.
-      // Replace `ZX_ERR_INTERNAL` with the correct error once https://fxbug.dev/70356 is fixed.
+      // TODO(https://fxbug.dev/42149591): Make `BlobCompressor::Create()` return the actual error instead.
+      // Replace `ZX_ERR_INTERNAL` with the correct error once https://fxbug.dev/42149591 is fixed.
       FX_LOGS(ERROR) << "Failed to initialize compressor: " << ZX_ERR_INTERNAL;
       return zx::error(ZX_ERR_INTERNAL);
     }
@@ -789,7 +789,7 @@ zx::result<> Blob::Writer::InitializeDecompressor() {
     return status.take_error();
   }
 
-  // TODO(https://fxbug.dev/96844): Offline compression *requires* an external sandboxed decompressor, but
+  // TODO(https://fxbug.dev/42179006): Offline compression *requires* an external sandboxed decompressor, but
   // not all targets currently enable this option. For now, we fall back to the same service
   // connector that Blobfs would attempt to use if the option was enabled but a specific sandbox
   // service was not specified.

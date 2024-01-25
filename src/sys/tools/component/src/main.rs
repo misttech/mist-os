@@ -46,10 +46,10 @@ pub async fn exec() -> Result<()> {
             resolve_cmd(args.query, lifecycle_controller, realm_query, writer).await
         }
         ComponentSubcommand::Explore(args) => {
-            // TODO(https://fxbug.dev/95554): Verify that the optional Launcher protocol is available
+            // TODO(https://fxbug.dev/42177573): Verify that the optional Launcher protocol is available
             // before connecting.
             let dash_launcher = connect_to_protocol::<fdash::LauncherMarker>()?;
-            // TODO(https://fxbug.dev/127189): Use Stdout::raw instead, when a command is not provided
+            // TODO(https://fxbug.dev/42077838): Use Stdout::raw instead, when a command is not provided
             let stdout = Stdout::buffered();
 
             explore_cmd(

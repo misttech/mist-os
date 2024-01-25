@@ -620,7 +620,7 @@ impl Url {
                     path = &path[1..];
                 }
                 if is_relative && url.fragment().is_none() {
-                    // TODO(https://fxbug.dev/119726): Fragments should be optional
+                    // TODO(https://fxbug.dev/42070831): Fragments should be optional
                     // for relative path URLs.
                     //
                     // Historically, a component URL string without a scheme

@@ -380,7 +380,7 @@ mod tests {
         let result_manifest_list =
             package_manifest_list.write_with_relative_paths(&manifest_path).unwrap();
 
-        // TODO(https://fxbug.dev/126289): Add "re-read" test once writer is functioning.
+        // TODO(https://fxbug.dev/42077054): Add "re-read" test once writer is functioning.
         let path_relative_package_manifest_list =
             PackageManifestList(VersionedPackageManifestList::Version1(PackageManifestListV1 {
                 paths_relative: RelativeTo::File,
@@ -416,7 +416,7 @@ mod tests {
         let result_manifest_list =
             package_manifest_list.clone().write_with_relative_paths(&manifest_path).unwrap();
 
-        // TODO(https://fxbug.dev/126289): Add "re-read" test once writer is functioning.
+        // TODO(https://fxbug.dev/42077054): Add "re-read" test once writer is functioning.
         assert_eq!(result_manifest_list, package_manifest_list);
     }
 

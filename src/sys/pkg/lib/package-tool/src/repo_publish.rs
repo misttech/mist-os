@@ -60,7 +60,7 @@ async fn repo_incremental_publish(cmd: &mut RepoPublishCommand) -> Result<()> {
         .package_lists(cmd.package_list_manifests.iter().cloned())
         .watch()?;
 
-    // FIXME(https://fxbug.dev/122178): Since the package manifest list is just a list of files, if we read
+    // FIXME(https://fxbug.dev/42073171): Since the package manifest list is just a list of files, if we read
     // the file while it's being written to, we might end up watching less files than we expect. To
     // work around that, lets just publish all packages in the package manifest just to be safe.
     // We can revert back to only publishing changes packages when this is fixed.

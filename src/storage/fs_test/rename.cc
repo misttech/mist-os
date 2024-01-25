@@ -393,7 +393,7 @@ TEST_P(RenameTest, RenameDirIntoRootSuceeds) {
 
 TEST_P(RenameTest, RenameDirectoryToChildIsForbidden) {
   // This test ensures renaming a directory to a child is forbidden.  The basic tests above test a
-  // variant of this, but this case is to specifically catch the issue described in https://fxbug.dev/95970.
+  // variant of this, but this case is to specifically catch the issue described in https://fxbug.dev/42178035.
   ASSERT_EQ(mkdir(GetPath("alpha").c_str(), 0755), 0);
   ASSERT_EQ(mkdir(GetPath("alpha/bravo").c_str(), 0755), 0);
   ASSERT_EQ(mkdir(GetPath("alpha/bravo/charlie").c_str(), 0755), 0);

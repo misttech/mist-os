@@ -147,7 +147,7 @@ zx_status_t VmoManager::UnlockVmo(const pgoff_t index, const bool evict) {
       if (auto status = vmo_node_or.value()->Unlock(index); status != ZX_OK) {
         return status;
       }
-      // TODO(https://fxbug.dev/119885): consider removing a vmo_node when all regarding pages are
+      // TODO(https://fxbug.dev/42070947): consider removing a vmo_node when all regarding pages are
       // invalidated.
     }
     return vmo_node_or.status_value();

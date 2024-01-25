@@ -147,7 +147,7 @@ async fn main() -> Result<(), Error> {
         directory_request.into(),
     );
 
-    // TODO(https://fxbug.dev/118209): //src/tests/oom looks for "fshost: lifecycle handler ready" to
+    // TODO(https://fxbug.dev/42069366): //src/tests/oom looks for "fshost: lifecycle handler ready" to
     // indicate the watcher is about to start.
     tracing::info!("fshost: lifecycle handler ready");
 
@@ -166,9 +166,9 @@ async fn main() -> Result<(), Error> {
     };
 
     tracing::info!("shutdown signal received");
-    // TODO(https://fxbug.dev/118209): //src/tests/oom looks for "received shutdown command over lifecycle
+    // TODO(https://fxbug.dev/42069366): //src/tests/oom looks for "received shutdown command over lifecycle
     // interface" to indicate fshost shutdown is starting. Shutdown logs have to go straight to
-    // serial because of timing issues (https://fxbug.dev/97630).
+    // serial because of timing issues (https://fxbug.dev/42179880).
     debug_log("received shutdown command over lifecycle interface");
 
     // Shutting down fshost involves sending asynchronous shutdown signals to several different

@@ -27,7 +27,7 @@ async fn connect_to_config_service(
     let service =
         fuchsia_component::client::open_service_at_dir::<scrs::ConfigServiceMarker>(expose_dir)?;
     loop {
-        // TODO(https://fxbug.dev/4776): Once component manager supports watching for
+        // TODO(https://fxbug.dev/42124541): Once component manager supports watching for
         // service instances, this loop should be replaced by a watcher.
         let entries = fuchsia_fs::directory::readdir(&service).await?;
         if let Some(entry) = entries.iter().next() {
@@ -76,7 +76,7 @@ async fn main() -> anyhow::Result<()> {
     fs.for_each_concurrent(None, |request: IncomingRequest| async {
         match request {
             IncomingRequest::Puppet(stream) => {
-                // TOOD(https://fxbug.dev/121847): Make this conversion less verbose.
+                // TOOD(https://fxbug.dev/42072863): Make this conversion less verbose.
                 let server_end: fidl::endpoints::ServerEnd<scr::ConfigReceiverPuppetMarker> =
                     std::sync::Arc::try_unwrap(stream.into_inner().0)
                         .unwrap()

@@ -73,7 +73,7 @@ async fn basic_directory_test() -> Result<(), Error> {
     assert_eq!(node.get_attr().await?.1.creation_time, 0);
     assert_eq!(node.get_attr().await?.1.modification_time, 0);
 
-    // TODO(https://fxbug.dev/91610): The C++ bootfs VFS uses the wrong POSIX bits (needs S_IXUSR).
+    // TODO(https://fxbug.dev/42173193): The C++ bootfs VFS uses the wrong POSIX bits (needs S_IXUSR).
     let cpp_bootfs = fio::MODE_TYPE_DIRECTORY | S_IRUSR;
     let rust_bootfs = fio::MODE_TYPE_DIRECTORY | S_IRUSR | S_IXUSR;
     let actual_value = node.get_attr().await?.1.mode;

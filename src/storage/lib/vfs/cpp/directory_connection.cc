@@ -57,7 +57,7 @@ void OpenAt(FuchsiaVfs* vfs, const fbl::RefPtr<Vnode>& parent,
                              std::move(server_end));
         } else if constexpr (std::is_same_v<ResultT, OpenResult::Ok>) {
           VnodeConnectionOptions options = *result.validated_options;
-          // TODO(https://fxbug.dev/101092): Remove this when web_engine with SDK 13.20230626.3.1 or
+          // TODO(https://fxbug.dev/42051879): Remove this when web_engine with SDK 13.20230626.3.1 or
           // later is rolled. The important commit is in the private integration repo, but the next
           // Fuchsia commit is b615ff398580f3b47c050beb9e8f0fc28907ac67 which can be used with the
           // sdkrevisions tool.
@@ -96,7 +96,7 @@ std::unique_ptr<Binding> DirectoryConnection::Bind(async_dispatcher_t* dispatche
 }
 
 void DirectoryConnection::Clone(CloneRequestView request, CloneCompleter::Sync& completer) {
-  // TODO(https://fxbug.dev/111302): test this.
+  // TODO(https://fxbug.dev/42062619): test this.
   Connection::NodeClone(request->flags | fio::OpenFlags::kDirectory, std::move(request->object));
 }
 

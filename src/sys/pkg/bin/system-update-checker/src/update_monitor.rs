@@ -30,7 +30,7 @@ where
     attempt_queue: ControlHandle<A>,
     update_state: InspectableDebugString<Option<State>>,
     version_available: InspectableDebugString<Option<String>>,
-    // TODO(https://fxbug.dev/84729)
+    // TODO(https://fxbug.dev/42165549)
     #[allow(unused)]
     inspect_node: fuchsia_inspect::Node,
 }

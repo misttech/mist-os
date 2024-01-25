@@ -422,7 +422,7 @@ impl File for VmoFile {
         Ok(self.vmo().await.get_content_size()?)
     }
 
-    // TODO(https://fxbug.dev/72801)
+    // TODO(https://fxbug.dev/42152303)
     async fn set_attrs(
         &self,
         _flags: fio::NodeAttributeFlags,
@@ -431,7 +431,7 @@ impl File for VmoFile {
         Err(Status::NOT_SUPPORTED)
     }
 
-    // TODO(https://fxbug.dev/72801)
+    // TODO(https://fxbug.dev/42152303)
     async fn update_attributes(
         &self,
         _attributes: fio::MutableNodeAttributes,

@@ -21,7 +21,7 @@
             environment: "#session-env",
         },
 
-        // TODO(https://fxbug.dev/123798) Remove comment when this transformation is complete.
+        // TODO(https://fxbug.dev/42074694) Remove comment when this transformation is complete.
         // This is the future home of system update-related components.
         {
             name: "system-update",
@@ -32,7 +32,7 @@
             name: "mdns",
             url: "fuchsia-pkg://fuchsia.com/mdns#meta/mdns.cm",
 
-            // TODO(https://fxbug.dev/93539): consider removing eager startup in non-eng builds.
+            // TODO(https://fxbug.dev/42175335): consider removing eager startup in non-eng builds.
             startup: "eager",
         },
         {
@@ -48,7 +48,7 @@
             // sysmem_connector to terminate and trigger a reboot on behalf of sysmem if the sysmem
             // driver terminates.
             //
-            // TODO(https://fxbug.dev/96061): Once we have something like on_terminate: "reboot" for drivers
+            // TODO(https://fxbug.dev/42178137): Once we have something like on_terminate: "reboot" for drivers
             // we can remove both "eager" and "reboot" here.
             startup: "eager",
             on_terminate: "reboot",
@@ -68,7 +68,7 @@
         // Children above this line are expected to be present on all configs that include
         // core.cml.
         //
-        // TODO(https://fxbug.dev/81003): If any of the components below are product-specific, move them
+        // TODO(https://fxbug.dev/42161411): If any of the components below are product-specific, move them
         // to core realm shards.
         {
             name: "activity",
@@ -501,7 +501,7 @@
             subdir: "goldfish-sync",
         },
 
-        // TODO(https://fxbug.dev/135645): Remove bt-host driver code
+        // TODO(https://fxbug.dev/42085239): Remove bt-host driver code
         {
             directory: "dev-class",
             from: "parent",

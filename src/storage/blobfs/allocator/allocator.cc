@@ -43,7 +43,7 @@ zx::result<InodePtr> Allocator::GetNode(uint32_t node_index) __TA_NO_THREAD_SAFE
   if (node_index >= node_map_.size() / kBlobfsInodeSize) {
     return zx::error(ZX_ERR_INVALID_ARGS);
   }
-  // TODO(https://fxbug.dev/80414): Calling lock_shared from a thread that already holds the lock is
+  // TODO(https://fxbug.dev/42160756): Calling lock_shared from a thread that already holds the lock is
   // undefined behaviour.
   node_map_grow_mutex_.lock_shared();
   return zx::ok(
@@ -68,7 +68,7 @@ zx_status_t Allocator::ResetFromStorage(fs::DeviceTransactionHandler& transactio
   storage::OwnedVmoid block_map_vmoid;
   storage::OwnedVmoid node_map_vmoid;
 
-  // TODO(https://fxbug.dev/49093): Change to use fpromise::result<OwnedVmo, zx_status_t>.
+  // TODO(https://fxbug.dev/42126023): Change to use fpromise::result<OwnedVmo, zx_status_t>.
   status = space_manager_->BlockAttachVmo(GetBlockMapVmo(),
                                           &block_map_vmoid.GetReference(space_manager_));
   if (status != ZX_OK) {
@@ -187,7 +187,7 @@ zx_status_t Allocator::GrowNodeMap(size_t size) {
   return node_map_.Grow(size);
 }
 
-// TODO(https://fxbug.dev/130250): change this to __TA_RELEASE_SHARED(node_map_grow_mutex_) after clang
+// TODO(https://fxbug.dev/42080556): change this to __TA_RELEASE_SHARED(node_map_grow_mutex_) after clang
 // roll.
 void Allocator::DropInodePtr() __TA_NO_THREAD_SAFETY_ANALYSIS {
   node_map_grow_mutex_.unlock_shared();

@@ -276,7 +276,7 @@ func TestUpdateTakesABIRevisionAndWritesABIRevision(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// FIXME(https://fxbug.dev/87309): In order to ease migration, initially the
+	// FIXME(https://fxbug.dev/42168416): In order to ease migration, initially the
 	// abi-revision is not required.
 	abiRevisionPath, ok := manifest.Meta()[abiRevisionKey]
 	if !ok {
@@ -457,7 +457,7 @@ func TestSealDoesNotRequireABIRevision(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// FIXME(https://fxbug.dev/87309): In order to ease migration, initially the
+	// FIXME(https://fxbug.dev/42168416): In order to ease migration, initially the
 	// abi-revision is not required.
 	_, err = r.Open("meta/fuchsia.pkg/abi-revision")
 	if err == nil {

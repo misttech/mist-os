@@ -175,7 +175,7 @@ async fn child_args() {
         // dynamic components. |create_child| will actually start the component immediately without
         // the need to manually bind it, because "the instances in a single run collection are
         // started when they are created" (see //docs/concepts/components/v2/realms.md).
-        // https://fxbug.dev/90085 discusses the idea to remove the startup parameter.
+        // https://fxbug.dev/42171498 discusses the idea to remove the startup parameter.
 
         fasync::OnSignals::new(&our_socket, zx::Signals::SOCKET_READABLE)
             .await
@@ -224,7 +224,7 @@ async fn child_args() {
             .await
             .expect("fidl error in create_child");
 
-        // TODO(https://fxbug.dev/98739): it should fail to create_child, but it succeeds instead. Also
+        // TODO(https://fxbug.dev/42181105): it should fail to create_child, but it succeeds instead. Also
         // the default_job received in write_startup_socket.rs is NOT the job we created above.
         result.unwrap();
 

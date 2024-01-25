@@ -359,7 +359,7 @@ pub struct BlockGroupDesc32 {
 // https://ext4.wiki.kernel.org/index.php/Ext4_Disk_Layout
 assert_eq_size!(BlockGroupDesc32, [u8; 32]);
 
-// TODO(https://fxbug.dev/122152): There are more fields in BlockGroupDesc if the filesystem is 64bit.
+// TODO(https://fxbug.dev/42073143): There are more fields in BlockGroupDesc if the filesystem is 64bit.
 // Uncomment this when we add support.
 // #[derive(FromZeros, FromBytes, NoCell, Unaligned)]
 // #[repr(C)]
@@ -508,7 +508,7 @@ pub enum ParsingError {
     #[error("Unable to parse INode {}", _0)]
     InvalidInode(u32),
 
-    // TODO(https://fxbug.dev/122152): A followup change will add the ability to include an address here.
+    // TODO(https://fxbug.dev/42073143): A followup change will add the ability to include an address here.
     #[error("Unable to parse ExtentHeader from INode")]
     InvalidExtentHeader,
     #[error("Invalid Extent Header magic number {} should be 0xF30A", _0)]
@@ -610,7 +610,7 @@ pub enum FeatureIncompat {
     /// Currently required flag.
     EntryHasFileType = 0x2,
 
-    // TODO(https://fxbug.dev/122152): We will permit journaling because our initial use will not have
+    // TODO(https://fxbug.dev/42073143): We will permit journaling because our initial use will not have
     // entries in the journal. Will need to add proper support in the future.
     /// We do not support journaling, but assuming an empty journal, we can still read.
     ///
@@ -625,7 +625,7 @@ pub enum FeatureIncompat {
     Is64Bit = 0x80,
     MultiMountProtection = 0x100,
 
-    // TODO(https://fxbug.dev/122152): Should be relatively trivial to support.
+    // TODO(https://fxbug.dev/42073143): Should be relatively trivial to support.
     /// No explicit support, we will permit the flag as it works for our needs.
     FlexibleBlockGroups = 0x200,
     ExtendedAttributeINodes = 0x400,
@@ -643,7 +643,7 @@ pub const REQUIRED_FEATURE_INCOMPAT: u32 =
 
 /// Banned "feature incompatible" flags.
 pub const BANNED_FEATURE_INCOMPAT: u32 = FeatureIncompat::Compression as u32 |
-    // TODO(https://fxbug.dev/122152): Possibly trivial to support.
+    // TODO(https://fxbug.dev/42073143): Possibly trivial to support.
     FeatureIncompat::Is64Bit as u32 |
     FeatureIncompat::MultiMountProtection as u32 |
     FeatureIncompat::ExtendedAttributeINodes as u32 |

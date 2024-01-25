@@ -384,7 +384,7 @@ async fn get_tests(test_component: Arc<Component>) -> Result<Vec<String>, Enumer
 
     let process_info = process.info().map_err(KernelError::ProcessInfo)?;
     if process_info.return_code != 0 {
-        // TODO(https://fxbug.dev/45858): Add a error logger to API so that we can display test stdout logs.
+        // TODO(https://fxbug.dev/42122428): Add a error logger to API so that we can display test stdout logs.
         error!("Failed getting list of tests:\n{}\n{}", output, error);
         return Err(EnumerationError::ListTest);
     }
@@ -405,7 +405,7 @@ async fn launch_component_process<E>(
 where
     E: From<NamespaceError> + From<launch::LaunchError> + From<ComponentError>,
 {
-    // TODO(https://fxbug.dev/58076): Golang binary fails if it is not provided with a stdin.
+    // TODO(https://fxbug.dev/42135993): Golang binary fails if it is not provided with a stdin.
     // Provide it till the issue is fixed.
     let (client, log) = zx::Socket::create_stream();
     let mut handle_infos = vec![];

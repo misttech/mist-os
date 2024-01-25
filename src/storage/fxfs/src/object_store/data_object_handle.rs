@@ -645,7 +645,7 @@ impl<S: HandleOwner> DataObjectHandle<S> {
                                         )
                                     }
                                     _ => {
-                                        // TODO(https://fxbug.dev/114786): Maybe we should create
+                                        // TODO(https://fxbug.dev/42066056): Maybe we should create
                                         // a new extent without checksums?
                                         bail!(
                                             "extent from ({},{}) which overlaps offset \

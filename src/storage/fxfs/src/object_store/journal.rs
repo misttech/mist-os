@@ -1587,7 +1587,7 @@ impl Journal {
                 let inspector = fuchsia_inspect::Inspector::default();
                 if let Some(this) = this_clone.upgrade() {
                     let (journal_min, journal_max, journal_reclaim_size) = {
-                        // TODO(https://fxbug.dev/118342): Push-back or rate-limit to prevent DoS.
+                        // TODO(https://fxbug.dev/42069513): Push-back or rate-limit to prevent DoS.
                         let inner = this.inner.lock().unwrap();
                         (
                             round_down(
@@ -1604,7 +1604,7 @@ impl Journal {
                     root.record_uint("journal_size", journal_max - journal_min);
                     root.record_uint("journal_reclaim_size", journal_reclaim_size);
 
-                    // TODO(https://fxbug.dev/117057): Post-compute rather than manually computing metrics.
+                    // TODO(https://fxbug.dev/42068224): Post-compute rather than manually computing metrics.
                     if let Some(x) = round_div(
                         100 * (journal_max - journal_min),
                         this.objects.allocator().get_disk_bytes(),

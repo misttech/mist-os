@@ -60,7 +60,7 @@ impl Path {
                 }
 
                 // Disallow empty components, ".", and ".."s.  Path is expected to be
-                // canonicalized.  See https://fxbug.dev/28436 for discussion of empty components.
+                // canonicalized.  See https://fxbug.dev/42103076 for discussion of empty components.
                 for c in check {
                     crate::name::validate_name(c)?;
                 }

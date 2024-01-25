@@ -115,7 +115,7 @@ std::string FtlnDiagnoseIssues(FTLN ftl) {
   KnownIssue issues[] = {
       {
           &PartialPageWrites,
-          "Block count in the billions. Partial Page Writes occurred. https://fxbug.dev/87629\n",
+          "Block count in the billions. Partial Page Writes occurred. https://fxbug.dev/42168771\n",
       },
       {
           &PartialPageWritesWithFix,
@@ -124,11 +124,11 @@ std::string FtlnDiagnoseIssues(FTLN ftl) {
       {
           &PrematureBlockRecycle,
           "A vpage points to a physical page which contains a different vpage. Premature Block "
-          "Recycles occurred. https://fxbug.dev/87653\n",
+          "Recycles occurred. https://fxbug.dev/42168798\n",
       },
       {
           &LostMapBlock,
-          "Unmapped map pages. An in-use map block may have been deleted. https://fxbug.dev/88465\n",
+          "Unmapped map pages. An in-use map block may have been deleted. https://fxbug.dev/42169699\n",
       },
       {
           &OutOfSpareBlocks,

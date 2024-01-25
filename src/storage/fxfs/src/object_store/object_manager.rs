@@ -40,7 +40,7 @@ use {
 // again that so that there's enough space for compactions, and then we need some spare for
 // overheads.
 //
-// TODO(https://fxbug.dev/96080): We should come up with a better way of determining what the multiplier
+// TODO(https://fxbug.dev/42178158): We should come up with a better way of determining what the multiplier
 // should be here.  2x was too low, as it didn't cover any space for metadata.  4x might be too
 // much.
 pub const fn reserved_space_from_journal_usage(journal_usage: u64) -> u64 {
@@ -695,7 +695,7 @@ impl ObjectManager {
                 let inspector = fuchsia_inspect::Inspector::default();
                 if let Some(this) = this_clone.upgrade() {
                     let (required, borrowed, earliest_checkpoint) = {
-                        // TODO(https://fxbug.dev/118342): Push-back or rate-limit to prevent DoS.
+                        // TODO(https://fxbug.dev/42069513): Push-back or rate-limit to prevent DoS.
                         let inner = this.inner.read().unwrap();
                         (
                             inner.required_reservation(),
@@ -711,7 +711,7 @@ impl ObjectManager {
                         root.record_uint("earliest_checkpoint", earliest_checkpoint);
                     }
 
-                    // TODO(https://fxbug.dev/117057): Post-compute rather than manually computing metrics.
+                    // TODO(https://fxbug.dev/42068224): Post-compute rather than manually computing metrics.
                     if let Some(x) = round_div(100 * borrowed, required) {
                         root.record_uint("borrowed_to_required_reservation_percent", x);
                     }

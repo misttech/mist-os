@@ -30,7 +30,7 @@ zx_status_t Bcache::RunRequests(const std::vector<storage::BufferedOperation>& o
       return ZX_ERR_NOT_SUPPORTED;
     }
 
-    // TODO(https://fxbug.dev/47947): Clean up this hack.
+    // TODO(https://fxbug.dev/42124749): Clean up this hack.
     void* data = static_cast<uint8_t*>(operation.data) + operation.op.vmo_offset * kMinfsBlockSize;
     ssize_t result;
     if (operation.op.type == storage::OperationType::kRead) {

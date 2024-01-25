@@ -7,7 +7,7 @@ fuchsia.io.Directory representing the root of the filesystem at `/root`.
 There are currently two ways to launch a filesystem. One way, the old way which is being
 deprecated, is to launch the raw filesystem binary, and the other way, which filesystems are moving
 to, is to launch as a component via the component framework. Both of these methods are supported by
-fs_management libraries in C++ and Rust (the Rust implementation is pending - https://fxbug.dev/96036).
+fs_management libraries in C++ and Rust (the Rust implementation is pending - https://fxbug.dev/42178109).
 
 No matter how the filesystem is launched (the old way or the new way), all our platform filesystems
 have the same structure to the export directory. The basic entries are -

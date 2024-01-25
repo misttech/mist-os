@@ -188,7 +188,7 @@ fidl::VectorView<uint8_t> Connection::NodeQuery() {
       }
     }
   }();
-  // TODO(https://fxbug.dev/101890): avoid the const cast.
+  // TODO(https://fxbug.dev/42052765): avoid the const cast.
   uint8_t* data = reinterpret_cast<uint8_t*>(const_cast<char*>(kProtocol.data()));
   return fidl::VectorView<uint8_t>::FromExternal(data, kProtocol.size());
 }

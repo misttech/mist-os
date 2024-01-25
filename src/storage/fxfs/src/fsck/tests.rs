@@ -194,7 +194,7 @@ async fn install_items_in_store<K: Key, V: Value>(
     transaction.commit().await.expect("commit failed");
 }
 
-/* TODO(https://fxbug.dev/92054): Fix this test
+/* TODO(https://fxbug.dev/42173686): Fix this test
 #[fuchsia::test]
 async fn test_missing_graveyard() {
     let mut test = FsckTest::new().await;

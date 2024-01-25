@@ -110,7 +110,7 @@ pub enum StartReason {
     /// Indicates that the component was explicitly started for debugging purposes.
     Debug,
     /// Indicates that the component was marked as eagerly starting by the parent.
-    // TODO(https://fxbug.dev/50714): Include the parent StartReason.
+    // TODO(https://fxbug.dev/42127825): Include the parent StartReason.
     // parent: ExtendedMoniker,
     // parent_start_reason: Option<Arc<StartReason>>
     Eager,
@@ -299,7 +299,7 @@ impl ComponentManagerInstance {
             }
             .await;
             if let Err(e) = res {
-                // TODO(https://fxbug.dev/81115): Instead of panicking, we could fall back more gently by
+                // TODO(https://fxbug.dev/42161535): Instead of panicking, we could fall back more gently by
                 // triggering component_manager's shutdown.
                 panic!(
                     "Component with on_terminate=REBOOT terminated, but triggering \
@@ -408,7 +408,7 @@ impl ComponentInstance {
     }
 
     /// Instantiates a new component instance with the given contents.
-    // TODO(https://fxbug.dev/127057) convert this to a builder API
+    // TODO(https://fxbug.dev/42077692) convert this to a builder API
     pub fn new(
         environment: Arc<Environment>,
         instanced_moniker: InstancedMoniker,
@@ -690,7 +690,7 @@ impl ComponentInstance {
     /// Clients should not call this function directly, except for `StopAction` and
     /// `ShutdownAction`.
     ///
-    /// TODO(https://fxbug.dev/116076): Limit the clients that call this directly.
+    /// TODO(https://fxbug.dev/42067346): Limit the clients that call this directly.
     ///
     /// REQUIRES: All dependents have already been stopped.
     pub async fn stop_instance_internal(
@@ -987,7 +987,7 @@ impl ComponentInstance {
         match &*state {
             InstanceState::Resolved(resolved_instance_state) => {
                 let exposed_dir = &resolved_instance_state.exposed_dir;
-                // TODO(https://fxbug.dev/81010): open_exposed does not have a rights input parameter, so
+                // TODO(https://fxbug.dev/42161419): open_exposed does not have a rights input parameter, so
                 // this makes use of the POSIX_[WRITABLE|EXECUTABLE] flags to open a connection
                 // with those rights if available from the parent directory connection but without
                 // failing if not available.
@@ -1490,7 +1490,7 @@ impl ResolvedInstanceState {
         let weak_component = WeakComponentInstance::new(component);
         let execution_scope = ExecutionScope::new();
 
-        // TODO(https://fxbug.dev/120627): Determine whether this is expected to fail.
+        // TODO(https://fxbug.dev/42071713): Determine whether this is expected to fail.
         let exposed_dir = ExposedDir::new(
             execution_scope.clone(),
             weak_component.clone(),
@@ -2015,7 +2015,7 @@ impl ResolvedInstanceState {
                 child: child_moniker,
             });
         }
-        // TODO(https://fxbug.dev/108376): next_dynamic_instance_id should be per-collection.
+        // TODO(https://fxbug.dev/42059793): next_dynamic_instance_id should be per-collection.
         let instance_id = match collection {
             Some(_) => {
                 let id = self.next_dynamic_instance_id;
@@ -3012,7 +3012,7 @@ pub mod tests {
         }
     }
 
-    // TODO(https://fxbug.dev/114982)
+    // TODO(https://fxbug.dev/42066274)
     #[ignore]
     #[fuchsia::test]
     async fn creating_dynamic_child_with_offer_cycle_fails() {
@@ -3067,7 +3067,7 @@ pub mod tests {
         assert_matches!(res, Err(fcomponent::Error::InvalidArguments));
     }
 
-    // TODO(https://fxbug.dev/114982)
+    // TODO(https://fxbug.dev/42066274)
     #[ignore]
     #[fuchsia::test]
     async fn creating_cycle_between_collections_fails() {

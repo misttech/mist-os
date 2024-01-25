@@ -61,7 +61,7 @@ async fn unformatted() {
     fixture.tear_down().await;
 }
 
-// TODO(https://fxbug.dev/122943) write_data_file not supported for fxblob.
+// TODO(https://fxbug.dev/42073877) write_data_file not supported for fxblob.
 #[fuchsia::test]
 #[cfg_attr(feature = "fxblob", ignore)]
 async fn no_existing_data_partition() {

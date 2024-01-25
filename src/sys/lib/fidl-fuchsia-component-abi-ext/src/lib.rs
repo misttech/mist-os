@@ -41,7 +41,7 @@ pub async fn read_abi_revision_optional(
     }
 }
 
-// TODO(https://fxbug.dev/111777): return fuchsia.version.AbiRevision & use decode_persistent().
+// TODO(https://fxbug.dev/42063073): return fuchsia.version.AbiRevision & use decode_persistent().
 /// Read an ABI revision value from the given file path.
 async fn read_abi_revision(
     dir: &fio::DirectoryProxy,

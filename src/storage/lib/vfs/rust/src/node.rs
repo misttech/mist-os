@@ -135,7 +135,7 @@ impl<N: Node> Connection<N> {
                 self.handle_clone(flags, object);
             }
             fio::NodeRequest::Reopen { rights_request: _, object_request, control_handle: _ } => {
-                // TODO(https://fxbug.dev/77623): Handle unimplemented io2 method.
+                // TODO(https://fxbug.dev/42157659): Handle unimplemented io2 method.
                 // Suppress any errors in the event a bad `object_request` channel was provided.
                 let _: Result<_, _> = object_request.close_with_epitaph(Status::NOT_SUPPORTED);
             }

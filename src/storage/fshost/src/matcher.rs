@@ -193,7 +193,7 @@ struct FxblobMatcher {
     // have.
     ramdisk_required: Option<String>,
     // Because this matcher binds to the system Fxfs component, we can only match on it once.
-    // TODO(https://fxbug.dev/128655): Can we be more precise here, e.g. give the matcher an expected device
+    // TODO(https://fxbug.dev/42079130): Can we be more precise here, e.g. give the matcher an expected device
     // path based on system configuration?
     already_matched: AtomicBool,
 }

@@ -61,7 +61,7 @@ fuchsia_package("full-resolver-pkg") {
   deps = [ ":component" ]
 }
 
-# TODO(https://fxbug.dev/122864) Remove transitional labels
+# TODO(https://fxbug.dev/42073789) Remove transitional labels
 group("full-resolver") {
 }
 

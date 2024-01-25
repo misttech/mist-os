@@ -8,7 +8,7 @@ use {
     fuchsia_component_test::{Capability, ChildOptions, RealmBuilder, Ref, Route},
 };
 
-// TODO(https://fxbug.dev/91100): Deduplicate this function. It is used in other CM integration tests
+// TODO(https://fxbug.dev/42172627): Deduplicate this function. It is used in other CM integration tests
 async fn start_nested_cm_and_wait_for_clean_stop(root_url: &str, moniker_to_wait_on: &str) {
     let builder = RealmBuilder::new().await.unwrap();
     let root = builder.add_child("root", root_url, ChildOptions::new().eager()).await.unwrap();

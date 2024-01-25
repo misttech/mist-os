@@ -41,7 +41,7 @@ use {
 
 pub const TEST_RUNNER_NAME: &str = cm_rust_testing::TEST_RUNNER_NAME;
 
-// TODO(https://fxbug.dev/61861): remove function wrappers once the routing_test_helpers
+// TODO(https://fxbug.dev/42140194): remove function wrappers once the routing_test_helpers
 // lib has a stable API.
 pub fn default_component_decl() -> ComponentDecl {
     ::routing_test_helpers::default_component_decl()

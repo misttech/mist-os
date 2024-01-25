@@ -82,7 +82,7 @@ struct Args {
     /// when set, saves the output directory on the host.
     /// Note - this option is only intended to aid in migrating OOT tests to v2. It will be
     /// removed once existing users stop using it, and new users will not be supported.
-    // TODO(https://fxbug.dev/96298): remove this option once users are migrated to ffx test.
+    // TODO(https://fxbug.dev/42178399): remove this option once users are migrated to ffx test.
     #[argh(option)]
     deprecated_output_directory: Option<String>,
 
@@ -197,7 +197,7 @@ async fn main() {
         accumulate_debug_data: true, // must be true to support coverage via scp
         log_protocol: Some(LogsIteratorOption::SocketBatchIterator),
         min_severity_logs: min_severity_logs.clone(),
-        // TODO(https://fxbug.dev/107998): make this configurable
+        // TODO(https://fxbug.dev/42059408): make this configurable
         show_full_moniker: true,
     };
 

@@ -88,7 +88,7 @@ fuchsia_unittest_package("paver-test") {
     "//src/storage/fvm/driver",
   ]
   test_specs = {
-    # Gives more timeout to reduce flake.(https://fxbug.dev/99735)
+    # Gives more timeout to reduce flake.(https://fxbug.dev/42182211)
     timeout_secs = 720
     log_settings = {
       max_severity = "ERROR"

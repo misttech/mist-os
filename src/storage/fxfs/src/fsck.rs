@@ -106,11 +106,11 @@ impl Default for FsckOptions<'_> {
 }
 
 /// Verifies the integrity of Fxfs.  See errors.rs for a list of checks performed.
-// TODO(https://fxbug.dev/87381): add checks for:
+// TODO(https://fxbug.dev/42168496): add checks for:
 //  + The root parent object store ID and root object store ID must not conflict with any other
 //    stores or the allocator.
 //
-// TODO(https://fxbug.dev/96075): This currently takes a write lock on the filesystem.  It would be nice if
+// TODO(https://fxbug.dev/42178152): This currently takes a write lock on the filesystem.  It would be nice if
 // we could take a snapshot.
 pub async fn fsck(filesystem: Arc<FxFilesystem>) -> Result<FsckResult, Error> {
     fsck_with_options(filesystem, &FsckOptions::default()).await
@@ -172,7 +172,7 @@ pub async fn fsck_with_options(
     let mut merger = layer_set.merger();
     let mut iter = volume_directory.iter(&mut merger).await?;
 
-    // TODO(https://fxbug.dev/96076): We could maybe iterate over stores concurrently.
+    // TODO(https://fxbug.dev/42178153): We could maybe iterate over stores concurrently.
     while let Some((_, store_id, _)) = iter.get() {
         journal_checkpoint_ids.insert(store_id);
         fsck.check_child_store_metadata(
@@ -250,7 +250,7 @@ pub async fn fsck_with_options(
 }
 
 /// Verifies the integrity of a volume within Fxfs.  See errors.rs for a list of checks performed.
-// TODO(https://fxbug.dev/96075): This currently takes a write lock on the filesystem.  It would be nice if
+// TODO(https://fxbug.dev/42178152): This currently takes a write lock on the filesystem.  It would be nice if
 // we could take a snapshot.
 pub async fn fsck_volume(
     filesystem: &FxFilesystem,
@@ -321,7 +321,7 @@ impl<'a> Fsck<'a> {
     fn new(options: &'a FsckOptions<'a>) -> Self {
         Fsck {
             options,
-            // TODO(https://fxbug.dev/95981): fix magic number
+            // TODO(https://fxbug.dev/42178047): fix magic number
             allocations: SkipListLayer::new(2048),
             errors: AtomicU64::new(0),
             warnings: AtomicU64::new(0),

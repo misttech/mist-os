@@ -63,7 +63,7 @@ impl RouteValidator {
 
             let resolved = match *state {
                 InstanceState::Resolved(ref r) => r,
-                // TODO(https://fxbug.dev/102026): The error is that the instance is not currently
+                // TODO(https://fxbug.dev/42052917): The error is that the instance is not currently
                 // resolved. Use a better error here, when one exists.
                 _ => return Err(fcomponent::Error::InstanceCannotResolve),
             };
@@ -100,7 +100,7 @@ impl RouteValidator {
         let state = instance.lock_state().await;
         let resolved = match *state {
             InstanceState::Resolved(ref r) => r,
-            // TODO(https://fxbug.dev/102026): The error is that the instance is not currently
+            // TODO(https://fxbug.dev/42052917): The error is that the instance is not currently
             // resolved. Use a better error here, when one exists.
             _ => return Err(fsys::RouteValidatorError::InstanceNotResolved),
         };

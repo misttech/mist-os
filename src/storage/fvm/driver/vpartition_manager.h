@@ -216,7 +216,7 @@ class VPartitionManager : public ManagerDeviceType {
 
   // **IMPORTANT**: GetInfo() is used to synchronize visibility of partitions in devfs with clients.
   // Before partitions have been made visible, we must wait to respond to any outstanding GetInfo()
-  // requests to ensure safe partition enumeration. See https://fxbug.dev/126961 for details.
+  // requests to ensure safe partition enumeration. See https://fxbug.dev/42077585 for details.
   std::optional<std::vector<GetInfoCompleter::Async>> get_info_requests_ TA_GUARDED(lock_) =
       std::vector<GetInfoCompleter::Async>();
 

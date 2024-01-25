@@ -105,7 +105,7 @@ struct RmSubCommand {
 
 #[derive(FromArgs, PartialEq, Debug)]
 /// format the file or block device as an empty Fxfs filesystem
-// TODO(https://fxbug.dev/97324): Mkfs should be able to create instances with one or more volumes, with a
+// TODO(https://fxbug.dev/42179540): Mkfs should be able to create instances with one or more volumes, with a
 // set of encryption engines.
 #[argh(subcommand, name = "mkfs")]
 struct FormatSubCommand {}
@@ -199,7 +199,7 @@ async fn main() -> Result<(), Error> {
     let args: TopLevel = argh::from_env();
     match args.subcommand {
         SubCommand::ImageEdit(cmd) => {
-            // TODO(https://fxbug.dev/95403): Add support for side-loaded encryption keys.
+            // TODO(https://fxbug.dev/42177406): Add support for side-loaded encryption keys.
             let crypt: Arc<dyn Crypt> = Arc::new(InsecureCrypt::new());
             match cmd.subcommand {
                 ImageSubCommand::Rm(rmargs) => {

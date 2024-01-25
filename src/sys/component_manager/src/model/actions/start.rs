@@ -467,7 +467,7 @@ async fn make_execution_runtime(
     start_reason: StartReason,
     execution_controller_task: Option<controller::ExecutionControllerTask>,
 ) -> Result<ComponentRuntime, StartActionError> {
-    // TODO(https://fxbug.dev/120713): Consider moving this check to ComponentInstance::add_child
+    // TODO(https://fxbug.dev/42071809): Consider moving this check to ComponentInstance::add_child
     match component.on_terminate {
         fdecl::OnTerminate::Reboot => {
             checker.reboot_on_terminate_allowed(&component.moniker).map_err(|err| {

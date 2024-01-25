@@ -393,7 +393,7 @@ mod util {
 
     #[test]
     #[should_panic]
-    // TODO(https://fxbug.dev/88496): delete the below
+    // TODO(https://fxbug.dev/42169733): delete the below
     #[cfg_attr(feature = "variant_asan", ignore)]
     #[cfg_attr(feature = "variant_hwasan", ignore)]
     fn fail_duplicates_in_ordering() {

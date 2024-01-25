@@ -69,7 +69,7 @@ class Corpus final {
   OptionsPtr options_;
   std::minstd_rand prng_;
 
-  // TODO(https://fxbug.dev/84361): Currently, all inputs are held in memory. It may be desirable to store
+  // TODO(https://fxbug.dev/42165141): Currently, all inputs are held in memory. It may be desirable to store
   // some inputs on local storage when the corpus grows too large.
   std::vector<Input> inputs_;
   size_t total_size_ = 0;

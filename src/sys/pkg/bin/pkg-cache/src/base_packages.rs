@@ -71,7 +71,7 @@ impl FrozenIndex<Base> {
             .chain([(system_image::SystemImage::package_path(), *system_image.hash())])
             .map(|(path, hash)| {
                 let (name, variant) = path.into_name_and_variant();
-                // TODO(https://fxbug.dev/53911) Remove variant checks when variant concept is deleted.
+                // TODO(https://fxbug.dev/42131375) Remove variant checks when variant concept is deleted.
                 if !variant.is_zero() {
                     panic!("base package variants must be zero: {name} {variant}");
                 }

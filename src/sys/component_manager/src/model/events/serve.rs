@@ -26,11 +26,11 @@ use {
 };
 
 // Number of bytes the header of a vector occupies in a fidl message.
-// TODO(https://fxbug.dev/98653): This should be a constant in a FIDL library.
+// TODO(https://fxbug.dev/42181010): This should be a constant in a FIDL library.
 const FIDL_VECTOR_HEADER_BYTES: usize = 16;
 
 // Number of bytes the header of a fidl message occupies.
-// TODO(https://fxbug.dev/98653): This should be a constant in a FIDL library.
+// TODO(https://fxbug.dev/42181010): This should be a constant in a FIDL library.
 const FIDL_HEADER_BYTES: usize = 16;
 
 /// Computes the scope length, which is the number of segments
@@ -179,7 +179,7 @@ pub fn validate_and_filter_event(
 /// [`EventFiller`] helps build a vector of events up to the Zircon
 /// channel message size limit.
 ///
-/// TODO(https://fxbug.dev/98653): This can be simplified given better
+/// TODO(https://fxbug.dev/42181010): This can be simplified given better
 /// FIDL large messages support.
 struct EventFiller {
     bytes_used: usize,

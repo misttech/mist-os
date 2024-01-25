@@ -272,7 +272,7 @@ pub struct FvmVolume {
 impl FvmVolume {
     async fn new(fvm: &VolumeManagerProxy, config: &BlockDeviceConfig) -> Self {
         let volume_dir = set_up_fvm_volume(fvm, config.fvm_volume_size).await;
-        // TODO(https://fxbug.dev/112484): In order to allow multiplexing to be removed, use
+        // TODO(https://fxbug.dev/42063787): In order to allow multiplexing to be removed, use
         // connect_to_device_fidl to connect to the BlockProxy instead of connect_to_.._dir_root.
         // Requires downstream work, i.e. set_up_fvm_volume() and set_up_insecure_zxcrypt should
         // return controllers.

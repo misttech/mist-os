@@ -798,7 +798,7 @@ struct TestEnv<B = BlobfsRamdisk> {
 }
 
 impl TestEnv<BlobfsRamdisk> {
-    // workaround for https://fxbug.dev/38162
+    // workaround for https://fxbug.dev/42113882
     async fn stop(self) {
         // Tear down the environment in reverse order, ending with the storage.
         drop(self.proxies);

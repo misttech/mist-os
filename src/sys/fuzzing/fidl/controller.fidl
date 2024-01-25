@@ -81,7 +81,7 @@ type Input = resource struct {
 /// Encapsulates the result of a long-running fuzzing workflow and optionally
 /// the input that caused it, depending on the workflow.
 //
-// TODO(https://fxbug.dev/124032): Include workflow enum.
+// TODO(https://fxbug.dev/42074956): Include workflow enum.
 type Artifact = resource table {
     /// Result of executing the long-running workflow.
     1: result Result;

@@ -17,7 +17,7 @@ async fn get_connection_info_file() {
         let test_dir = harness.get_directory(root, harness.dir_rights.all());
         let file = open_file_with_flags(&test_dir, file_flags, TEST_FILE).await;
 
-        // TODO(https://fxbug.dev/77623): Restrict GET_ATTRIBUTES.
+        // TODO(https://fxbug.dev/42157659): Restrict GET_ATTRIBUTES.
         let mut expected_operations = fio::Operations::GET_ATTRIBUTES;
         if file_flags.contains(fio::OpenFlags::RIGHT_READABLE) {
             expected_operations |= fio::Operations::READ_BYTES;
@@ -46,7 +46,7 @@ async fn get_connection_info_file_node_reference() {
     let test_dir = harness.get_directory(root, harness.dir_rights.all());
     let file = open_file_with_flags(&test_dir, fio::OpenFlags::NODE_REFERENCE, TEST_FILE).await;
     // Node references should only have the ability to get attributes.
-    // TODO(https://fxbug.dev/77623): Restrict GET_ATTRIBUTES.
+    // TODO(https://fxbug.dev/42157659): Restrict GET_ATTRIBUTES.
     assert_eq!(
         file.get_connection_info().await.unwrap(),
         fio::ConnectionInfo { rights: Some(fio::Operations::GET_ATTRIBUTES), ..Default::default() }

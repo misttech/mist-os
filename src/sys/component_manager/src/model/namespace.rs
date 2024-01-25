@@ -83,7 +83,7 @@ fn add_pkg_directory(
     namespace: &mut NamespaceBuilder,
     pkg_dir: fio::DirectoryProxy,
 ) -> Result<(), CreateNamespaceError> {
-    // TODO(https://fxbug.dev/108786): Use Proxy::into_client_end when available.
+    // TODO(https://fxbug.dev/42060182): Use Proxy::into_client_end when available.
     let client_end = ClientEnd::new(pkg_dir.into_channel().unwrap().into_zx_channel());
     let directory: sandbox::Directory = client_end.into();
     let path = cm_types::Path::new(PKG_PATH.to_str().unwrap()).unwrap();

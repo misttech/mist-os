@@ -84,7 +84,7 @@ fn get_new_test_server() -> TestServer {
     let test_data_dir_parent = "/data/test_data".to_owned();
     let test_data_path = format!("{}/{}", test_data_dir_parent, test_data_name);
 
-    // TODO(https://fxbug.dev/45856): use async lib.
+    // TODO(https://fxbug.dev/42122426): use async lib.
     fs::create_dir(&test_data_path).expect("cannot create test output directory.");
     let test_data_dir = fuchsia_fs::directory::open_in_namespace(
         &test_data_path,

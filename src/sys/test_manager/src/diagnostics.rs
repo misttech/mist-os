@@ -23,12 +23,12 @@ pub(crate) struct ServeSyslogOutcome {
     /// should resolve before tearing down the realm. This is a workaround that
     /// ensures that Archivist isn't torn down before it receives all ArchiveAccessor
     /// requests.
-    // TODO(https://fxbug.dev/105308): Remove this hack once component events are ordered.
+    // TODO(https://fxbug.dev/42056523): Remove this hack once component events are ordered.
     pub archivist_responding_task: fasync::Task<()>,
 }
 
 /// Connect to archivist and starting serving syslog.
-/// TODO(https://fxbug.dev/133153): Only take one ArchiveAccessorProxy, not both.
+/// TODO(https://fxbug.dev/42083125): Only take one ArchiveAccessorProxy, not both.
 pub(crate) fn serve_syslog(
     accessor: fdiagnostics::ArchiveAccessorProxy,
     host_accessor: fhost::ArchiveAccessorProxy,

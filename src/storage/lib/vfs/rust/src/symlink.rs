@@ -111,7 +111,7 @@ impl<T: Symlink> Connection<T> {
                 object_request,
                 control_handle: _,
             } => {
-                // TODO(https://fxbug.dev/77623): Handle unimplemented io2 method.
+                // TODO(https://fxbug.dev/42157659): Handle unimplemented io2 method.
                 // Suppress any errors in the event a bad `object_request` channel was provided.
                 let _: Result<_, _> = object_request.close_with_epitaph(Status::NOT_SUPPORTED);
             }
@@ -125,7 +125,7 @@ impl<T: Symlink> Connection<T> {
                 )?;
             }
             fio::SymlinkRequest::GetConnectionInfo { responder } => {
-                // TODO(https://fxbug.dev/77623): Restrict GET_ATTRIBUTES.
+                // TODO(https://fxbug.dev/42157659): Restrict GET_ATTRIBUTES.
                 let rights = fio::Operations::GET_ATTRIBUTES;
                 responder
                     .send(fio::ConnectionInfo { rights: Some(rights), ..Default::default() })?;
@@ -141,7 +141,7 @@ impl<T: Symlink> Connection<T> {
                 responder.send(Status::ACCESS_DENIED.into_raw())?;
             }
             fio::SymlinkRequest::GetAttributes { query: _, responder } => {
-                // TODO(https://fxbug.dev/77623): Handle unimplemented io2 method.
+                // TODO(https://fxbug.dev/42157659): Handle unimplemented io2 method.
                 responder.send(Err(Status::NOT_SUPPORTED.into_raw()))?;
             }
             fio::SymlinkRequest::UpdateAttributes { payload: _, responder } => {

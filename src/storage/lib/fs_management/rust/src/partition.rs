@@ -44,7 +44,7 @@ const BLOCK_DEV_PATH: &str = "/dev/class/block/";
 
 /// Waits for a partition to appear on BLOCK_DEV_PATH that matches the fields in the
 /// PartitionMatcher. Returns the path of the partition if found. Errors after timeout duration.
-// TODO(https://fxbug.dev/122007): Most users end up wanting the things we open for checking the partition,
+// TODO(https://fxbug.dev/42072982): Most users end up wanting the things we open for checking the partition,
 // like the partition proxy and the topological path. We should consider returning all those
 // resources instead of forcing them to retrieve them again.
 pub async fn find_partition(
@@ -190,7 +190,7 @@ pub async fn partition_matches_with_proxy(
     }
 
     if let Some(matcher_detected_disk_formats) = &matcher.detected_disk_formats {
-        // TODO(https://fxbug.dev/122007): avoid this cast
+        // TODO(https://fxbug.dev/42072982): avoid this cast
         let block_proxy = BlockProxy::from_channel(partition_proxy.into_channel().unwrap());
         let detected_format = detect_disk_format(&block_proxy).await;
         if !matcher_detected_disk_formats.into_iter().any(|x| x == &detected_format) {

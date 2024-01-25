@@ -29,7 +29,7 @@ namespace {
 zx::result<> CheckExists(fidl::UnownedClientEnd<fuchsia_io::Directory> exposed_dir,
                          const std::string& path) {
   // Check if the volume exists.  This way, we can return an explicit NOT_FOUND if absent.
-  // TODO(https://fxbug.dev/93066): Check the epitaph of the call to Mount instead.
+  // TODO(https://fxbug.dev/42174810): Check the epitaph of the call to Mount instead.
   auto endpoints_or = fidl::CreateEndpoints<fuchsia_io::Node>();
   if (endpoints_or.is_error())
     return endpoints_or.take_error();

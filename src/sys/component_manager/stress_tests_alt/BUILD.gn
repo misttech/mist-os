@@ -103,7 +103,7 @@ fuchsia_test_package("component-manager-stress-tests-alt") {
     ":unreliable_echo_client",
     ":unreliable_echo_server",
 
-    # https://fxbug.dev/101490: Dep included for affected tests presubmit
+    # https://fxbug.dev/42052321: Dep included for affected tests presubmit
     "//src/sys/component_manager:component-manager-realm-builder-cmp",
   ]
   test_components = [ ":test" ]
@@ -131,7 +131,7 @@ fuchsia_test_package("component-manager-stress-tests-short") {
     ":unreliable_echo_client",
     ":unreliable_echo_server",
 
-    # https://fxbug.dev/101490: Dep included for affected tests presubmit
+    # https://fxbug.dev/42052321: Dep included for affected tests presubmit
     "//src/sys/component_manager:component-manager-realm-builder-cmp",
   ]
   test_components = [ ":test_short" ]

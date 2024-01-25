@@ -846,7 +846,7 @@ where
                             .path("/config/ssl")
                             .rights(fio::R_STAR_DIR),
                     )
-                    // TODO(https://fxbug.dev/75658): Change to storage once convenient.
+                    // TODO(https://fxbug.dev/42155475): Change to storage once convenient.
                     .capability(
                         Capability::directory("data").path("/data").rights(fio::RW_STAR_DIR),
                     )

@@ -203,7 +203,7 @@ async fn open_storage_root(
         None => storage_source_info.backing_directory_path.to_path_buf(),
     };
     if let Some(dir_source_component) = storage_source_info.storage_provider.as_ref() {
-        // TODO(https://fxbug.dev/50716): This should be StartReason::AccessCapability, but we haven't
+        // TODO(https://fxbug.dev/42127827): This should be StartReason::AccessCapability, but we haven't
         // plumbed in all the details needed to use it.
         dir_source_component.start(&StartReason::StorageAdmin, None, vec![], vec![]).await?;
         let path = full_backing_directory_path
@@ -457,7 +457,7 @@ pub async fn delete_isolated_storage(
         (dir, name.to_string())
     };
 
-    // TODO(https://fxbug.dev/36377): This function is subject to races. If another process has a handle to the
+    // TODO(https://fxbug.dev/42111898): This function is subject to races. If another process has a handle to the
     // isolated storage directory, it can add files while this function is running. That could
     // cause it to spin or fail because a subdir was not empty after it removed all the contents.
     // It's also possible that the directory was already deleted by the backing component or a

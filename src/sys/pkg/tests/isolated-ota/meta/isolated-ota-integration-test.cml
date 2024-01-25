@@ -31,7 +31,7 @@
             from: "#dns_resolver",
         },
         {
-            // TODO(https://fxbug.dev/103980): use certs from this package rather than the system realm.
+            // TODO(https://fxbug.dev/42055086): use certs from this package rather than the system realm.
             directory: "root-ssl-certificates",
             rights: [ "r*" ],
             path: "/config/ssl",

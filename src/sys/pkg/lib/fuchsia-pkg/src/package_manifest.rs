@@ -514,7 +514,7 @@ struct PackageManifestV1 {
     /// by 'pm') or the file containing the serialized manifest (new, portable,
     /// behavior)
     #[serde(default, skip_serializing_if = "RelativeTo::is_default")]
-    // TODO(https://fxbug.dev/114780): rename this to `paths_relative` since it applies
+    // TODO(https://fxbug.dev/42066050): rename this to `paths_relative` since it applies
     // to both blobs and subpackages. (I'd change it now, but it's encoded in
     // JSON files so we may need a soft transition to support both at first.)
     blob_sources_relative: RelativeTo,

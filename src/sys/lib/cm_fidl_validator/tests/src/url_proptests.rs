@@ -374,7 +374,7 @@ lit!(
         path_noscheme!(),
         // query!() is not allowed in subpackaged component URLs
 
-        // TODO(https://fxbug.dev/119726): fragments should be optional (as they are
+        // TODO(https://fxbug.dev/42070831): fragments should be optional (as they are
         // for ABSOLUTE_COMPONENT_URL), but this is not possible until
         // `cm_types::Url::validate()` no longer returns an error when
         // a fragment is not included with a relative path (subpackaged)

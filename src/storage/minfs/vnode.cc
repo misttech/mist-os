@@ -686,7 +686,7 @@ zx::result<> VnodeMinfs::TruncateInternal(Transaction* transaction, size_t len) 
       zx_status_t status =
           vmo_.op_range(ZX_VMO_OP_DECOMMIT, decommit_offset, decommit_length, nullptr, 0);
       if (status != ZX_OK) {
-        // TODO(https://fxbug.dev/35948): This is a known issue; the additional logging here is to help
+        // TODO(https://fxbug.dev/42111421): This is a known issue; the additional logging here is to help
         // diagnose.
         FX_LOGS(ERROR) << "TruncateInternal: Modifying node length from " << inode_size << " to "
                        << len;

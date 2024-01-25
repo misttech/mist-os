@@ -475,7 +475,7 @@ async fn get_tests(
 
     let process_info = process.info().map_err(KernelError::ProcessInfo).unwrap();
     if process_info.return_code != 0 {
-        // TODO(https://fxbug.dev/45858): Add a error logger to API so that we can display test stdout logs.
+        // TODO(https://fxbug.dev/42122428): Add a error logger to API so that we can display test stdout logs.
         error!("Failed getting list of tests:\n{}\n{}", stdout, stderr);
         return Err(EnumerationError::ListTest);
     }
@@ -538,7 +538,7 @@ where
     .await?)
 }
 
-// TODO(https://fxbug.dev/45854): Add integration tests.
+// TODO(https://fxbug.dev/42122424): Add integration tests.
 #[cfg(test)]
 mod tests {
     use {

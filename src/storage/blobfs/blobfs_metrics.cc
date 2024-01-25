@@ -26,7 +26,7 @@ namespace blobfs {
 BlobfsMetrics::BlobfsMetrics(bool should_record_page_in, inspect::Inspector inspector)
     : inspector_{std::move(inspector)}, should_record_page_in_(should_record_page_in) {
   // Add a node that allows querying the size of the Inspect VMO at runtime.
-  // TODO(https://fxbug.dev/80285): Replace the following lazy node with the one now part of the Inspector
+  // TODO(https://fxbug.dev/42160612): Replace the following lazy node with the one now part of the Inspector
   // class itself (i.e. call `inspector_.CreateStatsNode()` instead).
   root_.CreateLazyNode(
       "inspect_vmo_stats",

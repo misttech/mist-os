@@ -123,7 +123,7 @@ pub struct StoreInfo {
     /// then get committed in an arbitrary order (or not at all).
     last_object_id: u64,
 
-    /// Object ids for layers.  TODO(https://fxbug.dev/95971): need a layer of indirection here so we can
+    /// Object ids for layers.  TODO(https://fxbug.dev/42178036): need a layer of indirection here so we can
     /// support snapshots.
     pub layers: Vec<u64>,
 
@@ -173,7 +173,7 @@ impl StoreInfo {
     }
 }
 
-// TODO(https://fxbug.dev/95972): We should test or put checks in place to ensure this limit isn't exceeded.
+// TODO(https://fxbug.dev/42178037): We should test or put checks in place to ensure this limit isn't exceeded.
 // It will likely involve placing limits on the maximum number of layers.
 pub const MAX_STORE_INFO_SERIALIZED_SIZE: usize = 131072;
 
@@ -694,7 +694,7 @@ impl ObjectStore {
 
     /// Populates an inspect node with store statistics.
     pub fn record_data(self: &Arc<Self>, root: &fuchsia_inspect::Node) {
-        // TODO(https://fxbug.dev/118342): Push-back or rate-limit to prevent DoS.
+        // TODO(https://fxbug.dev/42069513): Push-back or rate-limit to prevent DoS.
         let counters = self.counters.lock().unwrap();
         root.record_string("guid", Uuid::from_bytes(self.store_info().guid).to_string());
         root.record_uint("store_object_id", self.store_object_id);
@@ -1371,7 +1371,7 @@ impl ObjectStore {
             *self.lock_state.lock().unwrap() = LockState::Unencrypted;
         }
 
-        // TODO(https://fxbug.dev/95978): the layer size here could be bad and cause overflow.
+        // TODO(https://fxbug.dev/42178043): the layer size here could be bad and cause overflow.
 
         // If the store is encrypted, we can't open the object tree layers now, but we need to
         // compute the size of the layers.

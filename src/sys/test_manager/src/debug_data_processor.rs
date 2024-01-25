@@ -150,7 +150,7 @@ pub(crate) struct DebugDataForTestResult {
 /// Serve |fuchsia.debugdata.Publisher| as a RealmBuilder mock. Collected VMOs are sent over
 /// |debug_data_sender| for processing. |started_event| is signalled once the mock is ready
 /// to serve requests.
-// TODO(https://fxbug.dev/105308): |started_event| is added as part of a synchronization mechanism to
+// TODO(https://fxbug.dev/42056523): |started_event| is added as part of a synchronization mechanism to
 // work around cases when a component is destroyed before starting, even though there is a
 // request. Remove when no longer needed.
 pub(crate) async fn serve_debug_data_publisher(
@@ -261,7 +261,7 @@ mod test {
     /// |debug_vmo_recevied_sender| is a synchronization hack that sends one message for
     /// each vmo received. It is a workaround for the
     /// Started/Destroyed/CapabilityRequested events being delivered out of order.
-    /// See https://fxbug.dev/76579.
+    /// See https://fxbug.dev/42156498.
     async fn run_test_processor(
         mut stream: ftest_debug::DebugDataProcessorRequestStream,
         mut debug_vmo_recevied_sender: mpsc::Sender<()>,

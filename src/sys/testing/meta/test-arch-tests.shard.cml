@@ -49,7 +49,7 @@
             // update https://fuchsia.dev/fuchsia-src/concepts/testing/v2/test_runner_framework#legacy_non-hermetic_tests
             // when this list is updated.
             protocol: [
-                // TODO(https://fxbug.dev/86464): Remove this once we have facet API.
+                // TODO(https://fxbug.dev/42167477): Remove this once we have facet API.
                 "fuchsia.component.resolution.Resolver",
             ],
             from: "parent",

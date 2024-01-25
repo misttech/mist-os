@@ -208,7 +208,7 @@ impl Mock {
         readable: &[Hash],
         missing: &[Hash],
     ) {
-        // TODO(https://fxbug.dev/77717) re-evaluate filter_to_missing_blobs heuristic.
+        // TODO(https://fxbug.dev/42157763) re-evaluate filter_to_missing_blobs heuristic.
         if readable.len() + missing.len() > 20 {
             // heuristic path, handle the readdir, and trigger the fast path indicating
             // none of the missing blobs may be present by excluding them from the readdir.

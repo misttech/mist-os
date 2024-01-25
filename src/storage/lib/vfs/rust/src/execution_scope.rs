@@ -153,7 +153,7 @@ impl ExecutionScope {
         // correctly spawn a task in its drop function.
         self.executor.inner.lock().unwrap().active_count += 1;
 
-        // TODO(https://fxbug.dev/137463): Make fasync implement a single API that can handle
+        // TODO(https://fxbug.dev/42182949): Make fasync implement a single API that can handle
         // both of these cases.
         #[cfg(target_os = "fuchsia")]
         fuchsia_async::EHandle::local().spawn_detached(TaskRunner {

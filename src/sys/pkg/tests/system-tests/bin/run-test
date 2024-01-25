@@ -68,7 +68,7 @@ while [ $# -gt 0 ]; do
       DEVICE_NAME="$2"
       shift
       ;;
-    # FIXME(https://fxbug.dev/71146) drop support for --old-device-name once we
+    # FIXME(https://fxbug.dev/42150466) drop support for --old-device-name once we
     # no longer need to test with builds older than 2021-02-22.
     --old-device-name)
       if [[ $# -lt 2 ]]; then

@@ -17,7 +17,7 @@ pub enum Outcome {
     /// Suite was stopped prematurely due to cancellation by the user.
     Cancelled,
     /// Suite did not report completion.
-    // TODO(https://fxbug.dev/90037) - this outcome indicates an internal error as test manager isn't
+    // TODO(https://fxbug.dev/42171445) - this outcome indicates an internal error as test manager isn't
     // sending expected events. We should return an error instead.
     DidNotFinish,
     Error {

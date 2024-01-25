@@ -93,7 +93,7 @@ where
             *last_error_type = Some(error_type);
             let new_status = match error_type {
                 HttpsDateErrorType::InvalidHostname | HttpsDateErrorType::SchemeNotHttps => {
-                    // TODO(https://fxbug.dev/59771) - decide how to surface irrecoverable
+                    // TODO(https://fxbug.dev/42137876) - decide how to surface irrecoverable
                     // errors to clients
                     error!(
                         "Got an unexpected error {:?}, which indicates a bad \
@@ -234,7 +234,7 @@ where
     }
 
     async fn next_possible_sample_time(&self) -> zx::Time {
-        // TODO(https://fxbug.dev/113722): Implement rate limiting if required.
+        // TODO(https://fxbug.dev/42065019): Implement rate limiting if required.
         zx::Time::get_monotonic()
     }
 }

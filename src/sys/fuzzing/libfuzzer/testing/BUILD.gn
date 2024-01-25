@@ -23,7 +23,7 @@ config("libfuzzer") {
   runtime_json = read_file("$clang_lib_dir/runtime.json", "json")
   libfuzzer = ""
   foreach(variant, runtime_json) {
-    # TODO(https://fxbug.dev/84352): This is a workaround until "-fsanitize=fuzzer" is added to
+    # TODO(https://fxbug.dev/42165131): This is a workaround until "-fsanitize=fuzzer" is added to
     # runtime.json. It assumes libclang_rt.asan.so and libclang_rt.fuzzer.a are co-located.
     if (libfuzzer == "" && variant["cflags"] == [ "-fsanitize=address" ]) {
       targets = []

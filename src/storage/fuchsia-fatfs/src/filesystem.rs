@@ -201,7 +201,7 @@ mod tests {
     const TEST_DISK_SIZE: u64 = 2048 << 10; // 2048K
 
     #[fuchsia::test]
-    #[ignore] // TODO(https://fxbug.dev/56138): Clean up tasks to prevent panic on drop in FatfsFileRef
+    #[ignore] // TODO(https://fxbug.dev/42133844): Clean up tasks to prevent panic on drop in FatfsFileRef
     async fn test_automatic_flush() {
         let disk = TestFatDisk::empty_disk(TEST_DISK_SIZE);
         let structure = TestDiskContents::dir().add_child("test", "Hello".into());

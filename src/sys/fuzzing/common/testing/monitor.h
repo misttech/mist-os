@@ -38,7 +38,7 @@ class FakeMonitor final : public Monitor {
   fidl::InterfaceHandle<Monitor> NewBinding();
   void Update(UpdateReason reason, Status status, UpdateCallback callback) override;
 
-  // TODO(https://fxbug.dev/92490): There needs to be a way to wait on an update until the |Controller| is
+  // TODO(https://fxbug.dev/42174170): There needs to be a way to wait on an update until the |Controller| is
   // fully updated to use the same executor as the test when testing.
   Promise<> AwaitUpdate();
 

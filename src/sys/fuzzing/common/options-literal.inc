@@ -13,7 +13,7 @@
 #endif
 
 // Keep these in sync with the documentation in the FIDL file.
-// TODO(https://fxbug.dev/84367): Some customers have also requested a "min_input_size" option.
+// TODO(https://fxbug.dev/42165147): Some customers have also requested a "min_input_size" option.
 //                   (type,       snake_case_name,    CamelCaseName,    default-value);
 FUCHSIA_FUZZER_OPTION(uint32_t,   runs,               Runs,             0)
 FUCHSIA_FUZZER_OPTION(int64_t,    max_total_time,     MaxTotalTime,     zx::sec(0).get())

@@ -105,7 +105,7 @@ Header Header::FromGrowableSliceCount(size_t usable_partitions, size_t initial_u
   // Slice size must be a multiple of the block size.
   ZX_ASSERT(slice_size % kBlockSize == 0);
 
-  // TODO(https://fxbug.dev/40192): Allow the partition table to vary.
+  // TODO(https://fxbug.dev/42116137): Allow the partition table to vary.
   ZX_ASSERT(usable_partitions == kMaxUsablePartitions);
   Header result{
       .magic = kMagic,
@@ -201,7 +201,7 @@ bool Header::IsValid(uint64_t disk_size, uint64_t disk_block_size, std::string& 
 }
 
 bool Header::HasValidTableSizes(std::string& out_err) const {
-  // TODO(https://fxbug.dev/40192) Allow the partition table to be different lengths (aligned to blocks):
+  // TODO(https://fxbug.dev/42116137) Allow the partition table to be different lengths (aligned to blocks):
   //   size_t kMinPartitionTableSize = kBlockSize;
   //   if (sb.vpartition_table_size < kMinPartitionTableSize ||
   //       sb.vpartition_table_size > kMaxPartitionTableByteSize ||

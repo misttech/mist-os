@@ -6,7 +6,7 @@
         // The primary time source URL represents a component to be installed to receive time
         // updates. There is no maximum URL length defined by RFC 3986, but this length should
         // be long enough to accommodate most non-data: URLs.
-        // See https://fxbug.dev/53565 for additional context on this value.
+        // See https://fxbug.dev/42130991 for additional context on this value.
         primary_time_source_url: {
             type: "string",
             max_size: 4096,

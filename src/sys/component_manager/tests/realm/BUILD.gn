@@ -61,7 +61,7 @@ fuchsia_test_package("realm_integration_tests") {
     ":no_program",
     "//src/sys/component_manager/testing/echo_server",
 
-    # https://fxbug.dev/101490: Dep included for affected tests presubmit
+    # https://fxbug.dev/42052321: Dep included for affected tests presubmit
     "//src/sys/component_manager:component-manager-realm-builder-cmp",
   ]
 }

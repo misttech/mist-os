@@ -75,7 +75,7 @@ async fn open_remote_file_test() {
     .await;
 }
 
-/// Ensure specifying POSIX_* flags cannot cause rights escalation (https://fxbug.dev/40862).
+/// Ensure specifying POSIX_* flags cannot cause rights escalation (https://fxbug.dev/42116881).
 /// The test sets up the following hierarchy of nodes:
 ///
 /// --------------------- RW   --------------------------

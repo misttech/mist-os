@@ -12,7 +12,7 @@
     },
     children: [
         {
-            // TODO(https://fxbug.dev/33880): Don't hardcode the URL here. This
+            // TODO(https://fxbug.dev/42109125): Don't hardcode the URL here. This
             // needs to work for all the different filesystem test harnesses.
             name: "fs_test",
             url: "fuchsia-pkg://fuchsia.com/fxfs-conformance-test#meta/fxfs-harness.cm",

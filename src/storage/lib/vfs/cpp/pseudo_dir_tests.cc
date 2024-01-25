@@ -118,7 +118,7 @@ TEST(PseudoDir, ApiTest) {
     dc.ExpectEnd();
   }
 
-  // FIXME(https://fxbug.dev/31129): Can't unittest watch/notify (hard to isolate right now).
+  // FIXME(https://fxbug.dev/42106069): Can't unittest watch/notify (hard to isolate right now).
 }
 
 TEST(PseudoDir, RejectOpenFlagNotDirectory) {

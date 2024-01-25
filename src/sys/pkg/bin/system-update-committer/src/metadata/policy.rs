@@ -312,7 +312,7 @@ mod tests {
 
         let config = ComponentConfig::builder().blobfs(Mode::Ignore).build();
 
-        // TODO(https://fxbug.dev/76636): When there are multiple VerifySource
+        // TODO(https://fxbug.dev/42156562): When there are multiple VerifySource
         // types, test heterogeneous VerifyErrors lists.
         assert_matches!(
             PolicyEngine::apply_config(Err(VerifyErrors::VerifyErrors(vec![ve1, ve2])), &config),

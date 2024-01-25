@@ -717,7 +717,7 @@ void RunnerTest::Stop() {
                     return fpromise::ok();
                   })
                   .or_else([](zx_status_t& status) -> ZxResult<> {
-                    // TODO(https://fxbug.dev/109100): fdio sometimes truncates the fuzzer output when
+                    // TODO(https://fxbug.dev/42060461): fdio sometimes truncates the fuzzer output when
                     // stopping, and this leads to errors being returned. For the sake of this test,
                     // ignore those errors.
                     if (status != ZX_ERR_IO) {

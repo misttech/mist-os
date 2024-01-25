@@ -321,7 +321,7 @@ impl Drop for NamespaceBinding {
     }
 }
 
-// TODO(https://fxbug.dev/93066): Soft migration; remove this after completion
+// TODO(https://fxbug.dev/42174810): Soft migration; remove this after completion
 pub type ServingFilesystem = ServingSingleVolumeFilesystem;
 
 /// Asynchronously manages a serving filesystem. Created from [`Filesystem::serve()`].
@@ -1126,7 +1126,7 @@ mod tests {
         std::fs::File::open(test_path).expect_err("test file was not unbound");
     }
 
-    // TODO(https://fxbug.dev/93066): Re-enable this test; it depends on Fxfs failing repeated calls to
+    // TODO(https://fxbug.dev/42174810): Re-enable this test; it depends on Fxfs failing repeated calls to
     // Start.
     #[ignore]
     #[fuchsia::test]
@@ -1180,7 +1180,7 @@ mod tests {
             .expect("Create volume failed");
         vol.query().await.expect("Query volume failed");
         fs.close_volume("foo");
-        // TODO(https://fxbug.dev/106555) Closing the volume is not synchronous. Immediately reopening the
+        // TODO(https://fxbug.dev/42057878) Closing the volume is not synchronous. Immediately reopening the
         // volume will race with the asynchronous close and sometimes fail because the volume is
         // still mounted.
         // fs.open_volume("foo", MountOptions{crypt: None, as_blob: false}).await

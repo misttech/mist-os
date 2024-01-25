@@ -382,7 +382,7 @@ pub enum AllocatorValue {
     None,
     // Used when we know there are no possible allocations below us in the stack.
     // This is currently all the time. We used to have a related Delta type but
-    // it has been removed due to correctness issues (https://fxbug.dev/97223).
+    // it has been removed due to correctness issues (https://fxbug.dev/42179428).
     Abs { count: u64, owner_object_id: u64 },
 }
 
@@ -690,7 +690,7 @@ impl Allocator {
             object_id,
             max_extent_size_bytes,
             tree: LSMTree::new(merge, Box::new(NullCache {})),
-            temporary_allocations: SkipListLayer::new(1024), // TODO(https://fxbug.dev/95981): magic numbers
+            temporary_allocations: SkipListLayer::new(1024), // TODO(https://fxbug.dev/42178047): magic numbers
             inner: Mutex::new(Inner {
                 info: AllocatorInfo::default(),
                 opened: false,
@@ -946,7 +946,7 @@ impl Allocator {
     }
 
     fn needs_sync(&self) -> bool {
-        // TODO(https://fxbug.dev/95982): This will only trigger if *all* free space is taken up with
+        // TODO(https://fxbug.dev/42178048): This will only trigger if *all* free space is taken up with
         // committed deallocated bytes, but we might want to trigger a sync if we're low and there
         // happens to be a lot of deallocated bytes as that might mean we can fully satisfy
         // allocation requests.
@@ -985,7 +985,7 @@ impl Allocator {
                     root.record_uint("max_extent_size_bytes", this.max_extent_size_bytes);
                     root.record_uint("bytes_total", this.device_size);
                     let (allocated, reserved, used, unavailable) = {
-                        // TODO(https://fxbug.dev/118342): Push-back or rate-limit to prevent DoS.
+                        // TODO(https://fxbug.dev/42069513): Push-back or rate-limit to prevent DoS.
                         let inner = this.inner.lock().unwrap();
                         (
                             inner.allocated_bytes().try_into().unwrap_or(0u64),
@@ -999,7 +999,7 @@ impl Allocator {
                     root.record_uint("bytes_used", used);
                     root.record_uint("bytes_unavailable", unavailable);
 
-                    // TODO(https://fxbug.dev/117057): Post-compute rather than manually computing
+                    // TODO(https://fxbug.dev/42068224): Post-compute rather than manually computing
                     // metrics.
                     if let Some(x) = round_div(100 * allocated, this.device_size) {
                         root.record_uint("bytes_allocated_percent", x);

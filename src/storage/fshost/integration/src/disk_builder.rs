@@ -460,7 +460,7 @@ impl DiskBuilder {
             .await
             .expect("create_fvm_volume failed");
 
-            // TODO(https://fxbug.dev/121274): Remove hardcoded path.
+            // TODO(https://fxbug.dev/42072287): Remove hardcoded path.
             let data_block_path = format!("/fvm/{}-p-2/block", data_label);
             let data_dir = recursive_wait_and_open_directory(&device_dir, &data_block_path)
                 .await
@@ -544,7 +544,7 @@ impl DiskBuilder {
         .unwrap();
 
         // Path to block device or partition which will back the FVM. Assumed to be empty/zeroed.
-        // TODO(https://fxbug.dev/121274): Remove hardcoded path.
+        // TODO(https://fxbug.dev/42072287): Remove hardcoded path.
         let block_path = "/part-000/block";
         let device_dir = if self.gpt {
             bind_gpt_driver(&ramdisk).await;

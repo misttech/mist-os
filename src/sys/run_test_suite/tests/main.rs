@@ -393,7 +393,7 @@ fuchsia-pkg://fuchsia.com/run_test_suite_integration_tests#meta/echo_test_client
 
 #[fixture::fixture(run_with_reporter)]
 #[fuchsia::test]
-// TODO(https://fxbug.dev/106819): we should add a test case similar to this one where run_test_suite does
+// TODO(https://fxbug.dev/42058135): we should add a test case similar to this one where run_test_suite does
 // not use experimental_parallel_execution. We currently don't have one because
 // it is possible for a test run to persist because its controller terminated
 // early, which may cause the test to fail depending on the implementation.

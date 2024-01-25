@@ -256,7 +256,7 @@ fidl::UnownedClientEnd<fuchsia_device::Controller> BlockPartitionClient::control
 }
 
 fidl::ClientEnd<block::Block> BlockPartitionClient::GetChannel() {
-  // TODO(https://fxbug.dev/112484): this relies on multiplexing.
+  // TODO(https://fxbug.dev/42063787): this relies on multiplexing.
   return component::MaybeClone(partition_.client_end(), component::AssumeProtocolComposesNode);
 }
 

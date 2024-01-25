@@ -32,7 +32,7 @@ void advisory_lock(zx_koid_t owner, fbl::RefPtr<fs::Vnode> vnode, bool range_ok,
       break;
   }
 
-  // TODO(https://fxbug.dev/71330) implement range locking
+  // TODO(https://fxbug.dev/42150671) implement range locking
   // for F_SETLK, F_SETLKW, and F_GETLK fcntl operations
   if (request.has_range()) {
     callback(ZX_ERR_NOT_SUPPORTED);

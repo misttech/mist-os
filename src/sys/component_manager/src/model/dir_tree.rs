@@ -71,7 +71,7 @@ impl DirTree {
         // If there are multiple exposes, choosing the first expose for `cap`. `cap` is only used
         // for debug info.
         //
-        // TODO(https://fxbug.dev/4776): This could lead to incomplete debug output because the source name
+        // TODO(https://fxbug.dev/42124541): This could lead to incomplete debug output because the source name
         // is what's printed, so if the exposes have different source names only one of them will
         // appear in the output. However, in practice routing is unlikely to fail for an aggregate
         // because the algorithm typically terminates once an aggregate is found. Find a more robust

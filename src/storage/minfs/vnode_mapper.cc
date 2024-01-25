@@ -112,7 +112,7 @@ BaseBufferView::Flusher GetIndirectFlusher(VnodeMinfs* vnode, LazyBuffer* file,
         });
   };
 #else
-  // TODO(https://fxbug.dev/47947): For the time being, host side code must immediately write data to the
+  // TODO(https://fxbug.dev/42124749): For the time being, host side code must immediately write data to the
   // device, but we should be able to make this code the same as above if storage::BufferedOperation
   // changes a bit (so that a pointer to the buffer is kept rather than a pointer to the address in
   // memory).

@@ -256,7 +256,7 @@ fit::result<UseBlockDeviceError<Protocol>> UseBlockDevice(
       ERROR("Unable to open block device controller: %s (%s)\n", controller_path.c_str(),
             controller.status_string());
     }
-    // TODO(https://fxbug.dev/97955) Consider handling the error instead of ignoring it.
+    // TODO(https://fxbug.dev/42180237) Consider handling the error instead of ignoring it.
     (void)paver_client->UseBlockDevice(
         std::move(block_device.value()), std::move(controller.value()),
         // Note: manually converting any DataSink protocol into a DynamicDataSink.
@@ -295,7 +295,7 @@ zx_status_t RealMain(Flags flags) {
         return data_sink.status_value();
       }
       auto [data_sink_local, data_sink_remote] = std::move(*data_sink);
-      // TODO(https://fxbug.dev/97955) Consider handling the error instead of ignoring it.
+      // TODO(https://fxbug.dev/42180237) Consider handling the error instead of ignoring it.
       (void)paver_client->FindDataSink(std::move(data_sink_remote));
 
       auto streamer_endpoints = fidl::CreateEndpoints<fuchsia_paver::PayloadStream>();
@@ -409,7 +409,7 @@ zx_status_t RealMain(Flags flags) {
   }
   auto [data_sink_local, data_sink_remote] = std::move(*data_sink_endpoints);
 
-  // TODO(https://fxbug.dev/97955) Consider handling the error instead of ignoring it.
+  // TODO(https://fxbug.dev/42180237) Consider handling the error instead of ignoring it.
   (void)paver_client->FindDataSink(std::move(data_sink_remote));
   fidl::WireSyncClient data_sink{std::move(data_sink_local)};
 

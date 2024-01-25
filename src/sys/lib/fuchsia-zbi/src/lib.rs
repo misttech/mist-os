@@ -193,7 +193,7 @@ impl ZbiParser {
     ) -> Result<ZbiResult, ZbiParserError> {
         // StorageRamdisk item users currently expect the header to be contained in the item
         // result.
-        // TODO(https://fxbug.dev/93235): Remove special cases for StorageRamdisk.
+        // TODO(https://fxbug.dev/42174998): Remove special cases for StorageRamdisk.
         let (length, offset) = if zbi_type == ZbiType::StorageRamdisk {
             (ZBI_HEADER_SIZE + zbi_item.item_length as usize, zbi_item.header_offset)
         } else {
@@ -287,7 +287,7 @@ impl ZbiParser {
             return Err(ZbiParserError::ItemNotFound { zbi_type });
         }
 
-        // TODO(https://fxbug.dev/34597): The ZBI spec doesn't require (type, extra) to be a unique key, so
+        // TODO(https://fxbug.dev/42109921): The ZBI spec doesn't require (type, extra) to be a unique key, so
         // follow the existing convention of giving the last occurrence priority.
         for item in self.items[&zbi_type].iter().rev() {
             if item.extra == extra && item.raw_type == zbi_type_raw {
@@ -446,7 +446,7 @@ impl ZbiParser {
 
             if self.should_store_item(zbi_type) {
                 let entry = self.items.entry(zbi_type).or_insert(Vec::new());
-                // TODO(https://fxbug.dev/93235): Remove special case for StorageRamdisk.
+                // TODO(https://fxbug.dev/42174998): Remove special case for StorageRamdisk.
                 entry.push(ZbiItem {
                     header_offset: current_offset,
                     item_offset: current_offset + header_offset,
@@ -756,7 +756,7 @@ mod tests {
     #[fuchsia::test]
     async fn ramdisk_item_contains_header() {
         // This is a special case which we really should remove. The fshost expects storage
-        // ramdisk items to contain the header, and zero for an extra. See https://fxbug.dev/93235 for details.
+        // ramdisk items to contain the header, and zero for an extra. See https://fxbug.dev/42174998 for details.
         let size = 0x40;
         let mut ramdisk_header = ZbiBuilder::simple_header(ZbiType::StorageRamdisk, size);
         ramdisk_header.extra = U32::<LittleEndian>::new(0xABCD);

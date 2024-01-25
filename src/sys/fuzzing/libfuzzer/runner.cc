@@ -438,7 +438,7 @@ Status LibFuzzerRunner::CollectStatus() {
 }
 
 ZxPromise<> LibFuzzerRunner::Stop() {
-  // TODO(https://fxbug.dev/87155): If libFuzzer-for-Fuchsia watches for something sent to stdin in order to
+  // TODO(https://fxbug.dev/42168245): If libFuzzer-for-Fuchsia watches for something sent to stdin in order to
   // call its |Fuzzer::StaticInterruptCallback|, we could ask libFuzzer to shut itself down. This
   // would guarantee we get all of its output.
   return process_.Kill().and_then(workflow_.Stop());
@@ -758,7 +758,7 @@ ZxPromise<> LibFuzzerRunner::ParseStderr() {
               FX_LOGS(ERROR) << "failed to read libFuzzer stderr: " << zx_status_get_string(status);
               return fpromise::error(status);
             }
-            // TODO(https://fxbug.dev/109100): Rarely, the process output will be truncated. This causes
+            // TODO(https://fxbug.dev/42060461): Rarely, the process output will be truncated. This causes
             // problems for tooling like undercoat. This is the only location in the LibFuzzerRunner
             // that returns `ZX_ERR_IO_INVALID`.
             if (pid_ < 0 && !process_.is_killed()) {

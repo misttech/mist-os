@@ -77,9 +77,9 @@ pub use types::{
     LATEST_VERSION, PER_BLOCK_SEEK_VERSION,
 };
 
-// TODO(https://fxbug.dev/122125): This should be versioned.  Whether we reused serialized_types is up for
+// TODO(https://fxbug.dev/42073113): This should be versioned.  Whether we reused serialized_types is up for
 // debate (since this version might be better off as independent from the journal version).
-// TODO(https://fxbug.dev/122125): Is this the best home for this?
+// TODO(https://fxbug.dev/42073113): Is this the best home for this?
 #[derive(Serialize, Deserialize, Debug)]
 pub struct BlobMetadata {
     pub hashes: Vec<[u8; 32]>,

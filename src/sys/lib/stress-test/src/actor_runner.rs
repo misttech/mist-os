@@ -43,7 +43,7 @@ impl ActorRunner {
     /// Run the actor in a new task indefinitely for the given generation.
     /// The runner will stop if the actor requests an environment reset.
     /// The amount of parallelism is determined by the caller's executor.
-    // TODO(https://fxbug.dev/78793): Find a different way to set parallelism.
+    // TODO(https://fxbug.dev/42158958): Find a different way to set parallelism.
     pub fn run(
         self,
         counter_tx: CounterTx,

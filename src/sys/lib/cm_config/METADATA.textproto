@@ -9,7 +9,7 @@ last_reviewed_date: {
 }
 
 trackers: {
-  # TODO(https://fxbug.dev/132769): Migrate Flake fetcher to Buganizer.
+  # TODO(https://fxbug.dev/42082841): Migrate Flake fetcher to Buganizer.
   # This component is for Flake fetcher use only.
   issue_tracker: {
     component_id: 1404357

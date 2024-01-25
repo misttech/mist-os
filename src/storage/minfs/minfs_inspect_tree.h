@@ -90,7 +90,7 @@ class MinfsInspectTree final {
   //   4. When a device does run out of space, does it recover after a certain period of time?
   //      This may allow us to identify patterns over time, e.g. if something temporarily uses a
   //      large amount of space, we might see periodic spikes which then recover for long periods.
-  //   5. Has the mitigation added in https://fxbug.dev/88364 been successful at preventing at least some
+  //   5. Has the mitigation added in https://fxbug.dev/42169588 been successful at preventing at least some
   //      out of space issues?
   //
   // These properties may be simplified once we know the answers to #1 and #2 and have more data.

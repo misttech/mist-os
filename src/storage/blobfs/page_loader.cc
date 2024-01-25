@@ -80,7 +80,7 @@ ReadRange GetBlockAlignedExtendedRange(const LoaderInfo& info, uint64_t offset, 
   //
   // Read in at least 32KB at a time. This gives us the best performance numbers w.r.t. memory
   // savings and observed latencies. Detailed results from experiments to tune this can be found in
-  // https://fxbug.dev/48519.
+  // https://fxbug.dev/42125385.
   constexpr uint64_t kReadAheadClusterSize{UINT64_C(32) * (1 << 10)};
 
   size_t read_ahead_offset = offset;

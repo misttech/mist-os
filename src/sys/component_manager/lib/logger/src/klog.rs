@@ -56,7 +56,7 @@ impl<S: Subscriber> Layer<S> for KernelLogger {
             let msg_prefix = format!("[component_manager] {}: ", level);
 
             while msg.len() > 0 {
-                // TODO(https://fxbug.dev/32998): zx_debuglog_write also accepts options and the possible options include
+                // TODO(https://fxbug.dev/42108144): zx_debuglog_write also accepts options and the possible options include
                 // log levels, but they seem to be mostly unused and not displayed today, so we don't pass
                 // along log level yet.
                 let msg_to_write = format!("{}{}", msg_prefix, msg);
@@ -214,7 +214,7 @@ mod tests {
 
     #[test]
     #[should_panic(expected = "panic_test")]
-    // TODO(https://fxbug.dev/88496): LeakSanitizer flags leaks caused by panic.
+    // TODO(https://fxbug.dev/42169733): LeakSanitizer flags leaks caused by panic.
     #[cfg_attr(feature = "variant_asan", ignore)]
     #[cfg_attr(feature = "variant_hwasan", ignore)]
     fn log_panic_test() {

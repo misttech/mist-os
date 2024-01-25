@@ -187,7 +187,7 @@ impl Fuzzer {
     ///
     pub async fn stop(&mut self, max_wait_time: Option<zx::Duration>) -> Result<(), zx::Status> {
         if let (Some(task), Some(max_wait_time)) = (self.task.take(), max_wait_time) {
-            // TODO(https://fxbug.dev/112353): Extend the test fixtures and add tests for the timeout case.
+            // TODO(https://fxbug.dev/42063642): Extend the test fixtures and add tests for the timeout case.
             let stop_fut = task.fuse();
             let timer_fut = fasync::Timer::new(max_wait_time).fuse();
             pin_mut!(stop_fut, timer_fut);

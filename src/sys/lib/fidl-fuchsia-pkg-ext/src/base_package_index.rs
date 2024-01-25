@@ -44,7 +44,7 @@ impl BasePackageIndex {
     /// returns None.
     pub fn is_unpinned_base_package(&self, pkg_url: &AbsolutePackageUrl) -> Option<BlobId> {
         // Always send Merkle-pinned requests through the resolver.
-        // TODO(https://fxbug.dev/62389) consider returning the pinned hash if it matches the base hash.
+        // TODO(https://fxbug.dev/42140778) consider returning the pinned hash if it matches the base hash.
         let pkg_url = match pkg_url {
             AbsolutePackageUrl::Unpinned(unpinned) => unpinned,
             AbsolutePackageUrl::Pinned(_) => return None,

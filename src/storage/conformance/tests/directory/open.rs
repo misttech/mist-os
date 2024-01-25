@@ -1119,4 +1119,4 @@ async fn open2_open_existing_directory() {
     assert_matches!(proxy2.get_connection_info().await, Ok(_));
 }
 
-// TODO(https://fxbug.dev/77623): Add open2 connect tests.
+// TODO(https://fxbug.dev/42157659): Add open2 connect tests.

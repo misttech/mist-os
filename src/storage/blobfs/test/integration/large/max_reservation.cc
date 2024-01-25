@@ -17,7 +17,7 @@ namespace {
 TEST_F(BlobfsTest, MaxReservation) {
   // Create and destroy kBlobfsDefaultInodeCount number of blobs.
   // This verifies that creating blobs does not lead to stray node reservations.
-  // Refer to https://fxbug.dev/54001 for the bug that lead to this test.
+  // Refer to https://fxbug.dev/42131476 for the bug that lead to this test.
   size_t count = 0;
   for (uint64_t i = 0; i < kBlobfsDefaultInodeCount; i++) {
     std::unique_ptr<BlobInfo> info = GenerateRandomBlob(fs().mount_path(), 64);

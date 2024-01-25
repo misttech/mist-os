@@ -166,7 +166,7 @@ impl FxFile {
         self.handle.uncached_handle().is_allocated(start_offset).await.map_err(map_to_status)
     }
 
-    // TODO(https://fxbug.dev/89873): might be better to have a cached/uncached mode for file and call
+    // TODO(https://fxbug.dev/42171261): might be better to have a cached/uncached mode for file and call
     // this when in uncached mode
     pub async fn write_at_uncached(&self, offset: u64, content: &[u8]) -> Result<u64, Status> {
         let mut buf = self.handle.uncached_handle().allocate_buffer(content.len()).await;
@@ -180,7 +180,7 @@ impl FxFile {
         Ok(content.len() as u64)
     }
 
-    // TODO(https://fxbug.dev/89873): might be better to have a cached/uncached mode for file and call
+    // TODO(https://fxbug.dev/42171261): might be better to have a cached/uncached mode for file and call
     // this when in uncached mode
     pub async fn read_at_uncached(&self, offset: u64, buffer: &mut [u8]) -> Result<u64, Status> {
         let mut buf = self.handle.uncached_handle().allocate_buffer(buffer.len()).await;
@@ -529,7 +529,7 @@ impl File for FxFile {
     async fn sync(&self, mode: SyncMode) -> Result<(), Status> {
         self.handle.flush().await.map_err(map_to_status)?;
 
-        // TODO(https://fxbug.dev/96085): at the moment, this doesn't send a flush to the device, which
+        // TODO(https://fxbug.dev/42178163): at the moment, this doesn't send a flush to the device, which
         // doesn't match minfs.
         if mode == SyncMode::Normal {
             self.handle

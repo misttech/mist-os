@@ -118,7 +118,7 @@ group("tests") {
 
   if (current_cpu == "riscv64") {
     deps -= [
-      # TODO(https://fxbug.dev/132943): Remove when `test_runtime_dir_entries` passes on
+      # TODO(https://fxbug.dev/42082963): Remove when `test_runtime_dir_entries` passes on
       # RISC-V.
       ":elf_runner_tests",
     ]

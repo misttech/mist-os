@@ -128,7 +128,7 @@ pub fn get_program_strvec<'a>(
 }
 
 /// Retrieves program.binary from ComponentStartInfo and makes sure that path is relative.
-// TODO(https://fxbug.dev/129604): This method should accept a program dict instead of start_info
+// TODO(https://fxbug.dev/42079981): This method should accept a program dict instead of start_info
 pub fn get_program_binary(
     start_info: &fcrunner::ComponentStartInfo,
 ) -> Result<String, StartInfoProgramError> {
@@ -159,7 +159,7 @@ pub fn get_program_binary_from_dict(
 }
 
 /// Retrieves program.args from ComponentStartInfo and validates them.
-// TODO(https://fxbug.dev/129604): This method should accept a program dict instead of start_info
+// TODO(https://fxbug.dev/42079981): This method should accept a program dict instead of start_info
 pub fn get_program_args(
     start_info: &fcrunner::ComponentStartInfo,
 ) -> Result<Vec<String>, StartInfoProgramError> {
@@ -185,7 +185,7 @@ pub fn get_program_args_from_dict(
 pub fn get_environ(dict: &fdata::Dictionary) -> Result<Option<Vec<String>>, StartInfoProgramError> {
     // Temporarily allow unreachable patterns while fuchsia.data.DictionaryValue
     // is migrated from `strict` to `flexible`.
-    // TODO(https://fxbug.dev/92247): Remove this.
+    // TODO(https://fxbug.dev/42173900): Remove this.
     #[allow(unreachable_patterns)]
     match get_value(dict, ENVIRON_KEY) {
         Some(fdata::DictionaryValue::StrVec(values)) => {

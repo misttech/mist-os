@@ -141,7 +141,7 @@ zx::result<> Watchdog::Untrack(OperationTrackerId id) {
 
 void Watchdog::Run() {
   while (true) {
-    // TODO(https://fxbug.dev/58179)
+    // TODO(https://fxbug.dev/42136107)
     // Inspect debug printer only accepts a FILE stream for output, but we don't
     // want to hold the lock while actually flushing out to log. This buffer is
     // used as a temporary destination to queue lines and thread information so it

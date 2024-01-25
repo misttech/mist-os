@@ -1734,7 +1734,7 @@ TEST_F(PaverServiceSkipBlockTest, WriteBootloaderNotAligned) {
 }
 
 TEST_F(PaverServiceSkipBlockTest, WriteVolumes) {
-  // TODO(https://fxbug.dev/33793): Figure out a way to test this.
+  // TODO(https://fxbug.dev/42109028): Figure out a way to test this.
 }
 
 void PaverServiceSkipBlockTest::TestSysconfigWriteBufferedClient(uint32_t offset_in_pages,

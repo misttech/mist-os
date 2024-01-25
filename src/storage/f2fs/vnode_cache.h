@@ -64,7 +64,7 @@ class VnodeCache {
  private:
   // All vnode raw pointers including dirty vnodes are kept in vnode_table_, and invalid vnodes
   // (nlink_ = 0) are evicted in VnodeF2fs::Recycle() when they have no connection anymore.
-  // TODO(https://fxbug.dev/119885): Eviction policy needs to consider memory pressure.
+  // TODO(https://fxbug.dev/42070947): Eviction policy needs to consider memory pressure.
   using VnodeTableTraits = fbl::DefaultKeyedObjectTraits<ino_t, VnodeF2fs>;
   using VnodeTable = fbl::WAVLTree<ino_t, VnodeF2fs*, VnodeTableTraits>;
 

@@ -229,7 +229,7 @@ async fn load_cache_packages_impl(
     // with *only* blobs that are readable, i.e. blobs for which the `USER_0` signal is set (which
     // is currently checked per-package per-blob by `blobfs.filter_to_missing_blobs()`). Would need
     // to confirm with the storage team that blobfs meets this requirement.
-    // TODO(https://fxbug.dev/90656): ensure non-fuchsia.com URLs are correctly handled in dynamic index.
+    // TODO(https://fxbug.dev/42172132): ensure non-fuchsia.com URLs are correctly handled in dynamic index.
     let memoized_packages = async_lock::RwLock::new(HashMap::new());
     let all_known = blobfs.list_known_blobs().await.ok();
     let all_known = all_known.as_ref();

@@ -103,7 +103,7 @@ async fn test_no_rtc_start_clock_from_time_source_alternate_signal() {
     let clock = new_nonshareable_clock();
     timekeeper_test(clock, None, |clock, push_source_controller, _, _| async move {
         let sample_monotonic = zx::Time::get_monotonic();
-        tracing::info!("[https://fxbug.dev/130140]: before push_source_controller.set_sample");
+        tracing::info!("[https://fxbug.dev/42080434]: before push_source_controller.set_sample");
         push_source_controller
             .set_sample(TimeSample {
                 utc: Some(VALID_TIME.into_nanos()),
@@ -131,7 +131,7 @@ async fn test_no_rtc_start_clock_from_time_source() {
         let before_update_ticks = clock.get_details().unwrap().last_value_update_ticks;
 
         let sample_monotonic = zx::Time::get_monotonic();
-        tracing::info!("[https://fxbug.dev/130140]: before push_source_controller.set_sample");
+        tracing::info!("[https://fxbug.dev/42080434]: before push_source_controller.set_sample");
         push_source_controller
             .set_sample(TimeSample {
                 utc: Some(VALID_TIME.into_nanos()),
@@ -141,16 +141,16 @@ async fn test_no_rtc_start_clock_from_time_source() {
             })
             .await;
 
-        tracing::info!("[https://fxbug.dev/130140]: before CLOCK_STARTED");
+        tracing::info!("[https://fxbug.dev/42080434]: before CLOCK_STARTED");
         fasync::OnSignals::new(&clock, zx::Signals::CLOCK_STARTED).await.unwrap();
-        tracing::info!("[https://fxbug.dev/130140]: before SIGNAL_UTC_CLOCK_SYNCHRONIZED");
+        tracing::info!("[https://fxbug.dev/42080434]: before SIGNAL_UTC_CLOCK_SYNCHRONIZED");
         fasync::OnSignals::new(
             &clock,
             zx::Signals::from_bits(fft::SIGNAL_UTC_CLOCK_SYNCHRONIZED).unwrap(),
         )
         .await
         .unwrap();
-        tracing::info!("[https://fxbug.dev/130140]: after SIGNAL_UTC_CLOCK_SYNCHRONIZED");
+        tracing::info!("[https://fxbug.dev/42080434]: after SIGNAL_UTC_CLOCK_SYNCHRONIZED");
         let after_update_ticks = clock.get_details().unwrap().last_value_update_ticks;
         assert!(after_update_ticks > before_update_ticks);
 
@@ -163,7 +163,7 @@ async fn test_no_rtc_start_clock_from_time_source() {
 
         let cobalt_event_stream =
             create_cobalt_event_stream(Arc::new(cobalt), LogMethod::LogMetricEvents);
-        tracing::info!("[https://fxbug.dev/130140]: before cobalt_event_stream.take");
+        tracing::info!("[https://fxbug.dev/42080434]: before cobalt_event_stream.take");
         let actual = cobalt_event_stream.take(6).collect::<Vec<_>>().await;
         assert!(
             actual.iter().any(|elem| *elem
@@ -216,7 +216,7 @@ async fn test_invalid_rtc_start_clock_from_time_source() {
             let mut cobalt_event_stream =
                 create_cobalt_event_stream(Arc::new(cobalt), LogMethod::LogMetricEvents);
             // Timekeeper should reject the RTC time.
-            tracing::info!("[https://fxbug.dev/130140]: before cobalt_event_stream.take");
+            tracing::info!("[https://fxbug.dev/42080434]: before cobalt_event_stream.take");
             assert_eq!(
                 cobalt_event_stream.by_ref().take(2).collect::<Vec<MetricEvent>>().await,
                 vec![
@@ -230,7 +230,9 @@ async fn test_invalid_rtc_start_clock_from_time_source() {
             );
 
             let sample_monotonic = zx::Time::get_monotonic();
-            tracing::info!("[https://fxbug.dev/130140]: before push_source_controller.set_sample");
+            tracing::info!(
+                "[https://fxbug.dev/42080434]: before push_source_controller.set_sample"
+            );
             push_source_controller
                 .set_sample(TimeSample {
                     utc: Some(VALID_TIME.into_nanos()),
@@ -241,7 +243,7 @@ async fn test_invalid_rtc_start_clock_from_time_source() {
                 .await;
 
             // Timekeeper should accept the time from the time source.
-            tracing::info!("[https://fxbug.dev/130140]: before CLOCK_STARTED");
+            tracing::info!("[https://fxbug.dev/42080434]: before CLOCK_STARTED");
             fasync::OnSignals::new(&clock, zx::Signals::CLOCK_STARTED).await.unwrap();
             fasync::OnSignals::new(
                 &clock,
@@ -304,7 +306,7 @@ async fn test_start_clock_from_rtc() {
                 create_cobalt_event_stream(Arc::new(cobalt), LogMethod::LogMetricEvents);
 
             // Clock should start from the time read off the RTC.
-            tracing::info!("[https://fxbug.dev/130140]: before CLOCK_STARTED");
+            tracing::info!("[https://fxbug.dev/42080434]: before CLOCK_STARTED");
             fasync::OnSignals::new(&clock, zx::Signals::CLOCK_STARTED).await.unwrap();
 
             // UTC time reported by the clock should be at least the time reported by the RTC, and no
@@ -314,7 +316,7 @@ async fn test_start_clock_from_rtc() {
             assert_geq!(reported_utc, *VALID_RTC_TIME);
             assert_leq!(reported_utc, *VALID_RTC_TIME + (monotonic_after - monotonic_before));
 
-            tracing::info!("[https://fxbug.dev/130140]: before cobalt_event_stream.take");
+            tracing::info!("[https://fxbug.dev/42080434]: before cobalt_event_stream.take");
             assert_eq!(
                 cobalt_event_stream.by_ref().take(3).collect::<Vec<MetricEvent>>().await,
                 vec![
@@ -333,7 +335,9 @@ async fn test_start_clock_from_rtc() {
             // Clock should be updated again when the push source reports another time.
             let clock_last_set_ticks = clock.get_details().unwrap().last_value_update_ticks;
             let sample_monotonic = zx::Time::get_monotonic();
-            tracing::info!("[https://fxbug.dev/130140]: before push_source_controller.set_sample");
+            tracing::info!(
+                "[https://fxbug.dev/42080434]: before push_source_controller.set_sample"
+            );
             push_source_controller
                 .set_sample(TimeSample {
                     utc: Some(VALID_TIME.into_nanos()),
@@ -342,12 +346,16 @@ async fn test_start_clock_from_rtc() {
                     ..Default::default()
                 })
                 .await;
-            tracing::info!("[https://fxbug.dev/130140]: after push_source_controller.set_sample stage 1");
+            tracing::info!(
+                "[https://fxbug.dev/42080434]: after push_source_controller.set_sample stage 1"
+            );
             poll_until!(|| {
                 clock.get_details().unwrap().last_value_update_ticks != clock_last_set_ticks
             })
             .await;
-            tracing::info!("[https://fxbug.dev/130140]: after push_source_controller.set_sample stage 2");
+            tracing::info!(
+                "[https://fxbug.dev/42080434]: after push_source_controller.set_sample stage 2"
+            );
             let clock_utc = clock.read().unwrap();
             let monotonic_after_read = zx::Time::get_monotonic();
             assert_geq!(clock_utc, *VALID_TIME);
@@ -437,7 +445,7 @@ async fn test_reject_before_backstop() {
         let cobalt_event_stream =
             create_cobalt_event_stream(Arc::new(cobalt), LogMethod::LogMetricEvents);
 
-        tracing::info!("[https://fxbug.dev/130140]: before push_source_controller.set_sample");
+        tracing::info!("[https://fxbug.dev/42080434]: before push_source_controller.set_sample");
         push_source_controller
             .set_sample(TimeSample {
                 utc: Some(BEFORE_BACKSTOP_TIME.into_nanos()),
@@ -448,7 +456,7 @@ async fn test_reject_before_backstop() {
             .await;
 
         // Wait for the sample rejected event to be sent to Cobalt.
-        tracing::info!("[https://fxbug.dev/130140]: before cobalt_event_stream.take");
+        tracing::info!("[https://fxbug.dev/42080434]: before cobalt_event_stream.take");
         cobalt_event_stream
             .take_while(|event| {
                 let is_reject_sample_event = event.metric_id
@@ -481,7 +489,7 @@ async fn test_slew_clock() {
         // Let the first sample be slightly in the past so later samples are not in the future.
         let sample_1_monotonic = zx::Time::get_monotonic() - BETWEEN_SAMPLES;
         let sample_1_utc = *VALID_TIME;
-        tracing::info!("[https://fxbug.dev/130140]: before push_source_controller.set_sample");
+        tracing::info!("[https://fxbug.dev/42080434]: before push_source_controller.set_sample");
         push_source_controller
             .set_sample(TimeSample {
                 utc: Some(sample_1_utc.into_nanos()),
@@ -493,9 +501,9 @@ async fn test_slew_clock() {
 
         // After the first sample, the clock is started, and running at the same rate as
         // the reference.
-        tracing::info!("[https://fxbug.dev/130140]: before CLOCK_STARTED");
+        tracing::info!("[https://fxbug.dev/42080434]: before CLOCK_STARTED");
         fasync::OnSignals::new(&clock, zx::Signals::CLOCK_STARTED).await.unwrap();
-        tracing::info!("[https://fxbug.dev/130140]: before SIGNAL_UTC_CLOCK_SYNCHRONIZED");
+        tracing::info!("[https://fxbug.dev/42080434]: before SIGNAL_UTC_CLOCK_SYNCHRONIZED");
         fasync::OnSignals::new(
             &clock,
             zx::Signals::from_bits(fft::SIGNAL_UTC_CLOCK_SYNCHRONIZED).unwrap(),
@@ -509,7 +517,7 @@ async fn test_slew_clock() {
         // Push a second sample that indicates UTC running slightly behind monotonic.
         let sample_2_monotonic = sample_1_monotonic + BETWEEN_SAMPLES;
         let sample_2_utc = sample_1_utc + BETWEEN_SAMPLES - error_for_slew * 2;
-        tracing::info!("[https://fxbug.dev/130140]: before push_source_controller.set_sample 2");
+        tracing::info!("[https://fxbug.dev/42080434]: before push_source_controller.set_sample 2");
         push_source_controller
             .set_sample(TimeSample {
                 utc: Some(sample_2_utc.into_nanos()),
@@ -525,7 +533,7 @@ async fn test_slew_clock() {
         let slew_rate = clock.get_details().unwrap().mono_to_synthetic.rate;
         assert_lt!(slew_rate.synthetic_ticks, slew_rate.reference_ticks);
 
-        // TODO(https://fxbug.dev/65239) - verify that the slew completes.
+        // TODO(https://fxbug.dev/42143927) - verify that the slew completes.
     })
     .await
     .unwrap();
@@ -540,7 +548,7 @@ async fn test_step_clock() {
         let monotonic_before = zx::Time::get_monotonic();
         let sample_1_monotonic = monotonic_before - BETWEEN_SAMPLES;
         let sample_1_utc = *VALID_TIME;
-        tracing::info!("[https://fxbug.dev/130140]: before push_source_controller.set_sample");
+        tracing::info!("[https://fxbug.dev/42080434]: before push_source_controller.set_sample");
         push_source_controller
             .set_sample(TimeSample {
                 utc: Some(sample_1_utc.into_nanos()),
@@ -551,9 +559,9 @@ async fn test_step_clock() {
             .await;
 
         // Wait until the clock is running and synchronized before testing.
-        tracing::info!("[https://fxbug.dev/130140]: before CLOCK_STARTED");
+        tracing::info!("[https://fxbug.dev/42080434]: before CLOCK_STARTED");
         fasync::OnSignals::new(&clock, zx::Signals::CLOCK_STARTED).await.unwrap();
-        tracing::info!("[https://fxbug.dev/130140]: before SIGNAL_UTC_CLOCK_SYNCHRONIZED");
+        tracing::info!("[https://fxbug.dev/42080434]: before SIGNAL_UTC_CLOCK_SYNCHRONIZED");
         fasync::OnSignals::new(
             &clock,
             zx::Signals::from_bits(fft::SIGNAL_UTC_CLOCK_SYNCHRONIZED).unwrap(),
@@ -569,7 +577,7 @@ async fn test_step_clock() {
 
         let sample_2_monotonic = sample_1_monotonic + BETWEEN_SAMPLES;
         let sample_2_utc = sample_1_utc + BETWEEN_SAMPLES + STEP_ERROR;
-        tracing::info!("[https://fxbug.dev/130140]: before push_source_controller.set_sample 2");
+        tracing::info!("[https://fxbug.dev/42080434]: before push_source_controller.set_sample 2");
         push_source_controller
             .set_sample(TimeSample {
                 utc: Some(sample_2_utc.into_nanos()),
@@ -615,7 +623,7 @@ async fn test_restart_crashed_time_source() {
         let monotonic_before = zx::Time::get_monotonic();
         let sample_1_monotonic = monotonic_before - BETWEEN_SAMPLES;
         let sample_1_utc = *VALID_TIME;
-        tracing::info!("[https://fxbug.dev/130140]: before push_source_controller.set_sample");
+        tracing::info!("[https://fxbug.dev/42080434]: before push_source_controller.set_sample");
         push_source_controller
             .set_sample(TimeSample {
                 utc: Some(sample_1_utc.into_nanos()),
@@ -626,7 +634,7 @@ async fn test_restart_crashed_time_source() {
             .await;
 
         // After the first sample, the clock is started.
-        tracing::info!("[https://fxbug.dev/130140]: before CLOCK_STARTED");
+        tracing::info!("[https://fxbug.dev/42080434]: before CLOCK_STARTED");
         fasync::OnSignals::new(&clock, zx::Signals::CLOCK_STARTED).await.unwrap();
         let last_generation_counter = clock.get_details().unwrap().generation_counter;
 
@@ -634,7 +642,7 @@ async fn test_restart_crashed_time_source() {
         let _result = push_source_controller.simulate_crash();
         let sample_2_utc = *VALID_TIME_2;
         let sample_2_monotonic = sample_1_monotonic + BETWEEN_SAMPLES;
-        tracing::info!("[https://fxbug.dev/130140]: before push_source_controller.set_sample 2");
+        tracing::info!("[https://fxbug.dev/42080434]: before push_source_controller.set_sample 2");
         push_source_controller
             .set_sample(TimeSample {
                 utc: Some(sample_2_utc.into_nanos()),
