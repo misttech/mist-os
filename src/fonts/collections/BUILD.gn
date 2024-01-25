@@ -146,7 +146,6 @@ local_font_bundle("short-stack-local") {
 # `base_package_labels` or `cache_package_labels`.
 font_collection("open-fonts-collection") {
   product_config_path = "open-fonts-collection.fontcfg.json5"
-  generate_hermetic_assets = true
 
   # Font manifest will refer to files at /fonts/data/assets/... instead of the
   # default /pkg/data/assets/...
@@ -185,7 +184,6 @@ local_font_bundle("small-open-fonts-local") {
 font_collection("small-open-fonts-collection") {
   product_config_path = "small-open-fonts-collection.fontcfg.json5"
   local_font_bundles = [ ":small-open-fonts-local" ]
-  generate_hermetic_assets = true
   assets_root_dir = "/fonts"
 }
 
@@ -227,7 +225,6 @@ font_collection("downstream-test-fonts-collection") {
   product_config_path = "downstream-test-fonts-collection.fontcfg.json5"
   manifest_prefix = "downstream_test_fonts"
   local_font_bundles = [ ":test-fonts-downstream-local" ]
-  generate_hermetic_assets = true
 }
 
 # Minimal font collection for some tests.
@@ -237,7 +234,6 @@ font_collection("test-fonts-small-collection") {
   product_config_path = "test-fonts-small-collection.fontcfg.json5"
   manifest_prefix = "test_fonts_small"
   local_font_bundles = [ ":test-fonts-small-local" ]
-  generate_hermetic_assets = true
 }
 
 # Minimal font collection plus Noto CJK fonts, for tests.
@@ -250,7 +246,6 @@ font_collection("test-fonts-medium-collection") {
     ":test-fonts-small-local",
     ":noto-cjk-test-fonts-local",
   ]
-  generate_hermetic_assets = true
 }
 
 # Large font collection consisting of most of the open-source fonts we have.
@@ -268,7 +263,6 @@ font_collection("test-fonts-large-collection") {
     ":roboto-mono-local",
     ":roboto-slab-local",
   ]
-  generate_hermetic_assets = true
 }
 
 # Empty font collection for products that spawn a font server but don't want any

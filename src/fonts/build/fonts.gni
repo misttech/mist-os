@@ -2,7 +2,6 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-import("//build/config.gni")
 import("//build/dist/resource.gni")
 import("//src/fonts/build/font_args.gni")
 import("//src/fonts/build/font_manifest.gni")
@@ -40,8 +39,7 @@ foreach(font_pkgs_path, font_pkgs_paths) {
   }
 }
 
-# Define a `config_data` target to bundle all of the given font files into the
-# font server's "/config/data".
+# Define a target to bundle all of the given font files.
 #
 # Parameters
 #
@@ -146,23 +144,15 @@ template("local_font_bundle") {
 #     registry files.
 #     Type: boolean
 #
-#   generate_hermetic_assets
-#     Optional: If set, generates the hermetic font assets in addition to
-#     the config-data assets.
-#     Default: false
-#     Type: boolean
-#
 #   assets_root_dir
 #     Optional: If set, this will be the prefix directory that the font manifest
-#     will place the resources by default.  Used only if
-#     generate_hermetic_assets == true.
+#     will place the hermetic resources by default.
 #     Default: "/pkg"
 #     Type: string
 template("font_collection") {
   forward_variables_from(invoker,
                          [
                            "font_packages",
-                           "generate_hermetic_assets",
                            "assets_root_dir",
                            "local_asset_names",
                            "local_font_bundles",
@@ -170,11 +160,7 @@ template("font_collection") {
                            "product_config_path",
                          ])
 
-  if (!defined(generate_hermetic_assets)) {
-    generate_hermetic_assets = false
-  }
-
-  if (generate_hermetic_assets && !defined(assets_root_dir)) {
+  if (!defined(assets_root_dir)) {
     assets_root_dir = "/pkg"
   }
 
@@ -202,12 +188,6 @@ template("font_collection") {
       !(invoker.testonly && manifest_prefix == _default_manifest_prefix),
       "Can't use default manifest_prefix '${manifest_prefix}' with a testonly font_collection.")
 
-  # The font resolver in pkg_resolver expects a hard-coded location in
-  # /config/data for the file font_packages.json. To avoid collisions from
-  # multiple definitions of that file, we don't add it to config_data when
-  # building tests.
-  generate_pkg_resolver_config_data = !invoker.testonly
-
   if (defined(local_asset_names)) {
     bundle_name = "_${target_name}_local_font_bundle"
     local_font_bundle(bundle_name) {
@@ -219,44 +199,6 @@ template("font_collection") {
   # `fx format-code` insists on removing clarifying parentheses here.
   assert(font_packages + local_font_bundles == [] == invoker.empty,
          "An empty font_collection must explicitly declare `empty = true`")
-
-  ##############################################################################
-  # Generate font_packages.json, used by pkg-resolver to know which Fuchsia
-  # packages are font packages.
-  ##############################################################################
-  pkg_resolver_registry_path =
-      "${target_gen_dir}/${target_name}_font_packages.json"
-  pkg_resolver_registry_label = "${target_name}_font_packages.json"
-  pkg_resolver_config_data_label =
-      "${target_name}_pkg_resolver_font_packages_config_data"
-
-  _group_visibility = ":${target_name}"
-  generated_file(pkg_resolver_registry_label) {
-    forward_variables_from(invoker, [ "testonly" ])
-    deps = font_packages
-    if (generate_pkg_resolver_config_data) {
-      visibility = [ ":${pkg_resolver_config_data_label}" ]
-      not_needed([ "_group_visibility" ])
-    } else {
-      visibility = [ _group_visibility ]
-      not_needed([ "pkg_resolver_config_data_label" ])
-    }
-    data_keys = [ "fuchsia_package_urls" ]
-    walk_keys = [ "font_barrier" ]
-    output_conversion = "json"
-    outputs = [ pkg_resolver_registry_path ]
-  }
-
-  if (generate_pkg_resolver_config_data) {
-    config_data(pkg_resolver_config_data_label) {
-      for_pkg = "pkg-resolver"
-
-      # This output name is fixed.
-      # There can be only one instance of this target included in any product.
-      outputs = [ "font_packages.json" ]
-      sources = [ pkg_resolver_registry_path ]
-    }
-  }
 
   ##############################################################################
   # Generate all_fonts.json, used by the manifest generator to know the
@@ -308,38 +250,37 @@ template("font_collection") {
 
   # Also generate the font manifest for font resources that will get packaged
   # alongside the font manager.
-  if (generate_hermetic_assets) {
-    asset_font_manifest_label = "${target_name}_asset_manifest_file"
-    asset_font_manifest_path = "${target_out_dir}/${target_name}_all.hermetic_assets.font_manifest.json"
-    font_manifest(asset_font_manifest_label) {
-      forward_variables_from(invoker,
-                             [
-                               "testonly",
-                               "visibility",
-                             ])
-      all_fonts_path = _all_fonts_json_path
-      local_fonts_path = _local_fonts_json_path
-      font_files = all_font_file_paths
-      deps = [
-        ":${_all_fonts_json_label}",
-        ":${_local_fonts_json_label}",
-      ]
-      output = asset_font_manifest_path
-      pretty_print = is_debug
-      target_asset_dir = "${assets_root_dir}/${_assets_relative_path}"
-    }
+  asset_font_manifest_label = "${target_name}_asset_manifest_file"
+  asset_font_manifest_path =
+      "${target_out_dir}/${target_name}_all.hermetic_assets.font_manifest.json"
+  font_manifest(asset_font_manifest_label) {
+    forward_variables_from(invoker,
+                           [
+                             "testonly",
+                             "visibility",
+                           ])
+    all_fonts_path = _all_fonts_json_path
+    local_fonts_path = _local_fonts_json_path
+    font_files = all_font_file_paths
+    deps = [
+      ":${_all_fonts_json_label}",
+      ":${_local_fonts_json_label}",
+    ]
+    output = asset_font_manifest_path
+    pretty_print = is_debug
+    target_asset_dir = "${assets_root_dir}/${_assets_relative_path}"
+  }
 
-    font_assets_label = "${target_name}_font_assets"
-    resource(font_assets_label) {
-      forward_variables_from(invoker,
-                             [
-                               "testonly",
-                               "visibility",
-                             ])
-      sources = get_target_outputs(":${asset_font_manifest_label}")
-      deps = [ ":${asset_font_manifest_label}" ]
-      outputs = "${_assets_relative_path}/{{source_file_part}}"
-    }
+  font_assets_label = "${target_name}_font_assets"
+  resource(font_assets_label) {
+    forward_variables_from(invoker,
+                           [
+                             "testonly",
+                             "visibility",
+                           ])
+    sources = get_target_outputs(":${asset_font_manifest_label}")
+    deps = [ ":${asset_font_manifest_label}" ]
+    outputs = "${_assets_relative_path}/{{source_file_part}}"
   }
 
   group(target_name) {
@@ -349,14 +290,6 @@ template("font_collection") {
                              "visibility",
                            ])
 
-    deps = local_font_bundles
-    if (generate_hermetic_assets) {
-      deps += [ ":${font_assets_label}" ]
-    }
-    if (generate_pkg_resolver_config_data) {
-      deps += [ ":${pkg_resolver_config_data_label}" ]
-    } else {
-      deps += [ ":${pkg_resolver_registry_label}" ]
-    }
+    deps = local_font_bundles + [ ":${font_assets_label}" ]
   }
 }
