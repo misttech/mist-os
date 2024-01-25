@@ -6,20 +6,22 @@
 set -eu -o pipefail
 
 print_banner() {
-  git_commit=$(git rev-parse HEAD)
-  echo
-  echo "###############################################################################"
-  echo "#                                                                             #"
-  echo "#  This check builds the Fuchsia operating system.                            #"
-  echo "#                                                                             #"
-  echo "#  Most code is built in 'check mode' using clippy, to maximize coverage in   #"
-  echo "#  the compiler front end while reducing build times.                         #"
-  echo "#                                                                             #"
-  echo "#  You can browse the Fuchsia source code at the following URL:               #"
-  echo "#  https://cs.opensource.google/fuchsia/fuchsia/+/$git_commit:"
-  echo "#                                                                             #"
-  echo "###############################################################################"
-  echo
+  {
+    git_commit=$(git rev-parse HEAD)
+    echo
+    echo "###############################################################################"
+    echo "#                                                                             #"
+    echo "#  This check builds the Fuchsia operating system.                            #"
+    echo "#                                                                             #"
+    echo "#  Most code is built in 'check mode' using clippy, to maximize coverage in   #"
+    echo "#  the compiler front end while reducing build times.                         #"
+    echo "#                                                                             #"
+    echo "#  You can browse the Fuchsia source code at the following URL:               #"
+    echo "#  https://cs.opensource.google/fuchsia/fuchsia/+/$git_commit:"
+    echo "#                                                                             #"
+    echo "###############################################################################"
+    echo
+  } >&2
 }
 
 # toabs converts the possibly relative argument into an absolute path. Run in a
@@ -108,6 +110,7 @@ $fx set \
     --args 'rust_cap_lints = "warn"' \
     --args 'disable_elf_checks = true' \
     --args 'debuginfo = "none"' \
+    --with '//bundles/buildbot/minimal' \
     workbench_eng.x64 \
     ; echo
 
