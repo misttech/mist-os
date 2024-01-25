@@ -533,8 +533,31 @@ async fn connect_to_peer(
     node_id: &EncodableString,
 ) -> Result<()> {
     let mut peer_channels = Some((peer_reader, peer_writer));
+    let mut peer_sender: Option<Sender<(stream::Reader, stream::Writer)>> = None;
 
     poll_fn(|ctx| {
+        // If we found a place to send the new stream during the last poll, but
+        // it gave us pending, we have to keep that sender's clone around so our
+        // waker is remembered and we get woken up. We could just drop it here
+        // and repeat the whole discovery again, which would cost compute but
+        // make us more responsive to changes in the network topology by a
+        // smidge. Instead we'll try the same link again, and keep trying until
+        // it succeeds or breaks.
+        if let Some(sender) = &mut peer_sender {
+            match sender.poll_ready(ctx) {
+                Poll::Ready(Ok(())) => {
+                    sender
+                        .start_send(peer_channels.take().unwrap())
+                        .expect("Should be guaranteed to succeed!");
+                    return Poll::Ready(());
+                }
+                Poll::Ready(Err(_)) => peer_sender = None,
+                Poll::Pending => {
+                    return Poll::Pending;
+                }
+            }
+        }
+
         let mut peers = peers.lock().unwrap();
 
         // For each peer we have a list of channels to which we can send our
@@ -547,7 +570,6 @@ async fn connect_to_peer(
         };
 
         let mut changed = false;
-        let mut ret = Poll::Ready(());
 
         // Go through each potential connection and send to the first one which
         // will handle the connection. We may discover the first few we try have
@@ -561,10 +583,12 @@ async fn connect_to_peer(
         // performance in the long run than sending on a slower connection that
         // can be serviced right away.
         peer_list.retain_mut(|x| {
-            if peer_channels.is_some() && ret.is_ready() {
-                match x.0.poll_ready(ctx) {
+            if peer_sender.is_none() && peer_channels.is_some() {
+                let mut sender = x.0.clone();
+                match sender.poll_ready(ctx) {
                     Poll::Ready(Ok(())) => {
-                        x.0.start_send(peer_channels.take().unwrap())
+                        sender
+                            .start_send(peer_channels.take().unwrap())
                             .expect("Should be guaranteed to succeed!");
                         true
                     }
@@ -573,7 +597,7 @@ async fn connect_to_peer(
                         false
                     }
                     Poll::Pending => {
-                        ret = Poll::Pending;
+                        peer_sender = Some(sender);
                         true
                     }
                 }
@@ -589,7 +613,13 @@ async fn connect_to_peer(
             peers.increment_generation();
         }
 
-        ret
+        // The peer sender is where we register our waker. If we don't have one
+        // we didn't register a waker and should return now.
+        if peer_sender.is_none() {
+            Poll::Ready(())
+        } else {
+            Poll::Pending
+        }
     })
     .await;
 
