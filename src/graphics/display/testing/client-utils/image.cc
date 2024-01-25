@@ -163,7 +163,7 @@ Image* Image::Create(const fidl::WireSyncClient<fhd::Coordinator>& dc, uint32_t 
   constraints.image_format_constraints_count = 1;
   fuchsia_sysmem::wire::ImageFormatConstraints& image_constraints =
       constraints.image_format_constraints[0];
-  if (format == fuchsia_images2::wire::PixelFormat::kBgra32) {
+  if (format == fuchsia_images2::wire::PixelFormat::kB8G8R8A8) {
     image_constraints.pixel_format.type = fuchsia_sysmem::wire::PixelFormatType::kBgra32;
     image_constraints.color_spaces_count = 1;
     image_constraints.color_space[0] = fuchsia_sysmem::wire::ColorSpace{

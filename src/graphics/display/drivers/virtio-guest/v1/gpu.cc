@@ -522,7 +522,7 @@ std::optional<virtio_abi::ResourceFormat> To2DResourceFormat(
     fuchsia_images2::wire::PixelFormat pixel_format) {
   // TODO(https://fxbug.dev/42073721): Support more formats.
   switch (pixel_format) {
-    case fuchsia_images2::PixelFormat::kBgra32:
+    case fuchsia_images2::PixelFormat::kB8G8R8A8:
       return virtio_abi::ResourceFormat::kBgra32;
     default:
       return std::nullopt;

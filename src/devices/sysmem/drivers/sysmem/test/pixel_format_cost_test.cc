@@ -20,7 +20,7 @@ TEST(PixelFormatCost, Afbc) {
     fuchsia_sysmem2::ImageFormatConstraints image_format_constraints;
     {
       fuchsia_images2::PixelFormat pixel_format;
-      pixel_format = fuchsia_images2::PixelFormat::kBgra32;
+      pixel_format = fuchsia_images2::PixelFormat::kB8G8R8A8;
       image_format_constraints.pixel_format().emplace(std::move(pixel_format));
     }
     constraints.image_format_constraints()->at(0) = std::move(image_format_constraints);
@@ -29,7 +29,7 @@ TEST(PixelFormatCost, Afbc) {
     fuchsia_sysmem2::ImageFormatConstraints image_format_constraints;
     {
       fuchsia_images2::PixelFormat pixel_format;
-      pixel_format = fuchsia_images2::PixelFormat::kBgra32;
+      pixel_format = fuchsia_images2::PixelFormat::kB8G8R8A8;
       image_format_constraints.pixel_format() = pixel_format;
       image_format_constraints.pixel_format_modifier() =
           fuchsia_images2::kFormatModifierArmAfbc32X8;
@@ -66,7 +66,7 @@ TEST(PixelFormatCost, IntelTiling) {
       fuchsia_sysmem2::ImageFormatConstraints image_format_constraints;
       {
         fuchsia_images2::PixelFormat pixel_format;
-        pixel_format = fuchsia_images2::PixelFormat::kBgra32;
+        pixel_format = fuchsia_images2::PixelFormat::kB8G8R8A8;
         image_format_constraints.pixel_format() = pixel_format;
         image_format_constraints.pixel_format_modifier() = fuchsia_images2::kFormatModifierLinear;
       }
@@ -76,7 +76,7 @@ TEST(PixelFormatCost, IntelTiling) {
       fuchsia_sysmem2::ImageFormatConstraints image_format_constraints;
       {
         fuchsia_images2::PixelFormat pixel_format;
-        pixel_format = fuchsia_images2::PixelFormat::kBgra32;
+        pixel_format = fuchsia_images2::PixelFormat::kB8G8R8A8;
         image_format_constraints.pixel_format() = pixel_format;
         image_format_constraints.pixel_format_modifier() = modifier;
       }
@@ -101,7 +101,7 @@ TEST(PixelFormatCost, IntelTiling) {
     // Explicit linear should be treated the same as no format modifier value.
     {
       fuchsia_images2::PixelFormat pixel_format;
-      pixel_format = fuchsia_images2::PixelFormat::kBgra32;
+      pixel_format = fuchsia_images2::PixelFormat::kB8G8R8A8;
       constraints.image_format_constraints()->at(0).pixel_format() = pixel_format;
     }
     EXPECT_LT(0, UsagePixelFormatCost::Compare(kUnknownVid, kUnknownPid, constraints, 0, 1));
@@ -124,7 +124,7 @@ TEST(PixelFormatCost, IntelTiling) {
       fuchsia_sysmem2::ImageFormatConstraints image_format_constraints;
       {
         fuchsia_images2::PixelFormat pixel_format;
-        pixel_format = fuchsia_images2::PixelFormat::kBgra32;
+        pixel_format = fuchsia_images2::PixelFormat::kB8G8R8A8;
         image_format_constraints.pixel_format() = pixel_format;
         image_format_constraints.pixel_format_modifier() = modifier_list[i];
       }
@@ -147,7 +147,7 @@ TEST(PixelFormatCost, ArmTransactionElimination) {
     fuchsia_sysmem2::ImageFormatConstraints image_format_constraints;
     {
       fuchsia_images2::PixelFormat pixel_format;
-      pixel_format = fuchsia_images2::PixelFormat::kBgra32;
+      pixel_format = fuchsia_images2::PixelFormat::kB8G8R8A8;
       image_format_constraints.pixel_format() = pixel_format;
       image_format_constraints.pixel_format_modifier() =
           fuchsia_images2::kFormatModifierArmAfbc32X8;
@@ -158,7 +158,7 @@ TEST(PixelFormatCost, ArmTransactionElimination) {
     fuchsia_sysmem2::ImageFormatConstraints image_format_constraints;
     {
       fuchsia_images2::PixelFormat pixel_format;
-      pixel_format = fuchsia_images2::PixelFormat::kBgra32;
+      pixel_format = fuchsia_images2::PixelFormat::kB8G8R8A8;
       image_format_constraints.pixel_format() = pixel_format;
       image_format_constraints.pixel_format_modifier() =
           fuchsia_images2::kFormatModifierArmAfbc32X8Te;
@@ -193,7 +193,7 @@ TEST(PixelFormatCost, AfbcWithFlags) {
       fuchsia_sysmem2::ImageFormatConstraints image_format_constraints;
       {
         fuchsia_images2::PixelFormat pixel_format;
-        pixel_format = fuchsia_images2::PixelFormat::kBgra32;
+        pixel_format = fuchsia_images2::PixelFormat::kB8G8R8A8;
         image_format_constraints.pixel_format() = pixel_format;
         image_format_constraints.pixel_format_modifier() = modifier_list[i];
       }

@@ -496,7 +496,7 @@ bool AmlogicCompareCapturedImage(cpp20::span<const uint8_t> captured_image,
                                  cpp20::span<const uint8_t> input_image,
                                  fuchsia_images2::wire::PixelFormat input_image_pixel_format,
                                  int height, int width) {
-  assert(input_image_pixel_format == fuchsia_images2::wire::PixelFormat::kBgra32 ||
+  assert(input_image_pixel_format == fuchsia_images2::wire::PixelFormat::kB8G8R8A8 ||
          input_image_pixel_format == fuchsia_images2::wire::PixelFormat::kR8G8B8A8);
 
   auto expected_image = std::vector<uint8_t>(input_image.begin(), input_image.end());
@@ -505,7 +505,7 @@ bool AmlogicCompareCapturedImage(cpp20::span<const uint8_t> captured_image,
   // (most-siginificant) format. To avoid out-of-order data access, we convert
   // the endianness of the input image, if they are in (least-significant)
   // R8G8B8A8 (most-significant) order.
-  if (input_image_pixel_format == fuchsia_images2::wire::PixelFormat::kBgra32) {
+  if (input_image_pixel_format == fuchsia_images2::wire::PixelFormat::kB8G8R8A8) {
     for (size_t i = 0; i + 3 < expected_image.size(); i += 4) {
       std::swap(expected_image[i], expected_image[i + 3]);
       std::swap(expected_image[i + 1], expected_image[i + 2]);

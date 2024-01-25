@@ -70,7 +70,7 @@ const glm::vec4 kProtectedReplacementColorInRGBA = glm::vec4(0, 0, 0, 1);
 vk::Format ConvertToVkFormat(const fuchsia_images2::PixelFormat pixel_format) {
   switch (pixel_format) {
     // These two Zircon formats correspond to the Sysmem BGRA32 format.
-    case fuchsia_images2::PixelFormat::kBgra32:
+    case fuchsia_images2::PixelFormat::kB8G8R8A8:
       return vk::Format::eB8G8R8A8Srgb;
     // These two Zircon formats correspond to the Sysmem R8G8B8A8 format.
     case fuchsia_images2::PixelFormat::kR8G8B8A8:

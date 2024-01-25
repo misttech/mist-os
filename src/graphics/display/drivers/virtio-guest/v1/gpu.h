@@ -186,7 +186,7 @@ class GpuDevice : public virtio::Device,
   // TODO(https://fxbug.dev/42073721): Support more formats.
   static constexpr std::array<fuchsia_images2_pixel_format_enum_value_t, 1> kSupportedFormats = {
       static_cast<fuchsia_images2_pixel_format_enum_value_t>(
-          fuchsia_images2::wire::PixelFormat::kBgra32),
+          fuchsia_images2::wire::PixelFormat::kB8G8R8A8),
   };
 };
 

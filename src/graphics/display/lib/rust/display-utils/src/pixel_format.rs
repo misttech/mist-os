@@ -123,17 +123,17 @@ impl From<images2::PixelFormat> for PixelFormat {
         match src {
             images2::PixelFormat::Invalid => Self::Invalid,
             images2::PixelFormat::R8G8B8A8 => Self::R8G8B8A8,
-            images2::PixelFormat::Bgra32 => Self::Bgra32,
+            images2::PixelFormat::B8G8R8A8 => Self::Bgra32,
             images2::PixelFormat::I420 => Self::I420,
             images2::PixelFormat::M420 => Self::M420,
             images2::PixelFormat::Nv12 => Self::Nv12,
             images2::PixelFormat::Yuy2 => Self::Yuy2,
             images2::PixelFormat::Mjpeg => Self::Mjpeg,
             images2::PixelFormat::Yv12 => Self::Yv12,
-            images2::PixelFormat::Bgr24 => Self::Bgr24,
-            images2::PixelFormat::Rgb565 => Self::Rgb565,
-            images2::PixelFormat::Rgb332 => Self::Rgb332,
-            images2::PixelFormat::Rgb2220 => Self::Rgb2220,
+            images2::PixelFormat::B8G8R8 => Self::Bgr24,
+            images2::PixelFormat::R5G6B5 => Self::Rgb565,
+            images2::PixelFormat::R3G3B2 => Self::Rgb332,
+            images2::PixelFormat::R2G2B2X2 => Self::Rgb2220,
             images2::PixelFormat::L8 => Self::L8,
             images2::PixelFormat::R8 => Self::R8,
             images2::PixelFormat::R8G8 => Self::R8G8,
@@ -156,17 +156,17 @@ impl From<PixelFormat> for images2::PixelFormat {
         match src {
             PixelFormat::Invalid => Self::Invalid,
             PixelFormat::R8G8B8A8 => Self::R8G8B8A8,
-            PixelFormat::Bgra32 => Self::Bgra32,
+            PixelFormat::Bgra32 => Self::B8G8R8A8,
             PixelFormat::I420 => Self::I420,
             PixelFormat::M420 => Self::M420,
             PixelFormat::Nv12 => Self::Nv12,
             PixelFormat::Yuy2 => Self::Yuy2,
             PixelFormat::Mjpeg => Self::Mjpeg,
             PixelFormat::Yv12 => Self::Yv12,
-            PixelFormat::Bgr24 => Self::Bgr24,
-            PixelFormat::Rgb565 => Self::Rgb565,
-            PixelFormat::Rgb332 => Self::Rgb332,
-            PixelFormat::Rgb2220 => Self::Rgb2220,
+            PixelFormat::Bgr24 => Self::B8G8R8,
+            PixelFormat::Rgb565 => Self::R5G6B5,
+            PixelFormat::Rgb332 => Self::R3G3B2,
+            PixelFormat::Rgb2220 => Self::R2G2B2X2,
             PixelFormat::L8 => Self::L8,
             PixelFormat::R8 => Self::R8,
             PixelFormat::R8G8 => Self::R8G8,
@@ -491,8 +491,8 @@ mod tests {
             images2::PixelFormat::R8G8B8A8
         );
         assert_eq!(
-            images2::PixelFormat::from(PixelFormat::from(images2::PixelFormat::Bgra32)),
-            images2::PixelFormat::Bgra32
+            images2::PixelFormat::from(PixelFormat::from(images2::PixelFormat::B8G8R8A8)),
+            images2::PixelFormat::B8G8R8A8
         );
         assert_eq!(
             images2::PixelFormat::from(PixelFormat::from(images2::PixelFormat::I420)),
@@ -519,20 +519,20 @@ mod tests {
             images2::PixelFormat::Yv12
         );
         assert_eq!(
-            images2::PixelFormat::from(PixelFormat::from(images2::PixelFormat::Bgr24)),
-            images2::PixelFormat::Bgr24
+            images2::PixelFormat::from(PixelFormat::from(images2::PixelFormat::B8G8R8)),
+            images2::PixelFormat::B8G8R8
         );
         assert_eq!(
-            images2::PixelFormat::from(PixelFormat::from(images2::PixelFormat::Rgb565)),
-            images2::PixelFormat::Rgb565
+            images2::PixelFormat::from(PixelFormat::from(images2::PixelFormat::R5G6B5)),
+            images2::PixelFormat::R5G6B5
         );
         assert_eq!(
-            images2::PixelFormat::from(PixelFormat::from(images2::PixelFormat::Rgb332)),
-            images2::PixelFormat::Rgb332
+            images2::PixelFormat::from(PixelFormat::from(images2::PixelFormat::R3G3B2)),
+            images2::PixelFormat::R3G3B2
         );
         assert_eq!(
-            images2::PixelFormat::from(PixelFormat::from(images2::PixelFormat::Rgb2220)),
-            images2::PixelFormat::Rgb2220
+            images2::PixelFormat::from(PixelFormat::from(images2::PixelFormat::R2G2B2X2)),
+            images2::PixelFormat::R2G2B2X2
         );
         assert_eq!(
             images2::PixelFormat::from(PixelFormat::from(images2::PixelFormat::L8)),
@@ -651,7 +651,7 @@ mod tests {
             sysmem::PixelFormatType::R8G8B8A8
         );
         assert_eq!(
-            sysmem::PixelFormatType::from(PixelFormat::from(images2::PixelFormat::Bgra32)),
+            sysmem::PixelFormatType::from(PixelFormat::from(images2::PixelFormat::B8G8R8A8)),
             sysmem::PixelFormatType::Bgra32
         );
         assert_eq!(
@@ -679,19 +679,19 @@ mod tests {
             sysmem::PixelFormatType::Yv12
         );
         assert_eq!(
-            sysmem::PixelFormatType::from(PixelFormat::from(images2::PixelFormat::Bgr24)),
+            sysmem::PixelFormatType::from(PixelFormat::from(images2::PixelFormat::B8G8R8)),
             sysmem::PixelFormatType::Bgr24
         );
         assert_eq!(
-            sysmem::PixelFormatType::from(PixelFormat::from(images2::PixelFormat::Rgb565)),
+            sysmem::PixelFormatType::from(PixelFormat::from(images2::PixelFormat::R5G6B5)),
             sysmem::PixelFormatType::Rgb565
         );
         assert_eq!(
-            sysmem::PixelFormatType::from(PixelFormat::from(images2::PixelFormat::Rgb332)),
+            sysmem::PixelFormatType::from(PixelFormat::from(images2::PixelFormat::R3G3B2)),
             sysmem::PixelFormatType::Rgb332
         );
         assert_eq!(
-            sysmem::PixelFormatType::from(PixelFormat::from(images2::PixelFormat::Rgb2220)),
+            sysmem::PixelFormatType::from(PixelFormat::from(images2::PixelFormat::R2G2B2X2)),
             sysmem::PixelFormatType::Rgb2220
         );
         assert_eq!(
@@ -732,7 +732,7 @@ mod tests {
         );
         assert_eq!(
             images2::PixelFormat::from(PixelFormat::from(sysmem::PixelFormatType::Bgra32)),
-            images2::PixelFormat::Bgra32
+            images2::PixelFormat::B8G8R8A8
         );
         assert_eq!(
             images2::PixelFormat::from(PixelFormat::from(sysmem::PixelFormatType::I420)),
@@ -760,19 +760,19 @@ mod tests {
         );
         assert_eq!(
             images2::PixelFormat::from(PixelFormat::from(sysmem::PixelFormatType::Bgr24)),
-            images2::PixelFormat::Bgr24
+            images2::PixelFormat::B8G8R8
         );
         assert_eq!(
             images2::PixelFormat::from(PixelFormat::from(sysmem::PixelFormatType::Rgb565)),
-            images2::PixelFormat::Rgb565
+            images2::PixelFormat::R5G6B5
         );
         assert_eq!(
             images2::PixelFormat::from(PixelFormat::from(sysmem::PixelFormatType::Rgb332)),
-            images2::PixelFormat::Rgb332
+            images2::PixelFormat::R3G3B2
         );
         assert_eq!(
             images2::PixelFormat::from(PixelFormat::from(sysmem::PixelFormatType::Rgb2220)),
-            images2::PixelFormat::Rgb2220
+            images2::PixelFormat::R2G2B2X2
         );
         assert_eq!(
             images2::PixelFormat::from(PixelFormat::from(sysmem::PixelFormatType::L8)),

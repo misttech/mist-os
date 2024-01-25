@@ -178,7 +178,7 @@ class DisplayCompositorTest : public DisplayCompositorTestBase {
 
  protected:
   static constexpr fuchsia_images2::PixelFormat kPixelFormat =
-      fuchsia_images2::PixelFormat::kBgra32;
+      fuchsia_images2::PixelFormat::kB8G8R8A8;
   std::unique_ptr<flatland::MockDisplayCoordinator> mock_display_coordinator_;
   std::shared_ptr<flatland::MockRenderer> renderer_;
   std::shared_ptr<flatland::DisplayCompositor> display_compositor_;

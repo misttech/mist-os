@@ -451,7 +451,7 @@ bool ColorLayer::Init(const fidl::WireSyncClient<fhd::Coordinator>& dc) {
     layer->active = true;
 
     constexpr fuchsia_images2::wire::PixelFormat kColorLayerFormat =
-        fuchsia_images2::wire::PixelFormat::kBgra32;
+        fuchsia_images2::wire::PixelFormat::kB8G8R8A8;
     constexpr uint32_t kColorLayerBytesPerPixel = 4;
     uint32_t kColorLayerColor = get_fg_color();
 

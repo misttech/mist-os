@@ -161,7 +161,9 @@ type PixelFormat = flexible enum {
     /// 32bpp BGRA, 1 plane.  RGB only, 8 bits per each of B/G/R/A sample.
     ///
     /// Compatible with VK_FORMAT_B8G8R8A8_UNORM.
-    BGRA32 = 101;
+    ///
+    /// In sysmem(1), this is BGRA32.
+    B8G8R8A8 = 101;
 
     /// YUV only, 8 bits per Y sample
     ///
@@ -195,26 +197,36 @@ type PixelFormat = flexible enum {
     /// 24bpp BGR, 1 plane. RGB only, 8 bits per each of B/G/R sample
     ///
     /// Compatible with VK_FORMAT_B8G8R8_UNORM.
-    BGR24 = 108;
+    ///
+    /// In sysmem(1), this is BGR24.
+    B8G8R8 = 108;
 
     /// 16bpp RGB, 1 plane. 5 bits R, 6 bits G, 5 bits B
     ///
     /// Compatible with VK_FORMAT_R5G6B5_UNORM_PACK16.
-    RGB565 = 109;
+    ///
+    /// In sysmem(1), this is RGB565.
+    R5G6B5 = 109;
 
     /// 8bpp RGB, 1 plane. 3 bits R, 3 bits G, 2 bits B
     ///
     /// Not compatible with any vulkan format.
-    RGB332 = 110;
+    ///
+    /// In sysmem(1), this is RGB332.
+    R3G3B2 = 110;
 
     /// 8bpp RGB, 1 plane. 2 bits R, 2 bits G, 2 bits B
     ///
     /// Not compatible with any vulkan format.
-    RGB2220 = 111;
+    ///
+    /// In sysmem(1), this is RGB2220.
+    R2G2B2X2 = 111;
 
     /// 8bpp, Luminance-only (red, green and blue have identical values.)
     ///
     /// Compatible with VK_FORMAT_R8_UNORM.
+    ///
+    /// Most clients will prefer to use R8 instead.
     L8 = 112;
 
     /// 8bpp, Red-only (Green and Blue are to be interpreted as 0).

@@ -55,7 +55,7 @@ constexpr display::DisplayId kPrimaryDisplayId(1);
 
 constexpr fuchsia_images2_pixel_format_enum_value_t kPixelFormats[] = {
     static_cast<fuchsia_images2_pixel_format_enum_value_t>(
-        fuchsia_images2::wire::PixelFormat::kBgra32),
+        fuchsia_images2::wire::PixelFormat::kB8G8R8A8),
     static_cast<fuchsia_images2_pixel_format_enum_value_t>(
         fuchsia_images2::wire::PixelFormat::kR8G8B8A8),
 };

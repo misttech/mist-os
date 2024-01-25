@@ -18,7 +18,7 @@
 namespace {
 
 // GGA (Google Graphics Array) device only supports RGB888 format.
-constexpr auto kPixelFormat = fuchsia_images2::wire::PixelFormat::kBgr24;
+constexpr auto kPixelFormat = fuchsia_images2::wire::PixelFormat::kB8G8R8;
 constexpr int kBitsPerPixel = 24;
 
 }  // namespace

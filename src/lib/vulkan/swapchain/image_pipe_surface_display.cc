@@ -200,7 +200,7 @@ void ImagePipeSurfaceDisplay::ControllerOnDisplaysChanged(
 
   for (fuchsia::images2::PixelFormat pixel_format : info[0].pixel_format) {
     switch (pixel_format) {
-      case fuchsia::images2::PixelFormat::BGRA32:
+      case fuchsia::images2::PixelFormat::B8G8R8A8:
         formats.push_back({VK_FORMAT_B8G8R8A8_UNORM, VK_COLORSPACE_SRGB_NONLINEAR_KHR});
         formats.push_back({VK_FORMAT_B8G8R8A8_SRGB, VK_COLORSPACE_SRGB_NONLINEAR_KHR});
         break;

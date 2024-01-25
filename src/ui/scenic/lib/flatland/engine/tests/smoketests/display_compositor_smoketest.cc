@@ -95,7 +95,7 @@ class DisplayCompositorSmokeTest : public DisplayCompositorTestBase {
 
  protected:
   static constexpr fuchsia_images2::PixelFormat kPixelFormat =
-      fuchsia_images2::PixelFormat::kBgra32;
+      fuchsia_images2::PixelFormat::kB8G8R8A8;
 
   fuchsia::sysmem::AllocatorSyncPtr sysmem_allocator_;
   std::unique_ptr<async::Executor> executor_;

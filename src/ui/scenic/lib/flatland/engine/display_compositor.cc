@@ -544,7 +544,7 @@ void DisplayCompositor::ApplyLayerColor(const fuchsia::hardware::display::types:
                               static_cast<uint8_t>(255 * image.multiply_color[3])};
 
   (*display_coordinator_)
-      ->SetLayerColorConfig(layer_id, fuchsia::images2::PixelFormat::BGRA32, col);
+      ->SetLayerColorConfig(layer_id, fuchsia::images2::PixelFormat::B8G8R8A8, col);
 
 // TODO(https://fxbug.dev/42056054): Currently, not all display hardware supports the ability to
 // set either the position or the alpha on a color layer, as color layers are not primary

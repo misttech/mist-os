@@ -52,7 +52,7 @@ class FakeBufferCollection : public fidl::testing::WireTestBase<fuchsia_sysmem2:
     buffer_memory_settings.heap(fuchsia_sysmem2::HeapType::kFramebuffer);
     single_buffer_settings.buffer_settings(buffer_memory_settings.Build());
     auto image_format_constraints = fuchsia_sysmem2::wire::ImageFormatConstraints::Builder(arena);
-    image_format_constraints.pixel_format(fuchsia_images2::wire::PixelFormat::kBgra32);
+    image_format_constraints.pixel_format(fuchsia_images2::wire::PixelFormat::kB8G8R8A8);
     image_format_constraints.pixel_format_modifier(fuchsia_images2::wire::kFormatModifierLinear);
     single_buffer_settings.image_format_constraints(image_format_constraints.Build());
     collection_info.settings(single_buffer_settings.Build());
@@ -262,7 +262,7 @@ TEST(SimpleDisplay, ImportBufferCollection) {
   constexpr uint32_t kWidth = 800;
   constexpr uint32_t kHeight = 600;
   constexpr uint32_t kStride = 800;
-  constexpr auto kPixelFormat = fuchsia_images2::wire::PixelFormat::kBgra32;
+  constexpr auto kPixelFormat = fuchsia_images2::wire::PixelFormat::kB8G8R8A8;
 
   SimpleDisplay display(nullptr, fidl::WireSyncClient(std::move(hardware_sysmem_client)),
                         std::move(sysmem_client), fake_mmio.MmioBuffer(), kWidth, kHeight, kStride,
@@ -329,7 +329,7 @@ TEST(SimpleDisplay, ImportKernelFramebufferImage) {
   constexpr uint32_t kWidth = 800;
   constexpr uint32_t kHeight = 600;
   constexpr uint32_t kStride = 800;
-  constexpr auto kPixelFormat = fuchsia_images2::wire::PixelFormat::kBgra32;
+  constexpr auto kPixelFormat = fuchsia_images2::wire::PixelFormat::kB8G8R8A8;
   constexpr size_t kBytesPerPixel = 4;
   const uint64_t kBanjoCollectionId = 1u;
   constexpr size_t kImageBytes = uint64_t{kStride} * kHeight * kBytesPerPixel;

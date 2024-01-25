@@ -65,13 +65,13 @@ namespace {
 // List of supported pixel formats.
 // TODO(https://fxbug.dev/42148348): Add more supported formats.
 constexpr std::array<fuchsia_images2::wire::PixelFormat, 2> kSupportedPixelFormats = {
-    fuchsia_images2::wire::PixelFormat::kBgra32,
+    fuchsia_images2::wire::PixelFormat::kB8G8R8A8,
     fuchsia_images2::wire::PixelFormat::kR8G8B8A8,
 };
 
 constexpr std::array<fuchsia_images2_pixel_format_enum_value_t, 2> kSupportedBanjoPixelFormats = {
     static_cast<fuchsia_images2_pixel_format_enum_value_t>(
-        fuchsia_images2::wire::PixelFormat::kBgra32),
+        fuchsia_images2::wire::PixelFormat::kB8G8R8A8),
     static_cast<fuchsia_images2_pixel_format_enum_value_t>(
         fuchsia_images2::wire::PixelFormat::kR8G8B8A8),
 };
@@ -723,7 +723,7 @@ zx_status_t AmlogicDisplay::DisplayControllerImplSetBufferCollectionConstraints(
     // instead.
     constraints.image_format_constraints_count = 0;
     ZX_DEBUG_ASSERT(format_support_check_ != nullptr);
-    if (format_support_check_(fuchsia_images2::wire::PixelFormat::kBgra32)) {
+    if (format_support_check_(fuchsia_images2::wire::PixelFormat::kB8G8R8A8)) {
       for (const auto format_modifier : {fuchsia_sysmem::wire::kFormatModifierLinear,
                                          fuchsia_sysmem::wire::kFormatModifierArmLinearTe}) {
         const size_t index = constraints.image_format_constraints_count++;

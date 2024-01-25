@@ -203,7 +203,7 @@ TEST_F(DisplayCoordinatorListenerTest, OnDisplaysChanged) {
   fuchsia::hardware::display::Info test_display;
   test_display.id = {.value = 1};
   test_display.modes = {test_mode};
-  test_display.pixel_format = {fuchsia::images2::PixelFormat::BGRA32};
+  test_display.pixel_format = {fuchsia::images2::PixelFormat::B8G8R8A8};
   test_display.cursor_configs = {};
   test_display.manufacturer_name = "fake_manufacturer_name";
   test_display.monitor_name = "fake_monitor_name";

@@ -2028,7 +2028,7 @@ TEST(Sysmem, ComplicatedFormatModifiersV2) {
     auto& image_constraints_1 = constraints_1.image_format_constraints()->at(i);
 
     image_constraints_1.pixel_format() =
-        i < 2 ? fuchsia_images2::PixelFormat::kR8G8B8A8 : fuchsia_images2::PixelFormat::kBgra32;
+        i < 2 ? fuchsia_images2::PixelFormat::kR8G8B8A8 : fuchsia_images2::PixelFormat::kB8G8R8A8;
     image_constraints_1.pixel_format_modifier() = kFormatModifiers[i];
     image_constraints_1.color_spaces().emplace(1);
     image_constraints_1.color_spaces()->at(0) = fuchsia_images2::ColorSpace::kSrgb;
@@ -3335,7 +3335,7 @@ TEST(Sysmem, PixelFormatBgr24V2) {
   buffer_memory.heap_permitted() = {v2::HeapType::kSystemRam};
   constraints.image_format_constraints().emplace(1);
   auto& image_constraints = constraints.image_format_constraints()->at(0);
-  image_constraints.pixel_format() = fuchsia_images2::PixelFormat::kBgr24;
+  image_constraints.pixel_format() = fuchsia_images2::PixelFormat::kB8G8R8;
   image_constraints.color_spaces().emplace(1);
   image_constraints.color_spaces()->at(0) = fuchsia_images2::ColorSpace::kSrgb;
   // The min dimensions intentionally imply a min size that's larger than
@@ -3374,7 +3374,7 @@ TEST(Sysmem, PixelFormatBgr24V2) {
   ASSERT_TRUE(buffer_collection_info.settings()->image_format_constraints().has_value());
 
   ASSERT_EQ(buffer_collection_info.settings()->image_format_constraints()->pixel_format().value(),
-            fuchsia_images2::PixelFormat::kBgr24);
+            fuchsia_images2::PixelFormat::kB8G8R8);
 
   for (uint32_t i = 0; i < buffer_collection_info.buffers()->size(); ++i) {
     ASSERT_NE(buffer_collection_info.buffers()->at(i).vmo()->get(), ZX_HANDLE_INVALID);
@@ -6545,13 +6545,13 @@ TEST(Sysmem, VectorPixelFormatAndModifier) {
 
   set_pixel_format_modifier_constraints_v2(
       parent_collection,
-      {{fuchsia_images2::PixelFormat::kBgr24, fuchsia_images2::kFormatModifierLinear},
+      {{fuchsia_images2::PixelFormat::kB8G8R8, fuchsia_images2::kFormatModifierLinear},
        {fuchsia_images2::PixelFormat::kR8G8B8A8, fuchsia_images2::kFormatModifierLinear}},
       true);
   set_pixel_format_modifier_constraints_v2(
       child_collection,
       {{fuchsia_images2::PixelFormat::kR8G8B8A8, fuchsia_images2::kFormatModifierLinear},
-       {fuchsia_images2::PixelFormat::kBgra32, fuchsia_images2::kFormatModifierLinear}},
+       {fuchsia_images2::PixelFormat::kB8G8R8A8, fuchsia_images2::kFormatModifierLinear}},
       true);
 
   auto parent_wait_result = parent_collection->WaitForAllBuffersAllocated();
@@ -6630,12 +6630,12 @@ TEST(Sysmem, VectorPixelFormatAndModifier_MultipleInVector) {
 
   set_pixel_format_modifier_constraints_v2(
       parent_collection,
-      {{fuchsia_images2::PixelFormat::kBgra32, fuchsia_images2::kFormatModifierArmAfbc16X16},
+      {{fuchsia_images2::PixelFormat::kB8G8R8A8, fuchsia_images2::kFormatModifierArmAfbc16X16},
        {fuchsia_images2::PixelFormat::kR8G8B8A8, fuchsia_images2::kFormatModifierIntelI915XTiled}},
       true, true);
   set_pixel_format_modifier_constraints_v2(
       child_collection,
-      {{fuchsia_images2::PixelFormat::kBgra32, fuchsia_images2::kFormatModifierIntelI915YTiled},
+      {{fuchsia_images2::PixelFormat::kB8G8R8A8, fuchsia_images2::kFormatModifierIntelI915YTiled},
        {fuchsia_images2::PixelFormat::kR8G8B8A8, fuchsia_images2::kFormatModifierIntelI915XTiled}},
       true, true);
 

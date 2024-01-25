@@ -206,7 +206,7 @@ TEST(ImageFormat, IntelCcsFormats_V1_wire) {
 TEST(ImageFormat, IntelYTiledFormat_V2BytesPerRowDivisor) {
   fidl::Arena allocator;
   sysmem_v2::wire::ImageFormatConstraints constraints(allocator);
-  constraints.set_pixel_format(fuchsia_images2::wire::PixelFormat::kBgra32);
+  constraints.set_pixel_format(fuchsia_images2::wire::PixelFormat::kB8G8R8A8);
   constraints.set_pixel_format_modifier(allocator,
                                         fuchsia_images2::wire::kFormatModifierIntelI915YTiled);
   constraints.set_min_size(allocator, fuchsia_math::wire::SizeU{128u, 32u});

@@ -14,14 +14,14 @@ namespace sysmem_v2 = fuchsia_sysmem2;
 
 TEST(ImageFormat, LinearComparison_V2) {
   PixelFormatAndModifier plain;
-  plain.pixel_format = fuchsia_images2::PixelFormat::kBgra32;
+  plain.pixel_format = fuchsia_images2::PixelFormat::kB8G8R8A8;
 
   PixelFormatAndModifier linear;
-  linear.pixel_format = fuchsia_images2::PixelFormat::kBgra32;
+  linear.pixel_format = fuchsia_images2::PixelFormat::kB8G8R8A8;
   linear.pixel_format_modifier = fuchsia_images2::kFormatModifierLinear;
 
   PixelFormatAndModifier x_tiled;
-  x_tiled.pixel_format = fuchsia_images2::PixelFormat::kBgra32;
+  x_tiled.pixel_format = fuchsia_images2::PixelFormat::kB8G8R8A8;
   x_tiled.pixel_format_modifier = fuchsia_images2::kFormatModifierIntelI915XTiled;
 
   EXPECT_TRUE(ImageFormatIsPixelFormatEqual(plain, plain));
@@ -39,14 +39,14 @@ TEST(ImageFormat, LinearComparison_V2) {
 TEST(ImageFormat, LinearComparison_V2_wire) {
   fidl::Arena allocator;
   PixelFormatAndModifier plain;
-  plain.pixel_format = fuchsia_images2::wire::PixelFormat::kBgra32;
+  plain.pixel_format = fuchsia_images2::wire::PixelFormat::kB8G8R8A8;
 
   PixelFormatAndModifier linear;
-  linear.pixel_format = fuchsia_images2::PixelFormat::kBgra32;
+  linear.pixel_format = fuchsia_images2::PixelFormat::kB8G8R8A8;
   linear.pixel_format_modifier = fuchsia_images2::wire::kFormatModifierLinear;
 
   PixelFormatAndModifier x_tiled;
-  x_tiled.pixel_format = fuchsia_images2::PixelFormat::kBgra32;
+  x_tiled.pixel_format = fuchsia_images2::PixelFormat::kB8G8R8A8;
   x_tiled.pixel_format_modifier = fuchsia_images2::wire::kFormatModifierIntelI915XTiled;
 
   EXPECT_TRUE(ImageFormatIsPixelFormatEqual(plain, plain));
@@ -95,7 +95,7 @@ TEST(ImageFormat, LinearComparison_V1_wire) {
 
 TEST(ImageFormat, LinearRowBytes_V2) {
   sysmem_v2::ImageFormatConstraints constraints;
-  constraints.pixel_format() = fuchsia_images2::PixelFormat::kBgra32;
+  constraints.pixel_format() = fuchsia_images2::PixelFormat::kB8G8R8A8;
   constraints.pixel_format_modifier() = fuchsia_images2::kFormatModifierLinear;
   constraints.min_size() = {12u, 1u};
   constraints.max_size() = {100u, 0xFFFFFFFF};
@@ -115,7 +115,7 @@ TEST(ImageFormat, LinearRowBytes_V2) {
 TEST(ImageFormat, LinearRowBytes_V2_wire) {
   fidl::Arena allocator;
   sysmem_v2::wire::ImageFormatConstraints constraints(allocator);
-  constraints.set_pixel_format(fuchsia_images2::wire::PixelFormat::kBgra32);
+  constraints.set_pixel_format(fuchsia_images2::wire::PixelFormat::kB8G8R8A8);
   constraints.set_pixel_format_modifier(allocator, fuchsia_images2::wire::kFormatModifierLinear);
   constraints.set_min_size(allocator, fuchsia_math::wire::SizeU{12u, 1u});
   constraints.set_max_size(allocator, fuchsia_math::wire::SizeU{100u, 0xFFFFFFFF});
@@ -201,31 +201,31 @@ TEST(ImageFormat, ZbiPixelFormatV2) {
     fpromise::result<fuchsia_images2::wire::PixelFormat> convert_result =
         ImageFormatConvertZbiToSysmemPixelFormat_v2(ZBI_PIXEL_FORMAT_RGB_565);
     ASSERT_TRUE(convert_result.is_ok());
-    EXPECT_EQ(convert_result.value(), fuchsia_images2::wire::PixelFormat::kRgb565);
+    EXPECT_EQ(convert_result.value(), fuchsia_images2::wire::PixelFormat::kR5G6B5);
   }
   {
     fpromise::result<fuchsia_images2::wire::PixelFormat> convert_result =
         ImageFormatConvertZbiToSysmemPixelFormat_v2(ZBI_PIXEL_FORMAT_RGB_332);
     ASSERT_TRUE(convert_result.is_ok());
-    EXPECT_EQ(convert_result.value(), fuchsia_images2::wire::PixelFormat::kRgb332);
+    EXPECT_EQ(convert_result.value(), fuchsia_images2::wire::PixelFormat::kR3G3B2);
   }
   {
     fpromise::result<fuchsia_images2::wire::PixelFormat> convert_result =
         ImageFormatConvertZbiToSysmemPixelFormat_v2(ZBI_PIXEL_FORMAT_RGB_2220);
     ASSERT_TRUE(convert_result.is_ok());
-    EXPECT_EQ(convert_result.value(), fuchsia_images2::wire::PixelFormat::kRgb2220);
+    EXPECT_EQ(convert_result.value(), fuchsia_images2::wire::PixelFormat::kR2G2B2X2);
   }
   {
     fpromise::result<fuchsia_images2::wire::PixelFormat> convert_result =
         ImageFormatConvertZbiToSysmemPixelFormat_v2(ZBI_PIXEL_FORMAT_ARGB_8888);
     ASSERT_TRUE(convert_result.is_ok());
-    EXPECT_EQ(convert_result.value(), fuchsia_images2::wire::PixelFormat::kBgra32);
+    EXPECT_EQ(convert_result.value(), fuchsia_images2::wire::PixelFormat::kB8G8R8A8);
   }
   {
     fpromise::result<fuchsia_images2::wire::PixelFormat> convert_result =
         ImageFormatConvertZbiToSysmemPixelFormat_v2(ZBI_PIXEL_FORMAT_RGB_X888);
     ASSERT_TRUE(convert_result.is_ok());
-    EXPECT_EQ(convert_result.value(), fuchsia_images2::wire::PixelFormat::kBgra32);
+    EXPECT_EQ(convert_result.value(), fuchsia_images2::wire::PixelFormat::kB8G8R8A8);
   }
   {
     fpromise::result<fuchsia_images2::wire::PixelFormat> convert_result =
@@ -249,7 +249,7 @@ TEST(ImageFormat, ZbiPixelFormatV2) {
     fpromise::result<fuchsia_images2::wire::PixelFormat> convert_result =
         ImageFormatConvertZbiToSysmemPixelFormat_v2(ZBI_PIXEL_FORMAT_RGB_888);
     ASSERT_TRUE(convert_result.is_ok());
-    EXPECT_EQ(convert_result.value(), fuchsia_images2::wire::PixelFormat::kBgr24);
+    EXPECT_EQ(convert_result.value(), fuchsia_images2::wire::PixelFormat::kB8G8R8);
   }
   {
     fpromise::result<fuchsia_images2::wire::PixelFormat> convert_result =
@@ -279,7 +279,7 @@ TEST(ImageFormat, ZbiPixelFormatV2) {
 
 TEST(ImageFormat, PlaneByteOffset_V2) {
   sysmem_v2::ImageFormatConstraints constraints;
-  constraints.pixel_format() = fuchsia_images2::PixelFormat::kBgra32;
+  constraints.pixel_format() = fuchsia_images2::PixelFormat::kB8G8R8A8;
   constraints.pixel_format_modifier() = fuchsia_images2::kFormatModifierLinear;
   constraints.min_size() = {12u, 12u};
   constraints.max_size() = {100u, 100u};
@@ -327,7 +327,7 @@ TEST(ImageFormat, PlaneByteOffset_V2) {
 TEST(ImageFormat, PlaneByteOffset_V2_wire) {
   fidl::Arena allocator;
   sysmem_v2::wire::ImageFormatConstraints constraints(allocator);
-  constraints.set_pixel_format(fuchsia_images2::wire::PixelFormat::kBgra32);
+  constraints.set_pixel_format(fuchsia_images2::wire::PixelFormat::kB8G8R8A8);
   constraints.set_pixel_format_modifier(allocator, fuchsia_images2::wire::kFormatModifierLinear);
   constraints.set_min_size(allocator, fuchsia_math::wire::SizeU{12u, 12u});
   constraints.set_max_size(allocator, fuchsia_math::wire::SizeU{100u, 100u});
@@ -428,7 +428,7 @@ TEST(ImageFormat, PlaneByteOffset_V1_wire) {
 
 TEST(ImageFormat, TransactionEliminationFormats_V2) {
   PixelFormatAndModifier format;
-  format.pixel_format = fuchsia_images2::PixelFormat::kBgra32;
+  format.pixel_format = fuchsia_images2::PixelFormat::kB8G8R8A8;
   format.pixel_format_modifier = fuchsia_images2::kFormatModifierLinear;
 
   EXPECT_TRUE(ImageFormatCompatibleWithProtectedMemory(format));
@@ -473,7 +473,7 @@ TEST(ImageFormat, TransactionEliminationFormats_V2) {
 TEST(ImageFormat, TransactionEliminationFormats_V2_wire) {
   fidl::Arena allocator;
   PixelFormatAndModifier format;
-  format.pixel_format = fuchsia_images2::wire::PixelFormat::kBgra32;
+  format.pixel_format = fuchsia_images2::wire::PixelFormat::kB8G8R8A8;
   format.pixel_format_modifier = fuchsia_images2::wire::kFormatModifierLinear;
 
   EXPECT_TRUE(ImageFormatCompatibleWithProtectedMemory(format));
@@ -569,7 +569,7 @@ TEST(ImageFormat, BasicSizes_V2) {
   constexpr uint32_t kStride = kWidth * 6;
 
   fuchsia_images2::ImageFormat image_format_bgra32;
-  image_format_bgra32.pixel_format() = fuchsia_images2::PixelFormat::kBgra32;
+  image_format_bgra32.pixel_format() = fuchsia_images2::PixelFormat::kB8G8R8A8;
   image_format_bgra32.size() = {kWidth, kHeight};
   image_format_bgra32.bytes_per_row().emplace(kStride);
   EXPECT_EQ(kHeight * kStride, ImageFormatImageSize(image_format_bgra32));
@@ -597,7 +597,7 @@ TEST(ImageFormat, BasicSizes_V2_wire) {
   constexpr uint32_t kStride = kWidth * 6;
 
   fuchsia_images2::wire::ImageFormat image_format_bgra32(allocator);
-  image_format_bgra32.set_pixel_format(fuchsia_images2::PixelFormat::kBgra32);
+  image_format_bgra32.set_pixel_format(fuchsia_images2::PixelFormat::kB8G8R8A8);
   image_format_bgra32.set_size(allocator, fuchsia_math::wire::SizeU{kWidth, kHeight});
   image_format_bgra32.set_bytes_per_row(kStride);
   EXPECT_EQ(kHeight * kStride, ImageFormatImageSize(image_format_bgra32));
@@ -775,12 +775,12 @@ TEST(ImageFormat, GoldfishOptimal_V2) {
   constexpr uint32_t kStride = kWidth * 6;
 
   fuchsia_images2::ImageFormat linear_image_format_bgra32;
-  linear_image_format_bgra32.pixel_format() = fuchsia_images2::PixelFormat::kBgra32;
+  linear_image_format_bgra32.pixel_format() = fuchsia_images2::PixelFormat::kB8G8R8A8;
   linear_image_format_bgra32.size() = {kWidth, kHeight};
   linear_image_format_bgra32.bytes_per_row().emplace(kStride);
 
   fuchsia_images2::ImageFormat goldfish_optimal_image_format_bgra32;
-  goldfish_optimal_image_format_bgra32.pixel_format() = fuchsia_images2::PixelFormat::kBgra32;
+  goldfish_optimal_image_format_bgra32.pixel_format() = fuchsia_images2::PixelFormat::kB8G8R8A8;
   goldfish_optimal_image_format_bgra32.pixel_format_modifier() =
       fuchsia_images2::kFormatModifierGoogleGoldfishOptimal;
   goldfish_optimal_image_format_bgra32.size() = {kWidth, kHeight};
@@ -806,13 +806,13 @@ TEST(ImageFormat, GoldfishOptimal_V2_wire) {
   constexpr uint32_t kStride = kWidth * 6;
 
   fuchsia_images2::wire::ImageFormat linear_image_format_bgra32(allocator);
-  linear_image_format_bgra32.set_pixel_format(fuchsia_images2::wire::PixelFormat::kBgra32);
+  linear_image_format_bgra32.set_pixel_format(fuchsia_images2::wire::PixelFormat::kB8G8R8A8);
   linear_image_format_bgra32.set_size(allocator, fuchsia_math::wire::SizeU{kWidth, kHeight});
   linear_image_format_bgra32.set_bytes_per_row(kStride);
 
   fuchsia_images2::wire::ImageFormat goldfish_optimal_image_format_bgra32(allocator);
   goldfish_optimal_image_format_bgra32.set_pixel_format(
-      fuchsia_images2::wire::PixelFormat::kBgra32);
+      fuchsia_images2::wire::PixelFormat::kB8G8R8A8);
   goldfish_optimal_image_format_bgra32.set_pixel_format_modifier(
       allocator, fuchsia_images2::wire::kFormatModifierGoogleGoldfishOptimal);
   goldfish_optimal_image_format_bgra32.set_size(allocator,

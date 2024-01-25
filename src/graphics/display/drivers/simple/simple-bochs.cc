@@ -17,7 +17,7 @@ namespace {
 
 constexpr int kDisplayWidth = 1024;
 constexpr int kDisplayHeight = 768;
-constexpr auto kDisplayFormat = fuchsia_images2::wire::PixelFormat::kBgra32;
+constexpr auto kDisplayFormat = fuchsia_images2::wire::PixelFormat::kB8G8R8A8;
 constexpr int kBitsPerPixel = 32;
 
 }  // namespace

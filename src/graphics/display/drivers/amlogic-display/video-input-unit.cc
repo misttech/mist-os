@@ -330,7 +330,7 @@ void VideoInputUnit::FlipOnVsync(uint8_t idx, const display_config_t* config,
     case fuchsia_images2::PixelFormat::kR8G8B8A8:
       cfg_w0.set_color_matrix(OsdBlk0CfgW0Reg::kColorMatrixAbgr8888);
       break;
-    case fuchsia_images2::PixelFormat::kBgra32:
+    case fuchsia_images2::PixelFormat::kB8G8R8A8:
       cfg_w0.set_color_matrix(OsdBlk0CfgW0Reg::kColorMatrixArgb8888);
       break;
     default:

@@ -448,7 +448,7 @@ void Pipe::ApplyConfiguration(const display_config_t* banjo_display_config,
   if (has_color_layer) {
     color_layer_t* layer = &banjo_display_config->layer_list[0]->cfg.color;
     const auto format = static_cast<fuchsia_images2::wire::PixelFormat>(layer->format);
-    ZX_DEBUG_ASSERT(format == fuchsia_images2::wire::PixelFormat::kBgra32);
+    ZX_DEBUG_ASSERT(format == fuchsia_images2::wire::PixelFormat::kB8G8R8A8);
     uint32_t color = *reinterpret_cast<const uint32_t*>(layer->color_list);
 
     bottom_color.set_r(encode_pipe_color_component(static_cast<uint8_t>(color >> 16)));
@@ -675,7 +675,7 @@ void Pipe::ConfigurePrimaryPlane(uint32_t plane_num, const primary_layer_t* prim
     case fuchsia_images2::PixelFormat::kR8G8B8A8:
       plane_ctrl.set_rgb_color_order(registers::PlaneControl::RgbColorOrder::kRgbx);
       break;
-    case fuchsia_images2::PixelFormat::kBgra32:
+    case fuchsia_images2::PixelFormat::kB8G8R8A8:
       plane_ctrl.set_rgb_color_order(registers::PlaneControl::RgbColorOrder::kBgrx);
       break;
     default:

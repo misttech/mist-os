@@ -657,7 +657,7 @@ TEST_F(FakeSysmemTest, SysmemRequirements_BgraOnly) {
     return new_buffer_collection;
   });
   display_->SetFormatSupportCheck([](fuchsia_images2::wire::PixelFormat format) {
-    return format == fuchsia_images2::wire::PixelFormat::kBgra32;
+    return format == fuchsia_images2::wire::PixelFormat::kB8G8R8A8;
   });
 
   zx::result<fidl::Endpoints<sysmem::BufferCollectionToken>> token_endpoints =

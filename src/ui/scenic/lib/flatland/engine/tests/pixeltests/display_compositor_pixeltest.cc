@@ -329,7 +329,7 @@ class DisplayCompositorPixelTest : public DisplayCompositorTestBase {
   // TODO(https://fxbug.dev/42076251): This is unnecesarily hardcoded. We should consider
   // making display pixel format a test parameter as well.
   static constexpr fuchsia_images2::PixelFormat kDisplayPixelFormat =
-      fuchsia_images2::PixelFormat::kBgra32;
+      fuchsia_images2::PixelFormat::kB8G8R8A8;
 
   fuchsia::sysmem::AllocatorSyncPtr sysmem_allocator_;
   std::unique_ptr<async::Executor> executor_;

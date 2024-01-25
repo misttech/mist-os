@@ -86,7 +86,7 @@ const std::map<ColorSpaceWire, SamplingInfo> kColorSpaceSamplingInfo = {
 };
 const std::map<PixelFormatWire, SamplingInfo> kPixelFormatSamplingInfo = {
     {PixelFormat::kR8G8B8A8, {{8}, kColorType_RGB}},
-    {PixelFormat::kBgra32, {{8}, kColorType_RGB}},
+    {PixelFormat::kB8G8R8A8, {{8}, kColorType_RGB}},
     {PixelFormat::kI420, {{8}, kColorType_YUV}},
     {PixelFormat::kM420, {{8}, kColorType_YUV}},
     {PixelFormat::kNv12, {{8}, kColorType_YUV}},
@@ -95,12 +95,12 @@ const std::map<PixelFormatWire, SamplingInfo> kPixelFormatSamplingInfo = {
     // pretending to be uncompressed.
     {PixelFormat::kMjpeg, {{8}, kColorType_RGB}},
     {PixelFormat::kYv12, {{8}, kColorType_YUV}},
-    {PixelFormat::kBgr24, {{8}, kColorType_RGB}},
+    {PixelFormat::kB8G8R8, {{8}, kColorType_RGB}},
 
     // These use the same colorspaces as regular 8-bit-per-component formats
-    {PixelFormat::kRgb565, {{8}, kColorType_RGB}},
-    {PixelFormat::kRgb332, {{8}, kColorType_RGB}},
-    {PixelFormat::kRgb2220, {{8}, kColorType_RGB}},
+    {PixelFormat::kR5G6B5, {{8}, kColorType_RGB}},
+    {PixelFormat::kR3G3B2, {{8}, kColorType_RGB}},
+    {PixelFormat::kR2G2B2X2, {{8}, kColorType_RGB}},
     // Expands to RGB
     {PixelFormat::kL8, {{8}, kColorType_RGB}},
     {PixelFormat::kR8, {{8}, kColorType_RGB}},
@@ -152,7 +152,7 @@ class IntelTiledFormats : public ImageFormatSet {
 
   bool IsSupported(const PixelFormatAndModifier& pixel_format) const override {
     if (pixel_format.pixel_format != PixelFormat::kR8G8B8A8 &&
-        pixel_format.pixel_format != PixelFormat::kBgra32 &&
+        pixel_format.pixel_format != PixelFormat::kB8G8R8A8 &&
         pixel_format.pixel_format != PixelFormat::kNv12) {
       return false;
     }
@@ -368,7 +368,7 @@ class IntelTiledFormats : public ImageFormatSet {
 
     switch (pixel_format_and_modifier.pixel_format) {
       case PixelFormat::kR8G8B8A8:
-      case PixelFormat::kBgra32: {
+      case PixelFormat::kB8G8R8A8: {
         // Format only has one plane
         ZX_DEBUG_ASSERT(plane == 0);
 
@@ -414,7 +414,7 @@ class IntelTiledFormats : public ImageFormatSet {
   static uint32_t FormatNumOfPlanes(const PixelFormat& pixel_format) {
     switch (pixel_format) {
       case PixelFormat::kR8G8B8A8:
-      case PixelFormat::kBgra32:
+      case PixelFormat::kB8G8R8A8:
         return 1u;
       case PixelFormat::kNv12:
         return 2u;
@@ -445,7 +445,7 @@ class AfbcFormats : public ImageFormatSet {
       fuchsia_images2::kFormatModifierArmBchBit | fuchsia_images2::kFormatModifierArmTiledHeaderBit;
   bool IsSupported(const PixelFormatAndModifier& pixel_format) const override {
     if (pixel_format.pixel_format != PixelFormatWire::kR8G8B8A8 &&
-        pixel_format.pixel_format != PixelFormatWire::kBgra32) {
+        pixel_format.pixel_format != PixelFormatWire::kB8G8R8A8) {
       return false;
     }
     switch (pixel_format.pixel_format_modifier & ~kAfbcModifierMask) {
@@ -507,7 +507,7 @@ class AfbcFormats : public ImageFormatSet {
 
     ZX_DEBUG_ASSERT(image_format.pixel_format().has_value());
     ZX_DEBUG_ASSERT(image_format.pixel_format().value() == PixelFormatWire::kR8G8B8A8 ||
-                    image_format.pixel_format().value() == PixelFormatWire::kBgra32);
+                    image_format.pixel_format().value() == PixelFormatWire::kB8G8R8A8);
     constexpr uint32_t kBytesPerPixel = 4;
     constexpr uint32_t kBytesPerBlockHeader = 16;
 
@@ -610,11 +610,11 @@ class AfbcFormats : public ImageFormatSet {
 uint64_t linear_size(uint32_t surface_height, uint32_t bytes_per_row, PixelFormat type) {
   switch (type) {
     case PixelFormat::kR8G8B8A8:
-    case PixelFormat::kBgra32:
-    case PixelFormat::kBgr24:
-    case PixelFormat::kRgb565:
-    case PixelFormat::kRgb332:
-    case PixelFormat::kRgb2220:
+    case PixelFormat::kB8G8R8A8:
+    case PixelFormat::kB8G8R8:
+    case PixelFormat::kR5G6B5:
+    case PixelFormat::kR3G3B2:
+    case PixelFormat::kR2G2B2X2:
     case PixelFormat::kL8:
     case PixelFormat::kR8:
     case PixelFormat::kR8G8:
@@ -689,16 +689,16 @@ class LinearFormats : public ImageFormatSet {
       case PixelFormat::kMjpeg:
         return false;
       case PixelFormat::kR8G8B8A8:
-      case PixelFormat::kBgra32:
-      case PixelFormat::kBgr24:
+      case PixelFormat::kB8G8R8A8:
+      case PixelFormat::kB8G8R8:
       case PixelFormat::kI420:
       case PixelFormat::kM420:
       case PixelFormat::kNv12:
       case PixelFormat::kYuy2:
       case PixelFormat::kYv12:
-      case PixelFormat::kRgb565:
-      case PixelFormat::kRgb332:
-      case PixelFormat::kRgb2220:
+      case PixelFormat::kR5G6B5:
+      case PixelFormat::kR3G3B2:
+      case PixelFormat::kR2G2B2X2:
       case PixelFormat::kL8:
       case PixelFormat::kR8:
       case PixelFormat::kR8G8:
@@ -864,16 +864,16 @@ class ArmTELinearFormats : public ImageFormatSet {
       case PixelFormat::kMjpeg:
         return false;
       case PixelFormat::kR8G8B8A8:
-      case PixelFormat::kBgra32:
-      case PixelFormat::kBgr24:
+      case PixelFormat::kB8G8R8A8:
+      case PixelFormat::kB8G8R8:
       case PixelFormat::kI420:
       case PixelFormat::kM420:
       case PixelFormat::kNv12:
       case PixelFormat::kYuy2:
       case PixelFormat::kYv12:
-      case PixelFormat::kRgb565:
-      case PixelFormat::kRgb332:
-      case PixelFormat::kRgb2220:
+      case PixelFormat::kR5G6B5:
+      case PixelFormat::kR3G3B2:
+      case PixelFormat::kR2G2B2X2:
       case PixelFormat::kL8:
       case PixelFormat::kR8:
       case PixelFormat::kR8G8:
@@ -1041,9 +1041,9 @@ uint32_t ImageFormatBitsPerPixel(const PixelFormatAndModifier& pixel_format) {
       return 0u;
     case PixelFormat::kR8G8B8A8:
       return 4u * 8u;
-    case PixelFormat::kBgra32:
+    case PixelFormat::kB8G8R8A8:
       return 4u * 8u;
-    case PixelFormat::kBgr24:
+    case PixelFormat::kB8G8R8:
       return 3u * 8u;
     case PixelFormat::kI420:
       return 12u;
@@ -1055,10 +1055,10 @@ uint32_t ImageFormatBitsPerPixel(const PixelFormatAndModifier& pixel_format) {
       return 2u * 8u;
     case PixelFormat::kYv12:
       return 12u;
-    case PixelFormat::kRgb565:
+    case PixelFormat::kR5G6B5:
       return 16u;
-    case PixelFormat::kRgb332:
-    case PixelFormat::kRgb2220:
+    case PixelFormat::kR3G3B2:
+    case PixelFormat::kR2G2B2X2:
     case PixelFormat::kL8:
     case PixelFormat::kR8:
       return 8u;
@@ -1092,9 +1092,9 @@ uint32_t ImageFormatStrideBytesPerWidthPixel(const PixelFormatAndModifier& pixel
       return 0u;
     case PixelFormat::kR8G8B8A8:
       return 4u;
-    case PixelFormat::kBgra32:
+    case PixelFormat::kB8G8R8A8:
       return 4u;
-    case PixelFormat::kBgr24:
+    case PixelFormat::kB8G8R8:
       return 3u;
     case PixelFormat::kI420:
       return 1u;
@@ -1106,11 +1106,11 @@ uint32_t ImageFormatStrideBytesPerWidthPixel(const PixelFormatAndModifier& pixel
       return 2u;
     case PixelFormat::kYv12:
       return 1u;
-    case PixelFormat::kRgb565:
+    case PixelFormat::kR5G6B5:
       return 2u;
-    case PixelFormat::kRgb332:
+    case PixelFormat::kR3G3B2:
       return 1u;
-    case PixelFormat::kRgb2220:
+    case PixelFormat::kR2G2B2X2:
       return 1u;
     case PixelFormat::kL8:
       return 1u;
@@ -1170,9 +1170,9 @@ uint32_t ImageFormatSurfaceWidthMinDivisor(const PixelFormatAndModifier& pixel_f
       return 0u;
     case PixelFormat::kR8G8B8A8:
       return 1u;
-    case PixelFormat::kBgra32:
+    case PixelFormat::kB8G8R8A8:
       return 1u;
-    case PixelFormat::kBgr24:
+    case PixelFormat::kB8G8R8:
       return 1u;
     case PixelFormat::kI420:
       return 2u;
@@ -1184,11 +1184,11 @@ uint32_t ImageFormatSurfaceWidthMinDivisor(const PixelFormatAndModifier& pixel_f
       return 2u;
     case PixelFormat::kYv12:
       return 2u;
-    case PixelFormat::kRgb565:
+    case PixelFormat::kR5G6B5:
       return 1u;
-    case PixelFormat::kRgb332:
+    case PixelFormat::kR3G3B2:
       return 1u;
-    case PixelFormat::kRgb2220:
+    case PixelFormat::kR2G2B2X2:
       return 1u;
     case PixelFormat::kL8:
       return 1u;
@@ -1223,9 +1223,9 @@ uint32_t ImageFormatSurfaceHeightMinDivisor(const PixelFormatAndModifier& pixel_
       return 0u;
     case PixelFormat::kR8G8B8A8:
       return 1u;
-    case PixelFormat::kBgra32:
+    case PixelFormat::kB8G8R8A8:
       return 1u;
-    case PixelFormat::kBgr24:
+    case PixelFormat::kB8G8R8:
       return 1u;
     case PixelFormat::kI420:
       return 2u;
@@ -1237,11 +1237,11 @@ uint32_t ImageFormatSurfaceHeightMinDivisor(const PixelFormatAndModifier& pixel_
       return 2u;
     case PixelFormat::kYv12:
       return 2u;
-    case PixelFormat::kRgb565:
+    case PixelFormat::kR5G6B5:
       return 1u;
-    case PixelFormat::kRgb332:
+    case PixelFormat::kR3G3B2:
       return 1u;
-    case PixelFormat::kRgb2220:
+    case PixelFormat::kR2G2B2X2:
       return 1u;
     case PixelFormat::kL8:
       return 1u;
@@ -1276,9 +1276,9 @@ uint32_t ImageFormatSampleAlignment(const PixelFormatAndModifier& pixel_format) 
       return 0u;
     case PixelFormat::kR8G8B8A8:
       return 4u;
-    case PixelFormat::kBgra32:
+    case PixelFormat::kB8G8R8A8:
       return 4u;
-    case PixelFormat::kBgr24:
+    case PixelFormat::kB8G8R8:
       return 1u;
     case PixelFormat::kI420:
       return 2u;
@@ -1290,11 +1290,11 @@ uint32_t ImageFormatSampleAlignment(const PixelFormatAndModifier& pixel_format) 
       return 2u;
     case PixelFormat::kYv12:
       return 2u;
-    case PixelFormat::kRgb565:
+    case PixelFormat::kR5G6B5:
       return 2u;
-    case PixelFormat::kRgb332:
+    case PixelFormat::kR3G3B2:
       return 1u;
-    case PixelFormat::kRgb2220:
+    case PixelFormat::kR2G2B2X2:
       return 1u;
     case PixelFormat::kL8:
       return 1u;
@@ -1359,15 +1359,15 @@ fpromise::result<fuchsia_images2::wire::PixelFormat> ImageFormatConvertZbiToSysm
     zbi_pixel_format_t zx_pixel_format) {
   switch (zx_pixel_format) {
     case ZBI_PIXEL_FORMAT_RGB_565:
-      return fpromise::ok(PixelFormat::kRgb565);
+      return fpromise::ok(PixelFormat::kR5G6B5);
     case ZBI_PIXEL_FORMAT_RGB_332:
-      return fpromise::ok(PixelFormat::kRgb332);
+      return fpromise::ok(PixelFormat::kR3G3B2);
     case ZBI_PIXEL_FORMAT_RGB_2220:
-      return fpromise::ok(PixelFormat::kRgb2220);
+      return fpromise::ok(PixelFormat::kR2G2B2X2);
     case ZBI_PIXEL_FORMAT_ARGB_8888:
       // Switching to using alpha.
     case ZBI_PIXEL_FORMAT_RGB_X888:
-      return fpromise::ok(PixelFormat::kBgra32);
+      return fpromise::ok(PixelFormat::kB8G8R8A8);
     case ZBI_PIXEL_FORMAT_MONO_8:
       return fpromise::ok(PixelFormat::kL8);
     case ZBI_PIXEL_FORMAT_I420:
@@ -1375,7 +1375,7 @@ fpromise::result<fuchsia_images2::wire::PixelFormat> ImageFormatConvertZbiToSysm
     case ZBI_PIXEL_FORMAT_NV12:
       return fpromise::ok(PixelFormat::kNv12);
     case ZBI_PIXEL_FORMAT_RGB_888:
-      return fpromise::ok(PixelFormat::kBgr24);
+      return fpromise::ok(PixelFormat::kB8G8R8);
     case ZBI_PIXEL_FORMAT_ABGR_8888:
       // Switching to using alpha.
     case ZBI_PIXEL_FORMAT_BGR_888_X:

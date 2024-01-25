@@ -102,7 +102,7 @@ GetCreateColorBuffer2Params(fidl::AnyArena& allocator,
   const auto& pixel_format = image_constraints.pixel_format();
   ColorBufferFormatType color_buffer_format;
   switch (pixel_format) {
-    case PixelFormat::kBgra32:
+    case PixelFormat::kB8G8R8A8:
       color_buffer_format = ColorBufferFormatType::kBgra;
       break;
     case PixelFormat::kR8G8B8A8:

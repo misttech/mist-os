@@ -30,7 +30,7 @@ Display::Display(fuchsia::hardware::display::types::DisplayId id, uint32_t width
 }
 Display::Display(fuchsia::hardware::display::types::DisplayId id, uint32_t width_in_px,
                  uint32_t height_in_px)
-    : Display(id, width_in_px, height_in_px, 0, 0, {fuchsia_images2::PixelFormat::kBgra32}, 0) {}
+    : Display(id, width_in_px, height_in_px, 0, 0, {fuchsia_images2::PixelFormat::kB8G8R8A8}, 0) {}
 
 void Display::Claim() {
   FX_DCHECK(!claimed_);

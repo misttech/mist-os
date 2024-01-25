@@ -74,7 +74,7 @@ namespace {
 
 constexpr fuchsia_images2_pixel_format_enum_value_t kSupportedFormats[] = {
     static_cast<fuchsia_images2_pixel_format_enum_value_t>(
-        fuchsia_images2::wire::PixelFormat::kBgra32),
+        fuchsia_images2::wire::PixelFormat::kB8G8R8A8),
     static_cast<fuchsia_images2_pixel_format_enum_value_t>(
         fuchsia_images2::wire::PixelFormat::kR8G8B8A8),
 };
@@ -83,15 +83,15 @@ constexpr cursor_info_t kCursorInfos[3] = {
     {.width = 64,
      .height = 64,
      .format = static_cast<fuchsia_images2_pixel_format_enum_value_t>(
-         fuchsia_images2::wire::PixelFormat::kBgra32)},
+         fuchsia_images2::wire::PixelFormat::kB8G8R8A8)},
     {.width = 128,
      .height = 128,
      .format = static_cast<fuchsia_images2_pixel_format_enum_value_t>(
-         fuchsia_images2::wire::PixelFormat::kBgra32)},
+         fuchsia_images2::wire::PixelFormat::kB8G8R8A8)},
     {.width = 256,
      .height = 256,
      .format = static_cast<fuchsia_images2_pixel_format_enum_value_t>(
-         fuchsia_images2::wire::PixelFormat::kBgra32)},
+         fuchsia_images2::wire::PixelFormat::kB8G8R8A8)},
 };
 constexpr uint32_t kImageTypes[4] = {
     IMAGE_TYPE_SIMPLE,
@@ -1782,7 +1782,7 @@ config_check_result_t Controller::DisplayControllerImplCheckConfiguration(
           }
           const auto format = static_cast<fuchsia_images2::wire::PixelFormat>(
               banjo_display_config->layer_list[j]->cfg.color.format);
-          if (format != fuchsia_images2::wire::PixelFormat::kBgra32) {
+          if (format != fuchsia_images2::wire::PixelFormat::kB8G8R8A8) {
             current_display_client_composition_opcodes[j] |= CLIENT_COMPOSITION_OPCODE_USE_PRIMARY;
           }
           break;

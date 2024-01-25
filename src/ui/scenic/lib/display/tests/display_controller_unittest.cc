@@ -20,7 +20,7 @@ TEST_F(DisplayCoordinatorTest, Display2Test) {
   constexpr fuchsia::hardware::display::types::DisplayId kDisplayId = {.value = 2};
   const fuchsia::hardware::display::Mode kDisplayMode = {
       .horizontal_resolution = 1024, .vertical_resolution = 800, .refresh_rate_e2 = 60, .flags = 0};
-  const fuchsia_images2::PixelFormat kPixelFormat = fuchsia_images2::PixelFormat::kBgra32;
+  const fuchsia_images2::PixelFormat kPixelFormat = fuchsia_images2::PixelFormat::kB8G8R8A8;
 
   Display2 display(kDisplayId, /*display_modes=*/{kDisplayMode}, /*pixel_formats=*/{kPixelFormat});
 
@@ -48,7 +48,7 @@ TEST_F(DisplayCoordinatorTest, DisplayCoordinatorTest) {
   constexpr fuchsia::hardware::display::types::DisplayId kDisplayId2 = {.value = 2};
   const fuchsia::hardware::display::Mode kDisplayMode = {
       .horizontal_resolution = 1024, .vertical_resolution = 800, .refresh_rate_e2 = 60, .flags = 0};
-  const fuchsia_images2::PixelFormat kPixelFormat = fuchsia_images2::PixelFormat::kBgra32;
+  const fuchsia_images2::PixelFormat kPixelFormat = fuchsia_images2::PixelFormat::kB8G8R8A8;
 
   Display2 display1(kDisplayId1, {kDisplayMode}, {kPixelFormat});
   Display2 display2(kDisplayId2, {kDisplayMode}, {kPixelFormat});
