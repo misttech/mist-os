@@ -104,6 +104,15 @@ class SSH:
             ) from err
         _LOGGER.debug("%s is available via ssh.", self._name)
 
+    @property
+    def target_address(self) -> custom_types.TargetSshAddress:
+        """Gets the address used on SSH."""
+        if self._ip_port:
+            return custom_types.TargetSshAddress(
+                ip=self._ip_port.ip, port=self._ip_port.port
+            )
+        return self._ffx_transport.get_target_ssh_address()
+
     def run(
         self, command: str, timeout: float = _TIMEOUTS["COMMAND_RESPONSE"]
     ) -> str:
@@ -120,19 +129,46 @@ class SSH:
             errors.SSHCommandError: On failure.
             errors.FfxCommandError: If failed to get the target SSH address.
         """
+        process = self.popen(command)
+        stdout, stderr = process.communicate(timeout=timeout)
+        if process.returncode != 0:
+            if stdout:
+                _LOGGER.debug("stdout returned by the command is: %s", stdout)
+            if stderr:
+                _LOGGER.debug("stderr returned by the command is: %s", stdout)
+            raise errors.SSHCommandError(
+                f"Unexpected returncode: {process.returncode}"
+            )
+        _LOGGER.debug(
+            "Output returned by SSH command '%s' is: '%s'",
+            command,
+            stdout,
+        )
+        return stdout.decode()
+
+    def popen(self, command: str) -> subprocess.Popen[Any]:
+        """Run command on Fuchsia device from host via SSH and return the underlying subprocess.
+
+        It is up to callers to detect and handle potential errors, and make sure
+        to close this process eventually (e.g. with `popen.terminate` method).
+
+
+        Args:
+            command: Command to run on the Fuchsia device.
+
+        Returns:
+            The underlying subprocess.
+
+        Raises:
+            errors.SSHCommandError: On failure.
+            errors.FfxCommandError: If failed to get the target SSH address.
+        """
         ip: ipaddress.IPv4Address | ipaddress.IPv6Address | None = None
         port: int | None = None
         ssh_command: str
 
-        if self._ip_port:
-            ip = self._ip_port.ip
-            port = self._ip_port.port
-        else:
-            target_ssh_address: custom_types.TargetSshAddress = (
-                self._ffx_transport.get_target_ssh_address()
-            )
-            ip = target_ssh_address.ip
-            port = target_ssh_address.port
+        address = self.target_address
+        ip, port = address.ip, address.port
 
         if port:
             ssh_command = _SSH_COMMAND_WITH_PORT.format(
@@ -152,27 +188,12 @@ class SSH:
                 command=command,
             )
 
+        _LOGGER.debug("Running the SSH command: '%s'...", ssh_command)
         try:
-            _LOGGER.debug("Running the SSH command: '%s'...", ssh_command)
-            output: str = subprocess.check_output(
-                ssh_command.split(), timeout=timeout
-            ).decode()
-            _LOGGER.debug(
-                "Output returned by SSH command '%s' is: '%s'",
-                ssh_command,
-                output,
+            return subprocess.Popen(
+                ssh_command.split(),
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
             )
-            return output
-        except subprocess.CalledProcessError as err:
-            if err.stdout:
-                _LOGGER.debug(
-                    "stdout returned by the command is: %s", err.stdout
-                )
-            if err.stderr:
-                _LOGGER.debug(
-                    "stderr returned by the command is: %s", err.stdout
-                )
-
-            raise errors.SSHCommandError(err) from err
         except Exception as err:  # pylint: disable=broad-except
             raise errors.SSHCommandError(err) from err

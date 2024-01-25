@@ -105,15 +105,17 @@ class SshTests(unittest.TestCase):
         mock_time.assert_called()
         mock_sleep.assert_called()
 
-    @mock.patch.object(
-        ssh.subprocess,
-        "check_output",
-        return_value=b"some output",
-        autospec=True,
-    )
-    def test_ssh_run_wo_device_ip(self, mock_check_output) -> None:
+    @mock.patch.object(ssh.subprocess, "Popen", autospec=True)
+    def test_ssh_run_wo_device_ip(self, mock_popen) -> None:
         """Testcase for SSH.run() when called using SSH object created without
         device_ip argument."""
+        process_mock = mock.Mock()
+        attrs = {
+            "communicate.return_value": (b"some output", None),
+            "returncode": 0,
+        }
+        process_mock.configure_mock(**attrs)
+        mock_popen.return_value = process_mock
         self.ffx_obj.get_target_ssh_address.return_value = _MOCK_ARGS[
             "target_ssh_address"
         ]
@@ -121,56 +123,112 @@ class SshTests(unittest.TestCase):
             self.ssh_obj_wo_ip.run(command="some_command"), "some output"
         )
 
-        mock_check_output.assert_called()
+        mock_popen.assert_called_with(
+            [
+                "ssh",
+                "-oPasswordAuthentication=no",
+                "-oStrictHostKeyChecking=no",
+                "-oConnectTimeout=3",
+                "-i",
+                f"{_SSH_PRIVATE_KEY}",
+                "-p",
+                f"{_SSH_PORT}",
+                f"fuchsia@{_IPV4}",
+                "some_command",
+            ],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
 
-    @mock.patch.object(
-        ssh.subprocess,
-        "check_output",
-        return_value=b"some output",
-        autospec=True,
-    )
-    def test_ssh_run_with_device_ip(self, mock_check_output) -> None:
+    @mock.patch.object(ssh.subprocess, "Popen", autospec=True)
+    def test_ssh_run_with_device_ip(self, mock_popen) -> None:
         """Testcase for SSH.run() when called using SSH object created with
         device_ip argument."""
+        process_mock = mock.Mock()
+        attrs = {
+            "communicate.return_value": (b"some output", None),
+            "returncode": 0,
+        }
+        process_mock.configure_mock(**attrs)
+        mock_popen.return_value = process_mock
         self.assertEqual(
             self.ssh_obj_with_ip.run(command="some_command"), "some output"
         )
 
-        mock_check_output.assert_called()
+        mock_popen.assert_called_with(
+            [
+                "ssh",
+                "-oPasswordAuthentication=no",
+                "-oStrictHostKeyChecking=no",
+                "-oConnectTimeout=3",
+                "-i",
+                f"{_SSH_PRIVATE_KEY}",
+                f"fuchsia@{_IPV4}",
+                "some_command",
+            ],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
 
     @parameterized.expand(
         [
             (
                 {
                     "label": "CalledProcessError",
-                    "side_effect": subprocess.CalledProcessError(
-                        returncode=1,
-                        cmd="ssh fuchsia@12.34.56.78:ls",
-                        output="command output",
-                        stderr="command error",
-                    ),
+                    "return_code": 1,
                 },
             ),
             (
                 {
                     "label": "RuntimeError",
+                    "return_code": 0,
                     "side_effect": RuntimeError("command failed"),
                 },
             ),
         ],
         name_func=_custom_test_name_func,
     )
-    @mock.patch.object(ssh.subprocess, "check_output", autospec=True)
-    def test_ssh_run_exception(
-        self, parameterized_dict, mock_check_output
-    ) -> None:
+    @mock.patch.object(ssh.subprocess, "Popen", autospec=True)
+    def test_ssh_run_exception(self, parameterized_dict, mock_popen) -> None:
         """Testcase for SSH.run() raising errors.SSHCommandError exception"""
         self.ffx_obj.get_target_ssh_address.return_value = _MOCK_ARGS[
             "target_ssh_address"
         ]
-        mock_check_output.side_effect = parameterized_dict["side_effect"]
+        process_mock = mock.Mock()
+        attrs = {
+            "communicate.return_value": (b"some output", "some error"),
+            "returncode": parameterized_dict["return_code"],
+        }
+        process_mock.configure_mock(**attrs)
+        mock_popen.return_value = process_mock
+        if "side_effect" in parameterized_dict:
+            mock_popen.side_effect = parameterized_dict["side_effect"]
 
         with self.assertRaises(errors.SSHCommandError):
             self.ssh_obj_wo_ip.run(command="some_command")
 
-        mock_check_output.assert_called()
+        mock_popen.assert_called()
+
+    @mock.patch.object(ssh.subprocess, "Popen", autospec=True)
+    def test_ssh_popen(self, mock_popen) -> None:
+        """Testcase for SSH.popen()"""
+        self.assertEqual(
+            self.ssh_obj_with_ip.popen("some_command"),
+            mock_popen.return_value,
+        )
+        mock_popen.assert_called()
+
+    def test_ssh_ip_port(self) -> None:
+        """Testcase for SSH.target_address"""
+        self.ffx_obj.get_target_ssh_address.return_value = _MOCK_ARGS[
+            "target_ssh_address"
+        ]
+        self.assertEqual(
+            self.ssh_obj_wo_ip.target_address, _MOCK_ARGS["target_ssh_address"]
+        )
+        self.ffx_obj.get_target_ssh_address.assert_called()
+        address = self.ssh_obj_with_ip.target_address
+        self.assertEqual(address.ip, _INPUT_ARGS["device_ssh_ipv4_no_port"].ip)
+        self.assertEqual(
+            address.port, _INPUT_ARGS["device_ssh_ipv4_no_port"].port
+        )
