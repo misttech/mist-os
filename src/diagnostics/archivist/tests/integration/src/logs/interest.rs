@@ -3,11 +3,13 @@
 // found in the LICENSE file.
 
 use crate::test_topology;
+use anyhow::{Context, Error};
 use diagnostics_data::LogsData;
-use diagnostics_reader::{ArchiveReader, Error, Logs};
+use diagnostics_reader::{ArchiveReader, Logs};
 use fidl_fuchsia_archivist_test as ftest;
 use fidl_fuchsia_diagnostics::{
-    ArchiveAccessorMarker, Interest, LogInterestSelector, LogSettingsMarker, Severity,
+    ArchiveAccessorMarker, ComponentSelector, Interest, LogInterestSelector, LogSettingsMarker,
+    LogSettingsProxy, Severity,
 };
 use futures::{Stream, StreamExt};
 use selectors::{self, parse_component_selector, VerboseError};
@@ -45,15 +47,7 @@ async fn set_interest() {
         .await
         .expect("connect to puppet");
 
-    let selector = parse_component_selector::<VerboseError>(PUPPET_NAME).unwrap();
-
-    // Helper function to generate a new LogInterestSelector from severity.
-    let interest_selectors = |severity: Severity| {
-        [LogInterestSelector {
-            selector: selector.clone(),
-            interest: Interest { min_severity: Some(severity), ..Default::default() },
-        }]
-    };
+    let component_log_settings = ComponentLogSettings::new(PUPPET_NAME);
 
     // Use default severity INFO.
     // Wait for the initial interest to be observed.
@@ -83,8 +77,7 @@ async fn set_interest() {
     .await;
 
     // Severity: DEBUG
-    let mut interest = interest_selectors(Severity::Debug);
-    log_settings.set_interest(&interest).await.expect("registered interest");
+    component_log_settings.set_interest(&log_settings, Severity::Debug).await.unwrap();
     response = puppet.wait_for_interest_change().await.unwrap();
     assert_eq!(response.severity, Some(Severity::Debug));
     puppet.log_messages(vec![
@@ -107,8 +100,7 @@ async fn set_interest() {
     .await;
 
     // Severity: WARN
-    interest = interest_selectors(Severity::Warn);
-    log_settings.set_interest(&interest).await.expect("registered interest");
+    component_log_settings.set_interest(&log_settings, Severity::Warn).await.unwrap();
     response = puppet.wait_for_interest_change().await.unwrap();
     assert_eq!(response.severity, Some(Severity::Warn));
     puppet.log_messages(vec![
@@ -126,8 +118,7 @@ async fn set_interest() {
     .await;
 
     // Severity: ERROR
-    interest = interest_selectors(Severity::Error);
-    log_settings.set_interest(&interest).await.expect("registered interest");
+    component_log_settings.set_interest(&log_settings, Severity::Error).await.unwrap();
     response = puppet.wait_for_interest_change().await.unwrap();
     assert_eq!(response.severity, Some(Severity::Error));
     puppet.log_messages(vec![
@@ -183,33 +174,20 @@ async fn set_interest_before_startup() {
     .await
     .expect("create test topology");
 
-    // Helper function to generate a new LogInterestSelector from severity.
-    let selector = parse_component_selector::<VerboseError>("**").unwrap();
-    let interest_selectors = |severity: Severity| {
-        [LogInterestSelector {
-            selector: selector.clone(),
-            interest: Interest { min_severity: Some(severity), ..Default::default() },
-        }]
-    };
-
-    // Set the coll:* minimum severity to Severity::Debug.
-    let interests = interest_selectors(Severity::Debug);
     let log_settings = realm_proxy
         .connect_to_protocol::<LogSettingsMarker>()
         .await
         .expect("connect to log settings");
-    log_settings.set_interest(&interests).await.expect("set interest");
+
+    // Set the minimum severity to Severity::Debug.
+    let component_log_settings = ComponentLogSettings::new("**");
+    component_log_settings.set_interest(&log_settings, Severity::Debug).await.unwrap();
 
     // Start listening for logs.
     let accessor = realm_proxy
         .connect_to_protocol::<ArchiveAccessorMarker>()
         .await
         .expect("connect to archive accessor");
-
-    let mut logs = ArchiveReader::new()
-        .with_archive(accessor)
-        .snapshot_then_subscribe::<Logs>()
-        .expect("subscribe to logs");
 
     // Connect to the component under test to start it.
     let puppet = test_topology::connect_to_puppet(&realm_proxy, PUPPET_NAME)
@@ -222,6 +200,11 @@ async fn set_interest_before_startup() {
         (Severity::Debug, "debugging world"),
         (Severity::Info, "Hello, world!"),
     ]);
+
+    let mut logs = ArchiveReader::new()
+        .with_archive(accessor)
+        .snapshot_then_subscribe::<Logs>()
+        .expect("subscribe to logs");
 
     // Assert logs include the Severity::Debug log.
     assert_ordered_logs(
@@ -236,7 +219,7 @@ type Message = (Severity, &'static str);
 
 async fn assert_ordered_logs<'a, S>(mut logs: S, component_name: &str, messages: Vec<Message>)
 where
-    S: Stream<Item = Result<LogsData, Error>> + std::marker::Unpin,
+    S: Stream<Item = Result<LogsData, diagnostics_reader::Error>> + std::marker::Unpin,
 {
     for (expected_severity, expected_msg) in messages {
         let log = logs.next().await.expect("got log response").expect("log isn't an error");
@@ -261,5 +244,34 @@ impl PuppetProxyExt for ftest::PuppetProxy {
             };
             self.log(request).expect("log succeeds");
         }
+    }
+}
+
+// A helper struct that modifies log settings for a set of components matched by a given
+// component_selector.
+struct ComponentLogSettings {
+    component_selector: ComponentSelector,
+}
+
+impl ComponentLogSettings {
+    fn new(component_selector_str: &'static str) -> Self {
+        let component_selector = parse_component_selector::<VerboseError>(component_selector_str)
+            .expect("is valid component selector");
+        Self { component_selector }
+    }
+}
+
+impl ComponentLogSettings {
+    async fn set_interest(
+        &self,
+        log_settings: &LogSettingsProxy,
+        severity: Severity,
+    ) -> Result<(), Error> {
+        let interests = [LogInterestSelector {
+            selector: self.component_selector.clone(),
+            interest: Interest { min_severity: Some(severity), ..Default::default() },
+        }];
+        log_settings.set_interest(&interests).await.context("set interest")?;
+        Ok(())
     }
 }
