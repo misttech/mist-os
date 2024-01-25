@@ -17,6 +17,8 @@ import sys
 
 from pylib import elf_info
 
+_STAMP_FILE_NAME = ".stamp"
+
 
 def create_empty(path: str):
     os.makedirs(os.path.dirname(path), exist_ok=True)
@@ -69,7 +71,7 @@ def main():
                     return 1
                 debug_map[build_id] = elf_with_symbols
 
-    did_copy = False
+    copied_files = []
 
     # Check source files for symbols and debug_info
     for build_id, elf_file in debug_map.items():
@@ -96,12 +98,15 @@ def main():
         # it has debug_info.
         os.makedirs(os.path.dirname(debug_path), exist_ok=True)
         shutil.copy2(elf_file, debug_path)
-        did_copy = True
+        copied_files.append(build_id)
 
-    if not did_copy:
+    if len(copied_files) == 0:
         # Create an empty file if the output directory is empty, as bazel will ignore
         # empty directories
         create_empty(os.path.join(args.output_dir, ".ensure_there_is_one_file"))
+
+    with open(os.path.join(args.output_dir, _STAMP_FILE_NAME), "w") as f:
+        f.write("\n".join(copied_files))
 
     return 0
 

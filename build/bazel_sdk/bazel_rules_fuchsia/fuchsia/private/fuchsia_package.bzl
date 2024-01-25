@@ -442,6 +442,9 @@ def _build_fuchsia_package_impl(ctx):
             ctx.attr.tools,
             ctx.attr._fuchsia_sdk_debug_symbols,
         ),
+        OutputGroupInfo(
+            build_id_dir = _debug_info.build_id_dirs.values()[0],
+        ),
     ]
 
 _build_fuchsia_package, _build_fuchsia_package_test = rule_variants(

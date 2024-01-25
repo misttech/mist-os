@@ -8,22 +8,36 @@ load("@rules_cc//cc:find_cc_toolchain.bzl", "find_cc_toolchain")
 load(":providers.bzl", "FuchsiaDebugSymbolInfo")
 load(":utils.bzl", "flatten", "make_resource_struct")
 
-def strip_resources(ctx, resources):
-    """Strips resources and returns FuchsiaDebugSymbolInfo.
+def strip_resources(ctx, resources, build_id_path = None):
+    """Generate an action to strip resources, then return a FuchsiaDebugSymbolInfo value.
+
+    The generated action will output a single .build-id directory which will contain
+    all of the debug symbols from the given resources. This action will always
+    generate a directory even if there are no resources to strip.
+
+    In addition, the action will generate a file in the build id directory named
+    .stamp which will contain the full names of all of the debug symbols that were
+    generated.
 
     Args:
       ctx: rule context.
       resources: A list of unstripped input resource_struct() values.
+      build_id_path: (optional) A string which will be used when declaring
+        the build id directory. Defaults to `ctx.label.name + "/.build-id"`.
 
     Returns:
       a pair whose first item is a list of stripped resource_struct() instances,
       and the second item is a FuchsiaDebugSymbolInfo provider for the
       corresponding .build-id directory.
     """
-    if not resources:
-        return [], FuchsiaDebugSymbolInfo(build_id_dirs = {})
 
-    build_id_dir = ctx.actions.declare_directory(ctx.label.name + "/.build-id")
+    build_id_path = build_id_path or (ctx.label.name + "/.build-id")
+
+    if type(build_id_path) != "string":
+        fail("'{}' must be a string but got {}.".format(build_id_path, type(build_id_path)))
+
+    build_id_dir = ctx.actions.declare_directory(build_id_path)
+
     stripped_resources = []
     all_maybe_elf_files = []
     all_ids_txt = []
