@@ -175,12 +175,21 @@ impl Model {
             );
         } else {
             if let Err(e) = self.root.start(&StartReason::Root, None, vec![], vec![]).await {
-                // If we fail to start the root, but the root is being shutdown, that's ok. The
-                // system is tearing down, so it doesn't matter any more if we never got everything
-                // started that we wanted to.
+                // `root.start` may take a long time as it will be resolving and starting
+                // eager children. If graceful shutdown is initiated, that will cause those
+                // children to fail to resolve or fail to start, and for `start` to fail.
+                //
+                // If we fail to start the root, but the root is being shutdown, or already
+                // shutdown, that's ok. The system is tearing down, so it doesn't matter any more
+                // if we never got everything started that we wanted to.
                 let action_set = self.root.lock_actions().await;
                 if !action_set.contains(&ActionKey::Shutdown) {
-                    panic!("failed to start root component {}: {:?}", self.root.component_url, e);
+                    if !self.root.lock_execution().await.is_shut_down() {
+                        panic!(
+                            "failed to start root component {}: {:?}",
+                            self.root.component_url, e
+                        );
+                    }
                 }
             }
         }
@@ -219,6 +228,33 @@ pub mod tests {
         fidl_fuchsia_component_decl as fdecl,
         moniker::{Moniker, MonikerBase},
     };
+
+    #[fuchsia::test]
+    async fn already_shut_down_when_start_fails() {
+        let components = vec![(
+            "root",
+            ComponentDeclBuilder::new()
+                .add_child(cm_rust::ChildDecl {
+                    name: "bad-scheme".to_string(),
+                    url: "bad-scheme://sdf".to_string(),
+                    startup: fdecl::StartupMode::Eager,
+                    environment: None,
+                    on_terminate: None,
+                    config_overrides: None,
+                })
+                .build(),
+        )];
+
+        let TestModelResult { model, .. } =
+            TestEnvironmentBuilder::new().set_components(components).build().await;
+
+        let _ =
+            ActionSet::register(model.root.clone(), ShutdownAction::new(ShutdownType::Instance))
+                .await
+                .unwrap();
+
+        model.start(ComponentInput::empty()).await;
+    }
 
     #[fuchsia::test]
     async fn shutting_down_when_start_fails() {
