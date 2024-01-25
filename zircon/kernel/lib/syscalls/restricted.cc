@@ -111,7 +111,7 @@ zx_status_t sys_restricted_kick(zx_handle_t handle, uint32_t options) {
 
   auto up = ProcessDispatcher::GetCurrent();
   fbl::RefPtr<ThreadDispatcher> thread;
-  // TODO(https://fxbug.dev/126688): Decide if this is the correct right for this operation.
+  // TODO(https://fxbug.dev/42077353): Decide if this is the correct right for this operation.
   zx_status_t status =
       up->handle_table().GetDispatcherWithRights(*up, handle, ZX_RIGHT_MANAGE_THREAD, &thread);
   if (status != ZX_OK) {

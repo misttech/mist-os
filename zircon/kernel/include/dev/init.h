@@ -38,7 +38,7 @@ void PlatformDriverHandoffLate(const ArchPhysHandoff& arch_handoff);
 
 // Further platform-specific subroutines for the UART.
 //
-// TODO(https://fxbug.dev/89182): These will go away when the UART driver can dealt
+// TODO(https://fxbug.dev/42170495): These will go away when the UART driver can dealt
 // with directly as a platform-agnostic libuart type.
 void PlatformUartDriverHandoffEarly(const uart::all::Driver& serial);
 void PlatformUartDriverHandoffLate(const uart::all::Driver& serial);

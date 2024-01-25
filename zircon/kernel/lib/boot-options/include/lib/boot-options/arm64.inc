@@ -35,7 +35,7 @@ system on chip. Currently accepted values are amlogic-t931g, amlogic-s905d2, aml
 amlogic-a311d.
 )""")
 
-// TODO(https://fxbug.dev/80082): Unify arch agnostic options.
+// TODO(https://fxbug.dev/42160387): Unify arch agnostic options.
 DEFINE_OPTION("kernel.smp.maxcpus", uint32_t, arm64_smp_max_cpus, {16}, R"""(
 This option caps the number of CPUs to initialize.  It cannot be greater than *SMP\_MAX\_CPUS*
 for a specific architecture.

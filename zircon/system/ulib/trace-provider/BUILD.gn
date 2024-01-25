@@ -118,10 +118,10 @@ trace_provider_library("trace-provider") {
 # The issue is that the SDK doesn't (yet) support generating C FIDL bindings at
 # build time, which we need if we export as "source", and since we're
 # implemented in C++ we can't export as "static".
-# TODO(https://fxbug.dev/23081): The name here is temporary, pending being able to build
+# TODO(https://fxbug.dev/42097127): The name here is temporary, pending being able to build
 # the library as "libtrace-provider.so".
 #
-# TODO(https://fxbug.dev/22911): Add start.cc to this library in order to match the
+# TODO(https://fxbug.dev/42096938): Add start.cc to this library in order to match the
 # non-shared version of the library.
 trace_provider_library("trace-provider-so") {
   sdk_publishable = true

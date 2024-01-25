@@ -277,7 +277,7 @@ zx::result<> handle_cpuid(const ExitInfo& exit_info, AutoVmcs& vmcs, GuestState&
           // Disable support for the IA32_FLUSH_CMD MSR.
           guest_state.rdx &= ~(1u << X86_FEATURE_L1D_FLUSH.bit);
 
-          // TODO(https://fxbug.dev/108623): Enable AVX-512 if supported.
+          // TODO(https://fxbug.dev/42060002): Enable AVX-512 if supported.
           //
           // Disabling this to work around invalid opcode errors trying to execute these
           // instructions.

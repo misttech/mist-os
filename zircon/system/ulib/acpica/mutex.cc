@@ -28,7 +28,7 @@
 // the |acpi_spinlock_lock|.
 //
 // Non-contested mode needs to apply to both spin locks and mutexes to prevent deadlock.
-// TODO(https://fxbug.dev/79085): remove this, and replace it with a higher-level lock on the ACPI FIDL
+// TODO(https://fxbug.dev/42159282): remove this, and replace it with a higher-level lock on the ACPI FIDL
 // protocol. This is risky because pthread timeouts use CLOCK_REALTIME, which makes no forward
 // progress in early boot.
 static pthread_rwlock_t acpi_spinlock_lock = PTHREAD_RWLOCK_INITIALIZER;
@@ -120,7 +120,7 @@ ACPI_STATUS AcpiOsAcquireMutex(ACPI_MUTEX Handle, UINT16 Timeout)
       } else {
         // This relise on CLOCK_REALTIME. If the clock hasn't started, we will wait
         // indefinitely. There's not much else we can do.
-        // TODO(https://fxbug.dev/79085): remove the rwlock from here.
+        // TODO(https://fxbug.dev/42159282): remove the rwlock from here.
         std::timespec then = timeout_to_timespec(Timeout);
         ret = pthread_rwlock_timedrdlock(&acpi_spinlock_lock, &then);
         if (ret == ETIMEDOUT)

@@ -9,7 +9,7 @@
     program: {
         binary: "test/fbl-test",
 
-        // TODO(https://fxbug.dev/92566): Remove shuffle disable flag after fixing the test.
+        // TODO(https://fxbug.dev/42174254): Remove shuffle disable flag after fixing the test.
         args: [
             "--gtest_shuffle",
             "false",

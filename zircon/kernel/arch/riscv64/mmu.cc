@@ -54,7 +54,7 @@
 
 // Static relocated base to prepare for KASLR. Used at early boot and by gdb
 // script to know the target relocated address.
-// TODO(https://fxbug.dev/24762): Choose it randomly.
+// TODO(https://fxbug.dev/42098994): Choose it randomly.
 uint64_t kernel_relocated_base = kArchHandoffVirtualAddress;
 
 // The main translation table for the kernel. Used by the one kernel address space

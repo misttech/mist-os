@@ -143,7 +143,7 @@ zx_status_t x86_get_set_vector_regs(Thread* thread, zx_thread_state_vector_regs_
           &comp_size));
   DEBUG_ASSERT(save);  // Legacy getter should always succeed.
 
-  // https://fxbug.dev/50632: Overwriting the reserved bits of the mxcsr register
+  // https://fxbug.dev/42127734: Overwriting the reserved bits of the mxcsr register
   // causes a #GP Fault. We need to check against the mxcsr_mask to see if the
   // proposed mxcsr is valid.
   if (access == RegAccess::kSet && !mxcsr_is_valid(regs->mxcsr, save->mxcsr_mask)) {
@@ -180,7 +180,7 @@ zx_status_t arch_get_general_regs(Thread* thread, zx_thread_state_general_regs_t
   DEBUG_ASSERT(thread->IsUserStateSavedLocked());
 
   // Punt if registers aren't available. E.g.,
-  // TODO(https://fxbug.dev/30521): Registers aren't available in synthetic exceptions.
+  // TODO(https://fxbug.dev/42105394): Registers aren't available in synthetic exceptions.
   if (thread->arch().suspended_general_regs.gregs == nullptr)
     return ZX_ERR_NOT_SUPPORTED;
 
@@ -208,7 +208,7 @@ zx_status_t arch_set_general_regs(Thread* thread, const zx_thread_state_general_
   DEBUG_ASSERT(thread->IsUserStateSavedLocked());
 
   // Punt if registers aren't available. E.g.,
-  // TODO(https://fxbug.dev/30521): Registers aren't available in synthetic exceptions.
+  // TODO(https://fxbug.dev/42105394): Registers aren't available in synthetic exceptions.
   if (thread->arch().suspended_general_regs.gregs == nullptr)
     return ZX_ERR_NOT_SUPPORTED;
 
@@ -219,7 +219,7 @@ zx_status_t arch_set_general_regs(Thread* thread, const zx_thread_state_general_
   if (!x86_is_vaddr_canonical(in->gs_base))
     return ZX_ERR_INVALID_ARGS;
 
-  // https://fxbug.dev/50633: Disallow setting RIP to a non-canonical address, to
+  // https://fxbug.dev/42127735: Disallow setting RIP to a non-canonical address, to
   // prevent returning to such addresses using the SYSRET or IRETQ
   // instructions. See docs/concepts/kernel/sysret_problem.md.
   //
@@ -253,7 +253,7 @@ zx_status_t arch_get_single_step(Thread* thread, zx_thread_state_single_step_t* 
   DEBUG_ASSERT(thread->IsUserStateSavedLocked());
 
   // Punt if registers aren't available. E.g.,
-  // TODO(https://fxbug.dev/30521): Registers aren't available in synthetic exceptions.
+  // TODO(https://fxbug.dev/42105394): Registers aren't available in synthetic exceptions.
   if (thread->arch().suspended_general_regs.gregs == nullptr)
     return ZX_ERR_NOT_SUPPORTED;
 
@@ -283,7 +283,7 @@ zx_status_t arch_set_single_step(Thread* thread, const zx_thread_state_single_st
   DEBUG_ASSERT(thread->IsUserStateSavedLocked());
 
   // Punt if registers aren't available. E.g.,
-  // TODO(https://fxbug.dev/30521): Registers aren't available in synthetic exceptions.
+  // TODO(https://fxbug.dev/42105394): Registers aren't available in synthetic exceptions.
   if (thread->arch().suspended_general_regs.gregs == nullptr)
     return ZX_ERR_NOT_SUPPORTED;
 
@@ -404,7 +404,7 @@ zx_status_t arch_set_debug_regs(Thread* thread, const zx_thread_state_debug_regs
 
   // NOTE: This currently does a write-read round-trip to the CPU in order to ensure that
   //       |thread->arch().debug_state| tracks the exact value as it is stored in the registers.
-  // TODO(https://fxbug.dev/32873): Ideally, we could do some querying at boot time about the format that
+  // TODO(https://fxbug.dev/42108006): Ideally, we could do some querying at boot time about the format that
   // the CPU is storing reserved bits and we can create a mask we can apply to the input values
   // and avoid changing the state.
 

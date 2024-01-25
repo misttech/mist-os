@@ -37,7 +37,7 @@ void TestValuesIn() {
     ZX_ASSERT_MSG(p2[i] == *it, "Expected %d, got %d", p2[i], *it);
   }
 
-  // TODO(https://fxbug.dev/82902): This does not work. We still don't support bools in a vector.
+  // TODO(https://fxbug.dev/42163520): This does not work. We still don't support bools in a vector.
   // auto c3 = std::vector<bool>({false, true});
   // auto p3 = ::zxtest::ValuesIn(c3);
   // ZX_ASSERT_MSG(p3.size() == c3.size(), "Resulting provider size does not match input

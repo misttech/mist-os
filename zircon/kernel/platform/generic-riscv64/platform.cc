@@ -76,7 +76,7 @@ namespace {
 // Enable feature to probe for parked cpu cores via SBI to build
 // a fallback topology tree in case one was not passed in from
 // the bootloader.
-// TODO(https://fxbug.dev/129255): Remove this hack once boot shim detects cpus via device tree.
+// TODO(https://fxbug.dev/42079665): Remove this hack once boot shim detects cpus via device tree.
 constexpr bool ENABLE_SBI_TOPOLOGY_DETECT_FALLBACK = true;
 
 void* ramdisk_base;
@@ -114,7 +114,7 @@ static void halt_other_cpus() {
   }
 }
 
-// TODO(https://fxbug.dev/98351): Refactor platform_panic_start.
+// TODO(https://fxbug.dev/42180675): Refactor platform_panic_start.
 void platform_panic_start(PanicStartHaltOtherCpus option) {
   arch_disable_ints();
   dlog_panic_start();

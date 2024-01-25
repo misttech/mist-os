@@ -254,7 +254,7 @@ bool test_addresses_outside_user_range(bool capture_faults) {
   for (const TestCase& test_case : kTestCases) {
     vaddr_t test_addr = test_case.test_addr;
 #if defined(__aarch64__)
-    // TODO(https://fxbug.dev/93593): We strip the tag here because tags are not relayed to user_copy
+    // TODO(https://fxbug.dev/42175395): We strip the tag here because tags are not relayed to user_copy
     // page fault information. The only user of this page fault info is the deferred kernel
     // exception handler (via VmAspace::SoftFault), but that does not operate on tags. We
     // would like to rethink how user_copy exception info is handled, but that's outside the

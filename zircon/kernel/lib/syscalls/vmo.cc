@@ -147,7 +147,7 @@ zx_status_t sys_vmo_transfer_data(zx_handle_t dst_vmo_handle, uint32_t options, 
     return status;
   }
 
-  // TODO(https://fxbug.dev/132304): Stop decompressing compressed pages from the source range.
+  // TODO(https://fxbug.dev/42082399): Stop decompressing compressed pages from the source range.
   return dst_vmo_dispatcher->vmo()->SupplyPages(offset, length, &pages,
                                                 SupplyOptions::TransferData);
 }

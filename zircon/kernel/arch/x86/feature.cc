@@ -233,10 +233,10 @@ void x86_cpu_feature_init() {
   g_cpu_vulnerable_to_rsb_underflow = !gBootOptions->x86_disable_spec_mitigations &&
                                       (x86_vendor == X86_VENDOR_INTEL) &&
                                       x86_intel_cpu_has_rsb_fallback(&cpuid_old, &msr_old);
-  // TODO(https://fxbug.dev/33667, https://fxbug.dev/12150): Consider whether a process can opt-out of an IBPB on
+  // TODO(https://fxbug.dev/33667, https://fxbug.dev/42072538): Consider whether a process can opt-out of an IBPB on
   // switch, either on switch-in (ex: its compiled with a retpoline) or switch-out (ex: it promises
   // not to attack the next process).
-  // TODO(https://fxbug.dev/33667, https://fxbug.dev/12150): Should we have an individual knob for IBPB?
+  // TODO(https://fxbug.dev/33667, https://fxbug.dev/42072538): Should we have an individual knob for IBPB?
   g_should_ibpb_on_ctxt_switch = !gBootOptions->x86_disable_spec_mitigations && g_has_ibpb;
 
   switch (x86_vendor) {
@@ -335,7 +335,7 @@ void x86_cpu_feature_late_init_percpu(void) {
     printf("Turbo performance boost: unsupported\n");
   }
 
-  // TODO(https://fxbug.dev/61093): Replace with newer lib/arch and hwreg counterparts.
+  // TODO(https://fxbug.dev/42139346): Replace with newer lib/arch and hwreg counterparts.
   cpu_id::CpuId cpuid_old;
   MsrAccess msr_old;
 
@@ -447,7 +447,7 @@ void x86_feature_debug(void) {
   PrintFields<arch::CpuidFeatureFlagsC>(print_feature);
   PrintFields<arch::CpuidFeatureFlagsD>(print_feature);
   PrintFields<arch::CpuidExtendedFeatureFlagsB>(print_feature);
-  // TODO(https://fxbug.dev/68404): Print when we can afford to.
+  // TODO(https://fxbug.dev/42147424): Print when we can afford to.
   // io.Read<arch::CpuidAmdFeatureFlagsC>().ForEachField(print_feature);
   Printf("\n");
 
@@ -658,7 +658,7 @@ static const x86_microarch_config_t tiger_lake_config{
         {
             .states =
                 {
-                    // TODO(https://fxbug.dev/102663): fill this in.
+                    // TODO(https://fxbug.dev/42053624): fill this in.
                     X86_CSTATE_C1(0),
                 },
             .default_state_mask = kX86IdleStateMaskC1Only,
@@ -677,7 +677,7 @@ static const x86_microarch_config_t alder_lake_config{
         {
             .states =
                 {
-                    // TODO(https://fxbug.dev/102663): fill this in.
+                    // TODO(https://fxbug.dev/42053624): fill this in.
                     X86_CSTATE_C1(0),
                 },
             .default_state_mask = kX86IdleStateMaskC1Only,
@@ -867,7 +867,7 @@ static const x86_microarch_config_t goldmont_plus_config{
         {
             .states =
                 {
-                    // TODO(https://fxbug.dev/35457): Read C6 and deeper latency from IRTL registers
+                    // TODO(https://fxbug.dev/42110877): Read C6 and deeper latency from IRTL registers
                     {.name = "C10", .mwait_hint = 0x60, .exit_latency = 10000, .flushes_tlb = true},
                     {.name = "C9", .mwait_hint = 0x50, .exit_latency = 2000, .flushes_tlb = true},
                     {.name = "C8", .mwait_hint = 0x40, .exit_latency = 1000, .flushes_tlb = true},
@@ -903,7 +903,7 @@ static const x86_microarch_config_t zen_config{
     .reboot_reason = cf9_reboot_reason,
     .disable_c1e = false,
     // Zen SOCs save substantial power using HLT instead of MWAIT.
-    // TODO(https://fxbug.dev/61265): Use a predictor/selection to use mwait for short sleeps.
+    // TODO(https://fxbug.dev/42139534): Use a predictor/selection to use mwait for short sleeps.
     .idle_prefer_hlt = true,
     .idle_states =
         {

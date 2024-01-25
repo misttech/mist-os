@@ -86,7 +86,7 @@ const T* GetTableByType(const AcpiParserInterface& parser) {
   if (header == nullptr) {
     return nullptr;
   }
-  // TODO(https://fxbug.dev/89248): Change this check so that tables with optional entries can be found on
+  // TODO(https://fxbug.dev/42170568): Change this check so that tables with optional entries can be found on
   // platforms that do not have them
   if (header->length < sizeof(T)) {
     return nullptr;

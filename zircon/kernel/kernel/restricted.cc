@@ -140,7 +140,7 @@ zx_status_t RestrictedEnter(uint32_t options, uintptr_t vector_table_ptr, uintpt
   // As usual, we must disable interrupts prior to checking for pending signals.
   arch_disable_ints();
   if (current_thread->IsSignaled()) {
-    // TODO(https://fxbug.dev/126791): Ideally, we'd call Thread::Current::ProcessPendingSignals
+    // TODO(https://fxbug.dev/42077468): Ideally, we'd call Thread::Current::ProcessPendingSignals
     // here, however, we don't have a pointer to the user register state that was pushed on the
     // stack when we entered the kernel.  Instead, we return the special RETRY error so that unwind
     // the call stack and call Thread::Current::ProcessPendingSignals in the usual spot.  We'll

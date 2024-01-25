@@ -18,7 +18,7 @@ struct address {
   int sortkey;
 };
 
-// TODO(https://fxbug.dev/89912): this bound is arbitrarily large to allow for
+// TODO(https://fxbug.dev/42171305): this bound is arbitrarily large to allow for
 // handling large DNS responses returned from the DNS resolver. We should
 // revisit this bound when we can configure the DNS resolver to truncate results
 // server side.

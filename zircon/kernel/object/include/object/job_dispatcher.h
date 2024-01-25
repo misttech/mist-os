@@ -28,7 +28,7 @@ class JobNode;
 // Job signal that is active when a job has no children (i.e., no child jobs and no child
 // processes).
 //
-// TODO(https://fxbug.dev/53986): This is a temporary signal that we don't want userspace using (yet?).
+// TODO(https://fxbug.dev/42131457): This is a temporary signal that we don't want userspace using (yet?).
 // Either expose this signal to userspace in "zircon/types.h", or remove this signal.
 #define ZX_JOB_NO_CHILDREN __ZX_OBJECT_SIGNAL_6
 
@@ -274,7 +274,7 @@ class JobDispatcher final
   // The common |get_lock()| protects all members below.
   State state_ TA_GUARDED(get_lock());
   int64_t return_code_ TA_GUARDED(get_lock());
-  // TODO(cpu): The OOM kill system is incomplete, see https://fxbug.dev/32577 for details.
+  // TODO(cpu): The OOM kill system is incomplete, see https://fxbug.dev/42107677 for details.
   bool kill_on_oom_ TA_GUARDED(get_lock());
 
   template <typename Ptr, typename Tag>

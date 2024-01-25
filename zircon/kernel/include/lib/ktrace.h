@@ -701,7 +701,7 @@ inline void fxt_flow_end(const fxt::InternedCategory& category, uint64_t timesta
 
 constexpr fxt::Koid kNoProcess{0u};
 
-// TODO(https://fxbug.dev/118873): Move ktrace interfaces into ktrace namespace.
+// TODO(https://fxbug.dev/42069955): Move ktrace interfaces into ktrace namespace.
 namespace ktrace {
 
 // Maintains the mapping from CPU numbers to pre-allocated KOIDs.

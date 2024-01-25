@@ -6,7 +6,7 @@
 
 import("//build/config/zircon/levels.gni")
 
-# TODO(https://fxbug.dev/67356): Get rid of zircon_kernel_disable_asserts
+# TODO(https://fxbug.dev/42146261): Get rid of zircon_kernel_disable_asserts
 import("//build/zircon/build_args.gni")
 _kernel_debug_level = zx_assert_level
 if (zircon_kernel_disable_asserts) {
@@ -101,7 +101,7 @@ declare_args() {
   # values are between 0-3.  The higher the value, the more that are
   # enabled.  A value of 0 disables all of them.
   #
-  # TODO(https://fxbug.dev/41790): This value is derived from assert_level.  Decouple
+  # TODO(https://fxbug.dev/42117912): This value is derived from assert_level.  Decouple
   # the two and set kernel_debug_level independently.
   kernel_debug_level = _kernel_debug_level
 

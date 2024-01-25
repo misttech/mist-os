@@ -187,7 +187,7 @@ static bool x86_test_physmap_nx() {
 }
 
 // Ensure that Destroy works on unified aspaces without triggering lockdep.
-// TODO(https://fxbug.dev/132980): Move this to the arch-agnostic tests in
+// TODO(https://fxbug.dev/42083004): Move this to the arch-agnostic tests in
 // zircon/kernel/tests/mmu_tests.cc once unified aspaces are supported on all architectures.
 static bool x86_test_destroy_unified() {
   BEGIN_TEST;

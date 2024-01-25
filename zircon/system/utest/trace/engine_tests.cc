@@ -133,7 +133,7 @@ TEST(EngineTests, TestAcquireContextForCategory) {
   END_TRACE_TEST;
 }
 
-// TODO(https://fxbug.dev/8493): deflake and reenable this test.
+// TODO(https://fxbug.dev/42165772): deflake and reenable this test.
 /* Commented out because the test is currently disabled due to a flake.
 
 TEST(EngineTests, TestAcquireContextForCategoryCached) {
@@ -763,7 +763,7 @@ Event(ts: <>, pt: <>, category: \"+enabled\", name: \"name\", Instant(scope: glo
   END_TRACE_TEST;
 }
 
-// This test exercises https://fxbug.dev/22904 where a buffer becomes full and immediately
+// This test exercises https://fxbug.dev/42096930 where a buffer becomes full and immediately
 // thereafter tracing is stopped. This causes the "please save buffer"
 // processing to run when tracing is not active.
 TEST(EngineTests, TestShutdownWhenFull) {

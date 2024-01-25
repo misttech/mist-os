@@ -82,7 +82,7 @@ timer_irq_assignment timer_assignment;
 uint32_t event_stream_shift;
 uint32_t event_stream_freq;
 
-// TODO(https://fxbug.dev/91701): Make this ktl::atomic when we start to mutate the offset to
+// TODO(https://fxbug.dev/42173294): Make this ktl::atomic when we start to mutate the offset to
 // deal with suspend.
 uint64_t raw_ticks_to_ticks_offset{0};
 
@@ -158,7 +158,7 @@ static uint64_t read_cntpct_a73() {
   // Fix will be applied to all cores, as two consecutive reads should be
   // faster than checking if core is A73 and branching before every read.
   const uint64_t old_read = __arm_rsr64(TIMER_REG_CNTPCT);
-  // TODO(https://fxbug.dev/44780): Prevent buggy compiler from CSE'ing the two samples!
+  // TODO(https://fxbug.dev/42121232): Prevent buggy compiler from CSE'ing the two samples!
   // Remove this when the compiler is fixed.
   __asm__ volatile("");
   const uint64_t new_read = __arm_rsr64(TIMER_REG_CNTPCT);
@@ -171,7 +171,7 @@ static uint64_t read_cntvct_a73() {
   // Fix will be applied to all cores, as two consecutive reads should be
   // faster than checking if core is A73 and branching before every read.
   const uint64_t old_read = __arm_rsr64(TIMER_REG_CNTVCT);
-  // TODO(https://fxbug.dev/44780): Prevent buggy compiler from CSE'ing the two samples!
+  // TODO(https://fxbug.dev/42121232): Prevent buggy compiler from CSE'ing the two samples!
   // Remove this when the compiler is fixed.
   __asm__ volatile("");
   const uint64_t new_read = __arm_rsr64(TIMER_REG_CNTVCT);
@@ -266,14 +266,14 @@ static void platform_tick(void* arg) {
 zx_ticks_t platform_current_raw_ticks() { return read_ct(); }
 
 zx_ticks_t platform_current_ticks() {
-  // TODO(https://fxbug.dev/91701): switch to the ABA method of reading the offset when we start
+  // TODO(https://fxbug.dev/42173294): switch to the ABA method of reading the offset when we start
   // to allow the offset to be changed as a result of coming out of system
   // suspend.
   return read_ct() + raw_ticks_to_ticks_offset;
 }
 
 zx_ticks_t platform_get_raw_ticks_to_ticks_offset() {
-  // TODO(https://fxbug.dev/91701): consider the memory order semantics of this load when the
+  // TODO(https://fxbug.dev/42173294): consider the memory order semantics of this load when the
   // time comes.
   return raw_ticks_to_ticks_offset;
 }
@@ -295,7 +295,7 @@ zx_status_t platform_set_oneshot_timer(zx_time_t deadline) {
   // straddles a counter tick. Adjust the deadline from normalized ticks to raw
   // ticks in the process.
   //
-  // TODO(https://fxbug.dev/91701): If/when we start to use the raw ticks -> ticks offset to
+  // TODO(https://fxbug.dev/42173294): If/when we start to use the raw ticks -> ticks offset to
   // manage fixing up the timer when coming out of suspend, we need to come back
   // here and reconsider memory order issues.
   const affine::Ratio time_to_ticks = platform_get_ticks_to_time_ratio().Inverse();

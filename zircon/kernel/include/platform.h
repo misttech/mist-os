@@ -79,10 +79,10 @@ bool platform_early_console_enabled();
 void platform_set_hw_reboot_reason(zbi_hw_reboot_reason_t reason);
 zbi_hw_reboot_reason_t platform_hw_reboot_reason();
 
-// TODO(https://fxbug.dev/91213): Remove this when zx_pc_firmware_tables() goes away.
+// TODO(https://fxbug.dev/42172752): Remove this when zx_pc_firmware_tables() goes away.
 extern zx_paddr_t gAcpiRsdp;
 
-// TODO(https://fxbug.dev/91213): Remove this when zx_pc_firmware_tables() goes away.
+// TODO(https://fxbug.dev/42172752): Remove this when zx_pc_firmware_tables() goes away.
 extern zx_paddr_t gSmbiosPhys;
 
 // platform_panic_start informs the system that a panic message is about

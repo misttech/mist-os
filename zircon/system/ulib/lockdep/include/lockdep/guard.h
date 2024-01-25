@@ -324,7 +324,7 @@ class __TA_SCOPED_CAPABILITY
   // about the conditional path that would not be raised in the constructor
   // body.
   void ValidateAndAcquire() __TA_NO_THREAD_SAFETY_ANALYSIS {
-    // TODO(https://fxbug.dev/84890): break this acquire up into two steps.  One where we
+    // TODO(https://fxbug.dev/42165728): break this acquire up into two steps.  One where we
     // validate the operation before attempting to obtain the lock, and the
     // other where we update our bookkeeping to indicate that the lock is owned
     // _after_ successfully obtaining the lock.
@@ -612,7 +612,7 @@ class __TA_SCOPED_CAPABILITY Guard<LockType, Option, internal::EnableIfShared<Lo
   // about the conditional path that would not be raised in the constructor
   // body.
   void ValidateAndAcquire() __TA_NO_THREAD_SAFETY_ANALYSIS {
-    // TODO(https://fxbug.dev/84890): break this acquire up into two steps.  One where we
+    // TODO(https://fxbug.dev/42165728): break this acquire up into two steps.  One where we
     // validate the operation before attempting to obtain the lock, and the
     // other where we update our bookkeeping to indicate that the lock is owned
     // _after_ successfully obtaining the lock.

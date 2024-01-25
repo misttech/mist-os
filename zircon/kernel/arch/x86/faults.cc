@@ -136,7 +136,7 @@ static void x86_debug_handler(iframe_t* frame) {
   x86_write_debug_status(X86_DR6_MASK);
 
   // NOTE: a HW breakpoint exception can also represent a single step.
-  // TODO(https://fxbug.dev/32872): Is it worth separating this into two separate exceptions?
+  // TODO(https://fxbug.dev/42108005): Is it worth separating this into two separate exceptions?
   if (try_dispatch_user_exception(frame, ZX_EXCP_HW_BREAKPOINT)) {
     // If the exception was successfully handled, we mask the debug the single step bit, as the cpu
     // doesn't automatically do it.
@@ -573,7 +573,7 @@ void arch_fill_in_exception_context(const arch_exception_context_t* arch_context
   zx_context->synth_code = arch_context->user_synth_code;
   zx_context->synth_data = arch_context->user_synth_data;
 
-  // TODO(https://fxbug.dev/30521): |frame| will be nullptr for synthetic exceptions that
+  // TODO(https://fxbug.dev/42105394): |frame| will be nullptr for synthetic exceptions that
   // don't provide general register values yet.
   if (arch_context->frame) {
     zx_context->arch.u.x86_64.vector = arch_context->frame->vector;
@@ -592,7 +592,7 @@ zx_status_t arch_dispatch_user_policy_exception(uint32_t policy_exception_code,
 
 bool arch_install_exception_context(Thread* thread, const arch_exception_context_t* context) {
   if (!context->frame) {
-    // TODO(https://fxbug.dev/30521): Must be a synthetic exception as they don't (yet) provide the
+    // TODO(https://fxbug.dev/42105394): Must be a synthetic exception as they don't (yet) provide the
     // registers.
     return false;
   }

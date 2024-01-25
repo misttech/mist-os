@@ -272,7 +272,7 @@ struct ArmTranslationControlRegisterEl2Base
     // Bits marked RES1 need to be either preserved or set to 1. If constructing
     // the register from scratch, set them to 1.
     //
-    // TODO(https://fxbug.dev/75300): Consider adding RES1 support to hwreg library.
+    // TODO(https://fxbug.dev/42155079): Consider adding RES1 support to hwreg library.
     set_res1_bit32(1);
     set_res1_bit23(1);
   }

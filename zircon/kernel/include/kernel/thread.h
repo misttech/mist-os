@@ -1655,7 +1655,7 @@ struct Thread {
   // These fields are among the most active in the thread. They are grouped
   // together near the front to improve cache locality.
   unsigned int flags_{};
-  // TODO(https://fxbug.dev/126338): Write down memory order requirements for accessing signals_.
+  // TODO(https://fxbug.dev/42077109): Write down memory order requirements for accessing signals_.
   ktl::atomic<unsigned int> signals_{};
   SchedulerState scheduler_state_;
   WaitQueueCollection::ThreadState wait_queue_state_;
@@ -1774,7 +1774,7 @@ inline void Thread::DumpTidDuringPanic(zx_koid_t tid, bool full) TA_NO_THREAD_SA
   DumpTidLocked(tid, full);
 }
 
-// TODO(johngro): Remove this when we have addressed https://fxbug.dev/33473.  Right now, this
+// TODO(johngro): Remove this when we have addressed https://fxbug.dev/42108673.  Right now, this
 // is used in only one place (x86_bringup_aps in arch/x86/smp.cpp) outside of
 // thread.cpp.
 //

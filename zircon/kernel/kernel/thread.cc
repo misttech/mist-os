@@ -815,7 +815,7 @@ void Thread::SetMigrateFnLocked(MigrateFn migrate_fn) {
   migrate_fn_ = ktl::move(migrate_fn);
 
   // Clear stale state when (un) setting the migrate fn.
-  // TODO(https://fxbug.dev/84078): Cleanup the migrate fn feature and associated state
+  // TODO(https://fxbug.dev/42164826): Cleanup the migrate fn feature and associated state
   // and clearly define and check invariants.
   scheduler_state().next_cpu_ = INVALID_CPU;
   migrate_pending_ = false;
@@ -1013,7 +1013,7 @@ void Thread::Current::ProcessPendingSignals(GeneralRegsSource source, void* greg
       // this thread has user mode component, call arch_set_suspended_general_regs() to make the
       // general registers available to a debugger during the exception.
       if (current_thread->user_thread_) {
-        // TODO(https://fxbug.dev/126109): Do we need to hold the thread lock here?
+        // TODO(https://fxbug.dev/42076855): Do we need to hold the thread lock here?
         Guard<MonitoredSpinLock, NoIrqSave> guard{ThreadLock::Get(), SOURCE_TAG};
         arch_set_suspended_general_regs(current_thread, source, gregs);
       }
@@ -1033,7 +1033,7 @@ void Thread::Current::ProcessPendingSignals(GeneralRegsSource source, void* greg
     //
     if (signals & THREAD_SIGNAL_POLICY_EXCEPTION) {
       DEBUG_ASSERT(has_user_thread);
-      // TODO(https://fxbug.dev/126338): Consider wrapping this up in a method
+      // TODO(https://fxbug.dev/42077109): Consider wrapping this up in a method
       // (e.g. Thread::Current::ClearSignals) and think hard about whether relaxed is sufficient.
       current_thread->signals_.fetch_and(~THREAD_SIGNAL_POLICY_EXCEPTION,
                                          ktl::memory_order_relaxed);
@@ -1041,7 +1041,7 @@ void Thread::Current::ProcessPendingSignals(GeneralRegsSource source, void* greg
       uint32_t policy_exception_code;
       uint32_t policy_exception_data;
       {
-        // TODO(https://fxbug.dev/126109): Do we need to hold the thread lock here?
+        // TODO(https://fxbug.dev/42076855): Do we need to hold the thread lock here?
         Guard<MonitoredSpinLock, NoIrqSave> guard{ThreadLock::Get(), SOURCE_TAG};
 
         // Policy exceptions are user-visible so must make the general register state available to
@@ -1062,7 +1062,7 @@ void Thread::Current::ProcessPendingSignals(GeneralRegsSource source, void* greg
       arch_disable_ints();
 
       {
-        // TODO(https://fxbug.dev/126109): Do we need to hold the thread lock here?
+        // TODO(https://fxbug.dev/42076855): Do we need to hold the thread lock here?
         Guard<MonitoredSpinLock, NoIrqSave> guard{ThreadLock::Get(), SOURCE_TAG};
         arch_reset_suspended_general_regs(current_thread);
       }
@@ -1074,7 +1074,7 @@ void Thread::Current::ProcessPendingSignals(GeneralRegsSource source, void* greg
       if (has_user_thread) {
         bool saved;
         {
-          // TODO(https://fxbug.dev/126109): Do we need to hold the thread lock here?
+          // TODO(https://fxbug.dev/42076855): Do we need to hold the thread lock here?
           Guard<MonitoredSpinLock, NoIrqSave> guard{ThreadLock::Get(), SOURCE_TAG};
 
           // This thread has been asked to suspend.  When a user thread is suspended, its full
@@ -1094,7 +1094,7 @@ void Thread::Current::ProcessPendingSignals(GeneralRegsSource source, void* greg
         arch_disable_ints();
 
         {
-          // TODO(https://fxbug.dev/126109): Do we need to hold the thread lock here?
+          // TODO(https://fxbug.dev/42076855): Do we need to hold the thread lock here?
           Guard<MonitoredSpinLock, NoIrqSave> guard{ThreadLock::Get(), SOURCE_TAG};
 
           if (saved) {
@@ -1924,7 +1924,7 @@ void Thread::Current::GetBacktrace(Backtrace& out_bt) {
   auto fp = reinterpret_cast<vaddr_t>(__GET_FRAME(0));
   GetBacktraceCommon(Thread::Current::Get(), fp, out_bt);
 
-  // (https://fxbug.dev/97528): Force the function to not tail call GetBacktraceCommon.
+  // (https://fxbug.dev/42179766): Force the function to not tail call GetBacktraceCommon.
   // This will make sure the frame pointer we grabbed at the top
   // of the function is still valid across the call.
   asm("");

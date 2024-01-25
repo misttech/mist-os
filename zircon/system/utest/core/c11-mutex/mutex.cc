@@ -89,7 +89,7 @@ TEST(C11MutexTest, MultiThreadedContention) {
   }
 }
 
-// TODO(https://fxbug.dev/39408) Remove all TA_NO_THREAD_SAFETY_ANALYSIS annotations when we can
+// TODO(https://fxbug.dev/42115265) Remove all TA_NO_THREAD_SAFETY_ANALYSIS annotations when we can
 TEST(C11MutexTest, TryMutexMultiThreadedContention) TA_NO_THREAD_SAFETY_ANALYSIS {
   struct MutexThreadArgs {
     std::atomic<int> lock_acquired;
@@ -256,7 +256,7 @@ TEST(C11MutexTest, TimeoutElapsed) {
     // Since the wait is based on the UTC clock which can be adjusted while
     // the wait proceeds, it is important to check that the mutex does not
     // return early.
-    // TODO(https://fxbug.dev/34941): when the kernel UTC clock gets wired, the test framework should
+    // TODO(https://fxbug.dev/42110304): when the kernel UTC clock gets wired, the test framework should
     // expose a way to do local modifications to the clock so we can properly
     // test this behavior. Currently the UTC offset is global and mutating it here
     // can create hard to diagnose flakes as seen with bug 34857.

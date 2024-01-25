@@ -397,7 +397,7 @@ static bool test_auto_timeslice_extension() {
 // 4. a spinlock is held
 // 5. blocking is disallowed via |arch_set_blocking_disallowed|.
 //
-// See https://fxbug.dev/100545 for motivation.
+// See https://fxbug.dev/42051271 for motivation.
 static bool test_local_preempt_pending() {
   BEGIN_TEST;
 

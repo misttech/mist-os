@@ -3765,7 +3765,7 @@ static bool is_page_zero(vm_page_t* page) {
   return true;
 }
 
-// Tests that ZeroRange does not remove pinned pages. Regression test for https://fxbug.dev/101608.
+// Tests that ZeroRange does not remove pinned pages. Regression test for https://fxbug.dev/42052452.
 static bool vmo_zero_pinned_test() {
   BEGIN_TEST;
 

@@ -861,7 +861,7 @@ static bool evictor_dont_need_pager_backed_test() {
 }
 
 // Tests that evicted pages are removed from the VMO *and* added to the pmm free pool. Regression
-// test for https://fxbug.dev/73865.
+// test for https://fxbug.dev/42153484.
 static bool evictor_evicted_pages_are_freed_test() {
   BEGIN_TEST;
   AutoVmScannerDisable scanner_disable;

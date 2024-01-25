@@ -38,7 +38,7 @@ void general_regs_fill_test_values(zx_thread_state_general_regs_t* regs) {
   //
   // Note that setting the direction flag (bit 10) helps test whether the
   // kernel correctly handles taking an interrupt when that flag is set
-  // (see https://fxbug.dev/30944).
+  // (see https://fxbug.dev/42105863).
   regs->rflags = (1 << 0) |   // CF: carry flag
                  (1 << 1) |   // Reserved, always 1
                  (1 << 2) |   // PF: parity flag
@@ -128,7 +128,7 @@ void vector_regs_fill_test_values(zx_thread_state_vector_regs_t* regs) {
 
 #elif defined(__riscv)
 
-  // TODO(https://fxbug.dev/124336): No vector register (V extn) support on RISC-V yet.
+  // TODO(https://fxbug.dev/42075221): No vector register (V extn) support on RISC-V yet.
 
 #else
 
@@ -342,7 +342,7 @@ void vector_regs_expect_unsupported_are_zero(const zx_thread_state_vector_regs_t
 
 #elif defined(__riscv)
 
-  // TODO(https://fxbug.dev/124336): No vector register (V extn) support on RISC-V yet.
+  // TODO(https://fxbug.dev/42075221): No vector register (V extn) support on RISC-V yet.
 
 #else
 
@@ -371,7 +371,7 @@ void vector_regs_expect_eq(const zx_thread_state_vector_regs_t& regs1,
 
 #elif defined(__riscv)
 
-  // TODO(https://fxbug.dev/124336): No vector register (V extn) support on RISC-V yet.
+  // TODO(https://fxbug.dev/42075221): No vector register (V extn) support on RISC-V yet.
 
 #else
 

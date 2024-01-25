@@ -94,7 +94,7 @@
     sd     sp, RISCV64_IFRAME_OFFSET_SP(sp)   // x2
     sd     gp, RISCV64_IFRAME_OFFSET_GP(sp)   // x3
 #if __has_feature(shadow_call_stack)
-    // TODO(https://fxbug.dev/124357): bump the shadow call stack forward one in case
+    // TODO(https://fxbug.dev/42075244): bump the shadow call stack forward one in case
     // we interrupted the cpu after it has saved a return address but before it
     // has had a chance to increment it
     addi   gp, gp, 8

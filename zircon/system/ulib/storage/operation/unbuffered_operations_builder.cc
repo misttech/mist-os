@@ -49,7 +49,7 @@ void UnbufferedOperationsBuilder::Add(const UnbufferedOperation& new_operation) 
       continue;
     }
 
-    // TODO(https://fxbug.dev/34018): Merge/coalesce is more involved than this. One enqueue can encompass
+    // TODO(https://fxbug.dev/42109279): Merge/coalesce is more involved than this. One enqueue can encompass
     // from
     //                one to all existing requests - leading to popping out operations.
     auto old_range =

@@ -16,7 +16,7 @@ namespace {
 
 // Call serial_write while holding the thread lock to establish a lock ordering between the thread
 // lock and the uart_serial lock.  By establishing the lock ordering, lockdep may be able to detect
-// violations of this ordering.  This is a regression test for https://fxbug.dev/76022.
+// violations of this ordering.  This is a regression test for https://fxbug.dev/42155881.
 bool SerialWriteHoldingThreadLockTest() {
   BEGIN_TEST;
 

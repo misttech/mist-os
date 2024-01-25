@@ -69,7 +69,7 @@ static_assert(MMU_KERNEL_SIZE_SHIFT >= 25, "");
 
 // Static relocated base to prepare for KASLR. Used at early boot and by gdb
 // script to know the target relocated address.
-// TODO(https://fxbug.dev/24762): Choose it randomly.
+// TODO(https://fxbug.dev/42098994): Choose it randomly.
 #if DISABLE_KASLR
 uint64_t kernel_relocated_base = KERNEL_BASE;
 #else
@@ -273,7 +273,7 @@ uint s1_pte_attr_to_mmu_flags(pte_t pte, bool hypervisor = false) {
       mmu_flags |= ARCH_MMU_FLAG_PERM_EXECUTE;
     }
 
-    // TODO: https://fxbug.dev/88451
+    // TODO: https://fxbug.dev/42169684
     // Add additional asserts here that the translation table entries are correctly formed
     // with regards to UXN and PXN bits and possibly other unhandled and/or ambiguous bits.
   }
@@ -372,7 +372,7 @@ int first_used_page_table_entry(const volatile pte_t* page_table, uint page_size
       // so this is really just checking for scenarios where the low type bits got set to INVALID,
       // but the rest of the entry did not.
       //
-      // TODO(https://fxbug.dev/79118): Once https://fxbug.dev/79118 is resolved this can be removed.
+      // TODO(https://fxbug.dev/79118): Once https://fxbug.dev/42159319 is resolved this can be removed.
       ASSERT_MSG(is_pte_valid(pte),
                  "page_table at %p has malformed invalid entry %#" PRIx64 " at %u\n", page_table,
                  pte, i);
@@ -1989,7 +1989,7 @@ void ArmArchVmAspace::AssertEmptyLocked() const {
     // Attempt to walk the page table and find the first leaf most mapping that we can. This
     // represents (at least one of) the entries that is holding this page table alive.
     //
-    // TODO(https://fxbug.dev/79118): Once https://fxbug.dev/79118 is resolved this call, and the entire called
+    // TODO(https://fxbug.dev/79118): Once https://fxbug.dev/42159319 is resolved this call, and the entire called
     // method, can be removed.
     zx_status_t status = DebugFindFirstLeafMapping(&pt_addr, &entry_vaddr, &pte);
     panic(

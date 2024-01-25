@@ -84,7 +84,7 @@ static bool event_signal_result_after_wait_test() {
 
 // Ensure that Event::Signal while holding a spinlock is safe.
 //
-// This is a regression test for https://fxbug.dev/77392.
+// This is a regression test for https://fxbug.dev/42157402.
 static bool event_signal_spinlock_test() {
   BEGIN_TEST;
 

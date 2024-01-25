@@ -300,7 +300,7 @@ typedef struct {
   bool disable_c1e;
 
   // Whether the idle loop should prefer HLT to MWAIT.
-  // TODO(https://fxbug.dev/61265): Allow idle predictor/governor to drive this from a table
+  // TODO(https://fxbug.dev/42139534): Allow idle predictor/governor to drive this from a table
   bool idle_prefer_hlt;
   x86_idle_states_t idle_states;
 } x86_microarch_config_t;

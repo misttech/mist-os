@@ -1341,7 +1341,7 @@ VmPageSpliceList::~VmPageSpliceList() { FreeAllPages(); }
 // static
 VmPageSpliceList VmPageSpliceList::CreateFromPageList(uint64_t offset, uint64_t length,
                                                       list_node* pages) {
-  // TODO(https://fxbug.dev/88859): This method needs coverage in vmpl_unittests.
+  // TODO(https://fxbug.dev/42170136): This method needs coverage in vmpl_unittests.
   DEBUG_ASSERT(pages);
   DEBUG_ASSERT(list_length(pages) == length / PAGE_SIZE);
   VmPageSpliceList res(offset, length, 0);
@@ -1477,7 +1477,7 @@ VmPageOrMarker VmPageSpliceList::Pop() {
 
   VmPageOrMarker res;
   if (!list_is_empty(&raw_pages_)) {
-    // TODO(https://fxbug.dev/88859): This path and CreateFromPageList() need coverage in
+    // TODO(https://fxbug.dev/42170136): This path and CreateFromPageList() need coverage in
     // vmpl_unittests.
     vm_page_t* head = list_remove_head_type(&raw_pages_, vm_page, queue_node);
     res = VmPageOrMarker::Page(head);

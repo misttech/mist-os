@@ -241,7 +241,7 @@ TEST(VmoTestCase, MapRead) {
 // The expected behavior is that the writes succeed without crashing
 // the kernel.
 //
-// See https://fxbug.dev/66978 for more details.
+// See https://fxbug.dev/42145844 for more details.
 TEST(VmoTestCase, ParallelWriteAndDecommit) {
   const size_t kVmoSize = zx_system_get_page_size();
 
@@ -1656,7 +1656,7 @@ TEST(VmoTestCase, CacheFlush) {
 
   // Check all the valid the combinations.
   //
-  // TODO(https://fxbug.dev/124333): zx_cache_flush is not yet implemented on riscv64.
+  // TODO(https://fxbug.dev/42075218): zx_cache_flush is not yet implemented on riscv64.
 #if defined(__riscv)
   constexpr zx_status_t expected = ZX_ERR_NOT_SUPPORTED;
 #else

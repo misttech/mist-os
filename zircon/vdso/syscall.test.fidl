@@ -7,7 +7,7 @@ library zx;
 closed protocol Syscall {
     /// ## Summary
     ///
-    /// TODO(https://fxbug.dev/32938)
+    /// TODO(https://fxbug.dev/42108078)
     ///
     /// ## Declaration
     ///
@@ -19,29 +19,29 @@ closed protocol Syscall {
     ///
     /// ## Description
     ///
-    /// TODO(https://fxbug.dev/32938)
+    /// TODO(https://fxbug.dev/42108078)
     ///
     /// ## Rights
     ///
-    /// TODO(https://fxbug.dev/32253)
+    /// TODO(https://fxbug.dev/42107318)
     ///
     /// ## Return value
     ///
-    /// TODO(https://fxbug.dev/32938)
+    /// TODO(https://fxbug.dev/42108078)
     ///
     /// ## Errors
     ///
-    /// TODO(https://fxbug.dev/32938)
+    /// TODO(https://fxbug.dev/42108078)
     ///
     /// ## See also
     ///
-    /// TODO(https://fxbug.dev/32938)
+    /// TODO(https://fxbug.dev/42108078)
     @testonly
     strict Test_0() -> () error Status;
 
     /// ## Summary
     ///
-    /// TODO(https://fxbug.dev/32938)
+    /// TODO(https://fxbug.dev/42108078)
     ///
     /// ## Declaration
     ///
@@ -53,23 +53,23 @@ closed protocol Syscall {
     ///
     /// ## Description
     ///
-    /// TODO(https://fxbug.dev/32938)
+    /// TODO(https://fxbug.dev/42108078)
     ///
     /// ## Rights
     ///
-    /// TODO(https://fxbug.dev/32253)
+    /// TODO(https://fxbug.dev/42107318)
     ///
     /// ## Return value
     ///
-    /// TODO(https://fxbug.dev/32938)
+    /// TODO(https://fxbug.dev/42108078)
     ///
     /// ## Errors
     ///
-    /// TODO(https://fxbug.dev/32938)
+    /// TODO(https://fxbug.dev/42108078)
     ///
     /// ## See also
     ///
-    /// TODO(https://fxbug.dev/32938)
+    /// TODO(https://fxbug.dev/42108078)
     @testonly
     @test_category1
     strict Test_1(struct {
@@ -78,7 +78,7 @@ closed protocol Syscall {
 
     /// ## Summary
     ///
-    /// TODO(https://fxbug.dev/32938)
+    /// TODO(https://fxbug.dev/42108078)
     ///
     /// ## Declaration
     ///
@@ -90,23 +90,23 @@ closed protocol Syscall {
     ///
     /// ## Description
     ///
-    /// TODO(https://fxbug.dev/32938)
+    /// TODO(https://fxbug.dev/42108078)
     ///
     /// ## Rights
     ///
-    /// TODO(https://fxbug.dev/32253)
+    /// TODO(https://fxbug.dev/42107318)
     ///
     /// ## Return value
     ///
-    /// TODO(https://fxbug.dev/32938)
+    /// TODO(https://fxbug.dev/42108078)
     ///
     /// ## Errors
     ///
-    /// TODO(https://fxbug.dev/32938)
+    /// TODO(https://fxbug.dev/42108078)
     ///
     /// ## See also
     ///
-    /// TODO(https://fxbug.dev/32938)
+    /// TODO(https://fxbug.dev/42108078)
     @testonly
     @test_category1
     strict Test_2(struct {
@@ -116,7 +116,7 @@ closed protocol Syscall {
 
     /// ## Summary
     ///
-    /// TODO(https://fxbug.dev/32938)
+    /// TODO(https://fxbug.dev/42108078)
     ///
     /// ## Declaration
     ///
@@ -128,23 +128,23 @@ closed protocol Syscall {
     ///
     /// ## Description
     ///
-    /// TODO(https://fxbug.dev/32938)
+    /// TODO(https://fxbug.dev/42108078)
     ///
     /// ## Rights
     ///
-    /// TODO(https://fxbug.dev/32253)
+    /// TODO(https://fxbug.dev/42107318)
     ///
     /// ## Return value
     ///
-    /// TODO(https://fxbug.dev/32938)
+    /// TODO(https://fxbug.dev/42108078)
     ///
     /// ## Errors
     ///
-    /// TODO(https://fxbug.dev/32938)
+    /// TODO(https://fxbug.dev/42108078)
     ///
     /// ## See also
     ///
-    /// TODO(https://fxbug.dev/32938)
+    /// TODO(https://fxbug.dev/42108078)
     @testonly
     @test_category2
     strict Test_3(struct {
@@ -155,7 +155,7 @@ closed protocol Syscall {
 
     /// ## Summary
     ///
-    /// TODO(https://fxbug.dev/32938)
+    /// TODO(https://fxbug.dev/42108078)
     ///
     /// ## Declaration
     ///
@@ -167,23 +167,23 @@ closed protocol Syscall {
     ///
     /// ## Description
     ///
-    /// TODO(https://fxbug.dev/32938)
+    /// TODO(https://fxbug.dev/42108078)
     ///
     /// ## Rights
     ///
-    /// TODO(https://fxbug.dev/32253)
+    /// TODO(https://fxbug.dev/42107318)
     ///
     /// ## Return value
     ///
-    /// TODO(https://fxbug.dev/32938)
+    /// TODO(https://fxbug.dev/42108078)
     ///
     /// ## Errors
     ///
-    /// TODO(https://fxbug.dev/32938)
+    /// TODO(https://fxbug.dev/42108078)
     ///
     /// ## See also
     ///
-    /// TODO(https://fxbug.dev/32938)
+    /// TODO(https://fxbug.dev/42108078)
     @testonly
     strict Test_4(struct {
         a int32;
@@ -194,7 +194,7 @@ closed protocol Syscall {
 
     /// ## Summary
     ///
-    /// TODO(https://fxbug.dev/32938)
+    /// TODO(https://fxbug.dev/42108078)
     ///
     /// ## Declaration
     ///
@@ -207,23 +207,23 @@ closed protocol Syscall {
     ///
     /// ## Description
     ///
-    /// TODO(https://fxbug.dev/32938)
+    /// TODO(https://fxbug.dev/42108078)
     ///
     /// ## Rights
     ///
-    /// TODO(https://fxbug.dev/32253)
+    /// TODO(https://fxbug.dev/42107318)
     ///
     /// ## Return value
     ///
-    /// TODO(https://fxbug.dev/32938)
+    /// TODO(https://fxbug.dev/42108078)
     ///
     /// ## Errors
     ///
-    /// TODO(https://fxbug.dev/32938)
+    /// TODO(https://fxbug.dev/42108078)
     ///
     /// ## See also
     ///
-    /// TODO(https://fxbug.dev/32938)
+    /// TODO(https://fxbug.dev/42108078)
     @testonly
     strict Test_5(struct {
         a int32;
@@ -235,7 +235,7 @@ closed protocol Syscall {
 
     /// ## Summary
     ///
-    /// TODO(https://fxbug.dev/32938)
+    /// TODO(https://fxbug.dev/42108078)
     ///
     /// ## Declaration
     ///
@@ -248,23 +248,23 @@ closed protocol Syscall {
     ///
     /// ## Description
     ///
-    /// TODO(https://fxbug.dev/32938)
+    /// TODO(https://fxbug.dev/42108078)
     ///
     /// ## Rights
     ///
-    /// TODO(https://fxbug.dev/32253)
+    /// TODO(https://fxbug.dev/42107318)
     ///
     /// ## Return value
     ///
-    /// TODO(https://fxbug.dev/32938)
+    /// TODO(https://fxbug.dev/42108078)
     ///
     /// ## Errors
     ///
-    /// TODO(https://fxbug.dev/32938)
+    /// TODO(https://fxbug.dev/42108078)
     ///
     /// ## See also
     ///
-    /// TODO(https://fxbug.dev/32938)
+    /// TODO(https://fxbug.dev/42108078)
     @testonly
     strict Test_6(struct {
         a int32;
@@ -277,7 +277,7 @@ closed protocol Syscall {
 
     /// ## Summary
     ///
-    /// TODO(https://fxbug.dev/32938)
+    /// TODO(https://fxbug.dev/42108078)
     ///
     /// ## Declaration
     ///
@@ -295,23 +295,23 @@ closed protocol Syscall {
     ///
     /// ## Description
     ///
-    /// TODO(https://fxbug.dev/32938)
+    /// TODO(https://fxbug.dev/42108078)
     ///
     /// ## Rights
     ///
-    /// TODO(https://fxbug.dev/32253)
+    /// TODO(https://fxbug.dev/42107318)
     ///
     /// ## Return value
     ///
-    /// TODO(https://fxbug.dev/32938)
+    /// TODO(https://fxbug.dev/42108078)
     ///
     /// ## Errors
     ///
-    /// TODO(https://fxbug.dev/32938)
+    /// TODO(https://fxbug.dev/42108078)
     ///
     /// ## See also
     ///
-    /// TODO(https://fxbug.dev/32938)
+    /// TODO(https://fxbug.dev/42108078)
     @testonly
     strict Test_7(struct {
         a int32;
@@ -325,7 +325,7 @@ closed protocol Syscall {
 
     /// ## Summary
     ///
-    /// TODO(https://fxbug.dev/32938)
+    /// TODO(https://fxbug.dev/42108078)
     ///
     /// ## Declaration
     ///
@@ -344,23 +344,23 @@ closed protocol Syscall {
     ///
     /// ## Description
     ///
-    /// TODO(https://fxbug.dev/32938)
+    /// TODO(https://fxbug.dev/42108078)
     ///
     /// ## Rights
     ///
-    /// TODO(https://fxbug.dev/32253)
+    /// TODO(https://fxbug.dev/42107318)
     ///
     /// ## Return value
     ///
-    /// TODO(https://fxbug.dev/32938)
+    /// TODO(https://fxbug.dev/42108078)
     ///
     /// ## Errors
     ///
-    /// TODO(https://fxbug.dev/32938)
+    /// TODO(https://fxbug.dev/42108078)
     ///
     /// ## See also
     ///
-    /// TODO(https://fxbug.dev/32938)
+    /// TODO(https://fxbug.dev/42108078)
     @testonly
     strict Test_8(struct {
         a int32;
@@ -381,7 +381,7 @@ closed protocol Syscall {
 
     /// ## Summary
     ///
-    /// TODO(https://fxbug.dev/32938)
+    /// TODO(https://fxbug.dev/42108078)
     ///
     /// ## Declaration
     ///
@@ -393,23 +393,23 @@ closed protocol Syscall {
     ///
     /// ## Description
     ///
-    /// TODO(https://fxbug.dev/32938)
+    /// TODO(https://fxbug.dev/42108078)
     ///
     /// ## Rights
     ///
-    /// TODO(https://fxbug.dev/32253)
+    /// TODO(https://fxbug.dev/42107318)
     ///
     /// ## Return value
     ///
-    /// TODO(https://fxbug.dev/32938)
+    /// TODO(https://fxbug.dev/42108078)
     ///
     /// ## Errors
     ///
-    /// TODO(https://fxbug.dev/32938)
+    /// TODO(https://fxbug.dev/42108078)
     ///
     /// ## See also
     ///
-    /// TODO(https://fxbug.dev/32938)
+    /// TODO(https://fxbug.dev/42108078)
     @testonly
     strict TestWrapper(struct {
         a int32;
@@ -419,7 +419,7 @@ closed protocol Syscall {
 
     /// ## Summary
     ///
-    /// TODO(https://fxbug.dev/32938)
+    /// TODO(https://fxbug.dev/42108078)
     ///
     /// ## Declaration
     ///
@@ -432,23 +432,23 @@ closed protocol Syscall {
     ///
     /// ## Description
     ///
-    /// TODO(https://fxbug.dev/32938)
+    /// TODO(https://fxbug.dev/42108078)
     ///
     /// ## Rights
     ///
-    /// TODO(https://fxbug.dev/32253)
+    /// TODO(https://fxbug.dev/42107318)
     ///
     /// ## Return value
     ///
-    /// TODO(https://fxbug.dev/32938)
+    /// TODO(https://fxbug.dev/42108078)
     ///
     /// ## Errors
     ///
-    /// TODO(https://fxbug.dev/32938)
+    /// TODO(https://fxbug.dev/42108078)
     ///
     /// ## See also
     ///
-    /// TODO(https://fxbug.dev/32938)
+    /// TODO(https://fxbug.dev/42108078)
     @testonly
     strict TestHandleCreate(struct {
         return_value Status;

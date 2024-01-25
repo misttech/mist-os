@@ -85,7 +85,7 @@ zx_status_t DeviceContext::InitCommon() {
     return status;
   }
 
-  // TODO(https://fxbug.dev/105668): handle allocation better.
+  // TODO(https://fxbug.dev/42056922): handle allocation better.
   constexpr size_t kMaxAllocatorMemoryUsage = 256 * PAGE_SIZE;
   fbl::RefPtr<RegionAllocator::RegionPool> region_pool =
       RegionAllocator::RegionPool::Create(kMaxAllocatorMemoryUsage);

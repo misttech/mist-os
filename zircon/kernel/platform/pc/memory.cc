@@ -240,7 +240,7 @@ static void x86_resource_init_hook(unsigned int rl) {
     }
   }
 
-  // debug_uart.irq needs to be reserved here. See https://fxbug.dev/33936.
+  // debug_uart.irq needs to be reserved here. See https://fxbug.dev/42109187.
 }
 
 LK_INIT_HOOK(x86_resource_init, x86_resource_init_hook, LK_INIT_LEVEL_HEAP)

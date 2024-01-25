@@ -527,7 +527,7 @@ inline void ApplyX86ErrataWorkarounds(CpuidIoProvider&& cpuid, MsrIoProvider&& m
                 lscfg.set_erratum_1033_workaround(1);
               }
               // 1095: Potential Violation of Read Ordering In Lock Operation in SMT Mode.
-              if (true) {  // TODO(https://fxbug.dev/37450): Do not apply if SMT is disabled.
+              if (true) {  // TODO(https://fxbug.dev/42113091): Do not apply if SMT is disabled.
                 lscfg.set_erratum_1095_workaround(1);
               }
               lscfg.WriteTo(&msr);

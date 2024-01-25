@@ -144,7 +144,7 @@ CHILD_MAIN(RunLinenoiseWithLongPrompt) {
   return 0;
 }
 
-// Test for reproduction in https://fxbug.dev/33554 where a long prompt caused a crash.
+// Test for reproduction in https://fxbug.dev/42108763 where a long prompt caused a crash.
 TEST(Linenoise, CrashLongPrompt) {
   auto child = RunChild("RunLinenoiseWithLongPrompt");
 

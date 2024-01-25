@@ -669,7 +669,7 @@ closed protocol Pager {
     ///
     /// *pager* must be of type `ZX_OBJ_TYPE_PAGER` and have `ZX_RIGHT_MANAGE_VMO`.
     ///
-    /// <!-- TODO(https://fxbug.dev/129527): ZX_PAGER_RESET_VMO_STATS does more than a pure query. -->
+    /// <!-- TODO(https://fxbug.dev/42079895): ZX_PAGER_RESET_VMO_STATS does more than a pure query. -->
     /// *pager_vmo* must be of type `ZX_OBJ_TYPE_VMO` and have `ZX_RIGHT_READ`.
     ///
     /// ## Return value

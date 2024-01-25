@@ -46,7 +46,7 @@ inline zx_ticks_t get_raw_ticks() {
 
 }  // namespace
 
-// TODO(https://fxbug.dev/91701): switch to the ABA method of reading the offset when we start
+// TODO(https://fxbug.dev/42173294): switch to the ABA method of reading the offset when we start
 // to allow the offset to be changed as a result of coming out of system
 // suspend.
 __EXPORT zx_ticks_t _zx_ticks_get(void) {

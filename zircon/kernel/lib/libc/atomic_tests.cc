@@ -99,7 +99,7 @@ bool KtlAtomicRef128Test() {
   EXPECT_EQ(int_ref.load(ktl::memory_order_acquire), kValue);
   int_ref.store(kValue + 1, ktl::memory_order_release);
   EXPECT_EQ(int_ref.load(ktl::memory_order_acquire), kValue + 1);
-  // TODO(https://fxbug.dev/47117): gcc __int128 is not considered is_lock_free, even though it
+  // TODO(https://fxbug.dev/42123828): gcc __int128 is not considered is_lock_free, even though it
   // generates lock-free code for load/store/compare_exchange.
 #ifdef __clang__
   EXPECT_EQ(true, int_ref.is_lock_free());

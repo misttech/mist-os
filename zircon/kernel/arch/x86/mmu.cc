@@ -75,7 +75,7 @@ volatile pt_entry_t pdp_high[NO_OF_PT_ENTRIES] __ALIGNED(PAGE_SIZE);
 #if __has_feature(address_sanitizer)
 volatile pt_entry_t kasan_shadow_pt[NO_OF_PT_ENTRIES] __ALIGNED(PAGE_SIZE);  // Leaf page tables
 volatile pt_entry_t kasan_shadow_pd[NO_OF_PT_ENTRIES] __ALIGNED(PAGE_SIZE);  // Page directories
-// TODO(https://fxbug.dev/30033): Share this with the vm::zero_page
+// TODO(https://fxbug.dev/42104852): Share this with the vm::zero_page
 volatile uint8_t kasan_zero_page[PAGE_SIZE] __ALIGNED(PAGE_SIZE);
 #endif
 
@@ -355,7 +355,7 @@ void X86PageTableMmu::TlbInvalidate(const PendingTlbInvalidation* pending) {
   // We need to send the TLB invalidate to all CPUs if this aspace is shared because active_cpus
   // is inaccurate in that case (another CPU may be running a unified aspace with these shared
   // mappings).
-  // TODO(https://fxbug.dev/132980): Replace this global broadcast for shared aspaces with a more
+  // TODO(https://fxbug.dev/42083004): Replace this global broadcast for shared aspaces with a more
   // targeted one once shared aspaces keep track of all the CPUs they are on.
   if (IsShared() || pending->contains_global) {
     target = MP_IPI_TARGET_ALL;
@@ -803,7 +803,7 @@ zx_status_t X86ArchVmAspace::AllocatePCID() {
   DEBUG_ASSERT(g_x86_feature_pcid_enabled);
   zx::result<uint16_t> result = pcid_allocator->TryAlloc();
   if (result.is_error()) {
-    // TODO(https://fxbug.dev/124428): Implement some kind of PCID recycling.
+    // TODO(https://fxbug.dev/42075323): Implement some kind of PCID recycling.
     LTRACEF("X86: ran out of PCIDs when assigning new aspace\n");
     return ZX_ERR_NO_RESOURCES;
   }
@@ -820,7 +820,7 @@ X86ArchVmAspace::~X86ArchVmAspace() {
   if (pt_) {
     pt_->~X86PageTableBase();
   }
-  // TODO(https://fxbug.dev/30927): check that we've destroyed the aspace.
+  // TODO(https://fxbug.dev/42105844): check that we've destroyed the aspace.
 }
 
 zx_status_t X86ArchVmAspace::Destroy() {

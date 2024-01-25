@@ -161,7 +161,7 @@
   // Reload the interrupted PC (as modified) into sepc.
   ld a0, (sp)
   csrw sepc, a0
-#ifndef __clang__  // TODO(https://fxbug.dev/122138)
+#ifndef __clang__  // TODO(https://fxbug.dev/42073127)
   .cfi_register 64, sepc
 #endif
 

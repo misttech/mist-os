@@ -7,7 +7,7 @@ const LOG_RECORD_MAX usize64 = 256;
 
 @transport("Syscall")
 closed protocol Debuglog {
-    // TODO(https://fxbug.dev/32803): handle == ZX_HANDLE_INVALID accepted.
+    // TODO(https://fxbug.dev/42107929): handle == ZX_HANDLE_INVALID accepted.
     /// ## Summary
     ///
     /// Create an object allowing access to the kernel debuglog.
@@ -91,7 +91,7 @@ closed protocol Debuglog {
     /// NUL-termination. *buffer* will be truncated to some size less than
     /// ZX_LOG_RECORD_MAX so that it may fit in the `data` field of `zx_log_record_t`.
     ///
-    /// <!-- TODO(https://fxbug.dev/72345): Consider documenting ZX_LOG_LOCAL -->
+    /// <!-- TODO(https://fxbug.dev/42151796): Consider documenting ZX_LOG_LOCAL -->
     ///
     /// *options* must be set to `0`.
     ///

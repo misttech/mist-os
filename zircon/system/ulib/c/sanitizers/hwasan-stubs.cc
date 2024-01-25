@@ -45,7 +45,7 @@ HWASAN_STUB(load4)
 HWASAN_STUB(load8)
 HWASAN_STUB(load16)
 
-// TODO(https://fxbug.dev/109033): The llvm flag for replacing memory checking with
+// TODO(https://fxbug.dev/42060386): The llvm flag for replacing memory checking with
 // libcalls also replaces memory tagging. Memory tagging can continue to be
 // inlined though since it's perfectly fine to write tags to shadow memory after
 // it's set up.

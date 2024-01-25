@@ -256,7 +256,7 @@
 
 #elif defined(__riscv)
 
-// TODO(https://fxbug.dev/124336): RISC-V vector state not supported yet.
+// TODO(https://fxbug.dev/42075221): RISC-V vector state not supported yet.
 
 #else
 
@@ -495,7 +495,7 @@
 
 #elif defined(__riscv)
 
-  // TODO(https://fxbug.dev/124336): RISC-V vector state not supported yet.
+  // TODO(https://fxbug.dev/42075221): RISC-V vector state not supported yet.
   call zx_thread_exit
   unimp
 

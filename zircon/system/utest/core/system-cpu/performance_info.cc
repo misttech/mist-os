@@ -348,7 +348,7 @@ TEST(SystemCpu, GetPerformanceInfo) {
 }
 
 // Verify that the scheduler's target preemption time is properly updated when the performance scale
-// changes. Failure to maintain consistency will result in a kernel panic. See https://fxbug.dev/86901.
+// changes. Failure to maintain consistency will result in a kernel panic. See https://fxbug.dev/42167963.
 TEST(SystemCpu, TargetPreemptionTimeAssert) {
   if (GetCpuCount() < kTestThreadCpu + 1) {
     return;
@@ -404,7 +404,7 @@ TEST(SystemCpu, TargetPreemptionTimeAssert) {
 }
 
 TEST(SystemCpu, ScaleBandwidth) {
-  // TODO(https://fxbug.dev/85846): Disabled while flakeds are investigated.
+  // TODO(https://fxbug.dev/42166790): Disabled while flakeds are investigated.
   return;
 
   if (GetCpuCount() < kTestThreadCpu + 1) {

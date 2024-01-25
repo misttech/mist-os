@@ -406,7 +406,7 @@ func Summarize(ir fidlgen.Root, sourceDir string, order DeclOrder, cb func(Decl)
 		// of unknown elements. In either case, we cannot make sense of the
 		// definition and so we skip it.
 		//
-		// TODO(https://fxbug.dev/106538): We do not want to silently ignore things
+		// TODO(https://fxbug.dev/42057859): We do not want to silently ignore things
 		// that a user might expect to generate results.
 		if decl == nil || reflect.ValueOf(decl).IsNil() {
 			// Before skipping, we should still record the file that the
@@ -487,7 +487,7 @@ const (
 	TypeKindOverlay     TypeKind = "overlay"
 	TypeKindAlias       TypeKind = "alias" // Not a type per se, but conveniently regarded as such.
 
-	// TODO(https://fxbug.dev/110021): These kinds exist only for the sake of the
+	// TODO(https://fxbug.dev/42061412): These kinds exist only for the sake of the
 	// interim, v2 form of FIDL library zx.
 	TypeKindPointer      TypeKind = "pointer"
 	TypeKindVoidPointer  TypeKind = "voidptr"
@@ -763,7 +763,7 @@ type TypeDescriptor struct {
 // fidlgen.Type and fidlgen.PartialTypeConstructor.
 type recursiveType interface {
 	GetKind() fidlgen.TypeKind
-	// TODO(https://fxbug.dev/105758): The presence of the declMap in the signature is
+	// TODO(https://fxbug.dev/42057022): The presence of the declMap in the signature is
 	// to account for yet another type alias IR deficiency: the IR loses
 	// type information (e.g., size) about the value of the right-hand side, so
 	// we use the map to look up previously processed declarations to make a
@@ -810,7 +810,7 @@ func resolveType(typ recursiveType, attrs fidlgen.Attributes, decls declMap, typ
 			desc.Kind = TypeKindOverlay
 		case *Alias:
 			desc.Kind = TypeKindAlias
-		default: // TODO(https://fxbug.dev/106538): Skip if unknown.
+		default: // TODO(https://fxbug.dev/42057859): Skip if unknown.
 			return nil, nil
 		}
 
@@ -821,7 +821,7 @@ func resolveType(typ recursiveType, attrs fidlgen.Attributes, decls declMap, typ
 		if err != nil {
 			return nil, err
 		}
-		if nested == nil { // TODO(https://fxbug.dev/106538): Skip if unknown.
+		if nested == nil { // TODO(https://fxbug.dev/42057859): Skip if unknown.
 			return nil, nil
 		}
 		desc.ElementType = nested
@@ -835,7 +835,7 @@ func resolveType(typ recursiveType, attrs fidlgen.Attributes, decls declMap, typ
 			desc.Kind = TypeKindVector
 		}
 
-		// TODO(https://fxbug.dev/105758): Temporary contriving of alias name currently
+		// TODO(https://fxbug.dev/42057022): Temporary contriving of alias name currently
 		// lost in the IR.
 		//
 		// See the definition of @embedded_alias in //zircon/vdso/README.md for
@@ -851,7 +851,7 @@ func resolveType(typ recursiveType, attrs fidlgen.Attributes, decls declMap, typ
 		if err != nil {
 			return nil, err
 		}
-		if nested == nil { // TODO(https://fxbug.dev/106538): Skip if unknown.
+		if nested == nil { // TODO(https://fxbug.dev/42057859): Skip if unknown.
 			return nil, nil
 		}
 		desc.ElementType = nested
@@ -879,7 +879,7 @@ func resolveType(typ recursiveType, attrs fidlgen.Attributes, decls declMap, typ
 		desc.Kind = TypeKindHandle
 		desc.Type = string(typ.GetIdentifierType())
 		desc.Decl = decls[desc.Type]
-	default: // TODO(https://fxbug.dev/106538): Skip if unknown.
+	default: // TODO(https://fxbug.dev/42057859): Skip if unknown.
 		return nil, nil
 	}
 
@@ -932,7 +932,7 @@ type Struct struct {
 	// request/response payload).
 	synthesized bool
 
-	// TODO(https://fxbug.dev/110021): wrappedReturn indicates that this struct defines
+	// TODO(https://fxbug.dev/42061412): wrappedReturn indicates that this struct defines
 	// the singleton, response body of a protocol method used to define a
 	// syscall, and further that the return type of that syscall is actually
 	// the type of the wrapped parameter. The reason for this workaround is
@@ -952,7 +952,7 @@ type StructMember struct {
 	// Offset is the offset of the field.
 	Offset int
 
-	// TODO(https://fxbug.dev/110021): The following attributes may annotate "syscall"
+	// TODO(https://fxbug.dev/42061412): The following attributes may annotate "syscall"
 	// request and response structs. While we have to synthesize syscall
 	// information manually, we record these values here during member
 	// processing for later syscall processing.
@@ -975,7 +975,7 @@ func newStruct(strct fidlgen.Struct, decls declMap, typeKinds map[TypeKind]struc
 	for _, member := range strct.Members {
 		attrs := member.GetAttributes()
 
-		// TODO(https://fxbug.dev/105758): For struct members, we have the `MaybeAlias`
+		// TODO(https://fxbug.dev/42057022): For struct members, we have the `MaybeAlias`
 		// field as a workaround for recovering any alias name.
 		memberType := recursiveType(fidlgenType(member.Type))
 		if member.MaybeAlias != nil {
@@ -985,7 +985,7 @@ func newStruct(strct fidlgen.Struct, decls declMap, typeKinds map[TypeKind]struc
 		if err != nil {
 			return nil, fmt.Errorf("%s.%s: failed to derive type: %w", s.Name, member.Name, err)
 		}
-		if typ == nil { // TODO(https://fxbug.dev/106538): Skip if unknown.
+		if typ == nil { // TODO(https://fxbug.dev/42057859): Skip if unknown.
 			continue
 		}
 		s.Members = append(s.Members, StructMember{
@@ -993,7 +993,7 @@ func newStruct(strct fidlgen.Struct, decls declMap, typeKinds map[TypeKind]struc
 			Type:   *typ,
 			Offset: member.FieldShapeV2.Offset,
 
-			// TODO(https://fxbug.dev/110021): Eventually the IR will effectively
+			// TODO(https://fxbug.dev/42061412): Eventually the IR will effectively
 			// surface this information directly in the syscall-related
 			// elements: at that point this can be removed.
 			inout:   attrs.HasAttribute("inout"),
@@ -1048,7 +1048,7 @@ func newOverlay(overlay fidlgen.Overlay, decls declMap, typeKinds map[TypeKind]s
 	for i, member := range overlay.Members {
 		attrs := member.GetAttributes()
 
-		// TODO(https://fxbug.dev/105758): For overlay members, we have the
+		// TODO(https://fxbug.dev/42057022): For overlay members, we have the
 		// `MaybeAlias` field as a workaround for recovering any alias name.
 		memberType := recursiveType(fidlgenType(member.Type))
 		if member.MaybeAlias != nil {
@@ -1085,7 +1085,7 @@ func newAlias(alias fidlgen.Alias, decls declMap, typeKinds map[TypeKind]struct{
 	if err != nil {
 		return nil, err
 	}
-	if typ == nil { // TODO(https://fxbug.dev/106538): Skip if unknown.
+	if typ == nil { // TODO(https://fxbug.dev/42057859): Skip if unknown.
 		return nil, nil
 	}
 	return &Alias{
@@ -1166,7 +1166,7 @@ func (ctor fidlgenTypeCtor) GetElementType() recursiveType {
 	if len(ctor.Args) == 0 {
 		return nil
 	}
-	// TODO(https://fxbug.dev/7660): This list appears to always be empty or a
+	// TODO(https://fxbug.dev/42156522): This list appears to always be empty or a
 	// singleton (and its unclear what further arguments would mean).
 	return fidlgenTypeCtor(ctor.Args[0])
 }
@@ -1450,7 +1450,7 @@ func newSyscallFamily(protocol fidlgen.Protocol, decls declMap) (*SyscallFamily,
 				return nil, err
 			}
 
-			// TODO(https://fxbug.dev/105758, https://fxbug.dev/113897): The name of an aliased
+			// TODO(https://fxbug.dev/105758, https://fxbug.dev/42065140): The name of an aliased
 			// error type does not yet survive into the IR (just the full
 			// resolution). So, to account for the major case of wanting to use
 			// `zx/Status` as an error type - while in its alias form - we

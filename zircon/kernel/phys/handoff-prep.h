@@ -33,7 +33,7 @@ class Log;
 
 class HandoffPrep {
  public:
-  // TODO(https://fxbug.dev/84107): The first argument is the space inside the data ZBI
+  // TODO(https://fxbug.dev/42164859): The first argument is the space inside the data ZBI
   // where the ZBI_TYPE_STORAGE_KERNEL was, the only safe space to reuse for
   // now.  Eventually this function will just allocate from the memalloc::Pool
   // using a type designated for handoff data so the kernel can decide if it
@@ -93,7 +93,7 @@ class HandoffPrep {
   // Add a generic VMO to be simply published to userland.  The kernel proper
   // won't ever look at it.
   //
-  // TODO(https://fxbug.dev/84107): Currently this returns the buffer to copy the
+  // TODO(https://fxbug.dev/42164859): Currently this returns the buffer to copy the
   // contents into.  Later this will require a whole-page allocation that gets
   // handed off.  It can be changed in place hereafter until the moment of
   // handoff.
@@ -115,7 +115,7 @@ class HandoffPrep {
     size_t size_bytes = 0;
   };
 
-  // TODO(https://fxbug.dev/84107): Later this will just return
+  // TODO(https://fxbug.dev/42164859): Later this will just return
   // gPhysNew<memalloc::Type::kPhysHandoff>.
   Allocator& allocator() { return allocator_; }
 

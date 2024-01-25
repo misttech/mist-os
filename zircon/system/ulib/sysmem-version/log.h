@@ -18,7 +18,7 @@
 #endif
 
 // Temporary solution for logging in driver and non-driver contexts by logging to stderr
-// TODO(https://fxbug.dev/41539): Replace with logging interface that accommodates both driver and non-driver contexts
+// TODO(https://fxbug.dev/42117633): Replace with logging interface that accommodates both driver and non-driver contexts
 // including sysmem driver itself.
 #define SYSMEM_VERSION_LOG_TRACE (0x10)
 #define SYSMEM_VERSION_LOG_DEBUG (0x20)

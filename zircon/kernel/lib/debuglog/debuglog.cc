@@ -601,7 +601,7 @@ void dlog_serial_write(ktl::string_view str) {
     return;
   }
 
-  // If dlog has finished shutting down, just drop this message.  See https://fxbug.dev/134287.
+  // If dlog has finished shutting down, just drop this message.  See https://fxbug.dev/42084162.
   if (DLOG->ShutdownFinished()) {
     return;
   }

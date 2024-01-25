@@ -27,7 +27,7 @@
   // 64 is the canonical "alternate frame return column".
   .cfi_return_column 64
   // The interrupted PC is found in the sepc CSR, which has a DWARF number.
-#ifndef __clang__  // TODO(https://fxbug.dev/122138)
+#ifndef __clang__  // TODO(https://fxbug.dev/42073127)
   .cfi_register 64, sepc
 #endif
 

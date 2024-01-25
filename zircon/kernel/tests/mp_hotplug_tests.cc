@@ -88,7 +88,7 @@ static void wait_for_cpu_active(cpu_num_t i) {
 [[maybe_unused]] static bool mp_hotplug_test() {
   BEGIN_TEST;
 
-// TODO(https://fxbug.dev/136436): Re-enable test on RISC-V.
+// TODO(https://fxbug.dev/42086046): Re-enable test on RISC-V.
 #if defined(__riscv)
   printf("skipping test mp_hotplug, hotplug only suported on x64 and arm64\n");
   END_TEST;

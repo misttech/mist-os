@@ -300,7 +300,7 @@ closed protocol Vmo {
         buffer_size usize64;
     }) -> () error Status;
 
-    // TODO(https://fxbug.dev/32803): No rights required?
+    // TODO(https://fxbug.dev/42107929): No rights required?
     /// ## SUMMARY
     ///
     /// Read the current size of a VMO object.
@@ -324,7 +324,7 @@ closed protocol Vmo {
     ///
     /// ## Rights
     ///
-    /// TODO(https://fxbug.dev/32253)
+    /// TODO(https://fxbug.dev/42107318)
     ///
     /// ## Return value
     ///
@@ -928,8 +928,8 @@ closed protocol Vmo {
         cache_policy uint32;
     }) -> () error Status;
 
-    // TODO(https://fxbug.dev/32803): handle: No rights required, ZX_RIGHT_EXECUTE added to dup out
-    // TODO(https://fxbug.dev/32803): vmex == ZX_HANDLE_INVALID also accepted.
+    // TODO(https://fxbug.dev/42107929): handle: No rights required, ZX_RIGHT_EXECUTE added to dup out
+    // TODO(https://fxbug.dev/42107929): vmex == ZX_HANDLE_INVALID also accepted.
     /// ## SUMMARY
     ///
     /// Add execute rights to a VMO.
@@ -991,7 +991,7 @@ closed protocol Vmo {
 
     /// ## SUMMARY
     ///
-    /// TODO(https://fxbug.dev/32938)
+    /// TODO(https://fxbug.dev/42108078)
     ///
     /// ## Declaration
     ///
@@ -1006,7 +1006,7 @@ closed protocol Vmo {
     ///
     /// ## Description
     ///
-    /// TODO(https://fxbug.dev/32938)
+    /// TODO(https://fxbug.dev/42108078)
     ///
     /// ## Rights
     ///
@@ -1014,15 +1014,15 @@ closed protocol Vmo {
     ///
     /// ## Return value
     ///
-    /// TODO(https://fxbug.dev/32938)
+    /// TODO(https://fxbug.dev/42108078)
     ///
     /// ## Errors
     ///
-    /// TODO(https://fxbug.dev/32938)
+    /// TODO(https://fxbug.dev/42108078)
     ///
     /// ## See also
     ///
-    /// TODO(https://fxbug.dev/32938)
+    /// TODO(https://fxbug.dev/42108078)
     strict CreateContiguous(resource struct {
         bti Handle:BTI;
         size usize64;

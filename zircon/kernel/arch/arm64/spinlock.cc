@@ -68,7 +68,7 @@ bool arch_spin_trylock(arch_spin_lock_t* lock) TA_NO_THREAD_SAFETY_ANALYSIS {
       // Even though this is a try lock, if the store on acquire fails we try
       // again. This is to prevent spurious failures from misleading the caller
       // into thinking the lock is held by another thread. See
-      // https://fxbug.dev/83983 for details.
+      // https://fxbug.dev/42164720 for details.
       "cbnz    %w[out], 1b;"
       "2:"
       "clrex;"

@@ -604,7 +604,7 @@ class TestKTraceState : public ::internal::KTraceState {
 
   // Check that Reserve() does not allocate any space in the trace
   // buffer in the case where writes were disabled before Reserve()
-  // was called.  See https://fxbug.dev/122181.
+  // was called.  See https://fxbug.dev/42073175.
   static bool DisableWritesTest() {
     BEGIN_TEST;
 
@@ -642,7 +642,7 @@ class TestKTraceState : public ::internal::KTraceState {
 
   // Begin a write (Reserve), but disable writes before the PendingCommit is
   // committed or destroyed.  Make sure we don't fail any asserts.  See
-  // https://fxbug.dev/122043.
+  // https://fxbug.dev/42073022.
   static bool DisableWritesDuringPendingCommitTest() {
     BEGIN_TEST;
 

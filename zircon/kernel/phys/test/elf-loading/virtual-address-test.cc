@@ -29,7 +29,7 @@ constexpr const char* kTestName = "virtual-address-loading-loading-test";
 // The name of ELF module to be loaded.
 constexpr ktl::string_view kGetInt = "get-int.virtual-address-loading-test";
 
-// TODO(https://fxbug.dev/91187): Pick a load address through a sort of allocator
+// TODO(https://fxbug.dev/42172722): Pick a load address through a sort of allocator
 // (i.e., as we would in production).
 constexpr uint64_t kLoadAddress = 0xffff'ffff'0000'0000;
 
@@ -39,11 +39,11 @@ int PhysLoadTestMain(KernelStorage kernelfs) {
   gSymbolize->set_name(kTestName);
 
 #ifdef __aarch64__
-  // TODO(https://fxbug.dev/135733): There is no upper address space in EL2+ by
+  // TODO(https://fxbug.dev/42085337): There is no upper address space in EL2+ by
   // default, so drop down to EL1 and proceed with the test.
   if (auto el = arch::ArmCurrentEl::Read().el(); el > 1) {
     printf(
-        "TODO(https://fxbug.dev/135733): %s test is only supported for EL1 (current EL is %lu); skipping it\n",
+        "TODO(https://fxbug.dev/42085337): %s test is only supported for EL1 (current EL is %lu); skipping it\n",
         kTestName, el);
     return 0;
   }
@@ -65,7 +65,7 @@ int PhysLoadTestMain(KernelStorage kernelfs) {
   Allocation loaded = elf.Load(kLoadAddress);
   elf.Relocate();
 
-  // TODO(https://fxbug.dev/91187): Set up C++ ABI support and map and jump into a
+  // TODO(https://fxbug.dev/42172722): Set up C++ ABI support and map and jump into a
   // loaded C++ program.
   if (auto result = elf.MapInto(*gAddressSpace); result.is_error()) {
     printf("Failed to map loaded image\n");

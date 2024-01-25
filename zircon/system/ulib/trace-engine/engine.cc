@@ -602,7 +602,7 @@ EXPORT_NO_DDK zx_status_t trace_engine_mark_buffer_saved(uint32_t wrapped_count,
 namespace {
 
 void handle_all_observers_started() {
-  // TODO(https://fxbug.dev/22873): Allow indicating an observer failed to start.
+  // TODO(https://fxbug.dev/42096895): Allow indicating an observer failed to start.
 
   // Clear the signal, otherwise we'll keep getting called.
   g_event.signal(SIGNAL_ALL_OBSERVERS_STARTED, 0u);
@@ -796,7 +796,7 @@ EXPORT trace_context_t* trace_acquire_context_for_category(const char* category_
   return context;
 }
 
-// TODO(https://fxbug.dev/22947): This function is split out from
+// TODO(https://fxbug.dev/42096977): This function is split out from
 // |trace_acquire_context_for_category_cached()| because gcc doesn't
 // optimize the prologue as well as it could: It creates the stack frame
 // for the entire function prior to the "is disabled?" early-exit test.

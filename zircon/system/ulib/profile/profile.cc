@@ -172,7 +172,7 @@ void ProfileProvider::SetProfileByRole(SetProfileByRoleRequestView request,
       completer.Reply(ZX_ERR_INVALID_ARGS);
       return;
     }
-    // TODO(https://fxbug.dev/40858): If a media profile is not found in the system config, use the
+    // TODO(https://fxbug.dev/42116876): If a media profile is not found in the system config, use the
     // forwarded parameters. This can be removed once clients are migrated to use defined roles.
     // Skip media roles with invalid deadline parameters.
     if (media_role->capacity <= 0 || media_role->deadline <= 0 ||

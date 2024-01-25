@@ -326,7 +326,7 @@ zx_status_t VmObject::RoundSize(uint64_t size, uint64_t* out_size) {
 zx_status_t VmObject::GetPageBlocking(uint64_t offset, uint pf_flags, list_node* alloc_list,
                                       vm_page_t** page, paddr_t* pa) {
   zx_status_t status = ZX_OK;
-  // TOOD(https://fxbug.dev/94078): Enforce no locks held as this might wait whilst holding a lock.
+  // TOOD(https://fxbug.dev/42175933): Enforce no locks held as this might wait whilst holding a lock.
   __UNINITIALIZED LazyPageRequest page_request;
   do {
     status = GetPage(offset, pf_flags, alloc_list, &page_request, page, pa);

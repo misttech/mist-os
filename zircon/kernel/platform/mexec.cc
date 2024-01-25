@@ -30,7 +30,7 @@
 
 namespace {
 
-// TODO(https://fxbug.dev/84107): Later this will arrive in a whole page from the
+// TODO(https://fxbug.dev/42164859): Later this will arrive in a whole page from the
 // physboot handoff so it can be stuffed into a VMO and extended there.
 
 // Mexec data as gleaned from the physboot hand-off.

@@ -164,7 +164,7 @@ class SharedLegacyIrqHandler
   void Handler();
 
   DeviceHandlerList device_handler_list_;
-  // TODO(https://fxbug.dev/32978): Tracking of this lock is disabled to silence the circular
+  // TODO(https://fxbug.dev/42108122): Tracking of this lock is disabled to silence the circular
   // dependency warning from lockdep. The circular dependency is a known issue
   // that will be addressed by refactoring PCI support into userspace.
   mutable DECLARE_SPINLOCK(SharedLegacyIrqHandler,

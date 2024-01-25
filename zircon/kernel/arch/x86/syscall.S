@@ -336,7 +336,7 @@ LOCAL_FUNCTION_LABEL(x86_syscall_cleanup_and_return)
     movq    %rdx, %r12
 
     // Spectre V1: If the syscall is going to return certain errors, flush the L1D$
-    // TODO(https://fxbug.dev/33667): Can this be folded together w/ MD_CLEAR below?
+    // TODO(https://fxbug.dev/42108888): Can this be folded together w/ MD_CLEAR below?
     test    %rax, %rax
     jz      1f
     movq    %rax, %rdi
@@ -377,7 +377,7 @@ syscall_maybe_mds_buff_overwrite:
     // mode after its registers have been modified by a debugger so we restore them all to keep it
     // simple (except for RCX and R11 which are clobbered by the SYSRET instruction).
     //
-    // TODO(https://fxbug.dev/62790): Make the restored register state completely capture the thread's state
+    // TODO(https://fxbug.dev/42141222): Make the restored register state completely capture the thread's state
     // and make syscalls act more like atomic instructions.
     pop_value %rax
     pop_value %rbx

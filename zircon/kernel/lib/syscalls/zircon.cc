@@ -133,7 +133,7 @@ zx_status_t sys_debuglog_create(zx_handle_t rsrc, uint32_t options, zx_handle_t*
   // Inversely: if a resource handle is given, or if `options` is nonzero,
   // require that `rsrc` be a valid root resource handle.
   if (rsrc != ZX_HANDLE_INVALID || options != 0) {
-    // TODO(https://fxbug.dev/30918): finer grained validation
+    // TODO(https://fxbug.dev/42105834): finer grained validation
     zx_status_t status = validate_resource(rsrc, ZX_RSRC_KIND_ROOT);
     if (status != ZX_OK)
       return status;

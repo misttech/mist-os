@@ -15,7 +15,7 @@ namespace {
 template <bool Reseed>
 constexpr int kRetries = Reseed ? 200 : 10;
 
-// TODO(https://fxbug.dev/102847): GCC's <arm_acle.h> does have these, but we can't use
+// TODO(https://fxbug.dev/42053828): GCC's <arm_acle.h> does have these, but we can't use
 // that header with -mgeneral-regs.
 #ifndef __clang__
 inline int __rndr(uint64_t* ptr) { return __builtin_aarch64_rndr(ptr); }

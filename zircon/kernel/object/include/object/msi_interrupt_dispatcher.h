@@ -74,7 +74,7 @@ class MsiInterruptDispatcher : public InterruptDispatcher {
 // device's capability space via its MSI Capability Structure. This includes
 // enabling MSI, configuring vectors, and masking/unmasking vectors. To reduce
 // interrupt latency all masking and unmasking at interrupt time is handled by
-// this dispatcher, but all configuration is (will be: https://fxbug.dev/32978) handled by the
+// this dispatcher, but all configuration is (will be: https://fxbug.dev/42108122) handled by the
 // userspace PCI Bus Driver. To facilitate safe interactions between the two,
 // all access to MSI configuration registers are synchronized via the MSI
 // allocation lock. Userspace will rarely be accessing this outside of

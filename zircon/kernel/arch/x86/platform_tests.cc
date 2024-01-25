@@ -412,7 +412,7 @@ static bool test_gdt_mapping() {
   END_TEST;
 }
 
-// TODO(https://fxbug.dev/88368): Unconditionally re-enable this test when https://fxbug.dev/88368 has been
+// TODO(https://fxbug.dev/88368): Unconditionally re-enable this test when https://fxbug.dev/42169592 has been
 // resolved.
 //
 // Spam all the CPUs with NMIs, see that nothing bad happens.
@@ -420,7 +420,7 @@ bool test_nmi_spam() {
   BEGIN_TEST;
 
   if (x86_hypervisor == X86_HYPERVISOR_KVM) {
-    printf("skipping test, see https://fxbug.dev/88368\n");
+    printf("skipping test, see https://fxbug.dev/42169592\n");
     END_TEST;
   }
 

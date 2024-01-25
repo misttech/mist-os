@@ -175,7 +175,7 @@ int ReseedLoop(void* arg) {
 void StartReseedThread(uint level) {
   // Force a reseed before returning from the init hook.
   // We have no guarantees when the thread will be scheduled and run.
-  // TODO(https://fxbug.dev/82810): Make this synchronous reseed faster by removing
+  // TODO(https://fxbug.dev/42163418): Make this synchronous reseed faster by removing
   // JitterEntropy reseed, as we already seeded from it in EarlyBoot.
   ReseedPRNG();
   Thread* t = Thread::Create("prng-reseed", ReseedLoop, nullptr, HIGHEST_PRIORITY);

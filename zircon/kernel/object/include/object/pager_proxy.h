@@ -111,7 +111,7 @@ class PagerProxy : public PageProvider,
   // PageSource calls ClearAsyncRequest to take back the request while the packet is still busy -
   PageRequest* active_request_ TA_GUARDED(mtx_) = nullptr;
   // this can happen if ClearAsyncRequest races with a PagerProxy::Free coming from port dequeue.
-  // More details about this race can be found in https://fxbug.dev/91935.
+  // More details about this race can be found in https://fxbug.dev/42173553.
   // Queue of page_request_t's that have come in while packet_ is busy. The
   // head of this queue is sent to the port when packet_ is freed.
   fbl::TaggedDoublyLinkedList<PageRequest*, PageProviderTag> pending_requests_ TA_GUARDED(mtx_);

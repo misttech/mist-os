@@ -822,7 +822,7 @@ TEST(RestrictedMode, KickWhileStartingAndExiting) {
     // Read exceptions out of the exception channel until we get the first one triggered by
     // the child thread. We do this to avoid a rare race condition in which a
     // ZX_EXCP_THREAD_EXITING triggered by a thread in another test case is delivered to the
-    // process exception channel after this test case starts. See https://fxbug.dev/128498
+    // process exception channel after this test case starts. See https://fxbug.dev/42078955
     // for more info.
     zx_exception_info_t info;
     zx::exception exception;

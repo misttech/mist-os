@@ -183,7 +183,7 @@ arch::ShadowCallStackBacktrace Symbolize::GetShadowCallStackBacktrace(uintptr_t 
 void Symbolize::PrintRegisters(const PhysExceptionState& exc) {
   Printf("%s: Registers stored at %p: {{{hexdict:", name_, &exc);
 
-// TODO(https://fxbug.dev/91214): Replace with a hexdict abstraction from
+// TODO(https://fxbug.dev/42172753): Replace with a hexdict abstraction from
 // libsymbolizer-markup.
 #if defined(__aarch64__)
 

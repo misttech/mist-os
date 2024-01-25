@@ -191,7 +191,7 @@ class RegisterBase {
   // The undefined bits message will look like: "unknown set bits: 0x00301000"
   //
   // WARNING: This will substantially increase code size and stack usage at the
-  // call site. https://fxbug.dev/68404 tracks investigation to improve this.
+  // call site. https://fxbug.dev/42147424 tracks investigation to improve this.
   //
   // Example use:
   // reg.Print([](const char* arg) { printf("%s\n", arg); });

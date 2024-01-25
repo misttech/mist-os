@@ -124,7 +124,7 @@ class ElfImage {
   // not be consulted for addresses within the load image; that is what
   // memory_image() is for.
   Allocation Load(ktl::optional<uint64_t> relocation_address = {}, bool in_place_ok = true,
-                  // TODO(https://fxbug.dev/84107): This won't be needed once kernels
+                  // TODO(https://fxbug.dev/42164859): This won't be needed once kernels
                   // in use no longer use the old boot_alloc code that blindly
                   // uses memory off the end of the kernel image.
                   size_t extra_vaddr_size = 0);

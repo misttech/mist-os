@@ -475,7 +475,7 @@ static bool vmaspace_free_unaccessed_page_tables_test() {
 
 // Touch mappings in both the shared and restricted region of a unified aspace and ensure we can
 // correctly harvest accessed bits.
-// TODO(https://fxbug.dev/132980): Enable on other architectures once they are supported.
+// TODO(https://fxbug.dev/42083004): Enable on other architectures once they are supported.
 #if defined(__x86_64__) || defined(__aarch64__)
 static bool vmaspace_unified_accessed_test() {
   BEGIN_TEST;

@@ -14,14 +14,14 @@ group("tests") {
   ]
   if (toolchain_environment == "kernel") {
     deps += [ ":kernel" ]
-  } else {  # TODO(https://fxbug.dev/67010): testonly in kernel proper
+  } else {  # TODO(https://fxbug.dev/42145882): testonly in kernel proper
     testonly = true
   }
 }
 
 # This is the subset that's compatible with the kernel.phys environment.
 source_set("phys") {
-  # TODO(https://fxbug.dev/67010): testonly = true
+  # TODO(https://fxbug.dev/42145882): testonly = true
   testonly = toolchain_environment != "kernel"
   cflags = [ "-fno-builtin" ]
   sources = [
@@ -48,7 +48,7 @@ source_set("phys") {
 }
 
 source_set("zbitl") {
-  # TODO(https://fxbug.dev/67010): testonly = true
+  # TODO(https://fxbug.dev/42145882): testonly = true
   testonly = toolchain_environment != "kernel"
   sources = [ "zbitl_tests.cc" ]
 
@@ -67,7 +67,7 @@ source_set("zbitl") {
 if (toolchain_environment == "kernel") {
   # These are only for the kernel proper.
   source_set("kernel") {
-    # TODO(https://fxbug.dev/67010): testonly = true
+    # TODO(https://fxbug.dev/42145882): testonly = true
     cflags = [ "-fno-builtin" ]
     sources = [
       "alloc_checker_tests.cc",

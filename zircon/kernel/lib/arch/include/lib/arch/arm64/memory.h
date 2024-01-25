@@ -91,7 +91,7 @@ struct ArmMemoryAttrIndirectionRegister
 
   // Get the memory attribute at the given index.
   //
-  // TODO(https://fxbug.dev/78027): Ideally hwreg would support this natively.
+  // TODO(https://fxbug.dev/42158108): Ideally hwreg would support this natively.
   constexpr uint8_t GetAttributeValue(unsigned int index) const {
     ZX_DEBUG_ASSERT(index < kNumAttributes);
     unsigned int low_bit = index * kAttributeBits;
@@ -105,7 +105,7 @@ struct ArmMemoryAttrIndirectionRegister
 
   // Set the memory attribute at the given index.
   //
-  // TODO(https://fxbug.dev/78027): Ideally hwreg would support this natively.
+  // TODO(https://fxbug.dev/42158108): Ideally hwreg would support this natively.
   constexpr ArmMemoryAttrIndirectionRegister& SetAttributeValue(unsigned int index, uint8_t value) {
     ZX_DEBUG_ASSERT(index < kNumAttributes);
 

@@ -1379,7 +1379,7 @@ static zx_status_t x86_perfmon_map_buffers_locked(PerfmonState* state, Guard<Mut
     // The buffer_vmo is provided by userspace and may need pages committed, which could potentially
     // block. As we currently are holding a lock this operation is generally not permitted, using
     // CallUntracked allows us to suppress the warning.
-    // TODO(https://fxbug.dev/108303): Restructure this mapping code to performing the pinning externally.
+    // TODO(https://fxbug.dev/42059713): Restructure this mapping code to performing the pinning externally.
     guard.CallUntracked([&] {
       status = PinnedVmObject::Create(data->buffer_vmo, vmo_offset, size, true, &buf_pin);
     });

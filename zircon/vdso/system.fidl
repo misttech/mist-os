@@ -29,7 +29,7 @@ type StringView = struct {
 closed protocol System {
     /// ## Summary
     ///
-    /// TODO(https://fxbug.dev/32938)
+    /// TODO(https://fxbug.dev/42108078)
     ///
     /// ## Declaration
     ///
@@ -41,23 +41,23 @@ closed protocol System {
     ///
     /// ## Description
     ///
-    /// TODO(https://fxbug.dev/32938)
+    /// TODO(https://fxbug.dev/42108078)
     ///
     /// ## Rights
     ///
-    /// TODO(https://fxbug.dev/32253)
+    /// TODO(https://fxbug.dev/42107318)
     ///
     /// ## Return value
     ///
-    /// TODO(https://fxbug.dev/32938)
+    /// TODO(https://fxbug.dev/42108078)
     ///
     /// ## Errors
     ///
-    /// TODO(https://fxbug.dev/32938)
+    /// TODO(https://fxbug.dev/42108078)
     ///
     /// ## See also
     ///
-    /// TODO(https://fxbug.dev/32938)
+    /// TODO(https://fxbug.dev/42108078)
     @const
     @vdsocall
     strict GetDcacheLineSize() -> (@wrapped_return struct {
@@ -84,7 +84,7 @@ closed protocol System {
     ///
     /// ## Rights
     ///
-    /// TODO(https://fxbug.dev/32253)
+    /// TODO(https://fxbug.dev/42107318)
     ///
     /// ## Return value
     ///
@@ -139,7 +139,7 @@ closed protocol System {
     ///
     /// ## Rights
     ///
-    /// TODO(https://fxbug.dev/32253)
+    /// TODO(https://fxbug.dev/42107318)
     ///
     /// ## Return value
     ///
@@ -188,7 +188,7 @@ closed protocol System {
     ///
     /// ## Rights
     ///
-    /// TODO(https://fxbug.dev/32253)
+    /// TODO(https://fxbug.dev/42107318)
     ///
     /// ## Return value
     ///
@@ -232,7 +232,7 @@ closed protocol System {
     ///
     /// ## Rights
     ///
-    /// TODO(https://fxbug.dev/32253)
+    /// TODO(https://fxbug.dev/42107318)
     ///
     /// ## Return value
     ///
@@ -282,7 +282,7 @@ closed protocol System {
     ///
     /// ## Rights
     ///
-    /// TODO(https://fxbug.dev/32253)
+    /// TODO(https://fxbug.dev/42107318)
     ///
     /// ## Return value
     ///
@@ -720,7 +720,7 @@ closed protocol System {
 
     /// ## Summary
     ///
-    /// TODO(https://fxbug.dev/32938)
+    /// TODO(https://fxbug.dev/42108078)
     ///
     /// ## Declaration
     ///
@@ -864,7 +864,7 @@ closed protocol System {
     ///
     /// ## See also
     ///
-    /// TODO(https://fxbug.dev/32938)
+    /// TODO(https://fxbug.dev/42108078)
     strict Powerctl(resource struct {
         resource Handle:RESOURCE;
         cmd uint32;
@@ -873,7 +873,7 @@ closed protocol System {
 
     /// # Summary
     ///
-    /// TODO(https://fxbug.dev/137059): Document exact behavior and interface as it iterates.
+    /// TODO(https://fxbug.dev/42182545): Document exact behavior and interface as it iterates.
     ///
     /// ## Declaration
     ///

@@ -8,7 +8,7 @@
 #include <thread>
 
 int main() {
-  // This is the minimal reproducer used for the issue described in https://fxbug.dev/66819. We have this in
+  // This is the minimal reproducer used for the issue described in https://fxbug.dev/42145668. We have this in
   // its own separate executable so it's easier to spawn in a new process. This needs to run in a
   // separate process each time so lsan's atexit handler can be called while the detached thread can
   // still run.

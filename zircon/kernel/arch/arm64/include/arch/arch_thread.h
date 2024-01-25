@@ -63,7 +63,7 @@ struct arch_thread {
   // in an exception.
   // The regs are saved on the stack and then a pointer is stored here.
   // Nullptr if not suspended or not stopped in an exception.
-  // TODO(https://fxbug.dev/30521): Also nullptr for synthetic exceptions that don't provide
+  // TODO(https://fxbug.dev/42105394): Also nullptr for synthetic exceptions that don't provide
   // them yet.
   struct iframe_t* suspended_general_regs;
 
@@ -87,7 +87,7 @@ struct arch_thread {
 
   // User mode's TPIDR and TPIDRRO.
   //
-  // TODO(https://fxbug.dev/121508): User mode registers state is stored in two places, on the stack
+  // TODO(https://fxbug.dev/42072547): User mode registers state is stored in two places, on the stack
   // (|iframe_t|) and here.  Consider consolidating and moving it all here so that it's in one
   // place.  Motivation is to reduce code complexity.
   uint64_t tpidr_el0;

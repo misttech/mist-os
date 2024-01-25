@@ -87,7 +87,7 @@ void ktrace_report_probes() {
   }
 }
 
-// TODO(https://fxbug.dev/112751)
+// TODO(https://fxbug.dev/42064084)
 void ktrace_report_cpu_pseudo_threads() {
   const uint max_cpus = arch_max_num_cpus();
   char name[32];
@@ -439,7 +439,7 @@ ssize_t KTraceState::ReadUser(user_out_ptr<void> ptr, uint32_t off, size_t len) 
       // the entire purpose of lock_ is to serialize these operations and so is safe to be held for
       // this copy.
       //
-      // TOOD(https://fxbug.dev/101783): Determine if this should be changed to capture faults and resolve them
+      // TOOD(https://fxbug.dev/42052646): Determine if this should be changed to capture faults and resolve them
       // outside the lock.
       guard.CallUntracked([&] { copy_result = CopyToUser(ptr8.byte_offset(done), r.ptr, r.len); });
       if (copy_result != ZX_OK) {
@@ -683,7 +683,7 @@ static void ktrace_init(unsigned level) {
   // ensures that trace points do not take runtime initialization branches and
   // incur unnecessary overhead.
   //
-  // TODO(https://fxbug.dev/27083): The runtime initialization branches in trace points
+  // TODO(https://fxbug.dev/42101573): The runtime initialization branches in trace points
   // can be removed when GCC properly supports section attributes on static
   // template members.
   //

@@ -173,7 +173,7 @@ class AddressSpace {
     return ((Paging::template kNumTableEntries<Paging::kLevels[LevelIndex]> == kNumTableEntries) &&
             ...);
   }
-  // TODO(https://fxbug.dev/133357): Uncomment.
+  // TODO(https://fxbug.dev/42083279): Uncomment.
   /*
   static_assert(
       SameNumberOfEntries<LowerPaging>(ktl::make_index_sequence<LowerPaging::kLevels.size()>()));

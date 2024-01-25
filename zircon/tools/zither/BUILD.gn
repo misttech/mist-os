@@ -694,7 +694,7 @@ zither_golden_test("zx.test") {
   ]
 }
 
-# TODO(https://fxbug.dev/110021): These tests reference some experimental built-in
+# TODO(https://fxbug.dev/42061412): These tests reference some experimental built-in
 # types introduced in the context of this bug.
 zither_golden_test("experimental_zx_types") {
   experimental_flags = [ "zx_c_types" ]

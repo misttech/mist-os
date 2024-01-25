@@ -100,7 +100,7 @@ typedef struct trace_provider trace_provider_t;
 //
 // Returns the trace provider, or null if creation failed.
 //
-// TODO(https://fxbug.dev/30979): Currently this connects to the trace manager service.
+// TODO(https://fxbug.dev/42105901): Currently this connects to the trace manager service.
 // Switch to passively exporting the trace provider via the "hub" through
 // the process's exported directory once that stuff is implemented.  We'll
 // probably need to pass some extra parameters to the trace provider then.
@@ -108,7 +108,7 @@ trace_provider_t* trace_provider_create_with_name(zx_handle_t to_service,
                                                   async_dispatcher_t* dispatcher, const char* name);
 
 // Wrapper around trace_provider_create_with_name for backward compatibility.
-// TODO(https://fxbug.dev/22886): Update all providers to use create_with_name, then change this
+// TODO(https://fxbug.dev/42096909): Update all providers to use create_with_name, then change this
 // to also take a name, then update all providers to call this one, and then
 // delete trace_provider_create_with_name.
 trace_provider_t* trace_provider_create(zx_handle_t to_service, async_dispatcher_t* dispatcher);

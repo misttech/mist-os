@@ -106,7 +106,7 @@ TEST(GwpAsanTest, GwpAsanOOMException) {
   ASSERT_EQ(nullptr, info.error_type);
 }
 
-// TODO(https://fxbug.dev/132347): Enable once the crash is correctly detected.
+// TODO(https://fxbug.dev/42082446): Enable once the crash is correctly detected.
 TEST(GwpAsanTest, DISABLED_GwpAsanDoubleFree) {
   if constexpr (!HAS_GWP_ASAN) {
     return;
@@ -123,7 +123,7 @@ TEST(GwpAsanTest, DISABLED_GwpAsanDoubleFree) {
   ASSERT_EQ(gwp_asan::ErrorToString(gwp_asan::Error::DOUBLE_FREE), info.error_type);
 }
 
-// TODO(https://fxbug.dev/132347): Enable once the crash is correctly detected.
+// TODO(https://fxbug.dev/42082446): Enable once the crash is correctly detected.
 TEST(GwpAsanTest, DISABLED_GwpAsanInvalidFree) {
   if constexpr (!HAS_GWP_ASAN) {
     return;

@@ -28,7 +28,7 @@ closed protocol Thread {
     ///
     /// ## Rights
     ///
-    /// TODO(https://fxbug.dev/32253)
+    /// TODO(https://fxbug.dev/42107318)
     ///
     /// ## Return value
     ///
@@ -471,7 +471,7 @@ closed protocol Thread {
     ///
     /// ## Rights
     ///
-    /// TODO(https://fxbug.dev/32253)
+    /// TODO(https://fxbug.dev/42107318)
     ///
     /// ## Return value
     ///

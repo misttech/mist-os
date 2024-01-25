@@ -64,7 +64,7 @@ TEST(VmoTransferDataTestCase, SnapshotChildSrc) {
   const uint64_t kChildSize = kPageSize * 3;
   char got[kSize];
   char expected[kSize];
-  // TODO(https://fxbug.dev/123742): Add ZX_VMO_CHILD_SNAPSHOT_MODIFIED to this list.
+  // TODO(https://fxbug.dev/42074633): Add ZX_VMO_CHILD_SNAPSHOT_MODIFIED to this list.
   uint32_t child_types[] = {ZX_VMO_CHILD_SNAPSHOT, ZX_VMO_CHILD_SNAPSHOT_AT_LEAST_ON_WRITE};
 
   for (auto child_type : child_types) {
@@ -120,7 +120,7 @@ TEST(VmoTransferDataTestCase, SnapshotChildDst) {
   const uint64_t kChildSize = kPageSize * 3;
   char got[kSize];
   char expected[kSize];
-  // TODO(https://fxbug.dev/123742): Add ZX_VMO_CHILD_SNAPSHOT_MODIFIED to this list.
+  // TODO(https://fxbug.dev/42074633): Add ZX_VMO_CHILD_SNAPSHOT_MODIFIED to this list.
   uint32_t child_types[] = {ZX_VMO_CHILD_SNAPSHOT, ZX_VMO_CHILD_SNAPSHOT_AT_LEAST_ON_WRITE};
 
   for (auto child_type : child_types) {

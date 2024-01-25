@@ -68,7 +68,7 @@ config("retpoline") {
 }
 
 # Mitigate errata in Intel Skylake family of CPUs that cause control transfer instructions to
-# execute incorrectly when they end at or cross 32-byte boundaries. (https://fxbug.dev/44204)
+# execute incorrectly when they end at or cross 32-byte boundaries. (https://fxbug.dev/42120593)
 config("skylake_jcc") {
   visibility = [ ":*" ]
   defines = [ "X64_KERNEL_JCC_WORKAROUND" ]
@@ -112,7 +112,7 @@ config("kernel") {
   ]
 }
 
-# TODO(https://fxbug.dev/58463): Remove conditional when all dependencies below have been
+# TODO(https://fxbug.dev/42136423): Remove conditional when all dependencies below have been
 # migrated to the Fuchsia build.
 # NOTE: Bad indentation is intentional, to make code reviews easier.
 zx_library("x86") {

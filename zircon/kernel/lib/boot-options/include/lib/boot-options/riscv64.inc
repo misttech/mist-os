@@ -9,7 +9,7 @@
 //
 // These are the riscv64-specific boot options.
 
-// TODO(https://fxbug.dev/80082): Unify arch agnostic options.
+// TODO(https://fxbug.dev/42160387): Unify arch agnostic options.
 DEFINE_OPTION("kernel.smp.maxcpus", uint32_t, riscv64_smp_max_cpus, {16}, R"""(
 This option caps the number of CPUs to initialize.  It cannot be greater than *SMP\_MAX\_CPUS*
 for a specific architecture.

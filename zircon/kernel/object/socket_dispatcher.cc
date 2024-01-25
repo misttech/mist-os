@@ -217,7 +217,7 @@ zx_status_t SocketDispatcher::WriteSelfLocked(user_in_ptr<const char> src, size_
   size_t st = 0u;
   zx_status_t status;
 
-  // TODO(https://fxbug.dev/99589): Perform user copying while holding the dispatcher lock is generally not
+  // TODO(https://fxbug.dev/42182048): Perform user copying while holding the dispatcher lock is generally not
   // not allowed, but is exempted here while a fix for sockets is developed. Performing the
   // MBufChain operations (which do the actual user copy) with tracking disabled will allow the
   // user copy to go through, with side effect of reducing the effectiveness of any other lockdep
@@ -291,7 +291,7 @@ zx_status_t SocketDispatcher::Read(ReadType type, user_out_ptr<char> dst, size_t
   size_t actual = 0;
   if (type == ReadType::kPeek) {
     zx_status_t status = ZX_OK;
-    // TODO(https://fxbug.dev/99589): See comment in WriteSelfLocked on why we use CallUntracked.
+    // TODO(https://fxbug.dev/42182048): See comment in WriteSelfLocked on why we use CallUntracked.
     guard.CallUntracked([&] {
       AssertHeld(*get_lock());
       status = data_.Peek(dst, len, flags_ & ZX_SOCKET_DATAGRAM, &actual);
@@ -303,7 +303,7 @@ zx_status_t SocketDispatcher::Read(ReadType type, user_out_ptr<char> dst, size_t
     bool was_full = is_full();
 
     zx_status_t status = ZX_OK;
-    // TODO(https://fxbug.dev/99589): See comment in WriteSelfLocked on why we use CallUntracked.
+    // TODO(https://fxbug.dev/42182048): See comment in WriteSelfLocked on why we use CallUntracked.
     guard.CallUntracked([&] {
       AssertHeld(*get_lock());
       status = data_.Read(dst, len, flags_ & ZX_SOCKET_DATAGRAM, &actual);

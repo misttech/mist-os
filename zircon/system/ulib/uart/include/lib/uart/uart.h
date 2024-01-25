@@ -208,12 +208,12 @@ class DriverBase {
     UnparseConfig<KdrvConfig>(cfg_, out);
   }
 
-  // TODO(https://fxbug.dev/102726): Remove once all drivers define this method.
+  // TODO(https://fxbug.dev/42053694): Remove once all drivers define this method.
   template <class IoProvider>
   void SetLineControl(IoProvider& io, std::optional<DataBits> data_bits,
                       std::optional<Parity> parity, std::optional<StopBits> stop_bits) {
     static_assert(!std::is_same_v<IoProvider, IoProvider>,
-                  "TODO(https://fxbug.dev/102726): implment me");
+                  "TODO(https://fxbug.dev/42053694): implment me");
   }
 
   // API for use in IoProvider setup.
@@ -438,7 +438,7 @@ class KernelDriver {
   // An individual setting given by std::nullopt signifies that it should be
   // left as previously configured.
   //
-  // TODO(https://fxbug.dev/102726): Separate out the setting of baud rate.
+  // TODO(https://fxbug.dev/42053694): Separate out the setting of baud rate.
   template <typename LockPolicy = DefaultLockPolicy>
   void SetLineControl(std::optional<DataBits> data_bits = DataBits::k8,
                       std::optional<Parity> parity = Parity::kNone,
@@ -447,7 +447,7 @@ class KernelDriver {
     uart_.SetLineControl(io_, data_bits, parity, stop_bits);
   }
 
-  // TODO(https://fxbug.dev/129378): Asses the need of |enable_interrupt_callback|.
+  // TODO(https://fxbug.dev/42079801): Asses the need of |enable_interrupt_callback|.
   template <typename LockPolicy = DefaultLockPolicy, typename EnableInterruptCallback>
   void InitInterrupt(EnableInterruptCallback&& enable_interrupt_callback) {
     Guard<LockPolicy> lock(&lock_, SOURCE_TAG);

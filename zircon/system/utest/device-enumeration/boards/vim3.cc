@@ -29,7 +29,7 @@ TEST_F(DeviceEnumerationTest, Vim3Test) {
       // TODO(b/291154545): Add bluetooth paths when firmware is publicly available.
       // "sys/platform/05:00:3/bluetooth-composite-spec/aml-uart/bt-transport-uart/bt-hci-broadcom",
 
-      // TODO(https://fxbug.dev/117539): Update topopath when dwmac is off
+      // TODO(https://fxbug.dev/42068759): Update topopath when dwmac is off
       // netdevice migration.
       "sys/platform/05:06:9/ethernet_mac/aml-ethernet/dwmac/dwmac/Designware-MAC/netdevice-migration/network-device",
       "sys/platform/05:06:9/ethernet_mac/aml-ethernet",

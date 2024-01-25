@@ -22,7 +22,7 @@ namespace arch {
 /// Yield the processor momentarily.  This should be used in busy waits.
 inline void Yield() { __asm__("pause"); }
 
-// TODO(https://fxbug.dev/49941): Improve the docs on the barrier APIs, maybe rename/refine.
+// TODO(https://fxbug.dev/42126965): Improve the docs on the barrier APIs, maybe rename/refine.
 
 /// Synchronize all memory accesses of all kinds.
 inline void DeviceMemoryBarrier() { __asm__("fence iorw, iorw" ::: "memory"); }

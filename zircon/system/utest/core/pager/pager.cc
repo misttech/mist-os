@@ -2375,7 +2375,7 @@ TEST(Pager, FailErrorCode) {
 }
 
 // Test that writing to a forked zero pager marker does not cause a kernel panic. This is a
-// regression test for https://fxbug.dev/53181.
+// regression test for https://fxbug.dev/42130566.
 TEST(Pager, WritingZeroFork) {
   zx::pager pager;
   ASSERT_EQ(zx::pager::create(0, &pager), ZX_OK);
@@ -3440,7 +3440,7 @@ TEST(Pager, OpCommitCloneVmar) {
   ASSERT_FALSE(pager.GetPageReadRequest(vmo, 0, &offset, &length));
 }
 
-// Regression test for https://fxbug.dev/92251. Tests that a port dequeue racing with pager destruction on a
+// Regression test for https://fxbug.dev/42173905. Tests that a port dequeue racing with pager destruction on a
 // detached VMO does not result in use-after-frees.
 TEST(Pager, RacyPortDequeue) {
   // Repeat multiple times so we can hit the race. 1000 is a good balance between trying to

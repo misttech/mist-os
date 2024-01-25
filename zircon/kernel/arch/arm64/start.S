@@ -113,7 +113,7 @@ PhysbootHandoff = _start
     msr     sctlr_el1, tmp
 
     // This can be any arbitrary (page-aligned) address >= KERNEL_ASPACE_BASE.
-    // TODO(https://fxbug.dev/24762): Choose it randomly.
+    // TODO(https://fxbug.dev/42098994): Choose it randomly.
     adr_global  tmp, kernel_relocated_base
     ldr     kernel_vaddr, [tmp]
 
@@ -167,7 +167,7 @@ ImageFixup = AfterImageFixup
     /* void arm64_boot_map(pte_t* kernel_table0, vaddr_t vaddr, paddr_t paddr, size_t len, pte_t flags); */
 
     /* map a large run of physical memory at the base of the kernel's address space
-     * TODO(https://fxbug.dev/47856): Only map the arenas. */
+     * TODO(https://fxbug.dev/42124648): Only map the arenas. */
     mov     x0, page_table1
     mov     x1, KERNEL_ASPACE_BASE
     mov     x2, 0

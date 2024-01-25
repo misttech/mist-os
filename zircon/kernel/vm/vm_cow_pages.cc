@@ -146,7 +146,7 @@ class BatchPQRemove {
     if (page_or_marker->IsPage()) {
       Push(page_or_marker->ReleasePage());
     } else if (page_or_marker->IsReference()) {
-      // TODO(https://fxbug.dev/60238): Consider whether it is worth batching these.
+      // TODO(https://fxbug.dev/42138396): Consider whether it is worth batching these.
       FreeReference(page_or_marker->ReleaseReference());
     } else {
       *page_or_marker = VmPageOrMarker::Empty();
@@ -871,7 +871,7 @@ zx_status_t VmCowPages::CreateCloneLocked(CloneType type, uint64_t offset, uint6
     }
     case CloneType::SnapshotModified: {
       // If at the root of vmo hierarchy or the slice of the root VMO, create a unidirectional clone
-      // TODO(https://fxbug.dev/123742): consider extinding this to take unidirectional clones of
+      // TODO(https://fxbug.dev/42074633): consider extinding this to take unidirectional clones of
       // snapshot-modified leaves if possible.
       if (!parent_ || is_slice_locked()) {
         if (is_slice_locked()) {
@@ -3632,7 +3632,7 @@ zx_status_t VmCowPages::ZeroPagesLocked(uint64_t page_start_base, uint64_t page_
     AssertHeld(content.page_owner->lock_ref());
     if (!slot && content.page_owner->is_hidden_locked()) {
       free_any_pages();
-      // TODO(https://fxbug.dev/60238): This could be more optimal since unlike a regular cow clone,
+      // TODO(https://fxbug.dev/42138396): This could be more optimal since unlike a regular cow clone,
       // we are not going to actually need to read the target page we are cloning, and hence it does
       // not actually need to get converted.
       if (content.page_or_marker->IsReference()) {
@@ -4880,7 +4880,7 @@ zx_status_t VmCowPages::TakePagesWithParentLocked(uint64_t offset, uint64_t len,
   uint64_t new_pages_len = 0;
   while (position < end) {
     // Allocate a zero page to replace the content at position.
-    // TODO(https://fxbug.dev/126153): Inserting a full zero page is inefficient. We should replace
+    // TODO(https://fxbug.dev/42076904): Inserting a full zero page is inefficient. We should replace
     // this logic with something a bit more efficient; this could mean using the same logic that
     // `ZeroPages` uses and insert markers, or generalizing the concept of intervals and using
     // those instead.
@@ -6233,11 +6233,11 @@ bool VmCowPages::RemovePageForCompressionLocked(vm_page_t* page, uint64_t offset
     } else if (ktl::holds_alternative<VmCompressor::FailTag>(compression_result)) {
       // Compression failed, but the page back in.
       old_ref = VmPageOrMarkerRef(slot).SwapReferenceForPage(page);
-      // TODO(https://fxbug.dev/60238): Placing in a queue and then moving it is inefficient, but
+      // TODO(https://fxbug.dev/42138396): Placing in a queue and then moving it is inefficient, but
       // avoids needing to reason about whether reclamation could be manually attempted on pages
       // that might otherwise not end up in the reclaimable queues.
       SetNotPinnedLocked(page, offset);
-      // TODO(https://fxbug.dev/60238): Marking this page as failing reclamation will prevent it
+      // TODO(https://fxbug.dev/42138396): Marking this page as failing reclamation will prevent it
       // from ever being tried again. As compression might succeed if the contents changes, we
       // should consider moving the page out of this queue if it is modified.
       pmm_page_queues()->CompressFailed(page);
@@ -6245,7 +6245,7 @@ bool VmCowPages::RemovePageForCompressionLocked(vm_page_t* page, uint64_t offset
       page = nullptr;
     } else {
       ASSERT(ktl::holds_alternative<VmCompressor::ZeroTag>(compression_result));
-      // TODO(https://fxbug.dev/60238): determine if we can decommit the slot instead of placing a
+      // TODO(https://fxbug.dev/42138396): determine if we can decommit the slot instead of placing a
       // marker.
       old_ref = slot->ReleaseReference();
       *slot = VmPageOrMarker::Marker();
@@ -7048,7 +7048,7 @@ VmCowPages::DiscardablePageCounts VmCowPages::DebugGetDiscardablePageCounts() co
 
   uint64_t pages = 0;
   page_list_.ForEveryPage([&pages](const auto* p, uint64_t) {
-    // TODO(https://fxbug.dev/60238) Figure out attribution between pages and references.
+    // TODO(https://fxbug.dev/42138396) Figure out attribution between pages and references.
     if (p->IsPageOrRef()) {
       ++pages;
     }

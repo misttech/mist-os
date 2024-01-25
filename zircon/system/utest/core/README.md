@@ -75,7 +75,7 @@ standalone mode on bringup builds. These tests are built as standalone
 binaries and packaged as Fuchsia components instead of standalone bootfs
 tests. Note that this is a temporary workaround for the next vDSO not
 being available in the standalone mode in bringup builds. Refer to
-https://fxbug.dev/89597 for more context. See `requires_next_vdso` in BUILD.gn
+https://fxbug.dev/42170954 for more context. See `requires_next_vdso` in BUILD.gn
 for a list of such tests.
 
 ### Example usage

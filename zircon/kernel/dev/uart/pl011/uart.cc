@@ -199,7 +199,7 @@ static int pl011_uart_getc(bool wait) {
       Guard<MonitoredSpinLock, IrqSave> guard{uart_spinlock::Get(), SOURCE_TAG};
       pl011_unmask_rx();
 
-      // TODO(https://fxbug.dev/100984): See comment in |pl011_uart_getc| where we write to ICR.
+      // TODO(https://fxbug.dev/42051758): See comment in |pl011_uart_getc| where we write to ICR.
       UARTREG(uart_base, UART_ICR) = 0;
     }
     return result.value();

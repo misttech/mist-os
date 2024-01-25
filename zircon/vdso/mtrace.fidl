@@ -7,7 +7,7 @@ library zx;
 closed protocol Mtrace {
     /// ## Summary
     ///
-    /// TODO(https://fxbug.dev/32938)
+    /// TODO(https://fxbug.dev/42108078)
     ///
     /// ## Declaration
     ///
@@ -28,7 +28,7 @@ closed protocol Mtrace {
     /// `kernel.enable-debugging-syscalls=true` on the kernel command line. Otherwise,
     /// the function returns `ZX_ERR_NOT_SUPPORTED`.
     ///
-    /// TODO(https://fxbug.dev/32938)
+    /// TODO(https://fxbug.dev/42108078)
     ///
     /// ## Rights
     ///
@@ -37,15 +37,15 @@ closed protocol Mtrace {
     ///
     /// ## Return value
     ///
-    /// TODO(https://fxbug.dev/32938)
+    /// TODO(https://fxbug.dev/42108078)
     ///
     /// ## Errors
     ///
-    /// TODO(https://fxbug.dev/32938)
+    /// TODO(https://fxbug.dev/42108078)
     ///
     /// ## See also
     ///
-    /// TODO(https://fxbug.dev/32938)
+    /// TODO(https://fxbug.dev/42108078)
     strict Control(resource struct {
         handle Handle:RESOURCE;
         kind uint32;

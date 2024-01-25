@@ -214,7 +214,7 @@ JobDispatcher::~JobDispatcher() {
 
 zx_koid_t JobDispatcher::get_related_koid() const { return parent_ ? parent_->get_koid() : 0u; }
 
-// TODO(https://fxbug.dev/117196): Make these methods inline if KBMA is accepted.
+// TODO(https://fxbug.dev/42068378): Make these methods inline if KBMA is accepted.
 #if KERNEL_BASED_MEMORY_ATTRIBUTION
 AttributionObjectNode* JobDispatcher::attribution_objects_begin() {
   return &attribution_objects_begin_;

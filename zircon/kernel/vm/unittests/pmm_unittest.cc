@@ -1279,7 +1279,7 @@ static bool physmap_for_each_gap_test() {
 #if __has_feature(address_sanitizer)
 static bool kasan_detects_use_after_free() {
   BEGIN_TEST;
-  // TODO(https://fxbug.dev/30033): Enable on arm64 when kasan poisoning works there.
+  // TODO(https://fxbug.dev/42104852): Enable on arm64 when kasan poisoning works there.
 #if defined(__x86_64__)
   ManagedPmmNode node;
 

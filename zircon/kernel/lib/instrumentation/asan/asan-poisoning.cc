@@ -56,7 +56,7 @@ void print_error_shadow(uintptr_t address, size_t bytes, bool is_write, void* ca
           "\nKASAN detected a %s error: ptr={{{data:%#lx}}}, size=%#zx, caller: {{{pc:%p}}}\n",
           !is_write ? "read" : "write", address, bytes, caller);
 
-  // TODO(https://fxbug.dev/30033): Decode the shadow value into 'use-after-free'/redzone/page free/etc.
+  // TODO(https://fxbug.dev/42104852): Decode the shadow value into 'use-after-free'/redzone/page free/etc.
   printf("Shadow memory state around the buggy address %#lx:\n", shadow);
   // Print at least 16 bytes of the shadow map before and after the invalid access.
   uintptr_t start_addr = (shadow & ~0x07) - 0x10;
@@ -65,7 +65,7 @@ void print_error_shadow(uintptr_t address, size_t bytes, bool is_write, void* ca
   bool caret = false;
   size_t caret_ind = 0;
   for (size_t i = 0; i < 5; i++) {
-    // TODO(https://fxbug.dev/51170): When kernel printf properly supports #, switch.
+    // TODO(https://fxbug.dev/42128332): When kernel printf properly supports #, switch.
     printf("0x%016lx:", start_addr);
     for (size_t j = 0; j < 8; j++) {
       printf(" 0x%02hhx", reinterpret_cast<uint8_t*>(start_addr)[j]);
@@ -90,7 +90,7 @@ void print_error_shadow(uintptr_t address, size_t bytes, bool is_write, void* ca
     start_addr += 8;
   }
   // Dump additional VM Page state - this is useful to debug use-after-state-change bugs.
-  // TODO(https://fxbug.dev/30033): This is disabled because we could panic while holding one of the
+  // TODO(https://fxbug.dev/42104852): This is disabled because we could panic while holding one of the
   // aspace locks, causing an error. Figure out how to dump vm_page_t info from here.
   // paddr_to_vm_page(vaddr_to_paddr(reinterpret_cast<void*>(address)))->dump();
 }
@@ -167,7 +167,7 @@ uintptr_t asan_region_is_poisoned(uintptr_t address, size_t size) {
 }
 
 void asan_check(uintptr_t address, size_t bytes, bool is_write, void* caller) {
-  // TODO(https://fxbug.dev/30033): Inline the fast path for constant-size checks.
+  // TODO(https://fxbug.dev/42104852): Inline the fast path for constant-size checks.
   if (!g_asan_initialized.load(ktl::memory_order_relaxed)) {
     return;
   }

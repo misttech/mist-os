@@ -136,7 +136,7 @@ void test_hw_breakpoint_impl(zx_handle_t excp_channel) {
 }  // namespace
 
 TEST(HwBreakpointStartTests, HWBreakpointTest) {
-  // TODO(https://fxbug.dev/35295): This test flakes.
+  // TODO(https://fxbug.dev/42110697): This test flakes.
   return;
 
 #if defined(__x86_64__)

@@ -47,7 +47,7 @@ int TestMain(void*, arch::EarlyTicks) {
   arch::BootCpuid<arch::CpuidFeatureFlagsC>().ForEachField(print_feature);
   arch::BootCpuid<arch::CpuidFeatureFlagsD>().ForEachField(print_feature);
   arch::BootCpuid<arch::CpuidExtendedFeatureFlagsB>().ForEachField(print_feature);
-  // TODO(https://fxbug.dev/68404): Print when we can afford to.
+  // TODO(https://fxbug.dev/42147424): Print when we can afford to.
   // arch::BootCpuid<arch::CpuidAmdFeatureFlagsC>().ForEachField(print_feature);
 
   printf("Extended features enabled:\n");

@@ -202,7 +202,7 @@ auto UbsanPanicStart(const char* check, SourceLocation& loc,
 }
 
 void PrintTypeDescriptor(const TypeDescriptor& type, const char* prefix = NULL) {
-  // TODO(https://fxbug.dev/105063): Improve logging by interpreting TypeDescriptor values.
+  // TODO(https://fxbug.dev/42056251): Improve logging by interpreting TypeDescriptor values.
   if (prefix) {
     printf("%s:", prefix);
   }
@@ -320,7 +320,7 @@ void __ubsan_handle_alignment_assumption(AlignmentAssumptionData* Data, ValueHan
   printf("Offset: 0x%016lx\n", Offset);
 }
 
-// TODO(https://fxbug.dev/105063): Add missing handlers:
+// TODO(https://fxbug.dev/42056251): Add missing handlers:
 // * invalid_builtin
 // * nonnull_return_v1
 // * nullability_return_v1

@@ -26,7 +26,7 @@ type Uint32Alias = uint32
 
 type Uint64Alias = uint64
 
-// TODO(https://fxbug.dev/105758): The IR currently does not propagate enough
+// TODO(https://fxbug.dev/42057022): The IR currently does not propagate enough
 // information for bindings to express this type as an alias.
 const ConstFromAlias uint8 = 0xff
 

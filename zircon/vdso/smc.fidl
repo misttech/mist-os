@@ -27,7 +27,7 @@ type SmcResult = struct {
 
 @transport("Syscall")
 closed protocol Smc {
-    // TODO(https://fxbug.dev/32803): handle No rights required?
+    // TODO(https://fxbug.dev/42107929): handle No rights required?
     /// ## Summary
     ///
     /// Make Secure Monitor Call (SMC) from user space.
@@ -61,7 +61,7 @@ closed protocol Smc {
     ///
     /// ## Rights
     ///
-    /// TODO(https://fxbug.dev/32253)
+    /// TODO(https://fxbug.dev/42107318)
     ///
     /// ## Return value
     ///

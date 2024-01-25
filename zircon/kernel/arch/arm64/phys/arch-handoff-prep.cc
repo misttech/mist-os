@@ -28,7 +28,7 @@ void HandoffPrep::ArchSummarizeMiscZbiItem(const zbi_header_t& header,
   switch (header.type) {
     case ZBI_TYPE_KERNEL_DRIVER: {
       switch (header.extra) {
-        // TODO(https://fxbug.dev/87958): Move me to userspace.
+        // TODO(https://fxbug.dev/42169136): Move me to userspace.
         case ZBI_KERNEL_DRIVER_AMLOGIC_HDCP:
           ZX_ASSERT(payload.size() >= sizeof(zbi_dcfg_amlogic_hdcp_driver_t));
           arch_handoff.amlogic_hdcp_driver =

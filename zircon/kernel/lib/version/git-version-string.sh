@@ -13,7 +13,7 @@ readonly CHECKOUT_ROOT="$2"
 set -e
 
 # The --no-optional-locks option ensures git read-only operations do
-# not refresh the index (https://fxbug.dev/93875)
+# not refresh the index (https://fxbug.dev/42175708)
 GIT_REV="git-$(git --no-optional-locks -C "$CHECKOUT_ROOT" rev-parse HEAD 2>/dev/null)"
 
 if [ -n "$(git --no-optional-locks -C "$CHECKOUT_ROOT" status --porcelain --untracked-files=no 2>/dev/null)" ]; then

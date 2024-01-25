@@ -19,6 +19,6 @@ source_set("as_source") {
 
   # This library is linked into libc, which is used by libfuzzer.
   # Don't instrument it to avoid getting noise in code coverage.
-  # TODO(https://fxbug.dev/25073): Once a cleaner solution is found, remove this.
+  # TODO(https://fxbug.dev/42099340): Once a cleaner solution is found, remove this.
   configs += [ "//build/config/zircon:no_fuzzer" ]
 }

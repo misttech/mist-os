@@ -100,7 +100,7 @@ void platform_halt_cpu(void) {
   halted_cpus.fetch_or(cpu_num_to_mask(arch_curr_cpu_num()));
 }
 
-// TODO(https://fxbug.dev/98351): Refactor platform_panic_start.
+// TODO(https://fxbug.dev/42180675): Refactor platform_panic_start.
 void platform_panic_start(PanicStartHaltOtherCpus option) {
   arch_disable_ints();
   dlog_panic_start();

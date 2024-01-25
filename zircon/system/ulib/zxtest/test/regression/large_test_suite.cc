@@ -6,7 +6,7 @@
 
 // This test prevents regression of global initialization function overflowing the stack with large
 // number of tests.
-// Bug: https://fxbug.dev/82409
+// Bug: https://fxbug.dev/42162972
 TEST(S0, T0) {}
 TEST(S1, T1) {}
 TEST(S2, T2) {}

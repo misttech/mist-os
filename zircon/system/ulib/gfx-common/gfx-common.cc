@@ -409,7 +409,7 @@ void gfx_blend(struct gfx_surface* target, struct gfx_surface* source, uint32_t 
     uint32_t i, j;
     for (i = 0; i < height; i++) {
       for (j = 0; j < width; j++) {
-        // TODO(https://fxbug.dev/84457): Currently it ignores destination alpha.
+        // TODO(https://fxbug.dev/42165247): Currently it ignores destination alpha.
         // We should implement alpha blending correctly.
         *dest = alpha32_add_ignore_destalpha(*dest, *src);
         dest++;
@@ -453,7 +453,7 @@ void gfx_blend(struct gfx_surface* target, struct gfx_surface* source, uint32_t 
     uint32_t i, j;
     for (i = 0; i < height; i++) {
       for (j = 0; j < width; j++) {
-        // TODO(https://fxbug.dev/84457): Currently it ignores destination alpha.
+        // TODO(https://fxbug.dev/42165247): Currently it ignores destination alpha.
         // We should implement alpha blending correctly.
         *dest = Rgb888(alpha32_add_ignore_destalpha(dest->ToRgba32(), *src));
         dest++;

@@ -27,7 +27,7 @@ pub type Uint32Alias = u32;
 
 pub type Uint64Alias = u64;
 
-/// TODO(https://fxbug.dev/105758): The IR currently does not propagate enough
+/// TODO(https://fxbug.dev/42057022): The IR currently does not propagate enough
 /// information for bindings to express this type as an alias.
 pub const CONST_FROM_ALIAS: u8 = 0xff;
 

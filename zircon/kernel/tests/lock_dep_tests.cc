@@ -739,7 +739,7 @@ static bool lock_dep_dynamic_analysis_tests() {
     }
 
     // Note that this ordering (spinlock followed by mutex) cannot currently be
-    // detected by lockdep in the kernel.  See https://fxbug.dev/85289 and the discussion of
+    // detected by lockdep in the kernel.  See https://fxbug.dev/42166171 and the discussion of
     // the solution for details.  The TL;DR is that spinlocks and mutexes end up
     // using different system provided contexts for their analysis, and rely on
     // asserts in the lock implementations themselves to provide protection
@@ -1433,7 +1433,7 @@ UNITTEST_END_TESTCASE(lock_dep_tests, "lock_dep_tests", "lock_dep_tests")
 // state variable telling the primary to go, and then unwinds.
 //
 // See the notes in the test (below) for details of how we set up the initial
-// situation without accidentally deadlocking (also, see https://fxbug.dev/119371)
+// situation without accidentally deadlocking (also, see https://fxbug.dev/42070437)
 //
 static bool bug_84827_regression_test() {
   BEGIN_TEST;

@@ -6,7 +6,7 @@
 # Though under //zircon, this build file #
 # is meant to be used in the Fuchsia GN  #
 # build.                                 #
-# See https://fxbug.dev/36139.                   #
+# See https://fxbug.dev/42111634.                   #
 ##########################################
 
 assert(!defined(zx) || zx != "/",

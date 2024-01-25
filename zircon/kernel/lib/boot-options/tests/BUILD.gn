@@ -8,7 +8,7 @@ if (is_kernel) {
   # NOTE: This cannot be called 'tests' due to the target with the same name
   # below that is used in the Fuchsia build to add boot-option-test-package.
   source_set("kernel-tests") {
-    # TODO(https://fxbug.dev/67010): testonly = true
+    # TODO(https://fxbug.dev/42145882): testonly = true
     sources = [ "kernel-tests.cc" ]
 
     deps = [

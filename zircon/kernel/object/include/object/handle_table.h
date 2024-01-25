@@ -284,7 +284,7 @@ class HandleTable : public fbl::RefCounted<HandleTable> {
                                     fbl::RefPtr<Dispatcher>* dispatcher, zx_rights_t* rights);
 
   // Protects |handle_table_| and |handle_table_cursors_|.
-  // TODO(https://fxbug.dev/54938): Allow multiple handle table locks to be acquired at once.
+  // TODO(https://fxbug.dev/42132512): Allow multiple handle table locks to be acquired at once.
   // Right now, this is required when a process closes the last handle to
   // another process, during the destruction of the handle table.
   mutable DECLARE_BRWLOCK_PI(HandleTable, lockdep::LockFlagsMultiAcquire) lock_;

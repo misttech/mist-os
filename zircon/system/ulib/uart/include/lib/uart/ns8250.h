@@ -187,7 +187,7 @@ class UartStatusRegister : public hwreg::RegisterBase<UartStatusRegister, uint32
 // of a 4 byte region, hence 'scaled' mmio is performed. This flavor also implies that all accesses
 // are performed through 4 byte read/writes.
 //
-// TODO(https://fxbug.dev/130249): Clean up port count usage.
+// TODO(https://fxbug.dev/42080554): Clean up port count usage.
 template <uint32_t KdrvExtra>
 inline constexpr uint32_t kPortCount = 8;
 

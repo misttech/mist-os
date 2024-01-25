@@ -164,7 +164,7 @@ zx_status_t IdentityPageAllocator::Allocate(void** result) {
 
   // Start by obtaining an unused physical page. This address will eventually
   // be the physical/virtual address of our identity mapped page.
-  // TODO: when https://fxbug.dev/30925 is completed, we should allocate low memory directly
+  // TODO: when https://fxbug.dev/42105842 is completed, we should allocate low memory directly
   //       from the pmm rather than using "alloc_pages_greater_than" which is
   //       somewhat of a hack.
   paddr_t pa;
@@ -660,7 +660,7 @@ zx_status_t sys_system_get_performance_info(zx_handle_t resource, uint32_t topic
   return ZX_OK;
 }
 
-// TODO(https://fxbug.dev/137058): Reconcile with HaltToken, zx_system_powerctl, and
+// TODO(https://fxbug.dev/42182544): Reconcile with HaltToken, zx_system_powerctl, and
 // kernel-initiated-oom-reboot.
 zx_status_t sys_system_suspend_enter(zx_handle_t resource, zx_time_t resume_deadline) {
   const zx_status_t validate_status =

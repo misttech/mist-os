@@ -22,9 +22,9 @@ if (current_toolchain == default_toolchain) {
       configs = [
         "//zircon/kernel/lib/userabi/userboot:userboot_config",
 
-        # TODO(https://fxbug.dev/48501): This is needed pervasively and not just
+        # TODO(https://fxbug.dev/42125366): This is needed pervasively and not just
         # in the linking target so its compile-time flags can
-        # work around https://fxbug.dev/48501.  It's separate from
+        # work around https://fxbug.dev/42125366.  It's separate from
         # userboot_config so it can be removed by other links
         # reusing this environment, e.g. hermetic_module().
         "//build/config/zircon:rodso",

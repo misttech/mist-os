@@ -122,7 +122,7 @@ zx_status_t fx_logger_reconfigure_structured(fx_logger_t* logger,
 
 SYSLOG_EXPORT
 zx_status_t fx_logger_create_internal(const fx_logger_config_t* config, fx_logger_t** out_logger) {
-  // TODO(https://fxbug.dev/65995): Share the input checks and handle closing logic with
+  // TODO(https://fxbug.dev/42144753): Share the input checks and handle closing logic with
   // fx_logger::Reconfigure().
   if (!config || !out_logger) {
     return ZX_ERR_INVALID_ARGS;

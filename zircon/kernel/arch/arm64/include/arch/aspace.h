@@ -146,7 +146,7 @@ class ArmArchVmAspace final : public ArchVmAspaceInterface {
   // the kernel physmap) of the containing page table, the virtual address of the entry, and the
   // raw pte value.
   //
-  // TODO(https://fxbug.dev/79118): Once https://fxbug.dev/79118 is resolved this method can be removed.
+  // TODO(https://fxbug.dev/79118): Once https://fxbug.dev/42159319 is resolved this method can be removed.
   zx_status_t DebugFindFirstLeafMapping(vaddr_t* out_pt, vaddr_t* out_vaddr, pte_t* out_pte) const;
 
   void FlushTLBEntry(vaddr_t vaddr, bool terminal) const TA_REQ(lock_);

@@ -516,7 +516,7 @@ static int cmd_crash_user_read(int argc, const cmd_args* argv, uint32_t flags) {
     return -1;
   }
 #elif defined(__aarch64__)
-  // TODO(https://fxbug.dev/59284): Once we support PAN enable this for arm64.
+  // TODO(https://fxbug.dev/42137335): Once we support PAN enable this for arm64.
   printf("ARM64 currently does not support PAN; will not crash.\n");
   return -1;
 #endif

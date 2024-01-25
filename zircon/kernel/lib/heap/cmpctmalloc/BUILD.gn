@@ -26,7 +26,7 @@ source_set("cmpctmalloc") {
     deps += [
       "//zircon/kernel/lib/counters",
 
-      # TODO(https://fxbug.dev/51163): Remove headers when possible.
+      # TODO(https://fxbug.dev/42128324): Remove headers when possible.
       "//zircon/kernel/lib/instrumentation:headers",
     ]
   }

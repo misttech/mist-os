@@ -256,7 +256,7 @@ void X86PageTableBase::ConsistencyManager::Finish() {
   }
   pt_->TlbInvalidate(&tlb_);
   if (pt_->IsRestricted() && pt_->referenced_pt_ != nullptr) {
-    // TODO(https://fxbug.dev/132980): This TLB invalidation could be wrapped into the preceding
+    // TODO(https://fxbug.dev/42083004): This TLB invalidation could be wrapped into the preceding
     // one so long as we built the target mask correctly.
     Guard<Mutex> a{AssertOrderedLock, &pt_->referenced_pt_->lock_,
                    pt_->referenced_pt_->LockOrder()};

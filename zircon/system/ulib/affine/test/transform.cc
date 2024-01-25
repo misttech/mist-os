@@ -316,14 +316,14 @@ TEST(TransformTestCase, Compose) {
 
         // F(Identity(a)) == F(a)
         //
-        // TODO(https://fxbug.dev/13293): Note that this does not currently produce the exact
+        // TODO(https://fxbug.dev/42082948): Note that this does not currently produce the exact
         // same result, or even an equivalent result.  The intermediate offset
         // of the composition of bc(ab(a)) is -12345, and the current
         // composition implementation always attempts to move this to the
         // b_offset side of the composed function.  In this case, that means
         // running the -12345 through the 17/7 ratio, which results in some
         // offset rounding error.  For now, however, this is the expected
-        // behavior of the current implementation.  If/when https://fxbug.dev/13293 is resolved,
+        // behavior of the current implementation.  If/when https://fxbug.dev/42082948 is resolved,
         // this test vector will start to fail and will need to be updated.
         TestVector{
             {     0,     0, {  1, 1 } },
@@ -381,7 +381,7 @@ TEST(TransformTestCase, Compose) {
             Exact::Yes
         },
 
-        // TODO(https://fxbug.dev/13293): Right now, it is impossible to under/overflow saturate
+        // TODO(https://fxbug.dev/42082948): Right now, it is impossible to under/overflow saturate
         // the AC.a_offset side of the composed function, because the current
         // implementation always distributes the intermediate offset entirely to
         // the C side of the equation.  When this changes, we need to add test

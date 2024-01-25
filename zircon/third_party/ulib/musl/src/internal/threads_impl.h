@@ -279,7 +279,7 @@ static inline pid_t __thread_get_tid(void) {
 //
 // Because zx_handle_t uses the top bits of its uint32_t, simply returning the
 // uint32_t as an int32_t would erronously cause the tid to be < 0, causing the
-// FILE structure to go unguarded. See https://fxbug.dev/34058 for more detail.
+// FILE structure to go unguarded. See https://fxbug.dev/42109323 for more detail.
 //
 // However, zx_handle_t reserves the bits in ZX_HANDLE_FIXED_BITS_MASK, and
 // they're always set to 1. These bits happen to be the lowest two bits, and

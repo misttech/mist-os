@@ -949,7 +949,7 @@ Event(ts: <>, pt: <>, category: \"+enabled\", name: \"name\", DurationBegin, {ke
   END_TRACE_TEST;
 }
 
-// This function is kept pending resolution of https://fxbug.dev/22929 when TA_STRING_LITERAL()
+// This function is kept pending resolution of https://fxbug.dev/42096957 when TA_STRING_LITERAL()
 // is re-added.
 TEST(TEST_SUITE, test_string_literal_arguments) {
   BEGIN_TRACE_TEST;

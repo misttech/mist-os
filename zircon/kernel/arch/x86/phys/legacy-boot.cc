@@ -31,7 +31,7 @@
 
 extern "C" {
 
-// TODO(https://fxbug.dev/79166): In the linuxboot case, the linking logic gives the
+// TODO(https://fxbug.dev/42159372): In the linuxboot case, the linking logic gives the
 // wrong value for PHYS_LOAD_ADDRESS in the linuxboot case; work around that
 // for now.
 [[gnu::weak]] extern ktl::byte LINUXBOOT_LOAD_ADDRESS[];
@@ -82,7 +82,7 @@ void LegacyBootInitMemory() {
     };
   };
 
-  // TODO(https://fxbug.dev/79166): See LINUXBOOT_LOAD_ADDRESS comment above.
+  // TODO(https://fxbug.dev/42159372): See LINUXBOOT_LOAD_ADDRESS comment above.
   uint64_t phys_start = &LINUXBOOT_LOAD_ADDRESS ? reinterpret_cast<uint64_t>(LINUXBOOT_LOAD_ADDRESS)
                                                 : reinterpret_cast<uint64_t>(PHYS_LOAD_ADDRESS);
   uint64_t phys_end = reinterpret_cast<uint64_t>(_end);

@@ -33,7 +33,7 @@ libc_source_set("fenv") {
     "feupdateenv.cpp",
   ]
 
-  # TODO(https://fxbug.dev/102847): gcc doesn't provide some intrinsics that llvm-libc
+  # TODO(https://fxbug.dev/42053828): gcc doesn't provide some intrinsics that llvm-libc
   # expects and clang provides. Remove this after these have been upstreamed
   # into gcc.
   if (is_gcc) {

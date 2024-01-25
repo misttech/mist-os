@@ -80,8 +80,8 @@
         "is_virtual": false,
         "file": "../../zircon/vdso/zx_common.fidl",
         "data": "CHANNEL_MAX_MSG_BYTES",
-        "start_offset": 1185,
-        "end_offset": 1206
+        "start_offset": 1188,
+        "end_offset": 1209
       }
     },
     {
@@ -90,8 +90,8 @@
         "is_virtual": false,
         "file": "../../zircon/vdso/zx_common.fidl",
         "data": "CHANNEL_MAX_MSG_HANDLES",
-        "start_offset": 1229,
-        "end_offset": 1252
+        "start_offset": 1232,
+        "end_offset": 1255
       }
     },
     {
@@ -120,8 +120,8 @@
         "is_virtual": false,
         "file": "../../zircon/vdso/zx_common.fidl",
         "data": "IOB_MAX_REGIONS",
-        "start_offset": 1272,
-        "end_offset": 1287
+        "start_offset": 1275,
+        "end_offset": 1290
       }
     },
     {
@@ -130,8 +130,8 @@
         "is_virtual": false,
         "file": "../../zircon/vdso/zx_common.fidl",
         "data": "MAX_CPUS",
-        "start_offset": 1339,
-        "end_offset": 1347
+        "start_offset": 1342,
+        "end_offset": 1350
       }
     },
     {
@@ -140,8 +140,8 @@
         "is_virtual": false,
         "file": "../../zircon/vdso/zx_common.fidl",
         "data": "MAX_NAME_LEN",
-        "start_offset": 1307,
-        "end_offset": 1319
+        "start_offset": 1310,
+        "end_offset": 1322
       }
     },
     {
@@ -190,8 +190,8 @@
         "is_virtual": false,
         "file": "../../zircon/vdso/zx_common.fidl",
         "data": "ObjType",
-        "start_offset": 1368,
-        "end_offset": 1375
+        "start_offset": 1371,
+        "end_offset": 1378
       }
     },
     {
@@ -200,8 +200,8 @@
         "is_virtual": false,
         "file": "../../zircon/vdso/zx_common.fidl",
         "data": "NONE",
-        "start_offset": 1405,
-        "end_offset": 1409
+        "start_offset": 1408,
+        "end_offset": 1412
       }
     },
     {
@@ -210,8 +210,8 @@
         "is_virtual": false,
         "file": "../../zircon/vdso/zx_common.fidl",
         "data": "PROCESS",
-        "start_offset": 1419,
-        "end_offset": 1426
+        "start_offset": 1422,
+        "end_offset": 1429
       }
     },
     {
@@ -220,8 +220,8 @@
         "is_virtual": false,
         "file": "../../zircon/vdso/zx_common.fidl",
         "data": "THREAD",
-        "start_offset": 1436,
-        "end_offset": 1442
+        "start_offset": 1439,
+        "end_offset": 1445
       }
     },
     {
@@ -230,8 +230,8 @@
         "is_virtual": false,
         "file": "../../zircon/vdso/zx_common.fidl",
         "data": "VMO",
-        "start_offset": 1452,
-        "end_offset": 1455
+        "start_offset": 1455,
+        "end_offset": 1458
       }
     },
     {
@@ -240,8 +240,8 @@
         "is_virtual": false,
         "file": "../../zircon/vdso/zx_common.fidl",
         "data": "CHANNEL",
-        "start_offset": 1465,
-        "end_offset": 1472
+        "start_offset": 1468,
+        "end_offset": 1475
       }
     },
     {
@@ -250,8 +250,8 @@
         "is_virtual": false,
         "file": "../../zircon/vdso/zx_common.fidl",
         "data": "EVENT",
-        "start_offset": 1482,
-        "end_offset": 1487
+        "start_offset": 1485,
+        "end_offset": 1490
       }
     },
     {
@@ -260,8 +260,8 @@
         "is_virtual": false,
         "file": "../../zircon/vdso/zx_common.fidl",
         "data": "PORT",
-        "start_offset": 1497,
-        "end_offset": 1501
+        "start_offset": 1500,
+        "end_offset": 1504
       }
     },
     {
@@ -270,8 +270,8 @@
         "is_virtual": false,
         "file": "../../zircon/vdso/zx_common.fidl",
         "data": "INTERRUPT",
-        "start_offset": 1511,
-        "end_offset": 1520
+        "start_offset": 1514,
+        "end_offset": 1523
       }
     },
     {
@@ -280,8 +280,8 @@
         "is_virtual": false,
         "file": "../../zircon/vdso/zx_common.fidl",
         "data": "PCI_DEVICE",
-        "start_offset": 1530,
-        "end_offset": 1540
+        "start_offset": 1533,
+        "end_offset": 1543
       }
     },
     {
@@ -290,8 +290,8 @@
         "is_virtual": false,
         "file": "../../zircon/vdso/zx_common.fidl",
         "data": "LOG",
-        "start_offset": 1551,
-        "end_offset": 1554
+        "start_offset": 1554,
+        "end_offset": 1557
       }
     },
     {
@@ -300,8 +300,8 @@
         "is_virtual": false,
         "file": "../../zircon/vdso/zx_common.fidl",
         "data": "SOCKET",
-        "start_offset": 1565,
-        "end_offset": 1571
+        "start_offset": 1568,
+        "end_offset": 1574
       }
     },
     {
@@ -310,8 +310,8 @@
         "is_virtual": false,
         "file": "../../zircon/vdso/zx_common.fidl",
         "data": "RESOURCE",
-        "start_offset": 1582,
-        "end_offset": 1590
+        "start_offset": 1585,
+        "end_offset": 1593
       }
     },
     {
@@ -320,8 +320,8 @@
         "is_virtual": false,
         "file": "../../zircon/vdso/zx_common.fidl",
         "data": "EVENTPAIR",
-        "start_offset": 1601,
-        "end_offset": 1610
+        "start_offset": 1604,
+        "end_offset": 1613
       }
     },
     {
@@ -330,8 +330,8 @@
         "is_virtual": false,
         "file": "../../zircon/vdso/zx_common.fidl",
         "data": "JOB",
-        "start_offset": 1621,
-        "end_offset": 1624
+        "start_offset": 1624,
+        "end_offset": 1627
       }
     },
     {
@@ -340,8 +340,8 @@
         "is_virtual": false,
         "file": "../../zircon/vdso/zx_common.fidl",
         "data": "VMAR",
-        "start_offset": 1635,
-        "end_offset": 1639
+        "start_offset": 1638,
+        "end_offset": 1642
       }
     },
     {
@@ -350,8 +350,8 @@
         "is_virtual": false,
         "file": "../../zircon/vdso/zx_common.fidl",
         "data": "FIFO",
-        "start_offset": 1650,
-        "end_offset": 1654
+        "start_offset": 1653,
+        "end_offset": 1657
       }
     },
     {
@@ -360,8 +360,8 @@
         "is_virtual": false,
         "file": "../../zircon/vdso/zx_common.fidl",
         "data": "GUEST",
-        "start_offset": 1665,
-        "end_offset": 1670
+        "start_offset": 1668,
+        "end_offset": 1673
       }
     },
     {
@@ -370,8 +370,8 @@
         "is_virtual": false,
         "file": "../../zircon/vdso/zx_common.fidl",
         "data": "VCPU",
-        "start_offset": 1681,
-        "end_offset": 1685
+        "start_offset": 1684,
+        "end_offset": 1688
       }
     },
     {
@@ -380,8 +380,8 @@
         "is_virtual": false,
         "file": "../../zircon/vdso/zx_common.fidl",
         "data": "TIMER",
-        "start_offset": 1696,
-        "end_offset": 1701
+        "start_offset": 1699,
+        "end_offset": 1704
       }
     },
     {
@@ -390,8 +390,8 @@
         "is_virtual": false,
         "file": "../../zircon/vdso/zx_common.fidl",
         "data": "IOMMU",
-        "start_offset": 1712,
-        "end_offset": 1717
+        "start_offset": 1715,
+        "end_offset": 1720
       }
     },
     {
@@ -400,8 +400,8 @@
         "is_virtual": false,
         "file": "../../zircon/vdso/zx_common.fidl",
         "data": "BTI",
-        "start_offset": 1728,
-        "end_offset": 1731
+        "start_offset": 1731,
+        "end_offset": 1734
       }
     },
     {
@@ -410,8 +410,8 @@
         "is_virtual": false,
         "file": "../../zircon/vdso/zx_common.fidl",
         "data": "PROFILE",
-        "start_offset": 1742,
-        "end_offset": 1749
+        "start_offset": 1745,
+        "end_offset": 1752
       }
     },
     {
@@ -420,8 +420,8 @@
         "is_virtual": false,
         "file": "../../zircon/vdso/zx_common.fidl",
         "data": "PMT",
-        "start_offset": 1760,
-        "end_offset": 1763
+        "start_offset": 1763,
+        "end_offset": 1766
       }
     },
     {
@@ -430,8 +430,8 @@
         "is_virtual": false,
         "file": "../../zircon/vdso/zx_common.fidl",
         "data": "SUSPEND_TOKEN",
-        "start_offset": 1774,
-        "end_offset": 1787
+        "start_offset": 1777,
+        "end_offset": 1790
       }
     },
     {
@@ -440,8 +440,8 @@
         "is_virtual": false,
         "file": "../../zircon/vdso/zx_common.fidl",
         "data": "PAGER",
-        "start_offset": 1798,
-        "end_offset": 1803
+        "start_offset": 1801,
+        "end_offset": 1806
       }
     },
     {
@@ -450,8 +450,8 @@
         "is_virtual": false,
         "file": "../../zircon/vdso/zx_common.fidl",
         "data": "EXCEPTION",
-        "start_offset": 1814,
-        "end_offset": 1823
+        "start_offset": 1817,
+        "end_offset": 1826
       }
     },
     {
@@ -460,8 +460,8 @@
         "is_virtual": false,
         "file": "../../zircon/vdso/zx_common.fidl",
         "data": "CLOCK",
-        "start_offset": 1834,
-        "end_offset": 1839
+        "start_offset": 1837,
+        "end_offset": 1842
       }
     },
     {
@@ -470,8 +470,8 @@
         "is_virtual": false,
         "file": "../../zircon/vdso/zx_common.fidl",
         "data": "STREAM",
-        "start_offset": 1850,
-        "end_offset": 1856
+        "start_offset": 1853,
+        "end_offset": 1859
       }
     },
     {
@@ -480,8 +480,8 @@
         "is_virtual": false,
         "file": "../../zircon/vdso/zx_common.fidl",
         "data": "MSI",
-        "start_offset": 1867,
-        "end_offset": 1870
+        "start_offset": 1870,
+        "end_offset": 1873
       }
     }
   ],

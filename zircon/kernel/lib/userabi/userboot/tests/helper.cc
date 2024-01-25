@@ -19,7 +19,7 @@
 
 namespace {
 
-// TODO(https://fxbug.dev/121753): Replace copy & pasted FIDL C bindings with new C++ bindings when
+// TODO(https://fxbug.dev/42072759): Replace copy & pasted FIDL C bindings with new C++ bindings when
 // that's allowed.
 
 struct fuchsia_io_DirectoryOpenRequest {

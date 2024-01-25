@@ -38,7 +38,7 @@ class IdlePowerThread final {
   // The current or target high-level operational state of the CPU. The depth and type of
   // idle/suspend states depends inputs from other subsystems, such as timer and run queues and
   // system power targets.
-  // TODO(https://fxbug.dev/137029): Rationalize this state with mp active / online states.
+  // TODO(https://fxbug.dev/42086705): Rationalize this state with mp active / online states.
   enum class State : uint8_t {
     Active,
     Wakeup,  // Similar to Active with respect to scheduling but signals a wakeup occurred.

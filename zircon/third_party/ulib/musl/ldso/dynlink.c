@@ -60,7 +60,7 @@ static void loader_svc_config(const char* config);
 
 #define KEEP_DSO_VMAR __has_feature(xray_instrument)
 
-// TODO(https://fxbug.dev/130526): Some ubsan-instrumented functions in the dynlink
+// TODO(https://fxbug.dev/42080808): Some ubsan-instrumented functions in the dynlink
 // startup path use too much stack leading to early stackoverflows. In the long
 // run, we'll have a new libc/dynamic linker that can help alleviate this issue,
 // but in the interim, we can selectively disable ubsan instrumentation on
@@ -677,7 +677,7 @@ LIBC_NO_SAFESTACK NO_ASAN static void assign_module_id(struct dso* dso) {
 // Locate the build ID note just after mapping the segments in.
 // This is called from dls2, so it cannot use any non-static functions.
 //
-// TODO(https://fxbug.dev/130526): Temporarily disable ubsan on this function but only
+// TODO(https://fxbug.dev/42080808): Temporarily disable ubsan on this function but only
 // for riscv64. This function in particular has a large amount of type-mismatch
 // checks added via -fsanitize=null,object-size,alignment. The instrumented code
 // should call __ubsan_handle_type_mismatch_v1 on the failing case, and this
@@ -1216,7 +1216,7 @@ LIBC_NO_SAFESTACK static void trace_load(struct dso* p) {
   // The output is in multiple lines to cope with damn line wrapping.
   // N.B. Programs like the Intel Processor Trace decoder parse this output.
   // Do not change without coordination with consumers.
-  // TODO(https://fxbug.dev/30479): Switch to official tracing mechanism when ready.
+  // TODO(https://fxbug.dev/42105346): Switch to official tracing mechanism when ready.
   static int seqno;
   debugmsg("@trace_load: %" PRIu64 ":%da %p %p %p", pid, seqno, p->l_map.l_addr, p->map,
            p->map + p->map_len);

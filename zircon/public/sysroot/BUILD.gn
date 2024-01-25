@@ -271,7 +271,7 @@ template("_create_sysroot") {
   #    and then needs to be rebuilt!!
   #
   action("${prefix}_headers") {
-    # TODO(https://fxbug.dev/69028): self-caching outputs is intended populate_sysroot_headers.py
+    # TODO(https://fxbug.dev/42148117): self-caching outputs is intended populate_sysroot_headers.py
 
     inputs = [ sysroot_entries_json_file ]
     outputs = []

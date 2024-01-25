@@ -38,10 +38,10 @@ KCOUNTER(dispatcher_channel_destroy_count, "dispatcher.channel.destroy")
 
 namespace {
 
-// Temporary hack to chase down bugs like https://fxbug.dev/47000 where upwards of 250MB of ipc
+// Temporary hack to chase down bugs like https://fxbug.dev/42123699 where upwards of 250MB of ipc
 // memory is consumed. The bet is that even if each message is at max size there
 // should be one or two channels with thousands of messages. If so, this check adds
-// no overhead to the existing code. See https://fxbug.dev/47691.
+// no overhead to the existing code. See https://fxbug.dev/42124465.
 // TODO(cpu): This limit can be lower but mojo's ChannelTest.PeerStressTest sends
 // about 3K small messages. Switching to size limit is more reasonable.
 constexpr size_t kMaxPendingMessageCount = 3500;
@@ -298,7 +298,7 @@ zx_status_t ChannelDispatcher::Call(zx_koid_t owner, MessagePacketPtr msg, zx_ti
     // instead of a single shared lock, so that we never have to defer
     // preemption.  Such a solution gets complicated however, owning to
     // lifecycle issues for the various SignalObservers, and the common locking
-    // structure of PeeredDispatchers.  See https://fxbug.dev/100122.  TL;DR - someday, when
+    // structure of PeeredDispatchers.  See https://fxbug.dev/42050802.  TL;DR - someday, when
     // we have had the time to carefully refactor the locking here, come back
     // and remove the use of CriticalMutex.
     //

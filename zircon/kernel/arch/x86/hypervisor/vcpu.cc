@@ -905,7 +905,7 @@ zx::result<> Vcpu::EnterInternal(PreEnterFn pre_enter, PostExitFn post_exit,
     // Spectre V2: Ensure that code executed in the VM guest cannot influence
     // indirect branch prediction in the host.
     //
-    // TODO(https://fxbug.dev/33667): We may be able to avoid the IBPB here; the kernel
+    // TODO(https://fxbug.dev/42108888): We may be able to avoid the IBPB here; the kernel
     // is either built with a retpoline or has Enhanced IBRS enabled. We
     // currently execute an IBPB on context-switch to a new aspace. The IBPB is
     // currently only here to protect hypervisor user threads.

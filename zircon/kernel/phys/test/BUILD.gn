@@ -223,7 +223,7 @@ if (current_toolchain != default_toolchain) {
   }
 
   common_test("backtrace-test") {
-    # TODO(https://fxbug.dev/115879): Fix and enable me.
+    # TODO(https://fxbug.dev/42067126): Fix and enable me.
     disabled_for_efi = true
 
     sources = [ "backtrace-test.cc" ]
@@ -287,7 +287,7 @@ if (current_toolchain != default_toolchain) {
       "//zircon/kernel/lib/libc",
     ]
 
-    # TODO(https://fxbug.dev/129256): Remove if this doesn't help
+    # TODO(https://fxbug.dev/42079666): Remove if this doesn't help
     # because that means the timeout is likely not the issue.
     #
     # Any changes to this timeout should be reflected in

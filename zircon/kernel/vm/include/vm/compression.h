@@ -59,12 +59,12 @@ class VmCompressedStorage : public fbl::RefCounted<VmCompressedStorage> {
   //
   // The return address remains valid as long as this specific reference is not freed, and otherwise
   // any other calls to |Store| or |Free| do not invalidate.
-  // TODO(https://fxbug.dev/60238): Restrict this if de-fragmentation of the compressed storage becomes
+  // TODO(https://fxbug.dev/42138396): Restrict this if de-fragmentation of the compressed storage becomes
   // necessary.
   //
   // No guarantee on alignment of the data is provided, and callers must tolerate arbitrary byte
   // alignment.
-  // TODO(https://fxbug.dev/60238): Consider providing an alignment guarantee if needed by decompressors.
+  // TODO(https://fxbug.dev/42138396): Consider providing an alignment guarantee if needed by decompressors.
   virtual ktl::pair<const void*, size_t> CompressedData(CompressedRef ref) const = 0;
 
   // Perform an information dump of the internal state to the debuglog.
@@ -97,7 +97,7 @@ class VmCompressionStrategy : public fbl::RefCounted<VmCompressionStrategy> {
   //
   // No guarantee on the alignment of |src| or |dst| is provided, and the caller is free to provide
   // pointers with arbitrary byte alignment.
-  // TODO(https://fxbug.dev/60238): Consider requiring an alignment if needed by compressors.
+  // TODO(https://fxbug.dev/42138396): Consider requiring an alignment if needed by compressors.
   using FailTag = VmCompressor::FailTag;
   using ZeroTag = VmCompressor::ZeroTag;
   using CompressResult = ktl::variant<size_t, ZeroTag, FailTag>;
@@ -109,7 +109,7 @@ class VmCompressionStrategy : public fbl::RefCounted<VmCompressionStrategy> {
   //
   // No guarantee on the alignment of |src| or |dst| is provided, and the caller is free to provide
   // pointers with arbitrary byte alignment.
-  // TODO(https://fxbug.dev/60238): Consider requiring an alignment if needed by decompressors.
+  // TODO(https://fxbug.dev/42138396): Consider requiring an alignment if needed by decompressors.
   virtual void Decompress(const void* src, size_t src_len, void* dst) = 0;
 
   // Perform an information dump of the internal state to the debuglog.
@@ -129,7 +129,7 @@ class VmCompression final : public fbl::RefCounted<VmCompression> {
   // Constructs a compression manager using the given storage and compression strategies. The
   // |compression_threshold| is the number of bytes above which a compression is considered to have
   // failed and should not be considered worth storing.
-  // TODO(https://fxbug.dev/60238): Limit total amount of pages stored.
+  // TODO(https://fxbug.dev/42138396): Limit total amount of pages stored.
   VmCompression(fbl::RefPtr<VmCompressedStorage> storage,
                 fbl::RefPtr<VmCompressionStrategy> strategy, size_t compression_threshold);
   ~VmCompression();
@@ -147,7 +147,7 @@ class VmCompression final : public fbl::RefCounted<VmCompression> {
   //  FailTag - Input could not be compressed or stored.
   // The |now| parameter is the timestamp to be stored with the compressed data, and is used with
   // the corresponding parameter to |Decompress| to determine how long a page was stored for.
-  // TODO(https://fxbug.dev/60238): Should different failures be exposed here?
+  // TODO(https://fxbug.dev/42138396): Should different failures be exposed here?
   using CompressedRef = VmPageOrMarker::ReferenceValue;
   using FailTag = VmCompressor::FailTag;
   using ZeroTag = VmCompressor::ZeroTag;

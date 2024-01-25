@@ -616,7 +616,7 @@ TEST(FutexTest, EventSignaling) {
   log("signal_thread 3 joined\n");
 }
 
-// Regression test for https://fxbug.dev/132757.
+// Regression test for https://fxbug.dev/42082828.
 //
 // Verify that concurrently calling zx_futex_wait with an exiting thread as the new owner does not
 // create a use-after-free.

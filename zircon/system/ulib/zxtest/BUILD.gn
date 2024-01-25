@@ -100,7 +100,7 @@ sdk_source_set("zxtest") {
   public_configs = [
     ":prod_config",
 
-    # TODO(https://fxbug.dev/135694): zxtest headers use VLA, rather than suppressing
+    # TODO(https://fxbug.dev/42085293): zxtest headers use VLA, rather than suppressing
     # every use of zxtest headers of which there are many, we suppress it here.
     "//build/config:Wno-vla-cxx-extension",
   ]
@@ -132,7 +132,7 @@ sdk_source_set("zxtest-streams") {
     ":prod_config",
     ":zxtest_enable_streamable_assertions",
 
-    # TODO(https://fxbug.dev/135694): zxtest headers use VLA, rather than suppressing
+    # TODO(https://fxbug.dev/42085293): zxtest headers use VLA, rather than suppressing
     # every use of zxtest headers of which there are many, we suppress it here.
     "//build/config:Wno-vla-cxx-extension",
   ]

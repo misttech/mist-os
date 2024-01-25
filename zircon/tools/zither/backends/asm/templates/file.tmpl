@@ -17,7 +17,7 @@
 #define {{ $guard }}
 
 {{/*
-    TODO(https://fxbug.dev/106538) We are not protected against cyclic includes here.
+    TODO(https://fxbug.dev/42057859) We are not protected against cyclic includes here.
     Either we need to generate headers differently or appeal to a FIDL feature
     that does not yet exist in order to restrict what sort of FIDL gets
     processed by zither.
