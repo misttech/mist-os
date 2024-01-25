@@ -22,6 +22,8 @@ ffx_plugin("ffx_repository_packages") {
   ]
   test_deps = [
     "//src/developer/ffx/config:lib",
+    "//src/developer/ffx/lib/pkg:empty-repo-keys",
+    "//src/developer/ffx/lib/pkg:empty-repo-metadata",
     "//src/developer/ffx/lib/timeout:lib",
     "//src/lib/fuchsia-async",
     "//third_party/rust_crates:pretty_assertions",
