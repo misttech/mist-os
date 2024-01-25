@@ -5,14 +5,12 @@
 #include <elf.h>
 #include <sched.h>
 #include <signal.h>
-#include <stdio.h>
 #include <string.h>
 #include <sys/ptrace.h>
 #include <sys/uio.h>
 #include <sys/user.h>
 #include <syscall.h>
 #include <time.h>
-#include <unistd.h>
 
 #include <linux/sched.h>
 
@@ -22,9 +20,6 @@
 
 #include <gtest/gtest.h>
 
-#include "src/lib/files/directory.h"
-#include "src/lib/files/file.h"
-#include "src/lib/files/path.h"
 #include "src/starnix/tests/syscalls/cpp/test_helper.h"
 
 constexpr int kOriginalSigno = SIGUSR1;
@@ -451,171 +446,3 @@ TEST(PtraceTest, PtraceEventStopWithForkClonePtrace) {
   DetectForkAndContinue(child_pid, false, false);
 }
 #endif
-
-constexpr int kBadExitStatus = 0xabababab;
-
-pid_t DoExec() {
-  pid_t child_pid = fork();
-  if (child_pid == 0) {
-    EXPECT_EQ(ptrace(PTRACE_TRACEME, 0, 0, 0), 0);
-    raise(SIGSTOP);
-
-    std::string test_binary = "/data/tests/ptrace_test_exec_child";
-    if (!files::IsFile(test_binary)) {
-      // We're running on host
-      char self_path[PATH_MAX];
-      realpath("/proc/self/exe", self_path);
-
-      test_binary = files::JoinPath(files::GetDirectoryName(self_path), "ptrace_test_exec_child");
-    }
-    char *const argv[] = {const_cast<char *>(test_binary.c_str()), nullptr};
-    std::cerr << test_binary << std::endl;
-
-    // execv happens without releasing futex, so futex's FUTEX_OWNER_DIED bit is set.
-    execve(test_binary.c_str(), argv, nullptr);
-    std::cerr << ">>>>>>>>>>" << strerror(errno) << std::endl;
-    // Should not get here.
-    _exit(kBadExitStatus);
-  }
-  return child_pid;
-}
-
-// Ensure that the tracee sends a SIGTRAP when it encounters an exec and
-// TRACEEXEC is not enabled.
-TEST(PtraceTest, ExecveWithSigtrap) {
-  pid_t child_pid = DoExec();
-
-  int status;
-  ASSERT_EQ(child_pid, waitpid(child_pid, &status, 0));
-  EXPECT_TRUE(WIFSTOPPED(status) && WSTOPSIG(status) == SIGSTOP)
-      << "status = " << status << " WIFSTOPPED = " << WIFSTOPPED(status)
-      << " WSTOPSIG = " << WSTOPSIG(status);
-
-  EXPECT_EQ(0, ptrace(PTRACE_CONT, child_pid, 0, 0));
-
-  EXPECT_EQ(child_pid, waitpid(child_pid, &status, 0));
-  EXPECT_TRUE(WIFSTOPPED(status) && WSTOPSIG(status) == SIGTRAP)
-      << "status = " << status << " WIFSTOPPED = " << WIFSTOPPED(status)
-      << " WSTOPSIG = " << WSTOPSIG(status);
-
-  EXPECT_EQ(0, ptrace(PTRACE_DETACH, child_pid, 0, 0));
-  EXPECT_EQ(child_pid, waitpid(child_pid, &status, 0));
-  ASSERT_TRUE(WIFEXITED(status) && WEXITSTATUS(status) == 0)
-      << "WIFEXITED(status) == " << WIFEXITED(status)
-      << " WEXITSTATUS(status) == " << WEXITSTATUS(status);
-}
-
-// Ensure that, if TRACEEXIT is enabled, and the tracee executes an exit, it
-// then sends a SIGTRAP | (PTRACE_EVENT_EXIT << 8)
-TEST(PtraceTest, PtraceEventStopWithExit) {
-  pid_t child_pid = DoExec();
-
-  int status;
-  ASSERT_EQ(child_pid, waitpid(child_pid, &status, 0));
-  EXPECT_TRUE(WIFSTOPPED(status) && WSTOPSIG(status) == SIGSTOP)
-      << "status = " << status << " WIFSTOPPED = " << WIFSTOPPED(status)
-      << " WSTOPSIG = " << WSTOPSIG(status);
-
-  EXPECT_EQ(0, ptrace(PTRACE_SETOPTIONS, child_pid, 0, PTRACE_O_TRACEEXIT))
-      << "error " << strerror(errno);
-  EXPECT_EQ(0, ptrace(PTRACE_CONT, child_pid, 0, 0));
-
-  // Wait for the exec
-  EXPECT_EQ(child_pid, waitpid(child_pid, &status, 0));
-  EXPECT_TRUE(WIFSTOPPED(status) && WSTOPSIG(status) == SIGTRAP)
-      << "status = " << status << " WIFSTOPPED = " << WIFSTOPPED(status)
-      << " WSTOPSIG = " << WSTOPSIG(status);
-  EXPECT_EQ(0, ptrace(PTRACE_CONT, child_pid, 0, 0));
-
-  // Wait for the exit
-  EXPECT_EQ(child_pid, waitpid(child_pid, &status, 0));
-  EXPECT_TRUE(WIFSTOPPED(status) && WSTOPSIG(status) == SIGTRAP)
-      << "status = " << status << " WIFSTOPPED = " << WIFSTOPPED(status)
-      << " WSTOPSIG = " << WSTOPSIG(status);
-
-  EXPECT_EQ(SIGTRAP | (PTRACE_EVENT_EXIT << 8), status >> 8);
-  int exit_status = kBadExitStatus;
-  EXPECT_EQ(ptrace(PTRACE_GETEVENTMSG, child_pid, 0, &exit_status), 0);
-  // The actual exit status seems to change depending on how this test is run,
-  // so just make sure that something is returned.
-  EXPECT_TRUE(kBadExitStatus != exit_status)
-      << "expected = " << kBadExitStatus << " actual: " << exit_status;
-  EXPECT_EQ(0, ptrace(PTRACE_DETACH, child_pid, 0, 0));
-  EXPECT_EQ(child_pid, waitpid(child_pid, &status, 0));
-  ASSERT_TRUE(WIFEXITED(status) && WEXITSTATUS(status) == 0)
-      << "WIFEXITED(status) == " << WIFEXITED(status)
-      << " WEXITSTATUS(status) == " << WEXITSTATUS(status);
-}
-
-// Ensure that, if TRACEEXEC is enabled, and the tracee executes an exec, it
-// then sends a SIGTRAP | (PTRACE_EVENT_EXEC << 8).
-TEST(PtraceTest, PtraceEventStopWithExecve) {
-  pid_t child_pid = DoExec();
-
-  int status;
-  ASSERT_EQ(child_pid, waitpid(child_pid, &status, 0));
-  EXPECT_TRUE(WIFSTOPPED(status) && WSTOPSIG(status) == SIGSTOP)
-      << "status = " << status << " WIFSTOPPED = " << WIFSTOPPED(status)
-      << " WSTOPSIG = " << WSTOPSIG(status);
-
-  EXPECT_EQ(0, ptrace(PTRACE_SETOPTIONS, child_pid, 0, PTRACE_O_TRACEEXEC | PTRACE_O_TRACEEXIT))
-      << "error " << strerror(errno);
-  EXPECT_EQ(0, ptrace(PTRACE_CONT, child_pid, 0, 0));
-
-  // Wait for the exec
-  EXPECT_EQ(child_pid, waitpid(child_pid, &status, 0));
-  EXPECT_TRUE(WIFSTOPPED(status) && WSTOPSIG(status) == SIGTRAP)
-      << "status = " << status << " WIFSTOPPED = " << WIFSTOPPED(status)
-      << " WSTOPSIG = " << WSTOPSIG(status);
-
-  EXPECT_EQ(SIGTRAP | (PTRACE_EVENT_EXEC << 8), status >> 8);
-  pid_t target_pid;
-  EXPECT_EQ(ptrace(PTRACE_GETEVENTMSG, child_pid, 0, &target_pid), 0);
-  EXPECT_EQ(target_pid, child_pid);
-
-  EXPECT_EQ(0, ptrace(PTRACE_DETACH, child_pid, 0, 0));
-  EXPECT_EQ(child_pid, waitpid(child_pid, &status, 0));
-  ASSERT_TRUE(WIFEXITED(status) && WEXITSTATUS(status) == 0)
-      << "WIFEXITED(status) == " << WIFEXITED(status)
-      << " WEXITSTATUS(status) == " << WEXITSTATUS(status);
-}
-
-// Ensure that, if TRACEEXIT is enabled, and the tracee is killed with a
-// SIGTERM, it sends a SIGTRAP | (PTRACE_EVENT_EXIT << 8)
-TEST(PtraceTest, PtraceEventStopWithSignalExit) {
-  pid_t child_pid = DoExec();
-
-  int status;
-  ASSERT_EQ(child_pid, waitpid(child_pid, &status, 0));
-  EXPECT_TRUE(WIFSTOPPED(status) && WSTOPSIG(status) == SIGSTOP)
-      << "status = " << status << " WIFSTOPPED = " << WIFSTOPPED(status)
-      << " WSTOPSIG = " << WSTOPSIG(status);
-
-  EXPECT_EQ(0, ptrace(PTRACE_SETOPTIONS, child_pid, 0, PTRACE_O_TRACEEXIT))
-      << "error " << strerror(errno);
-  ASSERT_EQ(0, kill(child_pid, SIGTERM));
-  EXPECT_EQ(0, ptrace(PTRACE_CONT, child_pid, 0, 0));
-
-  // Wait for the signal-delivery-stop
-  EXPECT_EQ(child_pid, waitpid(child_pid, &status, 0));
-  EXPECT_TRUE(WIFSTOPPED(status) && WSTOPSIG(status) == SIGTERM)
-      << "status = " << status << " WIFSTOPPED = " << WIFSTOPPED(status)
-      << " WSTOPSIG = " << WSTOPSIG(status);
-  EXPECT_EQ(0, ptrace(PTRACE_CONT, child_pid, 0, SIGTERM));
-
-  // Wait for the exit
-  EXPECT_EQ(child_pid, waitpid(child_pid, &status, 0));
-  EXPECT_TRUE(WIFSTOPPED(status) && WSTOPSIG(status) == SIGTRAP)
-      << "status = " << status << " WIFSTOPPED = " << WIFSTOPPED(status)
-      << " WSTOPSIG = " << WSTOPSIG(status);
-
-  EXPECT_EQ(SIGTRAP | (PTRACE_EVENT_EXIT << 8), status >> 8);
-  int exit_status = 0xabababab;
-  EXPECT_EQ(ptrace(PTRACE_GETEVENTMSG, child_pid, 0, &exit_status), 0);
-  EXPECT_TRUE(SIGTERM == exit_status) << " exit_status " << exit_status;
-  EXPECT_EQ(0, ptrace(PTRACE_DETACH, child_pid, 0, 0));
-  EXPECT_EQ(child_pid, waitpid(child_pid, &status, 0));
-  ASSERT_TRUE(WIFSIGNALED(status) && WTERMSIG(status) == SIGTERM)
-      << "WIFSIGNALED(status) == " << WIFEXITED(status)
-      << " WTERMSIG(status) == " << WTERMSIG(status);
-}

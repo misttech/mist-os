@@ -556,6 +556,8 @@
                 "PtraceTest.ExitWhenParentIsNotTracer_Syscall_TraceVfork_TraceVforkDone",
                 "PtraceTest.Int3",
                 "PtraceTest.Sysemu_PokeUser",
+                "TraceExec/PtraceExecveTest.Execve_GetRegs_PeekUser_SIGKILL_TraceClone_TraceExit/0",
+                "TraceExec/PtraceExecveTest.Execve_GetRegs_PeekUser_SIGKILL_TraceClone_TraceExit/1",
 
                 // raw_socket_icmp
                 "RawSocketICMPTest.IPv6ChecksumNotSupported",
@@ -1040,10 +1042,6 @@
 
                 // These tests hang / hard crash
                 "PtraceTest.AttachingConvertsGroupStopToPtraceStop",
-
-                // TODO(b/297434895): This test hangs if multithreaded exec doesn't work.
-                "TraceExec/PtraceExecveTest.Execve_GetRegs_PeekUser_SIGKILL_TraceClone_TraceExit/0",
-                "TraceExec/PtraceExecveTest.Execve_GetRegs_PeekUser_SIGKILL_TraceClone_TraceExit/1",
 
                 // TODO(https://fxbug.dev/129161): Fix flake.
                 "VforkTest.ExecedChildExitDoesntUnstopParent",
