@@ -10,9 +10,10 @@ namespace bt {
 
 std::string ProtocolErrorTraits<pw::bluetooth::emboss::StatusCode>::ToString(
     pw::bluetooth::emboss::StatusCode ecode) {
-  return bt_lib_cpp_string::StringPrintf("%s (HCI %#.2x)",
-                                         hci_spec::StatusCodeToString(ecode).c_str(),
-                                         static_cast<unsigned int>(ecode));
+  return bt_lib_cpp_string::StringPrintf(
+      "%s (HCI %#.2x)",
+      hci_spec::StatusCodeToString(ecode).c_str(),
+      static_cast<unsigned int>(ecode));
 }
 
 }  // namespace bt

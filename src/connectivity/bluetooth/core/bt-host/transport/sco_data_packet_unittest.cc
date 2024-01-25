@@ -25,7 +25,8 @@ TEST(ScoPacketTest, ReadFromBufferWithStatusFlag) {
                          0x01,  // data total length
                          0x09   // payload
   );
-  std::unique_ptr<ScoDataPacket> packet = ScoDataPacket::New(/*payload_size=*/1);
+  std::unique_ptr<ScoDataPacket> packet =
+      ScoDataPacket::New(/*payload_size=*/1);
   ASSERT_TRUE(packet);
   packet->mutable_view()->mutable_data().Write(bytes);
   packet->InitializeFromBuffer();

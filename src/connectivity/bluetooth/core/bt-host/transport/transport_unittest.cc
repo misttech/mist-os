@@ -15,20 +15,23 @@ namespace bt::hci {
 
 namespace {
 
-using TransportTest = bt::testing::FakeDispatcherControllerTest<bt::testing::MockController>;
+using TransportTest =
+    bt::testing::FakeDispatcherControllerTest<bt::testing::MockController>;
 using TransportDeathTest = TransportTest;
 
-TEST_F(TransportTest, CommandChannelTimeoutShutsDownChannelAndNotifiesClosedCallback) {
+TEST_F(TransportTest,
+       CommandChannelTimeoutShutsDownChannelAndNotifiesClosedCallback) {
   CommandChannel::WeakPtr cmd_chan_weak = cmd_channel()->AsWeakPtr();
 
   size_t closed_cb_count = 0;
   transport()->SetTransportErrorCallback([&] { closed_cb_count++; });
 
-  constexpr pw::chrono::SystemClock::duration kCommandTimeout = std::chrono::seconds(12);
+  constexpr pw::chrono::SystemClock::duration kCommandTimeout =
+      std::chrono::seconds(12);
 
   StaticByteBuffer req_reset(LowerBits(hci_spec::kReset),
                              UpperBits(hci_spec::kReset),  // HCI_Reset opcode
-                             0x00                          // parameter_total_size
+                             0x00  // parameter_total_size
   );
 
   // Expect the HCI_Reset command but dont send a reply back to make the command
@@ -37,17 +40,18 @@ TEST_F(TransportTest, CommandChannelTimeoutShutsDownChannelAndNotifiesClosedCall
 
   size_t cb_count = 0;
   CommandChannel::TransactionId id1, id2;
-  auto cb = [&cb_count](CommandChannel::TransactionId callback_id, const EventPacket& event) {
-    cb_count++;
-  };
+  auto cb = [&cb_count](CommandChannel::TransactionId callback_id,
+                        const EventPacket& event) { cb_count++; };
 
   auto packet =
-      hci::EmbossCommandPacket::New<pw::bluetooth::emboss::ResetCommandWriter>(hci_spec::kReset);
+      hci::EmbossCommandPacket::New<pw::bluetooth::emboss::ResetCommandWriter>(
+          hci_spec::kReset);
   id1 = cmd_channel()->SendCommand(std::move(packet), cb);
   ASSERT_NE(0u, id1);
 
   packet =
-      hci::EmbossCommandPacket::New<pw::bluetooth::emboss::ResetCommandWriter>(hci_spec::kReset);
+      hci::EmbossCommandPacket::New<pw::bluetooth::emboss::ResetCommandWriter>(
+          hci_spec::kReset);
   id2 = cmd_channel()->SendCommand(std::move(packet), cb);
   ASSERT_NE(0u, id2);
 
@@ -64,7 +68,8 @@ TEST_F(TransportTest, CommandChannelTimeoutShutsDownChannelAndNotifiesClosedCall
 
 TEST_F(TransportDeathTest, AttachInspectBeforeInitializeACLDataChannelCrashes) {
   inspect::Inspector inspector;
-  EXPECT_DEATH_IF_SUPPORTED(transport()->AttachInspect(inspector.GetRoot()), ".*");
+  EXPECT_DEATH_IF_SUPPORTED(transport()->AttachInspect(inspector.GetRoot()),
+                            ".*");
 }
 
 TEST_F(TransportTest, HciErrorClosesTransportWithSco) {

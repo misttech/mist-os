@@ -29,7 +29,9 @@ TEST(StaticPacketTest, StaticPacketBasic) {
 }
 
 TEST(EmbossCommandPacketTest, EmbossCommandPacketBasic) {
-  auto packet = EmbossCommandPacket::New<pw::bluetooth::emboss::TestCommandPacketWriter>(1234);
+  auto packet =
+      EmbossCommandPacket::New<pw::bluetooth::emboss::TestCommandPacketWriter>(
+          1234);
   packet.view_t().payload().Write(13);
 
   EXPECT_EQ(packet.size(), 4u);
@@ -43,19 +45,24 @@ TEST(EmbossCommandPacketTest, EmbossCommandPacketBasic) {
 
 TEST(EmbossCommandPacketTest, EmbossCommandPacketDeathTest) {
   EmbossCommandPacket packet =
-      EmbossCommandPacket::New<pw::bluetooth::emboss::TestCommandPacketView>(1234);
+      EmbossCommandPacket::New<pw::bluetooth::emboss::TestCommandPacketView>(
+          1234);
 
   // Try and fail to request view for struct larger than TestCommandPacket.
-  EXPECT_DEATH_IF_SUPPORTED(packet.view<pw::bluetooth::emboss::InquiryCommandView>(),
-                            "emboss packet buffer not large enough");
-  // Try and fail to allocate 0 length packet (needs at least 3 bytes for the header).
   EXPECT_DEATH_IF_SUPPORTED(
-      EmbossCommandPacket::New<pw::bluetooth::emboss::CommandHeaderView>(1234, 0),
+      packet.view<pw::bluetooth::emboss::InquiryCommandView>(),
+      "emboss packet buffer not large enough");
+  // Try and fail to allocate 0 length packet (needs at least 3 bytes for the
+  // header).
+  EXPECT_DEATH_IF_SUPPORTED(
+      EmbossCommandPacket::New<pw::bluetooth::emboss::CommandHeaderView>(1234,
+                                                                         0),
       "command packet size must be at least 3 bytes");
 }
 
 TEST(EmbossEventPacketTest, EmbossEventPacketBasic) {
-  auto packet = EmbossEventPacket::New<pw::bluetooth::emboss::TestEventPacketWriter>(123);
+  auto packet =
+      EmbossEventPacket::New<pw::bluetooth::emboss::TestEventPacketWriter>(123);
   packet.view_t().payload().Write(13);
 
   EXPECT_EQ(packet.size(), 3u);
@@ -69,7 +76,8 @@ TEST(EmbossEventPacketTest, EmbossEventPacketDeathTest) {
   EmbossEventPacket packet =
       EmbossEventPacket::New<pw::bluetooth::emboss::TestEventPacketView>(123);
 
-  // Try and fail to allocate 0 length packet (needs at least 2 bytes for the header).
+  // Try and fail to allocate 0 length packet (needs at least 2 bytes for the
+  // header).
   EXPECT_DEATH_IF_SUPPORTED(EmbossEventPacket::New(0),
                             "event packet size must be at least 2 bytes");
 }
@@ -85,8 +93,10 @@ TEST(EmbossEventPacketTest, StatusCode) {
       hci_spec::vendor::android::kLEMultiAdvtStateChangeSubeventCode);
 
   ASSERT_TRUE(packet.StatusCode().has_value());
-  EXPECT_EQ(packet.StatusCode().value(), hci_spec::StatusCode::OPERATION_CANCELLED_BY_HOST);
-  EXPECT_EQ(packet.ToResult(), ToResult(hci_spec::StatusCode::OPERATION_CANCELLED_BY_HOST));
+  EXPECT_EQ(packet.StatusCode().value(),
+            hci_spec::StatusCode::OPERATION_CANCELLED_BY_HOST);
+  EXPECT_EQ(packet.ToResult(),
+            ToResult(hci_spec::StatusCode::OPERATION_CANCELLED_BY_HOST));
 }
 
 }  // namespace
