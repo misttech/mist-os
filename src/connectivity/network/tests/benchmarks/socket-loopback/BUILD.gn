@@ -145,7 +145,7 @@ if (target_cpu != "riscv64") {
     test_type = "system"
   }
 
-  # TODO(https://fxbug.dev/117883): Delete this once Fast UDP is the default.
+  # TODO(https://fxbug.dev/42069075): Delete this once Fast UDP is the default.
   fuchsia_unittest_component(
       "loopback-socket-benchmarks-with-fast-udp-tracing") {
     manifest = "meta/loopback-socket-benchmarks-with-fast-udp-tracing.cml"

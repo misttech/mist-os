@@ -383,7 +383,7 @@ fn create_child_decl(child_name: &str, url: &str) -> fdecl::Child {
     fdecl::Child {
         name: Some(child_name.to_string()),
         url: Some(url.to_string()),
-        // TODO(https://fxbug.dev/90085): Remove the startup field when the
+        // TODO(https://fxbug.dev/42171498): Remove the startup field when the
         // child is being created in a single_run collection. In such a case,
         // this field is currently required to be set to
         // `fdecl::StartupMode::Lazy` even though it is a no-op.
@@ -1204,7 +1204,7 @@ impl Controller {
                     // TODO(https://github.com/rust-lang/rust/issues/86442): once
                     // std::io::ErrorKind::HostUnreachable is stable, we should use that instead.
                     match e.raw_os_error() {
-                        // TODO(https://fxbug.dev/100939): Return ENETUNREACH when no route found in
+                        // TODO(https://fxbug.dev/42051708): Return ENETUNREACH when no route found in
                         // Netstack2.
                         Some(libc::EHOSTUNREACH) | Some(libc::ENETUNREACH) => {
                             fntr::Error::AddressUnreachable

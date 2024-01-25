@@ -174,7 +174,7 @@ fn do_router_solicitation<BC: RsBindingsContext<CC::DeviceId>, CC: RsContext<BC>
 ) {
     let src_ll = core_ctx.get_link_layer_addr_bytes(device_id);
 
-    // TODO(https://fxbug.dev/85055): Either panic or guarantee that this error
+    // TODO(https://fxbug.dev/42165912): Either panic or guarantee that this error
     // can't happen statically.
     let _: Result<(), _> =
         core_ctx.send_rs_packet(bindings_ctx, device_id, RouterSolicitation::default(), |src_ip| {

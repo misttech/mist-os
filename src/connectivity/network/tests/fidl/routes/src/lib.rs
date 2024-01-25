@@ -450,7 +450,7 @@ fn initial_loopback_routes_v4<N: Netstack>(
         ),
     ]
     .into_iter()
-    // TODO(https://fxbug.dev/123108) Unify the loopback routes between
+    // TODO(https://fxbug.dev/42074061) Unify the loopback routes between
     // Netstack2 and Netstack3
     .chain(match N::VERSION {
         NetstackVersion::Netstack3 | NetstackVersion::ProdNetstack3 => {
@@ -473,7 +473,7 @@ fn initial_loopback_routes_v6<N: Netstack>(
 ) -> impl Iterator<Item = fnet_routes_ext::InstalledRoute<Ipv6>> {
     [new_installed_route(net_subnet_v6!("::1/128"), loopback_id, DEFAULT_INTERFACE_METRIC, true)]
         .into_iter()
-        // TODO(https://fxbug.dev/123108) Unify the loopback routes between
+        // TODO(https://fxbug.dev/42074061) Unify the loopback routes between
         // Netstack2 and Netstack3
         .chain(match N::VERSION {
             NetstackVersion::Netstack3 | NetstackVersion::ProdNetstack3 => {
@@ -548,7 +548,7 @@ async fn watcher_existing<N: Netstack, I: net_types::ip::Ip + fnet_routes_ext::F
         .id;
 
     let device = sandbox.create_endpoint(name).await.expect("create endpoint");
-    // TODO(https://fxbug.dev/123440) Netstack2 only installs certain routes
+    // TODO(https://fxbug.dev/42074358) Netstack2 only installs certain routes
     // after the interface is enabled. Using `install_endpoint` installs the
     // interface, enables it, and waits for it to come online.
     let interface = realm

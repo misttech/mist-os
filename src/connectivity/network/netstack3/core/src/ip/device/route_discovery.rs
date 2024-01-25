@@ -161,7 +161,7 @@ impl<BC: Ipv6RouteDiscoveryBindingsContext<CC::DeviceId>, CC: Ipv6RouteDiscovery
                             }
                             // Routes with an infinite lifetime have no timers
                             //
-                            // TODO(https://fxbug.dev/97751): Hold timers scheduled to
+                            // TODO(https://fxbug.dev/42180014): Hold timers scheduled to
                             // fire at infinity.
                             NonZeroNdpLifetime::Infinite => {
                                 bindings_ctx.cancel_timer(timer_id.clone())
@@ -241,7 +241,7 @@ fn invalidate_route<
 ) {
     // Routes with an infinite lifetime have no timers.
     //
-    // TODO(https://fxbug.dev/97751): Hold timers scheduled to fire at infinity.
+    // TODO(https://fxbug.dev/42180014): Hold timers scheduled to fire at infinity.
     let _: Option<BC::Instant> = bindings_ctx
         .cancel_timer(Ipv6DiscoveredRouteTimerId { device_id: device_id.clone(), route });
     del_discovered_ipv6_route(core_ctx, bindings_ctx, device_id, route)

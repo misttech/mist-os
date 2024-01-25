@@ -12,7 +12,7 @@
         {
             type: "expect_failure",
             matchers: [
-                // TODO(https://fxbug.dev/100939): Return ENETUNREACH instead of EHOSTUNREACH.
+                // TODO(https://fxbug.dev/42051708): Return ENETUNREACH instead of EHOSTUNREACH.
                 "NoNetworkTest.SendToNet*",
             ],
         },

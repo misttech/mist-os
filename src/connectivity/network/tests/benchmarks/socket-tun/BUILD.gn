@@ -54,7 +54,7 @@ common_deps = [
 netstack3_deps = common_deps + [
                    "//src/connectivity/network/netstack3:component",
 
-                   # TODO(https://fxbug.dev/125773): remove this when the production Netstack3
+                   # TODO(https://fxbug.dev/42076541): remove this when the production Netstack3
                    # component no longer brings its own DHCPv4 client, given that it is
                    # otherwise unused in this benchmark.
                    "//src/connectivity/network/dhcpv4/client/bindings:component",

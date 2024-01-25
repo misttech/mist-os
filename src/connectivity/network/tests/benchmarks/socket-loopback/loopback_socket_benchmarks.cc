@@ -443,7 +443,7 @@ void RegisterTests() {
         fxl::StringPrintf(kPingTestNameFmt, network_to_string(Network::kIpv6)).c_str(),
         PingLatency<Ipv6>);
   };
-  // TODO(https://fxbug.dev/47321): Remove the conditional once Netstack3
+  // TODO(https://fxbug.dev/42124055): Remove the conditional once Netstack3
   // supports enough of the POSIX ICMP socket API.
   if (!std::getenv(kNetstack3EnvVar)) {
     register_ping();

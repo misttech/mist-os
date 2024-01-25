@@ -233,7 +233,7 @@ void FakeAp::Rx(std::shared_ptr<const SimFrame> frame, std::shared_ptr<const Wla
 
 void FakeAp::RxMgmtFrame(std::shared_ptr<const SimManagementFrame> mgmt_frame) {
   switch (mgmt_frame->MgmtFrameType()) {
-    // TODO(https://fxbug.dev/89334): A probe response should only be sent if the Probe Request
+    // TODO(https://fxbug.dev/42170664): A probe response should only be sent if the Probe Request
     // contains the SSID of this AP.
     case SimManagementFrame::FRAME_TYPE_PROBE_REQ: {
       auto probe_req_frame = std::static_pointer_cast<const SimProbeReqFrame>(mgmt_frame);
@@ -397,7 +397,7 @@ void FakeAp::RxMgmtFrame(std::shared_ptr<const SimManagementFrame> mgmt_frame) {
             if (auth_req_frame->seq_num_ == 3) {
               if (security_.expect_challenge_failure) {
                 // Refuse authentication if this AP has been configured to.
-                // TODO(https://fxbug.dev/61139): Actually check the challenge response rather than hardcoding
+                // TODO(https://fxbug.dev/42139397): Actually check the challenge response rather than hardcoding
                 // authentication kSuccess or failure using expect_challenge_failure.
                 RemoveClient(auth_req_frame->src_addr_);
                 ScheduleAuthResp(auth_req_frame, wlan_ieee80211::StatusCode::kChallengeFailure);

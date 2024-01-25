@@ -459,7 +459,7 @@ async fn define_msg_handling_loop_future<DS: DataStore>(
                     dhcpv4::protocol::DhcpOption::ServerIdentifier(addr) => Some(addr.clone()),
                     _ => None,
                 })
-                // TODO(https://fxbug.dev/105402): Eliminate this panic.
+                // TODO(https://fxbug.dev/42056628): Eliminate this panic.
                 .expect("expect server identifier is always present")
                 .into();
             let response = msg.serialize();
@@ -482,7 +482,7 @@ async fn define_msg_handling_loop_future<DS: DataStore>(
 
             let mut sll_addr = [0; 8];
             (&mut sll_addr[..chaddr.bytes().len()]).copy_from_slice(&chaddr.bytes());
-            // TODO(https://fxbug.dev/104557): Add `ETH_P_IP` upstream in the `libc` crate.
+            // TODO(https://fxbug.dev/42055726): Add `ETH_P_IP` upstream in the `libc` crate.
             const ETH_P_IP: u16 = 0x0800;
             let sockaddr_ll = libc::sockaddr_ll {
                 sll_family: libc::AF_PACKET.try_into().expect("convert sll_family failed"),

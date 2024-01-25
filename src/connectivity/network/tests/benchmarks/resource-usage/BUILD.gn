@@ -50,7 +50,7 @@ fuchsia_test_component("resource-usage-benchmark-netstack3") {
   deps = [
            ":resource_usage_benchmark",
 
-           # TODO(https://fxbug.dev/125773): remove this when the production Netstack3
+           # TODO(https://fxbug.dev/42076541): remove this when the production Netstack3
            # component no longer brings its own DHCPv4 client, given that it is
            # otherwise unused in this benchmark.
            "//src/connectivity/network/dhcpv4/client/bindings:component",

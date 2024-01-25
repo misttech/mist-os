@@ -21,7 +21,7 @@
 
             // Tests time out because netstack3 doesn't send Router
             // Solicitations when IPv6 forwarding is enabled.
-            // TODO(https://fxbug.dev/124585): Add support to netstack3 for
+            // TODO(https://fxbug.dev/42075425): Add support to netstack3 for
             // sending router solicitations and handling router advertisements
             // when acting as a router.
             matchers: [

@@ -248,7 +248,7 @@
                 "LocalhostTest/SocketOptsTest.SetUDPMulticastIfImrIfindex/IPv*_Datagram",
                 "LocalhostTest/SocketOptsTest.SetUDPMulticastIfImrAddress/IPv4_Datagram",
 
-                // TODO(https://fxbug.dev/21198): Support dual-stack TCP sockets.
+                // TODO(https://fxbug.dev/42095034): Support dual-stack TCP sockets.
                 "AnyAddrSocketTestStream/*",
 
                 // Read after shutdown.

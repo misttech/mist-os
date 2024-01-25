@@ -34,7 +34,7 @@ impl Connect for DnsTcpStream {
         match bind_addr {
             Some(bind_addr) => {
                 unimplemented!(
-                    "https://fxbug.dev/97821: cannot bind to {:?}; `connect_with_bind` is \
+                    "https://fxbug.dev/42180092: cannot bind to {:?}; `connect_with_bind` is \
                     unimplemented",
                     bind_addr,
                 )

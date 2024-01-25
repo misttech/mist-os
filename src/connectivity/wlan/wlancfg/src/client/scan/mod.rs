@@ -205,7 +205,7 @@ async fn sme_scan(
                 .filter_map(|scan_result| {
                     wlan_common::scan::ScanResult::try_from(scan_result).map(Some).unwrap_or_else(
                         |e| {
-                            // TODO(https://fxbug.dev/83708): Report details about which
+                            // TODO(https://fxbug.dev/42164415): Report details about which
                             // scan result failed to convert if possible.
                             error!("ScanResult conversion failed: {:?}", e);
                             None
@@ -253,7 +253,7 @@ async fn perform_scan(
                 return (scan_request, Err(types::ScanError::GeneralError));
             }
         };
-        // TODO(https://fxbug.dev/111468) Log metrics when this times out so we are aware of the issue.
+        // TODO(https://fxbug.dev/42062802) Log metrics when this times out so we are aware of the issue.
         let scan_results = sme_scan(&sme_proxy, &scan_request, &mut scan_defects)
             .on_timeout(SCAN_TIMEOUT, || {
                 error!("Timed out waiting on scan response from SME");
@@ -274,7 +274,7 @@ async fn perform_scan(
                 };
                 bss_by_network =
                     bss_to_network_map(results, &target_ssids, &mut scan_event_inspect_data);
-                // TODO(https://fxbug.dev/136384) Consider passing in scan results and reading the
+                // TODO(https://fxbug.dev/42085988) Consider passing in scan results and reading the
                 // "ScanObservation" there to create a single source of truth for "ScanObservation".
                 saved_networks_manager
                     .record_scan_result(target_ssids, bss_by_network.keys().collect())
@@ -874,7 +874,7 @@ mod tests {
             }))) => {
                 // Shutdown SME request stream.
                 responder.control_handle().shutdown();
-                // TODO(https://fxbug.dev/81036): Drop the stream to shutdown the channel.
+                // TODO(https://fxbug.dev/42161447): Drop the stream to shutdown the channel.
                 drop(sme_stream);
             }
         );

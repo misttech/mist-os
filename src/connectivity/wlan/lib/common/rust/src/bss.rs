@@ -29,8 +29,8 @@ use {
     zerocopy::{AsBytes, Ref},
 };
 
-// TODO(https://fxbug.dev/29885): Represent this as bitfield instead.
-// TODO(https://fxbug.dev/29877): Move all ordering logic to SME.
+// TODO(https://fxbug.dev/42104685): Represent this as bitfield instead.
+// TODO(https://fxbug.dev/42104676): Move all ordering logic to SME.
 /// Supported wireless network protection.
 ///
 /// Describes the protection configured for a BSS. The tags of each variant are ordered such that
@@ -536,7 +536,7 @@ impl fmt::Display for BssDescription {
         )
     }
 }
-// TODO(https://fxbug.dev/83708): The error printed should include a minimal amount of information
+// TODO(https://fxbug.dev/42164415): The error printed should include a minimal amount of information
 // about the BSS Description that could not be converted to aid debugging.
 impl TryFrom<fidl_internal::BssDescription> for BssDescription {
     type Error = anyhow::Error;

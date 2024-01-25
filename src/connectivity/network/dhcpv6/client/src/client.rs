@@ -177,7 +177,7 @@ fn to_configured_addresses(
         return Err(ClientError::UnsupportedConfigs);
     }
 
-    // TODO(https://fxbug.dev/77790): make IAID consistent across
+    // TODO(https://fxbug.dev/42157844): make IAID consistent across
     // configurations.
     Ok((0..)
         .map(v6::IAID::new)
@@ -193,7 +193,7 @@ fn to_configured_addresses(
 
 // The client only supports a single IA_PD.
 //
-// TODO(https://fxbug.dev/114132): Support multiple IA_PDs.
+// TODO(https://fxbug.dev/42065403): Support multiple IA_PDs.
 const IA_PD_IAID: v6::IAID = v6::IAID::new(0);
 
 /// Creates a state machine for the input client config.
@@ -353,11 +353,11 @@ impl<S: for<'a> AsyncSocket<'a>> Client<S> {
                         let () = client.maybe_send_dns_server_updates(servers)?;
                     }
                     dhcpv6_core::client::Action::IaNaUpdates(_) => {
-                        // TODO(https://fxbug.dev/96684): add actions to
+                        // TODO(https://fxbug.dev/42178828): add actions to
                         // (re)schedule preferred and valid lifetime timers.
-                        // TODO(https://fxbug.dev/96674): Add
+                        // TODO(https://fxbug.dev/42178817): Add
                         // action to remove the previous address.
-                        // TODO(https://fxbug.dev/95265): Add action to add
+                        // TODO(https://fxbug.dev/42177252): Add action to add
                         // the new address and cancel timers for old address.
                     }
                     dhcpv6_core::client::Action::IaPdUpdates(mut updates) => {
@@ -610,7 +610,7 @@ impl<S: for<'a> AsyncSocket<'a>> Client<S> {
                 // The responder will be dropped and cause the channel to be closed.
                 Some(ClientWatchAddressResponder { .. }) => Err(ClientError::DoubleWatch),
                 None => {
-                    // TODO(https://fxbug.dev/72701): Implement the address watcher.
+                    // TODO(https://fxbug.dev/42152192): Implement the address watcher.
                     warn!("WatchAddress call will block forever as it is unimplemented");
                     self.address_responder = Some(responder);
                     Ok(())
@@ -624,7 +624,7 @@ impl<S: for<'a> AsyncSocket<'a>> Client<S> {
                     self.maybe_send_prefixes()
                 }
             },
-            // TODO(https://fxbug.dev/72702): Implement Shutdown.
+            // TODO(https://fxbug.dev/42152193): Implement Shutdown.
             ClientRequest::Shutdown { responder: _ } => {
                 Err(ClientError::Unimplemented("Shutdown".to_string()))
             }

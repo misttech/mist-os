@@ -78,7 +78,7 @@ rustc_binary("bin") {
   sources = wlandevicemonitor_srcs
 }
 
-# TODO(https://fxbug.dev/91927): fuchsia_component_manifest will soon be unnecessary and can
+# TODO(https://fxbug.dev/42173544): fuchsia_component_manifest will soon be unnecessary and can
 #                        folded into the component
 fuchsia_component_manifest("wlandevicemonitor-manifest") {
   component_name = "wlandevicemonitor"

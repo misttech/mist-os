@@ -75,7 +75,7 @@ pub(crate) enum Error {
 
 const DEFAULT_BUFFER_LENGTH: usize = 2048;
 
-// TODO(https://fxbug.dev/101303): Decorate *all* logging with human-readable
+// TODO(https://fxbug.dev/42052114): Decorate *all* logging with human-readable
 // device debug information to disambiguate.
 impl NetdeviceWorker {
     pub(crate) async fn new(
@@ -122,7 +122,7 @@ impl NetdeviceWorker {
             trace_duration!("netdevice::recv");
 
             let frame_length = rx.len();
-            // TODO(https://fxbug.dev/100873): pass strongly owned buffers down
+            // TODO(https://fxbug.dev/42051635): pass strongly owned buffers down
             // to the stack instead of copying it out.
             rx.read_at(0, &mut buff[..frame_length]).map_err(|e| {
                 tracing::error!("failed to read from buffer {:?}", e);
@@ -154,7 +154,7 @@ impl NetdeviceWorker {
                     if now - last_wifi_drop_log >= zx::Duration::from_seconds(5) {
                         tracing::warn!(
                             "Dropping frame destined to TCP port 22 on WiFi interface. \
-                            See https://fxbug.dev/134298."
+                            See https://fxbug.dev/42084174."
                         );
                         last_wifi_drop_log = now;
                     }
@@ -185,7 +185,7 @@ const SSH_PORT: u16 = 22;
 /// incurring the security risk of remote access before we have the filtering
 /// engine in place.
 ///
-/// TODO(https://fxbug.dev/134298): Remove this and replace with real filtering.
+/// TODO(https://fxbug.dev/42084174): Remove this and replace with real filtering.
 fn workaround_drop_ssh_over_wlan(
     device_class: &fhardware_network::DeviceClass,
     buffer: &[u8],
@@ -420,7 +420,7 @@ impl DeviceHandler {
 
         // Always set the interface to multicast promiscuous mode because we
         // don't really plumb through multicast filtering.
-        // TODO(https://fxbug.dev/58919): Remove this when multicast filtering
+        // TODO(https://fxbug.dev/42136929): Remove this when multicast filtering
         // is available.
         fuchsia_zircon::Status::ok(
             mac_proxy
@@ -529,7 +529,7 @@ impl DeviceHandler {
         );
         add_initial_routes(ctx.bindings_ctx_mut(), &core_id).await;
 
-        // TODO(https://fxbug.dev/69644): Use a different secret key (not this
+        // TODO(https://fxbug.dev/42148800): Use a different secret key (not this
         // one) to generate stable opaque interface identifiers.
         let mut secret_key = [0; STABLE_IID_SECRET_KEY_BYTES];
         ctx.bindings_ctx_mut().rng().fill(&mut secret_key);

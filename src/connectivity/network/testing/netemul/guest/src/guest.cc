@@ -161,7 +161,7 @@ void GuestImpl::OnTeardown() {
     // is dropped.
     // Log an error since this usage is brittle and can lead to errors
     // if/when other tests are introduced.
-    // TODO(https://fxbug.dev/118810): Consider blocking in CreateGuest instead.
+    // TODO(https://fxbug.dev/42069886): Consider blocking in CreateGuest instead.
     FX_LOGST(ERROR, name_.c_str()) << "Unbinding guest without Shutdown called";
     DoShutdown();
   }

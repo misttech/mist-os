@@ -285,7 +285,7 @@ impl<D: DeviceOps + Send + 'static> FullmacMlme<D> {
         let spectrum_management_support =
             banjo_to_fidl::convert_spectrum_management_support(support);
 
-        // TODO(https://fxbug.dev/113677): Get persistence working by adding the appropriate configs
+        // TODO(https://fxbug.dev/42064968): Get persistence working by adding the appropriate configs
         //                         in *.cml files
         let (persistence_proxy, _persistence_server_end) = match fidl::endpoints::create_proxy::<
             fidl_fuchsia_diagnostics_persist::DataPersistenceMarker,
@@ -481,7 +481,7 @@ impl<D: DeviceOps + Send + 'static> FullmacMlme<D> {
                 self.mlme_event_sink.send(fidl_mlme::MlmeEvent::ConnectConf { resp });
             }
             FullmacDriverEvent::RoamConf { resp } => {
-                // TODO(https://fxbug.dev/120899) Implement RoamConf handling in MLME.
+                // TODO(https://fxbug.dev/42071941) Implement RoamConf handling in MLME.
                 self.mlme_event_sink.send(fidl_mlme::MlmeEvent::RoamConf { resp });
             }
             FullmacDriverEvent::AuthInd { ind } => {

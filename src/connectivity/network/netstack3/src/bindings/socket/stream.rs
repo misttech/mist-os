@@ -267,7 +267,7 @@ impl ReceiveBuffer for ReceiveBufferWithZirconSocket {
             }
             total
         });
-        // TODO(https://fxbug.dev/112391): Instead of inferring the state in
+        // TODO(https://fxbug.dev/42063684): Instead of inferring the state in
         // Bindings, we can reclaim the memory more promptly by teaching Core
         // about SHUT_RD.
         if shut_rd {
@@ -1266,7 +1266,7 @@ impl<I: IpSockAddrExt + IpExt> RequestHandler<'_, I> {
                 respond_not_supported!("stream::GetIpv6MulticastLoopback", responder);
             }
             fposix_socket::StreamSocketRequest::SetIpv6Only { value, responder } => {
-                // TODO(https://fxbug.dev/21198): support dual-stack sockets.
+                // TODO(https://fxbug.dev/42095034): support dual-stack sockets.
                 responder
                     .send(
                         match I::VERSION {
@@ -1669,7 +1669,7 @@ mod tests {
 
     #[test]
     fn send_buffer_resize_empties_zircon_socket() {
-        // Regression test for https://fxbug.dev/119242.
+        // Regression test for https://fxbug.dev/42070294.
         let (local, peer) = zx::Socket::create_stream();
         let notifier = NeedsDataNotifier::default();
         let mut sbuf = SendBufferWithZirconSocket::new(
@@ -1687,7 +1687,7 @@ mod tests {
 
     #[test]
     fn send_buffer_resize_down_capacity() {
-        // Regression test for https://fxbug.dev/121449.
+        // Regression test for https://fxbug.dev/42072481.
         let (local, peer) = zx::Socket::create_stream();
         let notifier = NeedsDataNotifier::default();
         let mut sbuf = SendBufferWithZirconSocket::new(

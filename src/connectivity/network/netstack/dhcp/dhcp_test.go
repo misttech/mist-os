@@ -1298,7 +1298,7 @@ func TestRetransmissionTimeoutWithUnexpectedPackets(t *testing.T) {
 }
 
 func TestClientDropsIrrelevantFrames(t *testing.T) {
-	// TODO(https://fxbug.dev/79556): Extend this test to cover the stat tracking frames discarded
+	// TODO(https://fxbug.dev/42159805): Extend this test to cover the stat tracking frames discarded
 	// due to an invalid PacketType.
 	for _, tc := range []struct {
 		clientPort     uint16

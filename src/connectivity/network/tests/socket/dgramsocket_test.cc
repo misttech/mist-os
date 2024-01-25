@@ -1108,7 +1108,7 @@ TEST_P(DatagramSendTest, DatagramSend) {
   // platforms that this test runs on will assign a port that will not
   // "underflow" when subtracting by 1 (as the port is always at least 1).
   // Previously, we added by 1 and this resulted in a test flake on Fuchsia
-  // (gVisor netstack-based). See https://fxbug.dev/84431 for more details.
+  // (gVisor netstack-based). See https://fxbug.dev/42165219 for more details.
   //
   // [1]:
   // https://github.com/google/gvisor/blob/570ca571805d6939c4c24b6a88660eefaf558ae7/pkg/tcpip/ports/ports.go#L242
@@ -1886,7 +1886,7 @@ TEST_P(IOSendingZeroBytesMethodTest, ZeroLengthPayload) {
   }
   EXPECT_EQ(io_method.ExecuteIO(connected().get(), data, 0), 0) << strerror(errno);
 
-  // TODO(https://fxbug.dev/103497): Match Linux behavior when calling `writev` with zero length
+  // TODO(https://fxbug.dev/42054549): Match Linux behavior when calling `writev` with zero length
   // payloads.
   if (!kIsFuchsia && io_method.Op() == IOMethod::Op::WRITEV) {
     ASSERT_NO_FATAL_FAILURE(ExpectNoPollin(bound().get()));
@@ -2016,7 +2016,7 @@ TEST_P(VectorizedIOSendingZeroBytesMethodTest, ZeroLengthPayload) {
 
   EXPECT_EQ(io_method.ExecuteIO(connected().get(), iov_ptr, iov_size), 0) << strerror(errno);
 
-  // TODO(https://fxbug.dev/103497): Match Linux behavior when calling `writev` with zero length
+  // TODO(https://fxbug.dev/42054549): Match Linux behavior when calling `writev` with zero length
   // payloads.
   if (!kIsFuchsia && io_method.Op() == VectorizedIOMethod::Op::WRITEV) {
     ASSERT_NO_FATAL_FAILURE(ExpectNoPollin(bound().get()));
@@ -2251,7 +2251,7 @@ TEST_P(NetDatagramSocketsCmsgRecvTest, TruncatedMessageMinimumValidSize) {
   char control[sizeof(cmsghdr)];
   ASSERT_NO_FATAL_FAILURE(SendAndCheckReceivedMessage(control, sizeof(cmsghdr), [](msghdr& msghdr) {
     if (kIsFuchsia) {
-      // TODO(https://fxbug.dev/86146): Add support for truncated control messages (MSG_CTRUNC).
+      // TODO(https://fxbug.dev/42167124): Add support for truncated control messages (MSG_CTRUNC).
       EXPECT_EQ(msghdr.msg_controllen, 0u);
       EXPECT_EQ(CMSG_FIRSTHDR(&msghdr), nullptr);
     } else {
@@ -2273,7 +2273,7 @@ TEST_P(NetDatagramSocketsCmsgRecvTest, TruncatedMessageByOneByte) {
   ASSERT_NO_FATAL_FAILURE(
       SendAndCheckReceivedMessage(control, socklen_t(sizeof(control)), [&](msghdr& msghdr) {
         if (kIsFuchsia) {
-          // TODO(https://fxbug.dev/86146): Add support for truncated control messages (MSG_CTRUNC).
+          // TODO(https://fxbug.dev/42167124): Add support for truncated control messages (MSG_CTRUNC).
           EXPECT_EQ(msghdr.msg_controllen, 0u);
           EXPECT_EQ(CMSG_FIRSTHDR(&msghdr), nullptr);
         } else {
@@ -2890,7 +2890,7 @@ TEST_P(NetDatagramSocketsCmsgIpTosTest, SendCmsg) {
         uint8_t recv_tos;
         memcpy(&recv_tos, CMSG_DATA(cmsg), sizeof(recv_tos));
         if (kIsFuchsia) {
-          // TODO(https://fxbug.dev/21106): Support sending SOL_IP -> IP_TOS control message.
+          // TODO(https://fxbug.dev/42094933): Support sending SOL_IP -> IP_TOS control message.
           constexpr uint8_t kDefaultTOS = 0;
           EXPECT_EQ(recv_tos, kDefaultTOS);
         } else {
@@ -3944,7 +3944,7 @@ TEST_P(DatagramLinearizedSendSemanticsTest, Ipv6Only) {
   if (GetParam().Get() != AF_INET6) {
     GTEST_SKIP() << "IPV6_V6ONLY can only be used on AF_INET6 sockets.";
   }
-  // TODO(https://fxbug.dev/96108): Remove this test after setting IPV6_V6ONLY after bind is
+  // TODO(https://fxbug.dev/42178189): Remove this test after setting IPV6_V6ONLY after bind is
   // disallowed on Fuchsia.
   if (!kIsFuchsia) {
     GTEST_SKIP() << "Linux does not support setting IPV6_V6ONLY after a socket has been bound.";
@@ -3958,7 +3958,7 @@ TEST_P(DatagramCachedSendSemanticsTest, Ipv6Only) {
   if (GetParam().Get() != AF_INET6) {
     GTEST_SKIP() << "IPV6_V6ONLY can only be used on AF_INET6 sockets.";
   }
-  // TODO(https://fxbug.dev/96108): Remove this test after setting IPV6_V6ONLY after bind is
+  // TODO(https://fxbug.dev/42178189): Remove this test after setting IPV6_V6ONLY after bind is
   // disallowed on Fuchsia.
   if (!kIsFuchsia) {
     GTEST_SKIP() << "Linux does not support setting IPV6_V6ONLY after a socket has been bound.";

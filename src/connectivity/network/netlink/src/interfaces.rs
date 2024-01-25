@@ -813,9 +813,7 @@ impl<H: InterfacesHandler, S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMess
         // NB: Only check if their is a change after verifying the provided
         // interface is valid. This is for conformance with Linux which will
         // return ENODEV for invalid devices, even if no-change was requested.
-        let Some(enable) = enable else {
-            return Ok(None)
-        };
+        let Some(enable) = enable else { return Ok(None) };
 
         let control = self.get_interface_control(id).ok_or(RequestError::UnrecognizedInterface)?;
 
@@ -879,7 +877,7 @@ impl<H: InterfacesHandler, S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMess
             .add_address(
                 &mut address.into_ext(),
                 fnet_interfaces_admin::AddressParameters {
-                    // TODO(https://fxbug.dev/123319): Update how we add subnet
+                    // TODO(https://fxbug.dev/42074223): Update how we add subnet
                     // routes for addresses.
                     add_subnet_route: Some(add_subnet_route),
                     ..fnet_interfaces_admin::AddressParameters::default()

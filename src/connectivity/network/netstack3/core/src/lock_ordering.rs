@@ -253,7 +253,7 @@ impl_lock_after!(AllDeviceSockets => AnyDeviceSockets);
 impl_lock_after!(AnyDeviceSockets => DeviceLayerState);
 impl_lock_after!(DeviceLayerState => EthernetDeviceIpState<Ipv4>);
 
-// TODO(https://fxbug.dev/120973): Double-check that locking IPv4 ethernet state
+// TODO(https://fxbug.dev/42072024): Double-check that locking IPv4 ethernet state
 // before IPv6 is correct and won't interfere with dual-stack sockets.
 impl_lock_after!(EthernetDeviceIpState<Ipv4> => IpDeviceGmp<Ipv4>);
 impl_lock_after!(IpDeviceGmp<Ipv4> => IpDeviceAddresses<Ipv4>);

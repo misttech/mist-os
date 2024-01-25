@@ -1410,7 +1410,7 @@ fn add_slaac_addr_sub<BC: SlaacBindingsContext<CC::DeviceId>, CC: SlaacContext<B
                 SlaacConfig::Static { valid_until },
                 // Generate the global address as defined by RFC 4862 section 5.5.3.d.
                 //
-                // TODO(https://fxbug.dev/95946): Support regenerating address.
+                // TODO(https://fxbug.dev/42178008): Support regenerating address.
                 either::Either::Left(core::iter::once(generate_global_static_address(
                     &subnet,
                     &iid[..],
@@ -1557,7 +1557,7 @@ fn add_slaac_addr_sub<BC: SlaacBindingsContext<CC::DeviceId>, CC: SlaacContext<B
             }
         };
 
-        // TODO(https://fxbug.dev/91301): Should bindings be the one to actually
+        // TODO(https://fxbug.dev/42172850): Should bindings be the one to actually
         // assign the address to maintain a "single source of truth"?
         let res = slaac_addrs.add_addr_sub_and_then(
             bindings_ctx,
@@ -1640,7 +1640,7 @@ fn add_slaac_addr_sub<BC: SlaacBindingsContext<CC::DeviceId>, CC: SlaacContext<B
 
                 // Try the next address.
                 //
-                // TODO(https://fxbug.dev/100003): Limit number of attempts.
+                // TODO(https://fxbug.dev/42050670): Limit number of attempts.
                 slaac_addrs.increment(|counters| &counters.generated_slaac_addr_exists);
             }
             Ok(addr_sub) => {

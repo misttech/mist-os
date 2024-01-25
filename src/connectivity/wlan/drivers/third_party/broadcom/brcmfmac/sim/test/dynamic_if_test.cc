@@ -282,7 +282,7 @@ TEST_F(DynamicIfTest, CreateDestroy) {
   EXPECT_EQ(DeviceCountByProtocolId(ZX_PROTOCOL_WLAN_FULLMAC_IMPL), 0u);
 }
 
-// https://fxbug.dev/78738 resulted because of a race created by the invokation of the event handler prior
+// https://fxbug.dev/42158897 resulted because of a race created by the invokation of the event handler prior
 // to handling of the armed check based interface removal. In this test, we use a fake event handler
 // to validate that the handler is invoked after all BRCMF_E_IF_DEL related handling is complete.
 TEST_F(DynamicIfTest, EventHandlingOnSoftAPDel) {

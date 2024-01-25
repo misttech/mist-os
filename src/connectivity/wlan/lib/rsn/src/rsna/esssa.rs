@@ -215,7 +215,7 @@ impl EssSa {
 
     /// This function will not succeed unless called on a new Esssa or one that was reset.
     pub fn initiate(&mut self, update_sink: &mut UpdateSink) -> Result<(), Error> {
-        // TODO(https://fxbug.dev/69388): Ptksa starts in Initialized when the EssSa
+        // TODO(https://fxbug.dev/42148516): Ptksa starts in Initialized when the EssSa
         // computes the PMKSA from a PSK. When an EssSa is not initialized with a PSK,
         // Ptksa start in Uninitialized since the PMKSA cannot be computed. For example,
         // when using SAE for authentication, Ptksa starts in Uninitialized.
@@ -400,7 +400,7 @@ impl EssSa {
                 // Always install keys immediately to avoid race conditions after the eapol
                 // exchange completes. This is a particular issue for WPA1, where we may miss
                 // the first PTK-encrypted frame of the group key handshake.
-                // TODO(https://fxbug.dev/100315): Preemptively requesting the key to be set before
+                // TODO(https://fxbug.dev/42051016): Preemptively requesting the key to be set before
                 //                         receiving eapol confirm may not be necessary.
                 update_sink.push(update);
             } else if let Some(updates_awaiting_confirm) = &mut self.updates_awaiting_confirm {
@@ -1058,7 +1058,7 @@ mod tests {
     // (1) the Supplicant derives the same PTK for the replayed message, and
     // (2) the Supplicant is reusing the nonce from its previous message,
     // (3) the Supplicant only reports a PTK if the 4-Way Handshake was completed successfully.
-    // Regression test for: https://fxbug.dev/29713
+    // Regression test for: https://fxbug.dev/42104495
     #[test]
     fn test_replayed_msg1_ptk_installation_same_anonces() {
         let mut supplicant = test_util::get_wpa2_supplicant();

@@ -457,7 +457,7 @@ async fn acquire_with_dhcpd_bound_device<SERVER: Netstack, CLIENT: NetstackAndDh
     .await;
 }
 
-// Regression test for https://fxbug.dev/131152.
+// Regression test for https://fxbug.dev/42081372.
 #[netstack_test]
 async fn does_not_crash_with_overlapping_subnet_route<
     SERVER: Netstack,
@@ -1079,7 +1079,7 @@ fn param_name(param: &fidl_fuchsia_net_dhcp::Parameter) -> fidl_fuchsia_net_dhcp
     }
 }
 
-// This test guards against regression for the issue found in https://fxbug.dev/62989. The test
+// This test guards against regression for the issue found in https://fxbug.dev/42141442. The test
 // attempts to create an inconsistent state on the dhcp server by allowing the server to complete a
 // transaction with a client, thereby creating a record of a lease. The server is then restarted;
 // if the linked issue has not been fixed, then the server will inadvertently erase its

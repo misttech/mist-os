@@ -7,7 +7,7 @@
 // proxy.
 {
     expose: [
-        // TODO(https://fxbug.dev/125773): Remove once DHCP client is used by
+        // TODO(https://fxbug.dev/42076541): Remove once DHCP client is used by
         // both netstacks and is moved into the network realm.
         {
             protocol: "fuchsia.net.dhcp.ClientProvider",

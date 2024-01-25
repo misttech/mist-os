@@ -46,7 +46,7 @@ impl Authenticator for MockAuthenticator {
         _update_sink: &mut UpdateSink,
         _result: EapolResultCode,
     ) -> Result<(), Error> {
-        //TODO(https://fxbug.dev/68454): Implement when functional.
+        //TODO(https://fxbug.dev/42147479): Implement when functional.
         Ok(())
     }
 }

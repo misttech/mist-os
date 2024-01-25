@@ -77,7 +77,7 @@ pub(crate) struct Config {
 #[derive(Debug)]
 struct Dictionary(HashMap<String, Box<fdata::DictionaryValue>>);
 
-// NB(https://fxbug.dev/96211): `fuchsia.data/Dictionary` is produced from a
+// NB(https://fxbug.dev/42178304): `fuchsia.data/Dictionary` is produced from a
 // restricted subset of JSON that appears in parts of the component manifest,
 // such as the `program` section. As a result, there are some undesirable
 // properties of the `Dictionary` type that arise from its JSON source. For

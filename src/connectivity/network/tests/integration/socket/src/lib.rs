@@ -1738,7 +1738,7 @@ async fn tcp_buffer_size<I: net_types::ip::Ip + TestIpExt, N: Netstack>(
 
 #[netstack_test]
 async fn decrease_tcp_sendbuf_size<I: net_types::ip::Ip + TestIpExt, N: Netstack>(name: &str) {
-    // This is a regression test for https://fxbug.dev/121878. With Netstack3,
+    // This is a regression test for https://fxbug.dev/42072897. With Netstack3,
     // if a TCP socket had a full send buffer and a decrease of the send buffer
     // size was requested, the new size would not take effect immediately as
     // expected.  Instead, the apparent size (visible via POSIX `getsockopt`
@@ -2390,7 +2390,7 @@ async fn udp_sendto_unroutable_leaves_socket_bound<N: Netstack>(name: &str) {
     assert_eq!(
         send_result,
         Err(Some(if N::VERSION == NetstackVersion::Netstack3 {
-            // TODO(https://fxbug.dev/100939): Figure out what code is expected
+            // TODO(https://fxbug.dev/42051708): Figure out what code is expected
             // here and make Netstack2 and Netstack3 return codes consistent.
             fposix::Errno::Enetunreach
         } else {
@@ -3134,7 +3134,7 @@ async fn tcp_connect_to_remote_with_zone<N: Netstack>(name: &str) {
             ()
         }
         NetstackVersion::Netstack3 | NetstackVersion::ProdNetstack3 => {
-            // TODO(https://fxbug.dev/100759): Re-enable this once Netstack3
+            // TODO(https://fxbug.dev/42051508): Re-enable this once Netstack3
             // supports fallible device access.
             return;
         }
@@ -3188,7 +3188,7 @@ enum ProtocolWithZirconSocket {
 #[test_case(ProtocolWithZirconSocket::Tcp)]
 #[test_case(ProtocolWithZirconSocket::FastUdp)]
 async fn zx_socket_rights<N: Netstack>(name: &str, protocol: ProtocolWithZirconSocket) {
-    // TODO(https://fxbug.dev/99905): Remove this test when Fast UDP is
+    // TODO(https://fxbug.dev/42182397): Remove this test when Fast UDP is
     // supported by Netstack3.
     if matches!(N::VERSION, NetstackVersion::Netstack3 | NetstackVersion::ProdNetstack3)
         && protocol == ProtocolWithZirconSocket::FastUdp
@@ -3399,7 +3399,7 @@ async fn tcp_icmp_error_v4<N: Netstack>(name: &str, code: Icmpv4DestUnreachableC
 #[netstack_test]
 #[test_case(Icmpv6DestUnreachableCode::NoRoute => libc::ENETUNREACH)]
 #[test_case(Icmpv6DestUnreachableCode::PortUnreachable => libc::ECONNREFUSED)]
-// TODO(https://fxbug.dev/125901): Test against all possible codes once we can
+// TODO(https://fxbug.dev/42076684): Test against all possible codes once we can
 // timeout in handshake states.
 async fn tcp_icmp_error_v6<N: Netstack>(name: &str, code: Icmpv6DestUnreachableCode) -> i32 {
     let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");

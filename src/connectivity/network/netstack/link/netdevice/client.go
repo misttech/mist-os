@@ -212,7 +212,7 @@ func (p *Port) WritePackets(pkts stack.PacketBufferList) (int, tcpip.Error) {
 func (p *Port) WriteRawPacket(pkt stack.PacketBufferPtr) tcpip.Error {
 	var pkts stack.PacketBufferList
 	pkts.PushBack(pkt)
-	// TODO(https://fxbug.dev/86725): Frame type detection may not work for implementing
+	// TODO(https://fxbug.dev/42167767): Frame type detection may not work for implementing
 	// packet sockets.
 	_, err := p.client.write(p.portInfo.Id, pkts)
 	return err
@@ -477,7 +477,7 @@ func (*Port) GSOMaxSize() uint32 {
 
 // SupportedGSO implements stack.GSOEndpoint.
 func (*Port) SupportedGSO() stack.SupportedGSO {
-	// TODO(https://fxbug.dev/76010): expose hardware offloading capabilities.
+	// TODO(https://fxbug.dev/42155868): expose hardware offloading capabilities.
 	return stack.GvisorGSOSupported
 }
 

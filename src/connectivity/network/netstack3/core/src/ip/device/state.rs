@@ -287,7 +287,7 @@ pub struct IpDeviceAddresses<Instant: crate::Instant, I: Ip + IpDeviceStateIpExt
     addrs: Vec<PrimaryRc<I::AssignedAddress<Instant>>>,
 }
 
-// TODO(https://fxbug.dev/84871): Once we figure out what invariants we want to
+// TODO(https://fxbug.dev/42165707): Once we figure out what invariants we want to
 // hold regarding the set of IP addresses assigned to a device, ensure that all
 // of the methods on `IpDeviceAddresses` uphold those invariants.
 impl<Instant: crate::Instant, I: IpDeviceStateIpExt> IpDeviceAddresses<Instant, I> {
@@ -858,7 +858,7 @@ pub struct Ipv6AddressState<Instant> {
 }
 
 /// Data associated with an IPv6 address on an interface.
-// TODO(https://fxbug.dev/91753): Should this be generalized for loopback?
+// TODO(https://fxbug.dev/42173351): Should this be generalized for loopback?
 #[derive(Debug)]
 pub struct Ipv6AddressEntry<Instant> {
     pub(crate) addr_sub: AddrSubnet<Ipv6Addr, Ipv6DeviceAddr>,

@@ -1871,7 +1871,7 @@ async fn device_control_closes_on_device_close<N: Netstack>(name: &str) {
         watcher.try_next().await.expect("watcher error").expect("watcher ended uexpectedly");
 }
 
-// TODO(https://fxbug.dev/110470) Remove this trait once the source of the
+// TODO(https://fxbug.dev/42061838) Remove this trait once the source of the
 // timeout-induced-flake has been identified.
 /// A wrapper for a [`futures::future::Future`] that panics if the future has
 /// not resolved within [`ASYNC_EVENT_POSITIVE_CHECK_TIME`].
@@ -2783,7 +2783,7 @@ impl IpForwarding {
             }
         }
         match N::VERSION {
-            // TODO(https://fxbug.dev/124237): Implement multicast forwarding in Netstack3.
+            // TODO(https://fxbug.dev/42075111): Implement multicast forwarding in Netstack3.
             NetstackVersion::Netstack3 => IpForwarding {
                 v4: false_if_none(self.v4),
                 v4_multicast: None,

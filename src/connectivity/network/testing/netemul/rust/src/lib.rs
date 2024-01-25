@@ -566,7 +566,7 @@ impl<'a> TestRealm<'a> {
         Ok(())
     }
 
-    // TODO(https://fxbug.dev/88245): Remove this function when pinging only
+    // TODO(https://fxbug.dev/42169456): Remove this function when pinging only
     // once is free from NUD-related issues and is guaranteed to succeed.
     /// Sends ICMP echo requests to `addr` on a 1-second interval until a response
     /// is received.

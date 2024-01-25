@@ -121,7 +121,7 @@ where
     ) -> Result<(), (B, TransportReceiveError)> {
         let remote_ip = match SpecifiedAddr::new(remote_ip.into()) {
             None => {
-                // TODO(https://fxbug.dev/101993): Increment the counter.
+                // TODO(https://fxbug.dev/42052879): Increment the counter.
                 trace!("tcp: source address unspecified, dropping the packet");
                 return Ok(());
             }
@@ -130,7 +130,7 @@ where
         let remote_ip: SocketIpAddr<_> = match remote_ip.try_into() {
             Ok(remote_ip) => remote_ip,
             Err(AddrIsMappedError {}) => {
-                // TODO(https://fxbug.dev/101993): Increment the counter.
+                // TODO(https://fxbug.dev/42052879): Increment the counter.
                 trace!("tcp: source address is mapped (ipv4-mapped-ipv6), dropping the packet");
                 return Ok(());
             }
@@ -138,7 +138,7 @@ where
         let local_ip: SocketIpAddr<_> = match local_ip.try_into() {
             Ok(local_ip) => local_ip,
             Err(AddrIsMappedError {}) => {
-                // TODO(https://fxbug.dev/101993): Increment the counter.
+                // TODO(https://fxbug.dev/42052879): Increment the counter.
                 trace!("tcp: local address is mapped (ipv4-mapped-ipv6), dropping the packet");
                 return Ok(());
             }
@@ -148,7 +148,7 @@ where
         {
             Ok(packet) => packet,
             Err(err) => {
-                // TODO(https://fxbug.dev/101993): Increment the counter.
+                // TODO(https://fxbug.dev/42052879): Increment the counter.
                 trace!("tcp: failed parsing incoming packet {:?}", err);
                 return Ok(());
             }
@@ -158,7 +158,7 @@ where
         let incoming = match Segment::try_from(packet) {
             Ok(segment) => segment,
             Err(err) => {
-                // TODO(https://fxbug.dev/101993): Increment the counter.
+                // TODO(https://fxbug.dev/42052879): Increment the counter.
                 trace!("tcp: malformed segment {:?}", err);
                 return Ok(());
             }
@@ -351,7 +351,7 @@ fn handle_incoming_packet<I, BC, CC>(
             ) {
                 Ok(()) => {}
                 Err((err, DefaultSendOptions)) => {
-                    // TODO(https://fxbug.dev/101993): Increment the counter.
+                    // TODO(https://fxbug.dev/42052879): Increment the counter.
                     trace!("cannot construct an ip socket to respond RST: {:?}, ignoring", err);
                 }
             }
@@ -384,7 +384,7 @@ where
             AddrVec::Listen(listener_addr) => {
                 // If we have a listener and the incoming segment is a SYN, we
                 // allocate a new connection entry in the demuxer.
-                // TODO(https://fxbug.dev/101992): Support SYN cookies.
+                // TODO(https://fxbug.dev/42052878): Support SYN cookies.
 
                 socketmap
                     .listeners()
@@ -587,7 +587,7 @@ where
             expiry: _,
         }) = state
         {
-            // TODO(https://fxbug.dev/136316): Enable reusing TIME-WAIT when we
+            // TODO(https://fxbug.dev/42085913): Enable reusing TIME-WAIT when we
             // have dual stack listeners.
             if !incoming.seq.before(*last_ack) && SockI::VERSION == WireI::VERSION {
                 return ConnectionIncomingSegmentDisposition::ReuseCandidateForListener;
@@ -661,7 +661,7 @@ where
         match core_ctx.send_ip_packet(bindings_ctx, &ip_sock, body, None) {
             Ok(()) => {}
             Err((body, err)) => {
-                // TODO(https://fxbug.dev/101993): Increment the counter.
+                // TODO(https://fxbug.dev/42052879): Increment the counter.
                 trace!("tcp: failed to send ip packet {:?}: {:?}", body, err)
             }
         }
@@ -730,7 +730,7 @@ where
     // reuse the connection in TIME-WAIT, this is because we need to store the
     // reused connection in the accept queue so we have to respect its limit.
     if accept_queue.len() == backlog.get() {
-        // TODO(https://fxbug.dev/101993): Increment the counter.
+        // TODO(https://fxbug.dev/42052879): Increment the counter.
         trace!("incoming SYN dropped because of the full backlog of the listener");
         return ListenerIncomingSegmentDisposition::FoundSocket;
     }
@@ -756,7 +756,7 @@ where
     ) {
         Ok(ip_sock) => ip_sock,
         Err(err) => {
-            // TODO(https://fxbug.dev/101993): Increment the counter.
+            // TODO(https://fxbug.dev/42052879): Increment the counter.
             trace!("cannot construct an ip socket to the SYN originator: {:?}, ignoring", err);
             return ListenerIncomingSegmentDisposition::NoMatchingSocket;
         }
@@ -863,7 +863,7 @@ where
                 (I::into_demux_socket_id(id), primary)
             }) {
                 Ok((entry, primary)) => {
-                    // TODO(https://fxbug.dev/136316): This is safe because we
+                    // TODO(https://fxbug.dev/42085913): This is safe because we
                     // don't have dual stack listeners yet. So any connection
                     // passively created must be in the current stack.
                     let id = assert_matches!(
@@ -912,7 +912,7 @@ where
         match core_ctx.send_ip_packet(bindings_ctx, &ip_sock, body, None) {
             Ok(()) => {}
             Err((body, err)) => {
-                // TODO(https://fxbug.dev/101993): Increment the counter.
+                // TODO(https://fxbug.dev/42052879): Increment the counter.
                 trace!("tcp: failed to send ip packet {:?}: {:?}", body, err)
             }
         }

@@ -566,7 +566,7 @@ fn handle_packet<
 // [RFC 4861 section 10], to align behavior between IPv4 and IPv6 and simplify
 // testing.
 //
-// TODO(https://fxbug.dev/124960): allow this default to be overridden.
+// TODO(https://fxbug.dev/42075782): allow this default to be overridden.
 //
 // [RFC 4861 section 10]: https://tools.ietf.org/html/rfc4861#section-10
 const DEFAULT_ARP_REQUEST_PERIOD: Duration = crate::ip::device::state::RETRANS_TIMER_DEFAULT.get();

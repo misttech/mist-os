@@ -142,7 +142,7 @@ impl From<IcmpErrorCode> for Option<ConnectionError> {
                     Some(ConnectionError::HostUnreachable)
                 }
             },
-            // TODO(https://fxbug.dev/101806): Map the following ICMP messages.
+            // TODO(https://fxbug.dev/42052672): Map the following ICMP messages.
             IcmpErrorCode::V4(
                 Icmpv4ErrorCode::ParameterProblem(_)
                 | Icmpv4ErrorCode::Redirect(_)
@@ -165,7 +165,7 @@ impl From<IcmpErrorCode> for Option<ConnectionError> {
                 }
                 Icmpv6DestUnreachableCode::RejectRoute => Some(ConnectionError::NetworkUnreachable),
             },
-            // TODO(https://fxbug.dev/101806): Map the following ICMP messages.
+            // TODO(https://fxbug.dev/42052672): Map the following ICMP messages.
             IcmpErrorCode::V6(
                 Icmpv6ErrorCode::PacketTooBig
                 | Icmpv6ErrorCode::ParameterProblem(_)

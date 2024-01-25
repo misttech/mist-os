@@ -263,7 +263,7 @@ fn flags_for_device(info: &DeviceSpecificInfo<'_>) -> psocket::InterfaceFlags {
     };
 
     // Approximate that all interfaces support multicasting.
-    // TODO(https://fxbug.dev/125492): Set this more precisely.
+    // TODO(https://fxbug.dev/42076301): Set this more precisely.
     let multicast = true;
 
     // Note that the interface flags are not all intuitively named. Quotes below

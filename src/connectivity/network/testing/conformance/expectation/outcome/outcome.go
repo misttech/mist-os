@@ -18,7 +18,7 @@ const (
 	// Flaky is a special value that, when used as a test expectation, indicates
 	// that we should accept any outcome as expected. Any expectation marked
 	// as flaky should have an accompanying bug.
-	// TODO(https://fxbug.dev/98306): Align how flaky test cases are handled with
+	// TODO(https://fxbug.dev/42180625): Align how flaky test cases are handled with
 	// the rest of Fuchsia tests.
 	Flaky
 )

@@ -122,7 +122,7 @@ void MdnsInterfaceTransceiver::SendMessage(const DnsMessage& message,
   ++messages_sent_;
   bytes_sent_ += packet_size;
 
-  // Host down errors are expected. See https://fxbug.dev/62074.
+  // Host down errors are expected. See https://fxbug.dev/42140430.
   if (result < 0 && errno != EHOSTDOWN && errno != ENETUNREACH) {
     FX_LOGS(ERROR) << "Failed to sendto " << address << " from " << name_ << " (" << address_
                    << "), size " << packet_size << ", " << strerror(errno);

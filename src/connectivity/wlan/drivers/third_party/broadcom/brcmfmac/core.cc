@@ -465,7 +465,7 @@ zx_status_t brcmf_net_attach(struct brcmf_if* ifp, bool rtnl_locked) {
 
 static void brcmf_net_detach(struct net_device* ndev, bool rtnl_locked) {
   // TODO(cphoenix): Make sure devices are removed and memory is freed properly. This code
-  // is probably wrong. See https://fxbug.dev/29675.
+  // is probably wrong. See https://fxbug.dev/42104452.
   brcmf_free_net_device_vif(ndev);
   brcmf_free_net_device(ndev);
 }
@@ -660,7 +660,7 @@ zx_status_t brcmf_bus_started(brcmf_pub* drvr, bool drvr_restarting) {
 
   if (!drvr_restarting) {
     /* Add primary networking interface */
-    // TODO(https://fxbug.dev/29361): Name uniqueness
+    // TODO(https://fxbug.dev/42104104): Name uniqueness
     ret = brcmf_add_if(drvr, 0, 0, kPrimaryNetworkInterfaceName, NULL, &ifp);
     if (ret != ZX_OK) {
       return ret;

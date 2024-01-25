@@ -34,13 +34,13 @@ var tcpHighperfExpectations map[AnvlCaseNumber]outcome.Outcome = map[AnvlCaseNum
 	{3, 27}: Pass,
 	{3, 28}: Pass,
 	{3, 29}: Pass,
-	{3, 30}: Flaky, // TODO(https://fxbug.dev/105201): Fix flake.
+	{3, 30}: Flaky, // TODO(https://fxbug.dev/42056405): Fix flake.
 	{3, 31}: Pass,
 	{3, 32}: Pass,
 	{4, 17}: Fail,
 	{4, 18}: Fail,
 	{4, 19}: Pass,
-	{4, 20}: Flaky, // TODO(https://fxbug.dev/105258): Fix flake.
+	{4, 20}: Flaky, // TODO(https://fxbug.dev/42056467): Fix flake.
 	{5, 18}: Pass,
 	{5, 19}: Pass,
 	{5, 20}: Fail,

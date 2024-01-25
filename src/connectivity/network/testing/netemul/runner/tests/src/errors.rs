@@ -4,7 +4,7 @@
 
 use test_case::test_case;
 
-// TODO(https://fxbug.dev/94623): use a package-local (relative) URL and resolve
+// TODO(https://fxbug.dev/42176539): use a package-local (relative) URL and resolve
 // it to an absolute URL via a service provided by the package resolver, to
 // avoid having to hardcode the package name here.
 fn test_url(component: &str) -> String {

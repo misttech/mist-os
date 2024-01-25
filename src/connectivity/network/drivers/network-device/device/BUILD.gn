@@ -7,7 +7,7 @@ import("//build/test.gni")
 import("//build/testing/perf/test.gni")
 import("//src/connectivity/network/drivers/network-device/ddk_source_split.gni")
 
-# TODO(https://fxbug.dev/75544): Get rid of this target once std::shared_mutex
+# TODO(https://fxbug.dev/42155349): Get rid of this target once std::shared_mutex
 # and std::shared_lock have thread analysis annotations.
 source_set("shared_lock") {
   sources = [ "public/locks.h" ]
@@ -56,7 +56,7 @@ ddk_source_split("device") {
   ddk_deps = [ "//src/connectivity/network/drivers/network-device/mac:mac_ddk" ]
   non_ddk_deps = [ "//src/connectivity/network/drivers/network-device/mac" ]
 
-  # TODO(https://fxbug.dev/94768): This target uses mutable tables which are deprecated,
+  # TODO(https://fxbug.dev/42176699): This target uses mutable tables which are deprecated,
   # rather than builders.
   configs = [ "//build/cpp:fidl-wire-deprecated-mutable-tables" ]
 }
@@ -82,7 +82,7 @@ test("test_bin") {
     "//zircon/system/ulib/sync:sync-cpp",
   ]
 
-  # TODO(https://fxbug.dev/94768): This target uses mutable tables which are deprecated,
+  # TODO(https://fxbug.dev/42176699): This target uses mutable tables which are deprecated,
   # rather than builders.
   configs += [ "//build/cpp:fidl-wire-deprecated-mutable-tables" ]
 }
@@ -111,7 +111,7 @@ test("microbenchmarks_bin") {
     "//zircon/system/ulib/perftest",
   ]
 
-  # TODO(https://fxbug.dev/94768): This target uses mutable tables which are deprecated,
+  # TODO(https://fxbug.dev/42176699): This target uses mutable tables which are deprecated,
   # rather than builders.
   configs += [ "//build/cpp:fidl-wire-deprecated-mutable-tables" ]
 }

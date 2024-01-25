@@ -206,8 +206,8 @@ fn test_forwarding_v4(
         iface1_addr: fidl_subnet!("192.168.1.1/24"),
         iface2_addr: fidl_subnet!("192.168.2.1/24"),
         forwarding_config,
-        // TODO(https://fxbug.dev/77901): Use `std_ip_v4!(..).into()`.
-        // TODO(https://fxbug.dev/77965): Use `net_declare` macros to create
+        // TODO(https://fxbug.dev/42157968): Use `std_ip_v4!(..).into()`.
+        // TODO(https://fxbug.dev/42158038): Use `net_declare` macros to create
         // `net_types` addresses.
         src_ip: net_types::ip::Ipv4Addr::new(std_ip_v4!("192.168.1.2").octets()),
         dst_ip: net_types::ip::Ipv4Addr::new(std_ip_v4!("192.168.2.2").octets()),
@@ -223,8 +223,8 @@ fn test_forwarding_v6(
         iface1_addr: fidl_subnet!("a::1/64"),
         iface2_addr: fidl_subnet!("b::1/64"),
         forwarding_config,
-        // TODO(https://fxbug.dev/77901): Use `std_ip_v6!(..).into()`.
-        // TODO(https://fxbug.dev/77965): Use `net_declare` macros to create
+        // TODO(https://fxbug.dev/42157968): Use `std_ip_v6!(..).into()`.
+        // TODO(https://fxbug.dev/42158038): Use `net_declare` macros to create
         // `net_types` addresses.
         src_ip: net_types::ip::Ipv6Addr::from_bytes(std_ip_v6!("a::2").octets()),
         dst_ip: net_types::ip::Ipv6Addr::from_bytes(std_ip_v6!("b::2").octets()),

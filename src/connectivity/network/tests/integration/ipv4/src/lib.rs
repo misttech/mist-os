@@ -264,7 +264,7 @@ async fn sends_igmp_reports<N: Netstack>(
                     return None;
                 }
 
-                // TODO(https://fxbug.dev/98534): Don't send IGMP reports before a local address
+                // TODO(https://fxbug.dev/42180878): Don't send IGMP reports before a local address
                 // is assigned.
                 if N::VERSION != NetstackVersion::Netstack3 {
                     assert_eq!(

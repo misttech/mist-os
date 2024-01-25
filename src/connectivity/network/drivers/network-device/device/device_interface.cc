@@ -428,7 +428,7 @@ void DeviceInterface::NetworkDeviceIfcCompleteTx(const tx_result_t* tx_list, siz
 }
 
 void DeviceInterface::NetworkDeviceIfcSnoop(const rx_buffer_t* rx_list, size_t rx_count) {
-  // TODO(https://fxbug.dev/43028): Implement real version. Current implementation acts as if no LISTEN is
+  // TODO(https://fxbug.dev/42119287): Implement real version. Current implementation acts as if no LISTEN is
   // ever in place.
 }
 

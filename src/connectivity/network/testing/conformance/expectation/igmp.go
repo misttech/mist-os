@@ -16,7 +16,7 @@ var igmpExpectations map[AnvlCaseNumber]outcome.Outcome = map[AnvlCaseNumber]out
 	{3, 1}:  Pass,
 	{3, 4}:  Pass,
 	{3, 5}:  Pass,
-	// TODO(https://fxbug.dev/104720): Investigate flake.
+	// TODO(https://fxbug.dev/42055899): Investigate flake.
 	{3, 6}: Flaky,
 	{3, 7}: Pass,
 	{5, 1}: Pass,
@@ -26,7 +26,7 @@ var igmpExpectations map[AnvlCaseNumber]outcome.Outcome = map[AnvlCaseNumber]out
 	{5, 7}: Pass,
 	{5, 8}: Fail,
 	{5, 9}: Fail,
-	// TODO(https://fxbug.dev/118202): Fix.
+	// TODO(https://fxbug.dev/42069359): Fix.
 	{5, 11}: Fail,
 	{6, 2}:  Pass,
 	{6, 8}:  Pass,
@@ -40,7 +40,7 @@ var igmpExpectationsNS3 map[AnvlCaseNumber]outcome.Outcome = map[AnvlCaseNumber]
 	{3, 1}:  Pass,
 	{3, 4}:  Pass,
 	{3, 5}:  Pass,
-	// TODO(https://fxbug.dev/104720): Investigate flake.
+	// TODO(https://fxbug.dev/42055899): Investigate flake.
 	{3, 6}: Flaky,
 	{3, 7}: Pass,
 	{5, 1}: Pass,
@@ -50,7 +50,7 @@ var igmpExpectationsNS3 map[AnvlCaseNumber]outcome.Outcome = map[AnvlCaseNumber]
 	{5, 7}: Pass,
 	{5, 8}: Fail,
 	{5, 9}: Pass,
-	// TODO(https://fxbug.dev/118202): Fix.
+	// TODO(https://fxbug.dev/42069359): Fix.
 	{5, 11}: Flaky,
 	{6, 2}:  Pass,
 	{6, 8}:  Pass,

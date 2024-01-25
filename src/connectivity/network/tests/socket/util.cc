@@ -70,7 +70,7 @@ void TxCapacity(int fd, size_t& out_capacity) {
 
 #if defined(__Fuchsia__)
   zx_info_socket_t zx_socket_info;
-  // TODO(https://fxbug.dev/60337): We can avoid this additional space once zircon sockets are
+  // TODO(https://fxbug.dev/42138506): We can avoid this additional space once zircon sockets are
   // not artificially increasing the buffer sizes.
   if (sock_type == SOCK_STREAM) {
     ASSERT_NO_FATAL_FAILURE(ZxSocketInfoStream(fd, zx_socket_info));
@@ -97,7 +97,7 @@ void RxCapacity(int fd, size_t& out_capacity) {
 
 #if defined(__Fuchsia__)
   zx_info_socket_t zx_socket_info;
-  // TODO(https://fxbug.dev/60337): We can avoid this additional space once zircon sockets are
+  // TODO(https://fxbug.dev/42138506): We can avoid this additional space once zircon sockets are
   // not artificially increasing the buffer sizes.
   if (sock_type == SOCK_STREAM) {
     ASSERT_NO_FATAL_FAILURE(ZxSocketInfoStream(fd, zx_socket_info));
@@ -157,7 +157,7 @@ void fill_stream_send_buf(int fd, int peer_fd, ssize_t* out_bytes_written) {
     // We'll arbitrarily select a larger size which will allow us to fill both zircon sockets
     // faster.
     //
-    // TODO(https://fxbug.dev/60337): We can use the minimum buffer size once zircon sockets are not
+    // TODO(https://fxbug.dev/42138506): We can use the minimum buffer size once zircon sockets are not
     // artificially increasing the buffer sizes.
     constexpr int bufsize = 64 << 10;
 #else
@@ -435,7 +435,7 @@ void DoNullPtrIO(const fbl::unique_fd& fd, const fbl::unique_fd& other, IOMethod
         case IOMethod::Op::SENDMSG: {
           // Fuchsia doesn't comply because zircon sockets do not implement atomic vector
           // operations, so these vector operations end up having sent the byte provided in the
-          // ExecuteIO closure. See https://fxbug.dev/67928 for more details.
+          // ExecuteIO closure. See https://fxbug.dev/42146896 for more details.
           //
           // Wait for the packet to arrive since we are nonblocking.
           pollfd pfd = {

@@ -18,7 +18,7 @@
 //! [`Result`]: core::result::Result
 //! [`Try`]: crate::event::Try
 
-// TODO(https://fxbug.dev/128398): Implement this in terms of the standard `core::ops::Try` and related
+// TODO(https://fxbug.dev/42078844): Implement this in terms of the standard `core::ops::Try` and related
 //                         traits when they stabilize. Simplify (and eventually remove) this module
 //                         when those APIs can be used instead. Note that `core::ops::Try` is
 //                         already be implemented for `Option` and `Result`, so `core::ops::Try`

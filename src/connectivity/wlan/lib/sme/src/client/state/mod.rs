@@ -41,7 +41,7 @@ use {
     wlan_statemachine::*,
 };
 /// Timeout for the MLME connect op, which consists of Join, Auth, and Assoc steps.
-/// TODO(https://fxbug.dev/99620): Consider having a single overall connect timeout that is
+/// TODO(https://fxbug.dev/42182084): Consider having a single overall connect timeout that is
 ///                        managed by SME and also includes the EstablishRsna step.
 const DEFAULT_JOIN_AUTH_ASSOC_FAILURE_TIMEOUT: u32 = 60; // beacon intervals
 /// Maximum number of association attempts we will make without achieving a
@@ -84,7 +84,7 @@ pub struct Associated {
     last_signal_report_time: zx::Time,
     link_state: LinkState,
     protection_ie: Option<ProtectionIe>,
-    // TODO(https://fxbug.dev/82654): Remove `wmm_param` field when wlanstack telemetry is deprecated.
+    // TODO(https://fxbug.dev/42163244): Remove `wmm_param` field when wlanstack telemetry is deprecated.
     wmm_param: Option<ie::WmmParam>,
     last_channel_switch_time: Option<zx::Time>,
     reassociation_loop_count: u32,
@@ -911,7 +911,7 @@ impl ClientState {
                     state.into()
                 }
                 MlmeEvent::RoamConf { resp } => {
-                    warn!("Roaming is an experimental feature that can place wlanfullmac in an unrecoverable state: https://fxbug.dev/120899.");
+                    warn!("Roaming is an experimental feature that can place wlanfullmac in an unrecoverable state: https://fxbug.dev/42071941.");
                     if resp.result_code != fidl_ieee80211::StatusCode::Success {
                         error!("Roaming failed! Client will not reconnect until AP deauthenticates or disassociates: {:?}", resp);
                     }

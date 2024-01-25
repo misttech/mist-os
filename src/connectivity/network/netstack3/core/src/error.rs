@@ -101,7 +101,7 @@ pub enum LocalAddressError {
 
     /// The address cannot be used because of its zone.
     ///
-    /// TODO(https://fxbug.dev/103426): Make this an IP socket error once UDP
+    /// TODO(https://fxbug.dev/42054471): Make this an IP socket error once UDP
     /// sockets contain IP sockets.
     #[error("{}", _0)]
     Zone(#[from] ZonedAddressError),

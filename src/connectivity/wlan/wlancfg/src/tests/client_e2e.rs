@@ -854,7 +854,7 @@ use fidl_sme::Protection as Scanned;
 #[test_case(Saved::Wpa, Scanned::Wpa2PersonalTkipOnly, TEST_CREDS.wpa_pass_min.clone())]
 #[test_case(Saved::Wpa, Scanned::Wpa2PersonalTkipOnly, TEST_CREDS.wpa_pass_max.clone())]
 #[test_case(Saved::Wpa, Scanned::Wpa2PersonalTkipOnly, TEST_CREDS.wpa_psk.clone())]
-// TODO(https://fxbug.dev/85817): reenable credential upgrading
+// TODO(https://fxbug.dev/42166758): reenable credential upgrading
 // #[test_case(Saved::Wpa, Scanned::Wpa2Wpa3Personal, TEST_CREDS.wpa_pass_min.clone())]
 // #[test_case(Saved::Wpa, Scanned::Wpa2Wpa3Personal, TEST_CREDS.wpa_pass_max.clone())]
 // #[test_case(Saved::Wpa, Scanned::Wpa2Wpa3Personal, TEST_CREDS.wpa_psk.clone())]
@@ -897,7 +897,7 @@ fn test_save_and_connect(
     );
 }
 
-// TODO(https://fxbug.dev/85817): reenable credential upgrading, which will make these cases connect
+// TODO(https://fxbug.dev/42166758): reenable credential upgrading, which will make these cases connect
 #[test_case(Saved::Wpa, Scanned::Wpa2Wpa3Personal, TEST_CREDS.wpa_pass_min.clone())]
 #[test_case(Saved::Wpa, Scanned::Wpa2Wpa3Personal, TEST_CREDS.wpa_pass_max.clone())]
 #[test_case(Saved::Wpa, Scanned::Wpa2Wpa3Personal, TEST_CREDS.wpa_psk.clone())]
@@ -1046,7 +1046,7 @@ fn test_save_and_fail_to_connect(
                     },
                     fidl_sme::ScanRequest::Passive(_req) => {
                         // Sometimes, a passive scan sneaks in for the idle interface. Ignore it.
-                        // Context: https://fxbug.dev/115137
+                        // Context: https://fxbug.dev/42066447
                     },
                 }
                 let vmo = write_vmo(mock_scan_results).expect("failed to write VMO");

@@ -110,7 +110,7 @@ fn handle_update_result<I: Ip, BC: PmtuBindingsContext<I>>(
     result: Result<Option<Mtu>, Option<Mtu>>,
     cache_is_empty: bool,
 ) {
-    // TODO(https://fxbug.dev/92599): Do something with this `Result`.
+    // TODO(https://fxbug.dev/42174290): Do something with this `Result`.
     let _: Result<_, _> = result.map(|ret| {
         maybe_schedule_timer(bindings_ctx, cache_is_empty);
         ret

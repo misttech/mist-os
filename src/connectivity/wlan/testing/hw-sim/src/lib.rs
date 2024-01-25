@@ -60,13 +60,13 @@ lazy_static! {
 pub const WLANCFG_DEFAULT_AP_CHANNEL: Channel = Channel { primary: 11, cbw: Cbw::Cbw20 };
 
 lazy_static! {
-    // TODO(https://fxbug.dev/108667): This sleep was introduced to preserve the old timing behavior
+    // TODO(https://fxbug.dev/42060050): This sleep was introduced to preserve the old timing behavior
     // of scanning when hw-sim depending on the SoftMAC driver iterating through all of the
     // channels.
     pub static ref ARTIFICIAL_SCAN_SLEEP: fuchsia_zircon::Duration = 2.seconds();
 
     // Once a client interface is available for scanning, it takes up to around 30s for a scan
-    // to complete (see https://fxbug.dev/109900). Allow at least double that amount of time to reduce
+    // to complete (see https://fxbug.dev/42061276). Allow at least double that amount of time to reduce
     // flakiness and longer than the timeout WLAN policy should have.
     pub static ref SCAN_RESPONSE_TEST_TIMEOUT: fuchsia_zircon::Duration = 70.seconds();
 }
@@ -710,7 +710,7 @@ pub async fn loop_until_iface_is_found(helper: &mut test_utils::TestHelper) {
     // Attempt to issue a scan command until the request succeeds.  Scanning will fail until a
     // client interface is available.  A successful response to a scan request indicates that the
     // client policy layer is ready to use.
-    // TODO(https://fxbug.dev/57415): Figure out a new way to signal that the client policy layer is ready to go.
+    // TODO(https://fxbug.dev/42135259): Figure out a new way to signal that the client policy layer is ready to go.
     let mut retry = test_utils::RetryWithBackoff::infinite_with_max_interval(10.seconds());
     loop {
         let (scan_proxy, server_end) = create_proxy().unwrap();

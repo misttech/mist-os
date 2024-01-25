@@ -171,7 +171,7 @@ do
     # That means test cases expecting pass/failure with error logs will show up
     # as `Skip` when this tool is used.
     #
-    # TODO(https://fxbug.dev/112878): Support listing expects with error logs.
+    # TODO(https://fxbug.dev/42064224): Support listing expects with error logs.
     if [[ $test == *"_errlog" ]]; then
         testname=${component/_errlog_test/_test_no_err_logs}
         expect=$expectations_filename

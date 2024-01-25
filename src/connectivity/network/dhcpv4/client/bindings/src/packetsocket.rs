@@ -20,7 +20,7 @@ fn translate_io_error(e: std::io::Error) -> dhcp_client_core::deps::SocketError 
     use fposix::Errno as E;
     match e.raw_os_error().and_then(fposix::Errno::from_primitive) {
         None => dhcp_client_core::deps::SocketError::Other(e),
-        // TODO(https://fxbug.dev/124593): better indicate recoverable
+        // TODO(https://fxbug.dev/42075434): better indicate recoverable
         // vs. non-recoverable error types.
         Some(errno) => match errno {
             // ============
@@ -188,7 +188,7 @@ fn translate_io_error(e: std::io::Error) -> dhcp_client_core::deps::SocketError 
     }
 }
 
-// TODO(https://fxbug.dev/124913): expose this from `libc` crate on fuchsia.
+// TODO(https://fxbug.dev/42075730): expose this from `libc` crate on fuchsia.
 const ARPHRD_ETHER: libc::c_ushort = 1;
 
 impl dhcp_client_core::deps::Socket<net_types::ethernet::Mac> for PacketSocket {

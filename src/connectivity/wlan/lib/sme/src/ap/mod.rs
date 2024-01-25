@@ -199,7 +199,7 @@ impl ApSme {
                     }
                 };
 
-                // TODO(https://fxbug.dev/28891): Select which rates are mandatory here.
+                // TODO(https://fxbug.dev/42103581): Select which rates are mandatory here.
                 let rates = band_cap.basic_rates.iter().map(|r| SupportedRate(*r)).collect();
 
                 ctx.mlme_sink.send(MlmeRequest::Start(req));
@@ -394,7 +394,7 @@ impl super::Station for ApSme {
                     MlmeEvent::DeauthenticateInd { ind } => {
                         bss.handle_deauth(&ind.peer_sta_address.into())
                     }
-                    // TODO(https://fxbug.dev/37891): This path should never be taken, as the MLME will never send
+                    // TODO(https://fxbug.dev/42113580): This path should never be taken, as the MLME will never send
                     // this. Make sure this is the case.
                     MlmeEvent::DeauthenticateConf { resp } => {
                         bss.handle_deauth(&resp.peer_sta_address.into())
@@ -500,7 +500,7 @@ fn validate_radio_cfg(
     radio_cfg: &RadioConfig,
 ) -> Result<OpRadioConfig, StartResult> {
     let channel = radio_cfg.channel;
-    // TODO(https://fxbug.dev/93171): We shouldn't expect to only start an AP in the US. The regulatory
+    // TODO(https://fxbug.dev/42174927): We shouldn't expect to only start an AP in the US. The regulatory
     // enforcement for the channel should apply at a lower layer.
     if !channel.is_valid_in_us() {
         return Err(StartResult::InvalidArguments(format!("Invalid US channel {}", channel)));
@@ -863,7 +863,7 @@ fn create_start_request(
         capability_info: capabilities.raw(),
         rates: basic_rates.to_vec(),
         country: fidl_mlme::Country {
-            // TODO(https://fxbug.dev/29490): Get config from wlancfg
+            // TODO(https://fxbug.dev/42104247): Get config from wlancfg
             alpha2: ['U' as u8, 'S' as u8],
             suffix: fidl_mlme::COUNTRY_ENVIRON_ALL,
         },

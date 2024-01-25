@@ -291,7 +291,7 @@ pub struct ConnState<WireI: IpExt, SocketI: IpExt, D: Eq + Hash, S: DatagramSock
     /// In that case, when the socket is disconnected, the device should be
     /// cleared since it was set as part of a `connect` call, not explicitly.
     ///
-    /// TODO(https://fxbug.dev/110370): Implement this by changing socket
+    /// TODO(https://fxbug.dev/42061727): Implement this by changing socket
     /// addresses.
     pub(crate) clear_device_on_disconnect: bool,
 
@@ -431,7 +431,7 @@ impl<I: IpExt, D, S: DatagramSocketSpec> IpOptions<I, D, S> {
 #[derive(Copy, Clone, Debug, Default, Eq, PartialEq)]
 pub(crate) struct SocketHopLimits<I: Ip> {
     pub(crate) unicast: Option<NonZeroU8>,
-    // TODO(https://fxbug.dev/108323): Make this an Option<u8> to allow sending
+    // TODO(https://fxbug.dev/42059735): Make this an Option<u8> to allow sending
     // multicast packets destined only for the local machine.
     pub(crate) multicast: Option<NonZeroU8>,
     // An unused marker type signifying the IP version for which these hop
@@ -2363,7 +2363,7 @@ fn listen_inner<
     *entry.get_mut() = SocketState::Bound(BoundSocketState {
         socket_type: BoundSocketStateType::Listener {
             state: ListenerState {
-                // TODO(https://fxbug.dev/131970): Remove this clone().
+                // TODO(https://fxbug.dev/42082099): Remove this clone().
                 ip_options: ip_options.clone(),
                 addr: bound_addr,
             },
@@ -4332,7 +4332,7 @@ where
                 }
             }
         }
-        log_unimplemented!((), "https://fxbug.dev/39479: Implement this by looking up a route");
+        log_unimplemented!((), "https://fxbug.dev/42115343: Implement this by looking up a route");
         Err(SetMulticastMembershipError::NoDeviceAvailable)
     })
 }

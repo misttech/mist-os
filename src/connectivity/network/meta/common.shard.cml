@@ -91,7 +91,7 @@
         {
             protocol: "fuchsia.net.dhcp.ClientProvider",
 
-            // TODO(https://fxbug.dev/125773): Once the DHCP client component is
+            // TODO(https://fxbug.dev/42076541): Once the DHCP client component is
             // being used for all DHCPv4 functionality, make it a child of this
             // realm, route the protocol from there instead of the netstack
             // realm, and mark it here as "required".
@@ -216,11 +216,11 @@
                 "fuchsia.net.stack.Stack",
                 "fuchsia.posix.socket.Provider",
 
-                // TODO(https://fxbug.dev/93579): once product assembly supports product-specific
+                // TODO(https://fxbug.dev/42175379): once product assembly supports product-specific
                 // components running in the network realm, remove this.
                 "fuchsia.posix.socket.raw.Provider",
 
-                // TODO(https://fxbug.dev/110344): make it possible to put this
+                // TODO(https://fxbug.dev/42061698): make it possible to put this
                 // standalone import in its own paragraph without format-code
                 // reflowing the entire list.
                 "fuchsia.update.verify.NetstackVerifier",
@@ -228,7 +228,7 @@
             from: "#netstack",
         },
 
-        // TODO(https://fxbug.dev/111695) Don't expose the Root API once
+        // TODO(https://fxbug.dev/42062982) Don't expose the Root API once
         // Weavestack no longer needs it.
         {
             protocol: [ "fuchsia.net.root.Interfaces" ],

@@ -973,7 +973,7 @@ func (*noopNicRemovedHandler) RemovedNIC(tcpip.NICID) {}
 
 type netstackTestOptions struct {
 	nicRemovedHandler NICRemovedHandler
-	// TODO(https://fxbug.dev/104820): Tests which pass a NDPDispatcher impl
+	// TODO(https://fxbug.dev/42055981): Tests which pass a NDPDispatcher impl
 	// and runs a goroutine should have the goroutine joined in addition to
 	// being cancelled.
 	ndpDisp            ipv6.NDPDispatcher

@@ -169,7 +169,7 @@ impl<BC: IgmpBindingsContext<CC::DeviceId>, CC: IgmpContext<BC>> IgmpPacketHandl
                 return;
             }
             _ => {
-                debug!("TODO(https://fxbug.dev/120293): Support IGMPv3");
+                debug!("TODO(https://fxbug.dev/42071402): Support IGMPv3");
                 return;
             }
         } {

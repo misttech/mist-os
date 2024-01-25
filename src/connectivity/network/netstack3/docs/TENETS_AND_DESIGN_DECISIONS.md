@@ -96,7 +96,7 @@ reference to state (see Patterns below).
 
 The specific details are to be determined. The work to research/experiment and
 then finally migrate Netstack3 to a world where interior-mutability is the norm
-is captured in <https://fxbug.dev/48578>.
+is captured in <https://fxbug.dev/42125450>.
 
 #### Patterns
 ```rust
@@ -316,7 +316,7 @@ Symbol names avoid stuttering, i.e. prefer `udp::Socket` to `udp::UdpSocket`,
 Avoid importing symbols directly, import their parent module instead, i.e.
 prefer `use crate::transport::udp` to `use crate::transport::udp::Socket`.
 
-> TODO(https://fxbug.dev/105636): We've decided to adopt this guidance, but
+> TODO(https://fxbug.dev/42056887): We've decided to adopt this guidance, but
 > defer renaming any symbols for now to focus on more important milestones. We
 > still wish to a world with clearer imports and less stuttering, but the
 > codebase may not reflect this until we decide to flip the switch on existing

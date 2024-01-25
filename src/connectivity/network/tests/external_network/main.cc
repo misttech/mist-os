@@ -49,7 +49,7 @@ TEST(ExternalNetworkTest, ConnectToNonRoutableINET) {
   // EINPROGRESS because a TCP handshake will never be performed (the test is
   // run without network configurations that make the remote routable).
   //
-  // TODO(https://fxbug.dev/46817, https://gvisor.dev/issues/1988): Set errno to the
+  // TODO(https://fxbug.dev/42123494, https://gvisor.dev/issues/1988): Set errno to the
   // same value as linux when a remote is unroutable.
   if (!kIsFuchsia) {
     ASSERT_TRUE(errno == EINPROGRESS || errno == ENETUNREACH) << strerror(errno);
@@ -83,7 +83,7 @@ TEST(ExternalNetworkTest, ConnectToNonRoutableINET6) {
   // EINPROGRESS because a TCP handshake will never be performed (the test is
   // run without network configurations that make the remote routable).
   //
-  // TODO(https://fxbug.dev/46817): Set errno to the same value as linux when a
+  // TODO(https://fxbug.dev/42123494): Set errno to the same value as linux when a
   // remote is unroutable.
   if (!kIsFuchsia) {
     ASSERT_TRUE(errno == EINPROGRESS || errno == ENETUNREACH) << strerror(errno);

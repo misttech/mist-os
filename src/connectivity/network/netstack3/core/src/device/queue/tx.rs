@@ -205,7 +205,7 @@ where
 
         match result {
             EnqueueStatus::NotAttempted((body, meta)) => {
-                // TODO(https://fxbug.dev/127022): Deliver the frame to packet
+                // TODO(https://fxbug.dev/42077654): Deliver the frame to packet
                 // sockets and to the device atomically.
                 deliver_to_device_sockets(self, bindings_ctx, device_id, &body);
 

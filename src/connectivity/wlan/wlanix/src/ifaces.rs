@@ -153,7 +153,7 @@ impl ClientIface for SmeClientIface {
     }
 
     async fn abort_scan(&self) -> Result<(), Error> {
-        // TODO(https://fxbug.dev/128604): Actually pipe this call down to SME.
+        // TODO(https://fxbug.dev/42079074): Actually pipe this call down to SME.
         if let Some(sender) = self.scan_abort_signal.lock().take() {
             sender.send(()).map_err(|_| format_err!("Unable to send scan abort signal"))
         } else {
@@ -252,7 +252,7 @@ impl ClientIface for SmeClientIface {
 }
 
 /// Wait until stream returns an OnConnectResult event or None. Ignore other event types.
-/// TODO(https://fxbug.dev/134895): Function taken from wlancfg. Dedupe later.
+/// TODO(https://fxbug.dev/42084621): Function taken from wlancfg. Dedupe later.
 async fn wait_for_connect_result(
     stream: &mut fidl_sme::ConnectTransactionEventStream,
 ) -> Result<fidl_sme::ConnectResult, Error> {

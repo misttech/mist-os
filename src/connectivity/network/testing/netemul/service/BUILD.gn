@@ -83,7 +83,7 @@ fuchsia_test_component("netemul-sandbox-tests") {
 fuchsia_test_package("netemul-tests") {
   test_components = [ ":netemul-sandbox-tests" ]
   test_specs = {
-    # TODO(https://fxbug.dev/82295): run tests in parallel when this doesn't
+    # TODO(https://fxbug.dev/42162845): run tests in parallel when this doesn't
     # cause embedded archivist to crash.
     parallel = 1
   }

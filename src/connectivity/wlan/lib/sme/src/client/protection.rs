@@ -201,12 +201,12 @@ impl<'a> TryFrom<SecurityContext<'a, SecurityAuthenticator>> for Protection {
                 }
                 wpa::WpaAuthenticator::Wpa2 { authentication, .. } => match authentication {
                     wpa::Authentication::Personal(personal) => context.map(personal).try_into(),
-                    // TODO(https://fxbug.dev/92693): Implement conversions for WPA Enterprise.
+                    // TODO(https://fxbug.dev/42174395): Implement conversions for WPA Enterprise.
                     _ => Err(format_err!("WPA Enterprise is unsupported")),
                 },
                 wpa::WpaAuthenticator::Wpa3 { authentication, .. } => match authentication {
                     wpa::Authentication::Personal(personal) => context.map(personal).try_into(),
-                    // TODO(https://fxbug.dev/92693): Implement conversions for WPA Enterprise.
+                    // TODO(https://fxbug.dev/42174395): Implement conversions for WPA Enterprise.
                     _ => Err(format_err!("WPA Enterprise is unsupported")),
                 },
             },

@@ -600,13 +600,13 @@ func interfaceWatcherEventLoop(
 				syslog.InfoTf(watcherProtocolName, "default route changed event: %s", event)
 
 				properties, ok := propertiesMap[event.nicid]
-				// TODO(https://fxbug.dev/95468): Change to panic once interface properties
+				// TODO(https://fxbug.dev/42177477): Change to panic once interface properties
 				// are guaranteed to not change after an interface is removed.
 				if !ok {
 					_ = syslog.WarnTf(watcherProtocolName, "default route changed event for unknown interface: %#v", event)
 					break
 				}
-				// TODO(https://fxbug.dev/95574): Once these events are only emitted when
+				// TODO(https://fxbug.dev/42177595): Once these events are only emitted when
 				// the presence of a default route has actually changed, panic if the event
 				// disagrees with our view of the world.
 				var changes interfaces.Properties
@@ -630,7 +630,7 @@ func interfaceWatcherEventLoop(
 				syslog.InfoTf(watcherProtocolName, "online changed event: %#v", event)
 
 				properties, ok := propertiesMap[event.nicid]
-				// TODO(https://fxbug.dev/95468): Change to panic once interface properties
+				// TODO(https://fxbug.dev/42177477): Change to panic once interface properties
 				// are guaranteed to not change after an interface is removed.
 				if !ok {
 					_ = syslog.WarnTf(watcherProtocolName, "online changed event for unknown interface: %#v", event)

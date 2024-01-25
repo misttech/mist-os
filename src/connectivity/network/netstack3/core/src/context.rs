@@ -230,7 +230,7 @@ pub trait SendFrameContext<BC, Meta> {
 /// A context that stores counters.
 ///
 /// `CounterContext` exposes access to counters for observation and debugging.
-// TODO(https://fxbug.dev/134635): rename CounterContext once the deprecated
+// TODO(https://fxbug.dev/42084333): rename CounterContext once the deprecated
 // trait of that name is removed.
 pub trait CounterContext<T> {
     /// Call the function with an immutable reference to counter type T.
@@ -996,7 +996,7 @@ pub(crate) mod testutil {
             Id: Debug + Hash + Eq;
     }
 
-    // TODO(https://fxbug.dev/130841): hold lock on `FakeTimerCtx` across entire
+    // TODO(https://fxbug.dev/42081080): hold lock on `FakeTimerCtx` across entire
     // method to avoid potential race conditions.
     impl<Id: Clone, Ctx: WithFakeTimerContext<Id>> FakeTimerCtxExt<Id> for Ctx {
         /// Triggers the next timer, if any, by calling `f` on it.

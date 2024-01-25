@@ -28,7 +28,7 @@
 
 namespace wlan::nxpfmac {
 
-// TODO(https://fxbug.dev/110081): Try to find a better way of determining this value.
+// TODO(https://fxbug.dev/42061478): Try to find a better way of determining this value.
 // This information doesn't seem to be available from mlan anywhere but with insufficient headroom
 // the mlan logs will mention that this is the required value.
 constexpr uint16_t kSdioBusTxHeadroom = 56u;

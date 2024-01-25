@@ -35,7 +35,7 @@ use std::{
     future::Future,
     num::NonZeroU16,
     ops::Deref,
-    // TODO(https://fxbug.dev/125488): Use RC types exported from Core, after
+    // TODO(https://fxbug.dev/42076296): Use RC types exported from Core, after
     // we make sockets reference-backed.
     sync::Arc,
     time::Duration,

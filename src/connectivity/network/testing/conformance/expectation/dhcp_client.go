@@ -71,7 +71,7 @@ var dhcpClientExpectations map[AnvlCaseNumber]outcome.Outcome = map[AnvlCaseNumb
 	{13, 6}:  Pass,
 	{13, 7}:  Pass,
 	{13, 8}:  Pass,
-	// TODO(https://fxbug.dev/123465): Investigate flake.
+	// TODO(https://fxbug.dev/42074385): Investigate flake.
 	{13, 9}:  Flaky,
 	{13, 10}: Inconclusive,
 	{16, 1}:  Pass,

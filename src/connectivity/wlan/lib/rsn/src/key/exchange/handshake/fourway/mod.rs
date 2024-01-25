@@ -240,7 +240,7 @@ impl Config {
         // Check that the supplicant protection is a subset of the authenticator protection.
         match (&s_protection, &a_protection) {
             (ProtectionInfo::Rsne(s_rsne), ProtectionInfo::Rsne(a_rsne)) => {
-                // TODO(https://fxbug.dev/29786): Replace with ? syntax when
+                // TODO(https://fxbug.dev/42104575): Replace with ? syntax when
                 // NegotiatedProtection::from_protection no longer returns
                 // anyhow::Error.
                 match s_rsne.is_valid_subset_of(a_rsne) {
@@ -251,16 +251,16 @@ impl Config {
                     Err(e) => return Err(e.into()),
                 };
             }
-            // TODO(https://fxbug.dev/70414): Check if the ProtectionInfo::LegacyWpa is a
+            // TODO(https://fxbug.dev/42149656): Check if the ProtectionInfo::LegacyWpa is a
             // subset or superset of the other ProtectionInfo
             (_, ProtectionInfo::LegacyWpa(_)) => {}
             (ProtectionInfo::LegacyWpa(_), _) => {}
         }
 
-        // TODO(https://fxbug.dev/29786): Replace with ? syntax when
+        // TODO(https://fxbug.dev/42104575): Replace with ? syntax when
         // NegotiatedProtection::from_protection no longer returns
         // anyhow::Error.
-        // TODO(https://fxbug.dev/70417): NegotiatedProtection should take into
+        // TODO(https://fxbug.dev/42149659): NegotiatedProtection should take into
         // account a_protection since the use of management frame
         // protection cannot be determined from s_protection alone.
         match NegotiatedProtection::from_protection(&s_protection) {
@@ -274,7 +274,7 @@ impl Config {
         if role == Role::Authenticator {
             rsn_ensure!(gtk_provider.is_some(), Error::MissingGtkProvider);
 
-            // TODO(https://fxbug.dev/70417): NegotiatedProtection should have a group_mgmt_cipher
+            // TODO(https://fxbug.dev/42149659): NegotiatedProtection should have a group_mgmt_cipher
             // associated function instead.
             match get_group_mgmt_cipher(&s_protection, &a_protection)? {
                 Some(group_mgmt_cipher) => match igtk_provider.as_ref() {

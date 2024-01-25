@@ -24,7 +24,7 @@ fuchsia_component("component") {
   deps = [ ":bin" ]
 }
 
-# TODO(https://fxbug.dev/117883): delete this once Fast UDP is the default and
+# TODO(https://fxbug.dev/42069075): delete this once Fast UDP is the default and
 # this is no longer used.
 fuchsia_component("component-with-fast-udp") {
   testonly = true
@@ -33,7 +33,7 @@ fuchsia_component("component-with-fast-udp") {
   deps = [ ":bin" ]
 }
 
-# TODO(https://fxbug.dev/117883): delete this once Fast UDP is the default and
+# TODO(https://fxbug.dev/42069075): delete this once Fast UDP is the default and
 # this is no longer used.
 fuchsia_component("component-with-fast-udp-tracing") {
   testonly = true
@@ -57,7 +57,7 @@ fuchsia_component("component-debug") {
   deps = [ ":bin_with_deadlock_detection" ]
 }
 
-# TODO(https://fxbug.dev/117883): consider removing this once there is a plan to
+# TODO(https://fxbug.dev/42069075): consider removing this once there is a plan to
 # maintain test coverage of the netstack's implementation of synchronous UDP.
 fuchsia_component("component-with-sync-udp-debug") {
   testonly = true
@@ -66,7 +66,7 @@ fuchsia_component("component-with-sync-udp-debug") {
   deps = [ ":bin_with_deadlock_detection" ]
 }
 
-# TODO(https://fxbug.dev/117883): delete this once Fast UDP is the default and
+# TODO(https://fxbug.dev/42069075): delete this once Fast UDP is the default and
 # this is no longer used.
 fuchsia_component("component-with-fast-udp-debug") {
   testonly = true

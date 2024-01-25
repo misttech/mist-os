@@ -1200,7 +1200,7 @@ async fn test_watcher_race<N: Netstack>(name: &str) {
     }
 }
 
-// TODO(https://fxbug.dev/107338): Run this against netstack3 when it
+// TODO(https://fxbug.dev/42058712): Run this against netstack3 when it
 // hides IPv6 addresses on offline interfaces from clients of
 // fuchsia.net.interfaces/Watcher.
 #[netstack_test]
@@ -1314,7 +1314,7 @@ async fn addresses_while_offline<N: Netstack>(
     .expect("failed to wait for address to be present");
 }
 
-// TODO(https://fxbug.dev/112627): Split this test up.
+// TODO(https://fxbug.dev/42063946): Split this test up.
 /// Test interface changes are reported through the interface watcher.
 #[netstack_test]
 async fn watcher<N: Netstack>(name: &str) {
@@ -1486,7 +1486,7 @@ async fn watcher<N: Netstack>(name: &str) {
         });
         futures::future::ready(match addresses {
             Some(addresses) if addresses.len() == LL_ADDR_COUNT => {
-                // TODO(https://fxbug.dev/105039): Make the assertion true
+                // TODO(https://fxbug.dev/42056224): Make the assertion true
                 // regardless of whether DAD is enabled or not, and assert
                 // this through this test or perhaps a separate test.
                 if !online_changed {

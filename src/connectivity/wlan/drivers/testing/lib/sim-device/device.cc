@@ -168,7 +168,7 @@ zx_status_t FakeDevMgr::DeviceAdd(zx_device_t* parent, device_add_args_t* args, 
   DBG_PRT("%s: Added SIM device. proto %d # devices: %lu Handle: %p\n", __func__,
           args ? args->proto_id : 0, devices_.size(), out ? *out : nullptr);
 
-  // TODO(https://fxbug.dev/76420) - Add async support for Init()
+  // TODO(https://fxbug.dev/42156323) - Add async support for Init()
   if (args && args->ops && args->ops->init) {
     init_thread_id_ = std::this_thread::get_id();
     ZX_DEBUG_ASSERT(init_state_ == DdkCallState::kIdle);
@@ -261,7 +261,7 @@ void FakeDevMgr::DeviceAsyncRemove(zx_device_t* device) {
     unbind_state_ = DdkCallState::kCallPending;
     return;
   }
-  // TODO(https://fxbug.dev/76420) - Add async support for DeviceUnbind()
+  // TODO(https://fxbug.dev/42156323) - Add async support for DeviceUnbind()
   DeviceUnbind(device);
 }
 

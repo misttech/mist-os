@@ -514,7 +514,7 @@ pub fn make_handshake(
     }
 }
 
-// TODO(https://fxbug.dev/70332): The expect_* functions that follow should be refactored with a macro.
+// TODO(https://fxbug.dev/42149565): The expect_* functions that follow should be refactored with a macro.
 
 pub fn get_eapol_resp(updates: &[SecAssocUpdate]) -> Option<eapol::KeyFrameBuf> {
     updates

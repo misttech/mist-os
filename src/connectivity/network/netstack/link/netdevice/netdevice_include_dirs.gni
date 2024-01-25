@@ -14,7 +14,7 @@
 #   include_dirs = netdevice_include_dirs
 # }
 #
-# TODO(https://fxbug.dev/90500): public_configs doesn't work with go_library.
+# TODO(https://fxbug.dev/42171960): public_configs doesn't work with go_library.
 
 netdevice_include_dirs =
     [ rebase_path("//src/connectivity/lib/network-device/buffer_descriptor") ]

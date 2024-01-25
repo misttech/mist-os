@@ -125,7 +125,7 @@ async fn connects_to_stack(netstack_version: fnet_migration::NetstackVersion) {
             .await
             .expect("listing existing interfaces");
 
-            // TODO(https://fxbug.dev/125773): Remove these checks once both
+            // TODO(https://fxbug.dev/42076541): Remove these checks once both
             // stacks use DHCP client. Netstack3 must serve the DHCP client
             // through itself to comply with netstack-proxy.
             let client_provider = realm

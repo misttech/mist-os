@@ -22,7 +22,7 @@
 
 namespace wlan {
 
-// TODO(https://fxbug.dev/28866): Some of this file's definition are inconsistent in its naming
+// TODO(https://fxbug.dev/42103553): Some of this file's definition are inconsistent in its naming
 // and should not represent a frame.
 
 // wlan_tu_t is an 802.11 Time Unit.
@@ -260,7 +260,7 @@ struct MgmtFrameHeader {
   }
 
  private:
-  // TODO(https://fxbug.dev/29316): Dangerous as this cast is undefined and should not be used.
+  // TODO(https://fxbug.dev/42104054): Dangerous as this cast is undefined and should not be used.
   const uint8_t* raw() const { return reinterpret_cast<const uint8_t*>(this); }
 
 } __PACKED;

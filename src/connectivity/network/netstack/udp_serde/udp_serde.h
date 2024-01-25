@@ -17,7 +17,7 @@
 // This library is highly customized for the needs of its two users (Netstack
 // and fdio) and should not be relied upon by anyone else.
 
-// TODO(https://fxbug.dev/97607): Consider replacing this library with FIDL-at-rest.
+// TODO(https://fxbug.dev/42179854): Consider replacing this library with FIDL-at-rest.
 
 #ifdef __cplusplus
 extern "C" {
@@ -145,7 +145,7 @@ typedef enum SerializeSendMsgMetaError {
 // describing the reason for the failure.
 //
 // This method is only intended to be used in tests.
-// TODO(https://fxbug.dev/107864): Isolate testonly methods.
+// TODO(https://fxbug.dev/42059260): Isolate testonly methods.
 UDP_SERDE_EXPORT SerializeSendMsgMetaError serialize_send_msg_meta(const SendMsgMeta* meta_,
                                                                    ConstBuffer addr,
                                                                    Buffer out_buf);
@@ -175,7 +175,7 @@ typedef struct DeserializeRecvMsgMetaResult {
 // describing the reason for the failure.
 //
 // This method is only intended to be used in tests.
-// TODO(https://fxbug.dev/107864): Isolate testonly methods.
+// TODO(https://fxbug.dev/42059260): Isolate testonly methods.
 UDP_SERDE_EXPORT DeserializeRecvMsgMetaResult deserialize_recv_msg_meta(Buffer buf);
 
 // The length of the prelude bytes in a Tx message.

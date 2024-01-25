@@ -1083,14 +1083,14 @@ impl IpExt for Ipv6 {
     const FIDL_IP_VERSION: fidl_net::IpVersion = fidl_net::IpVersion::V6;
 }
 
-// TODO(https://fxbug.dev/135211): Use ip_test when it supports async.
+// TODO(https://fxbug.dev/42084902): Use ip_test when it supports async.
 #[fixture::teardown(TestSetup::shutdown)]
 #[fasync::run_singlethreaded(test)]
 async fn add_remove_neighbor_entry_v4() {
     add_remove_neighbor_entry::<Ipv4>().await
 }
 
-// TODO(https://fxbug.dev/135211): Use ip_test when it supports async.
+// TODO(https://fxbug.dev/42084902): Use ip_test when it supports async.
 #[fixture::teardown(TestSetup::shutdown)]
 #[fasync::run_singlethreaded(test)]
 async fn add_remove_neighbor_entry_v6() {
@@ -1150,14 +1150,14 @@ async fn add_remove_neighbor_entry<I: Ip + IpExt>() -> TestSetup {
     t
 }
 
-// TODO(https://fxbug.dev/135211): Use ip_test when it supports async.
+// TODO(https://fxbug.dev/42084902): Use ip_test when it supports async.
 #[fixture::teardown(TestSetup::shutdown)]
 #[fasync::run_singlethreaded(test)]
 async fn remove_dynamic_neighbor_entry_v4() {
     remove_dynamic_neighbor_entry::<Ipv4>().await
 }
 
-// TODO(https://fxbug.dev/135211): Use ip_test when it supports async.
+// TODO(https://fxbug.dev/42084902): Use ip_test when it supports async.
 #[fixture::teardown(TestSetup::shutdown)]
 #[fasync::run_singlethreaded(test)]
 async fn remove_dynamic_neighbor_entry_v6() {

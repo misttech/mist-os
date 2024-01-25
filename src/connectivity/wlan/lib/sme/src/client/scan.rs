@@ -238,7 +238,7 @@ fn new_scan_request(
         txn_id: mlme_txn_id,
         scan_type: fidl_mlme::ScanTypes::Passive,
         probe_delay: 0,
-        // TODO(https://fxbug.dev/88658): SME silently ignores unsupported channels
+        // TODO(https://fxbug.dev/42169913): SME silently ignores unsupported channels
         channel_list: get_channels_to_scan(
             &device_info,
             spectrum_management_support,
@@ -276,7 +276,7 @@ fn new_discovery_scan_request<T>(
     )
 }
 
-// TODO(https://fxbug.dev/88658): SME silently ignores unsupported channels
+// TODO(https://fxbug.dev/42169913): SME silently ignores unsupported channels
 /// Get channels to scan depending on device's capability and scan type. If scan type is passive,
 /// or if scan type is active but the device handles DFS channels, then the channels returned by
 /// this function are the intersection of device's supported channels and Fuchsia supported
@@ -647,7 +647,7 @@ mod tests {
             10,
             fidl_sme::ScanRequest::Active(fidl_sme::ActiveScanRequest {
                 ssids: vec![ssid1.clone(), ssid2.clone()],
-                // TODO(https://fxbug.dev/88658): SME silently ignores unsupported channels
+                // TODO(https://fxbug.dev/42169913): SME silently ignores unsupported channels
                 channels: vec![1, 20, 100],
             }),
         );

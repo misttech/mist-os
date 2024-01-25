@@ -894,7 +894,7 @@ struct DeviceConfig {
 #[derive(Clone, Default)]
 pub struct FakeEventDispatcherBuilder {
     devices: Vec<DeviceConfig>,
-    // TODO(https://fxbug.dev/134098): Use NeighborAddr when available.
+    // TODO(https://fxbug.dev/42083952): Use NeighborAddr when available.
     arp_table_entries: Vec<(usize, SpecifiedAddr<Ipv4Addr>, UnicastAddr<Mac>)>,
     ndp_table_entries: Vec<(usize, UnicastAddr<Ipv6Addr>, UnicastAddr<Mac>)>,
     // usize refers to index into devices Vec.
@@ -1033,7 +1033,7 @@ impl FakeEventDispatcherBuilder {
     pub(crate) fn add_arp_table_entry(
         &mut self,
         device: usize,
-        // TODO(https://fxbug.dev/134098): Use NeighborAddr when available.
+        // TODO(https://fxbug.dev/42083952): Use NeighborAddr when available.
         ip: SpecifiedAddr<Ipv4Addr>,
         mac: UnicastAddr<Mac>,
     ) {
@@ -1045,7 +1045,7 @@ impl FakeEventDispatcherBuilder {
     pub(crate) fn add_ndp_table_entry(
         &mut self,
         device: usize,
-        // TODO(https://fxbug.dev/134098): Use NeighborAddr when available.
+        // TODO(https://fxbug.dev/42083952): Use NeighborAddr when available.
         ip: UnicastAddr<Ipv6Addr>,
         mac: UnicastAddr<Mac>,
     ) {
@@ -1162,7 +1162,7 @@ impl FakeEventDispatcherBuilder {
 pub(crate) fn add_arp_or_ndp_table_entry<A: IpAddress>(
     builder: &mut FakeEventDispatcherBuilder,
     device: usize,
-    // TODO(https://fxbug.dev/134098): Use NeighborAddr when available.
+    // TODO(https://fxbug.dev/42083952): Use NeighborAddr when available.
     ip: SpecifiedAddr<A>,
     mac: UnicastAddr<Mac>,
 ) {

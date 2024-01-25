@@ -246,7 +246,7 @@ pub fn convert_associate_indication(
 ) -> fidl_mlme::AssociateIndication {
     fidl_mlme::AssociateIndication {
         peer_sta_address: ind.peer_sta_address,
-        // TODO(https://fxbug.dev/117108): Fix the discrepancy between WlanFullmacAssocInd and
+        // TODO(https://fxbug.dev/42068281): Fix the discrepancy between WlanFullmacAssocInd and
         // fidl_mlme::AssociateIndication
         capability_info: 0,
         listen_interval: ind.listen_interval,
@@ -462,10 +462,10 @@ pub fn convert_device_info(
             _ => bail!("Invalid WLAN MAC role {}", info.role.0),
         },
         bands,
-        // TODO(https://fxbug.dev/88315): This field will be replaced in the new driver features
+        // TODO(https://fxbug.dev/42169534): This field will be replaced in the new driver features
         // framework.
         softmac_hardware_capability: 0,
-        // TODO(https://fxbug.dev/43938): This field is stubbed out for future use.
+        // TODO(https://fxbug.dev/42120297): This field is stubbed out for future use.
         qos_capable: false,
     })
 }
@@ -536,7 +536,7 @@ fn convert_hist_scope_and_antenna_id(
 pub fn convert_iface_histogram_stats(
     stats: banjo_wlan_fullmac::WlanFullmacIfaceHistogramStats,
 ) -> fidl_stats::IfaceHistogramStats {
-    // TODO(https://fxbug.dev/117109): DRY these with macros
+    // TODO(https://fxbug.dev/42068282): DRY these with macros
     let original_noise_floor_histograms = unsafe {
         std::slice::from_raw_parts(
             stats.noise_floor_histograms_list,

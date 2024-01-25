@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-// TODO(https://fxbug.dev/49875): rewrite this test in Rust.
+// TODO(https://fxbug.dev/42126891): rewrite this test in Rust.
 
 #include <fuchsia/net/interfaces/cpp/fidl.h>
 #include <fuchsia/netemul/sync/cpp/fidl.h>

@@ -469,7 +469,7 @@ async fn echo_reply_streams(
     configs: Vec<InterfaceConfig>,
     echo_notifier: mpsc::UnboundedSender<()>,
 ) {
-    // TODO(https://fxbug.dev/119965): Combine configs with the NetemulInterface struct
+    // TODO(https://fxbug.dev/42071036): Combine configs with the NetemulInterface struct
     let stream = interfaces
         .iter()
         .zip(configs.iter())
@@ -599,7 +599,7 @@ async fn test_state<N: Netstack>(
     futures::pin_mut!(echo_reply_streams);
     let () = accelerate_fake_clock(&env.fake_clock).await;
 
-    // TODO(https://fxbug.dev/65585): Get reachability monitor's reachability state over FIDL rather
+    // TODO(https://fxbug.dev/42144302): Get reachability monitor's reachability state over FIDL rather
     // than the inspect data. Watching for updates to inspect data is currently not supported, so
     // poll instead.
     const INSPECT_COMPONENT: &str = "reachability";

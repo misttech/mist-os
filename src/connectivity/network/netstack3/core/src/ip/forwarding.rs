@@ -283,7 +283,7 @@ pub(crate) mod testutil {
     /// `subnet`, including routes that consider `subnet` on-link for some device
     /// and routes that require packets destined to a node within `subnet` to be
     /// routed through some next-hop node.
-    // TODO(https://fxbug.dev/126729): Unify this with other route removal methods.
+    // TODO(https://fxbug.dev/42077399): Unify this with other route removal methods.
     pub(crate) fn del_routes_to_subnet<
         I: IpLayerIpExt,
         BC: IpLayerBindingsContext<I, CC::DeviceId>,

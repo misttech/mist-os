@@ -509,7 +509,7 @@ impl<S: SocketMapStateSpec> SocketId<S> {
     const CONNECTION_VARIANT: usize = 0;
 }
 
-// TODO(https://fxbug.dev/126141): Remove this when it is no longer used for
+// TODO(https://fxbug.dev/42076891): Remove this when it is no longer used for
 // TCP socket lookup.
 impl<S: SocketMapStateSpec> DenseMapCollectionKey for SocketId<S>
 where
@@ -1374,7 +1374,7 @@ mod tests {
 
     #[test]
     fn try_insert_with_callback_not_called_on_error() {
-        // TODO(https://fxbug.dev/126141): remove this test along with
+        // TODO(https://fxbug.dev/42076891): remove this test along with
         // try_insert_with.
         set_logger_for_test();
         let mut bound = FakeBoundSocketMap::default();

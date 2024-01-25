@@ -20,7 +20,7 @@ fuchsia_component("component") {
   manifest = "meta/network-default.cml"
 }
 
-# TODO(https://fxbug.dev/85450): use subassembly-based product assembly to
+# TODO(https://fxbug.dev/42166351): use subassembly-based product assembly to
 # assemble the network realm from shards depending on the product, rather than
 # creating two separate component manifests and relying on include shards to
 # reduce duplication.
@@ -38,7 +38,7 @@ group("for_transition") {
 # don't care between Netstack 2 and 3. These tests currently use NS2,
 # which is unavailable on RISC-V. Instead, use NS3 there. Once NS3 is
 # widely deployed, this group can be deleted.
-# TODO(https://fxbug.dev/133188): Define a package here instead of a group, then
+# TODO(https://fxbug.dev/42083163): Define a package here instead of a group, then
 # use it as a subpackage within the tests that need it.
 group("netstack-for-tests") {
   deps = [ "netstack:component" ]
@@ -71,7 +71,7 @@ fuchsia_package("netstack2") {
 network_unified_binary_regular_and_gub_packages("netstack3") {
   package_name = "netstack3"
   gub_deps = [
-    # TODO(https://fxbug.dev/125773): Move this component out of this package
+    # TODO(https://fxbug.dev/42076541): Move this component out of this package
     # and into the network package once both Netstack2 and Netstack3 are using
     # the component for all DHCPv4 functionality.
     "dhcpv4/client/bindings:component",
@@ -94,7 +94,7 @@ network_unified_binary_regular_and_gub_packages("netstack-migration") {
   ]
 }
 
-# TODO(https://fxbug.dev/122864) Remove transitional labels
+# TODO(https://fxbug.dev/42073789) Remove transitional labels
 group("virtualization-core-shard") {
 }
 

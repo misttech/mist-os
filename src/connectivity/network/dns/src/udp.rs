@@ -26,7 +26,7 @@ impl udp::UdpSocket for DnsUdpSocket {
     async fn connect_with_bind(_addr: SocketAddr, bind_addr: SocketAddr) -> io::Result<Self> {
         let socket = Self::bind(bind_addr).await?;
 
-        // TODO(https://fxbug.dev/108817): Consider calling connect on the
+        // TODO(https://fxbug.dev/42060217): Consider calling connect on the
         // socket. Doing so isn't strictly necessary and is disabled within the
         // provided Trust-DNS implementations. As a result, the same behavior is
         // currently implemented here. See

@@ -43,7 +43,7 @@ class FakeAp final : public StationIfc {
     std::array<uint8_t, kMaxKeyLen> key;
     enum SimSecProtoType sec_type = SEC_PROTO_TYPE_OPEN;
 
-    // TODO(https://fxbug.dev/61139): Remove this field which is currently used to
+    // TODO(https://fxbug.dev/42139397): Remove this field which is currently used to
     // determine success or failure of a simulated authentication
     // out of band.
     bool expect_challenge_failure = false;

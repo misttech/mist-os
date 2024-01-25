@@ -107,7 +107,7 @@ t_s32 moal_memcmp(t_void *pmoal, const t_void *pmem1, const t_void *pmem2, t_u32
 void moal_udelay(t_void *pmoal, t_u32 delay) { zx_nanosleep(zx_deadline_after(ZX_USEC(delay))); }
 
 void moal_usleep_range(t_void *pmoal, t_u32 min_delay, t_u32 max_delay) {
-  // TODO(https://fxbug.dev/106939): Investigate need for timer slack here. Unfortunately we can't specify
+  // TODO(https://fxbug.dev/42058268): Investigate need for timer slack here. Unfortunately we can't specify
   // slack for a single call to zx_nanosleep, it would have to be applied to the entire job. Another
   // option would be to create a timer with a specific slack for this. For now just sleep.
   uint64_t halfway = (static_cast<uint64_t>(min_delay) + static_cast<uint64_t>(max_delay)) / 2;
@@ -398,7 +398,7 @@ void populate_callbacks(mlan_device *mlan_dev) {
   mlan_dev->callbacks.moal_recv_complete = &moal_recv_complete;
   mlan_dev->callbacks.moal_recv_packet = &moal_recv_packet;
 
-  // TODO(https://fxbug.dev/110577): Implement support for ASMDU packet delivery. By not providing
+  // TODO(https://fxbug.dev/42061956): Implement support for ASMDU packet delivery. By not providing
   // this callback we let mlan handle ASMDU packets for now. It will deaggregate them into multiple
   // single packet deliveries.
   // mlan_dev->callbacks.moal_recv_amsdu_packet = &moal_recv_amsdu_packet;

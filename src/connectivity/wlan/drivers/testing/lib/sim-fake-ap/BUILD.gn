@@ -15,6 +15,6 @@ static_library("sim-fake-ap") {
     "//src/connectivity/wlan/drivers/testing/lib/sim-env",
   ]
 
-  # TODO(https://fxbug.dev/58162): delete the below and fix compiler warnings
+  # TODO(https://fxbug.dev/42136089): delete the below and fix compiler warnings
   configs += [ "//build/config:Wno-conversion" ]
 }

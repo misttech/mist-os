@@ -703,7 +703,7 @@ func TestFilterUpdates(t *testing.T) {
 			v6Table: defaultV6Table,
 		},
 		{
-			// TODO(https://fxbug.dev/68501): Keep state is not supported.
+			// TODO(https://fxbug.dev/42147532): Keep state is not supported.
 			name: "keep state",
 			rules: []filter.Rule{
 				{

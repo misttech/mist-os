@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-// TODO(https://fxbug.dev/29887): Deny this lint once this code is exercised by the client state machine.
-//                        See `Associated::on_block_ack_frame` and https://fxbug.dev/98298.
+// TODO(https://fxbug.dev/42104687): Deny this lint once this code is exercised by the client state machine.
+//                        See `Associated::on_block_ack_frame` and https://fxbug.dev/42180615.
 #![allow(dead_code)]
 
 //! BlockAck API and state.
@@ -31,8 +31,8 @@ pub const ADDBA_REQ_FRAME_LEN: usize = frame_len!(mac::MgmtHdr, mac::ActionHdr, 
 pub const ADDBA_RESP_FRAME_LEN: usize = frame_len!(mac::MgmtHdr, mac::ActionHdr, mac::AddbaRespHdr);
 pub const DELBA_FRAME_LEN: usize = frame_len!(mac::MgmtHdr, mac::ActionHdr, mac::DelbaHdr);
 
-// TODO(https://fxbug.dev/29887): Determine a better value.
-// TODO(https://fxbug.dev/29325): Implement QoS policy engine. See the following parts of the specification:
+// TODO(https://fxbug.dev/42104687): Determine a better value.
+// TODO(https://fxbug.dev/42104064): Implement QoS policy engine. See the following parts of the specification:
 //
 //              - IEEE Std 802.11-2016, 3.1 (Traffic Identifier)
 //              - IEEE Std 802.11-2016, 5.1.1.1 (Data Service - General)
@@ -42,7 +42,7 @@ pub const DELBA_FRAME_LEN: usize = frame_len!(mac::MgmtHdr, mac::ActionHdr, mac:
 //              A TID is from [0, 15] and is assigned to an MSDU in the layers above the MAC. [0,
 //              7] identify Traffic Categories (TCs) and [8, 15] identify parameterized TCs.
 const BLOCK_ACK_BUFFER_SIZE: u16 = 64;
-const BLOCK_ACK_TID: u16 = 0; // TODO(https://fxbug.dev/29325): Implement QoS policy engine.
+const BLOCK_ACK_TID: u16 = 0; // TODO(https://fxbug.dev/42104064): Implement QoS policy engine.
 
 /// BlockAck transmitter.
 ///
@@ -91,7 +91,7 @@ pub struct Established {
     pub is_initiator: bool,
 }
 
-// TODO(https://fxbug.dev/29887): BlockAck should be closed if the TID expires before BlockAck or QoS frames are
+// TODO(https://fxbug.dev/42104687): BlockAck should be closed if the TID expires before BlockAck or QoS frames are
 //              received. The state machine must be driven by a timing mechanism to ensure that
 //              this happens. See IEEE Std 802.11-2016, 10.24.5.
 statemachine!(
@@ -118,12 +118,12 @@ impl BlockAckState {
     /// order to await an affirmative ADDBA response frame from that peer.
     ///
     /// See IEEE Std 802.11-2016, 10.24.2.
-    #[allow(dead_code)] // TODO(https://fxbug.dev/29887): Establish BlockAck sessions to increase throughput.
+    #[allow(dead_code)] // TODO(https://fxbug.dev/42104687): Establish BlockAck sessions to increase throughput.
     pub fn establish(self, tx: &mut impl BlockAckTx) -> Self {
         match self {
             BlockAckState::Closed(state) => {
-                // TODO(https://fxbug.dev/29887): Examine `CapabilityInfo` of the remote peer.
-                // TODO(https://fxbug.dev/29887): It appears there is no particular rule to choose the value for
+                // TODO(https://fxbug.dev/42104687): Examine `CapabilityInfo` of the remote peer.
+                // TODO(https://fxbug.dev/42104687): It appears there is no particular rule to choose the value for
                 //              `dialog_token`. Persist the dialog token for the BlockAck session
                 //              and find a proven way to generate tokens. See IEEE Std 802.11-2016,
                 //              9.6.5.2.
@@ -150,7 +150,7 @@ impl BlockAckState {
     /// Only initiator peers should attempt to explicitly close BlockAck sessions.
     ///
     /// See IEEE Std 802.11-2016, 10.24.5.
-    #[allow(dead_code)] // TODO(https://fxbug.dev/29887): Implement the datagrams and transmission of DELBA frames.
+    #[allow(dead_code)] // TODO(https://fxbug.dev/42104687): Implement the datagrams and transmission of DELBA frames.
     pub fn close(self, tx: &mut impl BlockAckTx, reason_code: mac::ReasonCode) -> Self {
         // This aggressively transitions to the `Closed` state. DELBA frames do not require an
         // exchange (as ADDBA frames do). Note that per IEEE Std 802.11-2016, 10.24.5, only the
@@ -245,7 +245,7 @@ impl BlockAckState {
             },
             BlockAckState::Established(state) => match action {
                 mac::BlockAckAction::DELBA => {
-                    // TODO(https://fxbug.dev/29887): Examine the DELBA frame as needed.  This is necessary for GCR
+                    // TODO(https://fxbug.dev/42104687): Examine the DELBA frame as needed.  This is necessary for GCR
                     //              modes, for example.
                     if let Err(error) = read_delba_hdr(body) {
                         error!("error processing DELBA frame: {}", error);
@@ -276,10 +276,10 @@ pub fn write_addba_req_body<B: Appendable>(
             .with_policy(mac::BlockAckPolicy::IMMEDIATE)
             .with_tid(BLOCK_ACK_TID)
             .with_buffer_size(BLOCK_ACK_BUFFER_SIZE),
-        timeout: 0, // TODO(https://fxbug.dev/29887): No timeout. Determine a better value.
+        timeout: 0, // TODO(https://fxbug.dev/42104687): No timeout. Determine a better value.
         starting_sequence_control: mac::BlockAckStartingSequenceControl(0)
             .with_fragment_number(0) // Always zero. See IEEE Std 802.11-2016, 9.6.5.2.
-            .with_starting_sequence_number(1), // TODO(https://fxbug.dev/29887): Determine a better value.
+            .with_starting_sequence_number(1), // TODO(https://fxbug.dev/42104687): Determine a better value.
     };
     write_frame_with_dynamic_buf!(
         buffer,
@@ -313,7 +313,7 @@ pub fn write_addba_resp_body<B: Appendable>(
             .with_policy(mac::BlockAckPolicy::IMMEDIATE)
             .with_tid(BLOCK_ACK_TID)
             .with_buffer_size(BLOCK_ACK_BUFFER_SIZE),
-        timeout: 0, // TODO(https://fxbug.dev/29887): No timeout. Determina a better value.
+        timeout: 0, // TODO(https://fxbug.dev/42104687): No timeout. Determina a better value.
     };
     write_frame_with_dynamic_buf!(
         buffer,

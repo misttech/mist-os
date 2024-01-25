@@ -58,7 +58,7 @@ func New(links []*BridgeableEndpoint) (*Endpoint, error) {
 		return nil, fmt.Errorf("creating bridge with no attached endpoints is invalid")
 	}
 	{
-		// TODO(https://fxbug.dev/57022): Make sure links are all using the same kind of link.
+		// TODO(https://fxbug.dev/42134823): Make sure links are all using the same kind of link.
 		links := append([]*BridgeableEndpoint(nil), links...)
 		sort.Slice(links, func(i, j int) bool {
 			return strings.Compare(string(links[i].LinkAddress()), string(links[j].LinkAddress())) > 0
@@ -104,7 +104,7 @@ func (*Endpoint) Up() error {
 	return nil
 }
 
-// TODO(https://fxbug.dev/86388): Implement disabling the bridge.
+// TODO(https://fxbug.dev/42167392): Implement disabling the bridge.
 func (*Endpoint) Down() error {
 	_ = syslog.WarnTf(tag, "disabling bridges is unimplemented, the bridge will still be usable")
 	return nil
@@ -176,7 +176,7 @@ func (ep *Endpoint) WritePackets(pkts stack.PacketBufferList) (int, tcpip.Error)
 		switch err.(type) {
 		case nil:
 		case *tcpip.ErrClosedForSend:
-			// TODO(https://fxbug.dev/86959): Handle bridged interface removal.
+			// TODO(https://fxbug.dev/42168026): Handle bridged interface removal.
 			_ = syslog.WarnTf(tag, "WritePackets on bridged endpoint returned ClosedForSend")
 		default:
 			if firstErr == nil {
@@ -246,7 +246,7 @@ func (ep *Endpoint) DeliverNetworkPacketToBridge(rxEP *BridgeableEndpoint, proto
 	// We will be sending the packet out the bridge members.
 	pkt.PktType = tcpip.PacketOutgoing
 
-	// TODO(https://fxbug.dev/20778): Learn which destinations are on
+	// TODO(https://fxbug.dev/42094567): Learn which destinations are on
 	// which links and restrict transmission, like a bridge.
 	i := 0
 	rxFound := false
@@ -285,7 +285,7 @@ func (ep *Endpoint) DeliverNetworkPacketToBridge(rxEP *BridgeableEndpoint, proto
 		switch err.(type) {
 		case nil:
 		case *tcpip.ErrClosedForSend:
-			// TODO(https://fxbug.dev/86959): Handle bridged interface removal.
+			// TODO(https://fxbug.dev/42168026): Handle bridged interface removal.
 		default:
 			_ = syslog.WarnTf(tag, "failed to write to bridged endpoint %p: %s", l, err)
 		}

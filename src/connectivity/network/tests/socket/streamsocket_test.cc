@@ -57,7 +57,7 @@ void AssertExpectedReventsAfterPeerShutdown(int fd) {
       // before shutdown is complete. POLLWRNORM and POLLRDNORM are masked because
       // we do not yet support them on Fuchsia.
       //
-      // TODO(https://fxbug.dev/73258): Support POLLWRNORM and POLLRDNORM on Fuchsia.
+      // TODO(https://fxbug.dev/42152810): Support POLLWRNORM and POLLRDNORM on Fuchsia.
       .events =
           std::numeric_limits<decltype(pfd.events)>::max() & ~(POLLOUT | POLLWRNORM | POLLRDNORM),
   };
@@ -202,7 +202,7 @@ TEST_F(NetStreamSocketsTest, SocketAtOOBMark) {
   if (kIsFuchsia) {
     // sockatmark is not supported on Fuchsia.
     EXPECT_EQ(result, -1);
-    // TODO(https://fxbug.dev/84632): This should be ENOSYS, not ENOTTY.
+    // TODO(https://fxbug.dev/42165442): This should be ENOSYS, not ENOTTY.
     EXPECT_EQ(errno, ENOTTY) << strerror(errno);
   } else {
     EXPECT_EQ(result, 0) << strerror(errno);
@@ -217,7 +217,7 @@ TEST_F(NetStreamSocketsTest, Sendmmsg) {
   int result = sendmmsg(client().get(), &header, 0u, 0u);
   if (kIsFuchsia) {
     // Fuchsia does not support sendmmsg().
-    // TODO(https://fxbug.dev/45262, https://fxbug.dev/42678): Implement sendmmsg().
+    // TODO(https://fxbug.dev/45262, https://fxbug.dev/42118897): Implement sendmmsg().
     EXPECT_EQ(result, -1);
     EXPECT_EQ(errno, ENOSYS) << strerror(errno);
   } else {
@@ -234,7 +234,7 @@ TEST_F(NetStreamSocketsTest, Recvmmsg) {
   EXPECT_EQ(result, -1);
   if (kIsFuchsia) {
     // Fuchsia does not support recvmmsg().
-    // TODO(https://fxbug.dev/45260): Implement recvmmsg().
+    // TODO(https://fxbug.dev/42121765): Implement recvmmsg().
     EXPECT_EQ(errno, ENOSYS) << strerror(errno);
   } else {
     EXPECT_EQ(errno, EAGAIN) << strerror(errno);
@@ -651,7 +651,7 @@ TEST_P(ConnectingIOTest, BlockedIO) {
       // Ensure that we read the data whose send request was enqueued until
       // the connection was established.
 
-      // TODO(https://fxbug.dev/67928): Replace these multiple non-blocking
+      // TODO(https://fxbug.dev/42146896): Replace these multiple non-blocking
       // reads with a single blocking read after Fuchsia supports atomic
       // vectorized writes.
       size_t total = 0;
@@ -1122,7 +1122,7 @@ TEST(NetStreamTest, GetTcpInfo) {
       ASSERT_NE(info.tcpi_rttvar, initialization);
       ASSERT_NE(info.tcpi_snd_ssthresh, initialization);
       ASSERT_NE(info.tcpi_snd_cwnd, initialization);
-// TODO(https://fxbug.dev/64200): our Linux sysroot is too old to know about this field.
+// TODO(https://fxbug.dev/42142786): our Linux sysroot is too old to know about this field.
 #if defined(__Fuchsia__)
       ASSERT_NE(info.tcpi_reord_seen, initialization);
 #endif
@@ -1136,7 +1136,7 @@ TEST(NetStreamTest, GetTcpInfo) {
       expected.tcpi_rttvar = info.tcpi_rttvar;
       expected.tcpi_snd_ssthresh = info.tcpi_snd_ssthresh;
       expected.tcpi_snd_cwnd = info.tcpi_snd_cwnd;
-// TODO(https://fxbug.dev/64200): our Linux sysroot is too old to know about this field.
+// TODO(https://fxbug.dev/42142786): our Linux sysroot is too old to know about this field.
 #if defined(__Fuchsia__)
       expected.tcpi_reord_seen = info.tcpi_reord_seen;
 #endif
@@ -1202,7 +1202,7 @@ TEST(NetStreamTest, GetSocketAcceptConn) {
 
   ASSERT_EQ(shutdown(fd.get(), SHUT_RD), 0) << strerror(errno);
 
-  // TODO(https://fxbug.dev/61714): Shutting down a listening endpoint is asynchronous in gVisor;
+  // TODO(https://fxbug.dev/42140031): Shutting down a listening endpoint is asynchronous in gVisor;
   // transitioning out of the listening state is the responsibility of
   // tcp.endpoint.protocolListenLoop
   // (https://cs.opensource.google/gvisor/gvisor/+/master:pkg/tcpip/transport/tcp/accept.go;l=742-762;drc=58b9bdfc21e792c5d529ec9f4ab0b2f2cd1ee082),
@@ -1268,7 +1268,7 @@ TEST_P(BlockedIOTest, CloseWhileBlocked) {
   bool is_write = io_method.isWrite();
 
   if (kIsFuchsia && is_write) {
-    GTEST_SKIP() << "TODO(https://fxbug.dev/60337): Enable socket write methods after we are able "
+    GTEST_SKIP() << "TODO(https://fxbug.dev/42138506): Enable socket write methods after we are able "
                     "to deterministically block on socket writes.";
   }
 
@@ -1473,11 +1473,11 @@ TEST_P(ConnectAcrossIpVersionTest, ConnectReturnsError) {
 
   if (!kIsFuchsia) {
     if (preexisting_err) {
-      // TODO(https://fxbug.dev/108729): Match Linux by returning async errors before
+      // TODO(https://fxbug.dev/42060119): Match Linux by returning async errors before
       // address errors.
       ASSERT_EQ(errno, ECONNREFUSED) << strerror(errno);
     } else {
-      // TODO(https://fxbug.dev/108665): Match Linux by returning divergent errors between
+      // TODO(https://fxbug.dev/42060048): Match Linux by returning divergent errors between
       // IP versions.
       switch (domain.which()) {
         case SocketDomain::Which::IPv4:
@@ -1594,7 +1594,7 @@ TEST(NetStreamTest, ConnectTwice) {
 
   ASSERT_EQ(listen(listener.get(), 0), 0) << strerror(errno);
 
-  // TODO(https://fxbug.dev/61594): decide if we want to match Linux's behaviour.
+  // TODO(https://fxbug.dev/42139897): decide if we want to match Linux's behaviour.
   {
     int ret = connect(client.get(), reinterpret_cast<const sockaddr*>(&addr), sizeof(addr));
     if (kIsFuchsia) {
@@ -1757,15 +1757,15 @@ TEST_P(HangupTest, DuringConnect) {
               EXPECT_EQ(n, 1);
               EXPECT_EQ(pfd.revents, POLLOUT | POLLWRNORM | POLLHUP | POLLERR);
             } else {
-              // TODO(https://fxbug.dev/81448): Poll for POLLIN and POLLRDHUP to show their absence.
+              // TODO(https://fxbug.dev/42161904): Poll for POLLIN and POLLRDHUP to show their absence.
               // Can't be polled now because these events are asserted synchronously, and they might
               // be ready before the other expected events are asserted.
               pfd.events ^= (POLLIN | POLLRDHUP);
-              // TODO(https://fxbug.dev/85279): Remove the poll timeout.
+              // TODO(https://fxbug.dev/42166160): Remove the poll timeout.
               int n = poll(&pfd, 1, std::chrono::milliseconds(kTimeout).count());
               EXPECT_GE(n, 0) << strerror(errno);
               EXPECT_EQ(n, 1);
-              // TODO(https://fxbug.dev/73258): Add POLLWRNORM to the expectations.
+              // TODO(https://fxbug.dev/42152810): Add POLLWRNORM to the expectations.
               EXPECT_EQ(pfd.revents, POLLOUT | POLLHUP | POLLERR);
             }
           }
@@ -1774,7 +1774,7 @@ TEST_P(HangupTest, DuringConnect) {
           if (!kIsFuchsia) {
             EXPECT_EQ(errno, EINPROGRESS) << strerror(errno);
           } else {
-            // TODO(https://fxbug.dev/61594): Fuchsia doesn't allow never-connected socket reuse.
+            // TODO(https://fxbug.dev/42139897): Fuchsia doesn't allow never-connected socket reuse.
             EXPECT_EQ(errno, ECONNRESET) << strerror(errno);
           }
           // connect result was consumed by the connect call.
@@ -1818,16 +1818,16 @@ TEST_P(HangupTest, DuringConnect) {
             EXPECT_EQ(n, 1);
             EXPECT_EQ(pfd.revents, POLLOUT | POLLWRNORM | POLLHUP);
           } else {
-            // TODO(https://fxbug.dev/81448): Poll for POLLIN and POLLRDHUP to show their absence.
+            // TODO(https://fxbug.dev/42161904): Poll for POLLIN and POLLRDHUP to show their absence.
             // Can't be polled now because these events are asserted synchronously, and they might
             // be ready before the other expected events are asserted.
             pfd.events ^= (POLLIN | POLLRDHUP);
-            // TODO(https://fxbug.dev/85279): Remove the poll timeout.
+            // TODO(https://fxbug.dev/42166160): Remove the poll timeout.
             int n = poll(&pfd, 1, std::chrono::milliseconds(kTimeout).count());
             EXPECT_GE(n, 0) << strerror(errno);
             EXPECT_EQ(n, 1);
-            // TODO(https://fxbug.dev/85283): Remove POLLERR from the expectations.
-            // TODO(https://fxbug.dev/73258): Add POLLWRNORM to the expectations.
+            // TODO(https://fxbug.dev/42166165): Remove POLLERR from the expectations.
+            // TODO(https://fxbug.dev/42152810): Add POLLWRNORM to the expectations.
             EXPECT_EQ(pfd.revents, POLLOUT | POLLHUP | POLLERR);
           }
           break;

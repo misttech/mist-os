@@ -643,7 +643,7 @@ fn process_rsna_updates(
                     SecAssocStatus::PmkSaEstablished => (),
                 }
             }
-            // TODO(https://fxbug.dev/29105): We must handle SAE here for FullMAC devices.
+            // TODO(https://fxbug.dev/42103820): We must handle SAE here for FullMAC devices.
             update => warn!("Unhandled association update: {:?}", update),
         }
     }

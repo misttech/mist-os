@@ -101,7 +101,7 @@ pub const WPA2_PERSONAL: SuiteFilter = SuiteFilter {
     // it. We'll disallow it for now to keep logic simple because otherwise, we also have
     // to do the check that pairwise and group keys match.
     //
-    // TODO(https://fxbug.dev/29878): deploy metric to measure AKM and cipher use in practice.
+    // TODO(https://fxbug.dev/42104677): deploy metric to measure AKM and cipher use in practice.
     known_pairwise_ciphers: &[cipher::CCMP_128],
     required_group_mgmt_cipher: None,
 };

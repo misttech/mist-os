@@ -108,7 +108,7 @@ impl RemoteClient {
         ctx: &mut Context,
         result_code: fidl_mlme::AuthenticateResultCode,
     ) {
-        // TODO(https://fxbug.dev/91118) - Added to help investigate hw-sim test. Remove later
+        // TODO(https://fxbug.dev/42172646) - Added to help investigate hw-sim test. Remove later
         tracing::info!("Sending fidl_mlme::AuthenticateResponse - result code: {:?}", result_code);
         ctx.mlme_sink.send(MlmeRequest::AuthResponse(fidl_mlme::AuthenticateResponse {
             peer_sta_address: self.addr.to_array(),

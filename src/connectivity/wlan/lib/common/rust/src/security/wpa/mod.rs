@@ -144,14 +144,14 @@ impl From<Wpa1Credentials> for Authentication<Wpa1Credentials, ()> {
     }
 }
 
-// TODO(https://fxbug.dev/92693): Specify the WPA2 Enterprise type.
+// TODO(https://fxbug.dev/42174395): Specify the WPA2 Enterprise type.
 impl From<Wpa2PersonalCredentials> for Authentication<Wpa2PersonalCredentials, ()> {
     fn from(credentials: Wpa2PersonalCredentials) -> Self {
         Authentication::Personal(credentials)
     }
 }
 
-// TODO(https://fxbug.dev/92693): Specify the WPA3 Enterprise type.
+// TODO(https://fxbug.dev/42174395): Specify the WPA3 Enterprise type.
 impl From<Wpa3PersonalCredentials> for Authentication<Wpa3PersonalCredentials, ()> {
     fn from(credentials: Wpa3PersonalCredentials) -> Self {
         Authentication::Personal(credentials)
@@ -178,7 +178,7 @@ where
     fn from(authentication: Authentication<P, E>) -> Self {
         match authentication {
             Authentication::Personal(personal) => personal.into(),
-            // TODO(https://fxbug.dev/92693): Implement conversions for WPA Enterprise.
+            // TODO(https://fxbug.dev/42174395): Implement conversions for WPA Enterprise.
             Authentication::Enterprise(_) => panic!("WPA Enterprise is unsupported"),
         }
     }
@@ -194,7 +194,7 @@ impl From<Credentials> for BareCredentials {
                 }
                 PersonalCredentials::Psk(psk) => BareCredentials::WpaPsk(psk),
             },
-            // TODO(https://fxbug.dev/92693): Implement conversions for WPA Enterprise.
+            // TODO(https://fxbug.dev/42174395): Implement conversions for WPA Enterprise.
             Credentials::Enterprise(_) => panic!("WPA Enterprise is unsupported"),
         }
     }
@@ -450,7 +450,7 @@ impl TryFrom<fidl_security::WpaCredentials> for Wpa3PersonalCredentials {
     }
 }
 
-// TODO(https://fxbug.dev/92693): Add variants to `EnterpriseCredentials` as needed and implement
+// TODO(https://fxbug.dev/42174395): Add variants to `EnterpriseCredentials` as needed and implement
 //                        conversions.
 /// General WPA Enterprise credentials.
 ///
@@ -466,14 +466,14 @@ pub enum EnterpriseCredentials {}
 
 impl From<()> for EnterpriseCredentials {
     fn from(_: ()) -> Self {
-        // TODO(https://fxbug.dev/92693): Implement conversions for WPA Enterprise.
+        // TODO(https://fxbug.dev/42174395): Implement conversions for WPA Enterprise.
         panic!("WPA Enterprise is unsupported")
     }
 }
 
 impl From<EnterpriseCredentials> for fidl_security::WpaCredentials {
     fn from(_: EnterpriseCredentials) -> Self {
-        // TODO(https://fxbug.dev/92693): Implement conversions for WPA Enterprise.
+        // TODO(https://fxbug.dev/42174395): Implement conversions for WPA Enterprise.
         panic!("WPA Enterprise is unsupported")
     }
 }

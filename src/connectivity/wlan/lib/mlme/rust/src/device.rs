@@ -301,8 +301,8 @@ pub trait DeviceOps {
                 // Note: This is only effective if the underlying device meets both criteria below:
                 // 1. Does not support tx status report.
                 // 2. Honors our instruction on tx_vector to use.
-                // TODO(https://fxbug.dev/28893): Choose an optimal MCS for management frames
-                // TODO(https://fxbug.dev/43456): Log stats about minstrel usage vs default tx vector.
+                // TODO(https://fxbug.dev/42103583): Choose an optimal MCS for management frames
+                // TODO(https://fxbug.dev/42119762): Log stats about minstrel usage vs default tx vector.
                 let mcs_idx = if frame_control.is_data() { 7 } else { 3 };
                 tx_vector::TxVector::new(
                     banjo_common::WlanPhyType::ERP,
@@ -640,7 +640,7 @@ pub struct WlanSoftmacIfcProtocolOps {
 extern "C" fn handle_recv(ctx: &mut crate::DriverEventSink, packet: *const WlanRxPacket) {
     trace::duration!("wlan", "handle_recv");
 
-    // TODO(https://fxbug.dev/29063): C++ uses a buffer allocator for this, determine if we need one.
+    // TODO(https://fxbug.dev/42103773): C++ uses a buffer allocator for this, determine if we need one.
     let bytes =
         unsafe { std::slice::from_raw_parts((*packet).mac_frame_buffer, (*packet).mac_frame_size) }
             .into();
@@ -655,7 +655,7 @@ extern "C" fn handle_complete_tx(
     _packet: *const WlanTxPacket,
     _status: i32,
 ) {
-    // TODO(https://fxbug.dev/85924): Implement this to support asynchronous packet delivery.
+    // TODO(https://fxbug.dev/42166877): Implement this to support asynchronous packet delivery.
 }
 #[no_mangle]
 extern "C" fn handle_report_tx_result(
@@ -1126,7 +1126,7 @@ pub mod test_utils {
                 )));
             let usme_bootstrap_server_end_handle =
                 state.usme_bootstrap_server_end.take().unwrap().into_channel().into_handle();
-            // TODO(https://fxbug.dev/45464): Capture _ifc and provide a testing surface.
+            // TODO(https://fxbug.dev/42121991): Capture _ifc and provide a testing surface.
             Ok(usme_bootstrap_server_end_handle)
         }
 

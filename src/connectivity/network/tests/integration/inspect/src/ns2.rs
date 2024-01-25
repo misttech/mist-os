@@ -339,7 +339,7 @@ async fn inspect_nic(name: &str) {
                 fidl_fuchsia_net_ext::IpAddress::from(BOB_IP).to_string() => {
                     "Link address": fidl_fuchsia_net_ext::MacAddress::from(BOB_MAC).to_string(),
                     State: "Static",
-                    // TODO(https://fxbug.dev/78847): Use NonZeroIntProperty once we are able to
+                    // TODO(https://fxbug.dev/42159018): Use NonZeroIntProperty once we are able to
                     // distinguish between signed and unsigned integers from the
                     // fuchsia.diagnostics FIDL. This is currently not possible because the inspect
                     // data is serialized into JSON then converted back, losing type information.
@@ -466,7 +466,7 @@ async fn inspect_dhcp(
     inbound_packets: Vec<PacketAttributes>,
 ) {
     type N = netstack_testing_common::realms::Netstack2;
-    // TODO(https://fxbug.dev/79556): Extend this test to cover the stat tracking frames discarded
+    // TODO(https://fxbug.dev/42159805): Extend this test to cover the stat tracking frames discarded
     // due to an invalid PacketType.
     let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
     let network = sandbox.create_network("net").await.expect("failed to create network");
@@ -661,7 +661,7 @@ async fn inspect_stat_counters(name: &str) {
     let data = get_inspect_data(&realm, "netstack", r#"Networking\ Stat\ Counters"#, "counters")
         .await
         .expect("get_inspect_data failed");
-    // TODO(https://fxbug.dev/62447): change AnyProperty to AnyUintProperty when available.
+    // TODO(https://fxbug.dev/42140843): change AnyProperty to AnyUintProperty when available.
     assert_data_tree!(data, "Networking Stat Counters": {
         DroppedPackets: AnyProperty,
         SocketCount: AnyProperty,

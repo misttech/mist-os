@@ -145,7 +145,7 @@ foreach(test, tests_with_err_logs + long_tests_with_err_logs) {
         package_deps + [ "//src/lib/testing/expectation:expectation_comparer" ]
     if (defined(test.long_test) && test.long_test) {
       test_specs = {
-        # Longer timeout to reduce flake (https://fxbug.dev/104137)
+        # Longer timeout to reduce flake (https://fxbug.dev/42055260)
         timeout_secs = 720
       }
     }
@@ -162,7 +162,7 @@ foreach(test, tests_with_err_logs + long_tests_with_err_logs) {
         max_severity = "ERROR"
       }
       if (defined(test.long_test) && test.long_test) {
-        # Longer timeout to reduce flake (https://fxbug.dev/104137)
+        # Longer timeout to reduce flake (https://fxbug.dev/42055260)
         timeout_secs = 720
       }
     }
@@ -217,7 +217,7 @@ resource("netcfg-with-duplicate-names") {
 }
 
 # We keep tests that involve the virtualization stack (and especially guest
-# images) restricted to a separate builder.  See https://fxbug.dev/122994 for
+# images) restricted to a separate builder.  See https://fxbug.dev/42073933 for
 # more details.
 group("tests-involving-guests") {
   testonly = true
@@ -237,7 +237,7 @@ group("tests") {
          ] + err_log_package_deps
 
   if (!is_coverage) {
-    # TODO(https://fxbug.dev/104137): Re-enable this test when it passes with
+    # TODO(https://fxbug.dev/42055260): Re-enable this test when it passes with
     # the coverage variant.
     deps += long_test_err_log_package_deps
   }

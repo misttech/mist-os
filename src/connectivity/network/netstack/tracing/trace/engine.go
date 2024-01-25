@@ -82,10 +82,10 @@ func EngineInitialize(start uintptr, size uint64, mode BufferingMode, handler Ha
 	case Oneshot:
 		// do nothing
 	case Circular:
-		// TODO(https://fxbug.dev/78263): Support circular mode.
+		// TODO(https://fxbug.dev/42158370): Support circular mode.
 		return fmt.Errorf("Circular mode (%d): %w", mode, ErrNotSupported)
 	case Streaming:
-		// TODO(https://fxbug.dev/78265): Support streaming mode.
+		// TODO(https://fxbug.dev/42158372): Support streaming mode.
 		return fmt.Errorf("Streaming mode (%d): %w", mode, ErrNotSupported)
 	default:
 		panic(fmt.Sprintf("unknown mode (%d)", mode))

@@ -55,7 +55,7 @@
             },
         ],
         start: [
-            // TODO(https://fxbug.dev/137290): Add DHCP server support to
+            // TODO(https://fxbug.dev/42182776): Add DHCP server support to
             // directly to netemul runner and remove this bootstrap component.
             "bootstrap-dhcpd",
         ],

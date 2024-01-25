@@ -153,7 +153,7 @@ struct SocketState<S, D> {
     /// State provided by bindings that is held in core.
     external_state: S,
     /// The socket's target device and protocol.
-    // TODO(https://fxbug.dev/126263): Consider splitting up the state here to
+    // TODO(https://fxbug.dev/42077026): Consider splitting up the state here to
     // improve performance.
     target: Mutex<Target<D>>,
 }
@@ -798,7 +798,7 @@ where
     ) {
         let device = device.clone().into();
 
-        // TODO(https://fxbug.dev/125732): Invert the order of acquisition
+        // TODO(https://fxbug.dev/42076496): Invert the order of acquisition
         // for the lock on the sockets held in the device and the any-device
         // sockets lock.
         self.with_any_device_sockets(|AnyDeviceSockets(any_device_sockets), core_ctx| {

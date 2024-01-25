@@ -481,7 +481,7 @@ async fn neigh_list_entries<N: Netstack>(name: &str) {
         EntryMatch::new(
             bob.ep.id(),
             alice.ipv6,
-            // TODO(https://fxbug.dev/131547): Simpify to just asserting that the
+            // TODO(https://fxbug.dev/42081683): Simpify to just asserting that the
             // state is STALE when NS3 no longer consults the neighbor table
             // when sending the NA message which causes a state transition from
             // STALE to DELAY.
@@ -797,7 +797,7 @@ async fn neigh_add_entry_invalid_mac<N: Netstack>(
     }
 }
 
-// TODO(https://fxbug.dev/124960): Remove this test when NS3 passes
+// TODO(https://fxbug.dev/42075782): Remove this test when NS3 passes
 // neigh_add_remove_entry since that test is a superset of this test but it
 // doesn't yet pass due to the lack of fuchsia.net.neighbor/EntryIterator.
 #[netstack_test]
@@ -1203,7 +1203,7 @@ async fn neigh_unreachable_entries<N: Netstack>(name: &str) {
         &mut iter,
         [
             ItemMatch::Added(want_incomplete_entry.clone()),
-            // TODO(https://fxbug.dev/132349): Expect the entry to change to sentinel
+            // TODO(https://fxbug.dev/42082448): Expect the entry to change to sentinel
             // state for NS3 instead of being removed entirely.
             match N::VERSION {
                 NetstackVersion::Netstack2 { tracing: _, fast_udp: _ }

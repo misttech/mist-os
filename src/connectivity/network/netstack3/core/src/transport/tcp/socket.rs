@@ -313,7 +313,7 @@ pub trait TcpDemuxContext<I: DualStackIpExt, D: device::WeakId, BT: TcpBindingsT
     fn with_demux_mut<O, F: FnOnce(&mut DemuxState<I, D, BT>) -> O>(&mut self, cb: F) -> O;
 }
 
-// TODO(https://fxbug.dev/136316): This trait is useful when we don't have full
+// TODO(https://fxbug.dev/42085913): This trait is useful when we don't have full
 // support of dual-stack sockets, so we can take short-cuts for single-stack
 // operations. Remove once TCP dual-stack is fully supported.
 /// A helper trait that turns [`MaybeDualStack`] context into the current stack
@@ -1372,7 +1372,7 @@ fn make_connection<
     }
 }
 
-// TODO(https://fxbug.dev/136316): Remove this method once we support all dual
+// TODO(https://fxbug.dev/42085913): Remove this method once we support all dual
 // stack operations.
 fn try_into_this_stack_conn_mut<
     'a,
@@ -1655,7 +1655,7 @@ where
         port: Option<NonZeroU16>,
     ) -> Result<(), BindError> {
         debug!("bind {id:?} to {addr:?}:{port:?}");
-        // TODO(https://fxbug.dev/21198): Support dual-stack bind.
+        // TODO(https://fxbug.dev/42095034): Support dual-stack bind.
         let addr: Option<ZonedAddr<SocketIpAddr<I::Addr>, _>> =
             match addr {
                 None => None,
@@ -1670,7 +1670,7 @@ where
                 }
             };
 
-        // TODO(https://fxbug.dev/104300): Check if local_ip is a unicast address.
+        // TODO(https://fxbug.dev/42055442): Check if local_ip is a unicast address.
         self.core_ctx().with_socket_mut_transport_demux(id, |core_ctx, socket_state| {
             let Unbound { bound_device, buffer_sizes, socket_options, sharing, socket_extra } =
                 match socket_state {
@@ -1846,7 +1846,7 @@ where
         let addr = self.core_ctx().with_socket_mut_and_converter(&conn_id, |socket_state, converter| {
             let (conn, conn_addr) = assert_matches!(
                 socket_state,
-                TcpSocketState::Bound(BoundSocketState::Connected((conn, _sharing))) => try_into_this_stack_conn_mut::<I, _, C::CoreContext>(conn, &converter).expect("TODO(https://fxbug.dev/136316): dual stack listener not supported yet"),
+                TcpSocketState::Bound(BoundSocketState::Connected((conn, _sharing))) => try_into_this_stack_conn_mut::<I, _, C::CoreContext>(conn, &converter).expect("TODO(https://fxbug.dev/42085913): dual stack listener not supported yet"),
                 "invalid socket ID"
             );
             conn.accept_queue = None;
@@ -2014,7 +2014,7 @@ where
                     DualStackRemoteIp::OtherStack(remote_ip),
                     MaybeDualStack::DualStack((core_ctx, converter)),
                 ) => {
-                    // TODO(https://fxbug.dev/136316): We don't have dual stack
+                    // TODO(https://fxbug.dev/42085913): We don't have dual stack
                     // listeners yet, meaning we can't connect a socket that is
                     // bound in the other stack. So local_ip and listener_addr
                     // must be None for now.
@@ -2743,7 +2743,7 @@ where
                     }
                 }),
                 TcpSocketState::Bound(BoundSocketState::Connected(_)) => {
-                    // TODO(https://fxbug.dev/97823): Support setting the option
+                    // TODO(https://fxbug.dev/42180094): Support setting the option
                     // for connection sockets.
                     Err(SetReuseAddrError::NotSupported)
                 }
@@ -2811,7 +2811,7 @@ where
 
         let id = match I::into_dual_stack_ip_socket(id) {
             EitherStack::ThisStack(id) => id,
-            // TODO(https://fxbug.dev/136316): Handle ICMP error for the other
+            // TODO(https://fxbug.dev/42085913): Handle ICMP error for the other
             // stack.
             EitherStack::OtherStack(_) => return,
         };
@@ -2833,7 +2833,7 @@ where
                 TcpSocketState::Bound(BoundSocketState::Connected((conn, _sharing))) => try_into_this_stack_conn_mut::<I, _, C::CoreContext>(conn, &converter),
                 "invalid socket ID"
             ) else {
-                // TODO(https://fxbug.dev/136316): Destroy the other stack
+                // TODO(https://fxbug.dev/42085913): Destroy the other stack
                 // socket once we allow that.
                 return false;
             };
@@ -2929,7 +2929,7 @@ where
                         }
                         MaybeDualStack::DualStack(converter) => match converter.convert(state) {
                             EitherStack::ThisStack((conn, addr)) => (conn.defunct, addr),
-                            // TODO(https://fxbug.dev/136316): Support dual stack.
+                            // TODO(https://fxbug.dev/42085913): Support dual stack.
                             EitherStack::OtherStack((_conn, _addr)) => return,
                         },
                     };
@@ -3070,7 +3070,7 @@ fn close_pending_sockets<I, CC, BC>(
                 socket_state,
                 TcpSocketState::Bound(BoundSocketState::Connected((conn, _sharing))) => match converter {
                     MaybeDualStack::NotDualStack(nds) => nds.convert(conn),
-                    // TODO(https://fxbug.dev/136316): The assertion is fine
+                    // TODO(https://fxbug.dev/42085913): The assertion is fine
                     // because we don't have dual stack listeners.
                     MaybeDualStack::DualStack(ds) => assert_matches!(ds.convert(conn), EitherStack::ThisStack(conn) => conn),
                 }
@@ -3286,7 +3286,7 @@ pub enum SetDeviceError {
     Unroutable,
     /// The socket has an address with a different zone.
     ZoneChange,
-    // TODO(https://fxbug.dev/136316): Remove this variant.
+    // TODO(https://fxbug.dev/42085913): Remove this variant.
     /// Setting device not supported for dual stack.
     DualStackNotSupported,
 }
@@ -3460,7 +3460,7 @@ where
         // If we managed to install ourselves in the demux, we need to remove
         // the previous listening form if any.
         if let Some(listener_addr) = listener_addr {
-            // TODO(https://fxbug.dev/136316): This assertion is OK because we
+            // TODO(https://fxbug.dev/42085913): This assertion is OK because we
             // don't have dual stack listeners.
             let id = assert_matches!(WireI::as_dual_stack_ip_socket(demux_id), EitherStack::ThisStack(id) => id);
             socketmap

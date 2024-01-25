@@ -275,7 +275,7 @@ struct net_device {
   bool initialized_for_ap;
   bool multicast_promisc;
   bool is_up;
-  // TODO(https://fxbug.dev/88275): Remove when the new API is used exclusively.
+  // TODO(https://fxbug.dev/42169489): Remove when the new API is used exclusively.
   bool new_connect_api;   // We should send a ConnectConfirm instead of AssocConfirm.
   uint64_t scan_txn_id;   // The txn_id provided by SME to identify the scan
   uint16_t scan_sync_id;  // The sync_id in the FW request to identify the scan

@@ -44,7 +44,7 @@ fn translate_io_error(e: std::io::Error) -> dhcp_client_core::deps::SocketError 
             | E::Epipe
             | E::Esocktnosupport => dhcp_client_core::deps::SocketError::Other(e),
 
-            // TODO(https://fxbug.dev/127396): Revisit whether we should
+            // TODO(https://fxbug.dev/42077996): Revisit whether we should
             // actually panic on this error once we establish whether this error
             // is set for UDP sockets.
             E::Ehostdown => dhcp_client_core::deps::SocketError::Other(e),

@@ -2839,7 +2839,7 @@ zx_status_t SimFirmware::ScanStart(std::unique_ptr<ScanOpts> opts) {
   hw_.SetChannel(channel);
 
   // Do an active scan using random mac
-  // TODO(https://fxbug.dev/89334): SSIDs in scan request are ignored
+  // TODO(https://fxbug.dev/42170664): SSIDs in scan request are ignored
   if (scan_state_.opts->is_active) {
     scan_state_.active_scan_attempts = 1;
     simulation::SimProbeReqFrame probe_req_frame(pfn_mac_addr_);
@@ -3221,7 +3221,7 @@ void SimFirmware::RxBeacon(const wlan_common::WlanChannel& channel,
 
     scan_result.bss_capability.set_val(frame->capability_info_.val());
     scan_state_.opts->on_result_fn(scan_result);
-    // TODO(https://fxbug.dev/49350): Channel switch during scanning need to be supported.
+    // TODO(https://fxbug.dev/42126309): Channel switch during scanning need to be supported.
   } else if (assoc_state_.state == AssocState::ASSOCIATED &&
              frame->bssid_ == assoc_state_.opts->bssid) {
     // if we're associated with this AP, start/restart the beacon watchdog
@@ -3303,7 +3303,7 @@ void SimFirmware::EscanResultSeen(const ScanResult& result_in) {
       continue;
     }
     switch (ie->IeType()) {
-      // TODO(https://fxbug.dev/89334): scan_state_.opts should contain SSIDs which would determine
+      // TODO(https://fxbug.dev/42170664): scan_state_.opts should contain SSIDs which would determine
       // whether to report this scan result or not.
       case simulation::InformationElement::IE_TYPE_SSID: {
         const auto ssid_ie = std::static_pointer_cast<simulation::SsidInformationElement>(ie);

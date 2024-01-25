@@ -1173,7 +1173,7 @@ mod test {
     }
 
     #[test]
-    // Regression test for https://fxbug.dev/109960.
+    // Regression test for https://fxbug.dev/42061342.
     fn ring_buffer_wrap_around() {
         const CAPACITY: usize = 16;
         let mut rb = RingBuffer::new(CAPACITY);

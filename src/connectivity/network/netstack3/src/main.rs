@@ -43,7 +43,7 @@ pub fn main() {
     let mut fs = ServiceFs::new();
     let _: &mut ServiceFsDir<'_, _> = fs
         .dir("svc")
-        // TODO(https://fxbug.dev/125773): This is transitional. Once the
+        // TODO(https://fxbug.dev/42076541): This is transitional. Once the
         // out-of-stack DHCP client is being used by both netstacks, it
         // should be moved out of the netstack realm and into the network
         // realm. The trip through Netstack3 allows for availability of DHCP

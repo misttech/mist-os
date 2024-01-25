@@ -273,7 +273,7 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpState<Ipv6>>>
         remote_link_addr: Option<Mac>,
     ) {
         let dst_ip = match remote_link_addr {
-            // TODO(https://fxbug.dev/131547): once `send_ndp_packet` does not go through
+            // TODO(https://fxbug.dev/42081683): once `send_ndp_packet` does not go through
             // the normal IP egress flow, using the NUD table to resolve the link address,
             // use the specified link address to determine where to unicast the
             // solicitation.
@@ -294,7 +294,7 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpState<Ipv6>>>
 
         self.increment(|counters: &NdpCounters| &counters.tx_neighbor_solicitation);
         tracing::debug!("sending NDP solicitation for {lookup_addr} to {dst_ip}");
-        // TODO(https://fxbug.dev/85055): Either panic or guarantee that this error
+        // TODO(https://fxbug.dev/42165912): Either panic or guarantee that this error
         // can't happen statically.
         let _: Result<(), _> = crate::ip::icmp::send_ndp_packet(
             self,
@@ -485,7 +485,7 @@ pub struct EthernetCreationProperties {
     /// The device's MAC address.
     pub mac: UnicastAddr<Mac>,
     /// The maximum frame size this device supports.
-    // TODO(https://fxbug.dev/121480): Add a minimum frame size for all
+    // TODO(https://fxbug.dev/42072516): Add a minimum frame size for all
     // Ethernet devices such that you can't create an `EthernetDeviceState`
     // with a `MaxEthernetFrameSize` smaller than the minimum. The absolute minimum
     // needs to be at least the minimum body size of an Ethernet frame. For

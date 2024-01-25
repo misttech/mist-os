@@ -209,7 +209,7 @@ pub struct Entry<A: IpAddress, D> {
     /// The destination device.
     pub device: D,
     /// An optional gateway if the subnet is not on link.
-    // TODO(https://fxbug.dev/123288): Restrict `gateway` to `UnicastAddr`.
+    // TODO(https://fxbug.dev/42074188): Restrict `gateway` to `UnicastAddr`.
     pub gateway: Option<SpecifiedAddr<A>>,
     /// The metric of the entry.
     pub metric: Metric,

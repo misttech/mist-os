@@ -8,7 +8,7 @@ import (
 	"go.fuchsia.dev/fuchsia/src/connectivity/network/testing/conformance/expectation/outcome"
 )
 
-// TODO(https://fxbug.dev/117415): Pass tests once IGMPv3 has been fully
+// TODO(https://fxbug.dev/42068622): Pass tests once IGMPv3 has been fully
 // implemented.
 var igmpv3Expectations map[AnvlCaseNumber]outcome.Outcome = map[AnvlCaseNumber]outcome.Outcome{
 	{1, 2}:   Pass,

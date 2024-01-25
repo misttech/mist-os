@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 //! Integration tests for fuchsia.net.routes.admin.
-// TODO(https://fxbug.dev/129220): Add tests for authentication of interfaces.
+// TODO(https://fxbug.dev/42079627): Add tests for authentication of interfaces.
 
 #![cfg(test)]
 
@@ -872,7 +872,7 @@ async fn system_removes_route_from_route_set<
     .expect("remove route"));
 }
 
-// TODO(https://fxbug.dev/130864): Remove all uses of {Add,Del}ForwardingEntry
+// TODO(https://fxbug.dev/42081105): Remove all uses of {Add,Del}ForwardingEntry
 // from this file.
 #[netstack_test]
 #[test_case(SystemRouteProtocol::NetRootRoutes; "fuchsia.net.root/Routes")]

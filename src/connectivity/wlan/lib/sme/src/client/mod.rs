@@ -141,7 +141,7 @@ impl ClientConfig {
         let has_wep_support = || self.cfg.wep_supported;
         let has_wpa1_support = || self.cfg.wpa1_supported;
         let has_wpa2_support = || {
-            // TODO(https://fxbug.dev/108287): Unlike other protocols, hardware and driver support for WPA2
+            // TODO(https://fxbug.dev/42059694): Unlike other protocols, hardware and driver support for WPA2
             //                         is assumed here. Query and track this as with other security
             //                         protocols.
             has_privacy
@@ -189,7 +189,7 @@ impl ClientConfig {
             BssProtection::Wpa3Personal => has_wpa3_support()
                 .then(|| vec![SecurityDescriptor::WPA3_PERSONAL])
                 .unwrap_or_else(|| vec![]),
-            // TODO(https://fxbug.dev/92693): Implement conversions for WPA Enterprise protocols.
+            // TODO(https://fxbug.dev/42174395): Implement conversions for WPA Enterprise protocols.
             BssProtection::Wpa2Enterprise | BssProtection::Wpa3Enterprise => vec![],
             BssProtection::Unknown => vec![],
         }
@@ -271,10 +271,10 @@ pub enum ConnectTransactionEvent {
 #[derive(Debug, PartialEq)]
 pub enum ConnectFailure {
     SelectNetworkFailure(SelectNetworkFailure),
-    // TODO(https://fxbug.dev/68531): SME no longer performs scans when connecting. Remove the
+    // TODO(https://fxbug.dev/42147565): SME no longer performs scans when connecting. Remove the
     //                        `ScanFailure` variant.
     ScanFailure(fidl_mlme::ScanResultCode),
-    // TODO(https://fxbug.dev/96668): `JoinFailure` and `AuthenticationFailure` no longer needed when
+    // TODO(https://fxbug.dev/42178810): `JoinFailure` and `AuthenticationFailure` no longer needed when
     //                        state machine is fully transitioned to USME.
     JoinFailure(fidl_ieee80211::StatusCode),
     AuthenticationFailure(fidl_ieee80211::StatusCode),
@@ -283,7 +283,7 @@ pub enum ConnectFailure {
 }
 
 impl ConnectFailure {
-    // TODO(https://fxbug.dev/82654): ConnectFailure::is_timeout is not useful, remove it
+    // TODO(https://fxbug.dev/42163244): ConnectFailure::is_timeout is not useful, remove it
     pub fn is_timeout(&self) -> bool {
         // Note: For association, we don't have a failure type for timeout, so cannot deduce
         //       whether an association failure is due to timeout.
@@ -713,7 +713,7 @@ impl super::Station for ClientSme {
                                     .into_iter()
                                     .map(|bss_description| {
                                         self.cfg.create_scan_result(
-                                            // TODO(https://fxbug.dev/83882): ScanEnd drops the timestamp from MLME
+                                            // TODO(https://fxbug.dev/42164608): ScanEnd drops the timestamp from MLME
                                             zx::Time::from_nanos(0),
                                             bss_description,
                                             &self.context.device_info,
@@ -1191,7 +1191,7 @@ mod tests {
         let (persistence_req_sender, _persistence_receiver) =
             test_utils::create_inspect_persistence_channel();
         let mut mac_sublayer_support = fake_mac_sublayer_support();
-        // TODO(https://fxbug.dev/96668) - FullMAC still uses the old state machine. Once FullMAC is
+        // TODO(https://fxbug.dev/42178810) - FullMAC still uses the old state machine. Once FullMAC is
         //                         fully transitioned, this override will no longer be
         //                         necessary.
         mac_sublayer_support.device.mac_implementation_type =
@@ -1792,7 +1792,7 @@ mod tests {
         let (persistence_req_sender, _persistence_receiver) =
             test_utils::create_inspect_persistence_channel();
         let mut mac_sublayer_support = fake_mac_sublayer_support();
-        // TODO(https://fxbug.dev/96668) - FullMAC still uses the old state machine. Once FullMAC is
+        // TODO(https://fxbug.dev/42178810) - FullMAC still uses the old state machine. Once FullMAC is
         //                         fully transitioned, this override will no longer be
         //                         necessary.
         mac_sublayer_support.device.mac_implementation_type =

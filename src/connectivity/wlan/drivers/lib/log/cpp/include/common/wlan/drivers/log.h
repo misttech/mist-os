@@ -11,7 +11,7 @@
 #include <wlan/drivers/internal/macro_helpers.h>
 #include <wlan/drivers/internal/throttle_counter.h>
 
-// TODO(https://fxbug.dev/81914): Add support for log level fatal i.e. lfatal().
+// TODO(https://fxbug.dev/42162422): Add support for log level fatal i.e. lfatal().
 #define lerror(fmt, ...) (wlan_drivers_log_internal(ERROR, 0, NULL, fmt, ##__VA_ARGS__))
 #define lwarn(fmt, ...) (wlan_drivers_log_internal(WARNING, 0, NULL, fmt, ##__VA_ARGS__))
 #define linfo(fmt, ...) (wlan_drivers_log_internal(INFO, 0, NULL, fmt, ##__VA_ARGS__))
@@ -42,7 +42,7 @@
 #define lthrottle_trace(filter, tag, fmt...) \
   wlan_drivers_lthrottle_internal(LOG_THROTTLE_EVENTS_PER_SEC, TRACE, filter, tag, fmt)
 
-// TODO(https://fxbug.dev/82722): Remove lthrottle_log_if() in favor of throttle macros that
+// TODO(https://fxbug.dev/42163320): Remove lthrottle_log_if() in favor of throttle macros that
 // provide additional information on how many times the logs got throttled.
 #define lthrottle_log_if(events_per_second, condition, log) \
   do {                                                      \

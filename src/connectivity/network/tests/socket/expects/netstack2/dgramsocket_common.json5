@@ -12,7 +12,7 @@
         {
             type: "expect_failure",
             matchers: [
-                // TODO(https://fxbug.dev/123365): Return ENODEV instead of EINVAL.
+                // TODO(https://fxbug.dev/42074274): Return ENODEV instead of EINVAL.
                 "LocalhostTest.IpAddMembershipInvalidIface",
             ],
         },

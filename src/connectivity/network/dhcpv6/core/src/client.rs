@@ -685,7 +685,7 @@ enum IaOptionError<V: IaValue> {
     T1GreaterThanT2 { t1: v6::TimeValue, t2: v6::TimeValue },
     #[error("status code error: {0}")]
     StatusCode(#[from] StatusCodeError),
-    // TODO(https://fxbug.dev/104297): Use an owned option type rather
+    // TODO(https://fxbug.dev/42055437): Use an owned option type rather
     // than a string of the debug representation of the invalid option.
     #[error("invalid option: {0:?}")]
     InvalidOption(String),
@@ -750,7 +750,7 @@ fn check_lifetimes(
     }
 }
 
-// TODO(https://fxbug.dev/104519): Move this function and associated types
+// TODO(https://fxbug.dev/42055684): Move this function and associated types
 // into packet-formats-dhcp.
 fn process_ia<
     'a,
@@ -856,7 +856,7 @@ fn process_ia<
     Ok(IaOption::Success { status_message: success_status_message, t1, t2, ia_values })
 }
 
-// TODO(https://fxbug.dev/104519): Move this function and associated types
+// TODO(https://fxbug.dev/42055684): Move this function and associated types
 // into packet-formats-dhcp.
 fn process_ia_na(
     ia_na_data: &v6::IanaData<&'_ [u8]>,
@@ -889,7 +889,7 @@ enum IaPdOptionError {
 
 type IaPdOption = IaOption<Subnet<Ipv6Addr>>;
 
-// TODO(https://fxbug.dev/104519): Move this function and associated types
+// TODO(https://fxbug.dev/42055684): Move this function and associated types
 // into packet-formats-dhcp.
 fn process_ia_pd(ia_pd_data: &v6::IaPdData<&'_ [u8]>) -> Result<IaPdOption, IaPdOptionError> {
     process_ia(ia_pd_data.t1(), ia_pd_data.t2(), ia_pd_data.iter_options(), |opt| match opt {
@@ -943,7 +943,7 @@ struct ErrorStatusCode(v6::ErrorStatusCode, String);
 
 #[derive(thiserror::Error, Debug)]
 enum OptionsError {
-    // TODO(https://fxbug.dev/104297): Use an owned option type rather
+    // TODO(https://fxbug.dev/42055437): Use an owned option type rather
     // than a string of the debug representation of the invalid option.
     #[error("duplicate option with code {0:?} {1} and {2}")]
     DuplicateOption(v6::OptionCode, String, String),
@@ -969,7 +969,7 @@ enum OptionsError {
     MismatchedClientId { got: Vec<u8>, want: [u8; CLIENT_ID_LEN] },
     #[error("unexpected Client ID in Reply to anonymous Information-Request: {0:?}")]
     UnexpectedClientId(Vec<u8>),
-    // TODO(https://fxbug.dev/104297): Use an owned option type rather
+    // TODO(https://fxbug.dev/42055437): Use an owned option type rather
     // than a string of the debug representation of the invalid option.
     #[error("invalid option found: {0:?}")]
     InvalidOption(String),
@@ -1020,9 +1020,9 @@ impl<V> IaChecker for HashMap<v6::IAID, V> {
     }
 }
 
-// TODO(https://fxbug.dev/104025): Make the choice between ignoring invalid
+// TODO(https://fxbug.dev/42055137): Make the choice between ignoring invalid
 // options and discarding the entire message configurable.
-// TODO(https://fxbug.dev/104519): Move this function and associated types
+// TODO(https://fxbug.dev/42055684): Move this function and associated types
 // into packet-formats-dhcp.
 /// Process options.
 ///
@@ -1187,7 +1187,7 @@ fn process_options<B: ByteSlice, IaNaChecker: IaChecker, IaPdChecker: IaChecker>
                         VALID_MAX_SOLICIT_TIMEOUT_RANGE,
                     );
                 } else {
-                    // TODO(https://fxbug.dev/103407): Use a bounded type to
+                    // TODO(https://fxbug.dev/42054450): Use a bounded type to
                     // store SOL_MAX_RT.
                     solicit_max_rt_option = Some(sol_max_rt_opt.get());
                 }
@@ -1410,7 +1410,7 @@ fn process_options<B: ByteSlice, IaNaChecker: IaChecker, IaPdChecker: IaChecker>
                 dns_servers = Some(server_addrs);
             }
             v6::ParsedDhcpOption::DomainList(_domains) => {
-                // TODO(https://fxbug.dev/87176) implement domain list.
+                // TODO(https://fxbug.dev/42168268) implement domain list.
             }
         }
     }
@@ -2444,7 +2444,7 @@ fn process_ia_error_status(
         //
         // Retry obtaining this IA_NA in subsequent messages.
         //
-        // TODO(https://fxbug.dev/81086): implement rate limiting.
+        // TODO(https://fxbug.dev/42161502): implement rate limiting.
         (
             RequestLeasesMessageType::Request
             | RequestLeasesMessageType::Renew
@@ -2488,7 +2488,7 @@ fn process_ia_error_status(
         //
         // Retry obtaining this IA_PD in subsequent messages.
         //
-        // TODO(https://fxbug.dev/81086): implement rate limiting.
+        // TODO(https://fxbug.dev/42161502): implement rate limiting.
         (
             RequestLeasesMessageType::Request
             | RequestLeasesMessageType::Renew
@@ -2542,7 +2542,7 @@ fn process_ia_error_status(
         // We currently always multicast our messages so we do not expect the
         // UseMulticast error.
         //
-        // TODO(https://fxbug.dev/76764): Do not consider this an invalid error
+        // TODO(https://fxbug.dev/42156704): Do not consider this an invalid error
         // when unicasting messages.
         (
             RequestLeasesMessageType::Request | RequestLeasesMessageType::Renew,
@@ -3080,7 +3080,7 @@ fn process_reply_with_leases<B: ByteSlice, I: Instant>(
                     //    message had not been received).  The client continues to use other
                     //    bindings for which the server did return information.
                     //
-                    // TODO(https://fxbug.dev/81086): implement rate limiting.
+                    // TODO(https://fxbug.dev/42161502): implement rate limiting.
                     warn!(
                         "Reply to {}: allowing retransmit timeout to retry due to missing IA",
                         request_type
@@ -3433,7 +3433,7 @@ impl<I: Instant> Requesting<I> {
     /// The client's policy on message exchange failure is to select another
     /// server; if there are no  more servers available, restart server
     /// discovery.
-    /// TODO(https://fxbug.dev/88117): make the client policy configurable.
+    /// TODO(https://fxbug.dev/42169314): make the client policy configurable.
     fn retransmission_timer_expired<R: Rng>(
         self,
         request_transaction_id: [u8; 3],
@@ -3606,7 +3606,7 @@ impl<I: Instant> Requesting<I> {
                             //    which it retransmits the message (see Section 14.1).
                             //
                             // Ignore this Reply and rely on timeout for retransmission.
-                            // TODO(https://fxbug.dev/81086): implement rate limiting.
+                            // TODO(https://fxbug.dev/42161502): implement rate limiting.
                             v6::ErrorStatusCode::UnspecFail => {
                                 warn!(
                                     "ignoring Reply to Request: ignoring due to UnspecFail error
@@ -3614,7 +3614,7 @@ impl<I: Instant> Requesting<I> {
                                     message,
                                 );
                             }
-                            // TODO(https://fxbug.dev/76764): implement unicast.
+                            // TODO(https://fxbug.dev/42156704): implement unicast.
                             // The client already uses multicast.
                             v6::ErrorStatusCode::UseMulticast => {
                                 warn!(
@@ -3717,7 +3717,7 @@ impl<I: Instant> Requesting<I> {
                 // have gone stale as the server may have assigned advertised
                 // IAs to some other client.
                 //
-                // TODO(https://fxbug.dev/72701) Send AddressWatcher update with
+                // TODO(https://fxbug.dev/42152192) Send AddressWatcher update with
                 // assigned addresses.
                 Transition {
                     state: ClientState::Assigned(Assigned {
@@ -3819,7 +3819,7 @@ impl<I: Instant> Requesting<I> {
             let configured_non_temporary_addresses = to_configured_values(non_temporary_addresses);
             let configured_delegated_prefixes = to_configured_values(delegated_prefixes);
 
-            // TODO(https://fxbug.dev/96674): Before selecting a different server,
+            // TODO(https://fxbug.dev/42178817): Before selecting a different server,
             // add actions to remove the existing assigned addresses, if any.
             let AdvertiseMessage {
                 server_id,
@@ -4415,7 +4415,7 @@ impl<I: Instant, const IS_REBINDING: bool> RenewingOrRebinding<I, IS_REBINDING> 
                     //    which it retransmits the message and limit the duration of the
                     //    time during which it retransmits the message (see Section 14.1).
                     //
-                    // TODO(https://fxbug.dev/81086): implement rate limiting. Without
+                    // TODO(https://fxbug.dev/42161502): implement rate limiting. Without
                     // rate limiting support, the client relies on the regular
                     // retransmission mechanism to rate limit retransmission.
                     // Similarly, for other status codes indicating failure that are not
@@ -4437,7 +4437,7 @@ impl<I: Instant, const IS_REBINDING: bool> RenewingOrRebinding<I, IS_REBINDING> 
                         v6::ErrorStatusCode::UseMulticast,
                         message,
                     )) => {
-                        // TODO(https://fxbug.dev/76764): Implement unicast.
+                        // TODO(https://fxbug.dev/42156704): Implement unicast.
                         warn!(
                             "ignoring Reply to Renew with status code UseMulticast \
                                 and message '{}' as Reply was already sent as multicast",
@@ -4539,7 +4539,7 @@ impl<I: Instant, const IS_REBINDING: bool> RenewingOrRebinding<I, IS_REBINDING> 
                 transaction_id: None,
             },
             StateAfterReplyWithLeases::Assigned => {
-                // TODO(https://fxbug.dev/72701) Send AddressWatcher update with
+                // TODO(https://fxbug.dev/42152192) Send AddressWatcher update with
                 // assigned addresses.
                 Transition {
                     state: ClientState::Assigned(Assigned {
@@ -7449,7 +7449,7 @@ mod tests {
         );
     }
 
-    // TODO(https://fxbug.dev/109224): Refactor this test into independent test cases.
+    // TODO(https://fxbug.dev/42060598): Refactor this test into independent test cases.
     #[test]
     fn requesting_receive_reply_with_failure_status_code() {
         let options_to_request = vec![];
@@ -10442,7 +10442,7 @@ mod tests {
         let buf = assert_matches!(
             &actions[..],
             [
-                // TODO(https://fxbug.dev/96674): should include action to
+                // TODO(https://fxbug.dev/42178817): should include action to
                 // remove the address of IA with NoBinding status.
                 Action::CancelTimer(ClientTimerType::Retransmission),
                 Action::SendMessage(buf),

@@ -74,7 +74,7 @@ fuchsia_unittest_package("netemul-runner-errors-tests") {
 
   subpackages = [ "//src/sys/test_manager:pkg" ]
 
-  # TODO(https://fxbug.dev/65359): allowlist ERROR logs from netemul_test_runner
+  # TODO(https://fxbug.dev/42144060): allowlist ERROR logs from netemul_test_runner
   # when testing invalid test configurations that cause it to emit ERROR logs.
   test_specs = {
     log_settings = {
@@ -88,7 +88,7 @@ group("tests") {
   testonly = true
   deps = [ ":netemul-runner-tests" ]
 
-  # TODO(https://fxbug.dev/95120): deflake the following test on coverage bots and
+  # TODO(https://fxbug.dev/42177092): deflake the following test on coverage bots and
   # re-enable.
   if (!is_coverage) {
     deps += [ ":netemul-runner-errors-tests" ]

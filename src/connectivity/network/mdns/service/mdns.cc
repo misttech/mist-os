@@ -63,7 +63,7 @@ void Mdns::Start(fuchsia::net::interfaces::WatcherPtr interfaces_watcher,
 
   // If alternate services are registered, create an address responder agent to respond to address
   // queries for the alternate host name. No probe is performed.
-  // TODO(https://fxbug.dev/113901): Remove this when alt_services is no longer needed.
+  // TODO(https://fxbug.dev/42065146): Remove this when alt_services is no longer needed.
   if (!alt_services_.empty()) {
     auto alt_host_name = MdnsNames::AltHostName(local_host_name);
     if (alt_host_name == local_host_name) {
@@ -290,7 +290,7 @@ bool Mdns::PublishServiceInstance(std::string host_name, std::vector<inet::IpAdd
   // services, publish from the alternate host name.
   if (!from_proxy &&
       std::find(alt_services_.begin(), alt_services_.end(), service_name) != alt_services_.end()) {
-    // TODO(https://fxbug.dev/113901): Remove this when alt_services is no longer needed.
+    // TODO(https://fxbug.dev/42065146): Remove this when alt_services is no longer needed.
     FX_LOGS(INFO) << "Alternate services specified, responding on alternate host name.";
     host_name = MdnsNames::AltHostName(original_local_host_name_);
   }

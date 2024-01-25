@@ -90,7 +90,7 @@ enum IcmpEvent {
     EchoReply(IcmpPacketMetadata),
 }
 
-// TODO(https://fxbug.dev/91971): Replace this with a shared solution.
+// TODO(https://fxbug.dev/42173593): Replace this with a shared solution.
 fn to_fidl_address(addr: net_types::ip::Ipv4Addr) -> fnet::IpAddress {
     fnet::IpAddress::Ipv4(fnet::Ipv4Address { addr: addr.ipv4_bytes() })
 }

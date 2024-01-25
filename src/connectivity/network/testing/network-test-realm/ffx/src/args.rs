@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-// TODO(https://fxbug.dev/76549): Replace with GN config once available in an ffx_plugin.
+// TODO(https://fxbug.dev/42156465): Replace with GN config once available in an ffx_plugin.
 #![deny(unused_results)]
 
 use fidl_fuchsia_net_ext as fnet_ext;
@@ -210,8 +210,8 @@ pub struct Dhcpv6ClientStart {
     #[argh(option, from_str_fn(optional_prefix_from_str))]
     /// request prefix delegation from servers
     pub prefix_delegation_config: Option<Option<fnet_ext::SubnetV6>>,
-    // TODO(https://fxbug.dev/48867): Add configuration for Rapid Commit.
-    // TODO(https://fxbug.dev/105427): Add configuration for acquiring temporary addresses.
+    // TODO(https://fxbug.dev/42125771): Add configuration for Rapid Commit.
+    // TODO(https://fxbug.dev/42056655): Add configuration for acquiring temporary addresses.
 }
 
 #[derive(argh::ArgsInfo, argh::FromArgs, Debug, PartialEq)]

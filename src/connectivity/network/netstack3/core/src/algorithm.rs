@@ -169,7 +169,7 @@ where
 /// See the function documentation for more info.
 #[derive(Copy, Clone, Debug)]
 pub(crate) enum OpaqueIidNonce {
-    // TODO(https://fxbug.dev/69644) Remove allow(dead_code) when this is used
+    // TODO(https://fxbug.dev/42148800) Remove allow(dead_code) when this is used
     // to generate static opaque identifiers.
     #[cfg_attr(not(test), allow(dead_code))]
     DadCounter(u8),

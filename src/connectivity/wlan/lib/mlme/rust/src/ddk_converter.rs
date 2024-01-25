@@ -53,7 +53,7 @@ pub fn mlme_band_cap_from_softmac(
         })
     }
 
-    // TODO(https://fxbug.dev/135357): The predicate fields in `WlanSoftmacBandCapability` have been
+    // TODO(https://fxbug.dev/42084991): The predicate fields in `WlanSoftmacBandCapability` have been
     //                         deprecated. As such, this function raises no errors when the
     //                         predicate is set `true` but the predicated field is unset, because
     //                         servers working against the deprecated fields are expected to always

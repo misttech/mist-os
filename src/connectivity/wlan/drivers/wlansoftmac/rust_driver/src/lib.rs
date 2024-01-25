@@ -167,7 +167,7 @@ async fn start<D: DeviceOps + 'static>(
     let security_support = device.security_support()?;
     let spectrum_management_support = device.spectrum_management_support()?;
 
-    // TODO(https://fxbug.dev/113677): Get persistence working by adding the appropriate configs
+    // TODO(https://fxbug.dev/42064968): Get persistence working by adding the appropriate configs
     //                         in *.cml files
     let (persistence_proxy, _persistence_server_end) = match fidl::endpoints::create_proxy::<
         fidl_fuchsia_diagnostics_persist::DataPersistenceMarker,
@@ -186,7 +186,7 @@ async fn start<D: DeviceOps + 'static>(
         wpa1_supported: legacy_privacy_support.wpa1_supported,
     };
 
-    // TODO(https://fxbug.dev/126324): The MLME event stream should be moved out of DeviceOps entirely.
+    // TODO(https://fxbug.dev/42077094): The MLME event stream should be moved out of DeviceOps entirely.
     let mlme_event_stream = match device.take_mlme_event_stream() {
         Some(mlme_event_stream) => mlme_event_stream,
         None => {

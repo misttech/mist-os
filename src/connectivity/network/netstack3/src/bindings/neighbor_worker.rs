@@ -193,7 +193,7 @@ impl Worker {
                 Item::SinkItem(Some(SinkItem::Event(
                     ref event @ Event { ref id, kind, addr, at },
                 ))) => {
-                    // TODO(https://fxbug.dev/136401): Add flags to the log indicating if
+                    // TODO(https://fxbug.dev/42086008): Add flags to the log indicating if
                     // the neighbor is a default gateway and if it is on-link.
                     info!(tag = "NUD", "{event}");
 
@@ -514,7 +514,7 @@ pub(super) async fn serve_controller(
                     responder,
                 } => {
                     warn!(
-                        "TODO(https://fxbug.dev/124960): \
+                        "TODO(https://fxbug.dev/42075782): \
                             Implement fuchsia.net.neighbor/Controller.UpdateUnreachabilityConfig"
                     );
                     responder.send(Err(zx::Status::NOT_SUPPORTED.into_raw()))

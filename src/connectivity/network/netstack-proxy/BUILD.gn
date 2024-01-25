@@ -58,7 +58,7 @@ network_unified_binary_regular_and_gub_components("component") {
     ":bin",
     "//src/connectivity/network/netstack3:bin",
 
-    # TODO(https://fxbug.dev/125773): Remove this once the DHCP client is
+    # TODO(https://fxbug.dev/42076541): Remove this once the DHCP client is
     # in the network realm and can get the packet socket provider
     # capability from there.
     "//src/connectivity/network/dhcpv4/client/bindings:component",

@@ -41,7 +41,7 @@ fuchsia_driver("wlanphy_driver-driver") {
 
   deps = wlanphy_deps
 
-  # TODO(https://fxbug.dev/58162): delete the below and fix compiler warnings
+  # TODO(https://fxbug.dev/42136089): delete the below and fix compiler warnings
   configs += [ "//build/config:Wno-conversion" ]
 }
 
@@ -74,7 +74,7 @@ executable("wlanphy_device_test") {
            "//zircon/system/ulib/zx",
          ]
 
-  # TODO(https://fxbug.dev/58162): delete the below and fix compiler warnings
+  # TODO(https://fxbug.dev/42136089): delete the below and fix compiler warnings
   configs += [ "//build/config:Wno-conversion" ]
 }
 

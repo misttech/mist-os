@@ -33,7 +33,7 @@ use {
         CLIENT_MAC_ADDR, ETH_DST_MAC,
     },
 };
-// Remedy for https://fxbug.dev/8165 (https://fxbug.dev/33151)
+// Remedy for https://fxbug.dev/8165 (https://fxbug.dev/42108316)
 // Refer to |KMinstrelUpdateIntervalForHwSim| in //src/connectivity/wlan/drivers/wlan/device.cpp
 const DATA_FRAME_INTERVAL_NANOS: i64 = 4_000_000;
 
@@ -326,8 +326,8 @@ async fn rate_selection() {
         assert_eq!(&tx_vecs[..], SUPPORTED_IDXS);
     }
     info!(
-        "If the test fails due to QEMU slowness outside of the scope of WLAN (See https://fxbug.dev/8165, \
-         https://fxbug.dev/33151). Try increasing |DATA_FRAME_INTERVAL_NANOS| above."
+        "If the test fails due to QEMU slowness outside of the scope of WLAN (See https://fxbug.dev/42162128, \
+         https://fxbug.dev/42108316). Try increasing |DATA_FRAME_INTERVAL_NANOS| above."
     );
     assert_eq!(snapshot.max.tx_vec_idx, MAX_SUCCESSFUL_IDX);
 }

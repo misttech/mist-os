@@ -67,7 +67,7 @@ impl IntoSockAddr for libc::sockaddr_ll {
 
         // SAFETY: We ensure that the address family (`AF_PACKET`) and length (`sockaddr_ll_len`)
         // match the type of storage address (`sockaddr_ll`).
-        // TODO(https://fxbug.dev/104559): Move this unsafe code upstream into `socket2`.
+        // TODO(https://fxbug.dev/42055728): Move this unsafe code upstream into `socket2`.
         let ((), sock_addr) = unsafe {
             socket2::SockAddr::try_init(|sockaddr_storage, len_ptr| {
                 (sockaddr_storage as *mut libc::sockaddr_ll).write(self);

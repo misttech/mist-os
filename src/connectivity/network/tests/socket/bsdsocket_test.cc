@@ -122,7 +122,7 @@ TEST(LocalhostTest, Accept4CloexecFlag) {
   ASSERT_EQ(fcntl(acptfd, F_GETFD), FD_CLOEXEC);
 }
 
-// TODO(https://fxbug.dev/90038): Delete once SockOptsTest is gone.
+// TODO(https://fxbug.dev/42171446): Delete once SockOptsTest is gone.
 struct SockOption {
   int level;
   int option;
@@ -643,7 +643,7 @@ INSTANTIATE_TEST_SUITE_P(
                                      STRINGIFIED_SOCKOPT(IPPROTO_IPV6, IPV6_UNICAST_HOPS))),
     SocketKindAndOptionToString);
 
-// TODO(https://fxbug.dev/90038): Use SocketOptionTestBase for these tests.
+// TODO(https://fxbug.dev/42171446): Use SocketOptionTestBase for these tests.
 class SocketOptsTest : public SocketKindTest {
  protected:
   static bool IsTCP() { return std::get<1>(GetParam()).which() == SocketType::Which::Stream; }
@@ -1433,7 +1433,7 @@ TEST_P(ReadAfterShutdownTest, Success) {
   if (kIsFuchsia && socket_type.which() == SocketType::Which::Dgram &&
       read_type == ReadType::Blocking && shutdown_type.which() == ShutdownType::Which::Read &&
       which_end == ShutdownEnd::Local && read_socket_state == ReadSocketState::NoPendingData) {
-    // TODO(https://fxbug.dev/42041): Support blocking reads after shutdown for dgram sockets.
+    // TODO(https://fxbug.dev/42118192): Support blocking reads after shutdown for dgram sockets.
     GTEST_SKIP() << "Blocking dgram reads with no pending data hang on Fuchsia when the socket "
                     "is shutdown with SHUT_RD";
   }
@@ -1586,7 +1586,7 @@ class NetSocketTest : public testing::TestWithParam<SocketType> {};
 // Test MSG_PEEK
 // MSG_PEEK : Peek into the socket receive queue without moving the contents from it.
 //
-// TODO(https://fxbug.dev/90876): change this test to use recvmsg instead of recvfrom to exercise
+// TODO(https://fxbug.dev/42172376): change this test to use recvmsg instead of recvfrom to exercise
 // MSG_PEEK with scatter/gather.
 TEST_P(NetSocketTest, SocketPeekTest) {
   const SocketType socket_type = GetParam();
@@ -1636,7 +1636,7 @@ TEST_P(NetSocketTest, SocketPeekTest) {
     ssize_t readLen = 0;
     // Retry socket read with MSG_PEEK to ensure all of the expected data is received.
     //
-    // TODO(https://fxbug.dev/74639) : Use SO_RCVLOWAT instead of retry.
+    // TODO(https://fxbug.dev/42154343) : Use SO_RCVLOWAT instead of retry.
     do {
       readLen = asyncSocketRead(recvfd.get(), sendfd.get(), recvbuf, sizeof(recvbuf), flags,
                                 socket_type, SocketDomain::IPv4(), kTimeout);
@@ -1739,7 +1739,7 @@ TEST_P(SocketKindTest, IoctlFIONREAD) {
   int res = ioctl(recvfd.get(), FIONREAD, &num_readable);
 
   if (kIsFuchsia && socket_type.which() == SocketType::Which::Dgram) {
-    // TODO(https://fxbug.dev/42040): Support FIONREAD on Fuchsia.
+    // TODO(https://fxbug.dev/42118191): Support FIONREAD on Fuchsia.
     ASSERT_EQ(res, -1);
     EXPECT_EQ(errno, ENOTTY) << strerror(errno);
     return;

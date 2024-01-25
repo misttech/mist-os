@@ -271,10 +271,10 @@ func (c *context) initBufferSizes() {
 		c.setRollingBufferStart(0, c.bufferStart+uintptr(BufferHeaderSize))
 		c.clearRollingBufferStart(1)
 	case Circular:
-		// TODO(https://fxbug.dev/78263): Support circular mode.
+		// TODO(https://fxbug.dev/42158370): Support circular mode.
 		panic("circular mode is not supported")
 	case Streaming:
-		// TODO(https://fxbug.dev/78265): Support streaming mode.
+		// TODO(https://fxbug.dev/42158372): Support streaming mode.
 		panic("streaming mode is not supported")
 	default:
 		panic(fmt.Sprintf("unknown mode (%d)", mode))
@@ -339,7 +339,7 @@ func (c *context) usingDurableBuffer() bool {
 }
 
 func (c *context) allocDurableRecord(nbytes uint64) (*[MaxBufferSize]byte, uint64, bool) {
-	// TODO(https://fxbug.dev/78263): Support circular mode.
+	// TODO(https://fxbug.dev/42158370): Support circular mode.
 	return nil, 0, false
 }
 
@@ -356,10 +356,10 @@ func (c *context) allocRecord(nbytes uint64) (*[MaxBufferSize]byte, uint64, bool
 		}
 		return c.rollingBufferStart[bufferNumber], bufferOffset - nbytes, true
 	case Circular:
-		// TODO(https://fxbug.dev/78263): Support circular mode.
+		// TODO(https://fxbug.dev/42158370): Support circular mode.
 		panic("circular mode is not supported")
 	case Streaming:
-		// TODO(https://fxbug.dev/78265): Support streaming mode.
+		// TODO(https://fxbug.dev/42158372): Support streaming mode.
 		panic("streaming mode is not supported")
 	default:
 		panic(fmt.Sprintf("unknown mode (%d)", mode))

@@ -6,7 +6,7 @@ group("services") {
   deps = [ "//src/connectivity/network/mdns/service:mdns" ]
 }
 
-# TODO(https://fxbug.dev/122864) Remove transitional labels
+# TODO(https://fxbug.dev/42073789) Remove transitional labels
 group("config") {
 }
 

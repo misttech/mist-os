@@ -628,7 +628,7 @@ pub(crate) fn fields_to_retain_from_response_to_request(
         // Strictly according to RFC 2131, the Server Identifier MUST be included in
         // the DHCPACK. However, we've observed DHCP servers in the field fail to
         // set the Server Identifier, instead expecting the client to remember it
-        // from the DHCPOFFER (https://fxbug.dev/113194). Thus, we treat Server
+        // from the DHCPOFFER (https://fxbug.dev/42064504). Thus, we treat Server
         // Identifier as optional for DHCPACK.
         Option<net_types::SpecifiedAddr<net_types::ip::Ipv4Addr>>,
     >,

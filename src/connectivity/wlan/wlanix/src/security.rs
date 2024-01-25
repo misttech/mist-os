@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-//! TODO(https://fxbug.dev/134895): Types and functions in this file are taken from wlancfg. Dedupe later.
+//! TODO(https://fxbug.dev/42084621): Types and functions in this file are taken from wlancfg. Dedupe later.
 
 use {
     ieee80211::Bssid,

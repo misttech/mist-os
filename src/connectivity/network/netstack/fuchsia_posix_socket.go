@@ -1319,7 +1319,7 @@ func (ep *endpointWithEvent) GetError(fidl.Context) (socket.BaseSocketGetErrorRe
 }
 
 func (epe *endpointWithEvent) describe() (zx.Handle, error) {
-	// TODO(https://fxbug.dev/77623): The rights on this handle should be capped at the connection's.
+	// TODO(https://fxbug.dev/42157659): The rights on this handle should be capped at the connection's.
 	event, err := epe.peer.Duplicate(zx.RightTransfer | zx.RightWait)
 	_ = syslog.DebugTf("Describe", "%p: err=%v", epe, err)
 	return event, err
@@ -1501,7 +1501,7 @@ func (eps *endpointWithSocket) startReadWriteLoops(loopRead, loopWrite func(chan
 }
 
 func (eps *endpointWithSocket) describe() (zx.Handle, error) {
-	// TODO(https://fxbug.dev/77623): The rights on this handle should be capped at the connection's.
+	// TODO(https://fxbug.dev/42157659): The rights on this handle should be capped at the connection's.
 	socket, err := eps.peer.Handle().Duplicate(zx.RightTransfer | zx.RightsIO | zx.RightWait | zx.RightInspect)
 	_ = syslog.DebugTf("Describe", "%p: err=%v", eps, err)
 	return socket, err
@@ -1747,7 +1747,7 @@ func (s *streamSocketImpl) loopWrite(ch chan<- struct{}) {
 		if n != int64(reader.readBytes) {
 			panic(fmt.Sprintf("partial write into endpoint (%s); got %d, want %d", err, n, reader.readBytes))
 		}
-		// TODO(https://fxbug.dev/35006): Handle all transport write errors.
+		// TODO(https://fxbug.dev/42110377): Handle all transport write errors.
 		switch err.(type) {
 		case nil, *tcpip.ErrBadBuffer:
 			switch err := reader.lastError.(type) {
@@ -1784,7 +1784,7 @@ func (s *streamSocketImpl) loopWrite(ch chan<- struct{}) {
 				continue
 			}
 		case *tcpip.ErrConnectionRefused:
-			// TODO(https://fxbug.dev/61594): Allow the socket to be reused for
+			// TODO(https://fxbug.dev/42139897): Allow the socket to be reused for
 			// another connection attempt to match Linux.
 			return
 		case *tcpip.ErrConnectionAborted, *tcpip.ErrConnectionReset, *tcpip.ErrNetworkUnreachable, *tcpip.ErrHostUnreachable:
@@ -1804,7 +1804,7 @@ func (s *streamSocketImpl) loopWrite(ch chan<- struct{}) {
 // handleEndpointReadError contains handling logic for tcpip.Endpoint read errors.
 // Returns true iff the error was found to be terminal.
 func (eps *endpointWithSocket) handleEndpointReadError(err tcpip.Error, inCh <-chan struct{}, transProto tcpip.TransportProtocolNumber) bool {
-	// TODO(https://fxbug.dev/35006): Handle all transport read errors.
+	// TODO(https://fxbug.dev/42110377): Handle all transport read errors.
 	switch err.(type) {
 	case *tcpip.ErrWouldBlock:
 		select {
@@ -1925,7 +1925,7 @@ func (s *streamSocketImpl) loopRead(ch chan<- struct{}) {
 			// having received a TCP RST.
 			return
 		case *tcpip.ErrConnectionRefused:
-			// TODO(https://fxbug.dev/61594): Allow the socket to be reused for
+			// TODO(https://fxbug.dev/42139897): Allow the socket to be reused for
 			// another connection attempt to match Linux.
 			return
 		case *tcpip.ErrConnectionAborted, *tcpip.ErrConnectionReset, *tcpip.ErrNetworkUnreachable, *tcpip.ErrHostUnreachable:
@@ -2041,7 +2041,7 @@ func (d *destinationCache) reset() {
 }
 
 func (d *destinationCache) clear() {
-	// TODO(https://fxbug.dev/100894): Use a single syscall to close these eventpairs.
+	// TODO(https://fxbug.dev/42051658): Use a single syscall to close these eventpairs.
 	if err := d.local.Close(); err != nil {
 		panic(fmt.Sprintf("local.Close() = %s", err))
 	}
@@ -2078,7 +2078,7 @@ func (c *cmsgCache) reset() {
 }
 
 func (c *cmsgCache) clear() {
-	// TODO(https://fxbug.dev/100894): Use a single syscall to close these eventpairs.
+	// TODO(https://fxbug.dev/42051658): Use a single syscall to close these eventpairs.
 	if err := c.local.Close(); err != nil {
 		panic(fmt.Sprintf("local.Close() = %s", err))
 	}
@@ -2482,7 +2482,7 @@ func (s *datagramSocketImpl) addConnection(_ fidl.Context, channel zx.Channel) {
 // to packets enqueued before the call.
 
 func (s *datagramSocketImpl) Connect(_ fidl.Context, address fnet.SocketAddress) (socket.BaseNetworkSocketConnectResult, error) {
-	// TODO(https://fxbug.dev/109784): Audit cache flushes after Fast UDP launches.
+	// TODO(https://fxbug.dev/42061146): Audit cache flushes after Fast UDP launches.
 	return executeMutatorWithCacheFlushes(s, func(ewm endpointWithMutators) (socket.BaseNetworkSocketConnectResult, error) {
 		if err := s.nonStreamEndpoint.connect(ewm.ep, address); err != nil {
 			return socket.BaseNetworkSocketConnectResultWithErr(tcpipErrorToCode(err)), nil
@@ -2492,137 +2492,137 @@ func (s *datagramSocketImpl) Connect(_ fidl.Context, address fnet.SocketAddress)
 }
 
 func (s *datagramSocketImpl) Disconnect(ctx fidl.Context) (socket.BaseNetworkSocketDisconnectResult, error) {
-	// TODO(https://fxbug.dev/109784): Audit cache flushes after Fast UDP launches.
+	// TODO(https://fxbug.dev/42061146): Audit cache flushes after Fast UDP launches.
 	return executeMutatorWithCacheFlushes(s, func(ewm endpointWithMutators) (socket.BaseNetworkSocketDisconnectResult, error) {
 		return ewm.Disconnect(ctx)
 	})
 }
 
 func (s *datagramSocketImpl) SetIpTypeOfService(ctx fidl.Context, value uint8) (socket.BaseNetworkSocketSetIpTypeOfServiceResult, error) {
-	// TODO(https://fxbug.dev/109784): Audit cache flushes after Fast UDP launches.
+	// TODO(https://fxbug.dev/42061146): Audit cache flushes after Fast UDP launches.
 	return executeMutatorWithCacheFlushes(s, func(ewm endpointWithMutators) (socket.BaseNetworkSocketSetIpTypeOfServiceResult, error) {
 		return ewm.SetIpTypeOfService(ctx, value)
 	})
 }
 
 func (s *datagramSocketImpl) SetIpv6Only(ctx fidl.Context, value bool) (socket.BaseNetworkSocketSetIpv6OnlyResult, error) {
-	// TODO(https://fxbug.dev/109784): Audit cache flushes after Fast UDP launches.
+	// TODO(https://fxbug.dev/42061146): Audit cache flushes after Fast UDP launches.
 	return executeMutatorWithCacheFlushes(s, func(ewm endpointWithMutators) (socket.BaseNetworkSocketSetIpv6OnlyResult, error) {
 		return ewm.SetIpv6Only(ctx, value)
 	})
 }
 
 func (s *datagramSocketImpl) SetIpv6TrafficClass(ctx fidl.Context, value socket.OptionalUint8) (socket.BaseNetworkSocketSetIpv6TrafficClassResult, error) {
-	// TODO(https://fxbug.dev/109784): Audit cache flushes after Fast UDP launches.
+	// TODO(https://fxbug.dev/42061146): Audit cache flushes after Fast UDP launches.
 	return executeMutatorWithCacheFlushes(s, func(ewm endpointWithMutators) (socket.BaseNetworkSocketSetIpv6TrafficClassResult, error) {
 		return ewm.SetIpv6TrafficClass(ctx, value)
 	})
 }
 
 func (s *datagramSocketImpl) SetIpv6UnicastHops(ctx fidl.Context, value socket.OptionalUint8) (socket.BaseNetworkSocketSetIpv6UnicastHopsResult, error) {
-	// TODO(https://fxbug.dev/109784): Audit cache flushes after Fast UDP launches.
+	// TODO(https://fxbug.dev/42061146): Audit cache flushes after Fast UDP launches.
 	return executeMutatorWithCacheFlushes(s, func(ewm endpointWithMutators) (socket.BaseNetworkSocketSetIpv6UnicastHopsResult, error) {
 		return ewm.SetIpv6UnicastHops(ctx, value)
 	})
 }
 
 func (s *datagramSocketImpl) SetIpTtl(ctx fidl.Context, value socket.OptionalUint8) (socket.BaseNetworkSocketSetIpTtlResult, error) {
-	// TODO(https://fxbug.dev/109784): Audit cache flushes after Fast UDP launches.
+	// TODO(https://fxbug.dev/42061146): Audit cache flushes after Fast UDP launches.
 	return executeMutatorWithCacheFlushes(s, func(ewm endpointWithMutators) (socket.BaseNetworkSocketSetIpTtlResult, error) {
 		return ewm.SetIpTtl(ctx, value)
 	})
 }
 
 func (s *datagramSocketImpl) SetSendBuffer(ctx fidl.Context, size uint64) (socket.BaseSocketSetSendBufferResult, error) {
-	// TODO(https://fxbug.dev/109784): Audit cache flushes after Fast UDP launches.
-	// TODO(https://fxbug.dev/95986): Test synchronous semantics wrt packet sends.
+	// TODO(https://fxbug.dev/42061146): Audit cache flushes after Fast UDP launches.
+	// TODO(https://fxbug.dev/42178052): Test synchronous semantics wrt packet sends.
 	return executeMutatorWithCacheFlushes(s, func(ewm endpointWithMutators) (socket.BaseSocketSetSendBufferResult, error) {
 		return ewm.SetSendBuffer(ctx, size)
 	})
 }
 
 func (s *datagramSocketImpl) SetBindToDevice(ctx fidl.Context, value string) (socket.BaseSocketSetBindToDeviceResult, error) {
-	// TODO(https://fxbug.dev/109784): Audit cache flushes after Fast UDP launches.
-	// TODO(https://fxbug.dev/95986): Test synchronous semantics wrt packet sends.
+	// TODO(https://fxbug.dev/42061146): Audit cache flushes after Fast UDP launches.
+	// TODO(https://fxbug.dev/42178052): Test synchronous semantics wrt packet sends.
 	return executeMutatorWithCacheFlushes(s, func(ewm endpointWithMutators) (socket.BaseSocketSetBindToDeviceResult, error) {
 		return ewm.SetBindToDevice(ctx, value)
 	})
 }
 
 func (s *datagramSocketImpl) SetBroadcast(ctx fidl.Context, value bool) (socket.BaseSocketSetBroadcastResult, error) {
-	// TODO(https://fxbug.dev/109784): Audit cache flushes after Fast UDP launches.
+	// TODO(https://fxbug.dev/42061146): Audit cache flushes after Fast UDP launches.
 	return executeMutatorWithCacheFlushes(s, func(ewm endpointWithMutators) (socket.BaseSocketSetBroadcastResult, error) {
 		return ewm.SetBroadcast(ctx, value)
 	})
 }
 
 func (s *datagramSocketImpl) SetNoCheck(ctx fidl.Context, value bool) (socket.BaseSocketSetNoCheckResult, error) {
-	// TODO(https://fxbug.dev/109784): Audit cache flushes after Fast UDP launches.
-	// TODO(https://fxbug.dev/95986): Test synchronous semantics wrt packet sends.
+	// TODO(https://fxbug.dev/42061146): Audit cache flushes after Fast UDP launches.
+	// TODO(https://fxbug.dev/42178052): Test synchronous semantics wrt packet sends.
 	return executeMutatorWithCacheFlushes(s, func(ewm endpointWithMutators) (socket.BaseSocketSetNoCheckResult, error) {
 		return ewm.SetNoCheck(ctx, value)
 	})
 }
 
 func (s *datagramSocketImpl) SetIpv6MulticastInterface(ctx fidl.Context, value uint64) (socket.BaseNetworkSocketSetIpv6MulticastInterfaceResult, error) {
-	// TODO(https://fxbug.dev/109784): Audit cache flushes after Fast UDP launches.
-	// TODO(https://fxbug.dev/95986): Test synchronous semantics wrt packet sends.
+	// TODO(https://fxbug.dev/42061146): Audit cache flushes after Fast UDP launches.
+	// TODO(https://fxbug.dev/42178052): Test synchronous semantics wrt packet sends.
 	return executeMutatorWithCacheFlushes(s, func(ewm endpointWithMutators) (socket.BaseNetworkSocketSetIpv6MulticastInterfaceResult, error) {
 		return ewm.SetIpv6MulticastInterface(ctx, value)
 	})
 }
 
 func (s *datagramSocketImpl) SetIpv6MulticastHops(ctx fidl.Context, value socket.OptionalUint8) (socket.BaseNetworkSocketSetIpv6MulticastHopsResult, error) {
-	// TODO(https://fxbug.dev/109784): Audit cache flushes after Fast UDP launches.
-	// TODO(https://fxbug.dev/95986): Test synchronous semantics wrt packet sends.
+	// TODO(https://fxbug.dev/42061146): Audit cache flushes after Fast UDP launches.
+	// TODO(https://fxbug.dev/42178052): Test synchronous semantics wrt packet sends.
 	return executeMutatorWithCacheFlushes(s, func(ewm endpointWithMutators) (socket.BaseNetworkSocketSetIpv6MulticastHopsResult, error) {
 		return ewm.SetIpv6MulticastHops(ctx, value)
 	})
 }
 
 func (s *datagramSocketImpl) SetIpv6MulticastLoopback(ctx fidl.Context, value bool) (socket.BaseNetworkSocketSetIpv6MulticastLoopbackResult, error) {
-	// TODO(https://fxbug.dev/109784): Audit cache flushes after Fast UDP launches.
-	// TODO(https://fxbug.dev/95986): Test synchronous semantics wrt packet sends.
+	// TODO(https://fxbug.dev/42061146): Audit cache flushes after Fast UDP launches.
+	// TODO(https://fxbug.dev/42178052): Test synchronous semantics wrt packet sends.
 	return executeMutatorWithCacheFlushes(s, func(ewm endpointWithMutators) (socket.BaseNetworkSocketSetIpv6MulticastLoopbackResult, error) {
 		return ewm.SetIpv6MulticastLoopback(ctx, value)
 	})
 }
 
 func (s *datagramSocketImpl) SetIpMulticastTtl(ctx fidl.Context, value socket.OptionalUint8) (socket.BaseNetworkSocketSetIpMulticastTtlResult, error) {
-	// TODO(https://fxbug.dev/109784): Audit cache flushes after Fast UDP launches.
-	// TODO(https://fxbug.dev/95986): Test synchronous semantics wrt packet sends.
+	// TODO(https://fxbug.dev/42061146): Audit cache flushes after Fast UDP launches.
+	// TODO(https://fxbug.dev/42178052): Test synchronous semantics wrt packet sends.
 	return executeMutatorWithCacheFlushes(s, func(ewm endpointWithMutators) (socket.BaseNetworkSocketSetIpMulticastTtlResult, error) {
 		return ewm.SetIpMulticastTtl(ctx, value)
 	})
 }
 
 func (s *datagramSocketImpl) SetIpMulticastInterface(ctx fidl.Context, iface uint64, value fnet.Ipv4Address) (socket.BaseNetworkSocketSetIpMulticastInterfaceResult, error) {
-	// TODO(https://fxbug.dev/109784): Audit cache flushes after Fast UDP launches.
-	// TODO(https://fxbug.dev/95986): Test synchronous semantics wrt packet sends.
+	// TODO(https://fxbug.dev/42061146): Audit cache flushes after Fast UDP launches.
+	// TODO(https://fxbug.dev/42178052): Test synchronous semantics wrt packet sends.
 	return executeMutatorWithCacheFlushes(s, func(ewm endpointWithMutators) (socket.BaseNetworkSocketSetIpMulticastInterfaceResult, error) {
 		return ewm.SetIpMulticastInterface(ctx, iface, value)
 	})
 }
 
 func (s *datagramSocketImpl) SetIpMulticastLoopback(ctx fidl.Context, value bool) (socket.BaseNetworkSocketSetIpMulticastLoopbackResult, error) {
-	// TODO(https://fxbug.dev/109784): Audit cache flushes after Fast UDP launches.
-	// TODO(https://fxbug.dev/95986): Test synchronous semantics wrt packet sends.
+	// TODO(https://fxbug.dev/42061146): Audit cache flushes after Fast UDP launches.
+	// TODO(https://fxbug.dev/42178052): Test synchronous semantics wrt packet sends.
 	return executeMutatorWithCacheFlushes(s, func(ewm endpointWithMutators) (socket.BaseNetworkSocketSetIpMulticastLoopbackResult, error) {
 		return ewm.SetIpMulticastLoopback(ctx, value)
 	})
 }
 
 func (s *datagramSocketImpl) AddIpMembership(ctx fidl.Context, membership socket.IpMulticastMembership) (socket.BaseNetworkSocketAddIpMembershipResult, error) {
-	// TODO(https://fxbug.dev/109784): Audit cache flushes after Fast UDP launches.
-	// TODO(https://fxbug.dev/95986): Test synchronous semantics wrt packet sends.
+	// TODO(https://fxbug.dev/42061146): Audit cache flushes after Fast UDP launches.
+	// TODO(https://fxbug.dev/42178052): Test synchronous semantics wrt packet sends.
 	return executeMutatorWithCacheFlushes(s, func(ewm endpointWithMutators) (socket.BaseNetworkSocketAddIpMembershipResult, error) {
 		return ewm.AddIpMembership(ctx, membership)
 	})
 }
 
 func (s *datagramSocketImpl) DropIpMembership(ctx fidl.Context, membership socket.IpMulticastMembership) (socket.BaseNetworkSocketDropIpMembershipResult, error) {
-	// TODO(https://fxbug.dev/109784): Audit cache flushes after Fast UDP launches.
-	// TODO(https://fxbug.dev/95986): Test synchronous semantics wrt packet sends.
+	// TODO(https://fxbug.dev/42061146): Audit cache flushes after Fast UDP launches.
+	// TODO(https://fxbug.dev/42178052): Test synchronous semantics wrt packet sends.
 	return executeMutatorWithCacheFlushes(s, func(ewm endpointWithMutators) (socket.BaseNetworkSocketDropIpMembershipResult, error) {
 		return ewm.DropIpMembership(ctx, membership)
 	})
@@ -2637,77 +2637,77 @@ func (s *datagramSocketImpl) SetIpReceiveOriginalDestinationAddress(_ fidl.Conte
 }
 
 func (s *datagramSocketImpl) AddIpv6Membership(ctx fidl.Context, membership socket.Ipv6MulticastMembership) (socket.BaseNetworkSocketAddIpv6MembershipResult, error) {
-	// TODO(https://fxbug.dev/109784): Audit cache flushes after Fast UDP launches.
-	// TODO(https://fxbug.dev/95986): Test synchronous semantics wrt packet sends.
+	// TODO(https://fxbug.dev/42061146): Audit cache flushes after Fast UDP launches.
+	// TODO(https://fxbug.dev/42178052): Test synchronous semantics wrt packet sends.
 	return executeMutatorWithCacheFlushes(s, func(ewm endpointWithMutators) (socket.BaseNetworkSocketAddIpv6MembershipResult, error) {
 		return ewm.AddIpv6Membership(ctx, membership)
 	})
 }
 
 func (s *datagramSocketImpl) DropIpv6Membership(ctx fidl.Context, membership socket.Ipv6MulticastMembership) (socket.BaseNetworkSocketDropIpv6MembershipResult, error) {
-	// TODO(https://fxbug.dev/109784): Audit cache flushes after Fast UDP launches.
-	// TODO(https://fxbug.dev/95986): Test synchronous semantics wrt packet sends
+	// TODO(https://fxbug.dev/42061146): Audit cache flushes after Fast UDP launches.
+	// TODO(https://fxbug.dev/42178052): Test synchronous semantics wrt packet sends
 	return executeMutatorWithCacheFlushes(s, func(ewm endpointWithMutators) (socket.BaseNetworkSocketDropIpv6MembershipResult, error) {
 		return ewm.DropIpv6Membership(ctx, membership)
 	})
 }
 
 func (s *datagramSocketImpl) Bind(ctx fidl.Context, sockaddr fnet.SocketAddress) (socket.BaseNetworkSocketBindResult, error) {
-	// TODO(https://fxbug.dev/109784): Audit cache flushes after Fast UDP launches.
-	// TODO(https://fxbug.dev/95986): Test synchronous semantics wrt packet sends
+	// TODO(https://fxbug.dev/42061146): Audit cache flushes after Fast UDP launches.
+	// TODO(https://fxbug.dev/42178052): Test synchronous semantics wrt packet sends
 	return executeMutatorWithCacheFlushes(s, func(ewm endpointWithMutators) (socket.BaseNetworkSocketBindResult, error) {
 		return ewm.Bind(ctx, sockaddr)
 	})
 }
 
 func (s *datagramSocketImpl) SetIpPacketInfo(ctx fidl.Context, value bool) (socket.BaseNetworkSocketSetIpPacketInfoResult, error) {
-	// TODO(https://fxbug.dev/109784): Audit cache flushes after Fast UDP launches.
+	// TODO(https://fxbug.dev/42061146): Audit cache flushes after Fast UDP launches.
 	return executeMutatorWithCacheFlushes(s, func(ewm endpointWithMutators) (socket.BaseNetworkSocketSetIpPacketInfoResult, error) {
 		return ewm.SetIpPacketInfo(ctx, value)
 	})
 }
 
 func (s *datagramSocketImpl) SetKeepAlive(ctx fidl.Context, value bool) (socket.BaseSocketSetKeepAliveResult, error) {
-	// TODO(https://fxbug.dev/109784): Audit cache flushes after Fast UDP launches.
-	// TODO(https://fxbug.dev/95986): Test synchronous semantics wrt packet sends
+	// TODO(https://fxbug.dev/42061146): Audit cache flushes after Fast UDP launches.
+	// TODO(https://fxbug.dev/42178052): Test synchronous semantics wrt packet sends
 	return executeMutatorWithCacheFlushes(s, func(ewm endpointWithMutators) (socket.BaseSocketSetKeepAliveResult, error) {
 		return ewm.SetKeepAlive(ctx, value)
 	})
 }
 
 func (s *datagramSocketImpl) SetLinger(ctx fidl.Context, linger bool, seconds uint32) (socket.BaseSocketSetLingerResult, error) {
-	// TODO(https://fxbug.dev/109784): Audit cache flushes after Fast UDP launches.
+	// TODO(https://fxbug.dev/42061146): Audit cache flushes after Fast UDP launches.
 	return executeMutatorWithCacheFlushes(s, func(ewm endpointWithMutators) (socket.BaseSocketSetLingerResult, error) {
 		return ewm.SetLinger(ctx, linger, seconds)
 	})
 }
 
 func (s *datagramSocketImpl) SetOutOfBandInline(ctx fidl.Context, value bool) (socket.BaseSocketSetOutOfBandInlineResult, error) {
-	// TODO(https://fxbug.dev/109784): Audit cache flushes after Fast UDP launches.
-	// TODO(https://fxbug.dev/95986): Test synchronous semantics wrt packet sends
+	// TODO(https://fxbug.dev/42061146): Audit cache flushes after Fast UDP launches.
+	// TODO(https://fxbug.dev/42178052): Test synchronous semantics wrt packet sends
 	return executeMutatorWithCacheFlushes(s, func(ewm endpointWithMutators) (socket.BaseSocketSetOutOfBandInlineResult, error) {
 		return ewm.SetOutOfBandInline(ctx, value)
 	})
 }
 
 func (s *datagramSocketImpl) SetReceiveBuffer(ctx fidl.Context, size uint64) (socket.BaseSocketSetReceiveBufferResult, error) {
-	// TODO(https://fxbug.dev/109784): Audit cache flushes after Fast UDP launches.
+	// TODO(https://fxbug.dev/42061146): Audit cache flushes after Fast UDP launches.
 	return executeMutatorWithCacheFlushes(s, func(ewm endpointWithMutators) (socket.BaseSocketSetReceiveBufferResult, error) {
 		return ewm.SetReceiveBuffer(ctx, size)
 	})
 }
 
 func (s *datagramSocketImpl) SetReuseAddress(ctx fidl.Context, value bool) (socket.BaseSocketSetReuseAddressResult, error) {
-	// TODO(https://fxbug.dev/109784): Audit cache flushes after Fast UDP launches.
-	// TODO(https://fxbug.dev/95986): Test synchronous semantics wrt packet sends
+	// TODO(https://fxbug.dev/42061146): Audit cache flushes after Fast UDP launches.
+	// TODO(https://fxbug.dev/42178052): Test synchronous semantics wrt packet sends
 	return executeMutatorWithCacheFlushes(s, func(ewm endpointWithMutators) (socket.BaseSocketSetReuseAddressResult, error) {
 		return ewm.SetReuseAddress(ctx, value)
 	})
 }
 
 func (s *datagramSocketImpl) SetReusePort(ctx fidl.Context, value bool) (socket.BaseSocketSetReusePortResult, error) {
-	// TODO(https://fxbug.dev/109784): Audit cache flushes after Fast UDP launches.
-	// TODO(https://fxbug.dev/95986): Test synchronous semantics wrt packet sends
+	// TODO(https://fxbug.dev/42061146): Audit cache flushes after Fast UDP launches.
+	// TODO(https://fxbug.dev/42178052): Test synchronous semantics wrt packet sends
 	return executeMutatorWithCacheFlushes(s, func(ewm endpointWithMutators) (socket.BaseSocketSetReusePortResult, error) {
 		return ewm.SetReusePort(ctx, value)
 	})
@@ -2718,7 +2718,7 @@ func (s *datagramSocketImpl) SetReusePort(ctx fidl.Context, value bool) (socket.
 // before modifying endpoint state in order to avoid racing with concurrently enqueued
 // payloads.
 func (s *datagramSocketImpl) blockUntilSocketDrained() {
-	// TODO(https://fxbug.dev/100877): Prevent ingress into the socket while draining.
+	// TODO(https://fxbug.dev/42051639): Prevent ingress into the socket while draining.
 	s.sharedState.localEDrainedCond.L.Lock()
 	defer s.sharedState.localEDrainedCond.L.Unlock()
 	for {
@@ -2979,7 +2979,7 @@ func (s *datagramSocketImpl) SendMsgPreflight(_ fidl.Context, req socket.Datagra
 
 	// The Netstack's destinationCache tracks the state of the route table and is invalidated
 	// whenever the route table is modified.
-	// TODO(https://fxbug.dev/100895): Implement per-route caching invalidation.
+	// TODO(https://fxbug.dev/42051659): Implement per-route caching invalidation.
 	var nsEventPair zx.Handle
 	if status := zx.Sys_handle_duplicate(s.ns.destinationCacheMu.destinationCache.peer, zx.RightsBasic, &nsEventPair); status != zx.ErrOk {
 		return socket.DatagramSocketSendMsgPreflightResult{}, &zx.Error{Status: status, Text: "zx.EventPair"}
@@ -2992,7 +2992,7 @@ func (s *datagramSocketImpl) SendMsgPreflight(_ fidl.Context, req socket.Datagra
 		return socket.DatagramSocketSendMsgPreflightResult{}, &zx.Error{Status: status, Text: "zx.EventPair"}
 	}
 	response := socket.DatagramSocketSendMsgPreflightResponse{}
-	// TODO(https://fxbug.dev/93268): Compute MTU dynamically once `IP_DONTFRAG` is supported.
+	// TODO(https://fxbug.dev/42175034): Compute MTU dynamically once `IP_DONTFRAG` is supported.
 	response.SetMaximumSize(s.sharedState.maxPayloadSize)
 
 	response.SetValidity([]zx.Handle{nsEventPair, socketEventPair})
@@ -3628,7 +3628,7 @@ func (s *streamSocketImpl) Accept(_ fidl.Context, wantAddr bool) (socket.StreamS
 		if err != nil {
 			return socket.StreamSocketAcceptResult{}, err
 		}
-		// TODO(https://fxbug.dev/67600): this copies a lock; avoid this when FIDL bindings are better.
+		// TODO(https://fxbug.dev/42146533): this copies a lock; avoid this when FIDL bindings are better.
 		response := socket.StreamSocketAcceptResponse{
 			S: streamSocketInterface,
 		}
@@ -4858,7 +4858,7 @@ func (s *packetSocketImpl) controlMessagesToFIDL(cmsg tcpip.ReceivableControlMes
 }
 
 func (s *packetSocketImpl) RecvMsg(_ fidl.Context, wantPacketInfo bool, dataLen uint32, wantControl bool, flags socket.RecvMsgFlags) (packetsocket.SocketRecvMsgResult, error) {
-	// TODO(https://fxbug.dev/21106): do something with control messages.
+	// TODO(https://fxbug.dev/42094933): do something with control messages.
 	_ = wantControl
 
 	bytes, res, err := s.synchronousDatagramSocket.recvMsg(tcpip.ReadOptions{
@@ -4894,7 +4894,7 @@ func (s *packetSocketImpl) RecvMsg(_ fidl.Context, wantPacketInfo bool, dataLen 
 }
 
 func (s *packetSocketImpl) SendMsg(_ fidl.Context, addr *packetsocket.PacketInfo, data []uint8, control packetsocket.SendControlData, _ socket.SendMsgFlags) (packetsocket.SocketSendMsgResult, error) {
-	// TODO(https://fxbug.dev/21106): do something with control.
+	// TODO(https://fxbug.dev/42094933): do something with control.
 	_ = control
 
 	var fullAddr tcpip.FullAddress

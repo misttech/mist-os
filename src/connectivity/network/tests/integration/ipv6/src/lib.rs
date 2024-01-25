@@ -1101,7 +1101,7 @@ async fn sends_mld_reports<N: Netstack>(
         // While Netstack3 installs a link-local subnet route when an interface is
         // added, Netstack2 installs it only when an interface is enabled. Add the
         // forwarding entry for Netstack2 only to compensate for this behavioral difference.
-        // TODO(https://fxbug.dev/123440): Unify behavior for adding a link-local
+        // TODO(https://fxbug.dev/42074358): Unify behavior for adding a link-local
         // subnet route between NS2/NS3.
         if N::VERSION == NetstackVersion::Netstack3 {
             interfaces::add_address_wait_assigned(

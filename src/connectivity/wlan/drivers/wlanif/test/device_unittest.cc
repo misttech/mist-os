@@ -682,5 +682,5 @@ TEST_F(WlanifDeviceTest, CheckCallbacks) {
   EXPECT_EQ(status, ZX_OK);
   signal.Reset();
 }
-// TODO(https://fxbug.dev/121450) Add unit tests for other functions in wlanif::Device
+// TODO(https://fxbug.dev/42072483) Add unit tests for other functions in wlanif::Device
 }  // namespace

@@ -51,7 +51,7 @@ fn generate_send_recv_bufs(size: usize) -> (Vec<u8>, Vec<u8>) {
         // property of sending such a message is that any permutation of
         // the bytes look identical, which hides certain TCP bugs where the
         // bytes sent have been permuted due to wrong sequence numbers, e.g.
-        // https://fxbug.dev/128850.
+        // https://fxbug.dev/42079275.
         (0u8..=254).cycle().take(size).collect(),
         // The choice of filling the receive buffer with a non-zero byte
         // is deliberate: the [zero page scanner] may reclaim large memory
@@ -221,7 +221,7 @@ fn format_byte_count(byte_count: usize) -> String {
     }
 }
 
-// TODO(https://fxbug.dev/131703): Remove the following if NS3 is eventually
+// TODO(https://fxbug.dev/42081857): Remove the following if NS3 is eventually
 // made to behave the same as NS2.
 //
 // Returns the value we expect a getsockopt call for SO_SNDBUF and
@@ -483,7 +483,7 @@ async fn main() {
     };
 
     let tracer = if tracing {
-        // TODO(https://fxbug.dev/22911): Use race-free trace provider
+        // TODO(https://fxbug.dev/42096938): Use race-free trace provider
         // initialization when available.
         fuchsia_trace_provider::trace_provider_create_with_fdio();
 
@@ -557,7 +557,7 @@ async fn main() {
 
         // NB: All of these message sizes are kept below the MTU of 1500 bytes
         // so that fragmentation is not needed (NS3 doesn't currently support
-        // fragmentation c.f. https://fxbug.dev/128588).
+        // fragmentation c.f. https://fxbug.dev/42079055).
         for message_size in [1, 100, 1 << 10] {
             // NB: The 1, 10, and 50 message counts match those in the loopback socket
             // benchmark to facilitate comparison of results, and 250 is as large as

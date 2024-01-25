@@ -348,7 +348,7 @@ mod test {
             Some(candidates[1].clone())
         );
 
-        // TODO(https://fxbug.dev/120520): After `select_bss` filters out incompatible BSSs, this None
+        // TODO(https://fxbug.dev/42071595): After `select_bss` filters out incompatible BSSs, this None
         // compatibility should change to a Some, to test that logic.
         // Make both BSSs incompatible.
         candidates[1].bss.compatibility = None;

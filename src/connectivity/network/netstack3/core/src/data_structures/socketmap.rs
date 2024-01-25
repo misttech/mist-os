@@ -165,7 +165,7 @@ where
     ///
     /// If the map has a value for `key`, calls `apply` on that value and then
     /// returns the result. Otherwise returns `None`.
-    #[todo_unused::todo_unused("https://fxbug.dev/96320")]
+    #[todo_unused::todo_unused("https://fxbug.dev/42178425")]
     pub fn map_mut<R>(&mut self, key: &A, apply: impl FnOnce(&mut V) -> R) -> Option<R> {
         let Self { map, len: _ } = self;
         let value =

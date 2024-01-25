@@ -488,7 +488,7 @@ impl Client {
                     dhcp_client_core::client::Step::Exit(reason) => match reason {
                         dhcp_client_core::client::ExitReason::GracefulShutdown => {
                             if let Some(current_lease) = self.current_lease.take() {
-                                // TODO(https://fxbug.dev/128999): Send DHCPRELEASE.
+                                // TODO(https://fxbug.dev/42079439): Send DHCPRELEASE.
                                 self.handle_lease_drop(current_lease).await?;
                             }
                             return Err(Error::Exit(ClientExitReason::GracefulShutdown));

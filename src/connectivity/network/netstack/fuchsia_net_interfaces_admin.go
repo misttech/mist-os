@@ -115,7 +115,7 @@ func (pi *adminAddressStateProviderImpl) UpdateAddressProperties(_ fidl.Context,
 	); err.(type) {
 	case nil:
 	case *tcpip.ErrUnknownNICID, *tcpip.ErrBadLocalAddress:
-		// TODO(https://fxbug.dev/94442): Upgrade to panic once we're guaranteed that we get here iff the address still exists.
+		// TODO(https://fxbug.dev/42176338): Upgrade to panic once we're guaranteed that we get here iff the address still exists.
 		_ = syslog.WarnTf(addressStateProviderName, "SetAddressLifetimes(%d, %s, %#v) failed: %s",
 			pi.nicid, pi.protocolAddr.AddressWithPrefix.Address, lifetimes, err)
 	default:
@@ -176,7 +176,7 @@ type adminControlImpl struct {
 	cancelServe context.CancelFunc
 	syncRemoval bool
 	doneChannel chan zx.Channel
-	// TODO(https://fxbug.dev/87963): encode owned, strong, and weak refs once
+	// TODO(https://fxbug.dev/42169142): encode owned, strong, and weak refs once
 	// cloning Control is allowed.
 	isStrongRef bool
 }
@@ -225,7 +225,7 @@ func (ci *adminControlImpl) Detach(fidl.Context) error {
 	// Make it a weak ref but don't decrease the reference count. If this was a
 	// strong ref, the interface will leak.
 	//
-	// TODO(https://fxbug.dev/87963): Detach should only be allowed on OWNED refs
+	// TODO(https://fxbug.dev/42169142): Detach should only be allowed on OWNED refs
 	// once we allow cloning Control.
 	ci.isStrongRef = false
 	return nil
@@ -447,7 +447,7 @@ func (ci *adminControlImpl) AddAddress(_ fidl.Context, subnet net.Subnet, parame
 	defer impl.mu.Unlock()
 	impl.mu.sentAddedEvent = true
 	if err := impl.mu.eventProxy.OnAddressAdded(); err != nil {
-		_ = syslog.ErrorTf(controlName, "NICID=%d failed to send OnAddressAdded() for %s - THIS MAY RESULT IN DROPPED ASP REQUESTS (https://fxbug.dev/131322): %s", impl.nicid, protocolAddr.AddressWithPrefix.Address, err)
+		_ = syslog.ErrorTf(controlName, "NICID=%d failed to send OnAddressAdded() for %s - THIS MAY RESULT IN DROPPED ASP REQUESTS (https://fxbug.dev/42081560): %s", impl.nicid, protocolAddr.AddressWithPrefix.Address, err)
 	}
 
 	// If the address was removed before we sent the OnAddressAdded event, then

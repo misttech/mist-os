@@ -114,7 +114,7 @@ func (ni *stackImpl) DelForwardingEntry(_ fidl.Context, entry stack.ForwardingEn
 	return ni.ns.delForwardingEntry(entry), nil
 }
 
-// TODO(https://fxbug.dev/94475): Remove this.
+// TODO(https://fxbug.dev/42176374): Remove this.
 func (ni *stackImpl) SetInterfaceIpForwardingDeprecated(_ fidl.Context, id uint64, ip net.IpVersion, enabled bool) (stack.StackSetInterfaceIpForwardingDeprecatedResult, error) {
 	netProto, ok := fidlconv.ToTCPIPNetProto(ip)
 	if !ok {

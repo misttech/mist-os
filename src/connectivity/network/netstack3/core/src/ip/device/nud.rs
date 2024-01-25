@@ -693,7 +693,7 @@ impl UnreachableMode {
                 panic!("cannot calculate exponential backoff in state {self:?}")
             }
         };
-        // TODO(https://fxbug.dev/133437): vary this retransmit timeout by some random
+        // TODO(https://fxbug.dev/42083368): vary this retransmit timeout by some random
         // "jitter factor" to avoid synchronization of transmissions from different
         // hosts.
         (core_ctx.retransmit_timeout() * BACKOFF_MULTIPLE.saturating_pow(probes_sent.get()))
@@ -975,7 +975,7 @@ impl<D: LinkDevice, Time: Instant, N: LinkResolutionNotifier<D>> DynamicNeighbor
         BC: NudBindingsContext<I, D, CC::DeviceId, Instant = Time>,
         CC: NudSenderContext<I, D, BC>,
     {
-        // TODO(https://fxbug.dev/124960): if the new state matches the current state,
+        // TODO(https://fxbug.dev/42075782): if the new state matches the current state,
         // update the link address as necessary, but do not cancel + reschedule timers.
         let now = bindings_ctx.now();
         match self {
@@ -1042,7 +1042,7 @@ impl<D: LinkDevice, Time: Instant, N: LinkResolutionNotifier<D>> DynamicNeighbor
         BC: NudBindingsContext<I, D, CC::DeviceId>,
         CC: NudSenderContext<I, D, BC>,
     {
-        // TODO(https://fxbug.dev/124960): if the new state matches the current state,
+        // TODO(https://fxbug.dev/42075782): if the new state matches the current state,
         // update the link address as necessary, but do not cancel + reschedule timers.
         let previous =
             core::mem::replace(self, DynamicNeighborState::Stale(Stale { link_address }));
@@ -1485,7 +1485,7 @@ enum NudTimerInner<I: Ip, D: LinkDevice> {
 #[derivative(Default(bound = ""))]
 #[cfg_attr(test, derive(Debug, PartialEq, Eq))]
 pub struct NudState<I: Ip, D: LinkDevice, Time: Instant, N: LinkResolutionNotifier<D>> {
-    // TODO(https://fxbug.dev/126138): Key neighbors by `UnicastAddr`.
+    // TODO(https://fxbug.dev/42076887): Key neighbors by `UnicastAddr`.
     neighbors: HashMap<SpecifiedAddr<I::Addr>, NeighborState<D, Time, N>>,
     last_gc: Option<Time>,
 }
@@ -1782,12 +1782,12 @@ pub(crate) trait NudHandler<I: Ip, D: LinkDevice, BC: LinkResolutionContext<D>>:
         &mut self,
         bindings_ctx: &mut BC,
         device_id: &Self::DeviceId,
-        // TODO(https://fxbug.dev/126138): Use IPv4 subnet information to
+        // TODO(https://fxbug.dev/42076887): Use IPv4 subnet information to
         // disallow the address with all host bits equal to 0, and the
         // subnet broadcast addresses with all host bits equal to 1.
-        // TODO(https://fxbug.dev/134098): Use NeighborAddr when available.
+        // TODO(https://fxbug.dev/42083952): Use NeighborAddr when available.
         neighbor: SpecifiedAddr<I::Addr>,
-        // TODO(https://fxbug.dev/134102): Wrap in `UnicastAddr`.
+        // TODO(https://fxbug.dev/42083958): Wrap in `UnicastAddr`.
         link_addr: D::Address,
         source: DynamicNeighborUpdateSource,
     );
@@ -1873,7 +1873,7 @@ fn handle_neighbor_timer<I, D, CC, BC>(
                         // Subsequent traffic to this neighbor will recreate the entry and restart
                         // address resolution.
                         //
-                        // TODO(https://fxbug.dev/132349): consider retaining this neighbor entry in
+                        // TODO(https://fxbug.dev/42082448): consider retaining this neighbor entry in
                         // a sentinel `Failed` state, equivalent to its having been discarded except
                         // for debugging/observability purposes.
                         tracing::debug!(
@@ -2322,7 +2322,7 @@ where
         // numbers correspond to higher usefulness and therefore lower likelihood of
         // being discarded.
         //
-        // TODO(https://fxbug.dev/124960): once neighbor entries hold a timestamp
+        // TODO(https://fxbug.dev/42075782): once neighbor entries hold a timestamp
         // tracking when they were last updated, consider using this timestamp to break
         // ties between entries in the same state, so that we discard less recently
         // updated entries before more recently updated ones.
@@ -5134,7 +5134,7 @@ mod tests {
                     let src_ip: UnicastAddr<_> = src_ip.into_addr();
                     src_ip.into_specified()
                 },
-                // TODO(https://fxbug.dev/131547): expect STALE instead once we correctly do not
+                // TODO(https://fxbug.dev/42081683): expect STALE instead once we correctly do not
                 // go through NUD to send NDP packets.
                 NeighborState::Dynamic(DynamicNeighborState::Delay(Delay {
                     link_address: remote_mac.get(),

@@ -12,7 +12,7 @@
         {
             type: "expect_failure",
             matchers: [
-                // TODO(https://fxbug.dev/106604): Implement filtering in NS3.
+                // TODO(https://fxbug.dev/42057933): Implement filtering in NS3.
                 "*ns3*",
             ],
         },

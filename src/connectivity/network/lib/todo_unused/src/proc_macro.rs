@@ -70,8 +70,8 @@ mod tests {
     fn fxbug_regex() {
         let re = regex::Regex::new(FXBUG_REGEX).unwrap();
         for (str, expect_match) in [
-            ("https://fxbug.dev/1234", true),
-            ("http://fxbug.dev/1234", false),
+            ("https://fxbug.dev/42074312", true),
+            ("http://fxbug.dev/42074312", false),
             ("https://fxbug.dev/", false),
             ("https://fxbugxdev/1234", false),
         ] {

@@ -314,7 +314,7 @@ impl QueryWindow {
 
 fn update_resolver<T: ResolverLookup>(resolver: &SharedResolver<T>, servers: ServerList) {
     let mut resolver_opts = ResolverOpts::default();
-    // TODO(https://fxbug.dev/102536): Set ip_strategy once a unified lookup API
+    // TODO(https://fxbug.dev/42053483): Set ip_strategy once a unified lookup API
     // exists that respects this setting.
     resolver_opts.num_concurrent_reqs = 10;
     // TODO(https://github.com/bluejekyll/trust-dns/issues/1702): Use the
@@ -589,7 +589,7 @@ fn policy_lookup(addr: &net_types::ip::Ipv6Addr) -> &'static Policy {
 /// `DasCmpInfo` provides an implementation of a subset of Destination Address
 /// Selection according to the sorting rules defined in [RFC 6724 Section 6].
 ///
-/// TODO(https://fxbug.dev/65219): Implement missing rules 3, 4, and 7.
+/// TODO(https://fxbug.dev/42143905): Implement missing rules 3, 4, and 7.
 /// Rules 3, 4, and 7 are omitted for compatibility with the equivalent
 /// implementation in Fuchsia's libc.
 ///
@@ -652,7 +652,7 @@ impl DasCmpInfo {
 }
 
 impl std::cmp::Ord for DasCmpInfo {
-    // TODO(https://fxbug.dev/65219): Implement missing rules 3, 4, and 7.
+    // TODO(https://fxbug.dev/42143905): Implement missing rules 3, 4, and 7.
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
         use std::cmp::Ordering;
         let DasCmpInfo {
@@ -872,7 +872,7 @@ fn create_ip_lookup_fut<T: ResolverLookup>(
                         Err(std::num::TryFromIntError { .. }) => {
                             match error {
                                 None => {
-                                    // TODO(https://fxbug.dev/111095): Remove
+                                    // TODO(https://fxbug.dev/42062388): Remove
                                     // this once Trust-DNS enforces that all
                                     // responses with no records return a
                                     // `NoRecordsFound` error.
@@ -884,7 +884,7 @@ fn create_ip_lookup_fut<T: ResolverLookup>(
                                     // Moreover, the failed query counters are
                                     // based on the `ResolverError::kind`, which
                                     // isn't applicable here.
-                                    error!("resolver response unexpectedly contained no records and no error. See https://fxbug.dev/111095.");
+                                    error!("resolver response unexpectedly contained no records and no error. See https://fxbug.dev/42062388.");
                                     return Err(fname::LookupError::NotFound);
                                 },
                                 Some(e) => Err(e),
@@ -1567,7 +1567,7 @@ mod tests {
                         // Verify that the resolver does not panic when the
                         // response contains no records and no error. This
                         // scenario should theoretically not occur, but
-                        // currently does. See https://fxbug.dev/111095.
+                        // currently does. See https://fxbug.dev/42062388.
                         assert_eq!(
                             proxy
                                 .lookup_ip(

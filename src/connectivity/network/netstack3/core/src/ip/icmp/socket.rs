@@ -178,7 +178,7 @@ impl DatagramSocketSpec for Icmp {
         >,
     ) -> Result<Self::Serializer<I, B>, Self::SerializeError> {
         let ConnIpAddr { local: (local_ip, id), remote: (remote_ip, ()) } = addr;
-        // TODO(https://fxbug.dev/47321): Instead of panic, make this trait
+        // TODO(https://fxbug.dev/42124055): Instead of panic, make this trait
         // method fallible so that the caller can return errors. This will
         // become necessary once we use the datagram module for sending.
         let icmp_echo: packet_formats::icmp::IcmpPacketRaw<I, &[u8], IcmpEchoRequest> =
@@ -266,7 +266,7 @@ impl<I: IpExt, D: WeakId> PortAllocImpl for IcmpBoundSockets<I, D> {
     }
 }
 
-// TODO(https://fxbug.dev/133884): Remove the laziness by dropping `Option`.
+// TODO(https://fxbug.dev/42083786): Remove the laziness by dropping `Option`.
 type LocalIdAllocator<I, D> = Option<PortAlloc<IcmpBoundSockets<I, D>>>;
 
 #[derive(Derivative)]
@@ -813,7 +813,7 @@ mod tests {
         SendTo,
     }
 
-    // TODO(https://fxbug.dev/135041): Add test cases with local delivery and a
+    // TODO(https://fxbug.dev/42084713): Add test cases with local delivery and a
     // bound device once delivery of looped-back packets is corrected in the
     // socket map.
     #[ip_test]

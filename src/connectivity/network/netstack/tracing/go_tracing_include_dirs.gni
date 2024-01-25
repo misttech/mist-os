@@ -14,7 +14,7 @@
 #   include_dirs = go_tracing_include_dirs
 # }
 #
-# TODO(https://fxbug.dev/90500): public_configs doesn't work with go_library.
+# TODO(https://fxbug.dev/42171960): public_configs doesn't work with go_library.
 
 go_tracing_include_dirs = [
   rebase_path("//zircon/system/ulib/trace-provider/include"),

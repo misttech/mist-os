@@ -65,7 +65,7 @@ source_set("sim_common") {
     "//zircon/system/ulib/async",
   ]
 
-  # TODO(https://fxbug.dev/58162): delete the below and fix compiler warnings
+  # TODO(https://fxbug.dev/42136089): delete the below and fix compiler warnings
   configs += [ "//build/config:Wno-conversion" ]
 }
 
@@ -81,7 +81,7 @@ source_set("sim") {
   public_configs = [ ":config_sim" ]
   friend = [ "test/*" ]
 
-  # TODO(https://fxbug.dev/58162): delete the below and fix compiler warnings
+  # TODO(https://fxbug.dev/42136089): delete the below and fix compiler warnings
   configs += [ "//build/config:Wno-conversion" ]
 }
 
@@ -98,6 +98,6 @@ source_set("sim_mfg") {
   public_configs = [ ":config_sim_mfg" ]
   friend = [ "test/*" ]
 
-  # TODO(https://fxbug.dev/58162): delete the below and fix compiler warnings
+  # TODO(https://fxbug.dev/42136089): delete the below and fix compiler warnings
   configs += [ "//build/config:Wno-conversion" ]
 }

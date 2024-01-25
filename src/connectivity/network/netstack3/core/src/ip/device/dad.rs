@@ -294,7 +294,7 @@ fn do_duplicate_address_detection<BC: DadBindingsContext<CC::DeviceId>, CC: DadC
     //           multicast solicitations and SHOULD be included in
     //           unicast solicitations.
     //
-    // TODO(https://fxbug.dev/85055): Either panic or guarantee that this error
+    // TODO(https://fxbug.dev/42165912): Either panic or guarantee that this error
     // can't happen statically.
     let dst_ip = addr.addr().addr().to_solicited_node_address();
     let _: Result<(), _> = core_ctx.send_dad_packet(

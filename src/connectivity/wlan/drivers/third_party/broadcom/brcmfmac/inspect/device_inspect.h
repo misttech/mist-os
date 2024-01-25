@@ -26,7 +26,7 @@
 
 namespace wlan::brcmfmac {
 
-// TODO(https://fxbug.dev/70331) - Avoid duplicates for windowed and non-windowed property.
+// TODO(https://fxbug.dev/42149564) - Avoid duplicates for windowed and non-windowed property.
 struct DeviceConnMetrics {
   inspect::Node root;
   inspect::UintProperty success;

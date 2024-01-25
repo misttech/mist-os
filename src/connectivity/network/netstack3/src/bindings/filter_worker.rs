@@ -92,10 +92,10 @@ impl UpdateDispatcherInner {
         // single lock to ensure bindings and core see updates in the same
         // order.
 
-        // TODO(https://fxbug.dev/137447): validate changes against existing
+        // TODO(https://fxbug.dev/42182933): validate changes against existing
         // state, taking into account the `idempotent` option specified above.
 
-        // TODO(https://fxbug.dev/133898): propagate changes to Netstack3 Core
+        // TODO(https://fxbug.dev/42083801): propagate changes to Netstack3 Core
         // once the necessary functionality is available.
 
         let resources =
@@ -329,7 +329,7 @@ pub(crate) async fn serve_control(
                     inner.lock().await.remove_controller(&final_id);
                 }
                 ControlRequest::ReopenDetachedController { key: _, request: _, control_handle } => {
-                    error!("TODO(https://fxbug.dev/137137): detaching is not implemented");
+                    error!("TODO(https://fxbug.dev/42182623): detaching is not implemented");
                     control_handle.shutdown_with_epitaph(zx::Status::NOT_SUPPORTED);
                 }
             }
@@ -445,7 +445,7 @@ async fn serve_controller(
                 responder.send(result)?;
             }
             NamespaceControllerRequest::Detach { responder: _ } => {
-                error!("TODO(https://fxbug.dev/137137): detaching is not implemented");
+                error!("TODO(https://fxbug.dev/42182623): detaching is not implemented");
                 control_handle.shutdown_with_epitaph(zx::Status::NOT_SUPPORTED);
             }
         }
@@ -453,7 +453,7 @@ async fn serve_controller(
     Ok(())
 }
 
-// TODO(https://fxbug.dev/137090): remove this once NetCfg interacts with
+// TODO(https://fxbug.dev/42182576): remove this once NetCfg interacts with
 // fuchsia.net.filter for Netstack3.
 pub(crate) async fn serve_deprecated(
     stream: fidl_fuchsia_net_filter_deprecated::FilterRequestStream,
@@ -466,21 +466,21 @@ pub(crate) async fn serve_deprecated(
                 FilterRequest::DisableInterface { responder, .. } => {
                     error!(
                         "fuchsia.net.filter.deprecated.Filter is not implemented \
-                           (https://fxbug.dev/137090); ignoring DisableInterface"
+                           (https://fxbug.dev/42182576); ignoring DisableInterface"
                     );
                     responder.send(Ok(())).unwrap_or_else(|e| error!("failed to respond: {e:?}"));
                 }
                 FilterRequest::EnableInterface { responder, .. } => {
                     error!(
                         "fuchsia.net.filter.deprecated.Filter is not implemented \
-                           (https://fxbug.dev/137090); ignoring EnableInterface"
+                           (https://fxbug.dev/42182576); ignoring EnableInterface"
                     );
                     responder.send(Ok(())).unwrap_or_else(|e| error!("failed to respond: {e:?}"));
                 }
                 FilterRequest::GetRules { responder } => {
                     error!(
                         "fuchsia.net.filter.deprecated.Filter is not implemented \
-                           (https://fxbug.dev/137090); ignoring GetRules"
+                           (https://fxbug.dev/42182576); ignoring GetRules"
                     );
                     responder
                         .send(&[], 0)
@@ -489,23 +489,23 @@ pub(crate) async fn serve_deprecated(
                 FilterRequest::UpdateRules { rules, generation, responder } => {
                     error!(
                         "fuchsia.net.filter.deprecated.Filter is not implemented \
-                            (https://fxbug.dev/137090); ignoring UpdateRules \
+                            (https://fxbug.dev/42182576); ignoring UpdateRules \
                             {{ generation: {:?}, rules: {:?} }}",
                         generation, rules
                     );
                     responder.send(Ok(())).unwrap_or_else(|e| error!("failed to respond: {e:?}"));
                 }
                 FilterRequest::GetNatRules { .. } => {
-                    todo!("https://fxbug.dev/137090: implement filtering support");
+                    todo!("https://fxbug.dev/42182576: implement filtering support");
                 }
                 FilterRequest::UpdateNatRules { .. } => {
-                    todo!("https://fxbug.dev/137090: implement filtering support");
+                    todo!("https://fxbug.dev/42182576: implement filtering support");
                 }
                 FilterRequest::GetRdrRules { .. } => {
-                    todo!("https://fxbug.dev/137090: implement filtering support");
+                    todo!("https://fxbug.dev/42182576: implement filtering support");
                 }
                 FilterRequest::UpdateRdrRules { .. } => {
-                    todo!("https://fxbug.dev/137090: implement filtering support");
+                    todo!("https://fxbug.dev/42182576: implement filtering support");
                 }
             };
             Ok(())

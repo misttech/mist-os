@@ -246,7 +246,7 @@ async fn create_realm_instance(
         }
         if let Some(exposes) = exposes {
             for exposed in exposes {
-                // TODO(https://fxbug.dev/72043): allow duplicate protocols.
+                // TODO(https://fxbug.dev/42151461): allow duplicate protocols.
                 //
                 // Protocol names will be aliased as `child_name/protocol_name`, and this panic will
                 // be replaced with an INVALID_ARGS epitaph sent on the `ManagedRealm` channel if a
@@ -281,7 +281,7 @@ async fn create_realm_instance(
                     type HashSet<T> = HashMap<T, ()>;
                     let mut unique_caps = HashSet::new();
                     for cap in caps {
-                        // TODO(https://fxbug.dev/77069): consider introducing an abstraction here
+                        // TODO(https://fxbug.dev/42157043): consider introducing an abstraction here
                         // over the (fnetemul::Capability, CapabilityRoute, String) triple that is
                         // defined here for each of the built-in netemul capabilities, corresponding
                         // to their FIDL representation, routing logic, and capability name.
@@ -546,7 +546,7 @@ impl ManagedRealm {
                     req,
                     control_handle: _,
                 } => {
-                    // TODO(https://fxbug.dev/72043): allow `child_name` to be specified once we
+                    // TODO(https://fxbug.dev/42151461): allow `child_name` to be specified once we
                     // prefix capabilities with the name of the component exposing them.
                     //
                     // Currently `child_name` isn't used to disambiguate duplicate protocols, so we
@@ -1426,7 +1426,7 @@ mod tests {
                         ])),
                         ..Default::default()
                     },
-                    // TODO(https://fxbug.dev/65359): when we can allow ERROR logs for routing
+                    // TODO(https://fxbug.dev/42144060): when we can allow ERROR logs for routing
                     // errors, add a child component that does not `use` NetworkContext, and verify
                     // that we cannot get at NetworkContext through it. It should result in a
                     // zx::Status::UNAVAILABLE error.
@@ -1451,7 +1451,7 @@ mod tests {
     }
 
     #[fixture(with_sandbox)]
-    // TODO(https://fxbug.dev/65359): when we can allowlist particular ERROR logs in a test, we can
+    // TODO(https://fxbug.dev/42144060): when we can allowlist particular ERROR logs in a test, we can
     // use #[fuchsia::test] which initializes syslog.
     #[fasync::run_singlethreaded(test)]
     async fn create_realm_invalid_options(sandbox: fnetemul::SandboxProxy) {
@@ -1464,7 +1464,7 @@ mod tests {
         // would result in a lot of large struct literals defined as macro arguments of
         // #[test_case]. This may be more readable as an auto-formatted array.
         //
-        // TODO(https://fxbug.dev/76384): refactor how we specify the test cases to make it easier
+        // TODO(https://fxbug.dev/42156282): refactor how we specify the test cases to make it easier
         // to tell why a given case is invalid.
         struct TestCase<'a> {
             name: &'a str,
@@ -1724,7 +1724,7 @@ mod tests {
                 }],
                 epitaph: zx::Status::INVALID_ARGS,
             },
-            // TODO(https://fxbug.dev/72043): once we allow duplicate protocols, verify that a child
+            // TODO(https://fxbug.dev/42151461): once we allow duplicate protocols, verify that a child
             // exposing duplicate protocols results in a ZX_ERR_INTERNAL epitaph.
         ];
         for TestCase { name, children, epitaph } in cases {
@@ -1823,7 +1823,7 @@ mod tests {
                 .expect("fuchsia.netemul.test/CounterB.increment call failed"),
             2,
         );
-        // TODO(https://fxbug.dev/65359): once we can allow the ERROR logs that result from the
+        // TODO(https://fxbug.dev/42144060): once we can allow the ERROR logs that result from the
         // routing failure, verify that counter-b does *not* have access to counter-a's protocol.
     }
 
@@ -2043,7 +2043,7 @@ mod tests {
                         ])),
                         ..Default::default()
                     },
-                    // TODO(https://fxbug.dev/65359): when we can allow ERROR logs for routing
+                    // TODO(https://fxbug.dev/42144060): when we can allow ERROR logs for routing
                     // errors, add a child component that does not `use` `devfs`, and verify that we
                     // cannot get at the realm's `devfs` through it. It should result in a
                     // zx::Status::UNAVAILABLE error.
@@ -2236,7 +2236,7 @@ mod tests {
         moniker: &str,
         expected_status: zx::Status,
     ) {
-        // TODO(https://fxbug.dev/124847): Use #[fixture] for this once it integrates
+        // TODO(https://fxbug.dev/42075656): Use #[fixture] for this once it integrates
         // well with #[test_case].
         with_sandbox(
             &format!("{action:?}_child_component_errors_{expected_status}"),
@@ -2327,7 +2327,7 @@ mod tests {
     }
 
     #[fixture(with_sandbox)]
-    // TODO(https://fxbug.dev/65359): when we can allowlist particular ERROR logs in a test, we can
+    // TODO(https://fxbug.dev/42144060): when we can allowlist particular ERROR logs in a test, we can
     // use #[fuchsia::test] which initializes syslog.
     #[fasync::run_singlethreaded(test)]
     async fn add_remove_device_invalid_path(sandbox: fnetemul::SandboxProxy) {

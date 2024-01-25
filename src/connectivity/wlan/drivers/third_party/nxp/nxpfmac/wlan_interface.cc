@@ -400,7 +400,7 @@ void WlanInterface::StartScan(StartScanRequestView request, fdf::Arena& arena,
     }
   };
 
-  // TODO(https://fxbug.dev/108408): Consider calculating a more accurate scan timeout based on the max
+  // TODO(https://fxbug.dev/42059829): Consider calculating a more accurate scan timeout based on the max
   // scan time per channel in the scan request.
   constexpr zx_duration_t kScanTimeout = ZX_MSEC(12000);
   zx_status_t status =
@@ -789,7 +789,7 @@ void WlanInterface::SaeFrameTx(SaeFrameTxRequestView request, fdf::Arena& arena,
 }
 
 void WlanInterface::WmmStatusReq(fdf::Arena& arena, WmmStatusReqCompleter::Sync& completer) {
-  // TODO(https://fxbug.dev/110091): Implement support for this.
+  // TODO(https://fxbug.dev/42061489): Implement support for this.
 
   fuchsia_wlan_common_wire::WlanWmmParameters wmm{};
   auto ifc_arena = fdf::Arena::Create(0, 0);

@@ -83,7 +83,7 @@ func (d *nudDispatcher) log(verb string, nicID tcpip.NICID, entry stack.Neighbor
 		return "U"
 	}()
 
-	// TODO(https://fxbug.dev/62788): Change log level to Debug once the neighbor table
+	// TODO(https://fxbug.dev/42141219): Change log level to Debug once the neighbor table
 	// is able to be inspected.
 	_ = syslog.InfoTf(nudTag, "%s %s (%s|%s) NIC=%d LinkAddress=%s %s", verb, entry.Addr, family, flags, nicID, entry.LinkAddr, entry.State)
 }
@@ -138,7 +138,7 @@ const (
 // neighbors).
 func maxEntryIteratorItemsQueueLen() uint64 {
 	const neighborEntryMultiplier = 4
-	// TODO(https://fxbug.dev/124470): export the stack.neighborCacheSize
+	// TODO(https://fxbug.dev/42075370): export the stack.neighborCacheSize
 	// constant in gVisor so we can depend on it here.
 	const gVisorNeighborCacheSize = 512
 	if neighbor.MaxItemBatchSize > gVisorNeighborCacheSize {

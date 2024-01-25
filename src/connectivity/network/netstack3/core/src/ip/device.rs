@@ -594,7 +594,7 @@ pub trait IpDeviceStateContext<I: IpDeviceIpExt, BC: InstantContext>:
 
     /// Calls the function with an iterator over all the address IDs associated
     /// with the device.
-    // TODO(https://fxbug.dev/107842): Avoid dynamic dispatch.
+    // TODO(https://fxbug.dev/42059236): Avoid dynamic dispatch.
     fn with_address_ids<
         O,
         F: FnOnce(
@@ -1129,7 +1129,7 @@ fn enable_ipv6_device_with_config<
             );
         });
 
-    // TODO(https://fxbug.dev/95946): Generate link-local address with opaque
+    // TODO(https://fxbug.dev/42178008): Generate link-local address with opaque
     // IIDs.
     if config.slaac_config.enable_stable_addresses {
         if let Some(iid) = core_ctx.get_eui64_iid(device_id) {

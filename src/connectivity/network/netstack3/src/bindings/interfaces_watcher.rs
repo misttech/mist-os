@@ -547,7 +547,7 @@ impl Worker {
                                             *include_non_assigned_addresses,
                                         ),
                                     };
-                                    // TODO(https://fxbug.dev/110587): Mask address properties fields
+                                    // TODO(https://fxbug.dev/42061967): Mask address properties fields
                                     // from address-added events according to watcher interest.
                                     if should_push {
                                         watcher.push(event.clone());
@@ -774,7 +774,7 @@ impl Worker {
                                 addresses: Some(Self::collect_addresses(addresses)),
                                 ..Default::default()
                             }),
-                            // TODO(https://fxbug.dev/105574): once preferred lifetimes
+                            // TODO(https://fxbug.dev/42056818): once preferred lifetimes
                             // are supported, we need to respect (dis)interest in them
                             // too.
                             ChangedAddressProperties::PropertiesChanged {

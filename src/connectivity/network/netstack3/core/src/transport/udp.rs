@@ -1306,7 +1306,7 @@ fn receive_ip_packet<
         DatagramBoundStateContext::with_bound_sockets(core_ctx, |_core_ctx, bound_sockets| {
             lookup(bound_sockets, (src_ip, src_port), (dst_ip, dst_port), device_weak)
                 .map(|result| match result {
-                    // TODO(https://fxbug.dev/125489): Make these socket IDs
+                    // TODO(https://fxbug.dev/42076297): Make these socket IDs
                     // strongly owned instead of just cloning them to prevent
                     // deletion before delivery is done.
                     LookupResult::Conn(id, _) | LookupResult::Listener(id, _) => id.clone(),
@@ -2201,7 +2201,7 @@ impl<
     > DatagramBoundStateContext<I, BC, Udp> for CC
 {
     type IpSocketsCtx<'a> = CC::IpSocketsCtx<'a>;
-    // TODO(https://fxbug.dev/133884): Remove the laziness by dropping `Option`.
+    // TODO(https://fxbug.dev/42083786): Remove the laziness by dropping `Option`.
     type LocalIdAllocator = Option<PortAlloc<UdpBoundSocketMap<I, CC::WeakDeviceId>>>;
 
     fn with_bound_sockets<
@@ -2692,7 +2692,7 @@ mod tests {
                     &'a mut I::UdpNonDualStackBoundStateContext<D>,
                 >,
             );
-            // TODO(https://fxbug.dev/131992): Replace this with a derived impl.
+            // TODO(https://fxbug.dev/42082123): Replace this with a derived impl.
             impl<'a, I: TestIpExt, NewIp: TestIpExt, D: FakeStrongDeviceId + 'static>
                 GenericOverIp<NewIp> for Wrap<'a, I, D>
             {
@@ -6468,7 +6468,7 @@ mod tests {
         .unwrap();
         crate::testutil::handle_queued_rx_packets(&mut ctx);
 
-        // TODO(https://fxbug.dev/135041): They should both be non-empty. The
+        // TODO(https://fxbug.dev/42084713): They should both be non-empty. The
         // socket map should allow a looped back packet to be delivered despite
         // it being bound to a device other than loopback.
         if bind_to_device {

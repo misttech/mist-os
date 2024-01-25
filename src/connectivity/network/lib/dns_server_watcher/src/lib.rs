@@ -42,7 +42,7 @@ pub struct DnsServers {
 
 impl DnsServers {
     /// Sets the DNS servers discovered from `source`.
-    // TODO(https://fxbug.dev/55672): Make sure `servers` only contain servers that could be obtained
+    // TODO(https://fxbug.dev/42133326): Make sure `servers` only contain servers that could be obtained
     // from `source`.
     pub fn set_servers_from_source(
         &mut self,
@@ -93,7 +93,7 @@ impl DnsServers {
     /// Note, if multiple `DnsServer_`s have the same address but different sources, only
     /// the `DnsServer_` with the most preferred source will be present in the consolidated
     /// list of servers.
-    // TODO(https://fxbug.dev/55893): Consider ordering across sources of the same source-kind based on some
+    // TODO(https://fxbug.dev/42133571): Consider ordering across sources of the same source-kind based on some
     // metric.
     pub fn consolidated(&self) -> Vec<SocketAddress> {
         self.consolidate_filter_map(|x| x.address)
@@ -131,7 +131,7 @@ impl DnsServers {
     /// protocol together and preferring network-supplied configurations over product-supplied
     /// ones.
     ///
-    /// TODO(https://fxbug.dev/48868): We currently prioritize IPv4 servers over IPv6 as our DHCPv6
+    /// TODO(https://fxbug.dev/42125772): We currently prioritize IPv4 servers over IPv6 as our DHCPv6
     /// client does not yet support stateful address assignment. This can result in situations
     /// where we can discover v6 nameservers that can't be reached as we've not discovered a global
     /// address.

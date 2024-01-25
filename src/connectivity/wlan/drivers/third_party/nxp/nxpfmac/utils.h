@@ -28,7 +28,7 @@ constexpr uint8_t band_from_channel(uint32_t channel) {
 }
 
 constexpr bool is_dfs_channel(uint32_t channel) {
-  // TODO(https://fxbug.dev/110320): Take regulatory domain into consideration.
+  // TODO(https://fxbug.dev/42061672): Take regulatory domain into consideration.
   return channel >= 52 && channel <= 144;
 }
 

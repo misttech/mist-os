@@ -986,7 +986,7 @@ impl<BC: BindingsContext> Ipv6DiscoveredRoutesContext<BC>
             metric: AddableMetric::MetricTracksInterface,
         };
 
-        // TODO(https://fxbug.dev/129219): Rather than perform a synchronous
+        // TODO(https://fxbug.dev/42079625): Rather than perform a synchronous
         // check for whether the route already exists, use a routes-admin
         // RouteSet to track the NDP-added route.
         let already_exists = self.with_ip_routing_table(

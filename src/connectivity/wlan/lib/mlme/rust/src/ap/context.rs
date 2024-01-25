@@ -115,7 +115,7 @@ impl<D> Context<D> {
                     ie::BssMaxIdlePeriod {
                         max_idle_period,
                         idle_options: ie::IdleOptions(0)
-                            // TODO(https://fxbug.dev/37891): Support configuring this.
+                            // TODO(https://fxbug.dev/42113580): Support configuring this.
                             .with_protected_keep_alive_required(false),
                     }
                 },
@@ -193,7 +193,7 @@ impl<D> Context<D> {
     }
 
     /// Sends a WLAN probe response frame (IEEE Std 802.11-2016, 9.3.3.11) to the PHY.
-    // TODO(https://fxbug.dev/42088): Use this for devices that don't support probe request offload.
+    // TODO(https://fxbug.dev/42118243): Use this for devices that don't support probe request offload.
     pub fn make_probe_resp_frame(
         &mut self,
         addr: MacAddr,
@@ -349,7 +349,7 @@ impl<D> Context<D> {
             dst_addr,
             src_addr,
             is_protected,
-            false, // TODO(https://fxbug.dev/37891): Support QoS.
+            false, // TODO(https://fxbug.dev/42113580): Support QoS.
             mac::ETHER_TYPE_EAPOL,
             eapol_frame,
         )
@@ -449,7 +449,7 @@ impl<D: DeviceOps> Context<D> {
                     capability_info: capabilities.raw(),
                     rates: rates.iter().map(|r| r.0).collect(),
                     rsne,
-                    // TODO(https://fxbug.dev/37891): Send everything else (e.g. HT capabilities).
+                    // TODO(https://fxbug.dev/42113580): Send everything else (e.g. HT capabilities).
                 },
             })
             .map_err(|e| e.into())

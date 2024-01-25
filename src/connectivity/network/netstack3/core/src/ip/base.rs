@@ -477,7 +477,7 @@ impl IpLayerIpExt for Ipv4 {
         // https://en.cppreference.com/w/cpp/atomic/memory_order#Relaxed_ordering
         // for more details.
         //
-        // TODO(https://fxbug.dev/87588): Generate IPv4 IDs unpredictably
+        // TODO(https://fxbug.dev/42168725): Generate IPv4 IDs unpredictably
         next_packet_id.fetch_add(1, atomic::Ordering::Relaxed)
     }
 }
@@ -732,7 +732,7 @@ pub(crate) fn resolve_route_to_destination<
     // performed as a strong host! This makes the loopback interface behave
     // more like the other interfaces on the system.
     //
-    // TODO(https://fxbug.dev/93870): Encode the delivery of locally-
+    // TODO(https://fxbug.dev/42175703): Encode the delivery of locally-
     // destined packets to loopback in the route table.
     let local_delivery_instructions: Option<LocalDelivery<RoutableIpAddr<I::Addr>, &CC::DeviceId>> =
         addr.and_then(|addr| {
@@ -985,7 +985,7 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IcmpSocketsTable<I
         proto: Ipv4Proto,
         body: B,
     ) -> Result<(), (B, TransportReceiveError)> {
-        // TODO(https://fxbug.dev/93955): Deliver the packet to interested raw
+        // TODO(https://fxbug.dev/42175797): Deliver the packet to interested raw
         // sockets.
 
         match proto {
@@ -1039,7 +1039,7 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IcmpSocketsTable<I
         proto: Ipv6Proto,
         body: B,
     ) -> Result<(), (B, TransportReceiveError)> {
-        // TODO(https://fxbug.dev/93955): Deliver the packet to interested raw
+        // TODO(https://fxbug.dev/42175797): Deliver the packet to interested raw
         // sockets.
 
         match proto {
@@ -1722,7 +1722,7 @@ fn dispatch_receive_ipv6_packet<
     body: B,
     parse_metadata: Option<ParseMetadata>,
 ) {
-    // TODO(https://fxbug.dev/21227): Once we support multiple extension
+    // TODO(https://fxbug.dev/42095067): Once we support multiple extension
     // headers in IPv6, we will need to verify that the callers of this
     // function are still sound. In particular, they may accidentally pass a
     // parse_metadata argument which corresponds to a single extension
@@ -1997,7 +1997,7 @@ pub(crate) fn receive_ipv4_packet<
         // send back an ICMP response as it can be used as an attack vector for
         // DDoS attacks. We only send back an ICMP response if the RFC requires
         // that we MUST send one, as noted by `must_send_icmp` and `action`.
-        // TODO(https://fxbug.dev/77598): test this code path once
+        // TODO(https://fxbug.dev/42157630): test this code path once
         // `Ipv4Packet::parse` can return an `IpParseError::ParameterProblem`
         // error.
         Err(IpParseError::ParameterProblem {
@@ -2118,7 +2118,7 @@ pub(crate) fn receive_ipv4_packet<
                     Err(b) => {
                         let _: B = b;
                         core_ctx.increment(|counters: &IpCounters<Ipv4>| &counters.mtu_exceeded);
-                        // TODO(https://fxbug.dev/86247): Encode the MTU error
+                        // TODO(https://fxbug.dev/42167236): Encode the MTU error
                         // more obviously in the type system.
                         debug!("failed to forward IPv4 packet: MTU exceeded");
                     }
@@ -2414,7 +2414,7 @@ pub(crate) fn receive_ipv6_packet<
                     next_hop,
                     buffer,
                 ) {
-                    // TODO(https://fxbug.dev/86247): Encode the MTU error more
+                    // TODO(https://fxbug.dev/42167236): Encode the MTU error more
                     // obviously in the type system.
                     core_ctx.increment(|counters: &IpCounters<Ipv6>| &counters.mtu_exceeded);
                     debug!("failed to forward IPv6 packet: MTU exceeded");
@@ -2546,7 +2546,7 @@ fn receive_ipv4_packet_action<
     // packets that arrive at the loopback interface (after being looped back)
     // but destined to an address that is assigned to another local interface.
     //
-    // TODO(https://fxbug.dev/93870): This should instead be controlled by the
+    // TODO(https://fxbug.dev/42175703): This should instead be controlled by the
     // routing table.
 
     // Since we treat all addresses identically, it doesn't matter whether one
@@ -2592,7 +2592,7 @@ fn receive_ipv6_packet_action<
     // packets that arrive at the loopback interface (after being looped back)
     // but destined to an address that is assigned to another local interface.
     //
-    // TODO(https://fxbug.dev/93870): This should instead be controlled by the
+    // TODO(https://fxbug.dev/42175703): This should instead be controlled by the
     // routing table.
 
     // It's possible that there is more than one device with the address
@@ -4836,7 +4836,7 @@ mod tests {
         // run until there are no timers because some timers will always exist
         // for background tasks.
         //
-        // TODO(https://fxbug.dev/48578): Once this test is contextified, use a
+        // TODO(https://fxbug.dev/42125450): Once this test is contextified, use a
         // more precise condition to ensure that DAD is complete.
         let now = bindings_ctx.now();
         let _: Vec<_> = bindings_ctx.trigger_timers_until_instant(
@@ -4869,7 +4869,7 @@ mod tests {
         // Make sure all timers are done (DAD to complete on the interface due
         // to new IP).
         //
-        // TODO(https://fxbug.dev/48578): Once this test is contextified, use a
+        // TODO(https://fxbug.dev/42125450): Once this test is contextified, use a
         // more precise condition to ensure that DAD is complete.
         let _: Vec<_> = bindings_ctx.trigger_timers_until_instant(
             FakeInstant::LATEST,

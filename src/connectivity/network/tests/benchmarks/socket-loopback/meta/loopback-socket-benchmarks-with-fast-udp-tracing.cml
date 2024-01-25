@@ -11,7 +11,7 @@
             "FAST_UDP=true",
             "NETSTACK2=true",
 
-            // TODO(https://fxbug.dev/121880): Move this to the shard once it's
+            // TODO(https://fxbug.dev/42072900): Move this to the shard once it's
             // possible to compose environment args.
             "TRACING=true",
         ],

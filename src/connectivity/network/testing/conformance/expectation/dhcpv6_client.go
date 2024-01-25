@@ -52,10 +52,10 @@ var dhcpv6ClientExpectations map[AnvlCaseNumber]outcome.Outcome = map[AnvlCaseNu
 	{23, 3}: Inconclusive,
 	{23, 4}: Inconclusive,
 	{23, 5}: Inconclusive,
-	// TODO(https://fxbug.dev/116499): Root-cause and fix.
+	// TODO(https://fxbug.dev/42067671): Root-cause and fix.
 	{24, 1}: Flaky,
 	{24, 2}: Pass,
-	// TODO(https://fxbug.dev/116499): Root-cause and fix.
+	// TODO(https://fxbug.dev/42067671): Root-cause and fix.
 	{24, 3}: Flaky,
 	{24, 4}: Pass,
 	{24, 5}: Pass,
@@ -64,7 +64,7 @@ var dhcpv6ClientExpectations map[AnvlCaseNumber]outcome.Outcome = map[AnvlCaseNu
 	{25, 1}: Pass,
 	{25, 2}: Pass,
 	{25, 3}: Pass,
-	// TODO(https://fxbug.dev/116499): Root-cause and fix.
+	// TODO(https://fxbug.dev/42067671): Root-cause and fix.
 	{25, 4}:  Flaky,
 	{25, 5}:  Pass,
 	{25, 6}:  Pass,
@@ -155,10 +155,10 @@ var dhcpv6ClientExpectationsNS3 map[AnvlCaseNumber]outcome.Outcome = map[AnvlCas
 	{23, 3}: Inconclusive,
 	{23, 4}: Inconclusive,
 	{23, 5}: Inconclusive,
-	// TODO(https://fxbug.dev/116499): Root-cause and fix.
+	// TODO(https://fxbug.dev/42067671): Root-cause and fix.
 	{24, 1}: Flaky,
 	{24, 2}: Pass,
-	// TODO(https://fxbug.dev/116499): Root-cause and fix.
+	// TODO(https://fxbug.dev/42067671): Root-cause and fix.
 	{24, 3}: Flaky,
 	{24, 4}: Pass,
 	{24, 5}: Pass,
@@ -167,7 +167,7 @@ var dhcpv6ClientExpectationsNS3 map[AnvlCaseNumber]outcome.Outcome = map[AnvlCas
 	{25, 1}: Pass,
 	{25, 2}: Pass,
 	{25, 3}: Pass,
-	// TODO(https://fxbug.dev/116499): Root-cause and fix.
+	// TODO(https://fxbug.dev/42067671): Root-cause and fix.
 	{25, 4}:  Flaky,
 	{25, 5}:  Pass,
 	{25, 6}:  Pass,

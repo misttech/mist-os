@@ -136,7 +136,7 @@ func (s *session) startEngine(disposition tracing.BufferDisposition, additionalC
 	default:
 		panic(fmt.Sprintf("unknown disposition (%d)", disposition))
 	}
-	// TODO(https://fxbug.dev/22973): Add support for additional categories.
+	// TODO(https://fxbug.dev/42097006): Add support for additional categories.
 	if err := trace.EngineStart(startMode); err != nil {
 		return err
 	}

@@ -1204,7 +1204,7 @@ where
     S::Buffer: BufferMut,
     M: IcmpMessage<Ipv6>,
 {
-    // TODO(https://fxbug.dev/95359): Send through ICMPv6 send path.
+    // TODO(https://fxbug.dev/42177356): Send through ICMPv6 send path.
     IpLayerHandler::<Ipv6, _>::send_ip_packet_from_device(
         core_ctx,
         bindings_ctx,
@@ -1298,7 +1298,7 @@ fn receive_ndp_packet<
     src_ip: Ipv6SourceAddr,
     packet: NdpPacket<B>,
 ) {
-    // TODO(https://fxbug.dev/97319): Make sure IP's hop limit is set to 255 as
+    // TODO(https://fxbug.dev/42179534): Make sure IP's hop limit is set to 255 as
     // per RFC 4861 section 6.1.2.
 
     match packet {
@@ -1411,7 +1411,7 @@ fn receive_ndp_packet<
             }
         }
         NdpPacket::NeighborAdvertisement(ref p) => {
-            // TODO(https://fxbug.dev/97311): Invalidate discovered routers when
+            // TODO(https://fxbug.dev/42179526): Invalidate discovered routers when
             // neighbor entry's IsRouter field transitions to false.
 
             let target_address = p.message().target_address();
@@ -1460,7 +1460,7 @@ fn receive_ndp_packet<
                     //       completely reliable). How to handle such a case
                     //       is beyond the scope of this document.
                     //
-                    // TODO(https://fxbug.dev/36238): Signal to bindings
+                    // TODO(https://fxbug.dev/42111744): Signal to bindings
                     // that a duplicate address is detected.
                     error!(
                         "NA from {src_ip} with target address {target_address} that is also \
@@ -1475,7 +1475,7 @@ fn receive_ndp_packet<
                 IpAddressState::Unavailable => {
                     // Address not targeting us so we know its for a neighbor.
                     //
-                    // TODO(https://fxbug.dev/99830): Move NUD to IP.
+                    // TODO(https://fxbug.dev/42182317): Move NUD to IP.
                 }
             }
 
@@ -1541,7 +1541,7 @@ fn receive_ndp_packet<
             //   The RetransTimer variable SHOULD be copied from the Retrans
             //   Timer field, if it is specified.
             //
-            // TODO(https://fxbug.dev/101357): Control whether or not we should
+            // TODO(https://fxbug.dev/42052173): Control whether or not we should
             // update the retransmit timer.
             if let Some(retransmit_timer) = ra.retransmit_timer() {
                 Ipv6DeviceHandler::set_discovered_retrans_timer(
@@ -1556,14 +1556,14 @@ fn receive_ndp_packet<
             //   If the received Cur Hop Limit value is specified, the host
             //   SHOULD set its CurHopLimit variable to the received value.
             //
-            // TODO(https://fxbug.dev/101357): Control whether or not we should
+            // TODO(https://fxbug.dev/42052173): Control whether or not we should
             // update the default hop limit.
             if let Some(hop_limit) = ra.current_hop_limit() {
                 trace!("receive_ndp_packet: NDP RA: updating device's hop limit to {:?} for router: {:?}", ra.current_hop_limit(), src_ip);
                 IpDeviceHandler::set_default_hop_limit(core_ctx, &device_id, hop_limit);
             }
 
-            // TODO(https://fxbug.dev/126654): Support default router preference.
+            // TODO(https://fxbug.dev/42077316): Support default router preference.
             Ipv6DeviceHandler::update_discovered_ipv6_route(
                 core_ctx,
                 bindings_ctx,
@@ -1602,7 +1602,7 @@ fn receive_ndp_packet<
                         // so for now we just record the link-layer address in
                         // our neighbor table.
                         //
-                        // TODO(https://fxbug.dev/133436): Add support for routers in NUD.
+                        // TODO(https://fxbug.dev/42083367): Add support for routers in NUD.
                         NudIpHandler::handle_neighbor_probe(
                             core_ctx,
                             bindings_ctx,
@@ -1651,7 +1651,7 @@ fn receive_ndp_packet<
                         let valid_lifetime = prefix_info.valid_lifetime();
 
                         if prefix_info.on_link_flag() {
-                            // TODO(https://fxbug.dev/126654): Support route preference.
+                            // TODO(https://fxbug.dev/42077316): Support route preference.
                             Ipv6DeviceHandler::update_discovered_ipv6_route(
                                 core_ctx,
                                 bindings_ctx,
@@ -1673,7 +1673,7 @@ fn receive_ndp_packet<
                         }
                     }
                     NdpOption::RouteInformation(rio) => {
-                        // TODO(https://fxbug.dev/126654): Support route preference.
+                        // TODO(https://fxbug.dev/42077316): Support route preference.
                         Ipv6DeviceHandler::update_discovered_ipv6_route(
                             core_ctx,
                             bindings_ctx,
@@ -1686,7 +1686,7 @@ fn receive_ndp_packet<
                         )
                     }
                     NdpOption::Mtu(mtu) => {
-                        // TODO(https://fxbug.dev/101357): Control whether or
+                        // TODO(https://fxbug.dev/42052173): Control whether or
                         // not we should update the link's MTU in response to
                         // RAs.
                         Ipv6DeviceHandler::set_link_mtu(core_ctx, &device_id, Mtu::new(mtu));
@@ -2603,7 +2603,7 @@ fn send_icmpv4_error_message<
     header_len: usize,
     fragment_type: Ipv4FragmentType,
 ) {
-    // TODO(https://fxbug.dev/95827): Come up with rules for when to send ICMP
+    // TODO(https://fxbug.dev/42177876): Come up with rules for when to send ICMP
     // error messages.
 
     if !should_send_icmpv4_error(
@@ -2619,7 +2619,7 @@ fn send_icmpv4_error_message<
     // body.
     original_packet.shrink_back_to(header_len + 64);
 
-    // TODO(https://fxbug.dev/95828): Improve source address selection for ICMP
+    // TODO(https://fxbug.dev/42177877): Improve source address selection for ICMP
     // errors sent from unnumbered/router interfaces.
     let _ = try_send_error!(
         core_ctx,
@@ -2661,7 +2661,7 @@ fn send_icmpv6_error_message<
     original_packet: B,
     allow_dst_multicast: bool,
 ) {
-    // TODO(https://fxbug.dev/95827): Come up with rules for when to send ICMP
+    // TODO(https://fxbug.dev/42177876): Come up with rules for when to send ICMP
     // error messages.
 
     if !should_send_icmpv6_error(
@@ -2673,7 +2673,7 @@ fn send_icmpv6_error_message<
         return;
     }
 
-    // TODO(https://fxbug.dev/95828): Improve source address selection for ICMP
+    // TODO(https://fxbug.dev/42177877): Improve source address selection for ICMP
     // errors sent from unnumbered/router interfaces.
     let _ = try_send_error!(
         core_ctx,
@@ -2886,7 +2886,7 @@ fn receive_icmp_echo_reply<
                 return;
             }
         }
-        // TODO(https://fxbug.dev/47952): Neither the ICMPv4 or ICMPv6 RFCs
+        // TODO(https://fxbug.dev/42124755): Neither the ICMPv4 or ICMPv6 RFCs
         // explicitly state what to do in case we receive an "unsolicited"
         // echo reply. We only expose the replies if we have a registered
         // connection for the IcmpAddr of the incoming reply for now. Given
@@ -3264,7 +3264,7 @@ mod tests {
         );
 
         for counter in assert_counters {
-            // TODO(https://fxbug.dev/134635): Redesign iterating through
+            // TODO(https://fxbug.dev/42084333): Redesign iterating through
             // assert_counters once CounterContext is removed.
             let count = match *counter {
                 "send_ipv4_packet" => core_ctx.state.ipv4.inner.counters().send_ip_packet.get(),
@@ -3414,7 +3414,7 @@ mod tests {
                 | Ipv4Proto::Proto(IpProto::Tcp) => {}
             }
 
-            // TODO(https://fxbug.dev/47953): We seem to fail to parse an IPv6 packet if
+            // TODO(https://fxbug.dev/42124756): We seem to fail to parse an IPv6 packet if
             // its Next Header value is unrecognized (rather than treating this
             // as a valid parsing but then replying with a parameter problem
             // error message). We should a) fix this and, b) expand this test to

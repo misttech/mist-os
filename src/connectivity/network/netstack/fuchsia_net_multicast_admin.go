@@ -27,7 +27,7 @@ type multicastEvent struct {
 
 var _ stack.MulticastForwardingEventDispatcher = (*multicastEventDispatcher)(nil)
 
-// TODO(https://fxbug.dev/81922): Extract the common logic for implementing
+// TODO(https://fxbug.dev/42162431): Extract the common logic for implementing
 // hanging gets.
 type multicastEventDispatcher struct {
 	cancelServe context.CancelFunc

@@ -184,7 +184,7 @@ impl<D> Ap<D> {
         &self,
         responder: wlan_sme::responder::Responder<fidl_mlme::MinstrelListResponse>,
     ) -> Result<(), Error> {
-        // TODO(https://fxbug.dev/79543): Implement once Minstrel is in Rust.
+        // TODO(https://fxbug.dev/42159791): Implement once Minstrel is in Rust.
         error!("ListMinstrelPeers is not supported.");
         let peers = fidl_minstrel::Peers { addrs: vec![] };
         let resp = fidl_mlme::MinstrelListResponse { peers };
@@ -197,7 +197,7 @@ impl<D> Ap<D> {
         responder: wlan_sme::responder::Responder<fidl_mlme::MinstrelStatsResponse>,
         _addr: &MacAddr,
     ) -> Result<(), Error> {
-        // TODO(https://fxbug.dev/79543): Implement once Minstrel is in Rust.
+        // TODO(https://fxbug.dev/42159791): Implement once Minstrel is in Rust.
         error!("GetMinstrelStats is not supported.");
         let resp = fidl_mlme::MinstrelStatsResponse { peer: None };
         responder.respond(resp);
@@ -354,7 +354,7 @@ impl<D: DeviceOps> Ap<D> {
                 self.handle_sme_get_minstrel_stats(responder, &req.peer_addr.into())
             }
             Req::AuthResponse(resp) => {
-                // TODO(https://fxbug.dev/91118) - Added to help investigate hw-sim test. Remove later
+                // TODO(https://fxbug.dev/42172646) - Added to help investigate hw-sim test. Remove later
                 info!("Handling MLME auth resp. self.bss.is_some()?: {}", self.bss.is_some());
                 self.bss.as_mut().ok_or_bss_err()?.handle_mlme_auth_resp(&mut self.ctx, resp)
             }
@@ -920,7 +920,7 @@ mod tests {
             fake_device_state.lock().wlan_channel,
             fidl_common::WlanChannel {
                 primary: 2,
-                // TODO(https://fxbug.dev/40917): Correctly support this.
+                // TODO(https://fxbug.dev/42116942): Correctly support this.
                 cbw: fidl_common::ChannelBandwidth::Cbw20,
                 secondary80: 0,
             }

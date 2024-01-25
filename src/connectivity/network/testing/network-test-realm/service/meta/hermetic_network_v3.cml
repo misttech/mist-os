@@ -12,7 +12,7 @@
             url: "#meta/netstack3-debug.cm",
         },
 
-        // TODO(https://fxbug.dev/125773): This is transitional. Once the DHCP
+        // TODO(https://fxbug.dev/42076541): This is transitional. Once the DHCP
         // client is being used by both netstacks, it should be moved into
         // the shard.
         {

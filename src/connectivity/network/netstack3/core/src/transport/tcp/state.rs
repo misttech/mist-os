@@ -39,7 +39,7 @@ use crate::{
 ///       Maximum Segment Lifetime, the time a TCP segment can exist in
 ///       the internetwork system.  Arbitrarily defined to be 2 minutes.
 pub(super) const MSL: Duration = Duration::from_secs(2 * 60);
-// TODO(https://fxbug.dev/117955): With the current usage of netstack3 on mostly
+// TODO(https://fxbug.dev/42069155): With the current usage of netstack3 on mostly
 // link-local workloads, these values are large enough to accommodate most cases
 // so it can help us detect failure faster. We should make them agree with other
 // common implementations once we can configure them through socket options.
@@ -47,7 +47,7 @@ const DEFAULT_MAX_RETRIES: NonZeroU8 = const_unwrap_option(NonZeroU8::new(12));
 const DEFAULT_USER_TIMEOUT: Duration = Duration::from_secs(60 * 2);
 
 /// Default maximum SYN's to send before giving up an attempt to connect.
-// TODO(https://fxbug.dev/126318): Make these constants configurable.
+// TODO(https://fxbug.dev/42077087): Make these constants configurable.
 pub(super) const DEFAULT_MAX_SYN_RETRIES: NonZeroU8 = const_unwrap_option(NonZeroU8::new(6));
 const DEFAULT_MAX_SYNACK_RETRIES: NonZeroU8 = const_unwrap_option(NonZeroU8::new(5));
 
@@ -4824,7 +4824,7 @@ mod test {
         Segment::syn_ack(ISS_2, ISS_1 + 1, UnscaledWindowSize::from(u16::MAX), Options { mss: None, window_scale: Some(WindowScale::default()) }).into() =>
         Some(Segment::ack(ISS_1 + 1, ISS_2 + 1, UnscaledWindowSize::from(u16::MAX))); "retransmit syn_ack"
     )]
-    // Regression test for https://fxbug.dev/107597
+    // Regression test for https://fxbug.dev/42058963
     fn ack_to_retransmitted_segment(
         mut state: State<FakeInstant, RingBuffer, NullBuffer, ()>,
         seg: Segment<&[u8]>,
@@ -5546,7 +5546,7 @@ mod test {
         }); "fin_wait_2")]
     fn delayed_ack(mut state: State<FakeInstant, RingBuffer, RingBuffer, ()>) {
         let mut clock = FakeInstantCtx::default();
-        // TODO(https://fxbug.dev/124309): Enable delayed ack by default.
+        // TODO(https://fxbug.dev/42075191): Enable delayed ack by default.
         let socket_options = SocketOptions { delayed_ack: true, ..SocketOptions::default() };
         assert_eq!(
             state.on_segment::<_, ClientlessBufferProvider>(
@@ -5624,7 +5624,7 @@ mod test {
     #[test]
     fn immediate_ack_if_out_of_order_or_fin() {
         let clock = FakeInstantCtx::default();
-        // TODO(https://fxbug.dev/124309): Enable delayed ack by default.
+        // TODO(https://fxbug.dev/42075191): Enable delayed ack by default.
         let socket_options = SocketOptions { delayed_ack: true, ..SocketOptions::default() };
         let mut state: State<_, _, _, ()> = State::Established(Established {
             snd: Send {

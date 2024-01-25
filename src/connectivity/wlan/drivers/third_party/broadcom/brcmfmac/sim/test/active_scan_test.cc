@@ -71,7 +71,7 @@ class ActiveScanTest : public SimTest {
                    zx::duration beacon_interval = kBeaconInterval);
 
   void StartScan(const wlan_fullmac_wire::WlanFullmacImplBaseStartScanRequest* req);
-  // TODO(https://fxbug.dev/https://fxbug.dev/83861): Align the way active_scan_test and passive_scan_test
+  // TODO(https://fxbug.dev/https://fxbug.dev/42164585): Align the way active_scan_test and passive_scan_test
 
   // verify scan results.
   void VerifyScanResults();
@@ -174,7 +174,7 @@ void ActiveScanTest::GetFirmwarePfnMac() {
 }
 
 void ActiveScanTest::VerifyScanResults() {
-  // TODO(https://fxbug.dev/83883): Verify the timestamp of each scan result.
+  // TODO(https://fxbug.dev/42164609): Verify the timestamp of each scan result.
   for (auto result : scan_results_) {
     int matches_seen = 0;
 

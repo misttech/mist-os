@@ -439,7 +439,7 @@ TEST_F(MdnsUnitTests, Subscribe) {
   RunLoopUntilIdle();
 }
 
-// Regression test for https://fxbug.dev/55116.
+// Regression test for https://fxbug.dev/42132711.
 TEST_F(MdnsUnitTests, Regression55116) {
   // Start.
   SetHasInterfaces(true);
@@ -549,7 +549,7 @@ TEST_F(MdnsUnitTests, AsyncSendMessage) {
   (void)get_and_clear_send_message_called();
 
   // We should see |SendMessage| happening immediately after the callback, which ensures that
-  // asynchronous callbacks produce immediate results (https://fxbug.dev/58141).
+  // asynchronous callbacks produce immediate results (https://fxbug.dev/42136066).
   callback(Mdns::Publication::Create(inet::IpPort::From_in_port_t(5353), {}));
   EXPECT_TRUE(get_and_clear_send_message_called());
 
@@ -892,7 +892,7 @@ TEST_F(MdnsUnitTests, RespondAlt) {
 }
 
 // Tests that |ProxyHostPublisher.PublishProxyHost| can be called more than once for a given
-// service instance. This is a regression test for https://fxbug.dev/124634.
+// service instance. This is a regression test for https://fxbug.dev/42075480.
 TEST_F(MdnsUnitTests, PublishProxyHostAlreadyPublishedLocally) {
   // Start.
   SetHasInterfaces(true);
@@ -920,7 +920,7 @@ TEST_F(MdnsUnitTests, PublishProxyHostAlreadyPublishedLocally) {
   // We don't expect the callback, because the probe has not completed.
   EXPECT_FALSE(callback1_called);
 
-  // Publish a proxy host of the same name. This call caused a crash before https://fxbug.dev/124634 was fixed.
+  // Publish a proxy host of the same name. This call caused a crash before https://fxbug.dev/42075480 was fixed.
   fuchsia::net::mdns::ServiceInstancePublisherPtr publisher2_ptr;
   bool callback2_called = false;
   service_impl.PublishProxyHost(

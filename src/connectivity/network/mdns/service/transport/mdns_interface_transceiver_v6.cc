@@ -26,7 +26,7 @@ int MdnsInterfaceTransceiverV6::SetOptionDisableMulticastLoop() {
       setsockopt(socket_fd().get(), IPPROTO_IPV6, IPV6_MULTICAST_LOOP, &param, sizeof(param));
   if (result < 0) {
     if (errno == ENOPROTOOPT) {
-      FX_LOGS(WARNING) << "https://fxbug.dev/20688 IPV6_MULTICAST_LOOP not supported "
+      FX_LOGS(WARNING) << "https://fxbug.dev/42094467 IPV6_MULTICAST_LOOP not supported "
                           "(ENOPROTOOPT), continuing anyway";
       result = 0;
     } else {
@@ -44,7 +44,7 @@ int MdnsInterfaceTransceiverV6::SetOptionJoinMulticastGroup() {
   int result = setsockopt(socket_fd().get(), IPPROTO_IPV6, IPV6_JOIN_GROUP, &param, sizeof(param));
   if (result < 0) {
     if (errno == ENODEV) {
-      FX_LOGS(WARNING) << "https://fxbug.dev/21173 IPV6_JOIN_GROUP returned ENODEV, mDNS will "
+      FX_LOGS(WARNING) << "https://fxbug.dev/42095007 IPV6_JOIN_GROUP returned ENODEV, mDNS will "
                           "not communicate via IPV6";
     } else {
       FX_LOGS(ERROR) << "Failed to set socket option IPV6_JOIN_GROUP, " << strerror(errno);
@@ -76,9 +76,9 @@ int MdnsInterfaceTransceiverV6::SetOptionUnicastTtl() {
       setsockopt(socket_fd().get(), IPPROTO_IPV6, IPV6_UNICAST_HOPS, &param, sizeof(param));
   if (result < 0) {
     if (errno == ENOPROTOOPT) {
-      // TODO(https://fxbug.dev/41357): remove the bug reference when the bug is fixed.
+      // TODO(https://fxbug.dev/42117431): remove the bug reference when the bug is fixed.
       FX_LOGS(WARNING)
-          << "https://fxbug.dev/41357: IPV6_UNICAST_HOPS not supported (ENOPROTOOPT), continuing anyway";
+          << "https://fxbug.dev/42117431: IPV6_UNICAST_HOPS not supported (ENOPROTOOPT), continuing anyway";
       result = 0;
     } else {
       FX_LOGS(ERROR) << "Failed to set socket option IPV6_UNICAST_HOPS, " << strerror(errno);

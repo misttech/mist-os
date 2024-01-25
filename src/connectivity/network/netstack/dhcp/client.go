@@ -65,7 +65,7 @@ type Client struct {
 	// info holds the Client's state as type Info.
 	info atomic.Value
 
-	// TODO(https://fxbug.dev/71350): Once we can persist inspect snapshot across
+	// TODO(https://fxbug.dev/42150693): Once we can persist inspect snapshot across
 	// reboots, remove the recent state history.
 	stateRecentHistory util.CircularLogs
 

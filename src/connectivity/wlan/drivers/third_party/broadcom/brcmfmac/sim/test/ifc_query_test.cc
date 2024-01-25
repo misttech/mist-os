@@ -26,7 +26,7 @@ TEST_F(SimTest, ClientIfcQuery) {
   ASSERT_EQ(StartInterface(wlan_common::WlanMacRole::kClient, &client_ifc, kDefaultMac), ZX_OK);
 
   wlan_fullmac_wire::WlanFullmacQueryInfo ifc_query_result;
-  // TODO(https://fxbug.dev/94163): This query silently logs errors and fails because the
+  // TODO(https://fxbug.dev/42176028): This query silently logs errors and fails because the
   // the "chanspecs", "ldpc_cap", and other iovars are not supported by the simulated firmware.
   env_->ScheduleNotification(std::bind(&SimInterface::Query, &client_ifc, &ifc_query_result),
                              zx::sec(1));

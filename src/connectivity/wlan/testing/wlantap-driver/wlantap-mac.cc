@@ -143,13 +143,13 @@ void WlantapMac::NotifyAssociationComplete(NotifyAssociationCompleteRequestView 
                                            fdf::Arena& arena,
                                            NotifyAssociationCompleteCompleter::Sync& completer) {
   // This is the test driver, so we can just pretend the association was configured.
-  // TODO(https://fxbug.dev/28907): Evaluate the use and implement
+  // TODO(https://fxbug.dev/42103599): Evaluate the use and implement
   completer.buffer(arena).ReplySuccess();
 }
 
 void WlantapMac::ClearAssociation(ClearAssociationRequestView request, fdf::Arena& arena,
                                   ClearAssociationCompleter::Sync& completer) {
-  // TODO(https://fxbug.dev/28907): Evaluate the use and implement. Association is never
+  // TODO(https://fxbug.dev/42103599): Evaluate the use and implement. Association is never
   // configured, so there is nothing to clear.
   completer.buffer(arena).ReplySuccess();
 }

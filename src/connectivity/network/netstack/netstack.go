@@ -258,7 +258,7 @@ type ifState struct {
 	// Non-nil iff the underlying link status can be observed.
 	observer link.Observer
 	nicid    tcpip.NICID
-	// TODO(https://fxbug.dev/96478): This lock is unnecessary in that we would
+	// TODO(https://fxbug.dev/42178599): This lock is unnecessary in that we would
 	// rather reuse `ifState.mu` if not for the fact that mutexes cannot be used
 	// with select. Consolidate and remove this lock.
 	// Lock for DHCP client's access to ifState.
@@ -306,7 +306,7 @@ type ifState struct {
 
 	bridgeable *bridge.BridgeableEndpoint
 
-	// TODO(https://fxbug.dev/86665): Bridged interfaces are disabled within
+	// TODO(https://fxbug.dev/42167700): Bridged interfaces are disabled within
 	// gVisor upon creation and thus the bridge must keep track of them
 	// in order to re-enable them when the bridge is removed. This is a
 	// hack, and should be replaced with a proper bridging implementation.
@@ -1074,7 +1074,7 @@ func (ifs *ifState) onDownLocked(name string, closed bool) {
 		for _, h := range ifs.ns.nicRemovedHandlers {
 			h.RemovedNIC(ifs.nicid)
 		}
-		// TODO(https://fxbug.dev/86665): Re-enabling bridged interfaces on removal
+		// TODO(https://fxbug.dev/42167700): Re-enabling bridged interfaces on removal
 		// of the bridge is a hack, and needs a proper implementation.
 		for _, nicid := range ifs.bridgedInterfaces {
 			nicInfo, ok := ifs.ns.stack.NICInfo()[nicid]
@@ -1396,7 +1396,7 @@ func (ns *Netstack) Bridge(nics []tcpip.NICID) (*ifState, error) {
 		}
 		links = append(links, ifs.bridgeable)
 
-		// TODO(https://fxbug.dev/86661): Replace this with explicit
+		// TODO(https://fxbug.dev/42167696): Replace this with explicit
 		// configuration. For now, take the minimum default route
 		// metric across all the links because there is currently
 		// no way to specify it when creating the bridge.
@@ -1434,12 +1434,12 @@ func (ns *Netstack) Bridge(nics []tcpip.NICID) (*ifState, error) {
 			ifs.mu.Lock()
 			defer ifs.mu.Unlock()
 
-			// TODO(https://fxbug.dev/86665): Disabling bridged interfaces inside gVisor
+			// TODO(https://fxbug.dev/42167700): Disabling bridged interfaces inside gVisor
 			// is a hack, and in need of a proper implementation.
 			switch err := ifs.ns.stack.DisableNIC(ifs.nicid); err.(type) {
 			case nil:
 			case *tcpip.ErrUnknownNICID:
-				// TODO(https://fxbug.dev/86959): Handle bridged interface removal.
+				// TODO(https://fxbug.dev/42168026): Handle bridged interface removal.
 				_ = syslog.Warnf("NIC %d removed while attaching to bridge", ifs.nicid)
 			default:
 				panic(fmt.Sprintf("unexpected error disabling NIC %d while attaching to bridge: %s", ifs.nicid, err))

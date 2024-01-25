@@ -19,7 +19,7 @@
         {
             type: "expect_failure",
             matchers: [
-                // TODO(https://fxbug.dev/106736): Support raw sockets.
+                // TODO(https://fxbug.dev/42058079): Support raw sockets.
                 "RawSocketTest.SendToDifferentProtocolV4",
                 "RawSocketTest.SendtoRecvfromV6",
                 "RawSocketTest.SendtoRecvfrom",

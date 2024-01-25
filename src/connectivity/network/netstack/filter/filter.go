@@ -416,7 +416,7 @@ func (f *Filter) parseRules(rules []filter.Rule) (v4Table stack.Table, v6Table s
 		case filter.ActionPass:
 			target = &stack.AcceptTarget{}
 			if r.KeepState {
-				// TODO(https://fxbug.dev/68501): Support keep state.
+				// TODO(https://fxbug.dev/42147532): Support keep state.
 				return stack.Table{}, stack.Table{}, false
 			}
 		case filter.ActionDrop:

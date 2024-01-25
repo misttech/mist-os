@@ -859,7 +859,7 @@ impl<I: deps::Instant> Selecting<I> {
         time: &C,
         stop_receiver: &mut mpsc::UnboundedReceiver<()>,
     ) -> Result<SelectingOutcome<I>, Error> {
-        // TODO(https://fxbug.dev/124724): avoid dropping/recreating the packet
+        // TODO(https://fxbug.dev/42075580): avoid dropping/recreating the packet
         // socket unnecessarily by taking an `&impl
         // deps::Socket<net_types::ethernet::Mac>` here instead.
         let socket = packet_socket_provider.get_packet_socket().await.map_err(Error::Socket)?;
@@ -1278,7 +1278,7 @@ impl<I: deps::Instant> Renewing<I> {
     async fn do_renewing<C: deps::Clock<Instant = I>>(
         &self,
         client_config: &ClientConfig,
-        // TODO(https://fxbug.dev/124724): avoid dropping/recreating the packet
+        // TODO(https://fxbug.dev/42075580): avoid dropping/recreating the packet
         // socket unnecessarily by taking an `&impl
         // deps::Socket<std::net::SocketAddr>` here instead.
         udp_socket_provider: &impl deps::UdpSocketProvider,
@@ -1473,7 +1473,7 @@ impl<I: deps::Instant> Rebinding<I> {
     async fn do_rebinding<C: deps::Clock<Instant = I>>(
         &self,
         client_config: &ClientConfig,
-        // TODO(https://fxbug.dev/124724): avoid dropping/recreating the packet
+        // TODO(https://fxbug.dev/42075580): avoid dropping/recreating the packet
         // socket unnecessarily by taking an `&impl
         // deps::Socket<std::net::SocketAddr>` here instead.
         udp_socket_provider: &impl deps::UdpSocketProvider,

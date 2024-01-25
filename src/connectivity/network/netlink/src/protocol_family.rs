@@ -245,7 +245,7 @@ pub mod route {
         // in a message, it is treated as the "local" address on the interface
         // to be added/removed. When both are included, `IFA_LOCAL` is treated
         // as the "local" address and `IFA_ADDRESS` is treated as the "peer".
-        // TODO(https://fxbug.dev/129502): Support peer addresses.
+        // TODO(https://fxbug.dev/42079868): Support peer addresses.
         let address_bytes = match (local_bytes, address_bytes) {
             (Some(local), Some(address)) => {
                 if local == address {

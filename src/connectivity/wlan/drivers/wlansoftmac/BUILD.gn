@@ -83,7 +83,7 @@ fuchsia_driver("wlansoftmac_driver-driver") {
   deps = [ ":source_set" ]
   configs += [ "//build/config/fuchsia:enable_zircon_asserts" ]
 
-  # TODO(https://fxbug.dev/58162): delete the below and fix compiler warnings
+  # TODO(https://fxbug.dev/42136089): delete the below and fix compiler warnings
   configs += [ "//build/config:Wno-conversion" ]
 }
 
@@ -113,7 +113,7 @@ fuchsia_unittest_package("wlansoftmac-tests") {
   deps = [ ":wlansoftmac_tests" ]
 }
 
-# TODO(https://fxbug.dev/124830): This test target will be removed after wlansoftmac
+# TODO(https://fxbug.dev/42075638): This test target will be removed after wlansoftmac
 #                         no longer uses Banjo types.
 test("wlansoftmac_convert_tests") {
   testonly = true
@@ -125,7 +125,7 @@ test("wlansoftmac_convert_tests") {
            "//third_party/googletest:gtest",
          ]
 
-  # TODO(https://fxbug.dev/58162): delete the below and fix compiler warnings
+  # TODO(https://fxbug.dev/42136089): delete the below and fix compiler warnings
   configs += [ "//build/config:Wno-conversion" ]
 }
 

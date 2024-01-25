@@ -289,7 +289,7 @@ zx_status_t Session::FetchTx(TxQueue::SessionTransaction& transaction) {
       desc.return_flags = static_cast<uint32_t>(netdev::wire::TxReturnFlags::kTxRetError |
                                                 netdev::wire::TxReturnFlags::kTxRetNotAvailable);
 
-      // TODO(https://fxbug.dev/32098): We're assuming that writing to the FIFO
+      // TODO(https://fxbug.dev/42107145): We're assuming that writing to the FIFO
       // here is a sufficient memory barrier for the other end to access the
       // data. That is currently true but not really guaranteed by the API.
       zx_status_t status = fifo_tx_.write(sizeof(desc_idx), &desc_idx, 1, nullptr);
@@ -625,7 +625,7 @@ void Session::MarkTxReturnResult(uint16_t descriptor_index, zx_status_t status) 
 void Session::ReturnTxDescriptors(const uint16_t* descriptors, size_t count) {
   size_t actual_count;
 
-  // TODO(https://fxbug.dev/32098): We're assuming that writing to the FIFO here
+  // TODO(https://fxbug.dev/42107145): We're assuming that writing to the FIFO here
   // is a sufficient memory barrier for the other end to access the data. That
   // is currently true but not really guaranteed by the API.
   zx_status_t status = fifo_tx_.write(sizeof(uint16_t), descriptors, count, &actual_count);
@@ -798,7 +798,7 @@ bool Session::CompleteRxWith(const Session& owner, const RxFrameInfo& frame_info
 
       // Can't do much if we can't fetch more descriptors. We have to drop this frame.
       // We intentionally don't log here because this becomes too noisy.
-      // TODO(https://fxbug.dev/74434): Log here sparingly as part of "no buffers available"
+      // TODO(https://fxbug.dev/42154117): Log here sparingly as part of "no buffers available"
       // strategy.
       if (FetchRxDescriptors() != ZX_OK) {
         return false;
@@ -1034,7 +1034,7 @@ void Session::CommitRx() {
   }
   size_t actual;
 
-  // TODO(https://fxbug.dev/32098): We're assuming that writing to the FIFO here
+  // TODO(https://fxbug.dev/42107145): We're assuming that writing to the FIFO here
   // is a sufficient memory barrier for the other end to access the data. That
   // is currently true but not really guaranteed by the API.
   zx_status_t status = fifo_rx_->fifo.write(sizeof(uint16_t), rx_return_queue_.get(),

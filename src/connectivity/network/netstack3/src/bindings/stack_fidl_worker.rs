@@ -54,20 +54,20 @@ impl StackFidlWorker {
                         enabled: _,
                         responder,
                     } => {
-                        // TODO(https://fxbug.dev/76987): Support configuring
+                        // TODO(https://fxbug.dev/42156951): Support configuring
                         // per-NIC forwarding.
                         responder.send(Err(fidl_net_stack::Error::NotSupported)).unwrap_or_else(|e| error!("failed to respond: {e:?}"));
                     }
                     StackRequest::SetDhcpClientEnabled { responder, id: _, enable } => {
-                        // TODO(https://fxbug.dev/81593): Remove this once
+                        // TODO(https://fxbug.dev/42162065): Remove this once
                         // DHCPv4 client is implemented out-of-stack.
                         if enable {
-                            error!("TODO(https://fxbug.dev/111066): Support starting DHCP client");
+                            error!("TODO(https://fxbug.dev/42062356): Support starting DHCP client");
                         }
                         responder.send(Ok(())).unwrap_or_else(|e| error!("failed to respond: {e:?}"));
                     }
                     StackRequest::BridgeInterfaces{ interfaces: _, bridge, control_handle: _ } => {
-                        error!("TODO(https://fxbug.dev/86661): Support bridging in NS3, probably via a new API");
+                        error!("TODO(https://fxbug.dev/42167696): Support bridging in NS3, probably via a new API");
                         bridge.close_with_epitaph(fuchsia_zircon::Status::NOT_SUPPORTED)
                         .unwrap_or_else(|e| {
                             debug!("failed to close bridge control {:?}", e)

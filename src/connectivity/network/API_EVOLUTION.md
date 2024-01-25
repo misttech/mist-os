@@ -121,7 +121,7 @@ At present, these are the libraries considered in this document:
    + broad general-purpose protocol `Stack` does not employ role separation,
      should be decomposed into several protocols after consulting industry
      standards
-   + protocol `Log` to be replaced by inspect in https://fxbug.dev/42432
+   + protocol `Log` to be replaced by inspect in https://fxbug.dev/42118625
 - `fuchsia.net.tun`
    + not included in SDK
    + ownership-based

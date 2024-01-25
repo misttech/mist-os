@@ -23,14 +23,14 @@ use {
     },
 };
 
-// TODO(https://fxbug.dev/28744): Enable CBW40 support once its information is available from AssocCtx.
+// TODO(https://fxbug.dev/42103418): Enable CBW40 support once its information is available from AssocCtx.
 const ASSOC_CHAN_WIDTH: banjo_common::ChannelBandwidth = banjo_common::ChannelBandwidth::CBW20;
 
 const MCS_MASK_0_31: u128 = 0xFFFFFFFF;
 const MINSTREL_FRAME_LENGTH: u32 = 1400; // bytes
 const MINSTREL_EXP_WEIGHT: f32 = 0.75; // Used to calculate moving average throughput
 
-// TODO(https://fxbug.dev/82520): Determine if we should use a separate variable for (1.0 - MINSTREL_PROABILITY_THRESHOLD).
+// TODO(https://fxbug.dev/42163096): Determine if we should use a separate variable for (1.0 - MINSTREL_PROABILITY_THRESHOLD).
 const MINSTREL_PROBABILITY_THRESHOLD: f32 = 0.9; // If probability is past this level,
                                                  // only consider throughput
 const PROBE_INTERVAL: u8 = 16; // Number of normal packets to send between two probe packets.
@@ -74,7 +74,7 @@ impl TxStats {
         // Based on experiments, if HT is supported, it is better not to use ERP for
         // data frames. With ralink RT5592 and Netgear Nighthawk X10, approximately 80
         // feet away, HT/ERP tx throughput < 1 Mbps, HT only tx 4-8 Mbps
-        // TODO(https://fxbug.dev/29488): Revisit with VHT support.
+        // TODO(https://fxbug.dev/42104244): Revisit with VHT support.
         self.tx_vector_idx.is_ht() && !other.tx_vector_idx.is_ht()
     }
 
@@ -153,7 +153,7 @@ impl Peer {
         if let Some(ht_cap) = assoc_cfg.ht_cap {
             let mut ht_cap = HtCapabilities::from(ht_cap.clone());
 
-            // TODO(https://fxbug.dev/29488): SGI support suppressed. Remove these once they are supported.
+            // TODO(https://fxbug.dev/42104244): SGI support suppressed. Remove these once they are supported.
             let mut cap_info = ht_cap.ht_cap_info;
             cap_info.set_short_gi_20(false);
             cap_info.set_short_gi_40(false);
@@ -627,7 +627,7 @@ fn tx_time_ht(
 }
 
 fn header_tx_time_ht() -> Duration {
-    // TODO(https://fxbug.dev/81987): Implement Plcp preamble and header
+    // TODO(https://fxbug.dev/42162502): Implement Plcp preamble and header
     Duration::ZERO
 }
 
@@ -650,7 +650,7 @@ fn payload_tx_time_ht(
     const DATA_SUB_CARRIERS_20: u16 = 52;
     // Unit: Number of complex data numbers per spatial stream per OFDM symbol (40 MHz)
     const DATA_SUB_CARRIERS_40: u16 = 108;
-    // TODO(https://fxbug.dev/29488): VHT would have kDataSubCarriers80 = 234 and kDataSubCarriers160 = 468
+    // TODO(https://fxbug.dev/42104244): VHT would have kDataSubCarriers80 = 234 and kDataSubCarriers160 = 468
 
     let nss = 1 + mcs_idx / HT_NUM_UNIQUE_MCS;
     let relative_mcs_idx = mcs_idx % HT_NUM_UNIQUE_MCS;
@@ -685,7 +685,7 @@ fn tx_time_erp(rate: &SupportedRate) -> Duration {
 }
 
 fn header_tx_time_erp() -> Duration {
-    // TODO(https://fxbug.dev/81987): Implement Plcp preamble and header
+    // TODO(https://fxbug.dev/42162502): Implement Plcp preamble and header
     Duration::ZERO
 }
 
@@ -839,7 +839,7 @@ mod tests {
         let peer_stats =
             minstrel.get_fidl_peer_stats(&peer_addr).expect("Failed to get peer stats");
         assert_eq!(&peer_stats.addr, TEST_MAC_ADDR.as_array());
-        // TODO(https://fxbug.dev/28744): Size would be 40 if 40 MHz is supported and 72 if 40 MHz + SGI are supported.
+        // TODO(https://fxbug.dev/42103418): Size would be 40 if 40 MHz is supported and 72 if 40 MHz + SGI are supported.
         assert_eq!(peer_stats.entries.len(), 24);
         assert_eq!(peer_stats.max_tp, 16); // In the absence of data, our highest supported rate is max throughput.
         assert_eq!(peer_stats.basic_highest, ERP_START_IDX + ERP_NUM_TX_VECTOR as u16 - 1);

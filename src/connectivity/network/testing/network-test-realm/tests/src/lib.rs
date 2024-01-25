@@ -1226,7 +1226,7 @@ const IPV6_LINK_LOCAL_ADDRESS_CONFIG: PingAddressConfig = PingAddressConfig {
         IPV6_LINK_LOCAL_ADDRESS_CONFIG,
         PingOptions {
             interface_name:  Some(INTERFACE1_NAME.to_string()),
-            // TODO(https://fxbug.dev/133573): Fix and use the default timeout.
+            // TODO(https://fxbug.dev/42083514): Fix and use the default timeout.
             timeout: zx::Duration::from_seconds(5),
             ..PingOptions::default()
         },
@@ -1308,7 +1308,7 @@ async fn ping(
     netstack: fntr::Netstack,
     expected_result: Result<(), fntr::Error>,
 ) {
-    // TODO(https://fxbug.dev/95457): Destructure these types in the parameter
+    // TODO(https://fxbug.dev/42177465): Destructure these types in the parameter
     // definition.
     let PingAddressConfig { source_subnet, target_subnet } = address_config;
     let PingOptions { interface_name, payload_length, timeout, disable_target_interface } = options;
@@ -1652,7 +1652,7 @@ async fn join_multicast_group(
     name: &str,
     case_name: &str,
     netstack: fntr::Netstack,
-    // TODO(https://fxbug.dev/95458): Support mut parameters from variant_test.
+    // TODO(https://fxbug.dev/42177466): Support mut parameters from variant_test.
     #[allow(unused_mut)] mut multicast_address: fnet::IpAddress,
     subnet: fnet::Subnet,
 ) {
@@ -1728,7 +1728,7 @@ async fn join_multicast_group(
 async fn join_multicast_group_after_stop(
     name: &str,
     case_name: &str,
-    // TODO(https://fxbug.dev/95458): Support mut parameters from variant_test.
+    // TODO(https://fxbug.dev/42177466): Support mut parameters from variant_test.
     #[allow(unused_mut)] mut multicast_address: fnet::IpAddress,
     #[allow(unused_mut)] mut second_multicast_address: fnet::IpAddress,
     subnet: fnet::Subnet,
@@ -1831,7 +1831,7 @@ async fn join_multicast_group_after_stop(
 async fn leave_multicast_group(
     name: &str,
     case_name: &str,
-    // TODO(https://fxbug.dev/95458): Support mut parameters from variant_test.
+    // TODO(https://fxbug.dev/42177466): Support mut parameters from variant_test.
     #[allow(unused_mut)] mut multicast_address: fnet::IpAddress,
     subnet: fnet::Subnet,
     netstack: fntr::Netstack,
@@ -1924,7 +1924,7 @@ async fn join_multicast_group_with_non_existent_interface(
         .expect("start_hermetic_network_realm failed")
         .expect("start_hermetic_network_realm error");
 
-    // TODO(https://fxbug.dev/123365): Resolve error code discrepancy for `IP_ADD_MEMBERSHIP`
+    // TODO(https://fxbug.dev/42074274): Resolve error code discrepancy for `IP_ADD_MEMBERSHIP`
     // (called under the hood by `join_multicast_group` below).
     let expected_err = match netstack {
         fntr::Netstack::V2 => fntr::Error::InvalidArguments,
@@ -2039,7 +2039,7 @@ async fn join_multicast_group_with_non_multicast_address(
 async fn join_same_multicast_group_multiple_times(
     name: &str,
     case_name: &str,
-    // TODO(https://fxbug.dev/95458): Support mut parameters from variant_test.
+    // TODO(https://fxbug.dev/42177466): Support mut parameters from variant_test.
     #[allow(unused_mut)] mut multicast_address: fnet::IpAddress,
     subnet: fnet::Subnet,
     netstack: fntr::Netstack,
@@ -2205,7 +2205,7 @@ async fn leave_multicast_group_with_non_multicast_address(
 async fn leave_unjoined_multicast_group(
     name: &str,
     case_name: &str,
-    // TODO(https://fxbug.dev/95458): Support mut parameters from variant_test.
+    // TODO(https://fxbug.dev/42177466): Support mut parameters from variant_test.
     #[allow(unused_mut)] mut multicast_address: fnet::IpAddress,
     subnet: fnet::Subnet,
     netstack: fntr::Netstack,
@@ -2349,6 +2349,6 @@ async fn start_dhcpv6_client(
         .expect("frame stream terminated unexpectedly");
 }
 
-// TODO(https://fxbug.dev/107647): Test stopping all DHCPv6 clients. Currently
+// TODO(https://fxbug.dev/42059019): Test stopping all DHCPv6 clients. Currently
 // blocked on address assignment, otherwise there's no observable effect of
 // stopping the clients.

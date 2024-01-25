@@ -53,7 +53,7 @@ pub enum NeighborRemovalError {
     NotFound(#[from] NotFoundError),
 }
 
-// TODO(https://fxbug.dev/134098): Use NeighborAddr to witness these properties.
+// TODO(https://fxbug.dev/42083952): Use NeighborAddr to witness these properties.
 fn validate_neighbor_addr<A: IpAddress>(addr: A) -> Option<SpecifiedAddr<A>> {
     let is_valid: bool = A::Version::map_ip(
         addr,
@@ -112,9 +112,9 @@ where
     pub fn resolve_link_addr(
         &mut self,
         device_id: &<C::CoreContext as DeviceIdContext<D>>::DeviceId,
-    // TODO(https://fxbug.dev/126138): Use IPv4 subnet information to
+    // TODO(https://fxbug.dev/42076887): Use IPv4 subnet information to
     // disallow subnet and subnet broadcast addresses.
-    // TODO(https://fxbug.dev/134098): Use NeighborAddr when available.
+    // TODO(https://fxbug.dev/42083952): Use NeighborAddr when available.
         dst: &SpecifiedAddr<I::Addr>,
     ) -> LinkResolutionResult<
         D::Address,
@@ -189,10 +189,10 @@ where
         &mut self,
         device_id: &<C::CoreContext as DeviceIdContext<D>>::DeviceId,
         neighbor: I::Addr,
-        // TODO(https://fxbug.dev/126138): Use IPv4 subnet information to
+        // TODO(https://fxbug.dev/42076887): Use IPv4 subnet information to
         // disallow the address with all host bits equal to 0, and the
         // subnet broadcast addresses with all host bits equal to 1.
-        // TODO(https://fxbug.dev/134098): Use NeighborAddr when available.
+        // TODO(https://fxbug.dev/42083952): Use NeighborAddr when available.
         link_address: D::Address,
     ) -> Result<(), StaticNeighborInsertionError> {
         if !link_address.is_unicast() {
@@ -249,10 +249,10 @@ where
     pub fn remove_entry(
         &mut self,
         device_id: &<C::CoreContext as DeviceIdContext<D>>::DeviceId,
-        // TODO(https://fxbug.dev/126138): Use IPv4 subnet information to
+        // TODO(https://fxbug.dev/42076887): Use IPv4 subnet information to
         // disallow the address with all host bits equal to 0, and the
         // subnet broadcast addresses with all host bits equal to 1.
-        // TODO(https://fxbug.dev/134098): Use NeighborAddr when available.
+        // TODO(https://fxbug.dev/42083952): Use NeighborAddr when available.
         neighbor: I::Addr,
     ) -> Result<(), NeighborRemovalError> {
         let (core_ctx, bindings_ctx) = self.contexts();

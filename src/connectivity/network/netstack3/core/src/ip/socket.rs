@@ -325,7 +325,7 @@ pub struct IpSock<I: IpExt, D, O> {
     definition: IpSockDefinition<I, D>,
     /// Options set on the socket that are independent of the socket definition.
     ///
-    /// TODO(https://fxbug.dev/39479): use this to record multicast options.
+    /// TODO(https://fxbug.dev/42115343): use this to record multicast options.
     #[allow(unused)]
     options: O,
 }
@@ -610,7 +610,7 @@ impl<
             .lookup_route(bindings_ctx, device.as_ref(), Some(*local_ip), *remote_ip)
             .map_err(MmsError::NoDevice)?;
         let mtu = IpDeviceContext::<I, BC>::get_mtu(self, &device);
-        // TODO(https://fxbug.dev/121911): Calculate the options size when they
+        // TODO(https://fxbug.dev/42072935): Calculate the options size when they
         // are supported.
         Mms::from_mtu::<I>(mtu, 0 /* no ip options used */).ok_or(MmsError::MTUTooSmall(mtu))
     }
@@ -681,7 +681,7 @@ pub(crate) mod ipv6_source_address_selection {
         a: &SasCandidate<D>,
         b: &SasCandidate<D>,
     ) -> Ordering {
-        // TODO(https://fxbug.dev/46822): Implement rules 2, 4, 5.5, 6, and 7.
+        // TODO(https://fxbug.dev/42123500): Implement rules 2, 4, 5.5, 6, and 7.
 
         let a_addr = a.addr_sub.addr().into_specified();
         let b_addr = b.addr_sub.addr().into_specified();

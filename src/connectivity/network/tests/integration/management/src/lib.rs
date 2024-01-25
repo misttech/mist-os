@@ -998,7 +998,7 @@ async fn test_prefix_provider_not_supported<M: Manager, N: Netstack>(name: &str)
     );
 }
 
-// TODO(https://fxbug.dev/114132): Remove this test when multiple clients
+// TODO(https://fxbug.dev/42065403): Remove this test when multiple clients
 // requesting prefixes is supported.
 #[netstack_test]
 async fn test_prefix_provider_already_acquiring<M: Manager, N: Netstack>(name: &str) {
@@ -1183,7 +1183,7 @@ async fn test_prefix_provider_double_watch<M: Manager, N: Netstack>(name: &str) 
         .expect("PrefixControl event stream ended");
     assert_eq!(reason, fnet_dhcpv6::PrefixControlExitReason::DoubleWatch);
 
-    // TODO(https://fxbug.dev/74241): Cannot expected `is_closed` to return true
+    // TODO(https://fxbug.dev/42153903): Cannot expected `is_closed` to return true
     // even though PEER_CLOSED has already been observed on the channel.
     assert_eq!(prefix_control.on_closed().await, Ok(zx::Signals::CHANNEL_PEER_CLOSED));
     assert!(prefix_control.is_closed());

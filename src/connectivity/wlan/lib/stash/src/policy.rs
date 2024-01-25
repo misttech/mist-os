@@ -74,7 +74,7 @@ impl PolicyStorage {
         Self::new_with_id_and_proxy(
             id,
             default_stash_proxy,
-            // TODO(https://fxbug.dev/136411): For now, always use stash.
+            // TODO(https://fxbug.dev/42086019): For now, always use stash.
             /* only_stash: */
             true,
         )

@@ -59,7 +59,7 @@ pub fn watch_phy_devices<'a>(
                         }
                     }
                 };
-                // TODO(https://fxbug.dev/124740): remove the assumption that devices have numeric IDs.
+                // TODO(https://fxbug.dev/42075598): remove the assumption that devices have numeric IDs.
                 let mut s = std::collections::hash_map::DefaultHasher::new();
                 let () = filename.hash(&mut s);
                 let mut s: u64 = s.finish();

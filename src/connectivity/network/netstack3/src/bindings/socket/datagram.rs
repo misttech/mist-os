@@ -463,7 +463,9 @@ where
         match ctx.api().udp().set_posix_reuse_port(id, reuse_port) {
             Ok(()) => Ok(()),
             Err(e) => {
-                warn!("tried to set SO_REUSEPORT on a bound socket; see https://fxbug.dev/100840");
+                warn!(
+                    "tried to set SO_REUSEPORT on a bound socket; see https://fxbug.dev/42051599"
+                );
                 Err(e)
             }
         }
@@ -1193,7 +1195,7 @@ where
                 flags: _,
                 responder,
             } => {
-                // TODO(https://fxbug.dev/21106): handle control.
+                // TODO(https://fxbug.dev/42094933): handle control.
                 responder
                     .send(self.send_msg(addr.map(|addr| *addr), data))
                     .unwrap_or_else(|e| error!("failed to respond: {e:?}"));
@@ -1224,7 +1226,7 @@ where
                 value_bytes: _,
                 responder,
             } => {
-                // TODO(https://fxbug.dev/123057): Actually implement SetSendBuffer.
+                // TODO(https://fxbug.dev/42074004): Actually implement SetSendBuffer.
                 //
                 // Currently, UDP sending in Netstack3 is synchronous, so it's not clear what a
                 // sensible implementation would look like.
@@ -1256,7 +1258,7 @@ where
                 // ANVL's UDP test stub requires that setting SO_REUSEADDR succeeds.
                 // Blindly return success here to unblock test coverage (possible since
                 // the network test realm is restarted before each test case).
-                // TODO(https://fxbug.dev/97823): Actually implement SetReuseAddress.
+                // TODO(https://fxbug.dev/42180094): Actually implement SetReuseAddress.
                 responder.send(Ok(())).unwrap_or_else(|e| error!("failed to respond: {e:?}"));
             }
             fposix_socket::SynchronousDatagramSocketRequest::GetReuseAddress { responder } => {
@@ -1298,7 +1300,7 @@ where
                 // no-op so that applications needing to send broadcast packets may
                 // make progress.
                 //
-                // TODO(https://fxbug.dev/126299): Actually implement SO_BROADCAST.
+                // TODO(https://fxbug.dev/42077065): Actually implement SO_BROADCAST.
                 let response = if value { Ok(()) } else { Err(fposix::Errno::Eopnotsupp) };
                 responder.send(response).unwrap_or_else(|e| error!("failed to respond: {e:?}"));
             }
@@ -1360,7 +1362,7 @@ where
                 value: _,
                 responder,
             } => {
-                warn!("TODO(https://fxbug.dev/107644): implement IPV6_MULTICAST_IF socket option");
+                warn!("TODO(https://fxbug.dev/42059016): implement IPV6_MULTICAST_IF socket option");
                 responder.send(Ok(())).unwrap_or_else(|e| error!("failed to respond: {e:?}"));
             }
             fposix_socket::SynchronousDatagramSocketRequest::GetIpv6MulticastInterface {
@@ -1394,7 +1396,7 @@ where
                 value,
                 responder,
             } => {
-                // TODO(https://fxbug.dev/106865): add support for
+                // TODO(https://fxbug.dev/42058186): add support for
                 // looping back sent packets.
                 responder
                     .send((!value).then_some(()).ok_or(fposix::Errno::Enoprotoopt))
@@ -2077,7 +2079,7 @@ where
         hop_limit: fposix_socket::OptionalUint8,
     ) -> Result<(), fposix::Errno> {
         let hop_limit: Option<u8> = hop_limit.into_core();
-        // TODO(https://fxbug.dev/108323): Support setting a multicast hop limit
+        // TODO(https://fxbug.dev/42059735): Support setting a multicast hop limit
         // of 0.
         let hop_limit =
             hop_limit.map(|u| NonZeroU8::new(u).ok_or(fposix::Errno::Einval)).transpose()?;
@@ -2655,7 +2657,7 @@ mod tests {
 
     /// Tests a simple UDP setup with a client and a server, where the client
     /// can send data to the server and the server receives it.
-    // TODO(https://fxbug.dev/47321): this test is incorrect for ICMP sockets. At the time of this
+    // TODO(https://fxbug.dev/42124055): this test is incorrect for ICMP sockets. At the time of this
     // writing it crashes before reaching the wrong parts, but we will need to specialize the body
     // of this test for ICMP before calling the feature complete.
     #[fixture::teardown(TestSetup::shutdown)]
@@ -3571,7 +3573,7 @@ mod tests {
 
     declare_tests!(send_recv_loopback_peek);
 
-    // TODO(https://fxbug.dev/92678): add a syscall test to exercise this
+    // TODO(https://fxbug.dev/42174378): add a syscall test to exercise this
     // behavior.
     #[fixture::teardown(TestSetup::shutdown)]
     async fn multicast_join_receive<A: TestSockAddr, T>(

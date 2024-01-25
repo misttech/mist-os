@@ -29,7 +29,7 @@ impl ToPsk for wpa::Wpa1Credentials {
         match self {
             wpa::Wpa1Credentials::Psk(ref psk) => psk.clone(),
             wpa::Wpa1Credentials::Passphrase(ref passphrase) => {
-                // TODO(https://fxbug.dev/95934): Unify the representation of PSKs. There can only be
+                // TODO(https://fxbug.dev/42177995): Unify the representation of PSKs. There can only be
                 //                        one...!
                 CommonPsk(
                     compute(passphrase.as_ref(), ssid)
@@ -52,7 +52,7 @@ impl ToPsk for wpa::Wpa2PersonalCredentials {
         match self {
             wpa::Wpa2PersonalCredentials::Psk(ref psk) => psk.clone(),
             wpa::Wpa2PersonalCredentials::Passphrase(ref passphrase) => {
-                // TODO(https://fxbug.dev/95934): Unify the representation of PSKs. There can only be
+                // TODO(https://fxbug.dev/42177995): Unify the representation of PSKs. There can only be
                 //                        one...!
                 CommonPsk(
                     compute(passphrase.as_ref(), ssid)

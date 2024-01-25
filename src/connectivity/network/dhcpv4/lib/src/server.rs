@@ -357,7 +357,7 @@ impl<DS: DataStore, TS: SystemTimeSource> Server<DS, TS> {
                 return Ok(requested_addr);
             }
         }
-        // TODO(https://fxbug.dev/21423): The ip should be handed out based on
+        // TODO(https://fxbug.dev/42095285): The ip should be handed out based on
         // client subnet. Currently, the server blindly hands out the next
         // available ip from its available ip pool, without any subnet analysis.
         if let Some(addr) = self.pool.available().next() {
@@ -742,7 +742,7 @@ impl<DS: DataStore, TS: SystemTimeSource> Server<DS, TS> {
                     Err(ServerError::IncorrectDHCPServer(addr))
                 }
             }
-            // TODO(https://fxbug.dev/21423): This IP should be chosen based on the
+            // TODO(https://fxbug.dev/42095285): This IP should be chosen based on the
             // subnet of the client.
             None => Ok(*self.params.server_ips.first().ok_or(ServerError::ServerMissingIpAddr)?),
         }
@@ -863,7 +863,7 @@ pub fn get_requested_options(
     options_repo: &HashMap<OptionCode, DhcpOption>,
     subnet_mask: PrefixLength<Ipv4>,
 ) -> Vec<DhcpOption> {
-    // TODO(https://fxbug.dev/104860): We should consider always supplying the
+    // TODO(https://fxbug.dev/42056025): We should consider always supplying the
     // SubnetMask for all DHCPDISCOVER and DHCPREQUEST requests. ISC
     // does this, and we may desire to for increased compatibility with
     // non-compliant clients.
@@ -910,7 +910,7 @@ pub fn get_requested_options(
     })
 }
 
-// TODO(https://fxbug.dev/74998): Find an alternative to panicking.
+// TODO(https://fxbug.dev/42154741): Find an alternative to panicking.
 fn release_leased_addr<DS: DataStore>(
     id: &ClientIdentifier,
     record: &mut LeaseRecord,
@@ -979,7 +979,7 @@ impl<DS: DataStore, TS: SystemTimeSource> ServerDispatcher for Server<DS, TS> {
             return Err(Status::INVALID_ARGS);
         }
 
-        // TODO(https://fxbug.dev/62558): rethink this check and this function.
+        // TODO(https://fxbug.dev/42140964): rethink this check and this function.
         if self.pool.universe.is_empty() {
             error!("Server validation failed: Address pool is empty");
             return Err(Status::INVALID_ARGS);
@@ -1308,7 +1308,7 @@ struct AddressPool {
     // Morally immutable after construction, this is the full set of addresses
     // this pool manages, both allocated and available.
     //
-    // TODO(https://fxbug.dev/74521): make this type std::ops::Range.
+    // TODO(https://fxbug.dev/42154213): make this type std::ops::Range.
     universe: BTreeSet<Ipv4Addr>,
     allocated: BTreeSet<Ipv4Addr>,
 }
@@ -1468,7 +1468,7 @@ fn get_client_state(msg: &Message) -> Result<ClientState, ()> {
     // 'server identifier' MUST NOT be filled in, 'requested IP address' option MUST NOT be filled
     // in, 'ciaddr' MUST be filled in with client's IP address.
     //
-    // TODO(https://fxbug.dev/64978): Distinguish between clients in RENEWING and REBINDING states
+    // TODO(https://fxbug.dev/42143639): Distinguish between clients in RENEWING and REBINDING states
     if server_id.is_some() && msg.ciaddr.is_unspecified() && requested_ip.is_some() {
         Ok(ClientState::Selecting)
     } else if server_id.is_none() && requested_ip.is_some() && msg.ciaddr.is_unspecified() {

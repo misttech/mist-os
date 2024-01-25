@@ -107,7 +107,7 @@ impl AkmAlgorithm {
                 let sae_fields = body.map(|body| body.to_vec()).unwrap_or(vec![]);
                 actions.forward_sme_sae_rx(
                     hdr.auth_txn_seq_num,
-                    // TODO(https://fxbug.dev/91353): All reserved values mapped to REFUSED_REASON_UNSPECIFIED.
+                    // TODO(https://fxbug.dev/42172907): All reserved values mapped to REFUSED_REASON_UNSPECIFIED.
                     Option::<fidl_ieee80211::StatusCode>::from(hdr.status_code)
                         .unwrap_or(fidl_ieee80211::StatusCode::RefusedReasonUnspecified),
                     sae_fields,

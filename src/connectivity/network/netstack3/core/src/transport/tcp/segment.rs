@@ -70,7 +70,7 @@ impl Options {
                     }
                     options.window_scale = Some(WindowScale::new(ws).unwrap_or(WindowScale::MAX));
                 }
-                // TODO(https://fxbug.dev/121882): We don't support these yet.
+                // TODO(https://fxbug.dev/42072902): We don't support these yet.
                 TcpOption::SackPermitted
                 | TcpOption::Sack(_)
                 | TcpOption::Timestamp { ts_val: _, ts_echo_reply: _ } => {}
@@ -695,7 +695,7 @@ mod test {
         data_len: 1,
         rcv_nxt: 3,
         rcv_wnd: 10,
-    } => Some((SeqNum::new(3), None, 1..1)); "regression test for https://fxbug.dev/110391")]
+    } => Some((SeqNum::new(3), None, 1..1)); "regression test for https://fxbug.dev/42061750")]
     fn segment_overlap(
         OverlapTestArgs { seg_seq, control, data_len, rcv_nxt, rcv_wnd }: OverlapTestArgs,
     ) -> Option<(SeqNum, Option<Control>, Range<u32>)> {

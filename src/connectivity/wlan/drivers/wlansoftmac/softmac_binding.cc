@@ -341,13 +341,13 @@ zx_status_t SoftmacBinding::EthernetImplSetParam(uint32_t param, int32_t value,
   WLAN_TRACE_DURATION();
   ldebug(0, nullptr, "Entering.");
   if (param == ETHERNET_SETPARAM_PROMISC) {
-    // See https://fxbug.dev/28881: In short, the bridge mode doesn't require WLAN
+    // See https://fxbug.dev/42103570: In short, the bridge mode doesn't require WLAN
     // promiscuous mode enabled.
     //               So we give a warning and return OK here to continue the
     //               bridging.
-    // TODO(https://fxbug.dev/29113): To implement the real promiscuous mode.
+    // TODO(https://fxbug.dev/42103829): To implement the real promiscuous mode.
     if (value == 1) {  // Only warn when enabling.
-      lwarn("WLAN promiscuous not supported yet. see https://fxbug.dev/29113");
+      lwarn("WLAN promiscuous not supported yet. see https://fxbug.dev/42103829");
     }
     return ZX_OK;
   }

@@ -30,7 +30,7 @@ struct ClientPhy<N> {
     identifier: N,
 }
 
-// TODO(https://fxbug.dev/91118) - Added to help investigate hw-sim test. Remove later
+// TODO(https://fxbug.dev/42172646) - Added to help investigate hw-sim test. Remove later
 async fn canary(mut finish_receiver: oneshot::Receiver<()>) {
     let mut interval_stream = fasync::Interval::new(fasync::Duration::from_seconds(1));
     loop {

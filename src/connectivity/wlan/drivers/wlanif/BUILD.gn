@@ -40,7 +40,7 @@ all_deps = [
   "//zircon/system/ulib/sync",
   "//zircon/system/ulib/sync:sync-cpp",
 
-  # TODO(https://fxbug.dev/38599): The fdio dependency here is purely due to
+  # TODO(https://fxbug.dev/42114366): The fdio dependency here is purely due to
   # a problem with transitive Rust static library dependencies when linking
   # C++ programs
   "//sdk/lib/fdio",
@@ -52,7 +52,7 @@ source_set("lib_source") {
   public_deps = all_deps
   include_dirs = [ "src/connectivity/wlan/drivers/wlanif/" ]
 
-  # TODO(https://fxbug.dev/58162): delete the below and fix compiler warnings
+  # TODO(https://fxbug.dev/42136089): delete the below and fix compiler warnings
   configs += [ "//build/config:Wno-conversion" ]
 }
 

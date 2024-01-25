@@ -63,7 +63,7 @@ impl TryFrom<SecurityContext> for fidl_security::Authentication {
 
         match bss.protection() {
             // Unsupported.
-            // TODO(https://fxbug.dev/92693): Implement conversions for WPA Enterprise.
+            // TODO(https://fxbug.dev/42174395): Implement conversions for WPA Enterprise.
             Protection::Unknown | Protection::Wpa2Enterprise | Protection::Wpa3Enterprise => {
                 Err(SecurityError::Unsupported)
             }

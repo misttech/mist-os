@@ -30,7 +30,7 @@ const (
 	// 'static' to escape Netstack's DHCP-learned routes' lifecycle management
 	// hooks that 'dynamic' routes will be affected by.
 	//
-	// TODO(https://fxbug.dev/43503): Instead of adding routes as static, support a type
+	// TODO(https://fxbug.dev/42119815): Instead of adding routes as static, support a type
 	// of dynamic route specifically for NDP.
 	staticRouteAvoidingLifeCycleHooks = false
 
@@ -481,7 +481,7 @@ func (n *ndpDispatcher) handleEvent(event ndpEvent) {
 			}
 		}()
 		if !success {
-			// TODO(https://fxbug.dev/115418): add test coverage for all the DAD outcomes that
+			// TODO(https://fxbug.dev/42066687): add test coverage for all the DAD outcomes that
 			// result in cache invalidation, including `DADError` and `DADAborted`.
 			n.ns.resetDestinationCache()
 		}

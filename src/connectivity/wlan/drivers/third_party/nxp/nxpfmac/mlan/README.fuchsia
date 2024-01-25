@@ -12,7 +12,7 @@ goal is to avoid any changes unless it is absolutely required to build the
 code for Fuchsia. To this end an OWNERS file has been added to prevent
 inadvertent formatting or other changes.
 
-OSRB approval requested in https://fxbug.dev/101261.
+OSRB approval requested in https://fxbug.dev/42052067.
 Initial check-in of mlan code fxrev.dev/700142.
 
 Local Modifications:

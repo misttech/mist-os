@@ -44,12 +44,12 @@ template("fuchsia_netemul_guest_test_package") {
     test_specs = {
       environments = guest_envs
 
-      # TODO(https://fxbug.dev/117767): Remove error logging in clean shutdown paths.
+      # TODO(https://fxbug.dev/42068946): Remove error logging in clean shutdown paths.
       log_settings = {
         max_severity = "ERROR"
       }
 
-      # TODO(https://fxbug.dev/118321): Enable parallelized guest tests.
+      # TODO(https://fxbug.dev/42069490): Enable parallelized guest tests.
       parallel = 1
     }
 

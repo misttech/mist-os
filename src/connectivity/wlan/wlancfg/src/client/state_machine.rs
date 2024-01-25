@@ -250,7 +250,7 @@ async fn disconnecting_state(
         }
     }
 
-    // TODO(https://fxbug.dev/53505): either make this fire-and-forget in the SME, or spawn a thread for this,
+    // TODO(https://fxbug.dev/42130926): either make this fire-and-forget in the SME, or spawn a thread for this,
     // so we don't block on it
     common_options
         .proxy
@@ -2366,7 +2366,7 @@ mod tests {
             }
         );
         // Progress the state machine
-        // TODO(https://fxbug.dev/53505): remove this once the disconnect request is fire-and-forget
+        // TODO(https://fxbug.dev/42130926): remove this once the disconnect request is fire-and-forget
         assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
         // Second SME request: connect to the second network
         let connect_txn_handle = assert_variant!(

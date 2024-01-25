@@ -660,7 +660,7 @@ impl RecvMsgParams {
             fppacket::RecvPacketInfo { packet_type, interface_type, packet_info }
         });
 
-        // TODO(https://fxbug.dev/106735): Return control data and flags.
+        // TODO(https://fxbug.dev/42058078): Return control data and flags.
         let _ = (want_control, flags);
         let control = fppacket::RecvControlData::default();
 

@@ -439,7 +439,7 @@ enum CacheTimerAction<A: IpAddress> {
     CancelExistingTimer(FragmentCacheKey<A>),
 }
 
-// TODO(https://fxbug.dev/92672): Make these operate on a context trait rather
+// TODO(https://fxbug.dev/42174372): Make these operate on a context trait rather
 // than `&self` and `&mut self`.
 impl<I: IpExt, Instant> IpPacketFragmentCache<I, Instant> {
     /// Attempts to process a packet fragment.

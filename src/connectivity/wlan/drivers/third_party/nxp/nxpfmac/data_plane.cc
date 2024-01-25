@@ -202,7 +202,7 @@ void DataPlane::NetDevGetInfo(device_impl_info_t *out_info) {
       .max_buffer_parts = 1,
       .max_buffer_length = ZX_PAGE_SIZE,
       .buffer_alignment = buffer_alignment,
-      // TODO(https://fxbug.dev/110577): Revisit this minimum size when ASMDU support is added.
+      // TODO(https://fxbug.dev/42061956): Revisit this minimum size when ASMDU support is added.
       .min_rx_buffer_length = align<uint32_t>(kMinRxBufferLength + rx_headroom, ZX_PAGE_SIZE),
       // Make sure there's enough headroom for a frame object, an mlan_buffer and the TX headroom
       // required by the bus. The tx headroom needs to start on an aligned address so make sure the

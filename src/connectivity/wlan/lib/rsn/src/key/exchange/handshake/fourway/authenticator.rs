@@ -223,7 +223,7 @@ fn process_message_2<B: ByteSlice>(
     let gtk = cfg
         .gtk_provider
         .as_ref()
-        // TODO(https://fxbug.dev/29786): Replace with Error::MissingGtkProvider
+        // TODO(https://fxbug.dev/42104575): Replace with Error::MissingGtkProvider
         .ok_or_else(|| format_err!("GtkProvider is missing"))?
         .lock()
         .unwrap()
@@ -236,13 +236,13 @@ fn process_message_2<B: ByteSlice>(
             let igtk_provider = cfg
                 .igtk_provider
                 .as_ref()
-                // TODO(https://fxbug.dev/29786): Replace with Error::MissingIgtkProvider
+                // TODO(https://fxbug.dev/42104575): Replace with Error::MissingIgtkProvider
                 .ok_or_else(|| format_err!("IgtkProvider is missing"))?
                 .lock()
                 .unwrap();
             let igtk_provider_cipher = igtk_provider.cipher();
             if group_mgmt_cipher != igtk_provider_cipher {
-                // TODO(https://fxbug.dev/29786): Replace with Error::WrongIgtkProviderCipher
+                // TODO(https://fxbug.dev/42104575): Replace with Error::WrongIgtkProviderCipher
                 return Err(format_err!(
                     "wrong IgtkProvider cipher: {:?} != {:?}",
                     group_mgmt_cipher,

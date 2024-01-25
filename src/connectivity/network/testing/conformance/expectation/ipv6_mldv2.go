@@ -6,7 +6,7 @@ package expectation
 
 import "go.fuchsia.dev/fuchsia/src/connectivity/network/testing/conformance/expectation/outcome"
 
-// TODO(https://fxbug.dev/117415): Pass tests once MLDv2 has been fully
+// TODO(https://fxbug.dev/42068622): Pass tests once MLDv2 has been fully
 // implemented.
 var ipv6Mldv2Expectations map[AnvlCaseNumber]outcome.Outcome = map[AnvlCaseNumber]outcome.Outcome{
 	{1, 2}:   Fail,

@@ -1147,7 +1147,7 @@ async fn restore_state_after_setting_country_code(
 }
 
 // This function allows the defect recording to run in parallel with the regulatory region setting
-// routine.  For full context, see https://fxbug.dev/112640.
+// routine.  For full context, see https://fxbug.dev/42063961.
 fn initiate_record_defect(
     phy_manager: Arc<Mutex<dyn PhyManagerApi + Send>>,
     defect: Defect,
@@ -1380,7 +1380,7 @@ pub(crate) async fn serve_iface_manager_requests(
                         connection_selector.clone()
                     ).await;
                 },
-                // TODO(https://fxbug.dev/116552): Handle result of bss selection for local roam.
+                // TODO(https://fxbug.dev/42067731): Handle result of bss selection for local roam.
                 BssSelectionOperation::_LocalRoam(_) => {}
             },
             defect = defect_receiver.select_next_some() => {

@@ -40,7 +40,7 @@ pub(crate) async fn run_client_provider<Fut, F>(
                     let params_str = format!("{:?}", params);
                     let () =
                         serve_client(params, request).await.unwrap_or_else(|e: anyhow::Error| {
-                            // TODO(https://fxbug.dev/118074): Return error through
+                            // TODO(https://fxbug.dev/42069288): Return error through
                             // a terminal event.
                             warn!("error running client with params {}: {:?}", params_str, e);
                         });

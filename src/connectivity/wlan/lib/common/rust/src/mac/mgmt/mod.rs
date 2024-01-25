@@ -13,7 +13,7 @@ mod status;
 
 pub use {fields::*, reason::*, status::*};
 
-// TODO(https://fxbug.dev/128928): Use this in the `MgmtBody::AssocReq` variant.
+// TODO(https://fxbug.dev/42079361): Use this in the `MgmtBody::AssocReq` variant.
 #[derive(Debug)]
 pub struct ActionFrame<const NO_ACK: bool, B>
 where
@@ -33,7 +33,7 @@ where
     }
 }
 
-// TODO(https://fxbug.dev/128928): Use this in the `MgmtBody::AssocReq` variant.
+// TODO(https://fxbug.dev/42079361): Use this in the `MgmtBody::AssocReq` variant.
 #[derive(Debug)]
 pub struct AssocReqFrame<B>
 where
@@ -53,7 +53,7 @@ where
     }
 }
 
-// TODO(https://fxbug.dev/128928): Use this in the `MgmtBody::AssocResp` variant.
+// TODO(https://fxbug.dev/42079361): Use this in the `MgmtBody::AssocResp` variant.
 #[derive(Debug)]
 pub struct AssocRespFrame<B>
 where
@@ -73,7 +73,7 @@ where
     }
 }
 
-// TODO(https://fxbug.dev/128928): Use this in the `MgmtBody::Auth` variant.
+// TODO(https://fxbug.dev/42079361): Use this in the `MgmtBody::Auth` variant.
 #[derive(Debug)]
 pub struct AuthFrame<B>
 where
@@ -93,7 +93,7 @@ where
     }
 }
 
-// TODO(https://fxbug.dev/128928): Use this in the `MgmtBody::AssocResp` variant.
+// TODO(https://fxbug.dev/42079361): Use this in the `MgmtBody::AssocResp` variant.
 #[derive(Debug)]
 pub struct ProbeReqFrame<B>
 where

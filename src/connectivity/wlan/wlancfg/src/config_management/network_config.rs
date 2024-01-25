@@ -402,7 +402,7 @@ impl From<Credential> for fidl_policy::Credential {
     }
 }
 
-// TODO(https://fxbug.dev/102606): Remove this operator implementation. Once calls to
+// TODO(https://fxbug.dev/42053561): Remove this operator implementation. Once calls to
 //                         `select_authentication_method` are removed from the state machine, there
 //                         will instead be an `Authentication` (or `SecurityAuthenticator`) field
 //                         in `ScannedCandidate` which can be more directly compared to SME
@@ -446,7 +446,7 @@ impl PartialEq<Option<fidl_security::Credentials>> for Credential {
     }
 }
 
-// TODO(https://fxbug.dev/102606): Remove this operator implementation. See the similar conversion above.
+// TODO(https://fxbug.dev/42053561): Remove this operator implementation. See the similar conversion above.
 #[cfg(test)]
 impl PartialEq<Option<Box<fidl_security::Credentials>>> for Credential {
     fn eq(&self, credentials: &Option<Box<fidl_security::Credentials>>) -> bool {

@@ -350,7 +350,7 @@ func makeArgValueBool(val bool) argValue {
 // Arg is a typed key value pair.
 // Many trace record types can optionally include an array of Args to provide
 // additional information.
-// TODO(https://fxbug.dev/89762): Export APIs to use Arg.
+// TODO(https://fxbug.dev/42171138): Export APIs to use Arg.
 type Arg struct {
 	NameRef stringRef
 	Value   argValue

@@ -52,7 +52,7 @@ async fn main() {
     // Maintains a set of currently bound sockets.
     let mut datagram_sockets = HashSet::new();
     let mut stream_sockets = HashMap::new();
-    // TODO(https://fxbug.dev/102161): maintain a separate receive buffer for
+    // TODO(https://fxbug.dev/42053067): maintain a separate receive buffer for
     // each socket to support multiple concurrent sockets over loopback.
     let mut receive_buffer_size = DEFAULT_BUFFER_SIZE;
     let mut loopback_receive_buffer = VecDeque::new();
@@ -637,7 +637,7 @@ async fn handle_datagram_request(
                 fposix_socket::DatagramSocketProtocol::IcmpEcho => icmp_echo_receive_buffer,
             }
             .pop_front()
-            // TODO(https://fxbug.dev/102839): block until data is available (or return
+            // TODO(https://fxbug.dev/42053819): block until data is available (or return
             // `EWOULDBLOCK` if `O_NONBLOCK` is set on the socket).
             //
             // It's OK to expect data to be in the receive buffer because the benchmarks

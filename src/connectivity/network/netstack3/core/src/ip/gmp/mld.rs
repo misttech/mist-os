@@ -162,7 +162,7 @@ impl<BC: MldBindingsContext<CC::DeviceId>, CC: MldContext<BC>> MldPacketHandler<
                 return;
             }
             MldPacket::MulticastListenerReportV2(_) => {
-                debug!("TODO(https://fxbug.dev/119938): Support MLDv2");
+                debug!("TODO(https://fxbug.dev/42071006): Support MLDv2");
                 return;
             }
         } {
@@ -427,7 +427,7 @@ fn send_mld_packet<
     // been configured), the message is sent with the unspecified address (::)
     // as the IPv6 source address.
     //
-    // TODO(https://fxbug.dev/98534): Handle an IPv6 link-local address being
+    // TODO(https://fxbug.dev/42180878): Handle an IPv6 link-local address being
     // assigned when reports were sent with the unspecified source address.
     let src_ip =
         core_ctx.get_ipv6_link_local_addr(device).map_or(Ipv6::UNSPECIFIED_ADDRESS, |x| x.get());
@@ -1286,7 +1286,7 @@ mod tests {
                 .update_configuration(
                     &device_id,
                     Ipv6DeviceConfigurationUpdate {
-                        // TODO(https://fxbug.dev/98534): Make sure that DAD resolving
+                        // TODO(https://fxbug.dev/42180878): Make sure that DAD resolving
                         // for a link-local address results in reports sent with a
                         // specified source address.
                         dad_transmits: Some(None),

@@ -94,13 +94,13 @@ impl InfraBss {
             .set_channel(fidl_common::WlanChannel {
                 primary: channel,
 
-                // TODO(https://fxbug.dev/40917): Correctly support this.
+                // TODO(https://fxbug.dev/42116942): Correctly support this.
                 cbw: fidl_common::ChannelBandwidth::Cbw20,
                 secondary80: 0,
             })
             .map_err(|s| Error::Status(format!("failed to set channel"), s))?;
 
-        // TODO(https://fxbug.dev/37891): Support DTIM.
+        // TODO(https://fxbug.dev/42113580): Support DTIM.
 
         let (in_buf, _, beacon_offload_params) = bss.make_beacon_frame(ctx)?;
         let mac_frame = in_buf.as_slice().to_vec();
@@ -521,7 +521,7 @@ impl InfraBss {
                 hdr.da,
                 hdr.sa,
                 self.rsne.is_some(),
-                false, // TODO(https://fxbug.dev/37891): Support QoS.
+                false, // TODO(https://fxbug.dev/42113580): Support QoS.
                 hdr.ether_type.to_native(),
                 body,
             )
@@ -569,7 +569,7 @@ impl InfraBss {
             .map_err(|e| Rejection::Client(client.addr, e))
     }
 
-    // TODO(https://fxbug.dev/88968): Determine whether this is still needed and add an API path if so.
+    // TODO(https://fxbug.dev/42170256): Determine whether this is still needed and add an API path if so.
     #[allow(unused)]
     pub fn handle_bcn_tx_complete_indication<D: DeviceOps>(
         &mut self,

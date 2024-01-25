@@ -165,7 +165,7 @@ rustc_library_with_features("netstack3-core") {
       ]
       test_deps += [ "//third_party/rust_crates:scopeguard" ]
 
-      # TODO(https://fxbug.dev/136837): Split up large tests.
+      # TODO(https://fxbug.dev/42086491): Split up large tests.
       # Compiling the tests OOMs on RBE with these variants.
       if (is_coverage || is_hwasan || is_fuzzer || target_cpu == "arm64") {
         test_disable_rbe = true

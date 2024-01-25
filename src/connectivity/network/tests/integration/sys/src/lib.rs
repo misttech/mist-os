@@ -217,7 +217,7 @@ async fn ns_persist_tags_under_size_limits<N: Netstack>(name: &str) {
 // inspect node specified in that selector has been persisted in an archivist
 // payload.
 //
-// TODO(https://fxbug.dev/125664): Note that this test does NOT validate that
+// TODO(https://fxbug.dev/42076420): Note that this test does NOT validate that
 // child nodes specified using wildcards (e.g. `Foo/*/*:*`) are present in the
 // archivist payload, nor that all child nodes of any given selector are
 // persisted. We're still relying on fireteam primaries and netstack developers

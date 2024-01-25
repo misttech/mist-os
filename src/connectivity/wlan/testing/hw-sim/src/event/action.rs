@@ -155,7 +155,7 @@ where
 
     event::matched(move |_: &mut S, event: &fidl_tap::StartScanArgs| {
         tracing::info!(
-            "TODO(https://fxbug.dev/108667): Sleeping for {} second(s) before sending scan completion.",
+            "TODO(https://fxbug.dev/42060050): Sleeping for {} second(s) before sending scan completion.",
             SCAN_COMPLETION_DELAY.into_seconds()
         );
         SCAN_COMPLETION_DELAY.sleep();
@@ -236,7 +236,7 @@ where
     })
 }
 
-// TODO(https://fxbug.dev/130171): Preserve the updates in the sink for logging, inspection, etc.
+// TODO(https://fxbug.dev/42080468): Preserve the updates in the sink for logging, inspection, etc.
 pub fn authenticate_with_control_state<'h>(
 ) -> impl Handler<AuthenticationControl, AuthenticationEvent<'h>, Output = ActionResult> + 'h {
     event::matched(|control: &mut AuthenticationControl, event: &AuthenticationEvent<'_>| {

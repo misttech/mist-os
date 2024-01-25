@@ -213,7 +213,7 @@ type RecvMsgMeta struct {
 // Returns any found control messages present within a `tcpip.ReceiveableControlMessages` struct.
 //
 // This method is only intended to be used in tests.
-// TODO(https://fxbug.dev/107864): Isolate testonly methods.
+// TODO(https://fxbug.dev/42059260): Isolate testonly methods.
 func DeserializeRecvMsgMeta(buf []byte) (RecvMsgMeta, error) {
 	bufIn := C.Buffer{
 		buf:      (*C.uchar)(unsafe.Pointer(((*reflect.SliceHeader)(unsafe.Pointer(&buf))).Data)),
@@ -304,7 +304,7 @@ func convertSerializeSendMsgMetaErr(err C.SerializeSendMsgMetaError) error {
 // using the LLCPP bindings.
 //
 // This method is only intended to be used in tests.
-// TODO(https://fxbug.dev/107864): Isolate testonly methods.
+// TODO(https://fxbug.dev/42059260): Isolate testonly methods.
 func SerializeSendMsgMeta(protocol tcpip.NetworkProtocolNumber, addr tcpip.FullAddress, cmsgSet tcpip.SendableControlMessages, buf []byte) error {
 	fidlAddr := fidlconv.ToNetSocketAddressWithProto(protocol, addr)
 	fromAddrType, addrSlice := getFidlAddrTypeAndSlice(fidlAddr)

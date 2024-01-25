@@ -32,7 +32,7 @@ source_set("sim_test") {
     "//zircon/system/ulib/zxtest",
   ]
 
-  # TODO(https://fxbug.dev/58162): delete the below and fix compiler warnings
+  # TODO(https://fxbug.dev/42136089): delete the below and fix compiler warnings
   configs += [ "//build/config:Wno-conversion" ]
 }
 
@@ -50,7 +50,7 @@ executable("active_scan_test") {
     "//src/connectivity/wlan/lib/common/cpp:common",
   ]
 
-  # TODO(https://fxbug.dev/58162): delete the below and fix compiler warnings
+  # TODO(https://fxbug.dev/42136089): delete the below and fix compiler warnings
   configs += [ "//build/config:Wno-conversion" ]
 }
 
@@ -68,7 +68,7 @@ executable("arp_test") {
     "//src/connectivity/wlan/lib/common/cpp:common",
   ]
 
-  # TODO(https://fxbug.dev/58162): delete the below and fix compiler warnings
+  # TODO(https://fxbug.dev/42136089): delete the below and fix compiler warnings
   configs += [ "//build/config:Wno-conversion" ]
 }
 
@@ -86,7 +86,7 @@ executable("connect_test") {
     "//src/devices/lib/broadcom",
   ]
 
-  # TODO(https://fxbug.dev/58162): delete the below and fix compiler warnings
+  # TODO(https://fxbug.dev/42136089): delete the below and fix compiler warnings
   configs += [ "//build/config:Wno-conversion" ]
 }
 
@@ -102,7 +102,7 @@ executable("auth_test") {
     "//src/connectivity/wlan/lib/common/cpp:common",
   ]
 
-  # TODO(https://fxbug.dev/58162): delete the below and fix compiler warnings
+  # TODO(https://fxbug.dev/42136089): delete the below and fix compiler warnings
   configs += [ "//build/config:Wno-conversion" ]
 }
 
@@ -115,7 +115,7 @@ executable("bad_entropy_test") {
     "//src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac:core",
   ]
 
-  # TODO(https://fxbug.dev/58162): delete the below and fix compiler warnings
+  # TODO(https://fxbug.dev/42136089): delete the below and fix compiler warnings
   configs += [ "//build/config:Wno-conversion" ]
 }
 
@@ -130,7 +130,7 @@ executable("beacon_lost_test") {
     "//src/connectivity/wlan/lib/common/cpp:common",
   ]
 
-  # TODO(https://fxbug.dev/58162): delete the below and fix compiler warnings
+  # TODO(https://fxbug.dev/42136089): delete the below and fix compiler warnings
   configs += [ "//build/config:Wno-conversion" ]
 }
 
@@ -143,7 +143,7 @@ executable("bootloader_mac_addr_test") {
     "//src/connectivity/wlan/lib/common/cpp:common",
   ]
 
-  # TODO(https://fxbug.dev/58162): delete the below and fix compiler warnings
+  # TODO(https://fxbug.dev/42136089): delete the below and fix compiler warnings
   configs += [ "//build/config:Wno-conversion" ]
 }
 
@@ -153,7 +153,7 @@ executable("call_after_del_iface_test") {
   sources = [ "call_after_del_iface_test.cc" ]
   deps = [ ":sim_test" ]
 
-  # TODO(https://fxbug.dev/58162): delete the below and fix compiler warnings
+  # TODO(https://fxbug.dev/42136089): delete the below and fix compiler warnings
   configs += [ "//build/config:Wno-conversion" ]
 }
 
@@ -168,7 +168,7 @@ executable("cc_test") {
     "//src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac:core",
   ]
 
-  # TODO(https://fxbug.dev/58162): delete the below and fix compiler warnings
+  # TODO(https://fxbug.dev/42136089): delete the below and fix compiler warnings
   configs += [ "//build/config:Wno-conversion" ]
 }
 
@@ -192,7 +192,7 @@ executable("channel_switch_test") {
     "//src/connectivity/wlan/lib/common/cpp:common",
   ]
 
-  # TODO(https://fxbug.dev/58162): delete the below and fix compiler warnings
+  # TODO(https://fxbug.dev/42136089): delete the below and fix compiler warnings
   configs += [ "//build/config:Wno-conversion" ]
 }
 
@@ -210,7 +210,7 @@ executable("crash_recovery_test") {
     "//src/connectivity/wlan/lib/common/cpp:common",
   ]
 
-  # TODO(https://fxbug.dev/58162): delete the below and fix compiler warnings
+  # TODO(https://fxbug.dev/42136089): delete the below and fix compiler warnings
   configs += [ "//build/config:Wno-conversion" ]
 }
 
@@ -229,7 +229,7 @@ executable("create_softap_test") {
     "//src/connectivity/wlan/lib/common/cpp:common",
   ]
 
-  # TODO(https://fxbug.dev/58162): delete the below and fix compiler warnings
+  # TODO(https://fxbug.dev/42136089): delete the below and fix compiler warnings
   configs += [ "//build/config:Wno-conversion" ]
 }
 
@@ -245,7 +245,7 @@ executable("data_frame_test") {
     "//src/connectivity/wlan/lib/common/cpp:common",
   ]
 
-  # TODO(https://fxbug.dev/58162): delete the below and fix compiler warnings
+  # TODO(https://fxbug.dev/42136089): delete the below and fix compiler warnings
   configs += [ "//build/config:Wno-conversion" ]
 }
 
@@ -259,7 +259,7 @@ executable("disassoc_test") {
     "//src/connectivity/wlan/lib/common/cpp:common",
   ]
 
-  # TODO(https://fxbug.dev/58162): delete the below and fix compiler warnings
+  # TODO(https://fxbug.dev/42136089): delete the below and fix compiler warnings
   configs += [ "//build/config:Wno-conversion" ]
 }
 
@@ -275,7 +275,7 @@ executable("dynamic_if_test") {
     "//src/connectivity/wlan/lib/common/cpp:common",
   ]
 
-  # TODO(https://fxbug.dev/58162): delete the below and fix compiler warnings
+  # TODO(https://fxbug.dev/42136089): delete the below and fix compiler warnings
   configs += [ "//build/config:Wno-conversion" ]
 }
 
@@ -289,7 +289,7 @@ executable("err_inject_test") {
     "//src/connectivity/wlan/lib/common/cpp:common",
   ]
 
-  # TODO(https://fxbug.dev/58162): delete the below and fix compiler warnings
+  # TODO(https://fxbug.dev/42136089): delete the below and fix compiler warnings
   configs += [ "//build/config:Wno-conversion" ]
 }
 
@@ -303,7 +303,7 @@ executable("escan_params_test") {
     "//src/connectivity/wlan/drivers/testing/lib/sim-device",
   ]
 
-  # TODO(https://fxbug.dev/58162): delete the below and fix compiler warnings
+  # TODO(https://fxbug.dev/42136089): delete the below and fix compiler warnings
   configs += [ "//build/config:Wno-conversion" ]
 }
 
@@ -321,7 +321,7 @@ executable("firmware_config_test") {
     "//zircon/system/public",
   ]
 
-  # TODO(https://fxbug.dev/58162): delete the below and fix compiler warnings
+  # TODO(https://fxbug.dev/42136089): delete the below and fix compiler warnings
   configs += [ "//build/config:Wno-conversion" ]
 }
 
@@ -345,7 +345,7 @@ executable("wmm_status_test") {
     "//src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac:core",
   ]
 
-  # TODO(https://fxbug.dev/58162): delete the below and fix compiler warnings
+  # TODO(https://fxbug.dev/42136089): delete the below and fix compiler warnings
   configs += [ "//build/config:Wno-conversion" ]
 }
 
@@ -369,7 +369,7 @@ executable("ifc_query_test") {
     "//src/connectivity/wlan/lib/common/cpp:common",
   ]
 
-  # TODO(https://fxbug.dev/58162): delete the below and fix compiler warnings
+  # TODO(https://fxbug.dev/42136089): delete the below and fix compiler warnings
   configs += [ "//build/config:Wno-conversion" ]
 }
 
@@ -383,7 +383,7 @@ executable("ifc_query_feature_support_test") {
     "//src/connectivity/wlan/lib/common/cpp:common",
   ]
 
-  # TODO(https://fxbug.dev/58162): delete the below and fix compiler warnings
+  # TODO(https://fxbug.dev/42136089): delete the below and fix compiler warnings
   configs += [ "//build/config:Wno-conversion" ]
 }
 
@@ -400,7 +400,7 @@ executable("iovar_test") {
     "//src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/sim",
   ]
 
-  # TODO(https://fxbug.dev/58162): delete the below and fix compiler warnings
+  # TODO(https://fxbug.dev/42136089): delete the below and fix compiler warnings
   configs += [ "//build/config:Wno-conversion" ]
 }
 
@@ -418,7 +418,7 @@ executable("lifecycle_test") {
     "//zircon/system/ulib/zxtest",
   ]
 
-  # TODO(https://fxbug.dev/58162): delete the below and fix compiler warnings
+  # TODO(https://fxbug.dev/42136089): delete the below and fix compiler warnings
   configs += [ "//build/config:Wno-conversion" ]
 }
 
@@ -444,7 +444,7 @@ executable("mfg_test") {
     "//src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac:core",
   ]
 
-  # TODO(https://fxbug.dev/58162): delete the below and fix compiler warnings
+  # TODO(https://fxbug.dev/42136089): delete the below and fix compiler warnings
   configs += [ "//build/config:Wno-conversion" ]
 }
 
@@ -458,7 +458,7 @@ executable("no_random_mac_test") {
     "//src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac:core",
   ]
 
-  # TODO(https://fxbug.dev/58162): delete the below and fix compiler warnings
+  # TODO(https://fxbug.dev/42136089): delete the below and fix compiler warnings
   configs += [ "//build/config:Wno-conversion" ]
 }
 
@@ -475,7 +475,7 @@ executable("passive_scan_test") {
     "//src/connectivity/wlan/lib/common/cpp:common",
   ]
 
-  # TODO(https://fxbug.dev/58162): delete the below and fix compiler warnings
+  # TODO(https://fxbug.dev/42136089): delete the below and fix compiler warnings
   configs += [ "//build/config:Wno-conversion" ]
 }
 
@@ -490,7 +490,7 @@ executable("phy_ps_mode_test") {
     "//src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac:core",
   ]
 
-  # TODO(https://fxbug.dev/58162): delete the below and fix compiler warnings
+  # TODO(https://fxbug.dev/42136089): delete the below and fix compiler warnings
   configs += [ "//build/config:Wno-conversion" ]
 }
 
@@ -505,7 +505,7 @@ executable("phy_mac_roles_test") {
     "//src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac:core",
   ]
 
-  # TODO(https://fxbug.dev/58162): delete the below and fix compiler warnings
+  # TODO(https://fxbug.dev/42136089): delete the below and fix compiler warnings
   configs += [ "//build/config:Wno-conversion" ]
 }
 
@@ -520,7 +520,7 @@ executable("scan_dwell_time_test") {
     "//src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac:core",
   ]
 
-  # TODO(https://fxbug.dev/58162): delete the below and fix compiler warnings
+  # TODO(https://fxbug.dev/42136089): delete the below and fix compiler warnings
   configs += [ "//build/config:Wno-conversion" ]
 }
 
@@ -534,7 +534,7 @@ executable("scan_while_scanning_test") {
     "//src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac:core",
   ]
 
-  # TODO(https://fxbug.dev/58162): delete the below and fix compiler warnings
+  # TODO(https://fxbug.dev/42136089): delete the below and fix compiler warnings
   configs += [ "//build/config:Wno-conversion" ]
 }
 
@@ -548,7 +548,7 @@ executable("set_keys_test") {
     "//src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac:core",
   ]
 
-  # TODO(https://fxbug.dev/58162): delete the below and fix compiler warnings
+  # TODO(https://fxbug.dev/42136089): delete the below and fix compiler warnings
   configs += [ "//build/config:Wno-conversion" ]
 }
 
@@ -562,7 +562,7 @@ executable("set_multicast_test") {
     "//src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac:core",
   ]
 
-  # TODO(https://fxbug.dev/58162): delete the below and fix compiler warnings
+  # TODO(https://fxbug.dev/42136089): delete the below and fix compiler warnings
   configs += [ "//build/config:Wno-conversion" ]
 }
 
@@ -576,7 +576,7 @@ executable("start_ap_while_scanning_test") {
     "//src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac:core",
   ]
 
-  # TODO(https://fxbug.dev/58162): delete the below and fix compiler warnings
+  # TODO(https://fxbug.dev/42136089): delete the below and fix compiler warnings
   configs += [ "//build/config:Wno-conversion" ]
 }
 
@@ -591,7 +591,7 @@ executable("timeout_test") {
     "//src/devices/lib/broadcom",
   ]
 
-  # TODO(https://fxbug.dev/58162): delete the below and fix compiler warnings
+  # TODO(https://fxbug.dev/42136089): delete the below and fix compiler warnings
   configs += [ "//build/config:Wno-conversion" ]
 }
 

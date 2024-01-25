@@ -13,7 +13,7 @@ import (
 	"go.fuchsia.dev/fuchsia/src/connectivity/network/testing/conformance/parseoutput"
 )
 
-// TODO(https://fxbug.dev/92179): Test expectations are intended to potentially be moved into a
+// TODO(https://fxbug.dev/42173824): Test expectations are intended to potentially be moved into a
 // config file (perhaps JSON) rather than being embedded in Go in this way.
 var expectations map[parseoutput.CaseIdentifier]outcome.Outcome = func() map[parseoutput.CaseIdentifier]outcome.Outcome {
 	m := make(map[parseoutput.CaseIdentifier]outcome.Outcome)
@@ -35,7 +35,7 @@ var expectations map[parseoutput.CaseIdentifier]outcome.Outcome = func() map[par
 	addAllExpectations("dhcp-client", platform.NS2, dhcpClientExpectations)
 	addAllExpectations("dhcp-server", platform.NS2, dhcpServerExpectations)
 	addAllExpectations("dhcpv6-client", platform.NS2, dhcpv6ClientExpectations)
-	// TODO(https://fxbug.dev/132770): Note that the PD suite only runs against
+	// TODO(https://fxbug.dev/42082843): Note that the PD suite only runs against
 	// NS3 in Infra, so these are not regularly exercised and may be stale (any
 	// divergence in expectation between NS2 and NS3 is a bug since DHCPv6 client
 	// is out-of-stack and should behave the same with both stacks).

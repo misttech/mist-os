@@ -213,7 +213,7 @@ pub mod socket {
 
 /// Useful synchronization primitives.
 pub mod sync {
-    // TODO(https://fxbug.dev/110884): Support single-threaded variants of types
+    // TODO(https://fxbug.dev/42062225): Support single-threaded variants of types
     // exported from this module.
 
     // Exclusively re-exports from the sync crate.

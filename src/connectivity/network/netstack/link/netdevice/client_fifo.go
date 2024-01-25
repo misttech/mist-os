@@ -200,7 +200,7 @@ func fifoWrite(handle zx.Handle, b []uint16) (zx.Status, uint32) {
 	var _x uint16
 	data := unsafe.Pointer((*reflect.SliceHeader)(unsafe.Pointer(&b)).Data)
 
-	// TODO(https://fxbug.dev/32098): We're assuming that writing to the FIFO
+	// TODO(https://fxbug.dev/42107145): We're assuming that writing to the FIFO
 	// here is a sufficient memory barrier for the other end to access the data.
 	// That is currently true but not really guaranteed by the API.
 

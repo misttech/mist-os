@@ -93,7 +93,7 @@ impl Method {
         match cfg {
             Config::ComputedPsk(psk) => Ok(Method::Psk(psk)),
             Config::Sae { ssid, password, mac, peer_mac } => {
-                // TODO(https://fxbug.dev/91949): Use PweMethod::Direct here for SAE Hash-to-Element.
+                // TODO(https://fxbug.dev/42173568): Use PweMethod::Direct here for SAE Hash-to-Element.
                 let handshake = sae::new_sae_handshake(
                     DEFAULT_GROUP_ID,
                     AKM_SAE,

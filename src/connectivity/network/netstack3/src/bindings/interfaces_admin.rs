@@ -220,7 +220,7 @@ impl OwnedControlHandle {
     }
 
     // Constructs a new channel of `OwnedControlHandle` with the given handle as the owner.
-    // TODO(https://fxbug.dev/87963): This currently enforces that there is only ever one owner,
+    // TODO(https://fxbug.dev/42169142): This currently enforces that there is only ever one owner,
     // which will need to be revisited to implement `Clone`.
     pub(crate) async fn new_channel_with_owned_handle(
         handle: fidl::endpoints::ServerEnd<fnet_interfaces_admin::ControlMarker>,
@@ -780,7 +780,7 @@ async fn remove_address(ctx: &mut Ctx, id: BindingId, address: fnet::Subnet) -> 
         // Even if the address is not in the bindings HashMap of addresses,
         // it could still be in core (e.g. if it's a loopback address or a
         // SLAAC address).
-        // TODO(https://fxbug.dev/135102): Rather than falling back in this way,
+        // TODO(https://fxbug.dev/42084781): Rather than falling back in this way,
         // make it impossible to make this mistake by centralizing the
         // "source of truth" for addresses on a device.
         return match ctx.api().device_ip_any().del_ip_addr(&core_id, specified_addr) {
@@ -832,11 +832,13 @@ fn set_configuration(
             __source_breaking,
         }) => {
             if let Some(_) = igmp {
-                tracing::warn!("TODO(https://fxbug.dev/120293): support IGMP configuration changes")
+                tracing::warn!(
+                    "TODO(https://fxbug.dev/42071402): support IGMP configuration changes"
+                )
             }
             if let Some(_) = multicast_forwarding {
                 tracing::warn!(
-                "TODO(https://fxbug.dev/124237): setting multicast_forwarding not yet supported"
+                "TODO(https://fxbug.dev/42075111): setting multicast_forwarding not yet supported"
             )
             }
             (
@@ -866,11 +868,13 @@ fn set_configuration(
             __source_breaking,
         }) => {
             if let Some(_) = mld {
-                tracing::warn!("TODO(https://fxbug.dev/120293): support MLD configuration changes")
+                tracing::warn!(
+                    "TODO(https://fxbug.dev/42071402): support MLD configuration changes"
+                )
             }
             if let Some(_) = multicast_forwarding {
                 tracing::warn!(
-                    "TODO(https://fxbug.dev/124237): setting multicast_forwarding not yet supported"
+                    "TODO(https://fxbug.dev/42075111): setting multicast_forwarding not yet supported"
                 )
             }
 
@@ -1003,10 +1007,10 @@ fn get_configuration(ctx: &mut Ctx, id: BindingId) -> fnet_interfaces_admin::Con
                     .ip_config
                     .forwarding_enabled,
             ),
-            // TODO(https://fxbug.dev/120293): Support IGMP configuration
+            // TODO(https://fxbug.dev/42071402): Support IGMP configuration
             // changes.
             igmp: None,
-            // TODO(https://fxbug.dev/124237): Support multicast forwarding
+            // TODO(https://fxbug.dev/42075111): Support multicast forwarding
             // configuration changes.
             multicast_forwarding: None,
             arp: arp.map(IntoFidl::into_fidl),
@@ -1021,10 +1025,10 @@ fn get_configuration(ctx: &mut Ctx, id: BindingId) -> fnet_interfaces_admin::Con
                     .ip_config
                     .forwarding_enabled,
             ),
-            // TODO(https://fxbug.dev/120293): Support MLD configuration
+            // TODO(https://fxbug.dev/42071402): Support MLD configuration
             // changes.
             mld: None,
-            // TODO(https://fxbug.dev/124237): Support multicast forwarding
+            // TODO(https://fxbug.dev/42075111): Support multicast forwarding
             // configuration changes.
             multicast_forwarding: None,
             ndp: ndp.map(IntoFidl::into_fidl),
@@ -1064,7 +1068,7 @@ fn add_address(
     let specified_addr = addr_subnet_either.addr();
 
     if params.temporary.unwrap_or(false) {
-        todo!("https://fxbug.dev/105630: support adding temporary addresses");
+        todo!("https://fxbug.dev/42056881: support adding temporary addresses");
     }
     const INFINITE_NANOS: i64 = zx::Time::INFINITE.into_nanos();
     let initial_properties =
@@ -1076,12 +1080,12 @@ fn add_address(
         .unwrap_or(fnet_interfaces::PreferredLifetimeInfo::PreferredUntil(INFINITE_NANOS))
     {
         fnet_interfaces::PreferredLifetimeInfo::Deprecated(_) => {
-            todo!("https://fxbug.dev/105630: support adding deprecated addresses")
+            todo!("https://fxbug.dev/42056881: support adding deprecated addresses")
         }
         fnet_interfaces::PreferredLifetimeInfo::PreferredUntil(preferred_until) => {
             if preferred_until != INFINITE_NANOS {
                 tracing::warn!(
-                    "TODO(https://fxbug.dev/105630): ignoring preferred_until: {:?}",
+                    "TODO(https://fxbug.dev/42056881): ignoring preferred_until: {:?}",
                     preferred_until
                 );
             }
@@ -1606,7 +1610,7 @@ fn dispatch_address_state_provider_request(
             responder,
         } => {
             if preferred_lifetime_info.is_some() {
-                tracing::warn!("Updating preferred lifetime info is not yet supported (https://fxbug.dev/105011)");
+                tracing::warn!("Updating preferred lifetime info is not yet supported (https://fxbug.dev/42056194)");
             }
             let device_id =
                 ctx.bindings_ctx().devices.get_core_id(id).expect("interface not found");

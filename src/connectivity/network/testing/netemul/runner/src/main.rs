@@ -136,7 +136,7 @@ async fn handle_runner_request(
                     // directory in the test root's namespace, where the protocol was routed from
                     // the test driver.
                     //
-                    // TODO(https://fxbug.dev/108786): Use Proxy::into_client_end when available.
+                    // TODO(https://fxbug.dev/42060182): Use Proxy::into_client_end when available.
                     let svc_dir = std::sync::Arc::new(fidl::endpoints::ClientEnd::new(
                         svc_dir.into_channel().expect("proxy into channel").into_zx_channel(),
                     ));
@@ -156,7 +156,7 @@ async fn handle_runner_request(
                     // (closing incoming request channels) until the runner receives a Stop request
                     // from component_manager, then shut down the component.
                     //
-                    // TODO(https://fxbug.dev/94888): communicate the invalid component
+                    // TODO(https://fxbug.dev/42176832): communicate the invalid component
                     // configuration to the test manager (via an epitaph, for example), rather than
                     // just closing the `fuchsia.test/Suite` protocol.
                     let _: &mut ServiceFsDir<'_, _> =
@@ -199,7 +199,7 @@ async fn handle_runner_request(
                     }
                 };
                 control_handle.shutdown_with_epitaph(component_epitaph);
-                // TODO(https://fxbug.dev/81036): remove this once
+                // TODO(https://fxbug.dev/42161447): remove this once
                 // `ControlHandle::shutdown_with_epitaph` actually closes the underlying
                 // channel.
                 drop(request_stream);
@@ -224,7 +224,7 @@ async fn handle_runner_request(
                         // (in this case, the test root) is destroyed, component manager will close
                         // the event stream, in which case we expect PEER_CLOSED.
                         //
-                        // TODO(https://fxbug.dev/114562): PEER_CLOSED is not enough to between normal
+                        // TODO(https://fxbug.dev/42065808): PEER_CLOSED is not enough to between normal
                         // channel closure that happens on component destruction and an internal
                         // error in component manager that caused the channel to close
                         // unexpectedly. Ideally, it should be possible to precisely check whether

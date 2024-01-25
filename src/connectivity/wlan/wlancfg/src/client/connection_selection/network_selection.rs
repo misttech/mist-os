@@ -13,7 +13,7 @@ pub fn select_networks(
     match network {
         Some(ref network) => HashSet::from([network.clone()]),
         None => {
-            // TODO(https://fxbug.dev/113030): Add network selection logic.
+            // TODO(https://fxbug.dev/42064323): Add network selection logic.
             // Currently, the connection selection is determined solely based on the BSS. All available
             // networks are allowed.
             available_networks

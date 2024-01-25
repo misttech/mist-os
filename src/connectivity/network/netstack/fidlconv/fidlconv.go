@@ -262,7 +262,7 @@ func ToStackMulticastRoute(route admin.Route) (tcpipstack.MulticastRoute, bool) 
 	}, true
 }
 
-// TODO(https://fxbug.dev/99434): Replace usages with `Clock.Elapsed` when available.
+// TODO(https://fxbug.dev/42181878): Replace usages with `Clock.Elapsed` when available.
 func ToZxTime(t tcpip.MonotonicTime) zx.Time {
 	return zx.Time(t.Sub(tcpip.MonotonicTime{}))
 }
@@ -328,7 +328,7 @@ func ToAddressRemovalReason(reason tcpipstack.AddressRemovalReason) interfacesad
 		return interfacesadmin.AddressRemovalReasonInterfaceRemoved
 	case tcpipstack.AddressRemovalManualAction:
 		return interfacesadmin.AddressRemovalReasonUserRemoved
-	// TODO(https://fxbug.dev/113923): When invalidation for all addresses are
+	// TODO(https://fxbug.dev/42065170): When invalidation for all addresses are
 	// handled in-stack, change this to return an appropriate FIDL variant instead
 	// of panicking.
 	// The invalidated removal reason is only returned for addresses auto-generated

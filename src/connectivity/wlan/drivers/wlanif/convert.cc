@@ -315,7 +315,7 @@ wlan_mac_role_t ConvertWlanMacRole(fuchsia_wlan_common::wire::WlanMacRole role) 
 void ConvertHtCapabilities(const fuchsia_wlan_ieee80211::wire::HtCapabilities& in,
                            ht_capabilities_t* out) {
   ZX_ASSERT(sizeof(out->bytes) == in.bytes.size());
-  // TODO(https://fxbug.dev/95240): The underlying bytes in
+  // TODO(https://fxbug.dev/42177225): The underlying bytes in
   // fuchsia.wlan.fullmac/HtCapabilitiesField are @packed so that copying them directly to
   // a byte array works. We may wish to change the FIDL definition in the future so this copy is
   // however more obviously correct.
@@ -325,7 +325,7 @@ void ConvertHtCapabilities(const fuchsia_wlan_ieee80211::wire::HtCapabilities& i
 void ConvertVhtCapabilities(const fuchsia_wlan_ieee80211::wire::VhtCapabilities& in,
                             vht_capabilities_t* out) {
   ZX_ASSERT(sizeof(out->bytes) == in.bytes.size());
-  // TODO(https://fxbug.dev/95240): The underlying bytes in
+  // TODO(https://fxbug.dev/42177225): The underlying bytes in
   // fuchsia.wlan.fullmac/VhtCapabilitiesField are @packed so that copying them directly to
   // a byte array works. We may wish to change the definition in the future so this copy is however
   // more obviously correct.

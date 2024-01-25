@@ -30,7 +30,7 @@
         {
             type: "skip",
             matchers: [
-                // TODO(https://fxbug.dev/60337): Re-enable this once the test
+                // TODO(https://fxbug.dev/42138506): Re-enable this once the test
                 // isn't trying to accomodate NS2 buffer size values.
                 "NetStreamSocketsTest.PartialWriteStress",
                 "NetStreamTest/ConnectingIOTest.BlockedIO/CloseListener*",

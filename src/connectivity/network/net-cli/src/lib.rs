@@ -611,7 +611,7 @@ async fn do_if<C: NetCliDepsConnector>(
                     finterfaces_admin::AddressStateProviderMarker,
                 >()
                 .context("create proxy")?;
-                // TODO(https://fxbug.dev/93439): Call `detach` at the end
+                // TODO(https://fxbug.dev/42175224): Call `detach` at the end
                 // (after `add_forwarding_entry` below). This will ensure that
                 // the address is only added if all intermediate operations
                 // succeed. In the meantime, `detach` is called before the

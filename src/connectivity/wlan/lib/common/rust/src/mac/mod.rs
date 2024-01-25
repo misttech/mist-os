@@ -37,7 +37,7 @@ pub type Aid = u16;
 // 2007.
 pub const MAX_AID: u16 = 2007;
 
-// TODO(https://fxbug.dev/128928): Use this in the `MacFrame::Data` variant.
+// TODO(https://fxbug.dev/42079361): Use this in the `MacFrame::Data` variant.
 pub struct DataFrame<B> {
     // Data Header: fixed fields
     pub fixed_fields: Ref<B, FixedDataHdrFields>,
@@ -100,7 +100,7 @@ where
     }
 }
 
-// TODO(https://fxbug.dev/128928): Use this in the `MacFrame::Mgmt` variant.
+// TODO(https://fxbug.dev/42079361): Use this in the `MacFrame::Mgmt` variant.
 pub struct MgmtFrame<B> {
     // Management Header: fixed fields
     pub mgmt_hdr: Ref<B, MgmtHdr>,
