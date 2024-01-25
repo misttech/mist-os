@@ -889,7 +889,7 @@ group("smallvec") {
 }
 
 group("socket2") {
-  public_deps = [ ":socket2-v0_4_4" ]
+  public_deps = [ ":socket2-v0_5_5" ]
 }
 
 group("splines") {
@@ -14352,6 +14352,43 @@ rust_library("socket2-v0_4_4") {
   applicable_licenses = [ ":socket2-v0_4_4.license" ]
 }
 
+license("socket2-v0_5_5.license") {
+  public_package_name = "socket2"
+  license_files = [
+    "//third_party/rust_crates/vendor/socket2-0.5.5/LICENSE-APACHE",
+    "//third_party/rust_crates/vendor/socket2-0.5.5/LICENSE-MIT",
+  ]
+}
+
+rust_library("socket2-v0_5_5") {
+  crate_name = "socket2"
+  crate_root = "//third_party/rust_crates/vendor/socket2-0.5.5/src/lib.rs"
+  output_name = "socket2-3e06690d869fbc1e"
+  configs -= [ "//build/config/rust:2018_idioms" ]
+
+  deps = []
+  if (true) {
+    deps += [ ":libc-v0_2_149" ]
+  }
+  if (false) {
+    deps += [ ":windows-sys-v0_48_0" ]
+  }
+
+  rustenv = []
+
+  rustflags = [
+    "--cap-lints=allow",
+    "--edition=2021",
+    "-Cmetadata=3e06690d869fbc1e",
+    "-Cextra-filename=-3e06690d869fbc1e",
+    "--cfg=feature=\"all\"",
+  ]
+
+  visibility = [ ":*" ]
+
+  applicable_licenses = [ ":socket2-v0_5_5.license" ]
+}
+
 license("spin-v0_5_2.license") {
   public_package_name = "spin"
   license_files = [ "//third_party/rust_crates/vendor/spin-0.5.2/LICENSE" ]
@@ -17849,6 +17886,7 @@ rust_library("windows-sys-v0_48_0") {
     "--cfg=feature=\"Win32_Storage_FileSystem\"",
     "--cfg=feature=\"Win32_System_IO\"",
     "--cfg=feature=\"Win32_System_Pipes\"",
+    "--cfg=feature=\"Win32_System_Threading\"",
     "--cfg=feature=\"Win32_System_WindowsProgramming\"",
   ]
 

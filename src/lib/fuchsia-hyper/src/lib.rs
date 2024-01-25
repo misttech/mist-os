@@ -158,7 +158,7 @@ impl TcpOptions {
         }
     }
 
-    pub(crate) fn apply<T: std::os::fd::AsRawFd>(&self, stream: &T) -> io::Result<()> {
+    pub(crate) fn apply<T: std::os::fd::AsFd>(&self, stream: &T) -> io::Result<()> {
         let stream = socket2::SockRef::from(stream);
         let mut any = false;
         let mut keepalive = socket2::TcpKeepalive::new();

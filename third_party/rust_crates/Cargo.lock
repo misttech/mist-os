@@ -217,7 +217,7 @@ dependencies = [
  "parking",
  "polling",
  "slab",
- "socket2",
+ "socket2 0.4.4",
  "waker-fn",
  "windows-sys 0.42.0",
 ]
@@ -1471,7 +1471,7 @@ dependencies = [
  "siphasher 0.3.10",
  "slab",
  "smallvec 1.8.0",
- "socket2",
+ "socket2 0.5.5",
  "splines",
  "static_assertions",
  "strsim 0.10.0",
@@ -4143,6 +4143,16 @@ checksum = "66d72b759436ae32898a2af0a14218dbf55efde3feeb170eb623637db85ee1e0"
 dependencies = [
  "libc",
  "winapi",
+]
+
+[[package]]
+name = "socket2"
+version = "0.5.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7b5fac59a5cb5dd637972e5fca70daf0523c9067fcdc4842f053dae04a18f8e9"
+dependencies = [
+ "libc",
+ "windows-sys 0.48.0",
 ]
 
 [[package]]
