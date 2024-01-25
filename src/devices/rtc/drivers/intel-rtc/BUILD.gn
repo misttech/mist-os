@@ -12,7 +12,11 @@ assert(target_cpu == "x64")
 driver_bind_rules("intel_rtc_bind") {
   rules = "intel_rtc.bind"
   tests = "bind-tests.json"
-  deps = [ "//src/devices/bind/fuchsia.acpi" ]
+  deps = [
+    "//sdk/fidl/fuchsia.hardware.interrupt:fuchsia.hardware.interrupt_bindlib",
+    "//src/devices/bind/fuchsia.acpi",
+    "//src/devices/bind/fuchsia.sysmem",
+  ]
 }
 
 common_deps = [

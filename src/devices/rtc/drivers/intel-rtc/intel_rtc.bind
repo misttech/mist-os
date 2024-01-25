@@ -2,11 +2,25 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-using fuchsia.acpi;
+composite intel_rtc;
 
-if fuchsia.acpi.HID == "PNP0B00" {
-  fuchsia.BIND_COMPOSITE == 1;
-} else {
-  fuchsia.acpi.FIRST_CID == "PNP0B00";
-  fuchsia.BIND_COMPOSITE == 1;
+using fuchsia.acpi;
+using fuchsia.hardware.interrupt;
+using fuchsia.sysmem;
+
+primary node "acpi" {
+  fuchsia.BIND_PROTOCOL == fuchsia.acpi.BIND_PROTOCOL.DEVICE;
+  if fuchsia.acpi.HID == "PNP0B00" {
+    true;
+  } else {
+    fuchsia.acpi.FIRST_CID == "PNP0B00";
+  }
+}
+
+node "irq000" {
+  fuchsia.hardware.interrupt.Service == fuchsia.hardware.interrupt.Service.ZirconTransport;
+}
+
+node "sysmem" {
+  fuchsia.BIND_PROTOCOL == fuchsia.sysmem.BIND_PROTOCOL.DEVICE;
 }
