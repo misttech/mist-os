@@ -445,6 +445,7 @@ async fn bootstrap_generic_sme<D: DeviceOps>(
 mod tests {
     use {
         super::*,
+        anyhow::format_err,
         diagnostics_assertions::assert_data_tree,
         fidl::endpoints::Proxy,
         fuchsia_inspect::InspectorConfig,
@@ -764,8 +765,163 @@ mod tests {
         ));
     }
 
+    struct ServeTestHarness {
+        pub init_complete_receiver: Pin<Box<oneshot::Receiver<Result<(), zx::Status>>>>,
+        pub mlme_init_sender: oneshot::Sender<Result<(), zx::Status>>,
+        pub complete_mlme_sender: oneshot::Sender<Result<(), anyhow::Error>>,
+        pub complete_sme_sender: oneshot::Sender<Result<(), anyhow::Error>>,
+    }
+
+    impl ServeTestHarness {
+        fn new() -> (Pin<Box<impl Future<Output = Result<(), zx::Status>>>>, ServeTestHarness) {
+            let (init_complete_sender, init_complete_receiver) = oneshot::channel();
+            let init_completer = InitCompleter::new(move |result| {
+                init_complete_sender.send(result).unwrap();
+            });
+            let (mlme_init_sender, mlme_init_receiver) = oneshot::channel();
+            let (complete_mlme_sender, complete_mlme_receiver) = oneshot::channel();
+            let mlme_fut = Box::pin(async { complete_mlme_receiver.await.unwrap() });
+            let (complete_sme_sender, complete_sme_receiver) = oneshot::channel();
+            let sme_fut = Box::pin(async { complete_sme_receiver.await.unwrap() });
+
+            (
+                Box::pin(serve(init_completer, mlme_init_receiver, mlme_fut, sme_fut)),
+                ServeTestHarness {
+                    init_complete_receiver: Box::pin(init_complete_receiver),
+                    mlme_init_sender,
+                    complete_mlme_sender,
+                    complete_sme_sender,
+                },
+            )
+        }
+    }
+
+    #[test]
+    fn serve_exits_with_error_if_mlme_init_sender_dropped() {
+        let mut exec = fasync::TestExecutor::new();
+        let (mut serve_fut, mut harness) = ServeTestHarness::new();
+
+        assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
+        drop(harness.mlme_init_sender);
+        assert_variant!(
+            exec.run_until_stalled(&mut serve_fut),
+            Poll::Ready(Err(zx::Status::INTERNAL))
+        );
+
+        assert_variant!(
+            exec.run_until_stalled(&mut harness.init_complete_receiver),
+            Poll::Ready(Ok(Err(zx::Status::INTERNAL)))
+        );
+    }
+
+    #[test]
+    fn serve_exits_with_error_on_init_failure() {
+        let mut exec = fasync::TestExecutor::new();
+        let (mut serve_fut, mut harness) = ServeTestHarness::new();
+
+        assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
+        harness.mlme_init_sender.send(Err(zx::Status::IO_NOT_PRESENT)).unwrap();
+        assert_variant!(
+            exec.run_until_stalled(&mut serve_fut),
+            Poll::Ready(Err(zx::Status::IO_NOT_PRESENT))
+        );
+        assert_variant!(
+            exec.run_until_stalled(&mut harness.init_complete_receiver),
+            Poll::Ready(Ok(Err(zx::Status::IO_NOT_PRESENT)))
+        );
+    }
+
+    #[test_case(Ok(()))]
+    #[test_case(Err(format_err!("")))]
+    fn serve_exits_with_error_if_mlme_completes_before_init(early_mlme_result: Result<(), Error>) {
+        let mut exec = fasync::TestExecutor::new();
+        let (mut serve_fut, mut harness) = ServeTestHarness::new();
+
+        assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
+        harness.complete_mlme_sender.send(early_mlme_result).unwrap();
+        assert_variant!(
+            exec.run_until_stalled(&mut serve_fut),
+            Poll::Ready(Err(zx::Status::INTERNAL))
+        );
+        assert_variant!(
+            exec.run_until_stalled(&mut harness.init_complete_receiver),
+            Poll::Ready(Ok(Err(zx::Status::INTERNAL)))
+        );
+    }
+
+    #[test_case(Ok(()))]
+    #[test_case(Err(format_err!("")))]
+    fn serve_exits_with_error_if_sme_shuts_down_before_mlme(early_sme_result: Result<(), Error>) {
+        let mut exec = fasync::TestExecutor::new();
+        let (mut serve_fut, mut harness) = ServeTestHarness::new();
+
+        assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
+        harness.mlme_init_sender.send(Ok(())).unwrap();
+        assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
+        assert_variant!(
+            exec.run_until_stalled(&mut harness.init_complete_receiver),
+            Poll::Ready(Ok(Ok(())))
+        );
+        harness.complete_sme_sender.send(early_sme_result).unwrap();
+        assert_variant!(
+            exec.run_until_stalled(&mut serve_fut),
+            Poll::Ready(Err(zx::Status::INTERNAL))
+        );
+    }
+
+    #[test]
+    fn serve_exits_with_error_if_mlme_completes_with_error() {
+        let mut exec = fasync::TestExecutor::new();
+        let (mut serve_fut, mut harness) = ServeTestHarness::new();
+
+        assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
+        harness.mlme_init_sender.send(Ok(())).unwrap();
+        assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
+        assert_variant!(
+            exec.run_until_stalled(&mut harness.init_complete_receiver),
+            Poll::Ready(Ok(Ok(())))
+        );
+        harness.complete_mlme_sender.send(Err(format_err!("mlme error"))).unwrap();
+        assert_eq!(exec.run_until_stalled(&mut serve_fut), Poll::Ready(Err(zx::Status::INTERNAL)));
+    }
+
+    #[test]
+    fn serve_exits_with_error_if_sme_shuts_down_with_error() {
+        let mut exec = fasync::TestExecutor::new();
+        let (mut serve_fut, mut harness) = ServeTestHarness::new();
+
+        assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
+        harness.mlme_init_sender.send(Ok(())).unwrap();
+        assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
+        assert_variant!(
+            exec.run_until_stalled(&mut harness.init_complete_receiver),
+            Poll::Ready(Ok(Ok(())))
+        );
+        harness.complete_mlme_sender.send(Ok(())).unwrap();
+        harness.complete_sme_sender.send(Err(format_err!("sme error"))).unwrap();
+        assert_eq!(exec.run_until_stalled(&mut serve_fut), Poll::Ready(Err(zx::Status::INTERNAL)));
+    }
+
+    #[test]
+    fn serve_ends_with_graceful_shutdown() {
+        let mut exec = fasync::TestExecutor::new();
+        let (mut serve_fut, mut harness) = ServeTestHarness::new();
+
+        assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
+        harness.mlme_init_sender.send(Ok(())).unwrap();
+        assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
+        assert_variant!(
+            exec.run_until_stalled(&mut harness.init_complete_receiver),
+            Poll::Ready(Ok(Ok(())))
+        );
+        harness.complete_mlme_sender.send(Ok(())).unwrap();
+        assert_eq!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
+        harness.complete_sme_sender.send(Ok(())).unwrap();
+        assert_eq!(exec.run_until_stalled(&mut serve_fut), Poll::Ready(Ok(())));
+    }
+
     #[derive(Debug)]
-    struct SoftmacHarness<F> {
+    struct StartAndServeTestHarness<F> {
         pub start_and_serve_fut: F,
         pub softmac_handle_receiver: oneshot::Receiver<Result<WlanSoftmacHandle, zx::Status>>,
         pub generic_sme_proxy: fidl_sme::GenericSmeProxy,
@@ -788,7 +944,8 @@ mod tests {
     fn start_and_serve_with_device(
         exec: &mut fasync::TestExecutor,
         fake_device: FakeDevice,
-    ) -> Result<SoftmacHarness<impl Future<Output = Result<(), zx::Status>>>, zx::Status> {
+    ) -> Result<StartAndServeTestHarness<impl Future<Output = Result<(), zx::Status>>>, zx::Status>
+    {
         let fake_buf_provider = wlan_mlme::buffer::FakeBufferProvider::new();
         let (softmac_handle_sender, mut softmac_handle_receiver) =
             oneshot::channel::<Result<WlanSoftmacHandle, zx::Status>>();
@@ -848,7 +1005,7 @@ mod tests {
                 let inspect_vmo = exec.run_singlethreaded(inspect_vmo_fut);
                 inspect_vmo.expect("Failed to bootstrap USME.");
 
-                Ok(SoftmacHarness {
+                Ok(StartAndServeTestHarness {
                     start_and_serve_fut,
                     softmac_handle_receiver,
                     generic_sme_proxy,
@@ -904,7 +1061,7 @@ mod tests {
     fn stop_leads_to_graceful_shutdown() {
         let mut exec = fasync::TestExecutor::new();
         let (fake_device, fake_device_state) = FakeDevice::new(&exec);
-        let SoftmacHarness {
+        let StartAndServeTestHarness {
             mut start_and_serve_fut,
             mut softmac_handle_receiver,
             generic_sme_proxy,
