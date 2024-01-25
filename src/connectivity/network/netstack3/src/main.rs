@@ -26,7 +26,7 @@ struct Options {
 
 /// Runs Netstack3.
 pub fn main() {
-    // TOOD(https://fxbug.dev/125388): Support running with multiple threads.
+    // TODO(https://fxbug.dev/316616750): Support running with multiple threads.
     // This is currently blocked on fixing race conditions when concurrent
     // operations are allowed.
     let mut executor = fuchsia_async::SendExecutor::new(1 /* num_threads */);
