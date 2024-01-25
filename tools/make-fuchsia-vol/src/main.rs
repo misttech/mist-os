@@ -44,6 +44,12 @@ const MISC_GUID: PartType = part_type("1D75395D-F2C6-476B-A8B7-45CC1C97B476");
 const INSTALLER_GUID: PartType = part_type("4DCE98CE-E77E-45C1-A863-CAF92F1330C1");
 const FVM_GUID: PartType = part_type("41D0E340-57E3-954E-8C1E-17ECAC44CFF5");
 
+const ZBI_ZIRCON_A: &str = "zbi_zircon-a";
+const ZBI_ZIRCON_R: &str = "zbi_zircon-r";
+const BLK_STORAGE_SPARSE: &str = "blk_storage-sparse";
+const FXFS_BLK_STORAGE_FULL: &str = "fxfs-blk_storage-full";
+const BLK_BLOB: &str = "blk_blob";
+
 // The relevant part of the product bundle metadata schema, as realized by
 // entries in the product_bundles.json build API module.
 #[derive(Deserialize, Serialize)]
@@ -325,6 +331,14 @@ fn get_vbmeta_partition_name(
     }
 
     bail!("could not find ZBI partition name for slot {partition_slot:?}")
+}
+
+fn get_image(images: &HashMap<String, Utf8PathBuf>, name: &str) -> Result<Utf8PathBuf, Error> {
+    if let Some(name) = images.get(name) {
+        Ok(name.clone())
+    } else {
+        bail!("images missing entry for '{}'", name)
+    }
 }
 
 fn main() -> Result<(), Error> {
@@ -654,23 +668,23 @@ fn check_args(args: &mut TopLevel) -> Result<(), Error> {
             .collect();
 
         if args.zbi.is_none() {
-            args.zbi = Some(images["zbi_zircon-a"].clone());
+            args.zbi = Some(get_image(&images, ZBI_ZIRCON_A)?);
         }
         if args.zedboot.is_none() {
-            args.zedboot = Some(images["zbi_zircon-r"].clone())
+            args.zedboot = Some(get_image(&images, ZBI_ZIRCON_R)?);
         }
         if !args.ramdisk_only {
             if args.use_sparse_fvm {
                 if args.sparse_fvm.is_none() {
-                    args.sparse_fvm = Some(images["blk_storage-sparse"].clone());
+                    args.sparse_fvm = Some(get_image(&images, BLK_STORAGE_SPARSE)?);
                 }
             } else if args.use_fxfs {
                 if args.fxfs.is_none() {
-                    args.fxfs = Some(images["fxfs-blk_storage-full"].clone())
+                    args.fxfs = Some(get_image(&images, FXFS_BLK_STORAGE_FULL)?);
                 }
             } else {
                 if args.blob.is_none() {
-                    args.blob = Some(images["blk_blob"].clone())
+                    args.blob = Some(get_image(&images, BLK_BLOB)?);
                 }
             }
         }
