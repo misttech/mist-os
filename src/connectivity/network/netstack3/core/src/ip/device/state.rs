@@ -17,6 +17,7 @@ use net_types::{
 use packet_formats::utils::NonZeroDuration;
 
 use crate::{
+    inspect::{Inspectable, InspectableValue, Inspector},
     ip::{
         device::{
             route_discovery::Ipv6RouteDiscoveryState, slaac::SlaacConfiguration, IpAddressId,
@@ -714,6 +715,15 @@ pub enum Lifetime<I> {
     Infinite,
 }
 
+impl<I: crate::Instant> InspectableValue for Lifetime<I> {
+    fn record<N: Inspector>(&self, name: &str, inspector: &mut N) {
+        match self {
+            Self::Finite(instant) => inspector.record_inspectable_value(name, instant),
+            Self::Infinite => inspector.record_str(name, "infinite"),
+        }
+    }
+}
+
 /// The configuration for an IPv4 address.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct Ipv4AddrConfig<Instant> {
@@ -767,6 +777,13 @@ impl<I: Instant> RwLockFor<crate::lock_ordering::Ipv4DeviceAddressState> for Ipv
 #[derive(Debug)]
 pub struct Ipv4AddressState<Instant> {
     pub(crate) config: Ipv4AddrConfig<Instant>,
+}
+
+impl<Instant: crate::Instant> Inspectable for Ipv4AddressState<Instant> {
+    fn record<I: Inspector>(&self, inspector: &mut I) {
+        let Self { config: Ipv4AddrConfig { valid_until } } = self;
+        inspector.record_inspectable_value("ValidUntil", valid_until)
+    }
 }
 
 /// Configuration for an IPv6 address assigned via SLAAC.
@@ -855,6 +872,33 @@ pub(crate) struct Ipv6AddressFlags {
 pub struct Ipv6AddressState<Instant> {
     pub(crate) flags: Ipv6AddressFlags,
     pub(crate) config: Ipv6AddrConfig<Instant>,
+}
+
+impl<Instant: crate::Instant> Inspectable for Ipv6AddressState<Instant> {
+    fn record<I: Inspector>(&self, inspector: &mut I) {
+        let Self { flags: Ipv6AddressFlags { deprecated, assigned }, config } = self;
+        inspector.record_bool("Deprecated", *deprecated);
+        inspector.record_bool("Assigned", *assigned);
+        let (is_slaac, valid_until) = match config {
+            Ipv6AddrConfig::Manual(Ipv6AddrManualConfig { valid_until }) => (false, *valid_until),
+            Ipv6AddrConfig::Slaac(SlaacConfig::Static { valid_until }) => (true, *valid_until),
+            Ipv6AddrConfig::Slaac(SlaacConfig::Temporary(TemporarySlaacConfig {
+                valid_until,
+                desync_factor,
+                creation_time,
+                dad_counter,
+            })) => {
+                // Record the extra temporary slaac configuration before
+                // returning.
+                inspector.record_double("DesyncFactorSecs", desync_factor.as_secs_f64());
+                inspector.record_uint("DadCounter", *dad_counter);
+                inspector.record_inspectable_value("CreationTime", creation_time);
+                (true, Lifetime::Finite(*valid_until))
+            }
+        };
+        inspector.record_bool("IsSlaac", is_slaac);
+        inspector.record_inspectable_value("ValidUntil", &valid_until);
+    }
 }
 
 /// Data associated with an IPv6 address on an interface.

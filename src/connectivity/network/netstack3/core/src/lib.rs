@@ -65,18 +65,11 @@ pub mod device {
     pub(crate) use base::*;
     pub(crate) use id::*;
 
-    // Re-exported freestanding functions.
-    //
-    // TODO(https://fxbug.dev/42083910): Replace freestanding functions with API
-    // objects.
-    pub use base::inspect_devices;
-
     // Re-exported types.
     pub use api::{RemoveDeviceResult, RemoveDeviceResultWithContext};
     pub use arp::ArpCounters;
     pub use base::{
         DeviceCounters, DeviceLayerEventDispatcher, DeviceLayerStateTypes, DeviceSendFrameError,
-        DevicesVisitor, InspectDeviceState,
     };
     pub use config::{
         ArpConfiguration, ArpConfigurationUpdate, DeviceConfiguration, DeviceConfigurationUpdate,
@@ -118,6 +111,9 @@ pub mod filter {
 
 /// Facilities for inspecting stack state for debugging.
 pub mod inspect {
+    pub(crate) mod base;
+    pub(crate) use base::*;
+
     // Re-exported functions.
     //
     // TODO(https://fxbug.dev/42083910): Replace freestanding functions with API
@@ -126,6 +122,7 @@ pub mod inspect {
 
     // Re-exported types.
     pub use crate::counters::{CounterVisitor, StackCounters};
+    pub use base::{InspectableValue, Inspector};
 }
 
 /// Methods for dealing with ICMP sockets.
@@ -263,6 +260,7 @@ pub use context::{
     CoreCtx, EventContext, InstantBindingsTypes, InstantContext, ReferenceNotifiers, RngContext,
     SyncCtx, TimerContext, TracingContext, UnlockedCoreCtx,
 };
+pub use inspect::Inspector;
 pub use marker::{BindingsContext, BindingsTypes, CoreContext, IpBindingsContext, IpExt};
 pub use state::StackState;
 pub use time::{handle_timer, Instant, TimerId};

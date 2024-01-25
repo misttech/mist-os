@@ -547,6 +547,12 @@ pub(crate) mod testutil {
         offset: Duration,
     }
 
+    impl crate::inspect::InspectableValue for FakeInstant {
+        fn record<I: crate::inspect::Inspector>(&self, _name: &str, _inspector: &mut I) {
+            unimplemented!()
+        }
+    }
+
     impl FakeInstant {
         #[cfg(test)]
         pub(crate) const LATEST: FakeInstant = FakeInstant { offset: Duration::MAX };

@@ -7,19 +7,15 @@
 //! This module provides utilities for publishing netstack3 diagnostics data to
 //! Inspect.
 
-use crate::bindings::{
-    devices::{
-        DeviceIdAndName, DeviceSpecificInfo, DynamicCommonInfo, DynamicNetdeviceInfo, NetdeviceInfo,
-    },
-    BindingsCtx, Ctx, StackTime,
-};
-use fuchsia_inspect::{ArrayProperty as _, Node};
+use std::{fmt::Debug, string::ToString as _};
+
+use fuchsia_inspect::Node;
 use net_types::{
     ip::{Ip, IpAddress, IpVersion, Ipv4, Ipv6},
     Witness as _,
 };
 use netstack3_core::{
-    device::{self, ArpCounters, DeviceCounters, DeviceId, EthernetLinkDevice, WeakDeviceId},
+    device::{ArpCounters, DeviceCounters, DeviceId, EthernetLinkDevice, WeakDeviceId},
     inspect::StackCounters,
     ip::{
         CommonIpCounters, IcmpRxCounters, IcmpTxCounters, Ipv4Counters, Ipv6Counters, NdpCounters,
@@ -27,16 +23,22 @@ use netstack3_core::{
     neighbor, tcp,
     udp::UdpCounters,
 };
-use std::{fmt::Debug, string::ToString as _};
+
+use crate::bindings::{
+    devices::{
+        DeviceIdAndName, DeviceSpecificInfo, DynamicCommonInfo, DynamicNetdeviceInfo, NetdeviceInfo,
+    },
+    BindingsCtx, Ctx, DeviceIdExt as _, StackTime,
+};
 
 /// A visitor for diagnostics data that has distinct Ipv4 and Ipv6 variants.
 struct DualIpVisitor<'a> {
-    node: &'a fuchsia_inspect::Node,
+    node: &'a Node,
     count: usize,
 }
 
 impl<'a> DualIpVisitor<'a> {
-    fn new(node: &'a fuchsia_inspect::Node) -> Self {
+    fn new(node: &'a Node) -> Self {
         Self { node, count: 0 }
     }
 
@@ -44,7 +46,7 @@ impl<'a> DualIpVisitor<'a> {
     /// across IP versions.
     fn record_unique_child<F>(&mut self, f: F)
     where
-        F: FnOnce(&fuchsia_inspect::Node),
+        F: FnOnce(&Node),
     {
         let Self { node, count } = self;
         let id = core::mem::replace(count, *count + 1);
@@ -53,7 +55,56 @@ impl<'a> DualIpVisitor<'a> {
 }
 
 /// A visitor for diagnostics data.
-struct Visitor<'a>(&'a fuchsia_inspect::Node);
+struct Visitor<'a>(&'a Node);
+
+struct BindingsInspector<'a> {
+    node: &'a Node,
+    unnamed_count: usize,
+}
+
+impl<'a> BindingsInspector<'a> {
+    fn new(node: &'a Node) -> Self {
+        Self { node, unnamed_count: 0 }
+    }
+}
+
+impl<'a> netstack3_core::inspect::Inspector for BindingsInspector<'a> {
+    type ChildInspector<'l> = BindingsInspector<'l>;
+
+    fn record_child<F: FnOnce(&mut Self::ChildInspector<'_>)>(&mut self, name: &str, f: F) {
+        self.node.record_child(name, |node| f(&mut BindingsInspector::new(node)))
+    }
+
+    fn record_unnamed_child<F: FnOnce(&mut Self::ChildInspector<'_>)>(&mut self, f: F) {
+        let Self { node: _, unnamed_count } = self;
+        let id = core::mem::replace(unnamed_count, *unnamed_count + 1);
+        self.record_child(&format!("{id}"), f)
+    }
+
+    fn record_uint<T: Into<u64>>(&mut self, name: &str, value: T) {
+        self.node.record_uint(name, value.into())
+    }
+
+    fn record_int<T: Into<i64>>(&mut self, name: &str, value: T) {
+        self.node.record_int(name, value.into())
+    }
+
+    fn record_double<T: Into<f64>>(&mut self, name: &str, value: T) {
+        self.node.record_double(name, value.into())
+    }
+
+    fn record_str(&mut self, name: &str, value: &str) {
+        self.node.record_string(name, value)
+    }
+
+    fn record_string(&mut self, name: &str, value: String) {
+        self.node.record_string(name, value)
+    }
+
+    fn record_bool(&mut self, name: &str, value: bool) {
+        self.node.record_bool(name, value)
+    }
+}
 
 /// Publishes netstack3 socket diagnostics data to Inspect.
 pub(crate) fn sockets(ctx: &mut Ctx) -> fuchsia_inspect::Inspector {
@@ -137,76 +188,66 @@ pub(crate) fn routes(ctx: &mut Ctx) -> fuchsia_inspect::Inspector {
     inspector
 }
 
-pub(crate) fn devices(ctx: &Ctx) -> fuchsia_inspect::Inspector {
-    impl<'a> device::DevicesVisitor<BindingsCtx> for Visitor<'a> {
-        fn visit_devices(
-            &self,
-            devices: impl Iterator<Item = device::InspectDeviceState<BindingsCtx>>,
-        ) {
-            use crate::bindings::DeviceIdExt as _;
-            let Self(node) = self;
-            for device::InspectDeviceState { device_id, addresses } in devices {
-                let external_state = device_id.external_state();
-                let DeviceIdAndName { id: binding_id, name } = device_id.bindings_id();
-                node.record_child(format!("{binding_id}"), |node| {
-                    node.record_string("Name", &name);
-                    node.record_uint("InterfaceId", (*binding_id).into());
-                    let ip_addresses = node.create_string_array("IpAddresses", addresses.len());
-                    for (j, address) in addresses.iter().enumerate() {
-                        ip_addresses.set(j, address.to_string());
-                    }
-                    node.record(ip_addresses);
-                    external_state.with_common_info(
-                        |DynamicCommonInfo {
-                             admin_enabled,
-                             mtu,
-                             addresses: _,
-                             control_hook: _,
-                             events: _,
-                         }| {
-                            node.record_bool("AdminEnabled", *admin_enabled);
-                            node.record_uint("MTU", mtu.get().into());
-                        },
-                    );
-                    match external_state {
-                        DeviceSpecificInfo::Netdevice(
-                            info @ NetdeviceInfo {
-                                mac,
-                                dynamic: _,
-                                handler: _,
-                                static_common_info: _,
-                            },
-                        ) => {
-                            node.record_bool("Loopback", false);
-                            node.record_child("NetworkDevice", |node| {
-                                node.record_string("MacAddress", mac.get().to_string());
-                                info.with_dynamic_info(
-                                    |DynamicNetdeviceInfo {
-                                         phy_up,
-                                         common_info: _,
-                                         neighbor_event_sink: _,
-                                     }| {
-                                        node.record_bool("PhyUp", *phy_up);
-                                    },
-                                );
-                            });
-                        }
-                        DeviceSpecificInfo::Loopback(_info) => {
-                            node.record_bool("Loopback", true);
-                        }
-                        // TODO(https://fxbug.dev/42051633): Add relevant
-                        // inspect data for pure IP devices.
-                        DeviceSpecificInfo::PureIp(_info) => {
-                            node.record_bool("loopback", false);
-                        }
-                    }
-                })
-            }
-        }
-    }
+pub(crate) fn devices(ctx: &mut Ctx) -> fuchsia_inspect::Inspector {
+    // Snapshot devices out so we're not holding onto the devices lock for too
+    // long.
+    let devices =
+        ctx.bindings_ctx().devices.with_devices(|devices| devices.cloned().collect::<Vec<_>>());
     let inspector = fuchsia_inspect::Inspector::new(Default::default());
-    let core_ctx = ctx.core_ctx();
-    device::inspect_devices::<BindingsCtx, _>(core_ctx, &Visitor(inspector.root()));
+    let node = inspector.root();
+    for device_id in devices {
+        let external_state = device_id.external_state();
+        let DeviceIdAndName { id: binding_id, name } = device_id.bindings_id();
+        node.record_child(format!("{binding_id}"), |node| {
+            node.record_string("Name", &name);
+            node.record_uint("InterfaceId", (*binding_id).into());
+            node.record_child("IPv4", |node| {
+                ctx.api().device_ip::<Ipv4>().inspect(&device_id, &mut BindingsInspector::new(node))
+            });
+            node.record_child("IPv6", |node| {
+                ctx.api().device_ip::<Ipv6>().inspect(&device_id, &mut BindingsInspector::new(node))
+            });
+            external_state.with_common_info(
+                |DynamicCommonInfo {
+                     admin_enabled,
+                     mtu,
+                     addresses: _,
+                     control_hook: _,
+                     events: _,
+                 }| {
+                    node.record_bool("AdminEnabled", *admin_enabled);
+                    node.record_uint("MTU", mtu.get().into());
+                },
+            );
+            match external_state {
+                DeviceSpecificInfo::Netdevice(
+                    info @ NetdeviceInfo { mac, dynamic: _, handler: _, static_common_info: _ },
+                ) => {
+                    node.record_bool("Loopback", false);
+                    node.record_child("NetworkDevice", |node| {
+                        node.record_string("MacAddress", mac.get().to_string());
+                        info.with_dynamic_info(
+                            |DynamicNetdeviceInfo {
+                                 phy_up,
+                                 common_info: _,
+                                 neighbor_event_sink: _,
+                             }| {
+                                node.record_bool("PhyUp", *phy_up);
+                            },
+                        );
+                    });
+                }
+                DeviceSpecificInfo::Loopback(_info) => {
+                    node.record_bool("Loopback", true);
+                }
+                // TODO(https://fxbug.dev/42051633): Add relevant
+                // inspect data for pure IP devices.
+                DeviceSpecificInfo::PureIp(_info) => {
+                    node.record_bool("loopback", false);
+                }
+            }
+        })
+    }
     inspector
 }
 
@@ -538,7 +579,7 @@ fn record_ip<F: FnOnce(&Node)>(
     });
 }
 
-fn record_udp(node: &fuchsia_inspect::Node, counters: &UdpCounters) {
+fn record_udp(node: &Node, counters: &UdpCounters) {
     let UdpCounters {
         rx_icmp_error,
         rx,

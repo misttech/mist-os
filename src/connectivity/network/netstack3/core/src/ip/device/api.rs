@@ -21,6 +21,7 @@ use crate::{
     device::{AnyDevice, DeviceIdContext},
     error::ExistsError,
     error::NotFoundError,
+    inspect::Inspector,
     ip::{
         self,
         device::{
@@ -276,6 +277,25 @@ where
         let mut vec = Vec::new();
         self.for_each_assigned_ip_addr_subnet(device, |a| vec.push(a));
         vec
+    }
+
+    /// Exports IP state for `device` into `inspector`.
+    pub fn inspect<N: Inspector>(
+        &mut self,
+        device: &<C::CoreContext as DeviceIdContext<AnyDevice>>::DeviceId,
+        inspector: &mut N,
+    ) {
+        inspector.record_child("Addresses", |inspector| {
+            self.core_ctx().with_address_ids(device, |addrs, core_ctx| {
+                for addr in addrs {
+                    inspector.record_display_child(addr.addr_sub(), |inspector| {
+                        core_ctx.with_ip_address_state(device, &addr, |addr_state| {
+                            inspector.delegate_inspectable(addr_state)
+                        })
+                    });
+                }
+            })
+        })
     }
 }
 /// The device IP API interacting with all IP versions.

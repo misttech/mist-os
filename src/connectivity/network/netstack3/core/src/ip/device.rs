@@ -15,7 +15,10 @@ pub(crate) mod slaac;
 pub(crate) mod state;
 
 use alloc::{boxed::Box, vec::Vec};
-use core::{fmt::Debug, num::NonZeroU8};
+use core::{
+    fmt::{Debug, Display},
+    num::NonZeroU8,
+};
 
 use net_types::{
     ip::{
@@ -37,6 +40,7 @@ use crate::{
     },
     device::{AnyDevice, DeviceIdContext},
     error::{ExistsError, NotFoundError},
+    inspect::Inspectable,
     ip::{
         device::{
             config::{
@@ -312,10 +316,11 @@ pub trait IpDeviceIpExt: IpDeviceStateIpExt {
         + Copy
         + PartialEq
         + Debug
+        + Display
         + Into<SpecifiedAddr<Self::Addr>>;
     type AddressConfig<I: Instant>: Default + Debug;
     type ManualAddressConfig<I: Instant>: Default + Debug + Into<Self::AddressConfig<I>>;
-    type AddressState<I: Instant>: 'static;
+    type AddressState<I: Instant>: 'static + Inspectable;
     type ConfigurationUpdate: From<IpDeviceConfigurationUpdate>
         + AsRef<Option<IpDeviceConfigurationUpdate>>
         + Debug;

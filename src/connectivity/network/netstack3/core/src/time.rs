@@ -13,6 +13,7 @@ use tracing::trace;
 use crate::{
     context::TimerContext,
     device::{self, DeviceId, DeviceLayerTimerId},
+    inspect::InspectableValue,
     ip::{
         self,
         device::{IpDeviceIpExt, IpDeviceTimerId},
@@ -225,7 +226,9 @@ impl<BT: BindingsTypes, L> crate::context::CounterContext<TimerCounters> for Cor
 /// `Instant` can be implemented by any type which represents an instant in
 /// time. This can include any sort of real-world clock time (e.g.,
 /// [`std::time::Instant`]) or fake time such as in testing.
-pub trait Instant: Sized + Ord + Copy + Clone + Debug + Send + Sync + 'static {
+pub trait Instant:
+    Sized + Ord + Copy + Clone + Debug + Send + Sync + InspectableValue + 'static
+{
     /// Returns the amount of time elapsed from another instant to this one.
     ///
     /// # Panics

@@ -10,13 +10,8 @@ use core::{
 
 use derivative::Derivative;
 use lock_order::{lock::UnlockedAccess, wrap::prelude::*};
-use net_types::{
-    ethernet::Mac,
-    ip::{Ip, IpAddr, Ipv4, Ipv6},
-    BroadcastAddr, MulticastAddr, Witness as _,
-};
+use net_types::{ethernet::Mac, ip::Ip, BroadcastAddr, MulticastAddr};
 use packet::Buf;
-use smallvec::SmallVec;
 
 use crate::{
     context::{CounterContext, InstantContext},
@@ -24,7 +19,6 @@ use crate::{
     device::{
         arp::ArpCounters,
         ethernet::{self, EthernetLinkDevice, EthernetTimerId},
-        for_any_device_id,
         id::{
             BaseDeviceId, BasePrimaryDeviceId, DeviceId, EthernetDeviceId, EthernetPrimaryDeviceId,
             StrongId, WeakId,
@@ -37,9 +31,7 @@ use crate::{
     error::NotSupportedError,
     ip::{
         device::{
-            nud::LinkResolutionContext,
-            state::{AssignedAddress as _, IpDeviceFlags},
-            IpDeviceIpExt, IpDeviceStateContext,
+            nud::LinkResolutionContext, state::IpDeviceFlags, IpDeviceIpExt, IpDeviceStateContext,
         },
         forwarding::IpForwardingDeviceContext,
         types::RawMetric,
@@ -130,63 +122,6 @@ where
             |IpDeviceFlags { ip_enabled }| *ip_enabled,
         )
     }
-}
-
-/// Creates a snapshot of the devices in the stack at the time of invocation.
-///
-/// Devices are copied into the return value.
-///
-/// The argument `filter_map` defines a filtering function, so that unneeded
-/// devices are not copied and returned in the snapshot.
-pub(crate) fn snapshot_device_ids<T, BC: BindingsContext, F: FnMut(DeviceId<BC>) -> Option<T>>(
-    core_ctx: &SyncCtx<BC>,
-    filter_map: F,
-) -> impl IntoIterator<Item = T> {
-    let mut core_ctx = CoreCtx::new_deprecated(core_ctx);
-    let devices = core_ctx.read_lock::<crate::lock_ordering::DeviceLayerState>();
-    let Devices { ethernet, pure_ip: _, loopback } = &*devices;
-    // TODO(https://fxbug.dev/42051633): Include Pure IP devices.
-    DevicesIter { ethernet: ethernet.values(), loopback: loopback.iter() }
-        .filter_map(filter_map)
-        .collect::<SmallVec<[T; 32]>>()
-}
-
-/// Visitor for Device state.
-pub trait DevicesVisitor<BC: BindingsContext> {
-    /// Performs a user-defined operation over an iterator of device state.
-    fn visit_devices(&self, devices: impl Iterator<Item = InspectDeviceState<BC>>);
-}
-
-/// The state of a Device, for exporting to Inspect.
-pub struct InspectDeviceState<BC: BindingsContext> {
-    /// A strong ID identifying a Device.
-    pub device_id: DeviceId<BC>,
-
-    /// The IP addresses assigned to a Device by core.
-    pub addresses: SmallVec<[IpAddr; 32]>,
-}
-
-/// Provides access to Device state via a `visitor`.
-pub fn inspect_devices<BC: BindingsContext, V: DevicesVisitor<BC>>(
-    core_ctx: &SyncCtx<BC>,
-    visitor: &V,
-) {
-    let devices = snapshot_device_ids(core_ctx, Some).into_iter().map(|device| {
-        let device_id = device.clone();
-        let ip = for_any_device_id!(DeviceId, &device, d => &d.device_state().ip);
-        let ipv4 =
-            lock_order::lock::RwLockFor::<crate::lock_ordering::IpDeviceAddresses<Ipv4>>::read_lock(
-                ip,
-            );
-        let ipv4_addresses = ipv4.iter().map(|a| IpAddr::from(a.addr().into_addr()));
-        let ipv6 =
-            lock_order::lock::RwLockFor::<crate::lock_ordering::IpDeviceAddresses<Ipv6>>::read_lock(
-                ip,
-            );
-        let ipv6_addresses = ipv6.iter().map(|a| IpAddr::from(a.addr().addr()));
-        InspectDeviceState { device_id, addresses: ipv4_addresses.chain(ipv6_addresses).collect() }
-    });
-    visitor.visit_devices(devices)
 }
 
 pub enum Ipv6DeviceLinkLayerAddr {
@@ -571,6 +506,7 @@ pub(crate) mod testutil {
 
     #[cfg(test)]
     use net_types::ip::IpVersion;
+    use net_types::ip::{Ipv4, Ipv6};
 
     use crate::ip::device::config::{
         IpDeviceConfigurationUpdate, Ipv4DeviceConfigurationUpdate, Ipv6DeviceConfigurationUpdate,
@@ -730,8 +666,8 @@ mod tests {
     use const_unwrap::const_unwrap_option;
     use net_declare::net_mac;
     use net_types::{
-        ip::{AddrSubnet, Mtu},
-        SpecifiedAddr, UnicastAddr,
+        ip::{AddrSubnet, Ipv4, Ipv6, Mtu},
+        SpecifiedAddr, UnicastAddr, Witness as _,
     };
     use test_case::test_case;
 
@@ -740,6 +676,7 @@ mod tests {
         context::testutil::FakeInstant,
         device::{
             ethernet::{EthernetCreationProperties, MaxEthernetFrameSize},
+            for_any_device_id,
             loopback::{LoopbackCreationProperties, LoopbackDevice},
             pure_ip::PureIpDevice,
             queue::tx::TransmitQueueConfiguration,

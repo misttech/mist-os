@@ -197,7 +197,23 @@ async fn inspect_devices(name: &str) {
                 AdminEnabled: true,
                 MTU: 65536u64,
                 Loopback: true,
-                IpAddresses: vec!["127.0.0.1".to_string(), "::1".to_string()],
+                IPv4: {
+                    Addresses: {
+                        "127.0.0.1/8": {
+                            ValidUntil: "infinite",
+                        }
+                    }
+                },
+                IPv6: {
+                    Addresses: {
+                        "::1/128": {
+                            ValidUntil: "infinite",
+                            IsSlaac: false,
+                            Deprecated: false,
+                            Assigned: true,
+                        }
+                    }
+                }
             },
             "2": {
                 Name: NETDEV_NAME,
@@ -205,7 +221,23 @@ async fn inspect_devices(name: &str) {
                 AdminEnabled: true,
                 MTU: u64::from(netemul::DEFAULT_MTU),
                 Loopback: false,
-                IpAddresses: vec!["192.168.0.1".to_string(), "fe80::ff:fe00:1".to_string()],
+                IPv4: {
+                    "Addresses": {
+                        "192.168.0.1/24": {
+                            ValidUntil: "infinite"
+                        }
+                    }
+                },
+                IPv6: {
+                    "Addresses": {
+                        "fe80::ff:fe00:1/64": {
+                            ValidUntil: "infinite",
+                            IsSlaac: true,
+                            Deprecated: false,
+                            Assigned: false,
+                        }
+                    }
+                },
                 NetworkDevice: {
                     MacAddress: "02:00:00:00:00:01",
                     PhyUp: true,

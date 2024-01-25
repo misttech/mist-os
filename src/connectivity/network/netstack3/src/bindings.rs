@@ -74,6 +74,7 @@ use netstack3_core::{
     filter::FilterBindingsTypes,
     handle_timer,
     icmp::{self, IcmpEchoBindingsContext},
+    inspect::{InspectableValue, Inspector},
     ip::{
         AddIpAddrSubnetError, AddressRemovedReason, IpDeviceConfigurationUpdate, IpDeviceEvent,
         Ipv4DeviceConfigurationUpdate, Ipv6DeviceConfiguration, Ipv6DeviceConfigurationUpdate,
@@ -380,6 +381,13 @@ impl std::fmt::Display for StackTime {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let Self(time) = *self;
         write!(f, "{:.6}", time.into_nanos() as f64 / 1_000_000_000f64)
+    }
+}
+
+impl InspectableValue for StackTime {
+    fn record<I: Inspector>(&self, name: &str, inspector: &mut I) {
+        let Self(inner) = self;
+        inspector.record_int(name, inner.into_nanos())
     }
 }
 
@@ -1190,7 +1198,7 @@ impl NetstackSeed {
             });
             let devices_ctx = netstack.ctx.clone();
             let devices = inspector.root().create_lazy_child("Devices", move || {
-                futures::future::ok(inspect::devices(&devices_ctx)).boxed()
+                futures::future::ok(inspect::devices(&mut devices_ctx.clone())).boxed()
             });
             let neighbors_ctx = netstack.ctx.clone();
             let neighbors = inspector.root().create_lazy_child("Neighbors", move || {
