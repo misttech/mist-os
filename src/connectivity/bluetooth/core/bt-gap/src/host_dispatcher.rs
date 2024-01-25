@@ -836,7 +836,8 @@ impl HostDispatcher {
 
         // Connect to the host device.
         let hardware = fuchsia_component::client::connect_to_named_protocol_at_dir_root::<
-            HardwareHostMarker,>(dir, host_path)
+            HardwareHostMarker,
+        >(dir, host_path)
         .context("failed to open bt-host device")?;
         let (host, server_end) = fidl::endpoints::create_proxy::<HostMarker>()?;
         hardware.open(server_end)?;
@@ -951,11 +952,7 @@ impl HostDispatcher {
     }
 }
 
-async fn init_host(
-    path: &str,
-    node: inspect::Node,
-    proxy: HostProxy,
-) -> Result<HostDevice, Error> {
+async fn init_host(path: &str, node: inspect::Node, proxy: HostProxy) -> Result<HostDevice, Error> {
     node.record_string("path", path);
 
     // Obtain basic information and create and entry in the dispatcher's map.
