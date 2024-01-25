@@ -178,6 +178,12 @@ that may apply to your driver.
 
 ## Update the DFv1 driver from Banjo to FIDL {:#update-the-dfv1-driver-from-banjo-to-fidl}
 
+Note: There are two types of FIDL transport protocols that Fuchsia
+drivers use: Driver transport and Zircon transport. Only Driver transport
+is used to talk to other drivers co-located in the same driver host, and
+importantly, **all Banjo protocols are expected to migrate to Driver
+transport, not Zircon transport.**
+
 Updating a driver's `.fidl` file is a good starting point for driver
 migration because everything originates from the `.fidl` file. Fortunately,
 Banjo and FIDL generate code from the same IDL (which is FIDL), so you
@@ -229,7 +235,8 @@ your driver's `.fidl` file, for example:
   is **required** for all FIDL protocols. This attribute allows the
   client to search this protocol using its generated name.
 
-  However, the `@transport("Driver")` attribute is **optional** for
+  However, the `@transport("Driver")` attribute (which indicates that
+  this is a Driver transport protocol) is **optional** for
   drivers that use the [driver runtime FIDL](#update-the-dfv1-driver-to-use-the-driver-runtime).
   And driver runtime migration is only necessary if your driver talks
   to other drivers co-located in the same driver host.
@@ -238,6 +245,9 @@ your driver's `.fidl` file, for example:
   "How do I know if my driver talks to other drivers co-located in
   the same process?" question in the [Before you start](#before-you-start)
   section.
+
+  For more examples on the Driver transport protocols, see this
+  [Driver transport examples][driver-transport-example] directory.
 
 ### 2. Update function definitions to use FIDL error syntax {:#update-function-definitions-to-use-fidl-error-sytntax}
 
@@ -957,6 +967,7 @@ All the **source code files** mentioned in this section:
 - [`//src/connectivity/wlan/drivers/third_party/nxp/nxpfmac/device.cc`][nxpfmac-device-cc]
 - [`//src/connectivity/wlan/drivers/wlansoftmac/device.cc`][wlanoftmac-device-cc]
 - [`//src/connectivity/wlan/drivers/wlansoftmac/meta/wlansoftmac.cml`][wlansofmac-cml]
+- [`//examples/drivers/transport/driver/`][driver-transport-example]
 
 All the **documentation pages** mentioned in this section:
 
@@ -1027,4 +1038,5 @@ All the **documentation pages** mentioned in this section:
 [nxpfmac-device-cc]: https://cs.opensource.google/fuchsia/fuchsia/+/main:src/connectivity/wlan/drivers/third_party/nxp/nxpfmac/device.cc
 [fidl-attributes]: /docs/reference/fidl/language/attributes.md
 [default-dispatcher]: /docs/concepts/drivers/driver-dispatcher-and-threads.md#default-dispatcher
+[driver-transport-example]: https://cs.opensource.google/fuchsia/fuchsia/+/main:examples/drivers/transport/driver/
 
