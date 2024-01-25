@@ -102,13 +102,6 @@ zx_status_t TestBoard::Create(zx_device_t* parent) {
   }
 
   // Add a composite device
-  const zx_bind_inst_t power_match[] = {
-      BI_ABORT_IF(NE, BIND_FIDL_PROTOCOL, ZX_FIDL_PROTOCOL_POWER),
-      BI_MATCH_IF(EQ, BIND_POWER_DOMAIN, 3),
-  };
-  device_fragment_part_t power_fragment[] = {
-      {std::size(power_match), power_match},
-  };
   const zx_bind_inst_t gpio_match[] = {
       BI_ABORT_IF(NE, BIND_PROTOCOL, ZX_PROTOCOL_GPIO),
       BI_MATCH_IF(EQ, BIND_GPIO_PIN, 3),
@@ -126,7 +119,6 @@ zx_status_t TestBoard::Create(zx_device_t* parent) {
   };
   device_fragment_t composite[] = {
       {"gpio", std::size(gpio_fragment), gpio_fragment},
-      {"power", std::size(power_fragment), power_fragment},
   };
 
   struct composite_test_metadata metadata_1 = {

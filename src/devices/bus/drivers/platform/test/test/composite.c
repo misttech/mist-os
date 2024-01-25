@@ -141,6 +141,7 @@ static zx_status_t test_bind(void* ctx, zx_device_t* parent) {
     return status;
   }
 
+  // Make sure we can read metadata added to a fragment.
   size_t size;
   composite_test_metadata metadata;
   status = device_get_fragment_metadata(parent, "pdev", DEVICE_METADATA_PRIVATE, &metadata,
@@ -200,26 +201,6 @@ static zx_status_t test_bind(void* ctx, zx_device_t* parent) {
     return status;
   }
 
-  // Make sure we can read metadata added to a fragment.
-  status = device_get_metadata_size(test->zxdev, DEVICE_METADATA_PRIVATE, &size);
-  if (status != ZX_OK || size != sizeof(composite_test_metadata)) {
-    zxlogf(ERROR, "%s: device_get_metadata_size failed: %d", DRIVER_NAME, status);
-    device_async_remove(test->zxdev);
-    return ZX_ERR_INTERNAL;
-  }
-  status =
-      device_get_metadata(test->zxdev, DEVICE_METADATA_PRIVATE, &metadata, sizeof(metadata), &size);
-  if (status != ZX_OK || size != sizeof(composite_test_metadata)) {
-    zxlogf(ERROR, "%s: device_get_metadata failed: %d", DRIVER_NAME, status);
-    device_async_remove(test->zxdev);
-    return ZX_ERR_INTERNAL;
-  }
-
-  if (metadata.metadata_value != 12345) {
-    zxlogf(ERROR, "%s: device_get_metadata failed: %d", DRIVER_NAME, status);
-    device_async_remove(test->zxdev);
-    return ZX_ERR_INTERNAL;
-  }
   return ZX_OK;
 }
 
