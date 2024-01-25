@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 #include <lib/devicetree/devicetree.h>
+#include <lib/stdcompat/array.h>
 #include <lib/stdcompat/span.h>
 #include <lib/uart/all.h>
 #include <lib/uart/amlogic.h>
@@ -18,8 +19,6 @@
 #include <type_traits>
 
 #include <zxtest/zxtest.h>
-
-#include "lib/stdcompat/array.h"
 
 using namespace std::literals;
 

@@ -122,6 +122,13 @@ struct Driver : public DriverBase<Driver, ZBI_KERNEL_DRIVER_AMLOGIC_UART, zbi_dc
         .set_rx_enable(true)
         .set_tx_interrupt(false)
         .set_rx_interrupt(false)
+        .set_two_wire(true)
+        .WriteTo(io.io())
+        // Must change state of rx/tx reset back to non reset or IRQs might
+        // not work properly.
+        .set_clear_error(false)
+        .set_rx_reset(false)
+        .set_tx_reset(false)
         .WriteTo(io.io());
   }
 
@@ -154,13 +161,13 @@ struct Driver : public DriverBase<Driver, ZBI_KERNEL_DRIVER_AMLOGIC_UART, zbi_dc
 
   template <class IoProvider>
   void EnableTxInterrupt(IoProvider& io, bool enable = true) {
-    auto cr = ControlRegister::Get().FromValue(0);
+    auto cr = ControlRegister::Get().ReadFrom(io.io());
     cr.set_tx_interrupt(enable).WriteTo(io.io());
   }
 
   template <class IoProvider>
   void EnableRxInterrupt(IoProvider& io, bool enable = true) {
-    auto cr = ControlRegister::Get().FromValue(0);
+    auto cr = ControlRegister::Get().ReadFrom(io.io());
     cr.set_rx_interrupt(enable).WriteTo(io.io());
   }
 
@@ -177,37 +184,37 @@ struct Driver : public DriverBase<Driver, ZBI_KERNEL_DRIVER_AMLOGIC_UART, zbi_dc
 
   template <class IoProvider, typename Lock, typename Waiter, typename Tx, typename Rx>
   void Interrupt(IoProvider& io, Lock& lock, Waiter& waiter, Tx&& tx, Rx&& rx) {
-    auto sr = StatusRegister::Get().ReadFrom(io.io());
+    size_t drained_rx = 0;
+    while (drained_rx < kFifoDepth) {
+      auto sr = StatusRegister::Get().ReadFrom(io.io());
+      auto cr = ControlRegister::Get().ReadFrom(io.io());
 
-    bool tx_done = false;
-    auto check_tx = [&]() {
-      if (!tx_done && !sr.tx_fifo_full()) {
-        tx(lock, waiter, [&]() {
-          EnableTxInterrupt(io, false);
-          tx_done = true;
-        });
+      // Drain characters in the fifo.
+      bool rx_disabled = false;
+      // Drain at most |kFifoDepth| characters per IRQ.
+      // If there were no characters in the fifo, then it was either an error
+      // or TX IRQ, will be handled in this pass.
+      drained_rx += sr.rx_fifo_count() == 0 ? kFifoDepth : sr.rx_fifo_count();
+      for (size_t i = 0; i < sr.rx_fifo_count() && !rx_disabled; ++i) {
+        rx(
+            lock,  //
+            [&]() { return ReadFifoRegister::Get().ReadFrom(io.io()).data(); },
+            [&]() {
+              // If the buffer is full, disable the receive interrupt instead
+              // and stop checking.
+              EnableRxInterrupt(io, false);
+              rx_disabled = true;
+            });
       }
-    };
-    check_tx();
 
-    bool full = false;
-    while (!full && !sr.rx_fifo_empty()) {
-      // Read the character if there's a place to put it.
-      rx(
-          lock,  //
-          [&]() { return ReadFifoRegister::Get().ReadFrom(io.io()).data(); },
-          [&]() {
-            // If the buffer is full, disable the receive interrupt instead
-            // and stop checking.
-            EnableRxInterrupt(io, false);
-            full = true;
-          });
+      // Clear any interrupt due to errors.
+      if (sr.frame_error() || sr.parity_error()) {
+        cr.set_clear_error(true).WriteTo(io.io()).set_clear_error(false).WriteTo(io.io());
+      }
 
-      // Fetch fresh status for next iteration to check.
-      sr.ReadFrom(io.io());
-
-      // Re-check for transmit since we have fresh status handy.
-      check_tx();
+      if (cr.tx_interrupt() && !sr.tx_fifo_full()) {
+        tx(lock, waiter, [&]() { EnableTxInterrupt(io, false); });
+      }
     }
   }
 };
