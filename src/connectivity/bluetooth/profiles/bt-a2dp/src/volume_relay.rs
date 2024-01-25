@@ -19,29 +19,37 @@ use {
     tracing::{info, trace, warn},
 };
 
+/// Represents set volume request.
+/// All volume values are AVRCP volume values with range [0, 127].
 struct SetVolumeRequest {
-    prev_volume: u8,
+    previous: u8,  // System volume value before the request was made.
+    requested: u8, // Requested new volume value.
     responder: Option<fidl_fuchsia_bluetooth_avrcp::AbsoluteVolumeHandlerSetVolumeResponder>,
 }
 
 impl SetVolumeRequest {
     fn new(
-        current: u8,
-        responder: fidl_fuchsia_bluetooth_avrcp::AbsoluteVolumeHandlerSetVolumeResponder,
+        current_volume: u8,
+        requested_volume: u8,
+        responder: Option<fidl_fuchsia_bluetooth_avrcp::AbsoluteVolumeHandlerSetVolumeResponder>,
     ) -> Self {
-        Self { prev_volume: current, responder: Some(responder) }
+        Self { previous: current_volume, requested: requested_volume, responder }
     }
 
     fn is_volume_changed(&self, new_volume: u8) -> bool {
-        self.prev_volume != new_volume
+        self.previous != new_volume
+    }
+
+    fn is_increment_request(current_vol: u8, requested_vol: u8) -> bool {
+        requested_vol > current_vol
     }
 
     /// Regardless of if the new volume is the same or different from the
     /// previous volume, send a response back using the SetVolumeResponder.
-    /// Consumes self.
-    fn send(mut self, new_volume: u8) -> bool {
-        let _ = self.responder.take().unwrap().send(new_volume);
-        self.is_volume_changed(new_volume)
+    fn send(&mut self, new_volume: u8) {
+        if let None = self.responder.take().and_then(|responder| responder.send(new_volume).ok()) {
+            warn!("Could not send SetVolume response");
+        }
     }
 
     /// Sends a response back using the SetVolumeResponder if the
@@ -52,7 +60,9 @@ impl SetVolumeRequest {
         if !self.is_volume_changed(new_volume) {
             return false;
         }
-        let _ = self.responder.take().unwrap().send(new_volume);
+        if let None = self.responder.take().and_then(|responder| responder.send(new_volume).ok()) {
+            warn!("Could not send SetVolume response");
+        }
         true
     }
 }
@@ -160,6 +170,12 @@ impl VolumeRelay {
         // lifetime of volume changed subscriptions.
         let mut hanging_onchanged = Vec::new();
         let mut hanging_setvolumes = Vec::new();
+        // Keeps track of most recent failed set volume request.
+        // Tuple of previous volume value and requested volume value.
+        let mut failed_setvolume: Option<SetVolumeRequest> = None;
+        // For now, we use minimum AVRCP volume step size to adjust volume when
+        // set volume request fails.
+        const AVRCP_VOLUME_STEP_SIZE: u8 = 1;
 
         let setvolume_timeout = Fuse::terminated();
         pin_mut!(setvolume_timeout);
@@ -179,7 +195,27 @@ impl VolumeRelay {
                         Some(Ok(req)) => req,
                     };
                     match request {
-                        avrcp::AbsoluteVolumeHandlerRequest::SetVolume { requested_volume, responder } => {
+                        avrcp::AbsoluteVolumeHandlerRequest::SetVolume { mut requested_volume, responder } => {
+                            if requested_volume == current_volume {
+                                warn!("Requested AVRCP volume same as current volume: {requested_volume}");
+                                let _ = responder.send(current_volume);
+                                continue;
+                            }
+
+                            // TODO(dayeonglee): if the previously failed set volume request was requested
+                            // with the same value, increment/decrement it by the step size.
+                            if let Some(failed_req) = failed_setvolume.take() {
+                                let is_increment = SetVolumeRequest::is_increment_request(current_volume, requested_volume);
+                                if (is_increment && requested_volume <= failed_req.requested) || (!is_increment && requested_volume >= failed_req.requested) {
+                                    let before = requested_volume;
+                                    match is_increment {
+                                        true => requested_volume = failed_req.requested + AVRCP_VOLUME_STEP_SIZE,
+                                        false => requested_volume = failed_req.requested - AVRCP_VOLUME_STEP_SIZE,
+                                    };
+                                    info!("Requested volume adjusted from {before} to {requested_volume}");
+                                }
+                            }
+
                             let settings = AvrcpVolume(requested_volume).as_audio_settings(media::AudioRenderUsage::Media);
                             trace!("AVRCP Setting system volume to {} -> {:?}", requested_volume, settings);
                             if let Err(e) = audio.set(&settings).await {
@@ -187,7 +223,7 @@ impl VolumeRelay {
                                 let _ = responder.send(current_volume);
                                 continue;
                             }
-                            hanging_setvolumes.push(SetVolumeRequest::new(current_volume, responder));
+                            hanging_setvolumes.push(SetVolumeRequest::new(current_volume, requested_volume, Some(responder)));
                             if setvolume_timeout.is_terminated() {
                                 setvolume_timeout.set(Timer::new(SETVOLUME_TIMEOUT.after_now()).fuse());
                             }
@@ -202,10 +238,13 @@ impl VolumeRelay {
                     }
                 },
                 _ = setvolume_timeout => {
-                    hanging_setvolumes.drain(..).for_each(|req| {
-                        let changed = req.send(current_volume);
+                    hanging_setvolumes.drain(..).for_each(|mut req| {
+                        req.send(current_volume);
                         // TODO(b/250265882): convert the log back to trace once issue is resolved.
-                        info!("Timed out - reporting result of SetVolume as {current_volume}. Volume changed: {changed}");
+                        info!("SetVolume request timed out. Requested: {0}. Volume change: {1} -> {current_volume}", req.requested, req.previous);
+                        if failed_setvolume.is_none() {
+                            failed_setvolume = Some(SetVolumeRequest::new(req.previous, req.requested, None));
+                        }
                     });
                 },
                 watch_response = sys_volume_watch_fut => {
@@ -291,9 +330,6 @@ mod tests {
 
     const INITIAL_MEDIA_VOLUME: f32 = 0.8;
     const INITIAL_AVRCP_VOLUME: u8 = 101;
-
-    const NEW_MEDIA_VOLUME: f32 = 0.9;
-    const NEW_AVRCP_VOLUME: u8 = 114;
 
     fn setup_avrcp_proxy() -> (avrcp::PeerManagerProxy, avrcp::PeerManagerRequestStream) {
         endpoints::create_proxy_and_stream::<avrcp::PeerManagerMarker>().unwrap()
@@ -430,8 +466,114 @@ mod tests {
         let (volume_client, watch_responder) =
             finish_relay_setup(&mut relay_fut, &mut exec, avrcp_requests, &mut settings_requests);
 
-        // Case 1. Volume set request is sent. The volume set here does not need to match below.
-        let volume_set_fut = volume_client.set_volume(0);
+        // Set volume request with the same volume value as the initial volume.
+        let volume_set_fut = volume_client.set_volume(INITIAL_AVRCP_VOLUME);
+        pin_mut!(volume_set_fut);
+
+        exec.run_until_stalled(&mut relay_fut).expect_pending("should be pending");
+
+        let request_fut = settings_requests.select_next_some();
+        pin_mut!(request_fut);
+
+        // Response is returned immediately with the initial value.
+        exec.run_until_stalled(&mut request_fut)
+            .expect_pending("audio settings change request should not have been sent");
+        assert_matches!(
+            exec.run_until_stalled(&mut volume_set_fut).expect("should be ready"),
+            Ok(INITIAL_AVRCP_VOLUME)
+        );
+
+        // Volume decrease request to 90.
+        let volume_set_fut = volume_client.set_volume(90);
+        pin_mut!(volume_set_fut);
+
+        exec.run_until_stalled(&mut relay_fut).expect_pending("should be pending");
+
+        exec.run_until_stalled(&mut volume_set_fut).expect_pending("should be pending");
+
+        match exec.run_until_stalled(&mut request_fut).expect("should be ready") {
+            Ok(settings::AudioRequest::Set { settings, responder }) => {
+                assert!(
+                    settings.streams.as_ref().unwrap()[0]
+                        .user_volume
+                        .as_ref()
+                        .unwrap()
+                        .level
+                        .unwrap()
+                        < INITIAL_MEDIA_VOLUME
+                );
+                let _ = responder.send(Ok(())).unwrap();
+            }
+            x => panic!("Expected Ready audio set request and got: {:?}", x),
+        };
+
+        exec.run_until_stalled(&mut relay_fut).expect_pending("should be pending");
+
+        // When a new volume happens as a result, it's returned.
+        respond_to_audio_watch(watch_responder, 0.7);
+
+        exec.run_until_stalled(&mut relay_fut).expect_pending("should be pending");
+
+        assert_matches!(
+            exec.run_until_stalled(&mut volume_set_fut).expect("should be ready"),
+            Ok(88 /* 0.7 audio settings volume to AVRCP volume */)
+        );
+    }
+
+    #[fuchsia::test]
+    fn set_volume_command_retry() {
+        let mut exec = fasync::TestExecutor::new_with_fake_time();
+        let (mut settings_requests, avrcp_requests, _stop_sender, relay_fut) = setup_volume_relay();
+
+        pin_mut!(relay_fut);
+
+        exec.run_until_stalled(&mut relay_fut).expect_pending("should be pending");
+
+        let (volume_client, watch_responder) =
+            finish_relay_setup(&mut relay_fut, &mut exec, avrcp_requests, &mut settings_requests);
+
+        // Volume increase request to 103.
+        let volume_set_fut = volume_client.set_volume(103);
+        pin_mut!(volume_set_fut);
+
+        exec.run_until_stalled(&mut relay_fut).expect_pending("should be pending");
+
+        let request_fut = settings_requests.select_next_some();
+        pin_mut!(request_fut);
+
+        exec.run_until_stalled(&mut volume_set_fut).expect_pending("should be pending");
+
+        let mut requested_audio_settings_vol: f32;
+        match exec.run_until_stalled(&mut request_fut).expect("should be ready") {
+            Ok(settings::AudioRequest::Set { settings, responder }) => {
+                requested_audio_settings_vol = settings.streams.as_ref().unwrap()[0]
+                    .user_volume
+                    .as_ref()
+                    .unwrap()
+                    .level
+                    .unwrap();
+                assert_eq!(1, settings.streams.expect("a stream was set").len());
+                let _ = responder.send(Ok(())).unwrap();
+            }
+            x => panic!("Expected Ready audio set request and got: {:?}", x),
+        };
+
+        exec.run_until_stalled(&mut relay_fut).expect_pending("should be pending");
+
+        // Mimic no volume change by waiting out the maximum time we will wait for a new volume.
+        exec.set_fake_time(105.millis().after_now());
+        let _ = exec.wake_expired_timers();
+
+        exec.run_until_stalled(&mut relay_fut).expect_pending("should be pending");
+
+        // Because no change was sent from Media, the initial value from media is sent.
+        assert_matches!(
+            exec.run_until_stalled(&mut volume_set_fut).expect("should be ready"),
+            Ok(INITIAL_AVRCP_VOLUME)
+        );
+
+        // Second set volume request to 103.
+        let volume_set_fut = volume_client.set_volume(103);
         pin_mut!(volume_set_fut);
 
         exec.run_until_stalled(&mut relay_fut).expect_pending("should be pending");
@@ -443,7 +585,55 @@ mod tests {
 
         match exec.run_until_stalled(&mut request_fut).expect("should be ready") {
             Ok(settings::AudioRequest::Set { settings, responder }) => {
-                assert_eq!(1, settings.streams.expect("a stream was set").len());
+                // We should have adjusted the volume value to be larger for the second request.
+                let new_requested = settings.streams.as_ref().unwrap()[0]
+                    .user_volume
+                    .as_ref()
+                    .unwrap()
+                    .level
+                    .unwrap();
+                assert!(new_requested > requested_audio_settings_vol);
+                let _ = responder.send(Ok(())).unwrap();
+                requested_audio_settings_vol = new_requested;
+            }
+            x => panic!("Expected Ready audio set request and got: {:?}", x),
+        };
+
+        exec.run_until_stalled(&mut relay_fut).expect_pending("should be pending");
+
+        // Mimic no volume change by waiting out the maximum time we will wait for a new volume.
+        exec.set_fake_time(105.millis().after_now());
+        let _ = exec.wake_expired_timers();
+
+        exec.run_until_stalled(&mut relay_fut).expect_pending("should be pending");
+
+        // Because no change was sent from Media, the initial value from media is sent.
+        assert_matches!(
+            exec.run_until_stalled(&mut volume_set_fut).expect("should be ready"),
+            Ok(INITIAL_AVRCP_VOLUME)
+        );
+
+        // Third set volume request to 103.
+        let volume_set_fut = volume_client.set_volume(103);
+        pin_mut!(volume_set_fut);
+
+        exec.run_until_stalled(&mut relay_fut).expect_pending("should be pending");
+
+        exec.run_until_stalled(&mut volume_set_fut).expect_pending("should be pending");
+
+        let request_fut = settings_requests.select_next_some();
+        pin_mut!(request_fut);
+
+        match exec.run_until_stalled(&mut request_fut).expect("should be ready") {
+            Ok(settings::AudioRequest::Set { settings, responder }) => {
+                // We should have adjusted the volume value again.
+                let new_requested = settings.streams.as_ref().unwrap()[0]
+                    .user_volume
+                    .as_ref()
+                    .unwrap()
+                    .level
+                    .unwrap();
+                assert!(new_requested > requested_audio_settings_vol);
                 let _ = responder.send(Ok(())).unwrap();
             }
             x => panic!("Expected Ready audio set request and got: {:?}", x),
@@ -452,88 +642,13 @@ mod tests {
         exec.run_until_stalled(&mut relay_fut).expect_pending("should be pending");
 
         // When a new volume happens as a result, it's returned.
-        respond_to_audio_watch(watch_responder, NEW_MEDIA_VOLUME);
+        respond_to_audio_watch(watch_responder, 0.82);
 
         exec.run_until_stalled(&mut relay_fut).expect_pending("should be pending");
 
         assert_matches!(
             exec.run_until_stalled(&mut volume_set_fut).expect("should be ready"),
-            Ok(NEW_AVRCP_VOLUME)
-        );
-
-        let watch_responder = expect_audio_watch(&mut exec, &mut settings_requests);
-
-        // Case 2. We get another command, but this time, it didn't produce a new volume result (because it
-        // didn't change the volume)
-        let volume_set_fut = volume_client.set_volume(0);
-        pin_mut!(volume_set_fut);
-
-        exec.run_until_stalled(&mut relay_fut).expect_pending("should be pending");
-
-        exec.run_until_stalled(&mut volume_set_fut).expect_pending("should be pending");
-
-        let request_fut = settings_requests.select_next_some();
-        pin_mut!(request_fut);
-
-        match exec.run_until_stalled(&mut request_fut).expect("should be ready") {
-            Ok(settings::AudioRequest::Set { responder, .. }) => {
-                let _ = responder.send(Ok(())).unwrap();
-            }
-            x => panic!("Expected Ready audio set request and got: {:?}", x),
-        };
-
-        exec.run_until_stalled(&mut relay_fut).expect_pending("should be pending");
-
-        // The maximum time we will wait for a new volume is 100 milliseconds.
-        exec.set_fake_time(105.millis().after_now());
-        let _ = exec.wake_expired_timers();
-
-        exec.run_until_stalled(&mut relay_fut).expect_pending("should be pending");
-
-        // Because no change was sent from Media, the last value from media is sent.
-        assert_matches!(
-            exec.run_until_stalled(&mut volume_set_fut).expect("should be ready"),
-            Ok(NEW_AVRCP_VOLUME)
-        );
-
-        // Case 3. We get another command. This time, it produced a new volume result, but it's the same value
-        // as before. We won't get a response until timeout.
-        let volume_set_fut = volume_client.set_volume(110);
-        pin_mut!(volume_set_fut);
-
-        exec.run_until_stalled(&mut relay_fut).expect_pending("should be pending");
-
-        exec.run_until_stalled(&mut volume_set_fut).expect_pending("should be pending");
-
-        let request_fut = settings_requests.select_next_some();
-        pin_mut!(request_fut);
-
-        match exec.run_until_stalled(&mut request_fut).expect("should be ready") {
-            Ok(settings::AudioRequest::Set { responder, .. }) => {
-                let _ = responder.send(Ok(())).unwrap();
-            }
-            x => panic!("Expected Ready audio set request and got: {:?}", x),
-        };
-
-        exec.run_until_stalled(&mut relay_fut).expect_pending("should be pending");
-
-        // Volume is same as before (L432 was also the same value).
-        respond_to_audio_watch(watch_responder, NEW_MEDIA_VOLUME);
-
-        // Set volume request should still be pending.
-        exec.run_until_stalled(&mut relay_fut).expect_pending("should be pending");
-        exec.run_until_stalled(&mut volume_set_fut).expect_pending("should be pending");
-
-        // Wait for maximum time.
-        exec.set_fake_time(101.millis().after_now());
-        let _ = exec.wake_expired_timers();
-
-        exec.run_until_stalled(&mut relay_fut).expect_pending("should be pending");
-
-        // Because no change was sent from Media, the last value from media is sent.
-        assert_matches!(
-            exec.run_until_stalled(&mut volume_set_fut).expect("should be ready"),
-            Ok(NEW_AVRCP_VOLUME)
+            Ok(104 /* 0.82 audio settings volume as AVRCP volume */)
         );
     }
 
@@ -584,13 +699,15 @@ mod tests {
         exec.run_until_stalled(&mut relay_fut).expect_pending("should be pending");
 
         // When a new volume happens as a result, it's returned.
-        respond_to_audio_watch(watch_responder, NEW_MEDIA_VOLUME);
+        const CHANGED_MEDIA_VOLUME: f32 = 0.9;
+        const CHANGED_AVRCP_VOLUME: u8 = 114; // 0.9 audio settings volume as AVRCP volume.
+        respond_to_audio_watch(watch_responder, CHANGED_MEDIA_VOLUME);
 
         exec.run_until_stalled(&mut relay_fut).expect_pending("should be pending");
 
         assert_matches!(
             exec.run_until_stalled(&mut volume_hanging_fut).expect("should be ready"),
-            Ok(NEW_AVRCP_VOLUME)
+            Ok(CHANGED_AVRCP_VOLUME)
         );
 
         let _watch_responder = expect_audio_watch(&mut exec, &mut settings_requests);
@@ -641,18 +758,20 @@ mod tests {
         exec.run_until_stalled(&mut relay_fut).expect_pending("should be pending");
 
         // Respond with a new volume.
-        respond_to_audio_watch(watch_responder, NEW_MEDIA_VOLUME);
+        const CHANGED_MEDIA_VOLUME: f32 = 0.9;
+        const CHANGED_AVRCP_VOLUME: u8 = 114; // 0.9 audio settings volume as AVRCP volume.
+        respond_to_audio_watch(watch_responder, CHANGED_MEDIA_VOLUME);
 
         exec.run_until_stalled(&mut relay_fut).expect_pending("should be pending");
 
         // Both volume update futures should receive the updated avrcp volume.
         assert_matches!(
             exec.run_until_stalled(&mut volume_hanging_fut2).expect("should be ready"),
-            Ok(NEW_AVRCP_VOLUME)
+            Ok(CHANGED_AVRCP_VOLUME)
         );
         assert_matches!(
             exec.run_until_stalled(&mut volume_hanging_fut3).expect("should be ready"),
-            Ok(NEW_AVRCP_VOLUME)
+            Ok(CHANGED_AVRCP_VOLUME)
         );
 
         let _watch_responder = expect_audio_watch(&mut exec, &mut settings_requests);
