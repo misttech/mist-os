@@ -18,14 +18,15 @@ async fn test_export(
 ) -> Result<(), Error> {
     let client = Client::new(test_name, "#meta/keyvaluestore_supportexports_client.cm");
     let server = Server::new(test_name, "#meta/keyvaluestore_supportexports_server.cm");
+    let write_items: Vec<_> = write_items.into_iter().map(|s| s.to_string()).collect();
 
     run_test(
         StoreMarker::PROTOCOL_NAME,
         TestKind::ClientAndServer { client: &client, server: &server },
         |builder: RealmBuilder, client: ChildRef| async move {
             builder.init_mutable_config_to_empty(&client).await?;
-            builder.set_config_value_string_vector(&client, "write_items", write_items).await?;
-            builder.set_config_value_uint64(&client, "max_export_size", max_export_size).await?;
+            builder.set_config_value(&client, "write_items", write_items.into()).await?;
+            builder.set_config_value(&client, "max_export_size", max_export_size.into()).await?;
             Ok::<(RealmBuilder, ChildRef), Error>((builder, client))
         },
         |log_reader| {

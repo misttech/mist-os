@@ -22,7 +22,7 @@ async fn build_test_realm(vmm_url: &'static str) -> Result<RealmInstance, Error>
     // Override the component_url for the vmm so that we can test both the C++ and Rust vmm
     // binaries.
     builder.init_mutable_config_from_package(&vmm_launcher).await.unwrap();
-    builder.set_config_value_string(&vmm_launcher, "vmm_component_url", vmm_url).await.unwrap();
+    builder.set_config_value(&vmm_launcher, "vmm_component_url", vmm_url.into()).await.unwrap();
 
     builder
         .add_route(

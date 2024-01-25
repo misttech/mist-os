@@ -575,14 +575,18 @@ where
         if self.ignore_system_image || blob_implementation_overridden {
             builder.init_mutable_config_from_package(&pkg_cache).await.unwrap();
             if self.ignore_system_image {
-                builder.set_config_value_bool(&pkg_cache, "use_system_image", false).await.unwrap();
+                builder
+                    .set_config_value(&pkg_cache, "use_system_image", false.into())
+                    .await
+                    .unwrap();
             }
             if blob_implementation_overridden {
                 builder
-                    .set_config_value_bool(
+                    .set_config_value(
                         &pkg_cache,
                         "use_fxblob",
-                        matches!(blob_implementation, blobfs_ramdisk::Implementation::Fxblob),
+                        matches!(blob_implementation, blobfs_ramdisk::Implementation::Fxblob)
+                            .into(),
                     )
                     .await
                     .unwrap();

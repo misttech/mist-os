@@ -24,9 +24,9 @@ async fn test_one_component_log_by_log() -> Result<(), Error> {
         TestKind::StandaloneComponent { client: &client },
         |builder: RealmBuilder, client: ChildRef| async move {
             builder.init_mutable_config_to_empty(&client).await?;
-            builder.set_config_value_bool(&client, "do_in_process", true).await?;
-            builder.set_config_value_uint8(&client, "augend", 1).await?;
-            builder.set_config_value_uint8(&client, "addend", 3).await?;
+            builder.set_config_value(&client, "do_in_process", true.into()).await?;
+            builder.set_config_value(&client, "augend", 1u8.into()).await?;
+            builder.set_config_value(&client, "addend", 3u8.into()).await?;
             Ok::<(RealmBuilder, ChildRef), Error>((builder, client))
         },
         |log_reader| {
@@ -63,9 +63,9 @@ async fn test_one_component() -> Result<(), Error> {
         TestKind::StandaloneComponent { client: &client },
         |builder: RealmBuilder, client: ChildRef| async move {
             builder.init_mutable_config_to_empty(&client).await?;
-            builder.set_config_value_bool(&client, "do_in_process", true).await?;
-            builder.set_config_value_uint8(&client, "augend", 10).await?;
-            builder.set_config_value_uint8(&client, "addend", 30).await?;
+            builder.set_config_value(&client, "do_in_process", true.into()).await?;
+            builder.set_config_value(&client, "augend", 10u8.into()).await?;
+            builder.set_config_value(&client, "addend", 30u8.into()).await?;
             Ok::<(RealmBuilder, ChildRef), Error>((builder, client))
         },
         |log_reader| {
@@ -81,8 +81,8 @@ async fn test_one_component() -> Result<(), Error> {
 // Tests the standard FIDL IPC scenario, with a client talking to a server.
 #[fasync::run_singlethreaded(test)]
 async fn test_two_component_log_by_log() -> Result<(), Error> {
-    let augend = 1;
-    let addend = 2;
+    let augend = 1u8;
+    let addend = 2u8;
     let want_response = 3;
     let test_name = "test_two_component";
     let client = Client::new(test_name, "#meta/example_tester_example_client.cm");
@@ -93,9 +93,9 @@ async fn test_two_component_log_by_log() -> Result<(), Error> {
         TestKind::ClientAndServer { client: &client, server: &server },
         |builder: RealmBuilder, client: ChildRef| async move {
             builder.init_mutable_config_to_empty(&client).await?;
-            builder.set_config_value_bool(&client, "do_in_process", false).await?;
-            builder.set_config_value_uint8(&client, "augend", augend).await?;
-            builder.set_config_value_uint8(&client, "addend", addend).await?;
+            builder.set_config_value(&client, "do_in_process", false.into()).await?;
+            builder.set_config_value(&client, "augend", augend.into()).await?;
+            builder.set_config_value(&client, "addend", addend.into()).await?;
             Ok::<(RealmBuilder, ChildRef), Error>((builder, client))
         },
         |log_reader| {
@@ -146,9 +146,9 @@ async fn test_two_component() -> Result<(), Error> {
         TestKind::ClientAndServer { client: &client, server: &server },
         |builder: RealmBuilder, client: ChildRef| async move {
             builder.init_mutable_config_to_empty(&client).await?;
-            builder.set_config_value_bool(&client, "do_in_process", false).await?;
-            builder.set_config_value_uint8(&client, "augend", 10).await?;
-            builder.set_config_value_uint8(&client, "addend", 20).await?;
+            builder.set_config_value(&client, "do_in_process", false.into()).await?;
+            builder.set_config_value(&client, "augend", 10u8.into()).await?;
+            builder.set_config_value(&client, "addend", 20u8.into()).await?;
             Ok::<(RealmBuilder, ChildRef), Error>((builder, client))
         },
         |log_reader| {
@@ -166,8 +166,8 @@ async fn test_two_component() -> Result<(), Error> {
 // Tests a client-server IPC interaction mediated by a proxy in the middle.
 #[fasync::run_singlethreaded(test)]
 async fn test_three_component_log_by_log() -> Result<(), Error> {
-    let augend = 4;
-    let addend = 5;
+    let augend = 4u8;
+    let addend = 5u8;
     let want_response = 9;
     let test_name = "test_three_component";
     let client = Client::new(test_name, "#meta/example_tester_example_client.cm");
@@ -179,9 +179,9 @@ async fn test_three_component_log_by_log() -> Result<(), Error> {
         TestKind::ClientProxyAndServer { client: &client, proxy: &proxy, server: &server },
         |builder: RealmBuilder, client: ChildRef| async move {
             builder.init_mutable_config_to_empty(&client).await?;
-            builder.set_config_value_bool(&client, "do_in_process", false).await?;
-            builder.set_config_value_uint8(&client, "augend", augend).await?;
-            builder.set_config_value_uint8(&client, "addend", addend).await?;
+            builder.set_config_value(&client, "do_in_process", false.into()).await?;
+            builder.set_config_value(&client, "augend", augend.into()).await?;
+            builder.set_config_value(&client, "addend", addend.into()).await?;
             Ok::<(RealmBuilder, ChildRef), Error>((builder, client))
         },
         |log_reader| {
@@ -234,9 +234,9 @@ async fn test_three_component() -> Result<(), Error> {
         TestKind::ClientProxyAndServer { client: &client, proxy: &proxy, server: &server },
         |builder: RealmBuilder, client: ChildRef| async move {
             builder.init_mutable_config_to_empty(&client).await?;
-            builder.set_config_value_bool(&client, "do_in_process", false).await?;
-            builder.set_config_value_uint8(&client, "augend", 40).await?;
-            builder.set_config_value_uint8(&client, "addend", 50).await?;
+            builder.set_config_value(&client, "do_in_process", false.into()).await?;
+            builder.set_config_value(&client, "augend", 40u8.into()).await?;
+            builder.set_config_value(&client, "addend", 50u8.into()).await?;
             Ok::<(RealmBuilder, ChildRef), Error>((builder, client))
         },
         |log_reader| {

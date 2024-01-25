@@ -102,7 +102,7 @@ async fn assemble_puppet_realm(
     match display_rotation {
         Some(display_rotation) => {
             builder
-                .set_config_value_uint32(&ui_stack, "display_rotation", display_rotation)
+                .set_config_value(&ui_stack, "display_rotation", display_rotation.into())
                 .await
                 .expect("Failed to set display_rotation.");
         }
@@ -112,10 +112,10 @@ async fn assemble_puppet_realm(
     match device_pixel_ratio {
         Some(device_pixel_ratio) => {
             builder
-                .set_config_value_string(
+                .set_config_value(
                     &ui_stack,
                     "device_pixel_ratio",
-                    device_pixel_ratio.to_string(),
+                    device_pixel_ratio.to_string().into(),
                 )
                 .await
                 .expect("Failed to set device_pixel_ratio.");

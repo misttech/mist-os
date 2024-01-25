@@ -35,10 +35,10 @@ async fn test_draw_success() -> Result<(), Error> {
         |builder: RealmBuilder, client: ChildRef| async move {
             builder.init_mutable_config_to_empty(&client).await?;
             builder
-                .set_config_value_string_vector(
+                .set_config_value(
                     &client,
                     "script",
-                    [
+                    vec![
                         "-5,0:0,0",
                         "-2,2:5,6",
                         "PUSH",
@@ -48,7 +48,8 @@ async fn test_draw_success() -> Result<(), Error> {
                         "7,-8:-4,3",
                         "PUSH",
                         "WAIT",
-                    ],
+                    ]
+                    .into(),
                 )
                 .await?;
             Ok::<(RealmBuilder, ChildRef), Error>((builder, client))

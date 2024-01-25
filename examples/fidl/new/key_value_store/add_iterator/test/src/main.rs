@@ -21,13 +21,13 @@ async fn test_iteration(test_name: &str, iterate_from: &str) -> Result<(), Error
         |builder: RealmBuilder, client: ChildRef| async move {
             builder.init_mutable_config_to_empty(&client).await?;
             builder
-                .set_config_value_string_vector(
+                .set_config_value(
                     &client,
                     "write_items",
-                    vec!["verse_1", "verse_2", "verse_3", "verse_4"],
+                    vec!["verse_1", "verse_2", "verse_3", "verse_4"].into(),
                 )
                 .await?;
-            builder.set_config_value_string(&client, "iterate_from", iterate_from).await?;
+            builder.set_config_value(&client, "iterate_from", iterate_from.into()).await?;
             Ok::<(RealmBuilder, ChildRef), Error>((builder, client))
         },
         |log_reader| {

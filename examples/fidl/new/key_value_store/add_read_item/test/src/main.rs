@@ -23,9 +23,7 @@ async fn test_read_item_success() -> Result<(), Error> {
         TestKind::ClientAndServer { client: &client, server: &server },
         |builder: RealmBuilder, client: ChildRef| async move {
             builder.init_mutable_config_from_package(&client).await?;
-            builder
-                .set_config_value_string_vector(&client, "read_items", [key.to_string()])
-                .await?;
+            builder.set_config_value(&client, "read_items", vec![key].into()).await?;
             Ok::<(RealmBuilder, ChildRef), Error>((builder, client))
         },
         |log_reader| {
@@ -52,9 +50,7 @@ async fn test_read_item_error() -> Result<(), Error> {
         TestKind::ClientAndServer { client: &client, server: &server },
         |builder: RealmBuilder, client: ChildRef| async move {
             builder.init_mutable_config_from_package(&client).await?;
-            builder
-                .set_config_value_string_vector(&client, "read_items", [key.to_string()])
-                .await?;
+            builder.set_config_value(&client, "read_items", vec![key].into()).await?;
             Ok::<(RealmBuilder, ChildRef), Error>((builder, client))
         },
         |log_reader| {

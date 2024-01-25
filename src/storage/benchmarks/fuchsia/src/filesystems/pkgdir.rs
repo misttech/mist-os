@@ -151,7 +151,7 @@ impl PkgDirRealm {
             )
             .await
             .unwrap();
-        builder.set_config_value_bool(&pkgdir, "use_fxblob", fxblob).await.unwrap();
+        builder.set_config_value(&pkgdir, "use_fxblob", fxblob.into()).await.unwrap();
         builder
             .add_route(
                 Route::new()

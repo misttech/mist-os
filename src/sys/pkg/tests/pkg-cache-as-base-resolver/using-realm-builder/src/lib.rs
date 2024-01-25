@@ -113,7 +113,7 @@ impl TestEnvBuilder {
         builder.init_mutable_config_from_package(&pkg_cache).await.unwrap();
         match BLOB_IMPLEMENTATION {
             blobfs_ramdisk::Implementation::Fxblob => {
-                builder.set_config_value_bool(&pkg_cache, "use_fxblob", true).await.unwrap();
+                builder.set_config_value(&pkg_cache, "use_fxblob", true.into()).await.unwrap();
 
                 let svc_dir = vfs::remote::remote_dir(blobfs.svc_dir().unwrap().unwrap());
                 let service_reflector = builder
@@ -168,7 +168,7 @@ impl TestEnvBuilder {
                     .unwrap();
             }
             blobfs_ramdisk::Implementation::CppBlobfs => {
-                builder.set_config_value_bool(&pkg_cache, "use_fxblob", false).await.unwrap();
+                builder.set_config_value(&pkg_cache, "use_fxblob", false.into()).await.unwrap();
             }
         }
 

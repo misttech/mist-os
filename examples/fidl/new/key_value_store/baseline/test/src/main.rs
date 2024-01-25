@@ -22,7 +22,7 @@ async fn test_write_item_success() -> Result<(), Error> {
         TestKind::ClientAndServer { client: &client, server: &server },
         |builder: RealmBuilder, client: ChildRef| async move {
             builder.init_mutable_config_to_empty(&client).await?;
-            builder.set_config_value_string_vector(&client, "write_items", ["verse_1"]).await?;
+            builder.set_config_value(&client, "write_items", vec!["verse_1"].into()).await?;
             Ok::<(RealmBuilder, ChildRef), Error>((builder, client))
         },
         |log_reader| {
@@ -46,7 +46,7 @@ async fn test_write_item_invalid(test_name: &str, input: &str) -> Result<(), Err
         TestKind::ClientAndServer { client: &client, server: &server },
         |builder: RealmBuilder, client: ChildRef| async move {
             builder.init_mutable_config_to_empty(&client).await?;
-            builder.set_config_value_string_vector(&client, "write_items", [input]).await?;
+            builder.set_config_value(&client, "write_items", vec![input].into()).await?;
             Ok::<(RealmBuilder, ChildRef), Error>((builder, client))
         },
         |log_reader| {
@@ -89,7 +89,7 @@ async fn test_write_item_error_already_found() -> Result<(), Error> {
         |builder: RealmBuilder, client: ChildRef| async move {
             builder.init_mutable_config_to_empty(&client).await?;
             builder
-                .set_config_value_string_vector(&client, "write_items", ["verse_1", "verse_1"])
+                .set_config_value(&client, "write_items", vec!["verse_1", "verse_1"].into())
                 .await?;
             Ok::<(RealmBuilder, ChildRef), Error>((builder, client))
         },

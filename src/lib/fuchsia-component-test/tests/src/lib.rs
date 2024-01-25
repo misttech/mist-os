@@ -812,13 +812,13 @@ async fn config_set_values_only() -> Result<(), Error> {
     // fail to replace a config field in a component that doesn't have a config schema
     builder.init_mutable_config_to_empty(&echo_server).await.unwrap();
     assert_matches!(
-        builder.set_config_value_bool(&echo_server, "echo_bool", false).await,
+        builder.set_config_value(&echo_server, "echo_bool", false.into()).await,
         Err(RealmBuilderError::ServerError(ftest::RealmBuilderError::NoConfigSchema))
     );
 
     // fail to replace a config field for a component that hasn't opted in
     assert_matches!(
-        builder.set_config_value_string(&echo_client, "doesnt_exist", "test").await,
+        builder.set_config_value(&echo_client, "doesnt_exist", "test".into()).await,
         Err(RealmBuilderError::ServerError(ftest::RealmBuilderError::ConfigOverrideUnsupported))
     );
 
@@ -827,27 +827,27 @@ async fn config_set_values_only() -> Result<(), Error> {
 
     // fail to replace a field that doesn't exist
     assert_matches!(
-        builder.set_config_value_string(&echo_client, "doesnt_exist", "test").await,
+        builder.set_config_value(&echo_client, "doesnt_exist", "test".into()).await,
         Err(RealmBuilderError::ServerError(ftest::RealmBuilderError::NoSuchConfigField))
     );
 
     // fail to replace a field with the wrong type
     assert_matches!(
-        builder.set_config_value_string(&echo_client, "echo_bool", "test").await,
+        builder.set_config_value(&echo_client, "echo_bool", "test".into()).await,
         Err(RealmBuilderError::ServerError(ftest::RealmBuilderError::ConfigValueInvalid))
     );
 
     // fail to replace a string that violates max_len
     let long_string = String::from_utf8(vec![b'F'; 20]).unwrap();
     assert_matches!(
-        builder.set_config_value_string(&echo_client, "echo_string", long_string.clone()).await,
+        builder.set_config_value(&echo_client, "echo_string", long_string.clone().into()).await,
         Err(RealmBuilderError::ServerError(ftest::RealmBuilderError::ConfigValueInvalid))
     );
 
     // fail to replace a vector whose string element violates max_len
     assert_matches!(
         builder
-            .set_config_value_string_vector(&echo_client, "echo_string_vector", vec![long_string])
+            .set_config_value(&echo_client, "echo_string_vector", vec![long_string].into())
             .await,
         Err(RealmBuilderError::ServerError(ftest::RealmBuilderError::ConfigValueInvalid))
     );
@@ -855,23 +855,22 @@ async fn config_set_values_only() -> Result<(), Error> {
     // fail to replace a vector that violates max_count
     assert_matches!(
         builder
-            .set_config_value_string_vector(
-                &echo_client,
-                "echo_string_vector",
-                vec!["a", "b", "c", "d"],
-            )
+            .set_config_value(&echo_client, "echo_string_vector", vec!["a", "b", "c", "d"].into(),)
             .await,
         Err(RealmBuilderError::ServerError(ftest::RealmBuilderError::ConfigValueInvalid))
     );
 
     // succeed at replacing all fields with proper constraints
-    builder.set_config_value_string(&echo_client, "echo_string", "Foobar!").await.unwrap();
     builder
-        .set_config_value_string_vector(&echo_client, "echo_string_vector", ["Hey", "Folks"])
+        .set_config_value(&echo_client, "echo_string", "Foobar!".to_string().into())
         .await
         .unwrap();
-    builder.set_config_value_bool(&echo_client, "echo_bool", true).await.unwrap();
-    builder.set_config_value_uint64(&echo_client, "echo_num", 42).await.unwrap();
+    builder
+        .set_config_value(&echo_client, "echo_string_vector", vec!["Hey", "Folks"].into())
+        .await
+        .unwrap();
+    builder.set_config_value(&echo_client, "echo_bool", true.into()).await.unwrap();
+    builder.set_config_value(&echo_client, "echo_num", (42 as u64).into()).await.unwrap();
     builder
         .add_route(
             Route::new()
@@ -930,9 +929,9 @@ async fn config_mix_packaged_and_set_values() {
     builder.init_mutable_config_from_package(&echo_client).await.unwrap();
 
     // succeed at replacing two of four fields with proper constraints
-    builder.set_config_value_string(&echo_client, "echo_string", "Foobar!").await.unwrap();
+    builder.set_config_value(&echo_client, "echo_string", "Foobar!".into()).await.unwrap();
     builder
-        .set_config_value_string_vector(&echo_client, "echo_string_vector", ["Hey", "Folks"])
+        .set_config_value(&echo_client, "echo_string_vector", vec!["Hey", "Folks"].into())
         .await
         .unwrap();
 
@@ -1006,7 +1005,7 @@ async fn config_override_for_root_with_config_in_collection_without_override() {
     builder.init_mutable_config_from_package(&collection_launcher).await.unwrap();
 
     // set a config override for the RB root
-    builder.set_config_value_string(&collection_launcher, "to_override", "Foobar!").await.unwrap();
+    builder.set_config_value(&collection_launcher, "to_override", "Foobar!".into()).await.unwrap();
 
     builder
         .add_route(

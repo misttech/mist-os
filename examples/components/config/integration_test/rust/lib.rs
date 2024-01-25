@@ -73,7 +73,7 @@ async fn inspect_rust_replace_some_values() {
     // [END config_load]
 
     // [START config_replace]
-    builder.set_config_value_string(&config_component, "greeting", "Fuchsia").await.unwrap();
+    builder.set_config_value(&config_component, "greeting", "Fuchsia".into()).await.unwrap();
     // [END config_replace]
 
     let _instance = builder.build().await.unwrap();
@@ -119,8 +119,8 @@ async fn inspect_rust_replace_all_packaged_values() {
 
     builder.init_mutable_config_from_package(&config_component).await.unwrap();
 
-    builder.set_config_value_string(&config_component, "greeting", "Fuchsia").await.unwrap();
-    builder.set_config_value_uint64(&config_component, "delay_ms", 200).await.unwrap();
+    builder.set_config_value(&config_component, "greeting", "Fuchsia".into()).await.unwrap();
+    builder.set_config_value(&config_component, "delay_ms", 200u64.into()).await.unwrap();
 
     let _instance = builder.build().await.unwrap();
 
@@ -168,8 +168,8 @@ async fn inspect_rust_set_all_values_when_empty() {
     builder.init_mutable_config_to_empty(&config_component).await.unwrap();
     // [END config_empty]
 
-    builder.set_config_value_string(&config_component, "greeting", "Fuchsia").await.unwrap();
-    builder.set_config_value_uint64(&config_component, "delay_ms", 200).await.unwrap();
+    builder.set_config_value(&config_component, "greeting", "Fuchsia".into()).await.unwrap();
+    builder.set_config_value(&config_component, "delay_ms", (200 as u64).into()).await.unwrap();
 
     let _instance = builder.build().await.unwrap();
 

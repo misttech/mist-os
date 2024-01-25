@@ -266,12 +266,12 @@ impl TestEnvBuilder {
         // Update Power Manager's structured config values
         realm_builder.init_mutable_config_from_package(&power_manager).await.unwrap();
         realm_builder
-            .set_config_value_string(
+            .set_config_value(
                 &power_manager,
                 "node_config_path",
                 self.power_manager_node_config_path
-                    .as_ref()
-                    .expect("power_manager_node_config_path not set"),
+                    .expect("power_manager_node_config_path not set")
+                    .into(),
             )
             .await
             .unwrap();

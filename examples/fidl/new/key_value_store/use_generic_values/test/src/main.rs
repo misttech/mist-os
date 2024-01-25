@@ -24,15 +24,15 @@ async fn test_write_items_twice(
         TestKind::ClientAndServer { client: &client, server: &server },
         |builder: RealmBuilder, client: ChildRef| async move {
             builder.init_mutable_config_to_empty(&client).await?;
-            builder.set_config_value_bool(&client, "set_overwrite_option", set_overwrite).await?;
-            builder.set_config_value_bool(&client, "set_concat_option", set_concat).await?;
-            builder.set_config_value_string_vector(&client, "write_bytes", ["foo", "bar"]).await?;
+            builder.set_config_value(&client, "set_overwrite_option", set_overwrite.into()).await?;
+            builder.set_config_value(&client, "set_concat_option", set_concat.into()).await?;
+            builder.set_config_value(&client, "write_bytes", vec!["foo", "bar"].into()).await?;
+            builder.set_config_value(&client, "write_strings", vec!["baz", "qux"].into()).await?;
+            builder.set_config_value(&client, "write_uint64s", vec![1u64, 101u64].into()).await?;
             builder
-                .set_config_value_string_vector(&client, "write_strings", ["baz", "qux"])
+                .set_config_value(&client, "write_int64s", vec![-2 as i64, -102 as i64].into())
                 .await?;
-            builder.set_config_value_uint64_vector(&client, "write_uint64s", [1, 101]).await?;
-            builder.set_config_value_int64_vector(&client, "write_int64s", [-2, -102]).await?;
-            builder.set_config_value_uint64_vector(&client, "write_uint128s", [3, 103]).await?;
+            builder.set_config_value(&client, "write_uint128s", vec![3u64, 103u64].into()).await?;
             Ok::<(RealmBuilder, ChildRef), Error>((builder, client))
         },
         |log_reader| {
@@ -73,13 +73,13 @@ async fn test_write_items_default_success() -> Result<(), Error> {
         TestKind::ClientAndServer { client: &client, server: &server },
         |builder: RealmBuilder, client: ChildRef| async move {
             builder.init_mutable_config_to_empty(&client).await?;
-            builder.set_config_value_bool(&client, "set_overwrite_option", false).await?;
-            builder.set_config_value_bool(&client, "set_concat_option", false).await?;
-            builder.set_config_value_string_vector(&client, "write_bytes", ["foo"]).await?;
-            builder.set_config_value_string_vector(&client, "write_strings", ["baz"]).await?;
-            builder.set_config_value_uint64_vector(&client, "write_uint64s", [1]).await?;
-            builder.set_config_value_int64_vector(&client, "write_int64s", [-2]).await?;
-            builder.set_config_value_uint64_vector(&client, "write_uint128s", [3]).await?;
+            builder.set_config_value(&client, "set_overwrite_option", false.into()).await?;
+            builder.set_config_value(&client, "set_concat_option", false.into()).await?;
+            builder.set_config_value(&client, "write_bytes", vec!["foo"].into()).await?;
+            builder.set_config_value(&client, "write_strings", vec!["baz"].into()).await?;
+            builder.set_config_value(&client, "write_uint64s", vec![1u64].into()).await?;
+            builder.set_config_value(&client, "write_int64s", vec![-2 as i64].into()).await?;
+            builder.set_config_value(&client, "write_uint128s", vec![3u64].into()).await?;
             Ok::<(RealmBuilder, ChildRef), Error>((builder, client))
         },
         |log_reader| {

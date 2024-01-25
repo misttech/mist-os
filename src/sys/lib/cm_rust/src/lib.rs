@@ -1473,6 +1473,19 @@ impl ConfigValue {
     }
 }
 
+impl From<&str> for ConfigValue {
+    fn from(value: &str) -> Self {
+        ConfigValue::Single(value.to_string().into())
+    }
+}
+
+impl From<Vec<&str>> for ConfigValue {
+    fn from(value: Vec<&str>) -> Self {
+        let value: Vec<_> = value.into_iter().map(|s| s.to_string()).collect();
+        ConfigValue::Vector(value.into())
+    }
+}
+
 macro_rules! generate_configvalue_from {
     ($name:expr, $type:ty) => {
         impl From<$type> for ConfigValue {

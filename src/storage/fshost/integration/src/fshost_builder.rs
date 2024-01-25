@@ -84,7 +84,7 @@ impl FshostBuilder {
 
         // fshost config overrides
         for (key, value) in self.config_values {
-            realm_builder.set_config_value(&fshost, key, value).await.unwrap()
+            realm_builder.set_config_value(&fshost, key, value.value).await.unwrap()
         }
 
         realm_builder

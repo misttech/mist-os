@@ -620,30 +620,30 @@ where
             builder.init_mutable_config_from_package(&pkg_resolver).await.unwrap();
             if let Some(fetch_delivery_blob) = self.fetch_delivery_blob {
                 builder
-                    .set_config_value_bool(
+                    .set_config_value(
                         &pkg_resolver,
                         "fetch_delivery_blob",
-                        fetch_delivery_blob,
+                        fetch_delivery_blob.into(),
                     )
                     .await
                     .unwrap();
             }
             if let Some(delivery_blob_fallback) = self.delivery_blob_fallback {
                 builder
-                    .set_config_value_bool(
+                    .set_config_value(
                         &pkg_resolver,
                         "delivery_blob_fallback",
-                        delivery_blob_fallback,
+                        delivery_blob_fallback.into(),
                     )
                     .await
                     .unwrap();
             }
             if let Some(tuf_metadata_timeout_seconds) = self.tuf_metadata_timeout_seconds {
                 builder
-                    .set_config_value_uint32(
+                    .set_config_value(
                         &pkg_resolver,
                         "tuf_metadata_timeout_seconds",
-                        tuf_metadata_timeout_seconds,
+                        tuf_metadata_timeout_seconds.into(),
                     )
                     .await
                     .unwrap();
@@ -652,10 +652,10 @@ where
                 self.blob_network_header_timeout_seconds
             {
                 builder
-                    .set_config_value_uint32(
+                    .set_config_value(
                         &pkg_resolver,
                         "blob_network_header_timeout_seconds",
-                        blob_network_header_timeout_seconds,
+                        blob_network_header_timeout_seconds.into(),
                     )
                     .await
                     .unwrap();
@@ -663,10 +663,10 @@ where
             if let Some(blob_network_body_timeout_seconds) = self.blob_network_body_timeout_seconds
             {
                 builder
-                    .set_config_value_uint32(
+                    .set_config_value(
                         &pkg_resolver,
                         "blob_network_body_timeout_seconds",
-                        blob_network_body_timeout_seconds,
+                        blob_network_body_timeout_seconds.into(),
                     )
                     .await
                     .unwrap();
@@ -675,20 +675,20 @@ where
                 self.blob_download_resumption_attempts_limit
             {
                 builder
-                    .set_config_value_uint32(
+                    .set_config_value(
                         &pkg_resolver,
                         "blob_download_resumption_attempts_limit",
-                        blob_download_resumption_attempts_limit,
+                        blob_download_resumption_attempts_limit.into(),
                     )
                     .await
                     .unwrap();
             }
             if let Some(blob_download_concurrency_limit) = self.blob_download_concurrency_limit {
                 builder
-                    .set_config_value_uint16(
+                    .set_config_value(
                         &pkg_resolver,
                         "blob_download_concurrency_limit",
-                        blob_download_concurrency_limit,
+                        blob_download_concurrency_limit.into(),
                     )
                     .await
                     .unwrap();
@@ -699,16 +699,18 @@ where
         // outside of SWD control.
         let () = builder.init_mutable_config_from_package(&pkg_cache).await.unwrap();
         let () = builder
-            .set_config_value_bool(
+            .set_config_value(
                 &pkg_cache,
                 "use_fxblob",
-                matches!(blob_implementation, blobfs_ramdisk::Implementation::Fxblob),
+                matches!(blob_implementation, blobfs_ramdisk::Implementation::Fxblob).into(),
             )
             .await
             .unwrap();
         if system_image.is_none() {
-            let () =
-                builder.set_config_value_bool(&pkg_cache, "use_system_image", false).await.unwrap();
+            let () = builder
+                .set_config_value(&pkg_cache, "use_system_image", false.into())
+                .await
+                .unwrap();
         }
 
         builder

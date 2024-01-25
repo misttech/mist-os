@@ -161,12 +161,16 @@ async fn create_wlan_components(builder: &RealmBuilder, config: WlanConfig) -> R
     // Configure components
     let use_legacy_privacy = config.use_legacy_privacy.unwrap_or(false);
     builder.init_mutable_config_to_empty(&wlandevicemonitor).await?;
-    builder.set_config_value_bool(&wlandevicemonitor, "wep_supported", use_legacy_privacy).await?;
-    builder.set_config_value_bool(&wlandevicemonitor, "wpa1_supported", use_legacy_privacy).await?;
+    builder
+        .set_config_value(&wlandevicemonitor, "wep_supported", use_legacy_privacy.into())
+        .await?;
+    builder
+        .set_config_value(&wlandevicemonitor, "wpa1_supported", use_legacy_privacy.into())
+        .await?;
 
     builder.init_mutable_config_to_empty(&wlancfg).await?;
-    builder.set_config_value_string(&wlancfg, "recovery_profile", String::from("")).await?;
-    builder.set_config_value_bool(&wlancfg, "recovery_enabled", false).await?;
+    builder.set_config_value(&wlancfg, "recovery_profile", String::from("").into()).await?;
+    builder.set_config_value(&wlancfg, "recovery_enabled", false.into()).await?;
 
     builder
         .add_route(

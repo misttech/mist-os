@@ -23,16 +23,16 @@ async fn test_write_success() -> Result<(), Error> {
         |builder: RealmBuilder, client: ChildRef| async move {
             builder.init_mutable_config_to_empty(&client).await?;
             builder
-                .set_config_value_string_vector(&client, "write_items", ["verse_1", "verse_2"])
+                .set_config_value(&client, "write_items", vec!["verse_1", "verse_2"].into())
                 .await?;
             builder
-                .set_config_value_string_vector(
+                .set_config_value(
                     &client,
                     "write_nested",
-                    ["rest_of_poem\nverse_3\nverse_4"],
+                    vec!["rest_of_poem\nverse_3\nverse_4"].into(),
                 )
                 .await?;
-            builder.set_config_value_string_vector(&client, "write_null", ["null_verse"]).await?;
+            builder.set_config_value(&client, "write_null", vec!["null_verse"].into()).await?;
             Ok::<(RealmBuilder, ChildRef), Error>((builder, client))
         },
         |log_reader| {
@@ -58,15 +58,9 @@ async fn test_empty_nested() -> Result<(), Error> {
         TestKind::ClientAndServer { client: &client, server: &server },
         |builder: RealmBuilder, client: ChildRef| async move {
             builder.init_mutable_config_to_empty(&client).await?;
-            builder
-                .set_config_value_string_vector(&client, "write_items", Vec::<&str>::new())
-                .await?;
-            builder
-                .set_config_value_string_vector(&client, "write_nested", ["invalid_empty"])
-                .await?;
-            builder
-                .set_config_value_string_vector(&client, "write_null", Vec::<&str>::new())
-                .await?;
+            builder.set_config_value(&client, "write_items", Vec::<&str>::new().into()).await?;
+            builder.set_config_value(&client, "write_nested", vec!["invalid_empty"].into()).await?;
+            builder.set_config_value(&client, "write_null", Vec::<&str>::new().into()).await?;
             Ok::<(RealmBuilder, ChildRef), Error>((builder, client))
         },
         |log_reader| {

@@ -213,7 +213,7 @@ async fn test_tunnel_boot_items() -> Result<()> {
         .await?;
 
     realm.init_mutable_config_from_package(&driver_test_realm).await?;
-    realm.set_config_value_bool(&driver_test_realm, "tunnel_boot_items", true).await?;
+    realm.set_config_value(&driver_test_realm, "tunnel_boot_items", true.into()).await?;
 
     let instance = realm.build().await?;
     let args = fdt::RealmArgs {
