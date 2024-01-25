@@ -68,7 +68,7 @@ impl FsNodeOps for CpuClassDirectory {
             })
         }
 
-        // TODO(https://fxbug.dev/121327): A workaround before binding FsNodeOps to each kobject.
+        // TODO(https://fxbug.dev/42072346): A workaround before binding FsNodeOps to each kobject.
         Ok(VecDirectory::new_file(entries))
     }
 

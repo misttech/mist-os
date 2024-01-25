@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-// TODO(https://fxbug.dev/88589): Refactor these into a generic ValueList
+// TODO(https://fxbug.dev/42169836): Refactor these into a generic ValueList
 mod selector_list;
 mod string_list;
 
@@ -103,7 +103,7 @@ pub struct MetricConfig {
     pub upload_once: Option<bool>,
     /// Optional project id. When present this project id will be used instead of the top-level
     /// project id.
-    // TODO(https://fxbug.dev/120759): remove this when we support batching.
+    // TODO(https://fxbug.dev/42071858): remove this when we support batching.
     pub project_id: Option<u32>,
 }
 
@@ -135,7 +135,7 @@ struct MetricTemplate {
     upload_once: Option<bool>,
     /// Optional project id. When present this project id will be used instead of the top-level
     /// project id.
-    // TODO(https://fxbug.dev/120759): remove this when we support batching.
+    // TODO(https://fxbug.dev/42071858): remove this when we support batching.
     project_id: Option<u32>,
 }
 
@@ -165,7 +165,7 @@ pub fn parse_selector_for_test(selector_str: &str) -> Option<ParsedSelector> {
     Some(selector_list::parse_selector::<serde::de::value::Error>(selector_str).unwrap())
 }
 
-// TODO(https://fxbug.dev/88589): Maybe refactor this into a generic ValueList - but remember that
+// TODO(https://fxbug.dev/42169836): Maybe refactor this into a generic ValueList - but remember that
 // unlike StringList and SelectorList, it's not OK to have just a ComponentIdInfo in a config
 // file - the file should always be a list even if there's just one (or zero) items.
 #[derive(Deserialize, Debug)]
@@ -378,7 +378,7 @@ impl SamplerConfig {
         sampler_dir: impl AsRef<Path>,
         fire_dir: Option<impl AsRef<Path>>,
     ) -> Result<Self, Error> {
-        // TODO(https://fxbug.dev/88640): Remove legacy_sampler_config_paths when
+        // TODO(https://fxbug.dev/42169894): Remove legacy_sampler_config_paths when
         // all config dirs use sampler_dir/foo/*.json
         let legacy_sampler_config_paths = paths_matching_name(&sampler_dir, "*.json")?;
         let sampler_config_paths = paths_matching_name(&sampler_dir, "*/*.json")?;

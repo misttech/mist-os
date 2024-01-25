@@ -544,7 +544,7 @@ impl PortWaiter {
         // performance (by minimizing syscalls) when operating on FDs backed by
         // starnix.
         //
-        // TODO(https://fxbug.dev/134622): If we can read a batch of packets
+        // TODO(https://fxbug.dev/42084319): If we can read a batch of packets
         // from the `zx::Port`, maybe we can keep the ordering?
         let Some(callback) = self.remove_callback(key) else {
             return;

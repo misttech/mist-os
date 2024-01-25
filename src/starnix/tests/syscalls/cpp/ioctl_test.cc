@@ -46,7 +46,7 @@ class IoctlInvalidTest : public IoctlTest,
 TEST_P(IoctlInvalidTest, InvalidRequest) {
   const auto [req, family, name, expected_errno] = GetParam();
 
-  // TODO(https://fxbug.dev/129749): This test does not work with SIOC{G,S}IFADDR as
+  // TODO(https://fxbug.dev/42080141): This test does not work with SIOC{G,S}IFADDR as
   // any family value returns 0. Need to find out why.
   if ((req == SIOCGIFADDR || req == SIOCSIFADDR) && !test_helper::IsStarnix()) {
     GTEST_SKIP() << "IoctlInvalidTests with SIOCGIFADDR/SIOCSIFADDR do not work on Linux yet";

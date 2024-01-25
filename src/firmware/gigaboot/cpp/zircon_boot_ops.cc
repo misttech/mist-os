@@ -53,7 +53,7 @@ bool WriteToPartition(ZirconBootOps* ops, const char* part, size_t offset, size_
 }
 
 void Boot(ZirconBootOps* ops, zbi_header_t* zbi, size_t capacity) {
-  // TODO(https://fxbug.dev/78965): Implement the same relocation logic in zircon_boot
+  // TODO(https://fxbug.dev/42159148): Implement the same relocation logic in zircon_boot
   // library and use it here to validate.
   printf("Booting zircon\n");
 

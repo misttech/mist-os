@@ -329,7 +329,7 @@ impl ClientImpl {
 
 /// `IntoHandlerResult` helps with converting a value into the result of a setting request.
 pub(crate) trait IntoHandlerResult {
-    #[allow(clippy::result_large_err)] // TODO(https://fxbug.dev/117896)
+    #[allow(clippy::result_large_err)] // TODO(https://fxbug.dev/42069089)
     /// Converts `Self` into a `SettingHandlerResult` for use in a `Controller`.
     fn into_handler_result(self) -> SettingHandlerResult;
 }

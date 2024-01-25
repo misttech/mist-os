@@ -136,7 +136,7 @@ zx_status_t GuestEthernet::CreateGuestInterface(bool enable_bridge) {
   if (enable_bridge) {
     config.set_bridged(fuchsia::net::virtualization::Bridged{});
   } else {
-    // See https://fxbug.dev/101224 for NAT support.
+    // See https://fxbug.dev/42052026 for NAT support.
     FX_LOGS(ERROR) << "Only bridging is currently supported";
     return ZX_ERR_NOT_SUPPORTED;
   }

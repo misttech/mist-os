@@ -73,7 +73,7 @@ pub struct Node {
 #[derive(Debug, Clone)]
 pub struct Property {
     name: String,
-    // TODO(https://fxbug.dev/84729)
+    // TODO(https://fxbug.dev/42165549)
     #[allow(unused)]
     id: BlockIndex,
     parent: BlockIndex,
@@ -1195,7 +1195,7 @@ impl Data {
         }
 
         // There are issues with displaying a tree that has no properties.
-        // TODO(https://fxbug.dev/49861): Support empty trees in archive.
+        // TODO(https://fxbug.dev/42126876): Support empty trees in archive.
         if self.properties.len() == 0 {
             return true;
         }

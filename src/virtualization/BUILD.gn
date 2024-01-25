@@ -15,7 +15,7 @@ group("virtualization") {
 # To avoid creating excessive load on infra, we split out tests that pull in
 # heavyweight guest packages (which are expensive to include in built images)
 # or tests that involve actually booting guest images.  See
-# https://fxbug.dev/122994 for more background.
+# https://fxbug.dev/42073933 for more background.
 group("tests-involving-guests") {
   testonly = true
 

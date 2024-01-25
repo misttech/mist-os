@@ -61,7 +61,7 @@ this in order to load the ZBI from disk into memory, append a number of ZBI
 items, and then pass control to the ZBI kernel.
 
 There's currently no way to provide these definitions alone in an SDK; instead
-they are included as part of the larger Zircon sysroot SDK (https://fxbug.dev/65907).
+they are included as part of the larger Zircon sysroot SDK (https://fxbug.dev/42144657).
 
 The ZBI definitions are currently located in the Firmware SDK under
 `arch/<arch>/sysroot/include/zircon/boot/`, primarily `image.h`.

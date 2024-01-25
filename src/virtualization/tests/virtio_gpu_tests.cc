@@ -175,7 +175,7 @@ bool ScreenshotsSame(const Screenshot& a, const Screenshot& b) {
 }
 
 TYPED_TEST(VirtioGpuTest, DetectDisplay) {
-  // TODO(https://fxbug.dev/130445): Fix and re-enable this test on zircon.
+  // TODO(https://fxbug.dev/42080718): Fix and re-enable this test on zircon.
   if (this->GetGuestKernel() == GuestKernel::ZIRCON) {
     GTEST_SKIP();
   }
@@ -215,7 +215,7 @@ TYPED_TEST(VirtioGpuTest, DetectDisplay) {
 }
 
 TYPED_TEST(VirtioGpuTest, ScreenNotBlack) {
-  // TODO(https://fxbug.dev/102870): Revive the this test.
+  // TODO(https://fxbug.dev/42053853): Revive the this test.
   GTEST_SKIP();
 
   // Take a screenshot.
@@ -229,7 +229,7 @@ TYPED_TEST(VirtioGpuTest, ScreenNotBlack) {
 }
 
 TYPED_TEST(VirtioGpuTest, ScreenDataLooksValid) {
-  // TODO(https://fxbug.dev/102870): Revive the this test.
+  // TODO(https://fxbug.dev/42053853): Revive the this test.
   GTEST_SKIP();
 
   // Take a screenshot.
@@ -254,7 +254,7 @@ TYPED_TEST(VirtioGpuTest, ScreenDataLooksValid) {
 }
 
 TYPED_TEST(VirtioGpuTest, TextInputChangesConsole) {
-  // TODO(https://fxbug.dev/102870): Revive the this test.
+  // TODO(https://fxbug.dev/42053853): Revive the this test.
   GTEST_SKIP();
 
   // Take a screenshot.

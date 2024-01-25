@@ -22,7 +22,7 @@ use starnix_uapi::{
 use zerocopy::{AsBytes, FromBytes};
 
 /// The size of the red zone.
-// TODO(https://fxbug.dev/121659): Determine whether or not this is the correct red zone size for aarch64.
+// TODO(https://fxbug.dev/42072654): Determine whether or not this is the correct red zone size for aarch64.
 pub const RED_ZONE_SIZE: u64 = 128;
 
 /// The size of the syscall instruction in bytes.

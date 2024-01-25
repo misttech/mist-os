@@ -22,7 +22,7 @@ namespace camera {
 
 constexpr auto kTag = "FakeBufferCollection";
 
-// TODO(https://fxbug.dev/41499): Track creation & destruction of buffer collections for programmatic
+// TODO(https://fxbug.dev/42117588): Track creation & destruction of buffer collections for programmatic
 //      checks of leaks.
 
 const uint32_t kIspLineAlignment = 128;  // Required alignment of ISP buffers

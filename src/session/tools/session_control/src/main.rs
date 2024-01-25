@@ -186,7 +186,7 @@ mod tests {
     use {
         super::*,
         fidl::endpoints::create_proxy_and_stream,
-        // fidl_fuchsia.sys2::EventType, TODO(https://fxbug.dev/47730): re-enable the tests.
+        // fidl_fuchsia.sys2::EventType, TODO(https://fxbug.dev/42124509): re-enable the tests.
         fuchsia_async as fasync,
         futures::TryStreamExt,
         // test_utils_lib::events::{EventSource, Ordering, RecordedEvent},
@@ -301,7 +301,7 @@ mod tests {
         assert!(add_element(element_url, manager).await.is_err());
     }
 
-    // TODO(https://fxbug.dev/47730): re-enable these tests.
+    // TODO(https://fxbug.dev/42124509): re-enable these tests.
     // /// Verifies that session control is routed the expected capabilities.
     // #[fasync::run_singlethreaded(test)]
     // async fn test_capability_routing() {

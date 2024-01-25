@@ -103,10 +103,10 @@
                 // clock_nanosleep_test
                 "ClockNanosleepProcessTest.SleepFiveSeconds",
 
-                // epoll_test - https://fxbug.dev/79261
+                // epoll_test - https://fxbug.dev/42159478
                 "EpollTest.CloseFile",
 
-                // eventfd_test - splice() isn't implemented https://fxbug.dev/119324
+                // eventfd_test - splice() isn't implemented https://fxbug.dev/42070385
                 "EventfdTest.SpliceReturnsEINVAL",
 
                 // exceptions_test
@@ -141,7 +141,7 @@
                 "ExecveatTest.SymlinkNoFollowWithNormalFile",
 
                 // This test call exec from a process with multiple threads.
-                // Starnix doesnt' support this yet: https://fxbug.dev/132623
+                // Starnix doesnt' support this yet: https://fxbug.dev/42082680
                 "ExecTest.FromSiblingThread",
                 "ExecTest.WithSiblingThread",
 
@@ -202,7 +202,7 @@
                 "CloneTest.NewUserNamespacePermitsAllOtherNamespaces",
                 "CloneTest.NonCanonicalTLS",
 
-                // futex_test - https://fxbug.dev/79277 Needs atomic ops on restricted memory.
+                // futex_test - https://fxbug.dev/42159495 Needs atomic ops on restricted memory.
                 "PrivateFutexTest.WakeOp0Set",
                 "PrivateFutexTest.WakeOp0Add",
                 "PrivateFutexTest.WakeOp0Or",
@@ -577,10 +577,10 @@
                 // sendfile_test
                 "SendFileTest.SendFileToSelf",
 
-                // sigaltstack_test - https://fxbug.dev/79359
+                // sigaltstack_test - https://fxbug.dev/42159586
                 "SigaltstackTest.ResetByExecve",
 
-                // socket_abstract_test - https://fxbug.dev/79366
+                // socket_abstract_test - https://fxbug.dev/42159594
                 "AbstractUnixSockets/AllSocketPairTest.SetSocketRecvBufForceAboveMax/*",
                 "AbstractUnixSockets/AllSocketPairTest.GetSocketOutOfBandInlineOption/*",
                 "AbstractUnixSockets/AllSocketPairTest.GetSetSocketRcvlowatOption/*",
@@ -689,7 +689,7 @@
                 "AllConnectedSockets/PersistentListenerConnectStressTest.ShutdownCloseFirst/*",
                 "AllConnectedSockets/PersistentListenerConnectStressTest.ShutdownCloseSecond/*",
 
-                // socket_unix_pair_test - https://fxbug.dev/79408
+                // socket_unix_pair_test - https://fxbug.dev/42159641
                 "AllUnixDomainSockets/UnixSocketPairCmsgTest.SendNullCredsBeforeSoPassCredRecvEndAfterSendEnd/*",
                 "AllUnixDomainSockets/UnixSocketPairCmsgTest.WriteBeforeSoPassCredRecvEndAfterSendEnd/*",
 
@@ -757,7 +757,7 @@
                 "AllInetTests/TcpSocketTest.TcpSCMPriority/*",
                 "AllInetTests/TcpSocketTest.Tiocinq/*",
 
-                // timerfd_test - https://fxbug.dev/79430
+                // timerfd_test - https://fxbug.dev/42159666
                 "AllTimerTypes/TimerfdTest.BlockingPoll_SetTimeResetsExpirations/CLOCK_MONOTONIC",
                 "AllTimerTypes/TimerfdTest.BlockingPoll_SetTimeResetsExpirations/CLOCK_BOOTTIME",
 
@@ -793,7 +793,7 @@
                 // utimes_test
                 "FutimesatTest.OnNullPathWithOPath",
 
-                // wait_test - https://fxbug.dev/79451
+                // wait_test - https://fxbug.dev/42159689
                 "Waiters/WaitAnyChildTest.IgnoredChildRusage/*",
                 "Waiters/WaitSpecificChildTest.SiblingChildrenWNOTHREAD/0",
 
@@ -841,7 +841,7 @@
 
                 // This hangs on debug builds.
                 //
-                // See https://fxbug.dev/135058.
+                // See https://fxbug.dev/42084731.
                 "MountTest.MaxMountsWithSlave",
 
                 // This test hangs because Netlink sockets do not support the
@@ -876,7 +876,7 @@
                 // Times out.
                 "ItimerTest.DeliversSIGPROFToThreadsRoughlyFairlyIdle",
 
-                // https://fxbug.dev/136337
+                // https://fxbug.dev/42085936
                 "AllSocketPairTest.RecvTimeoutRecvmsgOneSecondSucceeds/*",
                 "FilesystemUnixSockets/AllSocketPairTest.RecvTimeoutUsecNeg/*",
                 "AllSocketPairTest.SendTimeoutUsecTooLarge/*",
@@ -910,13 +910,13 @@
                 "FlockTest.TestSharedLockFailExclusiveHolderBlocking",
                 "FlockTest.TestExclusiveLockFailExclusiveHolderBlocking",
 
-                // TODO(https://fxbug.dev/105339): Re-enable once flake is resolved.
+                // TODO(https://fxbug.dev/42056557): Re-enable once flake is resolved.
                 "Waiters/WaitSpecificChildTest.MultipleForkOutOfOrder/*",
 
-                // TODO(https://fxbug.dev/120705): Re-enable once flake is resolved.
+                // TODO(https://fxbug.dev/42071800): Re-enable once flake is resolved.
                 "SharedPrivate/PrivateAndSharedFutexTest.Wait_BitsetTimeout/*",
 
-                // TODO(https://fxbug.dev/120707): Re-enable once flake is resolved.
+                // TODO(https://fxbug.dev/42071802): Re-enable once flake is resolved.
                 "FilesystemUnixSockets/AllSocketPairTest.RecvTimeoutUsecTooLarge/*",
 
                 // These tests are flaky.
@@ -934,7 +934,7 @@
                 "PselectTest.SignalMaskBlocksSignal",
                 "UnameTest.Sanity",
 
-                // https://fxbug.dev/112590
+                // https://fxbug.dev/42063905
                 "AllFamilies/SocketMultiProtocolInetLoopbackIsolatedTest.V4EphemeralPortReservedReuseAddr/*",
                 "AllFamilies/SocketMultiProtocolInetLoopbackIsolatedTest.V4MappedEphemeralPortReservedReuseAddr/*",
 
@@ -949,7 +949,7 @@
                 "All/SocketInetLoopbackIsolatedTest.TCPFinWait2Test/*",
                 "All/SocketInetLoopbackIsolatedTest.TCPLinger2TimeoutAfterClose/*",
 
-                // socket_inet_loopback_isolated_test - flaky TODO(https://fxbug.dev/128640)
+                // socket_inet_loopback_isolated_test - flaky TODO(https://fxbug.dev/42079114)
                 "All/SocketInetLoopbackIsolatedTest.TCPConnectionReuseAddrConflicts/*",
                 "All/SocketInetLoopbackIsolatedTest.TCPPassiveCloseNoTimeWaitReuseTest/*",
                 "All/SocketInetLoopbackIsolatedTest.TCPPassiveCloseNoTimeWaitTest/*",
@@ -959,7 +959,7 @@
                 "AllInetTests/UdpSocketTest.ReadShutdownDifferentThread/*",
                 "AllInetTests/UdpSocketTest.ErrorQueue/*",
 
-                // TODO(https://fxbug.dev/114813): Re-enable once CLONE_VM | CLONE_THREAD is implemented
+                // TODO(https://fxbug.dev/42066087): Re-enable once CLONE_VM | CLONE_THREAD is implemented
                 "Waiters/WaitAnyChildTest.CloneSIGCHLD/*",
                 "Waiters/WaitAnyChildTest.ForkAndClone/*",
                 "Waiters/WaitSpecificChildTest.CloneSIGCHLD/*",
@@ -995,7 +995,7 @@
                 // libpthread.  See http://g/grte/c/AOZW4ySVadE/m/NhMQgRs-5r8J
                 "RobustFutexTest.PthreadMutexAttr",
 
-                // uidgid_test - https://fxbug.dev/79438
+                // uidgid_test - https://fxbug.dev/42159674
                 "UidGidRootTest.SetgidNotFromThreadGroupLeader",
 
                 // socket_ipv4_udp_unbound_external_networking_test
@@ -1015,7 +1015,7 @@
                 "SpliceTest.ToPipeWithSmallCapacityDoesNotSpin",
 
                 // pty_test
-                //TODO(https://fxbug.dev/126724): Re-enable once flake is resolved.
+                //TODO(https://fxbug.dev/42077394): Re-enable once flake is resolved.
                 "JobControlTest.ReleaseTTYSignals",
                 "JobControlTest.ReleaseUnsetTTY",
                 "JobControlTest.SetForegroundProcessGroupSIGTTOUBackground",
@@ -1025,7 +1025,7 @@
 
                 // sigstop_test
 
-                // TODO(https://fxbug.dev/128870): Investigate failure on arm.
+                // TODO(https://fxbug.dev/42079297): Investigate failure on arm.
                 "SigstopTest.RestartSyscall",
 
                 // exec_binary_test
@@ -1043,7 +1043,7 @@
                 // These tests hang / hard crash
                 "PtraceTest.AttachingConvertsGroupStopToPtraceStop",
 
-                // TODO(https://fxbug.dev/129161): Fix flake.
+                // TODO(https://fxbug.dev/42079561): Fix flake.
                 "VforkTest.ExecedChildExitDoesntUnstopParent",
                 "VforkTest.ParentStopsUntilChildExits",
 

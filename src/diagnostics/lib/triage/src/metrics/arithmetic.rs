@@ -9,7 +9,7 @@ enum PromotedOperands {
     Int(Vec<i64>),
 }
 
-// TODO(https://fxbug.dev/57073): More informative error messages as part of structured errors.
+// TODO(https://fxbug.dev/42134879): More informative error messages as part of structured errors.
 
 pub fn calculate(function: &MathFunction, operands: &Vec<MetricValue>) -> MetricValue {
     // Arity check. + and * are well-defined for 1..N arguments, but the parser will only

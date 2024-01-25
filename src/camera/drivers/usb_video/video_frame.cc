@@ -148,7 +148,7 @@ zx_status_t VideoFrame::CopyData(usb_request_t* req, uint32_t data_offset) {
   ZX_DEBUG_ASSERT(avail >= data_size);
 
   uint8_t* dst = reinterpret_cast<uint8_t*>(buffer_.virtual_address()) + bytes_;
-  // TODO(https://fxbug.dev/63635): Decide what to do here
+  // TODO(https://fxbug.dev/42142159): Decide what to do here
   [[maybe_unused]] auto copy_result = usb_request_copy_from(req, dst, data_size, data_offset);
 
   bytes_ += data_size;
@@ -215,7 +215,7 @@ void VideoFrame::ParseHeaderTimestamps(usb_request_t* req) {
   // payload's SOF number is not required to match the 'current' frame number.
 
   // Get the current host SOF value and host monotonic timestamp.
-  // TODO(https://fxbug.dev/104503): Use the IRQ timestamp instead of the system timestamp
+  // TODO(https://fxbug.dev/42055667): Use the IRQ timestamp instead of the system timestamp
   // for more accuracy.
   zx_time_t host_complete_time_ns = zx_clock_get_monotonic();
 

@@ -279,7 +279,7 @@ impl SamplerExecutor {
             .add(sampler_config.project_configs.len() as u64);
 
         let mut project_to_stats_map: HashMap<u32, Arc<ProjectSamplerStats>> = HashMap::new();
-        // TODO(https://fxbug.dev/42067): Create only one ArchiveReader for each unique poll rate so we
+        // TODO(https://fxbug.dev/42118220): Create only one ArchiveReader for each unique poll rate so we
         // can avoid redundant snapshots.
         let project_sampler_futures =
             sampler_config.project_configs.iter().cloned().map(|project_config| {
@@ -341,7 +341,7 @@ impl SamplerExecutor {
             while let Some(sampler_result) = spawned_tasks.next().await {
                 match sampler_result {
                     Err(e) => {
-                        // TODO(https://fxbug.dev/42067): Consider restarting the failed sampler depending on
+                        // TODO(https://fxbug.dev/42118220): Consider restarting the failed sampler depending on
                         // failure mode.
                         warn!("A spawned sampler has failed: {:?}", e);
                         execution_context_owned_stats.errorfully_exited_samplers.add(1);
@@ -457,7 +457,7 @@ impl ProjectSampler {
         project_sampler_stats.metrics_configured.add(config.metrics.len() as u64);
 
         let mut metric_loggers = HashMap::new();
-        // TODO(https://fxbug.dev/120759): we should remove this once we support batching. There should be
+        // TODO(https://fxbug.dev/42071858): we should remove this once we support batching. There should be
         // only one metric logger per ProjectSampler.
         if project_id != 0 {
             let (metric_logger_proxy, metrics_server_end) =
@@ -544,7 +544,7 @@ impl ProjectSampler {
                         )));
                     }
                     ProjectSamplerEvent::RebootChannelClosed(e) => {
-                        // TODO(https://fxbug.dev/42067): Consider differentiating errors if
+                        // TODO(https://fxbug.dev/42118220): Consider differentiating errors if
                         // we ever want to recover a sampler after a oneshot channel death.
                         return Err(format_err!(
                             concat!(
@@ -619,7 +619,7 @@ impl ProjectSampler {
     fn rebuild_selector_data_structures(&mut self) {
         let mut all_selectors = vec![];
         for metric in &mut self.metrics {
-            // TODO(https://fxbug.dev/87709): Using Box<ParsedSelector> could reduce copying.
+            // TODO(https://fxbug.dev/42168860): Using Box<ParsedSelector> could reduce copying.
             let active_selectors = metric
                 .selectors
                 .iter()
@@ -1038,7 +1038,7 @@ fn convert_inspect_histogram_to_cobalt_histogram(
             }
         }
         _ => {
-            // TODO(https://fxbug.dev/42067): Does cobalt support floors or step counts that are
+            // TODO(https://fxbug.dev/42118220): Does cobalt support floors or step counts that are
             // not ints? if so, we can support that as well with double arrays if the
             // actual counts are whole numbers.
             return Err(format_err!(
@@ -1126,7 +1126,7 @@ fn process_occurence(
         return Ok(None);
     }
 
-    // TODO(https://fxbug.dev/42067): Once fuchsia.cobalt is gone, we don't need to preserve
+    // TODO(https://fxbug.dev/42118220): Once fuchsia.cobalt is gone, we don't need to preserve
     // occurrence counts "fitting" into i64s.
     Ok(Some(MetricEventPayload::Count(diff as u64)))
 }
@@ -2046,7 +2046,7 @@ mod tests {
         expect_one_metric_event_value(sampler.process_snapshot(file2_value8).await, 5, "fourth");
     }
 
-    // TODO(https://fxbug.dev/120759): we should remove this once we support batching.
+    // TODO(https://fxbug.dev/42071858): we should remove this once we support batching.
     #[fuchsia::test]
     async fn project_id_can_be_overwritten_by_the_metric_project_id() {
         let mut sampler = ProjectSampler {

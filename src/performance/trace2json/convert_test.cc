@@ -82,7 +82,7 @@ void ConvertAndCompare(ConvertSettings settings, std::string expected_output_fil
       << "Files " << settings.output_file_name << " and " << expected_output_file << " differ.";
 }
 
-// TODO(https://fxbug.dev/128193): Temporarily disable this test to facilitate a roll of
+// TODO(https://fxbug.dev/42078677): Temporarily disable this test to facilitate a roll of
 // rapidjson. The latest roll contains changes to rapidjson's internal `dtoa`
 // implementation, which ever so slightly changes the string representation of
 // certain doubles. Once the roll goes through, we should come back, change the
@@ -100,7 +100,7 @@ TEST(ConvertTest, DISABLED_SimpleTrace) {
   ConvertAndCompare(settings, test_data_path + "simple_trace_expected.json", kNoIgnores);
 }
 
-// TODO(https://fxbug.dev/128193): Temporarily disable this test to facilitate a roll of
+// TODO(https://fxbug.dev/42078677): Temporarily disable this test to facilitate a roll of
 // rapidjson. The latest roll contains changes to rapidjson's internal `dtoa`
 // implementation, which ever so slightly changes the string representation of
 // certain doubles. Once the roll goes through, we should come back, change the
@@ -121,7 +121,7 @@ TEST(ConvertTest, DISABLED_ExampleBenchmark) {
   ConvertAndCompare(settings, test_data_path + "example_benchmark_expected.json", kNoIgnores);
 }
 
-// TODO(https://fxbug.dev/128193): Temporarily disable this test to facilitate a roll of
+// TODO(https://fxbug.dev/42078677): Temporarily disable this test to facilitate a roll of
 // rapidjson. The latest roll contains changes to rapidjson's internal `dtoa`
 // implementation, which ever so slightly changes the string representation of
 // certain doubles. Once the roll goes through, we should come back, change the
@@ -140,7 +140,7 @@ TEST(ConvertTest, DISABLED_SimpleTraceCompressedOutput) {
   ConvertAndCompare(settings, test_data_path + "simple_trace_expected.json.gz", kIgnoreGzipOs);
 }
 
-// TODO(https://fxbug.dev/128193): Temporarily disable this test to facilitate a roll of
+// TODO(https://fxbug.dev/42078677): Temporarily disable this test to facilitate a roll of
 // rapidjson. The latest roll contains changes to rapidjson's internal `dtoa`
 // implementation, which ever so slightly changes the string representation of
 // certain doubles. Once the roll goes through, we should come back, change the
@@ -159,7 +159,7 @@ TEST(ConvertTest, DISABLED_SimpleTraceCompressedInput) {
   ConvertAndCompare(settings, test_data_path + "simple_trace_expected.json", kNoIgnores);
 }
 
-// TODO(https://fxbug.dev/128193): Temporarily disable this test to facilitate a roll of
+// TODO(https://fxbug.dev/42078677): Temporarily disable this test to facilitate a roll of
 // rapidjson. The latest roll contains changes to rapidjson's internal `dtoa`
 // implementation, which ever so slightly changes the string representation of
 // certain doubles. Once the roll goes through, we should come back, change the

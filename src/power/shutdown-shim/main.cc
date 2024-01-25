@@ -35,7 +35,7 @@ namespace sys2_fidl = fuchsia_sys2;
 
 // The amount of time that the shim will spend trying to connect to
 // power_manager before giving up.
-// TODO(https://fxbug.dev/54426): increase this timeout
+// TODO(https://fxbug.dev/42131944): increase this timeout
 const zx::duration SERVICE_CONNECTION_TIMEOUT = zx::sec(2);
 
 // The amount of time that the shim will spend waiting for a manually trigger

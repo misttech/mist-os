@@ -54,7 +54,7 @@ Re-build, re-pave, and restart your device and it will boot into
 
 ### Temporarily disabling launch-on-boot
 
-TODO(https://fxbug.dev/126266): Update this documentation once we move this
+TODO(https://fxbug.dev/42077029): Update this documentation once we move this
 functionality to only rely on structured config.
 
 If your development device runs a product that specifies

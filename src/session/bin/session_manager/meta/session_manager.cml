@@ -54,7 +54,7 @@
             from: "parent",
         },
 
-        // TODO(https://fxbug.dev/126266): As of 2023-04-26, this is only used to allow
+        // TODO(https://fxbug.dev/42077029): As of 2023-04-26, this is only used to allow
         // developers to stop the session from automatically launching on boot.
         // Once structured configuration provides first-class support for this
         // kind of override, consider removing this stanza.
@@ -426,7 +426,7 @@
             availability: "same_as_target",
         },
         {
-            // TODO(https://fxbug.dev/105828): These additional `protocol` offers to the
+            // TODO(https://fxbug.dev/42057100): These additional `protocol` offers to the
             // `#session` collection are only required by the `terminal`
             // component. `terminal` is launched as a member of the `elements`
             // collection of the application shell (a descendent of the
@@ -459,7 +459,7 @@
             availability: "same_as_target",
         },
         {
-            // TODO(https://fxbug.dev/105828): These additional `directory` offers to
+            // TODO(https://fxbug.dev/42057100): These additional `directory` offers to
             // the `#session` collection are only required by the `terminal`
             // component. `terminal` is launched as a member of the `elements`
             // collection of the application shell (a descendent of the

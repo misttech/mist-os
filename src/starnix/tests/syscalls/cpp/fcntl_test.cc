@@ -120,7 +120,7 @@ TEST(FcntlLockTest, ChangeLockTypeInMiddleOfAnotherLock) {
 }
 
 TEST(FcntlLockTest, CloneFiles) {
-  // TODO(https://fxbug.dev/129749): Find out why this test does not work on host in CQ
+  // TODO(https://fxbug.dev/42080141): Find out why this test does not work on host in CQ
   if (!test_helper::IsStarnix()) {
     GTEST_SKIP() << "This test does not work on Linux in CQ";
   }

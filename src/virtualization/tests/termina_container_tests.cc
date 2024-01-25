@@ -14,7 +14,7 @@ using GuestTypes = ::testing::Types<TerminaContainerEnclosedGuest>;
 
 TYPED_TEST_SUITE(TerminaIntegrationTest, GuestTypes, GuestTestNameGenerator);
 
-// TODO(https://fxbug.dev/115859): This test is flaking on ASAN builds.
+// TODO(https://fxbug.dev/42067104): This test is flaking on ASAN builds.
 #if !__has_feature(address_sanitizer)
 
 constexpr auto kExpectedContainerName = "penguin";

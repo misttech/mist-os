@@ -22,7 +22,7 @@
 
 namespace camera {
 
-// TODO(https://fxbug.dev/57529): Refactor into a class that incorporates relevant methods.
+// TODO(https://fxbug.dev/42135385): Refactor into a class that incorporates relevant methods.
 // TODO(jsasinowski): Generalize to cover additional gain modes.
 struct AnalogGain {
   // Analog gain constants queried from the sensor, per the SMIA spec.

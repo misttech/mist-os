@@ -16,7 +16,7 @@ TEST_F(VirtioMagmaGuestTest, DeviceProperties) {
   ASSERT_EQ(return_code, 0) << kDevicePath << " is not a character device";
 }
 
-// TODO(https://fxbug.dev/92209) add a wayland device to the enclosed Termina guest for buffer import/export
+// TODO(https://fxbug.dev/42173858) add a wayland device to the enclosed Termina guest for buffer import/export
 TEST_F(VirtioMagmaGuestTest, DISABLED_MagmaConformance) {
   std::string text;
   int32_t return_code = 0;

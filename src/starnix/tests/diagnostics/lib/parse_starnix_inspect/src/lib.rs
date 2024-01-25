@@ -67,7 +67,7 @@ impl CoredumpReport {
                             Some(property.uint().expect("getting process koid from report node"))
                     }
 
-                    // TODO(https://fxbug.dev/130834) i64/int in kernel shows up as u64/uint here
+                    // TODO(https://fxbug.dev/42081072) i64/int in kernel shows up as u64/uint here
                     "pid" => {
                         pid = Some(property.uint().expect("getting pid from report node") as i64)
                     }

@@ -15,7 +15,7 @@ executable("hypervisor_integration_tests") {
     "main.cc",
   ]
 
-  # TODO(https://fxbug.dev/123449): Implement riscv64 support.
+  # TODO(https://fxbug.dev/42074367): Implement riscv64 support.
   if (target_cpu != "riscv64") {
     sources += [
       # Arch-specific code.

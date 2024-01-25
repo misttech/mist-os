@@ -842,7 +842,7 @@ pub mod tests {
         stepper.iterate_policy();
     }
 
-    #[allow(clippy::unit_cmp)] // TODO(https://fxbug.dev/95036)
+    #[allow(clippy::unit_cmp)] // TODO(https://fxbug.dev/42176998)
     /// Tests that the ThermalPolicy node populates the correct temperature sensor driver path in
     /// its UpdateThermalLoad messages.
     #[fasync::run_singlethreaded(test)]
@@ -881,7 +881,7 @@ pub mod tests {
         assert_eq!(node.process_thermal_load(ThermalLoad(20)).await.unwrap(), ());
     }
 
-    #[allow(clippy::unit_cmp)] // TODO(https://fxbug.dev/95036)
+    #[allow(clippy::unit_cmp)] // TODO(https://fxbug.dev/42176998)
     /// Tests that each of the configured `thermal_load_notify_nodes` nodes receive an
     /// UpdateThermalLoad message as expected.
     #[fasync::run_singlethreaded(test)]

@@ -35,7 +35,7 @@ class Logger {
   //
   // If false, we only log guest output on test failure.
   //
-  // TODO(https://fxbug.dev/56119): Currently enabled to diagnose ongoing test flakes.
+  // TODO(https://fxbug.dev/42133823): Currently enabled to diagnose ongoing test flakes.
   static constexpr bool kLogAllGuestOutput = true;
 
  private:

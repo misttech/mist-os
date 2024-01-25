@@ -108,7 +108,7 @@ zx_status_t IoApic::Write(uint64_t addr, const IoValue& value) {
       // when our `Interrupt` function is called), so we can ignore writes to
       // this register.
       //
-      // TODO(https://fxbug.dev/77786): Correctly support level-triggered interrupts.
+      // TODO(https://fxbug.dev/42157839): Correctly support level-triggered interrupts.
       return ZX_OK;
     }
     default:
@@ -196,7 +196,7 @@ zx::result<IoApic::Action> IoApic::WriteRedirectEntryLocked(uint32_t global_irq,
 
   // Report any pending and now unmasked interrupt to the caller.
   //
-  // TODO(https://fxbug.dev/77786): We do not correctly support level-triggered interrupts
+  // TODO(https://fxbug.dev/42157839): We do not correctly support level-triggered interrupts
   // here. In particular, the current IO APIC API only supports
   // edge-triggered interrupts (i.e., when our `Interrupt` method is called),
   // but we never find out when an interrupt stops being active.

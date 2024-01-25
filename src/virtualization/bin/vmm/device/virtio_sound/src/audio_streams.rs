@@ -130,7 +130,7 @@ pub fn create_audio_input<'a>(
 /// * The driver might send many buffers smaller than period_bytes. If this
 ///   happens, we may run out of packets and be forced to reject the buffer.
 ///
-/// TODO(https://fxbug.dev/90032): We can support the general case if necessary.
+/// TODO(https://fxbug.dev/42171440): We can support the general case if necessary.
 struct PayloadBuffer {
     mapping: Mapping,
     packets_avail: VecDeque<Range<usize>>, // ranges with mapping
@@ -299,7 +299,7 @@ impl<'a> AudioStream<'a> for AudioOutput<'a> {
             {
                 let t = lead_time_recv.borrow_and_update();
                 if *t > zx::Duration::from_nanos(0) {
-                    // TODO(https://fxbug.dev/101220): temporary for debugging
+                    // TODO(https://fxbug.dev/42052022): temporary for debugging
                     throttled_log::info!(
                         "AudioOutput received non-zero lead_time {} ns",
                         t.into_nanos()
@@ -337,7 +337,7 @@ impl<'a> AudioStream<'a> for AudioOutput<'a> {
         let futs = match &mut *self.conn.borrow_mut() {
             Some(conn) => {
                 conn.closing.set();
-                // TODO(https://fxbug.dev/101220): temporary for debugging
+                // TODO(https://fxbug.dev/42052022): temporary for debugging
                 throttled_log::info!("AudioOutput is disconnecting");
                 futures::future::join_all(
                     conn.packets_pending.iter().map(|(_, n)| n.clone().when_set()),
@@ -346,7 +346,7 @@ impl<'a> AudioStream<'a> for AudioOutput<'a> {
             None => panic!("called disconnect() without a connection"),
         };
         futs.await;
-        // TODO(https://fxbug.dev/101220): temporary for debugging
+        // TODO(https://fxbug.dev/42052022): temporary for debugging
         throttled_log::info!("AudioOutput disconnect has completed");
         // Writing None here will deallocate all per-connection state, including the
         // FIDL channel and the payload buffer mapping.
@@ -357,7 +357,7 @@ impl<'a> AudioStream<'a> for AudioOutput<'a> {
     async fn start(&self) -> Result<(), Error> {
         let fut = match &*self.conn.borrow() {
             Some(conn) => {
-                // TODO(https://fxbug.dev/101220): temporary for debugging
+                // TODO(https://fxbug.dev/42052022): temporary for debugging
                 throttled_log::info!("AudioOutput start calling renderer.play");
 
                 conn.fidl_proxy
@@ -368,7 +368,7 @@ impl<'a> AudioStream<'a> for AudioOutput<'a> {
         // Relinquish our borrow of conn while waiting for the renderer.play() response.
         fut.await?;
 
-        // TODO(https://fxbug.dev/101220): temporary for debugging
+        // TODO(https://fxbug.dev/42052022): temporary for debugging
         throttled_log::info!("AudioOutput start (renderer.play) has completed");
 
         Ok(())
@@ -378,7 +378,7 @@ impl<'a> AudioStream<'a> for AudioOutput<'a> {
         // Deterministically return all packets after we pause.
         let fut = match &*self.conn.borrow() {
             Some(conn) => {
-                // TODO(https://fxbug.dev/101220): temporary for debugging
+                // TODO(https://fxbug.dev/42052022): temporary for debugging
                 throttled_log::info!("AudioOutput stop calling pause_no_reply+discard_all_packets");
 
                 conn.fidl_proxy.pause_no_reply()?;
@@ -389,7 +389,7 @@ impl<'a> AudioStream<'a> for AudioOutput<'a> {
         // Relinquish our borrow of conn while waiting for the discard_all_packets() response.
         fut.await?;
 
-        // TODO(https://fxbug.dev/101220): temporary for debugging
+        // TODO(https://fxbug.dev/42052022): temporary for debugging
         throttled_log::info!("AudioOutput stop (renderer.discard_all_packets) has completed");
 
         Ok(())
@@ -438,7 +438,7 @@ impl<'a> AudioStream<'a> for AudioOutput<'a> {
                     ()
                 }
                 None => {
-                    // TODO(https://fxbug.dev/101220): temporary for debugging
+                    // TODO(https://fxbug.dev/42052022): temporary for debugging
                     throttled_log::info!(
                     "conn.borrow on packet completion (to add to packets_avail) failed - disconnected with outstanding packets");
                     // ignore: disconnected before our await completed
@@ -485,7 +485,7 @@ impl<'a> AudioStream<'a> for AudioOutput<'a> {
                     ()
                 }
                 None => {
-                    // TODO(https://fxbug.dev/101220): temporary for debugging
+                    // TODO(https://fxbug.dev/42052022): temporary for debugging
                     throttled_log::info!(
                   "conn.borrow on completion (removing from packets_pending) failed - disconnected with outstanding packets?");
                     // ignore: disconnected before our await completed
@@ -532,7 +532,7 @@ impl<'a> AudioStream<'a> for AudioOutput<'a> {
                         },
                     },
                     None => {
-                        // TODO(https://fxbug.dev/101220): temporary for debugging
+                        // TODO(https://fxbug.dev/42052022): temporary for debugging
                         throttled_log::info!("AudioRenderer disconnected before the packet completed (1)");
                         // Disconnected before the packet completed. We may hit this case instead
                         // of the closing_fut case below because both futures can be ready at the
@@ -541,7 +541,7 @@ impl<'a> AudioStream<'a> for AudioOutput<'a> {
                     },
                 },
             _ = closing_fut.fuse() => {
-                // TODO(https://fxbug.dev/101220): temporary for debugging
+                // TODO(https://fxbug.dev/42052022): temporary for debugging
                 throttled_log::info!("AudioRenderer disconnected before the packet completed (2)");
                 // Disconnected before the packet completed.
                 reply_txq::err(chain, wire::VIRTIO_SND_S_IO_ERR, 0)?
@@ -562,15 +562,15 @@ impl<'a> AudioStream<'a> for AudioOutput<'a> {
                                 match event {
                                     Some(OnMinLeadTimeChanged { min_lead_time_nsec }) => {
                                         // Include our deadline in the lead time.
-                                        // This is an upper-bound: see discussion in https://fxbug.dev/90564.
+                                        // This is an upper-bound: see discussion in https://fxbug.dev/42172030.
                                         let lead_time = zx::Duration::from_nanos(min_lead_time_nsec)
                                             + super::DEADLINE_PROFILE.period;
-                                        // TODO(https://fxbug.dev/101220): temporary for debugging
+                                        // TODO(https://fxbug.dev/42052022): temporary for debugging
                                         throttled_log::info!("AudioRenderer lead_time {} ns", lead_time.into_nanos());
                                         job.lead_time.send(lead_time)?;
                                     },
                                     None => {
-                                        // TODO(https://fxbug.dev/101220): temporary for debugging
+                                        // TODO(https://fxbug.dev/42052022): temporary for debugging
                                         throttled_log::info!("AudioRenderer lead_time FIDL connection closed by peer");
                                         // FIDL connection closed by peer.
                                         break;
@@ -582,14 +582,14 @@ impl<'a> AudioStream<'a> for AudioOutput<'a> {
                                     fidl::Error::ClientChannelClosed{..} => (),
                                     _ => tracing::warn!("AudioRenderer event stream: unexpected error: {}", err),
                                 }
-                                // TODO(https://fxbug.dev/101220): temporary for debugging
+                                // TODO(https://fxbug.dev/42052022): temporary for debugging
                                 throttled_log::info!("AudioRenderer lead_time FIDL connection broken");
                                 // FIDL connection broken.
                                 break;
                             }
                     },
                     _ = job.lead_time.closed().fuse() => {
-                        // TODO(https://fxbug.dev/101220): temporary for debugging
+                        // TODO(https://fxbug.dev/42052022): temporary for debugging
                         throttled_log::info!("AudioRenderer has been disconnected");
                         // The AudioOutput has been disconnected.
                         break;

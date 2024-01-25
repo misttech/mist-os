@@ -111,7 +111,7 @@ template("generate_fuchsia_web_package_flavors") {
         name = "canary"
         archive = "${invoker.prebuilt_archive_base_path}/arch/$target_cpu/${target_name}.far"
 
-        # TODO(https://fxbug.dev/70573): Add support for overriding this.
+        # TODO(https://fxbug.dev/42149832): Add support for overriding this.
         production_safe = false
       },
     ]

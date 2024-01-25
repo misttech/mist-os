@@ -56,7 +56,7 @@ TEST(ReadWriteTest, preadv_pwritev) {
   EXPECT_STREQ(read_buffer, kWriteBuffer);
 }
 
-// TODO(https://fxbug.dev/117677) implement partial read/write support (we'll also need tests for read(),
+// TODO(https://fxbug.dev/42068846) implement partial read/write support (we'll also need tests for read(),
 //                        writev(), and readv()).
 TEST(ReadWriteTest, DISABLED_PartialWrite) {
   test_helper::ScopedTempFD temp_file;

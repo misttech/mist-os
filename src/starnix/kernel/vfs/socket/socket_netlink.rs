@@ -692,7 +692,7 @@ impl DeviceListener for Arc<Mutex<NetlinkSocketInner>> {
         let kobject = device.kobject();
         let subsystem = kobject.parent().unwrap();
         let subsystem = subsystem.name();
-        // TODO(https://fxbug.dev/127713): Pass the synthetic UUID when available.
+        // TODO(https://fxbug.dev/42078277): Pass the synthetic UUID when available.
         // Otherwise, default as "0".
         let message = format!(
             "{action}@/{path}\0\

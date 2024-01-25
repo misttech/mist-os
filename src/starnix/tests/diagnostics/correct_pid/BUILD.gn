@@ -41,7 +41,7 @@ if (is_linux) {
     testonly = true
     sources = [ "src/kmsg_hello_world.cc" ]
 
-    # TODO(https://fxbug.dev/116773) enable on asan builders
+    # TODO(https://fxbug.dev/42067974) enable on asan builders
     exclude_toolchain_tags = [ "instrumented" ]
   }
 }

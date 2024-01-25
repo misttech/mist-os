@@ -76,7 +76,7 @@ bool CpuStatsFetcherImpl::CalculateCpuPercentage(double *cpu_percentage) {
   return true;
 }
 
-// TODO(https://fxbug.dev/4571) When Component Stats (CS) supports cpu metrics,
+// TODO(https://fxbug.dev/42122264) When Component Stats (CS) supports cpu metrics,
 // switch to Component Stats / iquery, by creating a new class with the
 // interface CpuStatsFetcher.
 void CpuStatsFetcherImpl::InitializeKernelStats() {

@@ -87,7 +87,7 @@ void LogTraceStats(const perfetto::TraceStats& stats) {
   }
 }
 
-// TODO(https://fxbug.dev/115525): Remove this once the migration to track_event_config is complete.
+// TODO(https://fxbug.dev/42066806): Remove this once the migration to track_event_config is complete.
 std::string GetChromeTraceConfigString(
     const perfetto::protos::gen::TrackEventConfig& track_event_config) {
   rapidjson::Document chrome_trace_config(rapidjson::kObjectType);
@@ -134,7 +134,7 @@ perfetto::protos::gen::TraceConfig_DataSource* AddDataSource(
   const auto track_event_config = GetTrackEventConfig(enabled_categories);
   data_source_config->set_track_event_config_raw(track_event_config.SerializeAsString());
 
-  // TODO(https://fxbug.dev/115525): Remove this once the migration to track_event_config is complete.
+  // TODO(https://fxbug.dev/42066806): Remove this once the migration to track_event_config is complete.
   if (data_source_name == kChromiumTraceEvent) {
     data_source_config->mutable_chrome_config()->set_trace_config(
         GetChromeTraceConfigString(track_event_config));

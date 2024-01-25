@@ -18,7 +18,7 @@
     // [1]: https://fuchsia.dev/fuchsia-src/contribute/governance/rfcs/0089_core_realm_variations
     // [2]: https://cs.opensource.google/fuchsia/fuchsia/+/main:src/session/bin/session_manager/meta/session_manager.cml
     //
-    // TODO(https://fxbug.dev/103234): Remove this shard
+    // TODO(https://fxbug.dev/42054258): Remove this shard
     offer: [
         {
             protocol: "fuchsia.lightsensor.Sensor",

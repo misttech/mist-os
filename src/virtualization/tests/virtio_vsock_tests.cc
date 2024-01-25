@@ -133,7 +133,7 @@ class VsockGuestTest : public GuestTest<T>, public fuchsia::virtualization::Host
   fidl::Binding<fuchsia::virtualization::HostVsockAcceptor> binding_{this};
 };
 
-// TODO(https://fxbug.dev/86054) Presently vsock tests are not run on Zircon as the zircon guest vsock
+// TODO(https://fxbug.dev/42167022) Presently vsock tests are not run on Zircon as the zircon guest vsock
 // driver has known bugs that need fixing.
 using GuestTypes = ::testing::Types<DebianEnclosedGuest>;
 

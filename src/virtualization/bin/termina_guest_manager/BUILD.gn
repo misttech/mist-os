@@ -193,7 +193,7 @@ executable("bin") {
 }
 
 fuchsia_component("termina_guest_manager_cmp") {
-  # TODO(https://fxbug.dev/122217): when
+  # TODO(https://fxbug.dev/42073215): when
   # fuchsia.component.test/Realm.InitMutableConfigFromPackage works with
   # subpackaged components, uncomment.
   # visibility = [ ":*" ]

@@ -54,7 +54,7 @@ static constexpr uintptr_t kKernelOffset = 0x100000;
 // If the kernel specifies a load address smaller than this cut off,
 // we assume it is position-independent.
 //
-// TODO(https://fxbug.dev/32255): Delete once the x86 kernel is position-independent.
+// TODO(https://fxbug.dev/42107320): Delete once the x86 kernel is position-independent.
 constexpr uintptr_t kX86PositionIndependentLoadAddressCutOff = 0x100000;
 #include "src/virtualization/bin/vmm/arch/x64/acpi.h"
 #else
@@ -153,7 +153,7 @@ zx_status_t read_unified_zbi(fbl::unique_fd zbi_fd, const uintptr_t kernel_zbi_o
 
   *guest_ip = kernel_payload_header.entry + kKernelOffset;
 
-  // TODO(https://fxbug.dev/32255): Transitionally, we assume the x86 entrypoint is
+  // TODO(https://fxbug.dev/42107320): Transitionally, we assume the x86 entrypoint is
   // absolute if it is greater than the fixed load address.
 #if __x86_64__
   if (kernel_payload_header.entry > kX86PositionIndependentLoadAddressCutOff) {

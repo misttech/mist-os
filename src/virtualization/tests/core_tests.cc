@@ -69,7 +69,7 @@ TYPED_TEST(CoreGuestTest, VirtioRng) {
 TYPED_TEST(CoreGuestTest, RealTimeClock) {
   // Real time clock not functioning in Zircon guest at this time.
   //
-  // TODO(https://fxbug.dev/75440): Fix clock in Zircon guest.
+  // TODO(https://fxbug.dev/42155234): Fix clock in Zircon guest.
   if (this->GetGuestKernel() == GuestKernel::ZIRCON) {
     return;
   }

@@ -195,7 +195,7 @@ pub struct InputFile {
 struct InputFileMutableState {
     events: VecDeque<uapi::input_event>,
     waiters: WaitQueue,
-    // TODO: https://fxbug.dev/131759 - remove `Optional` when implementing Inspect for Keyboard InputFiles
+    // TODO: https://fxbug.dev/42081918 - remove `Optional` when implementing Inspect for Keyboard InputFiles
     // Touch InputFile will be initialized with a InspectStatus that holds Inspect data
     // `None` for Keyboard InputFile
     inspect_status: Option<InspectStatus>,
@@ -261,14 +261,14 @@ impl InputFile {
             x_axis_info: uapi::input_absinfo {
                 minimum: 0,
                 maximum: i32::from(width),
-                // TODO(https://fxbug.dev/124595): `value` field should contain the most recent
+                // TODO(https://fxbug.dev/42075436): `value` field should contain the most recent
                 // X position.
                 ..uapi::input_absinfo::default()
             },
             y_axis_info: uapi::input_absinfo {
                 minimum: 0,
                 maximum: i32::from(height),
-                // TODO(https://fxbug.dev/124595): `value` field should contain the most recent
+                // TODO(https://fxbug.dev/42075436): `value` field should contain the most recent
                 // Y position.
                 ..uapi::input_absinfo::default()
             },
@@ -331,7 +331,7 @@ impl InputFile {
                         .as_mut()
                         .map(|status| status.health_node.set_ok());
                     let mut previous_event_disposition = vec![];
-                    // TODO(https://fxbug.dev/123718): Remove `close_fut`.
+                    // TODO(https://fxbug.dev/42074606): Remove `close_fut`.
                     let mut close_fut = touch_source_proxy.on_closed();
                     loop {
                         let query_fut = touch_source_proxy.watch(&previous_event_disposition);
@@ -389,11 +389,11 @@ impl InputFile {
                                     }
                                     None => (),
                                 }
-                                // TODO(https://fxbug.dev/124597): Reading from an `InputFile` should
+                                // TODO(https://fxbug.dev/42075438): Reading from an `InputFile` should
                                 // not provide access to events that occurred before the file was
                                 // opened.
                                 inner.events.extend(new_events);
-                                // TODO(https://fxbug.dev/124598): Skip notify if `inner.events`
+                                // TODO(https://fxbug.dev/42075439): Skip notify if `inner.events`
                                 // is empty.
                                 inner.waiters.notify_fd_events(FdEvents::POLLIN);
                             }
@@ -585,11 +585,11 @@ impl FileOps for Arc<InputFile> {
             Some(event) => {
                 inner.inspect_status.as_ref().map(|status| status.count_read_events(1));
                 drop(inner);
-                // TODO(https://fxbug.dev/124600): Consider sending as many events as will fit
+                // TODO(https://fxbug.dev/42075443): Consider sending as many events as will fit
                 // in `data`, instead of sending them one at a time.
                 data.write_all(event.as_bytes())
             }
-            // TODO(https://fxbug.dev/124602): `EAGAIN` is only permitted if the file is opened
+            // TODO(https://fxbug.dev/42075445): `EAGAIN` is only permitted if the file is opened
             // with `O_NONBLOCK`. Figure out what to do if the file is opened without that flag.
             None => {
                 log_info!("read() returning EAGAIN");
@@ -715,7 +715,7 @@ fn parse_fidl_touch_event(fidl_event: &FidlTouchEvent) -> Option<TouchEvent> {
             pos_x: *x,
             pos_y: *y,
         }),
-        _ => None, // TODO(https://fxbug.dev/124603): Add some inspect counters of ignored events.
+        _ => None, // TODO(https://fxbug.dev/42075446): Add some inspect counters of ignored events.
     }
 }
 
@@ -800,7 +800,7 @@ fn make_contact_state_uapi_events(event: &TouchEvent) -> Option<[uapi::input_eve
                 code: uapi::BTN_TOUCH as u16,
                 value,
             },
-            // TODO(https://fxbug.dev/124606): Reporting `BTN_TOOL_FINGER` here could cause some
+            // TODO(https://fxbug.dev/42075449): Reporting `BTN_TOOL_FINGER` here could cause some
             // programs to interpret this device as a touchpad, rather than a touchscreen. Also,
             // this isn't suitable if `InputFile` (eventually) supports multi-touch mode.
             // See https://www.kernel.org/doc/Documentation/input/event-codes.rst.
@@ -841,7 +841,7 @@ fn phase_change_from_fidl_phase(fidl_phase: &FidlEventPhase) -> Option<PhaseChan
         FidlEventPhase::Add => Some(PhaseChange::Added),
         FidlEventPhase::Change => None, // `Change` indicates position change only
         FidlEventPhase::Remove => Some(PhaseChange::Removed),
-        // TODO(https://fxbug.dev/124607): Figure out whether this is correct.
+        // TODO(https://fxbug.dev/42075450): Figure out whether this is correct.
         FidlEventPhase::Cancel => None,
     }
 }
@@ -1176,7 +1176,7 @@ mod test {
         // Wait for another `Watch`, to ensure `relay_thread` has consumed the `Watch` reply
         // from above.
         //
-        // TODO(https://fxbug.dev/124609): Without this, `relay_thread` gets stuck `await`-ing
+        // TODO(https://fxbug.dev/42075452): Without this, `relay_thread` gets stuck `await`-ing
         // the reply to its first request. Figure out why that happens, and remove this second
         // reply.
         answer_next_watch_request(&mut touch_source_stream, make_touch_event()).await;

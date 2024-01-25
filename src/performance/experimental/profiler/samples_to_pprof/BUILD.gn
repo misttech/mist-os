@@ -9,7 +9,7 @@ import("//third_party/protobuf/proto_library.gni")
 source_set("samples_to_pprof_src") {
   sources = [ "samples_to_pprof.cc" ]
   deps = [
-    # TODO(https://fxbug.dev/115412): Replace with pprof.
+    # TODO(https://fxbug.dev/42066681): Replace with pprof.
     # "//third_party/github.com/google/pprof:profile_proto",
     ":profile_proto",
     "//src/lib/fxl",

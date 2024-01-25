@@ -79,7 +79,7 @@ static_library("perfmon") {
   }
 
   public_configs = [
-    # TODO(https://fxbug.dev/58162): delete the below and fix compiler warnings
+    # TODO(https://fxbug.dev/42136089): delete the below and fix compiler warnings
     "//build/config:Wno-conversion",
   ]
 }

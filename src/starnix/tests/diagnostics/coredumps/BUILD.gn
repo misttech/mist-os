@@ -33,7 +33,7 @@ fuchsia_test_component("integration_test") {
   deps = [ ":bin" ]
   test_type = "starnix"
 
-  # TODO(https://fxbug.dev/130859) remove once ScopedInstance can be used separately
+  # TODO(https://fxbug.dev/42081099) remove once ScopedInstance can be used separately
   check_includes = false
 }
 

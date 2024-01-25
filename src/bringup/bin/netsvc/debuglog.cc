@@ -244,7 +244,7 @@ void debuglog_recv(async_dispatcher_t* dispatcher, void* data, size_t len, bool 
     return;
   }
   // Copied not cast in-place to satisfy alignment requirements flagged by ubsan (see
-  // https://fxbug.dev/45798).
+  // https://fxbug.dev/42122361).
   netboot_debuglog_packet_t pkt;
   memcpy(&pkt, data, sizeof(netboot_debuglog_packet_t));
   if ((pkt.magic != NETBOOT_DEBUGLOG_MAGIC)) {

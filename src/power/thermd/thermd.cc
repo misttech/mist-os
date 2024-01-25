@@ -135,7 +135,7 @@ void start_trace() {
   }
 }
 
-// TODO(https://fxbug.dev/108619): This code here needs an update, it's using some very old patterns.
+// TODO(https://fxbug.dev/42059997): This code here needs an update, it's using some very old patterns.
 zx_status_t RunThermd() {
   zx::result power_resource = get_power_resource();
   if (power_resource.is_error()) {
@@ -174,7 +174,7 @@ zx_status_t RunThermd() {
               return ZX_OK;
             }
             // first sensor is ambient sensor
-            // TODO(https://fxbug.dev/108619): come up with a way to detect this is the ambient sensor
+            // TODO(https://fxbug.dev/42059997): come up with a way to detect this is the ambient sensor
             auto& device = *static_cast<
                 std::optional<zx::result<fidl::ClientEnd<fuchsia_hardware_thermal::Device>>>*>(
                 cookie);
@@ -367,7 +367,7 @@ int main(int argc, char** argv) {
   // RunThermd never returns successfully, so always treat this as an error path.
   FX_LOGS(ERROR) << "Exited with status: " << zx_status_get_string(status);
 
-  // TODO(https://fxbug.dev/97657): Hang around. If we exit before archivist has started, our logs
+  // TODO(https://fxbug.dev/42179909): Hang around. If we exit before archivist has started, our logs
   // will be lost, and it's important that we know that thermd is failing and why.
   std::promise<void>().get_future().wait();
 

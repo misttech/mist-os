@@ -252,7 +252,7 @@ impl FsNodeOps for ExtFile {
             ))
         })?;
 
-        // TODO(https://fxbug.dev/130425) returned vmo shouldn't be writeable
+        // TODO(https://fxbug.dev/42080696) returned vmo shouldn't be writeable
         Ok(Box::new(VmoFileObject::new(vmo.clone())))
     }
 }

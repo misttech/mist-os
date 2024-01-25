@@ -5,7 +5,7 @@
 group("heapdump") {
   deps = [ "collector" ]
 
-  # TODO(https://fxbug.dev/122141): ASAN builds use a different allocator that
+  # TODO(https://fxbug.dev/42073131): ASAN builds use a different allocator that
   # heapdump's instrumentation does not support yet.
   if (!is_asan) {
     deps += [ "instrumentation" ]
@@ -20,7 +20,7 @@ group("tests") {
     "lib/heapdump_vmo:tests",
   ]
 
-  # TODO(https://fxbug.dev/122141): ASAN builds use a different allocator that
+  # TODO(https://fxbug.dev/42073131): ASAN builds use a different allocator that
   # heapdump's instrumentation does not support yet.
   if (!is_asan) {
     deps += [ "instrumentation:tests" ]

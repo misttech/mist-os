@@ -247,7 +247,7 @@ impl SystemShutdownHandler {
                             let _ = responder.send(result.map_err(|e| e.into_raw()));
                         }
                         fpowercontrol::AdminRequest::Mexec { responder, .. } => {
-                            // TODO(https://fxbug.dev/86681): Currently implemented and
+                            // TODO(https://fxbug.dev/42167718): Currently implemented and
                             // relied upon in the shutdown-shim. Were the
                             // shutdown-shim to be deprecated, the mexec
                             // preparation logic would need to be migrated
@@ -362,7 +362,7 @@ impl SystemShutdownHandler {
     /// Wraps the node's `shutdown` function with a timeout value. If the `shutdown` call has not
     /// returned within the specified timeout, an error is returned. In the event of a timeout, the
     /// underlying channel that encountered the timeout may encounter issues with subsequent
-    /// transactions (https://fxbug.dev/53760). In this case, that means the channel used by the
+    /// transactions (https://fxbug.dev/42131208). In this case, that means the channel used by the
     /// `component_mgr_proxy` channel encountered the timeout. In
     /// all likelihood, because Driver Manager will not be doing any meaningful work in response to
     /// this FIDL call, we can presume that Component Manager, which will be performing a

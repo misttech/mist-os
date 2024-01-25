@@ -17,17 +17,17 @@ pub struct Element {
     exposed_capabilities: zx::Channel,
 
     /// The component URL used to launch the component.
-    // TODO(https://fxbug.dev/84729)
+    // TODO(https://fxbug.dev/42165549)
     #[allow(unused)]
     url: String,
 
     /// Component child name, or empty string if not a child of the realm.
-    // TODO(https://fxbug.dev/84729)
+    // TODO(https://fxbug.dev/42165549)
     #[allow(unused)]
     name: String,
 
     /// Component child collection name or empty string if not a child of the realm.
-    // TODO(https://fxbug.dev/84729)
+    // TODO(https://fxbug.dev/42165549)
     #[allow(unused)]
     collection: String,
 }

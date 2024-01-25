@@ -248,7 +248,7 @@ pub async fn run_devhost_ota(
     cfg: DevhostConfig,
     out_dir: ServerEnd<fio::NodeMarker>,
 ) -> Result<(), Error> {
-    // TODO(https://fxbug.dev/112997, b/255340851): deduplicate this spinup code with the code in
+    // TODO(https://fxbug.dev/42064284, b/255340851): deduplicate this spinup code with the code in
     // ota_main.rs. To do that, we'll need to remove the run_devhost_ota call
     // from //src/recovery/system/src/main.rs and make run_*_ota public to only ota_main.rs.
     // Also, remove out_dir - ota_main.rs should provide an outgoing directory already spun up.
@@ -575,7 +575,7 @@ mod tests {
         }
     }
 
-    #[ignore] //TODO(https://fxbug.dev/102239) Move to integration test
+    #[ignore] //TODO(https://fxbug.dev/42053153) Move to integration test
     #[fasync::run_singlethreaded(test)]
     async fn test_run_devhost_ota() -> Result<(), Error> {
         let package = PackageBuilder::new("test-package")

@@ -66,7 +66,7 @@ zx::result<usb_video_vc_probe_and_commit_controls> ClearIfIoErrors(zx_status_t s
   return zx::error(status);
 }
 
-// TODO(https://fxbug.dev/104233): Use of dwMaxVideoFrameBufferSize for certain formats has been
+// TODO(https://fxbug.dev/42055367): Use of dwMaxVideoFrameBufferSize for certain formats has been
 // deprecated.  The dwMaxVideoFrameSize field obtained here should be used instead.
 zx::result<usb_video_vc_probe_and_commit_controls> ProbeAndCommit(usb_protocol_t* usb,
                                                                   uint8_t iface_num,

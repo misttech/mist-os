@@ -111,7 +111,7 @@ int Setup(std::optional<zx::duration> auto_cycle_interval, async::Loop* buffer_c
         collage->RemoveCollection(id);
       };
 
-  // TODO(https://fxbug.dev/122163): Add logic to hide views if device is muted.
+  // TODO(https://fxbug.dev/42073155): Add logic to hide views if device is muted.
   camera::StreamCycler::MuteStateHandler mute_handler = [](bool muted) {};
 
   camera::StreamCycler::ShowBufferHandler show_buffer_handler =

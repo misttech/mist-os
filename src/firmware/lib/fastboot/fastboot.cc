@@ -374,7 +374,7 @@ zx::result<> Fastboot::Flash(const std::string& command, Transport* transport) {
                         zx::error(data_sink_endpoints.status_value()));
   }
   auto [data_sink_local, data_sink_remote] = std::move(*data_sink_endpoints);
-  // TODO(https://fxbug.dev/97955) Consider handling the error instead of ignoring it.
+  // TODO(https://fxbug.dev/42180237) Consider handling the error instead of ignoring it.
   (void)paver_client_res.value()->FindDataSink(std::move(data_sink_remote));
   fidl::WireSyncClient data_sink{std::move(data_sink_local)};
 

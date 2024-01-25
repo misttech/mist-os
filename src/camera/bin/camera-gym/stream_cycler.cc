@@ -90,7 +90,7 @@ void StreamCycler::WatchDevicesCallback(std::vector<fuchsia::camera3::WatchDevic
   for (auto& event : events) {
     if (event.is_added()) {
       // Connect to device.
-      // TODO(https://fxbug.dev/48506) Properly detect expected device id.
+      // TODO(https://fxbug.dev/42125371) Properly detect expected device id.
       watcher_->ConnectToDevice(event.added(), device_.NewRequest(dispatcher_));
 
       // Watch for mute changes.
@@ -439,7 +439,7 @@ void StreamCycler::ExecuteSetCropCommand(SetCropCommand& command) {
 
 // Actual execution of the "set-resolution" command.
 void StreamCycler::ExecuteSetResolutionCommand(SetResolutionCommand& command) {
-  // TODO(https://fxbug.dev/60143) - Placeholder for set resolution command.
+  // TODO(https://fxbug.dev/42138291) - Placeholder for set resolution command.
   CommandSuccessNotify();
 }
 

@@ -19,7 +19,7 @@ use futures::{SinkExt, StreamExt};
 
 pub(crate) async fn audio_core_service_mock(
     handles: LocalComponentHandles,
-    // TODO(https://fxbug.dev/105325): replace with Arc<Mutex<...>>
+    // TODO(https://fxbug.dev/42056542): replace with Arc<Mutex<...>>
     audio_streams: Arc<RwLock<HashMap<AudioRenderUsage, (f32, bool)>>>,
     audio_core_request_sender: Sender<AudioCoreRequest>,
     usages_to_report: Vec<AudioRenderUsage>,

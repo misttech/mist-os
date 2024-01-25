@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-// TODO(https://fxbug.dev/115695): Remove.
+// TODO(https://fxbug.dev/42066994): Remove.
 #![allow(unused_variables, unused_imports, dead_code)]
 
 use {

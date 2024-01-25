@@ -265,7 +265,7 @@ TEST_F(MountTest, Ext4ReadOnlySmokeTest) {
   std::string expected_contents;
   EXPECT_TRUE(files::ReadFileToString("data/hello_world.txt", &expected_contents));
 
-  // TODO(https://fxbug.dev/130532) remove explicit loopback discovery and binding once unneeded
+  // TODO(https://fxbug.dev/42080815) remove explicit loopback discovery and binding once unneeded
   test_helper::ScopedFD loop_control(open("/dev/loop-control", O_RDWR, 0777));
   ASSERT_TRUE(loop_control.is_valid());
 

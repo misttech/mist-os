@@ -120,7 +120,7 @@ pub fn convert_debuglog_to_log_message(record: &zx::sys::zx_log_record_t) -> Opt
         contents.pop();
     }
 
-    // TODO(https://fxbug.dev/32998): Once we support structured logs we won't need this
+    // TODO(https://fxbug.dev/42108144): Once we support structured logs we won't need this
     // hack to match a string in klogs.
     const MAX_STRING_SEARCH_SIZE: usize = 100;
     let last = contents
@@ -374,7 +374,7 @@ mod tests {
         );
         assert_eq!(log_message.metadata.severity, Severity::Warn);
 
-        // TODO(https://fxbug.dev/74601): Once 74601 is resolved, uncomment the lines below. Prior to 74601
+        // TODO(https://fxbug.dev/42154302): Once 74601 is resolved, uncomment the lines below. Prior to 74601
         // being resolved, the follow case may fail because the line is very long, may be truncated,
         // and if it is truncated, may no longer be valid UTF8 because the truncation may occur in
         // the middle of a multi-byte character.

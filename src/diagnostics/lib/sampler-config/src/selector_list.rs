@@ -48,7 +48,7 @@ impl IntoIterator for SelectorList {
 }
 
 /// ParsedSelector stores the information Sampler needs to use the selector.
-// TODO(https://fxbug.dev/87709) - this could be more memory-efficient by using slices into the string.
+// TODO(https://fxbug.dev/42168860) - this could be more memory-efficient by using slices into the string.
 #[derive(Clone, Debug)]
 pub struct ParsedSelector {
     /// The original string, needed to initialize the ArchiveAccessor

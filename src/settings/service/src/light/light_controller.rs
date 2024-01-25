@@ -133,7 +133,7 @@ impl controller::Handle for LightController {
             Request::Get => {
                 // Read all light values from underlying fuchsia.hardware.light before returning a
                 // value to ensure we have the latest light state.
-                // TODO(https://fxbug.dev/56319): remove once all clients are migrated.
+                // TODO(https://fxbug.dev/42134045): remove once all clients are migrated.
                 Some(self.restore().await.map(|light_info| Some(SettingInfo::Light(light_info))))
             }
             _ => None,
@@ -169,7 +169,7 @@ impl LightController {
     async fn set(&self, name: String, state: Vec<LightState>) -> SettingHandlerResult {
         let id = fuchsia_trace::Id::new();
         let mut light_info = self.data_cache.lock().await;
-        // TODO(https://fxbug.dev/107540) Deduplicate the code here and in mic_mute if possible.
+        // TODO(https://fxbug.dev/42058901) Deduplicate the code here and in mic_mute if possible.
         if light_info.is_none() {
             drop(light_info);
             let _ = self.restore().await?;
@@ -337,7 +337,7 @@ impl LightController {
         for group_config in config.light_groups {
             let mut light_state: Vec<LightState> = Vec::new();
 
-            // TODO(https://fxbug.dev/56319): once all clients go through setui, restore state from hardware
+            // TODO(https://fxbug.dev/42134045): once all clients go through setui, restore state from hardware
             // only if not found in persistent storage.
             for light_index in group_config.hardware_index.iter() {
                 light_state.push(

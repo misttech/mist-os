@@ -309,7 +309,7 @@ impl EventStreamLogger {
             let counter = self.counters_node.create_uint(ty.as_ref(), 1);
             self.counters.insert(ty.clone(), counter);
         }
-        // TODO(https://fxbug.dev/92374): leverage string references for the payload.
+        // TODO(https://fxbug.dev/42174041): leverage string references for the payload.
         match &event.payload {
             EventPayload::DiagnosticsReady(DiagnosticsReadyPayload { component, .. })
             | EventPayload::LogSinkRequested(LogSinkRequestedPayload { component, .. })
@@ -322,7 +322,7 @@ impl EventStreamLogger {
     }
 
     fn log_inspect(&mut self, event_name: &str, identity: &ComponentIdentity) {
-        // TODO(https://fxbug.dev/92374): leverage string references for the `event_name`.
+        // TODO(https://fxbug.dev/42174041): leverage string references for the `event_name`.
         inspect_log!(self.component_log_node,
             "event" => event_name,
             "moniker" => identity.moniker.to_string(),

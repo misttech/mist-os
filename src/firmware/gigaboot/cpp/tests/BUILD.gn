@@ -16,7 +16,7 @@ test("gigaboot_unittests") {
     "mock_boot_service.h",
     "mock_efi_variables.h",
 
-    # TODO(https://fxbug.dev/131699) Re-enable this test once clang front end
+    # TODO(https://fxbug.dev/42081851) Re-enable this test once clang front end
     # bug is fixed.
     # "network_test.cc",
 

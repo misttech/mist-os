@@ -289,7 +289,7 @@ pub fn sys_lstat(
     user_path: UserCString,
     buffer: UserRef<uapi::stat>,
 ) -> Result<(), Errno> {
-    // TODO(https://fxbug.dev/91430): Add the `AT_NO_AUTOMOUNT` flag once it is supported in
+    // TODO(https://fxbug.dev/42172993): Add the `AT_NO_AUTOMOUNT` flag once it is supported in
     // `sys_newfstatat`.
     sys_newfstatat(locked, current_task, FdNumber::AT_FDCWD, user_path, buffer, AT_SYMLINK_NOFOLLOW)
 }
@@ -409,7 +409,7 @@ pub fn sys_stat(
     user_path: UserCString,
     buffer: UserRef<uapi::stat>,
 ) -> Result<(), Errno> {
-    // TODO(https://fxbug.dev/91430): Add the `AT_NO_AUTOMOUNT` flag once it is supported in
+    // TODO(https://fxbug.dev/42172993): Add the `AT_NO_AUTOMOUNT` flag once it is supported in
     // `sys_newfstatat`.
     sys_newfstatat(locked, current_task, FdNumber::AT_FDCWD, user_path, buffer, 0)
 }

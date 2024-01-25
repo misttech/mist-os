@@ -88,7 +88,7 @@ pub struct FlatlandScanout {
 impl Scanout for FlatlandScanout {
     fn present(&mut self) -> Result<(), Error> {
         let credits = self.present_credits.get();
-        // TODO(https://fxbug.dev/102870): For now we just skip the present if we don't have any credits.
+        // TODO(https://fxbug.dev/42053853): For now we just skip the present if we don't have any credits.
         // We need to improve this so that once we do get a credit we'll eventually flush any
         // changes to screen.
         if credits > 0 {
@@ -104,7 +104,7 @@ impl Scanout for FlatlandScanout {
         resource: Option<&Resource2D<'a>>,
     ) -> Result<(), Error> {
         if let Some(resource) = resource {
-            // TODO(https://fxbug.dev/102870): We need to set the source region from the rect in the
+            // TODO(https://fxbug.dev/42053853): We need to set the source region from the rect in the
             // VirtioGpuSetScanout command.
             //
             // In practice for single scanout configurations drivers usually provide precisely

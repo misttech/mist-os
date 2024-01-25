@@ -116,5 +116,5 @@ async fn listen_for_syslog_routed_stdio() {
     puppet.eprintln(&msg).unwrap();
     logs.filter(|m| futures::future::ready(m.msg().unwrap() == msg)).next().await;
 
-    // TODO(https://fxbug.dev/49357): add test for multiline log once behavior is defined.
+    // TODO(https://fxbug.dev/42126316): add test for multiline log once behavior is defined.
 }

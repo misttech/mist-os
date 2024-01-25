@@ -207,7 +207,7 @@ impl ShutdownWatcher {
 
     /// Notifies the registered reboot watchers of the incoming reboot request reason.
     async fn notify_reboot_watchers(&self, reason: RebootReason, timeout: Seconds) {
-        // TODO(https://fxbug.dev/44484): This string must live for the duration of the function because the
+        // TODO(https://fxbug.dev/42120903): This string must live for the duration of the function because the
         // trace macro uses it when the function goes out of scope. Therefore, it must be bound here
         // and not used anonymously at the macro callsite.
         let reason_str = format!("{:?}", reason);
@@ -223,7 +223,7 @@ impl ShutdownWatcher {
         // Create a future for each watcher that calls the watcher's `on_reboot` method and returns
         // the watcher proxy if the response was received within the timeout, or None otherwise. We
         // take this approach so that watchers that timed out have their channel dropped
-        // (https://fxbug.dev/53760).
+        // (https://fxbug.dev/42131208).
         let watcher_futures = watchers.into_iter().map(|(key, watcher_proxy)| async move {
             let deadline = zx::Duration::from_seconds(timeout.0 as i64).after_now();
             match watcher_proxy

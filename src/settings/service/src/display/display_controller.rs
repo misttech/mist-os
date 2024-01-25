@@ -392,7 +392,7 @@ impl From<ThemeModeV1> for ThemeType {
             ThemeModeV1::Default => ThemeType::Default,
             ThemeModeV1::Light => ThemeType::Light,
             ThemeModeV1::Dark => ThemeType::Dark,
-            // ThemeType has removed Auto field, see https://fxbug.dev/64775
+            // ThemeType has removed Auto field, see https://fxbug.dev/42143417
             ThemeModeV1::Unknown | ThemeModeV1::Auto => ThemeType::Unknown,
         }
     }

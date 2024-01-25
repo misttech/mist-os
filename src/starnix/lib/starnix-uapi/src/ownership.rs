@@ -27,7 +27,7 @@
 // Not all instance of OwnedRef and Releasable are used in non test code yet.
 #![allow(dead_code)]
 
-// TODO(https://fxbug.dev/131097): Create a linter to ensure TempRef is not held while calling any blocking
+// TODO(https://fxbug.dev/42081310): Create a linter to ensure TempRef is not held while calling any blocking
 // operation.
 
 use core::hash::Hasher;
@@ -51,7 +51,7 @@ macro_rules! make_ownership_types {
 pub trait [< Releasable $($suffix)? >] {
     type Context<'a>;
 
-    // TODO(https://fxbug.dev/131095): Only the `self` version should exist, but this is
+    // TODO(https://fxbug.dev/42081308): Only the `self` version should exist, but this is
     // problematic with Task and CurrentTask at this point.
     fn release<'a>(self: $self, c: Self::Context<'a>);
 }

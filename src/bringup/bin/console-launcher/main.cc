@@ -352,7 +352,7 @@ int main(int argv, char** argc) {
       continue;
     }
 
-    // TODO(https://fxbug.dev/68742): Replace the use of threads with async clients when it is
+    // TODO(https://fxbug.dev/42147799): Replace the use of threads with async clients when it is
     // possible to extract the channel from the client.
     auto [thread,
           inserted] = threads.emplace(path, [&root, client_end = std::move(endpoints->client),
@@ -517,7 +517,7 @@ int main(int argv, char** argc) {
   for (auto& thread : workers) {
     thread.join();
   }
-  // TODO(https://fxbug.dev/97657): Hang around. If we exit before archivist has started, our logs
+  // TODO(https://fxbug.dev/42179909): Hang around. If we exit before archivist has started, our logs
   // will be lost, and this log is load bearing in shell_disabled_test.
   std::promise<void>().get_future().wait();
 }

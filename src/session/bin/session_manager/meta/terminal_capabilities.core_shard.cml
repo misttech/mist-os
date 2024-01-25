@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-// TODO(https://fxbug.dev/105828): The routes in this shard are only required
+// TODO(https://fxbug.dev/42057100): The routes in this shard are only required
 // by the `terminal` component. Other (current and future) children of
 // `#session-manager` should not `use` these protocols without first
 // getting a security policy review.

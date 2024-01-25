@@ -22,14 +22,14 @@ constexpr std::string_view kLinuxKernelSerialDebugCmdline[] = {
     // to a real UART driver. The latter assumes a working transmit interrupt,
     // but we don't implement one yet.
     //
-    // TODO(https://fxbug.dev/48616): Ideally, Machina's UART would support IRQs allowing
+    // TODO(https://fxbug.dev/42125493): Ideally, Machina's UART would support IRQs allowing
     // us to just use the full UART driver.
     "keep_bootcon",
 
     // Tell Linux to not try and use the UART as a console, but use the virtual
     // console tty0 instead.
     //
-    // TODO(https://fxbug.dev/48616): If Machina's UART had full IRQ support, using
+    // TODO(https://fxbug.dev/42125493): If Machina's UART had full IRQ support, using
     // ttyS0 as a console would be fine.
     "console=tty0",
 };

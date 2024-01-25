@@ -172,7 +172,7 @@ struct InternedCategoryStorage {
 // This implementation uses the N3599 extension supported by Clang and GCC.  C++20 ratified a
 // slightly different syntax that is simple to switch to, once available, without affecting call
 // sites.
-// TODO(https://fxbug.dev/33284): Update to C++20 syntax when available.
+// TODO(https://fxbug.dev/42108463): Update to C++20 syntax when available.
 //
 // References:
 //     http://open-std.org/JTC1/SC22/WG21/docs/papers/2013/n3599.html

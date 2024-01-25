@@ -87,7 +87,7 @@ async fn send_stop_shell_command(
     guest_cmd: ShutdownCommand,
     guest_endpoint: GuestProxy,
 ) -> Result<(), Error> {
-    // TODO(https://fxbug.dev/111128): Use a different console for sending the stop command.
+    // TODO(https://fxbug.dev/42062425): Use a different console for sending the stop command.
     let socket = guest_endpoint
         .get_console()
         .await

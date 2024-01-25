@@ -33,7 +33,7 @@ zx::result<> Driver::Start() {
     return result.take_error();
   }
 
-  // (TODO:https://fxbug.dev/131463) To allow the power-simulator to be found in /dev/class/power-simulator,
+  // (TODO:https://fxbug.dev/42081644) To allow the power-simulator to be found in /dev/class/power-simulator,
   // a line needs to be added to src/lib/ddk/include/lib/ddk/protodefs.h
   result = AddChild("power-simulator", "power-sim", devfs_connector_sim_);
   if (result.is_error()) {

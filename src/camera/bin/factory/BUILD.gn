@@ -56,7 +56,7 @@ executable("camera_factory_bin") {
 fidl("fuchsia.factory.camera") {
   sdk_category = "internal"
 
-  # TODO(https://fxbug.dev/35879): Remove lint exclusions by fixing known FIDL lint violations in this target
+  # TODO(https://fxbug.dev/42111344): Remove lint exclusions by fixing known FIDL lint violations in this target
   excluded_checks = [
     "string-bounds-not-specified",
     "invalid-case-for-decl-name",

@@ -153,7 +153,7 @@ impl MigrationManager {
                         // reverted back to this build. This build doesn't know about the
                         // future migrations, so it doesn't know what state the data is in.
                         // Report an error but use the last known migration this build is aware of.
-                        // TODO(https://fxbug.dev/116822) Remove light migration fallback once proper
+                        // TODO(https://fxbug.dev/42068029) Remove light migration fallback once proper
                         // fallback handling is in place. This is safe for now since Light settings
                         // are always overwritten. The follow-up must be compatible with this
                         // fallback.

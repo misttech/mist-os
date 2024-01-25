@@ -45,7 +45,7 @@ static constexpr char kSecondNicMacString[] = "02:1a:11:00:01:01";
 
 // Run the two promises, returning the result of the first that completes.
 //
-// TODO(https://fxbug.dev/60922): When a library version becomes available, use that
+// TODO(https://fxbug.dev/42139156): When a library version becomes available, use that
 // instead.
 template <typename V, typename E>
 fpromise::promise<V, E> SelectPromise(fpromise::promise<V, E>& a, fpromise::promise<V, E>& b) {
@@ -221,7 +221,7 @@ TEST_F(VirtioNetMultipleInterfacesDebianGuestTest, ReceiveAndEchoMultiple) {
   // We can just disable this since we don't actually want our networks managed, but longer term
   // we need to improve the fake network logic.
   //
-  // TODO(https://fxbug.dev/114651): Improve fake network to reply to NetworkManager.
+  // TODO(https://fxbug.dev/42065907): Improve fake network to reply to NetworkManager.
   EXPECT_EQ(this->Execute({"sudo", "systemctl", "mask", "NetworkManager.service"}), ZX_OK);
   EXPECT_EQ(this->Execute({"sudo", "systemctl", "stop", "NetworkManager.service"}), ZX_OK);
 

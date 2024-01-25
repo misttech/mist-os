@@ -39,7 +39,7 @@ impl From<TimerRemaining> for itimerspec {
 pub struct IntervalTimer {
     pub timer_id: TimerId,
 
-    #[allow(dead_code)] // TODO(https://fxbug.dev/123084)
+    #[allow(dead_code)] // TODO(https://fxbug.dev/42074034)
     clock_id: ClockId,
 
     pub signal_event: SignalEvent,
@@ -196,7 +196,7 @@ impl IntervalTimer {
         guard.interval = interval;
         guard.on_setting_changed();
 
-        // TODO(https://fxbug.dev/123084): check on clock_id to see if the clock supports creating a timer.
+        // TODO(https://fxbug.dev/42074034): check on clock_id to see if the clock supports creating a timer.
 
         let self_ref = self.clone();
         kernel.kthreads.spawn_future(async move {

@@ -5,7 +5,7 @@
 import("//build/test.gni")
 import("//build/zircon/migrated_targets.gni")
 
-# TODO(https://fxbug.dev/54322): Keep in sync with BUILD.gn until the bootloader
+# TODO(https://fxbug.dev/42131832): Keep in sync with BUILD.gn until the bootloader
 # is fully migrated to the Fuchsia build.
 
 config("config") {

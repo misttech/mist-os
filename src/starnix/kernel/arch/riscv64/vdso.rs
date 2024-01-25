@@ -7,6 +7,6 @@ pub const VDSO_SIGRETURN_NAME: Option<&'static str> = Some("__vdso_rt_sigreturn"
 pub fn raw_ticks() -> u64 {
     // Returns 0 since the VDSO is not fully implemented for riscv64 yet.
     // This isn't a problem as vvar_data is currently unused in this architecture
-    // TODO(https://fxbug.dev/129367): Implement gettimeofday() in riscv64.
+    // TODO(https://fxbug.dev/42079789): Implement gettimeofday() in riscv64.
     0
 }

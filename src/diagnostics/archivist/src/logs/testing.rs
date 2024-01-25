@@ -77,7 +77,7 @@ impl Default for TestHarness {
 impl TestHarness {
     /// Create a new test harness which will keep its LogSinks alive as long as it itself is,
     /// useful for testing inspect hierarchies for attribution.
-    // TODO(https://fxbug.dev/53932) this will be made unnecessary by historical retention of component stats
+    // TODO(https://fxbug.dev/42131398) this will be made unnecessary by historical retention of component stats
     pub fn with_retained_sinks() -> Self {
         Self::make(true)
     }

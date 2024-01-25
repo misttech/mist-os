@@ -69,12 +69,12 @@ class TestCaseResult:
         self.metric: str = metric
         # This field below is being renamed from "label" to "metric".
         # It is duplicated as a transitional measure so that it can be accessed
-        # via either name.  TODO(https://fxbug.dev/59861): Remove the "label" field."
+        # via either name.  TODO(https://fxbug.dev/42137976): Remove the "label" field."
         self.label: str = metric
         self.unit: Unit = unit
         self.values: List[float] = values
 
-        # TODO(https://fxbug.dev/59861): Remove the statement below when "label" is removed.
+        # TODO(https://fxbug.dev/42137976): Remove the statement below when "label" is removed.
         self.label = metric
 
     def to_json(self, test_suite: str) -> Dict[str, Any]:
@@ -138,7 +138,7 @@ class MetricsSpecSet:
         self.test_suite: Optional[str] = test_suite
         self.test_name: Optional[str] = test_name
 
-        # TODO(https://fxbug.dev/59861): Remove the if block below, which is used for
+        # TODO(https://fxbug.dev/42137976): Remove the if block below, which is used for
         # backward compatible transition purpose.
         if self.test_name is None and self.test_suite is not None:
             self.test_name = self.test_suite

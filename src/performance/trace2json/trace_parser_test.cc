@@ -18,7 +18,7 @@ TEST(TraceParserTest, InvalidTrace) {
   EXPECT_FALSE(parser.ParseComplete(&input));
 }
 
-// This is a regression test for https://fxbug.dev/123479.  Check that
+// This is a regression test for https://fxbug.dev/42074400.  Check that
 // EOF is handled properly.
 //
 // The actual bug occurred on a large trace file where an

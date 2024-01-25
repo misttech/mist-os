@@ -80,7 +80,7 @@ impl From<InterfaceSpec> for Interface {
     }
 }
 
-// TODO(https://fxbug.dev/123112) Remove light sensor flags after configs updated.
+// TODO(https://fxbug.dev/42074066) Remove light sensor flags after configs updated.
 pub mod display {
     use bitflags::bitflags;
     use serde::Deserialize;

@@ -308,7 +308,7 @@ impl ReaderServer {
     /// such that the only diagnostics properties they contain are those
     /// configured by the static and client-provided selectors.
     ///
-    // TODO(https://fxbug.dev/4601): Error entries should still be included, but with a custom hierarchy
+    // TODO(https://fxbug.dev/42122598): Error entries should still be included, but with a custom hierarchy
     //             that makes it clear to clients that snapshotting failed.
     fn filter_snapshot(
         &self,

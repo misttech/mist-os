@@ -1,4 +1,4 @@
-// TODO(https://fxbug.dev/125664): Must be kept in sync with netstack's Inspect
+// TODO(https://fxbug.dev/42076420): Must be kept in sync with netstack's Inspect
 // tree manually in lieu of automated testing solution.
 [
     {

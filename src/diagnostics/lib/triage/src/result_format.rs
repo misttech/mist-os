@@ -82,7 +82,7 @@ impl<'a> ActionResultFormatter<'a> {
                 continue;
             }
             writeln!(f, "Plugin '{name}'")?;
-            // TODO(https://fxbug.dev/126054): use self.verbose flag correctly in plugins.
+            // TODO(https://fxbug.dev/42076794): use self.verbose flag correctly in plugins.
             ActionResultFormatter::new(&result).write_text(f)?;
         }
         Ok(())

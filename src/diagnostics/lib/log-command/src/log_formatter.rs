@@ -294,7 +294,7 @@ where
     }
 }
 
-// TODO(https://fxbug.dev/129280): Add unit tests once this is possible
+// TODO(https://fxbug.dev/42079693): Add unit tests once this is possible
 // to test.
 fn get_timestamp() -> Result<Timestamp> {
     Ok(Timestamp::from(
@@ -426,7 +426,7 @@ where
         };
         Ok(match log_entry {
             LogEntry { data: LogData::TargetLog(data), .. } => {
-                // TODO(https://fxbug.dev/121413): Add support for log spam redaction and other
+                // TODO(https://fxbug.dev/42072442): Add support for log spam redaction and other
                 // features listed in the design doc.
                 writeln!(self.writer, "{}", LogTextPresenter::new(&data, text_options))?;
             }

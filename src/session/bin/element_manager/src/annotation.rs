@@ -44,7 +44,7 @@ pub enum AnnotationError {
     Watch(#[from] HangingGetServerError),
 }
 
-// TODO(https://fxbug.dev/93948): clarify error types/names
+// TODO(https://fxbug.dev/42175789): clarify error types/names
 enum BufferIOError {
     BufferReadFailed,
 }
@@ -351,7 +351,7 @@ fn handle_annotation_controller_request(
             .ok();
         }
         felement::AnnotationControllerRequest::WatchAnnotations { responder } => {
-            // An error is returned if there is already a `WatchAnnotations` request pending for the client. Since the responder gets dropped (TODO(https://fxbug.dev/94602)), the connection will be closed to indicate unexpected client behavior.
+            // An error is returned if there is already a `WatchAnnotations` request pending for the client. Since the responder gets dropped (TODO(https://fxbug.dev/42176516)), the connection will be closed to indicate unexpected client behavior.
             watch_subscriber.watch_annotations(WatchResponder::AnnotationController(responder))?;
         }
     }

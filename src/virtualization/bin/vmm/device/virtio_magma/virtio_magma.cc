@@ -482,7 +482,7 @@ zx_status_t VirtioMagma::Handle_buffer_export(const virtio_magma_buffer_export_c
     return ZX_OK;
   }
 
-  // TODO(https://fxbug.dev/13261): improvement backlog
+  // TODO(https://fxbug.dev/42082665): improvement backlog
   // Perform a blocking import of the image, then return the VFD ID in the response.
   // Note that since the virtio-magma device is fully synchronous anyway, this does
   // not impact performance. Ideally, the device would stash the response chain and

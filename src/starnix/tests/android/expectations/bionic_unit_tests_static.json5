@@ -32,7 +32,7 @@
                 // Requires MTE support
                 "malloc.disable_mte",
 
-                // TODO(https://fxbug.dev/103867): Implement membarrier
+                // TODO(https://fxbug.dev/42054960): Implement membarrier
                 "membarrier.global_barrier",
                 "membarrier.global_expedited",
                 "membarrier.private_expedited",
@@ -42,7 +42,7 @@
                 "net_if.if_nameindex",
                 "net_if.if_nametoindex_if_indextoname",
 
-                // TODO(https://fxbug.dev/114813): CLONE_VM for child processes.
+                // TODO(https://fxbug.dev/42066087): CLONE_VM for child processes.
                 "sched.clone",
 
                 // Requires a configured timezone.
@@ -118,7 +118,7 @@
         {
             type: "skip",
             matchers: [
-                // https://fxbug.dev/136325
+                // https://fxbug.dev/42085923
                 "time.timer_disarm_terminates",
 
                 // This test is passing in some configurations.
@@ -156,14 +156,14 @@
                 "wctype.towupper_l",
 
                 // This is effectively a benchmark that sometimes takes too long on our bots.
-                // See https://fxbug.dev/129654#c15
+                // See https://fxbug.dev/42080036#c15
                 "stdio*.fread_unbuffered_pathological_performance",
 
-                // TODO(https://fxbug.dev/129654): Flaky on the bots - need to be investigated.
+                // TODO(https://fxbug.dev/42080036): Flaky on the bots - need to be investigated.
                 "pthread.pthread_getcpuclockid__clock_gettime",
                 "unistd*.sleep",
 
-                // TODO(https://fxbug.dev/131217): Flaky on the bots - needs to be investigated.
+                // TODO(https://fxbug.dev/42081444): Flaky on the bots - needs to be investigated.
                 "android_mallopt.multiple_enable_gwp_asan",
                 "pidfd.pidfd_open",
                 "spawn.signal_stress",

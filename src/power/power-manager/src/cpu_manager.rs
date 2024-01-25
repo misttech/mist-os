@@ -41,7 +41,7 @@ use std::rc::Rc;
 ///
 /// FIDL dependencies: No direct dependencies
 
-// NOTE(https://fxbug.dev/85815): The thermal state configuration for Sherlock is generated using a process
+// NOTE(https://fxbug.dev/42166756): The thermal state configuration for Sherlock is generated using a process
 // described in this bug.
 // TODO(fxbug/dev/85813): Move this comment to the sherlock node config.
 
@@ -103,7 +103,7 @@ struct CpuCluster {
     /// Index of this cluster's current P-state. If an update to the P-state fails, we will assume
     /// that it is between the previous and desired states (inclusive), so that pessimistic guesses
     /// of the P-state may be used accordingly.
-    // TODO(https://fxbug.dev/84685): Look into richer specification of failure modes in the CPU device
+    // TODO(https://fxbug.dev/42165500): Look into richer specification of failure modes in the CPU device
     // protocols.
     current_pstate: Cell<RangedValue<usize>>,
 }
@@ -953,7 +953,7 @@ impl Node for CpuManager {
     }
 }
 
-// TODO(https://fxbug.dev/84727): Determine whether it would be useful to track histories of any of these
+// TODO(https://fxbug.dev/42165547): Determine whether it would be useful to track histories of any of these
 // signals.
 struct InspectData {
     root_node: inspect::Node,

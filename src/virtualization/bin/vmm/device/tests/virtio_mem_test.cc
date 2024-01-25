@@ -232,7 +232,7 @@ TEST_F(VirtioMemTest, PlugAndUnplugSuccess) {
 }
 
 TEST_F(VirtioMemTest, PlugAndUnplugErrors) {
-  // TODO(https://fxbug.dev/100514): Find a way to suppress error logging from the virtio_mem component just
+  // TODO(https://fxbug.dev/42051237): Find a way to suppress error logging from the virtio_mem component just
   // for this test out of bounds plugs
   Plug(region_addr_ + kRegionSize - kPluggedBlockSize, 2, VIRTIO_MEM_RESP_ERROR);
   Plug(region_addr_, kRegionSize / kPluggedBlockSize + 1, VIRTIO_MEM_RESP_ERROR);

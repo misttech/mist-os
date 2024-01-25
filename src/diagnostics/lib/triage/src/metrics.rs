@@ -343,7 +343,7 @@ fn first_usable_value(values: impl Iterator<Item = MetricValue>) -> MetricValue 
     if found_empty {
         return MetricValue::Vector(vec![]);
     }
-    // TODO(https://fxbug.dev/58922): Improve and simplify the error semantics
+    // TODO(https://fxbug.dev/42136933): Improve and simplify the error semantics
     return missing("Every value was missing");
 }
 
@@ -881,7 +881,7 @@ impl<'a> MetricState<'a> {
         if operands.len() != 1 {
             return syntax_error("Count requires one argument, a vector");
         }
-        // TODO(https://fxbug.dev/58922): Refactor all the arg-sanitizing boilerplate into one function
+        // TODO(https://fxbug.dev/42136933): Refactor all the arg-sanitizing boilerplate into one function
         match self.evaluate(namespace, &operands[0]) {
             MetricValue::Vector(items) => {
                 let errors = items
@@ -1005,7 +1005,7 @@ impl<'a> MetricState<'a> {
         let operand_values = map_vec(&operands, |operand| self.evaluate(namespace, operand));
         let args = map_vec_r(&operand_values, |operand| unwrap_for_math(operand));
         match (args[0], args[1]) {
-            // TODO(https://fxbug.dev/58922): Refactor all the arg-sanitizing boilerplate into one function
+            // TODO(https://fxbug.dev/42136933): Refactor all the arg-sanitizing boilerplate into one function
             (MetricValue::Problem(p), MetricValue::Problem(q)) => {
                 MetricValue::Problem(Self::important_problem(vec![p, q]))
             }
@@ -1081,7 +1081,7 @@ impl<'a> MetricState<'a> {
         MetricValue::Bool(match value {
             MetricValue::Problem(Problem::UnhandledType(_)) => true,
 
-            // TODO(https://fxbug.dev/58922): Well-designed errors and special cases, not hacks
+            // TODO(https://fxbug.dev/42136933): Well-designed errors and special cases, not hacks
             // is_unhandled_type() returns false on an empty vector, while is_missing() returns
             // true as a special case. So these functions can't easily be refactored. When 58922 is
             // completed this logic will be a lot simpler and more consistent.
@@ -1108,7 +1108,7 @@ impl<'a> MetricState<'a> {
         let value = self.evaluate(namespace, &operands[0]);
         MetricValue::Bool(match value {
             MetricValue::Problem(Problem::Missing(_)) => true,
-            // TODO(https://fxbug.dev/58922): Well-designed errors and special cases, not hacks
+            // TODO(https://fxbug.dev/42136933): Well-designed errors and special cases, not hacks
             MetricValue::Vector(contents) if contents.len() == 0 => true,
             MetricValue::Vector(contents) if contents.len() == 1 => match contents[0] {
                 MetricValue::Problem(Problem::Missing(_)) => true,
@@ -1666,7 +1666,7 @@ pub(crate) mod test {
         };
     }
 
-    // TODO(https://fxbug.dev/58922): Modify or probably delete this function after better error design.
+    // TODO(https://fxbug.dev/42136933): Modify or probably delete this function after better error design.
     #[fuchsia::test]
     fn test_missing_hacks() -> Result<(), Error> {
         assert_eq!(eval!("Missing(2>'a')"), MetricValue::Bool(true));

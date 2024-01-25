@@ -13,13 +13,13 @@ pub async fn guest_vsockperf(
     args: VsockPerfArgs,
     _remote_control: RemoteControlProxy,
 ) -> Result<()> {
-    // TODO(https://fxbug.dev/116879): Remove when overnet supports duplicated socket handles.
+    // TODO(https://fxbug.dev/42068091): Remove when overnet supports duplicated socket handles.
     println!("The ffx guest plugin doesn't support duplicating handles for socket io.");
     println!("Use the guest tool instead: `fx shell guest vsock-perf {}`", args.guest_type);
-    println!("See https://fxbug.dev/116879 for updates.");
+    println!("See https://fxbug.dev/42068091 for updates.");
     return Ok(());
 
-    // TODO(https://fxbug.dev/116879): Enable when overnet supports duplicated socket handles.
+    // TODO(https://fxbug.dev/42068091): Enable when overnet supports duplicated socket handles.
     #[allow(unreachable_code)]
     {
         let services = guest_cli::platform::HostPlatformServices::new(_remote_control);

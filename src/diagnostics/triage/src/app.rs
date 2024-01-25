@@ -32,7 +32,7 @@ impl App {
     /// and writes the results to the dest. If an error occurs during the running of the app
     /// it will be returned as an Error.
     pub fn run(self, dest: &mut dyn std::io::Write) -> Result<bool, Error> {
-        // TODO(https://fxbug.dev/50449): Use 'argh' crate.
+        // TODO(https://fxbug.dev/42127530): Use 'argh' crate.
         let ProgramStateHolder { parse_result, diagnostic_data, output_format } =
             config::initialize(self.options.clone())?;
 

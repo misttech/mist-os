@@ -203,7 +203,7 @@ fuchsia_test_package("netsvc-tests-package") {
         # We get a test flake only on coverage builders that is not reproducible
         # locally, owed purely to an error log from driver test realm in an
         # otherwise-passing test.
-        # See https://fxbug.dev/131630.
+        # See https://fxbug.dev/42081776.
         max_severity = "ERROR"
       }
     }

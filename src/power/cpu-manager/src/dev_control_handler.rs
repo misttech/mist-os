@@ -231,8 +231,8 @@ impl Node for DeviceControlHandler {
         // Connect to the driver. Typically this is None, but it may be set by tests.
         let mut option = self.driver_proxy.borrow_mut();
         if option.is_none() {
-            // TODO(https://fxbug.dev/107961): Avoid relying on dev-topological access.
-            // TODO(https://fxbug.dev/119543): Get the class path from the driver specification.
+            // TODO(https://fxbug.dev/42059368): Avoid relying on dev-topological access.
+            // TODO(https://fxbug.dev/42070628): Get the class path from the driver specification.
             const DEV: &str = "/dev/class/cpu-ctrl/";
 
             let dir =

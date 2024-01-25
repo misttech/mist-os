@@ -103,7 +103,7 @@ where
             location_to_id_map: BTreeMap::new(),
             file_name_to_id_map: BTreeMap::new(),
             next_id: 0,
-            // TODO(https://fxbug.dev/45391): Factor this out into AssectCollectionInspectData
+            // TODO(https://fxbug.dev/42121910): Factor this out into AssectCollectionInspectData
             inspect_node: AssetCollectionInspectData::make_node(parent_inspect_node),
         }
     }
@@ -167,7 +167,7 @@ pub struct AssetCollection<L: AssetLoader> {
     /// `DirectoryProxy` contains an `Arc`, so it is safe to clone. We can use a directory for an
     /// extended period without keeping the entire map locked.
     //
-    // TODO(https://fxbug.dev/8904): If resource use becomes a concern, consider replacing with a LRU cache.
+    // TODO(https://fxbug.dev/42170337): If resource use becomes a concern, consider replacing with a LRU cache.
     id_to_dir_map: Mutex<BTreeMap<AssetId, io::DirectoryProxy>>,
 
     /// Cache of memory buffers
@@ -266,7 +266,7 @@ impl<L: AssetLoader> AssetCollection<L> {
                         drop(directory_cache_lock);
                         self.fetch_and_cache_package_directory(id, package_locator).await
                     }
-                    // TODO(https://fxbug.dev/8904): Implement async fetching and notification
+                    // TODO(https://fxbug.dev/42170337): Implement async fetching and notification
                     _ => Err(AssetCollectionError::UncachedEphemeral {
                         file_name: file_name.to_string(),
                         package_locator: package_locator.clone(),
@@ -291,7 +291,7 @@ impl<L: AssetLoader> AssetCollection<L> {
         // Cache directory handle
         let mut directory_cache = self.id_to_dir_map.lock().await;
         directory_cache.insert(asset_id, Clone::clone(&dir_proxy));
-        // TODO(https://fxbug.dev/8904): For "universe" fonts, send event to clients.
+        // TODO(https://fxbug.dev/42170337): For "universe" fonts, send event to clients.
 
         Ok(dir_proxy)
     }

@@ -353,7 +353,7 @@ impl FontDb {
     }
 
     /// Iterates over legacy fallbacks specified by `"fallback": true` in the font catalog.
-    // TODO(https://fxbug.dev/46156): Remove this code after all product font collections and font catalogs
+    // TODO(https://fxbug.dev/42122760): Remove this code after all product font collections and font catalogs
     // are updated.
     fn iter_legacy_fallback_chain<'a>(&'a self) -> impl Iterator<Item = v2::TypefaceId> + 'a {
         self.iter_families()

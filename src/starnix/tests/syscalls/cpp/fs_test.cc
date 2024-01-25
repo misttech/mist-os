@@ -261,7 +261,7 @@ bool has_capability(int cap) {
 }
 
 bool change_ids(uid_t user, gid_t group) {
-  // TODO(https://fxbug.dev/125669): changing the filesystem user ID from 0 to
+  // TODO(https://fxbug.dev/42076425): changing the filesystem user ID from 0 to
   // nonzero should drop capabilities, dropping them manually as a workaround.
   uid_t current_ruid, current_euid, current_suid;
   SAFE_SYSCALL(getresuid(&current_ruid, &current_euid, &current_suid));

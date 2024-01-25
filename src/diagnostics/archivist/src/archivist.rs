@@ -351,7 +351,7 @@ impl Archivist {
                 },
             );
             let accessor_pipeline = Arc::clone(pipeline);
-            // TODO(https://fxbug.dev/126321): Add Inspect support
+            // TODO(https://fxbug.dev/42077091): Add Inspect support
             let accessor = Self::add_host_before_last_dot(accessor_pipeline.protocol_name());
             svc_dir.add_fidl_service_at(
                 accessor,

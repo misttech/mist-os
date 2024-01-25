@@ -396,7 +396,7 @@ async fn run_generic_netlink<S: Sender<GenericMessage> + Send>(
 
 impl<S: Sender<GenericMessage> + Send> GenericNetlink<S> {
     pub fn new() -> (Self, impl Future<Output = ()> + Send) {
-        // TODO(https://fxbug.dev/128857): Add dynamic family support. Right now this is only
+        // TODO(https://fxbug.dev/42079282): Add dynamic family support. Right now this is only
         // structured to support static family additions.
         let (generic_netlink, netlink_fut) = Self::new_internal();
         let server = generic_netlink.server.clone();

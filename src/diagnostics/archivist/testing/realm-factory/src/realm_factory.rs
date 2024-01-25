@@ -30,7 +30,7 @@ impl ArchivistRealmFactory {
         // This child test realm allows us to downscope the event stream offered
         // to archivist to the #test subtree. We need this because it's not possible
         // to downscope an event stream to the ref "self". See
-        // https://fxbug.dev/132340 for more information.
+        // https://fxbug.dev/42082439 for more information.
         let test_realm = builder.add_child_realm("test", ChildOptions::new()).await?;
         let archivist_url =
             options.archivist_config.unwrap_or(ArchivistConfig::Default).component_url();

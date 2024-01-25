@@ -31,7 +31,7 @@ import("//build/python/python_action.gni")
 #     Type: List<Environment>
 #     Optional: environments in which the test will be executed.
 #
-# TODO(https://fxbug.dev/60611) update public pipeline docs with this template
+# TODO(https://fxbug.dev/42138811) update public pipeline docs with this template
 template("archive_pipeline") {
   assert(defined(invoker.inspect), "Must define inspect selectors")
 

@@ -15,7 +15,7 @@ rustc_library("freetype_ffi") {
   if (is_fuchsia) {
     non_rust_deps = [ "//third_party/freetype2" ]
   } else {
-    # TODO(https://fxbug.dev/36315): Remove workaround for Rust host_toolchain
+    # TODO(https://fxbug.dev/42111830): Remove workaround for Rust host_toolchain
     non_rust_deps = [ "//third_party/freetype2:freetype2_for_rust_host" ]
   }
 

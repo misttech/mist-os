@@ -28,7 +28,7 @@ const char kChildPath[] = "/pkg/bin/provider_destruction_app";
 const char kCategoriesArg[] = "--categories=" CATEGORY_NAME;
 
 // Try this many times to exercise shutdown.
-// This has been more than enough to trigger https://fxbug.dev/23108 in practice.
+// This has been more than enough to trigger https://fxbug.dev/42097157 in practice.
 constexpr size_t kNumIterations = 50;
 
 TEST(ProviderDestruction, StressTest) {

@@ -31,7 +31,7 @@ group("tests") {
     ]
   }
 
-  # TODO(https://fxbug.dev/116773): Remove !is_asan check when Starnix can run binaries built for
+  # TODO(https://fxbug.dev/42067974): Remove !is_asan check when Starnix can run binaries built for
   # ASAN.
   if (!is_asan) {
     if (target_cpu == "x64" && host_os == "linux" && host_cpu == "x64") {

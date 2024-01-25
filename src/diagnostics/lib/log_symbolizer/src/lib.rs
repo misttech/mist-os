@@ -16,7 +16,7 @@ use tokio::{
     process::Command,
 };
 
-// TODO(https://fxbug.dev/121413): Remove this.
+// TODO(https://fxbug.dev/42072442): Remove this.
 /// No-op symbolizer used for testing
 pub struct NoOpSymbolizer {
     _task: Cell<Option<fuchsia_async::Task<Result<(), async_channel::SendError<String>>>>>,

@@ -25,7 +25,7 @@
                 // dependencies. This "protocol" is a phantom used to ensure
                 // that driver-manager is shut down before power-manager is.
                 //
-                // TODO(https://fxbug.dev/119962): Change the APIs used here so
+                // TODO(https://fxbug.dev/42071033): Change the APIs used here so
                 // that driver-manager pulls policy from power-manager, rather
                 // power-manager pushing it to driver-manager.
                 "power-manager-outlives-driver-manager",

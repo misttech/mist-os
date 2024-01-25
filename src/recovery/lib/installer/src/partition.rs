@@ -125,7 +125,7 @@ impl Partition {
             {
                 return Ok(None);
             }
-            // TODO(https://fxbug.dev/44595) support any other partitions that might be needed
+            // TODO(https://fxbug.dev/42121026) support any other partitions that might be needed
             if string == "storage-sparse" {
                 pave_type = Some(PartitionPaveType::Volume);
             } else if bootloader == BootloaderType::Efi {

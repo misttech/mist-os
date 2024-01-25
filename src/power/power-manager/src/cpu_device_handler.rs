@@ -38,7 +38,7 @@ use std::rc::Rc;
 /// FIDL dependencies:
 ///     - fuchsia.hardware.cpu_ctrl.Device: used to query descriptions of CPU performance states
 //
-// TODO(https://fxbug.dev/84191): Update summary when CpuControlHandler is removed.
+// TODO(https://fxbug.dev/42164952): Update summary when CpuControlHandler is removed.
 
 /// Builder struct for CpuDeviceHandler.
 pub struct CpuDeviceHandlerBuilder<'a, 'b> {
@@ -198,7 +198,7 @@ impl Node for CpuDeviceHandler {
                     fio::OpenFlags::RIGHT_READABLE,
                 )?;
 
-                // TODO(https://fxbug.dev/113828): Remove this requirement when the configuration
+                // TODO(https://fxbug.dev/42065064): Remove this requirement when the configuration
                 // specifies the device more robustly than by its sequential number.
                 let path = self.driver_path.strip_prefix(DEV_CLASS_CPUCTRL).ok_or_else(|| {
                     anyhow::anyhow!("driver_path={} not in {}", self.driver_path, DEV_CLASS_CPUCTRL)

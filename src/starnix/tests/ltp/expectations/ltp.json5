@@ -228,7 +228,7 @@
                 // Needs working sched_getcpu()
                 "perf_event_open02",
 
-                // https://fxbug.dev/127682
+                // https://fxbug.dev/42078242
                 "times03",
                 "umip_basic_test",
                 "umount02",
@@ -246,17 +246,17 @@
                 "sgetmask01",
 
                 // These tests fail when an init is run in the container to set up /apex.
-                // TODO(https://fxbug.dev/129839) re-enable these tests
+                // TODO(https://fxbug.dev/42080241) re-enable these tests
                 "mmapstress04",
             ],
         },
         {
             type: "skip",
             matchers: [
-                // https://fxbug.dev/136331
+                // https://fxbug.dev/42085930
                 "fgetxattr01",
 
-                // https://fxbug.dev/135993
+                // https://fxbug.dev/42085553
                 "open04",
 
                 // Flaky test.

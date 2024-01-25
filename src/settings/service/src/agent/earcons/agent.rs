@@ -85,7 +85,7 @@ impl Agent {
         {
             // For now, report back as an error to prevent issues on
             // platforms that don't support the handler's dependencies.
-            // TODO(https://fxbug.dev/61341): Handle with config
+            // TODO(https://fxbug.dev/42139617): Handle with config
             tracing::error!("Could not set up VolumeChangeHandler: {:?}", e);
         }
 
@@ -99,7 +99,7 @@ impl Agent {
         {
             // For now, report back as an error to prevent issues on
             // platforms that don't support the handler's dependencies.
-            // TODO(https://fxbug.dev/61341): Handle with config
+            // TODO(https://fxbug.dev/42139617): Handle with config
             tracing::error!("Could not set up BluetoothHandler");
         }
 

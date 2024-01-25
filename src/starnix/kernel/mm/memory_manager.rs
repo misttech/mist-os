@@ -672,7 +672,7 @@ fn map_in_vmar(
         } else {
             // When we don't expect to have ZX_RIGHT_WRITEABLE, fall back to a VMO op that doesn't
             // need it.
-            // TODO(https://fxbug.dev/132494) use a gentler signal when available
+            // TODO(https://fxbug.dev/42082608) use a gentler signal when available
             zx::VmoOp::ALWAYS_NEED
         };
         trace_duration!(trace_category_starnix_mm!(), "MmapCommitPages");
@@ -1360,7 +1360,7 @@ impl MemoryManagerState {
         prot_flags: ProtectionFlags,
     ) -> Result<(), Errno> {
         profile_duration!("Protect");
-        // TODO(https://fxbug.dev/97514): If the mprotect flags include PROT_GROWSDOWN then the specified protection may
+        // TODO(https://fxbug.dev/42179751): If the mprotect flags include PROT_GROWSDOWN then the specified protection may
         // extend below the provided address if the lowest mapping is a MAP_GROWSDOWN mapping. This function has to
         // compute the potentially extended range before modifying the Zircon protections or metadata.
         let vmar_flags = prot_flags.to_vmar_flags();
@@ -1603,7 +1603,7 @@ impl MemoryManagerState {
             // Don't grow a read-only GROWSDOWN mapping for a write fault, it won't work.
             return Ok(false);
         }
-        // TODO(https://fxbug.dev/97514): Once we add a guard region below a growsdown mapping we will need to move that
+        // TODO(https://fxbug.dev/42179751): Once we add a guard region below a growsdown mapping we will need to move that
         // before attempting to map the grown area.
         let low_addr = addr - (addr.ptr() as u64 % *PAGE_SIZE);
         let high_addr = mapping_low_addr;
@@ -1611,7 +1611,7 @@ impl MemoryManagerState {
             .ptr()
             .checked_sub(low_addr.ptr())
             .ok_or_else(|| anyhow!("Invalid growth range"))?;
-        // TODO(https://fxbug.dev/97514): - Instead of making a new VMO, perhaps a growsdown mapping should be oversized to start with the end mapped.
+        // TODO(https://fxbug.dev/42179751): - Instead of making a new VMO, perhaps a growsdown mapping should be oversized to start with the end mapped.
         // Then on extension we could map further down in the VMO for as long as we had space.
         let vmo = Arc::new(zx::Vmo::create(length as u64).map_err(|s| match s {
             zx::Status::NO_MEMORY | zx::Status::OUT_OF_RANGE => {
@@ -1951,7 +1951,7 @@ pub trait TaskMemoryAccessor: MemoryAccessor {
     fn maximum_valid_address(&self) -> UserAddress;
 }
 
-// TODO(https://fxbug.dev/129310): replace this with MaybeUninit::as_bytes_mut.
+// TODO(https://fxbug.dev/42079727): replace this with MaybeUninit::as_bytes_mut.
 #[inline]
 fn object_as_mut_bytes<T: FromBytes + Sized>(
     object: &mut MaybeUninit<T>,
@@ -1967,7 +1967,7 @@ fn object_as_mut_bytes<T: FromBytes + Sized>(
     }
 }
 
-// TODO(https://fxbug.dev/129310): replace this with MaybeUninit::slice_as_bytes_mut.
+// TODO(https://fxbug.dev/42079727): replace this with MaybeUninit::slice_as_bytes_mut.
 #[inline]
 fn slice_as_mut_bytes<T: FromBytes + Sized>(
     slice: &mut [MaybeUninit<T>],
@@ -2018,7 +2018,7 @@ pub unsafe fn read_to_vec<T: FromBytes>(
 pub unsafe fn read_to_array<T: FromBytes, const N: usize>(
     read_fn: impl FnOnce(&mut [MaybeUninit<T>]) -> Result<(), Errno>,
 ) -> Result<[T; N], Errno> {
-    // TODO(https://fxbug.dev/129314): replace with MaybeUninit::uninit_array.
+    // TODO(https://fxbug.dev/42079731): replace with MaybeUninit::uninit_array.
     let buffer: MaybeUninit<[MaybeUninit<T>; N]> = MaybeUninit::uninit();
     // SAFETY: We are converting from an uninitialized array to an array
     // of uninitialized elements which is the same. See
@@ -2714,7 +2714,7 @@ impl MemoryManager {
     where
         L: LockBefore<MmDumpable>,
     {
-        // TODO(https://fxbug.dev/123742): When SNAPSHOT (or equivalent) is supported on pager-backed VMOs
+        // TODO(https://fxbug.dev/42074633): When SNAPSHOT (or equivalent) is supported on pager-backed VMOs
         // we can remove the hack below (which also won't be performant). For now, as a workaround,
         // we use SNAPSHOT_AT_LEAST_ON_WRITE on both the child and the parent.
 
@@ -3645,7 +3645,7 @@ pub fn create_anonymous_mapping_vmo(size: u64) -> Result<Arc<zx::Vmo>, Errno> {
     set_zx_name(&vmo, b"starnix-anon");
 
     profile.pivot("ReplaceAnonVmoAsExecutable");
-    // TODO(https://fxbug.dev/105639): Audit replace_as_executable usage
+    // TODO(https://fxbug.dev/42056890): Audit replace_as_executable usage
     vmo = vmo.replace_as_executable(&VMEX_RESOURCE).map_err(impossible_error)?;
     Ok(Arc::new(vmo))
 }

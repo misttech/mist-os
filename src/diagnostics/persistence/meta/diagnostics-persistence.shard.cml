@@ -23,7 +23,7 @@
         },
 
         // Persistence also uses /cache but needs it declared differently in production and test.
-        // TODO(https://fxbug.dev/100608): Put /cache here when possible.
+        // TODO(https://fxbug.dev/42051341): Put /cache here when possible.
     ],
     expose: [
         {

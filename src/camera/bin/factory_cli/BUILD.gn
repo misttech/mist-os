@@ -20,7 +20,7 @@ executable("camera_factory_cli_bin") {
     "//zircon/system/ulib/async-loop:async-loop-default",
   ]
 
-  # TODO(https://fxbug.dev/135694): delete the below and fix compiler warnings
+  # TODO(https://fxbug.dev/42085293): delete the below and fix compiler warnings
   configs += [ "//build/config:Wno-vla-cxx-extension" ]
 }
 

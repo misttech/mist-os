@@ -12,7 +12,7 @@ guest_packages = [
   "//src/virtualization/bin/guest_manager:debian_guest_manager",
   "//src/virtualization/bin/guest_manager:zircon_guest_manager",
 
-  # TODO(https://fxbug.dev/122217): when
+  # TODO(https://fxbug.dev/42073215): when
   # fuchsia.component.test/Realm.InitMutableConfigFromPackage works with
   # subpackaged components, replace with:
   # "//src/virtualization/bin/termina_guest_manager",
@@ -55,10 +55,10 @@ group("tests") {
     "virtio_input_test_util:tests($host_toolchain)",
   ]
 
-  # TODO(https://fxbug.dev/12616): These tests currently do not work on arm64.
+  # TODO(https://fxbug.dev/42076911): These tests currently do not work on arm64.
   if (current_cpu == "x64") {
     deps += [
-      # TODO(https://fxbug.dev/64348): These tests needs to be reworked so that they
+      # TODO(https://fxbug.dev/42142945): These tests needs to be reworked so that they
       # interact correctly with Scenic.
       ":virtualization_magma_tests_pkg",
       ":virtualization_sound_tests_pkg",
@@ -83,7 +83,7 @@ group("test_images") {
     linux_tests_label,
     termina_extras_label,
 
-    # TODO(https://fxbug.dev/122217): when
+    # TODO(https://fxbug.dev/42073215): when
     # fuchsia.component.test/Realm.InitMutableConfigFromPackage works with
     # subpackaged components, remove this line.
     "//src/virtualization/bin/termina_guest_manager:termina_guest_manager_cmp",
@@ -633,7 +633,7 @@ fuchsia_test_package("termina_container_tests_pkg") {
   subpackages = guest_packages
   test_specs = {
     if (is_debug) {
-      # See https://fxbug.dev/110903 for test timeouts when starting the container.
+      # See https://fxbug.dev/42062247 for test timeouts when starting the container.
       timeout_secs = 420
     }
     environments = [ nuc_env ]

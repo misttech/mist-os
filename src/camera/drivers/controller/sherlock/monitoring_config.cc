@@ -36,7 +36,7 @@ static fuchsia::camera2::hal::StreamConfig OutputStreamMLFRConfig() {
   stream.set_bytes_per_row_divisor(kIspBytesPerRowDivisor);
   stream.set_contiguous(true);
   stream.set_frames_per_second(kOutputStreamMlFRFrameRate);
-  // TODO(https://fxbug.dev/99578): Support releasing initial participants' camping buffer counts.
+  // TODO(https://fxbug.dev/42182036): Support releasing initial participants' camping buffer counts.
   stream.set_buffer_count_for_camping(kMonitoringIspFROutputBuffers + kMonitoringGDC1InputBuffers);
   stream.set_min_buffer_count(kMonitoringIspFROutputBuffers + kMonitoringGDC1InputBuffers +
                               kOutputStreamMlFRMaxClientBuffers);

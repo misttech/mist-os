@@ -270,14 +270,14 @@ impl FidlStorage {
     }
 
     #[cfg(test)]
-    // TODO(https://fxbug.dev/91407) Remove allow once all tests have been migrated to fidl storage.
+    // TODO(https://fxbug.dev/42172967) Remove allow once all tests have been migrated to fidl storage.
     #[allow(dead_code)]
     fn set_caching_enabled(&mut self, enabled: bool) {
         self.caching_enabled = enabled;
     }
 
     #[cfg(test)]
-    // TODO(https://fxbug.dev/91407) Remove allow once all tests have been migrated to fidl storage.
+    // TODO(https://fxbug.dev/42172967) Remove allow once all tests have been migrated to fidl storage.
     #[allow(dead_code)]
     fn set_debounce_writes(&mut self, debounce: bool) {
         self.debounce_writes = debounce;
@@ -352,7 +352,7 @@ impl FidlStorage {
         let typed_storage = self
             .typed_storage_map
             .get(key)
-            // TODO(https://fxbug.dev/113292) Replace this with an error result.
+            // TODO(https://fxbug.dev/42064613) Replace this with an error result.
             .unwrap_or_else(|| panic!("Invalid data keyed by {key}"));
         let mut cached_storage = typed_storage.cached_storage.lock().await;
         if cached_storage.current_data.is_none() || !self.caching_enabled {
@@ -365,13 +365,13 @@ impl FidlStorage {
             {
                 Ok(file_proxy) => Some(file_proxy),
                 Err(OpenError::OpenError(Status::NOT_FOUND)) => None,
-                // TODO(https://fxbug.dev/113292) Replace this with an error result.
+                // TODO(https://fxbug.dev/42064613) Replace this with an error result.
                 Err(e) => panic!("failed to open file for {key:?}: {e:?}"),
             } {
                 let data = match fuchsia_fs::file::read(&file_proxy).await {
                     Ok(data) => Some(data),
                     Err(ReadError::ReadError(Status::NOT_FOUND)) => None,
-                    // TODO(https://fxbug.dev/113292) Replace this with an error result.
+                    // TODO(https://fxbug.dev/42064613) Replace this with an error result.
                     Err(e) => panic!("failed to get fidl data from disk for {key:?}: {e:?}"),
                 };
 

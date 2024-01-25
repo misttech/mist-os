@@ -157,7 +157,7 @@ pub async fn list_files(
 
         // `fuchsia_fs::directory::open_directory` could block forever when the directory
         // it is trying to open does not exist.
-        // TODO(https://fxbug.dev/110964): use `open_directory` hang bug is fixed.
+        // TODO(https://fxbug.dev/42062314): use `open_directory` hang bug is fixed.
         let diagnostics_dir_proxy = match fuchsia_fs::directory::open_directory_no_describe(
             &out_dir_proxy,
             "diagnostics",

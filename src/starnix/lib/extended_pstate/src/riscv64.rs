@@ -10,7 +10,7 @@ pub struct State {
     // Floating-point registers from the F and D extensions.
     pub fp_registers: [u64; 32usize],
     pub fcsr: u32,
-    // TODO(https://fxbug.dev/124336): Save state for the V extension if necessary.
+    // TODO(https://fxbug.dev/42075221): Save state for the V extension if necessary.
 }
 
 const_assert_eq!(std::mem::size_of::<State>(), 264);

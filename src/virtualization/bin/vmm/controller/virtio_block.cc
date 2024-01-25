@@ -21,7 +21,7 @@ uint32_t read_only(fuchsia::virtualization::BlockMode mode) {
 }
 
 uint32_t discardable(fuchsia::virtualization::BlockFormat& format) {
-  // TODO(https://fxbug.dev/90622): Enable discard support if BLOCK is the format used.
+  // TODO(https://fxbug.dev/42172095): Enable discard support if BLOCK is the format used.
   return 0;
 }
 

@@ -108,7 +108,7 @@ class FakeDev {
         devmgr_integration_test::IsolatedDevmgr::Create(std::move(args), dispatcher);
     ASSERT_OK(devmgr.status_value());
     devmgr_ = std::move(devmgr.value());
-    // TODO(https://fxbug.dev/80815): Stop requiring this recursive wait.
+    // TODO(https://fxbug.dev/42161201): Stop requiring this recursive wait.
     ASSERT_OK(device_watcher::RecursiveWaitForFile(devmgr_.devfs_root().get(),
                                                    "sys/platform/00:00:2d/ramctl")
                   .status_value());

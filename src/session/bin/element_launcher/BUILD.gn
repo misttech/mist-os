@@ -53,7 +53,7 @@ fuchsia_package("element_launcher") {
 
 # Make `element_launcher` available to products assembled with Bazel.
 #
-# TODO(https://fxbug.dev/122492): Make this less verbose.
+# TODO(https://fxbug.dev/42073448): Make this less verbose.
 fuchsia_package_archive("element_launcher_archive") {
   package = ":element_launcher"
 }

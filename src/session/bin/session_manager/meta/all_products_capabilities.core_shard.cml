@@ -269,7 +269,7 @@
             ],
         },
 
-        // TODO(https://fxbug.dev/126266): As of 2023-04-26, `session-manager` only uses
+        // TODO(https://fxbug.dev/42077029): As of 2023-04-26, `session-manager` only uses
         // this directory so developers can stop the session from automatically
         // launching on boot. Once structured configuration provides first-class
         // support for this kind of override, consider removing this stanza.

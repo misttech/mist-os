@@ -14,7 +14,7 @@
 // 5.15 kernel which is used by Termina supports virtio-mem only on x86-64
 // https://elixir.bootlin.com/linux/v5.15.81/source/drivers/virtio/Kconfig#L99
 //
-// TODO(https://fxbug.dev/100514): Enable ARM once kernel is updated to 5.18 or later
+// TODO(https://fxbug.dev/42051237): Enable ARM once kernel is updated to 5.18 or later
 // https://elixir.bootlin.com/linux/v5.18/source/drivers/virtio/Kconfig#L108
 #ifndef __aarch64__
 namespace {
@@ -62,7 +62,7 @@ class VirtioMemTerminaGuest : public TerminaEnclosedGuest {
     uint64_t upper_limit_guest_memory = (free_bytes / 3 * 2) & ~(kLinuxMinimalDIMMSize - 1);
     uint64_t guest_memory = std::min(kDesiredGuestMemory, upper_limit_guest_memory);
 
-    // TODO(https://fxbug.dev/100514): Bump up the number of PCI slots
+    // TODO(https://fxbug.dev/42051237): Bump up the number of PCI slots
     //
     // Not enough PCI slots, turn off a few devices
     launch_info->config.set_guest_memory(guest_memory);
@@ -86,7 +86,7 @@ class VirtioMemDebianGuest : public DebianEnclosedGuest {
     if (status != ZX_OK) {
       return status;
     }
-    // TODO(https://fxbug.dev/100514): Bump up the number of PCI slots
+    // TODO(https://fxbug.dev/42051237): Bump up the number of PCI slots
     //
     // Not enough PCI slots, turn off a few devices
     launch_info->config.set_virtio_rng(false);
@@ -168,7 +168,7 @@ void RequestMemoryAndWaitForCompletion(
                 << " plugged_size = " << plugged_size;
 }
 
-// TODO(https://fxbug.dev/100514): Re-enable Debian after finding out why it doesn't update the total system
+// TODO(https://fxbug.dev/42051237): Re-enable Debian after finding out why it doesn't update the total system
 // memory after the successful hotplug
 using GuestTypes = ::testing::Types<VirtioMemTerminaGuest>;
 TYPED_TEST_SUITE(MemGuestTest, GuestTypes, GuestTestNameGenerator);

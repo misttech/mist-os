@@ -78,7 +78,7 @@ where
     /// Maps from a unique "full name" to a typeface
     full_name_lookup: BTreeMap<String, Arc<Typeface>>,
     /// Holds Inspect data about manifests, families, and the fallback collection.
-    // TODO(https://fxbug.dev/84729)
+    // TODO(https://fxbug.dev/42165549)
     #[allow(unused)]
     inspect_data: inspect::ServiceInspectData,
 
@@ -224,7 +224,7 @@ where
             "service:match_non_unique_typeface_request",
             "family" => &query_family_string[..]
         );
-        // TODO(https://fxbug.dev/44328): If support for lazy trace args is added, include more query params, e.g.
+        // TODO(https://fxbug.dev/42120730): If support for lazy trace args is added, include more query params, e.g.
         // code points.
 
         let matched_family: Option<FontFamilyMatch<'_>> =
@@ -465,13 +465,13 @@ where
         use fonts::ProviderRequest::*;
 
         match request {
-            // TODO(https://fxbug.dev/8903): Remove when all clients have migrated to GetTypeface
+            // TODO(https://fxbug.dev/42170326): Remove when all clients have migrated to GetTypeface
             GetFont { request, responder } => {
                 let request = request.into_typeface_request();
                 let response = self.match_request(request).await?.into_font_response();
                 Ok(responder.send(response)?)
             }
-            // TODO(https://fxbug.dev/8903): Remove when all clients have migrated to GetFontFamilyInfo
+            // TODO(https://fxbug.dev/42170326): Remove when all clients have migrated to GetFontFamilyInfo
             GetFamilyInfo { family, responder } => {
                 let font_info =
                     self.get_family_info(fonts::FamilyName { name: family }).into_family_info();
@@ -485,7 +485,7 @@ where
                 let family_info = self.get_family_info(family);
                 Ok(responder.send(&family_info)?)
             }
-            // TODO(https://fxbug.dev/34897): Implement font event dispatch
+            // TODO(https://fxbug.dev/42110254): Implement font event dispatch
             RegisterFontSetEventListener { listener: _, responder: _ } => unimplemented!(),
         }
     }

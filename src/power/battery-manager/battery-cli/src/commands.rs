@@ -13,7 +13,7 @@ use {
     },
 };
 
-//TODO(https://fxbug.dev/46991): Make the macro a library
+//TODO(https://fxbug.dev/42123687): Make the macro a library
 /// Macro to generate a command enum and its impl.
 macro_rules! gen_commands {
     ($name:ident {

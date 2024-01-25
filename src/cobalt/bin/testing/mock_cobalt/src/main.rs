@@ -69,7 +69,7 @@ async fn run_metrics_service(
                         responder,
                         ..
                     } => {
-                        // TODO(https://fxbug.dev/90740): Support experiment_ids.
+                        // TODO(https://fxbug.dev/42172226): Support experiment_ids.
                         let handler = make_handler(project_spec, &loggers, logger);
                         let () = responder.send(Ok(()))?;
                         handler.await

@@ -411,7 +411,7 @@ impl Socket {
     {
         let user_addr = UserAddress::from(arg);
 
-        // TODO(https://fxbug.dev/129059): Share this implementation with `fdio`
+        // TODO(https://fxbug.dev/42079507): Share this implementation with `fdio`
         // by moving things to `zxio`.
 
         // The following netdevice IOCTLs are supported on all sockets for

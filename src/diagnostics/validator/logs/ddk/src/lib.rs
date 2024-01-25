@@ -56,7 +56,7 @@ impl Puppet {
         let test_file = "test_file.cc".to_string();
         let test_line_64: u64 = 9001;
         let test_line_32 = 9001;
-        // TODO(https://fxbug.dev/66981): Additional arguments aren't yet supported by the DDK.
+        // TODO(https://fxbug.dev/42145848): Additional arguments aren't yet supported by the DDK.
         let record = Record {
             arguments: vec![Argument {
                 name: "message".to_string(),

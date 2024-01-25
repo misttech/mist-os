@@ -162,7 +162,7 @@ void PipelineManager::ShutdownImpl() {
   }
 }
 
-// TODO(https://fxbug.dev/100525): the notion of "shutdown" being a required step
+// TODO(https://fxbug.dev/42051249): the notion of "shutdown" being a required step
 void PipelineManager::SetPipelineChanging(bool changing) {
   TRACE_DURATION("camera", "PipelineManager::SetPipelineChanging", "changing", changing);
   ZX_ASSERT_MSG(changing != pipeline_changing_, "pipeline already %s",

@@ -86,7 +86,7 @@ class TraceImportingTest(unittest.TestCase):
         self.assertNotEqual(len(list(model.all_events())), 0)
 
     def test_zero_length_duration_events(self) -> None:
-        # This is a regression test for a bug (https://fxbug.dev/131863) where
+        # This is a regression test for a bug (https://fxbug.dev/42082034) where
         # trace importing fails to correctly handle zero-length trace
         # durations with the ph='X' type.
         #
@@ -126,7 +126,7 @@ class TraceImportingTest(unittest.TestCase):
         # durations have the same start timestamp. The tests the case of
         # separate begin and end records (ph='B' and ph='E') in the input.
         #
-        # This is a regression test for a bug (https://fxbug.dev/131863). The
+        # This is a regression test for a bug (https://fxbug.dev/42082034). The
         # bug arose because the trace importer sorted the trace events using a
         # non-stable sort (likely quicksort). We use an example input here
         # with a moderate number of trace events (100) because the bug did

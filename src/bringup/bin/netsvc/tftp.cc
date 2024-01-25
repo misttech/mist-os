@@ -53,7 +53,7 @@ void debug_print_packet(const char* prefix, const cpp20::span<uint8_t>& pkt) {
   printf("netsvc: tftp %s: %ld bytes: ", prefix, pkt.size());
   // Only print enough bytes so we can see the TFTP header and some initial
   // bytes. We're trying to catch problems while transferring data and the
-  // header is rather small (4 bytes). See https://fxbug.dev/90854.
+  // header is rather small (4 bytes). See https://fxbug.dev/42172352.
   size_t print_len = std::min(pkt.size(), static_cast<size_t>(16));
   for (const uint8_t& b : pkt.subspan(0, print_len)) {
     printf("%02x", b);

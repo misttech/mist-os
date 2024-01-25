@@ -185,7 +185,7 @@ const RESTRICTED_ENTER_OPTIONS: u32 = 0;
 ///   5. Handle pending signals.
 ///   6. Goto 1.
 ///
-/// TODO(https://fxbug.dev/117302): Note, cross-process shared resources allocated in this function
+/// TODO(https://fxbug.dev/42068497): Note, cross-process shared resources allocated in this function
 /// that aren't freed by the Zircon kernel upon thread and/or process termination (like mappings in
 /// the shared region) should be freed in `Task::destroy_do_not_use_outside_of_drop_if_possible()`.
 fn run_task(

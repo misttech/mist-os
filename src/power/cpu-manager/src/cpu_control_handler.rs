@@ -564,7 +564,7 @@ impl Node for CpuControlHandler {
                     fio::OpenFlags::RIGHT_READABLE,
                 )?;
 
-                // TODO(https://fxbug.dev/113828): Remove this requirement when the configuration
+                // TODO(https://fxbug.dev/42065064): Remove this requirement when the configuration
                 // specifies the device more robustly than by its sequential number.
                 let path =
                     self.cpu_driver_path.strip_prefix(DEV_CLASS_CPUCTRL).ok_or_else(|| {

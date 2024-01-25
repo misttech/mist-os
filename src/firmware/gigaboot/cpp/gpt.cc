@@ -425,7 +425,7 @@ cpp20::span<const std::array<char, GPT_NAME_LEN / 2>> EfiGptBlockDevice::ListPar
   return cpp20::span(utf8_names_.begin(), last_partition);
 }
 
-// TODO(https://fxbug.dev/79197): The function currently only finds the storage devie that hosts
+// TODO(https://fxbug.dev/42159406): The function currently only finds the storage devie that hosts
 // the currently running image. This can be a problem when booting from USB. Add support to handle
 // the USB case.
 fit::result<efi_status, EfiGptBlockDevice> FindEfiGptDevice() {

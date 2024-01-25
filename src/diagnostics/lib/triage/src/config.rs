@@ -98,7 +98,7 @@ impl<'de> Deserialize<'de> for SelectorEntry {
     }
 }
 
-// TODO(https://fxbug.dev/111911): This struct should be removed once serde_json5 has DeserializeSeed support.
+// TODO(https://fxbug.dev/42063223): This struct should be removed once serde_json5 has DeserializeSeed support.
 #[derive(Deserialize, Debug)]
 #[serde(tag = "type")]
 pub enum ActionConfig {

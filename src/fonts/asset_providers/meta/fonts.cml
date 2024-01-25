@@ -47,7 +47,7 @@
             to: "#font-server",
             rights: [ "r*" ],
 
-            // TODO(https://fxbug.dev/130462): Remove once config-data is not needed.
+            // TODO(https://fxbug.dev/42080737): Remove once config-data is not needed.
             availability: "optional",
         },
 

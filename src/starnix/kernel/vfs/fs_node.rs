@@ -71,7 +71,7 @@ pub struct FsNode {
     ops: Box<dyn FsNodeOps>,
 
     /// The current kernel.
-    // TODO(https://fxbug.dev/130251): This is a temporary measure to access a task on drop.
+    // TODO(https://fxbug.dev/42080557): This is a temporary measure to access a task on drop.
     kernel: Weak<Kernel>,
 
     /// The FileSystem that owns this FsNode's tree.

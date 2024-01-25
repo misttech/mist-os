@@ -101,7 +101,7 @@ impl<'a> StructuredActionContext<'a> {
 }
 
 impl StructuredActionContext<'_> {
-    // TODO(https://fxbug.dev/96685): This must be refactored into `build`.
+    // TODO(https://fxbug.dev/42178829): This must be refactored into `build`.
     // remove the unnecessary code blocks after refactor.
     /// Processes all actions, acting on the ones that trigger.
     pub fn process(&mut self) -> &TriageOutput {
@@ -527,7 +527,7 @@ mod test {
         );
     }
 
-    // TODO(https://fxbug.dev/96683): Additional unit tests required.
+    // TODO(https://fxbug.dev/42178827): Additional unit tests required.
 
     #[fuchsia::test]
     fn actions_cache_correctly() {

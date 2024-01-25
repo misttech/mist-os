@@ -75,18 +75,18 @@ pub async fn populate_data_map(inspect_handles: &[InspectHandle]) -> DataMap {
 /// Searches the directory specified by inspect_directory_proxy for
 /// .inspect files and populates the `inspect_data_map` with the found VMOs.
 async fn populate_data_map_from_dir(inspect_proxy: &fio::DirectoryProxy) -> DataMap {
-    // TODO(https://fxbug.dev/36762): Use a streaming and bounded readdir API when available to avoid
+    // TODO(https://fxbug.dev/42112326): Use a streaming and bounded readdir API when available to avoid
     // being hung.
     let entries = fuchsia_fs::directory::readdir_recursive(inspect_proxy, /* timeout= */ None)
         .filter_map(|result| {
             async move {
-                // TODO(https://fxbug.dev/49157): decide how to show directories that we failed to read.
+                // TODO(https://fxbug.dev/42126094): decide how to show directories that we failed to read.
                 result.ok()
             }
         });
     let mut data_map = DataMap::new();
     pin_mut!(entries);
-    // TODO(https://fxbug.dev/60250) convert this async loop to a stream so we can carry backpressure
+    // TODO(https://fxbug.dev/42138410) convert this async loop to a stream so we can carry backpressure
     while let Some(entry) = entries.next().await {
         // We are only currently interested in inspect VMO files (root.inspect) and
         // inspect services.
@@ -317,7 +317,7 @@ mod tests {
         ns.unbind(path).unwrap();
     }
 
-    // TODO(https://fxbug.dev/93344): remove this test when the out/diagnostics dir is removed
+    // TODO(https://fxbug.dev/42175119): remove this test when the out/diagnostics dir is removed
     #[fuchsia::test]
     async fn inspect_data_collector_tree() {
         let path = "/test-bindings2/out";

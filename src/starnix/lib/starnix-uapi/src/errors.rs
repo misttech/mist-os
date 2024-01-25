@@ -375,7 +375,7 @@ macro_rules! errno_from_zxio_code {
 
 // There isn't really a mapping from zx::Status to Errno. The correct mapping is context-speific
 // but this converter is a reasonable first-approximation. The translation matches
-// fdio_status_to_errno. See https://fxbug.dev/30921 for more context.
+// fdio_status_to_errno. See https://fxbug.dev/42105838 for more context.
 // TODO: Replace clients with more context-specific mappings.
 #[macro_export]
 macro_rules! from_status_like_fdio {

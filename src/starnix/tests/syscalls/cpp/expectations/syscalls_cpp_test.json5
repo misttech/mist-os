@@ -6,14 +6,14 @@
         {
             type: "skip",
             matchers: [
-                // TODO(https://fxbug.dev/97514): Make these tests pass in Starnix then enable.
+                // TODO(https://fxbug.dev/42179751): Make these tests pass in Starnix then enable.
                 "MapGrowsdownTest.Mprotect*",
                 "MapGrowsdownTest.Syscall*",
 
-                // TODO(https://fxbug.dev/129704): This test causes the test suite to fail on NUC.
+                // TODO(https://fxbug.dev/42080092): This test causes the test suite to fail on NUC.
                 "RestartRead.ReadFromPipeRestarts",
 
-                // TODO(https://fxbug.dev/127336)
+                // TODO(https://fxbug.dev/42077930)
                 "Shared/MMapProcStatmTest.RssAfterUnmap/0",
                 "Shared/MMapProcStatmTest.RssAfterMapOverride/0",
 
@@ -24,10 +24,10 @@
         {
             type: "expect_failure",
             matchers: [
-                // TODO(https://fxbug.dev/121778)
+                // TODO(https://fxbug.dev/42072786)
                 "MMapProcTest.AdjacentFileMappings",
 
-                // TODO(https://fxbug.dev/128842)
+                // TODO(https://fxbug.dev/42079266)
                 "VdsoTest.VdsoCanBeMadvised",
             ],
         },

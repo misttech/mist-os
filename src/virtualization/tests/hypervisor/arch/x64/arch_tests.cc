@@ -141,7 +141,7 @@ TEST(Guest, VcpuInterruptPriority) {
   ASSERT_EQ(test.vcpu.read_state(ZX_VCPU_STATE, &vcpu_state, sizeof(vcpu_state)), ZX_OK);
   EXPECT_EQ(vcpu_state.rax, kInterruptVector);
 
-  // TODO(https://fxbug.dev/12585): Check that the exception is cleared.
+  // TODO(https://fxbug.dev/42076626): Check that the exception is cleared.
 }
 
 TEST(Guest, VcpuNmi) {
@@ -180,7 +180,7 @@ TEST(Guest, VcpuNmiPriority) {
   ASSERT_EQ(test.vcpu.read_state(ZX_VCPU_STATE, &vcpu_state, sizeof(vcpu_state)), ZX_OK);
   EXPECT_EQ(vcpu_state.rax, kNmiVector);
 
-  // TODO(https://fxbug.dev/12585): Check that the interrupt is queued.
+  // TODO(https://fxbug.dev/42076626): Check that the interrupt is queued.
 }
 
 TEST(Guest, VcpuException) {

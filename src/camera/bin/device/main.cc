@@ -126,7 +126,7 @@ int main(int argc, char* argv[]) {
         }
         device = result.take_value();
 
-        // TODO(https://fxbug.dev/44628): publish discoverable service name once supported
+        // TODO(https://fxbug.dev/42121063): publish discoverable service name once supported
         zx_status_t status =
             context->outgoing()->AddPublicService(device->GetHandler(), outgoing_service_name);
         if (status != ZX_OK) {

@@ -943,7 +943,7 @@ impl ThreadGroup {
             zx::Task::get_runtime_info(process).expect("Failed to get starnix process stats");
         TaskTimeStats {
             user_time: zx::Duration::from_nanos(info.cpu_time),
-            // TODO(https://fxbug.dev/127682): How can we calculate system time?
+            // TODO(https://fxbug.dev/42078242): How can we calculate system time?
             system_time: zx::Duration::default(),
         }
     }
@@ -1401,7 +1401,7 @@ impl ThreadGroupMutableState<Base = ThreadGroup, BaseType = Arc<ThreadGroup>> {
 
     /// Return the appropriate task in |thread_group| to send the given signal.
     pub fn get_signal_target(&self, _signal: UncheckedSignal) -> Option<TempRef<'_, Task>> {
-        // TODO(https://fxbug.dev/96632): Consider more than the main thread or the first thread in the thread group
+        // TODO(https://fxbug.dev/42178771): Consider more than the main thread or the first thread in the thread group
         // to dispatch the signal.
         self.get_live_task().ok()
     }

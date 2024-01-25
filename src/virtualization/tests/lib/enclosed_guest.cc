@@ -48,13 +48,13 @@ using fuchsia::ui::observation::geometry::ViewDescriptor;
 
 constexpr char kZirconGuestUrl[] = "zircon_guest_manager#meta/zircon_guest_manager.cm";
 constexpr char kDebianGuestUrl[] = "debian_guest_manager#meta/debian_guest_manager.cm";
-// TODO(https://fxbug.dev/122217): when fuchsia.component.test/Realm.InitMutableConfigFromPackage
+// TODO(https://fxbug.dev/42073215): when fuchsia.component.test/Realm.InitMutableConfigFromPackage
 // works with subpackaged components, make this a subpackage URL.
 constexpr char kTerminaGuestUrl[] = "#meta/termina_guest_manager.cm";
 constexpr auto kDevGpuDirectory = "dev-gpu";
 constexpr auto kGuestManagerName = "guest_manager";
 
-// TODO(https://fxbug.dev/12589): Use consistent naming for the test utils here.
+// TODO(https://fxbug.dev/42076670): Use consistent naming for the test utils here.
 constexpr char kDebianTestUtilDir[] = "/test_utils";
 constexpr zx::duration kRetryStep = zx::msec(200);
 

@@ -151,7 +151,7 @@ void StreamImpl::OnFrameAvailable(fuchsia::camera2::FrameAvailableInfo info) {
   ++frame_counter_;
 
   // Discard the frame if there are too many frames outstanding.
-  // TODO(https://fxbug.dev/64801): Recycle LRU frames.
+  // TODO(https://fxbug.dev/42143447): Recycle LRU frames.
   if (frame_waiters_.size() == max_camping_buffers_) {
     record_.FrameDropped(cobalt::FrameDropReason::kTooManyFramesInFlight);
     legacy_stream_->ReleaseFrame(info.buffer_id);
@@ -328,7 +328,7 @@ void StreamImpl::SetCropRegion(uint64_t id, std::unique_ptr<fuchsia::math::RectF
       y_max = y_min + region->height;
     }
     legacy_stream_->SetRegionOfInterest(x_min, y_min, x_max, y_max, [](zx_status_t status) {
-      // TODO(https://fxbug.dev/50908): Make this an error once RegionOfInterest support is known at
+      // TODO(https://fxbug.dev/42128040): Make this an error once RegionOfInterest support is known at
       // init time. FX_PLOGS(WARNING, status) << "Stream does not support crop region.";
     });
   }

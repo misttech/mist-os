@@ -152,7 +152,7 @@ TEST(Guest, GuestSetTrapWithBell) {
   EXPECT_EQ(packet.guest_bell.addr, static_cast<zx_gpaddr_t>(TRAP_ADDR));
 }
 
-// TestCase for https://fxbug.dev/33986.
+// TestCase for https://fxbug.dev/42109242.
 TEST(Guest, GuestSetTrapWithBellDrop) {
   // Build the port before test so test is destructed first.
   zx::port port;
@@ -170,7 +170,7 @@ TEST(Guest, GuestSetTrapWithBellDrop) {
   // port. This should work correctly.
 }
 
-// TestCase for https://fxbug.dev/34001.
+// TestCase for https://fxbug.dev/42109261.
 TEST(Guest, GuestSetTrapWithBellAndUser) {
   zx::port port;
   ASSERT_EQ(zx::port::create(0, &port), ZX_OK);

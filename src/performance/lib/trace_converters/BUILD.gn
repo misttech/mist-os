@@ -31,11 +31,11 @@ source_set("chromium") {
     "//zircon/system/ulib/trace-reader",
   ]
   configs += [
-    # TODO(https://fxbug.dev/58162): delete the below and fix compiler warnings
+    # TODO(https://fxbug.dev/42136089): delete the below and fix compiler warnings
     "//build/config:Wno-conversion",
   ]
 
-  # TODO(https://fxbug.dev/135694): delete the below and fix compiler warnings
+  # TODO(https://fxbug.dev/42085293): delete the below and fix compiler warnings
   configs += [ "//build/config:Wno-vla-cxx-extension" ]
 }
 
@@ -50,7 +50,7 @@ test("chromium_unittests") {
     "//third_party/googletest:gtest",
   ]
 
-  # TODO(https://fxbug.dev/135694): delete the below and fix compiler warnings
+  # TODO(https://fxbug.dev/42085293): delete the below and fix compiler warnings
   configs += [ "//build/config:Wno-vla-cxx-extension" ]
 }
 

@@ -45,7 +45,7 @@ Archivist accepts a configuration file to allow product-specific configuration s
 package. The configuration file must be valid JSON with a single object at the top level. Its path
 within Archivist's namespace is defined by the `--config-path` argument.
 
-<!-- TODO(https://fxbug.dev/60812) link to the fuchsia.dev configuration docs -->
+<!-- TODO(https://fxbug.dev/42139034) link to the fuchsia.dev configuration docs -->
 
 See [the generated docs for Archivist's serde-based config parser][config-docs] for details.
 

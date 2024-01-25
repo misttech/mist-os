@@ -14,7 +14,7 @@
             matchers: [
                 // mmap_test
                 // These test cases fail with pager-backed filesystems currently.
-                // TODO(https://fxbug.dev/133371): Re-enable once these pass on fxfs.
+                // TODO(https://fxbug.dev/42083295): Re-enable once these pass on fxfs.
                 "MMapFileTest.ReadSharedTruncateSIGBUS",
                 "MMapFileTest.WriteSharedTruncateSIGBUS",
 
@@ -27,7 +27,7 @@
         {
             type: "skip",
             matchers: [
-                // TODO(https://fxbug.dev/130402): Re-enable once flake is resolved.
+                // TODO(https://fxbug.dev/42080671): Re-enable once flake is resolved.
                 "AllInetTests/SimpleTcpSocketTest.NonBlockingConnectNoListenerPeek/*",
                 "AllInetTests/SimpleTcpSocketTest.NonBlockingConnectNoListenerRead/*",
                 "AllInetTests/SimpleTcpSocketTest.NonBlockingConnectNoListener/*",
