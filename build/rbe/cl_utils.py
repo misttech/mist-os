@@ -244,10 +244,11 @@ def expand_response_files(
     """
     for tok in command:
         if tok.startswith("@"):
-            # remove blanks and comments
-            rspfile = Path(tok[1:])
+            # rustc supports an alternative syntax: @shell:RSPFILE
+            rspfile = Path(tok[1:].removeprefix("shell:"))
             rspfiles.append(rspfile)
             rsp_lines = rspfile.read_text().splitlines()
+            # remove blanks and comments
             rsp_lines_stripped = (line.strip() for line in rsp_lines)
             filtered_lines = remove_hash_comments(
                 line for line in rsp_lines_stripped if line

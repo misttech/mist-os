@@ -398,6 +398,19 @@ class ExpandResponseFilesTests(unittest.TestCase):
             )
             self.assertEqual(rspfiles, [rsp])
 
+    def test_rspfile_rustc_alternative_syntax(self):
+        with tempfile.TemporaryDirectory() as td:
+            tdp = Path(td)
+            rsp = tdp / "args.rsp"
+            rsp.write_text("56\n78\n")
+            command = ["tool.sh", f"@shell:{rsp}", "-o", "cmd4.out"]
+            rspfiles = []
+            self.assertEqual(
+                list(cl_utils.expand_response_files(command, rspfiles)),
+                ["tool.sh", "56", "78", "-o", "cmd4.out"],
+            )
+            self.assertEqual(rspfiles, [rsp])
+
     def test_nested_repeated_rspfiles(self):
         with tempfile.TemporaryDirectory() as td:
             tdp = Path(td)
