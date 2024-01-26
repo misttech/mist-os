@@ -85,6 +85,11 @@ fuchsia_package("bt-init-testonly") {
   ]
 }
 
+# Core shard for the #bluetooth-core subrealm.
+core_shard("core-shard") {
+  shard_file = "meta/bt-init.core_shard.cml"
+}
+
 core_shard("fastpair-core-shard") {
   shard_file = "meta/bt-fastpair.core_shard.cml"
 }
