@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 pub mod access_vector_cache;
-pub mod hooks;
 pub mod permission_check;
 pub mod security_server;
 pub mod seq_lock;
@@ -25,8 +24,6 @@ impl From<u64> for SecurityId {
 pub enum ObjectClass {
     /// Placeholder value used when an [`ObjectClass`] is required, but uninitialized.
     Undefined,
-    // TODO: Eliminate `dead_code` guard.
-    #[allow(dead_code)]
     Process,
     // TODO: Include all object classes supported by SELinux.
 }
@@ -34,6 +31,32 @@ pub enum ObjectClass {
 impl Default for ObjectClass {
     fn default() -> Self {
         Self::Undefined
+    }
+}
+
+impl ObjectClass {
+    fn policy_name(&self) -> &'static str {
+        match self {
+            Self::Undefined => {
+                panic!("attempt to display SELinux object class for object with undefined class");
+            }
+            Self::Process => "process",
+        }
+    }
+}
+
+#[derive(Clone, Copy, PartialEq)]
+pub enum ProcessPermission {
+    Fork,
+    Transition,
+}
+
+impl ProcessPermission {
+    fn policy_name(&self) -> &'static str {
+        match self {
+            Self::Fork => "fork",
+            Self::Transition => "transition",
+        }
     }
 }
 

@@ -10,6 +10,7 @@ use crate::{
     execution::{create_zircon_process, TaskInfo},
     loader::{load_executable, resolve_executable, ResolvedElf},
     mm::{MemoryAccessor, MemoryAccessorExt, MemoryManager, TaskMemoryAccessor},
+    selinux::hooks::current_task_hooks as selinux_hooks,
     signals::{send_standard_signal, RunState, SignalActions, SignalInfo},
     task::{
         Kernel, PidTable, ProcessGroup, PtraceCoreState, PtraceEvent, PtraceEventData,
@@ -680,7 +681,10 @@ impl CurrentTask {
         // used in the `open` call.
         executable.name.check_access(self, Access::EXEC)?;
 
-        let resolved_elf = resolve_executable(self, executable, path.clone(), argv, environ)?;
+        let elf_selinux_state = selinux_hooks::check_exec_access(self)?;
+
+        let resolved_elf =
+            resolve_executable(self, executable, path.clone(), argv, environ, elf_selinux_state)?;
 
         if self.thread_group.read().tasks_count() > 1 {
             track_stub!(TODO("https://fxbug.dev/297434895"), "exec on multithread process");
@@ -714,6 +718,10 @@ impl CurrentTask {
         self.mm()
             .exec(resolved_elf.file.name.clone())
             .map_err(|status| from_status_like_fdio!(status))?;
+
+        // Update the SELinux state, if enabled.
+        selinux_hooks::update_state_on_exec(self, &resolved_elf.selinux_state);
+
         let start_info = load_executable(self, resolved_elf, &path)?;
         let regs: zx_thread_state_general_regs_t = start_info.into();
         self.thread_state.registers = regs.into();
@@ -731,6 +739,9 @@ impl CurrentTask {
         self.thread_state.extended_pstate.reset();
 
         self.thread_group.signal_actions.reset_for_exec();
+
+        // TODO(http://b/320436714): when adding SELinux support for the file subsystem, implement
+        // hook to clean up state after exec.
 
         // TODO: The termination signal is reset to SIGCHLD.
 

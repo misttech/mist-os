@@ -27,7 +27,6 @@ rustc_library("core") {
   source_root = "lib.rs"
   sources = [
     "access_vector_cache.rs",
-    "hooks.rs",
     "lib.rs",
     "permission_check.rs",
     "security_server.rs",

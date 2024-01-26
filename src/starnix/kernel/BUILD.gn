@@ -176,6 +176,9 @@ rustc_library("starnix_core") {
     "power/sync_on_suspend.rs",
     "power/wakeup_count.rs",
     "selinux/fs.rs",
+    "selinux/hooks/current_task_hooks.rs",
+    "selinux/hooks/mod.rs",
+    "selinux/hooks/thread_group_hooks.rs",
     "selinux/mod.rs",
     "signals/mod.rs",
     "signals/signal_handling.rs",
@@ -416,7 +419,7 @@ rustc_library("starnix_core") {
   if (starnix_enable_alternate_anon_allocs) {
     features += [ "alternate_anon_allocs" ]
   }
-
+  inputs = [ "//src/starnix/lib/selinux/testdata/micro_policies/process_fork_transition_policy.pp" ]
   configs += [ "//src/starnix/config:starnix_clippy_lints" ]
 }
 

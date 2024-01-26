@@ -12,6 +12,7 @@ use zerocopy::{AsBytes, FromBytes, FromZeros, NoCell};
 use crate::{
     execution::execute_task,
     mm::{DumpPolicy, MemoryAccessor, MemoryAccessorExt, PAGE_SIZE},
+    selinux::hooks::current_task_hooks as selinux_hooks,
     task::{
         max_priority_for_sched_policy, min_priority_for_sched_policy, ptrace_attach,
         ptrace_dispatch, ptrace_traceme, CurrentTask, ExitStatus, PtraceAllowedPtracers,
@@ -71,6 +72,8 @@ where
     L: LockBefore<MmDumpable>,
     L: LockBefore<TaskRelease>,
 {
+    selinux_hooks::check_task_create_access(current_task)?;
+
     let child_exit_signal = if args.exit_signal == 0 {
         None
     } else {

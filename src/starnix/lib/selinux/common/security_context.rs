@@ -22,6 +22,12 @@ pub struct SecurityContext {
     range: Option<MlsRange>,
 }
 
+impl SecurityContext {
+    pub fn type_(&self) -> &str {
+        &self.type_
+    }
+}
+
 /// The MLS range, containing a mandatory sensitivity component and an optional category component.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct MlsRange {

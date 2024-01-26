@@ -5,6 +5,7 @@
 use crate::{
     device::terminal::{ControllingSession, Terminal},
     mutable_state::{state_accessor, state_implementation},
+    selinux::hooks::thread_group_hooks::SeLinuxThreadGroupState,
     signals::{
         send_signal, send_standard_signal, syscalls::WaitingOptions, SignalActions, SignalDetail,
         SignalInfo,
@@ -21,7 +22,6 @@ use crate::{
 use fuchsia_zircon as zx;
 use itertools::Itertools;
 use macro_rules_attribute::apply;
-use selinux::hooks::SeLinuxThreadGroupState;
 use starnix_lifecycle::{AtomicU64Counter, DropNotifier};
 use starnix_logging::{log_error, log_warn, track_stub};
 use starnix_sync::{LockBefore, Locked, Mutex, MutexGuard, ProcessGroupState, RwLock};
@@ -105,7 +105,7 @@ pub struct ThreadGroupMutableState {
 
     pub terminating: bool,
 
-    /// The SELinux security structure. `None` if SELinux is disabled.
+    /// The SELinux operations for this thread group.
     pub selinux_state: Option<SeLinuxThreadGroupState>,
 
     /// Time statistics accumulated from the children.

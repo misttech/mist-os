@@ -3396,7 +3396,7 @@ impl BinderDriver {
                         .read()
                         .selinux_state
                         .as_ref()
-                        .expect("Using selinux_state without SELinux enabled")
+                        .expect("Using selinux state without SELinux enabled")
                         .current_sid;
                     let mut security_context = security_server
                         .sid_to_security_context(&sid)

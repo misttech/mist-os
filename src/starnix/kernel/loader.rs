@@ -7,6 +7,7 @@ use crate::{
         vmo::round_up_to_system_page_size, DesiredAddress, MappingName, MappingOptions,
         MemoryAccessor, MemoryManager, ProtectionFlags, PAGE_SIZE, VMEX_RESOURCE,
     },
+    selinux::hooks::thread_group_hooks::SeLinuxResolvedElfState,
     task::CurrentTask,
     vfs::{FileHandle, FileWriteGuardMode, FileWriteGuardRef},
 };
@@ -246,6 +247,8 @@ pub struct ResolvedElf {
     pub argv: Vec<CString>,
     /// The environment to initialize for the new process.
     pub environ: Vec<CString>,
+    /// The SELinux state for the new process. None if SELinux is disabled.
+    pub selinux_state: Option<SeLinuxResolvedElfState>,
     /// Exec/write lock.
     pub file_write_guard: FileWriteGuardRef,
 }
@@ -272,8 +275,9 @@ pub fn resolve_executable(
     path: CString,
     argv: Vec<CString>,
     environ: Vec<CString>,
+    selinux_state: Option<SeLinuxResolvedElfState>,
 ) -> Result<ResolvedElf, Errno> {
-    resolve_executable_impl(current_task, file, path, argv, environ, 0)
+    resolve_executable_impl(current_task, file, path, argv, environ, 0, selinux_state)
 }
 
 /// Resolves a file into a validated executable ELF, following script interpreters to a fixed
@@ -285,6 +289,7 @@ fn resolve_executable_impl(
     argv: Vec<CString>,
     environ: Vec<CString>,
     recursion_depth: usize,
+    selinux_state: Option<SeLinuxResolvedElfState>,
 ) -> Result<ResolvedElf, Errno> {
     if recursion_depth > MAX_RECURSION_DEPTH {
         return error!(ELOOP);
@@ -300,9 +305,9 @@ fn resolve_executable_impl(
         Err(_) => return error!(EINVAL),
     }
     if &header == HASH_BANG {
-        resolve_script(current_task, vmo, path, argv, environ, recursion_depth)
+        resolve_script(current_task, vmo, path, argv, environ, recursion_depth, selinux_state)
     } else {
-        resolve_elf(current_task, file, vmo, argv, environ)
+        resolve_elf(current_task, file, vmo, argv, environ, selinux_state)
     }
 }
 
@@ -314,6 +319,7 @@ fn resolve_script(
     argv: Vec<CString>,
     environ: Vec<CString>,
     recursion_depth: usize,
+    selinux_state: Option<SeLinuxResolvedElfState>,
 ) -> Result<ResolvedElf, Errno> {
     // All VMOs have sizes in multiple of the system page size, so as long as we only read a page or
     // less, we should never read past the end of the VMO.
@@ -339,6 +345,7 @@ fn resolve_script(
         args,
         environ,
         recursion_depth + 1,
+        selinux_state,
     )
 }
 
@@ -387,6 +394,7 @@ fn resolve_elf(
     vmo: Arc<zx::Vmo>,
     argv: Vec<CString>,
     environ: Vec<CString>,
+    selinux_state: Option<SeLinuxResolvedElfState>,
 ) -> Result<ResolvedElf, Errno> {
     let elf_headers = elf_parse::Elf64Headers::from_vmo(&vmo).map_err(elf_parse_error_to_errno)?;
     let interp = if let Some(interp_hdr) = elf_headers
@@ -413,7 +421,7 @@ fn resolve_elf(
     };
     let file_write_guard =
         file.name.entry.node.create_write_guard(FileWriteGuardMode::Exec)?.into_ref();
-    Ok(ResolvedElf { file, vmo, interp, argv, environ, file_write_guard })
+    Ok(ResolvedElf { file, vmo, interp, argv, environ, selinux_state, file_write_guard })
 }
 
 /// Loads a resolved ELF into memory, along with an interpreter if one is defined, and initializes

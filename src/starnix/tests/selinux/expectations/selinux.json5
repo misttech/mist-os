@@ -34,7 +34,6 @@
                 "*selinux_shm*",
                 "*selinux_stat*",
                 "*selinux_sysctl*",
-                "*selinux_task_create*",
                 "*selinux_task_setnice*",
                 "*selinux_task_setscheduler*",
                 "*selinux_task_getscheduler*",

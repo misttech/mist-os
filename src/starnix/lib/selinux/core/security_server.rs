@@ -5,7 +5,7 @@
 use crate::{
     access_vector_cache::{Manager as AvcManager, Query, QueryMut},
     seq_lock::SeqLock,
-    AccessVector, ObjectClass, SecurityId,
+    AccessVector, ObjectClass, ProcessPermission, SecurityId,
 };
 
 use anyhow;
@@ -178,6 +178,43 @@ impl SecurityServer {
             false
         } else {
             self.state.lock().reject_unknown()
+        }
+    }
+
+    // TODO: make more general, for any object class and multiple permissions.
+    pub fn has_process_permission(
+        &self,
+        source_sid: SecurityId,
+        target_sid: SecurityId,
+        permission: ProcessPermission,
+    ) -> bool {
+        if self.state.lock().policy.as_ref().is_none() {
+            return true;
+        }
+        // TODO(http://b/320437139): check AVC before computing permission.
+        let source_target_and_policy = {
+            let state = self.state.lock();
+            (
+                state.sids.get(&source_sid).map(Clone::clone),
+                state.sids.get(&target_sid).map(Clone::clone),
+                state.policy.clone(),
+            )
+        };
+
+        if let (Some(source_security_context), Some(target_security_context), Some(policy)) =
+            source_target_and_policy
+        {
+            policy
+                .parsed
+                .is_explicitly_allowed(
+                    source_security_context.type_(),
+                    target_security_context.type_(),
+                    ObjectClass::Process.policy_name(),
+                    permission.policy_name(),
+                )
+                .unwrap_or(false)
+        } else {
+            false
         }
     }
 
