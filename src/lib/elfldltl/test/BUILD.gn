@@ -19,6 +19,7 @@ test("elfldltl-unittests") {
     "abi-tests.cc",
     "container-tests.cc",
     "diagnostics-tests.cc",
+    "dwarf-tests.cc",
     "dynamic-tests.cc",
     "field-tests.cc",
     "file-tests.cc",
