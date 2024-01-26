@@ -14,6 +14,7 @@
 use std::collections::HashMap;
 use std::fmt::Debug;
 
+use async_utils::fold::FoldWhile;
 use fidl::marker::SourceBreaking;
 use fidl_fuchsia_hardware_network as fhardware_network;
 use fidl_fuchsia_net as fnet;
@@ -1006,11 +1007,20 @@ pub trait Update {
     /// Optionally returns a resource that has already been added to the
     /// controller with the same [`ResourceId`].
     fn add(&mut self, controller: ControllerId, resource: Resource) -> Option<Resource>;
+
+    /// Remove the resource from the specified controller's state.
+    ///
+    /// Returns the removed resource, if present.
+    fn remove(&mut self, controller: ControllerId, resource: &ResourceId) -> Option<Resource>;
 }
 
 impl Update for HashMap<ControllerId, HashMap<ResourceId, Resource>> {
     fn add(&mut self, controller: ControllerId, resource: Resource) -> Option<Resource> {
         self.entry(controller).or_default().insert(resource.id(), resource)
+    }
+
+    fn remove(&mut self, controller: ControllerId, resource: &ResourceId) -> Option<Resource> {
+        self.get_mut(&controller)?.remove(resource)
     }
 }
 
@@ -1019,8 +1029,6 @@ impl Update for HashMap<ControllerId, HashMap<ResourceId, Resource>> {
 pub async fn get_existing_resources<C: Update + Default>(
     stream: impl Stream<Item = Result<Event, WatchError>>,
 ) -> Result<C, GetExistingResourcesError> {
-    use async_utils::fold::FoldWhile;
-
     async_utils::fold::fold_while(
         stream,
         Ok(C::default()),
@@ -1050,6 +1058,71 @@ pub async fn get_existing_resources<C: Update + Default>(
     .await
     .short_circuited()
     .map_err(|_resources| GetExistingResourcesError::StreamEnded)?
+}
+
+/// Errors returned by [`wait_for_condition`].
+#[derive(Debug, Error)]
+pub enum WaitForConditionError {
+    /// There was an error in the event stream.
+    #[error("there was an error in the event stream: {0}")]
+    ErrorInStream(WatchError),
+    /// There was an `Added` event for an already existing resource.
+    #[error("observed an added event for an already existing resource: {0:?}")]
+    AddedAlreadyExisting(Resource),
+    /// There was a `Removed` event for a non-existent resource.
+    #[error("observed a removed event for a non-existent resource: {0:?}")]
+    RemovedNonExistent(ResourceId),
+    /// The event stream unexpectedly ended.
+    #[error("the event stream unexpectedly ended")]
+    StreamEnded,
+}
+
+/// Wait for a condition on filtering state to be satisfied.
+///
+/// With the given `initial_state`, take events from `event_stream` and update
+/// the state, calling `predicate` whenever the state changes. When predicates
+/// returns `True` yield `Ok(())`.
+pub async fn wait_for_condition<
+    C: Update,
+    S: Stream<Item = Result<Event, WatchError>>,
+    F: Fn(&C) -> bool,
+>(
+    event_stream: S,
+    initial_state: &mut C,
+    predicate: F,
+) -> Result<(), WaitForConditionError> {
+    async_utils::fold::try_fold_while(
+        event_stream.map_err(WaitForConditionError::ErrorInStream),
+        initial_state,
+        |resources: &mut C, event| {
+            futures::future::ready(match event {
+                Event::Existing(controller, resource) | Event::Added(controller, resource) => {
+                    if let Some(resource) = resources.add(controller, resource) {
+                        Err(WaitForConditionError::AddedAlreadyExisting(resource))
+                    } else {
+                        Ok(FoldWhile::Continue(resources))
+                    }
+                }
+                Event::Removed(controller, resource) => resources
+                    .remove(controller, &resource)
+                    .map(|_| FoldWhile::Continue(resources))
+                    .ok_or(WaitForConditionError::RemovedNonExistent(resource)),
+                // Wait until a transactional update has been completed to call
+                // the predicate so it's not run against partially-updated
+                // state.
+                Event::Idle | Event::EndOfUpdate => {
+                    if predicate(&resources) {
+                        Ok(FoldWhile::Done(()))
+                    } else {
+                        Ok(FoldWhile::Continue(resources))
+                    }
+                }
+            })
+        },
+    )
+    .await?
+    .short_circuited()
+    .map_err(|_resources: &mut C| WaitForConditionError::StreamEnded)
 }
 
 /// Namespace controller creation errors.
@@ -1336,6 +1409,7 @@ mod tests {
     use std::collections::HashMap;
 
     use assert_matches::assert_matches;
+    use futures::{channel::mpsc, task::Poll, FutureExt as _, SinkExt as _};
     use net_declare::{fidl_ip, fidl_subnet};
     use test_case::test_case;
 
@@ -1915,6 +1989,175 @@ mod tests {
             get_existing_resources::<HashMap<_, _>>(event_stream).await,
             Err(GetExistingResourcesError::StreamEnded)
         )
+    }
+
+    #[fuchsia_async::run_singlethreaded(test)]
+    async fn wait_for_condition_add_remove() {
+        let mut state = HashMap::new();
+
+        // Verify that checking for the presence of a resource blocks until the
+        // resource is added.
+        let has_resource = |resources: &HashMap<_, HashMap<_, _>>| {
+            resources.get(&test_controller_a()).map_or(false, |controller| {
+                controller
+                    .get(&test_resource_id())
+                    .map_or(false, |resource| resource == &test_resource())
+            })
+        };
+        assert_matches!(
+            wait_for_condition(futures::stream::pending(), &mut state, has_resource).now_or_never(),
+            None
+        );
+        assert!(state.is_empty());
+        assert_matches!(
+            wait_for_condition(
+                futures::stream::iter([
+                    Ok(Event::Added(test_controller_b(), test_resource())),
+                    Ok(Event::EndOfUpdate),
+                    Ok(Event::Added(test_controller_a(), test_resource())),
+                    Ok(Event::EndOfUpdate),
+                ]),
+                &mut state,
+                has_resource
+            )
+            .now_or_never(),
+            Some(Ok(()))
+        );
+        assert_eq!(
+            state,
+            HashMap::from([
+                (test_controller_a(), HashMap::from([(test_resource_id(), test_resource())])),
+                (test_controller_b(), HashMap::from([(test_resource_id(), test_resource())])),
+            ])
+        );
+
+        // Re-add the resource and observe an error.
+        assert_matches!(
+            wait_for_condition(
+                futures::stream::iter([
+                    Ok(Event::Added(test_controller_a(), test_resource())),
+                    Ok(Event::EndOfUpdate),
+                ]),
+                &mut state,
+                has_resource
+            )
+            .now_or_never(),
+            Some(Err(WaitForConditionError::AddedAlreadyExisting(r))) if r == test_resource()
+        );
+        assert_eq!(
+            state,
+            HashMap::from([
+                (test_controller_a(), HashMap::from([(test_resource_id(), test_resource())])),
+                (test_controller_b(), HashMap::from([(test_resource_id(), test_resource())])),
+            ])
+        );
+
+        // Verify that checking for the absence of a resource blocks until the
+        // resource is removed.
+        let does_not_have_resource = |resources: &HashMap<_, HashMap<_, _>>| {
+            resources.get(&test_controller_a()).map_or(false, |controller| controller.is_empty())
+        };
+        assert_matches!(
+            wait_for_condition(futures::stream::pending(), &mut state, does_not_have_resource)
+                .now_or_never(),
+            None
+        );
+        assert_eq!(
+            state,
+            HashMap::from([
+                (test_controller_a(), HashMap::from([(test_resource_id(), test_resource())])),
+                (test_controller_b(), HashMap::from([(test_resource_id(), test_resource())])),
+            ])
+        );
+        assert_matches!(
+            wait_for_condition(
+                futures::stream::iter([
+                    Ok(Event::Removed(test_controller_b(), test_resource_id())),
+                    Ok(Event::EndOfUpdate),
+                    Ok(Event::Removed(test_controller_a(), test_resource_id())),
+                    Ok(Event::EndOfUpdate),
+                ]),
+                &mut state,
+                does_not_have_resource
+            )
+            .now_or_never(),
+            Some(Ok(()))
+        );
+        assert_eq!(
+            state,
+            HashMap::from([
+                (test_controller_a(), HashMap::new()),
+                (test_controller_b(), HashMap::new()),
+            ])
+        );
+
+        // Remove a non-existent resource and observe an error.
+        assert_matches!(
+            wait_for_condition(
+                futures::stream::iter([
+                    Ok(Event::Removed(test_controller_a(), test_resource_id())),
+                    Ok(Event::EndOfUpdate),
+                ]),
+                &mut state,
+                does_not_have_resource
+            ).now_or_never(),
+            Some(Err(WaitForConditionError::RemovedNonExistent(r))) if r == test_resource_id()
+        );
+        assert_eq!(
+            state,
+            HashMap::from([
+                (test_controller_a(), HashMap::new()),
+                (test_controller_b(), HashMap::new()),
+            ])
+        );
+    }
+
+    #[test]
+    fn predicate_not_tested_until_update_complete() {
+        let mut state = HashMap::new();
+        let (mut tx, rx) = mpsc::unbounded();
+
+        let wait = wait_for_condition(rx, &mut state, |state| !state.is_empty()).fuse();
+        futures::pin_mut!(wait);
+
+        // Sending an `Added` event should *not* allow the wait operation to
+        // complete, because the predicate should only be tested once the full
+        // update has been observed.
+        let mut exec = fuchsia_async::TestExecutor::new();
+        exec.run_singlethreaded(async {
+            tx.send(Ok(Event::Added(test_controller_a(), test_resource())))
+                .await
+                .expect("receiver should not be closed");
+        });
+        assert_matches!(exec.run_until_stalled(&mut wait), Poll::Pending);
+
+        exec.run_singlethreaded(async {
+            tx.send(Ok(Event::EndOfUpdate)).await.expect("receiver should not be closed");
+            wait.await.expect("condition should be satisfied once update is complete");
+        });
+    }
+
+    #[fuchsia_async::run_singlethreaded(test)]
+    async fn wait_for_condition_error_in_stream() {
+        let mut state = HashMap::new();
+        let event_stream =
+            futures::stream::once(futures::future::ready(Err(WatchError::EmptyEventBatch)));
+        assert_matches!(
+            wait_for_condition(event_stream, &mut state, |_| true).await,
+            Err(WaitForConditionError::ErrorInStream(WatchError::EmptyEventBatch))
+        );
+        assert!(state.is_empty());
+    }
+
+    #[fuchsia_async::run_singlethreaded(test)]
+    async fn wait_for_condition_stream_ended() {
+        let mut state = HashMap::new();
+        let event_stream = futures::stream::empty();
+        assert_matches!(
+            wait_for_condition(event_stream, &mut state, |_| true).await,
+            Err(WaitForConditionError::StreamEnded)
+        );
+        assert!(state.is_empty());
     }
 
     #[fuchsia_async::run_singlethreaded(test)]

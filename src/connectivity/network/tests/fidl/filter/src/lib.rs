@@ -399,7 +399,7 @@ async fn on_id_assigned(name: &str) {
         realm.connect_to_protocol::<fnet_filter::StateMarker>().expect("connect to protocol");
     let stream = fnet_filter_ext::event_stream_from_state(state).expect("get filter event stream");
     futures::pin_mut!(stream);
-    let observed: HashMap<_, _> =
+    let mut observed: HashMap<_, _> =
         fnet_filter_ext::get_existing_resources(&mut stream).await.expect("get resources");
     assert_eq!(
         observed,
@@ -415,12 +415,11 @@ async fn on_id_assigned(name: &str) {
     // closure and opening a new controller with the same ID, we wait to observe
     // removal of the controller's resources.
     drop(controller);
-    let (controller, removed_resource) = assert_matches!(
-        stream.next().await.expect("observe resource removal"),
-        Ok(fnet_filter_ext::Event::Removed(id, resource)) => (id, resource)
-    );
-    assert_eq!(controller, controller_id);
-    assert_eq!(removed_resource, resource.id());
+    fnet_filter_ext::wait_for_condition(&mut stream, &mut observed, |state| {
+        state.get(&controller_id).unwrap().is_empty()
+    })
+    .await
+    .expect("controller's resources should be removed on drop");
 
     let controller = open_new_controller().await;
     assert_eq!(controller.id(), &controller_id);
