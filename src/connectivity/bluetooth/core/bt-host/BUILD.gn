@@ -53,6 +53,21 @@ executable("bin") {
   deps = [ ":sources_bt_host_component" ]
 }
 
+config("config_enable_inspect") {
+  defines = [ "PW_BLUETOOTH_SAPPHIRE_INSPECT_ENABLED" ]
+}
+
+config("config_enable_trace") {
+  defines = [ "PW_BLUETOOTH_SAPPHIRE_TRACE_ENABLED" ]
+}
+
+group("config") {
+  public_configs = [
+    ":config_enable_inspect",
+    ":config_enable_trace",
+  ]
+}
+
 fuchsia_component_manifest("manifest") {
   component_name = "bt-host"
   manifest = "meta/bt-host.cml"

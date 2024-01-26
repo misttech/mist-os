@@ -11,6 +11,8 @@
 #include "pw_log/log.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/to_string.h"
 
+#pragma clang diagnostic ignored "-Wvariadic-macros"
+
 // Logging utilities for the host library. This provides a common abstraction
 // over Zircon DDK debug utilities (used when the host stack code runs in a
 // driver) and printf (when it's used in unit tests and command-line tools).

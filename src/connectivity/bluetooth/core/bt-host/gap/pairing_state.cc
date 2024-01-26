@@ -233,19 +233,19 @@ void PairingState::OnUserConfirmationRequest(uint32_t numeric_value,
 
   if (current_pairing_->action == PairingAction::kAutomatic) {
     if (!outgoing_connection_) {
-      bt_log(
-          ERROR,
-          "gap-bredr",
-          "automatically rejecting incoming link pairing (peer: %s, handle: %#.4x)",
-          bt_str(peer_id()),
-          handle());
+      bt_log(ERROR,
+             "gap-bredr",
+             "automatically rejecting incoming link pairing (peer: %s, handle: "
+             "%#.4x)",
+             bt_str(peer_id()),
+             handle());
     } else {
-      bt_log(
-          DEBUG,
-          "gap-bredr",
-          "automatically confirming outgoing link pairing (peer: %s, handle: %#.4x)",
-          bt_str(peer_id()),
-          handle());
+      bt_log(DEBUG,
+             "gap-bredr",
+             "automatically confirming outgoing link pairing (peer: %s, "
+             "handle: %#.4x)",
+             bt_str(peer_id()),
+             handle());
     }
     cb(outgoing_connection_);
     return;
@@ -366,8 +366,8 @@ void PairingState::OnSimplePairingComplete(
                                   "Pairing failed on link %#.4x (id: %s)",
                                   handle(),
                                   bt_str(peer_id()))) {
-    // TODO(https://fxbug.dev/42113087): Checking pairing_delegate() for reset like
-    // this isn't thread safe.
+    // TODO(https://fxbug.dev/42113087): Checking pairing_delegate() for reset
+    // like this isn't thread safe.
     if (pairing_delegate().is_alive()) {
       pairing_delegate()->CompletePairing(peer_id(),
                                           ToResult(HostError::kFailed));
@@ -454,25 +454,25 @@ void PairingState::OnLinkKeyNotification(
     const UInt128& link_key,
     hci_spec::LinkKeyType key_type,
     bool local_secure_connections_supported) {
-  // TODO(https://fxbug.dev/42111880): We assume the controller is never in pairing
-  // debug mode because it's a security hazard to pair and bond using Debug
-  // Combination link keys.
-  BT_ASSERT_MSG(
-      key_type != hci_spec::LinkKeyType::kDebugCombination,
-      "Pairing on link %#.4x (id: %s) resulted in insecure Debug Combination link key",
-      handle(),
-      bt_str(peer_id()));
+  // TODO(https://fxbug.dev/42111880): We assume the controller is never in
+  // pairing debug mode because it's a security hazard to pair and bond using
+  // Debug Combination link keys.
+  BT_ASSERT_MSG(key_type != hci_spec::LinkKeyType::kDebugCombination,
+                "Pairing on link %#.4x (id: %s) resulted in insecure Debug "
+                "Combination link key",
+                handle(),
+                bt_str(peer_id()));
 
   // When not pairing, only connection link key changes are allowed.
   if (state() == State::kIdle &&
       key_type == hci_spec::LinkKeyType::kChangedCombination) {
     if (!link_->ltk()) {
-      bt_log(
-          WARN,
-          "gap-bredr",
-          "Got Changed Combination key but link %#.4x (id: %s) has no current key",
-          handle(),
-          bt_str(peer_id()));
+      bt_log(WARN,
+             "gap-bredr",
+             "Got Changed Combination key but link %#.4x (id: %s) has no "
+             "current key",
+             handle(),
+             bt_str(peer_id()));
       state_ = State::kFailed;
       SignalStatus(ToResult(HostError::kInsufficientSecurity),
                    "OnLinkKeyNotification with no current key");
@@ -514,7 +514,6 @@ void PairingState::OnLinkKeyNotification(
                  "OnLinkKeyNotification with insufficient security");
     return;
   }
-
   // If we performed an association procedure for MITM protection then expect
   // the controller to produce a corresponding "authenticated" link key.
   // Inversely, do not accept a link key reported as authenticated if we haven't
@@ -537,15 +536,15 @@ void PairingState::OnLinkKeyNotification(
   // Set Security Properties for this BR/EDR connection
   set_security_properties(sec_props);
 
-  // TODO(https://fxbug.dev/42082735): When in SC Only mode, all services require
-  // security mode 4, level 4
+  // TODO(https://fxbug.dev/42082735): When in SC Only mode, all services
+  // require security mode 4, level 4
   if (security_mode() == BrEdrSecurityMode::SecureConnectionsOnly &&
       security_properties().level() !=
           sm::SecurityLevel::kSecureAuthenticated) {
-    bt_log(
-        WARN,
-        "gap-bredr",
-        "BR/EDR link key has insufficient security for Secure Connections Only mode");
+    bt_log(WARN,
+           "gap-bredr",
+           "BR/EDR link key has insufficient security for Secure Connections "
+           "Only mode");
     state_ = State::kFailed;
     SignalStatus(ToResult(HostError::kInsufficientSecurity),
                  "OnLinkKeyNotification requires Secure Connections");
@@ -716,18 +715,18 @@ void PairingState::Pairing::ComputePairingData() {
   expected_event = GetExpectedEvent(local_iocap, peer_iocap);
   BT_DEBUG_ASSERT(GetStateForPairingEvent(expected_event) != State::kFailed);
   authenticated = IsPairingAuthenticated(local_iocap, peer_iocap);
-  bt_log(
-      DEBUG,
-      "gap-bredr",
-      "As %s with local %hhu/peer %hhu capabilities, expecting an %sauthenticated %u pairing "
-      "using %#x%s",
-      initiator ? "initiator" : "responder",
-      static_cast<unsigned char>(local_iocap),
-      static_cast<unsigned char>(peer_iocap),
-      authenticated ? "" : "un",
-      static_cast<unsigned int>(action),
-      expected_event,
-      allow_automatic ? "" : " (auto not allowed)");
+  bt_log(DEBUG,
+         "gap-bredr",
+         "As %s with local %hhu/peer %hhu capabilities, expecting an "
+         "%sauthenticated %u pairing "
+         "using %#x%s",
+         initiator ? "initiator" : "responder",
+         static_cast<unsigned char>(local_iocap),
+         static_cast<unsigned char>(peer_iocap),
+         authenticated ? "" : "un",
+         static_cast<unsigned int>(action),
+         expected_event,
+         allow_automatic ? "" : " (auto not allowed)");
 }
 
 const char* PairingState::ToString(PairingState::State state) {
@@ -832,8 +831,9 @@ std::vector<fit::closure> PairingState::CompletePairingRequests(
   // negotiate the best security possible. Even though pairing succeeded, send
   // an error status if the individual request security requirements are not
   // satisfied.
-  // TODO(https://fxbug.dev/42075714): Only notify failure to callbacks of requests
-  // that have the same (or none) MITM requirements as the current pairing.
+  // TODO(https://fxbug.dev/42075714): Only notify failure to callbacks of
+  // requests that have the same (or none) MITM requirements as the current
+  // pairing.
   bool link_key_received = current_pairing_->security_properties.has_value();
   if (link_key_received) {
     for (auto& request : request_queue_) {

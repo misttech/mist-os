@@ -1306,7 +1306,7 @@ TEST_F(CommandChannelTest,
       hci_spec::kLEConnectionCompleteSubeventCode, std::move(le_event_cb));
 
   // Initiate the async transaction with kTestEventCode as its completion code
-  // (we use hci_spec::kInquiry as a dummy opcode).
+  // (we use hci_spec::kInquiry as a test opcode).
   int async_cmd_cb_count = 0;
   auto async_cmd_cb = [&](auto id, const EventPacket& event) {
     if (async_cmd_cb_count == 0) {
@@ -1365,11 +1365,12 @@ TEST_F(CommandChannelTest, TransportClosedCallback) {
   auto error_cb = [&error_cb_called] { error_cb_called = true; };
   transport()->SetTransportErrorCallback(error_cb);
 
-  heap_dispatcher().Post([this](pw::async::Context /*ctx*/, pw::Status status) {
-    if (status.ok()) {
-      test_device()->Stop();
-    }
-  });
+  (void)heap_dispatcher().Post(
+      [this](pw::async::Context /*ctx*/, pw::Status status) {
+        if (status.ok()) {
+          test_device()->Stop();
+        }
+      });
   RunUntilIdle();
   EXPECT_TRUE(error_cb_called);
 }

@@ -75,8 +75,8 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
   while (provider.remaining_bytes() > 0) {
     // Receive an l2cap packet.
     uint16_t data_size = provider.ConsumeIntegral<uint16_t>();
-    auto data = provider.ConsumeBytes<uint8_t>(data_size);
-    fake_chan->Receive(bt::BufferView(data.data(), data.size()));
+    auto packet = provider.ConsumeBytes<uint8_t>(data_size);
+    fake_chan->Receive(bt::BufferView(packet.data(), packet.size()));
 
     if (provider.ConsumeBool()) {
       registry.OpenOutbound(
@@ -88,5 +88,6 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
     }
   }
 
+  bt::set_random_generator(nullptr);
   return 0;
 }

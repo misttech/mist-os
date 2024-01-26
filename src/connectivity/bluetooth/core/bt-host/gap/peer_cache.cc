@@ -56,8 +56,8 @@ bool PeerCache::AddBondedPeer(BondingData bd) {
   // |bd.le_pairing_data| must contain either a LTK or CSRK for LE Security Mode
   // 1 or 2.
   //
-  // TODO(https://fxbug.dev/42102158): the address type checks here don't add much
-  // value because the address type is derived from the presence of FIDL
+  // TODO(https://fxbug.dev/42102158): the address type checks here don't add
+  // much value because the address type is derived from the presence of FIDL
   // bredr_bond and le_bond fields, so the check really should be whether at
   // least one of the mandatory bond secrets is present.
   if (bd.address.IsLowEnergy() && !bond_le) {
@@ -177,8 +177,8 @@ bool PeerCache::StoreLowEnergyBond(PeerId identifier,
     // maps to this peer.
   }
 
-  // TODO(https://fxbug.dev/42072204): Check that we're not downgrading the security
-  // level before overwriting the bond.
+  // TODO(https://fxbug.dev/42072204): Check that we're not downgrading the
+  // security level before overwriting the bond.
   peer->MutLe().SetBondData(bond_data);
   BT_DEBUG_ASSERT(!peer->temporary());
   BT_DEBUG_ASSERT(peer->le()->bonded());
@@ -214,8 +214,8 @@ bool PeerCache::StoreBrEdrBond(const DeviceAddress& address,
     return false;
   }
 
-  // TODO(https://fxbug.dev/42072204): Check that we're not downgrading the security
-  // level before overwriting the bond.
+  // TODO(https://fxbug.dev/42072204): Check that we're not downgrading the
+  // security level before overwriting the bond.
   peer->MutBrEdr().SetBondData(link_key);
   BT_DEBUG_ASSERT(!peer->temporary());
   BT_DEBUG_ASSERT(peer->bredr()->bonded());
@@ -227,12 +227,12 @@ bool PeerCache::StoreBrEdrBond(const DeviceAddress& address,
 bool PeerCache::SetAutoConnectBehaviorForIntentionalDisconnect(PeerId peer_id) {
   Peer* const peer = FindById(peer_id);
   if (!peer) {
-    bt_log(
-        WARN,
-        "gap-le",
-        "failed to update auto-connect behavior to kSkipUntilNextConnection for "
-        "unknown peer: %s",
-        bt_str(peer_id));
+    bt_log(WARN,
+           "gap-le",
+           "failed to update auto-connect behavior to kSkipUntilNextConnection "
+           "for "
+           "unknown peer: %s",
+           bt_str(peer_id));
     return false;
   }
 
@@ -255,11 +255,11 @@ bool PeerCache::SetAutoConnectBehaviorForIntentionalDisconnect(PeerId peer_id) {
 bool PeerCache::SetAutoConnectBehaviorForSuccessfulConnection(PeerId peer_id) {
   Peer* const peer = FindById(peer_id);
   if (!peer) {
-    bt_log(
-        WARN,
-        "gap-le",
-        "failed to update auto-connect behavior to kAlways for unknown peer: %s",
-        bt_str(peer_id));
+    bt_log(WARN,
+           "gap-le",
+           "failed to update auto-connect behavior to kAlways for unknown "
+           "peer: %s",
+           bt_str(peer_id));
     return false;
   }
 
@@ -270,8 +270,8 @@ bool PeerCache::SetAutoConnectBehaviorForSuccessfulConnection(PeerId peer_id) {
 
   peer->MutLe().set_auto_connect_behavior(Peer::AutoConnectBehavior::kAlways);
 
-  // TODO(https://fxbug.dev/42113239): Implement auto-connect behavior tracking for
-  // classic bluetooth.
+  // TODO(https://fxbug.dev/42113239): Implement auto-connect behavior tracking
+  // for classic bluetooth.
 
   return true;
 }

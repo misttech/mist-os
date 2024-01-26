@@ -4,8 +4,6 @@
 
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/gap/bredr_connection_manager.h"
 
-#include <lib/async/time.h>
-
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/assert.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/expiring_set.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/inspectable.h"
@@ -469,8 +467,8 @@ bool BrEdrConnectionManager::Disconnect(PeerId peer_id,
          ReasonAsString(reason).c_str(),
          bt_str(peer_id));
 
-  // TODO(https://fxbug.dev/42143836) - If a disconnect request is received when we
-  // have a pending connection, we should instead abort the connection, by
+  // TODO(https://fxbug.dev/42143836) - If a disconnect request is received when
+  // we have a pending connection, we should instead abort the connection, by
   // either:
   //   * removing the request if it has not yet been processed
   //   * sending a cancel command to the controller and waiting for it to be
@@ -784,13 +782,13 @@ void BrEdrConnectionManager::InitializeConnection(
   // Interrogate this peer to find out its version/capabilities.
   connection.Interrogate([this, peer = peer->GetWeakPtr(), handle](
                              hci::Result<> result) {
-    if (bt_is_error(
-            result,
-            WARN,
-            "gap-bredr",
-            "interrogation failed, dropping connection (peer: %s, handle: %#.4x)",
-            bt_str(peer->identifier()),
-            handle)) {
+    if (bt_is_error(result,
+                    WARN,
+                    "gap-bredr",
+                    "interrogation failed, dropping connection (peer: %s, "
+                    "handle: %#.4x)",
+                    bt_str(peer->identifier()),
+                    handle)) {
       // If this connection was locally requested, requester(s) are notified by
       // the disconnection.
       Disconnect(peer->identifier(), DisconnectReason::kInterrogationFailed);
@@ -830,14 +828,14 @@ void BrEdrConnectionManager::CompleteConnectionSetup(
   }
   BrEdrConnection& conn_state = connections_iter->second;
   if (conn_state.peer_id() != peer->identifier()) {
-    bt_log(
-        WARN,
-        "gap-bredr",
-        "Connection switched peers! (now to %s), ignoring interrogation result (peer: %s, "
-        "handle: %#.4x)",
-        bt_str(conn_state.peer_id()),
-        bt_str(peer_id),
-        handle);
+    bt_log(WARN,
+           "gap-bredr",
+           "Connection switched peers! (now to %s), ignoring interrogation "
+           "result (peer: %s, "
+           "handle: %#.4x)",
+           bt_str(conn_state.peer_id()),
+           bt_str(peer_id),
+           handle);
     return;
   }
   hci::BrEdrConnection* const connection = &conn_state.link();
@@ -860,12 +858,12 @@ void BrEdrConnectionManager::CompleteConnectionSetup(
   auto security_callback = [peer_id](hci_spec::ConnectionHandle handle,
                                      sm::SecurityLevel level,
                                      auto cb) {
-    bt_log(
-        INFO,
-        "gap-bredr",
-        "Ignoring security upgrade request; not implemented (peer: %s, handle: %#.4x)",
-        bt_str(peer_id),
-        handle);
+    bt_log(INFO,
+           "gap-bredr",
+           "Ignoring security upgrade request; not implemented (peer: %s, "
+           "handle: %#.4x)",
+           bt_str(peer_id),
+           handle);
     cb(ToResult(HostError::kNotSupported));
   };
 
@@ -916,12 +914,12 @@ BrEdrConnectionManager::OnAuthenticationComplete(
 
   auto iter = connections_.find(connection_handle);
   if (iter == connections_.end()) {
-    bt_log(
-        INFO,
-        "gap-bredr",
-        "ignoring authentication complete (status: %s) for unknown connection handle %#.04x",
-        bt_str(ToResult(status)),
-        connection_handle);
+    bt_log(INFO,
+           "gap-bredr",
+           "ignoring authentication complete (status: %s) for unknown "
+           "connection handle %#.04x",
+           bt_str(ToResult(status)),
+           connection_handle);
     return hci::CommandChannel::EventCallbackResult::kContinue;
   }
 
@@ -970,15 +968,15 @@ BrEdrConnectionManager::OnConnectionRequest(
   // In case of concurrent incoming requests from the same peer, reject all but
   // the first
   if (ExistsIncomingRequest(peer_id)) {
-    bt_log(
-        WARN,
-        "gap-bredr",
-        "rejecting duplicate incoming connection request (peer: %s, addr: %s, link_type: %s, "
-        "class: %s)",
-        bt_str(peer_id),
-        bt_str(addr),
-        hci_spec::LinkTypeToString(params.link_type().Read()),
-        bt_str(device_class));
+    bt_log(WARN,
+           "gap-bredr",
+           "rejecting duplicate incoming connection request (peer: %s, addr: "
+           "%s, link_type: %s, "
+           "class: %s)",
+           bt_str(peer_id),
+           bt_str(addr),
+           hci_spec::LinkTypeToString(params.link_type().Read()),
+           bt_str(device_class));
     SendRejectConnectionRequest(
         addr,
         pw::bluetooth::emboss::StatusCode::CONNECTION_REJECTED_BAD_BD_ADDR);
@@ -989,12 +987,12 @@ BrEdrConnectionManager::OnConnectionRequest(
   // or we received duplicate requests), we reject the request with
   // 'ConnectionAlreadyExists'
   if (FindConnectionById(peer_id)) {
-    bt_log(
-        WARN,
-        "gap-bredr",
-        "rejecting incoming connection request; already connected (peer: %s, addr: %s)",
-        bt_str(peer_id),
-        bt_str(addr));
+    bt_log(WARN,
+           "gap-bredr",
+           "rejecting incoming connection request; already connected (peer: "
+           "%s, addr: %s)",
+           bt_str(peer_id),
+           bt_str(addr));
     SendRejectConnectionRequest(
         addr, pw::bluetooth::emboss::StatusCode::CONNECTION_ALREADY_EXISTS);
     return hci::CommandChannel::EventCallbackResult::kContinue;
@@ -1002,14 +1000,14 @@ BrEdrConnectionManager::OnConnectionRequest(
 
   // Accept the connection, performing a role switch. We receive a Connection
   // Complete event when the connection is complete, and finish the link then.
-  bt_log(
-      INFO,
-      "gap-bredr",
-      "accepting incoming connection (peer: %s, addr: %s, link_type: %s, class: %s)",
-      bt_str(peer_id),
-      bt_str(addr),
-      hci_spec::LinkTypeToString(link_type),
-      bt_str(device_class));
+  bt_log(INFO,
+         "gap-bredr",
+         "accepting incoming connection (peer: %s, addr: %s, link_type: %s, "
+         "class: %s)",
+         bt_str(peer_id),
+         bt_str(addr),
+         hci_spec::LinkTypeToString(link_type),
+         bt_str(device_class));
 
   // Register that we're in the middle of an incoming request for this peer -
   // create a new request if one doesn't already exist
@@ -1076,15 +1074,15 @@ void BrEdrConnectionManager::CompleteRequest(
     }
     // This could potentially happen if the peer expired from the peer cache
     // during the connection procedure
-    bt_log(
-        INFO,
-        "gap-bredr",
-        "ConnectionComplete received with no known request (status: %s, peer: %s, addr: %s, "
-        "handle: %#.4x)",
-        bt_str(status),
-        bt_str(peer_id),
-        bt_str(address),
-        handle);
+    bt_log(INFO,
+           "gap-bredr",
+           "ConnectionComplete received with no known request (status: %s, "
+           "peer: %s, addr: %s, "
+           "handle: %#.4x)",
+           bt_str(status),
+           bt_str(peer_id),
+           bt_str(address),
+           handle);
     return;
   }
   auto& request = req_iter->second;
@@ -1103,18 +1101,18 @@ void BrEdrConnectionManager::CompleteRequest(
     role = request.role_change().value();
   }
 
-  bt_log(
-      INFO,
-      "gap-bredr",
-      "%s connection %s (status: %s, role: %s, peer: %s, addr: %s, handle: %#.4x)",
-      direction,
-      result,
-      bt_str(status),
-      role == pw::bluetooth::emboss::ConnectionRole::CENTRAL ? "central"
-                                                             : "peripheral",
-      bt_str(peer_id),
-      bt_str(address),
-      handle);
+  bt_log(INFO,
+         "gap-bredr",
+         "%s connection %s (status: %s, role: %s, peer: %s, addr: %s, handle: "
+         "%#.4x)",
+         direction,
+         result,
+         bt_str(status),
+         role == pw::bluetooth::emboss::ConnectionRole::CENTRAL ? "central"
+                                                                : "peripheral",
+         bt_str(peer_id),
+         bt_str(address),
+         handle);
 
   if (completes_outgoing_request) {
     // Determine the modified status in case of cancellation or timeout
@@ -1152,16 +1150,16 @@ void BrEdrConnectionManager::CompleteRequest(
     }
     if (completes_outgoing_request && connection_requests_.size() == 1 &&
         request.ShouldRetry(status.error_value())) {
-      bt_log(
-          INFO,
-          "gap-bredr",
-          "no pending connection requests to other peers, so %sretrying outbound connection (peer: "
-          "%s, addr: %s)",
-          request.HasIncoming()
-              ? "waiting for inbound request completion before potentially "
-              : "",
-          bt_str(peer_id),
-          bt_str(address));
+      bt_log(INFO,
+             "gap-bredr",
+             "no pending connection requests to other peers, so %sretrying "
+             "outbound connection (peer: "
+             "%s, addr: %s)",
+             request.HasIncoming()
+                 ? "waiting for inbound request completion before potentially "
+                 : "",
+             bt_str(peer_id),
+             bt_str(address));
       // By not erasing |request| from |connection_requests_|, even if
       // TryCreateNextConnection does not directly retry because there's an
       // inbound request to the same peer, the retry will happen if the inbound
@@ -1338,12 +1336,12 @@ BrEdrConnectionManager::OnLinkKeyNotification(
 
   auto* peer = cache_->FindByAddress(addr);
   if (!peer) {
-    bt_log(
-        WARN,
-        "gap-bredr",
-        "no known peer with address %s found; link key not stored (key type: %u)",
-        bt_str(addr),
-        static_cast<uint8_t>(key_type));
+    bt_log(WARN,
+           "gap-bredr",
+           "no known peer with address %s found; link key not stored (key "
+           "type: %u)",
+           bt_str(addr),
+           static_cast<uint8_t>(key_type));
     cache_->LogBrEdrBondingEvent(false);
     return hci::CommandChannel::EventCallbackResult::kContinue;
   }
@@ -1472,7 +1470,7 @@ BrEdrConnectionManager::OnUserConfirmationRequest(
     }
   };
   conn_pair->second->pairing_state().OnUserConfirmationRequest(
-      letoh32(params.numeric_value), std::move(confirm_cb));
+      le32toh(params.numeric_value), std::move(confirm_cb));
   return hci::CommandChannel::EventCallbackResult::kContinue;
 }
 
@@ -1527,7 +1525,7 @@ BrEdrConnectionManager::OnUserPasskeyNotification(
     return hci::CommandChannel::EventCallbackResult::kContinue;
   }
   conn_pair->second->pairing_state().OnUserPasskeyNotification(
-      letoh32(params.numeric_value));
+      le32toh(params.numeric_value));
   return hci::CommandChannel::EventCallbackResult::kContinue;
 }
 
@@ -1613,12 +1611,12 @@ void BrEdrConnectionManager::HandleNonAclConnectionRequest(
 
   auto conn_pair = FindConnectionByAddress(addr.value());
   if (!conn_pair) {
-    bt_log(
-        WARN,
-        "gap-bredr",
-        "rejecting (e)SCO connection request for peer that is not connected (peer: %s, addr: %s)",
-        bt_str(peer_id),
-        bt_str(addr));
+    bt_log(WARN,
+           "gap-bredr",
+           "rejecting (e)SCO connection request for peer that is not connected "
+           "(peer: %s, addr: %s)",
+           bt_str(peer_id),
+           bt_str(addr));
     SendRejectSynchronousRequest(
         addr,
         pw::bluetooth::emboss::StatusCode::UNACCEPTABLE_CONNECTION_PARAMETERS);
@@ -1626,12 +1624,12 @@ void BrEdrConnectionManager::HandleNonAclConnectionRequest(
   }
 
   // The ScoConnectionManager owned by the BrEdrConnection will respond.
-  bt_log(
-      DEBUG,
-      "gap-bredr",
-      "SCO request ignored, handled by ScoConnectionManager (peer: %s, addr: %s)",
-      bt_str(peer_id),
-      bt_str(addr));
+  bt_log(DEBUG,
+         "gap-bredr",
+         "SCO request ignored, handled by ScoConnectionManager (peer: %s, "
+         "addr: %s)",
+         bt_str(peer_id),
+         bt_str(addr));
 }
 
 bool BrEdrConnectionManager::Connect(

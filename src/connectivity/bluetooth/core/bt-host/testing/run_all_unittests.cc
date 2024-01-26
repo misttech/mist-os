@@ -44,7 +44,8 @@ int32_t NormalizeRandomSeed(uint32_t seed) {
 }
 
 int32_t GenerateRandomSeed() {
-  // TODO(https://fxbug.dev/42069982): Get time using pw::chrono for portability.
+  // TODO(https://fxbug.dev/42069982): Get time using pw::chrono for
+  // portability.
   const int64_t time_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
                               std::chrono::system_clock::now() -
                               std::chrono::system_clock::from_time_t(0))
@@ -90,9 +91,11 @@ int main(int argc, char** argv) {
     random_seed = NormalizeRandomSeed(random_seed);
   } else {
     random_seed = GenerateRandomSeed();
-    BT_ASSERT(pw::string::Format(
-                  new_argv_seed_option, "--gtest_random_seed=%d", random_seed)
-                  .ok());
+    bool format_ok =
+        pw::string::Format(
+            new_argv_seed_option, "--gtest_random_seed=%d", random_seed)
+            .ok();
+    BT_ASSERT(format_ok);
     new_argv.push_back(new_argv_seed_option);
   }
 

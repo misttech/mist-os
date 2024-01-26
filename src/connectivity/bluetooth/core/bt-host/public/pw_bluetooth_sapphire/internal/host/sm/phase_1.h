@@ -5,7 +5,6 @@
 #ifndef SRC_CONNECTIVITY_BLUETOOTH_CORE_BT_HOST_PUBLIC_PW_BLUETOOTH_SAPPHIRE_INTERNAL_HOST_SM_PHASE_1_H_
 #define SRC_CONNECTIVITY_BLUETOOTH_CORE_BT_HOST_PUBLIC_PW_BLUETOOTH_SAPPHIRE_INTERNAL_HOST_SM_PHASE_1_H_
 
-#include <lib/async/cpp/task.h>
 #include <lib/fit/function.h>
 
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/hci/connection.h"
@@ -115,7 +114,8 @@ class Phase1 final : public PairingPhase, public PairingChannelHandler {
   // PairingPhase overrides
   std::string ToStringInternal() override {
     return bt_lib_cpp_string::StringPrintf(
-        "Pairing Phase 1 (feature exchange) - pairing to %s security with \"%s\" IOCapabilities",
+        "Pairing Phase 1 (feature exchange) - pairing to %s security with "
+        "\"%s\" IOCapabilities",
         LevelToString(requested_level_),
         util::IOCapabilityToString(io_capability_).c_str());
   }

@@ -8,6 +8,8 @@
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/log.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/slab_allocator.h"
 
+#pragma clang diagnostic ignored "-Wshadow"
+
 namespace bt::gatt {
 namespace {
 
@@ -262,10 +264,10 @@ void RemoteService::WriteLongCharacteristic(CharacteristicHandle id,
       ((!chrc->extended_properties().has_value()) ||
        (!(chrc->extended_properties().value() &
           ExtendedProperty::kReliableWrite)))) {
-    bt_log(
-        DEBUG,
-        "gatt",
-        "characteristic does not support \"reliable write\"; attempting request anyway");
+    bt_log(DEBUG,
+           "gatt",
+           "characteristic does not support \"reliable write\"; attempting "
+           "request anyway");
   }
 
   SendLongWriteRequest(chrc->info().value_handle,

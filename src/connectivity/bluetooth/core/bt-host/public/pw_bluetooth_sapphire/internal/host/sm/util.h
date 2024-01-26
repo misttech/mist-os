@@ -55,7 +55,6 @@ std::pair<T, T> MapToRoles(const T& local_value,
   }
   return {peer_value, local_value};
 }
-
 // Used to select the key generation method as described in Vol 3, Part H,
 // 2.3.5.1 based on local and peer authentication parameters:
 //   - |secure_connections|: True if Secure Connections pairing is used. False

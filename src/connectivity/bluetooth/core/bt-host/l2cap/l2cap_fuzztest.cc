@@ -63,6 +63,7 @@ class DataFuzzTest : public TestingBase {
 
   ~DataFuzzTest() override {
     channel_manager_ = nullptr;
+    bt::set_random_generator(nullptr);
     TestingBase::TearDown();
   }
 

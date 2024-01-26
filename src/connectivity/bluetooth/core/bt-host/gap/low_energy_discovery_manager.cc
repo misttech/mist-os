@@ -143,7 +143,7 @@ void LowEnergyDiscoveryManager::StartDiscovery(bool active,
     auto session = AddSession(active);
     // Post the callback instead of calling it synchronously to avoid bugs
     // caused by client code not expecting this.
-    heap_dispatcher_.Post(
+    (void)heap_dispatcher_.Post(
         [callback = std::move(callback), session = std::move(session)](
             pw::async::Context /*ctx*/, pw::Status status) mutable {
           if (status.ok()) {
@@ -290,13 +290,13 @@ void LowEnergyDiscoveryManager::OnPeerFound(
     peer = peer_cache_->NewPeer(result.address, result.connectable);
     BT_ASSERT(peer);
   } else if (!peer->connectable() && result.connectable) {
-    bt_log(
-        DEBUG,
-        "gap-le",
-        "received connectable advertisement from previously non-connectable peer (address: %s, "
-        "peer: %s)",
-        bt_str(result.address),
-        bt_str(peer->identifier()));
+    bt_log(DEBUG,
+           "gap-le",
+           "received connectable advertisement from previously non-connectable "
+           "peer (address: %s, "
+           "peer: %s)",
+           bt_str(result.address),
+           bt_str(peer->identifier()));
     peer->set_connectable(true);
   }
 

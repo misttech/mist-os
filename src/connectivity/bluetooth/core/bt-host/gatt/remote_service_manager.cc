@@ -183,80 +183,79 @@ RemoteService* RemoteServiceManager::GattProfileService() {
 void RemoteServiceManager::ConfigureServiceChangedNotifications(
     RemoteService* gatt_profile_service, att::ResultFunction<> callback) {
   auto self = weak_self_.GetWeakPtr();
-  gatt_profile_service->DiscoverCharacteristics([self,
-                                                 callback =
-                                                     std::move(callback)](
-                                                    att::Result<> status,
-                                                    const CharacteristicMap&
-                                                        characteristics) mutable {
-    // The Client's Bearer may outlive this object.
-    if (!self.is_alive()) {
-      return;
-    }
+  gatt_profile_service->DiscoverCharacteristics(
+      [self, callback = std::move(callback)](
+          att::Result<> status,
+          const CharacteristicMap& characteristics) mutable {
+        // The Client's Bearer may outlive this object.
+        if (!self.is_alive()) {
+          return;
+        }
 
-    if (bt_is_error(status,
-                    WARN,
-                    "gatt",
-                    "Error discovering GATT Profile service characteristics")) {
-      callback(status);
-      return;
-    }
+        if (bt_is_error(
+                status,
+                WARN,
+                "gatt",
+                "Error discovering GATT Profile service characteristics")) {
+          callback(status);
+          return;
+        }
 
-    RemoteService* gatt_profile_service = self->GattProfileService();
-    BT_ASSERT(gatt_profile_service);
+        RemoteService* gatt_profile_service = self->GattProfileService();
+        BT_ASSERT(gatt_profile_service);
 
-    auto svc_changed_char_iter =
-        std::find_if(characteristics.begin(),
-                     characteristics.end(),
-                     [](CharacteristicMap::const_reference c) {
-                       const CharacteristicData& data = c.second.first;
-                       return data.type == types::kServiceChangedCharacteristic;
-                     });
+        auto svc_changed_char_iter = std::find_if(
+            characteristics.begin(),
+            characteristics.end(),
+            [](CharacteristicMap::const_reference c) {
+              const CharacteristicData& data = c.second.first;
+              return data.type == types::kServiceChangedCharacteristic;
+            });
 
-    // The Service Changed characteristic is optional, and its absence implies
-    // that the set of GATT services on the server is fixed.
-    if (svc_changed_char_iter == characteristics.end()) {
-      callback(ToResult(HostError::kNotFound));
-      return;
-    }
+        // The Service Changed characteristic is optional, and its absence
+        // implies that the set of GATT services on the server is fixed.
+        if (svc_changed_char_iter == characteristics.end()) {
+          callback(ToResult(HostError::kNotFound));
+          return;
+        }
 
-    const bt::gatt::CharacteristicHandle svc_changed_char_handle =
-        svc_changed_char_iter->first;
+        const bt::gatt::CharacteristicHandle svc_changed_char_handle =
+            svc_changed_char_iter->first;
 
-    auto notification_cb = [self](const ByteBuffer& value,
-                                  bool /*maybe_truncated*/) {
-      // The Client's Bearer may outlive this object.
-      if (self.is_alive()) {
-        self->OnServiceChangedNotification(value);
-      }
-    };
+        auto notification_cb = [self](const ByteBuffer& value,
+                                      bool /*maybe_truncated*/) {
+          // The Client's Bearer may outlive this object.
+          if (self.is_alive()) {
+            self->OnServiceChangedNotification(value);
+          }
+        };
 
-    // Don't save handler_id as notifications never need to be disabled.
-    auto status_cb = [self, callback = std::move(callback)](
-                         att::Result<> status, IdType /*handler_id*/) {
-      // The Client's Bearer may outlive this object.
-      if (!self.is_alive()) {
-        return;
-      }
+        // Don't save handler_id as notifications never need to be disabled.
+        auto status_cb = [self, callback = std::move(callback)](
+                             att::Result<> status, IdType /*handler_id*/) {
+          // The Client's Bearer may outlive this object.
+          if (!self.is_alive()) {
+            return;
+          }
 
-      // If the Service Changed characteristic exists, notification support is
-      // mandatory (Core Spec v5.2, Vol 3, Part G, Sec 7.1).
-      if (bt_is_error(
-              status,
-              WARN,
-              "gatt",
-              "Enabling notifications of Service Changed characteristic failed")) {
-        callback(status);
-        return;
-      }
+          // If the Service Changed characteristic exists, notification support
+          // is mandatory (Core Spec v5.2, Vol 3, Part G, Sec 7.1).
+          if (bt_is_error(status,
+                          WARN,
+                          "gatt",
+                          "Enabling notifications of Service Changed "
+                          "characteristic failed")) {
+            callback(status);
+            return;
+          }
 
-      callback(fit::ok());
-    };
+          callback(fit::ok());
+        };
 
-    gatt_profile_service->EnableNotifications(svc_changed_char_handle,
-                                              std::move(notification_cb),
-                                              std::move(status_cb));
-  });
+        gatt_profile_service->EnableNotifications(svc_changed_char_handle,
+                                                  std::move(notification_cb),
+                                                  std::move(status_cb));
+      });
 }
 
 void RemoteServiceManager::InitializeGattProfileService(
@@ -539,9 +538,9 @@ void RemoteServiceManager::OnServiceChangedNotification(
 
   ServiceChangedCharacteristicValue value;
   value.range_start_handle =
-      letoh16(buffer.ReadMember<
+      le16toh(buffer.ReadMember<
               &ServiceChangedCharacteristicValue::range_start_handle>());
-  value.range_end_handle = letoh16(
+  value.range_end_handle = le16toh(
       buffer
           .ReadMember<&ServiceChangedCharacteristicValue::range_end_handle>());
   if (value.range_start_handle > value.range_end_handle) {
@@ -560,11 +559,11 @@ void RemoteServiceManager::OnServiceChangedNotification(
   // service discovery procedure. Queue the service changes and process them as
   // the last step of initialization.
   if (!initialized_) {
-    bt_log(
-        DEBUG,
-        "gatt",
-        "Received service changed notification before RemoteServiceManager initialization "
-        "complete; queueing.");
+    bt_log(DEBUG,
+           "gatt",
+           "Received service changed notification before RemoteServiceManager "
+           "initialization "
+           "complete; queueing.");
     return;
   }
 
@@ -646,13 +645,13 @@ void RemoteServiceManager::ProcessServiceChangedDiscoveryResults(
   CalculateServiceChanges(
       service_changed, removed_iters, added_data, modified_iters_and_data);
 
-  bt_log(
-      INFO,
-      "gatt",
-      "service changed notification added %zu, removed %zu, and modified %zu services",
-      added_data.size(),
-      removed_iters.size(),
-      modified_iters_and_data.size());
+  bt_log(INFO,
+         "gatt",
+         "service changed notification added %zu, removed %zu, and modified "
+         "%zu services",
+         added_data.size(),
+         removed_iters.size(),
+         modified_iters_and_data.size());
 
   std::vector<att::Handle> removed_service_handles;
   for (ServiceMap::iterator& service_iter : removed_iters) {
@@ -672,11 +671,11 @@ void RemoteServiceManager::ProcessServiceChangedDiscoveryResults(
       // is bonded with any client. We don't want to reset the service and
       // potentially miss notifications until characteristics have been
       // rediscovered. See Core Spec v5.3, Vol 3, Part G, Sec 7.1.
-      bt_log(
-          INFO,
-          "gatt",
-          "GATT Profile Service changed; assuming same characteristics (server values probably "
-          "changed)");
+      bt_log(INFO,
+             "gatt",
+             "GATT Profile Service changed; assuming same characteristics "
+             "(server values probably "
+             "changed)");
       modified_services.push_back(service_iter->second->GetWeakPtr());
       continue;
     }

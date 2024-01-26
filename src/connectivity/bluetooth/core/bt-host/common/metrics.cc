@@ -7,12 +7,14 @@
 namespace bt {
 
 template <>
-void IntMetricCounter::AttachInspect(inspect::Node &parent, const std::string &name) {
+void IntMetricCounter::AttachInspect(inspect::Node& parent,
+                                     const std::string& name) {
   inspect_property_ = parent.CreateInt(name, 0);
 }
 
 template <>
-void UintMetricCounter::AttachInspect(inspect::Node &parent, const std::string &name) {
+void UintMetricCounter::AttachInspect(inspect::Node& parent,
+                                      const std::string& name) {
   inspect_property_ = parent.CreateUint(name, 0);
 }
 

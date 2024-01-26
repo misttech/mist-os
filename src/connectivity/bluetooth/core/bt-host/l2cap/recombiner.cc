@@ -94,12 +94,12 @@ Recombiner::Result Recombiner::ProcessFirstFragment(
       le16toh(GetBasicHeader(*fragment).length) + sizeof(BasicHeader);
 
   if (current_length > expected_frame_length) {
-    bt_log(
-        DEBUG,
-        "l2cap",
-        "fragment malformed: payload too long (expected length: %zu, fragment length: %zu)",
-        expected_frame_length,
-        current_length);
+    bt_log(DEBUG,
+           "l2cap",
+           "fragment malformed: payload too long (expected length: %zu, "
+           "fragment length: %zu)",
+           expected_frame_length,
+           current_length);
     return {.pdu = {}, .frames_dropped = true};
   }
 
@@ -125,15 +125,15 @@ Recombiner::Result Recombiner::ProcessFirstFragment(
 void Recombiner::ClearRecombination() {
   BT_DEBUG_ASSERT(recombination_);
   if (recombination_->pdu.is_valid()) {
-    bt_log(
-        DEBUG,
-        "l2cap",
-        "recombiner dropped packet (fragments: %zu, expected length: %zu, accumulated length: "
-        "%zu, handle: %.4x)",
-        recombination_->pdu.fragment_count(),
-        recombination_->expected_frame_length,
-        recombination_->accumulated_length,
-        handle_);
+    bt_log(DEBUG,
+           "l2cap",
+           "recombiner dropped packet (fragments: %zu, expected length: %zu, "
+           "accumulated length: "
+           "%zu, handle: %.4x)",
+           recombination_->pdu.fragment_count(),
+           recombination_->expected_frame_length,
+           recombination_->accumulated_length,
+           handle_);
   }
   recombination_.reset();
   EndTraces();

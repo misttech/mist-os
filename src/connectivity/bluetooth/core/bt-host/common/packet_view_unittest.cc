@@ -11,6 +11,8 @@
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/byte_buffer.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/testing/test_helpers.h"
 
+#pragma clang diagnostic ignored "-Wzero-length-array"
+
 namespace bt {
 namespace {
 
@@ -76,11 +78,18 @@ TEST(PacketViewTest, NonEmptyPayload) {
   memcpy(payload->arg3, "Test", 4);
 
   constexpr std::array<uint8_t, kBufferSize> kExpected{{
-      0x00, 0x00, 0x00,   // header
-      0x7F,               // arg0
-      0x00, 0x00,         // arg1
-      0x01, 0x02,         // arg2
-      'T', 'e', 's', 't'  // arg3
+      0x00,
+      0x00,
+      0x00,  // header
+      0x7F,  // arg0
+      0x00,
+      0x00,  // arg1
+      0x01,
+      0x02,  // arg2
+      'T',
+      'e',
+      's',
+      't'  // arg3
   }};
   EXPECT_TRUE(ContainersEqual(kExpected, buffer));
 }

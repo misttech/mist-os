@@ -15,6 +15,10 @@
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/log.h"
 #include "src/connectivity/bluetooth/lib/cpp-string/string_printf.h"
 
+#pragma clang diagnostic ignored "-Wvariadic-macros"
+#pragma clang diagnostic ignored \
+    "-Wgnu-statement-expression-from-macro-expansion"
+
 namespace bt {
 
 // Type used to hold either a HostError or a ProtocolErrorCode, a

@@ -19,7 +19,8 @@ bool IsValidUrl(const std::string& url) {
   // See Section 2.2 for the set of reserved characters.
   // See Section 2.3 for the set of unreserved characters.
   constexpr char kValidUrlChars[] =
-      "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_.~!#$&'()*+,/:;=?@[]";
+      "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_.~!#$&'("
+      ")*+,/:;=?@[]";
   return url.find_first_not_of(kValidUrlChars) == std::string::npos;
 }
 
@@ -410,7 +411,7 @@ size_t DataElement::Read(DataElement* elem, const ByteBuffer& buffer) {
       if (cursor.size() < sizeof(uint16_t)) {
         return 0;
       }
-      data_bytes = betoh16(cursor.To<uint16_t>());
+      data_bytes = be16toh(cursor.To<uint16_t>());
       bytes_read += sizeof(uint16_t);
       break;
     }
@@ -418,7 +419,7 @@ size_t DataElement::Read(DataElement* elem, const ByteBuffer& buffer) {
       if (cursor.size() < sizeof(uint32_t)) {
         return 0;
       }
-      data_bytes = betoh32(cursor.To<uint32_t>());
+      data_bytes = be32toh(cursor.To<uint32_t>());
       bytes_read += sizeof(uint32_t);
       break;
     }
@@ -447,11 +448,11 @@ size_t DataElement::Read(DataElement* elem, const ByteBuffer& buffer) {
       if (size_desc == Size::kOneByte) {
         elem->Set(cursor.To<uint8_t>());
       } else if (size_desc == Size::kTwoBytes) {
-        elem->Set(betoh16(cursor.To<uint16_t>()));
+        elem->Set(be16toh(cursor.To<uint16_t>()));
       } else if (size_desc == Size::kFourBytes) {
-        elem->Set(betoh32(cursor.To<uint32_t>()));
+        elem->Set(be32toh(cursor.To<uint32_t>()));
       } else if (size_desc == Size::kEightBytes) {
-        elem->Set(betoh64(cursor.To<uint64_t>()));
+        elem->Set(be64toh(cursor.To<uint64_t>()));
       } else {
         // TODO(https://fxbug.dev/42078670): support 128-bit uints
         // Invalid size.
@@ -463,11 +464,11 @@ size_t DataElement::Read(DataElement* elem, const ByteBuffer& buffer) {
       if (size_desc == Size::kOneByte) {
         elem->Set(cursor.To<int8_t>());
       } else if (size_desc == Size::kTwoBytes) {
-        elem->Set(betoh16(cursor.To<int16_t>()));
+        elem->Set(be16toh(cursor.To<int16_t>()));
       } else if (size_desc == Size::kFourBytes) {
-        elem->Set(betoh32(cursor.To<int32_t>()));
+        elem->Set(be32toh(cursor.To<int32_t>()));
       } else if (size_desc == Size::kEightBytes) {
-        elem->Set(betoh64(cursor.To<int64_t>()));
+        elem->Set(be64toh(cursor.To<int64_t>()));
       } else {
         // TODO(https://fxbug.dev/42078670): support 128-bit uints
         // Invalid size.
@@ -477,9 +478,9 @@ size_t DataElement::Read(DataElement* elem, const ByteBuffer& buffer) {
     }
     case Type::kUuid: {
       if (size_desc == Size::kTwoBytes) {
-        elem->Set(UUID(betoh16(cursor.To<uint16_t>())));
+        elem->Set(UUID(be16toh(cursor.To<uint16_t>())));
       } else if (size_desc == Size::kFourBytes) {
-        elem->Set(UUID(betoh32(cursor.To<uint32_t>())));
+        elem->Set(UUID(be32toh(cursor.To<uint32_t>())));
       } else if (size_desc == Size::kSixteenBytes) {
         StaticByteBuffer<16> uuid_bytes;
         // UUID expects these to be in little-endian order.

@@ -8,7 +8,8 @@
 
 namespace bt {
 
-void BoundedInspectListNode::AttachInspect(inspect::Node& parent, std::string name) {
+void BoundedInspectListNode::AttachInspect(inspect::Node& parent,
+                                           std::string name) {
   list_node_ = parent.CreateChild(name);
 }
 

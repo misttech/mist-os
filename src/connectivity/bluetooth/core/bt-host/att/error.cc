@@ -6,6 +6,8 @@
 
 #include "pw_string/format.h"
 
+#pragma clang diagnostic ignored "-Wswitch-enum"
+
 namespace bt {
 namespace {
 

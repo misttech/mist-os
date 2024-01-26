@@ -5,28 +5,31 @@
 import("//build_overrides/pigweed.gni")
 import("$dir_pw_unit_test/test.gni")
 
-public_dir = "//src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/hci"
+dir_public_hci = "../public/pw_bluetooth_sapphire/internal/host/hci"
 
 pw_source_set("hci") {
+  public = [
+    "$dir_public_hci/acl_connection.h",
+    "$dir_public_hci/advertising_report_parser.h",
+    "$dir_public_hci/android_extended_low_energy_advertiser.h",
+    "$dir_public_hci/bredr_connection.h",
+    "$dir_public_hci/bredr_connection_request.h",
+    "$dir_public_hci/command_handler.h",
+    "$dir_public_hci/connection.h",
+    "$dir_public_hci/extended_low_energy_advertiser.h",
+    "$dir_public_hci/legacy_low_energy_advertiser.h",
+    "$dir_public_hci/legacy_low_energy_scanner.h",
+    "$dir_public_hci/local_address_delegate.h",
+    "$dir_public_hci/low_energy_advertiser.h",
+    "$dir_public_hci/low_energy_connection.h",
+    "$dir_public_hci/low_energy_connector.h",
+    "$dir_public_hci/low_energy_scanner.h",
+    "$dir_public_hci/sco_connection.h",
+    "$dir_public_hci/sequential_command_runner.h",
+    "$dir_public_hci/util.h",
+  ]
+
   sources = [
-    "$public_dir/acl_connection.h",
-    "$public_dir/advertising_report_parser.h",
-    "$public_dir/android_extended_low_energy_advertiser.h",
-    "$public_dir/bredr_connection.h",
-    "$public_dir/bredr_connection_request.h",
-    "$public_dir/command_handler.h",
-    "$public_dir/connection.h",
-    "$public_dir/extended_low_energy_advertiser.h",
-    "$public_dir/legacy_low_energy_advertiser.h",
-    "$public_dir/legacy_low_energy_scanner.h",
-    "$public_dir/local_address_delegate.h",
-    "$public_dir/low_energy_advertiser.h",
-    "$public_dir/low_energy_connection.h",
-    "$public_dir/low_energy_connector.h",
-    "$public_dir/low_energy_scanner.h",
-    "$public_dir/sco_connection.h",
-    "$public_dir/sequential_command_runner.h",
-    "$public_dir/util.h",
     "acl_connection.cc",
     "advertising_handle_map.cc",
     "advertising_report_parser.cc",
@@ -47,28 +50,31 @@ pw_source_set("hci") {
   ]
 
   public_deps = [
+    "$dir_pw_async:heap_dispatcher",
     "$dir_pw_bluetooth:emboss_hci_group",
     "$dir_pw_third_party/fuchsia:fit",
     "//src/connectivity/bluetooth/core/bt-host/transport",
-    "//third_party/pigweed:pw_async_heap_dispatcher",
   ]
 }
 
 pw_source_set("testing") {
   testonly = true
 
+  public = [
+    "$dir_public_hci/fake_bredr_connection.h",
+    "$dir_public_hci/fake_local_address_delegate.h",
+    "$dir_public_hci/fake_low_energy_connection.h",
+    "$dir_public_hci/fake_sco_connection.h",
+  ]
+
   sources = [
-    "$public_dir/fake_bredr_connection.h",
-    "$public_dir/fake_local_address_delegate.h",
-    "$public_dir/fake_low_energy_connection.h",
-    "$public_dir/fake_sco_connection.h",
     "fake_bredr_connection.cc",
     "fake_local_address_delegate.cc",
     "fake_low_energy_connection.cc",
     "fake_sco_connection.cc",
   ]
 
-  deps = [ "//third_party/pigweed:pw_async_heap_dispatcher" ]
+  deps = [ "$dir_pw_async:heap_dispatcher" ]
 
   public_deps = [ ":hci" ]
 }
@@ -94,4 +100,6 @@ pw_test("tests") {
     "$dir_pw_bluetooth:emboss_hci_test",
     "//src/connectivity/bluetooth/core/bt-host/testing",
   ]
+
+  test_main = "//src/connectivity/bluetooth/core/bt-host/testing:gtest_main"
 }

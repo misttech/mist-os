@@ -140,7 +140,7 @@ void GenericAccessClient::ReadAppearance(AppearanceCallback callback) {
             return;
           }
 
-          uint16_t char_value = letoh16(buffer.template To<uint16_t>());
+          uint16_t char_value = le16toh(buffer.template To<uint16_t>());
           cb(fit::ok(char_value));
         });
   });
@@ -172,12 +172,12 @@ void GenericAccessClient::ReadPeripheralPreferredConnectionParameters(
     }
 
     if (!conn_params_value_handle) {
-      bt_log(
-          DEBUG,
-          "gap-le",
-          "GAP service does not have peripheral preferred connection parameters characteristic "
-          "(peer: %s)",
-          bt_str(self->peer_id_));
+      bt_log(DEBUG,
+             "gap-le",
+             "GAP service does not have peripheral preferred connection "
+             "parameters characteristic "
+             "(peer: %s)",
+             bt_str(self->peer_id_));
       cb(ToResult(HostError::kNotFound).take_error());
       return;
     }
@@ -191,13 +191,13 @@ void GenericAccessClient::ReadPeripheralPreferredConnectionParameters(
             return;
           }
 
-          if (bt_is_error(
-                  result,
-                  DEBUG,
-                  "gap-le",
-                  "error reading peripheral preferred connection parameters characteristic "
-                  "(peer: %s)",
-                  bt_str(self->peer_id_))) {
+          if (bt_is_error(result,
+                          DEBUG,
+                          "gap-le",
+                          "error reading peripheral preferred connection "
+                          "parameters characteristic "
+                          "(peer: %s)",
+                          bt_str(self->peer_id_))) {
             cb(result.take_error());
             return;
           }
@@ -205,12 +205,12 @@ void GenericAccessClient::ReadPeripheralPreferredConnectionParameters(
           if (buffer.size() !=
               sizeof(
                   PeripheralPreferredConnectionParametersCharacteristicValue)) {
-            bt_log(
-                DEBUG,
-                "gap-le",
-                "peripheral preferred connection parameters characteristic has invalid value size "
-                "(peer: %s)",
-                bt_str(self->peer_id_));
+            bt_log(DEBUG,
+                   "gap-le",
+                   "peripheral preferred connection parameters characteristic "
+                   "has invalid value size "
+                   "(peer: %s)",
+                   bt_str(self->peer_id_));
             cb(ToResult(HostError::kPacketMalformed).take_error());
             return;
           }
@@ -218,10 +218,10 @@ void GenericAccessClient::ReadPeripheralPreferredConnectionParameters(
           auto char_value = buffer.template To<
               PeripheralPreferredConnectionParametersCharacteristicValue>();
           hci_spec::LEPreferredConnectionParameters params(
-              letoh16(char_value.min_interval),
-              letoh16(char_value.max_interval),
-              letoh16(char_value.max_latency),
-              letoh16(char_value.supervision_timeout));
+              le16toh(char_value.min_interval),
+              le16toh(char_value.max_interval),
+              le16toh(char_value.max_latency),
+              le16toh(char_value.supervision_timeout));
 
           cb(fit::ok(params));
         });

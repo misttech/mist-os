@@ -190,13 +190,13 @@ void LowEnergyConnection::DropRef(LowEnergyConnectionHandle* ref) {
       return;
     }
 
-    bt_log(
-        INFO,
-        "gap-le",
-        "received security upgrade request on L2CAP channel (level: %s, peer: %s, handle: %#.4x)",
-        sm::LevelToString(level),
-        bt_str(self->peer_id()),
-        handle);
+    bt_log(INFO,
+           "gap-le",
+           "received security upgrade request on L2CAP channel (level: %s, "
+           "peer: %s, handle: %#.4x)",
+           sm::LevelToString(level),
+           bt_str(self->peer_id()),
+           handle);
     BT_ASSERT(self->handle() == handle);
     self->OnSecurityRequest(level, std::move(cb));
   };
@@ -291,8 +291,8 @@ void LowEnergyConnection::RegisterEventHandlers() {
 // central has been idle for kLEConnectionPauseCentral and
 // kLEConnectionPausePeripheral has passed since the connection was established
 // (Core Spec v5.2, Vol 3, Part C, Sec 9.3.12).
-// TODO(https://fxbug.dev/42159733): Wait to update connection parameters until all
-// initialization procedures have completed.
+// TODO(https://fxbug.dev/42159733): Wait to update connection parameters until
+// all initialization procedures have completed.
 void LowEnergyConnection::StartConnectionPausePeripheralTimeout() {
   BT_ASSERT(!conn_pause_peripheral_timeout_.has_value());
   conn_pause_peripheral_timeout_.emplace(
@@ -312,8 +312,8 @@ void LowEnergyConnection::StartConnectionPausePeripheralTimeout() {
 // Connection parameter updates by the central are not allowed until the central
 // is idle and the peripheral has been idle for kLEConnectionPauseCentral (Core
 // Spec v5.2, Vol 3, Part C, Sec 9.3.12).
-// TODO(https://fxbug.dev/42159733): Wait to update connection parameters until all
-// initialization procedures have completed.
+// TODO(https://fxbug.dev/42159733): Wait to update connection parameters until
+// all initialization procedures have completed.
 void LowEnergyConnection::StartConnectionPauseCentralTimeout() {
   BT_ASSERT(!conn_pause_central_timeout_.has_value());
   conn_pause_central_timeout_.emplace(
@@ -447,11 +447,11 @@ void LowEnergyConnection::HandleRequestConnectionParameterUpdateCommandStatus(
             pw::bluetooth::emboss::StatusCode::UNSUPPORTED_REMOTE_FEATURE)) {
       // Retry connection parameter update with l2cap if the peer doesn't
       // support LL procedure.
-      bt_log(
-          INFO,
-          "gap-le",
-          "peer does not support HCI LE Connection Update command, trying l2cap request (peer: %s)",
-          bt_str(peer_id()));
+      bt_log(INFO,
+             "gap-le",
+             "peer does not support HCI LE Connection Update command, trying "
+             "l2cap request (peer: %s)",
+             bt_str(peer_id()));
       L2capRequestConnectionParameterUpdate(params);
     }
     return;
@@ -460,22 +460,21 @@ void LowEnergyConnection::HandleRequestConnectionParameterUpdateCommandStatus(
   // Note that this callback is for the Connection Update Complete event, not
   // the Connection Update status event, which is handled by the above code (see
   // v5.2, Vol. 4, Part E 7.7.15 / 7.7.65.3).
-  le_conn_update_complete_command_callback_ = [this,
-                                               params](pw::bluetooth::emboss::
-                                                           StatusCode status) {
-    // Retry connection parameter update with l2cap if the peer doesn't support
-    // LL procedure.
-    if (status ==
-        pw::bluetooth::emboss::StatusCode::UNSUPPORTED_REMOTE_FEATURE) {
-      bt_log(
-          INFO,
-          "gap-le",
-          "peer does not support HCI LE Connection Update command, trying l2cap request "
-          "(peer: %s)",
-          bt_str(peer_id()));
-      L2capRequestConnectionParameterUpdate(params);
-    }
-  };
+  le_conn_update_complete_command_callback_ =
+      [this, params](pw::bluetooth::emboss::StatusCode status) {
+        // Retry connection parameter update with l2cap if the peer doesn't
+        // support LL procedure.
+        if (status ==
+            pw::bluetooth::emboss::StatusCode::UNSUPPORTED_REMOTE_FEATURE) {
+          bt_log(INFO,
+                 "gap-le",
+                 "peer does not support HCI LE Connection Update command, "
+                 "trying l2cap request "
+                 "(peer: %s)",
+                 bt_str(peer_id()));
+          L2capRequestConnectionParameterUpdate(params);
+        }
+      };
 }
 
 void LowEnergyConnection::L2capRequestConnectionParameterUpdate(
@@ -491,19 +490,19 @@ void LowEnergyConnection::L2capRequestConnectionParameterUpdate(
 
   auto response_cb = [handle = handle(), peer_id = peer_id()](bool accepted) {
     if (accepted) {
-      bt_log(
-          DEBUG,
-          "gap-le",
-          "peer accepted l2cap connection parameter update request (peer: %s, handle: %#.4x)",
-          bt_str(peer_id),
-          handle);
+      bt_log(DEBUG,
+             "gap-le",
+             "peer accepted l2cap connection parameter update request (peer: "
+             "%s, handle: %#.4x)",
+             bt_str(peer_id),
+             handle);
     } else {
-      bt_log(
-          INFO,
-          "gap-le",
-          "peer rejected l2cap connection parameter update request (peer: %s, handle: %#.4x)",
-          bt_str(peer_id),
-          handle);
+      bt_log(INFO,
+             "gap-le",
+             "peer rejected l2cap connection parameter update request (peer: "
+             "%s, handle: %#.4x)",
+             bt_str(peer_id),
+             handle);
     }
   };
 
@@ -526,8 +525,8 @@ void LowEnergyConnection::UpdateConnectionParams(
       hci_spec::kLEConnectionUpdate);
   auto view = command.view_t();
   view.connection_handle().Write(handle());
-  // TODO(https://fxbug.dev/42074287): Handle invalid connection parameters before
-  // sending them to the controller.
+  // TODO(https://fxbug.dev/42074287): Handle invalid connection parameters
+  // before sending them to the controller.
   view.connection_interval_min().UncheckedWrite(params.min_interval());
   view.connection_interval_max().UncheckedWrite(params.max_interval());
   view.max_latency().UncheckedWrite(params.max_latency());
@@ -610,8 +609,8 @@ void LowEnergyConnection::MaybeUpdateConnectionParameters() {
   if (link_->role() == pw::bluetooth::emboss::ConnectionRole::CENTRAL) {
     // If the GAP service preferred connection parameters characteristic has not
     // been read by now, just use the default parameters.
-    // TODO(https://fxbug.dev/42144795): Wait for preferred connection parameters
-    // to be read.
+    // TODO(https://fxbug.dev/42144795): Wait for preferred connection
+    // parameters to be read.
     BT_ASSERT(peer_.is_alive());
     auto conn_params = peer_->le()->preferred_connection_parameters().value_or(
         kDefaultPreferredConnectionParameters);
@@ -710,12 +709,12 @@ void LowEnergyConnection::OnGattServicesResult(att::Result<> status,
           }
 
           if (result.is_error()) {
-            bt_log(
-                INFO,
-                "gap-le",
-                "error reading peripheral preferred connection parameters (status:  %s, peer: %s)",
-                ::bt::internal::ToString(result).c_str(),
-                bt_str(self->peer_id()));
+            bt_log(INFO,
+                   "gap-le",
+                   "error reading peripheral preferred connection parameters "
+                   "(status:  %s, peer: %s)",
+                   ::bt::internal::ToString(result).c_str(),
+                   bt_str(self->peer_id()));
             return;
           }
 
@@ -825,11 +824,11 @@ LowEnergyConnection::OnIdentityInformationRequest() {
 }
 
 void LowEnergyConnection::ConfirmPairing(ConfirmCallback confirm) {
-  bt_log(
-      INFO,
-      "gap-le",
-      "pairing delegate request for pairing confirmation w/ no passkey (peer: %s)",
-      bt_str(peer_id()));
+  bt_log(INFO,
+         "gap-le",
+         "pairing delegate request for pairing confirmation w/ no passkey "
+         "(peer: %s)",
+         bt_str(peer_id()));
 
   auto delegate = conn_mgr_->pairing_delegate();
   if (!delegate.is_alive()) {

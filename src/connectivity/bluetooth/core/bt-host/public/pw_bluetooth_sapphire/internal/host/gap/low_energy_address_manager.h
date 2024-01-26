@@ -5,8 +5,6 @@
 #ifndef SRC_CONNECTIVITY_BLUETOOTH_CORE_BT_HOST_PUBLIC_PW_BLUETOOTH_SAPPHIRE_INTERNAL_HOST_GAP_LOW_ENERGY_ADDRESS_MANAGER_H_
 #define SRC_CONNECTIVITY_BLUETOOTH_CORE_BT_HOST_PUBLIC_PW_BLUETOOTH_SAPPHIRE_INTERNAL_HOST_GAP_LOW_ENERGY_ADDRESS_MANAGER_H_
 
-#include <lib/async/cpp/task.h>
-
 #include <optional>
 #include <queue>
 
@@ -100,7 +98,7 @@ class LowEnergyAddressManager final : public hci::LocalAddressDelegate {
   // Assign a callback to be notified any time the LE address changes.
   void register_address_changed_callback(AddressCallback callback) {
     address_changed_callbacks_.emplace_back(std::move(callback));
-  };
+  }
 
   // Return the current address.
   const DeviceAddress& current_address() const {

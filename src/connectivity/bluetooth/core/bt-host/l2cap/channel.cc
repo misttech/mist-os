@@ -155,13 +155,13 @@ ChannelImpl::ChannelImpl(pw::async::Dispatcher& dispatcher,
 ChannelImpl::~ChannelImpl() {
   size_t removed_count = this->pending_tx_sdus_.size();
   if (removed_count > 0) {
-    bt_log(
-        TRACE,
-        "hci",
-        "packets dropped (count: %lu) due to channel destruction (link: %#.4x, id: %#.4x)",
-        removed_count,
-        link_handle(),
-        id());
+    bt_log(TRACE,
+           "hci",
+           "packets dropped (count: %lu) due to channel destruction (link: "
+           "%#.4x, id: %#.4x)",
+           removed_count,
+           link_handle(),
+           id());
   }
 }
 

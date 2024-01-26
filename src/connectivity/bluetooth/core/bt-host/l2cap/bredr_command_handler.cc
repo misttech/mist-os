@@ -19,11 +19,12 @@ namespace bt::l2cap::internal {
 bool BrEdrCommandHandler::ConnectionResponse::Decode(
     const ByteBuffer& payload_buf) {
   auto conn_rsp_payload = payload_buf.To<PayloadT>();
-  remote_cid_ = letoh16(conn_rsp_payload.dst_cid);
-  local_cid_ = letoh16(conn_rsp_payload.src_cid);
-  result_ = static_cast<ConnectionResult>(letoh16(conn_rsp_payload.result));
-  conn_status_ =
-      static_cast<ConnectionStatus>(letoh16(conn_rsp_payload.status));
+  remote_cid_ = le16toh(conn_rsp_payload.dst_cid);
+  local_cid_ = le16toh(conn_rsp_payload.src_cid);
+  result_ = static_cast<ConnectionResult>(
+      le16toh(static_cast<uint16_t>(conn_rsp_payload.result)));
+  conn_status_ = static_cast<ConnectionStatus>(
+      le16toh(static_cast<uint16_t>(conn_rsp_payload.status)));
   return true;
 }
 
@@ -31,10 +32,10 @@ bool BrEdrCommandHandler::ConfigurationResponse::Decode(
     const ByteBuffer& payload_buf) {
   PacketView<PayloadT> config_rsp(&payload_buf,
                                   payload_buf.size() - sizeof(PayloadT));
-  local_cid_ = letoh16(config_rsp.header().src_cid);
-  flags_ = letoh16(config_rsp.header().flags);
-  result_ =
-      static_cast<ConfigurationResult>(letoh16(config_rsp.header().result));
+  local_cid_ = le16toh(config_rsp.header().src_cid);
+  flags_ = le16toh(config_rsp.header().flags);
+  result_ = static_cast<ConfigurationResult>(
+      le16toh(static_cast<uint16_t>(config_rsp.header().result)));
 
   if (!config_.ReadOptions(config_rsp.payload_data())) {
     bt_log(WARN,
@@ -49,8 +50,10 @@ bool BrEdrCommandHandler::InformationResponse::Decode(
     const ByteBuffer& payload_buf) {
   PacketView<InformationResponsePayload> info_rsp(
       &payload_buf, payload_buf.size() - sizeof(InformationResponsePayload));
-  type_ = InformationType{letoh16(info_rsp.header().type)};
-  result_ = InformationResult{letoh16(info_rsp.header().result)};
+  type_ =
+      InformationType{le16toh(static_cast<uint16_t>(info_rsp.header().type))};
+  result_ = InformationResult{
+      le16toh(static_cast<uint16_t>(info_rsp.header().result))};
   if (result_ != InformationResult::kSuccess) {
     return true;
   }
@@ -67,20 +70,20 @@ bool BrEdrCommandHandler::InformationResponse::Decode(
       expected_size = sizeof(FixedChannelsSupported);
       break;
     default:
-      bt_log(
-          DEBUG,
-          "l2cap-bredr",
-          "cmd: passing Information Response with unknown type %#.4hx with %zu data bytes",
-          static_cast<unsigned short>(type_),
-          info_rsp.payload_size());
+      bt_log(DEBUG,
+             "l2cap-bredr",
+             "cmd: passing Information Response with unknown type %#.4hx with "
+             "%zu data bytes",
+             static_cast<unsigned short>(type_),
+             info_rsp.payload_size());
   }
   if (info_rsp.payload_size() < expected_size) {
-    bt_log(
-        DEBUG,
-        "l2cap-bredr",
-        "cmd: ignoring malformed Information Response, type %#.4hx with %zu data bytes",
-        static_cast<unsigned short>(type_),
-        info_rsp.payload_size());
+    bt_log(DEBUG,
+           "l2cap-bredr",
+           "cmd: ignoring malformed Information Response, type %#.4hx with %zu "
+           "data bytes",
+           static_cast<unsigned short>(type_),
+           info_rsp.payload_size());
     return false;
   }
   data_ = info_rsp.payload_data();
@@ -97,8 +100,8 @@ void BrEdrCommandHandler::ConnectionResponder::Send(ChannelId local_cid,
   ConnectionResponsePayload conn_rsp = {
       htole16(local_cid),
       htole16(remote_cid()),
-      static_cast<ConnectionResult>(htole16(result)),
-      static_cast<ConnectionStatus>(htole16(status))};
+      static_cast<ConnectionResult>(htole16(static_cast<uint16_t>(result))),
+      static_cast<ConnectionStatus>(htole16(static_cast<uint16_t>(status)))};
   sig_responder_->Send(BufferView(&conn_rsp, sizeof(conn_rsp)));
 }
 
@@ -123,7 +126,7 @@ void BrEdrCommandHandler::ConfigurationResponder::Send(
   config_rsp.mutable_header()->src_cid = htole16(remote_cid);
   config_rsp.mutable_header()->flags = htole16(flags);
   config_rsp.mutable_header()->result =
-      static_cast<ConfigurationResult>(htole16(result));
+      static_cast<ConfigurationResult>(htole16(static_cast<uint16_t>(result)));
 
   auto payload_view = config_rsp.mutable_payload_data().mutable_view();
   for (auto& option : options) {
@@ -184,9 +187,9 @@ void BrEdrCommandHandler::InformationResponder::Send(InformationResult result,
                                                               data.size());
 
   info_rsp_view.mutable_header()->type =
-      static_cast<InformationType>(htole16(type_));
+      static_cast<InformationType>(htole16(static_cast<uint16_t>(type_)));
   info_rsp_view.mutable_header()->result =
-      static_cast<InformationResult>(htole16(result));
+      static_cast<InformationResult>(htole16(static_cast<uint16_t>(result)));
   info_rsp_view.mutable_payload_data().Write(data);
   sig_responder_->Send(info_rsp_view.data());
 }
@@ -241,7 +244,8 @@ bool BrEdrCommandHandler::SendInformationRequest(
     InformationType type, InformationResponseCallback cb) {
   auto on_info_rsp = BuildResponseHandler<InformationResponse>(std::move(cb));
 
-  InformationRequestPayload payload = {InformationType{htole16(type)}};
+  InformationRequestPayload payload = {
+      InformationType{htole16(static_cast<uint16_t>(type))}};
   return sig()->SendRequest(kInformationRequest,
                             BufferView(&payload, sizeof(payload)),
                             std::move(on_info_rsp));
@@ -261,8 +265,8 @@ void BrEdrCommandHandler::ServeConnectionRequest(ConnectionRequestCallback cb) {
     }
 
     const auto& conn_req = request_payload.To<ConnectionRequestPayload>();
-    const Psm psm = letoh16(conn_req.psm);
-    const ChannelId remote_cid = letoh16(conn_req.src_cid);
+    const Psm psm = le16toh(conn_req.psm);
+    const ChannelId remote_cid = le16toh(conn_req.src_cid);
 
     ConnectionResponder responder(sig_responder, remote_cid);
 
@@ -317,8 +321,8 @@ void BrEdrCommandHandler::ServeConfigurationRequest(
         &request_payload,
         request_payload.size() - sizeof(ConfigurationRequestPayload));
     const auto local_cid =
-        static_cast<ChannelId>(letoh16(config_req.header().dst_cid));
-    const uint16_t flags = letoh16(config_req.header().flags);
+        static_cast<ChannelId>(le16toh(config_req.header().dst_cid));
+    const uint16_t flags = le16toh(config_req.header().flags);
     ConfigurationResponder responder(sig_responder, local_cid);
 
     ChannelConfiguration config;
@@ -349,7 +353,8 @@ void BrEdrCommandHandler::ServeInformationRequest(
     }
 
     const auto& info_req = request_payload.To<InformationRequestPayload>();
-    const auto type = static_cast<InformationType>(letoh16(info_req.type));
+    const auto type = static_cast<InformationType>(
+        le16toh(static_cast<uint16_t>(info_req.type)));
     InformationResponder responder(sig_responder, type);
     cb(type, &responder);
   };

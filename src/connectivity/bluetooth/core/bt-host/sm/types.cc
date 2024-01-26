@@ -11,6 +11,8 @@
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/sm/smp.h"
 #include "src/connectivity/bluetooth/lib/cpp-string/string_printf.h"
 
+#pragma clang diagnostic ignored "-Wswitch-enum"
+
 namespace bt::sm {
 namespace {
 const char* const kInspectLevelPropertyName = "level";

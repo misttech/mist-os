@@ -141,7 +141,7 @@ class ControllerTest {
     if (!data_received_callback_)
       return;
 
-    heap_dispatcher_.Post(
+    (void)heap_dispatcher_.Post(
         [this, packet = std::move(data_packet)](pw::async::Context /*ctx*/,
                                                 pw::Status status) mutable {
           if (status.ok()) {

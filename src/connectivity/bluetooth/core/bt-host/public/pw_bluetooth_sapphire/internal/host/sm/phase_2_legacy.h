@@ -5,7 +5,6 @@
 #ifndef SRC_CONNECTIVITY_BLUETOOTH_CORE_BT_HOST_PUBLIC_PW_BLUETOOTH_SAPPHIRE_INTERNAL_HOST_SM_PHASE_2_LEGACY_H_
 #define SRC_CONNECTIVITY_BLUETOOTH_CORE_BT_HOST_PUBLIC_PW_BLUETOOTH_SAPPHIRE_INTERNAL_HOST_SM_PHASE_2_LEGACY_H_
 
-#include <lib/async/cpp/task.h>
 #include <lib/fit/function.h>
 
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/device_address.h"
@@ -85,7 +84,8 @@ class Phase2Legacy final : public PairingPhase, public PairingChannelHandler {
   // PairingPhase overrides
   std::string ToStringInternal() override {
     return bt_lib_cpp_string::StringPrintf(
-        "Legacy Pairing Phase 2 (encryption key agreement) - pairing with %s method",
+        "Legacy Pairing Phase 2 (encryption key agreement) - pairing with %s "
+        "method",
         util::PairingMethodToString(features_.method).c_str());
   }
 

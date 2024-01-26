@@ -8,7 +8,6 @@
 #include <memory>
 #include <unordered_map>
 
-#include "lib/async/cpp/task.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/byte_buffer.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/macros.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/packet_view.h"
@@ -162,8 +161,8 @@ class SignalingChannel : public SignalingChannelInterface {
   //
   // This method is thread-safe in that a SignalingChannel cannot be deleted
   // while this is running. SendPacket() can be called safely from this method.
-  // TODO(https://fxbug.dev/42056068): make non-virtual & private after removing le
-  // signaling channel override
+  // TODO(https://fxbug.dev/42056068): make non-virtual & private after removing
+  // le signaling channel override
   virtual bool HandlePacket(const SignalingPacket& packet);
 
   // Sends out a command reject packet with the given parameters.

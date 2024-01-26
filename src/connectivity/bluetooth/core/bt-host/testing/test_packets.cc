@@ -345,9 +345,9 @@ DynamicByteBuffer ReadRemoteSupportedFeaturesCompletePacket(
       0x00,
       (extended_features ? 0x80 : 0x00)
       // lmp_features
-      // Set: 3 slot packets, 5 slot packets, Encryption, Timing Accuracy,
-      // Role Switch, Hold Mode, Sniff Mode, LE Supported
-      // Extended Features if enabled
+      // Set: 3 slot packets, 5 slot packets, Encryption,
+      // Timing Accuracy, Role Switch, Hold Mode, Sniff Mode,
+      // LE Supported Extended Features if enabled
       ));
 }
 

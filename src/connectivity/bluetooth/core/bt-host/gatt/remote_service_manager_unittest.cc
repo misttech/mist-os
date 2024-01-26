@@ -16,6 +16,8 @@
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/gatt/gatt_defs.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/testing/test_helpers.h"
 
+#pragma clang diagnostic ignored "-Wshadow"
+
 namespace bt::gatt::internal {
 namespace {
 

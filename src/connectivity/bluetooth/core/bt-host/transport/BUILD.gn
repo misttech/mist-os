@@ -6,24 +6,27 @@ import("//build_overrides/pigweed.gni")
 import("$dir_pw_build/target_types.gni")
 import("$dir_pw_unit_test/test.gni")
 
-public_dir = "//src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/transport"
+dir_public_transport = "../public/pw_bluetooth_sapphire/internal/host/transport"
 
 pw_source_set("transport") {
+  public = [
+    "$dir_public_transport/acl_data_channel.h",
+    "$dir_public_transport/acl_data_packet.h",
+    "$dir_public_transport/command_channel.h",
+    "$dir_public_transport/control_packets.h",
+    "$dir_public_transport/data_buffer_info.h",
+    "$dir_public_transport/emboss_control_packets.h",
+    "$dir_public_transport/emboss_packet.h",
+    "$dir_public_transport/error.h",
+    "$dir_public_transport/link_type.h",
+    "$dir_public_transport/packet.h",
+    "$dir_public_transport/sco_data_channel.h",
+    "$dir_public_transport/sco_data_packet.h",
+    "$dir_public_transport/slab_allocators.h",
+    "$dir_public_transport/transport.h",
+  ]
+
   sources = [
-    "$public_dir/acl_data_channel.h",
-    "$public_dir/acl_data_packet.h",
-    "$public_dir/command_channel.h",
-    "$public_dir/control_packets.h",
-    "$public_dir/data_buffer_info.h",
-    "$public_dir/emboss_control_packets.h",
-    "$public_dir/emboss_packet.h",
-    "$public_dir/error.h",
-    "$public_dir/link_type.h",
-    "$public_dir/packet.h",
-    "$public_dir/sco_data_channel.h",
-    "$public_dir/sco_data_packet.h",
-    "$public_dir/slab_allocators.h",
-    "$public_dir/transport.h",
     "acl_data_channel.cc",
     "acl_data_packet.cc",
     "command_channel.cc",
@@ -37,23 +40,25 @@ pw_source_set("transport") {
   ]
 
   public_deps = [
+    "$dir_pw_async:dispatcher",
+    "$dir_pw_async:task",
     "$dir_pw_bluetooth",
     "$dir_pw_bluetooth:emboss_hci_group",
     "$dir_pw_bluetooth:emboss_hci_test",
     "$dir_pw_third_party/fuchsia:fit",
     "//src/connectivity/bluetooth/core/bt-host/common",
     "//src/connectivity/bluetooth/core/bt-host/hci-spec",
-    "//third_party/pigweed:pw_async_dispatcher",
-    "//third_party/pigweed:pw_async_task",
   ]
 }
 
 pw_source_set("testing") {
   testonly = true
 
+  public = [
+    "$dir_public_transport/fake_sco_data_channel.h",
+    "$dir_public_transport/mock_acl_data_channel.h",
+  ]
   sources = [
-    "$public_dir/fake_sco_data_channel.h",
-    "$public_dir/mock_acl_data_channel.h",
     "fake_sco_data_channel.cc",
     "mock_acl_data_channel.cc",
   ]

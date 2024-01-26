@@ -2,19 +2,22 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-import("//build/fuzzing/fuchsia_library_fuzzer.gni")
+import("//build/fuzz.gni")
 import("//build_overrides/pigweed.gni")
 import("$dir_pw_fuzzer/fuzzer.gni")
 import("$dir_pw_unit_test/test.gni")
 
-public_dir = "//src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/sm"
+dir_public_sm = "../public/pw_bluetooth_sapphire/internal/host/sm"
 
 pw_source_set("definitions") {
+  public = [
+    "$dir_public_sm/error.h",
+    "$dir_public_sm/packet.h",
+    "$dir_public_sm/smp.h",
+    "$dir_public_sm/types.h",
+  ]
+
   sources = [
-    "$public_dir/error.h",
-    "$public_dir/packet.h",
-    "$public_dir/smp.h",
-    "$public_dir/types.h",
     "error.cc",
     "packet.cc",
     "types.cc",
@@ -27,20 +30,23 @@ pw_source_set("definitions") {
 }
 
 pw_source_set("sm") {
+  public = [
+    "$dir_public_sm/ecdh_key.h",
+    "$dir_public_sm/pairing_channel.h",
+    "$dir_public_sm/pairing_phase.h",
+    "$dir_public_sm/phase_1.h",
+    "$dir_public_sm/phase_2_legacy.h",
+    "$dir_public_sm/phase_2_secure_connections.h",
+    "$dir_public_sm/phase_3.h",
+    "$dir_public_sm/sc_stage_1.h",
+    "$dir_public_sm/sc_stage_1_just_works_numeric_comparison.h",
+    "$dir_public_sm/sc_stage_1_passkey.h",
+    "$dir_public_sm/security_manager.h",
+    "$dir_public_sm/security_request_phase.h",
+    "$dir_public_sm/util.h",
+  ]
+
   sources = [
-    "$public_dir/ecdh_key.h",
-    "$public_dir/pairing_channel.h",
-    "$public_dir/pairing_phase.h",
-    "$public_dir/phase_1.h",
-    "$public_dir/phase_2_legacy.h",
-    "$public_dir/phase_2_secure_connections.h",
-    "$public_dir/phase_3.h",
-    "$public_dir/sc_stage_1.h",
-    "$public_dir/sc_stage_1_just_works_numeric_comparison.h",
-    "$public_dir/sc_stage_1_passkey.h",
-    "$public_dir/security_manager.h",
-    "$public_dir/security_request_phase.h",
-    "$public_dir/util.h",
     "ecdh_key.cc",
     "pairing_channel.cc",
     "pairing_phase.cc",
@@ -60,6 +66,7 @@ pw_source_set("sm") {
     "$dir_pw_string",
     "$dir_pw_third_party/boringssl",
     "$dir_pw_third_party/fuchsia:fit",
+    "//src/connectivity/bluetooth/core/bt-host:config",
     "//src/connectivity/bluetooth/core/bt-host/gap:definitions",
     "//src/connectivity/bluetooth/core/bt-host/hci",
     "//src/connectivity/bluetooth/core/bt-host/l2cap",
@@ -69,11 +76,12 @@ pw_source_set("sm") {
 pw_source_set("testing") {
   testonly = true
 
-  sources = [
-    "$public_dir/fake_phase_listener.h",
-    "$public_dir/test_security_manager.h",
-    "test_security_manager.cc",
+  public = [
+    "$dir_public_sm/fake_phase_listener.h",
+    "$dir_public_sm/test_security_manager.h",
   ]
+
+  sources = [ "test_security_manager.cc" ]
 
   deps = [ ":sm" ]
 }
@@ -104,6 +112,8 @@ pw_test("tests") {
     "//src/connectivity/bluetooth/core/bt-host/l2cap:testing",
     "//src/connectivity/bluetooth/core/bt-host/testing",
   ]
+
+  test_main = "//src/connectivity/bluetooth/core/bt-host/testing:gtest_main"
 }
 
 fuchsia_library_fuzzer("valid_packet_reader_fuzzer") {
@@ -117,4 +127,11 @@ fuchsia_library_fuzzer("valid_packet_reader_fuzzer") {
 pw_fuzzer("pw_valid_packet_reader_fuzzer") {
   sources = [ "valid_packet_reader_parse_sdu_fuzztest.cc" ]
   deps = [ ":definitions" ]
+}
+
+pw_test_group("tests_and_fuzzers") {
+  tests = [
+    ":tests",
+    ":pw_valid_packet_reader_fuzzer_test",
+  ]
 }

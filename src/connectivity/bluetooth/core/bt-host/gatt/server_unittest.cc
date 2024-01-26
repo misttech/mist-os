@@ -4,8 +4,6 @@
 
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/gatt/server.h"
 
-#include <lib/async/cpp/task.h>
-
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/att/att.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/att/attribute.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/att/database.h"
@@ -15,6 +13,8 @@
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/gatt/local_service_manager.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/l2cap/mock_channel_test.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/testing/test_helpers.h"
+
+#pragma clang diagnostic ignored "-Wshadow"
 
 namespace bt::gatt {
 namespace {
@@ -108,8 +108,8 @@ class ServerTest : public l2cap::testing::MockChannelTest {
 
   att::Database::WeakPtr db() const { return local_services_->database(); }
 
-  // TODO(armansito): Consider introducing a FakeBearer for testing
-  // (https://fxbug.dev/42142784).
+  // TODO(https://fxbug.dev/42142784): Consider introducing a FakeBearer for
+  // testing.
   att::Bearer* att() const { return att_.get(); }
 
  private:
@@ -131,7 +131,8 @@ class ServerTest : public l2cap::testing::MockChannelTest {
       for (auto& attr : grouping.attributes()) {
         if (attr.type() == types::kCharacteristicDeclaration) {
           EXPECT_NE(state, kChrcDeclarationFound)
-              << "unexpectedly found two consecutive characteristic declarations";
+              << "unexpectedly found two consecutive characteristic "
+                 "declarations";
           state = kChrcDeclarationFound;
         } else if (state == kChrcDeclarationFound && attr.type() == chrc_type) {
           state = kCorrectChrcUuidFound;
@@ -1653,8 +1654,8 @@ TEST_F(ServerTest, WriteRequestSuccess) {
   fake_chan()->Receive(kRequest);
 }
 
-// TODO(bwb): Add test cases for the error conditions involved in a Write
-// Command (https://fxbug.dev/42146420)
+// TODO(https://fxbug.dev/42146420) Add test cases for the error conditions
+// involved in a Write Command.
 
 TEST_F(ServerTest, WriteCommandSuccess) {
   const StaticByteBuffer kTestValue('f', 'o', 'o');
@@ -3231,7 +3232,6 @@ class ServerTestSecurity : public ServerTest {
     EXPECT_TRUE((this->*EmulateMethod)(
         authorization_required_attr()->handle(),
         fit::error(att::ErrorCode::kInsufficientAuthentication)));
-
     // Link encrypted w/ MITM.
     fake_chan()->set_security(
         sm::SecurityProperties(sm::SecurityLevel::kAuthenticated,

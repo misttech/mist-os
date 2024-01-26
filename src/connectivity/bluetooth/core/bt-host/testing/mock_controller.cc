@@ -5,7 +5,6 @@
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/testing/mock_controller.h"
 
 #include <endian.h>
-#include <lib/async/cpp/task.h>
 
 #include <cstdint>
 
@@ -188,7 +187,7 @@ void MockController::OnCommandReceived(const ByteBuffer& data) {
 
   if (transaction_callback_) {
     DynamicByteBuffer rx(data);
-    heap_dispatcher().Post(
+    (void)heap_dispatcher().Post(
         [rx = std::move(rx), f = transaction_callback_.share()](
             auto, pw::Status status) {
           if (status.ok()) {
@@ -220,7 +219,7 @@ void MockController::OnACLDataPacketReceived(
 
   if (data_callback_) {
     DynamicByteBuffer packet_copy(acl_data_packet);
-    heap_dispatcher().Post(
+    (void)heap_dispatcher().Post(
         [packet_copy = std::move(packet_copy), cb = data_callback_.share()](
             auto, pw::Status status) mutable {
           if (status.ok()) {
@@ -249,32 +248,35 @@ void MockController::OnScoDataPacketReceived(
 void MockController::SendCommand(pw::span<const std::byte> data) {
   // Post task to simulate async
   DynamicByteBuffer buffer(BufferView(data.data(), data.size()));
-  heap_dispatcher().Post([this, buffer = std::move(buffer)](
-                             pw::async::Context /*ctx*/, pw::Status status) {
-    if (status.ok()) {
-      OnCommandReceived(buffer);
-    }
-  });
+  (void)heap_dispatcher().Post(
+      [this, buffer = std::move(buffer)](pw::async::Context /*ctx*/,
+                                         pw::Status status) {
+        if (status.ok()) {
+          OnCommandReceived(buffer);
+        }
+      });
 }
 void MockController::SendAclData(pw::span<const std::byte> data) {
   // Post task to simulate async
   DynamicByteBuffer buffer(BufferView(data.data(), data.size()));
-  heap_dispatcher().Post([this, buffer = std::move(buffer)](
-                             pw::async::Context /*ctx*/, pw::Status status) {
-    if (status.ok()) {
-      OnACLDataPacketReceived(buffer);
-    }
-  });
+  (void)heap_dispatcher().Post(
+      [this, buffer = std::move(buffer)](pw::async::Context /*ctx*/,
+                                         pw::Status status) {
+        if (status.ok()) {
+          OnACLDataPacketReceived(buffer);
+        }
+      });
 }
 void MockController::SendScoData(pw::span<const std::byte> data) {
   // Post task to simulate async
   DynamicByteBuffer buffer(BufferView(data.data(), data.size()));
-  heap_dispatcher().Post([this, buffer = std::move(buffer)](
-                             pw::async::Context /*ctx*/, pw::Status status) {
-    if (status.ok()) {
-      OnScoDataPacketReceived(buffer);
-    }
-  });
+  (void)heap_dispatcher().Post(
+      [this, buffer = std::move(buffer)](pw::async::Context /*ctx*/,
+                                         pw::Status status) {
+        if (status.ok()) {
+          OnScoDataPacketReceived(buffer);
+        }
+      });
 }
 
 }  // namespace bt::testing

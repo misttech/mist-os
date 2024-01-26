@@ -424,10 +424,10 @@ fit::result<ErrorCode> SecurityManagerImpl::RequestSecurityUpgrade(
     SecurityLevel level) {
   if (level >= SecurityLevel::kAuthenticated &&
       io_cap_ == IOCapability::kNoInputNoOutput) {
-    bt_log(
-        WARN,
-        "sm",
-        "cannot fulfill authenticated security request as IOCapabilities are NoInputNoOutput");
+    bt_log(WARN,
+           "sm",
+           "cannot fulfill authenticated security request as IOCapabilities "
+           "are NoInputNoOutput");
     return fit::error(ErrorCode::kAuthenticationRequirements);
   }
 
@@ -884,7 +884,8 @@ void SecurityManagerImpl::OnPairingFailed(Error error) {
           s = arg.ToString();
         } else {
           BT_PANIC(
-              "security upgrade cannot fail when current_phase_ is std::monostate!");
+              "security upgrade cannot fail when current_phase_ is "
+              "std::monostate!");
         }
         return s;
       },

@@ -512,11 +512,12 @@ TEST_F(Phase3Test, AbortsIfLocalIdKeyIsRemoved) {
   NewPhase3(args);
   listener()->set_identity_info(std::nullopt);
 
-  heap_dispatcher().Post([this](pw::async::Context /*ctx*/, pw::Status status) {
-    if (status.ok()) {
-      phase_3()->Start();
-    }
-  });
+  (void)heap_dispatcher().Post(
+      [this](pw::async::Context /*ctx*/, pw::Status status) {
+        if (status.ok()) {
+          phase_3()->Start();
+        }
+      });
   const StaticByteBuffer<PacketSize<ErrorCode>()> kExpectedFailure{
       kPairingFailed, ErrorCode::kUnspecifiedReason};
   ASSERT_TRUE(Expect(kExpectedFailure));

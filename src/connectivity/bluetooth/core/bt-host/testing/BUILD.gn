@@ -5,17 +5,20 @@
 import("//build_overrides/pigweed.gni")
 import("$dir_pw_unit_test/test.gni")
 
-public_dir = "//src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/testing"
+dir_public_testing = "../public/pw_bluetooth_sapphire/internal/host/testing"
 
 pw_source_set("testing") {
   testonly = true
 
+  public = [
+    "$dir_public_testing/controller_test.h",
+    "$dir_public_testing/inspect.h",
+    "$dir_public_testing/inspect_util.h",
+    "$dir_public_testing/parse_args.h",
+    "$dir_public_testing/test_packets.h",
+  ]
+
   sources = [
-    "$public_dir/controller_test.h",
-    "$public_dir/inspect.h",
-    "$public_dir/inspect_util.h",
-    "$public_dir/parse_args.h",
-    "$public_dir/test_packets.h",
     "inspect_util.cc",
     "parse_args.cc",
     "test_packets.cc",
@@ -40,7 +43,7 @@ pw_source_set("testing") {
 pw_source_set("test_helpers") {
   testonly = true
 
-  sources = [ "$public_dir/test_helpers.h" ]
+  public = [ "$dir_public_testing/test_helpers.h" ]
 
   deps = [ "//src/connectivity/bluetooth/lib/cpp-string" ]
 
@@ -65,40 +68,40 @@ pw_test("tests") {
     ":testing",
     "//src/connectivity/bluetooth/core/bt-host/l2cap:testing",
   ]
+
+  test_main = "//src/connectivity/bluetooth/core/bt-host/testing:gtest_main"
 }
 
 pw_source_set("controller_test_double_base") {
   testonly = true
 
-  sources = [
-    "$public_dir/controller_test_double_base.h",
-    "controller_test_double_base.cc",
-  ]
+  public = [ "$dir_public_testing/controller_test_double_base.h" ]
+
+  sources = [ "controller_test_double_base.cc" ]
 
   public_deps = [
+    "$dir_pw_async:heap_dispatcher",
     "$dir_pw_bluetooth",
     "$dir_pw_third_party/fuchsia:fit",
     "//src/connectivity/bluetooth/core/bt-host/common",
     "//src/connectivity/bluetooth/core/bt-host/hci",
-    "//third_party/pigweed:pw_async_heap_dispatcher",
   ]
 }
 
 pw_source_set("mock_controller") {
   testonly = true
 
-  sources = [
-    "$public_dir/mock_controller.h",
-    "mock_controller.cc",
-  ]
+  public = [ "$dir_public_testing/mock_controller.h" ]
+
+  sources = [ "mock_controller.cc" ]
 
   public_deps = [
     ":controller_test_double_base",
     ":test_helpers",
+    "$dir_pw_async:heap_dispatcher",
     "$dir_pw_unit_test",
     "//src/connectivity/bluetooth/core/bt-host/transport",
     "//src/connectivity/bluetooth/core/bt-host/transport:testing",
-    "//third_party/pigweed:pw_async_heap_dispatcher",
   ]
 }
 
@@ -107,14 +110,17 @@ pw_source_set("mock_controller") {
 pw_source_set("fake_controller") {
   testonly = true
 
+  public = [
+    "$dir_public_testing/fake_controller.h",
+    "$dir_public_testing/fake_dynamic_channel.h",
+    "$dir_public_testing/fake_gatt_server.h",
+    "$dir_public_testing/fake_l2cap.h",
+    "$dir_public_testing/fake_peer.h",
+    "$dir_public_testing/fake_sdp_server.h",
+    "$dir_public_testing/fake_signaling_server.h",
+  ]
+
   sources = [
-    "$public_dir/fake_controller.h",
-    "$public_dir/fake_dynamic_channel.h",
-    "$public_dir/fake_gatt_server.h",
-    "$public_dir/fake_l2cap.h",
-    "$public_dir/fake_peer.h",
-    "$public_dir/fake_sdp_server.h",
-    "$public_dir/fake_signaling_server.h",
     "fake_controller.cc",
     "fake_dynamic_channel.cc",
     "fake_gatt_server.cc",
@@ -155,13 +161,11 @@ pw_source_set("gtest_main") {
 }
 
 pw_source_set("fuzzing") {
-  testonly = true
-  sources = [ "$public_dir/peer_fuzzer.h" ]
+  public = [ "$dir_public_testing/peer_fuzzer.h" ]
   deps = [ "//src/connectivity/bluetooth/core/bt-host/gap" ]
 }
 
 source_set("fuzztest_driver") {
-  testonly = true
   sources = [ "fuzztest_driver.cc" ]
   deps = [
     "//src/connectivity/bluetooth/core/bt-host/common",

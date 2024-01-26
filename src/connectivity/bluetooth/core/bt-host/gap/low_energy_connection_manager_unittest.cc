@@ -11,6 +11,8 @@
 #include <memory>
 #include <vector>
 
+#include <gmock/gmock.h>
+
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/assert.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/byte_buffer.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/device_address.h"
@@ -19,7 +21,6 @@
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/gap/fake_pairing_delegate.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/gap/gap.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/gap/low_energy_address_manager.h"
-#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/gap/low_energy_connection_manager.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/gap/peer.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/gap/peer_cache.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/gatt/fake_layer.h"
@@ -202,14 +203,14 @@ class LowEnergyConnectionManagerTest : public TestingBase {
                                 hci_spec::ConnectionHandle handle,
                                 bool connected,
                                 bool canceled) {
-    bt_log(
-        DEBUG,
-        "gap-test",
-        "OnConnectionStateChanged: %s (handle: %#.4x) (connected: %s) (canceled: %s):\n",
-        address.ToString().c_str(),
-        handle,
-        (connected ? "true" : "false"),
-        (canceled ? "true" : "false"));
+    bt_log(DEBUG,
+           "gap-test",
+           "OnConnectionStateChanged: %s (handle: %#.4x) (connected: %s) "
+           "(canceled: %s):\n",
+           address.ToString().c_str(),
+           handle,
+           (connected ? "true" : "false"),
+           (canceled ? "true" : "false"));
     if (canceled) {
       canceled_peers_.insert(address);
     } else if (connected) {
@@ -1428,9 +1429,9 @@ TEST_F(LowEnergyConnectionManagerTest,
   // connection to peer already exists.
   RunFor(kLECreateConnectionTimeout);
   // An error should be returned if the connection complete was incorrectly not
-  // matched to the pending connection request (see https://fxbug.dev/42148050). In
-  // the future it may make sense to return success because a link to the peer
-  // already exists.
+  // matched to the pending connection request (see https://fxbug.dev/42148050).
+  // In the future it may make sense to return success because a link to the
+  // peer already exists.
   ASSERT_TRUE(result.is_error());
   EXPECT_TRUE(peer->le()->connected());
 }
@@ -1502,8 +1503,8 @@ TEST_F(LowEnergyConnectionManagerTest,
 }
 
 // Successful connection to a peer whose address type is kBREDR.
-// TODO(https://fxbug.dev/42102158): This test will likely become obsolete when LE
-// connections are based on the presence of LowEnergyData in a Peer and no
+// TODO(https://fxbug.dev/42102158): This test will likely become obsolete when
+// LE connections are based on the presence of LowEnergyData in a Peer and no
 // address type enum exists.
 TEST_F(LowEnergyConnectionManagerTest,
        ConnectAndDisconnectDualModeDeviceWithBrEdrAddress) {
@@ -2141,8 +2142,8 @@ TEST_F(
       kPeripheralPreferredConnectionParametersCharacteristic);
   service_client->set_characteristics({char_data});
 
-  // TODO(https://fxbug.dev/42074287): These parameters are invalid, but this test
-  // passes because we fail to validate them before sending them to the
+  // TODO(https://fxbug.dev/42074287): These parameters are invalid, but this
+  // test passes because we fail to validate them before sending them to the
   // controller.
   StaticByteBuffer char_value(0x01,
                               0x00,  // min interval

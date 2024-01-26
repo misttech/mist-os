@@ -5,7 +5,6 @@
 #ifndef SRC_CONNECTIVITY_BLUETOOTH_CORE_BT_HOST_PUBLIC_PW_BLUETOOTH_SAPPHIRE_INTERNAL_HOST_SM_PHASE_3_H_
 #define SRC_CONNECTIVITY_BLUETOOTH_CORE_BT_HOST_PUBLIC_PW_BLUETOOTH_SAPPHIRE_INTERNAL_HOST_SM_PHASE_3_H_
 
-#include <lib/async/cpp/task.h>
 #include <lib/fit/function.h>
 
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/device_address.h"
@@ -107,8 +106,10 @@ class Phase3 final : public PairingPhase, public PairingChannelHandler {
   // PairingPhase override
   std::string ToStringInternal() override {
     return bt_lib_cpp_string::StringPrintf(
-        "Pairing Phase 3 (security key distribution) - paired with %s security properties, sending "
-        "0x%02X local key distribution value and expecting 0x%02X as peer key distribution value",
+        "Pairing Phase 3 (security key distribution) - paired with %s security "
+        "properties, sending "
+        "0x%02X local key distribution value and expecting 0x%02X as peer key "
+        "distribution value",
         le_sec_.ToString().c_str(),
         features_.local_key_distribution,
         features_.remote_key_distribution);

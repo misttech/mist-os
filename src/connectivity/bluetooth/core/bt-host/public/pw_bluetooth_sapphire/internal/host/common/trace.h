@@ -7,6 +7,8 @@
 
 #include <cstdint>
 
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/config.h"
+
 #ifndef NTRACE
 #include <lib/trace/event.h>
 #else

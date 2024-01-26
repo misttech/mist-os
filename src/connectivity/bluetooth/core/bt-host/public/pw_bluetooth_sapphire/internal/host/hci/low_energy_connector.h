@@ -5,9 +5,6 @@
 #ifndef SRC_CONNECTIVITY_BLUETOOTH_CORE_BT_HOST_PUBLIC_PW_BLUETOOTH_SAPPHIRE_INTERNAL_HOST_HCI_LOW_ENERGY_CONNECTOR_H_
 #define SRC_CONNECTIVITY_BLUETOOTH_CORE_BT_HOST_PUBLIC_PW_BLUETOOTH_SAPPHIRE_INTERNAL_HOST_HCI_LOW_ENERGY_CONNECTOR_H_
 
-#include <lib/async/cpp/task.h>
-#include <lib/async/dispatcher.h>
-
 #include <memory>
 
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/device_address.h"
@@ -124,8 +121,8 @@ class LowEnergyConnector : public LocalAddressClient {
   //
   // By default the address provided by the LocalAddressDelegate is used.
   //
-  // TODO(https://fxbug.dev/42141593): Remove this temporary fix once we determine
-  // the root cause for authentication failures.
+  // TODO(https://fxbug.dev/42141593): Remove this temporary fix once we
+  // determine the root cause for authentication failures.
   void UseLocalIdentityAddress() { use_local_identity_address_ = true; }
 
   // LocalAddressClient override:
@@ -197,8 +194,8 @@ class LowEnergyConnector : public LocalAddressClient {
   CommandChannel::EventHandlerId event_handler_id_;
 
   // Use the local public address if true.
-  // TODO(https://fxbug.dev/42141593): Remove this temporary fix once we determine
-  // the root cause for authentication failures.
+  // TODO(https://fxbug.dev/42141593): Remove this temporary fix once we
+  // determine the root cause for authentication failures.
   bool use_local_identity_address_ = false;
 
   // Keep this as the last member to make sure that all weak pointers are

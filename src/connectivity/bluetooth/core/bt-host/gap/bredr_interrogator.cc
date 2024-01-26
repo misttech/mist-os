@@ -184,14 +184,14 @@ void BrEdrInterrogator::QueueReadRemoteExtendedFeatures(uint8_t page) {
     auto view = event.view<
         pw::bluetooth::emboss::ReadRemoteExtendedFeaturesCompleteEventView>();
 
-    bt_log(
-        TRACE,
-        "gap-bredr",
-        "got extended features page %u, max page %u (requested page: %u, peer id: %s)",
-        view.page_number().Read(),
-        view.max_page_number().Read(),
-        page,
-        bt_str(peer_id_));
+    bt_log(TRACE,
+           "gap-bredr",
+           "got extended features page %u, max page %u (requested page: %u, "
+           "peer id: %s)",
+           view.page_number().Read(),
+           view.max_page_number().Read(),
+           page,
+           bt_str(peer_id_));
 
     peer_->SetFeaturePage(view.page_number().Read(),
                           view.lmp_features().BackingStorage().ReadUInt());

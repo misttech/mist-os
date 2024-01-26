@@ -164,12 +164,12 @@ ScoConnectionManager::OnSynchronousConnectionComplete(
   }
 
   auto status = event.ToResult();
-  if (bt_is_error(
-          status,
-          INFO,
-          "gap-sco",
-          "SCO connection failed to be established; trying next parameters if available (peer: %s)",
-          bt_str(peer_id_))) {
+  if (bt_is_error(status,
+                  INFO,
+                  "gap-sco",
+                  "SCO connection failed to be established; trying next "
+                  "parameters if available (peer: %s)",
+                  bt_str(peer_id_))) {
     // A request must be in progress for this event to be generated.
     CompleteRequestOrTryNextParameters(fit::error(HostError::kFailed));
     return hci::CommandChannel::EventCallbackResult::kContinue;
@@ -262,11 +262,11 @@ ScoConnectionManager::OnConnectionRequest(const hci::EmbossEventPacket& event) {
        !FindNextParametersThatSupportSco()) ||
       (params.link_type().Read() == pw::bluetooth::emboss::LinkType::ESCO &&
        !FindNextParametersThatSupportEsco())) {
-    bt_log(
-        DEBUG,
-        "sco",
-        "in progress request parameters don't support the requested transport (%s); rejecting",
-        hci_spec::LinkTypeToString(params.link_type().Read()));
+    bt_log(DEBUG,
+           "sco",
+           "in progress request parameters don't support the requested "
+           "transport (%s); rejecting",
+           hci_spec::LinkTypeToString(params.link_type().Read()));
     // The controller will send an HCI Synchronous Connection Complete event, so
     // the request will be completed then.
     SendRejectConnectionCommand(DeviceAddressBytes(params.bd_addr()),
@@ -300,12 +300,12 @@ ScoConnectionManager::OnConnectionRequest(const hci::EmbossEventPacket& event) {
         if (!self.is_alive() || status.is_ok()) {
           return;
         }
-        bt_is_error(
-            status,
-            WARN,
-            "sco",
-            "enhanced accept SCO connection command failed, waiting for connection complete (peer: %s",
-            bt_str(peer_id));
+        bt_is_error(status,
+                    WARN,
+                    "sco",
+                    "enhanced accept SCO connection command failed, waiting "
+                    "for connection complete (peer: %s",
+                    bt_str(peer_id));
         // Do not complete the request here. Wait for
         // HCI_Synchronous_Connection_Complete event, which should be received
         // after Connection_Accept_Timeout with status
@@ -457,13 +457,13 @@ void ScoConnectionManager::CompleteRequestOrTryNextParameters(
 
 void ScoConnectionManager::CompleteRequest(ConnectionResult result) {
   BT_ASSERT(in_progress_request_);
-  bt_log(
-      INFO,
-      "gap-sco",
-      "Completing SCO connection request (initiator: %d, success: %d, peer: %s)",
-      in_progress_request_->initiator,
-      result.is_ok(),
-      bt_str(peer_id_));
+  bt_log(INFO,
+         "gap-sco",
+         "Completing SCO connection request (initiator: %d, success: %d, peer: "
+         "%s)",
+         in_progress_request_->initiator,
+         result.is_ok(),
+         bt_str(peer_id_));
   // Clear in_progress_request_ before calling callback to prevent additional
   // calls to CompleteRequest() during execution of the callback (e.g. due to
   // destroying the RequestHandle).

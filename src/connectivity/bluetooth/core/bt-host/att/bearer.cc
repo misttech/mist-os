@@ -14,6 +14,8 @@
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/sm/types.h"
 #include "src/connectivity/bluetooth/lib/cpp-string/string_printf.h"
 
+#pragma clang diagnostic ignored "-Wswitch-enum"
+
 namespace bt::att {
 
 // static
@@ -289,7 +291,8 @@ Bearer::Bearer(l2cap::Channel::WeakPtr chan, pw::async::Dispatcher& dispatcher)
   }
 
   mtu_ = min_mtu();
-  // TODO(https://fxbug.dev/42087558): Dynamically configure preferred MTU value.
+  // TODO(https://fxbug.dev/42087558): Dynamically configure preferred MTU
+  // value.
   preferred_mtu_ = kLEMaxMTU;
 }
 
@@ -626,12 +629,12 @@ void Bearer::HandleEndTransaction(TransactionQueue* tq,
   }
 
   BT_ASSERT(error.has_value());
-  bt_log(
-      TRACE,
-      "att",
-      "Received security error %s for transaction; requesting upgrade to level: %s",
-      bt_str(error->first),
-      sm::LevelToString(security_requirement));
+  bt_log(TRACE,
+         "att",
+         "Received security error %s for transaction; requesting upgrade to "
+         "level: %s",
+         bt_str(error->first),
+         sm::LevelToString(security_requirement));
   chan_->UpgradeSecurity(
       security_requirement,
       [self = weak_self_.GetWeakPtr(),

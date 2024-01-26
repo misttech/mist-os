@@ -633,28 +633,28 @@ void LogicalLink::OnRxFixedChannelsSupportedInfoRsp(
   }
 
   if (rsp.result() == InformationResult::kNotSupported) {
-    bt_log(
-        TRACE,
-        "l2cap",
-        "Received Fixed Channels Supported Information Response (result: Not Supported)");
+    bt_log(TRACE,
+           "l2cap",
+           "Received Fixed Channels Supported Information Response (result: "
+           "Not Supported)");
     return;
   }
 
   if (rsp.result() != InformationResult::kSuccess) {
-    bt_log(
-        TRACE,
-        "l2cap",
-        "Received Fixed Channels Supported Information Response (result: %.4hx)",
-        static_cast<uint16_t>(rsp.result()));
+    bt_log(TRACE,
+           "l2cap",
+           "Received Fixed Channels Supported Information Response (result: "
+           "%.4hx)",
+           static_cast<uint16_t>(rsp.result()));
     return;
   }
 
   if (rsp.type() != InformationType::kFixedChannelsSupported) {
-    bt_log(
-        TRACE,
-        "l2cap",
-        "Incorrect Fixed Channels Supported Information Response type (type: %#.4hx)",
-        static_cast<unsigned short>(rsp.type()));
+    bt_log(TRACE,
+           "l2cap",
+           "Incorrect Fixed Channels Supported Information Response type "
+           "(type: %#.4hx)",
+           static_cast<unsigned short>(rsp.type()));
     return;
   }
 
@@ -684,11 +684,11 @@ void LogicalLink::SendConnectionParameterUpdateRequest(
         bool accepted = false;
 
         if (rsp.status() != LowEnergyCommandHandler::Status::kSuccess) {
-          bt_log(
-              TRACE,
-              "l2cap",
-              "LE Connection Parameter Update Request rejected (reason: %#.4hx)",
-              static_cast<unsigned short>(rsp.reject_reason()));
+          bt_log(TRACE,
+                 "l2cap",
+                 "LE Connection Parameter Update Request rejected (reason: "
+                 "%#.4hx)",
+                 static_cast<unsigned short>(rsp.reject_reason()));
         } else {
           accepted = rsp.result() == ConnectionParameterUpdateResult::kAccepted;
         }
@@ -768,21 +768,21 @@ void LogicalLink::SetBrEdrAutomaticFlushTimeout(
       [cb = std::move(callback_wrapper), handle = handle_, flush_timeout](
           auto, const hci::EventPacket& event) mutable {
         if (event.ToResult().is_error()) {
-          bt_log(
-              WARN,
-              "hci",
-              "WriteAutomaticFlushTimeout command failed (result: %s, handle: %#.4x)",
-              bt_str(event.ToResult()),
-              handle);
+          bt_log(WARN,
+                 "hci",
+                 "WriteAutomaticFlushTimeout command failed (result: %s, "
+                 "handle: %#.4x)",
+                 bt_str(event.ToResult()),
+                 handle);
         } else {
-          bt_log(
-              DEBUG,
-              "hci",
-              "automatic flush timeout updated (handle: %#.4x, timeout: %lld ms)",
-              handle,
-              std::chrono::duration_cast<std::chrono::milliseconds>(
-                  flush_timeout)
-                  .count());
+          bt_log(DEBUG,
+                 "hci",
+                 "automatic flush timeout updated (handle: %#.4x, timeout: "
+                 "%lld ms)",
+                 handle,
+                 std::chrono::duration_cast<std::chrono::milliseconds>(
+                     flush_timeout)
+                     .count());
         }
         cb(event.ToResult());
       });

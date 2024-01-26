@@ -226,7 +226,8 @@ class PairingState final {
   // Returns value for IO Capability Request Reply, else std::nullopt for IO
   // Capability Negative Reply.
   //
-  // TODO(https://fxbug.dev/42138242): Indicate presence of out-of-band (OOB) data.
+  // TODO(https://fxbug.dev/42138242): Indicate presence of out-of-band (OOB)
+  // data.
   [[nodiscard]] std::optional<pw::bluetooth::emboss::IoCapability>
   OnIoCapabilityRequest();
 
@@ -374,7 +375,6 @@ class PairingState final {
 
     // HCI event to respond to in order to complete or reject pairing.
     hci_spec::EventCode expected_event;
-
     // True if this pairing is expected to be resistant to MITM attacks.
     bool authenticated;
 

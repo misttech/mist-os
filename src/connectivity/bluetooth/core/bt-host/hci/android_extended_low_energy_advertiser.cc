@@ -354,11 +354,11 @@ AndroidExtendedLowEnergyAdvertiser::OnAdvertisingStateChangedSubevent(
       staged_connections_map_.extract(connection_handle);
 
   if (staged_parameters_node.empty()) {
-    bt_log(
-        ERROR,
-        "hci-le",
-        "advertising state change event, staged params not available (handle: %d)",
-        view.advertising_handle().Read());
+    bt_log(ERROR,
+           "hci-le",
+           "advertising state change event, staged params not available "
+           "(handle: %d)",
+           view.advertising_handle().Read());
     return CommandChannel::EventCallbackResult::kContinue;
   }
 

@@ -26,6 +26,8 @@
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/transport/link_type.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/transport/transport.h"
 
+#pragma clang diagnostic ignored "-Wshadow"
+
 namespace bt::hci {
 namespace {
 
@@ -96,8 +98,8 @@ class AclDataChannelTest : public TestingBase {
 };
 class AclDataChannelMtuTest : public AclDataChannelTest {
  public:
-  DataBufferInfo BREDRBufferInfo() { return DataBufferInfo(1024, 50); };
-  DataBufferInfo LEBufferInfo() { return DataBufferInfo(64, 16); };
+  DataBufferInfo BREDRBufferInfo() { return DataBufferInfo(1024, 50); }
+  DataBufferInfo LEBufferInfo() { return DataBufferInfo(64, 16); }
 };
 
 class AclDataChannelOnlyBREDRBufferAvailable : public AclDataChannelTest {

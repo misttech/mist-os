@@ -4,8 +4,6 @@
 
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/testing/controller_test_double_base.h"
 
-#include <lib/async/cpp/task.h>
-
 namespace bt::testing {
 
 ControllerTestDoubleBase::ControllerTestDoubleBase(
@@ -28,13 +26,14 @@ bool ControllerTestDoubleBase::SendCommandChannelPacket(
   // Post packet to simulate async behavior that many tests expect.
   DynamicByteBuffer buffer(packet);
   auto self = weak_self_.GetWeakPtr();
-  heap_dispatcher().Post([self, buffer = std::move(buffer)](
-                             pw::async::Context /*ctx*/, pw::Status status) {
-    if (self.is_alive() && status.ok()) {
-      self->event_cb_(
-          {reinterpret_cast<const std::byte*>(buffer.data()), buffer.size()});
-    }
-  });
+  (void)heap_dispatcher().Post(
+      [self, buffer = std::move(buffer)](pw::async::Context /*ctx*/,
+                                         pw::Status status) {
+        if (self.is_alive() && status.ok()) {
+          self->event_cb_({reinterpret_cast<const std::byte*>(buffer.data()),
+                           buffer.size()});
+        }
+      });
   return true;
 }
 
@@ -47,13 +46,14 @@ bool ControllerTestDoubleBase::SendACLDataChannelPacket(
   // Post packet to simulate async behavior that some tests expect.
   DynamicByteBuffer buffer(packet);
   auto self = weak_self_.GetWeakPtr();
-  heap_dispatcher().Post([self, buffer = std::move(buffer)](
-                             pw::async::Context /*ctx*/, pw::Status status) {
-    if (self.is_alive() && status.ok()) {
-      self->acl_cb_(
-          {reinterpret_cast<const std::byte*>(buffer.data()), buffer.size()});
-    }
-  });
+  (void)heap_dispatcher().Post(
+      [self, buffer = std::move(buffer)](pw::async::Context /*ctx*/,
+                                         pw::Status status) {
+        if (self.is_alive() && status.ok()) {
+          self->acl_cb_({reinterpret_cast<const std::byte*>(buffer.data()),
+                         buffer.size()});
+        }
+      });
   return true;
 }
 
@@ -93,7 +93,7 @@ void ControllerTestDoubleBase::ConfigureSco(
   auto callback_wrapper =
       [dispatcher = &pw_dispatcher_,
        cb = std::move(callback)](pw::Status cb_status) mutable {
-        pw::async::HeapDispatcher(*dispatcher)
+        (void)pw::async::HeapDispatcher(*dispatcher)
             .Post([cb_status, cb = std::move(cb)](pw::async::Context /*ctx*/,
                                                   pw::Status status) mutable {
               if (status.ok()) {
@@ -115,7 +115,7 @@ void ControllerTestDoubleBase::ResetSco(
   auto callback_wrapper =
       [dispatcher = &pw_dispatcher_,
        cb = std::move(callback)](pw::Status cb_status) mutable {
-        pw::async::HeapDispatcher(*dispatcher)
+        (void)pw::async::HeapDispatcher(*dispatcher)
             .Post([cb_status, cb = std::move(cb)](pw::async::Context /*ctx*/,
                                                   pw::Status status) mutable {
               if (status.ok()) {

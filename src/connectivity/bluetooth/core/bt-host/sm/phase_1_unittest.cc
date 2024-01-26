@@ -575,8 +575,8 @@ TEST_F(Phase1Test, FeatureExchangeSecureAuthenticatedEncryptionKeySize) {
       0x04,  // IO cap.: KeyboardDisplay
       0x00,  // OOB: not present
       AuthReq::kBondingFlag | AuthReq::kMITM | AuthReq::kSC,
-      0x0F,  // encr. key size: 15, i.e. one byte less than max possible
-             // encryption key size.
+      0x0F,                 // encr. key size: 15, i.e. one byte less than max
+                            // possible encryption key size.
       KeyDistGen::kEncKey,  // initiator keys
       KeyDistGen::kEncKey   // responder keys
   );
@@ -948,8 +948,8 @@ TEST_F(Phase1Test, FeatureExchangeLocalResponderDoesNotRequestUnsupportedKeys) {
       0x00,  // OOB: not present
       AuthReq::kBondingFlag | AuthReq::kCT2,
       0x10,  // encr. key size: 16 (default max)
-      0x00,  // initiator keys: none - we shouldn't request the SignKey as we
-             // don't support it
+      0x00,  // initiator keys: none - we shouldn't request the SignKey
+             // as we don't support it
       0x00   // responder keys: none
   );
 
@@ -1017,8 +1017,8 @@ TEST_F(Phase1Test, FeatureExchangeResponderRespectsInitiatorForIdKey) {
       AuthReq::kBondingFlag | AuthReq::kCT2,
       0x10,  // encr. key size: 16 (default max)
       0x00,  // initiator keys: none
-      0x00   // responder keys: none - we shouldn't distribute IdKey even though
-             // we have it
+      0x00   // responder keys: none - we shouldn't distribute IdKey
+             // even though we have it
   );
 
   NewPhase1(Role::kResponder, phase_args);

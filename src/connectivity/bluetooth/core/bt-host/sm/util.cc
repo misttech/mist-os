@@ -23,6 +23,8 @@
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/sm/smp.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/sm/types.h"
 
+#pragma clang diagnostic ignored "-Wswitch-enum"
+
 namespace bt::sm::util {
 namespace {
 
@@ -160,9 +162,9 @@ std::string DisplayMethodToString(Delegate::DisplayMethod method) {
 }
 
 MutableByteBufferPtr NewPdu(size_t param_size) {
-  // TODO(https://fxbug.dev/42083692): Remove unique_ptr->DynamicByteBuffer double
-  // indirection once sufficient progress has been made on the attached bug
-  // (specifically re:l2cap::Channel::Send).
+  // TODO(https://fxbug.dev/42083692): Remove unique_ptr->DynamicByteBuffer
+  // double indirection once sufficient progress has been made on the attached
+  // bug (specifically re:l2cap::Channel::Send).
   return std::make_unique<DynamicByteBuffer>(sizeof(Header) + param_size);
 }
 
@@ -177,7 +179,6 @@ PairingMethod SelectPairingMethod(bool sec_conn,
       (!sec_conn && local_oob && peer_oob)) {
     return PairingMethod::kOutOfBand;
   }
-
   // If neither device requires MITM protection or if the peer has not I/O
   // capable, we select Just Works.
   if (!mitm_required || peer_ioc == IOCapability::kNoInputNoOutput) {

@@ -7,10 +7,10 @@
 
 #include "pw_assert/check.h"
 
-#define BT_PANIC(msg, args...) PW_CRASH(msg, ##args)
+#define BT_PANIC(msg, ...) PW_CRASH(msg, ##__VA_ARGS__)
 #define BT_ASSERT(x) PW_CHECK(x)
-#define BT_ASSERT_MSG(x, msg, args...) PW_CHECK(x, msg, ##args)
+#define BT_ASSERT_MSG(x, msg, ...) PW_CHECK(x, msg, ##__VA_ARGS__)
 #define BT_DEBUG_ASSERT(x) PW_DCHECK(x)
-#define BT_DEBUG_ASSERT_MSG(x, msg, args...) PW_DCHECK(x, msg, ##args)
+#define BT_DEBUG_ASSERT_MSG(x, msg, ...) PW_DCHECK(x, msg, ##__VA_ARGS__)
 
 #endif  // SRC_CONNECTIVITY_BLUETOOTH_CORE_BT_HOST_PUBLIC_PW_BLUETOOTH_SAPPHIRE_INTERNAL_HOST_COMMON_ASSERT_H_

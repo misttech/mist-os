@@ -94,13 +94,10 @@ bool HasKeysToDistribute(PairingFeatures features);
 enum class SecurityLevel {
   // No encryption
   kNoSecurity = 1,
-
   // Encrypted without MITM protection (unauthenticated)
   kEncrypted = 2,
-
   // Encrypted with MITM protection (authenticated)
   kAuthenticated = 3,
-
   // Encrypted with MITM protection, Secure Connections, and a 128-bit
   // encryption key.
   kSecureAuthenticated = 4,

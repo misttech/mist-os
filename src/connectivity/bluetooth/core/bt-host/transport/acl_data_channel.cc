@@ -5,7 +5,6 @@
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/transport/acl_data_channel.h"
 
 #include <endian.h>
-#include <lib/async/cpp/time.h>
 
 #include <iterator>
 
@@ -425,7 +424,7 @@ void AclDataChannelImpl::RequestAclPriority(
         }
 
         hci_spec::OpCode op_code =
-            letoh16(encoded.ReadMember<&hci_spec::CommandHeader::opcode>());
+            le16toh(encoded.ReadMember<&hci_spec::CommandHeader::opcode>());
         auto packet = bt::hci::CommandPacket::New(
             op_code, encoded.size() - sizeof(hci_spec::CommandHeader));
         auto packet_view = packet->mutable_view()->mutable_data();
@@ -476,12 +475,12 @@ AclDataChannelImpl::NumberOfCompletedPacketsCallback(const EventPacket& event) {
     auto iter = pending_links_.find(le16toh(data->connection_handle));
     if (iter == pending_links_.end()) {
       // This is expected if the completed packet is a SCO packet.
-      bt_log(
-          TRACE,
-          "hci",
-          "controller reported completed packets for connection handle without pending packets: "
-          "%#.4x",
-          data->connection_handle);
+      bt_log(TRACE,
+             "hci",
+             "controller reported completed packets for connection handle "
+             "without pending packets: "
+             "%#.4x",
+             data->connection_handle);
       continue;
     }
 
@@ -495,13 +494,13 @@ AclDataChannelImpl::NumberOfCompletedPacketsCallback(const EventPacket& event) {
       // but this is insufficient: packets can be queued in the channel to the
       // transport driver, and possibly in the transport driver or USB/UART
       // drivers.
-      bt_log(
-          ERROR,
-          "hci",
-          "ACL packet tx count mismatch! (handle: %#.4x, expected: %zu, actual : %u)",
-          le16toh(data->connection_handle),
-          iter->second.count,
-          comp_packets);
+      bt_log(ERROR,
+             "hci",
+             "ACL packet tx count mismatch! (handle: %#.4x, expected: %zu, "
+             "actual : %u)",
+             le16toh(data->connection_handle),
+             iter->second.count,
+             comp_packets);
       // This should eventually result in convergence with the correct pending
       // packet count. If it undercounts the true number of pending packets,
       // this branch will be reached again when the controller sends an updated
@@ -564,8 +563,8 @@ void AclDataChannelImpl::OnRxPacket(pw::span<const std::byte> buffer) {
   BT_ASSERT(rx_callback_);
 
   if (buffer.size() < sizeof(hci_spec::ACLDataHeader)) {
-    // TODO(https://fxbug.dev/42179582): Handle these types of errors by signaling
-    // Transport.
+    // TODO(https://fxbug.dev/42179582): Handle these types of errors by
+    // signaling Transport.
     bt_log(ERROR,
            "hci",
            "malformed packet - expected at least %zu bytes, got %zu",
@@ -583,8 +582,8 @@ void AclDataChannelImpl::OnRxPacket(pw::span<const std::byte> buffer) {
   packet->InitializeFromBuffer();
 
   if (packet->view().header().data_total_length != payload_size) {
-    // TODO(https://fxbug.dev/42179582): Handle these types of errors by signaling
-    // Transport.
+    // TODO(https://fxbug.dev/42179582): Handle these types of errors by
+    // signaling Transport.
     bt_log(ERROR,
            "hci",
            "malformed packet - payload size from header (%hu) does not match"

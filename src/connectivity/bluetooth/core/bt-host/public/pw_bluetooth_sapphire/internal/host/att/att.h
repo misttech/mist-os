@@ -14,6 +14,9 @@
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/hci-spec/constants.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/l2cap/l2cap_defs.h"
 
+#pragma clang diagnostic ignored "-Wc99-extensions"
+#pragma clang diagnostic ignored "-Wflexible-array-extensions"
+
 namespace bt::att {
 
 // v5.0, Vol 3, Part G, 5.1.2

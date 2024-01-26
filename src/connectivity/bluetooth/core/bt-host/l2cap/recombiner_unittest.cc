@@ -10,6 +10,8 @@
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/l2cap/pdu.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/transport/packet.h"
 
+#pragma clang diagnostic ignored "-Wshadow"
+
 namespace bt::l2cap {
 namespace {
 

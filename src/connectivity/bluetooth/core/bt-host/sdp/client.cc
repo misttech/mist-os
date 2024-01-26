@@ -237,7 +237,7 @@ void Impl::OnRxFrame(ByteBufferPtr data) {
   // Each SDU in SDP is one request or one response. Core 5.0 Vol 3 Part B, 4.2
   PacketView<sdp::Header> packet(data.get());
   size_t pkt_params_len = data->size() - sizeof(Header);
-  uint16_t params_len = betoh16(packet.header().param_length);
+  uint16_t params_len = be16toh(packet.header().param_length);
   if (params_len != pkt_params_len) {
     bt_log(INFO,
            "sdp",
@@ -247,7 +247,7 @@ void Impl::OnRxFrame(ByteBufferPtr data) {
     return;
   }
   packet.Resize(params_len);
-  TransactionId tid = betoh16(packet.header().tid);
+  TransactionId tid = be16toh(packet.header().tid);
   auto it = pending_.find(tid);
   if (it == pending_.end()) {
     bt_log(INFO, "sdp", "Received unknown transaction id (%u)", tid);

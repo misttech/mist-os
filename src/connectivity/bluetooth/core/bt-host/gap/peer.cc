@@ -81,7 +81,7 @@ void Peer::LowEnergyData::AttachInspect(inspect::Node& parent,
   node_ = parent.CreateChild(name);
   inspect_properties_.connection_state =
       node_.CreateString(LowEnergyData::kInspectConnectionStateName,
-                         ConnectionStateToString(connection_state()));
+                         Peer::ConnectionStateToString(connection_state()));
   inspect_properties_.last_adv_data_parse_failure = node_.CreateString(
       LowEnergyData::kInspectLastAdvertisingDataParseFailureName, "");
   adv_data_parse_failure_count_.AttachInspect(
@@ -240,16 +240,16 @@ void Peer::LowEnergyData::OnConnectionStateMaybeChanged(
     return;
   }
 
-  bt_log(
-      DEBUG,
-      "gap-le",
-      "peer (%s) LE connection state changed from %s to %s (initializing count: %hu, "
-      "connection count: %hu)",
-      bt_str(peer_->identifier()),
-      ConnectionStateToString(previous).c_str(),
-      ConnectionStateToString(connection_state()).c_str(),
-      initializing_tokens_count_,
-      connection_tokens_count_);
+  bt_log(DEBUG,
+         "gap-le",
+         "peer (%s) LE connection state changed from %s to %s (initializing "
+         "count: %hu, "
+         "connection count: %hu)",
+         bt_str(peer_->identifier()),
+         ConnectionStateToString(previous).c_str(),
+         ConnectionStateToString(connection_state()).c_str(),
+         initializing_tokens_count_,
+         connection_tokens_count_);
 
   inspect_properties_.connection_state.Set(
       ConnectionStateToString(connection_state()));
@@ -344,10 +344,10 @@ Peer::BrEdrData::RegisterInitializingConnection() {
 }
 
 Peer::ConnectionToken Peer::BrEdrData::RegisterConnection() {
-  BT_ASSERT_MSG(
-      !connected(),
-      "attempt to register BR/EDR connection when a connection is already registered (peer: %s)",
-      bt_str(peer_->identifier()));
+  BT_ASSERT_MSG(!connected(),
+                "attempt to register BR/EDR connection when a connection is "
+                "already registered (peer: %s)",
+                bt_str(peer_->identifier()));
 
   ConnectionState prev_state = connection_state();
   connection_tokens_count_++;

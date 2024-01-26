@@ -4,8 +4,6 @@
 
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/l2cap/mock_channel_test.h"
 
-#include <lib/async/cpp/task.h>
-
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/testing/test_helpers.h"
 
 namespace bt::l2cap::testing {
@@ -75,12 +73,13 @@ void MockChannelTest::OnPacketSent(std::unique_ptr<ByteBuffer> packet) {
     auto reply = std::move(expected.replies().front());
     expected.replies().pop();
     // Post tasks to simulate real inbound packets, which are asynchronous.
-    heap_dispatcher().Post([this, reply = std::move(reply)](
-                               pw::async::Context /*ctx*/, pw::Status status) {
-      if (status.ok()) {
-        fake_chan_->Receive(reply);
-      }
-    });
+    (void)heap_dispatcher().Post(
+        [this, reply = std::move(reply)](pw::async::Context /*ctx*/,
+                                         pw::Status status) {
+          if (status.ok()) {
+            fake_chan_->Receive(reply);
+          }
+        });
   }
 }
 

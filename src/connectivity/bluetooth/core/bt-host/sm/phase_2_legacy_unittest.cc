@@ -399,11 +399,12 @@ TEST_F(Phase2LegacyTest, JustWorksUserConfirmationRejectedPairingFails) {
     confirmation_requested = true;
     cb(false);
   });
-  heap_dispatcher().Post([this](pw::async::Context /*ctx*/, pw::Status status) {
-    if (status.ok()) {
-      phase_2_legacy()->Start();
-    }
-  });
+  (void)heap_dispatcher().Post(
+      [this](pw::async::Context /*ctx*/, pw::Status status) {
+        if (status.ok()) {
+          phase_2_legacy()->Start();
+        }
+      });
   const StaticByteBuffer<PacketSize<ErrorCode>()> kExpectedFailure{
       kPairingFailed, ErrorCode::kUnspecifiedReason};
   ASSERT_TRUE(Expect(kExpectedFailure));
@@ -423,11 +424,12 @@ TEST_F(Phase2LegacyTest, PasskeyInputRejectedPairingFails) {
         const int64_t kGenericNegativeInt = -12;
         cb(kGenericNegativeInt);
       });
-  heap_dispatcher().Post([this](pw::async::Context /*ctx*/, pw::Status status) {
-    if (status.ok()) {
-      phase_2_legacy()->Start();
-    }
-  });
+  (void)heap_dispatcher().Post(
+      [this](pw::async::Context /*ctx*/, pw::Status status) {
+        if (status.ok()) {
+          phase_2_legacy()->Start();
+        }
+      });
   const StaticByteBuffer<PacketSize<ErrorCode>()> kExpectedFailure{
       kPairingFailed, ErrorCode::kPasskeyEntryFailed};
   ASSERT_TRUE(Expect(kExpectedFailure));
@@ -446,11 +448,12 @@ TEST_F(Phase2LegacyTest, PasskeyDisplayRejectedPairingFails) {
         confirmation_requested = true;
         cb(false);
       });
-  heap_dispatcher().Post([this](pw::async::Context /*ctx*/, pw::Status status) {
-    if (status.ok()) {
-      phase_2_legacy()->Start();
-    }
-  });
+  (void)heap_dispatcher().Post(
+      [this](pw::async::Context /*ctx*/, pw::Status status) {
+        if (status.ok()) {
+          phase_2_legacy()->Start();
+        }
+      });
   const StaticByteBuffer<PacketSize<ErrorCode>()> kExpectedFailure{
       kPairingFailed, ErrorCode::kUnspecifiedReason};
   ASSERT_TRUE(Expect(kExpectedFailure));

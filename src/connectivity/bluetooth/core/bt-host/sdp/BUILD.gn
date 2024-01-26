@@ -7,16 +7,19 @@ import("//build_overrides/pigweed.gni")
 import("$dir_pw_fuzzer/fuzzer.gni")
 import("$dir_pw_unit_test/test.gni")
 
-public_dir = "//src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/sdp"
+dir_public_sdp = "../public/pw_bluetooth_sapphire/internal/host/sdp"
 
 # Basic target with protocol definitions and no logic, suitable for test
 # emulation.
 pw_source_set("definitions") {
+  public = [
+    "$dir_public_sdp/data_element.h",
+    "$dir_public_sdp/error.h",
+    "$dir_public_sdp/sdp.h",
+    "$dir_public_sdp/service_record.h",
+  ]
+
   sources = [
-    "$public_dir/data_element.h",
-    "$public_dir/error.h",
-    "$public_dir/sdp.h",
-    "$public_dir/service_record.h",
     "data_element.cc",
     "error.cc",
     "service_record.cc",
@@ -26,11 +29,14 @@ pw_source_set("definitions") {
 }
 
 pw_source_set("sdp") {
+  public = [
+    "$dir_public_sdp/client.h",
+    "$dir_public_sdp/pdu.h",
+    "$dir_public_sdp/server.h",
+    "$dir_public_sdp/service_discoverer.h",
+  ]
+
   sources = [
-    "$public_dir/client.h",
-    "$public_dir/pdu.h",
-    "$public_dir/server.h",
-    "$public_dir/service_discoverer.h",
     "client.cc",
     "pdu.cc",
     "server.cc",
@@ -60,6 +66,8 @@ pw_test("tests") {
     "//src/connectivity/bluetooth/core/bt-host/l2cap:testing",
     "//src/connectivity/bluetooth/core/bt-host/testing",
   ]
+
+  test_main = "//src/connectivity/bluetooth/core/bt-host/testing:gtest_main"
 }
 
 fuchsia_library_fuzzer("data_element_fuzzer") {
@@ -86,4 +94,12 @@ fuchsia_library_fuzzer("pdu_fuzzer") {
 pw_fuzzer("pw_pdu_fuzzer") {
   sources = [ "pdu_fuzztest.cc" ]
   deps = [ ":sdp" ]
+}
+
+pw_test_group("tests_and_fuzzers") {
+  tests = [
+    ":tests",
+    ":pw_data_element_fuzzer_test",
+    ":pw_pdu_fuzzer_test",
+  ]
 }

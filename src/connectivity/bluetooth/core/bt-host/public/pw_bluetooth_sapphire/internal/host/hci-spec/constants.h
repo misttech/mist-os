@@ -789,9 +789,9 @@ enum class EncryptionStatus : uint8_t {
 };
 
 // HCI command timeout interval (milliseconds)
-// TODO(https://fxbug.dev/1196,https://fxbug.dev/42070801) This was increased to handle flaking integration tests.
-// We may want to reduce this to something lower again once we have a better
-// resolution to this issue.
+// TODO(https://fxbug.dev/42070690, https://fxbug.dev/42070801) This was
+// increased to handle flaking integration tests. We may want to reduce this
+// to something lower again once we have a bette resolution to this issue.
 constexpr pw::chrono::SystemClock::duration kCommandTimeout = std::chrono::seconds(10);
 
 // The minimum and maximum range values for the LE advertising interval
@@ -1335,4 +1335,5 @@ constexpr pw::chrono::SystemClock::duration kMaxPageTimeoutDuration = kDurationP
 
 }  // namespace bt::hci_spec
 
-#endif // SRC_CONNECTIVITY_BLUETOOTH_CORE_BT_HOST_PUBLIC_PW_BLUETOOTH_SAPPHIRE_INTERNAL_HOST_HCI_SPEC_CONSTANTS_H_
+
+#endif  // SRC_CONNECTIVITY_BLUETOOTH_CORE_BT_HOST_PUBLIC_PW_BLUETOOTH_SAPPHIRE_INTERNAL_HOST_HCI_SPEC_CONSTANTS_H_

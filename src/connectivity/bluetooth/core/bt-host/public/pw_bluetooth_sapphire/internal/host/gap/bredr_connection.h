@@ -93,12 +93,12 @@ class BrEdrConnection final {
   pw::chrono::SystemClock::duration duration() const;
 
   sm::SecurityProperties security_properties() const {
-    ZX_ASSERT(pairing_state_);
+    BT_ASSERT(pairing_state_);
     return pairing_state_->security_properties();
   }
 
   void set_security_mode(BrEdrSecurityMode mode) {
-    ZX_ASSERT(pairing_state_);
+    BT_ASSERT(pairing_state_);
     pairing_state_->set_security_mode(mode);
   }
 

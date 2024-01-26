@@ -335,12 +335,12 @@ CommandChannel::EventHandlerId CommandChannel::AddLEMetaEventHandler(
     EventCallbackVariant event_callback) {
   EventHandlerData* handler = FindLEMetaEventHandler(le_meta_subevent_code);
   if (handler && handler->is_async()) {
-    bt_log(
-        ERROR,
-        "hci",
-        "async event handler %zu already registered for LE Meta Event subevent code %#.2x",
-        handler->handler_id,
-        le_meta_subevent_code);
+    bt_log(ERROR,
+           "hci",
+           "async event handler %zu already registered for LE Meta Event "
+           "subevent code %#.2x",
+           handler->handler_id,
+           le_meta_subevent_code);
     return 0u;
   }
 
@@ -358,12 +358,12 @@ CommandChannel::EventHandlerId CommandChannel::AddVendorEventHandler(
   CommandChannel::EventHandlerData* handler =
       FindVendorEventHandler(vendor_subevent_code);
   if (handler && handler->is_async()) {
-    bt_log(
-        ERROR,
-        "hci",
-        "async event handler %zu already registered for Vendor Event subevent code %#.2x",
-        handler->handler_id,
-        vendor_subevent_code);
+    bt_log(ERROR,
+           "hci",
+           "async event handler %zu already registered for Vendor Event "
+           "subevent code %#.2x",
+           handler->handler_id,
+           vendor_subevent_code);
     return 0u;
   }
 
@@ -654,8 +654,8 @@ void CommandChannel::UpdateTransaction(std::unique_ptr<EventPacket> event) {
     return;
   }
 
-  // TODO(https://fxbug.dev/42062242): Do not allow asynchronous commands to finish
-  // with Command Complete.
+  // TODO(https://fxbug.dev/42062242): Do not allow asynchronous commands to
+  // finish with Command Complete.
   if (event_code == hci_spec::kCommandCompleteEventCode) {
     bt_log(WARN, "hci", "async command received CommandComplete");
     unregister_async_handler = true;
@@ -783,8 +783,8 @@ void CommandChannel::OnEvent(pw::span<const std::byte> buffer) {
   }
 
   if (buffer.size() < sizeof(hci_spec::EventHeader)) {
-    // TODO(https://fxbug.dev/42179582): Handle these types of errors by signaling
-    // Transport.
+    // TODO(https://fxbug.dev/42179582): Handle these types of errors by
+    // signaling Transport.
     bt_log(ERROR,
            "hci",
            "malformed packet - expected at least %zu bytes, got %zu",
@@ -801,8 +801,8 @@ void CommandChannel::OnEvent(pw::span<const std::byte> buffer) {
   event->InitializeFromBuffer();
 
   if (event->view().header().parameter_total_size != payload_size) {
-    // TODO(https://fxbug.dev/42179582): Handle these types of errors by signaling
-    // Transport.
+    // TODO(https://fxbug.dev/42179582): Handle these types of errors by
+    // signaling Transport.
     bt_log(ERROR,
            "hci",
            "malformed packet - payload size from header (%hu) does not match"

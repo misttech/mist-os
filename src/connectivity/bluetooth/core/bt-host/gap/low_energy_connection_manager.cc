@@ -29,6 +29,8 @@
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/transport/transport.h"
 #include "src/connectivity/bluetooth/lib/cpp-string/string_printf.h"
 
+#pragma clang diagnostic ignored "-Wswitch-enum"
+
 using bt::sm::BondableMode;
 
 namespace bt::gap {
@@ -178,15 +180,15 @@ void LowEnergyConnectionManager::Connect(
   auto pending_iter = pending_requests_.find(peer_id);
   if (pending_iter != pending_requests_.end()) {
     if (!current_request_) {
-      bt_log(
-          WARN,
-          "gap-le",
-          "Connect called for peer with pending request while no current_request_ exists (peer: "
-          "%s)",
-          bt_str(peer_id));
+      bt_log(WARN,
+             "gap-le",
+             "Connect called for peer with pending request while no "
+             "current_request_ exists (peer: "
+             "%s)",
+             bt_str(peer_id));
     }
-    // TODO(https://fxbug.dev/42144310): Merge connection_options with the options
-    // of the pending request.
+    // TODO(https://fxbug.dev/42144310): Merge connection_options with the
+    // options of the pending request.
     pending_iter->second.AddCallback(std::move(callback));
     // TODO(https://fxbug.dev/42148775): Try to create this connection.
     return;
@@ -194,8 +196,8 @@ void LowEnergyConnectionManager::Connect(
 
   // Add callback to connecting request if |peer_id| matches.
   if (current_request_ && current_request_->request.peer_id() == peer_id) {
-    // TODO(https://fxbug.dev/42144310): Merge connection_options with the options
-    // of the current request.
+    // TODO(https://fxbug.dev/42144310): Merge connection_options with the
+    // options of the current request.
     current_request_->request.AddCallback(std::move(callback));
     return;
   }
@@ -380,25 +382,25 @@ void LowEnergyConnectionManager::RegisterRemoteInitiatedLink(
          bt_str(link->local_address()),
          bt_str(*link));
 
-  // TODO(https://fxbug.dev/42143994): Use own address when storing the connection.
-  // Currently this will refuse the connection and disconnect the link if |peer|
-  // is already connected to us by a different local address.
+  // TODO(https://fxbug.dev/42143994): Use own address when storing the
+  // connection. Currently this will refuse the connection and disconnect the
+  // link if |peer| is already connected to us by a different local address.
   if (connections_.find(peer_id) != connections_.end()) {
-    bt_log(
-        INFO,
-        "gap-le",
-        "multiple links from peer; remote-initiated connection refused (peer: %s)",
-        bt_str(peer_id));
+    bt_log(INFO,
+           "gap-le",
+           "multiple links from peer; remote-initiated connection refused "
+           "(peer: %s)",
+           bt_str(peer_id));
     callback(fit::error(HostError::kFailed));
     return;
   }
 
   if (remote_connectors_.find(peer_id) != remote_connectors_.end()) {
-    bt_log(
-        INFO,
-        "gap-le",
-        "remote connector for peer already exists; connection refused (peer: %s)",
-        bt_str(peer_id));
+    bt_log(INFO,
+           "gap-le",
+           "remote connector for peer already exists; connection refused "
+           "(peer: %s)",
+           bt_str(peer_id));
     callback(fit::error(HostError::kFailed));
     return;
   }
@@ -434,8 +436,8 @@ void LowEnergyConnectionManager::RegisterRemoteInitiatedLink(
 
 void LowEnergyConnectionManager::SetPairingDelegate(
     const PairingDelegate::WeakPtr& delegate) {
-  // TODO(armansito): Add a test case for this once https://fxbug.dev/42169848 is
-  // done.
+  // TODO(https://fxbug.dev/42169848): Add a test case for this once bug is
+  // resolved.
   pairing_delegate_ = delegate;
 
   // Tell existing connections to abort ongoing pairing procedures. The new
@@ -528,9 +530,9 @@ void LowEnergyConnectionManager::TryCreateNextConnection() {
            "deferring connection attempt (peer: %s)",
            bt_str(peer_id));
 
-    // TODO(https://fxbug.dev/42172291): For now the requests for this peer won't
-    // complete until the next peer discovery. This will no longer be an issue
-    // when we use background scanning.
+    // TODO(https://fxbug.dev/42172291): For now the requests for this peer
+    // won't complete until the next peer discovery. This will no longer be an
+    // issue when we use background scanning.
   }
 }
 
@@ -572,12 +574,12 @@ void LowEnergyConnectionManager::OnRemoteInitiatedConnectResult(
 
   if (result.is_error()) {
     inspect_properties_.incoming_connection_failure_count_.Add(1);
-    bt_log(
-        INFO,
-        "gap-le",
-        "failed to complete remote initated connection with peer (peer: %s, status: %s)",
-        bt_str(peer_id),
-        bt_str(result));
+    bt_log(INFO,
+           "gap-le",
+           "failed to complete remote initated connection with peer (peer: %s, "
+           "status: %s)",
+           bt_str(peer_id),
+           bt_str(result));
   } else {
     inspect_properties_.incoming_connection_success_count_.Add(1);
     bt_log(INFO,
@@ -632,15 +634,15 @@ bool LowEnergyConnectionManager::InitializeConnection(
 
   auto peer_id = connection->peer_id();
 
-  // TODO(https://fxbug.dev/42143994): For now reject having more than one link with
-  // the same peer. This should change once this has more context on the local
-  // destination for remote initiated connections.
+  // TODO(https://fxbug.dev/42143994): For now reject having more than one link
+  // with the same peer. This should change once this has more context on the
+  // local destination for remote initiated connections.
   if (connections_.find(peer_id) != connections_.end()) {
-    bt_log(
-        INFO,
-        "gap-le",
-        "cannot initialize multiple links to same peer; connection refused (peer: %s)",
-        bt_str(peer_id));
+    bt_log(INFO,
+           "gap-le",
+           "cannot initialize multiple links to same peer; connection refused "
+           "(peer: %s)",
+           bt_str(peer_id));
     // Notify request that duplicate connection could not be initialized.
     request.NotifyCallbacks(fit::error(HostError::kFailed));
     // Do not update peer state, as there is another active LE connection in

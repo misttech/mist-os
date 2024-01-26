@@ -422,7 +422,8 @@ TEST_F(ChannelConfigurationTest, ConfigToString) {
   EXPECT_TRUE(config.ReadOptions(kOptionBuffer));
   const std::string kExpected =
       "{[type: MTU, mtu: 48], "
-      "[type: RtxFlowControl, mode: 1, tx window size: 0, max transmit: 0, rtx timeout: 0, monitor "
+      "[type: RtxFlowControl, mode: 1, tx window size: 0, max transmit: 0, rtx "
+      "timeout: 0, monitor "
       "timeout: 0, max pdu payload size: 0], "
       "[type: FlushTimeout, flush timeout: 200], "
       "[type: 0x70, length: 1]}";

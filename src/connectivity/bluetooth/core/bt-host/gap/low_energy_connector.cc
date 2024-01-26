@@ -416,12 +416,12 @@ void LowEnergyConnector::OnInterrogationComplete(hci::Result<> status) {
   // Complete event soon after. Wait for this event before initiating a retry.
   if (status == ToResult(pw::bluetooth::emboss::StatusCode::
                              CONNECTION_FAILED_TO_BE_ESTABLISHED)) {
-    bt_log(
-        INFO,
-        "gap-le",
-        "Received kConnectionFailedToBeEstablished during interrogation. Waiting for Disconnect "
-        "Complete. (peer: %s)",
-        bt_str(peer_id_));
+    bt_log(INFO,
+           "gap-le",
+           "Received kConnectionFailedToBeEstablished during interrogation. "
+           "Waiting for Disconnect "
+           "Complete. (peer: %s)",
+           bt_str(peer_id_));
     state_.Set(State::kAwaitingConnectionFailedToBeEstablishedDisconnect);
     return;
   }

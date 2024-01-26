@@ -16,6 +16,8 @@
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/hci/util.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/transport/transport.h"
 
+#pragma clang diagnostic ignored "-Wswitch-enum"
+
 namespace bt::hci {
 namespace {
 

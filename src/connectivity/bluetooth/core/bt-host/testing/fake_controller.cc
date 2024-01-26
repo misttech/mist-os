@@ -5,7 +5,6 @@
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/testing/fake_controller.h"
 
 #include <endian.h>
-#include <lib/async/cpp/task.h>
 
 #include <cstddef>
 
@@ -194,8 +193,8 @@ void FakeController::Settings::ApplyAndroidVendorExtensionDefaults() {
   // Settings for the android vendor extensions component within the Fake
   // Controller. These settings correspond to the vendor capabilities returned
   // by the controller. See
-  // src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/hci-spec/vendor_protocol.h
-  // and LEGetVendorCapabilities for more information.
+  // src/connectivity/bluetooth/core/bt-host/hci-spec/vendor_protocol.h and
+  // LEGetVendorCapabilities for more information.
   android_extension_settings.view().status().Write(
       pw::bluetooth::emboss::StatusCode::SUCCESS);
   android_extension_settings.view().max_advt_instances().Write(3);
@@ -249,7 +248,7 @@ void FakeController::SendCommand(pw::span<const std::byte> command) {
   BT_ASSERT(command.size() >= sizeof(hci_spec::CommandHeader));
 
   // Post the packet to simulate async HCI behavior.
-  heap_dispatcher().Post(
+  (void)heap_dispatcher().Post(
       [self = GetWeakPtr(), command = DynamicByteBuffer(BufferView(command))](
           pw::async::Context /*ctx*/, pw::Status status) {
         if (!self.is_alive() || !status.ok()) {
@@ -400,7 +399,7 @@ void FakeController::SendNumberOfCompletedPacketsEvent(
 
 void FakeController::ConnectLowEnergy(
     const DeviceAddress& addr, pw::bluetooth::emboss::ConnectionRole role) {
-  heap_dispatcher().Post(
+  (void)heap_dispatcher().Post(
       [addr, role, this](pw::async::Context /*ctx*/, pw::Status status) {
         if (!status.ok()) {
           return;
@@ -476,7 +475,7 @@ void FakeController::SendConnectionRequest(
 void FakeController::L2CAPConnectionParameterUpdate(
     const DeviceAddress& addr,
     const hci_spec::LEPreferredConnectionParameters& params) {
-  heap_dispatcher().Post(
+  (void)heap_dispatcher().Post(
       [addr, params, this](pw::async::Context /*ctx*/, pw::Status status) {
         if (!status.ok()) {
           return;
@@ -533,7 +532,7 @@ void FakeController::SendLEConnectionUpdateCompleteSubevent(
 
 void FakeController::Disconnect(const DeviceAddress& addr,
                                 pw::bluetooth::emboss::StatusCode reason) {
-  heap_dispatcher().Post(
+  (void)heap_dispatcher().Post(
       [this, addr, reason](pw::async::Context /*ctx*/, pw::Status status) {
         if (!status.ok()) {
           return;
@@ -634,7 +633,7 @@ void FakeController::SendAdvertisingReports() {
   // We'll send new reports for the same peers if duplicate filtering is
   // disabled.
   if (!le_scan_state_.filter_duplicates) {
-    heap_dispatcher().Post(
+    (void)heap_dispatcher().Post(
         [this](pw::async::Context /*ctx*/, pw::Status status) {
           if (status.ok()) {
             SendAdvertisingReports();
@@ -1109,7 +1108,7 @@ void FakeController::OnInquiry(
   bt_log(INFO, "fake-hci", "sending inquiry responses..");
   SendInquiryResponses();
 
-  heap_dispatcher().PostAfter(
+  (void)heap_dispatcher().PostAfter(
       [this](pw::async::Context /*ctx*/, pw::Status status) {
         if (!status.ok()) {
           return;
@@ -1470,8 +1469,8 @@ void FakeController::OnReadBRADDR() {
 
 void FakeController::OnLESetAdvertisingEnable(
     const pw::bluetooth::emboss::LESetAdvertisingEnableCommandView& params) {
-  // TODO(https://fxbug.dev/42161900): if own address type is random, check that a
-  // random address is set
+  // TODO(https://fxbug.dev/42161900): if own address type is random, check that
+  // a random address is set
 
   legacy_advertising_state_.enabled =
       params.advertising_enable().Read() ==
@@ -2022,7 +2021,7 @@ void FakeController::OnLEReadRemoteFeaturesCommand(
     le_read_remote_features_cb_();
   }
 
-  const hci_spec::ConnectionHandle handle = letoh16(params.connection_handle);
+  const hci_spec::ConnectionHandle handle = le16toh(params.connection_handle);
   FakePeer* peer = FindByConnHandle(handle);
   if (!peer) {
     RespondWithCommandStatus(
@@ -2282,9 +2281,9 @@ void FakeController::OnLESetExtendedAdvertisingParameters(
     return;
   }
 
-  // TODO(https://fxbug.dev/42160350): Core spec Volume 4, Part E, Section 7.8.53:
-  // if legacy advertising PDUs are being used, the Primary_Advertising_PHY
-  // shall indicate the LE 1M PHY.
+  // TODO(https://fxbug.dev/42160350): Core spec Volume 4, Part E,
+  // Section 7.8.53: if legacy advertising PDUs are being used, the
+  // Primary_Advertising_PHY shall indicate the LE 1M PHY.
   if (params.primary_advertising_phy().Read() !=
       pw::bluetooth::emboss::LEPrimaryAdvertisingPHY::LE_1M) {
     bt_log(INFO,
@@ -2614,8 +2613,8 @@ void FakeController::OnLESetExtendedAdvertisingEnable(
       return;
     }
 
-    // TODO(https://fxbug.dev/42161900): if own address type is random, check that
-    // a random address is set
+    // TODO(https://fxbug.dev/42161900): if own address type is random, check
+    // that a random address is set
     state.enabled = true;
   }
 
@@ -2628,11 +2627,11 @@ void FakeController::OnLEReadMaximumAdvertisingDataLength() {
   hci_spec::LEReadMaxAdvertisingDataLengthReturnParams params;
   params.status = pw::bluetooth::emboss::StatusCode::SUCCESS;
 
-  // TODO(https://fxbug.dev/42157495): Extended advertising supports sending larger
-  // amounts of data, but they have to be fragmented across multiple commands to
-  // the controller. This is not yet supported in this implementation. We should
-  // support larger than kMaxLEExtendedAdvertisingDataLength advertising data
-  // with fragmentation.
+  // TODO(https://fxbug.dev/42157495): Extended advertising supports sending
+  // larger amounts of data, but they have to be fragmented across multiple
+  // commands to the controller. This is not yet supported in this
+  // implementation. We should support larger than
+  // kMaxLEExtendedAdvertisingDataLength advertising data with fragmentation.
   params.max_adv_data_length = htole16(hci_spec::kMaxLEAdvertisingDataLength);
   RespondWithCommandComplete(hci_spec::kLEReadMaxAdvertisingDataLength,
                              BufferView(&params, sizeof(params)));
@@ -2805,7 +2804,7 @@ void FakeController::OnAndroidStartA2dpOffload(
 
   hci_android::A2dpCodecType const codec_type =
       static_cast<hci_android::A2dpCodecType>(
-          le32toh(params.codec_type().Read()));
+          le32toh(static_cast<uint32_t>(params.codec_type().Read())));
   switch (codec_type) {
     case hci_android::A2dpCodecType::kSbc:
     case hci_android::A2dpCodecType::kAac:
@@ -2821,7 +2820,7 @@ void FakeController::OnAndroidStartA2dpOffload(
 
   hci_android::A2dpSamplingFrequency const sampling_frequency =
       static_cast<hci_android::A2dpSamplingFrequency>(
-          le32toh(params.sampling_frequency().Read()));
+          le32toh(static_cast<uint32_t>(params.sampling_frequency().Read())));
   switch (sampling_frequency) {
     case hci_android::A2dpSamplingFrequency::k44100Hz:
     case hci_android::A2dpSamplingFrequency::k48000Hz:
@@ -3389,7 +3388,7 @@ void FakeController::OnACLDataPacketReceived(
   if (acl_data_callback_) {
     BT_DEBUG_ASSERT(data_dispatcher_);
     DynamicByteBuffer packet_copy(acl_data_packet);
-    data_dispatcher_->Post(
+    (void)data_dispatcher_->Post(
         [packet_copy = std::move(packet_copy), cb = acl_data_callback_.share()](
             pw::async::Context /*ctx*/, pw::Status status) mutable {
           if (status.ok()) {
@@ -3501,8 +3500,8 @@ void FakeController::HandleReceivedCommandPacket(
     return;
   }
 
-  // TODO(https://fxbug.dev/42175513): Validate size of payload to be the correct
-  // length below.
+  // TODO(https://fxbug.dev/42175513): Validate size of payload to be the
+  // correct length below.
   switch (opcode) {
     case hci_spec::kReadLocalVersionInfo: {
       OnReadLocalVersionInfo();
@@ -3682,12 +3681,12 @@ void FakeController::HandleReceivedCommandPacket(
 
   auto ogf = command_packet.ogf();
   if (ogf == hci_spec::kVendorOGF) {
-    bt_log(
-        WARN,
-        "fake-hci",
-        "vendor commands not yet migrated to Emboss; received Emboss vendor command with "
-        "opcode: %#.4x",
-        opcode);
+    bt_log(WARN,
+           "fake-hci",
+           "vendor commands not yet migrated to Emboss; received Emboss vendor "
+           "command with "
+           "opcode: %#.4x",
+           opcode);
     RespondWithCommandComplete(
         opcode, pw::bluetooth::emboss::StatusCode::UNKNOWN_COMMAND);
     return;

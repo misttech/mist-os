@@ -117,10 +117,10 @@ CommandChannel::EventCallbackResult AclConnection::OnEncryptionChangeEvent(
   if (use_secure_connections_ &&
       encryption_status_ !=
           pw::bluetooth::emboss::EncryptionStatus::ON_WITH_AES_FOR_BREDR) {
-    bt_log(
-        DEBUG,
-        "hci",
-        "BR/EDR Secure Connection must use AES encryption. Closing connection...");
+    bt_log(DEBUG,
+           "hci",
+           "BR/EDR Secure Connection must use AES encryption. Closing "
+           "connection...");
     HandleEncryptionStatus(fit::error(Error(HostError::kInsufficientSecurity)),
                            /*key_refreshed=*/false);
     return CommandChannel::EventCallbackResult::kContinue;

@@ -120,13 +120,13 @@ void Phase2SecureConnections::OnPeerPublicKey(
     // non-initiating device can reflect our public key (which we send in
     // plaintext). The inputs to the hash that we disclose bit- by-bit in
     // ScStage1Passkey are the two public keys, our nonce, and one bit of our
-    // passkey, so if the peer uses the same public key then it can easily brute
-    // force for the passkey bit.
-    bt_log(
-        WARN,
-        "sm",
-        "peer public ECDH key mirrors local public ECDH key (sent_local_ecdh_: %d)",
-        sent_local_ecdh_);
+    // passkey, so if the peer uses the same public key then it can easily
+    // brute force for the passkey bit.
+    bt_log(WARN,
+           "sm",
+           "peer public ECDH key mirrors local public ECDH key "
+           "(sent_local_ecdh_: %d)",
+           sent_local_ecdh_);
     Abort(ErrorCode::kInvalidParameters);
     return;
   }
@@ -168,9 +168,9 @@ void Phase2SecureConnections::StartAuthenticationStage1() {
                                                  sm_chan().GetWeakPtr(),
                                                  std::move(complete_cb));
   } else {  // method == kOutOfBand
-    // TODO(https://fxbug.dev/42138242): OOB would require significant extra plumbing
-    // & add security exposure not necessary for current goals. This is not
-    // spec-compliant but should allow us to pass PTS.
+    // TODO(https://fxbug.dev/42138242): OOB would require significant extra
+    // plumbing & add security exposure not necessary for current goals. This is
+    // not spec-compliant but should allow us to pass PTS.
     bt_log(WARN, "sm", "Received unsupported request for OOB pairing");
     Abort(ErrorCode::kCommandNotSupported);
     return;
@@ -292,10 +292,10 @@ fit::result<ErrorCode> Phase2SecureConnections::CanReceiveDhKeyCheck() const {
     return fit::error(ErrorCode::kUnspecifiedReason);
   }
   if (role() == Role::kInitiator && !sent_local_dhkey_check_) {
-    bt_log(
-        WARN,
-        "sm",
-        "received peer ecdh key check as initiator before sending local ecdh key check (SC)");
+    bt_log(WARN,
+           "sm",
+           "received peer ecdh key check as initiator before sending local "
+           "ecdh key check (SC)");
     return fit::error(ErrorCode::kUnspecifiedReason);
   }
   return fit::ok();

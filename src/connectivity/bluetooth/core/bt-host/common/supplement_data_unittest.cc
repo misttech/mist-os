@@ -95,7 +95,8 @@ TEST(SupplementDataTest, WriteFieldAndVerifyContents) {
 
   // Have just enough space for the first three values (+ 6 for 2 extra octets
   // for each TLV field).
-  constexpr char kBufferSize = StringSize(kValue0) + StringSize(kValue1) + StringSize(kValue2) + 6;
+  constexpr char kBufferSize =
+      StringSize(kValue0) + StringSize(kValue1) + StringSize(kValue2) + 6;
   StaticByteBuffer<kBufferSize> buffer;
 
   SupplementDataWriter writer(&buffer);
@@ -105,16 +106,21 @@ TEST(SupplementDataTest, WriteFieldAndVerifyContents) {
   EXPECT_TRUE(writer.WriteField(DataType::kFlags, BufferView(kValue0)));
   EXPECT_EQ(StringSize(kValue0) + 2, writer.bytes_written());
 
-  EXPECT_TRUE(writer.WriteField(DataType::kShortenedLocalName, BufferView(kValue1)));
-  EXPECT_EQ(StringSize(kValue0) + 2 + StringSize(kValue1) + 2, writer.bytes_written());
+  EXPECT_TRUE(
+      writer.WriteField(DataType::kShortenedLocalName, BufferView(kValue1)));
+  EXPECT_EQ(StringSize(kValue0) + 2 + StringSize(kValue1) + 2,
+            writer.bytes_written());
 
   // Trying to write kValue3 should fail because there isn't enough room left in
   // the buffer.
-  EXPECT_FALSE(writer.WriteField(DataType::kCompleteLocalName, BufferView(kValue3)));
+  EXPECT_FALSE(
+      writer.WriteField(DataType::kCompleteLocalName, BufferView(kValue3)));
 
   // Writing kValue2 should fill up the buffer.
-  EXPECT_TRUE(writer.WriteField(DataType::kCompleteLocalName, BufferView(kValue2)));
-  EXPECT_FALSE(writer.WriteField(DataType::kCompleteLocalName, BufferView(kValue3)));
+  EXPECT_TRUE(
+      writer.WriteField(DataType::kCompleteLocalName, BufferView(kValue2)));
+  EXPECT_FALSE(
+      writer.WriteField(DataType::kCompleteLocalName, BufferView(kValue3)));
   EXPECT_EQ(buffer.size(), writer.bytes_written());
 
   // Verify the contents.

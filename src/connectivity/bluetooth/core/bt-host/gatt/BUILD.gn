@@ -6,31 +6,33 @@ import("//build_overrides/pigweed.gni")
 import("$dir_pw_build/target_types.gni")
 import("$dir_pw_unit_test/test.gni")
 
-public_dir = "//src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/gatt"
+dir_public_gatt = "../public/pw_bluetooth_sapphire/internal/host/gatt"
 
 # Basic target with protocol definitions and no logic, suitable for test
 # emulation.
 pw_source_set("definitions") {
-  sources = [
-    "$public_dir/gatt_defs.h",
-    "gatt_defs.cc",
-  ]
+  public = [ "$dir_public_gatt/gatt_defs.h" ]
+
+  sources = [ "gatt_defs.cc" ]
 
   public_deps = [ "//src/connectivity/bluetooth/core/bt-host/att:definitions" ]
 }
 
 pw_source_set("gatt") {
+  public = [
+    "$dir_public_gatt/client.h",
+    "$dir_public_gatt/connection.h",
+    "$dir_public_gatt/gatt.h",
+    "$dir_public_gatt/generic_attribute_service.h",
+    "$dir_public_gatt/local_service_manager.h",
+    "$dir_public_gatt/remote_characteristic.h",
+    "$dir_public_gatt/remote_service.h",
+    "$dir_public_gatt/remote_service_manager.h",
+    "$dir_public_gatt/server.h",
+    "$dir_public_gatt/types.h",
+  ]
+
   sources = [
-    "$public_dir/client.h",
-    "$public_dir/connection.h",
-    "$public_dir/gatt.h",
-    "$public_dir/generic_attribute_service.h",
-    "$public_dir/local_service_manager.h",
-    "$public_dir/remote_characteristic.h",
-    "$public_dir/remote_service.h",
-    "$public_dir/remote_service_manager.h",
-    "$public_dir/server.h",
-    "$public_dir/types.h",
     "client.cc",
     "connection.cc",
     "gatt.cc",
@@ -46,6 +48,7 @@ pw_source_set("gatt") {
   public_deps = [
     ":definitions",
     "$dir_pw_third_party/fuchsia:fit",
+    "//src/connectivity/bluetooth/core/bt-host:config",
     "//src/connectivity/bluetooth/core/bt-host/att",
   ]
 }
@@ -53,10 +56,13 @@ pw_source_set("gatt") {
 pw_source_set("testing") {
   testonly = true
 
+  public = [
+    "$dir_public_gatt/fake_client.h",
+    "$dir_public_gatt/fake_layer.h",
+    "$dir_public_gatt/mock_server.h",
+  ]
+
   sources = [
-    "$public_dir/fake_client.h",
-    "$public_dir/fake_layer.h",
-    "$public_dir/mock_server.h",
     "fake_client.cc",
     "fake_layer.cc",
     "mock_server.cc",
@@ -64,9 +70,9 @@ pw_source_set("testing") {
 
   public_deps = [
     ":gatt",
+    "$dir_pw_async:heap_dispatcher",
     "$dir_pw_unit_test",
     "//src/connectivity/bluetooth/core/bt-host/common",
-    "//third_party/pigweed:pw_async_heap_dispatcher",
   ]
 }
 
@@ -87,4 +93,6 @@ pw_test("tests") {
     "//src/connectivity/bluetooth/core/bt-host/l2cap:testing",
     "//src/connectivity/bluetooth/core/bt-host/testing",
   ]
+
+  test_main = "//src/connectivity/bluetooth/core/bt-host/testing:gtest_main"
 }

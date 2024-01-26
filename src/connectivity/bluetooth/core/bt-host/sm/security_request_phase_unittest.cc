@@ -86,11 +86,12 @@ TEST_F(SecurityRequestPhaseTest, MakeEncryptedBondableSecurityRequest) {
       SecurityRequestOptions{.requested_level = SecurityLevel::kEncrypted,
                              .bondable = BondableMode::Bondable});
   StaticByteBuffer kExpectedReq(kSecurityRequest, AuthReq::kBondingFlag);
-  heap_dispatcher().Post([this](pw::async::Context /*ctx*/, pw::Status status) {
-    if (status.ok()) {
-      security_request_phase()->Start();
-    }
-  });
+  (void)heap_dispatcher().Post(
+      [this](pw::async::Context /*ctx*/, pw::Status status) {
+        if (status.ok()) {
+          security_request_phase()->Start();
+        }
+      });
   ASSERT_TRUE(Expect(kExpectedReq));
   EXPECT_EQ(SecurityLevel::kEncrypted,
             security_request_phase()->pending_security_request());
@@ -101,11 +102,12 @@ TEST_F(SecurityRequestPhaseTest, MakeAuthenticatedNonBondableSecurityRequest) {
       SecurityRequestOptions{.requested_level = SecurityLevel::kAuthenticated,
                              .bondable = BondableMode::NonBondable});
   StaticByteBuffer kExpectedReq(kSecurityRequest, AuthReq::kMITM);
-  heap_dispatcher().Post([this](pw::async::Context /*ctx*/, pw::Status status) {
-    if (status.ok()) {
-      security_request_phase()->Start();
-    }
-  });
+  (void)heap_dispatcher().Post(
+      [this](pw::async::Context /*ctx*/, pw::Status status) {
+        if (status.ok()) {
+          security_request_phase()->Start();
+        }
+      });
   ASSERT_TRUE(Expect(kExpectedReq));
   EXPECT_EQ(SecurityLevel::kAuthenticated,
             security_request_phase()->pending_security_request());
@@ -117,11 +119,13 @@ TEST_F(SecurityRequestPhaseTest,
       .requested_level = SecurityLevel::kSecureAuthenticated});
   StaticByteBuffer kExpectedReq(
       kSecurityRequest, AuthReq::kBondingFlag | AuthReq::kMITM | AuthReq::kSC);
-  heap_dispatcher().Post([this](pw::async::Context /*ctx*/, pw::Status status) {
-    if (status.ok()) {
-      security_request_phase()->Start();
-    }
-  });
+
+  (void)heap_dispatcher().Post(
+      [this](pw::async::Context /*ctx*/, pw::Status status) {
+        if (status.ok()) {
+          security_request_phase()->Start();
+        }
+      });
   ASSERT_TRUE(Expect(kExpectedReq));
   EXPECT_EQ(SecurityLevel::kSecureAuthenticated,
             security_request_phase()->pending_security_request());

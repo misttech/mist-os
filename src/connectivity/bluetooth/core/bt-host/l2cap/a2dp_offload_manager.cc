@@ -32,12 +32,12 @@ void A2dpOffloadManager::StartA2dpOffload(
 
   switch (a2dp_offload_status_) {
     case A2dpOffloadStatus::kStarted: {
-      bt_log(
-          WARN,
-          "l2cap",
-          "Only one channel can offload A2DP at a time; already offloaded (handle: %#.4x, local id: %#.4x",
-          *offloaded_link_handle_,
-          *offloaded_channel_id_);
+      bt_log(WARN,
+             "l2cap",
+             "Only one channel can offload A2DP at a time; already offloaded "
+             "(handle: %#.4x, local id: %#.4x",
+             *offloaded_link_handle_,
+             *offloaded_channel_id_);
       callback(ToResult(HostError::kInProgress));
       return;
     }
@@ -50,11 +50,11 @@ void A2dpOffloadManager::StartA2dpOffload(
       return;
     }
     case A2dpOffloadStatus::kStopping: {
-      bt_log(
-          WARN,
-          "l2cap",
-          "A2DP offload is stopping... wait until stopped before starting (status: %hhu)",
-          static_cast<unsigned char>(a2dp_offload_status_));
+      bt_log(WARN,
+             "l2cap",
+             "A2DP offload is stopping... wait until stopped before starting "
+             "(status: %hhu)",
+             static_cast<unsigned char>(a2dp_offload_status_));
       callback(ToResult(HostError::kInProgress));
       return;
     }
@@ -133,13 +133,13 @@ void A2dpOffloadManager::StartA2dpOffload(
         }
 
         if (event.ToResult().is_error()) {
-          bt_log(
-              WARN,
-              "l2cap",
-              "Start A2DP offload command failed (result: %s, handle: %#.4x, local id: %#.4x)",
-              bt_str(event.ToResult()),
-              handle,
-              id);
+          bt_log(WARN,
+                 "l2cap",
+                 "Start A2DP offload command failed (result: %s, handle: "
+                 "%#.4x, local id: %#.4x)",
+                 bt_str(event.ToResult()),
+                 handle,
+                 id);
           a2dp_offload_status_ = A2dpOffloadStatus::kStopped;
         } else {
           bt_log(INFO,
@@ -223,13 +223,13 @@ void A2dpOffloadManager::RequestStopA2dpOffload(
         }
 
         if (event.ToResult().is_error()) {
-          bt_log(
-              WARN,
-              "l2cap",
-              "Stop A2DP offload command failed (result: %s, handle: %#.4x, local id: %#.4x)",
-              bt_str(event.ToResult()),
-              handle,
-              id);
+          bt_log(WARN,
+                 "l2cap",
+                 "Stop A2DP offload command failed (result: %s, handle: %#.4x, "
+                 "local id: %#.4x)",
+                 bt_str(event.ToResult()),
+                 handle,
+                 id);
         } else {
           bt_log(INFO,
                  "l2cap",
@@ -258,12 +258,12 @@ bool A2dpOffloadManager::IsChannelOffloaded(
   // Same channel that requested start A2DP offloading must request stop
   // offloading
   if (id != offloaded_channel_id_ || link_handle != offloaded_link_handle_) {
-    bt_log(
-        WARN,
-        "l2cap",
-        "Offloaded channel must request stop offloading; offloaded channel (handle: %#.4x, local id: %#.4x)",
-        *offloaded_link_handle_,
-        *offloaded_channel_id_);
+    bt_log(WARN,
+           "l2cap",
+           "Offloaded channel must request stop offloading; offloaded channel "
+           "(handle: %#.4x, local id: %#.4x)",
+           *offloaded_link_handle_,
+           *offloaded_channel_id_);
     return false;
   }
 

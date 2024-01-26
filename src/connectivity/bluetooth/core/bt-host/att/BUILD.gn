@@ -5,16 +5,17 @@
 import("//build_overrides/pigweed.gni")
 import("$dir_pw_unit_test/test.gni")
 
-public_dir = "//src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/att"
+dir_public_att = "../public/pw_bluetooth_sapphire/internal/host/att"
 
 # Basic target with protocol definitions and no logic, suitable for test
 # emulation.
 pw_source_set("definitions") {
-  sources = [
-    "$public_dir/att.h",
-    "$public_dir/packet.h",
-    "packet.cc",
+  public = [
+    "$dir_public_att/att.h",
+    "$dir_public_att/packet.h",
   ]
+
+  sources = [ "packet.cc" ]
 
   public_deps = [
     "//src/connectivity/bluetooth/core/bt-host/common",
@@ -24,13 +25,16 @@ pw_source_set("definitions") {
 }
 
 pw_source_set("att") {
+  public = [
+    "$dir_public_att/attribute.h",
+    "$dir_public_att/bearer.h",
+    "$dir_public_att/database.h",
+    "$dir_public_att/error.h",
+    "$dir_public_att/permissions.h",
+    "$dir_public_att/write_queue.h",
+  ]
+
   sources = [
-    "$public_dir/attribute.h",
-    "$public_dir/bearer.h",
-    "$public_dir/database.h",
-    "$public_dir/error.h",
-    "$public_dir/permissions.h",
-    "$public_dir/write_queue.h",
     "attribute.cc",
     "bearer.cc",
     "database.cc",
@@ -62,4 +66,6 @@ pw_test("tests") {
     ":att",
     "//src/connectivity/bluetooth/core/bt-host/l2cap:testing",
   ]
+
+  test_main = "//src/connectivity/bluetooth/core/bt-host/testing:gtest_main"
 }

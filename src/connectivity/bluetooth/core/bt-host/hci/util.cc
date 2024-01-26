@@ -9,6 +9,8 @@
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/assert.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/log.h"
 
+#pragma clang diagnostic ignored "-Wswitch-enum"
+
 namespace bt::hci {
 
 bool DeviceAddressFromAdvReport(const hci_spec::LEAdvertisingReportData& report,

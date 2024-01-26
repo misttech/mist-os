@@ -106,14 +106,14 @@ bool ScoConnection::Send(ByteBufferPtr payload) {
   }
 
   if (payload->size() > channel_->max_data_length()) {
-    bt_log(
-        WARN,
-        "gap-sco",
-        "dropping SCO packet larger than the buffer data packet length (packet size: %zu, max "
-        "data length: "
-        "%hu)",
-        payload->size(),
-        channel_->max_data_length());
+    bt_log(WARN,
+           "gap-sco",
+           "dropping SCO packet larger than the buffer data packet length "
+           "(packet size: %zu, max "
+           "data length: "
+           "%hu)",
+           payload->size(),
+           channel_->max_data_length());
     return false;
   }
 

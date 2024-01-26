@@ -28,13 +28,13 @@ bool DynamicChannel::SetRemoteChannelId(ChannelId remote_cid) {
   // do not allow duplicate remote CIDs
   auto channel = registry_->FindChannelByRemoteId(remote_cid);
   if (channel && channel != this) {
-    bt_log(
-        WARN,
-        "l2cap",
-        "channel %#.4x: received remote channel id %#.4x that is already set for channel %#.4x",
-        local_cid(),
-        remote_cid,
-        channel->local_cid());
+    bt_log(WARN,
+           "l2cap",
+           "channel %#.4x: received remote channel id %#.4x that is already "
+           "set for channel %#.4x",
+           local_cid(),
+           remote_cid,
+           channel->local_cid());
     return false;
   }
 

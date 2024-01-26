@@ -5,9 +5,6 @@
 #ifndef SRC_CONNECTIVITY_BLUETOOTH_CORE_BT_HOST_PUBLIC_PW_BLUETOOTH_SAPPHIRE_INTERNAL_HOST_TRANSPORT_TRANSPORT_H_
 #define SRC_CONNECTIVITY_BLUETOOTH_CORE_BT_HOST_PUBLIC_PW_BLUETOOTH_SAPPHIRE_INTERNAL_HOST_TRANSPORT_TRANSPORT_H_
 
-#include <lib/async/cpp/wait.h>
-#include <lib/async/dispatcher.h>
-
 #include <atomic>
 #include <memory>
 #include <thread>

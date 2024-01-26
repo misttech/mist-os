@@ -7,6 +7,8 @@
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/hci-spec/protocol.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/transport/command_channel.h"
 
+#pragma clang diagnostic ignored "-Wshadow"
+
 namespace bt::hci {
 
 SequentialCommandRunner::SequentialCommandRunner(
@@ -121,12 +123,12 @@ void SequentialCommandRunner::TryRunNextQueuedCommand(Result<> status) {
     }
 
     if (self.is_alive() && seq_no != self->sequence_number_) {
-      bt_log(
-          TRACE,
-          "hci",
-          "Ignoring event for previous sequence (event code: %#.2x, status: %s)",
-          event_packet.event_code(),
-          bt_str(status));
+      bt_log(TRACE,
+             "hci",
+             "Ignoring event for previous sequence (event code: %#.2x, status: "
+             "%s)",
+             event_packet.event_code(),
+             bt_str(status));
     }
 
     // The sequence could have failed or been canceled, and a new sequence could

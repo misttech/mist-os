@@ -59,18 +59,18 @@ void ScStage1JustWorksNumericComparison::OnPairingConfirm(
   // Only the responder can send the confirm value to the initiator (Vol 3, Part
   // H, 2.3.5.6.2).
   if (role_ == Role::kResponder) {
-    bt_log(
-        WARN,
-        "sm",
-        "cannot accept pairing confirm in SC Numeric Comparison/Just Works responder mode");
+    bt_log(WARN,
+           "sm",
+           "cannot accept pairing confirm in SC Numeric Comparison/Just Works "
+           "responder mode");
     on_complete_(fit::error(ErrorCode::kUnspecifiedReason));
     return;
   }
   if (responder_confirm_.has_value()) {
-    bt_log(
-        WARN,
-        "sm",
-        "received multiple Pairing Confirm values in SC Numeric Comparison/Just Works");
+    bt_log(WARN,
+           "sm",
+           "received multiple Pairing Confirm values in SC Numeric "
+           "Comparison/Just Works");
     on_complete_(fit::error(ErrorCode::kUnspecifiedReason));
     return;
   }

@@ -5,7 +5,6 @@
 #ifndef SRC_CONNECTIVITY_BLUETOOTH_CORE_BT_HOST_PUBLIC_PW_BLUETOOTH_SAPPHIRE_INTERNAL_HOST_SM_PHASE_2_SECURE_CONNECTIONS_H_
 #define SRC_CONNECTIVITY_BLUETOOTH_CORE_BT_HOST_PUBLIC_PW_BLUETOOTH_SAPPHIRE_INTERNAL_HOST_SM_PHASE_2_SECURE_CONNECTIONS_H_
 
-#include <lib/async/cpp/task.h>
 #include <lib/fit/function.h>
 
 #include <cstdint>
@@ -102,7 +101,8 @@ class Phase2SecureConnections final : public PairingPhase,
   // PairingPhase overrides.
   std::string ToStringInternal() override {
     return bt_lib_cpp_string::StringPrintf(
-        "Secure Connections Pairing Phase 2 (encryption key agreement) - pairing with %s method",
+        "Secure Connections Pairing Phase 2 (encryption key agreement) - "
+        "pairing with %s method",
         util::PairingMethodToString(features_.method).c_str());
   }
 

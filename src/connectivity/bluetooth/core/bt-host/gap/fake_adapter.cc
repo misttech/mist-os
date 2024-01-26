@@ -19,7 +19,7 @@ FakeAdapter::FakeAdapter(pw::async::Dispatcher& pw_dispatcher)
 bool FakeAdapter::Initialize(InitializeCallback callback,
                              fit::closure transport_closed_callback) {
   init_state_ = InitState::kInitializing;
-  heap_dispatcher_.Post(
+  (void)heap_dispatcher_.Post(
       [this, cb = std::move(callback)](pw::async::Context /*ctx*/,
                                        pw::Status status) mutable {
         if (status.ok()) {

@@ -11,6 +11,8 @@
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/l2cap/channel_configuration.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/l2cap/l2cap_defs.h"
 
+#pragma clang diagnostic ignored "-Wswitch-enum"
+
 namespace bt::l2cap::internal {
 namespace {
 
@@ -78,12 +80,12 @@ void BrEdrDynamicChannelRegistry::OnRxConnReq(
          remote_cid);
 
   if (remote_cid == kInvalidChannelId) {
-    bt_log(
-        DEBUG,
-        "l2cap-bredr",
-        "Invalid source CID; rejecting connection for PSM %#.4x from channel %#.4x",
-        psm,
-        remote_cid);
+    bt_log(DEBUG,
+           "l2cap-bredr",
+           "Invalid source CID; rejecting connection for PSM %#.4x from "
+           "channel %#.4x",
+           psm,
+           remote_cid);
     responder->Send(kInvalidChannelId,
                     ConnectionResult::kInvalidSourceCID,
                     ConnectionStatus::kNoInfoAvailable);
@@ -91,12 +93,12 @@ void BrEdrDynamicChannelRegistry::OnRxConnReq(
   }
 
   if (FindChannelByRemoteId(remote_cid) != nullptr) {
-    bt_log(
-        DEBUG,
-        "l2cap-bredr",
-        "Remote CID already in use; rejecting connection for PSM %#.4x from channel %#.4x",
-        psm,
-        remote_cid);
+    bt_log(DEBUG,
+           "l2cap-bredr",
+           "Remote CID already in use; rejecting connection for PSM %#.4x from "
+           "channel %#.4x",
+           psm,
+           remote_cid);
     responder->Send(kInvalidChannelId,
                     ConnectionResult::kSourceCIDAlreadyAllocated,
                     ConnectionStatus::kNoInfoAvailable);
@@ -219,20 +221,20 @@ void BrEdrDynamicChannelRegistry::OnRxInfoReq(
 void BrEdrDynamicChannelRegistry::OnRxExtendedFeaturesInfoRsp(
     const BrEdrCommandHandler::InformationResponse& rsp) {
   if (rsp.status() == BrEdrCommandHandler::Status::kReject) {
-    bt_log(
-        ERROR,
-        "l2cap-bredr",
-        "Extended Features Information Request rejected, reason %#.4hx, disconnecting",
-        static_cast<unsigned short>(rsp.reject_reason()));
+    bt_log(ERROR,
+           "l2cap-bredr",
+           "Extended Features Information Request rejected, reason %#.4hx, "
+           "disconnecting",
+           static_cast<unsigned short>(rsp.reject_reason()));
     return;
   }
 
   if (rsp.result() != InformationResult::kSuccess) {
-    bt_log(
-        DEBUG,
-        "l2cap-bredr",
-        "Extended Features Information Response failure result (result: %#.4hx)",
-        static_cast<uint16_t>(rsp.result()));
+    bt_log(DEBUG,
+           "l2cap-bredr",
+           "Extended Features Information Response failure result (result: "
+           "%#.4hx)",
+           static_cast<uint16_t>(rsp.result()));
     // Treat failure result as if feature mask indicated no ERTM support so that
     // configuration can fall back to basic mode.
     ForEach([](DynamicChannel* chan) {
@@ -439,11 +441,11 @@ void BrEdrDynamicChannel::Disconnect(DisconnectDoneCallback done_cb) {
   auto on_discon_rsp_timeout = [local_cid = local_cid(),
                                 self = weak_self_.GetWeakPtr(),
                                 done_cb = done_cb.share()]() mutable {
-    bt_log(
-        WARN,
-        "l2cap-bredr",
-        "Channel %#.4x: Timed out waiting for Disconnection Response; completing disconnection",
-        local_cid);
+    bt_log(WARN,
+           "l2cap-bredr",
+           "Channel %#.4x: Timed out waiting for Disconnection Response; "
+           "completing disconnection",
+           local_cid);
     if (self.is_alive()) {
       done_cb();
     }
@@ -499,14 +501,14 @@ ChannelInfo BrEdrDynamicChannel::info() const {
       remote_config().retransmission_flow_control_option()->mps();
   const auto max_tx_sdu_size = std::min(peer_mtu, max_tx_pdu_payload_size);
   if (max_tx_pdu_payload_size < peer_mtu) {
-    bt_log(
-        DEBUG,
-        "l2cap-bredr",
-        "Channel %#.4x: reporting MPS of %hu to service to avoid segmenting outbound SDUs, "
-        "which would otherwise be %hu according to MTU",
-        local_cid(),
-        max_tx_sdu_size,
-        peer_mtu);
+    bt_log(DEBUG,
+           "l2cap-bredr",
+           "Channel %#.4x: reporting MPS of %hu to service to avoid segmenting "
+           "outbound SDUs, "
+           "which would otherwise be %hu according to MTU",
+           local_cid(),
+           max_tx_sdu_size,
+           peer_mtu);
   }
   auto info =
       ChannelInfo::MakeEnhancedRetransmissionMode(max_rx_sdu_size,
@@ -545,8 +547,8 @@ void BrEdrDynamicChannel::OnRxConfigReq(
   if (remote_config_accum_.has_value()) {
     remote_config_accum_->Merge(std::move(config));
   } else {
-    // TODO(https://fxbug.dev/42115983): if channel is being re-configured, merge
-    // with existing configuration
+    // TODO(https://fxbug.dev/42115983): if channel is being re-configured,
+    // merge with existing configuration
     remote_config_accum_ = std::move(config);
   }
 
@@ -587,15 +589,16 @@ void BrEdrDynamicChannel::OnRxConfigReq(
     const auto local_mode =
         local_config_.retransmission_flow_control_option()->mode();
     if (req_mode != local_mode) {
-      bt_log(
-          TRACE,
-          "l2cap-bredr",
-          "Channel %#.4x: second configuration request doesn't have desired mode, "
-          "sending unacceptable parameters response and disconnecting (req mode: %#.2x, "
-          "desired: %#.2x)",
-          local_cid(),
-          static_cast<uint8_t>(req_mode),
-          static_cast<uint8_t>(local_mode));
+      bt_log(TRACE,
+             "l2cap-bredr",
+             "Channel %#.4x: second configuration request doesn't have desired "
+             "mode, "
+             "sending unacceptable parameters response and disconnecting (req "
+             "mode: %#.2x, "
+             "desired: %#.2x)",
+             local_cid(),
+             static_cast<uint8_t>(req_mode),
+             static_cast<uint8_t>(local_mode));
       ChannelConfiguration::ConfigurationOptions options;
       options.push_back(
           std::make_unique<
@@ -629,12 +632,12 @@ void BrEdrDynamicChannel::OnRxConfigReq(
       unknown_string += std::string(" ") + option.ToString();
     }
 
-    bt_log(
-        DEBUG,
-        "l2cap-bredr",
-        "Channel %#.4x: config request contained unknown options (options: %s)\n",
-        local_cid(),
-        unknown_string.c_str());
+    bt_log(DEBUG,
+           "l2cap-bredr",
+           "Channel %#.4x: config request contained unknown options (options: "
+           "%s)\n",
+           local_cid(),
+           unknown_string.c_str());
 
     responder->Send(remote_cid(),
                     0x0000,
@@ -650,17 +653,17 @@ void BrEdrDynamicChannel::OnRxConfigReq(
                     0x0000,
                     ConfigurationResult::kUnacceptableParameters,
                     std::move(unacceptable_options));
-    bt_log(
-        TRACE,
-        "l2cap-bredr",
-        "Channel %#.4x: Sent unacceptable parameters configuration response (options: %s)",
-        local_cid(),
-        bt_str(unacceptable_config));
+    bt_log(TRACE,
+           "l2cap-bredr",
+           "Channel %#.4x: Sent unacceptable parameters configuration response "
+           "(options: %s)",
+           local_cid(),
+           bt_str(unacceptable_config));
     return;
   }
 
-  // TODO(https://fxbug.dev/42057179): Defer accepting config req using a Pending
-  // response
+  // TODO(https://fxbug.dev/42057179): Defer accepting config req using a
+  // Pending response
   state_ |= kRemoteConfigAccepted;
 
   ChannelConfiguration response_config;
@@ -705,16 +708,16 @@ void BrEdrDynamicChannel::OnRxConfigReq(
   }
 
   if (BothConfigsAccepted() && !AcceptedChannelModesAreConsistent()) {
-    bt_log(
-        WARN,
-        "l2cap-bredr",
-        "Channel %#.4x: inconsistent channel mode negotiation (local mode: %#.2x, remote "
-        "mode: %#.2x); falling back to Basic Mode",
-        local_cid(),
-        static_cast<uint8_t>(
-            local_config().retransmission_flow_control_option()->mode()),
-        static_cast<uint8_t>(
-            remote_config().retransmission_flow_control_option()->mode()));
+    bt_log(WARN,
+           "l2cap-bredr",
+           "Channel %#.4x: inconsistent channel mode negotiation (local mode: "
+           "%#.2x, remote "
+           "mode: %#.2x); falling back to Basic Mode",
+           local_cid(),
+           static_cast<uint8_t>(
+               local_config().retransmission_flow_control_option()->mode()),
+           static_cast<uint8_t>(
+               remote_config().retransmission_flow_control_option()->mode()));
 
     // The most applicable guidance for the case where the peer send conflicting
     // modes is in Core Spec v5.0 Vol 3, Part A, Sec 5.4: "If the mode proposed
@@ -861,25 +864,25 @@ uint16_t BrEdrDynamicChannel::CalculateLocalMtu() const {
       request_ertm ? kMaxInboundPduPayloadSize : kMaxMTU;
   uint16_t mtu = parameters_.max_rx_sdu_size.value_or(kDefaultPreferredMtu);
   if (mtu < kMinACLMTU) {
-    bt_log(
-        WARN,
-        "l2cap-bredr",
-        "Channel %#.4x: preferred MTU channel parameter below minimum allowed, using minimum "
-        "instead (mtu param: %#x, min mtu: %#x)",
-        local_cid(),
-        mtu,
-        kMinACLMTU);
+    bt_log(WARN,
+           "l2cap-bredr",
+           "Channel %#.4x: preferred MTU channel parameter below minimum "
+           "allowed, using minimum "
+           "instead (mtu param: %#x, min mtu: %#x)",
+           local_cid(),
+           mtu,
+           kMinACLMTU);
     mtu = kMinACLMTU;
   }
   if (request_ertm && mtu > kMaxInboundPduPayloadSize) {
-    bt_log(
-        DEBUG,
-        "l2cap-bredr",
-        "Channel %#.4x: preferred MTU channel parameter above MPS; using MPS instead to avoid "
-        "segmentation (mtu param: %#x, max pdu: %#x)",
-        local_cid(),
-        mtu,
-        kMaxInboundPduPayloadSize);
+    bt_log(DEBUG,
+           "l2cap-bredr",
+           "Channel %#.4x: preferred MTU channel parameter above MPS; using "
+           "MPS instead to avoid "
+           "segmentation (mtu param: %#x, max pdu: %#x)",
+           local_cid(),
+           mtu,
+           kMaxInboundPduPayloadSize);
     mtu = kMaxInboundPduPayloadSize;
   }
   return mtu;
@@ -976,19 +979,19 @@ bool BrEdrDynamicChannel::AcceptedChannelModesAreConsistent() const {
 
 ChannelConfiguration BrEdrDynamicChannel::CheckForUnacceptableConfigReqOptions(
     const ChannelConfiguration& config) const {
-  // TODO(https://fxbug.dev/42115983): reject reconfiguring MTU if mode is Enhanced
-  // Retransmission or Streaming mode.
+  // TODO(https://fxbug.dev/42115983): reject reconfiguring MTU if mode is
+  // Enhanced Retransmission or Streaming mode.
   ChannelConfiguration unacceptable;
 
   // Reject MTUs below minimum size
   if (config.mtu_option()->mtu() < kMinACLMTU) {
-    bt_log(
-        DEBUG,
-        "l2cap",
-        "Channel %#.4x: config request contains MTU below minimum (mtu: %hu, min: %hu)",
-        local_cid(),
-        config.mtu_option()->mtu(),
-        kMinACLMTU);
+    bt_log(DEBUG,
+           "l2cap",
+           "Channel %#.4x: config request contains MTU below minimum (mtu: "
+           "%hu, min: %hu)",
+           local_cid(),
+           config.mtu_option()->mtu(),
+           kMinACLMTU);
     // Respond back with a proposed MTU value of the required minimum (Core Spec
     // v5.1, Vol 3, Part A, Section 5.1: "It is implementation specific whether
     // the local device continues the configuration process or disconnects the
@@ -1007,24 +1010,24 @@ ChannelConfiguration BrEdrDynamicChannel::CheckForUnacceptableConfigReqOptions(
       // Local device must accept, as basic mode has highest precedence.
       if (local_mode ==
           RetransmissionAndFlowControlMode::kEnhancedRetransmission) {
-        bt_log(
-            DEBUG,
-            "l2cap-bredr",
-            "Channel %#.4x: accepting peer basic mode configuration option when preferred mode "
-            "was ERTM",
-            local_cid());
+        bt_log(DEBUG,
+               "l2cap-bredr",
+               "Channel %#.4x: accepting peer basic mode configuration option "
+               "when preferred mode "
+               "was ERTM",
+               local_cid());
       }
       break;
     case RetransmissionAndFlowControlMode::kEnhancedRetransmission:
       // Basic mode has highest precedence, so if local mode is basic, reject
       // ERTM and send local mode.
       if (local_mode == RetransmissionAndFlowControlMode::kBasic) {
-        bt_log(
-            DEBUG,
-            "l2cap-bredr",
-            "Channel %#.4x: rejecting peer ERTM mode configuration option because preferred "
-            "mode is basic",
-            local_cid());
+        bt_log(DEBUG,
+               "l2cap-bredr",
+               "Channel %#.4x: rejecting peer ERTM mode configuration option "
+               "because preferred "
+               "mode is basic",
+               local_cid());
         unacceptable.set_retransmission_flow_control_option(
             ChannelConfiguration::RetransmissionAndFlowControlOption::
                 MakeBasicMode());
@@ -1034,13 +1037,13 @@ ChannelConfiguration BrEdrDynamicChannel::CheckForUnacceptableConfigReqOptions(
           CheckForUnacceptableErtmOptions(config));
       break;
     default:
-      bt_log(
-          DEBUG,
-          "l2cap-bredr",
-          "Channel %#.4x: rejecting unsupported retransmission and flow control configuration "
-          "option (mode: %#.2x)",
-          local_cid(),
-          static_cast<uint8_t>(req_mode));
+      bt_log(DEBUG,
+             "l2cap-bredr",
+             "Channel %#.4x: rejecting unsupported retransmission and flow "
+             "control configuration "
+             "option (mode: %#.2x)",
+             local_cid(),
+             static_cast<uint8_t>(req_mode));
 
       // All other modes are lower precedence than what local device supports,
       // so send local mode.
@@ -1098,9 +1101,9 @@ BrEdrDynamicChannel::CheckForUnacceptableErtmOptions(
     unacceptable_rfc_option->set_tx_window_size(kErtmMaxUnackedInboundFrames);
   }
 
-  // NOTE(https://fxbug.dev/42054330): MPS must be large enough to fit the largest
-  // SDU in the minimum MTU case, because ERTM does not segment in the outbound
-  // direction.
+  // NOTE(https://fxbug.dev/42054330): MPS must be large enough to fit the
+  // largest SDU in the minimum MTU case, because ERTM does not segment in the
+  // outbound direction.
   if (peer_rfc_option.mps() < kMinACLMTU) {
     bt_log(DEBUG,
            "l2cap-bredr",
@@ -1142,36 +1145,37 @@ bool BrEdrDynamicChannel::TryRecoverFromUnacceptableParametersConfigRsp(
       const auto remote_mode =
           remote_config_.retransmission_flow_control_option()->mode();
       if (rsp_mode != remote_mode) {
-        bt_log(
-            ERROR,
-            "l2cap-bredr",
-            "Channel %#.4x: Unsuccessful config: mode in unacceptable parameters config "
-            "response does not match mode in remote config request (rsp mode: %#.2x, req mode: "
-            "%#.2x)",
-            local_cid(),
-            static_cast<uint8_t>(rsp_mode),
-            static_cast<uint8_t>(remote_mode));
+        bt_log(ERROR,
+               "l2cap-bredr",
+               "Channel %#.4x: Unsuccessful config: mode in unacceptable "
+               "parameters config "
+               "response does not match mode in remote config request (rsp "
+               "mode: %#.2x, req mode: "
+               "%#.2x)",
+               local_cid(),
+               static_cast<uint8_t>(rsp_mode),
+               static_cast<uint8_t>(remote_mode));
         return false;
       }
     }
 
-    bt_log(
-        TRACE,
-        "l2cap-bredr",
-        "Channel %#.4x: Attempting to recover from unacceptable parameters config response by "
-        "falling back to basic mode and resending config request",
-        local_cid());
+    bt_log(TRACE,
+           "l2cap-bredr",
+           "Channel %#.4x: Attempting to recover from unacceptable parameters "
+           "config response by "
+           "falling back to basic mode and resending config request",
+           local_cid());
 
     // Fall back to basic mode and try sending config again up to
     // kMaxNumBasicConfigRequests times
     peer_supports_ertm_ = false;
     if (num_basic_config_requests_ == kMaxNumBasicConfigRequests) {
-      bt_log(
-          WARN,
-          "l2cap-bredr",
-          "Channel %#.4x: Peer rejected config request. Channel's limit of %#.2x basic mode config request attempts has been met",
-          local_cid(),
-          kMaxNumBasicConfigRequests);
+      bt_log(WARN,
+             "l2cap-bredr",
+             "Channel %#.4x: Peer rejected config request. Channel's limit of "
+             "%#.2x basic mode config request attempts has been met",
+             local_cid(),
+             kMaxNumBasicConfigRequests);
       return false;
     }
     UpdateLocalConfigForErtm();
@@ -1180,12 +1184,12 @@ bool BrEdrDynamicChannel::TryRecoverFromUnacceptableParametersConfigRsp(
   }
 
   // Other unacceptable parameters cannot be recovered from.
-  bt_log(
-      WARN,
-      "l2cap-bredr",
-      "Channel %#.4x: Unsuccessful config: could not recover from unacceptable parameters config "
-      "response",
-      local_cid());
+  bt_log(WARN,
+         "l2cap-bredr",
+         "Channel %#.4x: Unsuccessful config: could not recover from "
+         "unacceptable parameters config "
+         "response",
+         local_cid());
   return false;
 }
 
@@ -1350,12 +1354,12 @@ BrEdrDynamicChannel::ResponseHandlerAction BrEdrDynamicChannel::OnRxConfigRsp(
   }
 
   if (rsp.result() == ConfigurationResult::kUnacceptableParameters) {
-    bt_log(
-        DEBUG,
-        "l2cap-bredr",
-        "Channel %#.4x: Received unacceptable parameters config response (options: %s)",
-        local_cid(),
-        bt_str(rsp.config()));
+    bt_log(DEBUG,
+           "l2cap-bredr",
+           "Channel %#.4x: Received unacceptable parameters config response "
+           "(options: %s)",
+           local_cid(),
+           bt_str(rsp.config()));
 
     if (!TryRecoverFromUnacceptableParametersConfigRsp(rsp.config())) {
       PassOpenError();
@@ -1397,16 +1401,16 @@ BrEdrDynamicChannel::ResponseHandlerAction BrEdrDynamicChannel::OnRxConfigRsp(
   }
 
   if (BothConfigsAccepted() && !AcceptedChannelModesAreConsistent()) {
-    bt_log(
-        WARN,
-        "l2cap-bredr",
-        "Channel %#.4x: inconsistent channel mode negotiation (local mode: %#.2x, remote "
-        "mode: %#.2x); falling back to Basic Mode",
-        local_cid(),
-        static_cast<uint8_t>(
-            local_config().retransmission_flow_control_option()->mode()),
-        static_cast<uint8_t>(
-            remote_config().retransmission_flow_control_option()->mode()));
+    bt_log(WARN,
+           "l2cap-bredr",
+           "Channel %#.4x: inconsistent channel mode negotiation (local mode: "
+           "%#.2x, remote "
+           "mode: %#.2x); falling back to Basic Mode",
+           local_cid(),
+           static_cast<uint8_t>(
+               local_config().retransmission_flow_control_option()->mode()),
+           static_cast<uint8_t>(
+               remote_config().retransmission_flow_control_option()->mode()));
 
     // See spec justification in OnRxConfigReq.
     local_config_.set_retransmission_flow_control_option(

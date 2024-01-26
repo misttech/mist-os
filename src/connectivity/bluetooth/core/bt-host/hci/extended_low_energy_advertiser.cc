@@ -87,11 +87,11 @@ ExtendedLowEnergyAdvertiser::BuildSetAdvertisingParams(
   std::optional<hci_spec::AdvertisingHandle> handle =
       advertising_handle_map_.MapHandle(address);
   if (!handle) {
-    bt_log(
-        WARN,
-        "hci-le",
-        "could not allocate a new advertising handle for address: %s (all in use)",
-        bt_str(address));
+    bt_log(WARN,
+           "hci-le",
+           "could not allocate a new advertising handle for address: %s (all "
+           "in use)",
+           bt_str(address));
     return std::unique_ptr<CommandPacket>();
   }
   packet_view.advertising_handle().Write(handle.value());
@@ -132,8 +132,8 @@ ExtendedLowEnergyAdvertiser::BuildSetAdvertisingParams(
   packet_view.scan_request_notification_enable().Write(
       pw::bluetooth::emboss::GenericEnableParam::DISABLE);
 
-  // TODO(https://fxbug.dev/42161929): using legacy PDUs requires advertisements on
-  // the LE 1M PHY.
+  // TODO(https://fxbug.dev/42161929): using legacy PDUs requires advertisements
+  // on the LE 1M PHY.
   packet_view.primary_advertising_phy().Write(
       pw::bluetooth::emboss::LEPrimaryAdvertisingPHY::LE_1M);
   packet_view.secondary_advertising_phy().Write(

@@ -112,12 +112,12 @@ void Engine::UpdateAckSeq(uint8_t new_seq, bool is_poll_response) {
     // numbers of yet-acknowledged data that we've sent to that peer. See
     // conditions "With-Invalid-ReqSeq" and "With-Invalid-ReqSeq-Retrans" in
     // Core Spec v5.0 Vol 3 Part A Sec 8.6.5.5.
-    bt_log(
-        WARN,
-        "l2cap",
-        "Received acknowledgment for %hhu frames but only %hhu frames are pending",
-        n_frames_acked,
-        NumUnackedFrames());
+    bt_log(WARN,
+           "l2cap",
+           "Received acknowledgment for %hhu frames but only %hhu frames are "
+           "pending",
+           n_frames_acked,
+           NumUnackedFrames());
     connection_failure_callback_();  // May invalidate |self|.
     return;
   }
@@ -413,13 +413,13 @@ bool Engine::RetransmitUnackedData(std::optional<uint8_t> only_with_seq,
       cur_frame->buf.AsMutable<EnhancedControlField>()->set_is_poll_response();
 
       // Per "Retransmit-I-frames" of Core Spec v5.0 Vol 3, Part A, Sec 8.6.5.6,
-      // "[t]he F-bit of all other [than the first] unacknowledged I-frames sent
+      // "the F-bit of all other [than the first] unacknowledged I-frames sent
       // shall be 0," so clear this for subsequent iterations.
       set_is_poll_response = false;
     }
 
-    // TODO(https://fxbug.dev/42087625): If the task is already running, we should
-    // not restart it.
+    // TODO(https://fxbug.dev/42087625): If the task is already running, we
+    // should not restart it.
     SendPdu(&*cur_frame);
     *cur_frame->buf.AsMutable<EnhancedControlField>() = control_field;
   }

@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#pragma clang diagnostic ignored "-Wcast-qual"
+
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/sm/ecdh_key.h"
 
 #include <algorithm>

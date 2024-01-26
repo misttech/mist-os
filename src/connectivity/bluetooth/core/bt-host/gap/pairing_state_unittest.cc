@@ -4,9 +4,9 @@
 
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/gap/pairing_state.h"
 
+#include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
-#include "gmock/gmock.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/gap/fake_pairing_delegate.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/gap/peer_cache.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/hci/fake_bredr_connection.h"
@@ -24,7 +24,6 @@ namespace bt::gap {
 namespace {
 
 using namespace inspect::testing;
-using bt::testing::ReadInspect;
 
 using hci::testing::FakeBrEdrConnection;
 using hci_spec::kUserConfirmationRequestEventCode;
@@ -2869,7 +2868,7 @@ TEST_F(PairingStateTest, Inspect) {
                                   StringIs("encryption_status", "OFF"))))),
             ChildrenMatch(UnorderedElementsAre(security_properties_matcher)));
 
-  inspect::Hierarchy hierarchy = ReadInspect(inspector);
+  inspect::Hierarchy hierarchy = bt::testing::ReadInspect(inspector);
   EXPECT_THAT(hierarchy, ChildrenMatch(ElementsAre(pairing_state_matcher)));
 }
 #endif  // NINSPECT

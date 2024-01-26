@@ -158,8 +158,8 @@ void ScoDataChannelImpl::OnOutboundPacketReadable() { TrySendNextPackets(); }
 
 void ScoDataChannelImpl::OnRxPacket(pw::span<const std::byte> buffer) {
   if (buffer.size() < sizeof(hci_spec::SynchronousDataHeader)) {
-    // TODO(https://fxbug.dev/42179582): Handle these types of errors by signaling
-    // Transport.
+    // TODO(https://fxbug.dev/42179582): Handle these types of errors by
+    // signaling Transport.
     bt_log(ERROR,
            "hci",
            "malformed packet - expected at least %zu bytes, got %zu",
@@ -177,8 +177,8 @@ void ScoDataChannelImpl::OnRxPacket(pw::span<const std::byte> buffer) {
   packet->InitializeFromBuffer();
 
   if (packet->view().header().data_total_length != payload_size) {
-    // TODO(https://fxbug.dev/42179582): Handle these types of errors by signaling
-    // Transport.
+    // TODO(https://fxbug.dev/42179582): Handle these types of errors by
+    // signaling Transport.
     bt_log(ERROR,
            "hci",
            "malformed packet - payload size from header (%hu) does not match"
@@ -188,7 +188,7 @@ void ScoDataChannelImpl::OnRxPacket(pw::span<const std::byte> buffer) {
     return;
   }
 
-  auto conn_iter = connections_.find(letoh16(packet->connection_handle()));
+  auto conn_iter = connections_.find(le16toh(packet->connection_handle()));
   if (conn_iter == connections_.end()) {
     // Ignore inbound packets for connections that aren't registered. Unlike
     // ACL, buffering data received before a connection is registered is
@@ -214,13 +214,13 @@ ScoDataChannelImpl::OnNumberOfCompletedPacketsEvent(const EventPacket& event) {
       sizeof(hci_spec::NumberOfCompletedPacketsEventData);
 
   if (payload.number_of_handles != handles_in_packet) {
-    bt_log(
-        ERROR,
-        "hci",
-        "packets handle count (%d) doesn't match params size (%zu); either the packet was "
-        "parsed incorrectly or the controller is buggy",
-        payload.number_of_handles,
-        handles_in_packet);
+    bt_log(ERROR,
+           "hci",
+           "packets handle count (%d) doesn't match params size (%zu); either "
+           "the packet was "
+           "parsed incorrectly or the controller is buggy",
+           payload.number_of_handles,
+           handles_in_packet);
   }
 
   for (uint8_t i = 0; i < payload.number_of_handles && i < handles_in_packet;
@@ -230,12 +230,12 @@ ScoDataChannelImpl::OnNumberOfCompletedPacketsEvent(const EventPacket& event) {
     auto iter = pending_packet_counts_.find(le16toh(data->connection_handle));
     if (iter == pending_packet_counts_.end()) {
       // This is expected if the completed packet is an ACL packet.
-      bt_log(
-          TRACE,
-          "hci",
-          "controller reported completed packets for connection handle without pending packets: "
-          "%#.4x",
-          data->connection_handle);
+      bt_log(TRACE,
+             "hci",
+             "controller reported completed packets for connection handle "
+             "without pending packets: "
+             "%#.4x",
+             data->connection_handle);
       continue;
     }
 
@@ -249,13 +249,13 @@ ScoDataChannelImpl::OnNumberOfCompletedPacketsEvent(const EventPacket& event) {
       // but this is insufficient: packets can be queued in the channel to the
       // transport driver, and possibly in the transport driver or USB/UART
       // drivers.
-      bt_log(
-          ERROR,
-          "hci",
-          "SCO packet tx count mismatch! (handle: %#.4x, expected: %zu, actual : %u)",
-          le16toh(data->connection_handle),
-          iter->second,
-          comp_packets);
+      bt_log(ERROR,
+             "hci",
+             "SCO packet tx count mismatch! (handle: %#.4x, expected: %zu, "
+             "actual : %u)",
+             le16toh(data->connection_handle),
+             iter->second,
+             comp_packets);
       // This should eventually result in convergence with the correct pending
       // packet count. If it undercounts the true number of pending packets,
       // this branch will be reached again when the controller sends an updated

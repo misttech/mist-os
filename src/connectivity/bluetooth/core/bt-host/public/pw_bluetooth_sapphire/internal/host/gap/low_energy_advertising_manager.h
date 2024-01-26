@@ -125,7 +125,7 @@ class LowEnergyAdvertisingManager {
   AdvertisementId::value_t next_advertisement_id_ = 1;
 
   // Active advertisements, indexed by id.
-  // TODO(armansito): Use fbl::HashMap here (https://fxbug.dev/42143883) or move
+  // TODO(https://fxbug.dev/42143883): Use fbl::HashMap here or move
   // ActiveAdvertisement definition here and store by value (it is a small
   // object).
   std::unordered_map<AdvertisementId, std::unique_ptr<ActiveAdvertisement>>

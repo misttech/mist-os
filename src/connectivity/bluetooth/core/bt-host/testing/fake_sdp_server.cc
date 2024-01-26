@@ -8,6 +8,8 @@
 
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/testing/fake_l2cap.h"
 
+#pragma clang diagnostic ignored "-Wshadow"
+
 namespace bt::testing {
 
 FakeSdpServer::FakeSdpServer(pw::async::Dispatcher& pw_dispatcher)

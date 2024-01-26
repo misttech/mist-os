@@ -111,14 +111,15 @@ bool FakeSignalingChannel::SendRequest(CommandCode req_code,
   transaction.response_callback = std::move(cb);
 
   // Simulate the remote's response(s)
-  heap_dispatcher_.Post([this, index = expected_transaction_index_](
-                            pw::async::Context /*ctx*/, pw::Status status) {
-    if (status.ok()) {
-      Transaction& transaction = transactions_[index];
-      transaction.responses_handled =
-          TriggerResponses(transaction, transaction.responses);
-    }
-  });
+  (void)heap_dispatcher_.Post(
+      [this, index = expected_transaction_index_](pw::async::Context /*ctx*/,
+                                                  pw::Status status) {
+        if (status.ok()) {
+          Transaction& transaction = transactions_[index];
+          transaction.responses_handled =
+              TriggerResponses(transaction, transaction.responses);
+        }
+      });
 
   expected_transaction_index_++;
   return (transaction.request_code == req_code);

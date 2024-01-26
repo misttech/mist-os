@@ -13,13 +13,16 @@ namespace bt {
 namespace {
 
 // Initialize from bytes.
-const DeviceAddress kClassic(DeviceAddress::Type::kBREDR, {0x55, 0x44, 0x33, 0x22, 0x11, 0x41});
-const DeviceAddress kPublic(DeviceAddress::Type::kLEPublic, {0x42, 0x11, 0x22, 0x33, 0x44, 0x55});
+const DeviceAddress kClassic(DeviceAddress::Type::kBREDR,
+                             {0x55, 0x44, 0x33, 0x22, 0x11, 0x41});
+const DeviceAddress kPublic(DeviceAddress::Type::kLEPublic,
+                            {0x42, 0x11, 0x22, 0x33, 0x44, 0x55});
 const DeviceAddress kNonResolvable(DeviceAddress::Type::kLERandom,
                                    {0x55, 0x44, 0x33, 0x22, 0x11, 0x00});
 const DeviceAddress kResolvable(DeviceAddress::Type::kLERandom,
                                 {0x55, 0x44, 0x33, 0x22, 0x11, 0x43});
-const DeviceAddress kStatic(DeviceAddress::Type::kLERandom, {0x55, 0x44, 0x33, 0x22, 0x11, 0xC3});
+const DeviceAddress kStatic(DeviceAddress::Type::kLERandom,
+                            {0x55, 0x44, 0x33, 0x22, 0x11, 0xC3});
 
 struct TestPayload {
   uint8_t arg0;

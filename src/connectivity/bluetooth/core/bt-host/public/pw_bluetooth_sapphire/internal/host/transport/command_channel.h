@@ -5,8 +5,6 @@
 #ifndef SRC_CONNECTIVITY_BLUETOOTH_CORE_BT_HOST_PUBLIC_PW_BLUETOOTH_SAPPHIRE_INTERNAL_HOST_TRANSPORT_COMMAND_CHANNEL_H_
 #define SRC_CONNECTIVITY_BLUETOOTH_CORE_BT_HOST_PUBLIC_PW_BLUETOOTH_SAPPHIRE_INTERNAL_HOST_TRANSPORT_COMMAND_CHANNEL_H_
 
-#include <lib/async/cpp/task.h>
-#include <lib/async/dispatcher.h>
 #include <lib/fit/function.h>
 
 #include <list>
@@ -170,8 +168,8 @@ class CommandChannel final {
   // Callbacks invoked to report generic HCI events excluding CommandComplete
   // and CommandStatus events.
   //
-  // TODO(https://fxbug.dev/42167863): Finish migration away from EventCallback and
-  // replace with EmbossEventCallback (renamed to EventCallback).
+  // TODO(https://fxbug.dev/42167863): Finish migration away from EventCallback
+  // and replace with EmbossEventCallback (renamed to EventCallback).
   using EventCallback =
       fit::function<EventCallbackResult(const EventPacket& event_packet)>;
   using EmbossEventCallback =

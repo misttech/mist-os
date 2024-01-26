@@ -295,8 +295,8 @@ class AdvertisingData {
       {UUIDElemSize::k16Bit, BoundedUuids(kMax16BitUuids)},
       {UUIDElemSize::k32Bit, BoundedUuids(kMax32BitUuids)},
       {UUIDElemSize::k128Bit, BoundedUuids(kMax128BitUuids)}};
-  // TODO(armansito): Consider storing the payload in its serialized form and
-  // have these point into the structure (see https://fxbug.dev/42172180).
+  // TODO(https://fxbug.dev/42172180): Consider storing the payload in its
+  // serialized form and have these point into the structure.
   std::optional<LocalName> local_name_;
   std::optional<int8_t> tx_power_;
   std::optional<uint16_t> appearance_;

@@ -5,7 +5,6 @@
 #ifndef SRC_CONNECTIVITY_BLUETOOTH_CORE_BT_HOST_PUBLIC_PW_BLUETOOTH_SAPPHIRE_INTERNAL_HOST_L2CAP_LOGICAL_LINK_H_
 #define SRC_CONNECTIVITY_BLUETOOTH_CORE_BT_HOST_PUBLIC_PW_BLUETOOTH_SAPPHIRE_INTERNAL_HOST_L2CAP_LOGICAL_LINK_H_
 
-#include <lib/async/dispatcher.h>
 #include <lib/fit/function.h>
 
 #include <list>
@@ -218,8 +217,8 @@ class LogicalLink : public hci::AclDataChannel::ConnectionInterface {
   // fixed channels the peer supports (Core Spec v5.1, Vol 3, Part A, Sec 4.13).
   // Except for the signaling channels, fixed channels may not be created until
   // this response has been received.
-  // TODO(https://fxbug.dev/42119997): save fixed channels mask and use to verify
-  // opened fixed channel ids are supported
+  // TODO(https://fxbug.dev/42119997): save fixed channels mask and use to
+  // verify opened fixed channel ids are supported
   void OnRxFixedChannelsSupportedInfoRsp(
       const BrEdrCommandHandler::InformationResponse& rsp);
 

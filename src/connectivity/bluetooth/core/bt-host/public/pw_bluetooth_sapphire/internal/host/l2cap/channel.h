@@ -5,7 +5,6 @@
 #ifndef SRC_CONNECTIVITY_BLUETOOTH_CORE_BT_HOST_PUBLIC_PW_BLUETOOTH_SAPPHIRE_INTERNAL_HOST_L2CAP_CHANNEL_H_
 #define SRC_CONNECTIVITY_BLUETOOTH_CORE_BT_HOST_PUBLIC_PW_BLUETOOTH_SAPPHIRE_INTERNAL_HOST_L2CAP_CHANNEL_H_
 
-#include <lib/async/dispatcher.h>
 #include <lib/fit/function.h>
 
 #include <atomic>
@@ -16,7 +15,6 @@
 #include <mutex>
 #include <queue>
 
-#include "lib/inspect/cpp/vmo/types.h"
 #include "pw_bluetooth/vendor.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/byte_buffer.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/inspect.h"
@@ -114,7 +112,7 @@ class Channel : public WeakSelf<Channel> {
   // a maximum inbound (rx) and outbound (tx) packet size for the L2CAP
   // implementation (see v5.2, Vol. 3, Part A 5.1). L2CAP requires that channel
   // MTUs are at least 23 bytes for LE-U links and 48 bytes for ACL-U links. A
-  // further requirement is that "[t]he minimum MTU for a channel is the larger
+  // further requirement is that "the minimum MTU for a channel is the larger
   // of the L2CAP minimum [...] and any MTU explicitly required by the protocols
   // and profiles using that channel." `max_rx_sdu_size` is always determined by
   // the capabilities of the local implementation. For dynamic channels,

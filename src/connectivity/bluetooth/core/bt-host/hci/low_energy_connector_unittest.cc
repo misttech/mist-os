@@ -366,7 +366,7 @@ TEST_F(LowEnergyConnectorTest, IncomingConnectDuringConnectionRequest) {
       callback,
       kPwConnectTimeout);
 
-  heap_dispatcher().Post(
+  (void)heap_dispatcher().Post(
       [kIncomingAddress, this](pw::async::Context /*ctx*/, pw::Status status) {
         if (!status.ok()) {
           return;

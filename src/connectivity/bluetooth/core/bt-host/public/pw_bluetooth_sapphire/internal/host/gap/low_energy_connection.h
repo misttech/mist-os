@@ -5,8 +5,6 @@
 #ifndef SRC_CONNECTIVITY_BLUETOOTH_CORE_BT_HOST_PUBLIC_PW_BLUETOOTH_SAPPHIRE_INTERNAL_HOST_GAP_LOW_ENERGY_CONNECTION_H_
 #define SRC_CONNECTIVITY_BLUETOOTH_CORE_BT_HOST_PUBLIC_PW_BLUETOOTH_SAPPHIRE_INTERNAL_HOST_GAP_LOW_ENERGY_CONNECTION_H_
 
-#include <lib/async/dispatcher.h>
-
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/identifier.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/inspectable.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/gap/gap.h"
@@ -267,8 +265,8 @@ class LowEnergyConnection final : public sm::Delegate {
 
   // Updates or requests an update of the connection parameters, for central and
   // peripheral roles respectively, if interrogation has completed.
-  // TODO(https://fxbug.dev/42159733): Wait to update connection parameters until
-  // all initialization procedures have completed.
+  // TODO(https://fxbug.dev/42159733): Wait to update connection parameters
+  // until all initialization procedures have completed.
   void MaybeUpdateConnectionParameters();
 
   // Registers the peer with GATT and initiates service discovery. If

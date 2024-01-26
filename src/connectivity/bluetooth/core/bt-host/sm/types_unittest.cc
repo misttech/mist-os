@@ -10,12 +10,12 @@
 
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/sm/smp.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/testing/inspect_util.h"
+#include "src/connectivity/bluetooth/lib/cpp-string/string_printf.h"
 
 namespace bt::sm {
 namespace {
 
 using namespace inspect::testing;
-using bt::testing::ReadInspect;
 
 TEST(TypesTest, LinkKeyTypeToSecurityProperties) {
   SecurityProperties props(hci_spec::LinkKeyType::kCombination);
@@ -335,7 +335,7 @@ TEST(TypesTest, InspectSecurityProperties) {
           BoolIs("authenticated", true),
           StringIs("key_type", "kAuthenticatedCombination256"))))));
 
-  inspect::Hierarchy hierarchy = ReadInspect(inspector);
+  inspect::Hierarchy hierarchy = bt::testing::ReadInspect(inspector);
   EXPECT_THAT(
       hierarchy,
       AllOf(ChildrenMatch(UnorderedElementsAre(insecure_matcher,

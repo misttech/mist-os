@@ -339,28 +339,28 @@ void LowEnergyAdvertiser::CompleteIncomingConnection(
           handle, local_address, peer_address, conn_params, role, hci());
 
   if (!IsAdvertising(local_address)) {
-    bt_log(
-        DEBUG,
-        "hci-le",
-        "connection received without advertising address (role: %d, local address: %s, peer "
-        "address: %s, connection parameters: %s)",
-        static_cast<uint8_t>(role),
-        bt_str(local_address),
-        bt_str(peer_address),
-        bt_str(conn_params));
+    bt_log(DEBUG,
+           "hci-le",
+           "connection received without advertising address (role: %d, local "
+           "address: %s, peer "
+           "address: %s, connection parameters: %s)",
+           static_cast<uint8_t>(role),
+           bt_str(local_address),
+           bt_str(peer_address),
+           bt_str(conn_params));
     return;
   }
 
   if (!connection_callbacks_[local_address]) {
-    bt_log(
-        WARN,
-        "hci-le",
-        "connection received when not connectable (role: %d, local address: %s, peer "
-        "address: %s, connection parameters: %s)",
-        static_cast<uint8_t>(role),
-        bt_str(local_address),
-        bt_str(peer_address),
-        bt_str(conn_params));
+    bt_log(WARN,
+           "hci-le",
+           "connection received when not connectable (role: %d, local address: "
+           "%s, peer "
+           "address: %s, connection parameters: %s)",
+           static_cast<uint8_t>(role),
+           bt_str(local_address),
+           bt_str(peer_address),
+           bt_str(conn_params));
     return;
   }
 

@@ -443,9 +443,9 @@ TEST_F(LegacyLowEnergyAdvertiserTest, StartAdvertisingReadTxPowerFails) {
   EXPECT_TRUE(status->error_value().is_protocol_error());
 }
 
-// TODO(create bug): This test should really belong in LowEnergyAdvertiser's
-// unittest file
-// (//src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/hci/low_energy_advertiser_unittest.cc)
+// TODO(https://fxbug.dev/322368333): This test should really belong in
+// LowEnergyAdvertiser's unittest file
+// ($dir_pw_bluetooth_sapphire/host/hci/low_energy_advertiser_unittest.cc)
 // because all low energy advertisers should follow this convention. However,
 // this requires that all low energy advertisers implement random address
 // rotation. Currently, the only other low energy advertiser is the

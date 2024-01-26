@@ -20,7 +20,7 @@ uint16_t FakeClient::mtu() const {
 }
 
 void FakeClient::ExchangeMTU(MTUCallback callback) {
-  heap_dispatcher_.Post(
+  (void)heap_dispatcher_.Post(
       [mtu_status = exchange_mtu_status_,
        mtu = server_mtu_,
        callback = std::move(callback)](pw::async::Context /*ctx*/,
@@ -94,7 +94,7 @@ void FakeClient::DiscoverServicesWithUuidsInRange(
           uuids.empty() || uuids_set.find(svc.type) != uuids_set.end();
       if (svc.kind == kind && uuid_matches && svc.range_start >= start &&
           svc.range_start <= end) {
-        heap_dispatcher_.Post(
+        (void)heap_dispatcher_.Post(
             [svc, cb = svc_callback.share()](pw::async::Context /*ctx*/,
                                              pw::Status status) {
               if (status.ok()) {
@@ -105,12 +105,13 @@ void FakeClient::DiscoverServicesWithUuidsInRange(
     }
   }
 
-  heap_dispatcher_.Post([callback_status, cb = std::move(status_callback)](
-                            pw::async::Context /*ctx*/, pw::Status status) {
-    if (status.ok()) {
-      cb(callback_status);
-    }
-  });
+  (void)heap_dispatcher_.Post(
+      [callback_status, cb = std::move(status_callback)](
+          pw::async::Context /*ctx*/, pw::Status status) {
+        if (status.ok()) {
+          cb(callback_status);
+        }
+      });
 }
 
 void FakeClient::DiscoverCharacteristics(
@@ -122,22 +123,23 @@ void FakeClient::DiscoverCharacteristics(
   last_chrc_discovery_end_handle_ = range_end;
   chrc_discovery_count_++;
 
-  heap_dispatcher_.Post([this,
-                         range_start,
-                         range_end,
-                         chrc_callback = std::move(chrc_callback),
-                         status_callback = std::move(status_callback)](
-                            pw::async::Context /*ctx*/, pw::Status status) {
-    if (!status.ok()) {
-      return;
-    }
-    for (const auto& chrc : chrcs_) {
-      if (chrc.handle >= range_start && chrc.handle <= range_end) {
-        chrc_callback(chrc);
-      }
-    }
-    status_callback(chrc_discovery_status_);
-  });
+  (void)heap_dispatcher_.Post(
+      [this,
+       range_start,
+       range_end,
+       chrc_callback = std::move(chrc_callback),
+       status_callback = std::move(status_callback)](pw::async::Context /*ctx*/,
+                                                     pw::Status status) {
+        if (!status.ok()) {
+          return;
+        }
+        for (const auto& chrc : chrcs_) {
+          if (chrc.handle >= range_start && chrc.handle <= range_end) {
+            chrc_callback(chrc);
+          }
+        }
+        status_callback(chrc_discovery_status_);
+      });
 }
 
 void FakeClient::DiscoverDescriptors(att::Handle range_start,
@@ -154,23 +156,24 @@ void FakeClient::DiscoverDescriptors(att::Handle range_start,
     discovery_status = desc_discovery_status_;
   }
 
-  heap_dispatcher_.Post([this,
-                         discovery_status,
-                         range_start,
-                         range_end,
-                         desc_callback = std::move(desc_callback),
-                         status_callback = std::move(status_callback)](
-                            pw::async::Context /*ctx*/, pw::Status status) {
-    if (!status.ok()) {
-      return;
-    }
-    for (const auto& desc : descs_) {
-      if (desc.handle >= range_start && desc.handle <= range_end) {
-        desc_callback(desc);
-      }
-    }
-    status_callback(discovery_status);
-  });
+  (void)heap_dispatcher_.Post(
+      [this,
+       discovery_status,
+       range_start,
+       range_end,
+       desc_callback = std::move(desc_callback),
+       status_callback = std::move(status_callback)](pw::async::Context /*ctx*/,
+                                                     pw::Status status) {
+        if (!status.ok()) {
+          return;
+        }
+        for (const auto& desc : descs_) {
+          if (desc.handle >= range_start && desc.handle <= range_end) {
+            desc_callback(desc);
+          }
+        }
+        status_callback(discovery_status);
+      });
 }
 
 void FakeClient::ReadRequest(att::Handle handle, ReadCallback callback) {

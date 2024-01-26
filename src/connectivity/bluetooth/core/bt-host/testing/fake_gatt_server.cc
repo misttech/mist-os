@@ -138,7 +138,7 @@ void FakeGattServer::HandleFindByTypeValue(hci_spec::ConnectionHandle conn,
   att::Handle end = le16toh(
       bytes.ReadMember<&att::FindByTypeValueRequestParams::end_handle>());
   att::AttributeType16 service_kind =
-      letoh16(bytes.ReadMember<&att::FindByTypeValueRequestParams::type>());
+      le16toh(bytes.ReadMember<&att::FindByTypeValueRequestParams::type>());
   BufferView service_uuid_bytes =
       bytes.view(sizeof(att::FindByTypeValueRequestParams));
   UUID service_uuid;

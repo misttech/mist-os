@@ -4,8 +4,6 @@
 
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/l2cap/fake_channel.h"
 
-#include <lib/async/cpp/task.h>
-
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/host_error.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/log.h"
 
@@ -115,7 +113,7 @@ bool FakeChannel::Send(ByteBufferPtr sdu) {
   }
 
   if (send_dispatcher_) {
-    send_dispatcher_->Post(
+    (void)send_dispatcher_->Post(
         [cb = send_cb_.share(), sdu = std::move(sdu)](
             pw::async::Context /*ctx*/, pw::Status status) mutable {
           if (status.ok()) {
@@ -132,7 +130,7 @@ bool FakeChannel::Send(ByteBufferPtr sdu) {
 void FakeChannel::UpgradeSecurity(sm::SecurityLevel level,
                                   sm::ResultFunction<> callback) {
   BT_ASSERT(security_dispatcher_);
-  security_dispatcher_->Post(
+  (void)security_dispatcher_->Post(
       [cb = std::move(callback),
        f = security_cb_.share(),
        handle = handle_,

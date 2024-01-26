@@ -332,7 +332,7 @@ TEST_F(ServerTest, RegisterProtocolOnlyService) {
     EXPECT_LE(sizeof(Header), cb_packet->size());
     PacketView<Header> packet(cb_packet.get());
     EXPECT_EQ(kServiceSearchResponse, packet.header().pdu_id);
-    uint16_t len = betoh16(packet.header().param_length);
+    uint16_t len = be16toh(packet.header().param_length);
     packet.Resize(len);
     ServiceSearchResponse resp;
     fit::result<Error<>> result = resp.Parse(packet.payload_data());
@@ -380,7 +380,7 @@ TEST_F(ServerTest, RegisterProtocolOnlyService) {
     EXPECT_LE(sizeof(Header), cb_packet->size());
     PacketView<sdp::Header> packet(cb_packet.get());
     ASSERT_EQ(kServiceSearchAttributeResponse, packet.header().pdu_id);
-    uint16_t len = betoh16(packet.header().param_length);
+    uint16_t len = be16toh(packet.header().param_length);
     packet.Resize(len);
     ServiceSearchAttributeResponse rsp;
     fit::result<Error<>> result = rsp.Parse(packet.payload_data());
@@ -424,7 +424,7 @@ TEST_F(ServerTest, RegisterProtocolOnlyService) {
     EXPECT_LE(sizeof(Header), cb_packet->size());
     PacketView<sdp::Header> packet(cb_packet.get());
     ASSERT_EQ(0x01, packet.header().pdu_id);
-    uint16_t len = betoh16(packet.header().param_length);
+    uint16_t len = be16toh(packet.header().param_length);
     ASSERT_GE(sizeof(Header) + len, cb_packet->size());
     packet.Resize(len);
     ErrorResponse rsp;
@@ -950,8 +950,8 @@ TEST_F(ServerTest, ServiceSearchRequest) {
     EXPECT_LE(sizeof(Header), cb_packet->size());
     PacketView<Header> packet(cb_packet.get());
     EXPECT_EQ(kServiceSearchResponse, packet.header().pdu_id);
-    tid = betoh16(packet.header().tid);
-    uint16_t len = betoh16(packet.header().param_length);
+    tid = be16toh(packet.header().tid);
+    uint16_t len = be16toh(packet.header().param_length);
     bt_log(TRACE, "unittest", "resize packet to %d", len);
     packet.Resize(len);
     ServiceSearchResponse resp;
@@ -1065,8 +1065,8 @@ TEST_F(ServerTest, ServiceSearchRequestOneOfMany) {
     EXPECT_LE(sizeof(Header), cb_packet->size());
     PacketView<Header> packet(cb_packet.get());
     EXPECT_EQ(kServiceSearchResponse, packet.header().pdu_id);
-    tid = betoh16(packet.header().tid);
-    uint16_t len = betoh16(packet.header().param_length);
+    tid = be16toh(packet.header().tid);
+    uint16_t len = be16toh(packet.header().param_length);
     bt_log(TRACE, "unittests", "resizing packet to %d", len);
     packet.Resize(len);
     ServiceSearchResponse resp;
@@ -1138,7 +1138,7 @@ TEST_F(ServerTest, ServiceSearchContinuationState) {
     EXPECT_LE(sizeof(Header), cb_packet->size());
     PacketView<sdp::Header> packet(cb_packet.get());
     ASSERT_EQ(0x03, packet.header().pdu_id);
-    uint16_t len = betoh16(packet.header().param_length);
+    uint16_t len = be16toh(packet.header().param_length);
     EXPECT_LE(len,
               0x2F);  // 10 records (4 * 10) + 2 (total count) + 2 (current
                       // count) + 3 (cont state)
@@ -1266,7 +1266,7 @@ TEST_F(ServerTest, ServiceAttributeRequest) {
     EXPECT_LE(sizeof(Header), cb_packet->size());
     PacketView<sdp::Header> packet(cb_packet.get());
     ASSERT_EQ(0x05, packet.header().pdu_id);
-    uint16_t len = betoh16(packet.header().param_length);
+    uint16_t len = be16toh(packet.header().param_length);
     EXPECT_LE(len, 0x11);  // 10 + 2 (byte count) + 5 (cont state)
     packet.Resize(len);
     fit::result<Error<>> result = rsp.Parse(packet.payload_data());
@@ -1457,7 +1457,7 @@ TEST_F(ServerTest, SearchAttributeRequest) {
     EXPECT_LE(sizeof(Header), cb_packet->size());
     PacketView<sdp::Header> packet(cb_packet.get());
     ASSERT_EQ(0x07, packet.header().pdu_id);
-    uint16_t len = betoh16(packet.header().param_length);
+    uint16_t len = be16toh(packet.header().param_length);
     EXPECT_LE(len, 0x11);  // 2 (byte count) + 10 (max len) + 5 (cont state)
     packet.Resize(len);
     fit::result<Error<>> result = rsp.Parse(packet.payload_data());
@@ -1677,7 +1677,7 @@ TEST_F(ServerTest, BrowseGroup) {
     EXPECT_LE(sizeof(Header), cb_packet->size());
     PacketView<sdp::Header> packet(cb_packet.get());
     ASSERT_EQ(0x07, packet.header().pdu_id);
-    uint16_t len = betoh16(packet.header().param_length);
+    uint16_t len = be16toh(packet.header().param_length);
     packet.Resize(len);
     auto status = rsp.Parse(packet.payload_data());
     EXPECT_EQ(fit::ok(), status);
@@ -1753,11 +1753,11 @@ TEST_F(ServerTest, InspectHierarchy) {
             ChildrenMatch(UnorderedElementsAre(psm_matcher)));
 
   auto record_matcher = AllOf(
-      NodeMatches(AllOf(
-          NameMatches("record0x0"),
-          PropertyList(UnorderedElementsAre(StringIs(
-              "record",
-              "Service Class Id List: Sequence { UUID(00001000-0000-1000-8000-00805f9b34fb) }"))))),
+      NodeMatches(AllOf(NameMatches("record0x0"),
+                        PropertyList(UnorderedElementsAre(StringIs(
+                            "record",
+                            "Service Class Id List: Sequence { "
+                            "UUID(00001000-0000-1000-8000-00805f9b34fb) }"))))),
       ChildrenMatch(UnorderedElementsAre(reg_psm_matcher)));
 
   auto sdp_matcher = AllOf(NodeMatches(AllOf(NameMatches("sdp_server"))),
@@ -1799,18 +1799,21 @@ TEST_F(ServerTest, InspectHierarchyAfterUnregisterService) {
       AllOf(NodeMatches(AllOf(NameMatches("registered_psms"))),
             ChildrenMatch(UnorderedElementsAre(a2dp_psm_matcher)));
 
-  auto sdp_record_matcher = AllOf(
-      NodeMatches(AllOf(PropertyList(UnorderedElementsAre(StringIs(
-          "record",
-          "Service Class Id List: Sequence { UUID(00001000-0000-1000-8000-00805f9b34fb) }"))))),
-      ChildrenMatch(UnorderedElementsAre(sdp_matcher)));
-  auto a2dp_record_matcher = AllOf(
-      NodeMatches(AllOf(PropertyList(UnorderedElementsAre(StringIs(
-          "record",
-          "Profile Descriptor: Sequence { Sequence { "
-          "UUID(0000110d-0000-1000-8000-00805f9b34fb) UnsignedInt:2(259) } }\nService Class "
-          "Id List: Sequence { UUID(0000110b-0000-1000-8000-00805f9b34fb) }"))))),
-      ChildrenMatch(UnorderedElementsAre(a2dp_matcher)));
+  auto sdp_record_matcher =
+      AllOf(NodeMatches(AllOf(PropertyList(UnorderedElementsAre(
+                StringIs("record",
+                         "Service Class Id List: Sequence { "
+                         "UUID(00001000-0000-1000-8000-00805f9b34fb) }"))))),
+            ChildrenMatch(UnorderedElementsAre(sdp_matcher)));
+  auto a2dp_record_matcher =
+      AllOf(NodeMatches(AllOf(PropertyList(UnorderedElementsAre(
+                StringIs("record",
+                         "Profile Descriptor: Sequence { Sequence { "
+                         "UUID(0000110d-0000-1000-8000-00805f9b34fb) "
+                         "UnsignedInt:2(259) } }\nService Class "
+                         "Id List: Sequence { "
+                         "UUID(0000110b-0000-1000-8000-00805f9b34fb) }"))))),
+            ChildrenMatch(UnorderedElementsAre(a2dp_matcher)));
 
   auto sdp_server_matcher =
       AllOf(NodeMatches(AllOf(NameMatches("sdp_server"))),

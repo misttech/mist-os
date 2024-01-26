@@ -4,8 +4,6 @@
 
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/l2cap/fake_l2cap.h"
 
-#include <lib/async/cpp/task.h>
-
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/assert.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/l2cap/l2cap_defs.h"
 
@@ -152,12 +150,13 @@ void FakeL2cap::RequestConnectionParameterUpdate(
           ? connection_parameter_update_request_responder_(handle, params)
           : true;
   // Simulate async response.
-  heap_dispatcher_.Post([request_cb = std::move(request_cb), response](
-                            pw::async::Context /*ctx*/, pw::Status status) {
-    if (status.ok()) {
-      request_cb(response);
-    }
-  });
+  (void)heap_dispatcher_.Post(
+      [request_cb = std::move(request_cb), response](pw::async::Context /*ctx*/,
+                                                     pw::Status status) {
+        if (status.ok()) {
+          request_cb(response);
+        }
+      });
 }
 
 void FakeL2cap::OpenL2capChannel(hci_spec::ConnectionHandle handle,
@@ -179,11 +178,11 @@ void FakeL2cap::OpenL2capChannel(hci_spec::ConnectionHandle handle,
       params.mode.value_or(l2cap::RetransmissionAndFlowControlMode::kBasic);
   auto max_rx_sdu_size = params.max_rx_sdu_size.value_or(l2cap::kMaxMTU);
 
-  BT_ASSERT_MSG(
-      chan_data.params == params,
-      "Didn't receive expected L2CAP channel parameters (expected: %s, found: %s)",
-      bt_str(chan_data.params),
-      bt_str(params));
+  BT_ASSERT_MSG(chan_data.params == params,
+                "Didn't receive expected L2CAP channel parameters (expected: "
+                "%s, found: %s)",
+                bt_str(chan_data.params),
+                bt_str(params));
 
   auto channel_info =
       l2cap::ChannelInfo::MakeBasicMode(max_rx_sdu_size, l2cap::kDefaultMTU);
@@ -205,12 +204,13 @@ void FakeL2cap::OpenL2capChannel(hci_spec::ConnectionHandle handle,
   }
 
   // Simulate async channel creation process.
-  heap_dispatcher_.Post([cb = std::move(cb), chan = std::move(chan)](
-                            pw::async::Context /*ctx*/, pw::Status status) {
-    if (status.ok()) {
-      cb(chan);
-    }
-  });
+  (void)heap_dispatcher_.Post(
+      [cb = std::move(cb), chan = std::move(chan)](pw::async::Context /*ctx*/,
+                                                   pw::Status status) {
+        if (status.ok()) {
+          cb(chan);
+        }
+      });
 }
 
 bool FakeL2cap::RegisterService(l2cap::Psm psm,

@@ -7,42 +7,45 @@ import("//build_overrides/pigweed.gni")
 import("$dir_pw_fuzzer/fuzzer.gni")
 import("$dir_pw_unit_test/test.gni")
 
-public_dir = "//src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common"
+dir_public_common = "../public/pw_bluetooth_sapphire/internal/host/common"
 
 pw_source_set("common") {
+  public = [
+    "$dir_public_common/advertising_data.h",
+    "$dir_public_common/assert.h",
+    "$dir_public_common/bounded_inspect_list_node.h",
+    "$dir_public_common/byte_buffer.h",
+    "$dir_public_common/device_address.h",
+    "$dir_public_common/device_class.h",
+    "$dir_public_common/error.h",
+    "$dir_public_common/expiring_set.h",
+    "$dir_public_common/fake_inspect.h",
+    "$dir_public_common/host_error.h",
+    "$dir_public_common/identifier.h",
+    "$dir_public_common/inspect.h",
+    "$dir_public_common/inspectable.h",
+    "$dir_public_common/log.h",
+    "$dir_public_common/macros.h",
+    "$dir_public_common/manufacturer_names.h",
+    "$dir_public_common/metrics.h",
+    "$dir_public_common/packet_view.h",
+    "$dir_public_common/pipeline_monitor.h",
+    "$dir_public_common/random.h",
+    "$dir_public_common/retire_log.h",
+    "$dir_public_common/slab_allocator.h",
+    "$dir_public_common/slab_buffer.h",
+    "$dir_public_common/smart_task.h",
+    "$dir_public_common/supplement_data.h",
+    "$dir_public_common/to_string.h",
+    "$dir_public_common/trace.h",
+    "$dir_public_common/uint128.h",
+    "$dir_public_common/uint256.h",
+    "$dir_public_common/uuid.h",
+    "$dir_public_common/weak_self.h",
+    "$dir_public_common/windowed_inspect_numeric_property.h",
+  ]
+
   sources = [
-    "$public_dir/advertising_data.h",
-    "$public_dir/assert.h",
-    "$public_dir/bounded_inspect_list_node.h",
-    "$public_dir/byte_buffer.h",
-    "$public_dir/device_address.h",
-    "$public_dir/device_class.h",
-    "$public_dir/error.h",
-    "$public_dir/expiring_set.h",
-    "$public_dir/fake_inspect.h",
-    "$public_dir/host_error.h",
-    "$public_dir/identifier.h",
-    "$public_dir/inspect.h",
-    "$public_dir/inspectable.h",
-    "$public_dir/log.h",
-    "$public_dir/macros.h",
-    "$public_dir/manufacturer_names.h",
-    "$public_dir/metrics.h",
-    "$public_dir/packet_view.h",
-    "$public_dir/pipeline_monitor.h",
-    "$public_dir/random.h",
-    "$public_dir/retire_log.h",
-    "$public_dir/slab_allocator.h",
-    "$public_dir/slab_buffer.h",
-    "$public_dir/smart_task.h",
-    "$public_dir/supplement_data.h",
-    "$public_dir/to_string.h",
-    "$public_dir/trace.h",
-    "$public_dir/uint128.h",
-    "$public_dir/uint256.h",
-    "$public_dir/uuid.h",
-    "$public_dir/weak_self.h",
-    "$public_dir/windowed_inspect_numeric_property.h",
     "advertising_data.cc",
     "bounded_inspect_list_node.cc",
     "byte_buffer.cc",
@@ -62,6 +65,8 @@ pw_source_set("common") {
 
   public_deps = [
     "$dir_pw_assert",
+    "$dir_pw_async:dispatcher",
+    "$dir_pw_async:task",
     "$dir_pw_bluetooth:emboss_hci_group",
     "$dir_pw_intrusive_ptr",
     "$dir_pw_log",
@@ -69,10 +74,9 @@ pw_source_set("common") {
     "$dir_pw_span",
     "$dir_pw_string",
     "$dir_pw_third_party/fuchsia:fit",
+    "//src/connectivity/bluetooth/core/bt-host:config",
     "//src/connectivity/bluetooth/lib/cpp-string",
     "//src/connectivity/bluetooth/lib/cpp-type",
-    "//third_party/pigweed:pw_async_dispatcher",
-    "//third_party/pigweed:pw_async_task",
   ]
 
   if (current_os == "fuchsia") {
@@ -108,9 +112,11 @@ pw_test("tests") {
 
   deps = [
     ":common",
+    "$dir_pw_async:fake_dispatcher_fixture",
     "//src/connectivity/bluetooth/core/bt-host/testing",
-    "//third_party/pigweed/backends/pw_async_fuchsia:fake_dispatcher_fixture",
   ]
+
+  test_main = "//src/connectivity/bluetooth/core/bt-host/testing:gtest_main"
 }
 
 fuchsia_library_fuzzer("advertising_data_fuzzer") {
@@ -124,4 +130,11 @@ fuchsia_library_fuzzer("advertising_data_fuzzer") {
 pw_fuzzer("pw_advertising_data_fuzzer") {
   sources = [ "advertising_data_fuzztest.cc" ]
   deps = [ ":common" ]
+}
+
+pw_test_group("tests_and_fuzzers") {
+  tests = [
+    ":tests",
+    ":pw_advertising_data_fuzzer_test",
+  ]
 }

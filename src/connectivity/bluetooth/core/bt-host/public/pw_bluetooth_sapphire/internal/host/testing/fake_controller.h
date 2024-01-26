@@ -304,7 +304,7 @@ class FakeController final : public ControllerTestDoubleBase,
                        uint8_t id,
                        const ByteBuffer& payload);
 
-  void SendNumberOfCompletedPacketsEvent(hci_spec::ConnectionHandle conn,
+  void SendNumberOfCompletedPacketsEvent(hci_spec::ConnectionHandle handle,
                                          uint16_t num);
 
   // Sets up a LE link to the device with the given |addr|. FakeController will
@@ -431,7 +431,7 @@ class FakeController final : public ControllerTestDoubleBase,
   void SendCommand(pw::span<const std::byte> command) override;
   void SendAclData(pw::span<const std::byte> data) override {
     // Post the packet to simulate async HCI behavior.
-    heap_dispatcher().Post(
+    (void)heap_dispatcher().Post(
         [self = GetWeakPtr(), data = DynamicByteBuffer(BufferView(data))](
             pw::async::Context /*ctx*/, pw::Status status) {
           if (self.is_alive() && status.ok()) {
@@ -441,7 +441,7 @@ class FakeController final : public ControllerTestDoubleBase,
   }
   void SendScoData(pw::span<const std::byte> data) override {
     // Post the packet to simulate async HCI behavior.
-    heap_dispatcher().Post(
+    (void)heap_dispatcher().Post(
         [self = GetWeakPtr(), data = DynamicByteBuffer(BufferView(data))](
             pw::async::Context /*ctx*/, pw::Status status) {
           if (self.is_alive() && status.ok()) {

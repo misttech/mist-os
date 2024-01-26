@@ -11,16 +11,17 @@
 
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/byte_buffer.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/hci-spec/protocol.h"
-#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/l2cap/bredr_dynamic_channel.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/l2cap/fake_signaling_channel.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/l2cap/l2cap_defs.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/testing/test_helpers.h"
 
+#pragma clang diagnostic ignored "-Wshadow"
+
 namespace bt::l2cap::internal {
 namespace {
 
-// TODO(https://fxbug.dev/42056068): Add integration test with FakeChannelTest and
-// BrEdrSignalingChannel using snooped connection data to verify signaling
+// TODO(https://fxbug.dev/42056068): Add integration test with FakeChannelTest
+// and BrEdrSignalingChannel using snooped connection data to verify signaling
 // channel traffic.
 
 constexpr uint16_t kPsm = 0x0001;
@@ -408,7 +409,7 @@ const StaticByteBuffer kInboundConfigReqWithERTM(
     0x00,
 
     // Retransmission & Flow Control option (Type, Length = 9, mode = ERTM,
-    // dummy parameters)
+    // arbitrary parameters)
     0x04,
     0x09,
     0x03,
@@ -664,7 +665,8 @@ class BrEdrDynamicChannelTest : public pw::async::test::FakeDispatcherFixture {
 
     ext_info_transaction_id_ = EXPECT_OUTBOUND_REQ(
         *sig(), kInformationRequest, kExtendedFeaturesInfoReq.view());
-    // TODO(63074): Make these tests not rely on strict ordering of channel IDs.
+    // TODO(https://fxbug.dev/42141538): Make these tests not rely on strict
+    // ordering of channel IDs.
     registry_ = std::make_unique<BrEdrDynamicChannelRegistry>(
         sig(),
         fit::bind_member<&BrEdrDynamicChannelTest::OnChannelClose>(this),

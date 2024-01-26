@@ -395,8 +395,8 @@ TEST(DataElementTest, ToString) {
       DataElement(std::string("ABC\xc3\x28XYZ")).ToString());  // Invalid UTF8.
   EXPECT_EQ("String(ABC.(XYZ....)",
             DataElement(std::string("ABC\xc3\x28XYZ💖"))
-                .ToString());  // Invalid UTF8 means the whole string must be
-                               // treated as ASCII.
+                .ToString());  // Invalid UTF8 means the whole
+                               // string must be treated as ASCII.
   DataElement elem;
   elem.SetUrl(std::string("http://example.com"));
   EXPECT_EQ("Url(http://example.com)", elem.ToString());

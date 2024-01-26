@@ -4,8 +4,6 @@
 
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/hci/fake_local_address_delegate.h"
 
-#include <lib/async/cpp/task.h>
-
 namespace bt::hci {
 
 void FakeLocalAddressDelegate::EnsureLocalAddress(AddressCallback callback) {
@@ -14,12 +12,13 @@ void FakeLocalAddressDelegate::EnsureLocalAddress(AddressCallback callback) {
     callback(local_address_);
     return;
   }
-  heap_dispatcher_.Post([callback = std::move(callback), addr = local_address_](
-                            pw::async::Context /*ctx*/, pw::Status status) {
-    if (status.ok()) {
-      callback(addr);
-    }
-  });
+  (void)heap_dispatcher_.Post(
+      [callback = std::move(callback), addr = local_address_](
+          pw::async::Context /*ctx*/, pw::Status status) {
+        if (status.ok()) {
+          callback(addr);
+        }
+      });
 }
 
 }  // namespace bt::hci

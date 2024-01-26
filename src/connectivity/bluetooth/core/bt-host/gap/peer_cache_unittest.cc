@@ -1480,7 +1480,7 @@ TEST_F(PeerCacheBrEdrUpdateCallbackTest,
 class PeerCacheExpirationTest : public pw::async::test::FakeDispatcherFixture {
  public:
   PeerCacheExpirationTest() = default;
-  void SetUp() {
+  void SetUp() override {
     cache_.set_peer_removed_callback([this](PeerId) { peers_removed_++; });
     auto* peer = cache_.NewPeer(kAddrLeAlias, /*connectable=*/true);
     ASSERT_TRUE(peer);
@@ -1491,7 +1491,7 @@ class PeerCacheExpirationTest : public pw::async::test::FakeDispatcherFixture {
     peers_removed_ = 0;
   }
 
-  void TearDown() {
+  void TearDown() override {
     cache_.set_peer_removed_callback(nullptr);
     RunUntilIdle();
   }

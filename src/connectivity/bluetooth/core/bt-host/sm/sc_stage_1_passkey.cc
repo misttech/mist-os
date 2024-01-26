@@ -148,10 +148,10 @@ void ScStage1Passkey::SendPairingConfirm() {
 
 void ScStage1Passkey::OnPairingConfirm(PairingConfirmValue confirm) {
   if (peer_confirm_.has_value()) {
-    bt_log(
-        WARN,
-        "sm",
-        "received multiple Pairing Confirm values in one SC Passkey Entry cycle");
+    bt_log(WARN,
+           "sm",
+           "received multiple Pairing Confirm values in one SC Passkey Entry "
+           "cycle");
     on_complete_(fit::error(ErrorCode::kUnspecifiedReason));
     return;
   }
@@ -191,10 +191,10 @@ void ScStage1Passkey::OnPairingRandom(PairingRandomValue rand) {
     return;
   }
   if (peer_rand_.has_value()) {
-    bt_log(
-        WARN,
-        "sm",
-        "received multiple Pairing Random values in one SC Passkey Entry cycle");
+    bt_log(WARN,
+           "sm",
+           "received multiple Pairing Random values in one SC Passkey Entry "
+           "cycle");
     on_complete_(fit::error(ErrorCode::kUnspecifiedReason));
     return;
   }

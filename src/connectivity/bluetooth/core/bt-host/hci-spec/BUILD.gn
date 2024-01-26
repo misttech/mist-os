@@ -5,18 +5,21 @@
 import("//build_overrides/pigweed.gni")
 import("$dir_pw_unit_test/test.gni")
 
-public_dir = "//src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/hci-spec"
+dir_public_hci_spec = "../public/pw_bluetooth_sapphire/internal/host/hci-spec"
 
 # Static library containing the HCI specification definitions
 pw_source_set("hci-spec") {
+  public = [
+    "$dir_public_hci_spec/constants.h",
+    "$dir_public_hci_spec/defaults.h",
+    "$dir_public_hci_spec/le_connection_parameters.h",
+    "$dir_public_hci_spec/link_key.h",
+    "$dir_public_hci_spec/lmp_feature_set.h",
+    "$dir_public_hci_spec/protocol.h",
+    "$dir_public_hci_spec/util.h",
+  ]
+
   sources = [
-    "$public_dir/constants.h",
-    "$public_dir/defaults.h",
-    "$public_dir/le_connection_parameters.h",
-    "$public_dir/link_key.h",
-    "$public_dir/lmp_feature_set.h",
-    "$public_dir/protocol.h",
-    "$public_dir/util.h",
     "le_connection_parameters.cc",
     "link_key.cc",
     "util.cc",
@@ -25,6 +28,7 @@ pw_source_set("hci-spec") {
   public_deps = [
     "$dir_pw_bluetooth:emboss_hci_group",
     "$dir_pw_chrono:system_clock",
+    "//src/connectivity/bluetooth/core/bt-host:config",
     "//src/connectivity/bluetooth/core/bt-host/common",
   ]
 }
@@ -33,4 +37,6 @@ pw_test("tests") {
   sources = [ "util_unittest.cc" ]
 
   deps = [ ":hci-spec" ]
+
+  test_main = "//src/connectivity/bluetooth/core/bt-host/testing:gtest_main"
 }

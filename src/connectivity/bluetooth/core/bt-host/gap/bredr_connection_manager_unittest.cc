@@ -4752,7 +4752,6 @@ TEST_F(BrEdrConnectionManagerTest, Inspect) {
 
   auto requests_matcher = AllOf(NodeMatches(NameMatches("connection_requests")),
                                 ChildrenMatch(::testing::IsEmpty()));
-
   auto connections_after_disconnect_matcher =
       AllOf(NodeMatches(NameMatches("connections")),
             ChildrenMatch(::testing::IsEmpty()));

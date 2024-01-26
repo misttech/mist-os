@@ -16,6 +16,8 @@
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/l2cap/l2cap_defs.h"
 #include "src/connectivity/bluetooth/lib/cpp-string/string_printf.h"
 
+#pragma clang diagnostic ignored "-Wswitch-enum"
+
 namespace bt::l2cap::internal {
 
 template <typename OptionT, typename PayloadT>
@@ -34,14 +36,14 @@ DynamicByteBuffer EncodeOption(PayloadT payload) {
 template <typename OptionT>
 bool CheckHeaderLengthField(PacketView<ConfigurationOption> option) {
   if (option.header().length != OptionT::kPayloadLength) {
-    bt_log(
-        WARN,
-        "l2cap",
-        "received channel configuration option with incorrect length (type: %#.2x, "
-        "length: %hhu, expected length: %hhu)",
-        static_cast<uint8_t>(option.header().type),
-        option.header().length,
-        OptionT::kPayloadLength);
+    bt_log(WARN,
+           "l2cap",
+           "received channel configuration option with incorrect length (type: "
+           "%#.2x, "
+           "length: %hhu, expected length: %hhu)",
+           static_cast<uint8_t>(option.header().type),
+           option.header().length,
+           OptionT::kPayloadLength);
     return false;
   }
   return true;
@@ -65,11 +67,11 @@ bool ChannelConfiguration::ReadOptions(const ByteBuffer& options_payload) {
 
 size_t ChannelConfiguration::ReadNextOption(const ByteBuffer& options) {
   if (options.size() < sizeof(ConfigurationOption)) {
-    bt_log(
-        WARN,
-        "l2cap",
-        "tried to decode channel configuration option from buffer with invalid size (size: %lu)",
-        options.size());
+    bt_log(WARN,
+           "l2cap",
+           "tried to decode channel configuration option from buffer with "
+           "invalid size (size: %lu)",
+           options.size());
     return 0;
   }
 
@@ -78,13 +80,13 @@ size_t ChannelConfiguration::ReadNextOption(const ByteBuffer& options) {
 
   // Check length against buffer bounds.
   if (option.header().length > remaining_size) {
-    bt_log(
-        WARN,
-        "l2cap",
-        "decoded channel configuration option with length greater than remaining buffer size "
-        "(length: %hhu, remaining: %zu)",
-        option.header().length,
-        remaining_size);
+    bt_log(WARN,
+           "l2cap",
+           "decoded channel configuration option with length greater than "
+           "remaining buffer size "
+           "(length: %hhu, remaining: %zu)",
+           option.header().length,
+           remaining_size);
     return 0;
   }
 
@@ -127,7 +129,7 @@ size_t ChannelConfiguration::ReadNextOption(const ByteBuffer& options) {
 // MtuOption implementation
 
 ChannelConfiguration::MtuOption::MtuOption(const ByteBuffer& data_buf) {
-  mtu_ = letoh16(data_buf.ReadMember<&MtuOptionPayload::mtu>());
+  mtu_ = le16toh(data_buf.ReadMember<&MtuOptionPayload::mtu>());
 }
 
 DynamicByteBuffer ChannelConfiguration::MtuOption::Encode() const {
@@ -182,9 +184,9 @@ ChannelConfiguration::RetransmissionAndFlowControlOption::
   mode_ = option_payload.mode;
   tx_window_size_ = option_payload.tx_window_size;
   max_transmit_ = option_payload.max_transmit;
-  rtx_timeout_ = letoh16(option_payload.rtx_timeout);
-  monitor_timeout_ = letoh16(option_payload.monitor_timeout);
-  mps_ = letoh16(option_payload.mps);
+  rtx_timeout_ = le16toh(option_payload.rtx_timeout);
+  monitor_timeout_ = le16toh(option_payload.monitor_timeout);
+  mps_ = le16toh(option_payload.mps);
 }
 
 DynamicByteBuffer
@@ -202,7 +204,8 @@ ChannelConfiguration::RetransmissionAndFlowControlOption::Encode() const {
 std::string ChannelConfiguration::RetransmissionAndFlowControlOption::ToString()
     const {
   return bt_lib_cpp_string::StringPrintf(
-      "[type: RtxFlowControl, mode: %hhu, tx window size: %hhu, max transmit: %hhu, rtx timeout: "
+      "[type: RtxFlowControl, mode: %hhu, tx window size: %hhu, max transmit: "
+      "%hhu, rtx timeout: "
       "%hu, monitor timeout: %hu, max pdu payload size: %hu]",
       static_cast<uint8_t>(mode_),
       tx_window_size_,
@@ -217,7 +220,7 @@ std::string ChannelConfiguration::RetransmissionAndFlowControlOption::ToString()
 ChannelConfiguration::FlushTimeoutOption::FlushTimeoutOption(
     const ByteBuffer& data_buf) {
   flush_timeout_ =
-      letoh16(data_buf.ReadMember<&FlushTimeoutOptionPayload::flush_timeout>());
+      le16toh(data_buf.ReadMember<&FlushTimeoutOptionPayload::flush_timeout>());
 }
 
 DynamicByteBuffer ChannelConfiguration::FlushTimeoutOption::Encode() const {

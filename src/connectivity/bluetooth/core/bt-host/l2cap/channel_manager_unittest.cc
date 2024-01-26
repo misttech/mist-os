@@ -19,6 +19,8 @@
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/transport/acl_data_packet.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/transport/mock_acl_data_channel.h"
 
+#pragma clang diagnostic ignored "-Wshadow"
+
 namespace bt::l2cap {
 namespace {
 
@@ -485,7 +487,8 @@ class ChannelManagerMockAclChannelTest : public TestingBase {
     acl_data_channel_.set_send_packets_cb(
         fit::bind_member<&ChannelManagerMockAclChannelTest::SendPackets>(this));
 
-    // TODO(63074): Make these tests not depend on strict channel ID ordering.
+    // TODO(https://fxbug.dev/63074): Make these tests not depend on strict
+    // channel ID ordering.
     chanmgr_ = ChannelManager::Create(&acl_data_channel_,
                                       transport()->command_channel(),
                                       /*random_channel_ids=*/false,

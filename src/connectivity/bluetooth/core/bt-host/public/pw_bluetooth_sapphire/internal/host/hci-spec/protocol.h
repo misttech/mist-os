@@ -27,6 +27,8 @@
 // MutableBufferView::mutable_payload(), or CommandPacket::mutable_payload()
 // instead. Take extra care when accessing flexible array members.
 
+#pragma clang diagnostic ignored "-Wc99-extensions"
+
 namespace bt::hci_spec {
 
 using pw::bluetooth::emboss::ConnectionRole;
@@ -455,7 +457,7 @@ struct ReadInquiryModeReturnParams {
   StatusCode status;
 
   pw::bluetooth::emboss::InquiryMode inquiry_mode;
-} __PACKED;
+} __attribute__((packed));
 
 // ==================================
 // Write Inquiry Mode (v1.2) (BR/EDR)
@@ -471,7 +473,7 @@ struct ReadPageScanTypeReturnParams {
 
   // See enum class PageScanType in hci_constants.h for possible values.
   pw::bluetooth::emboss::PageScanType page_scan_type;
-} __PACKED;
+} __attribute__((packed));
 
 // ====================================
 // Write Page Scan Type (v1.2) (BR/EDR)

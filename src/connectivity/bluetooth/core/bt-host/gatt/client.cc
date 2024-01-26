@@ -11,6 +11,8 @@
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/trace.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/gatt/gatt_defs.h"
 
+#pragma clang diagnostic ignored "-Wshadow"
+
 using bt::HostError;
 
 namespace bt::gatt {
@@ -871,23 +873,23 @@ class Impl final : public Client {
                                 rsp.payload_size() - sizeof(params.length));
       while (attr_list_view.size() >= params.length) {
         const BufferView pair_view = attr_list_view.view(0, pair_size);
-        const att::Handle handle = letoh16(pair_view.To<att::Handle>());
+        const att::Handle handle = le16toh(pair_view.To<att::Handle>());
 
         if (handle < start_handle || handle > end_handle) {
-          bt_log(
-              TRACE,
-              "gatt",
-              "client received read by type response with handle outside of requested range");
+          bt_log(TRACE,
+                 "gatt",
+                 "client received read by type response with handle outside of "
+                 "requested range");
           callback(fit::error(ReadByTypeError{
               Error(HostError::kPacketMalformed), std::nullopt}));
           return;
         }
 
         if (!attributes.empty() && attributes.back().handle >= handle) {
-          bt_log(
-              TRACE,
-              "gatt",
-              "client received read by type response with handles in non-increasing order");
+          bt_log(TRACE,
+                 "gatt",
+                 "client received read by type response with handles in "
+                 "non-increasing order");
           callback(fit::error(ReadByTypeError{
               Error(HostError::kPacketMalformed), std::nullopt}));
           return;

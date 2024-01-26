@@ -398,10 +398,10 @@ class AdapterImpl final : public Adapter {
     constexpr hci_spec::LESupportedFeature feature =
         hci_spec::LESupportedFeature::kLEExtendedAdvertising;
     if (state().low_energy_state.IsFeatureSupported(feature)) {
-      bt_log(
-          INFO,
-          "gap",
-          "controller supports extended advertising, using extended LE advertiser");
+      bt_log(INFO,
+             "gap",
+             "controller supports extended advertising, using extended LE "
+             "advertiser");
       return std::make_unique<hci::ExtendedLowEnergyAdvertiser>(hci_);
     }
 
@@ -410,19 +410,19 @@ class AdapterImpl final : public Adapter {
                 kAndroidVendorExtensions)) {
       uint8_t max_advt =
           state().android_vendor_capabilities.max_simultaneous_advertisements();
-      bt_log(
-          INFO,
-          "gap",
-          "controller supports android vendor extensions, max simultaneous advertisements: %d",
-          max_advt);
+      bt_log(INFO,
+             "gap",
+             "controller supports android vendor extensions, max simultaneous "
+             "advertisements: %d",
+             max_advt);
       return std::make_unique<hci::AndroidExtendedLowEnergyAdvertiser>(
           hci_, max_advt);
     }
 
-    bt_log(
-        INFO,
-        "gap",
-        "controller supports only legacy advertising, using legacy LE advertiser");
+    bt_log(INFO,
+           "gap",
+           "controller supports only legacy advertising, using legacy LE "
+           "advertiser");
     return std::make_unique<hci::LegacyLowEnergyAdvertiser>(hci_);
   }
 
@@ -824,10 +824,10 @@ void AdapterImpl::InitializeStep1() {
 
   if (state().IsControllerFeatureSupported(
           pw::bluetooth::Controller::FeaturesBits::kAndroidVendorExtensions)) {
-    bt_log(
-        INFO,
-        "gap",
-        "controller supports android hci extensions, querying exact feature set");
+    bt_log(INFO,
+           "gap",
+           "controller supports android hci extensions, querying exact feature "
+           "set");
     init_seq_runner_->QueueCommand(
         hci::EmbossCommandPacket::New<pw::bluetooth::vendor::android_hci::
                                           LEGetVendorCapabilitiesCommandView>(
@@ -1082,8 +1082,8 @@ void AdapterImpl::InitializeStep3() {
   // The controller may not support SCO flow control (as implied by not
   // supporting HCI_Write_Synchronous_Flow_Control_Enable), in which case we
   // don't support HCI SCO on this controller yet.
-  // TODO(https://fxbug.dev/42171056): Support controllers that don't support SCO
-  // flow control.
+  // TODO(https://fxbug.dev/42171056): Support controllers that don't support
+  // SCO flow control.
   bool sco_flow_control_supported = state_.IsCommandSupported(
       /*octet=*/10,
       hci_spec::SupportedCommand::kWriteSynchronousFlowControlEnable);
@@ -1097,31 +1097,31 @@ void AdapterImpl::InitializeStep3() {
         pw::bluetooth::emboss::GenericEnableParam::ENABLE);
     init_seq_runner_->QueueCommand(
         std::move(sync_flow_control), [this](const hci::EventPacket& event) {
-          if (hci_is_error(
-                  event,
-                  ERROR,
-                  "gap",
-                  "Write synchronous flow control enable failed, proceeding without HCI "
-                  "SCO support")) {
+          if (hci_is_error(event,
+                           ERROR,
+                           "gap",
+                           "Write synchronous flow control enable failed, "
+                           "proceeding without HCI "
+                           "SCO support")) {
             return;
           }
 
           if (!hci_->InitializeScoDataChannel(state_.sco_buffer_info)) {
-            bt_log(
-                WARN,
-                "gap",
-                "Failed to initialize ScoDataChannel, proceeding without HCI SCO support");
+            bt_log(WARN,
+                   "gap",
+                   "Failed to initialize ScoDataChannel, proceeding without "
+                   "HCI SCO support");
             return;
           }
           bt_log(DEBUG, "gap", "ScoDataChannel initialized successfully");
         });
   } else {
-    bt_log(
-        INFO,
-        "gap",
-        "HCI SCO not supported (SCO buffer available: %d, SCO flow control supported: %d)",
-        state_.sco_buffer_info.IsAvailable(),
-        sco_flow_control_supported);
+    bt_log(INFO,
+           "gap",
+           "HCI SCO not supported (SCO buffer available: %d, SCO flow control "
+           "supported: %d)",
+           state_.sco_buffer_info.IsAvailable(),
+           sco_flow_control_supported);
   }
 
   hci_->AttachInspect(adapter_node_);
@@ -1286,8 +1286,8 @@ void AdapterImpl::InitializeStep4() {
   // connection request PDUs. LE central privacy is still preserved during an
   // active scan, i.e. in LL scan request PDUs.
   //
-  // TODO(https://fxbug.dev/42141593): Remove this temporary fix once we determine
-  // the root cause for authentication failures.
+  // TODO(https://fxbug.dev/42141593): Remove this temporary fix once we
+  // determine the root cause for authentication failures.
   hci_le_connector_->UseLocalIdentityAddress();
 
   // Update properties before callback called so properties can be verified in
@@ -1298,7 +1298,8 @@ void AdapterImpl::InitializeStep4() {
   auto self = weak_self_.GetWeakPtr();
   SetLocalName(kDefaultLocalName, [self](auto status) mutable {
     // Set the default device class - a computer with audio.
-    // TODO(https://fxbug.dev/42074312): set this from a platform configuration file
+    // TODO(https://fxbug.dev/42074312): set this from a platform configuration
+    // file
     DeviceClass dev_class(DeviceClass::MajorClass::kComputer);
     dev_class.SetServiceClasses({DeviceClass::ServiceClass::kAudio});
     self->SetDeviceClass(dev_class, [self](const auto&) {
@@ -1467,11 +1468,11 @@ void AdapterImpl::OnLeAutoConnectRequest(Peer* peer) {
   PeerId peer_id = peer->identifier();
 
   if (!peer->le()->should_auto_connect()) {
-    bt_log(
-        DEBUG,
-        "gap",
-        "ignoring auto-connection (peer->should_auto_connect() is false) (peer: %s)",
-        bt_str(peer_id));
+    bt_log(DEBUG,
+           "gap",
+           "ignoring auto-connection (peer->should_auto_connect() is false) "
+           "(peer: %s)",
+           bt_str(peer_id));
     return;
   }
 

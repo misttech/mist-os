@@ -496,6 +496,7 @@ struct LEFlowControlCreditParams {
   uint16_t credits;
 } __attribute__((packed));
 
-}  // namespace bt
+}  // namespace bt::l2cap
+
 
 #endif  // SRC_CONNECTIVITY_BLUETOOTH_CORE_BT_HOST_PUBLIC_PW_BLUETOOTH_SAPPHIRE_INTERNAL_HOST_L2CAP_L2CAP_DEFS_H_

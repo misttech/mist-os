@@ -7,7 +7,8 @@
 namespace bt::l2cap::internal {
 bool LowEnergyCommandHandler::ConnectionParameterUpdateResponse::Decode(
     const ByteBuffer& payload_buf) {
-  const auto result = letoh16(payload_buf.ReadMember<&PayloadT::result>());
+  const auto result = le16toh(
+      static_cast<uint16_t>(payload_buf.ReadMember<&PayloadT::result>()));
   result_ = ConnectionParameterUpdateResult{result};
   return true;
 }
@@ -20,7 +21,8 @@ LowEnergyCommandHandler::ConnectionParameterUpdateResponder::
 void LowEnergyCommandHandler::ConnectionParameterUpdateResponder::Send(
     ConnectionParameterUpdateResult result) {
   ConnectionParameterUpdateResponsePayload payload;
-  payload.result = ConnectionParameterUpdateResult{htole16(result)};
+  payload.result =
+      ConnectionParameterUpdateResult{htole16(static_cast<uint16_t>(result))};
   sig_responder_->Send(BufferView(&payload, sizeof(payload)));
 }
 
@@ -55,21 +57,21 @@ void LowEnergyCommandHandler::ServeConnectionParameterUpdateRequest(
                                  SignalingChannel::Responder* sig_responder) {
     if (request_payload.size() !=
         sizeof(ConnectionParameterUpdateRequestPayload)) {
-      bt_log(
-          DEBUG,
-          "l2cap-le",
-          "cmd: rejecting malformed Connection Parameter Update Request, size %zu",
-          request_payload.size());
+      bt_log(DEBUG,
+             "l2cap-le",
+             "cmd: rejecting malformed Connection Parameter Update Request, "
+             "size %zu",
+             request_payload.size());
       sig_responder->RejectNotUnderstood();
       return;
     }
 
     const auto& req =
         request_payload.To<ConnectionParameterUpdateRequestPayload>();
-    const auto interval_min = letoh16(req.interval_min);
-    const auto interval_max = letoh16(req.interval_max);
-    const auto peripheral_latency = letoh16(req.peripheral_latency);
-    const auto timeout_multiplier = letoh16(req.timeout_multiplier);
+    const auto interval_min = le16toh(req.interval_min);
+    const auto interval_max = le16toh(req.interval_max);
+    const auto peripheral_latency = le16toh(req.peripheral_latency);
+    const auto timeout_multiplier = le16toh(req.timeout_multiplier);
     ConnectionParameterUpdateResponder responder(sig_responder);
     cb(interval_min,
        interval_max,

@@ -25,6 +25,8 @@
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/sm/security_manager.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/sm/types.h"
 
+#pragma clang diagnostic ignored "-Wshadow"
+
 namespace bt::gap {
 
 class PeerCache;
@@ -190,8 +192,9 @@ class Peer final {
     // Note that it is possible for `advertising_data()` to return a non-empty
     // buffer while this method returns std::nullopt, as AdvertisingData is only
     // stored if it is parsed correctly.
-    // TODO(https://fxbug.dev/42166259): Migrate clients off of advertising_data,
-    // so that we do not need to store the raw buffer after parsing it.
+    // TODO(https://fxbug.dev/42166259): Migrate clients off of
+    // advertising_data, so that we do not need to store the raw buffer after
+    // parsing it.
     const std::optional<std::reference_wrapper<const AdvertisingData>>
     parsed_advertising_data() const {
       if (parsed_adv_data_.is_error()) {
