@@ -28,7 +28,7 @@ async fn clone_file_with_same_or_fewer_rights() {
             assert_eq!(status, zx::Status::OK);
 
             // Check flags of cloned connection are correct.
-            let proxy = convert_node_proxy::<fio::FileMarker>(proxy);
+            let proxy = convert_node_proxy::<fio::FileProxy>(proxy);
             let (status, flags) = proxy.get_flags().await.expect("get_flags failed");
             assert_eq!(zx::Status::from_raw(status), zx::Status::OK);
             assert_eq!(flags, clone_flags);
@@ -53,7 +53,7 @@ async fn clone_file_with_same_rights_flag() {
         assert_eq!(status, zx::Status::OK);
 
         // Check flags of cloned connection are correct.
-        let proxy = convert_node_proxy::<fio::FileMarker>(proxy);
+        let proxy = convert_node_proxy::<fio::FileProxy>(proxy);
         let (status, flags) = proxy.get_flags().await.expect("get_flags failed");
         assert_eq!(zx::Status::from_raw(status), zx::Status::OK);
         assert_eq!(flags, file_flags);
@@ -127,7 +127,7 @@ async fn clone_directory_with_same_rights_flag() {
         assert_eq!(status, zx::Status::OK);
 
         // Check flags of cloned connection are correct.
-        let proxy = convert_node_proxy::<fio::DirectoryMarker>(proxy);
+        let proxy = convert_node_proxy::<fio::DirectoryProxy>(proxy);
         let (status, flags) = proxy.get_flags().await.expect("get_flags failed");
         assert_eq!(zx::Status::from_raw(status), zx::Status::OK);
         assert_eq!(flags, dir_flags);

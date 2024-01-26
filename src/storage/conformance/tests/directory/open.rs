@@ -6,7 +6,6 @@ use {
     assert_matches::assert_matches,
     fidl::endpoints::create_proxy,
     fidl_fuchsia_io as fio, fuchsia_zircon as zx,
-    futures::stream::TryStreamExt as _,
     io_conformance_util::{test_harness::TestHarness, *},
 };
 
@@ -352,7 +351,10 @@ async fn open_child_dir_with_posix_flags() {
             dir_flags
         );
         // Ensure expanded rights do not exceed those of the parent directory connection.
-        assert_eq!(get_node_flags(&child_dir_client).await & dir_flags, dir_flags);
+        let (status, flags) =
+            child_dir_client.get_flags().await.expect("Failed to get node flags!");
+        assert_matches!(zx::Status::ok(status), Ok(()));
+        assert_eq!(flags & dir_flags, dir_flags);
     }
 }
 
@@ -435,17 +437,9 @@ async fn open2_directory_unsupported() {
     let dir_proxy = open_dir_with_flags(&test_dir, fio::OpenFlags::RIGHT_READABLE, "dir").await;
 
     // fuchsia.io/Directory.Open2
-    let (open2_proxy, open2_server) = fidl::endpoints::create_proxy::<fio::NodeMarker>().unwrap();
-    dir_proxy
-        .open2(
-            ".",
-            &fio::ConnectionProtocols::Node(fio::NodeOptions::default()),
-            open2_server.into_channel(),
-        )
-        .unwrap();
     assert_matches!(
-        open2_proxy.take_event_stream().try_next().await,
-        Err(fidl::Error::ClientChannelClosed { status: zx::Status::NOT_SUPPORTED, .. })
+        dir_proxy.open2_node::<fio::DirectoryMarker>(".", Default::default()).await,
+        Err(zx::Status::NOT_SUPPORTED)
     );
 }
 
@@ -462,37 +456,29 @@ async fn open2_rights() {
         root_directory(vec![file(TEST_FILE, CONTENT.to_vec())]),
         fio::OpenFlags::RIGHT_READABLE,
     );
-
-    let (proxy, server) = fidl::endpoints::create_proxy::<fio::NodeMarker>().unwrap();
-    test_dir
-        .open2(
+    // Should fail to open the file if the rights exceed those allowed by the directory.
+    let status = test_dir
+        .open2_node::<fio::NodeMarker>(
             &TEST_FILE,
-            &fio::ConnectionProtocols::Node(fio::NodeOptions {
-                rights: Some(fio::Operations::WRITE_BYTES),
-                ..Default::default()
-            }),
-            server.into_channel(),
+            fio::NodeOptions { rights: Some(fio::Operations::WRITE_BYTES), ..Default::default() },
         )
-        .unwrap();
-    assert_matches!(
-        proxy.take_event_stream().try_next().await,
-        Err(fidl::Error::ClientChannelClosed { status: zx::Status::ACCESS_DENIED, .. })
-    );
+        .await
+        .expect_err("open should fail if rights exceed those of the parent connection");
+    assert_eq!(status, zx::Status::ACCESS_DENIED);
 
-    // Check that empty rights get copied from the parent.
-    let (proxy, server) = fidl::endpoints::create_proxy::<fio::FileMarker>().unwrap();
-    test_dir
-        .open2(
+    // Check that empty rights get copied from the parent if we don't specify any rights.
+    let proxy = test_dir
+        .open2_node::<fio::FileMarker>(
             &TEST_FILE,
-            &fio::ConnectionProtocols::Node(fio::NodeOptions {
+            fio::NodeOptions {
                 protocols: Some(fio::NodeProtocols {
                     file: Some(fio::FileProtocolFlags::default()),
                     ..Default::default()
                 }),
                 ..Default::default()
-            }),
-            server.into_channel(),
+            },
         )
+        .await
         .unwrap();
 
     assert_eq!(
@@ -523,11 +509,10 @@ async fn open2_invalid() {
 
     // It's an error to specify more than one protocol when trying to create an object.
     for mode in [fio::OpenMode::MaybeCreate, fio::OpenMode::AlwaysCreate] {
-        let (proxy, server) = fidl::endpoints::create_proxy::<fio::NodeMarker>().unwrap();
-        test_dir
-            .open2(
+        let status = test_dir
+            .open2_node::<fio::NodeMarker>(
                 "file",
-                &fio::ConnectionProtocols::Node(fio::NodeOptions {
+                fio::NodeOptions {
                     protocols: Some(fio::NodeProtocols {
                         file: Some(fio::FileProtocolFlags::default()),
                         directory: Some(fio::DirectoryProtocolOptions::default()),
@@ -535,23 +520,19 @@ async fn open2_invalid() {
                     }),
                     mode: Some(mode),
                     ..Default::default()
-                }),
-                server.into_channel(),
+                },
             )
-            .unwrap();
-        assert_matches!(
-            proxy.take_event_stream().try_next().await,
-            Err(fidl::Error::ClientChannelClosed { status: zx::Status::INVALID_ARGS, .. })
-        );
+            .await
+            .expect_err("open should fail if multiple protocols are set during object creation");
+        assert_eq!(status, zx::Status::INVALID_ARGS);
     }
 
     // It's an error to specify create attributes when opening an object.
     for mode in [None, Some(fio::OpenMode::OpenExisting)] {
-        let (proxy, server) = fidl::endpoints::create_proxy::<fio::NodeMarker>().unwrap();
-        test_dir
-            .open2(
+        let status = test_dir
+            .open2_node::<fio::DirectoryMarker>(
                 "file",
-                &fio::ConnectionProtocols::Node(fio::NodeOptions {
+                fio::NodeOptions {
                     protocols: Some(fio::NodeProtocols {
                         file: Some(fio::FileProtocolFlags::default()),
                         ..Default::default()
@@ -562,14 +543,11 @@ async fn open2_invalid() {
                         ..Default::default()
                     }),
                     ..Default::default()
-                }),
-                server.into_channel(),
+                },
             )
-            .unwrap();
-        assert_matches!(
-            proxy.take_event_stream().try_next().await,
-            Err(fidl::Error::ClientChannelClosed { status: zx::Status::INVALID_ARGS, .. })
-        );
+            .await
+            .expect_err("open should fail if setting creation_attributes on an existing object");
+        assert_eq!(status, zx::Status::INVALID_ARGS);
     }
 }
 
@@ -586,25 +564,21 @@ async fn open2_create_dot_fails_with_already_exists() {
         fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
     );
 
-    let (proxy, server) = fidl::endpoints::create_proxy::<fio::NodeMarker>().unwrap();
-    test_dir
-        .open2(
+    let status = test_dir
+        .open2_node::<fio::DirectoryMarker>(
             ".",
-            &fio::ConnectionProtocols::Node(fio::NodeOptions {
+            fio::NodeOptions {
                 protocols: Some(fio::NodeProtocols {
                     directory: Some(fio::DirectoryProtocolOptions::default()),
                     ..Default::default()
                 }),
                 mode: Some(fio::OpenMode::AlwaysCreate),
                 ..Default::default()
-            }),
-            server.into_channel(),
+            },
         )
-        .unwrap();
-    assert_matches!(
-        proxy.take_event_stream().try_next().await,
-        Err(fidl::Error::ClientChannelClosed { status: zx::Status::ALREADY_EXISTS, .. })
-    );
+        .await
+        .expect_err("open should fail when trying to create the dot path");
+    assert_eq!(status, zx::Status::ALREADY_EXISTS);
 }
 
 #[fuchsia::test]
@@ -620,93 +594,67 @@ async fn open2_open_directory() {
         fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
     );
 
-    // Should be able to open the directory specifying just the directory protocol.
-    let (proxy, server) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
-    test_dir
-        .open2(
+    // Should be able to open using the directory protocol.
+    let (_, representation) = test_dir
+        .open2_node_get_representation::<fio::DirectoryMarker>(
             "dir",
-            &fio::ConnectionProtocols::Node(fio::NodeOptions {
+            fio::NodeOptions {
+                flags: Some(fio::NodeFlags::GET_REPRESENTATION),
                 protocols: Some(fio::NodeProtocols {
                     directory: Some(fio::DirectoryProtocolOptions::default()),
                     ..Default::default()
                 }),
                 ..Default::default()
-            }),
-            server.into_channel(),
+            },
         )
-        .unwrap();
+        .await
+        .expect("open using directory protocol failed");
+    assert_matches!(representation, fio::Representation::Directory(_));
 
-    // Check it's a directory...
-    let (proxy2, server) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
-    proxy
-        .open2(
-            ".",
-            &fio::ConnectionProtocols::Node(fio::NodeOptions::default()),
-            server.into_channel(),
-        )
-        .unwrap();
-    assert_matches!(proxy2.get_connection_info().await, Ok(_));
-
-    // Any node protocol should work.
-    let (proxy, server) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
-    test_dir
-        .open2(
+    // Should also be able to open without specifying an exact protocol due to protocol resolution.
+    let (_, representation) = test_dir
+        .open2_node_get_representation::<fio::DirectoryMarker>(
             "dir",
-            &fio::ConnectionProtocols::Node(fio::NodeOptions::default()),
-            server.into_channel(),
+            fio::NodeOptions {
+                flags: Some(fio::NodeFlags::GET_REPRESENTATION),
+                ..Default::default()
+            },
         )
-        .unwrap();
-
-    // Check it's a directory...
-    let (proxy2, server) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
-    proxy
-        .open2(
-            ".",
-            &fio::ConnectionProtocols::Node(fio::NodeOptions::default()),
-            server.into_channel(),
-        )
-        .unwrap();
-    assert_matches!(proxy2.get_connection_info().await, Ok(_));
+        .await
+        .expect("open using node protocol resolution failed");
+    assert_matches!(representation, fio::Representation::Directory(_));
 
     // Attempting to open the directory as a file should fail.
-    let (proxy, server) = fidl::endpoints::create_proxy::<fio::NodeMarker>().unwrap();
-    test_dir
-        .open2(
+    let status = test_dir
+        .open2_node::<fio::NodeMarker>(
             "dir",
-            &fio::ConnectionProtocols::Node(fio::NodeOptions {
+            fio::NodeOptions {
                 protocols: Some(fio::NodeProtocols {
                     file: Some(fio::FileProtocolFlags::default()),
                     ..Default::default()
                 }),
                 ..Default::default()
-            }),
-            server.into_channel(),
+            },
         )
-        .unwrap();
-    assert_matches!(
-        proxy.take_event_stream().try_next().await,
-        Err(fidl::Error::ClientChannelClosed { status: zx::Status::NOT_FILE, .. })
-    );
+        .await
+        .expect_err("opening directory as file should fail");
+    assert_eq!(status, zx::Status::NOT_FILE);
 
-    // And as a symbolic link...
-    let (proxy, server) = fidl::endpoints::create_proxy::<fio::NodeMarker>().unwrap();
-    test_dir
-        .open2(
+    // Attempting to open the directory as a symbolic link should also fail.
+    let status = test_dir
+        .open2_node::<fio::NodeMarker>(
             "dir",
-            &fio::ConnectionProtocols::Node(fio::NodeOptions {
+            fio::NodeOptions {
                 protocols: Some(fio::NodeProtocols {
                     symlink: Some(fio::SymlinkProtocolFlags::default()),
                     ..Default::default()
                 }),
                 ..Default::default()
-            }),
-            server.into_channel(),
+            },
         )
-        .unwrap();
-    assert_matches!(
-        proxy.take_event_stream().try_next().await,
-        Err(fidl::Error::ClientChannelClosed { status: zx::Status::WRONG_TYPE, .. })
-    );
+        .await
+        .expect_err("opening directory as symlink should fail");
+    assert_eq!(status, zx::Status::WRONG_TYPE);
 }
 
 #[fuchsia::test]
@@ -724,76 +672,69 @@ async fn open2_open_file() {
     );
 
     // Should be able to open the file specifying just the file protocol.
-    let (proxy, server) = fidl::endpoints::create_proxy::<fio::FileMarker>().unwrap();
-    test_dir
-        .open2(
+    let (_, representation) = test_dir
+        .open2_node_get_representation::<fio::FileMarker>(
             "file",
-            &fio::ConnectionProtocols::Node(fio::NodeOptions {
+            fio::NodeOptions {
+                flags: Some(fio::NodeFlags::GET_REPRESENTATION),
                 protocols: Some(fio::NodeProtocols {
                     file: Some(fio::FileProtocolFlags::default()),
                     ..Default::default()
                 }),
                 ..Default::default()
-            }),
-            server.into_channel(),
+            },
         )
-        .unwrap();
+        .await
+        .expect("failed to open file with file protocol");
+    assert_matches!(representation, fio::Representation::File(_));
 
-    // Check it's a file...
-    assert_eq!(fuchsia_fs::file::read(&proxy).await.expect("read failed"), CONTENT);
-
-    // Any node protocol should work.
-    let (proxy, server) = fidl::endpoints::create_proxy::<fio::FileMarker>().unwrap();
-    test_dir
-        .open2(
+    // Should also be able to open without specifying an exact protocol due to protocol resolution.
+    let (_, representation) = test_dir
+        .open2_node_get_representation::<fio::FileMarker>(
             "file",
-            &fio::ConnectionProtocols::Node(fio::NodeOptions::default()),
-            server.into_channel(),
+            fio::NodeOptions {
+                flags: Some(fio::NodeFlags::GET_REPRESENTATION),
+                ..Default::default()
+            },
         )
-        .unwrap();
-
-    // Check it's a file...
-    assert_eq!(fuchsia_fs::file::read(&proxy).await.expect("read failed"), CONTENT);
+        .await
+        .expect("failed to open file with protocol resolution");
+    assert_matches!(representation, fio::Representation::File(_));
 
     // Attempting to open the file as a directory should fail.
-    let (proxy, server) = fidl::endpoints::create_proxy::<fio::NodeMarker>().unwrap();
-    test_dir
-        .open2(
+    let status = test_dir
+        .open2_node_get_representation::<fio::NodeMarker>(
             "file",
-            &fio::ConnectionProtocols::Node(fio::NodeOptions {
+            fio::NodeOptions {
+                flags: Some(fio::NodeFlags::GET_REPRESENTATION),
                 protocols: Some(fio::NodeProtocols {
                     directory: Some(fio::DirectoryProtocolOptions::default()),
                     ..Default::default()
                 }),
                 ..Default::default()
-            }),
-            server.into_channel(),
+            },
         )
-        .unwrap();
-    assert_matches!(
-        proxy.take_event_stream().try_next().await,
-        Err(fidl::Error::ClientChannelClosed { status: zx::Status::NOT_DIR, .. })
-    );
+        .await
+        .expect_err("should fail to open file as directory");
+    assert_eq!(status, zx::Status::NOT_DIR);
 
-    // And as a symbolic link...
-    let (proxy, server) = fidl::endpoints::create_proxy::<fio::NodeMarker>().unwrap();
-    test_dir
-        .open2(
+    // Attempting to open the file as a symbolic link should fail.
+
+    let status = test_dir
+        .open2_node_get_representation::<fio::NodeMarker>(
             "file",
-            &fio::ConnectionProtocols::Node(fio::NodeOptions {
+            fio::NodeOptions {
+                flags: Some(fio::NodeFlags::GET_REPRESENTATION),
                 protocols: Some(fio::NodeProtocols {
                     symlink: Some(fio::SymlinkProtocolFlags::default()),
                     ..Default::default()
                 }),
                 ..Default::default()
-            }),
-            server.into_channel(),
+            },
         )
-        .unwrap();
-    assert_matches!(
-        proxy.take_event_stream().try_next().await,
-        Err(fidl::Error::ClientChannelClosed { status: zx::Status::WRONG_TYPE, .. })
-    );
+        .await
+        .expect_err("should fail to open file as symlink");
+    assert_eq!(status, zx::Status::WRONG_TYPE);
 }
 
 #[fuchsia::test]
@@ -811,19 +752,18 @@ async fn open2_file_append() {
         fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
     );
 
-    let (proxy, server) = fidl::endpoints::create_proxy::<fio::FileMarker>().unwrap();
-    test_dir
-        .open2(
+    let proxy = test_dir
+        .open2_node::<fio::FileMarker>(
             "file",
-            &fio::ConnectionProtocols::Node(fio::NodeOptions {
+            fio::NodeOptions {
                 protocols: Some(fio::NodeProtocols {
                     file: Some(fio::FileProtocolFlags::APPEND),
                     ..Default::default()
                 }),
                 ..Default::default()
-            }),
-            server.into_channel(),
+            },
         )
+        .await
         .unwrap();
 
     // Append to the file.
@@ -847,19 +787,18 @@ async fn open2_file_truncate() {
         fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
     );
 
-    let (proxy, server) = fidl::endpoints::create_proxy::<fio::FileMarker>().unwrap();
-    test_dir
-        .open2(
+    let proxy = test_dir
+        .open2_node::<fio::FileMarker>(
             "file",
-            &fio::ConnectionProtocols::Node(fio::NodeOptions {
+            fio::NodeOptions {
                 protocols: Some(fio::NodeProtocols {
                     file: Some(fio::FileProtocolFlags::TRUNCATE),
                     ..Default::default()
                 }),
                 ..Default::default()
-            }),
-            server.into_channel(),
+            },
         )
+        .await
         .unwrap();
 
     assert_eq!(fuchsia_fs::file::read(&proxy).await.expect("read failed"), b"");
@@ -875,33 +814,26 @@ async fn open2_directory_get_representation() {
 
     let test_dir = harness.get_directory(root_directory(vec![]), fio::OpenFlags::RIGHT_READABLE);
 
-    let (proxy, server) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
-    test_dir
-        .open2(
+    let (_, representation) = test_dir
+        .open2_node_get_representation::<fio::DirectoryMarker>(
             ".",
-            &fio::ConnectionProtocols::Node(fio::NodeOptions {
+            fio::NodeOptions {
                 flags: Some(fio::NodeFlags::GET_REPRESENTATION),
                 attributes: Some(
                     fio::NodeAttributesQuery::PROTOCOLS | fio::NodeAttributesQuery::ABILITIES,
                 ),
                 ..Default::default()
-            }),
-            server.into_channel(),
+            },
         )
+        .await
         .unwrap();
 
     assert_matches!(
-        proxy
-            .take_event_stream()
-            .try_next()
-            .await
-            .expect("expected OnRepresentation event")
-            .expect("missing OnRepresentation event")
-            .into_on_representation(),
-        Some(fio::Representation::Directory(fio::DirectoryInfo {
+        representation,
+        fio::Representation::Directory(fio::DirectoryInfo {
             attributes: Some(fio::NodeAttributes2 { mutable_attributes, immutable_attributes }),
             ..
-        }))
+        })
         if mutable_attributes == fio::MutableNodeAttributes::default()
             && immutable_attributes
                 == fio::ImmutableNodeAttributes {
@@ -935,35 +867,28 @@ async fn open2_file_get_representation() {
         Some(fio::FileProtocolFlags::default())
     };
 
-    let (proxy, server) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
-    test_dir
-        .open2(
+    let (_, representation) = test_dir
+        .open2_node_get_representation::<fio::FileMarker>(
             "file",
-            &fio::ConnectionProtocols::Node(fio::NodeOptions {
+            fio::NodeOptions {
                 flags: Some(fio::NodeFlags::GET_REPRESENTATION),
                 protocols: Some(fio::NodeProtocols { file: file_protocols, ..Default::default() }),
                 attributes: Some(
                     fio::NodeAttributesQuery::PROTOCOLS | fio::NodeAttributesQuery::ABILITIES,
                 ),
                 ..Default::default()
-            }),
-            server.into_channel(),
+            },
         )
+        .await
         .unwrap();
 
     assert_matches!(
-        proxy
-            .take_event_stream()
-            .try_next()
-            .await
-            .expect("expected OnRepresentation event")
-            .expect("missing OnRepresentation event")
-            .into_on_representation(),
-        Some(fio::Representation::File(fio::FileInfo {
+        representation,
+        fio::Representation::File(fio::FileInfo {
             is_append,
             attributes: Some(fio::NodeAttributes2 { mutable_attributes, immutable_attributes }),
             ..
-        }))
+        })
         if mutable_attributes == fio::MutableNodeAttributes::default()
             && immutable_attributes
                 == fio::ImmutableNodeAttributes {
@@ -993,11 +918,10 @@ async fn open2_dir_optional_rights() {
         fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
     );
 
-    let (proxy, server) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
-    test_dir
-        .open2(
+    let proxy = test_dir
+        .open2_node::<fio::DirectoryMarker>(
             ".",
-            &fio::ConnectionProtocols::Node(fio::NodeOptions {
+            fio::NodeOptions {
                 protocols: Some(fio::NodeProtocols {
                     directory: Some(fio::DirectoryProtocolOptions {
                         // Optional rights not supported in the parent connection will be removed.
@@ -1010,9 +934,9 @@ async fn open2_dir_optional_rights() {
                 }),
                 rights: Some(fio::Operations::READ_BYTES),
                 ..Default::default()
-            }),
-            server.into_channel(),
+            },
         )
+        .await
         .unwrap();
 
     assert_eq!(
@@ -1035,34 +959,22 @@ async fn open2_request_attributes_rights_failure() {
     );
 
     // Open with no rights.
-    let (proxy, server) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
-    test_dir
-        .open2(
+    let proxy = test_dir
+        .open2_node::<fio::DirectoryMarker>(
             ".",
-            &fio::ConnectionProtocols::Node(fio::NodeOptions {
-                rights: Some(fio::Operations::empty()),
-                ..Default::default()
-            }),
-            server.into_channel(),
+            fio::NodeOptions { rights: Some(fio::Operations::empty()), ..Default::default() },
         )
+        .await
         .unwrap();
 
     // Now open again and request attributes. It should fail.
-    let (proxy2, server) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
-    proxy
-        .open2(
-            ".",
-            &fio::ConnectionProtocols::Node(fio::NodeOptions {
-                attributes: Some(fio::NodeAttributesQuery::PROTOCOLS),
-                ..Default::default()
-            }),
-            server.into_channel(),
-        )
-        .unwrap();
-
+    let options = fio::NodeOptions {
+        attributes: Some(fio::NodeAttributesQuery::PROTOCOLS),
+        ..Default::default()
+    };
     assert_matches!(
-        proxy2.take_event_stream().try_next().await,
-        Err(fidl::Error::ClientChannelClosed { status: zx::Status::ACCESS_DENIED, .. })
+        proxy.open2_node::<fio::DirectoryMarker>(".", options).await,
+        Err(zx::Status::ACCESS_DENIED)
     );
 }
 
@@ -1080,43 +992,37 @@ async fn open2_open_existing_directory() {
     );
 
     // Should not be able to open non-existing directory entry with open mode `OpenExisting`.
-    let (proxy, server) = fidl::endpoints::create_proxy::<fio::NodeMarker>().unwrap();
-    test_dir
-        .open2(
+    let status = test_dir
+        .open2_node::<fio::NodeMarker>(
             "foo",
-            &fio::ConnectionProtocols::Node(fio::NodeOptions {
+            fio::NodeOptions {
                 protocols: Some(fio::NodeProtocols {
                     directory: Some(fio::DirectoryProtocolOptions::default()),
                     ..Default::default()
                 }),
                 mode: Some(fio::OpenMode::OpenExisting),
                 ..Default::default()
-            }),
-            server.into_channel(),
+            },
         )
-        .unwrap();
-    assert_matches!(
-        proxy.take_event_stream().try_next().await,
-        Err(fidl::Error::ClientChannelClosed { status: zx::Status::NOT_FOUND, .. })
-    );
+        .await
+        .expect_err("should fail to open non-existing entry when OpenExisting is set");
+    assert_eq!(status, zx::Status::NOT_FOUND);
 
     // Check that calling open with `OpenExisting` is successful with an existing directory.
-    let (proxy2, server) = fidl::endpoints::create_proxy::<fio::NodeMarker>().unwrap();
     test_dir
-        .open2(
+        .open2_node::<fio::NodeMarker>(
             "dir",
-            &fio::ConnectionProtocols::Node(fio::NodeOptions {
+            fio::NodeOptions {
                 protocols: Some(fio::NodeProtocols {
                     directory: Some(fio::DirectoryProtocolOptions::default()),
                     ..Default::default()
                 }),
                 mode: Some(fio::OpenMode::OpenExisting),
                 ..Default::default()
-            }),
-            server.into_channel(),
+            },
         )
-        .unwrap();
-    assert_matches!(proxy2.get_connection_info().await, Ok(_));
+        .await
+        .expect("failed to open existing entry");
 }
 
 // TODO(https://fxbug.dev/42157659): Add open2 connect tests.

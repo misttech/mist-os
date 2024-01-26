@@ -8,14 +8,15 @@
 //! for fuchsia.io.
 
 use {
+    async_trait::async_trait,
     fidl::{
         endpoints::{create_proxy, ClientEnd, ProtocolMarker, Proxy},
-        AsHandleRef,
+        prelude::*,
     },
     fidl_fuchsia_io as fio, fidl_fuchsia_io_test as io_test,
     fuchsia_async::{DurationExt, TimeoutExt},
     fuchsia_zircon as zx,
-    futures::StreamExt,
+    futures::{StreamExt as _, TryStreamExt as _},
 };
 
 /// Test harness helper struct.
@@ -41,33 +42,34 @@ pub const EMPTY_NODE_ATTRS: fio::NodeAttributes = fio::NodeAttributes {
     modification_time: 0,
 };
 
-/// Listens for the `OnOpen` event and returns its [Status]. This takes the event stream out of the
-/// proxy, which can only be done once.
+/// Wait for [`fio::NodeEvent::OnOpen_`] to be sent via `node_proxy` and returns its [`zx::Status`].
 pub async fn get_open_status(node_proxy: &fio::NodeProxy) -> zx::Status {
-    let mut events = node_proxy.take_event_stream();
+    let mut events = Clone::clone(node_proxy).take_event_stream();
     if let Some(result) = events.next().await {
         match result.expect("FIDL error") {
             fio::NodeEvent::OnOpen_ { s, info: _ } => zx::Status::from_raw(s),
-            fio::NodeEvent::OnRepresentation { .. } => zx::Status::OK,
+            fio::NodeEvent::OnRepresentation { .. } => panic!(
+                "This function should only be used with fuchsia.io/Directory.Open, *not* Open2!"
+            ),
         }
     } else {
         zx::Status::PEER_CLOSED
     }
 }
 
-/// Asserts that no OnOpen event was sent on an opened proxy. This takes the event stream out of
-/// the proxy, which can only be done once.
+/// Asserts that no [`fio::NodeEvent::OnOpen_`] event is sent on an opened proxy.
 pub async fn assert_on_open_not_received(node_proxy: &fio::NodeProxy) {
-    let mut events = node_proxy.take_event_stream();
+    let mut events = Clone::clone(node_proxy).take_event_stream();
     // Wait at most 200ms for an OnOpen event to appear.
     let event =
         events.next().on_timeout(zx::Duration::from_millis(200).after_now(), || Option::None).await;
     assert!(event.is_none(), "Unexpected OnOpen event received");
 }
 
-/// Converts a generic `NodeProxy` to either a file or directory proxy.
-pub fn convert_node_proxy<T: ProtocolMarker>(proxy: fio::NodeProxy) -> T::Proxy {
-    T::Proxy::from_channel(proxy.into_channel().expect("Cannot convert node proxy to channel"))
+/// Converts a generic [`fio::NodeProxy`] to either [`fio::FileProxy`] or [`fio::DirectoryProxy`].
+/// **WARNING**: This function does _not_ verify that the conversion is valid.
+pub fn convert_node_proxy<T: Proxy>(proxy: fio::NodeProxy) -> T {
+    T::from_channel(proxy.into_channel().expect("Cannot convert node proxy to channel"))
 }
 
 /// Helper function to open the desired node in the root folder.
@@ -96,13 +98,8 @@ pub async fn open_node_status<T: ProtocolMarker>(
     if status != zx::Status::OK {
         Err(status)
     } else {
-        Ok(convert_node_proxy::<T>(node_proxy))
+        Ok(convert_node_proxy(node_proxy))
     }
-}
-
-/// Returns the specified node flags from the given NodeProxy.
-pub async fn get_node_flags(node_proxy: &fio::NodeProxy) -> fio::OpenFlags {
-    node_proxy.get_flags().await.expect("Failed to get node flags!").1
 }
 
 /// Helper function to open a file with the given flags. Only use this if testing something other
@@ -289,4 +286,107 @@ pub fn executable_file(name: &str) -> io_test::DirectoryEntry {
         name: Some(name.to_string()),
         ..Default::default()
     })
+}
+
+/// Extension trait for [`fio::DirectoryProxy`] to make interactions with the fuchsia.io protocol
+/// less verbose.
+#[async_trait]
+pub trait DirectoryProxyExt {
+    /// Open `path` using `node_options`, returning a proxy to the remote resource.
+    ///
+    /// Waits for [`fio::NodeEvent::OnRepresentation`] if [`fio::NodeFlags::GET_REPRESENTATION`]
+    /// is specified, otherwise calls `fuchsia.io/Node.GetConnectionInfo` to verify the result.
+    async fn open2_node<T: ProtocolMarker>(
+        &self,
+        path: &str,
+        node_options: fio::NodeOptions,
+    ) -> Result<T::Proxy, zx::Status>;
+
+    /// Similar to [`DirectoryProxyExt::open2_node`], but waits for and returns the
+    /// [`fio::NodeEvent::OnRepresentation`] event sent when opening a resource.
+    ///
+    /// Requires [`fio::NodeFlags::GET_REPRESENTATION`] to be specified in `node_options`.
+    async fn open2_node_get_representation<T: ProtocolMarker>(
+        &self,
+        path: &str,
+        node_options: fio::NodeOptions,
+    ) -> Result<(T::Proxy, fio::Representation), zx::Status>;
+}
+
+#[async_trait]
+impl DirectoryProxyExt for fio::DirectoryProxy {
+    async fn open2_node<T: ProtocolMarker>(
+        &self,
+        path: &str,
+        node_options: fio::NodeOptions,
+    ) -> Result<T::Proxy, zx::Status> {
+        Ok(open2_node_impl::<T>(self, path, node_options).await?.0)
+    }
+
+    async fn open2_node_get_representation<T: ProtocolMarker>(
+        &self,
+        path: &str,
+        node_options: fio::NodeOptions,
+    ) -> Result<(T::Proxy, fio::Representation), zx::Status> {
+        let get_representation = node_options
+            .flags
+            .is_some_and(|flags| flags.contains(fio::NodeFlags::GET_REPRESENTATION));
+        assert!(
+            get_representation,
+            "node_options must specify the GET_REPRESENTATION flag to use this function!"
+        );
+        let (proxy, on_representation) = open2_node_impl::<T>(self, path, node_options).await?;
+        Ok((proxy, on_representation.unwrap()))
+    }
+}
+
+async fn open2_node_impl<T: ProtocolMarker>(
+    dir: &fio::DirectoryProxy,
+    path: &str,
+    node_options: fio::NodeOptions,
+) -> Result<(T::Proxy, Option<fio::Representation>), zx::Status> {
+    let get_representation =
+        node_options.flags.is_some_and(|flags| flags.contains(fio::NodeFlags::GET_REPRESENTATION));
+    let (proxy, server) = create_proxy::<fio::NodeMarker>().expect("Cannot create proxy");
+    dir.open2(path, &fio::ConnectionProtocols::Node(node_options), server.into_channel())
+        .expect("Failed to call open2");
+    if get_representation {
+        // Wait for the OnRepresentation event to verify if opening the resource succeeded.
+        let representation = Some(get_on_representation_event(&proxy).await?);
+        return Ok((convert_node_proxy(proxy), representation));
+    }
+    // Protocols didn't specify GET_REPRESENTATION, call GetConnectionInfo to test that opening the
+    // resource succeeded. If that fails, return the epitaph from the channel closure.
+    proxy.get_connection_info().await.map_err(|e| {
+        if let fidl::Error::ClientChannelClosed { status, .. } = e {
+            status
+        } else {
+            panic!("Unhandled FIDL error: {:?}", e);
+        }
+    })?;
+    Ok((convert_node_proxy(proxy), None))
+}
+
+/// Wait for and return a [`fio::NodeEvent::OnRepresentation`] event sent via `node_proxy`.
+async fn get_on_representation_event(
+    node_proxy: &fio::NodeProxy,
+) -> Result<fio::Representation, zx::Status> {
+    // Try to extract the expected NodeEvent, but map channel epitaphs to zx::Status.
+    let event = Clone::clone(node_proxy)
+        .take_event_stream()
+        .try_next()
+        .await
+        .map_err(|e| {
+            if let fidl::Error::ClientChannelClosed { status, .. } = e {
+                status
+            } else {
+                panic!("Unhandled FIDL error: {:?}", e);
+            }
+        })?
+        .expect("Missing NodeEvent in stream!");
+    let representation = match event {
+        fio::NodeEvent::OnRepresentation { payload } => payload,
+        _ => panic!("Found unexpected NodeEvent type in stream!"),
+    };
+    Ok(representation)
 }

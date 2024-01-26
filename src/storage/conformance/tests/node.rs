@@ -5,8 +5,7 @@
 use {
     assert_matches::assert_matches,
     fidl_fuchsia_io as fio, fuchsia_zircon as zx,
-    futures::TryStreamExt,
-    io_conformance_util::{file, root_directory, test_harness::TestHarness},
+    io_conformance_util::{test_harness::TestHarness, *},
 };
 
 #[fuchsia::test]
@@ -20,31 +19,21 @@ async fn test_open_node_on_directory() {
     let root = root_directory(vec![]);
     let test_dir = harness.get_directory(root, harness.dir_rights.all());
 
-    let (proxy, server) = fidl::endpoints::create_proxy::<fio::NodeMarker>().unwrap();
-    test_dir
-        .open2(
+    let (_proxy, on_representation) = test_dir
+        .open2_node_get_representation::<fio::NodeMarker>(
             ".",
-            &fio::ConnectionProtocols::Node(fio::NodeOptions {
+            fio::NodeOptions {
                 flags: Some(fio::NodeFlags::GET_REPRESENTATION),
                 protocols: Some(fio::NodeProtocols {
                     node: Some(fio::NodeProtocolFlags::default()),
                     ..Default::default()
                 }),
                 ..Default::default()
-            }),
-            server.into_channel(),
+            },
         )
+        .await
         .unwrap();
-    assert_matches!(
-        proxy
-            .take_event_stream()
-            .try_next()
-            .await
-            .expect("expected OnRepresentation event")
-            .expect("missing OnRepresentation event")
-            .into_on_representation(),
-        Some(fio::Representation::Connector(fio::ConnectorInfo { .. }))
-    );
+    assert_matches!(on_representation, fio::Representation::Connector(fio::ConnectorInfo { .. }));
 }
 
 #[fuchsia::test]
@@ -58,51 +47,37 @@ async fn test_open_node_on_file() {
     let root = root_directory(vec![file("file", vec![])]);
     let test_dir = harness.get_directory(root, harness.dir_rights.all());
 
-    let (proxy, server) = fidl::endpoints::create_proxy::<fio::NodeMarker>().unwrap();
-    test_dir
-        .open2(
+    let (_proxy, representation) = test_dir
+        .open2_node_get_representation::<fio::NodeMarker>(
             "file",
-            &fio::ConnectionProtocols::Node(fio::NodeOptions {
+            fio::NodeOptions {
                 flags: Some(fio::NodeFlags::GET_REPRESENTATION),
                 protocols: Some(fio::NodeProtocols {
                     node: Some(fio::NodeProtocolFlags::default()),
                     ..Default::default()
                 }),
                 ..Default::default()
-            }),
-            server.into_channel(),
+            },
         )
+        .await
         .unwrap();
-    assert_matches!(
-        proxy
-            .take_event_stream()
-            .try_next()
-            .await
-            .expect("expected OnRepresentation event")
-            .expect("missing OnRepresentation event")
-            .into_on_representation(),
-        Some(fio::Representation::Connector(fio::ConnectorInfo { .. }))
-    );
+    assert_matches!(representation, fio::Representation::Connector(fio::ConnectorInfo { .. }));
 
-    // Test the must-be-directory flag.
-    let (proxy, server) = fidl::endpoints::create_proxy::<fio::NodeMarker>().unwrap();
-    test_dir
-        .open2(
+    // Test the must-be-directory flag which should result in an error.
+    let error: zx::Status = test_dir
+        .open2_node::<fio::NodeMarker>(
             "file",
-            &fio::ConnectionProtocols::Node(fio::NodeOptions {
+            fio::NodeOptions {
                 protocols: Some(fio::NodeProtocols {
                     node: Some(fio::NodeProtocolFlags::MUST_BE_DIRECTORY),
                     ..Default::default()
                 }),
                 ..Default::default()
-            }),
-            server.into_channel(),
+            },
         )
-        .unwrap();
-    assert_matches!(
-        proxy.take_event_stream().try_next().await,
-        Err(fidl::Error::ClientChannelClosed { status: zx::Status::NOT_DIR, .. })
-    );
+        .await
+        .unwrap_err();
+    assert_eq!(error, zx::Status::NOT_DIR);
 }
 
 #[fuchsia::test]
@@ -116,19 +91,18 @@ async fn test_set_attr_and_set_flags_on_node() {
     let root = root_directory(vec![file("file", vec![])]);
     let test_dir = harness.get_directory(root, harness.dir_rights.all());
 
-    let (proxy, server) = fidl::endpoints::create_proxy::<fio::NodeMarker>().unwrap();
-    test_dir
-        .open2(
+    let proxy = test_dir
+        .open2_node::<fio::NodeMarker>(
             "file",
-            &fio::ConnectionProtocols::Node(fio::NodeOptions {
+            fio::NodeOptions {
                 protocols: Some(fio::NodeProtocols {
                     node: Some(fio::NodeProtocolFlags::default()),
                     ..Default::default()
                 }),
                 ..Default::default()
-            }),
-            server.into_channel(),
+            },
         )
+        .await
         .unwrap();
 
     assert_eq!(
@@ -168,19 +142,18 @@ async fn test_node_clone() {
     let root = root_directory(vec![file("file", vec![])]);
     let test_dir = harness.get_directory(root, harness.dir_rights.all());
 
-    let (proxy, server) = fidl::endpoints::create_proxy::<fio::NodeMarker>().unwrap();
-    test_dir
-        .open2(
+    let proxy = test_dir
+        .open2_node::<fio::NodeMarker>(
             "file",
-            &fio::ConnectionProtocols::Node(fio::NodeOptions {
+            fio::NodeOptions {
                 protocols: Some(fio::NodeProtocols {
                     node: Some(fio::NodeProtocolFlags::default()),
                     ..Default::default()
                 }),
                 ..Default::default()
-            }),
-            server.into_channel(),
+            },
         )
+        .await
         .unwrap();
 
     let (proxy2, server) = fidl::endpoints::create_proxy::<fio::NodeMarker>().unwrap();
@@ -203,11 +176,10 @@ async fn test_open_node_with_attributes() {
     let root = root_directory(vec![]);
     let test_dir = harness.get_directory(root, harness.dir_rights.all());
 
-    let (proxy, server) = fidl::endpoints::create_proxy::<fio::NodeMarker>().unwrap();
-    test_dir
-        .open2(
+    let (_proxy, representation) = test_dir
+        .open2_node_get_representation::<fio::NodeMarker>(
             ".",
-            &fio::ConnectionProtocols::Node(fio::NodeOptions {
+            fio::NodeOptions {
                 flags: Some(fio::NodeFlags::GET_REPRESENTATION),
                 protocols: Some(fio::NodeProtocols {
                     node: Some(fio::NodeProtocolFlags::default()),
@@ -217,23 +189,16 @@ async fn test_open_node_with_attributes() {
                     fio::NodeAttributesQuery::PROTOCOLS | fio::NodeAttributesQuery::ABILITIES,
                 ),
                 ..Default::default()
-            }),
-            server.into_channel(),
+            },
         )
+        .await
         .unwrap();
 
-    assert_matches!(
-        proxy
-            .take_event_stream()
-            .try_next()
-            .await
-            .expect("expected OnRepresentation event")
-            .expect("missing OnRepresentation event")
-            .into_on_representation(),
-        Some(fio::Representation::Connector(fio::ConnectorInfo {
+    assert_matches!(representation,
+        fio::Representation::Connector(fio::ConnectorInfo {
             attributes: Some(fio::NodeAttributes2 { mutable_attributes, immutable_attributes }),
             ..
-        }))
+        })
         if mutable_attributes == fio::MutableNodeAttributes::default()
             && immutable_attributes
                 == fio::ImmutableNodeAttributes {
@@ -249,3 +214,5 @@ async fn test_open_node_with_attributes() {
                 }
     );
 }
+
+// TODO(https://fxbug.dev/293947862): Add tests for fuchsia.io/Node.Reopen.
