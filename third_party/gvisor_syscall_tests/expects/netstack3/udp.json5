@@ -66,7 +66,6 @@
                 "AllUDPSockets/AllSocketPairTest.GetSocketOutOfBandInlineOption/*",
                 "AllUDPSockets/AllSocketPairTest.GetSocketRcvbufOption/*",
                 "AllUDPSockets/AllSocketPairTest.KeepAliveSocketOption/*",
-                "AllUDPSockets/AllSocketPairTest.LingerSocketOption/*",
                 "AllUDPSockets/AllSocketPairTest.RecvmmsgInvalidTimeout/*",
                 "AllUDPSockets/AllSocketPairTest.RecvmmsgTimeoutBeforeRecv/*",
                 "AllUDPSockets/AllSocketPairTest.RecvmsgMsghdrFlagsCleared/*",

@@ -1327,7 +1327,8 @@ where
                 respond_not_supported!("syncudp::SetLinger", responder)
             }
             fposix_socket::SynchronousDatagramSocketRequest::GetLinger { responder } => {
-                respond_not_supported!("syncudp::GetLinger", responder)
+                tracing::debug!("syncudp::GetLinger is not supported, returning Ok((false, 0))");
+                responder.send(Ok((false, 0))).unwrap_or_else(|e| error!("failed to respond: {e:?}"))
             }
             fposix_socket::SynchronousDatagramSocketRequest::SetOutOfBandInline {
                 value: _,
@@ -1581,7 +1582,8 @@ where
                 value: _,
                 responder,
             } => {
-                respond_not_supported!("syncudp::SetIpPacketInfo", responder)
+                tracing::debug!("syncudp::SetIpPacketInfo is not supported, returning Ok(())");
+                responder.send(Ok(())).unwrap_or_else(|e| error!("failed to respond: {e:?}"));
             }
             fposix_socket::SynchronousDatagramSocketRequest::GetIpPacketInfo { responder } => {
                 respond_not_supported!("syncudp::GetIpPacketInfo", responder)

@@ -1100,7 +1100,10 @@ impl<I: IpSockAddrExt + IpExt> RequestHandler<'_, I> {
                 respond_not_supported!("stream::SetLinger", responder);
             }
             fposix_socket::StreamSocketRequest::GetLinger { responder } => {
-                respond_not_supported!("stream::GetLinger", responder);
+                tracing::debug!("stream::GetLinger is not supported, returning Ok((false, 0))");
+                responder
+                    .send(Ok((false, 0)))
+                    .unwrap_or_else(|e| tracing::error!("failed to respond: {e:?}"))
             }
             fposix_socket::StreamSocketRequest::SetReusePort { value: _, responder } => {
                 respond_not_supported!("stream::SetReusePort", responder);
@@ -1145,7 +1148,10 @@ impl<I: IpSockAddrExt + IpExt> RequestHandler<'_, I> {
                     .unwrap_or_else(|e| tracing::error!("failed to respond: {e:?}"));
             }
             fposix_socket::StreamSocketRequest::SetIpTypeOfService { value: _, responder } => {
-                respond_not_supported!("stream::SetIpTypeOfService", responder);
+                tracing::debug!("stream::SetIpTypeOfService is not supported, returning Ok(())");
+                responder
+                    .send(Ok(()))
+                    .unwrap_or_else(|e| tracing::error!("failed to respond: {e:?}"));
             }
             fposix_socket::StreamSocketRequest::GetIpTypeOfService { responder } => {
                 respond_not_supported!("stream::GetIpTypeOfService", responder);
@@ -1306,7 +1312,14 @@ impl<I: IpSockAddrExt + IpExt> RequestHandler<'_, I> {
                 respond_not_supported!("stream::GetIpv6ReceivePacketInfo", responder);
             }
             fposix_socket::StreamSocketRequest::GetInfo { responder } => {
-                respond_not_supported!("stream::GetInfo", responder);
+                let domain = match I::VERSION {
+                    IpVersion::V4 => fposix_socket::Domain::Ipv4,
+                    IpVersion::V6 => fposix_socket::Domain::Ipv6,
+                };
+
+                responder
+                    .send(Ok((domain, fposix_socket::StreamSocketProtocol::Tcp)))
+                    .unwrap_or_else(|e| tracing::error!("failed to respond: {e:?}"));
             }
             // Note for the following two options:
             // Nagle enabled means TCP delays sending segment, thus meaning
@@ -1326,7 +1339,10 @@ impl<I: IpSockAddrExt + IpExt> RequestHandler<'_, I> {
                     .unwrap_or_else(|e| tracing::error!("failed to respond: {e:?}"));
             }
             fposix_socket::StreamSocketRequest::SetTcpMaxSegment { value_bytes: _, responder } => {
-                respond_not_supported!("stream::SetTcpMaxSegment", responder);
+                tracing::debug!("stream::SetTcpMaxSegment is not supported, returning Ok(())");
+                responder
+                    .send(Ok(()))
+                    .unwrap_or_else(|e| tracing::error!("failed to respond: {e:?}"));
             }
             fposix_socket::StreamSocketRequest::GetTcpMaxSegment { responder } => {
                 respond_not_supported!("stream::GetTcpMaxSegment", responder);
@@ -1471,7 +1487,13 @@ impl<I: IpSockAddrExt + IpExt> RequestHandler<'_, I> {
                 respond_not_supported!("stream::GetTcpWindowClamp", responder);
             }
             fposix_socket::StreamSocketRequest::GetTcpInfo { responder } => {
-                respond_not_supported!("stream::GetTcpInfo", responder);
+                tracing::debug!(
+                    "stream::GetTcpInfo is not supported, \
+                     returning fposix_socket::TcpInfo::default()"
+                );
+                responder
+                    .send(Ok(&fposix_socket::TcpInfo::default()))
+                    .unwrap_or_else(|e| tracing::error!("failed to respond: {e:?}"));
             }
             fposix_socket::StreamSocketRequest::SetTcpQuickAck { value, responder } => {
                 self.with_socket_options_mut(|so| so.delayed_ack = !value);
