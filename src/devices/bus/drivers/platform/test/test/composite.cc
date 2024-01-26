@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <fuchsia/hardware/gpio/c/banjo.h>
+#include <fidl/fuchsia.hardware.gpio/cpp/fidl.h>
 #include <fuchsia/hardware/platform/device/c/banjo.h>
 #include <fuchsia/hardware/spi/c/banjo.h>
 #include <fuchsia/hardware/test/c/banjo.h>
@@ -19,6 +19,8 @@
 #include <zircon/syscalls.h>
 #include <zircon/syscalls/object.h>
 #include <zircon/types.h>
+
+#include <ddktl/device.h>
 
 #include "src/devices/bus/drivers/platform/test/test-metadata.h"
 
@@ -40,28 +42,47 @@ typedef struct {
   };
 } mode_config_t;
 
-static void test_release(void* ctx) { free(ctx); }
+class TestCompositeDevice;
+using DeviceType = ddk::Device<TestCompositeDevice>;
 
-static zx_protocol_device_t test_device_protocol = {
-    .version = DEVICE_OPS_VERSION,
-    .release = test_release,
+class TestCompositeDevice : public DeviceType {
+ public:
+  static zx_status_t Bind(void* ctx, zx_device_t* parent);
+
+  explicit TestCompositeDevice(zx_device_t* parent) : DeviceType(parent) {}
+
+  void DdkRelease() { delete this; }
 };
 
-static zx_status_t test_gpio(gpio_protocol_t* gpio) {
-  zx_status_t status;
-  uint8_t value;
+static zx_status_t test_gpio(fidl::ClientEnd<fuchsia_hardware_gpio::Gpio> gpio_client) {
+  fidl::WireSyncClient<fuchsia_hardware_gpio::Gpio> gpio(std::move(gpio_client));
 
-  if ((status = gpio_config_out(gpio, 0)) != ZX_OK) {
-    return status;
+  if (auto result = gpio->ConfigOut(0); !result.ok()) {
+    return result.status();
+  } else if (result->is_error()) {
+    return result->error_value();
   }
-  if ((status = gpio_read(gpio, &value)) != ZX_OK || value != 0) {
-    return status;
+
+  if (auto result = gpio->Read(); !result.ok()) {
+    return result.status();
+  } else if (result->is_error()) {
+    return result->error_value();
+  } else if (result->value()->value != 0) {
+    return ZX_ERR_BAD_STATE;
   }
-  if ((status = gpio_write(gpio, 1)) != ZX_OK) {
-    return status;
+
+  if (auto result = gpio->Write(1); !result.ok()) {
+    return result.status();
+  } else if (result->is_error()) {
+    return result->error_value();
   }
-  if ((status = gpio_read(gpio, &value)) != ZX_OK || value != 1) {
-    return status;
+
+  if (auto result = gpio->Read(); !result.ok()) {
+    return result.status();
+  } else if (result->is_error()) {
+    return result->error_value();
+  } else if (result->value()->value != 1) {
+    return ZX_ERR_BAD_STATE;
   }
 
   return ZX_OK;
@@ -129,13 +150,11 @@ static zx_status_t test_spi(spi_protocol_t* spi) {
   return ZX_OK;
 }
 
-static zx_status_t test_bind(void* ctx, zx_device_t* parent) {
-  zx_status_t status;
-
+zx_status_t TestCompositeDevice::Bind(void* ctx, zx_device_t* parent) {
   zxlogf(INFO, "test_bind: %s ", DRIVER_NAME);
 
   pdev_protocol_t pdev;
-  status = device_get_fragment_protocol(parent, "pdev", ZX_PROTOCOL_PDEV, &pdev);
+  zx_status_t status = device_get_fragment_protocol(parent, "pdev", ZX_PROTOCOL_PDEV, &pdev);
   if (status != ZX_OK) {
     zxlogf(ERROR, "%s: could not get protocol ZX_PROTOCOL_PDEV", DRIVER_NAME);
     return status;
@@ -156,20 +175,19 @@ static zx_status_t test_bind(void* ctx, zx_device_t* parent) {
     return ZX_ERR_INTERNAL;
   }
 
-  gpio_protocol_t gpio;
-  spi_protocol_t spi;
-
   if (metadata.composite_device_id == PDEV_DID_TEST_COMPOSITE_1) {
-    status = device_get_fragment_protocol(parent, "gpio", ZX_PROTOCOL_GPIO, &gpio);
-    if (status != ZX_OK) {
-      zxlogf(ERROR, "%s: could not get protocol ZX_PROTOCOL_GPIO", DRIVER_NAME);
-      return status;
+    auto result =
+        DdkConnectFragmentFidlProtocol<fuchsia_hardware_gpio::Service::Device>(parent, "gpio");
+    if (result.is_error()) {
+      zxlogf(ERROR, "%s: failed to connect to GPIO: %s", DRIVER_NAME, result.status_string());
+      return result.status_value();
     }
-    if ((status = test_gpio(&gpio)) != ZX_OK) {
+    if ((status = test_gpio(*std::move(result))) != ZX_OK) {
       zxlogf(ERROR, "%s: test_gpio failed: %d", DRIVER_NAME, status);
       return status;
     }
   } else if (metadata.composite_device_id == PDEV_DID_TEST_COMPOSITE_2) {
+    spi_protocol_t spi;
     status = device_get_fragment_protocol(parent, "spi", ZX_PROTOCOL_SPI, &spi);
     if (status != ZX_OK) {
       zxlogf(ERROR, "%s: could not get protocol ZX_PROTOCOL_SPI", DRIVER_NAME);
@@ -181,32 +199,22 @@ static zx_status_t test_bind(void* ctx, zx_device_t* parent) {
     }
   }
 
-  test_t* test = calloc(1, sizeof(test_t));
-  if (!test) {
-    return ZX_ERR_NO_MEMORY;
-  }
+  auto test = std::make_unique<TestCompositeDevice>(parent);
 
-  device_add_args_t args = {
-      .version = DEVICE_ADD_ARGS_VERSION,
-      .name = "composite",
-      .ctx = test,
-      .ops = &test_device_protocol,
-      .flags = DEVICE_ADD_NON_BINDABLE,
-  };
-
-  status = device_add(parent, &args, &test->zxdev);
+  status = test->DdkAdd(ddk::DeviceAddArgs("composite").set_flags(DEVICE_ADD_NON_BINDABLE));
   if (status != ZX_OK) {
     zxlogf(ERROR, "%s: device_add failed: %d", DRIVER_NAME, status);
-    free(test);
     return status;
   }
+
+  [[maybe_unused]] auto unused = test.release();
 
   return ZX_OK;
 }
 
 static zx_driver_ops_t test_driver_ops = {
     .version = DRIVER_OPS_VERSION,
-    .bind = test_bind,
+    .bind = TestCompositeDevice::Bind,
 };
 
 ZIRCON_DRIVER(test_composite, test_driver_ops, "zircon", "0.1");

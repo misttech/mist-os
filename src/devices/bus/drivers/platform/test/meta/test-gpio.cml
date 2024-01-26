@@ -14,7 +14,16 @@
         compat: "driver/test-gpio.so",
         colocate: "true",
     },
+    capabilities: [
+        { service: "fuchsia.hardware.gpioimpl.Service" },
+    ],
     use: [
         { service: "fuchsia.hardware.platform.bus.Service" },
+    ],
+    expose: [
+        {
+            service: "fuchsia.hardware.gpioimpl.Service",
+            from: "self",
+        },
     ],
 }

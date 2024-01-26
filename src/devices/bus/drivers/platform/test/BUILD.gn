@@ -89,9 +89,9 @@ fuchsia_driver("test-gpio-driver") {
   sources = [ "test/gpio.cc" ]
   deps = [
     ":test-gpio-bind",
-    "//sdk/banjo/fuchsia.hardware.gpio:fuchsia.hardware.gpio_banjo_cpp",
-    "//sdk/banjo/fuchsia.hardware.gpioimpl:fuchsia.hardware.gpioimpl_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.platform.device:fuchsia.hardware.platform.device_banjo_cpp",
+    "//sdk/fidl/fuchsia.hardware.gpioimpl:fuchsia.hardware.gpioimpl_cpp",
+    "//sdk/lib/driver/outgoing/cpp",
     "//src/devices/lib/driver",
     "//src/devices/lib/driver:driver_runtime",
     "//src/lib/ddk",
@@ -242,16 +242,17 @@ driver_bind_rules("test-composite-bind") {
 fuchsia_driver("test-composite-driver") {
   output_name = "test-composite"
   configs += [ "//build/config:all_source" ]
-  sources = [ "test/composite.c" ]
+  sources = [ "test/composite.cc" ]
   deps = [
     ":test-composite-bind",
-    "//sdk/banjo/fuchsia.hardware.gpio:fuchsia.hardware.gpio_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.platform.device:fuchsia.hardware.platform.device_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.spi:fuchsia.hardware.spi_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.test:fuchsia.hardware.test_banjo_cpp",
+    "//sdk/fidl/fuchsia.hardware.gpio:fuchsia.hardware.gpio_cpp",
     "//src/devices/bind/fuchsia.test:fuchsia.test_cpp",
     "//src/devices/lib/driver",
     "//src/lib/ddk",
+    "//src/lib/ddktl",
 
     # TODO(https://fxbug.dev/42113849): Migrate to the new bind rules and delete the below
     "//src/lib/ddk:ddk-deprecated-binding-headers",
