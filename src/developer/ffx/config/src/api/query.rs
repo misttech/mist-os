@@ -194,13 +194,21 @@ impl<'a> ConfigQuery<'a> {
 
     /// Set the queried location to the given Value.
     pub async fn set(&self, value: Value) -> Result<()> {
+        tracing::debug!("Setting config value");
         let (key, level) = self.validate_write_query()?;
         let mut env = self.get_env().await?;
+        tracing::debug!("Config set got environment");
         env.populate_defaults(&level).await?;
+        tracing::debug!("Config set defaults populated");
         let config = env.config_from_cache(self.build).await?;
+        tracing::debug!("Config set got value from cache");
         let mut write_guard = config.write().await;
+        tracing::debug!("Config set got write guard");
         write_guard.set(key, level, value)?;
-        write_guard.save().await
+        tracing::debug!("Config set performed");
+        write_guard.save().await?;
+        tracing::debug!("Config set saved");
+        Ok(())
     }
 
     /// Remove the value at the queried location.
