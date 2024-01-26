@@ -11,16 +11,15 @@ use net_types::ip::{GenericOverIp, Ip, Ipv4, Ipv6};
 use tracing::trace;
 
 use crate::{
-    context::TimerContext,
-    device::{self, DeviceId, DeviceLayerTimerId},
+    context::{TimerContext, TimerHandler},
+    device::{DeviceId, DeviceLayerTimerId},
     inspect::InspectableValue,
     ip::{
-        self,
         device::{IpDeviceIpExt, IpDeviceTimerId},
         IpLayerTimerId,
     },
-    transport::{self, TransportLayerTimerId},
-    BindingsContext, BindingsTypes, CoreCtx, SyncCtx,
+    transport::TransportLayerTimerId,
+    BindingsTypes,
 };
 
 /// The identifier for any timer event.
@@ -159,36 +158,28 @@ impl_timer_context!(
     id
 );
 
-/// Handles a generic timer event.
-pub fn handle_timer<BC: BindingsContext>(
-    core_ctx: &SyncCtx<BC>,
-    bindings_ctx: &mut BC,
-    id: TimerId<BC>,
-) {
-    trace!("handle_timer: dispatching timerid: {:?}", id);
-    let mut core_ctx = CoreCtx::new_deprecated(core_ctx);
-
-    match id {
-        TimerId(TimerIdInner::DeviceLayer(x)) => {
-            device::handle_timer(&mut core_ctx, bindings_ctx, x);
-        }
-        TimerId(TimerIdInner::TransportLayer(x)) => {
-            transport::handle_timer(&mut core_ctx, bindings_ctx, x);
-        }
-        TimerId(TimerIdInner::IpLayer(x)) => {
-            ip::handle_timer(&mut core_ctx, bindings_ctx, x);
-        }
-        TimerId(TimerIdInner::Ipv4Device(x)) => {
-            ip::device::handle_ipv4_timer(&mut core_ctx, bindings_ctx, x.into());
-        }
-        TimerId(TimerIdInner::Ipv6Device(x)) => {
-            ip::device::handle_ipv6_timer(&mut core_ctx, bindings_ctx, x.into());
-        }
-        #[cfg(test)]
-        TimerId(TimerIdInner::Nop(_)) => {
-            crate::context::CounterContext::increment(&core_ctx, |counters: &TimerCounters| {
-                &counters.nop
-            })
+impl<BT, #[cfg(test)] CC: crate::context::CounterContext<TimerCounters>, #[cfg(not(test))] CC>
+    TimerHandler<BT, TimerId<BT>> for CC
+where
+    BT: BindingsTypes,
+    CC: TimerHandler<BT, DeviceLayerTimerId<BT>>
+        + TimerHandler<BT, TransportLayerTimerId<BT>>
+        + TimerHandler<BT, IpLayerTimerId>
+        + TimerHandler<BT, IpDeviceTimerId<Ipv4, DeviceId<BT>>>
+        + TimerHandler<BT, IpDeviceTimerId<Ipv6, DeviceId<BT>>>,
+{
+    fn handle_timer(&mut self, bindings_ctx: &mut BT, id: TimerId<BT>) {
+        trace!("handle_timer: dispatching timerid: {id:?}");
+        match id {
+            TimerId(TimerIdInner::DeviceLayer(x)) => self.handle_timer(bindings_ctx, x),
+            TimerId(TimerIdInner::TransportLayer(x)) => self.handle_timer(bindings_ctx, x),
+            TimerId(TimerIdInner::IpLayer(x)) => self.handle_timer(bindings_ctx, x),
+            TimerId(TimerIdInner::Ipv4Device(x)) => self.handle_timer(bindings_ctx, x),
+            TimerId(TimerIdInner::Ipv6Device(x)) => self.handle_timer(bindings_ctx, x),
+            #[cfg(test)]
+            TimerId(TimerIdInner::Nop(_)) => {
+                self.increment(|counters: &TimerCounters| &counters.nop)
+            }
         }
     }
 }
@@ -214,7 +205,9 @@ impl<BT: BindingsTypes> lock_order::lock::UnlockedAccess<crate::lock_ordering::T
 }
 
 #[cfg(test)]
-impl<BT: BindingsTypes, L> crate::context::CounterContext<TimerCounters> for CoreCtx<'_, BT, L> {
+impl<BT: BindingsTypes, L> crate::context::CounterContext<TimerCounters>
+    for crate::context::CoreCtx<'_, BT, L>
+{
     fn with_counters<O, F: FnOnce(&TimerCounters) -> O>(&self, cb: F) -> O {
         use lock_order::wrap::prelude::*;
         cb(self.unlocked_access::<crate::lock_ordering::TimerCounters>())

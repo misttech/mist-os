@@ -143,19 +143,21 @@ impl<DeviceId, BC, CC: TimerHandler<BC, IgmpTimerId<DeviceId>>>
     }
 }
 
-/// Handle an IPv4 device timer firing.
-pub(crate) fn handle_ipv4_timer<
+impl<CC, BC> TimerHandler<BC, IpDeviceTimerId<Ipv4, CC::DeviceId>> for CC
+where
     BC: IpDeviceBindingsContext<Ipv4, CC::DeviceId>,
     CC: IpDeviceConfigurationContext<Ipv4, BC>,
->(
-    core_ctx: &mut CC,
-    bindings_ctx: &mut BC,
-    id: Ipv4DeviceTimerId<CC::DeviceId>,
-) {
-    let device_id = id.device_id().clone();
-    core_ctx.with_ip_device_configuration(&device_id, |_state, mut core_ctx| {
-        TimerHandler::handle_timer(&mut core_ctx, bindings_ctx, id)
-    })
+{
+    fn handle_timer(
+        &mut self,
+        bindings_ctx: &mut BC,
+        IpDeviceTimerId(id): IpDeviceTimerId<Ipv4, CC::DeviceId>,
+    ) {
+        let device_id = id.device_id().clone();
+        self.with_ip_device_configuration(&device_id, |_state, mut core_ctx| {
+            TimerHandler::handle_timer(&mut core_ctx, bindings_ctx, id)
+        })
+    }
 }
 
 /// A timer ID for IPv6 devices.
@@ -291,19 +293,21 @@ impl<
     }
 }
 
-/// Handle an IPv6 device timer firing.
-pub(crate) fn handle_ipv6_timer<
+impl<CC, BC> TimerHandler<BC, IpDeviceTimerId<Ipv6, CC::DeviceId>> for CC
+where
     BC: IpDeviceBindingsContext<Ipv6, CC::DeviceId>,
     CC: IpDeviceConfigurationContext<Ipv6, BC>,
->(
-    core_ctx: &mut CC,
-    bindings_ctx: &mut BC,
-    id: Ipv6DeviceTimerId<CC::DeviceId>,
-) {
-    let device_id = id.device_id().clone();
-    core_ctx.with_ip_device_configuration(&device_id, |_state, mut core_ctx| {
-        TimerHandler::handle_timer(&mut core_ctx, bindings_ctx, id)
-    })
+{
+    fn handle_timer(
+        &mut self,
+        bindings_ctx: &mut BC,
+        IpDeviceTimerId(id): IpDeviceTimerId<Ipv6, CC::DeviceId>,
+    ) {
+        let device_id = id.device_id().clone();
+        self.with_ip_device_configuration(&device_id, |_state, mut core_ctx| {
+            TimerHandler::handle_timer(&mut core_ctx, bindings_ctx, id)
+        })
+    }
 }
 
 /// An extension trait adding IP device properties.

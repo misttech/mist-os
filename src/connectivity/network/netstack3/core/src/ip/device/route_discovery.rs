@@ -449,7 +449,7 @@ mod tests {
         route: Ipv6DiscoveredRoute,
     ) {
         assert_eq!(
-            bindings_ctx.trigger_next_timer(core_ctx, TimerHandler::handle_timer),
+            bindings_ctx.trigger_next_timer(core_ctx),
             Some(Ipv6DiscoveredRouteTimerId { device_id: FakeDeviceId, route })
         );
     }

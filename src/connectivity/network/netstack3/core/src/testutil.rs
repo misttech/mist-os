@@ -8,15 +8,16 @@
 use alloc::vec;
 use alloc::{borrow::ToOwned, collections::HashMap, sync::Arc, vec::Vec};
 use assert_matches::assert_matches;
-#[cfg(test)]
-use core::time::Duration;
+
 use core::{
     borrow::Borrow,
     convert::Infallible as Never,
     ffi::CStr,
     fmt::{self, Debug, Display},
+    hash::Hash,
     ops::{Deref, DerefMut},
     sync::atomic::AtomicUsize,
+    time::Duration,
 };
 
 use net_types::{
@@ -55,11 +56,11 @@ use crate::{
 use crate::{
     context::{
         testutil::{
-            FakeFrameCtx, FakeInstant, FakeNetworkContext, FakeTimerCtx, WithFakeFrameContext,
-            WithFakeTimerContext,
+            FakeFrameCtx, FakeInstant, FakeNetworkContext, FakeTimerCtx, FakeTimerCtxExt,
+            WithFakeFrameContext, WithFakeTimerContext,
         },
-        EventContext, InstantBindingsTypes, InstantContext, RngContext, TimerContext,
-        TracingContext,
+        EventContext, InstantBindingsTypes, InstantContext, RngContext, TimerContext, TimerHandler,
+        TracingContext, UnlockedCoreCtx,
     },
     device::{
         ethernet::MaxEthernetFrameSize,
@@ -184,6 +185,57 @@ where
     pub fn core_api(&mut self) -> crate::api::CoreApi<'_, &mut BC> {
         let Self { core_ctx, bindings_ctx } = self;
         CC::borrow(core_ctx).state.api(bindings_ctx)
+    }
+}
+
+/// Helper functions for dealing with fake timers.
+impl<BC: BindingsTypes> Ctx<BC> {
+    /// Shortcut for [`FakeTimerCtxExt::trigger_next_timer`].
+    pub fn trigger_next_timer<Id>(&mut self) -> Option<Id>
+    where
+        BC: FakeTimerCtxExt<Id>,
+        for<'a> UnlockedCoreCtx<'a, BC>: TimerHandler<BC, Id>,
+    {
+        let Self { core_ctx, bindings_ctx } = self;
+        bindings_ctx.trigger_next_timer(&mut CoreCtx::new_deprecated(core_ctx))
+    }
+
+    /// Shortcut for [`FakeTimerCtxExt::trigger_timers_for`].
+    pub fn trigger_timers_for<Id>(&mut self, duration: Duration) -> Vec<Id>
+    where
+        BC: FakeTimerCtxExt<Id>,
+        for<'a> UnlockedCoreCtx<'a, BC>: TimerHandler<BC, Id>,
+    {
+        let Self { core_ctx, bindings_ctx } = self;
+        bindings_ctx.trigger_timers_for(duration, &mut CoreCtx::new_deprecated(core_ctx))
+    }
+
+    /// Shortcut for [`FaketimerCtx::trigger_timers_until_instant`].
+    pub fn trigger_timers_until_instant<Id>(&mut self, instant: FakeInstant) -> Vec<Id>
+    where
+        BC: FakeTimerCtxExt<Id>,
+        for<'a> UnlockedCoreCtx<'a, BC>: TimerHandler<BC, Id>,
+    {
+        let Self { core_ctx, bindings_ctx } = self;
+        bindings_ctx.trigger_timers_until_instant(instant, &mut CoreCtx::new_deprecated(core_ctx))
+    }
+
+    /// Shortcut for [`FakeTimerCtxExt::trigger_timers_until_and_expect_unordered`].
+    pub fn trigger_timers_until_and_expect_unordered<Id, I: IntoIterator<Item = Id>>(
+        &mut self,
+        instant: FakeInstant,
+        timers: I,
+    ) where
+        Id: Debug + Hash + Eq,
+        BC: FakeTimerCtxExt<Id>,
+        for<'a> UnlockedCoreCtx<'a, BC>: TimerHandler<BC, Id>,
+    {
+        let Self { core_ctx, bindings_ctx } = self;
+        bindings_ctx.trigger_timers_until_and_expect_unordered(
+            instant,
+            timers,
+            &mut CoreCtx::new_deprecated(core_ctx),
+        )
     }
 }
 
@@ -1396,11 +1448,11 @@ impl<I: Ip> From<nud::Event<Mac, EthernetDeviceId<FakeBindingsCtx>, I, FakeInsta
 
 #[cfg(test)]
 pub(crate) fn handle_timer(
-    FakeCtx { core_ctx, bindings_ctx }: &mut FakeCtx,
+    ctx: &mut FakeCtx,
     _bindings_ctx: &mut (),
     id: TimerId<FakeBindingsCtx>,
 ) {
-    crate::time::handle_timer(core_ctx, bindings_ctx, id)
+    ctx.core_api().handle_timer(id)
 }
 
 pub(crate) const IPV6_MIN_IMPLIED_MAX_FRAME_SIZE: MaxEthernetFrameSize =

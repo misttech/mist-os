@@ -402,10 +402,7 @@ mod tests {
             let now = bindings_ctx.now();
             bindings_ctx.timer_ctx().assert_timers_installed([(RS_TIMER_ID, now..=now + duration)]);
 
-            assert_eq!(
-                bindings_ctx.trigger_next_timer(&mut core_ctx, TimerHandler::handle_timer),
-                Some(RS_TIMER_ID)
-            );
+            assert_eq!(bindings_ctx.trigger_next_timer(&mut core_ctx), Some(RS_TIMER_ID));
             let frames = core_ctx.frames();
             assert_eq!(frames.len(), usize::from(i + 1), "frames = {:?}", frames);
             let (RsMessageMeta { message }, frame) =

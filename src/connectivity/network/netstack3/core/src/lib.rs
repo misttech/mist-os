@@ -263,7 +263,7 @@ pub use context::{
 pub use inspect::Inspector;
 pub use marker::{BindingsContext, BindingsTypes, CoreContext, IpBindingsContext, IpExt};
 pub use state::StackState;
-pub use time::{handle_timer, Instant, TimerId};
+pub use time::{Instant, TimerId};
 
 // Re-export useful macros.
 pub use netstack3_macros::context_ip_bounds;

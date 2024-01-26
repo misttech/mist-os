@@ -747,10 +747,7 @@ mod tests {
                 Duration::from_secs(10),
                 GROUP_ADDR,
             );
-            assert_eq!(
-                bindings_ctx.trigger_next_timer(&mut core_ctx, TimerHandler::handle_timer),
-                Some(TIMER_ID)
-            );
+            assert_eq!(bindings_ctx.trigger_next_timer(&mut core_ctx), Some(TIMER_ID));
 
             // We should get two MLD reports - one for the unsolicited one for
             // the host to turn into Delay Member state and the other one for
@@ -781,10 +778,7 @@ mod tests {
             // The query says that it wants to hear from us immediately.
             assert_eq!(core_ctx.frames().len(), 2);
             // There should be no timers set.
-            assert_eq!(
-                bindings_ctx.trigger_next_timer(&mut core_ctx, TimerHandler::handle_timer),
-                None
-            );
+            assert_eq!(bindings_ctx.trigger_next_timer(&mut core_ctx), None);
             // The frames are all reports.
             for (_, frame) in core_ctx.frames() {
                 ensure_frame(&frame, 131, GROUP_ADDR, GROUP_ADDR);
@@ -806,10 +800,7 @@ mod tests {
             );
             assert_eq!(core_ctx.frames().len(), 1);
 
-            assert_eq!(
-                bindings_ctx.trigger_next_timer(&mut core_ctx, TimerHandler::handle_timer),
-                Some(TIMER_ID)
-            );
+            assert_eq!(bindings_ctx.trigger_next_timer(&mut core_ctx), Some(TIMER_ID));
             assert_eq!(core_ctx.frames().len(), 2);
 
             receive_mld_query(
@@ -827,10 +818,7 @@ mod tests {
                 _ => panic!("Wrong State!"),
             }
 
-            assert_eq!(
-                bindings_ctx.trigger_next_timer(&mut core_ctx, TimerHandler::handle_timer),
-                Some(TIMER_ID)
-            );
+            assert_eq!(bindings_ctx.trigger_next_timer(&mut core_ctx), Some(TIMER_ID));
             assert_eq!(core_ctx.frames().len(), 3);
             // The frames are all reports.
             for (_, frame) in core_ctx.frames() {
@@ -853,10 +841,7 @@ mod tests {
             );
             assert_eq!(core_ctx.frames().len(), 1);
 
-            assert_eq!(
-                bindings_ctx.trigger_next_timer(&mut core_ctx, TimerHandler::handle_timer),
-                Some(TIMER_ID)
-            );
+            assert_eq!(bindings_ctx.trigger_next_timer(&mut core_ctx), Some(TIMER_ID));
             assert_eq!(core_ctx.frames().len(), 2);
 
             receive_mld_query(&mut core_ctx, &mut bindings_ctx, Duration::from_secs(0), GROUP_ADDR);
@@ -870,10 +855,7 @@ mod tests {
             }
 
             // No timers!
-            assert_eq!(
-                bindings_ctx.trigger_next_timer(&mut core_ctx, TimerHandler::handle_timer),
-                None
-            );
+            assert_eq!(bindings_ctx.trigger_next_timer(&mut core_ctx), None);
             assert_eq!(core_ctx.frames().len(), 3);
             // The frames are all reports.
             for (_, frame) in core_ctx.frames() {
@@ -911,10 +893,7 @@ mod tests {
         let instant2 = bindings_ctx.timer_ctx().timers()[0].0.clone();
         // This new timer should be sooner.
         assert!(instant2 <= instant1);
-        assert_eq!(
-            bindings_ctx.trigger_next_timer(&mut core_ctx, TimerHandler::handle_timer),
-            Some(TIMER_ID)
-        );
+        assert_eq!(bindings_ctx.trigger_next_timer(&mut core_ctx), Some(TIMER_ID));
         assert!(bindings_ctx.now() - start <= duration);
         assert_eq!(core_ctx.frames().len(), 2);
         // The frames are all reports.
@@ -942,10 +921,7 @@ mod tests {
             )]);
             // The initial unsolicited report.
             assert_eq!(core_ctx.frames().len(), 1);
-            assert_eq!(
-                bindings_ctx.trigger_next_timer(&mut core_ctx, TimerHandler::handle_timer),
-                Some(TIMER_ID)
-            );
+            assert_eq!(bindings_ctx.trigger_next_timer(&mut core_ctx), Some(TIMER_ID));
             // The report after the delay.
             assert_eq!(core_ctx.frames().len(), 2);
             assert_eq!(
@@ -1019,10 +995,7 @@ mod tests {
                 core_ctx.gmp_join_group(&mut bindings_ctx, &FakeDeviceId, GROUP_ADDR),
                 GroupJoinResult::Joined(())
             );
-            assert_eq!(
-                bindings_ctx.trigger_next_timer(&mut core_ctx, TimerHandler::handle_timer),
-                Some(TIMER_ID)
-            );
+            assert_eq!(bindings_ctx.trigger_next_timer(&mut core_ctx), Some(TIMER_ID));
             for (_, frame) in core_ctx.frames() {
                 ensure_frame(&frame, 131, GROUP_ADDR, GROUP_ADDR);
                 ensure_slice_addr(&frame, 8, 24, MY_MAC.to_ipv6_link_local().addr().get());

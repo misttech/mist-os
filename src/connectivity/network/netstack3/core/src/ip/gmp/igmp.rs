@@ -563,7 +563,7 @@ mod tests {
     use super::*;
     use crate::{
         context::{
-            testutil::{handle_timer_helper_with_sc_ref_mut, FakeInstant, FakeTimerCtxExt},
+            testutil::{FakeInstant, FakeTimerCtxExt},
             InstantContext as _,
         },
         device::{
@@ -857,10 +857,7 @@ mod tests {
 
             // Should send a report after a query.
             receive_igmp_query(&mut core_ctx, &mut bindings_ctx, Duration::from_secs(10));
-            assert_eq!(
-                bindings_ctx.trigger_next_timer(&mut core_ctx, TimerHandler::handle_timer),
-                Some(REPORT_DELAY_TIMER_ID)
-            );
+            assert_eq!(bindings_ctx.trigger_next_timer(&mut core_ctx), Some(REPORT_DELAY_TIMER_ID));
             check_report(&mut core_ctx);
         });
     }
@@ -875,10 +872,7 @@ mod tests {
             );
             assert_eq!(core_ctx.frames().len(), 1);
 
-            assert_eq!(
-                bindings_ctx.trigger_next_timer(&mut core_ctx, TimerHandler::handle_timer),
-                Some(REPORT_DELAY_TIMER_ID)
-            );
+            assert_eq!(bindings_ctx.trigger_next_timer(&mut core_ctx), Some(REPORT_DELAY_TIMER_ID));
             assert_eq!(core_ctx.frames().len(), 2);
 
             receive_igmp_query(&mut core_ctx, &mut bindings_ctx, Duration::from_secs(10));
@@ -891,10 +885,7 @@ mod tests {
                 _ => panic!("Wrong State!"),
             }
 
-            assert_eq!(
-                bindings_ctx.trigger_next_timer(&mut core_ctx, TimerHandler::handle_timer),
-                Some(REPORT_DELAY_TIMER_ID)
-            );
+            assert_eq!(bindings_ctx.trigger_next_timer(&mut core_ctx), Some(REPORT_DELAY_TIMER_ID));
             assert_eq!(core_ctx.frames().len(), 3);
             ensure_ttl_ihl_rtr(&core_ctx);
         });
@@ -940,10 +931,7 @@ mod tests {
             let instant2 = bindings_ctx.timer_ctx().timers()[1].0.clone();
             assert_eq!(instant1, instant2);
 
-            assert_eq!(
-                bindings_ctx.trigger_next_timer(&mut core_ctx, TimerHandler::handle_timer),
-                Some(REPORT_DELAY_TIMER_ID)
-            );
+            assert_eq!(bindings_ctx.trigger_next_timer(&mut core_ctx), Some(REPORT_DELAY_TIMER_ID));
             // After the first timer, we send out our V1 report.
             assert_eq!(core_ctx.frames().len(), 2);
             // The last frame being sent should be a V1 report.
@@ -953,7 +941,7 @@ mod tests {
             assert_eq!(frame[24], 0x12);
 
             assert_eq!(
-                bindings_ctx.trigger_next_timer(&mut core_ctx, TimerHandler::handle_timer),
+                bindings_ctx.trigger_next_timer(&mut core_ctx),
                 Some(V1_ROUTER_PRESENT_TIMER_ID)
             );
             // After the second timer, we should reset our flag for v1 routers.
@@ -966,10 +954,7 @@ mod tests {
             }
 
             receive_igmp_query(&mut core_ctx, &mut bindings_ctx, Duration::from_secs(10));
-            assert_eq!(
-                bindings_ctx.trigger_next_timer(&mut core_ctx, TimerHandler::handle_timer),
-                Some(REPORT_DELAY_TIMER_ID)
-            );
+            assert_eq!(bindings_ctx.trigger_next_timer(&mut core_ctx), Some(REPORT_DELAY_TIMER_ID));
             assert_eq!(core_ctx.frames().len(), 3);
             // Now we should get V2 report
             assert_eq!(core_ctx.frames().last().unwrap().1[24], 0x16);
@@ -1003,10 +988,7 @@ mod tests {
         let instant2 = bindings_ctx.timer_ctx().timers()[0].0.clone();
         // Because of the message, our timer should be reset to a nearer future.
         assert!(instant2 <= instant1);
-        assert_eq!(
-            bindings_ctx.trigger_next_timer(&mut core_ctx, TimerHandler::handle_timer),
-            Some(REPORT_DELAY_TIMER_ID)
-        );
+        assert_eq!(bindings_ctx.trigger_next_timer(&mut core_ctx), Some(REPORT_DELAY_TIMER_ID));
         assert!(bindings_ctx.now() - start <= duration);
         assert_eq!(core_ctx.frames().len(), 2);
         // Make sure it is a V2 report.
@@ -1029,10 +1011,7 @@ mod tests {
             )]);
             // The initial unsolicited report.
             assert_eq!(core_ctx.frames().len(), 1);
-            assert_eq!(
-                bindings_ctx.trigger_next_timer(&mut core_ctx, TimerHandler::handle_timer),
-                Some(REPORT_DELAY_TIMER_ID)
-            );
+            assert_eq!(bindings_ctx.trigger_next_timer(&mut core_ctx), Some(REPORT_DELAY_TIMER_ID));
             // The report after the delay.
             assert_eq!(core_ctx.frames().len(), 2);
             assert_eq!(
@@ -1106,7 +1085,7 @@ mod tests {
             assert_eq!(core_ctx.frames().len(), 2);
             bindings_ctx.trigger_timers_and_expect_unordered(
                 [REPORT_DELAY_TIMER_ID, REPORT_DELAY_TIMER_ID_2],
-                handle_timer_helper_with_sc_ref_mut(&mut core_ctx, TimerHandler::handle_timer),
+                &mut core_ctx,
             );
             assert_eq!(core_ctx.frames().len(), 4);
             const RESP_TIME: Duration = Duration::from_secs(10);
@@ -1120,7 +1099,7 @@ mod tests {
             ]);
             bindings_ctx.trigger_timers_and_expect_unordered(
                 [REPORT_DELAY_TIMER_ID, REPORT_DELAY_TIMER_ID_2],
-                handle_timer_helper_with_sc_ref_mut(&mut core_ctx, TimerHandler::handle_timer),
+                &mut core_ctx,
             );
             // Two new reports should be sent.
             assert_eq!(core_ctx.frames().len(), 6);

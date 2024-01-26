@@ -823,10 +823,7 @@ mod tests {
     use super::*;
     use crate::{
         context::{
-            testutil::{
-                handle_timer_helper_with_sc_ref_mut, FakeCoreCtx, FakeCtx, FakeInstant,
-                FakeTimerCtxExt,
-            },
+            testutil::{FakeCoreCtx, FakeCtx, FakeInstant, FakeTimerCtxExt},
             InstantContext as _,
         },
         testutil::{assert_empty, FakeEventDispatcherConfig, FAKE_CONFIG_V4, FAKE_CONFIG_V6},
@@ -1343,10 +1340,7 @@ mod tests {
         validate_size(&core_ctx.get_ref().cache);
 
         // Trigger the timer (simulate a timer for the fragmented packet)
-        assert_eq!(
-            bindings_ctx.trigger_next_timer(&mut core_ctx, TimerHandler::handle_timer),
-            Some(key)
-        );
+        assert_eq!(bindings_ctx.trigger_next_timer(&mut core_ctx), Some(key));
 
         // Make sure no other times exist..
         bindings_ctx.timer_ctx().assert_no_timers_installed();
@@ -1408,10 +1402,7 @@ mod tests {
 
         // Trigger the timers, which will clear the cache.
         let timers = bindings_ctx
-            .trigger_timers_for(
-                REASSEMBLY_TIMEOUT + Duration::from_secs(1),
-                handle_timer_helper_with_sc_ref_mut(&mut core_ctx, TimerHandler::handle_timer),
-            )
+            .trigger_timers_for(REASSEMBLY_TIMEOUT + Duration::from_secs(1), &mut core_ctx)
             .len();
         assert!(timers == 171 || timers == 293); // ipv4 || ipv6
         assert_eq!(core_ctx.get_ref().cache.size, 0);
@@ -1782,10 +1773,7 @@ mod tests {
         );
 
         // Advance time by 30s (should be at 30s now).
-        assert_empty(bindings_ctx.trigger_timers_for(
-            Duration::from_secs(30),
-            handle_timer_helper_with_sc_ref_mut(&mut core_ctx, TimerHandler::handle_timer),
-        ));
+        assert_empty(bindings_ctx.trigger_timers_for(Duration::from_secs(30), &mut core_ctx));
 
         // Process fragment #2 for packet #0
         process_ip_fragment(
@@ -1798,10 +1786,7 @@ mod tests {
         );
 
         // Advance time by 10s (should be at 40s now).
-        assert_empty(bindings_ctx.trigger_timers_for(
-            Duration::from_secs(10),
-            handle_timer_helper_with_sc_ref_mut(&mut core_ctx, TimerHandler::handle_timer),
-        ));
+        assert_empty(bindings_ctx.trigger_timers_for(Duration::from_secs(10), &mut core_ctx));
 
         // Process fragment #1 for packet #2
         process_ip_fragment(
@@ -1826,10 +1811,7 @@ mod tests {
         try_reassemble_ip_packet(&mut core_ctx, &mut bindings_ctx, fragment_id_0, 24);
 
         // Advance time by 10s (should be at 50s now).
-        assert_empty(bindings_ctx.trigger_timers_for(
-            Duration::from_secs(10),
-            handle_timer_helper_with_sc_ref_mut(&mut core_ctx, TimerHandler::handle_timer),
-        ));
+        assert_empty(bindings_ctx.trigger_timers_for(Duration::from_secs(10), &mut core_ctx));
 
         // Process fragment #0 for packet #1
         process_ip_fragment(
@@ -1858,7 +1840,7 @@ mod tests {
         bindings_ctx.trigger_timers_for_and_expect(
             Duration::from_secs(10),
             [test_key::<I>(fragment_id_1.into())],
-            handle_timer_helper_with_sc_ref_mut(&mut core_ctx, TimerHandler::handle_timer),
+            &mut core_ctx,
         );
 
         // Make sure no other times exist.

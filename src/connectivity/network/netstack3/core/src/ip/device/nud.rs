@@ -2471,9 +2471,9 @@ mod tests {
     use crate::{
         context::{
             testutil::{
-                handle_timer_helper_with_sc_ref_mut, FakeBindingsCtx, FakeCoreCtx,
-                FakeCtxWithCoreCtx, FakeInstant, FakeLinkResolutionNotifier, FakeNetwork,
-                FakeNetworkLinks, FakeTimerCtxExt as _, WrappedFakeCoreCtx,
+                FakeBindingsCtx, FakeCoreCtx, FakeCtxWithCoreCtx, FakeInstant,
+                FakeLinkResolutionNotifier, FakeNetwork, FakeNetworkLinks, FakeTimerCtxExt as _,
+                WrappedFakeCoreCtx,
             },
             CtxPair, InstantContext, SendFrameContext as _,
         },
@@ -2985,10 +2985,7 @@ mod tests {
         init_delay_neighbor_with_ip(core_ctx, bindings_ctx, ip_address, link_address);
         let max_unicast_solicit = core_ctx.inner.max_unicast_solicit().get();
         assert_eq!(
-            bindings_ctx.trigger_timers_for(
-                DELAY_FIRST_PROBE_TIME.into(),
-                handle_timer_helper_with_sc_ref_mut(core_ctx, TimerHandler::handle_timer),
-            ),
+            bindings_ctx.trigger_timers_for(DELAY_FIRST_PROBE_TIME.into(), core_ctx),
             [NudTimerId::neighbor(FakeLinkDeviceId, ip_address, NudEvent::DelayFirstProbe)]
         );
         assert_neighbor_state_with_ip(
@@ -3033,10 +3030,7 @@ mod tests {
         for _ in 0..max_unicast_solicit {
             assert_neighbor_probe_sent_for_ip(core_ctx, ip_address, Some(LINK_ADDR1));
             assert_eq!(
-                bindings_ctx.trigger_timers_for(
-                    retransmit_timeout.into(),
-                    handle_timer_helper_with_sc_ref_mut(core_ctx, TimerHandler::handle_timer),
-                ),
+                bindings_ctx.trigger_timers_for(retransmit_timeout.into(), core_ctx),
                 [NudTimerId::neighbor(
                     FakeLinkDeviceId,
                     ip_address,
@@ -3352,10 +3346,7 @@ mod tests {
 
         // After REACHABLE_TIME, neighbor should transition to STALE.
         assert_eq!(
-            bindings_ctx.trigger_timers_for(
-                REACHABLE_TIME.into(),
-                handle_timer_helper_with_sc_ref_mut(&mut core_ctx, TimerHandler::handle_timer),
-            ),
+            bindings_ctx.trigger_timers_for(REACHABLE_TIME.into(), &mut core_ctx,),
             [NudTimerId::neighbor(FakeLinkDeviceId, I::LOOKUP_ADDR1, NudEvent::ReachableTime)]
         );
         assert_neighbor_state(
@@ -3759,10 +3750,7 @@ mod tests {
             other => unreachable!("test only covers DELAY and PROBE, got {:?}", other),
         };
         assert_eq!(
-            bindings_ctx.trigger_timers_for(
-                time.into(),
-                handle_timer_helper_with_sc_ref_mut(&mut core_ctx, TimerHandler::handle_timer),
-            ),
+            bindings_ctx.trigger_timers_for(time.into(), &mut core_ctx,),
             [NudTimerId::neighbor(FakeLinkDeviceId, I::LOOKUP_ADDR1, expected_initial_event)]
         );
         assert_neighbor_state(
@@ -3797,13 +3785,7 @@ mod tests {
         );
 
         // No multicast probes should be transmitted even after the retransmit timeout.
-        assert_eq!(
-            bindings_ctx.trigger_timers_for(
-                retrans_timer,
-                handle_timer_helper_with_sc_ref_mut(&mut core_ctx, TimerHandler::handle_timer),
-            ),
-            []
-        );
+        assert_eq!(bindings_ctx.trigger_timers_for(retrans_timer, &mut core_ctx,), []);
         assert_eq!(core_ctx.inner.take_frames(), []);
 
         // Send a packet and ensure that we also transmit a multicast probe.
@@ -3869,7 +3851,7 @@ mod tests {
             assert_eq!(
                 bindings_ctx.trigger_timers_for(
                     next_backoff_timer(&mut core_ctx, probes_sent),
-                    handle_timer_helper_with_sc_ref_mut(&mut core_ctx, TimerHandler::handle_timer),
+                    &mut core_ctx,
                 ),
                 [timer_id]
             );
@@ -3883,13 +3865,7 @@ mod tests {
         // If no more packets are sent, no multicast probes should be transmitted even
         // after the next backoff timer expires.
         let current_timer = next_backoff_timer(&mut core_ctx, u32::from(ITERATIONS));
-        assert_eq!(
-            bindings_ctx.trigger_timers_for(
-                current_timer,
-                handle_timer_helper_with_sc_ref_mut(&mut core_ctx, TimerHandler::handle_timer),
-            ),
-            [timer_id]
-        );
+        assert_eq!(bindings_ctx.trigger_timers_for(current_timer, &mut core_ctx,), [timer_id]);
         assert_eq!(core_ctx.inner.take_frames(), []);
         bindings_ctx.timer_ctx().assert_no_timers_installed();
 
@@ -4228,13 +4204,7 @@ mod tests {
                 .assert_timers_installed([(timer_id, bindings_ctx.now() + ONE_SECOND.get())]);
             assert_neighbor_probe_sent(&mut core_ctx, /* multicast */ None);
 
-            assert_eq!(
-                bindings_ctx.trigger_timers_for(
-                    retrans_timer,
-                    handle_timer_helper_with_sc_ref_mut(&mut core_ctx, TimerHandler::handle_timer),
-                ),
-                [timer_id]
-            );
+            assert_eq!(bindings_ctx.trigger_timers_for(retrans_timer, &mut core_ctx,), [timer_id]);
         }
 
         // The neighbor entry should have been removed.
@@ -4275,13 +4245,7 @@ mod tests {
                 .assert_timers_installed([(timer_id, bindings_ctx.now() + ONE_SECOND.get())]);
             assert_neighbor_probe_sent(&mut core_ctx, Some(LINK_ADDR1));
 
-            assert_eq!(
-                bindings_ctx.trigger_timers_for(
-                    retrans_timer,
-                    handle_timer_helper_with_sc_ref_mut(&mut core_ctx, TimerHandler::handle_timer),
-                ),
-                [timer_id]
-            );
+            assert_eq!(bindings_ctx.trigger_timers_for(retrans_timer, &mut core_ctx,), [timer_id]);
         }
 
         assert_neighbor_state(
@@ -4568,13 +4532,7 @@ mod tests {
                 for _ in 1..=max_multicast_solicit {
                     let retrans_timer = core_ctx.inner.retransmit_timeout().get();
                     assert_eq!(
-                        bindings_ctx.trigger_timers_for(
-                            retrans_timer,
-                            handle_timer_helper_with_sc_ref_mut(
-                                core_ctx,
-                                TimerHandler::handle_timer
-                            ),
-                        ),
+                        bindings_ctx.trigger_timers_for(retrans_timer, core_ctx),
                         [NudTimerId::neighbor(
                             FakeLinkDeviceId,
                             I::LOOKUP_ADDR1,
@@ -4658,10 +4616,7 @@ mod tests {
         // When the original timer eventually does expire, a new timer should be
         // scheduled based on when the entry was last confirmed.
         assert_eq!(
-            bindings_ctx.trigger_timers_for(
-                REACHABLE_TIME.get() / 2,
-                handle_timer_helper_with_sc_ref_mut(&mut core_ctx, TimerHandler::handle_timer),
-            ),
+            bindings_ctx.trigger_timers_for(REACHABLE_TIME.get() / 2, &mut core_ctx,),
             [NudTimerId::neighbor(FakeLinkDeviceId, I::LOOKUP_ADDR1, NudEvent::ReachableTime)]
         );
         let now = bindings_ctx.now();
@@ -4682,10 +4637,7 @@ mod tests {
         // When *that* timer fires, if the entry has not been confirmed since it was
         // scheduled, it should move into STALE.
         assert_eq!(
-            bindings_ctx.trigger_timers_for(
-                REACHABLE_TIME.get() / 2,
-                handle_timer_helper_with_sc_ref_mut(&mut core_ctx, TimerHandler::handle_timer),
-            ),
+            bindings_ctx.trigger_timers_for(REACHABLE_TIME.get() / 2, &mut core_ctx,),
             [NudTimerId::neighbor(FakeLinkDeviceId, I::LOOKUP_ADDR1, NudEvent::ReachableTime)]
         );
         assert_neighbor_state(

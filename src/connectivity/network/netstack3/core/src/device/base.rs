@@ -14,7 +14,7 @@ use net_types::{ethernet::Mac, ip::Ip, BroadcastAddr, MulticastAddr};
 use packet::Buf;
 
 use crate::{
-    context::{CounterContext, InstantContext},
+    context::{CounterContext, InstantContext, TimerHandler},
     counters::Counter,
     device::{
         arp::ArpCounters,
@@ -175,14 +175,19 @@ impl_timer_context!(
     id
 );
 
-/// Handle a timer event firing in the device layer.
-pub(crate) fn handle_timer<BC: BindingsContext>(
-    core_ctx: &mut CoreCtx<'_, BC, crate::lock_ordering::Unlocked>,
-    bindings_ctx: &mut BC,
-    DeviceLayerTimerId(id): DeviceLayerTimerId<BC>,
-) {
-    match id {
-        DeviceLayerTimerIdInner::Ethernet(id) => ethernet::handle_timer(core_ctx, bindings_ctx, id),
+impl<CC, BT> TimerHandler<BT, DeviceLayerTimerId<BT>> for CC
+where
+    BT: DeviceLayerTypes,
+    CC: TimerHandler<BT, EthernetTimerId<EthernetDeviceId<BT>>>,
+{
+    fn handle_timer(
+        &mut self,
+        bindings_ctx: &mut BT,
+        DeviceLayerTimerId(id): DeviceLayerTimerId<BT>,
+    ) {
+        match id {
+            DeviceLayerTimerIdInner::Ethernet(id) => self.handle_timer(bindings_ctx, id),
+        }
     }
 }
 

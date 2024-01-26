@@ -7,7 +7,7 @@ use lock_order::Unlocked;
 use net_types::ip::Ip;
 
 use crate::{
-    context::{ContextProvider, CoreCtx, CtxPair},
+    context::{ContextPair as _, ContextProvider, CoreCtx, CtxPair, TimerHandler as _},
     device::{
         api::{DeviceAnyApi, DeviceApi},
         queue::api::{ReceiveQueueApi, TransmitQueueApi},
@@ -21,6 +21,7 @@ use crate::{
         },
         icmp::socket::IcmpEchoSocketApi,
     },
+    time::TimerId,
     transport::{tcp::socket::TcpApi, udp::UdpApi},
     BindingsTypes,
 };
@@ -118,6 +119,16 @@ where
     pub fn receive_queue<D>(self) -> ReceiveQueueApi<D, CoreApiCtxPair<'a, BP>> {
         let Self(ctx) = self;
         ReceiveQueueApi::new(ctx)
+    }
+
+    /// Handles a timer.
+    pub fn handle_timer(&mut self, timer: TimerId<BP::Context>)
+    where
+        BP::Context: crate::BindingsContext,
+    {
+        let Self(ctx) = self;
+        let (core_ctx, bindings_ctx) = ctx.contexts();
+        core_ctx.handle_timer(bindings_ctx, timer)
     }
 }
 

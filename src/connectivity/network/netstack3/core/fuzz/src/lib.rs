@@ -18,8 +18,7 @@ use net_types::{
 };
 use netstack3_core::{
     device::{EthernetDeviceId, EthernetLinkDevice, RecvEthernetFrameMeta},
-    testutil::context::FakeTimerCtxExt as _,
-    testutil::{Ctx, FakeBindingsCtx, FakeCtx},
+    testutil::{FakeBindingsCtx, FakeCtx},
     TimerId,
 };
 use packet::{
@@ -407,11 +406,7 @@ fn dispatch(ctx: &mut FakeCtx, device_id: &EthernetDeviceId<FakeBindingsCtx>, ac
                 .receive_frame(RecvEthernetFrameMeta { device_id: device_id.clone() }, buf);
         }
         AdvanceTime(SmallDuration(duration)) => {
-            let Ctx { core_ctx, bindings_ctx } = ctx;
-            let _: Vec<TimerId<_>> = bindings_ctx
-                .trigger_timers_for(duration, |bindings_ctx, id| {
-                    netstack3_core::handle_timer(core_ctx, bindings_ctx, id)
-                });
+            let _: Vec<TimerId<_>> = ctx.trigger_timers_for(duration);
         }
     }
 }

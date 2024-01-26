@@ -1948,20 +1948,14 @@ mod tests {
             ]);
 
             // Trigger the deprecation timer.
-            assert_eq!(
-                bindings_ctx.trigger_next_timer(&mut core_ctx, TimerHandler::handle_timer),
-                Some(deprecate_timer_id)
-            );
+            assert_eq!(bindings_ctx.trigger_next_timer(&mut core_ctx), Some(deprecate_timer_id));
             let entry = SlaacAddressEntry { deprecated: true, ..entry };
             assert_eq!(core_ctx.get_ref().iter_slaac_addrs().collect::<Vec<_>>(), [entry],);
             bindings_ctx.timer_ctx().assert_timers_installed([(invalidate_timer_id, valid_until)]);
         }
 
         // Trigger the invalidation timer.
-        assert_eq!(
-            bindings_ctx.trigger_next_timer(&mut core_ctx, TimerHandler::handle_timer),
-            Some(invalidate_timer_id)
-        );
+        assert_eq!(bindings_ctx.trigger_next_timer(&mut core_ctx), Some(invalidate_timer_id));
         assert_empty(core_ctx.get_ref().iter_slaac_addrs());
         bindings_ctx.timer_ctx().assert_no_timers_installed();
     }
@@ -2627,10 +2621,7 @@ mod tests {
 
         // Trigger the regenerate timer to generate the second temporary SLAAC
         // address.
-        assert_eq!(
-            bindings_ctx.trigger_next_timer(&mut core_ctx, TimerHandler::handle_timer),
-            Some(first_regenerate_timer_id),
-        );
+        assert_eq!(bindings_ctx.trigger_next_timer(&mut core_ctx), Some(first_regenerate_timer_id),);
         let AddrProps {
             desync_factor: second_desync_factor,
             valid_until: second_valid_until,
@@ -2654,10 +2645,7 @@ mod tests {
         ]);
 
         // Deprecate first address.
-        assert_eq!(
-            bindings_ctx.trigger_next_timer(&mut core_ctx, TimerHandler::handle_timer),
-            Some(first_deprecate_timer_id),
-        );
+        assert_eq!(bindings_ctx.trigger_next_timer(&mut core_ctx), Some(first_deprecate_timer_id),);
         let first_entry = SlaacAddressEntry { deprecated: true, ..first_entry };
         assert_eq!(
             core_ctx.get_ref().iter_slaac_addrs().collect::<Vec<_>>(),
@@ -2681,10 +2669,7 @@ mod tests {
             for timer_id in expected_timer_order.iter() {
                 let timer_id = *timer_id;
 
-                assert_eq!(
-                    bindings_ctx.trigger_next_timer(&mut core_ctx, TimerHandler::handle_timer),
-                    Some(timer_id),
-                );
+                assert_eq!(bindings_ctx.trigger_next_timer(&mut core_ctx), Some(timer_id),);
 
                 if timer_id == second_regenerate_timer_id {
                     assert_eq!(third_created_at, None);

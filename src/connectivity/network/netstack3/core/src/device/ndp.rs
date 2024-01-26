@@ -141,10 +141,7 @@ mod tests {
             generate_opaque_interface_identifier, OpaqueIidNonce, STABLE_IID_SECRET_KEY_BYTES,
         },
         context::{
-            testutil::{
-                handle_timer_helper_with_sc_ref, FakeInstant, FakeNetwork, FakeNetworkLinks,
-                FakeTimerCtxExt as _, StepResult,
-            },
+            testutil::{FakeInstant, FakeNetwork, FakeNetworkLinks, StepResult},
             InstantContext as _, RngContext as _, TimerContext,
         },
         device::{
@@ -583,9 +580,9 @@ mod tests {
         assert!(is_in_ip_multicast(net.core_ctx("local"), &local_device_id, multicast_addr));
         assert!(!is_in_ip_multicast(net.core_ctx("remote"), &remote_device_id, multicast_addr));
 
-        net.with_context("local", |Ctx { core_ctx, bindings_ctx }| {
+        net.with_context("local", |ctx| {
             assert_eq!(
-                bindings_ctx.trigger_next_timer(&*core_ctx, crate::handle_timer).unwrap(),
+                ctx.trigger_next_timer().unwrap(),
                 dad_timer_id(local_eth_device_id, local_ip())
             );
         });
@@ -713,14 +710,13 @@ mod tests {
             .device_ip::<Ipv6>()
             .add_ip_addr_subnet(&dev_id, AddrSubnet::new(local_ip().into(), 128).unwrap())
             .unwrap();
-        let Ctx { core_ctx, bindings_ctx } = &mut ctx;
         for _ in 0..3 {
             assert_eq!(
-                bindings_ctx.trigger_next_timer(&*core_ctx, crate::handle_timer).unwrap(),
+                ctx.trigger_next_timer().unwrap(),
                 dad_timer_id(eth_dev_id.clone(), local_ip())
             );
         }
-        assert_eq!(get_address_assigned(core_ctx, &dev_id, local_ip(),), Some(true));
+        assert_eq!(get_address_assigned(&ctx.core_ctx, &dev_id, local_ip(),), Some(true));
     }
 
     #[test]
@@ -765,15 +761,9 @@ mod tests {
 
         let expected_timer_id = dad_timer_id(local_eth_device_id, local_ip());
         // During the first and second period, the remote host is still down.
-        net.with_context("local", |Ctx { core_ctx, bindings_ctx }| {
-            assert_eq!(
-                bindings_ctx.trigger_next_timer(&*core_ctx, crate::handle_timer).unwrap(),
-                expected_timer_id
-            );
-            assert_eq!(
-                bindings_ctx.trigger_next_timer(&*core_ctx, crate::handle_timer).unwrap(),
-                expected_timer_id
-            );
+        net.with_context("local", |ctx| {
+            assert_eq!(ctx.trigger_next_timer().unwrap(), expected_timer_id);
+            assert_eq!(ctx.trigger_next_timer().unwrap(), expected_timer_id);
         });
         net.with_context("remote", |ctx| {
             ctx.core_api()
@@ -883,38 +873,28 @@ mod tests {
             .device_ip::<Ipv6>()
             .add_ip_addr_subnet(&dev_id, AddrSubnet::new(local_ip().into(), 128).unwrap())
             .unwrap();
-        let Ctx { core_ctx, bindings_ctx } = &mut ctx;
-        assert_matches!(get_address_assigned(core_ctx, &dev_id, local_ip()), Some(false));
-        assert_eq!(bindings_ctx.frames_sent().len(), 1);
+
+        assert_matches!(get_address_assigned(&ctx.core_ctx, &dev_id, local_ip()), Some(false));
+        assert_eq!(ctx.bindings_ctx.frames_sent().len(), 1);
 
         // Send another NS.
         let local_timer_id = dad_timer_id(eth_dev_id.clone(), local_ip());
-        assert_eq!(
-            bindings_ctx.trigger_timers_for(
-                Duration::from_secs(1),
-                handle_timer_helper_with_sc_ref(core_ctx, crate::handle_timer)
-            ),
-            [local_timer_id.clone()]
-        );
-        assert_eq!(bindings_ctx.frames_sent().len(), 2);
+        assert_eq!(ctx.trigger_timers_for(Duration::from_secs(1)), [local_timer_id.clone()]);
+        assert_eq!(ctx.bindings_ctx.frames_sent().len(), 2);
 
         // Add another IP
         ctx.core_api()
             .device_ip::<Ipv6>()
             .add_ip_addr_subnet(&dev_id, AddrSubnet::new(remote_ip().into(), 128).unwrap())
             .unwrap();
-        let Ctx { core_ctx, bindings_ctx } = &mut ctx;
-        assert_matches!(get_address_assigned(core_ctx, &dev_id, local_ip()), Some(false));
-        assert_matches!(get_address_assigned(core_ctx, &dev_id, remote_ip()), Some(false));
-        assert_eq!(bindings_ctx.frames_sent().len(), 3);
+        assert_matches!(get_address_assigned(&ctx.core_ctx, &dev_id, local_ip()), Some(false));
+        assert_matches!(get_address_assigned(&ctx.core_ctx, &dev_id, remote_ip()), Some(false));
+        assert_eq!(ctx.bindings_ctx.frames_sent().len(), 3);
 
         // Run to the end for DAD for local ip
         let remote_timer_id = dad_timer_id(eth_dev_id, remote_ip());
         assert_eq!(
-            bindings_ctx.trigger_timers_for(
-                Duration::from_secs(2),
-                handle_timer_helper_with_sc_ref(core_ctx, crate::handle_timer)
-            ),
+            ctx.trigger_timers_for(Duration::from_secs(2)),
             [
                 local_timer_id.clone(),
                 remote_timer_id.clone(),
@@ -922,24 +902,18 @@ mod tests {
                 remote_timer_id.clone()
             ]
         );
-        assert_eq!(get_address_assigned(core_ctx, &dev_id, local_ip()), Some(true));
-        assert_matches!(get_address_assigned(core_ctx, &dev_id, remote_ip()), Some(false));
-        assert_eq!(bindings_ctx.frames_sent().len(), 6);
+        assert_eq!(get_address_assigned(&ctx.core_ctx, &dev_id, local_ip()), Some(true));
+        assert_matches!(get_address_assigned(&ctx.core_ctx, &dev_id, remote_ip()), Some(false));
+        assert_eq!(ctx.bindings_ctx.frames_sent().len(), 6);
 
         // Run to the end for DAD for local ip
-        assert_eq!(
-            bindings_ctx.trigger_timers_for(
-                Duration::from_secs(1),
-                handle_timer_helper_with_sc_ref(core_ctx, crate::handle_timer)
-            ),
-            [remote_timer_id]
-        );
-        assert_eq!(get_address_assigned(core_ctx, &dev_id, local_ip()), Some(true));
-        assert_eq!(get_address_assigned(core_ctx, &dev_id, remote_ip()), Some(true));
-        assert_eq!(bindings_ctx.frames_sent().len(), 6);
+        assert_eq!(ctx.trigger_timers_for(Duration::from_secs(1)), [remote_timer_id]);
+        assert_eq!(get_address_assigned(&ctx.core_ctx, &dev_id, local_ip()), Some(true));
+        assert_eq!(get_address_assigned(&ctx.core_ctx, &dev_id, remote_ip()), Some(true));
+        assert_eq!(ctx.bindings_ctx.frames_sent().len(), 6);
 
         // No more timers.
-        assert_eq!(bindings_ctx.trigger_next_timer(&*core_ctx, crate::handle_timer), None);
+        assert_eq!(ctx.trigger_next_timer(), None);
     }
 
     #[test]
@@ -981,68 +955,53 @@ mod tests {
             .device_ip::<Ipv6>()
             .add_ip_addr_subnet(&dev_id, AddrSubnet::new(local_ip().into(), 128).unwrap())
             .unwrap();
-        let Ctx { core_ctx, bindings_ctx } = &mut ctx;
-        assert_matches!(get_address_assigned(core_ctx, &dev_id, local_ip()), Some(false));
-        assert_eq!(bindings_ctx.frames_sent().len(), 1);
+        assert_matches!(get_address_assigned(&ctx.core_ctx, &dev_id, local_ip()), Some(false));
+        assert_eq!(ctx.bindings_ctx.frames_sent().len(), 1);
 
         // Send another NS.
         let local_timer_id = dad_timer_id(eth_dev_id.clone(), local_ip());
-        assert_eq!(
-            bindings_ctx.trigger_timers_for(
-                Duration::from_secs(1),
-                handle_timer_helper_with_sc_ref(core_ctx, crate::handle_timer)
-            ),
-            [local_timer_id.clone()]
-        );
-        assert_eq!(bindings_ctx.frames_sent().len(), 2);
+        assert_eq!(ctx.trigger_timers_for(Duration::from_secs(1)), [local_timer_id.clone()]);
+        assert_eq!(ctx.bindings_ctx.frames_sent().len(), 2);
 
         // Add another IP
         ctx.core_api()
             .device_ip::<Ipv6>()
             .add_ip_addr_subnet(&dev_id, AddrSubnet::new(remote_ip().into(), 128).unwrap())
             .unwrap();
-        let Ctx { core_ctx, bindings_ctx } = &mut ctx;
-        assert_matches!(get_address_assigned(core_ctx, &dev_id, local_ip()), Some(false));
-        assert_matches!(get_address_assigned(core_ctx, &dev_id, remote_ip()), Some(false));
-        assert_eq!(bindings_ctx.frames_sent().len(), 3);
+        assert_matches!(get_address_assigned(&ctx.core_ctx, &dev_id, local_ip()), Some(false));
+        assert_matches!(get_address_assigned(&ctx.core_ctx, &dev_id, remote_ip()), Some(false));
+        assert_eq!(ctx.bindings_ctx.frames_sent().len(), 3);
 
         // Run 1s
         let remote_timer_id = dad_timer_id(eth_dev_id, remote_ip());
         assert_eq!(
-            bindings_ctx.trigger_timers_for(
-                Duration::from_secs(1),
-                handle_timer_helper_with_sc_ref(core_ctx, crate::handle_timer)
-            ),
+            ctx.trigger_timers_for(Duration::from_secs(1)),
             [local_timer_id, remote_timer_id.clone()]
         );
-        assert_matches!(get_address_assigned(core_ctx, &dev_id, local_ip()), Some(false));
-        assert_matches!(get_address_assigned(core_ctx, &dev_id, remote_ip()), Some(false));
-        assert_eq!(bindings_ctx.frames_sent().len(), 5);
+        assert_matches!(get_address_assigned(&ctx.core_ctx, &dev_id, local_ip()), Some(false));
+        assert_matches!(get_address_assigned(&ctx.core_ctx, &dev_id, remote_ip()), Some(false));
+        assert_eq!(ctx.bindings_ctx.frames_sent().len(), 5);
 
         // Remove local ip
         ctx.core_api()
             .device_ip::<Ipv6>()
             .del_ip_addr(&dev_id, local_ip().into_specified())
             .unwrap();
-        let Ctx { core_ctx, bindings_ctx } = &mut ctx;
-        assert_eq!(get_address_assigned(core_ctx, &dev_id, local_ip()), None);
-        assert_matches!(get_address_assigned(core_ctx, &dev_id, remote_ip()), Some(false));
-        assert_eq!(bindings_ctx.frames_sent().len(), 5);
+        assert_eq!(get_address_assigned(&ctx.core_ctx, &dev_id, local_ip()), None);
+        assert_matches!(get_address_assigned(&ctx.core_ctx, &dev_id, remote_ip()), Some(false));
+        assert_eq!(ctx.bindings_ctx.frames_sent().len(), 5);
 
         // Run to the end for DAD for local ip
         assert_eq!(
-            bindings_ctx.trigger_timers_for(
-                Duration::from_secs(2),
-                handle_timer_helper_with_sc_ref(core_ctx, crate::handle_timer)
-            ),
+            ctx.trigger_timers_for(Duration::from_secs(2)),
             [remote_timer_id.clone(), remote_timer_id]
         );
-        assert_eq!(get_address_assigned(core_ctx, &dev_id, local_ip()), None);
-        assert_eq!(get_address_assigned(core_ctx, &dev_id, remote_ip()), Some(true));
-        assert_eq!(bindings_ctx.frames_sent().len(), 6);
+        assert_eq!(get_address_assigned(&ctx.core_ctx, &dev_id, local_ip()), None);
+        assert_eq!(get_address_assigned(&ctx.core_ctx, &dev_id, remote_ip()), Some(true));
+        assert_eq!(ctx.bindings_ctx.frames_sent().len(), 6);
 
         // No more timers.
-        assert_eq!(bindings_ctx.trigger_next_timer(&*core_ctx, crate::handle_timer), None);
+        assert_eq!(ctx.trigger_next_timer(), None);
     }
 
     trait UnwrapNdp<B: ByteSlice> {
@@ -1417,21 +1376,17 @@ mod tests {
                 },
             )
             .unwrap();
-        let Ctx { core_ctx, bindings_ctx } = &mut ctx;
-        assert_empty(bindings_ctx.frames_sent().iter());
+        assert_empty(ctx.bindings_ctx.frames_sent().iter());
 
-        let time = bindings_ctx.now();
-        assert_eq!(
-            bindings_ctx.trigger_next_timer(&*core_ctx, crate::handle_timer).unwrap(),
-            rs_timer_id(eth_device_id.clone())
-        );
+        let time = ctx.bindings_ctx.now();
+        assert_eq!(ctx.trigger_next_timer().unwrap(), rs_timer_id(eth_device_id.clone()));
         // Initial router solicitation should be a random delay between 0 and
         // `MAX_RTR_SOLICITATION_DELAY`.
-        assert!(bindings_ctx.now().duration_since(time) < MAX_RTR_SOLICITATION_DELAY);
-        assert_eq!(bindings_ctx.frames_sent().len(), 1);
+        assert!(ctx.bindings_ctx.now().duration_since(time) < MAX_RTR_SOLICITATION_DELAY);
+        assert_eq!(ctx.bindings_ctx.frames_sent().len(), 1);
         let (src_mac, _, src_ip, _, _, message, code) =
             parse_icmp_packet_in_ip_packet_in_ethernet_frame::<Ipv6, _, RouterSolicitation, _>(
-                &bindings_ctx.frames_sent()[0].1,
+                &ctx.bindings_ctx.frames_sent()[0].1,
                 EthernetFrameLengthCheck::NoCheck,
                 |_| {},
             )
@@ -1439,15 +1394,12 @@ mod tests {
         validate_params(src_mac, src_ip, message, code);
 
         // Should get 2 more router solicitation messages
-        let time = bindings_ctx.now();
-        assert_eq!(
-            bindings_ctx.trigger_next_timer(&*core_ctx, crate::handle_timer).unwrap(),
-            rs_timer_id(eth_device_id.clone())
-        );
-        assert_eq!(bindings_ctx.now().duration_since(time), RTR_SOLICITATION_INTERVAL);
+        let time = ctx.bindings_ctx.now();
+        assert_eq!(ctx.trigger_next_timer().unwrap(), rs_timer_id(eth_device_id.clone()));
+        assert_eq!(ctx.bindings_ctx.now().duration_since(time), RTR_SOLICITATION_INTERVAL);
         let (src_mac, _, src_ip, _, _, message, code) =
             parse_icmp_packet_in_ip_packet_in_ethernet_frame::<Ipv6, _, RouterSolicitation, _>(
-                &bindings_ctx.frames_sent()[1].1,
+                &ctx.bindings_ctx.frames_sent()[1].1,
                 EthernetFrameLengthCheck::NoCheck,
                 |_| {},
             )
@@ -1464,16 +1416,13 @@ mod tests {
                 AddrSubnet::new(fake_config.local_ip.get(), 128).unwrap(),
             )
             .unwrap();
-        let Ctx { core_ctx, bindings_ctx } = &mut ctx;
-        let time = bindings_ctx.now();
-        assert_eq!(
-            bindings_ctx.trigger_next_timer(&*core_ctx, crate::handle_timer).unwrap(),
-            rs_timer_id(eth_device_id)
-        );
-        assert_eq!(bindings_ctx.now().duration_since(time), RTR_SOLICITATION_INTERVAL);
+
+        let time = ctx.bindings_ctx.now();
+        assert_eq!(ctx.trigger_next_timer().unwrap(), rs_timer_id(eth_device_id));
+        assert_eq!(ctx.bindings_ctx.now().duration_since(time), RTR_SOLICITATION_INTERVAL);
         let (src_mac, _, src_ip, _, _, message, code) =
             parse_icmp_packet_in_ip_packet_in_ethernet_frame::<Ipv6, _, RouterSolicitation, _>(
-                &bindings_ctx.frames_sent()[2].1,
+                &ctx.bindings_ctx.frames_sent()[2].1,
                 EthernetFrameLengthCheck::NoCheck,
                 |p| {
                     // We should have a source link layer option now because we
@@ -1490,9 +1439,9 @@ mod tests {
         validate_params(src_mac, src_ip, message, code);
 
         // No more timers.
-        assert_eq!(bindings_ctx.trigger_next_timer(&*core_ctx, crate::handle_timer), None);
+        assert_eq!(ctx.trigger_next_timer(), None);
         // Should have only sent 3 packets (Router solicitations).
-        assert_eq!(bindings_ctx.frames_sent().len(), 3);
+        assert_eq!(ctx.bindings_ctx.frames_sent().len(), 3);
 
         let mut ctx = crate::testutil::FakeCtx::default();
         assert_empty(ctx.bindings_ctx.frames_sent().iter());
@@ -1524,30 +1473,23 @@ mod tests {
                 },
             )
             .unwrap();
-        let Ctx { core_ctx, bindings_ctx } = &mut ctx;
-        assert_empty(bindings_ctx.frames_sent().iter());
+        assert_empty(ctx.bindings_ctx.frames_sent().iter());
 
-        let time = bindings_ctx.now();
-        assert_eq!(
-            bindings_ctx.trigger_next_timer(&*core_ctx, crate::handle_timer).unwrap(),
-            rs_timer_id(eth_device_id.clone())
-        );
+        let time = ctx.bindings_ctx.now();
+        assert_eq!(ctx.trigger_next_timer().unwrap(), rs_timer_id(eth_device_id.clone()));
         // Initial router solicitation should be a random delay between 0 and
         // `MAX_RTR_SOLICITATION_DELAY`.
-        assert!(bindings_ctx.now().duration_since(time) < MAX_RTR_SOLICITATION_DELAY);
-        assert_eq!(bindings_ctx.frames_sent().len(), 1);
+        assert!(ctx.bindings_ctx.now().duration_since(time) < MAX_RTR_SOLICITATION_DELAY);
+        assert_eq!(ctx.bindings_ctx.frames_sent().len(), 1);
 
         // Should trigger 1 more router solicitations
-        let time = bindings_ctx.now();
-        assert_eq!(
-            bindings_ctx.trigger_next_timer(&*core_ctx, crate::handle_timer).unwrap(),
-            rs_timer_id(eth_device_id)
-        );
-        assert_eq!(bindings_ctx.now().duration_since(time), RTR_SOLICITATION_INTERVAL);
-        assert_eq!(bindings_ctx.frames_sent().len(), 2);
+        let time = ctx.bindings_ctx.now();
+        assert_eq!(ctx.trigger_next_timer().unwrap(), rs_timer_id(eth_device_id));
+        assert_eq!(ctx.bindings_ctx.now().duration_since(time), RTR_SOLICITATION_INTERVAL);
+        assert_eq!(ctx.bindings_ctx.frames_sent().len(), 2);
 
         // Each packet would be the same.
-        for f in bindings_ctx.frames_sent().iter() {
+        for f in ctx.bindings_ctx.frames_sent().iter() {
             let (src_mac, _, src_ip, _, _, message, code) =
                 parse_icmp_packet_in_ip_packet_in_ethernet_frame::<Ipv6, _, RouterSolicitation, _>(
                     &f.1,
@@ -1559,7 +1501,7 @@ mod tests {
         }
 
         // No more timers.
-        assert_eq!(bindings_ctx.trigger_next_timer(&*core_ctx, crate::handle_timer), None);
+        assert_eq!(ctx.trigger_next_timer(), None);
     }
 
     #[test]
@@ -1606,65 +1548,56 @@ mod tests {
                 },
             )
             .unwrap();
-        let Ctx { core_ctx, bindings_ctx } = &mut ctx;
         let timer_id: TimerId<_> =
             rs_timer_id(device.clone().try_into().expect("expected ethernet ID"));
 
         // Send the first router solicitation.
-        assert_empty(bindings_ctx.frames_sent().iter());
-        bindings_ctx.timer_ctx().assert_timers_installed([(timer_id.clone(), ..)]);
+        assert_empty(ctx.bindings_ctx.frames_sent().iter());
+        ctx.bindings_ctx.timer_ctx().assert_timers_installed([(timer_id.clone(), ..)]);
 
-        assert_eq!(
-            bindings_ctx.trigger_next_timer(&*core_ctx, crate::handle_timer).unwrap(),
-            timer_id
-        );
+        assert_eq!(ctx.trigger_next_timer().unwrap(), timer_id);
 
         // Should have sent a router solicitation and still have the timer
         // setup.
-        assert_eq!(bindings_ctx.frames_sent().len(), 1);
+        assert_eq!(ctx.bindings_ctx.frames_sent().len(), 1);
         let (_, _dst_mac, _, _, _, _, _) =
             parse_icmp_packet_in_ip_packet_in_ethernet_frame::<Ipv6, _, RouterSolicitation, _>(
-                &bindings_ctx.frames_sent()[0].1,
+                &ctx.bindings_ctx.frames_sent()[0].1,
                 EthernetFrameLengthCheck::NoCheck,
                 |_| {},
             )
             .unwrap();
-        bindings_ctx.timer_ctx().assert_timers_installed([(timer_id.clone(), ..)]);
+        ctx.bindings_ctx.timer_ctx().assert_timers_installed([(timer_id.clone(), ..)]);
 
         // Enable routing on device.
         set_forwarding_enabled::<_, Ipv6>(&mut ctx, &device, true);
-        let Ctx { core_ctx, bindings_ctx } = &mut ctx;
-        assert!(is_forwarding_enabled::<_, Ipv6>(core_ctx, &device));
+        assert!(is_forwarding_enabled::<_, Ipv6>(&ctx.core_ctx, &device));
 
         // Should have not sent any new packets, but unset the router
         // solicitation timer.
-        assert_eq!(bindings_ctx.frames_sent().len(), 1);
-        assert_empty(bindings_ctx.timer_ctx().timers().iter().filter(|x| &x.1 == &timer_id));
+        assert_eq!(ctx.bindings_ctx.frames_sent().len(), 1);
+        assert_empty(ctx.bindings_ctx.timer_ctx().timers().iter().filter(|x| &x.1 == &timer_id));
 
         // Unsetting routing should succeed.
         set_forwarding_enabled::<_, Ipv6>(&mut ctx, &device, false);
-        let Ctx { core_ctx, bindings_ctx } = &mut ctx;
-        assert!(!is_forwarding_enabled::<_, Ipv6>(core_ctx, &device));
-        assert_eq!(bindings_ctx.frames_sent().len(), 1);
-        bindings_ctx.timer_ctx().assert_timers_installed([(timer_id.clone(), ..)]);
+        assert!(!is_forwarding_enabled::<_, Ipv6>(&ctx.core_ctx, &device));
+        assert_eq!(ctx.bindings_ctx.frames_sent().len(), 1);
+        ctx.bindings_ctx.timer_ctx().assert_timers_installed([(timer_id.clone(), ..)]);
 
         // Send the first router solicitation after being turned into a host.
-        assert_eq!(
-            bindings_ctx.trigger_next_timer(&*core_ctx, crate::handle_timer).unwrap(),
-            timer_id
-        );
+        assert_eq!(ctx.trigger_next_timer().unwrap(), timer_id);
 
         // Should have sent a router solicitation.
-        assert_eq!(bindings_ctx.frames_sent().len(), 2);
+        assert_eq!(ctx.bindings_ctx.frames_sent().len(), 2);
         assert_matches!(
             parse_icmp_packet_in_ip_packet_in_ethernet_frame::<Ipv6, _, RouterSolicitation, _>(
-                &bindings_ctx.frames_sent()[1].1,
+                &ctx.bindings_ctx.frames_sent()[1].1,
                 EthernetFrameLengthCheck::NoCheck,
                 |_| {},
             ),
             Ok((_, _, _, _, _, _, _))
         );
-        bindings_ctx.timer_ctx().assert_timers_installed([(timer_id, ..)]);
+        ctx.bindings_ctx.timer_ctx().assert_timers_installed([(timer_id, ..)]);
 
         // Clear all device references.
         core::mem::drop(device);
@@ -1702,11 +1635,10 @@ mod tests {
             .add_ip_addr_subnet(&device, AddrSubnet::new(fake_config.local_ip.get(), 128).unwrap())
             .unwrap();
 
-        let Ctx { core_ctx, bindings_ctx } = &mut ctx;
         let device_id = device.clone().try_into().unwrap();
-        assert_eq!(get_address_assigned(core_ctx, &device, local_ip()), Some(true));
-        assert_empty(bindings_ctx.frames_sent().iter());
-        assert_empty(bindings_ctx.timer_ctx().timers());
+        assert_eq!(get_address_assigned(&ctx.core_ctx, &device, local_ip()), Some(true));
+        assert_empty(ctx.bindings_ctx.frames_sent().iter());
+        assert_empty(ctx.bindings_ctx.timer_ctx().timers());
 
         // Enable DAD for the device.
         const DUP_ADDR_DETECT_TRANSMITS: u8 = 3;
@@ -1731,11 +1663,10 @@ mod tests {
             .device_ip::<Ipv6>()
             .add_ip_addr_subnet(&device, AddrSubnet::new(fake_config.remote_ip.get(), 128).unwrap())
             .unwrap();
-        let Ctx { core_ctx, bindings_ctx } = &mut ctx;
-        assert_eq!(get_address_assigned(core_ctx, &device, local_ip()), Some(true));
-        assert_eq!(get_address_assigned(core_ctx, &device, remote_ip()), Some(false));
-        assert_eq!(bindings_ctx.frames_sent().len(), 1);
-        assert_eq!(bindings_ctx.timer_ctx().timers().len(), 1);
+        assert_eq!(get_address_assigned(&ctx.core_ctx, &device, local_ip()), Some(true));
+        assert_eq!(get_address_assigned(&ctx.core_ctx, &device, remote_ip()), Some(false));
+        assert_eq!(ctx.bindings_ctx.frames_sent().len(), 1);
+        assert_eq!(ctx.bindings_ctx.timer_ctx().timers().len(), 1);
 
         // Disable DAD during DAD.
         let _: Ipv6DeviceConfigurationUpdate = ctx
@@ -1746,25 +1677,16 @@ mod tests {
                 Ipv6DeviceConfigurationUpdate { dad_transmits: Some(None), ..Default::default() },
             )
             .unwrap();
-        let Ctx { core_ctx, bindings_ctx } = &mut ctx;
+
         let expected_timer_id = dad_timer_id(device_id, remote_ip());
         // Allow already started DAD to complete (2 more more NS, 3 more timers).
-        assert_eq!(
-            bindings_ctx.trigger_next_timer(&*core_ctx, crate::handle_timer).unwrap(),
-            expected_timer_id
-        );
-        assert_eq!(bindings_ctx.frames_sent().len(), 2);
-        assert_eq!(
-            bindings_ctx.trigger_next_timer(&*core_ctx, crate::handle_timer).unwrap(),
-            expected_timer_id
-        );
-        assert_eq!(bindings_ctx.frames_sent().len(), 3);
-        assert_eq!(
-            bindings_ctx.trigger_next_timer(&*core_ctx, crate::handle_timer).unwrap(),
-            expected_timer_id
-        );
-        assert_eq!(bindings_ctx.frames_sent().len(), 3);
-        assert_eq!(get_address_assigned(core_ctx, &device, remote_ip()), Some(true));
+        assert_eq!(ctx.trigger_next_timer().unwrap(), expected_timer_id);
+        assert_eq!(ctx.bindings_ctx.frames_sent().len(), 2);
+        assert_eq!(ctx.trigger_next_timer().unwrap(), expected_timer_id);
+        assert_eq!(ctx.bindings_ctx.frames_sent().len(), 3);
+        assert_eq!(ctx.trigger_next_timer().unwrap(), expected_timer_id);
+        assert_eq!(ctx.bindings_ctx.frames_sent().len(), 3);
+        assert_eq!(get_address_assigned(&ctx.core_ctx, &device, remote_ip()), Some(true));
 
         // Updating the IP should resolve immediately since DAD has just been
         // turned off.
@@ -1842,7 +1764,6 @@ mod tests {
             .into();
         crate::device::testutil::enable_device(&mut ctx, &device);
         set_forwarding_enabled::<_, Ipv6>(&mut ctx, &device, true);
-        let Ctx { core_ctx, bindings_ctx } = &mut ctx;
 
         let src_mac = config.remote_mac;
         let src_ip = src_mac.to_ipv6_link_local().addr().get();
@@ -1865,6 +1786,7 @@ mod tests {
             100,
             0,
         );
+        let Ctx { core_ctx, bindings_ctx } = &mut ctx;
         receive_ip_packet::<_, _, Ipv6>(
             core_ctx,
             bindings_ctx,
@@ -1876,7 +1798,7 @@ mod tests {
         assert_empty(get_global_ipv6_addrs(core_ctx, &device));
 
         // No timers.
-        assert_eq!(bindings_ctx.trigger_next_timer(&*core_ctx, crate::handle_timer), None);
+        assert_eq!(ctx.trigger_next_timer(), None);
     }
 
     impl From<SlaacTimerId<DeviceId<crate::testutil::FakeBindingsCtx>>>
@@ -1898,22 +1820,13 @@ mod tests {
     impl TestSlaacPrefix {
         fn send_prefix_update(
             &self,
-            core_ctx: &mut crate::testutil::FakeCoreCtx,
-            bindings_ctx: &mut crate::testutil::FakeBindingsCtx,
+            ctx: &mut crate::testutil::FakeCtx,
             device: &DeviceId<crate::testutil::FakeBindingsCtx>,
             src_ip: Ipv6Addr,
         ) {
             let Self { prefix, valid_for, preferred_for } = *self;
 
-            receive_prefix_update(
-                core_ctx,
-                bindings_ctx,
-                device,
-                src_ip,
-                prefix,
-                preferred_for,
-                valid_for,
-            );
+            receive_prefix_update(ctx, device, src_ip, prefix, preferred_for, valid_for);
         }
 
         fn valid_until<I: Instant>(&self, now: I) -> I {
@@ -2054,20 +1967,20 @@ mod tests {
         let config = Ipv6::FAKE_CONFIG;
         let src_mac = config.remote_mac;
         let src_ip: Ipv6Addr = src_mac.to_ipv6_link_local().addr().get();
-        let Ctx { core_ctx, bindings_ctx } = &mut ctx;
+
         // After the RA for the first prefix, we should have two addresses, one
         // static and one temporary.
-        prefix1.send_prefix_update(core_ctx, bindings_ctx, &device, src_ip);
+        prefix1.send_prefix_update(&mut ctx, &device, src_ip);
 
         let (prefix_1_static, prefix_1_temporary) = {
-            let slaac_configs = get_global_ipv6_addrs(core_ctx, &device)
+            let slaac_configs = get_global_ipv6_addrs(&ctx.core_ctx, &device)
                 .into_iter()
                 .filter_map(slaac_address)
                 .filter(|(a, _)| prefix1.prefix.contains(a));
 
             let (static_address, temporary_address) = single_static_and_temporary(slaac_configs);
 
-            let now = bindings_ctx.now();
+            let now = ctx.bindings_ctx.now();
             let prefix1_valid_until = prefix1.valid_until(now);
             assert_matches!(static_address, (_addr,
             SlaacConfig::Static { valid_until }) => {
@@ -2087,17 +2000,17 @@ mod tests {
 
         // When the RA for the second prefix comes in, we should leave the entries for the addresses
         // in the first prefix alone.
-        prefix2.send_prefix_update(core_ctx, bindings_ctx, &device, src_ip);
+        prefix2.send_prefix_update(&mut ctx, &device, src_ip);
 
         {
             // Check prefix 1 addresses again.
-            let slaac_configs = get_global_ipv6_addrs(core_ctx, &device)
+            let slaac_configs = get_global_ipv6_addrs(&ctx.core_ctx, &device)
                 .into_iter()
                 .filter_map(slaac_address)
                 .filter(|(a, _)| prefix1.prefix.contains(a));
             let (static_address, temporary_address) = single_static_and_temporary(slaac_configs);
 
-            let now = bindings_ctx.now();
+            let now = ctx.bindings_ctx.now();
             let prefix1_valid_until = prefix1.valid_until(now);
             assert_matches!(static_address, (addr, SlaacConfig::Static { valid_until }) => {
                 assert_eq!(addr, prefix_1_static);
@@ -2112,13 +2025,13 @@ mod tests {
         }
         {
             // Check prefix 2 addresses.
-            let slaac_configs = get_global_ipv6_addrs(core_ctx, &device)
+            let slaac_configs = get_global_ipv6_addrs(&ctx.core_ctx, &device)
                 .into_iter()
                 .filter_map(slaac_address)
                 .filter(|(a, _)| prefix2.prefix.contains(a));
             let (static_address, temporary_address) = single_static_and_temporary(slaac_configs);
 
-            let now = bindings_ctx.now();
+            let now = ctx.bindings_ctx.now();
             let prefix2_valid_until = prefix2.valid_until(now);
             assert_matches!(static_address, (_, SlaacConfig::Static { valid_until }) => {
                 assert_eq!(valid_until, Lifetime::Finite(prefix2_valid_until))
@@ -2142,7 +2055,6 @@ mod tests {
     {
         set_logger_for_test();
         let (mut ctx, device, slaac_config) = initialize_with_temporary_addresses_enabled();
-        let Ctx { core_ctx, bindings_ctx } = &mut ctx;
 
         let max_valid_lifetime =
             slaac_config.temporary_address_configuration.unwrap().temp_valid_lifetime.get();
@@ -2157,7 +2069,7 @@ mod tests {
             [],
             // Clone the RNG so we can see what the next value (which will be
             // used to generate the temporary address) will be.
-            OpaqueIidNonce::Random(bindings_ctx.rng().deep_clone().next_u64()),
+            OpaqueIidNonce::Random(ctx.bindings_ctx.rng().deep_clone().next_u64()),
             &slaac_config.temporary_address_configuration.unwrap().secret_key,
         );
         let mut expected_addr = [1, 2, 3, 4, 5, 6, 7, 8, 0, 0, 0, 0, 0, 0, 0, 0];
@@ -2171,8 +2083,7 @@ mod tests {
         // Should get a new temporary IP.
 
         receive_prefix_update(
-            core_ctx,
-            bindings_ctx,
+            &mut ctx,
             &device,
             src_ip,
             subnet,
@@ -2181,7 +2092,7 @@ mod tests {
         );
 
         // Should have gotten a new temporary IP.
-        let temporary_slaac_addresses = get_global_ipv6_addrs(core_ctx, &device)
+        let temporary_slaac_addresses = get_global_ipv6_addrs(&ctx.core_ctx, &device)
             .into_iter()
             .filter_map(|entry| match entry.config {
                 Ipv6AddrConfig::Slaac(SlaacConfig::Static { .. }) => None,
@@ -2199,7 +2110,7 @@ mod tests {
             temporary_slaac_addresses.into_iter().next().unwrap();
         assert_eq!(addr_sub.subnet(), subnet);
         assert!(assigned);
-        assert!(valid_until <= bindings_ctx.now().checked_add(max_valid_lifetime).unwrap());
+        assert!(valid_until <= ctx.bindings_ctx.now().checked_add(max_valid_lifetime).unwrap());
 
         (ctx, device, expected_addr)
     }
@@ -2224,14 +2135,15 @@ mod tests {
         // Receive an RA to figure out the temporary address that is assigned.
         let conflicted_addr = {
             let (mut ctx, device, _config) = initialize_with_temporary_addresses_enabled();
-            let Ctx { core_ctx, bindings_ctx } = &mut ctx;
 
-            *bindings_ctx.rng().rng() = rand::SeedableRng::from_seed(RNG_SEED);
+            *ctx.bindings_ctx.rng().rng() = rand::SeedableRng::from_seed(RNG_SEED);
 
             // Receive an RA and determine what temporary address was assigned, then return it.
-            receive_prefix_update(core_ctx, bindings_ctx, &device, src_ip, subnet, 9000, 10000);
+            receive_prefix_update(&mut ctx, &device, src_ip, subnet, 9000, 10000);
             let conflicted_addr =
-                *get_matching_slaac_address_entry(core_ctx, &device, |entry| match entry.config {
+                *get_matching_slaac_address_entry(&mut ctx.core_ctx, &device, |entry| match entry
+                    .config
+                {
                     Ipv6AddrConfig::Slaac(SlaacConfig::Static { valid_until: _ }) => false,
                     Ipv6AddrConfig::Slaac(SlaacConfig::Temporary(_)) => true,
                     Ipv6AddrConfig::Manual(_manual_config) => false,
@@ -2251,11 +2163,10 @@ mod tests {
             .device_ip::<Ipv6>()
             .add_ip_addr_subnet(&device, conflicted_addr.to_witness())
             .expect("adding address failed");
-        let Ctx { core_ctx, bindings_ctx } = &mut ctx;
 
         // Sanity check: `conflicted_addr` is already assigned on the device.
         assert_matches!(
-            get_global_ipv6_addrs(core_ctx, &device)
+            get_global_ipv6_addrs(&ctx.core_ctx, &device)
                 .into_iter()
                 .find(|entry| entry.addr_sub() == &conflicted_addr),
             Some(_)
@@ -2263,23 +2174,25 @@ mod tests {
 
         // Seed the RNG right before the RA is received, just like in our
         // earlier run above.
-        *bindings_ctx.rng().rng() = rand::SeedableRng::from_seed(RNG_SEED);
+        *ctx.bindings_ctx.rng().rng() = rand::SeedableRng::from_seed(RNG_SEED);
 
         // Receive a new RA with new prefix (autonomous). The system will assign
         // a temporary and static SLAAC address. The first temporary address
         // tried will conflict with `conflicted_addr` assigned above, so a
         // different one will be generated.
-        receive_prefix_update(core_ctx, bindings_ctx, &device, src_ip, subnet, 9000, 10000);
+        receive_prefix_update(&mut ctx, &device, src_ip, subnet, 9000, 10000);
 
         // Verify that `conflicted_addr` was generated and rejected.
-        assert_eq!(core_ctx.state.slaac_counters().generated_slaac_addr_exists.get(), 1);
+        assert_eq!(ctx.core_ctx.state.slaac_counters().generated_slaac_addr_exists.get(), 1);
 
         // Should have gotten a new temporary IP.
         let temporary_slaac_addresses =
-            get_matching_slaac_address_entries(core_ctx, &device, |entry| match entry.config {
-                Ipv6AddrConfig::Slaac(SlaacConfig::Static { valid_until: _ }) => false,
-                Ipv6AddrConfig::Slaac(SlaacConfig::Temporary(_)) => true,
-                Ipv6AddrConfig::Manual(_manual_config) => false,
+            get_matching_slaac_address_entries(&mut ctx.core_ctx, &device, |entry| {
+                match entry.config {
+                    Ipv6AddrConfig::Slaac(SlaacConfig::Static { valid_until: _ }) => false,
+                    Ipv6AddrConfig::Slaac(SlaacConfig::Temporary(_)) => true,
+                    Ipv6AddrConfig::Manual(_manual_config) => false,
+                }
             })
             .map(|entry| *entry.addr_sub())
             .collect::<Vec<_>>();
@@ -2413,8 +2326,7 @@ mod tests {
         let preferred_lifetime = 1;
 
         receive_prefix_update(
-            core_ctx,
-            bindings_ctx,
+            &mut ctx,
             &device,
             src_ip,
             prefix,
@@ -2423,7 +2335,7 @@ mod tests {
         );
 
         // Should have gotten a new IP.
-        let now = bindings_ctx.now();
+        let now = ctx.bindings_ctx.now();
         let valid_until = now + Duration::from_secs(valid_lifetime.into());
         let expected_address_entry = GlobalIpv6Addr {
             addr_sub: expected_addr_sub,
@@ -2432,10 +2344,10 @@ mod tests {
             }),
             flags: Ipv6AddressFlags { deprecated: false, assigned: false },
         };
-        assert_eq!(get_global_ipv6_addrs(core_ctx, &device), [expected_address_entry]);
+        assert_eq!(get_global_ipv6_addrs(&ctx.core_ctx, &device), [expected_address_entry]);
 
         // Make sure deprecate and invalidation timers are set.
-        bindings_ctx.timer_ctx().assert_some_timers_installed([
+        ctx.bindings_ctx.timer_ctx().assert_some_timers_installed([
             (
                 SlaacTimerId::new_deprecate_slaac_address(device.clone(), expected_addr).into(),
                 now + Duration::from_secs(preferred_lifetime.into()),
@@ -2448,11 +2360,11 @@ mod tests {
 
         // Trigger the deprecation timer.
         assert_eq!(
-            bindings_ctx.trigger_next_timer(&*core_ctx, crate::handle_timer).unwrap(),
+            ctx.trigger_next_timer().unwrap(),
             SlaacTimerId::new_deprecate_slaac_address(device.clone(), expected_addr).into()
         );
         assert_eq!(
-            get_global_ipv6_addrs(core_ctx, &device),
+            get_global_ipv6_addrs(&ctx.core_ctx, &device),
             [GlobalIpv6Addr {
                 flags: Ipv6AddressFlags { deprecated: true, ..expected_address_entry.flags },
                 ..expected_address_entry
@@ -2464,8 +2376,7 @@ mod tests {
     }
 
     fn receive_prefix_update(
-        core_ctx: &mut crate::testutil::FakeCoreCtx,
-        bindings_ctx: &mut crate::testutil::FakeBindingsCtx,
+        ctx: &mut crate::testutil::FakeCtx,
         device: &DeviceId<crate::testutil::FakeBindingsCtx>,
         src_ip: Ipv6Addr,
         subnet: Subnet<Ipv6Addr>,
@@ -2485,6 +2396,7 @@ mod tests {
             valid_lifetime,
             preferred_lifetime,
         );
+        let Ctx { core_ctx, bindings_ctx } = ctx;
         receive_ip_packet::<_, _, Ipv6>(
             core_ctx,
             bindings_ctx,
@@ -2568,8 +2480,7 @@ mod tests {
 
         set_logger_for_test();
         fn inner_test(
-            core_ctx: &mut crate::testutil::FakeCoreCtx,
-            bindings_ctx: &mut crate::testutil::FakeBindingsCtx,
+            ctx: &mut crate::testutil::FakeCtx,
             device: &DeviceId<crate::testutil::FakeBindingsCtx>,
             src_ip: Ipv6Addr,
             subnet: Subnet<Ipv6Addr>,
@@ -2578,24 +2489,16 @@ mod tests {
             valid_lifetime: u32,
             expected_valid_lifetime: u32,
         ) {
-            receive_prefix_update(
-                core_ctx,
-                bindings_ctx,
-                device,
-                src_ip,
-                subnet,
-                preferred_lifetime,
-                valid_lifetime,
-            );
-            let entry = get_slaac_address_entry(core_ctx, &device, addr_sub).unwrap();
-            let now = bindings_ctx.now();
+            receive_prefix_update(ctx, device, src_ip, subnet, preferred_lifetime, valid_lifetime);
+            let entry = get_slaac_address_entry(&mut ctx.core_ctx, &device, addr_sub).unwrap();
+            let now = ctx.bindings_ctx.now();
             let valid_until =
                 now.checked_add(Duration::from_secs(expected_valid_lifetime.into())).unwrap();
             let preferred_until =
                 now.checked_add(Duration::from_secs(preferred_lifetime.into())).unwrap();
 
             assert_slaac_lifetimes_enforced(
-                bindings_ctx,
+                &ctx.bindings_ctx,
                 &device,
                 entry,
                 valid_until,
@@ -2646,169 +2549,56 @@ mod tests {
             NonMappedAddr::new(UnicastAddr::new(Ipv6Addr::from(expected_addr)).unwrap()).unwrap();
         let expected_addr_sub = AddrSubnet::from_witness(expected_addr, prefix_length).unwrap();
 
-        let Ctx { core_ctx, bindings_ctx } = &mut ctx;
         // Have no addresses yet.
-        assert_empty(get_global_ipv6_addrs(core_ctx, &device));
+        assert_empty(get_global_ipv6_addrs(&ctx.core_ctx, &device));
 
         // Receive a new RA with new prefix (autonomous).
         //
         // Should get a new IP and set preferred lifetime to 1s.
 
         // Make sure deprecate and invalidation timers are set.
-        inner_test(core_ctx, bindings_ctx, &device, src_ip, subnet, expected_addr_sub, 30, 60, 60);
+        inner_test(&mut ctx, &device, src_ip, subnet, expected_addr_sub, 30, 60, 60);
 
         // If the valid lifetime is greater than the remaining lifetime, update
         // the valid lifetime.
-        inner_test(core_ctx, bindings_ctx, &device, src_ip, subnet, expected_addr_sub, 70, 70, 70);
+        inner_test(&mut ctx, &device, src_ip, subnet, expected_addr_sub, 70, 70, 70);
 
         // If the valid lifetime is greater than 2 hrs, update the valid
         // lifetime.
-        inner_test(
-            core_ctx,
-            bindings_ctx,
-            &device,
-            src_ip,
-            subnet,
-            expected_addr_sub,
-            1001,
-            7201,
-            7201,
-        );
+        inner_test(&mut ctx, &device, src_ip, subnet, expected_addr_sub, 1001, 7201, 7201);
 
         // Make remaining lifetime < 2 hrs.
-        assert_eq!(
-            bindings_ctx.trigger_timers_for(
-                Duration::from_secs(1000),
-                handle_timer_helper_with_sc_ref(core_ctx, crate::handle_timer)
-            ),
-            []
-        );
+        assert_eq!(ctx.trigger_timers_for(Duration::from_secs(1000)), []);
 
         // If the remaining lifetime is <= 2 hrs & valid lifetime is less than
         // that, don't update valid lifetime.
-        inner_test(
-            core_ctx,
-            bindings_ctx,
-            &device,
-            src_ip,
-            subnet,
-            expected_addr_sub,
-            1000,
-            2000,
-            6201,
-        );
+        inner_test(&mut ctx, &device, src_ip, subnet, expected_addr_sub, 1000, 2000, 6201);
 
         // Make the remaining lifetime > 2 hours.
-        inner_test(
-            core_ctx,
-            bindings_ctx,
-            &device,
-            src_ip,
-            subnet,
-            expected_addr_sub,
-            1000,
-            10800,
-            10800,
-        );
+        inner_test(&mut ctx, &device, src_ip, subnet, expected_addr_sub, 1000, 10800, 10800);
 
         // If the remaining lifetime is > 2 hours, and new valid lifetime is < 2
         // hours, set the valid lifetime to 2 hours.
-        inner_test(
-            core_ctx,
-            bindings_ctx,
-            &device,
-            src_ip,
-            subnet,
-            expected_addr_sub,
-            1000,
-            1000,
-            7200,
-        );
+        inner_test(&mut ctx, &device, src_ip, subnet, expected_addr_sub, 1000, 1000, 7200);
 
         // If the remaining lifetime is <= 2 hrs & valid lifetime is less than
         // that, don't update valid lifetime.
-        inner_test(
-            core_ctx,
-            bindings_ctx,
-            &device,
-            src_ip,
-            subnet,
-            expected_addr_sub,
-            1000,
-            2000,
-            7200,
-        );
+        inner_test(&mut ctx, &device, src_ip, subnet, expected_addr_sub, 1000, 2000, 7200);
 
         // Increase valid lifetime twice while it is greater than 2 hours.
-        inner_test(
-            core_ctx,
-            bindings_ctx,
-            &device,
-            src_ip,
-            subnet,
-            expected_addr_sub,
-            1001,
-            7201,
-            7201,
-        );
-        inner_test(
-            core_ctx,
-            bindings_ctx,
-            &device,
-            src_ip,
-            subnet,
-            expected_addr_sub,
-            1001,
-            7202,
-            7202,
-        );
+        inner_test(&mut ctx, &device, src_ip, subnet, expected_addr_sub, 1001, 7201, 7201);
+        inner_test(&mut ctx, &device, src_ip, subnet, expected_addr_sub, 1001, 7202, 7202);
 
         // Make remaining lifetime < 2 hrs.
-        assert_eq!(
-            bindings_ctx.trigger_timers_for(
-                Duration::from_secs(1000),
-                handle_timer_helper_with_sc_ref(core_ctx, crate::handle_timer)
-            ),
-            []
-        );
+        assert_eq!(ctx.trigger_timers_for(Duration::from_secs(1000)), []);
 
         // If the remaining lifetime is <= 2 hrs & valid lifetime is less than
         // that, don't update valid lifetime.
-        inner_test(
-            core_ctx,
-            bindings_ctx,
-            &device,
-            src_ip,
-            subnet,
-            expected_addr_sub,
-            1001,
-            6202,
-            6202,
-        );
+        inner_test(&mut ctx, &device, src_ip, subnet, expected_addr_sub, 1001, 6202, 6202);
 
         // Increase valid lifetime twice while it is less than 2 hours.
-        inner_test(
-            core_ctx,
-            bindings_ctx,
-            &device,
-            src_ip,
-            subnet,
-            expected_addr_sub,
-            1001,
-            6203,
-            6203,
-        );
-        inner_test(
-            core_ctx,
-            bindings_ctx,
-            &device,
-            src_ip,
-            subnet,
-            expected_addr_sub,
-            1001,
-            6204,
-            6204,
-        );
+        inner_test(&mut ctx, &device, src_ip, subnet, expected_addr_sub, 1001, 6203, 6203);
+        inner_test(&mut ctx, &device, src_ip, subnet, expected_addr_sub, 1001, 6204, 6204);
 
         // Clean up device references.
         ctx.core_api().device().remove_device(device.unwrap_ethernet()).into_removed();
@@ -2871,20 +2661,19 @@ mod tests {
             )
             .unwrap();
 
-        let Ctx { core_ctx, bindings_ctx } = &mut ctx;
-
         // Send an update with lifetimes that are smaller than the ones specified in the preferences.
         let valid_lifetime = 10000;
         let preferred_lifetime = 4000;
         receive_prefix_update(
-            core_ctx,
-            bindings_ctx,
+            &mut ctx,
             &device,
             router_ip,
             subnet,
             preferred_lifetime,
             valid_lifetime,
         );
+
+        let Ctx { core_ctx, bindings_ctx } = &mut ctx;
 
         let first_addr_entry = get_matching_slaac_address_entry(core_ctx, &device, |entry| {
             entry.addr_sub().subnet() == subnet
@@ -3022,17 +2811,15 @@ mod tests {
             )
             .unwrap();
 
-        let Ctx { core_ctx, bindings_ctx } = &mut ctx;
-
         receive_prefix_update(
-            core_ctx,
-            bindings_ctx,
+            &mut ctx,
             &device,
             router_ip,
             subnet,
             MAX_PREFERRED_LIFETIME.as_secs() as u32,
             MAX_VALID_LIFETIME.as_secs() as u32,
         );
+        let Ctx { core_ctx, bindings_ctx } = &mut ctx;
 
         let match_temporary_address = |entry: &GlobalIpv6Addr<FakeInstant>| {
             entry.addr_sub().subnet() == subnet
@@ -3155,14 +2942,12 @@ mod tests {
                 },
             )
             .unwrap();
-        let Ctx { core_ctx, bindings_ctx } = &mut ctx;
 
         // The prefix updates contains a shorter preferred lifetime than
         // the preferences allow.
         let prefix_preferred_for: Duration = MAX_PREFERRED_LIFETIME * 2 / 3;
         receive_prefix_update(
-            core_ctx,
-            bindings_ctx,
+            &mut ctx,
             &device,
             router_ip,
             subnet,
@@ -3170,30 +2955,28 @@ mod tests {
             MAX_VALID_LIFETIME.as_secs().try_into().unwrap(),
         );
 
-        let first_addr_entry = get_matching_slaac_address_entry(core_ctx, &device, |entry| {
-            entry.addr_sub().subnet() == subnet
-                && match entry.config {
-                    Ipv6AddrConfig::Slaac(SlaacConfig::Temporary(_)) => true,
-                    Ipv6AddrConfig::Slaac(SlaacConfig::Static { valid_until: _ }) => false,
-                    Ipv6AddrConfig::Manual(_manual_config) => false,
-                }
-        })
-        .unwrap();
+        let first_addr_entry =
+            get_matching_slaac_address_entry(&mut ctx.core_ctx, &device, |entry| {
+                entry.addr_sub().subnet() == subnet
+                    && match entry.config {
+                        Ipv6AddrConfig::Slaac(SlaacConfig::Temporary(_)) => true,
+                        Ipv6AddrConfig::Slaac(SlaacConfig::Static { valid_until: _ }) => false,
+                        Ipv6AddrConfig::Manual(_manual_config) => false,
+                    }
+            })
+            .unwrap();
         let regen_timer_id: TimerId<_> = SlaacTimerId::new_regenerate_temporary_slaac_address(
             device.clone(),
             *first_addr_entry.addr_sub(),
         )
         .into();
         trace!("advancing to regen for first address");
-        assert_eq!(
-            bindings_ctx.trigger_next_timer(&*core_ctx, crate::handle_timer),
-            Some(regen_timer_id.clone())
-        );
+        assert_eq!(ctx.trigger_next_timer(), Some(regen_timer_id.clone()));
 
         // The regeneration timer should cause a new address to be created in
         // the same subnet.
         assert_matches!(
-            get_matching_slaac_address_entry(core_ctx, &device, |entry| {
+            get_matching_slaac_address_entry(&mut ctx.core_ctx, &device, |entry| {
                 entry.addr_sub().subnet() == subnet
                     && entry.addr_sub() != first_addr_entry.addr_sub()
                     && match entry.config {
@@ -3208,15 +2991,14 @@ mod tests {
         // Now the router sends a new update that extends the preferred lifetime
         // of addresses.
         receive_prefix_update(
-            core_ctx,
-            bindings_ctx,
+            &mut ctx,
             &device,
             router_ip,
             subnet,
             prefix_preferred_for.as_secs().try_into().unwrap(),
             MAX_VALID_LIFETIME.as_secs().try_into().unwrap(),
         );
-        let addresses = get_matching_slaac_address_entries(core_ctx, &device, |entry| {
+        let addresses = get_matching_slaac_address_entries(&mut ctx.core_ctx, &device, |entry| {
             entry.addr_sub().subnet() == subnet
                 && match entry.config {
                     Ipv6AddrConfig::Slaac(SlaacConfig::Temporary(_)) => true,
@@ -3229,12 +3011,12 @@ mod tests {
 
         for address in &addresses {
             assert_matches!(
-                bindings_ctx.scheduled_instant(SlaacTimerId::new_deprecate_slaac_address(
+                ctx.bindings_ctx.scheduled_instant(SlaacTimerId::new_deprecate_slaac_address(
                     device.clone(),
                     *address,
                 )),
                 Some(deprecate_at) => {
-                    let preferred_for = deprecate_at - bindings_ctx.now();
+                    let preferred_for = deprecate_at - ctx.bindings_ctx.now();
                     assert!(preferred_for <= prefix_preferred_for, "{:?} <= {:?}", preferred_for, prefix_preferred_for);
                 }
             );
@@ -3243,12 +3025,9 @@ mod tests {
         trace!("advancing to new regen for first address");
         // Running the context forward until the first address is again eligible
         // for regeneration doesn't result in a new address being created.
+        assert_eq!(ctx.trigger_next_timer(), Some(regen_timer_id));
         assert_eq!(
-            bindings_ctx.trigger_next_timer(&*core_ctx, crate::handle_timer),
-            Some(regen_timer_id)
-        );
-        assert_eq!(
-            get_matching_slaac_address_entries(core_ctx, &device, |entry| entry
+            get_matching_slaac_address_entries(&mut ctx.core_ctx, &device, |entry| entry
                 .addr_sub()
                 .subnet()
                 == subnet
@@ -3266,7 +3045,7 @@ mod tests {
         // If we continue on until the first address is deprecated, we still
         // shouldn't regenerate since the second address is active.
         assert_eq!(
-            bindings_ctx.trigger_next_timer(&*core_ctx, crate::handle_timer),
+            ctx.trigger_next_timer(),
             Some(
                 SlaacTimerId::new_deprecate_slaac_address(
                     device.clone(),
@@ -3281,7 +3060,7 @@ mod tests {
             .filter(|addr| addr != &first_addr_entry.addr_sub().addr())
             .collect::<HashSet<_>>();
         assert_eq!(
-            get_matching_slaac_address_entries(core_ctx, &device, |entry| entry
+            get_matching_slaac_address_entries(&mut ctx.core_ctx, &device, |entry| entry
                 .addr_sub()
                 .subnet()
                 == subnet
@@ -3377,8 +3156,7 @@ mod tests {
         );
 
         receive_prefix_update(
-            core_ctx,
-            bindings_ctx,
+            &mut ctx,
             &device,
             router_ip,
             subnet,
@@ -3386,16 +3164,18 @@ mod tests {
             MAX_VALID_LIFETIME.as_secs().try_into().unwrap(),
         );
 
-        let first_addr_entry = get_matching_slaac_address_entry(core_ctx, &device, |entry| {
-            entry.addr_sub().subnet() == subnet
-                && match entry.config {
-                    Ipv6AddrConfig::Slaac(SlaacConfig::Temporary(_)) => true,
-                    Ipv6AddrConfig::Slaac(SlaacConfig::Static { valid_until: _ }) => false,
-                    Ipv6AddrConfig::Manual(_manual_config) => false,
-                }
-        })
-        .unwrap();
-        let regen_at = bindings_ctx
+        let first_addr_entry =
+            get_matching_slaac_address_entry(&mut ctx.core_ctx, &device, |entry| {
+                entry.addr_sub().subnet() == subnet
+                    && match entry.config {
+                        Ipv6AddrConfig::Slaac(SlaacConfig::Temporary(_)) => true,
+                        Ipv6AddrConfig::Slaac(SlaacConfig::Static { valid_until: _ }) => false,
+                        Ipv6AddrConfig::Manual(_manual_config) => false,
+                    }
+            })
+            .unwrap();
+        let regen_at = ctx
+            .bindings_ctx
             .scheduled_instant(SlaacTimerId::new_regenerate_temporary_slaac_address(
                 device.clone(),
                 *first_addr_entry.addr_sub(),
@@ -3405,18 +3185,16 @@ mod tests {
         let before_regen = regen_at - Duration::from_secs(10);
         // The only events that run before regen should be the DAD timers for
         // the static and temporary address that were created earlier.
-        let dad_timer_ids = get_matching_slaac_address_entries(core_ctx, &device, |entry| {
-            entry.addr_sub().subnet() == subnet
-        })
-        .map(|entry| dad_timer_id(eth_device_id.clone(), entry.addr_sub().addr()))
-        .collect::<Vec<_>>();
-        bindings_ctx.trigger_timers_until_and_expect_unordered(
-            before_regen,
-            dad_timer_ids,
-            |bindings_ctx, id| crate::handle_timer(core_ctx, bindings_ctx, id),
-        );
+        let dad_timer_ids =
+            get_matching_slaac_address_entries(&mut ctx.core_ctx, &device, |entry| {
+                entry.addr_sub().subnet() == subnet
+            })
+            .map(|entry| dad_timer_id(eth_device_id.clone(), entry.addr_sub().addr()))
+            .collect::<Vec<_>>();
+        ctx.trigger_timers_until_and_expect_unordered(before_regen, dad_timer_ids);
 
-        let preferred_until = bindings_ctx
+        let preferred_until = ctx
+            .bindings_ctx
             .scheduled_instant(SlaacTimerId::new_deprecate_slaac_address(
                 device.clone(),
                 first_addr_entry.addr_sub().addr(),
@@ -3427,7 +3205,7 @@ mod tests {
         let mut slaac_config = SlaacConfiguration::default();
         enable_temporary_addresses(
             &mut slaac_config,
-            bindings_ctx.rng(),
+            ctx.bindings_ctx.rng(),
             NonZeroDuration::new(MAX_VALID_LIFETIME).unwrap(),
             NonZeroDuration::new(max_preferred_lifetime).unwrap(),
             1,
@@ -3444,16 +3222,13 @@ mod tests {
             )
             .unwrap();
 
-        let Ctx { core_ctx, bindings_ctx } = &mut ctx;
-
         // Receiving this update should result in requiring a regen time that is
         // before the current time. The address should be regenerated
         // immediately.
-        let prefix_preferred_for = preferred_until - bindings_ctx.now();
+        let prefix_preferred_for = preferred_until - ctx.bindings_ctx.now();
 
         receive_prefix_update(
-            core_ctx,
-            bindings_ctx,
+            &mut ctx,
             &device,
             router_ip,
             subnet,
@@ -3464,10 +3239,7 @@ mod tests {
         // The regeneration is still handled by timer, so handle any pending
         // events.
         assert_eq!(
-            bindings_ctx.trigger_timers_for(
-                Duration::ZERO,
-                handle_timer_helper_with_sc_ref(core_ctx, crate::handle_timer)
-            ),
+            ctx.trigger_timers_for(Duration::ZERO),
             vec![SlaacTimerId::new_regenerate_temporary_slaac_address(
                 device.clone(),
                 *first_addr_entry.addr_sub()
@@ -3475,7 +3247,7 @@ mod tests {
             .into()]
         );
 
-        let addresses = get_matching_slaac_address_entries(core_ctx, &device, |entry| {
+        let addresses = get_matching_slaac_address_entries(&mut ctx.core_ctx, &device, |entry| {
             entry.addr_sub().subnet() == subnet
                 && match entry.config {
                     Ipv6AddrConfig::Slaac(SlaacConfig::Temporary(_)) => true,
@@ -3502,8 +3274,7 @@ mod tests {
         let src_ip = src_mac.to_ipv6_link_local().addr().get();
         let subnet = subnet_v6!("0102:0304:0506:0708::/64");
         let (mut ctx, device, config) = initialize_with_temporary_addresses_enabled();
-        let Ctx { core_ctx, bindings_ctx } = &mut ctx;
-        let now = bindings_ctx.now();
+        let now = ctx.bindings_ctx.now();
         let start = now;
         let temporary_address_config = config.temporary_address_configuration.unwrap();
 
@@ -3519,7 +3290,7 @@ mod tests {
             [],
             // Clone the RNG so we can see what the next value (which will be
             // used to generate the temporary address) will be.
-            OpaqueIidNonce::Random(bindings_ctx.rng().deep_clone().next_u64()),
+            OpaqueIidNonce::Random(ctx.bindings_ctx.rng().deep_clone().next_u64()),
             &secret_key,
         );
         let mut expected_addr = [1, 2, 3, 4, 5, 6, 7, 8, 0, 0, 0, 0, 0, 0, 0, 0];
@@ -3534,8 +3305,7 @@ mod tests {
         assert!(u64::from(valid_lifetime) < max_valid_lifetime.get().as_secs());
         assert!(u64::from(preferred_lifetime) < max_preferred_lifetime.get().as_secs());
         receive_prefix_update(
-            core_ctx,
-            bindings_ctx,
+            &mut ctx,
             &device,
             src_ip,
             subnet,
@@ -3543,7 +3313,7 @@ mod tests {
             valid_lifetime,
         );
 
-        let entry = get_slaac_address_entry(core_ctx, &device, expected_addr_sub).unwrap();
+        let entry = get_slaac_address_entry(&mut ctx.core_ctx, &device, expected_addr_sub).unwrap();
         let expected_valid_until =
             now.checked_add(Duration::from_secs(valid_lifetime.into())).unwrap();
         let expected_preferred_until =
@@ -3557,7 +3327,7 @@ mod tests {
         assert!(expected_preferred_until < max_preferred_until);
 
         assert_slaac_lifetimes_enforced(
-            bindings_ctx,
+            &ctx.bindings_ctx,
             &device,
             entry,
             expected_valid_until,
@@ -3568,14 +3338,8 @@ mod tests {
         // prefix. Per RFC 8981 Section 3.4.1, the lifetimes for the address should obey the
         // overall constraints expressed in the preferences.
 
-        assert_eq!(
-            bindings_ctx.trigger_timers_for(
-                Duration::from_secs(1000),
-                handle_timer_helper_with_sc_ref(core_ctx, crate::handle_timer)
-            ),
-            []
-        );
-        let now = bindings_ctx.now();
+        assert_eq!(ctx.trigger_timers_for(Duration::from_secs(1000)), []);
+        let now = ctx.bindings_ctx.now();
         let expected_valid_until =
             now.checked_add(Duration::from_secs(valid_lifetime.into())).unwrap();
         let expected_preferred_until =
@@ -3586,8 +3350,7 @@ mod tests {
         assert!(expected_preferred_until > max_preferred_until);
 
         receive_prefix_update(
-            core_ctx,
-            bindings_ctx,
+            &mut ctx,
             &device,
             src_ip,
             subnet,
@@ -3595,7 +3358,7 @@ mod tests {
             valid_lifetime,
         );
 
-        let entry = get_matching_slaac_address_entry(core_ctx, &device, |entry| {
+        let entry = get_matching_slaac_address_entry(&mut ctx.core_ctx, &device, |entry| {
             entry.addr_sub().subnet() == subnet
                 && match entry.config {
                     Ipv6AddrConfig::Slaac(SlaacConfig::Temporary(_)) => true,
@@ -3617,7 +3380,7 @@ mod tests {
             Ipv6AddrConfig::Manual(_manual_config) => unreachable!("temporary slaac address"),
         };
         assert_slaac_lifetimes_enforced(
-            bindings_ctx,
+            &ctx.bindings_ctx,
             &device,
             entry,
             expected_valid_until,
@@ -3631,7 +3394,7 @@ mod tests {
         let mut slaac_config = SlaacConfiguration::default();
         enable_temporary_addresses(
             &mut slaac_config,
-            bindings_ctx.rng(),
+            ctx.bindings_ctx.rng(),
             max_valid_lifetime,
             max_preferred_lifetime,
             idgen_retries,
@@ -3654,10 +3417,8 @@ mod tests {
         // the router's advertised valid lifetime.
         let max_valid_until = start.checked_add(max_valid_lifetime.get()).unwrap();
         assert!(expected_valid_until > max_valid_until);
-        let Ctx { core_ctx, bindings_ctx } = &mut ctx;
         receive_prefix_update(
-            core_ctx,
-            bindings_ctx,
+            &mut ctx,
             &device,
             src_ip,
             subnet,
@@ -3665,7 +3426,7 @@ mod tests {
             valid_lifetime,
         );
 
-        let entry = get_matching_slaac_address_entry(core_ctx, &device, |entry| {
+        let entry = get_matching_slaac_address_entry(&mut ctx.core_ctx, &device, |entry| {
             entry.addr_sub().subnet() == subnet
                 && match entry.config {
                     Ipv6AddrConfig::Slaac(SlaacConfig::Temporary(_)) => true,
@@ -3675,7 +3436,7 @@ mod tests {
         })
         .unwrap();
         assert_slaac_lifetimes_enforced(
-            bindings_ctx,
+            &ctx.bindings_ctx,
             &device,
             entry,
             max_valid_until,

@@ -792,20 +792,18 @@ impl<D> From<NudTimerId<Ipv6, EthernetLinkDevice, D>> for EthernetTimerId<D> {
     }
 }
 
-/// Handle an Ethernet timer firing.
-pub(super) fn handle_timer<
+impl<CC, BC> TimerHandler<BC, EthernetTimerId<CC::DeviceId>> for CC
+where
     BC: EthernetIpLinkDeviceBindingsContext<CC::DeviceId>,
     CC: EthernetIpLinkDeviceDynamicStateContext<BC>
         + TimerHandler<BC, NudTimerId<Ipv6, EthernetLinkDevice, CC::DeviceId>>
         + TimerHandler<BC, ArpTimerId<EthernetLinkDevice, CC::DeviceId>>,
->(
-    core_ctx: &mut CC,
-    bindings_ctx: &mut BC,
-    id: EthernetTimerId<CC::DeviceId>,
-) {
-    match id {
-        EthernetTimerId::Arp(id) => TimerHandler::handle_timer(core_ctx, bindings_ctx, id),
-        EthernetTimerId::Nudv6(id) => TimerHandler::handle_timer(core_ctx, bindings_ctx, id),
+{
+    fn handle_timer(&mut self, bindings_ctx: &mut BC, id: EthernetTimerId<CC::DeviceId>) {
+        match id {
+            EthernetTimerId::Arp(id) => self.handle_timer(bindings_ctx, id),
+            EthernetTimerId::Nudv6(id) => self.handle_timer(bindings_ctx, id),
+        }
     }
 }
 

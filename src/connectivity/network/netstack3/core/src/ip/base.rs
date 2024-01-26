@@ -1580,21 +1580,20 @@ impl_timer_context!(
 impl_timer_context!(IpLayerTimerId, PmtuTimerId<Ipv4>, IpLayerTimerId::PmtuTimeoutv4(id), id);
 impl_timer_context!(IpLayerTimerId, PmtuTimerId<Ipv6>, IpLayerTimerId::PmtuTimeoutv6(id), id);
 
-/// Handle a timer event firing in the IP layer.
-pub(crate) fn handle_timer<BC: BindingsContext>(
-    core_ctx: &mut CoreCtx<'_, BC, crate::lock_ordering::Unlocked>,
-    bindings_ctx: &mut BC,
-    id: IpLayerTimerId,
-) {
-    match id {
-        IpLayerTimerId::ReassemblyTimeoutv4(key) => {
-            TimerHandler::handle_timer(core_ctx, bindings_ctx, key)
+impl<CC, BC> TimerHandler<BC, IpLayerTimerId> for CC
+where
+    CC: TimerHandler<BC, FragmentCacheKey<Ipv4Addr>>
+        + TimerHandler<BC, FragmentCacheKey<Ipv6Addr>>
+        + TimerHandler<BC, PmtuTimerId<Ipv4>>
+        + TimerHandler<BC, PmtuTimerId<Ipv6>>,
+{
+    fn handle_timer(&mut self, bindings_ctx: &mut BC, id: IpLayerTimerId) {
+        match id {
+            IpLayerTimerId::ReassemblyTimeoutv4(key) => self.handle_timer(bindings_ctx, key),
+            IpLayerTimerId::ReassemblyTimeoutv6(key) => self.handle_timer(bindings_ctx, key),
+            IpLayerTimerId::PmtuTimeoutv4(id) => self.handle_timer(bindings_ctx, id),
+            IpLayerTimerId::PmtuTimeoutv6(id) => self.handle_timer(bindings_ctx, id),
         }
-        IpLayerTimerId::ReassemblyTimeoutv6(key) => {
-            TimerHandler::handle_timer(core_ctx, bindings_ctx, key)
-        }
-        IpLayerTimerId::PmtuTimeoutv4(id) => TimerHandler::handle_timer(core_ctx, bindings_ctx, id),
-        IpLayerTimerId::PmtuTimeoutv6(id) => TimerHandler::handle_timer(core_ctx, bindings_ctx, id),
     }
 }
 
@@ -3439,7 +3438,7 @@ mod tests {
 
     use super::*;
     use crate::{
-        context::testutil::{handle_timer_helper_with_sc_ref, FakeInstant, FakeTimerCtxExt as _},
+        context::testutil::FakeInstant,
         device::{
             self,
             ethernet::{EthernetCreationProperties, EthernetLinkDevice, RecvEthernetFrameMeta},
@@ -3566,7 +3565,7 @@ mod tests {
     /// Process an IP fragment depending on the `Ip` `process_ip_fragment` is
     /// specialized with.
     fn process_ip_fragment<I: Ip, BC: BindingsContext>(
-        core_ctx: &mut &SyncCtx<BC>,
+        core_ctx: &SyncCtx<BC>,
         bindings_ctx: &mut BC,
         device: &DeviceId<BC>,
         fragment_id: u16,
@@ -3599,7 +3598,7 @@ mod tests {
     /// of fragments for a packet. The generated packet will have a body of size
     /// 8 bytes.
     fn process_ipv4_fragment<BC: BindingsContext>(
-        core_ctx: &mut &SyncCtx<BC>,
+        core_ctx: &SyncCtx<BC>,
         bindings_ctx: &mut BC,
         device: &DeviceId<BC>,
         fragment_id: u16,
@@ -3633,7 +3632,7 @@ mod tests {
     /// of fragments for a packet. The generated packet will have a body of size
     /// 8 bytes.
     fn process_ipv6_fragment<BC: BindingsContext>(
-        core_ctx: &mut &SyncCtx<BC>,
+        core_ctx: &SyncCtx<BC>,
         bindings_ctx: &mut BC,
         device: &DeviceId<BC>,
         fragment_id: u16,
@@ -3903,7 +3902,6 @@ mod tests {
     fn test_ip_packet_reassembly_not_needed<I: Ip + TestIpExt>() {
         let (Ctx { core_ctx, mut bindings_ctx }, device_ids) =
             FakeEventDispatcherBuilder::from_config(I::FAKE_CONFIG).build();
-        let mut core_ctx = &core_ctx;
         let device: DeviceId<_> = device_ids[0].clone().into();
         let fragment_id = 5;
 
@@ -3911,7 +3909,7 @@ mod tests {
 
         // Test that a non fragmented packet gets dispatched right away.
 
-        process_ip_fragment::<I, _>(&mut core_ctx, &mut bindings_ctx, &device, fragment_id, 0, 1);
+        process_ip_fragment::<I, _>(&core_ctx, &mut bindings_ctx, &device, fragment_id, 0, 1);
 
         // Make sure the packet got dispatched.
         assert_eq!(core_ctx.state.ip_counters::<I>().dispatch_receive_ip_packet.get(), 1);
@@ -3921,7 +3919,6 @@ mod tests {
     fn test_ip_packet_reassembly<I: Ip + TestIpExt>() {
         let (Ctx { core_ctx, mut bindings_ctx }, device_ids) =
             FakeEventDispatcherBuilder::from_config(I::FAKE_CONFIG).build();
-        let mut core_ctx = &core_ctx;
         let device: DeviceId<_> = device_ids[0].clone().into();
         let fragment_id = 5;
 
@@ -3929,16 +3926,16 @@ mod tests {
         // all the fragments.
 
         // Process fragment #0
-        process_ip_fragment::<I, _>(&mut core_ctx, &mut bindings_ctx, &device, fragment_id, 0, 3);
+        process_ip_fragment::<I, _>(&core_ctx, &mut bindings_ctx, &device, fragment_id, 0, 3);
 
         // Process fragment #1
-        process_ip_fragment::<I, _>(&mut core_ctx, &mut bindings_ctx, &device, fragment_id, 1, 3);
+        process_ip_fragment::<I, _>(&core_ctx, &mut bindings_ctx, &device, fragment_id, 1, 3);
 
         // Make sure no packets got dispatched yet.
         assert_eq!(core_ctx.state.ip_counters::<I>().dispatch_receive_ip_packet.get(), 0);
 
         // Process fragment #2
-        process_ip_fragment::<I, _>(&mut core_ctx, &mut bindings_ctx, &device, fragment_id, 2, 3);
+        process_ip_fragment::<I, _>(&core_ctx, &mut bindings_ctx, &device, fragment_id, 2, 3);
 
         // Make sure the packet finally got dispatched now that the final
         // fragment has been 'received'.
@@ -3949,7 +3946,6 @@ mod tests {
     fn test_ip_packet_reassembly_with_packets_arriving_out_of_order<I: Ip + TestIpExt>() {
         let (Ctx { core_ctx, mut bindings_ctx }, device_ids) =
             FakeEventDispatcherBuilder::from_config(I::FAKE_CONFIG).build();
-        let mut core_ctx = &core_ctx;
         let device: DeviceId<_> = device_ids[0].clone().into();
         let fragment_id_0 = 5;
         let fragment_id_1 = 10;
@@ -3959,38 +3955,38 @@ mod tests {
         // the fragments with out of order arrival of fragments.
 
         // Process packet #0, fragment #1
-        process_ip_fragment::<I, _>(&mut core_ctx, &mut bindings_ctx, &device, fragment_id_0, 1, 3);
+        process_ip_fragment::<I, _>(&core_ctx, &mut bindings_ctx, &device, fragment_id_0, 1, 3);
 
         // Process packet #1, fragment #2
-        process_ip_fragment::<I, _>(&mut core_ctx, &mut bindings_ctx, &device, fragment_id_1, 2, 3);
+        process_ip_fragment::<I, _>(&core_ctx, &mut bindings_ctx, &device, fragment_id_1, 2, 3);
 
         // Process packet #1, fragment #0
-        process_ip_fragment::<I, _>(&mut core_ctx, &mut bindings_ctx, &device, fragment_id_1, 0, 3);
+        process_ip_fragment::<I, _>(&core_ctx, &mut bindings_ctx, &device, fragment_id_1, 0, 3);
 
         // Make sure no packets got dispatched yet.
         assert_eq!(core_ctx.state.ip_counters::<I>().dispatch_receive_ip_packet.get(), 0);
 
         // Process a packet that does not require reassembly (packet #2, fragment #0).
-        process_ip_fragment::<I, _>(&mut core_ctx, &mut bindings_ctx, &device, fragment_id_2, 0, 1);
+        process_ip_fragment::<I, _>(&core_ctx, &mut bindings_ctx, &device, fragment_id_2, 0, 1);
 
         // Make packet #1 got dispatched since it didn't need reassembly.
         assert_eq!(core_ctx.state.ip_counters::<I>().dispatch_receive_ip_packet.get(), 1);
 
         // Process packet #0, fragment #2
-        process_ip_fragment::<I, _>(&mut core_ctx, &mut bindings_ctx, &device, fragment_id_0, 2, 3);
+        process_ip_fragment::<I, _>(&core_ctx, &mut bindings_ctx, &device, fragment_id_0, 2, 3);
 
         // Make sure no other packets got dispatched yet.
         assert_eq!(core_ctx.state.ip_counters::<I>().dispatch_receive_ip_packet.get(), 1);
 
         // Process packet #0, fragment #0
-        process_ip_fragment::<I, _>(&mut core_ctx, &mut bindings_ctx, &device, fragment_id_0, 0, 3);
+        process_ip_fragment::<I, _>(&core_ctx, &mut bindings_ctx, &device, fragment_id_0, 0, 3);
 
         // Make sure that packet #0 finally got dispatched now that the final
         // fragment has been 'received'.
         assert_eq!(core_ctx.state.ip_counters::<I>().dispatch_receive_ip_packet.get(), 2);
 
         // Process packet #1, fragment #1
-        process_ip_fragment::<I, _>(&mut core_ctx, &mut bindings_ctx, &device, fragment_id_1, 1, 3);
+        process_ip_fragment::<I, _>(&core_ctx, &mut bindings_ctx, &device, fragment_id_1, 1, 3);
 
         // Make sure the packet finally got dispatched now that the final
         // fragment has been 'received'.
@@ -4002,17 +3998,16 @@ mod tests {
     where
         IpLayerTimerId: From<FragmentCacheKey<I::Addr>>,
     {
-        let (Ctx { core_ctx, mut bindings_ctx }, device_ids) =
-            FakeEventDispatcherBuilder::from_config(I::FAKE_CONFIG).build();
-        let mut core_ctx = &core_ctx;
+        let (mut ctx, device_ids) = FakeEventDispatcherBuilder::from_config(I::FAKE_CONFIG).build();
         let device: DeviceId<_> = device_ids[0].clone().into();
         let fragment_id = 5;
 
+        let Ctx { core_ctx, bindings_ctx } = &mut ctx;
         // Test to make sure that packets must arrive within the reassembly
         // timer.
 
         // Process fragment #0
-        process_ip_fragment::<I, _>(&mut core_ctx, &mut bindings_ctx, &device, fragment_id, 0, 3);
+        process_ip_fragment::<I, _>(core_ctx, bindings_ctx, &device, fragment_id, 0, 3);
 
         // Make sure a timer got added.
         bindings_ctx.timer_ctx().assert_timers_installed([(
@@ -4026,7 +4021,7 @@ mod tests {
         )]);
 
         // Process fragment #1
-        process_ip_fragment::<I, _>(&mut core_ctx, &mut bindings_ctx, &device, fragment_id, 1, 3);
+        process_ip_fragment::<I, _>(core_ctx, bindings_ctx, &device, fragment_id, 1, 3);
 
         // Trigger the timer (simulate a timer for the fragmented packet)
         let key = FragmentCacheKey::new(
@@ -4034,16 +4029,14 @@ mod tests {
             I::FAKE_CONFIG.local_ip.get(),
             u32::from(fragment_id),
         );
-        assert_eq!(
-            bindings_ctx.trigger_next_timer(core_ctx, crate::handle_timer).unwrap(),
-            IpLayerTimerId::from(key).into(),
-        );
+        assert_eq!(ctx.trigger_next_timer().unwrap(), IpLayerTimerId::from(key).into(),);
 
+        let Ctx { core_ctx, bindings_ctx } = &mut ctx;
         // Make sure no other timers exist.
         bindings_ctx.timer_ctx().assert_no_timers_installed();
 
         // Process fragment #2
-        process_ip_fragment::<I, _>(&mut core_ctx, &mut bindings_ctx, &device, fragment_id, 2, 3);
+        process_ip_fragment::<I, _>(core_ctx, bindings_ctx, &device, fragment_id, 2, 3);
 
         // Make sure no packets got dispatched yet since even though we
         // technically received all the fragments, this fragment (#2) arrived
@@ -4090,7 +4083,7 @@ mod tests {
         // Process fragment #0
         net.with_context("alice", |Ctx { core_ctx, bindings_ctx }| {
             process_ip_fragment::<I, _>(
-                &mut &*core_ctx,
+                core_ctx,
                 bindings_ctx,
                 &alice_device_id,
                 fragment_id,
@@ -4104,7 +4097,7 @@ mod tests {
         // Process fragment #1
         net.with_context("alice", |Ctx { core_ctx, bindings_ctx }| {
             process_ip_fragment::<I, _>(
-                &mut &*core_ctx,
+                core_ctx,
                 bindings_ctx,
                 &alice_device_id,
                 fragment_id,
@@ -4127,7 +4120,7 @@ mod tests {
         // Process fragment #2
         net.with_context("alice", |Ctx { core_ctx, bindings_ctx }| {
             process_ip_fragment::<I, _>(
-                &mut &*core_ctx,
+                core_ctx,
                 bindings_ctx,
                 &alice_device_id,
                 fragment_id,
@@ -4839,14 +4832,18 @@ mod tests {
         // TODO(https://fxbug.dev/42125450): Once this test is contextified, use a
         // more precise condition to ensure that DAD is complete.
         let now = bindings_ctx.now();
-        let _: Vec<_> = bindings_ctx.trigger_timers_until_instant(
-            now + Duration::from_secs(60 * 60 * 24 * 365),
-            handle_timer_helper_with_sc_ref(core_ctx, crate::handle_timer),
-        );
+        let _: Vec<_> =
+            ctx.trigger_timers_until_instant(now + Duration::from_secs(60 * 60 * 24 * 365));
 
         // Received packet should have been dispatched.
-        receive_ip_packet::<_, _, Ipv6>(core_ctx, bindings_ctx, &device, frame_dst, buf);
-        assert_eq!(core_ctx.state.ipv6.inner.counters.dispatch_receive_ip_packet.get(), 1);
+        receive_ip_packet::<_, _, Ipv6>(
+            &ctx.core_ctx,
+            &mut ctx.bindings_ctx,
+            &device,
+            frame_dst,
+            buf,
+        );
+        assert_eq!(ctx.core_ctx.state.ipv6.inner.counters.dispatch_receive_ip_packet.get(), 1);
 
         // Set the new IP (this should trigger DAD).
         let ip = config.local_ip.get();
@@ -4871,14 +4868,17 @@ mod tests {
         //
         // TODO(https://fxbug.dev/42125450): Once this test is contextified, use a
         // more precise condition to ensure that DAD is complete.
-        let _: Vec<_> = bindings_ctx.trigger_timers_until_instant(
-            FakeInstant::LATEST,
-            handle_timer_helper_with_sc_ref(core_ctx, crate::handle_timer),
-        );
+        let _: Vec<_> = ctx.trigger_timers_until_instant(FakeInstant::LATEST);
 
         // Received packet should have been dispatched.
-        receive_ip_packet::<_, _, Ipv6>(core_ctx, bindings_ctx, &device, frame_dst, buf);
-        assert_eq!(core_ctx.state.ipv6.inner.counters.dispatch_receive_ip_packet.get(), 2);
+        receive_ip_packet::<_, _, Ipv6>(
+            &ctx.core_ctx,
+            &mut ctx.bindings_ctx,
+            &device,
+            frame_dst,
+            buf,
+        );
+        assert_eq!(ctx.core_ctx.state.ipv6.inner.counters.dispatch_receive_ip_packet.get(), 2);
     }
 
     #[test]

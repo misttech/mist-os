@@ -901,7 +901,7 @@ mod tests {
         });
 
         net.run_until_idle(crate::device::testutil::receive_frame, |ctx, _, id| {
-            crate::handle_timer(&ctx.core_ctx, &mut ctx.bindings_ctx, id);
+            ctx.core_api().handle_timer(id);
             handle_queued_rx_packets(ctx);
         });
 

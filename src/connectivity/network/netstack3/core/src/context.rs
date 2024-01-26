@@ -918,13 +918,12 @@ pub(crate) mod testutil {
     }
 
     /// Adds methods for interacting with [`FakeTimerCtx`] and its wrappers.
-    pub trait FakeTimerCtxExt<Id> {
-        /// Triggers the next timer, if any, by calling `f` on it.
+    pub trait FakeTimerCtxExt<Id>: Sized {
+        /// Triggers the next timer, if any, by using the provided `handler`.
         ///
         /// `trigger_next_timer` triggers the next timer, if any, advances the
         /// internal clock to the timer's scheduled time, and returns its ID.
-        fn trigger_next_timer<C, F: FnMut(C, &mut Self, Id)>(&mut self, ctx: C, f: F)
-            -> Option<Id>;
+        fn trigger_next_timer<H: TimerHandler<Self, Id>>(&mut self, handler: &mut H) -> Option<Id>;
 
         /// Skips the current time forward until `instant`, triggering all
         /// timers until then, inclusive, by calling `f` on them.
@@ -934,20 +933,20 @@ pub(crate) mod testutil {
         /// # Panics
         ///
         /// Panics if `instant` is in the past.
-        fn trigger_timers_until_instant<F: FnMut(&mut Self, Id)>(
+        fn trigger_timers_until_instant<H: TimerHandler<Self, Id>>(
             &mut self,
             instant: FakeInstant,
-            f: F,
+            handler: &mut H,
         ) -> Vec<Id>;
 
         /// Skips the current time forward by `duration`, triggering all timers
-        /// until then, inclusive, by calling `f` on them.
+        /// until then, inclusive, by passing them to the `handler`.
         ///
         /// Returns the timers which were triggered.
-        fn trigger_timers_for<F: FnMut(&mut Self, Id)>(
+        fn trigger_timers_for<H: TimerHandler<Self, Id>>(
             &mut self,
             duration: Duration,
-            f: F,
+            handler: &mut H,
         ) -> Vec<Id>;
 
         /// Triggers timers and expects them to be the given timers.
@@ -964,11 +963,11 @@ pub(crate) mod testutil {
         #[track_caller]
         fn trigger_timers_and_expect_unordered<
             I: IntoIterator<Item = Id>,
-            F: FnMut(&mut Self, Id),
+            H: TimerHandler<Self, Id>,
         >(
             &mut self,
             timers: I,
-            f: F,
+            handler: &mut H,
         ) where
             Id: Debug + Hash + Eq;
 
@@ -979,12 +978,12 @@ pub(crate) mod testutil {
         /// only be triggered until `instant` (inclusive).
         fn trigger_timers_until_and_expect_unordered<
             I: IntoIterator<Item = Id>,
-            F: FnMut(&mut Self, Id),
+            H: TimerHandler<Self, Id>,
         >(
             &mut self,
             instant: FakeInstant,
             timers: I,
-            f: F,
+            handler: &mut H,
         ) where
             Id: Debug + Hash + Eq;
 
@@ -993,11 +992,11 @@ pub(crate) mod testutil {
         ///
         /// Like `trigger_timers_and_expect_unordered`, except that timers will
         /// only be triggered for `duration` (inclusive).
-        fn trigger_timers_for_and_expect<I: IntoIterator<Item = Id>, F: FnMut(&mut Self, Id)>(
+        fn trigger_timers_for_and_expect<I: IntoIterator<Item = Id>, H: TimerHandler<Self, Id>>(
             &mut self,
             duration: Duration,
             timers: I,
-            f: F,
+            handler: &mut H,
         ) where
             Id: Debug + Hash + Eq;
     }
@@ -1009,11 +1008,7 @@ pub(crate) mod testutil {
         ///
         /// `trigger_next_timer` triggers the next timer, if any, advances the
         /// internal clock to the timer's scheduled time, and returns its ID.
-        fn trigger_next_timer<C, F: FnMut(C, &mut Self, Id)>(
-            &mut self,
-            ctx: C,
-            mut f: F,
-        ) -> Option<Id> {
+        fn trigger_next_timer<H: TimerHandler<Self, Id>>(&mut self, handler: &mut H) -> Option<Id> {
             self.with_fake_timer_ctx_mut(|timers| {
                 timers.timers.pop().map(|InstantAndData(t, id)| {
                     timers.instant.time = t;
@@ -1021,23 +1016,23 @@ pub(crate) mod testutil {
                 })
             })
             .map(|id| {
-                f(ctx, self, id.clone());
+                handler.handle_timer(self, id.clone());
                 id
             })
         }
 
         /// Skips the current time forward until `instant`, triggering all
-        /// timers until then, inclusive, by calling `f` on them.
+        /// timers until then, inclusive, by giving them to `handler`.
         ///
         /// Returns the timers which were triggered.
         ///
         /// # Panics
         ///
         /// Panics if `instant` is in the past.
-        fn trigger_timers_until_instant<F: FnMut(&mut Self, Id)>(
+        fn trigger_timers_until_instant<H: TimerHandler<Self, Id>>(
             &mut self,
             instant: FakeInstant,
-            mut f: F,
+            handler: &mut H,
         ) -> Vec<Id> {
             assert!(instant >= self.with_fake_timer_ctx(|ctx| ctx.now()));
             let mut timers = Vec::new();
@@ -1045,7 +1040,7 @@ pub(crate) mod testutil {
             while self.with_fake_timer_ctx_mut(|ctx| {
                 ctx.timers.peek().map(|InstantAndData(i, _id)| i <= &instant).unwrap_or(false)
             }) {
-                timers.push(self.trigger_next_timer(&mut (), |_: &mut (), s, id| f(s, id)).unwrap())
+                timers.push(self.trigger_next_timer(handler).unwrap())
             }
 
             self.with_fake_timer_ctx_mut(|ctx| {
@@ -1060,16 +1055,16 @@ pub(crate) mod testutil {
         /// until then, inclusive, by calling `f` on them.
         ///
         /// Returns the timers which were triggered.
-        fn trigger_timers_for<F: FnMut(&mut Self, Id)>(
+        fn trigger_timers_for<H: TimerHandler<Self, Id>>(
             &mut self,
             duration: Duration,
-            f: F,
+            handler: &mut H,
         ) -> Vec<Id> {
             let instant = self.with_fake_timer_ctx(|ctx| ctx.now().saturating_add(duration));
             // We know the call to `self.trigger_timers_until_instant` will not
             // panic because we provide an instant that is greater than or equal
             // to the current time.
-            self.trigger_timers_until_instant(instant, f)
+            self.trigger_timers_until_instant(instant, handler)
         }
 
         /// Triggers timers and expects them to be the given timers.
@@ -1086,20 +1081,18 @@ pub(crate) mod testutil {
         #[track_caller]
         fn trigger_timers_and_expect_unordered<
             I: IntoIterator<Item = Id>,
-            F: FnMut(&mut Self, Id),
+            H: TimerHandler<Self, Id>,
         >(
             &mut self,
             timers: I,
-            mut f: F,
+            handler: &mut H,
         ) where
             Id: Debug + Hash + Eq,
         {
             let mut timers = RefCountedHashSet::from_iter(timers);
 
             for _ in 0..timers.len() {
-                let id = self
-                    .trigger_next_timer(&mut (), |_: &mut (), s, id| f(s, id))
-                    .expect("ran out of timers to trigger");
+                let id = self.trigger_next_timer(handler).expect("ran out of timers to trigger");
                 match timers.remove(id.clone()) {
                     RemoveResult::Removed(()) | RemoveResult::StillPresent => {}
                     RemoveResult::NotPresent => panic!("triggered unexpected timer: {:?}", id),
@@ -1122,18 +1115,18 @@ pub(crate) mod testutil {
         /// only be triggered until `instant` (inclusive).
         fn trigger_timers_until_and_expect_unordered<
             I: IntoIterator<Item = Id>,
-            F: FnMut(&mut Self, Id),
+            H: TimerHandler<Self, Id>,
         >(
             &mut self,
             instant: FakeInstant,
             timers: I,
-            f: F,
+            handler: &mut H,
         ) where
             Id: Debug + Hash + Eq,
         {
             let mut timers = RefCountedHashSet::from_iter(timers);
 
-            let triggered_timers = self.trigger_timers_until_instant(instant, f);
+            let triggered_timers = self.trigger_timers_until_instant(instant, handler);
 
             for id in triggered_timers {
                 match timers.remove(id.clone()) {
@@ -1156,45 +1149,17 @@ pub(crate) mod testutil {
         ///
         /// Like `trigger_timers_and_expect_unordered`, except that timers will
         /// only be triggered for `duration` (inclusive).
-        fn trigger_timers_for_and_expect<I: IntoIterator<Item = Id>, F: FnMut(&mut Self, Id)>(
+        fn trigger_timers_for_and_expect<I: IntoIterator<Item = Id>, H: TimerHandler<Self, Id>>(
             &mut self,
             duration: Duration,
             timers: I,
-            f: F,
+            handler: &mut H,
         ) where
             Id: Debug + Hash + Eq,
         {
             let instant = self.with_fake_timer_ctx(|ctx| ctx.now().saturating_add(duration));
-            self.trigger_timers_until_and_expect_unordered(instant, timers, f);
+            self.trigger_timers_until_and_expect_unordered(instant, timers, handler);
         }
-    }
-
-    #[cfg(test)]
-    pub(crate) fn handle_timer_helper_with_sc_ref_mut<
-        'a,
-        Id,
-        CC,
-        BC,
-        F: FnMut(&mut CC, &mut BC, Id) + 'a,
-    >(
-        core_ctx: &'a mut CC,
-        mut f: F,
-    ) -> impl FnMut(&mut BC, Id) + 'a {
-        move |bindings_ctx, id| f(core_ctx, bindings_ctx, id)
-    }
-
-    #[cfg(test)]
-    pub(crate) fn handle_timer_helper_with_sc_ref<
-        'a,
-        Id,
-        CC,
-        BC,
-        F: FnMut(&CC, &mut BC, Id) + 'a,
-    >(
-        core_ctx: &'a CC,
-        mut f: F,
-    ) -> impl FnMut(&mut BC, Id) + 'a {
-        move |bindings_ctx, id| f(core_ctx, bindings_ctx, id)
     }
 
     /// A fake [`FrameContext`].
@@ -2296,10 +2261,7 @@ pub(crate) mod testutil {
 
             // When no timers are installed, `trigger_next_timer` should return
             // `false`.
-            assert_eq!(
-                bindings_ctx.trigger_next_timer(&mut core_ctx, TimerHandler::handle_timer),
-                None
-            );
+            assert_eq!(bindings_ctx.trigger_next_timer(&mut core_ctx), None);
             assert_eq!(core_ctx.get_ref().as_slice(), []);
 
             // When one timer is installed, it should be triggered.
@@ -2313,10 +2275,7 @@ pub(crate) mod testutil {
             // Timer with id `0` scheduled to execute at `ONE_SEC_INSTANT`.
             assert_eq!(bindings_ctx.scheduled_instant(0).unwrap(), ONE_SEC_INSTANT);
 
-            assert_eq!(
-                bindings_ctx.trigger_next_timer(&mut core_ctx, TimerHandler::handle_timer),
-                Some(0)
-            );
+            assert_eq!(bindings_ctx.trigger_next_timer(&mut core_ctx), Some(0));
             assert_eq!(core_ctx.get_ref().as_slice(), [(0, ONE_SEC_INSTANT)]);
 
             // After the timer fires, it should not still be scheduled at some
@@ -2329,10 +2288,7 @@ pub(crate) mod testutil {
             // Once it's been triggered, it should be canceled and not
             // triggerable again.
             let FakeCtx { mut core_ctx, mut bindings_ctx } = new_ctx();
-            assert_eq!(
-                bindings_ctx.trigger_next_timer(&mut core_ctx, TimerHandler::handle_timer),
-                None
-            );
+            assert_eq!(bindings_ctx.trigger_next_timer(&mut core_ctx), None);
             assert_eq!(core_ctx.get_ref().as_slice(), []);
 
             // If we schedule a timer but then cancel it, it shouldn't fire.
@@ -2340,10 +2296,7 @@ pub(crate) mod testutil {
 
             assert_eq!(bindings_ctx.schedule_timer(ONE_SEC, 0), None);
             assert_eq!(bindings_ctx.cancel_timer(0), Some(ONE_SEC_INSTANT));
-            assert_eq!(
-                bindings_ctx.trigger_next_timer(&mut core_ctx, TimerHandler::handle_timer),
-                None
-            );
+            assert_eq!(bindings_ctx.trigger_next_timer(&mut core_ctx), None);
             assert_eq!(core_ctx.get_ref().as_slice(), []);
 
             // If we schedule a timer but then schedule the same ID again, the
@@ -2363,10 +2316,7 @@ pub(crate) mod testutil {
             assert_eq!(bindings_ctx.schedule_timer(Duration::from_secs(1), 1), None,);
             assert_eq!(bindings_ctx.schedule_timer(Duration::from_secs(2), 2), None,);
             assert_eq!(
-                bindings_ctx.trigger_timers_until_instant(
-                    ONE_SEC_INSTANT,
-                    handle_timer_helper_with_sc_ref_mut(&mut core_ctx, TimerHandler::handle_timer)
-                ),
+                bindings_ctx.trigger_timers_until_instant(ONE_SEC_INSTANT, &mut core_ctx),
                 vec![0, 1],
             );
 
@@ -2401,7 +2351,7 @@ pub(crate) mod testutil {
             bindings_ctx.trigger_timers_until_and_expect_unordered(
                 ONE_SEC_INSTANT,
                 vec![0],
-                |bindings_ctx, id| TimerHandler::handle_timer(&mut core_ctx, bindings_ctx, id),
+                &mut core_ctx,
             );
             assert_eq!(bindings_ctx.now(), ONE_SEC_INSTANT);
         }

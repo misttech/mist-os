@@ -712,39 +712,36 @@ mod tests {
         const RETRANS_TIMER: NonZeroDuration =
             unsafe { NonZeroDuration::new_unchecked(Duration::from_secs(1)) };
 
-        let FakeCtx { mut core_ctx, mut bindings_ctx } =
-            FakeCtx::with_core_ctx(FakeCoreCtxImpl::with_state(FakeDadContext {
-                state: Ipv6DadState::Tentative {
-                    dad_transmits_remaining: NonZeroU8::new(DAD_TRANSMITS_REQUIRED),
-                },
-                retrans_timer: RETRANS_TIMER,
-                max_dad_transmits: NonZeroU8::new(DAD_TRANSMITS_REQUIRED),
-                address_ctx: FakeAddressCtxImpl::with_state(FakeDadAddressContext {
-                    addr: DAD_ADDRESS,
-                    assigned: false,
-                    groups: HashMap::default(),
-                    ip_device_id_ctx: Default::default(),
-                }),
-            }));
+        let mut ctx = FakeCtx::with_core_ctx(FakeCoreCtxImpl::with_state(FakeDadContext {
+            state: Ipv6DadState::Tentative {
+                dad_transmits_remaining: NonZeroU8::new(DAD_TRANSMITS_REQUIRED),
+            },
+            retrans_timer: RETRANS_TIMER,
+            max_dad_transmits: NonZeroU8::new(DAD_TRANSMITS_REQUIRED),
+            address_ctx: FakeAddressCtxImpl::with_state(FakeDadAddressContext {
+                addr: DAD_ADDRESS,
+                assigned: false,
+                groups: HashMap::default(),
+                ip_device_id_ctx: Default::default(),
+            }),
+        }));
+        let FakeCtx { core_ctx, bindings_ctx } = &mut ctx;
         DadHandler::start_duplicate_address_detection(
-            &mut core_ctx,
-            &mut bindings_ctx,
+            core_ctx,
+            bindings_ctx,
             &FakeDeviceId,
             &get_address_id(DAD_ADDRESS.get()),
         );
 
         for count in 0..=(DAD_TRANSMITS_REQUIRED - 1) {
             check_dad(
-                &core_ctx,
-                &bindings_ctx,
+                core_ctx,
+                bindings_ctx,
                 usize::from(count + 1),
                 NonZeroU8::new(DAD_TRANSMITS_REQUIRED - count - 1),
                 RETRANS_TIMER,
             );
-            assert_eq!(
-                bindings_ctx.trigger_next_timer(&mut core_ctx, TimerHandler::handle_timer),
-                Some(DAD_TIMER_ID)
-            );
+            assert_eq!(bindings_ctx.trigger_next_timer(core_ctx), Some(DAD_TIMER_ID));
         }
         let FakeDadContext { state, retrans_timer: _, max_dad_transmits: _, address_ctx } =
             core_ctx.get_ref();

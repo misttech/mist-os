@@ -72,7 +72,6 @@ use netstack3_core::{
     },
     error::NetstackError,
     filter::FilterBindingsTypes,
-    handle_timer,
     icmp::{self, IcmpEchoBindingsContext},
     inspect::{InspectableValue, Inspector},
     ip::{
@@ -136,11 +135,6 @@ mod ctx {
 
         pub(crate) fn bindings_ctx_mut(&mut self) -> &mut BindingsCtx {
             &mut self.bindings_ctx
-        }
-
-        pub(crate) fn contexts_mut(&mut self) -> (&Arc<SyncCtx<BindingsCtx>>, &mut BindingsCtx) {
-            let Ctx { bindings_ctx, core_ctx } = self;
-            (core_ctx, bindings_ctx)
         }
 
         /// Destroys the last standing clone of [`Ctx`].
@@ -313,8 +307,7 @@ impl AsRef<IcmpEchoSockets> for BindingsCtx {
 
 impl timers::TimerHandler<TimerId<BindingsCtx>> for Ctx {
     fn handle_expired_timer(&mut self, timer: TimerId<BindingsCtx>) {
-        let (core_ctx, bindings_ctx) = self.contexts_mut();
-        handle_timer(core_ctx, bindings_ctx, timer)
+        self.api().handle_timer(timer)
     }
 
     fn get_timer_dispatcher(&mut self) -> &timers::TimerDispatcher<TimerId<BindingsCtx>> {

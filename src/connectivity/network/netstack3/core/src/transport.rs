@@ -67,6 +67,7 @@ use net_types::{
 };
 
 use crate::{
+    context::TimerHandler,
     device::WeakDeviceId,
     error::ZonedAddressError,
     ip::EitherDeviceId,
@@ -75,7 +76,7 @@ use crate::{
         tcp::TcpState,
         udp::{UdpCounters, UdpState, UdpStateBuilder},
     },
-    BindingsContext, BindingsTypes, CoreCtx, StackState,
+    BindingsContext, BindingsTypes, StackState,
 };
 
 /// A builder for transport layer state.
@@ -189,14 +190,15 @@ pub(crate) enum TransportLayerTimerId<BT: BindingsTypes> {
     Tcp(tcp::socket::TimerId<WeakDeviceId<BT>, BT>),
 }
 
-/// Handle a timer event firing in the transport layer.
-pub(crate) fn handle_timer<BC: BindingsContext>(
-    core_ctx: &mut CoreCtx<'_, BC, crate::lock_ordering::Unlocked>,
-    bindings_ctx: &mut BC,
-    id: TransportLayerTimerId<BC>,
-) {
-    match id {
-        TransportLayerTimerId::Tcp(id) => tcp::socket::handle_timer(core_ctx, bindings_ctx, id),
+impl<CC, BT> TimerHandler<BT, TransportLayerTimerId<BT>> for CC
+where
+    BT: BindingsTypes,
+    CC: TimerHandler<BT, tcp::socket::TimerId<WeakDeviceId<BT>, BT>>,
+{
+    fn handle_timer(&mut self, bindings_ctx: &mut BT, id: TransportLayerTimerId<BT>) {
+        match id {
+            TransportLayerTimerId::Tcp(id) => self.handle_timer(bindings_ctx, id),
+        }
     }
 }
 
