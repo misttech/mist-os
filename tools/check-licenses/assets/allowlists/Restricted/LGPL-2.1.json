@@ -65,7 +65,7 @@
           },
           {
             "projects": [
-              "third_party/github.com/pylint-dev/astroid"
+              "third_party/pylibs/astroid"
             ],
             "bug": "fxbug.dev/42084613",
             "notes": []
