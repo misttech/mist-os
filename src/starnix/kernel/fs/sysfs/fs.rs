@@ -11,7 +11,8 @@ use crate::{
     task::{CurrentTask, NetstackDevicesDirectory},
     vfs::{
         CacheConfig, CacheMode, FileSystem, FileSystemHandle, FileSystemOps, FileSystemOptions,
-        FsNodeInfo, FsNodeOps, FsStr, PathBuilder, StaticDirectoryBuilder, SymlinkNode,
+        FsNodeInfo, FsNodeOps, FsStr, PathBuilder, StaticDirectoryBuilder, StubEmptyFile,
+        SymlinkNode,
     },
 };
 use starnix_uapi::{auth::FsCred, errors::Errno, file_mode::mode, statfs, SYSFS_MAGIC};
@@ -67,6 +68,19 @@ impl SysFs {
 
         sysfs_kernel_directory(current_task, &mut dir);
         sysfs_power_directory(current_task, &mut dir);
+
+        dir.subdir(current_task, "module", 0o755, |dir| {
+            dir.subdir(current_task, "dm_verity", 0o755, |dir| {
+                dir.subdir(current_task, "parameters", 0o755, |dir| {
+                    dir.entry(
+                        current_task,
+                        "prefetch_cluster",
+                        StubEmptyFile::new_node("/sys/module/dm_verity/paramters/prefetch_cluster"),
+                        mode!(IFREG, 0o644),
+                    );
+                });
+            });
+        });
 
         // TODO(https://fxbug.dev/42072346): Temporary fix of flakeness in tcp_socket_test.
         // Remove after registry.rs refactor is in place.

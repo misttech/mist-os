@@ -15,6 +15,15 @@ const DESIRED_PATH_PREFIXES: &[&str] = &["/dev/", "/proc/", "/sys/"];
 
 /// Path prefixes excluded from inspect output.
 const IGNORED_PATH_PREFIXES: &[&str] = &[
+    // TODO(https://fxbug.dev/322165853) these directories have dynamically generated contents that
+    // are difficult to stub, so just exclude them from the not_found list.
+    "/sys/dev/block",
+    "/sys/dev/char",
+    // Ignore paths for specific filesystems we don't implement.
+    "/sys/fs/cgroup",
+    "/sys/fs/f2fs",
+    "/sys/fs/incremental-fs",
+    "/sys/fs/pstore",
     // TODO(https://fxbug.dev/311449535) we may need to implement tracing directories under these
     // paths but actually stubbing them breaks the current perfetto integration. They don't need to
     // be in the ENOENT list when they're already tracked elsewhere.
