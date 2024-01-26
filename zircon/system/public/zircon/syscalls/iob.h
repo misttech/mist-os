@@ -26,9 +26,10 @@ typedef uint64_t zx_iob_discipline_type_t;
 // TODO(https://fxbug.dev/319500512): + ring buffer discipline.
 
 // An IOBuffer (memory access) discipline specifies the layout of a region's
-// memory and manner in which it should be directly accessed. Disciplines may
-// correspond to particular syscalls that operate on IOBuffer handles to further
-// facilitate indirect, mediated access in the correct manner.
+// memory and manner in which it should be directly accessed. Each discipline
+// defines a container of sorts backed by the region's memory. These container
+// interfaces are also mirrored in discipline-specific syscalls that permit
+// indirect, kernel-mediated access to the region in this manner.
 typedef struct zx_iob_discipline {
   uint64_t type;
   uint64_t reserved[8];
@@ -44,6 +45,11 @@ typedef uint32_t zx_iob_region_type_t;
 
 // Region access controls for IOBuffer peers, specifying both mapped and
 // mediated access.
+//
+// "Mediated access" does not refer to access of the underlying region memory,
+// but rather access through the interface of the associated discipline
+// *container* backed by that memory, which will admit its own notions of
+// reading and writing of *entries*.
 typedef uint32_t zx_iob_access_t;
 
 #define ZX_IOB_EP0_CAN_MAP_READ ((zx_iob_access_t)(1u << 0))
