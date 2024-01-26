@@ -7,7 +7,6 @@
 #include <fidl/fuchsia.sysmem/cpp/wire.h>
 #include <fuchsia/sysmem/c/banjo.h>
 #include <lib/image-format/image_format.h>
-#include <lib/syslog/cpp/macros.h>
 #include <lib/zx/vmo.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -20,9 +19,8 @@
 
 namespace camera {
 
-constexpr auto kTag = "FakeBufferCollection";
-
-// TODO(https://fxbug.dev/42117588): Track creation & destruction of buffer collections for programmatic
+// TODO(https://fxbug.dev/42117588): Track creation & destruction of buffer collections for
+// programmatic
 //      checks of leaks.
 
 const uint32_t kIspLineAlignment = 128;  // Required alignment of ISP buffers
@@ -93,7 +91,7 @@ zx_status_t CreateContiguousBufferCollectionInfo(buffer_collection_info_2_t& buf
     buffer_collection.buffers[i].vmo_usable_start = 0;
     status = zx_vmo_create_contiguous(bti_handle, vmo_size, 0, &buffer_collection.buffers[i].vmo);
     if (status != ZX_OK) {
-      FX_LOGST(ERROR, kTag) << "Failed to allocate Buffer Collection";
+      fprintf(stderr, "Failed to allocate Buffer Collection");
       return status;
     }
   }
@@ -108,7 +106,7 @@ zx_status_t DestroyContiguousBufferCollection(buffer_collection_info_2_t& buffer
   for (auto& vmo_buffer : buffer_collection.buffers) {
     auto status = zx_handle_close(vmo_buffer.vmo);
     if (status != ZX_OK) {
-      FX_LOGST(ERROR, kTag) << "Error destroying a vmo.";
+      fprintf(stderr, "Error destroying a vmo.");
       result = status;
     }
     vmo_buffer.vmo = ZX_HANDLE_INVALID;

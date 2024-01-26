@@ -31,7 +31,6 @@ source_set("fake_buffer_collection") {
   deps = [ "//zircon/system/ulib/fbl" ]
   public_deps = [
     "//sdk/banjo/fuchsia.sysmem:fuchsia.sysmem_banjo_c",
-    "//sdk/lib/syslog/cpp",
     "//src/devices/lib/sysmem",
     "//src/lib/ddk",
     "//src/lib/ddktl",
