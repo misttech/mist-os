@@ -5,11 +5,10 @@
 #include "src/media/audio/drivers/aml-g12-tdm/composite.h"
 
 #include <fidl/fuchsia.driver.compat/cpp/wire.h>
+#include <lib/ddk/platform-defs.h>
 #include <lib/driver/component/cpp/driver_export.h>
 
 namespace audio::aml_g12 {
-
-// TODO(b/300991607): Use clock-gate, clock-pll, and gpio-init services.
 
 zx::result<> Driver::CreateDevfsNode() {
   fidl::Arena arena;
@@ -147,9 +146,44 @@ zx::result<> Driver::Start() {
     }
   }
 
+  auto device_info_result = pdev_->GetNodeDeviceInfo();
+  if (!device_info_result.ok()) {
+    FDF_LOG(ERROR, "Call to get node device info failed: %s", device_info_result.status_string());
+    return zx::error(device_info_result.status());
+  }
+  if (!device_info_result->is_ok()) {
+    FDF_LOG(ERROR, "Failed to get node device info: %s",
+            zx_status_get_string(device_info_result->error_value()));
+    return zx::error(device_info_result->error_value());
+  }
+
+  metadata::AmlVersion aml_version = {};
+  switch ((*device_info_result)->pid()) {
+    case PDEV_PID_AMLOGIC_A311D:
+      aml_version = metadata::AmlVersion::kA311D;
+      break;
+    case PDEV_PID_AMLOGIC_T931:
+      [[fallthrough]];
+    case PDEV_PID_AMLOGIC_S905D2:
+      aml_version = metadata::AmlVersion::kS905D2G;  // Also works with T931G.
+      break;
+    case PDEV_PID_AMLOGIC_S905D3:
+      aml_version = metadata::AmlVersion::kS905D3G;
+      break;
+    case PDEV_PID_AMLOGIC_A5:
+      aml_version = metadata::AmlVersion::kA5;
+      break;
+    case PDEV_PID_AMLOGIC_A1:
+      aml_version = metadata::AmlVersion::kA1;
+      break;
+    default:
+      FDF_LOG(ERROR, "Unsupported PID 0x%X", (*device_info_result)->pid());
+      return zx::error(ZX_ERR_NOT_SUPPORTED);
+  }
+
   server_ = std::make_unique<AudioCompositeServer>(
-      std::move(mmios), std::move((*get_bti_result)->bti), dispatcher(), std::move(gate_client),
-      std::move(pll_client), std::move(gpio_sclk_clients));
+      std::move(mmios), std::move((*get_bti_result)->bti), dispatcher(), aml_version,
+      std::move(gate_client), std::move(pll_client), std::move(gpio_sclk_clients));
 
   auto result = outgoing()->component().AddUnmanagedProtocol<fuchsia_hardware_audio::Composite>(
       bindings_.CreateHandler(server_.get(), dispatcher(), fidl::kIgnoreBindingClosure),

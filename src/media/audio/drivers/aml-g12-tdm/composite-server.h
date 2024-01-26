@@ -93,7 +93,7 @@ class AudioCompositeServer
  public:
   AudioCompositeServer(
       std::array<std::optional<fdf::MmioBuffer>, kNumberOfTdmEngines> mmios, zx::bti bti,
-      async_dispatcher_t* dispatcher,
+      async_dispatcher_t* dispatcher, metadata::AmlVersion aml_version,
       fidl::WireSyncClient<fuchsia_hardware_clock::Clock> clock_gate_client,
       fidl::WireSyncClient<fuchsia_hardware_clock::Clock> pll_client,
       std::vector<fidl::WireSyncClient<fuchsia_hardware_gpio::Gpio>> gpio_sclk_clients);
@@ -153,7 +153,8 @@ class AudioCompositeServer
 
   void OnSignalProcessingClosed(fidl::UnbindInfo info);
   zx_status_t ResetEngine(size_t index);
-  zx_status_t ConfigEngine(size_t index, size_t dai_index, bool input, fdf::MmioBuffer mmio);
+  zx_status_t ConfigEngine(size_t index, size_t dai_index, bool input, fdf::MmioBuffer mmio,
+                           metadata::AmlVersion aml_version);
   void TestPowerManagement();
   async::TaskClosureMethod<AudioCompositeServer, &AudioCompositeServer::TestPowerManagement>
       pm_timer_{this};

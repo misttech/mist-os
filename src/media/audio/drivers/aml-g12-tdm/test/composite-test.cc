@@ -9,6 +9,7 @@
 #include <fidl/fuchsia.hardware.platform.device/cpp/wire.h>
 #include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
 #include <lib/component/incoming/cpp/service.h>
+#include <lib/ddk/platform-defs.h>
 #include <lib/driver/incoming/cpp/namespace.h>
 #include <lib/driver/testing/cpp/driver_lifecycle.h>
 #include <lib/driver/testing/cpp/driver_runtime.h>
@@ -103,7 +104,11 @@ class FakePlatformDevice : public fidl::WireServer<fuchsia_hardware_platform_dev
   void GetSmc(fuchsia_hardware_platform_device::wire::DeviceGetSmcRequest* request,
               GetSmcCompleter::Sync& completer) override {}
 
-  void GetNodeDeviceInfo(GetNodeDeviceInfoCompleter::Sync& completer) override {}
+  void GetNodeDeviceInfo(GetNodeDeviceInfoCompleter::Sync& completer) override {
+    fidl::Arena arena;
+    auto info = fuchsia_hardware_platform_device::wire::NodeDeviceInfo::Builder(arena);
+    completer.ReplySuccess(info.vid(PDEV_VID_AMLOGIC).pid(PDEV_PID_AMLOGIC_A311D).Build());
+  }
 
   void GetBoardInfo(GetBoardInfoCompleter::Sync& completer) override {}
 

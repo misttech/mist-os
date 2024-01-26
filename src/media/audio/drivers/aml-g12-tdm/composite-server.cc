@@ -40,7 +40,7 @@ fuchsia_hardware_audio::DriverError ZxStatusToDriverError(zx_status_t status) {
 
 AudioCompositeServer::AudioCompositeServer(
     std::array<std::optional<fdf::MmioBuffer>, kNumberOfTdmEngines> mmios, zx::bti bti,
-    async_dispatcher_t* dispatcher,
+    async_dispatcher_t* dispatcher, metadata::AmlVersion aml_version,
     fidl::WireSyncClient<fuchsia_hardware_clock::Clock> clock_gate_client,
     fidl::WireSyncClient<fuchsia_hardware_clock::Clock> pll_client,
     std::vector<fidl::WireSyncClient<fuchsia_hardware_gpio::Gpio>> gpio_sclk_clients)
@@ -80,14 +80,14 @@ AudioCompositeServer::AudioCompositeServer(
   ZX_ASSERT(StartSocPower() == ZX_OK);
 
   // Output engines.
-  ZX_ASSERT(ConfigEngine(0, 0, false, std::move(mmios[0].value())) == ZX_OK);
-  ZX_ASSERT(ConfigEngine(1, 1, false, std::move(mmios[1].value())) == ZX_OK);
-  ZX_ASSERT(ConfigEngine(2, 2, false, std::move(mmios[2].value())) == ZX_OK);
+  ZX_ASSERT(ConfigEngine(0, 0, false, std::move(mmios[0].value()), aml_version) == ZX_OK);
+  ZX_ASSERT(ConfigEngine(1, 1, false, std::move(mmios[1].value()), aml_version) == ZX_OK);
+  ZX_ASSERT(ConfigEngine(2, 2, false, std::move(mmios[2].value()), aml_version) == ZX_OK);
 
   // Input engines.
-  ZX_ASSERT(ConfigEngine(3, 0, true, std::move(mmios[3].value())) == ZX_OK);
-  ZX_ASSERT(ConfigEngine(4, 1, true, std::move(mmios[4].value())) == ZX_OK);
-  ZX_ASSERT(ConfigEngine(5, 2, true, std::move(mmios[5].value())) == ZX_OK);
+  ZX_ASSERT(ConfigEngine(3, 0, true, std::move(mmios[3].value()), aml_version) == ZX_OK);
+  ZX_ASSERT(ConfigEngine(4, 1, true, std::move(mmios[4].value()), aml_version) == ZX_OK);
+  ZX_ASSERT(ConfigEngine(5, 2, true, std::move(mmios[5].value()), aml_version) == ZX_OK);
   // Unconditional reset on construction.
   for (size_t i = 0; i < kNumberOfTdmEngines; ++i) {
     ZX_ASSERT(ResetEngine(i) == ZX_OK);
@@ -109,12 +109,11 @@ AudioCompositeServer::AudioCompositeServer(
 }
 
 zx_status_t AudioCompositeServer::ConfigEngine(size_t index, size_t dai_index, bool input,
-                                               fdf::MmioBuffer mmio) {
-  // TODO(https://fxbug.dev/42082341): Configure this driver with passed-in metadata.
-
+                                               fdf::MmioBuffer mmio,
+                                               metadata::AmlVersion aml_version) {
   // Common configuration.
   engines_[index].config = {};
-  engines_[index].config.version = metadata::AmlVersion::kA311D;
+  engines_[index].config.version = aml_version;
   engines_[index].config.mClockDivFactor = 10;
   engines_[index].config.sClockDivFactor = 25;
 
