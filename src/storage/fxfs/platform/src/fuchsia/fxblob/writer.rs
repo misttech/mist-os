@@ -15,10 +15,12 @@ use {
         compression::{decode_archive, ChunkInfo, ChunkedDecompressor},
         Type1Blob,
     },
+    fidl::endpoints::ServerEnd,
+    fidl_fuchsia_fxfs::{BlobWriterMarker, BlobWriterRequest},
     fuchsia_hash::Hash,
     fuchsia_merkle::{MerkleTree, MerkleTreeBuilder},
     fuchsia_zircon::{self as zx, HandleBased as _, Status},
-    futures::{lock::Mutex as AsyncMutex, try_join},
+    futures::{lock::Mutex as AsyncMutex, try_join, TryStreamExt},
     fxfs::{
         errors::FxfsError,
         log::*,
@@ -74,8 +76,6 @@ struct Inner {
     payload_offset: u64,
     /// Decompressor used when writing compressed delivery blobs.
     decompressor: Option<ChunkedDecompressor>,
-    /// Latched write error.
-    write_error: Option<Status>,
 }
 
 impl Default for Inner {
@@ -91,7 +91,6 @@ impl Default for Inner {
             payload_persisted: 0,
             payload_offset: 0,
             decompressor: None,
-            write_error: None,
         }
     }
 }
@@ -337,18 +336,10 @@ impl FxDeliveryBlob {
         Ok(())
     }
 
-    async fn write_at(&self, offset: u64, content: &[u8]) -> Result<u64, Status> {
-        let mut inner = self.inner.lock().await;
-        if let Some(e) = inner.write_error {
-            return Err(e); // Error was latched from previous write call.
-        }
+    async fn append(&self, content: &[u8], inner: &mut Inner) -> Result<u64, Status> {
         if let None = inner.delivery_size {
             error!("truncate must be called before writing blobs");
             return Err(Status::BAD_STATE);
-        }
-        if offset != inner.delivery_bytes_written {
-            error!("only append is supported when writing blobs");
-            return Err(Status::NOT_SUPPORTED);
         }
         let content_len = content.len() as u64;
         if (inner.delivery_bytes_written + content_len) > inner.delivery_size.unwrap() {
@@ -434,13 +425,7 @@ impl FxDeliveryBlob {
             Ok(())
         }
         .await
-        .map_err(|e| {
-            // Log and latch any errors occurring above.
-            error!("Failed to write {hash}: {error:?}", hash = self.hash, error = e);
-            let status = map_to_status(e);
-            inner.write_error = Some(status);
-            Err(status)
-        })?;
+        .map_err(|e| Err(map_to_status(e)))?;
         Ok(content_len)
     }
 
@@ -474,13 +459,12 @@ impl FxDeliveryBlob {
             });
         }
         let mut buf = vec![0; bytes_written as usize];
-        let write_offset;
+        let mut inner = self.inner.lock().await;
+        let write_offset = inner.delivery_bytes_written;
         {
-            let inner = self.inner.lock().await;
             let Some(ref vmo) = inner.vmo else {
                 return Err(anyhow!("get_vmo was not called before attempting to write bytes"));
             };
-            write_offset = inner.delivery_bytes_written;
             let vmo_offset = write_offset % *RING_BUFFER_SIZE;
             if vmo_offset + bytes_written > *RING_BUFFER_SIZE {
                 let split = (*RING_BUFFER_SIZE - vmo_offset) as usize;
@@ -490,18 +474,55 @@ impl FxDeliveryBlob {
                 vmo.read(&mut buf, vmo_offset).context("failed to read from VMO")?;
             }
         }
-        self.write_at(write_offset, &buf)
-            .await
-            .with_context(|| {
-                format!(
+        self.append(&buf, &mut inner).await.with_context(|| {
+            format!(
             "failed to to write to blob {} (bytes_written = {}, write_offset = {}, buf.len() = {})",
             self.hash, bytes_written, write_offset, buf.len()
         )
-            })
-            .map_err(|err| {
-                eprintln!("{:?}", err);
-                err
-            })?;
+        })?;
+        Ok(())
+    }
+
+    pub async fn handle_requests(
+        &self,
+        server_end: ServerEnd<BlobWriterMarker>,
+    ) -> Result<(), Error> {
+        let mut latched_error = None;
+        let mut stream = server_end.into_stream()?;
+        while let Some(request) = stream.try_next().await? {
+            match request {
+                BlobWriterRequest::GetVmo { size, responder } => {
+                    let res = match self.get_vmo(size).await {
+                        Ok(vmo) => Ok(vmo),
+                        Err(e) => {
+                            tracing::error!("blob service: get_vmo failed: {:?}", e);
+                            Err(map_to_status(e).into_raw())
+                        }
+                    };
+                    responder.send(res).unwrap_or_else(|e| {
+                        tracing::error!("failed to send GetVmo response. error: {:?}", e);
+                    });
+                }
+                BlobWriterRequest::BytesReady { bytes_written, responder } => {
+                    let res = if let Some(status) = &latched_error {
+                        Err(*status)
+                    } else {
+                        match self.bytes_ready(bytes_written).await {
+                            Ok(()) => Ok(()),
+                            Err(e) => {
+                                tracing::error!("blob service: bytes_ready failed: {:?}", e);
+                                let status = map_to_status(e).into_raw();
+                                latched_error = Some(status);
+                                Err(status)
+                            }
+                        }
+                    };
+                    responder.send(res).unwrap_or_else(|e| {
+                        tracing::error!("failed to send BytesReady response. error: {:?}", e);
+                    });
+                }
+            }
+        }
         Ok(())
     }
 }

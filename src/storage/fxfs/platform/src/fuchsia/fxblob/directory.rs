@@ -10,7 +10,6 @@ use {
         component::map_to_raw_status,
         fuchsia::{
             directory::FxDirectory,
-            errors::map_to_status,
             fxblob::{blob::FxBlob, writer::FxDeliveryBlob},
             node::{FxNode, GetResult, OpenedNode},
             volume::{FxVolume, RootDir},
@@ -21,7 +20,7 @@ use {
     fidl::endpoints::{create_proxy, ClientEnd, Proxy as _, ServerEnd},
     fidl_fuchsia_fxfs::{
         BlobCreatorRequest, BlobCreatorRequestStream, BlobReaderRequest, BlobReaderRequestStream,
-        BlobWriterMarker, BlobWriterRequest, CreateBlobError,
+        BlobWriterMarker, CreateBlobError,
     },
     fidl_fuchsia_io::{
         self as fio, FilesystemInfo, MutableNodeAttributes, NodeAttributeFlags, NodeAttributes,
@@ -372,50 +371,12 @@ impl BlobDirectory {
             CreateBlobError::Internal
         })?;
         let client_end = ClientEnd::new(client_channel.into());
-        let this = self.clone();
         self.volume().scope().spawn(async move {
-            if let Err(e) = this.handle_blob_writer_requests(blob, server_end).await {
+            if let Err(e) = blob.as_ref().handle_requests(server_end).await {
                 tracing::error!("Failed to handle blob writer requests: {}", e);
             }
         });
         return Ok(client_end);
-    }
-
-    async fn handle_blob_writer_requests(
-        self: &Arc<Self>,
-        blob: OpenedNode<FxDeliveryBlob>,
-        server_end: ServerEnd<BlobWriterMarker>,
-    ) -> Result<(), Error> {
-        let mut stream = server_end.into_stream()?;
-        while let Some(request) = stream.try_next().await? {
-            match request {
-                BlobWriterRequest::GetVmo { size, responder } => {
-                    let res = match blob.as_ref().get_vmo(size).await {
-                        Ok(vmo) => Ok(vmo),
-                        Err(e) => {
-                            tracing::error!("blob service: get_vmo failed: {:?}", e);
-                            Err(map_to_status(e).into_raw())
-                        }
-                    };
-                    responder.send(res).unwrap_or_else(|e| {
-                        tracing::error!("failed to send GetVmo response. error: {:?}", e);
-                    });
-                }
-                BlobWriterRequest::BytesReady { bytes_written, responder } => {
-                    let res = match blob.as_ref().bytes_ready(bytes_written).await {
-                        Ok(()) => Ok(()),
-                        Err(e) => {
-                            tracing::error!("blob service: bytes_ready failed: {:?}", e);
-                            Err(map_to_status(e).into_raw())
-                        }
-                    };
-                    responder.send(res).unwrap_or_else(|e| {
-                        tracing::error!("failed to send BytesReady response. error: {:?}", e);
-                    });
-                }
-            }
-        }
-        Ok(())
     }
 }
 
