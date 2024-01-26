@@ -10,6 +10,11 @@
     "package_name": "fuchsia-diagnostics-tests"
   },
   {
+    "archive_gn_label": "//sdk/ctf/tests/fidl/fuchsia.driver.test:fuchsia-driver-test_tests_archive_copy",
+    "archive_name": "fuchsia-driver-test_tests",
+    "package_name": "fuchsia-driver-test_tests"
+  },
+  {
     "archive_gn_label": "//sdk/ctf/tests/fidl/fuchsia.element:fuchsia-element-tests_archive_copy",
     "archive_name": "fuchsia-element-tests",
     "package_name": "fuchsia-element-tests"

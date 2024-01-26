@@ -15,17 +15,8 @@
     ],
     offer: [
         {
-            directory: "dev-topological",
-            from: "#driver_test_realm",
-            to: "#test_suite",
-            rights: [ "r*" ],
-        },
-        {
             protocol: [
-                "fuchsia.device.manager.Administrator",
-                "fuchsia.device.manager.SystemStateTransition",
                 "fuchsia.driver.development.Manager",
-                "fuchsia.driver.registrar.DriverRegistrar",
                 "fuchsia.driver.test.Realm",
             ],
             from: "#driver_test_realm",
