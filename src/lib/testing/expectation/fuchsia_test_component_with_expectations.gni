@@ -71,7 +71,11 @@ template("fuchsia_test_component_with_expectations") {
   _merged_cml_target = "${target_name}_merged_cml"
   _merged_cml_file_name = "${_test_component_name}_merged.cml"
   cmc_merge(_merged_cml_target) {
+    testonly = true
     deps = [ ":${_expectations_offer_cml_shard_target}" ]
+    if (defined(invoker.deps)) {
+      deps += invoker.deps
+    }
     sources = [
       _expectations_offer_cml_shard_file,
       invoker.manifest,
@@ -101,11 +105,17 @@ template("fuchsia_test_component_with_expectations") {
   # Thus, the following generates a JSON file of that format.
   _manifest_json_singleton_target = "${target_name}_manifest_json_singleton"
   generated_file(_manifest_json_singleton_target) {
+    testonly = true
     outputs = [ "$target_out_dir/$_manifest_json_singleton_target.json" ]
     output_conversion = "json"
     contents = [ rebase_path(invoker.manifest, root_build_dir) ]
 
     visibility = [ ":*" ]
+
+    deps = []
+    if (defined(invoker.deps)) {
+      deps += invoker.deps
+    }
   }
   _manifest_json_singleton_target = ":$_manifest_json_singleton_target"
 
@@ -126,6 +136,7 @@ template("fuchsia_test_component_with_expectations") {
   # shard.
   _include_check_target = "${target_name}-check-includes"
   cmc_check_includes(_include_check_target) {
+    testonly = true
     _json_singleton_outputs =
         get_target_outputs(_manifest_json_singleton_target)
     manifest = _json_singleton_outputs[0]

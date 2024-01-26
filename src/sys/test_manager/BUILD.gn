@@ -181,6 +181,7 @@ fuchsia_package("pkg") {
   visibility = [
     "//bundles/assembly/*",
     "//src/connectivity/network/testing/netemul/runner/tests/*",
+    "//src/lib/testing/sharding/tests/*",
     "//src/sys/run_test_suite/tests/*",
     "//src/sys/test_manager/tests/*",
     "//src/sys/test_runners/*",

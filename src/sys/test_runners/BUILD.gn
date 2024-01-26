@@ -71,6 +71,7 @@ rustc_library("test_lib") {
   visibility = [
     "./*",
     "//src/connectivity/network/testing/netemul/runner/*",
+    "//src/lib/testing/sharding/tests/*",
   ]
 
   deps = [
