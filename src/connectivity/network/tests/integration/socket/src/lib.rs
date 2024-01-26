@@ -125,12 +125,18 @@ enum UdpProtocol {
 
 #[netstack_test]
 #[test_case(
-    UdpProtocol::Synchronous; "synchronous_protocol")]
+    UdpProtocol::Synchronous, false; "synchronous_protocol not mapped to ipv6")]
 #[test_case(
-    UdpProtocol::Fast; "fast_protocol")]
-async fn test_udp_socket<N: Netstack>(name: &str, protocol: UdpProtocol) {
+    UdpProtocol::Fast, false; "fast_protocol not mapped to ipv6")]
+#[test_case(
+    UdpProtocol::Synchronous, true; "synchronous_protocol mapped to ipv6")]
+#[test_case(
+    UdpProtocol::Fast, true; "fast_protocol mapped to ipv6")]
+async fn test_udp_socket<N: Netstack>(name: &str, protocol: UdpProtocol, mapped_to_ipv6: bool) {
     let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
     let net = sandbox.create_network("net").await.expect("failed to create network");
+
+    let _packet_capture = net.start_capture(name).await.expect("starting packet capture");
 
     let (client, server) = match protocol {
         UdpProtocol::Synchronous => {
@@ -191,7 +197,26 @@ async fn test_udp_socket<N: Netstack>(name: &str, protocol: UdpProtocol) {
     })
     .await;
 
-    run_udp_socket_test(&server, SERVER_SUBNET.addr, &client, CLIENT_SUBNET.addr).await
+    let maybe_map_to_ipv6 = move |orig_addr| match orig_addr {
+        fnet::IpAddress::Ipv4(addr) => {
+            if mapped_to_ipv6 {
+                let addr = net_types::ip::Ipv4Addr::new(addr.addr);
+                fnet::IpAddress::Ipv6(fnet::Ipv6Address {
+                    addr: addr.to_ipv6_mapped().ipv6_bytes(),
+                })
+            } else {
+                orig_addr
+            }
+        }
+        fnet::IpAddress::Ipv6(_) => {
+            unreachable!("SERVER_SUBNET and CLIENT_SUBNET expected to be Ipv4")
+        }
+    };
+
+    let server_addr = maybe_map_to_ipv6(SERVER_SUBNET.addr);
+    let client_addr = maybe_map_to_ipv6(CLIENT_SUBNET.addr);
+
+    run_udp_socket_test(&server, server_addr, &client, client_addr).await
 }
 
 enum UdpCacheInvalidationReason {
