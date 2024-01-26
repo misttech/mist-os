@@ -326,7 +326,6 @@ template("assembled_system") {
     supports_blobs = _supports_blobs
     base_packages = _base_packages
     cache_packages = _cache_packages
-    universe_packages = _universe_packages
     additional_boot_args = _additional_boot_args
   }
 
@@ -670,7 +669,7 @@ template("assembled_system") {
         supports_blobs = _supports_blobs
         base_packages = _must_exist.base_packages
         cache_packages = _must_exist.cache_packages
-        universe_packages = _universe_packages
+
         additional_boot_args = []
 
         bundle_name = "must_exist"

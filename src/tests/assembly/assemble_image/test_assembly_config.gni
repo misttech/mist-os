@@ -147,7 +147,6 @@ template("test_assembly_config") {
       supports_blobs = true
       base_packages = base_packages_param
       cache_packages = []
-      universe_packages = []
       additional_boot_args = []
       bootfs_labels = []
     }

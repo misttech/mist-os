@@ -11,6 +11,7 @@ import("//build/images/args.gni")
 import("//build/images/filesystem_limits.gni")
 import("//build/images/vboot/vboot.gni")
 import("//build/product.gni")
+import("//build/python/python_action.gni")
 import("//build/sdk/product_bundle.gni")
 import("//build/security.gni")
 import("//build/testing/host_test_data.gni")
@@ -196,6 +197,7 @@ if (is_fuchsia) {
         ":fuchsia_assembly",
         ":product_bundle",
         ":update",
+        ":validate_universe_config_data_entries_empty",
       ]
     }
 
@@ -385,6 +387,39 @@ if (is_fuchsia) {
           get_label_info(":${product_bundle_label}", "target_out_dir") + "/" +
           product_bundle_label
     }
+  }
+
+  generated_file("universe_config_data_entries") {
+    testonly = fuchsia_base.testonly
+    deps = fuchsia_base.universe_packages
+    data_keys = [ "config_package_entries" ]
+    walk_keys = [ "config_package_barrier" ]
+    output_conversion = "json"
+    outputs = [ "${target_out_dir}/universe_config_data_entries.json" ]
+  }
+
+  python_action("validate_universe_config_data_entries_empty") {
+    testonly = fuchsia_base.testonly
+    binary_label = "//build/assembly/scripts:validate_config_data_is_empty"
+    args = [
+      "--package-set",
+      "universe",
+      "--metadata-walk-results",
+      rebase_path("${target_out_dir}/universe_config_data_entries.json",
+                  root_build_dir),
+      "--package-allowlist",
+      rebase_path("//build/assembly/universe_config_data.allowlist.json",
+                  root_build_dir),
+      "--output",
+      rebase_path("${target_out_dir}/universe_config_data_entries_empty.txt",
+                  root_build_dir),
+    ]
+    inputs = [
+      "${target_out_dir}/universe_config_data_entries.json",
+      "//build/assembly/universe_config_data.allowlist.json",
+    ]
+    deps = [ ":universe_config_data_entries" ]
+    outputs = [ "${target_out_dir}/universe_config_data_entries_empty.txt" ]
   }
 
   ##################################################
