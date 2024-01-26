@@ -7463,7 +7463,7 @@ toolchain, so that recompilations with the new compiler can be triggered.
 When using the prebuilt, this is ignored and the CIPD instance ID of the
 prebuilt is used.
 
-**Current value (from the default):** `"5DPMgVsHLiYYnmk_e0Ww3jcqGJkk7yE88bJr2-SWHV0C"`
+**Current value (from the default):** `"RQLOwpxB0bbElhOePI1h8AFT0W944nXuBxJ1dL13JgcC"`
 
 From //build/rust/config.gni:38
 
@@ -8672,7 +8672,7 @@ From //build/images/args.gni:11
 
 **Current value (from the default):** `false`
 
-From //src/graphics/display/drivers/virtio-guest/BUILD.gn:6
+From //src/graphics/display/drivers/virtio-guest/BUILD.gn:8
 
 ### using_fuchsia_sdk
 
