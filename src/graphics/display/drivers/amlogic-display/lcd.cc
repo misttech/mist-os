@@ -169,11 +169,10 @@ zx::result<> Lcd::PerformDisplayInitCommandSequence(cpp20::span<const uint8_t> e
       // All other cmd_type bytes are real DSI commands
       case kMipiDsiDtDcsShortWrite0:
       case kMipiDsiDtDcsShortWrite1:
-      case /*kMipiDsiDtDcsShortWrite2*/ 0x25:
       case kMipiDsiDtDcsLongWrite:
       case kMipiDsiDtDcsRead0:
         is_dcs = true;
-        __FALLTHROUGH;
+        [[fallthrough]];
       default:
         zxlogf(TRACE, "dsi_cmd op=0x%x size=%d is_dcs=%s", cmd_type, payload_size,
                is_dcs ? "yes" : "no");
