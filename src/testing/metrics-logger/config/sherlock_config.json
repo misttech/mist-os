@@ -6,7 +6,7 @@
         },
         {
             "name": "soc_pll",
-            "topo_path_suffix": "/aml-thermal-pll/thermal"
+            "topo_path_suffix": "/aml_thermal_pll/thermal"
         },
         {
             "name": "therm_ambient",

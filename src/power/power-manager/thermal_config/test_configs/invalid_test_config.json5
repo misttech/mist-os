@@ -5,7 +5,7 @@
                 // missing `state` key
                 trip_points: [
                     {
-                        sensor: '/dev/aml-thermal-pll/thermal',
+                        sensor: '/dev/aml_thermal_pll/thermal',
                         activate_at: 80,
                         deactivate_below: 76,
                     },

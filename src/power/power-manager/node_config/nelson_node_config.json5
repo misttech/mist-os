@@ -17,7 +17,7 @@
     type: "TemperatureHandler",
     name: "soc_pll_thermal",
     config: {
-      driver_path: "/dev/sys/platform/05:05:a/aml-thermal-pll/thermal",
+      driver_path: "/dev/sys/platform/05:05:a/aml_thermal_pll/thermal",
       cache_duration_ms: 50
     }
   },

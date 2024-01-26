@@ -25,9 +25,9 @@ Driver::Driver(fdf::DriverStartArgs start_args,
       thread_temperature_server_(&thread_temperature_) {}
 
 zx::result<> Driver::Start() {
-  auto soc_nodes_result = AddNodes(node(), {"05:05:a", "aml-thermal-pll"});
+  auto soc_nodes_result = AddNodes(node(), {"05:05:a", "aml_thermal_pll"});
   if (soc_nodes_result.is_error()) {
-    FDF_SLOG(ERROR, "Failed to add `05:05:a/aml-thermal-pll`",
+    FDF_SLOG(ERROR, "Failed to add `05:05:a/aml_thermal_pll`",
              KV("status", soc_nodes_result.status_string()));
     return soc_nodes_result.take_error();
   }
