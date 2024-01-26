@@ -10,6 +10,7 @@ use starnix_uapi::{
     errno, error, errors::Errno, sched_param, SCHED_BATCH, SCHED_DEADLINE, SCHED_FIFO, SCHED_IDLE,
     SCHED_NORMAL, SCHED_RESET_ON_FORK, SCHED_RR,
 };
+use std::cmp::Ordering;
 
 // In user space, priority (niceness) is an integer from -20..19 (inclusive)
 // with the default being 0.
@@ -22,7 +23,7 @@ use starnix_uapi::{
 // https://man7.org/linux/man-pages/man2/setpriority.2.html#NOTES
 const DEFAULT_TASK_PRIORITY: u8 = 20;
 
-#[derive(Clone, Copy, Debug, Default, PartialEq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, PartialOrd)]
 pub struct SchedulerPolicy {
     kind: SchedulerPolicyKind,
     reset_on_fork: bool,
@@ -50,6 +51,12 @@ pub enum SchedulerPolicyKind {
         /// 0-99, from sched_setpriority()
         priority: u8,
     },
+}
+
+impl PartialOrd for SchedulerPolicyKind {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        self.ordering().partial_cmp(&other.ordering())
+    }
 }
 
 impl std::default::Default for SchedulerPolicyKind {
@@ -180,6 +187,16 @@ impl SchedulerPolicy {
 }
 
 impl SchedulerPolicyKind {
+    /// Returns a tuploe allowing to compare 2 policies.
+    fn ordering(&self) -> (u8, u8) {
+        match self {
+            Self::RoundRobin { priority } | Self::Fifo { priority } => (3, *priority),
+            Self::Normal { priority } => (2, *priority),
+            Self::Batch { priority } => (1, *priority),
+            Self::Idle { priority } => (0, *priority),
+        }
+    }
+
     /// Returns a number 0-31 (inclusive) mapping Linux scheduler priority to a Zircon priority
     /// level for the fair scheduler.
     ///
