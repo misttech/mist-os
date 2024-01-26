@@ -23,7 +23,7 @@ using SpiChildType =
 
 class SpiChild : public SpiChildType,
                  public ddk::SpiProtocol<SpiChild, ddk::base_protocol>,
-                 public fidl::Server<fuchsia_hardware_spi::Device> {
+                 public fidl::WireServer<fuchsia_hardware_spi::Device> {
  public:
   using ClientType = fdf::WireSharedClient<fuchsia_hardware_spiimpl::SpiImpl>;
 
@@ -41,20 +41,20 @@ class SpiChild : public SpiChildType,
 
   void OpenSession(OpenSessionRequestView request, OpenSessionCompleter::Sync& completer) override;
 
-  void TransmitVector(TransmitVectorRequest& request,
+  void TransmitVector(TransmitVectorRequestView request,
                       TransmitVectorCompleter::Sync& completer) override;
-  void ReceiveVector(ReceiveVectorRequest& request,
+  void ReceiveVector(ReceiveVectorRequestView request,
                      ReceiveVectorCompleter::Sync& completer) override;
-  void ExchangeVector(ExchangeVectorRequest& request,
+  void ExchangeVector(ExchangeVectorRequestView request,
                       ExchangeVectorCompleter::Sync& completer) override;
 
-  void RegisterVmo(RegisterVmoRequest& request, RegisterVmoCompleter::Sync& completer) override;
-  void UnregisterVmo(UnregisterVmoRequest& request,
+  void RegisterVmo(RegisterVmoRequestView request, RegisterVmoCompleter::Sync& completer) override;
+  void UnregisterVmo(UnregisterVmoRequestView request,
                      UnregisterVmoCompleter::Sync& completer) override;
 
-  void Transmit(TransmitRequest& request, TransmitCompleter::Sync& completer) override;
-  void Receive(ReceiveRequest& request, ReceiveCompleter::Sync& completer) override;
-  void Exchange(ExchangeRequest& request, ExchangeCompleter::Sync& completer) override;
+  void Transmit(TransmitRequestView request, TransmitCompleter::Sync& completer) override;
+  void Receive(ReceiveRequestView request, ReceiveCompleter::Sync& completer) override;
+  void Exchange(ExchangeRequestView request, ExchangeCompleter::Sync& completer) override;
 
   void CanAssertCs(CanAssertCsCompleter::Sync& completer) override;
   void AssertCs(AssertCsCompleter::Sync& completer) override;
