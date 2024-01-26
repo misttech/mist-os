@@ -5,8 +5,31 @@
 import("//build/compiled_action.gni")
 import("//build/dist/resource.gni")
 
-# TODO(jamesr): Document this template properly.
-# Required: expectations, output_path
+# Preprocesses an expectations JSON5 file in order to
+# resolve `include`s and check that the file is valid, and
+# produces a `resource` to be included in a fuchsia package.
+#
+# Parameters
+#   expectations (required)
+#     Path to a JSON5 test expectations file.
+#     Type: path
+#
+#   output_path (required)
+#     Output path for the preprocessed file `resource`.
+#
+#   cases_to_run (optional)
+#     String specifier of which cases to run with
+#     respect to whether or not they produce error logs.
+#     Type: string
+#     Options:
+#        - "NoErrLogs" indicates that tests expected to
+#          generate error logs should be skipped.
+#        - "WithErrLogs" indicates that only those tests
+#          expected to generate error logs should be run.
+#        - By default, all test cases will be run.
+#
+#   All other parameters are forwarded to the `compiled_action`
+#   target acting on the expectations file.
 template("preprocess_expectations") {
   assert(defined(invoker.expectations))
   assert(defined(invoker.output_path))

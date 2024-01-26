@@ -74,7 +74,6 @@ template("fuchsia_test_with_expectations_package") {
 
   _expectations_target = "${target_name}_preprocessed_expectations"
   preprocess_expectations(_expectations_target) {
-    # forward_variables_from(invoker, [ "deps" ])
     if (defined(invoker.treatment_of_cases_with_error_logs)) {
       assert(
           invoker.treatment_of_cases_with_error_logs == _skip_err_logs_cases ||

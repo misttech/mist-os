@@ -48,10 +48,12 @@ foreach(
 #         name (required)
 #         Type: string
 #           The target name to use for the `fuchsia_test_component`.
+#
 #         num_shards (required)
 #         Type: number
 #           The number of shards into which the component's test cases should
 #           be divided.
+#
 #         shard_part_regex (optional)
 #         Type: string
 #           A regex that specifies a portion of each test case to use as the
@@ -61,16 +63,31 @@ foreach(
 #           Note that backslashes in the regex will be escaped for you,
 #           so e.g. "capture_just_based_on_number_(\d+)" will work without
 #           additional escaping.
+#
 #         expectations (optional)
 #         Type: path
 #           The path to a //src/lib/testing/expectation test expectations JSON5
 #           file. If set, a `fuchsia_test_component_with_expectations` is
 #           emitted instead of a `fuchsia_test_component`.
+#
 #         generated_expectations (optional)
 #         Type: target
 #           A `//src/lib/testing/expectation/generated_expectations_file.gni`
 #           dep to use instead of a static `expectations` file. Only one of
 #           `expectations` or `generated_expectations` can be set.
+#
+#         treatment_of_cases_with_error_logs (optional)
+#         Type: string
+#           Identifies how test cases that are expected to generate error logs
+#           should be run. Only can be set if `expectations` or
+#           `generated_expectations` is set.
+#           Type: string
+#           Options:
+#             - "SKIP_CASES_WITH_ERROR_LOGS" indicates that tests expected to
+#               generate error logs should be skipped.
+#             - "RUN_ONLY_CASES_WITH_ERROR_LOGS" indicates that only those tests
+#               expected to generate error logs should be run.
+#             - By default, all test cases will be run.
 #
 #   The rest of the parameters are the same as `fuchsia_test_package`.
 template("fuchsia_sharded_test_package") {
@@ -188,6 +205,11 @@ template("fuchsia_sharded_test_package") {
             defined(test_component.generated_expectations)) {
           fuchsia_test_component_with_expectations(_shard_target_name) {
             forward_variables_from(_test_cmp_args, "*")
+
+            if (defined(invoker.treatment_of_cases_with_error_logs)) {
+              treatment_of_cases_with_error_logs =
+                  invoker.treatment_of_cases_with_error_logs
+            }
           }
         } else {
           fuchsia_test_component(_shard_target_name) {

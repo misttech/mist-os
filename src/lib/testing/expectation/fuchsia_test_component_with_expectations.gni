@@ -24,11 +24,28 @@ import("//tools/cmc/build/expect_includes.gni")
 #    The component manifest.
 #    Type: path
 #
+#  treatment_of_cases_with_error_logs (optional)
+#     Identifies how test cases that are expected to generate error logs
+#     should be run.
+#     Type: string
+#     Options:
+#       - "SKIP_CASES_WITH_ERROR_LOGS" indicates that tests expected to
+#         generate error logs should be skipped.
+#       - "RUN_ONLY_CASES_WITH_ERROR_LOGS" indicates that only those tests
+#         expected to generate error logs should be run.
+#       - By default, all test cases will be run.
+#
 #  All others - same as fuchsia_test_component.
 template("fuchsia_test_component_with_expectations") {
   assert(defined(invoker.manifest), "Must define path to manifest file.")
 
   _test_component_name = target_name
+  _skip_err_logs_cases = "SKIP_CASES_WITH_ERROR_LOGS"
+  _run_err_logs_cases = "RUN_ONLY_CASES_WITH_ERROR_LOGS"
+  not_needed([
+               _skip_err_logs_cases,
+               _run_err_logs_cases,
+             ])
 
   _expectations_target = "${target_name}_preprocessed_expectations"
   preprocess_expectations(_expectations_target) {
@@ -44,6 +61,16 @@ template("fuchsia_test_component_with_expectations") {
       assert(defined(invoker.expectations),
              "Must define path to expectations file.")
       expectations = invoker.expectations
+    }
+    if (defined(invoker.treatment_of_cases_with_error_logs)) {
+      assert(
+          invoker.treatment_of_cases_with_error_logs == _skip_err_logs_cases ||
+          invoker.treatment_of_cases_with_error_logs == _run_err_logs_cases)
+      if (invoker.treatment_of_cases_with_error_logs == _skip_err_logs_cases) {
+        cases_to_run = "NoErrLogs"
+      } else {
+        cases_to_run = "WithErrLogs"
+      }
     }
     output_path =
         "data/tests/expectations/${_test_component_name}/expectations.json5"
