@@ -19,6 +19,7 @@
 #include <fbl/auto_lock.h>
 
 #include "src/graphics/display/drivers/amlogic-display/board-resources.h"
+#include "src/graphics/display/drivers/amlogic-display/irq-handler-loop-util.h"
 #include "src/graphics/display/drivers/amlogic-display/rdma-regs.h"
 #include "src/graphics/display/drivers/amlogic-display/vpp-regs.h"
 #include "src/graphics/display/drivers/amlogic-display/vpu-regs.h"
@@ -68,6 +69,8 @@ RdmaEngine::RdmaEngine(fdf::MmioBuffer vpu_mmio, zx::bti dma_bti, zx::interrupt 
     : vpu_mmio_(std::move(vpu_mmio)),
       bti_(std::move(dma_bti)),
       rdma_irq_(std::move(rdma_done_interrupt)),
+      rdma_irq_handler_loop_config_(CreateIrqHandlerAsyncLoopConfig()),
+      rdma_irq_handler_loop_(&rdma_irq_handler_loop_config_),
       rdma_allocation_failures_(inspect_node->CreateUint("rdma_allocation_failures", 0)),
       rdma_irq_count_(inspect_node->CreateUint("rdma_irq_count", 0)),
       rdma_begin_count_(inspect_node->CreateUint("rdma_begin_count", 0)),
@@ -75,7 +78,9 @@ RdmaEngine::RdmaEngine(fdf::MmioBuffer vpu_mmio, zx::bti dma_bti, zx::interrupt 
       last_rdma_pending_in_vsync_interval_ns_(
           inspect_node->CreateUint("last_rdma_pending_in_vsync_interval_ns", 0)),
       last_rdma_pending_in_vsync_timestamp_ns_prop_(
-          inspect_node->CreateUint("last_rdma_pending_in_vsync_timestamp_ns", 0)) {}
+          inspect_node->CreateUint("last_rdma_pending_in_vsync_timestamp_ns", 0)) {
+  rdma_irq_handler_.set_object(rdma_irq_.get());
+}
 
 void RdmaEngine::TryResolvePendingRdma() {
   ZX_DEBUG_ASSERT(rdma_active_);
@@ -172,20 +177,6 @@ void RdmaEngine::ProcessRdmaUsageTable() {
     rdma_active_ = true;
     rdma_begin_count_.Add(1);
   }
-}
-
-int RdmaEngine::RdmaIrqThread() {
-  zx_status_t status;
-  while (true) {
-    status = rdma_irq_.wait(nullptr);
-    if (status != ZX_OK) {
-      zxlogf(ERROR, "RDMA Interrupt wait failed");
-      break;
-    }
-
-    rdma_irq_count_.Add(1);
-  }
-  return status;
 }
 
 int RdmaEngine::GetNextAvailableRdmaTableIndex() {
@@ -365,13 +356,8 @@ zx_status_t RdmaEngine::SetupRdma() {
 
   ResetRdmaTable();
 
-  auto start_thread = [](void* arg) { return static_cast<RdmaEngine*>(arg)->RdmaIrqThread(); };
-  status = thrd_status_to_zx_status(
-      thrd_create_with_name(&rdma_irq_thread_, start_thread, this, "rdma_irq_thread"));
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "Could not create rdma_thread");
-    return status;
-  }
+  rdma_irq_handler_loop_.StartThread("rdma_irq_thread");
+  rdma_irq_handler_.Begin(rdma_irq_handler_loop_.dispatcher());
 
   return ZX_OK;
 }
@@ -487,10 +473,35 @@ void RdmaEngine::DumpRdmaState() {
   zxlogf(INFO, "\n\n=========================================");
 }
 
+void RdmaEngine::OnTransactionFinished() { rdma_irq_count_.Add(1); }
+
+void RdmaEngine::InterruptHandler(async_dispatcher_t* dispatcher, async::IrqBase* irq,
+                                  zx_status_t status, const zx_packet_interrupt_t* interrupt) {
+  if (status == ZX_ERR_CANCELED) {
+    zxlogf(INFO, "RDMA interrupt wait is cancelled.");
+    return;
+  }
+  if (status != ZX_OK) {
+    zxlogf(ERROR, "RDMA interrupt wait failed: %s", zx_status_get_string(status));
+    // A failed async interrupt wait doesn't remove the interrupt from the
+    // async loop, so we have to manually cancel it.
+    irq->Cancel();
+    return;
+  }
+
+  OnTransactionFinished();
+
+  // For interrupts bound to ports (including those bound to async loops), the
+  // interrupt must be re-armed using zx_interrupt_ack() for each incoming
+  // interrupt request. This is best done after the interrupt has been fully
+  // processed.
+  zx::unowned_interrupt(irq->object())->ack();
+}
+
 void RdmaEngine::Release() {
   rdma_irq_.destroy();
   rdma_pmt_.unpin();
-  thrd_join(rdma_irq_thread_, nullptr);
+  rdma_irq_handler_loop_.Shutdown();
 }
 
 }  // namespace amlogic_display

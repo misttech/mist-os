@@ -6,6 +6,8 @@
 #define SRC_GRAPHICS_DISPLAY_DRIVERS_AMLOGIC_DISPLAY_RDMA_H_
 
 #include <fuchsia/hardware/display/controller/cpp/banjo.h>
+#include <lib/async-loop/cpp/loop.h>
+#include <lib/async/cpp/irq.h>
 #include <lib/device-protocol/pdev-fidl.h>
 #include <lib/inspect/cpp/inspect.h>
 #include <lib/mmio/mmio-buffer.h>
@@ -211,12 +213,19 @@ class RdmaEngine {
   void DumpRdmaState() __TA_REQUIRES(rdma_lock_);
 
  private:
+  void InterruptHandler(async_dispatcher_t* dispatcher, async::IrqBase* irq, zx_status_t status,
+                        const zx_packet_interrupt_t* interrupt);
+  void OnTransactionFinished();
+
   fdf::MmioBuffer vpu_mmio_;
   zx::bti bti_;
 
-  // RDMA IRQ handle and thread used for diagnostic purposes.
+  // RDMA IRQ handle used for diagnostic purposes.
   zx::interrupt rdma_irq_;
-  thrd_t rdma_irq_thread_;
+
+  const async_loop_config_t rdma_irq_handler_loop_config_;
+  async::Loop rdma_irq_handler_loop_;
+  async::IrqMethod<RdmaEngine, &RdmaEngine::InterruptHandler> rdma_irq_handler_{this};
 
   fbl::Mutex rdma_lock_;
 
