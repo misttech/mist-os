@@ -293,13 +293,9 @@ class RemoteTool(object):
         if gce_creds:
             auto_args.append(f"--use_gce_credentials={gce_creds}")
         else:
-            use_adc = self.config.get(
-                "use_application_default_credentials", None
-            )
-            if use_adc:
-                auto_args.append(
-                    f"--use_application_default_credentials={use_adc}"
-                )
+            # Developers will use application-default-credentials for now.
+            # This could change to a different credential helper in the future.
+            auto_args.append("--use_application_default_credentials=true")
 
         command = (
             [
