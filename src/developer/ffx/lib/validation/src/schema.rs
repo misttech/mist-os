@@ -6,6 +6,8 @@ use std::{any::TypeId, fmt::Display, ops::ControlFlow};
 
 mod macros;
 
+pub use ffx_validation_proc_macro::Schema;
+
 /// Walks through a schema type's structure and collects its constituents.
 ///
 /// The walk process can exit early with [ControlFlow::Break]. Generally only the [Walker]

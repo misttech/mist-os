@@ -10,6 +10,8 @@ pub mod schema;
 pub use ffx_validation_proc_macro::schema;
 pub mod validate;
 
+pub use schema::Schema;
+
 #[track_caller]
 pub fn validation_test<
     T: schema::Schema,

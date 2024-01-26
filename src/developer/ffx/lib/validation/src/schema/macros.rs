@@ -7,6 +7,12 @@ mod test {
     use crate::schema::Schema;
     use ffx_validation_proc_macro::schema;
 
+    // Allow RA to expand derive macros.
+    // Rust Analyzer cannot resolve the derive macro if "shadows" a trait.
+    // See https://github.com/rust-lang/rust-analyzer/issues/7408
+    #[cfg(rust_analyzer)]
+    use ffx_validation_proc_macro::Schema;
+
     // Marker structs
     struct Optional;
     struct RustType;
@@ -51,4 +57,35 @@ mod test {
             A, B, C(String), D { field: u32, b: u32 },
         };
     }
+
+    // Schema derive macro syntax tests
+
+    #[derive(Schema)]
+    #[allow(dead_code)]
+    struct DeriveStruct {
+        a: u32,
+        b: String,
+        c: Option<u32>,
+    }
+
+    #[derive(Schema)]
+    #[allow(dead_code)]
+    struct DeriveStructUnit;
+
+    #[derive(Schema)]
+    #[allow(dead_code)]
+    struct DeriveStructUnnamed(u32, String, Option<u32>);
+
+    #[derive(Schema)]
+    #[allow(dead_code)]
+    struct DeriveStructGeneric<T: Copy>
+    where
+        T: Schema + 'static,
+    {
+        a: T,
+        b: String,
+        c: Option<T>,
+    }
+
+    // TODO(https://fxbug.dev/320578550): Enums
 }

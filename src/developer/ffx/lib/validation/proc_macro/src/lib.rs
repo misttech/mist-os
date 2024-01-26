@@ -5,7 +5,7 @@
 use quote::quote;
 use syn::{
     parse::Parse, parse_macro_input, punctuated::Punctuated, Attribute, Generics, Ident, Lit, Path,
-    Token, Type,
+    Token, Type, TypeTuple,
 };
 
 // TODO(b/316034512): Derive macro for structs and enums
@@ -91,6 +91,83 @@ pub fn schema(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     items.items.iter().map(|item| item.build()).collect::<proc_macro2::TokenStream>().into()
 }
 
+#[proc_macro_derive(Schema)]
+pub fn schema_derive(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
+    // Essentially turn the item into a schema item.
+    let item = parse_macro_input!(input as syn::DeriveInput);
+
+    // TODO(https://fxbug.dev/320578372): Support where clause attributes: #[schema(where T: Schema + 'static)]
+
+    let out_item = match item.data {
+        syn::Data::Struct(struct_item) => {
+            let ty = match struct_item.fields {
+                // struct Name -> null
+                syn::Fields::Unit => SchemaType::Null,
+                // struct Name { field: u32 } -> struct { field: u32 }
+                syn::Fields::Named(fields) => {
+                    let mut out_fields = Punctuated::new();
+                    for (field, comma) in fields.named.pairs().map(|p| p.into_tuple()) {
+                        out_fields.push_value(SchemaField {
+                            key: SchemaStructKey {
+                                name: field.ident.clone().unwrap(),
+                                // TODO(https://fxbug.dev/320578372): Optional field attribute
+                                // #[schema(optional)] or #[serde(optional)]
+                                optional: false,
+                            },
+                            value: SchemaType::Alias(field.ty.clone()),
+                        });
+                        if let Some(comma) = comma {
+                            out_fields.push_punct(comma.clone());
+                        }
+                    }
+                    SchemaType::Struct { fields: out_fields }
+                }
+                // struct Name(u32, String); -> (u32, String)
+                syn::Fields::Unnamed(fields) => {
+                    let mut elems = Punctuated::new();
+                    for (field, comma) in fields.unnamed.pairs().map(|p| p.into_tuple()) {
+                        elems.push_value(field.ty.clone());
+                        if let Some(comma) = comma {
+                            elems.push_punct(comma.clone());
+                        }
+                    }
+                    SchemaType::Alias(Type::Tuple(TypeTuple {
+                        paren_token: fields.paren_token,
+                        elems,
+                    }))
+                }
+            };
+
+            let name = item.ident;
+            let (_, ty_args, _) = item.generics.split_for_impl();
+            let impl_path = quote!(#name #ty_args);
+
+            SchemaItem::Impl(SchemaImplItem {
+                generics: item.generics,
+                impl_path,
+                ty,
+                attr: ImplItemAttr::default(),
+            })
+        }
+        // TODO(https://fxbug.dev/320578550): Support enums
+        syn::Data::Enum(_enum_item) => {
+            return syn::Error::new(
+                item.ident.span(),
+                "Enums not supported: https://fxbug.dev/320578550",
+            )
+            .into_compile_error()
+            .into()
+        }
+        _ => {
+            return syn::Error::new(item.ident.span(), "Unions are not supported")
+                .into_compile_error()
+                .into()
+        }
+    };
+
+    out_item.build().into()
+}
+
 fn stringify_ident(id: &Ident) -> String {
     let mut s = id.to_string();
     if s.starts_with("r#") {
@@ -157,6 +234,7 @@ enum SchemaLiteral {
 }
 
 enum SchemaType {
+    Null,
     Union(Vec<SchemaType>),
     Alias(Type),
     Literal(SchemaLiteral),
@@ -538,6 +616,9 @@ impl Parse for SchemaType {
 impl SchemaType {
     fn build(&self, walker: &proc_macro2::TokenStream) -> proc_macro2::TokenStream {
         match self {
+            Self::Null => quote! {
+                #walker.add_type(::ffx_validation::schema::ValueType::Null)?;
+            },
             Self::Union(tys) => tys.iter().map(|ty| ty.build(walker)).collect(),
             Self::Alias(ty) => {
                 quote! {

@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use chrono::{Offset, TimeZone};
-use ffx_validation::schema;
+use ffx_validation::{schema, Schema};
 use fho::FfxContext;
 use fho::Result;
 use fidl_fuchsia_developer_ffx::{self as ffx};
@@ -16,7 +16,7 @@ const UNKNOWN_BUILD_HASH: &str = "(unknown)";
 /// and it uses a private member to make it non_exhaustive, we can't
 /// really use the serde remote serializer mechanism. So this is just a simple
 /// serializeable copy of VersionInfo.
-#[derive(Serialize, Deserialize, Debug, Default, PartialEq, Eq)]
+#[derive(Serialize, Deserialize, Debug, Default, PartialEq, Eq, Schema)]
 pub struct VersionInfo {
     pub commit_hash: Option<String>,
     pub commit_timestamp: Option<u64>,
@@ -25,18 +25,6 @@ pub struct VersionInfo {
     pub api_level: Option<u64>,
     pub exec_path: Option<String>,
     pub build_id: Option<String>,
-}
-
-schema! {
-    type VersionInfo = struct {
-        commit_hash: Option<String>,
-        commit_timestamp: Option<u64>,
-        build_version: Option<String>,
-        abi_revision: Option<u64>,
-        api_level: Option<u64>,
-        exec_path: Option<String>,
-        build_id: Option<String>,
-    };
 }
 
 impl From<ffx::VersionInfo> for VersionInfo {
@@ -91,6 +79,7 @@ impl From<VersionInfo> for ffx::VersionInfo {
 #[derive(Serialize, Deserialize, PartialEq, Eq, Debug)]
 pub struct Versions {
     pub tool_version: VersionInfo,
+    // TODO(https://fxbug.dev/320578372): Use schema derive macro once optional fields are supported
     #[serde(skip_serializing_if = "Option::is_none")]
     pub daemon_version: Option<VersionInfo>,
 }
