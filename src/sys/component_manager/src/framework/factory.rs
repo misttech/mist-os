@@ -82,7 +82,7 @@ impl FactoryCapabilityHost {
             fsandbox::FactoryRequest::CreateConnector { sender, receiver, control_handle: _ } => {
                 self.create_connector(sender, receiver);
             }
-            fsandbox::FactoryRequest::CreateDict { items, server_end, responder } => {
+            fsandbox::FactoryRequest::CreateDictionary { items, server_end, responder } => {
                 let res = self.create_dict(items, server_end);
                 responder.send(res)?;
             }
@@ -108,18 +108,18 @@ impl FactoryCapabilityHost {
 
     fn create_dict(
         &self,
-        items: Vec<fsandbox::DictItem>,
-        server_end: ServerEnd<fsandbox::DictMarker>,
-    ) -> Result<(), fsandbox::DictError> {
+        items: Vec<fsandbox::DictionaryItem>,
+        server_end: ServerEnd<fsandbox::DictionaryMarker>,
+    ) -> Result<(), fsandbox::DictionaryError> {
         let mut dict = Dict::new();
         let mut entries = dict.lock_entries();
         for item in items {
             let cap = Box::new(
                 AnyCapability::try_from(item.value)
-                    .map_err(|_| fsandbox::DictError::BadCapability)?,
+                    .map_err(|_| fsandbox::DictionaryError::BadCapability)?,
             );
             if entries.insert(item.key, cap).is_some() {
-                return Err(fsandbox::DictError::AlreadyExists);
+                return Err(fsandbox::DictionaryError::AlreadyExists);
             }
         }
         drop(entries);
@@ -224,11 +224,12 @@ mod tests {
                 let key = format!("key{}", i);
                 let koid = event.get_koid().unwrap();
                 let value: fsandbox::Capability = OneShotHandle::from(event.into_handle()).into();
-                (fsandbox::DictItem { key, value }, koid)
+                (fsandbox::DictionaryItem { key, value }, koid)
             })
             .unzip();
-        let (dict_proxy, server_end) = endpoints::create_proxy::<fsandbox::DictMarker>().unwrap();
-        factory_proxy.create_dict(items, server_end).await.unwrap().unwrap();
+        let (dict_proxy, server_end) =
+            endpoints::create_proxy::<fsandbox::DictionaryMarker>().unwrap();
+        factory_proxy.create_dictionary(items, server_end).await.unwrap().unwrap();
 
         // Read the items back from the dict.
         let items = dict_proxy.read().await.unwrap();
@@ -260,13 +261,13 @@ mod tests {
                 let event = zx::Event::create();
                 let key = "dup_key".into();
                 let value: fsandbox::Capability = OneShotHandle::from(event.into_handle()).into();
-                fsandbox::DictItem { key, value }
+                fsandbox::DictionaryItem { key, value }
             })
             .collect();
-        let (_, server_end) = endpoints::create_proxy::<fsandbox::DictMarker>().unwrap();
+        let (_, server_end) = endpoints::create_proxy::<fsandbox::DictionaryMarker>().unwrap();
         assert_eq!(
-            factory_proxy.create_dict(items, server_end).await.unwrap().unwrap_err(),
-            fsandbox::DictError::AlreadyExists,
+            factory_proxy.create_dictionary(items, server_end).await.unwrap().unwrap_err(),
+            fsandbox::DictionaryError::AlreadyExists,
         );
     }
 }

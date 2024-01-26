@@ -93,7 +93,7 @@ impl TryFrom<fsandbox::Capability> for AnyCapability {
             fsandbox::Capability::Cloneable(client_end) => {
                 try_from_handle_in_registry(client_end.as_handle_ref())
             }
-            fsandbox::Capability::Dict(client_end) => {
+            fsandbox::Capability::Dictionary(client_end) => {
                 let mut any = try_from_handle_in_registry(client_end.as_handle_ref())?;
                 // Cache the client end so it can be reused in future conversions to FIDL.
                 {

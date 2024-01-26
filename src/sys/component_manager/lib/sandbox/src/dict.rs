@@ -42,7 +42,7 @@ pub struct Dict {
     #[derivative(Debug = "ignore")]
     not_found: Arc<dyn Fn(Key) -> () + 'static + Send + Sync>,
 
-    /// Tasks that serve [DictIterator]s.
+    /// Tasks that serve [DictionaryIterator]s.
     #[derivative(Debug = "ignore")]
     iterator_tasks: fasync::TaskGroup,
 
@@ -50,7 +50,7 @@ pub struct Dict {
     ///
     /// This will be `Some` if was previously converted into a `ClientEnd`, such as by calling
     /// [into_fidl], and the capability is not currently in the registry.
-    client_end: Option<ClientEnd<fsandbox::DictMarker>>,
+    client_end: Option<ClientEnd<fsandbox::DictionaryMarker>>,
 }
 
 impl Default for Dict {
@@ -106,74 +106,76 @@ impl Dict {
         copy
     }
 
-    /// Serve the `fuchsia.component.Dict` protocol for this `Dict`.
+    /// Serve the `fuchsia.component.sandbox.Dictionary` protocol for this `Dict`.
     pub async fn serve_dict(
         &mut self,
-        mut stream: fsandbox::DictRequestStream,
+        mut stream: fsandbox::DictionaryRequestStream,
     ) -> Result<(), Error> {
         while let Some(request) =
             stream.try_next().await.context("failed to read request from stream")?
         {
             match request {
-                fsandbox::DictRequest::Insert { key, value, responder, .. } => {
+                fsandbox::DictionaryRequest::Insert { key, value, responder, .. } => {
                     let result = match self.lock_entries().entry(key) {
-                        Entry::Occupied(_) => Err(fsandbox::DictError::AlreadyExists),
+                        Entry::Occupied(_) => Err(fsandbox::DictionaryError::AlreadyExists),
                         Entry::Vacant(entry) => match AnyCapability::try_from(value) {
                             Ok(cap) => {
                                 entry.insert(cap);
                                 Ok(())
                             }
-                            Err(_) => Err(fsandbox::DictError::BadCapability),
+                            Err(_) => Err(fsandbox::DictionaryError::BadCapability),
                         },
                     };
                     responder.send(result).context("failed to send response")?;
                 }
-                fsandbox::DictRequest::Get { key, responder } => {
+                fsandbox::DictionaryRequest::Get { key, responder } => {
                     let result = match self.entries.lock().unwrap().get(&key) {
                         Some(cap) => Ok(cap.clone().into_fidl()),
                         None => {
                             (self.not_found)(key);
-                            Err(fsandbox::DictError::NotFound)
+                            Err(fsandbox::DictionaryError::NotFound)
                         }
                     };
                     responder.send(result).context("failed to send response")?;
                 }
-                fsandbox::DictRequest::Remove { key, responder } => {
+                fsandbox::DictionaryRequest::Remove { key, responder } => {
                     let result = match self.entries.lock().unwrap().remove(&key) {
                         Some(cap) => Ok(cap.into_fidl()),
                         None => {
                             (self.not_found)(key);
-                            Err(fsandbox::DictError::NotFound)
+                            Err(fsandbox::DictionaryError::NotFound)
                         }
                     };
                     responder.send(result).context("failed to send response")?;
                 }
-                fsandbox::DictRequest::Read { responder } => {
+                fsandbox::DictionaryRequest::Read { responder } => {
                     let items = self
                         .lock_entries()
                         .iter()
                         .map(|(key, value)| {
                             let value = value.clone().into_fidl();
-                            fsandbox::DictItem { key: key.clone(), value }
+                            fsandbox::DictionaryItem { key: key.clone(), value }
                         })
                         .collect();
                     responder.send(items).context("failed to send response")?;
                 }
-                fsandbox::DictRequest::Clone2 { request, control_handle: _ } => {
+                fsandbox::DictionaryRequest::Clone2 { request, control_handle: _ } => {
                     // The clone is registered under the koid of the client end.
                     let koid = request.basic_info().unwrap().related_koid;
-                    let server_end: ServerEnd<fsandbox::DictMarker> = request.into_channel().into();
+                    let server_end: ServerEnd<fsandbox::DictionaryMarker> =
+                        request.into_channel().into();
                     let stream = server_end.into_stream().unwrap();
                     self.clone().serve_and_register(stream, koid);
                 }
-                fsandbox::DictRequest::Copy { request, .. } => {
+                fsandbox::DictionaryRequest::Copy { request, .. } => {
                     // The copy is registered under the koid of the client end.
                     let koid = request.basic_info().unwrap().related_koid;
-                    let server_end: ServerEnd<fsandbox::DictMarker> = request.into_channel().into();
+                    let server_end: ServerEnd<fsandbox::DictionaryMarker> =
+                        request.into_channel().into();
                     let stream = server_end.into_stream().unwrap();
                     self.copy().serve_and_register(stream, koid);
                 }
-                fsandbox::DictRequest::Enumerate { contents: server_end, .. } => {
+                fsandbox::DictionaryRequest::Enumerate { contents: server_end, .. } => {
                     let items = self
                         .lock_entries()
                         .iter()
@@ -183,7 +185,7 @@ impl Dict {
                     let task = fasync::Task::spawn(serve_dict_iterator(items, stream));
                     self.iterator_tasks.add(task);
                 }
-                fsandbox::DictRequest::Drain { contents: server_end, .. } => {
+                fsandbox::DictionaryRequest::Drain { contents: server_end, .. } => {
                     // Take out entries, replacing with an empty BTreeMap.
                     // They are dropped if the caller does not request an iterator.
                     let entries = {
@@ -197,7 +199,7 @@ impl Dict {
                         self.iterator_tasks.add(task);
                     }
                 }
-                fsandbox::DictRequest::_UnknownMethod { ordinal, .. } => {
+                fsandbox::DictionaryRequest::_UnknownMethod { ordinal, .. } => {
                     warn!("Received unknown Dict request with ordinal {ordinal}");
                 }
             }
@@ -207,7 +209,7 @@ impl Dict {
     }
 
     /// Serves the `fuchsia.sandbox.Dict` protocol for this Open and moves it into the registry.
-    fn serve_and_register(self, stream: fsandbox::DictRequestStream, koid: zx::Koid) {
+    fn serve_and_register(self, stream: fsandbox::DictionaryRequestStream, koid: zx::Koid) {
         let mut dict = self.clone();
         let fut = async move {
             dict.serve_dict(stream).await.expect("failed to serve Dict");
@@ -222,16 +224,16 @@ impl Dict {
     ///
     /// This should only be used to put a remoted client end back into the Dict after it is removed
     /// from the registry.
-    pub(crate) fn set_client_end(&mut self, client_end: ClientEnd<fsandbox::DictMarker>) {
+    pub(crate) fn set_client_end(&mut self, client_end: ClientEnd<fsandbox::DictionaryMarker>) {
         self.client_end = Some(client_end)
     }
 }
 
-impl From<Dict> for ClientEnd<fsandbox::DictMarker> {
+impl From<Dict> for ClientEnd<fsandbox::DictionaryMarker> {
     fn from(mut dict: Dict) -> Self {
         dict.client_end.take().unwrap_or_else(|| {
             let (client_end, dict_stream) =
-                create_request_stream::<fsandbox::DictMarker>().unwrap();
+                create_request_stream::<fsandbox::DictionaryMarker>().unwrap();
             dict.serve_and_register(dict_stream, client_end.get_koid().unwrap());
             client_end
         })
@@ -240,7 +242,7 @@ impl From<Dict> for ClientEnd<fsandbox::DictMarker> {
 
 impl From<Dict> for fsandbox::Capability {
     fn from(dict: Dict) -> Self {
-        Self::Dict(dict.into())
+        Self::Dictionary(dict.into())
     }
 }
 
@@ -298,24 +300,24 @@ impl Capability for Dict {
     }
 }
 
-/// Serves the `fuchsia.sandbox.DictIterator` protocol, providing items from the given iterator.
+/// Serves the `fuchsia.sandbox.DictionaryIterator` protocol, providing items from the given iterator.
 async fn serve_dict_iterator(
     items: Vec<(Key, AnyCapability)>,
-    mut stream: fsandbox::DictIteratorRequestStream,
+    mut stream: fsandbox::DictionaryIteratorRequestStream,
 ) {
     let mut chunks = items
-        .chunks(fsandbox::MAX_DICT_ITEMS_CHUNK as usize)
+        .chunks(fsandbox::MAX_DICTIONARY_ITEMS_CHUNK as usize)
         .map(|chunk: &[(Key, AnyCapability)]| chunk.to_vec())
         .collect::<Vec<_>>()
         .into_iter();
 
     while let Some(request) = stream.try_next().await.expect("failed to read request from stream") {
         match request {
-            fsandbox::DictIteratorRequest::GetNext { responder } => match chunks.next() {
+            fsandbox::DictionaryIteratorRequest::GetNext { responder } => match chunks.next() {
                 Some(chunk) => {
                     let items = chunk
                         .into_iter()
-                        .map(|(key, value)| fsandbox::DictItem {
+                        .map(|(key, value)| fsandbox::DictionaryItem {
                             key: key.to_string(),
                             value: value.into_fidl(),
                         })
@@ -327,8 +329,8 @@ async fn serve_dict_iterator(
                     return;
                 }
             },
-            fsandbox::DictIteratorRequest::_UnknownMethod { ordinal, .. } => {
-                warn!("Received unknown DictIterator request with ordinal {ordinal}");
+            fsandbox::DictionaryIteratorRequest::_UnknownMethod { ordinal, .. } => {
+                warn!("Received unknown DictionaryIterator request with ordinal {ordinal}");
             }
         }
     }
@@ -355,7 +357,7 @@ mod tests {
     async fn serve_insert() -> Result<()> {
         let mut dict = Dict::new();
 
-        let (dict_proxy, dict_stream) = create_proxy_and_stream::<fsandbox::DictMarker>()?;
+        let (dict_proxy, dict_stream) = create_proxy_and_stream::<fsandbox::DictionaryMarker>()?;
         let server = dict.serve_dict(dict_stream);
 
         let client = async move {
@@ -396,7 +398,7 @@ mod tests {
             assert_eq!(entries.len(), 1);
         }
 
-        let (dict_proxy, dict_stream) = create_proxy_and_stream::<fsandbox::DictMarker>()?;
+        let (dict_proxy, dict_stream) = create_proxy_and_stream::<fsandbox::DictionaryMarker>()?;
         let server = dict.serve_dict(dict_stream);
 
         let client = async move {
@@ -432,7 +434,7 @@ mod tests {
             assert_eq!(entries.len(), 1);
         }
 
-        let (dict_proxy, dict_stream) = create_proxy_and_stream::<fsandbox::DictMarker>()?;
+        let (dict_proxy, dict_stream) = create_proxy_and_stream::<fsandbox::DictionaryMarker>()?;
         let server = dict.serve_dict(dict_stream);
 
         let client = async move {
@@ -459,7 +461,7 @@ mod tests {
     async fn insert_already_exists() -> Result<(), Error> {
         let mut dict = Dict::new();
 
-        let (dict_proxy, dict_stream) = create_proxy_and_stream::<fsandbox::DictMarker>()?;
+        let (dict_proxy, dict_stream) = create_proxy_and_stream::<fsandbox::DictionaryMarker>()?;
         let server = dict.serve_dict(dict_stream);
 
         let client = async move {
@@ -475,7 +477,7 @@ mod tests {
                 .insert(CAP_KEY, Unit::default().into_fidl())
                 .await
                 .expect("failed to call Insert");
-            assert_matches!(result, Err(fsandbox::DictError::AlreadyExists));
+            assert_matches!(result, Err(fsandbox::DictionaryError::AlreadyExists));
 
             Ok(())
         };
@@ -488,13 +490,13 @@ mod tests {
     async fn remove_not_found() -> Result<(), Error> {
         let mut dict = Dict::new();
 
-        let (dict_proxy, dict_stream) = create_proxy_and_stream::<fsandbox::DictMarker>()?;
+        let (dict_proxy, dict_stream) = create_proxy_and_stream::<fsandbox::DictionaryMarker>()?;
         let server = dict.serve_dict(dict_stream);
 
         let client = async move {
             // Removing an item from an empty dict should fail.
             let result = dict_proxy.remove(CAP_KEY).await.expect("failed to call Remove");
-            assert_matches!(result, Err(fsandbox::DictError::NotFound));
+            assert_matches!(result, Err(fsandbox::DictionaryError::NotFound));
 
             Ok(())
         };
@@ -506,7 +508,7 @@ mod tests {
     async fn serve_read() -> Result<(), Error> {
         let mut dict = Dict::new();
 
-        let (dict_proxy, dict_stream) = create_proxy_and_stream::<fsandbox::DictMarker>()?;
+        let (dict_proxy, dict_stream) = create_proxy_and_stream::<fsandbox::DictionaryMarker>()?;
         let _server = fasync::Task::spawn(async move { dict.serve_dict(dict_stream).await });
 
         // Create two Data capabilities.
@@ -529,7 +531,7 @@ mod tests {
         assert_eq!(items.len(), 2);
         assert_matches!(
             items.remove(0),
-            fsandbox::DictItem {
+            fsandbox::DictionaryItem {
                 key,
                 value: fsandbox::Capability::Data(fsandbox::DataCapability::Int64(num))
             }
@@ -538,7 +540,7 @@ mod tests {
         );
         assert_matches!(
             items.remove(0),
-            fsandbox::DictItem {
+            fsandbox::DictionaryItem {
                 key,
                 value: fsandbox::Capability::Data(fsandbox::DataCapability::Int64(num))
             }
@@ -600,13 +602,13 @@ mod tests {
         let dict = Dict::new();
         dict.lock_entries().insert(CAP_KEY.to_string(), Box::new(Unit::default()));
 
-        let client_end: ClientEnd<fsandbox::DictMarker> = dict.into();
+        let client_end: ClientEnd<fsandbox::DictionaryMarker> = dict.into();
         let dict_proxy = client_end.into_proxy().unwrap();
 
         // Clone the dict with `Clone2`
         let (clone_client_end, clone_server_end) = create_endpoints::<funknown::CloneableMarker>();
         let _ = dict_proxy.clone2(clone_server_end);
-        let clone_client_end: ClientEnd<fsandbox::DictMarker> =
+        let clone_client_end: ClientEnd<fsandbox::DictionaryMarker> =
             clone_client_end.into_channel().into();
         let clone_proxy = clone_client_end.into_proxy().unwrap();
 
@@ -621,9 +623,10 @@ mod tests {
         assert_eq!(cap, Unit::default().into_fidl());
 
         // Convert the original Dict back to a Rust object.
-        let fidl_capability = fsandbox::Capability::Dict(ClientEnd::<fsandbox::DictMarker>::new(
-            dict_proxy.into_channel().unwrap().into_zx_channel(),
-        ));
+        let fidl_capability =
+            fsandbox::Capability::Dictionary(ClientEnd::<fsandbox::DictionaryMarker>::new(
+                dict_proxy.into_channel().unwrap().into_zx_channel(),
+            ));
         let any: AnyCapability = fidl_capability.try_into().unwrap();
         let dict: Dict = any.try_into().unwrap();
 
@@ -634,17 +637,17 @@ mod tests {
         Ok(())
     }
 
-    /// Tests that `Dict.Enumerate` creates a [DictIterator] that returns entries.
+    /// Tests that `Dict.Enumerate` creates a [DictionaryIterator] that returns entries.
     #[fuchsia::test]
     async fn enumerate() -> Result<()> {
         // Number of entries in the Dict that will be enumerated.
         //
         // This value was chosen such that that GetNext returns multiple chunks of different sizes.
-        const NUM_ENTRIES: u32 = fsandbox::MAX_DICT_ITEMS_CHUNK * 2 + 1;
+        const NUM_ENTRIES: u32 = fsandbox::MAX_DICTIONARY_ITEMS_CHUNK * 2 + 1;
 
         // Number of items we expect in each chunk, for every chunk we expect to get.
         const EXPECTED_CHUNK_LENGTHS: &[u32] =
-            &[fsandbox::MAX_DICT_ITEMS_CHUNK, fsandbox::MAX_DICT_ITEMS_CHUNK, 1];
+            &[fsandbox::MAX_DICTIONARY_ITEMS_CHUNK, fsandbox::MAX_DICTIONARY_ITEMS_CHUNK, 1];
 
         // Create a Dict with [NUM_ENTRIES] entries that have Unit values.
         let dict = Dict::new();
@@ -655,10 +658,11 @@ mod tests {
             }
         }
 
-        let client_end: ClientEnd<fsandbox::DictMarker> = dict.into();
+        let client_end: ClientEnd<fsandbox::DictionaryMarker> = dict.into();
         let dict_proxy = client_end.into_proxy().unwrap();
 
-        let (iter_proxy, iter_server_end) = create_proxy::<fsandbox::DictIteratorMarker>().unwrap();
+        let (iter_proxy, iter_server_end) =
+            create_proxy::<fsandbox::DictionaryIteratorMarker>().unwrap();
         dict_proxy.enumerate(iter_server_end).expect("failed to call Enumerate");
 
         // Get all the entries from the Dict with `GetNext`.

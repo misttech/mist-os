@@ -84,7 +84,7 @@ pub async fn serve_controller(
                 let component = component.unwrap();
                 responder.send(Ok(component.is_started().await))?;
             }
-            fcomponent::ControllerRequest::GetExposedDict { dict, responder } => {
+            fcomponent::ControllerRequest::GetExposedDictionary { dictionary, responder } => {
                 let res = async {
                     let component = weak_component_instance
                         .upgrade()
@@ -96,7 +96,8 @@ pub async fn serve_controller(
                     let mut output_dict =
                         routers_to_open(&resolved.component_output_dict, &weak_component_instance);
                     tasks.spawn(async move {
-                        if let Err(err) = output_dict.serve_dict(dict.into_stream().unwrap()).await
+                        if let Err(err) =
+                            output_dict.serve_dict(dictionary.into_stream().unwrap()).await
                         {
                             warn!(%err, "failed to serve dict");
                         }

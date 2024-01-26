@@ -28,12 +28,12 @@ async fn serve_realm_factory(mut stream: RealmFactoryRequestStream) {
     let result: Result<(), Error> = async move {
         while let Ok(Some(request)) = stream.try_next().await {
             match request {
-                RealmFactoryRequest::CreateRealm { options, dict_server, responder } => {
+                RealmFactoryRequest::CreateRealm { options, dictionary, responder } => {
                     let realm = create_realm(options).await?;
 
                     // Get a dict containing the capabilities exposed by the realm.
                     let (expose_dict, server_end) = endpoints::create_proxy().unwrap();
-                    realm.root.controller().get_exposed_dict(server_end).await?.unwrap();
+                    realm.root.controller().get_exposed_dictionary(server_end).await?.unwrap();
                     let mut output_dict_entries = expose_dict.read().await?;
 
                     // Mix in additional capabilities to the dict.
@@ -58,13 +58,14 @@ async fn serve_realm_factory(mut stream: RealmFactoryRequestStream) {
                     let factory = client::connect_to_protocol::<fsandbox::FactoryMarker>()?;
                     let () = factory.create_connector(echo_sender_server, echo_receiver_client)?;
 
-                    output_dict_entries.push(fsandbox::DictItem {
+                    output_dict_entries.push(fsandbox::DictionaryItem {
                         key: format!("reverse-echo"),
                         value: fsandbox::Capability::Sender(echo_sender_client),
                     });
 
                     // Create the dict containing the capabilities to pass to the test.
-                    let () = factory.create_dict(output_dict_entries, dict_server).await?.unwrap();
+                    let () =
+                        factory.create_dictionary(output_dict_entries, dictionary).await?.unwrap();
 
                     // Serve the mixed-in capability.
                     task_group.spawn(async move {

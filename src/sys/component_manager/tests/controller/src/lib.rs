@@ -429,11 +429,11 @@ pub async fn start_when_already_started() {
 }
 
 #[fuchsia::test]
-pub async fn get_exposed_dict() {
+pub async fn get_exposed_dictionary() {
     let (controller_proxy, _instance) = spawn_child_with_url("#meta/echo_server.cm").await;
     let (exposed_dict, server_end) = create_proxy().unwrap();
 
-    controller_proxy.get_exposed_dict(server_end).await.unwrap().unwrap();
+    controller_proxy.get_exposed_dictionary(server_end).await.unwrap().unwrap();
     let echo_cap = exposed_dict.get(fecho::EchoMarker::DEBUG_NAME).await.unwrap().unwrap();
     let fsandbox::Capability::Open(echo_open) = echo_cap else { panic!("wrong type") };
     let echo_open = echo_open.into_proxy().unwrap();

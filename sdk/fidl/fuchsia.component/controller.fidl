@@ -27,8 +27,8 @@ closed protocol Controller {
 
     /// Returns the dictionary containing the component's exposed capabilities.
     @available(added=HEAD)
-    strict GetExposedDict(resource struct {
-        dict server_end:fuchsia.component.sandbox.Dict;
+    strict GetExposedDictionary(resource struct {
+        dictionary server_end:fuchsia.component.sandbox.Dictionary;
     }) -> () error Error;
 };
 

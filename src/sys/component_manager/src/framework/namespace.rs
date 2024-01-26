@@ -90,8 +90,8 @@ impl NamespaceCapabilityHost {
         request: fcomponent::NamespaceRequest,
     ) -> Result<(), fidl::Error> {
         match request {
-            fcomponent::NamespaceRequest::CreateFromDicts { entries, responder } => {
-                let res = self.create_from_dicts(entries).await;
+            fcomponent::NamespaceRequest::Create { entries, responder } => {
+                let res = self.create(entries).await;
                 responder.send(res)?;
             }
             fcomponent::NamespaceRequest::_UnknownMethod { ordinal, .. } => {
@@ -101,17 +101,17 @@ impl NamespaceCapabilityHost {
         Ok(())
     }
 
-    async fn create_from_dicts(
+    async fn create(
         &self,
-        entries: Vec<fcomponent::NamespaceDictPair>,
+        entries: Vec<fcomponent::NamespaceInputEntry>,
     ) -> Result<Vec<fcomponent::NamespaceEntry>, fcomponent::NamespaceError> {
         let mut namespace_builder =
             NamespaceBuilder::new(self.namespace_scope.clone(), Self::ignore_not_found());
         for entry in entries {
             let path = entry.path;
-            let dict = entry.dict.into_proxy().unwrap();
+            let dict = entry.dictionary.into_proxy().unwrap();
             let items: Vec<_> =
-                dict.read().await.map_err(|_| fcomponent::NamespaceError::DictRead)?;
+                dict.read().await.map_err(|_| fcomponent::NamespaceError::DictionaryRead)?;
             for item in items {
                 let capability: AnyCapability = item.value.try_into().unwrap();
                 let path = namespace::Path::new(format!("{}/{}", path, item.key))
@@ -189,7 +189,7 @@ mod tests {
     }
 
     #[fuchsia::test]
-    async fn namespace_create_from_dicts() {
+    async fn namespace_create() {
         let mut tasks = fasync::TaskGroup::new();
 
         let host = NamespaceCapabilityHost::new();
@@ -221,20 +221,19 @@ mod tests {
             dict.lock_entries().insert(fecho::EchoMarker::DEBUG_NAME.to_string(), Box::new(sender));
 
             let (dict_proxy, stream) =
-                endpoints::create_proxy_and_stream::<fsandbox::DictMarker>().unwrap();
+                endpoints::create_proxy_and_stream::<fsandbox::DictionaryMarker>().unwrap();
             tasks.add(fasync::Task::spawn(async move {
                 dict.serve_dict(stream).await.unwrap();
             }));
 
-            namespace_pairs.push(fcomponent::NamespaceDictPair {
+            namespace_pairs.push(fcomponent::NamespaceInputEntry {
                 path: path.into(),
-                dict: dict_proxy.into_channel().unwrap().into_zx_channel().into(),
+                dictionary: dict_proxy.into_channel().unwrap().into_zx_channel().into(),
             })
         }
 
         // Convert the dictionaries to a namespace.
-        let mut namespace_entries =
-            namespace_proxy.create_from_dicts(namespace_pairs).await.unwrap().unwrap();
+        let mut namespace_entries = namespace_proxy.create(namespace_pairs).await.unwrap().unwrap();
 
         // Confirm that the Sender in the dictionary was converted to a service node, and we
         // can access the Echo protocol (served by the Receiver) through this node.
@@ -255,7 +254,7 @@ mod tests {
     }
 
     #[fuchsia::test]
-    async fn namespace_create_from_dicts_err_shadow() {
+    async fn namespace_create_err_shadow() {
         let mut tasks = fasync::TaskGroup::new();
 
         let host = NamespaceCapabilityHost::new();
@@ -287,25 +286,25 @@ mod tests {
             dict.lock_entries().insert(fecho::EchoMarker::DEBUG_NAME.to_string(), Box::new(sender));
 
             let (dict_proxy, stream) =
-                endpoints::create_proxy_and_stream::<fsandbox::DictMarker>().unwrap();
+                endpoints::create_proxy_and_stream::<fsandbox::DictionaryMarker>().unwrap();
             tasks.add(fasync::Task::spawn(async move {
                 dict.serve_dict(stream).await.unwrap();
             }));
 
-            namespace_pairs.push(fcomponent::NamespaceDictPair {
+            namespace_pairs.push(fcomponent::NamespaceInputEntry {
                 path: path.into(),
-                dict: dict_proxy.into_channel().unwrap().into_zx_channel().into(),
+                dictionary: dict_proxy.into_channel().unwrap().into_zx_channel().into(),
             })
         }
 
         // Try to convert the dictionaries to a namespace. Expect an error because one path
         // shadows another.
-        let res = namespace_proxy.create_from_dicts(namespace_pairs).await.unwrap();
+        let res = namespace_proxy.create(namespace_pairs).await.unwrap();
         assert_matches!(res, Err(fcomponent::NamespaceError::Shadow));
     }
 
     #[fuchsia::test]
-    async fn namespace_create_from_dicts_err_dict_read() {
+    async fn namespace_create_err_dict_read() {
         let mut tasks = fasync::TaskGroup::new();
 
         let host = NamespaceCapabilityHost::new();
@@ -317,16 +316,16 @@ mod tests {
 
         // Create a dictionary and close the server end.
         let (dict_proxy, stream) =
-            endpoints::create_proxy_and_stream::<fsandbox::DictMarker>().unwrap();
+            endpoints::create_proxy_and_stream::<fsandbox::DictionaryMarker>().unwrap();
         drop(stream);
-        let namespace_pairs = vec![fcomponent::NamespaceDictPair {
+        let namespace_pairs = vec![fcomponent::NamespaceInputEntry {
             path: "/svc".into(),
-            dict: dict_proxy.into_channel().unwrap().into_zx_channel().into(),
+            dictionary: dict_proxy.into_channel().unwrap().into_zx_channel().into(),
         }];
 
         // Try to convert the dictionaries to a namespace. Expect an error because the dictionary
         // was unreadable.
-        let res = namespace_proxy.create_from_dicts(namespace_pairs).await.unwrap();
-        assert_matches!(res, Err(fcomponent::NamespaceError::DictRead));
+        let res = namespace_proxy.create(namespace_pairs).await.unwrap();
+        assert_matches!(res, Err(fcomponent::NamespaceError::DictionaryRead));
     }
 }

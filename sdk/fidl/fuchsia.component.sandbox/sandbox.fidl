@@ -10,8 +10,8 @@ using fuchsia.unknown;
 /// Maximum number of bytes in a [DataCapability].
 const MAX_DATA_LENGTH uint32 = 8192;
 
-/// Maximum number of items returned by [DictIterator].
-const MAX_DICT_ITEMS_CHUNK uint32 = 128;
+/// Maximum number of items returned by [DictionaryIterator].
+const MAX_DICTIONARY_ITEMS_CHUNK uint32 = 128;
 
 closed protocol HandleCapability {
     compose fuchsia.unknown.Cloneable;
@@ -39,7 +39,7 @@ type Capability = flexible resource union {
     3: handle client_end:HandleCapability;
     4: data DataCapability;
     5: cloneable client_end:fuchsia.unknown.Cloneable;
-    6: dict client_end:Dict;
+    6: dictionary client_end:Dictionary;
     7: sender client_end:Sender;
     8: receiver server_end:Receiver;
     9: open client_end:fuchsia.io.Openable;
@@ -47,21 +47,21 @@ type Capability = flexible resource union {
    11: optional OptionalCapability;
 };
 
-/// The key of a [`DictItem`].
-alias DictKey = string:MAX;
+/// The key of a [`DictionaryItem`].
+alias DictionaryKey = string:MAX;
 
-/// A key-value pair in a [`Dict`].
-type DictItem = resource struct {
-    key DictKey;
+/// A key-value pair in a [`Dictionary`].
+type DictionaryItem = resource struct {
+    key DictionaryKey;
     value Capability;
 };
 
-/// Error returned from methods in [`Dict`].
-type DictError = flexible enum {
-    /// The Dict does not contain an item with the given key.
+/// Error returned from methods in [`Dictionary`].
+type DictionaryError = flexible enum {
+    /// The Dictionary does not contain an item with the given key.
     NOT_FOUND = 1;
 
-    /// The Dict already contains an item with the given key.
+    /// The Dictionary already contains an item with the given key.
     ALREADY_EXISTS = 2;
 
     /// The Capability is invalid.
@@ -73,42 +73,42 @@ type DictError = flexible enum {
 };
 
 @discoverable
-open protocol Dict {
+open protocol Dictionary {
     /// Creates a new connection to the same underlying dictionary.
     ///
     /// Use `Copy` to a new dictionary with clones of all the exiting entries.
     compose fuchsia.unknown.Cloneable;
 
-    /// Inserts a key-value pair into the dict.
+    /// Inserts a key-value pair into the dictionary.
     ///
-    /// * error `DictError.ALREADY_EXISTS` if the dict already contains an
+    /// * error `DictionaryError.ALREADY_EXISTS` if the dictionary already contains an
     /// item with the same key.
-    flexible Insert(DictItem) -> () error DictError;
+    flexible Insert(DictionaryItem) -> () error DictionaryError;
 
     /// Get a clone of a capability from this dictionary.
     ///
-    /// * error `DictError.NOT_FOUND` if the dict does not contain the key.
+    /// * error `DictionaryError.NOT_FOUND` if the dictionary does not contain the key.
     flexible Get(struct {
-        key DictKey;
+        key DictionaryKey;
     }) -> (resource struct {
         capability Capability;
-    }) error DictError;
+    }) error DictionaryError;
 
-    /// Removes a key from the dict, returning the [`Capability`] value.
+    /// Removes a key from the dictionary, returning the [`Capability`] value.
     ///
-    /// * error `DictError.NOT_FOUND` if the dict does not contain the key.
+    /// * error `DictionaryError.NOT_FOUND` if the dictionary does not contain the key.
     flexible Remove(struct {
-        key DictKey;
+        key DictionaryKey;
     }) -> (resource struct {
         capability Capability;
-    }) error DictError;
+    }) error DictionaryError;
 
-    /// Returns all items in this dict, sorted by key in natural order.
+    /// Returns all items in this dictionary, sorted by key in natural order.
     ///
     /// This operation creates shallow clones of values.
-    // TODO(b/314361448): Remove once callers use Dict.Enumerate instead
+    // TODO(b/314361448): Remove once callers use Dictionary.Enumerate instead
     flexible Read() -> (resource struct {
-        items vector<DictItem>:MAX;
+        items vector<DictionaryItem>:MAX;
     });
 
     /// Create a new dictionary that contains a clone of all the entries in
@@ -118,14 +118,14 @@ open protocol Dict {
     /// created dictionary will contain references to those same nested
     /// dictionaries because the entries are cloned rather than copied.
     flexible Copy(resource struct {
-        request server_end:Dict;
+        request server_end:Dictionary;
     });
 
     /// Enumerates the entries in this dictionary.
     ///
     /// Creates a clone of each item during enumeration.
     flexible Enumerate(resource struct {
-        contents server_end:DictIterator;
+        contents server_end:DictionaryIterator;
     });
 
     /// Removes all the entries in this dictionary.
@@ -133,13 +133,13 @@ open protocol Dict {
     /// If `contents` is not provided, all the items are discarded without
     /// enumerating them.
     flexible Drain(resource struct {
-        contents server_end:<DictIterator, optional>;
+        contents server_end:<DictionaryIterator, optional>;
     });
 };
 
-open protocol DictIterator {
+open protocol DictionaryIterator {
     flexible GetNext() -> (resource struct {
-        items vector<DictItem>:MAX_DICT_ITEMS_CHUNK;
+        items vector<DictionaryItem>:MAX_DICTIONARY_ITEMS_CHUNK;
     });
 };
 
@@ -148,7 +148,7 @@ open protocol Sender {
     compose fuchsia.unknown.Cloneable;
 
     /// Sends a Capability over this sender.
-    strict Send(ProtocolPayload);
+    flexible Send(ProtocolPayload);
 };
 
 @discoverable
@@ -156,7 +156,7 @@ open protocol Receiver {
     compose fuchsia.unknown.Cloneable;
 
     /// Receives a Capability.
-    strict Receive(ProtocolPayload);
+    flexible Receive(ProtocolPayload);
 };
 
 /// Contains a protocol open request.
@@ -170,15 +170,15 @@ type ProtocolPayload = resource struct {
 @discoverable
 open protocol Factory {
     /// Creates a connector (pair of [`Sender`] and [`Receiver`]).
-    strict CreateConnector(resource struct {
+    flexible CreateConnector(resource struct {
         sender server_end:Sender;
         receiver client_end:Receiver;
     });
 
-    /// Creates a [`Dict`] initialized with `items`.
-    strict CreateDict(resource struct {
-        // TODO(https://fxbug.dev/306043410): Accept a DictIterator
-        items vector<DictItem>:MAX;
-        server_end server_end:Dict;
-    }) -> () error DictError;
+    /// Creates a [`Dictionary`] initialized with `items`.
+    flexible CreateDictionary(resource struct {
+        // TODO(https://fxbug.dev/306043410): Accept a DictionaryIterator
+        items vector<DictionaryItem>:MAX;
+        server_end server_end:Dictionary;
+    }) -> () error DictionaryError;
 };

@@ -40,10 +40,10 @@ impl Drop for InstalledNamespace {
     }
 }
 
-/// Converts the given dict to a namespace and adds it this component's namespace.
+/// Converts the given dictionary to a namespace and adds it this component's namespace.
 pub async fn extend_namespace<T>(
     realm_factory: T,
-    dict: ClientEnd<fsandbox::DictMarker>,
+    dictionary: ClientEnd<fsandbox::DictionaryMarker>,
 ) -> Result<InstalledNamespace>
 where
     T: Proxy + Debug,
@@ -52,9 +52,9 @@ where
     // TODO: What should we use for the namespace's unique id? Could also
     // consider an atomic counter, or the name of the test
     let prefix = format!("/dict-{}", Uuid::new_v4());
-    let dicts = vec![fcomponent::NamespaceDictPair { path: prefix.clone().into(), dict }];
+    let dicts = vec![fcomponent::NamespaceInputEntry { path: prefix.clone().into(), dictionary }];
     let mut namespace_entries =
-        namespace_proxy.create_from_dicts(dicts).await?.map_err(|e| format_err!("{:?}", e))?;
+        namespace_proxy.create(dicts).await?.map_err(|e| format_err!("{:?}", e))?;
     let namespace = Namespace::installed()?;
     let count = namespace_entries.len();
     if count != 1 {

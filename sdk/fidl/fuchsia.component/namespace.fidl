@@ -5,9 +5,9 @@ library fuchsia.component;
 using fuchsia.component.sandbox;
 
 @available(added=HEAD)
-type NamespaceDictPair = resource struct {
+type NamespaceInputEntry = resource struct {
     path string:MAX_PATH_LENGTH;
-    dict client_end:fuchsia.component.sandbox.Dict;
+    dictionary client_end:fuchsia.component.sandbox.Dictionary;
 };
 
 /// Error returned from methods in [`Namespace`].
@@ -26,15 +26,15 @@ type NamespaceError = flexible enum {
     BAD_ENTRY = 4;
 
     /// There was an error reading from one of the dictionaries.
-    DICT_READ = 5;
+    DICTIONARY_READ = 5;
 };
 
 /// Protocol for performing namespace operations.
 @available(added=HEAD)
 @discoverable
 open protocol Namespace {
-    strict CreateFromDicts(resource struct {
-        entries vector<NamespaceDictPair>:MAX;
+    flexible Create(resource struct {
+        entries vector<NamespaceInputEntry>:MAX;
     }) -> (resource struct {
         entries vector<NamespaceEntry>:MAX;
     }) error NamespaceError;

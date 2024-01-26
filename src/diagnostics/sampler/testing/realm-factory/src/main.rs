@@ -28,9 +28,9 @@ async fn serve_realm_factory(mut stream: RealmFactoryRequestStream) {
     let result: Result<(), Error> = async move {
         while let Ok(Some(request)) = stream.try_next().await {
             match request {
-                RealmFactoryRequest::CreateRealm { options, dict_server, responder } => {
+                RealmFactoryRequest::CreateRealm { options, dictionary, responder } => {
                     let realm = create_realm(options).await?;
-                    realm.root.controller().get_exposed_dict(dict_server).await?.unwrap();
+                    realm.root.controller().get_exposed_dictionary(dictionary).await?.unwrap();
                     realms.push(realm);
                     responder.send(Ok(()))?;
                 }
