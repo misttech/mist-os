@@ -18,6 +18,7 @@ use {
         TemperatureDriver, TemperatureLogger,
     },
     anyhow::{Error, Result},
+    argh::FromArgs,
     fidl_fuchsia_hardware_network as fhwnet,
     fidl_fuchsia_power_metrics::{self as fmetrics, RecorderRequest},
     fuchsia_async as fasync,
@@ -48,6 +49,10 @@ const MAX_CONCURRENT_CLIENTS: usize = 20;
 const MIN_INTERVAL_FOR_SYSLOG_MS: u32 = 500;
 
 const CONFIG_PATH: &'static str = "/config/data/config.json";
+
+const STANDALONE_SAMPLING_INTERVAL: u32 = 1000; // 1 sec.
+const STANDALONE_STATISTICS_INTERVAL: u32 = 60 * 1000; // 60 secs.
+const STANDALONE_CLIENT_ID: &'static str = "metrics-logger-standalone";
 
 /// Builds a MetricsLoggerServer.
 pub struct ServerBuilder<'a> {
@@ -508,27 +513,63 @@ impl MetricsLoggerServer {
         self.network_devices.replace(Some(device.clone()));
         Ok(device)
     }
+
+    async fn run_logging_standalone(
+        &self,
+        sampling_interval_ms: u32,
+        statistics_interval_ms: u32,
+        duration_ms: Option<u32>,
+    ) {
+        self.start_logging(
+            STANDALONE_CLIENT_ID,
+            vec![
+                fmetrics::Metric::Power(fmetrics::Power {
+                    sampling_interval_ms,
+                    statistics_args: Some(Box::new(fmetrics::StatisticsArgs {
+                        statistics_interval_ms,
+                    })),
+                }),
+                fmetrics::Metric::Temperature(fmetrics::Temperature {
+                    sampling_interval_ms,
+                    statistics_args: Some(Box::new(fmetrics::StatisticsArgs {
+                        statistics_interval_ms,
+                    })),
+                }),
+            ],
+            false,
+            true,
+            duration_ms,
+        )
+        .await
+        .expect("logging to start");
+        self.client_tasks.borrow_mut().remove(STANDALONE_CLIENT_ID).unwrap().await;
+    }
+}
+
+#[derive(Debug, Default, FromArgs, PartialEq)]
+/// metrics-logger
+struct CmdArgs {
+    #[argh(switch)]
+    /// whether or not to run the component in standalone mode. In standalone
+    /// mode access to fuchsia.metricslogger.test protocols is disabled and
+    /// the component collects logs forever at a preconfigured interval.
+    standalone: bool,
 }
 
 #[fuchsia::main(logging_tags = ["metrics-logger"])]
 async fn main() {
     // v2 components can't surface stderr yet, so we need to explicitly log errors.
-    match inner_main().await {
+    match inner_main(argh::from_env()).await {
         Err(err) => error!(%err, "Terminated with error"),
         Ok(()) => info!("Terminated with Ok(())"),
     }
 }
 
-async fn inner_main() -> Result<()> {
+async fn inner_main(args: CmdArgs) -> Result<()> {
     info!("Starting metrics logger");
 
     // Set up tracing
     fuchsia_trace_provider::trace_provider_create_with_fdio();
-
-    let mut fs = ServiceFs::new_local();
-
-    // Allow our services to be discovered.
-    fs.take_and_serve_directory_handle()?;
 
     // Required call to serve the inspect tree
     let inspector = inspect::component::inspector();
@@ -540,12 +581,30 @@ async fn inner_main() -> Result<()> {
         .ok()
         .and_then(|file| json::from_reader(std::io::BufReader::new(file)).ok());
     let server = ServerBuilder::new_from_json(config).build().await?;
-    fs.dir("svc").add_fidl_service(move |stream: fmetrics::RecorderRequestStream| {
-        MetricsLoggerServer::handle_new_service_connection(server.clone(), stream).detach();
-    });
 
-    // This future never completes.
-    fs.collect::<()>().await;
+    if args.standalone {
+        info!("Running in standalone mode");
+        server
+            .run_logging_standalone(
+                STANDALONE_SAMPLING_INTERVAL,
+                STANDALONE_STATISTICS_INTERVAL,
+                None,
+            )
+            .await;
+    } else {
+        info!("Running test protocols");
+        let mut fs = ServiceFs::new_local();
+
+        // Allow our services to be discovered.
+        fs.take_and_serve_directory_handle()?;
+
+        fs.dir("svc").add_fidl_service(move |stream: fmetrics::RecorderRequestStream| {
+            MetricsLoggerServer::handle_new_service_connection(server.clone(), stream).detach();
+        });
+
+        // This future never completes.
+        fs.collect::<()>().await;
+    }
 
     Ok(())
 }
@@ -631,6 +690,7 @@ mod tests {
     }
 
     struct Runner {
+        server: Rc<MetricsLoggerServer>,
         server_task: fasync::Task<()>,
         proxy: fmetrics::RecorderProxy,
 
@@ -694,9 +754,9 @@ mod tests {
             // Construct the server task.
             let (proxy, stream) =
                 fidl::endpoints::create_proxy_and_stream::<fmetrics::RecorderMarker>().unwrap();
-            let server_task = server.handle_new_service_connection(stream);
+            let server_task = server.clone().handle_new_service_connection(stream);
 
-            Self { executor, server_task, proxy, inspector }
+            Self { executor, server, server_task, proxy, inspector }
         }
 
         // If the server has an active logging task, run until the next log and return true.
@@ -713,6 +773,19 @@ mod tests {
 
         fn run_server_task_until_stalled(&mut self) {
             assert_matches!(self.executor.run_until_stalled(&mut self.server_task), Poll::Pending);
+        }
+
+        fn run_logging_standalone(&mut self) {
+            let server = self.server.clone();
+            self.server_task = fasync::Task::local(async move {
+                server
+                    .run_logging_standalone(
+                        STANDALONE_SAMPLING_INTERVAL,
+                        STANDALONE_STATISTICS_INTERVAL,
+                        None,
+                    )
+                    .await;
+            });
         }
     }
 
@@ -1829,5 +1902,87 @@ mod tests {
         );
         // Check the request is dispatched without error.
         assert_matches!(runner.executor.run_until_stalled(&mut query), Poll::Ready(Ok(Ok(()))));
+    }
+
+    #[test]
+    fn test_logging_standalone_runs() {
+        let runner_builder = RunnerBuilder::new();
+
+        let (_power_driver_tasks, power_drivers, power1, power2) = create_power_drivers();
+        power1.set(14.0);
+        power2.set(106.0);
+
+        let (_temperature_driver_tasks, temperature_drivers, cpu_temperature, gpu_temperature) =
+            create_temperature_drivers();
+
+        // Set new temperature data.
+        cpu_temperature.set(21.0);
+        gpu_temperature.set(52.0);
+
+        let mut runner = runner_builder
+            .with_power_drivers(power_drivers)
+            .with_temperature_drivers(temperature_drivers)
+            .build();
+
+        // Check the task is run without error.
+        runner.run_logging_standalone();
+        runner.run_server_task_until_stalled();
+
+        // Samples should continue forever. Obviously we can't check infinitely many samples, but
+        // we can check that they don't stop for a relatively large number of iterations.
+        for _ in 0..1000 {
+            assert_eq!(runner.iterate_logging_task(), true);
+        }
+
+        // Check that inspect data is updated.
+        assert_data_tree!(
+            runner.inspector,
+            root: {
+                MetricsLogger: {
+                    "metrics-logger-standalone": {
+                        TemperatureLogger: contains {
+                            "cpu": {
+                                "data (°C)": 21.0,
+                                "statistics": contains {
+                                    "min (°C)": 21.0,
+                                    "max (°C)": 21.0,
+                                    "average (°C)": 21.0,
+                                    "median (°C)": 21.0,
+                                }
+                            },
+                            "/dev/fake/gpu_temperature": {
+                                "data (°C)": 52.0,
+                                "statistics": contains {
+                                    "min (°C)": 52.0,
+                                    "max (°C)": 52.0,
+                                    "average (°C)": 52.0,
+                                    "median (°C)": 52.0,
+                                }
+                            }
+                        },
+                        PowerLogger: contains {
+                            "power_1": {
+                                "data (W)": 14.0,
+                                "statistics": contains {
+                                    "min (W)": 14.0,
+                                    "max (W)": 14.0,
+                                    "average (W)": 14.0,
+                                    "median (W)": 14.0,
+                                }
+                            },
+                            "/dev/fake/power_2": {
+                                "data (W)": 106.0,
+                                "statistics": contains {
+                                    "min (W)": 106.0,
+                                    "max (W)": 106.0,
+                                    "average (W)": 106.0,
+                                    "median (W)": 106.0,
+                                }
+                            },
+                        },
+                    }
+                }
+            }
+        );
     }
 }

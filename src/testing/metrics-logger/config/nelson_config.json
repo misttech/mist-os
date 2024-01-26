@@ -16,5 +16,15 @@
             "name": "top_board",
             "topo_path_suffix": "/aml-i2c/i2c/i2c-0-112/shtv3"
         }
+    ],
+    "power_drivers": [
+        {
+            "name": "power_speakers",
+            "topo_path_suffix": "/i2c-2-64/ti_ina231_speakers/ti-ina231"
+        },
+        {
+            "name": "power_mlb",
+            "topo_path_suffix": "/i2c-2-73/ti_ina231_mlb/ti-ina231"
+        }
     ]
 }

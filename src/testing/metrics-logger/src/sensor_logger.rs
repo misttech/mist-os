@@ -13,7 +13,7 @@ use {
     fuchsia_inspect::{self as inspect, ArrayProperty, Property},
     fuchsia_zircon as zx,
     futures::{stream::FuturesUnordered, StreamExt},
-    std::{collections::HashMap, rc::Rc},
+    std::{cmp::Ordering, collections::HashMap, rc::Rc},
     tracing::{error, info},
 };
 
@@ -60,6 +60,7 @@ async fn generate_sensor_drivers<T: fidl::endpoints::ProtocolMarker>(
     Ok(drivers)
 }
 
+#[derive(Eq, PartialEq)]
 pub enum SensorType {
     Temperature,
     Power,
@@ -165,6 +166,12 @@ macro_rules! log_trace_statistics {
                         0,
                         &$trace_args[Statistics::Avg as usize],
                     );
+                    fuchsia_trace::counter(
+                        &context,
+                        fuchsia_trace::cstr!("temperature_median"),
+                        0,
+                        &$trace_args[Statistics::Median as usize],
+                    );
                 }
             }
             SensorType::Power => {
@@ -188,6 +195,12 @@ macro_rules! log_trace_statistics {
                         fuchsia_trace::cstr!("power_avg"),
                         0,
                         &$trace_args[Statistics::Avg as usize],
+                    );
+                    fuchsia_trace::counter(
+                        &context,
+                        fuchsia_trace::cstr!("power_median"),
+                        0,
+                        &$trace_args[Statistics::Median as usize],
                     );
                 }
             }
@@ -335,7 +348,7 @@ impl<T: Sensor<T>> SensorLogger<T> {
             .is_some_and(|t| time_stamp - t.statistics_start_time >= t.statistics_interval);
 
         let mut trace_args = Vec::new();
-        let mut trace_args_statistics = vec![Vec::new(), Vec::new(), Vec::new()];
+        let mut trace_args_statistics = vec![Vec::new(), Vec::new(), Vec::new(), Vec::new()];
 
         let mut sensor_names = Vec::new();
         for driver in self.drivers.iter() {
@@ -399,6 +412,11 @@ impl<T: Sensor<T>> SensorLogger<T> {
                     }
                     let avg = sum / tracker.samples[index].len() as f32;
 
+                    let mut samples = tracker.samples[index].clone();
+                    // f32 doesn't support Ord, so can't use samples.sort().
+                    samples.sort_by(|x, y| x.partial_cmp(y).unwrap_or_else(|| Ordering::Less));
+                    let med = samples[samples.len() / 2];
+
                     self.inspect.log_statistics(
                         index,
                         (tracker.statistics_start_time - self.start_time).into_millis(),
@@ -406,6 +424,7 @@ impl<T: Sensor<T>> SensorLogger<T> {
                         min,
                         max,
                         avg,
+                        med,
                     );
 
                     trace_args_statistics[Statistics::Min as usize]
@@ -414,6 +433,8 @@ impl<T: Sensor<T>> SensorLogger<T> {
                         .push(fuchsia_trace::ArgValue::of(&sensor_names[index], max as f64));
                     trace_args_statistics[Statistics::Avg as usize]
                         .push(fuchsia_trace::ArgValue::of(&sensor_names[index], avg as f64));
+                    trace_args_statistics[Statistics::Median as usize]
+                        .push(fuchsia_trace::ArgValue::of(&sensor_names[index], med as f64));
 
                     if self.output_stats_to_syslog {
                         info!(
@@ -421,6 +442,7 @@ impl<T: Sensor<T>> SensorLogger<T> {
                             max,
                             min,
                             avg,
+                            med,
                             unit = T::unit().as_str(),
                             "Sensor statistics",
                         );
@@ -453,6 +475,7 @@ enum Statistics {
     Min = 0,
     Max,
     Avg,
+    Median,
 }
 
 struct InspectData {
@@ -511,6 +534,7 @@ impl InspectData {
                 statistics_node.create_double(format!("min ({})", self.unit), f64::MIN),
                 statistics_node.create_double(format!("max ({})", self.unit), f64::MIN),
                 statistics_node.create_double(format!("average ({})", self.unit), f64::MIN),
+                statistics_node.create_double(format!("median ({})", self.unit), f64::MIN),
             ]);
             self.statistics_nodes.push(statistics_node);
         }
@@ -532,6 +556,7 @@ impl InspectData {
         min: f32,
         max: f32,
         avg: f32,
+        med: f32,
     ) {
         if self.statistics_nodes.is_empty() {
             self.init_stats_nodes();
@@ -541,6 +566,7 @@ impl InspectData {
         self.statistics[index][Statistics::Min as usize].set(min as f64);
         self.statistics[index][Statistics::Max as usize].set(max as f64);
         self.statistics[index][Statistics::Avg as usize].set(avg as f64);
+        self.statistics[index][Statistics::Median as usize].set(med as f64);
     }
 }
 
@@ -634,16 +660,14 @@ pub mod tests {
     // - Vec<PowerDriver>: Fake power drivers for test usage.
     // - Rc<Cell<f32>>: Pointer for setting fake power data in the first driver.
     // - Rc<Cell<f32>>> Pointer for setting fake power data in the second driver.
-    pub fn create_power_drivers(
-    ) -> (Vec<fasync::Task<()>>, Vec<PowerDriver>, Rc<Cell<f32>>, Rc<Cell<f32>>) {
+    pub fn create_power_drivers_with_getters(
+        get_power1: impl FnMut() -> f32 + 'static,
+        get_power2: impl FnMut() -> f32 + 'static,
+    ) -> (Vec<fasync::Task<()>>, Vec<PowerDriver>) {
         let mut tasks = Vec::new();
-        let power_1 = Rc::new(Cell::new(0.0));
-        let power_1_clone = power_1.clone();
-        let (power_1_proxy, task) = setup_fake_power_driver(move || power_1_clone.get());
+        let (power_1_proxy, task) = setup_fake_power_driver(get_power1);
         tasks.push(task);
-        let power_2 = Rc::new(Cell::new(0.0));
-        let power_2_clone = power_2.clone();
-        let (power_2_proxy, task) = setup_fake_power_driver(move || power_2_clone.get());
+        let (power_2_proxy, task) = setup_fake_power_driver(get_power2);
         tasks.push(task);
 
         let power_drivers = vec![
@@ -658,6 +682,25 @@ pub mod tests {
                 proxy: power_2_proxy,
             },
         ];
+        (tasks, power_drivers)
+    }
+
+    // Convenience function to create a vector of two power drivers for test usage.
+    // Returns a tuple of:
+    // - Vec<fasync::Task<()>>: Tasks for handling driver query stream.
+    // - Vec<PowerDriver>: Fake power drivers for test usage.
+    // - Rc<Cell<f32>>: Pointer for setting fake power data in the first driver.
+    // - Rc<Cell<f32>>> Pointer for setting fake power data in the second driver.
+    pub fn create_power_drivers(
+    ) -> (Vec<fasync::Task<()>>, Vec<PowerDriver>, Rc<Cell<f32>>, Rc<Cell<f32>>) {
+        let power_1 = Rc::new(Cell::new(0.0));
+        let power_1_clone = power_1.clone();
+        let power_2 = Rc::new(Cell::new(0.0));
+        let power_2_clone = power_2.clone();
+        let (tasks, power_drivers) = create_power_drivers_with_getters(
+            move || power_1_clone.get(),
+            move || power_2_clone.get(),
+        );
         (tasks, power_drivers, power_1, power_2)
     }
 
@@ -860,6 +903,7 @@ pub mod tests {
                                     "max (W)": 2.0,
                                     "min (W)": 2.0,
                                     "average (W)": 2.0,
+                                    "median (W)": 2.0,
                                 }
                             },
                             "/dev/fake/power_2": {
@@ -869,6 +913,7 @@ pub mod tests {
                                     "max (W)": 5.0,
                                     "min (W)": 5.0,
                                     "average (W)": 5.0,
+                                    "median (W)": 5.0,
                                 }
                             }
                         }
@@ -960,6 +1005,7 @@ pub mod tests {
                                             "max (°C)": (30 + i - (i + 1) % 3) as f64,
                                             "min (°C)": (28 + i - (i + 1) % 3) as f64,
                                             "average (°C)": (29 + i - (i + 1) % 3) as f64,
+                                            "median (°C)": (29 + i - (i + 1) % 3) as f64,
                                         }
                                     },
                                     "/dev/fake/gpu_temperature": {
@@ -971,6 +1017,7 @@ pub mod tests {
                                             "max (°C)": (40 + i - (i + 1) % 3) as f64,
                                             "min (°C)": (38 + i - (i + 1) % 3) as f64,
                                             "average (°C)": (39 + i - (i + 1) % 3) as f64,
+                                            "median (°C)": (39 + i - (i + 1) % 3) as f64,
                                         }
                                     }
                                 }
