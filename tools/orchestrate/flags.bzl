@@ -21,6 +21,9 @@ ENABLED_EXPERIMENTS = [
     # Don't use orchestrate for hardware test groups.
     "no-orchestrate-hardware",
 
+    # Ignore hardware test groups.
+    "no-schedule-hardware",
+
     # Controls whether the subrunner is involved with emulator provisioning.
     # Only applicable for emulator test groups.
     "subrunner-emulator-provisioning",
