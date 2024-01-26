@@ -5,8 +5,7 @@
 use {
     crate::{
         bedrock::program,
-        capability::CapabilitySource,
-        model::{events::error::EventsError, routing::RouteRequest, storage::StorageError},
+        model::{events::error::EventsError, storage::StorageError},
     },
     ::routing::{
         error::{ComponentInstanceError, RoutingError},
@@ -19,6 +18,7 @@ use {
     cm_types::Name,
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_sys2 as fsys, fuchsia_zircon as zx,
     moniker::{ChildName, Moniker, MonikerError},
+    sandbox::ConversionError,
     std::path::PathBuf,
     thiserror::Error,
     version_history::AbiRevisionError,
@@ -111,9 +111,9 @@ pub enum ModelError {
         err: OpenOutgoingDirError,
     },
     #[error(transparent)]
-    RouteAndOpenCapabilityError {
+    RouteOrOpenError {
         #[from]
-        err: RouteAndOpenCapabilityError,
+        err: RouteOrOpenError,
     },
     #[error("error with capability provider: {err}")]
     CapabilityProviderError {
@@ -147,7 +147,7 @@ impl ModelError {
             ModelError::StartActionError { err } => err.as_zx_status(),
             ModelError::ComponentInstanceError { err } => err.as_zx_status(),
             ModelError::OpenOutgoingDirError { err } => err.as_zx_status(),
-            ModelError::RouteAndOpenCapabilityError { err } => err.as_zx_status(),
+            ModelError::RouteOrOpenError { err } => err.as_zx_status(),
             ModelError::CapabilityProviderError { err } => err.as_zx_status(),
             // Any other type of error is not expected.
             _ => zx::Status::INTERNAL,
@@ -677,6 +677,20 @@ impl CapabilityProviderError {
     }
 }
 
+#[derive(Debug, Error, Clone)]
+pub enum BedrockOpenError {
+    #[error("The capability failed to convert to Open: {0}")]
+    Conversion(#[from] ConversionError),
+}
+
+impl BedrockOpenError {
+    pub fn as_zx_status(&self) -> zx::Status {
+        match self {
+            Self::Conversion(_) => zx::Status::NOT_SUPPORTED,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Error)]
 pub enum OpenError {
     #[error("failed to get default capability provider: {err}")]
@@ -702,6 +716,8 @@ pub enum OpenError {
     },
     #[error("timed out opening capability")]
     Timeout,
+    #[error(transparent)]
+    BedrockOpen(#[from] BedrockOpenError),
 }
 
 impl OpenError {
@@ -710,6 +726,7 @@ impl OpenError {
             Self::GetDefaultProviderError { err } => err.as_zx_status(),
             Self::OpenStorageError { err } => err.as_zx_status(),
             Self::CapabilityProviderError { err } => err.as_zx_status(),
+            Self::BedrockOpen(err) => err.as_zx_status(),
             Self::CapabilityProviderNotFound => zx::Status::NOT_FOUND,
             Self::SourceInstanceNotFound => zx::Status::NOT_FOUND,
             Self::Timeout => zx::Status::TIMED_OUT,
@@ -719,26 +736,18 @@ impl OpenError {
 
 /// Describes all errors encountered when routing and opening a namespace capability.
 #[derive(Debug, Clone, Error)]
-pub enum RouteAndOpenCapabilityError {
-    #[error("could not route {request}: {err}")]
-    RoutingError {
-        request: RouteRequest,
-        #[source]
-        err: RoutingError,
-    },
-    #[error("could not open {source}: {err}")]
-    OpenError {
-        source: CapabilitySource,
-        #[source]
-        err: OpenError,
-    },
+pub enum RouteOrOpenError {
+    #[error("could not route: {0}")]
+    RoutingError(#[from] RoutingError),
+    #[error("could not open: {0}")]
+    OpenError(#[from] OpenError),
 }
 
-impl RouteAndOpenCapabilityError {
-    fn as_zx_status(&self) -> zx::Status {
+impl RouteOrOpenError {
+    pub fn as_zx_status(&self) -> zx::Status {
         match self {
-            Self::RoutingError { err, .. } => err.as_zx_status(),
-            Self::OpenError { err, .. } => err.as_zx_status(),
+            Self::RoutingError(err) => err.as_zx_status(),
+            Self::OpenError(err) => err.as_zx_status(),
         }
     }
 }
@@ -760,7 +769,7 @@ pub enum StartActionError {
         moniker: Moniker,
         runner: Name,
         #[source]
-        err: Box<RouteAndOpenCapabilityError>,
+        err: Box<RouteOrOpenError>,
     },
     #[error("Couldn't start `{moniker}` because it uses `\"on_terminate\": \"reboot\"` but is not allowed to by policy: {err}")]
     RebootOnTerminateForbidden {

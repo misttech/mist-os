@@ -19,8 +19,7 @@ use {
             actions::{ActionSet, DestroyAction, ShutdownAction, ShutdownType},
             component::StartReason,
             error::{
-                ActionError, ModelError, ResolveActionError, RouteAndOpenCapabilityError,
-                StartActionError,
+                ActionError, ModelError, ResolveActionError, RouteOrOpenError, StartActionError,
             },
             routing::{Route, RouteRequest, RouteSource, RoutingError},
             testing::{routing_test_helpers::*, test_helpers::*},
@@ -1789,14 +1788,13 @@ async fn use_runner_from_environment_not_found() {
 
     assert_matches!(
         *err,
-        RouteAndOpenCapabilityError::RoutingError {
-            err: RoutingError::UseFromEnvironmentNotFound {
+        RouteOrOpenError::RoutingError(
+            RoutingError::UseFromEnvironmentNotFound {
                 moniker,
                 capability_type,
                 capability_name,
             },
-            ..
-        }
+        )
         if moniker == Moniker::try_from(vec!["b"]).unwrap() &&
         capability_type == "runner" &&
         capability_name == "hobbit");

@@ -7,27 +7,19 @@ use {
         component::WeakComponentInstance,
         routing::{self, OpenOptions, RouteRequest},
     },
-    ::routing::capability_source::ComponentCapability,
     fidl::endpoints::ServerEnd,
     fidl_fuchsia_io as fio,
     tracing::error,
     vfs::{execution_scope::ExecutionScope, path::Path, remote::RoutingFn},
 };
 
-// TODO(https://fxbug.dev/42077445): `cap` is used only for debug output. This would be simpler if we
-// removed the `cap` argument and used `request` for the debug output instead.
-pub fn route_fn(
-    component: WeakComponentInstance,
-    cap: ComponentCapability,
-    request: RouteRequest,
-) -> RoutingFn {
+pub fn route_fn(component: WeakComponentInstance, request: RouteRequest) -> RoutingFn {
     Box::new(
         move |scope: ExecutionScope,
               flags: fio::OpenFlags,
               path: Path,
               server_end: ServerEnd<fio::NodeMarker>| {
             let component = component.clone();
-            let cap = cap.clone();
             let request = request.clone();
             scope.spawn(async move {
                 let component = match component.upgrade() {
@@ -36,10 +28,8 @@ pub fn route_fn(
                         // This can happen if the component instance tree topology changes such
                         // that the captured `component` no longer exists.
                         error!(
-                            "failed to upgrade WeakComponentInstance while routing {} `{}`: {:?}",
-                            cap.type_name(),
-                            cap.source_id(),
-                            e
+                            "failed to upgrade WeakComponentInstance while routing {}: {:?}",
+                            request, e
                         );
                         return;
                     }
@@ -52,9 +42,10 @@ pub fn route_fn(
                     server_chan: &mut server_chan,
                 };
                 let res =
-                    routing::route_and_open_capability(request, &component, open_options).await;
+                    routing::route_and_open_capability(&request, &component, open_options).await;
                 if let Err(e) = res {
-                    routing::report_routing_failure(&component, &cap, e.into(), server_chan).await;
+                    routing::report_routing_failure(&request, &component, e.into(), server_chan)
+                        .await;
                 }
             });
         },

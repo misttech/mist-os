@@ -6,13 +6,14 @@ use {
     crate::model::{
         actions::StopAction,
         component::{StartReason, WeakComponentInstance},
+        error::RouteOrOpenError,
+        routing::router::{Request, Router},
     },
     fidl::endpoints::RequestStream,
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_io as fio, fuchsia_async as fasync,
     fuchsia_zircon as zx,
     futures::channel::mpsc,
     futures::prelude::*,
-    routing::{component_instance::AnyWeakComponentInstance, Request, Router},
     sandbox::Dict,
     tracing::{error, warn},
 };
@@ -125,10 +126,10 @@ fn routers_to_open(dict: &Dict, target: &WeakComponentInstance) -> Dict {
             let request = Request {
                 rights: None,
                 relative_path: sandbox::Path::default(),
-                target: AnyWeakComponentInstance::new(target.clone()),
+                target: target.clone(),
                 availability: cm_types::Availability::Required,
             };
-            let (sender, _receiver) = mpsc::unbounded::<anyhow::Error>();
+            let (sender, _receiver) = mpsc::unbounded::<RouteOrOpenError>();
             let open = router.clone().into_open(request, fio::DirentType::Service, sender);
             Box::new(open)
         } else {

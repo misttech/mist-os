@@ -1,7 +1,8 @@
 // Copyright 2023 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-use anyhow::{anyhow, Context};
+use anyhow::anyhow;
+use clonable_error::ClonableError;
 use core::fmt;
 use fidl::endpoints::{create_endpoints, ClientEnd, ServerEnd};
 use fidl_fuchsia_component_sandbox as fsandbox;
@@ -218,19 +219,18 @@ impl TryFrom<OneShotHandle> for Open {
     ///
     /// The handle must be a channel that speaks the `Openable` protocol.
     fn try_from(one_shot: OneShotHandle) -> Result<Self, Self::Error> {
-        let handle =
-            one_shot.get_handle().map_err(|err| anyhow!("could not get handle: {:?}", err))?;
+        let handle = one_shot
+            .get_handle()
+            .map_err(|err| ClonableError::from(anyhow!("could not get handle: {:?}", err)))?;
 
-        let basic_info = handle
-            .basic_info()
-            .map_err(|status| anyhow!("failed to get handle info: {}", status))?;
+        let basic_info = handle.basic_info().map_err(|status| {
+            ClonableError::from(anyhow!("failed to get handle info: {}", status))
+        })?;
         if basic_info.object_type != zx::ObjectType::CHANNEL {
             return Err(ConversionError::NotSupported);
         }
 
-        let openable = ClientEnd::<fio::OpenableMarker>::from(handle)
-            .into_proxy()
-            .context("failed to convert to proxy")?;
+        let openable = ClientEnd::<fio::OpenableMarker>::from(handle).into_proxy().unwrap();
 
         Ok(Self::new(
             move |_scope: vfs::execution_scope::ExecutionScope,

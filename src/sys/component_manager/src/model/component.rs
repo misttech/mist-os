@@ -18,16 +18,17 @@ use {
         context::ModelContext,
         environment::Environment,
         error::{
-            ActionError, AddChildError, AddDynamicChildError, ComponentProviderError,
-            CreateNamespaceError, DestroyActionError, DynamicOfferError, ModelError,
-            OpenExposedDirError, OpenOutgoingDirError, RebootError, ResolveActionError,
-            StartActionError, StopActionError, StructuredConfigError,
+            ActionError, AddChildError, AddDynamicChildError, CapabilityProviderError,
+            ComponentProviderError, CreateNamespaceError, DestroyActionError, DynamicOfferError,
+            ModelError, OpenError, OpenExposedDirError, OpenOutgoingDirError, RebootError,
+            ResolveActionError, StartActionError, StopActionError, StructuredConfigError,
         },
         exposed_dir::ExposedDir,
         hooks::{CapabilityReceiver, Event, EventPayload, Hooks},
         namespace::create_namespace,
         routing::{
             self,
+            router::{Completer, Request, Routable, Router},
             service::{AnonymizedAggregateServiceDir, AnonymizedServiceRoute},
         },
         token::{InstanceToken, InstanceTokenState},
@@ -47,7 +48,6 @@ use {
         resolving::{
             ComponentAddress, ComponentResolutionContext, ResolvedComponent, ResolvedPackage,
         },
-        Completer, Request, Routable, Router,
     },
     async_trait::async_trait,
     async_utils::async_once::Once,
@@ -1591,7 +1591,12 @@ impl ResolvedInstanceState {
         capability_name: Name,
     ) -> Router {
         if decl.program.is_none() {
-            return Router::new_error(OpenOutgoingDirError::InstanceNonExecutable.into());
+            return Router::new_error(
+                OpenError::from(CapabilityProviderError::from(ComponentProviderError::from(
+                    OpenOutgoingDirError::InstanceNonExecutable,
+                )))
+                .into(),
+            );
         }
         let outgoing_dict = Self::build_program_outgoing_dict(component, &decl.capabilities);
         let weak_component = WeakComponentInstance::new(component);
@@ -1601,8 +1606,7 @@ impl ResolvedInstanceState {
                 let outgoing_dict = outgoing_dict.clone();
                 let capability_name = capability_name.clone();
                 component.nonblocking_task_group().spawn(async move {
-                    let target: WeakComponentInstance = request.target.unwrap();
-                    let target_moniker = target.moniker;
+                    let target_moniker = request.target.moniker.clone();
                     request.relative_path.prepend(capability_name.to_string());
 
                     // If the component is already started, this will be a no-op.
@@ -1619,11 +1623,17 @@ impl ResolvedInstanceState {
                         .await
                     {
                         Ok(_) => outgoing_dict.route(request, completer),
-                        Err(e) => completer.complete(Err(ComponentProviderError::from(e).into())),
+                        Err(e) => completer.complete(Err(OpenError::from(
+                            CapabilityProviderError::from(ComponentProviderError::from(e)),
+                        )
+                        .into())),
                     }
                 });
             } else {
-                completer.complete(Err(ComponentProviderError::SourceInstanceNotFound.into()));
+                completer.complete(Err(OpenError::from(CapabilityProviderError::from(
+                    ComponentProviderError::SourceInstanceNotFound,
+                ))
+                .into()));
             }
         })
     }
@@ -2398,16 +2408,23 @@ trait RouterExt: Routable + Clone + Send + Sync + 'static {
             let source = match source.upgrade() {
                 Ok(component) => component,
                 Err(_) => {
-                    return completer
-                        .complete(Err(ComponentProviderError::SourceInstanceNotFound.into()));
+                    return completer.complete(Err(OpenError::from(
+                        CapabilityProviderError::from(
+                            ComponentProviderError::SourceInstanceNotFound,
+                        ),
+                    )
+                    .into()));
                 }
             };
-            let target: WeakComponentInstance = request.target.unwrap();
-            let target = match target.upgrade() {
+            let target = match request.target.upgrade() {
                 Ok(component) => component,
                 Err(_) => {
-                    return completer
-                        .complete(Err(ComponentProviderError::TargetInstanceNotFound.into()));
+                    return completer.complete(Err(OpenError::from(
+                        CapabilityProviderError::from(
+                            ComponentProviderError::TargetInstanceNotFound,
+                        ),
+                    )
+                    .into()));
                 }
             };
             let (receiver, sender) = CapabilityReceiver::new();
@@ -2449,7 +2466,6 @@ pub mod tests {
                 test_helpers::{component_decl_with_test_runner, ActionsTest, ComponentInfo},
             },
         },
-        ::routing::component_instance::AnyWeakComponentInstance,
         assert_matches::assert_matches,
         cm_rust::{
             Availability, CapabilityDecl, ChildRef, DependencyType, ExposeDecl, ExposeProtocolDecl,
@@ -3644,26 +3660,5 @@ pub mod tests {
 
         // Wait for the logger to connect to LogSink.
         connect_rx.next().await.unwrap();
-    }
-
-    #[fuchsia::test]
-    fn test_unwrap_invalid_component_instance() {
-        let instance = AnyWeakComponentInstance::invalid_for_tests();
-        let unwrapped: WeakComponentInstanceInterface<ComponentInstance> = instance.unwrap();
-        assert!(unwrapped.upgrade().is_err());
-    }
-
-    #[fuchsia::test]
-    async fn test_unwrap_valid_component_instance() {
-        let component = ComponentInstance::new_root(
-            Environment::empty(),
-            Arc::new(ModelContext::new_for_test()),
-            Weak::new(),
-            "test:///root".to_string(),
-        );
-        let weak = WeakComponentInstanceInterface::new(&component);
-        let instance = AnyWeakComponentInstance::new(weak);
-        let unwrapped: WeakComponentInstanceInterface<ComponentInstance> = instance.unwrap();
-        assert_eq!(unwrapped.upgrade().unwrap().component_url, "test:///root".to_string());
     }
 }

@@ -10,7 +10,6 @@ use {
     },
     ::namespace::Namespace,
     ::routing::{
-        capability_source::ComponentCapability,
         legacy_router::RouteBundle,
         policy::ScopedPolicyChecker,
         resolving::{ComponentAddress, ResolvedComponent, ResolvedPackage, ResolverError},
@@ -18,7 +17,7 @@ use {
     anyhow::format_err,
     assert_matches::assert_matches,
     async_trait::async_trait,
-    cm_rust::{CapabilityTypeName, ComponentDecl, ConfigValuesData},
+    cm_rust::{ComponentDecl, ConfigValuesData},
     fidl::prelude::*,
     fidl::{
         endpoints::{create_endpoints, ClientEnd, ServerEnd},
@@ -61,9 +60,9 @@ pub enum DeclType {
 /// - Redirects all service capabilities to the echo service.
 pub fn proxy_routing_factory(
     decl_type: DeclType,
-) -> impl Fn(WeakComponentInstance, ComponentCapability, RouteRequest) -> RoutingFn {
-    move |_component: WeakComponentInstance, cap: ComponentCapability, request: RouteRequest| {
-        new_proxy_routing_fn(decl_type, cap.type_name(), request)
+) -> impl Fn(WeakComponentInstance, RouteRequest) -> RoutingFn {
+    move |_component: WeakComponentInstance, request: RouteRequest| {
+        new_proxy_routing_fn(decl_type, request)
     }
 }
 
@@ -74,18 +73,16 @@ async fn echo_protocol_fn(mut stream: EchoRequestStream) {
     }
 }
 
-fn new_proxy_routing_fn(
-    decl_type: DeclType,
-    ty: CapabilityTypeName,
-    request: RouteRequest,
-) -> RoutingFn {
+fn new_proxy_routing_fn(decl_type: DeclType, request: RouteRequest) -> RoutingFn {
     Box::new(
         move |scope: ExecutionScope,
               flags: fio::OpenFlags,
               path: Path,
               server_end: ServerEnd<fio::NodeMarker>| {
-            match ty {
-                CapabilityTypeName::Protocol => {
+            match request {
+                RouteRequest::UseProtocol(_)
+                | RouteRequest::ExposeProtocol(_)
+                | RouteRequest::OfferProtocol(_) => {
                     match decl_type {
                         DeclType::Expose => {
                             assert_matches!(request, RouteRequest::ExposeProtocol(_));
@@ -98,7 +95,9 @@ fn new_proxy_routing_fn(
                         echo_protocol_fn(stream).await;
                     });
                 }
-                CapabilityTypeName::Service => {
+                RouteRequest::UseService(_)
+                | RouteRequest::ExposeService(_)
+                | RouteRequest::OfferService(_) => {
                     match decl_type {
                         DeclType::Expose => {
                             assert_matches!(
@@ -116,7 +115,9 @@ fn new_proxy_routing_fn(
                     );
                     sub_dir.open(ExecutionScope::new(), flags, path, server_end);
                 }
-                CapabilityTypeName::Directory => {
+                RouteRequest::UseDirectory(_)
+                | RouteRequest::ExposeDirectory(_)
+                | RouteRequest::OfferDirectory(_) => {
                     match decl_type {
                         DeclType::Expose => {
                             assert_matches!(request, RouteRequest::ExposeDirectory(_));
@@ -127,12 +128,7 @@ fn new_proxy_routing_fn(
                     );
                     sub_dir.open(ExecutionScope::new(), flags, path, server_end);
                 }
-                CapabilityTypeName::Storage => panic!("storage capability unsupported"),
-                CapabilityTypeName::Runner => panic!("runner capability unsupported"),
-                CapabilityTypeName::Config => panic!("config capability unsupported"),
-                CapabilityTypeName::Resolver => panic!("resolver capability unsupported"),
-                CapabilityTypeName::EventStream => panic!("event stream capability unsupported"),
-                CapabilityTypeName::Dictionary => panic!("dictionary capability unsupported"),
+                _ => panic!("unsupported capability"),
             }
         },
     )

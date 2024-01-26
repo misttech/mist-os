@@ -3,11 +3,11 @@
 // found in the LICENSE file.
 
 use {
-    crate::model::component::{ComponentInstance, WeakComponentInstance},
-    ::routing::{
-        capability_source::CapabilitySource, policy::GlobalPolicyChecker, Completer, Request,
-        Routable, Router,
+    crate::model::{
+        component::{ComponentInstance, WeakComponentInstance},
+        routing::router::{Completer, Request, Routable, Router},
     },
+    ::routing::{capability_source::CapabilitySource, policy::GlobalPolicyChecker},
     cm_types::Name,
     cm_util::WeakTaskGroup,
     fidl::{
@@ -230,7 +230,7 @@ impl DictExt for Dict {
 pub fn new_terminating_router(sender: Sender<WeakComponentInstance>) -> Router {
     Router::new(move |request: Request, completer: Completer| {
         let sender = sender.clone();
-        let target = request.target.unwrap();
+        let target = request.target.clone();
         let open_fn = move |_scope: ExecutionScope,
                             flags: fio::OpenFlags,
                             path: Path,

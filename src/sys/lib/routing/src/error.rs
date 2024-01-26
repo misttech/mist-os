@@ -260,6 +260,18 @@ pub enum RoutingError {
     #[error("Routing a capability of an unsupported type: {}", type_name)]
     UnsupportedCapabilityType { type_name: CapabilityTypeName },
 
+    #[error("The capability does not support routing")]
+    BedrockUnsupportedCapability,
+
+    #[error("Item {name} is not present in dictionary")]
+    BedrockNotPresentInDictionary { name: String },
+
+    #[error("Object was destroyed")]
+    BedrockObjectDestroyed,
+
+    #[error("Routing request was abandoned by a router")]
+    BedrockRoutingRequestCanceled,
+
     #[error(transparent)]
     ComponentInstanceError(#[from] ComponentInstanceError),
 
@@ -316,7 +328,11 @@ impl RoutingError {
             | RoutingError::UnsupportedRouteSource { .. }
             | RoutingError::UnsupportedCapabilityType { .. }
             | RoutingError::EventsRoutingError(_)
+            | RoutingError::BedrockNotPresentInDictionary { .. }
+            | RoutingError::BedrockObjectDestroyed { .. }
+            | RoutingError::BedrockRoutingRequestCanceled { .. }
             | RoutingError::AvailabilityRoutingError(_) => zx::Status::NOT_FOUND,
+            RoutingError::BedrockUnsupportedCapability { .. } => zx::Status::NOT_SUPPORTED,
             RoutingError::MonikerError(_) => zx::Status::INTERNAL,
             RoutingError::ComponentInstanceError(err) => err.as_zx_status(),
             RoutingError::RightsRoutingError(err) => err.as_zx_status(),

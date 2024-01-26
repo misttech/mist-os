@@ -4,9 +4,9 @@
 
 use std::{path::PathBuf, sync::Arc};
 
+use ::routing::RouteRequest;
 use anyhow::Context;
 use async_trait::async_trait;
-use cm_rust::ProtocolDecl;
 use cm_types::Name;
 use cm_util::TaskGroup;
 use fidl::endpoints::ServerEnd;
@@ -16,10 +16,7 @@ use fuchsia_zircon as zx;
 use futures::TryStreamExt;
 use lazy_static::lazy_static;
 use moniker::{ExtendedMoniker, Moniker, MonikerBase};
-use routing::{
-    capability_source::{ComponentCapability, InternalCapability},
-    policy::PolicyError,
-};
+use routing::{capability_source::InternalCapability, policy::PolicyError};
 use tracing::warn;
 
 use crate::{
@@ -34,6 +31,14 @@ use crate::{
 
 lazy_static! {
     static ref INTROSPECTOR_SERVICE: Name = "fuchsia.component.Introspector".parse().unwrap();
+    static ref DEBUG_REQUEST: RouteRequest = RouteRequest::UseProtocol(cm_rust::UseProtocolDecl {
+        source: cm_rust::UseSource::Framework,
+        source_name: INTROSPECTOR_SERVICE.clone(),
+        source_dictionary: None,
+        target_path: cm_types::Path::new("/null").unwrap(),
+        dependency_type: cm_rust::DependencyType::Strong,
+        availability: Default::default(),
+    });
 }
 
 struct IntrospectorCapability {
@@ -155,13 +160,9 @@ impl CapabilityProvider for AccessDeniedCapabilityProvider {
         let Ok(target) = self.target.upgrade() else {
             return Ok(());
         };
-        let cap = ComponentCapability::Protocol(ProtocolDecl {
-            name: INTROSPECTOR_SERVICE.clone(),
-            source_path: None,
-        });
         report_routing_failure(
+            &DEBUG_REQUEST,
             &target,
-            &cap,
             PolicyError::CapabilityUseDisallowed {
                 cap: INTROSPECTOR_SERVICE.to_string(),
                 source_moniker: ExtendedMoniker::ComponentInstance(self.source_moniker),

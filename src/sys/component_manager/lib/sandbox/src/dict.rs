@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 use anyhow::{Context, Error};
+use clonable_error::ClonableError;
 use derivative::Derivative;
 use fidl::endpoints::{create_request_stream, ClientEnd, ServerEnd};
 use fidl_fuchsia_component_sandbox as fsandbox;
@@ -270,11 +271,13 @@ impl Capability for Dict {
         let dir = pfs::simple();
         for (key, value) in self.lock_entries().iter() {
             let open: Open = value.clone().try_into_open().map_err(|err| {
-                anyhow::Error::from(TryIntoOpenError::ConvertIntoOpen { key: key.clone(), err })
+                ClonableError::from(anyhow::Error::from(TryIntoOpenError::ConvertIntoOpen {
+                    key: key.clone(),
+                    err,
+                }))
             })?;
             let key: Name = key.clone().try_into().map_err(|err: ParseNameError| {
-                let err: TryIntoOpenError = err.into();
-                anyhow::Error::from(err)
+                ClonableError::from(anyhow::Error::from(TryIntoOpenError::from(err)))
             })?;
 
             match dir.add_entry_impl(key, open.into_remote(), false) {

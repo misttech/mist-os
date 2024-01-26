@@ -11,21 +11,25 @@ use {
             routing::report_routing_failure,
         },
     },
+    ::routing::RouteRequest,
     async_trait::async_trait,
     cm_types::Name,
     fuchsia_zircon as zx,
     lazy_static::lazy_static,
-    routing::capability_source::{ComponentCapability, InternalCapability},
+    routing::capability_source::InternalCapability,
     tracing::warn,
 };
 
 lazy_static! {
     static ref BINDER_SERVICE: Name = "fuchsia.component.Binder".parse().unwrap();
-    static ref BINDER_CAPABILITY: ComponentCapability =
-        ComponentCapability::Protocol(cm_rust::ProtocolDecl {
-            name: BINDER_SERVICE.clone(),
-            source_path: Some("/svc/fuchsia.component.Binder".parse().unwrap()),
-        });
+    static ref DEBUG_REQUEST: RouteRequest = RouteRequest::UseProtocol(cm_rust::UseProtocolDecl {
+        source: cm_rust::UseSource::Framework,
+        source_name: BINDER_SERVICE.clone(),
+        source_dictionary: None,
+        target_path: cm_types::Path::new("/null").unwrap(),
+        dependency_type: cm_rust::DependencyType::Strong,
+        availability: Default::default(),
+    });
 }
 
 /// Implementation of `fuchsia.component.Binder` FIDL protocol.
@@ -101,7 +105,7 @@ async fn report_routing_failure_to_target(
 ) {
     match target.upgrade().map_err(|e| ModelError::from(e)) {
         Ok(target) => {
-            report_routing_failure(&target, &*BINDER_CAPABILITY, err, server_end).await;
+            report_routing_failure(&DEBUG_REQUEST, &target, err, server_end).await;
         }
         Err(err) => {
             warn!(moniker=%target.moniker, error=%err, "failed to upgrade reference");

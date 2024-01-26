@@ -7,16 +7,14 @@ use {
         capability::CapabilitySource,
         model::{
             component::{ComponentInstance, WeakComponentInstance},
-            error::ModelError,
+            routing::router::{Completer, Request, Router},
         },
         sandbox_util::{new_terminating_router, DictExt},
     },
     ::routing::{
         capability_source::{ComponentCapability, InternalCapability},
-        error::RoutingError,
-        Completer, Request, Router,
+        error::{ComponentInstanceError, RoutingError},
     },
-    anyhow::format_err,
     cm_rust::{self, ExposeDeclCommon, OfferDeclCommon, SourceName, SourcePath, UseDeclCommon},
     cm_types::{Name, SeparatedPath},
     moniker::{ChildName, ChildNameBase, MonikerBase},
@@ -55,14 +53,6 @@ impl ComponentInput {
 
     pub fn new(capabilities: Dict) -> Self {
         Self { capabilities }
-    }
-
-    /// Creates a new ComponentInput with entries cloned from this ComponentInput.
-    ///
-    /// This is a shallow copy. Values are cloned, not copied, so are new references to the same
-    /// underlying data.
-    pub fn shallow_copy(&self) -> Self {
-        Self { capabilities: self.capabilities.copy() }
     }
 
     pub fn insert_capability<'a, C>(&self, path: impl Iterator<Item = &'a str>, capability: C)
@@ -533,9 +523,12 @@ async fn forward_request_to_child(
     completer: Completer,
 ) {
     let mut completer = Some(completer);
-    let res: Result<(), ModelError> = async {
+    let res: Result<(), RoutingError> = async {
         let child = weak_child.upgrade()?;
-        let child_state = child.lock_resolved_state().await?;
+        let child_state = child
+            .lock_resolved_state()
+            .await
+            .map_err(|e| ComponentInstanceError::resolve_failed(child.moniker.clone(), e))?;
         if let Some(router) = child_state
             .component_output_dict
             .get_routable::<Router>(capability_path.iter_segments())
@@ -548,6 +541,6 @@ async fn forward_request_to_child(
     .await;
 
     if let Err(err) = res {
-        completer.take().unwrap().complete(Err(format_err!("failed to route: {:?}", err)));
+        completer.take().unwrap().complete(Err(err.into()));
     }
 }

@@ -6,8 +6,7 @@ use {
     crate::model::{
         component::StartReason,
         error::{
-            ActionError, CreateNamespaceError, ModelError, RouteAndOpenCapabilityError,
-            StartActionError,
+            ActionError, CreateNamespaceError, ModelError, RouteOrOpenError, StartActionError,
         },
         routing::{route_and_open_capability, OpenOptions},
         testing::routing_test_helpers::*,
@@ -647,7 +646,7 @@ async fn use_restricted_storage_open_failure() {
     // `parent_consumer` should be able to open its storage because its not restricted
     let (_client_end, mut server_end) = zx::Channel::create();
     route_and_open_capability(
-        RouteRequest::UseStorage(UseStorageDecl {
+        &RouteRequest::UseStorage(UseStorageDecl {
             source_name: "cache".parse().unwrap(),
             target_path: "/storage".parse().unwrap(),
             availability: cm_rust::Availability::Required,
@@ -684,7 +683,7 @@ async fn use_restricted_storage_open_failure() {
     // `parent_consumer` should NOT be able to open its storage because its IS restricted
     let (_client_end, mut server_end) = zx::Channel::create();
     let result = route_and_open_capability(
-        RouteRequest::UseStorage(UseStorageDecl {
+        &RouteRequest::UseStorage(UseStorageDecl {
             source_name: "cache".parse().unwrap(),
             target_path: "/storage".parse().unwrap(),
             availability: cm_rust::Availability::Required,
@@ -701,10 +700,7 @@ async fn use_restricted_storage_open_failure() {
     .await;
     assert_matches!(
         result,
-        Err(RouteAndOpenCapabilityError::RoutingError {
-            err: RoutingError::ComponentNotInIdIndex { .. },
-            ..
-        })
+        Err(RouteOrOpenError::RoutingError(RoutingError::ComponentNotInIdIndex { .. },))
     );
 }
 
@@ -782,7 +778,7 @@ async fn open_storage_subdirectory() {
     let (root_dir, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
     let mut server_end = server_end.into_channel();
     route_and_open_capability(
-        RouteRequest::UseStorage(UseStorageDecl {
+        &RouteRequest::UseStorage(UseStorageDecl {
             source_name: "cache".parse().unwrap(),
             target_path: "/storage".parse().unwrap(),
             availability: cm_rust::Availability::Required,
@@ -814,7 +810,7 @@ async fn open_storage_subdirectory() {
     let (bar_dir, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
     let mut server_end = server_end.into_channel();
     route_and_open_capability(
-        RouteRequest::UseStorage(UseStorageDecl {
+        &RouteRequest::UseStorage(UseStorageDecl {
             source_name: "cache".parse().unwrap(),
             target_path: "/storage".parse().unwrap(),
             availability: cm_rust::Availability::Required,

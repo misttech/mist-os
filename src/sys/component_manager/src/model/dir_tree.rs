@@ -30,7 +30,7 @@ impl DirTree {
     /// `routing_factory` is a closure that generates the routing function that will be called
     /// when a leaf node is opened.
     pub fn build_from_exposes(
-        routing_factory: impl Fn(WeakComponentInstance, ComponentCapability, RouteRequest) -> RoutingFn,
+        routing_factory: impl Fn(WeakComponentInstance, RouteRequest) -> RoutingFn,
         component: WeakComponentInstance,
         decl: &ComponentDecl,
     ) -> Self {
@@ -61,7 +61,7 @@ impl DirTree {
 
     fn add_expose_capability(
         &mut self,
-        routing_factory: &impl Fn(WeakComponentInstance, ComponentCapability, RouteRequest) -> RoutingFn,
+        routing_factory: &impl Fn(WeakComponentInstance, RouteRequest) -> RoutingFn,
         component: WeakComponentInstance,
         target_name: &str,
         exposes: Vec<&ExposeDecl>,
@@ -83,7 +83,7 @@ impl DirTree {
             Some(r) => r,
             None => return,
         };
-        let routing_fn = routing_factory(component, cap, request);
+        let routing_fn = routing_factory(component, request);
         self.add_capability(path, type_name, routing_fn);
     }
 

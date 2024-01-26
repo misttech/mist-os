@@ -334,13 +334,13 @@ async fn open_runner(
         relative_path: "".into(),
         server_chan: &mut server_channel,
     };
-    route_and_open_capability(RouteRequest::UseRunner(runner.clone()), component, options)
+    route_and_open_capability(&RouteRequest::UseRunner(runner.clone()), component, options)
         .await
         .map_err(|err| StartActionError::ResolveRunnerError {
-            moniker: component.moniker.clone(),
-            err: Box::new(err),
-            runner: runner.source_name,
-        })?;
+        moniker: component.moniker.clone(),
+        err: Box::new(err),
+        runner: runner.source_name,
+    })?;
 
     return Ok(Some(RemoteRunner::new(client)));
 }
@@ -518,7 +518,7 @@ async fn create_scoped_logger(
         relative_path: String::new(),
         server_chan: &mut logsink_server_end.into_channel(),
     };
-    route_and_open_capability(route_request, component, open_options).await?;
+    route_and_open_capability(&route_request, component, open_options).await?;
     Ok(ScopedLogger::create(logsink)?)
 }
 

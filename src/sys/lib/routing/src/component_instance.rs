@@ -17,9 +17,7 @@ use {
     derivative::Derivative,
     moniker::{ChildName, ExtendedMoniker, Moniker, MonikerBase},
     std::{
-        any::Any,
         clone::Clone,
-        fmt,
         sync::{Arc, Weak},
     },
 };
@@ -227,53 +225,6 @@ impl<C: ComponentInstanceInterface> WeakComponentInstanceInterface<C> {
 impl<C: ComponentInstanceInterface> From<&Arc<C>> for WeakComponentInstanceInterface<C> {
     fn from(component: &Arc<C>) -> Self {
         Self { inner: Arc::downgrade(component), moniker: component.moniker().clone() }
-    }
-}
-
-/// A weak component reference that holds an arbitrary implementation of
-/// [`ComponentInstanceInterface`].
-#[derive(Clone)]
-pub struct AnyWeakComponentInstance(Arc<dyn Any + Send + Sync>, Arc<dyn fmt::Debug + Send + Sync>);
-
-impl AnyWeakComponentInstance {
-    pub fn new<T: ComponentInstanceInterface + 'static>(
-        interface: WeakComponentInstanceInterface<T>,
-    ) -> Self {
-        let interface = Arc::new(interface);
-        Self(interface.clone(), interface)
-    }
-
-    /// Makes an invalid [`AnyWeakComponentInstance`] that is only useful in
-    /// routing tests that do not deal with component instances. When unwrapped,
-    /// it will result in an invalid [`WeakComponentInstanceInterface`].
-    pub fn invalid_for_tests() -> Self {
-        let interface = Arc::new(InvalidComponentInstanceForTests);
-        Self(interface.clone(), interface)
-    }
-
-    pub fn unwrap<T: ComponentInstanceInterface + 'static>(
-        &self,
-    ) -> WeakComponentInstanceInterface<T> {
-        if let Some(value) = self.0.downcast_ref::<WeakComponentInstanceInterface<T>>() {
-            value.clone()
-        } else if self.0.downcast_ref::<InvalidComponentInstanceForTests>().is_some() {
-            WeakComponentInstanceInterface::<T>::invalid()
-        } else {
-            // The `ComponentInstanceInterface` implementation specified when
-            // creating this `AnyWeakComponentInstance` is different from the
-            // requested implementation when unwrapping. If we get here, it is an
-            // internal bug in the framework.
-            panic!("Incompatible ComponentInstanceInterface implementation");
-        }
-    }
-}
-
-#[derive(Debug, Clone)]
-struct InvalidComponentInstanceForTests;
-
-impl fmt::Debug for AnyWeakComponentInstance {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_tuple("AnyWeakComponentInstance").field(&self.1).finish()
     }
 }
 

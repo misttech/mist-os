@@ -15,12 +15,6 @@ use {
     tracing::{error, warn},
 };
 
-#[cfg(target_os = "fuchsia")]
-use {
-    crate::component_instance::WeakComponentInstanceInterface,
-    crate::router::{Completer, Request, Routable, Router},
-};
-
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 
@@ -318,38 +312,6 @@ impl ScopedPolicyChecker {
                 policy: "create_raw_processes".to_owned(),
                 moniker: self.scope.to_owned(),
             })
-    }
-}
-
-#[cfg(target_os = "fuchsia")]
-pub struct PolicyCheckRouter<C: ComponentInstanceInterface> {
-    capability_source: CapabilitySource<C>,
-    policy_checker: GlobalPolicyChecker,
-    router: Router,
-}
-
-#[cfg(target_os = "fuchsia")]
-impl<C: ComponentInstanceInterface> PolicyCheckRouter<C> {
-    pub fn new(
-        capability_source: CapabilitySource<C>,
-        policy_checker: GlobalPolicyChecker,
-        router: Router,
-    ) -> Self {
-        PolicyCheckRouter { capability_source, policy_checker, router }
-    }
-}
-
-#[cfg(target_os = "fuchsia")]
-impl<C> Routable for PolicyCheckRouter<C>
-where
-    C: ComponentInstanceInterface + 'static,
-{
-    fn route(&self, request: Request, completer: Completer) {
-        let target: WeakComponentInstanceInterface<C> = request.target.unwrap();
-        match self.policy_checker.can_route_capability(&self.capability_source, &target.moniker) {
-            Ok(()) => self.router.route(request, completer),
-            Err(policy_error) => completer.complete(Err(policy_error.into())),
-        }
     }
 }
 

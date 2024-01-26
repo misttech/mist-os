@@ -111,7 +111,7 @@ impl Resolver for RemoteResolver {
             server_chan: &mut server_end.into_channel(),
         };
         route_and_open_capability(
-            RouteRequest::Resolver(self.registration.clone()),
+            &RouteRequest::Resolver(self.registration.clone()),
             &component,
             open_options,
         )

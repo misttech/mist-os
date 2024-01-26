@@ -4,6 +4,7 @@
 
 pub mod open;
 pub mod providers;
+pub mod router;
 pub mod service;
 pub use ::routing::error::RoutingError;
 pub use open::*;
@@ -13,13 +14,12 @@ use {
         capability::CapabilitySource,
         model::{
             component::ComponentInstance,
-            error::{ModelError, RouteAndOpenCapabilityError},
+            error::{ModelError, RouteOrOpenError},
             storage,
         },
     },
     ::routing::{
-        self, capability_source::ComponentCapability,
-        component_instance::ComponentInstanceInterface, error::AvailabilityRoutingError,
+        self, component_instance::ComponentInstanceInterface, error::AvailabilityRoutingError,
         mapper::NoopRouteMapper,
     },
     async_trait::async_trait,
@@ -78,7 +78,7 @@ impl Route for RouteRequest {
 fn check_source_for_void(
     source: &CapabilitySource,
     moniker: &moniker::Moniker,
-) -> Result<(), RouteAndOpenCapabilityError> {
+) -> Result<(), RouteOrOpenError> {
     if let CapabilitySource::Void { ref capability, .. } = source {
         debug!(
             "Optional {} `{}` was not available for target component `{}`\n{}",
@@ -87,10 +87,7 @@ fn check_source_for_void(
             &moniker,
             ROUTE_ERROR_HELP
         );
-        return Err(RouteAndOpenCapabilityError::OpenError {
-            source: source.clone(),
-            err: crate::model::error::OpenError::SourceInstanceNotFound,
-        });
+        return Err(crate::model::error::OpenError::SourceInstanceNotFound.into());
     };
     Ok(())
 }
@@ -101,57 +98,30 @@ fn check_source_for_void(
 /// [`crate::model::policy::GlobalPolicyChecker`], the capability is not opened and an error
 /// is returned.
 pub(super) async fn route_and_open_capability(
-    route_request: RouteRequest,
+    route_request: &RouteRequest,
     target: &Arc<ComponentInstance>,
     open_options: OpenOptions<'_>,
-) -> Result<(), RouteAndOpenCapabilityError> {
+) -> Result<(), RouteOrOpenError> {
     match route_request.clone() {
         r @ RouteRequest::UseStorage(_) | r @ RouteRequest::OfferStorage(_) => {
-            let storage_source = r.route(target).await.map_err(|e| {
-                RouteAndOpenCapabilityError::RoutingError { request: route_request, err: e }
-            })?;
+            let storage_source = r.route(target).await?;
             check_source_for_void(&storage_source.source, &target.moniker)?;
 
-            let backing_dir_info = storage::route_backing_directory(storage_source.source.clone())
-                .await
-                .map_err(|e| {
-                    let storage_decl = match &storage_source.source {
-                        CapabilitySource::Component {
-                            capability: ComponentCapability::Storage(storage_decl),
-                            ..
-                        } => storage_decl.clone(),
-                        r => unreachable!("unexpected storage source: {:?}", r),
-                    };
-
-                    let request = RouteRequest::StorageBackingDirectory(storage_decl);
-
-                    RouteAndOpenCapabilityError::RoutingError { request, err: e }
-                })?;
-
+            let backing_dir_info =
+                storage::route_backing_directory(storage_source.source.clone()).await?;
             Ok(OpenRequest::new_from_storage_source(backing_dir_info, target, open_options)
                 .open()
-                .await
-                .map_err(|e| RouteAndOpenCapabilityError::OpenError {
-                    source: storage_source.source,
-                    err: e,
-                })?)
+                .await?)
         }
         r => {
-            let route_source = r.route(target).await.map_err(|e| {
-                RouteAndOpenCapabilityError::RoutingError { request: route_request, err: e }
-            })?;
+            let route_source = r.route(target).await?;
             check_source_for_void(&route_source.source, &target.moniker)?;
 
             // clone the source as additional context in case of an error
-            let capability_source = route_source.source.clone();
 
             Ok(OpenRequest::new_from_route_source(route_source, target, open_options)
                 .open()
-                .await
-                .map_err(|e| RouteAndOpenCapabilityError::OpenError {
-                    source: capability_source,
-                    err: e,
-                })?)
+                .await?)
         }
     }
 }
@@ -208,32 +178,22 @@ https://fuchsia.dev/go/components/connect-errors";
 /// failure to route a capability. Formats `err` as a `String`, but elides the type if the error is
 /// a `RoutingError`, the common case.
 pub async fn report_routing_failure(
+    request: &RouteRequest,
     target: &Arc<ComponentInstance>,
-    cap: &ComponentCapability,
     err: ModelError,
     server_end: zx::Channel,
 ) {
     server_end
         .close_with_epitaph(err.as_zx_status())
         .unwrap_or_else(|error| debug!(%error, "failed to send epitaph"));
-    let err_str = match &err {
-        ModelError::RoutingError { err } => err.to_string(),
-        _ => err.to_string(),
-    };
     target
         .with_logger_as_default(|| {
             match err {
-                ModelError::RouteAndOpenCapabilityError {
+                ModelError::RouteOrOpenError {
                     err:
-                        RouteAndOpenCapabilityError::RoutingError {
-                            err:
-                                RoutingError::AvailabilityRoutingError(
-                                    AvailabilityRoutingError::FailedToRouteToOptionalTarget {
-                                        ..
-                                    },
-                                ),
-                            ..
-                        },
+                        RouteOrOpenError::RoutingError(RoutingError::AvailabilityRoutingError(
+                            AvailabilityRoutingError::FailedToRouteToOptionalTarget { .. },
+                        )),
                 } => {
                     // If the target declared the capability as optional, but
                     // the capability could not be routed (such as if the source
@@ -247,23 +207,15 @@ pub async fn report_routing_failure(
                     // `Required` capabilities to `error!()`, consider also
                     // changing this log for `Optional` to `warn!()`.
                     info!(
-                        "Optional {} `{}` was not available for target component `{}`: {}\n{}",
-                        cap.type_name(),
-                        cap.source_id(),
-                        &target.moniker,
-                        &err_str,
-                        ROUTE_ERROR_HELP
+                        "Optional {request} was not available for target component `{}`: {}\n{}",
+                        &target.moniker, &err, ROUTE_ERROR_HELP
                     );
                 }
                 _ => {
                     // TODO(https://fxbug.dev/42060474): consider changing this to `error!()`
                     warn!(
-                        "Required {} `{}` was not available for target component `{}`: {}\n{}",
-                        cap.type_name(),
-                        cap.source_id(),
-                        &target.moniker,
-                        &err_str,
-                        ROUTE_ERROR_HELP
+                        "Required {request} was not available for target component `{}`: {}\n{}",
+                        &target.moniker, &err, ROUTE_ERROR_HELP
                     );
                 }
             }

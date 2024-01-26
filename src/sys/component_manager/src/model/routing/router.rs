@@ -2,7 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use anyhow::{anyhow, Context, Result};
+use crate::capability::CapabilitySource;
+use crate::model::{
+    component::WeakComponentInstance,
+    error::{BedrockOpenError, OpenError, RouteOrOpenError},
+};
+use ::routing::{error::RoutingError, policy::GlobalPolicyChecker};
 use cm_types::Availability;
 use fidl::epitaph::ChannelEpitaphExt;
 use fidl_fuchsia_component_sandbox as fsandbox;
@@ -18,12 +23,6 @@ use futures::{
 use sandbox::{AnyCapability, Capability, Dict, Open, Path};
 use std::{fmt, sync::Arc};
 use vfs::execution_scope::ExecutionScope;
-
-use crate::{
-    capability_source::CapabilitySource,
-    component_instance::{AnyWeakComponentInstance, ComponentInstanceInterface},
-    policy::{GlobalPolicyChecker, PolicyCheckRouter},
-};
 
 /// Types that implement [`Routable`] let the holder asynchronously request
 /// capabilities from them.
@@ -63,7 +62,7 @@ pub struct Request {
     pub availability: Availability,
 
     /// A reference to the requesting component.
-    pub target: AnyWeakComponentInstance,
+    pub target: WeakComponentInstance,
 }
 
 impl fmt::Debug for Router {
@@ -86,7 +85,7 @@ where
             Some(routable) => {
                 routable.route(request, completer);
             }
-            None => completer.complete(Err(anyhow!("object was destroyed"))),
+            None => completer.complete(Err(RoutingError::BedrockObjectDestroyed.into())),
         }
     }
 }
@@ -101,11 +100,10 @@ impl Router {
     }
 
     /// Creates a router that will always fail a request with the provided error.
-    pub fn new_error(error: anyhow::Error) -> Self {
-        let error = Arc::new(error);
+    pub fn new_error(error: RouteOrOpenError) -> Self {
         Router {
             route_fn: Arc::new(move |_request, completer| {
-                completer.complete(Err(anyhow!("router cannot be created: {}", error.clone())));
+                completer.complete(Err(error.clone()));
             }),
         }
     }
@@ -129,14 +127,14 @@ impl Router {
         let route_fn = move |mut request: Request, completer: Completer| {
             // The availability of the request must be compatible with the
             // availability of this step of the route.
-            let mut state = crate::availability::AvailabilityState(request.availability);
+            let mut state = ::routing::availability::AvailabilityState(request.availability);
             match state.advance(&availability) {
                 Ok(()) => {
                     request.availability = state.0;
                     // Everything checks out, forward the request.
                     self.route(request, completer);
                 }
-                Err(e) => completer.complete(Err(e.into())),
+                Err(e) => completer.complete(Err(RoutingError::from(e).into())),
             }
         };
         Router::new(route_fn)
@@ -144,14 +142,11 @@ impl Router {
 
     /// Returns a router that ensures the capability request is allowed by the
     /// policy in [`GlobalPolicyChecker`].
-    pub fn with_policy_check<C>(
+    pub fn with_policy_check(
         self,
-        capability_source: CapabilitySource<C>,
+        capability_source: CapabilitySource,
         policy_checker: GlobalPolicyChecker,
-    ) -> Self
-    where
-        C: ComponentInstanceInterface + 'static,
-    {
+    ) -> Self {
         Router::from_routable(PolicyCheckRouter::new(capability_source, policy_checker, self))
     }
 
@@ -167,7 +162,7 @@ impl Router {
         self,
         request: Request,
         entry_type: fio::DirentType,
-        errors: UnboundedSender<anyhow::Error>,
+        errors: UnboundedSender<RouteOrOpenError>,
     ) -> Open {
         let router = self.clone();
         let errors = Arc::new(errors);
@@ -192,20 +187,22 @@ impl Router {
                                 Ok(open) => {
                                     open.open(scope_clone, flags, relative_path, server_end);
                                 }
-                                Err(error) => {
+                                Err(err) => {
                                     // Capabilities that don't support opening, such as a Handle
                                     // capability, can fail and get logged here. We can also model
                                     // a Void source this way.
-                                    let _ = errors.unbounded_send(error.into());
-                                    let _ =
-                                        server_end.close_with_epitaph(zx::Status::NOT_SUPPORTED);
+                                    let err = OpenError::from(BedrockOpenError::Conversion(err));
+                                    let status = err.as_zx_status();
+                                    let _ = errors.unbounded_send(err.into());
+                                    let _ = server_end.close_with_epitaph(status);
                                 }
                             }
                         }
                         Err(error) => {
                             // Routing failed (e.g. broken route).
+                            let status = error.as_zx_status();
                             let _ = errors.unbounded_send(error);
-                            let _ = server_end.close_with_epitaph(zx::Status::UNAVAILABLE);
+                            let _ = server_end.close_with_epitaph(status);
                         }
                     }
                 })
@@ -230,7 +227,7 @@ impl Routable for AnyCapability {
                 if request.relative_path.is_empty() {
                     completer.complete(Ok(capability.clone()));
                 } else {
-                    completer.complete(Err(anyhow!("the capability does not support routing")))
+                    completer.complete(Err(RoutingError::BedrockUnsupportedCapability.into()))
                 }
             }
         }
@@ -241,19 +238,19 @@ impl Routable for AnyCapability {
 /// Instead of building a chain of boxed futures during recursive route calls,
 /// each router can pass the completer buck to the next router.
 pub struct Completer {
-    sender: oneshot::Sender<Result<AnyCapability>>,
+    sender: oneshot::Sender<Result<AnyCapability, RouteOrOpenError>>,
 }
 
 impl Completer {
-    pub fn complete(self, result: Result<AnyCapability>) {
+    pub fn complete(self, result: Result<AnyCapability, RouteOrOpenError>) {
         let _ = self.sender.send(result);
     }
 
-    pub fn new() -> (impl Future<Output = Result<AnyCapability>>, Self) {
+    pub fn new() -> (impl Future<Output = Result<AnyCapability, RouteOrOpenError>>, Self) {
         let (sender, receiver) = oneshot::channel();
         let fut = async move {
             let result: Result<_, Canceled> = receiver.await;
-            let capability = result.context("routing request was abandoned by a router")??;
+            let capability = result.map_err(|_| RoutingError::BedrockRoutingRequestCanceled)??;
             Ok(capability)
         };
         (fut, Completer { sender })
@@ -293,7 +290,10 @@ impl Routable for Dict {
         };
         let entries = self.lock_entries();
         let Some(capability) = entries.get(&name) else {
-            completer.complete(Err(anyhow!("item {} is not present in dictionary", name)));
+            completer
+                .complete(Err(
+                    RoutingError::BedrockNotPresentInDictionary { name: name.into() }.into()
+                ));
             return;
         };
         let capability = capability.clone();
@@ -324,10 +324,40 @@ impl Routable for Router {
 }
 
 /// Obtain a capability from `router`, following the description in `request`.
-pub async fn route(router: &Router, request: Request) -> Result<AnyCapability> {
+pub async fn route(router: &Router, request: Request) -> Result<AnyCapability, RouteOrOpenError> {
     let (fut, completer) = Completer::new();
     router.route(request, completer);
     fut.await
+}
+
+pub struct PolicyCheckRouter {
+    capability_source: CapabilitySource,
+    policy_checker: GlobalPolicyChecker,
+    router: Router,
+}
+
+impl PolicyCheckRouter {
+    pub fn new(
+        capability_source: CapabilitySource,
+        policy_checker: GlobalPolicyChecker,
+        router: Router,
+    ) -> Self {
+        PolicyCheckRouter { capability_source, policy_checker, router }
+    }
+}
+
+impl Routable for PolicyCheckRouter {
+    fn route(&self, request: Request, completer: Completer) {
+        match self
+            .policy_checker
+            .can_route_capability(&self.capability_source, &request.target.moniker)
+        {
+            Ok(()) => self.router.route(request, completer),
+            Err(policy_error) => {
+                completer.complete(Err(RoutingError::PolicyError(policy_error).into()));
+            }
+        }
+    }
 }
 
 #[cfg(test)]
@@ -347,7 +377,7 @@ mod tests {
                 rights: None,
                 relative_path: Path::default(),
                 availability: Availability::Optional,
-                target: AnyWeakComponentInstance::invalid_for_tests(),
+                target: WeakComponentInstance::invalid(),
             },
         )
         .await
@@ -367,14 +397,18 @@ mod tests {
                 rights: None,
                 relative_path: Path::default(),
                 availability: Availability::Required,
-                target: AnyWeakComponentInstance::invalid_for_tests(),
+                target: WeakComponentInstance::invalid(),
             },
         )
         .await
         .unwrap_err();
-        use crate::error::AvailabilityRoutingError;
-        let error = error.downcast_ref::<AvailabilityRoutingError>().unwrap();
-        assert_matches!(error, AvailabilityRoutingError::TargetHasStrongerAvailability);
+        use ::routing::error::AvailabilityRoutingError;
+        assert_matches!(
+            error,
+            RouteOrOpenError::RoutingError(RoutingError::AvailabilityRoutingError(
+                AvailabilityRoutingError::TargetHasStrongerAvailability
+            ))
+        );
     }
 
     #[fuchsia::test]
@@ -392,7 +426,7 @@ mod tests {
                 rights: None,
                 relative_path: Path::default(),
                 availability: Availability::Required,
-                target: AnyWeakComponentInstance::invalid_for_tests(),
+                target: WeakComponentInstance::invalid(),
             },
         )
         .await

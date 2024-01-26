@@ -17,13 +17,6 @@ pub mod resolving;
 pub mod rights;
 pub mod walk_state;
 
-// TODO(https://fxbug.dev/314347639): Build Router and sandbox for host.
-#[cfg(target_os = "fuchsia")]
-pub mod router;
-
-#[cfg(target_os = "fuchsia")]
-pub use self::router::{route, Completer, Request, Routable, Router};
-
 use fuchsia_zircon_status as zx;
 use {
     crate::{

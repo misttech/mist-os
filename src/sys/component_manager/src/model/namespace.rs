@@ -8,16 +8,13 @@ use {
         model::{
             component::{ComponentInstance, Package, WeakComponentInstance},
             error::CreateNamespaceError,
-            routing::{self, route_and_open_capability, OpenOptions},
+            routing::{self, route_and_open_capability, router::Request, OpenOptions},
         },
         sandbox_util::DictExt,
     },
     ::routing::{
-        capability_source::ComponentCapability,
-        component_instance::{AnyWeakComponentInstance, ComponentInstanceInterface},
-        mapper::NoopRouteMapper,
-        rights::Rights,
-        route_to_storage_decl, verify_instance_in_component_id_index, Request, RouteRequest,
+        component_instance::ComponentInstanceInterface, mapper::NoopRouteMapper, rights::Rights,
+        route_to_storage_decl, verify_instance_in_component_id_index, RouteRequest,
     },
     cm_rust::{self, ComponentDecl, UseDecl, UseStorageDecl},
     fidl::{endpoints::ClientEnd, epitaph::ChannelEpitaphExt, prelude::*},
@@ -261,14 +258,8 @@ async fn route_directory(
         ),
         _ => panic!("not a directory or storage capability"),
     };
-    if let Err(e) = route_and_open_capability(route_request, &target, open_options).await {
-        routing::report_routing_failure(
-            &target,
-            &ComponentCapability::Use(use_),
-            e.into(),
-            server_end,
-        )
-        .await;
+    if let Err(e) = route_and_open_capability(&route_request, &target, open_options).await {
+        routing::report_routing_failure(&route_request, &target, e.into(), server_end).await;
     }
 }
 
@@ -303,13 +294,13 @@ fn service_or_protocol_use(use_: UseDecl, component: WeakComponentInstance) -> B
                         .program_input_dict
                         .get_capability(use_protocol_decl.target_path.iter_segments())
                 }) {
-                    let result = ::routing::route(
+                    let result = crate::model::routing::router::route(
                         &router,
                         Request {
                             rights: None,
                             relative_path: sandbox::Path::default(),
                             availability: use_protocol_decl.availability.clone(),
-                            target: AnyWeakComponentInstance::new(weak_component.clone()),
+                            target: weak_component,
                         },
                     )
                     .await;
@@ -370,15 +361,10 @@ fn service_or_protocol_use(use_: UseDecl, component: WeakComponentInstance) -> B
             };
 
             let res =
-                routing::route_and_open_capability(route_request, &target, open_options).await;
+                routing::route_and_open_capability(&route_request, &target, open_options).await;
             if let Err(e) = res {
-                routing::report_routing_failure(
-                    &target,
-                    &ComponentCapability::Use(use_),
-                    e.into(),
-                    server_end,
-                )
-                .await;
+                routing::report_routing_failure(&route_request, &target, e.into(), server_end)
+                    .await;
             }
         };
         component.blocking_task_group().spawn(task)
