@@ -2,7 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <lib/fit/defer.h>
 #include <netinet/in.h>
 #include <netinet/ip_icmp.h>
 #include <poll.h>
@@ -303,6 +302,16 @@ TEST(Socket, ConcurrentCreate) {
 
 class SocketFault : public testing::TestWithParam<std::pair<int, int>> {
  protected:
+  static void SetUpTestSuite() {
+    faulting_ptr_ = mmap(nullptr, kFaultingSize_, PROT_NONE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+    ASSERT_NE(faulting_ptr_, MAP_FAILED);
+  }
+
+  static void TearDownTestSuite() {
+    EXPECT_EQ(munmap(faulting_ptr_, kFaultingSize_), 0) << strerror(errno);
+    faulting_ptr_ = nullptr;
+  }
+
   void SetUp() override {
     const auto [type, protocol] = GetParam();
 
@@ -346,6 +355,9 @@ class SocketFault : public testing::TestWithParam<std::pair<int, int>> {
     listen_fd_.reset();
   }
 
+  static constexpr size_t kFaultingSize_ = 987;
+  static inline void* faulting_ptr_;
+
   fbl::unique_fd recv_fd_;
   fbl::unique_fd listen_fd_;
   fbl::unique_fd send_fd_;
@@ -353,15 +365,7 @@ class SocketFault : public testing::TestWithParam<std::pair<int, int>> {
 
 // Test sending a packet from invalid memory.
 TEST_P(SocketFault, Write) {
-  constexpr size_t kRandomLength = 987;
-  void* faulting_ptr = mmap(nullptr, kRandomLength, PROT_NONE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
-  ASSERT_NE(faulting_ptr, MAP_FAILED);
-  auto cleanup_mapped = fit::defer([&faulting_ptr]() {
-    EXPECT_EQ(munmap(faulting_ptr, kRandomLength), 0) << strerror(errno);
-    faulting_ptr = 0;
-  });
-
-  EXPECT_EQ(write(send_fd_.get(), faulting_ptr, kRandomLength), -1);
+  EXPECT_EQ(write(send_fd_.get(), faulting_ptr_, kFaultingSize_), -1);
   EXPECT_EQ(errno, EFAULT);
 }
 
@@ -385,15 +389,8 @@ TEST_P(SocketFault, Read) {
   ASSERT_EQ(poll(&p, 1, -1), 1);
   ASSERT_EQ(p.revents, POLLIN);
 
-  void* faulting_ptr =
-      mmap(nullptr, sizeof(kSendIcmp), PROT_NONE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
-  ASSERT_NE(faulting_ptr, MAP_FAILED);
-  auto cleanup_mapped = fit::defer([&faulting_ptr]() {
-    EXPECT_EQ(munmap(faulting_ptr, sizeof(kSendIcmp)), 0) << strerror(errno);
-    faulting_ptr = 0;
-  });
-
-  EXPECT_EQ(read(recv_fd_.get(), faulting_ptr, sizeof(kSendIcmp)), -1);
+  static_assert(kFaultingSize_ >= sizeof(kSendIcmp));
+  EXPECT_EQ(read(recv_fd_.get(), faulting_ptr_, sizeof(kSendIcmp)), -1);
   EXPECT_EQ(errno, EFAULT);
 }
 

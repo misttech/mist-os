@@ -148,7 +148,6 @@ test("syscalls_cpp_test_bin") {
   deps = [
     ":test_utils",
     "//sdk/fidl/fuchsia.fs:fuchsia.fs_cpp",
-    "//sdk/lib/fit",
     "//sdk/lib/stdcompat",
     "//src/lib/files",
     "//src/lib/fxl/test:gtest_main",
