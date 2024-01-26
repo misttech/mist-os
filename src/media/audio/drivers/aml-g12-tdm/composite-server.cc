@@ -101,6 +101,12 @@ AudioCompositeServer::AudioCompositeServer(
   // Make sure that all reads/writes have gone through.
   BarrierBeforeRelease();
   ZX_ASSERT(bti_.release_quarantine() == ZX_OK);
+
+#if 0
+  // TODO(b/309153055): Once integration with the Power Framework is completed, we can remove
+  // this testing code.
+  TestPowerManagement();
+#endif
 }
 
 zx_status_t AudioCompositeServer::ConfigEngine(size_t index, size_t dai_index, bool input,
@@ -677,6 +683,17 @@ zx_status_t RingBufferServer::InitBuffer(size_t size) {
   return ZX_OK;
 }
 
+void AudioCompositeServer::TestPowerManagement() {
+  pm_timer_.PostDelayed(dispatcher_, zx::sec(1));
+  static bool enabled = true;
+  if (enabled) {
+    StartSocPower();
+  } else {
+    StopSocPower();
+  }
+  enabled = !enabled;
+}
+
 void RingBufferServer::ProcessRingNotification() {
   if (notification_period_.get()) {
     notify_timer_.PostDelayed(dispatcher_, notification_period_);
@@ -730,18 +747,7 @@ void RingBufferServer::WatchDelayInfo(WatchDelayInfoCompleter::Sync& completer) 
 void RingBufferServer::SetActiveChannels(
     fuchsia_hardware_audio::RingBufferSetActiveChannelsRequest& request,
     SetActiveChannelsCompleter::Sync& completer) {
-#if 0
-  // TODO(b/309153055): Active channels for one ring buffer should not control whole SoC audio
-  // power usage, use this only for testing via CLI before integration with Power Framework.
-  if (request.active_channels_bitmask()) {
-    owner_.StartSocPower();
-  } else {
-    owner_.StopSocPower();
-  }
-  completer.Reply(zx::ok(zx::clock::get_monotonic().get()));
-#else
   completer.Reply(zx::error(ZX_ERR_NOT_SUPPORTED));
-#endif
 }
 
 void AudioCompositeServer::GetElements(GetElementsCompleter::Sync& completer) {

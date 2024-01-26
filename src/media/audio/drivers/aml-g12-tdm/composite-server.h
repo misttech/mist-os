@@ -150,6 +150,9 @@ class AudioCompositeServer
   void OnSignalProcessingClosed(fidl::UnbindInfo info);
   zx_status_t ResetEngine(size_t index);
   zx_status_t ConfigEngine(size_t index, size_t dai_index, bool input, fdf::MmioBuffer mmio);
+  void TestPowerManagement();
+  async::TaskClosureMethod<AudioCompositeServer, &AudioCompositeServer::TestPowerManagement>
+      pm_timer_{this};
 
   async_dispatcher_t* dispatcher_;
   zx::bti bti_;
