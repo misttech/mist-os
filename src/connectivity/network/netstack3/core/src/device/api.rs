@@ -19,7 +19,6 @@ use crate::{
             NdpConfiguration, NdpConfigurationUpdate,
         },
         ethernet::EthernetLinkDevice,
-        for_any_device_id,
         loopback::LoopbackDevice,
         pure_ip::PureIpDevice,
         state::{BaseDeviceState, DeviceStateSpec, IpLinkDeviceStateInner},
@@ -27,6 +26,7 @@ use crate::{
         DeviceIdContext, DeviceLayerStateTypes, DeviceLayerTypes, DeviceReceiveFrameSpec,
         OriginTrackerContext,
     },
+    for_any_device_id,
     ip::{
         device::{
             IpDeviceBindingsContext, IpDeviceConfigurationContext, Ipv6DeviceConfigurationContext,

@@ -669,12 +669,11 @@ mod tests {
         context::testutil::FakeInstant,
         device::{
             ethernet::{EthernetCreationProperties, MaxEthernetFrameSize},
-            for_any_device_id,
             loopback::{LoopbackCreationProperties, LoopbackDevice},
-            pure_ip::PureIpDevice,
             queue::tx::TransmitQueueConfiguration,
+            DeviceProvider,
         },
-        error,
+        error, for_any_device_id,
         ip::device::{
             api::AddIpAddrSubnetError,
             config::{
@@ -879,20 +878,10 @@ mod tests {
         let device = add_device(&mut ctx);
 
         if with_tx_queue {
-            match &device {
-                DeviceId::Ethernet(device) => ctx
-                    .core_api()
-                    .transmit_queue::<EthernetLinkDevice>()
-                    .set_configuration(device, TransmitQueueConfiguration::Fifo),
-                DeviceId::Loopback(device) => ctx
-                    .core_api()
-                    .transmit_queue::<LoopbackDevice>()
-                    .set_configuration(device, TransmitQueueConfiguration::Fifo),
-                DeviceId::PureIp(device) => ctx
-                    .core_api()
-                    .transmit_queue::<PureIpDevice>()
-                    .set_configuration(device, TransmitQueueConfiguration::Fifo),
-            }
+            for_any_device_id!(DeviceId, DeviceProvider, D, &device, device => {
+                    ctx.core_api().transmit_queue::<D>()
+                        .set_configuration(device, TransmitQueueConfiguration::Fifo)
+            })
         }
 
         let _: Ipv6DeviceConfigurationUpdate = ctx
@@ -925,18 +914,11 @@ mod tests {
                 core::mem::take(&mut ctx.bindings_ctx.state_mut().tx_available),
                 [device.clone()]
             );
-            let result = match &device {
-                DeviceId::Ethernet(device) => ctx
-                    .core_api()
-                    .transmit_queue::<EthernetLinkDevice>()
-                    .transmit_queued_frames(device),
-                DeviceId::Loopback(device) => {
-                    ctx.core_api().transmit_queue::<LoopbackDevice>().transmit_queued_frames(device)
+            let result = for_any_device_id!(
+                DeviceId, DeviceProvider, D, &device, device => {
+                    ctx.core_api().transmit_queue::<D>().transmit_queued_frames(device)
                 }
-                DeviceId::PureIp(device) => {
-                    ctx.core_api().transmit_queue::<PureIpDevice>().transmit_queued_frames(device)
-                }
-            };
+            );
             assert_eq!(result, Ok(WorkQueueReport::AllDone));
         }
 

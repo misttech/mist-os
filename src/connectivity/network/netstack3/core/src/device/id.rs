@@ -16,7 +16,7 @@ use crate::{
         loopback::{LoopbackDevice, LoopbackDeviceId, LoopbackWeakDeviceId},
         pure_ip::{PureIpDevice, PureIpDeviceId, PureIpWeakDeviceId},
         state::{BaseDeviceState, DeviceStateSpec, IpLinkDeviceState, WeakCookie},
-        DeviceLayerTypes,
+        Device, DeviceLayerTypes,
     },
     sync::{PrimaryRc, StrongRc},
 };
@@ -185,9 +185,40 @@ pub enum DeviceId<BT: DeviceLayerTypes> {
 
 /// Evaluates the expression for the given device_id, regardless of its variant.
 ///
-/// The first argument should be a device ID enum, either [`DeviceId`] or
-/// [`WeakDeviceId`].
+/// This macro supports multiple forms.
+///
+/// Form #1: for_any_device_id!(device_id_enum, device_id,
+///          variable => expression)
+///   - `device_id_enum`: the type of device ID, either [`DeviceId`] or
+///     [`WeakDeviceId`].
+///   - `device_id`: The id to match on. I.e. a value of type `device_id_enum`.
+///   - `variable`: The local variable to bind the inner device id type to. This
+///     variable may be referenced from `expression`.
+///   - `expression`: The expression to evaluate against the given `device_id`.
+///
+/// Example: for_any_device_id!(DeviceId, my_device, id => println!({:?}, id))
+///
+/// Form #2: for_any_device_id!(device_id_enum, provider_trait, type_param,
+///          device_id, variable => expression)
+///   - `device_id_enum`, `device_id`, `variable`, and `expression`: Same as for
+///     Form #1.
+///   - `provider_trait`: The [`DeviceProvider`] trait.
+///   - `type_param`: The name of the type parameter to hold the values provided
+///     by `provider_trait`. This type parameter may be referenced from
+///     `expression`.
+///
+/// The second form is useful in situations where the compiler cannot infer a
+/// device type that differs for each variant of `device_id_enum`.
+///
+/// Example: for_any_device_id!(
+///     DeviceId,
+///     DeviceProvider,
+///     D,
+///     my_device, id => fn_with_id::<D>(id)
+/// )
+#[macro_export]
 macro_rules! for_any_device_id {
+    // Form #1
     ($device_id_enum_type:ident, $device_id:expr, $variable:pat => $expression:expr) => {
         match $device_id {
             $device_id_enum_type::Loopback($variable) => $expression,
@@ -195,8 +226,46 @@ macro_rules! for_any_device_id {
             $device_id_enum_type::PureIp($variable) => $expression,
         }
     };
+    // Form #2
+    (
+        $device_id_enum_type:ident,
+        $provider_trait:ident,
+        $type_param:ident,
+        $device_id:expr, $variable:pat => $expression:expr) => {
+        match $device_id {
+            $device_id_enum_type::Loopback($variable) => {
+                type $type_param = <() as $provider_trait>::Loopback;
+                $expression
+            }
+            $device_id_enum_type::Ethernet($variable) => {
+                type $type_param = <() as $provider_trait>::Ethernet;
+                $expression
+            }
+            $device_id_enum_type::PureIp($variable) => {
+                type $type_param = <() as $provider_trait>::PureIp;
+                $expression
+            }
+        }
+    };
 }
-pub(crate) use for_any_device_id;
+use crate::for_any_device_id;
+
+/// Provides the [`Device`] type for each device domain.
+pub trait DeviceProvider {
+    /// The [`Device`] type for Ethernet devices.
+    type Ethernet: Device;
+    /// The [`Device`] type for Loopback devices.
+    type Loopback: Device;
+    /// The [`Device`] type for pure IP devices.
+    type PureIp: Device;
+}
+
+/// This implementation is used in the `for_any_device_id` macro.
+impl DeviceProvider for () {
+    type Ethernet = EthernetLinkDevice;
+    type Loopback = LoopbackDevice;
+    type PureIp = PureIpDevice;
+}
 
 impl<BT: DeviceLayerTypes> Clone for DeviceId<BT> {
     #[cfg_attr(feature = "instrumented", track_caller)]

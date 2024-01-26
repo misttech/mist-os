@@ -27,7 +27,6 @@ use crate::{
         ethernet::{
             self, CoreCtxWithDeviceId, EthernetIpLinkDeviceDynamicStateContext, EthernetLinkDevice,
         },
-        for_any_device_id,
         loopback::{self, LoopbackDevice, LoopbackDeviceId, LoopbackPrimaryDeviceId},
         pure_ip::PureIpDeviceId,
         queue::tx::TransmitQueueHandler,
@@ -40,6 +39,7 @@ use crate::{
         WeakDeviceId,
     },
     error::{ExistsError, NotFoundError},
+    for_any_device_id,
     ip::device::{
         integration::CoreCtxWithIpDeviceConfiguration,
         nud::{

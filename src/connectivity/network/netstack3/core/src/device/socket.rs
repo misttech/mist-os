@@ -23,10 +23,8 @@ use packet_formats::{
 
 use crate::{
     context::{ContextPair, SendFrameContext},
-    device::{
-        self, for_any_device_id, AnyDevice, Device, DeviceId, DeviceIdContext, FrameDestination,
-        WeakDeviceId,
-    },
+    device::{self, AnyDevice, Device, DeviceId, DeviceIdContext, FrameDestination, WeakDeviceId},
+    for_any_device_id,
     sync::{Mutex, PrimaryRc, RwLock, StrongRc},
     CoreCtx, StackState,
 };

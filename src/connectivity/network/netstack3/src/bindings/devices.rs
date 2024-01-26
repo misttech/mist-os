@@ -19,10 +19,7 @@ use net_types::{
     SpecifiedAddr, UnicastAddr,
 };
 use netstack3_core::{
-    device::{
-        DeviceId, DeviceSendFrameError, EthernetLinkDevice, LoopbackDevice, LoopbackDeviceId,
-        PureIpDevice,
-    },
+    device::{DeviceId, DeviceProvider, DeviceSendFrameError, LoopbackDeviceId},
     sync::{Mutex as CoreMutex, RwLock as CoreRwLock},
     types::WorkQueueReport,
 };
@@ -197,19 +194,9 @@ pub(crate) fn spawn_tx_task(
             // have meaningful amounts of code that is generic over the device
             // type.
             device_id.upgrade().map(|device_id| {
-                match &device_id {
-                    DeviceId::Ethernet(device_id) => ctx
-                        .api()
-                        .transmit_queue::<EthernetLinkDevice>()
-                        .transmit_queued_frames(device_id),
-                    DeviceId::Loopback(device_id) => ctx
-                        .api()
-                        .transmit_queue::<LoopbackDevice>()
-                        .transmit_queued_frames(device_id),
-                    DeviceId::PureIp(device_id) => {
-                        ctx.api().transmit_queue::<PureIpDevice>().transmit_queued_frames(device_id)
-                    }
-                }
+                netstack3_core::for_any_device_id!(DeviceId, DeviceProvider, D, &device_id,
+                    id => ctx.api().transmit_queue::<D>().transmit_queued_frames(id)
+                )
                 .unwrap_or_else(|DeviceSendFrameError::DeviceNotReady(())| {
                     warn!(
                         "TODO(https://fxbug.dev/42057204): Support waiting for TX buffers to be \

@@ -78,7 +78,7 @@ pub mod device {
     pub use ethernet::{
         EthernetCreationProperties, EthernetLinkDevice, MaxEthernetFrameSize, RecvEthernetFrameMeta,
     };
-    pub use id::{DeviceId, EthernetDeviceId, EthernetWeakDeviceId, WeakDeviceId};
+    pub use id::{DeviceId, DeviceProvider, EthernetDeviceId, EthernetWeakDeviceId, WeakDeviceId};
     pub use loopback::{LoopbackCreationProperties, LoopbackDevice, LoopbackDeviceId};
     pub use pure_ip::PureIpDevice;
     pub use queue::tx::TransmitQueueConfiguration;
