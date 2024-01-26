@@ -2,6 +2,8 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import("//build/drivers.gni")
+
 declare_args() {
   use_virtio_gpu_v2 = false
 }
@@ -14,10 +16,38 @@ group("tests") {
   ]
 }
 
-group("virtio_gpu") {
+fuchsia_driver("virtio_gpu-driver") {
+  output_name = "virtio_gpu"
+  configs += [
+    "//build/config:all_source",
+    "//build/config/fuchsia:enable_zircon_asserts",
+  ]
   if (use_virtio_gpu_v2) {
-    deps = [ "v2:virtio_gpu" ]
+    deps = [
+      "v2:common_srcs",
+      "v2:virtio_gpu_bind",
+    ]
   } else {
-    deps = [ "v1:virtio_gpu" ]
+    deps = [
+      "v1:common_srcs",
+      "v1:virtio_gpu_bind_v1",
+    ]
   }
+}
+
+fuchsia_driver_component("virtio_gpu") {
+  component_name = "virtio_gpu"
+  if (use_virtio_gpu_v2) {
+    info = "v2/virtio_gpu-info.json"
+    manifest = "v2/meta/virtio_gpu.cml"
+  } else {
+    info = "v1/virtio_gpu-info.json"
+    manifest = "v1/meta/virtio_gpu.cml"
+  }
+  deps = [ ":virtio_gpu-driver" ]
+}
+
+fuchsia_driver_package("package") {
+  package_name = "virtio_gpu"
+  driver_components = [ ":virtio_gpu" ]
 }

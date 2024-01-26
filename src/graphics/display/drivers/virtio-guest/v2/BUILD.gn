@@ -48,30 +48,6 @@ source_set("common_srcs") {
   ]
 }
 
-fuchsia_driver("virtio_gpu-driver") {
-  output_name = "virtio_gpu"
-  configs += [
-    "//build/config:all_source",
-    "//build/config/fuchsia:enable_zircon_asserts",
-  ]
-  deps = [
-    ":common_srcs",
-    ":virtio_gpu_bind",
-  ]
-}
-
-fuchsia_driver_component("virtio_gpu") {
-  info = "virtio_gpu-info.json"
-  component_name = "virtio_gpu"
-  manifest = "meta/virtio_gpu.cml"
-  deps = [ ":virtio_gpu-driver" ]
-}
-
-fuchsia_driver_package("package") {
-  package_name = "virtio_gpu"
-  driver_components = [ ":virtio_gpu" ]
-}
-
 test("virtio-gpu-test") {
   output_name = "virtio-gpu-test-test"
   if (is_fuchsia) {
