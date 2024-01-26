@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 {
     include: [
-        "//src/lib/testing/expectation/meta/client.shard.cml",
+        "//src/lib/testing/sharding/meta/client_with_expectations.shard.cml",
         "syslog/client.shard.cml",
     ],
     program: {
