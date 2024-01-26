@@ -15,6 +15,13 @@ const DESIRED_PATH_PREFIXES: &[&str] = &["/dev/", "/proc/", "/sys/"];
 
 /// Path prefixes excluded from inspect output.
 const IGNORED_PATH_PREFIXES: &[&str] = &[
+    // TODO(https://fxbug.dev/322255433) these directories have dynamically generated contents that
+    // are difficult to stub, so just exclude them from the not_found list.
+    "/dev/cpuctl",
+    "/dev/cpuset",
+    "/dev/stune",
+    //TODO(https://fxbug.dev/306735736) stubbing these device directories seems to break adb.
+    "/sys/class/android_usb",
     // TODO(https://fxbug.dev/322165853) these directories have dynamically generated contents that
     // are difficult to stub, so just exclude them from the not_found list.
     "/sys/dev/block",
@@ -67,6 +74,11 @@ pub fn not_found_lazy_node_callback() -> BoxFuture<'static, Result<Inspector, an
         let original_counts = NOT_FOUND_COUNTS.lock();
         let original_counts = original_counts.iter().map(|(p, n)| (p.as_slice(), *n));
         for (path, count) in dedupe_uninteresting_numbers_in_paths(original_counts) {
+            // TODO(https://fxbug.dev/297438732) uevent paths are hard to stub individually because
+            // they are dynamically generated from all of the device classes.
+            if path.ends_with("uevent") {
+                continue;
+            }
             if IGNORED_PATH_PREFIXES.iter().any(|prefix| path.starts_with(prefix)) {
                 continue;
             }
