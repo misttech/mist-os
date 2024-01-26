@@ -58,8 +58,7 @@ int AmlG12TdmStream::Thread() {
 }
 
 void AmlG12TdmStream::InitDaiFormats() {
-  frame_rate_ =
-      AmlTdmConfigDevice::kSupportedFrameRates[AmlTdmConfigDevice::kDefaultFrameRateIndex];
+  frame_rate_ = AmlTdmConfigDevice::GetDefaultFrameRate();
   for (size_t i = 0; i < metadata_.codecs.number_of_codecs; ++i) {
     // Only the PCM signed sample format is supported.
     dai_formats_[i].sample_format = SampleFormat::PCM_SIGNED;
@@ -766,7 +765,7 @@ zx_status_t AmlG12TdmStream::AddFormats() {
                                             supported_formats->frame_rates.end());
   }
 
-  for (auto& i : AmlTdmConfigDevice::kSupportedFrameRates) {
+  for (auto& i : AmlTdmConfigDevice::GetSupportedFrameRates()) {
     bool fully_supported = true;
     for (const auto& frame_rate_set : codec_frame_rates) {
       if (frame_rate_set.count(i) == 0) {

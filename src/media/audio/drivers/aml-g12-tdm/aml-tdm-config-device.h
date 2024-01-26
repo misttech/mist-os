@@ -5,7 +5,10 @@
 #ifndef SRC_MEDIA_AUDIO_DRIVERS_AML_G12_TDM_AML_TDM_CONFIG_DEVICE_H_
 #define SRC_MEDIA_AUDIO_DRIVERS_AML_G12_TDM_AML_TDM_CONFIG_DEVICE_H_
 
+#include <fidl/fuchsia.hardware.audio/cpp/fidl.h>
+
 #include <memory>
+#include <vector>
 
 #include <soc/aml-common/aml-tdm-audio.h>
 
@@ -13,13 +16,33 @@ namespace audio::aml_g12 {
 
 class AmlTdmConfigDevice {
  public:
-  static constexpr uint32_t kDefaultFrameRateIndex = 3;
-  static constexpr uint32_t kSupportedFrameRates[] = {8'000, 16'000, 32'000, 48'000, 96'000};
   explicit AmlTdmConfigDevice(const metadata::AmlConfig& config, fdf::MmioBuffer mmio);
 
   zx_status_t InitHW(const metadata::AmlConfig& config, uint64_t channels_to_use,
                      uint32_t frame_rate);
   static zx_status_t Normalize(metadata::AmlConfig& config);
+  static std::vector<uint32_t> GetSupportedNumberOfChannels() { return {2}; }
+  static std::vector<uint32_t> GetSupportedFrameRates() {
+    return {8'000, 16'000, 32'000, 48'000, 96'000};
+  }
+  static uint32_t GetDefaultFrameRate() { return 48'000; }
+  static std::vector<uint8_t> GetSupportedBitsPerSlot() { return {16, 32}; }
+  static std::vector<uint8_t> GetSupportedBitsPerSample() { return {16, 32}; }
+  static std::vector<fuchsia_hardware_audio::DaiFrameFormat> GetFidlSupportedFrameFormats() {
+    return {fuchsia_hardware_audio::DaiFrameFormat::WithFrameFormatStandard(
+                fuchsia_hardware_audio::DaiFrameFormatStandard::kI2S),
+            fuchsia_hardware_audio::DaiFrameFormat::WithFrameFormatStandard(
+                fuchsia_hardware_audio::DaiFrameFormatStandard::kTdm1),
+            fuchsia_hardware_audio::DaiFrameFormat::WithFrameFormatStandard(
+                fuchsia_hardware_audio::DaiFrameFormatStandard::kTdm2),
+            fuchsia_hardware_audio::DaiFrameFormat::WithFrameFormatStandard(
+                fuchsia_hardware_audio::DaiFrameFormatStandard::kTdm3),
+            fuchsia_hardware_audio::DaiFrameFormat::WithFrameFormatStandard(
+                fuchsia_hardware_audio::DaiFrameFormatStandard::kStereoLeft)};
+  }
+  static std::vector<fuchsia_hardware_audio::DaiSampleFormat> GetFidlSupportedSampleFormats() {
+    return {fuchsia_hardware_audio::DaiSampleFormat::kPcmSigned};
+  }
 
   zx_status_t SetBuffer(zx_paddr_t buf, size_t len) { return device_->SetBuffer(buf, len); }
   uint32_t GetRingPosition() { return device_->GetRingPosition(); }

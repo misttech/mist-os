@@ -36,7 +36,7 @@ AmlG12TdmDai::AmlG12TdmDai(zx_device_t* parent, ddk::PDevFidl pdev)
 void AmlG12TdmDai::InitDaiFormats() {
   // Only the PCM signed sample format is supported.
   dai_format_.sample_format = ::fuchsia::hardware::audio::DaiSampleFormat::PCM_SIGNED;
-  dai_format_.frame_rate = AmlTdmConfigDevice::kSupportedFrameRates[0];
+  dai_format_.frame_rate = AmlTdmConfigDevice::GetSupportedFrameRates()[0];
   dai_format_.bits_per_sample = metadata_.dai.bits_per_sample;
   dai_format_.bits_per_slot = metadata_.dai.bits_per_slot;
   dai_format_.number_of_channels = metadata_.dai.number_of_channels;
@@ -288,9 +288,7 @@ void AmlG12TdmDai::GetRingBufferFormats(GetRingBufferFormatsCallback callback) {
   pcm_formats.mutable_bytes_per_sample()->push_back(metadata_.ring_buffer.bytes_per_sample);
   pcm_formats.mutable_valid_bits_per_sample()->push_back(metadata_.ring_buffer.bytes_per_sample *
                                                          8);
-  for (size_t i = 0; i < std::size(AmlTdmConfigDevice::kSupportedFrameRates); ++i) {
-    pcm_formats.mutable_frame_rates()->push_back(AmlTdmConfigDevice::kSupportedFrameRates[i]);
-  }
+  pcm_formats.set_frame_rates(AmlTdmConfigDevice::GetSupportedFrameRates());
   ::fuchsia::hardware::audio::SupportedFormats formats;
   formats.set_pcm_supported_formats(std::move(pcm_formats));
   response.ring_buffer_formats.push_back(std::move(formats));
@@ -322,9 +320,7 @@ void AmlG12TdmDai::GetDaiFormats(GetDaiFormatsCallback callback) {
       ZX_ASSERT(0);  // Not supported.
   }
   formats.frame_formats.push_back(std::move(frame_format));
-  for (size_t i = 0; i < std::size(AmlTdmConfigDevice::kSupportedFrameRates); ++i) {
-    formats.frame_rates.push_back(AmlTdmConfigDevice::kSupportedFrameRates[i]);
-  }
+  formats.frame_rates = AmlTdmConfigDevice::GetSupportedFrameRates();
   formats.bits_per_slot.push_back(metadata_.dai.bits_per_slot);
   formats.bits_per_sample.push_back(metadata_.dai.bits_per_sample);
   response.dai_formats.push_back(std::move(formats));

@@ -159,14 +159,10 @@ zx_status_t AmlTdmConfigDevice::InitHW(const metadata::AmlConfig& config, uint64
     // mclk rate for 48kHz = 768MHz/10 = 76.8MHz
     // Note: absmax mclk frequency is 500MHz per AmLogic
     ZX_ASSERT(!(config.mClockDivFactor % 2));  // mClock div factor must be divisible by 2.
-    ZX_ASSERT(frame_rate == 8'000 || frame_rate == 16'000 || frame_rate == 32'000 ||
-              frame_rate == 48'000 || frame_rate == 96'000);
-    static_assert(std::size(AmlTdmConfigDevice::kSupportedFrameRates) == 5);
-    ZX_ASSERT(AmlTdmConfigDevice::kSupportedFrameRates[0] == 8'000);
-    ZX_ASSERT(AmlTdmConfigDevice::kSupportedFrameRates[1] == 16'000);
-    ZX_ASSERT(AmlTdmConfigDevice::kSupportedFrameRates[2] == 32'000);
-    ZX_ASSERT(AmlTdmConfigDevice::kSupportedFrameRates[3] == 48'000);
-    ZX_ASSERT(AmlTdmConfigDevice::kSupportedFrameRates[4] == 96'000);
+    auto frame_rates = GetSupportedFrameRates();
+    if (std::find(frame_rates.begin(), frame_rates.end(), frame_rate) == frame_rates.end()) {
+      return ZX_ERR_NOT_SUPPORTED;
+    }
     const uint32_t frame_bytes = config.dai.bits_per_slot / 8 * config.dai.number_of_channels;
     // With frame_bytes = 8, we take mClockDivFactor and adjust the mclk_div up or down from 48kHz.
     const uint32_t mclk_div = config.mClockDivFactor * 48'000 * 8 / frame_bytes / frame_rate;

@@ -56,25 +56,22 @@ AudioCompositeServer::AudioCompositeServer(
     element_completers_[ring_buffer].completer = {};
   }
 
-  // TODO(https://fxbug.dev/42082341): Configure this driver with passed-in metadata.
   for (size_t i = 0; i < kNumberOfPipelines; ++i) {
     // Default supported DAI formats.
-    supported_dai_formats_[i].number_of_channels({2});
-    supported_dai_formats_[i].sample_formats({fuchsia_hardware_audio::DaiSampleFormat::kPcmSigned});
-    supported_dai_formats_[i].frame_formats(
-        {fuchsia_hardware_audio::DaiFrameFormat::WithFrameFormatStandard(
-            fuchsia_hardware_audio::DaiFrameFormatStandard::kI2S)});
-    supported_dai_formats_[i].frame_rates({48'000});
-    supported_dai_formats_[i].bits_per_slot({16, 32});
-    supported_dai_formats_[i].bits_per_sample({16});
+    supported_dai_formats_[i].number_of_channels(
+        AmlTdmConfigDevice::GetSupportedNumberOfChannels());
+    supported_dai_formats_[i].sample_formats(AmlTdmConfigDevice::GetFidlSupportedSampleFormats());
+    supported_dai_formats_[i].frame_formats(AmlTdmConfigDevice::GetFidlSupportedFrameFormats());
+    supported_dai_formats_[i].frame_rates(AmlTdmConfigDevice::GetSupportedFrameRates());
+    supported_dai_formats_[i].bits_per_slot(AmlTdmConfigDevice::GetSupportedBitsPerSlot());
+    supported_dai_formats_[i].bits_per_sample(AmlTdmConfigDevice::GetSupportedBitsPerSample());
 
     // Take values from supported list to define current DAI format.
     current_dai_formats_[i].emplace(
         supported_dai_formats_[i].number_of_channels()[0],
         (1 << supported_dai_formats_[i].number_of_channels()[0]) - 1,  // enable all channels.
         supported_dai_formats_[i].sample_formats()[0], supported_dai_formats_[i].frame_formats()[0],
-        supported_dai_formats_[i].frame_rates()[0],
-        supported_dai_formats_[i].bits_per_slot()[1],  // Take 32 bits for default I2S.
+        supported_dai_formats_[i].frame_rates()[0], supported_dai_formats_[i].bits_per_slot()[0],
         supported_dai_formats_[i].bits_per_sample()[0]);
   }
 
@@ -122,21 +119,32 @@ zx_status_t AudioCompositeServer::ConfigEngine(size_t index, size_t dai_index, b
   // Supported ring buffer formats.
   // We take some values from supported DAI formats.
   fuchsia_hardware_audio::PcmSupportedFormats pcm_formats;
-  // Vector with number_of_channels empty attributes.
+
+  // Vector with number_of_channels empty attributes supported in Ring Buffer
+  // equal to the number of channels supported on DAI.
   std::vector<fuchsia_hardware_audio::ChannelAttributes> attributes(
       supported_dai_formats_[dai_index].number_of_channels()[0]);
   fuchsia_hardware_audio::ChannelSet channel_set;
   channel_set.attributes(std::move(attributes));
   pcm_formats.channel_sets(std::vector{channel_set});
+
+  // Frame rates supported on DAI are supported in Ring Buffer.
   pcm_formats.frame_rates(supported_dai_formats_[dai_index].frame_rates());
+
+  // Sample format is PCM signed.
   pcm_formats.sample_formats(std::vector{fuchsia_hardware_audio::SampleFormat::kPcmSigned});
+
+  // Bits per slot supported on DAI are supported in Ring Buffer as bytes per sample.
   auto v = supported_dai_formats_[dai_index].bits_per_slot();
   std::transform(v.begin(), v.end(), v.begin(), [](const uint8_t bits_per_slot) -> uint8_t {
     ZX_ASSERT(bits_per_slot % 8 == 0);
     return bits_per_slot / 8;
   });
   pcm_formats.bytes_per_sample(v);
+
+  // Bits per sample supported on DAI are supported in Ring Buffer.
   pcm_formats.valid_bits_per_sample(supported_dai_formats_[dai_index].bits_per_sample());
+
   supported_ring_buffer_formats_[index] = std::move(pcm_formats);
 
   engines_[index].dai_index = dai_index;
@@ -166,6 +174,7 @@ zx_status_t AudioCompositeServer::ResetEngine(size_t index) {
   const fuchsia_hardware_audio::DaiFormat& dai_format =
       *current_dai_formats_[engines_[index].dai_index];
   if (dai_format.sample_format() != fuchsia_hardware_audio::DaiSampleFormat::kPcmSigned) {
+    FDF_LOG(ERROR, "Sample format not supported");
     return ZX_ERR_NOT_SUPPORTED;
   }
   auto& dai_type = engines_[index].config.dai.type;
@@ -182,6 +191,9 @@ zx_status_t AudioCompositeServer::ResetEngine(size_t index) {
     case StandardFormat::kNone:
       [[fallthrough]];
     case StandardFormat::kStereoRight:
+      [[fallthrough]];
+    default:
+      FDF_LOG(ERROR, "Frame format not supported");
       return ZX_ERR_NOT_SUPPORTED;
   }
   engines_[index].config.dai.bits_per_sample = dai_format.bits_per_sample();
@@ -200,6 +212,7 @@ zx_status_t AudioCompositeServer::ResetEngine(size_t index) {
 
   zx_status_t status = AmlTdmConfigDevice::Normalize(engines_[index].config);
   if (status != ZX_OK) {
+    FDF_LOG(ERROR, "Failed to normalize config: %s", zx_status_get_string(status));
     return status;
   }
 

@@ -248,7 +248,7 @@ class AmlG12CompositeTest : public zxtest::Test {
         2, 3, fuchsia_hardware_audio::DaiSampleFormat::kPcmSigned,
         fuchsia_hardware_audio::DaiFrameFormat::WithFrameFormatStandard(
             fuchsia_hardware_audio::DaiFrameFormatStandard::kI2S),
-        48'000, 16, 16);
+        48'000, 32, 16);
   }
 
   fuchsia_hardware_audio::Format GetDefaultRingBufferFormat() {
@@ -258,13 +258,89 @@ class AmlG12CompositeTest : public zxtest::Test {
     format.pcm_format(std::move(pcm_format));
     return format;
   }
+
   bool IsFakeClockGateEnabled() { return clock_gate_server_.IsFakeClockEnabled(); }
+
   bool IsFakeClockPllEnabled() { return clock_pll_server_.IsFakeClockEnabled(); }
+
   void StopSocPower() {
     dut_.SyncCall([](auto* dut) { return (*dut)->StopSocPower(); });
   }
+
   void StartSocPower() {
     dut_.SyncCall([](auto* dut) { return (*dut)->StartSocPower(); });
+  }
+
+  void CheckDefaultDaiFormats(uint64_t id) {
+    auto dai_formats_result = client_->GetDaiFormats(id);
+    ASSERT_TRUE(dai_formats_result.is_ok());
+    ASSERT_EQ(1, dai_formats_result->dai_formats().size());
+    auto& dai_formats = dai_formats_result->dai_formats()[0];
+    ASSERT_EQ(1, dai_formats.number_of_channels().size());
+    ASSERT_EQ(2, dai_formats.number_of_channels()[0]);
+    ASSERT_EQ(1, dai_formats.sample_formats().size());
+    ASSERT_EQ(fuchsia_hardware_audio::DaiSampleFormat::kPcmSigned, dai_formats.sample_formats()[0]);
+    ASSERT_EQ(5, dai_formats.frame_formats().size());
+    ASSERT_EQ(fuchsia_hardware_audio::DaiFrameFormat::WithFrameFormatStandard(
+                  fuchsia_hardware_audio::DaiFrameFormatStandard::kI2S),
+              dai_formats.frame_formats()[0]);
+    ASSERT_EQ(fuchsia_hardware_audio::DaiFrameFormat::WithFrameFormatStandard(
+                  fuchsia_hardware_audio::DaiFrameFormatStandard::kTdm1),
+              dai_formats.frame_formats()[1]);
+    ASSERT_EQ(fuchsia_hardware_audio::DaiFrameFormat::WithFrameFormatStandard(
+                  fuchsia_hardware_audio::DaiFrameFormatStandard::kTdm2),
+              dai_formats.frame_formats()[2]);
+    ASSERT_EQ(fuchsia_hardware_audio::DaiFrameFormat::WithFrameFormatStandard(
+                  fuchsia_hardware_audio::DaiFrameFormatStandard::kTdm3),
+              dai_formats.frame_formats()[3]);
+    ASSERT_EQ(fuchsia_hardware_audio::DaiFrameFormat::WithFrameFormatStandard(
+                  fuchsia_hardware_audio::DaiFrameFormatStandard::kStereoLeft),
+              dai_formats.frame_formats()[4]);
+    ASSERT_EQ(5, dai_formats.frame_rates().size());
+    ASSERT_EQ(8'000, dai_formats.frame_rates()[0]);
+    ASSERT_EQ(16'000, dai_formats.frame_rates()[1]);
+    ASSERT_EQ(32'000, dai_formats.frame_rates()[2]);
+    ASSERT_EQ(48'000, dai_formats.frame_rates()[3]);
+    ASSERT_EQ(96'000, dai_formats.frame_rates()[4]);
+    ASSERT_EQ(2, dai_formats.bits_per_slot().size());
+    ASSERT_EQ(16, dai_formats.bits_per_slot()[0]);
+    ASSERT_EQ(32, dai_formats.bits_per_slot()[1]);
+    ASSERT_EQ(2, dai_formats.bits_per_sample().size());
+    ASSERT_EQ(16, dai_formats.bits_per_sample()[0]);
+    ASSERT_EQ(32, dai_formats.bits_per_sample()[1]);
+  }
+
+  void SetDaiFormatDefault(uint64_t id) {
+    auto format = GetDefaultDaiFormat();
+    fuchsia_hardware_audio::CompositeSetDaiFormatRequest request(id, std::move(format));
+    auto dai_formats_result = client_->SetDaiFormat(std::move(request));
+    ASSERT_TRUE(dai_formats_result.is_ok());
+  }
+
+  void SetDaiFormatFrameFormat(uint64_t id, fuchsia_hardware_audio::DaiFrameFormat frame_format) {
+    auto format = GetDefaultDaiFormat();
+    format.frame_format(std::move(frame_format));
+    fuchsia_hardware_audio::CompositeSetDaiFormatRequest request(id, std::move(format));
+    auto dai_formats_result = client_->SetDaiFormat(std::move(request));
+    ASSERT_TRUE(dai_formats_result.is_ok());
+  }
+
+  void SetDaiFormatFrameRate(uint64_t id, uint32_t rate) {
+    auto format = GetDefaultDaiFormat();
+    format.frame_rate(rate);
+    fuchsia_hardware_audio::CompositeSetDaiFormatRequest request(id, std::move(format));
+    auto dai_formats_result = client_->SetDaiFormat(std::move(request));
+    ASSERT_TRUE(dai_formats_result.is_ok());
+  }
+
+  void SetDaiFormatBitePerSampleAndBitsPerSlot(uint64_t id, uint8_t bits_per_sample,
+                                               uint8_t bits_per_slot) {
+    auto format = GetDefaultDaiFormat();
+    format.bits_per_sample(bits_per_sample);
+    format.bits_per_slot(bits_per_slot);
+    fuchsia_hardware_audio::CompositeSetDaiFormatRequest request(id, std::move(format));
+    auto dai_formats_result = client_->SetDaiFormat(std::move(request));
+    ASSERT_TRUE(dai_formats_result.is_ok());
   }
 
  private:
@@ -295,23 +371,23 @@ TEST_F(AmlG12CompositeTest, Reset) {
 
   // After reset we check we have configured all engines for TDM output and input.
 
-  // Configure TDM OUT for I2S (default).
-  // TDM OUT CTRL0 config, bitoffset 2, 2 slots, 32 bits per slot is 0x3001002F.
-  ASSERT_EQ(0x3001'003F, platform_device_.mmio()[0x500 / 4]);  // A output.
-  ASSERT_EQ(0x3001'003F, platform_device_.mmio()[0x540 / 4]);  // B output.
-  ASSERT_EQ(0x3001'003F, platform_device_.mmio()[0x580 / 4]);  // C output.
+  // Configure TDM OUT for I2S 16 bits per slot and per sample (default).
+  // TDM OUT CTRL0 config, bitoffset 2, 2 slots, 16 bits per slot.
+  ASSERT_EQ(0x3001'002F, platform_device_.mmio()[0x500 / 4]);  // A output.
+  ASSERT_EQ(0x3001'002F, platform_device_.mmio()[0x540 / 4]);  // B output.
+  ASSERT_EQ(0x3001'002F, platform_device_.mmio()[0x580 / 4]);  // C output.
 
-  // Configure TDM IN for I2S (default).
+  // Configure TDM IN for I2S 16 bits per slot and per sample (default).
   // TDM IN CTRL0 config, PAD_TDMIN A(0), B(1) and C(2).
-  ASSERT_EQ(0x7003'001F, platform_device_.mmio()[0x300 / 4]);  // A input.
-  ASSERT_EQ(0x7013'001F, platform_device_.mmio()[0x340 / 4]);  // B input.
-  ASSERT_EQ(0x7023'001F, platform_device_.mmio()[0x380 / 4]);  // C input.
+  ASSERT_EQ(0x7003'000F, platform_device_.mmio()[0x300 / 4]);  // A input.
+  ASSERT_EQ(0x7013'000F, platform_device_.mmio()[0x340 / 4]);  // B input.
+  ASSERT_EQ(0x7023'000F, platform_device_.mmio()[0x380 / 4]);  // C input.
 
   // Configure clocks.
-  // SCLK CTRL, clk in/out enabled, 24 sdiv, 32 lrduty, 64 lrdiv.
-  ASSERT_EQ(0xc180'7c3f, platform_device_.mmio()[0x040 / 4]);  // A.
-  ASSERT_EQ(0xc180'7c3f, platform_device_.mmio()[0x048 / 4]);  // B.
-  ASSERT_EQ(0xc180'7c3f, platform_device_.mmio()[0x050 / 4]);  // C.
+  // SCLK CTRL, clk in/out enabled, 24 sdiv, 16 lrduty, 32 lrdiv.
+  ASSERT_EQ(0xc180'3c1f, platform_device_.mmio()[0x040 / 4]);  // A.
+  ASSERT_EQ(0xc180'3c1f, platform_device_.mmio()[0x048 / 4]);  // B.
+  ASSERT_EQ(0xc180'3c1f, platform_device_.mmio()[0x050 / 4]);  // C.
 }
 
 TEST_F(AmlG12CompositeTest, ElementsAndTopology) {
@@ -431,8 +507,8 @@ TEST_F(AmlG12CompositeTest, ElementsState) {
   }
 }
 
-TEST_F(AmlG12CompositeTest, GetDaiFormats) {
-  // Only ids 1, 2, and 3 provide DAI formats.
+TEST_F(AmlG12CompositeTest, GetDaiFormatsErrors) {
+  // Only ids 1, 2, and 3 configure HW DAI formats.
   {
     auto dai_formats_result = client_->GetDaiFormats(0);
     ASSERT_TRUE(dai_formats_result.is_error());
@@ -447,24 +523,16 @@ TEST_F(AmlG12CompositeTest, GetDaiFormats) {
     ASSERT_TRUE(dai_formats_result.error_value().domain_error() ==
                 fuchsia_hardware_audio::DriverError::kInvalidArgs);
   }
-  {
-    auto dai_formats_result = client_->GetDaiFormats(1);
-    ASSERT_TRUE(dai_formats_result.is_ok());
-    ASSERT_EQ(1, dai_formats_result->dai_formats().size());
-  }
-  {
-    auto dai_formats_result = client_->GetDaiFormats(2);
-    ASSERT_TRUE(dai_formats_result.is_ok());
-    ASSERT_EQ(1, dai_formats_result->dai_formats().size());
-  }
-  {
-    auto dai_formats_result = client_->GetDaiFormats(3);
-    ASSERT_TRUE(dai_formats_result.is_ok());
-    ASSERT_EQ(1, dai_formats_result->dai_formats().size());
-  }
 }
 
-TEST_F(AmlG12CompositeTest, SetDaiFormats) {
+TEST_F(AmlG12CompositeTest, GetDaiFormatsValid) {
+  // Ids 1, 2, and 3 are valid configure HW DAI formats.
+  CheckDefaultDaiFormats(1);
+  CheckDefaultDaiFormats(2);
+  CheckDefaultDaiFormats(3);
+}
+
+TEST_F(AmlG12CompositeTest, SetDaiFormatsErrors) {
   // Only ids 1, 2, and 3 configure HW DAI formats.
   {
     fuchsia_hardware_audio::CompositeSetDaiFormatRequest request(0, GetDefaultDaiFormat());
@@ -487,31 +555,31 @@ TEST_F(AmlG12CompositeTest, SetDaiFormats) {
     auto dai_formats_result = client_->SetDaiFormat(std::move(request));
     ASSERT_TRUE(dai_formats_result.is_ok());
 
-    // Configure TDM A for 16 bits I2S:
-    // TDM OUT CTRL0 config, bitoffset 2, 2 slots, 16 bits per slot is 0x3001002F.
-    ASSERT_EQ(0x3001'002F, platform_device_.mmio()[0x500 / 4]);
-    // TDM IN CTRL0 config, PAD_TDMIN A, 16 bits per slot.
-    ASSERT_EQ(0x7003'000F, platform_device_.mmio()[0x300 / 4]);
+    // Configure TDM A for 32 bits I2S:
+    // TDM OUT CTRL0 config, bitoffset 2, 2 slots, 32 bits per slot.
+    ASSERT_EQ(0x3001'003F, platform_device_.mmio()[0x500 / 4]);
+    // TDM IN CTRL0 config, PAD_TDMIN A, 32 bits per slot.
+    ASSERT_EQ(0x7003'001F, platform_device_.mmio()[0x300 / 4]);
   }
   {
     fuchsia_hardware_audio::CompositeSetDaiFormatRequest request(2, GetDefaultDaiFormat());
     auto dai_formats_result = client_->SetDaiFormat(std::move(request));
     ASSERT_TRUE(dai_formats_result.is_ok());
-    // Configure TDM B for 16 bits I2S:
-    // TDM OUT CTRL0 config, bitoffset 2, 2 slots, 16 bits per slot is 0x3001002F.
-    ASSERT_EQ(0x3001'002F, platform_device_.mmio()[0x540 / 4]);
-    // TDM IN CTRL0 config, PAD_TDMIN B, 16 bits per slot.
-    ASSERT_EQ(0x7013'000F, platform_device_.mmio()[0x340 / 4]);
+    // Configure TDM B for 32 bits I2S:
+    // TDM OUT CTRL0 config, bitoffset 2, 2 slots, 32 bits per slot.
+    ASSERT_EQ(0x3001'003F, platform_device_.mmio()[0x540 / 4]);
+    // TDM IN CTRL0 config, PAD_TDMIN B, 32 bits per slot.
+    ASSERT_EQ(0x7013'001F, platform_device_.mmio()[0x340 / 4]);
   }
   {
     fuchsia_hardware_audio::CompositeSetDaiFormatRequest request(3, GetDefaultDaiFormat());
     auto dai_formats_result = client_->SetDaiFormat(std::move(request));
     ASSERT_TRUE(dai_formats_result.is_ok());
-    // Configure TDM C for 16 bits I2S:
-    // TDM OUT CTRL0 config, bitoffset 2, 2 slots, 16 bits per slot is 0x3001002F.
-    ASSERT_EQ(0x3001'002F, platform_device_.mmio()[0x580 / 4]);
-    // TDM IN CTRL0 config, PAD_TDMIN C, 16 bits per slot.
-    ASSERT_EQ(0x7023'000F, platform_device_.mmio()[0x380 / 4]);
+    // Configure TDM C for 32 bits I2S:
+    // TDM OUT CTRL0 config, bitoffset 2, 2 slots, 32 bits per slot.
+    ASSERT_EQ(0x3001'003F, platform_device_.mmio()[0x580 / 4]);
+    // TDM IN CTRL0 config, PAD_TDMIN C, 32bits per slot.
+    ASSERT_EQ(0x7023'001F, platform_device_.mmio()[0x380 / 4]);
   }
 
   // Any DAI field not in the supported ones returns an error.
@@ -538,7 +606,7 @@ TEST_F(AmlG12CompositeTest, SetDaiFormats) {
   {
     auto format = GetDefaultDaiFormat();
     format.frame_format(fuchsia_hardware_audio::DaiFrameFormat::WithFrameFormatStandard(
-        fuchsia_hardware_audio::DaiFrameFormatStandard::kTdm2));
+        fuchsia_hardware_audio::DaiFrameFormatStandard::kStereoRight));
     fuchsia_hardware_audio::CompositeSetDaiFormatRequest request(3, std::move(format));
     auto dai_formats_result = client_->SetDaiFormat(std::move(request));
     ASSERT_TRUE(dai_formats_result.is_error());
@@ -576,6 +644,102 @@ TEST_F(AmlG12CompositeTest, SetDaiFormats) {
     ASSERT_TRUE(dai_formats_result.error_value().domain_error() ==
                 fuchsia_hardware_audio::DriverError::kInvalidArgs);
   }
+}
+
+TEST_F(AmlG12CompositeTest, SetDaiFormatsValid) {
+  // Ids 1, 2, and 3 are valid configure HW DAI formats.
+
+  SetDaiFormatDefault(1);
+  // Configure TDM A for 32 bits I2S:
+  // TDM OUT CTRL0 config, bitoffset 2, 2 slots, 32 bits per slot.
+  ASSERT_EQ(0x3001'003F, platform_device_.mmio()[0x500 / 4]);
+  // TDM IN CTRL0 config, PAD_TDMIN A, 32 bits per slot.
+  ASSERT_EQ(0x7003'001F, platform_device_.mmio()[0x300 / 4]);
+
+  SetDaiFormatDefault(2);
+  // Configure TDM B for 32 bits I2S:
+  // TDM OUT CTRL0 config, bitoffset 2, 2 slots, 32 bits per slot.
+  ASSERT_EQ(0x3001'003F, platform_device_.mmio()[0x540 / 4]);
+  // TDM IN CTRL0 config, PAD_TDMIN B, 32 bits per slot.
+  ASSERT_EQ(0x7013'001F, platform_device_.mmio()[0x340 / 4]);
+
+  SetDaiFormatDefault(3);
+  // Configure TDM C for 32 bits I2S:
+  // TDM OUT CTRL0 config, bitoffset 2, 2 slots, 32 bits per slot.
+  ASSERT_EQ(0x3001'003F, platform_device_.mmio()[0x580 / 4]);
+  // TDM IN CTRL0 config, PAD_TDMIN C, 32bits per slot.
+  ASSERT_EQ(0x7023'001F, platform_device_.mmio()[0x380 / 4]);
+
+  SetDaiFormatFrameFormat(1, fuchsia_hardware_audio::DaiFrameFormat::WithFrameFormatStandard(
+                                 fuchsia_hardware_audio::DaiFrameFormatStandard::kTdm1));
+  // TDM OUT CTRL0 config, reg_tdm_init_bitnum (bitoffset) 3
+  ASSERT_EQ(0x3001'803F, platform_device_.mmio()[0x500 / 4]);
+  // TDM IN CTRL0 config, reg_tdmin_in_bit_skew 4
+  ASSERT_EQ(0x3004'001F, platform_device_.mmio()[0x300 / 4]);
+
+  SetDaiFormatFrameFormat(1, fuchsia_hardware_audio::DaiFrameFormat::WithFrameFormatStandard(
+                                 fuchsia_hardware_audio::DaiFrameFormatStandard::kTdm2));
+  // TDM OUT CTRL0 config, reg_tdm_init_bitnum (bitoffset) 2
+  ASSERT_EQ(0x3001'003F, platform_device_.mmio()[0x500 / 4]);
+  // TDM IN CTRL0 config, reg_tdmin_in_bit_skew 3
+  ASSERT_EQ(0x3003'001F, platform_device_.mmio()[0x300 / 4]);
+
+  SetDaiFormatFrameFormat(1, fuchsia_hardware_audio::DaiFrameFormat::WithFrameFormatStandard(
+                                 fuchsia_hardware_audio::DaiFrameFormatStandard::kTdm3));
+  // TDM OUT CTRL0 config, reg_tdm_init_bitnum (bitoffset) 1
+  ASSERT_EQ(0x3000'803F, platform_device_.mmio()[0x500 / 4]);
+  // TDM IN CTRL0 config, reg_tdmin_in_bit_skew 2
+  ASSERT_EQ(0x3002'001F, platform_device_.mmio()[0x300 / 4]);
+
+  SetDaiFormatFrameFormat(1, fuchsia_hardware_audio::DaiFrameFormat::WithFrameFormatStandard(
+                                 fuchsia_hardware_audio::DaiFrameFormatStandard::kStereoLeft));
+  // TDM OUT CTRL0 config, reg_tdm_init_bitnum (bitoffset) 3
+  ASSERT_EQ(0x3001'803F, platform_device_.mmio()[0x500 / 4]);
+  // TDM IN CTRL0 config, reg_tdmin_in_bit_skew 4
+  ASSERT_EQ(0x3004'001F, platform_device_.mmio()[0x300 / 4]);
+
+  SetDaiFormatFrameRate(1, 8'000);
+  EXPECT_EQ(0x8400'003b, platform_device_.mmio()[0x001]);  // MCLK CTRL, div 60.
+
+  SetDaiFormatFrameRate(1, 16'000);
+  EXPECT_EQ(0x8400'001d, platform_device_.mmio()[0x001]);  // MCLK CTRL, div 30.
+
+  SetDaiFormatFrameRate(1, 32'000);
+  EXPECT_EQ(0x8400'000e, platform_device_.mmio()[0x001]);  // MCLK CTRL, div 15.
+
+  SetDaiFormatFrameRate(1, 48'000);
+  EXPECT_EQ(0x8400'0009, platform_device_.mmio()[0x001]);  // MCLK CTRL, div 10.
+
+  SetDaiFormatFrameRate(1, 96'000);
+  EXPECT_EQ(0x8400'0004, platform_device_.mmio()[0x001]);  // MCLK CTRL, div 5.
+
+  SetDaiFormatFrameRate(2, 8'000);                         // A change to id 2 does not affect id 1.
+  SetDaiFormatFrameRate(3, 48'000);                        // A change to id 3 does not affect id 1.
+  EXPECT_EQ(0x8400'0004, platform_device_.mmio()[0x001]);  // MCLK CTRL, div 5.
+
+  SetDaiFormatBitePerSampleAndBitsPerSlot(1, 32, 32);
+  // TDM OUT CTRL0 config, bitoffset 2, 2 slots, 32 bits per slot.
+  ASSERT_EQ(0x3001'003F, platform_device_.mmio()[0x500 / 4]);
+  // TDM OUT CTRL1 FRDDR with 32 bits per sample.
+  ASSERT_EQ(0x0000'1f40, platform_device_.mmio()[0x504 / 4]);
+  // SCLK CTRL, clk in/out enabled, 24 sdiv, 32 lrduty, 32 lrdiv.
+  ASSERT_EQ(0xc180'7c3f, platform_device_.mmio()[0x040 / 4]);
+
+  SetDaiFormatBitePerSampleAndBitsPerSlot(1, 16, 16);
+  // TDM OUT CTRL0 config, bitoffset 2, 2 slots, 16 bits per slot.
+  ASSERT_EQ(0x3001'002F, platform_device_.mmio()[0x500 / 4]);
+  // TDM OUT CTRL1 FRDDR with 16 bits per sample.
+  ASSERT_EQ(0x0000'0f20, platform_device_.mmio()[0x504 / 4]);
+  // SCLK CTRL, clk in/out enabled, 24 sdiv, 16 lrduty, 16 lrdiv.
+  ASSERT_EQ(0xc180'3c1f, platform_device_.mmio()[0x040 / 4]);
+
+  SetDaiFormatBitePerSampleAndBitsPerSlot(1, 16, 32);
+  // TDM OUT CTRL0 config, bitoffset 2, 2 slots, 32 bits per slot.
+  ASSERT_EQ(0x3001'003F, platform_device_.mmio()[0x500 / 4]);
+  // TDM OUT CTRL1 FRDDR with 16 bits per sample.
+  ASSERT_EQ(0x0000'0f20, platform_device_.mmio()[0x504 / 4]);
+  // SCLK CTRL, clk in/out enabled, 24 sdiv, 32 lrduty, 32 lrdiv.
+  ASSERT_EQ(0xc180'7c3f, platform_device_.mmio()[0x040 / 4]);
 }
 
 TEST_F(AmlG12CompositeTest, GetRingBufferFormats) {
