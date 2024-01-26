@@ -58,8 +58,7 @@
         "timeout_secs": 1564,
         "summary": {
             "tests": null
-        },
-        "image_overrides": {}
+        }
     },
     {
         "name": "affected:AEMU-(1)",
@@ -122,8 +121,7 @@
         "timeout_secs": 1564,
         "summary": {
             "tests": null
-        },
-        "image_overrides": {}
+        }
     },
     {
         "name": "affected:AEMU-(2)",
@@ -186,8 +184,7 @@
         "timeout_secs": 1564,
         "summary": {
             "tests": null
-        },
-        "image_overrides": {}
+        }
     },
     {
         "name": "hermetic:AEMU",
@@ -285,7 +282,6 @@
                     ]
                 }
             ]
-        },
-        "image_overrides": {}
+        }
     }
 ]

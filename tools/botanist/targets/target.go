@@ -131,9 +131,6 @@ type FuchsiaTarget interface {
 
 	// FFXEnv returns the env vars that the ffx instance should run with
 	FFXEnv() []string
-
-	// SetImageOverrides sets the images to override the defaults in images.json.
-	SetImageOverrides(build.ImageOverrides)
 }
 
 // genericFuchsiaTarget is a generic Fuchsia instance.
@@ -155,8 +152,6 @@ type genericFuchsiaTarget struct {
 
 	ffx    *FFXInstance
 	ffxEnv []string
-
-	imageOverrides build.ImageOverrides
 }
 
 // newGenericFuchsia creates a new generic Fuchsia target.
@@ -202,11 +197,6 @@ func (t *genericFuchsiaTarget) UseProductBundles() bool {
 // FFXEnv returns the environment to run ffx with.
 func (t *genericFuchsiaTarget) FFXEnv() []string {
 	return t.ffxEnv
-}
-
-// SetImageOverrides sets the images to override the defaults in images.json.
-func (t *genericFuchsiaTarget) SetImageOverrides(images build.ImageOverrides) {
-	t.imageOverrides = images
 }
 
 // StartSerialServer spawns a new serial server fo the given target.

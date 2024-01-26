@@ -34,8 +34,7 @@
         "timeout_secs": 0,
         "summary": {
             "tests": null
-        },
-        "image_overrides": {}
+        }
     },
     {
         "name": "Linux",
@@ -70,7 +69,6 @@
         "timeout_secs": 0,
         "summary": {
             "tests": null
-        },
-        "image_overrides": {}
+        }
     }
 ]

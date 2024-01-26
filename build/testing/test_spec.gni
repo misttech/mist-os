@@ -148,18 +148,6 @@ if (allowed_device_types == []) {
 #   deps (optional)
 #     [list of labels]: List of labels that the test depends on.
 #
-#   image_overrides (optional)
-#     [scope] Images to use instead of the defaults in images.json. This should
-#     only be used by boot_test() defined in //build/testing/boot_test.gni or
-#     cuckoo_kernel_zbi_test() defined in //build/testing/kernel_zbi_test.gni
-#     which require different images to boot the target with.
-#
-#     TODO(b/304279485): Deprecate in favour of specifying `product_bundle`.
-#
-#     zbi, vbmeta, qemu_kernel, efi_disk, fvm (optional)
-#       [label_with_toolchain] Specifies an override via label. One of
-#       these values must be set.
-#
 #   product_bundle (optional)
 #     [string] The name of a product bundle describing the system against which
 #     the test should be run (describing the test itself in the case of boot
@@ -423,11 +411,7 @@ template("test_spec") {
   }
 
   test_spec = {
-    forward_variables_from(invoker,
-                           [
-                             "image_overrides",
-                             "product_bundle",
-                           ])
+    forward_variables_from(invoker, [ "product_bundle" ])
     test = {
       forward_variables_from(invoker,
                              [
@@ -504,17 +488,16 @@ template("test_spec") {
     }
     deps = target_name_deps
     if (defined(invoker.isolated) && invoker.isolated &&
-        # Tests that use image overrides/product bundles, primarily boot tests,
-        # must necessarily run in isolated mode, so they need not be explicitly
-        # included in the isolated allowlist.
-        !defined(invoker.image_overrides) && !defined(invoker.product_bundle)) {
+        # Tests that use product bundles, primarily boot tests, must necessarily
+        # run in isolated mode, so they need not be explicitly included in the
+        # isolated allowlist.
+        !defined(invoker.product_bundle)) {
       deps += [ "//build/testing/isolated:isolated_test_spec_allowlist" ]
     }
     if (defined(invoker.timeout_secs) &&
-        # Tests that use image overrides/product bundles, primarily boot tests,
-        # are known to run slower, so they need not be explicitly included in
-        # the allowlist.
-        !defined(invoker.image_overrides) && !defined(invoker.product_bundle)) {
+        # Tests that use product bundles, primarily boot tests, are known to
+        # run slower, so they need not be explicitly included in the allowlist.
+        !defined(invoker.product_bundle)) {
       dir = string_replace(get_label_info(invoker.target, "dir"), "//", "")
       split = string_split(dir, "/")
       if (split[0] == "vendor") {

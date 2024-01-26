@@ -20,7 +20,6 @@ import (
 	"go.fuchsia.dev/fuchsia/tools/botanist"
 	"go.fuchsia.dev/fuchsia/tools/botanist/constants"
 	"go.fuchsia.dev/fuchsia/tools/botanist/targets"
-	"go.fuchsia.dev/fuchsia/tools/build"
 	"go.fuchsia.dev/fuchsia/tools/lib/environment"
 	"go.fuchsia.dev/fuchsia/tools/lib/ffxutil"
 	"go.fuchsia.dev/fuchsia/tools/lib/flagmisc"
@@ -100,9 +99,6 @@ type RunCommand struct {
 	// 3: enables parallel test execution
 	ffxExperimentLevel int
 
-	// Any image overrides for boot.
-	imageOverrides imageOverridesFlagValue
-
 	// When true skips setting up the targets.
 	skipSetup bool
 
@@ -111,20 +107,6 @@ type RunCommand struct {
 
 	// When true, upload to resultdb from testrunner.
 	uploadToResultDB bool
-}
-
-type imageOverridesFlagValue build.ImageOverrides
-
-func (v *imageOverridesFlagValue) String() string {
-	data, err := json.Marshal(v)
-	if err != nil {
-		return ""
-	}
-	return string(data)
-}
-
-func (v *imageOverridesFlagValue) Set(s string) error {
-	return json.Unmarshal([]byte(s), &v)
 }
 
 func (*RunCommand) Name() string {
@@ -162,7 +144,6 @@ func (r *RunCommand) SetFlags(f *flag.FlagSet) {
 	f.StringVar(&r.downloadManifest, "download-manifest", "", "Path to a manifest containing all package server downloads")
 	f.IntVar(&r.ffxExperimentLevel, "ffx-experiment-level", 0, "The level of experimental features to enable. If -ffx is not set, this will have no effect.")
 	f.BoolVar(&r.skipSetup, "skip-setup", false, "if set, botanist will not set up a target.")
-	f.Var(&r.imageOverrides, "image-overrides", "A json struct following the ImageOverrides schema at //tools/build/tests.go with the names of the images to use from images.json.")
 	// Temporary flag to enable a soft transition to uploading test results from botanist rather than from the recipe.
 	f.BoolVar(&r.uploadToResultDB, "upload-to-resultdb", false, "if set, test results will be uploaded to ResultDB from testrunner.")
 
@@ -260,7 +241,6 @@ func (r *RunCommand) setupFFX(ctx context.Context, fuchsiaTargets []targets.Fuch
 		// config and daemon, but run commands against its own specified target.
 		ffxForTarget := ffxutil.FFXWithTarget(ffx, t.Nodename())
 		t.SetFFX(&targets.FFXInstance{ffxForTarget, r.ffxExperimentLevel}, ffx.Env())
-		t.SetImageOverrides(build.ImageOverrides(r.imageOverrides))
 	}
 
 	return cleanup, ffx.WaitForDaemon(ctx)
@@ -353,10 +333,10 @@ func (r *RunCommand) dispatchTests(ctx context.Context, cancel context.CancelFun
 		// Signal other goroutines to exit when tests complete.
 		defer cancel()
 
-		if build.ImageOverrides(r.imageOverrides).IsEmpty() && r.productBundles == "" {
+		if r.productBundles == "" {
 			return fmt.Errorf("-product-bundles is required")
 		}
-		if build.ImageOverrides(r.imageOverrides).IsEmpty() && r.productBundleName == "" {
+		if r.productBundleName == "" {
 			return fmt.Errorf("-product-bundle-name is required")
 		}
 		startOpts := targets.StartOptions{

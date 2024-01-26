@@ -19,13 +19,6 @@ type TestSpec struct {
 	// Envs is a set of environments that the test should be executed in.
 	Envs []Environment `json:"environments"`
 
-	// ImageOverrides is a map of the images to override the default values in
-	// images.json used to boot a target. The key should be an ImageOverrideType
-	// and the value should be the label of the image to override with as defined
-	// in images.json.
-	// TODO(b/313662173): Remove once it is no longer used.
-	ImageOverrides ImageOverrides `json:"image_overrides,omitempty"`
-
 	// ProductBundle is the name of the product bundle describing the system
 	// against which the test should be run.
 	ProductBundle string `json:"product_bundle,omitempty"`
@@ -114,22 +107,6 @@ type Environment struct {
 
 func (env Environment) TargetsEmulator() bool {
 	return env.Dimensions.DeviceType() == "QEMU" || env.Dimensions.DeviceType() == "AEMU"
-}
-
-// ImageOverrides gives images by label that should override the default images.
-type ImageOverrides struct {
-	ZBI        string `json:"zbi,omitempty"`
-	VBMeta     string `json:"vbmeta,omitempty"`
-	QEMUKernel string `json:"qemu_kernel,omitempty"`
-	FVM        string `json:"fvm,omitempty"`
-	Fxfs       string `json:"fxfs,omitempty"`
-
-	// EFIDisk is the label of a bootable, UEFI (FAT) filesystem or disk image.
-	EFIDisk string `json:"efi_disk,omitempty"`
-}
-
-func (o ImageOverrides) IsEmpty() bool {
-	return o.ZBI == "" && o.VBMeta == "" && o.QEMUKernel == "" && o.EFIDisk == "" && o.FVM == ""
 }
 
 // DimensionSet encapsulates the Swarming dimensions a test wishes to target.

@@ -126,30 +126,6 @@ template("_boot_test") {
       deps += [ invoker.zbi ]
     }
 
-    image_overrides = {
-      forward_variables_from(invoker,
-                             [
-                               "efi_disk",
-                               "qemu_kernel",
-                               "vbmeta",
-                               "zbi",
-                             ])
-
-      # Absolutize the path part in any provided labels.
-      if (defined(efi_disk)) {
-        efi_disk = get_label_info(efi_disk, "label_with_toolchain")
-      }
-      if (defined(qemu_kernel)) {
-        qemu_kernel = get_label_info(qemu_kernel, "label_with_toolchain")
-      }
-      if (defined(vbmeta)) {
-        vbmeta = get_label_info(vbmeta, "label_with_toolchain")
-      }
-      if (defined(zbi)) {
-        zbi = get_label_info(zbi, "label_with_toolchain")
-      }
-    }
-
     environments = []
     foreach(device_type, invoker.device_types) {
       environments += [

@@ -31,8 +31,7 @@
         "timeout_secs": 0,
         "summary": {
             "tests": null
-        },
-        "image_overrides": {}
+        }
     },
     {
         "name": "Linux-other_dimension:foo",
@@ -66,7 +65,6 @@
         "timeout_secs": 0,
         "summary": {
             "tests": null
-        },
-        "image_overrides": {}
+        }
     }
 ]

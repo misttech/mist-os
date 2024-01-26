@@ -114,29 +114,9 @@ func AddImageDeps(ctx context.Context, s *Shard, buildDir string, images []build
 }
 
 func isUsedForTesting(s *Shard, image build.Image, pave bool) bool {
-	// If image overrides have been specified, then by convention we only wish
-	// to select among the images that could be overridden.
-	overrides := s.ImageOverrides
-	if !overrides.IsEmpty() {
-		if image.Label == overrides.ZBI || image.Label == overrides.VBMeta || image.Label == overrides.QEMUKernel || image.Label == overrides.EFIDisk {
-			return true
-		}
-
-		// Emulators always need a kernel or a UEFI filesystem/disk image.
-		if s.Env.TargetsEmulator() && image.Name == "qemu-kernel" && overrides.QEMUKernel == "" && overrides.EFIDisk == "" {
-			return true
-		}
-
-		// TODO(https://fxbug.dev/42124288): Remove zedboot images once we switch to flashing.
-		// TODO(https://fxbug.dev/42075766): Remove flashing deps once we no longer need to fastboot boot zedboot
-		// for release branches.
-		return !s.Env.TargetsEmulator() && (len(image.PaveZedbootArgs) != 0 || isFlashingDep(image))
-	}
-
 	if s.Env.TargetsEmulator() {
-		// Unless image overrides are specified, all EMU targets in botanist
-		// are using product bundles, so we don't need to get any deps from the
-		// images.json.
+		// All EMU targets in botanist are using product bundles, so we don't
+		// need to get any deps from the images.json.
 		return false
 	}
 	if isFlashingDep(image) {

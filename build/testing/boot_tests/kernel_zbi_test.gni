@@ -53,11 +53,6 @@ template("_cuckoo_product_bundle") {
 
   assembled_system_namespace = assembled_system_target
 
-  label_for_images = get_label_info(":$assembled_system_target",
-                                    "label_no_toolchain") + ".image_assembler"
-  label_for_images_with_toolchain =
-      get_label_info(label_for_images, "label_with_toolchain")
-
   # This creates the target test to run against the cuckoo images, the purpose of
   # this test is to trigger coverage collection.
   fuchsia_unittest_package(stub_test_target) {
@@ -65,18 +60,6 @@ template("_cuckoo_product_bundle") {
       "//src/sys/early_boot_instrumentation/test:early-boot-collector-stub",
     ]
     test_specs = {
-      # TODO(https://fxbug.dev/304279485): Remove `image_overrides`.
-      image_overrides = {
-        zbi = label_for_images_with_toolchain
-        if (use_vbmeta) {
-          vbmeta = label_for_images_with_toolchain
-        }
-        if (fxfs_blob) {
-          fxfs = label_for_images_with_toolchain
-        } else {
-          fvm = label_for_images_with_toolchain
-        }
-      }
       environments = target_environments
       isolated = true
       product_bundle = main_target

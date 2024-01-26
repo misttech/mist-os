@@ -49,28 +49,10 @@ func mockImages(t *testing.T) ([]build.Image, string) {
 			Type:  "kernel",
 		},
 		{
-			Name:  "other-qemu-kernel",
-			Path:  "other-qemu-kernel.bin",
-			Label: "//build/images:other-qemu-kernel",
-			Type:  "kernel",
-		},
-		{
 			Name:  "storage-full",
 			Path:  "obj/build/images/fuchsia/fuchsia/fvm.blk",
 			Label: "//build/images/fuchsia/my-fvm",
 			Type:  "blk",
-		},
-		{
-			Name:  "my-zbi",
-			Path:  "my.zbi",
-			Label: "//build/images:my-zbi",
-			Type:  "zbi",
-		},
-		{
-			Name:  "my-vbmeta",
-			Path:  "my.vbmeta",
-			Label: "//build/images:my-vbmeta",
-			Type:  "vbmeta",
 		},
 	}
 	imgDir := t.TempDir()
@@ -122,12 +104,11 @@ func TestAddImageDeps(t *testing.T) {
 		return deps
 	}
 	testCases := []struct {
-		name           string
-		pave           bool
-		imageOverrides build.ImageOverrides
-		deviceType     string
-		pbPath         string
-		want           []string
+		name       string
+		pave       bool
+		deviceType string
+		pbPath     string
+		want       []string
 	}{
 		{
 			name:       "emulator image deps",
@@ -148,32 +129,11 @@ func TestAddImageDeps(t *testing.T) {
 			want:       append(defaultDeps("", false), "netboot.zbi", "zedboot.zbi"),
 		},
 		{
-			name:           "emulator env with qemu kernel override",
-			deviceType:     "AEMU",
-			pave:           false,
-			imageOverrides: build.ImageOverrides{ZBI: "//build/images:my-zbi", QEMUKernel: "//build/images:other-qemu-kernel"},
-			want:           append(defaultDeps("", true), "my.zbi", "other-qemu-kernel.bin"),
-		},
-		{
-			name:           "emulator env with no qemu kernel override",
-			deviceType:     "AEMU",
-			pave:           false,
-			imageOverrides: build.ImageOverrides{ZBI: "//build/images:my-zbi"},
-			want:           append(defaultDeps("", true), "multiboot.bin", "my.zbi"),
-		},
-		{
 			name:       "emulator env with efi",
 			deviceType: "AEMU",
 			pave:       false,
 			pbPath:     "efi-boot-test/product_bundle",
 			want:       append(defaultDeps("efi-boot-test/product_bundle", true), "efi-boot-test/product_bundle/efi"),
-		},
-		{
-			name:           "hardware env with image overrides",
-			deviceType:     "NUC",
-			pave:           false,
-			imageOverrides: build.ImageOverrides{ZBI: "//build/images:my-zbi", VBMeta: "//build/images:my-vbmeta"},
-			want:           append(defaultDeps("", false), "my.vbmeta", "my.zbi", "zedboot.zbi"),
 		},
 		{
 			name:       "GCE image deps",
@@ -189,7 +149,6 @@ func TestAddImageDeps(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			s := &Shard{
-				ImageOverrides: tc.imageOverrides,
 				Env: build.Environment{
 					Dimensions: build.DimensionSet{
 						"device_type": tc.deviceType,

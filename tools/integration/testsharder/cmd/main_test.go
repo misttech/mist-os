@@ -692,9 +692,7 @@ func bootTestSpec(basename string) build.TestSpec {
 				},
 			},
 		},
-		ImageOverrides: build.ImageOverrides{
-			ZBI: "zbi-images-overrides",
-		},
+		ProductBundle: "boot-test_product_bundle",
 	}
 }
 

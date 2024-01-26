@@ -75,7 +75,6 @@
         "timeout_secs": 1206,
         "summary": {
             "tests": null
-        },
-        "image_overrides": {}
+        }
     }
 ]

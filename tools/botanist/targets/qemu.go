@@ -23,7 +23,6 @@ import (
 	"go.fuchsia.dev/fuchsia/tools/bootserver"
 	"go.fuchsia.dev/fuchsia/tools/botanist"
 	"go.fuchsia.dev/fuchsia/tools/botanist/constants"
-	"go.fuchsia.dev/fuchsia/tools/build"
 	"go.fuchsia.dev/fuchsia/tools/lib/ffxutil"
 	"go.fuchsia.dev/fuchsia/tools/lib/jsonutil"
 	"go.fuchsia.dev/fuchsia/tools/lib/logger"
@@ -251,55 +250,40 @@ func (t *QEMU) Start(ctx context.Context, images []bootserver.Image, args []stri
 	}
 	qemuCmd.SetBinary(absQEMUSystemPath)
 
-	useProductBundle := pbPath != ""
+	if pbPath == "" {
+		return fmt.Errorf("missing product bundle")
+	}
 
 	// If a QEMU kernel override was specified, use that; else, unless we want
 	// to boot via a UEFI disk image (which does not require one), then we
 	// surely want a QEMU kernel, so use the default.
 	var qemuKernel, efiDisk *bootserver.Image
-	if useProductBundle {
-		qemuKernel, err = t.ffx.GetImageFromPB(ctx, pbPath, "a", "qemu-kernel", "")
+	qemuKernel, err = t.ffx.GetImageFromPB(ctx, pbPath, "a", "qemu-kernel", "")
+	if err != nil {
+		return err
+	}
+	if qemuKernel == nil {
+		if !isBootTest {
+			return fmt.Errorf("failed to find qemu kernel from product bundle")
+		}
+		efiDisk, err = t.ffx.GetImageFromPB(ctx, pbPath, "", "", "firmware_fat")
 		if err != nil {
 			return err
 		}
-		if qemuKernel == nil {
-			efiDisk, err = t.ffx.GetImageFromPB(ctx, pbPath, "", "", "firmware_fat")
-			if err != nil {
-				return err
-			}
-			if efiDisk == nil {
-				qemuKernel = getImageByNameAndCPU(images, "kernel_qemu-kernel", t.config.Target)
-			}
-		}
-	} else {
-		if t.imageOverrides.QEMUKernel != "" {
-			qemuKernel = getImage(images, t.imageOverrides.QEMUKernel, build.ImageTypeQEMUKernel)
-		} else if t.imageOverrides.EFIDisk != "" {
-			efiDisk = getImage(images, t.imageOverrides.EFIDisk, build.ImageTypeFAT)
-		} else {
-			qemuKernel = getImageByNameAndCPU(images, "kernel_qemu-kernel", t.config.Target)
+		if efiDisk == nil {
+			return fmt.Errorf("failed to find either qemu kernel or efi disk from product bundle")
 		}
 	}
 
 	var zbi *bootserver.Image
-	if useProductBundle {
-		zbi, err = t.ffx.GetImageFromPB(ctx, pbPath, "a", "zbi", "")
-		if err != nil {
-			return err
-		}
-		// The zbi image may not exist as part of the
-		// product bundle for a boot test, which is ok.
-		if zbi == nil && !isBootTest {
-			return fmt.Errorf("failed to find zbi from product bundle")
-		}
-	} else {
-		// If a ZBI override is specified, use that; else if no overrides were
-		// specified, then we surely want a ZBI, so use the default.
-		if t.imageOverrides.ZBI != "" {
-			zbi = getImage(images, t.imageOverrides.ZBI, build.ImageTypeZBI)
-		} else if t.imageOverrides.IsEmpty() {
-			zbi = getImageByName(images, "zbi_zircon-a")
-		}
+	zbi, err = t.ffx.GetImageFromPB(ctx, pbPath, "a", "zbi", "")
+	if err != nil {
+		return err
+	}
+	// The zbi image may not exist as part of the
+	// product bundle for a boot test, which is ok.
+	if zbi == nil && !isBootTest {
+		return fmt.Errorf("failed to find zbi from product bundle")
 	}
 
 	// The QEMU command needs to be invoked within an empty directory, as QEMU
@@ -317,38 +301,13 @@ func (t *QEMU) Start(ctx context.Context, images []bootserver.Image, args []stri
 
 	var fvmImage *bootserver.Image
 	var fxfsImage *bootserver.Image
-	if useProductBundle {
-		fvmImage, err = t.ffx.GetImageFromPB(ctx, pbPath, "a", "fvm", "")
-		if err != nil {
-			return err
-		}
-		fxfsImage, err = t.ffx.GetImageFromPB(ctx, pbPath, "a", "fxfs", "")
-		if err != nil {
-			return err
-		}
-	} else {
-		if t.imageOverrides.IsEmpty() {
-			fvmImage = getImageByName(images, "blk_storage-full")
-			fxfsImage = getImageByName(images, "fxfs-blk_storage-full")
-		} else if t.imageOverrides.FVM != "" {
-			// TODO(ihuh): Figure out proper way to identify fvm instead of
-			// hardcoding the name extension.
-			for _, img := range images {
-				if img.Label == t.imageOverrides.FVM &&
-					img.Type == build.ImageTypeBlk &&
-					filepath.Ext(img.Name) == ".fvm" {
-					fvmImage = &img
-					break
-				}
-			}
-		} else if t.imageOverrides.Fxfs != "" {
-			for _, img := range images {
-				if img.Label == t.imageOverrides.Fxfs && img.Type == build.ImageTypeFxfsBlk {
-					fxfsImage = &img
-					break
-				}
-			}
-		}
+	fvmImage, err = t.ffx.GetImageFromPB(ctx, pbPath, "a", "fvm", "")
+	if err != nil {
+		return err
+	}
+	fxfsImage, err = t.ffx.GetImageFromPB(ctx, pbPath, "a", "fxfs", "")
+	if err != nil {
+		return err
 	}
 
 	if err := copyImagesToDir(ctx, workdir, false, qemuKernel, zbi, efiDisk, fvmImage, fxfsImage); err != nil {

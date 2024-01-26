@@ -41,9 +41,7 @@
         "summary": {
             "tests": null
         },
-        "image_overrides": {
-            "zbi": "zbi-images-overrides"
-        }
+        "product_bundle": "boot-test_product_bundle"
     },
     {
         "name": "hermetic:AEMU-fuchsia-pkg:__fuchsia.com_boot-test#meta_boot-test.cm",
@@ -87,8 +85,6 @@
         "summary": {
             "tests": null
         },
-        "image_overrides": {
-            "zbi": "zbi-images-overrides"
-        }
+        "product_bundle": "boot-test_product_bundle"
     }
 ]

@@ -50,8 +50,7 @@
         "timeout_secs": 604,
         "summary": {
             "tests": null
-        },
-        "image_overrides": {}
+        }
     },
     {
         "name": "AEMU-(2)",
@@ -104,7 +103,6 @@
         "timeout_secs": 604,
         "summary": {
             "tests": null
-        },
-        "image_overrides": {}
+        }
     }
 ]
