@@ -1149,10 +1149,6 @@ pub enum ChangeValidationError {
     InvalidAddressMatcher,
     #[error("rule specifies an invalid port matcher")]
     InvalidPortMatcher,
-    #[error("rule specifies a matcher that is unavailable in rule's context")]
-    MatcherUnavailable,
-    #[error("rule has an action that is invalid for the rule's routine")]
-    InvalidActionForRoutine,
 }
 
 impl TryFrom<fnet_filter::ChangeValidationError> for ChangeValidationError {
@@ -1167,10 +1163,6 @@ impl TryFrom<fnet_filter::ChangeValidationError> for ChangeValidationError {
                 Ok(Self::InvalidAddressMatcher)
             }
             fnet_filter::ChangeValidationError::InvalidPortMatcher => Ok(Self::InvalidPortMatcher),
-            fnet_filter::ChangeValidationError::MatcherUnavailable => Ok(Self::MatcherUnavailable),
-            fnet_filter::ChangeValidationError::InvalidActionForRoutine => {
-                Ok(Self::InvalidActionForRoutine)
-            }
             fnet_filter::ChangeValidationError::Ok
             | fnet_filter::ChangeValidationError::NotReached => {
                 Err(FidlConversionError::NotAnError)
@@ -1204,6 +1196,10 @@ pub enum ChangeCommitError {
     NotFound,
     #[error("the specified resource already exists")]
     AlreadyExists,
+    #[error("rule specifies a matcher that is unavailable in rule's context")]
+    MatcherUnavailable,
+    #[error("rule has an action that is invalid for the rule's routine")]
+    InvalidActionForRoutine,
 }
 
 impl TryFrom<fnet_filter::CommitError> for ChangeCommitError {
@@ -1213,6 +1209,8 @@ impl TryFrom<fnet_filter::CommitError> for ChangeCommitError {
         match error {
             fnet_filter::CommitError::NotFound => Ok(Self::NotFound),
             fnet_filter::CommitError::AlreadyExists => Ok(Self::AlreadyExists),
+            fnet_filter::CommitError::MatcherUnavailable => Ok(Self::MatcherUnavailable),
+            fnet_filter::CommitError::InvalidActionForRoutine => Ok(Self::InvalidActionForRoutine),
             fnet_filter::CommitError::Ok | fnet_filter::CommitError::NotReached => {
                 Err(FidlConversionError::NotAnError)
             }
@@ -1324,9 +1322,7 @@ impl Controller {
                         | fnet_filter::ChangeValidationError::NotReached => Ok(errors),
                         error @ (fnet_filter::ChangeValidationError::MissingRequiredField
                         | fnet_filter::ChangeValidationError::InvalidAddressMatcher
-                        | fnet_filter::ChangeValidationError::InvalidPortMatcher
-                        | fnet_filter::ChangeValidationError::MatcherUnavailable
-                        | fnet_filter::ChangeValidationError::InvalidActionForRoutine) => {
+                        | fnet_filter::ChangeValidationError::InvalidPortMatcher) => {
                             let error = error
                                 .try_into()
                                 .expect("`Ok` and `NotReached` are handled in another arm");
@@ -1371,7 +1367,9 @@ impl Controller {
                             Ok(errors)
                         }
                         error @ (fnet_filter::CommitError::NotFound
-                        | fnet_filter::CommitError::AlreadyExists) => {
+                        | fnet_filter::CommitError::AlreadyExists
+                        | fnet_filter::CommitError::MatcherUnavailable
+                        | fnet_filter::CommitError::InvalidActionForRoutine) => {
                             let error = error
                                 .try_into()
                                 .expect("`Ok` and `NotReached` are handled in another arm");

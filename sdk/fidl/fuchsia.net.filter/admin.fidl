@@ -106,19 +106,6 @@ closed protocol NamespaceController {
             INVALID_ADDRESS_MATCHER = 4;
             /// The change included a rule with an invalid port matcher.
             INVALID_PORT_MATCHER = 5;
-            /// The change included a rule with a matcher specified that is
-            /// unavailable in the context in which the rule will be evaluated.
-            ///
-            /// For example, this could be a matcher on the ingress interface on
-            /// a rule that is in a routine installed in the egress hook, or a
-            /// matcher on the source address specifying an IPv4 subnet that is
-            /// in an IPv6-only namespace.
-            MATCHER_UNAVAILABLE = 7;
-            /// The change included a rule with an action that was not valid for
-            /// the routine to which the rule was appended.
-            ///
-            /// For example, this could be a NAT action in an IP routine.
-            INVALID_ACTION_FOR_ROUTINE = 8;
         }>:MAX_BATCH_SIZE;
     });
 
@@ -152,6 +139,19 @@ closed protocol NamespaceController {
             NOT_FOUND = 4;
             /// One of the specified resources already exists.
             ALREADY_EXISTS = 5;
+            /// The change included a rule with a matcher specified that is
+            /// unavailable in the context in which the rule will be evaluated.
+            ///
+            /// For example, this could be a matcher on the ingress interface on
+            /// a rule that is in a routine installed in the egress hook, or a
+            /// matcher on the source address specifying an IPv4 subnet that is
+            /// in an IPv6-only namespace.
+            MATCHER_UNAVAILABLE = 6;
+            /// The change included a rule with an action that was not valid for
+            /// the routine to which the rule was appended.
+            ///
+            /// For example, this could be a NAT action in an IP routine.
+            INVALID_ACTION_FOR_ROUTINE = 7;
         }>:MAX_COMMIT_SIZE;
     });
 };
