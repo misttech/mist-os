@@ -443,6 +443,16 @@
         "start_offset": 1870,
         "end_offset": 1873
       }
+    },
+    {
+      "identifier": "zx/ObjType.IOB",
+      "location": {
+        "is_virtual": false,
+        "file": "../../zircon/vdso/zx_common.fidl",
+        "data": "IOB",
+        "start_offset": 1884,
+        "end_offset": 1887
+      }
     }
   ],
   "consts": [],

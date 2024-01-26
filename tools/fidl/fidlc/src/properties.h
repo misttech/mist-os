@@ -59,6 +59,7 @@ enum class HandleSubtype : uint32_t {
   kGuest = 20,
   kInterrupt = 9,
   kIommu = 23,
+  kIob = 33,
   kJob = 17,
   kMsi = 32,
   kPager = 28,

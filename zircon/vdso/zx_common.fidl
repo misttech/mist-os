@@ -70,6 +70,7 @@ type ObjType = strict enum : uint32 {
     CLOCK = 30;
     STREAM = 31;
     MSI = 32;
+    IOB = 33;
 };
 
 resource_definition Handle : uint32 {

@@ -68,6 +68,8 @@ std::string NameHandleSubtype(HandleSubtype subtype) {
       return "guest";
     case HandleSubtype::kInterrupt:
       return "interrupt";
+    case HandleSubtype::kIob:
+      return "iob";
     case HandleSubtype::kIommu:
       return "iommu";
     case HandleSubtype::kJob:
@@ -192,6 +194,8 @@ std::string NameHandleZXObjType(HandleSubtype subtype) {
       return "ZX_OBJ_TYPE_GUEST";
     case HandleSubtype::kInterrupt:
       return "ZX_OBJ_TYPE_INTERRUPT";
+    case HandleSubtype::kIob:
+      return "ZX_OBJ_TYPE_IOB";
     case HandleSubtype::kIommu:
       return "ZX_OBJ_TYPE_IOMMU";
     case HandleSubtype::kJob:

@@ -599,6 +599,7 @@
                 "fifo",
                 "guest",
                 "interrupt",
+                "iob",
                 "iommu",
                 "job",
                 "msi",
