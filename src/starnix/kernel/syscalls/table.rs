@@ -47,6 +47,7 @@ pub fn dispatch_syscall(
     syscall: &Syscall,
 ) -> Result<SyscallResult, Errno> {
     use crate::{
+        bpf::syscalls::sys_bpf,
         mm::syscalls::{
             sys_brk, sys_futex, sys_get_robust_list, sys_madvise, sys_membarrier, sys_mlock,
             sys_mmap, sys_mprotect, sys_mremap, sys_msync, sys_munlock, sys_munmap,
@@ -83,7 +84,6 @@ pub fn dispatch_syscall(
             sys_unshare,
         },
         vfs::{
-            bpf::sys_bpf,
             socket::syscalls::{
                 sys_accept, sys_accept4, sys_bind, sys_connect, sys_getpeername, sys_getsockname,
                 sys_getsockopt, sys_listen, sys_recvfrom, sys_recvmmsg, sys_recvmsg, sys_sendmmsg,

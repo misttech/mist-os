@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 use crate::{
+    bpf::fs::BpfFs,
     device::BinderFs,
     fs::{
         devpts::dev_pts_fs, devtmpfs::dev_tmp_fs, ext4::ExtFilesystem, overlayfs::OverlayFs,
@@ -13,7 +14,6 @@ use crate::{
     task::{CurrentTask, EventHandler, Kernel, Task, WaitCanceler, Waiter},
     time::utc,
     vfs::{
-        bpf::BpfFs,
         buffers::InputBuffer,
         fileops_impl_dataless, fileops_impl_delegate_read_and_seek, fileops_impl_nonseekable,
         fs_node_impl_not_dir,

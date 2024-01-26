@@ -27,7 +27,6 @@ mod vmo_file;
 mod wd_number;
 mod xattr;
 
-pub mod bpf;
 pub mod buffers;
 pub mod directory_file;
 pub mod eventfd;
