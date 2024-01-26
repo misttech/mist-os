@@ -463,6 +463,35 @@ TEST_P(SocketFault, ReadV) {
   }
 }
 
+TEST_P(SocketFault, WriteV) {
+  icmphdr kSendIcmp = {
+      .type = ICMP_ECHO,
+  };
+  constexpr size_t kBase0Size = 1;
+  iovec iov[] = {
+      {
+          .iov_base = &kSendIcmp,
+          .iov_len = kBase0Size,
+      },
+      {
+          .iov_base = faulting_ptr_,
+          .iov_len = sizeof(kFaultingSize_),
+      },
+      {
+          .iov_base = reinterpret_cast<char*>(&kSendIcmp) + kBase0Size,
+          .iov_len = sizeof(kSendIcmp) - kBase0Size,
+      },
+  };
+  ASSERT_EQ(writev(send_fd_.get(), iov, std::size(iov)), -1);
+  EXPECT_EQ(errno, EFAULT);
+
+  // Reading should fail since nothing should have been written.
+  ASSERT_NO_FATAL_FAILURE(SetRecvFdNonBlocking());
+  char recv_buf[sizeof(kSendIcmp)];
+  ASSERT_EQ(read(recv_fd_.get(), &recv_buf, sizeof(recv_buf)), -1);
+  EXPECT_EQ(errno, EAGAIN);
+}
+
 INSTANTIATE_TEST_SUITE_P(SocketFault, SocketFault,
                          testing::Values(std::make_pair(SOCK_DGRAM, 0),
                                          std::make_pair(SOCK_DGRAM, IPPROTO_ICMP),

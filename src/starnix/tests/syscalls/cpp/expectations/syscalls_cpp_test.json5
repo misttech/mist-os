@@ -32,6 +32,7 @@
 
                 // TODO(https://g-issues.fuchsia.dev/issues/318701791)
                 "SocketFault/SocketFault.ReadV/2",
+                "SocketFault/SocketFault.WriteV/2",
             ],
         },
     ],

@@ -24,6 +24,8 @@
         {
             type: "expect_pass",
             matchers: [
+                "SocketFault/SocketFault.WriteV/2",
+
                 // TODO(b/307352876): ReadWriteUnMountedDevFuse doesn't require fuse-overlayfs
                 "FuseTest.ReadWriteUnMountedDevFuse",
             ],
