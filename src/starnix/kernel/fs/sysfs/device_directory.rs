@@ -133,11 +133,6 @@ impl BlockDeviceDirectory {
             name: "size".into(),
             inode: None,
         });
-        entries.push(VecDirectoryEntry {
-            entry_type: DirectoryEntryType::REG,
-            name: b"size".into(),
-            inode: None,
-        });
         entries
     }
 }
