@@ -147,7 +147,7 @@ mod tests {
         device::{
             ethernet::{EthernetCreationProperties, EthernetLinkDevice, MaxEthernetFrameSize},
             link::LinkAddress,
-            testutil::{is_forwarding_enabled, receive_frame, set_forwarding_enabled},
+            testutil::{is_forwarding_enabled, set_forwarding_enabled},
             DeviceId, EthernetDeviceId, EthernetWeakDeviceId, FrameDestination,
         },
         ip::{
@@ -172,9 +172,8 @@ mod tests {
             SendIpPacketMeta,
         },
         testutil::{
-            assert_empty, handle_timer, set_logger_for_test, Ctx, FakeBindingsCtx,
-            FakeEventDispatcherBuilder, TestIpExt, DEFAULT_INTERFACE_METRIC, FAKE_CONFIG_V6,
-            IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
+            assert_empty, set_logger_for_test, Ctx, FakeBindingsCtx, FakeEventDispatcherBuilder,
+            TestIpExt, DEFAULT_INTERFACE_METRIC, FAKE_CONFIG_V6, IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
         },
         time::TimerIdInner,
         BindingsContext, CoreCtx, Instant, SyncCtx, TimerId,
@@ -263,7 +262,6 @@ mod tests {
     fn setup_net() -> (
         FakeNetwork<
             &'static str,
-            EthernetDeviceId<FakeBindingsCtx>,
             crate::testutil::FakeCtx,
             impl FakeNetworkLinks<
                 EthernetWeakDeviceId<FakeBindingsCtx>,
@@ -390,7 +388,7 @@ mod tests {
             assert_eq!(bindings_ctx.timer_ctx().timers().len(), 1);
         });
 
-        let _: StepResult = net.step(receive_frame, handle_timer);
+        let _: StepResult = net.step();
         assert_eq!(
             net.core_ctx("remote").state.ndp_counters().rx_neighbor_solicitation.get(),
             1,
@@ -399,7 +397,7 @@ mod tests {
         assert_eq!(net.bindings_ctx("remote").frames_sent().len(), 1);
 
         // Forward advertisement response back to local.
-        let _: StepResult = net.step(receive_frame, handle_timer);
+        let _: StepResult = net.step();
 
         assert_eq!(
             net.core_ctx("local").state.ndp_counters().rx_neighbor_advertisement.get(),
@@ -412,7 +410,7 @@ mod tests {
         net.with_context("local", |Ctx { core_ctx: _, bindings_ctx }| {
             assert_eq!(bindings_ctx.frames_sent().len(), 1);
         });
-        let _: StepResult = net.step(receive_frame, handle_timer);
+        let _: StepResult = net.step();
         assert_eq!(net.core_ctx("remote").state.icmp_rx_counters::<Ipv6>().echo_request.get(), 1);
 
         // TODO(brunodalbo): We should be able to verify that remote also sends
@@ -494,7 +492,7 @@ mod tests {
         assert!(is_in_ip_multicast(net.core_ctx("local"), &local_device_id, multicast_addr));
         assert!(is_in_ip_multicast(net.core_ctx("remote"), &remote_device_id, multicast_addr));
 
-        let _: StepResult = net.step(receive_frame, handle_timer);
+        let _: StepResult = net.step();
 
         // They should now realize the address they intend to use has a
         // duplicate in the local network.
@@ -599,7 +597,7 @@ mod tests {
         assert!(is_in_ip_multicast(net.core_ctx("local"), &local_device_id, multicast_addr));
         assert!(is_in_ip_multicast(net.core_ctx("remote"), &remote_device_id, multicast_addr));
 
-        let _: StepResult = net.step(receive_frame, handle_timer);
+        let _: StepResult = net.step();
 
         assert_eq!(
             with_assigned_ipv6_addr_subnets(
@@ -779,7 +777,7 @@ mod tests {
         assert_eq!(net.bindings_ctx("local").frames_sent().len(), 3);
         assert_eq!(net.bindings_ctx("remote").frames_sent().len(), 1);
 
-        let _: StepResult = net.step(receive_frame, handle_timer);
+        let _: StepResult = net.step();
 
         // Let's make sure that all timers are cancelled properly.
         net.with_context("local", |Ctx { core_ctx: _, bindings_ctx }| {

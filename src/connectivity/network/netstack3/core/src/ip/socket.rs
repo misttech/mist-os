@@ -2165,7 +2165,7 @@ mod tests {
         )
         .unwrap();
 
-        handle_queued_rx_packets(&mut ctx);
+        assert!(handle_queued_rx_packets(&mut ctx));
 
         assert_eq!(ctx.bindings_ctx.frames_sent().len(), 0);
 

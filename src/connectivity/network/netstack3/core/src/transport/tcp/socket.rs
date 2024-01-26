@@ -3844,6 +3844,43 @@ mod tests {
     impl<D: FakeStrongDeviceId> FakeNetworkContext for TcpCtx<D> {
         type TimerId = TimerId<D::Weak, TcpBindingsCtx<D>>;
         type SendMeta = DualStackSendIpPacketMeta<D>;
+        type RecvMeta = DualStackSendIpPacketMeta<D>;
+        fn handle_frame(&mut self, meta: Self::RecvMeta, buffer: Buf<Vec<u8>>) {
+            let Self { core_ctx, bindings_ctx } = self;
+            match meta {
+                DualStackSendIpPacketMeta::V4(meta) => {
+                    <TcpIpTransportContext as IpTransportContext<Ipv4, _, _>>::receive_ip_packet(
+                        core_ctx,
+                        bindings_ctx,
+                        &meta.device,
+                        Ipv4::recv_src_addr(*meta.src_ip),
+                        meta.dst_ip,
+                        buffer,
+                    )
+                    .expect("failed to deliver bytes");
+                }
+                DualStackSendIpPacketMeta::V6(meta) => {
+                    <TcpIpTransportContext as IpTransportContext<Ipv6, _, _>>::receive_ip_packet(
+                        core_ctx,
+                        bindings_ctx,
+                        &meta.device,
+                        Ipv6::recv_src_addr(*meta.src_ip),
+                        meta.dst_ip,
+                        buffer,
+                    )
+                    .expect("failed to deliver bytes");
+                }
+            }
+        }
+        fn handle_timer(&mut self, timer: Self::TimerId) {
+            match timer {
+                TimerId::V4(id) => self.tcp_api().handle_timer(id),
+                TimerId::V6(id) => self.tcp_api().handle_timer(id),
+            }
+        }
+        fn process_queues(&mut self) -> bool {
+            false
+        }
     }
 
     impl<D: FakeStrongDeviceId> WithFakeTimerContext<TimerId<D::Weak, TcpBindingsCtx<D>>>
@@ -4372,7 +4409,6 @@ mod tests {
 
     type TcpTestNetwork = FakeNetwork<
         &'static str,
-        DualStackSendIpPacketMeta<FakeDeviceId>,
         TcpCtx<FakeDeviceId>,
         fn(
             &'static str,
@@ -4430,48 +4466,6 @@ mod tests {
         fn get_mut(&self) -> impl DerefMut<Target = TcpSocketState<I, D, BT>> + '_ {
             let Self(rc) = self;
             rc.write()
-        }
-    }
-
-    fn handle_frame(
-        TcpCtx { core_ctx, bindings_ctx }: &mut TcpCtx<FakeDeviceId>,
-        meta: DualStackSendIpPacketMeta<FakeDeviceId>,
-        buffer: Buf<Vec<u8>>,
-    ) {
-        match meta {
-            DualStackSendIpPacketMeta::V4(meta) => {
-                <TcpIpTransportContext as IpTransportContext<Ipv4, _, _>>::receive_ip_packet(
-                    core_ctx,
-                    bindings_ctx,
-                    &FakeDeviceId,
-                    Ipv4::recv_src_addr(*meta.src_ip),
-                    meta.dst_ip,
-                    buffer,
-                )
-                .expect("failed to deliver bytes");
-            }
-            DualStackSendIpPacketMeta::V6(meta) => {
-                <TcpIpTransportContext as IpTransportContext<Ipv6, _, _>>::receive_ip_packet(
-                    core_ctx,
-                    bindings_ctx,
-                    &FakeDeviceId,
-                    Ipv6::recv_src_addr(*meta.src_ip),
-                    meta.dst_ip,
-                    buffer,
-                )
-                .expect("failed to deliver bytes");
-            }
-        }
-    }
-
-    fn handle_timer<D: FakeStrongDeviceId>(
-        ctx: &mut TcpCtx<D>,
-        _: &mut (),
-        timer_id: TimerId<D::Weak, TcpBindingsCtx<D>>,
-    ) {
-        match timer_id {
-            TimerId::V4(id) => ctx.tcp_api().handle_timer(id),
-            TimerId::V6(id) => ctx.tcp_api().handle_timer(id),
         }
     }
 
@@ -4553,11 +4547,9 @@ mod tests {
         let mut rng = new_rng(seed);
 
         let mut maybe_drop_frame =
-            |ctx: &mut TcpCtx<_>, meta: DualStackSendIpPacketMeta<_>, buffer: Buf<Vec<u8>>| {
+            |_: &mut TcpCtx<_>, meta: DualStackSendIpPacketMeta<_>, buffer: Buf<Vec<u8>>| {
                 let x: f64 = rng.gen();
-                if x > drop_rate {
-                    handle_frame(ctx, meta, buffer);
-                }
+                (x > drop_rate).then_some((meta, buffer))
             };
 
         let backlog = NonZeroUsize::new(1).unwrap();
@@ -4593,7 +4585,7 @@ mod tests {
         // look at the SYN queue deterministically.
         if drop_rate == 0.0 {
             // Step once for the SYN packet to be sent.
-            let _: StepResult = net.step(handle_frame, handle_timer);
+            let _: StepResult = net.step();
             // The listener should create a pending socket.
             assert_matches!(
                 server.get().deref(),
@@ -4614,7 +4606,7 @@ mod tests {
         }
 
         // Step the test network until the handshake is done.
-        net.run_until_idle(&mut maybe_drop_frame, handle_timer);
+        net.run_until_idle_with(&mut maybe_drop_frame);
         let (accepted, addr, accepted_ends) = net.with_context(REMOTE, |ctx| {
             ctx.tcp_api::<I>().accept(&server).expect("failed to accept")
         });
@@ -4673,7 +4665,7 @@ mod tests {
         for (c, id) in [(LOCAL, &client), (REMOTE, &accepted)] {
             net.with_context(c, |ctx| ctx.tcp_api::<I>().do_send(id))
         }
-        net.run_until_idle(&mut maybe_drop_frame, handle_timer);
+        net.run_until_idle_with(&mut maybe_drop_frame);
 
         for rcv_end in [client_rcv_end, accepted_rcv_end] {
             assert_eq!(
@@ -4942,7 +4934,7 @@ mod tests {
         });
 
         // Advance until the connection is established.
-        net.run_until_idle(handle_frame, handle_timer);
+        net.run_until_idle();
 
         net.with_context(LOCAL, |ctx| {
             let mut api = ctx.tcp_api();
@@ -5022,7 +5014,7 @@ mod tests {
         });
 
         // Advance until the connection is established.
-        net.run_until_idle(handle_frame, handle_timer);
+        net.run_until_idle();
 
         net.with_context(LOCAL, |ctx| {
             let mut api = ctx.tcp_api();
@@ -5097,7 +5089,7 @@ mod tests {
         });
 
         // Step one time for SYN packet to be delivered.
-        let _: StepResult = net.step(handle_frame, handle_timer);
+        let _: StepResult = net.step();
         // Assert that we got a RST back.
         net.collect_frames();
         assert_matches!(
@@ -5126,7 +5118,7 @@ mod tests {
             }
         });
 
-        net.run_until_idle(handle_frame, handle_timer);
+        net.run_until_idle();
         // Finally, the connection should be reset and bindings should have been
         // signaled.
         assert_matches!(
@@ -5398,7 +5390,7 @@ mod tests {
             socket
         });
 
-        net.run_until_idle(handle_frame, handle_timer);
+        net.run_until_idle();
 
         let ConnectionInfo { remote_addr, local_addr, device } = net.with_context(LOCAL, |ctx| {
             let mut api = ctx.tcp_api();
@@ -5501,7 +5493,7 @@ mod tests {
         });
 
         while {
-            assert!(!net.step(handle_frame, handle_timer).is_idle());
+            assert!(!net.step().is_idle());
             let is_fin_wait_2 = {
                 let local = weak_local.upgrade().unwrap();
                 let state = local.get();
@@ -5531,7 +5523,7 @@ mod tests {
             });
         }
 
-        net.run_until_idle(handle_frame, handle_timer);
+        net.run_until_idle();
 
         net.with_context(LOCAL, |TcpCtx { core_ctx: _, bindings_ctx }| {
             assert_eq!(bindings_ctx.now().duration_since(close_called), expected_time_to_close);
@@ -5563,7 +5555,7 @@ mod tests {
             assert_eq!(ctx.tcp_api().shutdown(&local, ShutdownType::Send), Ok(true));
         });
         loop {
-            assert!(!net.step(handle_frame, handle_timer).is_idle());
+            assert!(!net.step().is_idle());
             let is_fin_wait_2 = {
                 let state = local.get();
                 let state = assert_matches!(
@@ -5588,7 +5580,7 @@ mod tests {
         net.with_context(LOCAL, |ctx| {
             ctx.tcp_api().close(local);
         });
-        net.run_until_idle(handle_frame, handle_timer);
+        net.run_until_idle();
         assert_eq!(weak_local.upgrade(), None);
     }
 
@@ -5635,7 +5627,7 @@ mod tests {
                 );
             });
         }
-        net.run_until_idle(handle_frame, handle_timer);
+        net.run_until_idle();
         for (name, id) in [(LOCAL, local), (REMOTE, remote)] {
             net.with_context(name, |ctx| {
                 assert_matches!(
@@ -5727,7 +5719,7 @@ mod tests {
         // After the following step, we should have one established connection
         // in the listener's accept queue, which ought to be aborted during
         // shutdown.
-        net.run_until_idle(handle_frame, handle_timer);
+        net.run_until_idle();
 
         // The incoming connection was signaled, and the remote end was notified
         // of connection establishment.
@@ -5752,7 +5744,7 @@ mod tests {
             socket
         });
 
-        let _: StepResult = net.step(handle_frame, handle_timer);
+        let _: StepResult = net.step();
 
         // We have a timer scheduled for the pending connection.
         net.with_context(LOCAL, |TcpCtx { core_ctx: _, bindings_ctx }| {
@@ -5768,7 +5760,7 @@ mod tests {
             assert_eq!(bindings_ctx.timers.timers().len(), 0);
         });
 
-        net.run_until_idle(handle_frame, handle_timer);
+        net.run_until_idle();
 
         // Both remote sockets should now be reset to Closed state.
         net.with_context(REMOTE, |ctx| {
@@ -5820,7 +5812,7 @@ mod tests {
             socket
         });
 
-        net.run_until_idle(handle_frame, handle_timer);
+        net.run_until_idle();
 
         net.with_context(REMOTE, |ctx| {
             assert_matches!(
@@ -5917,7 +5909,7 @@ mod tests {
                         assert_eq!(size, remote_sizes.receive);
                     }
                 });
-                if net.step(handle_frame, handle_timer).is_idle() {
+                if net.step().is_idle() {
                     break;
                 }
             };
@@ -6090,7 +6082,7 @@ mod tests {
             client
         });
         // Finish the connection establishment.
-        net.run_until_idle(handle_frame, handle_timer);
+        net.run_until_idle();
         net.with_context(REMOTE, |ctx| {
             assert_eq!(
                 ctx.tcp_api().connect(
@@ -6435,7 +6427,7 @@ mod tests {
                 .expect("failed to connect");
         });
 
-        assert!(!net.step(handle_frame, handle_timer).is_idle());
+        assert!(!net.step().is_idle());
 
         net.collect_frames();
         let original_body = assert_matches!(
@@ -6538,7 +6530,7 @@ mod tests {
             .expect("failed to connect");
             extra_conn
         });
-        net.run_until_idle(handle_frame, handle_timer);
+        net.run_until_idle();
 
         net.with_context(REMOTE, |ctx| {
             assert_eq!(
@@ -6557,13 +6549,13 @@ mod tests {
         net.with_context(LOCAL, |ctx| {
             ctx.tcp_api().close(local);
         });
-        assert!(!net.step(handle_frame, handle_timer).is_idle());
-        assert!(!net.step(handle_frame, handle_timer).is_idle());
+        assert!(!net.step().is_idle());
+        assert!(!net.step().is_idle());
         net.with_context(REMOTE, |ctx| {
             ctx.tcp_api().close(remote);
         });
-        assert!(!net.step(handle_frame, handle_timer).is_idle());
-        assert!(!net.step(handle_frame, handle_timer).is_idle());
+        assert!(!net.step().is_idle());
+        assert!(!net.step().is_idle());
         // The connection should go to TIME-WAIT.
         let (tw_last_seq, tw_last_ack, tw_expiry) = {
             assert_matches!(
@@ -6596,7 +6588,7 @@ mod tests {
             conn
         });
         while net.next_step() != Some(tw_expiry) {
-            assert!(!net.step(handle_frame, handle_timer).is_idle());
+            assert!(!net.step().is_idle());
         }
         // This attempt should fail due the full accept queue at the listener.
         assert_matches!(
@@ -6661,7 +6653,7 @@ mod tests {
             assert!(iss.after(tw_last_ack) && iss.before(tw_last_seq));
         });
         // The TIME-WAIT socket should be reused to establish the connection.
-        net.run_until_idle(handle_frame, handle_timer);
+        net.run_until_idle();
         net.with_context(REMOTE, |ctx| {
             assert_eq!(
                 ctx.tcp_api().connect(
@@ -6736,7 +6728,7 @@ mod tests {
         });
 
         // Step the test network until the handshake is done.
-        net.run_until_idle(&mut handle_frame, handle_timer);
+        net.run_until_idle();
         let (accepted, addr, accepted_ends) = net
             .with_context(REMOTE, |ctx| ctx.tcp_api().accept(&server).expect("failed to accept"));
         assert_eq!(addr.ip, ZonedAddr::Unzoned(Ipv4::FAKE_CONFIG.local_ip));
@@ -6749,7 +6741,7 @@ mod tests {
         }
         net.with_context(LOCAL, |ctx| ctx.tcp_api().do_send(&client));
         net.with_context(REMOTE, |ctx| ctx.tcp_api().do_send(&accepted));
-        net.run_until_idle(&mut handle_frame, handle_timer);
+        net.run_until_idle();
 
         for rcv_end in [client_rcv_end, accepted_rcv_end] {
             assert_eq!(

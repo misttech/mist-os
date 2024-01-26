@@ -3440,7 +3440,6 @@ mod tests {
     use crate::{
         context::testutil::FakeInstant,
         device::{
-            self,
             ethernet::{EthernetCreationProperties, EthernetLinkDevice, RecvEthernetFrameMeta},
             loopback::{LoopbackCreationProperties, LoopbackDevice},
             testutil::set_forwarding_enabled,
@@ -3459,9 +3458,9 @@ mod tests {
         },
         state::StackState,
         testutil::{
-            assert_empty, handle_timer, new_rng, set_logger_for_test, Ctx, FakeBindingsCtx,
-            FakeCtx, FakeEventDispatcherBuilder, TestIpExt, DEFAULT_INTERFACE_METRIC,
-            FAKE_CONFIG_V4, FAKE_CONFIG_V6, IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
+            assert_empty, new_rng, set_logger_for_test, Ctx, FakeBindingsCtx, FakeCtx,
+            FakeEventDispatcherBuilder, TestIpExt, DEFAULT_INTERFACE_METRIC, FAKE_CONFIG_V4,
+            FAKE_CONFIG_V6, IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
         },
         SyncCtx, UnlockedCoreCtx,
     };
@@ -4092,7 +4091,7 @@ mod tests {
             );
         });
         // Make sure the packet got sent from alice to bob
-        assert!(!net.step(device::testutil::receive_frame, handle_timer).is_idle());
+        assert!(!net.step().is_idle());
 
         // Process fragment #1
         net.with_context("alice", |Ctx { core_ctx, bindings_ctx }| {
@@ -4105,7 +4104,7 @@ mod tests {
                 3,
             );
         });
-        assert!(!net.step(device::testutil::receive_frame, handle_timer).is_idle());
+        assert!(!net.step().is_idle());
 
         // Make sure no packets got dispatched yet.
         assert_eq!(
@@ -4128,7 +4127,7 @@ mod tests {
                 3,
             );
         });
-        assert!(!net.step(device::testutil::receive_frame, handle_timer).is_idle());
+        assert!(!net.step().is_idle());
 
         // Make sure the packet finally got dispatched now that the final
         // fragment has been received by bob.
@@ -4142,7 +4141,7 @@ mod tests {
         );
 
         // Make sure there are no more events.
-        assert!(net.step(device::testutil::receive_frame, handle_timer).is_idle());
+        assert!(net.step().is_idle());
     }
 
     #[test]

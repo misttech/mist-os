@@ -523,7 +523,7 @@ pub(crate) mod testutil {
     use assert_matches::assert_matches;
     #[cfg(test)]
     use derivative::Derivative;
-    #[cfg(test)]
+
     use packet::Buf;
     use rand_xorshift::XorShiftRng;
 
@@ -1523,14 +1523,6 @@ pub(crate) mod testutil {
         FakeCtxWithCoreCtx<FakeCoreCtx<S, Meta, DeviceId>, TimerId, Event, BindingsCtxState>;
 
     #[cfg(test)]
-    impl<S, Id, Meta, Event: Debug, DeviceId, BindingsCtxState> FakeNetworkContext
-        for FakeCtx<S, Id, Meta, Event, DeviceId, BindingsCtxState>
-    {
-        type TimerId = Id;
-        type SendMeta = Meta;
-    }
-
-    #[cfg(test)]
     impl<CC, Id, Event: Debug, BindingsCtxState> AsRef<FakeInstantCtx>
         for FakeCtxWithCoreCtx<CC, Id, Event, BindingsCtxState>
     {
@@ -1767,13 +1759,13 @@ pub(crate) mod testutil {
     /// Provides a utility to have many contexts keyed by `CtxId` that can
     /// exchange frames.
     #[cfg(test)]
-    pub(crate) struct FakeNetwork<CtxId, RecvMeta, Ctx: FakeNetworkContext, Links>
+    pub(crate) struct FakeNetwork<CtxId, Ctx: FakeNetworkContext, Links>
     where
-        Links: FakeNetworkLinks<Ctx::SendMeta, RecvMeta, CtxId>,
+        Links: FakeNetworkLinks<Ctx::SendMeta, Ctx::RecvMeta, CtxId>,
     {
         links: Links,
         current_time: FakeInstant,
-        pending_frames: BinaryHeap<PendingFrame<CtxId, RecvMeta>>,
+        pending_frames: BinaryHeap<PendingFrame<CtxId, Ctx::RecvMeta>>,
         // Declare `contexts` last to ensure that it is dropped last. See
         // https://doc.rust-lang.org/std/ops/trait.Drop.html#drop-order for
         // details.
@@ -1786,6 +1778,20 @@ pub(crate) mod testutil {
         type TimerId;
         /// The type of metadata associated with frames sent by this context.
         type SendMeta;
+        /// The type of metadata associated with frames received by this
+        /// context.
+        type RecvMeta;
+
+        /// Handles a single received frame in this context.
+        fn handle_frame(&mut self, recv: Self::RecvMeta, data: Buf<Vec<u8>>);
+        /// Handles a single timer id in this context.
+        fn handle_timer(&mut self, timer: Self::TimerId);
+        /// Processes any context-internal queues, returning `true` if any work
+        /// was done.
+        ///
+        /// This is used to drive queued frames that may be sitting inside the
+        /// context and invisible to the [`FakeNetwork`].
+        fn process_queues(&mut self) -> bool;
     }
 
     /// A set of links in a `FakeNetwork`.
@@ -1817,21 +1823,28 @@ pub(crate) mod testutil {
     pub(crate) struct StepResult {
         pub(crate) timers_fired: usize,
         pub(crate) frames_sent: usize,
+        pub(crate) contexts_with_queued_frames: usize,
     }
 
     #[cfg(test)]
     impl StepResult {
-        fn new(timers_fired: usize, frames_sent: usize) -> Self {
-            Self { timers_fired, frames_sent }
+        fn new(
+            timers_fired: usize,
+            frames_sent: usize,
+            contexts_with_queued_frames: usize,
+        ) -> Self {
+            Self { timers_fired, frames_sent, contexts_with_queued_frames }
         }
 
         fn new_idle() -> Self {
-            Self::new(0, 0)
+            Self::new(0, 0, 0)
         }
 
         /// Returns `true` if the last step did not perform any operations.
         pub(crate) fn is_idle(&self) -> bool {
-            return self.timers_fired == 0 && self.frames_sent == 0;
+            return self.timers_fired == 0
+                && self.frames_sent == 0
+                && self.contexts_with_queued_frames == 0;
         }
     }
 
@@ -1841,11 +1854,11 @@ pub(crate) mod testutil {
     pub(crate) struct LoopLimitReachedError;
 
     #[cfg(test)]
-    impl<CtxId, RecvMeta, Ctx, Links> FakeNetwork<CtxId, RecvMeta, Ctx, Links>
+    impl<CtxId, Ctx, Links> FakeNetwork<CtxId, Ctx, Links>
     where
         CtxId: Eq + Hash + Copy + Debug,
         Ctx: FakeNetworkContext,
-        Links: FakeNetworkLinks<Ctx::SendMeta, RecvMeta, CtxId>,
+        Links: FakeNetworkLinks<Ctx::SendMeta, Ctx::RecvMeta, CtxId>,
     {
         /// Retrieves a context named `context`.
         pub(crate) fn context<K: Into<CtxId>>(&mut self, context: K) -> &mut Ctx {
@@ -1854,14 +1867,14 @@ pub(crate) mod testutil {
     }
 
     #[cfg(test)]
-    impl<CtxId, RecvMeta, Ctx, Links> FakeNetwork<CtxId, RecvMeta, Ctx, Links>
+    impl<CtxId, Ctx, Links> FakeNetwork<CtxId, Ctx, Links>
     where
         CtxId: Eq + Hash + Copy + Debug,
         Ctx: FakeNetworkContext
             + WithFakeTimerContext<Ctx::TimerId>
             + WithFakeFrameContext<Ctx::SendMeta>,
         Ctx::TimerId: Clone,
-        Links: FakeNetworkLinks<Ctx::SendMeta, RecvMeta, CtxId>,
+        Links: FakeNetworkLinks<Ctx::SendMeta, Ctx::RecvMeta, CtxId>,
     {
         /// Creates a new `FakeNetwork`.
         ///
@@ -1914,7 +1927,7 @@ pub(crate) mod testutil {
         /// Iterates over pending frames in an arbitrary order.
         pub(crate) fn iter_pending_frames(
             &self,
-        ) -> impl Iterator<Item = &PendingFrame<CtxId, RecvMeta>> {
+        ) -> impl Iterator<Item = &PendingFrame<CtxId, Ctx::RecvMeta>> {
             self.pending_frames.iter()
         }
 
@@ -1955,29 +1968,46 @@ pub(crate) mod testutil {
         /// If `FakeNetwork` was set up with a bad `links`, calls to `step` may
         /// panic when trying to route frames to their context/device
         /// destinations.
-        pub(crate) fn step<
-            FH: FnMut(&mut Ctx, RecvMeta, Buf<Vec<u8>>),
-            FT: FnMut(&mut Ctx, &mut (), Ctx::TimerId),
+        pub(crate) fn step(&mut self) -> StepResult
+        where
+            Ctx::TimerId: core::fmt::Debug,
+        {
+            self.step_with(|_, meta, buf| Some((meta, buf)))
+        }
+
+        /// Like [`FakeNetwork::step`], but receives a function
+        /// `filter_map_frame` that can modify the an inbound frame before
+        /// delivery or drop it altogether by returning `None`.
+        pub(crate) fn step_with<
+            F: FnMut(&mut Ctx, Ctx::RecvMeta, Buf<Vec<u8>>) -> Option<(Ctx::RecvMeta, Buf<Vec<u8>>)>,
         >(
             &mut self,
-            mut handle_frame: FH,
-            mut handle_timer: FT,
+            mut filter_map_frame: F,
         ) -> StepResult
         where
             Ctx::TimerId: core::fmt::Debug,
         {
+            let mut ret = StepResult::new_idle();
+            // Drive all queues before checking for the network and time
+            // simulation.
+            for (_, ctx) in self.contexts.iter_mut() {
+                if ctx.process_queues() {
+                    ret.contexts_with_queued_frames += 1;
+                }
+            }
+
             self.collect_frames();
 
             let next_step = if let Some(t) = self.next_step() {
                 t
             } else {
-                return StepResult::new_idle();
+                return ret;
             };
 
             // This assertion holds the contract that `next_step` does not
             // return a time in the past.
             assert!(next_step >= self.current_time);
-            let mut ret = StepResult::new(0, 0);
+
             // Move time forward:
             self.current_time = next_step;
             for (_, ctx) in self.contexts.iter_mut() {
@@ -1992,12 +2022,14 @@ pub(crate) mod testutil {
                     break;
                 }
                 // We can unwrap because we just peeked.
-                let frame = self.pending_frames.pop().unwrap().1;
-                handle_frame(
-                    self.context(frame.dst_context),
-                    frame.meta,
-                    Buf::new(frame.frame, ..),
-                );
+                let PendingFrameData { dst_context, meta, frame } =
+                    self.pending_frames.pop().unwrap().1;
+                let dst_context = self.context(dst_context);
+                if let Some((meta, frame)) =
+                    filter_map_frame(dst_context, meta, Buf::new(frame, ..))
+                {
+                    dst_context.handle_frame(meta, frame)
+                }
                 ret.frames_sent += 1;
             }
 
@@ -2020,11 +2052,10 @@ pub(crate) mod testutil {
                 });
 
                 for t in timers {
-                    handle_timer(ctx, &mut (), t);
+                    ctx.handle_timer(t);
                     ret.timers_fired += 1;
                 }
             }
-
             ret
         }
 
@@ -2034,18 +2065,26 @@ pub(crate) mod testutil {
         ///
         /// Panics if 1,000,000 steps are performed without becoming idle.
         /// Also panics under the same conditions as [`step`].
-        pub(crate) fn run_until_idle<
-            FH: FnMut(&mut Ctx, RecvMeta, Buf<Vec<u8>>),
-            FT: FnMut(&mut Ctx, &mut (), Ctx::TimerId),
+        pub(crate) fn run_until_idle(&mut self)
+        where
+            Ctx::TimerId: core::fmt::Debug,
+        {
+            self.run_until_idle_with(|_, meta, frame| Some((meta, frame)))
+        }
+
+        /// Like [`FakeNetwork::run_until_idle`] but receives a function
+        /// `filter_map_frame` that can modify the an inbound frame before
+        /// delivery or drop it altogether by returning `None`.
+        pub(crate) fn run_until_idle_with<
+            F: FnMut(&mut Ctx, Ctx::RecvMeta, Buf<Vec<u8>>) -> Option<(Ctx::RecvMeta, Buf<Vec<u8>>)>,
         >(
             &mut self,
-            mut handle_frame: FH,
-            mut handle_timer: FT,
+            mut filter_map_frame: F,
         ) where
             Ctx::TimerId: core::fmt::Debug,
         {
             for _ in 0..1_000_000 {
-                if self.step(&mut handle_frame, &mut handle_timer).is_idle() {
+                if self.step_with(&mut filter_map_frame).is_idle() {
                     return;
                 }
             }
@@ -2120,14 +2159,13 @@ pub(crate) mod testutil {
     }
 
     #[cfg(test)]
-    impl<CtxId, Links, CC, BC, RecvMeta>
-        FakeNetwork<CtxId, RecvMeta, crate::testutil::ContextPair<CC, BC>, Links>
+    impl<CtxId, Links, CC, BC> FakeNetwork<CtxId, crate::testutil::ContextPair<CC, BC>, Links>
     where
         crate::testutil::ContextPair<CC, BC>: FakeNetworkContext,
         CtxId: Eq + Hash + Copy + Debug,
         Links: FakeNetworkLinks<
             <crate::testutil::ContextPair<CC, BC> as FakeNetworkContext>::SendMeta,
-            RecvMeta,
+            <crate::testutil::ContextPair<CC, BC> as FakeNetworkContext>::RecvMeta,
             CtxId,
         >,
     {
@@ -2171,7 +2209,6 @@ pub(crate) mod testutil {
         b_device_id: EthernetWeakDeviceId<crate::testutil::FakeBindingsCtx>,
     ) -> FakeNetwork<
         CtxId,
-        EthernetDeviceId<crate::testutil::FakeBindingsCtx>,
         crate::testutil::FakeCtx,
         impl FakeNetworkLinks<
             EthernetWeakDeviceId<crate::testutil::FakeBindingsCtx>,

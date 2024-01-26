@@ -558,18 +558,6 @@ pub(crate) mod testutil {
 
     impl<D: StrongId<Weak = FakeWeakDeviceId<Self>> + 'static + Ord> FakeStrongDeviceId for D {}
 
-    /// Calls [`receive_frame`], with a [`Ctx`].
-    #[cfg(test)]
-    pub(crate) fn receive_frame<B: packet::BufferMut, BC: BindingsContext>(
-        ctx: &mut Ctx<BC>,
-        device_id: EthernetDeviceId<BC>,
-        buffer: B,
-    ) {
-        ctx.core_api()
-            .device::<crate::device::ethernet::EthernetLinkDevice>()
-            .receive_frame(crate::device::ethernet::RecvEthernetFrameMeta { device_id }, buffer)
-    }
-
     pub fn enable_device<BC: BindingsContext>(
         ctx: &mut crate::testutil::Ctx<BC>,
         device: &DeviceId<BC>,

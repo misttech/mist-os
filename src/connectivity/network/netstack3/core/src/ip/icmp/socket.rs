@@ -792,7 +792,7 @@ mod tests {
     use crate::{
         device::loopback::{LoopbackCreationProperties, LoopbackDevice},
         ip::icmp::tests::FakeIcmpCtx,
-        testutil::{handle_queued_rx_packets, TestIpExt, DEFAULT_INTERFACE_METRIC},
+        testutil::{TestIpExt, DEFAULT_INTERFACE_METRIC},
     };
 
     impl<I: Ip> SocketId<I> {
@@ -895,15 +895,10 @@ mod tests {
                     socket_api.send_to(&conn, Some(ZonedAddr::Unzoned(remote_addr)), buf).unwrap();
                 }
             }
-            handle_queued_rx_packets(ctx);
-
             conn
         });
 
-        net.run_until_idle(crate::device::testutil::receive_frame, |ctx, _, id| {
-            ctx.core_api().handle_timer(id);
-            handle_queued_rx_packets(ctx);
-        });
+        net.run_until_idle();
 
         assert_eq!(net.core_ctx(LOCAL_CTX_NAME).state.icmp_rx_counters::<I>().echo_reply.get(), 1);
         assert_eq!(

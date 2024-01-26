@@ -67,7 +67,7 @@ where
 pub(crate) type ArpTimerId<D, DeviceId> = NudTimerId<Ipv4, D, DeviceId>;
 
 /// The metadata associated with an ARP frame.
-#[cfg_attr(test, derive(Debug, PartialEq))]
+#[cfg_attr(test, derive(Debug, PartialEq, Clone))]
 pub struct ArpFrameMetadata<D: ArpDevice, DeviceId> {
     /// The ID of the ARP device.
     pub(super) device_id: DeviceId,
@@ -646,7 +646,7 @@ mod tests {
         context::{
             testutil::{
                 FakeBindingsCtx, FakeCoreCtx, FakeCtx, FakeInstant, FakeLinkResolutionNotifier,
-                FakeNetwork,
+                FakeNetwork, FakeNetworkContext,
             },
             InstantContext as _, TimerHandler,
         },
@@ -717,6 +717,34 @@ mod tests {
         ArpFrameMetadata<EthernetLinkDevice, FakeLinkDeviceId>,
         FakeDeviceId,
     >;
+
+    impl FakeNetworkContext for crate::testutil::ContextPair<FakeCoreCtxImpl, FakeBindingsCtxImpl> {
+        type TimerId = ArpTimerId<EthernetLinkDevice, FakeLinkDeviceId>;
+        type SendMeta = ArpFrameMetadata<EthernetLinkDevice, FakeLinkDeviceId>;
+        type RecvMeta = ArpFrameMetadata<EthernetLinkDevice, FakeLinkDeviceId>;
+
+        fn handle_frame(
+            &mut self,
+            ArpFrameMetadata { device_id, .. }: Self::RecvMeta,
+            data: Buf<Vec<u8>>,
+        ) {
+            let Self { core_ctx, bindings_ctx } = self;
+            handle_packet(
+                core_ctx,
+                bindings_ctx,
+                device_id,
+                FrameDestination::Individual { local: true },
+                data,
+            )
+        }
+        fn handle_timer(&mut self, timer: Self::TimerId) {
+            let Self { core_ctx, bindings_ctx } = self;
+            TimerHandler::handle_timer(core_ctx, bindings_ctx, timer)
+        }
+        fn process_queues(&mut self) -> bool {
+            false
+        }
+    }
 
     impl DeviceIdContext<EthernetLinkDevice> for FakeCoreCtxImpl {
         type DeviceId = FakeLinkDeviceId;
@@ -1118,13 +1146,13 @@ mod tests {
                     (*name, ctx)
                 })
             },
-            |ctx: &str, _meta| {
+            |ctx: &str, meta: ArpFrameMetadata<_, _>| {
                 host_iter
                     .clone()
                     .filter_map(|cfg| {
                         let ArpHostConfig { name, proto_addr: _, hw_addr: _ } = cfg;
                         if !ctx.eq(*name) {
-                            Some((*name, FakeLinkDeviceId, None))
+                            Some((*name, meta.clone(), None))
                         } else {
                             None
                         }
@@ -1176,14 +1204,7 @@ mod tests {
             );
         });
         // Step once to deliver the ARP request to the remotes.
-        let res = network.step(
-            |FakeCtx { core_ctx, bindings_ctx }, device_id, buf| {
-                handle_packet(core_ctx, bindings_ctx, device_id, FrameDestination::Broadcast, buf)
-            },
-            |FakeCtx { core_ctx, bindings_ctx }, _ctx, id| {
-                TimerHandler::handle_timer(core_ctx, bindings_ctx, id)
-            },
-        );
+        let res = network.step();
         assert_eq!(res.timers_fired, 0);
 
         // Our faked broadcast network should deliver frames to every host other
@@ -1217,20 +1238,7 @@ mod tests {
         });
 
         // Step once to deliver the ARP response to the local.
-        let res = network.step(
-            |FakeCtx { core_ctx, bindings_ctx }, device_id, buf| {
-                handle_packet(
-                    core_ctx,
-                    bindings_ctx,
-                    device_id,
-                    FrameDestination::Individual { local: true },
-                    buf,
-                )
-            },
-            |FakeCtx { core_ctx, bindings_ctx }, _ctx, id| {
-                TimerHandler::handle_timer(core_ctx, bindings_ctx, id)
-            },
-        );
+        let res = network.step();
         assert_eq!(res.timers_fired, 0);
         assert_eq!(res.frames_sent, expected_frames_sent_bcast);
 

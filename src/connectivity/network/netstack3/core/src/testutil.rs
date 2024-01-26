@@ -1230,6 +1230,18 @@ pub(crate) fn add_arp_or_ndp_table_entry<A: IpAddress>(
 impl FakeNetworkContext for FakeCtx {
     type TimerId = TimerId<FakeBindingsCtx>;
     type SendMeta = EthernetWeakDeviceId<FakeBindingsCtx>;
+    type RecvMeta = EthernetDeviceId<FakeBindingsCtx>;
+    fn handle_frame(&mut self, device_id: Self::RecvMeta, data: Buf<Vec<u8>>) {
+        self.core_api()
+            .device::<crate::device::ethernet::EthernetLinkDevice>()
+            .receive_frame(crate::device::ethernet::RecvEthernetFrameMeta { device_id }, data)
+    }
+    fn handle_timer(&mut self, timer: Self::TimerId) {
+        self.core_api().handle_timer(timer)
+    }
+    fn process_queues(&mut self) -> bool {
+        handle_queued_rx_packets(self)
+    }
 }
 
 impl<I: IcmpIpExt> UdpBindingsContext<I, DeviceId<Self>> for FakeBindingsCtx {
@@ -1313,14 +1325,16 @@ impl DeviceLayerEventDispatcher for FakeBindingsCtx {
     }
 }
 
-#[cfg(test)]
-pub(crate) fn handle_queued_rx_packets(ctx: &mut FakeCtx) {
+/// Handles any pending frames and returns true if any frames that were in the
+/// RX queue were processed.
+pub(crate) fn handle_queued_rx_packets(ctx: &mut FakeCtx) -> bool {
+    let mut handled = false;
     loop {
         let rx_available = core::mem::take(&mut ctx.bindings_ctx.state_mut().rx_available);
         if rx_available.len() == 0 {
-            break;
+            break handled;
         }
-
+        handled = true;
         for id in rx_available.into_iter() {
             loop {
                 match ctx.core_api().receive_queue().handle_queued_frames(&id) {
@@ -1444,15 +1458,6 @@ impl<I: Ip> From<nud::Event<Mac, EthernetDeviceId<FakeBindingsCtx>, I, FakeInsta
             |e| DispatchedEvent::NeighborIpv6(e.into()),
         )
     }
-}
-
-#[cfg(test)]
-pub(crate) fn handle_timer(
-    ctx: &mut FakeCtx,
-    _bindings_ctx: &mut (),
-    id: TimerId<FakeBindingsCtx>,
-) {
-    ctx.core_api().handle_timer(id)
 }
 
 pub(crate) const IPV6_MIN_IMPLIED_MAX_FRAME_SIZE: MaxEthernetFrameSize =
@@ -1595,7 +1600,6 @@ mod tests {
     use super::*;
     use crate::{
         context::testutil::{FakeNetwork, FakeNetworkLinks},
-        device::testutil::receive_frame,
         ip::{
             socket::{DefaultSendOptions, IpSocketHandler},
             IpLayerHandler,
@@ -1647,11 +1651,11 @@ mod tests {
         });
 
         // Send from Alice to Bob.
-        assert_eq!(net.step(receive_frame, handle_timer).frames_sent, 1);
+        assert_eq!(net.step().frames_sent, 1);
         // Respond from Bob to Alice.
-        assert_eq!(net.step(receive_frame, handle_timer).frames_sent, 1);
+        assert_eq!(net.step().frames_sent, 1);
         // Should've starved all events.
-        assert!(net.step(receive_frame, handle_timer).is_idle());
+        assert!(net.step().is_idle());
     }
 
     #[test]
@@ -1702,28 +1706,28 @@ mod tests {
         // No timers fired before.
         assert_eq!(net.core_ctx(1).state.timer_counters.nop.get(), 0);
         assert_eq!(net.core_ctx(2).state.timer_counters.nop.get(), 0);
-        assert_eq!(net.step(receive_frame, handle_timer).timers_fired, 1);
+        assert_eq!(net.step().timers_fired, 1);
         // Only timer in context 1 should have fired.
         assert_eq!(net.core_ctx(1).state.timer_counters.nop.get(), 1);
         assert_eq!(net.core_ctx(2).state.timer_counters.nop.get(), 0);
-        assert_eq!(net.step(receive_frame, handle_timer).timers_fired, 1);
+        assert_eq!(net.step().timers_fired, 1);
         // Only timer in context 2 should have fired.
         assert_eq!(net.core_ctx(1).state.timer_counters.nop.get(), 1);
         assert_eq!(net.core_ctx(2).state.timer_counters.nop.get(), 1);
-        assert_eq!(net.step(receive_frame, handle_timer).timers_fired, 1);
+        assert_eq!(net.step().timers_fired, 1);
         // Only timer in context 2 should have fired.
         assert_eq!(net.core_ctx(1).state.timer_counters.nop.get(), 1);
         assert_eq!(net.core_ctx(2).state.timer_counters.nop.get(), 2);
-        assert_eq!(net.step(receive_frame, handle_timer).timers_fired, 1);
+        assert_eq!(net.step().timers_fired, 1);
         // Only timer in context 1 should have fired.
         assert_eq!(net.core_ctx(1).state.timer_counters.nop.get(), 2);
         assert_eq!(net.core_ctx(2).state.timer_counters.nop.get(), 2);
-        assert_eq!(net.step(receive_frame, handle_timer).timers_fired, 2);
+        assert_eq!(net.step().timers_fired, 2);
         // Both timers have fired at the same time.
         assert_eq!(net.core_ctx(1).state.timer_counters.nop.get(), 3);
         assert_eq!(net.core_ctx(2).state.timer_counters.nop.get(), 3);
 
-        assert!(net.step(receive_frame, handle_timer).is_idle());
+        assert!(net.step().is_idle());
         // Check that current time on contexts tick together.
         let t1 = net.with_context(1, |Ctx { core_ctx: _, bindings_ctx }| bindings_ctx.now());
         let t2 = net.with_context(2, |Ctx { core_ctx: _, bindings_ctx }| bindings_ctx.now());
@@ -1762,13 +1766,12 @@ mod tests {
             );
         });
 
-        while !net.step(receive_frame, handle_timer).is_idle()
-            && net.core_ctx(1).state.timer_counters.nop.get() < 1
+        while !net.step().is_idle() && net.core_ctx(1).state.timer_counters.nop.get() < 1
             || net.core_ctx(2).state.timer_counters.nop.get() < 1
         {}
         // Assert that we stopped before all times were fired, meaning we can
         // step again.
-        assert_eq!(net.step(receive_frame, handle_timer).timers_fired, 1);
+        assert_eq!(net.step().timers_fired, 1);
     }
 
     #[test]
@@ -1851,7 +1854,7 @@ mod tests {
                 &'a str,
             >,
         >(
-            net: &mut FakeNetwork<&'a str, EthernetDeviceId<FakeBindingsCtx>, FakeCtx, L>,
+            net: &mut FakeNetwork<&'a str, FakeCtx, L>,
             alice_nop: u64,
             bob_nop: u64,
             bob_echo_request: u64,
@@ -1870,19 +1873,19 @@ mod tests {
             );
         }
 
-        assert_eq!(net.step(receive_frame, handle_timer).timers_fired, 1);
+        assert_eq!(net.step().timers_fired, 1);
         assert_full_state(&mut net, 1, 0, 0, 0);
-        assert_eq!(net.step(receive_frame, handle_timer).frames_sent, 1);
+        assert_eq!(net.step().frames_sent, 1);
         assert_full_state(&mut net, 1, 0, 1, 0);
-        assert_eq!(net.step(receive_frame, handle_timer).timers_fired, 1);
+        assert_eq!(net.step().timers_fired, 1);
         assert_full_state(&mut net, 1, 1, 1, 0);
-        let step = net.step(receive_frame, handle_timer);
+        let step = net.step();
         assert_eq!(step.frames_sent, 1);
         assert_eq!(step.timers_fired, 1);
         assert_full_state(&mut net, 1, 2, 1, 1);
 
         // Should've starved all events.
-        assert!(net.step(receive_frame, handle_timer).is_idle());
+        assert!(net.step().is_idle());
     }
 
     fn send_packet<'a, A: IpAddress>(

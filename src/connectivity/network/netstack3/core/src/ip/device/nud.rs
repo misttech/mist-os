@@ -5275,12 +5275,7 @@ mod tests {
         ctx.bindings_ctx.timer_ctx().assert_no_timers_installed();
     }
 
-    type FakeNudNetwork<L> = FakeNetwork<
-        &'static str,
-        EthernetDeviceId<testutil::FakeBindingsCtx>,
-        testutil::Ctx<testutil::FakeBindingsCtx>,
-        L,
-    >;
+    type FakeNudNetwork<L> = FakeNetwork<&'static str, testutil::Ctx<testutil::FakeBindingsCtx>, L>;
 
     fn new_test_net<I: Ip + testutil::TestIpExt>() -> (
         FakeNudNetwork<
@@ -5407,11 +5402,7 @@ mod tests {
             tcp::buffer::testutil::ProvidedBuffers::default(),
         );
         for _ in 0..2 {
-            assert_eq!(
-                net.step(crate::device::testutil::receive_frame, testutil::handle_timer)
-                    .frames_sent,
-                1
-            );
+            assert_eq!(net.step().frames_sent, 1);
         }
 
         // The three-way handshake should now be complete, and the neighbor should have
@@ -5465,7 +5456,7 @@ mod tests {
             &mut net,
             tcp::buffer::testutil::ProvidedBuffers::Buffers(client_ends.clone()),
         );
-        net.run_until_idle(crate::device::testutil::receive_frame, testutil::handle_timer);
+        net.run_until_idle();
         net.with_context("local", |testutil::FakeCtx { core_ctx, bindings_ctx: _ }| {
             super::testutil::assert_dynamic_neighbor_state(
                 &mut CoreCtx::new_deprecated(core_ctx),
@@ -5483,11 +5474,7 @@ mod tests {
             ctx.core_api().tcp().do_send(&local_socket);
         });
         for _ in 0..2 {
-            assert_eq!(
-                net.step(crate::device::testutil::receive_frame, testutil::handle_timer)
-                    .frames_sent,
-                1
-            );
+            assert_eq!(net.step().frames_sent, 1);
         }
 
         // The ACK should have been processed, and the neighbor should have transitioned

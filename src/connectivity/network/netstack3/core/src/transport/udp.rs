@@ -6467,7 +6467,8 @@ mod tests {
             Buf::new(HELLO.to_vec(), ..),
         )
         .unwrap();
-        crate::testutil::handle_queued_rx_packets(&mut ctx);
+
+        assert!(crate::testutil::handle_queued_rx_packets(&mut ctx));
 
         // TODO(https://fxbug.dev/42084713): They should both be non-empty. The
         // socket map should allow a looped back packet to be delivered despite
