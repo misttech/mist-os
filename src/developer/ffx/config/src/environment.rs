@@ -278,12 +278,17 @@ impl Environment {
                     tracing::debug!("Creating new user default file");
                     match create_new_file(&default_path) {
                         Ok(mut file) => {
+                            tracing::debug!("Doing write_all");
                             file.write_all(b"{}")
                                 .context("writing default user configuration file")?;
+                            tracing::debug!("Syncing block cache with underlying storage");
                             file.sync_all()
                                 .context("syncing default user configuration file to filesystem")?;
+                            tracing::debug!("Done syncing");
                         }
-                        Err(e) if e.kind() == ErrorKind::AlreadyExists => {}
+                        Err(e) if e.kind() == ErrorKind::AlreadyExists => {
+                            tracing::debug!("File already exists");
+                        }
                         other => {
                             other.context("creating default user configuration file").map(|_| ())?
                         }
