@@ -14,7 +14,7 @@ use crate::{
         FdEvents, FileHandle,
     },
 };
-use starnix_sync::{FileOpsWrite, Mutex, Unlocked};
+use starnix_sync::{Mutex, Unlocked};
 use starnix_uapi::{errno, error, errors::Errno, open_flags::OpenFlags, ucred};
 
 // An implementation of AF_VSOCK.
@@ -170,7 +170,6 @@ impl SocketOps for VsockSocket {
     ) -> Result<usize, Errno> {
         let inner = self.lock();
         let mut locked = Unlocked::new(); // TODO(https://fxbug.dev/320461655): propagate through SocketOps
-        let mut locked = locked.cast_locked::<FileOpsWrite>();
         match &inner.state {
             VsockSocketState::Connected(file) => file.write(&mut locked, current_task, data),
             _ => error!(EBADF),
@@ -307,7 +306,6 @@ mod tests {
     };
     use fuchsia_zircon as zx;
     use fuchsia_zircon::HandleBased;
-    use starnix_sync::FileOpsWrite;
     use starnix_uapi::epoll_event;
     use syncio::Zxio;
 
@@ -395,7 +393,6 @@ mod tests {
         // Wait for the thread to become blocked on the read.
         zx::Duration::from_seconds(2).sleep();
 
-        let mut locked = locked.cast_locked::<FileOpsWrite>();
         socket_file
             .write(&mut locked, &current_task, &mut VecInputBuffer::new(&[0; XFER_SIZE]))
             .unwrap();

@@ -33,8 +33,8 @@
 //!    b: Mutex<u32>,
 //! }
 //!
-//! pub enum A {}
-//! pub enum B {}
+//! lock_level!(A);
+//! lock_level!(B);
 //!
 //! impl LockFor<LockA> for HoldsLocks {
 //!    type Data = u8;
@@ -76,8 +76,8 @@
 //! accidental lock ordering inversion introduced while defining the graph.
 //! This won't compile:
 //! ```compile_fail
-//! pub enum A {}
-//! pub enum B {}
+//! lock_level!(A);
+//! lock_level!(B);
 //!
 //! impl_lock_after(LockA => LockB);
 //! impl_lock_after(LockB => LockA);
@@ -97,8 +97,8 @@
 //! #    b: Mutex<u32>,
 //! # }
 //! #
-//! # pub enum A {}
-//! # pub enum B {}
+//! # lock_level!(A);
+//! # lock_level!(B);
 //! #
 //! # impl LockFor<LockA> for HoldsLocks {
 //! #    type Data = u8;
@@ -138,7 +138,7 @@
 //!
 //! ```compile_fail
 //! # use std::sync::Mutex;
-//! # use lock_order::{impl_lock_after, lock::LockFor, relation::LockAfter, Locked, Unlocked};
+//! # use lock_order::{impl_lock_after, lock_level, lock::LockFor, relation::LockAfter, Locked, Unlocked};
 //! #
 //! # #[derive(Default)]
 //! # struct HoldsLocks {
@@ -146,8 +146,8 @@
 //! #     b: Mutex<u32>,
 //! # }
 //! #
-//! # pub enum A {}
-//! # pub enum B {}
+//! # lock_level!(A);
+//! # lock_level!(B);
 //! #
 //! # impl LockFor<LockA> for HoldsLocks {
 //! #     type Data = u8;
@@ -184,7 +184,7 @@
 
 use core::marker::PhantomData;
 
-pub use crate::{LockBefore, LockFor, RwLockFor};
+pub use crate::{LockBefore, LockEqualOrBefore, LockFor, RwLockFor};
 
 /// Enforcement mechanism for lock ordering.
 ///
@@ -212,6 +212,7 @@ impl Unlocked {
         Locked::<'static, Unlocked>(Default::default())
     }
 }
+impl LockEqualOrBefore<Unlocked> for Unlocked {}
 
 // It's important that the lifetime on `Locked` here be anonymous. That means
 // that the lifetimes in the returned `Locked` objects below are inferred to
@@ -353,7 +354,7 @@ impl<L> Locked<'_, L> {
     pub fn cast_locked<'a, M>(&'a mut self) -> Locked<'a, M>
     where
         M: 'a,
-        L: LockBefore<M>,
+        L: LockEqualOrBefore<M>,
     {
         Locked::<'a, M>(PhantomData::default())
     }
@@ -365,7 +366,7 @@ mod test {
 
     #[test]
     fn example() {
-        use crate::{impl_lock_after, LockAfter, Unlocked};
+        use crate::{impl_lock_after, lock_level, LockAfter, Unlocked};
 
         #[derive(Default)]
         pub struct HoldsLocks {
@@ -373,8 +374,8 @@ mod test {
             b: Mutex<u32>,
         }
 
-        pub enum LockA {}
-        pub enum LockB {}
+        lock_level!(LockA);
+        lock_level!(LockB);
 
         impl LockFor<LockA> for HoldsLocks {
             type Data = u8;
@@ -413,16 +414,16 @@ mod test {
         //! Lock ordering tree:
         //! A -> B -> {C, D, E -> F, G -> H}
 
-        use crate::{impl_lock_after, LockAfter, Unlocked};
+        use crate::{impl_lock_after, lock_level, LockAfter, Unlocked};
 
-        pub enum A {}
-        pub enum B {}
-        pub enum C {}
-        pub enum D {}
-        pub enum E {}
-        pub enum F {}
-        pub enum G {}
-        pub enum H {}
+        lock_level!(A);
+        lock_level!(B);
+        lock_level!(C);
+        lock_level!(D);
+        lock_level!(E);
+        lock_level!(F);
+        lock_level!(G);
+        lock_level!(H);
 
         impl LockAfter<Unlocked> for A {}
         impl_lock_after!(A => B);

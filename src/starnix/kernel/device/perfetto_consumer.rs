@@ -150,10 +150,7 @@ impl PerfettoConnection {
         );
         bind_service_message.encode(&mut bind_service_bytes)?;
         let mut bind_service_buffer: VecInputBuffer = bind_service_bytes.into();
-        {
-            let mut locked = locked.cast_locked::<FileOpsWrite>();
-            conn_file.write(&mut locked, current_task, &mut bind_service_buffer)?;
-        }
+        conn_file.write(locked, current_task, &mut bind_service_buffer)?;
 
         let reply_frame = frame_reader.next_frame_blocking(locked, current_task)?;
 
@@ -184,8 +181,7 @@ impl PerfettoConnection {
         frame_bytes.extend_from_slice(&u32::try_from(frame.encoded_len())?.to_le_bytes());
         frame.encode(&mut frame_bytes)?;
         let mut buffer: VecInputBuffer = frame_bytes.into();
-        let mut locked = locked.cast_locked::<FileOpsWrite>();
-        self.conn_file.write(&mut locked, current_task, &mut buffer)?;
+        self.conn_file.write(locked, current_task, &mut buffer)?;
 
         Ok(request_id)
     }

@@ -1628,7 +1628,6 @@ mod test {
     use fuchsia_fs::{directory, file};
     use fuchsia_zircon::HandleBased;
     use fxfs_testing::{TestFixture, TestFixtureOptions};
-    use starnix_sync::FileOpsWrite;
     use starnix_uapi::{auth::Credentials, epoll_event, errors::EINVAL, file_mode::mode};
 
     #[::fuchsia::test]
@@ -2568,9 +2567,8 @@ mod test {
                         .expect("refresh info failed")
                         .time_modify;
                     let write_bytes: [u8; 5] = [1, 2, 3, 4, 5];
-                    let mut locked = locked.cast_locked::<FileOpsWrite>();
                     let written = file
-                        .write(&mut locked, &current_task, &mut VecInputBuffer::new(&write_bytes))
+                        .write(locked, &current_task, &mut VecInputBuffer::new(&write_bytes))
                         .expect("write failed");
                     assert_eq!(written, write_bytes.len());
                     let last_modified = child
@@ -2771,9 +2769,8 @@ mod test {
 
                     // Writing to a file should update ctime and mtime
                     let write_bytes: [u8; 5] = [1, 2, 3, 4, 5];
-                    let mut locked = locked.cast_locked::<FileOpsWrite>();
                     let written = file
-                        .write(&mut locked, &current_task, &mut VecInputBuffer::new(&write_bytes))
+                        .write(locked, &current_task, &mut VecInputBuffer::new(&write_bytes))
                         .expect("write failed");
                     assert_eq!(written, write_bytes.len());
 

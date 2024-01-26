@@ -700,8 +700,7 @@ mod tests {
             map_memory(current_task, UserAddress::default(), std::mem::size_of::<T>() as u64);
         let address_ref = UserRef::<T>::new(address);
         current_task.write_object(address_ref, value)?;
-        let mut locked = locked.cast_locked::<FileOpsIoctl>();
-        file.ioctl(&mut locked, current_task, command, address.into())?;
+        file.ioctl(locked, current_task, command, address.into())?;
         current_task.read_object(address_ref)
     }
 
@@ -711,9 +710,8 @@ mod tests {
         file: &FileHandle,
         steal: bool,
     ) -> Result<SyscallResult, Errno> {
-        let mut locked = locked.cast_locked::<FileOpsIoctl>();
         #[allow(clippy::bool_to_int_with_if)]
-        file.ioctl(&mut locked, current_task, TIOCSCTTY, steal.into())
+        file.ioctl(locked, current_task, TIOCSCTTY, steal.into())
     }
 
     fn lookup_node(
@@ -856,7 +854,6 @@ mod tests {
         let fs = dev_pts_fs(&task, Default::default());
 
         let ptmx = open_ptmx_and_unlock(&mut locked, &task, fs).expect("ptmx");
-        let mut locked = locked.cast_locked::<FileOpsIoctl>();
         assert_eq!(ptmx.ioctl(&mut locked, &task, 42, Default::default()), error!(ENOTTY));
 
         let pts_file = open_file(&task, fs, "0".into()).expect("open file");
@@ -1203,9 +1200,8 @@ mod tests {
         };
 
         let write_and_assert = |locked: &mut Locked<'_, Unlocked>, fd: &FileHandle, data: &[u8]| {
-            let mut locked = locked.cast_locked::<FileOpsWrite>();
             assert_eq!(
-                fd.write(&mut locked, &task, &mut VecInputBuffer::new(data)).expect("write"),
+                fd.write(locked, &task, &mut VecInputBuffer::new(data)).expect("write"),
                 data.len()
             );
         };

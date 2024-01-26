@@ -1042,7 +1042,6 @@ mod tests {
             FdEvents,
         },
     };
-    use starnix_sync::FileOpsWrite;
     use starnix_uapi::open_flags::OpenFlags;
 
     const KEY: ReadyItemKey = ReadyItemKey::Usize(1234);
@@ -1113,7 +1112,6 @@ mod tests {
                 wait_canceler.cancel();
             }
             let add_val = 1u64;
-            let mut locked = locked.cast_locked::<FileOpsWrite>();
             assert_eq!(
                 event
                     .write(

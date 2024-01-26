@@ -747,8 +747,7 @@ mod tests {
                 ..Default::default()
             },
         );
-        let mut locked = locked.cast_locked::<FileOpsIoctl>();
-        loop_file.ioctl(&mut locked, &current_task, LOOP_CONFIGURE, config_addr.into()).unwrap();
+        loop_file.ioctl(locked, &current_task, LOOP_CONFIGURE, config_addr.into()).unwrap();
 
         loop_file
     }
@@ -790,12 +789,7 @@ mod tests {
             &current_task,
             &uapi::loop_info64 { lo_offset: 3, ..Default::default() },
         );
-        {
-            let mut locked = locked.cast_locked::<FileOpsIoctl>();
-            loop_file
-                .ioctl(&mut locked, &current_task, LOOP_SET_STATUS64, info_addr.into())
-                .unwrap();
-        }
+        loop_file.ioctl(&mut locked, &current_task, LOOP_SET_STATUS64, info_addr.into()).unwrap();
 
         let mut buf = VecOutputBuffer::new(25);
         loop_file.read(&mut locked, &current_task, &mut buf).unwrap();
@@ -861,7 +855,6 @@ mod tests {
                 ..Default::default()
             },
         );
-        let mut locked = locked.cast_locked::<FileOpsIoctl>();
         loop_file.ioctl(&mut locked, &current_task, LOOP_SET_STATUS64, info_addr.into()).unwrap();
 
         let vmo = loop_file.get_vmo(&current_task, None, ProtectionFlags::READ).unwrap();

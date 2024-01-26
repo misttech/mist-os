@@ -95,15 +95,11 @@ where
         while count > 0 {
             let limit = std::cmp::min(*PAGE_SIZE as usize, count);
             let mut buffer = VecOutputBuffer::new(limit);
-            let read = {
-                let mut locked = locked.cast_locked::<FileOpsRead>();
-                in_file.read_at(&mut locked, current_task, offset, &mut buffer)?
-            };
+            let read = { in_file.read_at(locked, current_task, offset, &mut buffer)? };
             let mut buffer = Vec::from(buffer);
             buffer.truncate(read);
-            let mut locked = locked.cast_locked::<FileOpsWrite>();
             let written =
-                out_file.write(&mut locked, current_task, &mut VecInputBuffer::from(buffer))?;
+                out_file.write(locked, current_task, &mut VecInputBuffer::from(buffer))?;
             offset += written;
             total_written += written;
             update_offset(offset as off_t)?;

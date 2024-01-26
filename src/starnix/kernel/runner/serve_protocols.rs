@@ -24,7 +24,7 @@ use starnix_core::{
     },
 };
 use starnix_logging::{log_error, log_warn};
-use starnix_sync::{FileOpsWrite, LockBefore, Locked, TaskRelease, Unlocked};
+use starnix_sync::{LockBefore, Locked, TaskRelease, Unlocked};
 use starnix_uapi::{open_flags::OpenFlags, uapi};
 use std::{ffi::CString, sync::Arc};
 
@@ -209,9 +209,8 @@ fn forward_to_pty(
                         if bytes == 0 {
                             return Ok(());
                         }
-                        let mut locked = locked.cast_locked::<FileOpsWrite>();
                         pty_sink.write(
-                            &mut locked,
+                            locked,
                             current_task,
                             &mut VecInputBuffer::new(&buffer[..bytes]),
                         )?;

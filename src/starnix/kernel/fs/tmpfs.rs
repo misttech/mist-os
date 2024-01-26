@@ -350,7 +350,6 @@ mod test {
             FdNumber, UnlinkKind,
         },
     };
-    use starnix_sync::{FileOpsRead, FileOpsWrite};
     use starnix_uapi::{errno, mount_flags::MountFlags};
     use zerocopy::AsBytes;
 
@@ -384,16 +383,12 @@ mod test {
         let test_vec = test_seq.collect::<Vec<_>>();
         let test_bytes = test_vec.as_slice().as_bytes();
 
-        {
-            let mut locked = locked.cast_locked::<FileOpsWrite>();
-            let written = wr_file
-                .write(&mut locked, &current_task, &mut VecInputBuffer::new(test_bytes))
-                .unwrap();
-            assert_eq!(written, test_bytes.len());
-        }
+        let written = wr_file
+            .write(&mut locked, &current_task, &mut VecInputBuffer::new(test_bytes))
+            .unwrap();
+        assert_eq!(written, test_bytes.len());
 
         let mut read_buffer = VecOutputBuffer::new(test_bytes.len() + 1);
-        let mut locked = locked.cast_locked::<FileOpsRead>();
         let read = wr_file.read_at(&mut locked, &current_task, 0, &mut read_buffer).unwrap();
         assert_eq!(read, test_bytes.len());
         assert_eq!(test_bytes, read_buffer.data());
@@ -416,7 +411,6 @@ mod test {
         let buffer_size = 0x10000;
         let mut output_buffer = VecOutputBuffer::new(buffer_size);
         let test_offset = 100;
-        let mut locked = locked.cast_locked::<FileOpsRead>();
         let result =
             rd_file.read_at(&mut locked, &current_task, test_offset, &mut output_buffer).unwrap();
         assert_eq!(result, 0);
@@ -441,10 +435,7 @@ mod test {
                 .expect("failed to read")
         );
 
-        {
-            let mut locked = locked.cast_locked::<FileOpsWrite>();
-            assert!(file.write(&mut locked, &current_task, &mut VecInputBuffer::new(&[])).is_err());
-        }
+        assert!(file.write(&mut locked, &current_task, &mut VecInputBuffer::new(&[])).is_err());
 
         let file = current_task
             .open_file_at(FdNumber::AT_FDCWD, path.into(), OpenFlags::WRONLY, FileMode::EMPTY)
@@ -452,14 +443,11 @@ mod test {
 
         assert!(file.read(&mut locked, &current_task, &mut VecOutputBuffer::new(0)).is_err());
 
-        {
-            let mut locked = locked.cast_locked::<FileOpsWrite>();
-            assert_eq!(
-                0,
-                file.write(&mut locked, &current_task, &mut VecInputBuffer::new(&[]))
-                    .expect("failed to write")
-            );
-        }
+        assert_eq!(
+            0,
+            file.write(&mut locked, &current_task, &mut VecInputBuffer::new(&[]))
+                .expect("failed to write")
+        );
 
         let file = current_task
             .open_file_at(FdNumber::AT_FDCWD, path.into(), OpenFlags::RDWR, FileMode::EMPTY)
@@ -471,14 +459,11 @@ mod test {
                 .expect("failed to read")
         );
 
-        {
-            let mut locked = locked.cast_locked::<FileOpsWrite>();
-            assert_eq!(
-                0,
-                file.write(&mut locked, &current_task, &mut VecInputBuffer::new(&[]))
-                    .expect("failed to write")
-            );
-        }
+        assert_eq!(
+            0,
+            file.write(&mut locked, &current_task, &mut VecInputBuffer::new(&[]))
+                .expect("failed to write")
+        );
     }
 
     #[::fuchsia::test]

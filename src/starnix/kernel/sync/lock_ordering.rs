@@ -2,23 +2,23 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{impl_lock_after, Unlocked};
+use crate::{impl_lock_after, lock_level, Unlocked};
 
-pub enum BpfMapEntries {}
-pub enum KernelIpTables {}
-pub enum KernelSwapFiles {}
-pub enum DiagnosticsCoreDumpList {}
+lock_level!(BpfMapEntries);
+lock_level!(KernelIpTables);
+lock_level!(KernelSwapFiles);
+lock_level!(DiagnosticsCoreDumpList);
 
-pub enum MmDumpable {}
+lock_level!(MmDumpable);
 
-/// Artificial lock level that is used when releasing a Task
-pub enum TaskRelease {}
-pub enum ProcessGroupState {}
+// Artificial lock level that is used when releasing a Task
+lock_level!(TaskRelease);
+lock_level!(ProcessGroupState);
 
 // FileOps lock levels. These are artificial lock levels used to call methods of FileOps traits.
-pub enum FileOpsRead {}
-pub enum FileOpsWrite {}
-pub enum FileOpsIoctl {}
+lock_level!(FileOpsRead);
+lock_level!(FileOpsWrite);
+lock_level!(FileOpsIoctl);
 
 // This file defines a hierarchy of locks, that is, the order in which
 // the locks must be acquired. Unlocked is a highest level and represents

@@ -850,9 +850,8 @@ where
         msg.finalize();
         let mut buf = vec![0; msg.buffer_len()];
         msg.serialize(&mut buf[..]);
-        let mut locked = locked.cast_locked::<FileOpsWrite>();
         assert_eq!(
-            socket.write(&mut locked, current_task, &mut VecInputBuffer::from(buf))?,
+            socket.write(locked, current_task, &mut VecInputBuffer::from(buf))?,
             msg.buffer_len()
         );
     }
@@ -958,13 +957,10 @@ where
     msg.finalize();
     let mut buf = vec![0; msg.buffer_len()];
     msg.serialize(&mut buf[..]);
-    {
-        let mut locked = locked.cast_locked::<FileOpsWrite>();
-        assert_eq!(
-            socket.write(&mut locked, current_task, &mut VecInputBuffer::from(buf))?,
-            msg.buffer_len()
-        );
-    }
+    assert_eq!(
+        socket.write(locked, current_task, &mut VecInputBuffer::from(buf))?,
+        msg.buffer_len()
+    );
 
     read_buf.reset();
     let n = socket.read(locked, current_task, read_buf)?;

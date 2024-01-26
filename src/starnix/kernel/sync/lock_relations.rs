@@ -107,6 +107,21 @@ pub trait LockBefore<X> {}
 
 impl<B: LockAfter<A>, A> LockBefore<B> for A {}
 
+/// Marker trait that indicates that `Self` is `X` or an ancestor of `X`.
+///
+/// Functions and trait impls that want to apply lock ordering bounds should
+/// prefer [`LockBefore`]. However, there are some situations where using
+/// template to apply lock ordering bounds is impossible, so a fixed level
+/// must be used instead. In that case, `LockEqualOrBefore` can be used as
+/// a workaround to avoid restricting other methods to just the fixed level.
+/// See the tests for the example.
+/// Note: Any type representing a lock level must explicitly implement
+/// `LockEqualOrBefore<X> for X` (or use a `lock_level` macro) for this to
+/// work.
+pub trait LockEqualOrBefore<X> {}
+
+impl<B, A> LockEqualOrBefore<B> for A where A: LockBefore<B> {}
+
 // Defines the order between two lock levels. Lock B comes after A if B
 // can be acquired while A is locked.
 #[macro_export]
@@ -120,14 +135,23 @@ macro_rules! impl_lock_after {
     };
 }
 
+// Define a lock level that corresponds to some state that can be locked.
+#[macro_export]
+macro_rules! lock_level {
+    ($A:ident) => {
+        pub enum $A {}
+        impl $crate::LockEqualOrBefore<$A> for $A {}
+    };
+}
+
 #[cfg(test)]
 mod test {
-    use crate::{LockFor, Unlocked};
+    use crate::{LockBefore, LockEqualOrBefore, LockFor, Locked, Unlocked};
     use std::sync::{Mutex, MutexGuard};
 
-    pub enum A {}
-    pub enum B {}
-    pub enum C {}
+    lock_level!(A);
+    lock_level!(B);
+    lock_level!(C);
 
     impl_lock_after!(A => B);
     impl_lock_after!(B => C);
@@ -169,5 +193,49 @@ mod test {
         // Otherwise this wouldn't compile:
         let c = locked.lock::<C, _>(&state);
         assert_eq!(*c, C_DATA);
+    }
+
+    fn access_c<L: LockBefore<C>>(locked: &mut Locked<'_, L>, state: &FakeLocked) -> char {
+        let c = locked.lock::<C, _>(state);
+        *c
+    }
+
+    // Uses a fixed level B
+    fn fixed1(locked: &mut Locked<'_, B>, state: &FakeLocked) -> char {
+        relaxed(locked, state)
+    }
+
+    // Uses a fixed level B
+    fn fixed2(locked: &mut Locked<'_, B>, state: &FakeLocked) -> char {
+        access_c(locked, state)
+    }
+
+    // `LockBefore<B>` cannot be used here because then it would be impossible
+    // to use it from fixed1. `LockBefore<C>` can't be used because then
+    // `cast_locked::<B>` wouldn't work (there could be other ancestors of `C`)
+    fn relaxed<L>(locked: &mut Locked<'_, L>, state: &FakeLocked) -> char
+    where
+        L: LockEqualOrBefore<B>,
+    {
+        let mut locked = locked.cast_locked::<B>();
+        fixed2(&mut locked, state)
+    }
+
+    #[test]
+    fn lock_equal_or_before() {
+        const A_DATA: u32 = 123;
+        const C_DATA: char = '4';
+        let state = FakeLocked { a: A_DATA.into(), c: C_DATA.into() };
+        let mut locked = Unlocked::new();
+
+        assert_eq!(relaxed(&mut locked, &state), C_DATA);
+        let mut locked = locked.cast_locked::<A>();
+        assert_eq!(relaxed(&mut locked, &state), C_DATA);
+        let mut locked = locked.cast_locked::<B>();
+        assert_eq!(relaxed(&mut locked, &state), C_DATA);
+        assert_eq!(fixed1(&mut locked, &state), C_DATA);
+        // This won't compile as C: LockEqualOrBefore<B> is not satisfied.
+        // let mut locked = locked.cast_locked::<C>();
+        // assert_eq!(relaxed(&mut locked, &state), C_DATA);
     }
 }

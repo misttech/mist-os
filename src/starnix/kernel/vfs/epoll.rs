@@ -505,7 +505,6 @@ mod tests {
         HandleBased, {self as zx},
     };
     use starnix_lifecycle::AtomicUsizeCounter;
-    use starnix_sync::FileOpsWrite;
     use syncio::Zxio;
 
     #[::fuchsia::test]
@@ -535,9 +534,8 @@ mod tests {
         let thread = kernel.kthreads.spawner().spawn_and_get_result({
             let test_string = test_string.clone();
             move |locked, task| {
-                let mut locked = locked.cast_locked::<FileOpsWrite>();
                 let bytes_written = pipe_in
-                    .write(&mut locked, &task, &mut VecInputBuffer::new(test_string.as_bytes()))
+                    .write(locked, &task, &mut VecInputBuffer::new(test_string.as_bytes()))
                     .unwrap();
                 assert_eq!(bytes_written, test_len);
                 WRITE_COUNT.add(bytes_written);
@@ -570,15 +568,12 @@ mod tests {
         let test_bytes = test_string.as_bytes();
         let test_len = test_bytes.len();
 
-        {
-            let mut locked = locked.cast_locked::<FileOpsWrite>();
-            assert_eq!(
-                pipe_in
-                    .write(&mut locked, &current_task, &mut VecInputBuffer::new(test_bytes))
-                    .unwrap(),
-                test_bytes.len()
-            );
-        }
+        assert_eq!(
+            pipe_in
+                .write(&mut locked, &current_task, &mut VecInputBuffer::new(test_bytes))
+                .unwrap(),
+            test_bytes.len()
+        );
 
         let epoll_file_handle = EpollFileObject::new_file(&current_task);
         let epoll_file = epoll_file_handle.downcast_file::<EpollFileObject>().unwrap();
@@ -636,7 +631,6 @@ mod tests {
 
             let add_val = 1u64;
 
-            let mut locked = locked.cast_locked::<FileOpsWrite>();
             assert_eq!(
                 event
                     .write(
@@ -750,7 +744,6 @@ mod tests {
 
         // Make the thing send a notification, wait for it
         let add_val = 1u64;
-        let mut locked = locked.cast_locked::<FileOpsWrite>();
         assert_eq!(
             event
                 .write(&mut locked, &current_task, &mut VecInputBuffer::new(&add_val.to_ne_bytes()))

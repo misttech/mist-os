@@ -1073,8 +1073,7 @@ where
         let buffer: Vec<u8> = output_buffer.into();
         let mut input_buffer = VecInputBuffer::from(buffer);
         while input_buffer.available() > 0 {
-            let mut locked = locked.cast_locked::<FileOpsWrite>();
-            to_file.write(&mut locked, current_task, &mut input_buffer)?;
+            to_file.write(locked, current_task, &mut input_buffer)?;
         }
     }
 

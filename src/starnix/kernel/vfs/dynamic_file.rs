@@ -338,7 +338,7 @@ mod tests {
             SequenceFileSource, VecOutputBuffer,
         },
     };
-    use starnix_sync::{FileOpsRead, Locked, Mutex, Unlocked};
+    use starnix_sync::{Locked, Mutex, Unlocked};
     use starnix_uapi::{errors::Errno, open_flags::OpenFlags};
     use std::sync::Arc;
 
@@ -374,8 +374,7 @@ mod tests {
                        length: usize|
          -> Result<Vec<u8>, Errno> {
             let mut buffer = VecOutputBuffer::new(length);
-            let mut locked = locked.cast_locked::<FileOpsRead>();
-            file.read_at(&mut locked, &current_task, offset, &mut buffer)?;
+            file.read_at(locked, &current_task, offset, &mut buffer)?;
             Ok(buffer.data().to_vec())
         };
 
@@ -412,8 +411,7 @@ mod tests {
                        length: usize|
          -> Result<Vec<u8>, Errno> {
             let mut buffer = VecOutputBuffer::new(length);
-            let mut locked = locked.cast_locked::<FileOpsRead>();
-            let bytes_read = file.read_at(&mut locked, &current_task, offset, &mut buffer)?;
+            let bytes_read = file.read_at(locked, &current_task, offset, &mut buffer)?;
             Ok(buffer.data()[0..bytes_read].to_vec())
         };
 

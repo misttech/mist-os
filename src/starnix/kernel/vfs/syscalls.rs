@@ -23,7 +23,7 @@ use crate::{
 };
 use fuchsia_zircon as zx;
 use starnix_logging::{log_trace, track_stub};
-use starnix_sync::{FileOpsIoctl, FileOpsRead, FileOpsWrite, Locked, Mutex, Unlocked};
+use starnix_sync::{Locked, Mutex, Unlocked};
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
 use starnix_uapi::{
     __kernel_fd_set,
@@ -98,9 +98,8 @@ pub fn sys_write(
     length: usize,
 ) -> Result<usize, Errno> {
     let file = current_task.files.get(fd)?;
-    let mut locked = locked.cast_locked::<FileOpsWrite>();
     file.write(
-        &mut locked,
+        locked,
         current_task,
         &mut UserBuffersInputBuffer::unified_new_at(current_task, address, length)?,
     )
@@ -308,9 +307,8 @@ pub fn sys_pread64(
 ) -> Result<usize, Errno> {
     let file = current_task.files.get(fd)?;
     let offset = offset.try_into().map_err(|_| errno!(EINVAL))?;
-    let mut locked = locked.cast_locked::<FileOpsRead>();
     file.read_at(
-        &mut locked,
+        locked,
         current_task,
         offset,
         &mut UserBuffersOutputBuffer::unified_new_at(current_task, address, length)?,
@@ -327,9 +325,8 @@ pub fn sys_pwrite64(
 ) -> Result<usize, Errno> {
     let file = current_task.files.get(fd)?;
     let offset = offset.try_into().map_err(|_| errno!(EINVAL))?;
-    let mut locked = locked.cast_locked::<FileOpsWrite>();
     file.write_at(
-        &mut locked,
+        locked,
         current_task,
         offset,
         &mut UserBuffersInputBuffer::unified_new_at(current_task, address, length)?,
@@ -355,9 +352,8 @@ fn do_readv(
     let iovec = current_task.read_iovec(iovec_addr, iovec_count)?;
     let mut data = UserBuffersOutputBuffer::unified_new(current_task, iovec)?;
     if let Some(offset) = offset {
-        let mut locked = locked.cast_locked::<FileOpsRead>();
         file.read_at(
-            &mut locked,
+            locked,
             current_task,
             offset.try_into().map_err(|_| errno!(EINVAL))?,
             &mut data,
@@ -421,16 +417,15 @@ fn do_writev(
     let file = current_task.files.get(fd)?;
     let iovec = current_task.read_iovec(iovec_addr, iovec_count)?;
     let mut data = UserBuffersInputBuffer::unified_new(current_task, iovec)?;
-    let mut locked = locked.cast_locked::<FileOpsWrite>();
     let res = if let Some(offset) = offset {
         file.write_at(
-            &mut locked,
+            locked,
             current_task,
             offset.try_into().map_err(|_| errno!(EINVAL))?,
             &mut data,
         )
     } else {
-        file.write(&mut locked, current_task, &mut data)
+        file.write(locked, current_task, &mut data)
     };
 
     match &res {
@@ -1360,8 +1355,7 @@ pub fn sys_ioctl(
     arg: SyscallArg,
 ) -> Result<SyscallResult, Errno> {
     let file = current_task.files.get(fd)?;
-    let mut locked = locked.cast_locked::<FileOpsIoctl>();
-    file.ioctl(&mut locked, current_task, request, arg)
+    file.ioctl(locked, current_task, request, arg)
 }
 
 pub fn sys_symlinkat(

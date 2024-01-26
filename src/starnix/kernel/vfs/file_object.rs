@@ -23,7 +23,9 @@ use fidl::HandleBased;
 use fuchsia_inspect_contrib::profile_duration;
 use fuchsia_zircon as zx;
 use starnix_logging::{impossible_error, trace_category_starnix_mm, trace_duration, track_stub};
-use starnix_sync::{FileOpsIoctl, FileOpsRead, FileOpsWrite, LockBefore, Locked, Mutex};
+use starnix_sync::{
+    FileOpsIoctl, FileOpsRead, FileOpsWrite, LockBefore, LockEqualOrBefore, Locked, Mutex,
+};
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
 use starnix_uapi::{
     as_any::AsAny,
@@ -1109,13 +1111,16 @@ impl FileObject {
         })
     }
 
-    pub fn read_at(
+    pub fn read_at<L>(
         &self,
-        locked: &mut Locked<'_, FileOpsRead>,
+        locked: &mut Locked<'_, L>,
         current_task: &CurrentTask,
         offset: usize,
         data: &mut dyn OutputBuffer,
-    ) -> Result<usize, Errno> {
+    ) -> Result<usize, Errno>
+    where
+        L: LockEqualOrBefore<FileOpsRead>,
+    {
         if !self.ops().is_seekable() {
             return error!(ESPIPE);
         }
@@ -1124,27 +1129,34 @@ impl FileObject {
 
     /// Delegate the read operation to FileOps after executing the common permission check. This
     /// calls does not handle any operation related to file offsets.
-    pub fn read_raw(
+    pub fn read_raw<L>(
         &self,
-        locked: &mut Locked<'_, FileOpsRead>,
+        locked: &mut Locked<'_, L>,
         current_task: &CurrentTask,
         offset: usize,
         data: &mut dyn OutputBuffer,
-    ) -> Result<usize, Errno> {
+    ) -> Result<usize, Errno>
+    where
+        L: LockEqualOrBefore<FileOpsRead>,
+    {
         if offset >= MAX_LFS_FILESIZE {
             return error!(EINVAL);
         }
-        self.read_internal(|| self.ops.read(locked, self, current_task, offset, data))
+        let mut locked = locked.cast_locked::<FileOpsRead>();
+        self.read_internal(|| self.ops.read(&mut locked, self, current_task, offset, data))
     }
 
     /// Common checks before calling ops().write.
-    fn write_common(
+    fn write_common<L>(
         &self,
-        locked: &mut Locked<'_, FileOpsWrite>,
+        locked: &mut Locked<'_, L>,
         current_task: &CurrentTask,
         offset: usize,
         data: &mut dyn InputBuffer,
-    ) -> Result<usize, Errno> {
+    ) -> Result<usize, Errno>
+    where
+        L: LockEqualOrBefore<FileOpsWrite>,
+    {
         // We need to cap the size of `data` to prevent us from growing the file too large,
         // according to <https://man7.org/linux/man-pages/man2/write.2.html>:
         //
@@ -1154,18 +1166,20 @@ impl FileObject {
         //
         // However, at the moment, we just check the `offset`.
         check_offset(current_task, offset)?;
-        self.ops().write(locked, self, current_task, offset, data)
+        let mut locked = locked.cast_locked::<FileOpsWrite>();
+        self.ops().write(&mut locked, self, current_task, offset, data)
     }
 
     /// Common wrapper work for `write` and `write_at`.
-    fn write_fn<W>(
+    fn write_fn<W, L>(
         &self,
-        locked: &mut Locked<'_, FileOpsWrite>,
+        locked: &mut Locked<'_, L>,
         current_task: &CurrentTask,
         write: W,
     ) -> Result<usize, Errno>
     where
-        W: FnOnce(&mut Locked<'_, FileOpsWrite>) -> Result<usize, Errno>,
+        L: LockEqualOrBefore<FileOpsWrite>,
+        W: FnOnce(&mut Locked<'_, L>) -> Result<usize, Errno>,
     {
         if !self.can_write() {
             return error!(EBADF);
@@ -1181,12 +1195,15 @@ impl FileObject {
         Ok(bytes_written)
     }
 
-    pub fn write(
+    pub fn write<L>(
         &self,
-        locked: &mut Locked<'_, FileOpsWrite>,
+        locked: &mut Locked<'_, L>,
         current_task: &CurrentTask,
         data: &mut dyn InputBuffer,
-    ) -> Result<usize, Errno> {
+    ) -> Result<usize, Errno>
+    where
+        L: LockEqualOrBefore<FileOpsWrite>,
+    {
         self.write_fn(locked, current_task, |locked| {
             if !self.ops().has_persistent_offsets() {
                 return self.write_common(locked, current_task, 0, data);
@@ -1206,13 +1223,16 @@ impl FileObject {
         })
     }
 
-    pub fn write_at(
+    pub fn write_at<L>(
         &self,
-        locked: &mut Locked<'_, FileOpsWrite>,
+        locked: &mut Locked<'_, L>,
         current_task: &CurrentTask,
         offset: usize,
         data: &mut dyn InputBuffer,
-    ) -> Result<usize, Errno> {
+    ) -> Result<usize, Errno>
+    where
+        L: LockEqualOrBefore<FileOpsWrite>,
+    {
         if !self.ops().is_seekable() {
             return error!(ESPIPE);
         }
@@ -1221,13 +1241,16 @@ impl FileObject {
 
     /// Delegate the write operation to FileOps after executing the common permission check. This
     /// calls does not handle any operation related to file offsets.
-    pub fn write_raw(
+    pub fn write_raw<L>(
         &self,
-        locked: &mut Locked<'_, FileOpsWrite>,
+        locked: &mut Locked<'_, L>,
         current_task: &CurrentTask,
         mut offset: usize,
         data: &mut dyn InputBuffer,
-    ) -> Result<usize, Errno> {
+    ) -> Result<usize, Errno>
+    where
+        L: LockEqualOrBefore<FileOpsWrite>,
+    {
         self.write_fn(locked, current_task, |locked| {
             let _guard = self.node().append_lock.read(current_task)?;
 
@@ -1322,14 +1345,18 @@ impl FileObject {
         Ok(())
     }
 
-    pub fn ioctl(
+    pub fn ioctl<L>(
         &self,
-        locked: &mut Locked<'_, FileOpsIoctl>,
+        locked: &mut Locked<'_, L>,
         current_task: &CurrentTask,
         request: u32,
         arg: SyscallArg,
-    ) -> Result<SyscallResult, Errno> {
-        self.ops().ioctl(locked, self, current_task, request, arg)
+    ) -> Result<SyscallResult, Errno>
+    where
+        L: LockEqualOrBefore<FileOpsIoctl>,
+    {
+        let mut locked = locked.cast_locked::<FileOpsIoctl>();
+        self.ops().ioctl(&mut locked, self, current_task, request, arg)
     }
 
     pub fn fcntl(
@@ -1501,7 +1528,6 @@ mod tests {
             MountInfo,
         },
     };
-    use starnix_sync::{FileOpsRead, FileOpsWrite};
     use starnix_uapi::{
         auth::FsCred, device_type::DeviceType, file_mode::FileMode, open_flags::OpenFlags,
     };
@@ -1538,10 +1564,9 @@ mod tests {
         let done_clone = done.clone();
         let write_thread =
             kernel.kthreads.spawner().spawn_and_get_result(move |locked, current_task| {
-                let mut locked = locked.cast_locked::<FileOpsWrite>();
                 for i in 0..2000 {
                     fh.write(
-                        &mut locked,
+                        locked,
                         current_task,
                         &mut VecInputBuffer::new(U64::<LE>::new(i).as_bytes()),
                     )
@@ -1563,7 +1588,6 @@ mod tests {
         // races, then we might unexpectedly see zeroes.
         while !done.load(Ordering::SeqCst) {
             let mut buffer = VecOutputBuffer::new(4096);
-            let mut locked = locked.cast_locked::<FileOpsRead>();
             let amount = file_handle
                 .read_at(&mut locked, &current_task, 0, &mut buffer)
                 .expect("read failed");

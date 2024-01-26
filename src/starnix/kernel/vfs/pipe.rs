@@ -767,8 +767,7 @@ impl PipeFileObject {
         let mut pipe = self.lock_pipe_for_writing(current_task, self_file, non_blocking, len)?;
         let len = std::cmp::min(len, pipe.messages.available_capacity());
         let mut buffer = SpliceOutputBuffer { pipe: &mut pipe, len, available: len };
-        let mut locked = locked.cast_locked::<FileOpsRead>();
-        from.read_raw(&mut locked, current_task, offset.unwrap_or(0), &mut buffer)
+        from.read_raw(locked, current_task, offset.unwrap_or(0), &mut buffer)
     }
 
     /// Splice from this pipe to the given file handle.
@@ -794,8 +793,7 @@ impl PipeFileObject {
         let mut pipe = self.lock_pipe_for_reading(current_task, self_file, non_blocking)?;
         let len = std::cmp::min(len, pipe.messages.len());
         let mut buffer = SpliceInputBuffer { pipe: &mut pipe, len, available: len };
-        let mut locked = locked.cast_locked::<FileOpsWrite>();
-        to.write_raw(&mut locked, current_task, offset.unwrap_or(0), &mut buffer)
+        to.write_raw(locked, current_task, offset.unwrap_or(0), &mut buffer)
     }
 
     /// Copy data from the given input buffer into the pipe.

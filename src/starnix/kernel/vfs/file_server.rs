@@ -19,7 +19,6 @@ use fidl::{
 use fidl_fuchsia_io as fio;
 use fuchsia_zircon as zx;
 use starnix_logging::track_stub;
-use starnix_sync::{FileOpsRead, FileOpsWrite};
 use starnix_uapi::{
     device_type::DeviceType, errno, error, errors::Errno, file_mode::FileMode, ino_t, off_t,
     open_flags::OpenFlags,
@@ -574,9 +573,8 @@ impl file::RawFileIoConnection for StarnixNodeConnection {
             .kthreads
             .spawner()
             .spawn_and_get_result(move |locked, current_task| -> Result<Vec<u8>, Errno> {
-                let mut locked = locked.cast_locked::<FileOpsRead>();
                 let mut data = VecOutputBuffer::new(count as usize);
-                file.read_at(&mut locked, current_task, offset as usize, &mut data)?;
+                file.read_at(locked, current_task, offset as usize, &mut data)?;
                 Ok(data.into())
             })
             .await??)
@@ -590,8 +588,7 @@ impl file::RawFileIoConnection for StarnixNodeConnection {
             .kthreads
             .spawner()
             .spawn_and_get_result(move |locked, current_task| -> Result<usize, Errno> {
-                let mut locked = locked.cast_locked::<FileOpsWrite>();
-                file.write(&mut locked, current_task, &mut data)
+                file.write(locked, current_task, &mut data)
             })
             .await??;
         Ok(written as u64)
@@ -605,8 +602,7 @@ impl file::RawFileIoConnection for StarnixNodeConnection {
             .kthreads
             .spawner()
             .spawn_and_get_result(move |locked, current_task| -> Result<usize, Errno> {
-                let mut locked = locked.cast_locked::<FileOpsWrite>();
-                file.write_at(&mut locked, current_task, offset as usize, &mut data)
+                file.write_at(locked, current_task, offset as usize, &mut data)
             })
             .await??;
         Ok(written as u64)
