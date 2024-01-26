@@ -43,12 +43,14 @@ enum DsiOpcode : uint8_t {
   // overlap any valid DSI packet DI (Data Identifier) value.
   kDsiOpGpio = 0xf0,
 
-  // Attempt to read MIPI-DSI reg.
+  // Attempt to read `count` values from the MIPI-DSI register at `address`.
   //
-  // <op> <size=2> <reg> <value!=0>
+  // <op> <size=2> <address> <count=1|2|3|4>
   //
   // This opcode overlaps the DSI packet DI (Data Identifier) value for "Packed
   // Pixel Stream, 20-bit YCbCr, 4:2:2 Format" data type, Virtual Channel 3.
+  //
+  // TODO(https://fxbug.dev/322438328): Support reading larger-sized registers.
   kDsiOpReadReg = 0xfc,
 
   // Odd extended delay command to take several delays and gather them into

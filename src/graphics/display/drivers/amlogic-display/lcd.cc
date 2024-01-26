@@ -21,22 +21,25 @@ namespace amlogic_display {
 
 namespace {
 
+constexpr int kReadRegisterMaximumValueCount = 4;
+
 zx_status_t CheckDsiDeviceRegister(ddk::DsiImplProtocolClient* dsiimpl, uint8_t reg, size_t count) {
   ZX_DEBUG_ASSERT(count > 0);
+  ZX_DEBUG_ASSERT(count <= kReadRegisterMaximumValueCount);
 
-  const uint8_t payload = reg;
-
-  // TODO(https://fxbug.dev/42085293): Replace the VLA with a fixed-size
-  // array with size limits.
-  uint8_t response[count];
+  const std::array<uint8_t, 1> payload = {
+      reg,
+  };
+  std::array<uint8_t, kReadRegisterMaximumValueCount> response_buffer = {};
+  cpp20::span<uint8_t> response(response_buffer.data(), count);
 
   mipi_dsi_cmd_t cmd{
       .virt_chn_id = kMipiDsiVirtualChanId,
       .dsi_data_type = kMipiDsiDtGenShortRead1,
-      .pld_data_list = &payload,
-      .pld_data_count = 1,
-      .rsp_data_list = response,
-      .rsp_data_count = count,
+      .pld_data_list = payload.data(),
+      .pld_data_count = payload.size(),
+      .rsp_data_list = response.data(),
+      .rsp_data_count = response.size(),
       .flags = MIPI_DSI_CMD_FLAGS_ACK | MIPI_DSI_CMD_FLAGS_SET_MAX,
   };
 
@@ -157,20 +160,34 @@ zx::result<> Lcd::PerformDisplayInitCommandSequence(cpp20::span<const uint8_t> e
           zx::nanosleep(zx::deadline_after(zx::msec(encoded_commands[i + 4])));
         }
         break;
-      case kDsiOpReadReg:
-        zxlogf(TRACE, "dsi_read size=%d reg=%d, count=%d", payload_size, encoded_commands[i + 2],
-               encoded_commands[i + 3]);
+      case kDsiOpReadReg: {
         if (payload_size != 2) {
-          zxlogf(ERROR, "Invalid MIPI-DSI reg check, expected a register and a target value!");
+          zxlogf(ERROR,
+                 "Invalid MIPI-DSI read register payload size: "
+                 "expected 2 (register address and count), actual %d",
+                 payload_size);
+          return zx::error(ZX_ERR_INVALID_ARGS);
         }
-        status = CheckDsiDeviceRegister(&dsiimpl_, /*reg=*/encoded_commands[i + 2],
-                                        /*count=*/encoded_commands[i + 3]);
+
+        uint8_t address = encoded_commands[i + 2];
+        int count = encoded_commands[i + 3];
+        if (count <= 0 || count > kReadRegisterMaximumValueCount) {
+          zxlogf(ERROR,
+                 "Invalid MIPI-DSI read register value count: %d. "
+                 "It must be positive and no more than %d",
+                 count, kReadRegisterMaximumValueCount);
+          return zx::error(ZX_ERR_INVALID_ARGS);
+        }
+
+        zxlogf(TRACE, "Read MIPI-DSI register: address=0x%02x count=%d", address, count);
+        status = CheckDsiDeviceRegister(&dsiimpl_, address, count);
         if (status != ZX_OK) {
-          zxlogf(ERROR, "Error reading MIPI register 0x%x: %s", encoded_commands[i + 2],
+          zxlogf(ERROR, "Error reading MIPI-DSI register 0x%02x: %s", address,
                  zx_status_get_string(status));
           return zx::error(status);
         }
         break;
+      }
       case kDsiOpPhyPowerOn:
         zxlogf(TRACE, "dsi_phy_power_on size=%d", payload_size);
         set_signal_power_(/*on=*/true);
