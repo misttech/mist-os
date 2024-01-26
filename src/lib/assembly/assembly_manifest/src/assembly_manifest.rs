@@ -407,22 +407,34 @@ impl BlobfsContents {
     }
 
     fn add_package_blobs(
+        subpackage_name: Option<String>,
         package_manifest: PackageManifest,
         package_blobs: &mut Vec<PackageBlob>,
         merkle_size_map: &HashMap<String, u64>,
     ) -> anyhow::Result<()> {
         let (blobs, subpackages) = package_manifest.into_blobs_and_subpackages();
         for blob in blobs {
+            let path = if let Some(subpackage) = &subpackage_name {
+                format!("{}/{}", subpackage, &blob.path)
+            } else {
+                blob.path.to_string()
+            };
             package_blobs.push(PackageBlob {
                 merkle: blob.merkle.to_string(),
-                path: blob.path.to_string(),
+                path,
                 used_space_in_blobfs: *merkle_size_map.get(&blob.merkle.to_string()).with_context(
                     || format!("Blob merkle not found. {} {}", blob.path, blob.merkle),
                 )?,
             });
         }
         for subpackage in subpackages {
+            let subpackage_name = if let Some(parent_subpackage) = &subpackage_name {
+                format!("{}/{}", parent_subpackage, subpackage.name)
+            } else {
+                subpackage.name
+            };
             Self::add_package_blobs(
+                Some(subpackage_name),
                 PackageManifest::try_load_from(subpackage.manifest_path)?,
                 package_blobs,
                 merkle_size_map,
@@ -440,7 +452,7 @@ impl BlobfsContents {
         let package_manifest = PackageManifest::try_load_from(&manifest)?;
         let name = package_manifest.name().to_string();
         let mut package_blobs: Vec<PackageBlob> = vec![];
-        Self::add_package_blobs(package_manifest, &mut package_blobs, merkle_size_map)
+        Self::add_package_blobs(None, package_manifest, &mut package_blobs, merkle_size_map)
             .with_context(|| format!("adding package: {manifest}"))?;
         package_blobs.sort();
         package_set.0.push(PackageMetadata { name, manifest, blobs: package_blobs });
@@ -866,13 +878,19 @@ mod tests {
     #[test]
     fn test_blobfs_contents_add_base_or_cache_package() -> anyhow::Result<()> {
         let content = generate_test_package_manifest_content();
+        let super_content =
+            generate_test_super_package_manifest_content("package_manifest_temp_file.json");
 
         let mut package_manifest_temp_file = NamedTempFile::new()?;
+        let mut super_package_manifest_temp_file = NamedTempFile::new()?;
         let dir = tempdir().unwrap();
         let root = Utf8Path::from_path(dir.path()).unwrap();
         write!(package_manifest_temp_file, "{content}")?;
+        write!(super_package_manifest_temp_file, "{super_content}")?;
         let path = package_manifest_temp_file.into_temp_path();
         path.persist(dir.path().join("package_manifest_temp_file.json"))?;
+        let path = super_package_manifest_temp_file.into_temp_path();
+        path.persist(dir.path().join("super_package_manifest_temp_file.json"))?;
 
         let mut contents = BlobfsContents::default();
         let mut merkle_size_map: HashMap<String, u64> = HashMap::new();
@@ -890,9 +908,14 @@ mod tests {
         );
         contents
             .add_base_package(root.join("package_manifest_temp_file.json"), &merkle_size_map)?;
+        contents.add_base_package(
+            root.join("super_package_manifest_temp_file.json"),
+            &merkle_size_map,
+        )?;
         contents
             .add_cache_package(root.join("package_manifest_temp_file.json"), &merkle_size_map)?;
         let actual_package_blobs_base = &(contents.packages.base.0[0].blobs);
+        let actual_package_blobs_super_base = &(contents.packages.base.0[1].blobs);
         let actual_package_blobs_cache = &(contents.packages.cache.0[0].blobs);
 
         let package_blob1 = PackageBlob {
@@ -913,10 +936,31 @@ mod tests {
             used_space_in_blobfs: 30,
         };
 
+        let super_package_blob1 = PackageBlob {
+            merkle: "7ddff816740d5803358dd4478d8437585e8d5c984b4361817d891807a16ff581".to_string(),
+            path: "my-subpackage/bin/def".to_string(),
+            used_space_in_blobfs: 10,
+        };
+
+        let super_package_blob2 = PackageBlob {
+            merkle: "8cb3466c6e66592c8decaeaa3e399652fbe71dad5c3df1a5e919743a33815567".to_string(),
+            path: "my-subpackage/lib/ghi".to_string(),
+            used_space_in_blobfs: 20,
+        };
+
+        let super_package_blob3 = PackageBlob {
+            merkle: "eabdb84d26416c1821fd8972e0d835eedaf7468e5a9ebe01e5944462411aec70".to_string(),
+            path: "my-subpackage/abc/".to_string(),
+            used_space_in_blobfs: 30,
+        };
+
         let expected_blobs = vec![package_blob1, package_blob2, package_blob3];
+        let expected_super_blobs =
+            vec![super_package_blob1, super_package_blob2, super_package_blob3];
         // Verify if all 3 blobs are available and also if they are sorted.
         assert_eq!(actual_package_blobs_base, &expected_blobs);
         assert_eq!(actual_package_blobs_cache, &expected_blobs);
+        assert_eq!(actual_package_blobs_super_base, &expected_super_blobs);
 
         Ok(())
     }
@@ -953,6 +997,29 @@ mod tests {
         }
         "#;
         content.to_string()
+    }
+
+    fn generate_test_super_package_manifest_content(subpackage_manifest_path: &str) -> String {
+        format!(
+            r#"{{
+            "package": {{
+                "name": "super_package",
+                "version": "0"
+            }},
+            "blobs": [],
+            "subpackages": [
+                {{
+                    "name": "my-subpackage",
+                    "merkle": "eabdb84d26416c1821fd8972e0d835eedaf7468e5a9ebe01e5944462411aec70",
+                    "manifest_path": "{subpackage_manifest_path}"
+                }}
+            ],
+            "version": "1",
+            "blob_sources_relative": "file",
+            "repository": "fuchsia.com"
+        }}
+        "#
+        )
     }
 
     fn generate_test_manifest() -> AssemblyManifest {
