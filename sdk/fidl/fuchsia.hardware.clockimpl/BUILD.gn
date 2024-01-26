@@ -5,6 +5,7 @@
 import("//build/fidl/fidl.gni")
 
 fidl("fuchsia.hardware.clockimpl") {
+  sdk_category = "internal"
   sources = [
     "clock-impl.fidl",
     "init.fidl",

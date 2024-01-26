@@ -5,6 +5,7 @@
 import("//build/fidl/fidl.gni")
 
 fidl("fuchsia.hardware.gpioimpl") {
+  sdk_category = "internal"
   sources = [
     "gpio-impl.fidl",
     "metadata.fidl",

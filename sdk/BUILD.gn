@@ -567,6 +567,8 @@ sdk_molecule("platform_fidls") {
     "//sdk/fidl/fuchsia.debugger:fuchsia.debugger_sdk($fidl_toolchain)",
     "//sdk/fidl/fuchsia.exception:fuchsia.exception_sdk($fidl_toolchain)",
     "//sdk/fidl/fuchsia.hardware.block:fuchsia.hardware.block_sdk($fidl_toolchain)",
+    "//sdk/fidl/fuchsia.hardware.clockimpl:fuchsia.hardware.clockimpl_sdk($fidl_toolchain)",
+    "//sdk/fidl/fuchsia.hardware.gpioimpl:fuchsia.hardware.gpioimpl_sdk($fidl_toolchain)",
     "//sdk/fidl/fuchsia.hardware.platform.device:fuchsia.hardware.platform.device_sdk($fidl_toolchain)",
     "//sdk/fidl/fuchsia.hardware.sdmmc:fuchsia.hardware.sdmmc_sdk($fidl_toolchain)",
     "//sdk/fidl/fuchsia.sys2:fuchsia.sys2_sdk($fidl_toolchain)",
