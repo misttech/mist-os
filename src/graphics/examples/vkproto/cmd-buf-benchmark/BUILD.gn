@@ -57,6 +57,8 @@ executable("bin") {
     include_dirs += [ "//src/graphics/examples/vkproto/fuchsia" ]
 
     deps = [
+      # TODO(https://fxbug.dev/98632): workaround for toolchain issues, see bug
+      "//build/config/fuchsia:uses-outline-atomics-fxbug98632",
       "//src/lib/vulkan",
       "//src/lib/vulkan/swapchain",
     ]

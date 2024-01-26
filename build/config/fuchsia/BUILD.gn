@@ -290,6 +290,9 @@ group("uses-outline-atomics-fxbug98632") {
   visibility = [
     "${icu_root}:*",
     "//src/developer/debug/debug_agent/test_data:*",
+    "//src/developer/debug/e2e_tests/inferiors:*",
+    "//src/graphics/examples/vkproto:*",
+    "//src/graphics/examples/vkproto/cmd-buf-benchmark:*",
     "//third_party/ffmpeg:*",
     "//third_party/icu/default:*",
     "//third_party/icu/latest:*",

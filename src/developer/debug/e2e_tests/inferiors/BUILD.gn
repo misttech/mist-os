@@ -104,6 +104,9 @@ inferior("cpp_functions") {
 
 inferior("pretty_types") {
   sources = [ "pretty_types.cc" ]
+
+  # TODO(https://fxbug.dev/98632): workaround for toolchain issues, see bug
+  deps = [ "//build/config/fuchsia:uses-outline-atomics-fxbug98632" ]
 }
 
 inferior("rust_functions") {
