@@ -17,9 +17,6 @@
 #include "src/graphics/display/drivers/amlogic-display/common.h"
 #include "src/graphics/display/drivers/amlogic-display/panel-config.h"
 
-#define READ_DISPLAY_ID_CMD (0x04)
-#define READ_DISPLAY_ID_LEN (0x03)
-
 namespace amlogic_display {
 
 namespace {
@@ -55,16 +52,32 @@ zx_status_t CheckDsiDeviceRegister(ddk::DsiImplProtocolClient* dsiimpl, uint8_t 
 //
 // `dsiimpl` must be configured in DSI command mode.
 zx::result<uint32_t> GetMipiDsiDisplayId(ddk::DsiImplProtocolClient dsiimpl) {
-  uint8_t txcmd = READ_DISPLAY_ID_CMD;
-  uint8_t response[READ_DISPLAY_ID_LEN];
-  zx_status_t status = ZX_OK;
+  // TODO(https://fxbug.dev/322450952): The Read Display Identification
+  // Information (0x04) command is not guaranteed to be available on all
+  // display driver ICs. The response size and the actual meaning of the
+  // response may vary, depending on the DDIC models. Do not hardcode the
+  // command address and the response size.
+  //
+  // The following command address and response size are specified on:
+  // - JD9364 datasheet, Section 10.2.3 "RDDIDIF", page 146
+  // - JD9365D datasheet, Section 10.2.3 "RDDIDIF", page 130
+  // - ST7703I datasheet, Section 6.2.3 "Read Display ID", page 81
+  // - NT35596 datasheet, Section 6.1 "User Command Set (Command 1)", page 158
+  constexpr uint8_t kCommandReadDisplayIdentificationInformation = 0x04;
+  constexpr int kCommandReadDisplayIdentificationInformationResponseSize = 3;
+
+  const std::array<uint8_t, 1> payload = {
+      kCommandReadDisplayIdentificationInformation,
+  };
+  std::array<uint8_t, kCommandReadDisplayIdentificationInformationResponseSize> response;
   // Create the command using mipi-dsi library
   mipi_dsi_cmd_t cmd;
 
-  status =
-      mipi_dsi::MipiDsi::CreateCommand(&txcmd, 1, response, READ_DISPLAY_ID_LEN, COMMAND_GEN, &cmd);
+  zx_status_t status = mipi_dsi::MipiDsi::CreateCommand(
+      payload.data(), payload.size(), response.data(), response.size(), /*is_dcs=*/false, &cmd);
   if (status != ZX_OK) {
-    zxlogf(ERROR, "Failed to create READ_DISPLAY_ID command: %s", zx_status_get_string(status));
+    zxlogf(ERROR, "Failed to create Read Display Identification Information command: %s",
+           zx_status_get_string(status));
     return zx::error(status);
   }
 
