@@ -1605,7 +1605,6 @@ mod tests {
             IpLayerHandler,
         },
         socket::address::SocketIpAddr,
-        time::TimerIdInner,
         UnlockedCoreCtx,
     };
 
@@ -1658,116 +1657,160 @@ mod tests {
         assert!(net.step().is_idle());
     }
 
+    // Define some fake contexts and links specifically to test the fake
+    // network timers implementation.
+    #[derive(Default)]
+    struct FakeNetworkTestCtx {
+        timer_ctx: FakeTimerCtx<u32>,
+        frame_ctx: FakeFrameCtx<()>,
+        fired_timers: HashMap<u32, usize>,
+        frames_received: usize,
+    }
+
+    impl FakeNetworkTestCtx {
+        #[track_caller]
+        fn drain_and_assert_timers(&mut self, iter: impl IntoIterator<Item = (u32, usize)>) {
+            for (timer, fire_count) in iter {
+                assert_eq!(self.fired_timers.remove(&timer), Some(fire_count), "for timer {timer}");
+            }
+            assert!(self.fired_timers.is_empty(), "remaining timers: {:?}", self.fired_timers);
+        }
+
+        /// Generates an arbitrary request.
+        fn request() -> Vec<u8> {
+            vec![1, 2, 3, 4]
+        }
+
+        /// Generates an arbitrary response.
+        fn response() -> Vec<u8> {
+            vec![4, 3, 2, 1]
+        }
+    }
+
+    impl FakeNetworkContext for FakeNetworkTestCtx {
+        type TimerId = u32;
+        type SendMeta = ();
+        type RecvMeta = ();
+
+        fn handle_frame(&mut self, _recv: (), data: Buf<Vec<u8>>) {
+            self.frames_received += 1;
+            // If data is a request, generate a response. This mimics ICMP echo
+            // behavior.
+            if data.into_inner() == Self::request() {
+                self.frame_ctx.push((), Self::response())
+            }
+        }
+
+        fn handle_timer(&mut self, timer: u32) {
+            *self.fired_timers.entry(timer).or_insert(0) += 1;
+        }
+
+        fn process_queues(&mut self) -> bool {
+            false
+        }
+    }
+
+    impl WithFakeFrameContext<()> for FakeNetworkTestCtx {
+        fn with_fake_frame_ctx_mut<O, F: FnOnce(&mut FakeFrameCtx<()>) -> O>(&mut self, f: F) -> O {
+            f(&mut self.frame_ctx)
+        }
+    }
+
+    impl WithFakeTimerContext<u32> for FakeNetworkTestCtx {
+        fn with_fake_timer_ctx<O, F: FnOnce(&FakeTimerCtx<u32>) -> O>(&self, f: F) -> O {
+            f(&self.timer_ctx)
+        }
+
+        fn with_fake_timer_ctx_mut<O, F: FnOnce(&mut FakeTimerCtx<u32>) -> O>(
+            &mut self,
+            f: F,
+        ) -> O {
+            f(&mut self.timer_ctx)
+        }
+    }
+
+    fn new_fake_network_with_latency(
+        latency: Option<Duration>,
+    ) -> FakeNetwork<i32, FakeNetworkTestCtx, impl FakeNetworkLinks<(), (), i32>> {
+        FakeNetwork::new(
+            [(1, FakeNetworkTestCtx::default()), (2, FakeNetworkTestCtx::default())],
+            move |id, ()| {
+                vec![(
+                    match id {
+                        1 => 2,
+                        2 => 1,
+                        _ => unreachable!(),
+                    },
+                    (),
+                    latency,
+                )]
+            },
+        )
+    }
+
     #[test]
     fn test_fake_network_timers() {
         set_logger_for_test();
-        let (ctx_1, device_ids_1) = FAKE_CONFIG_V4.into_builder().build();
-        let (ctx_2, device_ids_2) = FAKE_CONFIG_V4.swap().into_builder().build();
-        let mut net = crate::context::testutil::new_simple_fake_network(
-            1,
-            ctx_1,
-            device_ids_1[0].downgrade(),
-            2,
-            ctx_2,
-            device_ids_2[0].downgrade(),
-        );
-        core::mem::drop((device_ids_1, device_ids_2));
+        let mut net = new_fake_network_with_latency(None);
 
-        net.with_context(1, |Ctx { core_ctx: _, bindings_ctx }| {
-            assert_eq!(
-                bindings_ctx.schedule_timer(Duration::from_secs(1), TimerId(TimerIdInner::Nop(1))),
-                None
-            );
-            assert_eq!(
-                bindings_ctx.schedule_timer(Duration::from_secs(4), TimerId(TimerIdInner::Nop(4))),
-                None
-            );
-            assert_eq!(
-                bindings_ctx.schedule_timer(Duration::from_secs(5), TimerId(TimerIdInner::Nop(5))),
-                None
-            );
+        net.with_context(1, |FakeNetworkTestCtx { timer_ctx, .. }| {
+            assert_eq!(timer_ctx.schedule_timer(Duration::from_secs(1), 1), None);
+            assert_eq!(timer_ctx.schedule_timer(Duration::from_secs(4), 4), None);
+            assert_eq!(timer_ctx.schedule_timer(Duration::from_secs(5), 5), None);
         });
 
-        net.with_context(2, |Ctx { core_ctx: _, bindings_ctx }| {
-            assert_eq!(
-                bindings_ctx.schedule_timer(Duration::from_secs(2), TimerId(TimerIdInner::Nop(2))),
-                None
-            );
-            assert_eq!(
-                bindings_ctx.schedule_timer(Duration::from_secs(3), TimerId(TimerIdInner::Nop(3))),
-                None
-            );
-            assert_eq!(
-                bindings_ctx.schedule_timer(Duration::from_secs(5), TimerId(TimerIdInner::Nop(6))),
-                None
-            );
+        net.with_context(2, |FakeNetworkTestCtx { timer_ctx, .. }| {
+            assert_eq!(timer_ctx.schedule_timer(Duration::from_secs(2), 2), None);
+            assert_eq!(timer_ctx.schedule_timer(Duration::from_secs(3), 3), None);
+            assert_eq!(timer_ctx.schedule_timer(Duration::from_secs(5), 6), None);
         });
 
         // No timers fired before.
-        assert_eq!(net.core_ctx(1).state.timer_counters.nop.get(), 0);
-        assert_eq!(net.core_ctx(2).state.timer_counters.nop.get(), 0);
+        net.context(1).drain_and_assert_timers([]);
+        net.context(2).drain_and_assert_timers([]);
         assert_eq!(net.step().timers_fired, 1);
         // Only timer in context 1 should have fired.
-        assert_eq!(net.core_ctx(1).state.timer_counters.nop.get(), 1);
-        assert_eq!(net.core_ctx(2).state.timer_counters.nop.get(), 0);
+        net.context(1).drain_and_assert_timers([(1, 1)]);
+        net.context(2).drain_and_assert_timers([]);
         assert_eq!(net.step().timers_fired, 1);
         // Only timer in context 2 should have fired.
-        assert_eq!(net.core_ctx(1).state.timer_counters.nop.get(), 1);
-        assert_eq!(net.core_ctx(2).state.timer_counters.nop.get(), 1);
+        net.context(1).drain_and_assert_timers([]);
+        net.context(2).drain_and_assert_timers([(2, 1)]);
         assert_eq!(net.step().timers_fired, 1);
         // Only timer in context 2 should have fired.
-        assert_eq!(net.core_ctx(1).state.timer_counters.nop.get(), 1);
-        assert_eq!(net.core_ctx(2).state.timer_counters.nop.get(), 2);
+        net.context(1).drain_and_assert_timers([]);
+        net.context(2).drain_and_assert_timers([(3, 1)]);
         assert_eq!(net.step().timers_fired, 1);
         // Only timer in context 1 should have fired.
-        assert_eq!(net.core_ctx(1).state.timer_counters.nop.get(), 2);
-        assert_eq!(net.core_ctx(2).state.timer_counters.nop.get(), 2);
+        net.context(1).drain_and_assert_timers([(4, 1)]);
+        net.context(2).drain_and_assert_timers([]);
         assert_eq!(net.step().timers_fired, 2);
         // Both timers have fired at the same time.
-        assert_eq!(net.core_ctx(1).state.timer_counters.nop.get(), 3);
-        assert_eq!(net.core_ctx(2).state.timer_counters.nop.get(), 3);
+        net.context(1).drain_and_assert_timers([(5, 1)]);
+        net.context(2).drain_and_assert_timers([(6, 1)]);
 
         assert!(net.step().is_idle());
         // Check that current time on contexts tick together.
-        let t1 = net.with_context(1, |Ctx { core_ctx: _, bindings_ctx }| bindings_ctx.now());
-        let t2 = net.with_context(2, |Ctx { core_ctx: _, bindings_ctx }| bindings_ctx.now());
+        let t1 = net.with_context(1, |FakeNetworkTestCtx { timer_ctx, .. }| timer_ctx.now());
+        let t2 = net.with_context(2, |FakeNetworkTestCtx { timer_ctx, .. }| timer_ctx.now());
         assert_eq!(t1, t2);
     }
 
     #[test]
     fn test_fake_network_until_idle() {
         set_logger_for_test();
-        let (ctx_1, device_ids_1) = FAKE_CONFIG_V4.into_builder().build();
-        let (ctx_2, device_ids_2) = FAKE_CONFIG_V4.swap().into_builder().build();
-        let mut net = crate::context::testutil::new_simple_fake_network(
-            1,
-            ctx_1,
-            device_ids_1[0].downgrade(),
-            2,
-            ctx_2,
-            device_ids_2[0].downgrade(),
-        );
-        core::mem::drop((device_ids_1, device_ids_2));
+        let mut net = new_fake_network_with_latency(None);
 
-        net.with_context(1, |Ctx { core_ctx: _, bindings_ctx }| {
-            assert_eq!(
-                bindings_ctx.schedule_timer(Duration::from_secs(1), TimerId(TimerIdInner::Nop(1))),
-                None
-            );
+        net.with_context(1, |FakeNetworkTestCtx { timer_ctx, .. }| {
+            assert_eq!(timer_ctx.schedule_timer(Duration::from_secs(1), 1), None);
         });
-        net.with_context(2, |Ctx { core_ctx: _, bindings_ctx }| {
-            assert_eq!(
-                bindings_ctx.schedule_timer(Duration::from_secs(2), TimerId(TimerIdInner::Nop(2))),
-                None
-            );
-            assert_eq!(
-                bindings_ctx.schedule_timer(Duration::from_secs(3), TimerId(TimerIdInner::Nop(3))),
-                None
-            );
+        net.with_context(2, |FakeNetworkTestCtx { timer_ctx, .. }| {
+            assert_eq!(timer_ctx.schedule_timer(Duration::from_secs(2), 2), None);
+            assert_eq!(timer_ctx.schedule_timer(Duration::from_secs(3), 3), None);
         });
 
-        while !net.step().is_idle() && net.core_ctx(1).state.timer_counters.nop.get() < 1
-            || net.core_ctx(2).state.timer_counters.nop.get() < 1
+        while !net.step().is_idle() && net.context(1).fired_timers.len() < 1
+            || net.context(2).fired_timers.len() < 1
         {}
         // Assert that we stopped before all times were fired, meaning we can
         // step again.
@@ -1778,100 +1821,37 @@ mod tests {
     fn test_delayed_packets() {
         set_logger_for_test();
         // Create a network that takes 5ms to get any packet to go through.
-        let latency = Duration::from_millis(5);
-        let (alice_ctx, alice_device_ids) = FAKE_CONFIG_V4.into_builder().build();
-        let (bob_ctx, bob_device_ids) = FAKE_CONFIG_V4.swap().into_builder().build();
-        let alice_device_id = alice_device_ids[0].clone();
-        let bob_device_id = bob_device_ids[0].clone();
-        core::mem::drop((alice_device_ids, bob_device_ids));
-        let mut net = FakeNetwork::new(
-            [("alice", alice_ctx), ("bob", bob_ctx)],
-            move |net: &'static str, _device_id: EthernetWeakDeviceId<FakeBindingsCtx>| {
-                if net == "alice" {
-                    vec![("bob", bob_device_id.clone(), Some(latency))]
-                } else {
-                    vec![("alice", alice_device_id.clone(), Some(latency))]
-                }
-            },
-        );
+        let mut net = new_fake_network_with_latency(Some(Duration::from_millis(5)));
 
-        // Alice sends Bob a ping.
-        net.with_context("alice", |Ctx { core_ctx, bindings_ctx }| {
-            IpSocketHandler::<Ipv4, _>::send_oneshot_ip_packet(
-                &mut CoreCtx::new_deprecated(&*core_ctx),
-                bindings_ctx,
-                None, // device
-                None, // local_ip
-                SocketIpAddr::try_from(FAKE_CONFIG_V4.remote_ip).unwrap(),
-                Ipv4Proto::Icmp,
-                DefaultSendOptions,
-                |_| {
-                    let req = IcmpEchoRequest::new(0, 0);
-                    let req_body = &[1, 2, 3, 4];
-                    Buf::new(req_body.to_vec(), ..).encapsulate(IcmpPacketBuilder::<Ipv4, _>::new(
-                        FAKE_CONFIG_V4.local_ip,
-                        FAKE_CONFIG_V4.remote_ip,
-                        IcmpUnusedCode,
-                        req,
-                    ))
-                },
-                None,
-            )
-            .unwrap();
+        // 1 sends 2 a request and schedules a timer.
+        net.with_context(1, |FakeNetworkTestCtx { frame_ctx, timer_ctx, .. }| {
+            frame_ctx.push((), FakeNetworkTestCtx::request());
+            assert_eq!(timer_ctx.schedule_timer(Duration::from_millis(3), 1), None);
         });
-
-        net.with_context("alice", |Ctx { core_ctx: _, bindings_ctx }| {
-            assert_eq!(
-                bindings_ctx
-                    .schedule_timer(Duration::from_millis(3), TimerId(TimerIdInner::Nop(1))),
-                None
-            );
-        });
-        net.with_context("bob", |Ctx { core_ctx: _, bindings_ctx }| {
-            assert_eq!(
-                bindings_ctx
-                    .schedule_timer(Duration::from_millis(7), TimerId(TimerIdInner::Nop(2))),
-                None
-            );
-            assert_eq!(
-                bindings_ctx
-                    .schedule_timer(Duration::from_millis(10), TimerId(TimerIdInner::Nop(1))),
-                None
-            );
+        // 2 schedules some timers.
+        net.with_context(2, |FakeNetworkTestCtx { timer_ctx, .. }| {
+            assert_eq!(timer_ctx.schedule_timer(Duration::from_millis(7), 2), None);
+            assert_eq!(timer_ctx.schedule_timer(Duration::from_millis(10), 1), None);
         });
 
         // Order of expected events is as follows:
-        // - Alice's timer expires at t = 3
-        // - Bob receives Alice's packet at t = 5
-        // - Bob's timer expires at t = 7
-        // - Alice receives Bob's response and Bob's last timer fires at t = 10
+        // - ctx1's timer expires at t = 3
+        // - ctx2 receives ctx1's packet at t = 5
+        // - ctx2's timer expires at t = 7
+        // - ctx1 receives ctx2's response and ctx2's last timer fires at t = 10
 
-        fn assert_full_state<
-            'a,
-            L: FakeNetworkLinks<
-                EthernetWeakDeviceId<FakeBindingsCtx>,
-                EthernetDeviceId<FakeBindingsCtx>,
-                &'a str,
-            >,
-        >(
-            net: &mut FakeNetwork<&'a str, FakeCtx, L>,
-            alice_nop: u64,
-            bob_nop: u64,
-            bob_echo_request: u64,
-            alice_echo_response: u64,
-        ) {
-            assert_eq!(net.core_ctx("alice").state.timer_counters.nop.get(), alice_nop);
-            assert_eq!(
-                net.core_ctx("alice").state.icmp_rx_counters::<Ipv4>().echo_reply.get(),
-                alice_echo_response
-            );
-
-            assert_eq!(net.core_ctx("bob").state.timer_counters.nop.get(), bob_nop);
-            assert_eq!(
-                net.core_ctx("bob").state.icmp_rx_counters::<Ipv4>().echo_request.get(),
-                bob_echo_request
-            );
-        }
+        let assert_full_state = |net: &mut FakeNetwork<_, FakeNetworkTestCtx, _>,
+                                 ctx1_timers,
+                                 ctx2_timers,
+                                 ctx2_frames,
+                                 ctx1_frames| {
+            let ctx1 = net.context(1);
+            assert_eq!(ctx1.fired_timers.len(), ctx1_timers);
+            assert_eq!(ctx1.frames_received, ctx1_frames);
+            let ctx2 = net.context(2);
+            assert_eq!(ctx2.fired_timers.len(), ctx2_timers);
+            assert_eq!(ctx2.frames_received, ctx2_frames);
+        };
 
         assert_eq!(net.step().timers_fired, 1);
         assert_full_state(&mut net, 1, 0, 0, 0);

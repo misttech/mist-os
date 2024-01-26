@@ -54,9 +54,6 @@ pub(crate) enum TimerIdInner<BT: BindingsTypes> {
     Ipv4Device(IpDeviceTimerId<Ipv4, DeviceId<BT>>),
     /// A timer event for an IPv6 device.
     Ipv6Device(IpDeviceTimerId<Ipv6, DeviceId<BT>>),
-    /// A no-op timer event (used for tests)
-    #[cfg(test)]
-    Nop(usize),
 }
 
 impl<BT: BindingsTypes> TimerIdInner<BT> {
@@ -158,8 +155,7 @@ impl_timer_context!(
     id
 );
 
-impl<BT, #[cfg(test)] CC: crate::context::CounterContext<TimerCounters>, #[cfg(not(test))] CC>
-    TimerHandler<BT, TimerId<BT>> for CC
+impl<BT, CC> TimerHandler<BT, TimerId<BT>> for CC
 where
     BT: BindingsTypes,
     CC: TimerHandler<BT, DeviceLayerTimerId<BT>>
@@ -176,41 +172,7 @@ where
             TimerId(TimerIdInner::IpLayer(x)) => self.handle_timer(bindings_ctx, x),
             TimerId(TimerIdInner::Ipv4Device(x)) => self.handle_timer(bindings_ctx, x),
             TimerId(TimerIdInner::Ipv6Device(x)) => self.handle_timer(bindings_ctx, x),
-            #[cfg(test)]
-            TimerId(TimerIdInner::Nop(_)) => {
-                self.increment(|counters: &TimerCounters| &counters.nop)
-            }
         }
-    }
-}
-
-#[cfg(test)]
-/// Timer-related counters.
-#[derive(Default)]
-pub struct TimerCounters {
-    /// Count of no-op timers handled.
-    pub(crate) nop: crate::counters::Counter,
-}
-
-#[cfg(test)]
-impl<BT: BindingsTypes> lock_order::lock::UnlockedAccess<crate::lock_ordering::TimerCounters>
-    for crate::StackState<BT>
-{
-    type Data = TimerCounters;
-    type Guard<'l> = &'l TimerCounters where Self: 'l;
-
-    fn access(&self) -> Self::Guard<'_> {
-        &self.timer_counters
-    }
-}
-
-#[cfg(test)]
-impl<BT: BindingsTypes, L> crate::context::CounterContext<TimerCounters>
-    for crate::context::CoreCtx<'_, BT, L>
-{
-    fn with_counters<O, F: FnOnce(&TimerCounters) -> O>(&self, cb: F) -> O {
-        use lock_order::wrap::prelude::*;
-        cb(self.unlocked_access::<crate::lock_ordering::TimerCounters>())
     }
 }
 

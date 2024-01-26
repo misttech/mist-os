@@ -52,8 +52,6 @@ impl StackStateBuilder {
             ipv4: self.ipv4.build(),
             ipv6: self.ipv6.build(),
             device: DeviceLayerState::new(),
-            #[cfg(test)]
-            timer_counters: Default::default(),
         }
     }
 }
@@ -64,8 +62,6 @@ pub struct StackState<BT: BindingsTypes> {
     pub(crate) ipv4: Ipv4State<BT::Instant, DeviceId<BT>, BT::DeviceClass>,
     pub(crate) ipv6: Ipv6State<BT::Instant, DeviceId<BT>, BT::DeviceClass>,
     pub(crate) device: DeviceLayerState<BT>,
-    #[cfg(test)]
-    pub(crate) timer_counters: crate::time::TimerCounters,
 }
 
 impl<BT: BindingsTypes> StackState<BT> {

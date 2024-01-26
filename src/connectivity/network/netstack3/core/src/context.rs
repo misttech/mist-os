@@ -1864,6 +1864,14 @@ pub(crate) mod testutil {
         pub(crate) fn context<K: Into<CtxId>>(&mut self, context: K) -> &mut Ctx {
             self.contexts.get_mut(&context.into()).unwrap()
         }
+
+        pub(crate) fn with_context<K: Into<CtxId>, O, F: FnOnce(&mut Ctx) -> O>(
+            &mut self,
+            context: K,
+            f: F,
+        ) -> O {
+            f(self.context(context))
+        }
     }
 
     #[cfg(test)]
@@ -2169,18 +2177,6 @@ pub(crate) mod testutil {
             CtxId,
         >,
     {
-        pub(crate) fn with_context<
-            K: Into<CtxId>,
-            O,
-            F: FnOnce(&mut crate::testutil::ContextPair<CC, BC>) -> O,
-        >(
-            &mut self,
-            context: K,
-            f: F,
-        ) -> O {
-            f(self.context(context))
-        }
-
         /// Retrieves a `FakeCoreCtx` named `context`.
         pub(crate) fn core_ctx<K: Into<CtxId>>(&mut self, context: K) -> &mut CC {
             let crate::testutil::ContextPair { core_ctx, bindings_ctx: _ } = self.context(context);

@@ -136,9 +136,6 @@ pub struct IcmpTxCounters<I>(PhantomData<I>, Never);
 pub struct IcmpRxCounters<I>(PhantomData<I>, Never);
 // Provides unlocked access of NdpCounters.
 pub enum NdpCounters {}
-// Provides unlocked access of TimerCounters.
-#[cfg(test)]
-pub enum TimerCounters {}
 // Provides unlocked access of DeviceCounters.
 pub enum DeviceCounters {}
 // Provides unlocked access of ArpCounters.
