@@ -30,6 +30,7 @@ import (
 	"go.fuchsia.dev/fuchsia/tools/lib/jsonutil"
 	"go.fuchsia.dev/fuchsia/tools/lib/logger"
 	"go.fuchsia.dev/fuchsia/tools/lib/osmisc"
+	"go.fuchsia.dev/fuchsia/tools/lib/retry"
 	"go.fuchsia.dev/fuchsia/tools/lib/serial"
 	"go.fuchsia.dev/fuchsia/tools/lib/syslog"
 	"go.fuchsia.dev/fuchsia/tools/net/sshutil"
@@ -92,6 +93,10 @@ type FuchsiaTarget interface {
 	// SerialSocketPath returns the path to the target's serial socket.
 	SerialSocketPath() string
 
+	// SetConnectionTimeout sets the timeout for making an SSH connection or resolving
+	// the IP address.
+	SetConnectionTimeout(time.Duration)
+
 	// SSHClient returns an SSH client to the device (if the device has SSH running).
 	SSHClient() (*sshutil.Client, error)
 
@@ -138,10 +143,11 @@ type genericFuchsiaTarget struct {
 	targetCtx       context.Context
 	targetCtxCancel context.CancelFunc
 
-	nodename     string
-	serial       io.ReadWriteCloser
-	serialSocket string
-	sshKeys      []string
+	nodename          string
+	serial            io.ReadWriteCloser
+	serialSocket      string
+	sshKeys           []string
+	connectionTimeout time.Duration
 
 	ipv4         net.IP
 	ipv6         *net.IPAddr
@@ -232,7 +238,11 @@ func (t *genericFuchsiaTarget) StartSerialServer() error {
 // resolveIP uses mDNS to resolve the IPv6 and IPv4 addresses of the
 // target. It then caches the results so future requests are fast.
 func (t *genericFuchsiaTarget) resolveIP() error {
-	ctx, cancel := context.WithTimeout(t.targetCtx, 2*time.Minute)
+	timeout := 2 * time.Minute
+	if t.connectionTimeout != 0 {
+		timeout = t.connectionTimeout
+	}
+	ctx, cancel := context.WithTimeout(t.targetCtx, timeout)
 	defer cancel()
 	ipv4, ipv6, err := ResolveIP(ctx, t.nodename)
 	if err != nil {
@@ -308,6 +318,12 @@ func (t *genericFuchsiaTarget) CaptureSerialLog(filename string) error {
 	}
 }
 
+// SetConnectionTimeout sets the timeout for making an SSH connection or
+// resolving the IP address.
+func (t *genericFuchsiaTarget) SetConnectionTimeout(timeout time.Duration) {
+	t.connectionTimeout = timeout
+}
+
 // sshClient is a helper function that returns an SSH client connected to the
 // target, which can be found at the given address.
 func (t *genericFuchsiaTarget) sshClient(addr *net.IPAddr) (*sshutil.Client, error) {
@@ -323,6 +339,10 @@ func (t *genericFuchsiaTarget) sshClient(addr *net.IPAddr) (*sshutil.Client, err
 	if err != nil {
 		return nil, err
 	}
+	connectBackoff := sshutil.DefaultConnectBackoff()
+	if t.connectionTimeout != 0 {
+		connectBackoff = retry.WithMaxDuration(retry.NewConstantBackoff(time.Second), t.connectionTimeout)
+	}
 	return sshutil.NewClient(
 		t.targetCtx,
 		sshutil.ConstantAddrResolver{
@@ -333,7 +353,7 @@ func (t *genericFuchsiaTarget) sshClient(addr *net.IPAddr) (*sshutil.Client, err
 			},
 		},
 		config,
-		sshutil.DefaultConnectBackoff(),
+		connectBackoff,
 	)
 }
 
@@ -633,6 +653,10 @@ func StartTargets(ctx context.Context, opts StartOptions, targets []FuchsiaTarge
 	eg, startCtx := errgroup.WithContext(ctx)
 	for _, t := range targets {
 		t := t
+		// TODO(https://fxbug.dev/322239710): Find a way to set this per product bundle.
+		if opts.IsBootTest {
+			t.SetConnectionTimeout(10 * time.Minute)
+		}
 		eg.Go(func() error {
 			imgs, closeFunc, err := bootserver.GetImages(startCtx, opts.ImageManifest, bootMode)
 			if err != nil {
