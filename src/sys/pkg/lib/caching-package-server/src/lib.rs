@@ -118,7 +118,7 @@ impl<S: package_directory::NonMetaStorage + Clone> CachingPackageServer<S> {
         // Making a RootDir takes ~100,000 ns (it reads the meta.far), so do this without the lock.
         let root_dir =
             match package_directory::RootDir::new(self.non_meta_storage.clone(), hash).await {
-                Ok(root_dir) => Arc::new(root_dir),
+                Ok(root_dir) => root_dir,
                 Err(e) => {
                     let () = vfs::common::send_on_open_with_error(
                         flags.contains(fio::OpenFlags::DESCRIBE),
@@ -143,7 +143,7 @@ impl<S: package_directory::NonMetaStorage + Clone> CachingPackageServer<S> {
             };
             // Create the connection while the lock is held so that the cleanup future doesn't busy
             // loop if the last outstanding connection happens to close while this one is made.
-            let () = Arc::clone(&root_dir).open(
+            let () = root_dir.clone().open(
                 scope.clone(),
                 flags,
                 vfs::path::Path::dot(),

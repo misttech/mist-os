@@ -29,8 +29,8 @@ pub(crate) struct MetaSubdir<S: crate::NonMetaStorage> {
 }
 
 impl<S: crate::NonMetaStorage> MetaSubdir<S> {
-    pub(crate) fn new(root_dir: Arc<RootDir<S>>, path: String) -> Self {
-        MetaSubdir { root_dir, path }
+    pub(crate) fn new(root_dir: Arc<RootDir<S>>, path: String) -> Arc<Self> {
+        Arc::new(MetaSubdir { root_dir, path })
     }
 }
 
@@ -78,7 +78,7 @@ impl<S: crate::NonMetaStorage> vfs::directory::entry::DirectoryEntry for MetaSub
         );
 
         if let Some(location) = self.root_dir.meta_files.get(&file_path).copied() {
-            let () = Arc::new(MetaFile::new(Arc::clone(&self.root_dir), location)).open(
+            let () = MetaFile::new(self.root_dir.clone(), location).open(
                 scope,
                 flags,
                 VfsPath::dot(),
@@ -90,8 +90,12 @@ impl<S: crate::NonMetaStorage> vfs::directory::entry::DirectoryEntry for MetaSub
         let directory_path = file_path + "/";
         for k in self.root_dir.meta_files.keys() {
             if k.starts_with(&directory_path) {
-                let () = Arc::new(MetaSubdir::new(Arc::clone(&self.root_dir), directory_path))
-                    .open(scope, flags, VfsPath::dot(), server_end);
+                let () = MetaSubdir::new(self.root_dir.clone(), directory_path).open(
+                    scope,
+                    flags,
+                    VfsPath::dot(),
+                    server_end,
+                );
                 return;
             }
         }
@@ -148,7 +152,7 @@ impl<S: crate::NonMetaStorage> vfs::directory::entry::DirectoryEntry for MetaSub
 
         if let Some(location) = self.root_dir.meta_files.get(&file_path).copied() {
             object_request.take().handle(|object_request| {
-                Arc::new(MetaFile::new(Arc::clone(&self.root_dir), location)).open2(
+                MetaFile::new(self.root_dir.clone(), location).open2(
                     scope,
                     VfsPath::dot(),
                     protocols,
@@ -162,7 +166,7 @@ impl<S: crate::NonMetaStorage> vfs::directory::entry::DirectoryEntry for MetaSub
         for k in self.root_dir.meta_files.keys() {
             if k.starts_with(&directory_path) {
                 object_request.take().handle(|object_request| {
-                    Arc::new(MetaSubdir::new(Arc::clone(&self.root_dir), directory_path)).open2(
+                    MetaSubdir::new(self.root_dir.clone(), directory_path).open2(
                         scope,
                         VfsPath::dot(),
                         protocols,
@@ -277,7 +281,7 @@ mod tests {
     }
 
     impl TestEnv {
-        async fn new() -> (Self, MetaSubdir<blobfs::Client>) {
+        async fn new() -> (Self, Arc<MetaSubdir<blobfs::Client>>) {
             let pkg = PackageBuilder::new("pkg")
                 .add_resource_at("meta/dir/dir/file", &b"contents"[..])
                 .build()
@@ -287,7 +291,7 @@ mod tests {
             let (blobfs_fake, blobfs_client) = FakeBlobfs::new();
             blobfs_fake.add_blob(metafar_blob.merkle, metafar_blob.contents);
             let root_dir = RootDir::new(blobfs_client, metafar_blob.merkle).await.unwrap();
-            let sub_dir = MetaSubdir::new(Arc::new(root_dir), "meta/dir/".to_string());
+            let sub_dir = MetaSubdir::new(root_dir, "meta/dir/".to_string());
             (Self { _blobfs_fake: blobfs_fake }, sub_dir)
         }
     }
@@ -295,10 +299,9 @@ mod tests {
     #[fuchsia_async::run_singlethreaded(test)]
     async fn directory_entry_open_unsets_posix_flags() {
         let (_env, sub_dir) = TestEnv::new().await;
-        let sub_dir = Arc::new(sub_dir);
 
         let () = crate::verify_open_adjusts_flags(
-            &(sub_dir as Arc<dyn DirectoryEntry>),
+            sub_dir,
             fio::OpenFlags::RIGHT_READABLE
                 | fio::OpenFlags::POSIX_WRITABLE
                 | fio::OpenFlags::POSIX_EXECUTABLE,
@@ -310,7 +313,6 @@ mod tests {
     #[fuchsia_async::run_singlethreaded(test)]
     async fn directory_entry_open_rejects_disallowed_flags() {
         let (_env, sub_dir) = TestEnv::new().await;
-        let sub_dir = Arc::new(sub_dir);
 
         for forbidden_flag in [
             fio::OpenFlags::RIGHT_WRITABLE,
@@ -323,7 +325,7 @@ mod tests {
             let (proxy, server_end) =
                 fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
             DirectoryEntry::open(
-                Arc::clone(&sub_dir),
+                sub_dir.clone(),
                 ExecutionScope::new(),
                 fio::OpenFlags::DESCRIBE | forbidden_flag,
                 VfsPath::dot(),
@@ -343,7 +345,8 @@ mod tests {
         let (_env, sub_dir) = TestEnv::new().await;
         let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
 
-        Arc::new(sub_dir).open(
+        DirectoryEntry::open(
+            sub_dir,
             ExecutionScope::new(),
             fio::OpenFlags::RIGHT_READABLE,
             VfsPath::dot(),
@@ -362,11 +365,11 @@ mod tests {
     #[fuchsia_async::run_singlethreaded(test)]
     async fn directory_entry_open_file() {
         let (_env, sub_dir) = TestEnv::new().await;
-        let sub_dir = Arc::new(sub_dir);
 
         for path in ["dir/file", "dir/file/"] {
             let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::FileMarker>().unwrap();
-            Arc::clone(&sub_dir).open(
+            DirectoryEntry::open(
+                sub_dir.clone(),
                 ExecutionScope::new(),
                 fio::OpenFlags::RIGHT_READABLE,
                 VfsPath::validate_and_split(path).unwrap(),
@@ -380,12 +383,12 @@ mod tests {
     #[fuchsia_async::run_singlethreaded(test)]
     async fn directory_entry_open_directory() {
         let (_env, sub_dir) = TestEnv::new().await;
-        let sub_dir = Arc::new(sub_dir);
 
         for path in ["dir", "dir/"] {
             let (proxy, server_end) =
                 fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
-            Arc::clone(&sub_dir).open(
+            DirectoryEntry::open(
+                sub_dir.clone(),
                 ExecutionScope::new(),
                 fio::OpenFlags::RIGHT_READABLE,
                 VfsPath::validate_and_split(path).unwrap(),
@@ -407,7 +410,7 @@ mod tests {
         let (_env, sub_dir) = TestEnv::new().await;
 
         assert_eq!(
-            DirectoryEntry::entry_info(&sub_dir),
+            DirectoryEntry::entry_info(sub_dir.as_ref()),
             EntryInfo::new(fio::INO_UNKNOWN, fio::DirentType::Directory)
         );
     }
@@ -416,10 +419,13 @@ mod tests {
     async fn directory_read_dirents() {
         let (_env, sub_dir) = TestEnv::new().await;
 
-        let (pos, sealed) = sub_dir
-            .read_dirents(&TraversalPosition::Start, Box::new(crate::tests::FakeSink::new(3)))
-            .await
-            .expect("read_dirents failed");
+        let (pos, sealed) = Directory::read_dirents(
+            sub_dir.as_ref(),
+            &TraversalPosition::Start,
+            Box::new(crate::tests::FakeSink::new(3)),
+        )
+        .await
+        .expect("read_dirents failed");
         assert_eq!(
             crate::tests::FakeSink::from_sealed(sealed).entries,
             vec![
@@ -438,7 +444,7 @@ mod tests {
 
         assert_eq!(
             Directory::register_watcher(
-                Arc::new(sub_dir),
+                sub_dir,
                 ExecutionScope::new(),
                 fio::WatchMask::empty(),
                 server.try_into().unwrap(),
@@ -452,7 +458,7 @@ mod tests {
         let (_env, sub_dir) = TestEnv::new().await;
 
         assert_eq!(
-            sub_dir.get_attrs().await.unwrap(),
+            Node::get_attrs(sub_dir.as_ref()).await.unwrap(),
             fio::NodeAttributes {
                 mode: fio::MODE_TYPE_DIRECTORY | 0o700,
                 id: 1,
@@ -470,7 +476,7 @@ mod tests {
         let (_env, sub_dir) = TestEnv::new().await;
 
         assert_eq!(
-            sub_dir.get_attributes(fio::NodeAttributesQuery::all()).await.unwrap(),
+            Node::get_attributes(sub_dir.as_ref(), fio::NodeAttributesQuery::all()).await.unwrap(),
             attributes!(
                 fio::NodeAttributesQuery::all(),
                 Mutable {
@@ -498,21 +504,16 @@ mod tests {
     #[fuchsia_async::run_singlethreaded(test)]
     async fn directory_entry_open2_self() {
         let (_env, sub_dir) = TestEnv::new().await;
-        let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
 
+        let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
+        let scope = ExecutionScope::new();
         let protocols = fio::ConnectionProtocols::Node(fio::NodeOptions {
             rights: Some(fio::Operations::READ_BYTES),
             ..Default::default()
         });
-        protocols.to_object_request(server_end).handle(|req| {
-            DirectoryEntry::open2(
-                Arc::new(sub_dir),
-                ExecutionScope::new(),
-                VfsPath::dot(),
-                protocols,
-                req,
-            )
-        });
+        protocols
+            .to_object_request(server_end)
+            .handle(|req| DirectoryEntry::open2(sub_dir, scope, VfsPath::dot(), protocols, req));
 
         assert_eq!(
             fuchsia_fs::directory::readdir(&proxy).await.unwrap(),
@@ -526,23 +527,18 @@ mod tests {
     #[fuchsia_async::run_singlethreaded(test)]
     async fn directory_entry_open2_file() {
         let (_env, sub_dir) = TestEnv::new().await;
-        let sub_dir = Arc::new(sub_dir);
 
         for path in ["dir/file", "dir/file/"] {
             let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::FileMarker>().unwrap();
+            let scope = ExecutionScope::new();
             let protocols = fio::ConnectionProtocols::Node(fio::NodeOptions {
                 rights: Some(fio::Operations::READ_BYTES),
                 ..Default::default()
             });
-            protocols.to_object_request(server_end).handle(|req| {
-                DirectoryEntry::open2(
-                    Arc::clone(&sub_dir),
-                    ExecutionScope::new(),
-                    VfsPath::validate_and_split(path).unwrap(),
-                    protocols,
-                    req,
-                )
-            });
+            let path = VfsPath::validate_and_split(path).unwrap();
+            protocols
+                .to_object_request(server_end)
+                .handle(|req| DirectoryEntry::open2(sub_dir.clone(), scope, path, protocols, req));
 
             assert_eq!(fuchsia_fs::file::read(&proxy).await.unwrap(), b"contents".to_vec());
         }
@@ -551,24 +547,19 @@ mod tests {
     #[fuchsia_async::run_singlethreaded(test)]
     async fn directory_entry_open2_directory() {
         let (_env, sub_dir) = TestEnv::new().await;
-        let sub_dir = Arc::new(sub_dir);
 
         for path in ["dir", "dir/"] {
             let (proxy, server_end) =
                 fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
+            let scope = ExecutionScope::new();
             let protocols = fio::ConnectionProtocols::Node(fio::NodeOptions {
                 rights: Some(fio::Operations::READ_BYTES),
                 ..Default::default()
             });
-            protocols.to_object_request(server_end).handle(|req| {
-                DirectoryEntry::open2(
-                    Arc::clone(&sub_dir),
-                    ExecutionScope::new(),
-                    VfsPath::validate_and_split(path).unwrap(),
-                    protocols,
-                    req,
-                )
-            });
+            let path = VfsPath::validate_and_split(path).unwrap();
+            protocols
+                .to_object_request(server_end)
+                .handle(|req| DirectoryEntry::open2(sub_dir.clone(), scope, path, protocols, req));
 
             assert_eq!(
                 fuchsia_fs::directory::readdir(&proxy).await.unwrap(),
@@ -583,25 +574,18 @@ mod tests {
     #[fuchsia_async::run_singlethreaded(test)]
     async fn directory_entry_open2_rejects_forbidden_open_modes() {
         let (_env, sub_dir) = TestEnv::new().await;
-        let sub_dir = Arc::new(sub_dir);
 
         for forbidden_open_mode in [fio::OpenMode::AlwaysCreate, fio::OpenMode::MaybeCreate] {
             let (proxy, server_end) =
                 fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
-
+            let scope = ExecutionScope::new();
             let protocols = fio::ConnectionProtocols::Node(fio::NodeOptions {
                 mode: Some(forbidden_open_mode),
                 rights: Some(fio::Operations::READ_BYTES),
                 ..Default::default()
             });
             protocols.to_object_request(server_end).handle(|req| {
-                DirectoryEntry::open2(
-                    Arc::clone(&sub_dir),
-                    ExecutionScope::new(),
-                    VfsPath::dot(),
-                    protocols,
-                    req,
-                )
+                DirectoryEntry::open2(sub_dir.clone(), scope, VfsPath::dot(), protocols, req)
             });
             assert_matches!(
                 proxy.take_event_stream().try_next().await,
@@ -613,24 +597,17 @@ mod tests {
     #[fuchsia_async::run_singlethreaded(test)]
     async fn directory_entry_open2_rejects_forbidden_rights() {
         let (_env, sub_dir) = TestEnv::new().await;
-        let sub_dir = Arc::new(sub_dir);
 
         for forbidden_rights in [fio::Operations::WRITE_BYTES, fio::Operations::EXECUTE] {
             let (proxy, server_end) =
                 fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
-
+            let scope = ExecutionScope::new();
             let protocols = fio::ConnectionProtocols::Node(fio::NodeOptions {
                 rights: Some(forbidden_rights),
                 ..Default::default()
             });
             protocols.to_object_request(server_end).handle(|req| {
-                DirectoryEntry::open2(
-                    Arc::clone(&sub_dir),
-                    ExecutionScope::new(),
-                    VfsPath::dot(),
-                    protocols,
-                    req,
-                )
+                DirectoryEntry::open2(sub_dir.clone(), scope, VfsPath::dot(), protocols, req)
             });
             assert_matches!(
                 proxy.take_event_stream().try_next().await,
@@ -642,12 +619,11 @@ mod tests {
     #[fuchsia_async::run_singlethreaded(test)]
     async fn directory_entry_open2_rejects_file_protocols() {
         let (_env, sub_dir) = TestEnv::new().await;
-        let sub_dir = Arc::new(sub_dir);
 
         for file_protocols in [fio::FileProtocolFlags::APPEND, fio::FileProtocolFlags::TRUNCATE] {
             let (proxy, server_end) =
                 fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
-
+            let scope = ExecutionScope::new();
             let protocols = fio::ConnectionProtocols::Node(fio::NodeOptions {
                 protocols: Some(fio::NodeProtocols {
                     file: Some(file_protocols),
@@ -657,13 +633,7 @@ mod tests {
                 ..Default::default()
             });
             protocols.to_object_request(server_end).handle(|req| {
-                DirectoryEntry::open2(
-                    Arc::clone(&sub_dir),
-                    ExecutionScope::new(),
-                    VfsPath::dot(),
-                    protocols,
-                    req,
-                )
+                DirectoryEntry::open2(sub_dir.clone(), scope, VfsPath::dot(), protocols, req)
             });
             assert_matches!(
                 proxy.take_event_stream().try_next().await,

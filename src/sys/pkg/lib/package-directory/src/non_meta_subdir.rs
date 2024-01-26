@@ -30,8 +30,8 @@ pub(crate) struct NonMetaSubdir<S: crate::NonMetaStorage> {
 }
 
 impl<S: crate::NonMetaStorage> NonMetaSubdir<S> {
-    pub(crate) fn new(root_dir: Arc<RootDir<S>>, path: String) -> Self {
-        NonMetaSubdir { root_dir, path }
+    pub(crate) fn new(root_dir: Arc<RootDir<S>>, path: String) -> Arc<Self> {
+        Arc::new(NonMetaSubdir { root_dir, path })
     }
 }
 
@@ -87,8 +87,12 @@ impl<S: crate::NonMetaStorage> vfs::directory::entry::DirectoryEntry for NonMeta
         let directory_path = file_path + "/";
         for k in self.root_dir.non_meta_files.keys() {
             if k.starts_with(&directory_path) {
-                let () = Arc::new(NonMetaSubdir::new(Arc::clone(&self.root_dir), directory_path))
-                    .open(scope, flags, VfsPath::dot(), server_end);
+                let () = NonMetaSubdir::new(self.root_dir.clone(), directory_path).open(
+                    scope,
+                    flags,
+                    VfsPath::dot(),
+                    server_end,
+                );
                 return;
             }
         }
@@ -194,7 +198,7 @@ mod tests {
     }
 
     impl TestEnv {
-        async fn new() -> (Self, NonMetaSubdir<blobfs::Client>) {
+        async fn new() -> (Self, Arc<NonMetaSubdir<blobfs::Client>>) {
             let pkg = PackageBuilder::new("pkg")
                 .add_resource_at("dir0/dir1/file", "bloblob".as_bytes())
                 .build()
@@ -207,7 +211,7 @@ mod tests {
                 blobfs_fake.add_blob(hash, bytes);
             }
             let root_dir = RootDir::new(blobfs_client, metafar_blob.merkle).await.unwrap();
-            let sub_dir = NonMetaSubdir::new(Arc::new(root_dir), "dir0/".to_string());
+            let sub_dir = NonMetaSubdir::new(root_dir, "dir0/".to_string());
             (Self { _blobfs_fake: blobfs_fake }, sub_dir)
         }
     }
@@ -217,7 +221,7 @@ mod tests {
         let (_env, sub_dir) = TestEnv::new().await;
 
         assert_eq!(
-            sub_dir.get_attrs().await.unwrap(),
+            Node::get_attrs(sub_dir.as_ref()).await.unwrap(),
             fio::NodeAttributes {
                 mode: fio::MODE_TYPE_DIRECTORY | 0o700,
                 id: 1,
@@ -235,7 +239,7 @@ mod tests {
         let (_env, sub_dir) = TestEnv::new().await;
 
         assert_eq!(
-            sub_dir.get_attributes(fio::NodeAttributesQuery::all()).await.unwrap(),
+            Node::get_attributes(sub_dir.as_ref(), fio::NodeAttributesQuery::all()).await.unwrap(),
             attributes!(
                 fio::NodeAttributesQuery::all(),
                 Mutable {
@@ -265,7 +269,7 @@ mod tests {
         let (_env, sub_dir) = TestEnv::new().await;
 
         assert_eq!(
-            DirectoryEntry::entry_info(&sub_dir),
+            DirectoryEntry::entry_info(sub_dir.as_ref()),
             EntryInfo::new(fio::INO_UNKNOWN, fio::DirentType::Directory)
         );
     }
@@ -278,7 +282,7 @@ mod tests {
 
         assert_eq!(
             Directory::register_watcher(
-                Arc::new(sub_dir),
+                sub_dir,
                 ExecutionScope::new(),
                 fio::WatchMask::empty(),
                 server.try_into().unwrap(),
@@ -291,10 +295,13 @@ mod tests {
     async fn directory_read_dirents() {
         let (_env, sub_dir) = TestEnv::new().await;
 
-        let (pos, sealed) = sub_dir
-            .read_dirents(&TraversalPosition::Start, Box::new(crate::tests::FakeSink::new(3)))
-            .await
-            .expect("read_dirents failed");
+        let (pos, sealed) = Directory::read_dirents(
+            sub_dir.as_ref(),
+            &TraversalPosition::Start,
+            Box::new(crate::tests::FakeSink::new(3)),
+        )
+        .await
+        .expect("read_dirents failed");
         assert_eq!(
             crate::tests::FakeSink::from_sealed(sealed).entries,
             vec![
@@ -308,12 +315,12 @@ mod tests {
     #[fuchsia_async::run_singlethreaded(test)]
     async fn directory_entry_open_directory() {
         let (_env, sub_dir) = TestEnv::new().await;
-        let sub_dir = Arc::new(sub_dir);
 
         for path in ["dir1", "dir1/"] {
             let (proxy, server_end) =
                 fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
-            Arc::clone(&sub_dir).open(
+            DirectoryEntry::open(
+                sub_dir.clone(),
                 ExecutionScope::new(),
                 fio::OpenFlags::RIGHT_READABLE,
                 VfsPath::validate_and_split(path).unwrap(),
@@ -333,11 +340,11 @@ mod tests {
     #[fuchsia_async::run_singlethreaded(test)]
     async fn directory_entry_open_file() {
         let (_env, sub_dir) = TestEnv::new().await;
-        let sub_dir = Arc::new(sub_dir);
 
         for path in ["dir1/file", "dir1/file/"] {
             let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::FileMarker>().unwrap();
-            Arc::clone(&sub_dir).open(
+            DirectoryEntry::open(
+                sub_dir.clone(),
                 ExecutionScope::new(),
                 fio::OpenFlags::RIGHT_READABLE,
                 VfsPath::validate_and_split(path).unwrap(),
@@ -351,10 +358,9 @@ mod tests {
     #[fuchsia_async::run_singlethreaded(test)]
     async fn directory_entry_open_unsets_posix_writable() {
         let (_env, sub_dir) = TestEnv::new().await;
-        let sub_dir = Arc::new(sub_dir);
 
         let () = crate::verify_open_adjusts_flags(
-            &(sub_dir as Arc<dyn DirectoryEntry>),
+            sub_dir,
             fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::POSIX_WRITABLE,
             fio::OpenFlags::RIGHT_READABLE,
         )
@@ -364,7 +370,6 @@ mod tests {
     #[fuchsia_async::run_singlethreaded(test)]
     async fn directory_entry_open_rejects_disallowed_flags() {
         let (_env, sub_dir) = TestEnv::new().await;
-        let sub_dir = Arc::new(sub_dir);
 
         for forbidden_flag in [
             fio::OpenFlags::RIGHT_WRITABLE,
@@ -376,7 +381,7 @@ mod tests {
             let (proxy, server_end) =
                 fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
             DirectoryEntry::open(
-                Arc::clone(&sub_dir),
+                sub_dir.clone(),
                 ExecutionScope::new(),
                 fio::OpenFlags::DESCRIBE | forbidden_flag,
                 VfsPath::dot(),
@@ -396,7 +401,8 @@ mod tests {
         let (_env, sub_dir) = TestEnv::new().await;
         let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
 
-        Arc::new(sub_dir).open(
+        DirectoryEntry::open(
+            sub_dir,
             ExecutionScope::new(),
             fio::OpenFlags::RIGHT_READABLE,
             VfsPath::dot(),

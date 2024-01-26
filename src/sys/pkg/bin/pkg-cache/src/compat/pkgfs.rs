@@ -117,7 +117,7 @@ pub fn make_dir(
 
     if let Some(system_image) = system_image {
         let () = dir
-            .add_entry("system", Arc::new(system_image.into_root_dir()))
+            .add_entry("system", system_image.into_root_dir())
             .context("adding system directory to pkgfs")?;
     }
 

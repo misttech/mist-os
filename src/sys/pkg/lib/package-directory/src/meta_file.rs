@@ -32,8 +32,8 @@ pub(crate) struct MetaFile<S: crate::NonMetaStorage> {
 }
 
 impl<S: crate::NonMetaStorage> MetaFile<S> {
-    pub(crate) fn new(root_dir: Arc<RootDir<S>>, location: MetaFileLocation) -> Self {
-        MetaFile { root_dir, location, vmo: OnceCell::new() }
+    pub(crate) fn new(root_dir: Arc<RootDir<S>>, location: MetaFileLocation) -> Arc<Self> {
+        Arc::new(MetaFile { root_dir, location, vmo: OnceCell::new() })
     }
 
     async fn vmo(&self) -> Result<&zx::Vmo, anyhow::Error> {
@@ -301,7 +301,7 @@ mod tests {
     }
 
     impl TestEnv {
-        async fn new() -> (Self, MetaFile<blobfs::Client>) {
+        async fn new() -> (Self, Arc<MetaFile<blobfs::Client>>) {
             let pkg = PackageBuilder::new("pkg")
                 .add_resource_at("meta/file", &TEST_FILE_CONTENTS[..])
                 .build()
@@ -312,7 +312,7 @@ mod tests {
             blobfs_fake.add_blob(metafar_blob.merkle, metafar_blob.contents);
             let root_dir = RootDir::new(blobfs_client, metafar_blob.merkle).await.unwrap();
             let location = *root_dir.meta_files.get("meta/file").unwrap();
-            (TestEnv { _blobfs_fake: blobfs_fake }, MetaFile::new(Arc::new(root_dir), location))
+            (TestEnv { _blobfs_fake: blobfs_fake }, MetaFile::new(root_dir, location))
         }
     }
 
@@ -358,7 +358,7 @@ mod tests {
         let (proxy, server_end) = fidl::endpoints::create_proxy().unwrap();
 
         DirectoryEntry::open(
-            Arc::new(meta_file),
+            meta_file,
             ExecutionScope::new(),
             fio::OpenFlags::DESCRIBE,
             VfsPath::validate_and_split("non-empty").unwrap(),
@@ -375,7 +375,6 @@ mod tests {
     #[fuchsia_async::run_singlethreaded(test)]
     async fn directory_entry_open_rejects_disallowed_flags() {
         let (_env, meta_file) = TestEnv::new().await;
-        let meta_file = Arc::new(meta_file);
 
         for forbidden_flag in [
             fio::OpenFlags::RIGHT_WRITABLE,
@@ -387,7 +386,7 @@ mod tests {
         ] {
             let (proxy, server_end) = fidl::endpoints::create_proxy().unwrap();
             DirectoryEntry::open(
-                Arc::clone(&meta_file),
+                meta_file.clone(),
                 ExecutionScope::new(),
                 fio::OpenFlags::DESCRIBE | forbidden_flag,
                 VfsPath::dot(),
@@ -408,7 +407,7 @@ mod tests {
         let (proxy, server_end) = fidl::endpoints::create_proxy().unwrap();
 
         DirectoryEntry::open(
-            Arc::new(meta_file),
+            meta_file,
             ExecutionScope::new(),
             fio::OpenFlags::DESCRIBE,
             VfsPath::dot(),
@@ -427,7 +426,7 @@ mod tests {
         let (_env, meta_file) = TestEnv::new().await;
 
         assert_eq!(
-            DirectoryEntry::entry_info(&meta_file),
+            DirectoryEntry::entry_info(meta_file.as_ref()),
             EntryInfo::new(fio::INO_UNKNOWN, fio::DirentType::File)
         );
     }
@@ -437,7 +436,11 @@ mod tests {
         let (_env, meta_file) = TestEnv::new().await;
 
         assert_eq!(
-            meta_file.open_file(&fio::OpenFlags::empty().to_file_options().unwrap()).await,
+            File::open_file(
+                meta_file.as_ref(),
+                &fio::OpenFlags::empty().to_file_options().unwrap()
+            )
+            .await,
             Ok(())
         );
     }
@@ -449,7 +452,7 @@ mod tests {
 
         for (i, e) in TEST_FILE_CONTENTS.iter().enumerate() {
             assert_eq!(
-                FileIo::read_at(&meta_file, i.try_into().unwrap(), &mut buffer).await,
+                FileIo::read_at(meta_file.as_ref(), i.try_into().unwrap(), &mut buffer).await,
                 Ok(1)
             );
             assert_eq!(&buffer, &[*e]);
@@ -464,7 +467,7 @@ mod tests {
         for i in 0..=1 {
             assert_eq!(
                 FileIo::read_at(
-                    &meta_file,
+                    meta_file.as_ref(),
                     u64::try_from(TEST_FILE_CONTENTS.len()).unwrap() + i,
                     &mut buffer
                 )
@@ -480,7 +483,7 @@ mod tests {
         let (_env, meta_file) = TestEnv::new().await;
         let mut buffer = [0u8; 5];
 
-        assert_eq!(FileIo::read_at(&meta_file, 2, &mut buffer).await, Ok(2));
+        assert_eq!(FileIo::read_at(meta_file.as_ref(), 2, &mut buffer).await, Ok(2));
         assert_eq!(&buffer, &[2, 3, 0, 0, 0]);
     }
 
@@ -488,21 +491,24 @@ mod tests {
     async fn file_write_at() {
         let (_env, meta_file) = TestEnv::new().await;
 
-        assert_eq!(FileIo::write_at(&meta_file, 0, &[]).await, Err(zx::Status::NOT_SUPPORTED));
+        assert_eq!(
+            FileIo::write_at(meta_file.as_ref(), 0, &[]).await,
+            Err(zx::Status::NOT_SUPPORTED)
+        );
     }
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn file_append() {
         let (_env, meta_file) = TestEnv::new().await;
 
-        assert_eq!(FileIo::append(&meta_file, &[]).await, Err(zx::Status::NOT_SUPPORTED));
+        assert_eq!(FileIo::append(meta_file.as_ref(), &[]).await, Err(zx::Status::NOT_SUPPORTED));
     }
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn file_truncate() {
         let (_env, meta_file) = TestEnv::new().await;
 
-        assert_eq!(File::truncate(&meta_file, 0).await, Err(zx::Status::NOT_SUPPORTED));
+        assert_eq!(File::truncate(meta_file.as_ref(), 0).await, Err(zx::Status::NOT_SUPPORTED));
     }
 
     #[fuchsia_async::run_singlethreaded(test)]
@@ -511,7 +517,7 @@ mod tests {
 
         for flag in [fio::VmoFlags::WRITE, fio::VmoFlags::EXECUTE, fio::VmoFlags::SHARED_BUFFER] {
             assert_eq!(
-                File::get_backing_memory(&meta_file, flag).await,
+                File::get_backing_memory(meta_file.as_ref(), flag).await,
                 Err(zx::Status::NOT_SUPPORTED)
             );
         }
@@ -521,7 +527,7 @@ mod tests {
     async fn file_get_backing_memory_private() {
         let (_env, meta_file) = TestEnv::new().await;
 
-        let vmo = File::get_backing_memory(&meta_file, fio::VmoFlags::PRIVATE_CLONE)
+        let vmo = File::get_backing_memory(meta_file.as_ref(), fio::VmoFlags::PRIVATE_CLONE)
             .await
             .expect("get_backing_memory should succeed");
         let size = vmo.get_content_size().expect("get_content_size should succeed");
@@ -547,7 +553,7 @@ mod tests {
     async fn file_get_backing_memory_not_private() {
         let (_env, meta_file) = TestEnv::new().await;
 
-        let vmo = File::get_backing_memory(&meta_file, fio::VmoFlags::READ)
+        let vmo = File::get_backing_memory(meta_file.as_ref(), fio::VmoFlags::READ)
             .await
             .expect("get_backing_memory should succeed");
         let size = vmo.get_content_size().expect("get_content_size should succeed");
@@ -574,7 +580,7 @@ mod tests {
         let (_env, meta_file) = TestEnv::new().await;
 
         assert_eq!(
-            File::get_size(&meta_file).await,
+            File::get_size(meta_file.as_ref()).await,
             Ok(u64::try_from(TEST_FILE_CONTENTS.len()).unwrap())
         );
     }
@@ -584,7 +590,7 @@ mod tests {
         let (_env, meta_file) = TestEnv::new().await;
 
         assert_eq!(
-            meta_file.get_attrs().await,
+            Node::get_attrs(meta_file.as_ref()).await,
             Ok(fio::NodeAttributes {
                 mode: fio::MODE_TYPE_FILE | 0o600,
                 id: 1,
@@ -603,7 +609,7 @@ mod tests {
 
         assert_eq!(
             File::set_attrs(
-                &meta_file,
+                meta_file.as_ref(),
                 fio::NodeAttributeFlags::empty(),
                 fio::NodeAttributes {
                     mode: 0,
@@ -625,7 +631,7 @@ mod tests {
         let (_env, meta_file) = TestEnv::new().await;
 
         assert_eq!(
-            File::sync(&meta_file, Default::default()).await,
+            File::sync(meta_file.as_ref(), Default::default()).await,
             Err(zx::Status::NOT_SUPPORTED)
         );
     }
@@ -635,7 +641,9 @@ mod tests {
         let (_env, meta_file) = TestEnv::new().await;
 
         assert_eq!(
-            meta_file.get_attributes(fio::NodeAttributesQuery::all()).await.unwrap(),
+            Node::get_attributes(meta_file.as_ref(), fio::NodeAttributesQuery::all())
+                .await
+                .unwrap(),
             attributes!(
                 fio::NodeAttributesQuery::all(),
                 Mutable {
@@ -661,8 +669,9 @@ mod tests {
     #[fuchsia_async::run_singlethreaded(test)]
     async fn directory_entry_open2_rejects_non_empty_path() {
         let (_env, meta_file) = TestEnv::new().await;
-        let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::NodeMarker>().unwrap();
 
+        let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::NodeMarker>().unwrap();
+        let scope = ExecutionScope::new();
         let protocols = fio::ConnectionProtocols::Node(fio::NodeOptions {
             rights: Some(fio::Operations::default()),
             protocols: Some(fio::NodeProtocols {
@@ -671,15 +680,10 @@ mod tests {
             }),
             ..Default::default()
         });
-        protocols.to_object_request(server_end).handle(|req| {
-            DirectoryEntry::open2(
-                Arc::new(meta_file),
-                ExecutionScope::new(),
-                VfsPath::validate_and_split("non-empty").unwrap(),
-                protocols,
-                req,
-            )
-        });
+        let path = VfsPath::validate_and_split("non-empty").unwrap();
+        protocols
+            .to_object_request(server_end)
+            .handle(|req| DirectoryEntry::open2(meta_file, scope, path, protocols, req));
 
         assert_matches!(
             proxy.take_event_stream().try_next().await,
@@ -690,8 +694,9 @@ mod tests {
     #[fuchsia_async::run_singlethreaded(test)]
     async fn directory_entry_open2_succeeds() {
         let (_env, meta_file) = TestEnv::new().await;
-        let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::NodeMarker>().unwrap();
 
+        let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::NodeMarker>().unwrap();
+        let scope = ExecutionScope::new();
         let protocols = fio::ConnectionProtocols::Node(fio::NodeOptions {
             rights: Some(fio::Operations::default()),
             protocols: Some(fio::NodeProtocols {
@@ -700,15 +705,9 @@ mod tests {
             }),
             ..Default::default()
         });
-        protocols.to_object_request(server_end).handle(|req| {
-            DirectoryEntry::open2(
-                Arc::new(meta_file),
-                ExecutionScope::new(),
-                VfsPath::dot(),
-                protocols,
-                req,
-            )
-        });
+        protocols
+            .to_object_request(server_end)
+            .handle(|req| DirectoryEntry::open2(meta_file, scope, VfsPath::dot(), protocols, req));
 
         assert_matches!(proxy.get_connection_info().await, Ok(_));
     }
@@ -716,11 +715,10 @@ mod tests {
     #[fuchsia_async::run_singlethreaded(test)]
     async fn directory_entry_open2_rejects_forbidden_open_modes() {
         let (_env, meta_file) = TestEnv::new().await;
-        let meta_file = Arc::new(meta_file);
 
         for forbidden_open_mode in [fio::OpenMode::AlwaysCreate, fio::OpenMode::MaybeCreate] {
             let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::NodeMarker>().unwrap();
-
+            let scope = ExecutionScope::new();
             let protocols = fio::ConnectionProtocols::Node(fio::NodeOptions {
                 rights: Some(fio::Operations::default()),
                 protocols: Some(fio::NodeProtocols {
@@ -731,13 +729,7 @@ mod tests {
                 ..Default::default()
             });
             protocols.to_object_request(server_end).handle(|req| {
-                DirectoryEntry::open2(
-                    Arc::clone(&meta_file),
-                    ExecutionScope::new(),
-                    VfsPath::dot(),
-                    protocols,
-                    req,
-                )
+                DirectoryEntry::open2(meta_file.clone(), scope, VfsPath::dot(), protocols, req)
             });
 
             assert_matches!(
@@ -750,11 +742,10 @@ mod tests {
     #[fuchsia_async::run_singlethreaded(test)]
     async fn directory_entry_open2_rejects_forbidden_rights() {
         let (_env, meta_file) = TestEnv::new().await;
-        let meta_file = Arc::new(meta_file);
 
         for forbidden_rights in [fio::Operations::WRITE_BYTES, fio::Operations::EXECUTE] {
             let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::NodeMarker>().unwrap();
-
+            let scope = ExecutionScope::new();
             let protocols = fio::ConnectionProtocols::Node(fio::NodeOptions {
                 rights: Some(forbidden_rights),
                 protocols: Some(fio::NodeProtocols {
@@ -764,13 +755,7 @@ mod tests {
                 ..Default::default()
             });
             protocols.to_object_request(server_end).handle(|req| {
-                DirectoryEntry::open2(
-                    Arc::clone(&meta_file),
-                    ExecutionScope::new(),
-                    VfsPath::dot(),
-                    protocols,
-                    req,
-                )
+                DirectoryEntry::open2(meta_file.clone(), scope, VfsPath::dot(), protocols, req)
             });
             assert_matches!(
                 proxy.take_event_stream().try_next().await,
@@ -782,13 +767,12 @@ mod tests {
     #[fuchsia_async::run_singlethreaded(test)]
     async fn directory_entry_open2_rejects_forbidden_file_protocols() {
         let (_env, meta_file) = TestEnv::new().await;
-        let meta_file = Arc::new(meta_file);
 
         for forbidden_file_protocols in
             [fio::FileProtocolFlags::APPEND, fio::FileProtocolFlags::TRUNCATE]
         {
             let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::NodeMarker>().unwrap();
-
+            let scope = ExecutionScope::new();
             let protocols = fio::ConnectionProtocols::Node(fio::NodeOptions {
                 rights: Some(fio::Operations::READ_BYTES),
                 protocols: Some(fio::NodeProtocols {
@@ -798,13 +782,7 @@ mod tests {
                 ..Default::default()
             });
             protocols.to_object_request(server_end).handle(|req| {
-                DirectoryEntry::open2(
-                    Arc::clone(&meta_file),
-                    ExecutionScope::new(),
-                    VfsPath::dot(),
-                    protocols,
-                    req,
-                )
+                DirectoryEntry::open2(meta_file.clone(), scope, VfsPath::dot(), protocols, req)
             });
             assert_matches!(
                 proxy.take_event_stream().try_next().await,

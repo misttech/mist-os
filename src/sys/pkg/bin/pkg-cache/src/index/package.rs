@@ -185,7 +185,7 @@ pub async fn fulfill_meta_far_blob(
     blobfs: &blobfs::Client,
     meta_hash: Hash,
     gc_protection: fpkg::GcProtection,
-) -> Result<package_directory::RootDir<blobfs::Client>, FulfillMetaFarError> {
+) -> Result<Arc<package_directory::RootDir<blobfs::Client>>, FulfillMetaFarError> {
     let root_dir = package_directory::RootDir::new(blobfs.clone(), meta_hash).await?;
     let () =
         index.write().await.fulfill_meta_far(meta_hash, root_dir.path().await?, gc_protection)?;

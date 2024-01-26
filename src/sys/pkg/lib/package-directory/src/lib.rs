@@ -7,7 +7,7 @@
 use {
     fidl::endpoints::ServerEnd,
     fidl_fuchsia_io as fio, fuchsia_zircon as zx,
-    std::{collections::HashSet, convert::TryInto as _, sync::Arc},
+    std::{collections::HashSet, convert::TryInto as _},
     tracing::error,
     vfs::{
         common::send_on_open_with_error,
@@ -154,7 +154,7 @@ pub async fn serve_path(
         }
     };
 
-    Arc::new(root_dir).open(scope, flags, path, server_end);
+    root_dir.open(scope, flags, path, server_end);
     Ok(())
 }
 
@@ -216,19 +216,13 @@ fn get_dir_children<'a>(
 
 #[cfg(test)]
 async fn verify_open_adjusts_flags(
-    entry: &Arc<dyn DirectoryEntry>,
+    entry: std::sync::Arc<impl DirectoryEntry>,
     in_flags: fio::OpenFlags,
     expected_flags: fio::OpenFlags,
 ) {
     let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::NodeMarker>().unwrap();
 
-    DirectoryEntry::open(
-        Arc::clone(entry),
-        ExecutionScope::new(),
-        in_flags,
-        VfsPath::dot(),
-        server_end,
-    );
+    DirectoryEntry::open(entry, ExecutionScope::new(), in_flags, VfsPath::dot(), server_end);
 
     let (status, flags) = proxy.get_flags().await.unwrap();
     let () = zx::Status::ok(status).unwrap();

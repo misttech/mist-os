@@ -255,7 +255,7 @@ async fn get(
                 Status::INTERNAL
             })?
         };
-        let () = Arc::new(root_dir).open(
+        let () = root_dir.open(
             scope,
             make_pkgdir_flags(executability_status(executability_restrictions, &package_status)),
             vfs::path::Path::dot(),
@@ -381,7 +381,8 @@ async fn serve_needed_blobs(
     package_index: &async_lock::RwLock<PackageIndex>,
     blobfs: &blobfs::Client,
     node: &finspect::Node,
-) -> Result<(package_directory::RootDir<blobfs::Client>, PackageStatus), ServeNeededBlobsError> {
+) -> Result<(Arc<package_directory::RootDir<blobfs::Client>>, PackageStatus), ServeNeededBlobsError>
+{
     let state = node.create_string("state", "need-meta-far");
     let res = async {
         // Step 1: Open and write the meta.far, or determine it is not needed.
@@ -456,7 +457,7 @@ async fn handle_open_meta_blob(
     blobfs: &blobfs::Client,
     package_index: &async_lock::RwLock<PackageIndex>,
     state: &StringProperty,
-) -> Result<package_directory::RootDir<blobfs::Client>, ServeNeededBlobsError> {
+) -> Result<Arc<package_directory::RootDir<blobfs::Client>>, ServeNeededBlobsError> {
     let hash = meta_far_info.blob_id.into();
     package_index.write().await.start_install(hash, gc_protection);
     let mut opened = false;

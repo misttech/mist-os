@@ -51,7 +51,7 @@ pub struct RootDir<S> {
 impl<S: crate::NonMetaStorage> RootDir<S> {
     /// Loads the package metadata given by `hash` from `non_meta_storage`, returning an object
     /// representing the package, backed by `non_meta_storage`.
-    pub async fn new(non_meta_storage: S, hash: fuchsia_hash::Hash) -> Result<Self, Error> {
+    pub async fn new(non_meta_storage: S, hash: fuchsia_hash::Hash) -> Result<Arc<Self>, Error> {
         let meta_far = open_for_read(&non_meta_storage, &hash, fio::OpenFlags::DESCRIBE)
             .map_err(Error::OpenMetaFar)?;
 
@@ -107,7 +107,14 @@ impl<S: crate::NonMetaStorage> RootDir<S> {
 
         let meta_far_vmo = Default::default();
 
-        Ok(RootDir { non_meta_storage, hash, meta_far, meta_files, non_meta_files, meta_far_vmo })
+        Ok(Arc::new(RootDir {
+            non_meta_storage,
+            hash,
+            meta_far,
+            meta_files,
+            non_meta_files,
+            meta_far_vmo,
+        }))
     }
 
     /// Returns the contents, if present, of the file at object relative path expression `path`.
@@ -258,30 +265,24 @@ impl<S: crate::NonMetaStorage> vfs::directory::entry::DirectoryEntry for RootDir
             // This branch is done here instead of in MetaAsDir so that Clone'ing MetaAsDir yields
             // MetaAsDir. See the MetaAsDir::open impl for more.
             if open_meta_as_file(flags) {
-                let () =
-                    Arc::new(MetaAsFile::new(self)).open(scope, flags, VfsPath::dot(), server_end);
+                let () = MetaAsFile::new(self).open(scope, flags, VfsPath::dot(), server_end);
             } else {
-                let () =
-                    Arc::new(MetaAsDir::new(self)).open(scope, flags, VfsPath::dot(), server_end);
+                let () = MetaAsDir::new(self).open(scope, flags, VfsPath::dot(), server_end);
             }
             return;
         }
 
         if canonical_path.starts_with("meta/") {
             if let Some(meta_file) = self.meta_files.get(canonical_path).copied() {
-                let () = Arc::new(MetaFile::new(self, meta_file)).open(
-                    scope,
-                    flags,
-                    VfsPath::dot(),
-                    server_end,
-                );
+                let () =
+                    MetaFile::new(self, meta_file).open(scope, flags, VfsPath::dot(), server_end);
                 return;
             }
 
             let subdir_prefix = canonical_path.to_string() + "/";
             for k in self.meta_files.keys() {
                 if k.starts_with(&subdir_prefix) {
-                    let () = Arc::new(MetaSubdir::new(self, subdir_prefix)).open(
+                    let () = MetaSubdir::new(self, subdir_prefix).open(
                         scope,
                         flags,
                         VfsPath::dot(),
@@ -306,7 +307,7 @@ impl<S: crate::NonMetaStorage> vfs::directory::entry::DirectoryEntry for RootDir
         let subdir_prefix = canonical_path.to_string() + "/";
         for k in self.non_meta_files.keys() {
             if k.starts_with(&subdir_prefix) {
-                let () = Arc::new(NonMetaSubdir::new(self, subdir_prefix)).open(
+                let () = NonMetaSubdir::new(self, subdir_prefix).open(
                     scope,
                     flags,
                     VfsPath::dot(),
@@ -429,6 +430,7 @@ mod tests {
         anyhow::anyhow,
         assert_matches::assert_matches,
         fidl::endpoints::{create_proxy, Proxy as _},
+        fuchsia_fs::directory::{DirEntry, DirentKind},
         fuchsia_pkg_testing::{blobfs::Fake as FakeBlobfs, PackageBuilder},
         pretty_assertions::assert_eq,
         std::convert::TryInto as _,
@@ -446,7 +448,7 @@ mod tests {
     impl TestEnv {
         async fn with_subpackages_content(
             subpackages_content: Option<&[u8]>,
-        ) -> (Self, RootDir<blobfs::Client>) {
+        ) -> (Self, Arc<RootDir<blobfs::Client>>) {
             let mut pkg = PackageBuilder::new("base-package-0")
                 .add_resource_at("resource", "blob-contents".as_bytes())
                 .add_resource_at("dir/file", "bloblob".as_bytes())
@@ -467,7 +469,7 @@ mod tests {
             (Self { _blobfs_fake: blobfs_fake }, root_dir)
         }
 
-        async fn new() -> (Self, RootDir<blobfs::Client>) {
+        async fn new() -> (Self, Arc<RootDir<blobfs::Client>>) {
             Self::with_subpackages_content(None).await
         }
     }
@@ -663,7 +665,7 @@ mod tests {
         let (_env, root_dir) = TestEnv::new().await;
 
         assert_eq!(
-            root_dir.get_attrs().await.unwrap(),
+            Node::get_attrs(root_dir.as_ref()).await.unwrap(),
             fio::NodeAttributes {
                 mode: fio::MODE_TYPE_DIRECTORY | 0o700,
                 id: 1,
@@ -681,7 +683,7 @@ mod tests {
         let (_env, root_dir) = TestEnv::new().await;
 
         assert_eq!(
-            root_dir.get_attributes(fio::NodeAttributesQuery::all()).await.unwrap(),
+            Node::get_attributes(root_dir.as_ref(), fio::NodeAttributesQuery::all()).await.unwrap(),
             attributes!(
                 fio::NodeAttributesQuery::all(),
                 Mutable {
@@ -711,7 +713,7 @@ mod tests {
         let (_env, root_dir) = TestEnv::new().await;
 
         assert_eq!(
-            DirectoryEntry::entry_info(&root_dir),
+            DirectoryEntry::entry_info(root_dir.as_ref()),
             EntryInfo::new(fio::INO_UNKNOWN, fio::DirentType::Directory)
         );
     }
@@ -721,7 +723,7 @@ mod tests {
         let (_env, root_dir) = TestEnv::new().await;
 
         let (pos, sealed) = Directory::read_dirents(
-            &root_dir,
+            root_dir.as_ref(),
             &TraversalPosition::Start,
             Box::new(crate::tests::FakeSink::new(4)),
         )
@@ -748,7 +750,7 @@ mod tests {
 
         assert_eq!(
             Directory::register_watcher(
-                Arc::new(root_dir),
+                root_dir,
                 ExecutionScope::new(),
                 fio::WatchMask::empty(),
                 server.try_into().unwrap(),
@@ -760,10 +762,9 @@ mod tests {
     #[fuchsia_async::run_singlethreaded(test)]
     async fn directory_entry_open_unsets_posix_writable() {
         let (_env, root_dir) = TestEnv::new().await;
-        let root_dir = Arc::new(root_dir);
 
         let () = crate::verify_open_adjusts_flags(
-            &(root_dir as Arc<dyn DirectoryEntry>),
+            root_dir,
             fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::POSIX_WRITABLE,
             fio::OpenFlags::RIGHT_READABLE,
         )
@@ -773,7 +774,6 @@ mod tests {
     #[fuchsia_async::run_singlethreaded(test)]
     async fn directory_entry_open_rejects_invalid_flags() {
         let (_env, root_dir) = TestEnv::new().await;
-        let root_dir = Arc::new(root_dir);
 
         for forbidden_flag in [
             fio::OpenFlags::RIGHT_WRITABLE,
@@ -785,7 +785,7 @@ mod tests {
             let (proxy, server_end) = create_proxy::<fio::DirectoryMarker>().unwrap();
 
             DirectoryEntry::open(
-                Arc::clone(&root_dir),
+                root_dir.clone(),
                 ExecutionScope::new(),
                 fio::OpenFlags::DESCRIBE | forbidden_flag,
                 VfsPath::dot(),
@@ -806,7 +806,7 @@ mod tests {
         let (proxy, server_end) = create_proxy::<fio::DirectoryMarker>().unwrap();
 
         DirectoryEntry::open(
-            Arc::new(root_dir),
+            root_dir,
             ExecutionScope::new(),
             fio::OpenFlags::RIGHT_READABLE,
             VfsPath::dot(),
@@ -816,18 +816,9 @@ mod tests {
         assert_eq!(
             fuchsia_fs::directory::readdir(&proxy).await.unwrap(),
             vec![
-                fuchsia_fs::directory::DirEntry {
-                    name: "dir".to_string(),
-                    kind: fuchsia_fs::directory::DirentKind::Directory
-                },
-                fuchsia_fs::directory::DirEntry {
-                    name: "meta".to_string(),
-                    kind: fuchsia_fs::directory::DirentKind::Directory
-                },
-                fuchsia_fs::directory::DirEntry {
-                    name: "resource".to_string(),
-                    kind: fuchsia_fs::directory::DirentKind::File
-                }
+                DirEntry { name: "dir".to_string(), kind: DirentKind::Directory },
+                DirEntry { name: "meta".to_string(), kind: DirentKind::Directory },
+                DirEntry { name: "resource".to_string(), kind: DirentKind::File }
             ]
         );
     }
@@ -835,13 +826,12 @@ mod tests {
     #[fuchsia_async::run_singlethreaded(test)]
     async fn directory_entry_open_non_meta_file() {
         let (_env, root_dir) = TestEnv::new().await;
-        let root_dir = Arc::new(root_dir);
 
         for path in ["resource", "resource/"] {
             let (proxy, server_end) = create_proxy().unwrap();
 
             DirectoryEntry::open(
-                Arc::clone(&root_dir),
+                root_dir.clone(),
                 ExecutionScope::new(),
                 fio::OpenFlags::RIGHT_READABLE,
                 VfsPath::validate_and_split(path).unwrap(),
@@ -862,13 +852,12 @@ mod tests {
     #[fuchsia_async::run_singlethreaded(test)]
     async fn directory_entry_open_meta_as_file() {
         let (_env, root_dir) = TestEnv::new().await;
-        let root_dir = Arc::new(root_dir);
 
         for path in ["meta", "meta/"] {
             let (proxy, server_end) = create_proxy::<fio::FileMarker>().unwrap();
 
             DirectoryEntry::open(
-                Arc::clone(&root_dir),
+                root_dir.clone(),
                 ExecutionScope::new(),
                 fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::NOT_DIRECTORY,
                 VfsPath::validate_and_split(path).unwrap(),
@@ -895,13 +884,12 @@ mod tests {
     #[fuchsia_async::run_singlethreaded(test)]
     async fn directory_entry_open_meta_as_dir() {
         let (_env, root_dir) = TestEnv::new().await;
-        let root_dir = Arc::new(root_dir);
 
         for path in ["meta", "meta/"] {
             let (proxy, server_end) = create_proxy::<fio::DirectoryMarker>().unwrap();
 
             DirectoryEntry::open(
-                Arc::clone(&root_dir),
+                root_dir.clone(),
                 ExecutionScope::new(),
                 fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::DIRECTORY,
                 VfsPath::validate_and_split(path).unwrap(),
@@ -911,26 +899,11 @@ mod tests {
             assert_eq!(
                 fuchsia_fs::directory::readdir(&proxy).await.unwrap(),
                 vec![
-                    fuchsia_fs::directory::DirEntry {
-                        name: "contents".to_string(),
-                        kind: fuchsia_fs::directory::DirentKind::File
-                    },
-                    fuchsia_fs::directory::DirEntry {
-                        name: "dir".to_string(),
-                        kind: fuchsia_fs::directory::DirentKind::Directory
-                    },
-                    fuchsia_fs::directory::DirEntry {
-                        name: "file".to_string(),
-                        kind: fuchsia_fs::directory::DirentKind::File
-                    },
-                    fuchsia_fs::directory::DirEntry {
-                        name: "fuchsia.abi".to_string(),
-                        kind: fuchsia_fs::directory::DirentKind::Directory
-                    },
-                    fuchsia_fs::directory::DirEntry {
-                        name: "package".to_string(),
-                        kind: fuchsia_fs::directory::DirentKind::File
-                    },
+                    DirEntry { name: "contents".to_string(), kind: DirentKind::File },
+                    DirEntry { name: "dir".to_string(), kind: DirentKind::Directory },
+                    DirEntry { name: "file".to_string(), kind: DirentKind::File },
+                    DirEntry { name: "fuchsia.abi".to_string(), kind: DirentKind::Directory },
+                    DirEntry { name: "package".to_string(), kind: DirentKind::File },
                 ]
             );
 
@@ -941,26 +914,11 @@ mod tests {
             assert_eq!(
                 fuchsia_fs::directory::readdir(&cloned_proxy).await.unwrap(),
                 vec![
-                    fuchsia_fs::directory::DirEntry {
-                        name: "contents".to_string(),
-                        kind: fuchsia_fs::directory::DirentKind::File
-                    },
-                    fuchsia_fs::directory::DirEntry {
-                        name: "dir".to_string(),
-                        kind: fuchsia_fs::directory::DirentKind::Directory
-                    },
-                    fuchsia_fs::directory::DirEntry {
-                        name: "file".to_string(),
-                        kind: fuchsia_fs::directory::DirentKind::File
-                    },
-                    fuchsia_fs::directory::DirEntry {
-                        name: "fuchsia.abi".to_string(),
-                        kind: fuchsia_fs::directory::DirentKind::Directory
-                    },
-                    fuchsia_fs::directory::DirEntry {
-                        name: "package".to_string(),
-                        kind: fuchsia_fs::directory::DirentKind::File
-                    },
+                    DirEntry { name: "contents".to_string(), kind: DirentKind::File },
+                    DirEntry { name: "dir".to_string(), kind: DirentKind::Directory },
+                    DirEntry { name: "file".to_string(), kind: DirentKind::File },
+                    DirEntry { name: "fuchsia.abi".to_string(), kind: DirentKind::Directory },
+                    DirEntry { name: "package".to_string(), kind: DirentKind::File },
                 ]
             );
         }
@@ -969,13 +927,12 @@ mod tests {
     #[fuchsia_async::run_singlethreaded(test)]
     async fn directory_entry_open_meta_file() {
         let (_env, root_dir) = TestEnv::new().await;
-        let root_dir = Arc::new(root_dir);
 
         for path in ["meta/file", "meta/file/"] {
             let (proxy, server_end) = create_proxy::<fio::FileMarker>().unwrap();
 
             DirectoryEntry::open(
-                Arc::clone(&root_dir),
+                root_dir.clone(),
                 ExecutionScope::new(),
                 fio::OpenFlags::RIGHT_READABLE,
                 VfsPath::validate_and_split(path).unwrap(),
@@ -989,13 +946,12 @@ mod tests {
     #[fuchsia_async::run_singlethreaded(test)]
     async fn directory_entry_open_meta_subdir() {
         let (_env, root_dir) = TestEnv::new().await;
-        let root_dir = Arc::new(root_dir);
 
         for path in ["meta/dir", "meta/dir/"] {
             let (proxy, server_end) = create_proxy::<fio::DirectoryMarker>().unwrap();
 
             DirectoryEntry::open(
-                Arc::clone(&root_dir),
+                root_dir.clone(),
                 ExecutionScope::new(),
                 fio::OpenFlags::RIGHT_READABLE,
                 VfsPath::validate_and_split(path).unwrap(),
@@ -1004,10 +960,7 @@ mod tests {
 
             assert_eq!(
                 fuchsia_fs::directory::readdir(&proxy).await.unwrap(),
-                vec![fuchsia_fs::directory::DirEntry {
-                    name: "file".to_string(),
-                    kind: fuchsia_fs::directory::DirentKind::File
-                }]
+                vec![DirEntry { name: "file".to_string(), kind: DirentKind::File }]
             );
         }
     }
@@ -1015,13 +968,12 @@ mod tests {
     #[fuchsia_async::run_singlethreaded(test)]
     async fn directory_entry_open_non_meta_subdir() {
         let (_env, root_dir) = TestEnv::new().await;
-        let root_dir = Arc::new(root_dir);
 
         for path in ["dir", "dir/"] {
             let (proxy, server_end) = create_proxy::<fio::DirectoryMarker>().unwrap();
 
             DirectoryEntry::open(
-                Arc::clone(&root_dir),
+                root_dir.clone(),
                 ExecutionScope::new(),
                 fio::OpenFlags::RIGHT_READABLE,
                 VfsPath::validate_and_split(path).unwrap(),
@@ -1030,10 +982,7 @@ mod tests {
 
             assert_eq!(
                 fuchsia_fs::directory::readdir(&proxy).await.unwrap(),
-                vec![fuchsia_fs::directory::DirEntry {
-                    name: "file".to_string(),
-                    kind: fuchsia_fs::directory::DirentKind::File
-                }]
+                vec![DirEntry { name: "file".to_string(), kind: DirentKind::File }]
             );
         }
     }
