@@ -750,11 +750,11 @@ impl PeerTask {
         let res = self.a2dp_control.pause(Some(peer_id)).await;
         let pause_token = match res {
             Err(e) => {
-                warn!(%peer_id, ?e, "Couldn't pause A2DP Audio");
+                warn!(%peer_id, ?e, "Couldn't pause A2DP audio");
                 None
             }
             Ok(token) => {
-                info!(%peer_id, "Successfully paused audio");
+                info!(%peer_id, "Successfully paused A2DP audio");
                 token
             }
         };
@@ -766,17 +766,17 @@ impl PeerTask {
                 // Cancel the SCO connection, we can't send audio.
                 // TODO(https://fxbug.dev/42160054): this probably means we should just cancel out of HFP and
                 // this peer's connection entirely.
-                warn!(%peer_id, ?e, "Couldn't start Audio - dropping audio connection");
-                return Err(Error::system(format!("Couldn't start audio"), e));
+                warn!(%peer_id, ?e, "Couldn't start HFP audio - dropping audio connection");
+                return Err(Error::system(format!("Couldn't start HFP audio"), e));
             } else {
-                info!(%peer_id, "Successfully started Audio");
+                info!(%peer_id, "Successfully started HFP audio");
             }
         }
         Vigil::watch(&vigil, {
             let control = self.audio_control.clone();
             move |_| match control.lock().stop() {
-                Err(e) => warn!(%peer_id, ?e,  "Couldn't stop audio"),
-                Ok(()) => info!(%peer_id, "Stopped HFP Audio"),
+                Err(e) => warn!(%peer_id, ?e,  "Couldn't stop HFP audio"),
+                Ok(()) => info!(%peer_id, "Stopped HFP audio"),
             }
         });
         info!(%peer_id, ?vigil, "Done finish_sco_connection");
