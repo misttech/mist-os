@@ -1481,6 +1481,7 @@ impl<
         core_ctx.increment(|counters| &counters.rx_icmp_error);
         // NB: At the moment bindings has no need to consume ICMP errors, so we
         // swallow them here.
+        // TODO(https://fxbug.dev/322214321): Actually implement SO_ERROR.
         debug!(
             "UDP received ICMP error {:?} from {:?} to {:?}",
             err, original_dst_ip, original_src_ip

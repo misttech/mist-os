@@ -1220,7 +1220,10 @@ where
                     .unwrap_or_else(|e| error!("failed to respond: {e:?}"));
             }
             fposix_socket::SynchronousDatagramSocketRequest::GetError { responder } => {
-                respond_not_supported!("syncudp::GetError", responder)
+                tracing::debug!("syncudp::GetError is not implemented, returning Ok");
+                // Pretend that we don't have any errors to report.
+                // TODO(https://fxbug.dev/322214321): Actually implement SO_ERROR.
+                responder.send(Ok(())).unwrap_or_else(|e| error!("failed to respond: {e:?}"));
             }
             fposix_socket::SynchronousDatagramSocketRequest::SetSendBuffer {
                 value_bytes: _,
