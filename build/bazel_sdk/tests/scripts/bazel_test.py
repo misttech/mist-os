@@ -621,6 +621,17 @@ def main():
             "--test_summary=none",
         ]
 
+    # Detect when to use remote service endpoint overrides from infra.
+    for config_arg, env_var, bazel_flag in (
+        ("sponge", "BAZEL_sponge_socket_path", "--bes_proxy"),
+        ("resultstore", "BAZEL_resultstore_socket_path", "--bes_proxy"),
+        ("remote", "BAZEL_rbe_socket_path", "--remote_proxy"),
+    ):
+        if f"--config={config_arg}" in bazel_config_args:
+            env_value = os.environ.get(env_var)
+            if env_value:
+                bazel_test_args += [f"{bazel_flag}=unix://{env_value}"]
+
     if args.bazel_build_events_log_json:
         args.bazel_build_events_log_json.parent.mkdir(
             parents=True, exist_ok=True
