@@ -348,3 +348,77 @@ async fn expose_protocol_from_dictionary() {
         .await;
     }
 }
+
+#[fuchsia::test]
+async fn dictionary_in_exposed_dir() {
+    // Test extracting a protocol from a dictionary with source self and child.
+    let components = vec![
+        (
+            "root",
+            ComponentDeclBuilder::new()
+                .protocol(ProtocolDeclBuilder::new("foo_svc").path("/svc/foo").build())
+                .dictionary(DictionaryDeclBuilder::new("self_dict").build())
+                .expose(ExposeDecl::Dictionary(ExposeDictionaryDecl {
+                    source: ExposeSource::Self_,
+                    source_name: "self_dict".parse().unwrap(),
+                    source_dictionary: None,
+                    target_name: "self_dict".parse().unwrap(),
+                    target: ExposeTarget::Parent,
+                    availability: Availability::Required,
+                }))
+                .expose(ExposeDecl::Dictionary(ExposeDictionaryDecl {
+                    source: ExposeSource::Child("leaf".into()),
+                    source_name: "child_dict".parse().unwrap(),
+                    source_dictionary: None,
+                    target_name: "child_dict".parse().unwrap(),
+                    target: ExposeTarget::Parent,
+                    availability: Availability::Required,
+                }))
+                .offer(OfferDecl::Protocol(OfferProtocolDecl {
+                    source: OfferSource::Self_,
+                    source_name: "foo_svc".parse().unwrap(),
+                    source_dictionary: None,
+                    target_name: "A".parse().unwrap(),
+                    target: OfferTarget::Capability("self_dict".parse().unwrap()),
+                    dependency_type: DependencyType::Strong,
+                    availability: Availability::Required,
+                }))
+                .add_child(ChildDeclBuilder::new_lazy_child("leaf".into()))
+                .build(),
+        ),
+        (
+            "leaf",
+            ComponentDeclBuilder::new()
+                .protocol(ProtocolDeclBuilder::new("foo_svc").path("/svc/foo").build())
+                .dictionary(DictionaryDeclBuilder::new("child_dict").build())
+                .offer(OfferDecl::Protocol(OfferProtocolDecl {
+                    source: OfferSource::Self_,
+                    source_name: "foo_svc".parse().unwrap(),
+                    source_dictionary: None,
+                    target_name: "B".parse().unwrap(),
+                    target: OfferTarget::Capability("child_dict".parse().unwrap()),
+                    dependency_type: DependencyType::Strong,
+                    availability: Availability::Required,
+                }))
+                .expose(ExposeDecl::Dictionary(ExposeDictionaryDecl {
+                    source: ExposeSource::Self_,
+                    source_name: "child_dict".parse().unwrap(),
+                    source_dictionary: None,
+                    target_name: "child_dict".parse().unwrap(),
+                    target: ExposeTarget::Parent,
+                    availability: Availability::Required,
+                }))
+                .build(),
+        ),
+    ];
+
+    let test = RoutingTestBuilder::new("root", components).build().await;
+    // The dictionaries in the exposed dir will be converted to subdirectories.
+    for path in ["/self_dict/A", "/child_dict/B"] {
+        test.check_use_exposed_dir(
+            vec![].try_into().unwrap(),
+            CheckUse::Protocol { path: path.parse().unwrap(), expected_res: ExpectedResult::Ok },
+        )
+        .await;
+    }
+}
