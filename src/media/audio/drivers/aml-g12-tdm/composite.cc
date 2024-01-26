@@ -61,8 +61,8 @@ zx::result<> Driver::Start() {
   }
   pdev_.Bind(std::move(pdev.value()));
   // We get one MMIO per engine.
-  // TODO(https://fxbug.dev/42082341): If we change the engines underlying AmlTdmDevice objects such that
-  // they take an MmioView, then we can get only one MmioBuffer here, own it in this driver and
+  // TODO(https://fxbug.dev/42082341): If we change the engines underlying AmlTdmDevice objects such
+  // that they take an MmioView, then we can get only one MmioBuffer here, own it in this driver and
   // pass MmioViews to the underlying AmlTdmDevice objects.
   std::array<std::optional<fdf::MmioBuffer>, kNumberOfTdmEngines> mmios;
   for (size_t i = 0; i < kNumberOfTdmEngines; ++i) {
@@ -124,9 +124,32 @@ zx::result<> Driver::Start() {
   fidl::WireSyncClient<fuchsia_hardware_clock::Clock> pll_client(
       std::move(clock_pll_result.value()));
 
-  server_ = std::make_unique<AudioCompositeServer>(std::move(mmios),
-                                                   std::move((*get_bti_result)->bti), dispatcher(),
-                                                   std::move(gate_client), std::move(pll_client));
+  std::array<const char*, kNumberOfPipelines> sclk_gpio_names = {
+      "gpio-tdm-a-sclk",
+      "gpio-tdm-b-sclk",
+      "gpio-tdm-c-sclk",
+  };
+  std::vector<fidl::WireSyncClient<fuchsia_hardware_gpio::Gpio>> gpio_sclk_clients;
+  for (auto& sclk_gpio_name : sclk_gpio_names) {
+    zx::result gpio_result =
+        incoming()->Connect<fuchsia_hardware_gpio::Service::Device>(sclk_gpio_name);
+    if (gpio_result.is_error() || !gpio_result->is_valid()) {
+      FDF_LOG(ERROR, "Connect to GPIO %s failed: %s", sclk_gpio_name, gpio_result.status_string());
+      return zx::error(gpio_result.error_value());
+    }
+    fidl::WireSyncClient<fuchsia_hardware_gpio::Gpio> gpio_sclk_client(
+        std::move(gpio_result.value()));
+    // Only save the GPIO client if we can communicate with it (we use a method with no side
+    // effects) since optional nodes are valid even if they are not configured in the board driver.
+    auto gpio_name_result = gpio_sclk_client->GetName();
+    if (gpio_name_result.ok()) {
+      gpio_sclk_clients.emplace_back(std::move(gpio_sclk_client));
+    }
+  }
+
+  server_ = std::make_unique<AudioCompositeServer>(
+      std::move(mmios), std::move((*get_bti_result)->bti), dispatcher(), std::move(gate_client),
+      std::move(pll_client), std::move(gpio_sclk_clients));
 
   auto result = outgoing()->component().AddUnmanagedProtocol<fuchsia_hardware_audio::Composite>(
       bindings_.CreateHandler(server_.get(), dispatcher(), fidl::kIgnoreBindingClosure),

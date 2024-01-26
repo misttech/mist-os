@@ -4,6 +4,7 @@
 
 composite aml_tdm_composite;
 
+using fuchsia.amlogic.platform.a311d;
 using fuchsia.amlogic.platform;
 using fuchsia.gpio;
 using fuchsia.clock;
@@ -35,4 +36,16 @@ optional node "gpio-init" {
 
 optional node "clock-init" {
   fuchsia.BIND_INIT_STEP == fuchsia.clock.BIND_INIT_STEP.CLOCK;
+}
+
+optional node "gpio-tdm-a-sclk" {
+  fuchsia.gpio.FUNCTION == fuchsia.gpio.FUNCTION.TDM_A_SCLK;
+}
+
+optional node "gpio-tdm-b-sclk" {
+  fuchsia.gpio.FUNCTION == fuchsia.gpio.FUNCTION.TDM_B_SCLK;
+}
+
+optional node "gpio-tdm-c-sclk" {
+  fuchsia.gpio.FUNCTION == fuchsia.gpio.FUNCTION.TDM_C_SCLK;
 }

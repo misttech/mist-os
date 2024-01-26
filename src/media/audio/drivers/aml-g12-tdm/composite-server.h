@@ -6,6 +6,7 @@
 
 #include <fidl/fuchsia.hardware.audio/cpp/fidl.h>
 #include <fidl/fuchsia.hardware.clock/cpp/fidl.h>
+#include <fidl/fuchsia.hardware.gpio/cpp/fidl.h>
 #include <lib/async/cpp/task.h>
 #include <lib/fzl/pinned-vmo.h>
 #include <lib/zx/result.h>
@@ -90,10 +91,13 @@ class AudioCompositeServer
     : public fidl::Server<fuchsia_hardware_audio::Composite>,
       public fidl::Server<fuchsia_hardware_audio_signalprocessing::SignalProcessing> {
  public:
-  AudioCompositeServer(std::array<std::optional<fdf::MmioBuffer>, kNumberOfTdmEngines> mmios,
-                       zx::bti bti, async_dispatcher_t* dispatcher,
-                       fidl::WireSyncClient<fuchsia_hardware_clock::Clock> clock_gate_client,
-                       fidl::WireSyncClient<fuchsia_hardware_clock::Clock> pll_client);
+  AudioCompositeServer(
+      std::array<std::optional<fdf::MmioBuffer>, kNumberOfTdmEngines> mmios, zx::bti bti,
+      async_dispatcher_t* dispatcher,
+      fidl::WireSyncClient<fuchsia_hardware_clock::Clock> clock_gate_client,
+      fidl::WireSyncClient<fuchsia_hardware_clock::Clock> pll_client,
+      std::vector<fidl::WireSyncClient<fuchsia_hardware_gpio::Gpio>> gpio_sclk_clients);
+
   async_dispatcher_t* dispatcher() { return dispatcher_; }
   zx::bti& bti() { return bti_; }
   fuchsia_hardware_audio::DaiFormat& current_dai_formats(size_t dai_index) {
@@ -174,6 +178,7 @@ class AudioCompositeServer
 
   fidl::WireSyncClient<fuchsia_hardware_clock::Clock> clock_gate_;
   fidl::WireSyncClient<fuchsia_hardware_clock::Clock> pll_;
+  std::vector<fidl::WireSyncClient<fuchsia_hardware_gpio::Gpio>> gpio_sclk_clients_;
   bool soc_power_started_ = false;
 };
 

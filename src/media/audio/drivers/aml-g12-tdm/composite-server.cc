@@ -42,11 +42,13 @@ AudioCompositeServer::AudioCompositeServer(
     std::array<std::optional<fdf::MmioBuffer>, kNumberOfTdmEngines> mmios, zx::bti bti,
     async_dispatcher_t* dispatcher,
     fidl::WireSyncClient<fuchsia_hardware_clock::Clock> clock_gate_client,
-    fidl::WireSyncClient<fuchsia_hardware_clock::Clock> pll_client)
+    fidl::WireSyncClient<fuchsia_hardware_clock::Clock> pll_client,
+    std::vector<fidl::WireSyncClient<fuchsia_hardware_gpio::Gpio>> gpio_sclk_clients)
     : dispatcher_(dispatcher),
       bti_(std::move(bti)),
       clock_gate_(std::move(clock_gate_client)),
-      pll_(std::move(pll_client)) {
+      pll_(std::move(pll_client)),
+      gpio_sclk_clients_(std::move(gpio_sclk_clients)) {
   for (auto& dai : kDaiIds) {
     element_completers_[dai].first_response_sent = false;
     element_completers_[dai].completer = {};
@@ -476,6 +478,16 @@ zx_status_t AudioCompositeServer::StartSocPower() {
             zx_status_get_string(pll_result->error_value()));
     return pll_result->error_value();
   }
+  constexpr uint32_t kMsecsToStabilizePll = 10;
+  zx::nanosleep(zx::deadline_after(zx::msec(kMsecsToStabilizePll)));
+  for (auto& gpio_sclk_client : gpio_sclk_clients_) {
+    constexpr uint32_t kSclkAltFunction = 1;
+    fidl::WireResult result = gpio_sclk_client->SetAltFunction(kSclkAltFunction);
+    if (!result.ok()) {
+      FDF_LOG(ERROR, "Failed to send request to set GPIO function: %s", result.status_string());
+      return result.status();
+    }
+  }
   soc_power_started_ = true;
   return ZX_OK;
 }
@@ -487,6 +499,22 @@ zx_status_t AudioCompositeServer::StopSocPower() {
   if (soc_power_started_ == false) {
     return ZX_OK;
   }
+  for (auto& gpio_sclk_client : gpio_sclk_clients_) {
+    constexpr uint32_t kGpioAltFunction = 0;
+    fidl::WireResult alt_function_result = gpio_sclk_client->SetAltFunction(kGpioAltFunction);
+    if (!alt_function_result.ok()) {
+      FDF_LOG(ERROR, "Failed to send request to set GPIO function: %s",
+              alt_function_result.status_string());
+      return alt_function_result.status();
+    }
+    fidl::WireResult config_out_result = gpio_sclk_client->ConfigOut(0);
+    if (!config_out_result.ok()) {
+      FDF_LOG(ERROR, "Failed to send request to set GPIO output: %s",
+              config_out_result.status_string());
+      return config_out_result.status();
+    }
+  }
+
   // MMIO access is still valid after clock gating the audio subsystem.
   fidl::WireResult clock_gate_result = clock_gate_->Disable();
   if (!clock_gate_result.ok()) {

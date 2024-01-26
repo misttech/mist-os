@@ -43,4 +43,8 @@ enum FUNCTION {
    VOLUME_UP,
    VDIG_ENABLE,
    POWER,
+   // Audio TDM GPIOs.
+   TDM_A_SCLK,
+   TDM_B_SCLK,
+   TDM_C_SCLK,
 };

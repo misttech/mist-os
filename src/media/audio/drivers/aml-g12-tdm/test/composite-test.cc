@@ -5,6 +5,7 @@
 #include "src/media/audio/drivers/aml-g12-tdm/composite.h"
 
 #include <fidl/fuchsia.hardware.clock/cpp/wire_test_base.h>
+#include <fidl/fuchsia.hardware.gpio/cpp/wire_test_base.h>
 #include <fidl/fuchsia.hardware.platform.device/cpp/wire.h>
 #include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
 #include <lib/component/incoming/cpp/service.h>
@@ -178,6 +179,38 @@ class FakeClock : public fidl::testing::WireTestBase<fuchsia_hardware_clock::Clo
   fidl::ServerBindingGroup<fuchsia_hardware_clock::Clock> bindings_;
 };
 
+class FakeGpio : public fidl::testing::WireTestBase<fuchsia_hardware_gpio::Gpio> {
+ public:
+  FakeGpio() = default;
+
+  fuchsia_hardware_gpio::Service::InstanceHandler GetInstanceHandler() {
+    return fuchsia_hardware_gpio::Service::InstanceHandler({
+        .device = bindings_.CreateHandler(this, fdf::Dispatcher::GetCurrent()->async_dispatcher(),
+                                          fidl::kIgnoreBindingClosure),
+    });
+  }
+  bool IsFakeGpioSetToSclk() { return set_to_sclk_; }
+
+ protected:
+  void ConfigOut(ConfigOutRequestView request, ConfigOutCompleter::Sync& completer) override {
+    completer.Reply(zx::ok());
+  }
+  void SetAltFunction(SetAltFunctionRequestView request,
+                      SetAltFunctionCompleter::Sync& completer) override {
+    set_to_sclk_ = request->function == 1;  // function is SCLK.
+    completer.Reply(zx::ok());
+  }
+  void GetName(GetNameCompleter::Sync& completer) override { completer.ReplySuccess("Test"); }
+
+  void NotImplemented_(const std::string& name, fidl::CompleterBase& completer) override {
+    completer.Close(ZX_ERR_NOT_SUPPORTED);
+  }
+
+ private:
+  bool set_to_sclk_ = false;  // Even though the board driver may set this, do not assume it is set.
+  fidl::ServerBindingGroup<fuchsia_hardware_gpio::Gpio> bindings_;
+};
+
 struct IncomingNamespace {
   fdf_testing::TestNode node_{std::string("root")};
   fdf_testing::TestEnvironment env_{fdf::Dispatcher::GetCurrent()->get()};
@@ -216,6 +249,21 @@ class AmlG12CompositeTest : public zxtest::Test {
               clock_pll_server_.GetInstanceHandler(), "clock-pll");
       ASSERT_TRUE(add_clock_pll_result.is_ok());
 
+      auto add_sclk_tdm_a_result =
+          incoming->env_.incoming_directory().AddService<fuchsia_hardware_gpio::Service>(
+              sclk_tdm_a_server_.GetInstanceHandler(), "gpio-tdm-a-sclk");
+      ASSERT_TRUE(add_sclk_tdm_a_result.is_ok());
+
+      auto add_sclk_tdm_b_result =
+          incoming->env_.incoming_directory().AddService<fuchsia_hardware_gpio::Service>(
+              sclk_tdm_b_server_.GetInstanceHandler(), "gpio-tdm-b-sclk");
+      ASSERT_TRUE(add_sclk_tdm_b_result.is_ok());
+
+      auto add_sclk_tdm_c_result =
+          incoming->env_.incoming_directory().AddService<fuchsia_hardware_gpio::Service>(
+              sclk_tdm_c_server_.GetInstanceHandler(), "gpio-tdm-c-sclk");
+      ASSERT_TRUE(add_sclk_tdm_c_result.is_ok());
+
       driver_start_args = std::move(start_args_result->start_args);
     });
 
@@ -242,6 +290,9 @@ class AmlG12CompositeTest : public zxtest::Test {
   FakePlatformDevice platform_device_;
   FakeClock clock_gate_server_;
   FakeClock clock_pll_server_;
+  FakeGpio sclk_tdm_a_server_;
+  FakeGpio sclk_tdm_b_server_;
+  FakeGpio sclk_tdm_c_server_;
 
   fuchsia_hardware_audio::DaiFormat GetDefaultDaiFormat() {
     return fuchsia_hardware_audio::DaiFormat(
@@ -260,8 +311,11 @@ class AmlG12CompositeTest : public zxtest::Test {
   }
 
   bool IsFakeClockGateEnabled() { return clock_gate_server_.IsFakeClockEnabled(); }
-
   bool IsFakeClockPllEnabled() { return clock_pll_server_.IsFakeClockEnabled(); }
+
+  bool IsTdmASclkSet() { return sclk_tdm_a_server_.IsFakeGpioSetToSclk(); }
+  bool IsTdmBSclkSet() { return sclk_tdm_b_server_.IsFakeGpioSetToSclk(); }
+  bool IsTdmCSclkSet() { return sclk_tdm_c_server_.IsFakeGpioSetToSclk(); }
 
   void StopSocPower() {
     dut_.SyncCall([](auto* dut) { return (*dut)->StopSocPower(); });
@@ -824,12 +878,25 @@ TEST_F(AmlG12CompositeTest, CreateRingBuffer) {
 }
 
 TEST_F(AmlG12CompositeTest, PowerSuspendResume) {
+  EXPECT_TRUE(IsTdmASclkSet());
+  EXPECT_TRUE(IsTdmBSclkSet());
+  EXPECT_TRUE(IsTdmCSclkSet());
   EXPECT_TRUE(IsFakeClockGateEnabled());
   EXPECT_TRUE(IsFakeClockPllEnabled());
+
   StopSocPower();
+
+  EXPECT_FALSE(IsTdmASclkSet());
+  EXPECT_FALSE(IsTdmBSclkSet());
+  EXPECT_FALSE(IsTdmCSclkSet());
   EXPECT_FALSE(IsFakeClockGateEnabled());
   EXPECT_FALSE(IsFakeClockPllEnabled());
+
   StartSocPower();
+
+  EXPECT_TRUE(IsTdmASclkSet());
+  EXPECT_TRUE(IsTdmBSclkSet());
+  EXPECT_TRUE(IsTdmCSclkSet());
   EXPECT_TRUE(IsFakeClockGateEnabled());
   EXPECT_TRUE(IsFakeClockPllEnabled());
 }

@@ -112,11 +112,31 @@ zx_status_t Vim3::AudioInit() {
       fdf::MakeProperty(bind_fuchsia_clock::FUNCTION, bind_fuchsia_clock::FUNCTION_AUDIO_PLL),
   };
 
+  const std::vector<fdf::BindRule> kTdmASclkRules{
+      fdf::MakeAcceptBindRule(bind_fuchsia::PROTOCOL, bind_fuchsia_gpio::BIND_PROTOCOL_DEVICE),
+      fdf::MakeAcceptBindRule(bind_fuchsia::GPIO_PIN, static_cast<uint32_t>(VIM3_BTPCM_CLK)),
+  };
+  const std::vector<fdf::NodeProperty> kTdmASclkProperties{
+      fdf::MakeProperty(bind_fuchsia::PROTOCOL, bind_fuchsia_gpio::BIND_PROTOCOL_DEVICE),
+      fdf::MakeProperty(bind_fuchsia_gpio::FUNCTION, bind_fuchsia_gpio::FUNCTION_TDM_A_SCLK),
+  };
+
+  const std::vector<fdf::BindRule> kTdmBSclkRules{
+      fdf::MakeAcceptBindRule(bind_fuchsia::PROTOCOL, bind_fuchsia_gpio::BIND_PROTOCOL_DEVICE),
+      fdf::MakeAcceptBindRule(bind_fuchsia::GPIO_PIN, static_cast<uint32_t>(VIM3_I2SB_SCLK)),
+  };
+  const std::vector<fdf::NodeProperty> kTdmBSclkProperties{
+      fdf::MakeProperty(bind_fuchsia::PROTOCOL, bind_fuchsia_gpio::BIND_PROTOCOL_DEVICE),
+      fdf::MakeProperty(bind_fuchsia_gpio::FUNCTION, bind_fuchsia_gpio::FUNCTION_TDM_B_SCLK),
+  };
+
   std::vector<fdf::ParentSpec> kControllerParents = std::vector{
       fdf::ParentSpec{{kGpioInitRules, kGpioInitProps}},
       fdf::ParentSpec{{kClockInitRules, kClockInitProps}},
       fdf::ParentSpec{{kClkBindRules, kClkProperties}},
       fdf::ParentSpec{{kHifiPllBindRules, kHifiPllProperties}},
+      fdf::ParentSpec{{kTdmASclkRules, kTdmASclkProperties}},
+      fdf::ParentSpec{{kTdmBSclkRules, kTdmBSclkProperties}},
   };
 
   // Audio composite device setup.

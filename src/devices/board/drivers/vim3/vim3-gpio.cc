@@ -87,6 +87,8 @@ static const gpio_pin_t gpio_pins[] = {
     DECL_GPIO_PIN(VIM3_WIFI_32K),
     DECL_GPIO_PIN(VIM3_BT_EN),
     DECL_GPIO_PIN(VIM3_POWER_BUTTON),
+    DECL_GPIO_PIN(VIM3_BTPCM_CLK),
+    DECL_GPIO_PIN(VIM3_I2SB_SCLK),
 };
 
 fuchsia_driver_framework::CompositeNodeSpec CreateGpioExpanderCompositeNodeSpec() {

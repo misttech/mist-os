@@ -142,6 +142,7 @@ driver_bind_rules("aml-g12-composite-bind") {
   tests = "tests-composite.json"
   deps = [
     "//src/devices/bind/fuchsia.amlogic.platform",
+    "//src/devices/bind/fuchsia.amlogic.platform.a311d",
     "//src/devices/bind/fuchsia.clock",
     "//src/devices/bind/fuchsia.gpio",
     "//src/devices/bind/fuchsia.platform",
@@ -161,6 +162,7 @@ source_set("aml-g12-composite-common") {
   public_deps = [
     "//sdk/fidl/fuchsia.hardware.audio:fuchsia.hardware.audio_cpp",
     "//sdk/fidl/fuchsia.hardware.clock:fuchsia.hardware.clock_cpp",
+    "//sdk/fidl/fuchsia.hardware.gpio:fuchsia.hardware.gpio_cpp",
     "//sdk/lib/driver/compat/cpp",
     "//sdk/lib/driver/component/cpp",
     "//sdk/lib/driver/devfs/cpp",
