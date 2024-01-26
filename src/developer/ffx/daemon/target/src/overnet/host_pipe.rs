@@ -13,6 +13,7 @@ use fuchsia_async::{unblock, Task, TimeoutExt, Timer};
 use futures::FutureExt;
 use futures_lite::stream::StreamExt;
 use nix::{
+    errno::Errno,
     sys::{
         signal::{kill, Signal::SIGKILL},
         wait::waitpid,
@@ -49,7 +50,7 @@ pub(crate) enum PipeError {
     Error(String),
     #[error("target referenced has gone")]
     TargetGone,
-    #[error("creating pipe to {1} failed: {0}")]
+    #[error("creating pipe to ['{1}'] failed: {0}")]
     PipeCreationFailed(String, String),
     #[error("no ssh address to {0}")]
     NoAddress(String),
@@ -403,7 +404,13 @@ impl HostPipeChild {
                     }
 
                     if let Some(status) = ssh.try_wait()? {
-                        tracing::error!("Target pipe exited with {status} due to {e:?}");
+                        match status.code() {
+                            // Possible to catch more error codes here, hence the use of a match.
+                            Some(255) => {
+                                tracing::warn!("SSH ret code: 255. Unexpected session termination.")
+                            }
+                            _ => tracing::error!("SSH exited with error code: {status}. "),
+                        }
                     } else {
                         tracing::error!(
                             "ssh child has not ended, trying one more time then ignoring it."
@@ -441,7 +448,9 @@ impl HostPipeChild {
                         if verbose_ssh {
                             write_ssh_log("E", &line).await;
                         } else {
-                            tracing::info!("SSH stderr: {}", line);
+                            // Sometimes the SSH message that comes from openssh has a carriage
+                            // return at the end which messes up the flow of the info log.
+                            tracing::info!("SSH stderr: {:?}", line.trim());
                             stderr_buf.push_line(line.clone());
                             event_queue
                                 .push(TargetEvent::SshHostPipeErr(HostPipeErr::from(line)))
@@ -676,7 +685,7 @@ async fn parse_ssh_error<R: AsyncBufRead + Unpin>(stderr: &mut R, verbose: bool)
     loop {
         let l = match read_ssh_line_with_timeouts(stderr).await {
             Err(e) => {
-                tracing::error!("reading ssh stderr: {e:?}");
+                tracing::warn!("SSH stderr: {e:?}");
                 return PipeError::NoCompatibilityCheck;
             }
             Ok(l) => l,
@@ -726,9 +735,16 @@ async fn parse_ssh_output(
     let res =
         match parse_ssh_connection(stdout, verbose_ssh).await.context("reading ssh connection") {
             Ok((addr, compatibility_status)) => (Some(HostAddr(addr)), compatibility_status),
-            Err(e) => {
-                let error_message = format!("Failed to read ssh client address: {e:?}");
-                tracing::error!("{error_message}");
+            Err(_e) => {
+                // Upon a successful connection, OpenSSH sets several environment variables.
+                // SSH_CONNECTION shows the address of the client, the outgoing port on the client,
+                // the address of the server and the incoming port on the server. In this error
+                // message, parse_ssh_connection_with_info function failed to parse the client
+                // address.
+                //
+                // No need to print the error because we are parsing it again and printing it in
+                // the logic below in parse_ssh_error function.
+                tracing::warn!("Could not parse the client address from $SSH_CONNECTION.");
                 (None, None)
             }
         };
@@ -737,6 +753,8 @@ async fn parse_ssh_output(
         Ok((addr, compat))
     } else {
         // If we failed to parse the ssh connection, there might be information in stderr
+        // We seem to always come here even if the error above was successfully parsed because we
+        // return (None, None) for res.
         Err(parse_ssh_error(stderr, verbose_ssh).await)
     }
 }
@@ -750,16 +768,21 @@ impl Drop for HostPipeChild {
             }
             Ok(None) => {
                 let _ = kill(pid, SIGKILL)
-                    .map_err(|e| tracing::warn!("failed to kill HostPipeChild: {:?}", e));
+                    .map_err(|e| tracing::debug!("failed to kill HostPipeChild: {:?}", e));
                 let _ = waitpid(pid, None)
-                    .map_err(|e| tracing::warn!("failed to clean up HostPipeChild: {:?}", e));
+                    .map_err(|e| tracing::debug!("failed to clean up HostPipeChild: {:?}", e));
             }
             Err(e) => {
-                tracing::warn!("failed to soft-wait HostPipeChild: {:?}", e);
-                let _ = kill(pid, SIGKILL)
-                    .map_err(|e| tracing::warn!("failed to kill HostPipeChild: {:?}", e));
-                let _ = waitpid(pid, None)
-                    .map_err(|e| tracing::warn!("failed to clean up HostPipeChild: {:?}", e));
+                // Let the user know if error returned from try_wait() is ESRCH
+                if e.kind() == io::Error::from(Errno::ESRCH).kind() {
+                    tracing::warn!("Failed to wait. No process found with the given PID: {pid}");
+                } else {
+                    tracing::debug!("failed to soft-wait HostPipeChild: {:?}", e);
+                    let _ = kill(pid, SIGKILL)
+                        .map_err(|e| tracing::debug!("failed to kill HostPipeChild: {:?}", e));
+                    let _ = waitpid(pid, None)
+                        .map_err(|e| tracing::debug!("failed to clean up HostPipeChild: {:?}", e));
+                }
             }
         };
 
@@ -787,7 +810,15 @@ where
     fn drop(&mut self) {
         let pid = Pid::from_raw(self.inner.inner.id().unwrap() as i32);
         let res = kill(pid, SIGKILL);
-        tracing::info!("killed inner {:?}", res);
+        match res {
+            Err(Errno::ESRCH) => {
+                tracing::warn!("Failed to kill. No process found with the given PID: {pid}");
+            }
+            Err(e) => {
+                tracing::debug!("Failed to kill. Got {e:?}");
+            }
+            _ => (),
+        };
     }
 }
 
@@ -963,7 +994,11 @@ fn overnet_pipe(node: Arc<overnet_core::Router>) -> Result<fidl::AsyncSocket, io
                 }
                 .await
                 {
-                    tracing::warn!("Host pipe circuit failed: {:?}", e);
+                    // The error has enough context without mentioning "Host pipe circuit failed."
+                    // Keeping it as a warning rather than an error because we usually trigger this
+                    // error with the other end of the overnet connection is terminated. For
+                    // example, when the target is shutdown.
+                    tracing::warn!("{e:?}");
                 }
             },
             errors
