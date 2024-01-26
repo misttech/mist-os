@@ -13,7 +13,7 @@ use crate::{
     task::{
         interval_timer::IntervalTimerHandle, ptrace_detach, AtomicStopState, ClockId,
         ControllingTerminal, CurrentTask, ExitStatus, Kernel, PidTable, ProcessGroup,
-        PtraceAllowedPtracers, PtraceEvent, PtraceStatus, Session, StopState, Task,
+        PtraceAllowedPtracers, PtraceEvent, PtraceOptions, PtraceStatus, Session, StopState, Task,
         TaskMutableState, TaskPersistentInfo, TaskPersistentInfoState, TimerId, TimerTable,
         WaitQueue,
     },
@@ -374,7 +374,19 @@ impl ThreadGroup {
         self.stop_state.load(Ordering::Relaxed)
     }
 
-    pub fn exit(self: &Arc<Self>, exit_status: ExitStatus) {
+    // Causes the thread group to exit.  If this is being called from a task
+    // that is part of the current thread group, the caller should pass
+    // `current_task`.  If ownership issues prevent passing `current_task`, then
+    // callers should use CurrentTask::thread_group_exit instead.
+    pub fn exit(
+        self: &Arc<Self>,
+        exit_status: ExitStatus,
+        mut current_task: Option<&mut CurrentTask>,
+    ) {
+        if let Some(ref mut current_task) = current_task {
+            current_task
+                .ptrace_event(PtraceOptions::TRACEEXIT, exit_status.signal_info_status() as u32);
+        }
         let mut state = self.write();
         if state.terminating {
             // The thread group is already terminating and all threads in the thread group have
@@ -1520,7 +1532,7 @@ mod test {
     async fn test_exit_status() {
         let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
         let child = current_task.clone_task_for_test(&mut locked, 0, Some(SIGCHLD));
-        child.thread_group.exit(ExitStatus::Exit(42));
+        child.thread_group.exit(ExitStatus::Exit(42), None);
         std::mem::drop(child);
         assert_eq!(
             current_task.thread_group.read().zombie_children[0].exit_info.status,
@@ -1593,7 +1605,7 @@ mod test {
 
         assert_eq!(task3.thread_group.read().get_ppid(), task2.id);
 
-        task2.thread_group.exit(ExitStatus::Exit(0));
+        task2.thread_group.exit(ExitStatus::Exit(0), None);
         std::mem::drop(task2);
 
         // Task3 parent should be current_task.

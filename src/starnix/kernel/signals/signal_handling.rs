@@ -168,12 +168,9 @@ fn action_for_signal(siginfo: &SignalInfo, sigaction: sigaction_t) -> DeliveryAc
 }
 
 /// Dequeues and handles a pending signal for `current_task`.
-pub fn dequeue_signal(
-    task: &Task,
-    mut task_state: TaskWriteGuard<'_>,
-    registers: &mut RegisterState,
-    extended_pstate: &ExtendedPstateState,
-) {
+pub fn dequeue_signal(current_task: &mut CurrentTask) {
+    let CurrentTask { task, thread_state, .. } = current_task;
+    let mut task_state = task.write();
     // This code is occasionally executed as the task is stopping. Stopping /
     // stopped threads should not get signals.
     if task.load_stopped().is_stopping_or_stopped() {
@@ -183,7 +180,7 @@ pub fn dequeue_signal(
     let siginfo =
         task_state.signals.take_next_where(|sig| !mask.has_signal(sig.signal) || sig.force);
     prepare_to_restart_syscall(
-        registers,
+        &mut thread_state.registers,
         siginfo.as_ref().map(|siginfo| task.thread_group.signal_actions.get(siginfo.signal)),
     );
 
@@ -218,7 +215,15 @@ pub fn dequeue_signal(
         if let SignalDetail::Timer { timer } = &siginfo.detail {
             timer.on_signal_delivered();
         }
-        deliver_signal(task, task_state, siginfo, registers, extended_pstate);
+        if let Some(status) = deliver_signal(
+            &task,
+            task_state,
+            siginfo,
+            &mut current_task.thread_state.registers,
+            &current_task.thread_state.extended_pstate,
+        ) {
+            current_task.thread_group_exit(status);
+        }
     }
 }
 
@@ -228,7 +233,7 @@ pub fn deliver_signal(
     mut siginfo: SignalInfo,
     registers: &mut RegisterState,
     extended_pstate: &ExtendedPstateState,
-) {
+) -> Option<ExitStatus> {
     loop {
         let sigaction = task.thread_group.signal_actions.get(siginfo.signal);
         let action = action_for_signal(&siginfo, sigaction);
@@ -277,12 +282,12 @@ pub fn deliver_signal(
                 // Release the signals lock. [`ThreadGroup::exit`] sends signals to threads which
                 // will include this one and cause a deadlock re-acquiring the signals lock.
                 drop(task_state);
-                task.thread_group.exit(ExitStatus::Kill(siginfo));
+                return Some(ExitStatus::Kill(siginfo));
             }
             DeliveryAction::CoreDump => {
                 task_state.set_flags(TaskFlags::DUMP_ON_EXIT, true);
                 drop(task_state);
-                task.thread_group.exit(ExitStatus::CoreDump(siginfo));
+                return Some(ExitStatus::CoreDump(siginfo));
             }
             DeliveryAction::Stop => {
                 drop(task_state);
@@ -294,6 +299,7 @@ pub fn deliver_signal(
         };
         break;
     }
+    None
 }
 
 /// Prepares `current` state to execute the signal handler stored in `action`.
@@ -433,18 +439,10 @@ pub fn sys_restart_syscall(
 /// Test utilities for signal handling.
 #[cfg(test)]
 pub(crate) mod testing {
-    use crate::{
-        signals::dequeue_signal,
-        task::{CurrentTask, ThreadState},
-        testing::AutoReleasableTask,
-    };
+    use crate::{signals::dequeue_signal, testing::AutoReleasableTask};
     use std::ops::DerefMut as _;
 
     pub(crate) fn dequeue_signal_for_test(current_task: &mut AutoReleasableTask) {
-        let CurrentTask {
-            task, thread_state: ThreadState { registers, extended_pstate, .. }, ..
-        } = current_task.deref_mut();
-        let task_state = task.write();
-        dequeue_signal(task, task_state, registers, extended_pstate);
+        dequeue_signal(current_task.deref_mut());
     }
 }

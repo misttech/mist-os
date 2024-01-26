@@ -18,9 +18,7 @@ use crate::{
     mm::MemoryManager,
     signals::{dequeue_signal, prepare_to_restart_syscall},
     syscalls::table::dispatch_syscall,
-    task::{
-        CurrentTask, ExitStatus, Kernel, SeccompStateValue, TaskFlags, ThreadGroup, ThreadState,
-    },
+    task::{CurrentTask, ExitStatus, Kernel, SeccompStateValue, TaskFlags, ThreadGroup},
     vfs::{FdNumber, FdTable, FileSystemCreator, FileSystemHandle, FileSystemOptions, FsStr},
 };
 use starnix_logging::log_trace;
@@ -113,23 +111,17 @@ pub fn process_completed_restricted_exit(
         {
             let flags = current_task.flags();
             {
-                let CurrentTask {
-                    task,
-                    thread_state: ThreadState { registers, extended_pstate, .. },
-                    ..
-                } = current_task;
-                let task_state = task.write();
                 if flags.contains(TaskFlags::TEMPORARY_SIGNAL_MASK)
                     || (!flags.contains(TaskFlags::EXITED)
                         && flags.contains(TaskFlags::SIGNALS_AVAILABLE))
                 {
-                    if !task.is_exitted() {
-                        dequeue_signal(task, task_state, registers, extended_pstate);
+                    if !current_task.is_exitted() {
+                        dequeue_signal(current_task);
                     }
                 }
                 // The syscall may need to restart for a non-signal-related
                 // reason. This call does nothing if we aren't restarting.
-                prepare_to_restart_syscall(registers, None);
+                prepare_to_restart_syscall(&mut current_task.thread_state.registers, None);
             }
         }
 
@@ -335,7 +327,7 @@ mod tests {
                 }
 
                 // exit the task.
-                task.thread_group.exit(ExitStatus::Exit(1));
+                task.thread_group.exit(ExitStatus::Exit(1), None);
             }
         });
 

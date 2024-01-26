@@ -680,10 +680,10 @@ pub fn sys_exit(
 
 pub fn sys_exit_group(
     _locked: &mut Locked<'_, Unlocked>,
-    current_task: &CurrentTask,
+    current_task: &mut CurrentTask,
     code: i32,
 ) -> Result<(), Errno> {
-    current_task.thread_group.exit(ExitStatus::Exit(code as u8));
+    current_task.thread_group_exit(ExitStatus::Exit(code as u8));
     Ok(())
 }
 
