@@ -259,6 +259,12 @@ def main():
         help="Output path to JSON-formatted Build Event Protocol log file",
         metavar="LOG",
     )
+    parser.add_argument(
+        "--bazel-exec-log-json",
+        type=Path,
+        help="Output path to JSON-formatted action execution log file",
+        metavar="LOG",
+    )
     parser.add_argument("extra_args", nargs=argparse.REMAINDER)
 
     args = parser.parse_args()
@@ -639,6 +645,14 @@ def main():
         bazel_test_args += [
             "--build_event_json_file=%s"
             % args.bazel_build_events_log_json.resolve()
+        ]
+
+    # Bazel action execution log.
+    # This contains records of local and remote executions.
+    if args.bazel_exec_log_json:
+        args.bazel_exec_log_json.parent.mkdir(parents=True, exist_ok=True)
+        bazel_test_args += [
+            "--execution_log_json_file=%s" % args.bazel_exec_log_json.resolve()
         ]
 
     if args.clean:

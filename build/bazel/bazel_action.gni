@@ -5,6 +5,7 @@
 import("//build/bazel/bazel_inputs.gni")
 import("//build/bazel/bazel_workspace.gni")
 import("//build/bazel/legacy_ninja_build_outputs.gni")
+import("//build/bazel/logging.gni")
 import("//build/bazel/remote_services.gni")
 import("//build/config/compiler.gni")
 
@@ -524,6 +525,10 @@ template("bazel_action") {
           },
         ]
       }
+    }
+
+    if (bazel_execution_logs) {
+      args += [ "--config=exec_log" ]
     }
 
     _remote_build = enable_bazel_remote_rbe

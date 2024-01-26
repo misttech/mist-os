@@ -746,8 +746,11 @@ block *
         "template.bazelrc",
         default_platform=f"fuchsia_{args.target_arch}",
         host_platform=host_tag_alt,
-        log_file=os.path.relpath(
+        workspace_log_file=os.path.relpath(
             os.path.join(logs_dir, "workspace-events.log"), workspace_dir
+        ),
+        execution_log_file=os.path.relpath(
+            os.path.join(logs_dir, "exec_log.json"), workspace_dir
         ),
         config_file=os.path.relpath(
             os.path.join(topdir, "download_config_file"), workspace_dir

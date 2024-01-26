@@ -4,6 +4,7 @@
 
 import("//build/bazel/bazel_fuchsia_sdk.gni")
 import("//build/bazel/generate_prebuilt_dir_content_hash.gni")
+import("//build/bazel/logging.gni")
 import("//build/bazel/remote_services.gni")
 import("//build/config/fuchsia/platform_version.gni")
 import("//build/sdk/config.gni")
@@ -135,6 +136,7 @@ template("bazel_sdk_tests_for") {
       "$target_gen_dir/$target_name.stamp",
       "$target_out_dir/$target_name.bazel_events_logs.json",
     ]
+    _exec_log = "$target_out_dir/$target_name.bazel_exec_log.json"
     depfile = "$target_gen_dir/$target_name.d"
 
     # Provide a distinct output_base for each test. This is because the
@@ -222,6 +224,12 @@ template("bazel_sdk_tests_for") {
       rebase_path(_prebuilt_clang_content_hash, root_build_dir),
     ]
 
+    if (bazel_execution_logs) {
+      args += [
+        "--bazel-exec-log-json",
+        rebase_path(_exec_log, root_build_dir),
+      ]
+    }
     args += [
       "--bazel-build-events-log-json",
       rebase_path(outputs[1], root_build_dir),
