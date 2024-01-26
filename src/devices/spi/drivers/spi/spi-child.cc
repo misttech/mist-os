@@ -28,93 +28,154 @@ void SpiChild::OpenSession(OpenSessionRequestView request, OpenSessionCompleter:
 void SpiChild::TransmitVector(TransmitVectorRequestView request,
                               TransmitVectorCompleter::Sync& completer) {
   fdf::Arena arena('SPI_');
-  auto result = spi_.sync().buffer(arena)->TransmitVector(cs_, request->data);
-  if (zx_status_t status = FidlStatus(result); status != ZX_OK) {
-    zxlogf(ERROR, "Couldn't complete SpiImpl::TransmitVector: %s", zx_status_get_string(status));
-    completer.Reply(status);
-  } else {
-    completer.Reply(ZX_OK);
-  }
+  spi_.buffer(arena)
+      ->TransmitVector(cs_, request->data)
+      .ThenExactlyOnce(
+          fit::inline_callback<
+              void(fdf::WireUnownedResult<fuchsia_hardware_spiimpl::SpiImpl::TransmitVector>&),
+              sizeof(TransmitVectorCompleter::Async)>(
+              [completer = completer.ToAsync()](auto& result) mutable {
+                if (zx_status_t status = FidlStatus(result); status != ZX_OK) {
+                  zxlogf(ERROR, "Couldn't complete SpiImpl::TransmitVector: %s",
+                         zx_status_get_string(status));
+                  completer.Reply(status);
+                } else {
+                  completer.Reply(ZX_OK);
+                }
+              }));
 }
 
 void SpiChild::ReceiveVector(ReceiveVectorRequestView request,
                              ReceiveVectorCompleter::Sync& completer) {
+  struct {
+    uint32_t size;
+    ReceiveVectorCompleter::Async completer;
+  } request_data{request->size, completer.ToAsync()};
+
   fdf::Arena arena('SPI_');
-  auto result = spi_.sync().buffer(arena)->ReceiveVector(cs_, request->size);
-  if (zx_status_t status = FidlStatus(result); status != ZX_OK) {
-    zxlogf(ERROR, "Couldn't complete SpiImpl::ReceiveVector: %s", zx_status_get_string(status));
-    completer.Reply(status, {});
-  } else if (result->value()->data.count() != request->size) {
-    zxlogf(ERROR, "Expected %u bytes != received %zu bytes", request->size,
-           result->value()->data.count());
-    completer.Reply(ZX_ERR_INTERNAL, {});
-  } else {
-    completer.Reply(ZX_OK, result->value()->data);
-  }
+  spi_.buffer(arena)
+      ->ReceiveVector(cs_, request->size)
+      .ThenExactlyOnce(
+          fit::inline_callback<
+              void(fdf::WireUnownedResult<fuchsia_hardware_spiimpl::SpiImpl::ReceiveVector>&),
+              sizeof(request_data)>([request_data = std::move(request_data)](auto& result) mutable {
+            if (zx_status_t status = FidlStatus(result); status != ZX_OK) {
+              zxlogf(ERROR, "Couldn't complete SpiImpl::ReceiveVector: %s",
+                     zx_status_get_string(status));
+              request_data.completer.Reply(status, {});
+            } else if (result->value()->data.count() != request_data.size) {
+              zxlogf(ERROR, "Expected %u bytes != received %zu bytes", request_data.size,
+                     result->value()->data.count());
+              request_data.completer.Reply(ZX_ERR_INTERNAL, {});
+            } else {
+              request_data.completer.Reply(ZX_OK, result->value()->data);
+            }
+          }));
 }
 
 void SpiChild::ExchangeVector(ExchangeVectorRequestView request,
                               ExchangeVectorCompleter::Sync& completer) {
+  struct {
+    size_t txdata_count;
+    ExchangeVectorCompleter::Async completer;
+  } request_data{request->txdata.count(), completer.ToAsync()};
+
   fdf::Arena arena('SPI_');
-  auto result = spi_.sync().buffer(arena)->ExchangeVector(cs_, request->txdata);
-  if (zx_status_t status = FidlStatus(result); status != ZX_OK) {
-    zxlogf(ERROR, "Couldn't complete SpiImpl::ExchangeVector: %s", zx_status_get_string(status));
-    completer.Reply(status, {});
-  } else if (result->value()->rxdata.count() != request->txdata.count()) {
-    zxlogf(ERROR, "Expected %zu bytes != received %zu bytes", request->txdata.count(),
-           result->value()->rxdata.count());
-    completer.Reply(ZX_ERR_INTERNAL, {});
-  } else {
-    completer.Reply(ZX_OK, result->value()->rxdata);
-  }
+  spi_.buffer(arena)
+      ->ExchangeVector(cs_, request->txdata)
+      .ThenExactlyOnce(
+          fit::inline_callback<
+              void(fdf::WireUnownedResult<fuchsia_hardware_spiimpl::SpiImpl::ExchangeVector>&),
+              sizeof(request_data)>([request_data = std::move(request_data)](auto& result) mutable {
+            if (zx_status_t status = FidlStatus(result); status != ZX_OK) {
+              zxlogf(ERROR, "Couldn't complete SpiImpl::ExchangeVector: %s",
+                     zx_status_get_string(status));
+              request_data.completer.Reply(status, {});
+            } else if (result->value()->rxdata.count() != request_data.txdata_count) {
+              zxlogf(ERROR, "Expected %zu bytes != received %zu bytes", request_data.txdata_count,
+                     result->value()->rxdata.count());
+              request_data.completer.Reply(ZX_ERR_INTERNAL, {});
+            } else {
+              request_data.completer.Reply(ZX_OK, result->value()->rxdata);
+            }
+          }));
 }
 
 void SpiChild::RegisterVmo(RegisterVmoRequestView request, RegisterVmoCompleter::Sync& completer) {
   fdf::Arena arena('SPI_');
-  auto result = spi_.sync().buffer(arena)->RegisterVmo(cs_, request->vmo_id,
-                                                       std::move(request->vmo), request->rights);
-  if (zx_status_t status = FidlStatus(result); status != ZX_OK) {
-    zxlogf(ERROR, "Couldn't complete SpiImpl::RegisterVmo: %s", zx_status_get_string(status));
-    completer.ReplyError(status);
-  } else {
-    completer.ReplySuccess();
-  }
+  spi_.buffer(arena)
+      ->RegisterVmo(cs_, request->vmo_id, std::move(request->vmo), request->rights)
+      .ThenExactlyOnce(
+          fit::inline_callback<
+              void(fdf::WireUnownedResult<fuchsia_hardware_spiimpl::SpiImpl::RegisterVmo>&),
+              sizeof(RegisterVmoCompleter::Async)>(
+              [completer = completer.ToAsync()](auto& result) mutable {
+                if (zx_status_t status = FidlStatus(result); status != ZX_OK) {
+                  zxlogf(ERROR, "Couldn't complete SpiImpl::RegisterVmo: %s",
+                         zx_status_get_string(status));
+                  completer.ReplyError(status);
+                } else {
+                  completer.ReplySuccess();
+                }
+              }));
 }
 
 void SpiChild::UnregisterVmo(UnregisterVmoRequestView request,
                              UnregisterVmoCompleter::Sync& completer) {
   fdf::Arena arena('SPI_');
-  auto result = spi_.sync().buffer(arena)->UnregisterVmo(cs_, request->vmo_id);
-  if (zx_status_t status = FidlStatus(result); status != ZX_OK) {
-    zxlogf(ERROR, "Couldn't complete SpiImpl::UnregisterVmo: %s", zx_status_get_string(status));
-    completer.ReplyError(status);
-  } else {
-    completer.ReplySuccess(std::move(result->value()->vmo));
-  }
+  spi_.buffer(arena)
+      ->UnregisterVmo(cs_, request->vmo_id)
+      .ThenExactlyOnce(
+          fit::inline_callback<
+              void(fdf::WireUnownedResult<fuchsia_hardware_spiimpl::SpiImpl::UnregisterVmo>&),
+              sizeof(UnregisterVmoCompleter::Async)>(
+              [completer = completer.ToAsync()](auto& result) mutable {
+                if (zx_status_t status = FidlStatus(result); status != ZX_OK) {
+                  zxlogf(ERROR, "Couldn't complete SpiImpl::UnregisterVmo: %s",
+                         zx_status_get_string(status));
+                  completer.ReplyError(status);
+                } else {
+                  completer.ReplySuccess(std::move(result->value()->vmo));
+                }
+              }));
 }
 
 void SpiChild::Transmit(TransmitRequestView request, TransmitCompleter::Sync& completer) {
   TRACE_DURATION("spi", "Transmit", "cs", cs_, "size", request->buffer.size);
   fdf::Arena arena('SPI_');
-  auto result = spi_.sync().buffer(arena)->TransmitVmo(cs_, request->buffer);
-  if (zx_status_t status = FidlStatus(result); status != ZX_OK) {
-    zxlogf(ERROR, "Couldn't complete SpiImpl::TransmitVmo: %s", zx_status_get_string(status));
-    completer.ReplyError(status);
-  } else {
-    completer.ReplySuccess();
-  }
+  spi_.buffer(arena)
+      ->TransmitVmo(cs_, request->buffer)
+      .ThenExactlyOnce(
+          fit::inline_callback<
+              void(fdf::WireUnownedResult<fuchsia_hardware_spiimpl::SpiImpl::TransmitVmo>&),
+              sizeof(TransmitCompleter::Async)>(
+              [completer = completer.ToAsync()](auto& result) mutable {
+                if (zx_status_t status = FidlStatus(result); status != ZX_OK) {
+                  zxlogf(ERROR, "Couldn't complete SpiImpl::TransmitVmo: %s",
+                         zx_status_get_string(status));
+                  completer.ReplyError(status);
+                } else {
+                  completer.ReplySuccess();
+                }
+              }));
 }
 
 void SpiChild::Receive(ReceiveRequestView request, ReceiveCompleter::Sync& completer) {
   TRACE_DURATION("spi", "Receive", "cs", cs_, "size", request->buffer.size);
   fdf::Arena arena('SPI_');
-  auto result = spi_.sync().buffer(arena)->ReceiveVmo(cs_, request->buffer);
-  if (zx_status_t status = FidlStatus(result); status != ZX_OK) {
-    zxlogf(ERROR, "Couldn't complete SpiImpl::ReceiveVmo: %s", zx_status_get_string(status));
-    completer.ReplyError(status);
-  } else {
-    completer.ReplySuccess();
-  }
+  spi_.buffer(arena)
+      ->ReceiveVmo(cs_, request->buffer)
+      .ThenExactlyOnce(fit::inline_callback<
+                       void(fdf::WireUnownedResult<fuchsia_hardware_spiimpl::SpiImpl::ReceiveVmo>&),
+                       sizeof(ReceiveCompleter::Async)>([completer = completer.ToAsync()](
+                                                            auto& result) mutable {
+        if (zx_status_t status = FidlStatus(result); status != ZX_OK) {
+          zxlogf(ERROR, "Couldn't complete SpiImpl::ReceiveVmo: %s", zx_status_get_string(status));
+          completer.ReplyError(status);
+        } else {
+          completer.ReplySuccess();
+        }
+      }));
 }
 
 void SpiChild::Exchange(ExchangeRequestView request, ExchangeCompleter::Sync& completer) {
@@ -127,13 +188,21 @@ void SpiChild::Exchange(ExchangeRequestView request, ExchangeCompleter::Sync& co
 
   TRACE_DURATION("spi", "Exchange", "cs", cs_, "size", request->tx_buffer.size);
   fdf::Arena arena('SPI_');
-  auto result = spi_.sync().buffer(arena)->ExchangeVmo(cs_, request->tx_buffer, request->rx_buffer);
-  if (zx_status_t status = FidlStatus(result); status != ZX_OK) {
-    zxlogf(ERROR, "Couldn't complete SpiImpl::ExchangeVmo: %s", zx_status_get_string(status));
-    completer.ReplyError(status);
-  } else {
-    completer.ReplySuccess();
-  }
+  spi_.buffer(arena)
+      ->ExchangeVmo(cs_, request->tx_buffer, request->rx_buffer)
+      .ThenExactlyOnce(
+          fit::inline_callback<
+              void(fdf::WireUnownedResult<fuchsia_hardware_spiimpl::SpiImpl::ExchangeVmo>&),
+              sizeof(ExchangeCompleter::Async)>(
+              [completer = completer.ToAsync()](auto& result) mutable {
+                if (zx_status_t status = FidlStatus(result); status != ZX_OK) {
+                  zxlogf(ERROR, "Couldn't complete SpiImpl::ExchangeVmo: %s",
+                         zx_status_get_string(status));
+                  completer.ReplyError(status);
+                } else {
+                  completer.ReplySuccess();
+                }
+              }));
 }
 
 zx_status_t SpiChild::SpiTransmit(const uint8_t* txdata_list, size_t txdata_count) {
@@ -210,13 +279,18 @@ void SpiChild::AssertCs(AssertCsCompleter::Sync& completer) {
   }
 
   fdf::Arena arena('SPI_');
-  auto result = spi_.sync().buffer(arena)->LockBus(cs_);
-  if (zx_status_t status = FidlStatus(result); status != ZX_OK) {
-    zxlogf(ERROR, "SpiImpl::LockBus failed: %s", zx_status_get_string(status));
-    completer.Reply(status);
-  } else {
-    completer.Reply(ZX_OK);
-  }
+  spi_.buffer(arena)->LockBus(cs_).ThenExactlyOnce(
+      fit::inline_callback<void(
+                               fdf::WireUnownedResult<fuchsia_hardware_spiimpl::SpiImpl::LockBus>&),
+                           sizeof(AssertCsCompleter::Async)>(
+          [completer = completer.ToAsync()](auto& result) mutable {
+            if (zx_status_t status = FidlStatus(result); status != ZX_OK) {
+              zxlogf(ERROR, "SpiImpl::LockBus failed: %s", zx_status_get_string(status));
+              completer.Reply(status);
+            } else {
+              completer.Reply(ZX_OK);
+            }
+          }));
 }
 
 void SpiChild::DeassertCs(DeassertCsCompleter::Sync& completer) {
@@ -226,13 +300,18 @@ void SpiChild::DeassertCs(DeassertCsCompleter::Sync& completer) {
   }
 
   fdf::Arena arena('SPI_');
-  auto result = spi_.sync().buffer(arena)->UnlockBus(cs_);
-  if (zx_status_t status = FidlStatus(result); status != ZX_OK) {
-    zxlogf(ERROR, "SpiImpl::UnlockBus failed: %s", zx_status_get_string(status));
-    completer.Reply(status);
-  } else {
-    completer.Reply(ZX_OK);
-  }
+  spi_.buffer(arena)->UnlockBus(cs_).ThenExactlyOnce(
+      fit::inline_callback<
+          void(fdf::WireUnownedResult<fuchsia_hardware_spiimpl::SpiImpl::UnlockBus>&),
+          sizeof(DeassertCsCompleter::Async)>(
+          [completer = completer.ToAsync()](auto& result) mutable {
+            if (zx_status_t status = FidlStatus(result); status != ZX_OK) {
+              zxlogf(ERROR, "SpiImpl::UnlockBus failed: %s", zx_status_get_string(status));
+              completer.Reply(status);
+            } else {
+              completer.Reply(ZX_OK);
+            }
+          }));
 }
 
 void SpiChild::Bind(async_dispatcher_t* dispatcher,
