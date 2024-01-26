@@ -2,7 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::uapi::dev_t;
 use std::fmt;
 
 pub const MEM_MAJOR: u32 = 1;
@@ -20,7 +19,7 @@ pub const DYN_MAJOR: u32 = 234;
 pub const ZRAM_MAJOR: u32 = 252;
 
 #[derive(Copy, Clone, Debug, Default, Eq, Ord, PartialEq, PartialOrd)]
-pub struct DeviceType(dev_t);
+pub struct DeviceType(u64);
 
 impl DeviceType {
     pub const NONE: DeviceType = DeviceType(0);
@@ -59,11 +58,11 @@ impl DeviceType {
         )
     }
 
-    pub const fn from_bits(dev: dev_t) -> DeviceType {
+    pub const fn from_bits(dev: u64) -> DeviceType {
         DeviceType(dev)
     }
 
-    pub const fn bits(&self) -> dev_t {
+    pub const fn bits(&self) -> u64 {
         self.0
     }
 

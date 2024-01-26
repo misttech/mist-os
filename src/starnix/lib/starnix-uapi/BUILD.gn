@@ -39,6 +39,7 @@ rustc_library("starnix-uapi") {
     "src/union.rs",
     "src/user_address.rs",
     "src/user_buffer.rs",
+    "src/vfs.rs",
   ]
 
   deps = [

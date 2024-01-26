@@ -31,9 +31,9 @@ use starnix_sync::{
 };
 use starnix_syscalls::{SyscallArg, SyscallResult};
 use starnix_uapi::{
-    auth::FsCred, device_type::DeviceType, errno, error, errors::Errno, file_mode::FileMode,
-    from_status_like_fdio, fsverity_descriptor, ino_t, mount_flags::MountFlags, off_t,
-    open_flags::OpenFlags, statfs,
+    __kernel_fsid_t, auth::FsCred, device_type::DeviceType, errno, error, errors::Errno,
+    file_mode::FileMode, from_status_like_fdio, fsverity_descriptor, ino_t,
+    mount_flags::MountFlags, off_t, open_flags::OpenFlags, statfs, vfs::default_statfs,
 };
 use std::sync::Arc;
 use syncio::{
@@ -91,7 +91,15 @@ impl FileSystemOps for RemoteFs {
                     (0, 0)
                 };
 
+                let fsid = __kernel_fsid_t {
+                    val: [
+                        (info.fs_id & 0xffffffff) as i32,
+                        ((info.fs_id >> 32) & 0xffffffff) as i32,
+                    ],
+                };
+
                 return Ok(statfs {
+                    f_type: info.fs_type as i64,
                     f_bsize: info.block_size.into(),
                     f_blocks: total_blocks,
                     f_bfree: free_blocks,
@@ -100,14 +108,14 @@ impl FileSystemOps for RemoteFs {
                     f_ffree: (info.total_nodes.saturating_sub(info.used_nodes))
                         .try_into()
                         .unwrap_or(i64::MAX),
-                    f_fsid: info.fs_id.try_into().unwrap_or(0),
+                    f_fsid: fsid,
                     f_namelen: info.max_filename_size.try_into().unwrap_or(0),
                     f_frsize: info.block_size.into(),
-                    ..statfs::default(info.fs_type)
+                    ..statfs::default()
                 });
             }
         }
-        Ok(statfs::default(REMOTE_FS_MAGIC))
+        Ok(default_statfs(REMOTE_FS_MAGIC))
     }
 
     fn name(&self) -> &'static FsStr {
@@ -2409,7 +2417,7 @@ mod test {
                     assert!(statfs.f_bfree > 0 && statfs.f_bfree <= statfs.f_blocks);
                     assert!(statfs.f_files > 0);
                     assert!(statfs.f_ffree > 0 && statfs.f_ffree <= statfs.f_files);
-                    assert!(statfs.f_fsid != 0);
+                    assert!(statfs.f_fsid.val[0] != 0 || statfs.f_fsid.val[1] != 0);
                     assert!(statfs.f_namelen > 0);
                     assert!(statfs.f_frsize > 0);
                 }

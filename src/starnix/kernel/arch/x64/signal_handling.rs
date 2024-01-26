@@ -13,7 +13,7 @@ use extended_pstate::ExtendedPstateState;
 use starnix_uapi::{
     __NR_restart_syscall, _fpstate_64,
     errors::{Errno, ErrnoCode, ERESTART_RESTARTBLOCK},
-    sigaction_t, sigaltstack, sigcontext, siginfo_t, ucontext,
+    sigaction, sigaltstack, sigcontext, siginfo_t, ucontext,
 };
 
 /// The size of the red zone.
@@ -63,7 +63,7 @@ impl SignalStackFrame {
         _extended_pstate: &ExtendedPstateState,
         signal_state: &SignalState,
         siginfo: &SignalInfo,
-        action: sigaction_t,
+        action: sigaction,
     ) -> SignalStackFrame {
         let context = ucontext {
             uc_mcontext: sigcontext {
@@ -101,11 +101,10 @@ impl SignalStackFrame {
             uc_sigmask: signal_state.mask().into(),
             ..Default::default()
         };
-        let restorer_address = action.sa_restorer.ptr() as u64;
         SignalStackFrame {
             context,
             siginfo_bytes: siginfo.as_siginfo_bytes(),
-            restorer_address,
+            restorer_address: action.sa_restorer.addr,
             fpstate: Default::default(),
         }
     }
@@ -186,7 +185,7 @@ mod tests {
     use starnix_uapi::{
         __NR_rt_sigreturn,
         errors::{EINTR, ERESTARTSYS},
-        sigaction_t,
+        sigaction,
         signals::{SIGUSR1, SIGUSR2},
         user_address::UserAddress,
         SA_RESTART, SA_RESTORER, SA_SIGINFO, SI_USER,
@@ -210,11 +209,11 @@ mod tests {
         // Register the signal action.
         current_task.thread_group.signal_actions.set(
             SIGUSR1,
-            sigaction_t {
+            sigaction {
                 sa_flags: (SA_RESTORER | SA_RESTART | SA_SIGINFO) as u64,
-                sa_handler: SA_HANDLER_ADDRESS,
-                sa_restorer: SA_RESTORER_ADDRESS,
-                ..sigaction_t::default()
+                sa_handler: SA_HANDLER_ADDRESS.into(),
+                sa_restorer: SA_RESTORER_ADDRESS.into(),
+                ..sigaction::default()
             },
         );
 
@@ -281,20 +280,20 @@ mod tests {
         // Register the signal actions.
         current_task.thread_group.signal_actions.set(
             SIGUSR1,
-            sigaction_t {
+            sigaction {
                 sa_flags: (SA_RESTORER | SA_RESTART | SA_SIGINFO) as u64,
-                sa_handler: SA_HANDLER_ADDRESS,
-                sa_restorer: SA_RESTORER_ADDRESS,
-                ..sigaction_t::default()
+                sa_handler: SA_HANDLER_ADDRESS.into(),
+                sa_restorer: SA_RESTORER_ADDRESS.into(),
+                ..sigaction::default()
             },
         );
         current_task.thread_group.signal_actions.set(
             SIGUSR2,
-            sigaction_t {
+            sigaction {
                 sa_flags: (SA_RESTORER | SA_RESTART | SA_SIGINFO) as u64,
-                sa_handler: SA_HANDLER2_ADDRESS,
-                sa_restorer: SA_RESTORER_ADDRESS,
-                ..sigaction_t::default()
+                sa_handler: SA_HANDLER2_ADDRESS.into(),
+                sa_restorer: SA_RESTORER_ADDRESS.into(),
+                ..sigaction::default()
             },
         );
 
@@ -413,11 +412,11 @@ mod tests {
         // Register the signal action.
         current_task.thread_group.signal_actions.set(
             SIGUSR1,
-            sigaction_t {
+            sigaction {
                 sa_flags: (SA_RESTORER | SA_SIGINFO) as u64,
-                sa_handler: SA_HANDLER_ADDRESS,
-                sa_restorer: SA_RESTORER_ADDRESS,
-                ..sigaction_t::default()
+                sa_handler: SA_HANDLER_ADDRESS.into(),
+                sa_restorer: SA_RESTORER_ADDRESS.into(),
+                ..sigaction::default()
             },
         );
 

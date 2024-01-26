@@ -11,7 +11,9 @@ use crate::{
     },
 };
 use once_cell::sync::Lazy;
-use starnix_uapi::{auth::FsCred, errors::Errno, file_mode::mode, statfs, TRACEFS_MAGIC};
+use starnix_uapi::{
+    auth::FsCred, errors::Errno, file_mode::mode, statfs, vfs::default_statfs, TRACEFS_MAGIC,
+};
 use std::sync::Arc;
 
 pub fn trace_fs(current_task: &CurrentTask, options: FileSystemOptions) -> &FileSystemHandle {
@@ -22,7 +24,7 @@ pub struct TraceFs;
 
 impl FileSystemOps for Arc<TraceFs> {
     fn statfs(&self, _fs: &FileSystem, _current_task: &CurrentTask) -> Result<statfs, Errno> {
-        Ok(statfs::default(TRACEFS_MAGIC))
+        Ok(default_statfs(TRACEFS_MAGIC))
     }
 
     fn name(&self) -> &'static FsStr {

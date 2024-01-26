@@ -20,13 +20,13 @@ use starnix_syscalls::{
 };
 use starnix_uapi::{
     auth::{CAP_SYS_ADMIN, CAP_SYS_BOOT},
-    errno, error,
+    c_char, errno, error,
     errors::Errno,
     from_status_like_fdio,
     personality::PersonalityFlags,
     uapi,
     user_address::{UserAddress, UserCString, UserRef},
-    utsname_t, GRND_NONBLOCK, GRND_RANDOM, LINUX_REBOOT_CMD_CAD_OFF, LINUX_REBOOT_CMD_CAD_ON,
+    utsname, GRND_NONBLOCK, GRND_RANDOM, LINUX_REBOOT_CMD_CAD_OFF, LINUX_REBOOT_CMD_CAD_ON,
     LINUX_REBOOT_CMD_HALT, LINUX_REBOOT_CMD_KEXEC, LINUX_REBOOT_CMD_RESTART,
     LINUX_REBOOT_CMD_RESTART2, LINUX_REBOOT_CMD_SW_SUSPEND, LINUX_REBOOT_MAGIC1,
     LINUX_REBOOT_MAGIC2, LINUX_REBOOT_MAGIC2A, LINUX_REBOOT_MAGIC2B, LINUX_REBOOT_MAGIC2C,
@@ -35,14 +35,15 @@ use starnix_uapi::{
 pub fn sys_uname(
     _locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
-    name: UserRef<utsname_t>,
+    name: UserRef<utsname>,
 ) -> Result<(), Errno> {
-    fn init_array(fixed: &mut [u8; 65], init: &[u8]) {
+    fn init_array(fixed: &mut [c_char; 65], init: &[u8]) {
         let len = init.len();
-        fixed[..len].copy_from_slice(init)
+        let as_c_char = unsafe { std::mem::transmute::<&[u8], &[c_char]>(init) };
+        fixed[..len].copy_from_slice(as_c_char)
     }
 
-    let mut result = utsname_t {
+    let mut result = utsname {
         sysname: [0; 65],
         nodename: [0; 65],
         release: [0; 65],

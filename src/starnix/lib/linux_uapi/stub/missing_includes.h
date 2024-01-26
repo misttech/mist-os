@@ -12,8 +12,7 @@
 #include <linux/seccomp.h>
 
 // generate.py will remove __bindgen_missing_ from the start of constant names.
-#define C(x) \
-    const __u32 __bindgen_missing_##x = x
+#define C(x) const __u32 __bindgen_missing_##x = x
 
 C(SECCOMP_IOCTL_NOTIF_RECV);
 C(SECCOMP_IOCTL_NOTIF_SEND);
@@ -147,5 +146,11 @@ C(RNDADDENTROPY);
 C(RNDZAPENTCNT);
 C(RNDCLEARPOOL);
 C(RNDRESEEDCRNG);
+
+typedef struct new_utsname utsname;
+typedef __kernel_gid_t gid_t;
+typedef __kernel_ino_t ino_t;
+typedef __kernel_mode_t mode_t;
+typedef __kernel_off_t off_t;
 
 #endif  // SRC_STARNIX_LIB_LINUX_UAPI_STUB_MISSING_INCLUDES_H_

@@ -14,9 +14,10 @@
 #include <asm/signal.h>
 #include <asm/socket.h>
 #include <asm/stat.h>
+#include <asm/statfs.h>
 #include <asm/ucontext.h>
-#include <linux/ashmem.h>
 #include <linux/android/binder.h>
+#include <linux/ashmem.h>
 #include <linux/audit.h>
 #include <linux/auxvec.h>
 #include <linux/bpf.h>
@@ -77,6 +78,7 @@
 #include <linux/uio.h>
 #include <linux/un.h>
 #include <linux/unistd.h>
+#include <linux/utsname.h>
 #include <linux/vm_sockets.h>
 #include <linux/wait.h>
 #include <linux/xattr.h>

@@ -33,6 +33,7 @@ use starnix_uapi::{
     off_t,
     open_flags::OpenFlags,
     statfs,
+    vfs::default_statfs,
 };
 use std::{
     io::Read,
@@ -124,7 +125,7 @@ impl RemoteBundle {
 impl FileSystemOps for RemoteBundle {
     fn statfs(&self, _fs: &FileSystem, _current_task: &CurrentTask) -> Result<statfs, Errno> {
         const REMOTE_BUNDLE_FS_MAGIC: u32 = u32::from_be_bytes(*b"bndl");
-        Ok(statfs::default(REMOTE_BUNDLE_FS_MAGIC))
+        Ok(default_statfs(REMOTE_BUNDLE_FS_MAGIC))
     }
     fn name(&self) -> &'static FsStr {
         "remote_bundle".into()

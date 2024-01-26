@@ -15,7 +15,9 @@ use crate::{
         SymlinkNode,
     },
 };
-use starnix_uapi::{auth::FsCred, errors::Errno, file_mode::mode, statfs, SYSFS_MAGIC};
+use starnix_uapi::{
+    auth::FsCred, errors::Errno, file_mode::mode, statfs, vfs::default_statfs, SYSFS_MAGIC,
+};
 
 pub const SYSFS_DEVICES: &str = "devices";
 pub const SYSFS_BUS: &str = "bus";
@@ -25,7 +27,7 @@ pub const SYSFS_BLOCK: &str = "block";
 struct SysFs;
 impl FileSystemOps for SysFs {
     fn statfs(&self, _fs: &FileSystem, _current_task: &CurrentTask) -> Result<statfs, Errno> {
-        Ok(statfs::default(SYSFS_MAGIC))
+        Ok(default_statfs(SYSFS_MAGIC))
     }
     fn name(&self) -> &'static FsStr {
         "sysfs".into()

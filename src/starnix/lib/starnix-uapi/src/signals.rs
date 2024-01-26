@@ -228,3 +228,9 @@ impl From<Signal> for SigSet {
         SigSet(value.mask() as std::os::raw::c_ulong)
     }
 }
+
+pub fn sigaltstack_contains_pointer(stack: &uapi::sigaltstack, ptr: u64) -> bool {
+    let min = stack.ss_sp.addr as u64;
+    let max = (stack.ss_sp.addr as u64).saturating_add(stack.ss_size as u64);
+    ptr >= min && ptr <= max
+}

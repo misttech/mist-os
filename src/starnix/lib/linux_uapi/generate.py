@@ -60,8 +60,6 @@ impl<T> From<uaddr> for uref<T> {
 
 # Tell bindgen not to produce records for these types.
 OPAQUE_TYPES = [
-    "__sighandler_t",
-    "__sigrestore_t",
     "group_filter.*",
     "sigval",
     "StdAtomic.*",

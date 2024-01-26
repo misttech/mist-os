@@ -23,7 +23,7 @@ use once_cell::sync::OnceCell;
 use starnix_logging::track_stub;
 use starnix_uapi::{
     auth::FsCred, errno, error, errors::Errno, file_mode::FileMode, ino_t, mount_flags::MountFlags,
-    off_t, open_flags::OpenFlags, statfs, EXT4_SUPER_MAGIC,
+    off_t, open_flags::OpenFlags, statfs, vfs::default_statfs, EXT4_SUPER_MAGIC,
 };
 use std::sync::Arc;
 
@@ -42,7 +42,7 @@ impl FileSystemOps for ExtFilesystem {
     }
 
     fn statfs(&self, _fs: &FileSystem, _current_task: &CurrentTask) -> Result<statfs, Errno> {
-        Ok(statfs::default(EXT4_SUPER_MAGIC))
+        Ok(default_statfs(EXT4_SUPER_MAGIC))
     }
 }
 

@@ -24,12 +24,12 @@ use starnix_uapi::{
         Errno, ErrnoCode, EINTR, ERESTARTNOHAND, ERESTARTNOINTR, ERESTARTSYS, ERESTART_RESTARTBLOCK,
     },
     resource_limits::Resource,
-    sigaction_t,
+    sigaction as sigaction_t,
     signals::{
-        SigSet, SIGABRT, SIGALRM, SIGBUS, SIGCHLD, SIGCONT, SIGFPE, SIGHUP, SIGILL, SIGINT, SIGIO,
-        SIGKILL, SIGPIPE, SIGPROF, SIGPWR, SIGQUIT, SIGSEGV, SIGSTKFLT, SIGSTOP, SIGSYS, SIGTERM,
-        SIGTRAP, SIGTSTP, SIGTTIN, SIGTTOU, SIGURG, SIGUSR1, SIGUSR2, SIGVTALRM, SIGWINCH, SIGXCPU,
-        SIGXFSZ,
+        sigaltstack_contains_pointer, SigSet, SIGABRT, SIGALRM, SIGBUS, SIGCHLD, SIGCONT, SIGFPE,
+        SIGHUP, SIGILL, SIGINT, SIGIO, SIGKILL, SIGPIPE, SIGPROF, SIGPWR, SIGQUIT, SIGSEGV,
+        SIGSTKFLT, SIGSTOP, SIGSYS, SIGTERM, SIGTRAP, SIGTSTP, SIGTTIN, SIGTTOU, SIGURG, SIGUSR1,
+        SIGUSR2, SIGVTALRM, SIGWINCH, SIGXCPU, SIGXFSZ,
     },
     user_address::UserAddress,
     SA_ONSTACK, SA_RESTART, SA_SIGINFO, SIG_DFL, SIG_IGN,
@@ -322,14 +322,14 @@ pub fn dispatch_signal_handler(
             Some(sigaltstack) => {
                 match main_stack {
                     // Only install the sigaltstack if the stack pointer is not already in it.
-                    Some(sp) if sigaltstack.contains_pointer(sp) => main_stack,
+                    Some(sp) if sigaltstack_contains_pointer(&sigaltstack, sp) => main_stack,
                     _ => {
                         // Since the stack grows down, the size is added to the ss_sp when
                         // calculating the "bottom" of the stack.
                         // Use the main stack if sigaltstack overflows.
                         sigaltstack
                             .ss_sp
-                            .ptr()
+                            .addr
                             .checked_add(sigaltstack.ss_size)
                             .map(|sp| sp as u64)
                             .or(main_stack)
@@ -346,8 +346,9 @@ pub fn dispatch_signal_handler(
     let stack_pointer =
         align_stack_pointer(stack_bottom.checked_sub(SIG_STACK_SIZE as u64).ok_or(errno!(EINVAL))?);
 
-    if let Some(sigaltstack) = signal_state.alt_stack {
-        if sigaltstack.contains_pointer(stack_pointer) ^ sigaltstack.contains_pointer(stack_bottom)
+    if let Some(alt_stack) = signal_state.alt_stack {
+        if sigaltstack_contains_pointer(&alt_stack, stack_pointer)
+            != sigaltstack_contains_pointer(&alt_stack, stack_bottom)
         {
             return error!(EINVAL);
         }
@@ -355,7 +356,7 @@ pub fn dispatch_signal_handler(
 
     // Write the signal stack frame at the updated stack pointer.
     task.write_memory(UserAddress::from(stack_pointer), signal_stack_frame.as_bytes())?;
-    signal_state.set_mask(action.sa_mask);
+    signal_state.set_mask(action.sa_mask.into());
 
     registers.set_stack_pointer_register(stack_pointer);
     registers.set_arg0_register(siginfo.signal.number() as u64);
@@ -367,7 +368,7 @@ pub fn dispatch_signal_handler(
             stack_pointer + memoffset::offset_of!(SignalStackFrame, context) as u64,
         );
     }
-    registers.set_instruction_pointer_register(action.sa_handler.ptr() as u64);
+    registers.set_instruction_pointer_register(action.sa_handler.addr);
 
     Ok(())
 }
@@ -406,7 +407,7 @@ pub fn prepare_to_restart_syscall(registers: &mut RegisterState, sigaction: Opti
         _ => return,
     };
     // Always restart if the signal did not call a handler (i.e. SIGSTOP).
-    let should_restart = should_restart || sigaction.sa_handler.is_null();
+    let should_restart = should_restart || sigaction.sa_handler.addr == 0;
 
     if !should_restart {
         registers.set_return_register(EINTR.return_value());

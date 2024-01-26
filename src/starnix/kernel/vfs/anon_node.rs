@@ -11,7 +11,7 @@ use crate::{
 };
 use starnix_uapi::{
     error, errors::Errno, file_mode::FileMode, ino_t, open_flags::OpenFlags, statfs,
-    ANON_INODE_FS_MAGIC,
+    vfs::default_statfs, ANON_INODE_FS_MAGIC,
 };
 use std::sync::Arc;
 
@@ -58,7 +58,7 @@ impl Anon {
 struct AnonFs;
 impl FileSystemOps for AnonFs {
     fn statfs(&self, _fs: &FileSystem, _current_task: &CurrentTask) -> Result<statfs, Errno> {
-        Ok(statfs::default(ANON_INODE_FS_MAGIC))
+        Ok(default_statfs(ANON_INODE_FS_MAGIC))
     }
     fn name(&self) -> &'static FsStr {
         "anon".into()

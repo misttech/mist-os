@@ -30,6 +30,7 @@ use starnix_uapi::{
     statfs, uapi,
     user_address::{UserAddress, UserRef},
     user_buffer::UserBuffer,
+    vfs::default_statfs,
     FIONREAD, F_GETPIPE_SZ, F_SETPIPE_SZ, PIPEFS_MAGIC,
 };
 use std::{cmp::Ordering, convert::TryInto, sync::Arc};
@@ -343,7 +344,7 @@ pub fn new_pipe(current_task: &CurrentTask) -> Result<(FileHandle, FileHandle), 
 struct PipeFs;
 impl FileSystemOps for PipeFs {
     fn statfs(&self, _fs: &FileSystem, _current_task: &CurrentTask) -> Result<statfs, Errno> {
-        Ok(statfs::default(PIPEFS_MAGIC))
+        Ok(default_statfs(PIPEFS_MAGIC))
     }
     fn name(&self) -> &'static FsStr {
         "pipe".into()

@@ -26,8 +26,8 @@ use crate::{
 };
 use starnix_syscalls::{SyscallArg, SyscallResult};
 use starnix_uapi::{
-    errors::Errno, open_flags::OpenFlags, statfs, user_address::UserAddress, MAP_ANONYMOUS,
-    MAP_PRIVATE, PROT_READ, PROT_WRITE,
+    errors::Errno, open_flags::OpenFlags, statfs, user_address::UserAddress, vfs::default_statfs,
+    MAP_ANONYMOUS, MAP_PRIVATE, PROT_READ, PROT_WRITE,
 };
 
 /// Create a FileSystemHandle for use in testing.
@@ -460,7 +460,7 @@ impl MemoryAccessor for AutoReleasableTask {
 struct TestFs;
 impl FileSystemOps for TestFs {
     fn statfs(&self, _fs: &FileSystem, _current_task: &CurrentTask) -> Result<statfs, Errno> {
-        Ok(statfs::default(0))
+        Ok(default_statfs(0))
     }
     fn name(&self) -> &'static FsStr {
         "test".into()

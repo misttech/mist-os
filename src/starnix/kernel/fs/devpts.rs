@@ -36,6 +36,7 @@ use starnix_uapi::{
     signals::SIGWINCH,
     statfs, uapi,
     user_address::{UserAddress, UserRef},
+    vfs::default_statfs,
     DEVPTS_SUPER_MAGIC, FIOASYNC, FIOCLEX, FIONBIO, FIONCLEX, FIONREAD, FIOQSIZE, TCFLSH, TCGETA,
     TCGETS, TCGETX, TCSBRK, TCSBRKP, TCSETA, TCSETAF, TCSETAW, TCSETS, TCSETSF, TCSETSW, TCSETX,
     TCSETXF, TCSETXW, TCXONC, TIOCCBRK, TIOCCONS, TIOCEXCL, TIOCGETD, TIOCGICOUNT, TIOCGLCKTRMIOS,
@@ -142,7 +143,7 @@ pub fn tty_device_init(current_task: &CurrentTask) {
 struct DevPtsFs;
 impl FileSystemOps for DevPtsFs {
     fn statfs(&self, _fs: &FileSystem, _current_task: &CurrentTask) -> Result<statfs, Errno> {
-        Ok(statfs::default(DEVPTS_SUPER_MAGIC))
+        Ok(default_statfs(DEVPTS_SUPER_MAGIC))
     }
     fn name(&self) -> &'static FsStr {
         "devpts".into()

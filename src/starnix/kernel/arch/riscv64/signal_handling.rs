@@ -14,7 +14,7 @@ use extended_pstate::ExtendedPstateState;
 use starnix_uapi::{
     __NR_restart_syscall,
     errors::{Errno, ErrnoCode, ERESTART_RESTARTBLOCK},
-    sigaction_t, sigaltstack, sigcontext, sigcontext__bindgen_ty_1, siginfo_t, ucontext,
+    sigaction, sigaltstack, sigcontext, sigcontext__bindgen_ty_1, siginfo_t, ucontext,
 };
 
 /// The size of the red zone.
@@ -43,7 +43,7 @@ impl SignalStackFrame {
         extended_pstate: &ExtendedPstateState,
         signal_state: &SignalState,
         siginfo: &SignalInfo,
-        _action: sigaction_t,
+        _action: sigaction,
     ) -> SignalStackFrame {
         let context = ucontext {
             uc_flags: 0,

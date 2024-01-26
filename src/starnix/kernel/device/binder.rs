@@ -79,6 +79,7 @@ use starnix_uapi::{
     union::struct_with_union_into_bytes,
     user_address::{UserAddress, UserRef},
     user_buffer::UserBuffer,
+    vfs::default_statfs,
     BINDERFS_SUPER_MAGIC, BINDER_BUFFER_FLAG_HAS_PARENT, BINDER_CURRENT_PROTOCOL_VERSION,
     BINDER_TYPE_BINDER, BINDER_TYPE_FD, BINDER_TYPE_FDA, BINDER_TYPE_HANDLE, BINDER_TYPE_PTR,
 };
@@ -4413,7 +4414,7 @@ impl From<Errno> for TransactionError {
 pub struct BinderFs;
 impl FileSystemOps for BinderFs {
     fn statfs(&self, _fs: &FileSystem, _current_task: &CurrentTask) -> Result<statfs, Errno> {
-        Ok(statfs::default(BINDERFS_SUPER_MAGIC))
+        Ok(default_statfs(BINDERFS_SUPER_MAGIC))
     }
     fn name(&self) -> &'static FsStr {
         "binder".into()

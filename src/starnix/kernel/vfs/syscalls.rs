@@ -2565,8 +2565,9 @@ pub fn sys_readahead(
 mod tests {
     use super::*;
     use crate::{mm::PAGE_SIZE, testing::*};
-    use starnix_uapi::{O_RDONLY, SEEK_CUR, SEEK_END, SEEK_SET};
+    use starnix_uapi::{vfs::default_statfs, O_RDONLY, SEEK_CUR, SEEK_END, SEEK_SET};
     use std::sync::Arc;
+    use zerocopy::AsBytes;
 
     #[::fuchsia::test]
     async fn test_sys_lseek() -> Result<(), Errno> {
@@ -2688,14 +2689,17 @@ mod tests {
         current_task.write_memory(path_addr, file_path.as_bytes()).expect("failed to clear struct");
 
         let user_stat = UserRef::new(path_addr + file_path.len());
-        current_task.write_object(user_stat, &statfs::default(0)).expect("failed to clear struct");
+        current_task.write_object(user_stat, &default_statfs(0)).expect("failed to clear struct");
 
         let user_path = UserCString::new(path_addr);
 
         assert_eq!(sys_statfs(&mut locked, &current_task, user_path, user_stat), Ok(()));
 
         let returned_stat = current_task.read_object(user_stat).expect("failed to read struct");
-        assert_eq!(returned_stat, statfs::default(u32::from_be_bytes(*b"f.io")));
+        assert_eq!(
+            returned_stat.as_bytes(),
+            default_statfs(u32::from_be_bytes(*b"f.io")).as_bytes()
+        );
     }
 
     #[::fuchsia::test]

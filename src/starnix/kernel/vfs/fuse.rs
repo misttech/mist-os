@@ -34,7 +34,9 @@ use starnix_uapi::{
     open_flags::OpenFlags,
     statfs,
     time::time_from_timespec,
-    uapi, FUSE_SUPER_MAGIC,
+    uapi,
+    vfs::default_statfs,
+    FUSE_SUPER_MAGIC,
 };
 use std::{
     collections::{hash_map::Entry, HashMap, VecDeque},
@@ -216,6 +218,7 @@ impl FileSystemOps for FuseFs {
             return error!(EINVAL);
         };
         Ok(statfs {
+            f_type: FUSE_SUPER_MAGIC as i64,
             f_blocks: statfs_out.st.blocks.try_into().map_err(|_| errno!(EINVAL))?,
             f_bfree: statfs_out.st.bfree.try_into().map_err(|_| errno!(EINVAL))?,
             f_bavail: statfs_out.st.bavail.try_into().map_err(|_| errno!(EINVAL))?,
@@ -224,7 +227,7 @@ impl FileSystemOps for FuseFs {
             f_bsize: statfs_out.st.bsize.try_into().map_err(|_| errno!(EINVAL))?,
             f_namelen: statfs_out.st.namelen.try_into().map_err(|_| errno!(EINVAL))?,
             f_frsize: statfs_out.st.frsize.try_into().map_err(|_| errno!(EINVAL))?,
-            ..statfs::default(FUSE_SUPER_MAGIC)
+            ..statfs::default()
         })
     }
     fn name(&self) -> &'static FsStr {
@@ -285,7 +288,7 @@ impl FileSystemOps for Arc<FuseCtlFs> {
     fn statfs(&self, _fs: &FileSystem, _current_task: &CurrentTask) -> Result<statfs, Errno> {
         // Magic number has been extracted from the stat utility.
         const FUSE_CTL_MAGIC: u32 = 0x65735543;
-        Ok(statfs::default(FUSE_CTL_MAGIC))
+        Ok(default_statfs(FUSE_CTL_MAGIC))
     }
 
     fn name(&self) -> &'static FsStr {

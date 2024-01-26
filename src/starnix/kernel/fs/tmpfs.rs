@@ -24,7 +24,9 @@ use starnix_uapi::{
     gid_t,
     open_flags::OpenFlags,
     seal_flags::SealFlags,
-    statfs, uid_t, TMPFS_MAGIC,
+    statfs, uid_t,
+    vfs::default_statfs,
+    TMPFS_MAGIC,
 };
 use std::sync::Arc;
 
@@ -37,7 +39,7 @@ impl FileSystemOps for Arc<TmpFs> {
             f_blocks: 0x100000000,
             f_bavail: 0x100000000,
             f_bfree: 0x100000000,
-            ..statfs::default(TMPFS_MAGIC)
+            ..default_statfs(TMPFS_MAGIC)
         })
     }
     fn name(&self) -> &'static FsStr {

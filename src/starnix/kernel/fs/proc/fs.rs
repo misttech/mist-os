@@ -7,7 +7,7 @@ use crate::{
     task::CurrentTask,
     vfs::{CacheMode, FileSystem, FileSystemHandle, FileSystemOps, FileSystemOptions, FsStr},
 };
-use starnix_uapi::{errors::Errno, statfs, PROC_SUPER_MAGIC};
+use starnix_uapi::{errors::Errno, statfs, vfs::default_statfs, PROC_SUPER_MAGIC};
 
 use std::sync::Arc;
 
@@ -20,7 +20,7 @@ pub fn proc_fs(current_task: &CurrentTask, options: FileSystemOptions) -> &FileS
 struct ProcFs;
 impl FileSystemOps for Arc<ProcFs> {
     fn statfs(&self, _fs: &FileSystem, _current_task: &CurrentTask) -> Result<statfs, Errno> {
-        Ok(statfs::default(PROC_SUPER_MAGIC))
+        Ok(default_statfs(PROC_SUPER_MAGIC))
     }
     fn name(&self) -> &'static FsStr {
         "proc".into()

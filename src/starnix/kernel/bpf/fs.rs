@@ -25,7 +25,9 @@ use starnix_uapi::{
     errors::Errno,
     file_mode::{mode, FileMode},
     open_flags::OpenFlags,
-    statfs, BPF_FS_MAGIC,
+    statfs,
+    vfs::default_statfs,
+    BPF_FS_MAGIC,
 };
 use std::sync::Arc;
 
@@ -103,7 +105,7 @@ impl BpfFs {
 
 impl FileSystemOps for BpfFs {
     fn statfs(&self, _fs: &FileSystem, _current_task: &CurrentTask) -> Result<statfs, Errno> {
-        Ok(statfs::default(BPF_FS_MAGIC))
+        Ok(default_statfs(BPF_FS_MAGIC))
     }
     fn name(&self) -> &'static FsStr {
         "bpf".into()

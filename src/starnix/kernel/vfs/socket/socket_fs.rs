@@ -6,7 +6,7 @@ use crate::{
     task::{CurrentTask, Kernel},
     vfs::{CacheMode, FileSystem, FileSystemHandle, FileSystemOps, FileSystemOptions, FsStr},
 };
-use starnix_uapi::{errors::Errno, statfs, SOCKFS_MAGIC};
+use starnix_uapi::{errors::Errno, statfs, vfs::default_statfs, SOCKFS_MAGIC};
 use std::sync::Arc;
 
 /// `SocketFs` is the file system where anonymous socket nodes are created, for example in
@@ -14,7 +14,7 @@ use std::sync::Arc;
 pub struct SocketFs;
 impl FileSystemOps for SocketFs {
     fn statfs(&self, _fs: &FileSystem, _current_task: &CurrentTask) -> Result<statfs, Errno> {
-        Ok(statfs::default(SOCKFS_MAGIC))
+        Ok(default_statfs(SOCKFS_MAGIC))
     }
     fn name(&self) -> &'static FsStr {
         "socket".into()

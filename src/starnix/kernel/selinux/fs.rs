@@ -26,7 +26,9 @@ use starnix_uapi::{
     file_mode::mode,
     open_flags::OpenFlags,
     ownership::{TempRef, WeakRef},
-    statfs, SELINUX_MAGIC,
+    statfs,
+    vfs::default_statfs,
+    SELINUX_MAGIC,
 };
 use std::{borrow::Cow, collections::BTreeMap, sync::Arc};
 
@@ -35,7 +37,7 @@ const SELINUX_PERMS: &[&str] = &["add", "find", "read", "set"];
 struct SeLinuxFs;
 impl FileSystemOps for SeLinuxFs {
     fn statfs(&self, _fs: &FileSystem, _current_task: &CurrentTask) -> Result<statfs, Errno> {
-        Ok(statfs::default(SELINUX_MAGIC))
+        Ok(default_statfs(SELINUX_MAGIC))
     }
     fn name(&self) -> &'static FsStr {
         "selinuxfs".into()
