@@ -29,6 +29,9 @@
 
                 // TODO(https://fxbug.dev/42079266)
                 "VdsoTest.VdsoCanBeMadvised",
+
+                // TODO(https://g-issues.fuchsia.dev/issues/318701791)
+                "SocketFault/SocketFault.ReadV/2",
             ],
         },
     ],

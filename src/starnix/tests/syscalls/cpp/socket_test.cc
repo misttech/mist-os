@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <fcntl.h>
 #include <netinet/in.h>
 #include <netinet/ip_icmp.h>
 #include <poll.h>
@@ -10,6 +11,7 @@
 #include <sys/mman.h>
 #include <sys/socket.h>
 #include <sys/types.h>
+#include <sys/uio.h>
 #include <sys/un.h>
 #include <unistd.h>
 
@@ -355,6 +357,12 @@ class SocketFault : public testing::TestWithParam<std::pair<int, int>> {
     listen_fd_.reset();
   }
 
+  void SetRecvFdNonBlocking() {
+    int flags = fcntl(recv_fd_.get(), F_GETFL, 0);
+    ASSERT_GE(flags, 0) << strerror(errno);
+    ASSERT_EQ(fcntl(recv_fd_.get(), F_SETFL, flags | O_NONBLOCK), 0) << strerror(errno);
+  }
+
   static constexpr size_t kFaultingSize_ = 987;
   static inline void* faulting_ptr_;
 
@@ -392,6 +400,67 @@ TEST_P(SocketFault, Read) {
   static_assert(kFaultingSize_ >= sizeof(kSendIcmp));
   EXPECT_EQ(read(recv_fd_.get(), faulting_ptr_, sizeof(kSendIcmp)), -1);
   EXPECT_EQ(errno, EFAULT);
+}
+
+TEST_P(SocketFault, ReadV) {
+  // First send a valid message that we can read.
+  //
+  // We send an ICMP message since this test is generic over UDP/TCP/ICMP.
+  // UDP/TCP do not care about the shape of the payload but ICMP does so we just
+  // use an ICMP compatible payload for simplicity.
+  constexpr icmphdr kSendIcmp = {
+      .type = ICMP_ECHO,
+  };
+  ASSERT_EQ(write(send_fd_.get(), &kSendIcmp, sizeof(kSendIcmp)),
+            static_cast<ssize_t>(sizeof(kSendIcmp)));
+
+  pollfd p = {
+      .fd = recv_fd_.get(),
+      .events = POLLIN,
+  };
+  ASSERT_EQ(poll(&p, 1, -1), 1);
+  ASSERT_EQ(p.revents, POLLIN);
+
+  char base0[1];
+  char base2[sizeof(kSendIcmp) - 1];
+  iovec iov[] = {
+      {
+          .iov_base = base0,
+          .iov_len = sizeof(base0),
+      },
+      {
+          .iov_base = faulting_ptr_,
+          .iov_len = sizeof(kFaultingSize_),
+      },
+      {
+          .iov_base = base2,
+          .iov_len = sizeof(base2),
+      },
+  };
+
+  // Read once with iov holding the invalid pointer.
+  ASSERT_EQ(readv(recv_fd_.get(), iov, std::size(iov)), -1);
+  EXPECT_EQ(errno, EFAULT);
+
+  // Read again after clearing the invalid buffer. This read will fail on UDP/ICMP
+  // sockets since they deque the message before checking the validity of buffers
+  // but TCP sockets will not remove bytes from the unread bytes held by the kernel
+  // if any buffer faults. Note that what UDP/ICMP does is ~acceptable since they are
+  // not meant to be a reliable protocol and the behaviour for TCP also makes sense
+  // because when the socket returns EFAULT, there is no way to know how many
+  // bytes the kernel write into our buffers. Since the kernel has no way to tell us
+  // how many bytes were read when a fault occurred, it has no other option than to
+  // keep the bytes before the fault to prevent userspace from dropping part of a
+  // byte stream.
+  ASSERT_NO_FATAL_FAILURE(SetRecvFdNonBlocking());
+  const auto [type, protocol] = GetParam();
+  iov[1] = iovec{};
+  if (type == SOCK_STREAM) {
+    ASSERT_EQ(readv(recv_fd_.get(), iov, std::size(iov)), static_cast<ssize_t>(sizeof(kSendIcmp)));
+  } else {
+    ASSERT_EQ(readv(recv_fd_.get(), iov, std::size(iov)), -1);
+    EXPECT_EQ(errno, EAGAIN);
+  }
 }
 
 INSTANTIATE_TEST_SUITE_P(SocketFault, SocketFault,
