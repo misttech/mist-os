@@ -110,9 +110,8 @@ pub fn build_component_sandbox(
 
     for offer in &decl.offers {
         // We only support protocol and dictionary capabilities right now
-        match &offer {
-            cm_rust::OfferDecl::Protocol(_) | cm_rust::OfferDecl::Dictionary(_) => (),
-            _ => continue,
+        if !is_supported_offer(offer) {
+            continue;
         }
         let mut _placeholder_dict = None;
         let target_dict = match offer.target() {
@@ -191,6 +190,13 @@ pub fn extend_dict_with_offers(
     sources_and_receivers
 }
 
+fn supported_use(use_: &cm_rust::UseDecl) -> Option<&cm_rust::UseProtocolDecl> {
+    match use_ {
+        cm_rust::UseDecl::Protocol(p) => Some(p),
+        _ => None,
+    }
+}
+
 fn extend_dict_with_use(
     component: &Arc<ComponentInstance>,
     children: &HashMap<ChildName, Arc<ComponentInstance>>,
@@ -200,16 +206,11 @@ fn extend_dict_with_use(
     use_: &cm_rust::UseDecl,
     sources_and_receivers: &mut Vec<(CapabilitySourceFactory, Receiver<WeakComponentInstance>)>,
 ) {
-    // We only support protocol capabilities right now
-    match &use_ {
-        cm_rust::UseDecl::Protocol(_) => (),
-        _ => return,
-    }
-
-    let cm_rust::UseDecl::Protocol(use_protocol) = use_ else {
-        unreachable!();
+    let Some(use_protocol) = supported_use(use_) else {
+        return;
     };
-    let source_path = use_protocol.source_path();
+
+    let source_path = use_.source_path();
     let router = match use_.source() {
         cm_rust::UseSource::Parent => {
             let Some(router) =
@@ -247,7 +248,7 @@ fn extend_dict_with_use(
                 RoutingError::use_from_child_expose_not_found(
                     child.moniker.leaf().unwrap(),
                     &child.moniker.parent().unwrap(),
-                    use_protocol.source_name.clone(),
+                    use_.source_name().clone(),
                 ),
             )
         }
@@ -259,7 +260,7 @@ fn extend_dict_with_use(
                 return;
             }
             let (receiver, sender) = Receiver::new();
-            let source_name = use_protocol.source_name.clone();
+            let source_name = use_.source_name().clone();
             sources_and_receivers.push((
                 CapabilitySourceFactory::new(move |component| CapabilitySource::Framework {
                     capability: InternalCapability::Protocol(source_name),
@@ -290,6 +291,10 @@ fn extend_dict_with_use(
     );
 }
 
+fn is_supported_offer(offer: &cm_rust::OfferDecl) -> bool {
+    matches!(offer, cm_rust::OfferDecl::Protocol(_) | cm_rust::OfferDecl::Dictionary(_))
+}
+
 fn extend_dict_with_offer(
     component: &Arc<ComponentInstance>,
     children: &HashMap<ChildName, Arc<ComponentInstance>>,
@@ -300,9 +305,8 @@ fn extend_dict_with_offer(
     sources_and_receivers: &mut Vec<(CapabilitySourceFactory, Receiver<WeakComponentInstance>)>,
 ) {
     // We only support protocol and dictionary capabilities right now
-    match &offer {
-        cm_rust::OfferDecl::Protocol(_) | cm_rust::OfferDecl::Dictionary(_) => (),
-        _ => return,
+    if !is_supported_offer(offer) {
+        return;
     }
     let source_path = offer.source_path();
     let target_name = offer.target_name();
@@ -391,6 +395,10 @@ fn extend_dict_with_offer(
     );
 }
 
+pub fn is_supported_expose(expose: &cm_rust::ExposeDecl) -> bool {
+    matches!(expose, cm_rust::ExposeDecl::Protocol(_) | cm_rust::ExposeDecl::Dictionary(_))
+}
+
 fn extend_dict_with_expose(
     component: &Arc<ComponentInstance>,
     children: &HashMap<ChildName, Arc<ComponentInstance>>,
@@ -399,10 +407,8 @@ fn extend_dict_with_expose(
     target_dict: &Dict,
     sources_and_receivers: &mut Vec<(CapabilitySourceFactory, Receiver<WeakComponentInstance>)>,
 ) {
-    // We only support protocol and dictionary capabilities right now
-    match &expose {
-        cm_rust::ExposeDecl::Protocol(_) | cm_rust::ExposeDecl::Dictionary(_) => (),
-        _ => return,
+    if !is_supported_expose(expose) {
+        return;
     }
     // We only support exposing to the parent right now
     if expose.target() != &cm_rust::ExposeTarget::Parent {

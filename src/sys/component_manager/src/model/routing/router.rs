@@ -15,7 +15,7 @@ use fidl_fuchsia_io as fio;
 use fuchsia_zircon as zx;
 use futures::{
     channel::{
-        mpsc::UnboundedSender,
+        mpsc::{self, UnboundedSender},
         oneshot::{self, Canceled},
     },
     Future,
@@ -150,6 +150,42 @@ impl Router {
         Router::from_routable(PolicyCheckRouter::new(capability_source, policy_checker, self))
     }
 
+    /// Returns a [Dict] equivalent to `dict`, but with all [Router]s replaced with [Open].
+    ///
+    /// This is an alternative to [Dict::try_into_open] when the [Dict] contains [Router]s, since
+    /// [Router] is not currently a type defined by the sandbox library.
+    pub fn dict_routers_to_open(weak_component: &WeakComponentInstance, dict: &Dict) -> Dict {
+        let entries = dict.lock_entries();
+        let out = Dict::new();
+        let mut out_entries = out.lock_entries();
+        for (key, value) in &*entries {
+            let value = if value.as_any().is::<Dict>() {
+                let dict: &Dict = value.try_into().unwrap();
+                Box::new(Self::dict_routers_to_open(weak_component, dict))
+            } else if value.as_any().is::<Router>() {
+                let router: &Router = value.try_into().unwrap();
+                let request = Request {
+                    rights: None,
+                    relative_path: sandbox::Path::default(),
+                    target: weak_component.clone(),
+                    // Use the weakest availability, so that it gets immediately upgraded to
+                    // the availability in `router`.
+                    availability: cm_types::Availability::Transitional,
+                };
+                let (sender, _receiver) = mpsc::unbounded::<RouteOrOpenError>();
+                // TODO: Should we convert the Open to a Directory here if the Router wraps a
+                // Dict?
+                let open = router.clone().into_open(request, fio::DirentType::Service, sender);
+                Box::new(open)
+            } else {
+                value.clone()
+            };
+            out_entries.insert(key.clone(), value);
+        }
+        drop(out_entries);
+        out
+    }
+
     /// Converts the [Router] capability into an [Open] capability such that open requests
     /// will be fulfilled via the specified `request` on the router.
     ///
@@ -172,6 +208,7 @@ impl Router {
                   relative_path: vfs::path::Path,
                   server_end: zx::Channel| {
                 let request = request.clone();
+                let target = request.target.clone();
                 let router = router.clone();
                 let scope_clone = scope.clone();
                 let errors = errors.clone();
@@ -181,8 +218,16 @@ impl Router {
                     let result = route(&router, request).await;
                     match result {
                         Ok(capability) => {
-                            // Connect to the capability by converting it into `Open`, then open it.
-                            let open: Result<Open, _> = capability.try_into();
+                            // Connect to the capability by converting it into [Open], then open it.
+                            let open = if (&*capability).as_any().is::<Dict>() {
+                                // HACK: Dict needs special casing because [Dict::try_into_open]
+                                // is unaware of [Router].
+                                let capability: Dict = capability.try_into().unwrap();
+                                let capability = Self::dict_routers_to_open(&target, &capability);
+                                capability.try_into_open()
+                            } else {
+                                capability.try_into_open()
+                            };
                             match open {
                                 Ok(open) => {
                                     open.open(scope_clone, flags, relative_path, server_end);

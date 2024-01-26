@@ -1482,7 +1482,7 @@ pub mod capability_util {
                     fio::OpenFlags::NOT_DIRECTORY
                 };
                 let vns_path = to_fvfs_path(path);
-                resolved_instance_state.get_exposed_dir().open(flags, vns_path, server_end);
+                resolved_instance_state.open_exposed_dir(flags, vns_path, server_end).await;
             }
             _ => {
                 panic!("Attempted to open exposed dir of unresolved component: {}", moniker);

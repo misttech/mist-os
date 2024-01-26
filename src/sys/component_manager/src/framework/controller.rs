@@ -6,15 +6,10 @@ use {
     crate::model::{
         actions::StopAction,
         component::{StartReason, WeakComponentInstance},
-        error::RouteOrOpenError,
-        routing::router::{Request, Router},
     },
     fidl::endpoints::RequestStream,
-    fidl_fuchsia_component as fcomponent, fidl_fuchsia_io as fio, fuchsia_async as fasync,
-    fuchsia_zircon as zx,
-    futures::channel::mpsc,
+    fidl_fuchsia_component as fcomponent, fuchsia_async as fasync, fuchsia_zircon as zx,
     futures::prelude::*,
-    sandbox::Dict,
     tracing::{error, warn},
 };
 
@@ -94,11 +89,10 @@ pub async fn serve_controller(
                         .lock_resolved_state()
                         .await
                         .map_err(|_| fcomponent::Error::InstanceCannotResolve)?;
-                    let mut output_dict =
-                        routers_to_open(&resolved.component_output_dict, &weak_component_instance);
+                    let mut exposed_dict = resolved.make_exposed_dict().await;
                     tasks.spawn(async move {
                         if let Err(err) =
-                            output_dict.serve_dict(dictionary.into_stream().unwrap()).await
+                            exposed_dict.serve_dict(dictionary.into_stream().unwrap()).await
                         {
                             warn!(%err, "failed to serve dict");
                         }
@@ -111,34 +105,6 @@ pub async fn serve_controller(
         }
     }
     Ok(())
-}
-
-fn routers_to_open(dict: &Dict, target: &WeakComponentInstance) -> Dict {
-    let entries = dict.lock_entries();
-    let out = Dict::new();
-    let mut out_entries = out.lock_entries();
-    for (key, value) in &*entries {
-        let value = if value.as_any().is::<Dict>() {
-            let dict: &Dict = value.try_into().unwrap();
-            Box::new(routers_to_open(dict, target))
-        } else if value.as_any().is::<Router>() {
-            let router: &Router = value.try_into().unwrap();
-            let request = Request {
-                rights: None,
-                relative_path: sandbox::Path::default(),
-                target: target.clone(),
-                availability: cm_types::Availability::Required,
-            };
-            let (sender, _receiver) = mpsc::unbounded::<RouteOrOpenError>();
-            let open = router.clone().into_open(request, fio::DirentType::Service, sender);
-            Box::new(open)
-        } else {
-            value.clone()
-        };
-        out_entries.insert(key.clone(), value);
-    }
-    drop(out_entries);
-    out
 }
 
 async fn execution_controller_task(

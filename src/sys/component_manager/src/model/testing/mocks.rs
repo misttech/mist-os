@@ -4,18 +4,14 @@
 
 use {
     crate::{
-        bedrock::program::Program,
-        builtin::runner::BuiltinRunnerFactory,
-        model::{component::WeakComponentInstance, resolver::Resolver, routing::RouteRequest},
+        bedrock::program::Program, builtin::runner::BuiltinRunnerFactory, model::resolver::Resolver,
     },
     ::namespace::Namespace,
     ::routing::{
-        legacy_router::RouteBundle,
         policy::ScopedPolicyChecker,
         resolving::{ComponentAddress, ResolvedComponent, ResolvedPackage, ResolverError},
     },
     anyhow::format_err,
-    assert_matches::assert_matches,
     async_trait::async_trait,
     cm_rust::{ComponentDecl, ConfigValuesData},
     fidl::prelude::*,
@@ -23,7 +19,6 @@ use {
         endpoints::{create_endpoints, ClientEnd, ServerEnd},
         epitaph::ChannelEpitaphExt,
     },
-    fidl_fidl_examples_routing_echo::{EchoMarker, EchoRequest, EchoRequestStream},
     fidl_fuchsia_component_runner as fcrunner,
     fidl_fuchsia_diagnostics_types::{
         ComponentDiagnostics, ComponentTasks, Task as DiagnosticsTask,
@@ -46,93 +41,9 @@ use {
     version_history,
     vfs::{
         directory::entry::DirectoryEntry, execution_scope::ExecutionScope, file::vmo::read_only,
-        path::Path, pseudo_directory, remote::RoutingFn, service,
+        pseudo_directory,
     },
 };
-
-#[derive(Clone, Copy)]
-pub enum DeclType {
-    Expose,
-}
-
-/// Creates a routing function that does the following:
-/// - Redirects all directory capabilities to a directory with the file "hello".
-/// - Redirects all service capabilities to the echo service.
-pub fn proxy_routing_factory(
-    decl_type: DeclType,
-) -> impl Fn(WeakComponentInstance, RouteRequest) -> RoutingFn {
-    move |_component: WeakComponentInstance, request: RouteRequest| {
-        new_proxy_routing_fn(decl_type, request)
-    }
-}
-
-async fn echo_protocol_fn(mut stream: EchoRequestStream) {
-    while let Some(EchoRequest::EchoString { value, responder }) = stream.try_next().await.unwrap()
-    {
-        responder.send(value.as_ref().map(|s| &**s)).unwrap();
-    }
-}
-
-fn new_proxy_routing_fn(decl_type: DeclType, request: RouteRequest) -> RoutingFn {
-    Box::new(
-        move |scope: ExecutionScope,
-              flags: fio::OpenFlags,
-              path: Path,
-              server_end: ServerEnd<fio::NodeMarker>| {
-            match request {
-                RouteRequest::UseProtocol(_)
-                | RouteRequest::ExposeProtocol(_)
-                | RouteRequest::OfferProtocol(_) => {
-                    match decl_type {
-                        DeclType::Expose => {
-                            assert_matches!(request, RouteRequest::ExposeProtocol(_));
-                        }
-                    }
-                    scope.spawn(async move {
-                        let server_end: ServerEnd<EchoMarker> =
-                            ServerEnd::new(server_end.into_channel());
-                        let stream: EchoRequestStream = server_end.into_stream().unwrap();
-                        echo_protocol_fn(stream).await;
-                    });
-                }
-                RouteRequest::UseService(_)
-                | RouteRequest::ExposeService(_)
-                | RouteRequest::OfferService(_) => {
-                    match decl_type {
-                        DeclType::Expose => {
-                            assert_matches!(
-                                &request,
-                                RouteRequest::ExposeService(RouteBundle::Aggregate(v))
-                                if v.len() == 2
-                            );
-                        }
-                    }
-                    let svc_host = service::host(echo_protocol_fn);
-                    let sub_dir = pseudo_directory!(
-                        "default" => pseudo_directory!(
-                            "echo" => svc_host
-                        )
-                    );
-                    sub_dir.open(ExecutionScope::new(), flags, path, server_end);
-                }
-                RouteRequest::UseDirectory(_)
-                | RouteRequest::ExposeDirectory(_)
-                | RouteRequest::OfferDirectory(_) => {
-                    match decl_type {
-                        DeclType::Expose => {
-                            assert_matches!(request, RouteRequest::ExposeDirectory(_));
-                        }
-                    }
-                    let sub_dir = pseudo_directory!(
-                        "hello" => read_only(b"friend"),
-                    );
-                    sub_dir.open(ExecutionScope::new(), flags, path, server_end);
-                }
-                _ => panic!("unsupported capability"),
-            }
-        },
-    )
-}
 
 #[derive(Debug, Clone)]
 pub struct MockResolver {

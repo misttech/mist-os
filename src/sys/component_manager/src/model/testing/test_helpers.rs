@@ -26,10 +26,8 @@ use {
     cm_types::Name,
     cm_types::Url,
     fidl::endpoints,
-    fidl_fidl_examples_routing_echo as echo, fidl_fuchsia_component as fcomponent,
-    fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_component_runner as fcrunner,
-    fidl_fuchsia_io as fio, fuchsia_async as fasync,
-    fuchsia_component::client::connect_to_named_protocol_at_dir_root,
+    fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_decl as fdecl,
+    fidl_fuchsia_component_runner as fcrunner, fidl_fuchsia_io as fio, fuchsia_async as fasync,
     fuchsia_zircon::{self as zx, Koid},
     futures::{channel::mpsc::Receiver, lock::Mutex, StreamExt, TryStreamExt},
     moniker::{ChildName, Moniker},
@@ -169,17 +167,6 @@ pub async fn list_directory_recursive<'a>(root_proxy: &'a fio::DirectoryProxy) -
     items
 }
 
-pub async fn read_file<'a>(root_proxy: &'a fio::DirectoryProxy, path: &'a str) -> String {
-    let file_proxy = fuchsia_fs::directory::open_file_no_describe(
-        &root_proxy,
-        path,
-        fio::OpenFlags::RIGHT_READABLE,
-    )
-    .expect("Failed to open file.");
-    let res = fuchsia_fs::file::read_to_string(&file_proxy).await;
-    res.expect("Unable to read file.")
-}
-
 pub async fn write_file<'a>(root_proxy: &'a fio::DirectoryProxy, path: &'a str, contents: &'a str) {
     let file_proxy = fuchsia_fs::directory::open_file_no_describe(
         &root_proxy,
@@ -193,17 +180,6 @@ pub async fn write_file<'a>(root_proxy: &'a fio::DirectoryProxy, path: &'a str, 
         .expect("Unable to write file.")
         .map_err(zx::Status::from_raw)
         .expect("Write failed");
-}
-
-pub async fn call_echo<'a>(
-    root_proxy: &'a fio::DirectoryProxy,
-    path: &'a str,
-    input: &str,
-) -> String {
-    let echo_proxy = connect_to_named_protocol_at_dir_root::<echo::EchoMarker>(&root_proxy, path)
-        .expect("failed to open echo service");
-    let res = echo_proxy.echo_string(Some(input)).await;
-    res.expect("failed to use echo service").expect("no result from echo")
 }
 
 /// Create a `DirectoryEntry` and `Channel` pair. The created `DirectoryEntry`

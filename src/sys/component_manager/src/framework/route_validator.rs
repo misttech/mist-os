@@ -151,7 +151,7 @@ impl RouteValidator {
                 (target, request)
             });
 
-            let exposes = routing::aggregate_exposes(&resolved.decl().exposes);
+            let exposes = routing::aggregate_exposes(resolved.decl().exposes.iter());
             let expose_requests = exposes.into_iter().map(|(target_name, e)| {
                 let target = fsys::RouteTarget {
                     name: target_name.into(),
@@ -199,7 +199,7 @@ impl RouteValidator {
                         matching_requests.into_iter()
                     }
                     fsys::DeclType::Expose => {
-                        let exposes = routing::aggregate_exposes(&resolved.decl().exposes);
+                        let exposes = routing::aggregate_exposes(resolved.decl().exposes.iter());
                         let matching_requests: Vec<_> = exposes
                             .into_iter()
                             .filter_map(|(target_name, e)| {
@@ -398,7 +398,7 @@ async fn validate_exposes(
 ) -> Vec<fsys::RouteReport> {
     let mut reports = vec![];
 
-    let exposes = routing::aggregate_exposes(&exposes);
+    let exposes = routing::aggregate_exposes(exposes.iter());
     for (target_name, e) in exposes {
         let capability = Some(target_name.to_string());
         let decl_type = Some(fsys::DeclType::Expose);

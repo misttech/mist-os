@@ -7,18 +7,19 @@ use {
         component::WeakComponentInstance,
         routing::{self, OpenOptions, RouteRequest},
     },
-    fidl::endpoints::ServerEnd,
-    fidl_fuchsia_io as fio,
+    fidl_fuchsia_io as fio, fuchsia_zircon as zx,
     tracing::error,
-    vfs::{execution_scope::ExecutionScope, path::Path, remote::RoutingFn},
+    vfs::{execution_scope::ExecutionScope, path::Path},
 };
+
+pub type RoutingFn = Box<dyn Fn(ExecutionScope, fio::OpenFlags, Path, zx::Channel) + Send + Sync>;
 
 pub fn route_fn(component: WeakComponentInstance, request: RouteRequest) -> RoutingFn {
     Box::new(
         move |scope: ExecutionScope,
               flags: fio::OpenFlags,
               path: Path,
-              server_end: ServerEnd<fio::NodeMarker>| {
+              mut server_end: zx::Channel| {
             let component = component.clone();
             let request = request.clone();
             scope.spawn(async move {
@@ -34,17 +35,16 @@ pub fn route_fn(component: WeakComponentInstance, request: RouteRequest) -> Rout
                         return;
                     }
                 };
-                let mut server_chan = server_end.into_channel();
 
                 let open_options = OpenOptions {
                     flags,
                     relative_path: path.into_string(),
-                    server_chan: &mut server_chan,
+                    server_chan: &mut server_end,
                 };
                 let res =
                     routing::route_and_open_capability(&request, &component, open_options).await;
                 if let Err(e) = res {
-                    routing::report_routing_failure(&request, &component, e.into(), server_chan)
+                    routing::report_routing_failure(&request, &component, e.into(), server_end)
                         .await;
                 }
             });

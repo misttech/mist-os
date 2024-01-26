@@ -9,7 +9,7 @@ use {
     crate::model::{
         actions::{
             resolve::sandbox_construction::{
-                build_component_sandbox, extend_dict_with_offers, CapabilitySourceFactory,
+                self, build_component_sandbox, extend_dict_with_offers, CapabilitySourceFactory,
                 ComponentInput,
             },
             shutdown, start, ActionSet, DestroyAction, DiscoverAction, ResolveAction,
@@ -23,7 +23,6 @@ use {
             ModelError, OpenError, OpenExposedDirError, OpenOutgoingDirError, RebootError,
             ResolveActionError, StartActionError, StopActionError, StructuredConfigError,
         },
-        exposed_dir::ExposedDir,
         hooks::{CapabilityReceiver, Event, EventPayload, Hooks},
         namespace::create_namespace,
         routing::{
@@ -31,6 +30,7 @@ use {
             router::{Completer, Request, Routable, Router},
             service::{AnonymizedAggregateServiceDir, AnonymizedServiceRoute},
         },
+        routing_fns::route_fn,
         token::{InstanceToken, InstanceTokenState},
     },
     crate::sandbox_util::{DictExt, LaunchTaskOnReceive},
@@ -56,8 +56,8 @@ use {
     cm_logger::scoped::ScopedLogger,
     cm_moniker::{IncarnationId, InstancedChildName, InstancedMoniker},
     cm_rust::{
-        self, CapabilityDecl, ChildDecl, CollectionDecl, ComponentDecl, FidlIntoNative,
-        NativeIntoFidl, OfferDeclCommon, SourceName, UseDecl,
+        self, CapabilityDecl, CapabilityTypeName, ChildDecl, CollectionDecl, ComponentDecl,
+        FidlIntoNative, NativeIntoFidl, OfferDeclCommon, SourceName, UseDecl,
     },
     cm_types::Name,
     cm_util::channel,
@@ -78,7 +78,7 @@ use {
         lock::{MappedMutexGuard, Mutex, MutexGuard},
     },
     moniker::{ChildName, ChildNameBase, Moniker, MonikerBase},
-    sandbox::{Dict, Open, Receiver},
+    sandbox::{Capability, Dict, Open, Receiver},
     std::iter::Iterator,
     std::{
         boxed::Box,
@@ -986,7 +986,6 @@ impl ComponentInstance {
         let state = self.lock_state().await;
         match &*state {
             InstanceState::Resolved(resolved_instance_state) => {
-                let exposed_dir = &resolved_instance_state.exposed_dir;
                 // TODO(https://fxbug.dev/42161419): open_exposed does not have a rights input parameter, so
                 // this makes use of the POSIX_[WRITABLE|EXECUTABLE] flags to open a connection
                 // with those rights if available from the parent directory connection but without
@@ -997,7 +996,7 @@ impl ComponentInstance {
                     | fio::OpenFlags::DIRECTORY;
                 let server_chan = channel::take_channel(server_chan);
                 let server_end = ServerEnd::new(server_chan);
-                exposed_dir.open(flags, Path::dot(), server_end);
+                resolved_instance_state.open_exposed_dir(flags, Path::dot(), server_end).await;
                 Ok(())
             }
             InstanceState::Destroyed => Err(OpenExposedDirError::InstanceDestroyed),
@@ -1437,8 +1436,9 @@ pub struct ResolvedInstanceState {
     /// [StartChildArgs].
     namespace_dir: Once<Arc<pfs::Simple>>,
 
-    /// Hosts a directory mapping the component's exposed capabilities.
-    exposed_dir: ExposedDir,
+    /// Hosts a directory mapping the component's exposed capabilities, generated from `exposed_dict`.
+    /// Created on demand.
+    exposed_dir: Once<Open>,
 
     /// Dynamic capabilities this component supports.
     ///
@@ -1490,12 +1490,6 @@ impl ResolvedInstanceState {
         let weak_component = WeakComponentInstance::new(component);
         let execution_scope = ExecutionScope::new();
 
-        // TODO(https://fxbug.dev/42071713): Determine whether this is expected to fail.
-        let exposed_dir = ExposedDir::new(
-            execution_scope.clone(),
-            weak_component.clone(),
-            &resolved_component.decl,
-        )?;
         let environments = Self::instantiate_environments(component, &resolved_component.decl);
         let decl = resolved_component.decl.clone();
         let program_output_dict = Self::build_program_output_dict(component, &decl);
@@ -1509,7 +1503,7 @@ impl ResolvedInstanceState {
             next_dynamic_instance_id: 1,
             environments,
             namespace_dir: Once::default(),
-            exposed_dir,
+            exposed_dir: Once::default(),
             dynamic_capabilities: vec![],
             dynamic_offers: vec![],
             address,
@@ -1818,9 +1812,81 @@ impl ResolvedInstanceState {
             .clone())
     }
 
-    /// Returns the exposed directory bound to this instance.
-    pub fn get_exposed_dir(&self) -> &ExposedDir {
-        &self.exposed_dir
+    /// Returns a [`Dict`] with contents similar to `component_output_dict`, but adds
+    /// capabilities backed by legacy routing, and hosts [`Open`]s instead of
+    /// [`Router`]s. This [`Dict`] is used to generate the `exposed_dir`. This function creates a new [`Dict`],
+    /// so allocation cost is paid only when called.
+    pub async fn make_exposed_dict(&self) -> Dict {
+        let dict = Router::dict_routers_to_open(&self.weak_component, &self.component_output_dict);
+        Self::extend_exposed_dict_with_legacy(&self.weak_component, self.decl(), &dict);
+        dict
+    }
+
+    fn extend_exposed_dict_with_legacy(
+        component: &WeakComponentInstance,
+        decl: &cm_rust::ComponentDecl,
+        target_dict: &Dict,
+    ) {
+        // Filter out capabilities handled by bedrock routing
+        let exposes = decl.exposes.iter().filter(|e| !sandbox_construction::is_supported_expose(e));
+        let exposes_by_target_name = routing::aggregate_exposes(exposes);
+        for (target_name, exposes) in exposes_by_target_name {
+            // If there are multiple exposes, choosing the first expose for `cap`. `cap` is only used
+            // for debug info.
+            //
+            // TODO(https://fxbug.dev/4776): This could lead to incomplete debug output because the source name
+            // is what's printed, so if the exposes have different source names only one of them will
+            // appear in the output. However, in practice routing is unlikely to fail for an aggregate
+            // because the algorithm typically terminates once an aggregate is found. Find a more robust
+            // solution, such as including all exposes or switching to the target name.
+            let first_expose = *exposes.first().expect("empty exposes is impossible");
+            let cap = ComponentCapability::Expose(first_expose.clone());
+            let type_name = cap.type_name();
+            let request = match routing::request_for_namespace_capability_expose(exposes) {
+                Some(r) => r,
+                None => continue,
+            };
+            let routing_fn = route_fn(component.clone(), request);
+            let dirent_type = match type_name {
+                CapabilityTypeName::Directory => fio::DirentType::Directory,
+                CapabilityTypeName::EventStream => fio::DirentType::Service,
+                CapabilityTypeName::Protocol => fio::DirentType::Service,
+                CapabilityTypeName::Service => fio::DirentType::Directory,
+                CapabilityTypeName::Storage => fio::DirentType::Directory,
+                CapabilityTypeName::Dictionary => fio::DirentType::Service,
+                // The below don't appear in exposed or used dir
+                CapabilityTypeName::Resolver
+                | CapabilityTypeName::Runner
+                | CapabilityTypeName::Config => fio::DirentType::Unknown,
+            };
+            let open = Open::new(routing_fn, dirent_type);
+            target_dict.insert_capability(iter::once(target_name), open);
+        }
+    }
+
+    /// Opens the exposed directory bound to this instance.
+    pub async fn open_exposed_dir(
+        &self,
+        flags: fio::OpenFlags,
+        path: vfs::path::Path,
+        server_end: ServerEnd<fio::NodeMarker>,
+    ) {
+        self.get_exposed_dir().await.open(
+            self.execution_scope.clone(),
+            flags,
+            path,
+            server_end.into_channel(),
+        );
+    }
+
+    async fn get_exposed_dir(&self) -> &Open {
+        let create_exposed_dir = async {
+            let exposed_dict = self.make_exposed_dict().await;
+            exposed_dict
+                .try_into_open()
+                .expect("converting exposed dict to open should always succeed")
+        };
+        self.exposed_dir.get_or_init(create_exposed_dir).await
     }
 
     /// Returns the resolved structured configuration of this instance, if any.

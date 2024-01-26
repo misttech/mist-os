@@ -225,7 +225,9 @@ pub async fn report_routing_failure(
 
 /// Group exposes by `target_name`. This will group all exposes that form an aggregate capability
 /// together.
-pub fn aggregate_exposes(exposes: &Vec<ExposeDecl>) -> BTreeMap<&str, Vec<&ExposeDecl>> {
+pub fn aggregate_exposes<'a>(
+    exposes: impl Iterator<Item = &'a ExposeDecl>,
+) -> BTreeMap<&'a str, Vec<&'a ExposeDecl>> {
     let mut out: BTreeMap<&str, Vec<&ExposeDecl>> = BTreeMap::new();
     for expose in exposes {
         out.entry(expose.target_name().as_str()).or_insert(vec![]).push(expose);

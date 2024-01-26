@@ -4,7 +4,6 @@
 
 pub mod actions;
 pub mod component;
-pub mod dir_tree;
 pub mod error;
 pub mod event_logger;
 pub mod hooks;
@@ -20,8 +19,6 @@ pub(crate) mod routing;
 pub(crate) mod routing_fns;
 pub(crate) mod storage;
 pub(crate) mod token;
-
-mod exposed_dir;
 
 #[cfg(test)]
 mod tests;

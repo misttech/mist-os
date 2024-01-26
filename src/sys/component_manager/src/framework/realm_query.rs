@@ -496,8 +496,7 @@ async fn open(
                 InstanceState::Resolved(r) => {
                     let path = vfs::path::Path::validate_and_split(path)
                         .map_err(|_| fsys::OpenError::BadPath)?;
-
-                    r.get_exposed_dir().open(flags, path, object);
+                    r.open_exposed_dir(flags, path, object).await;
                     Ok(())
                 }
                 _ => Err(fsys::OpenError::InstanceNotResolved),
@@ -946,7 +945,6 @@ mod tests {
             dependency_type: DependencyType::Strong,
             availability: Availability::Required,
         });
-
         let expose_decl = ExposeDecl::Protocol(ExposeProtocolDecl {
             source: ExposeSource::Self_,
             source_name: "bar".parse().unwrap(),
@@ -955,10 +953,18 @@ mod tests {
             target_name: "bar".parse().unwrap(),
             availability: cm_rust::Availability::Required,
         });
+        let capability_decl = ProtocolDecl {
+            name: "bar".parse().unwrap(),
+            source_path: Some("/svc/bar".parse().unwrap()),
+        };
 
         let components = vec![(
             "root",
-            ComponentDeclBuilder::new().use_(use_decl.clone()).expose(expose_decl.clone()).build(),
+            ComponentDeclBuilder::new()
+                .use_(use_decl)
+                .expose(expose_decl)
+                .protocol(capability_decl)
+                .build(),
         )];
 
         let TestModelResult { model, builtin_environment, .. } =
