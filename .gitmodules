@@ -628,3 +628,53 @@
 	url = https://fuchsia.googlesource.com/third_party/github.com/KhronosGroup/Vulkan-Utility-Libraries
 	name = third_party/Vulkan-Utility-Libraries
 	ignore = all
+[submodule "third_party/pylibs/astroid/src"]
+	path = third_party/pylibs/astroid/src
+	url = https://fuchsia.googlesource.com/third_party/github.com/pylint-dev/astroid
+	name = third_party/pylibs/astroid
+	ignore = all
+[submodule "third_party/pylibs/dill/src"]
+	path = third_party/pylibs/dill/src
+	url = https://fuchsia.googlesource.com/third_party/github.com/uqfoundation/dill
+	name = third_party/pylibs/dill
+	ignore = all
+[submodule "third_party/pylibs/isort/src"]
+	path = third_party/pylibs/isort/src
+	url = https://fuchsia.googlesource.com/third_party/github.com/PyCQA/isort
+	name = third_party/pylibs/isort
+	ignore = all
+[submodule "third_party/pylibs/mccabe/src"]
+	path = third_party/pylibs/mccabe/src
+	url = https://fuchsia.googlesource.com/third_party/github.com/PyCQA/mccabe
+	name = third_party/pylibs/mccabe
+	ignore = all
+[submodule "third_party/pylibs/mypy/src"]
+	path = third_party/pylibs/mypy/src
+	url = https://fuchsia.googlesource.com/third_party/github.com/python/mypy
+	name = third_party/pylibs/mypy
+	ignore = all
+[submodule "third_party/pylibs/mypy_extensions/src"]
+	path = third_party/pylibs/mypy_extensions/src
+	url = https://fuchsia.googlesource.com/third_party/github.com/python/mypy_extensions
+	name = third_party/pylibs/mypy_extensions
+	ignore = all
+[submodule "third_party/pylibs/platformdirs/src"]
+	path = third_party/pylibs/platformdirs/src
+	url = https://fuchsia.googlesource.com/third_party/github.com/platformdirs/platformdirs
+	name = third_party/pylibs/platformdirs
+	ignore = all
+[submodule "third_party/pylibs/pylint/src"]
+	path = third_party/pylibs/pylint/src
+	url = https://fuchsia.googlesource.com/third_party/github.com/pylint-dev/pylint
+	name = third_party/pylibs/pylint
+	ignore = all
+[submodule "third_party/pylibs/tomlkit/src"]
+	path = third_party/pylibs/tomlkit/src
+	url = https://fuchsia.googlesource.com/third_party/github.com/sdispater/tomlkit
+	name = third_party/pylibs/tomlkit
+	ignore = all
+[submodule "third_party/pylibs/typing_extensions/src"]
+	path = third_party/pylibs/typing_extensions/src
+	url = https://fuchsia.googlesource.com/third_party/github.com/python/typing_extensions
+	name = third_party/pylibs/typing_extensions
+	ignore = all
