@@ -106,7 +106,11 @@ class SSH:
 
     @property
     def target_address(self) -> custom_types.TargetSshAddress:
-        """Gets the address used on SSH."""
+        """Gets the address used on SSH.
+
+        Returns:
+            The IP address and port used for SSH.
+        """
         if self._ip_port:
             return custom_types.TargetSshAddress(
                 ip=self._ip_port.ip, port=self._ip_port.port
