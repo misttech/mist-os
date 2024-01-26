@@ -10,9 +10,8 @@ use crate::{
     mm::MemoryManager,
     signals::{deliver_signal, SignalActions, SignalInfo},
     task::{
-        ptrace_attach_from_state, ptrace_syscall_enter, ptrace_syscall_exit, CurrentTask,
-        ExceptionResult, ExitStatus, Kernel, ProcessGroup, PtraceCoreState, Task, TaskBuilder,
-        TaskFlags, ThreadGroup, ThreadGroupWriteGuard,
+        ptrace_attach_from_state, CurrentTask, ExceptionResult, ExitStatus, Kernel, ProcessGroup,
+        PtraceCoreState, Task, TaskBuilder, TaskFlags, ThreadGroup, ThreadGroupWriteGuard,
     },
 };
 use anyhow::{format_err, Error};
@@ -278,10 +277,6 @@ fn run_task(
                 current_task.thread_state.registers =
                     zx::sys::zx_thread_state_general_regs_t::from(&state).into();
 
-                if current_task.trace_syscalls.load(std::sync::atomic::Ordering::Relaxed) {
-                    ptrace_syscall_enter(current_task);
-                }
-
                 let syscall_decl = SyscallDecl::from_number(
                     current_task.thread_state.registers.syscall_register(),
                 );
@@ -297,10 +292,6 @@ fn run_task(
 
                 // Restore the CFI directives before continuing.
                 restore_cfi_directives!();
-
-                if current_task.trace_syscalls.load(std::sync::atomic::Ordering::Relaxed) {
-                    ptrace_syscall_exit(current_task, error_context.is_some());
-                }
 
                 firehose_trace_duration_end!(
                     trace_category_starnix!(),

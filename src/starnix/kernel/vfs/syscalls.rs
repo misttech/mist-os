@@ -2302,8 +2302,7 @@ pub fn sys_ppoll(
         // If write was ok, and poll was ok, return poll result.
         (Ok(_), Ok(num_events)) => Ok(num_events),
         (Ok(_), Err(e)) if e == EINTR => {
-            track_stub!("restart ppoll if not user handle");
-            error!(EINTR)
+            error!(ERESTARTNOHAND)
         }
         (Ok(_), poll_result) => poll_result,
         // If write was a failure, return the poll result unchanged.

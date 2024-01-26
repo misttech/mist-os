@@ -520,6 +520,9 @@ pub enum TaskStateCode {
     // Task is waiting for an event.
     Sleeping,
 
+    // Tracing stop
+    TracingStop,
+
     // Task has exited.
     Zombie,
 }
@@ -529,6 +532,7 @@ impl TaskStateCode {
         match self {
             TaskStateCode::Running => 'R',
             TaskStateCode::Sleeping => 'S',
+            TaskStateCode::TracingStop => 't',
             TaskStateCode::Zombie => 'Z',
         }
     }
@@ -537,6 +541,7 @@ impl TaskStateCode {
         match self {
             TaskStateCode::Running => "running",
             TaskStateCode::Sleeping => "sleeping",
+            TaskStateCode::TracingStop => "tracing stop",
             TaskStateCode::Zombie => "zombie",
         }
     }
@@ -1166,7 +1171,12 @@ impl Task {
         if status.exit_status.is_some() {
             TaskStateCode::Zombie
         } else if status.signals.run_state.is_blocked() {
-            TaskStateCode::Sleeping
+            let stop_state = self.load_stopped();
+            if stop_state.ptrace_only() && stop_state.is_stopped() {
+                TaskStateCode::TracingStop
+            } else {
+                TaskStateCode::Sleeping
+            }
         } else {
             TaskStateCode::Running
         }

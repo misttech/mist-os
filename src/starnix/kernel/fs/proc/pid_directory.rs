@@ -775,7 +775,7 @@ impl FileOps for MemFile {
         };
         match task.state_code() {
             TaskStateCode::Zombie => Ok(0),
-            TaskStateCode::Running | TaskStateCode::Sleeping => {
+            TaskStateCode::Running | TaskStateCode::Sleeping | TaskStateCode::TracingStop => {
                 let mut addr = UserAddress::default() + offset;
                 data.write_each(&mut |bytes| {
                     let read_bytes = if current_task.has_same_address_space(&task) {
@@ -803,7 +803,7 @@ impl FileOps for MemFile {
         let task = Task::from_weak(&self.0)?;
         match task.state_code() {
             TaskStateCode::Zombie => Ok(0),
-            TaskStateCode::Running | TaskStateCode::Sleeping => {
+            TaskStateCode::Running | TaskStateCode::Sleeping | TaskStateCode::TracingStop => {
                 let addr = UserAddress::default() + offset;
                 let mut written = 0;
                 let result = data.peek_each(&mut |bytes| {

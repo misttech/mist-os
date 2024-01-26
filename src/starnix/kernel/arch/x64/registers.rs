@@ -24,9 +24,11 @@ pub struct RegisterState {
 impl RegisterState {
     /// Saves any register state required to restart `syscall_number`.
     pub fn save_registers_for_restart(&mut self, syscall_number: u64) {
-        // The `rax` register read from the thread's state is clobbered by zircon with
-        // ZX_ERR_BAD_SYSCALL, but it really should be the syscall number.
-        self.rax = syscall_number;
+        // The `rax` register read from the thread's state is clobbered by
+        // zircon with ZX_ERR_BAD_SYSCALL.  Similarly, Linux sets it to ENOSYS
+        // until it has determined the correct return value for the syscall; we
+        // emulate this behavior because ptrace callers expect it.
+        self.rax = -(starnix_uapi::ENOSYS as i64) as u64;
 
         // `orig_rax` should hold the original value loaded into `rax` by the userspace process.
         self.orig_rax = syscall_number;
@@ -88,7 +90,7 @@ impl RegisterState {
 
     /// Returns the register that contains the syscall number.
     pub fn syscall_register(&self) -> u64 {
-        self.real_registers.rax
+        self.orig_rax
     }
 
     /// Resets the register that contains the application status flags.
@@ -162,7 +164,7 @@ impl RegisterState {
 
 impl From<zx::sys::zx_thread_state_general_regs_t> for RegisterState {
     fn from(regs: zx::sys::zx_thread_state_general_regs_t) -> Self {
-        RegisterState { real_registers: regs, orig_rax: 0 }
+        RegisterState { real_registers: regs, orig_rax: regs.rax }
     }
 }
 

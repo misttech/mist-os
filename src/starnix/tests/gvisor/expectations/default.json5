@@ -419,9 +419,6 @@
                 // packet_socket_test
                 "AllPacketSocketTests/PacketSocketTest.GetSockName/*",
 
-                // pause_test
-                "PauseTest.OnlyReturnsWhenSignalHandled",
-
                 // ping_socket_test
                 "PingSocket.ReceiveIPPacketInfo",
 
@@ -1032,6 +1029,12 @@
 
                 // Panics in process_builder.
                 "ElfTest.PIEOverflow",
+
+                // pause_test
+                // Passes on x86, fails on ARM. Note that pause() is a syscall
+                // on x86, but not on ARM, where it seems to be implemented with
+                // rt_sigsuspend.
+                "PauseTest.OnlyReturnsWhenSignalHandled",
 
                 // SignalMask[Blocks/Allows]Signal require timers to send signals.
                 // Passes sometimes, so it has to be skipped.

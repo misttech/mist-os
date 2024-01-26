@@ -176,7 +176,7 @@ pub const ERESTARTNOHAND: ErrnoCode = ErrnoCode(514);
 
 /// Like `ERESTARTNOHAND`, but restart by invoking a closure instead of calling the syscall
 /// implementation again.
-pub const ERESTART_RESTARTBLOCK: ErrnoCode = ErrnoCode(515);
+pub const ERESTART_RESTARTBLOCK: ErrnoCode = ErrnoCode(516);
 
 /// An extension trait for `Result<T, Errno>`.
 pub trait ErrnoResultExt<T> {

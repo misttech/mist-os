@@ -208,7 +208,7 @@ impl RegisterState {
 
 impl From<zx::sys::zx_thread_state_general_regs_t> for RegisterState {
     fn from(regs: zx::sys::zx_thread_state_general_regs_t) -> Self {
-        RegisterState { real_registers: regs, orig_a0: 0 }
+        RegisterState { real_registers: regs, orig_a0: regs.a0 }
     }
 }
 

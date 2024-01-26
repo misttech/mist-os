@@ -14,6 +14,9 @@
 #include <time.h>
 #include <unistd.h>
 
+#include <fstream>
+#include <iostream>
+
 #include <linux/sched.h>
 
 #ifdef __riscv
@@ -249,6 +252,128 @@ exit_loop:
   EXPECT_EQ(ptrace(PTRACE_CONT, child_pid, 0, 0), 0);
 }
 
+#ifdef __x86_64__
+
+namespace {
+
+// Loop until the target process indicates a sleeping state in /proc/pid/stat.
+std::optional<std::string> WaitUntilBlocked(pid_t target) {
+  for (int i = 0; i < 100000; i++) {
+    // Loop until the target task is paused.
+    std::string fname = "/proc/" + std::to_string(target) + "/stat";
+    std::ifstream t(fname);
+    std::stringstream buffer;
+    buffer << t.rdbuf();
+    if (buffer.str().find("S") != std::string::npos ||
+        buffer.str().find("t") != std::string::npos) {
+      break;
+    }
+    // Give up if we don't seem to be getting to sleep.
+    if (i == 99999)
+      return std::optional<std::string>(buffer.str());
+  }
+  return std::nullopt;
+}
+
+constexpr int kUnmaskedSignal = SIGUSR1;
+
+// Linux has internal errnos that capture the circumstances when an interrupted
+// syscall should restart rather than return.  These are ordinarily invisible to
+// the user - the syscall is either restarted, or the internal errno is replaced
+// by EINTR.  However, ptrace can detect them on ptrace-syscall-exit.
+void TraceSyscallWithRestartWithCall(int call, long arg0, long arg1, long arg2, long arg3,
+                                     int expected_errno) {
+  test_helper::ForkHelper helper;
+  helper.OnlyWaitForForkedChildren();
+  helper.ExpectSignal(SIGKILL);
+  pid_t child_pid = helper.RunInForkedProcess([call, arg0, arg1, arg2, arg3] {
+    struct sigaction sa = {};
+    sa.sa_handler = [](int signo) {};
+    EXPECT_EQ(sigfillset(&sa.sa_mask), 0);
+    EXPECT_EQ(sigaction(kUnmaskedSignal, &sa, nullptr), 0);
+    EXPECT_EQ(sigprocmask(SIG_UNBLOCK, &sa.sa_mask, nullptr), 0);
+
+    EXPECT_EQ(ptrace(PTRACE_TRACEME, 0, 0, 0), 0);
+    raise(SIGSTOP);
+
+    // When the following syscalls are interrupted, errno should be some weird
+    // internal errno (expected_errno above).  This means that the syscall will
+    // return -1 if it is interrupted by a signal that has a user handler.
+    EXPECT_EQ(-1, syscall(call, arg0, arg1, arg2, arg3));
+    EXPECT_EQ(EINTR, errno) << strerror(errno);
+  });
+
+  int status;
+  ASSERT_EQ(child_pid, waitpid(child_pid, &status, 0));
+  EXPECT_TRUE(WIFSTOPPED(status) && WSTOPSIG(status) == SIGSTOP)
+      << "status = " << status << " WIFSTOPPED = " << WIFSTOPPED(status)
+      << " WSTOPSIG = " << WSTOPSIG(status);
+
+  struct user_regs_struct regs = {};
+  do {
+    // Suppress the SIGSTOP and wait for the child to enter syscall-enter-stop
+    // for the given syscall.  Repeat this in case we're using a libc where
+    // raise() makes a syscall after sending the signal.
+    ASSERT_EQ(ptrace(PTRACE_SYSCALL, child_pid, 0, 0), 0);
+    ASSERT_EQ(waitpid(child_pid, &status, 0), child_pid);
+    EXPECT_TRUE(WIFSTOPPED(status) && WSTOPSIG(status) == SIGTRAP) << " status " << status;
+
+    ASSERT_EQ(ptrace(PTRACE_GETREGS, child_pid, 0, &regs), 0);
+  } while (static_cast<int>(regs.orig_rax) != call);
+  EXPECT_EQ(call, static_cast<int>(regs.orig_rax));
+  EXPECT_EQ(-ENOSYS, static_cast<int>(regs.rax));
+
+  // Resume the child with PTRACE_SYSCALL and expect it to block in the syscall.
+  EXPECT_EQ(ptrace(PTRACE_SYSCALL, child_pid, 0, 0), 0);
+  std::optional<std::string> proc_status = WaitUntilBlocked(child_pid);
+  EXPECT_EQ(proc_status, std::nullopt) << "Blocking failed with status " << *proc_status;
+  ASSERT_EQ(waitpid(child_pid, &status, WNOHANG), 0);
+
+  // Send the child kUnmaskedsignal, causing it to return the given errno and enter
+  // syscall-exit-stop from the syscall.
+  EXPECT_EQ(kill(child_pid, kUnmaskedSignal), 0);
+  ASSERT_EQ(waitpid(child_pid, &status, 0), child_pid);
+  EXPECT_TRUE(WIFSTOPPED(status) && WSTOPSIG(status) == SIGTRAP) << " status " << status;
+
+  EXPECT_EQ(ptrace(PTRACE_GETREGS, child_pid, 0, &regs), 0);
+  EXPECT_EQ(call, static_cast<int>(regs.orig_rax));
+  EXPECT_EQ(-expected_errno, static_cast<int>(regs.rax));
+
+  kill(child_pid, SIGKILL);
+  ptrace(PTRACE_DETACH, child_pid, 0, 0);
+}
+}  // namespace
+
+constexpr int ERESTARTNOHAND = 514;
+constexpr int ERESTART_RESTARTBLOCK = 516;
+
+TEST(PtraceTest, TraceSyscallWithRestart_pause) {
+  ASSERT_NO_FATAL_FAILURE(TraceSyscallWithRestartWithCall(SYS_pause, 0, 0, 0, 0, ERESTARTNOHAND));
+}
+
+TEST(PtraceTest, TraceSyscallWithRestart_nanosleep) {
+  const struct timespec req = {.tv_sec = 10, .tv_nsec = 0};
+  ASSERT_NO_FATAL_FAILURE(TraceSyscallWithRestartWithCall(
+      SYS_nanosleep, reinterpret_cast<long>(&req), 0, 0, 0, ERESTART_RESTARTBLOCK));
+}
+
+TEST(PtraceTest, TraceSyscallWithRestart_rt_sigsuspend) {
+  sigset_t sigset;
+  ASSERT_EQ(0, sigfillset(&sigset));
+  ASSERT_EQ(0, sigdelset(&sigset, kUnmaskedSignal));
+  ASSERT_NO_FATAL_FAILURE(
+      TraceSyscallWithRestartWithCall(SYS_rt_sigsuspend, reinterpret_cast<long>(&sigset),
+                                      sizeof(unsigned long), 0, 0, ERESTARTNOHAND));
+}
+
+TEST(PtraceTest, TraceSyscallWithRestart_ppoll) {
+  struct timespec req = {.tv_sec = 10, .tv_nsec = 0};
+  ASSERT_NO_FATAL_FAILURE(TraceSyscallWithRestartWithCall(
+      SYS_ppoll, 0, 0, reinterpret_cast<long>(&req), 0, ERESTARTNOHAND));
+}
+
+#endif  // __x86_64__
+
 TEST(PtraceTest, GetGeneralRegs) {
   test_helper::ForkHelper helper;
   helper.OnlyWaitForForkedChildren();
@@ -457,7 +582,7 @@ constexpr int kBadExitStatus = 0xabababab;
 pid_t DoExec() {
   pid_t child_pid = fork();
   if (child_pid == 0) {
-    EXPECT_EQ(ptrace(PTRACE_TRACEME, 0, 0, 0), 0);
+    EXPECT_EQ(ptrace(PTRACE_TRACEME, 0, 0, 0), 0) << strerror(errno);
     raise(SIGSTOP);
 
     std::string test_binary = "/data/tests/ptrace_test_exec_child";

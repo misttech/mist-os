@@ -18,7 +18,10 @@ use crate::{
     mm::MemoryManager,
     signals::{dequeue_signal, prepare_to_restart_syscall},
     syscalls::table::dispatch_syscall,
-    task::{CurrentTask, ExitStatus, Kernel, SeccompStateValue, TaskFlags, ThreadGroup},
+    task::{
+        ptrace_syscall_enter, ptrace_syscall_exit, CurrentTask, ExitStatus, Kernel,
+        SeccompStateValue, TaskFlags, ThreadGroup,
+    },
     vfs::{FdNumber, FdTable, FileSystemCreator, FileSystemHandle, FileSystemOptions, FsStr},
 };
 use starnix_logging::log_trace;
@@ -68,6 +71,10 @@ pub fn execute_syscall(
 
     current_task.thread_state.registers.save_registers_for_restart(syscall.decl.number);
 
+    if current_task.trace_syscalls.load(std::sync::atomic::Ordering::Relaxed) {
+        ptrace_syscall_enter(current_task);
+    }
+
     log_trace!("{:?}", syscall);
 
     let result: Result<SyscallResult, Errno> =
@@ -85,7 +92,7 @@ pub fn execute_syscall(
 
     current_task.trigger_delayed_releaser();
 
-    match result {
+    let return_value = match result {
         Ok(return_value) => {
             log_trace!("-> {:#x}", return_value.value());
             current_task.thread_state.registers.set_return_register(return_value.value());
@@ -96,7 +103,13 @@ pub fn execute_syscall(
             current_task.thread_state.registers.set_return_register(errno.return_value());
             Some(ErrorContext { error: errno, syscall })
         }
+    };
+
+    if current_task.trace_syscalls.load(std::sync::atomic::Ordering::Relaxed) {
+        ptrace_syscall_exit(current_task, return_value.is_some());
     }
+
+    return_value
 }
 
 /// Finishes `current_task` updates after a restricted mode exit such as a syscall, exception, or kick.

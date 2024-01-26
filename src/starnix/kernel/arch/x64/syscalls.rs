@@ -331,7 +331,7 @@ pub fn sys_pause(
     let guard = event.begin_wait();
     current_task.run_in_state(RunState::Event(event.clone()), || {
         match guard.block_until(zx::Time::INFINITE) {
-            Err(WakeReason::Interrupted) => error!(EINTR),
+            Err(WakeReason::Interrupted) => error!(ERESTARTNOHAND),
             Err(WakeReason::DeadlineExpired) => panic!("blocking forever cannot time out"),
             Ok(()) => Ok(()),
         }
