@@ -12,7 +12,7 @@ use crate::{
     vfs::{
         fileops_impl_dataless, fileops_impl_seekless, fs_node_impl_dir_readonly,
         DirectoryEntryType, DynamicFile, DynamicFileBuf, DynamicFileSource, FileOps, FsNode,
-        FsNodeHandle, FsNodeInfo, FsNodeOps, FsStr, VecDirectory, VecDirectoryEntry,
+        FsNodeHandle, FsNodeInfo, FsNodeOps, FsStr, StubEmptyFile, VecDirectory, VecDirectoryEntry,
     },
 };
 use fuchsia_zircon as zx;
@@ -100,6 +100,11 @@ impl FsNodeOps for ZramDeviceDirectory {
         let mut entries = BlockDeviceDirectory::create_file_ops_entries();
         entries.push(VecDirectoryEntry {
             entry_type: DirectoryEntryType::REG,
+            name: b"idle".into(),
+            inode: None,
+        });
+        entries.push(VecDirectoryEntry {
+            entry_type: DirectoryEntryType::REG,
             name: b"mm_stat".into(),
             inode: None,
         });
@@ -113,6 +118,11 @@ impl FsNodeOps for ZramDeviceDirectory {
         name: &FsStr,
     ) -> Result<FsNodeHandle, Errno> {
         match &**name {
+            b"idle" => Ok(node.fs().create_node(
+                current_task,
+                StubEmptyFile::new_node("zram idle file"),
+                FsNodeInfo::new_factory(mode!(IFREG, 0o664), FsCred::root()),
+            )),
             b"mm_stat" => {
                 let device = self.device.upgrade().ok_or_else(|| errno!(EINVAL))?;
                 Ok(node.fs().create_node(
