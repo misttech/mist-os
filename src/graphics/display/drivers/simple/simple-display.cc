@@ -32,6 +32,7 @@
 
 #include "src/graphics/display/lib/api-types-cpp/config-stamp.h"
 #include "src/graphics/display/lib/api-types-cpp/display-id.h"
+#include "src/graphics/display/lib/api-types-cpp/display-timing.h"
 
 namespace {
 
@@ -40,7 +41,7 @@ static constexpr display::DisplayId kDisplayId(1);
 static constexpr uint64_t kImageHandle = 0xdecafc0ffee;
 
 // Just guess that it's 30fps
-static constexpr uint64_t kRefreshRateHz = 30;
+static constexpr int kRefreshRateHz = 30;
 
 static constexpr auto kVSyncInterval = zx::usec(1000000 / kRefreshRateHz);
 
@@ -89,10 +90,30 @@ void SimpleDisplay::DisplayControllerImplSetDisplayControllerInterface(
 
   added_display_args_t args = {};
   args.display_id = display::ToBanjoDisplayId(kDisplayId);
-  args.panel_capabilities_source = PANEL_CAPABILITIES_SOURCE_DISPLAY_PARAMS;
-  args.panel.params.height = height_;
-  args.panel.params.width = width_;
-  args.panel.params.refresh_rate_e2 = kRefreshRateHz * 100;
+  args.panel_capabilities_source = PANEL_CAPABILITIES_SOURCE_DISPLAY_MODE;
+
+  const int64_t pixel_clock_hz = int64_t{width_} * height_ * kRefreshRateHz;
+  const int64_t pixel_clock_khz = (pixel_clock_hz + 500) / 1000;
+  ZX_DEBUG_ASSERT(pixel_clock_khz >= 0);
+  ZX_DEBUG_ASSERT(pixel_clock_khz <= int64_t{std::numeric_limits<uint32_t>::max()});
+  const display::DisplayTiming timing = {
+      .horizontal_active_px = static_cast<int32_t>(width_),
+      .horizontal_front_porch_px = 0,
+      .horizontal_sync_width_px = 0,
+      .horizontal_back_porch_px = 0,
+      .vertical_active_lines = static_cast<int32_t>(height_),
+      .vertical_front_porch_lines = 0,
+      .vertical_sync_width_lines = 0,
+      .vertical_back_porch_lines = 0,
+      .pixel_clock_frequency_khz = static_cast<int32_t>(pixel_clock_khz),
+      .fields_per_frame = display::FieldsPerFrame::kProgressive,
+      .hsync_polarity = display::SyncPolarity::kNegative,
+      .vsync_polarity = display::SyncPolarity::kNegative,
+      .vblank_alternates = false,
+      .pixel_repetition = 0,
+  };
+  args.panel.mode = display::ToBanjoDisplayMode(timing);
+
   // fuchsia.images2.PixelFormat can always cast to AnyPixelFormat safely.
   fuchsia_images2_pixel_format_enum_value_t pixel_format =
       static_cast<fuchsia_images2_pixel_format_enum_value_t>(format_);
