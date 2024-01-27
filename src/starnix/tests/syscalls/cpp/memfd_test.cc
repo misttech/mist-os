@@ -3,6 +3,8 @@
 // found in the LICENSE file.
 
 #include <fcntl.h>
+#include <sys/poll.h>
+#include <unistd.h>
 
 #include <linux/memfd.h>
 
@@ -12,6 +14,8 @@
 
 #include <fbl/unique_fd.h>
 #include <gtest/gtest.h>
+
+#include "fault_test.h"
 
 #if !defined(__NR_memfd_create)
 #if defined(__x86_64__)
@@ -87,6 +91,38 @@ TEST_F(MemfdTest, MapWritableThenSealFutureWrite) {
 
   // `F_SEAL_FUTURE_WRITE` should still succeed when there are writable mappings.
   ASSERT_EQ(fcntl(fd_.get(), F_ADD_SEALS, F_SEAL_FUTURE_WRITE), 0);
+}
+
+class MemfdFaultTest : public FaultTest<MemfdTest> {};
+
+TEST_F(MemfdFaultTest, Write) {
+  ASSERT_EQ(write(fd_.get(), faulting_ptr_, kFaultingSize_), -1);
+  EXPECT_EQ(errno, EFAULT);
+}
+
+TEST_F(MemfdFaultTest, Read) {
+  // First send a valid message that we can read.
+  constexpr char kWriteBuf[] = "Hello world";
+  ASSERT_EQ(write(fd_.get(), &kWriteBuf, sizeof(kWriteBuf)),
+            static_cast<ssize_t>(sizeof(kWriteBuf)));
+  ASSERT_EQ(lseek(fd_.get(), 0, SEEK_SET), 0) << strerror(errno);
+
+  pollfd p = {
+      .fd = fd_.get(),
+      .events = POLLIN,
+  };
+  ASSERT_EQ(poll(&p, 1, -1), 1);
+  ASSERT_EQ(p.revents, POLLIN);
+
+  static_assert(kFaultingSize_ >= sizeof(kWriteBuf));
+  ASSERT_EQ(read(fd_.get(), faulting_ptr_, sizeof(kWriteBuf)), -1);
+  EXPECT_EQ(errno, EFAULT);
+
+  // Previous read failed so we should be able to read all the written bytes
+  // here.
+  char read_buf[sizeof(kWriteBuf)] = {};
+  ASSERT_EQ(read(fd_.get(), read_buf, sizeof(read_buf)), static_cast<ssize_t>(sizeof(kWriteBuf)));
+  EXPECT_STREQ(read_buf, kWriteBuf);
 }
 
 }  // namespace
