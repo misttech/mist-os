@@ -94,7 +94,14 @@ TEST_F(MemfdTest, MapWritableThenSealFutureWrite) {
   ASSERT_EQ(fcntl(fd_.get(), F_ADD_SEALS, F_SEAL_FUTURE_WRITE), 0);
 }
 
-class MemfdFaultTest : public FaultTest<MemfdTest> {};
+class MemfdFaultTest : public FaultTest<MemfdTest> {
+ protected:
+  void SetFdNonBlocking() {
+    int flags = fcntl(fd_.get(), F_GETFL, 0);
+    ASSERT_GE(flags, 0) << strerror(errno);
+    ASSERT_EQ(fcntl(fd_.get(), F_SETFL, flags | O_NONBLOCK), 0) << strerror(errno);
+  }
+};
 
 TEST_F(MemfdFaultTest, Write) {
   ASSERT_EQ(write(fd_.get(), faulting_ptr_, kFaultingSize_), -1);
@@ -167,6 +174,35 @@ TEST_F(MemfdFaultTest, ReadV) {
   iov[1] = iovec{};
   ASSERT_EQ(readv(fd_.get(), iov, std::size(iov)), static_cast<ssize_t>(sizeof(base2)));
   EXPECT_STREQ(base2, &kWriteBuf[1]);
+}
+
+TEST_F(MemfdFaultTest, WriteV) {
+  char write_buf[] = "Hello world";
+  constexpr size_t kBase0Size = 1;
+  iovec iov[] = {
+      {
+          .iov_base = write_buf,
+          .iov_len = kBase0Size,
+      },
+      {
+          .iov_base = faulting_ptr_,
+          .iov_len = sizeof(kFaultingSize_),
+      },
+      {
+          .iov_base = reinterpret_cast<char*>(write_buf) + kBase0Size,
+          .iov_len = sizeof(write_buf) - kBase0Size,
+      },
+  };
+
+  // Write with iov holding the invalid pointer.
+  ASSERT_EQ(writev(fd_.get(), iov, std::size(iov)), -1);
+  EXPECT_EQ(errno, EFAULT);
+  ASSERT_EQ(lseek(fd_.get(), 0, SEEK_SET), 0) << strerror(errno);
+
+  // The memfd should have no size since the above write failed.
+  ASSERT_NO_FATAL_FAILURE(SetFdNonBlocking());
+  char recv_buf[sizeof(write_buf)];
+  EXPECT_EQ(read(fd_.get(), recv_buf, sizeof(recv_buf)), 0);
 }
 
 }  // namespace
