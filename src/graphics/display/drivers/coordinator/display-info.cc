@@ -56,12 +56,19 @@ void DisplayInfo::InitializeInspect(inspect::Node* parent_node) {
   ZX_DEBUG_ASSERT(init_done);
   node = parent_node->CreateChild(fbl::StringPrintf("display-%" PRIu64, id.value()).c_str());
 
-  if (!edid.has_value()) {
-    node.CreateUint("width", params.width, &properties);
-    node.CreateUint("height", params.height, &properties);
+  if (params.has_value()) {
+    node.CreateUint("width", params->width, &properties);
+    node.CreateUint("height", params->height, &properties);
     return;
   }
 
+  if (mode.has_value()) {
+    node.CreateUint("width", mode->h_addressable, &properties);
+    node.CreateUint("height", mode->v_addressable, &properties);
+    return;
+  }
+
+  ZX_DEBUG_ASSERT(edid.has_value());
   size_t i = 0;
   for (const display::DisplayTiming& t : edid->timings) {
     auto child = node.CreateChild(fbl::StringPrintf("timing-parameters-%lu", ++i).c_str());
@@ -92,9 +99,6 @@ zx::result<fbl::RefPtr<DisplayInfo>> DisplayInfo::Create(const added_display_arg
   out->pending_layer_change = false;
   out->layer_count = 0;
   out->id = ToDisplayId(info.display_id);
-  if (info.edid_present) {
-    out->edid = DisplayInfo::Edid{};
-  }
 
   zx::result get_display_info_pixel_formats_result =
       CoordinatorPixelFormat::CreateFblVectorFromBanjoVector(
@@ -116,11 +120,18 @@ zx::result<fbl::RefPtr<DisplayInfo>> DisplayInfo::Create(const added_display_arg
   }
   out->cursor_infos = std::move(get_display_info_cursor_infos_result.value());
 
-  if (!info.edid_present) {
+  if (info.panel_capabilities_source == PANEL_CAPABILITIES_SOURCE_DISPLAY_MODE) {
+    out->mode = info.panel.mode;
+    return zx::ok(std::move(out));
+  }
+
+  if (info.panel_capabilities_source == PANEL_CAPABILITIES_SOURCE_DISPLAY_PARAMS) {
     out->params = info.panel.params;
     return zx::ok(std::move(out));
   }
 
+  ZX_DEBUG_ASSERT(info.panel_capabilities_source == PANEL_CAPABILITIES_SOURCE_EDID);
+  out->edid = DisplayInfo::Edid{};
   ddk::I2cImplProtocolClient i2c(&info.panel.i2c);
   if (!i2c.is_valid()) {
     zxlogf(ERROR, "Presented edid display with no i2c bus");

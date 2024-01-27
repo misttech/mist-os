@@ -62,26 +62,52 @@ type CursorInfo = struct {
     format FuchsiaImages2PixelFormatEnumValue;
 };
 
+/// The capabilities of a display panel.
 type Panel = strict resource union {
     /// The i2c bus to use to read this display's EDID.
     1: i2c client_end:fuchsia.hardware.i2cimpl.I2cImpl;
-    /// The display's parameters if an EDID is not present.
+
+    /// Simplified hard-coded display configuration.
+    ///
+    /// Can be used when the device does not implement EDID,
+    /// or when the driver needs to override the EDID contents.
+    //
+    // TODO(https://fxbug.dev/318642950): Remove it once all drivers are
+    // migrated to use DisplayMode.
     2: params DisplayParams;
+
+    /// Hard-coded display configuration.
+    ///
+    /// Can be used when the device does not implement EDID,
+    /// or when the driver needs to override the EDID contents.
+    3: mode DisplayMode;
+};
+
+type PanelCapabilitiesSource = strict enum {
+    /// The panel uses Extended Display Identification Data (EDID) over the
+    /// I2C bus to communicate its capabilities.
+    EDID = 1;
+
+    /// The panel provides a DisplayParams struct to express its capabilities.
+    DISPLAY_PARAMS = 2;
+
+    /// The panel provides a DisplayMode struct to express its capabilities.
+    DISPLAY_MODE = 3;
 };
 
 /// A structure containing information a connected display.
 type AddedDisplayArgs = resource struct {
     display_id uint64;
 
-    /// A flag indicating whether or not the display has a valid EDID.
+    /// If `panel_capabilities_source` is `EDID`, `panel.i2c` must be a valid
+    /// I2c client. The rest fields in `panel` are ignored.
     ///
-    /// If true, the device should provide a fuchsia.hardware.i2cimpl.I2cImpl client in the `Panel`
-    /// union. Note that the i2c device will be called from the on_displays_changed callback, so
-    /// care should be taken to avoid deadlocks or double-locking.
+    /// If `panel_capabilities_source` is `DISPLAY_PARAMS`,
+    /// `panel.params` must be valid. The rest fields in `panel` are ignored.
     ///
-    /// If no EDID is present, then the meaning of display_config's mode structure is
-    /// undefined, and drivers should ignore it in check_configuration and apply_configuration.
-    edid_present bool;
+    /// If `panel_capabilities_source` is `DISPLAY_MODE`, `panel.display_mode`
+    /// must be valid. The rest fields in `panel` are ignored.
+    panel_capabilities_source PanelCapabilitiesSource;
     panel Panel;
 
     /// A list of pixel formats supported by the display. The first entry is the

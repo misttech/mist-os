@@ -77,7 +77,7 @@ void GpuDevice::DisplayControllerImplSetDisplayControllerInterface(
 
   added_display_args_t args = {
       .display_id = display::ToBanjoDisplayId(kDisplayId),
-      .edid_present = false,
+      .panel_capabilities_source = PANEL_CAPABILITIES_SOURCE_DISPLAY_PARAMS,
       .panel =
           {
               .params =

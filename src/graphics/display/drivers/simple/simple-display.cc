@@ -89,7 +89,7 @@ void SimpleDisplay::DisplayControllerImplSetDisplayControllerInterface(
 
   added_display_args_t args = {};
   args.display_id = display::ToBanjoDisplayId(kDisplayId);
-  args.edid_present = false;
+  args.panel_capabilities_source = PANEL_CAPABILITIES_SOURCE_DISPLAY_PARAMS;
   args.panel.params.height = height_;
   args.panel.params.width = width_;
   args.panel.params.refresh_rate_e2 = kRefreshRateHz * 100;

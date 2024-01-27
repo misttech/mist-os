@@ -94,7 +94,7 @@ zx_status_t FakeDisplay::DisplayClampRgbImplSetMinimumRgb(uint8_t minimum_rgb) {
 
 void FakeDisplay::PopulateAddedDisplayArgs(added_display_args_t* args) {
   args->display_id = display::ToBanjoDisplayId(kDisplayId);
-  args->edid_present = false;
+  args->panel_capabilities_source = PANEL_CAPABILITIES_SOURCE_DISPLAY_PARAMS;
   args->panel.params.height = kHeight;
   args->panel.params.width = kWidth;
   args->panel.params.refresh_rate_e2 = kRefreshRateFps * 100;

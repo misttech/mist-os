@@ -812,7 +812,7 @@ void Controller::CallOnDisplaysChanged(cpp20::span<DisplayDevice*> added,
   added_display_args_t added_args[std::max(static_cast<size_t>(1), added.size())];
   for (unsigned i = 0; i < added.size(); i++) {
     added_args[i].display_id = display::ToBanjoDisplayId(added[i]->id());
-    added_args[i].edid_present = true;
+    added_args[i].panel_capabilities_source = PANEL_CAPABILITIES_SOURCE_EDID;
     added[i]->i2c().GetProto(&added_args[i].panel.i2c);
     added_args[i].pixel_format_list = kSupportedFormats;
     added_args[i].pixel_format_count = static_cast<uint32_t>(std::size(kSupportedFormats));

@@ -245,7 +245,7 @@ void Display::DisplayControllerImplSetDisplayControllerInterface(
   for (auto& it : devices_) {
     added_display_args_t display = {
         .display_id = display::ToBanjoDisplayId(it.first),
-        .edid_present = false,
+        .panel_capabilities_source = PANEL_CAPABILITIES_SOURCE_DISPLAY_PARAMS,
         .panel =
             {
                 .params =
@@ -538,9 +538,9 @@ config_check_result_t Display::DisplayControllerImplCheckConfiguration(
 
       if (display_configs[i]->cc_flags != 0) {
         // Color Correction is not supported, but we will pretend we do.
-        // TODO(https://fxbug.dev/42111684): Returning error will cause blank screen if scenic requests
-        // color correction. For now, lets pretend we support it, until a proper
-        // fix is done (either from scenic or from core display)
+        // TODO(https://fxbug.dev/42111684): Returning error will cause blank screen if scenic
+        // requests color correction. For now, lets pretend we support it, until a proper fix is
+        // done (either from scenic or from core display)
         zxlogf(WARNING, "%s: Color Correction not support. No error reported", __func__);
       }
 
