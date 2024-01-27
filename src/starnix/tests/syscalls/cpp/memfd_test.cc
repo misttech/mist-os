@@ -4,6 +4,7 @@
 
 #include <fcntl.h>
 #include <sys/poll.h>
+#include <sys/uio.h>
 #include <unistd.h>
 
 #include <linux/memfd.h>
@@ -123,6 +124,49 @@ TEST_F(MemfdFaultTest, Read) {
   char read_buf[sizeof(kWriteBuf)] = {};
   ASSERT_EQ(read(fd_.get(), read_buf, sizeof(read_buf)), static_cast<ssize_t>(sizeof(kWriteBuf)));
   EXPECT_STREQ(read_buf, kWriteBuf);
+}
+
+TEST_F(MemfdFaultTest, ReadV) {
+  // First send a valid message that we can read.
+  constexpr char kWriteBuf[] = "Hello world";
+  ASSERT_EQ(write(fd_.get(), &kWriteBuf, sizeof(kWriteBuf)),
+            static_cast<ssize_t>(sizeof(kWriteBuf)));
+  ASSERT_EQ(lseek(fd_.get(), 0, SEEK_SET), 0) << strerror(errno);
+
+  pollfd p = {
+      .fd = fd_.get(),
+      .events = POLLIN,
+  };
+  ASSERT_EQ(poll(&p, 1, -1), 1);
+  ASSERT_EQ(p.revents, POLLIN);
+
+  char base0[1] = {};
+  char base2[sizeof(kWriteBuf) - sizeof(base0)] = {};
+  iovec iov[] = {
+      {
+          .iov_base = base0,
+          .iov_len = sizeof(base0),
+      },
+      {
+          .iov_base = faulting_ptr_,
+          .iov_len = sizeof(kFaultingSize_),
+      },
+      {
+          .iov_base = base2,
+          .iov_len = sizeof(base2),
+      },
+  };
+
+  // Read once with iov holding the invalid pointer. We should perform
+  // a partial read.
+  ASSERT_EQ(readv(fd_.get(), iov, std::size(iov)), 1);
+  ASSERT_EQ(base0[0], kWriteBuf[0]);
+
+  // Read the rest.
+  iov[0] = iovec{};
+  iov[1] = iovec{};
+  ASSERT_EQ(readv(fd_.get(), iov, std::size(iov)), static_cast<ssize_t>(sizeof(base2)));
+  EXPECT_STREQ(base2, &kWriteBuf[1]);
 }
 
 }  // namespace
