@@ -32,7 +32,8 @@ ServiceInstanceResolver::ServiceInstanceResolver(MdnsAgent::Owner* owner,
       ip_versions_(ip_versions),
       include_local_(include_local),
       include_local_proxies_(include_local_proxies),
-      callback_(std::move(callback)) {
+      callback_(std::move(callback)),
+      aaaa_queried_(false) {
   FX_DCHECK(callback_);
 }
 
@@ -57,9 +58,10 @@ void ServiceInstanceResolver::EndOfMessage() {
   // if srv was received but has no aaaa record, send aaaa query.
   // Since nsec is not supported, the following check is intentional as
   // ServiceInstanceResolver supports only v6 addresses.
-  if (instance_.has_service() && !instance_.has_ipv6_endpoint()) {
+  if (!aaaa_queried_ && instance_.has_service() && !instance_.has_ipv6_endpoint()) {
     Query(DnsType::kAaaa, target_full_name_, media_, ip_versions_, now(), kAdditionalInterval,
           kAdditionalIntervalMultiplier, kAdditionalMaxQueries);
+    aaaa_queried_ = true;
     return;
   }
 

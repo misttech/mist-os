@@ -53,6 +53,7 @@ class ServiceInstanceResolver : public MdnsAgent {
   bool include_local_proxies_;
   Mdns::ResolveServiceInstanceCallback callback_;
   inet::IpPort port_;
+  bool aaaa_queried_;
 
  public:
   // Disallow copy, assign and move.
