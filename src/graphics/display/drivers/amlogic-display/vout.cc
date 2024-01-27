@@ -144,16 +144,19 @@ void Vout::PopulateAddedDisplayArgs(
     added_display_args_t* args, display::DisplayId display_id,
     cpp20::span<const fuchsia_images2_pixel_format_enum_value_t> pixel_formats) {
   switch (type_) {
-    case VoutType::kDsi:
+    case VoutType::kDsi: {
       args->display_id = display::ToBanjoDisplayId(display_id);
       args->edid_present = false;
-      args->panel.params.height = dsi_.height;
-      args->panel.params.width = dsi_.width;
-      args->panel.params.refresh_rate_e2 = 6000;  // Just guess that it's 60fps
+      display::DisplayTiming display_timing = display::ToDisplayTiming(dsi_.disp_setting);
+      args->panel.params.height = display_timing.horizontal_active_px;
+      args->panel.params.width = display_timing.vertical_active_lines;
+      args->panel.params.refresh_rate_e2 =
+          static_cast<uint32_t>(display_timing.vertical_field_refresh_rate_millihertz());
       args->pixel_format_list = pixel_formats.data();
       args->pixel_format_count = pixel_formats.size();
       args->cursor_info_count = 0;
       return;
+    }
     case VoutType::kHdmi:
       args->display_id = display::ToBanjoDisplayId(display_id);
       args->edid_present = true;
