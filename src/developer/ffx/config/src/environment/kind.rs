@@ -33,6 +33,11 @@ impl EnvironmentKind {
             _ => None,
         }
     }
+
+    /// Whether this is an isolated context.
+    pub fn is_isolated(&self) -> bool {
+        matches!(self, EnvironmentKind::Isolated { .. })
+    }
 }
 
 impl std::fmt::Display for EnvironmentKind {

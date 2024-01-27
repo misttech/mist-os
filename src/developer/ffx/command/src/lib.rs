@@ -171,7 +171,9 @@ pub async fn run<T: ToolSuite>(exe_kind: ExecutableKind) -> Result<ExitStatus> {
     // Write to our stamp file if it was requested
     if let Some(mut stamp) = stamp {
         write_exit_code(&res, &mut stamp);
-        stamp.sync_all().bug_context("Error syncing exit code stamp write")?;
+        if !context.is_isolated() {
+            stamp.sync_all().bug_context("Error syncing exit code stamp write")?;
+        }
     }
 
     res

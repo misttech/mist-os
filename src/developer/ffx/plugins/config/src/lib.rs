@@ -135,7 +135,9 @@ async fn exec_env_set<W: Write>(
         writeln!(writer, "\"{}\" does not exist, creating empty json file", env_file.display())?;
         let mut file = File::create(&env_file).context("opening write buffer")?;
         file.write_all(b"{}").context("writing configuration file")?;
-        file.sync_all().context("syncing configuration file to filesystem")?;
+        if !env_context.env_kind().is_isolated() {
+            file.sync_all().context("syncing configuration file to filesystem")?;
+        }
     }
 
     // Double check read/write permissions and create the file if it doesn't exist.

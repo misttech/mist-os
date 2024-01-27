@@ -282,8 +282,11 @@ impl Environment {
                             file.write_all(b"{}")
                                 .context("writing default user configuration file")?;
                             tracing::debug!("Syncing block cache with underlying storage");
-                            file.sync_all()
-                                .context("syncing default user configuration file to filesystem")?;
+                            if !self.context().env_kind().is_isolated() {
+                                file.sync_all().context(
+                                    "syncing default user configuration file to filesystem",
+                                )?;
+                            }
                             tracing::debug!("Done syncing");
                         }
                         Err(e) if e.kind() == ErrorKind::AlreadyExists => {
