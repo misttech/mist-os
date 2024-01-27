@@ -8,7 +8,7 @@ use crate::{
     task::{with_current_task, CurrentTask, Kernel, ThreadGroup, WaitQueue, Waiter},
     vfs::{
         buffers::{InputBuffer, OutputBuffer},
-        fileops_impl_nonseekable, FdEvents, FileObject, FileOps, FsNode, FsString, NamespaceNode,
+        fileops_impl_nonseekable, FileObject, FileOps, FsNode, FsString, NamespaceNode,
     },
 };
 use anyhow::{Context, Error};
@@ -42,6 +42,7 @@ use starnix_uapi::{
     open_flags::OpenFlags,
     pid_t, uapi,
     user_address::{UserAddress, UserCString, UserRef},
+    vfs::FdEvents,
     PATH_MAX,
 };
 use std::{

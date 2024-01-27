@@ -12,7 +12,7 @@ use crate::{
             SocketFile, SocketMessageFlags, SocketPeer, SocketProtocol, SocketShutdownFlags,
             SocketType, UnixSocket, SA_FAMILY_SIZE,
         },
-        FdEvents, FdFlags, FdNumber, FileHandle, FsString, LookupContext,
+        FdFlags, FdNumber, FileHandle, FsString, LookupContext,
     },
 };
 use fuchsia_zircon as zx;
@@ -29,6 +29,7 @@ use starnix_uapi::{
     timespec,
     user_address::{UserAddress, UserRef},
     user_buffer::UserBuffer,
+    vfs::FdEvents,
     MSG_CTRUNC, MSG_DONTWAIT, MSG_TRUNC, MSG_WAITFORONE, SHUT_RD, SHUT_RDWR, SHUT_WR, SOCK_CLOEXEC,
     SOCK_NONBLOCK, UIO_MAXIOV,
 };

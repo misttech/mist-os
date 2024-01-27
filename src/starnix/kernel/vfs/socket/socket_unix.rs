@@ -16,7 +16,7 @@ use crate::{
             SocketOps, SocketPeer, SocketProtocol, SocketShutdownFlags, SocketType,
             DEFAULT_LISTEN_BACKLOG,
         },
-        FdEvents, FdNumber, FileHandle, FileObject, FsNodeHandle, FsStr, LookupContext,
+        FdNumber, FileHandle, FileObject, FsNodeHandle, FsStr, LookupContext,
     },
 };
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
@@ -28,6 +28,7 @@ use starnix_uapi::{
     socklen_t, uapi, ucred, uid_t,
     user_address::{UserAddress, UserRef},
     user_buffer::UserBuffer,
+    vfs::FdEvents,
     FIONREAD, SOL_SOCKET, SO_ACCEPTCONN, SO_BROADCAST, SO_ERROR, SO_KEEPALIVE, SO_LINGER,
     SO_NO_CHECK, SO_PASSCRED, SO_PEERCRED, SO_PEERSEC, SO_RCVBUF, SO_REUSEADDR, SO_REUSEPORT,
     SO_SNDBUF,

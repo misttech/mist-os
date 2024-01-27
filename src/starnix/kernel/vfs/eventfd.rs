@@ -8,11 +8,11 @@ use crate::{
     task::{CurrentTask, EventHandler, WaitCanceler, WaitQueue, Waiter},
     vfs::{
         buffers::{InputBuffer, InputBufferExt as _, OutputBuffer},
-        fileops_impl_nonseekable, Anon, FdEvents, FileHandle, FileObject, FileOps,
+        fileops_impl_nonseekable, Anon, FileHandle, FileObject, FileOps,
     },
 };
 use starnix_sync::{FileOpsRead, FileOpsWrite, Locked};
-use starnix_uapi::{error, errors::Errno, open_flags::OpenFlags};
+use starnix_uapi::{error, errors::Errno, open_flags::OpenFlags, vfs::FdEvents};
 
 const DATA_SIZE: usize = 8;
 

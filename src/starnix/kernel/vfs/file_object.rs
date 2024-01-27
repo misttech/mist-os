@@ -14,9 +14,9 @@ use crate::{
         fsverity::{
             FsVerityState, {self},
         },
-        DirentSink, FallocMode, FdEvents, FdTableId, FileReleaser, FileSystemHandle,
-        FileWriteGuard, FileWriteGuardMode, FileWriteGuardRef, FsNodeHandle, NamespaceNode,
-        RecordLockCommand, RecordLockOwner,
+        DirentSink, FallocMode, FdTableId, FileReleaser, FileSystemHandle, FileWriteGuard,
+        FileWriteGuardMode, FileWriteGuardRef, FsNodeHandle, NamespaceNode, RecordLockCommand,
+        RecordLockOwner,
     },
 };
 use fidl::HandleBased;
@@ -41,6 +41,7 @@ use starnix_uapi::{
     seal_flags::SealFlags,
     uapi,
     user_address::UserAddress,
+    vfs::FdEvents,
     FIONBIO, FIONREAD, FS_IOC_ENABLE_VERITY, FS_IOC_FSGETXATTR, FS_IOC_FSSETXATTR, FS_IOC_GETFLAGS,
     FS_IOC_MEASURE_VERITY, FS_IOC_READ_VERITY_METADATA, FS_IOC_SETFLAGS, FS_VERITY_FL, SEEK_CUR,
     SEEK_DATA, SEEK_END, SEEK_HOLE, SEEK_SET, TCGETS,

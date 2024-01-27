@@ -14,9 +14,9 @@ use crate::{
     vfs::{
         buffers::{InputBuffer, OutputBuffer},
         fileops_impl_nonseekable, fs_node_impl_dir_readonly, CacheMode, DirEntryHandle,
-        DirectoryEntryType, FdEvents, FileHandle, FileObject, FileOps, FileSystem,
-        FileSystemHandle, FileSystemOps, FileSystemOptions, FsNode, FsNodeHandle, FsNodeInfo,
-        FsNodeOps, FsStr, FsString, SpecialNode, VecDirectory, VecDirectoryEntry,
+        DirectoryEntryType, FileHandle, FileObject, FileOps, FileSystem, FileSystemHandle,
+        FileSystemOps, FileSystemOptions, FsNode, FsNodeHandle, FsNodeInfo, FsNodeOps, FsStr,
+        FsString, SpecialNode, VecDirectory, VecDirectoryEntry,
     },
 };
 use starnix_logging::track_stub;
@@ -37,6 +37,7 @@ use starnix_uapi::{
     statfs, uapi,
     user_address::{UserAddress, UserRef},
     vfs::default_statfs,
+    vfs::FdEvents,
     DEVPTS_SUPER_MAGIC, FIOASYNC, FIOCLEX, FIONBIO, FIONCLEX, FIONREAD, FIOQSIZE, TCFLSH, TCGETA,
     TCGETS, TCGETX, TCSBRK, TCSBRKP, TCSETA, TCSETAF, TCSETAW, TCSETS, TCSETSF, TCSETSW, TCSETX,
     TCSETXF, TCSETXW, TCXONC, TIOCCBRK, TIOCCONS, TIOCEXCL, TIOCGETD, TIOCGICOUNT, TIOCGLCKTRMIOS,

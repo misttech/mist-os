@@ -7,13 +7,10 @@ use crate::{
         CurrentTask, EventHandler, SignalHandler, SignalHandlerInner, ThreadGroup, WaitCanceler,
         Waiter,
     },
-    vfs::{
-        fileops_impl_dataless, fileops_impl_nonseekable, Anon, FdEvents, FileHandle, FileObject,
-        FileOps,
-    },
+    vfs::{fileops_impl_dataless, fileops_impl_nonseekable, Anon, FileHandle, FileObject, FileOps},
 };
 use fuchsia_zircon::{self as zx, AsHandleRef};
-use starnix_uapi::{errors::Errno, open_flags::OpenFlags, pid_t};
+use starnix_uapi::{errors::Errno, open_flags::OpenFlags, pid_t, vfs::FdEvents};
 use std::sync::Arc;
 
 pub struct PidFdFileObject {

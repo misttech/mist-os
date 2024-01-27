@@ -19,10 +19,9 @@ use crate::{
         fs_node_impl_not_dir,
         fuse::{new_fuse_fs, new_fusectl_fs},
         socket::{SocketAddress, SocketHandle, UnixSocket},
-        DirEntry, DirEntryHandle, DynamicFile, DynamicFileBuf, DynamicFileSource, FdEvents,
-        FileHandle, FileObject, FileOps, FileSystemHandle, FileSystemOptions, FsNode, FsNodeHandle,
-        FsNodeOps, FsStr, FsString, PathBuilder, RenameFlags, SimpleFileNode, SymlinkTarget,
-        UnlinkKind,
+        DirEntry, DirEntryHandle, DynamicFile, DynamicFileBuf, DynamicFileSource, FileHandle,
+        FileObject, FileOps, FileSystemHandle, FileSystemOptions, FsNode, FsNodeHandle, FsNodeOps,
+        FsStr, FsString, PathBuilder, RenameFlags, SimpleFileNode, SymlinkTarget, UnlinkKind,
     },
 };
 use fidl_fuchsia_io as fio;
@@ -40,6 +39,7 @@ use starnix_uapi::{
     mount_flags::MountFlags,
     open_flags::OpenFlags,
     ownership::WeakRef,
+    vfs::FdEvents,
     NAME_MAX,
 };
 use std::{

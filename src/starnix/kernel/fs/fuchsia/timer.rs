@@ -6,7 +6,7 @@ use crate::{
     task::{CurrentTask, EventHandler, SignalHandler, SignalHandlerInner, WaitCanceler, Waiter},
     vfs::{
         buffers::{InputBuffer, OutputBuffer},
-        fileops_impl_nonseekable, Anon, FdEvents, FileHandle, FileObject, FileOps,
+        fileops_impl_nonseekable, Anon, FileHandle, FileObject, FileOps,
     },
 };
 use fuchsia_runtime::zx_utc_reference_get;
@@ -23,6 +23,7 @@ use starnix_uapi::{
         duration_from_timespec, itimerspec_from_deadline_interval, time_from_timespec,
         timespec_from_duration, timespec_is_zero,
     },
+    vfs::FdEvents,
     TFD_TIMER_ABSTIME,
 };
 use std::sync::Arc;

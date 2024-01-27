@@ -11,11 +11,11 @@ use crate::{
             SocketOps, SocketPeer, SocketProtocol, SocketShutdownFlags, SocketType,
             DEFAULT_LISTEN_BACKLOG,
         },
-        FdEvents, FileHandle,
+        FileHandle,
     },
 };
 use starnix_sync::{Mutex, Unlocked};
-use starnix_uapi::{errno, error, errors::Errno, open_flags::OpenFlags, ucred};
+use starnix_uapi::{errno, error, errors::Errno, open_flags::OpenFlags, ucred, vfs::FdEvents};
 
 // An implementation of AF_VSOCK.
 // See https://man7.org/linux/man-pages/man7/vsock.7.html

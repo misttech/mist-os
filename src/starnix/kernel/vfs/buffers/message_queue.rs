@@ -8,9 +8,8 @@ use super::message_types::{AncillaryData, Message, MessageData};
 use crate::vfs::{
     buffers::{InputBuffer, OutputBuffer},
     socket::SocketAddress,
-    FdEvents,
 };
-use starnix_uapi::{error, errors::Errno};
+use starnix_uapi::{error, errors::Errno, vfs::FdEvents};
 
 #[derive(Debug, Default, Clone)]
 pub struct MessageReadInfo {

@@ -7,7 +7,7 @@ use crate::{
     vfs::{
         buffers::{VecInputBuffer, VecOutputBuffer},
         socket::{resolve_unix_socket_address, syscalls::sys_socket, SocketPeer},
-        FdEvents, FileHandle, FsStr, FsString,
+        FileHandle, FsStr, FsString,
     },
 };
 use once_cell::sync::OnceCell;
@@ -20,7 +20,7 @@ use perfetto_consumer_proto::perfetto::protos::{
 use prost::Message;
 use starnix_logging::{log_error, trace_category_atrace, trace_name_perfetto_blob};
 use starnix_sync::{FileOpsRead, FileOpsWrite, LockBefore, Locked, Unlocked};
-use starnix_uapi::{errno, errors::Errno, AF_UNIX, SOCK_STREAM};
+use starnix_uapi::{errno, errors::Errno, vfs::FdEvents, AF_UNIX, SOCK_STREAM};
 use std::{
     collections::VecDeque,
     sync::{

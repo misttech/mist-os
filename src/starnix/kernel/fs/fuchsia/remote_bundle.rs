@@ -9,7 +9,7 @@ use crate::{
     vfs::{
         default_seek, emit_dotdot, fileops_impl_directory, fileops_impl_seekable,
         fs_node_impl_dir_readonly, fs_node_impl_not_dir, fs_node_impl_symlink, CacheConfig,
-        CacheMode, DirectoryEntryType, DirentSink, FdEvents, FileObject, FileOps, FileSystem,
+        CacheMode, DirectoryEntryType, DirentSink, FileObject, FileOps, FileSystem,
         FileSystemHandle, FileSystemOps, FileSystemOptions, FsNode, FsNodeHandle, FsNodeInfo,
         FsNodeOps, FsStr, FsString, InputBuffer, OutputBuffer, SeekTarget, SymlinkTarget,
         ValueOrSize, DEFAULT_BYTES_PER_BLOCK,
@@ -34,6 +34,7 @@ use starnix_uapi::{
     open_flags::OpenFlags,
     statfs,
     vfs::default_statfs,
+    vfs::FdEvents,
 };
 use std::{
     io::Read,

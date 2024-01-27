@@ -2,11 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{
-    signals::RunState,
-    task::CurrentTask,
-    vfs::{FdEvents, FdNumber},
-};
+use crate::{signals::RunState, task::CurrentTask, vfs::FdNumber};
 use fidl::AsHandleRef as _;
 use fuchsia_inspect_contrib::profile_duration;
 use fuchsia_zircon as zx;
@@ -17,6 +13,7 @@ use starnix_uapi::{
     error,
     errors::{Errno, EINTR},
     ownership::debug_assert_no_local_temp_ref,
+    vfs::FdEvents,
 };
 use std::{
     collections::{HashMap, VecDeque},
@@ -1039,10 +1036,9 @@ mod tests {
         vfs::{
             buffers::{VecInputBuffer, VecOutputBuffer},
             eventfd::{new_eventfd, EventFdType},
-            FdEvents,
         },
     };
-    use starnix_uapi::open_flags::OpenFlags;
+    use starnix_uapi::{open_flags::OpenFlags, vfs::FdEvents};
 
     const KEY: ReadyItemKey = ReadyItemKey::Usize(1234);
 

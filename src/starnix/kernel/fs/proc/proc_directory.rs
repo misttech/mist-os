@@ -14,9 +14,8 @@ use crate::{
         emit_dotdot, fileops_impl_delegate_read_and_seek, fileops_impl_directory,
         fileops_impl_seekless, fs_node_impl_dir_readonly, fs_node_impl_symlink, unbounded_seek,
         BytesFile, DirectoryEntryType, DirentSink, DynamicFile, DynamicFileBuf, DynamicFileSource,
-        FdEvents, FileObject, FileOps, FileSystemHandle, FsNode, FsNodeHandle, FsNodeInfo,
-        FsNodeOps, FsStr, FsString, SeekTarget, SimpleFileNode, StaticDirectoryBuilder,
-        StubEmptyFile, SymlinkTarget,
+        FileObject, FileOps, FileSystemHandle, FsNode, FsNodeHandle, FsNodeInfo, FsNodeOps, FsStr,
+        FsString, SeekTarget, SimpleFileNode, StaticDirectoryBuilder, StubEmptyFile, SymlinkTarget,
     },
 };
 use fuchsia_component::client::connect_to_protocol_sync;
@@ -27,7 +26,7 @@ use starnix_logging::{log_error, track_stub};
 use starnix_sync::{FileOpsRead, FileOpsWrite, Locked};
 use starnix_uapi::{
     auth::FsCred, errno, error, errors::Errno, file_mode::mode, off_t, open_flags::OpenFlags,
-    pid_t, time::duration_to_scheduler_clock,
+    pid_t, time::duration_to_scheduler_clock, vfs::FdEvents,
 };
 use std::{
     collections::BTreeMap,

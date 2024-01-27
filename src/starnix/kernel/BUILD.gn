@@ -232,7 +232,6 @@ rustc_library("starnix_core") {
     "vfs/dynamic_file.rs",
     "vfs/epoll.rs",
     "vfs/eventfd.rs",
-    "vfs/fd_events.rs",
     "vfs/fd_number.rs",
     "vfs/fd_table.rs",
     "vfs/file_object.rs",

@@ -14,10 +14,7 @@ use crate::{
     fs::devpts::{get_device_type_for_pts, DEVPTS_COUNT},
     mutable_state::{state_accessor, state_implementation},
     task::{CurrentTask, EventHandler, ProcessGroup, Session, WaitCanceler, WaitQueue, Waiter},
-    vfs::{
-        buffers::{InputBuffer, InputBufferExt as _, OutputBuffer},
-        FdEvents,
-    },
+    vfs::buffers::{InputBuffer, InputBufferExt as _, OutputBuffer},
 };
 use starnix_logging::track_stub;
 use starnix_sync::{LockBefore, Locked, ProcessGroupState};
@@ -29,9 +26,11 @@ use starnix_uapi::{
     errors::Errno,
     pid_t,
     signals::{Signal, SIGINT, SIGQUIT, SIGSTOP},
-    tcflag_t, uapi, ECHO, ECHOCTL, ECHOE, ECHOK, ECHOKE, ECHONL, ECHOPRT, ICANON, ICRNL, IEXTEN,
-    IGNCR, INLCR, ISIG, IUTF8, OCRNL, ONLCR, ONLRET, ONOCR, OPOST, TABDLY, VEOF, VEOL, VEOL2,
-    VERASE, VINTR, VQUIT, VSUSP, XTABS,
+    tcflag_t, uapi,
+    vfs::FdEvents,
+    ECHO, ECHOCTL, ECHOE, ECHOK, ECHOKE, ECHONL, ECHOPRT, ICANON, ICRNL, IEXTEN, IGNCR, INLCR,
+    ISIG, IUTF8, OCRNL, ONLCR, ONLRET, ONOCR, OPOST, TABDLY, VEOF, VEOL, VEOL2, VERASE, VINTR,
+    VQUIT, VSUSP, XTABS,
 };
 
 // CANON_MAX_BYTES is the number of bytes that fit into a single line of

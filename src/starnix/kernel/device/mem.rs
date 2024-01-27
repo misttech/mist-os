@@ -12,8 +12,8 @@ use crate::{
     task::{CurrentTask, EventHandler, LogSubscription, Syslog, WaitCanceler, Waiter},
     vfs::{
         buffers::{InputBuffer, InputBufferExt as _, OutputBuffer},
-        fileops_impl_seekless, Anon, FdEvents, FileHandle, FileObject, FileOps, FileWriteGuardRef,
-        FsNode, FsNodeInfo, NamespaceNode, SeekTarget,
+        fileops_impl_seekless, Anon, FileHandle, FileObject, FileOps, FileWriteGuardRef, FsNode,
+        FsNodeInfo, NamespaceNode, SeekTarget,
     },
 };
 use fuchsia_zircon::{
@@ -23,7 +23,7 @@ use starnix_logging::{log_info, track_stub};
 use starnix_sync::{FileOpsIoctl, FileOpsRead, FileOpsWrite, Locked, Mutex};
 use starnix_uapi::{
     auth::FsCred, device_type::DeviceType, error, errors::Errno, file_mode::FileMode,
-    open_flags::OpenFlags, user_address::UserAddress,
+    open_flags::OpenFlags, user_address::UserAddress, vfs::FdEvents,
 };
 use std::mem::MaybeUninit;
 

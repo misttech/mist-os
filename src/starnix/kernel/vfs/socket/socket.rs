@@ -17,7 +17,7 @@ use crate::{
         },
         default_ioctl,
         socket::SocketShutdownFlags,
-        Anon, FdEvents, FileHandle, FileObject, FsNodeInfo,
+        Anon, FileHandle, FileObject, FsNodeInfo,
     },
 };
 use fuchsia_zircon as zx;
@@ -44,6 +44,7 @@ use starnix_uapi::{
     union::struct_with_union_into_bytes,
     user_address::{UserAddress, UserRef},
     user_buffer::UserBuffer,
+    vfs::FdEvents,
     AF_INET, SIOCGIFADDR, SIOCGIFFLAGS, SIOCGIFHWADDR, SIOCGIFINDEX, SIOCGIFMTU, SIOCSIFADDR,
     SIOCSIFFLAGS, SOL_SOCKET, SO_DOMAIN, SO_MARK, SO_PROTOCOL, SO_RCVTIMEO, SO_SNDTIMEO, SO_TYPE,
 };

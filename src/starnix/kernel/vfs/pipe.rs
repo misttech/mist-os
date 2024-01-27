@@ -11,9 +11,9 @@ use crate::{
             Buffer, InputBuffer, InputBufferCallback, MessageQueue, OutputBuffer,
             OutputBufferCallback, PeekBufferSegmentsCallback,
         },
-        default_fcntl, default_ioctl, fileops_impl_nonseekable, CacheMode, FdEvents, FileHandle,
-        FileObject, FileOps, FileSystem, FileSystemHandle, FileSystemOps, FileSystemOptions,
-        FsNodeInfo, FsStr, MountInfo, SpecialNode,
+        default_fcntl, default_ioctl, fileops_impl_nonseekable, CacheMode, FileHandle, FileObject,
+        FileOps, FileSystem, FileSystemHandle, FileSystemOps, FileSystemOptions, FsNodeInfo, FsStr,
+        MountInfo, SpecialNode,
     },
 };
 use starnix_sync::{
@@ -31,6 +31,7 @@ use starnix_uapi::{
     user_address::{UserAddress, UserRef},
     user_buffer::UserBuffer,
     vfs::default_statfs,
+    vfs::FdEvents,
     FIONREAD, F_GETPIPE_SZ, F_SETPIPE_SZ, PIPEFS_MAGIC,
 };
 use std::{cmp::Ordering, convert::TryInto, sync::Arc};

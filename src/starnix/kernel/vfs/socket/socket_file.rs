@@ -13,12 +13,12 @@ use crate::{
             Socket, SocketAddress, SocketDomain, SocketHandle, SocketMessageFlags, SocketProtocol,
             SocketType,
         },
-        FdEvents, FileHandle, FileObject, FileOps,
+        FileHandle, FileObject, FileOps,
     },
 };
 use starnix_sync::{FileOpsIoctl, FileOpsRead, FileOpsWrite, Locked};
 use starnix_syscalls::{SyscallArg, SyscallResult};
-use starnix_uapi::{error, errors::Errno, open_flags::OpenFlags};
+use starnix_uapi::{error, errors::Errno, open_flags::OpenFlags, vfs::FdEvents};
 
 pub fn new_socket_file(
     current_task: &CurrentTask,

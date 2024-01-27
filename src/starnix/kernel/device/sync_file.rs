@@ -11,7 +11,7 @@ use crate::{
     },
     vfs::{
         buffers::{InputBuffer, OutputBuffer},
-        fileops_impl_nonseekable, Anon, FdEvents, FdFlags, FdNumber, FileObject, FileOps,
+        fileops_impl_nonseekable, Anon, FdFlags, FdNumber, FileObject, FileOps,
     },
 };
 use fidl::HandleBased;
@@ -27,6 +27,7 @@ use starnix_uapi::{
     open_flags::OpenFlags,
     sync_fence_info, sync_file_info, sync_merge_data,
     user_address::{UserAddress, UserRef},
+    vfs::FdEvents,
     SYNC_IOC_MAGIC,
 };
 use std::{collections::HashSet, sync::Arc};

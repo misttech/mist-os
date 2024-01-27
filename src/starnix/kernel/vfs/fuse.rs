@@ -9,7 +9,7 @@ use crate::{
         buffers::{Buffer, InputBuffer, InputBufferExt as _, OutputBuffer, OutputBufferCallback},
         default_eof_offset, default_fcntl, default_ioctl, default_seek, fileops_impl_nonseekable,
         fs_args, fs_node_impl_dir_readonly, CacheConfig, CacheMode, DirEntry, DirectoryEntryType,
-        DirentSink, DynamicFile, DynamicFileBuf, DynamicFileSource, FallocMode, FdEvents, FdNumber,
+        DirentSink, DynamicFile, DynamicFileBuf, DynamicFileSource, FallocMode, FdNumber,
         FileObject, FileOps, FileSystem, FileSystemHandle, FileSystemOps, FileSystemOptions,
         FsNode, FsNodeHandle, FsNodeInfo, FsNodeOps, FsStr, FsString, PeekBufferSegmentsCallback,
         SeekTarget, SimpleFileNode, StaticDirectoryBuilder, SymlinkTarget, ValueOrSize,
@@ -36,6 +36,7 @@ use starnix_uapi::{
     time::time_from_timespec,
     uapi,
     vfs::default_statfs,
+    vfs::FdEvents,
     FUSE_SUPER_MAGIC,
 };
 use std::{

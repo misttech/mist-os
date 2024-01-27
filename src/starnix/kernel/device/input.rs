@@ -13,7 +13,7 @@ use crate::{
     task::{CurrentTask, EventHandler, WaitCanceler, WaitQueue, Waiter},
     vfs::{
         buffers::{InputBuffer, OutputBuffer},
-        fileops_impl_nonseekable, FdEvents, FileObject, FileOps, FsNode, FsString,
+        fileops_impl_nonseekable, FileObject, FileOps, FsNode, FsString,
     },
 };
 use starnix_logging::{log_info, log_warn, track_stub};
@@ -27,6 +27,7 @@ use starnix_uapi::{
     time::timeval_from_time,
     timeval, uapi,
     user_address::{UserAddress, UserRef},
+    vfs::FdEvents,
     ABS_CNT, ABS_X, ABS_Y, BTN_MISC, BTN_TOOL_FINGER, BTN_TOUCH, BUS_VIRTUAL, FF_CNT,
     INPUT_PROP_CNT, INPUT_PROP_DIRECT, KEY_CNT, KEY_POWER, LED_CNT, MSC_CNT, REL_CNT, SW_CNT,
 };

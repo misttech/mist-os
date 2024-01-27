@@ -11,7 +11,7 @@ use crate::{
             Socket, SocketAddress, SocketDomain, SocketHandle, SocketMessageFlags, SocketOps,
             SocketPeer, SocketProtocol, SocketShutdownFlags, SocketType,
         },
-        AncillaryData, FdEvents, InputBuffer, MessageReadInfo, OutputBuffer,
+        AncillaryData, InputBuffer, MessageReadInfo, OutputBuffer,
     },
 };
 use starnix_logging::track_stub;
@@ -20,6 +20,7 @@ use starnix_uapi::{
     errors::{Errno, ENOTSUP},
     from_status_like_fdio, uapi, ucred,
     user_buffer::UserBuffer,
+    vfs::FdEvents,
     MSG_DONTWAIT, MSG_WAITALL, SOL_SOCKET, SO_ATTACH_FILTER,
 };
 

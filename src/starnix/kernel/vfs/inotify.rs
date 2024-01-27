@@ -8,8 +8,8 @@ use crate::{
     vfs::{
         buffers::{InputBuffer, OutputBuffer},
         default_ioctl, fileops_impl_nonseekable, fs_args, inotify, Anon, BytesFile, BytesFileOps,
-        DirEntryHandle, FdEvents, FileHandle, FileObject, FileOps, FileReleaser, FsNodeOps, FsStr,
-        FsString, WdNumber,
+        DirEntryHandle, FileHandle, FileObject, FileOps, FileReleaser, FsNodeOps, FsStr, FsString,
+        WdNumber,
     },
 };
 use starnix_sync::{FileOpsIoctl, FileOpsRead, FileOpsWrite, Locked, Mutex};
@@ -24,6 +24,7 @@ use starnix_uapi::{
     inotify_mask::InotifyMask,
     open_flags::OpenFlags,
     user_address::{UserAddress, UserRef},
+    vfs::FdEvents,
     FIONREAD,
 };
 use std::{

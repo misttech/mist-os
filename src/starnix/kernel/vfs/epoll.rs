@@ -9,7 +9,7 @@ use crate::{
     },
     vfs::{
         buffers::{InputBuffer, OutputBuffer},
-        fileops_impl_nonseekable, Anon, FdEvents, FileHandle, FileObject, FileOps, WeakFileHandle,
+        fileops_impl_nonseekable, Anon, FileHandle, FileObject, FileOps, WeakFileHandle,
     },
 };
 use fuchsia_zircon as zx;
@@ -20,7 +20,7 @@ use starnix_uapi::{
     epoll_event, errno, error,
     errors::{Errno, EBADF, EINTR, ETIMEDOUT},
     open_flags::OpenFlags,
-    EPOLLET, EPOLLONESHOT,
+    vfs::FdEvents,
 };
 use std::{
     collections::{hash_map::Entry, HashMap, VecDeque},
@@ -408,10 +408,10 @@ impl EpollFileObject {
 
                 // Files marked with `EPOLLONESHOT` should only notify
                 // once and need to be rearmed manually with epoll_ctl_mod().
-                if wait.events.bits() & EPOLLONESHOT != 0 {
+                if wait.events.contains(FdEvents::EPOLLONESHOT) {
                     continue;
                 }
-                if wait.events.bits() & EPOLLET != 0 {
+                if wait.events.contains(FdEvents::EPOLLET) {
                     // The file can be closed while registered for epoll which is not an error.
                     // We do not expect other errors from waiting.
                     match self.wait_on_file_edge_triggered(current_task, pending_event.key, wait) {
@@ -498,13 +498,13 @@ mod tests {
             eventfd::{new_eventfd, EventFdType},
             pipe::new_pipe,
             socket::{SocketDomain, SocketType, UnixSocket},
-            FdEvents,
         },
     };
     use fuchsia_zircon::{
         HandleBased, {self as zx},
     };
     use starnix_lifecycle::AtomicUsizeCounter;
+    use starnix_uapi::vfs::FdEvents;
     use syncio::Zxio;
 
     #[::fuchsia::test]

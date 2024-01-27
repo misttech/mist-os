@@ -7,13 +7,13 @@ use crate::{
     task::{CurrentTask, EventHandler, WaitCanceler, Waiter},
     vfs::{
         buffers::{InputBuffer, OutputBuffer},
-        fileops_impl_nonseekable, Anon, FdEvents, FileHandle, FileObject, FileOps,
+        fileops_impl_nonseekable, Anon, FileHandle, FileObject, FileOps,
     },
 };
 use starnix_sync::{FileOpsRead, FileOpsWrite, Locked, Mutex};
 use starnix_uapi::{
     errno, error, errors::Errno, open_flags::OpenFlags, signalfd_siginfo, signals::SigSet,
-    SFD_NONBLOCK,
+    vfs::FdEvents, SFD_NONBLOCK,
 };
 use std::convert::TryInto;
 use zerocopy::AsBytes;

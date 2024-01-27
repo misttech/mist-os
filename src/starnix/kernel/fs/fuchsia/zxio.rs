@@ -2,13 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{
-    task::{
-        EventHandler, SignalHandler, SignalHandlerInner, WaitCanceler, Waiter, ZxioSignalHandler,
-    },
-    vfs::FdEvents,
+use crate::task::{
+    EventHandler, SignalHandler, SignalHandlerInner, WaitCanceler, Waiter, ZxioSignalHandler,
 };
-use starnix_uapi::{error, errors::Errno};
+use starnix_uapi::{error, errors::Errno, vfs::FdEvents};
 
 use fuchsia_zircon as zx;
 use std::sync::Arc;

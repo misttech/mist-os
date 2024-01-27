@@ -4,7 +4,7 @@
 
 use crate::{
     task::{CurrentTask, EventHandler, WaitCallback, WaitCanceler, WaitQueue, Waiter},
-    vfs::{FdEvents, OutputBuffer},
+    vfs::OutputBuffer,
 };
 use diagnostics_data::{Data, Logs, Severity};
 use fidl_fuchsia_diagnostics as fdiagnostics;
@@ -16,6 +16,7 @@ use starnix_sync::Mutex;
 use starnix_uapi::{
     auth::{CAP_SYSLOG, CAP_SYS_ADMIN},
     errors::{errno, error, Errno, EAGAIN},
+    vfs::FdEvents,
 };
 use std::{
     cmp,
