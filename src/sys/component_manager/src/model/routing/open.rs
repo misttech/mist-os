@@ -6,7 +6,10 @@ use {
     crate::{
         capability::{CapabilityProvider, CapabilitySource},
         model::{
-            component::{ComponentInstance, ExtendedInstance, StartReason, WeakComponentInstance},
+            component::{
+                ComponentInstance, ExtendedInstance, IncomingCapabilities, StartReason,
+                WeakComponentInstance,
+            },
             error::{ModelError, OpenError},
             routing::{
                 providers::{
@@ -236,8 +239,7 @@ impl<'a> OpenRequest<'a> {
                             name: capability.source_name().clone(),
                         },
                         None,
-                        vec![],
-                        vec![],
+                        IncomingCapabilities::default(),
                     )
                     .await?;
 

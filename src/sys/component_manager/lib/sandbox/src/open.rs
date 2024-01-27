@@ -4,7 +4,7 @@
 use anyhow::anyhow;
 use clonable_error::ClonableError;
 use core::fmt;
-use fidl::endpoints::{create_endpoints, ClientEnd, ServerEnd};
+use fidl::endpoints::{create_request_stream, ClientEnd, ServerEnd};
 use fidl_fuchsia_component_sandbox as fsandbox;
 use fidl_fuchsia_io as fio;
 use fuchsia_async as fasync;
@@ -167,6 +167,35 @@ impl Open {
             self.entry_type,
         )
     }
+
+    /// Serves the `fuchsia.io.Openable` protocol for this Open and moves it into the registry.
+    pub fn serve_and_register(self, mut stream: fio::OpenableRequestStream, koid: zx::Koid) {
+        let scope = ExecutionScope::new();
+        // If this future is dropped, stop serving the connection.
+        let guard = scopeguard::guard(scope.clone(), move |scope| {
+            scope.shutdown();
+        });
+
+        let open = self.clone();
+        let fut = {
+            async move {
+                let _guard = guard;
+                while let Ok(Some(request)) = stream.try_next().await {
+                    match request {
+                        fio::OpenableRequest::Open { flags, mode: _, path, object, .. } => {
+                            open.open(scope.clone(), flags, path, object.into_channel())
+                        }
+                    }
+                }
+                scope.wait().await;
+            }
+            .boxed()
+        };
+
+        // Move this capability into the registry.
+        let task = fasync::Task::spawn(fut);
+        registry::insert_with_task(Box::new(self), koid, task);
+    }
 }
 
 impl fmt::Debug for Open {
@@ -255,35 +284,8 @@ impl TryFrom<OneShotHandle> for Open {
 impl From<Open> for ClientEnd<fio::OpenableMarker> {
     /// Serves the `fuchsia.io.Openable` protocol for this Open and moves it into the registry.
     fn from(open: Open) -> Self {
-        let (client_end, server_end) = create_endpoints::<fio::OpenableMarker>();
-        let mut request_stream = server_end.into_stream().unwrap();
-
-        let scope = ExecutionScope::new();
-        // If this future is dropped, stop serving the connection.
-        let guard = scopeguard::guard(scope.clone(), move |scope| {
-            scope.shutdown();
-        });
-
-        let fut = {
-            let open = open.clone();
-            async move {
-                let _guard = guard;
-                while let Ok(Some(request)) = request_stream.try_next().await {
-                    match request {
-                        fio::OpenableRequest::Open { flags, mode: _mode, path, object, .. } => {
-                            open.open(scope.clone(), flags, path, object.into_channel())
-                        }
-                    }
-                }
-                scope.wait().await;
-            }
-            .boxed()
-        };
-
-        // Move this capability into the registry.
-        let task = fasync::Task::spawn(fut);
-        registry::insert_with_task(Box::new(open), client_end.get_koid().unwrap(), task);
-
+        let (client_end, openable_stream) = create_request_stream::<fio::OpenableMarker>().unwrap();
+        open.serve_and_register(openable_stream, client_end.get_koid().unwrap());
         client_end
     }
 }

@@ -4,7 +4,9 @@
 
 use {
     cm_rust::FidlIntoNative,
-    fidl::endpoints::{create_endpoints, create_proxy, ProtocolMarker, Proxy},
+    fidl::endpoints::{
+        create_endpoints, create_proxy, create_request_stream, ProtocolMarker, Proxy, ServerEnd,
+    },
     fidl_fidl_examples_routing_echo as fecho, fidl_fuchsia_component as fcomponent,
     fidl_fuchsia_component_decl as fcdecl, fidl_fuchsia_component_sandbox as fsandbox,
     fidl_fuchsia_io as fio, fidl_fuchsia_process as fprocess, fuchsia_async as fasync,
@@ -139,12 +141,13 @@ async fn launch_child_in_a_collection_in_nested_component_manager(
     builder.replace_realm_decl(realm_decl).await.unwrap();
     builder.build_in_nested_component_manager("#meta/component_manager.cm").await.unwrap()
 }
+
 /// Represents a local child that was created in a nested realm builder.
 struct SpawnedChild {
     /// The task which executes the local child.
     _local_child_task: fasync::Task<()>,
     /// The nested component manager instance that is hosting the local child.
-    _cm_realm_instance: RealmInstance,
+    cm_realm_instance: RealmInstance,
     /// When the local child is started it will send its handles over this mpsc.
     handles_receiver: mpsc::UnboundedReceiver<LocalComponentHandles>,
     /// The `fuchsia.component.Controller` channel that was created for the child.
@@ -183,13 +186,27 @@ async fn spawn_local_child() -> SpawnedChild {
         )
         .await
         .unwrap();
-    let child_decl = builder.get_component_decl(&child_ref).await.unwrap();
+
+    // Add a use for the `fidl.examples.routing.echo.Echo` protocol.
+    // It is not statically routed from any other component. `StartChildArgs.dict`
+    // must contain an Open capability under the same name for the component
+    // to successfully connect to the protocol.
+    let mut child_decl = builder.get_component_decl(&child_ref).await.unwrap();
+    child_decl.uses.push(cm_rust::UseDecl::Protocol(cm_rust::UseProtocolDecl {
+        source: cm_rust::UseSource::Parent,
+        source_name: "fidl.examples.routing.echo.Echo".parse().unwrap(),
+        source_dictionary: None,
+        target_path: "/svc/fidl.examples.routing.echo.Echo".parse().unwrap(),
+        dependency_type: cm_rust::DependencyType::Strong,
+        availability: cm_rust::Availability::Required,
+    }));
     builder.replace_realm_decl(child_decl).await.unwrap();
+
     let (url, local_child_task) = builder.initialize().await.unwrap();
     let (controller_proxy, cm_realm_instance) = spawn_child_with_url(&url).await;
     SpawnedChild {
         _local_child_task: local_child_task,
-        _cm_realm_instance: cm_realm_instance,
+        cm_realm_instance,
         handles_receiver,
         controller_proxy,
         component_status,
@@ -310,6 +327,103 @@ pub async fn start_with_numbered_handles() {
         .take_numbered_handle(handle_id)
         .expect("child was not given the numbered handle");
     assert_eq!(s1.basic_info().unwrap().related_koid, s2_from_runner.get_koid().unwrap());
+}
+
+#[fuchsia::test]
+pub async fn start_with_dict() {
+    let mut spawned_child = spawn_local_child().await;
+
+    // Connect to `fuchsia.component.sandbox.Factory` exposed by the nested component manager.
+    let factory = spawned_child
+        .cm_realm_instance
+        .root
+        .connect_to_protocol_at_exposed_dir::<fsandbox::FactoryMarker>()
+        .expect("failed to connect to fuchsia.component.sandbox.Factory");
+
+    // Create a Dictionary that will be passed to StartChild, containing an Open capability for the Echo protocol.
+    let (dictionary_client, dictionary_server) = create_endpoints::<fsandbox::DictionaryMarker>();
+
+    // StartChild dictionary entries must be Open capabilities.
+    // TODO(https://fxbug.dev/319542502): Consider using the external Router type, once it exists
+    let (echo_openable_client, mut echo_openable_stream) =
+        create_request_stream::<fio::OpenableMarker>().unwrap();
+
+    // Serve the `fidl.examples.routing.echo.Echo` protocol on the Openable.
+    let task_group = Mutex::new(fasync::TaskGroup::new());
+    let echo_service =
+        vfs::service::endpoint(move |_scope: ExecutionScope, channel: fuchsia_async::Channel| {
+            let mut task_group = task_group.lock().unwrap();
+            task_group.spawn(async move {
+                let server_end = ServerEnd::<fecho::EchoMarker>::new(channel.into());
+                let mut stream = server_end.into_stream().unwrap();
+                while let Some(fecho::EchoRequest::EchoString { value, responder }) =
+                    stream.try_next().await.unwrap()
+                {
+                    responder.send(value.as_ref().map(|s| &**s)).unwrap();
+                }
+            });
+        });
+
+    let _task = fasync::Task::spawn(async move {
+        while let Some(fio::OpenableRequest::Open {
+            flags,
+            mode: _,
+            path: _,
+            object,
+            control_handle: _,
+        }) = echo_openable_stream.try_next().await.unwrap()
+        {
+            echo_service.clone().open(
+                ExecutionScope::new(),
+                flags,
+                vfs::path::Path::dot(),
+                object.into(),
+            );
+        }
+    });
+
+    // Convert the Openable to an Open capability, also represented as an Openable.
+    let (echo_open_cap_client, echo_open_cap_server) = create_endpoints::<fio::OpenableMarker>();
+    let () = factory
+        .create_open(echo_openable_client, echo_open_cap_server)
+        .await
+        .expect("failed to call CreateOpen");
+
+    let items = vec![fsandbox::DictionaryItem {
+        key: "fidl.examples.routing.echo.Echo".to_string(),
+        value: fsandbox::Capability::Open(echo_open_cap_client),
+    }];
+
+    let () = factory
+        .create_dictionary(items, dictionary_server)
+        .await
+        .expect("failed to call CreateDictionary")
+        .expect("failed to create Dictionary");
+
+    let (_execution_controller_proxy, execution_controller_server_end) =
+        create_proxy::<fcomponent::ExecutionControllerMarker>().unwrap();
+    spawned_child
+        .controller_proxy
+        .start(
+            fcomponent::StartChildArgs {
+                dictionary: Some(dictionary_client),
+                ..Default::default()
+            },
+            execution_controller_server_end,
+        )
+        .await
+        .unwrap()
+        .unwrap();
+
+    let local_component_handles = spawned_child.handles_receiver.next().await.unwrap();
+
+    let echo_proxy = local_component_handles
+        .connect_to_protocol::<fecho::EchoMarker>()
+        .expect("failed to connect to Echo");
+
+    let response = echo_proxy.echo_string(Some("hello")).await.expect("failed to call EchoString");
+    assert!(response.is_some());
+    assert_eq!(response.unwrap(), "hello".to_string());
 }
 
 #[fuchsia::test]

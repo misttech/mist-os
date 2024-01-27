@@ -181,4 +181,14 @@ open protocol Factory {
         items vector<DictionaryItem>:MAX;
         server_end server_end:Dictionary;
     }) -> () error DictionaryError;
+
+    /// Creates an [`Open`] capability that issues Open calls on
+    /// an another [`Openable`].
+    ///
+    /// This registers the `Openable` as a sandbox capability,
+    /// represented by the client end peer of `server_end`.
+    strict CreateOpen(resource struct {
+        client_end client_end:fuchsia.io.Openable;
+        server_end server_end:fuchsia.io.Openable;
+    }) -> ();
 };

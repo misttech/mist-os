@@ -6,6 +6,7 @@ library fuchsia.component;
 using fuchsia.io;
 using fuchsia.process;
 using fuchsia.component.decl;
+using fuchsia.component.sandbox;
 
 /// The maximum number of handles that can be passed to a created component.
 const MAX_HANDLE_COUNT uint32 = 128;
@@ -163,6 +164,10 @@ type CreateChildArgs = resource table {
     /// `ComponentDecl.allowed_offers = STATIC_AND_DYNAMIC`.
     @available(added=HEAD)
     4: config_capabilities vector<fuchsia.component.decl.Configuration>:MAX_CONFIG_COUNT;
+
+    /// A dictionary that contains extra capabilities for the component instance.
+    @available(added=HEAD)
+    5: dictionary client_end:fuchsia.component.sandbox.Dictionary;
 };
 
 /// A protocol to iterate over the list of children in a realm.

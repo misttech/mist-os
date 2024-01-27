@@ -12,11 +12,11 @@ use {
     cm_types::Name,
     cm_util::TaskGroup,
     fidl::endpoints::{ClientEnd, DiscoverableProtocolMarker, ServerEnd},
-    fidl_fuchsia_component_sandbox as fsandbox, fuchsia_zircon as zx,
+    fidl_fuchsia_component_sandbox as fsandbox, fidl_fuchsia_io as fio, fuchsia_zircon as zx,
     fuchsia_zircon::AsHandleRef,
     futures::prelude::*,
     lazy_static::lazy_static,
-    sandbox::{AnyCapability, Dict, Receiver},
+    sandbox::{AnyCapability, Dict, Open, Receiver},
     std::sync::Arc,
     tracing::warn,
 };
@@ -49,7 +49,7 @@ impl InternalCapabilityProvider for FactoryCapabilityProvider {
     }
 }
 
-struct FactoryCapabilityHost {
+pub struct FactoryCapabilityHost {
     tasks: TaskGroup,
 }
 
@@ -83,8 +83,12 @@ impl FactoryCapabilityHost {
                 self.create_connector(sender, receiver);
             }
             fsandbox::FactoryRequest::CreateDictionary { items, server_end, responder } => {
-                let res = self.create_dict(items, server_end);
+                let res = self.create_dictionary(items, server_end);
                 responder.send(res)?;
+            }
+            fsandbox::FactoryRequest::CreateOpen { client_end, server_end, responder } => {
+                self.create_open(client_end, server_end);
+                responder.send()?;
             }
             fsandbox::FactoryRequest::_UnknownMethod { ordinal, .. } => {
                 warn!(%ordinal, "fuchsia.component.sandbox/Factory received unknown method");
@@ -106,26 +110,33 @@ impl FactoryCapabilityHost {
         sender.serve_and_register(sender_server.into_stream().unwrap(), sender_client_end_koid);
     }
 
-    fn create_dict(
+    fn create_open(
+        &self,
+        openable_client: ClientEnd<fio::OpenableMarker>,
+        openable_server: ServerEnd<fio::OpenableMarker>,
+    ) {
+        let open: Open = openable_client.into();
+        let client_end_koid = openable_server.basic_info().unwrap().related_koid;
+        open.serve_and_register(openable_server.into_stream().unwrap(), client_end_koid);
+    }
+
+    fn create_dictionary(
         &self,
         items: Vec<fsandbox::DictionaryItem>,
         server_end: ServerEnd<fsandbox::DictionaryMarker>,
     ) -> Result<(), fsandbox::DictionaryError> {
-        let mut dict = Dict::new();
+        let dict = Dict::new();
         let mut entries = dict.lock_entries();
         for item in items {
-            let cap = Box::new(
-                AnyCapability::try_from(item.value)
-                    .map_err(|_| fsandbox::DictionaryError::BadCapability)?,
-            );
+            let cap = AnyCapability::try_from(item.value)
+                .map_err(|_| fsandbox::DictionaryError::BadCapability)?;
             if entries.insert(item.key, cap).is_some() {
                 return Err(fsandbox::DictionaryError::AlreadyExists);
             }
         }
         drop(entries);
-        self.tasks.spawn(async move {
-            let _ = dict.serve_dict(server_end.into_stream().unwrap()).await;
-        });
+        let client_end_koid = server_end.basic_info().unwrap().related_koid;
+        dict.serve_and_register(server_end.into_stream().unwrap(), client_end_koid);
         Ok(())
     }
 }
@@ -135,8 +146,8 @@ pub struct FactoryFrameworkCapability {
 }
 
 impl FactoryFrameworkCapability {
-    pub fn new() -> Self {
-        Self { host: Arc::new(FactoryCapabilityHost::new()) }
+    pub fn new(host: Arc<FactoryCapabilityHost>) -> Self {
+        Self { host }
     }
 }
 

@@ -153,7 +153,7 @@ pub mod tests {
             actions::{
                 ActionSet, ResolveAction, ShutdownAction, ShutdownType, StartAction, StopAction,
             },
-            component::StartReason,
+            component::{IncomingCapabilities, StartReason},
             error::{ActionError, ResolveActionError},
             testing::test_helpers::{component_decl_with_test_runner, ActionsTest},
         },
@@ -195,7 +195,7 @@ pub mod tests {
         // Start it again then shut it down.
         ActionSet::register(
             component_a.clone(),
-            StartAction::new(StartReason::Debug, None, vec![], vec![]),
+            StartAction::new(StartReason::Debug, None, IncomingCapabilities::default()),
         )
         .await
         .unwrap();

@@ -234,6 +234,12 @@ pub enum AddDynamicChildError {
         #[from]
         err: ActionError,
     },
+    #[error("invalid dictionary")]
+    InvalidDictionary,
+    #[error(
+        "dictionary entry for capability '{capability_name}' conflicts with existing static route"
+    )]
+    StaticRouteConflict { capability_name: String },
     #[error("failed to add child to parent: {}", err)]
     AddChildError {
         #[from]
@@ -259,6 +265,8 @@ impl Into<fcomponent::Error> for AddDynamicChildError {
                 fcomponent::Error::InvalidArguments
             }
             AddDynamicChildError::ActionError { err } => err.into(),
+            AddDynamicChildError::InvalidDictionary { .. } => fcomponent::Error::InvalidArguments,
+            AddDynamicChildError::StaticRouteConflict { .. } => fcomponent::Error::InvalidArguments,
             AddDynamicChildError::NameTooLong { .. } => fcomponent::Error::InvalidArguments,
             AddDynamicChildError::AddChildError {
                 err: AddChildError::DynamicOfferError { .. },
@@ -291,6 +299,8 @@ impl Into<fsys::CreateError> for AddDynamicChildError {
                 fsys::CreateError::DynamicOffersForbidden
             }
             AddDynamicChildError::ActionError { .. } => fsys::CreateError::Internal,
+            AddDynamicChildError::InvalidDictionary { .. } => fsys::CreateError::Internal,
+            AddDynamicChildError::StaticRouteConflict { .. } => fsys::CreateError::Internal,
             AddDynamicChildError::NameTooLong { .. } => fsys::CreateError::BadChildDecl,
             AddDynamicChildError::AddChildError {
                 err: AddChildError::DynamicOfferError { .. },
@@ -858,6 +868,11 @@ pub enum StopActionError {
     GetParentFailed,
     #[error("failed to destroy dynamic children: {err}")]
     DestroyDynamicChildrenFailed { err: Box<ActionError> },
+    #[error("failed to resolve component: {err}")]
+    ResolveActionError {
+        #[source]
+        err: Box<ActionError>,
+    },
 }
 
 // This is implemented for fuchsia.sys2.LifecycleController protocol.
@@ -883,6 +898,10 @@ impl PartialEq for StopActionError {
             (
                 StopActionError::DestroyDynamicChildrenFailed { .. },
                 StopActionError::DestroyDynamicChildrenFailed { .. },
+            ) => true,
+            (
+                StopActionError::ResolveActionError { .. },
+                StopActionError::ResolveActionError { .. },
             ) => true,
             _ => false,
         }

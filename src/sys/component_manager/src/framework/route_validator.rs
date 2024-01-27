@@ -420,7 +420,7 @@ mod tests {
         super::*,
         crate::model::{
             actions::resolve::sandbox_construction::ComponentInput,
-            component::StartReason,
+            component::{IncomingCapabilities, StartReason},
             testing::{
                 out_dir::OutDir,
                 test_helpers::{TestEnvironmentBuilder, TestModelResult},
@@ -1206,13 +1206,13 @@ mod tests {
                 .find_and_maybe_resolve(&format!("coll:{}", name).as_str().try_into().unwrap())
                 .await
                 .unwrap();
-            child.start(&StartReason::Debug, None, vec![], vec![]).await.unwrap();
+            child.start(&StartReason::Debug, None, IncomingCapabilities::default()).await.unwrap();
         }
 
         // Open the service directory from `target` so that it gets instantiated.
         {
             let target = model.find_and_maybe_resolve(&"target".try_into().unwrap()).await.unwrap();
-            target.start(&StartReason::Debug, None, vec![], vec![]).await.unwrap();
+            target.start(&StartReason::Debug, None, IncomingCapabilities::default()).await.unwrap();
             let ns = mock_runner.get_namespace("test:///target_resolved").unwrap();
             let ns = ns.lock().await;
             // /pkg and /svc

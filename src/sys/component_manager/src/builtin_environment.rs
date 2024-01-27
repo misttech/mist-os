@@ -49,7 +49,7 @@ use {
         directory_ready_notifier::DirectoryReadyNotifier,
         framework::{
             binder::BinderFrameworkCapability,
-            factory::FactoryFrameworkCapability,
+            factory::{FactoryCapabilityHost, FactoryFrameworkCapability},
             introspector::IntrospectorFrameworkCapability,
             lifecycle_controller::{LifecycleController, LifecycleControllerFrameworkCapability},
             namespace::NamespaceFrameworkCapability,
@@ -111,7 +111,7 @@ use {
     moniker::{Moniker, MonikerBase},
     sandbox::Receiver,
     std::{iter, sync::Arc},
-    tracing::info,
+    tracing::{info, warn},
 };
 
 #[cfg(test)]
@@ -463,6 +463,7 @@ pub struct BuiltinEnvironment {
     pub lifecycle_controller: Option<Arc<LifecycleController>>,
     pub event_registry: Arc<EventRegistry>,
     pub event_source_factory: Arc<EventSourceFactory>,
+    pub factory_capability_host: Arc<FactoryCapabilityHost>,
     pub stop_notifier: Arc<RootStopNotifier>,
     pub directory_ready_notifier: Arc<DirectoryReadyNotifier>,
     pub inspect_sink_provider: Arc<InspectSinkProvider>,
@@ -971,6 +972,8 @@ impl BuiltinEnvironment {
             Arc::downgrade(&event_stream_provider),
         );
 
+        let factory_capability_host = Arc::new(FactoryCapabilityHost::new());
+
         let mut builtin_capabilities: Vec<Box<dyn BuiltinCapability>> =
             vec![Box::new(EventSourceFactoryCapability::new(event_source_factory.clone()))];
         let mut framework_capabilities: Vec<Box<dyn FrameworkCapability>> = vec![
@@ -979,7 +982,7 @@ impl BuiltinEnvironment {
                 instance_registry: model.context().instance_registry().clone(),
             }),
             Box::new(BinderFrameworkCapability::new()),
-            Box::new(FactoryFrameworkCapability::new()),
+            Box::new(FactoryFrameworkCapability::new(factory_capability_host.clone())),
             Box::new(NamespaceFrameworkCapability::new()),
             Box::new(PkgDirectoryFrameworkCapability::new()),
             Box::new(EventSourceFactoryCapability::new(event_source_factory.clone())),
@@ -1059,6 +1062,7 @@ impl BuiltinEnvironment {
             lifecycle_controller,
             event_registry,
             event_source_factory,
+            factory_capability_host,
             stop_notifier,
             directory_ready_notifier,
             inspect_sink_provider,
@@ -1080,13 +1084,14 @@ impl BuiltinEnvironment {
         // Create the ServiceFs
         let mut service_fs = ServiceFs::new();
 
+        let scope = self.model.top_instance().task_group().clone();
+
         // Install the root fuchsia.sys2.LifecycleController
         if let Some(lifecycle_controller) = &self.lifecycle_controller {
             let lifecycle_controller = lifecycle_controller.clone();
-            let scope = self.model.top_instance().task_group().clone();
+            let scope = scope.clone();
             service_fs.dir("svc").add_fidl_service(move |stream| {
                 let lifecycle_controller = lifecycle_controller.clone();
-                let scope = scope.clone();
                 // Spawn a short-lived task that adds the lifecycle controller serve to
                 // component manager's task scope.
                 scope.spawn(async move {
@@ -1098,10 +1103,9 @@ impl BuiltinEnvironment {
         // Install the root fuchsia.sys2.RealmQuery
         if let Some(realm_query) = &self.realm_query {
             let realm_query = realm_query.clone();
-            let scope = self.model.top_instance().task_group().clone();
+            let scope = scope.clone();
             service_fs.dir("svc").add_fidl_service(move |stream| {
                 let realm_query = realm_query.clone();
-                let scope = scope.clone();
                 // Spawn a short-lived task that adds the realm query serve to
                 // component manager's task scope.
                 scope.spawn(async move {
@@ -1109,6 +1113,17 @@ impl BuiltinEnvironment {
                 });
             });
         }
+
+        // Install the `fuchsia.component.sandbox.Factory` protocol.
+        let factory_capability_host = self.factory_capability_host.clone();
+        service_fs.dir("svc").add_fidl_service(move |stream| {
+            let factory_capability_host = factory_capability_host.clone();
+            scope.spawn(async move {
+                if let Err(err) = factory_capability_host.serve(stream).await {
+                    warn!(?err, "Failed to serve fuchsia.component.sandbox.Factory");
+                }
+            });
+        });
 
         // If component manager is in debug mode, create an event source scoped at the
         // root and offer it via ServiceFs to the outside world.

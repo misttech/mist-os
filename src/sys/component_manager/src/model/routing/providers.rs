@@ -5,7 +5,7 @@ use {
     crate::{
         capability::CapabilityProvider,
         model::{
-            component::{StartReason, WeakComponentInstance},
+            component::{IncomingCapabilities, StartReason, WeakComponentInstance},
             error::{CapabilityProviderError, ComponentProviderError},
             hooks::{CapabilityReceiver, Event, EventPayload},
         },
@@ -63,8 +63,7 @@ impl CapabilityProvider for DefaultComponentCapabilityProvider {
                     name: self.name.clone(),
                 },
                 None,
-                vec![],
-                vec![],
+                IncomingCapabilities::default(),
             )
             .await
             .map_err(Into::<ComponentProviderError>::into)?;

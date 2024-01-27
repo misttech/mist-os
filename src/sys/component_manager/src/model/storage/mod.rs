@@ -7,7 +7,7 @@ use {
     crate::{
         capability::CapabilitySource,
         model::{
-            component::{ComponentInstance, StartReason},
+            component::{ComponentInstance, IncomingCapabilities, StartReason},
             error::ModelError,
             routing::{Route, RouteSource},
         },
@@ -205,7 +205,9 @@ async fn open_storage_root(
     if let Some(dir_source_component) = storage_source_info.storage_provider.as_ref() {
         // TODO(https://fxbug.dev/42127827): This should be StartReason::AccessCapability, but we haven't
         // plumbed in all the details needed to use it.
-        dir_source_component.start(&StartReason::StorageAdmin, None, vec![], vec![]).await?;
+        dir_source_component
+            .start(&StartReason::StorageAdmin, None, IncomingCapabilities::default())
+            .await?;
         let path = full_backing_directory_path
             .to_str()
             .ok_or_else(|| ModelError::path_is_not_utf8(full_backing_directory_path.clone()))?;

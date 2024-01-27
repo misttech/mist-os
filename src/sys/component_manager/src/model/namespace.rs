@@ -8,7 +8,7 @@ use {
         model::{
             component::{ComponentInstance, Package, WeakComponentInstance},
             error::CreateNamespaceError,
-            routing::{self, route_and_open_capability, router::Request, OpenOptions},
+            routing::{self, route_and_open_capability, router, OpenOptions},
         },
         sandbox_util::DictExt,
     },
@@ -289,14 +289,37 @@ fn service_or_protocol_use(use_: UseDecl, component: WeakComponentInstance) -> B
         let target = component.clone();
         let task = async move {
             if let UseDecl::Protocol(use_protocol_decl) = &use_ {
-                if let Some(router) = target.lock_resolved_state().await.ok().and_then(|state| {
+                let router = target.lock_resolved_state().await.ok().and_then(|state| {
+                    // Try to get the capability from the incoming dict, which was passed when the child was started
+                    //
+                    // Unlike the program input dict below that contains Routers created by
+                    // component manager, the incoming dict may contain capabilities created externally.
+                    // Currently there is no way to create a Rotuer externally, so assume these
+                    // are Open capabilities and convert them to Router here.
+                    //
+                    // TODO(https://fxbug.dev/319542502): Convert from the external Router type, once it exists
                     state
-                        .program_input_dict
-                        .get_capability(use_protocol_decl.target_path.iter_segments())
-                }) {
-                    let result = crate::model::routing::router::route(
+                        .incoming_dict
+                        .as_ref()
+                        .and_then(|dict| {
+                            dict.lock_entries()
+                                .get(use_protocol_decl.source_name.as_str())
+                                .cloned()
+                                .and_then(|any| Open::try_from(any).ok())
+                                .map(router::Router::from_routable)
+                        })
+                        .or_else(|| {
+                            // Try to get the capability from the program input dict, created from static
+                            // routes when the component was resolved.
+                            state
+                                .program_input_dict
+                                .get_capability(use_protocol_decl.target_path.iter_segments())
+                        })
+                });
+                if let Some(router) = router {
+                    let result = router::route(
                         &router,
-                        Request {
+                        router::Request {
                             rights: None,
                             relative_path: sandbox::Path::default(),
                             availability: use_protocol_decl.availability.clone(),

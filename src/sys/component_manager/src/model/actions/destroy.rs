@@ -8,7 +8,7 @@ use {
             resolve::sandbox_construction::ComponentInput, Action, ActionKey, ActionSet,
             DiscoverAction, ResolveAction, ShutdownAction, ShutdownType, StartAction,
         },
-        component::{ComponentInstance, InstanceState, StartReason},
+        component::{ComponentInstance, IncomingCapabilities, InstanceState, StartReason},
         error::{ActionError, DestroyActionError},
         hooks::{Event, EventPayload},
     },
@@ -100,7 +100,11 @@ async fn do_destroy(component: &Arc<ComponentInstance>) -> Result<(), ActionErro
         let actions = component.lock_actions().await;
         vec![
             wait(actions.wait(ResolveAction::new())),
-            wait(actions.wait(StartAction::new(StartReason::Debug, None, vec![], vec![]))),
+            wait(actions.wait(StartAction::new(
+                StartReason::Debug,
+                None,
+                IncomingCapabilities::default(),
+            ))),
             task_shutdown,
         ]
     };

@@ -10,7 +10,7 @@ use {
                 resolve::sandbox_construction::ComponentInput, ActionSet, ShutdownAction,
                 ShutdownType, StartAction, StopAction,
             },
-            component::{ComponentInstance, InstanceState, StartReason},
+            component::{ComponentInstance, IncomingCapabilities, InstanceState, StartReason},
             error::{ActionError, ModelError, StartActionError},
             events::registry::EventSubscription,
             hooks::{Event, EventType, Hook, HooksRegistration},
@@ -136,7 +136,7 @@ async fn bind_concurrent() {
         let mut actions = system_component.lock_actions().await;
         actions.register_no_wait(
             &system_component,
-            StartAction::new(StartReason::Debug, None, vec![], vec![]),
+            StartAction::new(StartReason::Debug, None, IncomingCapabilities::default()),
         )
     };
 
@@ -146,7 +146,7 @@ async fn bind_concurrent() {
         let mut actions = system_component.lock_actions().await;
         actions.register_no_wait(
             &system_component,
-            StartAction::new(StartReason::Debug, None, vec![], vec![]),
+            StartAction::new(StartReason::Debug, None, IncomingCapabilities::default()),
         )
     };
 

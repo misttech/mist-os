@@ -69,6 +69,7 @@ use {
         epitaph::ChannelEpitaphExt,
     },
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_decl as fdecl,
+    fidl_fuchsia_component_sandbox as fsandbox,
     fidl_fuchsia_hardware_power_statecontrol as fstatecontrol, fidl_fuchsia_io as fio,
     fidl_fuchsia_process as fprocess, fuchsia_async as fasync,
     fuchsia_component::client,
@@ -78,7 +79,7 @@ use {
         lock::{MappedMutexGuard, Mutex, MutexGuard},
     },
     moniker::{ChildName, ChildNameBase, Moniker, MonikerBase},
-    sandbox::{Capability, Dict, Open, Receiver},
+    sandbox::{AnyCapability, Capability, Dict, Open, Receiver},
     std::iter::Iterator,
     std::{
         boxed::Box,
@@ -342,6 +343,19 @@ impl TopInstanceInterface for ComponentManagerInstance {
     }
 }
 
+/// Capabilities that a component receives dynamically.
+pub struct IncomingCapabilities {
+    pub numbered_handles: Vec<fprocess::HandleInfo>,
+    pub additional_namespace_entries: Vec<NamespaceEntry>,
+    pub dict: Option<sandbox::Dict>,
+}
+
+impl Default for IncomingCapabilities {
+    fn default() -> Self {
+        Self { numbered_handles: Vec::new(), additional_namespace_entries: Vec::new(), dict: None }
+    }
+}
+
 /// Models a component instance, possibly with links to children.
 pub struct ComponentInstance {
     /// The registry for resolving component URLs within the component instance.
@@ -601,9 +615,40 @@ impl ComponentInstance {
         let collection_dict = state
             .collection_dicts
             .get(&Name::new(&collection_name).unwrap())
-            .expect("dict missing for declared collection")
-            .copy();
-        let child_input = ComponentInput::new(collection_dict);
+            .expect("dict missing for declared collection");
+
+        let child_dict = collection_dict.copy();
+
+        // Merge `ChildArgs.dictionary` entries into the child sandbox.
+        if let Some(dictionary_client_end) = child_args.dictionary {
+            let fidl_capability = fsandbox::Capability::Dictionary(dictionary_client_end);
+            let any: AnyCapability =
+                fidl_capability.try_into().map_err(|_| AddDynamicChildError::InvalidDictionary)?;
+            let dict: Dict = any.try_into().map_err(|_| AddDynamicChildError::InvalidDictionary)?;
+            let dict_entries = {
+                let mut entries = dict.lock_entries();
+                std::mem::replace(&mut *entries, std::collections::BTreeMap::new())
+            };
+            let mut child_dict_entries = child_dict.lock_entries();
+            for (key, value) in dict_entries.into_iter() {
+                // The child/collection Dict normally contains Routers created by component manager.
+                // ChildArgs.dict may contain capabilities created by an external client.
+                //
+                // Currently there is no way to create a Rotuer externally, so assume these
+                // are Open capabilities and convert them to Router here.
+                //
+                // TODO(https://fxbug.dev/319542502): Consider using the external Router type, once it exists
+                let open: Open =
+                    value.try_into().map_err(|_| AddDynamicChildError::InvalidDictionary)?;
+                let router: Router = Router::from_routable(open);
+
+                if child_dict_entries.insert(key.clone(), Box::new(router)).is_some() {
+                    return Err(AddDynamicChildError::StaticRouteConflict { capability_name: key });
+                }
+            }
+        }
+
+        let child_input = ComponentInput::new(child_dict);
 
         let (child, discover_fut) = state
             .add_child(
@@ -629,8 +674,11 @@ impl ComponentInstance {
                 .start(
                     &StartReason::SingleRun,
                     None,
-                    child_args.numbered_handles.unwrap_or_default(),
-                    vec![],
+                    IncomingCapabilities {
+                        numbered_handles: child_args.numbered_handles.unwrap_or_default(),
+                        additional_namespace_entries: vec![],
+                        dict: None,
+                    },
                 )
                 .await
                 .map_err(|err| {
@@ -758,6 +806,14 @@ impl ComponentInstance {
 
             (was_running, component_stop_result)
         };
+
+        // TODO(b/322564390): Move incoming_dict into `ExecutionState` to avoid locking InstanceState.
+        {
+            let mut state = self.lock_state().await;
+            if let InstanceState::Resolved(resolved_state) = &mut *state {
+                resolved_state.incoming_dict = None;
+            };
+        }
 
         // When the component is stopped, any child instances in collections must be destroyed.
         self.destroy_dynamic_children()
@@ -1011,8 +1067,7 @@ impl ComponentInstance {
         self: &Arc<Self>,
         reason: &StartReason,
         execution_controller_task: Option<controller::ExecutionControllerTask>,
-        numbered_handles: Vec<fprocess::HandleInfo>,
-        additional_namespace_entries: Vec<NamespaceEntry>,
+        incoming: IncomingCapabilities,
     ) -> Result<(), ActionError> {
         // Skip starting a component instance that was already started. It's important to bail out
         // here so we don't waste time starting eager children more than once.
@@ -1025,12 +1080,7 @@ impl ComponentInstance {
         }
         ActionSet::register(
             self.clone(),
-            StartAction::new(
-                reason.clone(),
-                execution_controller_task,
-                numbered_handles,
-                additional_namespace_entries,
-            ),
+            StartAction::new(reason.clone(), execution_controller_task, incoming),
         )
         .await?;
 
@@ -1074,7 +1124,9 @@ impl ComponentInstance {
             let futures: Vec<_> = instances_to_bind
                 .iter()
                 .map(|component| async move {
-                    component.start(&StartReason::Eager, None, vec![], vec![]).await
+                    component
+                        .start(&StartReason::Eager, None, IncomingCapabilities::default())
+                        .await
                 })
                 .collect();
             join_all(futures).await.into_iter().fold(Ok(()), |acc, r| acc.and_then(|_| r))?;
@@ -1473,6 +1525,10 @@ pub struct ResolvedInstanceState {
     /// The dict containing all capabilities that we declare.
     program_output_dict: Dict,
 
+    /// Dictionary of extra capabilities passed to the component when it is started.
+    // TODO(b/322564390): Move this into `ExecutionState` once stop action releases lock on it
+    pub incoming_dict: Option<Dict>,
+
     /// Dicts containing the capabilities we want to provide to each collection. Each new
     /// dynamic child gets a clone of one of these inputs (which is potentially extended by
     /// dynamic offers).
@@ -1512,6 +1568,7 @@ impl ResolvedInstanceState {
             component_output_dict: Dict::new(),
             program_input_dict: Dict::new(),
             program_output_dict,
+            incoming_dict: None,
             collection_dicts: HashMap::new(),
         };
         state.add_static_children(component).await?;
@@ -1611,8 +1668,7 @@ impl ResolvedInstanceState {
                                 name: capability_name,
                             },
                             None,
-                            vec![],
-                            vec![],
+                            IncomingCapabilities::default(),
                         )
                         .await
                     {
@@ -2311,34 +2367,6 @@ impl ResolvedInstanceInterface for ResolvedInstanceState {
     }
 }
 
-/// The execution state for a component instance that has started running.
-///
-/// If the component instance has a program, it may also have a [`ProgramRuntime`].
-pub struct ComponentRuntime {
-    /// If set, that means this component is associated with a running program.
-    program: Option<ProgramRuntime>,
-
-    /// Approximates when the component was started.
-    pub timestamp: zx::Time,
-
-    /// Describes why the component instance was started
-    pub start_reason: StartReason,
-
-    /// Channels scoped to lifetime of this component's execution context. This
-    /// should only be used for the server_end of the `fuchsia.component.Binder`
-    /// connection.
-    binder_server_ends: Vec<zx::Channel>,
-
-    /// This stores the hook for notifying an ExecutionController about stop events for this
-    /// component.
-    execution_controller_task: Option<controller::ExecutionControllerTask>,
-
-    /// Logger attributed to this component.
-    ///
-    /// Only set if the component uses the `fuchsia.logger.LogSink` protocol.
-    logger: Option<Arc<ScopedLogger>>,
-}
-
 /// The execution state for a program instance that is running.
 struct ProgramRuntime {
     /// Used to interact with the Runner to influence the program's execution.
@@ -2386,6 +2414,34 @@ impl ProgramRuntime {
         self.exit_listener.await;
         stop_result
     }
+}
+
+/// The execution state for a component instance that has started running.
+///
+/// If the component instance has a program, it may also have a [`ProgramRuntime`].
+pub struct ComponentRuntime {
+    /// If set, that means this component is associated with a running program.
+    program: Option<ProgramRuntime>,
+
+    /// Approximates when the component was started.
+    pub timestamp: zx::Time,
+
+    /// Describes why the component instance was started
+    pub start_reason: StartReason,
+
+    /// Channels scoped to lifetime of this component's execution context. This
+    /// should only be used for the server_end of the `fuchsia.component.Binder`
+    /// connection.
+    binder_server_ends: Vec<zx::Channel>,
+
+    /// This stores the hook for notifying an ExecutionController about stop events for this
+    /// component.
+    execution_controller_task: Option<controller::ExecutionControllerTask>,
+
+    /// Logger attributed to this component.
+    ///
+    /// Only set if the component uses the `fuchsia.logger.LogSink` protocol.
+    logger: Option<Arc<ScopedLogger>>,
 }
 
 impl ComponentRuntime {
@@ -3714,7 +3770,7 @@ pub mod tests {
         // Start the child.
         ActionSet::register(
             child.clone(),
-            StartAction::new(StartReason::Debug, None, vec![], vec![]),
+            StartAction::new(StartReason::Debug, None, IncomingCapabilities::default()),
         )
         .await
         .expect("failed to start child");

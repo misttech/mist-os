@@ -8,7 +8,8 @@ use {
     crate::model::{
         actions::{Action, ActionKey},
         component::{
-            ComponentInstance, ComponentRuntime, ExecutionState, InstanceState, StartReason,
+            ComponentInstance, ComponentRuntime, ExecutionState, IncomingCapabilities,
+            InstanceState, StartReason,
         },
         error::{ActionError, CreateNamespaceError, StartActionError, StructuredConfigError},
         hooks::{Event, EventPayload, RuntimeInfo},
@@ -35,6 +36,7 @@ use {
     fidl_fuchsia_mem as fmem, fidl_fuchsia_process as fprocess, fuchsia_zircon as zx,
     futures::channel::oneshot,
     moniker::Moniker,
+    sandbox::Dict,
     serve_processargs::NamespaceBuilder,
     std::string::ToString,
     std::sync::Arc,
@@ -46,8 +48,7 @@ use {
 pub struct StartAction {
     start_reason: StartReason,
     execution_controller_task: Option<controller::ExecutionControllerTask>,
-    numbered_handles: Vec<fprocess::HandleInfo>,
-    additional_namespace_entries: Vec<NamespaceEntry>,
+    incoming: IncomingCapabilities,
     abort_handle: AbortHandle,
     abortable_scope: AbortableScope,
 }
@@ -56,18 +57,10 @@ impl StartAction {
     pub fn new(
         start_reason: StartReason,
         execution_controller_task: Option<controller::ExecutionControllerTask>,
-        numbered_handles: Vec<fprocess::HandleInfo>,
-        additional_namespace_entries: Vec<NamespaceEntry>,
+        incoming: IncomingCapabilities,
     ) -> Self {
         let (abortable_scope, abort_handle) = AbortableScope::new();
-        Self {
-            start_reason,
-            execution_controller_task,
-            numbered_handles,
-            additional_namespace_entries,
-            abort_handle,
-            abortable_scope,
-        }
+        Self { start_reason, execution_controller_task, incoming, abort_handle, abortable_scope }
     }
 }
 
@@ -78,8 +71,7 @@ impl Action for StartAction {
             component,
             &self.start_reason,
             self.execution_controller_task,
-            self.numbered_handles,
-            self.additional_namespace_entries,
+            self.incoming,
             self.abortable_scope,
         )
         .await
@@ -102,14 +94,14 @@ struct StartContext {
     scope: ExecutionScope,
     numbered_handles: Vec<fprocess::HandleInfo>,
     encoded_config: Option<fmem::Data>,
+    incoming_dict: Option<Dict>,
 }
 
 async fn do_start(
     component: &Arc<ComponentInstance>,
     start_reason: &StartReason,
     execution_controller_task: Option<controller::ExecutionControllerTask>,
-    numbered_handles: Vec<fprocess::HandleInfo>,
-    additional_namespace_entries: Vec<NamespaceEntry>,
+    incoming: IncomingCapabilities,
     abortable_scope: AbortableScope,
 ) -> Result<(), StartActionError> {
     // Translates the error when a long running future is aborted.
@@ -142,6 +134,12 @@ async fn do_start(
             })?,
         None => None,
     };
+
+    let IncomingCapabilities {
+        numbered_handles,
+        additional_namespace_entries,
+        dict: incoming_dict,
+    } = incoming;
 
     // Create the component's namespace.
     let scope = ExecutionScope::new();
@@ -198,6 +196,7 @@ async fn do_start(
         scope,
         numbered_handles,
         encoded_config,
+        incoming_dict,
     };
 
     start_component(&component, resolved_component.decl, pending_runtime, start_context).await
@@ -225,8 +224,16 @@ async fn start_component(
     let (diagnostics_sender, diagnostics_receiver) = oneshot::channel();
     let (break_on_start_left, break_on_start_right) = zx::EventPair::create();
 
-    let StartContext { runner, url, namespace_builder, numbered_handles, scope, encoded_config } =
-        start_context;
+    let StartContext {
+        runner,
+        url,
+        namespace_builder,
+        numbered_handles,
+        scope,
+        encoded_config,
+        incoming_dict,
+    } = start_context;
+
     if let Some(runner) = runner {
         let moniker = &component.moniker;
         let component_instance = state
@@ -260,6 +267,16 @@ async fn start_component(
     let timestamp = pending_runtime.timestamp;
 
     execution.runtime = Some(pending_runtime);
+
+    // TODO(b/322564390): Move incoming_dict into `ExecutionState`.
+    {
+        let resolved_state = match &mut *state {
+            InstanceState::Resolved(resolved_state) => resolved_state,
+            _ => panic!("expected component to be resolved"),
+        };
+        resolved_state.incoming_dict = incoming_dict;
+    }
+
     drop(execution);
     drop(state);
 
@@ -532,8 +549,9 @@ mod tests {
                 ActionError, ActionSet, ShutdownAction, ShutdownType, StartAction, StopAction,
             },
             component::{
-                Component, ComponentInstance, ComponentRuntime, ExecutionState, InstanceState,
-                ResolvedInstanceState, StartReason, UnresolvedInstanceState,
+                Component, ComponentInstance, ComponentRuntime, ExecutionState,
+                IncomingCapabilities, InstanceState, ResolvedInstanceState, StartReason,
+                UnresolvedInstanceState,
             },
             error::{ModelError, StartActionError},
             hooks::{Event, EventType, Hook, HooksRegistration},
@@ -599,7 +617,7 @@ mod tests {
 
         ActionSet::register(
             child.clone(),
-            StartAction::new(StartReason::Debug, None, vec![], vec![]),
+            StartAction::new(StartReason::Debug, None, IncomingCapabilities::default()),
         )
         .await
         .unwrap();
@@ -663,7 +681,7 @@ mod tests {
 
         ActionSet::register(
             child.clone(),
-            StartAction::new(StartReason::Debug, None, vec![], vec![]),
+            StartAction::new(StartReason::Debug, None, IncomingCapabilities::default()),
         )
         .await
         .unwrap();
@@ -698,7 +716,7 @@ mod tests {
         // Run start and stop in random order.
         let start_fut = ActionSet::register(
             child.clone(),
-            StartAction::new(StartReason::Debug, None, vec![], vec![]),
+            StartAction::new(StartReason::Debug, None, IncomingCapabilities::default()),
         );
         let stop_fut = ActionSet::register(child.clone(), StopAction::new(false));
         let mut futs = vec![start_fut.boxed(), stop_fut.boxed()];
@@ -742,10 +760,10 @@ mod tests {
         let _root = test_topology.model.find_and_maybe_resolve(&Moniker::default()).await.unwrap();
         let child = test_topology.model.find(&TEST_CHILD_NAME.try_into().unwrap()).await.unwrap();
 
-        let start_fut = child
-            .lock_actions()
-            .await
-            .register_no_wait(&child, StartAction::new(StartReason::Debug, None, vec![], vec![]));
+        let start_fut = child.lock_actions().await.register_no_wait(
+            &child,
+            StartAction::new(StartReason::Debug, None, IncomingCapabilities::default()),
+        );
 
         // Wait until start is blocked.
         resolved_rx.await.unwrap();
@@ -769,7 +787,7 @@ mod tests {
             let timestamp = zx::Time::get_monotonic();
             ActionSet::register(
                 child.clone(),
-                StartAction::new(StartReason::Debug, None, vec![], vec![]),
+                StartAction::new(StartReason::Debug, None, IncomingCapabilities::default()),
             )
             .await
             .expect("failed to start child");
@@ -790,7 +808,7 @@ mod tests {
             let timestamp = zx::Time::get_monotonic();
             ActionSet::register(
                 child.clone(),
-                StartAction::new(StartReason::Debug, None, vec![], vec![]),
+                StartAction::new(StartReason::Debug, None, IncomingCapabilities::default()),
             )
             .await
             .expect("failed to start child");
@@ -808,7 +826,7 @@ mod tests {
             let timestamp = zx::Time::get_monotonic();
             ActionSet::register(
                 child.clone(),
-                StartAction::new(StartReason::Debug, None, vec![], vec![]),
+                StartAction::new(StartReason::Debug, None, IncomingCapabilities::default()),
             )
             .await
             .expect("failed to start child");
@@ -834,7 +852,7 @@ mod tests {
 
         ActionSet::register(
             child.clone(),
-            StartAction::new(StartReason::Debug, None, vec![], vec![]),
+            StartAction::new(StartReason::Debug, None, IncomingCapabilities::default()),
         )
         .await
         .expect("failed to start child");
@@ -931,7 +949,7 @@ mod tests {
 
         ActionSet::register(
             child.clone(),
-            StartAction::new(StartReason::Debug, None, vec![], vec![]),
+            StartAction::new(StartReason::Debug, None, IncomingCapabilities::default()),
         )
         .await
         .expect("failed to start child");

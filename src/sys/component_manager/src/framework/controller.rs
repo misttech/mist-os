@@ -5,11 +5,13 @@
 use {
     crate::model::{
         actions::StopAction,
-        component::{StartReason, WeakComponentInstance},
+        component::{IncomingCapabilities, StartReason, WeakComponentInstance},
     },
     fidl::endpoints::RequestStream,
-    fidl_fuchsia_component as fcomponent, fuchsia_async as fasync, fuchsia_zircon as zx,
+    fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_sandbox as fsandbox,
+    fuchsia_async as fasync, fuchsia_zircon as zx,
     futures::prelude::*,
+    sandbox::{AnyCapability, Dict},
     tracing::{error, warn},
 };
 
@@ -49,20 +51,41 @@ pub async fn serve_controller(
                     control_handle,
                     stop_payload: None,
                 };
-                let numbered_handles = args.numbered_handles.take().unwrap_or_default();
-                let Ok(namespace): Result<namespace::Namespace, _> =
-                    args.namespace_entries.take().unwrap_or_default().try_into()
-                else {
-                    responder.send(Err(fcomponent::Error::InvalidArguments))?;
-                    continue;
-                };
-                if let Err(err) = component
-                    .start(
-                        &StartReason::Controller,
-                        Some(execution_controller),
+
+                let incoming = {
+                    let numbered_handles = args.numbered_handles.take().unwrap_or_default();
+
+                    let Ok(namespace): Result<namespace::Namespace, _> =
+                        args.namespace_entries.take().unwrap_or_default().try_into()
+                    else {
+                        responder.send(Err(fcomponent::Error::InvalidArguments))?;
+                        continue;
+                    };
+
+                    let dict = if let Some(dict_client_end) = args.dictionary {
+                        let fidl_capability = fsandbox::Capability::Dictionary(dict_client_end);
+                        let Ok(any) = AnyCapability::try_from(fidl_capability) else {
+                            responder.send(Err(fcomponent::Error::InvalidArguments))?;
+                            continue;
+                        };
+                        let Ok(dict) = Dict::try_from(any) else {
+                            responder.send(Err(fcomponent::Error::InvalidArguments))?;
+                            continue;
+                        };
+                        Some(dict)
+                    } else {
+                        None
+                    };
+
+                    IncomingCapabilities {
                         numbered_handles,
-                        namespace.into(),
-                    )
+                        additional_namespace_entries: namespace.into(),
+                        dict,
+                    }
+                };
+
+                if let Err(err) = component
+                    .start(&StartReason::Controller, Some(execution_controller), incoming)
                     .await
                 {
                     warn!(%err, "failed to start component");

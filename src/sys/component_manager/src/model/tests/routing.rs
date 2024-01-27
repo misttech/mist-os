@@ -22,7 +22,7 @@ use {
                 ActionError, ModelError, ResolveActionError, RouteOrOpenError, StartActionError,
             },
             routing::{Route, RouteRequest, RouteSource, RoutingError},
-            testing::{routing_test_helpers::*, test_helpers::*},
+            testing::{echo_service::EchoProtocol, routing_test_helpers::*, test_helpers::*},
         },
     },
     ::routing::{
@@ -35,11 +35,12 @@ use {
     assert_matches::assert_matches,
     cm_rust::*,
     cm_rust_testing::*,
+    fidl::endpoints::{ClientEnd, ServerEnd},
     fidl_fidl_examples_routing_echo::{self as echo},
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_decl as fdecl,
     fidl_fuchsia_component_resolution as fresolution, fidl_fuchsia_component_runner as fcrunner,
-    fidl_fuchsia_io as fio, fidl_fuchsia_mem as fmem, fuchsia_async as fasync,
-    fuchsia_zircon as zx,
+    fidl_fuchsia_component_sandbox as fsandbox, fidl_fuchsia_io as fio, fidl_fuchsia_mem as fmem,
+    fuchsia_async as fasync, fuchsia_zircon as zx,
     futures::{channel::oneshot, join, StreamExt},
     maplit::btreemap,
     moniker::{ChildName, ChildNameBase, Moniker, MonikerBase},
@@ -1099,6 +1100,99 @@ async fn dynamic_offer_to_static_offer() {
     .await;
     test.check_use(
         vec!["coll:c", "d"].try_into().unwrap(),
+        CheckUse::Protocol { path: default_service_capability(), expected_res: ExpectedResult::Ok },
+    )
+    .await;
+}
+
+/// Tests that a dynamic component can use a capability from the dict passed in CreateChildArgs.
+///
+///    a
+///   /
+/// [b]
+///
+/// a: creates [b], with a dict that contains an Open for `hippo_svc`
+/// [b]: instance in collection, uses the `hippo_svc` protocol.
+#[fuchsia::test]
+async fn create_child_with_dict() {
+    let components = vec![
+        (
+            "a",
+            ComponentDeclBuilder::new()
+                .use_(UseDecl::Protocol(UseProtocolDecl {
+                    source_name: "fuchsia.component.Realm".parse().unwrap(),
+                    source: UseSource::Framework,
+                    source_dictionary: None,
+                    target_path: "/svc/fuchsia.component.Realm".parse().unwrap(),
+                    dependency_type: DependencyType::Strong,
+                    availability: Availability::Required,
+                }))
+                .add_collection(CollectionDeclBuilder::new_transient_collection("coll").build())
+                .build(),
+        ),
+        (
+            "b",
+            ComponentDeclBuilder::new()
+                .use_(UseDecl::Protocol(UseProtocolDecl {
+                    source_name: "hippo_svc".parse().unwrap(),
+                    source: UseSource::Parent,
+                    source_dictionary: None,
+                    target_path: "/svc/hippo".parse().unwrap(),
+                    dependency_type: DependencyType::Strong,
+                    availability: Availability::Required,
+                }))
+                .build(),
+        ),
+    ];
+
+    // Create a dictionary with a sender for the `hippo_svc` protocol.
+    let dict = sandbox::Dict::new();
+
+    let (receiver, sender) = sandbox::Receiver::<()>::new();
+
+    // Serve the `fidl.examples.routing.echo.Echo` protocol on the receiver.
+    let _task = fasync::Task::spawn(async move {
+        let mut tasks = fasync::TaskGroup::new();
+        loop {
+            let Some(message) = receiver.receive().await else {
+                return;
+            };
+            let server_end = ServerEnd::<echo::EchoMarker>::new(message.payload.channel);
+            let stream: echo::EchoRequestStream = server_end.into_stream().unwrap();
+            tasks.add(fasync::Task::spawn(async move {
+                EchoProtocol::serve(stream).await.expect("failed to serve Echo");
+            }));
+        }
+    });
+
+    // CreateChild dictionary entries must be Open capabilities.
+    // TODO(https://fxbug.dev/319542502): Insert the external Router type, once it exists
+    let open: sandbox::Open = sender.into();
+    dict.lock_entries().insert("hippo_svc".to_string(), Box::new(open));
+
+    let dictionary_client_end: ClientEnd<fsandbox::DictionaryMarker> = dict.into();
+
+    let test = RoutingTest::new("a", components).await;
+    test.create_dynamic_child_with_args(
+        &Moniker::root(),
+        "coll",
+        ChildDecl {
+            name: "b".to_string(),
+            url: "test:///b".to_string(),
+            startup: fdecl::StartupMode::Lazy,
+            environment: None,
+            on_terminate: None,
+            config_overrides: None,
+        },
+        fcomponent::CreateChildArgs {
+            dictionary: Some(dictionary_client_end),
+            ..Default::default()
+        },
+    )
+    .await;
+
+    test.check_use(
+        vec!["coll:b"].try_into().unwrap(),
         CheckUse::Protocol { path: default_service_capability(), expected_res: ExpectedResult::Ok },
     )
     .await;

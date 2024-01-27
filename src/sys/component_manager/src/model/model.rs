@@ -5,7 +5,10 @@
 use {
     crate::model::{
         actions::{resolve::sandbox_construction::ComponentInput, ActionKey, DiscoverAction},
-        component::{ComponentInstance, ComponentManagerInstance, InstanceState, StartReason},
+        component::{
+            ComponentInstance, ComponentManagerInstance, IncomingCapabilities, InstanceState,
+            StartReason,
+        },
         context::ModelContext,
         environment::Environment,
         error::ModelError,
@@ -174,7 +177,9 @@ impl Model {
                 protocol to start the root component."
             );
         } else {
-            if let Err(e) = self.root.start(&StartReason::Root, None, vec![], vec![]).await {
+            if let Err(e) =
+                self.root.start(&StartReason::Root, None, IncomingCapabilities::default()).await
+            {
                 // `root.start` may take a long time as it will be resolving and starting
                 // eager children. If graceful shutdown is initiated, that will cause those
                 // children to fail to resolve or fail to start, and for `start` to fail.
@@ -204,7 +209,7 @@ impl Model {
         reason: &StartReason,
     ) -> Result<Arc<ComponentInstance>, ModelError> {
         let component = self.find_and_maybe_resolve(moniker).await?;
-        component.start(reason, None, vec![], vec![]).await?;
+        component.start(reason, None, IncomingCapabilities::default()).await?;
         Ok(component)
     }
 }

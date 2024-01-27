@@ -50,6 +50,10 @@ type StartChildArgs = resource table {
     /// If there are any conflicting entries, an error will occur when starting
     /// the component.
     2: namespace_entries vector<NamespaceEntry>:MAX_NAMESPACE_COUNT;
+
+    /// A dictionary that contains extra capabilities for the component instance.
+    @available(added=HEAD)
+    3: dictionary client_end:fuchsia.component.sandbox.Dictionary;
 };
 
 @available(added=14)

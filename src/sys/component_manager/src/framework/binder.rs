@@ -6,7 +6,7 @@ use {
     crate::{
         capability::{CapabilityProvider, FrameworkCapability, InternalCapabilityProvider},
         model::{
-            component::{StartReason, WeakComponentInstance},
+            component::{IncomingCapabilities, StartReason, WeakComponentInstance},
             error::ModelError,
             routing::report_routing_failure,
         },
@@ -56,7 +56,7 @@ impl BinderCapabilityProvider {
             target: self.target.moniker.clone(),
             name: BINDER_SERVICE.clone(),
         };
-        match source.start(&start_reason, None, vec![], vec![]).await {
+        match source.start(&start_reason, None, IncomingCapabilities::default()).await {
             Ok(_) => {
                 source.scope_to_runtime(server_end).await;
             }

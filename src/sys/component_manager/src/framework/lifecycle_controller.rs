@@ -6,7 +6,7 @@ use {
     crate::capability::{CapabilityProvider, FrameworkCapability, InternalCapabilityProvider},
     crate::model::{
         actions::{ActionSet, StopAction},
-        component::{StartReason, WeakComponentInstance},
+        component::{IncomingCapabilities, StartReason, WeakComponentInstance},
         error::ModelError,
         model::Model,
     },
@@ -62,12 +62,14 @@ impl LifecycleController {
         let moniker =
             join_monikers(scope_moniker, &moniker).map_err(|_| fsys::StartError::BadMoniker)?;
         let instance = model.find(&moniker).await.ok_or(fsys::StartError::InstanceNotFound)?;
-        instance.start(&StartReason::Debug, None, vec![], vec![]).await.map(|_| ()).map_err(
-            |error| {
+        instance
+            .start(&StartReason::Debug, None, IncomingCapabilities::default())
+            .await
+            .map(|_| ())
+            .map_err(|error| {
                 warn!(%moniker, %error, "failed to start instance");
                 error
-            },
-        )?;
+            })?;
         instance.scope_to_runtime(binder.into_channel()).await;
         Ok(())
     }
