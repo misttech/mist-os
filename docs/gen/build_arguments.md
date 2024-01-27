@@ -287,6 +287,18 @@ The list of environment names to include in "basic_envs".
 
 From //build/testing/environments.gni:9
 
+### bazel_execution_logs
+
+If true, emit additional execution logs, which contains information
+about remote executions and their action digests, cache status,
+remote inputs, and more.
+Caution: these logs can grow to be very large, due to the amount
+of information logged per action.
+
+**Current value (from the default):** `false`
+
+From //build/bazel/logging.gni:11
+
 ### bazel_fuchsia_sdk_all_cpus
 
 Set to true to populate the @fuchsia_sdk external repository with prebuilt
@@ -362,7 +374,7 @@ to stdout/stderr during the Ninja build.
 
 **Current value (from the default):** `false`
 
-From //build/bazel/bazel_action.gni:16
+From //build/bazel/bazel_action.gni:17
 
 ### bazel_upload_build_events
 
