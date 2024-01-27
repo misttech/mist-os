@@ -379,6 +379,11 @@
             to: "#core",
             availability: "optional",
         },
+        {
+            service: "fuchsia.hardware.rtc.Service",
+            from: "#bootstrap",
+            to: "#core",
+        },
     ],
     expose: [
         // For reboot_on_terminate

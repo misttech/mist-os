@@ -1322,6 +1322,14 @@
             ],
             from: "#pkg-cache",
         },
+        {
+            service: "fuchsia.hardware.rtc.Service",
+            from: [
+                "#boot-drivers",
+                "#full-pkg-drivers",
+                "#pkg-drivers",
+            ],
+        },
     ],
     environments: [
         {

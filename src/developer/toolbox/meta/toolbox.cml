@@ -22,5 +22,8 @@
                 "fuchsia.feedback.DataProvider",
             ],
         },
+        {
+            service: [ "fuchsia.hardware.rtc.Service" ],
+        },
     ],
 }
