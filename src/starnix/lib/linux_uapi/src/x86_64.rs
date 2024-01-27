@@ -11719,7 +11719,7 @@ pub struct ipt_ip {
     pub invflags: __u8,
 }
 #[repr(C)]
-#[derive(Debug, Default, FromBytes, NoCell, FromZeros)]
+#[derive(Debug, Default, AsBytes, FromBytes, NoCell, FromZeros)]
 pub struct ipt_entry {
     pub ip: ipt_ip,
     pub nfcache: crate::types::c_uint,
@@ -11747,7 +11747,7 @@ pub struct ipt_getinfo {
     pub size: crate::types::c_uint,
 }
 #[repr(C)]
-#[derive(Debug, FromBytes, NoCell, FromZeros)]
+#[derive(Debug, AsBytes, FromBytes, NoCell, FromZeros)]
 pub struct ipt_replace {
     pub name: [crate::types::c_char; 32usize],
     pub valid_hooks: crate::types::c_uint,
@@ -11792,7 +11792,7 @@ pub const nf_ip6_hook_priorities_NF_IP6_PRI_CONNTRACK_HELPER: nf_ip6_hook_priori
 pub const nf_ip6_hook_priorities_NF_IP6_PRI_LAST: nf_ip6_hook_priorities = 2147483647;
 pub type nf_ip6_hook_priorities = crate::types::c_int;
 #[repr(C)]
-#[derive(Copy, Clone, FromBytes, NoCell, FromZeros)]
+#[derive(Copy, Clone, AsBytes, FromBytes, NoCell, FromZeros)]
 pub struct ip6t_ip6 {
     pub src: in6_addr,
     pub dst: in6_addr,
@@ -11818,7 +11818,7 @@ impl Default for ip6t_ip6 {
     }
 }
 #[repr(C)]
-#[derive(FromBytes, NoCell, FromZeros)]
+#[derive(AsBytes, FromBytes, NoCell, FromZeros)]
 pub struct ip6t_entry {
     pub ipv6: ip6t_ip6,
     pub nfcache: crate::types::c_uint,
@@ -11884,7 +11884,7 @@ pub struct ip6t_getinfo {
     pub size: crate::types::c_uint,
 }
 #[repr(C)]
-#[derive(FromBytes, NoCell, FromZeros)]
+#[derive(AsBytes, FromBytes, NoCell, FromZeros)]
 pub struct ip6t_replace {
     pub name: [crate::types::c_char; 32usize],
     pub valid_hooks: crate::types::c_uint,

@@ -13,6 +13,7 @@ mod socket_types;
 mod socket_unix;
 mod socket_vsock;
 
+pub mod iptables_utils;
 pub mod syscalls;
 
 pub use socket::*;

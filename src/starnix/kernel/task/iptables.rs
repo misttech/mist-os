@@ -5,7 +5,7 @@
 use crate::{
     mm::MemoryAccessorExt,
     task::CurrentTask,
-    vfs::socket::{SocketDomain, SocketHandle, SocketType},
+    vfs::socket::{iptables_utils, SocketDomain, SocketHandle, SocketType},
 };
 use starnix_logging::{log_warn, track_stub};
 use starnix_uapi::{
@@ -194,21 +194,19 @@ impl IpTables {
             // Replaces the [`IpTable`] specified by `user_opt`.
             IPT_SO_SET_REPLACE => {
                 if socket.domain == SocketDomain::Inet {
-                    let table =
-                        ipt_replace::read_from_prefix(&*bytes).ok_or_else(|| errno!(EINVAL))?;
-                    let entries = bytes[std::mem::size_of::<ipt_replace>()..].to_vec();
+                    let table = iptables_utils::parse_ipt_replace(&*bytes)?;
 
                     let entry = IpTable {
-                        valid_hooks: table.valid_hooks,
-                        hook_entry: table.hook_entry,
-                        underflow: table.underflow,
-                        num_entries: table.num_entries,
-                        size: table.size,
-                        entries,
-                        num_counters: table.num_counters,
+                        valid_hooks: table.ipt_replace.valid_hooks,
+                        hook_entry: table.ipt_replace.hook_entry,
+                        underflow: table.ipt_replace.underflow,
+                        num_entries: table.ipt_replace.num_entries,
+                        size: table.ipt_replace.size,
+                        entries: bytes[std::mem::size_of::<ipt_replace>()..].to_vec(),
+                        num_counters: table.ipt_replace.num_counters,
                         counters: vec![],
                     };
-                    self.ipv4.insert(table.name, entry);
+                    self.ipv4.insert(table.ipt_replace.name, entry);
 
                     Ok(())
                 } else {
