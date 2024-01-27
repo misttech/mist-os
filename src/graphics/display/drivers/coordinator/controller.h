@@ -108,8 +108,7 @@ class Controller : public DeviceType,
 
   // |mtx()| must be held for as long as |edid| and |params| are retained.
   bool GetPanelConfig(DisplayId display_id, const fbl::Vector<display::DisplayTiming>** timings,
-                      const display_params_t** params, const display_mode_t** mode)
-      __TA_REQUIRES(mtx());
+                      const display_mode_t** mode) __TA_REQUIRES(mtx());
 
   zx::result<fbl::Array<CoordinatorPixelFormat>> GetSupportedPixelFormats(DisplayId display_id)
       __TA_REQUIRES(mtx());

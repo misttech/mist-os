@@ -670,7 +670,7 @@ void Controller::OnClientDead(ClientProxy* client) {
 
 bool Controller::GetPanelConfig(DisplayId display_id,
                                 const fbl::Vector<display::DisplayTiming>** timings,
-                                const display_params_t** params, const display_mode_t** mode) {
+                                const display_mode_t** mode) {
   ZX_DEBUG_ASSERT(mtx_trylock(&mtx_) == thrd_busy);
   if (unbinding_) {
     return false;
@@ -679,17 +679,11 @@ bool Controller::GetPanelConfig(DisplayId display_id,
     if (display.id == display_id) {
       if (display.edid.has_value()) {
         *timings = &display.edid->timings;
-        *params = nullptr;
         *mode = nullptr;
-      } else if (display.mode.has_value()) {
-        *timings = nullptr;
-        *params = nullptr;
-        *mode = &*display.mode;
       } else {
-        ZX_DEBUG_ASSERT(display.params.has_value());
+        ZX_DEBUG_ASSERT(display.mode.has_value());
         *timings = nullptr;
-        *params = &*display.params;
-        *mode = nullptr;
+        *mode = &*display.mode;
       }
       return true;
     }

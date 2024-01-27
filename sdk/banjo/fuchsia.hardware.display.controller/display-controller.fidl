@@ -45,13 +45,6 @@ type ConfigStamp = struct {
     value uint64;
 };
 
-/// A fallback structure to convey display information without an EDID.
-type DisplayParams = struct {
-    width uint32;
-    height uint32;
-    refresh_rate_e2 uint32;
-};
-
 /// Info about valid cursor configurations.
 type CursorInfo = struct {
     /// The width and height of the cursor configuration, in pixels.
@@ -67,20 +60,11 @@ type Panel = strict resource union {
     /// The i2c bus to use to read this display's EDID.
     1: i2c client_end:fuchsia.hardware.i2cimpl.I2cImpl;
 
-    /// Simplified hard-coded display configuration.
-    ///
-    /// Can be used when the device does not implement EDID,
-    /// or when the driver needs to override the EDID contents.
-    //
-    // TODO(https://fxbug.dev/318642950): Remove it once all drivers are
-    // migrated to use DisplayMode.
-    2: params DisplayParams;
-
     /// Hard-coded display configuration.
     ///
     /// Can be used when the device does not implement EDID,
     /// or when the driver needs to override the EDID contents.
-    3: mode DisplayMode;
+    2: mode DisplayMode;
 };
 
 type PanelCapabilitiesSource = strict enum {
@@ -88,11 +72,8 @@ type PanelCapabilitiesSource = strict enum {
     /// I2C bus to communicate its capabilities.
     EDID = 1;
 
-    /// The panel provides a DisplayParams struct to express its capabilities.
-    DISPLAY_PARAMS = 2;
-
     /// The panel provides a DisplayMode struct to express its capabilities.
-    DISPLAY_MODE = 3;
+    DISPLAY_MODE = 2;
 };
 
 /// A structure containing information a connected display.

@@ -73,9 +73,8 @@ class DisplayInfo : public IdMappable<fbl::RefPtr<DisplayInfo>, DisplayId>,
     fbl::Vector<audio_types_audio_stream_format_range_t> audio;
   };
 
-  // Exactly one of `edid`, `params` and `mode` can be non-nullopt.
+  // Exactly one of `edid` and `mode` can be non-nullopt.
   std::optional<Edid> edid;
-  std::optional<display_params_t> params;
   std::optional<display_mode_t> mode;
 
   fbl::Vector<CoordinatorPixelFormat> pixel_formats;

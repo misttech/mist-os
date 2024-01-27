@@ -361,9 +361,8 @@ void Client::SetDisplayMode(SetDisplayModeRequestView request,
 
   fbl::AutoLock lock(controller_->mtx());
   const fbl::Vector<display::DisplayTiming>* edid_timings;
-  const display_params_t* params;
   const display_mode_t* mode;
-  controller_->GetPanelConfig(display_id, &edid_timings, &params, &mode);
+  controller_->GetPanelConfig(display_id, &edid_timings, &mode);
 
   if (edid_timings) {
     for (const display::DisplayTiming& timing : *edid_timings) {
@@ -1175,9 +1174,8 @@ void Client::OnDisplaysChanged(cpp20::span<const DisplayId> added_display_ids,
     config->cursor_infos_ = std::move(get_cursor_infos_result.value());
 
     const fbl::Vector<display::DisplayTiming>* edid_timings;
-    const display_params_t* params;
     const display_mode_t* mode;
-    if (!controller_->GetPanelConfig(config->id, &edid_timings, &params, &mode)) {
+    if (!controller_->GetPanelConfig(config->id, &edid_timings, &mode)) {
       // This can only happen if the display was already disconnected.
       zxlogf(WARNING, "No config when adding display");
       continue;
@@ -1189,10 +1187,6 @@ void Client::OnDisplaysChanged(cpp20::span<const DisplayId> added_display_ids,
 
     if (edid_timings) {
       Controller::PopulateDisplayMode((*edid_timings)[0], &config->current_.mode);
-    } else if (params != nullptr) {
-      config->current_.mode = {};
-      config->current_.mode.h_addressable = params->width;
-      config->current_.mode.v_addressable = params->height;
     } else {
       ZX_DEBUG_ASSERT(mode != nullptr);
       config->current_.mode = *mode;
@@ -1226,9 +1220,8 @@ void Client::OnDisplaysChanged(cpp20::span<const DisplayId> added_display_ids,
     info.id = ToFidlDisplayId(config->id);
 
     const fbl::Vector<display::DisplayTiming>* edid_timings;
-    const display_params_t* params;
     const display_mode_t* mode;
-    controller_->GetPanelConfig(config->id, &edid_timings, &params, &mode);
+    controller_->GetPanelConfig(config->id, &edid_timings, &mode);
     std::vector<fhd::wire::Mode> modes;
     if (edid_timings) {
       modes.reserve(edid_timings->size());
@@ -1240,13 +1233,6 @@ void Client::OnDisplaysChanged(cpp20::span<const DisplayId> added_display_ids,
                 static_cast<uint32_t>((timing.vertical_field_refresh_rate_millihertz() + 5) / 10),
         });
       }
-    } else if (params != nullptr) {
-      modes.reserve(1);
-      modes.emplace_back(fhd::wire::Mode{
-          .horizontal_resolution = params->width,
-          .vertical_resolution = params->height,
-          .refresh_rate_e2 = params->refresh_rate_e2,
-      });
     } else {
       ZX_DEBUG_ASSERT(mode != nullptr);
       modes.reserve(1);
