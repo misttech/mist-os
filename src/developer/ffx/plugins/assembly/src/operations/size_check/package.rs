@@ -61,10 +61,6 @@ pub struct PackageSetBudget {
     pub creep_budget_bytes: u64,
     /// List of paths to `package_manifest.json` files for each package of the set of the group.
     pub packages: Vec<Utf8PathBuf>,
-    /// Blobs are de-duplicated by hash across the packages of this set.
-    /// This is intended to approximate the process of merging packages.
-    #[serde(default)]
-    pub merge: bool,
 }
 
 /// Size budget for a set of files matched by path.
@@ -281,23 +277,6 @@ fn load_manifests_blobs_match_budgets(budgets: &Vec<PackageSetBudget>) -> Result
                     path: manifest_blob.path,
                 });
             }
-        }
-
-        if budget.merge {
-            let map: BTreeMap<_, _> = budget_blob
-                .blobs
-                .drain(..)
-                .filter_map(|b| match b.path.as_str() {
-                    // Because we are merging the packages into a single package, remove the
-                    // meta.fars from each individual input.
-                    "meta/" => None,
-                    _ => Some((b.hash, b)),
-                })
-                .collect();
-            budget_blob.blobs = map.into_iter().map(|(_k, v)| v).collect();
-
-            // Add additional space for the meta.far.
-            budget_blob.budget.used_bytes = 32768;
         }
 
         budget_blobs.push(budget_blob);
@@ -577,7 +556,7 @@ mod tests {
     }
 
     #[test]
-    fn default_merge_and_creep() {
+    fn default_creep() {
         let budgets: BudgetConfig = serde_json::from_value(json!({
         "package_set_budgets":[
             {
@@ -589,7 +568,6 @@ mod tests {
         .unwrap();
         assert_eq!(budgets.package_set_budgets.len(), 1);
         let package_set_budget = &budgets.package_set_budgets[0];
-        assert!(!package_set_budget.merge);
         assert_eq!(package_set_budget.creep_budget_bytes, 0);
     }
 
@@ -641,14 +619,12 @@ mod tests {
                     "name": "Software Delivery",
                     "budget_bytes": 27,
                     "creep_budget_bytes": 2i32,
-                    "merge":false,
                     "packages": [],
                 },
                 {
                     "name": "Component Framework",
                     "budget_bytes": 51i32,
                     "creep_budget_bytes": 2i32,
-                    "merge":false,
                     "packages": [],
                 }
             ],
@@ -692,14 +668,12 @@ mod tests {
                     "name": "Software Delivery",
                     "budget_bytes": 27,
                     "creep_budget_bytes": 2i32,
-                    "merge":false,
                     "packages": [],
                 },
                 {
                     "name": "Component Framework",
                     "budget_bytes": 51i32,
                     "creep_budget_bytes": 2i32,
-                    "merge":false,
                     "packages": [],
                 }
             ],
@@ -743,14 +717,12 @@ mod tests {
                     "name": "Software Delivery",
                     "budget_bytes": 27,
                     "creep_budget_bytes": 2i32,
-                    "merge":false,
                     "packages": [],
                 },
                 {
                     "name": "Component Framework",
                     "budget_bytes": 51i32,
                     "creep_budget_bytes": 2i32,
-                    "merge":false,
                     "packages": [],
                 }
             ],
@@ -788,7 +760,6 @@ mod tests {
                 "name": "Software Delivery",
                 "budget_bytes": 1i32,
                 "creep_budget_bytes": 2i32,
-                "merge":false,
                 "packages": [],
             }]}),
         );
@@ -826,7 +797,6 @@ mod tests {
                 "name": "Software Deliver",
                 "budget_bytes": 1i32,
                 "creep_budget_bytes": 1i32,
-                "merge": false,
                 "packages": [],
             }]}),
         );
@@ -856,100 +826,6 @@ mod tests {
     }
 
     #[test]
-    fn two_blobs_with_one_shared_fails_over_budget() {
-        let test_fs = TestFs::new();
-        test_fs.write(
-            "size_budgets.json",
-            json!({"package_set_budgets":[{
-                "name": "Software Deliver",
-                "budget_bytes": 1i32,
-                "creep_budget_bytes": 2i32,
-                "merge": true,
-                "packages": [
-                    test_fs.path("obj/src/sys/pkg/bin/pkg-cache/pkg-cache/package_manifest.json"),
-                    test_fs.path("obj/src/sys/pkg/bin/pkgfs/pkgfs/package_manifest.json"),
-                ]
-            }]}),
-        );
-        test_fs.write(
-            "obj/src/sys/pkg/bin/pkg-cache/pkg-cache/package_manifest.json",
-            json!({
-                "version": "1",
-                "repository": "testrepository.com",
-                "package": {
-                    "name": "pkg-cache",
-                    "version": "0"
-                },
-                "blobs" : [{
-                    "source_path": "first_blob",
-                    "path": "ignored",
-                    "merkle": "0e56473237b6b2ce39358c11a0fbd2f89902f246d966898d7d787c9025124d51",
-                    "size": 16i32
-                },{
-                    "source_path": "second_blob_used_by_two_packages_of_the_component",
-                    "path": "ignored",
-                    "merkle": "b62ee413090825c2ae70fe143b34cbd851f055932cfd5e7ca4ef0efbb802da2f",
-                    "size": 64i32
-                }]
-            }),
-        );
-        test_fs.write(
-            "obj/src/sys/pkg/bin/pkgfs/pkgfs/package_manifest.json",
-            json!({
-                "version": "1",
-                "repository": "testrepository.com",
-                "package": {
-                    "name": "pkg-cache",
-                    "version": "0"
-                },
-                "blobs" : [{
-                    "source_path": "second_blob_used_by_two_packages_of_the_component",
-                    "path": "ignored",
-                    "merkle": "b62ee413090825c2ae70fe143b34cbd851f055932cfd5e7ca4ef0efbb802da2f",
-                    "size": 64i32
-                }]
-            }),
-        );
-
-        test_fs.write(
-            "blobs.json",
-            json!([{
-                "merkle": "0e56473237b6b2ce39358c11a0fbd2f89902f246d966898d7d787c9025124d51",
-                "size": 8i32
-            },{
-                "merkle": "b62ee413090825c2ae70fe143b34cbd851f055932cfd5e7ca4ef0efbb802da2f",
-                "size": 32i32
-            },{
-                "merkle": "01ecd6256f89243e1f0f7d7022cc2e8eb059b06c941d334d9ffb108478749646",
-                "size": 164i32
-            }]),
-        );
-        let res = verify_budgets_with_tools(
-            PackageSizeCheckArgs {
-                blobfs_layout: BlobfsLayout::Compact,
-                budgets: test_fs.path("size_budgets.json"),
-                blob_sizes: [test_fs.path("blobs.json")].to_vec(),
-                gerrit_output: Some(test_fs.path("output.json")),
-                verbose: false,
-                verbose_json_output: None,
-            },
-            Box::new(FakeToolProvider::default()),
-        );
-
-        test_fs.assert_eq(
-            "output.json",
-            json!({
-                "Software Deliver": 32808i32,
-                "Software Deliver.budget": 1i32,
-                "Software Deliver.creepBudget": 2i32,
-                "Software Deliver.owner": "http://go/fuchsia-size-stats/single_component/?f=component%3Ain%3ASoftware+Deliver"
-            }),
-        );
-        // Exceeding budgets does not fail the build.
-        assert!(matches!(res, Ok(())));
-    }
-
-    #[test]
     fn blob_size_are_summed_test() {
         let test_fs = TestFs::new();
         test_fs.write(
@@ -958,7 +834,6 @@ mod tests {
                 "name": "Software Deliver",
                 "creep_budget_bytes": 2i32,
                 "budget_bytes": 7497932i32,
-                "merge": false,
                 "packages": [
                     test_fs.path("obj/src/sys/pkg/bin/pkg-cache/pkg-cache/package_manifest.json"),
                 ]
@@ -1032,7 +907,6 @@ mod tests {
             "name": "Software Deliver",
                 "creep_budget_bytes": 1i32,
                 "budget_bytes": 7497932i32,
-                "merge": false,
                 "packages": [
                     test_fs.path("obj/src/sys/pkg/bin/pkg-cache/pkg-cache/package_manifest.json"),
                     test_fs.path("obj/src/sys/pkg/bin/pkgfs/pkgfs/package_manifest.json"),
@@ -1041,7 +915,6 @@ mod tests {
                 "name": "Connectivity",
                 "creep_budget_bytes": 1i32,
                 "budget_bytes": 10884219,
-                "merge": false,
                 "packages": [
                     test_fs.path( "obj/src/connectivity/bluetooth/core/bt-gap/bt-gap/package_manifest.json"),]
             }]}),
@@ -1205,7 +1078,6 @@ mod tests {
                 "name": "Connectivity",
                 "creep_budget_bytes": 1i32,
                 "budget_bytes": 7497932i32,
-                "merge": false,
                 "packages": [
                     test_fs.path("obj/src/sys/pkg/bin/pkg-cache/pkg-cache/package_manifest.json"),
                 ]
@@ -1263,7 +1135,6 @@ mod tests {
                     "name": "Software Deliver",
                     "creep_budget_bytes": 2i32,
                     "budget_bytes": 64i32,
-                    "merge": false,
                     "packages": [
                         test_fs.path("obj/src/sys/pkg/bin/pkg-cache/pkg-cache/package_manifest.json"),
                         test_fs.path("obj/src/sys/pkg/bin/pkgfs/pkgfs/package_manifest.json"),
@@ -1348,7 +1219,6 @@ mod tests {
                     "name": "Software Deliver",
                     "creep_budget_bytes": 2i32,
                     "budget_bytes": 256i32,
-                    "merge": false,
                     "packages": [
                         test_fs.path("obj/src/my_program/package_manifest.json"),
                     ]
