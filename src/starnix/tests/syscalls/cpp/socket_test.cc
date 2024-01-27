@@ -8,7 +8,6 @@
 #include <poll.h>
 #include <string.h>
 #include <sys/epoll.h>
-#include <sys/mman.h>
 #include <sys/socket.h>
 #include <sys/types.h>
 #include <sys/uio.h>
@@ -20,6 +19,8 @@
 #include <asm-generic/socket.h>
 #include <fbl/unique_fd.h>
 #include <gtest/gtest.h>
+
+#include "fault_test.h"
 
 #if !defined(__NR_memfd_create)
 #if defined(__x86_64__)
@@ -302,18 +303,8 @@ TEST(Socket, ConcurrentCreate) {
   child.join();
 }
 
-class SocketFault : public testing::TestWithParam<std::pair<int, int>> {
+class SocketFault : public FaultTest<testing::TestWithParam<std::pair<int, int>>> {
  protected:
-  static void SetUpTestSuite() {
-    faulting_ptr_ = mmap(nullptr, kFaultingSize_, PROT_NONE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
-    ASSERT_NE(faulting_ptr_, MAP_FAILED);
-  }
-
-  static void TearDownTestSuite() {
-    EXPECT_EQ(munmap(faulting_ptr_, kFaultingSize_), 0) << strerror(errno);
-    faulting_ptr_ = nullptr;
-  }
-
   void SetUp() override {
     const auto [type, protocol] = GetParam();
 
@@ -362,9 +353,6 @@ class SocketFault : public testing::TestWithParam<std::pair<int, int>> {
     ASSERT_GE(flags, 0) << strerror(errno);
     ASSERT_EQ(fcntl(recv_fd_.get(), F_SETFL, flags | O_NONBLOCK), 0) << strerror(errno);
   }
-
-  static constexpr size_t kFaultingSize_ = 987;
-  static inline void* faulting_ptr_;
 
   fbl::unique_fd recv_fd_;
   fbl::unique_fd listen_fd_;
