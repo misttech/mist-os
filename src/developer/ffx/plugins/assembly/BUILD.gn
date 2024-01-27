@@ -37,7 +37,9 @@ ffx_plugin("ffx_assembly") {
     "src/operations/product.rs",
     "src/operations/product/assembly_builder.rs",
     "src/operations/size_check.rs",
+    "src/operations/size_check/breakdown.rs",
     "src/operations/size_check/common.rs",
+    "src/operations/size_check/diff.rs",
     "src/operations/size_check/package.rs",
     "src/operations/size_check/product.rs",
     "src/operations/size_check/visualization.rs",
@@ -115,7 +117,6 @@ ffx_plugin("ffx_assembly") {
   test_deps = [
     "//src/lib/assembly/test_keys",
     "//src/lib/assembly/test_util",
-    "//src/lib/fuchsia",
     "//src/lib/fuchsia-async",
     "//src/storage/blobfs/tools:blobfs",
     "//src/sys/pkg/lib/far/rust:fuchsia-archive",

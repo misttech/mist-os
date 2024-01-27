@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::operations::size_check::common::PackageSizeInfo;
+use crate::operations::size_check::breakdown::SizeBreakdown;
 use anyhow::{Context, Result};
 use camino::Utf8PathBuf;
 use serde::Serialize;
@@ -46,7 +46,7 @@ struct VisualizationBlobNode {
 
 pub fn generate_visualization(
     visualization_dir: &Utf8PathBuf,
-    package_sizes: &Vec<PackageSizeInfo>,
+    breakdown: &SizeBreakdown,
 ) -> Result<()> {
     fs::create_dir_all(visualization_dir.join("d3_v3"))
         .context("creating d3_v3 directory for visualization")?;
@@ -68,36 +68,37 @@ pub fn generate_visualization(
         visualization_dir.join("data.js"),
         format!(
             "var tree_data={}",
-            serde_json::to_string(&generate_visualization_tree(&package_sizes))?
+            serde_json::to_string(&generate_visualization_tree(&breakdown))?
         ),
     )
     .context("creating data.js for visualization")
 }
 
 #[allow(clippy::ptr_arg)]
-fn generate_visualization_tree(package_sizes: &Vec<PackageSizeInfo>) -> VisualizationRootNode {
+fn generate_visualization_tree(breakdown: &SizeBreakdown) -> VisualizationRootNode {
     VisualizationRootNode {
         name: "packages".to_string(),
         kind: "p".to_string(),
-        children: package_sizes
+        children: breakdown
+            .packages
             .iter()
-            .map(|package_size| VisualizationPackageNode {
-                name: package_size.name.clone(),
+            .map(|(name, package)| VisualizationPackageNode {
+                name: name.clone(),
                 kind: "p".to_string(),
-                children: package_size
+                children: package
                     .blobs
                     .iter()
-                    .map(|blob| VisualizationBlobNode {
-                        name: blob.path_in_package.clone(),
+                    .map(|(path, blob)| VisualizationBlobNode {
+                        name: path.clone(),
                         kind: "s".to_string(),
-                        uniqueness: if blob.share_count == 1 {
+                        uniqueness: if blob.references.len() == 1 {
                             "unique".to_string()
                         } else {
                             "shared".to_string()
                         },
-                        proportional_size: blob.used_space_in_blobfs / blob.share_count,
-                        original_size: blob.used_space_in_blobfs,
-                        share_count: blob.share_count,
+                        proportional_size: blob.psize,
+                        original_size: blob.size,
+                        share_count: blob.references.len().try_into().unwrap(),
                     })
                     .collect::<Vec<_>>(),
             })
@@ -108,55 +109,83 @@ fn generate_visualization_tree(package_sizes: &Vec<PackageSizeInfo>) -> Visualiz
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::operations::size_check::common::PackageBlobSizeInfo;
-    use fuchsia_hash::Hash;
+    use crate::operations::size_check::breakdown::{
+        BlobBreakdown, PackageBreakdown, PackageReference,
+    };
+    use pretty_assertions::assert_eq;
     use serde_json::json;
-    use std::str::FromStr;
+    use std::collections::BTreeMap;
 
     #[test]
     fn verify_visualization_tree_test() -> Result<()> {
-        let blob1_info = PackageBlobSizeInfo {
-            merkle: Hash::from_str(
-                "7ddff816740d5803358dd4478d8437585e8d5c984b4361817d891807a16ff581",
-            )?,
-            path_in_package: "bin/defg".to_string(),
-            used_space_in_blobfs: 20,
-            share_count: 1,
-            absolute_share_count: 0,
+        let breakdown = SizeBreakdown {
+            packages: BTreeMap::from([
+                ("package1".to_string(), PackageBreakdown {
+                    name: "package1".to_string(),
+                    blobs: BTreeMap::from([
+                        ("bin/defg".to_string(), BlobBreakdown {
+                            hash: "7ddff816740d5803358dd4478d8437585e8d5c984b4361817d891807a16ff581".to_string(),
+                            size: 20,
+                            psize: 20,
+                            references: vec![
+                                PackageReference {
+                                    path: "bin/defg".to_string(),
+                                    name: "package1".to_string(),
+                                },
+                            ],
+                        }),
+                        ("lib/ghij".to_string(), BlobBreakdown {
+                            hash: "8cb3466c6e66592c8decaeaa3e399652fbe71dad5c3df1a5e919743a33815568".to_string(),
+                            size: 60,
+                            psize: 30,
+                            references: vec![
+                                PackageReference {
+                                    path: "lib/ghij".to_string(),
+                                    name: "package1".to_string(),
+                                },
+                                PackageReference {
+                                    path: "lib/ghij".to_string(),
+                                    name: "package2".to_string(),
+                                },
+                            ],
+                        }),
+                    ]),
+                }),
+                ("package2".to_string(), PackageBreakdown {
+                    name: "package2".to_string(),
+                    blobs: BTreeMap::from([
+                        ("lib/ghij".to_string(), BlobBreakdown {
+                            hash: "8cb3466c6e66592c8decaeaa3e399652fbe71dad5c3df1a5e919743a33815568".to_string(),
+                            size: 60,
+                            psize: 30,
+                            references: vec![
+                                PackageReference {
+                                    path: "lib/ghij".to_string(),
+                                    name: "package1".to_string(),
+                                },
+                                PackageReference {
+                                    path: "lib/ghij".to_string(),
+                                    name: "package2".to_string(),
+                                },
+                            ],
+                        }),
+                        ("abcd/".to_string(), BlobBreakdown {
+                            hash: "eabdb84d26416c1821fd8972e0d835eedaf7468e5a9ebe01e5944462411aec71".to_string(),
+                            size: 40,
+                            psize: 40,
+                            references: vec![
+                                PackageReference {
+                                    path: "abcd/".to_string(),
+                                    name: "package2".to_string(),
+                                },
+                            ],
+                        }),
+                    ]),
+                }),
+            ]),
+            blobs: BTreeMap::new(),
         };
-        let blob2_info = PackageBlobSizeInfo {
-            merkle: Hash::from_str(
-                "8cb3466c6e66592c8decaeaa3e399652fbe71dad5c3df1a5e919743a33815568",
-            )?,
-            path_in_package: "lib/ghij".to_string(),
-            used_space_in_blobfs: 60,
-            share_count: 2,
-            absolute_share_count: 0,
-        };
-        let blob3_info = PackageBlobSizeInfo {
-            merkle: Hash::from_str(
-                "eabdb84d26416c1821fd8972e0d835eedaf7468e5a9ebe01e5944462411aec71",
-            )?,
-            path_in_package: "abcd/".to_string(),
-            used_space_in_blobfs: 40,
-            share_count: 1,
-            absolute_share_count: 0,
-        };
-        let package_size_infos = vec![
-            PackageSizeInfo {
-                name: "package1".to_string(),
-                used_space_in_blobfs: 80,
-                proportional_size: 50,
-                blobs: vec![blob1_info, blob2_info.clone()],
-            },
-            PackageSizeInfo {
-                name: "package2".to_string(),
-                used_space_in_blobfs: 100,
-                proportional_size: 70,
-                blobs: vec![blob2_info, blob3_info],
-            },
-        ];
-        let visualization_tree = generate_visualization_tree(&package_size_infos);
+        let visualization_tree = generate_visualization_tree(&breakdown);
         assert_eq!(
             serde_json::to_value(visualization_tree)?,
             json!(
@@ -189,20 +218,20 @@ mod tests {
                             "n": "package2",
                             "children": [
                                 {
-                                    "n": "lib/ghij",
-                                    "k": "s",
-                                    "t": "shared",
-                                    "value": 30,
-                                    "originalSize": 60,
-                                    "c": 2
-                                },
-                                {
                                     "n": "abcd/",
                                     "k": "s",
                                     "t": "unique",
                                     "value": 40,
                                     "originalSize": 40,
                                     "c": 1
+                                },
+                                {
+                                    "n": "lib/ghij",
+                                    "k": "s",
+                                    "t": "shared",
+                                    "value": 30,
+                                    "originalSize": 60,
+                                    "c": 2
                                 }
                             ],
                             "k": "p"
