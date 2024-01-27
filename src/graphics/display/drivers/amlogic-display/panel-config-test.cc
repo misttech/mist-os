@@ -10,6 +10,8 @@
 
 #include <gtest/gtest.h>
 
+#include "src/graphics/display/lib/api-types-cpp/display-timing.h"
+
 namespace amlogic_display {
 
 namespace {
@@ -176,6 +178,85 @@ TEST(PanelDisplaySetting, InvalidPanels) {
 
   const display_setting_t* timing_unknown = GetPanelDisplaySetting(PANEL_UNKNOWN);
   EXPECT_EQ(timing_unknown, nullptr);
+}
+
+TEST(RefreshRate, P070acbFt) {
+  const display_setting_t* setting_p070acb_ft = GetPanelDisplaySetting(PANEL_P070ACB_FT);
+  ASSERT_NE(setting_p070acb_ft, nullptr);
+  const display::DisplayTiming timing_p070acb_ft = display::ToDisplayTiming(*setting_p070acb_ft);
+  EXPECT_EQ(timing_p070acb_ft.vertical_field_refresh_rate_millihertz(), 60'000);
+}
+
+TEST(RefreshRate, Tv070wsmFt) {
+  const display_setting_t* setting_tv070wsm_ft = GetPanelDisplaySetting(PANEL_TV070WSM_FT);
+  ASSERT_NE(setting_tv070wsm_ft, nullptr);
+  const display::DisplayTiming timing_tv070wsm_ft = display::ToDisplayTiming(*setting_tv070wsm_ft);
+  EXPECT_EQ(timing_tv070wsm_ft.vertical_field_refresh_rate_millihertz(), 60'000);
+}
+
+TEST(RefreshRate, Kd070d82Ft) {
+  const display_setting_t* setting_kd070d82_ft = GetPanelDisplaySetting(PANEL_KD070D82_FT);
+  ASSERT_NE(setting_kd070d82_ft, nullptr);
+  const display::DisplayTiming timing_kd070d82_ft = display::ToDisplayTiming(*setting_kd070d82_ft);
+  EXPECT_EQ(timing_kd070d82_ft.vertical_field_refresh_rate_millihertz(), 60'000);
+}
+
+TEST(RefreshRate, Kd070d82Ft9365) {
+  const display_setting_t* setting_kd070d82_ft_9365 =
+      GetPanelDisplaySetting(PANEL_KD070D82_FT_9365);
+  ASSERT_NE(setting_kd070d82_ft_9365, nullptr);
+  const display::DisplayTiming timing_kd070d82_ft_9365 =
+      display::ToDisplayTiming(*setting_kd070d82_ft_9365);
+  EXPECT_EQ(timing_kd070d82_ft_9365.vertical_field_refresh_rate_millihertz(), 60'000);
+}
+
+TEST(RefreshRate, Tv070wsmFt9365) {
+  const display_setting_t* setting_tv070wsm_ft_9365 =
+      GetPanelDisplaySetting(PANEL_TV070WSM_FT_9365);
+  ASSERT_NE(setting_tv070wsm_ft_9365, nullptr);
+  const display::DisplayTiming timing_tv070wsm_ft_9365 =
+      display::ToDisplayTiming(*setting_tv070wsm_ft_9365);
+  EXPECT_EQ(timing_tv070wsm_ft_9365.vertical_field_refresh_rate_millihertz(), 60'000);
+}
+
+TEST(RefreshRate, Tv070wsmSt7703i) {
+  const display_setting_t* setting_tv070wsm_st7703i =
+      GetPanelDisplaySetting(PANEL_TV070WSM_ST7703I);
+  ASSERT_NE(setting_tv070wsm_st7703i, nullptr);
+  const display::DisplayTiming timing_tv070wsm_st7703i =
+      display::ToDisplayTiming(*setting_tv070wsm_st7703i);
+  EXPECT_EQ(timing_tv070wsm_st7703i.vertical_field_refresh_rate_millihertz(), 60'000);
+}
+
+TEST(RefreshRate, P101dezFt) {
+  const display_setting_t* setting_p101dez_ft = GetPanelDisplaySetting(PANEL_P101DEZ_FT);
+  ASSERT_NE(setting_p101dez_ft, nullptr);
+  const display::DisplayTiming timing_p101dez_ft = display::ToDisplayTiming(*setting_p101dez_ft);
+  EXPECT_EQ(timing_p101dez_ft.vertical_field_refresh_rate_millihertz(), 60'000);
+}
+
+TEST(RefreshRate, Tv101wxmFt) {
+  const display_setting_t* setting_tv101wxm_ft = GetPanelDisplaySetting(PANEL_TV101WXM_FT);
+  ASSERT_NE(setting_tv101wxm_ft, nullptr);
+  const display::DisplayTiming timing_tv101wxm_ft = display::ToDisplayTiming(*setting_tv101wxm_ft);
+  EXPECT_EQ(timing_tv101wxm_ft.vertical_field_refresh_rate_millihertz(), 60'000);
+}
+
+TEST(RefreshRate, Tv101wxmFt9365) {
+  const display_setting_t* setting_tv101wxm_ft_9365 =
+      GetPanelDisplaySetting(PANEL_TV101WXM_FT_9365);
+  ASSERT_NE(setting_tv101wxm_ft_9365, nullptr);
+  const display::DisplayTiming timing_tv101wxm_ft_9365 =
+      display::ToDisplayTiming(*setting_tv101wxm_ft_9365);
+  EXPECT_EQ(timing_tv101wxm_ft_9365.vertical_field_refresh_rate_millihertz(), 60'000);
+}
+
+TEST(RefreshRate, Mtf050fhdi03) {
+  const display_setting_t* setting_mtf050fhdi_03 = GetPanelDisplaySetting(PANEL_MTF050FHDI_03);
+  ASSERT_NE(setting_mtf050fhdi_03, nullptr);
+  const display::DisplayTiming timing_mtf050fhdi_03 =
+      display::ToDisplayTiming(*setting_mtf050fhdi_03);
+  EXPECT_EQ(timing_mtf050fhdi_03.vertical_field_refresh_rate_millihertz(), 55'428);
 }
 
 }  // namespace
