@@ -78,6 +78,14 @@ mod test {
 
     #[derive(Schema)]
     #[allow(dead_code)]
+    struct DeriveStructNewType(u32);
+
+    #[derive(Schema)]
+    #[allow(dead_code)]
+    struct DeriveStructEmptyUnnamed();
+
+    #[derive(Schema)]
+    #[allow(dead_code)]
     struct DeriveStructGeneric<T: Copy>
     where
         T: Clone,
