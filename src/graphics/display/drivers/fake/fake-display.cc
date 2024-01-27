@@ -45,6 +45,7 @@
 #include "src/graphics/display/drivers/fake/image-info.h"
 #include "src/graphics/display/lib/api-types-cpp/config-stamp.h"
 #include "src/graphics/display/lib/api-types-cpp/display-id.h"
+#include "src/graphics/display/lib/api-types-cpp/display-timing.h"
 #include "src/graphics/display/lib/api-types-cpp/driver-buffer-collection-id.h"
 #include "src/graphics/display/lib/api-types-cpp/driver-capture-image-id.h"
 #include "src/graphics/display/lib/api-types-cpp/driver-image-id.h"
@@ -94,10 +95,30 @@ zx_status_t FakeDisplay::DisplayClampRgbImplSetMinimumRgb(uint8_t minimum_rgb) {
 
 void FakeDisplay::PopulateAddedDisplayArgs(added_display_args_t* args) {
   args->display_id = display::ToBanjoDisplayId(kDisplayId);
-  args->panel_capabilities_source = PANEL_CAPABILITIES_SOURCE_DISPLAY_PARAMS;
-  args->panel.params.height = kHeight;
-  args->panel.params.width = kWidth;
-  args->panel.params.refresh_rate_e2 = kRefreshRateFps * 100;
+  args->panel_capabilities_source = PANEL_CAPABILITIES_SOURCE_DISPLAY_MODE;
+
+  const int32_t pixel_clock_hz = kWidth * kHeight * kRefreshRateFps;
+  const int32_t pixel_clock_khz = (pixel_clock_hz + 500) / 1000;
+  ZX_DEBUG_ASSERT(pixel_clock_khz >= 0);
+  ZX_DEBUG_ASSERT(pixel_clock_khz <= std::numeric_limits<uint32_t>::max());
+
+  const display::DisplayTiming timing = {
+      .horizontal_active_px = static_cast<int32_t>(kWidth),
+      .horizontal_front_porch_px = 0,
+      .horizontal_sync_width_px = 0,
+      .horizontal_back_porch_px = 0,
+      .vertical_active_lines = static_cast<int32_t>(kHeight),
+      .vertical_front_porch_lines = 0,
+      .vertical_sync_width_lines = 0,
+      .vertical_back_porch_lines = 0,
+      .pixel_clock_frequency_khz = static_cast<int32_t>(pixel_clock_khz),
+      .fields_per_frame = display::FieldsPerFrame::kProgressive,
+      .hsync_polarity = display::SyncPolarity::kNegative,
+      .vsync_polarity = display::SyncPolarity::kNegative,
+      .vblank_alternates = false,
+      .pixel_repetition = 0,
+  };
+  args->panel.mode = display::ToBanjoDisplayMode(timing);
   args->pixel_format_list = kSupportedPixelFormats;
   args->pixel_format_count = std::size(kSupportedPixelFormats);
   args->cursor_info_count = 0;
