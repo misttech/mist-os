@@ -8,6 +8,8 @@
 #include <fuchsia/virtualaudio/cpp/fidl.h>
 #include <lib/async/dispatcher.h>
 #include <lib/fidl/cpp/synchronous_interface_ptr.h>
+#include <lib/fpromise/promise.h>
+#include <lib/inspect/component/cpp/testing.h>
 #include <lib/inspect/cpp/hierarchy.h>
 #include <lib/sys/component/cpp/testing/realm_builder.h>
 #include <zircon/types.h>
@@ -69,8 +71,9 @@ class HermeticAudioRealm {
   static inline std::string kMockCobalt = "mock_cobalt";
   static inline std::string kThermalTestControl = "thermal_test_control";
 
-  // Read the exported inspect info for the given component.
-  inspect::Hierarchy ReadInspect(std::string_view component_name);
+  const std::shared_ptr<std::optional<inspect::testing::TreeClient>>& InspectTree() {
+    return inspect_tree_;
+  }
 
   // Returns the root.
   component_testing::RealmRoot& realm_root() { return root_; }
@@ -79,6 +82,7 @@ class HermeticAudioRealm {
   struct CtorArgs {
     component_testing::RealmRoot root;
     std::vector<std::unique_ptr<component_testing::LocalComponentImpl>> local_components;
+    std::shared_ptr<std::optional<inspect::testing::TreeClient>> inspect_tree;
   };
   static CtorArgs BuildRealm(Options options, async_dispatcher* dispatcher);
 
@@ -87,6 +91,7 @@ class HermeticAudioRealm {
   component_testing::RealmRoot root_;
   fidl::SynchronousInterfacePtr<fuchsia::virtualaudio::Control> virtual_audio_control_;
   std::vector<std::unique_ptr<component_testing::LocalComponentImpl>> local_components_;
+  std::shared_ptr<std::optional<inspect::testing::TreeClient>> inspect_tree_;
 };
 
 }  // namespace media::audio::test

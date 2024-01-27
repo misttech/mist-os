@@ -4,8 +4,8 @@
 
 #include "src/media/audio/audio_core/testing/integration/hermetic_audio_realm.h"
 
+#include <fidl/fuchsia.inspect/cpp/fidl.h>
 #include <fuchsia/driver/test/cpp/fidl.h>
-#include <fuchsia/inspect/cpp/fidl.h>
 #include <lib/device-watcher/cpp/device-watcher.h>
 #include <lib/driver_test_realm/realm_builder/cpp/lib.h>
 #include <lib/fdio/directory.h>
@@ -26,6 +26,38 @@
 namespace media::audio::test {
 
 namespace {
+class InspectSinkMock : public component_testing::LocalComponentImpl,
+                        public fidl::WireServer<fuchsia_inspect::InspectSink> {
+ public:
+  static const inline std::string kName = "inspect_sink_mock";
+
+  InspectSinkMock(async_dispatcher_t* dispatcher,
+                  std::shared_ptr<std::optional<inspect::testing::TreeClient>> tree)
+      : dispatcher_{dispatcher}, tree_{std::move(tree)} {}
+
+  void OnStart() override {
+    auto provider_svc = std::make_unique<vfs::Service>([this](zx::channel request,
+                                                              async_dispatcher_t* dispatcher) {
+      fidl::ServerEnd<fuchsia_inspect::InspectSink> server_end(std::move(request));
+      bindings_.AddBinding(dispatcher_, std::move(server_end), this, fidl::kIgnoreBindingClosure);
+    });
+
+    FX_CHECK(outgoing()->AddPublicService(
+                 std::move(provider_svc),
+                 fidl::DiscoverableProtocolName<fuchsia_inspect::InspectSink>) == ZX_OK);
+  }
+
+  void Publish(PublishRequestView request, PublishCompleter::Sync& completer) override {
+    ZX_ASSERT(request->has_tree());
+    *tree_ = {inspect::testing::TreeClient(std::move(request->tree()), dispatcher_)};
+  }
+
+ private:
+  async_dispatcher_t* dispatcher_ = nullptr;
+  std::shared_ptr<std::optional<inspect::testing::TreeClient>> tree_;
+  fidl::ServerBindingGroup<fuchsia_inspect::InspectSink> bindings_;
+};
+
 void ConnectToVirtualAudio(component_testing::RealmRoot& root,
                            fidl::SynchronousInterfacePtr<fuchsia::virtualaudio::Control>& out) {
   // Connect to dev.
@@ -107,7 +139,9 @@ class LocalDirectoryExporter : public component_testing::LocalComponentImpl {
 
 // Cannot define these until LocalProcessorCreator is defined.
 HermeticAudioRealm::HermeticAudioRealm(CtorArgs&& args)
-    : root_(std::move(args.root)), local_components_(std::move(args.local_components)) {}
+    : root_(std::move(args.root)),
+      local_components_(std::move(args.local_components)),
+      inspect_tree_(std::move(args.inspect_tree)) {}
 HermeticAudioRealm::~HermeticAudioRealm() = default;
 
 // This returns `void` so we can ASSERT from within Create.
@@ -149,6 +183,11 @@ HermeticAudioRealm::CtorArgs HermeticAudioRealm::BuildRealm(Options options,
 
   builder.AddChild(kAudioCore, "#meta/audio_core.cm");
 
+  auto inspect_tree = std::make_shared<std::optional<inspect::testing::TreeClient>>(std::nullopt);
+  builder.AddLocalChild(InspectSinkMock::kName, [=] {
+    return std::make_unique<InspectSinkMock>(dispatcher, inspect_tree);
+  });
+
   // Route AudioCore -> test component.
   builder.AddRoute({
       .capabilities =
@@ -165,6 +204,15 @@ HermeticAudioRealm::CtorArgs HermeticAudioRealm::BuildRealm(Options options,
           },
       .source = ChildRef{kAudioCore},
       .targets = {ParentRef()},
+  });
+
+  builder.AddRoute({
+      .capabilities =
+          {
+              Protocol{"fuchsia.inspect.InspectSink"},
+          },
+      .source = ChildRef{InspectSinkMock::kName},
+      .targets = {ChildRef{kAudioCore}},
   });
 
   // Route test component -> AudioCore.
@@ -248,7 +296,10 @@ HermeticAudioRealm::CtorArgs HermeticAudioRealm::BuildRealm(Options options,
 
   // Route some capabilities to the driver realm.
   builder.AddRoute({
-      .capabilities = {Protocol{"fuchsia.logger.LogSink"}},
+      .capabilities =
+          {
+              Protocol{"fuchsia.logger.LogSink"},
+          },
       .source = ParentRef(),
       .targets = {ChildRef{"driver_test_realm"}},
   });
@@ -267,7 +318,10 @@ HermeticAudioRealm::CtorArgs HermeticAudioRealm::BuildRealm(Options options,
       .targets = {ParentRef()},
   });
   builder.AddRoute({
-      .capabilities = {Protocol{"fuchsia.logger.LogSink"}},
+      .capabilities =
+          {
+              Protocol{"fuchsia.logger.LogSink"},
+          },
       .source = ParentRef(),
       .targets = {ChildRef{kThermalTestControl}},
   });
@@ -280,7 +334,10 @@ HermeticAudioRealm::CtorArgs HermeticAudioRealm::BuildRealm(Options options,
       .targets = {ChildRef{kAudioCore}},
   });
   builder.AddRoute({
-      .capabilities = {Protocol{"fuchsia.logger.LogSink"}},
+      .capabilities =
+          {
+              Protocol{"fuchsia.logger.LogSink"},
+          },
       .source = ParentRef(),
       .targets = {ChildRef{kMockCobalt}},
   });
@@ -307,26 +364,7 @@ HermeticAudioRealm::CtorArgs HermeticAudioRealm::BuildRealm(Options options,
 
   // The lifecycle of local components created here is managed by the realm builder,
   // hence we return empty `.local_components`.
-  return {.root = builder.Build(dispatcher), .local_components = {}};
-}
-
-inspect::Hierarchy HermeticAudioRealm::ReadInspect(std::string_view component_name) {
-  // Only supported component for now.
-  FX_CHECK(component_name == kAudioCore);
-
-  fuchsia::inspect::TreeSyncPtr tree;
-  auto status = fdio_service_connect_at(root_.component().exposed().unowned_channel()->get(),
-                                        "diagnostics-audio-core/fuchsia.inspect.Tree",
-                                        tree.NewRequest().TakeChannel().release());
-  FX_CHECK(status == ZX_OK) << "could not connect to fuchsia.inspect.Tree for component '"
-                            << component_name << ": " << status;
-
-  fuchsia::inspect::TreeContent c;
-  status = tree->GetContent(&c);
-  FX_CHECK(status == ZX_OK) << "could not get VMO from fuchsia.inspect.Tree: " << status;
-  FX_CHECK(c.has_buffer());
-
-  return inspect::ReadFromVmo(c.buffer().vmo).take_value();
+  return {.root = builder.Build(dispatcher), .local_components = {}, .inspect_tree = inspect_tree};
 }
 
 }  // namespace media::audio::test

@@ -7,6 +7,7 @@
 #include <fidl/fuchsia.metrics/cpp/natural_types.h>
 #include <lib/component/incoming/cpp/protocol.h>
 #include <lib/fidl/cpp/wire/internal/transport_channel.h>
+#include <lib/inspect/component/cpp/component.h>
 #include <lib/syslog/cpp/macros.h>
 
 #include <memory>
@@ -1227,7 +1228,8 @@ Reporter::Reporter(sys::ComponentContext& component_context, async_dispatcher_t*
 }
 
 void Reporter::InitInspect() {
-  impl_->inspector = std::make_unique<sys::ComponentInspector>(&impl_->component_context);
+  impl_->inspector = std::make_unique<inspect::ComponentInspector>(impl_->fidl_dispatcher,
+                                                                   inspect::PublishOptions{});
   inspect::Node& root_node = impl_->inspector->root();
 
   impl_->failed_to_connect_to_device_count =

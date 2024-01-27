@@ -6,6 +6,7 @@
 #define SRC_MEDIA_AUDIO_AUDIO_CORE_TESTING_INTEGRATION_HERMETIC_AUDIO_TEST_H_
 
 #include <fuchsia/thermal/cpp/fidl.h>
+#include <lib/inspect/cpp/hierarchy.h>
 #include <lib/syslog/cpp/macros.h>
 #include <zircon/device/audio.h>
 
@@ -36,7 +37,8 @@ class HermeticAudioTest : public TestFixture {
  protected:
   // Tests that require real-time response should have no data loss from overflow or underflow if
   // run in a capable environment, but known issues can prevent this.
-  // TODO(https://fxbug.dev/42160300): re-enable underflow detection once outstanding bugs are resolved.
+  // TODO(https://fxbug.dev/42160300): re-enable underflow detection once outstanding bugs are
+  // resolved.
   static constexpr bool kEnableAllOverflowAndUnderflowChecksInRealtimeTests = false;
 
   // Creates a directory with an audio_core_config.json file.
@@ -173,6 +175,8 @@ class HermeticAudioTest : public TestFixture {
   void OnDefaultDeviceChanged(uint64_t old_default_token, uint64_t new_default_token);
   void ExpectInspectMetrics(const std::vector<std::string>& path,
                             const ExpectedInspectProperties& props);
+
+  inspect::Hierarchy GetInspectHierarchy();
 
   struct DeviceInfo {
     std::unique_ptr<VirtualDevice> virtual_device;

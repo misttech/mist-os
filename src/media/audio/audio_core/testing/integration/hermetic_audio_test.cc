@@ -5,6 +5,7 @@
 #include "src/media/audio/audio_core/testing/integration/hermetic_audio_test.h"
 
 #include <lib/inspect/cpp/hierarchy.h>
+#include <lib/inspect/testing/cpp/inspect.h>
 #include <lib/syslog/cpp/macros.h>
 #include <lib/trace-provider/provider.h>
 #include <lib/trace/event.h>
@@ -585,9 +586,23 @@ void HermeticAudioTest::ExpectInspectMetrics(CapturerShimImpl* capturer,
   ExpectInspectMetrics({"capturers", capturer->reporting_id_str()}, props);
 }
 
+inspect::Hierarchy HermeticAudioTest::GetInspectHierarchy() {
+  RunLoopUntil([&] { return realm_->InspectTree()->has_value(); });
+
+  std::optional<zx::vmo> vmo;
+  realm_->InspectTree()->value()->GetContent().Then(
+      [&](fidl::WireUnownedResult<fuchsia_inspect::Tree::GetContent>& content) {
+        vmo.emplace(std::move(content.value().content.buffer().vmo));
+      });
+
+  RunLoopUntil([&] { return vmo.has_value(); });
+
+  return std::move(inspect::ReadFromVmo(*vmo).value());
+}
+
 void HermeticAudioTest::ExpectInspectMetrics(const std::vector<std::string>& path,
                                              const ExpectedInspectProperties& props) {
-  auto root = realm_->ReadInspect(HermeticAudioRealm::kAudioCore);
+  auto root = GetInspectHierarchy();
   auto path_string = fxl::JoinStrings(path, "/");
   auto h = root.GetByPath(path);
   if (!h) {
@@ -598,7 +613,8 @@ void HermeticAudioTest::ExpectInspectMetrics(const std::vector<std::string>& pat
 }
 
 bool HermeticAudioTest::DeviceHasUnderflows(const std::string& unique_id) {
-  auto root = realm_->ReadInspect(HermeticAudioRealm::kAudioCore);
+  auto root = GetInspectHierarchy();
+
   for (const char* kind : {"device underflows", "pipeline underflows"}) {
     std::vector<std::string> path = {
         "output devices",
@@ -617,7 +633,6 @@ bool HermeticAudioTest::DeviceHasUnderflows(const std::string& unique_id) {
       continue;
     }
     if (p->value() > 0) {
-      FX_LOGS(WARNING) << "Found underflow at " << path_string;
       return true;
     }
   }

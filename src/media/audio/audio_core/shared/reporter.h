@@ -7,7 +7,7 @@
 
 #include <fuchsia/media/cpp/fidl.h>
 #include <lib/async/cpp/task.h>
-#include <lib/sys/inspect/cpp/component.h>
+#include <lib/inspect/component/cpp/component.h>
 #include <lib/zx/time.h>
 
 #include <memory>
@@ -265,7 +265,7 @@ class Reporter {
   // Exported for tests.
   const inspect::Inspector& inspector() {
     std::lock_guard<std::mutex> lock(mutex_);
-    return *impl_->inspector->inspector();
+    return impl_->inspector->inspector();
   }
 
  private:
@@ -302,7 +302,7 @@ class Reporter {
     sys::ComponentContext& component_context;
     async_dispatcher_t* fidl_dispatcher;
     async_dispatcher_t* io_dispatcher;
-    std::unique_ptr<sys::ComponentInspector> inspector;
+    std::unique_ptr<inspect::ComponentInspector> inspector;
     std::unique_ptr<media::audio::MetricsImpl> metrics_impl;
 
     inspect::UintProperty failed_to_connect_to_device_count;
