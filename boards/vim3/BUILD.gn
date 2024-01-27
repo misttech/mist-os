@@ -311,11 +311,12 @@ board_input_bundle("main_bundle") {
     # loaned free pages hits a low fraction of this value before any overall
     # OOM, pages aren't being stranded when it really matters.
     #
-    # 384 MiB, but with unused pages loaned back to zircon (see kernel.ppb
-    # settings above). This value leaves some loaned and free pages after boot,
-    # where not all the loaned pages are used by pager-backed VMOs. Whether
-    # those pages get absorbed later by pager-backed VMOs depends on workload.
-    "driver.sysmem.contiguous_memory_size=402653184",
+    # 306 MiB, but with unused pages loaned back to zircon (see kernel.ppb
+    # settings above). This value can leave some loaned and free pages just
+    # after boot, where not all the loaned pages are used by pager-backed VMOs.
+    # Whether those pages get absorbed later by pager-backed VMOs depends on
+    # workload.
+    "driver.sysmem.contiguous_memory_size=320864256",
   ]
 }
 
