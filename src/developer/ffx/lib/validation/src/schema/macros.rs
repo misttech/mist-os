@@ -80,7 +80,7 @@ mod test {
     #[allow(dead_code)]
     struct DeriveStructGeneric<T: Copy>
     where
-        T: Schema + 'static,
+        T: Clone,
     {
         a: T,
         b: String,

@@ -2,10 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use proc_macro2::Span;
 use quote::quote;
 use syn::{
     parse::Parse, parse_macro_input, punctuated::Punctuated, Attribute, Generics, Ident, Lit, Path,
-    Token, Type, TypeTuple,
+    Token, Type, TypeTuple, WherePredicate,
 };
 
 // TODO(b/316034512): Derive macro for structs and enums
@@ -94,14 +95,50 @@ pub fn schema(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
 #[proc_macro_derive(Schema)]
 pub fn schema_derive(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     // Essentially turn the item into a schema item.
-    let item = parse_macro_input!(input as syn::DeriveInput);
+    let mut item = parse_macro_input!(input as syn::DeriveInput);
 
     // TODO(https://fxbug.dev/320578372): Support where clause attributes: #[schema(where T: Schema + 'static)]
+
+    // TODO: Support for transparent schemas: #[schema(transparent)]
+    // Type and lifetime parameters don't need static bounds for a transparent schema.
+    let schema_trait_bound: syn::TypeParamBound =
+        syn::parse(quote!(::ffx_validation::Schema).into()).unwrap();
+    let static_lifetime = syn::Lifetime::new("'static", Span::call_site());
+
+    // Where predicates for the generated schema impl's where clause.
+    let mut clauses = Vec::<WherePredicate>::new();
+
+    // Aliases use std::any::TypeId, which requires the struct to be static.
+    // Add static lifetime bounds to all lifetimes appearing in the type.
+    for lt in item.generics.lifetimes() {
+        // impl<'lt> Schema for MyStruct<'lt> where 'lt: 'static
+        //                                          ^^^^^^^^^^^^
+        clauses.push(WherePredicate::Lifetime(syn::PredicateLifetime {
+            lifetime: lt.lifetime.clone(),
+            colon_token: Default::default(),
+            bounds: Punctuated::from_iter([static_lifetime.clone()]),
+        }));
+    }
+
+    // Also add static lifetime bounds to type parameters.
+    for ty_param in item.generics.type_params() {
+        // impl<T> Schema for MyStruct<T> where T: 'static
+        //                                      ^^^^^^^^^^^
+        clauses.push(WherePredicate::Type(syn::PredicateType {
+            lifetimes: None,
+            bounded_ty: Type::Path(syn::TypePath {
+                qself: None,
+                path: Path::from(ty_param.ident.clone()),
+            }),
+            colon_token: Default::default(),
+            bounds: Punctuated::from_iter([syn::TypeParamBound::Lifetime(static_lifetime.clone())]),
+        }));
+    }
 
     let out_item = match item.data {
         syn::Data::Struct(struct_item) => {
             let ty = match struct_item.fields {
-                // struct Name -> null
+                // struct Name; -> null type
                 syn::Fields::Unit => SchemaType::Null,
                 // struct Name { field: u32 } -> struct { field: u32 }
                 syn::Fields::Named(fields) => {
@@ -119,6 +156,16 @@ pub fn schema_derive(input: proc_macro::TokenStream) -> proc_macro::TokenStream 
                         if let Some(comma) = comma {
                             out_fields.push_punct(comma.clone());
                         }
+
+                        // Add schema bound to the where clause.
+                        // for struct MyStruct { field: Type } -> impl ... where Type: Schema
+                        //                                                       ^^^^^^^^^^^^
+                        clauses.push(WherePredicate::Type(syn::PredicateType {
+                            lifetimes: None,
+                            bounded_ty: field.ty.clone(),
+                            colon_token: Default::default(),
+                            bounds: Punctuated::from_iter([schema_trait_bound.clone()]),
+                        }));
                     }
                     SchemaType::Struct { fields: out_fields }
                 }
@@ -130,6 +177,16 @@ pub fn schema_derive(input: proc_macro::TokenStream) -> proc_macro::TokenStream 
                         if let Some(comma) = comma {
                             elems.push_punct(comma.clone());
                         }
+
+                        // Add schema bound to the where clause.
+                        // for struct MyStruct { field: Type } -> impl ... where Type: Schema
+                        //                                                       ^^^^^^^^^^^^
+                        clauses.push(WherePredicate::Type(syn::PredicateType {
+                            lifetimes: None,
+                            bounded_ty: field.ty.clone(),
+                            colon_token: Default::default(),
+                            bounds: Punctuated::from_iter([schema_trait_bound.clone()]),
+                        }));
                     }
                     SchemaType::Alias(Type::Tuple(TypeTuple {
                         paren_token: fields.paren_token,
@@ -141,6 +198,8 @@ pub fn schema_derive(input: proc_macro::TokenStream) -> proc_macro::TokenStream 
             let name = item.ident;
             let (_, ty_args, _) = item.generics.split_for_impl();
             let impl_path = quote!(#name #ty_args);
+
+            item.generics.make_where_clause().predicates.extend(clauses);
 
             SchemaItem::Impl(SchemaImplItem {
                 generics: item.generics,
