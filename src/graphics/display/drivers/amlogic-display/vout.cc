@@ -146,12 +146,9 @@ void Vout::PopulateAddedDisplayArgs(
   switch (type_) {
     case VoutType::kDsi: {
       args->display_id = display::ToBanjoDisplayId(display_id);
-      args->panel_capabilities_source = PANEL_CAPABILITIES_SOURCE_DISPLAY_PARAMS;
+      args->panel_capabilities_source = PANEL_CAPABILITIES_SOURCE_DISPLAY_MODE;
       display::DisplayTiming display_timing = display::ToDisplayTiming(dsi_.disp_setting);
-      args->panel.params.height = display_timing.horizontal_active_px;
-      args->panel.params.width = display_timing.vertical_active_lines;
-      args->panel.params.refresh_rate_e2 =
-          static_cast<uint32_t>(display_timing.vertical_field_refresh_rate_millihertz());
+      args->panel.mode = display::ToBanjoDisplayMode(display_timing);
       args->pixel_format_list = pixel_formats.data();
       args->pixel_format_count = pixel_formats.size();
       args->cursor_info_count = 0;
