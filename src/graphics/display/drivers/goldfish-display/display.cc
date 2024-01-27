@@ -42,6 +42,7 @@
 #include "src/graphics/display/drivers/goldfish-display/render_control.h"
 #include "src/graphics/display/lib/api-types-cpp/config-stamp.h"
 #include "src/graphics/display/lib/api-types-cpp/display-id.h"
+#include "src/graphics/display/lib/api-types-cpp/display-timing.h"
 #include "src/graphics/display/lib/api-types-cpp/driver-buffer-collection-id.h"
 #include "src/graphics/display/lib/api-types-cpp/driver-image-id.h"
 #include "src/lib/fxl/strings/string_printf.h"
@@ -243,17 +244,37 @@ void Display::DisplayControllerImplSetDisplayControllerInterface(
     const display_controller_interface_protocol_t* interface) {
   std::vector<added_display_args_t> args;
   for (auto& it : devices_) {
+    const uint32_t width = it.second.width;
+    const uint32_t height = it.second.height;
+    const uint32_t refresh_rate_hz = it.second.refresh_rate_hz;
+
+    const int64_t pixel_clock_hz = int64_t{width} * height * refresh_rate_hz;
+    const int64_t pixel_clock_khz = (pixel_clock_hz + 500) / 1000;
+    ZX_DEBUG_ASSERT(pixel_clock_khz >= 0);
+    ZX_DEBUG_ASSERT(pixel_clock_khz <= std::numeric_limits<uint32_t>::max());
+    const display::DisplayTiming timing = {
+        .horizontal_active_px = static_cast<int32_t>(width),
+        .horizontal_front_porch_px = 0,
+        .horizontal_sync_width_px = 0,
+        .horizontal_back_porch_px = 0,
+        .vertical_active_lines = static_cast<int32_t>(height),
+        .vertical_front_porch_lines = 0,
+        .vertical_sync_width_lines = 0,
+        .vertical_back_porch_lines = 0,
+        .pixel_clock_frequency_khz = static_cast<int32_t>(pixel_clock_khz),
+        .fields_per_frame = display::FieldsPerFrame::kProgressive,
+        .hsync_polarity = display::SyncPolarity::kNegative,
+        .vsync_polarity = display::SyncPolarity::kNegative,
+        .vblank_alternates = false,
+        .pixel_repetition = 0,
+    };
+
     added_display_args_t display = {
         .display_id = display::ToBanjoDisplayId(it.first),
-        .panel_capabilities_source = PANEL_CAPABILITIES_SOURCE_DISPLAY_PARAMS,
+        .panel_capabilities_source = PANEL_CAPABILITIES_SOURCE_DISPLAY_MODE,
         .panel =
             {
-                .params =
-                    {
-                        .width = it.second.width,
-                        .height = it.second.height,
-                        .refresh_rate_e2 = it.second.refresh_rate_hz * 100,
-                    },
+                .mode = display::ToBanjoDisplayMode(timing),
             },
         .pixel_format_list = kPixelFormats,
         .pixel_format_count = sizeof(kPixelFormats) / sizeof(kPixelFormats[0]),
