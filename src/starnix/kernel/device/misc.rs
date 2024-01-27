@@ -19,8 +19,9 @@ pub fn misc_device_init(current_task: &CurrentTask) {
     let misc_class = registry.get_or_create_class("misc".into(), registry.virtual_bus());
     registry.add_and_register_device(
         current_task,
-        "hwrng".into(),
-        DeviceMetadata::new("hwrng".into(), DeviceType::HW_RANDOM, DeviceMode::Char),
+        // TODO(https://fxbug.dev/322365477) consider making this configurable
+        "hw_random".into(),
+        DeviceMetadata::new("hw_random".into(), DeviceType::HW_RANDOM, DeviceMode::Char),
         misc_class.clone(),
         DeviceDirectory::new,
         simple_device_ops::<DevRandom>,
