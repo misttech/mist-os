@@ -682,11 +682,17 @@ impl<'a> Drop for TrimmableExtents<'a> {
 
 impl Allocator {
     pub fn new(filesystem: Arc<FxFilesystem>, object_id: u64) -> Allocator {
+        let block_size = filesystem.block_size();
+        // We expect device size to be a multiple of block size. Throw away any tail.
+        let device_size = round_down(filesystem.device().size(), block_size);
+        if device_size != filesystem.device().size() {
+            tracing::warn!("Device size is not block aligned. Rounding down.");
+        }
         let max_extent_size_bytes = max_extent_size_for_block_size(filesystem.block_size());
         Allocator {
             filesystem: Arc::downgrade(&filesystem),
-            block_size: filesystem.block_size(),
-            device_size: filesystem.device().size(),
+            block_size,
+            device_size,
             object_id,
             max_extent_size_bytes,
             tree: LSMTree::new(merge, Box::new(NullCache {})),
