@@ -44,8 +44,8 @@
 
 // Panel: BOE TV070WSM-TG1
 // DDIC: Fitipower JD9365
-// Board: Astro, Nelson
-// Touch IC: FocalTech FT3x27 (Astro), Goodix GT6853 (Nelson)
+// Board: Nelson
+// Touch IC: Goodix GT6853 (Nelson)
 #define PANEL_TV070WSM_FT_9365 UINT8_C(0x08)
 
 // Panel: K&D KD070D82-39TI-A010
