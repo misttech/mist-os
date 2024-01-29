@@ -3,6 +3,7 @@
 # found in the LICENSE file.
 
 import("//build/config/clang/clang.gni")
+import("//build/rust/config.gni")
 import("//build/toolchain/breakpad.gni")
 import("//build/toolchain/ccache.gni")
 import("//build/toolchain/concurrent_jobs.gni")
@@ -646,7 +647,14 @@ template("clang_toolchain") {
         # TODO(https://fxbug.dev/42124325): Replacement for rustenv
         command += "{{rustenv}}${ld_location_env} RUST_BACKTRACE=1 $rustc --color=always --crate-name {{crate_name}} {{source}}"
         command += " --crate-type {{crate_type}} --emit=dep-info=$depfile,link -Zdep-info-omit-d-target $link_map_args {{rustflags}}"
-        command += " -o \"{{UNSTRIPPED_OUTFILE}}\" {{rustdeps}} {{externs}}"
+        command += " -o \"{{UNSTRIPPED_OUTFILE}}\""
+        if (rustc_use_response_files) {
+          rspfile = outfile + ".rsp"
+          rspfile_content = "{{rustdeps}} {{externs}}"
+          command += " -Zshell-argfiles @shell:" + rspfile
+        } else {
+          command += " {{rustdeps}} {{externs}}"
+        }
         command +=
             " && $verify_depfile -t \"{{label}}\" -d $depfile {{sources}}"
 
@@ -765,7 +773,14 @@ template("clang_toolchain") {
         # TODO(https://fxbug.dev/42124325): Replacement for rustenv
         command += "{{rustenv}} RUST_BACKTRACE=1 $rustc --color=always --crate-name {{crate_name}} {{source}}"
         command += " --crate-type {{crate_type}} --emit=dep-info=$depfile,link -Zdep-info-omit-d-target {{rustflags}}"
-        command += " -o {{output}} {{rustdeps}} {{externs}}"
+        command += " -o {{output}}"
+        if (rustc_use_response_files) {
+          rspfile = "{{output}}.rsp"
+          rspfile_content = "{{rustdeps}} {{externs}}"
+          command += " -Zshell-argfiles @shell:" + rspfile
+        } else {
+          command += " {{rustdeps}} {{externs}}"
+        }
         command +=
             " && $verify_depfile -t \"{{label}}\" -d $depfile {{sources}}"
 
@@ -791,7 +806,14 @@ template("clang_toolchain") {
         # TODO(https://fxbug.dev/42124325): Replacement for rustenv
         command += "{{rustenv}} RUST_BACKTRACE=1 $rustc --color=always --crate-name {{crate_name}} {{source}}"
         command += " --crate-type {{crate_type}} --emit=dep-info=$depfile,link -Zdep-info-omit-d-target {{rustflags}}"
-        command += " -o {{output}} {{rustdeps}} {{externs}}"
+        command += " -o {{output}} "
+        if (rustc_use_response_files) {
+          rspfile = "{{output}}.rsp"
+          rspfile_content = "{{rustdeps}} {{externs}}"
+          command += " -Zshell-argfiles @shell:" + rspfile
+        } else {
+          command += " {{rustdeps}} {{externs}}"
+        }
         command +=
             " && $verify_depfile -t \"{{label}}\" -d $depfile {{sources}}"
 
@@ -835,7 +857,14 @@ template("clang_toolchain") {
         # TODO(https://fxbug.dev/42124325): Replacement for rustenv
         command += "{{rustenv}} RUST_BACKTRACE=1 $rustc --color=always --crate-name {{crate_name}} {{source}} "
         command += " --crate-type {{crate_type}} --emit=dep-info=$depfile,link -Zdep-info-omit-d-target {{rustflags}}"
-        command += " -o {{output}} --extern proc_macro {{rustdeps}} {{externs}}"
+        command += " -o {{output}} --extern proc_macro"
+        if (rustc_use_response_files) {
+          rspfile = "{{output}}.rsp"
+          rspfile_content = "{{rustdeps}} {{externs}}"
+          command += " -Zshell-argfiles @shell:" + rspfile
+        } else {
+          command += " {{rustdeps}} {{externs}}"
+        }
         command +=
             " && $verify_depfile -t \"{{label}}\" -d $depfile {{sources}}"
 
