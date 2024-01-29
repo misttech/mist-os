@@ -131,6 +131,8 @@ class ConsoleContext : public ProcessObserver,
   const fxl::RefPtr<PrettyStackManager>& pretty_stack_manager() { return pretty_stack_manager_; }
 
   void InitConsoleMode();
+  std::string GetConsoleMode();
+  void SetConsoleMode(std::string mode);
 
   // SessionObserver implementation:
   void HandleNotification(NotificationType, const std::string&) override;
@@ -202,9 +204,6 @@ class ConsoleContext : public ProcessObserver,
     std::map<int, ThreadRecord> id_to_thread;
     std::map<const Thread*, int> thread_to_id;
   };
-
-  std::string GetConsoleMode();
-  void SetConsoleMode(std::string mode);
 
   // Returns the record for the given target, or null (+ assertion) if not
   // found. These pointers are not stable across target list changes.

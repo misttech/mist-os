@@ -460,7 +460,8 @@ void ConsoleContext::InitConsoleMode() {
   std::string mode = GetConsoleMode();
   Console* console = Console::get();
 
-  if (mode == ClientSettings::System::kConsoleMode_Shell) {
+  if (mode == ClientSettings::System::kConsoleMode_Shell ||
+      mode == ClientSettings::System::kConsoleMode_EmbeddedInteractive) {
     console->EnableInput();
     console->EnableOutput();
   }
@@ -806,8 +807,8 @@ void ConsoleContext::OnThreadStopped(Thread* thread, const StopInfo& info) {
 
   // We've hit a breakpoint. If we're in kConsoleMode_ShellAfterBreak, it's time to switch to
   // kConsoleMode_Shell.
-  if (GetConsoleMode() == ClientSettings::System::kConsoleMode_ShellAfterBreak) {
-    SetConsoleMode(ClientSettings::System::kConsoleMode_Shell);
+  if (GetConsoleMode() == ClientSettings::System::kConsoleMode_Embedded) {
+    SetConsoleMode(ClientSettings::System::kConsoleMode_EmbeddedInteractive);
   }
 
   // Show the location information.
@@ -907,7 +908,8 @@ void ConsoleContext::OnSettingChanged(const SettingStore&, const std::string& se
     std::string mode = GetConsoleMode();
     Console* console = Console::get();
 
-    if (mode == ClientSettings::System::kConsoleMode_Shell) {
+    if (mode == ClientSettings::System::kConsoleMode_Shell ||
+        mode == ClientSettings::System::kConsoleMode_EmbeddedInteractive) {
       console->EnableInput();
       console->EnableOutput();
     } else {

@@ -68,9 +68,10 @@ static const char* kShowStdoutDescription =
 const char* ClientSettings::System::kConsoleMode = "console-mode";
 static const char* kConsoleModeDescription =
     R"(  The style in which zxdb interacts with the console. Valid values are
-  "shell" and "shell-after-break".)";
+  "shell", "embedded", and "embedded-interactive.)";
 const char* ClientSettings::System::kConsoleMode_Shell = "shell";
-const char* ClientSettings::System::kConsoleMode_ShellAfterBreak = "shell-after-break";
+const char* ClientSettings::System::kConsoleMode_Embedded = "embedded";
+const char* ClientSettings::System::kConsoleMode_EmbeddedInteractive = "embedded-interactive";
 
 const char* ClientSettings::System::kLanguage = "language";
 static const char* kLanguageDescription =
@@ -177,10 +178,11 @@ fxl::RefPtr<SettingSchema> CreateSchema() {
   schema->AddBool(ClientSettings::System::kAutoAttachLimbo, kAutoAttachLimboDescription, true);
   schema->AddBool(ClientSettings::System::kShowFilePaths, kShowFilePathsDescription, false);
   schema->AddBool(ClientSettings::System::kShowStdout, kShowStdoutDescription, true);
-  schema->AddString(ClientSettings::System::kConsoleMode, kConsoleModeDescription,
-                    ClientSettings::System::kConsoleMode_Shell,
-                    {ClientSettings::System::kConsoleMode_Shell,
-                     ClientSettings::System::kConsoleMode_ShellAfterBreak});
+  schema->AddString(
+      ClientSettings::System::kConsoleMode, kConsoleModeDescription,
+      ClientSettings::System::kConsoleMode_Shell,
+      {ClientSettings::System::kConsoleMode_Shell, ClientSettings::System::kConsoleMode_Embedded,
+       ClientSettings::System::kConsoleMode_EmbeddedInteractive});
   schema->AddString(ClientSettings::System::kLanguage, kLanguageDescription, "auto",
                     {"rust", "c++", "auto"});
   schema->AddList(ClientSettings::System::kSecondChanceExceptions,

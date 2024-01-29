@@ -33,7 +33,8 @@ struct ClientSettings {
 
     static const char* kConsoleMode;
     static const char* kConsoleMode_Shell;
-    static const char* kConsoleMode_ShellAfterBreak;
+    static const char* kConsoleMode_Embedded;
+    static const char* kConsoleMode_EmbeddedInteractive;
 
     static const char* kLanguage;
     static const char* kLanguage_Cpp;

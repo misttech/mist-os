@@ -49,7 +49,7 @@ const char kDebugModeHelp[] = R"(  --debug-mode
 
 const char kConsoleModeHelp[] = R"(  --console-mode
       The style in which zxdb interacts with the console. Valid values are
-      "shell" (default) and "shell-after-break".)";
+      "shell" (default), "embedded", and "embedded-interactive".)";
 
 const char kHelpHelp[] = R"(  --help
   -h
