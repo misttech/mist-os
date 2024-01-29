@@ -50,6 +50,7 @@ forensics
 ?mdns
 ?mediasession
 ?memory_monitor
+?metrics-logger-standalone
 ?netcfg-advanced
 ?netcfg-basic
 ?netcfg-config

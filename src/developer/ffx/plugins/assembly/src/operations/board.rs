@@ -26,6 +26,7 @@ pub fn board_input_bundle(args: BoardInputBundleArgs) -> Result<()> {
         kernel_boot_args,
         power_manager_config,
         thermal_config,
+        power_metrics_recorder_config,
     } = args;
     let bundle_file_path = outdir.join("board_input_bundle.json");
 
@@ -72,6 +73,11 @@ pub fn board_input_bundle(args: BoardInputBundleArgs) -> Result<()> {
         copy_config_file(&power_manager_config, "power_manager.json5", &config_files_dir)?;
     let thermal_config =
         copy_config_file(&thermal_config, "thermal_config.json", &config_files_dir)?;
+    let power_metrics_recorder_config = copy_config_file(
+        &power_metrics_recorder_config,
+        "power_metrics_recorder_config.json",
+        &config_files_dir,
+    )?;
 
     //========
     // Copy the drivers and packages to the outdir, writing the package manifests
@@ -124,10 +130,14 @@ pub fn board_input_bundle(args: BoardInputBundleArgs) -> Result<()> {
         drivers,
         packages,
         kernel_boot_args: kernel_boot_args.into_iter().collect(),
-        configuration: if power_manager_config.is_some() || thermal_config.is_some() {
+        configuration: if power_manager_config.is_some()
+            || thermal_config.is_some()
+            || power_metrics_recorder_config.is_some()
+        {
             Some(BoardProvidedConfig {
                 power_manager: power_manager_config,
                 thermal: thermal_config,
+                power_metrics_recorder: power_metrics_recorder_config,
             })
         } else {
             None

@@ -111,6 +111,7 @@ USER_PLATFORM_AIB_NAMES = BOOTSTRAP_USER_PLATFORM_AIB_NAMES + [
     "networking_with_virtualization",
     "no_update_checker",
     "omaha_client",
+    "power_metrics_recorder",
     "radar_proxy_without_injector",
     "sensors_framework",
     "session_manager",

@@ -106,6 +106,18 @@
       "short": null,
       "description": "thermal management configuration",
       "hidden": false
+    },
+    {
+      "kind": {
+        "Option": {
+          "arg_name": "power-metrics-recorder-config"
+        }
+      },
+      "optionality": "optional",
+      "long": "--power-metrics-recorder-config",
+      "short": null,
+      "description": "power metrics recorder configuration",
+      "hidden": false
     }
   ],
   "notes": [],

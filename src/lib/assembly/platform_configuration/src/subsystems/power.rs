@@ -2,11 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::subsystems::prelude::*;
 use anyhow::{ensure, Context};
 use assembly_config_schema::platform_config::power_config::PowerConfig;
 use assembly_util::{BootfsDestination, FileEntry};
-
-use crate::subsystems::prelude::*;
 
 pub(crate) struct PowerManagementSubsystem;
 
@@ -44,6 +43,18 @@ impl DefineSubsystemConfiguration<PowerConfig> for PowerManagementSubsystem {
                 ) && *context.build_type == BuildType::Eng
             );
             builder.platform_bundle("power_framework");
+        }
+
+        match (&context.board_info.configuration.power_metrics_recorder, &context.feature_set_level)
+        {
+            (Some(config), FeatureSupportLevel::Minimal) => {
+                builder.platform_bundle("power_metrics_recorder");
+                builder.package("metrics-logger-standalone").config_data(FileEntry {
+                    source: config.as_utf8_pathbuf().into(),
+                    destination: "config.json".to_string(),
+                })?;
+            }
+            _ => {} // do nothing
         }
 
         Ok(())

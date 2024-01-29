@@ -259,6 +259,14 @@ template("board_input_bundle") {
         rebase_path(configuration.thermal),
       ]
     }
+
+    if (defined(configuration.power_metrics_recorder)) {
+      creation_inputs += [ configuration.power_metrics_recorder ]
+      creation_args += [
+        "--power-metrics-recorder-config",
+        rebase_path(configuration.power_metrics_recorder),
+      ]
+    }
   }
 
   ffx_action(labels.main_target) {

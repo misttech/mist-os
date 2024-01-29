@@ -383,4 +383,8 @@ pub struct BoardInputBundleArgs {
     /// thermal management configuration
     #[argh(option)]
     pub thermal_config: Option<Utf8PathBuf>,
+
+    /// power metrics recorder configuration
+    #[argh(option)]
+    pub power_metrics_recorder_config: Option<Utf8PathBuf>,
 }

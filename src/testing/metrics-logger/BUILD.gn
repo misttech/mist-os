@@ -93,6 +93,8 @@ rustc_binary("bin") {
   ]
 }
 
+# TODO(b/322007400): metrics-logger-standalone is production facing. All of this
+# code should be moved to //src/power to reflect in-field production use.
 fuchsia_package_with_single_component("metrics-logger-standalone-pkg") {
   manifest = "meta/metrics-logger-standalone.cml"
   package_name = "metrics-logger-standalone"

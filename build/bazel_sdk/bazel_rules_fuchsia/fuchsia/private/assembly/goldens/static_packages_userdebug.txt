@@ -52,6 +52,7 @@ forensics
 ?mediasession
 ?memory_monitor
 ?memory_sampler
+?metrics-logger-standalone
 ?netcfg-advanced
 ?netcfg-basic
 ?netcfg-config

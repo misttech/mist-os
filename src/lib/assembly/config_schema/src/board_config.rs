@@ -121,6 +121,10 @@ pub struct BoardProvidedConfig {
     /// Thermal configuration for the power-manager service
     #[file_relative_paths]
     pub thermal: Option<FileRelativePathBuf>,
+
+    /// Configuration for the power metrics recorder service
+    #[file_relative_paths]
+    pub power_metrics_recorder: Option<FileRelativePathBuf>,
 }
 
 #[cfg(test)]

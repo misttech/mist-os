@@ -204,6 +204,9 @@ user_platform_aib_names =
       # Battery
       "battery_manager",
 
+      # Power metrics recorder
+      "power_metrics_recorder",
+
       # Forensics
       "feedback_large_disk",
       "feedback_low_memory_product_config",
