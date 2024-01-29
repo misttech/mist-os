@@ -18,7 +18,7 @@ use net_types::{
 
 use crate::{
     ip::device::Ipv6DeviceAddr,
-    socket::{AddrVec, DualStackIpExt, SocketMapAddrSpec},
+    socket::{AddrVec, DualStackIpExt, EitherStack, SocketMapAddrSpec},
 };
 
 /// A [`ZonedAddr`] whose address is `Zoned` iff a zone is required.
@@ -222,6 +222,21 @@ pub struct ListenerIpAddr<A: IpAddress, LI> {
 pub struct ListenerAddr<A, D> {
     pub(crate) ip: A,
     pub(crate) device: Option<D>,
+}
+
+impl<A, D> AsRef<Option<D>> for ListenerAddr<A, D> {
+    fn as_ref(&self) -> &Option<D> {
+        &self.device
+    }
+}
+
+impl<TA, OA, D> AsRef<Option<D>> for EitherStack<ListenerAddr<TA, D>, ListenerAddr<OA, D>> {
+    fn as_ref(&self) -> &Option<D> {
+        match self {
+            EitherStack::ThisStack(l) => &l.device,
+            EitherStack::OtherStack(l) => &l.device,
+        }
+    }
 }
 
 /// The IP address and identifier (port) of a connected socket.

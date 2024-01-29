@@ -44,8 +44,8 @@ use crate::{
         segment::{Options, Segment},
         seqnum::{SeqNum, UnscaledWindowSize},
         socket::{
-            do_send_inner, isn::IsnGenerator, make_connection, AsThisStack as _, BoundSocketState,
-            Connection, DemuxState, DeviceIpSocketHandler, DualStackIpExt, EitherStack,
+            isn::IsnGenerator, AsThisStack as _, BoundSocketState, Connection, DemuxState,
+            DeviceIpSocketHandler, DualStackDemuxIdConverter as _, DualStackIpExt, EitherStack,
             HandshakeStatus, Listener, ListenerAddrState, ListenerSharingState, MaybeDualStack,
             MaybeListener, PrimaryRc, TcpApi, TcpBindingsContext, TcpBindingsTypes, TcpContext,
             TcpDemuxContext, TcpDualStackContext, TcpIpTransportContext, TcpPortSpec, TcpSocketId,
@@ -224,7 +224,8 @@ fn handle_incoming_packet<I, BC, CC>(
                             conn_id,
                             incoming,
                             // TODO(https://issues.fuchsia.dev/319117141): Support
-                            // TimeWait reuse when we support dual stack listeners.
+                            // TimeWait reuse for dual stack listeners in the
+                            // other stack.
                             &mut None,
                         )
                     }
@@ -237,94 +238,109 @@ fn handle_incoming_packet<I, BC, CC>(
                     ConnectionIncomingSegmentDisposition::ReuseCandidateForListener => {}
                 }
             }
-            Some(SocketLookupResult::Listener((id, _listener_addr))) => {
-                match core_ctx.with_socket_mut_isn_transport_demux(
-                    &id,
-                    |core_ctx, socket_state, isn| {
-                        let (core_ctx, converter) = core_ctx.into_single_stack();
-                        try_handle_incoming_for_listener::<I, CC, BC>(
+            Some(SocketLookupResult::Listener((demux_listener_id, _listener_addr))) => {
+                match I::into_dual_stack_ip_socket(demux_listener_id) {
+                    EitherStack::ThisStack(listener_id) => {
+                        let disposition = core_ctx.with_socket_mut_isn_transport_demux(
+                            &listener_id,
+                            |core_ctx, socket_state, isn| match core_ctx {
+                                MaybeDualStack::NotDualStack((core_ctx, converter)) => {
+                                    try_handle_incoming_for_listener::<I, I, CC, BC, _>(
+                                        core_ctx,
+                                        bindings_ctx,
+                                        isn,
+                                        socket_state,
+                                        incoming,
+                                        conn_addr,
+                                        incoming_device,
+                                        &mut tw_reuse,
+                                        move |conn, addr| converter.convert_back((conn, addr)),
+                                        I::into_demux_socket_id,
+                                    )
+                                }
+                                MaybeDualStack::DualStack((core_ctx, converter)) => {
+                                    try_handle_incoming_for_listener::<_, _, CC, BC, _>(
+                                        core_ctx,
+                                        bindings_ctx,
+                                        isn,
+                                        socket_state,
+                                        incoming,
+                                        conn_addr,
+                                        incoming_device,
+                                        &mut tw_reuse,
+                                        move |conn, addr| {
+                                            converter
+                                                .convert_back(EitherStack::ThisStack((conn, addr)))
+                                        },
+                                        I::into_demux_socket_id,
+                                    )
+                                }
+                            },
+                        );
+                        if try_handle_listener_incoming_disposition(
                             core_ctx,
-                            converter,
                             bindings_ctx,
-                            isn,
-                            socket_state,
-                            incoming,
+                            disposition,
+                            &mut tw_reuse,
+                            &mut addrs_to_search,
                             conn_addr,
                             incoming_device,
-                            &mut tw_reuse,
-                        )
-                    },
-                ) {
-                    ListenerIncomingSegmentDisposition::FoundSocket => break true,
-                    ListenerIncomingSegmentDisposition::ConflictingConnection => {
-                        // We're about to rewind the lookup. If we got a
-                        // conflicting connection it means tw_reuse has been
-                        // removed from the demux state and we need to destroy
-                        // it.
-                        if let Some((tw_reuse, _)) = tw_reuse.take() {
-                            tcp::socket::destroy_socket(core_ctx, bindings_ctx, tw_reuse);
+                        ) {
+                            break true;
                         }
-
-                        // Reset the address vector iterator and go again, a
-                        // conflicting connection was found.
-                        addrs_to_search =
-                            AddrVecIter::<I, CC::WeakDeviceId, TcpPortSpec>::with_device(
-                                conn_addr.into(),
-                                core_ctx.downgrade_device_id(incoming_device),
-                            );
                     }
-                    ListenerIncomingSegmentDisposition::NoMatchingSocket => (),
-                    ListenerIncomingSegmentDisposition::NewConnection(primary) => {
-                        // If we have a new connection, we need to add it to the
-                        // set of all sockets.
-
-                        // First things first, if we got here then tw_reuse is
-                        // gone so we need to destroy it.
-                        if let Some((tw_reuse, _)) = tw_reuse.take() {
-                            tcp::socket::destroy_socket(core_ctx, bindings_ctx, tw_reuse);
-                        }
-
-                        // Now put the new connection into the socket map.
-                        //
-                        // Note that there's a possible subtle race here where
-                        // another thread could have already operated further on
-                        // this connection and marked it for destruction which
-                        // puts the entry in the DOA state, if we see that we
-                        // must immediately destroy the socket after having put
-                        // it in the map.
-                        let id = TcpSocketId(PrimaryRc::clone_strong(&primary));
-                        let to_destroy = core_ctx.with_all_sockets_mut(move |all_sockets| {
-                            let insert_entry = TcpSocketSetEntry::Primary(primary);
-                            match all_sockets.entry(id) {
-                                hash_map::Entry::Vacant(v) => {
-                                    let _: &mut _ = v.insert(insert_entry);
-                                    None
+                    EitherStack::OtherStack(listener_id) => {
+                        let disposition = core_ctx.with_socket_mut_isn_transport_demux(
+                            &listener_id,
+                            |core_ctx, socket_state, isn| {
+                                match core_ctx {
+                                    MaybeDualStack::NotDualStack((_core_ctx, _converter)) => {
+                                        // TODO(https://issues.fuchsia.dev/42085913):
+                                        // Remove this unreachable!.
+                                        unreachable!("OtherStack socket ID with non dual stack");
+                                    }
+                                    MaybeDualStack::DualStack((core_ctx, converter)) => {
+                                        let other_demux_id_converter =
+                                            core_ctx.other_demux_id_converter();
+                                        try_handle_incoming_for_listener::<_, _, CC, BC, _>(
+                                            core_ctx,
+                                            bindings_ctx,
+                                            isn,
+                                            socket_state,
+                                            incoming,
+                                            conn_addr,
+                                            incoming_device,
+                                            // TODO(https://issues.fuchsia.dev/319117141):
+                                            // Support TimeWait reuse for dual
+                                            // stack listeners in the other stack.
+                                            &mut None,
+                                            move |conn, addr| {
+                                                converter.convert_back(EitherStack::OtherStack((
+                                                    conn, addr,
+                                                )))
+                                            },
+                                            move |id| other_demux_id_converter.convert(id),
+                                        )
+                                    }
                                 }
-                                hash_map::Entry::Occupied(mut o) => {
-                                    // We're holding on to the primary ref, the
-                                    // only possible state here should be a DOA
-                                    // entry.
-                                    assert_matches!(
-                                        core::mem::replace(o.get_mut(), insert_entry),
-                                        TcpSocketSetEntry::DeadOnArrival
-                                    );
-                                    Some(o.key().clone())
-                                }
-                            }
-                        });
-                        // NB: we're releasing and reaquiring the
-                        // all_sockets_mut lock here for the convenience of not
-                        // needing different versions of `destroy_socket`. This
-                        // should be fine because the race this is solving
-                        // should not be common. If we have correct thread
-                        // attribution per flow it should effectively become
-                        // impossible so we go for code simplicity here.
-                        if let Some(to_destroy) = to_destroy {
-                            tcp::socket::destroy_socket(core_ctx, bindings_ctx, to_destroy);
+                            },
+                        );
+                        if try_handle_listener_incoming_disposition::<_, _, CC, BC, ()>(
+                            core_ctx,
+                            bindings_ctx,
+                            disposition,
+                            // TODO(https://issues.fuchsia.dev/319117141):
+                            // Support TimeWait reuse for dual stack listeners
+                            // in the other stack.
+                            &mut None,
+                            &mut addrs_to_search,
+                            conn_addr,
+                            incoming_device,
+                        ) {
+                            break true;
                         }
-                        break true;
                     }
-                }
+                };
             }
         }
     };
@@ -361,7 +377,7 @@ fn handle_incoming_packet<I, BC, CC>(
 
 enum SocketLookupResult<I: DualStackIpExt, D: device::WeakId, BT: TcpBindingsTypes> {
     Connection(I::DemuxSocketId<D, BT>),
-    Listener((TcpSocketId<I, D, BT>, ListenerAddr<ListenerIpAddr<I::Addr, NonZeroU16>, D>)),
+    Listener((I::DemuxSocketId<D, BT>, ListenerAddr<ListenerIpAddr<I::Addr, NonZeroU16>, D>)),
 }
 
 fn lookup_socket<I, CC, BC>(
@@ -668,7 +684,7 @@ where
     }
 
     // Send any enqueued data, if there is any.
-    do_send_inner(conn_id, conn, &conn_addr, core_ctx, bindings_ctx);
+    tcp::socket::do_send_inner(conn_id, conn, &conn_addr, core_ctx, bindings_ctx);
 
     // Enqueue the connection to the associated listener
     // socket's accept queue.
@@ -681,33 +697,135 @@ where
     ConnectionIncomingSegmentDisposition::FoundSocket
 }
 
+/// Responds to the disposition returned by [`try_handle_incoming_for_listener`].
+///
+/// Returns true if we have found the right socket and there is no need to
+/// continue the iteration for finding the next-best candidate.
+fn try_handle_listener_incoming_disposition<SockI, WireI, CC, BC, Addr>(
+    core_ctx: &mut CC,
+    bindings_ctx: &mut BC,
+    disposition: ListenerIncomingSegmentDisposition<PrimaryRc<SockI, CC::WeakDeviceId, BC>>,
+    tw_reuse: &mut Option<(TcpSocketId<SockI, CC::WeakDeviceId, BC>, Addr)>,
+    addrs_to_search: &mut AddrVecIter<WireI, CC::WeakDeviceId, TcpPortSpec>,
+    conn_addr: ConnIpAddr<WireI::Addr, NonZeroU16, NonZeroU16>,
+    incoming_device: &CC::DeviceId,
+) -> bool
+where
+    SockI: DualStackIpExt,
+    WireI: DualStackIpExt,
+    CC: TcpContext<SockI, BC>,
+    BC: TcpBindingsContext<SockI, CC::WeakDeviceId>,
+{
+    match disposition {
+        ListenerIncomingSegmentDisposition::FoundSocket => true,
+        ListenerIncomingSegmentDisposition::ConflictingConnection => {
+            // We're about to rewind the lookup. If we got a
+            // conflicting connection it means tw_reuse has been
+            // removed from the demux state and we need to destroy
+            // it.
+            if let Some((tw_reuse, _)) = tw_reuse.take() {
+                tcp::socket::destroy_socket(core_ctx, bindings_ctx, tw_reuse);
+            }
+
+            // Reset the address vector iterator and go again, a
+            // conflicting connection was found.
+            *addrs_to_search = AddrVecIter::<WireI, CC::WeakDeviceId, TcpPortSpec>::with_device(
+                conn_addr.into(),
+                core_ctx.downgrade_device_id(incoming_device),
+            );
+            false
+        }
+        ListenerIncomingSegmentDisposition::NoMatchingSocket => false,
+        ListenerIncomingSegmentDisposition::NewConnection(primary) => {
+            // If we have a new connection, we need to add it to the
+            // set of all sockets.
+
+            // First things first, if we got here then tw_reuse is
+            // gone so we need to destroy it.
+            if let Some((tw_reuse, _)) = tw_reuse.take() {
+                tcp::socket::destroy_socket(core_ctx, bindings_ctx, tw_reuse);
+            }
+
+            // Now put the new connection into the socket map.
+            //
+            // Note that there's a possible subtle race here where
+            // another thread could have already operated further on
+            // this connection and marked it for destruction which
+            // puts the entry in the DOA state, if we see that we
+            // must immediately destroy the socket after having put
+            // it in the map.
+            let id = TcpSocketId(PrimaryRc::clone_strong(&primary));
+            let to_destroy = core_ctx.with_all_sockets_mut(move |all_sockets| {
+                let insert_entry = TcpSocketSetEntry::Primary(primary);
+                match all_sockets.entry(id) {
+                    hash_map::Entry::Vacant(v) => {
+                        let _: &mut _ = v.insert(insert_entry);
+                        None
+                    }
+                    hash_map::Entry::Occupied(mut o) => {
+                        // We're holding on to the primary ref, the
+                        // only possible state here should be a DOA
+                        // entry.
+                        assert_matches!(
+                            core::mem::replace(o.get_mut(), insert_entry),
+                            TcpSocketSetEntry::DeadOnArrival
+                        );
+                        Some(o.key().clone())
+                    }
+                }
+            });
+            // NB: we're releasing and reaquiring the
+            // all_sockets_mut lock here for the convenience of not
+            // needing different versions of `destroy_socket`. This
+            // should be fine because the race this is solving
+            // should not be common. If we have correct thread
+            // attribution per flow it should effectively become
+            // impossible so we go for code simplicity here.
+            if let Some(to_destroy) = to_destroy {
+                tcp::socket::destroy_socket(core_ctx, bindings_ctx, to_destroy);
+            }
+            true
+        }
+    }
+}
+
 /// Tries to handle an incoming segment by passing it to a listening socket.
 ///
 /// Returns `FoundSocket` if the segment was handled, otherwise `NoMatchingSocket`.
-fn try_handle_incoming_for_listener<I, CC, BC>(
-    core_ctx: &mut CC::SingleStackIpTransportAndDemuxCtx<'_>,
-    converter: MaybeDualStack<CC::DualStackConverter, CC::SingleStackConverter>,
+fn try_handle_incoming_for_listener<SockI, WireI, CC, BC, DC>(
+    core_ctx: &mut DC,
     bindings_ctx: &mut BC,
     isn: &IsnGenerator<BC::Instant>,
-    socket_state: &mut TcpSocketState<I, CC::WeakDeviceId, BC>,
+    socket_state: &mut TcpSocketState<SockI, CC::WeakDeviceId, BC>,
     incoming: Segment<&[u8]>,
-    incoming_addrs: ConnIpAddr<I::Addr, NonZeroU16, NonZeroU16>,
+    incoming_addrs: ConnIpAddr<WireI::Addr, NonZeroU16, NonZeroU16>,
     incoming_device: &CC::DeviceId,
     tw_reuse: &mut Option<(
-        TcpSocketId<I, CC::WeakDeviceId, BC>,
-        ConnAddr<ConnIpAddr<I::Addr, NonZeroU16, NonZeroU16>, CC::WeakDeviceId>,
+        TcpSocketId<SockI, CC::WeakDeviceId, BC>,
+        ConnAddr<ConnIpAddr<WireI::Addr, NonZeroU16, NonZeroU16>, CC::WeakDeviceId>,
     )>,
-) -> ListenerIncomingSegmentDisposition<PrimaryRc<I, CC::WeakDeviceId, BC>>
+    make_connection: impl FnOnce(
+        Connection<SockI, WireI, CC::WeakDeviceId, BC>,
+        ConnAddr<ConnIpAddr<WireI::Addr, NonZeroU16, NonZeroU16>, CC::WeakDeviceId>,
+    ) -> SockI::ConnectionAndAddr<CC::WeakDeviceId, BC>,
+    make_demux_id: impl Fn(
+        TcpSocketId<SockI, CC::WeakDeviceId, BC>,
+    ) -> WireI::DemuxSocketId<CC::WeakDeviceId, BC>,
+) -> ListenerIncomingSegmentDisposition<PrimaryRc<SockI, CC::WeakDeviceId, BC>>
 where
-    I: DualStackIpExt,
-    BC: TcpBindingsContext<I, CC::WeakDeviceId>
+    SockI: DualStackIpExt,
+    WireI: DualStackIpExt,
+    BC: TcpBindingsContext<SockI, CC::WeakDeviceId>
         + BufferProvider<
             BC::ReceiveBuffer,
             BC::SendBuffer,
             ActiveOpen = <BC as TcpBindingsTypes>::ListenerNotifierOrProvidedBuffers,
             PassiveOpen = <BC as TcpBindingsTypes>::ReturnedBuffers,
         >,
-    CC: TcpContext<I, BC>,
+    CC: TcpContext<SockI, BC>,
+    DC: TransportIpContext<WireI, BC, DeviceId = CC::DeviceId, WeakDeviceId = CC::WeakDeviceId>
+        + DeviceIpSocketHandler<WireI, BC>
+        + TcpDemuxContext<WireI, CC::WeakDeviceId, BC>,
 {
     let (maybe_listener, sharing, listener_addr) = assert_matches!(
         socket_state,
@@ -735,10 +853,9 @@ where
         return ListenerIncomingSegmentDisposition::FoundSocket;
     }
 
-    let ListenerAddr { ip: _, device: bound_device } = listener_addr;
     // Ensure that if the remote address requires a zone, we propagate that to
     // the address for the connected socket.
-    let bound_device = bound_device.as_ref();
+    let bound_device = listener_addr.as_ref().clone();
     let bound_device = if crate::socket::must_have_zone(remote_ip.as_ref()) {
         Some(bound_device.map_or(EitherDeviceId::Strong(incoming_device), EitherDeviceId::Weak))
     } else {
@@ -781,7 +898,7 @@ where
             }
         }
     };
-    let Some(device_mss) = Mss::from_mms::<I>(device_mms) else {
+    let Some(device_mss) = Mss::from_mms::<WireI>(device_mms) else {
         return ListenerIncomingSegmentDisposition::FoundSocket;
     };
 
@@ -789,7 +906,7 @@ where
         isn,
         buffer_sizes.clone(),
         device_mss,
-        Mss::default::<I>(),
+        Mss::default::<WireI>(),
         socket_options.user_timeout,
     ));
 
@@ -824,10 +941,7 @@ where
             // Also this approach has the benefit of not accidentally persisting
             // the old state that we don't want.
             if let Some((tw_reuse, conn_addr)) = tw_reuse {
-                match socketmap
-                    .conns_mut()
-                    .remove(&I::into_demux_socket_id(tw_reuse.clone()), &conn_addr)
-                {
+                match socketmap.conns_mut().remove(&make_demux_id(tw_reuse.clone()), &conn_addr) {
                     Ok(()) => {
                         assert_matches!(bindings_ctx.cancel_timer(tw_reuse.downgrade()), Some(_));
                     }
@@ -845,7 +959,7 @@ where
             match socketmap.conns_mut().try_insert_with(addr, sharing, move |addr, sharing| {
                 let (id, primary) =
                     TcpSocketId::new(TcpSocketState::Bound(BoundSocketState::Connected((
-                        make_connection::<I, BC, CC>(
+                        make_connection(
                             Connection {
                                 accept_queue: Some(accept_queue_clone),
                                 state,
@@ -856,20 +970,12 @@ where
                                 handshake_status: HandshakeStatus::Pending,
                             },
                             addr,
-                            &converter,
                         ),
                         sharing,
                     ))));
-                (I::into_demux_socket_id(id), primary)
+                (make_demux_id(id.clone()), (primary, id))
             }) {
-                Ok((entry, primary)) => {
-                    // TODO(https://fxbug.dev/42085913): This is safe because we
-                    // don't have dual stack listeners yet. So any connection
-                    // passively created must be in the current stack.
-                    let id = assert_matches!(
-                        I::as_dual_stack_ip_socket(&entry.id()),
-                        EitherStack::ThisStack(id) => id
-                    );
+                Ok((_entry, (primary, id))) => {
                     // Make sure the new socket is in the pending accept queue
                     // before we release the demux lock.
                     accept_queue.push_pending(id.clone());

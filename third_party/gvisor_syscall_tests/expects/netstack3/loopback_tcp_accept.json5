@@ -15,26 +15,13 @@
         {
             type: "expect_failure",
             matchers: [
-                "All/SocketInetLoopbackTest.AcceptedInheritsTCPUserTimeout/*",
                 "All/SocketInetLoopbackTest.TCPAcceptAfterReset/*",
                 "All/SocketInetLoopbackTest.TCPDeferAccept/*",
                 "All/SocketInetLoopbackTest.TCPDeferAcceptTimeout/*",
-            ],
-        },
-        {
-            type: "expect_pass",
-            matchers: [
-                "All/SocketInetLoopbackTest.AcceptedInheritsTCPUserTimeout/ListenV4Any_ConnectV4Any",
-                "All/SocketInetLoopbackTest.AcceptedInheritsTCPUserTimeout/ListenV4Any_ConnectV4Loopback",
-                "All/SocketInetLoopbackTest.AcceptedInheritsTCPUserTimeout/ListenV4Loopback_ConnectV4Any",
-                "All/SocketInetLoopbackTest.AcceptedInheritsTCPUserTimeout/ListenV4Loopback_ConnectV4Loopback",
-                "All/SocketInetLoopbackTest.AcceptedInheritsTCPUserTimeout/ListenV6Any_ConnectV6Any",
-                "All/SocketInetLoopbackTest.AcceptedInheritsTCPUserTimeout/ListenV6Any_ConnectV6Loopback",
-                "All/SocketInetLoopbackTest.AcceptedInheritsTCPUserTimeout/ListenV6Loopback_ConnectV6Any",
-                "All/SocketInetLoopbackTest.AcceptedInheritsTCPUserTimeout/ListenV6Loopback_ConnectV6Loopback",
-                "All/SocketInetLoopbackTest.AcceptedInheritsTCPUserTimeout/ListenV4Any_ConnectV4MappedAny",
-                "All/SocketInetLoopbackTest.AcceptedInheritsTCPUserTimeout/ListenV4Any_ConnectV4MappedLoopback",
-                "All/SocketInetLoopbackTest.AcceptedInheritsTCPUserTimeout/ListenV4Loopback_ConnectV4MappedLoopback",
+
+                // TODO(https://issues.fuchsia.dev/319117141): Support listening
+                // in both stacks.
+                "All/SocketInetLoopbackTest.AcceptedInheritsTCPUserTimeout/ListenV6Any_ConnectV4*",
             ],
         },
     ],

@@ -37,6 +37,7 @@ use crate::{
 };
 
 /// An uninstantiable type.
+#[derive(Clone, Copy)]
 pub struct Uninstantiable(Never);
 
 impl AsRef<Never> for Uninstantiable {
@@ -349,13 +350,20 @@ impl<P> tcp_socket::AsThisStack<P> for UninstantiableWrapper<P> {
     }
 }
 
-impl<I: tcp_socket::DualStackIpExt, P> tcp_socket::TcpDualStackContext<I>
-    for UninstantiableWrapper<P>
-{
-    fn into_other_demux_socket_id<D: device::WeakId, BT: TcpBindingsTypes>(
+impl<I: tcp_socket::DualStackIpExt> tcp_socket::DualStackDemuxIdConverter<I> for Uninstantiable {
+    fn convert<D: device::WeakId, BT: tcp_socket::TcpBindingsTypes>(
         &self,
         _id: tcp_socket::TcpSocketId<I, D, BT>,
     ) -> <I::OtherVersion as tcp_socket::DualStackIpExt>::DemuxSocketId<D, BT> {
+        self.uninstantiable_unreachable()
+    }
+}
+
+impl<I: tcp_socket::DualStackIpExt, P> tcp_socket::TcpDualStackContext<I>
+    for UninstantiableWrapper<P>
+{
+    type Converter = Uninstantiable;
+    fn other_demux_id_converter(&self) -> Self::Converter {
         self.uninstantiable_unreachable()
     }
 }

@@ -15,29 +15,10 @@
         {
             type: "expect_failure",
             matchers: [
-                // Dual-stack TCP sockets are not supported.
-                "All/SocketInetLoopbackTest.TCPBacklogAcceptAll/ListenV4MappedAny_ConnectV4Any",
-                "All/SocketInetLoopbackTest.TCPBacklogAcceptAll/ListenV4MappedAny_ConnectV4Loopback",
-                "All/SocketInetLoopbackTest.TCPBacklogAcceptAll/ListenV4MappedAny_ConnectV4MappedAny",
-                "All/SocketInetLoopbackTest.TCPBacklogAcceptAll/ListenV4MappedAny_ConnectV4MappedLoopback",
-                "All/SocketInetLoopbackTest.TCPBacklogAcceptAll/ListenV4MappedLoopback_ConnectV4Any",
-                "All/SocketInetLoopbackTest.TCPBacklogAcceptAll/ListenV4MappedLoopback_ConnectV4Loopback",
-                "All/SocketInetLoopbackTest.TCPBacklogAcceptAll/ListenV4MappedLoopback_ConnectV4MappedLoopback",
-                "All/SocketInetLoopbackTest.TCPBacklogAcceptAll/ListenV6Any_ConnectV4Any",
-                "All/SocketInetLoopbackTest.TCPBacklogAcceptAll/ListenV6Any_ConnectV4MappedAny",
-                "All/SocketInetLoopbackTest.TCPBacklogAcceptAll/ListenV6Any_ConnectV4MappedLoopback",
-                "All/SocketInetLoopbackTest.TCPBacklogAcceptAll/ListenV6Any_ConnectV4Loopback",
-                "All/SocketInetLoopbackTest.TCPBacklog/ListenV4MappedAny_ConnectV4Any",
-                "All/SocketInetLoopbackTest.TCPBacklog/ListenV4MappedAny_ConnectV4Loopback",
-                "All/SocketInetLoopbackTest.TCPBacklog/ListenV4MappedAny_ConnectV4MappedAny",
-                "All/SocketInetLoopbackTest.TCPBacklog/ListenV4MappedAny_ConnectV4MappedLoopback",
-                "All/SocketInetLoopbackTest.TCPBacklog/ListenV4MappedLoopback_ConnectV4Any",
-                "All/SocketInetLoopbackTest.TCPBacklog/ListenV4MappedLoopback_ConnectV4Loopback",
-                "All/SocketInetLoopbackTest.TCPBacklog/ListenV4MappedLoopback_ConnectV4MappedLoopback",
-                "All/SocketInetLoopbackTest.TCPBacklog/ListenV6Any_ConnectV4Any",
-                "All/SocketInetLoopbackTest.TCPBacklog/ListenV6Any_ConnectV4Loopback",
-                "All/SocketInetLoopbackTest.TCPBacklog/ListenV6Any_ConnectV4MappedAny",
-                "All/SocketInetLoopbackTest.TCPBacklog/ListenV6Any_ConnectV4MappedLoopback",
+                // TODO(https://issues.fuchsia.dev/319117141): Support listening
+                // in both stacks.
+                "All/SocketInetLoopbackTest.TCPBacklogAcceptAll/ListenV6Any_ConnectV4*",
+                "All/SocketInetLoopbackTest.TCPBacklog/ListenV6Any_ConnectV4*",
             ],
         },
     ],
