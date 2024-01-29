@@ -79,8 +79,7 @@ use starnix_uapi::{
     union::struct_with_union_into_bytes,
     user_address::{UserAddress, UserRef},
     user_buffer::UserBuffer,
-    vfs::default_statfs,
-    vfs::FdEvents,
+    vfs::{default_statfs, FdEvents},
     BINDERFS_SUPER_MAGIC, BINDER_BUFFER_FLAG_HAS_PARENT, BINDER_CURRENT_PROTOCOL_VERSION,
     BINDER_TYPE_BINDER, BINDER_TYPE_FD, BINDER_TYPE_FDA, BINDER_TYPE_HANDLE, BINDER_TYPE_PTR,
 };
@@ -1908,8 +1907,8 @@ enum Command {
         sender: WeakBinderPeer,
         /// The transaction payload.
         data: TransactionData,
-        /// Whether the transaction must inherit the sender policy.
-        inherited_policy: Option<SchedulerPolicy>,
+        /// The eventual policy to use when the transaction is running.
+        scheduler_policy: Option<SchedulerPolicy>,
     },
     /// Commands a binder thread to process an incoming reply to its transaction.
     /// Sent from the server to the client.
@@ -2257,6 +2256,25 @@ impl BinderObjectFlags {
             log_error!("Unknown flag value for object: {:#}", value);
             errno!(EINVAL)
         })
+    }
+
+    fn get_scheduler_policy(&self) -> Option<SchedulerPolicy> {
+        let bits = self.bits();
+        let priority = bits & uapi::flat_binder_object_flags_FLAT_BINDER_FLAG_PRIORITY_MASK;
+        let sched_policy = (bits
+            & uapi::flat_binder_object_flags_FLAT_BINDER_FLAG_SCHED_POLICY_MASK)
+            >> uapi::flat_binder_object_shifts_FLAT_BINDER_FLAG_SCHED_POLICY_SHIFT;
+        if priority == 0 && sched_policy == 0 {
+            None
+        } else {
+            match SchedulerPolicy::from_binder(sched_policy, priority) {
+                Ok(policy) => policy,
+                Err(e) => {
+                    log_warn!("Unable to parse policy {sched_policy}:{priority}: {e:?}");
+                    None
+                }
+            }
+        }
     }
 }
 
@@ -3562,17 +3580,25 @@ impl BinderDriver {
                             .into(),
                         );
 
-                        let inherited_policy = object
-                            .flags
-                            .contains(BinderObjectFlags::INHERIT_RT)
-                            .then(|| current_task.read().scheduler_policy);
+                        // The object flags have 2 ways to declare a scheduler policy for the
+                        // transaction.
+                        // 1. It might contains a specific minimal policy to use.
+                        // 2. It might declare that the transaction supports priority inheritance.
+                        // The results must always be the best policy according to these rules.
+                        let mut scheduler_policy = object.flags.get_scheduler_policy();
+                        if object.flags.contains(BinderObjectFlags::INHERIT_RT) {
+                            let current_policy = current_task.read().scheduler_policy;
+                            scheduler_policy = scheduler_policy
+                                .map(|p| if p > current_policy { p } else { current_policy })
+                                .or(Some(current_policy));
+                        }
 
                         (
                             target_thread,
                             Command::Transaction {
                                 sender: WeakBinderPeer::new(binder_proc, binder_thread),
                                 data: transaction,
-                                inherited_policy,
+                                scheduler_policy,
                             },
                         )
                     };
@@ -3701,14 +3727,14 @@ impl BinderDriver {
                 // Attempt to write the command to the thread's buffer.
                 let bytes_written = command.write_to_memory(resource_accessor, read_buffer)?;
                 match command {
-                    Command::Transaction { sender, inherited_policy, .. } => {
+                    Command::Transaction { sender, scheduler_policy, .. } => {
                         // The transaction is synchronous and we're expected to give a reply, so
                         // push the transaction onto the transaction stack.
 
                         // If the transaction must inherit the sender policy, let update the
                         // scheduler policy, and keep track of the previous one.
-                        let inherited_policy = (|| {
-                            if let Some(policy) = inherited_policy {
+                        let scheduler_policy = (|| {
+                            if let Some(policy) = scheduler_policy {
                                 let old_policy = current_task.read().scheduler_policy;
                                 if old_policy < policy {
                                     match current_task.set_scheduler_policy(policy) {
@@ -3721,7 +3747,7 @@ impl BinderDriver {
                             }
                             SchedulerGuard::default()
                         })();
-                        let tx = TransactionRole::Receiver(sender, inherited_policy);
+                        let tx = TransactionRole::Receiver(sender, scheduler_policy);
                         thread_state.transactions.push(tx);
                     }
                     Command::DeadReply { pop_transaction: true } | Command::Reply(..) => {

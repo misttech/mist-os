@@ -718,7 +718,7 @@ pub fn sys_sched_setscheduler(
     let rlimit = target_task.thread_group.get_rlimit(Resource::RTPRIO);
 
     let param: sched_param = current_task.read_object(param.into())?;
-    let policy = SchedulerPolicy::from_raw(policy, param, rlimit)?;
+    let policy = SchedulerPolicy::from_sched_params(policy, param, rlimit)?;
     target_task.set_scheduler_policy(policy)?;
 
     Ok(())
@@ -832,7 +832,8 @@ pub fn sys_sched_setparam(
 
     let rlimit = target_task.thread_group.get_rlimit(Resource::RTPRIO);
 
-    let policy = SchedulerPolicy::from_raw(current_policy.raw_policy(), new_params, rlimit)?;
+    let policy =
+        SchedulerPolicy::from_sched_params(current_policy.raw_policy(), new_params, rlimit)?;
     target_task.set_scheduler_policy(policy)?;
 
     Ok(())
@@ -842,7 +843,7 @@ pub fn sys_sched_get_priority_min(
     _locked: &mut Locked<'_, Unlocked>,
     _ctx: &CurrentTask,
     policy: u32,
-) -> Result<i32, Errno> {
+) -> Result<u8, Errno> {
     min_priority_for_sched_policy(policy)
 }
 
@@ -850,7 +851,7 @@ pub fn sys_sched_get_priority_max(
     _locked: &mut Locked<'_, Unlocked>,
     _ctx: &CurrentTask,
     policy: u32,
-) -> Result<i32, Errno> {
+) -> Result<u8, Errno> {
     max_priority_for_sched_policy(policy)
 }
 
