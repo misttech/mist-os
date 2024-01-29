@@ -49,13 +49,6 @@ declare_args() {
   # Sets the fuchsia toolchain target triple suffix (after arch)
   rust_toolchain_triple_suffix = "fuchsia"
 
-  # Place lengthy rustdeps and externs (GN) into ninja response files.
-  # Response files are needed to get around command line length limitations.
-  # rustc support for response files (as needed in our GN build) was
-  # added with revision 'git_revision:dfe53afaebd817f334d8ef9dc75a5cd2562cf6e6'.
-  # This optional will eventually become permanently true.
-  rustc_use_response_files = false
-
   # Sets the maximum lint level.
   # "deny" will make all warnings into errors, "warn" preserves them as warnings, and "allow" will
   # ignore warnings.
