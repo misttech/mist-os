@@ -90,7 +90,7 @@ It will be set below and passed to other toolchains through toolchain_args
 
 **Current value (from the default):** `[]`
 
-From //build/config/BUILDCONFIG.gn:2098
+From //build/config/BUILDCONFIG.gn:2099
 
 ### allowed_test_device_types
 
@@ -3169,7 +3169,7 @@ This is just added to [`known_variants`](#known_variants).
 
 **Current value (from the default):** `[]`
 
-From //build/config/BUILDCONFIG.gn:1833
+From //build/config/BUILDCONFIG.gn:1834
 
 ### extra_vbmeta_descriptors
 
@@ -3969,7 +3969,7 @@ and the analysis overhead turned off by default.
 
 **Current value (from the default):** `false`
 
-From //build/config/BUILDCONFIG.gn:22
+From //build/config/BUILDCONFIG.gn:23
 
 ### is_debug
 
@@ -3981,7 +3981,7 @@ From //out/not-default/args.gn:10
 
 **Overridden from the default:** `true`
 
-From //build/config/BUILDCONFIG.gn:25
+From //build/config/BUILDCONFIG.gn:26
 
 **Current value for `target_cpu = "x64"`:** `false`
 
@@ -3989,7 +3989,7 @@ From //out/not-default/args.gn:10
 
 **Overridden from the default:** `true`
 
-From //build/config/BUILDCONFIG.gn:25
+From //build/config/BUILDCONFIG.gn:26
 
 ### is_perfetto_build_generator
 
@@ -4310,7 +4310,7 @@ Each element of the list is one variant, which is a scope defining:
 }]
 ```
 
-From //build/config/BUILDCONFIG.gn:1634
+From //build/config/BUILDCONFIG.gn:1635
 
 ### legacy_base_package_labels
 
@@ -5196,7 +5196,7 @@ Sets if we should output breakpad symbols for Fuchsia binaries.
 
 **Current value (from the default):** `false`
 
-From //build/config/BUILDCONFIG.gn:28
+From //build/config/BUILDCONFIG.gn:29
 
 ### output_gsym
 
@@ -5204,7 +5204,7 @@ Controls whether we should output GSYM files for Fuchsia binaries.
 
 **Current value (from the default):** `false`
 
-From //build/config/BUILDCONFIG.gn:31
+From //build/config/BUILDCONFIG.gn:32
 
 ### override_target_api_level
 
@@ -7335,6 +7335,19 @@ Sets the default LTO type for rustc builds.
 
 From //build/rust/config.gni:47
 
+### rust_one_rlib_per_dir
+
+To avoid build nondeterminism due to extern search paths resolving
+to more than one path during a build, enable this option to place
+every rlib into its own exclusive directory.
+This requires `rustc_use_response_file = true` due to the command-line
+bloat this causes.
+See http://g-issues.fuchsia.dev/issues/319148874 for more details.
+
+**Current value (from the default):** `false`
+
+From //build/rust/build.gni:19
+
 ### rust_rbe_check
 
 Run one of the more expensive checks, intended for CI.
@@ -7454,6 +7467,18 @@ This can be used to test custom Rust toolchains.
 **Current value (from the default):** `"//prebuilt/third_party/rust/linux-x64"`
 
 From //build/rust/config.gni:19
+
+### rustc_use_response_files
+
+Place lengthy rustdeps and externs (GN) into ninja response files.
+Response files are needed to get around command line length limitations.
+rustc support for response files (as needed in our GN build) was
+added with revision 'git_revision:dfe53afaebd817f334d8ef9dc75a5cd2562cf6e6'.
+This optional will eventually become permanently true.
+
+**Current value (from the default):** `false`
+
+From //build/rust/build.gni:11
 
 ### rustc_version_description
 
@@ -7737,7 +7762,7 @@ is satisfied if any of the strings matches against the candidate string.
 
 **Current value (from the default):** `[]`
 
-From //build/config/BUILDCONFIG.gn:2088
+From //build/config/BUILDCONFIG.gn:2089
 
 ### select_variant_canonical
 
@@ -7747,7 +7772,7 @@ See //build/toolchain/clang_toolchain.gni for details.
 
 **Current value (from the default):** `[]`
 
-From //build/config/BUILDCONFIG.gn:2093
+From //build/config/BUILDCONFIG.gn:2094
 
 ### select_variant_shortcuts
 
@@ -7805,7 +7830,7 @@ a list that can be spliced into [`select_variant`](#select_variant).
 }]
 ```
 
-From //build/config/BUILDCONFIG.gn:1879
+From //build/config/BUILDCONFIG.gn:1880
 
 ### size_checker_input
 
@@ -8263,7 +8288,7 @@ for details and documentation for each field.
 }
 ```
 
-From //build/config/BUILDCONFIG.gn:105
+From //build/config/BUILDCONFIG.gn:106
 
 ### truncate_build_info_commit_date
 
@@ -8325,7 +8350,7 @@ From //build/config/sanitizers/sanitizer_default_options.gni:47
 }]
 ```
 
-From //build/config/BUILDCONFIG.gn:1863
+From //build/config/BUILDCONFIG.gn:1864
 
 ### universe_package_labels
 
@@ -9037,7 +9062,7 @@ This allows testing for a Zircon-specific toolchain with:
 
 **Current value (from the default):** `false`
 
-From //build/config/BUILDCONFIG.gn:122
+From //build/config/BUILDCONFIG.gn:123
 
 ### zircon_tracelog
 
