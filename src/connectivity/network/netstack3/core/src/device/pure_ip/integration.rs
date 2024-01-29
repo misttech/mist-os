@@ -11,7 +11,7 @@ use lock_order::{
     relation::LockBefore,
     wrap::LockedWrapperApi,
 };
-use net_types::ip::Ip;
+use net_types::ip::{Ip, IpVersion, Ipv4, Ipv6};
 use packet::{Buf, BufferMut, Serializer};
 
 use crate::{
@@ -32,6 +32,7 @@ use crate::{
         socket::{DeviceSocketMetadata, HeldDeviceSockets, ParseSentFrameError},
         state::IpLinkDeviceState,
         DeviceCollectionContext, DeviceIdContext, DeviceLayerEventDispatcher, DeviceSendFrameError,
+        RecvIpFrameMeta,
     },
     device_socket::SentFrame,
     neighbor::NudUserConfig,
@@ -94,15 +95,71 @@ where
 
 impl<CC, BC> RecvFrameContext<BC, PureIpDeviceFrameMetadata<CC::DeviceId>> for CC
 where
-    CC: DeviceIdContext<PureIpDevice>,
+    CC: DeviceIdContext<PureIpDevice>
+        + RecvFrameContext<BC, RecvIpFrameMeta<CC::DeviceId, Ipv4>>
+        + RecvFrameContext<BC, RecvIpFrameMeta<CC::DeviceId, Ipv6>>,
 {
     fn receive_frame<B: BufferMut>(
         &mut self,
-        _bindings_ctx: &mut BC,
-        _metadata: PureIpDeviceFrameMetadata<CC::DeviceId>,
-        _frame: B,
+        bindings_ctx: &mut BC,
+        metadata: PureIpDeviceFrameMetadata<CC::DeviceId>,
+        buffer: B,
     ) {
-        // TODO(https://fxbug.dev/42051633): Handle receiving IP packets.
+        // NB: A link layer device would need to dispatch the frame to the
+        // device socket handler; however pure IP devices operate above the link
+        // layer, and are not expected to deliver their packets to device
+        // sockets. This conforms to the behavior on Linux.
+        let PureIpDeviceFrameMetadata { device_id, ip_version } = metadata;
+        match ip_version {
+            IpVersion::V4 => self.receive_frame(
+                bindings_ctx,
+                RecvIpFrameMeta::<_, Ipv4>::new(device_id, None),
+                buffer,
+            ),
+            IpVersion::V6 => self.receive_frame(
+                bindings_ctx,
+                RecvIpFrameMeta::<_, Ipv6>::new(device_id, None),
+                buffer,
+            ),
+        }
+    }
+}
+
+impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::PureIpDeviceRxDequeue>>
+    RecvFrameContext<BC, RecvIpFrameMeta<PureIpDeviceId<BC>, Ipv4>> for CoreCtx<'_, BC, L>
+{
+    fn receive_frame<B: BufferMut>(
+        &mut self,
+        bindings_ctx: &mut BC,
+        metadata: RecvIpFrameMeta<PureIpDeviceId<BC>, Ipv4>,
+        frame: B,
+    ) {
+        crate::ip::receive_ipv4_packet(
+            self,
+            bindings_ctx,
+            &metadata.device.into(),
+            metadata.frame_dst,
+            frame,
+        );
+    }
+}
+
+impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::PureIpDeviceRxDequeue>>
+    RecvFrameContext<BC, RecvIpFrameMeta<PureIpDeviceId<BC>, Ipv6>> for CoreCtx<'_, BC, L>
+{
+    fn receive_frame<B: BufferMut>(
+        &mut self,
+        bindings_ctx: &mut BC,
+        metadata: RecvIpFrameMeta<PureIpDeviceId<BC>, Ipv6>,
+        frame: B,
+    ) {
+        crate::ip::receive_ipv6_packet(
+            self,
+            bindings_ctx,
+            &metadata.device.into(),
+            metadata.frame_dst,
+            frame,
+        );
     }
 }
 
@@ -246,16 +303,19 @@ mod tests {
     use super::*;
 
     use assert_matches::assert_matches;
-    use net_types::ip::Mtu;
+    use ip_test_macro::ip_test;
+    use net_types::{ip::Mtu, Witness};
+    use packet_formats::ip::{IpPacketBuilder, IpProto};
 
     use crate::{
         device::{
             pure_ip::PureIpDeviceCreationProperties, RemoveDeviceResult, TransmitQueueConfiguration,
         },
-        testutil::DEFAULT_INTERFACE_METRIC,
+        testutil::{TestIpExt, DEFAULT_INTERFACE_METRIC},
     };
 
     const MTU: Mtu = Mtu::new(1234);
+    const TTL: u8 = 64;
 
     #[test]
     // Smoke test verifying [`PureIpDevice`] implements the traits required to
@@ -282,5 +342,35 @@ mod tests {
         );
         let mut tx_queue_api = ctx.core_api().transmit_queue::<PureIpDevice>();
         tx_queue_api.set_configuration(&device, TransmitQueueConfiguration::Fifo);
+    }
+
+    #[ip_test]
+    fn receive_frame<I: Ip + TestIpExt>() {
+        let mut ctx = crate::testutil::FakeCtx::default();
+        let device = ctx.core_api().device::<PureIpDevice>().add_device_with_default_state(
+            PureIpDeviceCreationProperties { mtu: MTU },
+            DEFAULT_INTERFACE_METRIC,
+        );
+        crate::device::testutil::enable_device(&mut ctx, &device.clone().into());
+
+        let packet = Buf::new(Vec::new(), ..)
+            .encapsulate(I::PacketBuilder::new(
+                I::FAKE_CONFIG.remote_ip.get(),
+                I::FAKE_CONFIG.local_ip.get(),
+                TTL,
+                IpProto::Udp.into(),
+            ))
+            .serialize_vec_outer()
+            .ok()
+            .unwrap()
+            .unwrap_b();
+
+        // Receive a frame from the network and verify delivery to the IP layer.
+        assert_eq!(ctx.core_ctx.state.ip_counters::<I>().receive_ip_packet.get(), 0);
+        ctx.core_api().device::<PureIpDevice>().receive_frame(
+            PureIpDeviceFrameMetadata { device_id: device, ip_version: I::VERSION },
+            packet,
+        );
+        assert_eq!(ctx.core_ctx.state.ip_counters::<I>().receive_ip_packet.get(), 1);
     }
 }

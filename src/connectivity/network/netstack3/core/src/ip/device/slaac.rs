@@ -2812,7 +2812,7 @@ mod tests {
             core_ctx,
             bindings_ctx,
             &device_id,
-            FrameDestination::Multicast,
+            Some(FrameDestination::Multicast),
             build_slaac_ra_packet(
                 remote_mac.to_ipv6_link_local().addr().get(),
                 Ipv6::ALL_NODES_LINK_LOCAL_MULTICAST_ADDRESS.get(),

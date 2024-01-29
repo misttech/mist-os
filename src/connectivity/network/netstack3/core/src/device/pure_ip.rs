@@ -5,8 +5,7 @@
 //! A pure IP device, capable of directly sending/receiving IPv4 & IPv6 packets.
 
 use alloc::vec::Vec;
-use core::marker::PhantomData;
-use net_types::ip::Mtu;
+use net_types::ip::{IpVersion, Mtu};
 use packet::Buf;
 
 use crate::device::{
@@ -71,7 +70,13 @@ impl DeviceStateSpec for PureIpDevice {
     }
 }
 
-type PureIpDeviceFrameMetadata<D> = PhantomData<D>;
+/// Metadata for IP packets received on a pure IP device.
+pub struct PureIpDeviceFrameMetadata<D> {
+    /// The device a packet was received on.
+    device_id: D,
+    /// The IP version of the received packet.
+    ip_version: IpVersion,
+}
 
 impl DeviceReceiveFrameSpec for PureIpDevice {
     type FrameMetadata<D> = PureIpDeviceFrameMetadata<D>;

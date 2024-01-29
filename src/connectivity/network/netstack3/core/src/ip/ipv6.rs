@@ -46,7 +46,7 @@ pub(crate) enum Ipv6PacketAction {
 pub(crate) fn handle_extension_headers<CC: DeviceIdContext<AnyDevice>, B: ByteSlice>(
     core_ctx: &mut CC,
     device: &CC::DeviceId,
-    frame_dst: FrameDestination,
+    frame_dst: Option<FrameDestination>,
     packet: &Ipv6Packet<B>,
     at_destination: bool,
 ) -> Ipv6PacketAction {
@@ -124,7 +124,7 @@ fn handle_hop_by_hop_options_ext_hdr<
 >(
     _bindings_ctx: &mut CC,
     _device: &CC::DeviceId,
-    _frame_dst: FrameDestination,
+    _frame_dst: Option<FrameDestination>,
     _packet: &Ipv6Packet<B>,
     options: I,
 ) -> Ipv6PacketAction {
@@ -148,7 +148,7 @@ fn handle_hop_by_hop_options_ext_hdr<
 fn _handle_routing_ext_hdr<'a, CC: DeviceIdContext<AnyDevice>, B: ByteSlice>(
     _bindings_ctx: &mut CC,
     _device: &CC::DeviceId,
-    _frame_dst: FrameDestination,
+    _frame_dst: Option<FrameDestination>,
     _packet: &Ipv6Packet<B>,
     _routing_data: &RoutingData<'a>,
 ) -> Ipv6PacketAction {
@@ -162,7 +162,7 @@ fn _handle_routing_ext_hdr<'a, CC: DeviceIdContext<AnyDevice>, B: ByteSlice>(
 fn handle_fragment_ext_hdr<'a, CC: DeviceIdContext<AnyDevice>, B: ByteSlice>(
     _bindings_ctx: &mut CC,
     _device: &CC::DeviceId,
-    _frame_dst: FrameDestination,
+    _frame_dst: Option<FrameDestination>,
     _packet: &Ipv6Packet<B>,
     _fragment_data: &FragmentData<'a>,
 ) -> Ipv6PacketAction {
@@ -182,7 +182,7 @@ fn handle_destination_options_ext_hdr<
 >(
     _bindings_ctx: &mut CC,
     _device: &CC::DeviceId,
-    _frame_dst: FrameDestination,
+    _frame_dst: Option<FrameDestination>,
     _packet: &Ipv6Packet<B>,
     options: I,
 ) -> Ipv6PacketAction {
@@ -240,7 +240,7 @@ mod tests {
             handle_extension_headers(
                 &mut CoreCtx::new_deprecated(&core_ctx),
                 &device_id,
-                frame_dst,
+                Some(frame_dst),
                 &packet,
                 false
             ),

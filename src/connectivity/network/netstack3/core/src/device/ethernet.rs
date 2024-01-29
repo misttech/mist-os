@@ -985,7 +985,7 @@ where
                 self.increment(|counters| &counters.recv_ip_delivered);
                 self.receive_frame(
                     bindings_ctx,
-                    RecvIpFrameMeta::<_, Ipv4>::new(device_id, frame_dst),
+                    RecvIpFrameMeta::<_, Ipv4>::new(device_id, Some(frame_dst)),
                     buffer,
                 )
             }
@@ -993,7 +993,7 @@ where
                 self.increment(|counters| &counters.recv_ip_delivered);
                 self.receive_frame(
                     bindings_ctx,
-                    RecvIpFrameMeta::<_, Ipv6>::new(device_id, frame_dst),
+                    RecvIpFrameMeta::<_, Ipv6>::new(device_id, Some(frame_dst)),
                     buffer,
                 )
             }
@@ -2051,7 +2051,7 @@ mod tests {
 
         // Receiving a packet not destined for the node should only result in a
         // dest unreachable message if routing is enabled.
-        receive_ip_packet::<_, _, I>(core_ctx, bindings_ctx, &device, frame_dst, buf.clone());
+        receive_ip_packet::<_, _, I>(core_ctx, bindings_ctx, &device, Some(frame_dst), buf.clone());
         assert_empty(bindings_ctx.frames_sent().iter());
 
         // Set routing and expect packets to be forwarded.
@@ -2063,7 +2063,7 @@ mod tests {
 
         // Should route the packet since routing fully enabled (netstack &
         // device).
-        receive_ip_packet::<_, _, I>(core_ctx, bindings_ctx, &device, frame_dst, buf.clone());
+        receive_ip_packet::<_, _, I>(core_ctx, bindings_ctx, &device, Some(frame_dst), buf.clone());
         {
             assert_eq!(bindings_ctx.frames_sent().len(), 1);
             let frames = bindings_ctx.frames_sent();
@@ -2094,7 +2094,13 @@ mod tests {
             .ok()
             .unwrap()
             .unwrap_b();
-        receive_ip_packet::<_, _, I>(core_ctx, bindings_ctx, &device, frame_dst, buf_unknown_dest);
+        receive_ip_packet::<_, _, I>(
+            core_ctx,
+            bindings_ctx,
+            &device,
+            Some(frame_dst),
+            buf_unknown_dest,
+        );
         assert_eq!(bindings_ctx.frames_sent().len(), 2);
         check_icmp::<I>(&bindings_ctx.frames_sent()[1].1);
 
@@ -2105,7 +2111,7 @@ mod tests {
         check_other_is_forwarding_enabled::<I>(core_ctx, &device, false);
 
         // Should not route packets anymore
-        receive_ip_packet::<_, _, I>(core_ctx, bindings_ctx, &device, frame_dst, buf);
+        receive_ip_packet::<_, _, I>(core_ctx, bindings_ctx, &device, Some(frame_dst), buf);
         assert_eq!(bindings_ctx.frames_sent().len(), 2);
     }
 
@@ -2322,7 +2328,7 @@ mod tests {
             core_ctx,
             bindings_ctx,
             device,
-            FrameDestination::Individual { local: true },
+            Some(FrameDestination::Individual { local: true }),
             buf,
         );
         assert_eq!(

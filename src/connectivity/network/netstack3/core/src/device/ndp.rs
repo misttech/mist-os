@@ -1049,7 +1049,7 @@ mod tests {
             &core_ctx,
             &mut bindings_ctx,
             &device_id,
-            FrameDestination::Multicast,
+            Some(FrameDestination::Multicast),
             icmpv6_packet_buf,
         );
         assert_eq!(core_ctx.state.ndp_counters().rx_router_solicitation.get(), 0);
@@ -1099,7 +1099,7 @@ mod tests {
             &core_ctx,
             &mut bindings_ctx,
             &device_id,
-            FrameDestination::Individual { local: true },
+            Some(FrameDestination::Individual { local: true }),
             icmpv6_packet_buf,
         );
         assert_eq!(core_ctx.state.ndp_counters().rx_router_advertisement.get(), 0);
@@ -1113,7 +1113,7 @@ mod tests {
             &core_ctx,
             &mut bindings_ctx,
             &device_id,
-            FrameDestination::Individual { local: true },
+            Some(FrameDestination::Individual { local: true }),
             icmpv6_packet_buf,
         );
         assert_eq!(core_ctx.state.ndp_counters().rx_router_advertisement.get(), 1);
@@ -1154,7 +1154,7 @@ mod tests {
                 core_ctx,
                 bindings_ctx,
                 device_id,
-                FrameDestination::Multicast,
+                Some(FrameDestination::Multicast),
                 icmpv6_packet_buf,
             );
             assert_eq!(
@@ -1249,7 +1249,7 @@ mod tests {
             core_ctx,
             bindings_ctx,
             &device,
-            FrameDestination::Multicast,
+            Some(FrameDestination::Multicast),
             icmpv6_packet_buf,
         );
         assert_eq!(core_ctx.state.ndp_counters().rx_router_advertisement.get(), 1);
@@ -1273,7 +1273,7 @@ mod tests {
             core_ctx,
             bindings_ctx,
             &device,
-            FrameDestination::Multicast,
+            Some(FrameDestination::Multicast),
             icmpv6_packet_buf,
         );
         assert_eq!(core_ctx.state.ndp_counters().rx_router_advertisement.get(), 2);
@@ -1297,7 +1297,7 @@ mod tests {
             core_ctx,
             bindings_ctx,
             &device,
-            FrameDestination::Multicast,
+            Some(FrameDestination::Multicast),
             icmpv6_packet_buf,
         );
         assert_eq!(core_ctx.state.ndp_counters().rx_router_advertisement.get(), 3);
@@ -1789,7 +1789,7 @@ mod tests {
             core_ctx,
             bindings_ctx,
             &device,
-            FrameDestination::Multicast,
+            Some(FrameDestination::Multicast),
             icmpv6_packet_buf,
         );
 
@@ -2247,7 +2247,7 @@ mod tests {
             core_ctx,
             bindings_ctx,
             &device,
-            FrameDestination::Multicast,
+            Some(FrameDestination::Multicast),
             icmpv6_packet_buf,
         );
         assert_empty(get_global_ipv6_addrs(core_ctx, &device));
@@ -2399,7 +2399,7 @@ mod tests {
             core_ctx,
             bindings_ctx,
             &device,
-            FrameDestination::Multicast,
+            Some(FrameDestination::Multicast),
             icmpv6_packet_buf,
         );
     }
@@ -2741,7 +2741,7 @@ mod tests {
             core_ctx,
             bindings_ctx,
             &device,
-            FrameDestination::Multicast,
+            Some(FrameDestination::Multicast),
             testutil::neighbor_advertisement_ip_packet(
                 source_ip.into(),
                 dest_ip,
@@ -3509,7 +3509,7 @@ mod tests {
             core_ctx,
             bindings_ctx,
             &device,
-            FrameDestination::Multicast,
+            Some(FrameDestination::Multicast),
             icmpv6_packet_buf,
         );
 

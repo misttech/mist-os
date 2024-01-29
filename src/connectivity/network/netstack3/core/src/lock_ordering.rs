@@ -199,6 +199,10 @@ pub enum LoopbackTxDequeue {}
 
 pub enum PureIpDeviceTxQueue {}
 pub enum PureIpDeviceTxDequeue {}
+// Note: Pure IP devices do not have an RX queue. This lock marker exists to
+// provide separation between the "device" layer, and the IP layer. If an RX
+// queue is introduced in the future, this lock-level may be trivially used.
+pub enum PureIpDeviceRxDequeue {}
 
 pub(crate) struct FilterState<I>(PhantomData<I>, Never);
 
@@ -207,7 +211,8 @@ impl_lock_after!(LoopbackTxDequeue => EthernetTxDequeue);
 impl_lock_after!(EthernetTxDequeue => PureIpDeviceTxDequeue);
 impl_lock_after!(PureIpDeviceTxDequeue => LoopbackRxDequeue);
 impl_lock_after!(LoopbackRxDequeue => EthernetRxDequeue);
-impl_lock_after!(EthernetRxDequeue => IcmpSocketsTable<Ipv4>);
+impl_lock_after!(EthernetRxDequeue => PureIpDeviceRxDequeue);
+impl_lock_after!(PureIpDeviceRxDequeue => IcmpSocketsTable<Ipv4>);
 impl_lock_after!(IcmpSocketsTable<Ipv4> => IcmpBoundMap<Ipv4>);
 impl_lock_after!(IcmpBoundMap<Ipv4> => IcmpTokenBucket<Ipv4>);
 impl_lock_after!(IcmpTokenBucket<Ipv4> => IcmpSocketsTable<Ipv6>);

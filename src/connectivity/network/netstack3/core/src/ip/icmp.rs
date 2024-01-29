@@ -471,7 +471,7 @@ pub(crate) trait IcmpErrorHandler<I: IcmpHandlerIpExt, BC>:
         &mut self,
         bindings_ctx: &mut BC,
         device: &Self::DeviceId,
-        frame_dst: FrameDestination,
+        frame_dst: Option<FrameDestination>,
         src_ip: I::SourceAddress,
         dst_ip: SpecifiedAddr<I::Addr>,
         original_packet: B,
@@ -488,7 +488,7 @@ impl<
         &mut self,
         bindings_ctx: &mut BC,
         device: &CC::DeviceId,
-        frame_dst: FrameDestination,
+        frame_dst: Option<FrameDestination>,
         src_ip: SpecifiedAddr<Ipv4Addr>,
         dst_ip: SpecifiedAddr<Ipv4Addr>,
         original_packet: B,
@@ -571,7 +571,7 @@ impl<
         &mut self,
         bindings_ctx: &mut BC,
         device: &CC::DeviceId,
-        frame_dst: FrameDestination,
+        frame_dst: Option<FrameDestination>,
         src_ip: UnicastAddr<Ipv6Addr>,
         dst_ip: SpecifiedAddr<Ipv6Addr>,
         original_packet: B,
@@ -2028,7 +2028,7 @@ pub(crate) fn send_icmpv4_protocol_unreachable<
     core_ctx: &mut CC,
     bindings_ctx: &mut BC,
     device: &CC::DeviceId,
-    frame_dst: FrameDestination,
+    frame_dst: Option<FrameDestination>,
     src_ip: SocketIpAddr<Ipv4Addr>,
     dst_ip: SocketIpAddr<Ipv4Addr>,
     original_packet: B,
@@ -2072,7 +2072,7 @@ pub(crate) fn send_icmpv6_protocol_unreachable<
     core_ctx: &mut CC,
     bindings_ctx: &mut BC,
     device: &CC::DeviceId,
-    frame_dst: FrameDestination,
+    frame_dst: Option<FrameDestination>,
     src_ip: SocketIpAddr<Ipv6Addr>,
     dst_ip: SocketIpAddr<Ipv6Addr>,
     original_packet: B,
@@ -2126,7 +2126,7 @@ pub(crate) fn send_icmpv4_port_unreachable<
     core_ctx: &mut CC,
     bindings_ctx: &mut BC,
     device: &CC::DeviceId,
-    frame_dst: FrameDestination,
+    frame_dst: Option<FrameDestination>,
     src_ip: SocketIpAddr<Ipv4Addr>,
     dst_ip: SocketIpAddr<Ipv4Addr>,
     original_packet: B,
@@ -2169,7 +2169,7 @@ pub(crate) fn send_icmpv6_port_unreachable<
     core_ctx: &mut CC,
     bindings_ctx: &mut BC,
     device: &CC::DeviceId,
-    frame_dst: FrameDestination,
+    frame_dst: Option<FrameDestination>,
     src_ip: SocketIpAddr<Ipv6Addr>,
     dst_ip: SocketIpAddr<Ipv6Addr>,
     original_packet: B,
@@ -2207,7 +2207,7 @@ pub(crate) fn send_icmpv4_net_unreachable<
     core_ctx: &mut CC,
     bindings_ctx: &mut BC,
     device: &CC::DeviceId,
-    frame_dst: FrameDestination,
+    frame_dst: Option<FrameDestination>,
     src_ip: SocketIpAddr<Ipv4Addr>,
     dst_ip: SocketIpAddr<Ipv4Addr>,
     proto: Ipv4Proto,
@@ -2255,7 +2255,7 @@ pub(crate) fn send_icmpv6_net_unreachable<
     core_ctx: &mut CC,
     bindings_ctx: &mut BC,
     device: &CC::DeviceId,
-    frame_dst: FrameDestination,
+    frame_dst: Option<FrameDestination>,
     src_ip: SocketIpAddr<Ipv6Addr>,
     dst_ip: SocketIpAddr<Ipv6Addr>,
     proto: Ipv6Proto,
@@ -2301,7 +2301,7 @@ pub(crate) fn send_icmpv4_ttl_expired<
     core_ctx: &mut CC,
     bindings_ctx: &mut BC,
     device: &CC::DeviceId,
-    frame_dst: FrameDestination,
+    frame_dst: Option<FrameDestination>,
     src_ip: SocketIpAddr<Ipv4Addr>,
     dst_ip: SocketIpAddr<Ipv4Addr>,
     proto: Ipv4Proto,
@@ -2350,7 +2350,7 @@ pub(crate) fn send_icmpv6_ttl_expired<
     core_ctx: &mut CC,
     bindings_ctx: &mut BC,
     device: &CC::DeviceId,
-    frame_dst: FrameDestination,
+    frame_dst: Option<FrameDestination>,
     src_ip: SocketIpAddr<Ipv6Addr>,
     dst_ip: SocketIpAddr<Ipv6Addr>,
     proto: Ipv6Proto,
@@ -2396,7 +2396,7 @@ pub(crate) fn send_icmpv6_packet_too_big<
     core_ctx: &mut CC,
     bindings_ctx: &mut BC,
     device: &CC::DeviceId,
-    frame_dst: FrameDestination,
+    frame_dst: Option<FrameDestination>,
     src_ip: SocketIpAddr<Ipv6Addr>,
     dst_ip: SocketIpAddr<Ipv6Addr>,
     proto: Ipv6Proto,
@@ -2451,7 +2451,7 @@ pub(crate) fn send_icmpv4_parameter_problem<
     core_ctx: &mut CC,
     bindings_ctx: &mut BC,
     device: &CC::DeviceId,
-    frame_dst: FrameDestination,
+    frame_dst: Option<FrameDestination>,
     src_ip: SocketIpAddr<Ipv4Addr>,
     dst_ip: SocketIpAddr<Ipv4Addr>,
     code: Icmpv4ParameterProblemCode,
@@ -2495,7 +2495,7 @@ pub(crate) fn send_icmpv6_parameter_problem<
     core_ctx: &mut CC,
     bindings_ctx: &mut BC,
     device: &CC::DeviceId,
-    frame_dst: FrameDestination,
+    frame_dst: Option<FrameDestination>,
     src_ip: SocketIpAddr<Ipv6Addr>,
     dst_ip: SocketIpAddr<Ipv6Addr>,
     code: Icmpv6ParameterProblemCode,
@@ -2533,7 +2533,7 @@ fn send_icmpv4_dest_unreachable<
     core_ctx: &mut CC,
     bindings_ctx: &mut BC,
     device: &CC::DeviceId,
-    frame_dst: FrameDestination,
+    frame_dst: Option<FrameDestination>,
     src_ip: SocketIpAddr<Ipv4Addr>,
     dst_ip: SocketIpAddr<Ipv4Addr>,
     code: Icmpv4DestUnreachableCode,
@@ -2565,7 +2565,7 @@ fn send_icmpv6_dest_unreachable<
     core_ctx: &mut CC,
     bindings_ctx: &mut BC,
     device: &CC::DeviceId,
-    frame_dst: FrameDestination,
+    frame_dst: Option<FrameDestination>,
     src_ip: SocketIpAddr<Ipv6Addr>,
     dst_ip: SocketIpAddr<Ipv6Addr>,
     code: Icmpv6DestUnreachableCode,
@@ -2594,7 +2594,7 @@ fn send_icmpv4_error_message<
     core_ctx: &mut CC,
     bindings_ctx: &mut BC,
     device: &CC::DeviceId,
-    frame_dst: FrameDestination,
+    frame_dst: Option<FrameDestination>,
     original_src_ip: SocketIpAddr<Ipv4Addr>,
     original_dst_ip: SocketIpAddr<Ipv4Addr>,
     code: M::Code,
@@ -2653,7 +2653,7 @@ fn send_icmpv6_error_message<
     core_ctx: &mut CC,
     bindings_ctx: &mut BC,
     device: &CC::DeviceId,
-    frame_dst: FrameDestination,
+    frame_dst: Option<FrameDestination>,
     original_src_ip: SocketIpAddr<Ipv6Addr>,
     original_dst_ip: SocketIpAddr<Ipv6Addr>,
     code: M::Code,
@@ -2721,7 +2721,7 @@ fn send_icmpv6_error_message<
 /// unnecessary for some ICMP error conditions. The ICMP error message check can
 /// be performed separately with `is_icmp_error_message`.
 fn should_send_icmpv4_error(
-    frame_dst: FrameDestination,
+    frame_dst: Option<FrameDestination>,
     src_ip: SpecifiedAddr<Ipv4Addr>,
     dst_ip: SpecifiedAddr<Ipv4Addr>,
     fragment_type: Ipv4FragmentType,
@@ -2748,7 +2748,7 @@ fn should_send_icmpv4_error(
     fragment_type == Ipv4FragmentType::InitialFragment
         && !(dst_ip.is_multicast()
             || dst_ip.is_limited_broadcast()
-            || frame_dst.is_broadcast()
+            || frame_dst.is_some_and(|dst| dst.is_broadcast())
             || src_ip.is_loopback()
             || src_ip.is_limited_broadcast()
             || src_ip.is_multicast()
@@ -2782,17 +2782,24 @@ fn should_send_icmpv4_error(
 /// unnecessary for some ICMP error conditions. The ICMP error message check can
 /// be performed separately with `is_icmp_error_message`.
 fn should_send_icmpv6_error(
-    frame_dst: FrameDestination,
+    frame_dst: Option<FrameDestination>,
     src_ip: SpecifiedAddr<Ipv6Addr>,
     dst_ip: SpecifiedAddr<Ipv6Addr>,
     allow_dst_multicast: bool,
 ) -> bool {
     // NOTE: We do not explicitly implement the "unspecified address" check, as
     // it is enforced by the types of the arguments.
-    !((!allow_dst_multicast
-        && (dst_ip.is_multicast() || frame_dst.is_multicast() || frame_dst.is_broadcast()))
-        || src_ip.is_loopback()
-        || src_ip.is_multicast())
+    let multicast_frame_dst = match frame_dst {
+        Some(FrameDestination::Individual { local: _ }) | None => false,
+        Some(FrameDestination::Broadcast) | Some(FrameDestination::Multicast) => true,
+    };
+    if (dst_ip.is_multicast() || multicast_frame_dst) && !allow_dst_multicast {
+        return false;
+    }
+    if src_ip.is_loopback() || src_ip.is_multicast() {
+        return false;
+    }
+    true
 }
 
 /// Determine whether or not an IP packet body contains an ICMP error message
@@ -3259,7 +3266,7 @@ mod tests {
             core_ctx,
             bindings_ctx,
             &device,
-            FrameDestination::Individual { local: true },
+            Some(FrameDestination::Individual { local: true }),
             buffer,
         );
 
@@ -3593,13 +3600,14 @@ mod tests {
 
         // Should Send, unless non initial fragment.
         assert!(should_send_icmpv4_error(
-            frame_dst,
+            Some(frame_dst),
             src_ip,
             dst_ip,
             Ipv4FragmentType::InitialFragment
         ));
+        assert!(should_send_icmpv4_error(None, src_ip, dst_ip, Ipv4FragmentType::InitialFragment));
         assert!(!should_send_icmpv4_error(
-            frame_dst,
+            Some(frame_dst),
             src_ip,
             dst_ip,
             Ipv4FragmentType::NonInitialFragment
@@ -3607,13 +3615,13 @@ mod tests {
 
         // Should not send because destined for IP broadcast addr
         assert!(!should_send_icmpv4_error(
-            frame_dst,
+            Some(frame_dst),
             src_ip,
             Ipv4::LIMITED_BROADCAST_ADDRESS,
             Ipv4FragmentType::InitialFragment
         ));
         assert!(!should_send_icmpv4_error(
-            frame_dst,
+            Some(frame_dst),
             src_ip,
             Ipv4::LIMITED_BROADCAST_ADDRESS,
             Ipv4FragmentType::NonInitialFragment
@@ -3621,13 +3629,13 @@ mod tests {
 
         // Should not send because destined for multicast addr
         assert!(!should_send_icmpv4_error(
-            frame_dst,
+            Some(frame_dst),
             src_ip,
             multicast_ip_1,
             Ipv4FragmentType::InitialFragment
         ));
         assert!(!should_send_icmpv4_error(
-            frame_dst,
+            Some(frame_dst),
             src_ip,
             multicast_ip_1,
             Ipv4FragmentType::NonInitialFragment
@@ -3635,13 +3643,13 @@ mod tests {
 
         // Should not send because Link Layer Broadcast.
         assert!(!should_send_icmpv4_error(
-            FrameDestination::Broadcast,
+            Some(FrameDestination::Broadcast),
             src_ip,
             dst_ip,
             Ipv4FragmentType::InitialFragment
         ));
         assert!(!should_send_icmpv4_error(
-            FrameDestination::Broadcast,
+            Some(FrameDestination::Broadcast),
             src_ip,
             dst_ip,
             Ipv4FragmentType::NonInitialFragment
@@ -3649,13 +3657,13 @@ mod tests {
 
         // Should not send because from loopback addr
         assert!(!should_send_icmpv4_error(
-            frame_dst,
+            Some(frame_dst),
             Ipv4::LOOPBACK_ADDRESS,
             dst_ip,
             Ipv4FragmentType::InitialFragment
         ));
         assert!(!should_send_icmpv4_error(
-            frame_dst,
+            Some(frame_dst),
             Ipv4::LOOPBACK_ADDRESS,
             dst_ip,
             Ipv4FragmentType::NonInitialFragment
@@ -3663,13 +3671,13 @@ mod tests {
 
         // Should not send because from limited broadcast addr
         assert!(!should_send_icmpv4_error(
-            frame_dst,
+            Some(frame_dst),
             Ipv4::LIMITED_BROADCAST_ADDRESS,
             dst_ip,
             Ipv4FragmentType::InitialFragment
         ));
         assert!(!should_send_icmpv4_error(
-            frame_dst,
+            Some(frame_dst),
             Ipv4::LIMITED_BROADCAST_ADDRESS,
             dst_ip,
             Ipv4FragmentType::NonInitialFragment
@@ -3677,13 +3685,13 @@ mod tests {
 
         // Should not send because from multicast addr
         assert!(!should_send_icmpv4_error(
-            frame_dst,
+            Some(frame_dst),
             multicast_ip_2,
             dst_ip,
             Ipv4FragmentType::InitialFragment
         ));
         assert!(!should_send_icmpv4_error(
-            frame_dst,
+            Some(frame_dst),
             multicast_ip_2,
             dst_ip,
             Ipv4FragmentType::NonInitialFragment
@@ -3691,13 +3699,13 @@ mod tests {
 
         // Should not send because from class E addr
         assert!(!should_send_icmpv4_error(
-            frame_dst,
+            Some(frame_dst),
             SpecifiedAddr::new(Ipv4Addr::new([240, 0, 0, 1])).unwrap(),
             dst_ip,
             Ipv4FragmentType::InitialFragment
         ));
         assert!(!should_send_icmpv4_error(
-            frame_dst,
+            Some(frame_dst),
             SpecifiedAddr::new(Ipv4Addr::new([240, 0, 0, 1])).unwrap(),
             dst_ip,
             Ipv4FragmentType::NonInitialFragment
@@ -3716,22 +3724,29 @@ mod tests {
 
         // Should Send.
         assert!(should_send_icmpv6_error(
-            frame_dst, src_ip, dst_ip, false /* allow_dst_multicast */
+            Some(frame_dst),
+            src_ip,
+            dst_ip,
+            false /* allow_dst_multicast */
         ));
+        assert!(should_send_icmpv6_error(None, src_ip, dst_ip, false /* allow_dst_multicast */));
         assert!(should_send_icmpv6_error(
-            frame_dst, src_ip, dst_ip, true /* allow_dst_multicast */
+            Some(frame_dst),
+            src_ip,
+            dst_ip,
+            true /* allow_dst_multicast */
         ));
 
         // Should not send because destined for multicast addr, unless exception
         // applies.
         assert!(!should_send_icmpv6_error(
-            frame_dst,
+            Some(frame_dst),
             src_ip,
             multicast_ip_1,
             false /* allow_dst_multicast */
         ));
         assert!(should_send_icmpv6_error(
-            frame_dst,
+            Some(frame_dst),
             src_ip,
             multicast_ip_1,
             true /* allow_dst_multicast */
@@ -3740,13 +3755,13 @@ mod tests {
         // Should not send because Link Layer Broadcast, unless exception
         // applies.
         assert!(!should_send_icmpv6_error(
-            FrameDestination::Broadcast,
+            Some(FrameDestination::Broadcast),
             src_ip,
             dst_ip,
             false /* allow_dst_multicast */
         ));
         assert!(should_send_icmpv6_error(
-            FrameDestination::Broadcast,
+            Some(FrameDestination::Broadcast),
             src_ip,
             dst_ip,
             true /* allow_dst_multicast */
@@ -3754,13 +3769,13 @@ mod tests {
 
         // Should not send because from loopback addr.
         assert!(!should_send_icmpv6_error(
-            frame_dst,
+            Some(frame_dst),
             Ipv6::LOOPBACK_ADDRESS,
             dst_ip,
             false /* allow_dst_multicast */
         ));
         assert!(!should_send_icmpv6_error(
-            frame_dst,
+            Some(frame_dst),
             Ipv6::LOOPBACK_ADDRESS,
             dst_ip,
             true /* allow_dst_multicast */
@@ -3768,13 +3783,13 @@ mod tests {
 
         // Should not send because from multicast addr.
         assert!(!should_send_icmpv6_error(
-            frame_dst,
+            Some(frame_dst),
             multicast_ip_2,
             dst_ip,
             false /* allow_dst_multicast */
         ));
         assert!(!should_send_icmpv6_error(
-            frame_dst,
+            Some(frame_dst),
             multicast_ip_2,
             dst_ip,
             true /* allow_dst_multicast */
@@ -3783,25 +3798,25 @@ mod tests {
         // Should not send because from multicast addr, even though dest
         // multicast exception applies.
         assert!(!should_send_icmpv6_error(
-            FrameDestination::Broadcast,
+            Some(FrameDestination::Broadcast),
             multicast_ip_2,
             dst_ip,
             false /* allow_dst_multicast */
         ));
         assert!(!should_send_icmpv6_error(
-            FrameDestination::Broadcast,
+            Some(FrameDestination::Broadcast),
             multicast_ip_2,
             dst_ip,
             true /* allow_dst_multicast */
         ));
         assert!(!should_send_icmpv6_error(
-            frame_dst,
+            Some(frame_dst),
             multicast_ip_2,
             multicast_ip_1,
             false /* allow_dst_multicast */
         ));
         assert!(!should_send_icmpv6_error(
-            frame_dst,
+            Some(frame_dst),
             multicast_ip_2,
             multicast_ip_1,
             true /* allow_dst_multicast */
@@ -4649,7 +4664,7 @@ mod tests {
                 &mut core_ctx.inner,
                 bindings_ctx,
                 &FakeDeviceId,
-                FrameDestination::Individual { local: true },
+                Some(FrameDestination::Individual { local: true }),
                 FAKE_CONFIG_V4.remote_ip.try_into().unwrap(),
                 FAKE_CONFIG_V4.local_ip.try_into().unwrap(),
                 IpProto::Udp.into(),
@@ -4667,7 +4682,7 @@ mod tests {
                 &mut core_ctx.inner,
                 bindings_ctx,
                 &FakeDeviceId,
-                FrameDestination::Individual { local: true },
+                Some(FrameDestination::Individual { local: true }),
                 FAKE_CONFIG_V4.remote_ip.try_into().unwrap(),
                 FAKE_CONFIG_V4.local_ip.try_into().unwrap(),
                 Icmpv4ParameterProblemCode::PointerIndicatesError,
@@ -4686,7 +4701,7 @@ mod tests {
                 &mut core_ctx.inner,
                 bindings_ctx,
                 &FakeDeviceId,
-                FrameDestination::Individual { local: true },
+                Some(FrameDestination::Individual { local: true }),
                 FAKE_CONFIG_V4.remote_ip.try_into().unwrap(),
                 FAKE_CONFIG_V4.local_ip.try_into().unwrap(),
                 Icmpv4DestUnreachableCode::DestNetworkUnreachable,
@@ -4704,7 +4719,7 @@ mod tests {
                 &mut core_ctx.inner,
                 bindings_ctx,
                 &FakeDeviceId,
-                FrameDestination::Individual { local: true },
+                Some(FrameDestination::Individual { local: true }),
                 FAKE_CONFIG_V6.remote_ip.try_into().unwrap(),
                 FAKE_CONFIG_V6.local_ip.try_into().unwrap(),
                 IpProto::Udp.into(),
@@ -4721,7 +4736,7 @@ mod tests {
                 &mut core_ctx.inner,
                 bindings_ctx,
                 &FakeDeviceId,
-                FrameDestination::Individual { local: true },
+                Some(FrameDestination::Individual { local: true }),
                 FAKE_CONFIG_V6.remote_ip.try_into().unwrap(),
                 FAKE_CONFIG_V6.local_ip.try_into().unwrap(),
                 IpProto::Udp.into(),
@@ -4739,7 +4754,7 @@ mod tests {
                 &mut core_ctx.inner,
                 bindings_ctx,
                 &FakeDeviceId,
-                FrameDestination::Individual { local: true },
+                Some(FrameDestination::Individual { local: true }),
                 FAKE_CONFIG_V6.remote_ip.try_into().unwrap(),
                 FAKE_CONFIG_V6.local_ip.try_into().unwrap(),
                 Icmpv6ParameterProblemCode::ErroneousHeaderField,
@@ -4757,7 +4772,7 @@ mod tests {
                 &mut core_ctx.inner,
                 bindings_ctx,
                 &FakeDeviceId,
-                FrameDestination::Individual { local: true },
+                Some(FrameDestination::Individual { local: true }),
                 FAKE_CONFIG_V6.remote_ip.try_into().unwrap(),
                 FAKE_CONFIG_V6.local_ip.try_into().unwrap(),
                 Icmpv6DestUnreachableCode::NoRoute,

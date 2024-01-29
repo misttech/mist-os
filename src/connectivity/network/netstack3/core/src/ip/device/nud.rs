@@ -4939,7 +4939,7 @@ mod tests {
             core_ctx,
             bindings_ctx,
             &device_id,
-            FrameDestination::Multicast,
+            Some(FrameDestination::Multicast),
             ra_packet_buf(&[][..]),
         );
         let link_device_id = device_id.clone().try_into().unwrap();
@@ -4950,7 +4950,7 @@ mod tests {
             core_ctx,
             bindings_ctx,
             &device_id,
-            FrameDestination::Multicast,
+            Some(FrameDestination::Multicast),
             ra_packet_buf(&options[..]),
         );
         assert_neighbors::<Ipv6, _>(
@@ -5051,7 +5051,7 @@ mod tests {
             core_ctx,
             bindings_ctx,
             &device_id,
-            FrameDestination::Multicast,
+            Some(FrameDestination::Multicast),
             neighbor_solicitation_ip_packet(**src_ip, dst_ip, target_addr, *remote_mac),
         );
 
@@ -5161,7 +5161,7 @@ mod tests {
             core_ctx,
             bindings_ctx,
             &device_id,
-            FrameDestination::Multicast,
+            Some(FrameDestination::Multicast),
             na_packet_buf(false, false),
         );
         let link_device_id = device_id.clone().try_into().unwrap();
@@ -5170,7 +5170,7 @@ mod tests {
             core_ctx,
             bindings_ctx,
             &device_id,
-            FrameDestination::Multicast,
+            Some(FrameDestination::Multicast),
             na_packet_buf(true, true),
         );
         assert_neighbors::<Ipv6, _>(core_ctx, &link_device_id, Default::default());
@@ -5244,7 +5244,7 @@ mod tests {
             core_ctx,
             bindings_ctx,
             &device_id,
-            FrameDestination::Multicast,
+            Some(FrameDestination::Multicast),
             na_packet_buf(true, true),
         );
         assert_neighbors::<Ipv6, _>(

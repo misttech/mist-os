@@ -850,7 +850,7 @@ mod tests {
             &core_ctx,
             &mut bindings_ctx,
             &device_id,
-            FrameDestination::Individual { local: true },
+            Some(FrameDestination::Individual { local: true }),
             buf(0, false, as_secs(ONE_SECOND).into(), 0),
         );
         bindings_ctx.timer_ctx().assert_no_timers_installed();
@@ -861,7 +861,7 @@ mod tests {
             &core_ctx,
             &mut bindings_ctx,
             &device_id,
-            FrameDestination::Individual { local: true },
+            Some(FrameDestination::Individual { local: true }),
             buf(as_secs(ONE_SECOND), true, 0, 0),
         );
         let gateway_route =
@@ -885,7 +885,7 @@ mod tests {
             &core_ctx,
             &mut bindings_ctx,
             &device_id,
-            FrameDestination::Individual { local: true },
+            Some(FrameDestination::Individual { local: true }),
             buf(as_secs(TWO_SECONDS), true, as_secs(ONE_SECOND).into(), 0),
         );
         let on_link_route = Ipv6DiscoveredRoute { subnet, gateway: None };
@@ -907,7 +907,7 @@ mod tests {
             &core_ctx,
             &mut bindings_ctx,
             &device_id,
-            FrameDestination::Individual { local: true },
+            Some(FrameDestination::Individual { local: true }),
             buf(
                 as_secs(TWO_SECONDS),
                 true,
@@ -936,7 +936,7 @@ mod tests {
             &core_ctx,
             &mut bindings_ctx,
             &device_id,
-            FrameDestination::Individual { local: true },
+            Some(FrameDestination::Individual { local: true }),
             buf(0, true, as_secs(TWO_SECONDS).into(), 0),
         );
         bindings_ctx.timer_ctx().assert_timers_installed([(
@@ -962,7 +962,7 @@ mod tests {
             &core_ctx,
             &mut bindings_ctx,
             &device_id,
-            FrameDestination::Individual { local: true },
+            Some(FrameDestination::Individual { local: true }),
             buf(0, false, 0, 0),
         );
         bindings_ctx.timer_ctx().assert_timers_installed([(
@@ -976,7 +976,7 @@ mod tests {
             &core_ctx,
             &mut bindings_ctx,
             &device_id,
-            FrameDestination::Individual { local: true },
+            Some(FrameDestination::Individual { local: true }),
             buf(0, true, 0, 0),
         );
         bindings_ctx.timer_ctx().assert_no_timers_installed();
@@ -1043,7 +1043,7 @@ mod tests {
             &core_ctx,
             &mut bindings_ctx,
             &device_id,
-            FrameDestination::Individual { local: true },
+            Some(FrameDestination::Individual { local: true }),
             buf(router_lifetime_secs, true, prefix_lifetime_secs),
         );
         bindings_ctx.timer_ctx().assert_timers_installed([(
@@ -1069,7 +1069,7 @@ mod tests {
             &core_ctx,
             &mut bindings_ctx,
             &device_id,
-            FrameDestination::Individual { local: true },
+            Some(FrameDestination::Individual { local: true }),
             buf(router_lifetime_secs, true, prefix_lifetime_secs),
         );
         bindings_ctx.timer_ctx().assert_timers_installed([
@@ -1092,7 +1092,7 @@ mod tests {
             &core_ctx,
             &mut bindings_ctx,
             &device_id,
-            FrameDestination::Individual { local: true },
+            Some(FrameDestination::Individual { local: true }),
             buf(router_lifetime_secs, true, prefix_lifetime_secs),
         );
         bindings_ctx.timer_ctx().assert_timers_installed([(
@@ -1108,7 +1108,7 @@ mod tests {
             &core_ctx,
             &mut bindings_ctx,
             &device_id,
-            FrameDestination::Individual { local: true },
+            Some(FrameDestination::Individual { local: true }),
             buf(router_lifetime_secs, true, prefix_lifetime_secs),
         );
         bindings_ctx.timer_ctx().assert_no_timers_installed();
@@ -1163,7 +1163,7 @@ mod tests {
             core_ctx,
             bindings_ctx,
             &device_id,
-            FrameDestination::Individual { local: true },
+            Some(FrameDestination::Individual { local: true }),
             router_advertisement_buf(
                 src_ip,
                 as_secs(TWO_SECONDS),

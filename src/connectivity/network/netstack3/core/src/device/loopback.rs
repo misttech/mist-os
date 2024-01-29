@@ -412,7 +412,7 @@ impl<BC: BindingsContext> ReceiveDequeFrameContext<LoopbackDevice, BC>
                     self,
                     bindings_ctx,
                     &device_id.clone().into(),
-                    frame_dest,
+                    Some(frame_dest),
                     buf,
                 )
             }
@@ -422,7 +422,7 @@ impl<BC: BindingsContext> ReceiveDequeFrameContext<LoopbackDevice, BC>
                     self,
                     bindings_ctx,
                     &device_id.clone().into(),
-                    frame_dest,
+                    Some(frame_dest),
                     buf,
                 )
             }

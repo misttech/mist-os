@@ -71,13 +71,20 @@ pub trait DeviceIdContext<D: Device> {
 }
 
 pub(super) struct RecvIpFrameMeta<D, I: Ip> {
+    /// The device on which the IP frame was received.
     pub(super) device: D,
-    pub(super) frame_dst: FrameDestination,
+    /// The link-layer destination address from the link-layer frame, if any.
+    /// `None` if the IP frame originated above the link-layer (e.g. pure IP
+    /// devices).
+    // NB: In the future, this field may also be `None` to represent link-layer
+    // protocols without destination addresses (i.e. PPP), but at the moment no
+    // such protocols are supported.
+    pub(super) frame_dst: Option<FrameDestination>,
     _marker: PhantomData<I>,
 }
 
 impl<D, I: Ip> RecvIpFrameMeta<D, I> {
-    pub(super) fn new(device: D, frame_dst: FrameDestination) -> RecvIpFrameMeta<D, I> {
+    pub(super) fn new(device: D, frame_dst: Option<FrameDestination>) -> RecvIpFrameMeta<D, I> {
         RecvIpFrameMeta { device, frame_dst, _marker: PhantomData }
     }
 }
@@ -191,11 +198,7 @@ where
     }
 }
 
-// TODO(joshlf): Does the IP layer ever need to distinguish between broadcast
-// and multicast frames?
-
-/// The type of address used as the source address in a device-layer frame:
-/// unicast or broadcast.
+/// The type of address used as the destination address in a device-layer frame.
 ///
 /// `FrameDestination` is used to implement RFC 1122 section 3.2.2 and RFC 4443
 /// section 2.4.e, which govern when to avoid sending an ICMP error message for
@@ -218,11 +221,6 @@ pub enum FrameDestination {
 }
 
 impl FrameDestination {
-    /// Is this `FrameDestination::Multicast`?
-    pub(crate) fn is_multicast(self) -> bool {
-        self == FrameDestination::Multicast
-    }
-
     /// Is this `FrameDestination::Broadcast`?
     pub(crate) fn is_broadcast(self) -> bool {
         self == FrameDestination::Broadcast
