@@ -5419,9 +5419,9 @@ mod tests {
             );
         });
 
-        // Remove the devices so that existing NUD timers get cleaned up; otherwise,
-        // they would hold dangling references to the devices when the `SyncCtx`s are
-        // dropped at the end of the test.
+        // Remove the devices so that existing NUD timers get cleaned up;
+        // otherwise, they would hold dangling references to the devices when
+        // the `StackState`s are dropped at the end of the test.
         for (ctx, device) in [("local", local_device), ("remote", remote_device)] {
             net.with_context(ctx, |testutil::FakeCtx { core_ctx, bindings_ctx }| {
                 crate::testutil::clear_routes_and_remove_ethernet_device(
@@ -5491,9 +5491,9 @@ mod tests {
             );
         });
 
-        // Remove the devices so that existing NUD timers get cleaned up; otherwise,
-        // they would hold dangling references to the devices when the `SyncCtx`s are
-        // dropped at the end of the test.
+        // Remove the devices so that existing NUD timers get cleaned up;
+        // otherwise, they would hold dangling references to the devices when
+        // the `StackState`s are dropped at the end of the test.
         for (ctx, device) in [("local", local_device), ("remote", remote_device)] {
             net.with_context(ctx, |testutil::FakeCtx { core_ctx, bindings_ctx }| {
                 crate::testutil::clear_routes_and_remove_ethernet_device(

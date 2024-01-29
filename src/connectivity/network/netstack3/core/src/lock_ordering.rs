@@ -13,7 +13,7 @@
 //! possible code paths respect the lock ordering defined here. By leveraging
 //! the types and traits from `lock_order`, we can guarantee at compile time
 //! that there are no opportunities for deadlock. The way this works is that
-//! each lock in [`SyncCtx`] and its associated per-device state gets assigned a
+//! each lock in [`CoreCtx`] and its associated per-device state gets assigned a
 //! type in this module. Then, for a pair of locks `A` and `B`, where `B` is
 //! allowed to be acquired while `A` is locked, there is a corresponding
 //! declaration of the [`lock_order::relation::LockAfter`] trait (done via the
@@ -96,7 +96,7 @@
 //! ordering graph and preserve cycle rejection, we should be able to migrate
 //! the definitions here without affecting the usages.
 //!
-//! [`SyncCtx`]: crate::SyncCtx
+//! [`CoreCtx`]: crate::CoreCtx
 //! [directed acyclic graph (DAG)]: https://en.wikipedia.org/wiki/Directed_acyclic_graph
 //! [strict partial order]: https://en.wikipedia.org/wiki/Partially_ordered_set#Strict_partial_orders
 //! [topological sort]: https://en.wikipedia.org/wiki/Topological_sorting

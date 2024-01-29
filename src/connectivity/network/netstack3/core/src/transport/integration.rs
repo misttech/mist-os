@@ -150,7 +150,7 @@ where
         CoreCtx<'a, BC, crate::lock_ordering::TcpSocketState<Ipv6>>;
     // TODO(https://fxbug.dev/42085913): Use `UninstantiableWrapper<Self>` as
     // the single stack ctx once the `AsSingleStack` bound has been dropped
-    // from [`TcpSyncCtx::DualStackIpTransportAndDemuxCtx`] (It's not
+    // from [`TcpContext::DualStackIpTransportAndDemuxCtx`] (It's not
     // possible for `Self` to implement
     // `AsSingleStack<UninstantiableWrapper<Self>>`).
     type SingleStackIpTransportAndDemuxCtx<'a> =

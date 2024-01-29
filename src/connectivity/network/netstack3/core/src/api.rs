@@ -138,20 +138,3 @@ where
         core_ctx.handle_timer(bindings_ctx, timer)
     }
 }
-
-#[cfg(any(test, feature = "testutils"))]
-impl<'a, BC> CoreApi<'a, &'a mut BC>
-where
-    BC: BindingsTypes,
-{
-    /// Creates a `CoreApi` from a `SyncCtx` and bindings context.
-    // TODO(https://fxbug.dev/42083910): Remove this function once all the tests
-    // are migrated to the new API structs. This is a handy transitional step
-    // while we still have functions taking split contexts.
-    pub fn with_contexts(
-        core_ctx: &'a crate::context::SyncCtx<BC>,
-        bindings_ctx: &'a mut BC,
-    ) -> Self {
-        core_ctx.state.api(bindings_ctx)
-    }
-}

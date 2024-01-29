@@ -2056,7 +2056,7 @@ mod tests {
 
     #[test]
     fn drop_real_ids() {
-        /// Test with a real `SyncCtx` to assert that IDs aren't dropped in the
+        /// Test with a real `CoreCtx` to assert that IDs aren't dropped in the
         /// wrong order.
         use crate::testutil::{FakeEventDispatcherBuilder, FAKE_CONFIG_V4};
         let (mut ctx, device_ids) = FakeEventDispatcherBuilder::from_config(FAKE_CONFIG_V4).build();

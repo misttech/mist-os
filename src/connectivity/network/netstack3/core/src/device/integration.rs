@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-//! Implementations of device layer traits for [`SyncCtx`].
+//! Implementations of device layer traits for [`CoreCtx`].
 
 use alloc::boxed::Box;
 use core::{num::NonZeroU8, ops::Deref as _};

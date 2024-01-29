@@ -2415,7 +2415,6 @@ mod tests {
 
     use super::*;
     use crate::{
-        api::CoreApi,
         context::testutil::{
             FakeBindingsCtx, FakeCoreCtx, FakeCtxWithCoreCtx, FakeFrameCtx, Wrapped,
             WrappedFakeCoreCtx,
@@ -6453,8 +6452,7 @@ mod tests {
             )
             .into();
         crate::device::testutil::enable_device(&mut ctx, &loopback_device_id);
-        let crate::testutil::Ctx { core_ctx, bindings_ctx } = &mut ctx;
-        let mut api = CoreApi::with_contexts(core_ctx, bindings_ctx).udp::<I>();
+        let mut api = ctx.core_api().udp::<I>();
         let socket = api.create();
         api.listen(&socket, None, Some(LOCAL_PORT)).unwrap();
         if bind_to_device {
