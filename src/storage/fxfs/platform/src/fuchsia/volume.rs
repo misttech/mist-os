@@ -49,8 +49,10 @@ use {
     vfs::{directory::entry::DirectoryEntry, execution_scope::ExecutionScope},
 };
 
+// LINT.IfChange
 // TODO:(b/299919008) Fix this number to something reasonable, or maybe just for fxblob.
 const DIRENT_CACHE_LIMIT: usize = 8000;
+// LINT.ThenChange(src/storage/stressor/src/aggressive.rs)
 
 #[derive(Clone)]
 pub struct MemoryPressureLevelConfig {

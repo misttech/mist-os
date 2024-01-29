@@ -6,7 +6,7 @@
     program: {
         runner: "elf",
         binary: "bin/stressor",
-        args: [ "--mode=gentle" ],
+        args: [ "--mode=aggressive" ],
     },
     use: [
         {

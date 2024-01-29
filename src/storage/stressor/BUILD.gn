@@ -4,14 +4,29 @@
 
 import("//build/components.gni")
 import("//build/rust/rustc_binary.gni")
+import("//build/rust/rustc_library.gni")
 import("//src/sys/core/build/core_shard.gni")
+
+rustc_library("lib") {
+  name = "stressor_lib"
+  edition = "2021"
+  deps = [
+    "//third_party/rust_crates:rand",
+    "//third_party/rust_crates:tracing",
+  ]
+  sources = [
+    "src/aggressive.rs",
+    "src/gentle.rs",
+    "src/lib.rs",
+  ]
+}
 
 rustc_binary("stressor_bin") {
   output_name = "stressor"
   edition = "2021"
   deps = [
+    ":lib",
     "//src/lib/fuchsia",
-    "//third_party/rust_crates:rand",
     "//third_party/rust_crates:tracing",
   ]
   sources = [ "src/main.rs" ]
@@ -23,9 +38,18 @@ fuchsia_component("stressor_component") {
   manifest = "meta/stressor.cml"
 }
 
+fuchsia_component("aggressive_stressor_component") {
+  component_name = "aggressive_storage_stressor"
+  deps = [ ":stressor_bin" ]
+  manifest = "meta/stressor.aggressive.cml"
+}
+
 fuchsia_package("stressor_package") {
   package_name = "storage_stressor"
-  deps = [ ":stressor_component" ]
+  deps = [
+    ":aggressive_stressor_component",
+    ":stressor_component",
+  ]
 }
 
 group("stressor") {
@@ -34,4 +58,8 @@ group("stressor") {
 
 core_shard("core_shard") {
   shard_file = "meta/stressor.core_shard.cml"
+}
+
+core_shard("aggressive_core_shard") {
+  shard_file = "meta/stressor.aggressive_core_shard.cml"
 }
