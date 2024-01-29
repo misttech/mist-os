@@ -16,6 +16,7 @@
 
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
+#include <lib/driver/testing/cpp/driver_runtime.h>
 #include <lib/sync/completion.h>
 #include <zircon/types.h>
 
@@ -47,14 +48,17 @@ class RecoveryTriggerTest : public testing::Test {
   // Clear the states of all async protections variable to ensure next trigger's success.
   void ResetAsync();
 
+  fdf_testing::DriverRuntime runtime_;
+
   std::unique_ptr<brcmf_bus> bus_if_;
   // Test object
   std::unique_ptr<RecoveryTrigger> trigger_;
 
-  // The WorkItem here should live as long as the default workqueue thread, so that after the test
-  // case function returns, the workqueue thread can still use the |signaler| inside this WorkItem
-  // to indicate that it has finished the task in this WorkItem.
+  // The WorkItem here should live longer than work_queue_, so that after the test case function
+  // returns, the workqueue thread can still use the |signaler| inside this WorkItem to indicate
+  // that it has finished the task in this WorkItem.
   WorkItem dummy_worker_;
+  WorkQueue work_queue_{"default"};
 
   static uint16_t recovery_trigger_count_;
   // Mark that the dummy worker is executed.
@@ -115,7 +119,7 @@ void RecoveryTriggerTest::SetUp() {
 }
 
 void RecoveryTriggerTest::TearDown() {
-  WorkQueue::FlushDefault();
+  work_queue_.Flush();
   // Resetting the recovery trigger flag.
   RecoveryTriggerTest::recovery_trigger_count_ = 0;
   RecoveryTriggerTest::recovery_not_triggered_ = false;
@@ -138,8 +142,8 @@ TEST_F(RecoveryTriggerTest, SdioTimeoutTriggerNegative) {
   trigger_->ClearStatistics();
   EXPECT_EQ(trigger_->sdio_timeout_.Inc(), ZX_OK);
 
-  // Schedule dummy worker to the default WorkQueue.
-  WorkQueue::ScheduleDefault(&dummy_worker_);
+  // Schedule dummy worker to the WorkQueue.
+  work_queue_.Schedule(&dummy_worker_);
   zx_status_t status = WaitForDummy(ZX_TIME_INFINITE);
   EXPECT_EQ(status, ZX_OK);
   EXPECT_TRUE(RecoveryTriggerTest::recovery_not_triggered_);
@@ -190,8 +194,8 @@ TEST_F(RecoveryTriggerTest, CtrlFrameResponseTimeoutTriggerNegative) {
   trigger_->ClearStatistics();
   EXPECT_EQ(trigger_->ctrl_frame_response_timeout_.Inc(), ZX_OK);
 
-  // Schedule the empty worker to the default WorkQueue.
-  WorkQueue::ScheduleDefault(&dummy_worker_);
+  // Schedule the empty worker to the WorkQueue.
+  work_queue_.Schedule(&dummy_worker_);
   zx_status_t status = WaitForDummy(ZX_TIME_INFINITE);
   EXPECT_EQ(status, ZX_OK);
   EXPECT_TRUE(RecoveryTriggerTest::recovery_not_triggered_);

@@ -19,14 +19,11 @@
 
 #define _ALL_SOURCE
 
-#include <lib/sync/completion.h>
-#include <string.h>
-#include <threads.h>
+#include <lib/fdf/cpp/dispatcher.h>
+#include <lib/sync/cpp/completion.h>
 #include <zircon/listnode.h>
-#include <zircon/syscalls.h>
-#include <zircon/threads.h>
 
-#include <memory>
+#include <atomic>
 #include <mutex>
 
 class WorkQueue;
@@ -58,37 +55,39 @@ class WorkItem {
 
 class WorkQueue {
  public:
-  explicit WorkQueue(const char* name);
-
-  // This is a static member which can be accessed globally.
-  static WorkQueue& DefaultInstance();
-  static void FlushDefault(void) { DefaultInstance().Flush(); }
-  static void ScheduleDefault(WorkItem* work);
+  explicit WorkQueue(const char* name, const char* thread_profile = nullptr);
 
   // Waits for any work on workqueue at time of call to complete. Jobs scheduled after flush starts,
   // including work scheduled by pre-flush work, will not be waited for.
   void Flush();
   void Schedule(WorkItem* work);
 
+  // Manually shut down the queue. After this call the WorkQueue can no longer schedule any work and
+  // cannot be restored to a working state.
+  void Shutdown();
+
   ~WorkQueue();
 
   static constexpr int kWorkqueueNameMaxlen = 64;
-  std::mutex lock_;
-  list_node_t list_;
-  WorkItem* current_;
-
-  thrd_t thread() const { return thread_; }
 
  private:
+  friend class WorkItem;
+
+  std::mutex lock_;
+  list_node_t list_{};
+  WorkItem* current_ = nullptr;
+
+  std::atomic<bool> running_{false};
   sync_completion_t work_ready_;
   char name_[kWorkqueueNameMaxlen];
-  thrd_t thread_;
+  fdf::Dispatcher dispatcher_;
+  libsync::Completion dispatcher_shutdown_;
 
   // Thread body for the WorkQueue execution thread.
-  int Runner();
+  void Runner();
 
   // Start the WorkQueue thread.
-  void StartWorkQueue();
+  void StartWorkQueue(const char* thread_profile);
 };
 
 #endif  // SRC_CONNECTIVITY_WLAN_DRIVERS_THIRD_PARTY_BROADCOM_BRCMFMAC_WORKQUEUE_H_

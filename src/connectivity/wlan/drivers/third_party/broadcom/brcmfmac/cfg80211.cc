@@ -90,7 +90,7 @@
     if (brcmf_bus_get_bus_type(cfg->pub->bus_if) == BRCMF_BUS_TYPE_SIM) { \
       (*cfg->worker.handler)(&cfg->worker);                               \
     } else {                                                              \
-      WorkQueue::ScheduleDefault(&cfg->worker);                           \
+      cfg->pub->default_wq.Schedule(&cfg->worker);                        \
     }                                                                     \
   }
 

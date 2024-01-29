@@ -16,37 +16,37 @@
 
 #include "workqueue.h"
 
+#include <lib/async/cpp/task.h>
 #include <zircon/assert.h>
 
 #include "debug.h"
 
 #define WORKQUEUE_SIGNAL ZX_USER_SIGNAL_0
 
-WorkQueue::WorkQueue(const char* name) : list_{}, current_(nullptr), work_ready_{}, thread_{} {
+constexpr std::string_view kDefaultProfile("fuchsia.devices.wlan.drivers.brcmf.workqueue.runner");
+
+WorkQueue::WorkQueue(const char* name, const char* thread_profile) {
   if (name == nullptr) {
     strlcpy(this->name_, "nameless", sizeof(name_));
   } else {
     strlcpy(this->name_, name, sizeof(name_));
   }
-  StartWorkQueue();
+  StartWorkQueue(thread_profile);
 }
 
-WorkQueue::~WorkQueue() {
-  auto work = WorkItem([](WorkItem* work) { thrd_exit(0); });
-  Schedule(&work);
-  thrd_join(thread_, nullptr);
-}
+WorkQueue::~WorkQueue() { Shutdown(); }
 
-WorkQueue& WorkQueue::DefaultInstance() {
-  static WorkQueue default_workqueue_("default_workqueue");
-  return default_workqueue_;
-}
-
-void WorkQueue::ScheduleDefault(WorkItem* work) {
-  if (work == nullptr) {
-    return;
+void WorkQueue::Shutdown() {
+  if (dispatcher_.get()) {
+    running_ = false;
+    // Schedule an empty work item to make sure that the thread will check the running_ flag.
+    WorkItem work([](WorkItem*) {});
+    Schedule(&work);
+    // Now that the posted task can finish shut down the dispatcher.
+    dispatcher_.ShutdownAsync();
+    dispatcher_shutdown_.Wait();
+    dispatcher_.close();
   }
-  DefaultInstance().Schedule(work);
 }
 
 void WorkQueue::Flush() {
@@ -86,8 +86,8 @@ void WorkQueue::Schedule(WorkItem* work) {
   lock_.unlock();
 }
 
-int WorkQueue::Runner() {
-  while (true) {
+void WorkQueue::Runner() {
+  while (running_.load(std::memory_order_relaxed)) {
     // When all the works are consumed, these two lines will block the thread.
     sync_completion_wait(&work_ready_, ZX_TIME_INFINITE);
     sync_completion_reset(&work_ready_);
@@ -109,13 +109,23 @@ int WorkQueue::Runner() {
   }
 }
 
-void WorkQueue::StartWorkQueue() {
+void WorkQueue::StartWorkQueue(const char* thread_profile) {
   work_ready_ = {};
   list_initialize(&list_);
-  auto thread_func = [](void* arg) { return reinterpret_cast<WorkQueue*>(arg)->Runner(); };
-  int status = thrd_create_with_name(&thread_, thread_func, this, name_);
-  ZX_ASSERT_MSG(status == thrd_success, "Failed to create WorkQ thread name: %s status: %d", name_,
-                status);
+  // This dispathcer must be a synchronized dispatcher allowing synchronous calls. Otherwise
+  // async::PostTask might be inlined, meaning that the posted task might run on the calling thread,
+  // blocking it indefinitely.
+  auto dispatcher = fdf::SynchronizedDispatcher::Create(
+      fdf::SynchronizedDispatcher::Options::kAllowSyncCalls, name_,
+      [this](fdf_dispatcher_t*) { dispatcher_shutdown_.Signal(); },
+      thread_profile ? std::string_view(thread_profile) : kDefaultProfile);
+
+  ZX_ASSERT_MSG(dispatcher.is_ok(), "Failed to create WorkQueue dispatcher name: %s status: %s",
+                name_, dispatcher.status_string());
+  dispatcher_ = std::move(dispatcher.value());
+
+  running_ = true;
+  async::PostTask(dispatcher_.async_dispatcher(), [this] { Runner(); });
 }
 
 WorkItem::WorkItem() : WorkItem(nullptr) {}

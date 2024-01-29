@@ -75,7 +75,9 @@ source_set("linuxisms") {
   public_deps = [
     "//sdk/banjo/fuchsia.hardware.ethernet:fuchsia.hardware.ethernet_banjo_cpp",
     "//sdk/fidl/fuchsia.wlan.common:fuchsia.wlan.common_cpp",
+    "//src/devices/lib/driver:driver_runtime",
     "//zircon/system/public",
+    "//zircon/system/ulib/sync:sync-cpp",
   ]
 }
 

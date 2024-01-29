@@ -16,6 +16,7 @@
 
 #include "src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/workqueue.h"
 
+#include <lib/driver/testing/cpp/driver_runtime.h>
 #include <lib/sync/completion.h>
 
 #include <gtest/gtest.h>
@@ -55,7 +56,13 @@ static void handler(WorkItem* work) {
   tester->state++;
 }
 
-TEST(Workqueue, JobsInOrder) {
+class WorkqueueTest : public ::testing::Test {
+ private:
+  // Create a testing driver runtime to allow for the creation of fdf dispatchers.
+  fdf_testing::DriverRuntime driver_runtime_;
+};
+
+TEST_F(WorkqueueTest, JobsInOrder) {
   WorkQueue* queue = new WorkQueue("MyWork");
   TestWork work1;
   TestWork work2;
@@ -74,7 +81,7 @@ TEST(Workqueue, JobsInOrder) {
   delete queue;
 }
 
-TEST(Workqueue, ScheduleDeduplication) {
+TEST_F(WorkqueueTest, ScheduleDeduplication) {
   WorkQueue* queue = new WorkQueue("MyWork");
   TestWork work1;
   TestWork work2;
@@ -99,18 +106,8 @@ TEST(Workqueue, ScheduleDeduplication) {
   EXPECT_EQ(work2.state, 2);
 }
 
-TEST(Workqueue, DefaultQueueWorks) {
-  TestWork work1;
-  work1.work = WorkItem(handler);
-  WorkQueue::ScheduleDefault(&work1.work);
-  work1.entered.Wait(ZX_TIME_INFINITE);
-  EXPECT_EQ(work1.state, 1);
-  work1.proceed.Signal();
-  WorkQueue::FlushDefault();
-}
-
 // Ensure that canceling an unqueued job works.
-TEST(Workqueue, CancelUnqueued) {
+TEST_F(WorkqueueTest, CancelUnqueued) {
   TestWork work1;
   work1.work = WorkItem(handler);
   work1.state = 1;
@@ -120,7 +117,7 @@ TEST(Workqueue, CancelUnqueued) {
 
 // Upon canceling a job that has not started yet, it should never run, and the cancel should
 // return without blocking.
-TEST(Workqueue, CancelPending) {
+TEST_F(WorkqueueTest, CancelPending) {
   WorkQueue* queue = new WorkQueue("MyWork");
   TestWork work1;
   TestWork work2;
@@ -163,8 +160,9 @@ static void cancel_handler(WorkItem* work) {
 
 // Upon canceling a job that is in progress, the canceler should block until the job completes.
 // Subsequent jobs should also complete.
-TEST(Workqueue, CancelCurrent) {
+TEST_F(WorkqueueTest, CancelCurrent) {
   WorkQueue* queue = new WorkQueue("MyWork");
+  WorkQueue canceler_queue("CancelerQueue");
   TestWork work1;
   TestWork work2;
   WorkCanceler canceler;
@@ -177,7 +175,7 @@ TEST(Workqueue, CancelCurrent) {
   work1.entered.Wait(ZX_TIME_INFINITE);
   EXPECT_EQ(work1.state, 1);
   EXPECT_EQ(work2.state, 0);
-  WorkQueue::ScheduleDefault(&canceler.work);
+  canceler_queue.Schedule(&canceler.work);
   // If this timeout is too short and the canceler hasn't entered yet, it may cause a false pass,
   // but not a flaky fail.
   zx_nanosleep(zx_deadline_after(ZX_MSEC(50)));
@@ -192,6 +190,13 @@ TEST(Workqueue, CancelCurrent) {
   delete queue;
   // Make sure that the canceler finishes before we exit, canceling it if needed.
   canceler.work.Cancel();
+}
+
+// After Shutdown the queue destructor should correctly recognize that the dispatcher is gone and
+// proceed without attempting to shut it down and wait for it again.
+TEST_F(WorkqueueTest, Shutdown) {
+  WorkQueue queue("MyWork");
+  queue.Shutdown();
 }
 
 }  // namespace

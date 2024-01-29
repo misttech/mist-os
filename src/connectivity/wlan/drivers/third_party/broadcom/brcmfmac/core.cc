@@ -221,7 +221,7 @@ void brcmf_netdev_set_multicast_list(struct net_device* ndev) {
   if (brcmf_bus_get_bus_type(ifp->drvr->bus_if) == BRCMF_BUS_TYPE_SIM) {
     brcmf_set_multicast_list(ifp);
   } else {
-    WorkQueue::ScheduleDefault(&ifp->multicast_work);
+    ifp->drvr->default_wq.Schedule(&ifp->multicast_work);
   }
 }
 
@@ -869,7 +869,7 @@ zx_status_t brcmf_schedule_recovery_worker(struct brcmf_pub* drvr) {
   if (brcmf_bus_get_bus_type(drvr->bus_if) == BRCMF_BUS_TYPE_SIM) {
     (*drvr->recovery_work.handler)(&drvr->recovery_work);
   } else {
-    WorkQueue::ScheduleDefault(&drvr->recovery_work);
+    drvr->default_wq.Schedule(&drvr->recovery_work);
   }
 
   return ZX_OK;

@@ -24,7 +24,6 @@
 #include <lib/sync/completion.h>
 #include <lib/zircon-internal/align.h>
 #include <lib/zx/vmo.h>
-#include <pthread.h>
 #include <zircon/errors.h>
 #include <zircon/status.h>
 
@@ -33,11 +32,6 @@
 #include <limits>
 
 #include <wifi/wifi-config.h>
-
-#ifndef _ALL_SOURCE
-#define _ALL_SOURCE  // Enables thrd_create_with_name in <threads.h>.
-#endif
-#include <threads.h>
 
 #include "src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/brcm_hw_ids.h"
 #include "src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/brcmu_utils.h"
@@ -173,12 +167,22 @@ zx_status_t brcmf_sdiod_intr_register(struct brcmf_sdio_dev* sdiodev, bool reloa
         return ret;
       }
       pdata->oob_irq_supported = true;
-      int status = thrd_create_with_name(&sdiodev->isr_thread, &brcmf_sdio_oob_irqhandler, sdiodev,
-                                         "brcmf-sdio-isr");
-      if (status != thrd_success) {
-        BRCMF_ERR("thrd_create_with_name failed: %d", status);
-        return ZX_ERR_INTERNAL;
+
+      // This dispathcer must be a synchronized dispatcher allowing synchronous calls. Otherwise
+      // async::PostTask might be inlined, meaning that the posted task might run on the calling
+      // thread, blocking it indefinitely.
+      constexpr char kRoleName[] = "fuchsia.devices.wlan.drivers.brcmf.sdio.oob-interrupt";
+      auto dispatcher = fdf::SynchronizedDispatcher::Create(
+          fdf::SynchronizedDispatcher::Options::kAllowSyncCalls, "brcmf-sdio-isr",
+          [sdiodev](fdf_dispatcher_t*) { sdiodev->isr_dispatcher_shutdown.Signal(); }, kRoleName);
+      if (dispatcher.is_error()) {
+        BRCMF_ERR("Failed to create ISR dispatcher: %s", dispatcher.status_string());
+        return dispatcher.status_value();
       }
+      sdiodev->isr_dispatcher = std::move(dispatcher.value());
+      async::PostTask(sdiodev->isr_dispatcher.async_dispatcher(),
+                      [sdiodev] { brcmf_sdio_oob_irqhandler(sdiodev); });
+
       sdiodev->oob_irq_requested = true;
       ret = enable_irq_wake(sdiodev->irq_handle);
       if (ret != ZX_OK) {
@@ -245,10 +249,9 @@ void brcmf_sdiod_intr_unregister(struct brcmf_sdio_dev* sdiodev) {
       sdiodev->irq_wake = false;
     }
     zx_handle_close(sdiodev->irq_handle);
-    int retval = 0;
-    int status = thrd_join(sdiodev->isr_thread, &retval);
-    if (status != thrd_success) {
-      BRCMF_ERR("thrd_join failed: %d", status);
+    if (sdiodev->isr_dispatcher.get()) {
+      sdiodev->isr_dispatcher.ShutdownAsync();
+      sdiodev->isr_dispatcher_shutdown.Wait();
     }
     sdiodev->oob_irq_requested = false;
   }

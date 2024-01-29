@@ -188,7 +188,7 @@ class SdioTest : public zxtest::Test {
   std::shared_ptr<MockDevice> root_{MockDevice::FakeRootParent()};
 };
 
-TEST_F(SdioTest, IntrRegisterStartup) {
+TEST_F(SdioTest, IntrRegisterUnregister) {
   FakeSdioDevice device;
   brcmf_sdio_dev sdio_dev = {};
   sdio_func func1 = {};
@@ -229,7 +229,20 @@ TEST_F(SdioTest, IntrRegisterStartup) {
   sdio1.VerifyAndClear();
   sdio2.VerifyAndClear();
 
-  zx_handle_close(sdio_dev.irq_handle);
+  // The interrupt handle handed out by FakeGpio is a duplicated handle. Closing the handle in
+  // sdio_dev is not enough to make the IRQ thread stop. The handle in FakeGpio also needs to close.
+  // Do this by destroying the FakeGpio instance.
+  wifi_gpio.reset();
+
+  // Unregister the interrupt.
+  sdio1.ExpectDoVendorControlRwByte(ZX_OK, true, SDIO_CCCR_BRCM_SEPINT, 0, 0);
+  sdio1.ExpectDisableFnIntr(ZX_OK);
+  sdio2.ExpectDisableFnIntr(ZX_OK);
+
+  brcmf_sdiod_intr_unregister(&sdio_dev);
+
+  sdio1.VerifyAndClear();
+  sdio2.VerifyAndClear();
 }
 
 TEST_F(SdioTest, IntrRegisterFwReload) {
@@ -272,10 +285,18 @@ TEST_F(SdioTest, IntrRegisterFwReload) {
   zx_handle_close(sdio_dev.irq_handle);
 }
 
-TEST_F(SdioTest, IntrDeregister) {
+TEST_F(SdioTest, IntrRegisterUnregisterNoMetadata) {
   FakeSdioDevice device;
   brcmf_sdio_dev sdio_dev = {};
   sdio_func func1 = {};
+  brcmf_bus bus_if = {};
+  brcmf_mp_device settings = {};
+  brcmf_sdio_pd sdio_settings = {};
+  // If the get metadata call fails with ZX_ERR_NOT_FOUND the register and unregister calls will
+  // behave differently.
+  const struct brcmf_bus_ops sdio_bus_ops = {
+      .get_wifi_metadata = [](brcmf_bus*, void*, size_t, size_t*) { return ZX_ERR_NOT_FOUND; },
+  };
 
   MockSdio sdio1;
   MockSdio sdio2;
@@ -283,30 +304,21 @@ TEST_F(SdioTest, IntrDeregister) {
   sdio_dev.sdio_proto_fn1 = *sdio1.GetProto();
   sdio_dev.sdio_proto_fn2 = *sdio2.GetProto();
   sdio_dev.drvr = device.drvr();
-  sdio_dev.oob_irq_requested = true;
+  bus_if.ops = &sdio_bus_ops;
+  sdio_dev.bus_if = &bus_if;
+  sdio_dev.settings = &settings;
+  sdio_dev.settings->bus.sdio = &sdio_settings;
 
-  // Create a dummy ISR thread for the interrupt deregistration to join.
-  int status = thrd_create_with_name(
-      &sdio_dev.isr_thread, [](void* arg) { return 0; }, nullptr, "brcmf-sdio-test-dummy-isr");
-  EXPECT_EQ(thrd_success, status);
+  // Register interrupt without metadata.
+  sdio1.ExpectEnableFnIntr(ZX_OK);
+  sdio2.ExpectEnableFnIntr(ZX_OK);
 
-  sdio1.ExpectDoVendorControlRwByte(ZX_OK, true, 0xf2, 0, 0).ExpectDisableFnIntr(ZX_OK);
-  sdio2.ExpectDisableFnIntr(ZX_OK);
-
-  brcmf_sdiod_intr_unregister(&sdio_dev);
+  EXPECT_OK(brcmf_sdiod_intr_register(&sdio_dev, false));
 
   sdio1.VerifyAndClear();
   sdio2.VerifyAndClear();
 
-  sdio_dev = {};
-  func1 = {};
-
-  sdio_dev.func1 = &func1;
-  sdio_dev.sdio_proto_fn1 = *sdio1.GetProto();
-  sdio_dev.sdio_proto_fn2 = *sdio2.GetProto();
-  sdio_dev.drvr = device.drvr();
-  sdio_dev.sd_irq_requested = true;
-
+  // Unregister interrupt without metadata.
   sdio1.ExpectDisableFnIntr(ZX_OK);
   sdio2.ExpectDisableFnIntr(ZX_OK);
 

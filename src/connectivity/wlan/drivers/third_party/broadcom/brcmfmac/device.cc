@@ -105,13 +105,13 @@ zx_status_t Device::Init() {
 void Device::DdkInit(ddk::InitTxn txn) { txn.Reply(Init()); }
 
 void Device::DdkRelease() {
-  Shutdown();
+  ShutdownDevice();
   delete this;
 }
 
 void Device::DdkSuspend(ddk::SuspendTxn txn) {
   BRCMF_INFO("Shutdown requested");
-  Shutdown();
+  ShutdownDevice();
   BRCMF_INFO("Shutdown completed");
   txn.Reply(ZX_OK, txn.requested_state());
 }
@@ -591,6 +591,17 @@ void Device::DestroyIface(WlanInterface** iface_ptr, fit::callback<void(zx_statu
     destroyed.Signal();
   });
   destroyed.Wait();
+}
+
+void Device::ShutdownDevice() {
+  // Perform shutdown as implemented by subclasses first.
+  Shutdown();
+
+  if (brcmf_pub_) {
+    // Shut down the default WorkQueue here to ensure that its dispatcher is shutdown properly even
+    // if the Device object's destructor is not called.
+    brcmf_pub_->default_wq.Shutdown();
+  }
 }
 
 }  // namespace brcmfmac

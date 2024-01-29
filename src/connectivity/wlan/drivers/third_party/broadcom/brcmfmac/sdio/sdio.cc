@@ -3301,23 +3301,12 @@ void brcmf_sdio_log_stats(struct brcmf_bus* bus_if) {
          bus->tx_queue->tx_queue.size(1 << 2), bus->tx_queue->tx_queue.size(1 << 3));
 }
 
-int brcmf_sdio_oob_irqhandler(void* cookie) {
-  struct brcmf_sdio_dev* sdiodev = static_cast<decltype(sdiodev)>(cookie);
+void brcmf_sdio_oob_irqhandler(brcmf_sdio_dev* sdiodev) {
   struct brcmf_sdio* bus = sdiodev->bus;
   zx_status_t status;
   uint32_t intstatus;
 
   BRCMF_INFO("OOB IRQ thread starting");
-
-  constexpr char kRoleName[] = "fuchsia.devices.wlan.drivers.brcmf.sdio.oob-interrupt";
-  zx_device_t* zx_device = sdiodev->drvr->device->parent();
-  status = device_set_profile_by_role(zx_device, thrd_get_zx_handle(thrd_current()), kRoleName,
-                                      strlen(kRoleName));
-  if (status != ZX_OK) {
-    BRCMF_WARN("Failed to apply role '%s' to OOB IRQ thread: %s", kRoleName,
-               zx_status_get_string(status));
-    // Keep going, this shouldn't stop the entire driver from working.
-  }
 
   while ((status = zx_interrupt_wait(sdiodev->irq_handle, NULL)) == ZX_OK) {
     bus->sdcnt.intrcount++;
@@ -3342,7 +3331,6 @@ int brcmf_sdio_oob_irqhandler(void* cookie) {
   }
 
   BRCMF_ERR("ISR exiting with status %s", zx_status_get_string(status));
-  return (int)status;
 }
 
 static void brcmf_sdio_drivestrengthinit(struct brcmf_sdio_dev* sdiodev, struct brcmf_chip* ci,
@@ -4044,29 +4032,6 @@ struct brcmf_sdio* brcmf_sdio_probe(struct brcmf_sdio_dev* sdiodev, bool reloadi
       BRCMF_ERR("insufficient memory to create txworkqueue");
       goto fail;
     }
-
-    // Apply a scheduler role to the work queue threads.
-    {
-      constexpr char kRoleName[] = "fuchsia.devices.wlan.drivers.brcmf.workqueue.runner";
-      zx_device_t* zx_device = sdiodev->drvr->device->zxdev();
-      zx_status_t status = device_set_profile_by_role(zx_device, thrd_get_zx_handle(wq->thread()),
-                                                      kRoleName, strlen(kRoleName));
-      if (status != ZX_OK) {
-        BRCMF_WARN("Failed to apply role '%s' to wq thread: %s", kRoleName,
-                   zx_status_get_string(status));
-        // Keep going, this shouldn't stop the entire driver from working.
-      }
-
-      status = device_set_profile_by_role(zx_device,
-                                          thrd_get_zx_handle(WorkQueue::DefaultInstance().thread()),
-                                          kRoleName, strlen(kRoleName));
-      if (status != ZX_OK) {
-        BRCMF_WARN("Failed to apply role '%s' to default wq thread: %s", kRoleName,
-                   zx_status_get_string(status));
-        // Keep going, this shouldn't stop the entire driver from working.
-      }
-    }
-
     bus->datawork = WorkItem(brcmf_sdio_dataworker);
     bus->brcmf_wq = wq;
 

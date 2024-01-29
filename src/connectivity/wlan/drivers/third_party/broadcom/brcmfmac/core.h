@@ -168,6 +168,8 @@ struct brcmf_pub {
   /* The semaphore to mark whether the drvr have already started the firmware crash recovery
    * process, this prevents the recovery worker being scheduled into workqueue more than once.*/
   std::atomic<bool> drvr_resetting;
+
+  WorkQueue default_wq{"default_workqueue"};
 };
 
 /* forward declarations */

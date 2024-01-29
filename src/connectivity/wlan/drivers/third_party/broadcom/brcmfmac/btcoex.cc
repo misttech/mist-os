@@ -267,7 +267,7 @@ static void brcmf_btcoex_timerfunc(struct brcmf_btcoex_info* bt) {
   BRCMF_DBG(TRACE, "enter");
 
   bt->timer_on = false;
-  WorkQueue::ScheduleDefault(&bt->work);
+  bt->cfg->pub->default_wq.Schedule(&bt->work);
   bt->cfg->pub->irq_callback_lock.unlock();
 }
 
@@ -408,7 +408,7 @@ static void brcmf_btcoex_dhcp_start(struct brcmf_btcoex_info* btci) {
   brcmf_btcoex_params_write(ifp, 68, BRCMF_BT_DHCP_REG68);
   btci->dhcp_done = false;
   btci->bt_state = BRCMF_BT_DHCP_START;
-  WorkQueue::ScheduleDefault(&btci->work);
+  btci->cfg->pub->default_wq.Schedule(&btci->work);
   BRCMF_DBG(TRACE, "enable BT DHCP Timer");
 }
 
@@ -423,7 +423,7 @@ static void brcmf_btcoex_dhcp_end(struct brcmf_btcoex_info* btci) {
     /* schedule worker if transition to IDLE is needed */
     if (btci->bt_state != BRCMF_BT_DHCP_IDLE) {
       BRCMF_DBG(BTCOEX, "bt_state:%d", btci->bt_state);
-      WorkQueue::ScheduleDefault(&btci->work);
+      btci->cfg->pub->default_wq.Schedule(&btci->work);
     }
   } else {
     /* Restore original values */

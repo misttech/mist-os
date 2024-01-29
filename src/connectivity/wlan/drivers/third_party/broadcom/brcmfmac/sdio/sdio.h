@@ -20,9 +20,14 @@
 #include <fidl/fuchsia.hardware.gpio/cpp/wire.h>
 #include <fuchsia/hardware/sdio/c/banjo.h>
 #include <lib/ddk/device.h>
-#include <lib/sync/completion.h>
+#include <lib/fdf/cpp/dispatcher.h>
+#include <lib/sync/cpp/completion.h>
 #include <lib/zx/result.h>
 #include <lib/zx/vmo.h>
+#ifndef _ALL_SOURCE
+#define _ALL_SOURCE  // Needed for thrd_create_with_name
+#endif
+#include <threads.h>
 #include <zircon/compiler.h>
 
 #include <optional>
@@ -237,7 +242,8 @@ struct brcmf_sdio_dev {
   fidl::WireSyncClient<fuchsia_hardware_gpio::Gpio> fidl_gpios[GPIO_COUNT];
   bool has_debug_gpio;
   zx_handle_t irq_handle;
-  thrd_t isr_thread;
+  fdf::Dispatcher isr_dispatcher{};
+  libsync::Completion isr_dispatcher_shutdown;
   struct brcmf_pub* drvr;
   uint32_t sbwad;             /* Save backplane window address */
   struct brcmf_core* cc_core; /* chipcommon core info struct */
@@ -435,7 +441,7 @@ void brcmf_sdio_isr(struct brcmf_sdio* bus);
 void brcmf_sdio_wd_timer(struct brcmf_sdio* bus, bool active);
 zx_status_t brcmf_sdio_sleep(struct brcmf_sdio* bus, bool sleep);
 void brcmf_sdio_trigger_dpc(struct brcmf_sdio* bus);
-int brcmf_sdio_oob_irqhandler(void* cookie);
+void brcmf_sdio_oob_irqhandler(brcmf_sdio_dev* sdiodev);
 
 zx_status_t brcmf_sdio_register(
     brcmf_pub* drvr, fidl::WireSyncClient<fuchsia_hardware_gpio::Gpio> fidl_gpios[GPIO_COUNT],

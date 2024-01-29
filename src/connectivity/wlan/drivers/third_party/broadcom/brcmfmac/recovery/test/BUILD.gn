@@ -18,6 +18,7 @@ executable("recovery_trigger_test") {
   testonly = true
   sources = [ "recovery_trigger_test.cc" ]
   deps = [
+    "//sdk/lib/driver/testing/cpp:cpp",
     "//src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac:core",
     "//src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/recovery",
     "//src/connectivity/wlan/lib/common/cpp:common",

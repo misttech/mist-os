@@ -134,7 +134,7 @@ static void brcmf_fweh_queue_event(brcmf_pub* drvr, brcmf_fweh_info* fweh,
   drvr->irq_callback_lock.lock();
   list_add_tail(&fweh->event_q, &event->q);
   drvr->irq_callback_lock.unlock();
-  WorkQueue::ScheduleDefault(&fweh->event_work);
+  drvr->default_wq.Schedule(&fweh->event_work);
 }
 
 // Add eapol frame to the same queue as events (to ensure processing order).

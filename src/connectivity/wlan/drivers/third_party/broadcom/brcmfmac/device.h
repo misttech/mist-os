@@ -152,6 +152,9 @@ class Device : public DeviceType,
   // Helpers
   void ShutdownDispatcher();
   void DestroyIface(WlanInterface** iface_ptr, fit::callback<void(zx_status_t)> respond);
+  // |Shutdown| above is intended for use by subclasses to implement their shutdown process. This
+  // method is intended for things related to this Device instance.
+  void ShutdownDevice();
 };
 
 }  // namespace brcmfmac
