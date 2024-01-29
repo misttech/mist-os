@@ -3,6 +3,7 @@
 # found in the LICENSE file.
 
 import("//build/python/python_library.gni")
+import("//build/testing/host_test_data.gni")
 
 python_library("trace_processing") {
   testonly = true
@@ -19,6 +20,14 @@ python_library("trace_processing") {
     "trace_utils.py",
   ]
   library_deps = [ "//src/performance/lib/py_test_utils:perf_test_utils" ]
+  deps = [ ":trace2json_binary($host_toolchain)" ]
+}
+
+if (is_host) {
+  host_test_data("trace2json_binary") {
+    deps = [ "//src/performance/trace2json:bin" ]
+    sources = [ "${root_out_dir}/trace2json" ]
+  }
 }
 
 group("tests") {

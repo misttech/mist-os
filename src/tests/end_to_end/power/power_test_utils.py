@@ -5,18 +5,30 @@
 """Fuchsia power test utility library."""
 
 import csv
-from dataclasses import dataclass
+import dataclasses
+import enum
 import json
+import logging
 import os
+import signal
+import subprocess
+import time
+from typing import override
 
 from trace_processing import trace_metrics
+
+_LOGGER = logging.getLogger(__name__)
+
+# The measurepower tool's path. The tool is expected to periodically output
+# power measurements into a csv file, with _ALL_POWER_CSV_HEADERS columns.
+_MEASUREPOWER_PATH_ENV_VARIABLE = "MEASUREPOWER_PATH"
 
 
 def _avg(avg: float, value: float, count: int) -> float:
     return avg + (value - avg) / count
 
 
-@dataclass
+@dataclasses.dataclass
 class PowerMetricSample:
     """A sample of collected power metrics.
 
@@ -39,7 +51,7 @@ class PowerMetricSample:
         return self.voltage * self.current * 1e-3
 
 
-@dataclass
+@dataclasses.dataclass
 class AggregatePowerMetrics:
     """Aggregate power metrics representation.
 
@@ -95,6 +107,20 @@ class AggregatePowerMetrics:
         return results
 
 
+# Constants class
+class _PowerCsvHeaders:
+    timestamp = "Timestamp"
+    current = "Current"
+    voltage = "Voltage"
+
+
+_ALL_POWER_CSV_HEADERS = [
+    _PowerCsvHeaders.timestamp,
+    _PowerCsvHeaders.current,
+    _PowerCsvHeaders.voltage,
+]
+
+
 class PowerMetricsProcessor:
     """Power metric processor to extract performance data from raw samples.
 
@@ -111,9 +137,7 @@ class PowerMetricsProcessor:
         with open(self._power_samples_path, "r") as f:
             reader = csv.reader(f)
             header = next(reader)
-            assert header[0] == "Timestamp"
-            assert header[1] == "Current"
-            assert header[2] == "Voltage"
+            assert header[0:3] == _ALL_POWER_CSV_HEADERS
             for row in reader:
                 sample = PowerMetricSample(
                     timestamp=int(row[0]),
@@ -150,3 +174,229 @@ class PowerMetricsProcessor:
             json.dump(results_json, outfile, indent=4)
 
         return fuchsiaperf_json_path
+
+
+@dataclasses.dataclass(frozen=True)
+class PowerSamplerConfig:
+    # Directory for samples output
+    output_dir: str
+    # Unique metric name, used in output file names.
+    metric_name: str
+    # Path of the measurepower tool (Optional)
+    measurepower_path: str | None = None
+
+
+class _PowerSamplerState(enum.Enum):
+    INIT = (1,)
+    STARTED = (2,)
+    STOPPED = (3,)
+
+
+class PowerSampler:
+    """Power sampling base class.
+
+    Usage:
+    ```
+    sampler:PowerSampler = create_power_sampler(...)
+    sampler.start()
+    ... interact with the device ...
+    sampler.stop()
+    sampler.process_and_write_fuchsia_perf_json(...)
+    ```
+    """
+
+    def __init__(self, config: PowerSamplerConfig):
+        """Constructor.
+
+        Args:
+            config (PowerSamplerConfig): Configuration.
+        """
+        self._state: _PowerSamplerState = _PowerSamplerState.INIT
+        self._config = config
+
+    def start(self) -> None:
+        """Starts sampling."""
+        assert self._state == _PowerSamplerState.INIT
+        self._state = _PowerSamplerState.STARTED
+
+    def stop(self) -> None:
+        """Stops sampling. Has no effect if already stopped."""
+        if self._state != _PowerSamplerState.STARTED:
+            pass
+        self._state = _PowerSamplerState.STOPPED
+
+    def csv_output_path(self) -> str:
+        """The power samples csv file path.
+
+        Returns:
+            str: The power samples csv file path.
+        """
+        return os.path.join(
+            self._config.output_dir,
+            f"{self._config.metric_name}_power_samples.csv",
+        )
+
+    def process_results(
+        self, trace_results: list[trace_metrics.TestCaseResult] = None
+    ) -> str:
+        """Creates a .fuchsiaperf.json file with the processed power samples"""
+        metrics_processor = PowerMetricsProcessor(
+            power_samples_path=self.csv_output_path()
+        )
+        metrics_processor.process_metrics()
+        fuchsiaperf_json_path = metrics_processor.write_fuchsiaperf_json(
+            output_dir=self._config.output_dir,
+            metric_name=self._config.metric_name,
+            trace_results=trace_results if trace_results else [],
+        )
+
+        _LOGGER.info(
+            f"Power measurements processed and written to {fuchsiaperf_json_path}"
+        )
+        return fuchsiaperf_json_path
+
+
+class _StubPowerSampler(PowerSampler):
+    """A no-op power sampler, used in environments where _MEASUREPOWER_PATH_ENV_VARIABLE isn't set."""
+
+    def __init__(self, config: PowerSamplerConfig):
+        """Constructor.
+
+        Args:
+            config (PowerSamplerConfig): Configuration.
+        """
+        super().__init__(config)
+
+    @override
+    def start(self) -> None:
+        super().start()
+        self._start_time_sec = time.time()
+
+    @override
+    def stop(self) -> None:
+        super().stop()
+
+        end_time_sec = time.time()
+
+        _LOGGER.warning(f"Writing {self.csv_output_path()} with fake data")
+        with open(self.csv_output_path(), "w") as csvfile:
+            writer = csv.DictWriter(csvfile, fieldnames=_ALL_POWER_CSV_HEADERS)
+            writer.writeheader()
+
+            for timetamp_sec in range(
+                int(self._start_time_sec), int(end_time_sec) + 1
+            ):
+                timestamp_ns = int(timetamp_sec * 1000000000)
+                writer.writerow(
+                    {
+                        _PowerCsvHeaders.timestamp: timestamp_ns,
+                        _PowerCsvHeaders.current: 100,
+                        _PowerCsvHeaders.voltage: 12,
+                    }
+                )
+            csvfile.flush()
+
+
+class _RealPowerSampler(PowerSampler):
+    """Wrapper for the measurepower command-line tool."""
+
+    def __init__(self, config: PowerSamplerConfig):
+        """Constructor.
+
+        Args:
+            config (PowerSamplerConfig): Configuration.
+        """
+        super().__init__(config)
+        assert config.measurepower_path
+        self._measurepower_proc: subprocess.Popen | None = None
+
+    @override
+    def start(self):
+        super().start()
+        _LOGGER.info(f"Starting power sampling")
+        self._start_power_measurement()
+        self._await_first_sample()
+
+    @override
+    def stop(self):
+        super().stop()
+        _LOGGER.info(f"Stopping power sampling...")
+        self._stop_power_measurement()
+        _LOGGER.info("Power sampling stopped")
+
+    def _start_power_measurement(self):
+        cmd = [
+            self._config.measurepower_path,
+            "-format",
+            "csv",
+            "-out",
+            os.path.join(self._config.output_dir, "power_measurements.csv"),
+        ]
+        _LOGGER.debug(f"Power measurement cmd: {cmd}")
+        self._measurepower_proc = subprocess.Popen(
+            cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE
+        )
+
+    def _await_first_sample(self, timeout_sec: float = 60):
+        _LOGGER.debug(f"Awaiting 1st power sample (timeout_sec={timeout_sec})")
+        proc = self._measurepower_proc
+        csv_path = self.csv_output_path()
+        deadline = time.now() + timeout_sec
+
+        while deadline > time.now():
+            if proc.poll():
+                stdout = proc.stdout.read()
+                stderr = proc.stderr.read()
+                raise RuntimeError(
+                    f"Measure power failed to start with status "
+                    f"{proc.returncode} stdout: {stdout} "
+                    f"stderr: {stderr}"
+                )
+            if os.path.exists(csv_path) and os.path.getsize(csv_path):
+                _LOGGER.debug(f"Received 1st power sample in {csv_path}")
+                return
+            time.sleep(1)
+
+        raise TimeoutError(
+            f"Timed out after {timeout_sec} seconds while waiting for power samples"
+        )
+
+    def _stop_power_measurement(self, timeout_sec: float = 60):
+        _LOGGER.debug("Stopping the measurepower process...")
+        proc = self._measurepower_proc
+        proc.send_signal(signal.SIGINT)
+        result = proc.wait(timeout_sec)
+        if result:
+            stdout = proc.stdout.read()
+            stderr = proc.stderr.read()
+            raise RuntimeError(
+                f"Measure power failed with status "
+                f"{proc.returncode} stdout: {stdout} "
+                f"stderr: {stderr}"
+            )
+        _LOGGER.debug("measurepower process stopped.")
+
+
+def create_power_sampler(
+    config: PowerSamplerConfig, fallback_to_stub: bool = True
+):
+    """Creates a power sampler.
+
+    In the absence of `_MEASUREPOWER_PATH_ENV_VARIABLE`, creates a no-op sampler.
+    """
+    measurepower_path = os.environ.get(_MEASUREPOWER_PATH_ENV_VARIABLE)
+    if not measurepower_path:
+        if not fallback_to_stub:
+            raise RuntimeError(
+                f"{_MEASUREPOWER_PATH_ENV_VARIABLE} env variable must be set"
+            )
+
+        _LOGGER.warning(
+            f"{_MEASUREPOWER_PATH_ENV_VARIABLE} env variable not set. Using a stub power sampler instead."
+        )
+        return _StubPowerSampler(config)
+    else:
+        config = dataclasses.replace(
+            config, measurepower_path=measurepower_path
+        )
+        return _RealPowerSampler(config)

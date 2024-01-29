@@ -43,10 +43,14 @@ ENV_FUCHSIA_EXPECTED_METRIC_NAMES_DEST_DIR: str = (
     "FUCHSIA_EXPECTED_METRIC_NAMES_DEST_DIR"
 )
 
+# Built + placed at this destination by host_test_data rule ":catapult_converter_binary"
+# which this library depends on
+CATAPULT_CONVERTER_BINARY_PATH: str = "host_x64/catapult_converter"
+
 
 def publish_fuchsiaperf(
     fuchsia_perf_file_paths: Iterable[Union[str, os.PathLike]],
-    expected_metric_names_filename: str,
+    expected_metric_names_filename: str | None = None,
     env: Union[dict[str, str], type(os.environ)] = os.environ,
     runtime_deps_dir: Union[str, os.PathLike] | None = None,
 ) -> None:
@@ -55,11 +59,11 @@ def publish_fuchsiaperf(
     Args:
         fuchsia_perf_file_paths: paths to the fuchsiaperf.json files containing the metrics. These
             will be summarized into a single fuchsiaperf.json file.
+        expected_metric_names_filename: allows to optionally validate the metrics in the perf file
+            against a set of expected metrics.
         env: map holding the environment variables.
         runtime_deps_dir: directory in which to look for necessary dependencies such as the expected
              metric names file, catapult converter, etc. Defaults to the test runtime_deps dir.
-        expected_metric_names_filename: allows to optionally validate the metrics in the perf file
-            against a set of expected metrics.
     """
     converter = CatapultConverter.from_env(
         fuchsia_perf_file_paths,
@@ -74,7 +78,7 @@ class CatapultConverter:
     def __init__(
         self,
         fuchsia_perf_file_paths: Iterable[Union[str, os.PathLike]],
-        expected_metric_names_filename: str,
+        expected_metric_names_filename: str | None = None,
         master: str | None = None,
         bot: str | None = None,
         build_bucket_id: str | None = None,
@@ -106,12 +110,7 @@ class CatapultConverter:
         self._fuchsia_expected_metric_names_dest_dir = (
             fuchsia_expected_metric_names_dest_dir
         )
-        if runtime_deps_dir:
-            self._runtime_deps_dir = runtime_deps_dir
-        else:
-            self._runtime_deps_dir = utils.get_associated_runtime_deps_dir(
-                __file__
-            )
+        self._runtime_deps_dir = runtime_deps_dir
 
         self._upload_enabled: bool = True
         if master is None and bot is None:
@@ -146,15 +145,21 @@ class CatapultConverter:
             fuchsia_perf_file_paths
         )
 
-        expected_metric_names_file: str = os.path.join(
-            self._runtime_deps_dir, expected_metric_names_filename
-        )
+        should_summarize: bool = False
+        if expected_metric_names_filename:
+            runtime_deps_dir = (
+                self._runtime_deps_dir
+                or utils.get_associated_runtime_deps_dir(__file__)
+            )
+            expected_metric_names_file = os.path.join(
+                runtime_deps_dir, expected_metric_names_filename
+            )
 
-        _LOGGER.debug("Checking metrics naming")
-        should_summarize: bool = self._check_fuchsia_perf_metrics_naming(
-            expected_metric_names_file,
-            fuchsia_perf_file_paths,
-        )
+            _LOGGER.debug("Checking metrics naming")
+            should_summarize = self._check_fuchsia_perf_metrics_naming(
+                expected_metric_names_file,
+                fuchsia_perf_file_paths,
+            )
 
         self._results_path = os.path.join(
             os.path.dirname(fuchsia_perf_file_paths[0]),
@@ -252,9 +257,11 @@ class CatapultConverter:
 
     def run(self) -> None:
         """Publishes the given metrics."""
-        converter_path = os.path.join(
-            self._runtime_deps_dir, "catapult_converter"
-        )
+        converter_path = CATAPULT_CONVERTER_BINARY_PATH
+        assert os.path.exists(
+            converter_path
+        ), f"{CATAPULT_CONVERTER_BINARY_PATH} not found"
+
         args = self._args()
         _LOGGER.info(f'Performance: Running {converter_path} {" ".join(args)}')
         self._subprocess_check_call([str(converter_path)] + args)

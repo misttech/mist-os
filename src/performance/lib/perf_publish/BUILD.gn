@@ -3,6 +3,7 @@
 # found in the LICENSE file.
 
 import("//build/python/python_library.gni")
+import("//build/testing/host_test_data.gni")
 
 python_library("perf_publish") {
   testonly = true
@@ -14,6 +15,14 @@ python_library("perf_publish") {
     "summarize.py",
   ]
   library_deps = [ "//src/performance/lib/py_test_utils:perf_test_utils" ]
+  deps = [ ":catapult_converter_binary($host_toolchain)" ]
+}
+
+if (is_host) {
+  host_test_data("catapult_converter_binary") {
+    deps = [ "//src/testing/catapult_converter:converter_bin" ]
+    sources = [ "${root_out_dir}/catapult_converter" ]
+  }
 }
 
 group("tests") {

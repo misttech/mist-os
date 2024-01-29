@@ -10,11 +10,14 @@ import os
 import subprocess
 from typing import Any, Dict, List, Optional, Self, TextIO, Tuple, Union
 
-from perf_test_utils import utils
 import trace_processing.trace_model as trace_model
 import trace_processing.trace_time as trace_time
 
 _LOGGER: logging.Logger = logging.getLogger("Performance")
+
+# Built + placed at this destination by host_test_data rule ":trace2json_binary"
+# which this library depends on
+_TRACE2JSON_BINARY_PATH = "host_x64/trace2json"
 
 
 class _FlowKey:
@@ -195,14 +198,10 @@ def convert_trace_file_to_json(
     output_path = base_path + output_extension
 
     if trace2json_path is None:
-        # Locate trace2json via runtime_deps. The python_perf_test template will
-        # ensure that trace2json is available via the runtime_deps directory.
-        runtime_deps_dir: os.PathLike = utils.get_associated_runtime_deps_dir(
-            __file__
-        )
-        trace2json_path: os.PathLike = os.path.join(
-            runtime_deps_dir, "trace2json"
-        )
+        trace2json_path = _TRACE2JSON_BINARY_PATH
+    assert os.path.exists(
+        trace2json_path
+    ), f"trace2json not found at {trace2json_path}"
 
     args: List[str] = [
         str(trace2json_path),
