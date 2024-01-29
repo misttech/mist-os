@@ -10,24 +10,21 @@
 #include <lib/elfldltl/testing/diagnostics.h>
 #include <lib/elfldltl/testing/typed-test.h>
 
-#include <string>
 #include <vector>
 
 #include "symbol-tests.h"
 
 namespace {
 
+using elfldltl::testing::ExpectedSingleError;
 using elfldltl::testing::ExpectOkDiagnostics;
-
-constexpr elfldltl::DiagnosticsFlags kDiagFlags = {.multiple_errors = true};
 
 FORMAT_TYPED_TEST_SUITE(ElfldltlDynamicTests);
 
 TYPED_TEST(ElfldltlDynamicTests, Empty) {
   using Elf = typename TestFixture::Elf;
 
-  std::vector<std::string> errors;
-  auto diag = elfldltl::CollectStringsDiagnostics(errors);
+  ExpectOkDiagnostics diag;
 
   elfldltl::DirectMemory memory({}, 0);
 
@@ -38,16 +35,12 @@ TYPED_TEST(ElfldltlDynamicTests, Empty) {
 
   // No matchers and nothing to match.
   EXPECT_TRUE(elfldltl::DecodeDynamic(diag, memory, cpp20::span(dyn)));
-
-  EXPECT_EQ(0u, diag.errors());
-  EXPECT_EQ(0u, diag.warnings());
 }
 
 TYPED_TEST(ElfldltlDynamicTests, MissingTerminator) {
   using Elf = typename TestFixture::Elf;
 
-  std::vector<std::string> errors;
-  auto diag = elfldltl::CollectStringsDiagnostics(errors, kDiagFlags);
+  ExpectedSingleError diag{"missing DT_NULL terminator in PT_DYNAMIC"};
 
   elfldltl::DirectMemory memory({}, 0);
 
@@ -55,11 +48,6 @@ TYPED_TEST(ElfldltlDynamicTests, MissingTerminator) {
   cpp20::span<const typename Elf::Dyn> dyn;
 
   EXPECT_TRUE(elfldltl::DecodeDynamic(diag, memory, dyn));
-
-  EXPECT_EQ(1u, diag.errors());
-  EXPECT_EQ(0u, diag.warnings());
-  ASSERT_GE(errors.size(), 1u);
-  EXPECT_EQ(errors.front(), "missing DT_NULL terminator in PT_DYNAMIC");
 }
 
 TYPED_TEST(ElfldltlDynamicTests, RejectTextrel) {
@@ -73,13 +61,9 @@ TYPED_TEST(ElfldltlDynamicTests, RejectTextrel) {
         {.tag = elfldltl::ElfDynTag::kNull},
     };
 
-    auto diag = ExpectOkDiagnostics();
-
+    ExpectOkDiagnostics diag;
     EXPECT_TRUE(elfldltl::DecodeDynamic(diag, memory, cpp20::span(dyn_notextrel),
                                         elfldltl::DynamicTextrelRejectObserver{}));
-
-    EXPECT_EQ(0u, diag.errors());
-    EXPECT_EQ(0u, diag.warnings());
   }
 
   {
@@ -89,11 +73,11 @@ TYPED_TEST(ElfldltlDynamicTests, RejectTextrel) {
         {.tag = elfldltl::ElfDynTag::kNull},
     };
 
-    auto expected = elfldltl::testing::ExpectedSingleError{
+    elfldltl::testing::ExpectedSingleError expected{
         elfldltl::DynamicTextrelRejectObserver::kMessage,
     };
 
-    EXPECT_TRUE(elfldltl::DecodeDynamic(expected.diag(), memory, cpp20::span(dyn_textrel),
+    EXPECT_TRUE(elfldltl::DecodeDynamic(expected, memory, cpp20::span(dyn_textrel),
                                         elfldltl::DynamicTextrelRejectObserver{}));
   }
 
@@ -110,40 +94,16 @@ TYPED_TEST(ElfldltlDynamicTests, RejectTextrel) {
     auto expected = elfldltl::testing::ExpectedSingleError{
         elfldltl::DynamicTextrelRejectObserver::kMessage,
     };
-    EXPECT_TRUE(elfldltl::DecodeDynamic(expected.diag(), memory, cpp20::span(dyn_flags_textrel),
+    EXPECT_TRUE(elfldltl::DecodeDynamic(expected, memory, cpp20::span(dyn_flags_textrel),
                                         elfldltl::DynamicTextrelRejectObserver{}));
   }
 }
-
-class TestDiagnostics {
- public:
-  using DiagType = decltype(elfldltl::CollectStringsDiagnostics(
-      std::declval<std::vector<std::string>&>(), kDiagFlags));
-
-  DiagType& diag() { return diag_; }
-
-  const std::vector<std::string>& errors() const { return errors_; }
-
-  std::string ExplainErrors() const {
-    std::string str = std::to_string(diag_.errors()) + " errors, " +
-                      std::to_string(diag_.warnings()) + " warnings:";
-    for (const std::string& line : errors_) {
-      str += "\n\t";
-      str += line;
-    }
-    return str;
-  }
-
- private:
-  std::vector<std::string> errors_;
-  DiagType diag_ = elfldltl::CollectStringsDiagnostics(errors_, kDiagFlags);
-};
 
 TYPED_TEST(ElfldltlDynamicTests, RelocationInfoObserverEmpty) {
   using Elf = typename TestFixture::Elf;
   using Dyn = typename Elf::Dyn;
 
-  TestDiagnostics diag;
+  ExpectOkDiagnostics diag;
   elfldltl::DirectMemory empty_memory({}, 0);
 
   // PT_DYNAMIC with no reloc info.
@@ -152,13 +112,8 @@ TYPED_TEST(ElfldltlDynamicTests, RelocationInfoObserverEmpty) {
   };
 
   elfldltl::RelocationInfo<Elf> info;
-  EXPECT_TRUE(elfldltl::DecodeDynamic(diag.diag(), empty_memory, cpp20::span(dyn_noreloc),
-                                      elfldltl::DynamicRelocationInfoObserver(info)))
-      << diag.ExplainErrors();
-
-  EXPECT_EQ(0u, diag.diag().errors());
-  EXPECT_EQ(0u, diag.diag().warnings());
-  EXPECT_TRUE(diag.errors().empty());
+  EXPECT_TRUE(elfldltl::DecodeDynamic(diag, empty_memory, cpp20::span(dyn_noreloc),
+                                      elfldltl::DynamicRelocationInfoObserver(info)));
 
   EXPECT_TRUE(info.rel_relative().empty());
   EXPECT_TRUE(info.rel_symbolic().empty());
@@ -254,7 +209,7 @@ TYPED_TEST(ElfldltlDynamicTests, RelocationInfoObserverFullValid) {
   using size_type = typename Elf::size_type;
   using Dyn = typename Elf::Dyn;
 
-  TestDiagnostics diag;
+  ExpectOkDiagnostics diag;
   RelocInfoTestImage<Elf> test_image;
 
   // PT_DYNAMIC with full valid reloc info.
@@ -311,13 +266,8 @@ TYPED_TEST(ElfldltlDynamicTests, RelocationInfoObserverFullValid) {
   };
 
   elfldltl::RelocationInfo<Elf> info;
-  EXPECT_TRUE(elfldltl::DecodeDynamic(diag.diag(), test_image.memory(), cpp20::span(dyn_goodreloc),
-                                      elfldltl::DynamicRelocationInfoObserver(info)))
-      << diag.ExplainErrors();
-
-  EXPECT_EQ(0u, diag.diag().errors());
-  EXPECT_EQ(0u, diag.diag().warnings());
-  EXPECT_TRUE(diag.errors().empty()) << diag.ExplainErrors();
+  EXPECT_TRUE(elfldltl::DecodeDynamic(diag, test_image.memory(), cpp20::span(dyn_goodreloc),
+                                      elfldltl::DynamicRelocationInfoObserver(info)));
 
   EXPECT_EQ(2u, info.rel_relative().size());
   EXPECT_EQ(1u, info.rel_symbolic().size());
@@ -335,7 +285,7 @@ TYPED_TEST(ElfldltlDynamicTests, RelocationInfoObserverBadRelent) {
   using size_type = typename Elf::size_type;
   using Dyn = typename Elf::Dyn;
 
-  TestDiagnostics diag;
+  ExpectedSingleError diag{"incorrect DT_RELENT value"};
   RelocInfoTestImage<Elf> test_image;
 
   const Dyn dyn_bad_relent[] = {
@@ -389,13 +339,8 @@ TYPED_TEST(ElfldltlDynamicTests, RelocationInfoObserverBadRelent) {
   };
 
   elfldltl::RelocationInfo<Elf> info;
-  EXPECT_TRUE(elfldltl::DecodeDynamic(diag.diag(), test_image.memory(), cpp20::span(dyn_bad_relent),
-                                      elfldltl::DynamicRelocationInfoObserver(info)))
-      << diag.ExplainErrors();
-
-  EXPECT_EQ(1u, diag.diag().errors());
-  EXPECT_EQ(0u, diag.diag().warnings());
-  EXPECT_EQ(1u, diag.errors().size()) << diag.ExplainErrors();
+  EXPECT_TRUE(elfldltl::DecodeDynamic(diag, test_image.memory(), cpp20::span(dyn_bad_relent),
+                                      elfldltl::DynamicRelocationInfoObserver(info)));
 
   // With keep-going, the data is delivered anyway.
   EXPECT_EQ(2u, info.rel_relative().size());
@@ -411,7 +356,7 @@ TYPED_TEST(ElfldltlDynamicTests, RelocationInfoObserverBadRelaent) {
   using size_type = typename Elf::size_type;
   using Dyn = typename Elf::Dyn;
 
-  TestDiagnostics diag;
+  ExpectedSingleError diag{"incorrect DT_RELAENT value"};
   RelocInfoTestImage<Elf> test_image;
 
   const Dyn dyn_bad_relaent[] = {
@@ -465,14 +410,8 @@ TYPED_TEST(ElfldltlDynamicTests, RelocationInfoObserverBadRelaent) {
   };
 
   elfldltl::RelocationInfo<Elf> info;
-  EXPECT_TRUE(elfldltl::DecodeDynamic(diag.diag(), test_image.memory(),
-                                      cpp20::span(dyn_bad_relaent),
-                                      elfldltl::DynamicRelocationInfoObserver(info)))
-      << diag.ExplainErrors();
-
-  EXPECT_EQ(1u, diag.diag().errors());
-  EXPECT_EQ(0u, diag.diag().warnings());
-  EXPECT_EQ(1u, diag.errors().size()) << diag.ExplainErrors();
+  EXPECT_TRUE(elfldltl::DecodeDynamic(diag, test_image.memory(), cpp20::span(dyn_bad_relaent),
+                                      elfldltl::DynamicRelocationInfoObserver(info)));
 
   // With keep-going, the data is delivered anyway.
   EXPECT_EQ(2u, info.rel_relative().size());
@@ -488,7 +427,7 @@ TYPED_TEST(ElfldltlDynamicTests, RelocationInfoObserverBadRelrent) {
   using size_type = typename Elf::size_type;
   using Dyn = typename Elf::Dyn;
 
-  TestDiagnostics diag;
+  ExpectedSingleError diag{"incorrect DT_RELRENT value"};
   RelocInfoTestImage<Elf> test_image;
 
   const Dyn dyn_bad_relrent[] = {
@@ -542,14 +481,8 @@ TYPED_TEST(ElfldltlDynamicTests, RelocationInfoObserverBadRelrent) {
   };
 
   elfldltl::RelocationInfo<Elf> info;
-  EXPECT_TRUE(elfldltl::DecodeDynamic(diag.diag(), test_image.memory(),
-                                      cpp20::span(dyn_bad_relrent),
-                                      elfldltl::DynamicRelocationInfoObserver(info)))
-      << diag.ExplainErrors();
-
-  EXPECT_EQ(1u, diag.diag().errors());
-  EXPECT_EQ(0u, diag.diag().warnings());
-  EXPECT_EQ(1u, diag.errors().size()) << diag.ExplainErrors();
+  EXPECT_TRUE(elfldltl::DecodeDynamic(diag, test_image.memory(), cpp20::span(dyn_bad_relrent),
+                                      elfldltl::DynamicRelocationInfoObserver(info)));
 
   // With keep-going, the data is delivered anyway.
   EXPECT_EQ(2u, info.rel_relative().size());
@@ -565,7 +498,7 @@ TYPED_TEST(ElfldltlDynamicTests, RelocationInfoObserverMissingPltrel) {
   using size_type = typename Elf::size_type;
   using Dyn = typename Elf::Dyn;
 
-  TestDiagnostics diag;
+  ExpectedSingleError diag{"invalid DT_PLTREL entry"};
   RelocInfoTestImage<Elf> test_image;
 
   const Dyn dyn_missing_pltrel[] = {
@@ -620,14 +553,8 @@ TYPED_TEST(ElfldltlDynamicTests, RelocationInfoObserverMissingPltrel) {
   };
 
   elfldltl::RelocationInfo<Elf> info;
-  EXPECT_TRUE(elfldltl::DecodeDynamic(diag.diag(), test_image.memory(),
-                                      cpp20::span(dyn_missing_pltrel),
-                                      elfldltl::DynamicRelocationInfoObserver(info)))
-      << diag.ExplainErrors();
-
-  EXPECT_EQ(1u, diag.diag().errors());
-  EXPECT_EQ(0u, diag.diag().warnings());
-  EXPECT_EQ(1u, diag.errors().size()) << diag.ExplainErrors();
+  EXPECT_TRUE(elfldltl::DecodeDynamic(diag, test_image.memory(), cpp20::span(dyn_missing_pltrel),
+                                      elfldltl::DynamicRelocationInfoObserver(info)));
 
   // DT_JMPREL was ignored but the rest is normal.
   EXPECT_EQ(2u, info.rel_relative().size());
@@ -643,7 +570,7 @@ TYPED_TEST(ElfldltlDynamicTests, RelocationInfoObserverBadPltrel) {
   using size_type = typename Elf::size_type;
   using Dyn = typename Elf::Dyn;
 
-  TestDiagnostics diag;
+  ExpectedSingleError diag{"missing DT_PLTREL entry"};
   RelocInfoTestImage<Elf> test_image;
 
   const Dyn dyn_bad_pltrel[] = {
@@ -695,13 +622,8 @@ TYPED_TEST(ElfldltlDynamicTests, RelocationInfoObserverBadPltrel) {
   };
 
   elfldltl::RelocationInfo<Elf> info;
-  EXPECT_TRUE(elfldltl::DecodeDynamic(diag.diag(), test_image.memory(), cpp20::span(dyn_bad_pltrel),
-                                      elfldltl::DynamicRelocationInfoObserver(info)))
-      << diag.ExplainErrors();
-
-  EXPECT_EQ(1u, diag.diag().errors());
-  EXPECT_EQ(0u, diag.diag().warnings());
-  EXPECT_EQ(1u, diag.errors().size()) << diag.ExplainErrors();
+  EXPECT_TRUE(elfldltl::DecodeDynamic(diag, test_image.memory(), cpp20::span(dyn_bad_pltrel),
+                                      elfldltl::DynamicRelocationInfoObserver(info)));
 
   // DT_JMPREL was ignored but the rest is normal.
   EXPECT_EQ(2u, info.rel_relative().size());
@@ -720,7 +642,7 @@ TYPED_TEST(ElfldltlDynamicTests, RelocationInfoObserverBadRelAddr) {
   using size_type = typename Elf::size_type;
   using Dyn = typename Elf::Dyn;
 
-  TestDiagnostics diag;
+  ExpectedSingleError diag{"DT_REL has misaligned address"};
   RelocInfoTestImage<Elf> test_image;
 
   const Dyn dyn_bad_rel_addr[] = {
@@ -776,14 +698,8 @@ TYPED_TEST(ElfldltlDynamicTests, RelocationInfoObserverBadRelAddr) {
   };
 
   elfldltl::RelocationInfo<Elf> info;
-  EXPECT_TRUE(elfldltl::DecodeDynamic(diag.diag(), test_image.memory(),
-                                      cpp20::span(dyn_bad_rel_addr),
-                                      elfldltl::DynamicRelocationInfoObserver(info)))
-      << diag.ExplainErrors();
-
-  EXPECT_EQ(1u, diag.diag().errors());
-  EXPECT_EQ(0u, diag.diag().warnings());
-  EXPECT_EQ(1u, diag.errors().size()) << diag.ExplainErrors();
+  EXPECT_TRUE(elfldltl::DecodeDynamic(diag, test_image.memory(), cpp20::span(dyn_bad_rel_addr),
+                                      elfldltl::DynamicRelocationInfoObserver(info)));
 
   // DT_REL was ignored but the rest is normal.
   EXPECT_EQ(0u, info.rel_relative().size());
@@ -799,7 +715,7 @@ TYPED_TEST(ElfldltlDynamicTests, RelocationInfoObserverBadRelSz) {
   using size_type = typename Elf::size_type;
   using Dyn = typename Elf::Dyn;
 
-  TestDiagnostics diag;
+  ExpectedSingleError diag{"DT_RELSZ not a multiple of DT_REL entry size"};
   RelocInfoTestImage<Elf> test_image;
 
   const Dyn dyn_bad_relsz[] = {
@@ -855,13 +771,8 @@ TYPED_TEST(ElfldltlDynamicTests, RelocationInfoObserverBadRelSz) {
   };
 
   elfldltl::RelocationInfo<Elf> info;
-  EXPECT_TRUE(elfldltl::DecodeDynamic(diag.diag(), test_image.memory(), cpp20::span(dyn_bad_relsz),
-                                      elfldltl::DynamicRelocationInfoObserver(info)))
-      << diag.ExplainErrors();
-
-  EXPECT_EQ(1u, diag.diag().errors());
-  EXPECT_EQ(0u, diag.diag().warnings());
-  EXPECT_EQ(1u, diag.errors().size()) << diag.ExplainErrors();
+  EXPECT_TRUE(elfldltl::DecodeDynamic(diag, test_image.memory(), cpp20::span(dyn_bad_relsz),
+                                      elfldltl::DynamicRelocationInfoObserver(info)));
 
   // DT_REL was ignored but the rest is normal.
   EXPECT_EQ(0u, info.rel_relative().size());
@@ -877,7 +788,7 @@ TYPED_TEST(ElfldltlDynamicTests, RelocationInfoObserverBadRelSzAlign) {
   using size_type = typename Elf::size_type;
   using Dyn = typename Elf::Dyn;
 
-  TestDiagnostics diag;
+  ExpectedSingleError diag{"DT_RELSZ not a multiple of DT_REL entry size"};
   RelocInfoTestImage<Elf> test_image;
 
   const Dyn dyn_bad_relsz_align[] = {
@@ -933,14 +844,8 @@ TYPED_TEST(ElfldltlDynamicTests, RelocationInfoObserverBadRelSzAlign) {
   };
 
   elfldltl::RelocationInfo<Elf> info;
-  EXPECT_TRUE(elfldltl::DecodeDynamic(diag.diag(), test_image.memory(),
-                                      cpp20::span(dyn_bad_relsz_align),
-                                      elfldltl::DynamicRelocationInfoObserver(info)))
-      << diag.ExplainErrors();
-
-  EXPECT_EQ(1u, diag.diag().errors());
-  EXPECT_EQ(0u, diag.diag().warnings());
-  EXPECT_EQ(1u, diag.errors().size()) << diag.ExplainErrors();
+  EXPECT_TRUE(elfldltl::DecodeDynamic(diag, test_image.memory(), cpp20::span(dyn_bad_relsz_align),
+                                      elfldltl::DynamicRelocationInfoObserver(info)));
 
   // DT_REL was ignored but the rest is normal.
   EXPECT_EQ(0u, info.rel_relative().size());
@@ -1030,7 +935,7 @@ TYPED_TEST(ElfldltlDynamicTests, SymbolInfoObserverEmpty) {
   using Elf = typename TestFixture::Elf;
   using Dyn = typename Elf::Dyn;
 
-  TestDiagnostics diag;
+  ExpectOkDiagnostics diag;
   elfldltl::DirectMemory empty_memory({}, 0);
 
   // PT_DYNAMIC with no symbol info.
@@ -1039,13 +944,8 @@ TYPED_TEST(ElfldltlDynamicTests, SymbolInfoObserverEmpty) {
   };
 
   elfldltl::SymbolInfo<Elf> info;
-  EXPECT_TRUE(elfldltl::DecodeDynamic(diag.diag(), empty_memory, cpp20::span(dyn_nosyms),
-                                      elfldltl::DynamicSymbolInfoObserver(info)))
-      << diag.ExplainErrors();
-
-  EXPECT_EQ(0u, diag.diag().errors());
-  EXPECT_EQ(0u, diag.diag().warnings());
-  EXPECT_TRUE(diag.errors().empty());
+  EXPECT_TRUE(elfldltl::DecodeDynamic(diag, empty_memory, cpp20::span(dyn_nosyms),
+                                      elfldltl::DynamicSymbolInfoObserver(info)));
 
   EXPECT_EQ(info.strtab().size(), 1u);
   EXPECT_TRUE(info.symtab().empty());
@@ -1060,7 +960,7 @@ TYPED_TEST(ElfldltlDynamicTests, SymbolInfoObserverFullValid) {
   using Dyn = typename Elf::Dyn;
   using Sym = typename Elf::Sym;
 
-  TestDiagnostics diag;
+  ExpectOkDiagnostics diag;
   SymbolInfoTestImage<Elf> test_image;
 
   constexpr uint32_t kDynFlags =
@@ -1088,13 +988,8 @@ TYPED_TEST(ElfldltlDynamicTests, SymbolInfoObserverFullValid) {
   };
 
   elfldltl::SymbolInfo<Elf> info;
-  EXPECT_TRUE(elfldltl::DecodeDynamic(diag.diag(), test_image.memory(), cpp20::span(dyn_goodsyms),
-                                      elfldltl::DynamicSymbolInfoObserver(info)))
-      << diag.ExplainErrors();
-
-  EXPECT_EQ(0u, diag.diag().errors());
-  EXPECT_EQ(0u, diag.diag().warnings());
-  EXPECT_TRUE(diag.errors().empty());
+  EXPECT_TRUE(elfldltl::DecodeDynamic(diag, test_image.memory(), cpp20::span(dyn_goodsyms),
+                                      elfldltl::DynamicSymbolInfoObserver(info)));
 
   EXPECT_EQ(info.strtab().size(), test_image.test_syms().strtab().size());
   EXPECT_EQ(info.strtab(), test_image.test_syms().strtab());
@@ -1115,7 +1010,7 @@ TYPED_TEST(ElfldltlDynamicTests, SymbolInfoObserverBadSonameOffset) {
   using Dyn = typename Elf::Dyn;
   using Sym = typename Elf::Sym;
 
-  TestDiagnostics diag;
+  ExpectedSingleError diag{"DT_SONAME does not fit in DT_STRTAB"};
   SymbolInfoTestImage<Elf> test_image;
   elfldltl::DirectMemory image_memory = test_image.memory();
 
@@ -1138,12 +1033,8 @@ TYPED_TEST(ElfldltlDynamicTests, SymbolInfoObserverBadSonameOffset) {
   };
 
   elfldltl::SymbolInfo<Elf> info;
-  EXPECT_TRUE(elfldltl::DecodeDynamic(diag.diag(), image_memory, cpp20::span(dyn_bad_soname_offset),
-                                      elfldltl::DynamicSymbolInfoObserver(info)))
-      << diag.ExplainErrors();
-  EXPECT_EQ(1u, diag.diag().errors());
-  EXPECT_EQ(0u, diag.diag().warnings());
-  EXPECT_EQ(1u, diag.errors().size()) << diag.ExplainErrors();
+  EXPECT_TRUE(elfldltl::DecodeDynamic(diag, image_memory, cpp20::span(dyn_bad_soname_offset),
+                                      elfldltl::DynamicSymbolInfoObserver(info)));
 }
 
 TYPED_TEST(ElfldltlDynamicTests, SymbolInfoObserverBadSyment) {
@@ -1151,7 +1042,7 @@ TYPED_TEST(ElfldltlDynamicTests, SymbolInfoObserverBadSyment) {
   using size_type = typename Elf::size_type;
   using Dyn = typename Elf::Dyn;
 
-  TestDiagnostics diag;
+  ExpectedSingleError diag{"incorrect DT_SYMENT value ", 17};
   SymbolInfoTestImage<Elf> test_image;
   elfldltl::DirectMemory image_memory = test_image.memory();
 
@@ -1173,12 +1064,8 @@ TYPED_TEST(ElfldltlDynamicTests, SymbolInfoObserverBadSyment) {
   };
 
   elfldltl::SymbolInfo<Elf> info;
-  EXPECT_TRUE(elfldltl::DecodeDynamic(diag.diag(), image_memory, cpp20::span(dyn_bad_syment),
-                                      elfldltl::DynamicSymbolInfoObserver(info)))
-      << diag.ExplainErrors();
-  EXPECT_EQ(1u, diag.diag().errors());
-  EXPECT_EQ(0u, diag.diag().warnings());
-  EXPECT_EQ(1u, diag.errors().size()) << diag.ExplainErrors();
+  EXPECT_TRUE(elfldltl::DecodeDynamic(diag, image_memory, cpp20::span(dyn_bad_syment),
+                                      elfldltl::DynamicSymbolInfoObserver(info)));
 }
 
 TYPED_TEST(ElfldltlDynamicTests, SymbolInfoObserverMissingStrsz) {
@@ -1186,7 +1073,7 @@ TYPED_TEST(ElfldltlDynamicTests, SymbolInfoObserverMissingStrsz) {
   using Dyn = typename Elf::Dyn;
   using Sym = typename Elf::Sym;
 
-  TestDiagnostics diag;
+  ExpectedSingleError diag{"DT_STRTAB without DT_STRSZ"};
   SymbolInfoTestImage<Elf> test_image;
   elfldltl::DirectMemory image_memory = test_image.memory();
 
@@ -1204,12 +1091,8 @@ TYPED_TEST(ElfldltlDynamicTests, SymbolInfoObserverMissingStrsz) {
   };
 
   elfldltl::SymbolInfo<Elf> info;
-  EXPECT_TRUE(elfldltl::DecodeDynamic(diag.diag(), image_memory, cpp20::span(dyn_missing_strsz),
-                                      elfldltl::DynamicSymbolInfoObserver(info)))
-      << diag.ExplainErrors();
-  EXPECT_EQ(1u, diag.diag().errors());
-  EXPECT_EQ(0u, diag.diag().warnings());
-  EXPECT_EQ(1u, diag.errors().size()) << diag.ExplainErrors();
+  EXPECT_TRUE(elfldltl::DecodeDynamic(diag, image_memory, cpp20::span(dyn_missing_strsz),
+                                      elfldltl::DynamicSymbolInfoObserver(info)));
 }
 
 TYPED_TEST(ElfldltlDynamicTests, SymbolInfoObserverMissingStrtab) {
@@ -1218,7 +1101,7 @@ TYPED_TEST(ElfldltlDynamicTests, SymbolInfoObserverMissingStrtab) {
   using Dyn = typename Elf::Dyn;
   using Sym = typename Elf::Sym;
 
-  TestDiagnostics diag;
+  ExpectedSingleError diag{"DT_STRSZ without DT_STRTAB"};
   SymbolInfoTestImage<Elf> test_image;
   elfldltl::DirectMemory image_memory = test_image.memory();
 
@@ -1239,12 +1122,8 @@ TYPED_TEST(ElfldltlDynamicTests, SymbolInfoObserverMissingStrtab) {
   };
 
   elfldltl::SymbolInfo<Elf> info;
-  EXPECT_TRUE(elfldltl::DecodeDynamic(diag.diag(), image_memory, cpp20::span(dyn_missing_strtab),
-                                      elfldltl::DynamicSymbolInfoObserver(info)))
-      << diag.ExplainErrors();
-  EXPECT_EQ(1u, diag.diag().errors());
-  EXPECT_EQ(0u, diag.diag().warnings());
-  EXPECT_EQ(1u, diag.errors().size()) << diag.ExplainErrors();
+  EXPECT_TRUE(elfldltl::DecodeDynamic(diag, image_memory, cpp20::span(dyn_missing_strtab),
+                                      elfldltl::DynamicSymbolInfoObserver(info)));
 }
 
 TYPED_TEST(ElfldltlDynamicTests, SymbolInfoObserverBadStrtabAddr) {
@@ -1253,7 +1132,9 @@ TYPED_TEST(ElfldltlDynamicTests, SymbolInfoObserverBadStrtabAddr) {
   using Dyn = typename Elf::Dyn;
   using Sym = typename Elf::Sym;
 
-  TestDiagnostics diag;
+  ExpectedSingleError diag{
+      "invalid address in DT_STRTAB or invalid size in DT_STRSZ",
+  };
   SymbolInfoTestImage<Elf> test_image;
   elfldltl::DirectMemory image_memory = test_image.memory();
 
@@ -1278,12 +1159,8 @@ TYPED_TEST(ElfldltlDynamicTests, SymbolInfoObserverBadStrtabAddr) {
   };
 
   elfldltl::SymbolInfo<Elf> info;
-  EXPECT_TRUE(elfldltl::DecodeDynamic(diag.diag(), image_memory, cpp20::span(dyn_bad_strtab_addr),
-                                      elfldltl::DynamicSymbolInfoObserver(info)))
-      << diag.ExplainErrors();
-  EXPECT_EQ(1u, diag.diag().errors());
-  EXPECT_EQ(0u, diag.diag().warnings());
-  EXPECT_EQ(1u, diag.errors().size()) << diag.ExplainErrors();
+  EXPECT_TRUE(elfldltl::DecodeDynamic(diag, image_memory, cpp20::span(dyn_bad_strtab_addr),
+                                      elfldltl::DynamicSymbolInfoObserver(info)));
 }
 
 TYPED_TEST(ElfldltlDynamicTests, SymbolInfoObserverBadSymtabAddr) {
@@ -1292,7 +1169,7 @@ TYPED_TEST(ElfldltlDynamicTests, SymbolInfoObserverBadSymtabAddr) {
   using Dyn = typename Elf::Dyn;
   using Sym = typename Elf::Sym;
 
-  TestDiagnostics diag;
+  ExpectOkDiagnostics diag;
   SymbolInfoTestImage<Elf> test_image;
   elfldltl::DirectMemory image_memory = test_image.memory();
 
@@ -1321,12 +1198,8 @@ TYPED_TEST(ElfldltlDynamicTests, SymbolInfoObserverBadSymtabAddr) {
   };
 
   elfldltl::SymbolInfo<Elf> info;
-  EXPECT_FALSE(elfldltl::DecodeDynamic(diag.diag(), image_memory, cpp20::span(dyn_bad_symtab_addr),
-                                       elfldltl::DynamicSymbolInfoObserver(info)))
-      << diag.ExplainErrors();
-  EXPECT_EQ(0u, diag.diag().errors());
-  EXPECT_EQ(0u, diag.diag().warnings());
-  EXPECT_EQ(0u, diag.errors().size()) << diag.ExplainErrors();
+  EXPECT_FALSE(elfldltl::DecodeDynamic(diag, image_memory, cpp20::span(dyn_bad_symtab_addr),
+                                       elfldltl::DynamicSymbolInfoObserver(info)));
 }
 
 TYPED_TEST(ElfldltlDynamicTests, SymbolInfoObserverBadSymtabAlign) {
@@ -1335,7 +1208,7 @@ TYPED_TEST(ElfldltlDynamicTests, SymbolInfoObserverBadSymtabAlign) {
   using Dyn = typename Elf::Dyn;
   using Sym = typename Elf::Sym;
 
-  TestDiagnostics diag;
+  ExpectedSingleError diag{"DT_SYMTAB has misaligned address"};
   SymbolInfoTestImage<Elf> test_image;
   elfldltl::DirectMemory image_memory = test_image.memory();
 
@@ -1363,12 +1236,8 @@ TYPED_TEST(ElfldltlDynamicTests, SymbolInfoObserverBadSymtabAlign) {
   };
 
   elfldltl::SymbolInfo<Elf> info;
-  EXPECT_FALSE(elfldltl::DecodeDynamic(diag.diag(), image_memory, cpp20::span(dyn_bad_symtab_align),
-                                       elfldltl::DynamicSymbolInfoObserver(info)))
-      << diag.ExplainErrors();
-  EXPECT_EQ(1u, diag.diag().errors());
-  EXPECT_EQ(0u, diag.diag().warnings());
-  EXPECT_EQ(1u, diag.errors().size()) << diag.ExplainErrors();
+  EXPECT_FALSE(elfldltl::DecodeDynamic(diag, image_memory, cpp20::span(dyn_bad_symtab_align),
+                                       elfldltl::DynamicSymbolInfoObserver(info)));
 }
 
 TYPED_TEST(ElfldltlDynamicTests, SymbolInfoObserverBadHashAddr) {
@@ -1377,7 +1246,7 @@ TYPED_TEST(ElfldltlDynamicTests, SymbolInfoObserverBadHashAddr) {
   using Dyn = typename Elf::Dyn;
   using Sym = typename Elf::Sym;
 
-  TestDiagnostics diag;
+  ExpectOkDiagnostics diag;
   SymbolInfoTestImage<Elf> test_image;
   elfldltl::DirectMemory image_memory = test_image.memory();
 
@@ -1406,12 +1275,8 @@ TYPED_TEST(ElfldltlDynamicTests, SymbolInfoObserverBadHashAddr) {
   };
 
   elfldltl::SymbolInfo<Elf> info;
-  EXPECT_FALSE(elfldltl::DecodeDynamic(diag.diag(), image_memory, cpp20::span(dyn_bad_hash_addr),
-                                       elfldltl::DynamicSymbolInfoObserver(info)))
-      << diag.ExplainErrors();
-  EXPECT_EQ(0u, diag.diag().errors());
-  EXPECT_EQ(0u, diag.diag().warnings());
-  EXPECT_EQ(0u, diag.errors().size()) << diag.ExplainErrors();
+  EXPECT_FALSE(elfldltl::DecodeDynamic(diag, image_memory, cpp20::span(dyn_bad_hash_addr),
+                                       elfldltl::DynamicSymbolInfoObserver(info)));
 }
 
 TYPED_TEST(ElfldltlDynamicTests, SymbolInfoObserverBadHashAlign) {
@@ -1420,7 +1285,7 @@ TYPED_TEST(ElfldltlDynamicTests, SymbolInfoObserverBadHashAlign) {
   using Dyn = typename Elf::Dyn;
   using Sym = typename Elf::Sym;
 
-  TestDiagnostics diag;
+  ExpectedSingleError diag{"DT_HASH has misaligned address"};
   SymbolInfoTestImage<Elf> test_image;
   elfldltl::DirectMemory image_memory = test_image.memory();
 
@@ -1446,12 +1311,8 @@ TYPED_TEST(ElfldltlDynamicTests, SymbolInfoObserverBadHashAlign) {
   };
 
   elfldltl::SymbolInfo<Elf> info;
-  EXPECT_TRUE(elfldltl::DecodeDynamic(diag.diag(), image_memory, cpp20::span(dyn_bad_hash_align),
-                                      elfldltl::DynamicSymbolInfoObserver(info)))
-      << diag.ExplainErrors();
-  EXPECT_EQ(1u, diag.diag().errors());
-  EXPECT_EQ(0u, diag.diag().warnings());
-  EXPECT_EQ(1u, diag.errors().size()) << diag.ExplainErrors();
+  EXPECT_TRUE(elfldltl::DecodeDynamic(diag, image_memory, cpp20::span(dyn_bad_hash_align),
+                                      elfldltl::DynamicSymbolInfoObserver(info)));
 }
 
 TYPED_TEST(ElfldltlDynamicTests, SymbolInfoObserverBadGnuHashAddr) {
@@ -1460,7 +1321,7 @@ TYPED_TEST(ElfldltlDynamicTests, SymbolInfoObserverBadGnuHashAddr) {
   using Dyn = typename Elf::Dyn;
   using Sym = typename Elf::Sym;
 
-  TestDiagnostics diag;
+  ExpectOkDiagnostics diag;
   SymbolInfoTestImage<Elf> test_image;
   elfldltl::DirectMemory image_memory = test_image.memory();
 
@@ -1486,13 +1347,8 @@ TYPED_TEST(ElfldltlDynamicTests, SymbolInfoObserverBadGnuHashAddr) {
   };
 
   elfldltl::SymbolInfo<Elf> info;
-  EXPECT_FALSE(elfldltl::DecodeDynamic(diag.diag(), image_memory,
-                                       cpp20::span(dyn_bad_gnu_hash_addr),
-                                       elfldltl::DynamicSymbolInfoObserver(info)))
-      << diag.ExplainErrors();
-  EXPECT_EQ(0u, diag.diag().errors());
-  EXPECT_EQ(0u, diag.diag().warnings());
-  EXPECT_EQ(0u, diag.errors().size()) << diag.ExplainErrors();
+  EXPECT_FALSE(elfldltl::DecodeDynamic(diag, image_memory, cpp20::span(dyn_bad_gnu_hash_addr),
+                                       elfldltl::DynamicSymbolInfoObserver(info)));
 }
 
 TYPED_TEST(ElfldltlDynamicTests, SymbolInfoObserverBadGnuHashAlign) {
@@ -1501,7 +1357,7 @@ TYPED_TEST(ElfldltlDynamicTests, SymbolInfoObserverBadGnuHashAlign) {
   using Dyn = typename Elf::Dyn;
   using Sym = typename Elf::Sym;
 
-  TestDiagnostics diag;
+  ExpectedSingleError diag{"DT_GNU_HASH has misaligned address"};
   SymbolInfoTestImage<Elf> test_image;
   elfldltl::DirectMemory image_memory = test_image.memory();
 
@@ -1524,13 +1380,8 @@ TYPED_TEST(ElfldltlDynamicTests, SymbolInfoObserverBadGnuHashAlign) {
   };
 
   elfldltl::SymbolInfo<Elf> info;
-  EXPECT_TRUE(elfldltl::DecodeDynamic(diag.diag(), image_memory,
-                                      cpp20::span(dyn_bad_gnu_hash_align),
-                                      elfldltl::DynamicSymbolInfoObserver(info)))
-      << diag.ExplainErrors();
-  EXPECT_EQ(1u, diag.diag().errors());
-  EXPECT_EQ(0u, diag.diag().warnings());
-  EXPECT_EQ(1u, diag.errors().size()) << diag.ExplainErrors();
+  EXPECT_TRUE(elfldltl::DecodeDynamic(diag, image_memory, cpp20::span(dyn_bad_gnu_hash_align),
+                                      elfldltl::DynamicSymbolInfoObserver(info)));
 }
 
 template <class Elf, class AbiTraits = elfldltl::LocalAbiTraits>

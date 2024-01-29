@@ -456,7 +456,7 @@ class DynamicSymbolInfoObserver : public DynamicSymbolInfoObserverBase<Elf> {
   constexpr bool Observe(DiagnosticsType& diagnostics, Memory& memory,
                          DynamicTagMatch<ElfDynTag::kSymEnt> tag, size_type val) {
     return val == sizeof(typename Elf::Sym) ||
-           diagnostics.FormatError("incorrect DT_SYMENT value"sv, val);
+           diagnostics.FormatError("incorrect DT_SYMENT value "sv, val);
   }
 
   template <class DiagnosticsType, class Memory>

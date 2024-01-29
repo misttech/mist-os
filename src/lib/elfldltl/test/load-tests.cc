@@ -38,7 +38,7 @@ TYPED_TEST(ElfldltlLoadTests, FailToAdd) {
   elfldltl::LoadInfo<Elf, elfldltl::StaticVector<0>::Container> load_info;
 
   Phdr phdr{.memsz = 1};
-  EXPECT_FALSE(load_info.AddSegment(error.diag(), kPageSize, phdr));
+  EXPECT_FALSE(load_info.AddSegment(error, kPageSize, phdr));
 }
 
 TYPED_TEST(ElfldltlLoadTests, AddEmptyPhdr) {
@@ -414,7 +414,7 @@ TYPED_TEST(ElfldltlLoadTests, ApplyRelroMissing) {
   {
     ASSERT_EQ(load_info.segments().size(), 0u);
     ExpectedSingleError expected("PT_GNU_RELRO not in any data segment");
-    EXPECT_TRUE(load_info.ApplyRelro(expected.diag(), phdrs[1], kPageSize, false));
+    EXPECT_TRUE(load_info.ApplyRelro(expected, phdrs[1], kPageSize, false));
   }
 
   EXPECT_TRUE(elfldltl::DecodePhdrs(diag, cpp20::span<const Phdr>(phdrs),
@@ -423,7 +423,7 @@ TYPED_TEST(ElfldltlLoadTests, ApplyRelroMissing) {
   {
     ASSERT_EQ(load_info.segments().size(), 1u);
     ExpectedSingleError expected("PT_GNU_RELRO not in any data segment");
-    EXPECT_TRUE(load_info.ApplyRelro(expected.diag(), phdrs[1], kPageSize, false));
+    EXPECT_TRUE(load_info.ApplyRelro(expected, phdrs[1], kPageSize, false));
   }
 }
 
@@ -449,7 +449,7 @@ TYPED_TEST(ElfldltlLoadTests, ApplyRelroBadStart) {
                                     load_info.GetPhdrObserver(kPageSize)));
 
   ExpectedSingleError expected("PT_GNU_RELRO not at segment start");
-  EXPECT_TRUE(load_info.ApplyRelro(expected.diag(), phdrs[1], kPageSize, false));
+  EXPECT_TRUE(load_info.ApplyRelro(expected, phdrs[1], kPageSize, false));
 }
 
 TYPED_TEST(ElfldltlLoadTests, ApplyRelroTooManyLoads) {
@@ -472,7 +472,7 @@ TYPED_TEST(ElfldltlLoadTests, ApplyRelroTooManyLoads) {
   ASSERT_EQ(load_info.segments().size(), 1u);
 
   auto expected = ExpectedSingleError("too many PT_LOAD segments", ": maximum 1 < requested ", 2);
-  load_info.ApplyRelro(expected.diag(), phdrs[1], kPageSize, false);
+  load_info.ApplyRelro(expected, phdrs[1], kPageSize, false);
 }
 
 using SomeLI = elfldltl::LoadInfo<elfldltl::Elf<>, elfldltl::StdContainer<std::vector>::Container>;

@@ -9,7 +9,6 @@
 #include <lib/elfldltl/testing/typed-test.h>
 #include <lib/elfldltl/tls-layout.h>
 
-#include <string_view>
 #include <tuple>
 #include <type_traits>
 
@@ -18,6 +17,7 @@
 namespace {
 
 using elfldltl::testing::ExpectedSingleError;
+using elfldltl::testing::ExpectOkDiagnostics;
 
 using Elf32Little = elfldltl::Elf32<elfldltl::ElfData::k2Lsb>;
 using Elf64Little = elfldltl::Elf64<elfldltl::ElfData::k2Lsb>;
@@ -142,7 +142,7 @@ struct EhdrTests {
   static_assert(!kBadMagic.Valid());
   static void BadMagicDiagnostic() {
     ExpectedSingleError expected{"not an ELF file"};
-    EXPECT_FALSE(kBadMagic.Valid(expected.diag()));
+    EXPECT_FALSE(kBadMagic.Valid(expected));
   }
 
   static constexpr typename Elf::Ehdr kBadIdentVersion = {
@@ -156,7 +156,7 @@ struct EhdrTests {
   static_assert(!kBadIdentVersion.Valid());
   static void BadIdentVersionDiagnostic() {
     ExpectedSingleError expected{"wrong EI_VERSION value"};
-    EXPECT_FALSE(kBadIdentVersion.Valid(expected.diag()));
+    EXPECT_FALSE(kBadIdentVersion.Valid(expected));
   }
 
   static constexpr typename Elf::Ehdr kBadVersion = {
@@ -170,7 +170,7 @@ struct EhdrTests {
   static_assert(!kBadVersion.Valid());
   static void BadVersionDiagnostic() {
     ExpectedSingleError expected{"wrong e_version value"};
-    EXPECT_FALSE(kBadVersion.Valid(expected.diag()));
+    EXPECT_FALSE(kBadVersion.Valid(expected));
   }
 
   static constexpr typename Elf::Ehdr kBadSize = {
@@ -185,7 +185,7 @@ struct EhdrTests {
   static_assert(!kBadSize.Valid());
   static void BadSizeDiagnostic() {
     ExpectedSingleError expected{"wrong e_ehsize value"};
-    EXPECT_FALSE(kBadSize.Valid(expected.diag()));
+    EXPECT_FALSE(kBadSize.Valid(expected));
   }
 
   static constexpr typename Elf::Ehdr kBadClass = {
@@ -199,7 +199,7 @@ struct EhdrTests {
   static_assert(!kBadClass.Valid());
   static void BadClassDiagnostic() {
     ExpectedSingleError expected{"wrong ELF class (bit-width)"};
-    EXPECT_FALSE(kBadClass.Valid(expected.diag()));
+    EXPECT_FALSE(kBadClass.Valid(expected));
   }
 
   static constexpr auto kNotMyClass = Elf::kClass == elfldltl::ElfClass::k64  //
@@ -217,7 +217,7 @@ struct EhdrTests {
   static_assert(!kWrongClass.Valid());
   static void WrongClassDiagnostic() {
     ExpectedSingleError expected{"wrong ELF class (bit-width)"};
-    EXPECT_FALSE(kWrongClass.Valid(expected.diag()));
+    EXPECT_FALSE(kWrongClass.Valid(expected));
   }
 
   static constexpr typename Elf::Ehdr kBadData = {
@@ -231,7 +231,7 @@ struct EhdrTests {
   static_assert(!kBadData.Valid());
   static void BadDataDiagnostic() {
     ExpectedSingleError expected{"wrong byte order"};
-    EXPECT_FALSE(kBadData.Valid(expected.diag()));
+    EXPECT_FALSE(kBadData.Valid(expected));
   }
 
   static constexpr auto kNotMyData = Elf::kData == elfldltl::ElfData::k2Lsb  //
@@ -249,7 +249,7 @@ struct EhdrTests {
   static_assert(!kWrongData.Valid());
   static void WrongDataDiagnostic() {
     ExpectedSingleError expected{"wrong byte order"};
-    EXPECT_FALSE(kWrongData.Valid(expected.diag()));
+    EXPECT_FALSE(kWrongData.Valid(expected));
   }
 
   static constexpr typename Elf::Ehdr kExec = {
@@ -265,12 +265,12 @@ struct EhdrTests {
   static_assert(kExec.Valid());
   static_assert(!kExec.Loadable(Machine));
   static void ExecDiagnostic() {
-    ExpectedSingleError expected_valid;
-    EXPECT_TRUE(kExec.Valid(expected_valid.diag()));
+    ExpectOkDiagnostics expected_valid;
+    EXPECT_TRUE(kExec.Valid(expected_valid));
     ExpectedSingleError expected_loadable{
         "loading ET_EXEC files is not supported, only ET_DYN files;"
         " be sure to compile and link as PIE (-fPIE, -pie)"};
-    EXPECT_FALSE(kExec.Loadable(expected_loadable.diag(), Machine));
+    EXPECT_FALSE(kExec.Loadable(expected_loadable, Machine));
   }
 
   static constexpr typename Elf::Ehdr kDyn = {
@@ -286,9 +286,9 @@ struct EhdrTests {
   static_assert(kDyn.Valid());
   static_assert(kDyn.Loadable(Machine));
   static void DynDiagnostic() {
-    ExpectedSingleError expected;
-    EXPECT_TRUE(kDyn.Valid(expected.diag()));
-    EXPECT_TRUE(kDyn.Loadable(expected.diag(), Machine));
+    ExpectOkDiagnostics expected;
+    EXPECT_TRUE(kDyn.Valid(expected));
+    EXPECT_TRUE(kDyn.Loadable(expected, Machine));
   }
 
   static constexpr typename Elf::Ehdr kCore = {
@@ -304,10 +304,10 @@ struct EhdrTests {
   static_assert(kCore.Valid());
   static_assert(!kCore.Loadable(Machine));
   static void CoreDiagnostic() {
-    ExpectedSingleError expected_valid;
-    EXPECT_TRUE(kCore.Valid(expected_valid.diag()));
+    ExpectOkDiagnostics expected_valid;
+    EXPECT_TRUE(kCore.Valid(expected_valid));
     ExpectedSingleError expected_loadable{"ET_CORE files cannot be loaded"};
-    EXPECT_FALSE(kCore.Loadable(expected_loadable.diag(), Machine));
+    EXPECT_FALSE(kCore.Loadable(expected_loadable, Machine));
   }
 
   static constexpr typename Elf::Ehdr kWrongMachine = {
@@ -323,10 +323,10 @@ struct EhdrTests {
   static_assert(kWrongMachine.Valid());
   static_assert(!kWrongMachine.Loadable(Machine));
   static void WrongMachineDiagnostic() {
-    ExpectedSingleError expected_valid;
-    EXPECT_TRUE(kWrongMachine.Valid(expected_valid.diag()));
+    ExpectOkDiagnostics expected_valid;
+    EXPECT_TRUE(kWrongMachine.Valid(expected_valid));
     ExpectedSingleError expected_loadable{"wrong e_machine for architecture"};
-    EXPECT_FALSE(kWrongMachine.Loadable(expected_loadable.diag(), Machine));
+    EXPECT_FALSE(kWrongMachine.Loadable(expected_loadable, Machine));
   }
 
   static void DiagnosticsTests() {

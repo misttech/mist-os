@@ -61,7 +61,7 @@ TEST(ElfldltlSegmentWithVmoTests, GetMutableMemoryCtor) {
         ": ",
         elfldltl::ZirconError{ZX_ERR_BAD_HANDLE},
     };
-    auto result = default_constructed(expected_error.diag(), segment);
+    auto result = default_constructed(expected_error, segment);
     ASSERT_TRUE(result.is_error());
     // ExpectedSingleError always says keep going.
     EXPECT_TRUE(result.error_value());

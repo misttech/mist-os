@@ -110,7 +110,7 @@ TEST(ElfldltlContainerTests, StaticVectorCtor) {
   {
     ExpectedSingleError expected("error", ": maximum 10 < requested ", 11);
     elfldltl::StaticVector<10>::Container<int> list{
-        expected.diag(), "error", {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10}};
+        expected, "error", {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10}};
   }
 }
 
@@ -238,7 +238,7 @@ TEST(ElfldltlContainerTests, StaticVectorInsert) {
 
     auto insert_range = {-4, -3, -2, -1};
     auto it_or_err =
-        list.insert(error.diag(), "error", list.begin(), insert_range.begin(), insert_range.end());
+        list.insert(error, "error", list.begin(), insert_range.begin(), insert_range.end());
     EXPECT_FALSE(it_or_err);
     auto expected = {0, 1, 2, 3, 4, 5, 6, 7};
     EXPECT_TRUE(std::equal(list.begin(), list.end(), expected.begin()));
@@ -275,7 +275,7 @@ TEST(ElfldltlContainerTests, StaticVectorResize) {
     auto diag = ExpectOkDiagnostics();
     elfldltl::StaticVector<10>::Container<int> list{diag, "", {0, 1, 2, 3, 4}};
     ExpectedSingleError error("error", ": maximum 10 < requested ", 13);
-    list.resize(error.diag(), "error", 13);
+    list.resize(error, "error", 13);
     auto expected = {0, 1, 2, 3, 4};
     EXPECT_TRUE(std::equal(list.begin(), list.end(), expected.begin()));
   }
@@ -349,7 +349,7 @@ TEST(ElfldltlContainerTests, StaticVectorCorrectlyMoves) {
   }
   EXPECT_EQ(diag.errors() + diag.warnings(), 0u);
 
-  list.emplace(expected.diag(), "error", list.begin());
+  list.emplace(expected, "error", list.begin());
 
   for (int i = 0; i < 10; i++) {
     list.erase(list.begin());
@@ -377,7 +377,7 @@ TEST(ElfldltlContainerTests, PreallocatedVectorStaticExtent) {
 
   {
     ExpectedSingleError expected("error", ": maximum 5 < requested ", 6);
-    vec.emplace_back(expected.diag(), "error", 1);
+    vec.emplace_back(expected, "error", 1);
   }
 }
 
@@ -407,7 +407,7 @@ TEST(ElfldltlContainerTests, PreallocatedVectorDynamicExtent) {
 
   {
     ExpectedSingleError expected("error", ": maximum", 5, " < requested", 6);
-    vec.emplace_back(expected.diag(), "error", 1);
+    vec.emplace_back(expected, "error", 1);
   }
 }
 

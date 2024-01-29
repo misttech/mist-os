@@ -21,6 +21,7 @@ namespace {
 
 using elfldltl::testing::ExpectedErrorList;
 using elfldltl::testing::ExpectedSingleError;
+using elfldltl::testing::ExpectReport;
 
 TEST(ElfldltlDiagnosticsTests, PrintfDiagnosticsReport) {
   std::array<char, 200> buffer{};
@@ -180,52 +181,53 @@ TEST(ElfldltlDiagnosticsTests, Ostream) {
 }
 
 template <size_t... Args>
-auto CreateExpect(std::index_sequence<Args...>) {
+constexpr auto CreateExpect(std::index_sequence<Args...>) {
   return ExpectedSingleError{"error ", Args...};
 }
 
 template <typename Diag, size_t... Args>
-auto CreateError(Diag& diag, std::index_sequence<Args...>) {
+constexpr auto CreateError(Diag& diag, std::index_sequence<Args...>) {
   diag.FormatError("error ", Args...);
 }
 
 TEST(ElfldltlDiagnosticsTests, FormatErrorVariadic) {
   {
     ExpectedSingleError expected("abc ", 123ull, " --- ", 45678910);
-    expected.diag().FormatError("abc ", 123ull, " --- ", 45678910);
+    expected.FormatError("abc ", 123ull, " --- ", 45678910);
   }
   {
     auto expected = CreateExpect(std::make_index_sequence<20>{});
-    CreateError(expected.diag(), std::make_index_sequence<20>{});
+    CreateError(expected, std::make_index_sequence<20>{});
   }
 }
 
 TEST(ElfldltlDiagnosticsTests, ResourceLimit) {
   {
     ExpectedSingleError expected("error", ": maximum 501 < requested ", 723);
-    expected.diag().ResourceLimit<501>("error", 723);
+    expected.ResourceLimit<501>("error", 723);
   }
 }
 
-TEST(ElfldltlDiagnosticsTests,
-     SystemError){{ExpectedSingleError expected("error", elfldltl::PosixError{EPERM});
-expected.diag().SystemError("error", elfldltl::PosixError{EPERM});
-}
+TEST(ElfldltlDiagnosticsTests, SystemError) {
+  {
+    ExpectedSingleError expected("error", elfldltl::PosixError{EPERM});
+    expected.SystemError("error", elfldltl::PosixError{EPERM});
+  }
 #ifdef __Fuchsia__
-{
-  ExpectedSingleError expected("error", elfldltl::ZirconError{ZX_ERR_NOT_SUPPORTED});
-  expected.diag().SystemError("error", elfldltl::ZirconError{ZX_ERR_NOT_SUPPORTED});
-}
+  {
+    ExpectedSingleError expected("error", elfldltl::ZirconError{ZX_ERR_NOT_SUPPORTED});
+    expected.SystemError("error", elfldltl::ZirconError{ZX_ERR_NOT_SUPPORTED});
+  }
 #endif
 }
 
 TEST(ElfldltlDiagnosticsTests, ExpectedErrorList) {
   ExpectedErrorList expected{
-      ExpectedSingleError{"abc ", 123},
-      ExpectedSingleError{"def ", 456},
+      ExpectReport{"abc ", 123},
+      ExpectReport{"def ", 456},
   };
-  expected.diag().FormatError("abc ", 123);
-  expected.diag().FormatError("def ", 456);
+  expected.FormatError("abc ", 123);
+  expected.FormatError("def ", 456);
 }
 
 }  // namespace

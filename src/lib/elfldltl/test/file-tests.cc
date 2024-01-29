@@ -134,10 +134,10 @@ class ElfldltlFileTests : public TestFile {
     };
   }
 
-  using InvalidFdDiagnostics = std::decay_t<decltype(MakeExpectedInvalidFd().diag())>;
+  using InvalidFdDiagnostics = decltype(MakeExpectedInvalidFd());
   using InvalidFdFileT = typename TestFile::template FileT<InvalidFdDiagnostics>;
 
-  using EofDiagnostics = std::decay_t<decltype(MakeExpectedEof().diag())>;
+  using EofDiagnostics = decltype(MakeExpectedEof());
   using EofFileT = typename TestFile::template FileT<EofDiagnostics>;
 };
 
@@ -145,7 +145,7 @@ TYPED_TEST_SUITE(ElfldltlFileTests, FileTypes);
 
 TYPED_TEST(ElfldltlFileTests, InvalidFd) {
   auto expected = TestFixture::MakeExpectedInvalidFd();
-  typename TestFixture::InvalidFdFileT file{expected.diag()};
+  typename TestFixture::InvalidFdFileT file{expected};
 
   std::optional<int> got = file.template ReadFromFile<int>(0);
   EXPECT_FALSE(got);
@@ -153,7 +153,7 @@ TYPED_TEST(ElfldltlFileTests, InvalidFd) {
 
 TYPED_TEST(ElfldltlFileTests, Eof) {
   auto expected = TestFixture::MakeExpectedEof();
-  typename TestFixture::EofFileT file{this->GetHandle(), expected.diag()};
+  typename TestFixture::EofFileT file{this->GetHandle(), expected};
 
   std::optional<int> got = file.template ReadFromFile<int>(0);
   EXPECT_EQ(got, std::nullopt);
@@ -213,7 +213,7 @@ TYPED_TEST(ElfldltlFileTests, Assignment) {
   };
 
   if constexpr (TestFixture::kDestroysHandle) {
-    test_assignment(TestFixture::MakeExpectedInvalidFd().diag());
+    test_assignment(TestFixture::MakeExpectedInvalidFd());
   } else {
     test_assignment(elfldltl::testing::ExpectOkDiagnostics());
   }

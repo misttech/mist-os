@@ -169,13 +169,13 @@ TYPED_TEST(ElfldltlLoadInfoMutableMemoryTests, NoGet) {
 
   {
     auto bad_addr = bad_addr_diag(kRodataAddr);
-    elfldltl::LoadInfoMutableMemory memory{bad_addr.diag(), load_info, get_mutable_memory};
+    elfldltl::LoadInfoMutableMemory memory{bad_addr, load_info, get_mutable_memory};
     ASSERT_TRUE(memory.Init());
     EXPECT_TRUE(memory.template Store<size_type>(kRodataAddr, 0x1234));
   }
   {
     auto bad_addr = bad_addr_diag(kCodeAddr);
-    elfldltl::LoadInfoMutableMemory memory{bad_addr.diag(), load_info, get_mutable_memory};
+    elfldltl::LoadInfoMutableMemory memory{bad_addr, load_info, get_mutable_memory};
     ASSERT_TRUE(memory.Init());
     EXPECT_TRUE(memory.template Store<size_type>(kCodeAddr, 0x5678));
   }
@@ -185,14 +185,14 @@ TYPED_TEST(ElfldltlLoadInfoMutableMemoryTests, NoGet) {
   {
     constexpr uintptr_t kBoundary = kRelroStart - (sizeof(size_type) / 2);
     auto bad_addr = bad_addr_diag(kBoundary);
-    elfldltl::LoadInfoMutableMemory memory{bad_addr.diag(), load_info, get_mutable_memory};
+    elfldltl::LoadInfoMutableMemory memory{bad_addr, load_info, get_mutable_memory};
     ASSERT_TRUE(memory.Init());
     EXPECT_TRUE(memory.template Store<size_type>(kBoundary, 0x1234));
   }
   {
     constexpr uintptr_t kBoundary = kDataStart - (sizeof(size_type) / 2);
     auto bad_addr = bad_addr_diag(kBoundary);
-    elfldltl::LoadInfoMutableMemory memory{bad_addr.diag(), load_info, get_mutable_memory};
+    elfldltl::LoadInfoMutableMemory memory{bad_addr, load_info, get_mutable_memory};
     ASSERT_TRUE(memory.Init());
     EXPECT_TRUE(memory.template Store<size_type>(kBoundary, 0x1234));
   }

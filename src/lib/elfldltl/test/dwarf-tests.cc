@@ -162,7 +162,7 @@ TYPED_TEST(ElfldltlDwarfTests, SectionDataReadFail) {
         " too small for DWARF header",
         kErrorArg,
     };
-    auto read = elfldltl::dwarf::SectionData::Read<Elf>(expected.diag(), kNoBytes, kErrorArg);
+    auto read = elfldltl::dwarf::SectionData::Read<Elf>(expected, kNoBytes, kErrorArg);
     EXPECT_FALSE(read);
   }
 
@@ -175,8 +175,8 @@ TYPED_TEST(ElfldltlDwarfTests, SectionDataReadFail) {
         " too small for DWARF header",
         kErrorArg,
     };
-    auto read = elfldltl::dwarf::SectionData::Read<Elf>(expected.diag(),
-                                                        AsBytes(kTooShortForHeader), kErrorArg);
+    auto read =
+        elfldltl::dwarf::SectionData::Read<Elf>(expected, AsBytes(kTooShortForHeader), kErrorArg);
     EXPECT_FALSE(read);
   }
 
@@ -194,8 +194,8 @@ TYPED_TEST(ElfldltlDwarfTests, SectionDataReadFail) {
         " too small for DWARF header",
         kErrorArg,
     };
-    auto read = elfldltl::dwarf::SectionData::Read<Elf>(expected.diag(),
-                                                        AsBytes(kTooShortForHeader64), kErrorArg);
+    auto read =
+        elfldltl::dwarf::SectionData::Read<Elf>(expected, AsBytes(kTooShortForHeader64), kErrorArg);
     EXPECT_FALSE(read);
   }
 
@@ -209,8 +209,7 @@ TYPED_TEST(ElfldltlDwarfTests, SectionDataReadFail) {
         " used in DWARF header",
         kErrorArg,
     };
-    auto read =
-        elfldltl::dwarf::SectionData::Read<Elf>(expected.diag(), AsBytes(kReserved), kErrorArg);
+    auto read = elfldltl::dwarf::SectionData::Read<Elf>(expected, AsBytes(kReserved), kErrorArg);
     EXPECT_FALSE(read);
   }
 
@@ -220,8 +219,8 @@ TYPED_TEST(ElfldltlDwarfTests, SectionDataReadFail) {
     elfldltl::testing::ExpectedSingleError expected{
         "data size ", 4, " < ", 5, " required by DWARF header", kErrorArg,
     };
-    auto read = elfldltl::dwarf::SectionData::Read<Elf>(expected.diag(),
-                                                        AsBytes(kTooShortForLength), kErrorArg);
+    auto read =
+        elfldltl::dwarf::SectionData::Read<Elf>(expected, AsBytes(kTooShortForLength), kErrorArg);
     EXPECT_FALSE(read);
   }
 
@@ -231,8 +230,8 @@ TYPED_TEST(ElfldltlDwarfTests, SectionDataReadFail) {
     elfldltl::testing::ExpectedSingleError expected{
         "data size ", 12, " < ", 13, " required by DWARF header", kErrorArg,
     };
-    auto read = elfldltl::dwarf::SectionData::Read<Elf>(expected.diag(),
-                                                        AsBytes(kTooShortForLength64), kErrorArg);
+    auto read =
+        elfldltl::dwarf::SectionData::Read<Elf>(expected, AsBytes(kTooShortForLength64), kErrorArg);
     EXPECT_FALSE(read);
   }
 }

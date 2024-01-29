@@ -348,7 +348,7 @@ TYPED_TEST(ElfldltlResolveTests, GnuUniqueError) {
   ASSERT_NE(a, nullptr);
 
   cpp20::span modules{&module, 1};
-  auto resolve = elfldltl::MakeSymbolResolver(module, modules, expected.diag(), kNoTlsdesc<Elf>);
+  auto resolve = elfldltl::MakeSymbolResolver(module, modules, expected, kNoTlsdesc<Elf>);
   auto found = resolve(*a, elfldltl::RelocateTls::kNone);
   EXPECT_FALSE(found);
 }
@@ -366,8 +366,7 @@ TYPED_TEST(ElfldltlResolveTests, Undefined) {
 
   elfldltl::SymbolInfoForSingleLookup<Elf> si{"noexist"};
   TestModule lookup_module{si};
-  auto resolve =
-      elfldltl::MakeSymbolResolver(lookup_module, modules, expected.diag(), kNoTlsdesc<Elf>);
+  auto resolve = elfldltl::MakeSymbolResolver(lookup_module, modules, expected, kNoTlsdesc<Elf>);
   auto found = resolve(si.symbol(), elfldltl::RelocateTls::kNone);
   ASSERT_FALSE(found);
 }
