@@ -6,58 +6,57 @@ use linux_uapi::{bpf_insn, c_void, sock_filter};
 
 use crate::{
     converter::cbpf_to_ebpf,
-    ubpf::{ubpf_create, ubpf_destroy, ubpf_exec, ubpf_load, ubpf_vm},
+    ubpf::{ubpf_create, ubpf_destroy, ubpf_exec, ubpf_load, ubpf_register, ubpf_vm},
     UbpfError::*,
 };
 
 // This file contains wrapper logic to build programs and execute
 // them in the ubpf VM.
 
-/// An abstraction over the ubpf VM.  Users will generally not need to
-/// access this: they should use EbpfProgram below.
 #[derive(Debug)]
-struct UbpfVm {
-    // The bpf vm used to run the program.  ubpf enforces that there is one program per vm.
-    // We make the assumption that ubpf_vms are immutable after loading the code into them.
-    // This implies that this API does not support reloading code.
-    opaque_vm: *mut ubpf_vm,
-
-    program: Vec<bpf_insn>,
+pub struct UbpfVmBuilder {
+    vm: *mut ubpf_vm,
 }
 
-unsafe impl Send for UbpfVm {}
-unsafe impl Sync for UbpfVm {}
-
-#[derive(thiserror::Error, Debug)]
-pub enum UbpfError {
-    #[error("Unable to create VM")]
-    VmInitialization,
-
-    #[error("Verification error loading program: {0}")]
-    ProgramLoadError(String),
-
-    #[error("VM error loading program: {0}")]
-    VmLoadError(String),
-
-    #[error("Unknown CBPF {element_type} {value} for {op}")]
-    UnrecognizedCbpfError { element_type: String, value: String, op: String },
-
-    #[error("Scratch buffer overrun: Starnix only supports 3 scratch memory locations")]
-    ScratchBufferOverflow,
+extern "C" fn ubpf_stub_callback() {
+    panic!("BPF program called a stub callback.");
 }
 
-impl UbpfVm {
-    // Return a fresh VM, ready for action.
-    fn init(mut code: Vec<bpf_insn>) -> Result<Self, UbpfError> {
+impl UbpfVmBuilder {
+    pub fn new() -> Result<Self, UbpfError> {
         let vm = unsafe { ubpf_create() };
         if vm == std::ptr::null_mut() {
             return Err(VmInitialization);
         }
+        Ok(UbpfVmBuilder { vm })
+    }
 
+    // This function signature will need more parameters eventually. The client needs to be able to
+    // supply a real callback and it's type. The callback will be needed to actually call the
+    // callback. The type will be needed for the verifier.
+    pub fn register(&self, index: u32, name: &'static str) -> Result<(), UbpfError> {
+        let success = unsafe {
+            ubpf_register(
+                self.vm,
+                index,
+                name.as_ptr() as *const std::os::raw::c_char,
+                ubpf_stub_callback as *mut std::os::raw::c_void,
+            )
+        };
+        if success != 0 {
+            return Err(VmRegisterError(
+                format!("Unable to register callback {} ({}) with error {}", index, name, success)
+                    .to_string(),
+            ));
+        }
+        Ok(())
+    }
+
+    pub fn load(self, mut code: Vec<bpf_insn>) -> Result<UbpfVm, UbpfError> {
         unsafe {
             let mut errmsg = std::ptr::null_mut();
             let success = ubpf_load(
-                vm,
+                self.vm,
                 code.as_mut_ptr() as *mut c_void,
                 (code.len() * std::mem::size_of::<bpf_insn>()) as u32,
                 &mut errmsg,
@@ -78,10 +77,48 @@ impl UbpfVm {
             }
         }
 
-        Ok(UbpfVm { opaque_vm: vm, program: code })
+        Ok(UbpfVm { opaque_vm: self.vm, _code: code })
     }
+}
 
-    fn run<T>(&self, data: &mut T) -> Result<u64, i32> {
+/// An abstraction over the ubpf VM.  Users will generally not need to
+/// access this: they should use EbpfProgram below.
+#[derive(Debug)]
+pub struct UbpfVm {
+    // The bpf vm used to run the program.  ubpf enforces that there is one program per vm.
+    // We make the assumption that ubpf_vms are immutable after loading the code into them.
+    // This implies that this API does not support reloading code.
+    opaque_vm: *mut ubpf_vm,
+
+    _code: Vec<bpf_insn>,
+}
+
+unsafe impl Send for UbpfVm {}
+unsafe impl Sync for UbpfVm {}
+
+#[derive(thiserror::Error, Debug)]
+pub enum UbpfError {
+    #[error("Unable to create VM")]
+    VmInitialization,
+
+    #[error("VM error registering callback: {0}")]
+    VmRegisterError(String),
+
+    #[error("Verification error loading program: {0}")]
+    ProgramLoadError(String),
+
+    #[error("VM error loading program: {0}")]
+    VmLoadError(String),
+
+    #[error("Unknown CBPF {element_type} {value} for {op}")]
+    UnrecognizedCbpfError { element_type: String, value: String, op: String },
+
+    #[error("Scratch buffer overrun: Starnix only supports 3 scratch memory locations")]
+    ScratchBufferOverflow,
+}
+
+impl UbpfVm {
+    pub fn run<T>(&self, data: &mut T) -> Result<u64, i32> {
         let data_size: usize = std::mem::size_of::<T>();
         let mut bpf_return_value: u64 = 0;
         let status = unsafe {
@@ -102,16 +139,17 @@ impl UbpfVm {
 }
 
 /// An EbpfProgram represents a program loaded in a ubpf VM.
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct EbpfProgram {
     // The program is stored by this UbpfVm
-    bpf_vm: UbpfVm,
+    vm: UbpfVm,
 }
 
 impl EbpfProgram {
     /// This method instantiates an EbpfProgram given ebpf instructions.
     pub fn new(code: Vec<bpf_insn>) -> Result<Self, UbpfError> {
-        Ok(EbpfProgram { bpf_vm: UbpfVm::init(code)? })
+        let builder = UbpfVmBuilder::new()?;
+        Ok(EbpfProgram { vm: builder.load(code)? })
     }
 
     /// This method instantiates an EbpfProgram given a cbpf original.
@@ -126,13 +164,7 @@ impl EbpfProgram {
     /// function.  The translated CBPF program will use the last 16
     /// words of |data|.
     pub fn run<T>(&self, data: &mut T) -> Result<u64, i32> {
-        self.bpf_vm.run(data)
-    }
-}
-
-impl Clone for UbpfVm {
-    fn clone(&self) -> UbpfVm {
-        UbpfVm::init(self.program.clone()).unwrap()
+        self.vm.run(data)
     }
 }
 

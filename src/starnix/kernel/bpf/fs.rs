@@ -10,9 +10,9 @@ use crate::{
     vfs::{
         buffers::{InputBuffer, OutputBuffer},
         fileops_impl_nonseekable, fs_node_impl_not_dir, fs_node_impl_xattr_delegate, CacheMode,
-        FileObject, FileOps, FileSystem, FileSystemHandle, FileSystemOps, FileSystemOptions,
-        FsNode, FsNodeHandle, FsNodeInfo, FsNodeOps, FsStr, FsString, MemoryDirectoryFile,
-        MemoryXattrStorage, NamespaceNode, XattrOp,
+        FdNumber, FileObject, FileOps, FileSystem, FileSystemHandle, FileSystemOps,
+        FileSystemOptions, FsNode, FsNodeHandle, FsNodeInfo, FsNodeOps, FsStr, FsString,
+        MemoryDirectoryFile, MemoryXattrStorage, NamespaceNode, XattrOp,
     },
 };
 use starnix_logging::track_stub;
@@ -21,7 +21,7 @@ use starnix_uapi::{
     as_any::AsAny,
     auth::FsCred,
     device_type::DeviceType,
-    error,
+    errno, error,
     errors::Errno,
     file_mode::{mode, FileMode},
     open_flags::OpenFlags,
@@ -83,6 +83,15 @@ impl BpfHandle {
     pub fn downcast<T: BpfObject>(&self) -> Option<&T> {
         (*self.0).as_any().downcast_ref::<T>()
     }
+}
+
+pub fn get_bpf_fd(current_task: &CurrentTask, fd: FdNumber) -> Result<BpfHandle, Errno> {
+    Ok(current_task
+        .files
+        .get(fd)?
+        .downcast_file::<BpfHandle>()
+        .ok_or_else(|| errno!(EBADF))?
+        .clone())
 }
 
 pub struct BpfFs;

@@ -26,9 +26,12 @@ PATH="$PWD/prebuilt/third_party/rust/linux-x64/bin:$PATH" \
   --with-derive-default \
   --explicit-padding \
   --allowlist-function "ubpf_.*" \
+  --allowlist-item "EBPF_.*" \
   --raw-line "${RAW_LINES}" \
   -o src/starnix/lib/ubpf/src/ubpf.rs \
   src/starnix/lib/ubpf/wrapper.h \
   -- \
+  -I . \
   -I third_party/android/platform/bionic/libc/include/ \
-  -I third_party/ubpf/vm/inc
+  -I third_party/ubpf/src/vm/inc \
+  -I out/default/gen/third_party/ubpf

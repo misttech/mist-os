@@ -9,7 +9,8 @@
 //! is a Linux extension of BPF that allows hooking BPF programs into many different
 //! non-networking-related contexts.
 
+mod map;
+mod program;
+
 pub mod fs;
-pub mod map;
-pub mod program;
 pub mod syscalls;

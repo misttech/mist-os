@@ -7,4 +7,6 @@
 
 #include <ubpf.h>
 
+#include "third_party/ubpf/src/vm/ebpf.h"
+
 #endif  // SRC_STARNIX_LIB_UBPF_WRAPPER_H_

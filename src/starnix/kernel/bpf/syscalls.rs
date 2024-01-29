@@ -7,7 +7,7 @@
 
 use crate::{
     bpf::{
-        fs::{get_selinux_context, BpfFsDir, BpfFsObject, BpfHandle, BpfObject},
+        fs::{get_bpf_fd, get_selinux_context, BpfFsDir, BpfFsObject, BpfHandle, BpfObject},
         map::{Map, MapSchema, MapStore},
         program::Program,
     },
@@ -15,7 +15,7 @@ use crate::{
     task::CurrentTask,
     vfs::{Anon, FdFlags, FdNumber, LookupContext},
 };
-use starnix_logging::{log_error, log_trace, track_stub};
+use starnix_logging::{log_trace, track_stub};
 use starnix_sync::{Locked, OrderedMutex, Unlocked};
 use starnix_syscalls::{SyscallResult, SUCCESS};
 use starnix_uapi::{
@@ -32,7 +32,6 @@ use starnix_uapi::{
     user_address::{UserAddress, UserCString, UserRef},
     BPF_F_RDONLY_PROG, PATH_MAX,
 };
-use ubpf::program::EbpfProgram;
 use zerocopy::{AsBytes, FromBytes};
 
 /// Read the arguments for a BPF command. The ABI works like this: If the arguments struct
@@ -74,15 +73,6 @@ fn install_bpf_handle_fd(
     // All BPF FDs have the CLOEXEC flag turned on by default.
     let file = Anon::new_file(current_task, Box::new(handle), OpenFlags::CLOEXEC);
     Ok(current_task.add_file(file, FdFlags::CLOEXEC)?.into())
-}
-
-fn get_bpf_fd(current_task: &CurrentTask, fd: u32) -> Result<BpfHandle, Errno> {
-    Ok(current_task
-        .files
-        .get(FdNumber::from_raw(fd as i32))?
-        .downcast_file::<BpfHandle>()
-        .ok_or_else(|| errno!(EBADF))?
-        .clone())
 }
 
 struct BpfTypeFormat {
@@ -144,7 +134,8 @@ pub fn sys_bpf(
             }
             let elem_attr: bpf_attr__bindgen_ty_2 = read_attr(current_task, attr_addr, attr_size)?;
             log_trace!("BPF_MAP_LOOKUP_ELEM");
-            let map = get_bpf_fd(current_task, elem_attr.map_fd)?;
+            let map_fd = FdNumber::from_raw(elem_attr.map_fd as i32);
+            let map = get_bpf_fd(current_task, map_fd)?;
             let map = map.downcast::<Map>().ok_or_else(|| errno!(EINVAL))?;
 
             let key = current_task.read_memory_to_vec(
@@ -162,7 +153,8 @@ pub fn sys_bpf(
         bpf_cmd_BPF_MAP_UPDATE_ELEM => {
             let elem_attr: bpf_attr__bindgen_ty_2 = read_attr(current_task, attr_addr, attr_size)?;
             log_trace!("BPF_MAP_UPDATE_ELEM");
-            let map = get_bpf_fd(current_task, elem_attr.map_fd)?;
+            let map_fd = FdNumber::from_raw(elem_attr.map_fd as i32);
+            let map = get_bpf_fd(current_task, map_fd)?;
             let map = map.downcast::<Map>().ok_or_else(|| errno!(EINVAL))?;
 
             let flags = elem_attr.flags;
@@ -185,7 +177,8 @@ pub fn sys_bpf(
         bpf_cmd_BPF_MAP_GET_NEXT_KEY => {
             let elem_attr: bpf_attr__bindgen_ty_2 = read_attr(current_task, attr_addr, attr_size)?;
             log_trace!("BPF_MAP_GET_NEXT_KEY");
-            let map = get_bpf_fd(current_task, elem_attr.map_fd)?;
+            let map_fd = FdNumber::from_raw(elem_attr.map_fd as i32);
+            let map = get_bpf_fd(current_task, map_fd)?;
             let map = map.downcast::<Map>().ok_or_else(|| errno!(EINVAL))?;
             let key = if elem_attr.key != 0 {
                 let key = current_task.read_memory_to_vec(
@@ -212,12 +205,16 @@ pub fn sys_bpf(
             let user_code = UserRef::<bpf_insn>::new(UserAddress::from(prog_attr.insns));
             let code = current_task.read_objects_to_vec(user_code, prog_attr.insn_cnt as usize)?;
 
-            // We ignore any errors in loading the program at the moment.
-            let _program_result = EbpfProgram::new(code).map_err(|e| {
-                log_error!("Failed to load BPF program: {:?}", e);
-                errno!(EINVAL)
-            });
-            install_bpf_fd(current_task, Program {})
+            let program = if current_task.kernel().features.bpf_v2 {
+                Program::new(current_task, code)?
+            } else {
+                // We pretend to succeed at loading the program in the basic version of bpf.
+                // Eventually we'll be able to remove this stub when we can load bpf programs
+                // accurately.
+                Program::new_stub()
+            };
+
+            install_bpf_fd(current_task, program)
         }
 
         // Attach an eBPF program to a target_fd at the specified attach_type hook.
@@ -244,7 +241,8 @@ pub fn sys_bpf(
         bpf_cmd_BPF_OBJ_PIN => {
             let pin_attr: bpf_attr__bindgen_ty_5 = read_attr(current_task, attr_addr, attr_size)?;
             log_trace!("BPF_OBJ_PIN {:?}", pin_attr);
-            let object = get_bpf_fd(current_task, pin_attr.bpf_fd)?;
+            let bpf_fd = FdNumber::from_raw(pin_attr.bpf_fd as i32);
+            let object = get_bpf_fd(current_task, bpf_fd)?;
             let path_addr = UserCString::new(UserAddress::from(pin_attr.pathname));
             let pathname = current_task.read_c_string_to_vec(path_addr, PATH_MAX as usize)?;
             let (parent, basename) = current_task.lookup_parent_at(
@@ -283,9 +281,10 @@ pub fn sys_bpf(
             let mut get_info_attr: bpf_attr__bindgen_ty_9 =
                 read_attr(current_task, attr_addr, attr_size)?;
             log_trace!("BPF_OBJ_GET_INFO_BY_FD {:?}", get_info_attr);
-            let fd = get_bpf_fd(current_task, get_info_attr.bpf_fd)?;
+            let bpf_fd = FdNumber::from_raw(get_info_attr.bpf_fd as i32);
+            let object = get_bpf_fd(current_task, bpf_fd)?;
 
-            let mut info = if let Some(map) = fd.downcast::<Map>() {
+            let mut info = if let Some(map) = object.downcast::<Map>() {
                 bpf_map_info {
                     type_: map.schema.map_type,
                     id: 0, // not used by android as far as I can tell
@@ -297,7 +296,7 @@ pub fn sys_bpf(
                 }
                 .as_bytes()
                 .to_owned()
-            } else if let Some(_prog) = fd.downcast::<Program>() {
+            } else if let Some(_prog) = object.downcast::<Program>() {
                 #[allow(unknown_lints, clippy::unnecessary_struct_initialization)]
                 bpf_prog_info {
                     // Doesn't matter yet
