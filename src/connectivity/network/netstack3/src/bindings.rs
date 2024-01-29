@@ -125,10 +125,6 @@ mod ctx {
             Self { bindings_ctx, core_ctx }
         }
 
-        pub(crate) fn core_ctx(&self) -> &Arc<SyncCtx<BindingsCtx>> {
-            &self.core_ctx
-        }
-
         pub(crate) fn bindings_ctx(&self) -> &BindingsCtx {
             &self.bindings_ctx
         }
@@ -1199,7 +1195,7 @@ impl NetstackSeed {
             });
             let counters_ctx = netstack.ctx.clone();
             let counters = inspector.root().create_lazy_child("Counters", move || {
-                futures::future::ok(inspect::counters(&counters_ctx)).boxed()
+                futures::future::ok(inspect::counters(&mut counters_ctx.clone())).boxed()
             });
             (sockets, routes, devices, neighbors, counters)
         };

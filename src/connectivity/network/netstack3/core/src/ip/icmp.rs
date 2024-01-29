@@ -206,21 +206,35 @@ pub struct IcmpRxCountersInner {
     pub packet_too_big: Counter,
 }
 
+/// Receive NDP counters.
+#[derive(Default)]
+pub struct NdpRxCounters {
+    /// Count of neighbor solicitation messages received.
+    pub neighbor_solicitation: Counter,
+    /// Count of neighbor advertisement messages received.
+    pub neighbor_advertisement: Counter,
+    /// Count of router advertisement messages received.
+    pub router_advertisement: Counter,
+    /// Count of router solicitation messages received.
+    pub router_solicitation: Counter,
+}
+
+/// Transmit NDP counters.
+#[derive(Default)]
+pub struct NdpTxCounters {
+    /// Count of neighbor advertisement messages sent.
+    pub neighbor_advertisement: Counter,
+    /// Count of neighbor solicitation messages sent.
+    pub neighbor_solicitation: Counter,
+}
+
 /// Counters for NDP messages.
 #[derive(Default)]
 pub struct NdpCounters {
-    /// Count of neighbor solicitation messages received.
-    pub rx_neighbor_solicitation: Counter,
-    /// Count of neighbor advertisement messages received.
-    pub rx_neighbor_advertisement: Counter,
-    /// Count of router advertisement messages received.
-    pub rx_router_advertisement: Counter,
-    /// Count of router solicitation messages received.
-    pub rx_router_solicitation: Counter,
-    /// Count of neighbor advertisement messages sent.
-    pub tx_neighbor_advertisement: Counter,
-    /// Count of neighbor solicitation messages sent.
-    pub tx_neighbor_solicitation: Counter,
+    /// Receive counters.
+    pub rx: NdpRxCounters,
+    /// Transmit counters.
+    pub tx: NdpTxCounters,
 }
 
 impl<BC: BindingsContext, I: Ip> UnlockedAccess<crate::lock_ordering::IcmpTxCounters<I>>
@@ -1241,7 +1255,7 @@ fn send_neighbor_advertisement<
     device_addr: UnicastAddr<Ipv6Addr>,
     dst_ip: SpecifiedAddr<Ipv6Addr>,
 ) {
-    core_ctx.increment(|counters| &counters.tx_neighbor_advertisement);
+    core_ctx.increment(|counters| &counters.tx.neighbor_advertisement);
     debug!("send_neighbor_advertisement from {:?} to {:?}", device_addr, dst_ip);
     // We currently only allow the destination address to be:
     // 1) a unicast address.
@@ -1317,7 +1331,7 @@ fn receive_ndp_packet<
                 }
             };
 
-            core_ctx.increment(|counters| &counters.rx_neighbor_solicitation);
+            core_ctx.increment(|counters| &counters.rx.neighbor_solicitation);
 
             match src_ip {
                 Ipv6SourceAddr::Unspecified => {
@@ -1436,7 +1450,7 @@ fn receive_ndp_packet<
                 }
             };
 
-            core_ctx.increment(|counters| &counters.rx_neighbor_advertisement);
+            core_ctx.increment(|counters| &counters.rx.neighbor_advertisement);
 
             match Ipv6DeviceHandler::remove_duplicate_tentative_address(
                 core_ctx,
@@ -1533,7 +1547,7 @@ fn receive_ndp_packet<
                 Ipv6SourceAddr::Unspecified => return,
             };
 
-            core_ctx.increment(|counters| &counters.rx_router_advertisement);
+            core_ctx.increment(|counters| &counters.rx.router_advertisement);
 
             let ra = p.message();
 
@@ -2956,7 +2970,7 @@ mod tests {
             socket::testutil::{FakeDeviceConfig, FakeDualStackIpSocketCtx},
             testutil::DualStackSendIpPacketMeta,
             types::RoutableIpAddr,
-            IpCounters, SendIpPacketMeta,
+            IpCounters, IpLayerIpExt, SendIpPacketMeta,
         },
         state::StackStateBuilder,
         testutil::{assert_empty, Ctx, TestIpExt, FAKE_CONFIG_V4, FAKE_CONFIG_V6},
@@ -2972,7 +2986,7 @@ mod tests {
         FakeDeviceId,
     >;
 
-    impl<Inner, I: Ip, D> CounterContext<IpCounters<I>>
+    impl<Inner, I: IpLayerIpExt, D> CounterContext<IpCounters<I>>
         for Wrapped<
             Inner,
             FakeCoreCtx<FakeDualStackIpSocketCtx<D>, DualStackSendIpPacketMeta<D>, D>,

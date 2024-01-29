@@ -8,6 +8,7 @@ use net_types::ip::Ip;
 
 use crate::{
     context::{ContextPair as _, ContextProvider, CoreCtx, CtxPair, TimerHandler as _},
+    counters::CountersApi,
     device::{
         api::{DeviceAnyApi, DeviceApi},
         queue::api::{ReceiveQueueApi, TransmitQueueApi},
@@ -119,6 +120,12 @@ where
     pub fn receive_queue<D>(self) -> ReceiveQueueApi<D, CoreApiCtxPair<'a, BP>> {
         let Self(ctx) = self;
         ReceiveQueueApi::new(ctx)
+    }
+
+    /// Gets access to the counters API.
+    pub fn counters(self) -> CountersApi<CoreApiCtxPair<'a, BP>> {
+        let Self(ctx) = self;
+        CountersApi::new(ctx)
     }
 
     /// Handles a timer.

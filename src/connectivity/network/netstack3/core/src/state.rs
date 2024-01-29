@@ -14,7 +14,7 @@ use crate::{
         self,
         device::slaac::SlaacCounters,
         icmp::{IcmpRxCounters, IcmpTxCounters, NdpCounters},
-        IpCounters, Ipv4State, Ipv6State,
+        IpCounters, IpLayerIpExt, Ipv4State, Ipv6State,
     },
     sync::RwLock,
     transport::{self, udp::UdpCounters, TransportLayerState},
@@ -73,20 +73,12 @@ impl<BT: BindingsTypes> StackState<BT> {
         CoreApi::new(CtxPair { core_ctx: CoreCtx::new(self), bindings_ctx })
     }
 
-    pub(crate) fn ip_counters<I: Ip>(&self) -> &IpCounters<I> {
+    pub(crate) fn ip_counters<I: IpLayerIpExt>(&self) -> &IpCounters<I> {
         I::map_ip(
             IpInvariant(self),
             |IpInvariant(state)| state.ipv4.as_ref().counters(),
             |IpInvariant(state)| state.ipv6.as_ref().counters(),
         )
-    }
-
-    pub(crate) fn ipv4(&self) -> &Ipv4State<BT::Instant, DeviceId<BT>, BT::DeviceClass> {
-        &self.ipv4
-    }
-
-    pub(crate) fn ipv6(&self) -> &Ipv6State<BT::Instant, DeviceId<BT>, BT::DeviceClass> {
-        &self.ipv6
     }
 
     pub(crate) fn filter<I: packet_formats::ip::IpExt>(

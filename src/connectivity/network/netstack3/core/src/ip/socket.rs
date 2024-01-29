@@ -427,7 +427,7 @@ where
 }
 
 impl<
-        I: Ip + IpExt + IpDeviceStateIpExt,
+        I: IpLayerIpExt + IpDeviceStateIpExt,
         BC: IpSocketBindingsContext,
         CC: IpSocketContext<I, BC> + CounterContext<IpCounters<I>>,
     > IpSocketHandler<I, BC> for CC
@@ -974,20 +974,24 @@ pub(crate) mod testutil {
     #[derive(Derivative, GenericOverIp)]
     #[generic_over_ip(I, Ip)]
     #[derivative(Default(bound = ""))]
-    pub(crate) struct FakeIpSocketCtx<I: IpDeviceStateIpExt, D> {
+    pub(crate) struct FakeIpSocketCtx<I: IpLayerIpExt + IpDeviceStateIpExt, D> {
         pub(crate) table: ForwardingTable<I, D>,
         device_state: HashMap<D, IpDeviceState<FakeInstant, I>>,
         ip_forwarding_ctx: FakeIpForwardingCtx<D>,
         pub(crate) counters: IpCounters<I>,
     }
 
-    impl<I: IpDeviceStateIpExt, D> CounterContext<IpCounters<I>> for FakeIpSocketCtx<I, D> {
+    impl<I: IpLayerIpExt + IpDeviceStateIpExt, D> CounterContext<IpCounters<I>>
+        for FakeIpSocketCtx<I, D>
+    {
         fn with_counters<O, F: FnOnce(&IpCounters<I>) -> O>(&self, cb: F) -> O {
             cb(&self.counters)
         }
     }
 
-    impl<I: IpDeviceStateIpExt, D> AsRef<FakeIpDeviceIdCtx<D>> for FakeIpSocketCtx<I, D> {
+    impl<I: IpLayerIpExt + IpDeviceStateIpExt, D> AsRef<FakeIpDeviceIdCtx<D>>
+        for FakeIpSocketCtx<I, D>
+    {
         fn as_ref(&self) -> &FakeIpDeviceIdCtx<D> {
             let FakeIpSocketCtx { device_state: _, table: _, ip_forwarding_ctx, counters: _ } =
                 self;
@@ -995,7 +999,9 @@ pub(crate) mod testutil {
         }
     }
 
-    impl<I: IpDeviceStateIpExt, D> AsMut<FakeIpDeviceIdCtx<D>> for FakeIpSocketCtx<I, D> {
+    impl<I: IpLayerIpExt + IpDeviceStateIpExt, D> AsMut<FakeIpDeviceIdCtx<D>>
+        for FakeIpSocketCtx<I, D>
+    {
         fn as_mut(&mut self) -> &mut FakeIpDeviceIdCtx<D> {
             let FakeIpSocketCtx { device_state: _, table: _, ip_forwarding_ctx, counters: _ } =
                 self;
@@ -1003,20 +1009,20 @@ pub(crate) mod testutil {
         }
     }
 
-    impl<I: IpDeviceStateIpExt, D> AsRef<Self> for FakeIpSocketCtx<I, D> {
+    impl<I: IpLayerIpExt + IpDeviceStateIpExt, D> AsRef<Self> for FakeIpSocketCtx<I, D> {
         fn as_ref(&self) -> &Self {
             self
         }
     }
 
-    impl<I: IpDeviceStateIpExt, D> AsMut<Self> for FakeIpSocketCtx<I, D> {
+    impl<I: IpLayerIpExt + IpDeviceStateIpExt, D> AsMut<Self> for FakeIpSocketCtx<I, D> {
         fn as_mut(&mut self) -> &mut Self {
             self
         }
     }
 
     impl<
-            I: IpExt + IpDeviceStateIpExt,
+            I: IpLayerIpExt + IpDeviceStateIpExt,
             BC: InstantContext + TracingContext,
             DeviceId: FakeStrongDeviceId,
         > TransportIpContext<I, BC> for FakeIpSocketCtx<I, DeviceId>
@@ -1046,8 +1052,8 @@ pub(crate) mod testutil {
         }
     }
 
-    impl<I: IpDeviceStateIpExt, DeviceId: FakeStrongDeviceId> DeviceIdContext<AnyDevice>
-        for FakeIpSocketCtx<I, DeviceId>
+    impl<I: IpLayerIpExt + IpDeviceStateIpExt, DeviceId: FakeStrongDeviceId>
+        DeviceIdContext<AnyDevice> for FakeIpSocketCtx<I, DeviceId>
     {
         type DeviceId = <FakeIpDeviceIdCtx<DeviceId> as DeviceIdContext<AnyDevice>>::DeviceId;
         type WeakDeviceId =
@@ -1105,7 +1111,7 @@ pub(crate) mod testutil {
     }
 
     impl<
-            I: IpDeviceStateIpExt + IpExt,
+            I: IpLayerIpExt + IpDeviceStateIpExt,
             BC: InstantContext + TracingContext,
             DeviceId: FakeStrongDeviceId,
         > IpSocketContext<I, BC> for FakeIpSocketCtx<I, DeviceId>
@@ -1132,7 +1138,7 @@ pub(crate) mod testutil {
     }
 
     impl<
-            I: IpDeviceStateIpExt + IpExt,
+            I: IpLayerIpExt + IpDeviceStateIpExt,
             S: AsRef<FakeIpSocketCtx<I, DeviceId>>
                 + AsMut<FakeIpSocketCtx<I, DeviceId>>
                 + AsRef<FakeIpDeviceIdCtx<DeviceId>>,
@@ -1182,7 +1188,7 @@ pub(crate) mod testutil {
         }
     }
 
-    impl<I: IpDeviceStateIpExt, D: FakeStrongDeviceId> FakeIpSocketCtx<I, D> {
+    impl<I: IpLayerIpExt + IpDeviceStateIpExt, D: FakeStrongDeviceId> FakeIpSocketCtx<I, D> {
         pub(crate) fn with_devices_state(
             devices: impl IntoIterator<
                 Item = (D, IpDeviceState<FakeInstant, I>, Vec<SpecifiedAddr<I::Addr>>),
@@ -1227,7 +1233,7 @@ pub(crate) mod testutil {
     }
 
     fn find_devices_with_addr<
-        I: IpDeviceStateIpExt,
+        I: IpLayerIpExt + IpDeviceStateIpExt,
         D: FakeStrongDeviceId,
         Instant: crate::Instant,
     >(
@@ -1266,7 +1272,7 @@ pub(crate) mod testutil {
     }
 
     impl<
-            I: IpDeviceStateIpExt,
+            I: IpLayerIpExt + IpDeviceStateIpExt,
             D: FakeStrongDeviceId,
             BC: RngContext + InstantContext<Instant = FakeInstant>,
         > MulticastMembershipHandler<I, BC> for FakeIpSocketCtx<I, D>
@@ -1297,7 +1303,7 @@ pub(crate) mod testutil {
     }
 
     impl<
-            I: IpExt + IpDeviceStateIpExt,
+            I: IpLayerIpExt + IpDeviceStateIpExt,
             BC: InstantContext + TracingContext,
             D: FakeStrongDeviceId,
             State: TransportIpContext<I, BC, DeviceId = D> + CounterContext<IpCounters<I>>,
@@ -1390,7 +1396,7 @@ pub(crate) mod testutil {
             device_state.get(device).unwrap_or_else(|| panic!("no device {device:?}"))
         }
 
-        pub(crate) fn find_devices_with_addr<I: IpDeviceStateIpExt>(
+        pub(crate) fn find_devices_with_addr<I: IpLayerIpExt + IpDeviceStateIpExt>(
             &self,
             addr: SpecifiedAddr<I::Addr>,
         ) -> impl Iterator<Item = D> + '_ {
@@ -1478,7 +1484,7 @@ pub(crate) mod testutil {
     }
 
     impl<D> FakeDualStackIpSocketCtx<D> {
-        pub(crate) fn get_common_counters<I: Ip>(&self) -> &IpCounters<I> {
+        pub(crate) fn get_common_counters<I: IpLayerIpExt>(&self) -> &IpCounters<I> {
             I::map_ip(
                 IpInvariant(self),
                 |IpInvariant(core_ctx)| &core_ctx.v4_common_counters,
@@ -1503,7 +1509,9 @@ pub(crate) mod testutil {
         }
     }
 
-    impl<I: IpDeviceStateIpExt, D> CounterContext<IpCounters<I>> for FakeDualStackIpSocketCtx<D> {
+    impl<I: IpLayerIpExt + IpDeviceStateIpExt, D> CounterContext<IpCounters<I>>
+        for FakeDualStackIpSocketCtx<D>
+    {
         fn with_counters<O, F: FnOnce(&IpCounters<I>) -> O>(&self, cb: F) -> O {
             cb(self.get_common_counters::<I>())
         }
@@ -1697,7 +1705,7 @@ pub(crate) mod testutil {
     }
 
     impl<
-            I: IpExt + IpDeviceStateIpExt,
+            I: IpLayerIpExt + IpDeviceStateIpExt,
             BC: InstantContext + TracingContext,
             DeviceId: FakeStrongDeviceId,
         > TransportIpContext<I, BC> for FakeDualStackIpSocketCtx<DeviceId>
@@ -1736,7 +1744,7 @@ pub(crate) mod testutil {
         pub(crate) remote_ips: Vec<A>,
     }
 
-    impl<I: IpDeviceStateIpExt, D: FakeStrongDeviceId> FakeIpSocketCtx<I, D> {
+    impl<I: IpLayerIpExt + IpDeviceStateIpExt, D: FakeStrongDeviceId> FakeIpSocketCtx<I, D> {
         /// Creates a new `FakeIpSocketCtx<Ipv6>` with the given device
         /// configs.
         pub(crate) fn new(

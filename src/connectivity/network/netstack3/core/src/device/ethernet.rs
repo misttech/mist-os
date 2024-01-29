@@ -292,7 +292,7 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpState<Ipv6>>>
 
         let mac = get_mac(self, device_id);
 
-        self.increment(|counters: &NdpCounters| &counters.tx_neighbor_solicitation);
+        self.increment(|counters: &NdpCounters| &counters.tx.neighbor_solicitation);
         tracing::debug!("sending NDP solicitation for {lookup_addr} to {dst_ip}");
         // TODO(https://fxbug.dev/42165912): Either panic or guarantee that this error
         // can't happen statically.

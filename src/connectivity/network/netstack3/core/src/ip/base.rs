@@ -25,8 +25,8 @@ use lock_order::{
 use net_types::ip::IpVersion;
 use net_types::{
     ip::{
-        GenericOverIp, Ip, IpAddress, IpInvariant, IpMarked, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr,
-        Ipv6SourceAddr, Mtu, Subnet,
+        GenericOverIp, Ip, IpAddress, IpInvariant, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr, Ipv6SourceAddr,
+        Mtu, Subnet,
     },
     MulticastAddr, SpecifiedAddr, UnicastAddr, Witness,
 };
@@ -51,6 +51,7 @@ use crate::{
         AnyDevice, DeviceId, DeviceIdContext, DeviceLayerTypes, FrameDestination, Id, StrongId,
         WeakDeviceId,
     },
+    inspect::{Inspectable, Inspector},
     ip::{
         device::{
             self, slaac::SlaacCounters, state::IpDeviceStateIpExt, IpDeviceAddr,
@@ -463,6 +464,7 @@ pub trait IpLayerIpExt: IpExt {
     >;
     type PacketIdState;
     type PacketId;
+    type RxCounters: Default + Inspectable;
     fn next_packet_id_from_state(state: &Self::PacketIdState) -> Self::PacketId;
 }
 
@@ -472,6 +474,7 @@ impl IpLayerIpExt for Ipv4 {
         Ipv4State<I, StrongDeviceId, DeviceClass>;
     type PacketIdState = AtomicU16;
     type PacketId = u16;
+    type RxCounters = Ipv4RxCounters;
     fn next_packet_id_from_state(next_packet_id: &Self::PacketIdState) -> Self::PacketId {
         // Relaxed ordering as we only need atomicity without synchronization. See
         // https://en.cppreference.com/w/cpp/atomic/memory_order#Relaxed_ordering
@@ -488,6 +491,7 @@ impl IpLayerIpExt for Ipv6 {
         Ipv6State<I, StrongDeviceId, DeviceClass>;
     type PacketIdState = ();
     type PacketId = ();
+    type RxCounters = Ipv6RxCounters;
     fn next_packet_id_from_state((): &Self::PacketIdState) -> Self::PacketId {
         ()
     }
@@ -865,21 +869,9 @@ impl<
     }
 }
 
-impl<BC: BindingsContext, I: Ip, L> CounterContext<IpCounters<I>> for CoreCtx<'_, BC, L> {
+impl<BC: BindingsContext, I: IpLayerIpExt, L> CounterContext<IpCounters<I>> for CoreCtx<'_, BC, L> {
     fn with_counters<O, F: FnOnce(&IpCounters<I>) -> O>(&self, cb: F) -> O {
         cb(self.unlocked_access::<crate::lock_ordering::IpStateCounters<I>>())
-    }
-}
-
-impl<BC: BindingsContext, L> CounterContext<Ipv4Counters> for CoreCtx<'_, BC, L> {
-    fn with_counters<O, F: FnOnce(&Ipv4Counters) -> O>(&self, cb: F) -> O {
-        cb(self.unlocked_access::<crate::lock_ordering::Ipv4StateCounters>())
-    }
-}
-
-impl<BC: BindingsContext, L> CounterContext<Ipv6Counters> for CoreCtx<'_, BC, L> {
-    fn with_counters<O, F: FnOnce(&Ipv6Counters) -> O>(&self, cb: F) -> O {
-        cb(self.unlocked_access::<crate::lock_ordering::Ipv6StateCounters>())
     }
 }
 
@@ -1103,7 +1095,6 @@ impl Ipv4StateBuilder {
             inner: Default::default(),
             icmp: icmp.build(),
             next_packet_id: Default::default(),
-            counters: Default::default(),
             filter: RwLock::new(crate::filter::State::default()),
         }
     }
@@ -1124,7 +1115,6 @@ impl Ipv6StateBuilder {
         Ipv6State {
             inner: Default::default(),
             icmp: icmp.build(),
-            counters: Default::default(),
             slaac_counters: Default::default(),
             filter: RwLock::new(crate::filter::State::default()),
         }
@@ -1135,17 +1125,12 @@ pub struct Ipv4State<Instant: crate::Instant, StrongDeviceId: StrongId, DeviceCl
     pub(super) inner: IpStateInner<Ipv4, Instant, StrongDeviceId>,
     pub(super) icmp: Icmpv4State<Instant, StrongDeviceId::Weak>,
     pub(super) next_packet_id: AtomicU16,
-    pub(super) counters: Ipv4Counters,
     pub(super) filter: RwLock<crate::filter::State<Ipv4, DeviceClass>>,
 }
 
 impl<Instant: crate::Instant, StrongDeviceId: StrongId, DeviceClass>
     Ipv4State<Instant, StrongDeviceId, DeviceClass>
 {
-    pub(crate) fn counters(&self) -> &Ipv4Counters {
-        &self.counters
-    }
-
     pub(crate) fn icmp_tx_counters(&self) -> &IcmpTxCounters<Ipv4> {
         &self.icmp.inner.tx_counters
     }
@@ -1176,7 +1161,6 @@ pub(super) fn gen_ip_packet_id<I: IpLayerIpExt, BC, CC: IpDeviceStateContext<I, 
 pub struct Ipv6State<Instant: crate::Instant, StrongDeviceId: StrongId, DeviceClass> {
     pub(super) inner: IpStateInner<Ipv6, Instant, StrongDeviceId>,
     pub(super) icmp: Icmpv6State<Instant, StrongDeviceId::Weak>,
-    pub(super) counters: Ipv6Counters,
     pub(super) slaac_counters: SlaacCounters,
     pub(super) filter: RwLock<crate::filter::State<Ipv6, DeviceClass>>,
 }
@@ -1184,10 +1168,6 @@ pub struct Ipv6State<Instant: crate::Instant, StrongDeviceId: StrongId, DeviceCl
 impl<Instant: crate::Instant, StrongDeviceId: StrongId, DeviceClass>
     Ipv6State<Instant, StrongDeviceId, DeviceClass>
 {
-    pub(crate) fn counters(&self) -> &Ipv6Counters {
-        &self.counters
-    }
-
     pub(crate) fn icmp_tx_counters(&self) -> &IcmpTxCounters<Ipv6> {
         &self.icmp.inner.tx_counters
     }
@@ -1405,12 +1385,10 @@ impl<BC: BindingsContext> UnlockedAccess<crate::lock_ordering::Ipv4StateNextPack
     }
 }
 
-/// IP layer counters.
-pub type IpCounters<I> = IpMarked<I, IpCountersInner>;
-
-/// Ip layer counters for a specific IP version.
-#[derive(Default)]
-pub struct IpCountersInner {
+/// Ip layer counters.
+#[derive(Default, GenericOverIp)]
+#[generic_over_ip(I, Ip)]
+pub struct IpCounters<I: IpLayerIpExt> {
     /// Count of incoming IP packets that are dispatched to the appropriate protocol.
     pub dispatch_receive_ip_packet: Counter,
     /// Count of incoming IP packets destined to another host.
@@ -1454,18 +1432,27 @@ pub struct IpCountersInner {
     pub unspecified_source: Counter,
     /// Count of incoming IP packets dropped.
     pub dropped: Counter,
+    /// Version specific rx counters.
+    pub version_rx: I::RxCounters,
 }
 
-/// IPv4-specific counters.
+/// IPv4-specific Rx counters.
 #[derive(Default)]
-pub struct Ipv4Counters {
+pub struct Ipv4RxCounters {
     /// Count of incoming IPv4 packets delivered.
     pub deliver: Counter,
 }
 
-/// IPv6-specific counters.
+impl Inspectable for Ipv4RxCounters {
+    fn record<I: Inspector>(&self, inspector: &mut I) {
+        let Self { deliver } = self;
+        inspector.record_counter("Delivered", deliver);
+    }
+}
+
+/// IPv6-specific Rx counters.
 #[derive(Default)]
-pub struct Ipv6Counters {
+pub struct Ipv6RxCounters {
     /// Count of incoming IPv6 multicast packets delivered.
     pub deliver_multicast: Counter,
     /// Count of incoming IPv6 unicast packets delivered.
@@ -1480,7 +1467,24 @@ pub struct Ipv6Counters {
     pub extension_header_discard: Counter,
 }
 
-impl<BC: BindingsContext, I: Ip> UnlockedAccess<crate::lock_ordering::IpStateCounters<I>>
+impl Inspectable for Ipv6RxCounters {
+    fn record<I: Inspector>(&self, inspector: &mut I) {
+        let Self {
+            deliver_multicast,
+            deliver_unicast,
+            drop_for_tentative,
+            non_unicast_source,
+            extension_header_discard,
+        } = self;
+        inspector.record_counter("DeliveredMulticast", deliver_multicast);
+        inspector.record_counter("DeliveredUnicast", deliver_unicast);
+        inspector.record_counter("DroppedTentativeDst", drop_for_tentative);
+        inspector.record_counter("DroppedNonUnicastSrc", non_unicast_source);
+        inspector.record_counter("DroppedExtensionHeader", extension_header_discard);
+    }
+}
+
+impl<BC: BindingsContext, I: IpLayerIpExt> UnlockedAccess<crate::lock_ordering::IpStateCounters<I>>
     for StackState<BC>
 {
     type Data = IpCounters<I>;
@@ -1491,38 +1495,16 @@ impl<BC: BindingsContext, I: Ip> UnlockedAccess<crate::lock_ordering::IpStateCou
     }
 }
 
-impl<BC: BindingsContext> UnlockedAccess<crate::lock_ordering::Ipv4StateCounters>
-    for StackState<BC>
-{
-    type Data = Ipv4Counters;
-    type Guard<'l> = &'l Ipv4Counters where Self: 'l;
-
-    fn access(&self) -> Self::Guard<'_> {
-        self.ipv4().counters()
-    }
-}
-
-impl<BC: BindingsContext> UnlockedAccess<crate::lock_ordering::Ipv6StateCounters>
-    for StackState<BC>
-{
-    type Data = Ipv6Counters;
-    type Guard<'l> = &'l Ipv6Counters where Self: 'l;
-
-    fn access(&self) -> Self::Guard<'_> {
-        self.ipv6().counters()
-    }
-}
-
 #[derive(Derivative)]
 #[derivative(Default(bound = ""))]
-pub struct IpStateInner<I: Ip, Instant: crate::Instant, DeviceId> {
+pub struct IpStateInner<I: IpLayerIpExt, Instant: crate::Instant, DeviceId> {
     table: RwLock<ForwardingTable<I, DeviceId>>,
     fragment_cache: Mutex<IpPacketFragmentCache<I, Instant>>,
     pmtu_cache: Mutex<PmtuCache<I, Instant>>,
     counters: IpCounters<I>,
 }
 
-impl<I: Ip, Instant: crate::Instant, DeviceId> IpStateInner<I, Instant, DeviceId> {
+impl<I: IpLayerIpExt, Instant: crate::Instant, DeviceId> IpStateInner<I, Instant, DeviceId> {
     pub(crate) fn counters(&self) -> &IpCounters<I> {
         &self.counters
     }
@@ -1974,9 +1956,7 @@ pub(crate) fn receive_ip_packet<B: BufferMut, BC: BindingsContext, I: Ip>(
 pub(crate) fn receive_ipv4_packet<
     BC: IpLayerBindingsContext<Ipv4, CC::DeviceId>,
     B: BufferMut,
-    CC: IpLayerIngressContext<Ipv4, BC>
-        + CounterContext<IpCounters<Ipv4>>
-        + CounterContext<Ipv4Counters>,
+    CC: IpLayerIngressContext<Ipv4, BC> + CounterContext<IpCounters<Ipv4>>,
 >(
     core_ctx: &mut CC,
     bindings_ctx: &mut BC,
@@ -2204,9 +2184,7 @@ pub(crate) fn receive_ipv4_packet<
 pub(crate) fn receive_ipv6_packet<
     BC: IpLayerBindingsContext<Ipv6, CC::DeviceId>,
     B: BufferMut,
-    CC: IpLayerIngressContext<Ipv6, BC>
-        + CounterContext<IpCounters<Ipv6>>
-        + CounterContext<Ipv6Counters>,
+    CC: IpLayerIngressContext<Ipv6, BC> + CounterContext<IpCounters<Ipv6>>,
 >(
     core_ctx: &mut CC,
     bindings_ctx: &mut BC,
@@ -2237,12 +2215,11 @@ pub(crate) fn receive_ipv6_packet<
             header_len: _,
             action,
         }) if must_send_icmp && action.should_send_icmp(&dst_ip) => {
-            core_ctx.increment(|counters: &IpCounters<Ipv6>| &counters.parameter_problem);
+            core_ctx.increment(|counters| &counters.parameter_problem);
             let dst_ip = match SpecifiedAddr::new(dst_ip) {
                 Some(ip) => ip,
                 None => {
-                    core_ctx
-                        .increment(|counters: &IpCounters<Ipv6>| &counters.unspecified_destination);
+                    core_ctx.increment(|counters| &counters.unspecified_destination);
                     debug!("receive_ipv6_packet: Received packet with unspecified destination IP address; dropping");
                     return;
                 }
@@ -2250,7 +2227,7 @@ pub(crate) fn receive_ipv6_packet<
             let src_ip = match UnicastAddr::new(src_ip) {
                 Some(ip) => ip,
                 None => {
-                    core_ctx.increment(|counters: &Ipv6Counters| &counters.non_unicast_source);
+                    core_ctx.increment(|counters| &counters.version_rx.non_unicast_source);
                     trace!("receive_ipv6_packet: Cannot send ICMP error in response to packet with non unicast source IP address");
                     return;
                 }
@@ -2285,7 +2262,8 @@ pub(crate) fn receive_ipv6_packet<
                 "receive_ipv6_packet: received packet from non-unicast source {}; dropping",
                 packet.src_ip()
             );
-            core_ctx.increment(|counters: &Ipv6Counters| &counters.non_unicast_source);
+            core_ctx
+                .increment(|counters: &IpCounters<Ipv6>| &counters.version_rx.non_unicast_source);
             return;
         }
     };
@@ -2317,8 +2295,9 @@ pub(crate) fn receive_ipv6_packet<
             // handle reassembly.
             match ipv6::handle_extension_headers(core_ctx, device, frame_dst, &packet, true) {
                 Ipv6PacketAction::_Discard => {
-                    core_ctx
-                        .increment(|counters: &Ipv6Counters| &counters.extension_header_discard);
+                    core_ctx.increment(|counters: &IpCounters<Ipv6>| {
+                        &counters.version_rx.extension_header_discard
+                    });
                     trace!(
                         "receive_ipv6_packet: handled IPv6 extension headers: discarding packet"
                     );
@@ -2389,8 +2368,8 @@ pub(crate) fn receive_ipv6_packet<
                 // Handle extension headers first.
                 match ipv6::handle_extension_headers(core_ctx, device, frame_dst, &packet, false) {
                     Ipv6PacketAction::_Discard => {
-                        core_ctx.increment(|counters: &Ipv6Counters| {
-                            &counters.extension_header_discard
+                        core_ctx.increment(|counters: &IpCounters<Ipv6>| {
+                            &counters.version_rx.extension_header_discard
                         });
                         trace!("receive_ipv6_packet: handled IPv6 extension headers: discarding packet");
                         return;
@@ -2531,7 +2510,7 @@ enum DropReason {
 /// Computes the action to take in order to process a received IPv4 packet.
 fn receive_ipv4_packet_action<
     BC: IpLayerBindingsContext<Ipv4, CC::DeviceId>,
-    CC: IpLayerContext<Ipv4, BC> + CounterContext<IpCounters<Ipv4>> + CounterContext<Ipv4Counters>,
+    CC: IpLayerContext<Ipv4, BC> + CounterContext<IpCounters<Ipv4>>,
 >(
     core_ctx: &mut CC,
     bindings_ctx: &mut BC,
@@ -2565,7 +2544,7 @@ fn receive_ipv4_packet_action<
             | Ipv4PresentAddressStatus::Multicast
             | Ipv4PresentAddressStatus::Unicast,
         ) => {
-            core_ctx.increment(|counters: &Ipv4Counters| &counters.deliver);
+            core_ctx.increment(|counters| &counters.version_rx.deliver);
             ReceivePacketAction::Deliver
         }
         None => {
@@ -2577,7 +2556,7 @@ fn receive_ipv4_packet_action<
 /// Computes the action to take in order to process a received IPv6 packet.
 fn receive_ipv6_packet_action<
     BC: IpLayerBindingsContext<Ipv6, CC::DeviceId>,
-    CC: IpLayerContext<Ipv6, BC> + CounterContext<IpCounters<Ipv6>> + CounterContext<Ipv6Counters>,
+    CC: IpLayerContext<Ipv6, BC> + CounterContext<IpCounters<Ipv6>>,
 >(
     core_ctx: &mut CC,
     bindings_ctx: &mut BC,
@@ -2632,11 +2611,11 @@ fn receive_ipv6_packet_action<
     };
     match highest_priority {
         Some(Ipv6PresentAddressStatus::Multicast) => {
-            core_ctx.increment(|counters: &Ipv6Counters| &counters.deliver_multicast);
+            core_ctx.increment(|counters| &counters.version_rx.deliver_multicast);
             ReceivePacketAction::Deliver
         }
         Some(Ipv6PresentAddressStatus::UnicastAssigned) => {
-            core_ctx.increment(|counters: &Ipv6Counters| &counters.deliver_unicast);
+            core_ctx.increment(|counters| &counters.version_rx.deliver_unicast);
             ReceivePacketAction::Deliver
         }
         Some(Ipv6PresentAddressStatus::UnicastTentative) => {
@@ -2670,7 +2649,7 @@ fn receive_ipv6_packet_action<
             // address. NS and NA packets should be addressed to a multicast
             // address that we would have joined during DAD so that we can
             // receive those packets.
-            core_ctx.increment(|counters: &Ipv6Counters| &counters.drop_for_tentative);
+            core_ctx.increment(|counters| &counters.version_rx.drop_for_tentative);
             ReceivePacketAction::Drop { reason: DropReason::Tentative }
         }
         None => {
@@ -4999,7 +4978,7 @@ mod tests {
             Some(FrameDestination::Individual { local: true }),
             buf,
         );
-        assert_eq!(core_ctx.state.ipv6.counters.non_unicast_source.get(), 1);
+        assert_eq!(core_ctx.state.ipv6.inner.counters.version_rx.non_unicast_source.get(), 1);
     }
 
     #[test]

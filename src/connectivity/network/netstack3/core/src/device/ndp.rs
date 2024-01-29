@@ -390,7 +390,7 @@ mod tests {
 
         let _: StepResult = net.step();
         assert_eq!(
-            net.core_ctx("remote").state.ndp_counters().rx_neighbor_solicitation.get(),
+            net.core_ctx("remote").state.ndp_counters().rx.neighbor_solicitation.get(),
             1,
             "remote received solicitation"
         );
@@ -400,7 +400,7 @@ mod tests {
         let _: StepResult = net.step();
 
         assert_eq!(
-            net.core_ctx("local").state.ndp_counters().rx_neighbor_advertisement.get(),
+            net.core_ctx("local").state.ndp_counters().rx.neighbor_advertisement.get(),
             1,
             "local received advertisement"
         );
@@ -1052,7 +1052,7 @@ mod tests {
             Some(FrameDestination::Multicast),
             icmpv6_packet_buf,
         );
-        assert_eq!(core_ctx.state.ndp_counters().rx_router_solicitation.get(), 0);
+        assert_eq!(core_ctx.state.ndp_counters().rx.router_solicitation.get(), 0);
     }
 
     #[test]
@@ -1102,7 +1102,7 @@ mod tests {
             Some(FrameDestination::Individual { local: true }),
             icmpv6_packet_buf,
         );
-        assert_eq!(core_ctx.state.ndp_counters().rx_router_advertisement.get(), 0);
+        assert_eq!(core_ctx.state.ndp_counters().rx.router_advertisement.get(), 0);
 
         // Test receiving NDP RA where source IP is a link local address (should
         // receive).
@@ -1116,7 +1116,7 @@ mod tests {
             Some(FrameDestination::Individual { local: true }),
             icmpv6_packet_buf,
         );
-        assert_eq!(core_ctx.state.ndp_counters().rx_router_advertisement.get(), 1);
+        assert_eq!(core_ctx.state.ndp_counters().rx.router_advertisement.get(), 1);
     }
 
     #[test]
@@ -1252,7 +1252,7 @@ mod tests {
             Some(FrameDestination::Multicast),
             icmpv6_packet_buf,
         );
-        assert_eq!(core_ctx.state.ndp_counters().rx_router_advertisement.get(), 1);
+        assert_eq!(core_ctx.state.ndp_counters().rx.router_advertisement.get(), 1);
         assert_eq!(
             crate::ip::IpDeviceContext::<Ipv6, _>::get_mtu(
                 &mut CoreCtx::new_deprecated(core_ctx),
@@ -1276,7 +1276,7 @@ mod tests {
             Some(FrameDestination::Multicast),
             icmpv6_packet_buf,
         );
-        assert_eq!(core_ctx.state.ndp_counters().rx_router_advertisement.get(), 2);
+        assert_eq!(core_ctx.state.ndp_counters().rx.router_advertisement.get(), 2);
         assert_eq!(
             crate::ip::IpDeviceContext::<Ipv6, _>::get_mtu(
                 &mut CoreCtx::new_deprecated(core_ctx),
@@ -1300,7 +1300,7 @@ mod tests {
             Some(FrameDestination::Multicast),
             icmpv6_packet_buf,
         );
-        assert_eq!(core_ctx.state.ndp_counters().rx_router_advertisement.get(), 3);
+        assert_eq!(core_ctx.state.ndp_counters().rx.router_advertisement.get(), 3);
         assert_eq!(
             crate::ip::IpDeviceContext::<Ipv6, _>::get_mtu(
                 &mut CoreCtx::new_deprecated(core_ctx),
