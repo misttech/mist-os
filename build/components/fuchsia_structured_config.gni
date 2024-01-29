@@ -548,7 +548,6 @@ template("fuchsia_structured_config_cpp_elf_lib") {
     deps = [
       ":${fidl_library_target}_cpp",
       "//sdk/lib/fidl",
-      "//sdk/lib/sys/cpp",
     ]
 
     public_deps = [
