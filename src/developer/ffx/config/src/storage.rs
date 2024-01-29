@@ -32,6 +32,7 @@ pub struct ConfigFile {
     path: Option<PathBuf>,
     contents: ConfigMap,
     dirty: bool,
+    flush: bool,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -88,11 +89,34 @@ fn write_json<W: Write>(file: Option<W>, value: Option<&Value>) -> Result<()> {
     }
 }
 
+struct MaybeFlushWriter<T> {
+    flush: bool,
+    writer: T,
+}
+
+impl<T: Write> Write for MaybeFlushWriter<T> {
+    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+        self.writer.write(buf)
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        if self.flush {
+            tracing::debug!("Flushing writer");
+            let ret = self.writer.flush();
+            tracing::debug!("Flushed writer");
+            ret
+        } else {
+            tracing::debug!("Skipped flushing writer (isolate detected)");
+            Ok(())
+        }
+    }
+}
+
 /// Atomically write to the file by creating a temporary file and passing it
 /// to the closure, and atomically rename it to the destination file.
-async fn with_writer<F>(path: Option<&Path>, f: F) -> Result<()>
+async fn with_writer<F>(path: Option<&Path>, f: F, flush: bool) -> Result<()>
 where
-    F: FnOnce(Option<BufWriter<&mut tempfile::NamedTempFile>>) -> Result<()>,
+    F: FnOnce(Option<BufWriter<&mut MaybeFlushWriter<tempfile::NamedTempFile>>>) -> Result<()>,
 {
     if let Some(path) = path {
         let path = Path::new(path);
@@ -101,11 +125,10 @@ where
             e
         })?;
         let parent = path.parent().unwrap_or_else(|| Path::new("."));
-        let mut tmp = tempfile::NamedTempFile::new_in(parent)?;
-
-        f(Some(BufWriter::new(&mut tmp)))?;
-
-        tmp.persist(path)?;
+        let tmp = tempfile::NamedTempFile::new_in(parent)?;
+        let mut writer = MaybeFlushWriter { flush, writer: tmp };
+        f(Some(BufWriter::new(&mut writer)))?;
+        writer.writer.persist(path)?;
 
         Ok(())
     } else {
@@ -115,7 +138,7 @@ where
 
 impl ConfigFile {
     fn from_map(path: Option<PathBuf>, contents: ConfigMap) -> Self {
-        Self { path, contents, dirty: false }
+        Self { path, contents, dirty: false, flush: true }
     }
 
     fn from_buf(path: Option<PathBuf>, buffer: impl Read) -> Self {
@@ -124,7 +147,7 @@ impl ConfigFile {
             .and_then(Value::as_object)
             .cloned()
             .unwrap_or_else(Map::default);
-        Self { path, contents, dirty: false }
+        Self { path, contents, dirty: false, flush: true }
     }
 
     fn from_file(path: &Path) -> Result<Self> {
@@ -136,6 +159,22 @@ impl ConfigFile {
                 path: Some(path.to_owned()),
                 contents: ConfigMap::default(),
                 dirty: false,
+                flush: true,
+            }),
+            Err(e) => Err(e.into()),
+        }
+    }
+
+    fn from_nonflushing_file(path: &Path) -> Result<Self> {
+        let file = OpenOptions::new().read(true).open(path);
+
+        match file {
+            Ok(buf) => Ok(Self::from_buf(Some(path.to_owned()), BufReader::new(buf))),
+            Err(e) if e.kind() == ErrorKind::NotFound => Ok(Self {
+                path: Some(path.to_owned()),
+                contents: ConfigMap::default(),
+                dirty: false,
+                flush: false,
             }),
             Err(e) => Err(e.into()),
         }
@@ -167,9 +206,11 @@ impl ConfigFile {
         // to the config if the value actually changed.
         if self.is_dirty() {
             self.dirty = false;
-            with_writer(self.path.as_deref(), |writer| {
-                write_json(writer, Some(&Value::Object(self.contents.clone())))
-            })
+            with_writer(
+                self.path.as_deref(),
+                |writer| write_json(writer, Some(&Value::Object(self.contents.clone()))),
+                self.flush,
+            )
             .await
         } else {
             Ok(())
@@ -203,10 +244,12 @@ impl Config {
     pub(crate) fn from_env(env: &Environment) -> Result<Self> {
         let user_conf = env.get_user();
         let build_conf = env.get_build();
-
-        let user = user_conf.as_deref().map(ConfigFile::from_file).transpose()?;
-        let build = build_conf.as_deref().map(ConfigFile::from_file).transpose()?;
-        let global = env.get_global().map(ConfigFile::from_file).transpose()?;
+        let is_isolated = env.context().env_kind().is_isolated();
+        let from_file =
+            if is_isolated { ConfigFile::from_nonflushing_file } else { ConfigFile::from_file };
+        let user = user_conf.as_deref().map(from_file).transpose()?;
+        let build = build_conf.as_deref().map(from_file).transpose()?;
+        let global = env.get_global().map(from_file).transpose()?;
 
         Ok(Self::new(
             global,
