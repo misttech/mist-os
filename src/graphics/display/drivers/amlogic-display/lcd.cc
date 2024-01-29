@@ -21,26 +21,6 @@ namespace amlogic_display {
 
 namespace {
 
-constexpr int IsDsiCommandPayloadSizeValid(uint8_t cmd_type, int payload_size) {
-  switch (cmd_type) {
-    case kMipiDsiDtDcsShortWrite0:
-      return payload_size == 1;
-    case kMipiDsiDtDcsShortWrite1:
-      return payload_size == 2;
-    case kMipiDsiDtDcsLongWrite:
-      return payload_size >= 1;
-    case kMipiDsiDtGenShortWrite0:
-      return payload_size == 0;
-    case kMipiDsiDtGenShortWrite1:
-      return payload_size == 1;
-    case kMipiDsiDtGenShortWrite2:
-      return payload_size == 2;
-    case kMipiDsiDtGenLongWrite:
-      return payload_size >= 0;
-  }
-  ZX_ASSERT_MSG(false, "Unsupported command type: 0x%02x", cmd_type);
-}
-
 constexpr int kReadRegisterMaximumValueCount = 4;
 
 zx_status_t CheckDsiDeviceRegister(ddk::DsiImplProtocolClient* dsiimpl, uint8_t reg, size_t count) {
@@ -93,19 +73,18 @@ zx::result<uint32_t> GetMipiDsiDisplayId(ddk::DsiImplProtocolClient dsiimpl) {
       kCommandReadDisplayIdentificationInformation,
   };
   std::array<uint8_t, kCommandReadDisplayIdentificationInformationResponseSize> response;
-
   // Create the command using mipi-dsi library
-  mipi_dsi_cmd_t cmd = {
-      .virt_chn_id = kMipiDsiVirtualChanId,
-      .dsi_data_type = kMipiDsiDtGenShortRead1,
-      .pld_data_list = payload.data(),
-      .pld_data_count = payload.size(),
-      .rsp_data_list = response.data(),
-      .rsp_data_count = response.size(),
-      .flags = MIPI_DSI_CMD_FLAGS_ACK | MIPI_DSI_CMD_FLAGS_SET_MAX,
-  };
+  mipi_dsi_cmd_t cmd;
 
-  zx_status_t status = dsiimpl.SendCmd(&cmd, 1);
+  zx_status_t status = mipi_dsi::MipiDsi::CreateCommand(
+      payload.data(), payload.size(), response.data(), response.size(), /*is_dcs=*/false, &cmd);
+  if (status != ZX_OK) {
+    zxlogf(ERROR, "Failed to create Read Display Identification Information command: %s",
+           zx_status_get_string(status));
+    return zx::error(status);
+  }
+
+  status = dsiimpl.SendCmd(&cmd, 1);
   if (status != ZX_OK) {
     zxlogf(ERROR, "Failed to read out Display ID: %s", zx_status_get_string(status));
     return zx::error(status);
@@ -126,6 +105,7 @@ zx::result<> Lcd::PerformDisplayInitCommandSequence(cpp20::span<const uint8_t> e
   for (size_t i = 0; i < encoded_commands.size() - kMinCmdSize;) {
     const uint8_t cmd_type = encoded_commands[i];
     const uint8_t payload_size = encoded_commands[i + 1];
+    bool is_dcs = false;
     // This command has an implicit size=2, treat it specially.
     if (cmd_type == kDsiOpSleep) {
       if (payload_size == 0 || payload_size == 0xff) {
@@ -220,30 +200,19 @@ zx::result<> Lcd::PerformDisplayInitCommandSequence(cpp20::span<const uint8_t> e
       case kMipiDsiDtDcsShortWrite0:
       case kMipiDsiDtDcsShortWrite1:
       case kMipiDsiDtDcsLongWrite:
+        is_dcs = true;
+        [[fallthrough]];
       case kMipiDsiDtGenShortWrite0:
       case kMipiDsiDtGenShortWrite1:
       case kMipiDsiDtGenShortWrite2:
-      case kMipiDsiDtGenLongWrite: {
+      case kMipiDsiDtGenLongWrite:
         zxlogf(TRACE, "DSI command type: 0x%02x payload size: %d", cmd_type, payload_size);
-
-        if (!IsDsiCommandPayloadSizeValid(cmd_type, payload_size)) {
-          zxlogf(ERROR,
-                 "Invalid payload size for MIPI-DSI command 0x%02x: "
-                 "actual size %d",
-                 cmd_type, payload_size);
-          return zx::error(ZX_ERR_INVALID_ARGS);
-        }
-
-        const cpp20::span<const uint8_t> payload = encoded_commands.subspan(i + 2, payload_size);
-        mipi_dsi_cmd_t cmd = {
-            .virt_chn_id = kMipiDsiVirtualChanId,
-            .dsi_data_type = cmd_type,
-            .pld_data_list = payload.data(),
-            .pld_data_count = payload.size(),
-            .rsp_data_list = nullptr,
-            .rsp_data_count = 0,
-            .flags = 0,
-        };
+        // Create the command using mipi-dsi library
+        mipi_dsi_cmd_t cmd;
+        status = mipi_dsi::MipiDsi::CreateCommand(&encoded_commands[i + 2], payload_size, NULL, 0,
+                                                  is_dcs, &cmd);
+        ZX_ASSERT_MSG(status == ZX_OK, "Failed to create the MIPI-DSI command for command type %d",
+                      cmd_type);
 
         status = dsiimpl_.SendCmd(&cmd, 1);
         if (status != ZX_OK) {
@@ -252,7 +221,6 @@ zx::result<> Lcd::PerformDisplayInitCommandSequence(cpp20::span<const uint8_t> e
           return zx::error(status);
         }
         break;
-      }
       case kMipiDsiDtDcsRead0:
       case kMipiDsiDtGenShortRead0:
       case kMipiDsiDtGenShortRead1:
