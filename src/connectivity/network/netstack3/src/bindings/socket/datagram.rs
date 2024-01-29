@@ -150,7 +150,7 @@ where
         O,
         F: FnOnce(&mut SocketCollection<Self, T>) -> O,
     >(
-        dispatcher: &mut D,
+        dispatcher: &D,
         cb: F,
     ) -> O;
 }
@@ -177,7 +177,7 @@ where
         O,
         F: FnOnce(&mut SocketCollection<Ipv4, T>) -> O,
     >(
-        dispatcher: &mut D,
+        dispatcher: &D,
         cb: F,
     ) -> O {
         cb(&mut dispatcher.as_ref().v4.write())
@@ -206,7 +206,7 @@ where
         O,
         F: FnOnce(&mut SocketCollection<Ipv6, T>) -> O,
     >(
-        dispatcher: &mut D,
+        dispatcher: &D,
         cb: F,
     ) -> O {
         cb(&mut dispatcher.as_ref().v6.write())
@@ -944,7 +944,7 @@ where
         let messages = Arc::new(CoreMutex::new(MessageQueue::new(local_event)));
 
         assert_matches!(
-            I::with_collection_mut(ctx.bindings_ctx_mut(), |c| c
+            I::with_collection_mut(ctx.bindings_ctx(), |c| c
                 .received
                 .insert(id.get_key_index(), messages.clone())),
             None
@@ -1073,9 +1073,8 @@ where
 
     fn close(self, ctx: &mut Ctx) {
         let id = self.info.id;
-        let _: Option<_> = I::with_collection_mut(ctx.bindings_ctx_mut(), |c| {
-            c.received.remove(id.get_key_index())
-        });
+        let _: Option<_> =
+            I::with_collection_mut(ctx.bindings_ctx(), |c| c.received.remove(id.get_key_index()));
         T::close(ctx, id);
     }
 }
@@ -3440,7 +3439,7 @@ mod tests {
         };
         loop {
             let all_delivered = stack.with_ctx(|ctx| {
-                let bindings_ctx = ctx.bindings_ctx_mut();
+                let bindings_ctx = ctx.bindings_ctx();
                 <<A::AddrType as IpAddress>::Version as SocketCollectionIpExt<T>>::with_collection(
                     bindings_ctx,
                     |SocketCollection { received }| {

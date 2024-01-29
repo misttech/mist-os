@@ -27,7 +27,6 @@ use netstack3_core::{
         SlaacConfiguration, TemporarySlaacAddressConfiguration, STABLE_IID_SECRET_KEY_BYTES,
     },
     routes::RawMetric,
-    RngContext as _,
 };
 use rand::Rng as _;
 
@@ -527,12 +526,12 @@ impl DeviceHandler {
             &core_ethernet_id,
             netstack3_core::device::TransmitQueueConfiguration::Fifo,
         );
-        add_initial_routes(ctx.bindings_ctx_mut(), &core_id).await;
+        add_initial_routes(ctx.bindings_ctx(), &core_id).await;
 
         // TODO(https://fxbug.dev/42148800): Use a different secret key (not this
         // one) to generate stable opaque interface identifiers.
         let mut secret_key = [0; STABLE_IID_SECRET_KEY_BYTES];
-        ctx.bindings_ctx_mut().rng().fill(&mut secret_key);
+        ctx.rng().fill(&mut secret_key);
 
         let ip_config = Some(IpDeviceConfigurationUpdate {
             ip_enabled: Some(false),
@@ -579,7 +578,7 @@ impl DeviceHandler {
 ///
 /// Note that if an error is encountered while installing a route, any routes
 /// that were successfully installed prior to the error will not be removed.
-async fn add_initial_routes(bindings_ctx: &mut BindingsCtx, device: &DeviceId<BindingsCtx>) {
+async fn add_initial_routes(bindings_ctx: &BindingsCtx, device: &DeviceId<BindingsCtx>) {
     use netstack3_core::routes::{AddableEntry, AddableMetric};
     const LINK_LOCAL_SUBNET: Subnet<Ipv6Addr> = net_declare::net_subnet_v6!("fe80::/64");
 

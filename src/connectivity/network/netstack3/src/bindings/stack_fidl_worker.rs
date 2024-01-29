@@ -150,7 +150,7 @@ impl StackFidlWorker {
         &mut self,
         subnet: fidl_net::Subnet,
     ) -> Result<(), fidl_net_stack::Error> {
-        let bindings_ctx = self.netstack.ctx.bindings_ctx_mut();
+        let bindings_ctx = self.netstack.ctx.bindings_ctx();
         if let Ok(subnet) = subnet.try_into_core() {
             bindings_ctx
                 .apply_route_change_either(match subnet {

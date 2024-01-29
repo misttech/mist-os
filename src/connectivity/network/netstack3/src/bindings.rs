@@ -129,8 +129,10 @@ mod ctx {
             &self.bindings_ctx
         }
 
-        pub(crate) fn bindings_ctx_mut(&mut self) -> &mut BindingsCtx {
-            &mut self.bindings_ctx
+        // Gets a new `RngImpl` as if we have an implementation of `RngContext`,
+        // but without needing `&mut self`.
+        pub(crate) fn rng(&self) -> RngImpl {
+            RngImpl::new()
         }
 
         /// Destroys the last standing clone of [`Ctx`].
@@ -420,6 +422,15 @@ impl FilterBindingsTypes for BindingsCtx {
 #[derive(Default)]
 pub(crate) struct RngImpl;
 
+impl RngImpl {
+    fn new() -> Self {
+        // A change detector in case OsRng is no longer a ZST and we should keep
+        // state for it inside RngImpl.
+        let OsRng {} = OsRng::default();
+        RngImpl {}
+    }
+}
+
 /// [`RngCore`] for `RngImpl` relies entirely on the operating system to
 /// generate random numbers and it needs not keep any state itself.
 ///
@@ -448,10 +459,7 @@ impl RngContext for BindingsCtx {
     type Rng<'a> = RngImpl;
 
     fn rng(&mut self) -> RngImpl {
-        // A change detector in case OsRng is no longer a ZST and we should keep
-        // state for it inside RngImpl.
-        let OsRng {} = OsRng::default();
-        RngImpl {}
+        RngImpl::new()
     }
 }
 
@@ -812,7 +820,7 @@ fn add_loopback_ip_addrs(
 
 /// Adds the IPv4 and IPv6 Loopback and multicast subnet routes, and the IPv4
 /// limited broadcast subnet route.
-async fn add_loopback_routes(bindings_ctx: &mut BindingsCtx, loopback: &DeviceId<BindingsCtx>) {
+async fn add_loopback_routes(bindings_ctx: &BindingsCtx, loopback: &DeviceId<BindingsCtx>) {
     use netstack3_core::routes::{AddableEntry, AddableMetric};
 
     let v4_changes = [
@@ -989,7 +997,7 @@ impl Netstack {
             )
             .unwrap();
         add_loopback_ip_addrs(&mut self.ctx, &loopback).expect("error adding loopback addresses");
-        add_loopback_routes(self.ctx.bindings_ctx_mut(), &loopback).await;
+        add_loopback_routes(self.ctx.bindings_ctx(), &loopback).await;
 
         let (stop_sender, stop_receiver) = futures::channel::oneshot::channel();
 

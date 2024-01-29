@@ -527,7 +527,7 @@ where
                     .count()
                     == 1
                 {
-                    ctx.bindings_ctx_mut().notify_interface_update(
+                    ctx.bindings_ctx().notify_interface_update(
                         &entry.device,
                         crate::bindings::InterfaceUpdate::DefaultRouteChanged {
                             version: I::VERSION,
@@ -551,13 +551,8 @@ where
             // is cheaper than collecting into a Vec to eliminate the borrow.
             let mut ctx_clone = ctx.clone();
             let removed = removed.map(|(entry, _generation)| to_entry::<I>(&mut ctx_clone, entry));
-            notify_removed_routes::<I>(
-                ctx.bindings_ctx_mut(),
-                route_update_dispatcher,
-                removed,
-                table,
-            )
-            .await;
+            notify_removed_routes::<I>(ctx.bindings_ctx(), route_update_dispatcher, removed, table)
+                .await;
         }
     };
 
@@ -565,7 +560,7 @@ where
 }
 
 async fn notify_removed_routes<I: Ip>(
-    bindings_ctx: &mut crate::bindings::BindingsCtx,
+    bindings_ctx: &crate::bindings::BindingsCtx,
     dispatcher: &crate::bindings::routes::state::RouteUpdateDispatcher<I>,
     removed_routes: impl IntoIterator<Item = netstack3_core::routes::Entry<I::Addr, DeviceId>>,
     table: &Table<I::Addr>,
