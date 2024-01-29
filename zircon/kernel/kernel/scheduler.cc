@@ -908,9 +908,20 @@ cpu_num_t Scheduler::FindTargetCpu(Thread* thread) {
 
   trace = KTRACE_END_SCOPE(("last_cpu", last_cpu), ("target_cpu", target_cpu));
 
-  bool delay_migration = last_cpu != target_cpu && last_cpu != INVALID_CPU &&
-                         thread->has_migrate_fn() && (active_mask & last_cpu_mask) != 0;
+  // If we have a migration function, and the CPU we have chosen is not the same as the last CPU we
+  // ran on, we need to override the choice of CPU to run on our last CPU.  When we join our last
+  // CPU's queue, we will have either migration function called (either by the scheduler, or by a
+  // thread who is de-activating that CPU in MigrateUnpinnedThreads) before being immediately
+  // re-assigned to a different CPU.
+  bool delay_migration =
+      last_cpu != target_cpu && last_cpu != INVALID_CPU && thread->has_migrate_fn();
   if (unlikely(delay_migration)) {
+    DEBUG_ASSERT_MSG(((active_mask & last_cpu_mask) != 0) ||
+                         Get(last_cpu)->cpu_deactivating_.load(ktl::memory_order_acquire),
+                     "Thread with migration function needs to run on CPU %u, "
+                     "but the CPU is currently inactive (mask = 0x%x) and not "
+                     "in the process of deactivating",
+                     last_cpu, active_mask);
     thread->scheduler_state().next_cpu_ = target_cpu;
     return last_cpu;
   } else {
@@ -1870,12 +1881,55 @@ void Scheduler::MigrateUnpinnedThreads() {
   const cpu_mask_t current_cpu_mask = cpu_num_to_mask(current_cpu);
   cpu_mask_t cpus_to_reschedule_mask = 0;
 
-  // Prevent this CPU from being selected as a target for scheduling threads.
-  mp_set_curr_cpu_active(false);
-
+  // Flag this scheduler as being in the process de-activating.  If a thread
+  // with a migration function unblocks and needs to become READY while we are
+  // in the middle of MigrateUnpinnedThreads, we will allow it to join this
+  // CPU's ready-queue knowing that we are going to immediately call the
+  // thread's migration function (on this CPU, as required) before reassigning
+  // the thread to a different CPU.
+  //
+  // Note: Because of the nature of the global thread-lock, this race is not
+  // currently possible (Threads who are blocked cannot unblock while we hold
+  // the global thread lock, which we currently do).  Once the thread lock has
+  // been removed, however, this race will become an important edge case to
+  // handle.
   const SchedTime now = CurrentTime();
   Scheduler* const current = Get(current_cpu);
+  current->cpu_deactivating_.store(true, ktl::memory_order_release);
 
+  // Flag this CPU as being inactive.  This will prevent this CPU from being
+  // selected as a target for scheduling threads.
+  mp_set_curr_cpu_active(false);
+
+  // Call all migrate functions for threads last run on the current CPU who are
+  // not currently READY.  The next time these threads unblock or wake up, the
+  // will be assigned to a different CPU, and we will have already called their
+  // migrate function for them.  When we are finished with this pass, the only
+  // threads who have a migrate function still to be called should only exist in
+  // this scheduler's READY queue, because:
+  //
+  // 1)  New threads or threads who have not recently run on this CPU cannot be
+  //     assigned to this CPU (because we cleared our active flag)
+  // 2a) Threads who were not ready but needed to have their migration function
+  //     called were found and had their migration function called during
+  //     CallMigrateFnForCpuLocked  --- OR ---
+  // 2b) The non-ready thread with a migration function unblocked and joined the
+  //     ready queue of this scheduler while it was being deactivated.  We will
+  //     call their migration functions next as we move all of the READY threads
+  //     off of this scheduler and over to a different one.
+  //
+  thread_lock.AssertHeld();  // TODO(eieio): HACK!
+  Thread::CallMigrateFnForCpuLocked(current_cpu);
+
+  // There should no longer be any non-ready threads who need to run a
+  // migration function on this CPU, and there should not be any new one until
+  // we set this CPU back to being active.  We can clear the transitory
+  // "cpu_deactivating_" flag now.
+  DEBUG_ASSERT(current->cpu_deactivating_.load(ktl::memory_order_relaxed));
+  current->cpu_deactivating_.store(false, ktl::memory_order_release);
+
+  // Now move any READY threads who can be moved over to a different CPU,
+  // calling their migrate functions as needed.
   {
     Guard<MonitoredSpinLock, NoIrqSave> queue_guard{&current->queue_lock_, SOURCE_TAG};
 
@@ -1893,6 +1947,7 @@ void Scheduler::MigrateUnpinnedThreads() {
 
         queue_guard.CallUnlocked([&] {
           thread_lock.AssertHeld();  // TODO(eieio): HACK!
+          thread->scheduler_state().last_cpu_ = INVALID_CPU;
           thread->CallMigrateFnLocked(Thread::MigrateStage::Before);
           thread->scheduler_state().next_cpu_ = INVALID_CPU;
 
@@ -1940,10 +1995,6 @@ void Scheduler::MigrateUnpinnedThreads() {
     // Return the pinned threads to the deadline run queue.
     current->deadline_run_queue_ = ktl::move(pinned_threads);
   }
-
-  // Call all migrate functions for threads last run on the current CPU.
-  thread_lock.AssertHeld();  // TODO(eieio): HACK!
-  Thread::CallMigrateFnForCpuLocked(current_cpu);
 
   trace.End();
   RescheduleMask(cpus_to_reschedule_mask);

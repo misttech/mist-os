@@ -830,6 +830,15 @@ void Thread::CallMigrateFnLocked(MigrateStage stage) {
   if (unlikely(migrate_fn_)) {
     switch (stage) {
       case MigrateStage::Before:
+        // We are leaving our last CPU and calling our migration function as we
+        // go.  Assert that we are running on the proper CPU, and clear our last
+        // cpu bookkeeping to indicate that the migration has started.
+        DEBUG_ASSERT_MSG(scheduler_state().last_cpu_ == arch_curr_cpu_num(),
+                         "Attempting to run Before stage of migration on a CPU "
+                         "which is not the last CPU the thread ran on (last cpu = "
+                         "%u, curr cpu = %u)\n",
+                         scheduler_state().last_cpu_, arch_curr_cpu_num());
+        scheduler_state().last_cpu_ = INVALID_CPU;
         if (!migrate_pending_) {
           migrate_pending_ = true;
           migrate_fn_(this, stage);

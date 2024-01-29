@@ -679,6 +679,14 @@ class Scheduler {
   // respect to load distribution decisions.
   size_t cluster_{0};
 
+  // Flag indicating that this Scheduler's CPU is in the process of becoming
+  // inactive.  When true, threads who have a migration function which must be
+  // run on this CPU are permitted to join this CPU's ready queue, even if the
+  // CPU has already been flagged as inactive.  The thread who is in charge of
+  // deactivating the CPU will make sure to run the migration function of the
+  // thread on this CPU before finishing the deactivation process.
+  ktl::atomic<bool> cpu_deactivating_{false};
+
   // Values exported for lock-free access across CPUs. These are mirrors of the
   // members of the same name without the exported_ prefix. This avoids
   // unnecessary atomic loads when updating the values using arithmetic
