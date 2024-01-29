@@ -785,6 +785,10 @@ template("assembled_system") {
       if (_supports_blobs) {
         outputs += [ files.config_data_manifest ]
       }
+
+      metadata = {
+        assembly_input_archives_barrier = []
+      }
     }
 
     hermetic_inputs_for_image_assembly(labels.image_assembly_inputs) {
