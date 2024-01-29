@@ -26,25 +26,25 @@ trait TestValue {
 
 impl TestValue for fnet_filter_ext::ResourceId {
     fn test_value() -> Self {
-        fnet_filter_ext::ResourceId::Namespace(fnet_filter_ext::NamespaceId::test_value())
+        Self::Namespace(fnet_filter_ext::NamespaceId::test_value())
     }
 }
 
 impl TestValue for fnet_filter_ext::Resource {
     fn test_value() -> Self {
-        fnet_filter_ext::Resource::Namespace(fnet_filter_ext::Namespace::test_value())
+        Self::Namespace(fnet_filter_ext::Namespace::test_value())
     }
 }
 
 impl TestValue for fnet_filter_ext::NamespaceId {
     fn test_value() -> Self {
-        fnet_filter_ext::NamespaceId("NAMESPACE_ID".to_owned())
+        Self("NAMESPACE_ID".to_owned())
     }
 }
 
 impl TestValue for fnet_filter_ext::Namespace {
     fn test_value() -> Self {
-        fnet_filter_ext::Namespace {
+        Self {
             id: fnet_filter_ext::NamespaceId::test_value(),
             domain: fnet_filter_ext::Domain::AllIp,
         }
@@ -53,7 +53,7 @@ impl TestValue for fnet_filter_ext::Namespace {
 
 impl TestValue for fnet_filter_ext::RoutineId {
     fn test_value() -> Self {
-        fnet_filter_ext::RoutineId {
+        Self {
             namespace: fnet_filter_ext::NamespaceId::test_value(),
             name: String::from("ingress"),
         }
@@ -62,7 +62,7 @@ impl TestValue for fnet_filter_ext::RoutineId {
 
 impl TestValue for fnet_filter_ext::Routine {
     fn test_value() -> Self {
-        fnet_filter_ext::Routine {
+        Self {
             id: fnet_filter_ext::RoutineId::test_value(),
             routine_type: fnet_filter_ext::RoutineType::Ip(Some(
                 fnet_filter_ext::InstalledIpRoutine {
@@ -71,6 +71,12 @@ impl TestValue for fnet_filter_ext::Routine {
                 },
             )),
         }
+    }
+}
+
+impl TestValue for fnet_filter_ext::RuleId {
+    fn test_value() -> Self {
+        Self { routine: fnet_filter_ext::RoutineId::test_value(), index: 0 }
     }
 }
 
@@ -200,25 +206,23 @@ async fn watcher_observe_updates(name: &str) {
         "transactional updates should be demarcated with EndOfUpdate event"
     );
 
+    // Removing a containing resource (e.g. a namespace) also removes all its
+    // contents.
+    let to_remove = fnet_filter_ext::Resource::Namespace(fnet_filter_ext::Namespace::test_value());
     controller
-        .push_changes(
-            resources
-                .iter()
-                .cloned()
-                .map(|resource| fnet_filter_ext::Change::Remove(resource.id()))
-                .collect(),
-        )
+        .push_changes(vec![fnet_filter_ext::Change::Remove(to_remove.id())])
         .await
         .expect("push changes");
     controller.commit().await.expect("commit pending changes");
-    for resource in &resources {
+    let mut expected = resources.into_iter().map(|resource| resource.id()).collect::<HashSet<_>>();
+    while !expected.is_empty() {
         let (controller_id, removed_resource) = assert_matches!(
             stream.next().await,
             Some(Ok(fnet_filter_ext::Event::Removed(id, resource))) => (id, resource),
             "removed resources should be broadcast to watcher"
         );
         assert_eq!(&controller_id, controller.id());
-        assert_eq!(removed_resource, resource.id());
+        assert_eq!(expected.remove(&removed_resource), true);
     }
     assert_matches!(
         stream.next().await,
@@ -764,4 +768,427 @@ async fn push_changes_index_based_error_return(name: &str, pos: InvalidChangePos
         )
         .collect::<Vec<_>>();
     assert_eq!(errors, expected);
+}
+
+#[netstack_test]
+#[test_case(
+    vec![
+        fnet_filter_ext::Resource::Namespace(fnet_filter_ext::Namespace::test_value()),
+        fnet_filter_ext::Resource::Routine(fnet_filter_ext::Routine::test_value()),
+        fnet_filter_ext::Resource::Rule(fnet_filter_ext::Rule::test_value()),
+    ],
+    fnet_filter_ext::ResourceId::Namespace(fnet_filter_ext::NamespaceId::test_value()),
+    &[];
+    "removing a namespace removes constituent routines and rules"
+)]
+#[test_case(
+    vec![
+        fnet_filter_ext::Resource::Namespace(fnet_filter_ext::Namespace::test_value()),
+        fnet_filter_ext::Resource::Routine(fnet_filter_ext::Routine::test_value()),
+        fnet_filter_ext::Resource::Rule(fnet_filter_ext::Rule::test_value()),
+    ],
+    fnet_filter_ext::ResourceId::Routine(fnet_filter_ext::RoutineId::test_value()),
+    &[fnet_filter_ext::Resource::Namespace(fnet_filter_ext::Namespace::test_value())];
+    "removing a routine removes constituent rules"
+)]
+async fn remove_resource_removes_contents(
+    name: &str,
+    resources: Vec<fnet_filter_ext::Resource>,
+    container: fnet_filter_ext::ResourceId,
+    expect_remaining: &[fnet_filter_ext::Resource],
+) {
+    let sandbox = netemul::TestSandbox::new().expect("create sandbox");
+    let realm = sandbox.create_netstack_realm::<Netstack3, _>(name).expect("create realm");
+
+    let control =
+        realm.connect_to_protocol::<fnet_filter::ControlMarker>().expect("connect to protocol");
+    let mut controller =
+        fnet_filter_ext::Controller::new(&control, &fnet_filter_ext::ControllerId(name.to_owned()))
+            .await
+            .expect("create controller");
+
+    // Add a resource along with some contents.
+    controller
+        .push_changes(resources.iter().cloned().map(fnet_filter_ext::Change::Create).collect())
+        .await
+        .expect("push changes");
+    controller.commit().await.expect("commit pending changes");
+
+    let state =
+        realm.connect_to_protocol::<fnet_filter::StateMarker>().expect("connect to protocol");
+    let stream = fnet_filter_ext::event_stream_from_state(state).expect("get filter event stream");
+    futures::pin_mut!(stream);
+    let mut observed: HashMap<_, _> =
+        fnet_filter_ext::get_existing_resources(&mut stream).await.expect("get resources");
+    assert_eq!(
+        observed,
+        HashMap::from([(
+            controller.id().clone(),
+            resources
+                .into_iter()
+                .map(|resource| (resource.id(), resource))
+                .collect::<HashMap<_, _>>()
+        )])
+    );
+
+    // Remove the containing resource.
+    controller
+        .push_changes(vec![fnet_filter_ext::Change::Remove(container)])
+        .await
+        .expect("push changes");
+    controller.commit().await.expect("commit pending changes");
+
+    fnet_filter_ext::wait_for_condition(&mut stream, &mut observed, |resources| {
+        resources
+            .get(controller.id())
+            .expect("get resources owned by controller")
+            .values()
+            .eq(expect_remaining.iter())
+    })
+    .await
+    .expect("wait for constituent resources to be removed");
+}
+
+#[derive(Clone, Copy)]
+enum Idempotence {
+    Idempotent,
+    NonIdempotent,
+}
+
+async fn commit_change_expect_result(
+    controller: &mut fnet_filter_ext::Controller,
+    change: fnet_filter_ext::Change,
+    idempotence: Idempotence,
+    expected_result: Result<(), fnet_filter_ext::ChangeCommitError>,
+) {
+    controller.push_changes(vec![change.clone()]).await.expect("push changes");
+    let result = match idempotence {
+        Idempotence::Idempotent => controller.commit_idempotent().await,
+        Idempotence::NonIdempotent => controller.commit().await,
+    };
+    match expected_result {
+        Ok(()) => result.expect("commit should succeed"),
+        Err(expected_error) => {
+            let errors = assert_matches!(
+                result,
+                Err(fnet_filter_ext::CommitError::ErrorOnChange(errors)) => errors
+            );
+            let (invalid_change, error) = assert_matches!(
+                &errors[..],
+                [result] => result,
+                "should observe one error on commit"
+            );
+            assert_eq!(invalid_change, &change);
+            assert_eq!(error, &expected_error);
+        }
+    }
+}
+
+#[netstack_test]
+#[test_case(
+    fnet_filter_ext::Resource::Namespace(fnet_filter_ext::Namespace::test_value()),
+    fnet_filter_ext::Resource::Namespace(
+        fnet_filter_ext::Namespace {
+            domain: fnet_filter_ext::Domain::Ipv6,
+            ..fnet_filter_ext::Namespace::test_value()
+        },
+    );
+    "namespace"
+)]
+#[test_case(
+    fnet_filter_ext::Resource::Routine(fnet_filter_ext::Routine::test_value()),
+    fnet_filter_ext::Resource::Routine(
+        fnet_filter_ext::Routine {
+            routine_type: fnet_filter_ext::RoutineType::Nat(None),
+            ..fnet_filter_ext::Routine::test_value()
+        },
+    );
+    "routine"
+)]
+#[test_case(
+    fnet_filter_ext::Resource::Rule(fnet_filter_ext::Rule::test_value()),
+    fnet_filter_ext::Resource::Rule(
+        fnet_filter_ext::Rule {
+            matchers: fnet_filter_ext::Matchers::default(),
+            ..fnet_filter_ext::Rule::test_value()
+        },
+    );
+    "rule"
+)]
+async fn add_existing_resource_idempotent(
+    name: &str,
+    duplicate_resource: fnet_filter_ext::Resource,
+    resource_with_same_id_different_property: fnet_filter_ext::Resource,
+) {
+    let sandbox = netemul::TestSandbox::new().expect("create sandbox");
+    let realm = sandbox.create_netstack_realm::<Netstack3, _>(name).expect("create realm");
+    let control =
+        realm.connect_to_protocol::<fnet_filter::ControlMarker>().expect("connect to protocol");
+
+    let mut controller =
+        fnet_filter_ext::Controller::new(&control, &fnet_filter_ext::ControllerId(name.to_owned()))
+            .await
+            .expect("create controller");
+    let resources = [
+        fnet_filter_ext::Resource::Namespace(fnet_filter_ext::Namespace::test_value()),
+        fnet_filter_ext::Resource::Routine(fnet_filter_ext::Routine::test_value()),
+        fnet_filter_ext::Resource::Rule(fnet_filter_ext::Rule::test_value()),
+    ];
+    controller
+        .push_changes(resources.iter().cloned().map(fnet_filter_ext::Change::Create).collect())
+        .await
+        .expect("push changes");
+    controller.commit().await.expect("commit pending changes");
+
+    let state =
+        realm.connect_to_protocol::<fnet_filter::StateMarker>().expect("connect to protocol");
+    let stream = fnet_filter_ext::event_stream_from_state(state).expect("get filter event stream");
+    futures::pin_mut!(stream);
+    let observed: HashMap<_, _> =
+        fnet_filter_ext::get_existing_resources(&mut stream).await.expect("get resources");
+    assert_eq!(
+        observed,
+        HashMap::from([(
+            controller.id().clone(),
+            resources
+                .into_iter()
+                .map(|resource| (resource.id(), resource))
+                .collect::<HashMap<_, _>>(),
+        )])
+    );
+
+    // Add a resource with the same ID as the existing one, but with one of its
+    // properties changed. This should always fail, even if `idempotent` is set.
+    commit_change_expect_result(
+        &mut controller,
+        fnet_filter_ext::Change::Create(resource_with_same_id_different_property.clone()),
+        Idempotence::Idempotent,
+        Err(fnet_filter_ext::ChangeCommitError::AlreadyExists),
+    )
+    .await;
+    commit_change_expect_result(
+        &mut controller,
+        fnet_filter_ext::Change::Create(resource_with_same_id_different_property),
+        Idempotence::NonIdempotent,
+        Err(fnet_filter_ext::ChangeCommitError::AlreadyExists),
+    )
+    .await;
+
+    // Add a resource that exactly matches the existing one. If the commit is
+    // idempotent, this should succeed; if not, it should fail.
+    commit_change_expect_result(
+        &mut controller,
+        fnet_filter_ext::Change::Create(duplicate_resource.clone()),
+        Idempotence::Idempotent,
+        Ok(()),
+    )
+    .await;
+    commit_change_expect_result(
+        &mut controller,
+        fnet_filter_ext::Change::Create(duplicate_resource),
+        Idempotence::NonIdempotent,
+        Err(fnet_filter_ext::ChangeCommitError::AlreadyExists),
+    )
+    .await;
+
+    // Whether the attempted changes fail, or succeed idempotently, either way
+    // the watcher should observe no changes. Contained resources should also
+    // remain installed (routines for a namespace and rules for a routine).
+    assert_matches!(
+        stream.next().on_timeout(ASYNC_EVENT_NEGATIVE_CHECK_TIMEOUT.after_now(), || None).await,
+        None,
+        "no changes should be observed"
+    );
+}
+
+#[netstack_test]
+#[test_case(
+    fnet_filter_ext::ResourceId::Namespace(fnet_filter_ext::NamespaceId::test_value());
+    "namespace"
+)]
+#[test_case(
+    fnet_filter_ext::ResourceId::Routine(fnet_filter_ext::RoutineId::test_value());
+    "routine"
+)]
+#[test_case(fnet_filter_ext::ResourceId::Rule(fnet_filter_ext::RuleId::test_value()); "rule")]
+async fn remove_unknown_resource_idempotent(name: &str, resource: fnet_filter_ext::ResourceId) {
+    let sandbox = netemul::TestSandbox::new().expect("create sandbox");
+    let realm = sandbox.create_netstack_realm::<Netstack3, _>(name).expect("create realm");
+    let control =
+        realm.connect_to_protocol::<fnet_filter::ControlMarker>().expect("connect to protocol");
+    let mut controller =
+        fnet_filter_ext::Controller::new(&control, &fnet_filter_ext::ControllerId(name.to_owned()))
+            .await
+            .expect("create controller");
+
+    let state =
+        realm.connect_to_protocol::<fnet_filter::StateMarker>().expect("connect to protocol");
+    let stream = fnet_filter_ext::event_stream_from_state(state).expect("get filter event stream");
+    futures::pin_mut!(stream);
+    let observed: HashMap<_, _> =
+        fnet_filter_ext::get_existing_resources(&mut stream).await.expect("get resources");
+    assert!(observed.is_empty());
+
+    // Remove a resource that doesn't exist. If the commit is idempotent, this
+    // should succeed; if not, it should fail.
+    commit_change_expect_result(
+        &mut controller,
+        fnet_filter_ext::Change::Remove(resource.clone()),
+        Idempotence::Idempotent,
+        Ok(()),
+    )
+    .await;
+    commit_change_expect_result(
+        &mut controller,
+        fnet_filter_ext::Change::Remove(resource),
+        Idempotence::NonIdempotent,
+        Err(fnet_filter_ext::ChangeCommitError::NamespaceNotFound),
+    )
+    .await;
+
+    // Whether the attempted change fails or succeeds, either way the watcher
+    // should observe no actual changes.
+    assert_matches!(
+        stream.next().on_timeout(ASYNC_EVENT_NEGATIVE_CHECK_TIMEOUT.after_now(), || None).await,
+        None,
+        "no changes should be observed"
+    );
+}
+
+#[netstack_test]
+#[test_case(Idempotence::Idempotent)]
+#[test_case(Idempotence::NonIdempotent)]
+async fn reference_unknown_resource(name: &str, idempotence: Idempotence) {
+    let sandbox = netemul::TestSandbox::new().expect("create sandbox");
+    let realm = sandbox.create_netstack_realm::<Netstack3, _>(name).expect("create realm");
+    let control =
+        realm.connect_to_protocol::<fnet_filter::ControlMarker>().expect("connect to protocol");
+    let mut controller =
+        fnet_filter_ext::Controller::new(&control, &fnet_filter_ext::ControllerId(name.to_owned()))
+            .await
+            .expect("create controller");
+
+    // Adding a routine that refers to an unknown namespace should fail.
+    commit_change_expect_result(
+        &mut controller,
+        fnet_filter_ext::Change::Create(fnet_filter_ext::Resource::Routine(
+            fnet_filter_ext::Routine::test_value(),
+        )),
+        idempotence,
+        Err(fnet_filter_ext::ChangeCommitError::NamespaceNotFound),
+    )
+    .await;
+
+    // Adding a rule that refers to an unknown namespace should fail.
+    commit_change_expect_result(
+        &mut controller,
+        fnet_filter_ext::Change::Create(fnet_filter_ext::Resource::Rule(
+            fnet_filter_ext::Rule::test_value(),
+        )),
+        idempotence,
+        Err(fnet_filter_ext::ChangeCommitError::NamespaceNotFound),
+    )
+    .await;
+
+    // Add the namespace the rule is referring to. The rule creation should
+    // still fail because it refers to an unknown routine.
+    controller
+        .push_changes(vec![fnet_filter_ext::Change::Create(fnet_filter_ext::Resource::Namespace(
+            fnet_filter_ext::Namespace::test_value(),
+        ))])
+        .await
+        .expect("push change");
+    controller.commit().await.expect("commit pending change");
+    commit_change_expect_result(
+        &mut controller,
+        fnet_filter_ext::Change::Create(fnet_filter_ext::Resource::Rule(
+            fnet_filter_ext::Rule::test_value(),
+        )),
+        idempotence,
+        Err(fnet_filter_ext::ChangeCommitError::RoutineNotFound),
+    )
+    .await;
+
+    // Add the routine the rule is referring to. The rule creation should still
+    // fail because it contains a `Jump` action that refers to an unknown
+    // routine.
+    controller
+        .push_changes(vec![fnet_filter_ext::Change::Create(fnet_filter_ext::Resource::Routine(
+            fnet_filter_ext::Routine::test_value(),
+        ))])
+        .await
+        .expect("push change");
+    commit_change_expect_result(
+        &mut controller,
+        fnet_filter_ext::Change::Create(fnet_filter_ext::Resource::Rule(fnet_filter_ext::Rule {
+            action: fnet_filter_ext::Action::Jump(String::from("does-not-exist")),
+            ..fnet_filter_ext::Rule::test_value()
+        })),
+        idempotence,
+        Err(fnet_filter_ext::ChangeCommitError::RoutineNotFound),
+    )
+    .await;
+}
+
+#[netstack_test]
+async fn commit_failure_clears_pending_changes_and_does_not_change_state(name: &str) {
+    let sandbox = netemul::TestSandbox::new().expect("create sandbox");
+    let realm = sandbox.create_netstack_realm::<Netstack3, _>(name).expect("create realm");
+    let control =
+        realm.connect_to_protocol::<fnet_filter::ControlMarker>().expect("connect to protocol");
+    let mut controller =
+        fnet_filter_ext::Controller::new(&control, &fnet_filter_ext::ControllerId(name.to_owned()))
+            .await
+            .expect("create controller");
+
+    // Add some state and observe its addition.
+    let resources = [
+        fnet_filter_ext::Resource::Namespace(fnet_filter_ext::Namespace::test_value()),
+        fnet_filter_ext::Resource::Routine(fnet_filter_ext::Routine::test_value()),
+        fnet_filter_ext::Resource::Rule(fnet_filter_ext::Rule::test_value()),
+    ];
+    controller
+        .push_changes(resources.iter().cloned().map(fnet_filter_ext::Change::Create).collect())
+        .await
+        .expect("push changes");
+    controller.commit().await.expect("commit pending changes");
+
+    let state =
+        realm.connect_to_protocol::<fnet_filter::StateMarker>().expect("connect to protocol");
+    let stream = fnet_filter_ext::event_stream_from_state(state).expect("get filter event stream");
+    futures::pin_mut!(stream);
+    let observed: HashMap<_, _> =
+        fnet_filter_ext::get_existing_resources(&mut stream).await.expect("get resources");
+    assert_eq!(
+        observed,
+        HashMap::from([(
+            controller.id().clone(),
+            resources
+                .into_iter()
+                .map(|resource| (resource.id(), resource))
+                .collect::<HashMap<_, _>>(),
+        )])
+    );
+
+    // Commit an invalid change and ensure we get an error.
+    commit_change_expect_result(
+        &mut controller,
+        fnet_filter_ext::Change::Remove(fnet_filter_ext::ResourceId::Namespace(
+            fnet_filter_ext::NamespaceId(String::from("does-not-exist")),
+        )),
+        Idempotence::NonIdempotent,
+        Err(fnet_filter_ext::ChangeCommitError::NamespaceNotFound),
+    )
+    .await;
+
+    // Committing again should succeed because the pending change should have
+    // been cleared on commit failure.
+    controller.commit().await.expect("commit with no pending changes should succeed");
+
+    // State should be unchanged, so the watcher should not observe any events.
+    assert_matches!(
+        stream.next().on_timeout(ASYNC_EVENT_NEGATIVE_CHECK_TIMEOUT.after_now(), || None).await,
+        None,
+        "no changes should be observed"
+    );
 }

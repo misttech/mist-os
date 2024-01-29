@@ -117,7 +117,7 @@ closed protocol NamespaceController {
         /// For example, an update to add a resource when the resource already
         /// exists will fail with an `ALREADY_EXISTS` error if `idempotent` is
         /// `false`, but will succeed if it is `true`. Likewise for removals and
-        /// `NOT_FOUND`.
+        /// `*_NOT_FOUND`.
         ///
         /// If not set, interpreted as false.
         1: idempotent bool;
@@ -135,10 +135,14 @@ closed protocol NamespaceController {
             NOT_REACHED = 1;
             /// The change was valid.
             OK = 2;
-            /// One of the specified resources was not found.
-            NOT_FOUND = 4;
+            /// The change referred to an unknown namespace.
+            NAMESPACE_NOT_FOUND = 3;
+            /// The change referred to an unknown routine.
+            ROUTINE_NOT_FOUND = 4;
+            /// The change referred to an unknown rule.
+            RULE_NOT_FOUND = 5;
             /// One of the specified resources already exists.
-            ALREADY_EXISTS = 5;
+            ALREADY_EXISTS = 6;
             /// The change included a rule with a matcher specified that is
             /// unavailable in the context in which the rule will be evaluated.
             ///
@@ -146,12 +150,12 @@ closed protocol NamespaceController {
             /// a rule that is in a routine installed in the egress hook, or a
             /// matcher on the source address specifying an IPv4 subnet that is
             /// in an IPv6-only namespace.
-            MATCHER_UNAVAILABLE = 6;
+            MATCHER_UNAVAILABLE = 7;
             /// The change included a rule with an action that was not valid for
             /// the routine to which the rule was appended.
             ///
             /// For example, this could be a NAT action in an IP routine.
-            INVALID_ACTION_FOR_ROUTINE = 7;
+            INVALID_ACTION_FOR_ROUTINE = 8;
         }>:MAX_COMMIT_SIZE;
     });
 };

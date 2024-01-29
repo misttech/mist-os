@@ -13,7 +13,7 @@ mod integration_tests;
 
 mod debug_fidl_worker;
 mod devices;
-mod filter_worker;
+mod filter;
 mod inspect;
 mod interfaces_admin;
 mod interfaces_watcher;
@@ -1229,7 +1229,7 @@ impl NetstackSeed {
 
         let (route_set_waitgroup, route_set_spawner) = TaskWaitGroup::new();
 
-        let filter_update_dispatcher = filter_worker::UpdateDispatcher::default();
+        let filter_update_dispatcher = filter::UpdateDispatcher::default();
 
         // It is unclear why we need to wrap the `for_each_concurrent` call with
         // `async move { ... }` but it seems like we do. Without this, the
@@ -1384,20 +1384,18 @@ impl NetstackSeed {
                         }
                         Service::FilterState(filter) => {
                             filter
-                                .serve_with(|rs| {
-                                    filter_worker::serve_state(rs, &filter_update_dispatcher)
-                                })
+                                .serve_with(|rs| filter::serve_state(rs, &filter_update_dispatcher))
                                 .await
                         }
                         Service::FilterControl(filter) => {
                             filter
                                 .serve_with(|rs| {
-                                    filter_worker::serve_control(rs, &filter_update_dispatcher)
+                                    filter::serve_control(rs, &filter_update_dispatcher)
                                 })
                                 .await
                         }
                         Service::FilterDeprecated(filter) => {
-                            filter.serve_with(|rs| filter_worker::serve_deprecated(rs)).await
+                            filter.serve_with(|rs| filter::serve_deprecated(rs)).await
                         }
                         Service::Neighbor(neighbor) => {
                             neighbor

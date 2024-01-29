@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+mod controller;
+
 use std::collections::{hash_map::Entry, HashMap};
 use std::num::NonZeroUsize;
 use std::sync::Arc;
@@ -18,6 +20,8 @@ use itertools::Itertools as _;
 use thiserror::Error;
 use tracing::{error, warn};
 
+use controller::Controller;
+
 // The maximum number of events a client for the `fuchsia.net.filter/Watcher` is
 // allowed to have queued. Clients will be dropped if they exceed this limit.
 // Keep this a multiple of `fnet_filter::MAX_BATCH_SIZE` (5 is somewhat
@@ -29,10 +33,7 @@ pub(crate) struct UpdateDispatcher(Arc<Mutex<UpdateDispatcherInner>>);
 
 #[derive(Default)]
 struct UpdateDispatcherInner {
-    resources: HashMap<
-        fnet_filter_ext::ControllerId,
-        HashMap<fnet_filter_ext::ResourceId, fnet_filter_ext::Resource>,
-    >,
+    resources: HashMap<fnet_filter_ext::ControllerId, Controller>,
     clients: Vec<WatcherSink>,
 }
 
@@ -53,7 +54,7 @@ impl UpdateDispatcherInner {
             );
             match resources.entry(id.clone()) {
                 Entry::Vacant(entry) => {
-                    let _ = entry.insert(HashMap::new());
+                    let _ = entry.insert(Controller::default());
                     return id;
                 }
                 Entry::Occupied(_) => {
@@ -70,7 +71,7 @@ impl UpdateDispatcherInner {
 
         // Notify all existing watchers of the removed resources.
         let events = resources
-            .into_keys()
+            .existing_ids()
             .map(|resource| fnet_filter_ext::Event::Removed(id.clone(), resource))
             .chain(std::iter::once(fnet_filter_ext::Event::EndOfUpdate))
             .collect::<Vec<_>>()
@@ -84,50 +85,43 @@ impl UpdateDispatcherInner {
         &mut self,
         controller: &fnet_filter_ext::ControllerId,
         changes: Vec<fnet_filter_ext::Change>,
-        _idempotent: bool,
-    ) -> fnet_filter::CommitResult {
+        idempotent: bool,
+    ) -> Result<(), (usize, fnet_filter::CommitError)> {
         let Self { resources, clients } = self;
 
         // NB: we update NS3 core and broadcast the updates to clients under a
         // single lock to ensure bindings and core see updates in the same
         // order.
 
-        // TODO(https://fxbug.dev/42182933): validate changes against existing
-        // state, taking into account the `idempotent` option specified above.
+        let events = resources
+            .get_mut(controller)
+            .expect("controller should not be removed while serving")
+            .validate_and_apply(changes, idempotent)?;
 
-        // TODO(https://fxbug.dev/42083801): propagate changes to Netstack3 Core
-        // once the necessary functionality is available.
+        // TODO(https://fxbug.dev/318738286): propagate changes to Netstack3
+        // Core once the necessary functionality is available. This will require
+        // merging this controller's state with all state owned by other
+        // controllers.
 
-        let resources =
-            resources.get_mut(controller).expect("controller should not be removed while serving");
-        for change in &changes {
-            match change {
-                fnet_filter_ext::Change::Create(resource) => {
-                    let _ = resources.insert(resource.id(), resource.clone());
-                }
-                fnet_filter_ext::Change::Remove(id) => {
-                    let _ = resources.remove(id);
-                }
+        // Notify all existing watchers of the update, if it was not a no-op.
+        if !events.is_empty() {
+            let events = events
+                .into_iter()
+                .map(|event| match event {
+                    controller::Event::Added(resource) => {
+                        fnet_filter_ext::Event::Added(controller.clone(), resource)
+                    }
+                    controller::Event::Removed(resource) => {
+                        fnet_filter_ext::Event::Removed(controller.clone(), resource)
+                    }
+                })
+                .chain(std::iter::once(fnet_filter_ext::Event::EndOfUpdate));
+            for client in clients {
+                client.send(events.clone());
             }
         }
 
-        // Notify all existing watchers of the update.
-        let events = changes
-            .into_iter()
-            .map(|change| match change {
-                fnet_filter_ext::Change::Create(resource) => {
-                    fnet_filter_ext::Event::Added(controller.clone(), resource)
-                }
-                fnet_filter_ext::Change::Remove(resource) => {
-                    fnet_filter_ext::Event::Removed(controller.clone(), resource)
-                }
-            })
-            .chain(std::iter::once(fnet_filter_ext::Event::EndOfUpdate));
-        for client in clients {
-            client.send(events.clone());
-        }
-
-        fnet_filter::CommitResult::Ok(fnet_filter::Empty {})
+        Ok(())
     }
 
     fn connect_new_client(&mut self) -> Watcher {
@@ -187,17 +181,14 @@ struct Watcher {
 
 impl Watcher {
     fn new_with_existing_resources(
-        resources: &HashMap<
-            fnet_filter_ext::ControllerId,
-            HashMap<fnet_filter_ext::ResourceId, fnet_filter_ext::Resource>,
-        >,
+        resources: &HashMap<fnet_filter_ext::ControllerId, Controller>,
     ) -> (Self, WatcherSink) {
         let existing_resources = resources
             .into_iter()
             .flat_map(|(controller, resources)| {
-                resources.iter().map(|(_id, resource)| resource).map(|resource| {
-                    fnet_filter_ext::Event::Existing(controller.clone(), resource.clone())
-                })
+                resources
+                    .existing_resources()
+                    .map(|resource| fnet_filter_ext::Event::Existing(controller.clone(), resource))
             })
             .chain(std::iter::once(fnet_filter_ext::Event::Idle))
             .collect::<Vec<_>>()
@@ -441,7 +432,22 @@ async fn serve_controller(
                 let fnet_filter::CommitOptions { idempotent, .. } = options;
                 let idempotent = idempotent.unwrap_or(false);
                 let changes = std::mem::take(&mut pending_changes);
+                let num_changes = changes.len();
                 let result = dispatcher.lock().await.commit_changes(id, changes, idempotent);
+                let result = match result {
+                    Ok(()) => fnet_filter::CommitResult::Ok(fnet_filter::Empty {}),
+                    Err((i, error)) => {
+                        let errors = std::iter::repeat(fnet_filter::CommitError::Ok)
+                            .take(i)
+                            .chain(std::iter::once(error))
+                            .chain(
+                                std::iter::repeat(fnet_filter::CommitError::NotReached)
+                                    .take(num_changes - i - 1),
+                            )
+                            .collect::<Vec<_>>();
+                        fnet_filter::CommitResult::ErrorOnChange(errors)
+                    }
+                };
                 responder.send(result)?;
             }
             NamespaceControllerRequest::Detach { responder: _ } => {

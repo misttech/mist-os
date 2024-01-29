@@ -1192,8 +1192,12 @@ pub enum PushChangesError {
 /// Extension type for the error variants of [`fnet_filter::CommitError`].
 #[derive(Debug, Error, PartialEq)]
 pub enum ChangeCommitError {
-    #[error("the specified resource was not found")]
-    NotFound,
+    #[error("the change referred to an unknown namespace")]
+    NamespaceNotFound,
+    #[error("the change referred to an unknown routine")]
+    RoutineNotFound,
+    #[error("the change referred to an unknown rule")]
+    RuleNotFound,
     #[error("the specified resource already exists")]
     AlreadyExists,
     #[error("rule specifies a matcher that is unavailable in rule's context")]
@@ -1207,7 +1211,9 @@ impl TryFrom<fnet_filter::CommitError> for ChangeCommitError {
 
     fn try_from(error: fnet_filter::CommitError) -> Result<Self, Self::Error> {
         match error {
-            fnet_filter::CommitError::NotFound => Ok(Self::NotFound),
+            fnet_filter::CommitError::NamespaceNotFound => Ok(Self::NamespaceNotFound),
+            fnet_filter::CommitError::RoutineNotFound => Ok(Self::RoutineNotFound),
+            fnet_filter::CommitError::RuleNotFound => Ok(Self::RuleNotFound),
             fnet_filter::CommitError::AlreadyExists => Ok(Self::AlreadyExists),
             fnet_filter::CommitError::MatcherUnavailable => Ok(Self::MatcherUnavailable),
             fnet_filter::CommitError::InvalidActionForRoutine => Ok(Self::InvalidActionForRoutine),
@@ -1366,7 +1372,9 @@ impl Controller {
                         fnet_filter::CommitError::Ok | fnet_filter::CommitError::NotReached => {
                             Ok(errors)
                         }
-                        error @ (fnet_filter::CommitError::NotFound
+                        error @ (fnet_filter::CommitError::NamespaceNotFound
+                        | fnet_filter::CommitError::RoutineNotFound
+                        | fnet_filter::CommitError::RuleNotFound
                         | fnet_filter::CommitError::AlreadyExists
                         | fnet_filter::CommitError::MatcherUnavailable
                         | fnet_filter::CommitError::InvalidActionForRoutine) => {
@@ -2254,7 +2262,7 @@ mod tests {
                 result,
                 Err(CommitError::ErrorOnChange(errors)) if errors == vec![(
                     Change::Remove(unknown_resource_id()),
-                    ChangeCommitError::NotFound,
+                    ChangeCommitError::NamespaceNotFound,
                 )]
             );
         };
@@ -2288,7 +2296,7 @@ mod tests {
             responder
                 .send(fnet_filter::CommitResult::ErrorOnChange(vec![
                     fnet_filter::CommitError::Ok,
-                    fnet_filter::CommitError::NotFound,
+                    fnet_filter::CommitError::NamespaceNotFound,
                     fnet_filter::CommitError::Ok,
                 ]))
                 .expect("send commit result");
