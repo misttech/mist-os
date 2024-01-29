@@ -442,10 +442,6 @@
             to: "#test_manager",
         },
         {
-            from: "#tzdata-provider",
-            to: "#test_manager",
-        },
-        {
             storage: "tmp",
             from: "self",
             to: "#test_manager",

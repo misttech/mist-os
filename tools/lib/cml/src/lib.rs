@@ -1418,6 +1418,17 @@ where
 /// [`Document`]: struct.Document.html
 macro_rules! merge_from_capability_field {
     ($self:ident, $other:ident, $field_name:ident) => {
+        // Empty entries are an error, and merging removes empty entries so we first need to check
+        // for them.
+        for entry in $self.$field_name.iter().flatten().chain($other.$field_name.iter().flatten()) {
+            if entry.names().is_empty() {
+                return Err(Error::Validate {
+                    err: format!("{}: Missing type name: {:#?}", entry.decl_type(), entry),
+                    filename: None,
+                });
+            }
+        }
+
         if let Some(all_ours) = $self.$field_name.as_mut() {
             if let Some(all_theirs) = $other.$field_name.take() {
                 for mut theirs in all_theirs {
@@ -1428,22 +1439,7 @@ macro_rules! merge_from_capability_field {
                 }
             }
             // Post-filter step: remove empty entries.
-            all_ours.retain(|ours| {
-                let mut nonempty = false;
-                for list in [
-                    ours.service(),
-                    ours.protocol(),
-                    ours.directory(),
-                    ours.storage(),
-                    ours.resolver(),
-                    ours.runner(),
-                    ours.event_stream(),
-                    ours.config(),
-                ] {
-                    nonempty |= list.is_some();
-                }
-                nonempty
-            });
+            all_ours.retain(|ours| !ours.names().is_empty())
         } else if let Some(theirs) = $other.$field_name.take() {
             $self.$field_name.replace(theirs);
         }
@@ -3466,7 +3462,7 @@ impl CapabilityClause for Capability {
         } else if self.config.is_some() {
             "config"
         } else {
-            panic!("Missing capability name")
+            panic!("Capability: Missing capability name")
         }
     }
     fn decl_type(&self) -> &'static str {
@@ -3564,7 +3560,7 @@ impl CapabilityClause for DebugRegistration {
         if self.protocol.is_some() {
             "protocol"
         } else {
-            panic!("Missing capability name")
+            panic!("Debug: Missing capability name")
         }
     }
     fn decl_type(&self) -> &'static str {
@@ -3686,7 +3682,7 @@ impl CapabilityClause for Use {
         } else if self.config.is_some() {
             "config"
         } else {
-            panic!("Missing capability name")
+            panic!("Use: Missing capability name")
         }
     }
 
@@ -3826,7 +3822,7 @@ impl CapabilityClause for Expose {
         } else if self.config.is_some() {
             "config"
         } else {
-            panic!("Missing capability name")
+            panic!("Expose: Missing capability name")
         }
     }
     fn decl_type(&self) -> &'static str {
@@ -3997,7 +3993,7 @@ impl CapabilityClause for Offer {
         } else if self.config.is_some() {
             "config"
         } else {
-            panic!("Missing capability name")
+            panic!("Offer: Missing capability name")
         }
     }
     fn decl_type(&self) -> &'static str {
@@ -5463,6 +5459,18 @@ mod tests {
         ]}));
         my.merge_from(&mut other, &path::Path::new("some/path")).unwrap();
         assert_eq!(my, result);
+    }
+
+    #[test]
+    fn test_merge_with_empty_names() {
+        // This document is an error because there is no capability name.
+        let mut my = document(json!({ "capabilities": [{ "path": "/a"}]}));
+
+        let mut other = document(json!({ "capabilities": [
+            { "directory": "a", "path": "/a" },
+            { "directory": "b", "path": "/b" },
+        ]}));
+        my.merge_from(&mut other, &path::Path::new("some/path")).unwrap_err();
     }
 
     #[test_case("protocol")]
