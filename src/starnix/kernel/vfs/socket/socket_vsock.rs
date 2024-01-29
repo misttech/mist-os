@@ -310,7 +310,7 @@ mod tests {
     };
     use fuchsia_zircon as zx;
     use fuchsia_zircon::HandleBased;
-    use starnix_uapi::epoll_event;
+    use starnix_uapi::vfs::EpollEvent;
     use syncio::Zxio;
 
     #[::fuchsia::test]
@@ -434,7 +434,7 @@ mod tests {
 
         let epoll_object = EpollFileObject::new_file(&current_task);
         let epoll_file = epoll_object.downcast_file::<EpollFileObject>().unwrap();
-        let event = epoll_event::new(FdEvents::POLLIN.bits(), 0);
+        let event = EpollEvent::new(FdEvents::POLLIN, 0);
         epoll_file.add(&current_task, &socket, &epoll_object, event).expect("poll_file.add");
 
         let fds = epoll_file.wait(&current_task, 1, zx::Time::ZERO).expect("wait");

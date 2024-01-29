@@ -1644,7 +1644,7 @@ mod test {
     use fuchsia_fs::{directory, file};
     use fuchsia_zircon::HandleBased;
     use fxfs_testing::{TestFixture, TestFixtureOptions};
-    use starnix_uapi::{auth::Credentials, epoll_event, errors::EINVAL, file_mode::mode};
+    use starnix_uapi::{auth::Credentials, errors::EINVAL, file_mode::mode, vfs::EpollEvent};
 
     #[::fuchsia::test]
     async fn test_tree() -> Result<(), anyhow::Error> {
@@ -1716,7 +1716,7 @@ mod test {
 
         let epoll_object = EpollFileObject::new_file(&current_task);
         let epoll_file = epoll_object.downcast_file::<EpollFileObject>().unwrap();
-        let event = epoll_event::new(FdEvents::POLLIN.bits(), 0);
+        let event = EpollEvent::new(FdEvents::POLLIN, 0);
         epoll_file.add(&current_task, &pipe, &epoll_object, event).expect("poll_file.add");
 
         let fds = epoll_file.wait(&current_task, 1, zx::Time::ZERO).expect("wait");

@@ -4,6 +4,7 @@
 
 use super::PAGE_SIZE;
 use linux_uapi as uapi;
+use zerocopy::{AsBytes, FromBytes, FromZeros, NoCell};
 
 pub const EPOLLONESHOT: u32 = 1 << 30;
 pub const EPOLLET: u32 = 1 << 31;
@@ -50,5 +51,23 @@ pub fn default_statfs(magic: u32) -> uapi::statfs {
         f_frsize: *PAGE_SIZE as i64,
         f_flags: 0,
         f_spare: [0, 0, 0, 0],
+    }
+}
+
+#[repr(C)]
+#[derive(AsBytes, FromBytes, FromZeros, NoCell)]
+pub struct EpollEvent(uapi::epoll_event);
+
+impl EpollEvent {
+    pub fn new(events: FdEvents, data: u64) -> Self {
+        Self(uapi::epoll_event { events: events.bits(), data, ..Default::default() })
+    }
+
+    pub fn events(&self) -> FdEvents {
+        FdEvents::from_bits_retain(self.0.events)
+    }
+
+    pub fn data(&self) -> u64 {
+        self.0.data
     }
 }

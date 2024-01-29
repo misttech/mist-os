@@ -25,7 +25,7 @@ use starnix_logging::track_stub;
 use starnix_uapi::{
     __kernel_time_t, clone_args,
     device_type::DeviceType,
-    epoll_event, errno, error,
+    errno, error,
     errors::Errno,
     file_mode::FileMode,
     gid_t, itimerval,
@@ -35,6 +35,7 @@ use starnix_uapi::{
     time::{duration_from_poll_timeout, duration_from_timeval, timeval_from_duration},
     uapi, uid_t,
     user_address::{UserAddress, UserCString, UserRef},
+    vfs::EpollEvent,
     ARCH_SET_FS, ARCH_SET_GS, AT_REMOVEDIR, AT_SYMLINK_NOFOLLOW, CLONE_VFORK, CLONE_VM, CSIGNAL,
     ITIMER_REAL,
 };
@@ -197,7 +198,7 @@ pub fn sys_epoll_wait(
     locked: &mut Locked<'_, Unlocked>,
     current_task: &mut CurrentTask,
     epfd: FdNumber,
-    events: UserRef<epoll_event>,
+    events: UserRef<EpollEvent>,
     max_events: i32,
     timeout: i32,
 ) -> Result<usize, Errno> {

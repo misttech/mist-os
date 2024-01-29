@@ -29,7 +29,7 @@ use starnix_uapi::{
     __kernel_fd_set,
     auth::{CAP_DAC_READ_SEARCH, CAP_SYS_ADMIN, CAP_WAKE_ALARM, PTRACE_MODE_ATTACH_REALCREDS},
     device_type::DeviceType,
-    epoll_event, errno, error,
+    errno, error,
     errors::EFAULT,
     errors::{Errno, ErrnoResultExt, EINTR, ENAMETOOLONG, ETIMEDOUT},
     f_owner_ex,
@@ -51,6 +51,7 @@ use starnix_uapi::{
     },
     timespec, uapi, uid_t,
     user_address::{UserAddress, UserCString, UserRef},
+    vfs::EpollEvent,
     vfs::FdEvents,
     AT_EACCESS, AT_EMPTY_PATH, AT_NO_AUTOMOUNT, AT_REMOVEDIR, AT_SYMLINK_FOLLOW,
     AT_SYMLINK_NOFOLLOW, CLOCK_BOOTTIME, CLOCK_BOOTTIME_ALARM, CLOCK_MONOTONIC, CLOCK_REALTIME,
@@ -2032,7 +2033,7 @@ pub fn sys_epoll_ctl(
     epfd: FdNumber,
     op: u32,
     fd: FdNumber,
-    event: UserRef<epoll_event>,
+    event: UserRef<EpollEvent>,
 ) -> Result<(), Errno> {
     if epfd == fd {
         return error!(EINVAL);
@@ -2061,7 +2062,7 @@ pub fn sys_epoll_ctl(
 fn do_epoll_pwait(
     current_task: &mut CurrentTask,
     epfd: FdNumber,
-    events: UserRef<epoll_event>,
+    events: UserRef<EpollEvent>,
     unvalidated_max_events: i32,
     deadline: zx::Time,
     user_sigmask: UserRef<SigSet>,
@@ -2080,7 +2081,7 @@ fn do_epoll_pwait(
     // memory is actually written, the events will be lost. This check is not a guarantee.
     current_task
         .mm()
-        .check_plausible(events.addr(), max_events * std::mem::size_of::<epoll_event>())?;
+        .check_plausible(events.addr(), max_events * std::mem::size_of::<EpollEvent>())?;
 
     let active_events = if !user_sigmask.is_null() {
         let signal_mask = current_task.read_object(user_sigmask)?;
@@ -2099,7 +2100,7 @@ pub fn sys_epoll_pwait(
     _locked: &mut Locked<'_, Unlocked>,
     current_task: &mut CurrentTask,
     epfd: FdNumber,
-    events: UserRef<epoll_event>,
+    events: UserRef<EpollEvent>,
     max_events: i32,
     timeout: i32,
     user_sigmask: UserRef<SigSet>,
@@ -2112,7 +2113,7 @@ pub fn sys_epoll_pwait2(
     _locked: &mut Locked<'_, Unlocked>,
     current_task: &mut CurrentTask,
     epfd: FdNumber,
-    events: UserRef<epoll_event>,
+    events: UserRef<EpollEvent>,
     max_events: i32,
     user_timespec: UserRef<timespec>,
     user_sigmask: UserRef<SigSet>,

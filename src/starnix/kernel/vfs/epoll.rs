@@ -17,10 +17,10 @@ use itertools::Itertools;
 use starnix_logging::log_warn;
 use starnix_sync::{Locked, Mutex, ReadOps, WriteOps};
 use starnix_uapi::{
-    epoll_event, errno, error,
+    errno, error,
     errors::{Errno, EBADF, EINTR, ETIMEDOUT},
     open_flags::OpenFlags,
-    vfs::FdEvents,
+    vfs::{EpollEvent, FdEvents},
 };
 use std::{
     collections::{hash_map::Entry, HashMap, VecDeque},
@@ -195,11 +195,8 @@ impl EpollFileObject {
         current_task: &CurrentTask,
         file: &FileHandle,
         epoll_file_handle: &FileHandle,
-        mut epoll_event: epoll_event,
+        epoll_event: EpollEvent,
     ) -> Result<(), Errno> {
-        epoll_event.events |= FdEvents::POLLHUP.bits();
-        epoll_event.events |= FdEvents::POLLERR.bits();
-
         // Check if adding this file would cause a cycle at a max depth of 5.
         if let Some(epoll_to_add) = file.downcast_file::<EpollFileObject>() {
             // We need to check for `MAX_NESTED_DEPTH - 1` because adding `epoll_to_add` to self
@@ -214,8 +211,8 @@ impl EpollFileObject {
             Entry::Vacant(entry) => {
                 let wait_object = entry.insert(WaitObject {
                     target: Arc::downgrade(file),
-                    events: FdEvents::from_bits_truncate(epoll_event.events),
-                    data: epoll_event.data,
+                    events: epoll_event.events() | FdEvents::POLLHUP | FdEvents::POLLERR,
+                    data: epoll_event.data(),
                     wait_canceler: None,
                 });
                 self.wait_on_file(current_task, key, wait_object)
@@ -228,11 +225,8 @@ impl EpollFileObject {
         &self,
         current_task: &CurrentTask,
         file: &FileHandle,
-        mut epoll_event: epoll_event,
+        epoll_event: EpollEvent,
     ) -> Result<(), Errno> {
-        epoll_event.events |= FdEvents::POLLHUP.bits();
-        epoll_event.events |= FdEvents::POLLERR.bits();
-
         let mut state = self.state.lock();
         let key = as_epoll_key(file).into();
         state.rearm_list.retain(|x| x.key != key);
@@ -242,7 +236,7 @@ impl EpollFileObject {
                 if let Some(wait_canceler) = wait_object.wait_canceler.take() {
                     wait_canceler.cancel();
                 }
-                wait_object.events = FdEvents::from_bits_truncate(epoll_event.events);
+                wait_object.events = epoll_event.events() | FdEvents::POLLHUP | FdEvents::POLLERR;
                 self.wait_on_file(current_task, key, wait_object)
             }
             Entry::Vacant(_) => error!(ENOENT),
@@ -380,7 +374,7 @@ impl EpollFileObject {
         current_task: &CurrentTask,
         max_events: usize,
         deadline: zx::Time,
-    ) -> Result<Vec<epoll_event>, Errno> {
+    ) -> Result<Vec<EpollEvent>, Errno> {
         // First we start waiting again on wait objects that have
         // previously been triggered.
         {
@@ -403,8 +397,8 @@ impl EpollFileObject {
             // The wait could have been deleted by here,
             // so ignore the None case.
             if let Some(wait) = state.wait_objects.get_mut(&pending_event.key) {
-                let reported_events = pending_event.events.bits() & wait.events.bits();
-                result.push(epoll_event::new(reported_events, wait.data));
+                let reported_events = pending_event.events & wait.events;
+                result.push(EpollEvent::new(reported_events, wait.data));
 
                 // Files marked with `EPOLLONESHOT` should only notify
                 // once and need to be rearmed manually with epoll_ctl_mod().
@@ -488,7 +482,7 @@ impl FileOps for EpollFileObject {
 
 #[cfg(test)]
 mod tests {
-    use super::{epoll_event, EpollFileObject, EventHandler, OpenFlags};
+    use super::{EpollFileObject, EventHandler, OpenFlags};
     use crate::{
         fs::fuchsia::create_fuchsia_pipe,
         task::Waiter,
@@ -504,7 +498,7 @@ mod tests {
         HandleBased, {self as zx},
     };
     use starnix_lifecycle::AtomicUsizeCounter;
-    use starnix_uapi::vfs::FdEvents;
+    use starnix_uapi::vfs::{EpollEvent, FdEvents};
     use syncio::Zxio;
 
     #[::fuchsia::test]
@@ -527,7 +521,7 @@ mod tests {
                 &current_task,
                 &pipe_out,
                 &epoll_file_handle,
-                epoll_event::new(FdEvents::POLLIN.bits(), EVENT_DATA),
+                EpollEvent::new(FdEvents::POLLIN, EVENT_DATA),
             )
             .unwrap();
 
@@ -545,9 +539,8 @@ mod tests {
         thread.await.expect("join");
         assert_eq!(1, events.len());
         let event = &events[0];
-        assert!(FdEvents::from_bits_truncate(event.events).contains(FdEvents::POLLIN));
-        let data = event.data;
-        assert_eq!(EVENT_DATA, data);
+        assert!(event.events().contains(FdEvents::POLLIN));
+        assert_eq!(event.data(), EVENT_DATA);
 
         let mut buffer = VecOutputBuffer::new(test_len);
         let bytes_read = pipe_out.read(&mut locked, &current_task, &mut buffer).unwrap();
@@ -582,16 +575,15 @@ mod tests {
                 &current_task,
                 &pipe_out,
                 &epoll_file_handle,
-                epoll_event::new(FdEvents::POLLIN.bits(), EVENT_DATA),
+                EpollEvent::new(FdEvents::POLLIN, EVENT_DATA),
             )
             .unwrap();
 
         let events = epoll_file.wait(&current_task, 10, zx::Time::INFINITE).unwrap();
         assert_eq!(1, events.len());
         let event = &events[0];
-        assert!(FdEvents::from_bits_truncate(event.events).contains(FdEvents::POLLIN));
-        let data = event.data;
-        assert_eq!(EVENT_DATA, data);
+        assert!(event.events().contains(FdEvents::POLLIN));
+        assert_eq!(event.data(), EVENT_DATA);
 
         let mut buffer = VecOutputBuffer::new(test_len);
         let bytes_read = pipe_out.read(&mut locked, &current_task, &mut buffer).unwrap();
@@ -614,7 +606,7 @@ mod tests {
                     &current_task,
                     &event,
                     &epoll_file_handle,
-                    epoll_event::new(FdEvents::POLLIN.bits(), EVENT_DATA),
+                    EpollEvent::new(FdEvents::POLLIN, EVENT_DATA),
                 )
                 .unwrap();
 
@@ -649,9 +641,8 @@ mod tests {
             } else {
                 assert_eq!(1, events.len());
                 let event = &events[0];
-                assert!(FdEvents::from_bits_truncate(event.events).contains(FdEvents::POLLIN));
-                let data = event.data;
-                assert_eq!(EVENT_DATA, data);
+                assert!(event.events().contains(FdEvents::POLLIN));
+                assert_eq!(event.data(), EVENT_DATA);
             }
         }
     }
@@ -672,20 +663,10 @@ mod tests {
             let epoll_object = EpollFileObject::new_file(&current_task);
             let epoll_file = epoll_object.downcast_file::<EpollFileObject>().unwrap();
             epoll_file
-                .add(
-                    &current_task,
-                    &pipe1,
-                    &epoll_object,
-                    epoll_event::new(FdEvents::POLLIN.bits(), 1),
-                )
+                .add(&current_task, &pipe1, &epoll_object, EpollEvent::new(FdEvents::POLLIN, 1))
                 .expect("epoll_file.add");
             epoll_file
-                .add(
-                    &current_task,
-                    &pipe2,
-                    &epoll_object,
-                    epoll_event::new(FdEvents::POLLIN.bits(), 2),
-                )
+                .add(&current_task, &pipe2, &epoll_object, EpollEvent::new(FdEvents::POLLIN, 2))
                 .expect("epoll_file.add");
             epoll_file.wait(&current_task, 2, zx::Time::ZERO).expect("wait")
         };
@@ -697,9 +678,8 @@ mod tests {
 
         let fds = poll();
         assert_eq!(fds.len(), 1);
-        assert_eq!(FdEvents::from_bits_truncate(fds[0].events), FdEvents::POLLIN);
-        let data = fds[0].data;
-        assert_eq!(data, 1);
+        assert_eq!(fds[0].events(), FdEvents::POLLIN);
+        assert_eq!(fds[0].data(), 1);
         assert_eq!(
             pipe1.read(&mut locked, &current_task, &mut VecOutputBuffer::new(64)).expect("read"),
             1
@@ -712,9 +692,8 @@ mod tests {
 
         let fds = poll();
         assert_eq!(fds.len(), 1);
-        assert_eq!(FdEvents::from_bits_truncate(fds[0].events), FdEvents::POLLIN);
-        let data = fds[0].data;
-        assert_eq!(data, 2);
+        assert_eq!(fds[0].events(), FdEvents::POLLIN);
+        assert_eq!(fds[0].data(), 2);
         assert_eq!(
             pipe2.read(&mut locked, &current_task, &mut VecOutputBuffer::new(64)).expect("read"),
             1
@@ -738,7 +717,7 @@ mod tests {
                 &current_task,
                 &event,
                 &epoll_file_handle,
-                epoll_event::new(FdEvents::POLLIN.bits(), EVENT_DATA),
+                EpollEvent::new(FdEvents::POLLIN, EVENT_DATA),
             )
             .unwrap();
 
@@ -781,21 +760,19 @@ mod tests {
                 &current_task,
                 &socket1,
                 &epoll_file_handle,
-                epoll_event::new(FdEvents::POLLIN.bits(), EVENT_DATA),
+                EpollEvent::new(FdEvents::POLLIN, EVENT_DATA),
             )
             .unwrap();
         assert_eq!(epoll_file.wait(&current_task, 10, zx::Time::ZERO).unwrap().len(), 0);
 
         let read_write_event = FdEvents::POLLIN | FdEvents::POLLOUT;
         epoll_file
-            .modify(&current_task, &socket1, epoll_event::new(read_write_event.bits(), EVENT_DATA))
+            .modify(&current_task, &socket1, EpollEvent::new(read_write_event, EVENT_DATA))
             .unwrap();
         let triggered_events = epoll_file.wait(&current_task, 10, zx::Time::ZERO).unwrap();
         assert_eq!(1, triggered_events.len());
         let event = &triggered_events[0];
-        let events = event.events;
-        assert_eq!(events, FdEvents::POLLOUT.bits());
-        let data = event.data;
-        assert_eq!(EVENT_DATA, data);
+        assert_eq!(event.events(), FdEvents::POLLOUT);
+        assert_eq!(event.data(), EVENT_DATA);
     }
 }
