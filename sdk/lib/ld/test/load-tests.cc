@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <lib/elfldltl/testing/diagnostics.h>
 #include <lib/ld/abi.h>
 #include <lib/stdcompat/string_view.h>
 #include <unistd.h>
@@ -24,6 +25,8 @@
 namespace {
 
 using namespace std::literals;
+
+using elfldltl::testing::ExpectReport;
 
 template <class Fixture>
 using LdLoadTests = Fixture;
@@ -526,13 +529,8 @@ TYPED_TEST(LdLoadFailureTests, MissingSymbol) {
 
   ASSERT_NO_FATAL_FAILURE(this->Needed({"libld-dep-a.so"}));
 
-  ASSERT_NO_FATAL_FAILURE(this->Load("missing-sym"));
-
-  EXPECT_EQ(this->Run(), this->kRunFailureForTrap);
-
-  this->ExpectLog(R"(undefined symbol: b
-startup dynamic linking failed with 1 errors and 0 warnings
-)");
+  ASSERT_NO_FATAL_FAILURE(  //
+      this->LoadAndFail("missing-sym", ExpectReport{"undefined symbol: ", "b"}));
 }
 
 TYPED_TEST(LdLoadFailureTests, MissingDependency) {
@@ -540,13 +538,11 @@ TYPED_TEST(LdLoadFailureTests, MissingDependency) {
 
   ASSERT_NO_FATAL_FAILURE(this->Needed({std::pair{"libmissing-dep-dep.so", false}}));
 
-  ASSERT_NO_FATAL_FAILURE(this->Load("missing-dep"));
-
-  EXPECT_EQ(this->Run(), this->kRunFailureForTrap);
-
-  this->ExpectLog(R"(cannot open dependency: libmissing-dep-dep.so
-startup dynamic linking failed with 1 errors and 0 warnings
-)");
+  ASSERT_NO_FATAL_FAILURE(  //
+      this->LoadAndFail("missing-dep", ExpectReport{
+                                           "cannot open dependency: ",
+                                           "libmissing-dep-dep.so",
+                                       }));
 }
 
 TYPED_TEST(LdLoadFailureTests, Relro) {

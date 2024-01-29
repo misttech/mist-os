@@ -110,6 +110,11 @@ class ExpectReport {
     }
   }
 
+  template <typename Report>
+  bool ReportTo(Report&& report) {
+    return std::apply(std::forward<Report>(report), expected_);
+  }
+
  private:
   enum class State { kUncalled, kCalled, kMoved };
 

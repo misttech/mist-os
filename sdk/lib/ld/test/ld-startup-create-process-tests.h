@@ -86,6 +86,11 @@ class LdStartupCreateProcessTests
     ASSERT_NO_FATAL_FAILURE(FinishLoad(executable_name));
   }
 
+  template <class... Reports>
+  void LoadAndFail(std::string_view name, Reports&&... reports) {
+    ASSERT_NO_FATAL_FAILURE(StartupLoadAndFail(*this, name, std::forward<Reports>(reports)...));
+  }
+
  private:
   using Base = elfldltl::testing::LoadTests<elfldltl::testing::RemoteVmarLoaderTraits, Elf>;
   using Base::Load;

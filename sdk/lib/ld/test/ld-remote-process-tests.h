@@ -48,9 +48,9 @@ class LdRemoteProcessTests : public ::testing::Test, public LdLoadZirconProcessT
   void set_stack_size(std::optional<size_t> stack_size) { stack_size_ = stack_size; }
 
  private:
-  static zx::vmo GetTestVmo(std::string_view path);
-
   class MockLoader;
+
+  static zx::vmo GetTestVmo(std::string_view path);
 
   uintptr_t entry_ = 0;
   uintptr_t vdso_base_ = 0;

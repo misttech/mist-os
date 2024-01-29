@@ -37,6 +37,11 @@ class LdStartupSpawnProcessTests : public ::testing::Test, public LdLoadTestsBas
 
   int64_t Run();
 
+  template <class... Reports>
+  void LoadAndFail(std::string_view name, Reports&&... reports) {
+    ASSERT_NO_FATAL_FAILURE(StartupLoadAndFail(*this, name, std::forward<Reports>(reports)...));
+  }
+
   ~LdStartupSpawnProcessTests();
 
  private:
