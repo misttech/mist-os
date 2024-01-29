@@ -12,6 +12,7 @@ use camino::{Utf8Path, Utf8PathBuf};
 use fuchsia_repo::repository::FileSystemRepository;
 use serde::{Deserialize, Serialize};
 use std::{fs::File, io::Read, ops::Deref};
+use v2::Canonicalizer;
 use zip::read::ZipArchive;
 
 pub use v2::{ProductBundleV2, Repository, Type};
@@ -62,9 +63,11 @@ impl ZipLoadedProductBundle {
         match try_load_product_bundle(product_bundle_manifest)? {
             ProductBundle::V2(data) => {
                 let mut data = data.clone();
-                data.canonicalize_paths(product_bundle_parent_path).with_context(|| {
-                    format!("Canonicalizing paths from {:?}", product_bundle_parent_path)
-                })?;
+                let mut canonicalizer = ZipCanonicalizer::new(product_bundle_parent_path);
+                data.canonicalize_paths_with(product_bundle_parent_path, &mut canonicalizer)
+                    .with_context(|| {
+                        format!("Canonicalizing paths from {:?}", product_bundle_parent_path)
+                    })?;
                 Ok(Self::new(ProductBundle::V2(data)))
             }
         }
@@ -85,6 +88,30 @@ impl Deref for ZipLoadedProductBundle {
 impl Into<ProductBundle> for ZipLoadedProductBundle {
     fn into(self) -> ProductBundle {
         self.product_bundle
+    }
+}
+
+struct ZipCanonicalizer {
+    product_bundle_dir: Utf8PathBuf,
+}
+
+impl Canonicalizer for ZipCanonicalizer {
+    fn root_path(&self) -> &Utf8PathBuf {
+        &self.product_bundle_dir
+    }
+
+    fn canonicalize_path(
+        &self,
+        path: impl AsRef<Utf8Path>,
+        _image_types: Vec<Type>,
+    ) -> Utf8PathBuf {
+        self.root_path().join(path).to_owned()
+    }
+}
+
+impl ZipCanonicalizer {
+    fn new(product_bundle_dir: impl Into<Utf8PathBuf>) -> Self {
+        Self { product_bundle_dir: product_bundle_dir.into() }
     }
 }
 

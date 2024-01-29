@@ -27,8 +27,8 @@ use fuchsia_merkle::Hash;
 use fuchsia_repo::{repo_client::RepoClient, repository::FileSystemRepository};
 use pathdiff::diff_utf8_paths;
 use serde::{Deserialize, Serialize};
-use std::collections::HashSet;
 use std::str::FromStr;
+use std::{cell::RefCell, collections::HashSet};
 
 /// Description of the data needed to set up (flash) a device.
 #[derive(Clone, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
@@ -158,6 +158,82 @@ impl FromStr for Type {
     }
 }
 
+pub(crate) trait Canonicalizer {
+    fn canonicalize_path(&self, path: impl AsRef<Utf8Path>, image_types: Vec<Type>) -> Utf8PathBuf;
+    fn root_path(&self) -> &Utf8PathBuf;
+
+    fn canonicalize_system(&self, system: &mut Option<Vec<Image>>) -> Result<()> {
+        if let Some(system) = system {
+            for image in system.iter_mut() {
+                let image_types = match image {
+                    Image::ZBI { path: _, signed: _ } | Image::Fxfs { path: _, contents: _ } => {
+                        vec![Type::Emu, Type::Flash]
+                    }
+                    Image::QemuKernel(_) | Image::FVM(_) => vec![Type::Emu],
+                    Image::FVMFastboot(_) | Image::VBMeta(_) => vec![Type::Flash],
+                    _ => vec![],
+                };
+
+                image.set_source(
+                    &self.canonicalize_path(&image.source().to_path_buf(), image_types),
+                );
+            }
+        }
+        Ok(())
+    }
+
+    fn canonicalize_dir(&self, path: &Utf8Path) -> Result<Utf8PathBuf> {
+        let path = self.canonicalize_path(path, vec![Type::Update]);
+        Ok(path)
+    }
+}
+
+pub(crate) struct DiskCanonicalizer {
+    product_bundle_dir: Utf8PathBuf,
+    not_supported: RefCell<HashSet<Type>>,
+}
+
+impl DiskCanonicalizer {
+    pub(crate) fn new(product_bundle_dir: impl Into<Utf8PathBuf>) -> Self {
+        Self {
+            product_bundle_dir: product_bundle_dir.into(),
+            not_supported: RefCell::new(HashSet::new()),
+        }
+    }
+}
+
+impl Canonicalizer for DiskCanonicalizer {
+    fn root_path(&self) -> &Utf8PathBuf {
+        &self.product_bundle_dir
+    }
+
+    fn canonicalize_path(&self, path: impl AsRef<Utf8Path>, image_types: Vec<Type>) -> Utf8PathBuf {
+        let product_bundle_path = self.product_bundle_dir.join(path.as_ref());
+        match product_bundle_path.canonicalize_utf8() {
+            Ok(p) => p,
+            Err(_) => {
+                tracing::debug!("Cannot canonicalize {}", &path.as_ref());
+                for image_type in &image_types {
+                    let mut ns = self.not_supported.borrow_mut();
+                    ns.insert(image_type.clone());
+                }
+                self.product_bundle_dir.join(path).to_owned()
+            }
+        }
+    }
+    fn canonicalize_dir(&self, path: &Utf8Path) -> Result<Utf8PathBuf> {
+        let dir = self.product_bundle_dir.join(path);
+        // Create the directory to ensure that canonicalize will work.
+        if !dir.exists() {
+            if let Err(e) = std::fs::create_dir_all(&dir) {
+                eprintln!("Cannot create directory: {}, {:#?}", dir, e);
+            }
+        }
+        let path = self.canonicalize_path(path, vec![Type::Update]);
+        Ok(path)
+    }
+}
+
 impl ProductBundleV2 {
     /// Convert all the paths from relative to absolute, assuming
     /// `product_bundle_dir` is the current base all the paths are relative to.
@@ -169,83 +245,56 @@ impl ProductBundleV2 {
         &mut self,
         product_bundle_dir: impl AsRef<Utf8Path>,
     ) -> Result<()> {
-        let product_bundle_dir = product_bundle_dir.as_ref();
-        let mut not_supported = HashSet::new();
+        let mut canonicalizer = DiskCanonicalizer::new(product_bundle_dir.as_ref());
 
-        // Canonicalize the path. If the path does not exist, print a warning
-        // and skip canonicalization.
-        let mut canonicalize_path = |path: &Utf8Path, image_types: Vec<Type>| -> Utf8PathBuf {
-            let product_bundle_path = product_bundle_dir.join(path);
-            match product_bundle_path.canonicalize_utf8() {
-                Ok(p) => p,
-                Err(_) => {
-                    eprintln!("Cannot canonicalize {}", &path);
-                    for image_type in &image_types {
-                        not_supported.insert(image_type.clone());
-                    }
-                    product_bundle_dir.join(path).to_owned()
-                }
-            }
-        };
+        let res = self.canonicalize_paths_with(product_bundle_dir, &mut canonicalizer);
+
+        if !canonicalizer.not_supported.borrow().is_empty() {
+            tracing::warn!("Warning: Missing artifacts. The following functionality will not work correctly: {:#?}", canonicalizer.not_supported);
+        }
+        res
+    }
+
+    pub(crate) fn canonicalize_paths_with<T>(
+        &mut self,
+        product_bundle_dir: impl AsRef<Utf8Path>,
+        canonicalizer: &mut T,
+    ) -> Result<()>
+    where
+        T: Canonicalizer,
+    {
+        let product_bundle_dir = product_bundle_dir.as_ref();
 
         // Canonicalize the partitions.
         for part in &mut self.partitions.bootstrap_partitions {
-            part.image = canonicalize_path(&part.image, vec![Type::Flash]);
+            part.image = canonicalizer.canonicalize_path(&part.image, vec![Type::Flash]);
         }
         for part in &mut self.partitions.bootloader_partitions {
-            part.image = canonicalize_path(&part.image, vec![Type::Flash]);
+            part.image = canonicalizer.canonicalize_path(&part.image, vec![Type::Flash]);
         }
         for cred in &mut self.partitions.unlock_credentials {
-            *cred = canonicalize_path(&cred, vec![Type::Flash]);
+            *cred = canonicalizer.canonicalize_path(&cred, vec![Type::Flash]);
         }
 
         // Canonicalize the systems.
-        let mut canonicalize_system = |system: &mut Option<Vec<Image>>| -> Result<()> {
-            if let Some(system) = system {
-                for image in system.iter_mut() {
-                    let image_types = match image {
-                        Image::ZBI { path: _, signed: _ }
-                        | Image::Fxfs { path: _, contents: _ } => vec![Type::Emu, Type::Flash],
-                        Image::QemuKernel(_) | Image::FVM(_) => vec![Type::Emu],
-                        Image::FVMFastboot(_) | Image::VBMeta(_) => vec![Type::Flash],
-                        _ => vec![],
-                    };
-
-                    image
-                        .set_source(&canonicalize_path(&image.source().to_path_buf(), image_types));
-                }
-            }
-            Ok(())
-        };
-        canonicalize_system(&mut self.system_a)?;
-        canonicalize_system(&mut self.system_b)?;
-        canonicalize_system(&mut self.system_r)?;
+        canonicalizer.canonicalize_system(&mut self.system_a)?;
+        canonicalizer.canonicalize_system(&mut self.system_b)?;
+        canonicalizer.canonicalize_system(&mut self.system_r)?;
 
         for repository in &mut self.repositories {
-            let mut canonicalize_dir = |path: &Utf8Path| -> Result<Utf8PathBuf> {
-                let dir = product_bundle_dir.join(path);
-                // Create the directory to ensure that canonicalize will work.
-                if !dir.exists() {
-                    if let Err(e) = std::fs::create_dir_all(&dir) {
-                        eprintln!("Cannot create directory: {}, {:#?}", dir, e);
-                    }
-                }
-                let path = canonicalize_path(path, vec![Type::Update]);
-                Ok(path)
-            };
-            repository.metadata_path = canonicalize_dir(&repository.metadata_path)?;
-            repository.blobs_path = canonicalize_dir(&repository.blobs_path)?;
+            repository.metadata_path = canonicalizer.canonicalize_dir(&repository.metadata_path)?;
+            repository.blobs_path = canonicalizer.canonicalize_dir(&repository.blobs_path)?;
             if let Some(path) = &repository.root_private_key_path {
-                repository.root_private_key_path = Some(canonicalize_dir(path)?);
+                repository.root_private_key_path = Some(canonicalizer.canonicalize_dir(path)?);
             }
             if let Some(path) = &repository.targets_private_key_path {
-                repository.targets_private_key_path = Some(canonicalize_dir(path)?);
+                repository.targets_private_key_path = Some(canonicalizer.canonicalize_dir(path)?);
             }
             if let Some(path) = &repository.snapshot_private_key_path {
-                repository.snapshot_private_key_path = Some(canonicalize_dir(path)?);
+                repository.snapshot_private_key_path = Some(canonicalizer.canonicalize_dir(path)?);
             }
             if let Some(path) = &repository.timestamp_private_key_path {
-                repository.timestamp_private_key_path = Some(canonicalize_dir(path)?);
+                repository.timestamp_private_key_path = Some(canonicalizer.canonicalize_dir(path)?);
             }
         }
 
@@ -267,10 +316,6 @@ impl ProductBundleV2 {
             // Only canonicalize the directory.
             // This prevents problems when virtual_devices_path is a symlink.
             self.virtual_devices_path = Some(dir.canonicalize_utf8()?.join(base));
-        }
-
-        if !not_supported.is_empty() {
-            eprintln!("Warning: Missing artifacts. The following functionality will not work correctly: {:#?}", not_supported);
         }
 
         Ok(())
