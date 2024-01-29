@@ -120,16 +120,16 @@ void Gatt2ClientServer::TrySendNextWatchServicesResult() {
     return;
   }
 
-  // TODO(https://fxbug.dev/42165836): Use measure-tape to verify response fits in FIDL channel before sending.
-  // This is only an issue for peers with very large databases.
+  // TODO(https://fxbug.dev/42165836): Use measure-tape to verify response fits in FIDL channel
+  // before sending. This is only an issue for peers with very large databases.
   bt_log(TRACE, "fidl", "notifying WatchServices() callback (removed: %zu, updated: %zu, peer: %s)",
          fidl_removed.size(), fidl_updated.size(), bt_str(peer_id_));
   watch_services_request_.value()(std::move(fidl_updated), std::move(fidl_removed));
   watch_services_request_.reset();
 }
 
-// TODO(https://fxbug.dev/42165818): Do not send privileged services (e.g. Generic Attribute Profile Service)
-// to clients.
+// TODO(https://fxbug.dev/42165818): Do not send privileged services (e.g. Generic Attribute Profile
+// Service) to clients.
 void Gatt2ClientServer::WatchServices(std::vector<fb::Uuid> fidl_uuids,
                                       WatchServicesCallback callback) {
   std::unordered_set<bt::UUID> uuids;

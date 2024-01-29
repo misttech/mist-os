@@ -26,11 +26,11 @@ class ExtendedLowEnergyAdvertiser final : public LowEnergyAdvertiser {
   // PDUs, the maximum advertising data size is
   // hci_spec::kMaxLEAdvertisingDataLength.
   //
-  // TODO(https://fxbug.dev/42157495): Extended advertising supports sending larger
-  // amounts of data, but they have to be fragmented across multiple commands to
-  // the controller. This is not yet supported in this implementation. We should
-  // support larger than kMaxLEExtendedAdvertisingDataLength advertising data
-  // with fragmentation.
+  // TODO(https://fxbug.dev/42157495): Extended advertising supports sending
+  // larger amounts of data, but they have to be fragmented across multiple
+  // commands to the controller. This is not yet supported in this
+  // implementation. We should support larger than
+  // kMaxLEExtendedAdvertisingDataLength advertising data with fragmentation.
   size_t GetSizeLimit() const override {
     return hci_spec::kMaxLEAdvertisingDataLength;
   }

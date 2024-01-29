@@ -26,7 +26,7 @@ void Transport::Initialize(
     fit::callback<void(bool /*success*/)> complete_callback) {
   BT_ASSERT(!command_channel_);
 
-  bt_log(DEBUG, "hci", "Initializing Transport");
+  bt_log(DEBUG, "hci", "initializing Transport");
   auto self = GetWeakPtr();
   auto complete_cb_wrapper =
       [self, cb = std::move(complete_callback)](pw::Status status) mutable {
@@ -54,7 +54,7 @@ void Transport::Initialize(
               }
               self->features_ = features;
 
-              bt_log(INFO, "hci", "Transport initialized successfully");
+              bt_log(INFO, "hci", "Transport initialized");
               cb(/*success=*/true);
             });
       };

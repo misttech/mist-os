@@ -1229,7 +1229,8 @@ TEST_F(ProfileServerTestFakeAdapter, L2capParametersExtRequestParametersSucceeds
   ASSERT_TRUE(result_chan_params.has_value());
   ASSERT_TRUE(result_chan_params->has_channel_mode());
   ASSERT_TRUE(result_chan_params->has_max_rx_sdu_size());
-  // TODO(https://fxbug.dev/42152567): set current security requirements in returned channel parameters
+  // TODO(https://fxbug.dev/42152567): set current security requirements in returned channel
+  // parameters
   ASSERT_FALSE(result_chan_params->has_security_requirements());
   ASSERT_TRUE(result_chan_params->has_flush_timeout());
   EXPECT_EQ(result_chan_params->channel_mode(), fidlbredr::ChannelMode::BASIC);

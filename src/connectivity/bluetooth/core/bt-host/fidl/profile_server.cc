@@ -254,7 +254,8 @@ void ProfileServer::L2capParametersExt::RequestParameters(
   }
 
   // No other channel parameters are  supported, so just return the current parameters.
-  // TODO(https://fxbug.dev/42152567): set current security requirements in returned channel parameters
+  // TODO(https://fxbug.dev/42152567): set current security requirements in returned channel
+  // parameters
   callback(ChannelInfoToFidlChannelParameters(channel_->info()));
 }
 

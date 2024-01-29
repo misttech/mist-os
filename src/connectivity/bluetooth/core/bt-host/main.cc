@@ -80,8 +80,8 @@ int main() {
     BT_DEBUG_ASSERT(host);
     if (!success) {
       bt_log(ERROR, "bt-host", "Failed to initialize bt-host; shutting down...");
-      // TODO(https://fxbug.dev/42086155): Verify that calling Lifecycler handler's stop function does
-      // not cause use after free in Adapter with integration tests
+      // TODO(https://fxbug.dev/42086155): Verify that calling Lifecycler handler's stop function
+      // does not cause use after free in Adapter with integration tests
       lifecycle_handler.Stop();
       return;
     }

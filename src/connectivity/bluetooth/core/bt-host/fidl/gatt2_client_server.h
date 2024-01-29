@@ -56,8 +56,8 @@ class Gatt2ClientServer : public GattServerBase<fuchsia::bluetooth::gatt2::Clien
 
   // If a service's handle maps to a null value, a connection request to that service is in
   // progress.
-  // TODO(https://fxbug.dev/42165614): Once FindService() returns the service directly, don't use null
-  // values.
+  // TODO(https://fxbug.dev/42165614): Once FindService() returns the service directly, don't use
+  // null values.
   std::unordered_map<bt::att::Handle, std::unique_ptr<Gatt2RemoteServiceServer>> services_;
 
   // False initially, and set to true after GATT::ListServices() completes.

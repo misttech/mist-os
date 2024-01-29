@@ -634,9 +634,10 @@ TEST_F(HostServerPairingTest, InitiatePairingLeDefault) {
                       [&](auto result) { pair_result = std::move(result); });
   RunLoopUntilIdle();
 
-  // TODO(https://fxbug.dev/42169848): We don't have a good mechanism for driving pairing to completion
-  // without faking the entire SMP exchange. We should add SMP mocks that allows us to propagate a
-  // result up to the FIDL layer. For now we assert that pairing has started and remains pending.
+  // TODO(https://fxbug.dev/42169848): We don't have a good mechanism for driving pairing to
+  // completion without faking the entire SMP exchange. We should add SMP mocks that allows us to
+  // propagate a result up to the FIDL layer. For now we assert that pairing has started and remains
+  // pending.
   ASSERT_FALSE(pair_result);  // Pairing request is pending
   ASSERT_TRUE(pairing_request_sent);
 }
@@ -669,9 +670,10 @@ TEST_F(HostServerPairingTest, InitiatePairingLeEncrypted) {
                       [&](auto result) { pair_result = std::move(result); });
   RunLoopUntilIdle();
 
-  // TODO(https://fxbug.dev/42169848): We don't have a good mechanism for driving pairing to completion
-  // without faking the entire SMP exchange. We should add SMP mocks that allows us to propagate a
-  // result up to the FIDL layer. For now we assert that pairing has started and remains pending.
+  // TODO(https://fxbug.dev/42169848): We don't have a good mechanism for driving pairing to
+  // completion without faking the entire SMP exchange. We should add SMP mocks that allows us to
+  // propagate a result up to the FIDL layer. For now we assert that pairing has started and remains
+  // pending.
   ASSERT_FALSE(pair_result);  // Pairing request is pending
   ASSERT_TRUE(pairing_request_sent);
 }
@@ -706,9 +708,10 @@ TEST_F(HostServerPairingTest, InitiatePairingNonBondableLe) {
                       [&](auto result) { pair_result = std::move(result); });
   RunLoopUntilIdle();
 
-  // TODO(https://fxbug.dev/42169848): We don't have a good mechanism for driving pairing to completion
-  // without faking the entire SMP exchange. We should add SMP mocks that allows us to propagate a
-  // result up to the FIDL layer. For now we assert that pairing has started and remains pending.
+  // TODO(https://fxbug.dev/42169848): We don't have a good mechanism for driving pairing to
+  // completion without faking the entire SMP exchange. We should add SMP mocks that allows us to
+  // propagate a result up to the FIDL layer. For now we assert that pairing has started and remains
+  // pending.
   ASSERT_FALSE(pair_result);  // Pairing request is pending
   ASSERT_TRUE(pairing_request_sent);
 }

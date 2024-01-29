@@ -207,11 +207,12 @@ void LowEnergyPeripheralServer::Advertise(
     return;
   }
 
-  // TODO(https://fxbug.dev/42156474): As a temporary hack until multiple advertisements is supported,
-  // don't allow more than one advertisement. The current behavior of hci::LegacyLowEnergyAdvertiser
-  // is to replace the current advertisement, which is not the intended behavior of `Advertise`.
-  // NOTE: This is insufficient  when there are multiple Peripheral clients advertising, but that is
-  // the status quo with `StartAdvertising` anyway (the last advertiser wins).
+  // TODO(https://fxbug.dev/42156474): As a temporary hack until multiple advertisements is
+  // supported, don't allow more than one advertisement. The current behavior of
+  // hci::LegacyLowEnergyAdvertiser is to replace the current advertisement, which is not the
+  // intended behavior of `Advertise`. NOTE: This is insufficient  when there are multiple
+  // Peripheral clients advertising, but that is the status quo with `StartAdvertising` anyway (the
+  // last advertiser wins).
   if (!advertisements_.empty()) {
     callback(fpromise::error(fble::PeripheralError::FAILED));
     return;

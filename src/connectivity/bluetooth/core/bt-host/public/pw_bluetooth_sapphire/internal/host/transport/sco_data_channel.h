@@ -23,9 +23,9 @@ class Transport;
 // with the transport driver at a time, so performance may be poor if multiple
 // connections are registered. The connection used for the current configuration
 // is selected randomly.
-// TODO(https://fxbug.dev/42171056): ScoDataChannel assumes that HCI flow control
-// via HCI_Number_Of_Completed_Packets events is supported by the controller.
-// Some controllers don't support this form of flow control.
+// TODO(https://fxbug.dev/42171056): ScoDataChannel assumes that HCI flow
+// control via HCI_Number_Of_Completed_Packets events is supported by the
+// controller. Some controllers don't support this form of flow control.
 class ScoDataChannel {
  public:
   // Registered SCO connections must implement this interface to send and

@@ -11,10 +11,10 @@ namespace bt {
 PeerId RandomPeerId() {
   PeerId id = kInvalidPeerId;
   while (id == kInvalidPeerId) {
-    // TODO(https://fxbug.dev/42083954): zx_cprng_draw() current guarantees this random ID to be
-    // unique and that there will be no collisions. Re-consider where this
-    // address is generated and whether we need to provide unique-ness
-    // guarantees beyond device scope.
+    // TODO(https://fxbug.dev/42083954): zx_cprng_draw() current guarantees this
+    // random ID to be unique and that there will be no collisions. Re-consider
+    // where this address is generated and whether we need to provide
+    // unique-ness guarantees beyond device scope.
     id = PeerId(Random<uint64_t>());
   }
   return id;

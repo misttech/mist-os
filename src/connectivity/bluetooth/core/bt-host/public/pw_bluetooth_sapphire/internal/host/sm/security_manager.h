@@ -77,8 +77,8 @@ class SecurityManager {
   // LTK.
   virtual bool AssignLongTermKey(const LTK& ltk) = 0;
 
-  // TODO(https://fxbug.dev/42130294): Add function to register a BR/EDR link and
-  // SMP channel.
+  // TODO(https://fxbug.dev/42130294): Add function to register a BR/EDR link
+  // and SMP channel.
 
   // Attempt to raise the security level of the connection to the desired
   // |level| and notify the result in |callback|.

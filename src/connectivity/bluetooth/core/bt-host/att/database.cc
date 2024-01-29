@@ -312,8 +312,8 @@ void Database::ExecuteWriteQueue(PeerId peer_id,
       break;
     }
 
-    // TODO(https://fxbug.dev/42179688): Consider removing the boolean return value
-    // in favor of always reporting errors using the callback. That would
+    // TODO(https://fxbug.dev/42179688): Consider removing the boolean return
+    // value in favor of always reporting errors using the callback. That would
     // simplify the pattern here.
     if (!attr->WriteAsync(
             peer_id, next.offset(), next.value(), std::move(attr_write_cb))) {

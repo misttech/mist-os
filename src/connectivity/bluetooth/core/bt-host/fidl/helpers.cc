@@ -374,7 +374,8 @@ bool AddProtocolDescriptorList(bt::sdp::ServiceRecord* rec,
 // fuchsia.bluetooth.Appearance, which is a subset of Bluetooth Assigned Numbers, "Appearance
 // Values" (https://www.bluetooth.com/specifications/assigned-numbers/).
 //
-// TODO(https://fxbug.dev/42145156): Remove this compatibility check with the strict Appearance enum.
+// TODO(https://fxbug.dev/42145156): Remove this compatibility check with the strict Appearance
+// enum.
 [[nodiscard]] bool IsAppearanceValid(uint16_t appearance_raw) {
   switch (appearance_raw) {
     case 0u:  // UNKNOWN
@@ -789,11 +790,11 @@ std::optional<bt::DeviceAddress> AddressFromFidlBondingData(
       bt_log(WARN, "fidl", "BR/EDR or Dual-Mode bond cannot have a random identity address!");
       return std::nullopt;
     }
-    // TODO(https://fxbug.dev/42102158): We currently assign kBREDR as the address type for dual-mode
-    // bonds. This makes address management for dual-mode devices a bit confusing as we have two
-    // "public" address types (i.e. kBREDR and kLEPublic). We should align the stack address types
-    // with the FIDL address types, such that both kBREDR and kLEPublic are represented as the same
-    // kind of "PUBLIC".
+    // TODO(https://fxbug.dev/42102158): We currently assign kBREDR as the address type for
+    // dual-mode bonds. This makes address management for dual-mode devices a bit confusing as we
+    // have two "public" address types (i.e. kBREDR and kLEPublic). We should align the stack
+    // address types with the FIDL address types, such that both kBREDR and kLEPublic are
+    // represented as the same kind of "PUBLIC".
     type = bt::DeviceAddress::Type::kBREDR;
   } else {
     type = bond.address().type == fbt::AddressType::RANDOM ? bt::DeviceAddress::Type::kLERandom
@@ -1109,8 +1110,8 @@ fble::AdvertisingData AdvertisingDataToFidl(const bt::AdvertisingData& input) {
     output.set_name(input.local_name()->name);
   }
   if (input.appearance()) {
-    // TODO(https://fxbug.dev/42145156): Remove this to allow for passing arbitrary appearance values
-    // to clients in a way that's forward-compatible with future BLE revisions.
+    // TODO(https://fxbug.dev/42145156): Remove this to allow for passing arbitrary appearance
+    // values to clients in a way that's forward-compatible with future BLE revisions.
     const uint16_t appearance_raw = input.appearance().value();
     if (auto appearance = AppearanceToFidl(appearance_raw)) {
       output.set_appearance(appearance.value());
