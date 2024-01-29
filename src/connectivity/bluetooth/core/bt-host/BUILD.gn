@@ -263,7 +263,7 @@ fuchsia_fuzzer_package("fuzzers") {
 source_set("device_tests") {
   testonly = true
 
-  sources = [ "host_unittest.cc" ]
+  sources = [ "host_test.cc" ]
 
   deps = [
     ":sources",
@@ -276,7 +276,7 @@ source_set("device_tests") {
 source_set("component_tests") {
   testonly = true
 
-  sources = [ "host_component_unittest.cc" ]
+  sources = [ "host_component_test.cc" ]
 
   deps = [
     ":sources_bt_host_component",

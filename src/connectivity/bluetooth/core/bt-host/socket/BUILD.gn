@@ -26,9 +26,9 @@ source_set("tests") {
   testonly = true
 
   sources = [
-    "socket_channel_relay_unittest.cc",
-    "socket_factory_l2cap_integration_unittest.cc",
-    "socket_factory_unittest.cc",
+    "socket_channel_relay_test.cc",
+    "socket_factory_l2cap_integration_test.cc",
+    "socket_factory_test.cc",
   ]
 
   deps = [
