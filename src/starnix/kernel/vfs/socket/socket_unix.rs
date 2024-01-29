@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 use crate::{
+    bpf::fs::{get_bpf_object, BpfHandle},
     mm::MemoryAccessorExt,
     task::{CurrentTask, EventHandler, Task, WaitCanceler, WaitQueue, Waiter},
     vfs::{
@@ -29,9 +30,9 @@ use starnix_uapi::{
     user_address::{UserAddress, UserRef},
     user_buffer::UserBuffer,
     vfs::FdEvents,
-    FIONREAD, SOL_SOCKET, SO_ACCEPTCONN, SO_BROADCAST, SO_ERROR, SO_KEEPALIVE, SO_LINGER,
-    SO_NO_CHECK, SO_PASSCRED, SO_PEERCRED, SO_PEERSEC, SO_RCVBUF, SO_REUSEADDR, SO_REUSEPORT,
-    SO_SNDBUF,
+    FIONREAD, SOL_SOCKET, SO_ACCEPTCONN, SO_ATTACH_BPF, SO_BROADCAST, SO_ERROR, SO_KEEPALIVE,
+    SO_LINGER, SO_NO_CHECK, SO_PASSCRED, SO_PEERCRED, SO_PEERSEC, SO_RCVBUF, SO_REUSEADDR,
+    SO_REUSEPORT, SO_SNDBUF,
 };
 use zerocopy::AsBytes;
 
@@ -124,6 +125,9 @@ struct UnixSocketInner {
     /// See SO_KEEPALIVE.
     pub keepalive: bool,
 
+    /// See SO_ATTACH_BPF.
+    bpf_program: Option<BpfHandle>,
+
     /// Unix credentials of the owner of this socket, for SO_PEERCRED.
     credentials: Option<ucred>,
 
@@ -148,6 +152,7 @@ impl UnixSocket {
                 reuseaddr: false,
                 reuseport: false,
                 keepalive: false,
+                bpf_program: None,
                 credentials: None,
                 state: UnixSocketState::Disconnected,
             }),
@@ -374,6 +379,11 @@ impl UnixSocket {
     fn set_keepalive(&self, keepalive: bool) {
         let mut inner = self.lock();
         inner.keepalive = keepalive;
+    }
+
+    fn set_bpf_program(&self, bpf_program: Option<BpfHandle>) {
+        let mut inner = self.lock();
+        inner.bpf_program = bpf_program;
     }
 
     fn peer_cred(&self) -> Option<ucred> {
@@ -713,6 +723,11 @@ impl SocketOps for UnixSocket {
                 SO_KEEPALIVE => {
                     let keepalive: u32 = task.read_object(user_opt.try_into()?)?;
                     self.set_keepalive(keepalive != 0);
+                }
+                SO_ATTACH_BPF => {
+                    let fd: FdNumber = task.read_object(user_opt.try_into()?)?;
+                    let object = get_bpf_object(task, fd)?;
+                    self.set_bpf_program(Some(object));
                 }
                 _ => return error!(ENOPROTOOPT),
             },

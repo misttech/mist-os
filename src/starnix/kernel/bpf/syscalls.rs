@@ -7,7 +7,7 @@
 
 use crate::{
     bpf::{
-        fs::{get_bpf_fd, get_selinux_context, BpfFsDir, BpfFsObject, BpfHandle, BpfObject},
+        fs::{get_bpf_object, get_selinux_context, BpfFsDir, BpfFsObject, BpfHandle, BpfObject},
         map::{Map, MapSchema, MapStore},
         program::Program,
     },
@@ -135,7 +135,7 @@ pub fn sys_bpf(
             let elem_attr: bpf_attr__bindgen_ty_2 = read_attr(current_task, attr_addr, attr_size)?;
             log_trace!("BPF_MAP_LOOKUP_ELEM");
             let map_fd = FdNumber::from_raw(elem_attr.map_fd as i32);
-            let map = get_bpf_fd(current_task, map_fd)?;
+            let map = get_bpf_object(current_task, map_fd)?;
             let map = map.downcast::<Map>().ok_or_else(|| errno!(EINVAL))?;
 
             let key = current_task.read_memory_to_vec(
@@ -154,7 +154,7 @@ pub fn sys_bpf(
             let elem_attr: bpf_attr__bindgen_ty_2 = read_attr(current_task, attr_addr, attr_size)?;
             log_trace!("BPF_MAP_UPDATE_ELEM");
             let map_fd = FdNumber::from_raw(elem_attr.map_fd as i32);
-            let map = get_bpf_fd(current_task, map_fd)?;
+            let map = get_bpf_object(current_task, map_fd)?;
             let map = map.downcast::<Map>().ok_or_else(|| errno!(EINVAL))?;
 
             let flags = elem_attr.flags;
@@ -178,7 +178,7 @@ pub fn sys_bpf(
             let elem_attr: bpf_attr__bindgen_ty_2 = read_attr(current_task, attr_addr, attr_size)?;
             log_trace!("BPF_MAP_GET_NEXT_KEY");
             let map_fd = FdNumber::from_raw(elem_attr.map_fd as i32);
-            let map = get_bpf_fd(current_task, map_fd)?;
+            let map = get_bpf_object(current_task, map_fd)?;
             let map = map.downcast::<Map>().ok_or_else(|| errno!(EINVAL))?;
             let key = if elem_attr.key != 0 {
                 let key = current_task.read_memory_to_vec(
@@ -242,7 +242,7 @@ pub fn sys_bpf(
             let pin_attr: bpf_attr__bindgen_ty_5 = read_attr(current_task, attr_addr, attr_size)?;
             log_trace!("BPF_OBJ_PIN {:?}", pin_attr);
             let bpf_fd = FdNumber::from_raw(pin_attr.bpf_fd as i32);
-            let object = get_bpf_fd(current_task, bpf_fd)?;
+            let object = get_bpf_object(current_task, bpf_fd)?;
             let path_addr = UserCString::new(UserAddress::from(pin_attr.pathname));
             let pathname = current_task.read_c_string_to_vec(path_addr, PATH_MAX as usize)?;
             let (parent, basename) = current_task.lookup_parent_at(
@@ -282,7 +282,7 @@ pub fn sys_bpf(
                 read_attr(current_task, attr_addr, attr_size)?;
             log_trace!("BPF_OBJ_GET_INFO_BY_FD {:?}", get_info_attr);
             let bpf_fd = FdNumber::from_raw(get_info_attr.bpf_fd as i32);
-            let object = get_bpf_fd(current_task, bpf_fd)?;
+            let object = get_bpf_object(current_task, bpf_fd)?;
 
             let mut info = if let Some(map) = object.downcast::<Map>() {
                 bpf_map_info {

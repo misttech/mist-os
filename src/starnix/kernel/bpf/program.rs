@@ -4,7 +4,7 @@
 
 use crate::{
     bpf::{
-        fs::{get_bpf_fd, BpfHandle, BpfObject},
+        fs::{get_bpf_object, BpfHandle, BpfObject},
         map::Map,
     },
     task::CurrentTask,
@@ -72,7 +72,7 @@ fn link(current_task: &CurrentTask, code: &mut Vec<bpf_insn>) -> Result<Vec<BpfH
             if instruction.src_reg() == BPF_PSEUDO_MAP_FD {
                 instruction.set_src_reg(0);
                 let fd = FdNumber::from_raw(instruction.imm);
-                let object = get_bpf_fd(current_task, fd)?;
+                let object = get_bpf_object(current_task, fd)?;
                 if object.downcast::<Map>().is_none() {
                     return error!(EINVAL);
                 }

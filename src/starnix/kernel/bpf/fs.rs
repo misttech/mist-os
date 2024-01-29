@@ -6,7 +6,7 @@
 #![allow(non_upper_case_globals)]
 
 use crate::{
-    task::{CurrentTask, Kernel},
+    task::{CurrentTask, Kernel, Task},
     vfs::{
         buffers::{InputBuffer, OutputBuffer},
         fileops_impl_nonseekable, fs_node_impl_not_dir, fs_node_impl_xattr_delegate, CacheMode,
@@ -85,13 +85,8 @@ impl BpfHandle {
     }
 }
 
-pub fn get_bpf_fd(current_task: &CurrentTask, fd: FdNumber) -> Result<BpfHandle, Errno> {
-    Ok(current_task
-        .files
-        .get(fd)?
-        .downcast_file::<BpfHandle>()
-        .ok_or_else(|| errno!(EBADF))?
-        .clone())
+pub fn get_bpf_object(task: &Task, fd: FdNumber) -> Result<BpfHandle, Errno> {
+    Ok(task.files.get(fd)?.downcast_file::<BpfHandle>().ok_or_else(|| errno!(EBADF))?.clone())
 }
 
 pub struct BpfFs;
