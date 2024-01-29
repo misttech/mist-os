@@ -26,13 +26,16 @@
  * SUCH DAMAGE.
  */
 
+#include <lib/async/cpp/task.h>
 #include <lib/ddk/binding_driver.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/driver.h>
 #include <lib/device-protocol/pci.h>
+#include <lib/fdf/cpp/dispatcher.h>
 #include <lib/fit/defer.h>
 #include <lib/mmio/mmio-buffer.h>
 #include <lib/pci/hw.h>
+#include <lib/sync/cpp/completion.h>
 #include <zircon/hw/pci.h>
 #include <zircon/syscalls/pci.h>
 
@@ -161,28 +164,12 @@ struct adapter {
   struct txrx_funcs* txrx;
 
   pci_interrupt_mode_t irq_mode;
+
+  fdf::Dispatcher irq_dispatcher{nullptr};
+  libsync::Completion irq_dispatcher_shutdown;
 };
 
 namespace {
-inline void eth_enable_rx(struct adapter* adapter) {
-  uint32_t rctl = E1000_READ_REG(&adapter->hw, E1000_RCTL);
-  E1000_WRITE_REG(&adapter->hw, E1000_RCTL, rctl | E1000_RCTL_EN);
-}
-
-inline void eth_disable_rx(struct adapter* adapter) {
-  uint32_t rctl = E1000_READ_REG(&adapter->hw, E1000_RCTL);
-  E1000_WRITE_REG(&adapter->hw, E1000_RCTL, rctl & ~E1000_RCTL_EN);
-}
-
-inline void eth_enable_tx(struct adapter* adapter) {
-  uint32_t tctl = E1000_READ_REG(&adapter->hw, E1000_TCTL);
-  E1000_WRITE_REG(&adapter->hw, E1000_TCTL, tctl | E1000_TCTL_EN);
-}
-
-inline void eth_disable_tx(struct adapter* adapter) {
-  uint32_t tctl = E1000_READ_REG(&adapter->hw, E1000_TCTL);
-  E1000_WRITE_REG(&adapter->hw, E1000_TCTL, tctl & ~E1000_TCTL_EN);
-}
 
 void reap_tx_buffers(struct adapter* adapter) {
   uint32_t n = adapter->tx_rd_ptr;
@@ -203,51 +190,12 @@ void reap_tx_buffers(struct adapter* adapter) {
   adapter->tx_rd_ptr = n;
 }
 
-static size_t eth_tx_queued(struct adapter* adapter) {
-  reap_tx_buffers(adapter);
-  return ((adapter->tx_wr_ptr + ETH_TXBUF_COUNT) - adapter->tx_rd_ptr) & (ETH_TXBUF_COUNT - 1);
-}
-
-void e1000_suspend(void* ctx, uint8_t requested_state, bool enable_wake, uint8_t suspend_reason) {
-  DEBUGOUT("entry");
-  auto* adapter = reinterpret_cast<struct adapter*>(ctx);
-  adapter->lock.lock();
-  adapter->state = ETH_SUSPENDING;
-
-  // Immediately disable the rx queue
-  eth_disable_rx(adapter);
-
-  // Wait for queued tx packets to complete
-  int iterations = 0;
-  do {
-    if (!eth_tx_queued(adapter)) {
-      goto tx_done;
-    }
-    adapter->lock.unlock();
-    zx_nanosleep(zx_deadline_after(ZX_MSEC(1)));
-    iterations++;
-    adapter->lock.lock();
-  } while (iterations < 10);
-  DEBUGOUT("timed out waiting for tx queue to drain when suspending");
-
-tx_done:
-  eth_disable_tx(adapter);
-  e1000_power_down_phy(&adapter->hw);
-  adapter->state = ETH_SUSPENDED;
-  device_suspend_reply(adapter->zxdev, ZX_OK, requested_state);
-  adapter->lock.unlock();
-}
-
-void e1000_resume(void* ctx, uint32_t requested_perf_state) {
-  DEBUGOUT("entry");
-  auto* adapter = reinterpret_cast<struct adapter*>(ctx);
-  adapter->lock.lock();
-  e1000_power_up_phy(&adapter->hw);
-  eth_enable_rx(adapter);
-  eth_enable_tx(adapter);
-  adapter->state = ETH_RUNNING;
-  device_resume_reply(adapter->zxdev, ZX_OK, DEV_POWER_STATE_D0, requested_perf_state);
-  adapter->lock.unlock();
+void shutdown_dispatcher_sync(struct adapter* adapter) {
+  if (adapter->irq_dispatcher.get()) {
+    adapter->irq_dispatcher.ShutdownAsync();
+    adapter->irq_dispatcher_shutdown.Wait();
+    adapter->irq_dispatcher.close();
+  }
 }
 
 void e1000_release(void* ctx) {
@@ -261,14 +209,32 @@ void e1000_release(void* ctx) {
   zx_handle_close(adapter->btih);
   zx_handle_close(adapter->irqh);
   e1000_pci_free(adapter->osdep.pci);
-  free(adapter);
+
+  shutdown_dispatcher_sync(adapter);
+
+  delete adapter;
+}
+
+void e1000_suspend(void* ctx, uint8_t requested_state, bool enable_wake, uint8_t suspend_reason) {
+  DEBUGOUT("entry");
+  auto* adapter = reinterpret_cast<struct adapter*>(ctx);
+
+  // e1000_release will destroy the adapter pointer, keep the zx_device pointer around for the
+  // suspend reply.
+  zx_device_t* zxdev = adapter->zxdev;
+
+  // Resume isn't supported in DFv1, which this driver is written for. Suspend is therefore only
+  // called on reboot or shutdown in which case we should treat the suspend as a release to ensure
+  // that the dispatcher is shut down correctly.
+  e1000_release(ctx);
+
+  device_suspend_reply(zxdev, ZX_OK, requested_state);
 }
 
 zx_protocol_device_t e1000_device_ops = {
     .version = DEVICE_OPS_VERSION,
     .release = e1000_release,
     .suspend = e1000_suspend,
-    .resume = e1000_resume,
 };
 
 }  // namespace
@@ -915,7 +881,7 @@ static int em_if_set_promisc(struct adapter* adapter, int flags) {
 static zx_status_t e1000_bind(void* ctx, zx_device_t* dev) {
   DEBUGOUT("bind entry");
 
-  auto* adapter = reinterpret_cast<struct adapter*>(calloc(1, sizeof(struct adapter)));
+  auto* adapter = new struct adapter {};
   if (!adapter) {
     return ZX_ERR_NO_MEMORY;
   }
@@ -1101,8 +1067,17 @@ static zx_status_t e1000_bind(void* ctx, zx_device_t* dev) {
     return status;
   }
 
-  thrd_create_with_name(&adapter->thread, e1000_irq_thread, adapter, "e1000_irq_thread");
-  thrd_detach(adapter->thread);
+  zx::result dispatcher = fdf::SynchronizedDispatcher::Create(
+      fdf::SynchronizedDispatcher::Options::kAllowSyncCalls, "e1000_irq_dispatcher",
+      [adapter](fdf_dispatcher_t*) { adapter->irq_dispatcher_shutdown.Signal(); });
+  if (dispatcher.is_error()) {
+    zxlogf(ERROR, "failed to create dispatcher: %s", dispatcher.status_string());
+    return dispatcher.status_value();
+  }
+  adapter->irq_dispatcher = std::move(dispatcher.value());
+
+  async::PostTask(adapter->irq_dispatcher.async_dispatcher(),
+                  [adapter] { e1000_irq_thread(adapter); });
 
   // enable interrupts
   u32 ims_mask = IMS_ENABLE_MASK;
