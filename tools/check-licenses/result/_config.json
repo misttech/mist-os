@@ -184,7 +184,8 @@
           "third_party/golibs/vendor": true,
           "third_party/tink/cc/third_party": true,
           "third_party/tink/cc/integration/awskms/third_party": true,
-          "third_party/syzkaller": true
+          "third_party/syzkaller": true,
+          "third_party/pylibs": true
         }
       },
       {
