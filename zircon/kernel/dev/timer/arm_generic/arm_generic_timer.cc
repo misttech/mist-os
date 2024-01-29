@@ -263,14 +263,96 @@ static void platform_tick(void* arg) {
   timer_tick(current_time());
 }
 
-zx_ticks_t platform_current_raw_ticks() { return read_ct(); }
+namespace internal {
 
-zx_ticks_t platform_current_ticks() {
+template <GetTicksSyncFlag Flags>
+inline zx_ticks_t platform_current_raw_ticks() {
+  // Refer to Section D12.1.3 "Synchronization requirements for AArch64 System
+  // registers" of "ARM Architecture Reference Manual® ARMv8, for ARMv8-A
+  // architecture profile" for details about how to synchronize reads of the
+  // system timer relative to the instruction pipeline.
+  //
+  // Of particular relevance is the following note from the section referenced
+  // above.
+  //
+  // ```
+  // In particular, the values read from System registers that hold
+  // self-incrementing counts, such as the Performance Monitors counters or the
+  // Generic Timer counter or timers, could be accessed from any time after the
+  // previous Context synchronization event. For example, where a memory access
+  // is used to communicate a read of such a counter, an ISB must be inserted
+  // between the read of the memory location that is known to have returned its
+  // data, either as a result of a condition on that data or of the read having
+  // completed, and the read of the counter, if it is necessary that the counter
+  // returns a count value after the memory communication.
+  // ```
+  //
+  // TODO(johngro): Look into ways other than an explicit ISB we can use to make
+  // sure that loads of the system timer register are not allowed to leak past
+  // subsequent loads/stores.  I have heard rumors that it is possible to do
+  // this by cleverly synthesizing a fake data read dependency in the pipeline,
+  // but I have not (yet) found any official documentation describing this.
+  if constexpr ((Flags & (GetTicksSyncFlag::kAfterPreviousLoads |
+                          GetTicksSyncFlag::kAfterPreviousStores)) != GetTicksSyncFlag::kNone) {
+    __isb(ARM_MB_SY);
+  }
+
+  const zx_ticks_t ret = read_ct();
+
+  if constexpr ((Flags & (GetTicksSyncFlag::kBeforeSubsequentLoads |
+                          GetTicksSyncFlag::kBeforeSubsequentStores)) != GetTicksSyncFlag::kNone) {
+    __isb(ARM_MB_SY);
+  }
+
+  return ret;
+}
+
+template <GetTicksSyncFlag Flags>
+inline zx_ticks_t platform_current_ticks() {
   // TODO(https://fxbug.dev/42173294): switch to the ABA method of reading the offset when we start
   // to allow the offset to be changed as a result of coming out of system
   // suspend.
-  return read_ct() + raw_ticks_to_ticks_offset;
+  return platform_current_raw_ticks<Flags>() + raw_ticks_to_ticks_offset;
 }
+
+}  // namespace internal
+
+zx_ticks_t platform_current_ticks() {
+  return internal::platform_current_ticks<GetTicksSyncFlag::kNone>();
+}
+
+zx_ticks_t platform_current_raw_ticks() {
+  return internal::platform_current_raw_ticks<GetTicksSyncFlag::kNone>();
+}
+
+template <GetTicksSyncFlag Flags>
+zx_ticks_t platform_current_ticks_synchronized() {
+  return internal::platform_current_ticks<Flags>();
+}
+
+// Explicit instantiation of all of the forms of synchronized tick access.
+//
+// TODO(johngro): Look into reasonable ways to put architecture specific code in
+// common platform headers, so we can both defer expansion (to only expand what
+// we need and nothing more) as well as inline this code.
+#define EXPAND_PLATFORM_CURRENT_TICKS_SYNCHRONIZED(flags) \
+  template zx_ticks_t platform_current_ticks_synchronized<static_cast<GetTicksSyncFlag>(flags)>()
+EXPAND_PLATFORM_CURRENT_TICKS_SYNCHRONIZED(1);
+EXPAND_PLATFORM_CURRENT_TICKS_SYNCHRONIZED(2);
+EXPAND_PLATFORM_CURRENT_TICKS_SYNCHRONIZED(3);
+EXPAND_PLATFORM_CURRENT_TICKS_SYNCHRONIZED(4);
+EXPAND_PLATFORM_CURRENT_TICKS_SYNCHRONIZED(5);
+EXPAND_PLATFORM_CURRENT_TICKS_SYNCHRONIZED(6);
+EXPAND_PLATFORM_CURRENT_TICKS_SYNCHRONIZED(7);
+EXPAND_PLATFORM_CURRENT_TICKS_SYNCHRONIZED(8);
+EXPAND_PLATFORM_CURRENT_TICKS_SYNCHRONIZED(9);
+EXPAND_PLATFORM_CURRENT_TICKS_SYNCHRONIZED(10);
+EXPAND_PLATFORM_CURRENT_TICKS_SYNCHRONIZED(11);
+EXPAND_PLATFORM_CURRENT_TICKS_SYNCHRONIZED(12);
+EXPAND_PLATFORM_CURRENT_TICKS_SYNCHRONIZED(13);
+EXPAND_PLATFORM_CURRENT_TICKS_SYNCHRONIZED(14);
+EXPAND_PLATFORM_CURRENT_TICKS_SYNCHRONIZED(15);
+#undef EXPAND_PLATFORM_CURRENT_TICKS_SYNCHRONIZED
 
 zx_ticks_t platform_get_raw_ticks_to_ticks_offset() {
   // TODO(https://fxbug.dev/42173294): consider the memory order semantics of this load when the

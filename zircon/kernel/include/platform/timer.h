@@ -12,6 +12,9 @@
 #include <zircon/compiler.h>
 #include <zircon/types.h>
 
+#include <fbl/enum_bits.h>
+#include <ktl/type_traits.h>
+
 // API to set/clear a hardware timer that is responsible for calling timer_tick() when it fires
 zx_status_t platform_set_oneshot_timer(zx_time_t deadline);
 void platform_stop_timer();
@@ -66,5 +69,54 @@ const affine::Ratio& platform_get_ticks_to_time_ratio();
 // Convert a sample taken early on to a proper zx_ticks_t, if possible.
 // This returns 0 if early samples are not convertible.
 zx_ticks_t platform_convert_early_ticks(arch::EarlyTicks sample);
+
+// A special version of `current_ticks` which is explicitly synchronized with
+// memory loads/stores in an architecture/timer specific way.  For example, when
+// using TSC as the ticks reference on an x64 system, there is nothing
+// explicitly preventing the actual read of the TSC finishing before or after
+// previous/subsequent loads/stores (unless we are talking about a subsequent
+// store which has a dependency on the TSC read).
+//
+// Most of the time, this does not matter, but occasionally it can be an issue.
+// For example, some algorithms need to record a timestamp while inside of a
+// critical section (either shared or exclusive).  While the implementation of
+// the synchronization object typically uses atomics and explicit C++ memory
+// order annotations to be sure that (for example) stores to some payload done
+// by a thread with exclusive access to the payload "happen-before" any
+// subsequent loads from threads with shared access to the payload, accesses to
+// the ticks reference on a system is typically not constrained by such
+// dependencies.
+//
+// Without special care, the time observed on the system timer can actually
+// occur before/after any loads or stores which are part of the entry/exit
+// into/out-of the critical section.
+//
+// In such situations, platform_current_ticks_synchronized can be used instead
+// to order to contain the timer observation.  Users pass (via template args) a
+// set of flags which cause appropriate architecture specific barriers to be
+// inserted before/after the ticks reference observation in order to contain it.
+// Specifically, users can demand that the observation must take place:
+//
+//  + After any previous loads
+//  + After any previous stores
+//  + Before any subsequent loads
+//  + Before any subsequent stores
+//
+// or any combination of the above.  Some timer/architecture combinations might
+// require even more strict synchronization than was requested, but all should
+// provide at least the minimum level of synchronization to satisfy the request.
+
+enum class GetTicksSyncFlag : uint8_t {
+  kNone = 0,
+  kAfterPreviousLoads = (1 << 0),
+  kAfterPreviousStores = (1 << 1),
+  kBeforeSubsequentLoads = (1 << 2),
+  kBeforeSubsequentStores = (1 << 3),
+};
+
+FBL_ENABLE_ENUM_BITS(GetTicksSyncFlag)
+
+template <GetTicksSyncFlag Flags>
+zx_ticks_t platform_current_ticks_synchronized();
 
 #endif  // ZIRCON_KERNEL_INCLUDE_PLATFORM_TIMER_H_

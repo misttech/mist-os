@@ -162,23 +162,69 @@ static affine::Transform early_ticks_to_ticks{0, 0, {0, 1}};
 
 #define LOCAL_TRACE 0
 
-static zx_ticks_t current_ticks_rdtsc(void) { return _rdtsc(); }
+static inline zx_ticks_t current_ticks_rdtsc(void) { return _rdtsc(); }
+static inline zx_ticks_t current_ticks_rdtscp(void) {
+  unsigned int unused;
+  return __rdtscp(&unused);
+}
 
 static zx_ticks_t current_ticks_hpet(void) { return hpet_get_value(); }
-
 static zx_ticks_t current_ticks_pit(void) { return pit_ticks; }
 
-zx_ticks_t platform_current_raw_ticks() {
+namespace internal {
+
+template <GetTicksSyncFlag Flags>
+inline zx_ticks_t platform_current_raw_ticks() {
   // Directly call the ticks functions to avoid the cost of a virtual (indirect) call.
   if (wall_clock == CLOCK_TSC) {
-    return current_ticks_rdtsc();
+    // See "Intel® 64 and IA-32 Architectures Software Developer’s Manual Vol.
+    // 2B Section 4.3", specifically the entries for RDTSC and RDTSCP for a
+    // description of the serialization properties of the instructions which
+    // access the TSC.
+    //
+    // If all stores must be completed and "globally visible" before the TSC is
+    // sampled, docs say to put an MFENCE in front of the TSC access.
+    if constexpr ((Flags & GetTicksSyncFlag::kAfterPreviousStores) != GetTicksSyncFlag::kNone) {
+      __asm__ __volatile__("mfence" ::: "memory");
+    }
+
+    // If all loads must be complete and "globally visible" (meaning that the
+    // value to load has been determined) before the TSC is sampled, docs say to
+    // either execute `LFENCE ; RDTSC` or just `RDTSCP`.
+    const zx_ticks_t ret = []() {
+      if constexpr ((Flags & GetTicksSyncFlag::kAfterPreviousLoads) != GetTicksSyncFlag::kNone) {
+        return current_ticks_rdtscp();
+      } else {
+        return current_ticks_rdtsc();
+      }
+    }();
+
+    // Finally, if we need the TSC sampling to have finished before any
+    // subsequent loads/stores start, docs say that we should put an LFENCE
+    // immediately after the RDTSC/RDTSCP.
+    if constexpr ((Flags & (GetTicksSyncFlag::kBeforeSubsequentLoads |
+                            GetTicksSyncFlag::kBeforeSubsequentStores)) !=
+                  GetTicksSyncFlag::kNone) {
+      __asm__ __volatile__("lfence" ::: "memory");
+    }
+
+    return ret;
   } else {
     switch (wall_clock) {
       case CLOCK_UNSELECTED:
         return 0;
       case CLOCK_PIT:
+        // In theory, we should not need anything special to synchronize the
+        // PIT. Right now, the PIT is just a global counter incremented by an
+        // IRQ handler when the interrupt timer fires once per msec, and Intel's
+        // memory model is strongly ordered, implying that no special
+        // synchronization should be required.
         return current_ticks_pit();
       case CLOCK_HPET:
+        // TODO(johngro): Research and apply any barriers required to
+        // synchronize observations of the HPET with the instruction pipeline.
+        // Right now, we almost never use the HPET as our reference, which
+        // somewhat lowers the priority of this issue.
         return current_ticks_hpet();
       default:
         PANIC_UNIMPLEMENTED;
@@ -186,19 +232,59 @@ zx_ticks_t platform_current_raw_ticks() {
   }
 }
 
-zx_ticks_t platform_current_ticks() {
+template <GetTicksSyncFlag Flags>
+inline zx_ticks_t platform_current_ticks() {
   while (true) {
     // Since the raw_ticks_to_ticks_offset is only updated either early in boot or during resume,
     // both of which occur when we're running on a single core with interrupts disabled, we don't
     // need to worry about thread synchronization so memory_order_relaxed is sufficient.
     const zx_ticks_t off1 = raw_ticks_to_ticks_offset.load(ktl::memory_order_relaxed);
-    const zx_ticks_t raw_ticks = platform_current_raw_ticks();
+    const zx_ticks_t raw_ticks = ::internal::platform_current_raw_ticks<Flags>();
     const zx_ticks_t off2 = raw_ticks_to_ticks_offset.load(ktl::memory_order_relaxed);
     if (off1 == off2) {
       return raw_ticks + off1;
     }
   }
 }
+
+}  // namespace internal
+
+zx_ticks_t platform_current_ticks() {
+  return internal::platform_current_ticks<GetTicksSyncFlag::kNone>();
+}
+
+zx_ticks_t platform_current_raw_ticks() {
+  return internal::platform_current_raw_ticks<GetTicksSyncFlag::kNone>();
+}
+
+template <GetTicksSyncFlag Flags>
+zx_ticks_t platform_current_ticks_synchronized() {
+  return internal::platform_current_ticks<Flags>();
+}
+
+// Explicit instantiation of all of the forms of synchronized tick access.
+//
+// TODO(johngro): Look into reasonable ways to put architecture specific code in
+// common platform headers, so we can both defer expansion (to only expand what
+// we need and nothing more) as well as inline this code.
+#define EXPAND_PLATFORM_CURRENT_TICKS_SYNCHRONIZED(flags) \
+  template zx_ticks_t platform_current_ticks_synchronized<static_cast<GetTicksSyncFlag>(flags)>()
+EXPAND_PLATFORM_CURRENT_TICKS_SYNCHRONIZED(1);
+EXPAND_PLATFORM_CURRENT_TICKS_SYNCHRONIZED(2);
+EXPAND_PLATFORM_CURRENT_TICKS_SYNCHRONIZED(3);
+EXPAND_PLATFORM_CURRENT_TICKS_SYNCHRONIZED(4);
+EXPAND_PLATFORM_CURRENT_TICKS_SYNCHRONIZED(5);
+EXPAND_PLATFORM_CURRENT_TICKS_SYNCHRONIZED(6);
+EXPAND_PLATFORM_CURRENT_TICKS_SYNCHRONIZED(7);
+EXPAND_PLATFORM_CURRENT_TICKS_SYNCHRONIZED(8);
+EXPAND_PLATFORM_CURRENT_TICKS_SYNCHRONIZED(9);
+EXPAND_PLATFORM_CURRENT_TICKS_SYNCHRONIZED(10);
+EXPAND_PLATFORM_CURRENT_TICKS_SYNCHRONIZED(11);
+EXPAND_PLATFORM_CURRENT_TICKS_SYNCHRONIZED(12);
+EXPAND_PLATFORM_CURRENT_TICKS_SYNCHRONIZED(13);
+EXPAND_PLATFORM_CURRENT_TICKS_SYNCHRONIZED(14);
+EXPAND_PLATFORM_CURRENT_TICKS_SYNCHRONIZED(15);
+#undef EXPAND_PLATFORM_CURRENT_TICKS_SYNCHRONIZED
 
 zx_ticks_t platform_get_raw_ticks_to_ticks_offset() {
   // On x86 this is only used to load the vDSO constant raw_ticks_to_ticks_offset. This happens
