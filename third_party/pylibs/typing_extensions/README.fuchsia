@@ -1,0 +1,20 @@
+Name: typing_extensions
+License: PSF License Version 2 and the Zero-Clause BSD license
+License File: src/LICENSE
+Upstream Git: https://github.com/python/typing_extensions
+Description:
+
+typing_extensions is backported and experimental type hints for Python
+
+
+Changes made to Work with Fuchsia:
+
+Added __init__.py to ensure the directory is treated as a Python package,
+enabling proper imports.
+
+Upgrading the version of mypy_extensions:
+
+Run `integration/third_party/pylibs/update-pylibs.sh` script to automatically
+figure out the right version for typing_extensions package based on the version
+of the mypy.
+

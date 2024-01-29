@@ -1,0 +1,21 @@
+Name: mypy_extensions
+License: MIT License
+License File: src/LICENSE
+Upstream Git: https://github.com/python/mypy_extensions
+Description:
+
+mypy_extensions is Python standard library typing module supported by the mypy
+type checker and the mypyc compiler.
+
+
+Changes made to Work with Fuchsia:
+
+Added __init__.py to ensure the directory is treated as a Python package,
+enabling proper imports.
+
+
+Upgrading the version of mypy_extensions:
+
+Run `integration/third_party/pylibs/update-pylibs.sh` script to automatically
+figure out the right version for mypy_extensions package based on the version
+of the mypy.

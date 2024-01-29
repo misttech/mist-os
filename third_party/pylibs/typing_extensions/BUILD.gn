@@ -1,0 +1,14 @@
+# Copyright 2024 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/python/python_library.gni")
+
+python_library("typing_extensions") {
+  sources = [
+    "__init__.py",
+    "src/src/_typed_dict_test_helper.py",
+    "src/src/test_typing_extensions.py",
+    "src/src/typing_extensions.py",
+  ]
+}
