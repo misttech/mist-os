@@ -1008,12 +1008,14 @@ where
 }
 
 /// Set the promiscuous mode flag on `device_id`.
+// NB: We don't currently have a need to expose this function so it's defined as
+// testonly.
+#[cfg(test)]
 pub(super) fn set_promiscuous_mode<
     BC: EthernetIpLinkDeviceBindingsContext<CC::DeviceId>,
     CC: EthernetIpLinkDeviceDynamicStateContext<BC>,
 >(
     core_ctx: &mut CC,
-    _bindings_ctx: &mut BC,
     device_id: &CC::DeviceId,
     enabled: bool,
 ) {
@@ -1420,7 +1422,10 @@ mod tests {
 
     use super::*;
     use crate::{
-        context::testutil::{FakeFrameCtx, FakeInstant, FakeLinkResolutionNotifier},
+        context::{
+            testutil::{FakeFrameCtx, FakeInstant, FakeLinkResolutionNotifier},
+            SyncCtx,
+        },
         device::{
             arp::ArpCounters,
             socket::Frame,
@@ -1443,7 +1448,6 @@ mod tests {
             add_arp_or_ndp_table_entry, assert_empty, new_rng, Ctx, FakeEventDispatcherBuilder,
             TestIpExt, DEFAULT_INTERFACE_METRIC, FAKE_CONFIG_V4, IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
         },
-        SyncCtx,
     };
 
     struct FakeEthernetCtx {
@@ -2129,7 +2133,6 @@ mod tests {
         let config = I::FAKE_CONFIG;
         let (mut ctx, device_ids) = FakeEventDispatcherBuilder::from_config(config.clone()).build();
         let eth_device = &device_ids[0];
-        let device = eth_device.clone().into();
 
         let buf = Buf::new(Vec::new(), ..)
             .encapsulate(I::PacketBuilder::new(
@@ -2150,31 +2153,26 @@ mod tests {
             .unwrap_b();
 
         // Accept packet destined for this device if promiscuous mode is off.
-        let Ctx { core_ctx, bindings_ctx } = &mut ctx;
-        crate::device::set_promiscuous_mode(core_ctx, bindings_ctx, &device, false)
-            .expect("error setting promiscuous mode");
+        set_promiscuous_mode(&mut CoreCtx::new_deprecated(&ctx.core_ctx), &eth_device, false);
         ctx.core_api()
             .device::<EthernetLinkDevice>()
             .receive_frame(RecvEthernetFrameMeta { device_id: eth_device.clone() }, buf.clone());
 
-        let Ctx { core_ctx, bindings_ctx } = &mut ctx;
-        assert_eq!(core_ctx.state.ip_counters::<I>().dispatch_receive_ip_packet.get(), 1);
+        assert_eq!(ctx.core_ctx.state.ip_counters::<I>().dispatch_receive_ip_packet.get(), 1);
         assert_eq!(
-            core_ctx.state.ip_counters::<I>().dispatch_receive_ip_packet_other_host.get(),
+            ctx.core_ctx.state.ip_counters::<I>().dispatch_receive_ip_packet_other_host.get(),
             0
         );
 
         // Accept packet destined for this device if promiscuous mode is on.
-        crate::device::set_promiscuous_mode(core_ctx, bindings_ctx, &device, true)
-            .expect("error setting promiscuous mode");
+        set_promiscuous_mode(&mut CoreCtx::new_deprecated(&ctx.core_ctx), &eth_device, true);
         ctx.core_api()
             .device::<EthernetLinkDevice>()
             .receive_frame(RecvEthernetFrameMeta { device_id: eth_device.clone() }, buf);
 
-        let Ctx { core_ctx, bindings_ctx } = &mut ctx;
-        assert_eq!(core_ctx.state.ip_counters::<I>().dispatch_receive_ip_packet.get(), 2);
+        assert_eq!(ctx.core_ctx.state.ip_counters::<I>().dispatch_receive_ip_packet.get(), 2);
         assert_eq!(
-            core_ctx.state.ip_counters::<I>().dispatch_receive_ip_packet_other_host.get(),
+            ctx.core_ctx.state.ip_counters::<I>().dispatch_receive_ip_packet_other_host.get(),
             0
         );
 
@@ -2198,22 +2196,19 @@ mod tests {
 
         // Reject packet not destined for this device if promiscuous mode is
         // off.
-        crate::device::set_promiscuous_mode(core_ctx, bindings_ctx, &device, false)
-            .expect("error setting promiscuous mode");
+        set_promiscuous_mode(&mut CoreCtx::new_deprecated(&ctx.core_ctx), &eth_device, false);
         ctx.core_api()
             .device::<EthernetLinkDevice>()
             .receive_frame(RecvEthernetFrameMeta { device_id: eth_device.clone() }, buf.clone());
 
-        let Ctx { core_ctx, bindings_ctx } = &mut ctx;
-        assert_eq!(core_ctx.state.ip_counters::<I>().dispatch_receive_ip_packet.get(), 2);
+        assert_eq!(ctx.core_ctx.state.ip_counters::<I>().dispatch_receive_ip_packet.get(), 2);
         assert_eq!(
-            core_ctx.state.ip_counters::<I>().dispatch_receive_ip_packet_other_host.get(),
+            ctx.core_ctx.state.ip_counters::<I>().dispatch_receive_ip_packet_other_host.get(),
             0
         );
 
         // Accept packet not destined for this device if promiscuous mode is on.
-        crate::device::set_promiscuous_mode(core_ctx, bindings_ctx, &device, true)
-            .expect("error setting promiscuous mode");
+        set_promiscuous_mode(&mut CoreCtx::new_deprecated(&ctx.core_ctx), &eth_device, true);
         ctx.core_api()
             .device::<EthernetLinkDevice>()
             .receive_frame(RecvEthernetFrameMeta { device_id: eth_device.clone() }, buf);

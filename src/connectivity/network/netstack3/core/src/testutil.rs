@@ -59,8 +59,8 @@ use crate::{
             FakeFrameCtx, FakeInstant, FakeNetworkContext, FakeTimerCtx, FakeTimerCtxExt,
             WithFakeFrameContext, WithFakeTimerContext,
         },
-        EventContext, InstantBindingsTypes, InstantContext, RngContext, TimerContext, TimerHandler,
-        TracingContext, UnlockedCoreCtx,
+        EventContext, InstantBindingsTypes, InstantContext, RngContext, SyncCtx, TimerContext,
+        TimerHandler, TracingContext, UnlockedCoreCtx,
     },
     device::{
         ethernet::MaxEthernetFrameSize,
@@ -95,7 +95,7 @@ use crate::{
         },
         udp::{self, UdpBindingsContext},
     },
-    BindingsTypes, CoreCtx, SyncCtx,
+    BindingsTypes, CoreCtx,
 };
 
 /// NDP test utilities.
@@ -1466,7 +1466,7 @@ pub(crate) const IPV6_MIN_IMPLIED_MAX_FRAME_SIZE: MaxEthernetFrameSize =
 /// Add a route directly to the forwarding table.
 #[cfg(any(test, feature = "testutils"))]
 pub fn add_route<BC: crate::BindingsContext>(
-    core_ctx: &crate::SyncCtx<BC>,
+    core_ctx: &crate::context::SyncCtx<BC>,
     bindings_ctx: &mut BC,
     entry: crate::ip::types::AddableEntryEither<crate::device::DeviceId<BC>>,
 ) -> Result<(), crate::ip::forwarding::AddRouteError> {
@@ -1493,7 +1493,7 @@ pub fn add_route<BC: crate::BindingsContext>(
 /// found to be deleted.
 #[cfg(any(test, feature = "testutils"))]
 pub fn del_routes_to_subnet<BC: crate::BindingsContext>(
-    core_ctx: &crate::SyncCtx<BC>,
+    core_ctx: &crate::context::SyncCtx<BC>,
     bindings_ctx: &mut BC,
     subnet: net_types::ip::SubnetEither,
 ) -> crate::error::Result<()> {
@@ -1515,7 +1515,7 @@ pub fn del_routes_to_subnet<BC: crate::BindingsContext>(
 }
 
 pub(crate) fn del_device_routes<BC: crate::BindingsContext>(
-    core_ctx: &crate::SyncCtx<BC>,
+    core_ctx: &crate::context::SyncCtx<BC>,
     bindings_ctx: &mut BC,
     device: &DeviceId<BC>,
 ) {
@@ -1534,7 +1534,7 @@ pub(crate) fn del_device_routes<BC: crate::BindingsContext>(
 
 /// Removes all of the routes through the device, then removes the device.
 pub fn clear_routes_and_remove_ethernet_device<BC: crate::BindingsContext>(
-    core_ctx: &crate::SyncCtx<BC>,
+    core_ctx: &crate::context::SyncCtx<BC>,
     bindings_ctx: &mut BC,
     ethernet_device: crate::device::EthernetDeviceId<BC>,
 ) {

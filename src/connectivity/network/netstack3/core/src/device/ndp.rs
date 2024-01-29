@@ -142,7 +142,7 @@ mod tests {
         },
         context::{
             testutil::{FakeInstant, FakeNetwork, FakeNetworkLinks, StepResult},
-            InstantContext as _, RngContext as _, TimerContext,
+            InstantContext as _, RngContext as _, SyncCtx, TimerContext,
         },
         device::{
             ethernet::{EthernetCreationProperties, EthernetLinkDevice, MaxEthernetFrameSize},
@@ -176,7 +176,7 @@ mod tests {
             TestIpExt, DEFAULT_INTERFACE_METRIC, FAKE_CONFIG_V6, IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
         },
         time::TimerIdInner,
-        BindingsContext, CoreCtx, Instant, SyncCtx, TimerId,
+        BindingsContext, CoreCtx, Instant, TimerId,
     };
 
     #[derive(Debug, PartialEq, Copy, Clone)]

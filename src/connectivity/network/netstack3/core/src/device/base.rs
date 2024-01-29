@@ -18,7 +18,7 @@ use crate::{
     counters::Counter,
     device::{
         arp::ArpCounters,
-        ethernet::{self, EthernetLinkDevice, EthernetTimerId},
+        ethernet::{EthernetLinkDevice, EthernetTimerId},
         id::{
             BaseDeviceId, BasePrimaryDeviceId, DeviceId, EthernetDeviceId, EthernetPrimaryDeviceId,
             StrongId, WeakId,
@@ -28,7 +28,6 @@ use crate::{
         socket::{self, HeldSockets},
         state::DeviceStateSpec,
     },
-    error::NotSupportedError,
     ip::{
         device::{
             nud::LinkResolutionContext, state::IpDeviceFlags, IpDeviceIpExt, IpDeviceStateContext,
@@ -37,7 +36,7 @@ use crate::{
         types::RawMetric,
     },
     sync::RwLock,
-    BindingsContext, CoreCtx, StackState, SyncCtx,
+    BindingsContext, CoreCtx, StackState,
 };
 
 /// A device.
@@ -481,28 +480,6 @@ pub enum DeviceSendFrameError<T> {
     DeviceNotReady(T),
 }
 
-/// Set the promiscuous mode flag on `device`.
-// TODO(rheacock): remove `allow(dead_code)` when this is used.
-#[allow(dead_code)]
-pub(crate) fn set_promiscuous_mode<BC: BindingsContext>(
-    core_ctx: &SyncCtx<BC>,
-    bindings_ctx: &mut BC,
-    device: &DeviceId<BC>,
-    enabled: bool,
-) -> Result<(), NotSupportedError> {
-    match device {
-        DeviceId::Ethernet(id) => Ok(self::ethernet::set_promiscuous_mode(
-            &mut CoreCtx::new_deprecated(core_ctx),
-            bindings_ctx,
-            id,
-            enabled,
-        )),
-        DeviceId::Loopback(LoopbackDeviceId { .. }) | DeviceId::PureIp(PureIpDeviceId { .. }) => {
-            Err(NotSupportedError)
-        }
-    }
-}
-
 #[cfg(any(test, feature = "testutils"))]
 pub(crate) mod testutil {
     use super::*;
@@ -605,7 +582,7 @@ pub(crate) mod testutil {
     /// Returns whether IP packet routing is enabled on `device`.
     #[cfg(test)]
     pub(crate) fn is_forwarding_enabled<BC: BindingsContext, I: Ip>(
-        core_ctx: &SyncCtx<BC>,
+        core_ctx: &crate::context::SyncCtx<BC>,
         device: &DeviceId<BC>,
     ) -> bool {
         let mut core_ctx = CoreCtx::new_deprecated(core_ctx);

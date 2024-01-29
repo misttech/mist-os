@@ -5,7 +5,7 @@
 //! Defines the types of changes that can be made to the routing table, and the
 //! worker responsible for executing those changes.
 //!
-//! Routing table changes are requested via an mpsc Sender held in NonSyncCtx
+//! Routing table changes are requested via an mpsc Sender held in BindingsCtx
 //! ([`Changes`]), while the [`ChangeRunner`] is run in a separate task and is
 //! responsible for ingesting those changes, updating the routing table, and
 //! syncing the table to core.

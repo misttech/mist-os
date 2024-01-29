@@ -45,7 +45,7 @@ use rand::{CryptoRng, RngCore};
 use crate::{
     counters::Counter,
     marker::{BindingsContext, BindingsTypes},
-    state::{StackState, StackStateBuilder},
+    state::StackState,
     sync, Instant,
 };
 
@@ -286,16 +286,10 @@ pub trait ReferenceNotifiers {
 /// The synchronized context.
 // TODO(https://fxbug.dev/42083910): Remove this type once the API no longer
 // requires it.
+#[cfg(any(test, feature = "testutils"))]
 pub struct SyncCtx<BT: BindingsTypes> {
     /// Contains the state of the stack.
     pub state: StackState<BT>,
-}
-
-impl<BC: BindingsContext> SyncCtx<BC> {
-    /// Create a new `SyncCtx`.
-    pub fn new(bindings_ctx: &mut BC) -> SyncCtx<BC> {
-        SyncCtx { state: StackStateBuilder::default().build_with_ctx(bindings_ctx) }
-    }
 }
 
 /// Provides access to core context implementations.
@@ -416,7 +410,7 @@ where
 /// This module is intentionally private so usage is limited to the type alias
 /// in [`CoreCtx`].
 mod locked {
-    use super::{BindingsTypes, CoreCtx, StackState, SyncCtx};
+    use super::{BindingsTypes, CoreCtx, StackState};
 
     use core::ops::Deref;
     use lock_order::{wrap::LockedWrapper, Locked as ExternalLocked, TupleWrapper, Unlocked};
@@ -472,9 +466,10 @@ mod locked {
         }
 
         /// Creates a new `CoreCtx` from a borrowed [`SyncCtx`].
-        // TODO(https://fxbug.dev/42083910): This is a transitional method before we
-        // get rid of SyncCtx altogether.
-        pub(crate) fn new_deprecated(sync_ctx: &'a SyncCtx<BT>) -> Self {
+        // TODO(https://fxbug.dev/42083910): This is a transitional method
+        // before we get rid of SyncCtx altogether.
+        #[cfg(any(test, feature = "testutils"))]
+        pub(crate) fn new_deprecated(sync_ctx: &'a crate::context::SyncCtx<BT>) -> Self {
             Self(ExternalLocked::new(&sync_ctx.state))
         }
     }

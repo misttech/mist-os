@@ -1932,7 +1932,7 @@ macro_rules! try_parse_ip_packet {
 /// depending on the type parameter, `I`.
 #[cfg(test)]
 pub(crate) fn receive_ip_packet<B: BufferMut, BC: BindingsContext, I: Ip>(
-    core_ctx: &crate::SyncCtx<BC>,
+    core_ctx: &crate::context::SyncCtx<BC>,
     bindings_ctx: &mut BC,
     device: &DeviceId<BC>,
     frame_dst: Option<FrameDestination>,
@@ -3419,7 +3419,7 @@ mod tests {
 
     use super::*;
     use crate::{
-        context::testutil::FakeInstant,
+        context::{testutil::FakeInstant, SyncCtx},
         device::{
             ethernet::{EthernetCreationProperties, EthernetLinkDevice, RecvEthernetFrameMeta},
             loopback::{LoopbackCreationProperties, LoopbackDevice},
@@ -3443,7 +3443,7 @@ mod tests {
             FakeEventDispatcherBuilder, TestIpExt, DEFAULT_INTERFACE_METRIC, FAKE_CONFIG_V4,
             FAKE_CONFIG_V6, IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
         },
-        SyncCtx, UnlockedCoreCtx,
+        UnlockedCoreCtx,
     };
 
     // Some helper functions

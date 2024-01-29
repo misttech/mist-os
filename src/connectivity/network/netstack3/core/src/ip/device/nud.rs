@@ -2475,7 +2475,7 @@ mod tests {
                 FakeLinkResolutionNotifier, FakeNetwork, FakeNetworkLinks, FakeTimerCtxExt as _,
                 WrappedFakeCoreCtx,
             },
-            CtxPair, InstantContext, SendFrameContext as _,
+            CtxPair, InstantContext, SendFrameContext as _, SyncCtx,
         },
         device::{
             ethernet::{EthernetCreationProperties, EthernetLinkDevice},
@@ -2497,7 +2497,7 @@ mod tests {
             IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
         },
         transport::tcp,
-        CoreCtx, SyncCtx, UnlockedCoreCtx,
+        CoreCtx, UnlockedCoreCtx,
     };
 
     struct FakeNudContext<I: Ip, D: LinkDevice> {

@@ -82,8 +82,8 @@ use netstack3_core::{
     neighbor,
     routes::RawMetric,
     udp::{self, UdpBindingsContext},
-    EventContext, InstantBindingsTypes, InstantContext, IpExt, RngContext, SyncCtx, TimerContext,
-    TimerId, TracingContext,
+    EventContext, InstantBindingsTypes, InstantContext, IpExt, RngContext, StackState,
+    TimerContext, TimerId, TracingContext,
 };
 
 mod ctx {
@@ -108,7 +108,7 @@ mod ctx {
         // will cause a panic. See `netstack3_core::sync::PrimaryRc` for more
         // details.
         bindings_ctx: BindingsCtx,
-        core_ctx: Arc<SyncCtx<BindingsCtx>>,
+        core_ctx: Arc<StackState<BindingsCtx>>,
     }
 
     #[allow(dead_code)] // TODO(https://fxbug.dev/318827209)
@@ -121,7 +121,7 @@ mod ctx {
     impl Ctx {
         fn new(routes_change_sink: routes::ChangeSink) -> Self {
             let mut bindings_ctx = BindingsCtx(Arc::new(BindingsCtxInner::new(routes_change_sink)));
-            let core_ctx = Arc::new(SyncCtx::new(&mut bindings_ctx));
+            let core_ctx = Arc::new(StackState::new(&mut bindings_ctx));
             Self { bindings_ctx, core_ctx }
         }
 
@@ -154,7 +154,7 @@ mod ctx {
 
         pub(crate) fn api(&mut self) -> netstack3_core::CoreApi<'_, &mut BindingsCtx> {
             let Ctx { bindings_ctx, core_ctx } = self;
-            core_ctx.state.api(bindings_ctx)
+            core_ctx.api(bindings_ctx)
         }
     }
 

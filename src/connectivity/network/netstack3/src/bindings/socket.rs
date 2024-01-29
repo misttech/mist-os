@@ -176,35 +176,30 @@ pub(crate) fn create_request_stream<T: fidl::endpoints::ProtocolMarker>(
 }
 
 fn get_interface_addresses(ctx: &mut Ctx) -> Vec<psocket::InterfaceAddresses> {
-    // Clone `ctx` so we can call API in the closure, it's cheaper than doing
-    // extra vec cloning to satisfy the borrow checker.
-    let mut ctx_clone = ctx.clone();
-    ctx.bindings_ctx().devices.with_devices(|devices| {
-        devices
-            .map(|d| {
-                // Generally, calling into `netstack3_core` while operating
-                // on the non-sync context is a recipe for deadlocks. That's
-                // not an issue here since the non-sync context isn't being
-                // passed into `get_all_ip_addr_subnets`.
-                let mut addresses = Vec::new();
-                ctx_clone.api().device_ip_any().for_each_assigned_ip_addr_subnet(d, |a| {
-                    addresses.push(fidl_fuchsia_net_ext::FromExt::from_ext(a))
-                });
+    // Snapshot devices out so we don't hold any locks while calling into core.
+    let devices =
+        ctx.bindings_ctx().devices.with_devices(|devices| devices.cloned().collect::<Vec<_>>());
+    devices
+        .into_iter()
+        .map(|d| {
+            let mut addresses = Vec::new();
+            ctx.api().device_ip_any().for_each_assigned_ip_addr_subnet(&d, |a| {
+                addresses.push(fidl_fuchsia_net_ext::FromExt::from_ext(a))
+            });
 
-                let DeviceIdAndName { id, name } = d.bindings_id();
-                let info = d.external_state();
-                let flags = flags_for_device(&info);
+            let DeviceIdAndName { id, name } = d.bindings_id();
+            let info = d.external_state();
+            let flags = flags_for_device(&info);
 
-                psocket::InterfaceAddresses {
-                    id: Some(id.get()),
-                    name: Some(name.clone()),
-                    addresses: Some(addresses),
-                    interface_flags: Some(flags),
-                    ..Default::default()
-                }
-            })
-            .collect::<Vec<_>>()
-    })
+            psocket::InterfaceAddresses {
+                id: Some(id.get()),
+                name: Some(name.clone()),
+                addresses: Some(addresses),
+                interface_flags: Some(flags),
+                ..Default::default()
+            }
+        })
+        .collect::<Vec<_>>()
 }
 
 fn get_interface_flags(

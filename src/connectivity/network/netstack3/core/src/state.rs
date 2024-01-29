@@ -133,3 +133,10 @@ impl<BT: BindingsTypes> StackState<BT> {
         &self.ipv6.slaac_counters()
     }
 }
+
+impl<BC: BindingsContext> StackState<BC> {
+    /// Create a new `StackState`.
+    pub fn new(bindings_ctx: &mut BC) -> Self {
+        StackStateBuilder::default().build_with_ctx(bindings_ctx)
+    }
+}
