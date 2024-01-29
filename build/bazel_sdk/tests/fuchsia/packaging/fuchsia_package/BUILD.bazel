@@ -43,7 +43,7 @@ fuchsia_package_checker_test(
     size = "small",
     bind_bytecode = "meta/bind/test_driver.bindbc",
     expected_blobs_to_file_names = {
-        "driver/libtest_driver.so": "libtest_driver_cc_binary.so_stripped",
+        "driver/test_driver_so.so": "test_driver_cc_binary.so_stripped",
         # Common files
         # Note: all of these files are not required and will be cleaned up but we
         # do not have a way to ignore files in this test so removing them will

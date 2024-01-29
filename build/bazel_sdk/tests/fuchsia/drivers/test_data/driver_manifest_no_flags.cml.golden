@@ -1,6 +1,6 @@
 {
     "program": {
-        "binary": "driver/libdriver_no_src.so",
+        "binary": "driver/libdriver_no_srcs.so",
         "bind": "meta/bind/foo.bindbc",
         "default_dispatcher_opts": [
             "allow_sync_calls"

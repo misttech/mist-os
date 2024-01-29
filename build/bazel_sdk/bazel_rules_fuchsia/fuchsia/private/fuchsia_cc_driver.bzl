@@ -33,7 +33,9 @@ def fuchsia_cc_driver(name, srcs = [], output_name = None, deps = [], **kwargs):
         fail(_MISSING_SRCS_FAIL_MESSAGE)
 
     # Ensure that our binary is named with a .so at the end
-    bin_name = (output_name or "lib{}".format(name)).rstrip(".so") + ".so"
+    bin_name = output_name or "lib{}".format(name)
+    if not bin_name.endswith(".so"):
+        bin_name = bin_name + ".so"
 
     # Grab the user supplied linkopts and add our specific opts that are required
     # for all drivers

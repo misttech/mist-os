@@ -34,6 +34,8 @@ fuchsia_cc_driver(
         "cc_test_driver.cc",
         "cc_test_driver.h",
     ],
+    # name the driver like this to make sure out extension stripping works
+    output_name = "test_driver_so",
     deps = ["@fuchsia_sdk//pkg/driver_component_cpp"],
 )
 
