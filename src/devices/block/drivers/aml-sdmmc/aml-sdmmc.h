@@ -302,6 +302,9 @@ class AmlSdmmc : public fdf::DriverBase,
       std::nullopt,
       compat::ForwardMetadata::Some({DEVICE_METADATA_SDMMC, DEVICE_METADATA_GPT_INFO}),
       get_banjo_config()};
+
+  // Dedicated dispatcher for inlining fuchsia_hardware_sdmmc::Sdmmc FIDL requests.
+  fdf::Dispatcher worker_dispatcher_;
 };
 
 }  // namespace aml_sdmmc

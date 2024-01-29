@@ -187,6 +187,15 @@ void AmlSdmmc::CompatServerInitialized(zx::result<> compat_result) {
   exposed_inspector_.emplace(inspect::ComponentInspector(
       dispatcher(), {.inspector = inspector(), .client_end = std::move(inspect_sink.value())}));
 
+  auto no_sync_calls_dispatcher =
+      fdf::SynchronizedDispatcher::Create({}, "aml-sdmmc-worker", [](fdf_dispatcher_t*) {});
+  if (no_sync_calls_dispatcher.is_error()) {
+    FDF_LOGL(ERROR, logger(), "Failed to create dispatcher: %s",
+             zx_status_get_string(no_sync_calls_dispatcher.status_value()));
+    return CompleteStart(zx::error(no_sync_calls_dispatcher.status_value()));
+  }
+  worker_dispatcher_ = *std::move(no_sync_calls_dispatcher);
+
   {
     fuchsia_hardware_sdmmc::SdmmcService::InstanceHandler handler({
         .sdmmc = fit::bind_member<&AmlSdmmc::Serve>(this),
@@ -361,7 +370,7 @@ zx::result<> AmlSdmmc::InitResources(
 }
 
 void AmlSdmmc::Serve(fdf::ServerEnd<fuchsia_hardware_sdmmc::Sdmmc> request) {
-  fdf::BindServer(driver_dispatcher()->get(), std::move(request), this);
+  fdf::BindServer(worker_dispatcher_.get(), std::move(request), this);
 }
 
 zx_status_t AmlSdmmc::WaitForInterruptImpl() {

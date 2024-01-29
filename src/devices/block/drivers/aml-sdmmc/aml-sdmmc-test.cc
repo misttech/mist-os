@@ -305,6 +305,16 @@ class AmlSdmmcTest : public zxtest::Test {
     mmio_->Write32(1, kAmlSdmmcCfgOffset);  // Set bus width 4.
   }
 
+  void TearDown() override {
+    zx::result prepare_stop_result = runtime_.RunToCompletion(dut_.PrepareStop());
+    EXPECT_OK(prepare_stop_result.status_value());
+
+    incoming_.reset();
+    runtime_.ShutdownAllDispatchers(fdf::Dispatcher::GetCurrent()->get());
+
+    EXPECT_OK(dut_.Stop());
+  }
+
  protected:
   static zx_koid_t GetVmoKoid(const zx::vmo& vmo) {
     zx_info_handle_basic_t info = {};
