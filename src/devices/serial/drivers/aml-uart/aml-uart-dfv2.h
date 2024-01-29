@@ -45,7 +45,7 @@ class AmlUartV2 : public fdf::DriverBase {
   std::optional<fdf::SynchronizedDispatcher> irq_dispatcher_;
   std::optional<AmlUart> aml_uart_;
   std::optional<fdf::PrepareStopCompleter> prepare_stop_completer_;
-  compat::DeviceServer device_server_;
+  compat::AsyncInitializedDeviceServer device_server_;
   fdf::ServerBindingGroup<fuchsia_hardware_serialimpl::Device> serial_impl_bindings_;
 };
 

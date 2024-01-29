@@ -23,9 +23,14 @@ RpmbDevice::RpmbDevice(SdmmcBlockDevice* sdmmc_parent,
       reliable_write_sector_count_(ext_csd[MMC_EXT_CSD_REL_WR_SEC_C]) {
   const std::string path_from_parent = std::string(sdmmc_parent_->parent()->driver_name()) + "/" +
                                        std::string(sdmmc_parent_->block_name()) + "/";
-  compat_server_.emplace(
-      sdmmc_parent_->parent()->driver_incoming(), sdmmc_parent_->parent()->driver_outgoing(),
-      sdmmc_parent_->parent()->driver_node_name(), kDeviceName, path_from_parent);
+
+  // TODO(hanbinyoon): Move this initialization so that any error status can be returned.
+  ZX_ASSERT(compat_server_
+                .Initialize(sdmmc_parent_->parent()->driver_incoming(),
+                            sdmmc_parent_->parent()->driver_outgoing(),
+                            sdmmc_parent_->parent()->driver_node_name(), kDeviceName,
+                            compat::ForwardMetadata::None(), std::nullopt, path_from_parent)
+                .is_ok());
 }
 
 zx_status_t RpmbDevice::AddDevice() {
@@ -58,7 +63,7 @@ zx_status_t RpmbDevice::AddDevice() {
   properties[0] = fdf::MakeProperty(arena, bind_fuchsia_hardware_rpmb::SERVICE,
                                     bind_fuchsia_hardware_rpmb::SERVICE_ZIRCONTRANSPORT);
 
-  std::vector<fuchsia_component_decl::wire::Offer> offers = compat_server_->CreateOffers(arena);
+  std::vector<fuchsia_component_decl::wire::Offer> offers = compat_server_.CreateOffers(arena);
   offers.push_back(
       fdf::MakeOffer<fuchsia_hardware_rpmb::Service>(arena, component::kDefaultInstance));
 

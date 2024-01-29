@@ -692,11 +692,17 @@ zx::result<> Vim3UsbPhyDevice::AddDevice(ChildNode& node) {
     return zx::ok();
   }
 
-  node.compat_server_.emplace(fdf::Dispatcher::GetCurrent()->async_dispatcher(), incoming(),
-                              outgoing(), kDeviceName, node.name_, "");
+  {
+    auto result = node.compat_server_.Initialize(incoming(), outgoing(), node_name(), node.name_,
+                                                 compat::ForwardMetadata::None(), std::nullopt,
+                                                 std::string(kDeviceName) + "/");
+    if (result.is_error()) {
+      return result.take_error();
+    }
+  }
 
   fidl::Arena arena;
-  auto offers = node.compat_server_->CreateOffers(arena);
+  auto offers = node.compat_server_.CreateOffers(arena);
   offers.push_back(fdf::MakeOffer<fuchsia_hardware_usb_phy::Service>(arena, node.name_));
   auto args =
       fuchsia_driver_framework::wire::NodeAddArgs::Builder(arena)

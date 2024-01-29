@@ -45,33 +45,26 @@ Device::Device(fdf::DriverStartArgs start_args,
   client_dispatcher_ = std::move(*client_dispatcher);
 }
 
-void Device::Start(fdf::StartCompleter completer) {
-  compat_server_.emplace(dispatcher(), incoming(), outgoing(), node_name(), name(), std::nullopt,
-                         compat::ForwardMetadata::None());
-  start_completer_.emplace(std::move(completer));
-  compat_server_->OnInitialized(fit::bind_member<&Device::CompatServerInitialized>(this));
-}
-
-void Device::CompleteStart(zx::result<> result) {
-  ZX_ASSERT(start_completer_.has_value());
-  start_completer_.value()(result);
-  start_completer_.reset();
-}
-
-void Device::CompatServerInitialized(zx::result<> compat_result) {
-  if (compat_result.is_error()) {
-    return CompleteStart(compat_result.take_error());
+zx::result<> Device::Start() {
+  // Initialize our device server.
+  {
+    zx::result<> result = compat_server_.Initialize(incoming(), outgoing(), node_name(), name(),
+                                                    compat::ForwardMetadata::None());
+    if (result.is_error()) {
+      return result.take_error();
+    }
   }
+
   zx_status_t status;
   if ((status = ConnectToWlanPhyImpl()) != ZX_OK) {
     lerror("Connect to WlanPhyImpl failed: %s", zx_status_get_string(status));
-    return CompleteStart(zx::error(status));
+    return zx::error(status);
   }
   if ((status = AddWlanDeviceConnector()) != ZX_OK) {
     lerror("Adding WlanPhy service failed: %s", zx_status_get_string(status));
-    return CompleteStart(zx::error(status));
+    return zx::error(status);
   }
-  return CompleteStart(zx::ok());
+  return zx::ok();
 }
 
 void Device::PrepareStop(fdf::PrepareStopCompleter completer) {

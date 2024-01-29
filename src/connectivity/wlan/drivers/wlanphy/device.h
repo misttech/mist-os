@@ -38,7 +38,7 @@ class Device final : public fdf::DriverBase,
                   fdf::UnownedSynchronizedDispatcher driver_dispatcher);
 
   static constexpr const char* Name() { return "wlanphy"; }
-  void Start(fdf::StartCompleter completer) override;
+  zx::result<> Start() override;
   void PrepareStop(fdf::PrepareStopCompleter completer) override;
 
   // Function implementations in protocol fuchsia_wlan_device::Phy.
@@ -63,8 +63,6 @@ class Device final : public fdf::DriverBase,
       fidl::UnknownEventMetadata<fuchsia_driver_framework::NodeController> metadata) override {}
 
  private:
-  void CompatServerInitialized(zx::result<> compat_result);
-  void CompleteStart(zx::result<> result);
   void Serve(fidl::ServerEnd<fuchsia_wlan_device::Connector> server) {
     bindings_.AddBinding(dispatcher(), std::move(server), this, fidl::kIgnoreBindingClosure);
   }
@@ -75,10 +73,9 @@ class Device final : public fdf::DriverBase,
 
   // Dispatcher for being a FIDL client firing requests to WlanPhyImpl device.
   fdf::Dispatcher client_dispatcher_;
-  std::optional<compat::DeviceServer> compat_server_;
+  compat::SyncInitializedDeviceServer compat_server_;
   fidl::WireSyncClient<fuchsia_driver_framework::NodeController> controller_node_;
   fidl::WireSyncClient<fuchsia_driver_framework::Node> node_;
-  std::optional<fdf::StartCompleter> start_completer_;
   driver_devfs::Connector<fuchsia_wlan_device::Connector> devfs_connector_;
   fidl::ServerBindingGroup<fuchsia_wlan_device::Connector> bindings_;
   fidl::ServerBindingGroup<fuchsia_wlan_device::Phy> phy_bindings_;

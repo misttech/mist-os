@@ -25,10 +25,15 @@ SdioFunctionDevice::SdioFunctionDevice(SdioControllerDevice* sdio_parent, uint32
                                        std::string(sdio_parent_->kDeviceName) + "/";
   compat::DeviceServer::BanjoConfig banjo_config;
   banjo_config.callbacks[ZX_PROTOCOL_SDIO] = sdio_server_.callback();
-  compat_server_.emplace(
-      sdio_parent_->parent()->driver_incoming(), sdio_parent_->parent()->driver_outgoing(),
-      sdio_parent_->parent()->driver_node_name(), sdio_function_name_, path_from_parent,
-      compat::ForwardMetadata::None(), std::move(banjo_config));
+
+  // TODO(hanbinyoon): Move this initialization so that any error status can be returned.
+  ZX_ASSERT(compat_server_
+                .Initialize(sdio_parent_->parent()->driver_incoming(),
+                            sdio_parent_->parent()->driver_outgoing(),
+                            sdio_parent_->parent()->driver_node_name(), sdio_function_name_,
+                            compat::ForwardMetadata::None(), std::move(banjo_config),
+                            path_from_parent)
+                .is_ok());
 }
 
 zx_status_t SdioFunctionDevice::Create(SdioControllerDevice* sdio_parent, uint32_t func,
@@ -77,7 +82,7 @@ zx_status_t SdioFunctionDevice::AddDevice(const sdio_func_hw_info_t& hw_info) {
   properties[4] = fdf::MakeProperty(arena, bind_fuchsia_hardware_sdio::SERVICE,
                                     bind_fuchsia_hardware_sdio::SERVICE_ZIRCONTRANSPORT);
 
-  std::vector<fuchsia_component_decl::wire::Offer> offers = compat_server_->CreateOffers(arena);
+  std::vector<fuchsia_component_decl::wire::Offer> offers = compat_server_.CreateOffers(arena);
   offers.push_back(fdf::MakeOffer<fuchsia_hardware_sdio::Service>(arena, sdio_function_name_));
 
   const auto args = fuchsia_driver_framework::wire::NodeAddArgs::Builder(arena)

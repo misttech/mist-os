@@ -4,7 +4,6 @@
 
 #include "src/devices/adc/drivers/adc/adc.h"
 
-#include <fidl/fuchsia.driver.compat/cpp/wire.h>
 #include <lib/ddk/metadata.h>
 #include <lib/driver/compat/cpp/metadata.h>
 #include <lib/driver/component/cpp/driver_export.h>
@@ -22,8 +21,6 @@ AdcDevice::AdcDevice(fdf::ClientEnd<fuchsia_hardware_adcimpl::Device> adc_impl, 
       channel_(channel),
       name_(name),
       resolution_(resolution),
-      compat_server_(adc->dispatcher(), adc->incoming(), adc->outgoing(), adc->node_name(), name_,
-                     std::string(Adc::kDeviceName) + "/"),
       devfs_connector_(fit::bind_member<&AdcDevice::Serve>(this)) {}
 
 void AdcDevice::GetResolution(GetResolutionCompleter::Sync& completer) {
@@ -83,6 +80,15 @@ zx::result<std::unique_ptr<AdcDevice>> AdcDevice::Create(
 
   auto dev = std::make_unique<AdcDevice>(std::move(adc_impl), *channel.idx(),
                                          std::move(*channel.name()), resolution, adc);
+
+  // Initialize our compat server.
+  {
+    zx::result result = dev->compat_server_.Initialize(adc->incoming(), adc->outgoing(),
+                                                       adc->node_name(), dev->name_);
+    if (result.is_error()) {
+      return result.take_error();
+    }
+  }
 
   // Serve fuchsia_hardware_adc.
   {

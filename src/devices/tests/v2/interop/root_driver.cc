@@ -25,7 +25,9 @@ class RootDriver : public fdf::DriverBase {
   void Start(fdf::StartCompleter completer) override {
     node_.Bind(std::move(node()), dispatcher());
     start_completer_.emplace(std::move(completer));
-    child_.OnInitialized(fit::bind_member<&RootDriver::CompatServerInitialized>(this));
+    child_.Begin(incoming(), outgoing(), node_name(), "v1",
+                 fit::bind_member<&RootDriver::CompatServerInitialized>(this),
+                 compat::ForwardMetadata::None(), get_banjo_config());
   }
 
   void CompleteStart(zx::result<> result) {
@@ -82,14 +84,7 @@ class RootDriver : public fdf::DriverBase {
 
   std::optional<fdf::StartCompleter> start_completer_;
 
-  compat::DeviceServer child_{dispatcher(),
-                              incoming(),
-                              outgoing(),
-                              node_name(),
-                              "v1",
-                              std::nullopt,
-                              compat::ForwardMetadata::None(),
-                              get_banjo_config()};
+  compat::AsyncInitializedDeviceServer child_;
 };
 
 }  // namespace

@@ -66,7 +66,7 @@ class AmlSdmmc : public fdf::DriverBase,
     }
   }
 
-  void Start(fdf::StartCompleter completer) override;
+  zx::result<> Start() override;
 
   void PrepareStop(fdf::PrepareStopCompleter completer) TA_EXCL(lock_) override;
 
@@ -207,9 +207,6 @@ class AmlSdmmc : public fdf::DriverBase,
 
   void Serve(fdf::ServerEnd<fuchsia_hardware_sdmmc::Sdmmc> request);
 
-  void CompatServerInitialized(zx::result<> compat_result);
-  void CompleteStart(zx::result<> result);
-
   compat::DeviceServer::BanjoConfig get_banjo_config() {
     compat::DeviceServer::BanjoConfig config{ZX_PROTOCOL_SDMMC};
     config.callbacks[ZX_PROTOCOL_SDMMC] = banjo_server_.callback();
@@ -290,18 +287,8 @@ class AmlSdmmc : public fdf::DriverBase,
   fidl::WireSyncClient<fuchsia_driver_framework::Node> parent_;
   fidl::WireSyncClient<fuchsia_driver_framework::NodeController> controller_;
 
-  std::optional<fdf::StartCompleter> start_completer_;
-
   compat::BanjoServer banjo_server_{ZX_PROTOCOL_SDMMC, this, &sdmmc_protocol_ops_};
-  compat::DeviceServer compat_server_{
-      dispatcher(),
-      incoming(),
-      outgoing(),
-      node_name(),
-      name(),
-      std::nullopt,
-      compat::ForwardMetadata::Some({DEVICE_METADATA_SDMMC, DEVICE_METADATA_GPT_INFO}),
-      get_banjo_config()};
+  compat::SyncInitializedDeviceServer compat_server_;
 
   // Dedicated dispatcher for inlining fuchsia_hardware_sdmmc::Sdmmc FIDL requests.
   fdf::Dispatcher worker_dispatcher_;

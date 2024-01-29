@@ -45,8 +45,10 @@ zx::result<> TiTca6408aDevice::Start() {
     return pin_index_offset.take_error();
   }
 
-  compat_server_.emplace(incoming(), outgoing(), node_name(), kDeviceName, std::nullopt,
-                         compat::ForwardMetadata::All());
+  ZX_ASSERT(compat_server_
+                .Initialize(incoming(), outgoing(), node_name(), kDeviceName,
+                            compat::ForwardMetadata::All())
+                .is_ok());
 
   device_ = std::make_unique<TiTca6408a>(std::move(i2c), *pin_index_offset.value());
 
@@ -72,7 +74,7 @@ void TiTca6408aDevice::Stop() {
 
 zx::result<> TiTca6408aDevice::CreateNode() {
   fidl::Arena arena;
-  auto offers = compat_server_->CreateOffers(arena);
+  auto offers = compat_server_.CreateOffers(arena);
   offers.push_back(
       fdf::MakeOffer<fuchsia_hardware_gpioimpl::Service>(arena, component::kDefaultInstance));
   auto properties =

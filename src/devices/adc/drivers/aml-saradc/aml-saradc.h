@@ -54,10 +54,7 @@ class AmlSaradc : public fdf::DriverBase {
 
  public:
   AmlSaradc(fdf::DriverStartArgs start_args, fdf::UnownedSynchronizedDispatcher driver_dispatcher)
-      : fdf::DriverBase(kDeviceName, std::move(start_args), std::move(driver_dispatcher)),
-        compat_server_(fdf::Dispatcher::GetCurrent()->async_dispatcher(), incoming(), outgoing(),
-                       node_name(), kDeviceName, std::nullopt,
-                       compat::ForwardMetadata::Some({DEVICE_METADATA_ADC})) {}
+      : fdf::DriverBase(kDeviceName, std::move(start_args), std::move(driver_dispatcher)) {}
 
   zx::result<> Start() override;
   void PrepareStop(fdf::PrepareStopCompleter completer) override;
@@ -68,7 +65,7 @@ class AmlSaradc : public fdf::DriverBase {
   std::unique_ptr<AmlSaradcDevice> device_;
   fdf::ServerBindingGroup<fuchsia_hardware_adcimpl::Device> bindings_;
   fidl::WireSyncClient<fuchsia_driver_framework::NodeController> controller_;
-  compat::DeviceServer compat_server_;
+  compat::SyncInitializedDeviceServer compat_server_;
 };
 
 }  // namespace aml_saradc

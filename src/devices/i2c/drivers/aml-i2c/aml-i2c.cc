@@ -103,9 +103,7 @@ namespace aml_i2c {
 
 AmlI2c::AmlI2c(fdf::DriverStartArgs start_args,
                fdf::UnownedSynchronizedDispatcher driver_dispatcher)
-    : fdf::DriverBase(kDriverName, std::move(start_args), std::move(driver_dispatcher)),
-      device_server_(incoming(), outgoing(), node_name(), kChildNodeName, std::nullopt,
-                     compat::ForwardMetadata::Some({DEVICE_METADATA_I2C_CHANNELS}), std::nullopt) {}
+    : fdf::DriverBase(kDriverName, std::move(start_args), std::move(driver_dispatcher)) {}
 
 void AmlI2c::SetTargetAddr(uint16_t addr) const {
   addr &= 0x7f;
@@ -351,16 +349,14 @@ void AmlI2c::Transact(TransactRequestView request, fdf::Arena& arena,
 }
 
 zx::result<> AmlI2c::Start() {
-  auto device_server_result = device_server_.InitResult();
-  if (device_server_result.has_value()) {
-    if (device_server_result->is_error()) {
-      FDF_LOG(ERROR, "Failed to initialize device server: %s",
-              device_server_result->status_string());
-      return device_server_result->take_error();
+  // Initialize our compat server.
+  {
+    zx::result<> result =
+        device_server_.Initialize(incoming(), outgoing(), node_name(), kChildNodeName,
+                                  compat::ForwardMetadata::Some({DEVICE_METADATA_I2C_CHANNELS}));
+    if (result.is_error()) {
+      return result.take_error();
     }
-  } else {
-    FDF_LOG(ERROR, "Device server not initialized");
-    return zx::error(ZX_ERR_INTERNAL);
   }
 
   zx::result compat_result = incoming()->Connect<fuchsia_driver_compat::Service::Device>();

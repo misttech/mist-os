@@ -172,6 +172,16 @@ zx::result<> AmlSaradc::CreateNode() {
 }
 
 zx::result<> AmlSaradc::Start() {
+  // Initialize our compat server.
+  {
+    zx::result result =
+        compat_server_.Initialize(incoming(), outgoing(), node_name(), kDeviceName,
+                                  compat::ForwardMetadata::Some({DEVICE_METADATA_ADC}));
+    if (result.is_error()) {
+      return result.take_error();
+    }
+  }
+
   // Map hardware resources from pdev.
   std::optional<fdf::MmioBuffer> adc_mmio, ao_mmio;
   zx::interrupt irq;

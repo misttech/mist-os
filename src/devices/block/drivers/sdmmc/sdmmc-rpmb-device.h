@@ -47,7 +47,7 @@ class RpmbDevice : public fidl::WireServer<fuchsia_hardware_rpmb::Rpmb> {
 
   fidl::WireSyncClient<fuchsia_driver_framework::NodeController> controller_;
 
-  std::optional<compat::DeviceServer> compat_server_;
+  compat::SyncInitializedDeviceServer compat_server_;
 };
 
 }  // namespace sdmmc

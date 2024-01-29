@@ -51,7 +51,7 @@ class PartitionDevice : public ddk::BlockImplProtocol<PartitionDevice>,
 
   compat::BanjoServer block_impl_server_{ZX_PROTOCOL_BLOCK_IMPL, this, &block_impl_protocol_ops_};
   std::optional<compat::BanjoServer> block_partition_server_;
-  std::optional<compat::DeviceServer> compat_server_;
+  compat::SyncInitializedDeviceServer compat_server_;
 };
 
 }  // namespace sdmmc

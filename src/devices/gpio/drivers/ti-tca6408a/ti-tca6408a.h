@@ -90,7 +90,7 @@ class TiTca6408aDevice : public fdf::DriverBase {
   fdf::ServerBindingGroup<fuchsia_hardware_gpioimpl::GpioImpl> bindings_;
   fidl::WireSyncClient<fuchsia_driver_framework::Node> node_;
   fidl::WireSyncClient<fuchsia_driver_framework::NodeController> controller_;
-  std::optional<compat::DeviceServer> compat_server_;
+  compat::SyncInitializedDeviceServer compat_server_;
 };
 
 }  // namespace gpio

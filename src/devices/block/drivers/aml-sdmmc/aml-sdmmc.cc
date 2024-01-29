@@ -121,47 +121,44 @@ zx::result<pdev_device_info_t> FidlToBanjoDeviceInfo(
 
 namespace aml_sdmmc {
 
-void AmlSdmmc::Start(fdf::StartCompleter completer) {
+zx::result<> AmlSdmmc::Start() {
   parent_.Bind(std::move(node()));
-  start_completer_.emplace(std::move(completer));
-  compat_server_.OnInitialized(fit::bind_member<&AmlSdmmc::CompatServerInitialized>(this));
-}
 
-void AmlSdmmc::CompleteStart(zx::result<> result) {
-  ZX_ASSERT(start_completer_.has_value());
-  start_completer_.value()(result);
-  start_completer_.reset();
-}
-
-void AmlSdmmc::CompatServerInitialized(zx::result<> compat_result) {
-  if (compat_result.is_error()) {
-    return CompleteStart(compat_result.take_error());
+  // Initialize our compat server.
+  {
+    zx::result<> result = compat_server_.Initialize(
+        incoming(), outgoing(), node_name(), name(),
+        compat::ForwardMetadata::Some({DEVICE_METADATA_SDMMC, DEVICE_METADATA_GPT_INFO}),
+        get_banjo_config());
+    if (result.is_error()) {
+      return result.take_error();
+    }
   }
 
   {
     zx::result result = incoming()->Connect<fuchsia_driver_compat::Service::Device>();
     if (result.is_error() || !result->is_valid()) {
       FDF_LOGL(ERROR, logger(), "Failed to connect to compat service: %s", result.status_string());
-      return CompleteStart(result.take_error());
+      return result.take_error();
     }
     auto parent_compat = fidl::WireSyncClient(std::move(result.value()));
 
     fidl::WireResult metadata = parent_compat->GetMetadata();
     if (!metadata.ok()) {
       FDF_LOGL(ERROR, logger(), "Call to GetMetadata failed: %s", metadata.status_string());
-      return CompleteStart(zx::error(metadata.status()));
+      return zx::error(metadata.status());
     }
     if (metadata->is_error()) {
       FDF_LOGL(ERROR, logger(), "Failed to GetMetadata: %s",
                zx_status_get_string(metadata->error_value()));
-      return CompleteStart(metadata->take_error());
+      return metadata->take_error();
     }
 
     zx::result parsed_metadata = ParseMetadata(metadata.value()->metadata, logger());
     if (parsed_metadata.is_error()) {
       FDF_LOGL(ERROR, logger(), "Failed to ParseMetadata: %s",
                zx_status_get_string(parsed_metadata.error_value()));
-      return CompleteStart(parsed_metadata.take_error());
+      return parsed_metadata.take_error();
     }
     board_config_ = parsed_metadata.value();
   }
@@ -170,11 +167,11 @@ void AmlSdmmc::CompatServerInitialized(zx::result<> compat_result) {
     zx::result pdev = incoming()->Connect<fuchsia_hardware_platform_device::Service::Device>();
     if (pdev.is_error() || !pdev->is_valid()) {
       FDF_LOGL(ERROR, logger(), "Failed to connect to platform device: %s", pdev.status_string());
-      return CompleteStart(pdev.take_error());
+      return pdev.take_error();
     }
 
     if (zx::result status = InitResources(std::move(pdev.value())); status.is_error()) {
-      return CompleteStart(status.take_error());
+      return status.take_error();
     }
   }
 
@@ -182,7 +179,7 @@ void AmlSdmmc::CompatServerInitialized(zx::result<> compat_result) {
   if (inspect_sink.is_error() || !inspect_sink->is_valid()) {
     FDF_LOGL(ERROR, logger(), "Failed to connect to inspect sink: %s",
              inspect_sink.status_string());
-    return CompleteStart(inspect_sink.take_error());
+    return inspect_sink.take_error();
   }
   exposed_inspector_.emplace(inspect::ComponentInspector(
       dispatcher(), {.inspector = inspector(), .client_end = std::move(inspect_sink.value())}));
@@ -192,7 +189,7 @@ void AmlSdmmc::CompatServerInitialized(zx::result<> compat_result) {
   if (no_sync_calls_dispatcher.is_error()) {
     FDF_LOGL(ERROR, logger(), "Failed to create dispatcher: %s",
              zx_status_get_string(no_sync_calls_dispatcher.status_value()));
-    return CompleteStart(zx::error(no_sync_calls_dispatcher.status_value()));
+    return zx::error(no_sync_calls_dispatcher.status_value());
   }
   worker_dispatcher_ = *std::move(no_sync_calls_dispatcher);
 
@@ -203,7 +200,7 @@ void AmlSdmmc::CompatServerInitialized(zx::result<> compat_result) {
     auto result = outgoing()->AddService<fuchsia_hardware_sdmmc::SdmmcService>(std::move(handler));
     if (result.is_error()) {
       FDF_LOGL(ERROR, logger(), "Failed to add service: %s", result.status_string());
-      return CompleteStart(result.take_error());
+      return result.take_error();
     }
   }
 
@@ -212,7 +209,7 @@ void AmlSdmmc::CompatServerInitialized(zx::result<> compat_result) {
   if (!controller_endpoints.is_ok()) {
     FDF_LOGL(ERROR, logger(), "Failed to create controller endpoints: %s",
              controller_endpoints.status_string());
-    return CompleteStart(controller_endpoints.take_error());
+    return controller_endpoints.take_error();
   }
 
   controller_.Bind(std::move(controller_endpoints->client));
@@ -236,12 +233,12 @@ void AmlSdmmc::CompatServerInitialized(zx::result<> compat_result) {
   auto result = parent_->AddChild(args, std::move(controller_endpoints->server), {});
   if (!result.ok()) {
     FDF_LOGL(ERROR, logger(), "Failed to add child: %s", result.status_string());
-    return CompleteStart(zx::error(result.status()));
+    return zx::error(result.status());
   }
 
   FDF_LOGL(INFO, logger(), "Completed start hook");
 
-  return CompleteStart(zx::ok());
+  return zx::ok();
 }
 
 zx::result<> AmlSdmmc::InitResources(

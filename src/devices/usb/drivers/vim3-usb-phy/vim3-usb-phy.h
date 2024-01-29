@@ -163,7 +163,7 @@ class Vim3UsbPhyDevice : public fdf::DriverBase {
 
     fbl::Mutex lock_;
     fidl::WireSyncClient<fuchsia_driver_framework::NodeController> controller_ __TA_GUARDED(lock_);
-    std::optional<compat::DeviceServer> compat_server_ __TA_GUARDED(lock_);
+    compat::SyncInitializedDeviceServer compat_server_ __TA_GUARDED(lock_);
     std::atomic_uint32_t count_ __TA_GUARDED(lock_) = 0;
   };
   zx::result<> AddDevice(ChildNode& node);

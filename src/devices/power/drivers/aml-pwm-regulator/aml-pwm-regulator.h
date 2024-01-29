@@ -45,7 +45,7 @@ class AmlPwmRegulator : public fidl::WireServer<fuchsia_hardware_vreg::Vreg> {
   const std::string name_;
 
   fidl::WireSyncClient<fuchsia_hardware_pwm::Pwm> pwm_proto_client_;
-  compat::DeviceServer compat_server_;
+  compat::SyncInitializedDeviceServer compat_server_;
 
   fidl::WireSyncClient<fuchsia_driver_framework::NodeController> controller_;
   fidl::ServerBindingGroup<fuchsia_hardware_vreg::Vreg> bindings_;
@@ -56,7 +56,7 @@ class AmlPwmRegulatorDriver : public fdf::DriverBase {
   AmlPwmRegulatorDriver(fdf::DriverStartArgs start_args,
                         fdf::UnownedSynchronizedDispatcher driver_dispatcher);
 
-  void Start(fdf::StartCompleter completer) override;
+  zx::result<> Start() override;
 
  private:
   friend class AmlPwmRegulator;

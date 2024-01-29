@@ -85,7 +85,7 @@ class SdioFunctionDevice : public fidl::WireServer<fuchsia_hardware_sdio::Device
   fidl::WireSyncClient<fuchsia_driver_framework::NodeController> controller_;
 
   compat::BanjoServer sdio_server_{ZX_PROTOCOL_SDIO, this, &sdio_protocol_ops_};
-  std::optional<compat::DeviceServer> compat_server_;
+  compat::SyncInitializedDeviceServer compat_server_;
 };
 
 }  // namespace sdmmc

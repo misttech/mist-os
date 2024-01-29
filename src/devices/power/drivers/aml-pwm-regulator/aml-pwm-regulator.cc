@@ -29,9 +29,7 @@ AmlPwmRegulator::AmlPwmRegulator(const PwmVregMetadataEntry& vreg_range,
       num_steps_(vreg_range.num_steps()),
       current_step_(vreg_range.num_steps()),
       name_(name),
-      pwm_proto_client_(std::move(pwm_proto_client)),
-      compat_server_(driver->dispatcher(), driver->incoming(), driver->outgoing(),
-                     driver->node_name(), name_, std::string(kDriverName) + "/") {}
+      pwm_proto_client_(std::move(pwm_proto_client)) {}
 
 void AmlPwmRegulator::SetVoltageStep(SetVoltageStepRequestView request,
                                      SetVoltageStepCompleter::Sync& completer) {
@@ -110,6 +108,15 @@ zx::result<std::unique_ptr<AmlPwmRegulator>> AmlPwmRegulator::Create(
   auto device =
       std::make_unique<AmlPwmRegulator>(metadata_entry, std::move(pwm_proto_client), driver, name);
 
+  // Initialize our compat server.
+  {
+    zx::result<> result = device->compat_server_.Initialize(driver->incoming(), driver->outgoing(),
+                                                            driver->node_name(), name);
+    if (result.is_error()) {
+      return result.take_error();
+    }
+  }
+
   {
     auto result = driver->outgoing()->AddService<fuchsia_hardware_vreg::Service>(
         fuchsia_hardware_vreg::Service::InstanceHandler({
@@ -163,14 +170,13 @@ AmlPwmRegulatorDriver::AmlPwmRegulatorDriver(fdf::DriverStartArgs start_args,
                                              fdf::UnownedSynchronizedDispatcher driver_dispatcher)
     : fdf::DriverBase(kDriverName, std::move(start_args), std::move(driver_dispatcher)) {}
 
-void AmlPwmRegulatorDriver::Start(fdf::StartCompleter completer) {
+zx::result<> AmlPwmRegulatorDriver::Start() {
   fidl::Arena arena;
   auto decoded = compat::GetMetadata<fuchsia_hardware_vreg::wire::Metadata>(
       incoming(), arena, DEVICE_METADATA_VREG, "pdev");
   if (decoded.is_error()) {
     FDF_LOG(ERROR, "Failed to get vreg metadata: %s", decoded.status_string());
-    completer(decoded.take_error());
-    return;
+    return decoded.take_error();
   }
 
   const auto& metadata = *decoded.value();
@@ -178,27 +184,24 @@ void AmlPwmRegulatorDriver::Start(fdf::StartCompleter completer) {
   // Validate
   if (!metadata.has_pwm_vreg()) {
     FDF_LOG(ERROR, "Metadata incomplete");
-    completer(zx::error(ZX_ERR_INTERNAL));
-    return;
+    return zx::error(ZX_ERR_INTERNAL);
   }
   for (const auto& pwm_vreg : metadata.pwm_vreg()) {
     if (!pwm_vreg.has_pwm_index() || !pwm_vreg.has_period_ns() || !pwm_vreg.has_min_voltage_uv() ||
         !pwm_vreg.has_voltage_step_uv() || !pwm_vreg.has_num_steps()) {
       FDF_LOG(ERROR, "Metadata incomplete");
-      completer(zx::error(ZX_ERR_INTERNAL));
-      return;
+      return zx::error(ZX_ERR_INTERNAL);
     }
   }
   // Build Voltage Regulators
   for (const auto& pwm_vreg : metadata.pwm_vreg()) {
     auto regulator = AmlPwmRegulator::Create(pwm_vreg, this);
     if (regulator.is_error()) {
-      completer(regulator.take_error());
-      return;
+      return regulator.take_error();
     }
     regulators_.push_back(std::move(*regulator));
   }
-  completer(zx::ok());
+  return zx::ok();
 }
 
 }  // namespace aml_pwm_regulator

@@ -59,7 +59,7 @@ class AmlI2c : public fdf::DriverBase, public fdf::WireServer<fuchsia_hardware_i
   zx::duration timeout_ = zx::sec(1);
   fdf::ServerBindingGroup<fuchsia_hardware_i2cimpl::Device> i2cimpl_bindings_;
   fidl::WireSyncClient<fuchsia_driver_framework::NodeController> child_controller_;
-  compat::DeviceServer device_server_;
+  compat::SyncInitializedDeviceServer device_server_;
   // Only needed in order to set the role name for the code that waits for irq's.
   std::optional<fdf::Dispatcher> irq_dispatcher_;
   std::optional<fdf::PrepareStopCompleter> completer_;

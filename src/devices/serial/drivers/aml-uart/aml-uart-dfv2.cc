@@ -22,10 +22,7 @@ constexpr std::string_view driver_name = "aml-uart";
 
 AmlUartV2::AmlUartV2(fdf::DriverStartArgs start_args,
                      fdf::UnownedSynchronizedDispatcher driver_dispatcher)
-    : fdf::DriverBase(driver_name, std::move(start_args), std::move(driver_dispatcher)),
-      device_server_(dispatcher(), incoming(), outgoing(), node_name(), child_name, std::nullopt,
-                     compat::ForwardMetadata::Some({DEVICE_METADATA_MAC_ADDRESS}),
-                     GetBanjoConfig()) {}
+    : fdf::DriverBase(driver_name, std::move(start_args), std::move(driver_dispatcher)) {}
 
 void AmlUartV2::Start(fdf::StartCompleter completer) {
   start_completer_.emplace(std::move(completer));
@@ -108,7 +105,10 @@ void AmlUartV2::OnReceivedMetadata(
     }
   }
 
-  device_server_.OnInitialized(fit::bind_member<&AmlUartV2::OnDeviceServerInitialized>(this));
+  device_server_.Begin(incoming(), outgoing(), node_name(), child_name,
+                       fit::bind_member<&AmlUartV2::OnDeviceServerInitialized>(this),
+                       compat::ForwardMetadata::Some({DEVICE_METADATA_MAC_ADDRESS}),
+                       GetBanjoConfig());
 }
 
 void AmlUartV2::OnDeviceServerInitialized(zx::result<> device_server_init_result) {

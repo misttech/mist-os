@@ -43,10 +43,15 @@ PartitionDevice::PartitionDevice(SdmmcBlockDevice* sdmmc_parent, const block_inf
                                     &block_partition_protocol_ops_);
     banjo_config.callbacks[ZX_PROTOCOL_BLOCK_PARTITION] = block_partition_server_->callback();
   }
-  compat_server_.emplace(
-      sdmmc_parent_->parent()->driver_incoming(), sdmmc_parent_->parent()->driver_outgoing(),
-      sdmmc_parent_->parent()->driver_node_name(), partition_name_, path_from_parent,
-      compat::ForwardMetadata::Some({DEVICE_METADATA_GPT_INFO}), std::move(banjo_config));
+
+  // TODO(hanbinyoon): Move this initialization so that any error status can be returned.
+  ZX_ASSERT(compat_server_
+                .Initialize(sdmmc_parent_->parent()->driver_incoming(),
+                            sdmmc_parent_->parent()->driver_outgoing(),
+                            sdmmc_parent_->parent()->driver_node_name(), partition_name_,
+                            compat::ForwardMetadata::Some({DEVICE_METADATA_GPT_INFO}),
+                            std::move(banjo_config), path_from_parent)
+                .is_ok());
 }
 
 zx_status_t PartitionDevice::AddDevice() {
@@ -69,7 +74,7 @@ zx_status_t PartitionDevice::AddDevice() {
   fidl::VectorView<fuchsia_driver_framework::wire::NodeProperty> properties(arena, 1);
   properties[0] = fdf::MakeProperty(arena, BIND_PROTOCOL, ZX_PROTOCOL_BLOCK_IMPL);
 
-  std::vector<fuchsia_component_decl::wire::Offer> offers = compat_server_->CreateOffers(arena);
+  std::vector<fuchsia_component_decl::wire::Offer> offers = compat_server_.CreateOffers(arena);
 
   const auto args = fuchsia_driver_framework::wire::NodeAddArgs::Builder(arena)
                         .name(arena, partition_name_)

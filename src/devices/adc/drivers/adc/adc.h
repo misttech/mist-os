@@ -50,7 +50,7 @@ class AdcDevice : public fidl::Server<fuchsia_hardware_adc::Device> {
 
   const uint8_t resolution_;
 
-  compat::DeviceServer compat_server_;
+  compat::SyncInitializedDeviceServer compat_server_;
   fidl::WireSyncClient<fuchsia_driver_framework::NodeController> controller_;
   fidl::ServerBindingGroup<fuchsia_hardware_adc::Device> bindings_;
   driver_devfs::Connector<fuchsia_hardware_adc::Device> devfs_connector_;

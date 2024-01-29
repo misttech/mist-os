@@ -61,40 +61,40 @@ bool ForwardMetadata::should_forward(MetadataKey key) const {
   return filter_->find(key) != filter_->end();
 }
 
-std::optional<zx::result<>> DeviceServer::InitResult() const {
-  const Initialized* initialized = std::get_if<Initialized>(&state_);
-  return (initialized != nullptr) ? std::make_optional(initialized->result) : std::nullopt;
+DeviceServer::DeviceServer(async_dispatcher_t* dispatcher,
+                           const std::shared_ptr<fdf::Namespace>& incoming,
+                           const std::shared_ptr<fdf::OutgoingDirectory>& outgoing,
+                           const std::optional<std::string>& node_name,
+                           std::string_view child_node_name,
+                           const std::optional<std::string>& child_additional_path,
+                           const ForwardMetadata& forward_metadata,
+                           std::optional<BanjoConfig> banjo_config) {
+  // We will use the sync initialization helper to create and initialize another instance of
+  // ourself, then move everything over to ourself from that.
+  SyncInitializedDeviceServer temp_server;
+  ZX_ASSERT(temp_server
+                .Initialize(incoming, outgoing, node_name, child_node_name, forward_metadata,
+                            std::move(banjo_config), child_additional_path)
+                .is_ok());
+  Init(temp_server.inner().name_, temp_server.inner().topological_path_.value(), std::nullopt,
+       std::move(temp_server.inner().banjo_config_));
+  metadata_ = std::move(temp_server.inner().metadata_);
+
+  temp_server.reset();
+  ZX_ASSERT(Serve(dispatcher, outgoing.get()) == ZX_OK);
+}
+
+void DeviceServer::OnInitialized(fit::callback<void(zx::result<>)> complete_callback) {
+  complete_callback(zx::ok());
 }
 
 void DeviceServer::Init(std::string name, std::string topological_path,
                         std::optional<ServiceOffersV1> service_offers,
                         std::optional<BanjoConfig> banjo_config) {
-  state_.emplace<Initialized>();
   name_ = std::move(name);
   topological_path_ = std::move(topological_path);
   service_offers_ = std::move(service_offers);
   banjo_config_ = std::move(banjo_config);
-}
-
-void DeviceServer::OnInitialized(fit::callback<void(zx::result<>)> complete_callback) {
-  Initialized* initialized = std::get_if<Initialized>(&state_);
-  if (initialized != nullptr) {
-    // We have already finished initialization (CompleteInitialization has already been called).
-    // Post the callback to run in the dispatcher with the result.
-    initialized->task.set_handler([this, cb = std::move(complete_callback)]() mutable {
-      Initialized* initialized = std::get_if<Initialized>(&state_);
-      ZX_ASSERT(initialized != nullptr);
-      cb(initialized->result);
-      initialized->task.set_handler(nullptr);
-    });
-    initialized->task.Post(initialized->dispatcher);
-  } else {
-    // The initialization has not finished yet. Store this callback so that CompleteInitialization
-    // can run it when it is called.
-    AsyncInit* init_state = std::get_if<AsyncInit>(&state_);
-    ZX_ASSERT(init_state != nullptr);
-    init_state->callback.emplace(std::move(complete_callback));
-  }
 }
 
 zx_status_t DeviceServer::AddMetadata(uint32_t type, const void* data, size_t size) {
@@ -116,8 +116,6 @@ zx_status_t DeviceServer::AddMetadata(uint32_t type, const void* data, size_t si
 }
 
 zx_status_t DeviceServer::GetMetadata(uint32_t type, void* buf, size_t buflen, size_t* actual) {
-  ZX_ASSERT(std::holds_alternative<Initialized>(state_));
-
   auto it = metadata_.find(type);
   if (it == metadata_.end()) {
     return ZX_ERR_NOT_FOUND;
@@ -136,8 +134,6 @@ zx_status_t DeviceServer::GetMetadata(uint32_t type, void* buf, size_t buflen, s
 }
 
 zx_status_t DeviceServer::GetMetadataSize(uint32_t type, size_t* out_size) {
-  ZX_ASSERT(std::holds_alternative<Initialized>(state_));
-
   auto it = metadata_.find(type);
   if (it == metadata_.end()) {
     return ZX_ERR_NOT_FOUND;
@@ -148,8 +144,6 @@ zx_status_t DeviceServer::GetMetadataSize(uint32_t type, size_t* out_size) {
 }
 
 zx_status_t DeviceServer::GetProtocol(BanjoProtoId proto_id, GenericProtocol* out) const {
-  ZX_ASSERT(std::holds_alternative<Initialized>(state_));
-
   if (!banjo_config_.has_value()) {
     return ZX_ERR_NOT_FOUND;
   }
@@ -253,15 +247,11 @@ std::vector<fcd::Offer> DeviceServer::CreateOffers() {
 }
 
 void DeviceServer::GetTopologicalPath(GetTopologicalPathCompleter::Sync& completer) {
-  ZX_ASSERT(std::holds_alternative<Initialized>(state_));
-
   ZX_ASSERT(topological_path_.has_value());
   completer.Reply(fidl::StringView::FromExternal(topological_path_.value()));
 }
 
 void DeviceServer::GetMetadata(GetMetadataCompleter::Sync& completer) {
-  ZX_ASSERT(std::holds_alternative<Initialized>(state_));
-
   std::vector<fuchsia_driver_compat::wire::Metadata> metadata;
   metadata.reserve(metadata_.size());
   for (auto& [type, data] : metadata_) {
@@ -294,8 +284,6 @@ void DeviceServer::GetMetadata(GetMetadataCompleter::Sync& completer) {
 
 void DeviceServer::GetBanjoProtocol(GetBanjoProtocolRequestView request,
                                     GetBanjoProtocolCompleter::Sync& completer) {
-  ZX_ASSERT(std::holds_alternative<Initialized>(state_));
-
   // First check that we are in the same driver host.
   static uint64_t process_koid = []() {
     zx_info_handle_basic_t basic;
@@ -320,13 +308,23 @@ void DeviceServer::GetBanjoProtocol(GetBanjoProtocolRequestView request,
                          reinterpret_cast<uint64_t>(result.ctx));
 }
 
-void DeviceServer::SyncInit(const std::shared_ptr<fdf::Namespace>& incoming,
-                            const std::shared_ptr<fdf::OutgoingDirectory>& outgoing,
-                            const std::optional<std::string>& node_name,
-                            const std::optional<std::string>& child_additional_path,
-                            const ForwardMetadata& forward_metadata) {
+zx::result<> SyncInitializedDeviceServer::Initialize(
+    const std::shared_ptr<fdf::Namespace>& incoming,
+    const std::shared_ptr<fdf::OutgoingDirectory>& outgoing,
+    const std::optional<std::string>& node_name, std::string_view child_node_name,
+    const ForwardMetadata& forward_metadata, std::optional<DeviceServer::BanjoConfig> banjo_config,
+    const std::optional<std::string>& child_additional_path) {
   auto node_name_val = node_name.value_or("NA");
   auto additional_path = child_additional_path.value_or("");
+  auto child_node_name_str = std::string(child_node_name);
+
+  // Ensure formatting of the additional_path is correct. No leading '/'. With end '/'.
+  if (!additional_path.empty() && additional_path[0] == '/') {
+    additional_path.erase(0, 1);
+  }
+  if (!additional_path.empty() && additional_path[additional_path.length() - 1] != '/') {
+    additional_path += "/";
+  }
 
   // First connect to all the parents.
   auto parent_devices = ConnectToParentDevices(incoming.get());
@@ -336,9 +334,9 @@ void DeviceServer::SyncInit(const std::shared_ptr<fdf::Namespace>& incoming,
 
     // In case that there are no parents, assume we are the root and create
     // the topological path from scratch.
-    topological_path_ = "/" + node_name_val + "/" + additional_path + name_;
-    ServeAndSetInitializeResult(fdf::Dispatcher::GetCurrent()->async_dispatcher(), outgoing);
-    return;
+    return CreateAndServeWithTopologicalPath(
+        "/" + node_name_val + "/" + additional_path + child_node_name_str, outgoing,
+        child_node_name_str, std::move(banjo_config));
   }
 
   // Now we have out parent clients, store them.
@@ -363,13 +361,13 @@ void DeviceServer::SyncInit(const std::shared_ptr<fdf::Namespace>& incoming,
 
   // No default parent found.
   if (!default_parent_client.is_valid()) {
-    FDF_LOG(WARNING, "Failed to find the default parent.");
+    FDF_LOG(WARNING, "Failed to find the default parent. Assuming root.");
 
     // In case that there is no default parent, assume we are the root and create
     // the topological path from scratch.
-    topological_path_ = "/" + node_name_val + "/" + additional_path + name_;
-    ServeAndSetInitializeResult(fdf::Dispatcher::GetCurrent()->async_dispatcher(), outgoing);
-    return;
+    return CreateAndServeWithTopologicalPath(
+        "/" + node_name_val + "/" + additional_path + child_node_name_str, outgoing,
+        child_node_name_str, std::move(banjo_config));
   }
 
   // Get the topological path from the default parent.
@@ -380,25 +378,34 @@ void DeviceServer::SyncInit(const std::shared_ptr<fdf::Namespace>& incoming,
 
     // In case that getting the topological path fails, assume we are the root and create
     // the topological path from scratch.
-    topological_path_ = "/" + node_name_val + "/" + additional_path + name_;
-    ServeAndSetInitializeResult(fdf::Dispatcher::GetCurrent()->async_dispatcher(), outgoing);
-    return;
+    return CreateAndServeWithTopologicalPath(
+        "/" + node_name_val + "/" + additional_path + child_node_name_str, outgoing,
+        child_node_name_str, std::move(banjo_config));
   }
+
+  std::string topological_path;
 
   // If we are a composite then we have to add the name of our composite device
   // to our primary parent. The composite device's name is the node_name.
   if (!parent_clients.empty()) {
-    topological_path_ = std::string(topological_path_result->path.get()) + "/" + node_name_val +
-                        "/" + additional_path + name_;
+    topological_path = std::string(topological_path_result->path.get()) + "/" + node_name_val +
+                       "/" + additional_path + child_node_name_str;
   } else {
-    topological_path_ =
-        std::string(topological_path_result->path.get()) + "/" + additional_path + name_;
+    topological_path = std::string(topological_path_result->path.get()) + "/" + additional_path +
+                       child_node_name_str;
   }
 
   // We can just serve and return if no metadata is needed.
   if (forward_metadata.empty()) {
-    ServeAndSetInitializeResult(fdf::Dispatcher::GetCurrent()->async_dispatcher(), outgoing);
-    return;
+    return CreateAndServeWithTopologicalPath(topological_path, outgoing, child_node_name_str,
+                                             std::move(banjo_config));
+  }
+
+  // We will create and serve the inner DeviceServer so we can add the metadata to it.
+  auto result = CreateAndServeWithTopologicalPath(topological_path, outgoing, child_node_name_str,
+                                                  std::move(banjo_config));
+  if (result.is_error()) {
+    return result;
   }
 
   // Forward metadata
@@ -407,75 +414,116 @@ void DeviceServer::SyncInit(const std::shared_ptr<fdf::Namespace>& incoming,
     if (!metadata_result.ok()) {
       FDF_LOG(WARNING, "Failed to get metadata from default parent. %s",
               metadata_result.status_string());
-      ServeAndSetInitializeResult(fdf::Dispatcher::GetCurrent()->async_dispatcher(), outgoing);
-      return;
-    }
-
-    if (metadata_result.value().is_error()) {
+    } else if (metadata_result.value().is_error()) {
       FDF_LOG(WARNING, "Failed to get metadata from default parent. %s",
               zx_status_get_string(metadata_result.value().error_value()));
-      ServeAndSetInitializeResult(fdf::Dispatcher::GetCurrent()->async_dispatcher(), outgoing);
-      return;
+      return zx::ok();
+    } else {
+      CollectMetadataFrom(metadata_result->value()->metadata, forward_metadata,
+                          &device_server_.value());
     }
-
-    CollectMetadataFrom(metadata_result->value()->metadata, forward_metadata, this);
   } else {
     for (auto& [parent_name, parent_client] : parent_clients) {
       fidl::WireResult metadata_result = parent_client->GetMetadata();
       if (!metadata_result.ok()) {
         FDF_LOG(WARNING, "Failed to get metadata from parent %s. %s", parent_name.c_str(),
                 metadata_result.status_string());
-        continue;
-      }
-
-      if (metadata_result.value().is_error()) {
+      } else if (metadata_result.value().is_error()) {
         FDF_LOG(WARNING, "Failed to get metadata from parent %s. %s", parent_name.c_str(),
                 zx_status_get_string(metadata_result.value().error_value()));
-        continue;
+      } else {
+        CollectMetadataFrom(metadata_result->value()->metadata, forward_metadata,
+                            &device_server_.value());
       }
-
-      CollectMetadataFrom(metadata_result->value()->metadata, forward_metadata, this);
     }
   }
 
-  ServeAndSetInitializeResult(fdf::Dispatcher::GetCurrent()->async_dispatcher(), outgoing);
+  return zx::ok();
 }
 
-void DeviceServer::ServeAndSetInitializeResult(
-    async_dispatcher_t* dispatcher, const std::shared_ptr<fdf::OutgoingDirectory>& outgoing) {
+zx::result<> SyncInitializedDeviceServer::CreateAndServeWithTopologicalPath(
+    std::string topological_path, const std::shared_ptr<fdf::OutgoingDirectory>& outgoing,
+    std::string child_node_name, std::optional<DeviceServer::BanjoConfig> banjo_config) {
+  ZX_ASSERT_MSG(device_server_ == std::nullopt,
+                "Cannot call Initialize on the SyncInitializedDeviceServer more than once.");
+  device_server_.emplace();
+  device_server_->Init(std::move(child_node_name), std::move(topological_path), std::nullopt,
+                       std::move(banjo_config));
+
   zx_status_t serve_result =
-      Serve(fdf::Dispatcher::GetCurrent()->async_dispatcher(), outgoing.get());
+      device_server_->Serve(fdf::Dispatcher::GetCurrent()->async_dispatcher(), outgoing.get());
   if (serve_result != ZX_OK) {
     FDF_LOG(ERROR, "Failed to serve: %s", zx_status_get_string(serve_result));
-    state_.emplace<Initialized>(dispatcher, zx::error(serve_result));
-    return;
+    device_server_.reset();
+    return zx::error(serve_result);
   }
 
-  state_.emplace<Initialized>(dispatcher, zx::ok());
+  return zx::ok();
 }
 
-void DeviceServer::BeginAsyncInit() {
-  AsyncInit* init_state = std::get_if<AsyncInit>(&state_);
-  ZX_ASSERT(init_state != nullptr);
-  auto task = ConnectToParentDevices(init_state->dispatcher, init_state->incoming.get(),
+void AsyncInitializedDeviceServer::Begin(const std::shared_ptr<fdf::Namespace>& incoming,
+                                         const std::shared_ptr<fdf::OutgoingDirectory>& outgoing,
+                                         const std::optional<std::string>& node_name,
+                                         std::string_view child_node_name,
+                                         fit::callback<void(zx::result<>)> callback,
+                                         const ForwardMetadata& forward_metadata,
+                                         std::optional<DeviceServer::BanjoConfig> banjo_config,
+                                         const std::optional<std::string>& child_additional_path) {
+  ZX_ASSERT_MSG(storage_ == std::nullopt,
+                "Cannot call Begin on AsyncInitializedDeviceServer more than once.");
+  auto node_name_val = node_name.value_or("NA");
+
+  // Ensure formatting of the additional_path is correct. No leading '/'. With end '/'.
+  auto additional_path = child_additional_path.value_or("");
+  if (!additional_path.empty() && additional_path[0] == '/') {
+    additional_path.erase(0, 1);
+  }
+  if (!additional_path.empty() && additional_path[additional_path.length() - 1] != '/') {
+    additional_path += "/";
+  }
+
+  storage_.emplace(AsyncInitStorage{
+      incoming,
+      outgoing,
+      node_name_val,
+      std::string(child_node_name),
+      std::move(callback),
+      forward_metadata,
+      std::move(banjo_config),
+      additional_path,
+  });
+  BeginAsyncInit();
+}
+
+void AsyncInitializedDeviceServer::BeginAsyncInit() {
+  ZX_ASSERT(storage_);
+  auto task = ConnectToParentDevices(fdf::Dispatcher::GetCurrent()->async_dispatcher(),
+                                     storage_->incoming.get(),
                                      [this](zx::result<std::vector<ParentDevice>> parents) {
                                        OnParentDevices(std::move(parents));
                                      });
   async_tasks_.AddTask(std::move(task));
 }
 
-void DeviceServer::OnParentDevices(zx::result<std::vector<ParentDevice>> parent_devices) {
-  AsyncInit* init_state = std::get_if<AsyncInit>(&state_);
-  ZX_ASSERT(init_state != nullptr);
+void AsyncInitializedDeviceServer::OnParentDevices(
+    zx::result<std::vector<ParentDevice>> parent_devices) {
+  if (!storage_) {
+    return;
+  }
+
   if (parent_devices.is_error()) {
     FDF_LOG(WARNING, "Failed to get parent devices: %s. Assuming root.",
             parent_devices.status_string());
 
     // In case that there are no parents, assume we are the root and create
     // the topological path from scratch.
-    topological_path_ = "/" + init_state->node_name + "/" +
-                        init_state->child_additional_path.value_or("") +
-                        init_state->child_node_name;
+    zx::result result = CreateAndServeWithTopologicalPath("/" + storage_->node_name + "/" +
+                                                          storage_->child_additional_path +
+                                                          storage_->child_node_name);
+    if (result.is_error()) {
+      CompleteInitialization(result.take_error());
+      return;
+    }
 
     CompleteInitialization(zx::ok());
     return;
@@ -483,7 +531,8 @@ void DeviceServer::OnParentDevices(zx::result<std::vector<ParentDevice>> parent_
 
   for (auto& parent : parent_devices.value()) {
     if (parent.name == "default") {
-      default_parent_client_.Bind(std::move(parent.client), init_state->dispatcher);
+      default_parent_client_.Bind(std::move(parent.client),
+                                  fdf::Dispatcher::GetCurrent()->async_dispatcher());
       continue;
     }
 
@@ -494,12 +543,23 @@ void DeviceServer::OnParentDevices(zx::result<std::vector<ParentDevice>> parent_
     }
 
     parent_clients_[parent.name] = fidl::WireClient<fuchsia_driver_compat::Device>(
-        std::move(parent.client), init_state->dispatcher);
+        std::move(parent.client), fdf::Dispatcher::GetCurrent()->async_dispatcher());
   }
 
   if (!default_parent_client_.is_valid()) {
-    FDF_LOG(ERROR, "Failed to find the default parent.");
-    CompleteInitialization(zx::error(ZX_ERR_NOT_FOUND));
+    FDF_LOG(ERROR, "Failed to find the default parent. Assuming root.");
+
+    // In case that there is no default parent, assume we are the root and create
+    // the topological path from scratch.
+    zx::result result = CreateAndServeWithTopologicalPath("/" + storage_->node_name + "/" +
+                                                          storage_->child_additional_path +
+                                                          storage_->child_node_name);
+    if (result.is_error()) {
+      CompleteInitialization(result.take_error());
+      return;
+    }
+
+    CompleteInitialization(zx::ok());
     return;
   }
 
@@ -509,19 +569,26 @@ void DeviceServer::OnParentDevices(zx::result<std::vector<ParentDevice>> parent_
       });
 }
 
-void DeviceServer::OnTopologicalPathResult(
+void AsyncInitializedDeviceServer::OnTopologicalPathResult(
     fidl::WireUnownedResult<fuchsia_driver_compat::Device::GetTopologicalPath>& result) {
-  AsyncInit* init_state = std::get_if<AsyncInit>(&state_);
-  ZX_ASSERT(init_state != nullptr);
+  if (!storage_) {
+    return;
+  }
+
   if (!result.ok()) {
     FDF_LOG(WARNING, "Failed to get topological path from the parent: %s. Assuming root.",
             result.status_string());
 
     // In case that getting the topological path fails, assume we are the root and create
     // the topological path from scratch.
-    topological_path_ = "/" + init_state->node_name + "/" +
-                        init_state->child_additional_path.value_or("") +
-                        init_state->child_node_name;
+    zx::result result = CreateAndServeWithTopologicalPath("/" + storage_->node_name + "/" +
+                                                          storage_->child_additional_path +
+                                                          storage_->child_node_name);
+    if (result.is_error()) {
+      CompleteInitialization(result.take_error());
+      return;
+    }
+
     CompleteInitialization(zx::ok());
     return;
   }
@@ -529,29 +596,40 @@ void DeviceServer::OnTopologicalPathResult(
   // If we are a composite then we have to add the name of our composite device
   // to our primary parent. The composite device's name is the node_name.
   if (!parent_clients_.empty()) {
-    topological_path_ = std::string(result->path.get()) + "/" + init_state->node_name + "/" +
-                        init_state->child_additional_path.value_or("") +
-                        init_state->child_node_name;
+    topological_path_ = std::string(result->path.get()) + "/" + storage_->node_name + "/" +
+                        storage_->child_additional_path + storage_->child_node_name;
   } else {
-    topological_path_ = std::string(result->path.get()) + "/" +
-                        init_state->child_additional_path.value_or("") +
-                        init_state->child_node_name;
+    topological_path_ = std::string(result->path.get()) + "/" + storage_->child_additional_path +
+                        storage_->child_node_name;
   }
 
-  if (init_state->forward_metadata.empty()) {
+  if (storage_->forward_metadata.empty()) {
+    zx::result result = CreateAndServeWithTopologicalPath(topological_path_);
+    if (result.is_error()) {
+      CompleteInitialization(result.take_error());
+      return;
+    }
+
     CompleteInitialization(zx::ok());
     return;
   }
 
+  // We will create and serve the inner DeviceServer so we can add the metadata to it.
+  zx::result create_result = CreateAndServeWithTopologicalPath(topological_path_);
+  if (create_result.is_error()) {
+    CompleteInitialization(create_result.take_error());
+    return;
+  }
+
   if (parent_clients_.empty()) {
-    init_state->in_flight_metadata++;
+    storage_->in_flight_metadata++;
     default_parent_client_->GetMetadata().Then(
         [this](fidl::WireUnownedResult<fuchsia_driver_compat::Device::GetMetadata>& result) {
           OnMetadataResult(result);
         });
   } else {
     for (auto& [parent_name, parent_client] : parent_clients_) {
-      init_state->in_flight_metadata++;
+      storage_->in_flight_metadata++;
       parent_client->GetMetadata().Then(
           [this](fidl::WireUnownedResult<fuchsia_driver_compat::Device::GetMetadata>& result) {
             OnMetadataResult(result);
@@ -560,64 +638,64 @@ void DeviceServer::OnTopologicalPathResult(
   }
 }
 
-void DeviceServer::OnMetadataResult(
+void AsyncInitializedDeviceServer::OnMetadataResult(
     fidl::WireUnownedResult<fuchsia_driver_compat::Device::GetMetadata>& result) {
-  AsyncInit* init_state = std::get_if<AsyncInit>(&state_);
-  ZX_ASSERT(init_state != nullptr);
+  if (!storage_) {
+    return;
+  }
+
   if (!result.ok()) {
-    FDF_LOG(ERROR, "Failed to get metadata: %s", result.status_string());
-    CompleteInitialization(zx::error(result.status()));
-    return;
-  }
-
-  if (result.value().is_error()) {
-    FDF_LOG(ERROR, "Failed to get metadata: %s",
+    FDF_LOG(WARNING, "Failed to get metadata: %s", result.status_string());
+  } else if (result.value().is_error()) {
+    FDF_LOG(WARNING, "Failed to get metadata: %s",
             zx_status_get_string(result.value().error_value()));
-    CompleteInitialization(zx::error(result.value().error_value()));
-    return;
+
+  } else {
+    CollectMetadataFrom(result.value().value()->metadata, storage_->forward_metadata,
+                        &device_server_.value());
   }
 
-  CollectMetadataFrom(result.value().value()->metadata, init_state->forward_metadata, this);
-  init_state->in_flight_metadata--;
-  if (init_state->in_flight_metadata == 0) {
+  storage_->in_flight_metadata--;
+  if (storage_->in_flight_metadata == 0) {
     CompleteInitialization(zx::ok());
+    return;
   }
 }
 
-void DeviceServer::CompleteInitialization(zx::result<> result) {
-  AsyncInit* init_state = std::get_if<AsyncInit>(&state_);
-  ZX_ASSERT(init_state != nullptr);
-
-  if (result.is_error()) {
-    FDF_LOG(ERROR, "Initialize failed: %s", result.status_string());
-
-    auto callback = std::move(init_state->callback);
-    state_.emplace<Initialized>(init_state->dispatcher, result);
-    if (callback.has_value()) {
-      callback.value()(result);
-    }
-
-    return;
+zx::result<> AsyncInitializedDeviceServer::CreateAndServeWithTopologicalPath(
+    std::string topological_path) {
+  if (!storage_) {
+    return zx::error(ZX_ERR_CANCELED);
   }
 
-  zx_status_t serve_result = Serve(init_state->dispatcher, init_state->outgoing.get());
+  ZX_ASSERT(device_server_ == std::nullopt);
+  device_server_.emplace();
+  device_server_->Init(std::move(storage_->child_node_name), std::move(topological_path),
+                       std::nullopt, std::move(storage_->banjo_config));
+
+  zx_status_t serve_result = device_server_->Serve(
+      fdf::Dispatcher::GetCurrent()->async_dispatcher(), storage_->outgoing.get());
   if (serve_result != ZX_OK) {
     FDF_LOG(ERROR, "Failed to serve: %s", zx_status_get_string(serve_result));
+    device_server_.reset();
+    return zx::error(serve_result);
+  }
 
-    auto callback = std::move(init_state->callback);
-    state_.emplace<Initialized>(init_state->dispatcher, zx::error(serve_result));
-    if (callback.has_value()) {
-      callback.value()(result);
-    }
+  return zx::ok();
+}
 
+void AsyncInitializedDeviceServer::CompleteInitialization(zx::result<> result) {
+  if (result.is_error()) {
+    device_server_.reset();
+  }
+
+  if (!storage_) {
     return;
   }
 
-  auto callback = std::move(init_state->callback);
-  state_.emplace<Initialized>(init_state->dispatcher, zx::ok());
-  if (callback.has_value()) {
-    callback.value()(result);
-  }
+  auto callback = std::move(storage_->callback);
+  storage_.reset();
+  callback(result);
 }
 
 }  // namespace compat
