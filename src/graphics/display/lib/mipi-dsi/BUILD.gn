@@ -4,6 +4,34 @@
 
 import("//build/cpp/library_headers.gni")
 
-library_headers("mipi-dsi") {
+library_headers("mipi-dsi-headers") {
   headers = [ "lib/mipi-dsi/mipi-dsi.h" ]
+}
+
+source_set("mipi-dsi") {
+  sources = [ "mipi-dsi.cc" ]
+  public_deps = [
+    ":mipi-dsi-headers",
+    "//sdk/lib/fit",
+    "//zircon/system/ulib/fbl",
+    "//zircon/system/ulib/zircon-internal",
+    "//zircon/system/ulib/zx",
+  ]
+
+  deps = [
+    "//sdk/banjo/fuchsia.hardware.dsiimpl:fuchsia.hardware.dsiimpl_banjo_cpp",
+    "//sdk/lib/fit",
+    "//zircon/system/ulib/fbl",
+    "//zircon/system/ulib/zircon-internal",
+    "//zircon/system/ulib/zx",
+  ]
+
+  # TODO(https://fxbug.dev/42176699): This target uses mutable tables which are deprecated,
+  # rather than builders.
+  configs += [ "//build/cpp:fidl-wire-deprecated-mutable-tables" ]
+}
+
+group("tests") {
+  testonly = true
+  deps = [ "test:tests" ]
 }

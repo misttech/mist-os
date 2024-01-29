@@ -5,6 +5,13 @@
 #ifndef SRC_GRAPHICS_DISPLAY_LIB_MIPI_DSI_INCLUDE_LIB_MIPI_DSI_MIPI_DSI_H_
 #define SRC_GRAPHICS_DISPLAY_LIB_MIPI_DSI_INCLUDE_LIB_MIPI_DSI_MIPI_DSI_H_
 
+#include <fuchsia/hardware/dsiimpl/c/banjo.h>
+#include <lib/zx/result.h>
+#include <unistd.h>
+#include <zircon/compiler.h>
+#include <zircon/errors.h>
+#include <zircon/types.h>
+
 #include <cstddef>
 #include <cstdint>
 
@@ -76,5 +83,20 @@ enum {
   MIPI_DSI_CMD_FLAGS_ACK = (1 << 0),
   MIPI_DSI_CMD_FLAGS_SET_MAX = (1 << 1),
 };
+
+enum {
+  COMMAND_GEN = (0),
+  COMMAND_DCS = (1),
+};
+
+namespace mipi_dsi {
+
+class MipiDsi {
+ public:
+  static zx_status_t CreateCommand(const uint8_t* tbuf, size_t tlen, uint8_t* rbuf, size_t rlen,
+                                   bool is_dcs, mipi_dsi_cmd_t* cmd);
+};
+
+}  // namespace mipi_dsi
 
 #endif  // SRC_GRAPHICS_DISPLAY_LIB_MIPI_DSI_INCLUDE_LIB_MIPI_DSI_MIPI_DSI_H_
