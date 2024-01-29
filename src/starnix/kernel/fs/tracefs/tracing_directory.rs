@@ -15,7 +15,7 @@ use starnix_uapi::errors::Errno;
 
 use std::{collections::HashMap, sync::Mutex};
 
-use fuchsia_trace::TraceCategoryContext;
+use fuchsia_trace::{Scope, TraceCategoryContext};
 use fuchsia_zircon as zx;
 use fuchsia_zircon::sys::zx_ticks_t;
 
@@ -76,6 +76,23 @@ impl FileOps for TraceMarkerFile {
                                 }
                             }
                         }
+                        ATraceEvent::Instant { name } => {
+                            context.write_instant_with_inline_name(&name, Scope::Process, &[]);
+                        }
+                        ATraceEvent::AsyncBegin { name, correlation_id } => {
+                            context.write_async_begin_with_inline_name(
+                                correlation_id.into(),
+                                &name,
+                                &[],
+                            );
+                        }
+                        ATraceEvent::AsyncEnd { name, correlation_id } => {
+                            context.write_async_end_with_inline_name(
+                                correlation_id.into(),
+                                &name,
+                                &[],
+                            );
+                        }
                     }
                 }
             }
@@ -86,9 +103,13 @@ impl FileOps for TraceMarkerFile {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
 enum ATraceEvent<'a> {
     Begin { pid: u64, name: &'a str },
     End { pid: u64 },
+    Instant { name: &'a str },
+    AsyncBegin { name: &'a str, correlation_id: u64 },
+    AsyncEnd { name: &'a str, correlation_id: u64 },
 }
 
 impl<'a> ATraceEvent<'a> {
@@ -99,14 +120,46 @@ impl<'a> ATraceEvent<'a> {
     fn parse(s: &'a str) -> Option<Self> {
         let chunks: Vec<_> = s.split('|').collect();
         if chunks.len() >= 3 && chunks[0] == "B" {
-            if let Ok(pid) = chunks[1].parse::<u64>() {
-                return Some(ATraceEvent::Begin { pid, name: chunks[2] });
-            }
+            let pid = chunks[1].parse::<u64>().ok()?;
+            return Some(ATraceEvent::Begin { pid, name: chunks[2] });
         } else if chunks.len() >= 2 && chunks[0] == "E" {
-            if let Ok(pid) = chunks[1].parse::<u64>() {
-                return Some(ATraceEvent::End { pid });
-            }
+            let pid = chunks[1].parse::<u64>().ok()?;
+            return Some(ATraceEvent::End { pid });
+        } else if chunks.len() >= 3 && chunks[0] == "I" {
+            return Some(ATraceEvent::Instant { name: chunks[2] });
+        } else if chunks.len() >= 4 && chunks[0] == "S" {
+            let correlation_id = chunks[3].parse::<u64>().ok()?;
+            return Some(ATraceEvent::AsyncBegin { name: chunks[2], correlation_id });
+        } else if chunks.len() >= 4 && chunks[0] == "F" {
+            let correlation_id = chunks[3].parse::<u64>().ok()?;
+            return Some(ATraceEvent::AsyncEnd { name: chunks[2], correlation_id });
         }
         None
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn atrace_event_parsing() {
+        assert_eq!(
+            ATraceEvent::parse("B|1636|slice_name"),
+            Some(ATraceEvent::Begin { pid: 1636, name: "slice_name" }),
+        );
+        assert_eq!(ATraceEvent::parse("E|1636"), Some(ATraceEvent::End { pid: 1636 }),);
+        assert_eq!(
+            ATraceEvent::parse("I|1636|instant_name"),
+            Some(ATraceEvent::Instant { name: "instant_name" }),
+        );
+        assert_eq!(
+            ATraceEvent::parse("S|1636|async_name|123"),
+            Some(ATraceEvent::AsyncBegin { name: "async_name", correlation_id: 123 }),
+        );
+        assert_eq!(
+            ATraceEvent::parse("F|1636|async_name|123"),
+            Some(ATraceEvent::AsyncEnd { name: "async_name", correlation_id: 123 }),
+        );
     }
 }

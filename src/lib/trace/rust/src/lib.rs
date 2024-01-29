@@ -1111,6 +1111,11 @@ impl TraceCategoryContext {
         }
     }
 
+    pub fn write_async_begin_with_inline_name(&self, id: Id, name: &str, args: &[Arg<'_>]) {
+        let name_ref = trace_make_inline_string_ref(name);
+        self.write_async_begin(id, name_ref, args);
+    }
+
     fn write_async_end(&self, id: Id, name_ref: sys::trace_string_ref_t, args: &[Arg<'_>]) {
         let ticks = zx::ticks_get();
         let thread_ref = self.register_current_thread();
@@ -1126,6 +1131,11 @@ impl TraceCategoryContext {
                 args.len(),
             );
         }
+    }
+
+    pub fn write_async_end_with_inline_name(&self, id: Id, name: &str, args: &[Arg<'_>]) {
+        let name_ref = trace_make_inline_string_ref(name);
+        self.write_async_end(id, name_ref, args);
     }
 
     fn write_async_instant(&self, id: Id, name_ref: sys::trace_string_ref_t, args: &[Arg<'_>]) {
