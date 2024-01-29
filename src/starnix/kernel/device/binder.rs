@@ -36,7 +36,7 @@ use starnix_logging::{
     log_error, log_trace, log_warn, trace_category_starnix, trace_duration, track_stub,
 };
 use starnix_sync::{
-    FileOpsIoctl, FileOpsRead, FileOpsWrite, InterruptibleEvent, Locked, Mutex, MutexGuard, RwLock,
+    FileOpsIoctl, InterruptibleEvent, Locked, Mutex, MutexGuard, ReadOps, RwLock, WriteOps,
 };
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
 use starnix_uapi::{
@@ -288,7 +288,7 @@ impl FileOps for BinderConnection {
 
     fn read(
         &self,
-        _locked: &mut Locked<'_, FileOpsRead>,
+        _locked: &mut Locked<'_, ReadOps>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         offset: usize,
@@ -300,7 +300,7 @@ impl FileOps for BinderConnection {
 
     fn write(
         &self,
-        _locked: &mut Locked<'_, FileOpsWrite>,
+        _locked: &mut Locked<'_, WriteOps>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         offset: usize,

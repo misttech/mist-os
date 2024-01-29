@@ -16,7 +16,7 @@ use crate::{
         FileHandle, FileObject, FileOps,
     },
 };
-use starnix_sync::{FileOpsIoctl, FileOpsRead, FileOpsWrite, Locked};
+use starnix_sync::{FileOpsIoctl, LockEqualOrBefore, Locked, ReadOps, WriteOps};
 use starnix_syscalls::{SyscallArg, SyscallResult};
 use starnix_uapi::{error, errors::Errno, open_flags::OpenFlags, vfs::FdEvents};
 
@@ -43,7 +43,7 @@ impl FileOps for SocketFile {
 
     fn read(
         &self,
-        _locked: &mut Locked<'_, FileOpsRead>,
+        locked: &mut Locked<'_, ReadOps>,
         file: &FileObject,
         current_task: &CurrentTask,
         offset: usize,
@@ -55,20 +55,21 @@ impl FileOps for SocketFile {
         if data.available() == 0 {
             return Ok(0);
         }
-        let info = self.recvmsg(current_task, file, data, SocketMessageFlags::empty(), None)?;
+        let info =
+            self.recvmsg(locked, current_task, file, data, SocketMessageFlags::empty(), None)?;
         Ok(info.bytes_read)
     }
 
     fn write(
         &self,
-        _locked: &mut Locked<'_, FileOpsWrite>,
+        locked: &mut Locked<'_, WriteOps>,
         file: &FileObject,
         current_task: &CurrentTask,
         offset: usize,
         data: &mut dyn InputBuffer,
     ) -> Result<usize, Errno> {
         debug_assert!(offset == 0);
-        self.sendmsg(current_task, file, data, None, vec![], SocketMessageFlags::empty())
+        self.sendmsg(locked, current_task, file, data, None, vec![], SocketMessageFlags::empty())
     }
 
     fn wait_async(
@@ -120,22 +121,31 @@ impl SocketFile {
     /// - `file`: The file that will be used for the `blocking_op`.
     /// - `data`: The user buffers to read data from.
     /// - `control_bytes`: Control message bytes to write to the socket.
-    pub fn sendmsg(
+    pub fn sendmsg<L>(
         &self,
+        locked: &mut Locked<'_, L>,
         current_task: &CurrentTask,
         file: &FileObject,
         data: &mut dyn InputBuffer,
         mut dest_address: Option<SocketAddress>,
         mut ancillary_data: Vec<AncillaryData>,
         flags: SocketMessageFlags,
-    ) -> Result<usize, Errno> {
+    ) -> Result<usize, Errno>
+    where
+        L: LockEqualOrBefore<WriteOps>,
+    {
         debug_assert!(data.bytes_read() == 0);
 
         // TODO: Implement more `flags`.
         let mut op = || {
             let offset_before = data.bytes_read();
-            let sent_bytes =
-                self.socket.write(current_task, data, &mut dest_address, &mut ancillary_data)?;
+            let sent_bytes = self.socket.write(
+                locked,
+                current_task,
+                data,
+                &mut dest_address,
+                &mut ancillary_data,
+            )?;
             debug_assert!(data.bytes_read() - offset_before == sent_bytes);
             if data.available() > 0 {
                 return error!(EAGAIN);
@@ -167,19 +177,23 @@ impl SocketFile {
     /// - `data`: The user buffers to write to.
     ///
     /// Returns the number of bytes read, as well as any control message that was encountered.
-    pub fn recvmsg(
+    pub fn recvmsg<L>(
         &self,
+        locked: &mut Locked<'_, L>,
         current_task: &CurrentTask,
         file: &FileObject,
         data: &mut dyn OutputBuffer,
         flags: SocketMessageFlags,
         deadline: Option<zx::Time>,
-    ) -> Result<MessageReadInfo, Errno> {
+    ) -> Result<MessageReadInfo, Errno>
+    where
+        L: LockEqualOrBefore<ReadOps>,
+    {
         // TODO: Implement more `flags`.
         let mut read_info = MessageReadInfo::default();
 
         let mut op = || {
-            let mut info = self.socket.read(current_task, data, flags)?;
+            let mut info = self.socket.read(locked, current_task, data, flags)?;
             read_info.append(&mut info);
             read_info.address = info.address;
 

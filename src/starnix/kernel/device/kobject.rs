@@ -13,7 +13,7 @@ use crate::{
     },
 };
 use starnix_logging::track_stub;
-use starnix_sync::{FileOpsRead, FileOpsWrite, Locked, Mutex};
+use starnix_sync::{Locked, Mutex, ReadOps, WriteOps};
 use starnix_uapi::{device_type::DeviceType, error, errors::Errno, open_flags::OpenFlags};
 use std::{
     collections::BTreeMap,
@@ -317,7 +317,7 @@ impl FileOps for UEventFile {
 
     fn read(
         &self,
-        _locked: &mut Locked<'_, FileOpsRead>,
+        _locked: &mut Locked<'_, ReadOps>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         offset: usize,
@@ -334,7 +334,7 @@ impl FileOps for UEventFile {
 
     fn write(
         &self,
-        _locked: &mut Locked<'_, FileOpsWrite>,
+        _locked: &mut Locked<'_, WriteOps>,
         _file: &FileObject,
         current_task: &CurrentTask,
         offset: usize,

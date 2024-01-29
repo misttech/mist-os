@@ -11,7 +11,7 @@ use crate::{
         SimpleFileNode,
     },
 };
-use starnix_sync::{FileOpsRead, FileOpsWrite, Locked};
+use starnix_sync::{Locked, ReadOps, WriteOps};
 use starnix_uapi::{errno, error, errors::Errno};
 
 #[derive(Copy, Clone, Eq, PartialEq, Hash)]
@@ -69,7 +69,7 @@ impl FileOps for PowerStateFile {
 
     fn write(
         &self,
-        _locked: &mut Locked<'_, FileOpsWrite>,
+        _locked: &mut Locked<'_, WriteOps>,
         _file: &FileObject,
         current_task: &CurrentTask,
         offset: usize,
@@ -92,7 +92,7 @@ impl FileOps for PowerStateFile {
 
     fn read(
         &self,
-        _locked: &mut Locked<'_, FileOpsRead>,
+        _locked: &mut Locked<'_, ReadOps>,
         _file: &FileObject,
         current_task: &CurrentTask,
         offset: usize,

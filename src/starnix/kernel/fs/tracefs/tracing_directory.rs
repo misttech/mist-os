@@ -10,7 +10,7 @@ use crate::{
     },
 };
 use starnix_logging::trace_category_atrace;
-use starnix_sync::{FileOpsWrite, Locked};
+use starnix_sync::{Locked, WriteOps};
 use starnix_uapi::errors::Errno;
 
 use std::{collections::HashMap, sync::Mutex};
@@ -49,7 +49,7 @@ impl FileOps for TraceMarkerFile {
 
     fn write(
         &self,
-        _locked: &mut Locked<'_, FileOpsWrite>,
+        _locked: &mut Locked<'_, WriteOps>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         _offset: usize,

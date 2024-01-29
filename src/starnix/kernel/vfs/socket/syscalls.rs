@@ -17,7 +17,7 @@ use crate::{
 };
 use fuchsia_zircon as zx;
 use starnix_logging::{log_trace, track_stub};
-use starnix_sync::{Locked, Unlocked};
+use starnix_sync::{LockBefore, Locked, ReadOps, Unlocked, WriteOps};
 use starnix_uapi::{
     cmsghdr, errno, error,
     errors::{Errno, EEXIST, EINPROGRESS},
@@ -429,19 +429,24 @@ fn read_iovec_from_msghdr(
     current_task.read_objects_to_vec(message_header.msg_iov.into(), iovec_count)
 }
 
-fn recvmsg_internal(
+fn recvmsg_internal<L>(
+    locked: &mut Locked<'_, L>,
     current_task: &CurrentTask,
     file: &FileHandle,
     user_message_header: UserRef<msghdr>,
     flags: u32,
     deadline: Option<zx::Time>,
-) -> Result<usize, Errno> {
+) -> Result<usize, Errno>
+where
+    L: LockBefore<ReadOps>,
+{
     let mut message_header = current_task.read_object(user_message_header.clone())?;
     let iovec = read_iovec_from_msghdr(current_task, &message_header)?;
 
     let flags = SocketMessageFlags::from_bits(flags).ok_or_else(|| errno!(EINVAL))?;
     let socket_ops = file.downcast_file::<SocketFile>().unwrap();
     let info = socket_ops.recvmsg(
+        locked,
         current_task,
         file,
         &mut UserBuffersOutputBuffer::unified_new(current_task, iovec)?,
@@ -520,7 +525,7 @@ fn recvmsg_internal(
 }
 
 pub fn sys_recvmsg(
-    _locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
     fd: FdNumber,
     user_message_header: UserRef<msghdr>,
@@ -530,11 +535,11 @@ pub fn sys_recvmsg(
     if !file.node().is_sock() {
         return error!(ENOTSOCK);
     }
-    recvmsg_internal(current_task, &file, user_message_header, flags, None)
+    recvmsg_internal(locked, current_task, &file, user_message_header, flags, None)
 }
 
 pub fn sys_recvmmsg(
-    _locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
     fd: FdNumber,
     user_mmsgvec: UserRef<mmsghdr>,
@@ -562,7 +567,7 @@ pub fn sys_recvmmsg(
     while index < vlen as usize {
         let user_mmsghdr = user_mmsgvec.at(index);
         let user_msghdr = user_mmsghdr.cast::<msghdr>();
-        match recvmsg_internal(current_task, &file, user_msghdr, flags, deadline) {
+        match recvmsg_internal(locked, current_task, &file, user_msghdr, flags, deadline) {
             Err(error) => {
                 if index == 0 {
                     return Err(error);
@@ -584,7 +589,7 @@ pub fn sys_recvmmsg(
 }
 
 pub fn sys_recvfrom(
-    _locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
     fd: FdNumber,
     user_buffer: UserAddress,
@@ -601,6 +606,7 @@ pub fn sys_recvfrom(
     let flags = SocketMessageFlags::from_bits(flags).ok_or_else(|| errno!(EINVAL))?;
     let socket_ops = file.downcast_file::<SocketFile>().unwrap();
     let info = socket_ops.recvmsg(
+        locked,
         current_task,
         &file,
         &mut UserBuffersOutputBuffer::unified_new_at(current_task, user_buffer, buffer_length)?,
@@ -620,12 +626,16 @@ pub fn sys_recvfrom(
     }
 }
 
-fn sendmsg_internal(
+fn sendmsg_internal<L>(
+    locked: &mut Locked<'_, L>,
     current_task: &CurrentTask,
     file: &FileHandle,
     user_message_header: UserRef<msghdr>,
     flags: u32,
-) -> Result<usize, Errno> {
+) -> Result<usize, Errno>
+where
+    L: LockBefore<WriteOps>,
+{
     let message_header = current_task.read_object(user_message_header)?;
 
     if message_header.msg_namelen > i32::MAX as u32 {
@@ -673,6 +683,7 @@ fn sendmsg_internal(
     let flags = SocketMessageFlags::from_bits(flags).ok_or_else(|| errno!(EOPNOTSUPP))?;
     let socket_ops = file.downcast_file::<SocketFile>().unwrap();
     socket_ops.sendmsg(
+        locked,
         current_task,
         file,
         &mut UserBuffersInputBuffer::unified_new(current_task, iovec)?,
@@ -683,7 +694,7 @@ fn sendmsg_internal(
 }
 
 pub fn sys_sendmsg(
-    _locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
     fd: FdNumber,
     user_message_header: UserRef<msghdr>,
@@ -693,11 +704,11 @@ pub fn sys_sendmsg(
     if !file.node().is_sock() {
         return error!(ENOTSOCK);
     }
-    sendmsg_internal(current_task, &file, user_message_header, flags)
+    sendmsg_internal(locked, current_task, &file, user_message_header, flags)
 }
 
 pub fn sys_sendmmsg(
-    _locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
     fd: FdNumber,
     user_mmsgvec: UserRef<mmsghdr>,
@@ -718,7 +729,7 @@ pub fn sys_sendmmsg(
     while index < vlen as usize {
         let user_mmsghdr = user_mmsgvec.at(index);
         let user_msghdr = user_mmsghdr.cast::<msghdr>();
-        match sendmsg_internal(current_task, &file, user_msghdr, flags) {
+        match sendmsg_internal(locked, current_task, &file, user_msghdr, flags) {
             Err(error) => {
                 if index == 0 {
                     return Err(error);
@@ -737,7 +748,7 @@ pub fn sys_sendmmsg(
 }
 
 pub fn sys_sendto(
-    _locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
     fd: FdNumber,
     user_buffer: UserAddress,
@@ -758,7 +769,7 @@ pub fn sys_sendto(
 
     let flags = SocketMessageFlags::from_bits(flags).ok_or_else(|| errno!(EOPNOTSUPP))?;
     let socket_file = file.downcast_file::<SocketFile>().unwrap();
-    socket_file.sendmsg(current_task, &file, &mut data, dest_address, vec![], flags)
+    socket_file.sendmsg(locked, current_task, &file, &mut data, dest_address, vec![], flags)
 }
 
 pub fn sys_getsockopt(

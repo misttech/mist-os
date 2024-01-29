@@ -20,8 +20,8 @@ use bstr::B;
 use starnix_lifecycle::AtomicU64Counter;
 use starnix_logging::{log_error, log_trace, log_warn, track_stub};
 use starnix_sync::{
-    FileOpsIoctl, FileOpsRead, FileOpsWrite, Locked, Mutex, MutexGuard, RwLock, RwLockReadGuard,
-    RwLockWriteGuard,
+    FileOpsIoctl, Locked, Mutex, MutexGuard, ReadOps, RwLock, RwLockReadGuard, RwLockWriteGuard,
+    WriteOps,
 };
 use starnix_syscalls::{SyscallArg, SyscallResult};
 use starnix_uapi::{
@@ -72,7 +72,7 @@ impl FileOps for DevFuse {
 
     fn read(
         &self,
-        _locked: &mut Locked<'_, FileOpsRead>,
+        _locked: &mut Locked<'_, ReadOps>,
         file: &FileObject,
         current_task: &CurrentTask,
         offset: usize,
@@ -84,7 +84,7 @@ impl FileOps for DevFuse {
 
     fn write(
         &self,
-        _locked: &mut Locked<'_, FileOpsWrite>,
+        _locked: &mut Locked<'_, WriteOps>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         offset: usize,
@@ -380,7 +380,7 @@ impl FileOps for AbortFile {
 
     fn read(
         &self,
-        _locked: &mut Locked<'_, FileOpsRead>,
+        _locked: &mut Locked<'_, ReadOps>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         _offset: usize,
@@ -391,7 +391,7 @@ impl FileOps for AbortFile {
 
     fn write(
         &self,
-        _locked: &mut Locked<'_, FileOpsWrite>,
+        _locked: &mut Locked<'_, WriteOps>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         _offset: usize,
@@ -558,7 +558,7 @@ impl FileOps for FuseFileObject {
 
     fn read(
         &self,
-        _locked: &mut Locked<'_, FileOpsRead>,
+        _locked: &mut Locked<'_, ReadOps>,
         file: &FileObject,
         current_task: &CurrentTask,
         offset: usize,
@@ -588,7 +588,7 @@ impl FileOps for FuseFileObject {
 
     fn write(
         &self,
-        _locked: &mut Locked<'_, FileOpsWrite>,
+        _locked: &mut Locked<'_, WriteOps>,
         file: &FileObject,
         current_task: &CurrentTask,
         offset: usize,

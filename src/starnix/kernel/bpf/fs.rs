@@ -16,7 +16,7 @@ use crate::{
     },
 };
 use starnix_logging::track_stub;
-use starnix_sync::{FileOpsRead, FileOpsWrite, Locked};
+use starnix_sync::{Locked, ReadOps, WriteOps};
 use starnix_uapi::{
     as_any::AsAny,
     auth::FsCred,
@@ -53,7 +53,7 @@ impl FileOps for BpfHandle {
     fileops_impl_nonseekable!();
     fn read(
         &self,
-        _locked: &mut Locked<'_, FileOpsRead>,
+        _locked: &mut Locked<'_, ReadOps>,
         _file: &FileObject,
         _current_task: &crate::task::CurrentTask,
         _offset: usize,
@@ -64,7 +64,7 @@ impl FileOps for BpfHandle {
     }
     fn write(
         &self,
-        _locked: &mut Locked<'_, FileOpsWrite>,
+        _locked: &mut Locked<'_, WriteOps>,
         _file: &FileObject,
         _current_task: &crate::task::CurrentTask,
         _offset: usize,

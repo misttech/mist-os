@@ -14,7 +14,7 @@ use crate::{
         FileHandle,
     },
 };
-use starnix_sync::{Mutex, Unlocked};
+use starnix_sync::{Locked, Mutex, ReadOps, WriteOps};
 use starnix_uapi::{errno, error, errors::Errno, open_flags::OpenFlags, ucred, vfs::FdEvents};
 
 // An implementation of AF_VSOCK.
@@ -137,43 +137,47 @@ impl SocketOps for VsockSocket {
 
     fn read(
         &self,
+        locked: &mut Locked<'_, ReadOps>,
         _socket: &Socket,
         current_task: &CurrentTask,
         data: &mut dyn OutputBuffer,
         _flags: SocketMessageFlags,
     ) -> Result<MessageReadInfo, Errno> {
-        let inner = self.lock();
-        let address = inner.address.clone();
+        let (address, file) = {
+            let inner = self.lock();
+            let address = inner.address.clone();
 
-        match &inner.state {
-            VsockSocketState::Connected(file) => {
-                let mut locked = Unlocked::new(); // TODO(https://fxbug.dev/320461655): propagate through SocketOps
-                let bytes_read = file.read(&mut locked, current_task, data)?;
-                Ok(MessageReadInfo {
-                    bytes_read,
-                    message_length: bytes_read,
-                    address,
-                    ancillary_data: vec![],
-                })
+            match &inner.state {
+                VsockSocketState::Connected(file) => (address, file.clone()),
+                _ => return error!(EBADF),
             }
-            _ => error!(EBADF),
-        }
+        };
+        let bytes_read = file.read(locked, current_task, data)?;
+        Ok(MessageReadInfo {
+            bytes_read,
+            message_length: bytes_read,
+            address,
+            ancillary_data: vec![],
+        })
     }
 
     fn write(
         &self,
+        locked: &mut Locked<'_, WriteOps>,
         _socket: &Socket,
         current_task: &CurrentTask,
         data: &mut dyn InputBuffer,
         _dest_address: &mut Option<SocketAddress>,
         _ancillary_data: &mut Vec<AncillaryData>,
     ) -> Result<usize, Errno> {
-        let inner = self.lock();
-        let mut locked = Unlocked::new(); // TODO(https://fxbug.dev/320461655): propagate through SocketOps
-        match &inner.state {
-            VsockSocketState::Connected(file) => file.write(&mut locked, current_task, data),
-            _ => error!(EBADF),
-        }
+        let file = {
+            let inner = self.lock();
+            match &inner.state {
+                VsockSocketState::Connected(file) => file.clone(),
+                _ => return error!(EBADF),
+            }
+        };
+        file.write(locked, current_task, data)
     }
 
     fn wait_async(
@@ -311,7 +315,7 @@ mod tests {
 
     #[::fuchsia::test]
     async fn test_vsock_socket() {
-        let (_kernel, current_task) = create_kernel_and_task();
+        let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
         let (fs1, fs2) = fidl::Socket::create_stream();
         const VSOCK_PORT: u32 = 5555;
 
@@ -346,14 +350,16 @@ mod tests {
         assert_eq!(fs1.write(&test_bytes_in[..]).unwrap(), test_bytes_in.len());
         let mut buffer_iterator = VecOutputBuffer::new(*PAGE_SIZE as usize);
         let read_message_info = server_socket
-            .read(&current_task, &mut buffer_iterator, SocketMessageFlags::empty())
+            .read(&mut locked, &current_task, &mut buffer_iterator, SocketMessageFlags::empty())
             .unwrap();
         assert_eq!(read_message_info.bytes_read, test_bytes_in.len());
         assert_eq!(buffer_iterator.data(), test_bytes_in);
 
         let test_bytes_out: [u8; 10] = [9, 8, 7, 6, 5, 4, 3, 2, 1, 0];
         let mut buffer_iterator = VecInputBuffer::new(&test_bytes_out);
-        server_socket.write(&current_task, &mut buffer_iterator, &mut None, &mut vec![]).unwrap();
+        server_socket
+            .write(&mut locked, &current_task, &mut buffer_iterator, &mut None, &mut vec![])
+            .unwrap();
         assert_eq!(buffer_iterator.bytes_read(), test_bytes_out.len());
 
         let mut read_back_buf = [0u8; 100];

@@ -13,7 +13,7 @@ use fuchsia_runtime::zx_utc_reference_get;
 use fuchsia_zircon as zx;
 use fuchsia_zircon::{AsHandleRef, Clock, Unowned};
 use starnix_logging::track_stub;
-use starnix_sync::{FileOpsRead, FileOpsWrite, Locked, Mutex};
+use starnix_sync::{Locked, Mutex, ReadOps, WriteOps};
 use starnix_uapi::{
     error,
     errors::Errno,
@@ -176,7 +176,7 @@ impl FileOps for TimerFile {
     fileops_impl_nonseekable!();
     fn write(
         &self,
-        _locked: &mut Locked<'_, FileOpsWrite>,
+        _locked: &mut Locked<'_, WriteOps>,
         file: &FileObject,
         _current_task: &CurrentTask,
         offset: usize,
@@ -193,7 +193,7 @@ impl FileOps for TimerFile {
 
     fn read(
         &self,
-        _locked: &mut Locked<'_, FileOpsRead>,
+        _locked: &mut Locked<'_, ReadOps>,
         file: &FileObject,
         current_task: &CurrentTask,
         offset: usize,

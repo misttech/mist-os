@@ -15,6 +15,7 @@ use crate::{
     },
 };
 use starnix_logging::track_stub;
+use starnix_sync::{Locked, ReadOps, WriteOps};
 use starnix_uapi::{
     c_int, errno, errno_from_zxio_code, error,
     errors::{Errno, ENOTSUP},
@@ -268,6 +269,7 @@ impl SocketOps for ZxioBackedSocket {
 
     fn read(
         &self,
+        _locked: &mut Locked<'_, ReadOps>,
         socket: &Socket,
         _current_task: &CurrentTask,
         data: &mut dyn OutputBuffer,
@@ -299,6 +301,7 @@ impl SocketOps for ZxioBackedSocket {
 
     fn write(
         &self,
+        _locked: &mut Locked<'_, WriteOps>,
         socket: &Socket,
         _current_task: &CurrentTask,
         data: &mut dyn InputBuffer,

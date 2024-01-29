@@ -17,7 +17,7 @@ use netlink::{
 use netlink_packet_core::{NetlinkMessage, NetlinkSerializable};
 use netlink_packet_route::rtnl::RtnlMessage;
 use netlink_packet_utils::Emitable as _;
-use starnix_sync::Mutex;
+use starnix_sync::{Locked, Mutex, ReadOps, WriteOps};
 use std::{marker::PhantomData, num::NonZeroU32, sync::Arc};
 use zerocopy::{AsBytes, FromBytes};
 
@@ -414,6 +414,7 @@ impl SocketOps for BaseNetlinkSocket {
 
     fn read(
         &self,
+        _locked: &mut Locked<'_, ReadOps>,
         _socket: &Socket,
         _current_task: &CurrentTask,
         data: &mut dyn OutputBuffer,
@@ -444,6 +445,7 @@ impl SocketOps for BaseNetlinkSocket {
 
     fn write(
         &self,
+        _locked: &mut Locked<'_, WriteOps>,
         _socket: &Socket,
         _current_task: &CurrentTask,
         data: &mut dyn InputBuffer,
@@ -606,6 +608,7 @@ impl SocketOps for UEventNetlinkSocket {
 
     fn read(
         &self,
+        _locked: &mut Locked<'_, ReadOps>,
         _socket: &Socket,
         _current_task: &CurrentTask,
         data: &mut dyn OutputBuffer,
@@ -616,6 +619,7 @@ impl SocketOps for UEventNetlinkSocket {
 
     fn write(
         &self,
+        _locked: &mut Locked<'_, WriteOps>,
         _socket: &Socket,
         _current_task: &CurrentTask,
         _data: &mut dyn InputBuffer,
@@ -874,6 +878,7 @@ impl SocketOps for RouteNetlinkSocket {
 
     fn read(
         &self,
+        _locked: &mut Locked<'_, ReadOps>,
         _socket: &Socket,
         _current_task: &CurrentTask,
         data: &mut dyn OutputBuffer,
@@ -885,6 +890,7 @@ impl SocketOps for RouteNetlinkSocket {
 
     fn write(
         &self,
+        _locked: &mut Locked<'_, WriteOps>,
         _socket: &Socket,
         _current_task: &CurrentTask,
         data: &mut dyn InputBuffer,
@@ -1050,6 +1056,7 @@ impl SocketOps for GenericNetlinkSocket {
 
     fn read(
         &self,
+        _locked: &mut Locked<'_, ReadOps>,
         _socket: &Socket,
         _current_task: &CurrentTask,
         data: &mut dyn OutputBuffer,
@@ -1060,6 +1067,7 @@ impl SocketOps for GenericNetlinkSocket {
 
     fn write(
         &self,
+        _locked: &mut Locked<'_, WriteOps>,
         _socket: &Socket,
         _current_task: &CurrentTask,
         data: &mut dyn InputBuffer,

@@ -19,7 +19,7 @@ use perfetto_consumer_proto::perfetto::protos::{
 };
 use prost::Message;
 use starnix_logging::{log_error, trace_category_atrace, trace_name_perfetto_blob};
-use starnix_sync::{FileOpsRead, FileOpsWrite, LockBefore, Locked, Unlocked};
+use starnix_sync::{LockBefore, Locked, ReadOps, Unlocked, WriteOps};
 use starnix_uapi::{errno, errors::Errno, vfs::FdEvents, AF_UNIX, SOCK_STREAM};
 use std::{
     collections::VecDeque,
@@ -73,7 +73,7 @@ impl FrameReader {
         current_task: &CurrentTask,
     ) -> Result<IpcFrame, anyhow::Error>
     where
-        L: LockBefore<FileOpsRead>,
+        L: LockBefore<ReadOps>,
     {
         loop {
             if self.next_message_size.is_none() && self.data.len() >= 4 {
@@ -169,7 +169,7 @@ impl PerfettoConnection {
         msg: ipc_frame::Msg,
     ) -> Result<u64, anyhow::Error>
     where
-        L: LockBefore<FileOpsWrite>,
+        L: LockBefore<WriteOps>,
     {
         let request_id = self.request_id;
         let frame =
@@ -211,7 +211,7 @@ impl PerfettoConnection {
         req: EnableTracingRequest,
     ) -> Result<u64, anyhow::Error>
     where
-        L: LockBefore<FileOpsWrite>,
+        L: LockBefore<WriteOps>,
     {
         let method_id = self.method_id("EnableTracing")?;
         let mut encoded_args: Vec<u8> = Vec::with_capacity(req.encoded_len());
@@ -236,7 +236,7 @@ impl PerfettoConnection {
         req: DisableTracingRequest,
     ) -> Result<u64, anyhow::Error>
     where
-        L: LockBefore<FileOpsWrite>,
+        L: LockBefore<WriteOps>,
     {
         let method_id = self.method_id("DisableTracing")?;
         let mut encoded_args: Vec<u8> = Vec::with_capacity(req.encoded_len());
@@ -261,7 +261,7 @@ impl PerfettoConnection {
         req: ReadBuffersRequest,
     ) -> Result<u64, anyhow::Error>
     where
-        L: LockBefore<FileOpsWrite>,
+        L: LockBefore<WriteOps>,
     {
         let method_id = self.method_id("ReadBuffers")?;
         let mut encoded_args: Vec<u8> = Vec::with_capacity(req.encoded_len());
@@ -286,7 +286,7 @@ impl PerfettoConnection {
         req: FreeBuffersRequest,
     ) -> Result<u64, anyhow::Error>
     where
-        L: LockBefore<FileOpsWrite>,
+        L: LockBefore<WriteOps>,
     {
         let method_id = self.method_id("FreeBuffers")?;
         let mut encoded_args: Vec<u8> = Vec::with_capacity(req.encoded_len());

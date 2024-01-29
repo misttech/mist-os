@@ -28,7 +28,7 @@ use netlink_packet_route::{
     AddressMessage, LinkMessage, RtnlMessage,
 };
 use starnix_logging::{log_warn, track_stub};
-use starnix_sync::{FileOpsRead, FileOpsWrite, LockBefore, Locked, Mutex};
+use starnix_sync::{LockBefore, LockEqualOrBefore, Locked, Mutex, ReadOps, WriteOps};
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
 use starnix_uapi::{
     as_any::AsAny,
@@ -95,6 +95,7 @@ pub trait SocketOps: Send + Sync + AsAny {
     /// data associated with the read messages.
     fn read(
         &self,
+        locked: &mut Locked<'_, ReadOps>,
         socket: &Socket,
         current_task: &CurrentTask,
         data: &mut dyn OutputBuffer,
@@ -111,6 +112,7 @@ pub trait SocketOps: Send + Sync + AsAny {
     /// Advances the iterator to indicate how much was actually written.
     fn write(
         &self,
+        locked: &mut Locked<'_, WriteOps>,
         socket: &Socket,
         current_task: &CurrentTask,
         data: &mut dyn InputBuffer,
@@ -407,8 +409,8 @@ impl Socket {
         arg: SyscallArg,
     ) -> Result<SyscallResult, Errno>
     where
-        L: LockBefore<FileOpsRead>,
-        L: LockBefore<FileOpsWrite>,
+        L: LockBefore<ReadOps>,
+        L: LockBefore<WriteOps>,
     {
         let user_addr = UserAddress::from(arg);
 
@@ -691,23 +693,33 @@ impl Socket {
         self.ops.accept(self)
     }
 
-    pub fn read(
+    pub fn read<L>(
         &self,
+        locked: &mut Locked<'_, L>,
         current_task: &CurrentTask,
         data: &mut dyn OutputBuffer,
         flags: SocketMessageFlags,
-    ) -> Result<MessageReadInfo, Errno> {
-        self.ops.read(self, current_task, data, flags)
+    ) -> Result<MessageReadInfo, Errno>
+    where
+        L: LockEqualOrBefore<ReadOps>,
+    {
+        let mut locked = locked.cast_locked::<ReadOps>();
+        self.ops.read(&mut locked, self, current_task, data, flags)
     }
 
-    pub fn write(
+    pub fn write<L>(
         &self,
+        locked: &mut Locked<'_, L>,
         current_task: &CurrentTask,
         data: &mut dyn InputBuffer,
         dest_address: &mut Option<SocketAddress>,
         ancillary_data: &mut Vec<AncillaryData>,
-    ) -> Result<usize, Errno> {
-        self.ops.write(self, current_task, data, dest_address, ancillary_data)
+    ) -> Result<usize, Errno>
+    where
+        L: LockEqualOrBefore<WriteOps>,
+    {
+        let mut locked = locked.cast_locked::<WriteOps>();
+        self.ops.write(&mut locked, self, current_task, data, dest_address, ancillary_data)
     }
 
     pub fn wait_async(
@@ -764,8 +776,8 @@ fn get_netlink_interface_info<L>(
     read_buf: &mut VecOutputBuffer,
 ) -> Result<(FileHandle, LinkMessage), Errno>
 where
-    L: LockBefore<FileOpsWrite>,
-    L: LockBefore<FileOpsRead>,
+    L: LockBefore<WriteOps>,
+    L: LockBefore<ReadOps>,
 {
     let iface_name = unsafe { CStr::from_ptr(in_ifreq.ifr_ifrn.ifrn_name.as_ptr()) }
         .to_str()
@@ -823,8 +835,8 @@ fn get_netlink_ipv4_addresses<L>(
     read_buf: &mut VecOutputBuffer,
 ) -> Result<(FileHandle, Vec<AddressMessage>, u32), Errno>
 where
-    L: LockBefore<FileOpsRead>,
-    L: LockBefore<FileOpsWrite>,
+    L: LockBefore<ReadOps>,
+    L: LockBefore<WriteOps>,
 {
     let sockaddr { sa_family, sa_data: _ } = unsafe { in_ifreq.ifr_ifru.ifru_addr };
     if sa_family != AF_INET {
@@ -886,8 +898,8 @@ fn set_netlink_interface_flags<L>(
     in_ifreq: &ifreq,
 ) -> Result<(), Errno>
 where
-    L: LockBefore<FileOpsWrite>,
-    L: LockBefore<FileOpsRead>,
+    L: LockBefore<WriteOps>,
+    L: LockBefore<ReadOps>,
 {
     let iface_name = unsafe { CStr::from_ptr(in_ifreq.ifr_ifrn.ifrn_name.as_ptr()) }
         .to_str()
@@ -952,8 +964,8 @@ fn send_netlink_msg_and_wait_response<L>(
     read_buf: &mut VecOutputBuffer,
 ) -> Result<NetlinkMessage<RtnlMessage>, Errno>
 where
-    L: LockBefore<FileOpsWrite>,
-    L: LockBefore<FileOpsRead>,
+    L: LockBefore<WriteOps>,
+    L: LockBefore<ReadOps>,
 {
     msg.finalize();
     let mut buf = vec![0; msg.buffer_len()];
@@ -974,14 +986,14 @@ where
 mod tests {
     use super::*;
     use crate::{
-        testing::{create_kernel_and_task, map_memory},
+        testing::{create_kernel_task_and_unlocked, map_memory},
         vfs::UnixControlData,
     };
     use starnix_uapi::SO_PASSCRED;
 
     #[::fuchsia::test]
     async fn test_dgram_socket() {
-        let (_kernel, current_task) = create_kernel_and_task();
+        let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
         let bind_address = SocketAddress::Unix(b"dgram_test".into());
         let rec_dgram = Socket::new(
             &current_task,
@@ -1012,15 +1024,16 @@ mod tests {
         .expect("Failed to connect socket.");
         send.connect(&current_task, SocketPeer::Handle(rec_dgram.clone())).unwrap();
         let mut source_iter = VecInputBuffer::new(&xfer_bytes);
-        send.write(&current_task, &mut source_iter, &mut None, &mut vec![]).unwrap();
+        send.write(&mut locked, &current_task, &mut source_iter, &mut None, &mut vec![]).unwrap();
         assert_eq!(source_iter.available(), 0);
         // Previously, this would cause the test to fail,
         // because rec_dgram was shut down.
         send.close();
 
         let mut rec_buffer = VecOutputBuffer::new(8);
-        let read_info =
-            rec_dgram.read(&current_task, &mut rec_buffer, SocketMessageFlags::empty()).unwrap();
+        let read_info = rec_dgram
+            .read(&mut locked, &current_task, &mut rec_buffer, SocketMessageFlags::empty())
+            .unwrap();
         assert_eq!(read_info.bytes_read, xfer_bytes.len());
         assert_eq!(rec_buffer.data(), xfer_bytes);
         assert_eq!(1, read_info.ancillary_data.len());

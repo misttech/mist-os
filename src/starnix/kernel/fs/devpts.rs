@@ -20,9 +20,7 @@ use crate::{
     },
 };
 use starnix_logging::track_stub;
-use starnix_sync::{
-    FileOpsIoctl, FileOpsRead, FileOpsWrite, LockBefore, Locked, ProcessGroupState,
-};
+use starnix_sync::{FileOpsIoctl, LockBefore, Locked, ProcessGroupState, ReadOps, WriteOps};
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
 use starnix_uapi::{
     auth::FsCred,
@@ -336,7 +334,7 @@ impl FileOps for DevPtmxFile {
 
     fn read(
         &self,
-        locked: &mut Locked<'_, FileOpsRead>,
+        locked: &mut Locked<'_, ReadOps>,
         file: &FileObject,
         current_task: &CurrentTask,
         offset: usize,
@@ -350,7 +348,7 @@ impl FileOps for DevPtmxFile {
 
     fn write(
         &self,
-        locked: &mut Locked<'_, FileOpsWrite>,
+        locked: &mut Locked<'_, WriteOps>,
         file: &FileObject,
         current_task: &CurrentTask,
         offset: usize,
@@ -434,7 +432,7 @@ impl FileOps for DevPtsFile {
 
     fn read(
         &self,
-        locked: &mut Locked<'_, FileOpsRead>,
+        locked: &mut Locked<'_, ReadOps>,
         file: &FileObject,
         current_task: &CurrentTask,
         offset: usize,
@@ -448,7 +446,7 @@ impl FileOps for DevPtsFile {
 
     fn write(
         &self,
-        locked: &mut Locked<'_, FileOpsWrite>,
+        locked: &mut Locked<'_, WriteOps>,
         file: &FileObject,
         current_task: &CurrentTask,
         offset: usize,

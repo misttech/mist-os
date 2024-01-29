@@ -23,9 +23,7 @@ use fidl::HandleBased;
 use fuchsia_inspect_contrib::profile_duration;
 use fuchsia_zircon as zx;
 use starnix_logging::{impossible_error, trace_category_starnix_mm, trace_duration, track_stub};
-use starnix_sync::{
-    FileOpsIoctl, FileOpsRead, FileOpsWrite, LockBefore, LockEqualOrBefore, Locked, Mutex,
-};
+use starnix_sync::{FileOpsIoctl, LockEqualOrBefore, Locked, Mutex, ReadOps, WriteOps};
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
 use starnix_uapi::{
     as_any::AsAny,
@@ -139,7 +137,7 @@ pub trait FileOps: Send + Sync + AsAny + 'static {
     /// Returns the number of bytes read.
     fn read(
         &self,
-        locked: &mut Locked<'_, FileOpsRead>,
+        locked: &mut Locked<'_, ReadOps>,
         file: &FileObject,
         current_task: &CurrentTask,
         offset: usize,
@@ -150,7 +148,7 @@ pub trait FileOps: Send + Sync + AsAny + 'static {
     /// Returns the number of bytes written.
     fn write(
         &self,
-        locked: &mut Locked<'_, FileOpsWrite>,
+        locked: &mut Locked<'_, WriteOps>,
         file: &FileObject,
         current_task: &CurrentTask,
         offset: usize,
@@ -445,7 +443,7 @@ macro_rules! fileops_impl_delegate_read_and_seek {
 
         fn read(
             &$self,
-            locked: &mut starnix_sync::Locked<'_, starnix_sync::FileOpsRead>,
+            locked: &mut starnix_sync::Locked<'_, starnix_sync::ReadOps>,
             file: &FileObject,
             current_task: &crate::task::CurrentTask,
             offset: usize,
@@ -535,7 +533,7 @@ macro_rules! fileops_impl_dataless {
     () => {
         fn write(
             &self,
-            _locked: &mut starnix_sync::Locked<'_, starnix_sync::FileOpsWrite>,
+            _locked: &mut starnix_sync::Locked<'_, starnix_sync::WriteOps>,
             _file: &crate::vfs::FileObject,
             _current_task: &crate::task::CurrentTask,
             _offset: usize,
@@ -546,7 +544,7 @@ macro_rules! fileops_impl_dataless {
 
         fn read(
             &self,
-            _locked: &mut starnix_sync::Locked<'_, starnix_sync::FileOpsRead>,
+            _locked: &mut starnix_sync::Locked<'_, starnix_sync::ReadOps>,
             _file: &crate::vfs::FileObject,
             _current_task: &crate::task::CurrentTask,
             _offset: usize,
@@ -567,7 +565,7 @@ macro_rules! fileops_impl_directory {
 
         fn read(
             &self,
-            _locked: &mut starnix_sync::Locked<'_, starnix_sync::FileOpsRead>,
+            _locked: &mut starnix_sync::Locked<'_, starnix_sync::ReadOps>,
             _file: &crate::vfs::FileObject,
             _current_task: &crate::task::CurrentTask,
             _offset: usize,
@@ -578,7 +576,7 @@ macro_rules! fileops_impl_directory {
 
         fn write(
             &self,
-            _locked: &mut starnix_sync::Locked<'_, starnix_sync::FileOpsWrite>,
+            _locked: &mut starnix_sync::Locked<'_, starnix_sync::WriteOps>,
             _file: &crate::vfs::FileObject,
             _current_task: &crate::task::CurrentTask,
             _offset: usize,
@@ -690,7 +688,7 @@ impl FileOps for OPathOps {
     }
     fn read(
         &self,
-        _locked: &mut Locked<'_, FileOpsRead>,
+        _locked: &mut Locked<'_, ReadOps>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         _offset: usize,
@@ -700,7 +698,7 @@ impl FileOps for OPathOps {
     }
     fn write(
         &self,
-        _locked: &mut Locked<'_, FileOpsWrite>,
+        _locked: &mut Locked<'_, WriteOps>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         _offset: usize,
@@ -833,7 +831,7 @@ impl FileOps for ProxyFileOps {
     // These take &mut Locked<'_, L> as a second argument
     fn read(
         &self,
-        locked: &mut Locked<'_, FileOpsRead>,
+        locked: &mut Locked<'_, ReadOps>,
         _file: &FileObject,
         current_task: &CurrentTask,
         offset: usize,
@@ -843,7 +841,7 @@ impl FileOps for ProxyFileOps {
     }
     fn write(
         &self,
-        locked: &mut Locked<'_, FileOpsWrite>,
+        locked: &mut Locked<'_, WriteOps>,
         _file: &FileObject,
         current_task: &CurrentTask,
         offset: usize,
@@ -1097,10 +1095,10 @@ impl FileObject {
         data: &mut dyn OutputBuffer,
     ) -> Result<usize, Errno>
     where
-        L: LockBefore<FileOpsRead>,
+        L: LockEqualOrBefore<ReadOps>,
     {
         self.read_internal(|| {
-            let mut locked = locked.cast_locked::<FileOpsRead>();
+            let mut locked = locked.cast_locked::<ReadOps>();
             if !self.ops().has_persistent_offsets() {
                 return self.ops.read(&mut locked, self, current_task, 0, data);
             }
@@ -1120,7 +1118,7 @@ impl FileObject {
         data: &mut dyn OutputBuffer,
     ) -> Result<usize, Errno>
     where
-        L: LockEqualOrBefore<FileOpsRead>,
+        L: LockEqualOrBefore<ReadOps>,
     {
         if !self.ops().is_seekable() {
             return error!(ESPIPE);
@@ -1138,12 +1136,12 @@ impl FileObject {
         data: &mut dyn OutputBuffer,
     ) -> Result<usize, Errno>
     where
-        L: LockEqualOrBefore<FileOpsRead>,
+        L: LockEqualOrBefore<ReadOps>,
     {
         if offset >= MAX_LFS_FILESIZE {
             return error!(EINVAL);
         }
-        let mut locked = locked.cast_locked::<FileOpsRead>();
+        let mut locked = locked.cast_locked::<ReadOps>();
         self.read_internal(|| self.ops.read(&mut locked, self, current_task, offset, data))
     }
 
@@ -1156,7 +1154,7 @@ impl FileObject {
         data: &mut dyn InputBuffer,
     ) -> Result<usize, Errno>
     where
-        L: LockEqualOrBefore<FileOpsWrite>,
+        L: LockEqualOrBefore<WriteOps>,
     {
         // We need to cap the size of `data` to prevent us from growing the file too large,
         // according to <https://man7.org/linux/man-pages/man2/write.2.html>:
@@ -1167,7 +1165,7 @@ impl FileObject {
         //
         // However, at the moment, we just check the `offset`.
         check_offset(current_task, offset)?;
-        let mut locked = locked.cast_locked::<FileOpsWrite>();
+        let mut locked = locked.cast_locked::<WriteOps>();
         self.ops().write(&mut locked, self, current_task, offset, data)
     }
 
@@ -1179,7 +1177,7 @@ impl FileObject {
         write: W,
     ) -> Result<usize, Errno>
     where
-        L: LockEqualOrBefore<FileOpsWrite>,
+        L: LockEqualOrBefore<WriteOps>,
         W: FnOnce(&mut Locked<'_, L>) -> Result<usize, Errno>,
     {
         if !self.can_write() {
@@ -1203,7 +1201,7 @@ impl FileObject {
         data: &mut dyn InputBuffer,
     ) -> Result<usize, Errno>
     where
-        L: LockEqualOrBefore<FileOpsWrite>,
+        L: LockEqualOrBefore<WriteOps>,
     {
         self.write_fn(locked, current_task, |locked| {
             if !self.ops().has_persistent_offsets() {
@@ -1232,7 +1230,7 @@ impl FileObject {
         data: &mut dyn InputBuffer,
     ) -> Result<usize, Errno>
     where
-        L: LockEqualOrBefore<FileOpsWrite>,
+        L: LockEqualOrBefore<WriteOps>,
     {
         if !self.ops().is_seekable() {
             return error!(ESPIPE);
@@ -1250,7 +1248,7 @@ impl FileObject {
         data: &mut dyn InputBuffer,
     ) -> Result<usize, Errno>
     where
-        L: LockEqualOrBefore<FileOpsWrite>,
+        L: LockEqualOrBefore<WriteOps>,
     {
         self.write_fn(locked, current_task, |locked| {
             let _guard = self.node().append_lock.read(current_task)?;

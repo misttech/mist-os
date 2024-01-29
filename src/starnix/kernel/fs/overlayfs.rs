@@ -17,8 +17,7 @@ use once_cell::sync::OnceCell;
 use rand::Rng;
 use starnix_logging::{log_error, log_warn, track_stub};
 use starnix_sync::{
-    FileOpsRead, FileOpsWrite, LockBefore, Locked, RwLock, RwLockReadGuard, RwLockWriteGuard,
-    Unlocked,
+    LockBefore, Locked, ReadOps, RwLock, RwLockReadGuard, RwLockWriteGuard, Unlocked, WriteOps,
 };
 use starnix_uapi::{
     auth::FsCred,
@@ -262,8 +261,8 @@ impl OverlayNode {
         current_task: &CurrentTask,
     ) -> Result<&ActiveEntry, Errno>
     where
-        L: LockBefore<FileOpsRead>,
-        L: LockBefore<FileOpsWrite>,
+        L: LockBefore<ReadOps>,
+        L: LockBefore<WriteOps>,
     {
         self.ensure_upper_maybe_copy(locked, current_task, UpperCopyMode::CopyAll)
     }
@@ -276,8 +275,8 @@ impl OverlayNode {
         copy_mode: UpperCopyMode,
     ) -> Result<&ActiveEntry, Errno>
     where
-        L: LockBefore<FileOpsRead>,
-        L: LockBefore<FileOpsWrite>,
+        L: LockBefore<ReadOps>,
+        L: LockBefore<WriteOps>,
     {
         self.upper.get_or_try_init(|| {
             let lower = self.lower.as_ref().expect("lower is expected when upper is missing");
@@ -360,8 +359,8 @@ impl OverlayNode {
     ) -> Result<ActiveEntry, Errno>
     where
         F: Fn(&ActiveEntry, &FsStr) -> Result<ActiveEntry, Errno>,
-        L: LockBefore<FileOpsRead>,
-        L: LockBefore<FileOpsWrite>,
+        L: LockBefore<ReadOps>,
+        L: LockBefore<WriteOps>,
     {
         let upper = self.ensure_upper(locked, current_task)?;
 
@@ -791,7 +790,7 @@ impl FileOps for OverlayFile {
 
     fn read(
         &self,
-        locked: &mut Locked<'_, FileOpsRead>,
+        locked: &mut Locked<'_, ReadOps>,
         _file: &FileObject,
         current_task: &CurrentTask,
         offset: usize,
@@ -821,7 +820,7 @@ impl FileOps for OverlayFile {
 
     fn write(
         &self,
-        locked: &mut Locked<'_, FileOpsWrite>,
+        locked: &mut Locked<'_, WriteOps>,
         _file: &FileObject,
         current_task: &CurrentTask,
         offset: usize,
@@ -1053,8 +1052,8 @@ fn copy_file_content<L>(
     to: &ActiveEntry,
 ) -> Result<(), Errno>
 where
-    L: LockBefore<FileOpsWrite>,
-    L: LockBefore<FileOpsRead>,
+    L: LockBefore<WriteOps>,
+    L: LockBefore<ReadOps>,
 {
     let from_file = from.entry().open_anonymous(current_task, OpenFlags::RDONLY)?;
     let to_file = to.entry().open_anonymous(current_task, OpenFlags::WRONLY)?;

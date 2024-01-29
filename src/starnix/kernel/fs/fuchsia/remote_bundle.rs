@@ -22,7 +22,7 @@ use fuchsia_zircon::{
     HandleBased, {self as zx},
 };
 use starnix_logging::{impossible_error, log_warn};
-use starnix_sync::{FileOpsRead, FileOpsWrite, Locked, RwLock, RwLockReadGuard, RwLockWriteGuard};
+use starnix_sync::{Locked, ReadOps, RwLock, RwLockReadGuard, RwLockWriteGuard, WriteOps};
 use starnix_uapi::{
     auth::FsCred,
     errno, error,
@@ -270,7 +270,7 @@ impl FileOps for VmoFile {
 
     fn read(
         &self,
-        _locked: &mut Locked<'_, FileOpsRead>,
+        _locked: &mut Locked<'_, ReadOps>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         mut offset: usize,
@@ -291,7 +291,7 @@ impl FileOps for VmoFile {
 
     fn write(
         &self,
-        _locked: &mut Locked<'_, FileOpsWrite>,
+        _locked: &mut Locked<'_, WriteOps>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         _offset: usize,

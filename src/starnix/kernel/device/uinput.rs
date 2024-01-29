@@ -18,7 +18,7 @@ use fidl_fuchsia_ui_test_input::{
 };
 use fuchsia_zircon as zx;
 use starnix_logging::{log_warn, track_stub};
-use starnix_sync::{FileOpsIoctl, FileOpsRead, FileOpsWrite, Locked, Mutex};
+use starnix_sync::{FileOpsIoctl, Locked, Mutex, ReadOps, WriteOps};
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
 use starnix_uapi::{
     device_type, error,
@@ -292,7 +292,7 @@ impl FileOps for Arc<UinputDevice> {
 
     fn write(
         &self,
-        _locked: &mut Locked<'_, FileOpsWrite>,
+        _locked: &mut Locked<'_, WriteOps>,
         _file: &vfs::FileObject,
         _current_task: &crate::task::CurrentTask,
         _offset: usize,
@@ -334,7 +334,7 @@ impl FileOps for Arc<UinputDevice> {
 
     fn read(
         &self,
-        _locked: &mut Locked<'_, FileOpsRead>,
+        _locked: &mut Locked<'_, ReadOps>,
         _file: &vfs::FileObject,
         _current_task: &crate::task::CurrentTask,
         _offset: usize,
@@ -822,7 +822,7 @@ mod test {
             ..Default::default()
         };
 
-        let mut locked_write = locked.cast_locked::<FileOpsWrite>();
+        let mut locked_write = locked.cast_locked::<WriteOps>();
 
         let mut res = dev.write(&mut locked_write, &file_object, &current_task, 0, &mut press_a_ev);
         assert_eq!(res, Ok(24));

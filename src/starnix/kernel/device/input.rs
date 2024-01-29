@@ -17,7 +17,7 @@ use crate::{
     },
 };
 use starnix_logging::{log_info, log_warn, track_stub};
-use starnix_sync::{FileOpsIoctl, FileOpsRead, FileOpsWrite, Locked};
+use starnix_sync::{FileOpsIoctl, Locked, ReadOps, WriteOps};
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
 use starnix_uapi::{
     device_type::{DeviceType, INPUT_MAJOR},
@@ -573,7 +573,7 @@ impl FileOps for Arc<InputFile> {
 
     fn read(
         &self,
-        _locked: &mut Locked<'_, FileOpsRead>,
+        _locked: &mut Locked<'_, ReadOps>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         offset: usize,
@@ -601,7 +601,7 @@ impl FileOps for Arc<InputFile> {
 
     fn write(
         &self,
-        _locked: &mut Locked<'_, FileOpsWrite>,
+        _locked: &mut Locked<'_, WriteOps>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         offset: usize,
@@ -1017,10 +1017,10 @@ mod test {
         current_task: &CurrentTask,
     ) -> Vec<uapi::input_event>
     where
-        L: LockBefore<FileOpsRead>,
+        L: LockBefore<ReadOps>,
     {
         std::iter::from_fn(|| {
-            let mut locked = locked.cast_locked::<FileOpsRead>();
+            let mut locked = locked.cast_locked::<ReadOps>();
             let mut event_bytes = VecOutputBuffer::new(INPUT_EVENT_SIZE);
             match file.read(&mut locked, file_object, current_task, 0, &mut event_bytes) {
                 Ok(INPUT_EVENT_SIZE) => Some(

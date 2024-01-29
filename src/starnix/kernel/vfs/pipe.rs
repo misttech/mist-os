@@ -16,9 +16,7 @@ use crate::{
         MountInfo, SpecialNode,
     },
 };
-use starnix_sync::{
-    FileOpsIoctl, FileOpsRead, FileOpsWrite, LockBefore, Locked, Mutex, MutexGuard,
-};
+use starnix_sync::{FileOpsIoctl, LockBefore, Locked, Mutex, MutexGuard, ReadOps, WriteOps};
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
 use starnix_uapi::{
     auth::CAP_SYS_RESOURCE,
@@ -394,7 +392,7 @@ impl FileOps for PipeFileObject {
 
     fn read(
         &self,
-        _locked: &mut Locked<'_, FileOpsRead>,
+        _locked: &mut Locked<'_, ReadOps>,
         file: &FileObject,
         current_task: &CurrentTask,
         offset: usize,
@@ -413,7 +411,7 @@ impl FileOps for PipeFileObject {
 
     fn write(
         &self,
-        _locked: &mut Locked<'_, FileOpsWrite>,
+        _locked: &mut Locked<'_, WriteOps>,
         file: &FileObject,
         current_task: &CurrentTask,
         offset: usize,
@@ -761,7 +759,7 @@ impl PipeFileObject {
         non_blocking: bool,
     ) -> Result<usize, Errno>
     where
-        L: LockBefore<FileOpsRead>,
+        L: LockBefore<ReadOps>,
     {
         // If both ends are pipes, use `lock_pipes` and `Pipe::splice`.
         assert!(from.downcast_file::<PipeFileObject>().is_none());
@@ -787,7 +785,7 @@ impl PipeFileObject {
         non_blocking: bool,
     ) -> Result<usize, Errno>
     where
-        L: LockBefore<FileOpsWrite>,
+        L: LockBefore<WriteOps>,
     {
         // If both ends are pipes, use `lock_pipes` and `Pipe::splice`.
         assert!(to.downcast_file::<PipeFileObject>().is_none());

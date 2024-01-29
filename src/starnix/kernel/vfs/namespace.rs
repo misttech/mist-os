@@ -28,7 +28,7 @@ use fidl_fuchsia_io as fio;
 use macro_rules_attribute::apply;
 use ref_cast::RefCast;
 use starnix_logging::log_warn;
-use starnix_sync::{FileOpsWrite, Locked, Mutex, RwLock};
+use starnix_sync::{Locked, Mutex, RwLock, WriteOps};
 use starnix_uapi::{
     arc_key::{ArcKey, PtrKey, WeakKey},
     device_type::DeviceType,
@@ -781,7 +781,7 @@ impl FileOps for ProcMountsFile {
 
     fn write(
         &self,
-        _locked: &mut Locked<'_, FileOpsWrite>,
+        _locked: &mut Locked<'_, WriteOps>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         _offset: usize,

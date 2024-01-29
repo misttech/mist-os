@@ -14,9 +14,7 @@ use crate::{
     },
 };
 use starnix_logging::track_stub;
-use starnix_sync::{
-    ordered_lock, FileOpsRead, FileOpsWrite, LockBefore, Locked, MutexGuard, Unlocked,
-};
+use starnix_sync::{ordered_lock, LockBefore, Locked, MutexGuard, ReadOps, Unlocked, WriteOps};
 use starnix_uapi::{
     errno, error,
     errors::Errno,
@@ -36,8 +34,8 @@ pub fn sendfile<L>(
     count: i32,
 ) -> Result<usize, Errno>
 where
-    L: LockBefore<FileOpsRead>,
-    L: LockBefore<FileOpsWrite>,
+    L: LockBefore<ReadOps>,
+    L: LockBefore<WriteOps>,
 {
     let out_file = current_task.files.get(out_fd)?;
     let in_file = current_task.files.get(in_fd)?;
@@ -201,8 +199,8 @@ pub fn splice<L>(
     flags: u32,
 ) -> Result<usize, Errno>
 where
-    L: LockBefore<FileOpsRead>,
-    L: LockBefore<FileOpsWrite>,
+    L: LockBefore<ReadOps>,
+    L: LockBefore<WriteOps>,
 {
     const KNOWN_FLAGS: u32 =
         uapi::SPLICE_F_MOVE | uapi::SPLICE_F_NONBLOCK | uapi::SPLICE_F_MORE | uapi::SPLICE_F_GIFT;
