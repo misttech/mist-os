@@ -1,0 +1,8 @@
+Name: PyPNG
+License: MIT
+License File: LICENSE
+Upstream Git: https://fuchsia.googlesource.com/third_party/gitlab.com/drj11/pypng
+URL: https://gitlab.com/drj11/pypng/
+Description:
+
+PNG module for Python. PyPNG is written entirely in Python.

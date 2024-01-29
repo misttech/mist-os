@@ -165,6 +165,8 @@ tables_generator_tests_*.txt
 /third_party/chre/src
 !/third_party/Vulkan-Utility-Libraries
 /third_party/Vulkan-Utility-Libraries/src
+!/third_party/pypng
+/third_party/pypng/src
 
 /tmp/
 /vendor/
