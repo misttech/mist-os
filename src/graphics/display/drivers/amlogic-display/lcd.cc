@@ -200,37 +200,28 @@ zx::result<> Lcd::PerformDisplayInitCommandSequence(cpp20::span<const uint8_t> e
       case kMipiDsiDtDcsShortWrite0:
       case kMipiDsiDtDcsShortWrite1:
       case kMipiDsiDtDcsLongWrite:
+      case kMipiDsiDtDcsRead0:
         is_dcs = true;
         [[fallthrough]];
-      case kMipiDsiDtGenShortWrite0:
-      case kMipiDsiDtGenShortWrite1:
-      case kMipiDsiDtGenShortWrite2:
-      case kMipiDsiDtGenLongWrite:
-        zxlogf(TRACE, "DSI command type: 0x%02x payload size: %d", cmd_type, payload_size);
+      default:
+        zxlogf(TRACE, "dsi_cmd op=0x%x size=%d is_dcs=%s", cmd_type, payload_size,
+               is_dcs ? "yes" : "no");
+        ZX_DEBUG_ASSERT(cmd_type != 0x37);
         // Create the command using mipi-dsi library
         mipi_dsi_cmd_t cmd;
         status = mipi_dsi::MipiDsi::CreateCommand(&encoded_commands[i + 2], payload_size, NULL, 0,
                                                   is_dcs, &cmd);
-        ZX_ASSERT_MSG(status == ZX_OK, "Failed to create the MIPI-DSI command for command type %d",
-                      cmd_type);
-
-        status = dsiimpl_.SendCmd(&cmd, 1);
-        if (status != ZX_OK) {
-          zxlogf(ERROR, "Failed to send command to the MIPI-DSI peripheral: %s",
+        if (status == ZX_OK) {
+          if ((status = dsiimpl_.SendCmd(&cmd, 1)) != ZX_OK) {
+            zxlogf(ERROR, "Error loading LCD init table. Aborting: %s",
+                   zx_status_get_string(status));
+            return zx::error(status);
+          }
+        } else {
+          zxlogf(ERROR, "Invalid command at byte 0x%lx (%s). Skipping", i,
                  zx_status_get_string(status));
-          return zx::error(status);
         }
         break;
-      case kMipiDsiDtDcsRead0:
-      case kMipiDsiDtGenShortRead0:
-      case kMipiDsiDtGenShortRead1:
-      case kMipiDsiDtGenShortRead2:
-        // TODO(https://fxbug.dev/322438328): Support MIPI-DSI read commands.
-        zxlogf(ERROR, "MIPI-DSI read command 0x%02x is not supported", cmd_type);
-        return zx::error(ZX_ERR_NOT_SUPPORTED);
-      default:
-        zxlogf(ERROR, "MIPI-DSI / panel initialization command 0x%02x is not supported", cmd_type);
-        return zx::error(ZX_ERR_NOT_SUPPORTED);
     }
     // increment by payload length
     i += payload_size + kMinCmdSize;
