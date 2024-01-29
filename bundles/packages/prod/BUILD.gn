@@ -14,7 +14,6 @@ group("all") {
   public_deps = [
     ":bluetooth_a2dp",
     ":bluetooth_all",
-    ":bluetooth_atheros",
     ":bluetooth_avrcp",
     ":bluetooth_core",
     ":bluetooth_hci",
@@ -50,19 +49,10 @@ group("bluetooth_a2dp") {
 group("bluetooth_all") {
   testonly = true
   public_deps = [
-    ":bluetooth_atheros",
     ":bluetooth_core",
     ":bluetooth_hci",
     ":bluetooth_intel",
     ":bluetooth_profiles",
-  ]
-}
-
-group("bluetooth_atheros") {
-  testonly = true
-  public_deps = [
-    ":bluetooth_hci",
-    "//src/connectivity/bluetooth/hci/vendor/atheros",
   ]
 }
 

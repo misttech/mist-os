@@ -28,10 +28,8 @@ group("drivers") {
     "hci/passthrough:driver",
     "hci/transport/uart:bt-transport-uart",
     "hci/transport/usb:bt-transport-usb",
-    "hci/vendor/atheros:driver",
     "hci/vendor/broadcom:bt-hci-broadcom",
     "hci/vendor/intel:driver",
-    "hci/vendor/marvell:bt-hci-marvell",
     "hci/virtual:driver",
   ]
 }
