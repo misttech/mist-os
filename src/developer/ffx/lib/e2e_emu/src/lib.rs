@@ -200,7 +200,11 @@ impl IsolatedEmulator {
         if !output.stderr.is_empty() {
             info!("stderr:\n{}", output.stderr);
         }
-        ensure!(output.status.success(), "ffx must complete successfully");
+        ensure!(
+            output.status.success(),
+            "ffx must complete successfully. stdout: {}",
+            output.stdout
+        );
         Ok(output.stdout)
     }
 
