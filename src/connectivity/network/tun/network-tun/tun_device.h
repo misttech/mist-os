@@ -7,7 +7,9 @@
 
 #include <fidl/fuchsia.net.tun/cpp/wire.h>
 #include <lib/async-loop/cpp/loop.h>
+#include <lib/fdf/cpp/dispatcher.h>
 
+#include <optional>
 #include <queue>
 
 #include <fbl/intrusive_double_list.h>
@@ -38,7 +40,8 @@ class TunDevice : public fbl::DoublyLinkedListable<std::unique_ptr<TunDevice>>,
   // Creates a new `TunDevice` with `config`.
   // `teardown` is called when all the bound client channels are closed.
   static zx::result<std::unique_ptr<TunDevice>> Create(
-      fit::callback<void(TunDevice*)> teardown, const fuchsia_net_tun::wire::DeviceConfig& config);
+      const DeviceInterfaceDispatchers& dispatchers, const ShimDispatchers& shim_dispatchers,
+      fit::callback<void(TunDevice*)> teardown, DeviceConfig&& config);
   ~TunDevice() override;
 
   // fuchsia.net.tun.Device implementation:
@@ -104,9 +107,11 @@ class TunDevice : public fbl::DoublyLinkedListable<std::unique_ptr<TunDevice>>,
     std::optional<WatchStateCompleter::Async> pending_watch_state_;
     std::optional<InternalState> last_state_;
     std::optional<fidl::ServerBindingRef<fuchsia_net_tun::Port>> binding_;
+    std::optional<libsync::Completion> port_destroyed_;
   };
 
-  TunDevice(fit::callback<void(TunDevice*)> teardown, DeviceConfig config);
+  TunDevice(fdf::Dispatcher* dispatcher, fit::callback<void(TunDevice*)> teardown,
+            DeviceConfig&& config);
   // Completes a single WriteFrame request. Returns true iff a reply was sent on the callback.
   template <typename F, typename C>
   bool WriteWith(F fn, C& callback);
@@ -124,6 +129,7 @@ class TunDevice : public fbl::DoublyLinkedListable<std::unique_ptr<TunDevice>>,
 
   async::Loop loop_;
   std::optional<thrd_t> loop_thread_;
+  fdf::Dispatcher* dispatcher_;
   std::optional<fidl::ServerBindingRef<fuchsia_net_tun::Device>> binding_;
   std::unique_ptr<DeviceAdapter> device_;
 

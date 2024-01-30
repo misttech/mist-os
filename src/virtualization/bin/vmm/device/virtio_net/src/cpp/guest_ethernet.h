@@ -12,8 +12,6 @@
 
 #include <fuchsia/hardware/network/driver/cpp/banjo.h>
 #include <fuchsia/net/cpp/fidl.h>
-#include <lib/async-loop/cpp/loop.h>
-#include <lib/async-loop/default.h>
 #include <lib/fit/function.h>
 #include <lib/sys/cpp/service_directory.h>
 #include <lib/trace-provider/provider.h>
@@ -28,17 +26,10 @@ class GuestEthernet : public ddk::NetworkDeviceImplProtocol<GuestEthernet>,
                       ddk::MacAddrProtocol<GuestEthernet>,
                       ddk::NetworkPortProtocol<GuestEthernet> {
  public:
-  GuestEthernet()
-      : mac_addr_proto_({&mac_addr_protocol_ops_, this}),
-        loop_(&kAsyncLoopConfigAttachToCurrentThread),
-        trace_provider_(loop_.dispatcher()),
-        svc_(sys::ServiceDirectory::CreateFromNamespace()),
-        tx_completion_queue_(kPortId, loop_.dispatcher(), &parent_),
-        rx_completion_queue_(loop_.dispatcher(), &parent_) {}
+  GuestEthernet(fdf::Dispatcher* sync_dispatcher,
+                const network::DeviceInterfaceDispatchers& netdev_dispatchers,
+                const network::ShimDispatchers& shim_dispatchers);
   ~GuestEthernet();
-
-  // Starts the dispatch loop on a new thread.
-  zx_status_t StartDispatchLoop();
 
   // Initializes this guest ethernet object by parsing the Rust provided MAC address, preparing
   // callbacks, and registering it the netstack. This will be invoked by the Rust thread, and
@@ -143,7 +134,9 @@ class GuestEthernet : public ddk::NetworkDeviceImplProtocol<GuestEthernet>,
   };
   std::vector<AvailableBuffer> available_buffers_ __TA_GUARDED(mutex_);
 
-  async::Loop loop_;
+  const fdf::Dispatcher* sync_dispatcher_;
+  const network::DeviceInterfaceDispatchers netdev_dispatchers_;
+  const network::ShimDispatchers shim_dispatchers_;
   trace::TraceProviderWithFdio trace_provider_;
   std::shared_ptr<sys::ServiceDirectory> svc_;
 

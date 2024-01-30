@@ -8,8 +8,8 @@
 #include <gtest/gtest.h>
 
 #include "device/test_session.h"
-#include "device/test_util.h"
-#include "mac/test_util.h"
+#include "device/test_util_banjo.h"
+#include "mac/test_util_banjo.h"
 #include "src/devices/testing/mock-ddk/mock-device.h"
 #include "src/lib/testing/predicates/status.h"
 
@@ -48,8 +48,7 @@ class NetDeviceDriverTest : public ::testing::Test {
     }
     port_impl_.SetStatus(
         {.flags = static_cast<uint32_t>(netdev::wire::StatusFlags::kOnline), .mtu = 2048});
-    if (zx_status_t status = NetworkDevice::Create(nullptr, parent_.get(), loop_.dispatcher());
-        status != ZX_OK) {
+    if (zx_status_t status = NetworkDevice::Create(nullptr, parent_.get()); status != ZX_OK) {
       return status;
     }
     if (zx_status_t status = port_impl_.AddPort(kPortId, device_impl_.client()); status != ZX_OK) {
@@ -85,8 +84,8 @@ class NetDeviceDriverTest : public ::testing::Test {
     return zx::ok(fidl::WireSyncClient(std::move(client_end)));
   }
 
-  const FakeNetworkDeviceImpl& device_impl() const { return device_impl_; }
-  FakeNetworkPortImpl& port_impl() { return port_impl_; }
+  const banjo::FakeNetworkDeviceImpl& device_impl() const { return device_impl_; }
+  banjo::FakeNetworkPortImpl& port_impl() { return port_impl_; }
 
   zx::result<netdev::wire::PortId> GetSaltedPortId(uint8_t base_id) {
     // List all existing ports from the device until we find the right port id.
@@ -131,7 +130,7 @@ class NetDeviceDriverTest : public ::testing::Test {
     }
   }
 
-  zx_status_t AttachSessionPort(TestSession& session, FakeNetworkPortImpl& impl) {
+  zx_status_t AttachSessionPort(TestSession& session, banjo::FakeNetworkPortImpl& impl) {
     std::vector<netdev::wire::FrameType> rx_types;
     for (uint8_t frame_type :
          cpp20::span(impl.port_info().rx_types_list, impl.port_info().rx_types_count)) {
@@ -148,9 +147,9 @@ class NetDeviceDriverTest : public ::testing::Test {
   const std::shared_ptr<MockDevice> parent_ = MockDevice::FakeRootParent();
   async::Loop loop_;
 
-  FakeMacDeviceImpl mac_impl_;
-  FakeNetworkDeviceImpl device_impl_;
-  FakeNetworkPortImpl port_impl_;
+  banjo::FakeMacDeviceImpl mac_impl_;
+  banjo::FakeNetworkDeviceImpl device_impl_;
+  banjo::FakeNetworkPortImpl port_impl_;
 };
 
 TEST_F(NetDeviceDriverTest, TestCreateSimple) { ASSERT_OK(CreateDevice()); }

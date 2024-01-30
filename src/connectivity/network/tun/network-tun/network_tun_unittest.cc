@@ -3,10 +3,10 @@
 // found in the LICENSE file.
 
 #include <lib/async-loop/cpp/loop.h>
+#include <lib/driver/testing/cpp/driver_runtime.h>
 #include <lib/fidl/cpp/wire/channel.h>
 #include <lib/fzl/vmo-mapper.h>
 #include <lib/stdcompat/span.h>
-#include <lib/sync/completion.h>
 #include <lib/syslog/global.h>
 #include <lib/zx/time.h>
 #include <zircon/status.h>
@@ -476,11 +476,6 @@ class SimpleClient {
 
 class TunTest : public gtest::RealLoopFixture {
  protected:
-  TunTest()
-      : gtest::RealLoopFixture(),
-        tun_ctl_loop_(&kAsyncLoopConfigNoAttachToCurrentThread),
-        tun_ctl_(tun_ctl_loop_.dispatcher()) {}
-
   void SetUp() override {
     fx_logger_config_t log_cfg = {
         .min_severity = -2,
@@ -489,13 +484,16 @@ class TunTest : public gtest::RealLoopFixture {
     };
     fx_log_reconfigure(&log_cfg);
     ASSERT_OK(tun_ctl_loop_.StartThread("tun-test"));
+    auto result = TunCtl::Create(tun_ctl_loop_.dispatcher());
+    ASSERT_OK(result.status_value());
+    tun_ctl_ = std::move(result.value());
   }
 
   void TearDown() override {
     // At the end of every test, all Device and DevicePair instances must be destroyed. We wait for
     // tun_ctl_ to observe all of them before destroying it and the async loop.
     sync_completion_t completion;
-    tun_ctl_.SetSafeShutdownCallback([&completion]() { sync_completion_signal(&completion); });
+    tun_ctl_->SetSafeShutdownCallback([&completion]() { sync_completion_signal(&completion); });
     ASSERT_OK(sync_completion_wait(&completion, kTimeout.get()));
     // Loop must be shutdown before TunCtl. Shutdown the loop here so it's explicit and not reliant
     // on the order of the fields in the class.
@@ -507,7 +505,7 @@ class TunTest : public gtest::RealLoopFixture {
     if (endpoints.is_error()) {
       return endpoints.take_error();
     }
-    tun_ctl_.Connect(std::move(endpoints->server));
+    tun_ctl_->Connect(std::move(endpoints->server));
     return zx::ok(fidl::WireSyncClient(std::move(endpoints->client)));
   }
 
@@ -637,10 +635,11 @@ class TunTest : public gtest::RealLoopFixture {
     return zx::ok(std::move(pair));
   }
 
-  DeviceAdapter& first_adapter() { return *tun_ctl_.devices().front().adapter(); }
+  DeviceAdapter& first_adapter() { return *tun_ctl_->devices().front().adapter(); }
 
-  async::Loop tun_ctl_loop_;
-  TunCtl tun_ctl_;
+  async::Loop tun_ctl_loop_{&kAsyncLoopConfigNoAttachToCurrentThread};
+  fdf_testing::DriverRuntime runtime_;
+  std::unique_ptr<TunCtl> tun_ctl_;
   fidl::Arena<> alloc_;
 };
 

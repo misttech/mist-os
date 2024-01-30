@@ -33,7 +33,8 @@ source_set("src") {
     "//sdk/fidl/fuchsia.hardware.network.driver:fuchsia.hardware.network.driver_banjo_cpp",
     "//sdk/fidl/fuchsia.net.tun:fuchsia.net.tun_cpp",
     "//sdk/lib/fit",
-    "//src/connectivity/network/drivers/network-device/device",
+    "//src/connectivity/network/drivers/network-device/device:banjo_shims",
+    "//src/connectivity/network/drivers/network-device/device:device",
     "//src/connectivity/network/drivers/network-device/mac",
     "//src/lib/vmo_store",
     "//zircon/system/ulib/async:async-cpp",
@@ -52,8 +53,15 @@ source_set("src") {
 
 executable("bin") {
   output_name = "network_tun"
-  sources = [ "main.cc" ]
-  deps = [ ":src" ]
+  sources = [
+    "main.cc",
+    "minimal_driver_runtime.cc",
+  ]
+  deps = [
+    ":src",
+    "//sdk/lib/driver/runtime:driver_runtime_env_cpp",
+    "//src/devices/lib/driver:driver_runtime",
+  ]
 }
 
 fuchsia_component("component") {
@@ -74,6 +82,7 @@ test("network_tun_unittest") {
 
   deps = [
     ":src",
+    "//sdk/lib/driver/testing/cpp:cpp",
     "//src/lib/fxl/test:gtest_main",
     "//src/lib/testing/loop_fixture",
     "//src/lib/testing/predicates",

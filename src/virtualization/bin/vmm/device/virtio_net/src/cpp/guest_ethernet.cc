@@ -7,6 +7,7 @@
 #include <lib/async/cpp/task.h>
 #include <lib/syslog/cpp/macros.h>
 
+#include "src/connectivity/network/drivers/network-device/device/network_device_shim.h"
 #include "src/virtualization/bin/vmm/device/virtio_net/src/cpp/guest_ethernet_interface.h"
 
 namespace {
@@ -52,24 +53,26 @@ bool IsTxBufferSupported(const tx_buffer& buffer) {
 }
 }  // namespace
 
-GuestEthernet::~GuestEthernet() {
-  Teardown();
-  loop_.JoinThreads();
-}
+GuestEthernet::GuestEthernet(fdf::Dispatcher* sync_dispatcher,
+                             const network::DeviceInterfaceDispatchers& netdev_dispatchers,
+                             const network::ShimDispatchers& shim_dispatchers)
+    : mac_addr_proto_({&mac_addr_protocol_ops_, this}),
+      sync_dispatcher_(sync_dispatcher),
+      netdev_dispatchers_(netdev_dispatchers),
+      shim_dispatchers_(shim_dispatchers),
+      trace_provider_(netdev_dispatchers.impl_->async_dispatcher()),
+      svc_(sys::ServiceDirectory::CreateFromNamespace()),
+      tx_completion_queue_(kPortId, netdev_dispatchers.impl_->async_dispatcher(), &parent_),
+      rx_completion_queue_(netdev_dispatchers.impl_->async_dispatcher(), &parent_) {}
 
-zx_status_t GuestEthernet::StartDispatchLoop() {
-  return loop_.StartThread("guest-ethernet-dispatcher");
-}
+GuestEthernet::~GuestEthernet() { Teardown(); }
 
 void GuestEthernet::Teardown() {
   netstack_.Unbind();
   network_.Unbind();
   interface_registration_.Unbind();
 
-  device_interface_->Teardown([this]() {
-    loop_.Quit();
-    loop_.RunUntilIdle();  // Flush remaining tasks.
-  });
+  device_interface_->Teardown([] {});
 }
 
 zx_status_t GuestEthernet::Initialize(const void* rust_guest_ethernet, const uint8_t* mac,
@@ -91,9 +94,10 @@ zx_status_t GuestEthernet::Initialize(const void* rust_guest_ethernet, const uin
   }
   std::memcpy(mac_address_, mac, VIRTIO_ETH_MAC_SIZE);
 
-  // Initialize is running on the Rust main thread, but CreateGuestInterface must be run on the
-  // C++ dispatcher thread. The Rust device will wait for this task to complete.
-  async::PostTask(loop_.dispatcher(), [this, enable_bridge]() {
+  // Initialize is running on the Rust main thread, but CreateGuestInterface must be run on a driver
+  // framework dispatcher. Additionally it must be a synchronous dispatcher that allows synchronous
+  // calls. The Rust device will wait for this task to complete.
+  async::PostTask(sync_dispatcher_->async_dispatcher(), [this, enable_bridge]() {
     this->set_status_(this->CreateGuestInterface(enable_bridge));
   });
 
@@ -107,15 +111,18 @@ zx_status_t GuestEthernet::CreateGuestInterface(bool enable_bridge) {
     this->set_status_(status);
   });
   zx_status_t status = svc_->Connect<::fuchsia::net::virtualization::Control>(
-      netstack_.NewRequest(loop_.dispatcher()));
+      netstack_.NewRequest(netdev_dispatchers_.impl_->async_dispatcher()));
   if (status != ZX_OK) {
     FX_PLOGS(WARNING, status) << "Failed to connect to netstack";
     return status;
   }
 
+  std::unique_ptr shim =
+      std::make_unique<network::NetworkDeviceShim>(GetNetworkDeviceImplClient(), shim_dispatchers_);
+
   // Set up the GuestEthernet device.
   zx::result<std::unique_ptr<network::NetworkDeviceInterface>> device_interface =
-      network::NetworkDeviceInterface::Create(loop_.dispatcher(), GetNetworkDeviceImplClient());
+      network::NetworkDeviceInterface::Create(netdev_dispatchers_, std::move(shim));
   if (device_interface.is_error()) {
     FX_PLOGS(WARNING, device_interface.error_value()) << "Failed to create guest interface";
     return device_interface.error_value();
@@ -140,7 +147,8 @@ zx_status_t GuestEthernet::CreateGuestInterface(bool enable_bridge) {
     FX_LOGS(ERROR) << "Only bridging is currently supported";
     return ZX_ERR_NOT_SUPPORTED;
   }
-  netstack_->CreateNetwork(std::move(config), network_.NewRequest());
+  netstack_->CreateNetwork(std::move(config),
+                           network_.NewRequest(sync_dispatcher_->async_dispatcher()));
 
   // Add our GuestEthernet device to the network.
   interface_registration_.set_error_handler([this](zx_status_t status) {
@@ -148,7 +156,7 @@ zx_status_t GuestEthernet::CreateGuestInterface(bool enable_bridge) {
     this->set_status_(status);
   });
   network_->AddPort(::fidl::InterfaceHandle<fuchsia::hardware::network::Port>(port.TakeChannel()),
-                    interface_registration_.NewRequest());
+                    interface_registration_.NewRequest(sync_dispatcher_->async_dispatcher()));
 
   return ZX_OK;
 }
@@ -228,7 +236,8 @@ zx::result<cpp20::span<uint8_t>> GuestEthernet::GetIoRegion(uint8_t vmo_id, uint
 
 void GuestEthernet::FinishShutdownIfRequired() {
   if (unlikely(state_ == State::kShuttingDown && in_flight_rx_ == 0)) {
-    async::PostTask(loop_.dispatcher(), std::move(shutdown_complete_callback_));
+    async::PostTask(netdev_dispatchers_.impl_->async_dispatcher(),
+                    std::move(shutdown_complete_callback_));
   }
 }
 
@@ -391,7 +400,7 @@ void GuestEthernet::NetworkDeviceImplPrepareVmo(uint8_t vmo_id, zx::vmo vmo,
   // Ensure another VMO hasn't already been mapped.
   if (io_vmo_.is_valid()) {
     FX_LOGS(INFO) << "Attempted to bind multiple VMOs";
-    async::PostTask(loop_.dispatcher(),
+    async::PostTask(netdev_dispatchers_.impl_->async_dispatcher(),
                     [callback, cookie]() { callback(cookie, ZX_ERR_NO_RESOURCES); });
     return;
   }
@@ -401,7 +410,8 @@ void GuestEthernet::NetworkDeviceImplPrepareVmo(uint8_t vmo_id, zx::vmo vmo,
   zx_status_t status = vmo.get_size(&vmo_size);
   if (status != ZX_OK) {
     FX_PLOGS(INFO, status) << "Failed to get VMO size";
-    async::PostTask(loop_.dispatcher(), [callback, cookie, status]() { callback(cookie, status); });
+    async::PostTask(netdev_dispatchers_.impl_->async_dispatcher(),
+                    [callback, cookie, status]() { callback(cookie, status); });
     return;
   }
 
@@ -412,7 +422,8 @@ void GuestEthernet::NetworkDeviceImplPrepareVmo(uint8_t vmo_id, zx::vmo vmo,
                                  0, vmo, 0, vmo_size, &mapped_address);
   if (status != ZX_OK) {
     FX_PLOGS(INFO, status) << "Failed to map IO buffer";
-    async::PostTask(loop_.dispatcher(), [callback, cookie, status]() { callback(cookie, status); });
+    async::PostTask(netdev_dispatchers_.impl_->async_dispatcher(),
+                    [callback, cookie, status]() { callback(cookie, status); });
     return;
   }
 
@@ -420,7 +431,8 @@ void GuestEthernet::NetworkDeviceImplPrepareVmo(uint8_t vmo_id, zx::vmo vmo,
   io_addr_ = reinterpret_cast<uint8_t*>(mapped_address);
   io_vmo_ = std::move(vmo);
   io_size_ = vmo_size;
-  async::PostTask(loop_.dispatcher(), [callback, cookie]() { callback(cookie, ZX_OK); });
+  async::PostTask(netdev_dispatchers_.impl_->async_dispatcher(),
+                  [callback, cookie]() { callback(cookie, ZX_OK); });
 }
 
 void GuestEthernet::NetworkDeviceImplReleaseVmo(uint8_t vmo_id) {

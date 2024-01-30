@@ -5,7 +5,7 @@
 #ifndef SRC_CONNECTIVITY_NETWORK_DRIVERS_NETWORK_DEVICE_DEVICE_DEVICE_INTERFACE_H_
 #define SRC_CONNECTIVITY_NETWORK_DRIVERS_NETWORK_DEVICE_DEVICE_DEVICE_INTERFACE_H_
 
-#include <fuchsia/hardware/network/driver/cpp/banjo.h>
+#include <fidl/fuchsia.hardware.network.driver/cpp/driver/fidl.h>
 #include <lib/async/dispatcher.h>
 #include <lib/fit/function.h>
 
@@ -20,6 +20,9 @@
 namespace network::testing {
 class NetworkDeviceTest;
 class FakeNetworkDeviceImpl;
+namespace banjo {
+class FakeNetworkDeviceImpl;
+}
 }  // namespace network::testing
 
 namespace network::internal {
@@ -49,7 +52,7 @@ struct SessionRxBuffer {
 //
 // Used to cache common calculation and reduce number of arguments in functions.
 struct RxFrameInfo {
-  const buffer_metadata_t& meta;
+  const fuchsia_hardware_network_driver::wire::BufferMetadata& meta;
   uint8_t port_id_salt;
   cpp20::span<const SessionRxBuffer> buffers;
   uint32_t total_length;
@@ -62,12 +65,12 @@ enum class PendingDeviceOperation { NONE, START, STOP };
 class DeviceInterface;
 
 class DeviceInterface : public fidl::WireServer<netdev::Device>,
-                        public ddk::NetworkDeviceIfcProtocol<DeviceInterface>,
+                        public fdf::WireServer<netdriver::NetworkDeviceIfc>,
                         public ::network::NetworkDeviceInterface {
  public:
   static zx::result<std::unique_ptr<DeviceInterface>> Create(
-      async_dispatcher_t* dispatcher, ddk::NetworkDeviceImplProtocolClient parent,
-      Sys* sys = nullptr);
+      const DeviceInterfaceDispatchers& dispatchers,
+      std::unique_ptr<NetworkDeviceImplBinder>&& binder);
   ~DeviceInterface() override;
 
   // Public NetworkDevice API.
@@ -75,14 +78,19 @@ class DeviceInterface : public fidl::WireServer<netdev::Device>,
   zx_status_t Bind(fidl::ServerEnd<netdev::Device> req) override;
   zx_status_t BindPort(uint8_t port_id, fidl::ServerEnd<netdev::Port> req) override;
 
-  // NetworkDevice interface implementation.
-  void NetworkDeviceIfcPortStatusChanged(uint8_t port_id, const port_status_t* new_status);
-  void NetworkDeviceIfcAddPort(uint8_t port_id, const network_port_protocol_t* port,
-                               network_device_ifc_add_port_callback callback, void* cookie);
-  void NetworkDeviceIfcRemovePort(uint8_t port_id);
-  void NetworkDeviceIfcCompleteRx(const rx_buffer_t* rx_list, size_t rx_count);
-  void NetworkDeviceIfcCompleteTx(const tx_result_t* tx_list, size_t tx_count);
-  void NetworkDeviceIfcSnoop(const rx_buffer_t* rx_list, size_t rx_count);
+  // NetworkDeviceIfc implementation.
+  void PortStatusChanged(netdriver::wire::NetworkDeviceIfcPortStatusChangedRequest* request,
+                         fdf::Arena& arena, PortStatusChangedCompleter::Sync& completer) override;
+  void AddPort(netdriver::wire::NetworkDeviceIfcAddPortRequest* request, fdf::Arena& arena,
+               AddPortCompleter::Sync& completer) override;
+  void RemovePort(netdriver::wire::NetworkDeviceIfcRemovePortRequest* request, fdf::Arena& arena,
+                  RemovePortCompleter::Sync& completer) override;
+  void CompleteRx(netdriver::wire::NetworkDeviceIfcCompleteRxRequest* request, fdf::Arena& arena,
+                  CompleteRxCompleter::Sync& completer) override;
+  void CompleteTx(netdriver::wire::NetworkDeviceIfcCompleteTxRequest* request, fdf::Arena& arena,
+                  CompleteTxCompleter::Sync& completer) override;
+  void Snoop(netdriver::wire::NetworkDeviceIfcSnoopRequest* request, fdf::Arena& arena,
+             SnoopCompleter::Sync& completer) override;
 
   uint16_t rx_fifo_depth() const;
   uint16_t tx_fifo_depth() const;
@@ -90,14 +98,14 @@ class DeviceInterface : public fidl::WireServer<netdev::Device>,
   // Returns the device-owned buffer count threshold at which we should trigger RxQueue work. If the
   // number of buffers on device is less than or equal to the threshold, we should attempt to fetch
   // more buffers.
-  uint16_t rx_notify_threshold() const { return device_info_.rx_threshold; }
+  uint16_t rx_notify_threshold() const { return device_info_.rx_threshold().value_or(0); }
 
   TxQueue& tx_queue() { return *tx_queue_; }
 
   SharedLock& control_lock() __TA_RETURN_CAPABILITY(control_lock_) { return control_lock_; }
   fbl::Mutex& rx_lock() __TA_RETURN_CAPABILITY(rx_lock_) { return rx_lock_; }
   fbl::Mutex& tx_lock() __TA_RETURN_CAPABILITY(tx_lock_) { return tx_lock_; }
-  const device_impl_info_t& info() { return device_info_; }
+  const netdriver::DeviceImplInfo& info() { return device_info_; }
 
   // Loads rx path descriptors from the primary session into a session transaction.
   zx_status_t LoadRxDescriptors(RxSessionTransaction& transact) __TA_REQUIRES_SHARED(control_lock_);
@@ -131,10 +139,10 @@ class DeviceInterface : public fidl::WireServer<netdev::Device>,
   // Checks if dead sessions are ready to be destroyed due to buffers returning.
   void NotifyTxReturned(bool was_full);
   // Sends the provided space buffers in `rx` to the device implementation.
-  void QueueRxSpace(const rx_space_buffer_t* rx, size_t count)
+  void QueueRxSpace(cpp20::span<netdriver::wire::RxSpaceBuffer> rx)
       __TA_EXCLUDES(control_lock_, rx_lock_, tx_lock_);
   // Sends the provided transmit buffers in `tx` to the device implementation.
-  void QueueTx(const tx_buffer_t* tx, size_t count)
+  void QueueTx(cpp20::span<netdriver::wire::TxBuffer> tx)
       __TA_EXCLUDES(control_lock_, rx_lock_, tx_lock_);
   bool IsDataPlaneOpen() __TA_REQUIRES_SHARED(control_lock_);
 
@@ -182,11 +190,18 @@ class DeviceInterface : public fidl::WireServer<netdev::Device>,
     }
   }
 
+  void NotifyTxComplete() {
+    if (evt_tx_complete_) {
+      evt_tx_complete_();
+    }
+  }
+
   DiagnosticsService& diagnostics() { return diagnostics_; }
 
  private:
   friend testing::NetworkDeviceTest;
   friend testing::FakeNetworkDeviceImpl;
+  friend testing::banjo::FakeNetworkDeviceImpl;
 
   // Helper class to keep track of clients bound to DeviceInterface.
   class Binding : public fbl::DoublyLinkedListable<std::unique_ptr<Binding>> {
@@ -201,11 +216,20 @@ class DeviceInterface : public fidl::WireServer<netdev::Device>,
   };
   using BindingList = fbl::SizedDoublyLinkedList<std::unique_ptr<Binding>>;
 
-  enum class TeardownState { RUNNING, BINDINGS, PORT_WATCHERS, PORTS, SESSIONS, FINISHED };
+  enum class TeardownState {
+    RUNNING,
+    BINDINGS,
+    PORT_WATCHERS,
+    PORTS,
+    SESSIONS,
+    DEVICE_IMPL,
+    IFC_BINDING,
+    BINDER,
+    FINISHED
+  };
 
-  explicit DeviceInterface(async_dispatcher_t* dispatcher,
-                           ddk::NetworkDeviceImplProtocolClient parent);
-  zx_status_t Init();
+  zx_status_t Init(std::unique_ptr<NetworkDeviceImplBinder>&& binder);
+  explicit DeviceInterface(const DeviceInterfaceDispatchers& dispatchers);
 
   // Starts the data path with the device implementation.
   void StartDevice() __TA_EXCLUDES(control_lock_, tx_lock_, rx_lock_);
@@ -239,7 +263,8 @@ class DeviceInterface : public fidl::WireServer<netdev::Device>,
   // Notifies the device implementation that the VMO used by the provided session will no longer be
   // used. It is called right before sessions are destroyed.
   // ReleaseVMO acquires the vmos_lock_ internally, so we mark it as excluding the vmos_lock_.
-  void ReleaseVmo(Session& session) __TA_REQUIRES(control_lock_);
+  void ReleaseVmo(Session& session, fit::callback<void()>&& on_complete)
+      __TA_REQUIRES(control_lock_);
 
   // Continues a teardown process, if one is running.
   //
@@ -274,12 +299,15 @@ class DeviceInterface : public fidl::WireServer<netdev::Device>,
   // Notifies all sessions that the transmit queue has available spots to take in transmit frames.
   void NotifyTxQueueAvailable() __TA_REQUIRES_SHARED(control_lock_);
 
-  // Immutable information BEFORE initialization:
-  device_impl_info_t device_info_{};
-  // dispatcher used for slow-path operations:
-  async_dispatcher_t* const dispatcher_;
+  zx_status_t CanCreatePortWithId(uint8_t port_id) __TA_REQUIRES(control_lock_);
+
+  netdriver::DeviceImplInfo device_info_;
   DiagnosticsService diagnostics_;
-  const ddk::NetworkDeviceImplProtocolClient device_;
+  const DeviceInterfaceDispatchers dispatchers_;
+  // Only used to keep a network device shim alive during the device's lifetime.
+  std::unique_ptr<NetworkDeviceImplBinder> binder_;
+  std::optional<fdf::ServerBindingRef<netdriver::NetworkDeviceIfc>> ifc_binding_;
+  fdf::WireSharedClient<netdriver::NetworkDeviceImpl> device_impl_;
   std::array<netdev::wire::RxAcceleration, netdev::wire::kMaxAccelFlags> accel_rx_;
   std::array<netdev::wire::TxAcceleration, netdev::wire::kMaxAccelFlags> accel_tx_;
 
@@ -318,7 +346,9 @@ class DeviceInterface : public fidl::WireServer<netdev::Device>,
 
   // Event hooks used in tests:
   fit::function<void(const char*)> evt_session_started_;
+  fit::function<void(const char*)> evt_session_died_;
   fit::function<void(uint64_t)> evt_rx_queue_packet_;
+  fit::function<void()> evt_tx_complete_;
 };
 
 }  // namespace network::internal

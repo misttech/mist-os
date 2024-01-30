@@ -15,7 +15,10 @@ use {
     futures::{StreamExt, TryFutureExt, TryStreamExt},
 };
 
-async fn run_virtio_net(mut virtio_net_fidl: VirtioNetRequestStream) -> Result<(), Error> {
+async fn run_virtio_net(
+    context: &guest_ethernet::GuestEthernetContext,
+    mut virtio_net_fidl: VirtioNetRequestStream,
+) -> Result<(), Error> {
     // Receive start info as first message.
     let (start_info, mac_address, enable_bridge, responder) = virtio_net_fidl
         .try_next()
@@ -31,7 +34,7 @@ async fn run_virtio_net(mut virtio_net_fidl: VirtioNetRequestStream) -> Result<(
     // Initialize configures the netstack using the C++ dispatch loop, which is in another thread.
     // Calling Ready lets the C++ thread synchronize configuration completion with this main Rust
     // thread.
-    let result = device::NetDevice::<guest_ethernet::GuestEthernet>::new();
+    let result = device::NetDevice::<guest_ethernet::GuestEthernet>::new(context);
     if let Err(err) = result {
         responder.send(Err(err.into_raw()))?;
         return Err(anyhow!("failed to create GuestEthernet: {}", err));
@@ -80,8 +83,11 @@ async fn main() -> Result<(), Error> {
     fs.take_and_serve_directory_handle()
         .map_err(|err| anyhow!("Error starting server: {}", err))?;
 
+    let context = guest_ethernet::GuestEthernetContext::new()
+        .map_err(|err| anyhow!("Error creating context: {}", err))?;
+
     fs.for_each_concurrent(None, |stream| async {
-        if let Err(err) = run_virtio_net(stream).await {
+        if let Err(err) = run_virtio_net(&context, stream).await {
             tracing::info!(%err, "Stopping virtio net device");
         }
     })

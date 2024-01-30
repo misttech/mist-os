@@ -9,6 +9,9 @@
 #include <fuchsia/hardware/network/driver/cpp/banjo.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/ddk/driver.h>
+#include <lib/sync/cpp/completion.h>
+
+#include <memory>
 
 #include <ddktl/device.h>
 #include <ddktl/fidl.h>
@@ -23,17 +26,24 @@ using DeviceType =
     ddk::Device<NetworkDevice, ddk::Messageable<fuchsia_hardware_network::DeviceInstance>::Mixin,
                 ddk::Unbindable>;
 
-class NetworkDevice : public DeviceType,
-                      public ddk::EmptyProtocol<ZX_PROTOCOL_NETWORK_DEVICE>,
-                      NetworkDeviceInterface::Sys {
+// Creates `fuchsia_hardware_network_driver::NetworkDeviceImpl` endpoints for a
+// parent device that is backed by the FIDL based driver runtime.
+class FidlNetworkDeviceImplBinder : public NetworkDeviceImplBinder {
  public:
-  explicit NetworkDevice(zx_device_t* parent, async_dispatcher_t* dispatcher)
-      : DeviceType(parent), dispatcher_(dispatcher) {}
+  explicit FidlNetworkDeviceImplBinder(NetworkDevice* parent) : parent_(parent) {}
+
+  zx::result<fdf::ClientEnd<fuchsia_hardware_network_driver::NetworkDeviceImpl>> Bind() override;
+
+ private:
+  NetworkDevice* parent_;
+};
+
+class NetworkDevice : public DeviceType, public ddk::EmptyProtocol<ZX_PROTOCOL_NETWORK_DEVICE> {
+ public:
+  explicit NetworkDevice(zx_device_t* parent) : DeviceType(parent) {}
   ~NetworkDevice() override;
 
-  static zx_status_t Create(void* ctx, zx_device_t* parent, async_dispatcher_t* dispatcher);
-
-  void NotifyThread(zx::unowned_thread thread, ThreadType type) override;
+  static zx_status_t Create(void* ctx, zx_device_t* parent);
 
   void DdkUnbind(ddk::UnbindTxn unbindTxn);
 
@@ -41,10 +51,15 @@ class NetworkDevice : public DeviceType,
 
   void GetDevice(GetDeviceRequestView request, GetDeviceCompleter::Sync& _completer) override;
 
+  NetworkDeviceInterface* GetInterface() { return device_.get(); }
+
  private:
-  async_dispatcher_t* dispatcher_;
+  std::unique_ptr<OwnedDeviceInterfaceDispatchers> dispatchers_;
+  std::unique_ptr<OwnedShimDispatchers> shim_dispatchers_;
+
   std::unique_ptr<NetworkDeviceInterface> device_;
 };
+
 }  // namespace network
 
 #endif  // SRC_CONNECTIVITY_NETWORK_DRIVERS_NETWORK_DEVICE_NETWORK_DEVICE_H_

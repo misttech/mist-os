@@ -20,7 +20,7 @@ class PortWatcher : public fbl::DoublyLinkedListable<std::unique_ptr<PortWatcher
                     public fidl::WireServer<netdev::PortWatcher> {
  public:
   // Maximum number of port events that can be queued before the channel is closed.
-  static constexpr size_t kMaximumQueuedEvents = MAX_PORTS * 2;
+  static constexpr size_t kMaximumQueuedEvents = netdev::kMaxPorts * 2ul;
   using List = fbl::SizedDoublyLinkedList<std::unique_ptr<PortWatcher>>;
   using ClosedCallback = fit::callback<void(PortWatcher&)>;
 

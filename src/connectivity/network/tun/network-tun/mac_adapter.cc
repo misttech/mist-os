@@ -77,6 +77,7 @@ void MacAdapter::MacAddrSetMode(mac_filter_mode_t mode, const mac_address_t* mul
     default:
       ZX_ASSERT_MSG(false, "Unexpected filter mode %d", mode);
   }
+
   mac_state_.mode = filter_mode;
   mac_state_.multicast_filters.clear();
   mac_state_.multicast_filters.reserve(multicast_macs_count);

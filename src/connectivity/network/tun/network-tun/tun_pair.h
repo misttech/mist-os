@@ -6,6 +6,7 @@
 #define SRC_CONNECTIVITY_NETWORK_TUN_NETWORK_TUN_TUN_PAIR_H_
 
 #include <lib/async-loop/cpp/loop.h>
+#include <lib/async-loop/default.h>
 
 #include <fbl/intrusive_double_list.h>
 
@@ -25,8 +26,11 @@ class TunPair : public fbl::DoublyLinkedListable<std::unique_ptr<TunPair>>,
  public:
   // Creates a new `TunPair` with `config`.
   // `teardown` is called when all the bound client channels are closed.
-  static zx::result<std::unique_ptr<TunPair>> Create(
-      fit::callback<void(TunPair*)> teardown, fuchsia_net_tun::wire::DevicePairConfig config);
+  static zx::result<std::unique_ptr<TunPair>> Create(const DeviceInterfaceDispatchers& dispatchers,
+                                                     const ShimDispatchers& shim_dispatchers,
+                                                     async_dispatcher_t* fidl_dispatcher,
+                                                     fit::callback<void(TunPair*)> teardown,
+                                                     DevicePairConfig&& config);
   ~TunPair() override;
 
   // DeviceAdapterParent implementation:
@@ -76,7 +80,8 @@ class TunPair : public fbl::DoublyLinkedListable<std::unique_ptr<TunPair>>,
     std::unique_ptr<Port> right;
   };
 
-  TunPair(fit::callback<void(TunPair*)> teardown, DevicePairConfig config);
+  TunPair(async_dispatcher_t* dispatcher, fit::callback<void(TunPair*)> teardown,
+          DevicePairConfig config);
   void Teardown();
 
   fit::callback<void(TunPair*)> teardown_callback_;
@@ -85,7 +90,7 @@ class TunPair : public fbl::DoublyLinkedListable<std::unique_ptr<TunPair>>,
   fbl::Mutex power_lock_;
   std::array<Ports, MAX_PORTS> ports_ __TA_GUARDED(power_lock_);
 
-  async::Loop loop_;
+  async::Loop loop_{&kAsyncLoopConfigNoAttachToCurrentThread};
   std::optional<thrd_t> loop_thread_;
   std::optional<fidl::ServerBindingRef<fuchsia_net_tun::DevicePair>> binding_;
   std::unique_ptr<DeviceAdapter> left_;

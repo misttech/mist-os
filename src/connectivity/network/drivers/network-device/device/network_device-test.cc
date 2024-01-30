@@ -4,6 +4,7 @@
 
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async/cpp/task.h>
+#include <lib/driver/testing/cpp/driver_runtime.h>
 #include <lib/fit/defer.h>
 #include <lib/sync/cpp/completion.h>
 #include <lib/syslog/global.h>
@@ -16,10 +17,13 @@
 
 #include "device_interface.h"
 #include "log.h"
+#include "network_device_shim.h"
 #include "session.h"
+#include "src/connectivity/network/drivers/network-device/mac/test_util.h"
 #include "src/lib/testing/predicates/status.h"
 #include "test_session.h"
 #include "test_util.h"
+#include "test_util_banjo.h"
 
 // Enable timeouts only to test things locally, committed code should not use timeouts.
 #define ENABLE_TIMEOUTS 0
@@ -98,6 +102,20 @@ class NetworkDeviceTest : public ::testing::Test {
   };
 
   void SetUp() override {
+    auto impl_dispatcher = fdf::UnsynchronizedDispatcher::Create(
+        {}, "", [this](fdf_dispatcher_t*) { impl_dispatcher_shutdown_.Signal(); });
+    ASSERT_OK(impl_dispatcher.status_value());
+    impl_dispatcher_ = std::move(impl_dispatcher.value());
+
+    auto ifc_dispatcher = fdf::UnsynchronizedDispatcher::Create(
+        {}, "", [this](fdf_dispatcher_t*) { ifc_dispatcher_shutdown_.Signal(); });
+    ASSERT_OK(ifc_dispatcher.status_value());
+    ifc_dispatcher_ = std::move(ifc_dispatcher.value());
+    auto port_dispatcher = fdf::UnsynchronizedDispatcher::Create(
+        {}, "", [this](fdf_dispatcher_t*) { port_dispatcher_shutdown_.Signal(); });
+    ASSERT_OK(port_dispatcher.status_value());
+    port_dispatcher_ = std::move(port_dispatcher.value());
+
     fx_logger_config_t log_cfg = {
         .min_severity = FX_LOG_TRACE,
         .tags = nullptr,
@@ -111,13 +129,21 @@ class NetworkDeviceTest : public ::testing::Test {
   void DiscardDeviceSync() {
     if (device_) {
       sync_completion_t completer;
-      device_->Teardown([&completer, this]() {
+      device_->Teardown([&completer]() {
         LOG_TRACE("Test: Teardown complete");
-        device_ = nullptr;
         sync_completion_signal(&completer);
       });
       ASSERT_OK(sync_completion_wait_deadline(&completer, TEST_DEADLINE.get()));
+      impl_.WaitReleased();
+      port13_.WaitPortRemoved();
+      device_ = nullptr;
     }
+    impl_dispatcher_.ShutdownAsync();
+    impl_dispatcher_shutdown_.Wait();
+    ifc_dispatcher_.ShutdownAsync();
+    ifc_dispatcher_shutdown_.Wait();
+    port_dispatcher_.ShutdownAsync();
+    port_dispatcher_shutdown_.Wait();
   }
 
   static zx_status_t WaitEvents(const zx::event& events, zx_signals_t signals, zx::time deadline) {
@@ -140,6 +166,10 @@ class NetworkDeviceTest : public ::testing::Test {
     return WaitEvents(impl_.events(), kEventSessionStarted, deadline);
   }
 
+  [[nodiscard]] zx_status_t WaitSessionDied(zx::time deadline = TEST_DEADLINE) {
+    return WaitEvents(impl_.events(), kEventSessionDied, deadline);
+  }
+
   [[nodiscard]] zx_status_t WaitTx(zx::time deadline = TEST_DEADLINE) {
     return WaitEvents(impl_.events(), kEventTx, deadline);
   }
@@ -153,13 +183,7 @@ class NetworkDeviceTest : public ::testing::Test {
     return WaitEvents(port.events(), kEventPortActiveChanged, deadline);
   }
 
-  async_dispatcher_t* dispatcher() {
-    if (!loop_) {
-      loop_ = std::make_unique<async::Loop>(&kAsyncLoopConfigNeverAttachToThread);
-      EXPECT_OK(loop_->StartThread("messenger-loop", nullptr));
-    }
-    return loop_->dispatcher();
-  }
+  fdf::Dispatcher& dispatcher() { return impl_dispatcher_; }
 
   fidl::WireSyncClient<netdev::Device> OpenConnection() {
     zx::result endpoints = fidl::CreateEndpoints<netdev::Device>();
@@ -206,7 +230,8 @@ class NetworkDeviceTest : public ::testing::Test {
     if (device_) {
       return ZX_ERR_INTERNAL;
     }
-    zx::result device = impl_.CreateChild(dispatcher());
+    zx::result device = impl_.CreateChild(
+        DeviceInterfaceDispatchers(impl_dispatcher_, ifc_dispatcher_, port_dispatcher_));
     if (device.is_ok()) {
       device_ = std::move(device.value());
     }
@@ -218,8 +243,7 @@ class NetworkDeviceTest : public ::testing::Test {
       return status;
     }
     port13_.SetStatus({.mtu = 2048});
-    port13_.AddPort(kPort13, impl_.client());
-    return ZX_OK;
+    return port13_.AddPort(kPort13, impl_dispatcher_, OpenConnection(), impl_);
   }
 
   zx_status_t OpenSession(TestSession* session,
@@ -242,9 +266,8 @@ class NetworkDeviceTest : public ::testing::Test {
 
   zx_status_t AttachSessionPort(TestSession& session, FakeNetworkPortImpl& impl) {
     std::vector<netdev::wire::FrameType> rx_types;
-    for (uint8_t frame_type :
-         cpp20::span(impl.port_info().rx_types_list, impl.port_info().rx_types_count)) {
-      rx_types.push_back(static_cast<netdev::wire::FrameType>(frame_type));
+    for (netdev::wire::FrameType frame_type : impl.port_info().rx_types) {
+      rx_types.push_back(frame_type);
     }
     return session.AttachPort(GetSaltedPortId(impl.id()), std::move(rx_types));
   }
@@ -257,8 +280,17 @@ class NetworkDeviceTest : public ::testing::Test {
     return device.sessions_;
   }
 
+  const internal::Session* GetPrimarySession(internal::DeviceInterface& device) const
+      __TA_REQUIRES(device.control_lock_) {
+    return device.primary_session_.get();
+  }
+
   void SetEvtRxQueuePacketHandler(fit::function<void(uint64_t)> h) {
     static_cast<internal::DeviceInterface*>(device_.get())->evt_rx_queue_packet_ = std::move(h);
+  }
+
+  void SetEvtTxCompleteHandler(fit::function<void()> h) {
+    static_cast<internal::DeviceInterface*>(device_.get())->evt_tx_complete_ = std::move(h);
   }
 
   void SetBacktraceCallback(fit::function<void()> cb) {
@@ -267,9 +299,17 @@ class NetworkDeviceTest : public ::testing::Test {
   }
 
  protected:
+  fdf_testing::DriverRuntime driver_runtime_;
+  fdf::UnsynchronizedDispatcher impl_dispatcher_;
+  libsync::Completion impl_dispatcher_shutdown_;
+  fdf::UnsynchronizedDispatcher ifc_dispatcher_;
+  libsync::Completion ifc_dispatcher_shutdown_;
+  fdf::UnsynchronizedDispatcher port_dispatcher_;
+  libsync::Completion port_dispatcher_shutdown_;
+
   FakeNetworkDeviceImpl impl_;
   FakeNetworkPortImpl port13_;
-  std::unique_ptr<async::Loop> loop_;
+  FakeMacDeviceImpl mac_impl_;
   int8_t session_counter_ = 0;
   std::unique_ptr<NetworkDeviceInterface> device_;
 };
@@ -347,9 +387,9 @@ TEST_F(NetworkDeviceTest, GetInfo) {
   ASSERT_TRUE(base_info.has_buffer_alignment());
   EXPECT_EQ(base_info.buffer_alignment(), impl_.info().buffer_alignment);
   ASSERT_TRUE(base_info.has_tx_accel());
-  EXPECT_EQ(base_info.tx_accel().count(), impl_.info().tx_accel_count);
+  EXPECT_EQ(base_info.tx_accel().count(), impl_.info().tx_accel.size());
   ASSERT_TRUE(base_info.has_rx_accel());
-  EXPECT_EQ(base_info.rx_accel().count(), impl_.info().rx_accel_count);
+  EXPECT_EQ(base_info.rx_accel().count(), impl_.info().rx_accel.size());
 }
 
 TEST_F(NetworkDeviceTest, OptionalMaxBufferLength) {
@@ -380,14 +420,17 @@ class PrepareVmoCallbackParamTest : public NetworkDeviceTest,
                                     public ::testing::WithParamInterface<bool> {
  public:
   void InstallPrepareVmoCallback(zx_status_t status) {
-    impl_.set_prepare_vmo_handler([this, status](uint8_t, const zx::vmo&,
-                                                 network_device_impl_prepare_vmo_callback callback,
-                                                 void* cookie) {
+    impl_.set_prepare_vmo_handler([this, status](uint8_t, const zx::vmo&, auto& completer) {
       const bool deferred_callback = GetParam();
       if (deferred_callback) {
-        async::PostTask(dispatcher(), [callback, cookie, status]() { callback(cookie, status); });
+        async::PostTask(dispatcher().async_dispatcher(),
+                        [completer = completer.ToAsync(), status]() mutable {
+                          fdf::Arena arena('TEST');
+                          completer.buffer(arena).Reply(status);
+                        });
       } else {
-        callback(cookie, status);
+        fdf::Arena arena('TEST');
+        completer.buffer(arena).Reply(status);
       }
     });
   }
@@ -485,10 +528,10 @@ TEST_F(NetworkDeviceTest, RxBufferBuild) {
   ASSERT_TRUE(first_vmo.has_value());
   uint8_t want_vmo = first_vmo.value();
 
-  RxReturnTransaction return_session(&impl_);
+  RxFidlReturnTransaction return_session(&impl_);
 
   // Prepare a chained return.
-  auto chained_return = std::make_unique<RxReturn>();
+  auto chained_return = std::make_unique<RxFidlReturn>();
   fbl::DoublyLinkedList buffers = impl_.TakeRxBuffers();
   for (const auto& descriptor_setup : kDescriptorSetup) {
     SCOPED_TRACE(descriptor_setup.descriptor);
@@ -497,7 +540,7 @@ TEST_F(NetworkDeviceTest, RxBufferBuild) {
     // order.
     std::unique_ptr rx = buffers.pop_back();
     ASSERT_TRUE(rx);
-    const rx_space_buffer_t& space = rx->space();
+    const fuchsia_hardware_network_driver::wire::RxSpaceBuffer& space = rx->space();
     ASSERT_EQ(space.region.vmo, want_vmo);
     buffer_descriptor_t& descriptor = session.descriptor(descriptor_setup.descriptor);
     ASSERT_EQ(space.region.offset, descriptor.offset + descriptor.head_length);
@@ -511,7 +554,7 @@ TEST_F(NetworkDeviceTest, RxBufferBuild) {
       }
       chained_return->PushPart(std::move(rx));
     } else {
-      std::unique_ptr ret = std::make_unique<RxReturn>(std::move(rx), kPort13);
+      std::unique_ptr ret = std::make_unique<RxFidlReturn>(std::move(rx), kPort13);
       if (descriptor_setup.flags.has_value()) {
         ret->buffer().meta.flags = static_cast<uint32_t>(*descriptor_setup.flags);
       }
@@ -523,8 +566,17 @@ TEST_F(NetworkDeviceTest, RxBufferBuild) {
   return_session.Enqueue(std::move(chained_return));
   // Ensure no more rx buffers were actually returned:
   ASSERT_TRUE(buffers.is_empty());
-  // Commit the returned buffers.
+
+  libsync::Completion completion;
+  SetEvtRxQueuePacketHandler([&completion](uint64_t key) {
+    ASSERT_EQ(key, internal::RxQueue::kTriggerRxKey);
+    completion.Signal();
+  });
+  //  Commit the returned buffers.
   return_session.Commit();
+  ASSERT_OK(completion.Wait(TEST_DEADLINE));
+  SetEvtRxQueuePacketHandler(nullptr);
+
   // Check that all descriptors were returned to the queue:
   size_t read_back;
   ASSERT_OK(session.FetchRx(all_descs, std::size(all_descs), &read_back));
@@ -619,22 +671,22 @@ TEST_F(NetworkDeviceTest, TxBufferBuild) {
   ASSERT_OK(session.SendTx(all_descs, kDescTests, &sent));
   ASSERT_EQ(sent, kDescTests);
   ASSERT_OK(WaitTx());
-  TxReturnTransaction return_session(&impl_);
+  TxFidlReturnTransaction return_session(&impl_);
   // load the buffers from the fake device implementation and check them.
   std::unique_ptr tx = impl_.PopTxBuffer();
   ASSERT_TRUE(tx);
-  ASSERT_EQ(tx->buffer().data_count, 1u);
-  ASSERT_EQ(tx->buffer().data_list[0].offset, session.descriptor(kDescriptorIndex0).offset);
-  ASSERT_EQ(tx->buffer().data_list[0].length, kDefaultBufferLength);
+  ASSERT_EQ(tx->buffer().data.count(), 1u);
+  ASSERT_EQ(tx->buffer().data[0].offset, session.descriptor(kDescriptorIndex0).offset);
+  ASSERT_EQ(tx->buffer().data[0].length, kDefaultBufferLength);
   return_session.Enqueue(std::move(tx));
   // check second descriptor:
   tx = impl_.PopTxBuffer();
   ASSERT_TRUE(tx);
-  ASSERT_EQ(tx->buffer().data_count, 1u);
+  ASSERT_EQ(tx->buffer().data.count(), 1u);
   {
     buffer_descriptor_t& desc = session.descriptor(kDescriptorIndex1);
-    ASSERT_EQ(tx->buffer().data_list[0].offset, desc.offset + desc.head_length);
-    ASSERT_EQ(tx->buffer().data_list[0].length,
+    ASSERT_EQ(tx->buffer().data[0].offset, desc.offset + desc.head_length);
+    ASSERT_EQ(tx->buffer().data[0].length,
               kDefaultBufferLength - desc.head_length - desc.tail_length);
   }
   tx->set_status(ZX_ERR_UNAVAILABLE);
@@ -642,11 +694,11 @@ TEST_F(NetworkDeviceTest, TxBufferBuild) {
   // check third descriptor:
   tx = impl_.PopTxBuffer();
   ASSERT_TRUE(tx);
-  ASSERT_EQ(tx->buffer().data_count, 3u);
+  ASSERT_EQ(tx->buffer().data.count(), 3u);
   {
     uint16_t descriptor = 2;
-    for (const buffer_region_t& region :
-         cpp20::span(tx->buffer().data_list, tx->buffer().data_count)) {
+    for (const fuchsia_hardware_network_driver::wire::BufferRegion& region :
+         tx->buffer().data.get()) {
       SCOPED_TRACE(descriptor);
       buffer_descriptor_t& d = session.descriptor(descriptor++);
       ASSERT_EQ(region.offset, d.offset);
@@ -657,8 +709,14 @@ TEST_F(NetworkDeviceTest, TxBufferBuild) {
   return_session.Enqueue(std::move(tx));
   // ensure no more tx buffers were actually enqueued:
   ASSERT_FALSE(impl_.PopTxBuffer());
+
+  sync_completion_t completion;
+  SetEvtTxCompleteHandler([&completion]() { sync_completion_signal(&completion); });
   // commit the returned buffers
   return_session.Commit();
+  ASSERT_OK(sync_completion_wait_deadline(&completion, TEST_DEADLINE.get()));
+  SetEvtTxCompleteHandler(nullptr);
+
   // check that all descriptors were returned to the queue:
   size_t read_back;
 
@@ -761,10 +819,15 @@ TEST_F(NetworkDeviceTest, TwoSessionsTx) {
   // Return both buffers and ensure they get to the correct sessions.
   buff_a->set_status(ZX_OK);
   buff_b->set_status(ZX_ERR_UNAVAILABLE);
-  TxReturnTransaction tx_ret(&impl_);
+  TxFidlReturnTransaction tx_ret(&impl_);
   tx_ret.Enqueue(std::move(buff_a));
   tx_ret.Enqueue(std::move(buff_b));
+
+  libsync::Completion completion;
+  SetEvtTxCompleteHandler([&completion]() { completion.Signal(); });
   tx_ret.Commit();
+  ASSERT_OK(completion.Wait(TEST_DEADLINE));
+  SetEvtTxCompleteHandler(nullptr);
 
   uint16_t rd;
   ASSERT_OK(session_a.FetchTx(&rd));
@@ -802,7 +865,7 @@ TEST_F(NetworkDeviceTest, TwoSessionsRx) {
 
   ASSERT_OK(WaitRxAvailable());
   VmoProvider vmo_provider = impl_.VmoGetter();
-  RxReturnTransaction return_session(&impl_);
+  RxFidlReturnTransaction return_session(&impl_);
   for (uint16_t i = 0; i < kBufferCount; i++) {
     std::unique_ptr buff = impl_.PopRxBuffer();
     ASSERT_TRUE(buff);
@@ -810,7 +873,14 @@ TEST_F(NetworkDeviceTest, TwoSessionsRx) {
     ASSERT_OK(buff->WriteData(data, vmo_provider));
     return_session.Enqueue(std::move(buff), kPort13);
   }
+  libsync::Completion completion;
+  SetEvtRxQueuePacketHandler([&completion](uint64_t key) {
+    EXPECT_EQ(key, internal::RxQueue::kTriggerRxKey);
+    completion.Signal();
+  });
   return_session.Commit();
+  ASSERT_OK(completion.Wait(TEST_DEADLINE));
+  SetEvtRxQueuePacketHandler(nullptr);
 
   auto checker = [kBufferCount, kDataLen](TestSession& session) {
     uint16_t descriptors[kBufferCount];
@@ -905,7 +975,7 @@ TEST_F(NetworkDeviceTest, ClosingPrimarySession) {
   // And now return data.
   constexpr uint32_t kReturnLength = 5;
   rx_buff->SetReturnLength(kReturnLength);
-  RxReturnTransaction rx_transaction(&impl_);
+  RxFidlReturnTransaction rx_transaction(&impl_);
   rx_transaction.Enqueue(std::move(rx_buff), kPort13);
   rx_transaction.Commit();
 
@@ -945,7 +1015,7 @@ TEST_F(NetworkDeviceTest, DelayedStart) {
   ASSERT_OK(WaitTx());
   std::unique_ptr tx_buffer = impl_.PopTxBuffer();
   ASSERT_TRUE(tx_buffer);
-  TxReturnTransaction transaction(&impl_);
+  TxFidlReturnTransaction transaction(&impl_);
   transaction.Enqueue(std::move(tx_buffer));
   transaction.Commit();
 
@@ -1009,7 +1079,7 @@ TEST_F(NetworkDeviceTest, DelayedStop) {
 
   // Return the outstanding buffer.
   std::unique_ptr buffer = impl_.PopTxBuffer();
-  TxReturnTransaction transaction(&impl_);
+  TxFidlReturnTransaction transaction(&impl_);
   transaction.Enqueue(std::move(buffer));
   transaction.Commit();
   // Now session should close.
@@ -1049,14 +1119,14 @@ TEST_P(RxTxParamTest, WaitsForAllBuffersReturned) {
   auto return_buffer = [this, &tx_buffers, &rx_buffers](RxTxSwitch which) {
     switch (which) {
       case RxTxSwitch::Tx: {
-        TxReturnTransaction transaction(&impl_);
+        TxFidlReturnTransaction transaction(&impl_);
         std::unique_ptr buffer = tx_buffers.pop_front();
         buffer->set_status(ZX_ERR_UNAVAILABLE);
         transaction.Enqueue(std::move(buffer));
         transaction.Commit();
       } break;
       case RxTxSwitch::Rx: {
-        RxReturnTransaction transaction(&impl_);
+        RxFidlReturnTransaction transaction(&impl_);
         std::unique_ptr buffer = rx_buffers.pop_front();
         buffer->return_part().length = 0;
         transaction.Enqueue(std::move(buffer), kPort13);
@@ -1152,7 +1222,7 @@ TEST_F(NetworkDeviceTest, TxHeadLength) {
   ASSERT_OK(WaitTx());
 
   VmoProvider vmo_provider = impl_.VmoGetter();
-  TxReturnTransaction transaction(&impl_);
+  TxFidlReturnTransaction transaction(&impl_);
   constexpr struct {
     uint8_t expect;
     const char* name;
@@ -1216,9 +1286,9 @@ TEST_F(NetworkDeviceTest, RxFrameTypeFilter) {
   ASSERT_OK(WaitRxAvailable());
   std::unique_ptr buff = impl_.PopRxBuffer();
   buff->SetReturnLength(10);
-  std::unique_ptr ret = std::make_unique<RxReturn>(std::move(buff), kPort13);
-  ret->buffer().meta.frame_type = static_cast<uint8_t>(netdev::wire::FrameType::kIpv4);
-  RxReturnTransaction rx_transaction(&impl_);
+  std::unique_ptr ret = std::make_unique<RxFidlReturn>(std::move(buff), kPort13);
+  ret->buffer().meta.frame_type = netdev::wire::FrameType::kIpv4;
+  RxFidlReturnTransaction rx_transaction(&impl_);
   rx_transaction.Enqueue(std::move(ret));
   rx_transaction.Commit();
 
@@ -1321,13 +1391,16 @@ TEST_F(NetworkDeviceTest, SessionNameRespectsStringView) {
   fidl::StringView name = fidl::StringView::FromExternal(name_str, 5u);
 
   bool reply_called = false;
+  libsync::Completion reply_completer;
   std::vector<zx::handle> handles;
   class T : public fidl::Transaction {
    public:
-    explicit T(bool* r, std::vector<zx::handle>* handles) : reply_called_(r), handles_(handles) {}
+    explicit T(bool* r, libsync::Completion* reply_completer, std::vector<zx::handle>* handles)
+        : reply_called_(r), reply_completer_(reply_completer), handles_(handles) {}
     std::unique_ptr<Transaction> TakeOwnership() override {
-      auto t = std::make_unique<T>(reply_called_, handles_);
+      auto t = std::make_unique<T>(reply_called_, reply_completer_, handles_);
       reply_called_ = nullptr;
+      reply_completer_ = nullptr;
       handles_ = nullptr;
       return t;
     }
@@ -1341,6 +1414,7 @@ TEST_F(NetworkDeviceTest, SessionNameRespectsStringView) {
       }
       message.ReleaseHandles();
       *reply_called_ = true;
+      reply_completer_->Signal();
       return ZX_OK;
     }
     void Close(zx_status_t epitaph) override {
@@ -1349,13 +1423,15 @@ TEST_F(NetworkDeviceTest, SessionNameRespectsStringView) {
 
    private:
     bool* reply_called_;
+    libsync::Completion* reply_completer_;
     std::vector<zx::handle>* handles_;
-  } transaction(&reply_called, &handles);
+  } transaction(&reply_called, &reply_completer, &handles);
 
   fidl::WireServer<netdev::Device>::OpenSessionCompleter::Sync completer(&transaction);
   fidl::WireRequest<netdev::Device::OpenSession> req{name, info};
   fidl::WireServer<netdev::Device>::OpenSessionRequestView view(&req);
   dev->OpenSession(view, completer);
+  ASSERT_OK(reply_completer.Wait(TEST_DEADLINE));
   ASSERT_TRUE(reply_called);
   const internal::SessionList& sessions = GetDeviceSessionsUnsafe(*dev);
   ASSERT_FALSE(sessions.is_empty());
@@ -1440,7 +1516,7 @@ TEST_F(NetworkDeviceTest, RespectsRxThreshold) {
 
   // Return the maximum number of buffers that we can return without hitting the threshold.
   for (uint16_t i = impl_.info().rx_depth - impl_.info().rx_threshold - 1; i != 0; i--) {
-    RxReturnTransaction return_session(&impl_);
+    RxFidlReturnTransaction return_session(&impl_);
     std::unique_ptr buff = impl_.PopRxBuffer();
     buff->SetReturnLength(kReturnBufferSize);
     return_session.Enqueue(std::move(buff), kPort13);
@@ -1453,7 +1529,7 @@ TEST_F(NetworkDeviceTest, RespectsRxThreshold) {
   ASSERT_STATUS(WaitRxAvailable(zx::deadline_after(zx::msec(10))), ZX_ERR_TIMED_OUT);
 
   // Return one more buffer to cross the threshold.
-  RxReturnTransaction return_session(&impl_);
+  RxFidlReturnTransaction return_session(&impl_);
   std::unique_ptr buff = impl_.PopRxBuffer();
   buff->SetReturnLength(kReturnBufferSize);
   return_session.Enqueue(std::move(buff), kPort13);
@@ -1538,7 +1614,8 @@ TEST_F(NetworkDeviceTest, RemovingPortCausesSessionToPause) {
   ASSERT_OK(WaitStart());
 
   // Removing the port causes the session to pause, which should cause the data plane to stop.
-  impl_.client().RemovePort(kPort13);
+  fdf::Arena arena('NETD');
+  ASSERT_OK(impl_.client().buffer(arena)->RemovePort(kPort13).status());
   ASSERT_OK(WaitStop());
 }
 
@@ -1563,7 +1640,7 @@ TEST_F(NetworkDeviceTest, OnlyReceiveOnSubscribedPorts) {
   ASSERT_EQ(actual, descriptors.size());
   ASSERT_OK(WaitRxAvailable());
   ASSERT_EQ(impl_.rx_buffer_count(), descriptors.size());
-  RxReturnTransaction return_session(&impl_);
+  RxFidlReturnTransaction return_session(&impl_);
   for (size_t i = 0; i < descriptors.size(); i++) {
     std::unique_ptr rx_space = impl_.PopRxBuffer();
     // Set the port ID to an offset based the index, we should expect the session to only see port
@@ -1571,10 +1648,11 @@ TEST_F(NetworkDeviceTest, OnlyReceiveOnSubscribedPorts) {
     uint8_t port_id = kPort13 + static_cast<uint8_t>(i);
     // Write some data so the buffer makes it into the session.
     ASSERT_OK(rx_space->WriteData(cpp20::span(&port_id, sizeof(port_id)), impl_.VmoGetter()));
-    std::unique_ptr ret = std::make_unique<RxReturn>(std::move(rx_space), port_id);
+    std::unique_ptr ret = std::make_unique<RxFidlReturn>(std::move(rx_space), port_id);
     return_session.Enqueue(std::move(ret));
   }
   return_session.Commit();
+  ASSERT_OK(WaitRxAvailable());
   ASSERT_OK(session.FetchRx(descriptors.data(), descriptors.size(), &actual));
   // Only one of the descriptors makes it back into the session.
   ASSERT_EQ(actual, 1u);
@@ -1585,11 +1663,11 @@ TEST_F(NetworkDeviceTest, OnlyReceiveOnSubscribedPorts) {
     ASSERT_EQ(desc.port_id.salt, GetSaltedPortId(kPort13).salt);
   }
   // The unused descriptor comes right back to us.
-  ASSERT_OK(WaitRxAvailable());
   ASSERT_EQ(impl_.rx_buffer_count(), 1u);
 }
 
 TEST_F(NetworkDeviceTest, SessionsAttachToPort) {
+  port13_.SetMac(mac_impl_.Bind(dispatcher()));
   ASSERT_OK(CreateDeviceWithPort13());
   TestSession session;
   ASSERT_OK(OpenSession(&session));
@@ -1620,36 +1698,16 @@ TEST_F(NetworkDeviceTest, RejectsInvalidPortIds) {
   {
     // Add a port with an invalid ID.
     FakeNetworkPortImpl fake_port;
-    network_port_protocol_t proto = fake_port.protocol();
-    libsync::Completion port_added;
-    impl_.client().AddPort(
-        MAX_PORTS, proto.ctx, proto.ops,
-        [](void* ctx, zx_status_t status) {
-          libsync::Completion* port_added = static_cast<libsync::Completion*>(ctx);
-          EXPECT_EQ(status, ZX_ERR_INVALID_ARGS);
-          port_added->Signal();
-        },
-        &port_added);
-    port_added.Wait();
-    // Port should NOT have been removed if AddPort fails.
+    ASSERT_EQ(fake_port.AddPortNoWait(MAX_PORTS, impl_dispatcher_, OpenConnection(), impl_),
+              ZX_ERR_INVALID_ARGS);
     ASSERT_FALSE(fake_port.removed());
   }
 
   {
     // Add a port with a duplicate ID.
     FakeNetworkPortImpl fake_port;
-    network_port_protocol_t proto = fake_port.protocol();
-    libsync::Completion port_added;
-    impl_.client().AddPort(
-        kPort13, proto.ctx, proto.ops,
-        [](void* ctx, zx_status_t status) {
-          libsync::Completion* port_added = static_cast<libsync::Completion*>(ctx);
-          EXPECT_EQ(status, ZX_ERR_ALREADY_EXISTS);
-          port_added->Signal();
-        },
-        &port_added);
-    port_added.Wait();
-    // Port should NOT have been removed if AddPort fails.
+    ASSERT_EQ(fake_port.AddPortNoWait(kPort13, impl_dispatcher_, OpenConnection(), impl_),
+              ZX_ERR_ALREADY_EXISTS);
     ASSERT_FALSE(fake_port.removed());
   }
 }
@@ -1659,7 +1717,7 @@ TEST_F(NetworkDeviceTest, TxBadPorts) {
   // returned with an error.
   ASSERT_OK(CreateDeviceWithPort13());
   FakeNetworkPortImpl port5;
-  port5.AddPort(5, impl_.client());
+  ASSERT_OK(port5.AddPort(5, impl_dispatcher_, OpenConnection(), impl_));
   auto cleanup = fit::defer([&port5]() { port5.RemoveSync(); });
 
   TestSession session;
@@ -1747,20 +1805,27 @@ TEST_F(NetworkDeviceTest, RxCrossSessionChaining) {
 
   std::unique_ptr buffer_b = impl_.PopRxBuffer();
   ASSERT_TRUE(buffer_b);
-  rx_space_buffer_t space_b = buffer_b->space();
+  const fuchsia_hardware_network_driver::wire::RxSpaceBuffer space_b = buffer_b->space();
 
   // Space from each buffer must've come from different VMOs.
   ASSERT_NE(buffer_a->space().region.vmo, buffer_b->space().region.vmo);
   // Return both buffers as a single chained rx frame.
   buffer_a->return_part().length = 0xdead;
   buffer_b->return_part().length = 0xbeef;
-  auto ret = std::make_unique<RxReturn>();
+  auto ret = std::make_unique<RxFidlReturn>();
   ret->PushPart(std::move(buffer_a));
   ret->PushPart(std::move(buffer_b));
   {
-    RxReturnTransaction transaction(&impl_);
+    RxFidlReturnTransaction transaction(&impl_);
     transaction.Enqueue(std::move(ret));
+    libsync::Completion completion;
+    SetEvtRxQueuePacketHandler([&completion](uint64_t key) {
+      EXPECT_EQ(key, internal::RxQueue::kTriggerRxKey);
+      completion.Signal();
+    });
     transaction.Commit();
+    ASSERT_OK(completion.Wait(TEST_DEADLINE));
+    SetEvtRxQueuePacketHandler(nullptr);
   }
 
   // By committing the transaction, the expectation is:
@@ -1778,12 +1843,12 @@ TEST_F(NetworkDeviceTest, RxCrossSessionChaining) {
   ASSERT_OK(WaitRxAvailable());
   std::unique_ptr buffer_b_again = impl_.PopRxBuffer();
   ASSERT_TRUE(buffer_b_again);
-  const rx_space_buffer_t& space = buffer_b_again->space();
+  const fuchsia_hardware_network_driver::wire::RxSpaceBuffer& space = buffer_b_again->space();
   EXPECT_EQ(space.region.vmo, space_b.region.vmo);
   EXPECT_EQ(space.region.offset, space_b.region.offset);
   EXPECT_EQ(space.region.length, space_b.region.length);
   {
-    RxReturnTransaction transaction(&impl_);
+    RxFidlReturnTransaction transaction(&impl_);
     transaction.Enqueue(std::move(buffer_b_again), kPort13);
     transaction.Commit();
   }
@@ -1882,7 +1947,7 @@ TEST_P(RxTxBufferReturnTest, TestRaceFramesWithDeviceStop) {
           buffer->return_part().length = kDefaultBufferLength;
           ASSERT_FALSE(impl_.PopRxBuffer());
           manual_return = [this, buffer = std::move(buffer)]() mutable {
-            RxReturnTransaction transact(&impl_);
+            RxFidlReturnTransaction transact(&impl_);
             transact.Enqueue(std::move(buffer), kPort13);
             transact.Commit();
           };
@@ -1897,7 +1962,7 @@ TEST_P(RxTxBufferReturnTest, TestRaceFramesWithDeviceStop) {
           buffer->set_status(ZX_OK);
           ASSERT_FALSE(impl_.PopTxBuffer());
           manual_return = [this, buffer = std::move(buffer)]() mutable {
-            TxReturnTransaction transact(&impl_);
+            TxFidlReturnTransaction transact(&impl_);
             transact.Enqueue(std::move(buffer));
             transact.Commit();
           };
@@ -1932,7 +1997,7 @@ TEST_P(RxTxBufferReturnTest, TestRaceFramesWithDeviceStop) {
         ASSERT_OK(impl_.events().signal(kEventRxAvailable, 0));
         // If new rx buffers came back to us, the session must not have been closed.
         ASSERT_FALSE(session_wait.pending & ZX_CHANNEL_PEER_CLOSED);
-        RxReturnTransaction return_rx(&impl_);
+        RxFidlReturnTransaction return_rx(&impl_);
         for (std::unique_ptr buffer = impl_.PopRxBuffer(); buffer; buffer = impl_.PopRxBuffer()) {
           buffer->return_part().length = 0;
           return_rx.Enqueue(std::move(buffer), kPort13);
@@ -1947,7 +2012,7 @@ TEST_P(RxTxBufferReturnTest, TestRaceFramesWithDeviceStop) {
           ASSERT_OK(impl_.events().signal(kEventTx, 0));
           // If we still have pending tx buffers then the session must not have been closed.
           ASSERT_FALSE(session_wait.pending & ZX_CHANNEL_PEER_CLOSED);
-          TxReturnTransaction return_tx(&impl_);
+          TxFidlReturnTransaction return_tx(&impl_);
           for (std::unique_ptr buffer = impl_.PopTxBuffer(); buffer; buffer = impl_.PopTxBuffer()) {
             buffer->set_status(ZX_ERR_UNAVAILABLE);
             return_tx.Enqueue(std::move(buffer));
@@ -1965,11 +2030,7 @@ TEST_P(RxTxBufferReturnTest, TestRaceFramesWithDeviceStop) {
       }
     }
 
-    cpp20::span vmos = impl_.vmos();
-    for (auto vmo = vmos.begin(); vmo != vmos.end(); vmo++) {
-      ASSERT_FALSE(vmo->is_valid())
-          << "unreleased VMO found at " << std::distance(vmo, vmos.begin());
-    }
+    impl_.WaitReleased();
   }
 }
 
@@ -1989,7 +2050,7 @@ TEST_F(NetworkDeviceTest, PortGetInfo) {
   fidl::WireResult result = port->GetInfo();
   ASSERT_OK(result.status());
   const netdev::wire::PortInfo& port_info = result.value().info;
-  const port_base_info_t& impl_info = port13_.port_info();
+  const PortInfo& impl_info = port13_.port_info();
   ASSERT_TRUE(port_info.has_id());
   const netdev::wire::PortId& port_id = port_info.id();
   EXPECT_EQ(port_id.base, kPort13);
@@ -2000,19 +2061,18 @@ TEST_F(NetworkDeviceTest, PortGetInfo) {
   EXPECT_EQ(base_info.port_class(),
             static_cast<netdev::wire::DeviceClass>(port13_.port_info().port_class));
   ASSERT_TRUE(base_info.has_rx_types());
-  EXPECT_EQ(base_info.rx_types().count(), impl_info.rx_types_count);
+  EXPECT_EQ(base_info.rx_types().count(), impl_info.rx_types.size());
   for (size_t i = 0; i < base_info.rx_types().count(); i++) {
-    EXPECT_EQ(base_info.rx_types()[i],
-              static_cast<netdev::wire::FrameType>(impl_info.rx_types_list[i]));
+    EXPECT_EQ(base_info.rx_types()[i], static_cast<netdev::wire::FrameType>(impl_info.rx_types[i]));
   }
   ASSERT_TRUE(base_info.has_tx_types());
-  EXPECT_EQ(base_info.tx_types().count(), impl_info.tx_types_count);
+  EXPECT_EQ(base_info.tx_types().count(), impl_info.tx_types.size());
   for (size_t i = 0; i < base_info.tx_types().count(); i++) {
     EXPECT_EQ(base_info.tx_types()[i].type,
-              static_cast<netdev::wire::FrameType>(impl_info.tx_types_list[i].type));
-    EXPECT_EQ(base_info.tx_types()[i].features, impl_info.tx_types_list[i].features);
+              static_cast<netdev::wire::FrameType>(impl_info.tx_types[i].type));
+    EXPECT_EQ(base_info.tx_types()[i].features, impl_info.tx_types[i].features);
     EXPECT_EQ(base_info.tx_types()[i].supported_flags,
-              static_cast<netdev::wire::TxFlags>(impl_info.tx_types_list[i].supported_flags));
+              static_cast<netdev::wire::TxFlags>(impl_info.tx_types[i].supported_flags));
   }
 }
 
@@ -2023,18 +2083,18 @@ TEST_F(NetworkDeviceTest, PortGetStatus) {
   ASSERT_OK(port.status_value());
   constexpr struct {
     const char* name;
-    port_status_t status;
+    PortStatus status;
   } kTests[] = {
       {
           .name = "offline-1280",
-          .status = {.flags = 0, .mtu = 1280},
+          .status = {.mtu = 1280, .flags = netdev::wire::StatusFlags()},
       },
       {
           .name = "online-1500",
           .status =
               {
-                  .flags = static_cast<uint32_t>(netdev::wire::StatusFlags::kOnline),
                   .mtu = 1500,
+                  .flags = netdev::wire::StatusFlags::kOnline,
               },
       },
   };
@@ -2052,13 +2112,7 @@ TEST_F(NetworkDeviceTest, PortGetStatus) {
 }
 
 TEST_F(NetworkDeviceTest, PortGetMac) {
-  // Test Port.GetMac FIDL implementation.
-  port13_.SetMac(mac_addr_protocol_t{
-      // NB: Banjo types want nonconst ops, but we want mac ops to be a constant expression so it
-      // can safely outlive this scope since it is set in port13.
-      .ops = const_cast<mac_addr_protocol_ops_t*>(&kMockMacOps),
-      .ctx = nullptr,
-  });
+  port13_.SetMac(mac_impl_.Bind(dispatcher()));
   ASSERT_OK(CreateDeviceWithPort13());
   zx::result port = OpenPort(kPort13);
   ASSERT_OK(port.status_value());
@@ -2070,9 +2124,8 @@ TEST_F(NetworkDeviceTest, PortGetMac) {
   fidl::WireResult result = mac->GetUnicastAddress();
   ASSERT_OK(result.status());
   fuchsia_net::wire::MacAddress& addr = result.value().address;
-  mac_address_t out_mac{};
-  kMockMacOps.get_address(nullptr, &out_mac);
-  EXPECT_TRUE(std::equal(addr.octets.begin(), addr.octets.end(), out_mac.octets));
+  const auto& octets = mac_impl_.mac().octets;
+  EXPECT_TRUE(std::equal(addr.octets.begin(), addr.octets.end(), octets.begin()));
 }
 
 TEST_F(NetworkDeviceTest, PortGetMacFails) {
@@ -2145,7 +2198,7 @@ TEST_F(NetworkDeviceTest, MultiplePortsAndSessions) {
   constexpr uint8_t kPortCount = 2;
   std::array<FakeNetworkPortImpl, kPortCount> ports;
   for (uint8_t i = 0; i < kPortCount; i++) {
-    ports[i].AddPort(i + 1, impl_.client());
+    ASSERT_OK(ports[i].AddPort(i + 1, impl_dispatcher_, OpenConnection(), impl_));
   }
   auto remove_ports = fit::defer([&ports]() {
     for (auto& port : ports) {
@@ -2204,17 +2257,18 @@ TEST_F(NetworkDeviceTest, MultiplePortsAndSessions) {
   ASSERT_EQ(impl_.rx_buffer_count(), descriptors.size());
 
   // Receive one buffer on each of the ports we created.
-  RxReturnTransaction return_session(&impl_);
+  RxFidlReturnTransaction return_session(&impl_);
   for (auto& port : ports) {
-    SCOPED_TRACE(static_cast<int>(port.id()));
+    SCOPED_TRACE(port.id());
     std::unique_ptr rx_space = impl_.PopRxBuffer();
     uint8_t port_id = port.id();
     // Write some data so the buffer makes it into the session.
     ASSERT_OK(rx_space->WriteData(cpp20::span(&port_id, sizeof(port_id)), impl_.VmoGetter()));
-    std::unique_ptr ret = std::make_unique<RxReturn>(std::move(rx_space), port_id);
+    std::unique_ptr ret = std::make_unique<RxFidlReturn>(std::move(rx_space), port_id);
     return_session.Enqueue(std::move(ret));
   }
   return_session.Commit();
+  ASSERT_OK(WaitRxAvailable());
 
   // Expect the appropriate buffers to be returned to all sessions.
   for (auto& s : sessions) {
@@ -2226,7 +2280,7 @@ TEST_F(NetworkDeviceTest, MultiplePortsAndSessions) {
 
     auto desc_iter = returned_descriptors.begin();
     for (auto& port : s.attach_ports) {
-      SCOPED_TRACE(static_cast<int>(port.id()));
+      SCOPED_TRACE(port.id());
       const buffer_descriptor_t& desc = s.session.descriptor(*desc_iter++);
       ASSERT_EQ(desc.port_id.base, port.id());
       ASSERT_EQ(desc.port_id.salt, GetSaltedPortId(port.id()).salt);
@@ -2240,7 +2294,7 @@ TEST_F(NetworkDeviceTest, ListenSessionPortFiltering) {
   constexpr uint8_t kPortCount = 2;
   std::array<FakeNetworkPortImpl, kPortCount> ports;
   for (uint8_t i = 0; i < static_cast<uint8_t>(ports.size()); i++) {
-    ports[i].AddPort(i + 1, impl_.client());
+    ASSERT_OK(ports[i].AddPort(i + 1, impl_dispatcher_, OpenConnection(), impl_));
   }
   auto remove_ports = fit::defer([&ports]() {
     for (auto& port : ports) {
@@ -2369,7 +2423,7 @@ TEST_F(NetworkDeviceTest, PortWatcher) {
   constexpr uint8_t kOtherPortId = 1;
   {
     FakeNetworkPortImpl port;
-    port.AddPort(kOtherPortId, impl_.client());
+    ASSERT_OK(port.AddPort(kOtherPortId, impl_dispatcher_, OpenConnection(), impl_));
     netdev::wire::PortId other_salted_id = GetSaltedPortId(kOtherPortId);
     auto remove_port = fit::defer([&port]() { port.RemoveSync(); });
     ASSERT_NO_FATAL_FAILURE(
@@ -2395,13 +2449,13 @@ TEST_F(NetworkDeviceTest, PortWatcher) {
 
   for (auto& port_id : install_rounds) {
     FakeNetworkPortImpl port;
-    port.AddPort(kOtherPortId, impl_.client());
+    ASSERT_OK(port.AddPort(kOtherPortId, impl_dispatcher_, OpenConnection(), impl_));
     port_id = GetSaltedPortId(kOtherPortId);
     port.RemoveSync();
   }
 
   for (auto& port_id : install_rounds) {
-    SCOPED_TRACE(static_cast<uint32_t>(port_id.base));
+    SCOPED_TRACE(port_id.base);
     ASSERT_NO_FATAL_FAILURE(
         expect_event(std::move(fut), {
                                          .which = netdev::wire::DevicePortEvent::Tag::kAdded,
@@ -2456,7 +2510,8 @@ TEST_F(NetworkDeviceTest, PortWatcherEnforcesQueueLimit) {
       port = nullptr;
     } else {
       port = std::make_unique<FakeNetworkPortImpl>();
-      ASSERT_OK(port->AddPort((event_count / 2) % MAX_PORTS, impl_.client()));
+      ASSERT_OK(
+          port->AddPort((event_count / 2) % MAX_PORTS, impl_dispatcher_, OpenConnection(), impl_));
     }
   }
   zx::result status = WaitClosedAndReadEpitaph(watcher.channel());
@@ -2546,7 +2601,7 @@ TEST_P(BadDescriptorTest, SessionIsKilledOnBadDescriptor) {
       break;
     case DescriptorSource::SecondarySessionRx: {
       ASSERT_OK(WaitRxAvailable());
-      RxReturnTransaction txn(&impl_);
+      RxFidlReturnTransaction txn(&impl_);
       std::unique_ptr rx_buffer = impl_.PopRxBuffer();
       rx_buffer->SetReturnLength(1);
       txn.Enqueue(std::move(rx_buffer), kPort13);
@@ -2655,7 +2710,7 @@ TEST_F(NetworkDeviceTest, SecondarySessionWithRxOffsetAndChaining) {
   }
 
   ASSERT_OK(WaitRxAvailable());
-  RxReturnTransaction txn(&impl_);
+  RxFidlReturnTransaction txn(&impl_);
   for (auto& b : buffers) {
     b.reference_data.reserve(b.length);
     for (uint32_t i = 0; i < b.length; i++) {
@@ -2673,7 +2728,15 @@ TEST_F(NetworkDeviceTest, SecondarySessionWithRxOffsetAndChaining) {
     };
     txn.Enqueue(std::move(rx_space), kPort13);
   }
+  libsync::Completion completion;
+  SetEvtRxQueuePacketHandler([&completion](uint64_t key) {
+    EXPECT_EQ(key, internal::RxQueue::kTriggerRxKey);
+    completion.Signal();
+  });
   txn.Commit();
+  ASSERT_OK(completion.Wait(TEST_DEADLINE));
+
+  SetEvtRxQueuePacketHandler(nullptr);
 
   for (auto& s : sessions) {
     SCOPED_TRACE(s.name);
@@ -2776,24 +2839,36 @@ TEST_F(NetworkDeviceTest, BufferChainingOnListenTx) {
 
 TEST_F(NetworkDeviceTest, SessionsClosedOnStartFailure) {
   ASSERT_OK(CreateDeviceWithPort13());
+
+  auto assert_no_sessions = [this] {
+    auto& device = *static_cast<internal::DeviceInterface*>(device_.get());
+    fbl::AutoLock lock(&device.control_lock());
+    ASSERT_TRUE(GetDeviceSessionsUnsafe(device).is_empty());
+    ASSERT_EQ(GetPrimarySession(device), nullptr);
+    ASSERT_FALSE(device.IsDataPlaneOpen());
+  };
+
   impl_.set_auto_start(ZX_ERR_INTERNAL);
   TestSession primary;
   ASSERT_OK(OpenSession(&primary, netdev::wire::SessionFlags::kPrimary, kDefaultDescriptorCount,
                         kDefaultBufferLength, "primary"));
   ASSERT_OK(AttachSessionPort(primary, port13_));
+  ASSERT_OK(WaitSessionDied());
+  ASSERT_NO_FATAL_FAILURE(assert_no_sessions());
+
   TestSession secondary;
   ASSERT_OK(OpenSession(&secondary, netdev::wire::SessionFlags::kMask, kDefaultDescriptorCount,
                         kDefaultBufferLength, "secondary"));
   ASSERT_OK(AttachSessionPort(secondary, port13_));
+  ASSERT_OK(WaitSessionDied());
+  ASSERT_NO_FATAL_FAILURE(assert_no_sessions());
+
   TestSession tertiary;
   ASSERT_OK(OpenSession(&tertiary, netdev::wire::SessionFlags::kMask, kDefaultDescriptorCount,
                         kDefaultBufferLength, "tertiary"));
   ASSERT_OK(AttachSessionPort(tertiary, port13_));
-
-  auto* device = static_cast<internal::DeviceInterface*>(device_.get());
-  fbl::AutoLock lock(&device->control_lock());
-  ASSERT_TRUE(GetDeviceSessionsUnsafe(*device).is_empty());
-  ASSERT_FALSE(device->IsDataPlaneOpen());
+  ASSERT_OK(WaitSessionDied());
+  ASSERT_NO_FATAL_FAILURE(assert_no_sessions());
 }
 
 INSTANTIATE_TEST_SUITE_P(NetworkDeviceTest, RxTxParamTest,
@@ -2880,7 +2955,7 @@ TEST_F(NetworkDeviceTest, DeadSessionsDontPreventTeardown) {
   ASSERT_STATUS(sync_completion_wait_deadline(&completer, zx::time::infinite_past().get()),
                 ZX_ERR_TIMED_OUT);
 
-  RxReturnTransaction txn(&impl_);
+  RxFidlReturnTransaction txn(&impl_);
   txn.Enqueue(std::move(buffer), port13_.id());
   txn.Commit();
 
@@ -2960,7 +3035,7 @@ TEST_F(NetworkDeviceTest, PortIdSaltChangesOnFlap) {
     // removal.
     const uint8_t expect_salt = base_salt + i;
     FakeNetworkPortImpl port;
-    port.AddPort(kPort13, impl_.client());
+    ASSERT_OK(port.AddPort(kPort13, impl_dispatcher_, OpenConnection(), impl_));
     // Check internal ID and salt.
     {
       netdev::wire::PortId id = GetSaltedPortId(kPort13);
@@ -3007,13 +3082,24 @@ TEST_F(NetworkDeviceTest, PortGetRxCounters) {
 
   constexpr uint32_t kReturnLength = 17;
 
-  auto prepare_return_buffer = [this]() -> std::unique_ptr<RxReturn> {
+  auto prepare_return_buffer = [this]() -> std::unique_ptr<RxFidlReturn> {
     std::unique_ptr buffer = impl_.PopRxBuffer();
     if (!buffer) {
       return nullptr;
     }
     buffer->SetReturnLength(kReturnLength);
-    return std::make_unique<RxReturn>(std::move(buffer), kPort13);
+    return std::make_unique<RxFidlReturn>(std::move(buffer), kPort13);
+  };
+
+  libsync::Completion rx_event;
+  SetEvtRxQueuePacketHandler([&rx_event](uint64_t key) {
+    ASSERT_EQ(key, internal::RxQueue::kTriggerRxKey);
+    rx_event.Signal();
+  });
+
+  auto wait_for_rx = [&rx_event] {
+    rx_event.Wait();
+    rx_event.Reset();
   };
 
   auto assert_counters = [&port_connection](uint64_t frames, uint64_t bytes,
@@ -3023,9 +3109,9 @@ TEST_F(NetworkDeviceTest, PortGetRxCounters) {
     ASSERT_OK(r.status());
     fidl::WireResponse rsp = std::move(r.value());
     ASSERT_TRUE(rsp.has_rx_bytes());
-    EXPECT_EQ(rsp.rx_bytes(), bytes);
+    ASSERT_EQ(rsp.rx_bytes(), bytes);
     ASSERT_TRUE(rsp.has_rx_frames());
-    EXPECT_EQ(rsp.rx_frames(), frames);
+    ASSERT_EQ(rsp.rx_frames(), frames);
 
     ASSERT_TRUE(rsp.has_tx_frames());
     EXPECT_EQ(rsp.tx_frames(), 0u);
@@ -3037,26 +3123,32 @@ TEST_F(NetworkDeviceTest, PortGetRxCounters) {
 
   // Return a single descriptor and assert the counters.
   {
-    std::unique_ptr<RxReturn> buffer = prepare_return_buffer();
+    std::unique_ptr<RxFidlReturn> buffer = prepare_return_buffer();
     ASSERT_TRUE(buffer);
-    RxReturnTransaction txn(&impl_);
+    RxFidlReturnTransaction txn(&impl_);
     txn.Enqueue(std::move(buffer));
     txn.Commit();
   }
+  wait_for_rx();
   assert_counters(1, kReturnLength, "single buffer");
 
   // Return all the remaining descriptors and assert the counters.
   {
-    RxReturnTransaction txn(&impl_);
+    RxFidlReturnTransaction txn(&impl_);
     for (size_t i = 1; i < std::size(kDescriptors); i++) {
-      std::unique_ptr<RxReturn> buffer = prepare_return_buffer();
+      std::unique_ptr<RxFidlReturn> buffer = prepare_return_buffer();
       ASSERT_TRUE(buffer);
       txn.Enqueue(std::move(buffer));
     }
     txn.Commit();
   }
+  wait_for_rx();
   assert_counters(std::size(kDescriptors), std::size(kDescriptors) * kReturnLength,
                   "remaining buffers");
+
+  // There will be a session switch event when the session closes. Ensure that there is no longer a
+  // callback that references a local variable.
+  SetEvtRxQueuePacketHandler(nullptr);
 }
 
 TEST_F(NetworkDeviceTest, PortGetTxCounters) {
@@ -3152,6 +3244,7 @@ TEST_F(NetworkDeviceTest, TooManySessions) {
 // Subclass for stress tests with diminished logging to decrease noise.
 class NetworkDeviceStressTest : public NetworkDeviceTest {
   void SetUp() override {
+    NetworkDeviceTest::SetUp();
     fx_logger_config_t log_cfg = {
         .min_severity = FX_LOG_INFO,
         .tags = nullptr,
@@ -3274,6 +3367,138 @@ TEST_F(NetworkDeviceTest, QueueRxSpaceBatches) {
   }
   ASSERT_EQ(impl_.queue_rx_space_called(), MAX_RX_SPACE_BUFFERS);
   ASSERT_EQ(impl_.queue_rx_space_called(), 1u);
+}
+
+class NetworkDeviceShimTest : public ::testing::Test {
+ public:
+  NetworkDeviceShimTest() = default;
+  void SetUp() override {
+    auto ifc_dispatcher = fdf::SynchronizedDispatcher::Create(
+        fdf::SynchronizedDispatcher::Options::kAllowSyncCalls, "shim-test-ifc",
+        [this](fdf_dispatcher_t*) { ifc_dispatcher_shutdown_.Signal(); });
+    ASSERT_OK(ifc_dispatcher.status_value());
+    ifc_dispatcher_ = std::move(ifc_dispatcher.value());
+
+    zx::result shim_dispatchers = OwnedShimDispatchers::Create();
+    ASSERT_OK(shim_dispatchers.status_value());
+    shim_dispatchers_ = std::move(shim_dispatchers.value());
+
+    CreateShim();
+  }
+
+  void TearDown() override {
+    if (ifc_dispatcher_.get()) {
+      ifc_dispatcher_.ShutdownAsync();
+      ifc_dispatcher_shutdown_.Wait();
+    }
+    if (shim_dispatchers_) {
+      shim_dispatchers_->ShutdownSync();
+    }
+
+    if (shim_) {
+      // With the dispatchers shut down this should be synchronous.
+      ASSERT_EQ(shim_->Teardown([] {}), NetworkDeviceImplBinder::Synchronicity::Sync);
+    }
+  }
+
+  zx_status_t InitImpl() {
+    auto ifc_client_end = ifc_.Bind(&ifc_dispatcher_);
+    if (ifc_client_end.is_error()) {
+      return ifc_client_end.status_value();
+    }
+
+    fdf::Arena arena('NETD');
+    auto result = fidl_impl_.buffer(arena)->Init(std::move(ifc_client_end.value()));
+    if (!result.ok()) {
+      return result.status();
+    }
+    return result->s;
+  }
+
+  zx_status_t AddPortSync(uint8_t port_id, network_port_protocol_t* proto) {
+    using Context = std::pair<libsync::Completion, zx_status_t>;
+    Context context;
+
+    shim_->NetworkDeviceIfcAddPort(
+        port_id, proto,
+        [](void* ctx, zx_status_t status) {
+          Context* context = static_cast<Context*>(ctx);
+          context->second = status;
+          context->first.Signal();
+        },
+        &context);
+    context.first.Wait();
+    return context.second;
+  }
+
+ protected:
+  fdf_testing::DriverRuntime driver_runtime_;
+  // This is the client that the shim will call into, i.e. the vendor driver.
+  banjo::FakeNetworkDeviceImpl banjo_impl_;
+  // This is the client that the shim will serve, i.e. the netdevice driver.
+  fdf::WireSyncClient<netdriver::NetworkDeviceImpl> fidl_impl_;
+  FakeNetworkDeviceIfc ifc_;
+  std::unique_ptr<NetworkDeviceShim> shim_;
+
+  fdf::Dispatcher ifc_dispatcher_;
+  libsync::Completion ifc_dispatcher_shutdown_;
+  std::unique_ptr<OwnedShimDispatchers> shim_dispatchers_;
+
+ private:
+  void CreateShim() {
+    auto proto = banjo_impl_.proto();
+    shim_ = std::make_unique<NetworkDeviceShim>(&proto, shim_dispatchers_->Unowned());
+    auto fidl_impl = shim_->Bind();
+    ASSERT_OK(fidl_impl.status_value());
+    fidl_impl_.Bind(std::move(fidl_impl.value()));
+  }
+};
+
+TEST_F(NetworkDeviceShimTest, BindAndTeardown) {
+  // Verify that a bound NetworkDeviceShim can be safely destroyed in its teardown callback.
+
+  libsync::Completion teardown_complete;
+  NetworkDeviceImplBinder::Synchronicity synchronicity = shim_->Teardown([&] {
+    shim_.reset();
+    teardown_complete.Signal();
+  });
+  ASSERT_EQ(synchronicity, NetworkDeviceImplBinder::Synchronicity::Async);
+  teardown_complete.Wait();
+}
+
+TEST_F(NetworkDeviceShimTest, AddPort) {
+  // Verify that AddPort works and manages the lifetime of the NetworkPortShim object correctly.
+  ASSERT_OK(InitImpl());
+
+  constexpr uint8_t kPortId = 13;
+  ifc_.add_port_ = [&](netdriver::wire::NetworkDeviceIfcAddPortRequest* request, fdf::Arena& arena,
+                       FakeNetworkDeviceIfc::AddPortCompleter::Sync& completer) {
+    ASSERT_EQ(request->id, kPortId);
+    completer.buffer(arena).Reply(ZX_OK);
+  };
+
+  network_port_protocol_t port_proto{};
+  ASSERT_OK(AddPortSync(kPortId, &port_proto));
+}
+
+TEST_F(NetworkDeviceShimTest, GetMac) {
+  // Verify that GetMac works and manages the lifetime of the MacAddrShim object correctly.
+  ASSERT_OK(InitImpl());
+
+  fdf::WireSyncClient<netdriver::NetworkPort> port_client;
+  ifc_.add_port_ = [&](netdriver::wire::NetworkDeviceIfcAddPortRequest* request, fdf::Arena& arena,
+                       FakeNetworkDeviceIfc::AddPortCompleter::Sync& completer) {
+    port_client.Bind(std::move(request->port));
+    completer.buffer(arena).Reply(ZX_OK);
+  };
+
+  banjo::FakeNetworkPortImpl port;
+  auto port_proto = port.protocol();
+  ASSERT_OK(AddPortSync(12, &port_proto));
+
+  fdf::Arena arena('NETD');
+  auto mac = port_client.buffer(arena)->GetMac();
+  ASSERT_OK(mac.status());
 }
 
 }  // namespace testing

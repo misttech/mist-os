@@ -10,11 +10,14 @@
 
 #include <fbl/auto_lock.h>
 
+#include "src/connectivity/network/drivers/network-device/device/network_device_shim.h"
+
 namespace network {
 namespace tun {
 
-zx::result<std::unique_ptr<DeviceAdapter>> DeviceAdapter::Create(async_dispatcher_t* dispatcher,
-                                                                 DeviceAdapterParent* parent) {
+zx::result<std::unique_ptr<DeviceAdapter>> DeviceAdapter::Create(
+    const DeviceInterfaceDispatchers& dispatchers, const ShimDispatchers& shim_dispatchers,
+    DeviceAdapterParent* parent) {
   fbl::AllocChecker ac;
   std::unique_ptr<DeviceAdapter> adapter(new (&ac) DeviceAdapter(parent));
   if (!ac.check()) {
@@ -25,8 +28,12 @@ zx::result<std::unique_ptr<DeviceAdapter>> DeviceAdapter::Create(async_dispatche
       .ctx = adapter.get(),
   };
 
-  zx::result device =
-      NetworkDeviceInterface::Create(dispatcher, ddk::NetworkDeviceImplProtocolClient(&proto));
+  std::unique_ptr shim = fbl::make_unique_checked<NetworkDeviceShim>(&ac, &proto, shim_dispatchers);
+  if (!ac.check()) {
+    return zx::error(ZX_ERR_NO_MEMORY);
+  }
+
+  zx::result device = NetworkDeviceInterface::Create(dispatchers, std::move(shim));
   if (device.is_error()) {
     return device.take_error();
   }
@@ -76,6 +83,8 @@ void DeviceAdapter::NetworkDeviceImplStop(network_device_impl_stop_callback call
           .length = 0,
       };
       rx_buffer_t return_buffer = {
+          .meta = {.frame_type =
+                       static_cast<uint8_t>(fuchsia_hardware_network::FrameType::kEthernet)},
           .data_list = &part,
           .data_count = 1,
       };
@@ -141,6 +150,8 @@ void DeviceAdapter::NetworkDeviceImplQueueRxSpace(const rx_space_buffer_t* buf_l
             .length = 0,
         };
         rx_buffer_t buffer = {
+            .meta = {.frame_type =
+                         static_cast<uint8_t>(fuchsia_hardware_network::FrameType::kEthernet)},
             .data_list = &part,
             .data_count = 1,
         };

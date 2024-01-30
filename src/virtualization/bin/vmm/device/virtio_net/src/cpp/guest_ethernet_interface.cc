@@ -6,14 +6,26 @@
 
 #include <lib/syslog/cpp/macros.h>
 
-zx_status_t guest_ethernet_create(GuestEthernet** guest_ethernet_out) {
-  auto guest_ethernet = std::make_unique<GuestEthernet>();
-  const zx_status_t status = guest_ethernet->StartDispatchLoop();
-  if (status == ZX_OK) {
-    *guest_ethernet_out = guest_ethernet.release();
+zx_status_t guest_ethernet_context_create(GuestEthernetContext** context_out) {
+  auto context = GuestEthernetContext::Create();
+  if (context.is_error()) {
+    return context.status_value();
   }
+  *context_out = context.value().release();
+  return ZX_OK;
+}
 
-  return status;
+void guest_ethernet_context_destroy(GuestEthernetContext* context) { delete context; }
+
+zx_status_t guest_ethernet_create(GuestEthernetContext* context,
+                                  GuestEthernet** guest_ethernet_out) {
+  if (context == nullptr) {
+    return ZX_ERR_INVALID_ARGS;
+  }
+  auto guest_ethernet = std::make_unique<GuestEthernet>(
+      context->SyncDispatcher(), context->Dispatchers(), context->ShimDispatchers());
+  *guest_ethernet_out = guest_ethernet.release();
+  return ZX_OK;
 }
 
 void guest_ethernet_destroy(GuestEthernet* guest_ethernet) {

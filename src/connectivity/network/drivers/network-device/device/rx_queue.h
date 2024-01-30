@@ -5,7 +5,7 @@
 #ifndef SRC_CONNECTIVITY_NETWORK_DRIVERS_NETWORK_DEVICE_DEVICE_RX_QUEUE_H_
 #define SRC_CONNECTIVITY_NETWORK_DRIVERS_NETWORK_DEVICE_DEVICE_RX_QUEUE_H_
 
-#include <fuchsia/hardware/network/driver/cpp/banjo.h>
+#include <lib/sync/cpp/completion.h>
 #include <lib/zx/port.h>
 #include <lib/zx/thread.h>
 
@@ -45,7 +45,8 @@ class RxQueue {
   // Called by the DeviceInterface parent when the session is marked as dead.
   void PurgeSession(Session& session);
   // Returns rx buffers to their respective sessions.
-  void CompleteRxList(const rx_buffer_t* rx_buffer_list, size_t count)
+  void CompleteRxList(
+      const fidl::VectorView<::fuchsia_hardware_network_driver::wire::RxBuffer>& rx_buffer_list)
       __TA_EXCLUDES(parent_->rx_lock());
   // Notifies watcher thread that the primary session changed.
   void TriggerSessionChanged();
@@ -72,8 +73,6 @@ class RxQueue {
     DISALLOW_COPY_ASSIGN_AND_MOVE(SessionTransaction);
   };
 
-  zx::unowned_thread thread_handle();
-
  private:
   explicit RxQueue(DeviceInterface* parent) : parent_(parent) {}
 
@@ -91,9 +90,11 @@ class RxQueue {
       __TA_REQUIRES_SHARED(parent_->control_lock());
   // Pops a buffer from the queue, if any are available, and stores the space information in `buff`.
   // Returns ZX_ERR_NO_RESOURCES if there are no buffers available.
-  zx_status_t PrepareBuff(rx_space_buffer_t* buff) __TA_REQUIRES(parent_->rx_lock())
-      __TA_REQUIRES_SHARED(parent_->control_lock());
-  int WatchThread(std::unique_ptr<rx_space_buffer_t[]> space_buffers);
+  zx_status_t PrepareBuff(fuchsia_hardware_network_driver::wire::RxSpaceBuffer* buff)
+      __TA_REQUIRES(parent_->rx_lock()) __TA_REQUIRES_SHARED(parent_->control_lock());
+  int WatchThread(
+      std::unique_ptr<fuchsia_hardware_network_driver::wire::RxSpaceBuffer[]> space_buffers);
+
   // Reclaims the buffer with `id` from the device. If the buffer's session is still valid, gives it
   // to the session, otherwise drops it.
   void ReclaimBuffer(uint32_t id) __TA_REQUIRES(parent_->rx_lock());
@@ -105,8 +106,11 @@ class RxQueue {
   size_t device_buffer_count_ __TA_GUARDED(parent_->rx_lock()) = 0;
 
   zx::port rx_watch_port_;
-  std::optional<thrd_t> rx_watch_thread_{};
+  fdf::Dispatcher dispatcher_;
+  libsync::Completion dispatcher_shutdown_;
   std::atomic<bool> running_;
+
+  static std::atomic<uint32_t> num_instances_;
 
   DISALLOW_COPY_ASSIGN_AND_MOVE(RxQueue);
 };

@@ -5,7 +5,6 @@
 #ifndef SRC_CONNECTIVITY_NETWORK_DRIVERS_NETWORK_DEVICE_DEVICE_DEVICE_PORT_H_
 #define SRC_CONNECTIVITY_NETWORK_DRIVERS_NETWORK_DEVICE_DEVICE_DEVICE_PORT_H_
 
-#include <fuchsia/hardware/network/driver/cpp/banjo.h>
 #include <lib/async/dispatcher.h>
 #include <lib/fit/function.h>
 #include <lib/stdcompat/optional.h>
@@ -22,13 +21,22 @@ class DeviceInterface;
 class DevicePort : public fidl::WireServer<netdev::Port> {
  public:
   using TeardownCallback = fit::callback<void(DevicePort&)>;
-  DevicePort(DeviceInterface* parent, async_dispatcher_t* dispatcher, netdev::wire::PortId id,
-             ddk::NetworkPortProtocolClient port, std::unique_ptr<MacAddrDeviceInterface> mac,
-             TeardownCallback on_teardown);
-  ~DevicePort() { port_.Removed(); }
+  using OnCreated = fit::callback<void(zx::result<std::unique_ptr<DevicePort>>)>;
+
+  // Asynchronously create a DevicePort object. This will make calls on the port_client to determine
+  // the initial state of the port. Once the port object is ready it will be provided through the
+  // on_created callback. If an error occurs it will also be reported through on_created. Note that
+  // on an error the callback may be (but is not guaranteed to be) called inline from the Create
+  // call. Because of this it's a good idea to avoid acquiring locks in the on_created callback when
+  // an error is reported.
+  static void Create(
+      DeviceInterface* parent, async_dispatcher_t* dispatcher, netdev::wire::PortId id,
+      fdf::WireSharedClient<fuchsia_hardware_network_driver::NetworkPort>&& port_client,
+      fdf_dispatcher_t* mac_dispatcher, TeardownCallback&& on_teardown, OnCreated&& on_created);
+
+  ~DevicePort() override;
 
   netdev::wire::PortId id() const { return id_; }
-  ddk::NetworkPortProtocolClient& impl() { return port_; }
 
   struct Counters {
     std::atomic<uint64_t> rx_frames = 0;
@@ -38,7 +46,7 @@ class DevicePort : public fidl::WireServer<netdev::Port> {
   };
 
   // Notifies port of status changes notifications from the network device implementation.
-  void StatusChanged(const port_status_t& new_status);
+  void StatusChanged(const netdev::wire::PortStatus& new_status);
   // Starts port teardown process.
   //
   // Once port is torn down and ready to be deleted, the teardown callback passed on construction
@@ -96,6 +104,18 @@ class DevicePort : public fidl::WireServer<netdev::Port> {
 
   using BindingList = fbl::DoublyLinkedList<std::unique_ptr<Binding>>;
 
+  DevicePort(DeviceInterface* parent, async_dispatcher_t* dispatcher, netdev::wire::PortId id,
+             fdf::WireSharedClient<fuchsia_hardware_network_driver::NetworkPort>&& port,
+             TeardownCallback&& on_teardown);
+
+  void Init(fdf_dispatcher_t* mac_dispatcher, fit::callback<void(zx_status_t)>&& on_complete);
+  void GetMac(fit::callback<void(zx::result<::fdf::ClientEnd<netdriver::MacAddr>>)>&& on_complete);
+  void CreateMacInterface(::fdf::ClientEnd<netdriver::MacAddr>&& client_end,
+                          fdf_dispatcher_t* mac_dispatcher,
+                          fit::callback<void(zx_status_t)>&& on_complete);
+  void GetInitialPortInfo(fit::callback<void(zx_status_t)>&& on_complete);
+  void GetInitialStatus(fit::callback<void(zx_status_t)>&& on_complete);
+
   // Concludes an ongoing teardown if it is ongoing and all internal resources are released.
   //
   // Returns true if teardown callback was dispatched.
@@ -111,16 +131,15 @@ class DevicePort : public fidl::WireServer<netdev::Port> {
   DeviceInterface* const parent_;  // Pointer to parent device. Not owned.
   async_dispatcher_t* const dispatcher_;
   const netdev::wire::PortId id_;
-  ddk::NetworkPortProtocolClient port_;
+  fdf::WireSharedClient<fuchsia_hardware_network_driver::NetworkPort> port_;
   Counters counters_;
   std::unique_ptr<MacAddrDeviceInterface> mac_ __TA_GUARDED(lock_);
   BindingList bindings_ __TA_GUARDED(lock_);
 
   netdev::wire::DeviceClass port_class_;
-  std::array<netdev::wire::FrameType, netdev::wire::kMaxFrameTypes> supported_rx_;
-  size_t supported_rx_count_;
-  std::array<netdev::wire::FrameTypeSupport, netdev::wire::kMaxFrameTypes> supported_tx_;
-  size_t supported_tx_count_;
+  netdev::PortStatus status_;
+  std::vector<netdev::wire::FrameType> supported_rx_;
+  std::vector<netdev::wire::FrameTypeSupport> supported_tx_;
 
   fbl::Mutex lock_;
   StatusWatcherList watchers_ __TA_GUARDED(lock_);

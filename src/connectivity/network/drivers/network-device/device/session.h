@@ -5,7 +5,6 @@
 #ifndef SRC_CONNECTIVITY_NETWORK_DRIVERS_NETWORK_DEVICE_DEVICE_SESSION_H_
 #define SRC_CONNECTIVITY_NETWORK_DRIVERS_NETWORK_DEVICE_DEVICE_SESSION_H_
 
-#include <fuchsia/hardware/network/driver/cpp/banjo.h>
 #include <lib/async/dispatcher.h>
 #include <lib/fidl/cpp/wire/server.h>
 #include <lib/fzl/pinned-vmo.h>
@@ -142,9 +141,9 @@ class Session : public fbl::DoublyLinkedListable<std::unique_ptr<Session>>,
   void Detach(DetachRequestView request, DetachCompleter::Sync& _completer) override;
   void Close(CloseCompleter::Sync& _completer) override;
 
-  zx_status_t AttachPort(netdev::wire::PortId port_id,
+  zx_status_t AttachPort(const netdev::wire::PortId& port_id,
                          cpp20::span<const netdev::wire::FrameType> frame_types);
-  zx_status_t DetachPort(netdev::wire::PortId port_id);
+  zx_status_t DetachPort(const netdev::wire::PortId& port_id);
 
   // Sets the return code for a tx descriptor.
   void MarkTxReturnResult(uint16_t descriptor, zx_status_t status);
@@ -159,7 +158,8 @@ class Session : public fbl::DoublyLinkedListable<std::unique_ptr<Session>>,
   // needed.
   zx_status_t LoadRxDescriptors(RxQueue::SessionTransaction& transact);
   // Sets the data in the space buffer `buff` to region described by `descriptor_index`.
-  zx_status_t FillRxSpace(uint16_t descriptor_index, rx_space_buffer_t* buff);
+  zx_status_t FillRxSpace(uint16_t descriptor_index,
+                          fuchsia_hardware_network_driver::wire::RxSpaceBuffer* buff);
   // Completes rx for a single frame described by `frame_info`.
   //
   // Returns true if the buffers comprising `frame_info` can immediately be reused.
