@@ -286,6 +286,12 @@ criteria = ["safe-to-deploy", "ub-risk-1"]
 version = "0.10.5"
 notes = "Reviewed on https://fxrev.dev/712371."
 
+[[audits.socket2]]
+who = "David Koloski <dkoloski@google.com>"
+criteria = ["safe-to-deploy", "ub-risk-2"]
+delta = "0.4.4 -> 0.5.5"
+notes = "Reviewed at https://fxrev.dev/946307"
+
 [[audits.take_mut]]
 who = "David Koloski <dkoloski@google.com>"
 criteria = ["safe-to-deploy", "ub-risk-2"]
