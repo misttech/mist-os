@@ -31,6 +31,10 @@ toc:
     path: /docs/development/sdk/ffx/start-a-component-during-development.md
   - title: Copy files to and from a component
     path: /docs/development/sdk/ffx/copy-files-to-and-from-a-component.md
+- title: Drivers
+  section:
+  - title: View driver information
+    path: /docs/development/sdk/ffx/view-driver-information.md
 - title: Packages
   section:
   - title: Create a Fuchsia package repository

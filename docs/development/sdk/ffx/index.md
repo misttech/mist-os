@@ -20,6 +20,10 @@ interact with Fuchsia systems, devices, and software.
   * [Start a component during development][start-a-component]
   * [Copy files to and from a component][copy-files]
 
+* Drivers
+
+  * [View driver information][view-driver-info]
+
 * Packages
 
   * [Create a Fuchsia package repository][create-a-package-repo]
@@ -54,6 +58,7 @@ interact with Fuchsia systems, devices, and software.
 [view-component-info]: view-component-information.md
 [start-a-component]: start-a-component-during-development.md
 [copy-files]: copy-files-to-and-from-a-component.md
+[view-driver-info]: view-driver-information.md
 [create-a-package-repo]: create-a-package-repository.md
 [update-packages]: update-packages-on-a-device.md
 [register-symbols]: register-debug-symbols.md
