@@ -5,6 +5,13 @@ use anyhow::Result;
 use fidl_fuchsia_power_broker as fbroker;
 use fuchsia_zircon::{HandleBased, Rights};
 
+/// A well-known set of PowerLevels to be specified as the valid_levels for a
+/// power element. This is the set of levels in fbroker::BinaryPowerLevel.
+pub const BINARY_POWER_LEVELS: [fbroker::PowerLevel; 2] = [
+    fbroker::BinaryPowerLevel::Off.into_primitive(),
+    fbroker::BinaryPowerLevel::On.into_primitive(),
+];
+
 pub struct PowerElementContext {
     pub element_control: fbroker::ElementControlProxy,
     pub lessor: fbroker::LessorProxy,
@@ -17,7 +24,7 @@ impl PowerElementContext {
         topology: &fbroker::TopologyProxy,
         element_name: &str,
         initial_current_level: fbroker::PowerLevel,
-        minimum_level: fbroker::PowerLevel,
+        valid_levels: Vec<fbroker::PowerLevel>,
         dependencies: Vec<fbroker::LevelDependency>,
         mut active_dependency_tokens_to_register: Vec<fbroker::DependencyToken>,
     ) -> Result<Self> {
@@ -32,7 +39,7 @@ impl PowerElementContext {
             .add_element(
                 element_name,
                 initial_current_level,
-                minimum_level,
+                &valid_levels,
                 dependencies,
                 active_dependency_tokens_to_register,
                 vec![],

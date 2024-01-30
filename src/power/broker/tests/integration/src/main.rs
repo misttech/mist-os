@@ -10,6 +10,7 @@ use fidl_fuchsia_power_broker::{
 };
 use fuchsia_component_test::{Capability, ChildOptions, RealmBuilder, RealmInstance, Ref, Route};
 use fuchsia_zircon::{self as zx, HandleBased};
+use power_broker_client::BINARY_POWER_LEVELS;
 
 async fn build_power_broker_realm() -> Result<RealmInstance, Error> {
     let builder = RealmBuilder::new().await?;
@@ -40,7 +41,7 @@ async fn test_direct() -> Result<()> {
         .add_element(
             "P",
             BinaryPowerLevel::Off.into_primitive(),
-            BinaryPowerLevel::Off.into_primitive(),
+            &BINARY_POWER_LEVELS,
             vec![],
             vec![parent_token.duplicate_handle(zx::Rights::SAME_RIGHTS).expect("dup failed")],
             vec![],
@@ -57,7 +58,7 @@ async fn test_direct() -> Result<()> {
         .add_element(
             "C",
             BinaryPowerLevel::Off.into_primitive(),
-            BinaryPowerLevel::Off.into_primitive(),
+            &BINARY_POWER_LEVELS,
             vec![LevelDependency {
                 dependency_type: DependencyType::Active,
                 dependent_level: BinaryPowerLevel::On.into_primitive(),
@@ -130,7 +131,7 @@ async fn test_transitive() -> Result<()> {
         .add_element(
             "A",
             BinaryPowerLevel::Off.into_primitive(),
-            BinaryPowerLevel::Off.into_primitive(),
+            &BINARY_POWER_LEVELS,
             vec![],
             vec![element_a_token.duplicate_handle(zx::Rights::SAME_RIGHTS).expect("dup failed")],
             vec![],
@@ -148,7 +149,7 @@ async fn test_transitive() -> Result<()> {
         .add_element(
             "B",
             BinaryPowerLevel::Off.into_primitive(),
-            BinaryPowerLevel::Off.into_primitive(),
+            &BINARY_POWER_LEVELS,
             vec![LevelDependency {
                 dependency_type: DependencyType::Active,
                 dependent_level: BinaryPowerLevel::On.into_primitive(),
@@ -172,7 +173,7 @@ async fn test_transitive() -> Result<()> {
         .add_element(
             "C",
             BinaryPowerLevel::Off.into_primitive(),
-            BinaryPowerLevel::Off.into_primitive(),
+            &BINARY_POWER_LEVELS,
             vec![LevelDependency {
                 dependency_type: DependencyType::Active,
                 dependent_level: BinaryPowerLevel::On.into_primitive(),
@@ -191,7 +192,7 @@ async fn test_transitive() -> Result<()> {
         .add_element(
             "D",
             BinaryPowerLevel::Off.into_primitive(),
-            BinaryPowerLevel::Off.into_primitive(),
+            &BINARY_POWER_LEVELS,
             vec![],
             vec![],
             vec![],
@@ -345,7 +346,7 @@ async fn test_shared() -> Result<()> {
         .add_element(
             "GP",
             10,
-            10,
+            &[10, 90, 200],
             vec![],
             vec![grandparent_token.duplicate_handle(zx::Rights::SAME_RIGHTS).expect("dup failed")],
             vec![],
@@ -358,7 +359,7 @@ async fn test_shared() -> Result<()> {
         .add_element(
             "P",
             0,
-            0,
+            &[0, 30, 50],
             vec![
                 LevelDependency {
                     dependency_type: DependencyType::Active,
@@ -387,7 +388,7 @@ async fn test_shared() -> Result<()> {
         .add_element(
             "C1",
             0,
-            0,
+            &[0, 5],
             vec![LevelDependency {
                 dependency_type: DependencyType::Active,
                 dependent_level: 5,
@@ -406,7 +407,7 @@ async fn test_shared() -> Result<()> {
         .add_element(
             "C2",
             0,
-            0,
+            &[0, 3],
             vec![LevelDependency {
                 dependency_type: DependencyType::Active,
                 dependent_level: 3,
@@ -558,7 +559,7 @@ async fn test_passive() -> Result<()> {
         .add_element(
             "A",
             BinaryPowerLevel::Off.into_primitive(),
-            BinaryPowerLevel::Off.into_primitive(),
+            &BINARY_POWER_LEVELS,
             vec![],
             vec![token_a.duplicate_handle(zx::Rights::SAME_RIGHTS)?],
             vec![],
@@ -572,7 +573,7 @@ async fn test_passive() -> Result<()> {
         .add_element(
             "B",
             BinaryPowerLevel::Off.into_primitive(),
-            BinaryPowerLevel::Off.into_primitive(),
+            &BINARY_POWER_LEVELS,
             vec![LevelDependency {
                 dependency_type: DependencyType::Active,
                 dependent_level: BinaryPowerLevel::On.into_primitive(),
@@ -589,7 +590,7 @@ async fn test_passive() -> Result<()> {
         .add_element(
             "C",
             BinaryPowerLevel::Off.into_primitive(),
-            BinaryPowerLevel::Off.into_primitive(),
+            &BINARY_POWER_LEVELS,
             vec![LevelDependency {
                 dependency_type: DependencyType::Passive,
                 dependent_level: BinaryPowerLevel::On.into_primitive(),
@@ -606,7 +607,7 @@ async fn test_passive() -> Result<()> {
         .add_element(
             "D",
             BinaryPowerLevel::Off.into_primitive(),
-            BinaryPowerLevel::Off.into_primitive(),
+            &BINARY_POWER_LEVELS,
             vec![LevelDependency {
                 dependency_type: DependencyType::Active,
                 dependent_level: BinaryPowerLevel::On.into_primitive(),
@@ -739,7 +740,7 @@ async fn test_topology() -> Result<()> {
         .add_element(
             "Earth",
             BinaryPowerLevel::Off.into_primitive(),
-            BinaryPowerLevel::Off.into_primitive(),
+            &BINARY_POWER_LEVELS,
             vec![],
             vec![earth_token.duplicate_handle(zx::Rights::SAME_RIGHTS)?],
             vec![],
@@ -752,7 +753,7 @@ async fn test_topology() -> Result<()> {
         .add_element(
             "Water",
             BinaryPowerLevel::Off.into_primitive(),
-            BinaryPowerLevel::Off.into_primitive(),
+            &BINARY_POWER_LEVELS,
             vec![LevelDependency {
                 dependency_type: DependencyType::Active,
                 dependent_level: BinaryPowerLevel::On.into_primitive(),
@@ -772,7 +773,7 @@ async fn test_topology() -> Result<()> {
         .add_element(
             "Fire",
             BinaryPowerLevel::Off.into_primitive(),
-            BinaryPowerLevel::Off.into_primitive(),
+            &BINARY_POWER_LEVELS,
             vec![],
             vec![fire_token.duplicate_handle(zx::Rights::SAME_RIGHTS)?],
             vec![],
@@ -785,7 +786,7 @@ async fn test_topology() -> Result<()> {
         .add_element(
             "Air",
             BinaryPowerLevel::Off.into_primitive(),
-            BinaryPowerLevel::Off.into_primitive(),
+            &BINARY_POWER_LEVELS,
             vec![],
             vec![air_token.duplicate_handle(zx::Rights::SAME_RIGHTS)?],
             vec![],

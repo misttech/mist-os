@@ -423,7 +423,7 @@ impl BrokerSvc {
                     TopologyRequest::AddElement {
                         element_name,
                         initial_current_level,
-                        minimum_level,
+                        valid_levels,
                         dependencies,
                         active_dependency_tokens_to_register,
                         passive_dependency_tokens_to_register,
@@ -433,7 +433,7 @@ impl BrokerSvc {
                             "AddElement({:?}, {:?}, {:?}, {:?}, {:?}, {:?})",
                             &element_name,
                             &initial_current_level,
-                            &minimum_level,
+                            &valid_levels,
                             &dependencies,
                             &active_dependency_tokens_to_register,
                             &passive_dependency_tokens_to_register,
@@ -450,7 +450,7 @@ impl BrokerSvc {
                         let res = broker.add_element(
                             &element_name,
                             initial_current_level,
-                            minimum_level,
+                            valid_levels,
                             dependencies,
                             active_dependency_tokens,
                             passive_dependency_tokens,

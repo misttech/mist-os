@@ -61,7 +61,7 @@ async fn create_suspend_topology(realm: &RealmProxyClient) -> Result<PowerElemen
         &topology,
         "suspend_controller",
         0,
-        0,
+        vec![0, 1],
         vec![fbroker::LevelDependency {
             dependency_type: fbroker::DependencyType::Active,
             dependent_level: 1,

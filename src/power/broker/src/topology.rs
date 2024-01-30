@@ -53,7 +53,15 @@ pub struct Dependency {
 pub struct Element {
     id: ElementID,
     name: String,
-    default_level: PowerLevel,
+    // Sorted ascending.
+    valid_levels: Vec<PowerLevel>,
+}
+
+impl Element {
+    fn new(id: ElementID, name: String, mut valid_levels: Vec<PowerLevel>) -> Self {
+        valid_levels.sort();
+        Self { id, name, valid_levels }
+    }
 }
 
 #[derive(Debug)]
@@ -76,6 +84,7 @@ impl Into<fpb::AddElementError> for AddElementError {
 #[derive(Debug)]
 pub enum ModifyDependencyError {
     AlreadyExists,
+    Invalid,
     NotAuthorized,
     NotFound(ElementID),
 }
@@ -84,6 +93,7 @@ impl Into<fpb::ModifyDependencyError> for ModifyDependencyError {
     fn into(self) -> fpb::ModifyDependencyError {
         match self {
             ModifyDependencyError::AlreadyExists => fpb::ModifyDependencyError::AlreadyExists,
+            ModifyDependencyError::Invalid => fpb::ModifyDependencyError::Invalid,
             ModifyDependencyError::NotAuthorized => fpb::ModifyDependencyError::NotAuthorized,
             ModifyDependencyError::NotFound(_) => fpb::ModifyDependencyError::NotFound,
         }
@@ -109,15 +119,14 @@ impl Topology {
     pub fn add_element(
         &mut self,
         name: &str,
-        default_level: PowerLevel,
+        valid_levels: Vec<PowerLevel>,
     ) -> Result<ElementID, AddElementError> {
         let id: ElementID = if ELEMENT_ID_DEBUG_MODE {
             ElementID::from(name)
         } else {
             ElementID::from(Uuid::new_v4().as_simple().to_string())
         };
-        self.elements
-            .insert(id.clone(), Element { id: id.clone(), name: name.into(), default_level });
+        self.elements.insert(id.clone(), Element::new(id.clone(), name.into(), valid_levels));
         Ok(id)
     }
 
@@ -130,8 +139,18 @@ impl Topology {
         self.elements.remove(element_id);
     }
 
-    pub fn get_default_level(&self, element_id: &ElementID) -> Option<PowerLevel> {
-        self.elements.get(element_id).map(|e| e.default_level)
+    pub fn minimum_level(&self, element_id: &ElementID) -> Option<PowerLevel> {
+        let Some(elem) = self.elements.get(element_id) else {
+            return None;
+        };
+        elem.valid_levels.first().copied()
+    }
+
+    pub fn is_valid_level(&self, element_id: &ElementID, level: PowerLevel) -> bool {
+        let Some(elem) = self.elements.get(element_id) else {
+            return false;
+        };
+        elem.valid_levels.contains(&level)
     }
 
     /// Gets direct, active dependencies for the given Element and PowerLevel.
@@ -190,15 +209,26 @@ impl Topology {
         (active_dependencies, passive_dependencies)
     }
 
-    /// Adds an active dependency to the Topology.
-    pub fn add_active_dependency(&mut self, dep: &Dependency) -> Result<(), ModifyDependencyError> {
+    /// Checks that a dependency is valid. Returns ModifyDependencyError if not.
+    fn check_valid_dependency(&self, dep: &Dependency) -> Result<(), ModifyDependencyError> {
         if !self.elements.contains_key(&dep.dependent.element_id) {
             return Err(ModifyDependencyError::NotFound(dep.dependent.element_id.clone()));
         }
         if !self.elements.contains_key(&dep.requires.element_id) {
             return Err(ModifyDependencyError::NotFound(dep.requires.element_id.clone()));
         }
-        // TODO(b/299463665): Add Dependency validation here, or in Dependency construction.
+        if !self.is_valid_level(&dep.dependent.element_id, dep.dependent.level) {
+            return Err(ModifyDependencyError::Invalid);
+        }
+        if !self.is_valid_level(&dep.requires.element_id, dep.requires.level) {
+            return Err(ModifyDependencyError::Invalid);
+        }
+        Ok(())
+    }
+
+    /// Adds an active dependency to the Topology.
+    pub fn add_active_dependency(&mut self, dep: &Dependency) -> Result<(), ModifyDependencyError> {
+        self.check_valid_dependency(dep)?;
         let required_levels =
             self.active_dependencies.entry(dep.dependent.clone()).or_insert(Vec::new());
         if required_levels.contains(&dep.requires) {
@@ -233,13 +263,7 @@ impl Topology {
         &mut self,
         dep: &Dependency,
     ) -> Result<(), ModifyDependencyError> {
-        if !self.elements.contains_key(&dep.dependent.element_id) {
-            return Err(ModifyDependencyError::NotFound(dep.dependent.element_id.clone()));
-        }
-        if !self.elements.contains_key(&dep.requires.element_id) {
-            return Err(ModifyDependencyError::NotFound(dep.requires.element_id.clone()));
-        }
-        // TODO(b/299463665): Add Dependency validation here, or in Dependency construction.
+        self.check_valid_dependency(dep)?;
         let active_required_levels =
             self.active_dependencies.entry(dep.dependent.clone()).or_insert(Vec::new());
         if active_required_levels.contains(&dep.requires) {
@@ -279,22 +303,17 @@ impl Topology {
 mod tests {
     use super::*;
     use fidl_fuchsia_power_broker::BinaryPowerLevel;
+    use power_broker_client::BINARY_POWER_LEVELS;
 
     #[fuchsia::test]
     fn test_add_remove_elements() {
         let mut t = Topology::new();
-        let water = t
-            .add_element("Water", BinaryPowerLevel::Off.into_primitive())
-            .expect("add_element failed");
-        let earth = t
-            .add_element("Earth", BinaryPowerLevel::Off.into_primitive())
-            .expect("add_element failed");
-        let fire = t
-            .add_element("Fire", BinaryPowerLevel::Off.into_primitive())
-            .expect("add_element failed");
-        let air = t
-            .add_element("Air", BinaryPowerLevel::Off.into_primitive())
-            .expect("add_element failed");
+        let water =
+            t.add_element("Water", BINARY_POWER_LEVELS.to_vec()).expect("add_element failed");
+        let earth =
+            t.add_element("Earth", BINARY_POWER_LEVELS.to_vec()).expect("add_element failed");
+        let fire = t.add_element("Fire", BINARY_POWER_LEVELS.to_vec()).expect("add_element failed");
+        let air = t.add_element("Air", BINARY_POWER_LEVELS.to_vec()).expect("add_element failed");
 
         t.add_active_dependency(&Dependency {
             dependent: ElementLevel {
@@ -379,14 +398,10 @@ mod tests {
     #[fuchsia::test]
     fn test_add_remove_direct_deps() {
         let mut t = Topology::new();
-        let a =
-            t.add_element("A", BinaryPowerLevel::Off.into_primitive()).expect("add_element failed");
-        let b =
-            t.add_element("B", BinaryPowerLevel::Off.into_primitive()).expect("add_element failed");
-        let c =
-            t.add_element("C", BinaryPowerLevel::Off.into_primitive()).expect("add_element failed");
-        let d =
-            t.add_element("D", BinaryPowerLevel::Off.into_primitive()).expect("add_element failed");
+        let a = t.add_element("A", BINARY_POWER_LEVELS.to_vec()).expect("add_element failed");
+        let b = t.add_element("B", BINARY_POWER_LEVELS.to_vec()).expect("add_element failed");
+        let c = t.add_element("C", BINARY_POWER_LEVELS.to_vec()).expect("add_element failed");
+        let d = t.add_element("D", BINARY_POWER_LEVELS.to_vec()).expect("add_element failed");
         // A <- B <- C -> D
         let ba = Dependency {
             dependent: ElementLevel {
@@ -449,10 +464,10 @@ mod tests {
     #[fuchsia::test]
     fn test_all_active_and_passive_dependencies() {
         let mut t = Topology::new();
-        let a = t.add_element("A", 0).expect("add_element failed");
-        let b = t.add_element("B", 0).expect("add_element failed");
-        let c = t.add_element("C", 0).expect("add_element failed");
-        let d = t.add_element("D", 0).expect("add_element failed");
+        let a = t.add_element("A", vec![0, 2, 3]).expect("add_element failed");
+        let b = t.add_element("B", vec![0, 1, 5]).expect("add_element failed");
+        let c = t.add_element("C", vec![0, 1]).expect("add_element failed");
+        let d = t.add_element("D", vec![0, 3]).expect("add_element failed");
         // C has direct active dependencies on B and D.
         // B only has passive dependencies on A.
         // Therefore, C has a transitive passive dependency on A.

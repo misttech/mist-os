@@ -21,6 +21,10 @@ enum IncomingRequest {
     Stats(fsuspend::StatsRequestStream),
 }
 
+const EXECUTION_STATE_ACTIVE: fbroker::PowerLevel = 2;
+const EXECUTION_STATE_WAKE_HANDLING: fbroker::PowerLevel = 1;
+const EXECUTION_STATE_INACTIVE: fbroker::PowerLevel = 0;
+
 /// SystemActivityGovernor runs the server for fuchsia.power.suspend FIDL APIs.
 pub struct SystemActivityGovernor {
     execution_state: PowerElementContext,
@@ -35,9 +39,15 @@ impl SystemActivityGovernor {
             ..Default::default()
         };
 
-        let execution_state =
-            PowerElementContext::new(topology, "execution_state", 0, 0, Vec::new(), Vec::new())
-                .await?;
+        let execution_state = PowerElementContext::new(
+            topology,
+            "execution_state",
+            0,
+            vec![EXECUTION_STATE_INACTIVE, EXECUTION_STATE_WAKE_HANDLING, EXECUTION_STATE_ACTIVE],
+            Vec::new(),
+            Vec::new(),
+        )
+        .await?;
 
         Ok(Rc::new(Self {
             execution_state,

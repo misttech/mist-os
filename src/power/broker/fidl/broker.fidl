@@ -57,10 +57,9 @@ open protocol Topology {
         element_name string:1024;
         /// The initial current power level of the element.
         initial_current_level PowerLevel;
-        /// Minimum level (i.e. OFF or the lowest possible power level) for
-        /// this element.
-        /// TODO(b/311905380): Specify all allowed power levels here.
-        minimum_level PowerLevel;
+        /// All power levels that are valid for this element. Any level not
+        /// specified here will be treated as invalid.
+        valid_levels vector<PowerLevel>:MAX_VALID_POWER_LEVELS;
         /// List of dependencies for this element's power levels.
         /// Note: dependencies UPON this element's levels cannot be added here.
         dependencies vector<LevelDependency>:MAX_DEPENDENCIES_IN_ADD_ELEMENT;
@@ -87,6 +86,7 @@ open protocol Topology {
 // Limitations on vector length for the sake of bounding request size.
 const MAX_DEPENDENCIES_IN_ADD_ELEMENT uint16 = 128;
 const MAX_TOKENS_IN_ADD_ELEMENT uint16 = 128;
+const MAX_VALID_POWER_LEVELS uint16 = 256;
 
 type AddElementError = flexible enum {
     INTERNAL = 1;
@@ -138,6 +138,7 @@ open protocol ElementControl {
 
 type ModifyDependencyError = flexible enum {
     ALREADY_EXISTS = 1;
+    INVALID = 2;
     NOT_AUTHORIZED = 3;
     NOT_FOUND = 4;
 };

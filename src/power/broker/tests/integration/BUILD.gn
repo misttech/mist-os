@@ -28,6 +28,7 @@ rustc_test("bin") {
     "//src/lib/fuchsia-component-test",
     "//src/lib/zircon/rust:fuchsia-zircon",
     "//src/power/broker:fuchsia.power.broker_rust",
+    "//src/power/broker/client",
     "//third_party/rust_crates:anyhow",
   ]
 }

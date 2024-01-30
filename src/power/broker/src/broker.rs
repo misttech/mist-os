@@ -313,13 +313,20 @@ impl Broker {
         &mut self,
         name: &str,
         initial_current_level: PowerLevel,
-        minimum_level: PowerLevel,
+        valid_levels: Vec<PowerLevel>,
         level_dependencies: Vec<fpb::LevelDependency>,
         active_dependency_tokens: Vec<Token>,
         passive_dependency_tokens: Vec<Token>,
     ) -> Result<ElementID, AddElementError> {
-        let id = self.catalog.topology.add_element(name, minimum_level)?;
+        if valid_levels.len() < 1 {
+            return Err(AddElementError::Invalid);
+        }
+        let id = self.catalog.topology.add_element(name, valid_levels.to_vec())?;
         self.current.update(&id, initial_current_level);
+        let Some(minimum_level) = self.catalog.topology.minimum_level(&id) else {
+            self.remove_element(&id);
+            return Err(AddElementError::Internal);
+        };
         self.required.update(&id, minimum_level);
         for dependency in level_dependencies {
             if let Err(err) = self.add_dependency(
@@ -333,6 +340,7 @@ impl Broker {
                 self.remove_element(&id);
                 return Err(match err {
                     ModifyDependencyError::AlreadyExists => AddElementError::Invalid,
+                    ModifyDependencyError::Invalid => AddElementError::Invalid,
                     ModifyDependencyError::NotFound(_) => AddElementError::Invalid,
                     ModifyDependencyError::NotAuthorized => AddElementError::NotAuthorized,
                 });
@@ -550,13 +558,10 @@ impl Catalog {
             required_level
         } else {
             // No claims, return default level:
-            if let Some(default_level) = self.topology.get_default_level(element_id) {
+            if let Some(default_level) = self.topology.minimum_level(element_id) {
                 default_level
             } else {
-                tracing::error!(
-                    "calculate_required_level: no default level set for {:?}",
-                    element_id
-                );
+                tracing::error!("calculate_required_level: no minimum_level for {:?}", element_id);
                 BinaryPowerLevel::Off.into_primitive()
             }
         }
@@ -829,6 +834,7 @@ mod tests {
     use super::*;
     use fidl_fuchsia_power_broker::{DependencyToken, PowerLevel};
     use fuchsia_zircon::{self as zx, HandleBased};
+    use power_broker_client::BINARY_POWER_LEVELS;
 
     #[fuchsia::test]
     fn test_binary_satisfy_power_level() {
@@ -927,7 +933,14 @@ mod tests {
     fn test_initialize_current_and_required_levels() {
         let mut broker = Broker::new();
         let latinum = broker
-            .add_element("Latinum", 7, 2, vec![], vec![], vec![])
+            .add_element(
+                "Latinum",
+                7,
+                vec![5, 2, 7], // unsorted, should still choose the minimum value
+                vec![],
+                vec![],
+                vec![],
+            )
             .expect("add_element failed");
         assert_eq!(broker.get_current_level(&latinum), Some(7));
         assert_eq!(broker.get_required_level(&latinum), Some(2));
@@ -942,7 +955,7 @@ mod tests {
             .add_element(
                 "Mithril",
                 BinaryPowerLevel::Off.into_primitive(),
-                BinaryPowerLevel::Off.into_primitive(),
+                BINARY_POWER_LEVELS.to_vec(),
                 vec![],
                 vec![token_mithril
                     .duplicate_handle(zx::Rights::SAME_RIGHTS)
@@ -956,7 +969,7 @@ mod tests {
         let add_element_not_authorized_res = broker.add_element(
             "Silver",
             BinaryPowerLevel::Off.into_primitive(),
-            BinaryPowerLevel::Off.into_primitive(),
+            BINARY_POWER_LEVELS.to_vec(),
             vec![fpb::LevelDependency {
                 dependency_type: DependencyType::Active,
                 dependent_level: BinaryPowerLevel::On.into_primitive(),
@@ -975,7 +988,7 @@ mod tests {
             .add_element(
                 "Silver",
                 BinaryPowerLevel::Off.into_primitive(),
-                BinaryPowerLevel::Off.into_primitive(),
+                BINARY_POWER_LEVELS.to_vec(),
                 vec![fpb::LevelDependency {
                     dependency_type: DependencyType::Active,
                     dependent_level: BinaryPowerLevel::On.into_primitive(),
@@ -1001,7 +1014,7 @@ mod tests {
             .add_element(
                 "Silver",
                 BinaryPowerLevel::Off.into_primitive(),
-                BinaryPowerLevel::Off.into_primitive(),
+                BINARY_POWER_LEVELS.to_vec(),
                 vec![fpb::LevelDependency {
                     dependency_type: DependencyType::Active,
                     dependent_level: BinaryPowerLevel::On.into_primitive(),
@@ -1023,7 +1036,7 @@ mod tests {
             .add_element(
                 "Unobtainium",
                 BinaryPowerLevel::Off.into_primitive(),
-                BinaryPowerLevel::Off.into_primitive(),
+                BINARY_POWER_LEVELS.to_vec(),
                 vec![],
                 vec![],
                 vec![],
@@ -1045,7 +1058,7 @@ mod tests {
             .add_element(
                 "P1",
                 BinaryPowerLevel::Off.into_primitive(),
-                BinaryPowerLevel::Off.into_primitive(),
+                BINARY_POWER_LEVELS.to_vec(),
                 vec![],
                 vec![parent1_token
                     .duplicate_handle(zx::Rights::SAME_RIGHTS)
@@ -1059,7 +1072,7 @@ mod tests {
             .add_element(
                 "P2",
                 BinaryPowerLevel::Off.into_primitive(),
-                BinaryPowerLevel::Off.into_primitive(),
+                BINARY_POWER_LEVELS.to_vec(),
                 vec![],
                 vec![parent2_token
                     .duplicate_handle(zx::Rights::SAME_RIGHTS)
@@ -1072,7 +1085,7 @@ mod tests {
             .add_element(
                 "C",
                 BinaryPowerLevel::Off.into_primitive(),
-                BinaryPowerLevel::Off.into_primitive(),
+                BINARY_POWER_LEVELS.to_vec(),
                 vec![
                     fpb::LevelDependency {
                         dependency_type: DependencyType::Active,
@@ -1151,7 +1164,7 @@ mod tests {
             .add_element(
                 "GP",
                 BinaryPowerLevel::Off.into_primitive(),
-                BinaryPowerLevel::Off.into_primitive(),
+                BINARY_POWER_LEVELS.to_vec(),
                 vec![],
                 vec![grandparent_token
                     .duplicate_handle(zx::Rights::SAME_RIGHTS)
@@ -1165,7 +1178,7 @@ mod tests {
             .add_element(
                 "P",
                 BinaryPowerLevel::Off.into_primitive(),
-                BinaryPowerLevel::Off.into_primitive(),
+                BINARY_POWER_LEVELS.to_vec(),
                 vec![],
                 vec![parent_token
                     .duplicate_handle(zx::Rights::SAME_RIGHTS)
@@ -1178,7 +1191,7 @@ mod tests {
             .add_element(
                 "C",
                 BinaryPowerLevel::Off.into_primitive(),
-                BinaryPowerLevel::Off.into_primitive(),
+                BINARY_POWER_LEVELS.to_vec(),
                 vec![fpb::LevelDependency {
                     dependency_type: DependencyType::Active,
                     dependent_level: BinaryPowerLevel::On.into_primitive(),
@@ -1293,15 +1306,15 @@ mod tests {
         // Parent requires Grandparent at 90 to support its own level of 30.
         // C2 -> P -> GP
         //  3 -> 30 -> 90
-        // Grandparent has a default required level of 10.
-        // All other elements have a default of 0.
+        // Grandparent has a minimum required level of 10.
+        // All other elements have a minimum of 0.
         let mut broker = Broker::new();
         let grandparent_token = DependencyToken::create();
         let grandparent: ElementID = broker
             .add_element(
                 "GP",
                 10,
-                10,
+                vec![10, 90, 200],
                 vec![],
                 vec![grandparent_token
                     .duplicate_handle(zx::Rights::SAME_RIGHTS)
@@ -1315,7 +1328,7 @@ mod tests {
             .add_element(
                 "P",
                 0,
-                0,
+                vec![0, 30, 50],
                 vec![
                     fpb::LevelDependency {
                         dependency_type: DependencyType::Active,
@@ -1345,7 +1358,7 @@ mod tests {
             .add_element(
                 "C1",
                 0,
-                0,
+                vec![0, 5],
                 vec![fpb::LevelDependency {
                     dependency_type: DependencyType::Active,
                     dependent_level: 5,
@@ -1362,7 +1375,7 @@ mod tests {
             .add_element(
                 "C2",
                 0,
-                0,
+                vec![0, 3],
                 vec![fpb::LevelDependency {
                     dependency_type: DependencyType::Active,
                     dependent_level: 3,
@@ -1522,7 +1535,7 @@ mod tests {
             .add_element(
                 "A",
                 BinaryPowerLevel::Off.into_primitive(),
-                BinaryPowerLevel::Off.into_primitive(),
+                BINARY_POWER_LEVELS.to_vec(),
                 vec![],
                 vec![token_a.duplicate_handle(zx::Rights::SAME_RIGHTS).expect("dup failed").into()],
                 vec![],
@@ -1534,7 +1547,7 @@ mod tests {
             .add_element(
                 "B",
                 BinaryPowerLevel::Off.into_primitive(),
-                BinaryPowerLevel::Off.into_primitive(),
+                BINARY_POWER_LEVELS.to_vec(),
                 vec![fpb::LevelDependency {
                     dependency_type: DependencyType::Active,
                     dependent_level: BinaryPowerLevel::On.into_primitive(),
@@ -1558,7 +1571,7 @@ mod tests {
             .add_element(
                 "C",
                 BinaryPowerLevel::Off.into_primitive(),
-                BinaryPowerLevel::Off.into_primitive(),
+                BINARY_POWER_LEVELS.to_vec(),
                 vec![fpb::LevelDependency {
                     dependency_type: DependencyType::Passive,
                     dependent_level: BinaryPowerLevel::On.into_primitive(),
@@ -1576,7 +1589,7 @@ mod tests {
             .add_element(
                 "D",
                 BinaryPowerLevel::Off.into_primitive(),
-                BinaryPowerLevel::Off.into_primitive(),
+                BINARY_POWER_LEVELS.to_vec(),
                 vec![fpb::LevelDependency {
                     dependency_type: DependencyType::Active,
                     dependent_level: BinaryPowerLevel::On.into_primitive(),
@@ -1703,7 +1716,7 @@ mod tests {
             .add_element(
                 "Adamantium",
                 BinaryPowerLevel::Off.into_primitive(),
-                BinaryPowerLevel::Off.into_primitive(),
+                BINARY_POWER_LEVELS.to_vec(),
                 vec![],
                 vec![token_active_adamantium
                     .duplicate_handle(zx::Rights::SAME_RIGHTS)
@@ -1719,7 +1732,7 @@ mod tests {
             .add_element(
                 "Vibranium",
                 BinaryPowerLevel::Off.into_primitive(),
-                BinaryPowerLevel::Off.into_primitive(),
+                BINARY_POWER_LEVELS.to_vec(),
                 vec![],
                 vec![token_active_vibranium
                     .duplicate_handle(zx::Rights::SAME_RIGHTS)
@@ -1755,6 +1768,41 @@ mod tests {
             BinaryPowerLevel::On.into_primitive(),
         );
         assert!(matches!(res_add_wrong_type, Err(ModifyDependencyError::NotAuthorized)));
+
+        // Add of invalid dependent level should fail.
+        const INVALID_POWER_LEVEL: PowerLevel = 5;
+        let res_add_invalid_dep_level = broker.add_dependency(
+            &adamantium,
+            DependencyType::Active,
+            INVALID_POWER_LEVEL,
+            token_active_vibranium
+                .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                .expect("dup failed")
+                .into(),
+            BinaryPowerLevel::On.into_primitive(),
+        );
+        assert!(
+            matches!(res_add_invalid_dep_level, Err(ModifyDependencyError::Invalid)),
+            "{:?}",
+            res_add_invalid_dep_level
+        );
+
+        // Add of invalid required level should fail.
+        let res_add_invalid_req_level = broker.add_dependency(
+            &adamantium,
+            DependencyType::Active,
+            BinaryPowerLevel::On.into_primitive(),
+            token_active_vibranium
+                .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                .expect("dup failed")
+                .into(),
+            INVALID_POWER_LEVEL,
+        );
+        assert!(
+            matches!(res_add_invalid_req_level, Err(ModifyDependencyError::Invalid)),
+            "{:?}",
+            res_add_invalid_req_level
+        );
 
         // Valid add of active type should succeed
         broker

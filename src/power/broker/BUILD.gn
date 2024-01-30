@@ -59,6 +59,8 @@ rustc_binary("bin") {
     "//third_party/rust_crates:uuid",
   ]
 
+  test_deps = [ "//src/power/broker/client" ]
+
   sources = [
     "src/broker.rs",
     "src/credentials.rs",
