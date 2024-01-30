@@ -45,7 +45,6 @@
         },
         {
             protocol: [
-                "fuchsia.component.Binder",
                 "fuchsia.feedback.CrashReporter",
                 "fuchsia.kernel.CpuResource",
                 "fuchsia.kernel.Stats",
