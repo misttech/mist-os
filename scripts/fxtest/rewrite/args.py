@@ -110,6 +110,9 @@ class Flags:
             if self.status is None:
                 self.status = termout.is_valid()
 
+        if self.break_on_failure:
+            self.status = False
+
 
 class FlagError(Exception):
     """Raised if there was a problem parsing command line flags."""
@@ -352,7 +355,7 @@ def parse_args(
     execution.add_argument(
         "--break-on-failure",
         action="store_true",
-        help="""Not hooked up yet, this currently does nothing. If True, any test case failures will stop test execution and launch zxdb attached to the failed test case, if the test runner supports stopping.""",
+        help="If True, any test case failures will stop test execution and launch zxdb attached to the failed test case, if the test runner supports stopping. Implies --no-status. Note: this flag is experimental",
         default=False,
     )
 

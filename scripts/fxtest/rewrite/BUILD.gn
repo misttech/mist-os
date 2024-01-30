@@ -35,6 +35,7 @@ if (is_host) {
     "args.py",
     "config.py",
     "console.py",
+    "debugger.py",
     "environment.py",
     "event.py",
     "execution.py",

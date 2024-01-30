@@ -8,11 +8,13 @@ import asyncio
 import atexit
 from dataclasses import dataclass
 from dataclasses import field
+import debugger
 import functools
 import gzip
 import json
 import os
 import re
+import signal
 import subprocess
 import sys
 import typing
@@ -182,6 +184,14 @@ To go back to the old fx test, use `fx --enable=legacy_fxtest test`, and please 
                 f"Output was logged to: {os.path.relpath(exec_env.log_file, os.getcwd())}",
                 style=flags.style,
             ),
+        )
+
+    if flags.break_on_failure:
+        recorder.emit_warning_message(
+            "🛑 Debugger integration is currently experimental, follow https://fxbug.dev/319320287 for updates 🛑"
+        )
+        recorder.emit_info_message(
+            f"⚠️  --break-on-failure specified, status output is disabled. ⚠️ "
         )
 
     # Print a message for users who want to know how to see all test output.
@@ -798,6 +808,16 @@ async def run_all_tests(
     abort_all_tests_event = asyncio.Event()
     test_failure_observed: bool = False
 
+    maybe_debugger: subprocess.Popen | None = None
+    if flags.break_on_failure:
+        # Turn the cursor back on before handing control over to the debugger. This doesn't control
+        # whether or not the cursor appears while in the zxdb prompt (https://fxbug.dev/322420507),
+        # but it does make sure that the cursor is enabled when the user is returned to the shell
+        # afterwards. The cleanup routine that is normally installed will no longer have the correct
+        # file descriptor and cannot restore the terminal settings as normal.
+        termout.cursor_show(True)
+        maybe_debugger = debugger.spawn(tests.selected)
+
     async def test_executor() -> None:
         nonlocal test_failure_observed
         to_run: ExecEntry
@@ -908,6 +928,18 @@ async def run_all_tests(
         tasks.append(asyncio.create_task(test_executor()))
 
     await asyncio.wait(tasks)
+
+    if maybe_debugger is not None:
+        # Reset stdout to /dev/null before terminating the debugger so termout doesn't fail its
+        # cleanup.
+        sys.stdout = open(os.devnull, "w")
+
+        # TODO(https://fxbug.dev/322418013): zxdb doesn't handle signals sent to it like SIGQUIT, it
+        # handles terminal control codes itself, which prevents us from exiting nicely and putting
+        # the terminal back into a good state. We should implement a SIGQUIT handler so we can
+        # signal zxdb from here to cleanup the terminal and exit.
+        pg = os.getpgid(maybe_debugger.pid)
+        os.killpg(pg, signal.SIGTERM)
 
     recorder.emit_end(id=test_group)
 
