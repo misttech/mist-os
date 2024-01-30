@@ -1,6 +1,6 @@
 {
-  "name": "set-rdr-rules",
-  "description": "sets rdr rules (see the netfilter::parser library for the RDR rules format)",
+  "name": "list",
+  "description": "A command to list filtering configuration.",
   "examples": [],
   "flags": [
     {
@@ -14,13 +14,6 @@
   ],
   "notes": [],
   "commands": [],
-  "positionals": [
-    {
-      "name": "rules",
-      "description": "",
-      "optionality": "required",
-      "hidden": false
-    }
-  ],
+  "positionals": [],
   "error_codes": []
 }

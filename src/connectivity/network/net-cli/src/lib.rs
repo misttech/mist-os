@@ -112,6 +112,9 @@ pub async fn do_root<C: NetCliDepsConnector>(
                 .await
                 .context("failed during filter-deprecated command")
         }
+        CommandEnum::Filter(opts::filter::Filter { filter_cmd: cmd }) => {
+            do_filter(out, cmd, connector).await.context("failed during filter command")
+        }
         CommandEnum::Log(opts::Log { log_cmd: cmd }) => {
             do_log(cmd, connector).await.context("failed during log command")
         }
@@ -977,6 +980,19 @@ async fn do_filter_deprecated<C: NetCliDepsConnector, W: std::io::Write>(
                 "error setting RDR rules"
             )?;
             info!("successfully set RDR rules");
+        }
+    }
+    Ok(())
+}
+
+async fn do_filter<C: NetCliDepsConnector, W: std::io::Write>(
+    mut out: W,
+    cmd: opts::filter::FilterEnum,
+    _connector: &C,
+) -> Result<(), Error> {
+    match cmd {
+        opts::filter::FilterEnum::List(opts::filter::List {}) => {
+            writeln!(out, "TODO(b/322163298): implement this sub command.")?;
         }
     }
     Ok(())
@@ -3735,6 +3751,23 @@ mac               -
 203.0.113.1
 2001:db8::1
 ";
+        let got_output = std::str::from_utf8(&output).unwrap();
+        pretty_assertions::assert_eq!(
+            trim_whitespace_for_comparison(got_output),
+            trim_whitespace_for_comparison(WANT_OUTPUT),
+        );
+    }
+
+    #[test_case(opts::filter::FilterEnum::List(opts::filter::List {}); "list")]
+    #[fasync::run_singlethreaded(test)]
+    async fn test_do_filter(cmd: opts::filter::FilterEnum) {
+        let mut output = Vec::new();
+        let connector = TestConnector { ..Default::default() };
+        let op = do_filter(&mut output, cmd.clone(), &connector).await;
+
+        assert_eq!(true, op.is_ok());
+
+        const WANT_OUTPUT: &str = "TODO(b/322163298): implement this sub command.";
         let got_output = std::str::from_utf8(&output).unwrap();
         pretty_assertions::assert_eq!(
             trim_whitespace_for_comparison(got_output),

@@ -1,6 +1,6 @@
 {
   "name": "filter",
-  "description": "commands for packet filter",
+  "description": "commands for configuring packet filtering",
   "examples": [],
   "flags": [
     {

@@ -19,6 +19,7 @@ use std::{
 
 pub(crate) mod dhcpd;
 pub(crate) mod dns;
+pub(crate) mod filter;
 
 #[derive(thiserror::Error, Clone, Debug)]
 #[error("{msg}")]
@@ -53,6 +54,7 @@ pub struct Command {
 #[argh(subcommand)]
 pub enum CommandEnum {
     FilterDeprecated(FilterDeprecated),
+    Filter(filter::Filter),
     If(If),
     Log(Log),
     Neigh(Neigh),

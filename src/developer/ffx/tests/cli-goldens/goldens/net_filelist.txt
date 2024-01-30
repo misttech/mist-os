@@ -179,6 +179,8 @@ ffx/net/filter-deprecated/get-rules.golden
 ffx/net/filter-deprecated/set-nat-rules.golden
 ffx/net/filter-deprecated/set-rdr-rules.golden
 ffx/net/filter-deprecated/set-rules.golden
+ffx/net/filter.golden
+ffx/net/filter/list.golden
 ffx/net/if.golden
 ffx/net/if/addr.golden
 ffx/net/if/addr/add.golden
