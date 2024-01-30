@@ -17,8 +17,6 @@ use linux_uapi as uapi;
 pub use uapi::*;
 use zerocopy::{AsBytes, FromBytes, FromZeros, NoCell};
 
-pub const ENOTSUP: u32 = uapi::EOPNOTSUPP;
-
 pub use uapi::__SIGRTMIN as SIGRTMIN;
 
 pub const SIG_DFL: uaddr = uaddr { addr: 0 };

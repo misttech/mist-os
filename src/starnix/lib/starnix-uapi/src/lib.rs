@@ -9,7 +9,6 @@ pub mod device_type;
 pub mod elf;
 pub mod errors;
 pub mod file_mode;
-pub mod vfs;
 pub mod inotify_mask;
 pub mod kcmp;
 pub mod math;
@@ -28,6 +27,7 @@ pub mod uapi;
 pub mod union;
 pub mod user_address;
 pub mod user_buffer;
+pub mod vfs;
 
 #[cfg(target_arch = "aarch64")]
 pub mod arm64;
@@ -45,6 +45,7 @@ pub use x64::*;
 pub mod riscv64;
 
 #[cfg(target_arch = "riscv64")]
+#[allow(unused_imports)]
 pub use riscv64::*;
 
 pub use uapi::*;

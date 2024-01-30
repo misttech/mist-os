@@ -196,6 +196,22 @@ impl SigSet {
     }
 }
 
+impl From<sigset_t> for SigSet {
+    fn from(value: sigset_t) -> Self {
+        // `transmute()` is safe here because this is a POD value of the same size (see
+        // assert above).
+        SigSet(unsafe { std::mem::transmute(value) })
+    }
+}
+
+impl From<SigSet> for sigset_t {
+    fn from(val: SigSet) -> Self {
+        // `transmute()` is safe here because this is a POD value of the same size (see
+        // assert above).
+        unsafe { std::mem::transmute(val.0) }
+    }
+}
+
 impl BitAnd for SigSet {
     type Output = Self;
 

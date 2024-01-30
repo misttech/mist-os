@@ -4,23 +4,8 @@
 
 #![allow(non_camel_case_types)]
 
-use crate::{signals::SigSet, uapi::sigset_t, uref};
+use crate::uref;
 use zerocopy::{AsBytes, FromBytes, FromZeros, NoCell};
-
-/// The type used by the kernel for the time in seconds in the stat struct.
-pub type stat_time_t = u64;
-
-impl From<sigset_t> for SigSet {
-    fn from(value: sigset_t) -> Self {
-        SigSet(value)
-    }
-}
-
-impl From<SigSet> for sigset_t {
-    fn from(val: SigSet) -> Self {
-        val.0
-    }
-}
 
 #[repr(C)]
 #[derive(Debug, Copy, Clone, AsBytes, FromBytes, FromZeros, NoCell)]

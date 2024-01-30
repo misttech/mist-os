@@ -21,7 +21,6 @@ use once_cell::sync::OnceCell;
 use starnix_logging::{log_error, track_stub};
 use starnix_sync::{Mutex, RwLock, RwLockReadGuard};
 use starnix_uapi::{
-    __kernel_ulong_t,
     as_any::AsAny,
     auth::{
         Credentials, FsCred, CAP_CHOWN, CAP_DAC_OVERRIDE, CAP_FOWNER, CAP_FSETID, CAP_MKNOD,
@@ -36,7 +35,7 @@ use starnix_uapi::{
     ownership::Releasable,
     resource_limits::Resource,
     signals::SIGXFSZ,
-    stat_time_t, statx, statx_timestamp,
+    statx, statx_timestamp,
     time::{timespec_from_time, NANOS_PER_SECOND},
     timespec, uapi, uid_t, FALLOC_FL_COLLAPSE_RANGE, FALLOC_FL_INSERT_RANGE, FALLOC_FL_KEEP_SIZE,
     FALLOC_FL_PUNCH_HOLE, FALLOC_FL_UNSHARE_RANGE, FALLOC_FL_ZERO_RANGE, LOCK_EX, LOCK_NB, LOCK_SH,
@@ -1628,13 +1627,8 @@ impl FsNode {
 
         let time_to_kernel_timespec_pair = |t| {
             let timespec { tv_sec, tv_nsec } = timespec_from_time(t);
-            // SAFETY: On some architecture (x86_64 at least), the stat definition from the kernel
-            // headers uses unsigned types for the number of seconds, while userspace expects that
-            // negative number are time before the epoch. The transmute is safe because the size is
-            // always the same as the one used in timespec.
-            #[allow(clippy::useless_transmute)]
-            let time: stat_time_t = unsafe { std::mem::transmute(tv_sec) };
-            let time_nsec = __kernel_ulong_t::try_from(tv_nsec).map_err(|_| errno!(EINVAL))?;
+            let time = tv_sec.try_into().map_err(|_| errno!(EINVAL))?;
+            let time_nsec = tv_nsec.try_into().map_err(|_| errno!(EINVAL))?;
             Ok((time, time_nsec))
         };
 
