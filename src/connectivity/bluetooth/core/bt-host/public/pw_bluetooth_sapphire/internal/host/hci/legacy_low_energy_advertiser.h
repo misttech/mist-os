@@ -55,7 +55,7 @@ class LegacyLowEnergyAdvertiser final : public LowEnergyAdvertiser {
       const hci_spec::LEConnectionParameters& conn_params) override;
 
  private:
-  std::optional<EmbossCommandPacket> BuildEnablePacket(
+  EmbossCommandPacket BuildEnablePacket(
       const DeviceAddress& address,
       pw::bluetooth::emboss::GenericEnableParam enable) override;
 
@@ -79,7 +79,7 @@ class LegacyLowEnergyAdvertiser final : public LowEnergyAdvertiser {
   CommandChannel::CommandPacketVariant BuildUnsetScanResponse(
       const DeviceAddress& address) override;
 
-  std::optional<EmbossCommandPacket> BuildRemoveAdvertisingSet(
+  EmbossCommandPacket BuildRemoveAdvertisingSet(
       const DeviceAddress& address) override;
 
   // |starting_| is set to true if a start is pending.
