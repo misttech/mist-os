@@ -406,10 +406,6 @@ void VmCowPages::DeadTransition(Guard<CriticalMutex>& guard) {
       parent_locked().DeadTransition(guard);
     }
   }
-  if (discardable_tracker_) {
-    discardable_tracker_->assert_cow_pages_locked();
-    discardable_tracker_->RemoveFromDiscardableListLocked();
-  }
 
   // We stack-own loaned pages between removing the page from PageQueues and freeing the page via
   // call to FreePagesLocked().
@@ -438,11 +434,20 @@ void VmCowPages::DeadTransition(Guard<CriticalMutex>& guard) {
 }
 
 VmCowPages::~VmCowPages() {
-  // All the explicit cleanup happens in DeadTransition(). Only asserts and implicit cleanup happens
-  // in the destructor.
+  // Most of the explicit cleanup happens in DeadTransition() with asserts and some remaining
+  // cleanup happening here in the destructor.
   canary_.Assert();
   DEBUG_ASSERT(page_list_.HasNoPageOrRef());
   DEBUG_ASSERT(life_cycle_ != LifeCycle::Alive);
+  // The discardable tracker is unlinked explicitly in the destructor to ensure that no RefPtrs can
+  // be constructed to the VmCowPages from here. See comment in
+  // DiscardableVmoTracker::DebugDiscardablePageCounts that depends upon this being here instead of
+  // during the dead transition.
+  if (discardable_tracker_) {
+    Guard<CriticalMutex> guard{lock()};
+    discardable_tracker_->assert_cow_pages_locked();
+    discardable_tracker_->RemoveFromDiscardableListLocked();
+  }
 }
 
 bool VmCowPages::DedupZeroPage(vm_page_t* page, uint64_t offset) {
