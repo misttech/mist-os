@@ -24,7 +24,6 @@
 // instead. Take extra care when accessing flexible array members.
 
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/hci-spec/protocol.h"
-#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/l2cap/l2cap_defs.h"
 
 #include <pw_bluetooth/hci_vendor.emb.h>
 

@@ -77,7 +77,7 @@ class AndroidVendorCapabilities final {
 
   // Get a bitmask of the codec types supported for A2DP source offload. See
   // A2dpCodecType in
-  // src/connectivity/bluetooth/core/bt-host/hci_spec/vendor_protocol.h.
+  // src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/hci_spec/vendor_protocol.h.
   uint32_t a2dp_source_offload_capability_mask() const {
     return a2dp_source_offload_capability_mask_;
   }
@@ -89,7 +89,7 @@ class AndroidVendorCapabilities final {
 
   // Get a bitmask of the codec types where dynamic audio buffering in the
   // Bluetooth controller is supported. See A2dpCodecType in
-  // src/connectivity/bluetooth/core/bt-host/hci_spec/vendor_protocol.h.
+  // src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/hci_spec/vendor_protocol.h.
   uint32_t supports_dynamic_audio_buffer() const {
     return supports_dynamic_audio_buffer_;
   }
