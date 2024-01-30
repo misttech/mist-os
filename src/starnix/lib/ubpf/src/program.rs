@@ -7,6 +7,8 @@ use linux_uapi::{bpf_insn, c_void, sock_filter};
 use crate::{
     converter::cbpf_to_ebpf,
     ubpf::{ubpf_create, ubpf_destroy, ubpf_exec, ubpf_load, ubpf_register, ubpf_vm},
+    verifier::verify,
+    UbpfError,
     UbpfError::*,
 };
 
@@ -53,6 +55,7 @@ impl UbpfVmBuilder {
     }
 
     pub fn load(self, mut code: Vec<bpf_insn>) -> Result<UbpfVm, UbpfError> {
+        verify(&code)?;
         unsafe {
             let mut errmsg = std::ptr::null_mut();
             let success = ubpf_load(
@@ -95,27 +98,6 @@ pub struct UbpfVm {
 
 unsafe impl Send for UbpfVm {}
 unsafe impl Sync for UbpfVm {}
-
-#[derive(thiserror::Error, Debug)]
-pub enum UbpfError {
-    #[error("Unable to create VM")]
-    VmInitialization,
-
-    #[error("VM error registering callback: {0}")]
-    VmRegisterError(String),
-
-    #[error("Verification error loading program: {0}")]
-    ProgramLoadError(String),
-
-    #[error("VM error loading program: {0}")]
-    VmLoadError(String),
-
-    #[error("Unknown CBPF {element_type} {value} for {op}")]
-    UnrecognizedCbpfError { element_type: String, value: String, op: String },
-
-    #[error("Scratch buffer overrun: Starnix only supports 3 scratch memory locations")]
-    ScratchBufferOverflow,
-}
 
 impl UbpfVm {
     pub fn run<T>(&self, data: &mut T) -> Result<u64, i32> {

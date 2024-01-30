@@ -6,9 +6,13 @@
 #![allow(non_upper_case_globals)]
 
 pub mod converter;
+pub mod error;
 pub mod program;
 pub mod ubpf;
 
+mod verifier;
+
 pub use converter::*;
+pub use error::*;
 pub use program::*;
 pub use ubpf::*;

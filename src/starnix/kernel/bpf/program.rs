@@ -14,7 +14,8 @@ use crate::{
 use starnix_logging::log_error;
 use starnix_uapi::{bpf_insn, errno, error, errors::Errno};
 use ubpf::{
-    program::{UbpfError, UbpfVm, UbpfVmBuilder},
+    error::UbpfError,
+    program::{UbpfVm, UbpfVmBuilder},
     ubpf::EBPF_OP_LDDW,
 };
 
