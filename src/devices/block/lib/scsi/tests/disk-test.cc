@@ -215,6 +215,93 @@ class DiskTest : public zxtest::Test {
               EXPECT_EQ(cdb.iov_len, 6);
               InquiryCDB decoded_cdb = {};
               memcpy(&decoded_cdb, cdb.iov_base, cdb.iov_len);
+              EXPECT_EQ(decoded_cdb.opcode, Opcode::TEST_UNIT_READY);
+              EXPECT_FALSE(is_write);
+              break;
+            }
+            case 2: {
+              if (cdb.iov_len == 6) {
+                ModeSense6CDB decoded_cdb = {};
+                memcpy(&decoded_cdb, cdb.iov_base, cdb.iov_len);
+                EXPECT_EQ(decoded_cdb.opcode, Opcode::MODE_SENSE_6);
+                EXPECT_EQ(decoded_cdb.page_code(), PageCode::kAllPageCode);
+                EXPECT_EQ(decoded_cdb.disable_block_descriptors(), true);
+                EXPECT_FALSE(is_write);
+                ModeSense6ParameterHeader header = {};
+                memcpy(data.iov_base, reinterpret_cast<char*>(&header), sizeof(header));
+              } else {
+                EXPECT_EQ(cdb.iov_len, 10);
+                ModeSense10CDB decoded_cdb = {};
+                memcpy(&decoded_cdb, cdb.iov_base, cdb.iov_len);
+                EXPECT_EQ(decoded_cdb.opcode, Opcode::MODE_SENSE_10);
+                EXPECT_EQ(decoded_cdb.page_code(), PageCode::kAllPageCode);
+                EXPECT_EQ(decoded_cdb.disable_block_descriptors(), true);
+                EXPECT_FALSE(is_write);
+                ModeSense10ParameterHeader header = {};
+                memcpy(data.iov_base, reinterpret_cast<char*>(&header), sizeof(header));
+              }
+              break;
+            }
+            case 3: {
+              if (cdb.iov_len == 6) {
+                ModeSense6CDB decoded_cdb = {};
+                memcpy(&decoded_cdb, cdb.iov_base, cdb.iov_len);
+                EXPECT_EQ(decoded_cdb.opcode, Opcode::MODE_SENSE_6);
+                EXPECT_EQ(decoded_cdb.page_code(), PageCode::kCachingPageCode);
+                EXPECT_EQ(decoded_cdb.disable_block_descriptors(), true);
+                EXPECT_FALSE(is_write);
+                ModeSense6ParameterHeader header = {};
+                memcpy(data.iov_base, reinterpret_cast<char*>(&header), sizeof(header));
+                CachingModePage response = {};
+                response.set_page_code(static_cast<uint8_t>(PageCode::kCachingPageCode));
+                memcpy(static_cast<char*>(data.iov_base) + sizeof(header),
+                       reinterpret_cast<char*>(&response), sizeof(response));
+              } else {
+                EXPECT_EQ(cdb.iov_len, 10);
+                ModeSense10CDB decoded_cdb = {};
+                memcpy(&decoded_cdb, cdb.iov_base, cdb.iov_len);
+                EXPECT_EQ(decoded_cdb.opcode, Opcode::MODE_SENSE_10);
+                EXPECT_EQ(decoded_cdb.page_code(), PageCode::kCachingPageCode);
+                EXPECT_EQ(decoded_cdb.disable_block_descriptors(), true);
+                EXPECT_FALSE(is_write);
+                ModeSense10ParameterHeader header = {};
+                memcpy(data.iov_base, reinterpret_cast<char*>(&header), sizeof(header));
+                CachingModePage response = {};
+                response.set_page_code(static_cast<uint8_t>(PageCode::kCachingPageCode));
+                memcpy(static_cast<char*>(data.iov_base) + sizeof(header),
+                       reinterpret_cast<char*>(&response), sizeof(response));
+              }
+              break;
+            }
+            case 4: {
+              EXPECT_EQ(cdb.iov_len, 10);
+              ReadCapacity10CDB decoded_cdb = {};
+              memcpy(&decoded_cdb, cdb.iov_base, cdb.iov_len);
+              EXPECT_EQ(decoded_cdb.opcode, Opcode::READ_CAPACITY_10);
+              EXPECT_FALSE(is_write);
+              ReadCapacity10ParameterData response = {};
+              response.returned_logical_block_address = htobe32(UINT32_MAX);
+              response.block_length_in_bytes = htobe32(kBlockSize);
+              memcpy(data.iov_base, reinterpret_cast<char*>(&response), sizeof(response));
+              break;
+            }
+            case 5: {
+              EXPECT_EQ(cdb.iov_len, 16);
+              ReadCapacity16CDB decoded_cdb = {};
+              memcpy(&decoded_cdb, cdb.iov_base, cdb.iov_len);
+              EXPECT_EQ(decoded_cdb.opcode, Opcode::READ_CAPACITY_16);
+              EXPECT_EQ(decoded_cdb.service_action, 0x10);
+              EXPECT_FALSE(is_write);
+              ReadCapacity16ParameterData response = {};
+              response.returned_logical_block_address = htobe64(kFakeBlocks - 1);
+              response.block_length_in_bytes = htobe32(kBlockSize);
+              memcpy(data.iov_base, reinterpret_cast<char*>(&response), sizeof(response));
+              break;
+            }
+            case 6: {
+              EXPECT_EQ(cdb.iov_len, 6);
+              InquiryCDB decoded_cdb = {};
+              memcpy(&decoded_cdb, cdb.iov_base, cdb.iov_len);
               EXPECT_EQ(decoded_cdb.opcode, Opcode::INQUIRY);
               EXPECT_EQ(decoded_cdb.page_code, scsi::InquiryCDB::kPageListVpdPageCode);
               EXPECT_FALSE(is_write);
@@ -227,7 +314,7 @@ class DiskTest : public zxtest::Test {
               memcpy(data.iov_base, reinterpret_cast<char*>(&vpd_page_list), sizeof(vpd_page_list));
               break;
             }
-            case 2: {
+            case 7: {
               EXPECT_EQ(cdb.iov_len, 6);
               InquiryCDB decoded_cdb = {};
               memcpy(&decoded_cdb, cdb.iov_base, cdb.iov_len);
@@ -240,7 +327,7 @@ class DiskTest : public zxtest::Test {
               block_limits.maximum_unmap_lba_count = htobe32(UINT32_MAX);
               break;
             }
-            case 3: {
+            case 8: {
               EXPECT_EQ(cdb.iov_len, 6);
               InquiryCDB decoded_cdb = {};
               memcpy(&decoded_cdb, cdb.iov_base, cdb.iov_len);
@@ -256,7 +343,7 @@ class DiskTest : public zxtest::Test {
               memcpy(data.iov_base, reinterpret_cast<char*>(&vpd_page_list), sizeof(vpd_page_list));
               break;
             }
-            case 4: {
+            case 9: {
               EXPECT_EQ(cdb.iov_len, 6);
               InquiryCDB decoded_cdb = {};
               memcpy(&decoded_cdb, cdb.iov_base, cdb.iov_len);
@@ -270,91 +357,12 @@ class DiskTest : public zxtest::Test {
               provisioning.set_provisioning_type(0x02);  // The logical unit is thin provisioned
               break;
             }
-            case 5: {
-              if (cdb.iov_len == 6) {
-                ModeSense6CDB decoded_cdb = {};
-                memcpy(&decoded_cdb, cdb.iov_base, cdb.iov_len);
-                EXPECT_EQ(decoded_cdb.opcode, Opcode::MODE_SENSE_6);
-                EXPECT_EQ(decoded_cdb.page_code(), PageCode::kAllPageCode);
-                EXPECT_EQ(decoded_cdb.disable_block_descriptors(), true);
-                EXPECT_FALSE(is_write);
-                ModeSense6ParameterHeader header = {};
-                memcpy(data.iov_base, reinterpret_cast<char*>(&header), sizeof(header));
-              } else {
-                EXPECT_EQ(cdb.iov_len, 10);
-                ModeSense10CDB decoded_cdb = {};
-                memcpy(&decoded_cdb, cdb.iov_base, cdb.iov_len);
-                EXPECT_EQ(decoded_cdb.opcode, Opcode::MODE_SENSE_10);
-                EXPECT_EQ(decoded_cdb.page_code(), PageCode::kAllPageCode);
-                EXPECT_EQ(decoded_cdb.disable_block_descriptors(), true);
-                EXPECT_FALSE(is_write);
-                ModeSense10ParameterHeader header = {};
-                memcpy(data.iov_base, reinterpret_cast<char*>(&header), sizeof(header));
-              }
-              break;
-            }
-            case 6: {
-              if (cdb.iov_len == 6) {
-                ModeSense6CDB decoded_cdb = {};
-                memcpy(&decoded_cdb, cdb.iov_base, cdb.iov_len);
-                EXPECT_EQ(decoded_cdb.opcode, Opcode::MODE_SENSE_6);
-                EXPECT_EQ(decoded_cdb.page_code(), PageCode::kCachingPageCode);
-                EXPECT_EQ(decoded_cdb.disable_block_descriptors(), true);
-                EXPECT_FALSE(is_write);
-                ModeSense6ParameterHeader header = {};
-                memcpy(data.iov_base, reinterpret_cast<char*>(&header), sizeof(header));
-                CachingModePage response = {};
-                response.set_page_code(static_cast<uint8_t>(PageCode::kCachingPageCode));
-                memcpy(static_cast<char*>(data.iov_base) + sizeof(header),
-                       reinterpret_cast<char*>(&response), sizeof(response));
-              } else {
-                EXPECT_EQ(cdb.iov_len, 10);
-                ModeSense10CDB decoded_cdb = {};
-                memcpy(&decoded_cdb, cdb.iov_base, cdb.iov_len);
-                EXPECT_EQ(decoded_cdb.opcode, Opcode::MODE_SENSE_10);
-                EXPECT_EQ(decoded_cdb.page_code(), PageCode::kCachingPageCode);
-                EXPECT_EQ(decoded_cdb.disable_block_descriptors(), true);
-                EXPECT_FALSE(is_write);
-                ModeSense10ParameterHeader header = {};
-                memcpy(data.iov_base, reinterpret_cast<char*>(&header), sizeof(header));
-                CachingModePage response = {};
-                response.set_page_code(static_cast<uint8_t>(PageCode::kCachingPageCode));
-                memcpy(static_cast<char*>(data.iov_base) + sizeof(header),
-                       reinterpret_cast<char*>(&response), sizeof(response));
-              }
-              break;
-            }
-            case 7: {
-              EXPECT_EQ(cdb.iov_len, 10);
-              ReadCapacity10CDB decoded_cdb = {};
-              memcpy(&decoded_cdb, cdb.iov_base, cdb.iov_len);
-              EXPECT_EQ(decoded_cdb.opcode, Opcode::READ_CAPACITY_10);
-              EXPECT_FALSE(is_write);
-              ReadCapacity10ParameterData response = {};
-              response.returned_logical_block_address = htobe32(UINT32_MAX);
-              response.block_length_in_bytes = htobe32(kBlockSize);
-              memcpy(data.iov_base, reinterpret_cast<char*>(&response), sizeof(response));
-              break;
-            }
-            case 8: {
-              EXPECT_EQ(cdb.iov_len, 16);
-              ReadCapacity16CDB decoded_cdb = {};
-              memcpy(&decoded_cdb, cdb.iov_base, cdb.iov_len);
-              EXPECT_EQ(decoded_cdb.opcode, Opcode::READ_CAPACITY_16);
-              EXPECT_EQ(decoded_cdb.service_action, 0x10);
-              EXPECT_FALSE(is_write);
-              ReadCapacity16ParameterData response = {};
-              response.returned_logical_block_address = htobe64(kFakeBlocks - 1);
-              response.block_length_in_bytes = htobe32(kBlockSize);
-              memcpy(data.iov_base, reinterpret_cast<char*>(&response), sizeof(response));
-              break;
-            }
           }
           default_seq_++;
 
           return ZX_OK;
         },
-        /*times=*/9);
+        /*times=*/10);
   }
 
   ControllerForTest controller_;

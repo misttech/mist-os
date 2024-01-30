@@ -20,25 +20,26 @@ zx::result<fbl::RefPtr<Disk>> Disk::Bind(zx_device_t* parent, Controller* contro
                                          uint8_t target, uint16_t lun, uint32_t max_transfer_bytes,
                                          DiskOptions disk_options) {
   fbl::AllocChecker ac;
-  auto disk = fbl::MakeRefCountedChecked<Disk>(&ac, parent, controller, target, lun,
-                                               max_transfer_bytes, disk_options);
+  auto disk = fbl::MakeRefCountedChecked<Disk>(&ac, parent, controller, target, lun, disk_options);
   if (!ac.check()) {
     return zx::error(ZX_ERR_NO_MEMORY);
   }
-  auto status = disk->AddDisk();
+  auto status = disk->AddDisk(max_transfer_bytes);
   if (status != ZX_OK) {
     return zx::error(status);
   }
   return zx::ok(disk);
 }
 
-zx_status_t Disk::AddDisk() {
+zx_status_t Disk::AddDisk(uint32_t max_transfer_bytes) {
   zx::result inquiry_data = controller_->Inquiry(target_, lun_);
   if (inquiry_data.is_error()) {
     return inquiry_data.status_value();
   }
-  // Check that its a disk first.
+  // Check that its a direct access block device first.
   if (inquiry_data.value().peripheral_device_type != 0) {
+    zxlogf(ERROR, "Device is not direct access block device!, device type: 0x%x",
+           inquiry_data.value().peripheral_device_type);
     return ZX_ERR_IO;
   }
 
@@ -56,18 +57,35 @@ zx_status_t Disk::AddDisk() {
 
   removable_ = inquiry_data.value().removable_media();
 
-  if (disk_options_.check_unmap_support) {
-    zx::result<VPDBlockLimits> block_limits = controller_->InquiryBlockLimits(target_, lun_);
-    if (block_limits.is_error()) {
-      return block_limits.status_value();
+  // Verify that the Lun is ready. This command expects a unit attention error.
+  if (zx_status_t status = controller_->TestUnitReady(target_, lun_); status != ZX_OK) {
+    // TestUnitReady returns ZX_ERR_UNAVAILABLE status if a unit attention error occurred.
+    if (status != ZX_ERR_UNAVAILABLE) {
+      zxlogf(ERROR, "Failed SCSI TEST UNIT READY command: %s", zx_status_get_string(status));
+      return status;
     }
-    uint32_t maximum_unmap_lba_count = betoh32(block_limits->maximum_unmap_lba_count);
+    zxlogf(DEBUG, "Expected Unit Attention error: %s", zx_status_get_string(status));
 
-    zx::result unmap_command_supported = controller_->InquirySupportUnmapCommand(target_, lun_);
-    if (unmap_command_supported.is_error()) {
-      return unmap_command_supported.status_value();
+    // Send request sense commands to clear the Unit Attention Condition(UAC) of LUs. UAC is a
+    // condition which needs to be serviced before the logical unit can process commands.
+    // This command will get sense data, but ignore it for now because our goal is to clear the
+    // UAC.
+    scsi::FixedFormatSenseDataHeader request_sense_data;
+    zx_status_t clear_uac_status =
+        controller_->RequestSense(target_, lun_, {&request_sense_data, sizeof(request_sense_data)});
+    if (clear_uac_status != ZX_OK) {
+      zxlogf(ERROR, "Failed SCSI REQUEST SENSE command: %s",
+             zx_status_get_string(clear_uac_status));
+      return clear_uac_status;
     }
-    unmap_command_supported_ = unmap_command_supported.value() && maximum_unmap_lba_count;
+
+    // Verify that the Lun is ready. This command expects a success.
+    clear_uac_status = controller_->TestUnitReady(target_, lun_);
+    if (clear_uac_status != ZX_OK) {
+      zxlogf(ERROR, "Failed SCSI TEST UNIT READY command: %s",
+             zx_status_get_string(clear_uac_status));
+      return clear_uac_status;
+    }
   }
 
   zx::result<std::tuple<bool, bool>> parameter =
@@ -96,6 +114,21 @@ zx_status_t Disk::AddDisk() {
   if (status != ZX_OK) {
     return status;
   }
+  zxlogf(INFO, "%ld blocks of %d bytes", block_count_, block_size_bytes_);
+
+  zx::result<VPDBlockLimits> block_limits = controller_->InquiryBlockLimits(target_, lun_);
+  if (block_limits.is_ok()) {
+    // A maximum_transfer_length field set to 0 indicates that the device server does not
+    // report a limit on the transfer length.
+    if (betoh32(block_limits->maximum_transfer_blocks) == 0) {
+      max_transfer_bytes_ = max_transfer_bytes;
+    } else {
+      max_transfer_bytes_ = std::min(
+          max_transfer_bytes, betoh32(block_limits->maximum_transfer_blocks) * block_size_bytes_);
+    }
+  } else {
+    max_transfer_bytes_ = max_transfer_bytes;
+  }
 
   if (max_transfer_bytes_ == fuchsia_hardware_block::wire::kMaxTransferUnbounded) {
     max_transfer_blocks_ = UINT32_MAX;
@@ -116,7 +149,13 @@ zx_status_t Disk::AddDisk() {
     max_transfer_bytes_ = max_transfer_blocks_ * block_size_bytes_;
   }
 
-  zxlogf(INFO, "%ld blocks of %d bytes", block_count_, block_size_bytes_);
+  if (disk_options_.check_unmap_support && block_limits.is_ok()) {
+    zx::result unmap_command_supported = controller_->InquirySupportUnmapCommand(target_, lun_);
+    if (unmap_command_supported.is_ok()) {
+      unmap_command_supported_ =
+          unmap_command_supported.value() && betoh32(block_limits->maximum_unmap_lba_count);
+    }
+  }
 
   status = DdkAdd(DiskName().c_str());
   if (status == ZX_OK) {

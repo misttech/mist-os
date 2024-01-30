@@ -158,7 +158,7 @@ class Ufs : public scsi::Controller, public UfsDeviceType {
   zx::result<> InitController();
   zx::result<> InitDeviceInterface();
   zx::result<> GetControllerDescriptor();
-  zx::result<uint8_t> AddLogicalUnits();
+  zx::result<uint32_t> AddLogicalUnits();
 
   zx_status_t EnableHostController();
   zx_status_t DisableHostController();

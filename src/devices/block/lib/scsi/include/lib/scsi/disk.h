@@ -56,12 +56,11 @@ class Disk : public DeviceType,
   // Public so that we can use make_unique.
   // Clients should use Disk::Bind().
   Disk(zx_device_t* parent, Controller* controller, uint8_t target, uint16_t lun,
-       uint32_t max_transfer_bytes, DiskOptions disk_options)
+       DiskOptions disk_options)
       : DeviceType(parent),
         controller_(controller),
         target_(target),
         lun_(lun),
-        max_transfer_bytes_(max_transfer_bytes),
         disk_options_(disk_options) {}
 
   // Create a Disk at a specific target/lun.
@@ -102,7 +101,7 @@ class Disk : public DeviceType,
   DiskOptions& GetDiskOptions() { return disk_options_; }
 
  private:
-  zx_status_t AddDisk();
+  zx_status_t AddDisk(uint32_t max_transfer_bytes);
 
   Controller* const controller_;
   const uint8_t target_;

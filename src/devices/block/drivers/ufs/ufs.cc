@@ -323,9 +323,18 @@ zx_status_t Ufs::ExecuteCommandSync(uint8_t target, uint16_t lun, iovec cdb, boo
                        safemath::checked_cast<uint32_t>(data.iov_len));
   if (auto response = transfer_request_processor_->SendScsiUpiu(upiu, lun_id, vmo_optional);
       response.is_error()) {
-    zxlogf(ERROR, "Failed to send SCSI command: opcode:0x%x ,%s",
-           static_cast<uint8_t>(upiu.GetOpcode()), response.status_string());
-    return response.error_value();
+    // Get the previous response from the admin slot.
+    auto response_upiu = std::make_unique<ResponseUpiu>(
+        transfer_request_processor_->GetRequestList().GetDescriptorBuffer(
+            kAdminCommandSlotNumber, ScsiCommandUpiu::GetResponseOffset()));
+    auto* response_data =
+        reinterpret_cast<scsi::FixedFormatSenseDataHeader*>(response_upiu->GetSenseData());
+    if (response_data->sense_key() != scsi::SenseKey::UNIT_ATTENTION) {
+      zxlogf(ERROR, "Failed to send SCSI command: %s", response.status_string());
+      return response.error_value();
+    }
+    // Returns ZX_ERR_UNAVAILABLE if a unit attention error.
+    return ZX_ERR_UNAVAILABLE;
   }
 
   if (data_direction == DataDirection::kDeviceToHost) {
@@ -352,7 +361,11 @@ zx_status_t Ufs::Init() {
     return result.error_value();
   }
 
-  zx::result<uint8_t> lun_count;
+  // The maximum transfer size supported by UFSHCI spec is 65535 * 256 KiB. However, we limit the
+  // maximum transfer size to 1MiB for performance reason.
+  max_transfer_bytes_ = kMaxTransferSize1MiB;
+
+  zx::result<uint32_t> lun_count;
   if (lun_count = AddLogicalUnits(); lun_count.is_error()) {
     zxlogf(ERROR, "Failed to scan logical units: %s", lun_count.status_string());
     return lun_count.error_value();
@@ -530,7 +543,7 @@ zx::result<> Ufs::InitDeviceInterface() {
   return zx::ok();
 }
 
-zx::result<uint8_t> Ufs::AddLogicalUnits() {
+zx::result<uint32_t> Ufs::AddLogicalUnits() {
   uint8_t max_luns = 0;
   if (device_manager_->GetGeometryDescriptor().bMaxNumberLU == 0) {
     max_luns = 8;
@@ -543,15 +556,20 @@ zx::result<uint8_t> Ufs::AddLogicalUnits() {
   }
   ZX_ASSERT(max_luns <= kMaxLun);
 
-  uint8_t lun_count = 0;
-  for (uint8_t lun = 0; lun < max_luns; ++lun) {
-    zx::result<UnitDescriptor> unit_descriptor = device_manager_->ReadUnitDescriptor(lun);
+  auto read_unit_descriptor = [this](uint16_t lun, size_t block_size,
+                                     uint64_t block_count) -> zx::result<> {
+    if (lun > UINT8_MAX) {
+      return zx::error(ZX_ERR_OUT_OF_RANGE);
+    }
+
+    zx::result<UnitDescriptor> unit_descriptor =
+        device_manager_->ReadUnitDescriptor(static_cast<uint8_t>(lun));
     if (unit_descriptor.is_error()) {
-      continue;
+      return unit_descriptor.take_error();
     }
 
     if (unit_descriptor->bLUEnable != 1) {
-      continue;
+      return zx::error(ZX_ERR_INTERNAL);
     }
 
     if (unit_descriptor->bLogicalBlockSize >= sizeof(size_t) * 8) {
@@ -560,88 +578,52 @@ zx::result<uint8_t> Ufs::AddLogicalUnits() {
       return zx::error(ZX_ERR_OUT_OF_RANGE);
     }
 
-    size_t block_size = 1 << unit_descriptor->bLogicalBlockSize;
-    uint64_t block_count = betoh64(unit_descriptor->qLogicalBlockCount);
+    size_t desc_block_size = 1 << unit_descriptor->bLogicalBlockSize;
+    uint64_t desc_block_count = betoh64(unit_descriptor->qLogicalBlockCount);
 
-    if (block_size < kBlockSize ||
-        block_size <
+    if (desc_block_size < kBlockSize ||
+        desc_block_size <
             static_cast<size_t>(device_manager_->GetGeometryDescriptor().bMinAddrBlockSize) *
                 kSectorSize ||
-        block_size >
+        desc_block_size >
             static_cast<size_t>(device_manager_->GetGeometryDescriptor().bMaxInBufferSize) *
                 kSectorSize ||
-        block_size >
+        desc_block_size >
             static_cast<size_t>(device_manager_->GetGeometryDescriptor().bMaxOutBufferSize) *
                 kSectorSize) {
-      zxlogf(ERROR, "Cannot handle logical block size of %zu.", block_size);
+      zxlogf(ERROR, "Cannot handle logical block size of %zu.", desc_block_size);
       return zx::error(ZX_ERR_OUT_OF_RANGE);
     }
-    ZX_ASSERT_MSG(block_size == kBlockSize, "Currently, it only supports a 4KB block size.");
+    ZX_ASSERT_MSG(desc_block_size == kBlockSize, "Currently, it only supports a 4KB block size.");
 
-    // Verify that the Lun is ready. This command expects a unit attention error.
-    // In some cases, unit attention may not occur if the device has not performed a power cycle. In
-    // this case, TestUnitReady() returns ZX_OK.
-    if (zx_status_t status = TestUnitReady(kPlaceholderTarget, lun); status != ZX_OK) {
-      // Get the previous response from the admin slot.
-      auto response_upiu = std::make_unique<ResponseUpiu>(
-          transfer_request_processor_->GetRequestList().GetDescriptorBuffer(
-              kAdminCommandSlotNumber, ScsiCommandUpiu::GetResponseOffset()));
-      auto* response_data =
-          reinterpret_cast<scsi::FixedFormatSenseDataHeader*>(response_upiu->GetSenseData());
-      if (response_data->sense_key() != scsi::SenseKey::UNIT_ATTENTION) {
-        zxlogf(ERROR, "Failed to send SCSI TEST UNIT READY command: %s",
-               zx_status_get_string(status));
-        return zx::error(status);
-      }
-      zxlogf(DEBUG, "Expected Unit Attention error: %s", zx_status_get_string(status));
-    }
-
-    // Send request sense commands to clear the Unit Attention Condition(UAC) of LUs. UAC is a
-    // condition which needs to be serviced before the logical unit can process commands.
-    // This command will get sense data, but ignore it for now because our goal is to clear the
-    // UAC.
-    uint8_t request_sense_data[sizeof(scsi::FixedFormatSenseDataHeader)];
-    if (zx_status_t status =
-            RequestSense(kPlaceholderTarget, lun,
-                         {request_sense_data, sizeof(scsi::FixedFormatSenseDataHeader)});
-        status != ZX_OK) {
-      zxlogf(ERROR, "Failed to send SCSI REQUEST SENSE command: %s", zx_status_get_string(status));
-      return zx::error(status);
-    }
-
-    // Verify that the Lun is ready. This command expects a success.
-    if (zx_status_t status = TestUnitReady(kPlaceholderTarget, lun); status != ZX_OK) {
-      zxlogf(ERROR, "Failed to send SCSI TEST UNIT READY command: %s",
-             zx_status_get_string(status));
-      return zx::error(status);
-    }
-
-    // UFS does not support the MODE SENSE(6) command. We should use the MODE SENSE(10) command.
-    // UFS does not support the READ(12)/WRITE(12) commands.
-    zx::result disk =
-        scsi::Disk::Bind(zxdev(), this, kPlaceholderTarget, lun, max_transfer_bytes_,
-                         scsi::DiskOptions(/*check_unmap_support=*/true, /*use_mode_sense_6*/ false,
-                                           /*use_read_write_12*/ false));
-    if (disk.is_error()) {
-      zxlogf(ERROR, "UFS: device_add for block device failed: %s", disk.status_string());
-      return disk.take_error();
-    }
-
-    if (disk->block_size_bytes() != block_size || disk->block_count() != block_count) {
-      zxlogf(INFO, "Failed to check for disk consistency. (block_size=%d/%zu, block_count=%ld/%ld)",
-             disk->block_size_bytes(), block_size, disk->block_count(), block_count);
+    if (desc_block_size != block_size || desc_block_count != block_count) {
+      zxlogf(INFO,
+             "Failed to check for disk consistency. (block_size=%zu/%zu, block_count=%ld/%ld)",
+             desc_block_size, block_size, desc_block_count, block_count);
       return zx::error(ZX_ERR_BAD_STATE);
     }
-    zxlogf(INFO, "LUN-%d block_size=%zu, block_count=%ld", lun, block_size, block_count);
+    zxlogf(INFO, "LUN-%d block_size=%zu, block_count=%ld", lun, desc_block_size, desc_block_count);
 
-    ++lun_count;
+    return zx::ok();
+  };
+
+  // UFS does not support the MODE SENSE(6) command. We should use the MODE SENSE(10) command.
+  // UFS does not support the READ(12)/WRITE(12) commands.
+  scsi::DiskOptions options(/*check_unmap_support*/ true, /*use_mode_sense_6*/ false,
+                            /*use_read_write_12*/ false);
+
+  zx::result<uint32_t> lun_count = ScanAndBindLogicalUnits(
+      zxdev(), kPlaceholderTarget, max_transfer_bytes_, max_luns, read_unit_descriptor, options);
+  if (lun_count.is_error()) {
+    zxlogf(ERROR, "Failed to scan logical units: %s", lun_count.status_string());
+    return lun_count.take_error();
   }
 
   // TODO(https://fxbug.dev/42075643): Send a request sense command to clear the UAC of a well-known
   // LU.
   // TODO(https://fxbug.dev/42075643): We need to implement the processing of a well-known LU.
 
-  return zx::ok(lun_count);
+  return zx::ok(lun_count.value());
 }
 
 void Ufs::DumpRegisters() {

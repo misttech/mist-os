@@ -4,6 +4,7 @@
 
 #include <endian.h>
 #include <lib/scsi/controller.h>
+#include <lib/scsi/disk.h>
 #include <zircon/status.h>
 
 #include <tuple>
@@ -45,7 +46,7 @@ zx::result<InquiryData> Controller::Inquiry(uint8_t target, uint16_t lun) {
   zx_status_t status = ExecuteCommandSync(target, lun, {&cdb, sizeof(cdb)}, /*is_write=*/false,
                                           {&data, sizeof(data)});
   if (status != ZX_OK) {
-    zxlogf(ERROR, "INQUIRY failed for target %u, lun %u: %s", target, lun,
+    zxlogf(DEBUG, "INQUIRY failed for target %u, lun %u: %s", target, lun,
            zx_status_get_string(status));
     return zx::error(status);
   }
@@ -275,7 +276,7 @@ zx_status_t Controller::ReadCapacity(uint8_t target, uint16_t lun, uint64_t* blo
   return ZX_OK;
 }
 
-zx::result<uint32_t> Controller::ReportLuns(uint8_t target) {
+zx::result<uint16_t> Controller::ReportLuns(uint8_t target) {
   ReportLunsCDB cdb = {};
   cdb.opcode = Opcode::REPORT_LUNS;
   ReportLunsParameterDataHeader data = {};
@@ -290,7 +291,51 @@ zx::result<uint32_t> Controller::ReportLuns(uint8_t target) {
   }
 
   // data.lun_list_length is the number of bytes of LUN structures.
-  return zx::ok(betoh32(data.lun_list_length) / 8);
+  const uint32_t lun_count = betoh32(data.lun_list_length) / 8;
+  if (lun_count > UINT16_MAX) {
+    zxlogf(ERROR, "REPORT_LUNS returned unexpectedly large LUN count: %u", lun_count);
+    return zx::error(ZX_ERR_OUT_OF_RANGE);
+  }
+
+  return zx::ok(static_cast<uint16_t>(lun_count));
+}
+
+zx::result<uint32_t> Controller::ScanAndBindLogicalUnits(zx_device_t* device, uint8_t target,
+                                                         uint32_t max_transfer_bytes,
+                                                         uint16_t max_lun, LuCallback lu_callback,
+                                                         DiskOptions disk_options) {
+  zx::result<uint16_t> lun_count = ReportLuns(target);
+  if (lun_count.is_error()) {
+    return lun_count.take_error();
+  }
+
+  // TODO(b/317838849): We should only attempt to bind to the luns obtained by ReportLuns().
+  uint16_t luns_found = 0;
+  for (uint16_t lun = 0; lun < max_lun; ++lun) {
+    zx::result disk = Disk::Bind(device, this, target, lun, max_transfer_bytes, disk_options);
+    if (disk.is_ok()) {
+      if (lu_callback) {
+        zx::result result = lu_callback(lun, disk->block_size_bytes(), disk->block_count());
+        if (result.is_error()) {
+          zxlogf(ERROR, "SCSI: lu_callback for block device failed: %s", disk.status_string());
+          return result.take_error();
+        }
+      }
+      ++luns_found;
+    }
+
+    if (luns_found == lun_count.value()) {
+      break;
+    }
+  }
+
+  if (luns_found != lun_count.value()) {
+    zxlogf(ERROR, "SCSI: Lun count(%d) and the number of luns found(%d) are different.",
+           lun_count.value(), luns_found);
+    return zx::error(ZX_ERR_BAD_STATE);
+  }
+
+  return zx::ok(lun_count.value());
 }
 
 }  // namespace scsi

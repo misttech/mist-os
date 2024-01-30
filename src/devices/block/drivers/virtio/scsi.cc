@@ -22,6 +22,7 @@
 #include <fbl/algorithm.h>
 #include <fbl/auto_lock.h>
 #include <pretty/hexdump.h>
+#include <safemath/safe_math.h>
 #include <virtio/scsi.h>
 
 #include "src/devices/bus/lib/virtio/trace.h"
@@ -92,7 +93,13 @@ void ScsiDevice::IrqRingUpdate() {
         // Capture response before freeing iobuffer.
         zx_status_t status;
         if (io_slot->response->response || io_slot->response->status) {
-          status = ZX_ERR_INTERNAL;
+          if (io_slot->response->sense_len == sizeof(scsi::FixedFormatSenseDataHeader) &&
+              reinterpret_cast<scsi::FixedFormatSenseDataHeader*>(io_slot->response->sense)
+                      ->sense_key() == scsi::SenseKey::UNIT_ATTENTION) {
+            status = ZX_ERR_UNAVAILABLE;
+          } else {
+            status = ZX_ERR_INTERNAL;
+          }
         } else {
           status = ZX_OK;
         }
@@ -338,22 +345,25 @@ constexpr uint32_t SCSI_SECTOR_SIZE = 512;
 constexpr uint32_t SCSI_MAX_XFER_SECTORS = 1024;  // 512K clamp
 
 zx_status_t ScsiDevice::WorkerThread() {
-  uint16_t max_target;
-  uint32_t max_lun;
+  uint8_t max_target;
+  uint16_t max_lun;
   uint32_t max_sectors;
   {
     fbl::AutoLock lock(&lock_);
+    // TODO: Return error if config_.max_target > (UINT8_MAX - 1) || config_.max_lun > (UINT16_MAX).
     // virtio-scsi has a 16-bit max_target field, but the encoding we use limits us to one byte
     // target identifiers.
-    max_target = std::min(config_.max_target, static_cast<uint16_t>(UINT8_MAX - 1));
-    max_lun = config_.max_lun;
+    max_target =
+        static_cast<uint8_t>(std::min(config_.max_target, static_cast<uint16_t>(UINT8_MAX - 1)));
+    // virtio-scsi has a 32-bit max_lun field, but the encoding we use limits us to 16-bit.
+    max_lun = static_cast<uint16_t>(std::min(config_.max_lun, static_cast<uint32_t>(UINT16_MAX)));
     // Smaller of controller's max transfer sectors and the 512K clamp.
     max_sectors = std::min(config_.max_sectors, SCSI_MAX_XFER_SECTORS);
   }
 
-  // Execute TEST UNIT READY on every possible target to find potential disks.
-  // TODO(https://fxbug.dev/42107226): For SCSI-3 targets, we could optimize this by using REPORT LUNS.
-  //
+  scsi::DiskOptions options(/*check_unmap_support*/ false, /*use_mode_sense_6*/ false,
+                            /*use_read_write_12*/ false);
+
   // virtio-scsi nominally supports multiple channels, but the device support is not
   // complete. The device encoding for targets in commands does not allow encoding the
   // channel number, so we do not attempt to scan beyond channel 0 here.
@@ -361,50 +371,12 @@ zx_status_t ScsiDevice::WorkerThread() {
   // QEMU and GCE disagree on the definition of the max_target and max_lun config fields;
   // QEMU's max_target/max_lun refer to the last valid whereas GCE's refers to the first
   // invalid target/lun. Use <= to handle both.
-  //
-  // TODO(https://fxbug.dev/42107226): Move probe sequence to ScsiLib -- have it call down into LLDs to execute
-  // commands.
   for (uint8_t target = 0u; target <= max_target; target++) {
-    zx::result luns_on_this_target = ReportLuns(target);
-    if (luns_on_this_target.is_error() || luns_on_this_target.value() == 0) {
+    zx::result<uint32_t> lun_count = ScanAndBindLogicalUnits(
+        zxdev(), target, max_sectors * SCSI_SECTOR_SIZE, max_lun, nullptr, options);
+    if (lun_count.is_error() || lun_count.value() == 0) {
       // For now, assume REPORT LUNS is supported. A failure indicates no LUNs on this target.
       continue;
-    }
-
-    uint16_t luns_found = 0;
-    uint32_t max_xfer_size_sectors = 0;
-    for (uint16_t lun = 0u; lun <= max_lun; lun++) {
-      auto status = TestUnitReady(target, lun);
-      if (status == ZX_OK) {
-        if (max_xfer_size_sectors == 0) {
-          // If we haven't queried the VPD pages for the target's xfer size
-          // yet, do it now. We only query this once per target.
-          zx::result<scsi::VPDBlockLimits> block_limits = InquiryBlockLimits(target, lun);
-          if (block_limits.is_ok()) {
-            // Smaller of |max_sectors| and target's max transfer sectors.
-            max_xfer_size_sectors =
-                std::min(max_sectors, betoh32(block_limits->maximum_transfer_blocks));
-          } else {
-            max_xfer_size_sectors = max_sectors;
-          }
-        }
-        zxlogf(INFO, "Virtio SCSI %u:%u Max Xfer Size %u bytes", target, lun,
-               max_xfer_size_sectors * SCSI_SECTOR_SIZE);
-        zx::result result =
-            scsi::Disk::Bind(device_, this, target, lun, max_xfer_size_sectors * SCSI_SECTOR_SIZE,
-                             scsi::DiskOptions::Default());
-        if (result.is_error()) {
-          return result.status_value();
-        }
-        luns_found++;
-      }
-      // If we've found all the LUNs present on this target, move on.
-      // Subtle detail - LUN 0 may respond to TEST UNIT READY even if it is not a valid LUN
-      // and there is a valid LUN elsewhere on the target. Test for one more LUN than we
-      // expect to work around that.
-      if (luns_found > luns_on_this_target.value()) {
-        break;
-      }
     }
   }
   return ZX_OK;

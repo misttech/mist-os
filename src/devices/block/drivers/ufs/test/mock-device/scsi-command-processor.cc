@@ -304,6 +304,7 @@ zx::result<std::vector<uint8_t>> ScsiCommandProcessor::DefaultInquiryHandler(
       auto *block_limits = reinterpret_cast<scsi::VPDBlockLimits *>(data_buffer.data());
       block_limits->peripheral_qualifier_device_type = 0;
       block_limits->page_code = scsi::InquiryCDB::kBlockLimitsVpdPageCode;
+      block_limits->maximum_transfer_blocks = htobe32(UINT32_MAX);
       block_limits->maximum_unmap_lba_count = htobe32(UINT32_MAX);
     } else if (scsi_cdb->page_code == scsi::InquiryCDB::kLogicalBlockProvisioningVpdPageCode) {
       data_buffer.resize(sizeof(scsi::VPDLogicalBlockProvisioning));
@@ -381,6 +382,26 @@ zx::result<std::vector<uint8_t>> ScsiCommandProcessor::DefaultUnmapHandler(
     return zx::error(status);
   }
 
+  return zx::ok(std::move(data_buffer));
+}
+
+zx::result<std::vector<uint8_t>> ScsiCommandProcessor::DefaultReportLunsHandler(
+    UfsMockDevice &mock_device, CommandUpiuData &command_upiu, ResponseUpiuData &response_upiu,
+    cpp20::span<PhysicalRegionDescriptionTableEntry> &prdt_upius) {
+  std::vector<uint8_t> data_buffer;
+
+  auto *report_luns_cdb = reinterpret_cast<scsi::ReportLunsCDB *>(command_upiu.cdb);
+
+  if (report_luns_cdb->select_report == 0) {
+    data_buffer.resize(sizeof(scsi::ReportLunsParameterDataHeader));
+    auto *report_luns_parameter =
+        reinterpret_cast<scsi::ReportLunsParameterDataHeader *>(data_buffer.data());
+    report_luns_parameter->lun_list_length = htobe32(mock_device.GetDeviceDesc().bNumberLU * 8);
+  } else {
+    return zx::error(ZX_ERR_NOT_SUPPORTED);
+  }
+
+  ZX_DEBUG_ASSERT(command_upiu.header_flags_r());
   return zx::ok(std::move(data_buffer));
 }
 

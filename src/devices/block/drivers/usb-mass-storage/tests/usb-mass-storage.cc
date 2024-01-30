@@ -437,6 +437,29 @@ static void RequestQueue(void* ctx, usb_request_t* usb_request,
           }
           break;
         }
+        case scsi::Opcode::REQUEST_SENSE: {
+          scsi::RequestSenseCDB cmd;
+          memcpy(&cmd, cbw.CBWCB, sizeof(cmd));
+          // Push reply
+          fbl::Array<unsigned char> reply(new unsigned char[cmd.allocation_length],
+                                          cmd.allocation_length);
+          scsi::FixedFormatSenseDataHeader sense_data;
+          sense_data.set_response_code(0x70);  // Current information
+          sense_data.set_valid(0);
+          sense_data.set_sense_key(scsi::SenseKey::NO_SENSE);
+          memcpy(reply.data(), &sense_data, sizeof(sense_data));
+          context->pending_packets.push_back(fbl::MakeRefCounted<Packet>(std::move(reply)));
+          // Push CSW
+          fbl::Array<unsigned char> csw(new unsigned char[sizeof(ums_csw_t)], sizeof(ums_csw_t));
+          context->csw.dCSWDataResidue = 0;
+          context->csw.dCSWTag = context->tag++;
+          context->csw.bmCSWStatus = CSW_SUCCESS;
+          memcpy(csw.data(), &context->csw, sizeof(context->csw));
+          context->pending_packets.push_back(fbl::MakeRefCounted<Packet>(std::move(csw)));
+          usb_request->response.status = ZX_OK;
+          complete_cb->callback(complete_cb->ctx, usb_request);
+          break;
+        }
         default:
           ADD_FAILURE("Unexpected SCSI command: %02Xh", cbw.CBWCB[0]);
       }

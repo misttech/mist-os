@@ -6,6 +6,7 @@
 #define SRC_DEVICES_BLOCK_LIB_SCSI_INCLUDE_LIB_SCSI_CONTROLLER_H_
 
 #include <lib/ddk/debug.h>
+#include <lib/fit/function.h>
 #include <lib/zx/result.h>
 #include <lib/zx/vmo.h>
 #include <stdint.h>
@@ -656,6 +657,10 @@ struct WriteBufferCDB {
 static_assert(sizeof(WriteBufferCDB) == 10, "Write Buffer CDB must be 10 bytes");
 
 struct DiskOp;
+struct DiskOptions;
+
+using LuCallback =
+    fit::function<zx::result<>(uint16_t lun, size_t block_size, uint64_t block_count)>;
 
 class Controller {
  public:
@@ -720,7 +725,12 @@ class Controller {
                            uint32_t* block_size_bytes);
 
   // Count the number of addressable LUNs attached to a target.
-  zx::result<uint32_t> ReportLuns(uint8_t target);
+  zx::result<uint16_t> ReportLuns(uint8_t target);
+
+  // Check the status of each LU and bind it. This function returns the number of LUs found.
+  zx::result<uint32_t> ScanAndBindLogicalUnits(zx_device_t* device, uint8_t target,
+                                               uint32_t max_transfer_bytes, uint16_t max_lun,
+                                               LuCallback lu_callback, DiskOptions disk_options);
 };
 
 }  // namespace scsi
