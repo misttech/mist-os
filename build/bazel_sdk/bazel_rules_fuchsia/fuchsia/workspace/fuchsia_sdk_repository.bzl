@@ -62,7 +62,7 @@ def _instantiate_local_idk(ctx, manifests):
     manifests.append({"root": "%s/." % local_idk, "manifest": "meta/manifest.json"})
 
 def _merge_rules_fuchsia(ctx):
-    rules_fuchsia_root = ctx.path(ctx.attr._rules_fuchsia_root).dirname
+    rules_fuchsia_root = ctx.path(Label("//:BUILD.bazel")).dirname
     ctx.symlink(rules_fuchsia_root.get_child("fuchsia"), "fuchsia")
 
     # LINT.IfChange
@@ -111,7 +111,7 @@ def _fuchsia_sdk_repository_impl(ctx):
     ctx.report_progress("Generating Bazel rules for the SDK")
     ctx.template(
         "BUILD.bazel",
-        ctx.attr._template,
+        ctx.path(Label("//fuchsia/workspace/sdk_templates:repository.BUILD.template")),
         substitutions = {
             "{{HOST_CPU}}": constants.host_cpus[0],
             "{{SDK_ID}}": sdk_id_from_manifests(ctx, manifests),
@@ -197,92 +197,6 @@ Loads a particular version of the Fuchsia IDK.
         ),
         "buildifier": attr.label(
             doc = "An optional label to the buildifier tool, used to reformat all generated Bazel files.",
-            allow_single_file = True,
-        ),
-        "_template": attr.label(
-            default = "//fuchsia/workspace/sdk_templates:repository.BUILD.template",
-            allow_single_file = True,
-        ),
-        # The templates need to be explicitly declared so that they trigger a new
-        # build when they change.
-        "_bind_library_template": attr.label(
-            default = "//fuchsia/workspace/sdk_templates:bind_library.BUILD.template",
-            allow_single_file = True,
-        ),
-        "_cc_library_template": attr.label(
-            default = "//fuchsia/workspace/sdk_templates:cc_library.BUILD.template",
-            allow_single_file = True,
-        ),
-        "_cc_prebuilt_library_template": attr.label(
-            default = "//fuchsia/workspace/sdk_templates:cc_prebuilt_library.BUILD.template",
-            allow_single_file = True,
-        ),
-        "_cc_prebuilt_library_distlib_subtemplate": attr.label(
-            default = "//fuchsia/workspace/sdk_templates:cc_prebuilt_library_distlib_sub.BUILD.template",
-            allow_single_file = True,
-        ),
-        "_cc_prebuilt_library_linklib_subtemplate": attr.label(
-            default = "//fuchsia/workspace/sdk_templates:cc_prebuilt_library_linklib_sub.BUILD.template",
-            allow_single_file = True,
-        ),
-        "_component_manifest_template": attr.label(
-            default = "//fuchsia/workspace/sdk_templates:component_manifest.BUILD.template",
-            allow_single_file = True,
-        ),
-        "_component_manifest_collection_template": attr.label(
-            default = "//fuchsia/workspace/sdk_templates:component_manifest_collection.BUILD.template",
-            allow_single_file = True,
-        ),
-        "_filegroup_template": attr.label(
-            default = "//fuchsia/workspace/sdk_templates:filegroup.BUILD.template",
-            allow_single_file = True,
-        ),
-        "_ffx_tool_template": attr.label(
-            default = "//fuchsia/workspace/sdk_templates:ffx_tool.BUILD.template",
-            allow_single_file = True,
-        ),
-        "_fidl_library_template": attr.label(
-            default = "//fuchsia/workspace/sdk_templates:fidl_library.BUILD.template",
-            allow_single_file = True,
-        ),
-        "_host_tool_template": attr.label(
-            default = "//fuchsia/workspace/sdk_templates:host_tool.BUILD.template",
-            allow_single_file = True,
-        ),
-        "_companion_host_tool_template": attr.label(
-            default = "//fuchsia/workspace/sdk_templates:companion_host_tool.BUILD.template",
-            allow_single_file = True,
-        ),
-        "_select_alias": attr.label(
-            default = "//fuchsia/workspace/sdk_templates:select_alias.BUILD.template",
-            allow_single_file = True,
-        ),
-        "_constraint_template": attr.label(
-            default = "//fuchsia/workspace/sdk_templates:constraint.BUILD.template",
-            allow_single_file = True,
-        ),
-        "_package_template": attr.label(
-            default = "//fuchsia/workspace/sdk_templates:package.BUILD.template",
-            allow_single_file = True,
-        ),
-        "_export_all_files_template": attr.label(
-            default = "//fuchsia/workspace/sdk_templates:export_all_files.BUILD.template",
-            allow_single_file = True,
-        ),
-        "_api_version_template": attr.label(
-            default = "//fuchsia/workspace/sdk_templates:api_version_template.bzl",
-            allow_single_file = True,
-        ),
-        "_sysroot_template": attr.label(
-            default = "//fuchsia/workspace/sdk_templates:sysroot.BUILD.template",
-            allow_single_file = True,
-        ),
-        "_sysroot_arch_subtemplate": attr.label(
-            default = "//fuchsia/workspace/sdk_templates:sysroot_arch_sub.BUILD.template",
-            allow_single_file = True,
-        ),
-        "_rules_fuchsia_root": attr.label(
-            default = "//:BUILD.bazel",
             allow_single_file = True,
         ),
     },
