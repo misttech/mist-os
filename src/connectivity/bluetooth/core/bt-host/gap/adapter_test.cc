@@ -525,7 +525,7 @@ TEST_F(AdapterTest, LeAutoConnect) {
 
   auto fake_peer =
       std::make_unique<FakePeer>(kTestAddr, dispatcher(), true, false);
-  fake_peer->enable_directed_advertising(true);
+  fake_peer->set_directed_advertising_enabled(true);
   test_device()->AddPeer(std::move(fake_peer));
 
   std::unique_ptr<bt::gap::LowEnergyConnectionHandle> conn;
@@ -578,7 +578,7 @@ TEST_F(AdapterTest, LeSkipAutoConnectBehavior) {
 
   auto fake_peer =
       std::make_unique<FakePeer>(kTestAddr, dispatcher(), true, false);
-  fake_peer->enable_directed_advertising(true);
+  fake_peer->set_directed_advertising_enabled(true);
   test_device()->AddPeer(std::move(fake_peer));
 
   std::unique_ptr<bt::gap::LowEnergyConnectionHandle> conn;
