@@ -10,8 +10,8 @@ use lock_order::{
 use net_types::ip::{Ipv4, Ipv6};
 
 use crate::{
-    device::{self, WeakDeviceId},
-    socket::{EitherStack, MaybeDualStack},
+    device::WeakDeviceId,
+    socket::MaybeDualStack,
     transport::{
         tcp::{
             self,
@@ -240,11 +240,9 @@ where
 }
 
 impl<L, BC: BindingsContext> tcp::socket::TcpDualStackContext<Ipv6> for CoreCtx<'_, BC, L> {
-    fn into_other_demux_socket_id<D: device::WeakId, BT: tcp::socket::TcpBindingsTypes>(
-        &self,
-        id: tcp::socket::TcpSocketId<Ipv6, D, BT>,
-    ) -> <Ipv4 as tcp::socket::DualStackIpExt>::DemuxSocketId<D, BT> {
-        EitherStack::OtherStack(id)
+    type Converter = tcp::socket::Ipv6SocketIdToIpv4DemuxIdConverter;
+    fn other_demux_id_converter(&self) -> Self::Converter {
+        tcp::socket::Ipv6SocketIdToIpv4DemuxIdConverter
     }
 }
 

@@ -32,7 +32,7 @@ pub trait ListenerNotifier {
 /// it.
 #[derive(Debug, Derivative)]
 #[derivative(Clone(bound = ""))]
-pub(crate) struct AcceptQueue<S, R, N>(Arc<Mutex<AcceptQueueInner<S, R, N>>>);
+pub struct AcceptQueue<S, R, N>(Arc<Mutex<AcceptQueueInner<S, R, N>>>);
 
 #[cfg(test)]
 impl<S, R, N> PartialEq for AcceptQueue<S, R, N>

@@ -24,21 +24,9 @@
         {
             type: "expect_failure",
             matchers: [
-                // Netstack3 does not support dual-stack TCP sockets yet.
-                "All/SocketInetLoopbackIsolatedTest.*/ListenV4Any_ConnectV4MappedAny",
-                "All/SocketInetLoopbackIsolatedTest.*/ListenV4Any_ConnectV4MappedLoopback",
-                "All/SocketInetLoopbackIsolatedTest.*/ListenV4Loopback_ConnectV4MappedLoopback",
-                "All/SocketInetLoopbackIsolatedTest.*/ListenV4MappedAny_ConnectV4Any",
-                "All/SocketInetLoopbackIsolatedTest.*/ListenV4MappedAny_ConnectV4Loopback",
-                "All/SocketInetLoopbackIsolatedTest.*/ListenV4MappedAny_ConnectV4MappedAny",
-                "All/SocketInetLoopbackIsolatedTest.*/ListenV4MappedAny_ConnectV4MappedLoopback",
-                "All/SocketInetLoopbackIsolatedTest.*/ListenV4MappedLoopback_ConnectV4Any",
-                "All/SocketInetLoopbackIsolatedTest.*/ListenV4MappedLoopback_ConnectV4Loopback",
-                "All/SocketInetLoopbackIsolatedTest.*/ListenV4MappedLoopback_ConnectV4MappedLoopback",
-                "All/SocketInetLoopbackIsolatedTest.*/ListenV6Any_ConnectV4Any",
-                "All/SocketInetLoopbackIsolatedTest.*/ListenV6Any_ConnectV4Loopback",
-                "All/SocketInetLoopbackIsolatedTest.*/ListenV6Any_ConnectV4MappedAny",
-                "All/SocketInetLoopbackIsolatedTest.*/ListenV6Any_ConnectV4MappedLoopback",
+                // TODO(https://issues.fuchsia.dev/319117141): Support listening
+                // in both stacks.
+                "All/SocketInetLoopbackIsolatedTest.TCPFinWait2Test/ListenV6Any_ConnectV4*",
             ],
         },
     ],
