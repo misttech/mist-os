@@ -7,6 +7,7 @@ import("//build/components.gni")
 group("conformance") {
   testonly = true
   deps = [
+    ":focus-conformance-test",
     ":key-conformance-test",
     ":mouse-conformance-test",
     ":touch-conformance-test",
@@ -201,6 +202,69 @@ fuchsia_test_package("key-conformance-test") {
   test_components = [ ":key-conformance-test-component" ]
   subpackages = [
     ":key-test-suite",
+    "//src/ui/testing/context:ui-context-factory",
+  ]
+  test_specs = {
+    log_settings = {
+      max_severity = "ERROR"
+    }
+    environments = [
+      {
+        dimensions = {
+          # Ensure the device has Vulkan.
+          device_type = "AEMU"
+        }
+      },
+    ]
+  }
+}
+
+############# Focus CONFORMANCE TEST #############
+executable("focus-validator-bin") {
+  testonly = true
+  sources = [ "focus-validator.cc" ]
+  output_name = "focus-validator"
+  deps = [
+    ":conformance-test-base",
+    "//sdk/fidl/fuchsia.ui.composition:fuchsia.ui.composition_hlcpp",
+    "//sdk/fidl/fuchsia.ui.display.singleton:fuchsia.ui.display.singleton_hlcpp",
+    "//sdk/fidl/fuchsia.ui.focus:fuchsia.ui.focus_hlcpp",
+    "//sdk/fidl/fuchsia.ui.input3:fuchsia.ui.input3_hlcpp",
+    "//sdk/fidl/fuchsia.ui.test.conformance:fuchsia.ui.test.conformance_hlcpp",
+    "//sdk/fidl/fuchsia.ui.test.scene:fuchsia.ui.test.scene_hlcpp",
+    "//sdk/lib/syslog/cpp",
+    "//sdk/lib/ui/scenic/cpp",
+    "//src/lib/fsl",
+    "//src/lib/fxl/test:gtest_main",
+  ]
+}
+
+fuchsia_component("focus-validator") {
+  testonly = true
+  manifest = "meta/focus-validator.cml"
+  deps = [ ":focus-validator-bin" ]
+}
+
+fuchsia_package("focus-test-suite") {
+  package_name = "focus-test-suite"
+  testonly = true
+  deps = [
+    ":focus-validator",
+    "//src/ui/testing/puppet:ui-puppet-component",
+  ]
+}
+
+fuchsia_test_component("focus-conformance-test-component") {
+  testonly = true
+  component_name = "focus-conformance-test"
+  manifest = "meta/focus-conformance-test.cml"
+  test_type = "system"
+}
+
+fuchsia_test_package("focus-conformance-test") {
+  test_components = [ ":focus-conformance-test-component" ]
+  subpackages = [
+    ":focus-test-suite",
     "//src/ui/testing/context:ui-context-factory",
   ]
   test_specs = {

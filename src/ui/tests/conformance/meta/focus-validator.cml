@@ -1,4 +1,4 @@
-// Copyright 2024 The Fuchsia Authors. All rights reserved.
+// Copyright 2022 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 {
@@ -7,7 +7,7 @@
         "//src/sys/test_runners/gtest/default.shard.cml",
     ],
     program: {
-        binary: "bin/key-validator",
+        binary: "bin/focus-validator",
     },
     use: [
         {
