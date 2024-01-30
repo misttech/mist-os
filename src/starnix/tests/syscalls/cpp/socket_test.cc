@@ -312,15 +312,17 @@ class SocketFault : public FaultTest, public testing::WithParamInterface<std::pa
       GTEST_SKIP() << "Ping sockets require root.";
     }
 
-    const sockaddr_in addr = {
+    sockaddr_in addr = {
         .sin_family = AF_INET,
-        .sin_port = htons(1337),
         .sin_addr = {htonl(INADDR_LOOPBACK)},
     };
-
+    socklen_t addrlen = sizeof(addr);
     ASSERT_TRUE(recv_fd_ = fbl::unique_fd(socket(AF_INET, type, protocol))) << strerror(errno);
-    ASSERT_EQ(bind(recv_fd_.get(), reinterpret_cast<const sockaddr*>(&addr), sizeof(addr)), 0)
+    ASSERT_EQ(bind(recv_fd_.get(), reinterpret_cast<sockaddr*>(&addr), addrlen), 0)
         << strerror(errno);
+    ASSERT_EQ(getsockname(recv_fd_.get(), reinterpret_cast<sockaddr*>(&addr), &addrlen), 0)
+        << strerror(errno);
+    ASSERT_EQ(addrlen, sizeof(addr));
     if (type == SOCK_STREAM) {
       ASSERT_EQ(listen(recv_fd_.get(), 0), 0) << strerror(errno);
       listen_fd_ = std::move(recv_fd_);
