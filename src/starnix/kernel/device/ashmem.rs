@@ -118,31 +118,31 @@ impl FileOps for Ashmem {
             }
 
             ASHMEM_SET_PROT_MASK => {
-                track_stub!("ASHMEM_SET_PROT_MASK");
+                track_stub!(TODO("https://fxbug.dev/322874231"), "ASHMEM_SET_PROT_MASK");
                 error!(ENOSYS)
             }
             ASHMEM_GET_PROT_MASK => {
-                track_stub!("ASHMEM_GET_PROT_MASK");
+                track_stub!(TODO("https://fxbug.dev/322874002"), "ASHMEM_GET_PROT_MASK");
                 error!(ENOSYS)
             }
             ASHMEM_PIN => {
-                track_stub!("ASHMEM_PIN");
+                track_stub!(TODO("https://fxbug.dev/322873842"), "ASHMEM_PIN");
                 error!(ENOSYS)
             }
             ASHMEM_UNPIN => {
-                track_stub!("ASHMEM_UNPIN");
+                track_stub!(TODO("https://fxbug.dev/322874326"), "ASHMEM_UNPIN");
                 error!(ENOSYS)
             }
             ASHMEM_GET_PIN_STATUS => {
-                track_stub!("ASHMEM_GET_PIN_STATUS");
+                track_stub!(TODO("https://fxbug.dev/322873280"), "ASHMEM_GET_PIN_STATUS");
                 error!(ENOSYS)
             }
             ASHMEM_PURGE_ALL_CACHES => {
-                track_stub!("ASHMEM_PURGE_ALL_CACHES");
+                track_stub!(TODO("https://fxbug.dev/322873734"), "ASHMEM_PURGE_ALL_CACHES");
                 error!(ENOSYS)
             }
             ASHMEM_GET_FILE_ID => {
-                track_stub!("ASHMEM_GET_FILE_ID");
+                track_stub!(TODO("https://fxbug.dev/322873958"), "ASHMEM_GET_FILE_ID");
                 error!(ENOSYS)
             }
             _ => default_ioctl(file, current_task, request, arg),

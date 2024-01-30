@@ -6,7 +6,7 @@ use crate::{
     task::CurrentTask,
     vfs::{create_bytes_file_with_handler, StaticDirectoryBuilder, StubEmptyFile},
 };
-use starnix_logging::track_stub;
+use starnix_logging::{bug_ref, track_stub};
 use starnix_uapi::file_mode::mode;
 use std::sync::Arc;
 
@@ -21,7 +21,10 @@ pub fn sysfs_kernel_directory(current_task: &CurrentTask, dir: &mut StaticDirect
                 dir.entry(
                     current_task,
                     "enabled",
-                    StubEmptyFile::new_node("/sys/kernel/mm/transparent_hugepage/enabled"),
+                    StubEmptyFile::new_node(
+                        "/sys/kernel/mm/transparent_hugepage/enabled",
+                        bug_ref!("https://fxbug.dev/322894184"),
+                    ),
                     mode!(IFREG, 0o644),
                 );
             });
@@ -44,7 +47,7 @@ pub fn sysfs_kernel_directory(current_task: &CurrentTask, dir: &mut StaticDirect
                     // First number is the time spent in suspend and resume processes.
                     // Second number is the time spent in sleep state.
                     track_stub!(
-                        TODO("https://fxbug.dev/303507442"),
+                        TODO("https://fxbug.dev/297438732"),
                         "/sys/kernel/wakeup_reasons/last_suspend_time"
                     );
                     let suspend_time = kernel

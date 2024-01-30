@@ -655,7 +655,7 @@ impl WaitingOptions {
     pub fn new_for_waitid(options: u32) -> Result<Self, Errno> {
         if options & !(__WCLONE | __WALL | WNOHANG | WNOWAIT | WSTOPPED | WEXITED | WCONTINUED) != 0
         {
-            track_stub!("waitid", options);
+            track_stub!(TODO("https://fxbug.dev/322874788"), "waitid options", options);
             return error!(EINVAL);
         }
         if options & (WEXITED | WSTOPPED | WCONTINUED) == 0 {
@@ -667,7 +667,7 @@ impl WaitingOptions {
     /// Build a `WaitingOptions` from the waiting flags of wait4.
     pub fn new_for_wait4(options: u32, waiter_pid: pid_t) -> Result<Self, Errno> {
         if options & !(__WCLONE | __WALL | WNOHANG | WUNTRACED | WCONTINUED) != 0 {
-            track_stub!("wait4", options);
+            track_stub!(TODO("https://fxbug.dev/322874017"), "wait4 options", options);
             return error!(EINVAL);
         }
         let mut result = Self::new(options | WEXITED);
@@ -790,7 +790,7 @@ pub fn sys_waitid(
                 ..Default::default()
             };
 
-            track_stub!("real rusage from waitid");
+            track_stub!(TODO("https://fxbug.dev/322874712"), "real rusage from waitid");
             current_task.write_object(user_rusage, &usage)?;
         }
 
@@ -832,7 +832,11 @@ pub fn sys_wait4(
     } else if raw_selector < -1 {
         ProcessSelector::Pgid(negate_pid(raw_selector)?)
     } else {
-        track_stub!("wait4", raw_selector as u64);
+        track_stub!(
+            TODO("https://fxbug.dev/322874213"),
+            "wait4 with selector",
+            raw_selector as u64
+        );
         return error!(ENOSYS);
     };
 
@@ -840,7 +844,7 @@ pub fn sys_wait4(
         let status = waitable_process.exit_info.status.wait_status();
 
         if !user_rusage.is_null() {
-            track_stub!("real rusage from wait4");
+            track_stub!(TODO("https://fxbug.dev/322874768"), "real rusage from wait4");
             let usage = rusage {
                 ru_utime: timeval_from_duration(waitable_process.time_stats.user_time),
                 ru_stime: timeval_from_duration(waitable_process.time_stats.system_time),

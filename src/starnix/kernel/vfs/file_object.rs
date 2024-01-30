@@ -609,7 +609,7 @@ pub fn default_ioctl(
             Ok(SUCCESS)
         }
         FIONREAD => {
-            track_stub!("FIONREAD");
+            track_stub!(TODO("https://fxbug.dev/322874897"), "FIONREAD");
             if !file.name.entry.node.is_reg() {
                 return error!(ENOTTY);
             }
@@ -623,19 +623,19 @@ pub fn default_ioctl(
             Ok(SUCCESS)
         }
         FS_IOC_FSGETXATTR => {
-            track_stub!("FS_IOC_FSGETXATTR");
+            track_stub!(TODO("https://fxbug.dev/322875209"), "FS_IOC_FSGETXATTR");
             let arg = UserAddress::from(arg).into();
             current_task.write_object(arg, &fsxattr::default())?;
             Ok(SUCCESS)
         }
         FS_IOC_FSSETXATTR => {
-            track_stub!("FS_IOC_FSSETXATTR");
+            track_stub!(TODO("https://fxbug.dev/322875271"), "FS_IOC_FSSETXATTR");
             let arg = UserAddress::from(arg).into();
             let _: fsxattr = current_task.read_object(arg)?;
             Ok(SUCCESS)
         }
         FS_IOC_GETFLAGS => {
-            track_stub!("FS_IOC_GETFLAGS");
+            track_stub!(TODO("https://fxbug.dev/322874935"), "FS_IOC_GETFLAGS");
             let arg = UserAddress::from(arg).into();
             let mut flags: u32 = 0;
             if matches!(*file.node().fsverity.lock(), FsVerityState::FsVerity) {
@@ -645,7 +645,7 @@ pub fn default_ioctl(
             Ok(SUCCESS)
         }
         FS_IOC_SETFLAGS => {
-            track_stub!("FS_IOC_SETFLAGS");
+            track_stub!(TODO("https://fxbug.dev/322875367"), "FS_IOC_SETFLAGS");
             let arg = UserAddress::from(arg).into();
             let _: u32 = current_task.read_object(arg)?;
             Ok(SUCCESS)
@@ -660,14 +660,14 @@ pub fn default_ioctl(
             Ok(fsverity::ioctl::read_metadata(current_task, UserAddress::from(arg).into(), file)?)
         }
         _ => {
-            track_stub!("ioctl", request);
+            track_stub!(TODO("https://fxbug.dev/322874917"), "ioctl fallthrough", request);
             error!(ENOTTY)
         }
     }
 }
 
 pub fn default_fcntl(cmd: u32) -> Result<SyscallResult, Errno> {
-    track_stub!("fcntl", cmd);
+    track_stub!(TODO("https://fxbug.dev/322875704"), "default fcntl", cmd);
     error!(EINVAL)
 }
 

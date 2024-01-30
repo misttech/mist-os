@@ -325,7 +325,7 @@ impl OverlayNode {
                 })
             };
 
-            track_stub!("overlayfs copy xattrs");
+            track_stub!(TODO("https://fxbug.dev/322874151"), "overlayfs copy xattrs");
             res
         })
     }
@@ -871,7 +871,7 @@ impl OverlayFs {
             None => (),
             Some(o) if o == "off" => (),
             Some(_) => {
-                track_stub!("overlayfs redirect_dir");
+                track_stub!(TODO("https://fxbug.dev/322874205"), "overlayfs redirect_dir");
                 return error!(ENOTSUP);
             }
         }

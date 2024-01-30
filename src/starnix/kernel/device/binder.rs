@@ -820,7 +820,10 @@ impl BinderProcess {
     ) -> Result<(), Errno> {
         let proxy = match handle {
             Handle::ContextManager => {
-                track_stub!("death notification for service manager");
+                track_stub!(
+                    TODO("https://fxbug.dev/322873363"),
+                    "binder death notification for service manager"
+                );
                 return Ok(());
             }
             Handle::Object { index } => {
@@ -856,7 +859,10 @@ impl BinderProcess {
     ) -> Result<(), Errno> {
         let owner = match handle {
             Handle::ContextManager => {
-                track_stub!("clear death notification for service manager");
+                track_stub!(
+                    TODO("https://fxbug.dev/322873735"),
+                    "binder clear death notification for service manager"
+                );
                 self.enqueue_command(Command::ClearDeathNotificationDone(cookie));
                 return Ok(());
             }
@@ -933,7 +939,10 @@ impl<'a> BinderProcessGuard<'a> {
     ) -> Result<(), Errno> {
         let idx = match handle {
             Handle::ContextManager => {
-                track_stub!("acquire/release refs for context manager object");
+                track_stub!(
+                    TODO("https://fxbug.dev/322873629"),
+                    "binder acquire/release refs for context manager object"
+                );
                 return Ok(());
             }
             Handle::Object { index } => index,
@@ -3287,7 +3296,10 @@ impl BinderDriver {
                     Ok(SUCCESS)
                 }
                 uapi::BINDER_ENABLE_ONEWAY_SPAM_DETECTION => {
-                    track_stub!("binder ENABLE_ONEWAY_SPAM_DETECTION");
+                    track_stub!(
+                        TODO("https://fxbug.dev/322874289"),
+                        "binder ENABLE_ONEWAY_SPAM_DETECTION"
+                    );
                     Ok(SUCCESS)
                 }
                 uapi::BINDER_THREAD_EXIT => {
@@ -3296,19 +3308,26 @@ impl BinderDriver {
                     Ok(SUCCESS)
                 }
                 uapi::BINDER_GET_NODE_DEBUG_INFO => {
-                    track_stub!("binder GET_NODE_DEBUG_INFO");
+                    track_stub!(TODO("https://fxbug.dev/322874232"), "binder GET_NODE_DEBUG_INFO");
                     error!(EOPNOTSUPP)
                 }
                 uapi::BINDER_GET_NODE_INFO_FOR_REF => {
-                    track_stub!("binder GET_NODE_INFO_FOR_REF");
+                    track_stub!(
+                        TODO("https://fxbug.dev/322874148"),
+                        "binder GET_NODE_INFO_FOR_REF"
+                    );
                     error!(EOPNOTSUPP)
                 }
                 uapi::BINDER_FREEZE => {
-                    track_stub!("binder BINDER_FREEZE");
+                    track_stub!(TODO("https://fxbug.dev/322874189"), "binder BINDER_FREEZE");
                     error!(EOPNOTSUPP)
                 }
                 _ => {
-                    track_stub!("binder unknown ioctl", request);
+                    track_stub!(
+                        TODO("https://fxbug.dev/322874384"),
+                        "binder unknown ioctl",
+                        request
+                    );
                     log_error!("binder received unknown ioctl request 0x{:08x}", request);
                     error!(EINVAL)
                 }
@@ -4325,7 +4344,11 @@ impl SerializedBinderObject {
                 })
             }
             object_type => {
-                track_stub!("unknown object type", object_type);
+                track_stub!(
+                    TODO("https://fxbug.dev/322873261"),
+                    "binder unknown object type",
+                    object_type
+                );
                 error!(EINVAL)
             }
         }

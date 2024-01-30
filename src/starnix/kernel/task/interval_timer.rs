@@ -140,7 +140,7 @@ impl IntervalTimer {
                     }),
                     SignalEventNotify::None => None, // No need to do anything.
                     SignalEventNotify::Thread { .. } => {
-                        track_stub!("SIGEV_THREAD timer");
+                        track_stub!(TODO("https://fxbug.dev/322875029"), "SIGEV_THREAD timer");
                         None
                     }
                     SignalEventNotify::ThreadId(tid) => {

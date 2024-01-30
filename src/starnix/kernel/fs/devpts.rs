@@ -216,7 +216,7 @@ impl FsNodeOps for DevPtsRootDir {
                     );
                     info.rdev = get_device_type_for_pts(id);
                     info.blksize = BLOCK_SIZE;
-                    track_stub!("devpts set gid to tty group");
+                    track_stub!(TODO("https://fxbug.dev/322873457"), "devpts set gid to tty group");
                     info.gid = 0;
                     let node =
                         node.fs().create_node_with_id(current_task, SpecialNode, info.ino, info);
@@ -489,30 +489,6 @@ impl FileOps for DevPtsFile {
     }
 }
 
-macro_rules! stub_ioctl_requests {
-    ($request:ident, $($($context:literal,)? $unsupported:ident)|*) => {{
-        match $request {
-            $(
-                $unsupported => {
-                    track_stub!(concat!("ioctl ", $($context, " ",)? stringify!($unsupported)));
-                    error!(ENOSYS)
-                }
-            )+
-            _ => error!(ENOTTY),
-        }
-    }};
-}
-
-macro_rules! devpts_stub_ioctl_requests  {
-    ($request:ident, $is_main:expr, $($unsupported:ident)|*) => {{
-        if $is_main {
-            stub_ioctl_requests!($request, $("ptmx", $unsupported)|*)
-        } else {
-            stub_ioctl_requests!($request, $("pts", $unsupported)|*)
-        }
-    }};
-}
-
 /// The ioctl behaviour common to main and replica terminal file descriptors.
 fn shared_ioctl<L>(
     locked: &mut Locked<'_, L>,
@@ -640,31 +616,239 @@ where
             Ok(SUCCESS)
         }
         TCSETSW => {
-            track_stub!("TCSETSW drain output queue first");
+            track_stub!(TODO("https://fxbug.dev/322873281"), "TCSETSW drain output queue first");
             let termios = current_task.read_object(UserRef::<uapi::termios>::new(user_addr))?;
             terminal.set_termios(locked, termios);
             Ok(SUCCESS)
         }
         TIOCSETD => {
-            if is_main {
-                track_stub!("ptmx setting line discipline");
-            } else {
-                track_stub!("pts setting line discipline");
-            }
+            track_stub!(
+                TODO("https://fxbug.dev/322874060"),
+                "devpts setting line discipline",
+                is_main
+            );
             error!(EINVAL)
         }
-        #[rustfmt::skip]
-        unsupported => devpts_stub_ioctl_requests!(
-            unsupported, is_main,
-            TCSETA | TCSETAW | TCSETAF | TCSBRK | TCXONC | TCFLSH | TIOCEXCL
-            | TIOCNXCL | TIOCOUTQ | TIOCSTI | TIOCMGET | TIOCMBIS | TIOCMBIC | TIOCMSET
-            | TIOCGSOFTCAR | TIOCSSOFTCAR | TIOCLINUX | TIOCCONS | TIOCGSERIAL | TIOCSSERIAL
-            | TIOCPKT | FIONBIO | TIOCGETD | TCSBRKP | TIOCSBRK | TIOCCBRK | TIOCGSID | TIOCGRS485
-            | TIOCSRS485 | TCGETX | TCSETX | TCSETXF | TCSETXW | TIOCVHANGUP | FIONCLEX | FIOCLEX
-            | FIOASYNC | TIOCSERCONFIG | TIOCSERGWILD | TIOCSERSWILD | TIOCGLCKTRMIOS
-            | TIOCSLCKTRMIOS | TIOCSERGSTRUCT | TIOCSERGETLSR | TIOCSERGETMULTI | TIOCSERSETMULTI
-            | TIOCMIWAIT | TIOCGICOUNT | FIOQSIZE
-        ),
+        TCSETA => {
+            track_stub!(TODO("https://fxbug.dev/322893186"), "devpts ioctl TCSETA", is_main);
+            error!(ENOSYS)
+        }
+        TCSETAW => {
+            track_stub!(TODO("https://fxbug.dev/322893291"), "devpts ioctl TCSETAW", is_main);
+            error!(ENOSYS)
+        }
+        TCSETAF => {
+            track_stub!(TODO("https://fxbug.dev/322893468"), "devpts ioctl TCSETAF", is_main);
+            error!(ENOSYS)
+        }
+        TCSBRK => {
+            track_stub!(TODO("https://fxbug.dev/322893658"), "devpts ioctl TCSBRK", is_main);
+            error!(ENOSYS)
+        }
+        TCXONC => {
+            track_stub!(TODO("https://fxbug.dev/322892912"), "devpts ioctl TCXONC", is_main);
+            error!(ENOSYS)
+        }
+        TCFLSH => {
+            track_stub!(TODO("https://fxbug.dev/322893703"), "devpts ioctl TCFLSH", is_main);
+            error!(ENOSYS)
+        }
+        TIOCEXCL => {
+            track_stub!(TODO("https://fxbug.dev/322893449"), "devpts ioctl TIOCEXCL", is_main);
+            error!(ENOSYS)
+        }
+        TIOCNXCL => {
+            track_stub!(TODO("https://fxbug.dev/322893393"), "devpts ioctl TIOCNXCL", is_main);
+            error!(ENOSYS)
+        }
+        TIOCOUTQ => {
+            track_stub!(TODO("https://fxbug.dev/322893723"), "devpts ioctl TIOCOUTQ", is_main);
+            error!(ENOSYS)
+        }
+        TIOCSTI => {
+            track_stub!(TODO("https://fxbug.dev/322893780"), "devpts ioctl TIOCSTI", is_main);
+            error!(ENOSYS)
+        }
+        TIOCMGET => {
+            track_stub!(TODO("https://fxbug.dev/322893681"), "devpts ioctl TIOCMGET", is_main);
+            error!(ENOSYS)
+        }
+        TIOCMBIS => {
+            track_stub!(TODO("https://fxbug.dev/322893709"), "devpts ioctl TIOCMBIS", is_main);
+            error!(ENOSYS)
+        }
+        TIOCMBIC => {
+            track_stub!(TODO("https://fxbug.dev/322893610"), "devpts ioctl TIOCMBIC", is_main);
+            error!(ENOSYS)
+        }
+        TIOCMSET => {
+            track_stub!(TODO("https://fxbug.dev/322893211"), "devpts ioctl TIOCMSET", is_main);
+            error!(ENOSYS)
+        }
+        TIOCGSOFTCAR => {
+            track_stub!(TODO("https://fxbug.dev/322893365"), "devpts ioctl TIOCGSOFTCAR", is_main);
+            error!(ENOSYS)
+        }
+        TIOCSSOFTCAR => {
+            track_stub!(TODO("https://fxbug.dev/322894074"), "devpts ioctl TIOCSSOFTCAR", is_main);
+            error!(ENOSYS)
+        }
+        TIOCLINUX => {
+            track_stub!(TODO("https://fxbug.dev/322893147"), "devpts ioctl TIOCLINUX", is_main);
+            error!(ENOSYS)
+        }
+        TIOCCONS => {
+            track_stub!(TODO("https://fxbug.dev/322893267"), "devpts ioctl TIOCCONS", is_main);
+            error!(ENOSYS)
+        }
+        TIOCGSERIAL => {
+            track_stub!(TODO("https://fxbug.dev/322893503"), "devpts ioctl TIOCGSERIAL", is_main);
+            error!(ENOSYS)
+        }
+        TIOCSSERIAL => {
+            track_stub!(TODO("https://fxbug.dev/322893663"), "devpts ioctl TIOCSSERIAL", is_main);
+            error!(ENOSYS)
+        }
+        TIOCPKT => {
+            track_stub!(TODO("https://fxbug.dev/322893148"), "devpts ioctl TIOCPKT", is_main);
+            error!(ENOSYS)
+        }
+        FIONBIO => {
+            track_stub!(TODO("https://fxbug.dev/322893957"), "devpts ioctl FIONBIO", is_main);
+            error!(ENOSYS)
+        }
+        TIOCGETD => {
+            track_stub!(TODO("https://fxbug.dev/322893974"), "devpts ioctl TIOCGETD", is_main);
+            error!(ENOSYS)
+        }
+        TCSBRKP => {
+            track_stub!(TODO("https://fxbug.dev/322894075"), "devpts ioctl TCSBRKP", is_main);
+            error!(ENOSYS)
+        }
+        TIOCSBRK => {
+            track_stub!(TODO("https://fxbug.dev/322893936"), "devpts ioctl TIOCSBRK", is_main);
+            error!(ENOSYS)
+        }
+        TIOCCBRK => {
+            track_stub!(TODO("https://fxbug.dev/322893213"), "devpts ioctl TIOCCBRK", is_main);
+            error!(ENOSYS)
+        }
+        TIOCGSID => {
+            track_stub!(TODO("https://fxbug.dev/322894076"), "devpts ioctl TIOCGSID", is_main);
+            error!(ENOSYS)
+        }
+        TIOCGRS485 => {
+            track_stub!(TODO("https://fxbug.dev/322893728"), "devpts ioctl TIOCGRS485", is_main);
+            error!(ENOSYS)
+        }
+        TIOCSRS485 => {
+            track_stub!(TODO("https://fxbug.dev/322893783"), "devpts ioctl TIOCSRS485", is_main);
+            error!(ENOSYS)
+        }
+        TCGETX => {
+            track_stub!(TODO("https://fxbug.dev/322893327"), "devpts ioctl TCGETX", is_main);
+            error!(ENOSYS)
+        }
+        TCSETX => {
+            track_stub!(TODO("https://fxbug.dev/322893741"), "devpts ioctl TCSETX", is_main);
+            error!(ENOSYS)
+        }
+        TCSETXF => {
+            track_stub!(TODO("https://fxbug.dev/322893937"), "devpts ioctl TCSETXF", is_main);
+            error!(ENOSYS)
+        }
+        TCSETXW => {
+            track_stub!(TODO("https://fxbug.dev/322893899"), "devpts ioctl TCSETXW", is_main);
+            error!(ENOSYS)
+        }
+        TIOCVHANGUP => {
+            track_stub!(TODO("https://fxbug.dev/322893742"), "devpts ioctl TIOCVHANGUP", is_main);
+            error!(ENOSYS)
+        }
+        FIONCLEX => {
+            track_stub!(TODO("https://fxbug.dev/322893938"), "devpts ioctl FIONCLEX", is_main);
+            error!(ENOSYS)
+        }
+        FIOCLEX => {
+            track_stub!(TODO("https://fxbug.dev/322894214"), "devpts ioctl FIOCLEX", is_main);
+            error!(ENOSYS)
+        }
+        FIOASYNC => {
+            track_stub!(TODO("https://fxbug.dev/322893269"), "devpts ioctl FIOASYNC", is_main);
+            error!(ENOSYS)
+        }
+        TIOCSERCONFIG => {
+            track_stub!(TODO("https://fxbug.dev/322893881"), "devpts ioctl TIOCSERCONFIG", is_main);
+            error!(ENOSYS)
+        }
+        TIOCSERGWILD => {
+            track_stub!(TODO("https://fxbug.dev/322893686"), "devpts ioctl TIOCSERGWILD", is_main);
+            error!(ENOSYS)
+        }
+        TIOCSERSWILD => {
+            track_stub!(TODO("https://fxbug.dev/322893837"), "devpts ioctl TIOCSERSWILD", is_main);
+            error!(ENOSYS)
+        }
+        TIOCGLCKTRMIOS => {
+            track_stub!(
+                TODO("https://fxbug.dev/322894114"),
+                "devpts ioctl TIOCGLCKTRMIOS",
+                is_main
+            );
+            error!(ENOSYS)
+        }
+        TIOCSLCKTRMIOS => {
+            track_stub!(
+                TODO("https://fxbug.dev/322893711"),
+                "devpts ioctl TIOCSLCKTRMIOS",
+                is_main
+            );
+            error!(ENOSYS)
+        }
+        TIOCSERGSTRUCT => {
+            track_stub!(
+                TODO("https://fxbug.dev/322893828"),
+                "devpts ioctl TIOCSERGSTRUCT",
+                is_main
+            );
+            error!(ENOSYS)
+        }
+        TIOCSERGETLSR => {
+            track_stub!(TODO("https://fxbug.dev/322894083"), "devpts ioctl TIOCSERGETLSR", is_main);
+            error!(ENOSYS)
+        }
+        TIOCSERGETMULTI => {
+            track_stub!(
+                TODO("https://fxbug.dev/322893962"),
+                "devpts ioctl TIOCSERGETMULTI",
+                is_main
+            );
+            error!(ENOSYS)
+        }
+        TIOCSERSETMULTI => {
+            track_stub!(
+                TODO("https://fxbug.dev/322893273"),
+                "devpts ioctl TIOCSERSETMULTI",
+                is_main
+            );
+            error!(ENOSYS)
+        }
+        TIOCMIWAIT => {
+            track_stub!(TODO("https://fxbug.dev/322894005"), "devpts ioctl TIOCMIWAIT", is_main);
+            error!(ENOSYS)
+        }
+        TIOCGICOUNT => {
+            track_stub!(TODO("https://fxbug.dev/322893862"), "devpts ioctl TIOCGICOUNT", is_main);
+            error!(ENOSYS)
+        }
+        FIOQSIZE => {
+            track_stub!(TODO("https://fxbug.dev/322893770"), "devpts ioctl FIOQSIZE", is_main);
+            error!(ENOSYS)
+        }
+        other => {
+            track_stub!(TODO("https://fxbug.dev/322893712"), "devpts unknown ioctl", other);
+            error!(ENOTTY)
+        }
     }
 }
 

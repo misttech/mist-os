@@ -59,7 +59,7 @@ impl FileOps for BpfHandle {
         _offset: usize,
         _data: &mut dyn OutputBuffer,
     ) -> Result<usize, Errno> {
-        track_stub!("bpf handle read");
+        track_stub!(TODO("https://fxbug.dev/322874229"), "bpf handle read");
         error!(EINVAL)
     }
     fn write(
@@ -70,7 +70,7 @@ impl FileOps for BpfHandle {
         _offset: usize,
         _data: &mut dyn InputBuffer,
     ) -> Result<usize, Errno> {
-        track_stub!("bpf handle write");
+        track_stub!(TODO("https://fxbug.dev/322873841"), "bpf handle write");
         error!(EINVAL)
     }
 }

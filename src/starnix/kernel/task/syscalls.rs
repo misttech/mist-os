@@ -761,7 +761,7 @@ pub fn sys_sched_getaffinity(
     // sched_setaffinity() is not implemented. Fake affinity mask based on the number of CPUs.
     let mask = get_default_cpumask();
     current_task.write_memory(user_mask, &mask.to_ne_bytes())?;
-    track_stub!("sched_getaffinity");
+    track_stub!(TODO("https://fxbug.dev/322874659"), "sched_getaffinity");
     Ok(CPU_AFFINITY_MASK_SIZE as usize)
 }
 
@@ -794,7 +794,7 @@ pub fn sys_sched_setaffinity(
 
     // Currently, we ignore the mask and act as if the system reset the mask
     // immediately to allowing all CPUs.
-    track_stub!("sched_setaffinity");
+    track_stub!(TODO("https://fxbug.dev/322874889"), "sched_setaffinity");
     Ok(())
 }
 
@@ -867,7 +867,7 @@ pub fn sys_prctl(
     match option {
         PR_SET_VMA => {
             if arg2 != PR_SET_VMA_ANON_NAME as u64 {
-                track_stub!("prctl PR_SET_VMA", arg2);
+                track_stub!(TODO("https://fxbug.dev/322874826"), "prctl PR_SET_VMA", arg2);
                 return error!(ENOSYS);
             }
             let addr = UserAddress::from(arg3);
@@ -913,7 +913,7 @@ pub fn sys_prctl(
             })
         }
         PR_SET_PDEATHSIG => {
-            track_stub!("PR_SET_PDEATHSIG");
+            track_stub!(TODO("https://fxbug.dev/322874397"), "PR_SET_PDEATHSIG");
             Ok(().into())
         }
         PR_SET_NAME => {
@@ -1020,7 +1020,7 @@ pub fn sys_prctl(
             }
 
             let securebits = SecureBits::from_bits(arg2 as u32).ok_or_else(|| {
-                track_stub!("PR_SET_SECUREBITS", arg2);
+                track_stub!(TODO("https://fxbug.dev/322875244"), "PR_SET_SECUREBITS", arg2);
                 errno!(ENOSYS)
             })?;
             creds.securebits = securebits;
@@ -1096,7 +1096,7 @@ pub fn sys_prctl(
             Ok(().into())
         }
         _ => {
-            track_stub!("prctl", option);
+            track_stub!(TODO("https://fxbug.dev/322874733"), "prctl fallthrough", option);
             error!(ENOSYS)
         }
     }
@@ -1180,7 +1180,7 @@ pub fn sys_prlimit64(
     user_old_limit: UserRef<rlimit>,
 ) -> Result<(), Errno> {
     if pid != 0 {
-        track_stub!("prlimit64 with non 0 pid");
+        track_stub!(TODO("https://fxbug.dev/322874217"), "prlimit64 with non 0 pid");
         return error!(ENOSYS);
     }
     let task = &current_task.task;
@@ -1201,7 +1201,10 @@ pub fn sys_prlimit64(
         // TODO: Integrate Resource::STACK with generic ResourceLimits machinery.
         Resource::STACK => {
             if maybe_new_limit.is_some() {
-                track_stub!("prlimit64 cannot set RLIMIT_STACK");
+                track_stub!(
+                    TODO("https://fxbug.dev/322874791"),
+                    "prlimit64 cannot set RLIMIT_STACK"
+                );
             }
             // The stack size is fixed at the moment, but
             // if MAP_GROWSDOWN is implemented this should
@@ -1400,10 +1403,13 @@ pub fn sys_seccomp(
             if flags != 0 {
                 return error!(EINVAL);
             }
-            track_stub!("seccomp");
+            track_stub!(TODO("https://fxbug.dev/322874791"), "SECCOMP_GET_NOTIF_SIZES");
             error!(ENOSYS)
         }
-        _ => error!(EINVAL),
+        _ => {
+            track_stub!(TODO("https://fxbug.dev/322874916"), "seccomp fallthrough", operation);
+            error!(EINVAL)
+        }
     }
 }
 
@@ -1463,7 +1469,7 @@ pub fn sys_getpriority(
         PRIO_PROCESS => {}
         _ => return error!(EINVAL),
     }
-    track_stub!("getpriority permissions");
+    track_stub!(TODO("https://fxbug.dev/322893809"), "getpriority permissions");
     let weak = get_task_or_current(current_task, who);
     let target_task = Task::from_weak(&weak)?;
     let state = target_task.read();
@@ -1481,7 +1487,7 @@ pub fn sys_setpriority(
         PRIO_PROCESS => {}
         _ => return error!(EINVAL),
     }
-    track_stub!("setpriority permissions");
+    track_stub!(TODO("https://fxbug.dev/322894197"), "setpriority permissions");
     let weak = get_task_or_current(current_task, who);
     let target_task = Task::from_weak(&weak)?;
     // The priority passed into setpriority is actually in the -19...20 range and is not
@@ -1524,7 +1530,7 @@ pub fn sys_setns(
         return error!(ENOSYS);
     }
 
-    track_stub!("unknown ns file for setns, see logs");
+    track_stub!(TODO("https://fxbug.dev/322893829"), "unknown ns file for setns, see logs");
     log_info!("ns_fd was not a supported namespace file: {}", file_handle.ops_type_name());
     error!(EINVAL)
 }
@@ -1536,7 +1542,7 @@ pub fn sys_unshare(
 ) -> Result<(), Errno> {
     const IMPLEMENTED_FLAGS: u32 = CLONE_FILES | CLONE_NEWNS | CLONE_NEWUTS;
     if flags & !IMPLEMENTED_FLAGS != 0 {
-        track_stub!("unshare", flags & !IMPLEMENTED_FLAGS);
+        track_stub!(TODO("https://fxbug.dev/322893372"), "unshare", flags & !IMPLEMENTED_FLAGS);
         return error!(EINVAL);
     }
 
@@ -1576,7 +1582,7 @@ pub fn sys_swapon(
         return error!(EPERM);
     }
 
-    track_stub!("swapon validate flags");
+    track_stub!(TODO("https://fxbug.dev/322893905"), "swapon validate flags");
 
     let path = current_task.read_c_string_to_vec(user_path, PATH_MAX as usize)?;
     let file = current_task.open_file(path.as_ref(), OpenFlags::RDWR)?;
@@ -1748,23 +1754,23 @@ pub fn sys_syslog(
         SyslogAction::SizeBuffer => syslog.size_buffer(),
         SyslogAction::Close | SyslogAction::Open => Ok(0),
         SyslogAction::ReadClear => {
-            track_stub!("syslog: read clear");
+            track_stub!(TODO("https://fxbug.dev/322894145"), "syslog: read clear");
             Ok(0)
         }
         SyslogAction::Clear => {
-            track_stub!("syslog: clear");
+            track_stub!(TODO("https://fxbug.dev/322893673"), "syslog: clear");
             Ok(0)
         }
         SyslogAction::ConsoleOff => {
-            track_stub!("syslog: console off");
+            track_stub!(TODO("https://fxbug.dev/322894399"), "syslog: console off");
             Ok(0)
         }
         SyslogAction::ConsoleOn => {
-            track_stub!("syslog: console on");
+            track_stub!(TODO("https://fxbug.dev/322894106"), "syslog: console on");
             Ok(0)
         }
         SyslogAction::ConsoleLevel => {
-            track_stub!("syslog: console level");
+            track_stub!(TODO("https://fxbug.dev/322894199"), "syslog: console level");
             Ok(0)
         }
     }

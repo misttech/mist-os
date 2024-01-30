@@ -463,7 +463,7 @@ impl SocketOps for BaseNetlinkSocket {
         };
 
         if destination.groups != 0 {
-            track_stub!("BaseNetlinkSockets multicasting");
+            track_stub!(TODO("https://fxbug.dev/322874956"), "BaseNetlinkSockets multicasting");
             return Ok(data.drain());
         }
 
@@ -490,7 +490,7 @@ impl SocketOps for BaseNetlinkSocket {
     }
 
     fn shutdown(&self, _socket: &Socket, _how: SocketShutdownFlags) -> Result<(), Errno> {
-        track_stub!("BaseNetlinkSocket::shutdown");
+        track_stub!(TODO("https://fxbug.dev/322875507"), "BaseNetlinkSocket::shutdown");
         Ok(())
     }
 
@@ -649,7 +649,7 @@ impl SocketOps for UEventNetlinkSocket {
     }
 
     fn shutdown(&self, _socket: &Socket, _how: SocketShutdownFlags) -> Result<(), Errno> {
-        track_stub!("BaseNetlinkSocket::shutdown");
+        track_stub!(TODO("https://fxbug.dev/322875507"), "BaseNetlinkSocket::shutdown");
         Ok(())
     }
 
@@ -1113,7 +1113,7 @@ impl SocketOps for GenericNetlinkSocket {
     }
 
     fn shutdown(&self, _socket: &Socket, _how: SocketShutdownFlags) -> Result<(), Errno> {
-        track_stub!("BaseNetlinkSocket::shutdown");
+        track_stub!(TODO("https://fxbug.dev/322875507"), "BaseNetlinkSocket::shutdown");
         Ok(())
     }
 

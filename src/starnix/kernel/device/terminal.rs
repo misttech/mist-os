@@ -775,16 +775,16 @@ impl TerminalMutableState<Base = Terminal> {
             }
 
             if self.termios.has_local_flags(ECHOE) {
-                track_stub!("terminal ECHOE");
+                track_stub!(TODO("https://fxbug.dev/322874345"), "terminal ECHOE");
             }
             if self.termios.has_local_flags(ECHOPRT) {
-                track_stub!("terminal ECHOPRT");
+                track_stub!(TODO("https://fxbug.dev/322874329"), "terminal ECHOPRT");
             }
             if self.termios.has_local_flags(ECHOK) {
-                track_stub!("terminal ECHOK");
+                track_stub!(TODO("https://fxbug.dev/322874293"), "terminal ECHOK");
             }
             if self.termios.has_local_flags(ECHOKE) {
-                track_stub!("terminal ECHOKE");
+                track_stub!(TODO("https://fxbug.dev/322874191"), "terminal ECHOKE");
             }
 
             // Anything written to the read buffer will have to be echoed.

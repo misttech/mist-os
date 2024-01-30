@@ -398,7 +398,7 @@ impl FileOps for LoopDeviceFile {
                 Ok(SUCCESS)
             }
             BLKFLSBUF => {
-                track_stub!("Loop device BLKFLSBUF");
+                track_stub!(TODO("https://fxbug.dev/322873756"), "Loop device BLKFLSBUF");
                 Ok(SUCCESS)
             }
             LOOP_SET_FD => {
@@ -467,7 +467,10 @@ impl FileOps for LoopDeviceFile {
                     if !state.flags.contains(LoopDeviceFlags::READ_ONLY) {
                         return error!(EINVAL);
                     }
-                    track_stub!("check backing store size before change loop fd");
+                    track_stub!(
+                        TODO("https://fxbug.dev/322874313"),
+                        "check backing store size before change loop fd"
+                    );
                     state.backing_file = Some(backing_file);
                     Ok(SUCCESS)
                 } else {
@@ -481,7 +484,7 @@ impl FileOps for LoopDeviceFile {
                 Ok(SUCCESS)
             }
             LOOP_SET_DIRECT_IO => {
-                track_stub!("Loop device LOOP_SET_DIRECT_IO");
+                track_stub!(TODO("https://fxbug.dev/322873418"), "Loop device LOOP_SET_DIRECT_IO");
                 error!(ENOTTY)
             }
             LOOP_SET_BLOCK_SIZE => {

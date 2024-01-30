@@ -982,7 +982,7 @@ impl CurrentTask {
             }
             zx::sys::ZX_EXCP_SW_BREAKPOINT => ExceptionResult::Signal(SignalInfo::default(SIGTRAP)),
             unknown => {
-                track_stub!("zircon exception", unknown);
+                track_stub!(TODO("https://fxbug.dev/322874381"), "zircon exception", unknown);
                 log_error!("Unknown exception {:?}", report);
                 ExceptionResult::Signal(SignalInfo::default(SIGSEGV))
             }
@@ -1337,11 +1337,11 @@ impl CurrentTask {
         let new_uts = flags & (CLONE_NEWUTS as u64) != 0;
 
         if clone_ptrace {
-            track_stub!("CLONE_PTRACE");
+            track_stub!(TODO("https://fxbug.dev/322874630"), "CLONE_PTRACE");
         }
 
         if clone_sysvsem {
-            track_stub!("CLONE_SYSVSEM");
+            track_stub!(TODO("https://fxbug.dev/322875185"), "CLONE_SYSVSEM");
         }
 
         if clone_sighand && !clone_vm {
@@ -1366,15 +1366,22 @@ impl CurrentTask {
             // the two processes. And the vfork() man page explicitly allows vfork() to be
             // implemented as fork() which is what we do here.
             if !clone_vfork {
-                track_stub!("CLONE_VM without CLONE_THREAD or CLONE_VFORK");
+                track_stub!(
+                    TODO("https://fxbug.dev/322875227"),
+                    "CLONE_VM without CLONE_THREAD or CLONE_VFORK"
+                );
             }
         } else if clone_thread && !clone_vm {
-            track_stub!("CLONE_THREAD without CLONE_VM");
+            track_stub!(TODO("https://fxbug.dev/322875167"), "CLONE_THREAD without CLONE_VM");
             return error!(ENOSYS);
         }
 
         if flags & !IMPLEMENTED_FLAGS != 0 {
-            track_stub!("clone", flags & !IMPLEMENTED_FLAGS);
+            track_stub!(
+                TODO("https://fxbug.dev/322875130"),
+                "clone unknown flags",
+                flags & !IMPLEMENTED_FLAGS
+            );
             return error!(ENOSYS);
         }
 

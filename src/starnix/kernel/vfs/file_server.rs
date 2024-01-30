@@ -430,7 +430,7 @@ impl directory::entry_container::Directory for StarnixNodeConnection {
         _mask: fio::WatchMask,
         _watcher: directory::entry_container::DirectoryWatcher,
     ) -> Result<(), zx::Status> {
-        track_stub!("register directory watcher");
+        track_stub!(TODO("https://fxbug.dev/322875605"), "register directory watcher");
         Ok(())
     }
     fn unregister_watcher(self: Arc<Self>, _key: usize) {}

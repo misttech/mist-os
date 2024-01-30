@@ -12,6 +12,7 @@ use crate::{
         FsNodeHandle, FsNodeInfo, FsNodeOps, FsString, SimpleFileNode, StaticDirectoryBuilder,
     },
 };
+use starnix_logging::bug_ref;
 use starnix_sync::Mutex;
 use starnix_uapi::{
     auth::{FsCred, CAP_SYS_ADMIN, CAP_SYS_RESOURCE},
@@ -29,170 +30,253 @@ pub fn sysctl_directory(current_task: &CurrentTask, fs: &FileSystemHandle) -> Fs
     let mut dir = StaticDirectoryBuilder::new(fs);
     dir.subdir(current_task, "abi", 0o555, |_dir| {
         #[cfg(target_arch = "aarch64")]
-        _dir.entry(current_task, "swp", StubSysctl::new_node("/proc/sys/abi/swp", None), mode);
+        _dir.entry(
+            current_task,
+            "swp",
+            StubSysctl::new_node("/proc/sys/abi/swp", bug_ref!("https://fxbug.dev/322873460")),
+            mode,
+        );
     });
     dir.subdir(current_task, "kernel", 0o555, |dir| {
         dir.entry(
             current_task,
             "core_pattern",
-            StubSysctl::new_node("/proc/sys/kernel/core_pattern", None),
+            StubSysctl::new_node(
+                "/proc/sys/kernel/core_pattern",
+                bug_ref!("https://fxbug.dev/322873960"),
+            ),
             mode,
         );
         dir.entry(
             current_task,
             "core_pipe_limit",
-            StubSysctl::new_node("/proc/sys/kernel/core_pipe_limit", None),
+            StubSysctl::new_node(
+                "/proc/sys/kernel/core_pipe_limit",
+                bug_ref!("https://fxbug.dev/322873721"),
+            ),
             mode,
         );
         dir.entry(
             current_task,
             "dmsg_restrict",
-            StubSysctl::new_node("/proc/sys/kernel/dmsg_restrict", None),
+            StubSysctl::new_node(
+                "/proc/sys/kernel/dmsg_restrict",
+                bug_ref!("https://fxbug.dev/322874424"),
+            ),
             mode,
         );
         dir.entry(
             current_task,
             "domainname",
-            StubSysctl::new_node("/proc/sys/kernel/domainname", None),
+            StubSysctl::new_node(
+                "/proc/sys/kernel/domainname",
+                bug_ref!("https://fxbug.dev/322873722"),
+            ),
             mode,
         );
         dir.entry(
             current_task,
             "hostname",
-            StubSysctl::new_node("/proc/sys/kernel/hostname", None),
+            StubSysctl::new_node(
+                "/proc/sys/kernel/hostname",
+                bug_ref!("https://fxbug.dev/322873462"),
+            ),
             mode,
         );
         dir.entry(
             current_task,
             "hung_task_check_count",
-            StubSysctl::new_node("/proc/sys/kernel/hung_task_check_count", None),
+            StubSysctl::new_node(
+                "/proc/sys/kernel/hung_task_check_count",
+                bug_ref!("https://fxbug.dev/322874644"),
+            ),
             mode,
         );
         dir.entry(
             current_task,
             "hung_task_panic",
-            StubSysctl::new_node("/proc/sys/kernel/hung_task_panic", None),
+            StubSysctl::new_node(
+                "/proc/sys/kernel/hung_task_panic",
+                bug_ref!("https://fxbug.dev/322874332"),
+            ),
             mode,
         );
         //
         dir.entry(
             current_task,
             "hung_task_timeout_secs",
-            StubSysctl::new_node("/proc/sys/kernel/hung_task_timeout_secs", None),
+            StubSysctl::new_node(
+                "/proc/sys/kernel/hung_task_timeout_secs",
+                bug_ref!("https://fxbug.dev/322873962"),
+            ),
             mode,
         );
         dir.entry(
             current_task,
             "hung_task_warnings",
-            StubSysctl::new_node("/proc/sys/kernel/hung_task_warnings", None),
+            StubSysctl::new_node(
+                "/proc/sys/kernel/hung_task_warnings",
+                bug_ref!("https://fxbug.dev/322873740"),
+            ),
             mode,
         );
         dir.entry(
             current_task,
             "modprobe",
-            StubSysctl::new_node("/proc/sys/kernel/modprobe", None),
+            StubSysctl::new_node(
+                "/proc/sys/kernel/modprobe",
+                bug_ref!("https://fxbug.dev/322874334"),
+            ),
             mode,
         );
         dir.entry(
             current_task,
             "modules_disabled",
-            StubSysctl::new_node("/proc/sys/kernel/modules_disabled", None),
+            StubSysctl::new_node(
+                "/proc/sys/kernel/modules_disabled",
+                bug_ref!("https://fxbug.dev/322874489"),
+            ),
             mode,
         );
         dir.entry(
             current_task,
             "panic_on_oops",
-            StubSysctl::new_node("/proc/sys/kernel/panic_on_oops", None),
+            StubSysctl::new_node(
+                "/proc/sys/kernel/panic_on_oops",
+                bug_ref!("https://fxbug.dev/322874296"),
+            ),
             mode,
         );
         dir.entry(
             current_task,
             "perf_cpu_time_max_percent",
-            StubSysctl::new_node("/proc/sys/kernel/perf_cpu_time_max_percent", None),
+            StubSysctl::new_node(
+                "/proc/sys/kernel/perf_cpu_time_max_percent",
+                bug_ref!("https://fxbug.dev/322873262"),
+            ),
             mode,
         );
         dir.entry(
             current_task,
             "perf_event_max_sample_rate",
-            StubSysctl::new_node("/proc/sys/kernel/perf_event_max_sample_rate", None),
+            StubSysctl::new_node(
+                "/proc/sys/kernel/perf_event_max_sample_rate",
+                bug_ref!("https://fxbug.dev/322874604"),
+            ),
             mode,
         );
         dir.entry(
             current_task,
             "perf_event_mlock_kb",
-            StubSysctl::new_node("/proc/sys/kernel/perf_event_mlock_kb", None),
+            StubSysctl::new_node(
+                "/proc/sys/kernel/perf_event_mlock_kb",
+                bug_ref!("https://fxbug.dev/322873800"),
+            ),
             mode,
         );
         dir.entry(
             current_task,
             "perf_event_paranoid",
-            StubSysctl::new_node("/proc/sys/kernel/perf_event_paranoid", None),
+            StubSysctl::new_node(
+                "/proc/sys/kernel/perf_event_paranoid",
+                bug_ref!("https://fxbug.dev/322873896"),
+            ),
             mode,
         );
         dir.entry(
             current_task,
             "randomize_va_space",
-            StubSysctl::new_node("/proc/sys/kernel/randomize_va_space", None),
+            StubSysctl::new_node(
+                "/proc/sys/kernel/randomize_va_space",
+                bug_ref!("https://fxbug.dev/322873202"),
+            ),
             mode,
         );
         dir.entry(
             current_task,
             "sched_child_runs_first",
-            StubSysctl::new_node("/proc/sys/kernel/sched_child_runs_first", None),
+            StubSysctl::new_node(
+                "/proc/sys/kernel/sched_child_runs_first",
+                bug_ref!("https://fxbug.dev/322874709"),
+            ),
             mode,
         );
         dir.entry(
             current_task,
             "sched_latency_ns",
-            StubSysctl::new_node("/proc/sys/kernel/sched_latency_ns", None),
+            StubSysctl::new_node(
+                "/proc/sys/kernel/sched_latency_ns",
+                bug_ref!("https://fxbug.dev/322874319"),
+            ),
             mode,
         );
         dir.entry(
             current_task,
             "sched_rt_period_us",
-            StubSysctl::new_node("/proc/sys/kernel/sched_rt_period_us", None),
+            StubSysctl::new_node(
+                "/proc/sys/kernel/sched_rt_period_us",
+                bug_ref!("https://fxbug.dev/322874785"),
+            ),
             mode,
         );
         dir.entry(
             current_task,
             "sched_rt_runtime_us",
-            StubSysctl::new_node("/proc/sys/kernel/sched_rt_runtime_us", None),
+            StubSysctl::new_node(
+                "/proc/sys/kernel/sched_rt_runtime_us",
+                bug_ref!("https://fxbug.dev/322874726"),
+            ),
             mode,
         );
         dir.entry(
             current_task,
             "sched_schedstats",
-            StubSysctl::new_node("/proc/sys/kernel/sched_schedstats", None),
+            StubSysctl::new_node(
+                "/proc/sys/kernel/sched_schedstats",
+                bug_ref!("https://fxbug.dev/322874584"),
+            ),
             mode,
         );
         dir.entry(
             current_task,
             "sched_tunable_scaling",
-            StubSysctl::new_node("/proc/sys/kernel/sched_tunable_scaling", None),
+            StubSysctl::new_node(
+                "/proc/sys/kernel/sched_tunable_scaling",
+                bug_ref!("https://fxbug.dev/322874666"),
+            ),
             mode,
         );
         dir.entry(
             current_task,
             "sched_wakeup_granularity_ns",
-            StubSysctl::new_node("/proc/sys/kernel/sched_wakeup_granularity_ns", None),
+            StubSysctl::new_node(
+                "/proc/sys/kernel/sched_wakeup_granularity_ns",
+                bug_ref!("https://fxbug.dev/322874525"),
+            ),
             mode,
         );
         dir.entry(
             current_task,
             "sysrq",
-            StubSysctl::new_node("/proc/sys/kernel/sysrq", None),
+            StubSysctl::new_node("/proc/sys/kernel/sysrq", bug_ref!("https://fxbug.dev/322874375")),
             mode,
         );
         dir.entry(
             current_task,
             "unprivileged_bpf_disable",
-            StubSysctl::new_node("/proc/sys/kernel/unprivileged_bpf_disable", None),
+            StubSysctl::new_node(
+                "/proc/sys/kernel/unprivileged_bpf_disable",
+                bug_ref!("https://fxbug.dev/322874504"),
+            ),
             mode,
         );
         dir.entry(
             current_task,
             "kptr_restrict",
-            StubSysctl::new_node("/proc/sys/kernel/kptr_restrict", None),
+            StubSysctl::new_node(
+                "/proc/sys/kernel/kptr_restrict",
+                bug_ref!("https://fxbug.dev/322873878"),
+            ),
             mode,
         );
         dir.node(
@@ -223,7 +307,10 @@ pub fn sysctl_directory(current_task: &CurrentTask, fs: &FileSystemHandle) -> Fs
             dir.entry(
                 current_task,
                 "boot_id",
-                StubSysctl::new_node("/proc/sys/kernel/random/boot_id", None),
+                StubSysctl::new_node(
+                    "/proc/sys/kernel/random/boot_id",
+                    bug_ref!("https://fxbug.dev/322874139"),
+                ),
                 mode,
             );
             dir.entry(
@@ -253,67 +340,100 @@ pub fn sysctl_directory(current_task: &CurrentTask, fs: &FileSystemHandle) -> Fs
         dir.entry(
             current_task,
             "dirty_background_ratio",
-            StubSysctl::new_node("/proc/sys/vm/dirty_background_ratio", None),
+            StubSysctl::new_node(
+                "/proc/sys/vm/dirty_background_ratio",
+                bug_ref!("https://fxbug.dev/322874492"),
+            ),
             mode,
         );
         dir.entry(
             current_task,
             "dirty_expire_centisecs",
-            StubSysctl::new_node("/proc/sys/vm/dirty_expire_centisecs", None),
+            StubSysctl::new_node(
+                "/proc/sys/vm/dirty_expire_centisecs",
+                bug_ref!("https://fxbug.dev/322874237"),
+            ),
             mode,
         );
         dir.entry(
             current_task,
             "drop_caches",
-            StubSysctl::new_node("/proc/sys/vm/drop_caches", None),
+            StubSysctl::new_node(
+                "/proc/sys/vm/drop_caches",
+                bug_ref!("https://fxbug.dev/322874299"),
+            ),
             mode,
         );
         dir.entry(
             current_task,
             "extra_free_kbytes",
-            StubSysctl::new_node("/proc/sys/vm/extra_free_kbytes", None),
+            StubSysctl::new_node(
+                "/proc/sys/vm/extra_free_kbytes",
+                bug_ref!("https://fxbug.dev/322873761"),
+            ),
             mode,
         );
         dir.entry(
             current_task,
             "max_map_count",
-            StubSysctl::new_node("/proc/sys/vm/max_map_count", None),
+            StubSysctl::new_node(
+                "/proc/sys/vm/max_map_count",
+                bug_ref!("https://fxbug.dev/322874684"),
+            ),
             mode,
         );
         dir.entry(
             current_task,
             "mmap_min_addr",
-            StubSysctl::new_node("/proc/sys/vm/mmap_min_addr", None),
+            StubSysctl::new_node(
+                "/proc/sys/vm/mmap_min_addr",
+                bug_ref!("https://fxbug.dev/322874526"),
+            ),
             mode,
         );
         dir.entry(
             current_task,
             "mmap_rnd_bits",
-            StubSysctl::new_node("/proc/sys/vm/mmap_rnd_bits", None),
+            StubSysctl::new_node(
+                "/proc/sys/vm/mmap_rnd_bits",
+                bug_ref!("https://fxbug.dev/322874505"),
+            ),
             mode,
         );
         dir.entry(
             current_task,
             "mmap_rnd_compat_bits",
-            StubSysctl::new_node("/proc/sys/vm/mmap_rnd_compat_bits", None),
+            StubSysctl::new_node(
+                "/proc/sys/vm/mmap_rnd_compat_bits",
+                bug_ref!("https://fxbug.dev/322874685"),
+            ),
             mode,
         );
         dir.entry(
             current_task,
             "overcommit_memory",
-            StubSysctl::new_node("/proc/sys/vm/overcommit_memory", None),
+            StubSysctl::new_node(
+                "/proc/sys/vm/overcommit_memory",
+                bug_ref!("https://fxbug.dev/322874159"),
+            ),
             mode,
         );
         dir.entry(
             current_task,
             "page-cluster",
-            StubSysctl::new_node("/proc/sys/vm/page-cluster", None),
+            StubSysctl::new_node(
+                "/proc/sys/vm/page-cluster",
+                bug_ref!("https://fxbug.dev/322874302"),
+            ),
             mode,
         );
         dir.entry(
             current_task,
             "watermark_scale_factor",
-            StubSysctl::new_node("/proc/sys/vm/watermark_scale_factor", None),
+            StubSysctl::new_node(
+                "/proc/sys/vm/watermark_scale_factor",
+                bug_ref!("https://fxbug.dev/322874321"),
+            ),
             mode,
         );
     });
@@ -342,19 +462,28 @@ pub fn sysctl_directory(current_task: &CurrentTask, fs: &FileSystemHandle) -> Fs
         dir.entry(
             current_task,
             "protected_hardlinks",
-            StubSysctl::new_node("/proc/sys/fs/protected_hardlinks", None),
+            StubSysctl::new_node(
+                "/proc/sys/fs/protected_hardlinks",
+                bug_ref!("https://fxbug.dev/322874347"),
+            ),
             mode,
         );
         dir.entry(
             current_task,
             "protected_symlinks",
-            StubSysctl::new_node("/proc/sys/fs/protected_symlinks", None),
+            StubSysctl::new_node(
+                "/proc/sys/fs/protected_symlinks",
+                bug_ref!("https://fxbug.dev/322874764"),
+            ),
             mode,
         );
         dir.entry(
             current_task,
             "suid_dumpable",
-            StubSysctl::new_node("/proc/sys/fs/suid_dumpable", None),
+            StubSysctl::new_node(
+                "/proc/sys/fs/suid_dumpable",
+                bug_ref!("https://fxbug.dev/322874210"),
+            ),
             mode,
         );
     });
@@ -389,11 +518,11 @@ struct StubSysctl {
 
 impl StubSysctl {
     #[track_caller]
-    fn new_node(message: &'static str, bug_url: Option<&'static str>) -> impl FsNodeOps {
+    fn new_node(message: &'static str, bug: starnix_logging::BugRef) -> impl FsNodeOps {
         let location = std::panic::Location::caller();
         let file = BytesFile::new(Self::default());
         SimpleFileNode::new(move || {
-            starnix_logging::__track_stub_inner(bug_url, message, None, location);
+            starnix_logging::__track_stub_inner(bug, message, None, location);
             Ok(file.clone())
         })
     }
@@ -414,32 +543,35 @@ pub fn net_directory(current_task: &CurrentTask, fs: &FileSystemHandle) -> FsNod
     dir.entry(
         current_task,
         "fib_trie",
-        StubSysctl::new_node("/proc/net/fib_trie", None),
+        StubSysctl::new_node("/proc/net/fib_trie", bug_ref!("https://fxbug.dev/322873635")),
         mode!(IFREG, 0o400),
     );
     dir.entry(
         current_task,
         "if_inet6",
-        StubSysctl::new_node("/proc/net/if_inet6", None),
+        StubSysctl::new_node("/proc/net/if_inet6", bug_ref!("https://fxbug.dev/322874669")),
         mode!(IFREG, 0o444),
     );
     dir.entry(
         current_task,
         "psched",
-        StubSysctl::new_node("/proc/net/psched", None),
+        StubSysctl::new_node("/proc/net/psched", bug_ref!("https://fxbug.dev/322874710")),
         mode!(IFREG, 0o444),
     );
     dir.entry(
         current_task,
         "xt_qtaguid",
-        StubSysctl::new_node("/proc/net/xt_qtaguid", None),
+        StubSysctl::new_node("/proc/net/xt_qtaguid", bug_ref!("https://fxbug.dev/322874322")),
         mode!(IFREG, 0o644),
     );
     dir.subdir(current_task, "xt_quota", 0o555, |dir| {
         dir.entry(
             current_task,
             "globalAlert",
-            StubSysctl::new_node("/proc/net/xt_quota/globalAlert", None),
+            StubSysctl::new_node(
+                "/proc/net/xt_quota/globalAlert",
+                bug_ref!("https://fxbug.dev/322873636"),
+            ),
             mode!(IFREG, 0o444),
         );
     });
@@ -486,7 +618,7 @@ impl ProcSysNetDev {
                     "accept_redirects",
                     StubSysctl::new_node(
                         "/proc/sys/net/ipv4/DEVICE/conf/accept_redirects",
-                        Some("https://fxbug.dev/297439563"),
+                        bug_ref!("https://fxbug.dev/297439563"),
                     ),
                     file_mode,
                 );
@@ -499,7 +631,7 @@ impl ProcSysNetDev {
                     "ucast_solicit",
                     StubSysctl::new_node(
                         "/proc/sys/net/ipv4/DEVICE/neigh/ucast_solicit",
-                        Some("https://fxbug.dev/297439563"),
+                        bug_ref!("https://fxbug.dev/297439563"),
                     ),
                     file_mode,
                 );
@@ -508,7 +640,7 @@ impl ProcSysNetDev {
                     "retrans_time_ms",
                     StubSysctl::new_node(
                         "/proc/sys/net/ipv4/DEVICE/neigh/retrans_time_ms",
-                        Some("https://fxbug.dev/297439563"),
+                        bug_ref!("https://fxbug.dev/297439563"),
                     ),
                     file_mode,
                 );
@@ -517,7 +649,7 @@ impl ProcSysNetDev {
                     "mcast_resolicit",
                     StubSysctl::new_node(
                         "/proc/sys/net/ipv4/DEVICE/neigh/mcast_resolicit",
-                        Some("https://fxbug.dev/297439563"),
+                        bug_ref!("https://fxbug.dev/297439563"),
                     ),
                     file_mode,
                 );
@@ -526,7 +658,7 @@ impl ProcSysNetDev {
                     "base_reachable_time_ms",
                     StubSysctl::new_node(
                         "/proc/sys/net/ipv4/DEVICE/neigh/base_reachable_time_ms",
-                        Some("https://fxbug.dev/297439563"),
+                        bug_ref!("https://fxbug.dev/297439563"),
                     ),
                     file_mode,
                 );
@@ -539,7 +671,7 @@ impl ProcSysNetDev {
                     "accept_ra",
                     StubSysctl::new_node(
                         "/proc/sys/net/ipv6/DEVICE/conf/accept_ra",
-                        Some("https://fxbug.dev/297439563"),
+                        bug_ref!("https://fxbug.dev/297439563"),
                     ),
                     file_mode,
                 );
@@ -548,7 +680,7 @@ impl ProcSysNetDev {
                     "accept_ra_info_min_plen",
                     StubSysctl::new_node(
                         "/proc/sys/net/ipv6/DEVICE/conf/accept_ra_info_min_plen",
-                        Some("https://fxbug.dev/297439563"),
+                        bug_ref!("https://fxbug.dev/297439563"),
                     ),
                     file_mode,
                 );
@@ -557,7 +689,7 @@ impl ProcSysNetDev {
                     "accept_ra_rt_table",
                     StubSysctl::new_node(
                         "/proc/sys/net/ipv6/DEVICE/conf/accept_ra_rt_table",
-                        Some("https://fxbug.dev/297439563"),
+                        bug_ref!("https://fxbug.dev/297439563"),
                     ),
                     file_mode,
                 );
@@ -566,7 +698,7 @@ impl ProcSysNetDev {
                     "accept_redirects",
                     StubSysctl::new_node(
                         "/proc/sys/net/ipv6/DEVICE/conf/accept_redirects",
-                        Some("https://fxbug.dev/297439563"),
+                        bug_ref!("https://fxbug.dev/297439563"),
                     ),
                     file_mode,
                 );
@@ -575,7 +707,7 @@ impl ProcSysNetDev {
                     "dad_transmits",
                     StubSysctl::new_node(
                         "/proc/sys/net/ipv6/DEVICE/conf/dad_transmits",
-                        Some("https://fxbug.dev/297439563"),
+                        bug_ref!("https://fxbug.dev/297439563"),
                     ),
                     file_mode,
                 );
@@ -584,7 +716,7 @@ impl ProcSysNetDev {
                     "use_tempaddr",
                     StubSysctl::new_node(
                         "/proc/sys/net/ipv6/DEVICE/conf/use_tempaddr",
-                        Some("https://fxbug.dev/297439563"),
+                        bug_ref!("https://fxbug.dev/297439563"),
                     ),
                     file_mode,
                 );
@@ -593,7 +725,7 @@ impl ProcSysNetDev {
                     "addr_gen_mode",
                     StubSysctl::new_node(
                         "/proc/sys/net/ipv6/DEVICE/conf/addr_gen_mode",
-                        Some("https://fxbug.dev/297439563"),
+                        bug_ref!("https://fxbug.dev/297439563"),
                     ),
                     file_mode,
                 );
@@ -602,7 +734,7 @@ impl ProcSysNetDev {
                     "stable_secret",
                     StubSysctl::new_node(
                         "/proc/sys/net/ipv6/DEVICE/conf/stable_secret",
-                        Some("https://fxbug.dev/297439563"),
+                        bug_ref!("https://fxbug.dev/297439563"),
                     ),
                     file_mode,
                 );
@@ -611,7 +743,7 @@ impl ProcSysNetDev {
                     "disable_ipv6",
                     StubSysctl::new_node(
                         "/proc/sys/net/ipv6/DEVICE/conf/disable_ip64",
-                        Some("https://fxbug.dev/297439563"),
+                        bug_ref!("https://fxbug.dev/297439563"),
                     ),
                     file_mode,
                 );
@@ -620,7 +752,7 @@ impl ProcSysNetDev {
                     "optimistic_dad",
                     StubSysctl::new_node(
                         "/proc/sys/net/ipv6/DEVICE/conf/optimistic_dad",
-                        Some("https://fxbug.dev/297439563"),
+                        bug_ref!("https://fxbug.dev/297439563"),
                     ),
                     file_mode,
                 );
@@ -629,7 +761,7 @@ impl ProcSysNetDev {
                     "use_oif_addrs_only",
                     StubSysctl::new_node(
                         "/proc/sys/net/ipv6/DEVICE/conf/use_oif_addrs_only",
-                        Some("https://fxbug.dev/297439563"),
+                        bug_ref!("https://fxbug.dev/297439563"),
                     ),
                     file_mode,
                 );
@@ -638,7 +770,7 @@ impl ProcSysNetDev {
                     "use_optimistic",
                     StubSysctl::new_node(
                         "/proc/sys/net/ipv6/DEVICE/conf/use_optimistic",
-                        Some("https://fxbug.dev/297439563"),
+                        bug_ref!("https://fxbug.dev/297439563"),
                     ),
                     file_mode,
                 );
@@ -651,7 +783,7 @@ impl ProcSysNetDev {
                     "ucast_solicit",
                     StubSysctl::new_node(
                         "/proc/sys/net/ipv6/DEVICE/neigh/ucast_solicit",
-                        Some("https://fxbug.dev/297439563"),
+                        bug_ref!("https://fxbug.dev/297439563"),
                     ),
                     file_mode,
                 );
@@ -660,7 +792,7 @@ impl ProcSysNetDev {
                     "retrans_time_ms",
                     StubSysctl::new_node(
                         "/proc/sys/net/ipv6/DEVICE/neigh/retrans_time_ms",
-                        Some("https://fxbug.dev/297439563"),
+                        bug_ref!("https://fxbug.dev/297439563"),
                     ),
                     file_mode,
                 );
@@ -669,7 +801,7 @@ impl ProcSysNetDev {
                     "mcast_resolicit",
                     StubSysctl::new_node(
                         "/proc/sys/net/ipv6/DEVICE/neigh/mcast_resolicit",
-                        Some("https://fxbug.dev/297439563"),
+                        bug_ref!("https://fxbug.dev/297439563"),
                     ),
                     file_mode,
                 );
@@ -678,7 +810,7 @@ impl ProcSysNetDev {
                     "base_reachable_time_ms",
                     StubSysctl::new_node(
                         "/proc/sys/net/ipv6/DEVICE/neigh/base_reachable_time_ms",
-                        Some("https://fxbug.dev/297439563"),
+                        bug_ref!("https://fxbug.dev/297439563"),
                     ),
                     file_mode,
                 );
@@ -726,13 +858,19 @@ fn sysctl_net_diretory(current_task: &CurrentTask, fs: &FileSystemHandle) -> FsN
         dir.entry(
             current_task,
             "bpf_jit_enable",
-            StubSysctl::new_node("/proc/sys/net/bpf_jit_enable", None),
+            StubSysctl::new_node(
+                "/proc/sys/net/bpf_jit_enable",
+                bug_ref!("https://fxbug.dev/322874627"),
+            ),
             file_mode,
         );
         dir.entry(
             current_task,
             "bpf_jit_kallsyms",
-            StubSysctl::new_node("/proc/sys/net/bpf_jit_kallsyms", None),
+            StubSysctl::new_node(
+                "/proc/sys/net/bpf_jit_kallsyms",
+                bug_ref!("https://fxbug.dev/322874163"),
+            ),
             file_mode,
         );
     });
@@ -746,13 +884,19 @@ fn sysctl_net_diretory(current_task: &CurrentTask, fs: &FileSystemHandle) -> FsN
         dir.entry(
             current_task,
             "fwmark_reflect",
-            StubSysctl::new_node("/proc/sys/net/ipv4/fwmark_reflect", None),
+            StubSysctl::new_node(
+                "/proc/sys/net/ipv4/fwmark_reflect",
+                bug_ref!("https://fxbug.dev/322874495"),
+            ),
             file_mode,
         );
         dir.entry(
             current_task,
             "ip_forward",
-            StubSysctl::new_node("/proc/sys/net/ipv4/ip_forward", None),
+            StubSysctl::new_node(
+                "/proc/sys/net/ipv4/ip_forward",
+                bug_ref!("https://fxbug.dev/322874452"),
+            ),
             file_mode,
         );
         dir.entry(
@@ -764,25 +908,37 @@ fn sysctl_net_diretory(current_task: &CurrentTask, fs: &FileSystemHandle) -> FsN
         dir.entry(
             current_task,
             "ping_group_range",
-            StubSysctl::new_node("/proc/sys/net/ipv4/ping_group_range", None),
+            StubSysctl::new_node(
+                "/proc/sys/net/ipv4/ping_group_range",
+                bug_ref!("https://fxbug.dev/322874256"),
+            ),
             file_mode,
         );
         dir.entry(
             current_task,
             "tcp_default_init_rwnd",
-            StubSysctl::new_node("/proc/sys/net/ipv4/tcp_default_init_rwnd", None),
+            StubSysctl::new_node(
+                "/proc/sys/net/ipv4/tcp_default_init_rwnd",
+                bug_ref!("https://fxbug.dev/322874199"),
+            ),
             file_mode,
         );
         dir.entry(
             current_task,
             "tcp_fwmark_accept",
-            StubSysctl::new_node("/proc/sys/net/ipv4/tcp_fwmark_accept", None),
+            StubSysctl::new_node(
+                "/proc/sys/net/ipv4/tcp_fwmark_accept",
+                bug_ref!("https://fxbug.dev/322874120"),
+            ),
             file_mode,
         );
         dir.entry(
             current_task,
             "tcp_rmem",
-            StubSysctl::new_node("/proc/sys/net/ipv4/tcp_rmem", None),
+            StubSysctl::new_node(
+                "/proc/sys/net/ipv4/tcp_rmem",
+                bug_ref!("https://fxbug.dev/322874549"),
+            ),
             file_mode,
         );
     });
@@ -796,7 +952,10 @@ fn sysctl_net_diretory(current_task: &CurrentTask, fs: &FileSystemHandle) -> FsN
         dir.entry(
             current_task,
             "fwmark_reflect",
-            StubSysctl::new_node("/proc/sys/net/ipv6/fwmark_reflect", None),
+            StubSysctl::new_node(
+                "/proc/sys/net/ipv6/fwmark_reflect",
+                bug_ref!("https://fxbug.dev/322874711"),
+            ),
             file_mode,
         );
         dir.entry(
@@ -810,7 +969,10 @@ fn sysctl_net_diretory(current_task: &CurrentTask, fs: &FileSystemHandle) -> FsN
         dir.entry(
             current_task,
             "max_dgram_qlen",
-            StubSysctl::new_node("/proc/sys/net/unix/max_dgram_qlen", None),
+            StubSysctl::new_node(
+                "/proc/sys/net/unix/max_dgram_qlen",
+                bug_ref!("https://fxbug.dev/322874454"),
+            ),
             file_mode,
         );
     });

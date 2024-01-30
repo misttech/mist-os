@@ -1247,7 +1247,7 @@ impl FileOps for MagmaFile {
                 current_task.write_object(UserRef::new(response_address), &response)
             }
             t => {
-                track_stub!("virtio magma ioctl", t);
+                track_stub!(TODO("https://fxbug.dev/322874166"), "virtio magma ioctl", t);
                 error!(ENOSYS)
             }
         }?;

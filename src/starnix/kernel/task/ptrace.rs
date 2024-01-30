@@ -789,7 +789,7 @@ pub fn ptrace_dispatch(
             error!(EIO)
         }
         _ => {
-            track_stub!("ptrace", request);
+            track_stub!(TODO("https://fxbug.dev/322874463"), "ptrace", request);
             error!(ENOSYS)
         }
     }

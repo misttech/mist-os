@@ -290,7 +290,7 @@ impl FileOps for DevKmsg {
                 Ok(0)
             }
             SeekTarget::Data(0) => {
-                track_stub!("/dev/kmsg: SEEK_DATA");
+                track_stub!(TODO("https://fxbug.dev/322874315"), "/dev/kmsg: SEEK_DATA");
                 Ok(0)
             }
             // The following are implemented as documented on:

@@ -205,7 +205,7 @@ where
     const KNOWN_FLAGS: u32 =
         uapi::SPLICE_F_MOVE | uapi::SPLICE_F_NONBLOCK | uapi::SPLICE_F_MORE | uapi::SPLICE_F_GIFT;
     if flags & !KNOWN_FLAGS != 0 {
-        track_stub!("splice flags", flags & !KNOWN_FLAGS);
+        track_stub!(TODO("https://fxbug.dev/322875389"), "splice flags", flags & !KNOWN_FLAGS);
         return error!(EINVAL);
     }
 
@@ -276,7 +276,7 @@ pub fn vmsplice(
     const KNOWN_FLAGS: u32 =
         uapi::SPLICE_F_MOVE | uapi::SPLICE_F_NONBLOCK | uapi::SPLICE_F_MORE | uapi::SPLICE_F_GIFT;
     if flags & !KNOWN_FLAGS != 0 {
-        track_stub!("vmsplice flags", flags & !KNOWN_FLAGS);
+        track_stub!(TODO("https://fxbug.dev/322875487"), "vmsplice flags", flags & !KNOWN_FLAGS);
         return error!(EINVAL);
     }
 
@@ -313,7 +313,7 @@ pub fn tee(
     const KNOWN_FLAGS: u32 =
         uapi::SPLICE_F_MOVE | uapi::SPLICE_F_NONBLOCK | uapi::SPLICE_F_MORE | uapi::SPLICE_F_GIFT;
     if flags & !KNOWN_FLAGS != 0 {
-        track_stub!("tee flags", flags & !KNOWN_FLAGS);
+        track_stub!(TODO("https://fxbug.dev/322874902"), "tee flags", flags & !KNOWN_FLAGS);
         return error!(EINVAL);
     }
 

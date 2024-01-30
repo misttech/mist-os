@@ -22,7 +22,7 @@ use fuchsia_component::client::connect_to_protocol_sync;
 use fuchsia_zircon as zx;
 use maplit::btreemap;
 use once_cell::sync::Lazy;
-use starnix_logging::{log_error, track_stub};
+use starnix_logging::{bug_ref, log_error, track_stub};
 use starnix_sync::{Locked, ReadOps, WriteOps};
 use starnix_uapi::{
     auth::FsCred, errno, error, errors::Errno, file_mode::mode, off_t, open_flags::OpenFlags,
@@ -123,37 +123,43 @@ impl ProcDirectory {
             "asound".into() => fs.create_node(
                 current_task,
                 // Note: this is actually a directory but for now just track when it's opened.
-                StubEmptyFile::new_node("/proc/asound"),
+                StubEmptyFile::new_node("/proc/asound", bug_ref!("https://fxbug.dev/322893329")),
                 FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root()),
             ),
             "diskstats".into() => fs.create_node(
                 current_task,
-                StubEmptyFile::new_node("/proc/diskstats"),
+                StubEmptyFile::new_node("/proc/diskstats", bug_ref!("https://fxbug.dev/322893370")),
                 FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root()),
             ),
             "filesystems".into() => fs.create_node(
                 current_task,
-                StubEmptyFile::new_node_with_bug("/proc/filesystems", "https://fxbug.dev/309002087"),
+                StubEmptyFile::new_node(
+                    "/proc/filesystems",
+                    bug_ref!("https://fxbug.dev/309002087"),
+                ),
                 FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root()),
             ),
             "misc".into() => fs.create_node(
                 current_task,
-                StubEmptyFile::new_node("/proc/misc"),
+                StubEmptyFile::new_node("/proc/misc", bug_ref!("https://fxbug.dev/322893943")),
                 FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root()),
             ),
             "modules".into() => fs.create_node(
                 current_task,
-                StubEmptyFile::new_node("/proc/modules"),
+                StubEmptyFile::new_node("/proc/modules", bug_ref!("https://fxbug.dev/322894157")),
                 FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root()),
             ),
             "pagetypeinfo".into() => fs.create_node(
                 current_task,
-                StubEmptyFile::new_node("/proc/pagetypeinfo"),
+                StubEmptyFile::new_node(
+                    "/proc/pagetypeinfo",
+                    bug_ref!("https://fxbug.dev/322894315"),
+                ),
                 FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root()),
             ),
             "slabinfo".into() => fs.create_node(
                 current_task,
-                StubEmptyFile::new_node("/proc/slabinfo"),
+                StubEmptyFile::new_node("/proc/slabinfo", bug_ref!("https://fxbug.dev/322894195")),
                 FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root()),
             ),
             "uid_cputime".into() => {
@@ -161,13 +167,19 @@ impl ProcDirectory {
                 dir.entry(
                     current_task,
                     "remove_uid_range",
-                    StubEmptyFile::new_node("/proc/uid_cputime/remove_uid_range"),
+                    StubEmptyFile::new_node(
+                        "/proc/uid_cputime/remove_uid_range",
+                        bug_ref!("https://fxbug.dev/322894025"),
+                    ),
                     mode!(IFREG, 0o222),
                 );
                 dir.entry(
                     current_task,
                     "show_uid_stat",
-                    StubEmptyFile::new_node("/proc/uid_cputime/show_uid_stat"),
+                    StubEmptyFile::new_node(
+                        "/proc/uid_cputime/show_uid_stat",
+                        bug_ref!("https://fxbug.dev/322893886"),
+                    ),
                     mode!(IFREG, 0444),
                 );
                 dir.build(current_task)
@@ -177,7 +189,10 @@ impl ProcDirectory {
                 dir.entry(
                     current_task,
                     "stats",
-                    StubEmptyFile::new_node("/proc/uid_io/stats"),
+                    StubEmptyFile::new_node(
+                        "/proc/uid_io/stats",
+                        bug_ref!("https://fxbug.dev/322893966"),
+                    ),
                     mode!(IFREG, 0o444),
                 );
                 dir.build(current_task)
@@ -187,29 +202,35 @@ impl ProcDirectory {
                 dir.entry(
                     current_task,
                     "set",
-                    StubEmptyFile::new_node("/proc/uid_procstat/set"),
+                    StubEmptyFile::new_node(
+                        "/proc/uid_procstat/set",
+                        bug_ref!("https://fxbug.dev/322894041"),
+                    ),
                     mode!(IFREG, 0o222),
                 );
                 dir.build(current_task)
             },
             "version".into() => fs.create_node(
                 current_task,
-                StubEmptyFile::new_node_with_bug("/proc/version", "https://fxbug.dev/309002311"),
+                StubEmptyFile::new_node("/proc/version", bug_ref!("https://fxbug.dev/309002311")),
                 FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root()),
             ),
             "vmallocinfo".into() => fs.create_node(
                 current_task,
-                StubEmptyFile::new_node("/proc/vmallocinfo"),
+                StubEmptyFile::new_node(
+                    "/proc/vmallocinfo",
+                    bug_ref!("https://fxbug.dev/322894183"),
+                ),
                 FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root()),
             ),
             "vmstat".into() => fs.create_node(
                 current_task,
-                StubEmptyFile::new_node("/proc/vmstat"),
+                StubEmptyFile::new_node("/proc/vmstat", bug_ref!("https://fxbug.dev/322894141")),
                 FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root()),
             ),
             "zoneinfo".into() => fs.create_node(
                 current_task,
-                StubEmptyFile::new_node("/proc/zoneinfo"),
+                StubEmptyFile::new_node("/proc/zoneinfo", bug_ref!("https://fxbug.dev/322893866")),
                 FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root()),
             ),
         };
@@ -472,7 +493,7 @@ impl FileOps for PressureFile {
         data: &mut dyn InputBuffer,
     ) -> Result<usize, Errno> {
         // Ignore the request for now.
-        track_stub!("pressure notification setup");
+        track_stub!(TODO("https://fxbug.dev/322873423"), "pressure notification setup");
         Ok(data.drain())
     }
 
@@ -747,7 +768,7 @@ impl DynamicFileSource for LoadavgFile {
             (runnable_tasks, existing_tasks, pid_table.last_pid())
         };
 
-        track_stub!("/proc/loadavg load stats");
+        track_stub!(TODO("https://fxbug.dev/322874486"), "/proc/loadavg load stats");
         writeln!(sink, "0.50 0.50 0.50 {}/{} {}", runnable_tasks, existing_tasks, last_pid)?;
         Ok(())
     }
@@ -764,7 +785,7 @@ impl SwapsFile {
 }
 impl DynamicFileSource for SwapsFile {
     fn generate(&self, sink: &mut DynamicFileBuf) -> Result<(), Errno> {
-        track_stub!("/proc/swaps include Kernel::swap_files");
+        track_stub!(TODO("https://fxbug.dev/322874154"), "/proc/swaps includes Kernel::swap_files");
         writeln!(sink, "Filename\t\t\t\tType\t\tSize\t\tUsed\t\tPriority")?;
         Ok(())
     }

@@ -110,7 +110,7 @@ pub fn sys_gettimeofday(
         current_task.write_object(user_tv, &tv)?;
     }
     if !user_tz.is_null() {
-        track_stub!("gettimeofday tz argument");
+        track_stub!(TODO("https://fxbug.dev/322874502"), "gettimeofday tz argument");
     }
     Ok(())
 }
@@ -137,15 +137,23 @@ pub fn sys_clock_nanosleep(
     match which_clock {
         CLOCK_REALTIME | CLOCK_MONOTONIC => {}
         CLOCK_TAI => {
-            track_stub!("clock_nanosleep, CLOCK_TAI", flags);
+            track_stub!(TODO("https://fxbug.dev/322875165"), "clock_nanosleep, CLOCK_TAI", flags);
             return error!(EINVAL);
         }
         CLOCK_BOOTTIME => {
-            track_stub!("clock_nanosleep, CLOCK_BOOTTIME", flags);
+            track_stub!(
+                TODO("https://fxbug.dev/322874654"),
+                "clock_nanosleep, CLOCK_BOOTTIME",
+                flags
+            );
             return error!(EINVAL);
         }
         CLOCK_PROCESS_CPUTIME_ID => {
-            track_stub!("clock_nanosleep, CLOCK_PROCESS_CPUTIME_ID", flags);
+            track_stub!(
+                TODO("https://fxbug.dev/322874886"),
+                "clock_nanosleep, CLOCK_PROCESS_CPUTIME_ID",
+                flags
+            );
             return error!(EINVAL);
         }
         _ => return error!(EOPNOTSUPP),

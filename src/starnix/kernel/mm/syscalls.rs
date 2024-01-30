@@ -80,7 +80,7 @@ pub fn do_mmap(
     offset: u64,
 ) -> Result<UserAddress, Errno> {
     let prot_flags = ProtectionFlags::from_bits(prot).ok_or_else(|| {
-        track_stub!("mmap", prot);
+        track_stub!(TODO("https://fxbug.dev/322874211"), "mmap parse protection", prot);
         errno!(EINVAL)
     })?;
 
@@ -96,7 +96,7 @@ pub fn do_mmap(
         | MAP_DENYWRITE
         | MAP_GROWSDOWN;
     if flags & !valid_flags != 0 {
-        track_stub!("mmap", flags);
+        track_stub!(TODO("https://fxbug.dev/322873638"), "mmap check flags", flags);
         return error!(EINVAL);
     }
 
@@ -163,7 +163,7 @@ pub fn sys_mprotect(
     prot: u32,
 ) -> Result<(), Errno> {
     let prot_flags = ProtectionFlags::from_bits(prot).ok_or_else(|| {
-        track_stub!("mprotect", prot);
+        track_stub!(TODO("https://fxbug.dev/322874672"), "mprotect parse protection", prot);
         errno!(EINVAL)
     })?;
     current_task.mm().protect(addr, length, prot_flags)?;
@@ -202,7 +202,7 @@ pub fn sys_msync(
     length: usize,
     _flags: u32,
 ) -> Result<(), Errno> {
-    track_stub!("msync");
+    track_stub!(TODO("https://fxbug.dev/322874588"), "msync");
     // Perform some basic validation of the address range given to satisfy gvisor tests that
     // use msync as a way to probe whether a page is mapped or not.
     current_task.mm().ensure_mapped(addr, length)?;
@@ -265,7 +265,7 @@ pub fn sys_process_vm_readv(
         remote_iov
     );
 
-    track_stub!("process_vm_readv single-copy");
+    track_stub!(TODO("https://fxbug.dev/322874765"), "process_vm_readv single-copy");
     // According to the man page, this syscall was added to Linux specifically to
     // avoid doing two copies like other IPC mechanisms require. We should avoid this too at some
     // point.
@@ -316,7 +316,7 @@ pub fn sys_process_vm_writev(
         remote_iov
     );
 
-    track_stub!("process_vm_writev single-copy");
+    track_stub!(TODO("https://fxbug.dev/322874339"), "process_vm_writev single-copy");
     // NB: According to the man page, this syscall was added to Linux specifically to
     // avoid doing two copies like other IPC mechanisms require. We should avoid this too at some
     // point.
@@ -417,7 +417,7 @@ fn do_futex<Key: FutexKey>(
             Ok(0)
         }
         _ => {
-            track_stub!("futex", cmd);
+            track_stub!(TODO("https://fxbug.dev/322875124"), "futex unknown command", cmd);
             error!(ENOSYS)
         }
     }

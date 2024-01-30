@@ -11,6 +11,7 @@ use crate::{
     task::CurrentTask,
     vfs::{create_stub_device_with_bug, fuse::open_fuse_device},
 };
+use starnix_logging::bug_ref;
 use starnix_uapi::device_type::DeviceType;
 
 pub fn misc_device_init(current_task: &CurrentTask) {
@@ -40,7 +41,10 @@ pub fn misc_device_init(current_task: &CurrentTask) {
         DeviceMetadata::new("mapper/control".into(), DeviceType::DEVICE_MAPPER, DeviceMode::Char),
         misc_class.clone(),
         DeviceDirectory::new,
-        create_stub_device_with_bug("device mapper control", "https://fxbug.dev/297432471"),
+        create_stub_device_with_bug(
+            "device mapper control",
+            bug_ref!("https://fxbug.dev/297432471"),
+        ),
     );
     registry.add_and_register_device(
         current_task,

@@ -21,7 +21,7 @@ use fuchsia_zircon as zx;
 use itertools::Itertools;
 use once_cell::sync::Lazy;
 use regex::Regex;
-use starnix_logging::track_stub;
+use starnix_logging::{bug_ref, track_stub};
 use starnix_sync::{Locked, ReadOps, WriteOps};
 use starnix_uapi::{
     auth::CAP_SYS_RESOURCE,
@@ -158,7 +158,7 @@ fn static_directory_builder_with_common_task_entries<'a>(
     dir.entry(
         current_task,
         "cgroup",
-        StubEmptyFile::new_node("/proc/pid/cgroup"),
+        StubEmptyFile::new_node("/proc/pid/cgroup", bug_ref!("https://fxbug.dev/322893771")),
         mode!(IFREG, 0o444),
     );
     dir.entry(
@@ -203,13 +203,13 @@ fn static_directory_builder_with_common_task_entries<'a>(
     dir.entry(
         current_task,
         "sched",
-        StubEmptyFile::new_node("/proc/pid/sched"),
+        StubEmptyFile::new_node("/proc/pid/sched", bug_ref!("https://fxbug.dev/322893980")),
         mode!(IFREG, 0o644),
     );
     dir.entry(
         current_task,
         "schedstat",
-        StubEmptyFile::new_node("/proc/pid/schedstat"),
+        StubEmptyFile::new_node("/proc/pid/schedstat", bug_ref!("https://fxbug.dev/322894256")),
         mode!(IFREG, 0o444),
     );
     dir.entry(current_task, "smaps", ProcSmapsFile::new_node(task.into()), mode!(IFREG, 0o444));
@@ -685,7 +685,7 @@ impl IoFile {
 }
 impl DynamicFileSource for IoFile {
     fn generate(&self, sink: &mut DynamicFileBuf) -> Result<(), Errno> {
-        track_stub!("/proc/pid/io");
+        track_stub!(TODO("https://fxbug.dev/322874250"), "/proc/pid/io");
         sink.write(b"rchar: 0\n");
         sink.write(b"wchar: 0\n");
         sink.write(b"syscr: 0\n");
@@ -1028,7 +1028,7 @@ impl DynamicFileSource for StatusFile {
         writeln!(sink, "Uid:\t{}\t{}\t{}\t{}", creds.uid, creds.euid, creds.saved_uid, creds.euid)?;
         writeln!(sink, "Gid:\t{}\t{}\t{}\t{}", creds.gid, creds.egid, creds.saved_gid, creds.egid)?;
         writeln!(sink, "Groups:\t{}", creds.groups.iter().map(|n| n.to_string()).join(" "))?;
-        track_stub!("/proc/pid/status fsuid");
+        track_stub!(TODO("https://fxbug.dev/322873739"), "/proc/pid/status fsuid");
 
         if let Some(task) = task {
             let mem_stats = task.mm().get_stats().map_err(|_| errno!(EIO))?;
@@ -1061,7 +1061,7 @@ impl OomScoreFile {
 impl BytesFileOps for OomScoreFile {
     fn read(&self, _current_task: &CurrentTask) -> Result<Cow<'_, [u8]>, Errno> {
         let _task = Task::from_weak(&self.0)?;
-        track_stub!("/proc/pid/oom_score");
+        track_stub!(TODO("https://fxbug.dev/322873459"), "/proc/pid/oom_score");
         Ok(serialize_i32_file(0).into())
     }
 }

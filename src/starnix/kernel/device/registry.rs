@@ -458,7 +458,7 @@ struct DynRegistry {
 
 impl DynRegistry {
     fn register(&mut self, device: impl DeviceOps) -> Result<DeviceType, Errno> {
-        track_stub!("emit uevent for dynamic registration");
+        track_stub!(TODO("https://fxbug.dev/322873632"), "emit uevent for dynamic registration");
 
         let minor = self.next_dynamic_minor;
         if minor > 255 {

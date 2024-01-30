@@ -96,7 +96,7 @@ pub fn sys_sysinfo(
     track_stub!(TODO("https://fxbug.dev/297374270"), "compute system load");
     let loads = [0; 3];
 
-    track_stub!("compute actual free ram usage");
+    track_stub!(TODO("https://fxbug.dev/322874530"), "compute actual free ram usage");
     let freeram = total_ram_pages / 8;
 
     let result = uapi::sysinfo {
@@ -236,7 +236,10 @@ pub fn sys_reboot(
                 fpower::RebootReason::UserRequest
             } else {
                 log_warn!("Unknown reboot args: {arg_bytes}");
-                track_stub!("unknown reboot args, see logs for strings");
+                track_stub!(
+                    TODO("https://fxbug.dev/322874610"),
+                    "unknown reboot args, see logs for strings"
+                );
                 return error!(ENOSYS);
             };
             match proxy.reboot(reboot_reason, zx::Time::INFINITE) {
@@ -268,7 +271,11 @@ pub fn sys_unknown(
     _current_task: &CurrentTask,
     syscall_number: u64,
 ) -> Result<SyscallResult, Errno> {
-    track_stub!(for_each_syscall! { syscall_number_to_name_literal_callback, syscall_number });
+    track_stub!(
+        TODO("https://fxbug.dev/322874143"),
+        for_each_syscall! { syscall_number_to_name_literal_callback, syscall_number },
+        syscall_number,
+    );
     // TODO: We should send SIGSYS once we have signals.
     error!(ENOSYS)
 }

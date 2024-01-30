@@ -565,7 +565,7 @@ impl FileOps for Arc<InputFile> {
                 Ok(SUCCESS)
             }
             _ => {
-                track_stub!("input ioctl", request);
+                track_stub!(TODO("https://fxbug.dev/322873200"), "input ioctl", request);
                 error!(EOPNOTSUPP)
             }
         }
@@ -608,7 +608,7 @@ impl FileOps for Arc<InputFile> {
         _data: &mut dyn InputBuffer,
     ) -> Result<usize, Errno> {
         debug_assert!(offset == 0);
-        track_stub!("write() on input device");
+        track_stub!(TODO("https://fxbug.dev/322874385"), "write() on input device");
         error!(EOPNOTSUPP)
     }
 

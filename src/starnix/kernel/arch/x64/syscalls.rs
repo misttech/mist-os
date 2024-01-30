@@ -88,7 +88,7 @@ pub fn sys_arch_prctl(
             Ok(())
         }
         _ => {
-            track_stub!("arch_prctl", code);
+            track_stub!(TODO("https://fxbug.dev/322874054"), "arch_prctl", code);
             error!(ENOSYS)
         }
     }

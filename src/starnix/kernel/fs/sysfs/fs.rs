@@ -14,6 +14,7 @@ use crate::{
         FsNodeOps, FsStr, PathBuilder, StaticDirectoryBuilder, StubEmptyFile, SymlinkNode,
     },
 };
+use starnix_logging::bug_ref;
 use starnix_uapi::{
     auth::FsCred, errors::Errno, file_mode::mode, statfs, vfs::default_statfs, SYSFS_MAGIC,
 };
@@ -80,7 +81,10 @@ impl SysFs {
                     dir.entry(
                         current_task,
                         "prefetch_cluster",
-                        StubEmptyFile::new_node("/sys/module/dm_verity/paramters/prefetch_cluster"),
+                        StubEmptyFile::new_node(
+                            "/sys/module/dm_verity/paramters/prefetch_cluster",
+                            bug_ref!("https://fxbug.dev/322893670"),
+                        ),
                         mode!(IFREG, 0o644),
                     );
                 });

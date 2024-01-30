@@ -190,7 +190,7 @@ pub fn create_drm_image(
         vk_usage |= vk::IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT;
     };
 
-    track_stub!("verify physical device limits");
+    track_stub!(TODO("https://fxbug.dev/322873633"), "magma verify physical device limits");
     let scenic_allocator = if use_scenic {
         Some(init_scenic().map_err(|_| MAGMA_STATUS_INTERNAL_ERROR)?)
     } else {

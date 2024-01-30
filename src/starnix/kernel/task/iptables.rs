@@ -176,7 +176,7 @@ impl IpTables {
                 Ok(revision.as_bytes().to_vec())
             }
             _ => {
-                track_stub!("optname for network sockets");
+                track_stub!(TODO("https://fxbug.dev/322875228"), "optname for network sockets");
                 Ok(vec![])
             }
         }

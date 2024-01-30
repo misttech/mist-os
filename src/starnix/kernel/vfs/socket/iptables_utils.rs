@@ -259,7 +259,7 @@ fn parse_xt_entry_match(bytes: &[u8]) -> Result<XtEntryMatch, Errno> {
         }
 
         _ => {
-            track_stub!("match extension not supported");
+            track_stub!(TODO("https://fxbug.dev/322875624"), "match extension not supported");
             MatchType::Unknown
         }
     };
@@ -303,7 +303,7 @@ fn parse_xt_entry_target(bytes: &[u8]) -> Result<XtEntryTarget, Errno> {
         }
 
         _ => {
-            track_stub!("target extension not supported");
+            track_stub!(TODO("https://fxbug.dev/322875546"), "target extension not supported");
             TargetType::Unknown
         }
     };

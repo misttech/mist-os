@@ -15,25 +15,19 @@ static STUB_COUNTS: Lazy<Mutex<HashMap<Invocation, Counts>>> =
 macro_rules! track_stub {
     (TODO($bug_url:literal), $message:expr, $flags:expr $(,)?) => {{
         $crate::__track_stub_inner(
-            Some($bug_url),
+            $crate::bug_ref!($bug_url),
             $message,
             Some($flags.into()),
             std::panic::Location::caller(),
         );
     }};
     (TODO($bug_url:literal), $message:expr $(,)?) => {{
-        $crate::__track_stub_inner(Some($bug_url), $message, None, std::panic::Location::caller());
-    }};
-    ($message:expr, $flags:expr $(,)?) => {{
         $crate::__track_stub_inner(
-            None,
+            $crate::bug_ref!($bug_url),
             $message,
-            Some($flags.into()),
+            None,
             std::panic::Location::caller(),
         );
-    }};
-    ($message:expr $(,)?) => {{
-        $crate::__track_stub_inner(None, $message, None, std::panic::Location::caller());
     }};
 }
 
@@ -41,7 +35,7 @@ macro_rules! track_stub {
 struct Invocation {
     location: &'static Location<'static>,
     message: &'static str,
-    bug_url: Option<&'static str>,
+    bug: BugRef,
 }
 
 #[derive(Default)]
@@ -52,29 +46,23 @@ struct Counts {
 #[doc(hidden)]
 #[inline]
 pub fn __track_stub_inner(
-    bug_url: Option<&'static str>,
+    bug: BugRef,
     message: &'static str,
     flags: Option<u64>,
     location: &'static Location<'static>,
 ) {
     let mut counts = STUB_COUNTS.lock();
-    let message_counts = counts.entry(Invocation { location, message, bug_url }).or_default();
+    let message_counts = counts.entry(Invocation { location, message, bug }).or_default();
     let context_count = message_counts.by_flags.entry(flags).or_default();
 
     // Log the first time we see a particular file/message/context tuple but don't risk spamming.
     if *context_count == 0 {
-        match (bug_url, flags) {
-            (Some(bug_url), Some(flags)) => {
-                crate::log_warn!(tag = "track_stub", %location, "{bug_url} {message}: 0x{flags:x}");
+        match flags {
+            Some(flags) => {
+                crate::log_warn!(tag = "track_stub", %location, "{bug} {message}: 0x{flags:x}");
             }
-            (Some(bug_url), None) => {
-                crate::log_warn!(tag = "track_stub", %location, "{bug_url} {message}");
-            }
-            (None, Some(flags)) => {
-                crate::log_warn!(tag = "track_stub", %location, "{message}: 0x{flags:x}");
-            }
-            (None, None) => {
-                crate::log_warn!(tag = "track_stub", %location, "{message}");
+            None => {
+                crate::log_warn!(tag = "track_stub", %location, "{bug} {message}");
             }
         }
     }
@@ -85,15 +73,12 @@ pub fn __track_stub_inner(
 pub fn track_stub_lazy_node_callback() -> BoxFuture<'static, Result<Inspector, anyhow::Error>> {
     Box::pin(async {
         let inspector = Inspector::default();
-        for (Invocation { location, message, bug_url }, context_counts) in STUB_COUNTS.lock().iter()
-        {
+        for (Invocation { location, message, bug }, context_counts) in STUB_COUNTS.lock().iter() {
             inspector.root().atomic_update(|root| {
                 root.record_child(*message, |message_node| {
                     message_node.record_string("file", location.file());
                     message_node.record_uint("line", location.line().into());
-                    if let Some(bug_url) = bug_url {
-                        message_node.record_string("bug", bug_url);
-                    }
+                    message_node.record_string("bug", bug.to_string());
 
                     // Make a copy of the map so we can mutate it while recording values.
                     let mut context_counts = context_counts.by_flags.clone();
@@ -118,4 +103,98 @@ pub fn track_stub_lazy_node_callback() -> BoxFuture<'static, Result<Inspector, a
         }
         Ok(inspector)
     })
+}
+
+#[macro_export]
+macro_rules! bug_ref {
+    ($bug_url:literal) => {{
+        // Assign the value to a const to ensure we get compile-time validation of the URL.
+        const __REF: $crate::BugRef = match $crate::BugRef::from_str($bug_url) {
+            Some(b) => b,
+            None => panic!("bug references must have the form `https://fxbug.dev/123456789`"),
+        };
+        __REF
+    }};
+}
+
+#[derive(Debug, Clone, Copy, Eq, Hash, Ord, PartialEq, PartialOrd)]
+pub struct BugRef {
+    number: u64,
+}
+
+impl BugRef {
+    #[doc(hidden)] // use bug_ref!() instead
+    pub const fn from_str(url: &'static str) -> Option<Self> {
+        let expected_prefix = b"https://fxbug.dev/";
+        let url = str::as_bytes(url);
+
+        if url.len() < expected_prefix.len() {
+            return None;
+        }
+        let (scheme_and_domain, number_str) = url.split_at(expected_prefix.len());
+
+        // The standard library doesn't seem to have a const string or slice equality function.
+        {
+            let mut i = 0;
+            while i < scheme_and_domain.len() {
+                if scheme_and_domain[i] != expected_prefix[i] {
+                    return None;
+                }
+                i += 1;
+            }
+        }
+
+        // The standard library doesn't seem to have a const base 10 string parser.
+        let mut number = 0;
+        {
+            let mut i = 0;
+            while i < number_str.len() {
+                number *= 10;
+                number += match number_str[i] {
+                    b'0' => 0,
+                    b'1' => 1,
+                    b'2' => 2,
+                    b'3' => 3,
+                    b'4' => 4,
+                    b'5' => 5,
+                    b'6' => 6,
+                    b'7' => 7,
+                    b'8' => 8,
+                    b'9' => 9,
+                    _ => return None,
+                };
+                i += 1;
+            }
+        }
+
+        Some(Self { number })
+    }
+}
+
+impl std::fmt::Display for BugRef {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "https://fxbug.dev/{}", self.number)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn valid_url_parses() {
+        assert_eq!(BugRef::from_str("https://fxbug.dev/1234567890").unwrap().number, 1234567890);
+    }
+
+    #[test]
+    fn missing_prefix_fails() {
+        assert_eq!(BugRef::from_str("1234567890"), None);
+    }
+
+    #[test]
+    fn short_prefixes_fail() {
+        assert_eq!(BugRef::from_str("b/1234567890"), None);
+        assert_eq!(BugRef::from_str("fxb/1234567890"), None);
+        assert_eq!(BugRef::from_str("fxbug.dev/1234567890"), None);
+    }
 }

@@ -16,7 +16,7 @@ use crate::{
     },
 };
 use fuchsia_zircon as zx;
-use starnix_logging::log_error;
+use starnix_logging::{bug_ref, log_error};
 use starnix_uapi::{
     auth::FsCred,
     device_type::{DeviceType, ZRAM_MAJOR},
@@ -120,7 +120,7 @@ impl FsNodeOps for ZramDeviceDirectory {
         match &**name {
             b"idle" => Ok(node.fs().create_node(
                 current_task,
-                StubEmptyFile::new_node("zram idle file"),
+                StubEmptyFile::new_node("zram idle file", bug_ref!("https://fxbug.dev/322892951")),
                 FsNodeInfo::new_factory(mode!(IFREG, 0o664), FsCred::root()),
             )),
             b"mm_stat" => {

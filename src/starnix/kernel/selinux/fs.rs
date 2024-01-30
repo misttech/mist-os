@@ -157,7 +157,7 @@ impl SeLoad {
 
 impl BytesFileOps for SeLoad {
     fn write(&self, _current_task: &CurrentTask, data: Vec<u8>) -> Result<(), Errno> {
-        track_stub!("ignoring selinux policy");
+        track_stub!(TODO("https://fxbug.dev/322874969"), "ignoring selinux policy");
         log_info!("Loading {} byte policy", data.len());
         self.security_server.load_policy(data).map_err(|error| {
             log_error!("Policy load error: {}", error);
@@ -271,7 +271,7 @@ impl SeCheckReqProt {
 impl BytesFileOps for SeCheckReqProt {
     fn write(&self, _current_task: &CurrentTask, data: Vec<u8>) -> Result<(), Errno> {
         let _checkreqprot = parse_unsigned_file::<u32>(&data)?;
-        track_stub!("selinux checkreqprot");
+        track_stub!(TODO("https://fxbug.dev/322874766"), "selinux checkreqprot");
         Ok(())
     }
 }

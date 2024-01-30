@@ -348,7 +348,7 @@ fn do_readv(
         return error!(EOPNOTSUPP);
     }
     if flags != 0 {
-        track_stub!("preadv2", flags);
+        track_stub!(TODO("https://fxbug.dev/322875072"), "preadv2 flags", flags);
     }
     let file = current_task.files.get(fd)?;
     let iovec = current_task.read_iovec(iovec_addr, iovec_count)?;
@@ -413,7 +413,7 @@ fn do_writev(
         return error!(EOPNOTSUPP);
     }
     if flags != 0 {
-        track_stub!("pwritev2", flags);
+        track_stub!(TODO("https://fxbug.dev/322874523"), "pwritev2 flags", flags);
     }
 
     let file = current_task.files.get(fd)?;
@@ -875,7 +875,7 @@ pub fn sys_linkat(
     flags: u32,
 ) -> Result<(), Errno> {
     if flags & !(AT_SYMLINK_FOLLOW | AT_EMPTY_PATH) != 0 {
-        track_stub!("linkat", flags);
+        track_stub!(TODO("https://fxbug.dev/322875706"), "linkat unknown flags", flags);
         return error!(EINVAL);
     }
 
@@ -941,7 +941,7 @@ pub fn sys_renameat2(
 
     // RENAME_WHITEOUT is not supported.
     if flags.contains(RenameFlags::WHITEOUT) {
-        track_stub!("RENAME_WHITEOUT");
+        track_stub!(TODO("https://fxbug.dev/322875416"), "RENAME_WHITEOUT");
         return error!(ENOSYS);
     };
 
@@ -1446,7 +1446,7 @@ pub fn sys_memfd_create(
     };
 
     if flags & !(MFD_CLOEXEC | MFD_ALLOW_SEALING) != 0 {
-        track_stub!("memfd_create", flags);
+        track_stub!(TODO("https://fxbug.dev/322875665"), "memfd_create unknown flags", flags);
     }
 
     let name = current_task.read_c_string_to_vec(user_name, MEMFD_NAME_MAX_LEN).map_err(|e| {
@@ -1488,7 +1488,11 @@ pub fn sys_mount(
     }
 
     let flags = MountFlags::from_bits(flags).ok_or_else(|| {
-        track_stub!("mount", flags & !MountFlags::from_bits_truncate(flags).bits());
+        track_stub!(
+            TODO("https://fxbug.dev/322875327"),
+            "mount unknown flags",
+            flags & !MountFlags::from_bits_truncate(flags).bits()
+        );
         errno!(EINVAL)
     })?;
 
@@ -1511,7 +1515,7 @@ fn do_mount_remount(
     data_addr: UserCString,
 ) -> Result<(), Errno> {
     if !data_addr.is_null() {
-        track_stub!("MS_REMOUNT: Updating data");
+        track_stub!(TODO("https://fxbug.dev/322875506"), "MS_REMOUNT: Updating data");
     }
     let mount = target.mount_if_root()?;
     let updated_flags = flags & MountFlags::CHANGEABLE_WITH_REMOUNT;
@@ -1523,7 +1527,7 @@ fn do_mount_remount(
         //   to modify only the per-mount-point flags.  This is particularly
         //   useful for setting or clearing the "read-only" flag on a mount
         //   without changing the underlying filesystem.
-        track_stub!("MS_REMOUNT: Updating superblock flags");
+        track_stub!(TODO("https://fxbug.dev/322875215"), "MS_REMOUNT: Updating superblock flags");
     }
     Ok(())
 }
@@ -1736,7 +1740,7 @@ pub fn sys_timerfd_create(
         _ => return error!(EINVAL),
     };
     if flags & !(TFD_NONBLOCK | TFD_CLOEXEC) != 0 {
-        track_stub!("timerfd_create", flags);
+        track_stub!(TODO("https://fxbug.dev/322875488"), "timerfd_create unknown flags", flags);
         return error!(EINVAL);
     }
     log_trace!("timerfd_create(clock_id={:?}, flags={:#x})", clock_id, flags);
@@ -1779,7 +1783,7 @@ pub fn sys_timerfd_settime(
     user_old_value: UserRef<itimerspec>,
 ) -> Result<(), Errno> {
     if flags & !(TFD_TIMER_ABSTIME | TFD_TIMER_CANCEL_ON_SET) != 0 {
-        track_stub!("timerfd_settime", flags);
+        track_stub!(TODO("https://fxbug.dev/322874722"), "timerfd_settime unknown flags", flags);
         return error!(EINVAL);
     }
 
@@ -2327,7 +2331,7 @@ pub fn sys_sync(
     _locked: &mut Locked<'_, Unlocked>,
     _current_task: &CurrentTask,
 ) -> Result<(), Errno> {
-    track_stub!("sync");
+    track_stub!(TODO("https://fxbug.dev/322875826"), "sync()");
     Ok(())
 }
 
@@ -2337,7 +2341,7 @@ pub fn sys_syncfs(
     fd: FdNumber,
 ) -> Result<(), Errno> {
     let _file = current_task.files.get_unless_opath(fd)?;
-    track_stub!("syncfs");
+    track_stub!(TODO("https://fxbug.dev/322875646"), "syncfs");
     Ok(())
 }
 
@@ -2375,7 +2379,7 @@ pub fn sys_fadvise64(
         | POSIX_FADV_DONTNEED
         | POSIX_FADV_NOREUSE => (),
         _ => {
-            track_stub!("fadvise64 unknown advice", advice);
+            track_stub!(TODO("https://fxbug.dev/322875684"), "fadvise64 unknown advice", advice);
             return error!(EINVAL);
         }
     }

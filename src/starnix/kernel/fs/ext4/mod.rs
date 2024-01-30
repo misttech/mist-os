@@ -162,23 +162,23 @@ impl FsNodeOps for ExtDirectory {
                 EntryType::Directory => Box::new(ExtDirectory { inner: Arc::new(ext_node) }),
                 EntryType::SymLink => Box::new(ExtSymlink { inner: ext_node }),
                 EntryType::Unknown => {
-                    track_stub!("ext4 unknown entry type");
+                    track_stub!(TODO("https://fxbug.dev/322873719"), "ext4 unknown entry type");
                     Box::new(ExtFile::new(ext_node, name.to_owned()))
                 }
                 EntryType::CharacterDevice => {
-                    track_stub!("ext4 character device");
+                    track_stub!(TODO("https://fxbug.dev/322874445"), "ext4 character device");
                     Box::new(ExtFile::new(ext_node, name.to_owned()))
                 }
                 EntryType::BlockDevice => {
-                    track_stub!("ext4 block device");
+                    track_stub!(TODO("https://fxbug.dev/322874062"), "ext4 block device");
                     Box::new(ExtFile::new(ext_node, name.to_owned()))
                 }
                 EntryType::FIFO => {
-                    track_stub!("ext4 fifo");
+                    track_stub!(TODO("https://fxbug.dev/322874249"), "ext4 fifo");
                     Box::new(ExtFile::new(ext_node, name.to_owned()))
                 }
                 EntryType::Socket => {
-                    track_stub!("ext4 socket");
+                    track_stub!(TODO("https://fxbug.dev/322874081"), "ext4 socket");
                     Box::new(ExtFile::new(ext_node, name.to_owned()))
                 }
             };

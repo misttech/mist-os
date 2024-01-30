@@ -1374,7 +1374,10 @@ impl MemoryManagerState {
         unsafe { self.user_vmar.protect(addr.ptr(), length, vmar_flags) }.map_err(|s| match s {
             zx::Status::INVALID_ARGS => errno!(EINVAL),
             zx::Status::NOT_FOUND => {
-                track_stub!("mprotect: succeed and update prot after NOT_FOUND");
+                track_stub!(
+                    TODO("https://fxbug.dev/322875024"),
+                    "mprotect: succeed and update prot after NOT_FOUND"
+                );
                 errno!(EINVAL)
             }
             zx::Status::ACCESS_DENIED => errno!(EACCES),
@@ -1475,14 +1478,17 @@ impl MemoryManagerState {
                         // Note, we cannot simply implemented MADV_DONTNEED with
                         // zx::VmoOp::DONT_NEED because they have different
                         // semantics.
-                        track_stub!("MADV_DONTNEED with file-backed mapping");
+                        track_stub!(
+                            TODO("https://fxbug.dev/322874496"),
+                            "MADV_DONTNEED with file-backed mapping"
+                        );
                         return error!(EINVAL);
                     }
                     MADV_DONTNEED => zx::VmoOp::ZERO,
                     MADV_WILLNEED => zx::VmoOp::COMMIT,
                     MADV_NOHUGEPAGE => return Ok(()),
                     advice => {
-                        track_stub!("madvise", advice);
+                        track_stub!(TODO("https://fxbug.dev/322874202"), "madvise", advice);
                         return error!(EINVAL);
                     }
                 };
@@ -3605,7 +3611,7 @@ impl SequenceFileSource for ProcSmapsFile {
                 }
             )?;
 
-            track_stub!("smaps dirty pages");
+            track_stub!(TODO("https://fxbug.dev/322874967"), "smaps dirty pages");
             let (shared_dirty_kb, private_dirty_kb) = (0, 0);
 
             let is_shared = share_count > 1;

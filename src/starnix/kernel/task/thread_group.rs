@@ -654,7 +654,7 @@ impl ThreadGroup {
             if value.it_value.tv_sec == 0 && value.it_value.tv_usec == 0 {
                 return Ok(itimerval::default());
             }
-            track_stub!("Unsupported itimer type: {which}");
+            track_stub!(TODO("https://fxbug.dev/322874521"), "Unsupported itimer type", which);
             return Err(errno!(ENOTSUP));
         }
 

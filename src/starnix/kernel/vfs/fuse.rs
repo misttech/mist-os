@@ -790,7 +790,7 @@ impl FileOps for FuseFileObject {
         request: u32,
         arg: SyscallArg,
     ) -> Result<SyscallResult, Errno> {
-        track_stub!("fuse ioctl");
+        track_stub!(TODO("https://fxbug.dev/322875259"), "fuse ioctl");
         default_ioctl(file, current_task, request, arg)
     }
 
@@ -801,7 +801,7 @@ impl FileOps for FuseFileObject {
         cmd: u32,
         _arg: u64,
     ) -> Result<SyscallResult, Errno> {
-        track_stub!("fuse fcntl");
+        track_stub!(TODO("https://fxbug.dev/322875764"), "fuse fcntl");
         default_fcntl(cmd)
     }
 }
@@ -1008,7 +1008,7 @@ impl FsNodeOps for Arc<FuseNode> {
         _offset: u64,
         _length: u64,
     ) -> Result<(), Errno> {
-        track_stub!("FsNodeOps::allocate");
+        track_stub!(TODO("https://fxbug.dev/322875414"), "FsNodeOps::allocate");
         error!(ENOTSUP)
     }
 
@@ -1284,7 +1284,11 @@ impl TryFrom<uapi::fuse_init_out> for FuseConfiguration {
     fn try_from(init_out: uapi::fuse_init_out) -> Result<Self, Errno> {
         let unknown_flags = init_out.flags & !FuseInitFlags::all().bits();
         if unknown_flags != 0 {
-            track_stub!("FUSE init flags", unknown_flags);
+            track_stub!(
+                TODO("https://fxbug.dev/322875725"),
+                "FUSE unknown init flags",
+                unknown_flags
+            );
             log_warn!("FUSE daemon requested unknown flags in init: {unknown_flags}");
         }
         let flags = FuseInitFlags::from_bits_truncate(init_out.flags);

@@ -53,7 +53,7 @@ impl SignalStackFrame {
 
         let fault_address = 0;
         if signal_state.has_queued(SIGBUS) || signal_state.has_queued(SIGSEGV) {
-            track_stub!("arm64 signal fault address");
+            track_stub!(TODO("https://fxbug.dev/322873483"), "arm64 signal fault address");
         }
         let context = ucontext {
             uc_flags: 0,
@@ -216,7 +216,7 @@ fn parse_sigcontext_data(
                     return error!(EINVAL);
                 }
 
-                track_stub!("sigcontext EXTRA_MAGIC");
+                track_stub!(TODO("https://fxbug.dev/322873793"), "sigcontext EXTRA_MAGIC");
                 offset += ESR_CONTEXT_SIZE as usize;
             }
 
