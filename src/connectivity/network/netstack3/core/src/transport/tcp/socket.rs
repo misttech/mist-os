@@ -52,7 +52,7 @@ use crate::{
     },
     convert::{BidirectionalConverter as _, OwnedOrRefsBidirectionalConverter},
     data_structures::socketmap::{IterShadows as _, SocketMap},
-    device::{self, AnyDevice, DeviceIdContext},
+    device::{self, AnyDevice, DeviceIdContext, WeakId},
     error::{ExistsError, LocalAddressError, ZonedAddressError},
     ip::{
         icmp::IcmpErrorCode,
@@ -62,10 +62,9 @@ use crate::{
         EitherDeviceId, TransportIpContext,
     },
     socket::{
-        self,
         address::{
-            AddrIsMappedError, ConnAddr, ConnIpAddr, DualStackRemoteIp, ListenerAddr,
-            ListenerIpAddr, SocketIpAddr, TryUnmapResult,
+            dual_stack_remote_ip, AddrIsMappedError, ConnAddr, ConnIpAddr, DualStackRemoteIp,
+            ListenerAddr, ListenerIpAddr, SocketIpAddr,
         },
         AddrVec, Bound, BoundSocketMap, EitherStack, IncompatibleError, InsertError, Inserter,
         ListenerAddrInfo, MaybeDualStack, RemoveResult, ShutdownType, SocketMapAddrSpec,
@@ -95,11 +94,6 @@ pub trait DualStackIpExt: crate::socket::DualStackIpExt {
     /// [`Ipv6`], this will be a `EitherStack`.
     type ConnectionAndAddr<D: device::WeakId, BT: TcpBindingsTypes>: Send + Sync + Debug;
 
-    /// The type for the address that the listener is listening on. This should
-    /// be just [`ListenerAddr`] for [`Ipv4`], but an [`EitherStack`] for
-    /// [`Ipv6`].
-    type ListenerAddr<D: device::WeakId>: Send + Sync + Debug + Clone + AsRef<Option<D>>;
-
     /// Determines which stack the demux socket ID belongs to and converts
     /// (by reference) to a dual stack TCP socket ID.
     fn as_dual_stack_ip_socket<D: device::WeakId, BT: TcpBindingsTypes>(
@@ -116,22 +110,6 @@ pub trait DualStackIpExt: crate::socket::DualStackIpExt {
     fn into_demux_socket_id<D: device::WeakId, BT: TcpBindingsTypes>(
         id: TcpSocketId<Self, D, BT>,
     ) -> Self::DemuxSocketId<D, BT>;
-
-    fn get_conn_info<D: device::WeakId, BT: TcpBindingsTypes>(
-        conn_and_addr: &Self::ConnectionAndAddr<D, BT>,
-    ) -> ConnectionInfo<Self::Addr, D>;
-    fn get_accept_queue_mut<D: device::WeakId, BT: TcpBindingsTypes>(
-        conn_and_addr: &mut Self::ConnectionAndAddr<D, BT>,
-    ) -> &mut Option<
-        AcceptQueue<
-            TcpSocketId<Self, D, BT>,
-            BT::ReturnedBuffers,
-            BT::ListenerNotifierOrProvidedBuffers,
-        >,
-    >;
-    fn get_bound_info<D: device::WeakId>(
-        listener_addr: &Self::ListenerAddr<D>,
-    ) -> BoundInfo<Self::Addr, D>;
 }
 
 impl DualStackIpExt for Ipv4 {
@@ -139,7 +117,6 @@ impl DualStackIpExt for Ipv4 {
         EitherStack<TcpSocketId<Ipv4, D, BT>, TcpSocketId<Ipv6, D, BT>>;
     type ConnectionAndAddr<D: device::WeakId, BT: TcpBindingsTypes> =
         (Connection<Ipv4, Ipv4, D, BT>, ConnAddr<ConnIpAddr<Ipv4Addr, NonZeroU16, NonZeroU16>, D>);
-    type ListenerAddr<D: device::WeakId> = ListenerAddr<ListenerIpAddr<Ipv4Addr, NonZeroU16>, D>;
 
     fn as_dual_stack_ip_socket<D: device::WeakId, BT: TcpBindingsTypes>(
         id: &Self::DemuxSocketId<D, BT>,
@@ -159,27 +136,6 @@ impl DualStackIpExt for Ipv4 {
     ) -> Self::DemuxSocketId<D, BT> {
         EitherStack::ThisStack(id)
     }
-    fn get_conn_info<D: device::WeakId, BT: TcpBindingsTypes>(
-        (_conn, addr): &Self::ConnectionAndAddr<D, BT>,
-    ) -> ConnectionInfo<Self::Addr, D> {
-        addr.clone().into()
-    }
-    fn get_accept_queue_mut<D: device::WeakId, BT: TcpBindingsTypes>(
-        (conn, _addr): &mut Self::ConnectionAndAddr<D, BT>,
-    ) -> &mut Option<
-        AcceptQueue<
-            TcpSocketId<Self, D, BT>,
-            BT::ReturnedBuffers,
-            BT::ListenerNotifierOrProvidedBuffers,
-        >,
-    > {
-        &mut conn.accept_queue
-    }
-    fn get_bound_info<D: device::WeakId>(
-        listener_addr: &Self::ListenerAddr<D>,
-    ) -> BoundInfo<Self::Addr, D> {
-        listener_addr.clone().into()
-    }
 }
 
 impl DualStackIpExt for Ipv6 {
@@ -187,12 +143,6 @@ impl DualStackIpExt for Ipv6 {
     type ConnectionAndAddr<D: device::WeakId, BT: TcpBindingsTypes> = EitherStack<
         (Connection<Ipv6, Ipv6, D, BT>, ConnAddr<ConnIpAddr<Ipv6Addr, NonZeroU16, NonZeroU16>, D>),
         (Connection<Ipv6, Ipv4, D, BT>, ConnAddr<ConnIpAddr<Ipv4Addr, NonZeroU16, NonZeroU16>, D>),
-    >;
-    // TODO(https://issues.fuchsia.dev/319117141): Use [`DualStackListenerIpAddr`]
-    // when we support listening in both stacks.
-    type ListenerAddr<D: device::WeakId> = EitherStack<
-        ListenerAddr<ListenerIpAddr<Ipv6Addr, NonZeroU16>, D>,
-        ListenerAddr<ListenerIpAddr<Ipv4Addr, NonZeroU16>, D>,
     >;
 
     fn as_dual_stack_ip_socket<D: device::WeakId, BT: TcpBindingsTypes>(
@@ -210,63 +160,6 @@ impl DualStackIpExt for Ipv6 {
         id: TcpSocketId<Self, D, BT>,
     ) -> Self::DemuxSocketId<D, BT> {
         id
-    }
-    fn get_conn_info<D: device::WeakId, BT: TcpBindingsTypes>(
-        conn_and_addr: &Self::ConnectionAndAddr<D, BT>,
-    ) -> ConnectionInfo<Self::Addr, D> {
-        match conn_and_addr {
-            EitherStack::ThisStack((_conn, addr)) => addr.clone().into(),
-            EitherStack::OtherStack((
-                _conn,
-                ConnAddr {
-                    ip:
-                        ConnIpAddr { local: (local_ip, local_port), remote: (remote_ip, remote_port) },
-                    device,
-                },
-            )) => ConnectionInfo {
-                local_addr: SocketAddr {
-                    ip: maybe_zoned(local_ip.addr().to_ipv6_mapped(), device),
-                    port: *local_port,
-                },
-                remote_addr: SocketAddr {
-                    ip: maybe_zoned(remote_ip.addr().to_ipv6_mapped(), device),
-                    port: *remote_port,
-                },
-                device: device.clone(),
-            },
-        }
-    }
-    fn get_accept_queue_mut<D: device::WeakId, BT: TcpBindingsTypes>(
-        conn_and_addr: &mut Self::ConnectionAndAddr<D, BT>,
-    ) -> &mut Option<
-        AcceptQueue<
-            TcpSocketId<Self, D, BT>,
-            BT::ReturnedBuffers,
-            BT::ListenerNotifierOrProvidedBuffers,
-        >,
-    > {
-        match conn_and_addr {
-            EitherStack::ThisStack((conn, _addr)) => &mut conn.accept_queue,
-            EitherStack::OtherStack((conn, _addr)) => &mut conn.accept_queue,
-        }
-    }
-    fn get_bound_info<D: device::WeakId>(
-        listener_addr: &Self::ListenerAddr<D>,
-    ) -> BoundInfo<Self::Addr, D> {
-        match listener_addr {
-            EitherStack::ThisStack(listener_addr) => listener_addr.clone().into(),
-            EitherStack::OtherStack(ListenerAddr {
-                ip: ListenerIpAddr { addr, identifier: local_port },
-                device,
-            }) => BoundInfo {
-                addr: Some(maybe_zoned(
-                    addr.map(|a| a.addr()).unwrap_or(Ipv4::UNSPECIFIED_ADDRESS).to_ipv6_mapped(),
-                    &device,
-                )),
-                port: *local_port,
-                device: device.clone(),
-            },
-        }
     }
 }
 
@@ -496,15 +389,12 @@ pub trait TcpContext<I: DualStackIpExt, BC: TcpBindingsTypes>:
     /// version, associated types and concrete types must unify and we can
     /// inspect types by converting them into the concrete types.
     type SingleStackConverter: OwnedOrRefsBidirectionalConverter<
-            I::ConnectionAndAddr<Self::WeakDeviceId, BC>,
-            (
-                Connection<I, I, Self::WeakDeviceId, BC>,
-                ConnAddr<ConnIpAddr<<I as Ip>::Addr, NonZeroU16, NonZeroU16>, Self::WeakDeviceId>,
-            ),
-        > + OwnedOrRefsBidirectionalConverter<
-            I::ListenerAddr<Self::WeakDeviceId>,
-            ListenerAddr<ListenerIpAddr<I::Addr, NonZeroU16>, Self::WeakDeviceId>,
-        >;
+        I::ConnectionAndAddr<Self::WeakDeviceId, BC>,
+        (
+            Connection<I, I, Self::WeakDeviceId, BC>,
+            ConnAddr<ConnIpAddr<<I as Ip>::Addr, NonZeroU16, NonZeroU16>, Self::WeakDeviceId>,
+        ),
+    >;
 
     /// The core context that will give access to both versions of the IP layer.
     type DualStackIpTransportAndDemuxCtx<'a>: TransportIpContext<I, BC, DeviceId = Self::DeviceId, WeakDeviceId = Self::WeakDeviceId>
@@ -525,33 +415,21 @@ pub trait TcpContext<I: DualStackIpExt, BC: TcpBindingsTypes>:
     /// version, associated types and concrete types must unify and we can
     /// inspect types by converting them into the concrete types.
     type DualStackConverter: OwnedOrRefsBidirectionalConverter<
-            I::ConnectionAndAddr<Self::WeakDeviceId, BC>,
-            EitherStack<
-                (
-                    Connection<I, I, Self::WeakDeviceId, BC>,
-                    ConnAddr<
-                        ConnIpAddr<<I as Ip>::Addr, NonZeroU16, NonZeroU16>,
-                        Self::WeakDeviceId,
-                    >,
-                ),
-                (
-                    Connection<I, I::OtherVersion, Self::WeakDeviceId, BC>,
-                    ConnAddr<
-                        ConnIpAddr<<I::OtherVersion as Ip>::Addr, NonZeroU16, NonZeroU16>,
-                        Self::WeakDeviceId,
-                    >,
-                ),
-            >,
-        > + OwnedOrRefsBidirectionalConverter<
-            I::ListenerAddr<Self::WeakDeviceId>,
-            EitherStack<
-                ListenerAddr<ListenerIpAddr<I::Addr, NonZeroU16>, Self::WeakDeviceId>,
-                ListenerAddr<
-                    ListenerIpAddr<<I::OtherVersion as Ip>::Addr, NonZeroU16>,
+        I::ConnectionAndAddr<Self::WeakDeviceId, BC>,
+        EitherStack<
+            (
+                Connection<I, I, Self::WeakDeviceId, BC>,
+                ConnAddr<ConnIpAddr<<I as Ip>::Addr, NonZeroU16, NonZeroU16>, Self::WeakDeviceId>,
+            ),
+            (
+                Connection<I, I::OtherVersion, Self::WeakDeviceId, BC>,
+                ConnAddr<
+                    ConnIpAddr<<I::OtherVersion as Ip>::Addr, NonZeroU16, NonZeroU16>,
                     Self::WeakDeviceId,
                 >,
-            >,
-        >;
+            ),
+        >,
+    >;
 
     /// Calls the function with mutable access to the set with all TCP sockets.
     fn with_all_sockets_mut<O, F: FnOnce(&mut TcpSocketSet<I, Self::WeakDeviceId, BC>) -> O>(
@@ -673,43 +551,13 @@ pub trait TcpContext<I: DualStackIpExt, BC: TcpBindingsTypes>:
     }
 }
 
-/// A ZST that helps convert IPv6 socket IDs into IPv4 demux IDs.
-#[derive(Clone, Copy)]
-pub struct Ipv6SocketIdToIpv4DemuxIdConverter;
-
-/// This trait allows us to work around the life-time issue when we need to
-/// convert an IPv6 socket ID into an IPv4 demux ID without holding on the
-/// a dual-stack CoreContext.
-pub trait DualStackDemuxIdConverter<I: DualStackIpExt> {
-    /// Turns a [`TcpSocketId`] into the demuxer ID of the other stack.
-    fn convert<D: device::WeakId, BT: TcpBindingsTypes>(
-        &self,
-        id: TcpSocketId<I, D, BT>,
-    ) -> <I::OtherVersion as DualStackIpExt>::DemuxSocketId<D, BT>;
-}
-
-impl DualStackDemuxIdConverter<Ipv6> for Ipv6SocketIdToIpv4DemuxIdConverter {
-    fn convert<D: device::WeakId, BT: TcpBindingsTypes>(
-        &self,
-        id: TcpSocketId<Ipv6, D, BT>,
-    ) -> <Ipv4 as DualStackIpExt>::DemuxSocketId<D, BT> {
-        EitherStack::OtherStack(id)
-    }
-}
-
 /// A provider of dualstack socket functionality required by TCP sockets.
 pub trait TcpDualStackContext<I: DualStackIpExt> {
-    type Converter: DualStackDemuxIdConverter<I> + Clone + Copy;
-
-    fn other_demux_id_converter(&self) -> Self::Converter;
-
     /// Turns a [`TcpSocketId`] into the demuxer ID of the other stack.
     fn into_other_demux_socket_id<D: device::WeakId, BT: TcpBindingsTypes>(
         &self,
         id: TcpSocketId<I, D, BT>,
-    ) -> <I::OtherVersion as DualStackIpExt>::DemuxSocketId<D, BT> {
-        self.other_demux_id_converter().convert(id)
-    }
+    ) -> <I::OtherVersion as DualStackIpExt>::DemuxSocketId<D, BT>;
 }
 
 /// Socket address includes the ip address and the port number.
@@ -788,7 +636,7 @@ struct TcpSocketSpec<I, D, BT>(PhantomData<(I, D, BT)>, Never);
 impl<I: DualStackIpExt, D: device::WeakId, BT: TcpBindingsTypes> SocketMapStateSpec
     for TcpSocketSpec<I, D, BT>
 {
-    type ListenerId = I::DemuxSocketId<D, BT>;
+    type ListenerId = TcpSocketId<I, D, BT>;
     type ConnId = I::DemuxSocketId<D, BT>;
 
     type ListenerSharingState = ListenerSharingState;
@@ -847,7 +695,7 @@ enum ListenerAddrState<S> {
     Shared { listener: Option<S>, bound: SmallVec<[S; 1]> },
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Debug)]
 #[cfg_attr(test, derive(PartialEq))]
 pub struct ListenerSharingState {
     pub(crate) sharing: SharingState,
@@ -871,7 +719,13 @@ impl<'a, S> Inserter<S> for ListenerAddrInserter<'a, S> {
 #[derive(Derivative)]
 #[derivative(Debug(bound = "D: Debug"))]
 pub enum BoundSocketState<I: DualStackIpExt, D: device::WeakId, BT: TcpBindingsTypes> {
-    Listener((MaybeListener<I, D, BT>, ListenerSharingState, I::ListenerAddr<D>)),
+    Listener(
+        (
+            MaybeListener<I, D, BT>,
+            ListenerSharingState,
+            ListenerAddr<ListenerIpAddr<I::Addr, NonZeroU16>, D>,
+        ),
+    ),
     Connected((I::ConnectionAndAddr<D, BT>, SharingState)),
 }
 
@@ -1505,6 +1359,21 @@ pub struct Connection<
     handshake_status: HandshakeStatus,
 }
 
+fn make_connection<
+    I: DualStackIpExt,
+    BC: TcpBindingsContext<I, CC::WeakDeviceId>,
+    CC: TcpContext<I, BC>,
+>(
+    conn: Connection<I, I, CC::WeakDeviceId, BC>,
+    addr: ConnAddr<ConnIpAddr<I::Addr, NonZeroU16, NonZeroU16>, CC::WeakDeviceId>,
+    converter: &MaybeDualStack<CC::DualStackConverter, CC::SingleStackConverter>,
+) -> I::ConnectionAndAddr<CC::WeakDeviceId, BC> {
+    match converter {
+        MaybeDualStack::NotDualStack(nds) => nds.convert_back((conn, addr)),
+        MaybeDualStack::DualStack(ds) => ds.convert_back(EitherStack::ThisStack((conn, addr))),
+    }
+}
+
 // TODO(https://fxbug.dev/42085913): Remove this method once we support all dual
 // stack operations.
 fn try_into_this_stack_conn_mut<
@@ -1524,26 +1393,6 @@ fn try_into_this_stack_conn_mut<
         MaybeDualStack::DualStack(ds) => match ds.convert(conn) {
             EitherStack::ThisStack(conn) => Some(conn),
             EitherStack::OtherStack(_conn) => None,
-        },
-    }
-}
-
-// TODO(https://fxbug.dev/42085913): Remove this method once we support all dual
-// stack operations.
-fn try_into_this_stack_listener_addr<
-    'a,
-    I: DualStackIpExt,
-    BC: TcpBindingsTypes,
-    CC: TcpContext<I, BC>,
->(
-    addr: &'a I::ListenerAddr<CC::WeakDeviceId>,
-    converter: &MaybeDualStack<CC::DualStackConverter, CC::SingleStackConverter>,
-) -> Option<&'a ListenerAddr<ListenerIpAddr<I::Addr, NonZeroU16>, CC::WeakDeviceId>> {
-    match converter {
-        MaybeDualStack::NotDualStack(nds) => Some(nds.convert(addr)),
-        MaybeDualStack::DualStack(ds) => match ds.convert(addr) {
-            EitherStack::ThisStack(addr) => Some(addr),
-            EitherStack::OtherStack(_addr) => None,
         },
     }
 }
@@ -1732,131 +1581,6 @@ impl HandshakeStatus {
         }
     }
 }
-
-fn bind_inner<I, BC, DC>(
-    core_ctx: &mut DC,
-    demux_socket_id: I::DemuxSocketId<DC::WeakDeviceId, BC>,
-    addr: Option<ZonedAddr<SocketIpAddr<I::Addr>, DC::DeviceId>>,
-    bound_device: &Option<DC::WeakDeviceId>,
-    port: Option<NonZeroU16>,
-    sharing: SharingState,
-) -> Result<
-    (ListenerAddr<ListenerIpAddr<I::Addr, NonZeroU16>, DC::WeakDeviceId>, ListenerSharingState),
-    LocalAddressError,
->
-where
-    I: DualStackIpExt,
-    BC: TcpBindingsTypes,
-    DC: TransportIpContext<I, BC>
-        + DeviceIpSocketHandler<I, BC>
-        + TcpDemuxContext<I, DC::WeakDeviceId, BC>,
-{
-    let (local_ip, device) = match addr {
-        Some(addr) => {
-            // Extract the specified address and the device. The
-            // device is either the one from the address or the one
-            // to which the socket was previously bound.
-            let (addr, required_device) =
-                crate::transport::resolve_addr_with_device::<I::Addr, _, _, _>(
-                    addr,
-                    bound_device.clone(),
-                )
-                .map_err(LocalAddressError::Zone)?;
-
-            let mut assigned_to = core_ctx.get_devices_with_assigned_addr(addr.clone().into());
-
-            if !assigned_to.any(|d| {
-                required_device.as_ref().map_or(true, |device| device == &EitherDeviceId::Strong(d))
-            }) {
-                return Err(LocalAddressError::AddressMismatch);
-            }
-
-            (Some(addr), required_device)
-        }
-        None => (None, bound_device.clone().map(EitherDeviceId::Weak)),
-    };
-
-    let weak_device = device.map(|d| d.as_weak(core_ctx).into_owned());
-    core_ctx.with_demux_mut(move |DemuxState { socketmap, port_alloc }| {
-        let port = match port {
-            None => match port_alloc.try_alloc(&local_ip, &socketmap) {
-                Some(port) => NonZeroU16::new(port).expect("ephemeral ports must be non-zero"),
-                None => {
-                    return Err(LocalAddressError::FailedToAllocateLocalPort);
-                }
-            },
-            Some(port) => port,
-        };
-
-        let addr = ListenerAddr {
-            ip: ListenerIpAddr { addr: local_ip, identifier: port },
-            device: weak_device,
-        };
-        let sharing = ListenerSharingState { sharing, listening: false };
-
-        let _inserted = socketmap
-            .listeners_mut()
-            .try_insert(addr.clone(), sharing.clone(), demux_socket_id)
-            .map_err(|_: (InsertError, ListenerSharingState)| LocalAddressError::AddressInUse)?;
-
-        Ok((addr, sharing))
-    })
-}
-
-fn try_update_listener_sharing<I, CC, BT>(
-    core_ctx: MaybeDualStack<
-        (&mut CC::DualStackIpTransportAndDemuxCtx<'_>, CC::DualStackConverter),
-        (&mut CC::SingleStackIpTransportAndDemuxCtx<'_>, CC::SingleStackConverter),
-    >,
-    id: &TcpSocketId<I, CC::WeakDeviceId, BT>,
-    addr: &I::ListenerAddr<CC::WeakDeviceId>,
-    sharing: &ListenerSharingState,
-    new_sharing: ListenerSharingState,
-) -> Result<ListenerSharingState, UpdateSharingError>
-where
-    I: DualStackIpExt,
-    CC: TcpContext<I, BT>,
-    BT: TcpBindingsTypes,
-{
-    match core_ctx {
-        MaybeDualStack::NotDualStack((core_ctx, converter)) => {
-            core_ctx.with_demux_mut(|DemuxState { socketmap, .. }| {
-                let entry = socketmap
-                    .listeners_mut()
-                    .entry(&I::into_demux_socket_id(id.clone()), converter.convert(addr))
-                    .expect("invalid listener id");
-                entry.try_update_sharing(sharing, new_sharing)
-            })
-        }
-        MaybeDualStack::DualStack((core_ctx, converter)) => match converter.convert(addr) {
-            EitherStack::ThisStack(addr) => TcpDemuxContext::<I, _, _>::with_demux_mut(
-                core_ctx,
-                |DemuxState { socketmap, .. }| {
-                    let entry = socketmap
-                        .listeners_mut()
-                        .entry(&I::into_demux_socket_id(id.clone()), addr)
-                        .expect("invalid listener id");
-                    entry.try_update_sharing(sharing, new_sharing)
-                },
-            ),
-            EitherStack::OtherStack(addr) => {
-                let demux_id = core_ctx.into_other_demux_socket_id(id.clone());
-                TcpDemuxContext::<I::OtherVersion, _, _>::with_demux_mut(
-                    core_ctx,
-                    |DemuxState { socketmap, .. }| {
-                        let entry = socketmap
-                            .listeners_mut()
-                            .entry(&demux_id, addr)
-                            .expect("invalid listener id");
-                        entry.try_update_sharing(sharing, new_sharing)
-                    },
-                )
-            }
-        },
-    }?;
-    Ok(new_sharing)
-}
-
 /// The TCP socket API.
 pub struct TcpApi<I: Ip, C>(C, IpVersionMarker<I>);
 
@@ -1933,15 +1657,20 @@ where
         port: Option<NonZeroU16>,
     ) -> Result<(), BindError> {
         debug!("bind {id:?} to {addr:?}:{port:?}");
-        let bind_addr = match addr {
-            // TODO(issues.fuchsia.dev/319117141): Should bind in both stacks
-            // for unspecified local address.
-            None => EitherStack::ThisStack(None),
-            Some(addr) => match socket::address::try_unmap(addr) {
-                TryUnmapResult::CannotBeUnmapped(addr) => EitherStack::ThisStack(Some(addr)),
-                TryUnmapResult::Mapped(addr) => EitherStack::OtherStack(addr),
-            },
-        };
+        // TODO(https://fxbug.dev/42095034): Support dual-stack bind.
+        let addr: Option<ZonedAddr<SocketIpAddr<I::Addr>, _>> =
+            match addr {
+                None => None,
+                Some(addr) => {
+                    let (addr, zone) = addr.into_addr_zone();
+                    let addr = addr.try_into().map_err(|AddrIsMappedError {}| {
+                        BindError::LocalAddressError(LocalAddressError::AddressUnexpectedlyMapped)
+                    })?;
+                    Some(ZonedAddr::new(addr, zone).unwrap_or_else(|| {
+                        unreachable!("Address must still be a valid `ZonedAddr`.")
+                    }))
+                }
+            };
 
         // TODO(https://fxbug.dev/42055442): Check if local_ip is a unicast address.
         self.core_ctx().with_socket_mut_transport_demux(id, |core_ctx, socket_state| {
@@ -1957,55 +1686,73 @@ where
                 socket_extra: socket_extra.clone(),
             };
 
-            let (listener_addr, sharing) = match core_ctx {
-                MaybeDualStack::NotDualStack((core_ctx, converter)) => match bind_addr {
-                    EitherStack::ThisStack(local_addr) => {
-                        let (addr, sharing) = bind_inner(
-                            core_ctx,
-                            I::into_demux_socket_id(id.clone()),
-                            local_addr,
-                            bound_device,
-                            port,
-                            *sharing,
-                        )?;
-                        (converter.convert_back(addr), sharing)
-                    }
-                    EitherStack::OtherStack(_addr) => {
-                        return Err(LocalAddressError::CannotBindToAddress.into());
-                    }
-                },
-                MaybeDualStack::DualStack((core_ctx, converter)) => match bind_addr {
-                    EitherStack::ThisStack(addr) => {
-                        let (addr, sharing) = bind_inner::<I, _, _>(
-                            core_ctx,
-                            I::into_demux_socket_id(id.clone()),
+            let (core_ctx, _converter) = core_ctx.into_single_stack();
+            let (local_ip, device) = match addr {
+                Some(addr) => {
+                    // Extract the specified address and the device. The
+                    // device is either the one from the address or the one
+                    // to which the socket was previously bound.
+                    let (addr, required_device) =
+                        crate::transport::resolve_addr_with_device::<I::Addr, _, _, _>(
                             addr,
-                            bound_device,
-                            port,
-                            *sharing,
-                        )?;
-                        (converter.convert_back(EitherStack::ThisStack(addr)), sharing)
+                            bound_device.clone(),
+                        )
+                        .map_err(LocalAddressError::Zone)?;
+
+                    let mut assigned_to = <
+                        <C::CoreContext as TcpContext<I, _>>
+                            ::SingleStackIpTransportAndDemuxCtx<'_> as TransportIpContext<I,_,>>
+                                ::get_devices_with_assigned_addr(
+                                    core_ctx, addr.clone().into()
+                    );
+                    if !assigned_to.any(|d| {
+                        required_device
+                            .as_ref()
+                            .map_or(true, |device| device == &EitherDeviceId::Strong(d))
+                    }) {
+                        return Err(LocalAddressError::AddressMismatch.into());
                     }
-                    EitherStack::OtherStack(addr) => {
-                        // TODO(https://issues.fuchsia.dev/42085913): Should
-                        // fail when IPV6_V6ONLY is set.
-                        let (addr, sharing) = bind_inner::<I::OtherVersion, _, _>(
-                            core_ctx,
-                            core_ctx.into_other_demux_socket_id(id.clone()),
-                            addr,
-                            bound_device,
-                            port,
-                            *sharing,
-                        )?;
-                        (converter.convert_back(EitherStack::OtherStack(addr)), sharing)
-                    }
-                },
+
+                    (Some(addr), required_device)
+                }
+                None => (None, bound_device.clone().map(EitherDeviceId::Weak)),
             };
+
+            let weak_device = device.map(|d| d.as_weak(core_ctx).into_owned());
+            let (addr, sharing) =
+                core_ctx.with_demux_mut(move |DemuxState { socketmap, port_alloc }| {
+                    let port = match port {
+                        None => match port_alloc.try_alloc(&local_ip, &socketmap) {
+                            Some(port) => {
+                                NonZeroU16::new(port).expect("ephemeral ports must be non-zero")
+                            }
+                            None => {
+                                return Err(LocalAddressError::FailedToAllocateLocalPort);
+                            }
+                        },
+                        Some(port) => port,
+                    };
+
+                    let addr = ListenerAddr {
+                        ip: ListenerIpAddr { addr: local_ip, identifier: port },
+                        device: weak_device,
+                    };
+                    let sharing = ListenerSharingState { sharing: *sharing, listening: false };
+
+                    let _inserted = socketmap
+                        .listeners_mut()
+                        .try_insert(addr.clone(), sharing.clone(), id.clone())
+                        .map_err(|_: (InsertError, ListenerSharingState)| {
+                            LocalAddressError::AddressInUse
+                        })?;
+
+                    Ok((addr, sharing))
+                })?;
 
             *socket_state = TcpSocketState::Bound(BoundSocketState::Listener((
                 MaybeListener::Bound(bound_state),
                 sharing,
-                listener_addr,
+                addr,
             )));
             Ok(())
         })
@@ -2027,19 +1774,24 @@ where
                 TcpSocketState::Bound(BoundSocketState::Connected(_))
                 | TcpSocketState::Unbound(_) => return Err(ListenError::NotSupported),
             };
-            let new_sharing = {
+
+            let (core_ctx, _converter) = core_ctx.into_single_stack();
+            core_ctx.with_demux_mut(|DemuxState { socketmap, .. }| {
+                let entry =
+                    socketmap.listeners_mut().entry(&id, &addr).expect("invalid listener id");
                 let ListenerSharingState { sharing, listening } = listener_sharing;
                 debug_assert!(!*listening, "invalid bound ID that has a listener socket");
-                ListenerSharingState { sharing: *sharing, listening: true }
-            };
-            *listener_sharing = try_update_listener_sharing::<_, C::CoreContext, _>(
-                core_ctx,
-                id,
-                addr,
-                listener_sharing,
-                new_sharing,
-            )
-            .map_err(|UpdateSharingError| ListenError::ListenerExists)?;
+                let sharing = *sharing;
+
+                let new_sharing = ListenerSharingState { sharing, listening: true };
+                match entry.try_update_sharing(&listener_sharing, new_sharing.clone()) {
+                    Ok(()) => {
+                        *listener_sharing = new_sharing;
+                        Ok(())
+                    }
+                    Err(UpdateSharingError) => Err(ListenError::ListenerExists),
+                }
+            })?;
 
             match listener {
                 MaybeListener::Bound(BoundState { buffer_sizes, socket_options, socket_extra }) => {
@@ -2093,22 +1845,19 @@ where
             Ok::<_, AcceptError>((conn_id, client_buffers))
         })?;
 
-        let remote_addr = self.core_ctx().with_socket_mut_and_converter(&conn_id, |socket_state, _converter| {
-            let conn_and_addr = assert_matches!(
+        let addr = self.core_ctx().with_socket_mut_and_converter(&conn_id, |socket_state, converter| {
+            let (conn, conn_addr) = assert_matches!(
                 socket_state,
-                TcpSocketState::Bound(BoundSocketState::Connected((conn_and_addr, _sharing))) => conn_and_addr,
+                TcpSocketState::Bound(BoundSocketState::Connected((conn, _sharing))) => try_into_this_stack_conn_mut::<I, _, C::CoreContext>(conn, &converter).expect("TODO(https://fxbug.dev/42085913): dual stack listener not supported yet"),
                 "invalid socket ID"
             );
-            *I::get_accept_queue_mut(conn_and_addr) = None;
-            let ConnectionInfo {
-                local_addr: _,
-                remote_addr,
-                device: _
-            } = I::get_conn_info(conn_and_addr);
-            remote_addr
-        });
+            conn.accept_queue = None;
+            let ConnAddr { ip: ConnIpAddr { local: _, remote }, device } = conn_addr;
+            let (remote_ip, remote_port) = *remote;
 
-        Ok((conn_id, remote_addr, client_buffers))
+            SocketAddr { ip: maybe_zoned(remote_ip.into(), device), port: remote_port }
+        });
+        Ok((conn_id, addr, client_buffers))
     }
 
     /// Connects a socket to a remote address.
@@ -2131,93 +1880,87 @@ where
         let (core_ctx, bindings_ctx) = self.contexts();
         core_ctx.with_socket_mut_isn_transport_demux(id, |core_ctx, socket_state, isn| {
             debug!("connect on {id:?} to {remote_ip:?}:{remote_port}");
-            let remote_ip = socket::address::dual_stack_remote_ip::<I, _>(remote_ip);
-            let (local_addr, sharing, socket_options, buffer_sizes, socket_extra) =
-                match socket_state {
-                    TcpSocketState::Bound(BoundSocketState::Connected((conn, _sharing))) => {
-                        let handshake_status = match core_ctx {
-                            MaybeDualStack::NotDualStack((_core_ctx, converter)) => {
-                                let (conn, _addr) = converter.convert(conn);
-                                &mut conn.handshake_status
-                            }
-                            MaybeDualStack::DualStack((_core_ctx, converter)) => {
-                                match converter.convert(conn) {
-                                    EitherStack::ThisStack((conn, _addr)) => {
-                                        &mut conn.handshake_status
-                                    }
-                                    EitherStack::OtherStack((conn, _addr)) => {
-                                        &mut conn.handshake_status
-                                    }
-                                }
-                            }
-                        };
-                        match handshake_status {
-                            HandshakeStatus::Pending => return Err(ConnectError::Pending),
-                            HandshakeStatus::Aborted => return Err(ConnectError::Aborted),
-                            HandshakeStatus::Completed { reported } => {
-                                if *reported {
-                                    return Err(ConnectError::Completed);
-                                } else {
-                                    *reported = true;
-                                    return Ok(());
+            let (
+                local_ip,
+                local_port,
+                bound_device,
+                listener_addr,
+                sharing,
+                socket_options,
+                buffer_sizes,
+                socket_extra,
+            ) = match socket_state {
+                TcpSocketState::Bound(BoundSocketState::Connected((conn, _sharing))) => {
+                    let handshake_status = match core_ctx {
+                        MaybeDualStack::NotDualStack((_core_ctx, converter)) => {
+                            let (conn, _addr) = converter.convert(conn);
+                            &mut conn.handshake_status
+                        }
+                        MaybeDualStack::DualStack((_core_ctx, converter)) => {
+                            match converter.convert(conn) {
+                                EitherStack::ThisStack((conn, _addr)) => &mut conn.handshake_status,
+                                EitherStack::OtherStack((conn, _addr)) => {
+                                    &mut conn.handshake_status
                                 }
                             }
                         }
+                    };
+                    match handshake_status {
+                        HandshakeStatus::Pending => return Err(ConnectError::Pending),
+                        HandshakeStatus::Aborted => return Err(ConnectError::Aborted),
+                        HandshakeStatus::Completed { reported } => {
+                            if *reported {
+                                return Err(ConnectError::Completed);
+                            } else {
+                                *reported = true;
+                                return Ok(());
+                            }
+                        }
                     }
-                    TcpSocketState::Unbound(Unbound {
-                        bound_device: _,
-                        socket_extra,
+                }
+                TcpSocketState::Unbound(Unbound {
+                    bound_device,
+                    socket_extra,
+                    buffer_sizes,
+                    socket_options,
+                    sharing,
+                }) => (
+                    None,
+                    None,
+                    bound_device.clone(),
+                    None,
+                    *sharing,
+                    *socket_options,
+                    *buffer_sizes,
+                    socket_extra.clone(),
+                ),
+                TcpSocketState::Bound(BoundSocketState::Listener((
+                    listener,
+                    ListenerSharingState { sharing, listening: _ },
+                    addr,
+                ))) => match listener {
+                    MaybeListener::Bound(BoundState {
                         buffer_sizes,
                         socket_options,
-                        sharing,
-                    }) => {
-                        let local_addr = match remote_ip {
-                            DualStackRemoteIp::ThisStack(_) => EitherStack::ThisStack(None),
-                            DualStackRemoteIp::OtherStack(_) => EitherStack::OtherStack(None),
-                        };
-                        (local_addr, *sharing, *socket_options, *buffer_sizes, socket_extra.clone())
-                    }
-                    TcpSocketState::Bound(BoundSocketState::Listener((
-                        listener,
-                        ListenerSharingState { sharing, listening: _ },
-                        addr,
-                    ))) => {
-                        let local_addr = match &core_ctx {
-                            MaybeDualStack::DualStack((_core_ctx, converter)) => {
-                                match converter.convert(addr.clone()) {
-                                    EitherStack::ThisStack(addr) => {
-                                        EitherStack::ThisStack(Some(addr))
-                                    }
-                                    EitherStack::OtherStack(addr) => {
-                                        EitherStack::OtherStack(Some(addr))
-                                    }
-                                }
-                            }
-                            MaybeDualStack::NotDualStack((_core_ctx, converter)) => {
-                                EitherStack::ThisStack(Some(converter.convert(addr.clone())))
-                            }
-                        };
-                        match listener {
-                            MaybeListener::Bound(BoundState {
-                                buffer_sizes,
-                                socket_options,
-                                socket_extra,
-                            }) => (
-                                local_addr,
-                                *sharing,
-                                *socket_options,
-                                *buffer_sizes,
-                                socket_extra.clone(),
-                            ),
-                            MaybeListener::Listener(_) => return Err(ConnectError::Listener),
-                        }
-                    }
-                };
-            match (core_ctx, local_addr, remote_ip) {
+                        socket_extra,
+                    }) => (
+                        addr.ip.addr,
+                        Some(addr.ip.identifier),
+                        addr.device.clone(),
+                        Some(addr.clone()),
+                        *sharing,
+                        *socket_options,
+                        *buffer_sizes,
+                        socket_extra.clone(),
+                    ),
+                    MaybeListener::Listener(_) => return Err(ConnectError::Listener),
+                },
+            };
+            let remote_ip = dual_stack_remote_ip::<I, _>(remote_ip);
+            match (remote_ip, core_ctx) {
                 (
-                    MaybeDualStack::NotDualStack((core_ctx, converter)),
-                    EitherStack::ThisStack(local_addr),
                     DualStackRemoteIp::ThisStack(remote_ip),
+                    MaybeDualStack::NotDualStack((core_ctx, converter)),
                 ) => {
                     let conn_and_addr = connect_inner(
                         core_ctx,
@@ -2225,8 +1968,11 @@ where
                         id,
                         &I::into_demux_socket_id(id.clone()),
                         isn,
-                        local_addr,
+                        listener_addr,
+                        local_ip,
                         remote_ip,
+                        bound_device,
+                        local_port,
                         remote_port,
                         socket_extra,
                         buffer_sizes,
@@ -2240,9 +1986,8 @@ where
                     Ok(())
                 }
                 (
-                    MaybeDualStack::DualStack((core_ctx, converter)),
-                    EitherStack::ThisStack(local_addr),
                     DualStackRemoteIp::ThisStack(remote_ip),
+                    MaybeDualStack::DualStack((core_ctx, converter)),
                 ) => {
                     let conn_and_addr = connect_inner(
                         core_ctx,
@@ -2250,8 +1995,11 @@ where
                         id,
                         &I::into_demux_socket_id(id.clone()),
                         isn,
-                        local_addr,
+                        listener_addr,
+                        local_ip,
                         remote_ip,
+                        bound_device,
+                        local_port,
                         remote_port,
                         socket_extra,
                         buffer_sizes,
@@ -2265,10 +2013,16 @@ where
                     Ok(())
                 }
                 (
-                    MaybeDualStack::DualStack((core_ctx, converter)),
-                    EitherStack::OtherStack(listener_addr),
                     DualStackRemoteIp::OtherStack(remote_ip),
+                    MaybeDualStack::DualStack((core_ctx, converter)),
                 ) => {
+                    // TODO(https://fxbug.dev/42085913): We don't have dual stack
+                    // listeners yet, meaning we can't connect a socket that is
+                    // bound in the other stack. So local_ip and listener_addr
+                    // must be None for now.
+                    assert_eq!(local_ip, None);
+                    assert_eq!(listener_addr, None);
+                    let (local_ip, listener_addr) = (None, None);
                     let conn_and_addr = connect_inner(
                         core_ctx,
                         bindings_ctx,
@@ -2276,7 +2030,10 @@ where
                         &core_ctx.into_other_demux_socket_id(id.clone()),
                         isn,
                         listener_addr,
+                        local_ip,
                         remote_ip,
+                        bound_device,
+                        local_port,
                         remote_port,
                         socket_extra,
                         buffer_sizes,
@@ -2289,7 +2046,12 @@ where
                     )));
                     Ok(())
                 }
-                _ => Err(ConnectError::NoRoute),
+                (DualStackRemoteIp::OtherStack(_remote_ip), MaybeDualStack::NotDualStack(_nds)) => {
+                    // [`MaybeDualStack::NotDualStack`] can only happen for IPv4
+                    // sockets but [`DualStackRemoteIp::OtherStack`] can only
+                    // happen for IPv6 sockets.
+                    unreachable!("OtherStack socket in a non-dual-stack setting");
+                }
             }
         })
     }
@@ -2302,65 +2064,33 @@ where
                 match socket_state {
                     TcpSocketState::Unbound(_) => (true, None),
                     TcpSocketState::Bound(BoundSocketState::Listener((
-                        maybe_listener,
+                        MaybeListener::Bound(_),
                         _sharing,
                         addr,
                     ))) => {
-                        let this_or_other_stack = match core_ctx {
-                            MaybeDualStack::NotDualStack((core_ctx, converter)) => {
-                                EitherStack::ThisStack((
-                                    core_ctx.as_this_stack(),
-                                    I::into_demux_socket_id(id.clone()),
-                                    converter.convert(addr),
-                                ))
-                            }
-                            MaybeDualStack::DualStack((core_ctx, converter)) => {
-                                match converter.convert(addr) {
-                                    EitherStack::ThisStack(addr) => EitherStack::ThisStack((
-                                        core_ctx.as_this_stack(),
-                                        I::into_demux_socket_id(id.clone()),
-                                        addr,
-                                    )),
-                                    EitherStack::OtherStack(addr) => {
-                                        let demux_id =
-                                            core_ctx.into_other_demux_socket_id(id.clone());
-                                        EitherStack::OtherStack((core_ctx, demux_id, addr))
-                                    }
-                                }
-                            }
-                        };
-                        match this_or_other_stack {
-                            EitherStack::ThisStack((core_ctx, demux_id, addr)) => {
-                                TcpDemuxContext::<I, _, _>::with_demux_mut(
-                                    core_ctx,
-                                    |DemuxState { socketmap, .. }| {
-                                        assert_matches!(
-                                            socketmap.listeners_mut().remove(&demux_id, &addr),
-                                            Ok(())
-                                        );
-                                    },
-                                );
-                            }
-                            EitherStack::OtherStack((core_ctx, demux_id, addr)) => {
-                                TcpDemuxContext::<I::OtherVersion, _, _>::with_demux_mut(
-                                    core_ctx,
-                                    |DemuxState { socketmap, .. }| {
-                                        assert_matches!(
-                                            socketmap.listeners_mut().remove(&demux_id, &addr),
-                                            Ok(())
-                                        );
-                                    },
-                                );
-                            }
-                        }
-                        let pending = match maybe_listener {
-                            MaybeListener::Bound(_) => None,
-                            MaybeListener::Listener(listener) => {
-                                let (pending, _socket_extra) = listener.accept_queue.close();
-                                Some(pending)
-                            }
-                        };
-                        (true, pending)
+                        let (core_ctx, _converter) = core_ctx.into_single_stack();
+                        core_ctx.with_demux_mut(|DemuxState { socketmap, .. }| {
+                            assert_matches!(socketmap.listeners_mut().remove(&id, &addr), Ok(()));
+                        });
+                        (true, None)
+                    }
+                    TcpSocketState::Bound(BoundSocketState::Listener((
+                        MaybeListener::Listener(Listener {
+                            accept_queue,
+                            backlog: _,
+                            buffer_sizes: _,
+                            socket_options: _,
+                        }),
+                        _sharing,
+                        addr,
+                    ))) => {
+                        let (core_ctx, _converter) = core_ctx.into_single_stack();
+                        core_ctx.with_demux_mut(|DemuxState { socketmap, .. }| {
+                            assert_matches!(socketmap.listeners_mut().remove(&id, &addr), Ok(()));
+                        });
+
+                        let (pending, _socket_extra) = accept_queue.close();
+                        (true, Some(pending))
                     }
                     TcpSocketState::Bound(BoundSocketState::Connected((conn, _sharing))) => {
                         fn do_close<SockI, WireI, CC, BC>(
@@ -2469,108 +2199,108 @@ where
     ) -> Result<bool, NoConnection> {
         let (core_ctx, bindings_ctx) = self.contexts();
         let (shutdown_send, shutdown_receive) = shutdown.to_send_receive();
-        let (result, pending) =
-            core_ctx.with_socket_mut_transport_demux(id, |core_ctx, socket_state| {
+        let (result, pending) = core_ctx.with_socket_mut_transport_demux(
+            id,
+            |core_ctx, socket_state| {
                 match socket_state {
-                    TcpSocketState::Unbound(_) => Err(NoConnection),
-                    TcpSocketState::Bound(BoundSocketState::Connected((conn, _sharing))) => {
-                        if !shutdown_send {
-                            return Ok((true, None));
-                        }
-                        fn do_shutdown<SockI, WireI, CC, BC>(
-                            core_ctx: &mut CC,
-                            bindings_ctx: &mut BC,
-                            id: &TcpSocketId<SockI, CC::WeakDeviceId, BC>,
-                            conn: &mut Connection<SockI, WireI, CC::WeakDeviceId, BC>,
-                            addr: &ConnAddr<
-                                ConnIpAddr<<WireI as Ip>::Addr, NonZeroU16, NonZeroU16>,
-                                CC::WeakDeviceId,
-                            >,
-                        ) -> Result<(), NoConnection>
-                        where
-                            SockI: DualStackIpExt,
-                            WireI: DualStackIpExt,
-                            BC: TcpBindingsContext<SockI, CC::WeakDeviceId>,
-                            CC: TransportIpContext<WireI, BC>
-                                + TcpDemuxContext<WireI, CC::WeakDeviceId, BC>,
-                        {
-                            match conn.state.close(CloseReason::Shutdown, &conn.socket_options) {
-                                Ok(()) => {
-                                    do_send_inner(id, conn, addr, core_ctx, bindings_ctx);
-                                    Ok(())
-                                }
-                                Err(CloseError::NoConnection) => Err(NoConnection),
-                                Err(CloseError::Closing) => Ok(()),
-                            }
-                        }
-                        match core_ctx {
-                            MaybeDualStack::NotDualStack((core_ctx, converter)) => {
-                                let (conn, addr) = converter.convert(conn);
-                                do_shutdown(core_ctx, bindings_ctx, id, conn, addr)?
-                            }
-                            MaybeDualStack::DualStack((core_ctx, converter)) => {
-                                match converter.convert(conn) {
-                                    EitherStack::ThisStack((conn, addr)) => {
-                                        do_shutdown(core_ctx, bindings_ctx, id, conn, addr)?
-                                    }
-                                    EitherStack::OtherStack((conn, addr)) => {
-                                        do_shutdown(core_ctx, bindings_ctx, id, conn, addr)?
-                                    }
-                                }
-                            }
-                        };
-                        Ok((true, None))
+                TcpSocketState::Unbound(_) => Err(NoConnection),
+                TcpSocketState::Bound(BoundSocketState::Connected((conn, _sharing))) => {
+                    if !shutdown_send {
+                        return Ok((true, None));
                     }
-                    TcpSocketState::Bound(BoundSocketState::Listener((
-                        maybe_listener,
-                        sharing,
-                        addr,
-                    ))) => {
-                        if !shutdown_receive {
-                            return Ok((false, None));
+                    fn do_shutdown<SockI, WireI, CC, BC>(
+                        core_ctx: &mut CC,
+                        bindings_ctx: &mut BC,
+                        id: &TcpSocketId<SockI, CC::WeakDeviceId, BC>,
+                        conn: &mut Connection<SockI, WireI, CC::WeakDeviceId, BC>,
+                        addr: &ConnAddr<
+                            ConnIpAddr<<WireI as Ip>::Addr, NonZeroU16, NonZeroU16>,
+                            CC::WeakDeviceId,
+                        >,
+                    ) -> Result<(), NoConnection>
+                    where
+                        SockI: DualStackIpExt,
+                        WireI: DualStackIpExt,
+                        BC: TcpBindingsContext<SockI, CC::WeakDeviceId>,
+                        CC: TransportIpContext<WireI, BC>
+                            + TcpDemuxContext<WireI, CC::WeakDeviceId, BC>,
+                    {
+                        match conn.state.close(CloseReason::Shutdown, &conn.socket_options) {
+                            Ok(()) => {
+                                do_send_inner(id, conn, addr, core_ctx, bindings_ctx);
+                                Ok(())
+                            }
+                            Err(CloseError::NoConnection) => Err(NoConnection),
+                            Err(CloseError::Closing) => Ok(()),
                         }
-                        match maybe_listener {
-                            MaybeListener::Bound(_) => return Err(NoConnection),
-                            MaybeListener::Listener(_) => {}
+                    }
+                    match core_ctx {
+                        MaybeDualStack::NotDualStack((core_ctx, converter)) => {
+                            let (conn, addr) = converter.convert(conn);
+                            do_shutdown(core_ctx, bindings_ctx, id, conn, addr)?
+                        },
+                        MaybeDualStack::DualStack((core_ctx, converter)) => match converter.convert(conn) {
+                            EitherStack::ThisStack((conn, addr)) => do_shutdown(core_ctx, bindings_ctx, id, conn, addr)?,
+                            EitherStack::OtherStack((conn, addr)) => do_shutdown(core_ctx, bindings_ctx, id, conn, addr)?,
                         }
+                    };
+                    Ok((true, None))
+                }
+                TcpSocketState::Bound(BoundSocketState::Listener((
+                    maybe_listener,
+                    sharing,
+                    addr,
+                ))) => {
+                    let (core_ctx, _converter) = core_ctx.into_single_stack();
+                    if !shutdown_receive {
+                        return Ok((false, None));
+                    }
+                    match maybe_listener {
+                        MaybeListener::Bound(_) => return Err(NoConnection),
+                        MaybeListener::Listener(_) => {}
+                    }
 
-                        let new_sharing = {
-                            let ListenerSharingState { sharing, listening } = sharing;
+                    let new_sharing =
+                        core_ctx.with_demux_mut(|DemuxState { socketmap, .. }| {
+                            let entry = socketmap
+                                .listeners_mut()
+                                .entry(id, addr)
+                                .expect("invalid listener ID");
+                            let ListenerSharingState { sharing: _, listening } = sharing;
                             assert!(*listening, "listener {id:?} is not listening");
-                            ListenerSharingState { listening: false, sharing: sharing.clone() }
-                        };
-                        *sharing = try_update_listener_sharing::<_, C::CoreContext, _>(
-                            core_ctx,
-                            id,
-                            addr,
-                            sharing,
-                            new_sharing,
-                        )
-                        .unwrap_or_else(|e| {
-                            unreachable!(
-                                "downgrading a TCP listener to bound should not fail, got {e:?}"
-                            )
+                            let new_sharing =
+                                ListenerSharingState { listening: false, ..sharing.clone() };
+                            match entry.try_update_sharing(sharing, new_sharing.clone()) {
+                                Ok(()) => new_sharing,
+                                Err(e) => {
+                                    unreachable!(
+                                        "downgrading a TCP listener to bound should not fail, got {e:?}"
+                                    )
+                                }
+                            }
                         });
 
-                        let queued_items =
-                            replace_with::replace_with_and(maybe_listener, |maybe_listener| {
-                                let Listener {
-                                    backlog: _,
-                                    accept_queue,
-                                    buffer_sizes,
-                                    socket_options,
-                                } = assert_matches!(maybe_listener,
+                    let queued_items = replace_with::replace_with_and(
+                        maybe_listener,
+                        |maybe_listener| {
+                        let Listener {
+                            backlog: _,
+                            accept_queue,
+                            buffer_sizes,
+                            socket_options
+                        } = assert_matches!(maybe_listener,
                             MaybeListener::Listener(l) => l, "must be a listener");
-                                let (pending, socket_extra) = accept_queue.close();
-                                let bound_state =
-                                    BoundState { buffer_sizes, socket_options, socket_extra };
-                                (MaybeListener::Bound(bound_state), pending)
-                            });
+                        let (pending, socket_extra) = accept_queue.close();
+                        let bound_state = BoundState { buffer_sizes, socket_options, socket_extra };
+                        (MaybeListener::Bound(bound_state), pending)
+                    });
+                    *sharing = new_sharing;
 
-                        Ok((false, Some(queued_items)))
-                    }
+                    Ok((false, Some(queued_items)))
                 }
-            })?;
+                }
+            },
+        )?;
 
         close_pending_sockets(core_ctx, bindings_ctx, pending.into_iter().flatten());
 
@@ -2655,19 +2385,8 @@ where
                 }
                 TcpSocketState::Bound(BoundSocketState::Listener((_listener, _sharing, addr))) => {
                     core_ctx.with_demux_mut(move |DemuxState { socketmap, .. }| {
-                        // TODO(https://fxbug.dev/42085913): Support dual stack
-                        // sockets.
-                        let this_stack_addr = try_into_this_stack_listener_addr::<
-                            I,
-                            C::BindingsContext,
-                            C::CoreContext,
-                        >(addr, &converter)
-                        .ok_or(SetDeviceError::DualStackNotSupported)?;
-                        let entry = socketmap
-                            .listeners_mut()
-                            .entry(&I::into_demux_socket_id(id.clone()), this_stack_addr)
-                            .expect("invalid ID");
-                        let ListenerAddr { device: old_device, ip: ip_addr } = this_stack_addr;
+                        let entry = socketmap.listeners_mut().entry(&id, addr).expect("invalid ID");
+                        let ListenerAddr { device: old_device, ip: ip_addr } = addr;
                         let ListenerIpAddr { identifier: _, addr: ip } = ip_addr;
 
                         if !crate::socket::can_device_change(
@@ -2682,14 +2401,7 @@ where
                         let ip = *ip_addr;
                         match entry.try_update_addr(ListenerAddr { device: weak_device, ip }) {
                             Ok(entry) => {
-                                *addr = match converter {
-                                    MaybeDualStack::NotDualStack(converter) => {
-                                        converter.convert_back(entry.get_addr().clone())
-                                    }
-                                    MaybeDualStack::DualStack(converter) => converter.convert_back(
-                                        EitherStack::ThisStack(entry.get_addr().clone()),
-                                    ),
-                                };
+                                *addr = entry.get_addr().clone();
                                 Ok(())
                             }
                             Err((ExistsError, _entry)) => Err(SetDeviceError::Conflict),
@@ -2708,11 +2420,50 @@ where
         self.core_ctx().with_socket_and_converter(id, |socket_state, _converter| match socket_state
         {
             TcpSocketState::Unbound(unbound) => SocketInfo::Unbound(unbound.into()),
-            TcpSocketState::Bound(BoundSocketState::Connected((conn_and_addr, _sharing))) => {
-                SocketInfo::Connection(I::get_conn_info(conn_and_addr))
+            TcpSocketState::Bound(BoundSocketState::Connected((conn, _sharing))) => {
+                #[derive(GenericOverIp)]
+                #[generic_over_ip(I, Ip)]
+                struct WrapIn<'a, I: DualStackIpExt, D: WeakId, BT: TcpBindingsTypes>(
+                    &'a I::ConnectionAndAddr<D, BT>,
+                );
+                #[derive(GenericOverIp)]
+                #[generic_over_ip(A, IpAddress)]
+                struct WrapOut<A: IpAddress, D>(ConnectionInfo<A, D>);
+                let WrapOut(conn_info) = I::map_ip(
+                    WrapIn(conn),
+                    |WrapIn(single_stack_state)| {
+                        let (_, v4_addr) = single_stack_state;
+                        WrapOut(v4_addr.clone().into())
+                    },
+                    |WrapIn(dual_stack_state)| match dual_stack_state {
+                        EitherStack::ThisStack((_, v6_addr)) => WrapOut(v6_addr.clone().into()),
+                        EitherStack::OtherStack((_, v4_addr)) => {
+                            let ConnAddr {
+                                ip:
+                                    ConnIpAddr {
+                                        local: (local_ip, local_port),
+                                        remote: (remote_ip, remote_port),
+                                    },
+                                device,
+                            } = v4_addr;
+                            WrapOut(ConnectionInfo {
+                                local_addr: SocketAddr {
+                                    ip: maybe_zoned(local_ip.addr().to_ipv6_mapped(), device),
+                                    port: *local_port,
+                                },
+                                remote_addr: SocketAddr {
+                                    ip: maybe_zoned(remote_ip.addr().to_ipv6_mapped(), device),
+                                    port: *remote_port,
+                                },
+                                device: device.clone(),
+                            })
+                        }
+                    },
+                );
+                SocketInfo::Connection(conn_info)
             }
             TcpSocketState::Bound(BoundSocketState::Listener((_listener, _sharing, addr))) => {
-                SocketInfo::Bound(I::get_bound_info(addr))
+                SocketInfo::Bound(addr.clone().into())
             }
         })
     }
@@ -2967,6 +2718,7 @@ where
             false => SharingState::Exclusive,
         };
         self.core_ctx().with_socket_mut_transport_demux(id, |core_ctx, socket_state| {
+            let (core_ctx, _converter) = core_ctx.into_single_stack();
             match socket_state {
                 TcpSocketState::Unbound(unbound) => {
                     unbound.sharing = new_sharing;
@@ -2976,24 +2728,22 @@ where
                     _listener,
                     old_sharing,
                     addr,
-                ))) => {
-                    if new_sharing == old_sharing.sharing {
+                ))) => core_ctx.with_demux_mut(|DemuxState { socketmap, .. }| {
+                    let ListenerSharingState { listening, sharing } = *old_sharing;
+                    let entry =
+                        socketmap.listeners_mut().entry(&id, addr).expect("invalid socket ID");
+                    if new_sharing == sharing {
                         return Ok(());
                     }
-                    let new_sharing = {
-                        let ListenerSharingState { sharing: _, listening } = old_sharing;
-                        ListenerSharingState { sharing: new_sharing, listening: *listening }
-                    };
-                    *old_sharing = try_update_listener_sharing::<_, C::CoreContext, _>(
-                        core_ctx,
-                        id,
-                        addr,
-                        old_sharing,
-                        new_sharing,
-                    )
-                    .map_err(|UpdateSharingError| SetReuseAddrError::AddrInUse)?;
-                    Ok(())
-                }
+                    let new_sharing = ListenerSharingState { listening, sharing: new_sharing };
+                    match entry.try_update_sharing(old_sharing, new_sharing.clone()) {
+                        Ok(()) => {
+                            *old_sharing = new_sharing;
+                            Ok(())
+                        }
+                        Err(UpdateSharingError) => Err(SetReuseAddrError::AddrInUse),
+                    }
+                }),
                 TcpSocketState::Bound(BoundSocketState::Connected(_)) => {
                     // TODO(https://fxbug.dev/42180094): Support setting the option
                     // for connection sockets.
@@ -3165,18 +2915,11 @@ where
             let stats: Option<SocketStats<I, _>> = match socket_state {
                 TcpSocketState::Unbound(_) => Some(SocketStats { local: None, remote: None }),
                 TcpSocketState::Bound(BoundSocketState::Listener((_state, _sharing, addr))) => {
-                    let Some(ListenerAddr { ip: ListenerIpAddr { identifier, addr }, ref device }) =
-                        try_into_this_stack_listener_addr::<I, C::BindingsContext, C::CoreContext>(
-                            addr, &converter,
-                        )
-                    else {
-                        // TODO(https://fxbug.dev/42085913): Support dual
-                        // stack sockets.
-                        return;
-                    };
+                    let ListenerAddr { ip: ListenerIpAddr { identifier, addr }, ref device } =
+                        *addr;
                     let local = addr.map(|addr| SocketAddr {
                         ip: maybe_zoned(*addr.as_ref(), device),
-                        port: *identifier,
+                        port: identifier,
                     });
                     Some(SocketStats { local, remote: None })
                 }
@@ -3324,87 +3067,39 @@ fn close_pending_sockets<I, CC, BC>(
     for conn_id in pending {
         let _: Option<BC::Instant> = bindings_ctx.cancel_timer(conn_id.downgrade());
         core_ctx.with_socket_mut_transport_demux(&conn_id, |core_ctx, socket_state| {
-            let conn_and_addr = assert_matches!(
+            let (core_ctx, converter)= core_ctx.into_single_stack();
+            let (conn, conn_addr) = assert_matches!(
                 socket_state,
-                TcpSocketState::Bound(BoundSocketState::Connected((conn_and_addr, _sharing))) => conn_and_addr,
-                "invalid socket ID"
+                TcpSocketState::Bound(BoundSocketState::Connected((conn, _sharing))) => match converter {
+                    MaybeDualStack::NotDualStack(nds) => nds.convert(conn),
+                    // TODO(https://fxbug.dev/42085913): The assertion is fine
+                    // because we don't have dual stack listeners.
+                    MaybeDualStack::DualStack(ds) => assert_matches!(ds.convert(conn), EitherStack::ThisStack(conn) => conn),
+                }
             );
-            let this_or_other_stack = match core_ctx {
-                MaybeDualStack::NotDualStack((core_ctx, converter)) => {
-                    let (conn, addr) = converter.convert(conn_and_addr);
-                    EitherStack::ThisStack((
-                        core_ctx.as_this_stack(),
-                        I::into_demux_socket_id(conn_id.clone()),
-                        &mut conn.state,
-                        &conn.ip_sock,
-                        addr.clone(),
-                    ))
-                },
-                MaybeDualStack::DualStack((core_ctx, converter)) => match converter.convert(conn_and_addr) {
-                    EitherStack::ThisStack((conn, addr)) => {
-                        EitherStack::ThisStack((
-                            core_ctx.as_this_stack(),
-                            I::into_demux_socket_id(conn_id.clone()),
-                            &mut conn.state,
-                            &conn.ip_sock,
-                            addr.clone(),
-                        ))
-                    }
-                    EitherStack::OtherStack((conn, addr)) => {
-                        let other_demux_id = core_ctx.into_other_demux_socket_id(conn_id.clone());
-                        EitherStack::OtherStack((
-                            core_ctx,
-                            other_demux_id,
-                            &mut conn.state,
-                            &conn.ip_sock,
-                            addr.clone(),
-                        ))
-                    }
-                }
-            };
+            core_ctx.with_demux_mut(|DemuxState { socketmap, .. }| {
+                assert_matches!(
+                    socketmap
+                        .conns_mut()
+                        .remove(&I::into_demux_socket_id(conn_id.clone()), &conn_addr),
+                    Ok(())
+                );
+            });
 
-            match this_or_other_stack {
-                EitherStack::ThisStack((core_ctx, demux_id, state, ip_sock, conn_addr)) => {
-                    close_pending_socket(core_ctx, bindings_ctx, &demux_id, state, ip_sock, &conn_addr)
-                }
-                EitherStack::OtherStack((core_ctx, demux_id, state, ip_sock, conn_addr)) => {
-                    close_pending_socket(core_ctx, bindings_ctx, &demux_id, state, ip_sock, &conn_addr)
-                }
+            if let Some(reset) = conn.state.abort() {
+                let ConnAddr { ip, device: _ } = conn_addr;
+                let ser = tcp_serialize_segment(reset, *ip);
+                core_ctx.send_ip_packet(bindings_ctx, &conn.ip_sock, ser, None).unwrap_or_else(
+                    |(body, err)| {
+                        debug!(
+                            "failed to reset connection to {:?}, body: {:?}, err: {:?}",
+                            ip, body, err
+                        )
+                    },
+                );
             }
         });
         destroy_socket(core_ctx, bindings_ctx, conn_id);
-    }
-}
-
-fn close_pending_socket<WireI, DC, BT>(
-    core_ctx: &mut DC,
-    bindings_ctx: &mut BT,
-    demux_id: &WireI::DemuxSocketId<DC::WeakDeviceId, BT>,
-    state: &mut State<
-        BT::Instant,
-        BT::ReceiveBuffer,
-        BT::SendBuffer,
-        BT::ListenerNotifierOrProvidedBuffers,
-    >,
-    ip_sock: &IpSock<WireI, DC::WeakDeviceId, DefaultSendOptions>,
-    conn_addr: &ConnAddr<ConnIpAddr<WireI::Addr, NonZeroU16, NonZeroU16>, DC::WeakDeviceId>,
-) where
-    WireI: DualStackIpExt,
-    DC: TransportIpContext<WireI, BT>
-        + DeviceIpSocketHandler<WireI, BT>
-        + TcpDemuxContext<WireI, DC::WeakDeviceId, BT>,
-    BT: TcpBindingsTypes,
-{
-    core_ctx.with_demux_mut(|DemuxState { socketmap, .. }| {
-        assert_matches!(socketmap.conns_mut().remove(demux_id, conn_addr), Ok(()));
-    });
-
-    if let Some(reset) = state.abort() {
-        let ConnAddr { ip, device: _ } = conn_addr;
-        let ser = tcp_serialize_segment(reset, *ip);
-        core_ctx.send_ip_packet(bindings_ctx, ip_sock, ser, None).unwrap_or_else(|(body, err)| {
-            debug!("failed to reset connection to {:?}, body: {:?}, err: {:?}", ip, body, err)
-        });
     }
 }
 
@@ -3684,7 +3379,10 @@ fn connect_inner<CC, BC, SockI, WireI>(
     demux_id: &WireI::DemuxSocketId<CC::WeakDeviceId, BC>,
     isn: &IsnGenerator<BC::Instant>,
     listener_addr: Option<ListenerAddr<ListenerIpAddr<WireI::Addr, NonZeroU16>, CC::WeakDeviceId>>,
+    local_ip: Option<SocketIpAddr<WireI::Addr>>,
     remote_ip: ZonedAddr<SocketIpAddr<WireI::Addr>, CC::DeviceId>,
+    bound_device: Option<CC::WeakDeviceId>,
+    local_port: Option<NonZeroU16>,
     remote_port: NonZeroU16,
     netstack_buffers: BC::ListenerNotifierOrProvidedBuffers,
     buffer_sizes: BufferSizes,
@@ -3705,9 +3403,6 @@ where
         + DeviceIpSocketHandler<WireI, BC>
         + TcpDemuxContext<WireI, CC::WeakDeviceId, BC>,
 {
-    let local_ip = listener_addr.as_ref().and_then(|la| la.ip.addr);
-    let bound_device = listener_addr.as_ref().and_then(|la| la.device.clone());
-    let local_port = listener_addr.as_ref().map(|la| la.ip.identifier);
     let (remote_ip, device) = crate::transport::resolve_addr_with_device::<WireI::Addr, _, _, _>(
         remote_ip,
         bound_device,
@@ -3717,7 +3412,7 @@ where
         .new_ip_socket(
             bindings_ctx,
             device.as_ref().map(|d| d.as_ref()),
-            local_ip,
+            local_ip.map(SocketIpAddr::into),
             remote_ip,
             IpProto::Tcp.into(),
             DefaultSendOptions,
@@ -3767,9 +3462,12 @@ where
         // If we managed to install ourselves in the demux, we need to remove
         // the previous listening form if any.
         if let Some(listener_addr) = listener_addr {
+            // TODO(https://fxbug.dev/42085913): This assertion is OK because we
+            // don't have dual stack listeners.
+            let id = assert_matches!(WireI::as_dual_stack_ip_socket(demux_id), EitherStack::ThisStack(id) => id);
             socketmap
                 .listeners_mut()
-                .remove(&demux_id, &listener_addr)
+                .remove(id, &listener_addr)
                 .expect("failed to remove a bound socket");
         }
 
@@ -4599,9 +4297,11 @@ mod tests {
     impl<D: FakeStrongDeviceId, BT: TcpBindingsTypes + IpSocketBindingsContext>
         TcpDualStackContext<Ipv6> for TcpCoreCtx<D, BT>
     {
-        type Converter = Ipv6SocketIdToIpv4DemuxIdConverter;
-        fn other_demux_id_converter(&self) -> Ipv6SocketIdToIpv4DemuxIdConverter {
-            Ipv6SocketIdToIpv4DemuxIdConverter
+        fn into_other_demux_socket_id<D2: device::WeakId, BT2: TcpBindingsTypes>(
+            &self,
+            id: TcpSocketId<Ipv6, D2, BT2>,
+        ) -> <Ipv4 as DualStackIpExt>::DemuxSocketId<D2, BT2> {
+            EitherStack::OtherStack(id)
         }
     }
 
@@ -7006,14 +6706,10 @@ mod tests {
         let mut net = new_test_net::<Ipv4>();
         let backlog = NonZeroUsize::new(1).unwrap();
         let server = net.with_context(REMOTE, |ctx| {
-            let mut api = ctx.tcp_api::<Ipv6>();
+            let mut api = ctx.tcp_api::<Ipv4>();
             let server = api.create(Default::default());
-            api.bind(
-                &server,
-                Some(ZonedAddr::Unzoned((*Ipv4::FAKE_CONFIG.remote_ip).to_ipv6_mapped())),
-                Some(PORT_1),
-            )
-            .expect("failed to bind the server socket");
+            api.bind(&server, Some(ZonedAddr::Unzoned(Ipv4::FAKE_CONFIG.remote_ip)), Some(PORT_1))
+                .expect("failed to bind the server socket");
             api.listen(&server, backlog).expect("can listen");
             server
         });
@@ -7035,7 +6731,7 @@ mod tests {
         net.run_until_idle();
         let (accepted, addr, accepted_ends) = net
             .with_context(REMOTE, |ctx| ctx.tcp_api().accept(&server).expect("failed to accept"));
-        assert_eq!(addr.ip, ZonedAddr::Unzoned((*Ipv4::FAKE_CONFIG.local_ip).to_ipv6_mapped()));
+        assert_eq!(addr.ip, ZonedAddr::Unzoned(Ipv4::FAKE_CONFIG.local_ip));
 
         let ClientBuffers { send: client_snd_end, receive: client_rcv_end } =
             client_ends.0.as_ref().lock().take().unwrap();
