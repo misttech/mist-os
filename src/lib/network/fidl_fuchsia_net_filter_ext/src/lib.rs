@@ -11,8 +11,7 @@
 //! is evolved in order to enforce that it is updated along with the FIDL
 //! library itself.
 
-use std::collections::HashMap;
-use std::fmt::Debug;
+use std::{collections::HashMap, fmt::Debug, ops::RangeInclusive};
 
 use async_utils::fold::FoldWhile;
 use fidl::marker::SourceBreaking;
@@ -484,17 +483,16 @@ impl TryFrom<fnet_filter::InterfaceMatcher> for InterfaceMatcher {
 /// numerical big-endian representation of the IP address.)
 #[derive(Debug, Clone, PartialEq)]
 pub struct AddressRange {
-    start: fnet::IpAddress,
-    end: fnet::IpAddress,
+    range: RangeInclusive<fnet::IpAddress>,
 }
 
 impl AddressRange {
-    pub fn start(&self) -> fnet::IpAddress {
-        self.start
+    fn start(&self) -> fnet::IpAddress {
+        *self.range.start()
     }
 
-    pub fn end(&self) -> fnet::IpAddress {
-        self.end
+    fn end(&self) -> fnet::IpAddress {
+        *self.range.end()
     }
 }
 
@@ -517,7 +515,7 @@ impl TryFrom<fnet_filter::AddressRange> for AddressRange {
                 if u32::from_be_bytes(start_bytes) > u32::from_be_bytes(end_bytes) {
                     Err(FidlConversionError::InvalidAddressRange)
                 } else {
-                    Ok(Self { start, end })
+                    Ok(Self { range: start..=end })
                 }
             }
             (
@@ -527,7 +525,7 @@ impl TryFrom<fnet_filter::AddressRange> for AddressRange {
                 if u128::from_be_bytes(start_bytes) > u128::from_be_bytes(end_bytes) {
                     Err(FidlConversionError::InvalidAddressRange)
                 } else {
-                    Ok(Self { start, end })
+                    Ok(Self { range: start..=end })
                 }
             }
             _ => Err(FidlConversionError::AddressRangeFamilyMismatch),
@@ -593,8 +591,7 @@ impl TryFrom<fnet_filter::AddressMatcher> for AddressMatcher {
 /// This type witnesses to the invariant that `start <= end`.
 #[derive(Debug, Clone, PartialEq)]
 pub struct PortMatcher {
-    start: u16,
-    end: u16,
+    range: RangeInclusive<u16>,
     pub invert: bool,
 }
 
@@ -610,22 +607,22 @@ impl PortMatcher {
         if start > end {
             return Err(PortMatcherError::InvalidPortRange);
         }
-        Ok(Self { start, end, invert })
+        Ok(Self { range: start..=end, invert })
     }
 
     pub fn start(&self) -> u16 {
-        self.start
+        *self.range.start()
     }
 
     pub fn end(&self) -> u16 {
-        self.end
+        *self.range.end()
     }
 }
 
 impl From<PortMatcher> for fnet_filter::PortMatcher {
     fn from(matcher: PortMatcher) -> Self {
-        let PortMatcher { start, end, invert } = matcher;
-        Self { start, end, invert }
+        let PortMatcher { range, invert } = matcher;
+        Self { start: *range.start(), end: *range.end(), invert }
     }
 }
 
@@ -637,7 +634,7 @@ impl TryFrom<fnet_filter::PortMatcher> for PortMatcher {
         if start > end {
             return Err(FidlConversionError::InvalidPortRange);
         }
-        Ok(Self { start, end, invert })
+        Ok(Self { range: start..=end, invert })
     }
 }
 
@@ -1512,8 +1509,7 @@ mod tests {
             end: fidl_ip!("192.0.2.1"),
         },
         AddressRange {
-            start: fidl_ip!("192.0.2.0"),
-            end: fidl_ip!("192.0.2.1"),
+            range: fidl_ip!("192.0.2.0")..=fidl_ip!("192.0.2.1"),
         };
         "AddressRange"
     )]
@@ -1524,7 +1520,7 @@ mod tests {
             ..Default::default()
         }),
         TransportProtocolMatcher::Udp {
-            src_port: Some(PortMatcher { start: 1024, end: u16::MAX, invert: false }),
+            src_port: Some(PortMatcher { range: 1024..=u16::MAX, invert: false }),
             dst_port: None,
         };
         "TransportProtocol"
@@ -1543,7 +1539,7 @@ mod tests {
             in_interface: Some(InterfaceMatcher::Name(String::from("wlan"))),
             transport_protocol: Some(TransportProtocolMatcher::Tcp {
                 src_port: None,
-                dst_port: Some(PortMatcher { start: 22, end: 22, invert: false }),
+                dst_port: Some(PortMatcher { range: 22..=22, invert: false }),
             }),
             ..Default::default()
         };
@@ -2179,7 +2175,8 @@ mod tests {
                 },
                 matchers: Matchers {
                     transport_protocol: Some(TransportProtocolMatcher::Tcp {
-                        src_port: Some(PortMatcher { start: u16::MAX, end: 0, invert: false }),
+                        #[allow(clippy::reversed_empty_ranges)]
+                        src_port: Some(PortMatcher { range: u16::MAX..=0, invert: false }),
                         dst_port: None,
                     }),
                     ..Default::default()
