@@ -41,11 +41,24 @@ macro_rules! enumerable_enum {
 }
 
 enumerable_enum! {
-    /// A well-known class in SELinux policy that has a particular meaning in policy enforcement hooks.
+    /// A well-known class in SELinux policy that has a particular meaning in policy enforcement
+    /// hooks.
     #[derive(Clone, Debug, Eq, Hash, PartialEq)]
     ObjectClass {
         /// The SELinux "process" object class.
         Process,
+        /// The SELinux "file" object class.
+        File,
+        /// The SELinux "blk_file" object class.
+        Block,
+        /// The SELinux "chr_file" object class.
+        Character,
+        /// The SELinux "lnk_file" object class.
+        Link,
+        /// The SELinux "fifo_file" object class.
+        Fifo,
+        /// The SELinux "sock_file" object class.
+        Socket,
     }
 }
 
@@ -53,6 +66,12 @@ impl ObjectClass {
     pub fn name(&self) -> &'static str {
         match self {
             Self::Process => "process",
+            Self::File => "file",
+            Self::Block => "blk_file",
+            Self::Character => "chr_file",
+            Self::Link => "lnk_file",
+            Self::Fifo => "fifo_file",
+            Self::Socket => "sock_file",
         }
     }
 }
@@ -66,6 +85,39 @@ impl From<ObjectClass> for AbstractObjectClass {
 impl From<String> for AbstractObjectClass {
     fn from(name: String) -> Self {
         Self::Custom(name)
+    }
+}
+
+enumerable_enum! {
+    /// A well-known file-like class in SELinux policy that has a particular meaning in policy
+    /// enforcement hooks.
+    #[derive(Clone, Debug, Eq, Hash, PartialEq)]
+    FileClass {
+        /// The SELinux "file" object class.
+        File,
+        /// The SELinux "blk_file" object class.
+        Block,
+        /// The SELinux "chr_file" object class.
+        Character,
+        /// The SELinux "lnk_file" object class.
+        Link,
+        /// The SELinux "fifo_file" object class.
+        Fifo,
+        /// The SELinux "sock_file" object class.
+        Socket,
+    }
+}
+
+impl From<FileClass> for ObjectClass {
+    fn from(file_class: FileClass) -> Self {
+        match file_class {
+            FileClass::File => Self::File,
+            FileClass::Block => Self::Block,
+            FileClass::Character => Self::Character,
+            FileClass::Link => Self::Link,
+            FileClass::Fifo => Self::Fifo,
+            FileClass::Socket => Self::Socket,
+        }
     }
 }
 

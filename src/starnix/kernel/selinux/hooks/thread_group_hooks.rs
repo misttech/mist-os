@@ -153,9 +153,8 @@ mod tests {
     use super::*;
     use selinux::security_server::Mode;
 
-    const SELINUX_TESTSUITE_BINARY_POLICY: &[u8] = include_bytes!(
-        "../../../lib/selinux/testdata/micro_policies/process_fork_transition_policy.pp"
-    );
+    const HOOKS_TESTS_BINARY_POLICY: &[u8] =
+        include_bytes!("../../../lib/selinux/testdata/micro_policies/hooks_tests_policy.pp");
 
     #[fuchsia::test]
     fn task_create_access_allowed_for_fake_mode() {
@@ -191,7 +190,7 @@ mod tests {
 
     #[fuchsia::test]
     fn task_create_access_allowed_for_allowed_type() {
-        let policy_bytes = SELINUX_TESTSUITE_BINARY_POLICY.to_vec();
+        let policy_bytes = HOOKS_TESTS_BINARY_POLICY.to_vec();
         let security_server = SecurityServer::new(Mode::Enable);
         security_server.set_enforcing(true);
         security_server.load_policy(policy_bytes).expect("policy load failed");
@@ -220,7 +219,7 @@ mod tests {
 
     #[fuchsia::test]
     fn task_create_access_denied_for_denied_type() {
-        let policy_bytes = SELINUX_TESTSUITE_BINARY_POLICY.to_vec();
+        let policy_bytes = HOOKS_TESTS_BINARY_POLICY.to_vec();
         let security_server = SecurityServer::new(Mode::Enable);
         security_server.set_enforcing(true);
         security_server.load_policy(policy_bytes).expect("policy load failed");
@@ -281,7 +280,7 @@ mod tests {
 
     #[fuchsia::test]
     fn exec_access_allowed_for_allowed_type() {
-        let policy_bytes = SELINUX_TESTSUITE_BINARY_POLICY.to_vec();
+        let policy_bytes = HOOKS_TESTS_BINARY_POLICY.to_vec();
         let security_server = SecurityServer::new(Mode::Enable);
         security_server.set_enforcing(true);
         security_server.load_policy(policy_bytes).expect("policy load failed");
@@ -315,7 +314,7 @@ mod tests {
 
     #[fuchsia::test]
     fn exec_access_denied_for_denied_type() {
-        let policy_bytes = SELINUX_TESTSUITE_BINARY_POLICY.to_vec();
+        let policy_bytes = HOOKS_TESTS_BINARY_POLICY.to_vec();
         let security_server = SecurityServer::new(Mode::Enable);
         security_server.set_enforcing(true);
         security_server.load_policy(policy_bytes).expect("policy load failed");

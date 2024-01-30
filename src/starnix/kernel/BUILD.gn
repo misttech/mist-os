@@ -424,7 +424,9 @@ rustc_library("starnix_core") {
   if (starnix_enable_alternate_anon_allocs) {
     features += [ "alternate_anon_allocs" ]
   }
-  inputs = [ "//src/starnix/lib/selinux/testdata/micro_policies/process_fork_transition_policy.pp" ]
+  inputs = [
+    "//src/starnix/lib/selinux/testdata/micro_policies/hooks_tests_policy.pp",
+  ]
   configs += [ "//src/starnix/config:starnix_clippy_lints" ]
 }
 

@@ -77,3 +77,8 @@ pub enum QueryError {
     #[error("the target type {target_type_name:?} does not exist")]
     UnknownTargetType { target_type_name: String },
 }
+
+/// Structured errors that may be encountered computing new security contexts based on a binary
+/// policy.
+#[derive(Debug, Error, PartialEq)]
+pub enum NewSecurityContextError {}

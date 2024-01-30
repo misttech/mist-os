@@ -13,7 +13,7 @@ mod extensible_bitmap;
 mod symbols;
 
 use {
-    error::{ParseError, QueryError},
+    error::{NewSecurityContextError, ParseError, QueryError},
     index::PolicyIndex,
     metadata::HandleUnknown,
     parsed_policy::ParsedPolicy,
@@ -23,7 +23,9 @@ use {
 use anyhow::Context as _;
 use once_cell::sync::Lazy;
 use parser::ByValue;
-use selinux_common::{self as sc, ClassPermission as _};
+use selinux_common::{
+    self as sc, security_context::SecurityContext, ClassPermission as _, FileClass,
+};
 use std::{collections::BTreeMap, fmt::Debug, marker::PhantomData, ops::Deref};
 use zerocopy::{little_endian as le, ByteSlice, FromBytes, NoCell, Ref, Unaligned};
 
@@ -169,6 +171,19 @@ impl<PS: ParseStrategy> Policy<PS> {
     /// policy.
     pub fn handle_unknown(&self) -> &HandleUnknown {
         self.0.parsed_policy().handle_unknown()
+    }
+
+    /// Returns the the security context that should be applied to a newly created file-like SELinux
+    /// object according to `source` and `target` security contexts, as well as the new object's
+    /// `class`. Returns an error if the security context for such an object is not well-defined
+    /// by this [`Policy`].
+    pub fn new_file_security_context(
+        &self,
+        _source: &SecurityContext,
+        _target: &SecurityContext,
+        _class: &FileClass,
+    ) -> Result<SecurityContext, NewSecurityContextError> {
+        todo!("Implement computing security contexts for newly created file-like objects");
     }
 
     /// Returns whether the input types are explicitly granted `permission` via an `allow [...];`
