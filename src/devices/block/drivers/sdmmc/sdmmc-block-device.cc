@@ -32,7 +32,7 @@ constexpr uint32_t kBootSizeMultiplier = 128 * 1024;
 
 namespace sdmmc {
 
-fdf::Logger& ReadWriteMetadata::logger() { return block_device_->logger(); }
+fdf::Logger& ReadWriteMetadata::logger() { return block_device->logger(); }
 
 void SdmmcBlockDevice::BlockComplete(sdmmc::BlockOperation& txn, zx_status_t status) {
   if (txn.node()->complete_cb()) {
@@ -236,8 +236,8 @@ void SdmmcBlockDevice::StopWorkerDispatcher(std::optional<fdf::PrepareStopComple
   }
 }
 
-void SdmmcBlockDevice::ReadWrite(std::vector<BlockOperation>& btxns, const EmmcPartition partition,
-                                 ReadWriteMetadata::Entry* entry) {
+void SdmmcBlockDevice::ReadWrite(std::vector<BlockOperation>& btxns,
+                                 const EmmcPartition partition) {
   zx_status_t st = SetPartition(partition);
   if (st != ZX_OK) {
     for (auto& btxn : btxns) {
@@ -268,7 +268,7 @@ void SdmmcBlockDevice::ReadWrite(std::vector<BlockOperation>& btxns, const EmmcP
            txn.command.opcode, txn.offset_vmo, total_data_transfer_blocks, btxns.size(),
            block_info_.block_size, block_info_.max_transfer_size);
 
-  sdmmc_buffer_region_t* buffer_region_ptr = entry->buffer_regions.get();
+  sdmmc_buffer_region_t* buffer_region_ptr = readwrite_metadata_.buffer_regions.get();
   std::vector<sdmmc_req_t> reqs;
   if (!command_packing) {
     // TODO(https://fxbug.dev/42076962): Consider using SDMMC_CMD_AUTO23, which is likely to enhance
@@ -295,15 +295,16 @@ void SdmmcBlockDevice::ReadWrite(std::vector<BlockOperation>& btxns, const EmmcP
     });
   } else {
     // Form packed command header (section 6.6.29.1, eMMC standard 5.1)
-    entry->packed_command_header_data->rw = is_read ? 1 : 2;
+    readwrite_metadata_.packed_command_header_data->rw = is_read ? 1 : 2;
     // Safe because btxns.size() <= kMaxPackedCommandsFor512ByteBlockSize.
-    entry->packed_command_header_data->num_entries = safemath::checked_cast<uint8_t>(btxns.size());
+    readwrite_metadata_.packed_command_header_data->num_entries =
+        safemath::checked_cast<uint8_t>(btxns.size());
 
     // TODO(https://fxbug.dev/42083080): Consider pre-registering the packed command header VMO with
     // the SDMMC driver to avoid pinning and unpinning for each transfer. Also handle the cache ops
     // here.
     *buffer_region_ptr = {
-        .buffer = {.vmo = entry->packed_command_header_vmo.get()},
+        .buffer = {.vmo = readwrite_metadata_.packed_command_header_vmo.get()},
         .type = SDMMC_BUFFER_TYPE_VMO_HANDLE,
         .offset = 0,
         .size = block_info_.block_size,
@@ -312,8 +313,9 @@ void SdmmcBlockDevice::ReadWrite(std::vector<BlockOperation>& btxns, const EmmcP
     buffer_region_ptr++;
     for (size_t i = 0; i < btxns.size(); i++) {
       const block_read_write_t& rw = btxns[i].operation()->rw;
-      entry->packed_command_header_data->arg[i].cmd23_arg = rw.length;
-      entry->packed_command_header_data->arg[i].cmdXX_arg = static_cast<uint32_t>(rw.offset_dev);
+      readwrite_metadata_.packed_command_header_data->arg[i].cmd23_arg = rw.length;
+      readwrite_metadata_.packed_command_header_data->arg[i].cmdXX_arg =
+          static_cast<uint32_t>(rw.offset_dev);
 
       *buffer_region_ptr = {
           .buffer = {.vmo = rw.vmo},
@@ -339,7 +341,7 @@ void SdmmcBlockDevice::ReadWrite(std::vector<BlockOperation>& btxns, const EmmcP
           .cmd_flags = SDMMC_WRITE_MULTIPLE_BLOCK_FLAGS,
           .arg = static_cast<uint32_t>(txn.offset_dev),
           .blocksize = block_info_.block_size,
-          .buffers_list = entry->buffer_regions.get(),
+          .buffers_list = readwrite_metadata_.buffer_regions.get(),
           .buffers_count = 1,  // 1 header block.
       });
     }
@@ -357,14 +359,13 @@ void SdmmcBlockDevice::ReadWrite(std::vector<BlockOperation>& btxns, const EmmcP
         .cmd_flags = cmd_flags,
         .arg = static_cast<uint32_t>(txn.offset_dev),
         .blocksize = block_info_.block_size,
-        .buffers_list = is_read ? entry->buffer_regions.get() + 1 : entry->buffer_regions.get(),
+        .buffers_list = is_read ? readwrite_metadata_.buffer_regions.get() + 1
+                                : readwrite_metadata_.buffer_regions.get(),
         .buffers_count = is_read ? btxns.size() : btxns.size() + 1,  // +1 for header block.
     });
   }
 
   auto callback = [this, btxns = std::move(btxns)](zx_status_t status, uint32_t retries) mutable {
-    readwrite_metadata_.DoneWithEntry();
-
     properties_.io_retries_.Add(retries);
     if (status != ZX_OK) {
       FDF_LOGL(ERROR, logger(), "do_txn error: %s", zx_status_get_string(status));
@@ -675,8 +676,6 @@ void SdmmcBlockDevice::HandleBlockOps(block::BorrowedOperationQueue<PartitionInf
 
     zx_status_t status = ZX_ERR_INVALID_ARGS;
     if (op == BLOCK_OPCODE_READ || op == BLOCK_OPCODE_WRITE) {
-      ReadWriteMetadata::Entry* entry = readwrite_metadata_.WaitForEntry();
-
       const char* const trace_name = op == BLOCK_OPCODE_READ ? "read" : "write";
       TRACE_DURATION_BEGIN("sdmmc", trace_name);
 
@@ -689,8 +688,8 @@ void SdmmcBlockDevice::HandleBlockOps(block::BorrowedOperationQueue<PartitionInf
         uint64_t cum_transfer_bytes = (bop.rw.length * block_info_.block_size) +
                                       zx_system_get_page_size();  // +1 page for header block.
         while (btxns.size() < max_command_packing) {
-          // TODO(https://fxbug.dev/42083080): It's inefficient to pop() here only to push() later in
-          // the case of packing ineligibility. Later on, we'll likely move away from using
+          // TODO(https://fxbug.dev/42083080): It's inefficient to pop() here only to push() later
+          // in the case of packing ineligibility. Later on, we'll likely move away from using
           // block::BorrowedOperationQueue once we start using the FIDL driver transport arena (at
           // which point, use something like peek() instead).
           std::optional<BlockOperation> pack_candidate_txn = txn_list.pop();
@@ -713,7 +712,7 @@ void SdmmcBlockDevice::HandleBlockOps(block::BorrowedOperationQueue<PartitionInf
         }
       }
 
-      ReadWrite(btxns, partition, entry);
+      ReadWrite(btxns, partition);
 
       TRACE_DURATION_END("sdmmc", trace_name, "opcode", TA_INT32(bop.rw.command.opcode), "extra",
                          TA_INT32(bop.rw.extra), "length", TA_INT32(bop.rw.length), "offset_vmo",

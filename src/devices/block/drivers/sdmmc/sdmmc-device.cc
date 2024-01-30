@@ -265,6 +265,7 @@ zx_status_t SdmmcDevice::SdmmcWaitForState(uint32_t desired_state) {
   return ZX_ERR_TIMED_OUT;
 }
 
+// TODO(b/300145353): Consider refactoring to avoid recursive calling.
 void SdmmcDevice::SdmmcIoRequestWithRetries(std::vector<sdmmc_req_t> reqs,
                                             fit::function<void(zx_status_t, uint32_t)> callback,
                                             uint32_t retries) {
@@ -297,25 +298,21 @@ void SdmmcDevice::SdmmcIoRequestWithRetries(std::vector<sdmmc_req_t> reqs,
     return callback(wire_req_vector.error_value(), retries);
   }
 
-  client_.buffer(arena)
-      ->Request(*wire_req_vector)
-      .Then([this, reqs = std::move(reqs), callback = std::move(callback), retries, last_retry](
-                fdf::WireUnownedResult<fuchsia_hardware_sdmmc::Sdmmc::Request>& result) mutable {
-        if (!result.ok()) {
-          FDF_LOGL(ERROR, logger(), "Request request failed: %s", result.status_string());
-          return callback(result.status(), retries);  // Not retrying if FIDL error.
-        }
+  auto result = client_.sync().buffer(arena)->Request(*wire_req_vector);
+  if (!result.ok()) {
+    FDF_LOGL(ERROR, logger(), "Request request failed: %s", result.status_string());
+    return callback(result.status(), retries);  // Not retrying if FIDL error.
+  }
 
-        if (result->is_error()) {
-          SdmmcStopForRetry();  // Performed synchronously within this asynchronous context.
-          if (!last_retry) {
-            return SdmmcIoRequestWithRetries(std::move(reqs), std::move(callback), retries + 1);
-          } else {
-            return callback(result->error_value(), retries);
-          }
-        }
-        return callback(ZX_OK, retries);
-      });
+  if (result->is_error()) {
+    SdmmcStopForRetry();
+    if (!last_retry) {
+      return SdmmcIoRequestWithRetries(std::move(reqs), std::move(callback), retries + 1);
+    } else {
+      return callback(result->error_value(), retries);
+    }
+  }
+  return callback(ZX_OK, retries);
 }
 
 void SdmmcDevice::SdmmcStopForRetry() {
