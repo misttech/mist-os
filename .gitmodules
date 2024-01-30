@@ -678,3 +678,13 @@
 	url = https://fuchsia.googlesource.com/third_party/github.com/python/typing_extensions
 	name = third_party/pylibs/typing_extensions
 	ignore = all
+[submodule "third_party/github.com/google/bt-test-interfaces/src"]
+	path = third_party/github.com/google/bt-test-interfaces/src
+	url = https://fuchsia.googlesource.com/third_party/github.com/google/bt-test-interfaces
+	name = third_party/github.com/google/bt-test-interfaces
+	ignore = all
+[submodule "third_party/pypng/src"]
+	path = third_party/pypng/src
+	url = https://fuchsia.googlesource.com/third_party/gitlab.com/drj11/pypng
+	name = third_party/pypng
+	ignore = all
