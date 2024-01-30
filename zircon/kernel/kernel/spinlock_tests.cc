@@ -26,6 +26,22 @@ bool spinlock_lock_unlock() {
   END_TEST;
 }
 
+TA_NO_THREAD_SAFETY_ANALYSIS bool spinlock_trylock() {
+  BEGIN_TEST;
+
+  SpinLock spinlock;
+  InterruptDisableGuard interrupt_guard;
+
+  EXPECT_FALSE(spinlock.TryAcquire(), "TryAcquire");
+  EXPECT_TRUE(spinlock.TryAcquire(), "TryAcquire second time");
+  spinlock.Release();
+
+  EXPECT_FALSE(spinlock.TryAcquire(), "TryAcquire");
+  spinlock.Release();
+
+  END_TEST;
+}
+
 bool spinlock_is_held() {
   BEGIN_TEST;
 
@@ -92,6 +108,7 @@ bool spinlock_assert_held_compile_test() {
 
 UNITTEST_START_TESTCASE(spinlock_tests)
 UNITTEST("spinlock_lock_unlock", spinlock_lock_unlock)
+UNITTEST("spinlock_trylock", spinlock_trylock)
 UNITTEST("spinlock_is_held", spinlock_is_held)
 UNITTEST("spinlock_assert_held", spinlock_assert_held)
 UNITTEST("spinlock_assert_held_compile_test", spinlock_assert_held_compile_test)
