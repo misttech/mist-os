@@ -256,7 +256,7 @@ impl StdinStopper {
             let mut stdin = std::io::stdin();
             let mut buffer = [0u8; 1];
             loop {
-                match stdin.read(&mut buffer) {
+                match stdin.read_exact(&mut buffer) {
                     Ok(_) => {
                         sender.send(()).unwrap();
                         return;
