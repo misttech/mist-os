@@ -9,6 +9,7 @@
 #include <lib/zx/vmar.h>
 #include <lib/zx/vmo.h>
 #include <threads.h>
+#include <unistd.h>
 #include <zircon/syscalls-next.h>
 #include <zircon/syscalls/debug.h>
 #include <zircon/syscalls/exception.h>
@@ -30,6 +31,8 @@ extern "C" zx_status_t restricted_enter_wrapper(uint32_t options, uintptr_t vect
                                                 zx_restricted_reason_t* reason_code);
 extern "C" void store_one();
 extern "C" void wait_then_syscall();
+extern "C" void load_fpu_registers(void* in);
+extern "C" void store_fpu_registers(void* out);
 
 // The normal-mode view of restricted-mode state will change slightly depending on
 // if the exit to normal-mode was caused by a syscall or an exception.
@@ -39,6 +42,10 @@ enum class RegisterMutation {
 };
 
 #if defined(__x86_64__)
+
+// The number of bytes needed to hold the FPU's state.
+// x86 has 8 10-byte registers, followed by 16 16-byte registers.
+static const uint16_t kFpuBufferSize = 8 * 10 + 16 * 16;
 
 class ArchRegisterState {
  public:
@@ -148,6 +155,10 @@ class ArchRegisterState {
 };
 
 #elif defined(__aarch64__)
+
+// The number of bytes needed to hold the FPU's state.
+// ARM has 32 16-byte floating-point registers.
+static const uint16_t kFpuBufferSize = 32 * 16;
 
 class ArchRegisterState {
  public:
@@ -262,6 +273,10 @@ class ArchRegisterState {
 };
 
 #elif defined(__riscv)
+
+// The number of bytes needed to hold the FPU's state.
+// RISC-V has 32 8-byte floating-point registers.
+static const uint16_t kFpuBufferSize = 32 * 8;
 
 class ArchRegisterState {
  public:
@@ -463,6 +478,131 @@ TEST(RestrictedMode, Basic) {
   // Validate that the instruction pointer is right after the syscall instruction.
   EXPECT_EQ((uintptr_t)&syscall_bounce_post_syscall, state.pc());
   state.VerifyTwiddledRestrictedState(RegisterMutation::kFromSyscall);
+}
+
+// Verify that floating point state is saved correctly on context switch.
+TEST(RestrictedMode, FloatingPointState) {
+  const uint32_t kNumRestrictedThreads = 32;
+  const uint32_t kNumFloatingPointThreads = 32;
+  std::atomic_int num_threads_ready = 0;
+  std::atomic_int num_threads_in_rmode = 0;
+  std::atomic_int start_restricted_threads = 0;
+  std::atomic_int exit_restricted_mode = 0;
+  zx_status_t statuses[kNumRestrictedThreads]{};
+  std::vector<std::thread> threads;
+
+  for (uint32_t i = 0; i < kNumRestrictedThreads; i++) {
+    threads.emplace_back(
+        [&exit_restricted_mode, &num_threads_ready, &num_threads_in_rmode,
+         &start_restricted_threads, &statuses](int thread_num) {
+          // Configure the initial register state.
+          zx::vmo vmo;
+          zx_status_t status = zx_restricted_bind_state(0, vmo.reset_and_get_address());
+          if (status != ZX_OK) {
+            statuses[thread_num] = status;
+            return;
+          }
+          auto cleanup = fit::defer([]() { zx_restricted_unbind_state(0); });
+
+          ArchRegisterState state;
+          state.InitializeRegisters();
+          state.set_pc(reinterpret_cast<uint64_t>(wait_then_syscall));
+#if defined(__x86_64__)
+          state.restricted_state().rdi = reinterpret_cast<uint64_t>(&num_threads_in_rmode);
+          state.restricted_state().rsi = reinterpret_cast<uint64_t>(&exit_restricted_mode);
+#elif defined(__aarch64__)  // defined(__x86_64__)
+          state.restricted_state().x[0] = reinterpret_cast<uint64_t>(&num_threads_in_rmode);
+          state.restricted_state().x[1] = reinterpret_cast<uint64_t>(&exit_restricted_mode);
+#elif defined(__riscv)      // defined(__aarch64__)
+          state.restricted_state().a0 = reinterpret_cast<uint64_t>(&num_threads_in_rmode);
+          state.restricted_state().a1 = reinterpret_cast<uint64_t>(&exit_restricted_mode);
+#endif                      // defined(__riscv)
+
+          // Write the state to the state VMO.
+          status = vmo.write(&state.restricted_state(), 0, sizeof(state.restricted_state()));
+          if (status != ZX_OK) {
+            statuses[thread_num] = status;
+            return;
+          }
+
+          // Wait for the main thread to tell us that we can write the FPU state and enter
+          // restricted mode. We synchronize this to make sure that all of the restricted threads
+          // modify their FPU state at the same time - context switching between the FPU write and
+          // the entry into restricted mode can cause the threads to save the FPU state in normal
+          // mode, which we do not want.
+          num_threads_ready.fetch_add(1);
+          while (start_restricted_threads.load() == 0) {
+          }
+
+          zx_restricted_reason_t reason_code;
+          // Construct the desired FPU state.
+          char fpu_buffer[kFpuBufferSize]{};
+          memset(fpu_buffer, 0x10101010 + thread_num, kFpuBufferSize);
+          // Stack allocate the buffer we're going to use to retrieve the FPU state after exiting
+          // restricted mode. We do this before writing the desired FPU state as the process of
+          // zeroing out the array modifies the floating-point registers on ARM.
+          char got_fpu_buffer[kFpuBufferSize]{};
+          load_fpu_registers(fpu_buffer);
+          status = restricted_enter_wrapper(0, (uintptr_t)vectab, &reason_code);
+          if (status != ZX_OK) {
+            statuses[thread_num] = status;
+            return;
+          }
+          if (reason_code != ZX_RESTRICTED_REASON_SYSCALL) {
+            statuses[thread_num] = ZX_ERR_BAD_STATE;
+            return;
+          }
+
+          // Validate that the FPU contains the expected contents.
+          store_fpu_registers(got_fpu_buffer);
+          if (memcmp(fpu_buffer, got_fpu_buffer, kFpuBufferSize) != 0) {
+            // Mark this test as a failure.
+            statuses[thread_num] = ZX_ERR_BAD_STATE;
+
+            // Print out the diff for easy debugging.
+            for (uint16_t i = 0; i < kFpuBufferSize; i++) {
+              if (got_fpu_buffer[i] != fpu_buffer[i]) {
+                printf("thread %d: byte %u differs; got 0x%x, want 0x%x\n", thread_num, i,
+                       got_fpu_buffer[i], fpu_buffer[i]);
+              }
+            }
+          } else {
+            statuses[thread_num] = ZX_OK;
+          }
+        },
+        (int)i);
+  }
+
+  // Wait for all the threads that will run restricted mode to spawn.
+  while (num_threads_ready.load() != kNumRestrictedThreads) {
+  }
+  // Tell all of the restricted threads to start.
+  start_restricted_threads.store(1);
+
+  // Wait for all of the restricted threads to enter restricted mode.
+  while (num_threads_in_rmode.load() != kNumRestrictedThreads) {
+  }
+
+  // Spawn a bunch of threads that overwrite the contents of the floating point registers.
+  // We spawn enough threads to make sure that all CPU's floating point registers are overwritten.
+  for (uint32_t i = 0; i < kNumFloatingPointThreads; i++) {
+    threads.emplace_back(
+        [](int thread_num) {
+          char fpu_buffer[kFpuBufferSize]{};
+          memset(fpu_buffer, 0x90909090 + thread_num, kFpuBufferSize);
+          load_fpu_registers(fpu_buffer);
+        },
+        (int)i);
+  }
+
+  // Signal all of the restricted mode threads to exit, then wait for them to do so.
+  exit_restricted_mode.store(1);
+  for (auto& thread : threads) {
+    thread.join();
+  }
+  for (uint32_t i = 0; i < kNumRestrictedThreads; i++) {
+    ASSERT_OK(statuses[i]);
+  }
 }
 
 void ReadExceptionFromChannel(const zx::channel& exception_channel,
