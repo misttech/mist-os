@@ -155,8 +155,9 @@ class BtHciBroadcomTest : public TestBase {
     ASSERT_EQ(BtHciBroadcom::Create(/*ctx=*/nullptr, root_device_.get(), dispatcher()), ZX_OK);
     ASSERT_TRUE(dut());
 
-    // TODO(https://fxbug.dev/42173055): Due to Mock DDK limitations, we need to add the BT_VENDOR protocol to
-    // the BtTransportUart MockDevice so that BtHciProtocolClient (and device_get_protocol) work.
+    // TODO(https://fxbug.dev/42173055): Due to Mock DDK limitations, we need to add the BT_VENDOR
+    // protocol to the BtTransportUart MockDevice so that BtHciProtocolClient (and
+    // device_get_protocol) work.
     bt_vendor_protocol_t vendor_proto;
     dut()->GetDeviceContext<BtHciBroadcom>()->DdkGetProtocol(ZX_PROTOCOL_BT_VENDOR, &vendor_proto);
     dut()->AddProtocol(ZX_PROTOCOL_BT_VENDOR, vendor_proto.ops, vendor_proto.ctx);
@@ -276,6 +277,24 @@ TEST_F(BtHciBroadcomTest, ControllerReturnsBdaddrEventWithoutBdaddrParam) {
 
   // Initialization should still succeed (an error will be logged, but it's not fatal).
   ASSERT_EQ(InitDut(), ZX_OK);
+}
+
+TEST_F(BtHciBroadcomTest, VendorProtocolSanityTest) {
+  auto endpoints = fidl::CreateEndpoints<fuchsia_hardware_bluetooth::Vendor>();
+  ASSERT_FALSE(endpoints.is_error());
+
+  // Bind client end
+  fidl::WireSyncClient vendor_client(std::move(endpoints->client));
+
+  // Bind server end
+  auto server_dispatcher = mock_ddk::GetDriverRuntime()->StartBackgroundDispatcher();
+  fidl::BindServer(server_dispatcher->async_dispatcher(), std::move(endpoints->server),
+                   dut()->GetDeviceContext<BtHciBroadcom>());
+
+  auto result = vendor_client->GetFeatures();
+  ASSERT_TRUE(result.ok());
+
+  EXPECT_EQ(result->features, fuchsia_hardware_bluetooth::BtVendorFeatures::kSetAclPriorityCommand);
 }
 
 TEST_F(BtHciBroadcomInitializedTest, EncodeSetAclPrioritySuccessWithParametersHighSink) {

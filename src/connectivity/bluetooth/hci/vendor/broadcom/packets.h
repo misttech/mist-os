@@ -2,6 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#ifndef SRC_CONNECTIVITY_BLUETOOTH_HCI_VENDOR_BROADCOM_PACKETS_H_
+#define SRC_CONNECTIVITY_BLUETOOTH_HCI_VENDOR_BROADCOM_PACKETS_H_
+
 #include <endian.h>
 #include <stdint.h>
 #include <zircon/compiler.h>
@@ -71,6 +74,7 @@ constexpr uint8_t kBcmAclPriorityNormal = 0x00;
 constexpr uint8_t kBcmAclPriorityHigh = 0x01;
 constexpr uint8_t kBcmAclDirectionSource = 0x00;
 constexpr uint8_t kBcmAclDirectionSink = 0x01;
+constexpr size_t kBcmSetAclPriorityCmdSize = sizeof(BcmSetAclPriorityCmd);
 
 constexpr size_t kMaxHciCommandSize =
     sizeof(HciCommandHeader) +
@@ -103,3 +107,5 @@ const HciCommandHeader kReadBdaddrCmd = {
 };
 
 }  // namespace bt_hci_broadcom
+
+#endif  // SRC_CONNECTIVITY_BLUETOOTH_HCI_VENDOR_BROADCOM_PACKETS_H_

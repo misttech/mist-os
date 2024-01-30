@@ -14,6 +14,7 @@
 #include <lib/ddk/driver.h>
 #include <lib/ddk/metadata.h>
 #include <lib/ddk/platform-defs.h>
+#include <lib/fdf/cpp/dispatcher.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -34,6 +35,46 @@ constexpr zx::duration kFirmwareDownloadDelay = zx::msec(50);
 // firmware load.
 constexpr zx::duration kBaudRateSwitchDelay = zx::msec(200);
 
+void BtHciBroadcom::GetFeatures(GetFeaturesCompleter::Sync& completer) {
+  completer.Reply(fuchsia_hardware_bluetooth::BtVendorFeatures::kSetAclPriorityCommand);
+}
+
+void BtHciBroadcom::EncodeCommand(EncodeCommandRequestView request,
+                                  EncodeCommandCompleter::Sync& completer) {
+  uint8_t data_buffer[kBcmSetAclPriorityCmdSize];
+  switch (request->command.Which()) {
+    case fuchsia_hardware_bluetooth::wire::BtVendorCommand::Tag::kSetAclPriority: {
+      EncodeSetAclPriorityCommand(request->command.set_acl_priority(), data_buffer);
+      auto encoded_cmd =
+          fidl::VectorView<uint8_t>::FromExternal(data_buffer, kBcmSetAclPriorityCmdSize);
+      completer.ReplySuccess(encoded_cmd);
+      return;
+    }
+    default: {
+      completer.ReplyError(ZX_ERR_INVALID_ARGS);
+      return;
+    }
+  }
+}
+
+void BtHciBroadcom::OpenHci(OpenHciCompleter::Sync& completer) {
+  auto endpoints = fidl::CreateEndpoints<fuchsia_hardware_bluetooth::Hci>();
+  if (endpoints.is_error()) {
+    zxlogf(ERROR, "Failed to create endpoints: %s", zx_status_get_string(endpoints.error_value()));
+    completer.ReplyError(endpoints.error_value());
+    return;
+  }
+  fidl::BindServer(fdf::Dispatcher::GetCurrent()->async_dispatcher(), std::move(endpoints->server),
+                   this);
+  completer.ReplySuccess(std::move(endpoints->client));
+}
+
+void BtHciBroadcom::handle_unknown_method(
+    fidl::UnknownMethodMetadata<fuchsia_hardware_bluetooth::Vendor> metadata,
+    fidl::UnknownMethodCompleter::Sync& completer) {
+  ZX_PANIC("Unknown method in Vendor request");
+}
+
 const std::unordered_map<uint16_t, std::string> BtHciBroadcom::kFirmwareMap = {
     {PDEV_PID_BCM43458, "BCM4345C5.hcd"},
     {PDEV_PID_BCM4359, "BCM4359C0.hcd"},
@@ -41,7 +82,6 @@ const std::unordered_map<uint16_t, std::string> BtHciBroadcom::kFirmwareMap = {
 
 BtHciBroadcom::BtHciBroadcom(zx_device_t* parent, async_dispatcher_t* dispatcher)
     : BtHciBroadcomType(parent), dispatcher_(dispatcher) {}
-
 zx_status_t BtHciBroadcom::Create(void* ctx, zx_device_t* parent) {
   return Create(ctx, parent, /*dispatcher=*/nullptr);
 }
@@ -110,8 +150,8 @@ void BtHciBroadcom::DdkUnbind(ddk::UnbindTxn txn) { txn.Reply(); }
 void BtHciBroadcom::DdkRelease() {
   command_channel_.reset();
 
-  // Driver manager is given a raw pointer to this dynamically allocated object in Create(), so when
-  // DdkRelease() is called we need to free the allocated memory.
+  // Driver manager is given a raw pointer to this dynamically allocated object in Create(), so
+  // when DdkRelease() is called we need to free the allocated memory.
   delete this;
 }
 
@@ -185,6 +225,26 @@ zx_status_t BtHciBroadcom::EncodeSetAclPriorityCommand(
   *actual_size = sizeof(command);
 
   return ZX_OK;
+}
+
+void BtHciBroadcom::EncodeSetAclPriorityCommand(
+    fuchsia_hardware_bluetooth::wire::BtVendorSetAclPriorityParams params, void* out_buffer) {
+  BcmSetAclPriorityCmd command = {
+      .header =
+          {
+              .opcode = htole16(kBcmSetAclPriorityCmdOpCode),
+              .parameter_total_size = sizeof(BcmSetAclPriorityCmd) - sizeof(HciCommandHeader),
+          },
+      .connection_handle = htole16(params.connection_handle),
+      .priority = (params.priority == fuchsia_hardware_bluetooth::BtVendorAclPriority::kNormal)
+                      ? kBcmAclPriorityNormal
+                      : kBcmAclPriorityHigh,
+      .direction = (params.direction == fuchsia_hardware_bluetooth::BtVendorAclDirection::kSource)
+                       ? kBcmAclDirectionSource
+                       : kBcmAclDirectionSink,
+  };
+
+  memcpy(out_buffer, &command, sizeof(command));
 }
 
 // NOLINTNEXTLINE(readability-convert-member-functions-to-static)
@@ -339,9 +399,9 @@ fpromise::promise<void, zx_status_t> BtHciBroadcom::LoadFirmware() {
   zx::vmo fw_vmo;
   size_t fw_size;
 
-  // If there's no firmware for this PID, we don't expect the bind to happen without a corresponding
-  // entry in the firmware table. Please double-check the PID value and add an entry to the firmware
-  // table if it's valid.
+  // If there's no firmware for this PID, we don't expect the bind to happen without a
+  // corresponding entry in the firmware table. Please double-check the PID value and add an entry
+  // to the firmware table if it's valid.
   ZX_ASSERT_MSG(kFirmwareMap.find(serial_pid_) != kFirmwareMap.end(), "no mapping for PID: %u",
                 serial_pid_);
   zx_status_t status = load_firmware(zxdev(), kFirmwareMap.at(serial_pid_).c_str(),

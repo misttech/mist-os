@@ -20,11 +20,14 @@
 namespace bt_hci_broadcom {
 
 class BtHciBroadcom;
+
 using BtHciBroadcomType =
     ddk::Device<BtHciBroadcom, ddk::GetProtocolable, ddk::Initializable, ddk::Unbindable,
                 ddk::Messageable<fuchsia_hardware_bluetooth::Hci>::Mixin>;
 
-class BtHciBroadcom : public BtHciBroadcomType, public ddk::BtVendorProtocol<BtHciBroadcom> {
+class BtHciBroadcom : public BtHciBroadcomType,
+                      public ddk::BtVendorProtocol<BtHciBroadcom>,
+                      public fidl::WireServer<fuchsia_hardware_bluetooth::Vendor> {
  public:
   // |dispatcher| will be used for the initialization thread if non-null.
   explicit BtHciBroadcom(zx_device_t* parent, async_dispatcher_t* dispatcher);
@@ -43,7 +46,7 @@ class BtHciBroadcom : public BtHciBroadcomType, public ddk::BtVendorProtocol<BtH
   void DdkRelease();
   zx_status_t DdkGetProtocol(uint32_t proto_id, void* out_proto);
 
-  // ddk::BtVendorProtocol mixins:
+  // ddk::BtVendorProtocol implementations:
   bt_vendor_features_t BtVendorGetFeatures();
   zx_status_t BtVendorEncodeCommand(bt_vendor_command_t command, const bt_vendor_params_t* params,
                                     uint8_t* out_encoded_buffer, size_t encoded_size,
@@ -53,6 +56,15 @@ class BtHciBroadcom : public BtHciBroadcomType, public ddk::BtVendorProtocol<BtH
   static constexpr size_t kMacAddrLen = 6;
 
   static const std::unordered_map<uint16_t, std::string> kFirmwareMap;
+
+  void GetFeatures(GetFeaturesCompleter::Sync& completer) override;
+  void EncodeCommand(EncodeCommandRequestView request,
+                     EncodeCommandCompleter::Sync& completer) override;
+  void OpenHci(OpenHciCompleter::Sync& completer) override;
+
+  void handle_unknown_method(
+      fidl::UnknownMethodMetadata<fuchsia_hardware_bluetooth::Vendor> metadata,
+      fidl::UnknownMethodCompleter::Sync& completer) override;
 
   // ddk::Messageable mixins:
   void OpenCommandChannel(OpenCommandChannelRequestView request,
@@ -77,6 +89,9 @@ class BtHciBroadcom : public BtHciBroadcomType, public ddk::BtVendorProtocol<BtH
   static zx_status_t EncodeSetAclPriorityCommand(bt_vendor_set_acl_priority_params_t params,
                                                  void* out_buffer, size_t buffer_size,
                                                  size_t* actual_size);
+
+  static void EncodeSetAclPriorityCommand(
+      fuchsia_hardware_bluetooth::wire::BtVendorSetAclPriorityParams params, void* out_buffer);
 
   fpromise::promise<std::vector<uint8_t>, zx_status_t> SendCommand(const void* command,
                                                                    size_t length);
