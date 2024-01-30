@@ -649,17 +649,17 @@ pub fn ptrace_dispatch(
                     let uiv: UserRef<iovec> = UserRef::from(data);
                     let iv = current_task.read_object(uiv)?;
                     let base = iv.iov_base.addr;
-                    let len = iv.iov_len;
+                    let mut len = iv.iov_len as usize;
                     ptrace_getregset(
                         current_task,
                         thread_state,
                         ElfNoteType::try_from(addr.ptr() as usize)?,
                         base,
-                        &mut (len as usize),
+                        &mut len,
                     )?;
                     current_task.write_object(
                         UserRef::<usize>::new(UserAddress::from_ptr(
-                            uiv.addr().ptr() + memoffset::offset_of!(iovec, iov_base),
+                            uiv.addr().ptr() + memoffset::offset_of!(iovec, iov_len),
                         )),
                         &(len as usize),
                     )?;
@@ -985,6 +985,9 @@ pub fn ptrace_getregset(
 ) -> Result<(), Errno> {
     match regset_type {
         ElfNoteType::PrStatus => {
+            if *len < std::mem::size_of::<user_regs_struct>() {
+                return error!(EINVAL);
+            }
             *len = std::cmp::min(*len, std::mem::size_of::<user_regs_struct>());
             let mut i: usize = 0;
             while i < *len {

@@ -402,19 +402,29 @@ TEST(PtraceTest, GetGeneralRegs) {
 #error "Test does not support architecture for PTRACE_GETREGS";
 #endif
 
-  // Get the general registers with PTRACE_GETREGSET
-  struct user_regs_struct regs_set;
+  // Get the general registers with PTRACE_GETREGSET. Make this too large so
+  // that ptrace can provide the correct value.
+  struct user_regs_struct regs_set[2];
   struct iovec iov;
-  iov.iov_base = &regs_set;
+  iov.iov_base = regs_set;
+
+  // Expect error on incorrect size.
+  iov.iov_len = sizeof(regs_set[0]) - 1;
+  EXPECT_EQ(ptrace(PTRACE_GETREGSET, child_pid, NT_PRSTATUS, &iov), -1)
+      << "Error " << errno << " " << strerror(errno);
+  EXPECT_EQ(errno, EINVAL);
+
+  // Provide a too large value for iov_len to make sure that ptrace resets it
+  // correctly
   iov.iov_len = sizeof(regs_set);
   EXPECT_EQ(ptrace(PTRACE_GETREGSET, child_pid, NT_PRSTATUS, &iov), 0)
       << "Error " << errno << " " << strerror(errno);
 
-  // Read exactly the full register set.
-  EXPECT_EQ(iov.iov_len, sizeof(regs_set));
+  // Make sure ptrace set the correct size for the user_regs_struct.
+  EXPECT_EQ(iov.iov_len, sizeof(struct user_regs_struct));
 
   // Child called kill(2), with SIGSTOP as arg 2.
-  EXPECT_EQ(regs_set.__REG, static_cast<unsigned long>(SIGSTOP));
+  EXPECT_EQ(regs_set[0].__REG, static_cast<unsigned long>(SIGSTOP));
 
   // The appropriate defines for this are not in the ptrace header for arm64.
 #ifdef __x86_64__
@@ -653,7 +663,7 @@ TEST(PtraceTest, PtraceEventStopWithExit) {
   EXPECT_EQ(0, ptrace(PTRACE_CONT, child_pid, 0, 0));
 
   // Wait for the exec
-  EXPECT_EQ(child_pid, waitpid(child_pid, &status, 0));
+  EXPECT_EQ(child_pid, waitpid(-1, &status, 0));
   EXPECT_TRUE(WIFSTOPPED(status) && WSTOPSIG(status) == SIGTRAP)
       << "status = " << status << " WIFSTOPPED = " << WIFSTOPPED(status)
       << " WSTOPSIG = " << WSTOPSIG(status);
