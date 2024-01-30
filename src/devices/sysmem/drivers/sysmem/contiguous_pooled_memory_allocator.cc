@@ -1059,21 +1059,9 @@ void ContiguousPooledMemoryAllocator::CheckUnusedRange(uint64_t offset, uint64_t
   uint32_t succeeded_count = 0;
   uint32_t failed_count = 0;
   uint32_t page_size = zx_system_get_page_size();
-  zx_cache_flush(&mapping_[offset], size, ZX_CACHE_FLUSH_DATA | ZX_CACHE_FLUSH_INVALIDATE);
-  auto nop_loan_range = [and_also_zero](const ralloc_region_t& range) {
-    if (!and_also_zero) {
-      return;
-    }
-#if DEBUG_ASSERT_IMPLEMENTED
-    // All loan ranges were already zeroed by Zircon, either via decommit or ZX_VMO_OP_ZERO if
-    // decommit failed.  No need to zero again.
-    uint64_t end = range.base + range.size;
-    uint64_t todo_size;
-    for (uint64_t iter = range.base; iter != end; iter += todo_size) {
-      todo_size = std::min(end - iter, zero_page_vmo_size_);
-      ZX_DEBUG_ASSERT(!memcmp(&mapping_[iter], zero_page_vmo_base_, todo_size));
-    }
-#endif
+  auto nop_loan_range = [](const ralloc_region_t& range) {
+    // We shouldn't read the pages in this case, and we shouldn't call zx_cache_flush() on these
+    // pages either.
   };
   auto maybe_zero_range = [this, and_also_zero](const ralloc_region_t& range) {
     if (!and_also_zero) {
@@ -1088,6 +1076,11 @@ void ContiguousPooledMemoryAllocator::CheckUnusedRange(uint64_t offset, uint64_t
       /*pattern_func=*/
       [this, page_size, and_also_zero, &succeeded_count,
        &failed_count](const ralloc_region_t& range) {
+        // ensure the CPU will see DMA writes up to this point (unless pattern happens to match of
+        // course)
+        zx_cache_flush(&mapping_[range.base], range.size,
+                       ZX_CACHE_FLUSH_DATA | ZX_CACHE_FLUSH_INVALIDATE);
+
         std::optional<ralloc_region_t> zero_range;
         auto handle_zero_range = [this, &zero_range, and_also_zero] {
           if (!and_also_zero || !zero_range.has_value()) {
