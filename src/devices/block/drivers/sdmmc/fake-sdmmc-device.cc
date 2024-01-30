@@ -339,4 +339,210 @@ zx_status_t FakeSdmmcDevice::CopySdmmcRegions(cpp20::span<const sdmmc_buffer_reg
   return ZX_OK;
 }
 
+void FakeSdmmcDevice::HostInfo(fdf::Arena& arena, HostInfoCompleter::Sync& completer) {
+  sdmmc_host_info_t info;
+  zx_status_t status = SdmmcHostInfo(&info);
+  if (status != ZX_OK) {
+    completer.buffer(arena).ReplyError(status);
+    return;
+  }
+
+  fuchsia_hardware_sdmmc::wire::SdmmcHostInfo wire_info;
+  wire_info.caps = info.caps;
+  wire_info.max_transfer_size = info.max_transfer_size;
+  wire_info.max_transfer_size_non_dma = info.max_transfer_size_non_dma;
+  wire_info.max_buffer_regions = info.max_buffer_regions;
+  wire_info.prefs = info.prefs;
+  completer.buffer(arena).ReplySuccess(wire_info);
+}
+
+void FakeSdmmcDevice::SetSignalVoltage(SetSignalVoltageRequestView request, fdf::Arena& arena,
+                                       SetSignalVoltageCompleter::Sync& completer) {
+  sdmmc_voltage_t voltage;
+  switch (request->voltage) {
+    case fuchsia_hardware_sdmmc::wire::SdmmcVoltage::kV330:
+      voltage = SDMMC_VOLTAGE_V330;
+      break;
+    case fuchsia_hardware_sdmmc::wire::SdmmcVoltage::kV180:
+      voltage = SDMMC_VOLTAGE_V180;
+      break;
+    default:
+      voltage = SDMMC_VOLTAGE_MAX;
+      break;
+  }
+
+  zx_status_t status = SdmmcSetSignalVoltage(voltage);
+  if (status != ZX_OK) {
+    completer.buffer(arena).ReplyError(status);
+    return;
+  }
+  completer.buffer(arena).ReplySuccess();
+}
+
+void FakeSdmmcDevice::SetBusWidth(SetBusWidthRequestView request, fdf::Arena& arena,
+                                  SetBusWidthCompleter::Sync& completer) {
+  sdmmc_bus_width_t bus_width;
+  switch (request->bus_width) {
+    case fuchsia_hardware_sdmmc::wire::SdmmcBusWidth::kEight:
+      bus_width = SDMMC_BUS_WIDTH_EIGHT;
+      break;
+    case fuchsia_hardware_sdmmc::wire::SdmmcBusWidth::kFour:
+      bus_width = SDMMC_BUS_WIDTH_FOUR;
+      break;
+    case fuchsia_hardware_sdmmc::wire::SdmmcBusWidth::kOne:
+      bus_width = SDMMC_BUS_WIDTH_ONE;
+      break;
+    default:
+      bus_width = SDMMC_BUS_WIDTH_MAX;
+      break;
+  }
+
+  zx_status_t status = SdmmcSetBusWidth(bus_width);
+  if (status != ZX_OK) {
+    completer.buffer(arena).ReplyError(status);
+    return;
+  }
+  completer.buffer(arena).ReplySuccess();
+}
+
+void FakeSdmmcDevice::SetBusFreq(SetBusFreqRequestView request, fdf::Arena& arena,
+                                 SetBusFreqCompleter::Sync& completer) {
+  zx_status_t status = SdmmcSetBusFreq(request->bus_freq);
+  if (status != ZX_OK) {
+    completer.buffer(arena).ReplyError(status);
+    return;
+  }
+  completer.buffer(arena).ReplySuccess();
+}
+
+void FakeSdmmcDevice::SetTiming(SetTimingRequestView request, fdf::Arena& arena,
+                                SetTimingCompleter::Sync& completer) {
+  sdmmc_timing_t timing;
+  // Only handling the cases for SdmmcBlockDeviceTest to work correctly.
+  switch (request->timing) {
+    case fuchsia_hardware_sdmmc::wire::SdmmcTiming::kHs:
+      timing = SDMMC_TIMING_HS;
+      break;
+    case fuchsia_hardware_sdmmc::wire::SdmmcTiming::kHsddr:
+      timing = SDMMC_TIMING_HSDDR;
+      break;
+    case fuchsia_hardware_sdmmc::wire::SdmmcTiming::kHs400:
+      timing = SDMMC_TIMING_HS400;
+      break;
+    default:
+      timing = SDMMC_TIMING_MAX;
+      break;
+  }
+
+  zx_status_t status = SdmmcSetTiming(timing);
+  if (status != ZX_OK) {
+    completer.buffer(arena).ReplyError(status);
+    return;
+  }
+  completer.buffer(arena).ReplySuccess();
+}
+
+void FakeSdmmcDevice::HwReset(fdf::Arena& arena, HwResetCompleter::Sync& completer) {
+  zx_status_t status = SdmmcHwReset();
+  if (status != ZX_OK) {
+    completer.buffer(arena).ReplyError(status);
+    return;
+  }
+  completer.buffer(arena).ReplySuccess();
+}
+
+void FakeSdmmcDevice::PerformTuning(PerformTuningRequestView request, fdf::Arena& arena,
+                                    PerformTuningCompleter::Sync& completer) {
+  zx_status_t status = SdmmcPerformTuning(request->cmd_idx);
+  if (status != ZX_OK) {
+    completer.buffer(arena).ReplyError(status);
+    return;
+  }
+  completer.buffer(arena).ReplySuccess();
+}
+
+void FakeSdmmcDevice::RegisterInBandInterrupt(RegisterInBandInterruptRequestView request,
+                                              fdf::Arena& arena,
+                                              RegisterInBandInterruptCompleter::Sync& completer) {
+  // TODO(fxbug.dev/134787): Support RegisterInBandInterrupt.
+  completer.buffer(arena).ReplyError(ZX_ERR_NOT_SUPPORTED);
+}
+
+void FakeSdmmcDevice::AckInBandInterrupt(fdf::Arena& arena,
+                                         AckInBandInterruptCompleter::Sync& completer) {
+  // Mirroring FakeSdmmcDevice::SdmmcAckInBandInterrupt().
+}
+
+void FakeSdmmcDevice::RegisterVmo(RegisterVmoRequestView request, fdf::Arena& arena,
+                                  RegisterVmoCompleter::Sync& completer) {
+  zx_status_t status =
+      SdmmcRegisterVmo(request->vmo_id, request->client_id, std::move(request->vmo),
+                       request->offset, request->size, request->vmo_rights);
+  if (status != ZX_OK) {
+    completer.buffer(arena).ReplyError(status);
+    return;
+  }
+  completer.buffer(arena).ReplySuccess();
+}
+
+void FakeSdmmcDevice::UnregisterVmo(UnregisterVmoRequestView request, fdf::Arena& arena,
+                                    UnregisterVmoCompleter::Sync& completer) {
+  zx::vmo vmo;
+  zx_status_t status = SdmmcUnregisterVmo(request->vmo_id, request->client_id, &vmo);
+  if (status != ZX_OK) {
+    completer.buffer(arena).ReplyError(status);
+    return;
+  }
+  completer.buffer(arena).ReplySuccess(std::move(vmo));
+}
+
+void FakeSdmmcDevice::Request(RequestRequestView request, fdf::Arena& arena,
+                              RequestCompleter::Sync& completer) {
+  fidl::Array<uint32_t, 4> response;
+  for (const auto& req : request->reqs) {
+    std::vector<sdmmc_buffer_region_t> buffer_regions;
+    for (const auto& buffer : req.buffers) {
+      sdmmc_buffer_region_t region;
+
+      if (buffer.buffer.is_vmo_id()) {
+        if (buffer.type != fuchsia_hardware_sdmmc::wire::SdmmcBufferType::kVmoId) {
+          completer.buffer(arena).ReplyError(ZX_ERR_INVALID_ARGS);
+          return;
+        }
+        region.buffer.vmo_id = buffer.buffer.vmo_id();
+        region.type = SDMMC_BUFFER_TYPE_VMO_ID;
+      } else {
+        if (!buffer.buffer.is_vmo() ||
+            buffer.type != fuchsia_hardware_sdmmc::wire::SdmmcBufferType::kVmoHandle) {
+          completer.buffer(arena).ReplyError(ZX_ERR_INVALID_ARGS);
+          return;
+        }
+        region.buffer.vmo = buffer.buffer.vmo().get();
+        region.type = SDMMC_BUFFER_TYPE_VMO_HANDLE;
+      }
+
+      region.offset = buffer.offset;
+      region.size = buffer.size;
+      buffer_regions.push_back(region);
+    }
+
+    sdmmc_req_t sdmmc_req = {
+        .cmd_idx = req.cmd_idx,
+        .cmd_flags = req.cmd_flags,
+        .arg = req.arg,
+        .blocksize = req.blocksize,
+        .suppress_error_messages = req.suppress_error_messages,
+        .client_id = req.client_id,
+        .buffers_list = buffer_regions.data(),
+        .buffers_count = buffer_regions.size(),
+    };
+    zx_status_t status = SdmmcRequest(&sdmmc_req, response.data());
+    if (status != ZX_OK) {
+      completer.buffer(arena).ReplyError(status);
+      return;
+    }
+  }
+  completer.buffer(arena).ReplySuccess(response);
+}
+
 }  // namespace sdmmc

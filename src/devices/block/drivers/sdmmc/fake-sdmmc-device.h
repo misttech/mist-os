@@ -5,9 +5,11 @@
 #ifndef SRC_DEVICES_BLOCK_DRIVERS_SDMMC_FAKE_SDMMC_DEVICE_H_
 #define SRC_DEVICES_BLOCK_DRIVERS_SDMMC_FAKE_SDMMC_DEVICE_H_
 
+#include <fidl/fuchsia.hardware.sdmmc/cpp/driver/fidl.h>
 #include <fuchsia/hardware/sdio/cpp/banjo.h>
 #include <fuchsia/hardware/sdmmc/cpp/banjo.h>
 #include <lib/ddk/binding.h>
+#include <lib/driver/testing/cpp/driver_runtime.h>
 #include <lib/fit/function.h>
 #include <lib/stdcompat/span.h>
 
@@ -22,7 +24,8 @@
 
 namespace sdmmc {
 
-class FakeSdmmcDevice : public ddk::SdmmcProtocol<FakeSdmmcDevice> {
+class FakeSdmmcDevice : public ddk::SdmmcProtocol<FakeSdmmcDevice>,
+                        public fdf::WireServer<fuchsia_hardware_sdmmc::Sdmmc> {
  public:
   using Command = uint32_t;
 
@@ -55,7 +58,19 @@ class FakeSdmmcDevice : public ddk::SdmmcProtocol<FakeSdmmcDevice> {
     }
   }
 
+  // For testing using Banjo.
   ddk::SdmmcProtocolClient GetClient() const { return ddk::SdmmcProtocolClient(&proto_); }
+
+  // For testing using FIDL.
+  zx::result<fdf::ClientEnd<fuchsia_hardware_sdmmc::Sdmmc>> GetFidlClientEnd() {
+    zx::result endpoints = fdf::CreateEndpoints<fuchsia_hardware_sdmmc::Sdmmc>();
+    if (endpoints.is_error()) {
+      return endpoints.take_error();
+    }
+    auto server_dispatcher = fdf_testing::DriverRuntime::GetInstance()->StartBackgroundDispatcher();
+    fdf::BindServer(server_dispatcher->get(), std::move(endpoints->server), this);
+    return zx::ok(std::move(endpoints->client));
+  }
 
   void set_host_info(const sdmmc_host_info_t& host_info) { host_info_ = host_info; }
 
@@ -88,6 +103,7 @@ class FakeSdmmcDevice : public ddk::SdmmcProtocol<FakeSdmmcDevice> {
     }
   }
 
+  // ddk::SdmmcProtocol implementation
   zx_status_t SdmmcHostInfo(sdmmc_host_info_t* out_info);
 
   zx_status_t SdmmcSetSignalVoltage(sdmmc_voltage_t voltage) {
@@ -115,6 +131,29 @@ class FakeSdmmcDevice : public ddk::SdmmcProtocol<FakeSdmmcDevice> {
                                uint64_t size, uint32_t vmo_rights);
   zx_status_t SdmmcUnregisterVmo(uint32_t vmo_id, uint8_t client_id, zx::vmo* out_vmo);
   zx_status_t SdmmcRequest(const sdmmc_req_t* req, uint32_t out_response[4]);
+
+  // fuchsia_hardware_sdmmc::Sdmmc implementation
+  void HostInfo(fdf::Arena& arena, HostInfoCompleter::Sync& completer) override;
+  void SetSignalVoltage(SetSignalVoltageRequestView request, fdf::Arena& arena,
+                        SetSignalVoltageCompleter::Sync& completer) override;
+  void SetBusWidth(SetBusWidthRequestView request, fdf::Arena& arena,
+                   SetBusWidthCompleter::Sync& completer) override;
+  void SetBusFreq(SetBusFreqRequestView request, fdf::Arena& arena,
+                  SetBusFreqCompleter::Sync& completer) override;
+  void SetTiming(SetTimingRequestView request, fdf::Arena& arena,
+                 SetTimingCompleter::Sync& completer) override;
+  void HwReset(fdf::Arena& arena, HwResetCompleter::Sync& completer) override;
+  void PerformTuning(PerformTuningRequestView request, fdf::Arena& arena,
+                     PerformTuningCompleter::Sync& completer) override;
+  void RegisterInBandInterrupt(RegisterInBandInterruptRequestView request, fdf::Arena& arena,
+                               RegisterInBandInterruptCompleter::Sync& completer) override;
+  void AckInBandInterrupt(fdf::Arena& arena, AckInBandInterruptCompleter::Sync& completer) override;
+  void RegisterVmo(RegisterVmoRequestView request, fdf::Arena& arena,
+                   RegisterVmoCompleter::Sync& completer) override;
+  void UnregisterVmo(UnregisterVmoRequestView request, fdf::Arena& arena,
+                     UnregisterVmoCompleter::Sync& completer) override;
+  void Request(RequestRequestView request, fdf::Arena& arena,
+               RequestCompleter::Sync& completer) override;
 
   std::vector<uint8_t> Read(size_t address, size_t size, uint8_t func = 0);
   void Write(size_t address, cpp20::span<const uint8_t> data, uint8_t func = 0);

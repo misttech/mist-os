@@ -2,8 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "sdmmc-block-device.h"
-
 #include <endian.h>
 #include <fidl/fuchsia.hardware.block/cpp/wire.h>
 #include <lib/async-loop/cpp/loop.h>
@@ -31,6 +29,7 @@
 #include <zxtest/zxtest.h>
 
 #include "fake-sdmmc-device.h"
+#include "sdmmc-block-device.h"
 #include "sdmmc-partition-device.h"
 #include "sdmmc-root-device.h"
 #include "sdmmc-rpmb-device.h"
@@ -52,7 +51,11 @@ class TestSdmmcRootDevice : public SdmmcRootDevice {
   zx_status_t Init(
       fidl::ObjectView<fuchsia_hardware_sdmmc::wire::SdmmcMetadata> metadata) override {
     zx_status_t status;
-    auto sdmmc = std::make_unique<SdmmcDevice>(this, sdmmc_.GetClient());
+    zx::result client_end = sdmmc_.GetFidlClientEnd();
+    if (client_end.is_error()) {
+      return client_end.error_value();
+    }
+    auto sdmmc = std::make_unique<SdmmcDevice>(this, std::move(*client_end));
     if (status = sdmmc->RefreshHostInfo(); status != ZX_OK) {
       return status;
     }
@@ -206,6 +209,8 @@ class SdmmcBlockDeviceTest : public zxtest::Test {
 
   void QueueBlockOps();
   void QueueRpmbRequests();
+  fidl::WireSharedClient<fuchsia_hardware_rpmb::Rpmb>& rpmb_client() { return rpmb_client_; }
+  std::atomic<bool>& run_threads() { return run_threads_; }
 
  protected:
   static constexpr size_t kBlockOpSize = BlockOperation::OperationSize(sizeof(block_op_t));
@@ -430,7 +435,8 @@ TEST_F(SdmmcBlockDeviceTest, BlockImplQueue) {
   user_.Queue(op4->operation(), OperationCallback, &ctx);
   user_.Queue(op5->operation(), OperationCallback, &ctx);
 
-  EXPECT_OK(sync_completion_wait(&ctx.completion, zx::duration::infinite().get()));
+  runtime_.PerformBlockingWork(
+      [&] { EXPECT_OK(sync_completion_wait(&ctx.completion, zx::duration::infinite().get())); });
 
   EXPECT_TRUE(op1->private_storage()->completed);
   EXPECT_TRUE(op2->private_storage()->completed);
@@ -484,7 +490,8 @@ TEST_F(SdmmcBlockDeviceTest, BlockImplQueueOutOfRange) {
   user_.Queue(op6->operation(), OperationCallback, &ctx);
   user_.Queue(op7->operation(), OperationCallback, &ctx);
 
-  EXPECT_OK(sync_completion_wait(&ctx.completion, zx::duration::infinite().get()));
+  runtime_.PerformBlockingWork(
+      [&] { EXPECT_OK(sync_completion_wait(&ctx.completion, zx::duration::infinite().get())); });
 
   EXPECT_TRUE(op1->private_storage()->completed);
   EXPECT_TRUE(op2->private_storage()->completed);
@@ -536,7 +543,8 @@ TEST_F(SdmmcBlockDeviceTest, NoCmd12ForSdBlockTransfer) {
   user_.Queue(op4->operation(), OperationCallback, &ctx);
   user_.Queue(op5->operation(), OperationCallback, &ctx);
 
-  EXPECT_OK(sync_completion_wait(&ctx.completion, zx::duration::infinite().get()));
+  runtime_.PerformBlockingWork(
+      [&] { EXPECT_OK(sync_completion_wait(&ctx.completion, zx::duration::infinite().get())); });
 
   const std::map<uint32_t, uint32_t> command_counts = sdmmc_.command_counts();
   EXPECT_EQ(command_counts.find(SDMMC_STOP_TRANSMISSION), command_counts.end());
@@ -575,7 +583,8 @@ TEST_F(SdmmcBlockDeviceTest, NoCmd12ForMmcBlockTransfer) {
   user_.Queue(op4->operation(), OperationCallback, &ctx);
   user_.Queue(op5->operation(), OperationCallback, &ctx);
 
-  EXPECT_OK(sync_completion_wait(&ctx.completion, zx::duration::infinite().get()));
+  runtime_.PerformBlockingWork(
+      [&] { EXPECT_OK(sync_completion_wait(&ctx.completion, zx::duration::infinite().get())); });
 
   const std::map<uint32_t, uint32_t> command_counts = sdmmc_.command_counts();
   EXPECT_EQ(command_counts.find(SDMMC_STOP_TRANSMISSION), command_counts.end());
@@ -611,7 +620,8 @@ TEST_F(SdmmcBlockDeviceTest, ErrorsPropagate) {
   user_.Queue(op4->operation(), OperationCallback, &ctx);
   user_.Queue(op5->operation(), OperationCallback, &ctx);
 
-  EXPECT_OK(sync_completion_wait(&ctx.completion, zx::duration::infinite().get()));
+  runtime_.PerformBlockingWork(
+      [&] { EXPECT_OK(sync_completion_wait(&ctx.completion, zx::duration::infinite().get())); });
 
   EXPECT_TRUE(op1->private_storage()->completed);
   EXPECT_TRUE(op2->private_storage()->completed);
@@ -643,7 +653,8 @@ TEST_F(SdmmcBlockDeviceTest, SendCmd12OnCommandFailure) {
 
   user_.Queue(op1->operation(), OperationCallback, &ctx1);
 
-  EXPECT_OK(sync_completion_wait(&ctx1.completion, zx::duration::infinite().get()));
+  runtime_.PerformBlockingWork(
+      [&] { EXPECT_OK(sync_completion_wait(&ctx1.completion, zx::duration::infinite().get())); });
   EXPECT_TRUE(op1->private_storage()->completed);
   EXPECT_EQ(sdmmc_.command_counts().at(SDMMC_STOP_TRANSMISSION), 10);
 }
@@ -665,7 +676,8 @@ TEST_F(SdmmcBlockDeviceTest, SendCmd12OnCommandFailureWhenAutoCmd12) {
 
   user_.Queue(op2->operation(), OperationCallback, &ctx2);
 
-  EXPECT_OK(sync_completion_wait(&ctx2.completion, zx::duration::infinite().get()));
+  runtime_.PerformBlockingWork(
+      [&] { EXPECT_OK(sync_completion_wait(&ctx2.completion, zx::duration::infinite().get())); });
   EXPECT_TRUE(op2->private_storage()->completed);
   EXPECT_EQ(sdmmc_.command_counts().at(SDMMC_STOP_TRANSMISSION), 10);
 }
@@ -706,7 +718,8 @@ TEST_F(SdmmcBlockDeviceTest, Trim) {
   user_.Queue(op6->operation(), OperationCallback, &ctx);
   user_.Queue(op7->operation(), OperationCallback, &ctx);
 
-  EXPECT_OK(sync_completion_wait(&ctx.completion, zx::duration::infinite().get()));
+  runtime_.PerformBlockingWork(
+      [&] { EXPECT_OK(sync_completion_wait(&ctx.completion, zx::duration::infinite().get())); });
 
   ASSERT_NO_FATAL_FAILURE(CheckVmo(op3->private_storage()->mapper, 10, 0));
 
@@ -771,7 +784,8 @@ TEST_F(SdmmcBlockDeviceTest, TrimErrors) {
   user_.Queue(op4->operation(), OperationCallback, &ctx);
   user_.Queue(op5->operation(), OperationCallback, &ctx);
 
-  EXPECT_OK(sync_completion_wait(&ctx.completion, zx::duration::infinite().get()));
+  runtime_.PerformBlockingWork(
+      [&] { EXPECT_OK(sync_completion_wait(&ctx.completion, zx::duration::infinite().get())); });
 
   EXPECT_OK(op1->private_storage()->status);
   EXPECT_NOT_OK(op2->private_storage()->status);
@@ -891,7 +905,8 @@ TEST_F(SdmmcBlockDeviceTest, CompleteTransactions) {
   user_.Queue(op4->operation(), OperationCallback, &ctx);
   user_.Queue(op5->operation(), OperationCallback, &ctx);
 
-  EXPECT_OK(sync_completion_wait(&ctx.completion, zx::duration::infinite().get()));
+  runtime_.PerformBlockingWork(
+      [&] { EXPECT_OK(sync_completion_wait(&ctx.completion, zx::duration::infinite().get())); });
 
   EXPECT_TRUE(op1->private_storage()->completed);
   EXPECT_TRUE(op2->private_storage()->completed);
@@ -933,7 +948,8 @@ TEST_F(SdmmcBlockDeviceTest, CompleteTransactionsOnStop) {
   EXPECT_OK(dut_.Stop());
   block_device_ = nullptr;
 
-  EXPECT_OK(sync_completion_wait(&ctx.completion, zx::duration::infinite().get()));
+  runtime_.PerformBlockingWork(
+      [&] { EXPECT_OK(sync_completion_wait(&ctx.completion, zx::duration::infinite().get())); });
 
   EXPECT_TRUE(op1->private_storage()->completed);
   EXPECT_TRUE(op2->private_storage()->completed);
@@ -1032,7 +1048,8 @@ TEST_F(SdmmcBlockDeviceTest, AccessBootPartitions) {
   });
 
   boot1_.Queue(op1->operation(), OperationCallback, &ctx);
-  EXPECT_OK(sync_completion_wait(&ctx.completion, zx::duration::infinite().get()));
+  runtime_.PerformBlockingWork(
+      [&] { EXPECT_OK(sync_completion_wait(&ctx.completion, zx::duration::infinite().get())); });
 
   ctx.expected_operations.store(1);
   sync_completion_reset(&ctx.completion);
@@ -1045,7 +1062,8 @@ TEST_F(SdmmcBlockDeviceTest, AccessBootPartitions) {
   });
 
   boot2_.Queue(op2->operation(), OperationCallback, &ctx);
-  EXPECT_OK(sync_completion_wait(&ctx.completion, zx::duration::infinite().get()));
+  runtime_.PerformBlockingWork(
+      [&] { EXPECT_OK(sync_completion_wait(&ctx.completion, zx::duration::infinite().get())); });
 
   ctx.expected_operations.store(1);
   sync_completion_reset(&ctx.completion);
@@ -1058,7 +1076,8 @@ TEST_F(SdmmcBlockDeviceTest, AccessBootPartitions) {
   });
 
   user_.Queue(op3->operation(), OperationCallback, &ctx);
-  EXPECT_OK(sync_completion_wait(&ctx.completion, zx::duration::infinite().get()));
+  runtime_.PerformBlockingWork(
+      [&] { EXPECT_OK(sync_completion_wait(&ctx.completion, zx::duration::infinite().get())); });
 
   EXPECT_TRUE(op1->private_storage()->completed);
   EXPECT_TRUE(op2->private_storage()->completed);
@@ -1101,7 +1120,8 @@ TEST_F(SdmmcBlockDeviceTest, BootPartitionRepeatedAccess) {
   });
 
   boot2_.Queue(op1->operation(), OperationCallback, &ctx);
-  EXPECT_OK(sync_completion_wait(&ctx.completion, zx::duration::infinite().get()));
+  runtime_.PerformBlockingWork(
+      [&] { EXPECT_OK(sync_completion_wait(&ctx.completion, zx::duration::infinite().get())); });
 
   ctx.expected_operations.store(2);
   sync_completion_reset(&ctx.completion);
@@ -1112,7 +1132,8 @@ TEST_F(SdmmcBlockDeviceTest, BootPartitionRepeatedAccess) {
   boot2_.Queue(op2->operation(), OperationCallback, &ctx);
   boot2_.Queue(op3->operation(), OperationCallback, &ctx);
 
-  EXPECT_OK(sync_completion_wait(&ctx.completion, zx::duration::infinite().get()));
+  runtime_.PerformBlockingWork(
+      [&] { EXPECT_OK(sync_completion_wait(&ctx.completion, zx::duration::infinite().get())); });
 
   EXPECT_TRUE(op1->private_storage()->completed);
   EXPECT_TRUE(op2->private_storage()->completed);
@@ -1159,7 +1180,8 @@ TEST_F(SdmmcBlockDeviceTest, AccessBootPartitionOutOfRange) {
   boot1_.Queue(op5->operation(), OperationCallback, &ctx);
   boot1_.Queue(op6->operation(), OperationCallback, &ctx);
 
-  EXPECT_OK(sync_completion_wait(&ctx.completion, zx::duration::infinite().get()));
+  runtime_.PerformBlockingWork(
+      [&] { EXPECT_OK(sync_completion_wait(&ctx.completion, zx::duration::infinite().get())); });
 
   EXPECT_TRUE(op1->private_storage()->completed);
   EXPECT_TRUE(op2->private_storage()->completed);
@@ -1316,8 +1338,7 @@ TEST_F(SdmmcBlockDeviceTest, RpmbPartition) {
                                           &rx_frames));
 
   fuchsia_hardware_rpmb::wire::Request write_read_request = {};
-  ASSERT_OK(tx_frames.duplicate(ZX_RIGHT_READ | ZX_RIGHT_TRANSFER | ZX_RIGHT_MAP,
-                                &write_read_request.tx_frames.vmo));
+  ASSERT_OK(tx_frames.duplicate(ZX_RIGHT_SAME_RIGHTS, &write_read_request.tx_frames.vmo));
 
   write_read_request.tx_frames.offset = 1024;
   write_read_request.tx_frames.size = 1024;
@@ -1355,8 +1376,7 @@ TEST_F(SdmmcBlockDeviceTest, RpmbPartition) {
   ASSERT_NO_FATAL_FAILURE(CheckVmo(rx_frames_mapper, 2, 1));
 
   fuchsia_hardware_rpmb::wire::Request write_request = {};
-  ASSERT_OK(tx_frames.duplicate(ZX_RIGHT_READ | ZX_RIGHT_TRANSFER | ZX_RIGHT_MAP,
-                                &write_request.tx_frames.vmo));
+  ASSERT_OK(tx_frames.duplicate(ZX_RIGHT_SAME_RIGHTS, &write_request.tx_frames.vmo));
 
   write_request.tx_frames.offset = 0;
   write_request.tx_frames.size = 2048;
@@ -1551,47 +1571,56 @@ TEST_F(SdmmcBlockDeviceTest, RpmbRequestsGetToRun) {
   ASSERT_TRUE(boot1_.is_valid());
   ASSERT_TRUE(boot2_.is_valid());
 
-  thrd_t block_thread;
-  EXPECT_EQ(thrd_create_with_name(
-                &block_thread,
-                [](void* ctx) -> int {
-                  reinterpret_cast<SdmmcBlockDeviceTest*>(ctx)->QueueBlockOps();
-                  return thrd_success;
-                },
-                this, "block-queue-thread"),
-            thrd_success);
+  thrd_t rpmb_thread;
+  EXPECT_EQ(
+      thrd_create_with_name(
+          &rpmb_thread,
+          [](void* ctx) -> int {
+            auto test = reinterpret_cast<SdmmcBlockDeviceTest*>(ctx);
 
-  zx::vmo vmo;
-  ASSERT_OK(zx::vmo::create(512, 0, &vmo));
+            zx::vmo vmo;
+            if (zx::vmo::create(512, 0, &vmo) != ZX_OK) {
+              return thrd_error;
+            }
 
-  std::atomic<uint32_t> ops_completed = 0;
-  sync_completion_t completion;
+            std::atomic<uint32_t> ops_completed = 0;
+            sync_completion_t completion;
 
-  for (uint32_t i = 0; i < kMaxOutstandingOps; i++) {
-    fuchsia_hardware_rpmb::wire::Request request = {};
-    EXPECT_OK(vmo.duplicate(ZX_RIGHT_SAME_RIGHTS, &request.tx_frames.vmo));
-    request.tx_frames.offset = 0;
-    request.tx_frames.size = 512;
+            for (uint32_t i = 0; i < kMaxOutstandingOps; i++) {
+              fuchsia_hardware_rpmb::wire::Request request = {};
+              EXPECT_OK(vmo.duplicate(ZX_RIGHT_SAME_RIGHTS, &request.tx_frames.vmo));
+              request.tx_frames.offset = 0;
+              request.tx_frames.size = 512;
 
-    rpmb_client_->Request(std::move(request))
-        .ThenExactlyOnce(
-            [&](fidl::WireUnownedResult<fuchsia_hardware_rpmb::Rpmb::Request>& result) {
-              if (!result.ok()) {
-                FAIL("Request failed: %s", result.error().FormatDescription().c_str());
-                return;
-              }
+              test->rpmb_client()
+                  ->Request(std::move(request))
+                  .ThenExactlyOnce(
+                      [&](fidl::WireUnownedResult<fuchsia_hardware_rpmb::Rpmb::Request>& result) {
+                        if (!result.ok()) {
+                          FAIL("Request failed: %s", result.error().FormatDescription().c_str());
+                          return;
+                        }
 
-              EXPECT_FALSE(result->is_error());
-              if ((ops_completed.fetch_add(1) + 1) == kMaxOutstandingOps) {
-                sync_completion_signal(&completion);
-              }
-            });
-  }
+                        EXPECT_FALSE(result->is_error());
+                        if ((ops_completed.fetch_add(1) + 1) == kMaxOutstandingOps) {
+                          sync_completion_signal(&completion);
+                        }
+                      });
+            }
 
-  sync_completion_wait(&completion, zx::duration::infinite().get());
+            sync_completion_wait(&completion, zx::duration::infinite().get());
 
-  run_threads_.store(false);
-  EXPECT_EQ(thrd_join(block_thread, nullptr), thrd_success);
+            test->run_threads().store(false);
+
+            return thrd_success;
+          },
+          this, "rpmb-queue-thread"),
+      thrd_success);
+
+  // Choose to run QueueBlockOps() using the foreground dispatcher, while
+  // fuchsia_hardware_sdmmc::Sdmmc is being served by the background dispatcher.
+  runtime_.PerformBlockingWork([this] { QueueBlockOps(); });
+  EXPECT_EQ(thrd_join(rpmb_thread, nullptr), thrd_success);
 }
 
 TEST_F(SdmmcBlockDeviceTest, BlockOpsGetToRun) {
@@ -1656,7 +1685,8 @@ TEST_F(SdmmcBlockDeviceTest, BlockOpsGetToRun) {
     user_.Queue(bop, op_callback, &context);
   }
 
-  sync_completion_wait(&context.completion, zx::duration::infinite().get());
+  runtime_.PerformBlockingWork(
+      [&] { sync_completion_wait(&context.completion, zx::duration::infinite().get()); });
 
   run_threads_.store(false);
   EXPECT_EQ(thrd_join(rpmb_thread, nullptr), thrd_success);
@@ -1788,7 +1818,8 @@ TEST_F(SdmmcBlockDeviceTest, Inspect) {
 
   user_.Queue(op1->operation(), OperationCallback, &ctx1);
 
-  EXPECT_OK(sync_completion_wait(&ctx1.completion, zx::duration::infinite().get()));
+  runtime_.PerformBlockingWork(
+      [&] { EXPECT_OK(sync_completion_wait(&ctx1.completion, zx::duration::infinite().get())); });
 
   EXPECT_TRUE(op1->private_storage()->completed);
   EXPECT_OK(op1->private_storage()->status);
@@ -1817,7 +1848,8 @@ TEST_F(SdmmcBlockDeviceTest, Inspect) {
 
   user_.Queue(op2->operation(), OperationCallback, &ctx2);
 
-  EXPECT_OK(sync_completion_wait(&ctx2.completion, zx::duration::infinite().get()));
+  runtime_.PerformBlockingWork(
+      [&] { EXPECT_OK(sync_completion_wait(&ctx2.completion, zx::duration::infinite().get())); });
 
   EXPECT_TRUE(op2->private_storage()->completed);
   EXPECT_NOT_OK(op2->private_storage()->status);
