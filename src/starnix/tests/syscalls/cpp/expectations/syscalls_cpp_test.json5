@@ -31,7 +31,8 @@
                 "VdsoTest.VdsoCanBeMadvised",
 
                 // TODO(https://g-issues.fuchsia.dev/issues/318701791)
-                "MemfdFaultTest.ReadV",
+                "MemfdFaultTest/FaultFileTest.ReadV/0",
+                "TmpfsFaultTest/FaultFileTest.ReadV/0",
                 "SocketFault/SocketFault.ReadV/2",
                 "SocketFault/SocketFault.WriteV/2",
             ],

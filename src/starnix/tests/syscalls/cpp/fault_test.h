@@ -7,23 +7,30 @@
 
 #include <sys/mman.h>
 
+#include <fbl/unique_fd.h>
 #include <gtest/gtest.h>
 
-template <typename T>
-class FaultTest : public T {
+class FaultTest : public testing::Test {
  protected:
-  static void SetUpTestSuite() {
-    faulting_ptr_ = mmap(nullptr, kFaultingSize_, PROT_NONE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
-    ASSERT_NE(faulting_ptr_, MAP_FAILED);
-  }
-
-  static void TearDownTestSuite() {
-    EXPECT_EQ(munmap(faulting_ptr_, kFaultingSize_), 0) << strerror(errno);
-    faulting_ptr_ = nullptr;
-  }
+  static void SetUpTestSuite();
+  static void TearDownTestSuite();
 
   static constexpr size_t kFaultingSize_ = 987;
-  static inline void* faulting_ptr_;
+  static void* faulting_ptr_;
+};
+
+class FaultFileTest : public FaultTest, public testing::WithParamInterface<int (*)()> {
+ protected:
+  void SetUp() override;
+
+  void TearDown() override;
+
+  void SetFdNonBlocking();
+
+  const fbl::unique_fd& fd() { return fd_; }
+
+ private:
+  fbl::unique_fd fd_;
 };
 
 #endif  // SRC_STARNIX_TESTS_SYSCALLS_CPP_FAULT_TEST_H_

@@ -102,6 +102,7 @@ test("syscalls_cpp_test_bin") {
     "custom_artifact_test.cc",
     "epoll_test.cc",
     "extended_pstate_test.cc",
+    "fault_test.cc",
     "fcntl_test.cc",
     "fs_test.cc",
     "fsverity_test.cc",
@@ -135,6 +136,7 @@ test("syscalls_cpp_test_bin") {
     "test_helper_test.cc",
     "time_test.cc",
     "timerfd_test.cc",
+    "tmpfs_test.cc",
     "trivial_test.cc",
     "udev_test.cc",
     "uio_test.cc",
@@ -326,8 +328,8 @@ fuchsia_test_package("starnix_syscalls_cpp_tests") {
   ]
 
   test_specs = {
-    # TODO(fxbug.dev/319150842): GCE doesn't support Vulkan, so, for now, just disable all of these
-    # tests on GCE.
+    # TODO(https://fxbug.dev/319150842): GCE doesn't support Vulkan, so, for now, just disable all
+    # of these tests on GCE.
     _env = basic_envs
     _env += [ gce_env ]
     _env -= [ gce_env ]

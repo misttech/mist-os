@@ -303,7 +303,7 @@ TEST(Socket, ConcurrentCreate) {
   child.join();
 }
 
-class SocketFault : public FaultTest<testing::TestWithParam<std::pair<int, int>>> {
+class SocketFault : public FaultTest, public testing::WithParamInterface<std::pair<int, int>> {
  protected:
   void SetUp() override {
     const auto [type, protocol] = GetParam();
