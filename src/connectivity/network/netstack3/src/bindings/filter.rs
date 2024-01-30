@@ -382,11 +382,11 @@ async fn serve_controller(
                                     )
                                 }
                                 FidlConversionError::InvalidAddressRange
-                                | FidlConversionError::AddressRangeFamilyMismatch => {
-                                    Error::ReturnToClient(
-                                        ChangeValidationError::InvalidAddressMatcher,
-                                    )
-                                }
+                                | FidlConversionError::AddressRangeFamilyMismatch
+                                | FidlConversionError::SubnetPrefixTooLong
+                                | FidlConversionError::SubnetHostBitsSet => Error::ReturnToClient(
+                                    ChangeValidationError::InvalidAddressMatcher,
+                                ),
                                 FidlConversionError::InvalidPortRange => {
                                     Error::ReturnToClient(ChangeValidationError::InvalidPortMatcher)
                                 }

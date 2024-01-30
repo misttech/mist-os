@@ -17,6 +17,7 @@ use async_utils::fold::FoldWhile;
 use fidl::marker::SourceBreaking;
 use fidl_fuchsia_hardware_network as fhardware_network;
 use fidl_fuchsia_net as fnet;
+use fidl_fuchsia_net_ext::IntoExt as _;
 use fidl_fuchsia_net_filter as fnet_filter;
 use fidl_fuchsia_net_interfaces as fnet_interfaces;
 use futures::{Stream, StreamExt as _, TryStreamExt as _};
@@ -44,6 +45,10 @@ pub enum FidlConversionError {
     InvalidAddressRange,
     #[error("address range start and end addresses are not the same IP family")]
     AddressRangeFamilyMismatch,
+    #[error("prefix length of subnet is longer than number of bits in IP address")]
+    SubnetPrefixTooLong,
+    #[error("host bits are set in subnet network")]
+    SubnetHostBitsSet,
     #[error("invalid port range (start must be <= end)")]
     InvalidPortRange,
     #[error("non-error result variant could not be converted to an error")]
@@ -476,6 +481,48 @@ impl TryFrom<fnet_filter::InterfaceMatcher> for InterfaceMatcher {
     }
 }
 
+/// Extension type for the `Subnet` variant of [`fnet_filter::AddressMatcherType`].
+///
+/// This type witnesses to the invariant that the prefix length of the subnet is
+/// no greater than the number of bits in the IP address, and that no host bits
+/// in the network address are set.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Subnet(fnet::Subnet);
+
+impl From<Subnet> for fnet::Subnet {
+    fn from(subnet: Subnet) -> Self {
+        let Subnet(subnet) = subnet;
+        subnet
+    }
+}
+
+impl TryFrom<fnet::Subnet> for Subnet {
+    type Error = FidlConversionError;
+
+    fn try_from(subnet: fnet::Subnet) -> Result<Self, Self::Error> {
+        let fnet::Subnet { addr, prefix_len } = subnet;
+
+        // We convert to `net_types::ip::Subnet` to validate the subnet's
+        // properties, but we don't store the subnet as that type because we
+        // want to avoid forcing all `Resource` types in this library to be
+        // parameterized on IP version.
+        let result = match addr {
+            fnet::IpAddress::Ipv4(v4) => {
+                net_types::ip::Subnet::<net_types::ip::Ipv4Addr>::new(v4.into_ext(), prefix_len)
+                    .map(|_| Subnet(subnet))
+            }
+            fnet::IpAddress::Ipv6(v6) => {
+                net_types::ip::Subnet::<net_types::ip::Ipv6Addr>::new(v6.into_ext(), prefix_len)
+                    .map(|_| Subnet(subnet))
+            }
+        };
+        result.map_err(|e| match e {
+            net_types::ip::SubnetError::PrefixTooLong => FidlConversionError::SubnetPrefixTooLong,
+            net_types::ip::SubnetError::HostBitsSet => FidlConversionError::SubnetHostBitsSet,
+        })
+    }
+}
+
 /// Extension type for [`fnet_filter::AddressRange`].
 ///
 /// This type witnesses to the invariant that `start` is in the same IP family
@@ -536,14 +583,14 @@ impl TryFrom<fnet_filter::AddressRange> for AddressRange {
 /// Extension type for [`fnet_filter::AddressMatcherType`].
 #[derive(Debug, Clone, PartialEq)]
 pub enum AddressMatcherType {
-    Subnet(fnet::Subnet),
+    Subnet(Subnet),
     Range(AddressRange),
 }
 
 impl From<AddressMatcherType> for fnet_filter::AddressMatcherType {
     fn from(matcher: AddressMatcherType) -> Self {
         match matcher {
-            AddressMatcherType::Subnet(subnet) => Self::Subnet(subnet),
+            AddressMatcherType::Subnet(subnet) => Self::Subnet(subnet.into()),
             AddressMatcherType::Range(range) => Self::Range(range.into()),
         }
     }
@@ -554,7 +601,7 @@ impl TryFrom<fnet_filter::AddressMatcherType> for AddressMatcherType {
 
     fn try_from(matcher: fnet_filter::AddressMatcherType) -> Result<Self, Self::Error> {
         match matcher {
-            fnet_filter::AddressMatcherType::Subnet(subnet) => Ok(Self::Subnet(subnet)),
+            fnet_filter::AddressMatcherType::Subnet(subnet) => Ok(Self::Subnet(subnet.try_into()?)),
             fnet_filter::AddressMatcherType::Range(range) => Ok(Self::Range(range.try_into()?)),
             fnet_filter::AddressMatcherType::__SourceBreaking { .. } => {
                 Err(FidlConversionError::UnknownUnionVariant(type_names::ADDRESS_MATCHER_TYPE))
@@ -1489,7 +1536,7 @@ mod tests {
     )]
     #[test_case(
         fnet_filter::AddressMatcherType::Subnet(fidl_subnet!("192.0.2.0/24")),
-        AddressMatcherType::Subnet(fidl_subnet!("192.0.2.0/24"));
+        AddressMatcherType::Subnet(Subnet(fidl_subnet!("192.0.2.0/24")));
         "AddressMatcherType"
     )]
     #[test_case(
@@ -1498,7 +1545,7 @@ mod tests {
             invert: true,
         },
         AddressMatcher {
-            matcher: AddressMatcherType::Subnet(fidl_subnet!("192.0.2.0/24")),
+            matcher: AddressMatcherType::Subnet(Subnet(fidl_subnet!("192.0.2.0/24"))),
             invert: true,
         };
         "AddressMatcher"
@@ -1749,6 +1796,18 @@ mod tests {
                 unknown_ordinal: 0
             }),
             Err(FidlConversionError::UnknownUnionVariant(type_names::ADDRESS_MATCHER_TYPE))
+        );
+    }
+
+    #[test]
+    fn subnet_try_from_invalid() {
+        assert_eq!(
+            Subnet::try_from(fnet::Subnet { addr: fidl_ip!("192.0.2.1"), prefix_len: 33 }),
+            Err(FidlConversionError::SubnetPrefixTooLong)
+        );
+        assert_eq!(
+            Subnet::try_from(fidl_subnet!("192.0.2.1/24")),
+            Err(FidlConversionError::SubnetHostBitsSet)
         );
     }
 

@@ -6,12 +6,13 @@
 
 use assert_matches::assert_matches;
 use fidl::endpoints::Proxy as _;
+use fidl_fuchsia_net as fnet;
 use fidl_fuchsia_net_filter as fnet_filter;
 use fidl_fuchsia_net_filter_ext as fnet_filter_ext;
 use fuchsia_async::{DurationExt as _, TimeoutExt as _};
 use futures::{FutureExt as _, StreamExt as _};
 use itertools::Itertools as _;
-use net_declare::fidl_ip;
+use net_declare::{fidl_ip, fidl_subnet};
 use netstack_testing_common::{
     realms::{Netstack3, TestSandboxExt as _},
     ASYNC_EVENT_NEGATIVE_CHECK_TIMEOUT,
@@ -599,20 +600,43 @@ async fn push_change_missing_required_field(name: &str) {
 
 #[netstack_test]
 #[test_case(
-    fnet_filter::AddressRange {
-        start: fidl_ip!("192.0.2.1"),
-        end: fidl_ip!("2001:db8::1"),
+    fnet_filter::AddressMatcher {
+        matcher: fnet_filter::AddressMatcherType::Range(fnet_filter::AddressRange {
+            start: fidl_ip!("192.0.2.1"),
+            end: fidl_ip!("2001:db8::1"),
+        }),
+        invert: false,
     };
     "address family mismatch"
 )]
 #[test_case(
-    fnet_filter::AddressRange {
-        start: fidl_ip!("192.0.2.2"),
-        end: fidl_ip!("192.0.2.1"),
+    fnet_filter::AddressMatcher {
+        matcher: fnet_filter::AddressMatcherType::Range(fnet_filter::AddressRange {
+            start: fidl_ip!("192.0.2.2"),
+            end: fidl_ip!("192.0.2.1"),
+        }),
+        invert: false,
     };
     "start > end"
 )]
-async fn push_change_invalid_address_matcher(name: &str, range: fnet_filter::AddressRange) {
+#[test_case(
+    fnet_filter::AddressMatcher {
+        matcher: fnet_filter::AddressMatcherType::Subnet(fnet::Subnet {
+            addr: fidl_ip!("192.0.2.1"),
+            prefix_len: 33,
+        }),
+        invert: false,
+    };
+    "subnet prefix too long"
+)]
+#[test_case(
+    fnet_filter::AddressMatcher {
+        matcher: fnet_filter::AddressMatcherType::Subnet(fidl_subnet!("192.0.2.1/24")),
+        invert: false,
+    };
+    "subnet host bits set"
+)]
+async fn push_change_invalid_address_matcher(name: &str, matcher: fnet_filter::AddressMatcher) {
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
     let realm = sandbox.create_netstack_realm::<Netstack3, _>(name).expect("create realm");
     let control =
@@ -642,10 +666,7 @@ async fn push_change_invalid_address_matcher(name: &str, range: fnet_filter::Add
                         index: 0,
                     },
                     matchers: fnet_filter::Matchers {
-                        src_addr: Some(fnet_filter::AddressMatcher {
-                            matcher: fnet_filter::AddressMatcherType::Range(range),
-                            invert: false,
-                        }),
+                        src_addr: Some(matcher),
                         ..Default::default()
                     },
                     action: fnet_filter::Action::Drop(fnet_filter::Empty {}),
