@@ -60,6 +60,8 @@ type HardwareRunInput struct {
 	FfxPath string `json:"ffx_path"`
 	// Map of CIPD destination to CIPD package path:version.
 	Cipd map[string]string `json:"cipd"`
+	// Path to ffxluciauth for downloading internal product bundles.
+	FfxluciauthPath string `json:"ffxluciauth_path"`
 }
 
 // RunInput is the struct that defines how to run a test.

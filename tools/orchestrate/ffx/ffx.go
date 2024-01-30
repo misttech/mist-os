@@ -55,17 +55,17 @@ type Option struct {
 	// IsolateDir is used.
 	LogDir string
 
-	// PrivateSSH is the list of the private ssh key files that ffx should use to
-	// connect to targets.
+	// PrivateSSH is the list of the pregenerated private ssh key files that ffx
+	// should use to connect to targets.
 	//
 	// Note: This option is only used to write the default ffx config when
 	// initializing an empty isolate directory. Otherwise, the existing config in
 	// IsolateDir is used.
 	PrivateSSH []string
 
-	// PublicSSH is the list of the public ssh key files and authorized_keys
-	// files that ffx should install when flashing targets or starting up emulator
-	// instances.
+	// PublicSSH is the list of the pregenerated public ssh key files and
+	// authorized_keys files that ffx should install when flashing targets or
+	// starting up emulator instances.
 	//
 	// Note: This option is only used to write the default ffx config when
 	// initializing an empty isolate directory. Otherwise, the existing config in
@@ -112,10 +112,6 @@ func New(opt *Option) (*Ffx, error) {
 }
 
 func (f *Ffx) setupDefaultConfig(configPath string, opt Option) error {
-	if len(opt.PrivateSSH) == 0 || len(opt.PublicSSH) == 0 {
-		return errors.New("PrivateSSH and PublicSSH cannot be empty when setting up ffx")
-	}
-
 	if opt.LogDir == "" {
 		opt.LogDir = filepath.Join(f.Dir, "log")
 	}
@@ -124,8 +120,7 @@ func (f *Ffx) setupDefaultConfig(configPath string, opt Option) error {
 	}
 
 	socketPath := filepath.Join(f.Dir, "ascendd")
-	err := writeConfigFile(
-		configPath, opt.LogDir, socketPath, opt.PublicSSH, opt.PrivateSSH, opt.EnableCSO)
+	err := writeConfigFile(configPath, opt, socketPath)
 	if err != nil {
 		return err
 	}
@@ -212,32 +207,40 @@ func (f *Ffx) WaitForDaemon(ctx context.Context) error {
 }
 
 // Flash uses "ffx target flash" to flash a product bundle into a device.
+// pubKeyPath is optional and ignored if empty.
 func (f *Ffx) Flash(fastbootSerial, productDir, pubKeyPath string) error {
-	_, err := f.RunCmdSync(
+	ffxArgs := []string{
 		"--target", fastbootSerial,
 		"--config", "{\"ffx\": {\"fastboot\": {\"inline_target\": true}}}",
 		"target", "flash",
-		"--authorized-keys", pubKeyPath,
-		"--product-bundle", productDir)
+		"--product-bundle", productDir}
+	if pubKeyPath != "" {
+		ffxArgs = append(ffxArgs, "--authorized-keys", pubKeyPath)
+	}
+	_, err := f.RunCmdSync(ffxArgs...)
 	return err
 }
 
-func writeConfigFile(configPath, logDir, socketPath string, pubSSH, privSSH []string, enableCSO bool) error {
+func writeConfigFile(configPath string, opt Option, socketPath string) error {
 	overnet := map[string]string{"socket": socketPath}
-	if enableCSO {
+	if opt.EnableCSO {
 		overnet["cso"] = "enabled"
+	}
+	ssh := map[string][]string{}
+	if len(opt.PrivateSSH) > 0 {
+		ssh["priv"] = opt.PrivateSSH
+	}
+	if len(opt.PublicSSH) > 0 {
+		ssh["pub"] = opt.PublicSSH
 	}
 	data := map[string]any{
 		"overnet": overnet,
 		"proxy": map[string]int{
 			"timeout_secs": 60,
 		},
-		"ssh": map[string][]string{
-			"priv": privSSH,
-			"pub":  pubSSH,
-		},
+		"ssh": ssh,
 		"log": map[string]any{
-			"dir":     []string{logDir},
+			"dir":     []string{opt.LogDir},
 			"enabled": []bool{true},
 			"level":   "Debug",
 		},

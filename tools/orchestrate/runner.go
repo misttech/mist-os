@@ -35,9 +35,6 @@ var (
 	targetLog     = filepath.Join(os.Getenv("TEST_UNDECLARED_OUTPUTS_DIR"), "target.log")
 	targetSymLog  = filepath.Join(os.Getenv("TEST_UNDECLARED_OUTPUTS_DIR"), "target.symbolized.log")
 	summaryPath   = filepath.Join(os.Getenv("TEST_UNDECLARED_OUTPUTS_DIR"), "summary.json")
-	privKeyPath   = "turquoise/sdk/build_defs/system/id_ed25519"
-	pubKeyPath    = "turquoise/sdk/build_defs/system/id_ed25519.pub"
-	luciAuthPath  = "turquoise/sdk/ffxluciauth/ffxluciauth"
 )
 
 // NewFtxRunner creates a FtxRunner with default dependencies.
@@ -52,15 +49,9 @@ func (r *FtxRunner) instantiateFfx(in *RunInput) error {
 	if err != nil {
 		return fmt.Errorf("os.Getwd: %w", err)
 	}
-	priv, pub := filepath.Join(wd, privKeyPath), filepath.Join(wd, pubKeyPath)
-	if err = os.Chmod(priv, 0600); err != nil {
-		return fmt.Errorf("os.Chmod: %w", err)
-	}
 	ffxOpt := &ffx.Option{
-		ExePath:    filepath.Join(wd, in.Hardware.FfxPath),
-		LogDir:     os.Getenv("TEST_UNDECLARED_OUTPUTS_DIR"),
-		PrivateSSH: []string{priv},
-		PublicSSH:  []string{pub},
+		ExePath: filepath.Join(wd, in.Hardware.FfxPath),
+		LogDir:  os.Getenv("TEST_UNDECLARED_OUTPUTS_DIR"),
 	}
 	f, err := ffx.New(ffxOpt)
 	if err != nil {
@@ -231,7 +222,16 @@ func (r *FtxRunner) downloadProductBundle(in *RunInput) (string, error) {
 		return "", fmt.Errorf("os.Getwd: %w", err)
 	}
 	dir := filepath.Join(wd, "ffx-product-bundle")
-	_, err = r.ffx.RunCmdSync("product", "download", in.Hardware.TransferURL, dir, "--auth", luciAuthPath)
+	ffxArgs := []string{
+		"product",
+		"download",
+		in.Hardware.TransferURL,
+		dir,
+	}
+	if in.Hardware.FfxluciauthPath != "" {
+		ffxArgs = append(ffxArgs, "--auth", in.Hardware.FfxluciauthPath)
+	}
+	_, err = r.ffx.RunCmdSync(ffxArgs...)
 	if err != nil {
 		return "", fmt.Errorf("ffx product download: %w", err)
 	}
@@ -240,7 +240,7 @@ func (r *FtxRunner) downloadProductBundle(in *RunInput) (string, error) {
 
 /* Step 3 - Flashing device. */
 func (r *FtxRunner) flashDevice(productDir string) error {
-	if err := r.ffx.Flash(r.deviceConfig.FastbootSerial, productDir, pubKeyPath); err != nil {
+	if err := r.ffx.Flash(r.deviceConfig.FastbootSerial, productDir, ""); err != nil {
 		return fmt.Errorf("ffx flash: %w", err)
 	}
 	return nil
