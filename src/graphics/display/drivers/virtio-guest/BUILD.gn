@@ -17,17 +17,18 @@ group("tests") {
 }
 
 fuchsia_driver("virtio_gpu-driver") {
-  output_name = "virtio_gpu"
   configs += [
     "//build/config:all_source",
     "//build/config/fuchsia:enable_zircon_asserts",
   ]
   if (use_virtio_gpu_v2) {
+    output_name = "virtio_gpu"
     deps = [
       "v2:common_srcs",
       "v2:virtio_gpu_bind",
     ]
   } else {
+    output_name = "virtio_gpu_v1"
     deps = [
       "v1:common_srcs",
       "v1:virtio_gpu_bind_v1",
