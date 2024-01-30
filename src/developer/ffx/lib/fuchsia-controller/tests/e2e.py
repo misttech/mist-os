@@ -4,6 +4,8 @@
 import asyncio
 import os
 import os.path
+import platform
+import subprocess
 import sys
 import typing
 import unittest
@@ -16,9 +18,31 @@ from fuchsia_controller_py import Context
 from fuchsia_controller_py import IsolateDir
 
 
+SDK_ROOT = "./sdk/exported/core"
+# For Linux this handles the gamut of options.
+# This map is derived from //build/rbe/fuchsia.py
+PLATFORM_TYPE = {
+    "x86_64": "x64",
+    "arm64": "arm64",
+}
+
+
+def _locate_ffx_binary(sdk_manifest: str) -> str:
+    """Locates the ffx binary from a given SDK root."""
+    return os.path.join(
+        SDK_ROOT,
+        "tools",
+        PLATFORM_TYPE[platform.machine()],
+        "ffx",
+    )
+
+
+FFX_PATH = _locate_ffx_binary(SDK_ROOT)
+
+
 class EndToEnd(unittest.IsolatedAsyncioTestCase):
     def _get_default_config(self) -> typing.Dict[str, str]:
-        return {"sdk.root": "./sdk/exported/core"}
+        return {"sdk.root": SDK_ROOT}
 
     def _get_isolate_dir(self) -> IsolateDir:
         isolation_path = None
@@ -201,6 +225,30 @@ class EndToEnd(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(res.response, "foo")
         res = asyncio.run(e.echo_string(value="barzzz"))
         self.assertEqual(res.response, "barzzz")
+
+    async def test_connect_daemon_without_autostart(self):
+        isolate_dir = self._get_isolate_dir()
+        ffx_cmd = [
+            FFX_PATH,
+            "--isolate-dir",
+            isolate_dir.directory(),
+            "daemon",
+            "echo",
+        ]
+        subprocess.check_call(ffx_cmd)
+        ctx = Context(
+            config={
+                "daemon.autostart": "false",
+            },
+            isolate_dir=isolate_dir,
+        )
+        e = ffx_fidl.Echo.Client(
+            ctx.connect_daemon_protocol(ffx_fidl.Echo.MARKER)
+        )
+        res = await e.echo_string(value="foo")
+        self.assertEqual(res.response, "foo")
+        res = await e.echo_string(value="barrrrzzz")
+        self.assertEqual(res.response, "barrrrzzz")
 
     async def test_sending_fidl_protocol(self):
         tc_server, tc_client = Channel.create()
