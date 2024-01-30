@@ -43,6 +43,7 @@ class LoaderImpl final : public fidl::Server<fuchsia_vulkan_loader::Loader>,
   void ConnectToManifestFs(ConnectToManifestFsRequest& request,
                            ConnectToManifestFsCompleter::Sync& completer) override;
   void GetSupportedFeatures(GetSupportedFeaturesCompleter::Sync& completer) override;
+  void GetVmexResource(GetVmexResourceCompleter::Sync& completer) override;
 
   void AddCallback(std::string name, GetCompleter::Async completer);
 

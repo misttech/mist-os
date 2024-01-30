@@ -5,8 +5,7 @@
 import("//build/components.gni")
 import("//build/dist/packaged_shared_library.gni")
 
-group("lavapipe-vulkan") {  # JJOSH: rename this and whole directory to
-                            # lavapipe-icd?
+group("lavapipe-vulkan") {
   public_deps = [ ":lavapipe_pkg" ]
 }
 

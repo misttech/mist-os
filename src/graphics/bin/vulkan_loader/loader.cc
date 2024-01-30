@@ -4,6 +4,9 @@
 
 #include "src/graphics/bin/vulkan_loader/loader.h"
 
+#include <fidl/fuchsia.kernel/cpp/wire.h>
+#include <lib/component/incoming/cpp/protocol.h>
+
 fidl::ProtocolHandler<fuchsia_vulkan_loader::Loader> LoaderImpl::GetHandler(
     LoaderApp* app, async_dispatcher_t* dispatcher) {
   return [=](fidl::ServerEnd<fuchsia_vulkan_loader::Loader> server_end) {
@@ -74,6 +77,36 @@ void LoaderImpl::GetSupportedFeatures(GetSupportedFeaturesCompleter::Sync& compl
       fuchsia_vulkan_loader::Features::kConnectToDeviceFs |
       fuchsia_vulkan_loader::Features::kConnectToManifestFs | fuchsia_vulkan_loader::Features::kGet;
   completer.Reply(kFeatures);
+}
+
+void LoaderImpl::GetVmexResource(GetVmexResourceCompleter::Sync& completer) {
+  if (!app_->allow_lavapipe_icd()) {
+    FX_LOGS(ERROR) << "Lavapipe is not allowed, GetVmexResource() shouldn't be called.";
+    completer.Reply(
+        fit::error(fuchsia_vulkan_loader::GetVmexResourceError::kLavapipeIcdNotAllowed));
+    return;
+  }
+
+  auto client_end_or = component::Connect<fuchsia_kernel::VmexResource>();
+  if (client_end_or.is_error()) {
+    FX_LOGS(WARNING) << "Failed to connect to fuchsia.kernel.VmexResource: "
+                     << client_end_or.status_string();
+    completer.Reply(
+        fit::error(fuchsia_vulkan_loader::GetVmexResourceError::kFailedToObtainResource));
+
+    return;
+  }
+
+  auto result = fidl::WireCall(*client_end_or)->Get();
+  if (!result.ok()) {
+    FX_LOGS(WARNING) << "fuchsia.kernel.VmexResource.Get() failed: " << result.error();
+    completer.Reply(
+        fit::error(fuchsia_vulkan_loader::GetVmexResourceError::kFailedToObtainResource));
+
+    return;
+  }
+
+  completer.Reply(fit::ok(std::move(result.value().resource)));
 }
 
 void LoaderImpl::AddCallback(std::string name, GetCompleter::Async completer) {

@@ -257,6 +257,9 @@
                     // TODO(https://fxbug.dev/42080863): Remove once the shell tools that use this
                     // capability no longer run in the sshd realm.
                     "/core/sshd-host/shell:**",
+
+                    // Allow Lavapipe only on Eng builds.
+                    "/core/vulkan_loader",
                 ],
             },
             {

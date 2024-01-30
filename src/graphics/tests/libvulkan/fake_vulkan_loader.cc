@@ -68,6 +68,12 @@ class LoaderImpl final : public fuchsia::vulkan::loader::Loader {
     callback(features);
   }
 
+  void GetVmexResource(GetVmexResourceCallback callback) override {
+    // Can't pass the enum value directly to `WithErr()` because it expects a "non-const &&"" arg.
+    auto err = fuchsia::vulkan::loader::GetVmexResourceError::LAVAPIPE_ICD_NOT_ALLOWED;
+    callback(fuchsia::vulkan::loader::Loader_GetVmexResource_Result::WithErr(std::move(err)));
+  }
+
   void ConnectToManifestFs(fuchsia::vulkan::loader::ConnectToManifestOptions options,
                            zx::channel channel) override {
     fdio_open("/pkg/data/manifest", static_cast<uint32_t>(fuchsia::io::OpenFlags::RIGHT_READABLE),

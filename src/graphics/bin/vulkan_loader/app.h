@@ -95,6 +95,10 @@ class LoaderApp {
     return pending_action_count_ > 0 || icd_notification_pending_;
   }
 
+  bool allow_magma_icds() const { return allow_magma_icds_; }
+  bool allow_goldfish_icd() const { return allow_goldfish_icd_; }
+  bool allow_lavapipe_icd() const { return allow_lavapipe_icd_; }
+
  private:
   friend class LoaderActionToken;
   void NotifyIcdsChangedOnMainThread();

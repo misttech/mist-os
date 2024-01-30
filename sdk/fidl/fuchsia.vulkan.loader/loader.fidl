@@ -21,6 +21,16 @@ type ConnectToManifestOptions = flexible bits {
     WAIT_FOR_IDLE = 1;
 };
 
+/// Error type returned by [`Loader.GetVmexResource`].
+@available(added=HEAD)
+type GetVmexResourceError = flexible enum {
+    /// The structured config value `allow_lavapipe_icd` is false.
+    LAVAPIPE_ICD_NOT_ALLOWED = 1;
+
+    /// The loader was unable to obtain a `VmexResource` handle.
+    FAILED_TO_OBTAIN_RESOURCE = 2;
+};
+
 /// Service to provide Vulkan libraries to the loader.
 @discoverable
 closed protocol Loader {
@@ -55,4 +65,11 @@ closed protocol Loader {
     strict GetSupportedFeatures() -> (struct {
         features Features;
     });
+
+    /// Returns a VmexResource that can be used by Lavapipe to JIT-compile code in the client
+    /// process, or an error.
+    @available(added=HEAD)
+    strict GetVmexResource() -> (resource struct {
+        resource zx.Handle:<RESOURCE>;
+    }) error GetVmexResourceError;
 };
