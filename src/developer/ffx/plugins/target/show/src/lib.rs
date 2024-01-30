@@ -7,7 +7,7 @@ use addr::TargetAddr;
 use anyhow::{anyhow, bail, Result};
 use async_trait::async_trait;
 use ffx_target_show_args as args;
-use fho::{deferred, moniker, Deferred, FfxMain, FfxTool, SimpleWriter};
+use fho::{deferred, moniker, Deferred, FfxMain, FfxTool, MachineWriter, ToolIO};
 use fidl_fuchsia_buildinfo::ProviderProxy;
 use fidl_fuchsia_developer_ffx::{TargetAddrInfo, TargetProxy};
 use fidl_fuchsia_feedback::{DeviceIdProviderProxy, LastRebootInfoProviderProxy};
@@ -42,9 +42,11 @@ pub struct ShowTool {
 
 fho::embedded_plugin!(ShowTool);
 
+type Writer = <ShowTool as FfxMain>::Writer;
+
 #[async_trait(?Send)]
 impl FfxMain for ShowTool {
-    type Writer = SimpleWriter;
+    type Writer = MachineWriter<Vec<ShowEntry>>;
     /// Main entry point for the `show` subcommand.
     async fn main(self, mut writer: Self::Writer) -> fho::Result<()> {
         let ShowTool {
@@ -75,7 +77,7 @@ impl FfxMain for ShowTool {
     }
 }
 
-async fn show_cmd<W: Write>(
+async fn show_cmd(
     channel_control_proxy: ChannelControlProxy,
     board_proxy: BoardProxy,
     device_proxy: DeviceProxy,
@@ -85,7 +87,7 @@ async fn show_cmd<W: Write>(
     last_reboot_info_proxy: LastRebootInfoProviderProxy,
     target_proxy: TargetProxy,
     target_show_args: args::TargetShow,
-    writer: &mut W,
+    writer: &mut Writer,
 ) -> Result<()> {
     show_cmd_impl(
         channel_control_proxy,
@@ -103,7 +105,7 @@ async fn show_cmd<W: Write>(
 }
 
 // Implementation of the target show command.
-async fn show_cmd_impl<W: Write>(
+async fn show_cmd_impl(
     channel_control_proxy: ChannelControlProxy,
     board_proxy: BoardProxy,
     device_proxy: DeviceProxy,
@@ -113,7 +115,7 @@ async fn show_cmd_impl<W: Write>(
     last_reboot_info_proxy: LastRebootInfoProviderProxy,
     target_proxy: TargetProxy,
     target_show_args: args::TargetShow,
-    writer: &mut W,
+    writer: &mut Writer,
 ) -> Result<()> {
     if target_show_args.version {
         writeln!(writer, "ffx target show version 0.1")?;
@@ -139,7 +141,9 @@ async fn show_cmd_impl<W: Write>(
         }
         Err(e) => bail!(e),
     };
-    if target_show_args.json {
+    if writer.is_machine() {
+        writer.machine(&show)?;
+    } else if target_show_args.json {
         show::output_for_machine(&show, &target_show_args, writer)?;
     } else {
         show::output_for_human(&show, &target_show_args, writer)?;
@@ -584,7 +588,8 @@ mod tests {
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_show_cmd_impl() {
-        let mut output = Vec::new();
+        let buffers = ffx_writer::TestBuffers::default();
+        let mut output = Writer::new_test(None, &buffers);
         show_cmd_impl(
             setup_fake_channel_control_server(),
             setup_fake_board_server(),
@@ -601,49 +606,52 @@ mod tests {
         .expect("show_cmd_impl");
         // Convert to a readable string instead of using a byte string and comparing that. Unless
         // you can read u8 arrays well, this helps debug the output.
-        let readable = String::from_utf8(output).expect("output is utf-8");
-        assert_eq!(readable, TEST_OUTPUT_HUMAN);
+        let (stdout, _stderr) = buffers.into_strings();
+        assert_eq!(stdout, TEST_OUTPUT_HUMAN);
     }
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_show_cmd_impl_json() {
-        let mut output = Vec::new();
-        show_cmd_impl(
-            setup_fake_channel_control_server(),
-            setup_fake_board_server(),
-            setup_fake_device_server(),
-            setup_fake_product_server(),
-            setup_fake_build_info_server(),
-            Some(setup_fake_device_id_server()),
-            setup_fake_last_reboot_info_server(),
-            setup_fake_target_server(),
-            args::TargetShow { json: true, ..Default::default() },
-            &mut output,
-        )
-        .await
-        .expect("show_cmd_impl");
-        let v: Value =
-            serde_json::from_str(std::str::from_utf8(&output).unwrap()).expect("Valid JSON");
-        assert!(v.is_array());
-        assert_eq!(v.as_array().unwrap().len(), 8);
+        for format in [None, Some(ffx_writer::Format::Json)] {
+            let buffers = ffx_writer::TestBuffers::default();
+            let mut output = Writer::new_test(format, &buffers);
+            show_cmd_impl(
+                setup_fake_channel_control_server(),
+                setup_fake_board_server(),
+                setup_fake_device_server(),
+                setup_fake_product_server(),
+                setup_fake_build_info_server(),
+                Some(setup_fake_device_id_server()),
+                setup_fake_last_reboot_info_server(),
+                setup_fake_target_server(),
+                args::TargetShow { json: true, ..Default::default() },
+                &mut output,
+            )
+            .await
+            .expect("show_cmd_impl");
+            let (stdout, _stderr) = buffers.into_strings();
+            let v: Value = serde_json::from_str(&stdout).expect("Valid JSON");
+            assert!(v.is_array());
+            assert_eq!(v.as_array().unwrap().len(), 8);
 
-        assert_eq!(v[0]["label"], Value::String("target".to_string()));
-        assert_eq!(v[1]["label"], Value::String("board".to_string()));
-        assert_eq!(v[2]["label"], Value::String("device".to_string()));
-        assert_eq!(v[3]["label"], Value::String("product".to_string()));
-        assert_eq!(v[4]["label"], Value::String("update".to_string()));
-        assert_eq!(v[5]["label"], Value::String("build".to_string()));
-        assert_eq!(v[6]["label"], Value::String("feedback".to_string()));
-        assert_eq!(v[7]["label"], Value::String("last_reboot".to_string()));
+            assert_eq!(v[0]["label"], Value::String("target".to_string()));
+            assert_eq!(v[1]["label"], Value::String("board".to_string()));
+            assert_eq!(v[2]["label"], Value::String("device".to_string()));
+            assert_eq!(v[3]["label"], Value::String("product".to_string()));
+            assert_eq!(v[4]["label"], Value::String("update".to_string()));
+            assert_eq!(v[5]["label"], Value::String("build".to_string()));
+            assert_eq!(v[6]["label"], Value::String("feedback".to_string()));
+            assert_eq!(v[7]["label"], Value::String("last_reboot".to_string()));
 
-        assert_eq!(v[0]["child"].as_array().unwrap().len(), 4);
-        assert_eq!(v[1]["child"].as_array().unwrap().len(), 3);
-        assert_eq!(v[2]["child"].as_array().unwrap().len(), 3);
-        assert_eq!(v[3]["child"].as_array().unwrap().len(), 16);
-        assert_eq!(v[4]["child"].as_array().unwrap().len(), 2);
-        assert_eq!(v[5]["child"].as_array().unwrap().len(), 4);
-        assert_eq!(v[6]["child"].as_array().unwrap().len(), 1);
-        assert_eq!(v[7]["child"].as_array().unwrap().len(), 3);
+            assert_eq!(v[0]["child"].as_array().unwrap().len(), 4);
+            assert_eq!(v[1]["child"].as_array().unwrap().len(), 3);
+            assert_eq!(v[2]["child"].as_array().unwrap().len(), 3);
+            assert_eq!(v[3]["child"].as_array().unwrap().len(), 16);
+            assert_eq!(v[4]["child"].as_array().unwrap().len(), 2);
+            assert_eq!(v[5]["child"].as_array().unwrap().len(), 4);
+            assert_eq!(v[6]["child"].as_array().unwrap().len(), 1);
+            assert_eq!(v[7]["child"].as_array().unwrap().len(), 3);
+        }
     }
 
     #[fuchsia_async::run_singlethreaded(test)]

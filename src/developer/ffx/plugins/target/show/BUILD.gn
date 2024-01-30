@@ -28,6 +28,7 @@ ffx_plugin("ffx_target_show") {
   ]
   test_deps = [
     "//sdk/fidl/fuchsia.net:fuchsia.net_rust",
+    "//src/developer/ffx/lib/writer:lib",
     "//src/lib/fuchsia-async",
   ]
 
