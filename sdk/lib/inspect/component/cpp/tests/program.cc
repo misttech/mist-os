@@ -7,12 +7,14 @@
 #include <lib/inspect/component/cpp/component.h>
 
 using inspect::ComponentInspector;
+using inspect::Inspector;
+using inspect::PublishVmo;
 
 int main() {
   async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
   auto* dispatcher = loop.dispatcher();
 
-  auto ci = ComponentInspector(dispatcher, {.tree_name = "InspectTreeServer"});
+  auto ci = ComponentInspector(dispatcher, {.tree_name = "ComponentInspector"});
 
   ci.root().RecordInt("val1", 1);
   ci.root().RecordInt("val2", 2);
@@ -27,6 +29,12 @@ int main() {
     insp.GetRoot().RecordInt("val4", 4);
     return fpromise::make_ok_promise(std::move(insp));
   });
+
+  Inspector insp;
+  PublishVmo(dispatcher, insp.DuplicateVmo(), {.tree_name = "VmoServer"});
+
+  insp.GetRoot().RecordString("value1", "only in VMO");
+  insp.GetRoot().RecordInt("value2", 10);
 
   ci.Health().Ok();
   loop.Run();

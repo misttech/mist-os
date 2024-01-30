@@ -15,12 +15,25 @@ ComponentInspector::ComponentInspector(async_dispatcher_t* dispatcher, PublishOp
                         ? std::move(*opts.client_end)
                         : component::Connect<fuchsia_inspect::InspectSink>().value();
   auto endpoints = fidl::CreateEndpoints<fuchsia_inspect::Tree>();
-  auto name = std::move(opts.tree_name);
   TreeServer::StartSelfManagedServer(inspector_, std::move(opts.tree_handler_settings), dispatcher,
                                      std::move(endpoints->server));
 
   fidl::Client client(std::move(client_end), dispatcher);
-  auto result = client->Publish({{.tree = std::move(endpoints->client), .name = std::move(name)}});
+  auto result =
+      client->Publish({{.tree = std::move(endpoints->client), .name = std::move(opts.tree_name)}});
+  ZX_ASSERT(result.is_ok());
+}
+
+void PublishVmo(async_dispatcher_t* dispatcher, zx::vmo vmo, VmoOptions opts) {
+  auto client_end = opts.client_end.has_value()
+                        ? std::move(*opts.client_end)
+                        : component::Connect<fuchsia_inspect::InspectSink>().value();
+  auto endpoints = fidl::CreateEndpoints<fuchsia_inspect::Tree>();
+  TreeServer::StartSelfManagedServer(std::move(vmo), {}, dispatcher, std::move(endpoints->server));
+
+  fidl::Client client(std::move(client_end), dispatcher);
+  auto result =
+      client->Publish({{.tree = std::move(endpoints->client), .name = std::move(opts.tree_name)}});
   ZX_ASSERT(result.is_ok());
 }
 #else
@@ -45,5 +58,4 @@ NodeHealth& ComponentInspector::Health() {
   }
   return *component_health_;
 }
-
 }  // namespace inspect

@@ -73,6 +73,14 @@ class InspectServiceTest : public gtest::RealLoopFixture,
     return TreeClient{std::move(endpoints->client), dispatcher()};
   }
 
+  TreeClient ConnectVmo() {
+    auto endpoints = fidl::CreateEndpoints<fuchsia_inspect::Tree>();
+    inspect::TreeServer::StartSelfManagedServer(inspector_.DuplicateVmo(), {}, dispatcher(),
+                                                std::move(endpoints->server));
+
+    return TreeClient{std::move(endpoints->client), dispatcher()};
+  }
+
   async::Executor executor_;
 };
 
@@ -434,6 +442,52 @@ TEST_F(InspectServiceTest, ReadMultiLevelIntoHierarchy) {
   ASSERT_EQ(1, a->value());
 }
 
+TEST_F(InspectServiceTest, SingleVmoGetContent) {
+  auto val = root().CreateInt("val", 1);
+  auto client = ConnectVmo();
+
+  fpromise::result<zx::vmo> content;
+  client->GetContent().Then(
+      [&](fidl::WireUnownedResult<fuchsia_inspect::Tree::GetContent>& result) {
+        ZX_ASSERT_MSG(result.ok(), "Tree::GetContent failed: %s",
+                      result.error().FormatDescription().c_str());
+        content = fpromise::ok(std::move(result.Unwrap()->content.buffer().vmo));
+      });
+
+  RunLoopUntil([&] { return !!content; });
+
+  auto vmo = content.take_value();
+  auto hierarchy = inspect::ReadFromVmo(std::move(vmo));
+  ASSERT_TRUE(hierarchy.is_ok());
+
+  const auto* val_prop = hierarchy.value().node().get_property<inspect::IntPropertyValue>("val");
+  ASSERT_NE(nullptr, val_prop);
+  EXPECT_EQ(1, val_prop->value());
+}
+
+TEST_F(InspectServiceTest, ListChildNamesFromVmoIsEmpty) {
+  inspect::ValueList values;
+  std::vector<std::string> expected_names;
+  root().RecordLazyNode("a", []() { return fpromise::make_ok_promise(inspect::Inspector{}); });
+
+  auto client = ConnectVmo();
+  auto endpoints = fidl::CreateEndpoints<fuchsia_inspect::TreeNameIterator>();
+
+  ASSERT_TRUE(client->ListChildNames(std::move(endpoints->server)).ok());
+
+  bool done = false;
+  std::vector<std::string> names_result;
+  TreeNameIteratorClient iter(std::move(endpoints->client), dispatcher());
+  executor_.schedule_task(inspect::testing::ReadAllChildNames(iter).and_then(
+      [&](std::vector<std::string>& promised_names) {
+        names_result = std::move(promised_names);
+        done = true;
+      }));
+
+  RunLoopUntil([&] { return done; });
+  ASSERT_TRUE(names_result.empty());
+}
+
 TEST_F(InspectServiceTest, ReadFromComponentInspector) {
   auto svc = component::OpenServiceRoot();
   auto client_end = component::ConnectAt<fuchsia_component::Binder>(*svc);
@@ -450,30 +504,48 @@ TEST_F(InspectServiceTest, ReadFromComponentInspector) {
   auto result = RunPromise(reader.SnapshotInspectUntilPresent({"inspect_writer_app"}));
 
   auto data = result.take_value();
-  uint64_t app_index;
-  bool found = false;
+  uint64_t component_inspector_index;
+  uint64_t vmo_index;
+  bool found_ci = false;
+  bool found_vmo = false;
   for (uint64_t i = 0; i < data.size(); i++) {
     if (data.at(i).moniker() == "inspect_writer_app") {
-      app_index = i;
-      found = true;
-      break;
+      if (data.at(i).metadata().name == "ComponentInspector") {
+        component_inspector_index = i;
+        found_ci = true;
+      } else if (data.at(i).metadata().name == "VmoServer") {
+        vmo_index = i;
+        found_vmo = true;
+      }
+
+      if (found_ci && found_vmo) {
+        break;
+      }
     }
   }
 
-  ASSERT_TRUE(found);
+  ASSERT_TRUE(found_ci && found_vmo);
 
-  auto& app_data = data.at(app_index);
+  auto& ci_data = data.at(component_inspector_index);
 
-  ASSERT_EQ(app_data.metadata().name, "InspectTreeServer");
-  ASSERT_EQ(app_data.metadata().filename, std::nullopt);
+  ASSERT_EQ(ci_data.metadata().name, "ComponentInspector");
+  ASSERT_EQ(ci_data.metadata().filename, std::nullopt);
 
-  ASSERT_EQ(1, app_data.GetByPath({"root", "val1"}).GetInt());
-  ASSERT_EQ(2, app_data.GetByPath({"root", "val2"}).GetInt());
-  ASSERT_EQ(3, app_data.GetByPath({"root", "val3"}).GetInt());
-  ASSERT_EQ(4, app_data.GetByPath({"root", "val4"}).GetInt());
-  ASSERT_EQ(0, app_data.GetByPath({"root", "child", "val"}).GetInt());
+  ASSERT_EQ(1, ci_data.GetByPath({"root", "val1"}).GetInt());
+  ASSERT_EQ(2, ci_data.GetByPath({"root", "val2"}).GetInt());
+  ASSERT_EQ(3, ci_data.GetByPath({"root", "val3"}).GetInt());
+  ASSERT_EQ(4, ci_data.GetByPath({"root", "val4"}).GetInt());
+  ASSERT_EQ(0, ci_data.GetByPath({"root", "child", "val"}).GetInt());
   ASSERT_EQ(
       std::string("OK"),
-      std::string(app_data.GetByPath({"root", "fuchsia.inspect.Health", "status"}).GetString()));
+      std::string(ci_data.GetByPath({"root", "fuchsia.inspect.Health", "status"}).GetString()));
+
+  auto& vmo_data = data.at(vmo_index);
+
+  ASSERT_EQ(vmo_data.metadata().name, "VmoServer");
+  ASSERT_EQ(vmo_data.metadata().filename, std::nullopt);
+
+  ASSERT_EQ(std::string("only in VMO"), vmo_data.GetByPath({"root", "value1"}).GetString());
+  ASSERT_EQ(10, vmo_data.GetByPath({"root", "value2"}).GetInt());
 }
 }  // namespace

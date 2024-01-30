@@ -11,6 +11,7 @@
 #include <lib/inspect/component/cpp/service.h>
 #include <zircon/types.h>
 
+#include <variant>
 #include <vector>
 
 namespace inspect {
@@ -57,13 +58,14 @@ class TreeNameIterator final : public fidl::WireServer<fuchsia_inspect::TreeName
   uint64_t current_index_ = 0;
 };
 
-void TreeServer::StartSelfManagedServer(Inspector inspector, TreeHandlerSettings settings,
+void TreeServer::StartSelfManagedServer(std::variant<Inspector, zx::vmo> data,
+                                        TreeHandlerSettings settings,
                                         async_dispatcher_t* dispatcher,
                                         fidl::ServerEnd<fuchsia_inspect::Tree>&& request) {
   ZX_ASSERT(dispatcher);
 
-  auto impl = std::unique_ptr<TreeServer>(
-      new TreeServer(std::move(inspector), std::move(settings), dispatcher));
+  auto impl =
+      std::unique_ptr<TreeServer>(new TreeServer(std::move(data), std::move(settings), dispatcher));
 
   auto* impl_ptr = impl.get();
   auto binding_ref = fidl::BindServer(dispatcher, std::move(request), std::move(impl), nullptr);
@@ -80,30 +82,43 @@ void TreeServer::GetContent(GetContentCompleter::Sync& completer) {
   const auto& failure_behavior = settings_.snapshot_behavior.FailureBehavior();
   using behavior_types = TreeServerSendPreference::Type;
 
-  if (primary_behavior == behavior_types::Frozen) {
-    auto maybe_vmo_frozen = inspector_.FrozenVmoCopy();
-    if (maybe_vmo_frozen.has_value()) {
-      buffer.vmo = std::move(maybe_vmo_frozen.value());
-    } else if (failure_behavior.has_value() && *failure_behavior == behavior_types::Live) {
-      buffer.vmo = inspector_.DuplicateVmo();
-    } else {
-      auto maybe_vmo_copied = inspector_.CopyVmo();
-      if (maybe_vmo_copied.has_value()) {
-        buffer.vmo = std::move(maybe_vmo_copied.value());
-      } else {
-        buffer.vmo = inspector_.DuplicateVmo();
-      }
-    }
-  } else if (primary_behavior == behavior_types::Live) {
-    buffer.vmo = inspector_.DuplicateVmo();
-  } else {
-    auto maybe_vmo_copied = inspector_.CopyVmo();
-    if (maybe_vmo_copied.has_value()) {
-      buffer.vmo = std::move(maybe_vmo_copied.value());
-    } else {
-      buffer.vmo = inspector_.DuplicateVmo();
-    }
-  }
+  std::visit(
+      [&](auto&& data) {
+        // T is one of the variant values of data_; at the time of writing that is Inspector or
+        // zx::vmo. The branching below first determines if the data is a VMO or an Inspector,
+        // and then determines the duplication policy given the data type.
+        using T = std::decay_t<decltype(data)>;
+        if constexpr (std::is_same_v<T, Inspector>) {
+          if (primary_behavior == behavior_types::Frozen) {
+            auto maybe_vmo_frozen = data.FrozenVmoCopy();
+            if (maybe_vmo_frozen.has_value()) {
+              buffer.vmo = std::move(maybe_vmo_frozen.value());
+            } else if (failure_behavior.has_value() && *failure_behavior == behavior_types::Live) {
+              buffer.vmo = data.DuplicateVmo();
+            } else {
+              auto maybe_vmo_copied = data.CopyVmo();
+              if (maybe_vmo_copied.has_value()) {
+                buffer.vmo = std::move(maybe_vmo_copied.value());
+              } else {
+                buffer.vmo = data.DuplicateVmo();
+              }
+            }
+          } else if (primary_behavior == behavior_types::Live) {
+            buffer.vmo = data.DuplicateVmo();
+          } else {
+            auto maybe_vmo_copied = data.CopyVmo();
+            if (maybe_vmo_copied.has_value()) {
+              buffer.vmo = std::move(maybe_vmo_copied.value());
+            } else {
+              buffer.vmo = data.DuplicateVmo();
+            }
+          }
+        } else if constexpr (std::is_same_v<T, zx::vmo>) {
+          data.duplicate(ZX_RIGHTS_BASIC | ZX_RIGHT_READ | ZX_RIGHT_MAP | ZX_RIGHT_GET_PROPERTY,
+                         &buffer.vmo);
+        }
+      },
+      data_);
 
   content_builder.buffer(std::move(buffer));
   completer.Reply(content_builder.Build());
@@ -113,19 +128,37 @@ void TreeServer::ListChildNames(ListChildNamesRequestView request,
                                 ListChildNamesCompleter::Sync& completer) {
   ZX_ASSERT(binding_.has_value());
 
-  TreeNameIterator::StartSelfManagedServer(
-      executor_.dispatcher(), std::move(request->tree_iterator), inspector_.GetChildNames());
+  std::visit(
+      [&](auto&& data) {
+        using T = std::decay_t<decltype(data)>;
+        if constexpr (std::is_same_v<T, Inspector>) {
+          TreeNameIterator::StartSelfManagedServer(
+              executor_.dispatcher(), std::move(request->tree_iterator), data.GetChildNames());
+        } else if constexpr (std::is_same_v<T, zx::vmo>) {
+          TreeNameIterator::StartSelfManagedServer(executor_.dispatcher(),
+                                                   std::move(request->tree_iterator), {});
+        }
+      },
+      data_);
 }
 
 void TreeServer::OpenChild(OpenChildRequestView request, OpenChildCompleter::Sync& completer) {
   ZX_ASSERT(binding_.has_value());
 
-  executor_.schedule_task(
-      inspector_.OpenChild(std::string(request->child_name.get()))
-          .and_then([request = std::move(request->tree), this](Inspector& inspector) mutable {
-            TreeServer::StartSelfManagedServer(inspector, settings_, executor_.dispatcher(),
-                                               std::move(request));
-          }));
+  std::visit(
+      [&](auto&& data) {
+        using T = std::decay_t<decltype(data)>;
+        if constexpr (std::is_same_v<T, Inspector>) {
+          executor_.schedule_task(data.OpenChild(std::string(request->child_name.get()))
+                                      .and_then([request = std::move(request->tree),
+                                                 this](Inspector& inspector) mutable {
+                                        TreeServer::StartSelfManagedServer(inspector, settings_,
+                                                                           executor_.dispatcher(),
+                                                                           std::move(request));
+                                      }));
+        }
+      },
+      data_);
 }
 
 }  // namespace inspect

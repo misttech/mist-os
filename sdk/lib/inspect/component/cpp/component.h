@@ -35,6 +35,26 @@ struct PublishOptions final {
   /// namespace or is renamed.
   std::optional<fidl::ClientEnd<fuchsia_inspect::InspectSink>> client_end = {};
 };
+
+/// Options for publishing a VMO.
+///
+/// This spawns a fuchsia.inspect.Tree server whose content is this VMO.
+/// It does not support lazy nodes.
+///
+/// The only service method is a live VMO. If you prefer to have copy semantics,
+/// copy the VMO before serving. This is because copying the VMO could be expensive.
+struct VmoOptions {
+  /// Provide a name to appear in the tree's Inspect Metadata. By default, it will be empty.
+  std::optional<std::string> tree_name = {};
+
+  /// Provide a fidl::ClientEnd, useful if `fuchsia.inspect.InspectSink` is not in the root
+  /// namespace or is renamed.
+  std::optional<fidl::ClientEnd<fuchsia_inspect::InspectSink>> client_end = {};
+};
+
+/// Publish a VMO according to `opts`.
+void PublishVmo(async_dispatcher_t* dispatcher, zx::vmo vmo, VmoOptions opts);
+
 #endif
 
 /// ComponentInspector is an instance of an Inspector that

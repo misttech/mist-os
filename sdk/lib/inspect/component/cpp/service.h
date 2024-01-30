@@ -13,6 +13,7 @@
 
 #include <functional>
 #include <memory>
+#include <variant>
 
 namespace inspect {
 
@@ -26,9 +27,19 @@ namespace inspect {
 /// For an example of usage, see the constructor for `inspect::ComponentInspector`.
 class TreeServer final : public fidl::WireServer<fuchsia_inspect::Tree> {
  public:
-  /// Starts a new server. The implementation deletes itself during teardown after an unbind.
-  static void StartSelfManagedServer(Inspector inspector, TreeHandlerSettings settings,
-                                     async_dispatcher_t* dispatcher,
+  /// Starts a new server. The implementation deletes itself during teardown after an unbind or
+  /// else runs until component shutdown.
+  ///
+  /// `data` is the Inspect data served over the connection.
+  ///
+  /// The `Inspector` variant results in full-featured Inspect with lazy nodes
+  /// and values.
+  ///
+  /// The `zx::vmo` variant will not serve lazy nodes/values. It will only serve the Inspect
+  /// data in itself. The VMO may contain lazy nodes/values, but they will be ignored when
+  /// snapshotting and parsing the data.
+  static void StartSelfManagedServer(std::variant<Inspector, zx::vmo> data,
+                                     TreeHandlerSettings settings, async_dispatcher_t* dispatcher,
                                      fidl::ServerEnd<fuchsia_inspect::Tree>&& request);
 
   /// Get the VMO handle for the Inspector handled by this server.
@@ -45,8 +56,9 @@ class TreeServer final : public fidl::WireServer<fuchsia_inspect::Tree> {
                       ListChildNamesCompleter::Sync& completer) override;
 
  private:
-  TreeServer(Inspector inspector, TreeHandlerSettings settings, async_dispatcher_t* disp)
-      : executor_(disp), settings_(settings), inspector_(std::move(inspector)) {}
+  TreeServer(std::variant<Inspector, zx::vmo> data, TreeHandlerSettings settings,
+             async_dispatcher_t* disp)
+      : executor_(disp), settings_(settings), data_(std::move(data)) {}
   TreeServer(const TreeServer&) = delete;
   TreeServer(TreeServer&&) = delete;
   TreeServer& operator=(TreeServer&&) = delete;
@@ -54,7 +66,7 @@ class TreeServer final : public fidl::WireServer<fuchsia_inspect::Tree> {
 
   async::Executor executor_;
   TreeHandlerSettings settings_;
-  Inspector inspector_;
+  std::variant<Inspector, zx::vmo> data_;
   cpp17::optional<fidl::ServerBindingRef<fuchsia_inspect::Tree>> binding_;
 };
 
