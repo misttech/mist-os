@@ -34,6 +34,8 @@ test("fan-controller-test-bin") {
   sources = [ "fan-controller-test.cc" ]
   deps = [
     ":common",
+    "//sdk/lib/async_patterns/testing/cpp",
+    "//sdk/lib/driver/testing/cpp",
     "//src/storage/lib/vfs/cpp",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/zxtest",

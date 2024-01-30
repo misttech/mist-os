@@ -41,7 +41,10 @@ void FanController::ExistsCallback(const fidl::ClientEnd<fuchsia_io::Directory>&
     return;
   }
 
-  if (controllers_.find(client_type->client_type()) == controllers_.end()) {
+  bool new_client_type = controllers_.find(client_type->client_type()) == controllers_.end();
+  controllers_[client_type->client_type()].fans_.emplace_back(std::move(fan));
+
+  if (new_client_type) {
     auto watcher = ConnectToWatcher(client_type->client_type());
     if (watcher.is_error()) {
       FX_LOGS(ERROR) << "Could not connect to ClientStateWatcher " << watcher.status_string();
@@ -52,7 +55,6 @@ void FanController::ExistsCallback(const fidl::ClientEnd<fuchsia_io::Directory>&
         fit::bind_member<&FanController::ControllerInstance::WatchCallback>(
             &controllers_[client_type->client_type()]));
   }
-  controllers_[client_type->client_type()].fans_.emplace_back(std::move(fan));
 }
 
 void FanController::ControllerInstance::WatchCallback(
@@ -68,9 +70,8 @@ void FanController::ControllerInstance::WatchCallback(
     FX_LOGS(ERROR) << "Unable to set state to " << result->state();
     return;
   }
-  auto state = static_cast<uint32_t>(result->state());
 
-  fans_.remove_if([state](auto& fan) {
+  fans_.remove_if([state = static_cast<uint32_t>(result->state())](auto& fan) {
     auto result = fan->SetFanLevel(state);
     if (result.is_error()) {
       FX_LOGS(ERROR) << "SetFanLevel failed with " << result.error_value();
