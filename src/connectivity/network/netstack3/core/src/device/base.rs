@@ -484,8 +484,6 @@ pub enum DeviceSendFrameError<T> {
 pub(crate) mod testutil {
     use super::*;
 
-    #[cfg(test)]
-    use net_types::ip::IpVersion;
     use net_types::ip::{Ipv4, Ipv6};
 
     use crate::ip::device::config::{
@@ -581,19 +579,15 @@ pub(crate) mod testutil {
 
     /// Returns whether IP packet routing is enabled on `device`.
     #[cfg(test)]
-    pub(crate) fn is_forwarding_enabled<BC: BindingsContext, I: Ip>(
-        core_ctx: &crate::context::SyncCtx<BC>,
+    #[netstack3_macros::context_ip_bounds(I, BC, crate)]
+    pub(crate) fn is_forwarding_enabled<BC: BindingsContext, I: crate::IpExt>(
+        ctx: &mut Ctx<BC>,
         device: &DeviceId<BC>,
     ) -> bool {
-        let mut core_ctx = CoreCtx::new_deprecated(core_ctx);
-        match I::VERSION {
-            IpVersion::V4 => {
-                crate::ip::device::is_ip_forwarding_enabled::<Ipv4, _, _>(&mut core_ctx, device)
-            }
-            IpVersion::V6 => {
-                crate::ip::device::is_ip_forwarding_enabled::<Ipv6, _, _>(&mut core_ctx, device)
-            }
-        }
+        let configuration = ctx.core_api().device_ip::<I>().get_configuration(device);
+        let crate::ip::device::state::IpDeviceConfiguration { forwarding_enabled, .. } =
+            configuration.as_ref();
+        *forwarding_enabled
     }
 
     /// A device ID type that supports identifying more than one distinct

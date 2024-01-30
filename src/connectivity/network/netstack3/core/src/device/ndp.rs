@@ -142,7 +142,7 @@ mod tests {
         },
         context::{
             testutil::{FakeInstant, FakeNetwork, FakeNetworkLinks, StepResult},
-            InstantContext as _, RngContext as _, SyncCtx, TimerContext,
+            InstantContext as _, RngContext as _, TimerContext,
         },
         device::{
             ethernet::{EthernetCreationProperties, EthernetLinkDevice, MaxEthernetFrameSize},
@@ -176,7 +176,7 @@ mod tests {
             TestIpExt, DEFAULT_INTERFACE_METRIC, FAKE_CONFIG_V6, IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
         },
         time::TimerIdInner,
-        BindingsContext, CoreCtx, Instant, TimerId,
+        CoreCtx, Instant, TimerId,
     };
 
     #[derive(Debug, PartialEq, Copy, Clone)]
@@ -192,12 +192,12 @@ mod tests {
         }
     }
 
-    fn get_global_ipv6_addrs<BC: BindingsContext>(
-        core_ctx: &SyncCtx<BC>,
-        device_id: &DeviceId<BC>,
-    ) -> Vec<GlobalIpv6Addr<BC::Instant>> {
+    fn get_global_ipv6_addrs(
+        ctx: &crate::testutil::FakeCtx,
+        device_id: &DeviceId<crate::testutil::FakeBindingsCtx>,
+    ) -> Vec<GlobalIpv6Addr<crate::context::testutil::FakeInstant>> {
         crate::ip::device::IpDeviceStateContext::<Ipv6, _>::with_address_ids(
-            &mut CoreCtx::new_deprecated(core_ctx),
+            &mut ctx.core_ctx(),
             device_id,
             |addrs, core_ctx| {
                 addrs
@@ -586,7 +586,7 @@ mod tests {
         });
 
         assert_eq!(
-            get_address_assigned(&&*net.core_ctx("local"), &local_device_id, local_ip()),
+            get_address_assigned(net.context("local"), &local_device_id, local_ip()),
             Some(true)
         );
 
@@ -610,11 +610,11 @@ mod tests {
 
         // Let's make sure that only our local node still can use that address.
         assert_eq!(
-            get_address_assigned(&&*net.core_ctx("local"), &local_device_id, local_ip()),
+            get_address_assigned(net.context("local"), &local_device_id, local_ip()),
             Some(true)
         );
         assert_eq!(
-            get_address_assigned(&&*net.core_ctx("remote"), &remote_device_id, local_ip()),
+            get_address_assigned(net.context("remote"), &remote_device_id, local_ip()),
             None,
         );
 
@@ -660,15 +660,15 @@ mod tests {
             .device_ip::<Ipv6>()
             .add_ip_addr_subnet(&dev_id, AddrSubnet::new(addr.into(), 128).unwrap())
             .unwrap();
-        assert_eq!(get_address_assigned(&ctx.core_ctx, &dev_id, addr,), Some(false));
+        assert_eq!(get_address_assigned(&ctx, &dev_id, addr,), Some(false));
 
         let addr = remote_ip();
-        assert_eq!(get_address_assigned(&ctx.core_ctx, &dev_id, addr,), None,);
+        assert_eq!(get_address_assigned(&ctx, &dev_id, addr,), None,);
         ctx.core_api()
             .device_ip::<Ipv6>()
             .add_ip_addr_subnet(&dev_id, AddrSubnet::new(addr.into(), 128).unwrap())
             .unwrap();
-        assert_eq!(get_address_assigned(&ctx.core_ctx, &dev_id, addr,), Some(false));
+        assert_eq!(get_address_assigned(&ctx, &dev_id, addr,), Some(false));
 
         // Clear all device references.
         ctx.core_api().device().remove_device(dev_id.unwrap_ethernet()).into_removed();
@@ -714,7 +714,7 @@ mod tests {
                 dad_timer_id(eth_dev_id.clone(), local_ip())
             );
         }
-        assert_eq!(get_address_assigned(&ctx.core_ctx, &dev_id, local_ip(),), Some(true));
+        assert_eq!(get_address_assigned(&ctx, &dev_id, local_ip(),), Some(true));
     }
 
     #[test]
@@ -808,12 +808,12 @@ mod tests {
     }
 
     fn get_address_assigned(
-        core_ctx: &crate::testutil::FakeCoreCtx,
+        ctx: &crate::testutil::FakeCtx,
         device: &DeviceId<crate::testutil::FakeBindingsCtx>,
         addr: Ipv6DeviceAddr,
     ) -> Option<bool> {
         crate::ip::device::IpDeviceStateContext::<Ipv6, _>::with_address_ids(
-            &mut CoreCtx::new_deprecated(core_ctx),
+            &mut ctx.core_ctx(),
             device,
             |mut addrs, core_ctx| {
                 addrs.find_map(|addr_id| {
@@ -872,7 +872,7 @@ mod tests {
             .add_ip_addr_subnet(&dev_id, AddrSubnet::new(local_ip().into(), 128).unwrap())
             .unwrap();
 
-        assert_matches!(get_address_assigned(&ctx.core_ctx, &dev_id, local_ip()), Some(false));
+        assert_matches!(get_address_assigned(&ctx, &dev_id, local_ip()), Some(false));
         assert_eq!(ctx.bindings_ctx.frames_sent().len(), 1);
 
         // Send another NS.
@@ -885,8 +885,8 @@ mod tests {
             .device_ip::<Ipv6>()
             .add_ip_addr_subnet(&dev_id, AddrSubnet::new(remote_ip().into(), 128).unwrap())
             .unwrap();
-        assert_matches!(get_address_assigned(&ctx.core_ctx, &dev_id, local_ip()), Some(false));
-        assert_matches!(get_address_assigned(&ctx.core_ctx, &dev_id, remote_ip()), Some(false));
+        assert_matches!(get_address_assigned(&ctx, &dev_id, local_ip()), Some(false));
+        assert_matches!(get_address_assigned(&ctx, &dev_id, remote_ip()), Some(false));
         assert_eq!(ctx.bindings_ctx.frames_sent().len(), 3);
 
         // Run to the end for DAD for local ip
@@ -900,14 +900,14 @@ mod tests {
                 remote_timer_id.clone()
             ]
         );
-        assert_eq!(get_address_assigned(&ctx.core_ctx, &dev_id, local_ip()), Some(true));
-        assert_matches!(get_address_assigned(&ctx.core_ctx, &dev_id, remote_ip()), Some(false));
+        assert_eq!(get_address_assigned(&ctx, &dev_id, local_ip()), Some(true));
+        assert_matches!(get_address_assigned(&ctx, &dev_id, remote_ip()), Some(false));
         assert_eq!(ctx.bindings_ctx.frames_sent().len(), 6);
 
         // Run to the end for DAD for local ip
         assert_eq!(ctx.trigger_timers_for(Duration::from_secs(1)), [remote_timer_id]);
-        assert_eq!(get_address_assigned(&ctx.core_ctx, &dev_id, local_ip()), Some(true));
-        assert_eq!(get_address_assigned(&ctx.core_ctx, &dev_id, remote_ip()), Some(true));
+        assert_eq!(get_address_assigned(&ctx, &dev_id, local_ip()), Some(true));
+        assert_eq!(get_address_assigned(&ctx, &dev_id, remote_ip()), Some(true));
         assert_eq!(ctx.bindings_ctx.frames_sent().len(), 6);
 
         // No more timers.
@@ -953,7 +953,7 @@ mod tests {
             .device_ip::<Ipv6>()
             .add_ip_addr_subnet(&dev_id, AddrSubnet::new(local_ip().into(), 128).unwrap())
             .unwrap();
-        assert_matches!(get_address_assigned(&ctx.core_ctx, &dev_id, local_ip()), Some(false));
+        assert_matches!(get_address_assigned(&ctx, &dev_id, local_ip()), Some(false));
         assert_eq!(ctx.bindings_ctx.frames_sent().len(), 1);
 
         // Send another NS.
@@ -966,8 +966,8 @@ mod tests {
             .device_ip::<Ipv6>()
             .add_ip_addr_subnet(&dev_id, AddrSubnet::new(remote_ip().into(), 128).unwrap())
             .unwrap();
-        assert_matches!(get_address_assigned(&ctx.core_ctx, &dev_id, local_ip()), Some(false));
-        assert_matches!(get_address_assigned(&ctx.core_ctx, &dev_id, remote_ip()), Some(false));
+        assert_matches!(get_address_assigned(&ctx, &dev_id, local_ip()), Some(false));
+        assert_matches!(get_address_assigned(&ctx, &dev_id, remote_ip()), Some(false));
         assert_eq!(ctx.bindings_ctx.frames_sent().len(), 3);
 
         // Run 1s
@@ -976,8 +976,8 @@ mod tests {
             ctx.trigger_timers_for(Duration::from_secs(1)),
             [local_timer_id, remote_timer_id.clone()]
         );
-        assert_matches!(get_address_assigned(&ctx.core_ctx, &dev_id, local_ip()), Some(false));
-        assert_matches!(get_address_assigned(&ctx.core_ctx, &dev_id, remote_ip()), Some(false));
+        assert_matches!(get_address_assigned(&ctx, &dev_id, local_ip()), Some(false));
+        assert_matches!(get_address_assigned(&ctx, &dev_id, remote_ip()), Some(false));
         assert_eq!(ctx.bindings_ctx.frames_sent().len(), 5);
 
         // Remove local ip
@@ -985,8 +985,8 @@ mod tests {
             .device_ip::<Ipv6>()
             .del_ip_addr(&dev_id, local_ip().into_specified())
             .unwrap();
-        assert_eq!(get_address_assigned(&ctx.core_ctx, &dev_id, local_ip()), None);
-        assert_matches!(get_address_assigned(&ctx.core_ctx, &dev_id, remote_ip()), Some(false));
+        assert_eq!(get_address_assigned(&ctx, &dev_id, local_ip()), None);
+        assert_matches!(get_address_assigned(&ctx, &dev_id, remote_ip()), Some(false));
         assert_eq!(ctx.bindings_ctx.frames_sent().len(), 5);
 
         // Run to the end for DAD for local ip
@@ -994,8 +994,8 @@ mod tests {
             ctx.trigger_timers_for(Duration::from_secs(2)),
             [remote_timer_id.clone(), remote_timer_id]
         );
-        assert_eq!(get_address_assigned(&ctx.core_ctx, &dev_id, local_ip()), None);
-        assert_eq!(get_address_assigned(&ctx.core_ctx, &dev_id, remote_ip()), Some(true));
+        assert_eq!(get_address_assigned(&ctx, &dev_id, local_ip()), None);
+        assert_eq!(get_address_assigned(&ctx, &dev_id, remote_ip()), Some(true));
         assert_eq!(ctx.bindings_ctx.frames_sent().len(), 6);
 
         // No more timers.
@@ -1569,7 +1569,7 @@ mod tests {
 
         // Enable routing on device.
         set_forwarding_enabled::<_, Ipv6>(&mut ctx, &device, true);
-        assert!(is_forwarding_enabled::<_, Ipv6>(&ctx.core_ctx, &device));
+        assert!(is_forwarding_enabled::<_, Ipv6>(&mut ctx, &device));
 
         // Should have not sent any new packets, but unset the router
         // solicitation timer.
@@ -1578,7 +1578,7 @@ mod tests {
 
         // Unsetting routing should succeed.
         set_forwarding_enabled::<_, Ipv6>(&mut ctx, &device, false);
-        assert!(!is_forwarding_enabled::<_, Ipv6>(&ctx.core_ctx, &device));
+        assert!(!is_forwarding_enabled::<_, Ipv6>(&mut ctx, &device));
         assert_eq!(ctx.bindings_ctx.frames_sent().len(), 1);
         ctx.bindings_ctx.timer_ctx().assert_timers_installed([(timer_id.clone(), ..)]);
 
@@ -1634,7 +1634,7 @@ mod tests {
             .unwrap();
 
         let device_id = device.clone().try_into().unwrap();
-        assert_eq!(get_address_assigned(&ctx.core_ctx, &device, local_ip()), Some(true));
+        assert_eq!(get_address_assigned(&ctx, &device, local_ip()), Some(true));
         assert_empty(ctx.bindings_ctx.frames_sent().iter());
         assert_empty(ctx.bindings_ctx.timer_ctx().timers());
 
@@ -1661,8 +1661,8 @@ mod tests {
             .device_ip::<Ipv6>()
             .add_ip_addr_subnet(&device, AddrSubnet::new(fake_config.remote_ip.get(), 128).unwrap())
             .unwrap();
-        assert_eq!(get_address_assigned(&ctx.core_ctx, &device, local_ip()), Some(true));
-        assert_eq!(get_address_assigned(&ctx.core_ctx, &device, remote_ip()), Some(false));
+        assert_eq!(get_address_assigned(&ctx, &device, local_ip()), Some(true));
+        assert_eq!(get_address_assigned(&ctx, &device, remote_ip()), Some(false));
         assert_eq!(ctx.bindings_ctx.frames_sent().len(), 1);
         assert_eq!(ctx.bindings_ctx.timer_ctx().timers().len(), 1);
 
@@ -1684,7 +1684,7 @@ mod tests {
         assert_eq!(ctx.bindings_ctx.frames_sent().len(), 3);
         assert_eq!(ctx.trigger_next_timer().unwrap(), expected_timer_id);
         assert_eq!(ctx.bindings_ctx.frames_sent().len(), 3);
-        assert_eq!(get_address_assigned(&ctx.core_ctx, &device, remote_ip()), Some(true));
+        assert_eq!(get_address_assigned(&ctx, &device, remote_ip()), Some(true));
 
         // Updating the IP should resolve immediately since DAD has just been
         // turned off.
@@ -1693,11 +1693,11 @@ mod tests {
             .device_ip::<Ipv6>()
             .add_ip_addr_subnet(&device, AddrSubnet::new(new_ip.get(), 128).unwrap())
             .unwrap();
-        assert_eq!(get_address_assigned(&ctx.core_ctx, &device, local_ip()), Some(true));
-        assert_eq!(get_address_assigned(&ctx.core_ctx, &device, remote_ip()), Some(true));
+        assert_eq!(get_address_assigned(&ctx, &device, local_ip()), Some(true));
+        assert_eq!(get_address_assigned(&ctx, &device, remote_ip()), Some(true));
         assert_eq!(
             get_address_assigned(
-                &ctx.core_ctx,
+                &ctx,
                 &device,
                 NonMappedAddr::new(new_ip.try_into().unwrap()).unwrap()
             ),
@@ -1793,7 +1793,7 @@ mod tests {
             icmpv6_packet_buf,
         );
 
-        assert_empty(get_global_ipv6_addrs(core_ctx, &device));
+        assert_empty(get_global_ipv6_addrs(&ctx, &device));
 
         // No timers.
         assert_eq!(ctx.trigger_next_timer(), None);
@@ -1971,7 +1971,7 @@ mod tests {
         prefix1.send_prefix_update(&mut ctx, &device, src_ip);
 
         let (prefix_1_static, prefix_1_temporary) = {
-            let slaac_configs = get_global_ipv6_addrs(&ctx.core_ctx, &device)
+            let slaac_configs = get_global_ipv6_addrs(&ctx, &device)
                 .into_iter()
                 .filter_map(slaac_address)
                 .filter(|(a, _)| prefix1.prefix.contains(a));
@@ -2002,7 +2002,7 @@ mod tests {
 
         {
             // Check prefix 1 addresses again.
-            let slaac_configs = get_global_ipv6_addrs(&ctx.core_ctx, &device)
+            let slaac_configs = get_global_ipv6_addrs(&ctx, &device)
                 .into_iter()
                 .filter_map(slaac_address)
                 .filter(|(a, _)| prefix1.prefix.contains(a));
@@ -2023,7 +2023,7 @@ mod tests {
         }
         {
             // Check prefix 2 addresses.
-            let slaac_configs = get_global_ipv6_addrs(&ctx.core_ctx, &device)
+            let slaac_configs = get_global_ipv6_addrs(&ctx, &device)
                 .into_iter()
                 .filter_map(slaac_address)
                 .filter(|(a, _)| prefix2.prefix.contains(a));
@@ -2090,7 +2090,7 @@ mod tests {
         );
 
         // Should have gotten a new temporary IP.
-        let temporary_slaac_addresses = get_global_ipv6_addrs(&ctx.core_ctx, &device)
+        let temporary_slaac_addresses = get_global_ipv6_addrs(&ctx, &device)
             .into_iter()
             .filter_map(|entry| match entry.config {
                 Ipv6AddrConfig::Slaac(SlaacConfig::Static { .. }) => None,
@@ -2139,9 +2139,7 @@ mod tests {
             // Receive an RA and determine what temporary address was assigned, then return it.
             receive_prefix_update(&mut ctx, &device, src_ip, subnet, 9000, 10000);
             let conflicted_addr =
-                *get_matching_slaac_address_entry(&mut ctx.core_ctx, &device, |entry| match entry
-                    .config
-                {
+                *get_matching_slaac_address_entry(&ctx, &device, |entry| match entry.config {
                     Ipv6AddrConfig::Slaac(SlaacConfig::Static { valid_until: _ }) => false,
                     Ipv6AddrConfig::Slaac(SlaacConfig::Temporary(_)) => true,
                     Ipv6AddrConfig::Manual(_manual_config) => false,
@@ -2164,7 +2162,7 @@ mod tests {
 
         // Sanity check: `conflicted_addr` is already assigned on the device.
         assert_matches!(
-            get_global_ipv6_addrs(&ctx.core_ctx, &device)
+            get_global_ipv6_addrs(&ctx, &device)
                 .into_iter()
                 .find(|entry| entry.addr_sub() == &conflicted_addr),
             Some(_)
@@ -2185,12 +2183,10 @@ mod tests {
 
         // Should have gotten a new temporary IP.
         let temporary_slaac_addresses =
-            get_matching_slaac_address_entries(&mut ctx.core_ctx, &device, |entry| {
-                match entry.config {
-                    Ipv6AddrConfig::Slaac(SlaacConfig::Static { valid_until: _ }) => false,
-                    Ipv6AddrConfig::Slaac(SlaacConfig::Temporary(_)) => true,
-                    Ipv6AddrConfig::Manual(_manual_config) => false,
-                }
+            get_matching_slaac_address_entries(&ctx, &device, |entry| match entry.config {
+                Ipv6AddrConfig::Slaac(SlaacConfig::Static { valid_until: _ }) => false,
+                Ipv6AddrConfig::Slaac(SlaacConfig::Temporary(_)) => true,
+                Ipv6AddrConfig::Manual(_manual_config) => false,
             })
             .map(|entry| *entry.addr_sub())
             .collect::<Vec<_>>();
@@ -2219,14 +2215,13 @@ mod tests {
             )
             .into();
         crate::device::testutil::enable_device(&mut ctx, &device);
-        let Ctx { core_ctx, bindings_ctx } = &mut ctx;
 
         let src_mac = config.remote_mac;
         let src_ip = src_mac.to_ipv6_link_local().addr().get();
         let prefix = Ipv6Addr::from([1, 2, 3, 4, 5, 6, 7, 8, 0, 0, 0, 0, 0, 0, 0, 0]);
         let prefix_length = 64;
 
-        assert_empty(get_global_ipv6_addrs(core_ctx, &device));
+        assert_empty(get_global_ipv6_addrs(&ctx, &device));
 
         // Receive a new RA with new prefix (autonomous), but preferred lifetime
         // is greater than valid.
@@ -2244,16 +2239,16 @@ mod tests {
             10000,
         );
         receive_ip_packet::<_, _, Ipv6>(
-            core_ctx,
-            bindings_ctx,
+            &ctx.core_ctx,
+            &mut ctx.bindings_ctx,
             &device,
             Some(FrameDestination::Multicast),
             icmpv6_packet_buf,
         );
-        assert_empty(get_global_ipv6_addrs(core_ctx, &device));
+        assert_empty(get_global_ipv6_addrs(&ctx, &device));
 
         // Address invalidation timers were added.
-        assert_empty(bindings_ctx.timer_ctx().timers());
+        assert_empty(ctx.bindings_ctx.timer_ctx().timers());
     }
 
     #[test]
@@ -2283,7 +2278,7 @@ mod tests {
         let expected_addr_sub = AddrSubnet::from_witness(expected_addr, prefix.prefix()).unwrap();
 
         // Have no addresses yet.
-        assert_empty(get_global_ipv6_addrs(&ctx.core_ctx, &device));
+        assert_empty(get_global_ipv6_addrs(&ctx, &device));
 
         let _: Ipv6DeviceConfigurationUpdate = ctx
             .core_api()
@@ -2342,7 +2337,7 @@ mod tests {
             }),
             flags: Ipv6AddressFlags { deprecated: false, assigned: false },
         };
-        assert_eq!(get_global_ipv6_addrs(&ctx.core_ctx, &device), [expected_address_entry]);
+        assert_eq!(get_global_ipv6_addrs(&ctx, &device), [expected_address_entry]);
 
         // Make sure deprecate and invalidation timers are set.
         ctx.bindings_ctx.timer_ctx().assert_some_timers_installed([
@@ -2362,7 +2357,7 @@ mod tests {
             SlaacTimerId::new_deprecate_slaac_address(device.clone(), expected_addr).into()
         );
         assert_eq!(
-            get_global_ipv6_addrs(&ctx.core_ctx, &device),
+            get_global_ipv6_addrs(&ctx, &device),
             [GlobalIpv6Addr {
                 flags: Ipv6AddressFlags { deprecated: true, ..expected_address_entry.flags },
                 ..expected_address_entry
@@ -2405,30 +2400,30 @@ mod tests {
     }
 
     fn get_matching_slaac_address_entries<F: FnMut(&GlobalIpv6Addr<FakeInstant>) -> bool>(
-        core_ctx: &mut crate::testutil::FakeCoreCtx,
+        ctx: &crate::testutil::FakeCtx,
         device: &DeviceId<crate::testutil::FakeBindingsCtx>,
         filter: F,
     ) -> impl Iterator<Item = GlobalIpv6Addr<FakeInstant>> {
-        get_global_ipv6_addrs(core_ctx, device).into_iter().filter(filter)
+        get_global_ipv6_addrs(ctx, device).into_iter().filter(filter)
     }
 
     fn get_matching_slaac_address_entry<F: FnMut(&GlobalIpv6Addr<FakeInstant>) -> bool>(
-        core_ctx: &mut crate::testutil::FakeCoreCtx,
+        ctx: &crate::testutil::FakeCtx,
         device: &DeviceId<crate::testutil::FakeBindingsCtx>,
         filter: F,
     ) -> Option<GlobalIpv6Addr<FakeInstant>> {
-        let mut matching_addrs = get_matching_slaac_address_entries(core_ctx, device, filter);
+        let mut matching_addrs = get_matching_slaac_address_entries(ctx, device, filter);
         let entry = matching_addrs.next();
         assert_eq!(matching_addrs.next(), None);
         entry
     }
 
     fn get_slaac_address_entry(
-        core_ctx: &mut crate::testutil::FakeCoreCtx,
+        ctx: &crate::testutil::FakeCtx,
         device: &DeviceId<crate::testutil::FakeBindingsCtx>,
         addr_sub: AddrSubnet<Ipv6Addr, Ipv6DeviceAddr>,
     ) -> Option<GlobalIpv6Addr<FakeInstant>> {
-        let mut matching_addrs = get_global_ipv6_addrs(core_ctx, device)
+        let mut matching_addrs = get_global_ipv6_addrs(ctx, device)
             .into_iter()
             .filter(|entry| *entry.addr_sub() == addr_sub);
         let entry = matching_addrs.next();
@@ -2488,7 +2483,7 @@ mod tests {
             expected_valid_lifetime: u32,
         ) {
             receive_prefix_update(ctx, device, src_ip, subnet, preferred_lifetime, valid_lifetime);
-            let entry = get_slaac_address_entry(&mut ctx.core_ctx, &device, addr_sub).unwrap();
+            let entry = get_slaac_address_entry(&ctx, &device, addr_sub).unwrap();
             let now = ctx.bindings_ctx.now();
             let valid_until =
                 now.checked_add(Duration::from_secs(expected_valid_lifetime.into())).unwrap();
@@ -2548,7 +2543,7 @@ mod tests {
         let expected_addr_sub = AddrSubnet::from_witness(expected_addr, prefix_length).unwrap();
 
         // Have no addresses yet.
-        assert_empty(get_global_ipv6_addrs(&ctx.core_ctx, &device));
+        assert_empty(get_global_ipv6_addrs(&ctx, &device));
 
         // Receive a new RA with new prefix (autonomous).
         //
@@ -2671,9 +2666,7 @@ mod tests {
             valid_lifetime,
         );
 
-        let Ctx { core_ctx, bindings_ctx } = &mut ctx;
-
-        let first_addr_entry = get_matching_slaac_address_entry(core_ctx, &device, |entry| {
+        let first_addr_entry = get_matching_slaac_address_entry(&ctx, &device, |entry| {
             entry.addr_sub().subnet() == subnet
                 && match entry.config {
                     Ipv6AddrConfig::Slaac(SlaacConfig::Temporary(_)) => true,
@@ -2685,15 +2678,14 @@ mod tests {
         assert!(!first_addr_entry.flags.assigned);
 
         receive_neighbor_advertisement_for_duplicate_address(
-            core_ctx,
-            bindings_ctx,
+            &mut ctx,
             &device,
             first_addr_entry.addr_sub().addr(),
         );
 
         // In response to the advertisement with the duplicate address, a
         // different address should be selected.
-        let second_addr_entry = get_matching_slaac_address_entry(core_ctx, &device, |entry| {
+        let second_addr_entry = get_matching_slaac_address_entry(&ctx, &device, |entry| {
             entry.addr_sub().subnet() == subnet
                 && match entry.config {
                     Ipv6AddrConfig::Slaac(SlaacConfig::Temporary(_)) => true,
@@ -2717,7 +2709,7 @@ mod tests {
             desync_factor: _,
             dad_counter: 1,
         })) => {
-            assert_eq!(creation_time, bindings_ctx.now());
+            assert_eq!(creation_time, ctx.bindings_ctx.now());
             assert_eq!(valid_until, first_addr_entry_valid);
         });
 
@@ -2726,8 +2718,7 @@ mod tests {
     }
 
     fn receive_neighbor_advertisement_for_duplicate_address(
-        core_ctx: &mut crate::testutil::FakeCoreCtx,
-        bindings_ctx: &mut crate::testutil::FakeBindingsCtx,
+        ctx: &mut crate::testutil::FakeCtx,
         device: &DeviceId<crate::testutil::FakeBindingsCtx>,
         source_ip: Ipv6DeviceAddr,
     ) {
@@ -2738,8 +2729,8 @@ mod tests {
         let override_flag = true;
 
         receive_ip_packet::<_, _, Ipv6>(
-            core_ctx,
-            bindings_ctx,
+            &ctx.core_ctx,
+            &mut ctx.bindings_ctx,
             &device,
             Some(FrameDestination::Multicast),
             testutil::neighbor_advertisement_ip_packet(
@@ -2817,8 +2808,6 @@ mod tests {
             MAX_PREFERRED_LIFETIME.as_secs() as u32,
             MAX_VALID_LIFETIME.as_secs() as u32,
         );
-        let Ctx { core_ctx, bindings_ctx } = &mut ctx;
-
         let match_temporary_address = |entry: &GlobalIpv6Addr<FakeInstant>| {
             entry.addr_sub().subnet() == subnet
                 && match entry.config {
@@ -2836,34 +2825,27 @@ mod tests {
                 // An address should be selected. This must be checked using DAD
                 // against other hosts on the network.
                 let addr_entry =
-                    get_matching_slaac_address_entry(core_ctx, &device, match_temporary_address)
+                    get_matching_slaac_address_entry(&ctx, &device, match_temporary_address)
                         .unwrap();
                 assert!(!addr_entry.flags.assigned);
 
                 // A response is received to the DAD request indicating that it
                 // is a duplicate.
                 receive_neighbor_advertisement_for_duplicate_address(
-                    core_ctx,
-                    bindings_ctx,
+                    &mut ctx,
                     &device,
                     addr_entry.addr_sub().addr(),
                 );
 
                 // The address should be unassigned from the device.
-                assert_eq!(
-                    get_slaac_address_entry(core_ctx, &device, *addr_entry.addr_sub()),
-                    None
-                );
+                assert_eq!(get_slaac_address_entry(&ctx, &device, *addr_entry.addr_sub()), None);
                 *addr_entry.addr_sub()
             })
             .collect();
 
         // After the last failed try, the system should have given up, and there
         // should be no temporary address for the subnet.
-        assert_eq!(
-            get_matching_slaac_address_entry(core_ctx, &device, match_temporary_address),
-            None
-        );
+        assert_eq!(get_matching_slaac_address_entry(&ctx, &device, match_temporary_address), None);
 
         // All the attempted addresses should be unique.
         let unique_addresses = attempted_addresses.iter().collect::<HashSet<_>>();
@@ -2953,16 +2935,15 @@ mod tests {
             MAX_VALID_LIFETIME.as_secs().try_into().unwrap(),
         );
 
-        let first_addr_entry =
-            get_matching_slaac_address_entry(&mut ctx.core_ctx, &device, |entry| {
-                entry.addr_sub().subnet() == subnet
-                    && match entry.config {
-                        Ipv6AddrConfig::Slaac(SlaacConfig::Temporary(_)) => true,
-                        Ipv6AddrConfig::Slaac(SlaacConfig::Static { valid_until: _ }) => false,
-                        Ipv6AddrConfig::Manual(_manual_config) => false,
-                    }
-            })
-            .unwrap();
+        let first_addr_entry = get_matching_slaac_address_entry(&ctx, &device, |entry| {
+            entry.addr_sub().subnet() == subnet
+                && match entry.config {
+                    Ipv6AddrConfig::Slaac(SlaacConfig::Temporary(_)) => true,
+                    Ipv6AddrConfig::Slaac(SlaacConfig::Static { valid_until: _ }) => false,
+                    Ipv6AddrConfig::Manual(_manual_config) => false,
+                }
+        })
+        .unwrap();
         let regen_timer_id: TimerId<_> = SlaacTimerId::new_regenerate_temporary_slaac_address(
             device.clone(),
             *first_addr_entry.addr_sub(),
@@ -2974,7 +2955,7 @@ mod tests {
         // The regeneration timer should cause a new address to be created in
         // the same subnet.
         assert_matches!(
-            get_matching_slaac_address_entry(&mut ctx.core_ctx, &device, |entry| {
+            get_matching_slaac_address_entry(&ctx, &device, |entry| {
                 entry.addr_sub().subnet() == subnet
                     && entry.addr_sub() != first_addr_entry.addr_sub()
                     && match entry.config {
@@ -2996,7 +2977,7 @@ mod tests {
             prefix_preferred_for.as_secs().try_into().unwrap(),
             MAX_VALID_LIFETIME.as_secs().try_into().unwrap(),
         );
-        let addresses = get_matching_slaac_address_entries(&mut ctx.core_ctx, &device, |entry| {
+        let addresses = get_matching_slaac_address_entries(&ctx, &device, |entry| {
             entry.addr_sub().subnet() == subnet
                 && match entry.config {
                     Ipv6AddrConfig::Slaac(SlaacConfig::Temporary(_)) => true,
@@ -3025,9 +3006,7 @@ mod tests {
         // for regeneration doesn't result in a new address being created.
         assert_eq!(ctx.trigger_next_timer(), Some(regen_timer_id));
         assert_eq!(
-            get_matching_slaac_address_entries(&mut ctx.core_ctx, &device, |entry| entry
-                .addr_sub()
-                .subnet()
+            get_matching_slaac_address_entries(&ctx, &device, |entry| entry.addr_sub().subnet()
                 == subnet
                 && match entry.config {
                     Ipv6AddrConfig::Slaac(SlaacConfig::Temporary(_)) => true,
@@ -3058,9 +3037,7 @@ mod tests {
             .filter(|addr| addr != &first_addr_entry.addr_sub().addr())
             .collect::<HashSet<_>>();
         assert_eq!(
-            get_matching_slaac_address_entries(&mut ctx.core_ctx, &device, |entry| entry
-                .addr_sub()
-                .subnet()
+            get_matching_slaac_address_entries(&ctx, &device, |entry| entry.addr_sub().subnet()
                 == subnet
                 && !entry.flags.deprecated
                 && match entry.config {
@@ -3162,16 +3139,15 @@ mod tests {
             MAX_VALID_LIFETIME.as_secs().try_into().unwrap(),
         );
 
-        let first_addr_entry =
-            get_matching_slaac_address_entry(&mut ctx.core_ctx, &device, |entry| {
-                entry.addr_sub().subnet() == subnet
-                    && match entry.config {
-                        Ipv6AddrConfig::Slaac(SlaacConfig::Temporary(_)) => true,
-                        Ipv6AddrConfig::Slaac(SlaacConfig::Static { valid_until: _ }) => false,
-                        Ipv6AddrConfig::Manual(_manual_config) => false,
-                    }
-            })
-            .unwrap();
+        let first_addr_entry = get_matching_slaac_address_entry(&ctx, &device, |entry| {
+            entry.addr_sub().subnet() == subnet
+                && match entry.config {
+                    Ipv6AddrConfig::Slaac(SlaacConfig::Temporary(_)) => true,
+                    Ipv6AddrConfig::Slaac(SlaacConfig::Static { valid_until: _ }) => false,
+                    Ipv6AddrConfig::Manual(_manual_config) => false,
+                }
+        })
+        .unwrap();
         let regen_at = ctx
             .bindings_ctx
             .scheduled_instant(SlaacTimerId::new_regenerate_temporary_slaac_address(
@@ -3183,12 +3159,11 @@ mod tests {
         let before_regen = regen_at - Duration::from_secs(10);
         // The only events that run before regen should be the DAD timers for
         // the static and temporary address that were created earlier.
-        let dad_timer_ids =
-            get_matching_slaac_address_entries(&mut ctx.core_ctx, &device, |entry| {
-                entry.addr_sub().subnet() == subnet
-            })
-            .map(|entry| dad_timer_id(eth_device_id.clone(), entry.addr_sub().addr()))
-            .collect::<Vec<_>>();
+        let dad_timer_ids = get_matching_slaac_address_entries(&ctx, &device, |entry| {
+            entry.addr_sub().subnet() == subnet
+        })
+        .map(|entry| dad_timer_id(eth_device_id.clone(), entry.addr_sub().addr()))
+        .collect::<Vec<_>>();
         ctx.trigger_timers_until_and_expect_unordered(before_regen, dad_timer_ids);
 
         let preferred_until = ctx
@@ -3245,7 +3220,7 @@ mod tests {
             .into()]
         );
 
-        let addresses = get_matching_slaac_address_entries(&mut ctx.core_ctx, &device, |entry| {
+        let addresses = get_matching_slaac_address_entries(&ctx, &device, |entry| {
             entry.addr_sub().subnet() == subnet
                 && match entry.config {
                     Ipv6AddrConfig::Slaac(SlaacConfig::Temporary(_)) => true,
@@ -3311,7 +3286,7 @@ mod tests {
             valid_lifetime,
         );
 
-        let entry = get_slaac_address_entry(&mut ctx.core_ctx, &device, expected_addr_sub).unwrap();
+        let entry = get_slaac_address_entry(&ctx, &device, expected_addr_sub).unwrap();
         let expected_valid_until =
             now.checked_add(Duration::from_secs(valid_lifetime.into())).unwrap();
         let expected_preferred_until =
@@ -3356,7 +3331,7 @@ mod tests {
             valid_lifetime,
         );
 
-        let entry = get_matching_slaac_address_entry(&mut ctx.core_ctx, &device, |entry| {
+        let entry = get_matching_slaac_address_entry(&ctx, &device, |entry| {
             entry.addr_sub().subnet() == subnet
                 && match entry.config {
                     Ipv6AddrConfig::Slaac(SlaacConfig::Temporary(_)) => true,
@@ -3424,7 +3399,7 @@ mod tests {
             valid_lifetime,
         );
 
-        let entry = get_matching_slaac_address_entry(&mut ctx.core_ctx, &device, |entry| {
+        let entry = get_matching_slaac_address_entry(&ctx, &device, |entry| {
             entry.addr_sub().subnet() == subnet
                 && match entry.config {
                     Ipv6AddrConfig::Slaac(SlaacConfig::Temporary(_)) => true,
@@ -3523,9 +3498,9 @@ mod tests {
             }),
             flags: Ipv6AddressFlags { deprecated: false, assigned: true },
         };
-        assert_eq!(get_global_ipv6_addrs(core_ctx, &device), [expected_address_entry]);
+        assert_eq!(get_global_ipv6_addrs(&ctx, &device), [expected_address_entry]);
         // Make sure deprecate and invalidation timers are set.
-        bindings_ctx.timer_ctx().assert_some_timers_installed([
+        ctx.bindings_ctx.timer_ctx().assert_some_timers_installed([
             (
                 SlaacTimerId::new_deprecate_slaac_address(device.clone(), expected_addr).into(),
                 now + Duration::from_secs(PREFERRED_LIFETIME_SECS.into()),
@@ -3541,7 +3516,7 @@ mod tests {
             .device_ip::<Ipv6>()
             .del_ip_addr(&device, expected_addr.into_specified())
             .unwrap();
-        assert_empty(get_global_ipv6_addrs(&ctx.core_ctx, &device));
+        assert_empty(get_global_ipv6_addrs(&ctx, &device));
         ctx.bindings_ctx.timer_ctx().assert_no_timers_installed();
     }
 
@@ -3558,14 +3533,11 @@ mod tests {
             .device_ip::<Ipv6>()
             .del_ip_addr(&device, expected_addr.into_specified())
             .unwrap();
-        let Ctx { core_ctx, bindings_ctx } = &mut ctx;
-        assert_empty(get_global_ipv6_addrs(core_ctx, &device).into_iter().filter(
-            |e| match e.config {
-                Ipv6AddrConfig::Slaac(SlaacConfig::Temporary(_)) => true,
-                Ipv6AddrConfig::Slaac(SlaacConfig::Static { valid_until: _ }) => false,
-                Ipv6AddrConfig::Manual(_manual_config) => false,
-            },
-        ));
-        bindings_ctx.timer_ctx().assert_no_timers_installed();
+        assert_empty(get_global_ipv6_addrs(&ctx, &device).into_iter().filter(|e| match e.config {
+            Ipv6AddrConfig::Slaac(SlaacConfig::Temporary(_)) => true,
+            Ipv6AddrConfig::Slaac(SlaacConfig::Static { valid_until: _ }) => false,
+            Ipv6AddrConfig::Manual(_manual_config) => false,
+        }));
+        ctx.bindings_ctx.timer_ctx().assert_no_timers_installed();
     }
 }

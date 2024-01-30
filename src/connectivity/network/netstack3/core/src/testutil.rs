@@ -186,6 +186,20 @@ where
         let Self { core_ctx, bindings_ctx } = self;
         CC::borrow(core_ctx).state.api(bindings_ctx)
     }
+
+    /// Retrieves the core and bindings context, respectively.
+    ///
+    /// This function can be used to call into non-api core functions that want
+    /// a core context.
+    pub fn contexts(&mut self) -> (UnlockedCoreCtx<'_, BC>, &mut BC) {
+        let Self { core_ctx, bindings_ctx } = self;
+        (UnlockedCoreCtx::new(&CC::borrow(core_ctx).state), bindings_ctx)
+    }
+
+    /// Like [`ContextPair::contexts`], but retrieves only the core context.
+    pub fn core_ctx(&self) -> UnlockedCoreCtx<'_, BC> {
+        UnlockedCoreCtx::new(&CC::borrow(&self.core_ctx).state)
+    }
 }
 
 /// Helper functions for dealing with fake timers.

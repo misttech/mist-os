@@ -1445,7 +1445,7 @@ mod tests {
             testutil::is_in_ip_multicast,
         },
         testutil::{
-            add_arp_or_ndp_table_entry, assert_empty, new_rng, Ctx, FakeEventDispatcherBuilder,
+            add_arp_or_ndp_table_entry, assert_empty, new_rng, FakeEventDispatcherBuilder,
             TestIpExt, DEFAULT_INTERFACE_METRIC, FAKE_CONFIG_V4, IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
         },
     };
@@ -1970,16 +1970,12 @@ mod tests {
     }
 
     fn is_forwarding_enabled<I: Ip>(
-        core_ctx: &crate::testutil::FakeCoreCtx,
+        ctx: &mut crate::testutil::FakeCtx,
         device: &DeviceId<crate::testutil::FakeBindingsCtx>,
     ) -> bool {
         match I::VERSION {
-            IpVersion::V4 => {
-                crate::device::testutil::is_forwarding_enabled::<_, Ipv4>(core_ctx, device)
-            }
-            IpVersion::V6 => {
-                crate::device::testutil::is_forwarding_enabled::<_, Ipv6>(core_ctx, device)
-            }
+            IpVersion::V4 => crate::device::testutil::is_forwarding_enabled::<_, Ipv4>(ctx, device),
+            IpVersion::V6 => crate::device::testutil::is_forwarding_enabled::<_, Ipv6>(ctx, device),
         }
     }
 
@@ -1987,13 +1983,13 @@ mod tests {
     #[netstack3_macros::context_ip_bounds(I, crate::testutil::FakeBindingsCtx, crate)]
     fn test_set_ip_routing<I: Ip + TestIpExt + crate::IpExt>() {
         fn check_other_is_forwarding_enabled<I: Ip>(
-            core_ctx: &crate::testutil::FakeCoreCtx,
+            ctx: &mut crate::testutil::FakeCtx,
             device: &DeviceId<crate::testutil::FakeBindingsCtx>,
             expected: bool,
         ) {
             let enabled = match I::VERSION {
-                IpVersion::V4 => is_forwarding_enabled::<Ipv6>(core_ctx, device),
-                IpVersion::V6 => is_forwarding_enabled::<Ipv4>(core_ctx, device),
+                IpVersion::V4 => is_forwarding_enabled::<Ipv6>(ctx, device),
+                IpVersion::V6 => is_forwarding_enabled::<Ipv4>(ctx, device),
             };
 
             assert_eq!(enabled, expected);
@@ -2047,30 +2043,40 @@ mod tests {
         add_arp_or_ndp_table_entry(&mut builder, device_builder_id, src_ip, src_mac);
         let (mut ctx, device_ids) = builder.build();
         let device: DeviceId<_> = device_ids[device_builder_id].clone().into();
-        let Ctx { core_ctx, bindings_ctx } = &mut ctx;
 
         // Should not be a router (default).
-        assert!(!is_forwarding_enabled::<I>(core_ctx, &device));
-        check_other_is_forwarding_enabled::<I>(core_ctx, &device, false);
+        assert!(!is_forwarding_enabled::<I>(&mut ctx, &device));
+        check_other_is_forwarding_enabled::<I>(&mut ctx, &device, false);
 
         // Receiving a packet not destined for the node should only result in a
         // dest unreachable message if routing is enabled.
-        receive_ip_packet::<_, _, I>(core_ctx, bindings_ctx, &device, Some(frame_dst), buf.clone());
-        assert_empty(bindings_ctx.frames_sent().iter());
+        receive_ip_packet::<_, _, I>(
+            &ctx.core_ctx,
+            &mut ctx.bindings_ctx,
+            &device,
+            Some(frame_dst),
+            buf.clone(),
+        );
+        assert_empty(ctx.bindings_ctx.frames_sent().iter());
 
         // Set routing and expect packets to be forwarded.
         set_forwarding_enabled::<_, I>(&mut ctx, &device, true);
-        let Ctx { core_ctx, bindings_ctx } = &mut ctx;
-        assert!(is_forwarding_enabled::<I>(core_ctx, &device));
+        assert!(is_forwarding_enabled::<I>(&mut ctx, &device));
         // Should not update other Ip routing status.
-        check_other_is_forwarding_enabled::<I>(core_ctx, &device, false);
+        check_other_is_forwarding_enabled::<I>(&mut ctx, &device, false);
 
         // Should route the packet since routing fully enabled (netstack &
         // device).
-        receive_ip_packet::<_, _, I>(core_ctx, bindings_ctx, &device, Some(frame_dst), buf.clone());
+        receive_ip_packet::<_, _, I>(
+            &ctx.core_ctx,
+            &mut ctx.bindings_ctx,
+            &device,
+            Some(frame_dst),
+            buf.clone(),
+        );
         {
-            assert_eq!(bindings_ctx.frames_sent().len(), 1);
-            let frames = bindings_ctx.frames_sent();
+            assert_eq!(ctx.bindings_ctx.frames_sent().len(), 1);
+            let frames = ctx.bindings_ctx.frames_sent();
             let (packet_buf, _, _, packet_src_ip, packet_dst_ip, proto, ttl) =
                 parse_ip_packet_in_ethernet_frame::<I>(
                     &frames[0].1[..],
@@ -2099,24 +2105,29 @@ mod tests {
             .unwrap()
             .unwrap_b();
         receive_ip_packet::<_, _, I>(
-            core_ctx,
-            bindings_ctx,
+            &ctx.core_ctx,
+            &mut ctx.bindings_ctx,
             &device,
             Some(frame_dst),
             buf_unknown_dest,
         );
-        assert_eq!(bindings_ctx.frames_sent().len(), 2);
-        check_icmp::<I>(&bindings_ctx.frames_sent()[1].1);
+        assert_eq!(ctx.bindings_ctx.frames_sent().len(), 2);
+        check_icmp::<I>(&ctx.bindings_ctx.frames_sent()[1].1);
 
         // Attempt to unset router
         set_forwarding_enabled::<_, I>(&mut ctx, &device, false);
-        let Ctx { core_ctx, bindings_ctx } = &mut ctx;
-        assert!(!is_forwarding_enabled::<I>(core_ctx, &device));
-        check_other_is_forwarding_enabled::<I>(core_ctx, &device, false);
+        assert!(!is_forwarding_enabled::<I>(&mut ctx, &device));
+        check_other_is_forwarding_enabled::<I>(&mut ctx, &device, false);
 
         // Should not route packets anymore
-        receive_ip_packet::<_, _, I>(core_ctx, bindings_ctx, &device, Some(frame_dst), buf);
-        assert_eq!(bindings_ctx.frames_sent().len(), 2);
+        receive_ip_packet::<_, _, I>(
+            &ctx.core_ctx,
+            &mut ctx.bindings_ctx,
+            &device,
+            Some(frame_dst),
+            buf,
+        );
+        assert_eq!(ctx.bindings_ctx.frames_sent().len(), 2);
     }
 
     #[ip_test]

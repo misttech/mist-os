@@ -2475,7 +2475,7 @@ mod tests {
                 FakeLinkResolutionNotifier, FakeNetwork, FakeNetworkLinks, FakeTimerCtxExt as _,
                 WrappedFakeCoreCtx,
             },
-            CtxPair, InstantContext, SendFrameContext as _, SyncCtx,
+            CtxPair, InstantContext, SendFrameContext as _,
         },
         device::{
             ethernet::{EthernetCreationProperties, EthernetLinkDevice},
@@ -4344,21 +4344,18 @@ mod tests {
     fn assert_neighbors<
         'a,
         I: Ip,
-        BC: crate::BindingsContext + NudBindingsContext<I, EthernetLinkDevice, EthernetDeviceId<BC>>,
+        CC: NudContext<I, EthernetLinkDevice, BC>,
+        BC: NudBindingsContext<I, EthernetLinkDevice, CC::DeviceId>,
     >(
-        core_ctx: &'a SyncCtx<BC>,
-        device_id: &EthernetDeviceId<BC>,
+        core_ctx: &mut CC,
+        device_id: &CC::DeviceId,
         expected: HashMap<
             SpecifiedAddr<I::Addr>,
             NeighborState<EthernetLinkDevice, BC::Instant, BC::Notifier>,
         >,
-    ) where
-        CoreCtx<'a, BC, crate::lock_ordering::Unlocked>: NudContext<I, EthernetLinkDevice, BC>
-            + DeviceIdContext<EthernetLinkDevice, DeviceId = EthernetDeviceId<BC>>,
-        <BC as LinkResolutionContext<EthernetLinkDevice>>::Notifier: PartialEq,
-    {
+    ) {
         NudContext::<I, EthernetLinkDevice, _>::with_nud_state_mut(
-            &mut CoreCtx::new_deprecated(core_ctx),
+            core_ctx,
             device_id,
             |NudState { neighbors, last_gc: _ }, _config| assert_eq!(*neighbors, expected),
         )
@@ -4943,18 +4940,18 @@ mod tests {
             ra_packet_buf(&[][..]),
         );
         let link_device_id = device_id.clone().try_into().unwrap();
-        assert_neighbors::<Ipv6, _>(core_ctx, &link_device_id, Default::default());
+        assert_neighbors::<Ipv6, _, _>(&mut ctx.core_ctx(), &link_device_id, Default::default());
 
         // RA with a source link layer option should create a new entry.
         receive_ip_packet::<_, _, Ipv6>(
-            core_ctx,
-            bindings_ctx,
+            &ctx.core_ctx,
+            &mut ctx.bindings_ctx,
             &device_id,
             Some(FrameDestination::Multicast),
             ra_packet_buf(&options[..]),
         );
-        assert_neighbors::<Ipv6, _>(
-            core_ctx,
+        assert_neighbors::<Ipv6, _, _>(
+            &mut ctx.core_ctx(),
             &link_device_id,
             HashMap::from([(
                 {
@@ -5097,7 +5094,7 @@ mod tests {
             HashMap::default()
         };
 
-        assert_neighbors::<Ipv6, _>(core_ctx, &link_device_id, expected_neighbors);
+        assert_neighbors::<Ipv6, _, _>(&mut ctx.core_ctx(), &link_device_id, expected_neighbors);
         // Remove device to clear all dangling references.
         core::mem::drop(device_id);
         ctx.core_api().device().remove_device(link_device_id).into_removed();
@@ -5165,16 +5162,17 @@ mod tests {
             na_packet_buf(false, false),
         );
         let link_device_id = device_id.clone().try_into().unwrap();
-        assert_neighbors::<Ipv6, _>(core_ctx, &link_device_id, Default::default());
+        assert_neighbors::<Ipv6, _, _>(&mut ctx.core_ctx(), &link_device_id, Default::default());
         receive_ip_packet::<_, _, Ipv6>(
-            core_ctx,
-            bindings_ctx,
+            &ctx.core_ctx,
+            &mut ctx.bindings_ctx,
             &device_id,
             Some(FrameDestination::Multicast),
             na_packet_buf(true, true),
         );
-        assert_neighbors::<Ipv6, _>(core_ctx, &link_device_id, Default::default());
+        assert_neighbors::<Ipv6, _, _>(&mut ctx.core_ctx(), &link_device_id, Default::default());
 
+        let testutil::Ctx { core_ctx, bindings_ctx } = &mut ctx;
         assert_eq!(bindings_ctx.take_frames(), []);
 
         // Trigger a neighbor solicitation to be sent.
@@ -5225,8 +5223,8 @@ mod tests {
             },
         );
 
-        assert_neighbors::<Ipv6, _>(
-            core_ctx,
+        assert_neighbors::<Ipv6, _, _>(
+            &mut ctx.core_ctx(),
             &link_device_id,
             HashMap::from([(
                 neighbor_ip.into_specified(),
@@ -5241,24 +5239,24 @@ mod tests {
 
         // A Neighbor advertisement should now update the entry.
         receive_ip_packet::<_, _, Ipv6>(
-            core_ctx,
-            bindings_ctx,
+            &ctx.core_ctx,
+            &mut ctx.bindings_ctx,
             &device_id,
             Some(FrameDestination::Multicast),
             na_packet_buf(true, true),
         );
-        assert_neighbors::<Ipv6, _>(
-            core_ctx,
+        assert_neighbors::<Ipv6, _, _>(
+            &mut ctx.core_ctx(),
             &link_device_id,
             HashMap::from([(
                 neighbor_ip.into_specified(),
                 NeighborState::Dynamic(DynamicNeighborState::Reachable(Reachable {
                     link_address: remote_mac.get(),
-                    last_confirmed_at: bindings_ctx.now(),
+                    last_confirmed_at: ctx.bindings_ctx.now(),
                 })),
             )]),
         );
-        let frames = bindings_ctx.take_frames();
+        let frames = ctx.bindings_ctx.take_frames();
         let (got_device_id, got_frame) = assert_matches!(&frames[..], [x] => x);
         assert_eq!(got_device_id, &eth_device_id);
 
@@ -5271,7 +5269,7 @@ mod tests {
 
         // Disabling the device should clear the neighbor table.
         set_ip_device_enabled::<Ipv6>(&mut ctx, &device_id, false, true);
-        assert_neighbors::<Ipv6, _>(&ctx.core_ctx, &link_device_id, HashMap::new());
+        assert_neighbors::<Ipv6, _, _>(&mut ctx.core_ctx(), &link_device_id, HashMap::new());
         ctx.bindings_ctx.timer_ctx().assert_no_timers_installed();
     }
 

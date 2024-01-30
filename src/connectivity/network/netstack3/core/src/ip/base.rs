@@ -3419,7 +3419,7 @@ mod tests {
 
     use super::*;
     use crate::{
-        context::{testutil::FakeInstant, SyncCtx},
+        context::testutil::FakeInstant,
         device::{
             ethernet::{EthernetCreationProperties, EthernetLinkDevice, RecvEthernetFrameMeta},
             loopback::{LoopbackCreationProperties, LoopbackDevice},
@@ -3544,31 +3544,20 @@ mod tests {
 
     /// Process an IP fragment depending on the `Ip` `process_ip_fragment` is
     /// specialized with.
-    fn process_ip_fragment<I: Ip, BC: BindingsContext>(
-        core_ctx: &SyncCtx<BC>,
-        bindings_ctx: &mut BC,
-        device: &DeviceId<BC>,
+    fn process_ip_fragment<I: Ip>(
+        ctx: &mut FakeCtx,
+        device: &DeviceId<FakeBindingsCtx>,
         fragment_id: u16,
         fragment_offset: u8,
         fragment_count: u8,
     ) {
         match I::VERSION {
-            IpVersion::V4 => process_ipv4_fragment(
-                core_ctx,
-                bindings_ctx,
-                device,
-                fragment_id,
-                fragment_offset,
-                fragment_count,
-            ),
-            IpVersion::V6 => process_ipv6_fragment(
-                core_ctx,
-                bindings_ctx,
-                device,
-                fragment_id,
-                fragment_offset,
-                fragment_count,
-            ),
+            IpVersion::V4 => {
+                process_ipv4_fragment(ctx, device, fragment_id, fragment_offset, fragment_count)
+            }
+            IpVersion::V6 => {
+                process_ipv6_fragment(ctx, device, fragment_id, fragment_offset, fragment_count)
+            }
         }
     }
 
@@ -3577,10 +3566,9 @@ mod tests {
     /// `fragment_offset` is the fragment offset. `fragment_count` is the number
     /// of fragments for a packet. The generated packet will have a body of size
     /// 8 bytes.
-    fn process_ipv4_fragment<BC: BindingsContext>(
-        core_ctx: &SyncCtx<BC>,
-        bindings_ctx: &mut BC,
-        device: &DeviceId<BC>,
+    fn process_ipv4_fragment(
+        ctx: &mut FakeCtx,
+        device: &DeviceId<FakeBindingsCtx>,
         fragment_id: u16,
         fragment_offset: u8,
         fragment_count: u8,
@@ -3598,8 +3586,8 @@ mod tests {
         let buffer =
             Buf::new(body, ..).encapsulate(builder).serialize_vec_outer().unwrap().into_inner();
         receive_ip_packet::<_, _, Ipv4>(
-            core_ctx,
-            bindings_ctx,
+            &ctx.core_ctx,
+            &mut ctx.bindings_ctx,
             device,
             Some(FrameDestination::Individual { local: true }),
             buffer,
@@ -3611,10 +3599,9 @@ mod tests {
     /// `fragment_offset` is the fragment offset. `fragment_count` is the number
     /// of fragments for a packet. The generated packet will have a body of size
     /// 8 bytes.
-    fn process_ipv6_fragment<BC: BindingsContext>(
-        core_ctx: &SyncCtx<BC>,
-        bindings_ctx: &mut BC,
-        device: &DeviceId<BC>,
+    fn process_ipv6_fragment(
+        ctx: &mut FakeCtx,
+        device: &DeviceId<FakeBindingsCtx>,
         fragment_id: u16,
         fragment_offset: u8,
         fragment_count: u8,
@@ -3638,8 +3625,8 @@ mod tests {
         bytes[4..6].copy_from_slice(&payload_len.to_be_bytes());
         let buffer = Buf::new(bytes, ..);
         receive_ip_packet::<_, _, Ipv6>(
-            core_ctx,
-            bindings_ctx,
+            &ctx.core_ctx,
+            &mut ctx.bindings_ctx,
             device,
             Some(FrameDestination::Individual { local: true }),
             buffer,
@@ -3916,25 +3903,23 @@ mod tests {
 
     #[ip_test]
     fn test_ip_packet_reassembly_not_needed<I: Ip + TestIpExt>() {
-        let (Ctx { core_ctx, mut bindings_ctx }, device_ids) =
-            FakeEventDispatcherBuilder::from_config(I::FAKE_CONFIG).build();
+        let (mut ctx, device_ids) = FakeEventDispatcherBuilder::from_config(I::FAKE_CONFIG).build();
         let device: DeviceId<_> = device_ids[0].clone().into();
         let fragment_id = 5;
 
-        assert_eq!(core_ctx.state.ip_counters::<I>().dispatch_receive_ip_packet.get(), 0);
+        assert_eq!(ctx.core_ctx.state.ip_counters::<I>().dispatch_receive_ip_packet.get(), 0);
 
         // Test that a non fragmented packet gets dispatched right away.
 
-        process_ip_fragment::<I, _>(&core_ctx, &mut bindings_ctx, &device, fragment_id, 0, 1);
+        process_ip_fragment::<I>(&mut ctx, &device, fragment_id, 0, 1);
 
         // Make sure the packet got dispatched.
-        assert_eq!(core_ctx.state.ip_counters::<I>().dispatch_receive_ip_packet.get(), 1);
+        assert_eq!(ctx.core_ctx.state.ip_counters::<I>().dispatch_receive_ip_packet.get(), 1);
     }
 
     #[ip_test]
     fn test_ip_packet_reassembly<I: Ip + TestIpExt>() {
-        let (Ctx { core_ctx, mut bindings_ctx }, device_ids) =
-            FakeEventDispatcherBuilder::from_config(I::FAKE_CONFIG).build();
+        let (mut ctx, device_ids) = FakeEventDispatcherBuilder::from_config(I::FAKE_CONFIG).build();
         let device: DeviceId<_> = device_ids[0].clone().into();
         let fragment_id = 5;
 
@@ -3942,26 +3927,25 @@ mod tests {
         // all the fragments.
 
         // Process fragment #0
-        process_ip_fragment::<I, _>(&core_ctx, &mut bindings_ctx, &device, fragment_id, 0, 3);
+        process_ip_fragment::<I>(&mut ctx, &device, fragment_id, 0, 3);
 
         // Process fragment #1
-        process_ip_fragment::<I, _>(&core_ctx, &mut bindings_ctx, &device, fragment_id, 1, 3);
+        process_ip_fragment::<I>(&mut ctx, &device, fragment_id, 1, 3);
 
         // Make sure no packets got dispatched yet.
-        assert_eq!(core_ctx.state.ip_counters::<I>().dispatch_receive_ip_packet.get(), 0);
+        assert_eq!(ctx.core_ctx.state.ip_counters::<I>().dispatch_receive_ip_packet.get(), 0);
 
         // Process fragment #2
-        process_ip_fragment::<I, _>(&core_ctx, &mut bindings_ctx, &device, fragment_id, 2, 3);
+        process_ip_fragment::<I>(&mut ctx, &device, fragment_id, 2, 3);
 
         // Make sure the packet finally got dispatched now that the final
         // fragment has been 'received'.
-        assert_eq!(core_ctx.state.ip_counters::<I>().dispatch_receive_ip_packet.get(), 1);
+        assert_eq!(ctx.core_ctx.state.ip_counters::<I>().dispatch_receive_ip_packet.get(), 1);
     }
 
     #[ip_test]
     fn test_ip_packet_reassembly_with_packets_arriving_out_of_order<I: Ip + TestIpExt>() {
-        let (Ctx { core_ctx, mut bindings_ctx }, device_ids) =
-            FakeEventDispatcherBuilder::from_config(I::FAKE_CONFIG).build();
+        let (mut ctx, device_ids) = FakeEventDispatcherBuilder::from_config(I::FAKE_CONFIG).build();
         let device: DeviceId<_> = device_ids[0].clone().into();
         let fragment_id_0 = 5;
         let fragment_id_1 = 10;
@@ -3971,42 +3955,42 @@ mod tests {
         // the fragments with out of order arrival of fragments.
 
         // Process packet #0, fragment #1
-        process_ip_fragment::<I, _>(&core_ctx, &mut bindings_ctx, &device, fragment_id_0, 1, 3);
+        process_ip_fragment::<I>(&mut ctx, &device, fragment_id_0, 1, 3);
 
         // Process packet #1, fragment #2
-        process_ip_fragment::<I, _>(&core_ctx, &mut bindings_ctx, &device, fragment_id_1, 2, 3);
+        process_ip_fragment::<I>(&mut ctx, &device, fragment_id_1, 2, 3);
 
         // Process packet #1, fragment #0
-        process_ip_fragment::<I, _>(&core_ctx, &mut bindings_ctx, &device, fragment_id_1, 0, 3);
+        process_ip_fragment::<I>(&mut ctx, &device, fragment_id_1, 0, 3);
 
         // Make sure no packets got dispatched yet.
-        assert_eq!(core_ctx.state.ip_counters::<I>().dispatch_receive_ip_packet.get(), 0);
+        assert_eq!(ctx.core_ctx.state.ip_counters::<I>().dispatch_receive_ip_packet.get(), 0);
 
         // Process a packet that does not require reassembly (packet #2, fragment #0).
-        process_ip_fragment::<I, _>(&core_ctx, &mut bindings_ctx, &device, fragment_id_2, 0, 1);
+        process_ip_fragment::<I>(&mut ctx, &device, fragment_id_2, 0, 1);
 
         // Make packet #1 got dispatched since it didn't need reassembly.
-        assert_eq!(core_ctx.state.ip_counters::<I>().dispatch_receive_ip_packet.get(), 1);
+        assert_eq!(ctx.core_ctx.state.ip_counters::<I>().dispatch_receive_ip_packet.get(), 1);
 
         // Process packet #0, fragment #2
-        process_ip_fragment::<I, _>(&core_ctx, &mut bindings_ctx, &device, fragment_id_0, 2, 3);
+        process_ip_fragment::<I>(&mut ctx, &device, fragment_id_0, 2, 3);
 
         // Make sure no other packets got dispatched yet.
-        assert_eq!(core_ctx.state.ip_counters::<I>().dispatch_receive_ip_packet.get(), 1);
+        assert_eq!(ctx.core_ctx.state.ip_counters::<I>().dispatch_receive_ip_packet.get(), 1);
 
         // Process packet #0, fragment #0
-        process_ip_fragment::<I, _>(&core_ctx, &mut bindings_ctx, &device, fragment_id_0, 0, 3);
+        process_ip_fragment::<I>(&mut ctx, &device, fragment_id_0, 0, 3);
 
         // Make sure that packet #0 finally got dispatched now that the final
         // fragment has been 'received'.
-        assert_eq!(core_ctx.state.ip_counters::<I>().dispatch_receive_ip_packet.get(), 2);
+        assert_eq!(ctx.core_ctx.state.ip_counters::<I>().dispatch_receive_ip_packet.get(), 2);
 
         // Process packet #1, fragment #1
-        process_ip_fragment::<I, _>(&core_ctx, &mut bindings_ctx, &device, fragment_id_1, 1, 3);
+        process_ip_fragment::<I>(&mut ctx, &device, fragment_id_1, 1, 3);
 
         // Make sure the packet finally got dispatched now that the final
         // fragment has been 'received'.
-        assert_eq!(core_ctx.state.ip_counters::<I>().dispatch_receive_ip_packet.get(), 3);
+        assert_eq!(ctx.core_ctx.state.ip_counters::<I>().dispatch_receive_ip_packet.get(), 3);
     }
 
     #[ip_test]
@@ -4018,15 +4002,14 @@ mod tests {
         let device: DeviceId<_> = device_ids[0].clone().into();
         let fragment_id = 5;
 
-        let Ctx { core_ctx, bindings_ctx } = &mut ctx;
         // Test to make sure that packets must arrive within the reassembly
         // timer.
 
         // Process fragment #0
-        process_ip_fragment::<I, _>(core_ctx, bindings_ctx, &device, fragment_id, 0, 3);
+        process_ip_fragment::<I>(&mut ctx, &device, fragment_id, 0, 3);
 
         // Make sure a timer got added.
-        bindings_ctx.timer_ctx().assert_timers_installed([(
+        ctx.bindings_ctx.timer_ctx().assert_timers_installed([(
             IpLayerTimerId::from(FragmentCacheKey::new(
                 I::FAKE_CONFIG.remote_ip.get(),
                 I::FAKE_CONFIG.local_ip.get(),
@@ -4037,7 +4020,7 @@ mod tests {
         )]);
 
         // Process fragment #1
-        process_ip_fragment::<I, _>(core_ctx, bindings_ctx, &device, fragment_id, 1, 3);
+        process_ip_fragment::<I>(&mut ctx, &device, fragment_id, 1, 3);
 
         // Trigger the timer (simulate a timer for the fragmented packet)
         let key = FragmentCacheKey::new(
@@ -4047,18 +4030,17 @@ mod tests {
         );
         assert_eq!(ctx.trigger_next_timer().unwrap(), IpLayerTimerId::from(key).into(),);
 
-        let Ctx { core_ctx, bindings_ctx } = &mut ctx;
         // Make sure no other timers exist.
-        bindings_ctx.timer_ctx().assert_no_timers_installed();
+        ctx.bindings_ctx.timer_ctx().assert_no_timers_installed();
 
         // Process fragment #2
-        process_ip_fragment::<I, _>(core_ctx, bindings_ctx, &device, fragment_id, 2, 3);
+        process_ip_fragment::<I>(&mut ctx, &device, fragment_id, 2, 3);
 
         // Make sure no packets got dispatched yet since even though we
         // technically received all the fragments, this fragment (#2) arrived
         // too late and the reassembly timer was triggered, causing the prior
         // fragment data to be discarded.
-        assert_eq!(core_ctx.state.ip_counters::<I>().dispatch_receive_ip_packet.get(), 0);
+        assert_eq!(ctx.core_ctx.state.ip_counters::<I>().dispatch_receive_ip_packet.get(), 0);
     }
 
     #[ip_test]
@@ -4097,29 +4079,15 @@ mod tests {
         // fragments.
 
         // Process fragment #0
-        net.with_context("alice", |Ctx { core_ctx, bindings_ctx }| {
-            process_ip_fragment::<I, _>(
-                core_ctx,
-                bindings_ctx,
-                &alice_device_id,
-                fragment_id,
-                0,
-                3,
-            );
+        net.with_context("alice", |ctx| {
+            process_ip_fragment::<I>(ctx, &alice_device_id, fragment_id, 0, 3);
         });
         // Make sure the packet got sent from alice to bob
         assert!(!net.step().is_idle());
 
         // Process fragment #1
-        net.with_context("alice", |Ctx { core_ctx, bindings_ctx }| {
-            process_ip_fragment::<I, _>(
-                core_ctx,
-                bindings_ctx,
-                &alice_device_id,
-                fragment_id,
-                1,
-                3,
-            );
+        net.with_context("alice", |ctx| {
+            process_ip_fragment::<I>(ctx, &alice_device_id, fragment_id, 1, 3);
         });
         assert!(!net.step().is_idle());
 
@@ -4134,15 +4102,8 @@ mod tests {
         );
 
         // Process fragment #2
-        net.with_context("alice", |Ctx { core_ctx, bindings_ctx }| {
-            process_ip_fragment::<I, _>(
-                core_ctx,
-                bindings_ctx,
-                &alice_device_id,
-                fragment_id,
-                2,
-                3,
-            );
+        net.with_context("alice", |ctx| {
+            process_ip_fragment::<I>(ctx, &alice_device_id, fragment_id, 2, 3);
         });
         assert!(!net.step().is_idle());
 
@@ -5309,8 +5270,7 @@ mod tests {
     }
 
     fn do_route_lookup<I: Ip + TestIpExt + IpDeviceStateIpExt>(
-        core_ctx: &SyncCtx<FakeBindingsCtx>,
-        bindings_ctx: &mut FakeBindingsCtx,
+        ctx: &mut FakeCtx,
         device_ids: Vec<DeviceId<FakeBindingsCtx>>,
         egress_device: Option<Device>,
         local_ip: Option<IpDeviceAddr<I::Addr>>,
@@ -5322,8 +5282,9 @@ mod tests {
     {
         let egress_device = egress_device.map(|d| &device_ids[d.index()]);
 
+        let (mut core_ctx, bindings_ctx) = ctx.contexts();
         IpSocketContext::<I, _>::lookup_route(
-            &mut CoreCtx::new_deprecated(core_ctx),
+            &mut core_ctx,
             bindings_ctx,
             egress_device,
             local_ip,
@@ -5410,13 +5371,12 @@ mod tests {
     ) {
         set_logger_for_test();
 
-        let (Ctx { core_ctx, mut bindings_ctx }, device_ids) = make_test_ctx::<I>();
-        let core_ctx = &core_ctx;
+        let (mut ctx, device_ids) = make_test_ctx::<I>();
 
         // Add a route to the remote address only for Device::First.
         crate::testutil::add_route(
-            core_ctx,
-            &mut bindings_ctx,
+            &ctx.core_ctx,
+            &mut ctx.bindings_ctx,
             AddableEntryEither::without_gateway(
                 Subnet::new(*remote_ip::<I>(), <I::Addr as IpAddress>::BYTES * 8).unwrap().into(),
                 device_ids[Device::First.index()].clone(),
@@ -5425,14 +5385,7 @@ mod tests {
         )
         .unwrap();
 
-        let result = do_route_lookup(
-            core_ctx,
-            &mut bindings_ctx,
-            device_ids,
-            egress_device,
-            local_ip,
-            dest_ip,
-        );
+        let result = do_route_lookup(&mut ctx, device_ids, egress_device, local_ip, dest_ip);
         assert_eq!(result, expected_result);
     }
 
@@ -5464,15 +5417,14 @@ mod tests {
     ) {
         set_logger_for_test();
 
-        let (Ctx { core_ctx, mut bindings_ctx }, device_ids) = make_test_ctx::<I>();
-        let core_ctx = &core_ctx;
+        let (mut ctx, device_ids) = make_test_ctx::<I>();
 
         // Add a route to the remote address for both devices, with preference
         // for the first.
         for device in [Device::First, Device::Second] {
             crate::testutil::add_route(
-                core_ctx,
-                &mut bindings_ctx,
+                &ctx.core_ctx,
+                &mut ctx.bindings_ctx,
                 AddableEntryEither::without_gateway(
                     Subnet::new(*remote_ip::<I>(), <I::Addr as IpAddress>::BYTES * 8)
                         .unwrap()
@@ -5485,8 +5437,7 @@ mod tests {
         }
 
         let result = do_route_lookup(
-            core_ctx,
-            &mut bindings_ctx,
+            &mut ctx,
             device_ids,
             egress_device,
             local_ip,
