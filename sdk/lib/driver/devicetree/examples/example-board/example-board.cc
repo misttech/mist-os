@@ -48,7 +48,8 @@ zx::result<> ExampleBoard::Start() {
     return group_manager.take_error();
   }
 
-  status = manager_->PublishDevices(std::move(*pbus), std::move(*group_manager));
+  auto pbus_client = fdf::WireSyncClient(std::move(pbus.value()));
+  status = manager_->PublishDevices(pbus_client, std::move(*group_manager));
   if (status.is_error()) {
     FDF_LOG(ERROR, "Failed to publish devices: %s", status.status_string());
     return status.take_error();
