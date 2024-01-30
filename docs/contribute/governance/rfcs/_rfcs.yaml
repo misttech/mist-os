@@ -3114,3 +3114,16 @@
   reviewers: ['cpu@google.com', 'csuter@google.com', 'jamesr@google.com', 'rashaeqbal@google.com']
   submitted: '2024-01-10'
   reviewed: '2024-01-10'
+
+- name: 'RFC-0239'
+  title: 'Platform Versioning in Practice'
+  short_description: 'Conceptual model and guarantees for compatability on Fuchsia.'
+  authors: ['hjfreyer@google.com']
+  file: '0239_platform_versioning_in_practice.md'
+  area: ['General', 'Governance']
+  issue: ['']
+  gerrit_change_id: ['941912']
+  status: 'Accepted'
+  reviewers: ['abarth@google.com', 'ianloic@google.com', 'mkember@google.com', 'yaar@google.com']
+  submitted: '2023-11-08'
+  reviewed: '2024-01-30'
