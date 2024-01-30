@@ -12,7 +12,7 @@ use {
     futures::channel::oneshot,
     ieee80211::{Bssid, Ssid},
     pin_utils::pin_mut,
-    realm_proxy::client::RealmProxyClient,
+    realm_proxy_client::RealmProxyClient,
     std::sync::Arc,
     wlan_common::{
         bss::Protection,

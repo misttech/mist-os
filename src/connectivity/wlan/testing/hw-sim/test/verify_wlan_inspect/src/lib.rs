@@ -14,7 +14,7 @@ use {
     ieee80211::Bssid,
     lazy_static::lazy_static,
     pin_utils::pin_mut,
-    realm_proxy::client::RealmProxyClient,
+    realm_proxy_client::RealmProxyClient,
     wlan_common::{
         bss::Protection,
         channel::{Cbw, Channel},

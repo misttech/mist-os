@@ -12,7 +12,7 @@ use {
     fuchsia_zircon as zx,
     futures::prelude::*,
     futures::{channel::mpsc, StreamExt, TryStreamExt},
-    realm_proxy::client::RealmProxyClient,
+    realm_proxy_client::RealmProxyClient,
     tracing::info,
 };
 
@@ -45,7 +45,7 @@ async fn create_realm(options: ftest::RealmOptions) -> Result<RealmProxyClient> 
     realm_factory
         .create_realm(options, server)
         .await?
-        .map_err(realm_proxy::Error::OperationError)?;
+        .map_err(realm_proxy_client::Error::OperationError)?;
     Ok(RealmProxyClient::from(client))
 }
 

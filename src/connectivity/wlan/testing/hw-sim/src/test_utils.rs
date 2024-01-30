@@ -17,7 +17,7 @@ use {
     fuchsia_zircon::{self as zx, prelude::*},
     futures::{channel::oneshot, AsyncReadExt, FutureExt, StreamExt},
     ieee80211::{MacAddr, MacAddrBytes},
-    realm_proxy::client::RealmProxyClient,
+    realm_proxy_client::RealmProxyClient,
     std::{
         fmt::Display,
         future::Future,

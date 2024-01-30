@@ -8,7 +8,7 @@ use fidl::endpoints::create_endpoints;
 use fidl_fuchsia_examples::EchoMarker;
 use fidl_test_example as ftest;
 use fuchsia_component::client::connect_to_protocol;
-use realm_proxy::client::RealmProxyClient;
+use realm_proxy_client::RealmProxyClient;
 use tracing::info;
 
 async fn create_realm(options: ftest::RealmOptions) -> Result<RealmProxyClient> {
@@ -18,7 +18,7 @@ async fn create_realm(options: ftest::RealmOptions) -> Result<RealmProxyClient> 
     realm_factory
         .create_realm(options, server)
         .await?
-        .map_err(realm_proxy::Error::OperationError)?;
+        .map_err(realm_proxy_client::Error::OperationError)?;
 
     Ok(RealmProxyClient::from(client))
 }

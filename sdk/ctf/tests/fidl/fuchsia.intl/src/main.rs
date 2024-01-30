@@ -9,7 +9,7 @@ use fidl_fuchsia_intl_test::*;
 use fidl_fuchsia_settings as fsettings;
 use fuchsia_component::client::connect_to_protocol;
 use futures::StreamExt;
-use realm_proxy::client::RealmProxyClient;
+use realm_proxy_client::RealmProxyClient;
 
 async fn create_realm(options: RealmOptions) -> Result<RealmProxyClient> {
     let realm_factory = connect_to_protocol::<RealmFactoryMarker>()?;
@@ -17,7 +17,7 @@ async fn create_realm(options: RealmOptions) -> Result<RealmProxyClient> {
     realm_factory
         .create_realm(options, server)
         .await?
-        .map_err(realm_proxy::Error::OperationError)?;
+        .map_err(realm_proxy_client::Error::OperationError)?;
     Ok(RealmProxyClient::from(client))
 }
 

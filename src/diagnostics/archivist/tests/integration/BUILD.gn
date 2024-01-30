@@ -37,7 +37,7 @@ rustc_test("integration_tests_bin") {
     "//src/sys/lib/cm_rust",
     "//src/sys/lib/cm_types",
     "//src/sys/lib/component-events",
-    "//src/testing/realm_proxy",
+    "//src/testing/realm_proxy/client",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:difference",
     "//third_party/rust_crates:futures",

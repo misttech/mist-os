@@ -14,7 +14,7 @@ use fuchsia_component_test::{
     Capability, ChildOptions, ChildRef, RealmBuilder, RealmBuilderParams, Ref, Route,
     SubRealmBuilder,
 };
-use realm_proxy::client::RealmProxyClient;
+use realm_proxy_client::RealmProxyClient;
 
 /// Options for creating a test topology.
 pub struct Options {
@@ -38,7 +38,7 @@ pub async fn create_realm(options: &ftest::RealmOptions) -> Result<RealmProxyCli
     realm_factory
         .create_realm(options, server)
         .await?
-        .map_err(realm_proxy::Error::OperationError)?;
+        .map_err(realm_proxy_client::Error::OperationError)?;
     Ok(RealmProxyClient::from(client))
 }
 

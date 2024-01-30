@@ -19,7 +19,7 @@ use {
     ieee80211::{Bssid, MacAddr, Ssid},
     lazy_static::lazy_static,
     pin_utils::pin_mut,
-    realm_proxy::client::RealmProxyClient,
+    realm_proxy_client::RealmProxyClient,
     std::{convert::TryFrom, future::Future, marker::Unpin},
     wlan_common::{
         bss::Protection,

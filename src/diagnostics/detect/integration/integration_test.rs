@@ -23,7 +23,8 @@ use {
     anyhow::Error, fidl::endpoints::create_endpoints, fidl_fuchsia_diagnostics_test as ftest,
     fidl_fuchsia_testing_harness::RealmProxy_Marker,
     fuchsia_component::client::connect_to_protocol, fuchsia_zircon as zx, futures::StreamExt,
-    realm_proxy::Error::OperationError, std::cmp::Ordering, test_case::test_case, tracing::*,
+    realm_proxy_client::Error::OperationError, std::cmp::Ordering, test_case::test_case,
+    tracing::*,
 };
 
 // Test that the "repeat" field of snapshots works correctly.

@@ -10,7 +10,7 @@ use {
     fuchsia_zircon::prelude::*,
     futures::{StreamExt, TryStreamExt},
     ieee80211::Ssid,
-    realm_proxy::client::RealmProxyClient,
+    realm_proxy_client::RealmProxyClient,
     std::convert::TryInto,
     tracing::info,
 };

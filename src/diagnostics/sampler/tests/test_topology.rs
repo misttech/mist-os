@@ -5,7 +5,7 @@
 use anyhow::*;
 use fidl::endpoints::create_endpoints;
 use fuchsia_component::client::connect_to_protocol;
-use realm_proxy::client::{extend_namespace, InstalledNamespace};
+use realm_proxy_client::{extend_namespace, InstalledNamespace};
 
 pub(crate) async fn create_realm() -> Result<InstalledNamespace, Error> {
     inner_create_realm(fidl_test_sampler::RealmOptions { ..Default::default() }).await
@@ -29,7 +29,7 @@ async fn inner_create_realm(
     realm_factory
         .create_realm(options, dict_server)
         .await?
-        .map_err(realm_proxy::Error::OperationError)?;
+        .map_err(realm_proxy_client::Error::OperationError)?;
     let ns = extend_namespace(realm_factory, dict_client).await?;
     Ok(ns)
 }

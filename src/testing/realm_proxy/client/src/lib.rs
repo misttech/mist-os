@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use {
-    anyhow::{bail, format_err, Error, Result},
+    anyhow::{bail, format_err, Result},
     fdio::Namespace,
     fidl::endpoints::{
         create_endpoints, ClientEnd, DiscoverableProtocolMarker, Proxy, ServiceMarker, ServiceProxy,
@@ -15,6 +15,9 @@ use {
     std::fmt::Debug,
     uuid::Uuid,
 };
+
+pub mod error;
+pub use error::Error;
 
 pub struct InstalledNamespace {
     prefix: String,
@@ -112,7 +115,7 @@ impl From<ClientEnd<RealmProxy_Marker>> for RealmProxyClient {
 
 impl RealmProxyClient {
     // Connects to the RealmProxy service.
-    pub fn connect() -> Result<Self, Error> {
+    pub fn connect() -> Result<Self, anyhow::Error> {
         let inner = connect_to_protocol::<RealmProxy_Marker>()?;
         Ok(Self { inner })
     }
@@ -122,7 +125,7 @@ impl RealmProxyClient {
     // Returns an error if the connection fails.
     pub async fn connect_to_protocol<T: DiscoverableProtocolMarker>(
         &self,
-    ) -> Result<T::Proxy, Error> {
+    ) -> Result<T::Proxy, anyhow::Error> {
         self.connect_to_named_protocol::<T>(T::PROTOCOL_NAME).await
     }
 
@@ -132,7 +135,7 @@ impl RealmProxyClient {
     pub async fn connect_to_named_protocol<T: DiscoverableProtocolMarker>(
         &self,
         protocol_name: &str,
-    ) -> Result<T::Proxy, Error> {
+    ) -> Result<T::Proxy, anyhow::Error> {
         let (client, server) = create_endpoints::<T>();
         let res =
             self.inner.connect_to_named_protocol(protocol_name, server.into_channel()).await?;
@@ -150,7 +153,9 @@ impl RealmProxyClient {
     // for more information about service capabilities.
     //
     // Returns an error if the connection fails.
-    pub async fn open_service<T: ServiceMarker>(&self) -> Result<fio::DirectoryProxy, Error> {
+    pub async fn open_service<T: ServiceMarker>(
+        &self,
+    ) -> Result<fio::DirectoryProxy, anyhow::Error> {
         let (client, server) = create_endpoints::<fio::DirectoryMarker>();
         let res = self.inner.open_service(T::SERVICE_NAME, server.into_channel()).await?;
         if let Some(op_err) = res.err() {
@@ -169,7 +174,7 @@ impl RealmProxyClient {
     pub async fn connect_to_service_instance<T: ServiceMarker>(
         &self,
         instance: &str,
-    ) -> Result<T::Proxy, Error> {
+    ) -> Result<T::Proxy, anyhow::Error> {
         let (client, server) = create_endpoints::<fio::DirectoryMarker>();
         let res = self
             .inner
