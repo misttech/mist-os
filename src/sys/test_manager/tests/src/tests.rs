@@ -535,33 +535,40 @@ async fn collect_isolated_logs_from_generated_component_manifest() {
     );
 }
 
+fn get_stdmsgs_and_status(events: &Vec<RunEvent>) -> (Vec<String>, Option<SuiteStatus>) {
+    let mut stdmsgs = vec![];
+    let mut s = None;
+    for e in events {
+        match e {
+            RunEvent::CaseStdout { name, stdout_message } => {
+                stdmsgs.push(format!("{} - {}", name, stdout_message));
+            }
+            RunEvent::CaseStderr { name, stderr_message } => {
+                stdmsgs.push(format!("{} - {}", name, stderr_message));
+            }
+
+            RunEvent::SuiteStopped { status } => s = Some(status.clone()),
+            _ => {
+                continue;
+            }
+        }
+    }
+    (stdmsgs, s)
+}
+
 #[fuchsia::test]
 async fn collect_isolated_logs_using_batch() {
     let test_url = "fuchsia-pkg://fuchsia.com/test-manager-diagnostics-tests#meta/test-root.cm";
     let mut options = default_run_option();
     options.log_iterator = Some(ftest_manager::LogsIteratorOption::BatchIterator);
-    let (_events, logs) = run_single_test(test_url, options).await.unwrap();
+    let (events, logs) = run_single_test(test_url, options).await.unwrap();
 
+    let (stdmsgs, status) = get_stdmsgs_and_status(&events);
+    assert_eq!(status, Some(SuiteStatus::Passed), "{logs:#?}\n{stdmsgs:#?}");
     assert_eq!(
         logs.iter().map(|attributed| attributed.log.as_ref()).collect::<Vec<&str>>(),
         vec!["Started diagnostics publisher", "Finishing through Stop"],
-        "{logs:#?}",
-    );
-}
-
-#[fuchsia::test]
-async fn collect_isolated_logs_using_archive_iterator() {
-    let test_url = "fuchsia-pkg://fuchsia.com/test-manager-diagnostics-tests#meta/test-root.cm";
-    let options = RunOptions {
-        log_iterator: Some(ftest_manager::LogsIteratorOption::SocketBatchIterator),
-        ..default_run_option()
-    };
-    let (_events, logs) = run_single_test(test_url, options).await.unwrap();
-
-    assert_eq!(
-        logs.iter().map(|attributed| attributed.log.as_ref()).collect::<Vec<&str>>(),
-        vec!["Started diagnostics publisher", "Finishing through Stop"],
-        "{logs:#?}",
+        "{logs:#?}\n{stdmsgs:#?}",
     );
 }
 
@@ -572,12 +579,13 @@ async fn collect_isolated_logs_using_host_socket() {
         log_iterator: Some(ftest_manager::LogsIteratorOption::SocketBatchIterator),
         ..default_run_option()
     };
-    let (_events, logs) = run_single_test(test_url, options).await.unwrap();
-
+    let (events, logs) = run_single_test(test_url, options).await.unwrap();
+    let (stdmsgs, status) = get_stdmsgs_and_status(&events);
+    assert_eq!(status, Some(SuiteStatus::Passed), "{logs:#?}\n{stdmsgs:#?}");
     assert_eq!(
         logs.iter().map(|attributed| attributed.log.as_ref()).collect::<Vec<&str>>(),
         vec!["Started diagnostics publisher", "Finishing through Stop"],
-        "{logs:#?}",
+        "{logs:#?}\n{stdmsgs:#?}",
     );
 }
 
