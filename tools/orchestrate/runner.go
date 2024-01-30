@@ -1,0 +1,492 @@
+// Copyright 2024 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+
+package orchestrate
+
+import (
+	"context"
+	"encoding/json"
+	"fmt"
+	"io"
+	"net/http"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"strings"
+	"time"
+
+	ffx "go.fuchsia.dev/fuchsia/tools/orchestrate/ffx"
+	utils "go.fuchsia.dev/fuchsia/tools/orchestrate/utils"
+)
+
+// FtxRunner uses FFX to run Fuchsia component tests.
+type FtxRunner struct {
+	ffx           *ffx.Ffx
+	deviceConfig  *DeviceConfig
+	ffxLogProc    *os.Process
+	targetLogFile *os.File
+}
+
+var (
+	ffxDaemonLog  = filepath.Join(os.Getenv("TEST_UNDECLARED_OUTPUTS_DIR"), "ffx_daemon.log")
+	ffxConfigDump = filepath.Join(os.Getenv("TEST_UNDECLARED_OUTPUTS_DIR"), "ffx_config.txt")
+	subrunnerLog  = filepath.Join(os.Getenv("TEST_UNDECLARED_OUTPUTS_DIR"), "subrunner.log")
+	targetLog     = filepath.Join(os.Getenv("TEST_UNDECLARED_OUTPUTS_DIR"), "target.log")
+	targetSymLog  = filepath.Join(os.Getenv("TEST_UNDECLARED_OUTPUTS_DIR"), "target.symbolized.log")
+	summaryPath   = filepath.Join(os.Getenv("TEST_UNDECLARED_OUTPUTS_DIR"), "summary.json")
+	privKeyPath   = "turquoise/sdk/build_defs/system/id_ed25519"
+	pubKeyPath    = "turquoise/sdk/build_defs/system/id_ed25519.pub"
+	luciAuthPath  = "turquoise/sdk/ffxluciauth/ffxluciauth"
+)
+
+// NewFtxRunner creates a FtxRunner with default dependencies.
+func NewFtxRunner(deviceConfig *DeviceConfig) *FtxRunner {
+	return &FtxRunner{
+		deviceConfig: deviceConfig,
+	}
+}
+
+func (r *FtxRunner) instantiateFfx(in *RunInput) error {
+	wd, err := os.Getwd()
+	if err != nil {
+		return fmt.Errorf("os.Getwd: %w", err)
+	}
+	priv, pub := filepath.Join(wd, privKeyPath), filepath.Join(wd, pubKeyPath)
+	if err = os.Chmod(priv, 0600); err != nil {
+		return fmt.Errorf("os.Chmod: %w", err)
+	}
+	ffxOpt := &ffx.Option{
+		ExePath:    filepath.Join(wd, in.Hardware.FfxPath),
+		LogDir:     os.Getenv("TEST_UNDECLARED_OUTPUTS_DIR"),
+		PrivateSSH: []string{priv},
+		PublicSSH:  []string{pub},
+	}
+	f, err := ffx.New(ffxOpt)
+	if err != nil {
+		return fmt.Errorf("ffx.New: %w", err)
+	}
+	r.ffx = f
+	return nil
+}
+
+// Run executes tests.
+func (r *FtxRunner) Run(in *RunInput, testCmd []string) error {
+	if len(in.Hardware.Cipd) > 0 {
+		fmt.Println("=== ftxrunner - Downloading CIPD packages (0/6) ===")
+		if err := r.cipdEnsure(in); err != nil {
+			return fmt.Errorf("cipdEnsure: %w", err)
+		}
+	}
+	fmt.Println("=== ftxrunner - Setting up ffx (1/6) ===")
+	if err := r.instantiateFfx(in); err != nil {
+		return fmt.Errorf("instantiateFfx: %w", err)
+	}
+	defer func() {
+		if err := r.ffx.Close(); err != nil {
+			fmt.Printf("ffx.Close: %v\n", err)
+		}
+	}()
+	if err := r.setupFfx(); err != nil {
+		return fmt.Errorf("setupFfx: %w", err)
+	}
+	defer r.stopDaemon()
+	fmt.Println("=== ftxrunner - Downloading Product Bundle (2/6) ===")
+	productDir, err := r.downloadProductBundle(in)
+	if err != nil {
+		return fmt.Errorf("downloadProductBundle: %w", err)
+	}
+	fmt.Println("=== ftxrunner - Flashing Device (3/6) ===")
+	if err := r.flashDevice(productDir); err != nil {
+		return fmt.Errorf("flashDevice: %w", err)
+	}
+	fmt.Println("=== ftxrunner - Serving Packages (4/6) ===")
+	if err := r.servePackages(in, productDir); err != nil {
+		return fmt.Errorf("servePackages: %w", err)
+	}
+	defer r.stopPackageServer()
+	fmt.Println("=== ftxrunner - Reach Device (5/6) ===")
+	if err := r.reachDevice(); err != nil {
+		return fmt.Errorf("reachDevice: %w", err)
+	}
+	defer r.stopFfxLog()
+	fmt.Println("=== ftxrunner - Test (6/6) ===")
+	if err := r.test(testCmd, in); err != nil {
+		return fmt.Errorf("test: %w", err)
+	}
+	return nil
+}
+
+/* Step 0 - Downloading CIPD packages. */
+func (r *FtxRunner) cipdEnsure(in *RunInput) error {
+	wd, err := os.Getwd()
+	if err != nil {
+		return fmt.Errorf("os.Getwd: %w", err)
+	}
+	for destPath, cipdSpec := range in.Hardware.Cipd {
+		split := strings.SplitN(cipdSpec, ":", 2)
+		ensureLine := fmt.Sprintf("%s\t%s\n", split[0], split[1])
+		cipdCmd := []string{
+			"cipd",
+			"ensure",
+			"-ensure-file",
+			"-",
+			"-root",
+			filepath.Join(wd, destPath),
+			"-service-account-json",
+			":gce",
+		}
+		fmt.Printf("Running command: %+v stdin: %s", cipdCmd, ensureLine)
+		cmd := exec.Command(cipdCmd[0], cipdCmd[1:]...)
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
+		cmd.Stdin = strings.NewReader(ensureLine)
+		cmd.Env = os.Environ()
+		if err := cmd.Run(); err != nil {
+			return fmt.Errorf("cmd.Run: %w", err)
+		}
+	}
+	return nil
+}
+
+/* Step 1 - Setting up ffx. */
+func (r *FtxRunner) setupFfx() error {
+	cmds := [][]string{
+		{"config", "set", "log.level", "Debug"},
+		{"config", "set", "test.experimental_json_input", "true"},
+		{"config", "set", "fastboot.flash.timeout_rate", "4"},
+		{"config", "set", "discovery.mdns.enabled", "false"},
+		{"config", "set", "fastboot.usb.disabled", "true"},
+		{"config", "set", "proactive_log.enabled", "false"},
+		{"config", "set", "daemon.autostart", "false"},
+		{"config", "set", "overnet.cso", "only"},
+		{"config", "set", "ffx-repo-add", "true"},
+	}
+	for _, cmd := range cmds {
+		if out, err := r.ffx.RunCmdSync(cmd...); err != nil {
+			return fmt.Errorf("ffx setup %v: %w out: %s", cmd, err, out)
+		}
+	}
+	if err := r.dumpFfxConfig(); err != nil {
+		return fmt.Errorf("dumpFfxConfig: %w", err)
+	}
+	if err := r.daemonStart(); err != nil {
+		return fmt.Errorf("ffx daemon start: %w", err)
+	}
+	if err := r.ffx.WaitForDaemon(context.Background()); err != nil {
+		return fmt.Errorf("ffx daemon wait: %w", err)
+	}
+	return nil
+}
+
+func (r *FtxRunner) dumpFfxConfig() error {
+	logFile, err := os.Create(ffxConfigDump)
+	if err != nil {
+		return fmt.Errorf("os.Create: %w", err)
+	}
+	defer func() {
+		if err := logFile.Close(); err != nil {
+			fmt.Printf("logFile.Close: %v\n", err)
+		}
+	}()
+	cmd := r.ffx.Cmd("config", "get")
+	cmd.Stdout = logFile
+	cmd.Stderr = logFile
+	return cmd.Run()
+}
+
+func (r *FtxRunner) daemonStart() error {
+	logFile, err := os.Create(ffxDaemonLog)
+	if err != nil {
+		return fmt.Errorf("os.Create: %w", err)
+	}
+	wd, err := os.Getwd()
+	if err != nil {
+		return fmt.Errorf("os.Getwd: %w", err)
+	}
+	cmd := r.ffx.Cmd("daemon", "start")
+	sshDir := filepath.Join(wd, "openssh-portable", "bin")
+	cmd.Env = appendPath(cmd.Env, sshDir)
+	cmd.Stdout = logFile
+	cmd.Stderr = logFile
+	return cmd.Start()
+}
+
+func appendPath(environ []string, dirs ...string) []string {
+	result := []string{}
+	for _, e := range environ {
+		if strings.HasPrefix(e, "PATH=") {
+			result = append(result, fmt.Sprintf("%s:%s", e, strings.Join(dirs, ":")))
+		} else {
+			result = append(result, e)
+		}
+	}
+	return result
+}
+
+/* Step 2 - Downloading product bundle. */
+func (r *FtxRunner) downloadProductBundle(in *RunInput) (string, error) {
+	wd, err := os.Getwd()
+	if err != nil {
+		return "", fmt.Errorf("os.Getwd: %w", err)
+	}
+	dir := filepath.Join(wd, "ffx-product-bundle")
+	_, err = r.ffx.RunCmdSync("product", "download", in.Hardware.TransferURL, dir, "--auth", luciAuthPath)
+	if err != nil {
+		return "", fmt.Errorf("ffx product download: %w", err)
+	}
+	return dir, nil
+}
+
+/* Step 3 - Flashing device. */
+func (r *FtxRunner) flashDevice(productDir string) error {
+	if err := r.ffx.Flash(r.deviceConfig.FastbootSerial, productDir, pubKeyPath); err != nil {
+		return fmt.Errorf("ffx flash: %w", err)
+	}
+	return nil
+}
+
+/* Step 4 - Serving packages. */
+func (r *FtxRunner) servePackages(in *RunInput, productDir string) error {
+	if out, err := r.ffx.RunCmdSync("repository", "add-from-pm", productDir); err != nil {
+		return fmt.Errorf("ffx repository add-from-pm: %w out: %s", err, out)
+	}
+	for _, far := range in.Hardware.PackageArchives {
+		if out, err := r.ffx.RunCmdSync("repository", "publish", productDir, "--package-archive", far); err != nil {
+			return fmt.Errorf("ffx repository publish %s: %w out: %s", far, err, out)
+		}
+	}
+	for _, buildID := range in.Hardware.BuildIds {
+		if out, err := r.ffx.RunCmdSync("debug", "symbol-index", "add", buildID); err != nil {
+			return fmt.Errorf("ffx debug symbol-index add %s: %w out: %s", buildID, err, out)
+		}
+	}
+	if err := r.serveAndWait(); err != nil {
+		return fmt.Errorf("serveAndWait: %w", err)
+	}
+	if _, err := r.ffx.RunCmdSync("repository", "list"); err != nil {
+		return fmt.Errorf("ffx repository list: %w", err)
+	}
+	return nil
+}
+
+func (r *FtxRunner) serveAndWait() error {
+	port := os.Getenv("FUCHSIA_PACKAGE_SERVER_PORT")
+	if port == "" {
+		port = "8083"
+	}
+	addr := fmt.Sprintf("[::]:%s", port)
+	if _, err := r.ffx.RunCmdAsync("repository", "server", "start", "--address", addr); err != nil {
+		return fmt.Errorf("ffx repository server start: %w", err)
+	}
+	return utils.RunWithRetries(context.Background(), 500*time.Millisecond, 5, func() error {
+		req, err := http.NewRequest("GET", fmt.Sprintf("http://localhost:%s", port), nil)
+		if err != nil {
+			return fmt.Errorf("http.NewRequest: %w", err)
+		}
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			return fmt.Errorf("http.DefaultClient.Do: %w", err)
+		}
+		// Check the response status code
+		if resp.StatusCode != 200 {
+			return fmt.Errorf("resp.StatusCode: got %d, want 200", resp.StatusCode)
+		}
+		return nil
+	})
+}
+
+/* Step 5 - Reach Device */
+func (r *FtxRunner) reachDevice() error {
+	addr := r.deviceConfig.Network.IPv4
+	if _, err := r.ffx.RunCmdSync("target", "add", addr, "--nowait"); err != nil {
+		return fmt.Errorf("ffx target add: %w", err)
+	}
+	if _, err := r.ffx.RunCmdSync("target", "wait"); err != nil {
+		return fmt.Errorf("ffx target wait: %w", err)
+	}
+	if _, err := r.ffx.RunCmdSync("target", "list"); err != nil {
+		return fmt.Errorf("ffx target list: %w", err)
+	}
+	if err := r.dumpFfxLog(); err != nil {
+		return fmt.Errorf("dumpFfxLog: %w", err)
+	}
+	if out, err := r.ffx.RunCmdSync(
+		"target",
+		"repository",
+		"register",
+		"--repository",
+		"devhost",
+		"--alias",
+		"fuchsia.com",
+		"--alias",
+		"chromium.org"); err != nil {
+		return fmt.Errorf("ffx target repository register: %w out: %s", err, out)
+	}
+	return nil
+}
+
+func (r *FtxRunner) dumpFfxLog() error {
+	logFile, err := os.Create(targetLog)
+	if err != nil {
+		return fmt.Errorf("os.Create: %w", err)
+	}
+	r.targetLogFile = logFile
+	cmd := r.ffx.Cmd("log", "--no-symbolize")
+	cmd.Stdout = logFile
+	cmd.Stderr = logFile
+	if err := cmd.Start(); err != nil {
+		return fmt.Errorf("cmd.Start: %w", err)
+	}
+	go func() {
+		if err := cmd.Wait(); err != nil {
+			fmt.Printf("cmd.Wait: %v", err)
+		}
+	}()
+	r.ffxLogProc = cmd.Process
+	return nil
+}
+
+/* Step 6 - Test */
+func (r *FtxRunner) test(testCmd []string, in *RunInput) error {
+	wd, err := os.Getwd()
+	if err != nil {
+		return fmt.Errorf("os.Getwd: %w", err)
+	}
+	logFile, err := os.Create(subrunnerLog)
+	if err != nil {
+		return fmt.Errorf("os.Create: %w", err)
+	}
+	defer func() {
+		if err := logFile.Close(); err != nil {
+			fmt.Printf("logFile.Close: %v\n", err)
+		}
+	}()
+
+	// Use ffx.Cmd to effectively construct `testCmd` with the same execution
+	// environment/constraint as any other ffx command (eg: setting
+	// FFX_ISOLATE_DIR). Note that immediately replace the executable specified
+	// in `cmd` with `testCmd`'s executable, so the test step isn't actually
+	// running an ffx command/subcommand.
+	cmd := r.ffx.Cmd(testCmd[1:]...)
+	cmd.Path, err = exec.LookPath(testCmd[0])
+	if err != nil {
+		return fmt.Errorf("exec.LookPath: %w", err)
+	}
+	cmd.Args[0] = cmd.Path
+
+	// Setup pipes to forward subcmd stdout and stderr to logFile and os.Stdout.
+	pipeOut := io.MultiWriter(logFile, os.Stdout)
+	cmd.Stdout = pipeOut
+	cmd.Stderr = pipeOut
+
+	// Finds ffx in PATH to allow downstream calls to "ffx" without having to
+	// leak the full path. Also adds ssh to PATH.
+	ffxDir := filepath.Dir(filepath.Join(wd, in.Hardware.FfxPath))
+	if err := os.Setenv("PATH", fmt.Sprintf("%s:%s", ffxDir, os.Getenv("PATH"))); err != nil {
+		return fmt.Errorf("os.Setenv: %w", err)
+	}
+	sshDir := filepath.Join(wd, "openssh-portable", "bin")
+	cmd.Env = appendPath(cmd.Env, sshDir, ffxDir)
+
+	fmt.Printf("Running test: %+v\n", cmd.Args)
+	err = cmd.Run()
+	fmt.Printf("Pausing 10 seconds for log flush...\n")
+	time.Sleep(10 * time.Second)
+	if _, err := r.ffx.RunCmdSync("target", "snapshot", "-d", os.Getenv("TEST_UNDECLARED_OUTPUTS_DIR")); err != nil {
+		fmt.Printf("target snapshot: %v\n", err)
+	}
+	if err = r.writeTestSummary(err); err != nil {
+		return fmt.Errorf("writeTestSummary: %w", err)
+	}
+	return nil
+}
+
+// testSummary determines the data for out/summary.json
+type testSummary struct {
+	Success bool `json:"success"`
+}
+
+func (r *FtxRunner) writeTestSummary(testErr error) error {
+	if testErr != nil {
+		fmt.Printf("Tests failed: %v\n", testErr)
+	}
+	summary := &testSummary{
+		Success: testErr == nil,
+	}
+	if err := os.MkdirAll(filepath.Dir(summaryPath), 0755); err != nil {
+		return fmt.Errorf("os.MkdirAll: %w", err)
+	}
+	if err := writeJSON(summaryPath, summary); err != nil {
+		return fmt.Errorf("writeJSON: %w", err)
+	}
+	return nil
+}
+
+func writeJSON(filename string, data any) error {
+	rawData, err := json.MarshalIndent(data, "", "  ")
+	if err != nil {
+		return fmt.Errorf("json.MarshalIndent: %w", err)
+	}
+	if err = os.WriteFile(filename, rawData, 0644); err != nil {
+		return fmt.Errorf("os.WriteFile: %w", err)
+	}
+	return nil
+}
+
+/* Cleanup */
+func (r *FtxRunner) stopPackageServer() {
+	_, err := r.ffx.RunCmdSync("repository", "server", "stop")
+	if err != nil {
+		fmt.Printf("ffx repository server stop: %v", err)
+	}
+}
+
+func (r *FtxRunner) stopDaemon() {
+	if _, err := r.ffx.RunCmdSync("daemon", "stop", "--no-wait"); err != nil {
+		fmt.Printf("ffx daemon stop: %v", err)
+	}
+}
+
+func (r *FtxRunner) stopFfxLog() {
+	if r.ffxLogProc == nil {
+		return
+	}
+	if err := r.ffxLogProc.Kill(); err != nil {
+		fmt.Printf("ffxLogProc.Kill: %v\n", err)
+	}
+	if err := r.targetLogFile.Close(); err != nil {
+		fmt.Printf("targetLogFile.Close: %v\n", err)
+	}
+	// Symbolize logs
+	if err := r.Symbolize(targetLog, targetSymLog); err != nil {
+		fmt.Printf("Symbolize: %v\n", err)
+	}
+}
+
+// Symbolize uses ffx to symbolize the log output.
+func (r *FtxRunner) Symbolize(input, output string) error {
+	logFile, err := os.Open(input)
+	if err != nil {
+		return fmt.Errorf("os.Open(%q): %w", input, err)
+	}
+	defer func() {
+		if err := logFile.Close(); err != nil {
+			fmt.Printf("logFile.Close: %v\n", err)
+		}
+	}()
+	symbolizedFile, err := os.Create(output)
+	if err != nil {
+		return fmt.Errorf("os.Create(%q): %w", output, err)
+	}
+	defer func() {
+		if err := symbolizedFile.Close(); err != nil {
+			fmt.Printf("symbolizedFile.Close: %v\n", err)
+		}
+	}()
+	cmd := r.ffx.Cmd("debug", "symbolize")
+	cmd.Stdin = logFile
+	cmd.Stdout = symbolizedFile
+	cmd.Stderr = symbolizedFile
+	return cmd.Run()
+}
