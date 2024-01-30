@@ -10,7 +10,10 @@ use {
         directory::FxDirectory,
         errors::map_to_status,
         node::FxNode,
-        pager::{default_page_in, PagerBacked, PagerPacketReceiverRegistration},
+        pager::{
+            default_page_in, MarkDirtyRange, PageInRange, PagerBacked,
+            PagerPacketReceiverRegistration,
+        },
         volume::FxVolume,
     },
     anyhow::{anyhow, ensure, Context, Error},
@@ -171,12 +174,12 @@ impl PagerBacked for FxBlob {
         &self.vmo
     }
 
-    fn page_in(self: Arc<Self>, range: Range<u64>) {
+    fn page_in(self: Arc<Self>, range: PageInRange<Self>) {
         // Delegate to the generic page handling code.
         default_page_in(self, range)
     }
 
-    fn mark_dirty(self: Arc<Self>, _range: Range<u64>) {
+    fn mark_dirty(self: Arc<Self>, _range: MarkDirtyRange<Self>) {
         unreachable!();
     }
 
@@ -196,7 +199,7 @@ impl PagerBacked for FxBlob {
         self.uncompressed_size
     }
 
-    async fn aligned_read(&self, range: Range<u64>) -> Result<(buffer::Buffer<'_>, usize), Error> {
+    async fn aligned_read(&self, range: Range<u64>) -> Result<buffer::Buffer<'_>, Error> {
         thread_local! {
             static DECOMPRESSOR: std::cell::RefCell<zstd::bulk::Decompressor<'static>> =
                 std::cell::RefCell::new(zstd::bulk::Decompressor::new().unwrap());
@@ -209,8 +212,8 @@ impl PagerBacked for FxBlob {
         let read = if self.compressed_offsets.is_empty() {
             self.handle.read(range.start, buffer.as_mut()).await?
         } else {
-            let indices =
-                (range.start / block_alignment) as usize..(range.end / block_alignment) as usize;
+            let indices = (range.start / block_alignment) as usize
+                ..range.end.div_ceil(block_alignment) as usize;
             let seek_table_len = self.compressed_offsets.len();
             ensure!(
                 indices.start < seek_table_len && indices.end <= seek_table_len,
@@ -287,7 +290,7 @@ impl PagerBacked for FxBlob {
         }
         // Zero the tail.
         buffer.as_mut_slice()[read..].fill(0);
-        Ok((buffer, read))
+        Ok(buffer)
     }
 }
 

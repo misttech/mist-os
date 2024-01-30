@@ -17,12 +17,13 @@ use {
     },
     fxfs::{
         log::*,
+        range::RangeExt,
         round::{round_down, round_up},
     },
     once_cell::sync::Lazy,
     std::{
         future::Future,
-        marker::{Send, Sync},
+        marker::PhantomData,
         mem::MaybeUninit,
         ops::Range,
         sync::{Arc, Mutex, Weak},
@@ -77,6 +78,7 @@ impl<T: PagerBacked> PagerPacketReceiver<T> {
                 if let Some(file) = file.upgrade() {
                     file
                 } else {
+                    error!("Received a page request for a file that is closed {:?}", contents);
                     return;
                 }
             }
@@ -90,8 +92,10 @@ impl<T: PagerBacked> PagerPacketReceiver<T> {
             return;
         };
         match command {
-            ZX_PAGER_VMO_READ => file.page_in(contents.range()),
-            ZX_PAGER_VMO_DIRTY => file.mark_dirty(contents.range()),
+            ZX_PAGER_VMO_READ => file.clone().page_in(PageInRange::new(contents.range(), file)),
+            ZX_PAGER_VMO_DIRTY => {
+                file.clone().mark_dirty(MarkDirtyRange::new(contents.range(), file))
+            }
             _ => unreachable!("Unhandled commands are filtered above"),
         }
     }
@@ -231,7 +235,7 @@ impl Pager {
 
     /// Supplies pages in response to a `ZX_PAGER_VMO_READ` page request. See
     /// `zx_pager_supply_pages` for more information.
-    pub fn supply_pages(
+    fn supply_pages(
         &self,
         vmo: &zx::Vmo,
         range: Range<u64>,
@@ -246,7 +250,7 @@ impl Pager {
     /// Notifies the kernel that a page request for the given `range` has failed. Sent in response
     /// to a `ZX_PAGER_VMO_READ` or `ZX_PAGER_VMO_DIRTY` page request. See `ZX_PAGER_OP_FAIL` for
     /// more information.
-    pub fn report_failure(&self, vmo: &zx::Vmo, range: Range<u64>, status: zx::Status) {
+    fn report_failure(&self, vmo: &zx::Vmo, range: Range<u64>, status: zx::Status) {
         let pager_status = match status {
             zx::Status::IO_DATA_INTEGRITY => zx::Status::IO_DATA_INTEGRITY,
             zx::Status::NO_SPACE => zx::Status::NO_SPACE,
@@ -268,7 +272,7 @@ impl Pager {
 
     /// Allows the kernel to dirty the `range` of pages. Sent in response to a `ZX_PAGER_VMO_DIRTY`
     /// page request. See `ZX_PAGER_OP_DIRTY` for more information.
-    pub fn dirty_pages(&self, vmo: &zx::Vmo, range: Range<u64>) {
+    fn dirty_pages(&self, vmo: &zx::Vmo, range: Range<u64>) {
         if let Err(e) = self.pager.op_range(zx::PagerOp::Dirty, vmo, range) {
             // TODO(https://fxbug.dev/42086069): The kernel can spuriously return ZX_ERR_NOT_FOUND.
             if e != zx::Status::NOT_FOUND {
@@ -376,12 +380,14 @@ pub trait PagerBacked: Sync + Send + Sized + 'static {
     fn vmo(&self) -> &zx::Vmo;
 
     /// Called by the pager when a `ZX_PAGER_VMO_READ` packet is received for the VMO. The
-    /// implementation should respond by calling `Pager::supply_pages` or `Pager::report_failure`.
-    fn page_in(self: Arc<Self>, range: Range<u64>);
+    /// implementation must respond by calling either `PageInRange::supply_pages` or
+    /// `PageInRange::report_failure`.
+    fn page_in(self: Arc<Self>, range: PageInRange<Self>);
 
     /// Called by the pager when a `ZX_PAGER_VMO_DIRTY` packet is received for the VMO. The
-    /// implementation should respond by calling `Pager::dirty_pages` or `Pager::report_failure`.
-    fn mark_dirty(self: Arc<Self>, range: Range<u64>);
+    /// implementation must respond by calling either `MarkDirtyRange::dirty_pages` or
+    /// `MarkDirtyRange::report_failure`.
+    fn mark_dirty(self: Arc<Self>, range: MarkDirtyRange<Self>);
 
     /// Called by the pager to indicate there are no more VMO children.
     fn on_zero_children(self: Arc<Self>);
@@ -393,20 +399,24 @@ pub trait PagerBacked: Sync + Send + Sized + 'static {
     /// This may be larger than the system page size (e.g. for compressed chunks).
     fn read_alignment(&self) -> u64;
 
-    /// Reads one or more blocks into a buffer and returns it. Note that |aligned_byte_range| *must*
-    /// be aligned to a multiple of |self.read_alignment()|.
+    /// Reads one or more blocks into a buffer and returns it. `aligned_byte_range` will always
+    /// start at a multiple of `self.read_alignment()` and will end at a multiple of
+    /// `self.read_alignment()` unless that would extend beyond `self.byte_size()`, in which case,
+    /// `aligned_byte_range` will end at `self.byte_size()`'s next page multiple. The returned
+    /// buffer must be at least as large as the requested range. Only the requested range will be
+    /// supplied to the pager.
     fn aligned_read(
         &self,
         aligned_byte_range: std::ops::Range<u64>,
-    ) -> impl Future<Output = Result<(buffer::Buffer<'_>, usize), Error>> + Send;
+    ) -> impl Future<Output = Result<buffer::Buffer<'_>, Error>> + Send;
 }
 
 /// A generic page_in implementation that supplies pages using block-aligned reads.
-pub fn default_page_in<P: PagerBacked>(this: Arc<P>, range: Range<u64>) {
+pub fn default_page_in<P: PagerBacked>(this: Arc<P>, pager_range: PageInRange<P>) {
     fxfs_trace::duration!(
         "start-page-in",
-        "offset" => range.start,
-        "len" => range.end - range.start
+        "offset" => pager_range.start(),
+        "len" => pager_range.len()
     );
 
     let pager = this.pager();
@@ -416,9 +426,9 @@ pub fn default_page_in<P: PagerBacked>(this: Arc<P>, range: Range<u64>) {
     const ZERO_VMO_SIZE: u64 = 1_048_576;
     static ZERO_VMO: Lazy<zx::Vmo> = Lazy::new(|| zx::Vmo::create(ZERO_VMO_SIZE).unwrap());
 
-    assert!(range.end < i64::MAX as u64);
+    assert!(pager_range.end() < i64::MAX as u64);
 
-    const READ_AHEAD_SIZE: u64 = 131_072;
+    const READ_AHEAD_SIZE: u64 = 128 * 1024;
     let read_alignment = this.read_alignment();
     let readahead_alignment = if read_alignment > READ_AHEAD_SIZE {
         read_alignment
@@ -428,65 +438,65 @@ pub fn default_page_in<P: PagerBacked>(this: Arc<P>, range: Range<u64>) {
 
     // Two important subtleties to consider in this space:
     //
-    // `byte_size` is the official size of the object. VMOs are page-aligned so `aligned_size` is
-    // the "offical" page length of the object. This may be smaller than Vmo::get_size because
+    // `byte_size` is the official size of the object. VMOs are page-aligned so `page_aligned_size`
+    // is the "official" page length of the object. This may be smaller than Vmo::get_size because
     // these two things are not updated atomically. The reverse is not true -- We do not currently
-    // ever shrink a VMO's size. We also do not update byte_size (self.handle.get_size()) if
-    // an independent handle is used to grow a file. This means the VMO's size should always be
+    // ever shrink a VMO's size. We also do not update byte_size (self.handle.get_size()) if an
+    // independent handle is used to grow a file. This means the VMO's size should always be
     // strictly equal or bigger than `byte_size`.
     //
     // It is valid to supply more pages than asked, but supplying pages outside of the VMO range
-    // will trigger OUT_OF_RANGE errors and the call will fail without supplying anything.
-    // We must supply the range requested under all circumstances to unblock any page misses but
-    // we should take care to never supply additional pages beyond the object length (`byte_size`)
-    // as there is a chance that we might serve a range outside of the VMO and fail to supply
-    // anything at all.
+    // will trigger OUT_OF_RANGE errors and the call will fail without supplying anything. We must
+    // supply the range requested under all circumstances to unblock any page misses but we should
+    // take care to never supply additional pages beyond `page_aligned_size` as there is a chance
+    // that we might serve a range outside of the VMO and fail to supply anything at all.
 
-    let aligned_size = round_up(this.byte_size(), read_alignment).unwrap();
+    let page_aligned_size = round_up(this.byte_size(), page_size()).unwrap();
 
-    // Zero-pad the tail if requested range exceeds the size of the thing we're reading.
-    // This can happen when we truncate and there are outstanding pager requests that the kernel
-    // was not able to cancel in time.
-    let mut offset = std::cmp::max(range.start, aligned_size);
-    while offset < range.end {
-        let end = std::cmp::min(range.end, offset + ZERO_VMO_SIZE);
-        pager.supply_pages(this.vmo(), offset..end, &ZERO_VMO, 0);
-        offset = end;
+    // Zero-pad the tail if the requested range exceeds the size of the thing we're reading. This
+    // can happen when we truncate and there are outstanding pager requests that the kernel was not
+    // able to cancel in time.
+    let (read_range, zero_range) = pager_range.split(page_aligned_size);
+    if let Some(zero_range) = zero_range {
+        for range in zero_range.chunks(ZERO_VMO_SIZE) {
+            range.supply_pages(&ZERO_VMO, 0);
+        }
     }
 
-    let mut readahead_range = round_down(range.start, readahead_alignment)
-        ..std::cmp::min(round_up(range.end, readahead_alignment).unwrap(), aligned_size);
-    // Read in chunks of 128 KiB.
-    let read_size = round_up(128 * 1024, read_alignment).unwrap();
-    while readahead_range.start < readahead_range.end {
-        let read_range = readahead_range.start
-            ..std::cmp::min(readahead_range.end, readahead_range.start + read_size);
-        readahead_range.start += read_size;
-
-        let this = this.clone();
-        this.clone().pager().spawn(page_in_chunk(this, read_range, ref_guard.clone()));
+    if let Some(read_range) = read_range {
+        let expanded_range_for_readahead = round_down(read_range.start(), readahead_alignment)
+            ..std::cmp::min(
+                round_up(read_range.end(), readahead_alignment).unwrap(),
+                page_aligned_size,
+            );
+        let read_range = read_range.expand(expanded_range_for_readahead);
+        for range in read_range.chunks(readahead_alignment) {
+            this.pager().spawn(page_in_chunk(this.clone(), range, ref_guard.clone()));
+        }
     }
 }
 
-#[fxfs_trace::trace("offset" => read_range.start, "len" => read_range.end - read_range.start)]
-async fn page_in_chunk<P: PagerBacked>(this: Arc<P>, read_range: Range<u64>, _ref_guard: RefGuard) {
-    let (buffer, buffer_len) = match this.aligned_read(read_range.clone()).await {
+#[fxfs_trace::trace("offset" => read_range.start(), "len" => read_range.len())]
+async fn page_in_chunk<P: PagerBacked>(
+    this: Arc<P>,
+    read_range: PageInRange<P>,
+    _ref_guard: RefGuard,
+) {
+    let buffer = match this.aligned_read(read_range.range()).await {
         Ok(v) => v,
         Err(error) => {
-            error!(range = ?read_range, ?error, "Failed to load range");
-            this.pager().report_failure(this.vmo(), read_range.clone(), map_to_status(error));
+            error!(range = ?read_range.range(), ?error, "Failed to load range");
+            read_range.report_failure(map_to_status(error));
             return;
         }
     };
-    let supply_range = read_range.start
-        ..round_up(read_range.start + buffer_len as u64, zx::system_get_page_size() as u64)
-            .unwrap();
-    this.pager().supply_pages(
-        this.vmo(),
-        supply_range,
-        buffer.allocator().buffer_source().vmo(),
-        buffer.range().start as u64,
+    assert!(
+        buffer.len() as u64 >= read_range.len(),
+        "A buffer smaller than requested was returned. requested: {}, returned: {}",
+        read_range.len(),
+        buffer.len()
     );
+    read_range.supply_pages(buffer.allocator().buffer_source().vmo(), buffer.range().start as u64);
 }
 
 /// Represents a dirty range of page aligned bytes within a pager backed VMO.
@@ -532,6 +542,248 @@ impl PagerVmoStats {
     }
 }
 
+#[inline]
+fn page_size() -> u64 {
+    zx::system_get_page_size().into()
+}
+
+/// A trait for specializing `PagerRange` for different request types.
+pub trait PagerRequestType {
+    /// Returns the name of the request type for logging purposes.
+    fn request_type_name() -> &'static str;
+}
+
+/// A request generated from a ZX_PAGER_VMO_READ packet.
+pub struct PageInRequest;
+
+impl PagerRequestType for PageInRequest {
+    fn request_type_name() -> &'static str {
+        "PageInRequest"
+    }
+}
+
+/// The requested range from a ZX_PAGER_VMO_READ packet. This object must not be dropped without
+/// calling either `supply_pages` or `report_failure`.
+pub type PageInRange<T> = PagerRange<T, PageInRequest>;
+
+/// A requested generated from a ZX_PAGER_VMO_DIRTY packet.
+pub struct MarkDirtyRequest;
+
+impl PagerRequestType for MarkDirtyRequest {
+    fn request_type_name() -> &'static str {
+        "MarkDirtyRequest"
+    }
+}
+
+/// The requested range from a ZX_PAGER_VMO_DIRTY packet. This object must not be dropped without
+/// calling either `mark_dirty` or `report_failure`.
+pub type MarkDirtyRange<T> = PagerRange<T, MarkDirtyRequest>;
+
+/// The requested range from a pager packet. This object ensures that all pager requests receive a
+/// response.
+pub struct PagerRange<T: PagerBacked, U: PagerRequestType> {
+    range: Range<u64>,
+
+    // A missing file indicates that a response has been sent for this range.
+    file: Option<Arc<T>>,
+
+    _request_type: PhantomData<U>,
+}
+
+impl<T: PagerBacked, U: PagerRequestType> PagerRange<T, U> {
+    /// Constructs a new `PagerRange<T, U>`. `range` must be page aligned.
+    fn new(range: Range<u64>, file: Arc<T>) -> Self {
+        debug_assert!(
+            range.start % page_size() == 0 && range.end % page_size() == 0,
+            "{:?} is not page aligned",
+            range
+        );
+        Self { range, file: Some(file), _request_type: PhantomData }
+    }
+
+    /// Splits the underlying range allowing for different parts of the range to be handled and
+    /// responded to independently. See `RangeExt::split` for how splitting a range works.
+    /// `split_point` must be page aligned.
+    pub fn split(mut self, split_point: u64) -> (Option<Self>, Option<Self>) {
+        let file = self.file.take().unwrap();
+        let (left, right) = self.range.clone().split(split_point);
+        let right = right.map(|range| Self::new(range, file.clone()));
+        let left = left.map(|range| Self::new(range, file));
+        (left, right)
+    }
+
+    /// Increases the size of the range that will be responded to. Panics if the current range is
+    /// not a subset of `new_range`. `new_range` must be page aligned.
+    pub fn expand(mut self, new_range: Range<u64>) -> Self {
+        assert!(
+            self.range.start >= new_range.start && self.range.end <= new_range.end,
+            "{:?} is not a subset of {:?}",
+            self.range,
+            new_range
+        );
+        debug_assert!(
+            new_range.start % page_size() == 0 && new_range.end % page_size() == 0,
+            "{:?} is not page aligned",
+            new_range
+        );
+        Self { range: new_range, file: self.file.take(), _request_type: PhantomData }
+    }
+
+    /// Returns an iterator that splits the range into ranges of `chunk_size`. If the length of the
+    /// range is not a multiple of `chunk_size` then the last chunk won't be of length `chunk_size`.
+    /// The returned iterator will panic if it's dropped without being fully consumed. `chunk_size`
+    /// must a multiple of the page size.
+    pub fn chunks(mut self, chunk_size: u64) -> PagerRangeChunksIter<T, U> {
+        debug_assert!(
+            chunk_size % page_size() == 0,
+            "{} is not a multiple of the page size",
+            chunk_size
+        );
+        PagerRangeChunksIter {
+            start: self.range.start,
+            end: self.range.end,
+            chunk_size: chunk_size,
+            file: self.file.take(),
+            _request_type: PhantomData,
+        }
+    }
+
+    #[inline]
+    pub fn start(&self) -> u64 {
+        self.range.start
+    }
+
+    #[inline]
+    pub fn end(&self) -> u64 {
+        self.range.end
+    }
+
+    #[inline]
+    pub fn len(&self) -> u64 {
+        self.range.end - self.range.start
+    }
+
+    #[inline]
+    pub fn range(&self) -> Range<u64> {
+        self.range.clone()
+    }
+
+    /// Notifies the kernel that the page request for this range has failed. See `ZX_PAGER_OP_FAIL`
+    /// for more information.
+    pub fn report_failure(mut self, status: zx::Status) {
+        let file = self.file.take().unwrap();
+        file.pager().report_failure(file.vmo(), self.range.clone(), status);
+    }
+
+    /// Test only method that will consume the PagerRange without having the send a response.
+    #[cfg(test)]
+    fn consume(mut self) {
+        self.file.take().unwrap();
+    }
+}
+
+impl<T: PagerBacked> PagerRange<T, PageInRequest> {
+    /// Supplies pages to the kernel for this range. See `zx_pager_supply_pages` for more
+    /// information.
+    pub fn supply_pages(mut self, transfer_vmo: &zx::Vmo, transfer_offset: u64) {
+        let file = self.file.take().unwrap();
+        file.pager().supply_pages(file.vmo(), self.range.clone(), transfer_vmo, transfer_offset);
+    }
+}
+
+impl<T: PagerBacked> PagerRange<T, MarkDirtyRequest> {
+    /// Allows the kernel to dirty this range of pages. See `ZX_PAGER_OP_DIRTY` for more
+    /// information.
+    pub fn dirty_pages(mut self) {
+        let file = self.file.take().unwrap();
+        file.pager().dirty_pages(file.vmo(), self.range.clone());
+    }
+}
+
+impl<T: PagerBacked, U: PagerRequestType> Drop for PagerRange<T, U> {
+    fn drop(&mut self) {
+        if let Some(file) = &self.file {
+            let request_type = U::request_type_name();
+            let range = self.range.clone();
+            let key = file.pager_packet_receiver_registration().key();
+            if cfg!(debug_assertions) {
+                // If this object is being dropped as part of a panic then avoid panicking again.
+                // Dropping pager packets when fxfs is crashing is acceptable. Panicking again would
+                // only clutter the logs.
+                if !std::thread::panicking() {
+                    panic!(
+                        "PagerRange was dropped without sending a response, \
+                        request_type={request_type}, range={range:?}, key={key}",
+                    );
+                }
+            } else {
+                error!(
+                    "PagerRange was dropped without sending a response, \
+                    request_type={request_type}, range={range:?}, key={key}",
+                );
+                file.pager().report_failure(file.vmo(), range, zx::Status::BAD_STATE);
+            }
+        }
+    }
+}
+
+/// An iterator similar to `std::slice::Chunks` which yields `PagerRange` objects.
+/// `PagerRangeChunksIter` will panic if it's dropped without being fully consumed.
+pub struct PagerRangeChunksIter<T: PagerBacked, U: PagerRequestType> {
+    start: u64,
+    end: u64,
+    chunk_size: u64,
+    // The file will be passed z
+    file: Option<Arc<T>>,
+    _request_type: PhantomData<U>,
+}
+
+impl<T: PagerBacked, U: PagerRequestType> Iterator for PagerRangeChunksIter<T, U> {
+    type Item = PagerRange<T, U>;
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.start == self.end {
+            None
+        } else if self.start + self.chunk_size >= self.end {
+            let next = PagerRange::new(self.start..self.end, self.file.take().unwrap());
+            self.start = self.end;
+            Some(next)
+        } else {
+            let next_end = self.start + self.chunk_size;
+            let next = PagerRange::new(self.start..next_end, self.file.as_ref().unwrap().clone());
+            self.start = next_end;
+            Some(next)
+        }
+    }
+}
+
+impl<T: PagerBacked, U: PagerRequestType> Drop for PagerRangeChunksIter<T, U> {
+    fn drop(&mut self) {
+        if self.start != self.end {
+            let request_type = U::request_type_name();
+            let remaining = self.start..self.end;
+            let file = self.file.take().unwrap();
+            let key = file.pager_packet_receiver_registration().key();
+            if cfg!(debug_assertions) {
+                // If this object is being dropped as part of a panic then avoid panicking again.
+                // Dropping pager packets when fxfs is crashing is acceptable. Panicking again would
+                // only clutter the logs.
+                if !std::thread::panicking() {
+                    panic!(
+                        "PagerRangeChunksIter was dropped without being fully consumed, \
+                    request_type={request_type}, remaining={remaining:?}, key={key}",
+                    );
+                }
+            } else {
+                error!(
+                    "PagerRangeChunksIter was dropped without being fully consumed, \
+                    request_type={request_type}, remaining={remaining:?}, key={key}",
+                );
+                file.pager().report_failure(file.vmo(), remaining, zx::Status::BAD_STATE);
+            }
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use {
@@ -546,8 +798,7 @@ mod tests {
 
     impl MockFile {
         fn new(pager: Arc<Pager>) -> Self {
-            let (vmo, pager_packet_receiver_registration) =
-                pager.create_vmo(zx::system_get_page_size().into()).unwrap();
+            let (vmo, pager_packet_receiver_registration) = pager.create_vmo(page_size()).unwrap();
             Self { pager, vmo, pager_packet_receiver_registration }
         }
     }
@@ -565,13 +816,13 @@ mod tests {
             &self.vmo
         }
 
-        fn page_in(self: Arc<Self>, range: Range<u64>) {
-            let aux_vmo = zx::Vmo::create(range.end - range.start).unwrap();
-            self.pager.supply_pages(&self.vmo, range, &aux_vmo, 0);
+        fn page_in(self: Arc<Self>, range: PageInRange<Self>) {
+            let aux_vmo = zx::Vmo::create(range.len()).unwrap();
+            range.supply_pages(&aux_vmo, 0);
         }
 
-        fn mark_dirty(self: Arc<Self>, range: Range<u64>) {
-            self.pager.dirty_pages(&self.vmo, range);
+        fn mark_dirty(self: Arc<Self>, range: MarkDirtyRange<Self>) {
+            range.dirty_pages();
         }
 
         fn on_zero_children(self: Arc<Self>) {}
@@ -585,7 +836,7 @@ mod tests {
         async fn aligned_read(
             &self,
             _aligned_byte_range: std::ops::Range<u64>,
-        ) -> Result<(buffer::Buffer<'_>, usize), Error> {
+        ) -> Result<buffer::Buffer<'_>, Error> {
             unimplemented!();
         }
     }
@@ -599,8 +850,7 @@ mod tests {
 
     impl OnZeroChildrenFile {
         fn new(pager: Arc<Pager>, sender: mpsc::UnboundedSender<()>) -> Self {
-            let (vmo, pager_packet_receiver_registration) =
-                pager.create_vmo(zx::system_get_page_size().into()).unwrap();
+            let (vmo, pager_packet_receiver_registration) = pager.create_vmo(page_size()).unwrap();
             Self { pager, vmo, pager_packet_receiver_registration, sender: Mutex::new(sender) }
         }
     }
@@ -618,11 +868,11 @@ mod tests {
             &self.vmo
         }
 
-        fn page_in(self: Arc<Self>, _range: Range<u64>) {
+        fn page_in(self: Arc<Self>, _range: PageInRange<Self>) {
             unreachable!();
         }
 
-        fn mark_dirty(self: Arc<Self>, _range: Range<u64>) {
+        fn mark_dirty(self: Arc<Self>, _range: MarkDirtyRange<Self>) {
             unreachable!();
         }
 
@@ -638,12 +888,12 @@ mod tests {
         async fn aligned_read(
             &self,
             _aligned_byte_range: std::ops::Range<u64>,
-        ) -> Result<(buffer::Buffer<'_>, usize), Error> {
+        ) -> Result<buffer::Buffer<'_>, Error> {
             unreachable!();
         }
     }
 
-    #[fuchsia::test(threads = 10)]
+    #[fuchsia::test(threads = 2)]
     async fn test_watch_for_zero_children() {
         let (sender, mut receiver) = mpsc::unbounded();
         let scope = ExecutionScope::new();
@@ -667,7 +917,7 @@ mod tests {
         scope.wait().await;
     }
 
-    #[fuchsia::test(threads = 10)]
+    #[fuchsia::test(threads = 2)]
     async fn test_multiple_watch_for_zero_children_calls() {
         let (sender, mut receiver) = mpsc::unbounded();
         let scope = ExecutionScope::new();
@@ -699,7 +949,7 @@ mod tests {
         scope.wait().await;
     }
 
-    #[fuchsia::test(threads = 10)]
+    #[fuchsia::test(threads = 2)]
     async fn test_status_code_mapping() {
         struct StatusCodeFile {
             vmo: zx::Vmo,
@@ -721,11 +971,11 @@ mod tests {
                 &self.vmo
             }
 
-            fn page_in(self: Arc<Self>, range: Range<u64>) {
-                self.pager.report_failure(&self.vmo, range, *self.status_code.lock().unwrap())
+            fn page_in(self: Arc<Self>, range: PageInRange<Self>) {
+                range.report_failure(*self.status_code.lock().unwrap());
             }
 
-            fn mark_dirty(self: Arc<Self>, _range: Range<u64>) {
+            fn mark_dirty(self: Arc<Self>, _range: MarkDirtyRange<Self>) {
                 unreachable!();
             }
 
@@ -742,15 +992,14 @@ mod tests {
             async fn aligned_read(
                 &self,
                 _aligned_byte_range: std::ops::Range<u64>,
-            ) -> Result<(buffer::Buffer<'_>, usize), Error> {
+            ) -> Result<buffer::Buffer<'_>, Error> {
                 unreachable!();
             }
         }
 
         let scope = ExecutionScope::new();
         let pager = Arc::new(Pager::new(scope.clone()).unwrap());
-        let (vmo, pager_packet_receiver_registration) =
-            pager.create_vmo(zx::system_get_page_size().into()).unwrap();
+        let (vmo, pager_packet_receiver_registration) = pager.create_vmo(page_size()).unwrap();
         let file = Arc::new(StatusCodeFile {
             vmo,
             pager: pager.clone(),
@@ -781,7 +1030,7 @@ mod tests {
         scope.wait().await;
     }
 
-    #[fuchsia::test(threads = 10)]
+    #[fuchsia::test(threads = 2)]
     async fn test_query_vmo_stats() {
         let scope = ExecutionScope::new();
         let pager = Arc::new(Pager::new(scope.clone()).unwrap());
@@ -808,14 +1057,14 @@ mod tests {
         scope.wait().await;
     }
 
-    #[fuchsia::test(threads = 10)]
+    #[fuchsia::test(threads = 2)]
     async fn test_query_dirty_ranges() {
         let scope = ExecutionScope::new();
         let pager = Arc::new(Pager::new(scope.clone()).unwrap());
         let file = Arc::new(MockFile::new(pager.clone()));
         pager.register_file(&file);
 
-        let page_size: u64 = zx::system_get_page_size().into();
+        let page_size = page_size();
         file.vmo().set_size(page_size * 7).unwrap();
         // Modify the 2nd, 3rd, and 5th pages.
         file.vmo().write(&[1, 2, 3, 4], page_size).unwrap();
@@ -845,5 +1094,266 @@ mod tests {
         assert!(buffer[0].is_zero_range());
 
         scope.wait().await;
+    }
+
+    #[fuchsia::test]
+    async fn test_pager_range_chunks_iter_chunks() {
+        let scope = ExecutionScope::new();
+        let pager = Arc::new(Pager::new(scope).unwrap());
+        let file = Arc::new(MockFile::new(pager));
+
+        let pager_range = PageInRange::new(0..page_size() * 5, file);
+        let ranges: Vec<Range<u64>> = pager_range
+            .chunks(page_size() * 2)
+            .map(|pager_range| {
+                let range = pager_range.range();
+                pager_range.consume();
+                range
+            })
+            .collect();
+        assert_eq!(
+            ranges,
+            [
+                0..page_size() * 2,
+                page_size() * 2..page_size() * 4,
+                page_size() * 4..page_size() * 5
+            ]
+        );
+    }
+
+    #[fuchsia::test]
+    async fn test_pager_range_split() {
+        let scope = ExecutionScope::new();
+        let pager = Arc::new(Pager::new(scope).unwrap());
+        let file = Arc::new(MockFile::new(pager));
+
+        let pager_range = PageInRange::new(0..page_size() * 10, file);
+        let (left, right) = pager_range.split(page_size() * 5);
+        let (left, right) = (left.unwrap(), right.unwrap());
+        assert_eq!(left.range(), 0..page_size() * 5);
+        assert_eq!(right.range(), page_size() * 5..page_size() * 10);
+
+        left.consume();
+        right.consume();
+    }
+
+    #[fuchsia::test]
+    #[should_panic(expected = "0..8192 is not a subset of 0..4096")]
+    async fn test_pager_range_bad_expand_panics() {
+        let scope = ExecutionScope::new();
+        let pager = Arc::new(Pager::new(scope).unwrap());
+        let file = Arc::new(MockFile::new(pager));
+
+        let pager_range = PageInRange::new(0..page_size() * 2, file);
+        pager_range.expand(0..page_size()).consume();
+    }
+
+    struct PagerRangeTestFile {
+        vmo: zx::Vmo,
+        pager_packet_receiver_registration: PagerPacketReceiverRegistration<Self>,
+        pager: Pager,
+        page_in_fn: Box<dyn Fn(PageInRange<Self>) + Send + Sync + 'static>,
+        mark_dirty_fn: Box<dyn Fn(MarkDirtyRange<Self>) + Send + Sync + 'static>,
+    }
+
+    impl PagerRangeTestFile {
+        fn new<
+            F1: Fn(PageInRange<Self>) + Send + Sync + 'static,
+            F2: Fn(MarkDirtyRange<Self>) + Send + Sync + 'static,
+        >(
+            page_in_fn: F1,
+            mark_dirty_fn: F2,
+        ) -> Arc<Self> {
+            let pager = Pager::new(ExecutionScope::new()).unwrap();
+            let (vmo, pager_packet_receiver_registration) =
+                pager.create_vmo(page_size() * 2).unwrap();
+            let this = Arc::new(Self {
+                vmo,
+                pager_packet_receiver_registration,
+                pager,
+                page_in_fn: Box::new(page_in_fn),
+                mark_dirty_fn: Box::new(mark_dirty_fn),
+            });
+            this.pager.register_file(&this);
+            this
+        }
+    }
+
+    impl PagerBacked for PagerRangeTestFile {
+        fn pager(&self) -> &Pager {
+            &self.pager
+        }
+
+        fn pager_packet_receiver_registration(&self) -> &PagerPacketReceiverRegistration<Self> {
+            &self.pager_packet_receiver_registration
+        }
+
+        fn vmo(&self) -> &zx::Vmo {
+            &self.vmo
+        }
+
+        fn page_in(self: Arc<Self>, range: PageInRange<Self>) {
+            (self.page_in_fn)(range)
+        }
+
+        fn mark_dirty(self: Arc<Self>, range: MarkDirtyRange<Self>) {
+            (self.mark_dirty_fn)(range)
+        }
+
+        fn on_zero_children(self: Arc<Self>) {}
+
+        fn byte_size(&self) -> u64 {
+            unimplemented!();
+        }
+
+        fn read_alignment(&self) -> u64 {
+            unimplemented!();
+        }
+
+        async fn aligned_read(
+            &self,
+            _range: std::ops::Range<u64>,
+        ) -> Result<buffer::Buffer<'_>, Error> {
+            unimplemented!();
+        }
+    }
+
+    fn real_supply_pages(range: PageInRange<PagerRangeTestFile>) {
+        let aux_vmo = zx::Vmo::create(range.len()).unwrap();
+        range.supply_pages(&aux_vmo, 0);
+    }
+
+    fn real_mark_dirty(range: MarkDirtyRange<PagerRangeTestFile>) {
+        range.dirty_pages();
+    }
+
+    #[fuchsia::test(threads = 2)]
+    async fn test_page_in_range_supply_pages() {
+        let file = PagerRangeTestFile::new(real_supply_pages, real_mark_dirty);
+
+        let mut data = vec![0; 20];
+        file.vmo.read(&mut data, 0).unwrap();
+    }
+
+    #[fuchsia::test(threads = 2)]
+    async fn test_page_in_range_report_failure() {
+        let file = PagerRangeTestFile::new(
+            |range| {
+                range.report_failure(zx::Status::IO_DATA_INTEGRITY);
+            },
+            real_mark_dirty,
+        );
+
+        let mut data = vec![0; 20];
+        let err = file.vmo.read(&mut data, 0).unwrap_err();
+        assert_eq!(err, zx::Status::IO_DATA_INTEGRITY);
+    }
+
+    #[cfg(debug_assertions)]
+    #[fuchsia::test(threads = 2)]
+    #[should_panic(expected = "PagerRange was dropped without sending a response")]
+    async fn test_page_in_range_dropped() {
+        let file = PagerRangeTestFile::new(|_| {}, real_mark_dirty);
+
+        let mut data = vec![0; 20];
+        file.vmo.read(&mut data, 0).unwrap_err();
+    }
+
+    #[cfg(not(debug_assertions))]
+    #[fuchsia::test(threads = 2)]
+    async fn test_page_in_range_dropped() {
+        let file = PagerRangeTestFile::new(|_| {}, real_mark_dirty);
+
+        let mut data = vec![0; 20];
+        let err = file.vmo.read(&mut data, 0).unwrap_err();
+        assert_eq!(err, zx::Status::BAD_STATE);
+    }
+
+    #[fuchsia::test(threads = 2)]
+    async fn test_mark_dirty_range_dirty_pages() {
+        let file = PagerRangeTestFile::new(real_supply_pages, real_mark_dirty);
+
+        let data = vec![5; 20];
+        file.vmo.write(&data, 0).unwrap();
+    }
+
+    #[fuchsia::test(threads = 2)]
+    async fn test_mark_dirty_range_report_failure() {
+        let file = PagerRangeTestFile::new(real_supply_pages, |range| {
+            range.report_failure(zx::Status::IO_DATA_INTEGRITY);
+        });
+
+        let data = vec![5; 20];
+        let err = file.vmo.write(&data, 0).unwrap_err();
+        assert_eq!(err, zx::Status::IO_DATA_INTEGRITY);
+    }
+
+    #[cfg(debug_assertions)]
+    #[fuchsia::test(threads = 2)]
+    #[should_panic(expected = "PagerRange was dropped without sending a response")]
+    async fn test_mark_dirty_range_dropped() {
+        let file = PagerRangeTestFile::new(real_supply_pages, |_| {});
+
+        let data = vec![5; 20];
+        file.vmo.write(&data, 0).unwrap_err();
+    }
+
+    #[cfg(not(debug_assertions))]
+    #[fuchsia::test(threads = 2)]
+    async fn test_mark_dirty_range_dropped() {
+        let file = PagerRangeTestFile::new(real_supply_pages, |_| {});
+
+        let data = vec![5; 20];
+        let err = file.vmo.write(&data, 0).unwrap_err();
+        assert_eq!(err, zx::Status::BAD_STATE);
+    }
+
+    #[fuchsia::test(threads = 2)]
+    async fn test_pager_range_chunks_iter_consumed() {
+        let file = PagerRangeTestFile::new(
+            |range| {
+                let aux_vmo = zx::Vmo::create(page_size()).unwrap();
+                range.expand(0..page_size() * 2).chunks(page_size()).for_each(|range| {
+                    range.supply_pages(&aux_vmo, 0);
+                });
+            },
+            real_mark_dirty,
+        );
+
+        let mut data = vec![0; 20];
+        file.vmo.read(&mut data, 0).unwrap();
+    }
+
+    fn partial_supply_pages(range: PageInRange<PagerRangeTestFile>) {
+        let aux_vmo = zx::Vmo::create(page_size()).unwrap();
+        // Expand the range to 2 pages and only supply the first page, dropping the iterator without
+        // fully consuming it.
+        range.expand(0..page_size() * 2).chunks(page_size()).take(1).for_each(|range| {
+            range.supply_pages(&aux_vmo, 0);
+        });
+    }
+
+    #[cfg(debug_assertions)]
+    #[fuchsia::test(threads = 2)]
+    #[should_panic(expected = "PagerRangeChunksIter was dropped without being fully consumed")]
+    async fn test_pager_range_chunks_iter_dropped() {
+        let file = PagerRangeTestFile::new(partial_supply_pages, real_mark_dirty);
+
+        let mut data = vec![0; 20];
+        // Ask for the 2nd page. The range will be expanded to the first 2 pages. The first page
+        // will succeed and the second page will be dropped.
+        file.vmo.read(&mut data, page_size()).unwrap_err();
+    }
+
+    #[cfg(not(debug_assertions))]
+    #[fuchsia::test(threads = 2)]
+    async fn test_pager_range_chunks_iter_dropped() {
+        let file = PagerRangeTestFile::new(partial_supply_pages, real_mark_dirty);
+
+        let mut data = vec![0; 20];
+        // Ask for the 2nd page. The range will be expanded to the first 2 pages. The first page
+        // will succeed and the second page will be dropped.
+        let err = file.vmo.read(&mut data, page_size()).unwrap_err();
+        assert_eq!(err, zx::Status::BAD_STATE);
     }
 }

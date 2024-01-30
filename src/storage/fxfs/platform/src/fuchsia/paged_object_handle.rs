@@ -4,8 +4,7 @@
 
 use {
     crate::fuchsia::{
-        pager::Pager,
-        pager::{PagerVmoStatsOptions, VmoDirtyRange},
+        pager::{MarkDirtyRange, Pager, PagerBacked, PagerVmoStatsOptions, VmoDirtyRange},
         volume::FxVolume,
     },
     anyhow::{ensure, Context, Error},
@@ -297,15 +296,18 @@ impl PagedObjectHandle {
         Ok(buffer)
     }
 
-    pub fn mark_dirty(&self, page_range: Range<u64>) -> Result<(), zx::Status> {
+    pub fn mark_dirty<T: PagerBacked>(
+        &self,
+        page_range: MarkDirtyRange<T>,
+    ) -> Result<(), zx::Status> {
         let mut inner = self.inner.lock().unwrap();
         if inner.read_only {
             // Enable-verity has already been called on this file.
-            self.pager().report_failure(self.vmo(), page_range, zx::Status::BAD_STATE);
+            page_range.report_failure(zx::Status::BAD_STATE);
             return Err(zx::Status::BAD_STATE);
         }
         let new_inner = Inner {
-            dirty_page_count: inner.dirty_page_count + page_count(page_range.clone()),
+            dirty_page_count: inner.dirty_page_count + page_count(page_range.range()),
             spare: SPARE_SIZE,
             ..*inner
         };
@@ -323,13 +325,13 @@ impl PagedObjectHandle {
                     reservation.forget();
                 }
                 None => {
-                    self.pager().report_failure(self.vmo(), page_range, zx::Status::NO_SPACE);
+                    page_range.report_failure(zx::Status::NO_SPACE);
                     return Err(zx::Status::NO_SPACE);
                 }
             }
         }
         *inner = new_inner;
-        self.pager().dirty_pages(self.vmo(), page_range);
+        page_range.dirty_pages();
         Ok(())
     }
 
@@ -1090,7 +1092,7 @@ mod tests {
         crate::fuchsia::{
             directory::FxDirectory,
             pager::PagerPacketReceiverRegistration,
-            pager::{default_page_in, PagerBacked},
+            pager::{default_page_in, PageInRange, PagerBacked},
             testing::{close_dir_checked, close_file_checked, open_file_checked, TestFixture},
             volume::FxVolumeAndRoot,
         },
@@ -2205,11 +2207,11 @@ mod tests {
                 self.handle.vmo()
             }
 
-            fn page_in(self: Arc<Self>, range: Range<u64>) {
-                default_page_in(self.clone(), range);
+            fn page_in(self: Arc<Self>, range: PageInRange<Self>) {
+                default_page_in(self, range);
             }
 
-            fn mark_dirty(self: Arc<Self>, range: Range<u64>) {
+            fn mark_dirty(self: Arc<Self>, range: MarkDirtyRange<Self>) {
                 self.handle.mark_dirty(range).unwrap();
             }
 
@@ -2223,10 +2225,7 @@ mod tests {
                 self.handle.uncached_size()
             }
 
-            async fn aligned_read(
-                &self,
-                range: Range<u64>,
-            ) -> Result<(buffer::Buffer<'_>, usize), Error> {
+            async fn aligned_read(&self, range: Range<u64>) -> Result<buffer::Buffer<'_>, Error> {
                 let buffer = self.handle.read_uncached(range).await?;
                 static COUNTER: AtomicU64 = AtomicU64::new(0);
                 let counter = COUNTER.fetch_add(1, Ordering::Relaxed);
@@ -2236,8 +2235,7 @@ mod tests {
                         unblocked_requests = self.cvar.wait(unblocked_requests).unwrap();
                     }
                 }
-                let buffer_len = buffer.len();
-                Ok((buffer, buffer_len))
+                Ok(buffer)
             }
         }
 

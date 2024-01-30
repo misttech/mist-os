@@ -8,7 +8,10 @@ use {
         errors::map_to_status,
         node::{FxNode, OpenedNode},
         paged_object_handle::PagedObjectHandle,
-        pager::{default_page_in, PagerBacked, PagerPacketReceiverRegistration},
+        pager::{
+            default_page_in, MarkDirtyRange, PageInRange, PagerBacked,
+            PagerPacketReceiverRegistration,
+        },
         volume::{info_to_filesystem_info, FxVolume},
     },
     anyhow::Error,
@@ -25,7 +28,6 @@ use {
             transaction::{lock_keys, LockKey, Options},
             DataObjectHandle, ObjectDescriptor, Timestamp,
         },
-        range::RangeExt,
     },
     std::{
         ops::Range,
@@ -558,22 +560,22 @@ impl PagerBacked for FxFile {
         self.handle.vmo()
     }
 
-    fn page_in(self: Arc<Self>, range: Range<u64>) {
+    fn page_in(self: Arc<Self>, range: PageInRange<Self>) {
         default_page_in(self, range)
     }
 
     #[trace]
-    fn mark_dirty(self: Arc<Self>, range: Range<u64>) {
+    fn mark_dirty(self: Arc<Self>, range: MarkDirtyRange<Self>) {
         let (valid_pages, invalid_pages) = range.split(MAX_FILE_SIZE);
         if let Some(invalid_pages) = invalid_pages {
-            self.pager().report_failure(self.vmo(), invalid_pages, zx::Status::FILE_BIG);
+            invalid_pages.report_failure(zx::Status::FILE_BIG);
         }
         let range = match valid_pages {
             Some(range) => range,
             None => return,
         };
 
-        let byte_count = range.end - range.start;
+        let byte_count = range.len();
         self.handle.owner().clone().report_pager_dirty(byte_count, move || {
             if let Err(_) = self.handle.mark_dirty(range) {
                 // Undo the report of the dirty pages since mark_dirty failed.
@@ -590,14 +592,15 @@ impl PagerBacked for FxFile {
     fn read_alignment(&self) -> u64 {
         self.handle.block_size()
     }
+
     fn byte_size(&self) -> u64 {
         self.handle.uncached_size()
     }
-    async fn aligned_read(&self, range: Range<u64>) -> Result<(buffer::Buffer<'_>, usize), Error> {
-        fxfs_trace::duration!("aligned_read", "len" => (range.end - range.start) as usize);
+
+    #[trace("len" => (range.end - range.start))]
+    async fn aligned_read(&self, range: Range<u64>) -> Result<buffer::Buffer<'_>, Error> {
         let buffer = self.handle.read_uncached(range).await?;
-        let buffer_len = buffer.len();
-        Ok((buffer, buffer_len))
+        Ok(buffer)
     }
 }
 
