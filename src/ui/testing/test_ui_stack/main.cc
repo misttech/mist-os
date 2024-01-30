@@ -10,6 +10,7 @@
 #include <fuchsia/ui/input/cpp/fidl.h>
 #include <fuchsia/ui/input3/cpp/fidl.h>
 #include <fuchsia/ui/pointerinjector/cpp/fidl.h>
+#include <fuchsia/ui/policy/cpp/fidl.h>
 #include <fuchsia/ui/scenic/cpp/fidl.h>
 #include <fuchsia/ui/test/input/cpp/fidl.h>
 #include <fuchsia/ui/test/scene/cpp/fidl.h>
@@ -75,6 +76,8 @@ int run_test_ui_stack(int argc, const char** argv) {
                                                           realm_exposed_services.get());
   AddPublicService<fuchsia::ui::pointerinjector::Registry>(context.get(),
                                                            realm_exposed_services.get());
+  AddPublicService<fuchsia::ui::policy::DeviceListenerRegistry>(context.get(),
+                                                                realm_exposed_services.get());
   AddPublicService<fuchsia::ui::composition::ScreenCapture>(context.get(),
                                                             realm_exposed_services.get());
   AddPublicService<fuchsia::ui::composition::Screenshot>(context.get(),

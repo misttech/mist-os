@@ -9,6 +9,7 @@ group("conformance") {
   deps = [
     ":focus-conformance-test",
     ":key-conformance-test",
+    ":media-button-conformance-test",
     ":mouse-conformance-test",
     ":touch-conformance-test",
   ]
@@ -265,6 +266,72 @@ fuchsia_test_package("focus-conformance-test") {
   test_components = [ ":focus-conformance-test-component" ]
   subpackages = [
     ":focus-test-suite",
+    "//src/ui/testing/context:ui-context-factory",
+  ]
+  test_specs = {
+    log_settings = {
+      max_severity = "ERROR"
+    }
+    environments = [
+      {
+        dimensions = {
+          # Ensure the device has Vulkan.
+          device_type = "AEMU"
+        }
+      },
+    ]
+  }
+}
+
+############# Media Button CONFORMANCE TEST #############
+executable("media-button-validator-bin") {
+  testonly = true
+  sources = [ "media-button-validator.cc" ]
+  output_name = "media-button-validator"
+  deps = [
+    ":conformance-test-base",
+    "//sdk/fidl/fuchsia.ui.composition:fuchsia.ui.composition_hlcpp",
+    "//sdk/fidl/fuchsia.ui.display.singleton:fuchsia.ui.display.singleton_hlcpp",
+    "//sdk/fidl/fuchsia.ui.focus:fuchsia.ui.focus_hlcpp",
+    "//sdk/fidl/fuchsia.ui.input:fuchsia.ui.input_hlcpp",
+    "//sdk/fidl/fuchsia.ui.input3:fuchsia.ui.input3_hlcpp",
+    "//sdk/fidl/fuchsia.ui.policy:fuchsia.ui.policy_hlcpp",
+    "//sdk/fidl/fuchsia.ui.test.conformance:fuchsia.ui.test.conformance_hlcpp",
+    "//sdk/fidl/fuchsia.ui.test.scene:fuchsia.ui.test.scene_hlcpp",
+    "//sdk/lib/syslog/cpp",
+    "//sdk/lib/ui/scenic/cpp",
+    "//src/lib/fostr/fidl/fuchsia.ui.input",
+    "//src/lib/fsl",
+    "//src/lib/fxl/test:gtest_main",
+  ]
+}
+
+fuchsia_component("media-button-validator") {
+  testonly = true
+  manifest = "meta/media-button-validator.cml"
+  deps = [ ":media-button-validator-bin" ]
+}
+
+fuchsia_package("media-button-test-suite") {
+  package_name = "media-button-test-suite"
+  testonly = true
+  deps = [
+    ":media-button-validator",
+    "//src/ui/testing/puppet:ui-puppet-component",
+  ]
+}
+
+fuchsia_test_component("media-button-conformance-test-component") {
+  testonly = true
+  component_name = "media-button-conformance-test"
+  manifest = "meta/media-button-conformance-test.cml"
+  test_type = "system"
+}
+
+fuchsia_test_package("media-button-conformance-test") {
+  test_components = [ ":media-button-conformance-test-component" ]
+  subpackages = [
+    ":media-button-test-suite",
     "//src/ui/testing/context:ui-context-factory",
   ]
   test_specs = {

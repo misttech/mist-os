@@ -13,6 +13,7 @@ use {
     fidl_fuchsia_ui_display_singleton::InfoMarker,
     fidl_fuchsia_ui_focus::FocusChainListenerRegistryMarker,
     fidl_fuchsia_ui_input3::KeyboardMarker,
+    fidl_fuchsia_ui_policy::DeviceListenerRegistryMarker,
     fidl_fuchsia_ui_test_context as ui_test_context, fidl_fuchsia_ui_test_input as ui_input,
     fidl_fuchsia_ui_test_scene as test_scene,
     fidl_fuchsia_vulkan_loader::LoaderMarker,
@@ -148,6 +149,7 @@ async fn assemble_puppet_realm(
                 .capability(Capability::protocol::<InfoMarker>())
                 .capability(Capability::protocol::<FocusChainListenerRegistryMarker>())
                 .capability(Capability::protocol::<ui_input::RegistryMarker>())
+                .capability(Capability::protocol::<DeviceListenerRegistryMarker>())
                 .from(Ref::child(TEST_UI_STACK))
                 .to(Ref::parent()),
         )

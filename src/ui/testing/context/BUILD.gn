@@ -20,6 +20,7 @@ rustc_binary("bin") {
     "//sdk/fidl/fuchsia.ui.display.singleton:fuchsia.ui.display.singleton_rust",
     "//sdk/fidl/fuchsia.ui.focus:fuchsia.ui.focus_rust",
     "//sdk/fidl/fuchsia.ui.input3:fuchsia.ui.input3_rust",
+    "//sdk/fidl/fuchsia.ui.policy:fuchsia.ui.policy_rust",
     "//sdk/fidl/fuchsia.ui.test.context:fuchsia.ui.test.context_rust",
     "//sdk/fidl/fuchsia.ui.test.input:fuchsia.ui.test.input_rust",
     "//sdk/fidl/fuchsia.ui.test.scene:fuchsia.ui.test.scene_rust",
