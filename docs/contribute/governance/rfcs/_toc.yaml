@@ -488,5 +488,7 @@ toc:
     path: /docs/contribute/governance/rfcs/0235_component_dictionaries.md
   - title: "RFC-0236: VMO Snapshot-Modified Clone"
     path: /docs/contribute/governance/rfcs/0236_vmo_snapshot_modified_clone.md
+  - title: "RFC-0237: Signalling Clock Updates With ZX_CLOCK_UPDATED"
+    path: /docs/contribute/governance/rfcs/0237_signalling_clock_updates_with_zx_clock_updated.md
   - title: "RFC-0238: VMO size"
     path: /docs/contribute/governance/rfcs/0238_vmo_size.md

@@ -3089,6 +3089,19 @@
   submitted: '2023-07-20'
   reviewed: '2023-12-12'
 
+- name: 'RFC-0237'
+  title: 'Signalling Clock Updates With ZX_CLOCK_UPDATED'
+  short_description: 'Add a new type of signal which is sent when a Zircon clock is updated'
+  authors: ['anthonyjon@google.com', 'mariagl@google.com']
+  file: '0237_signalling_clock_updates_with_zx_clock_updated.md'
+  area: ['Kernel']
+  issue: ['']
+  gerrit_change_id: ['922132']
+  status: 'Accepted'
+  reviewers: ['abarth@google.com', 'johngro@google.com', 'maniscalco@google.com', 'fdurso@google.com']
+  submitted: '2023-09-26'
+  reviewed: '2024-01-03'
+
 - name: 'RFC-0238'
   title: 'VMO size'
   short_description: 'Defines the size and stream size of a VMO.'
