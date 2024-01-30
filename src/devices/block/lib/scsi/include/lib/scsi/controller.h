@@ -551,29 +551,41 @@ struct SynchronizeCache10CDB {
 
 static_assert(sizeof(SynchronizeCache10CDB) == 10, "Synchronize Cache 10 CDB must be 10 bytes");
 
-struct StartStopCDB {
+enum class PowerCondition : uint8_t {
+  kStartValid = 0x0,
+  kActive = 0x1,
+  kIdle = 0x2,
+  kStandby = 0x3,
+  kObsolete = 0x5,
+  kLuControl = 0x7,
+  kForceIdle0 = 0xa,
+  kForceStandby0 = 0xb,
+};
+
+// SBC-3, section 5.25 "START STOP UNIT command".
+struct StartStopUnitCDB {
   Opcode opcode;
-  // imm(0) is IMMED
-  uint8_t imm;
+  // reserved_and_immed(0) is IMMED
+  uint8_t reserved_and_immed;
   uint8_t reserved;
-  // power_cond_modifier(3 downto 0) is 'power condition modifier'
-  uint8_t power_cond_modifier;
-  // power_cond(7 downto 4) is 'power conditions'
-  // power_cond(2) is 'no flush'
-  // power_cond(1) is 'loej (load eject)'
-  // power_cond(0) is 'start'
-  uint8_t power_cond;
+  // reserved_and_power_cond_modifier(3 downto 0) is 'power condition modifier'
+  uint8_t reserved_and_power_cond_modifier;
+  // power_condition_and_bits(7 downto 4) is 'power conditions'
+  // power_condition_and_bits(2) is 'no flush'
+  // power_condition_and_bits(1) is 'loej (load eject)'
+  // power_condition_and_bits(0) is 'start'
+  uint8_t power_condition_and_bits;
   uint8_t control;
 
-  DEF_SUBBIT(imm, 0, immed);
-  DEF_SUBFIELD(power_cond_modifier, 3, 0, power_condition_modifier);
-  DEF_SUBFIELD(power_cond, 7, 4, power_conditions);
-  DEF_SUBBIT(power_cond, 2, no_flush);
-  DEF_SUBBIT(power_cond, 1, loej);
-  DEF_SUBBIT(power_cond, 0, start);
+  DEF_SUBBIT(reserved_and_immed, 0, immed);
+  DEF_SUBFIELD(reserved_and_power_cond_modifier, 3, 0, power_condition_modifier);
+  DEF_ENUM_SUBFIELD(power_condition_and_bits, PowerCondition, 7, 4, power_condition);
+  DEF_SUBBIT(power_condition_and_bits, 2, no_flush);
+  DEF_SUBBIT(power_condition_and_bits, 1, load_eject);
+  DEF_SUBBIT(power_condition_and_bits, 0, start);
 } __PACKED;
 
-static_assert(sizeof(StartStopCDB) == 6, "Start Stop CDB must be 6 bytes");
+static_assert(sizeof(StartStopUnitCDB) == 6, "Start Stop Unit CDB must be 6 bytes");
 
 struct SecurityProtocolInCDB {
   Opcode opcode;
@@ -726,6 +738,12 @@ class Controller {
 
   // Count the number of addressable LUNs attached to a target.
   zx::result<uint16_t> ReportLuns(uint8_t target);
+
+  // Change the power condition of the logical unit. If |load_or_unload| is true, load the medium,
+  // if false, unload it. If |load_or_unload| is std::nullopt, do not load/unload.
+  zx_status_t StartStopUnit(uint8_t target, uint16_t lun, bool immed,
+                            PowerCondition power_condition, uint8_t modifier = 0,
+                            std::optional<bool> load_or_unload = std::nullopt);
 
   // Check the status of each LU and bind it. This function returns the number of LUs found.
   zx::result<uint32_t> ScanAndBindLogicalUnits(zx_device_t* device, uint8_t target,

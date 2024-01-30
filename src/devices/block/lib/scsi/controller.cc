@@ -300,6 +300,35 @@ zx::result<uint16_t> Controller::ReportLuns(uint8_t target) {
   return zx::ok(static_cast<uint16_t>(lun_count));
 }
 
+zx_status_t Controller::StartStopUnit(uint8_t target, uint16_t lun, bool immed,
+                                      PowerCondition power_condition, uint8_t modifier,
+                                      std::optional<bool> load_or_unload) {
+  StartStopUnitCDB cdb = {};
+  cdb.opcode = Opcode::START_STOP_UNIT;
+  cdb.set_immed(immed);
+  cdb.set_power_condition(power_condition);
+  cdb.set_power_condition_modifier(modifier);
+  cdb.set_no_flush(false);  // Currently, we only support flush.
+  if (load_or_unload.has_value()) {
+    if (power_condition != PowerCondition::kStartValid) {
+      zxlogf(ERROR,
+             "Power condition must be START_VALID to perform load/unload, power_condition=0x%x",
+             static_cast<uint8_t>(power_condition));
+      return ZX_ERR_INVALID_ARGS;
+    }
+    cdb.set_load_eject(true);
+    cdb.set_start(load_or_unload.value());  // Load = true, unload = false
+  }
+  cdb.set_start(0);
+  zx_status_t status =
+      ExecuteCommandSync(target, lun, {&cdb, sizeof(cdb)}, /*is_write=*/false, {nullptr, 0});
+  if (status != ZX_OK) {
+    zxlogf(ERROR, "START STOP UNIT failed for target %u, lun %u: %s", target, lun,
+           zx_status_get_string(status));
+  }
+  return status;
+}
+
 zx::result<uint32_t> Controller::ScanAndBindLogicalUnits(zx_device_t* device, uint8_t target,
                                                          uint32_t max_transfer_bytes,
                                                          uint16_t max_lun, LuCallback lu_callback,
