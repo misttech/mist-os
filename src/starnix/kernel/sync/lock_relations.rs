@@ -141,6 +141,7 @@ macro_rules! lock_level {
     ($A:ident) => {
         pub enum $A {}
         impl $crate::LockEqualOrBefore<$A> for $A {}
+        static_assertions::const_assert_eq!(std::mem::size_of::<$crate::Locked<'static, $A>>(), 0);
     };
 }
 

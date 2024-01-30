@@ -68,6 +68,7 @@ impl TaskBuilder {
         Self { task: OwnedRef::new(task), thread_state: Default::default() }
     }
 
+    #[inline(always)]
     pub fn release<L>(self, locked: &mut Locked<'_, L>)
     where
         L: LockBefore<TaskRelease>,
@@ -202,6 +203,7 @@ impl CurrentTask {
         TempRef::from(&self.task)
     }
 
+    #[inline(always)]
     pub fn release<L>(self, locked: &mut Locked<'_, L>)
     where
         L: LockBefore<TaskRelease>,

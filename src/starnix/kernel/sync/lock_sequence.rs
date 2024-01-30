@@ -183,6 +183,7 @@
 //! ```
 
 use core::marker::PhantomData;
+use static_assertions::const_assert_eq;
 
 pub use crate::{LockBefore, LockEqualOrBefore, LockFor, RwLockFor};
 
@@ -204,10 +205,13 @@ pub struct Locked<'a, L>(PhantomData<&'a L>);
 /// trees.
 pub enum Unlocked {}
 
+const_assert_eq!(std::mem::size_of::<Locked<'static, Unlocked>>(), 0);
+
 impl Unlocked {
     /// Entry point for locked access.
     ///
     /// `Unlocked` is the "root" lock level and can be acquired before any lock.
+    #[inline(always)]
     pub fn new() -> Locked<'static, Unlocked> {
         Locked::<'static, Unlocked>(Default::default())
     }
@@ -221,6 +225,7 @@ impl<L> Locked<'_, L> {
     /// Acquire the given lock.
     ///
     /// This requires that `M` can be locked after `L`.
+    #[inline(always)]
     pub fn lock<'a, M, S>(&'a mut self, source: &'a S) -> S::Guard<'a>
     where
         M: 'a,
@@ -234,6 +239,7 @@ impl<L> Locked<'_, L> {
     /// Acquire the given lock and a new locked context.
     ///
     /// This requires that `M` can be locked after `L`.
+    #[inline(always)]
     pub fn lock_and<'a, M, S>(&'a mut self, source: &'a S) -> (S::Guard<'a>, Locked<'a, M>)
     where
         M: 'a,
@@ -248,6 +254,7 @@ impl<L> Locked<'_, L> {
     /// as well as the new locked context.
     ///
     /// This requires that `M` can be locked after `L`.
+    #[inline(always)]
     pub fn lock_both_and<'a, M, S>(
         &'a mut self,
         source1: &'a S,
@@ -273,6 +280,7 @@ impl<L> Locked<'_, L> {
     /// Acquire two locks that are on the same level, in a consistent order (sorted by memory address) and return both guards.
     ///
     /// This requires that `M` can be locked after `L`.
+    #[inline(always)]
     pub fn lock_both<'a, M, S>(
         &'a mut self,
         source1: &'a S,
@@ -291,6 +299,7 @@ impl<L> Locked<'_, L> {
     ///
     /// For accessing state via reader/writer locks. This requires that `M` can
     /// be locked after `L`.
+    #[inline(always)]
     pub fn read_lock_and<'a, M, S>(&'a mut self, source: &'a S) -> (S::ReadGuard<'a>, Locked<'a, M>)
     where
         M: 'a,
@@ -305,6 +314,7 @@ impl<L> Locked<'_, L> {
     ///
     /// For accessing state via reader/writer locks. This requires that `M` can
     /// be locked after `L`.
+    #[inline(always)]
     pub fn read_lock<'a, M, S>(&'a mut self, source: &'a S) -> S::ReadGuard<'a>
     where
         M: 'a,
@@ -319,6 +329,7 @@ impl<L> Locked<'_, L> {
     ///
     /// For accessing state via reader/writer locks. This requires that `M` can
     /// be locked after `L`.
+    #[inline(always)]
     pub fn write_lock_and<'a, M, S>(
         &'a mut self,
         source: &'a S,
@@ -336,6 +347,7 @@ impl<L> Locked<'_, L> {
     ///
     /// For accessing state via reader/writer locks. This requires that `M` can
     /// be locked after `L`.
+    #[inline(always)]
     pub fn write_lock<'a, M, S>(&'a mut self, source: &'a S) -> S::WriteGuard<'a>
     where
         M: 'a,
@@ -351,6 +363,7 @@ impl<L> Locked<'_, L> {
     /// Like `lock_and` but doesn't actually acquire the lock `M`. This is
     /// safe because any locks that could be acquired with the lock `M` held can
     /// also be acquired without `M` being held.
+    #[inline(always)]
     pub fn cast_locked<'a, M>(&'a mut self) -> Locked<'a, M>
     where
         M: 'a,

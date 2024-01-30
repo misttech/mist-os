@@ -581,6 +581,7 @@ rustc_library("starnix_sync") {
     "//src/lib/zircon/rust:fuchsia-zircon",
     "//third_party/rust_crates:lock_api",
     "//third_party/rust_crates:once_cell",
+    "//third_party/rust_crates:static_assertions",
     "//third_party/rust_crates:tracing-mutex",
   ]
 
