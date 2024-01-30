@@ -72,9 +72,9 @@ while [[ $# -ge 1 ]]; do
     --path)
       shift
       [[ ! $1 ]] && die "--path requires at least an argument after it"
-      PROJECT_PATH="--path $1,"
+      PROJECT_PATH="--path $1"
       while [[ -n $2 && "$2" != "--"* ]]; do
-        PROJECT_PATH+="$2,"
+        PROJECT_PATH+=",$2"
         shift
       done
       RUST_METADATA=""
