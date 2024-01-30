@@ -10,9 +10,8 @@ use crate::{
     },
     task::{CurrentTask, NetstackDevicesDirectory},
     vfs::{
-        CacheConfig, CacheMode, FileSystem, FileSystemHandle, FileSystemOps, FileSystemOptions,
-        FsNodeInfo, FsNodeOps, FsStr, PathBuilder, StaticDirectoryBuilder, StubEmptyFile,
-        SymlinkNode,
+        CacheMode, FileSystem, FileSystemHandle, FileSystemOps, FileSystemOptions, FsNodeInfo,
+        FsNodeOps, FsStr, PathBuilder, StaticDirectoryBuilder, StubEmptyFile, SymlinkNode,
     },
 };
 use starnix_uapi::{
@@ -37,7 +36,11 @@ impl FileSystemOps for SysFs {
 impl SysFs {
     pub fn new_fs(current_task: &CurrentTask, options: FileSystemOptions) -> FileSystemHandle {
         let kernel = current_task.kernel();
-        let fs = FileSystem::new(kernel, CacheMode::Cached(CacheConfig::default()), SysFs, options);
+        // TODO(https://fxbug.dev/322596990): cgroup lifetimes need to be implemented; until then,
+        // we set CacheMode::Permanent here to hopefully avoid immediate issues. For now, every
+        // created cgroup will continue to exist, which doesn't match cgroup lifetime semantics, so
+        // we may still see some issues from this until cgroup lifetimes are implemented.
+        let fs = FileSystem::new(kernel, CacheMode::Permanent, SysFs, options);
         let mut dir = StaticDirectoryBuilder::new(&fs);
         let dir_mode = mode!(IFDIR, 0o755);
         dir.subdir(current_task, "fs", 0o755, |dir| {
