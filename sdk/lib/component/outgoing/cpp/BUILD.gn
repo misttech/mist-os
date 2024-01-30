@@ -20,6 +20,14 @@ sdk_source_set("cpp") {
     "structured_config.h",
   ]
 
+  # TODO(https://fxbug.dev/322528969): Temporarily disable asan container check for
+  # OutgoingDirectory::MakePath. This seems to be a false positive, but let's
+  # temporarily disable this test for now.
+  if (target_cpu == "riscv64") {
+    non_sdk_deps =
+        [ "//build/config/sanitizers:suppress-asan-container-overflow" ]
+  }
+
   public_deps = [
     "//sdk/fidl/fuchsia.io:fuchsia.io_cpp",
     "//sdk/lib/fdio",

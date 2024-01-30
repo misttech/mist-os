@@ -135,7 +135,10 @@ sanitizer_extra_options("suppress-asan-stack-use-after-return") {
 # if a part of the application is built with asan and another part is not. See
 # https://github.com/google/sanitizers/wiki/AddressSanitizerContainerOverflow.
 sanitizer_extra_options("suppress-asan-container-overflow") {
-  visibility = [ "//src/lib/llvm:*" ]
+  visibility = [
+    "//sdk/lib/component/outgoing/cpp:*",
+    "//src/lib/llvm:*",
+  ]
 
   args = [ "detect_container_overflow=0" ]
   output_name = "asan_default_options"
