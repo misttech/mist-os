@@ -40,7 +40,6 @@ and provides reliable data transfer through the M-PHY physical layer.
 * Support write booster
 * Support Power Mode
 * Support RPMB logical unit
-* Support well-known LU
 * Support Utp Task Management Request
 * Implement Ufs tools
 * Integration tests

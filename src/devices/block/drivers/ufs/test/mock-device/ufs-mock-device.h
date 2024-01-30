@@ -138,7 +138,7 @@ class UfsMockDevice {
   ScsiCommandProcessor &GetScsiCommandProcessor() { return scsi_command_processor_; }
 
  private:
-  std::array<UfsLogicalUnit, kMaxLun> logical_units_;
+  std::array<UfsLogicalUnit, kMaxLunCount> logical_units_;
   DeviceDescriptor device_desc_;
   GeometryDescriptor geometry_desc_;
   std::array<uint32_t, static_cast<size_t>(Attributes::kAttributeCount)> attributes_;

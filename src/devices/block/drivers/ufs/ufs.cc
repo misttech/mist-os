@@ -10,6 +10,7 @@
 #include <zircon/errors.h>
 #include <zircon/threads.h>
 
+#include <array>
 #include <vector>
 
 #include <fbl/auto_lock.h>
@@ -72,6 +73,38 @@ zx::result<> Ufs::AllocatePages(zx::vmo& vmo, fzl::VmoMapper& mapper, size_t siz
     return zx::error(status);
   }
   return zx::ok();
+}
+
+zx::result<uint16_t> Ufs::TranslateUfsLunToScsiLun(uint8_t ufs_lun) {
+  // Logical unit
+  if (!(ufs_lun & kUfsWellKnownlunId)) {
+    if (ufs_lun > kMaxLunIndex) {
+      return zx::error(ZX_ERR_OUT_OF_RANGE);
+    }
+    return zx::ok(ufs_lun);
+  }
+
+  // Well known logical unit
+  return zx::ok(static_cast<uint16_t>((static_cast<uint16_t>(ufs_lun) & ~kUfsWellKnownlunId) |
+                                      kScsiWellKnownLunId));
+}
+
+zx::result<uint8_t> Ufs::TranslateScsiLunToUfsLun(uint16_t scsi_lun) {
+  constexpr uint16_t kScsiWellKownLunIndicatorField = 0xff00;
+  // Well known logical unit
+  if ((scsi_lun & kScsiWellKownLunIndicatorField) == kScsiWellKnownLunId) {
+    return zx::ok(static_cast<uint8_t>((scsi_lun & kMaxLunId) | kUfsWellKnownlunId));
+  }
+
+  // Logical unit
+  if ((scsi_lun & kScsiWellKownLunIndicatorField) != 0) {
+    zxlogf(ERROR, "Invalid scsi lun: 0x%x", scsi_lun);
+    return zx::error(ZX_ERR_INVALID_ARGS);
+  }
+  if ((scsi_lun & kMaxLunId) > kMaxLunIndex) {
+    return zx::error(ZX_ERR_OUT_OF_RANGE);
+  }
+  return zx::ok(static_cast<uint8_t>(scsi_lun & kMaxLunId));
 }
 
 void Ufs::ProcessIoSubmissions() {
@@ -246,18 +279,20 @@ int Ufs::IoLoop() {
 void Ufs::ExecuteCommandAsync(uint8_t target, uint16_t lun, iovec cdb, bool is_write,
                               uint32_t block_size_bytes, scsi::DiskOp* disk_op, iovec data) {
   IoCommand* io_cmd = containerof(disk_op, IoCommand, disk_op);
-  if (lun > UINT8_MAX) {
-    disk_op->Complete(ZX_ERR_OUT_OF_RANGE);
-    return;
-  }
   if (cdb.iov_len > sizeof(io_cmd->cdb_buffer)) {
     disk_op->Complete(ZX_ERR_NOT_SUPPORTED);
     return;
   }
 
+  auto lun_id = TranslateScsiLunToUfsLun(lun);
+  if (lun_id.is_error()) {
+    disk_op->Complete(lun_id.status_value());
+    return;
+  }
+
   memcpy(io_cmd->cdb_buffer, cdb.iov_base, cdb.iov_len);
   io_cmd->cdb_length = safemath::checked_cast<uint8_t>(cdb.iov_len);
-  io_cmd->lun = safemath::checked_cast<uint8_t>(lun);
+  io_cmd->lun = lun_id.value();
   io_cmd->block_size_bytes = block_size_bytes;
   io_cmd->is_write = is_write;
 
@@ -284,10 +319,11 @@ void Ufs::ExecuteCommandAsync(uint8_t target, uint16_t lun, iovec cdb, bool is_w
 
 zx_status_t Ufs::ExecuteCommandSync(uint8_t target, uint16_t lun, iovec cdb, bool is_write,
                                     iovec data) {
-  if (lun > UINT8_MAX) {
-    return ZX_ERR_OUT_OF_RANGE;
+  auto lun_id = TranslateScsiLunToUfsLun(lun);
+  if (lun_id.is_error()) {
+    return lun_id.status_value();
   }
-  uint8_t lun_id = safemath::checked_cast<uint8_t>(lun);
+
   if (data.iov_len > max_transfer_bytes_) {
     zxlogf(ERROR, "Request exceeding max transfer size. transfer_bytes=%zu, max_transfer_bytes_=%d",
            data.iov_len, max_transfer_bytes_);
@@ -321,7 +357,7 @@ zx_status_t Ufs::ExecuteCommandSync(uint8_t target, uint16_t lun, iovec cdb, boo
   ScsiCommandUpiu upiu(static_cast<uint8_t*>(cdb.iov_base),
                        safemath::checked_cast<uint8_t>(cdb.iov_len), data_direction,
                        safemath::checked_cast<uint32_t>(data.iov_len));
-  if (auto response = transfer_request_processor_->SendScsiUpiu(upiu, lun_id, vmo_optional);
+  if (auto response = transfer_request_processor_->SendScsiUpiu(upiu, lun_id.value(), vmo_optional);
       response.is_error()) {
     // Get the previous response from the admin slot.
     auto response_upiu = std::make_unique<ResponseUpiu>(
@@ -554,7 +590,7 @@ zx::result<uint32_t> Ufs::AddLogicalUnits() {
            device_manager_->GetGeometryDescriptor().bMaxNumberLU);
     return zx::error(ZX_ERR_INVALID_ARGS);
   }
-  ZX_ASSERT(max_luns <= kMaxLun);
+  ZX_ASSERT(max_luns <= kMaxLunCount);
 
   auto read_unit_descriptor = [this](uint16_t lun, size_t block_size,
                                      uint64_t block_count) -> zx::result<> {
@@ -619,9 +655,22 @@ zx::result<uint32_t> Ufs::AddLogicalUnits() {
     return lun_count.take_error();
   }
 
-  // TODO(https://fxbug.dev/42075643): Send a request sense command to clear the UAC of a well-known
-  // LU.
-  // TODO(https://fxbug.dev/42075643): We need to implement the processing of a well-known LU.
+  // Find well known logical units.
+  std::array<WellKnownLuns, static_cast<uint8_t>(WellKnownLuns::kCount)> well_known_luns = {
+      WellKnownLuns::kReportLuns, WellKnownLuns::kUfsDevice, WellKnownLuns::kBoot,
+      WellKnownLuns::kRpmb};
+
+  for (auto& lun : well_known_luns) {
+    auto scsi_lun = TranslateUfsLunToScsiLun(static_cast<uint8_t>(lun));
+    if (scsi_lun.is_error()) {
+      return scsi_lun.take_error();
+    }
+    if (zx_status_t status = TestUnitReady(kPlaceholderTarget, scsi_lun.value()); status != ZX_OK) {
+      continue;
+    }
+    well_known_lun_set_.insert(lun);
+    zxlogf(INFO, "Well known LUN-0x%x", static_cast<uint8_t>(lun));
+  }
 
   return zx::ok(lun_count.value());
 }

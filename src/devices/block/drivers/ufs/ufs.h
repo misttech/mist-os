@@ -11,6 +11,8 @@
 #include <lib/inspect/cpp/inspect.h>
 #include <lib/scsi/disk.h>
 
+#include <unordered_set>
+
 #include <ddktl/device.h>
 #include <fbl/array.h>
 #include <fbl/condition_variable.h>
@@ -23,7 +25,8 @@
 
 namespace ufs {
 
-constexpr uint32_t kMaxLun = 32;
+constexpr uint32_t kMaxLunCount = 32;
+constexpr uint32_t kMaxLunIndex = kMaxLunCount - 1;
 constexpr uint32_t kDeviceInitTimeoutMs = 2000;
 constexpr uint32_t kHostControllerTimeoutUs = 1000;
 constexpr uint32_t kMaxTransferSize1MiB = 1024 * 1024;
@@ -32,11 +35,16 @@ constexpr uint8_t kPlaceholderTarget = 0;
 constexpr uint32_t kBlockSize = 4096;
 constexpr uint32_t kSectorSize = 512;
 
-enum WellKnownLuns {
+constexpr uint32_t kMaxLunId = 0x7f;
+constexpr uint16_t kUfsWellKnownlunId = 1 << 7;
+constexpr uint16_t kScsiWellKnownLunId = 0xc100;
+
+enum class WellKnownLuns : uint8_t {
   kReportLuns = 0x81,
-  kUfsDevice = 0xd0,
   kBoot = 0xb0,
   kRpmb = 0xc4,
+  kUfsDevice = 0xd0,
+  kCount = 4,
 };
 
 enum NotifyEvent {
@@ -145,6 +153,10 @@ class Ufs : public scsi::Controller, public UfsDeviceType {
   void DisableCompletion() { disable_completion_ = true; }
   void DumpRegisters();
 
+  bool HasWellKnownLun(WellKnownLuns lun) {
+    return well_known_lun_set_.find(lun) != well_known_lun_set_.end();
+  }
+
  private:
   friend class UfsTest;
   int IrqLoop();
@@ -164,6 +176,9 @@ class Ufs : public scsi::Controller, public UfsDeviceType {
   zx_status_t DisableHostController();
 
   zx::result<> AllocatePages(zx::vmo &vmo, fzl::VmoMapper &mapper, size_t size);
+
+  static zx::result<uint16_t> TranslateUfsLunToScsiLun(uint8_t ufs_lun);
+  static zx::result<uint8_t> TranslateScsiLunToUfsLun(uint16_t scsi_lun);
 
   ddk::Pci pci_;
   fdf::MmioBuffer mmio_;
@@ -192,6 +207,9 @@ class Ufs : public scsi::Controller, public UfsDeviceType {
 
   // Controller internal information.
   uint32_t logical_unit_count_ = 0;
+
+  // The luns of the well-known logical units that exist on the UFS device.
+  std::unordered_set<WellKnownLuns> well_known_lun_set_;
 
   // Callback function to perform when the host controller is notified.
   HostControllerCallback host_controller_callback_;

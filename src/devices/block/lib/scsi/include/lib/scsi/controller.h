@@ -23,6 +23,7 @@ namespace scsi {
 enum class Opcode : uint8_t {
   TEST_UNIT_READY = 0x00,
   REQUEST_SENSE = 0x03,
+  FORMAT_UNIT = 0x04,
   INQUIRY = 0x12,
   MODE_SELECT_6 = 0x15,
   MODE_SENSE_6 = 0x1A,

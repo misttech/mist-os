@@ -192,4 +192,28 @@ TEST_F(ScsiCommandTest, SynchronizeCache10) {
                                                              zx::unowned_vmo(GetVmo())));
 }
 
+TEST_F(ScsiCommandTest, WellKnownLuns) {
+  EXPECT_TRUE(ufs_->HasWellKnownLun(WellKnownLuns::kReportLuns));
+  EXPECT_TRUE(ufs_->HasWellKnownLun(WellKnownLuns::kUfsDevice));
+  EXPECT_TRUE(ufs_->HasWellKnownLun(WellKnownLuns::kBoot));
+  EXPECT_TRUE(ufs_->HasWellKnownLun(WellKnownLuns::kRpmb));
+
+  // Make TEST UNIT READY CDB
+  uint8_t cdb_buffer[6] = {};
+  auto cdb = reinterpret_cast<scsi::TestUnitReadyCDB *>(cdb_buffer);
+  cdb->opcode = scsi::Opcode::TEST_UNIT_READY;
+
+  // Check well known logical units.
+  std::array<WellKnownLuns, static_cast<uint8_t>(WellKnownLuns::kCount)> well_known_luns = {
+      WellKnownLuns::kReportLuns, WellKnownLuns::kUfsDevice, WellKnownLuns::kBoot,
+      WellKnownLuns::kRpmb};
+
+  for (auto lun : well_known_luns) {
+    ScsiCommandUpiu upiu(cdb_buffer, sizeof(*cdb), DataDirection::kNone);
+    EXPECT_EQ(upiu.GetOpcode(), scsi::Opcode::TEST_UNIT_READY);
+    EXPECT_OK(ufs_->GetTransferRequestProcessor().SendScsiUpiu(upiu, static_cast<uint8_t>(lun),
+                                                               zx::unowned_vmo(GetVmo())));
+  }
+}
+
 }  // namespace ufs

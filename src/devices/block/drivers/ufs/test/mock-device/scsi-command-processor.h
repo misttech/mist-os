@@ -91,6 +91,7 @@ class ScsiCommandProcessor {
 
  private:
   void BuildSenseData(ResponseUpiuData &response_upiu, scsi::SenseKey sense_key);
+  bool IsProcessableCommand(uint8_t lun, scsi::Opcode opcode) const;
 
   UfsMockDevice &mock_device_;
 };

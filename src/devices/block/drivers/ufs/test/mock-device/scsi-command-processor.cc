@@ -98,11 +98,43 @@ void ScsiCommandProcessor::BuildSenseData(ResponseUpiuData &response_upiu,
   sense_data->set_sense_key(sense_key);
 }
 
+bool ScsiCommandProcessor::IsProcessableCommand(uint8_t lun, scsi::Opcode opcode) const {
+  switch (static_cast<WellKnownLuns>(lun)) {
+    case WellKnownLuns::kReportLuns:
+      return opcode == scsi::Opcode::INQUIRY || opcode == scsi::Opcode::REQUEST_SENSE ||
+             opcode == scsi::Opcode::TEST_UNIT_READY || opcode == scsi::Opcode::REPORT_LUNS;
+    case WellKnownLuns::kUfsDevice:
+      return opcode == scsi::Opcode::INQUIRY || opcode == scsi::Opcode::REQUEST_SENSE ||
+             opcode == scsi::Opcode::TEST_UNIT_READY || opcode == scsi::Opcode::START_STOP_UNIT ||
+             opcode == scsi::Opcode::FORMAT_UNIT;
+    case WellKnownLuns::kBoot:
+      return opcode == scsi::Opcode::INQUIRY || opcode == scsi::Opcode::REQUEST_SENSE ||
+             opcode == scsi::Opcode::TEST_UNIT_READY || opcode == scsi::Opcode::READ_10 ||
+             opcode == scsi::Opcode::READ_16;
+    case WellKnownLuns::kRpmb:
+      return opcode == scsi::Opcode::INQUIRY || opcode == scsi::Opcode::REQUEST_SENSE ||
+             opcode == scsi::Opcode::TEST_UNIT_READY ||
+             opcode == scsi::Opcode::SECURITY_PROTOCOL_IN ||
+             opcode == scsi::Opcode::SECURITY_PROTOCOL_OUT;
+    default:
+      // Returns true if the LUN is a scsi disk.
+      return !(lun & kUfsWellKnownlunId);
+  };
+}
+
 zx_status_t ScsiCommandProcessor::HandleScsiCommand(
     CommandUpiuData &command_upiu, ResponseUpiuData &response_upiu,
     cpp20::span<PhysicalRegionDescriptionTableEntry> &prdt_upius) {
   scsi::Opcode opcode = static_cast<scsi::Opcode>(command_upiu.cdb[0]);
   std::vector<uint8_t> data;
+
+  uint8_t lun = command_upiu.header.lun;
+  if (!IsProcessableCommand(lun, opcode)) {
+    zxlogf(ERROR, "UFS MOCK: Lun(%d) does not support scsi command opcode: 0x%hhx is not supported",
+           lun, static_cast<uint8_t>(opcode));
+    return ZX_ERR_INVALID_ARGS;
+  }
+
   if (auto it = handlers_.find(opcode); it != handlers_.end()) {
     if (auto result = (it->second)(mock_device_, command_upiu, response_upiu, prdt_upius);
         result.is_error()) {

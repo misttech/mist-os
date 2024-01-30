@@ -108,10 +108,11 @@ UfsMockDevice::UfsMockDevice(zx::interrupt irq)
   geometry_desc_.bMinAddrBlockSize = 0x08;
   geometry_desc_.bMaxInBufferSize = 0x08;
   geometry_desc_.bMaxOutBufferSize = 0x08;
-  static_assert(kMaxLun == 8 || kMaxLun == 32, "Max Number of Logical Unit should be 8 or 32.");
-  if constexpr (kMaxLun == 8) {
+  static_assert(kMaxLunCount == 8 || kMaxLunCount == 32,
+                "Max Number of Logical Unit should be 8 or 32.");
+  if constexpr (kMaxLunCount == 8) {
     geometry_desc_.bMaxNumberLU = 0x00;
-  } else if (kMaxLun == 32) {
+  } else if (kMaxLunCount == 32) {
     geometry_desc_.bMaxNumberLU = 0x01;
   }
 }
