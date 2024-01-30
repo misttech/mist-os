@@ -11,7 +11,7 @@
 //! is evolved in order to enforce that it is updated along with the FIDL
 //! library itself.
 
-use std::{collections::HashMap, fmt::Debug, ops::RangeInclusive};
+use std::{collections::HashMap, fmt::Debug, num::NonZeroU64, ops::RangeInclusive};
 
 use async_utils::fold::FoldWhile;
 use fidl::marker::SourceBreaking;
@@ -41,6 +41,8 @@ pub enum FidlConversionError {
     MissingIpInstallationHook,
     #[error("NAT installation hook not provided")]
     MissingNatInstallationHook,
+    #[error("interface matcher specified an invalid ID of 0")]
+    ZeroInterfaceId,
     #[error("invalid address range (start must be <= end)")]
     InvalidAddressRange,
     #[error("address range start and end addresses are not the same IP family")]
@@ -449,7 +451,7 @@ impl TryFrom<fnet_filter::DeviceClass> for DeviceClass {
 /// Extension type for [`fnet_filter::InterfaceMatcher`].
 #[derive(Debug, Clone, PartialEq)]
 pub enum InterfaceMatcher {
-    Id(fnet::InterfaceId),
+    Id(NonZeroU64),
     Name(fnet_interfaces::Name),
     DeviceClass(DeviceClass),
 }
@@ -457,7 +459,7 @@ pub enum InterfaceMatcher {
 impl From<InterfaceMatcher> for fnet_filter::InterfaceMatcher {
     fn from(matcher: InterfaceMatcher) -> Self {
         match matcher {
-            InterfaceMatcher::Id(id) => Self::Id(id),
+            InterfaceMatcher::Id(id) => Self::Id(id.get()),
             InterfaceMatcher::Name(name) => Self::Name(name),
             InterfaceMatcher::DeviceClass(device_class) => Self::DeviceClass(device_class.into()),
         }
@@ -469,7 +471,10 @@ impl TryFrom<fnet_filter::InterfaceMatcher> for InterfaceMatcher {
 
     fn try_from(matcher: fnet_filter::InterfaceMatcher) -> Result<Self, Self::Error> {
         match matcher {
-            fnet_filter::InterfaceMatcher::Id(id) => Ok(Self::Id(id)),
+            fnet_filter::InterfaceMatcher::Id(id) => {
+                let id = NonZeroU64::new(id).ok_or(FidlConversionError::ZeroInterfaceId)?;
+                Ok(Self::Id(id))
+            }
             fnet_filter::InterfaceMatcher::Name(name) => Ok(Self::Name(name)),
             fnet_filter::InterfaceMatcher::DeviceClass(device_class) => {
                 Ok(Self::DeviceClass(device_class.try_into()?))
@@ -1189,6 +1194,8 @@ pub enum ControllerCreationError {
 pub enum ChangeValidationError {
     #[error("change contains a resource that is missing a required field")]
     MissingRequiredField,
+    #[error("rule specifies an invalid interface matcher")]
+    InvalidInterfaceMatcher,
     #[error("rule specifies an invalid address matcher")]
     InvalidAddressMatcher,
     #[error("rule specifies an invalid port matcher")]
@@ -1202,6 +1209,9 @@ impl TryFrom<fnet_filter::ChangeValidationError> for ChangeValidationError {
         match error {
             fnet_filter::ChangeValidationError::MissingRequiredField => {
                 Ok(Self::MissingRequiredField)
+            }
+            fnet_filter::ChangeValidationError::InvalidInterfaceMatcher => {
+                Ok(Self::InvalidInterfaceMatcher)
             }
             fnet_filter::ChangeValidationError::InvalidAddressMatcher => {
                 Ok(Self::InvalidAddressMatcher)
@@ -1371,6 +1381,7 @@ impl Controller {
                         fnet_filter::ChangeValidationError::Ok
                         | fnet_filter::ChangeValidationError::NotReached => Ok(errors),
                         error @ (fnet_filter::ChangeValidationError::MissingRequiredField
+                        | fnet_filter::ChangeValidationError::InvalidInterfaceMatcher
                         | fnet_filter::ChangeValidationError::InvalidAddressMatcher
                         | fnet_filter::ChangeValidationError::InvalidPortMatcher) => {
                             let error = error
@@ -1459,6 +1470,7 @@ mod tests {
     use std::collections::HashMap;
 
     use assert_matches::assert_matches;
+    use const_unwrap::const_unwrap_option;
     use futures::{channel::mpsc, task::Poll, FutureExt as _, SinkExt as _};
     use net_declare::{fidl_ip, fidl_subnet};
     use test_case::test_case;
@@ -1531,7 +1543,7 @@ mod tests {
     )]
     #[test_case(
         fnet_filter::InterfaceMatcher::Id(1),
-        InterfaceMatcher::Id(1);
+        InterfaceMatcher::Id(const_unwrap_option(NonZeroU64::new(1)));
         "InterfaceMatcher"
     )]
     #[test_case(
@@ -1786,6 +1798,14 @@ mod tests {
                 unknown_ordinal: 0
             }),
             Err(FidlConversionError::UnknownUnionVariant(type_names::INTERFACE_MATCHER))
+        );
+    }
+
+    #[test]
+    fn interface_matcher_try_from_invalid() {
+        assert_eq!(
+            InterfaceMatcher::try_from(fnet_filter::InterfaceMatcher::Id(0)),
+            Err(FidlConversionError::ZeroInterfaceId)
         );
     }
 

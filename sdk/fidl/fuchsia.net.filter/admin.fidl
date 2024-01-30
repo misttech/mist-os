@@ -102,10 +102,12 @@ closed protocol NamespaceController {
             /// The change included a resource that was missing a field that is
             /// required to be specified.
             MISSING_REQUIRED_FIELD = 3;
+            /// The change included a rule with an invalid interface matcher.
+            INVALID_INTERFACE_MATCHER = 4;
             /// The change included a rule with an invalid address matcher.
-            INVALID_ADDRESS_MATCHER = 4;
+            INVALID_ADDRESS_MATCHER = 5;
             /// The change included a rule with an invalid port matcher.
-            INVALID_PORT_MATCHER = 5;
+            INVALID_PORT_MATCHER = 6;
         }>:MAX_BATCH_SIZE;
     });
 

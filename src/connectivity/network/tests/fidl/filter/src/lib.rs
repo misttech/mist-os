@@ -599,6 +599,51 @@ async fn push_change_missing_required_field(name: &str) {
 }
 
 #[netstack_test]
+async fn push_change_invalid_interface_matcher(name: &str) {
+    let sandbox = netemul::TestSandbox::new().expect("create sandbox");
+    let realm = sandbox.create_netstack_realm::<Netstack3, _>(name).expect("create realm");
+    let control =
+        realm.connect_to_protocol::<fnet_filter::ControlMarker>().expect("connect to protocol");
+
+    // Use the FIDL bindings directly rather than going through the extension
+    // library, because it intentionally does not allow us to express the
+    // invalid types that we are testing.
+    let (controller, server_end) = fidl::endpoints::create_proxy().unwrap();
+    control.open_controller("test", server_end).expect("open controller");
+    let fnet_filter::NamespaceControllerEvent::OnIdAssigned { id: _ } = controller
+        .take_event_stream()
+        .next()
+        .await
+        .expect("controller should receive event")
+        .expect("controller should be assigned ID");
+
+    assert_eq!(
+        controller
+            .push_changes(&[fnet_filter::Change::Create(fnet_filter::Resource::Rule(
+                fnet_filter::Rule {
+                    id: fnet_filter::RuleId {
+                        routine: fnet_filter::RoutineId {
+                            namespace: String::from("namespace"),
+                            name: String::from("routine"),
+                        },
+                        index: 0,
+                    },
+                    matchers: fnet_filter::Matchers {
+                        in_interface: Some(fnet_filter::InterfaceMatcher::Id(0)),
+                        ..Default::default()
+                    },
+                    action: fnet_filter::Action::Drop(fnet_filter::Empty {}),
+                }
+            ))])
+            .await
+            .expect("call push changes"),
+        fnet_filter::ChangeValidationResult::ErrorOnChange(vec![
+            fnet_filter::ChangeValidationError::InvalidInterfaceMatcher
+        ])
+    );
+}
+
+#[netstack_test]
 #[test_case(
     fnet_filter::AddressMatcher {
         matcher: fnet_filter::AddressMatcherType::Range(fnet_filter::AddressRange {

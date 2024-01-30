@@ -381,6 +381,9 @@ async fn serve_controller(
                                         ChangeValidationError::MissingRequiredField,
                                     )
                                 }
+                                FidlConversionError::ZeroInterfaceId => Error::ReturnToClient(
+                                    ChangeValidationError::InvalidInterfaceMatcher,
+                                ),
                                 FidlConversionError::InvalidAddressRange
                                 | FidlConversionError::AddressRangeFamilyMismatch
                                 | FidlConversionError::SubnetPrefixTooLong
