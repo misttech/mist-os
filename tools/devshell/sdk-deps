@@ -1,0 +1,97 @@
+#!/bin/bash
+# Copyright 2023 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+#### CATEGORY=Other
+### List the dependencies of a target, and if dependencies are in SDK
+
+## usage: fx sdk-deps [Options]
+##
+##  Options:
+##     -t < target> : List all the deps of this targert
+##
+
+set -o errexit
+
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"/lib/vars.sh
+fx-config-read
+
+main() {
+    local build_dir=$(fx-command-run get-build-dir)
+    fx-info "Using build dir: ${build_dir}"
+    local target=
+    while [[ $# -ge 1 ]]; do
+        case "$1" in
+        -t)
+            shift
+            target="$1"
+            ;;
+        esac
+        shift
+    done
+
+
+    if [[ -z "${target}" ]]; then
+        echo "-t is required to pass in a target"
+        exit 1
+    fi
+
+    local dep_list=( $(fx-command-run gn desc "${build_dir}" "${target}" deps) )
+
+    local core_deps=()
+    local platform_deps=()
+    local non_sdk=()
+
+    mkdir tmp
+    local public_sdk_deps="tmp/public_sdk_deps"
+    local internal_sdk_deps="tmp/internal_sdk_deps"
+
+    fx-info "Collecting Core SDK dependencies..."
+    fx-command-run gn desc "${build_dir}" "//sdk:core" deps --all > ${public_sdk_deps}
+    fx-info "Collecting Driver SDK dependencies..."
+    fx-command-run gn desc "${build_dir}" "//sdk:driver" deps --all >> ${public_sdk_deps}
+    fx-info "Collecting Platform SDK dependencies..."
+    fx-command-run gn desc "${build_dir}" "//sdk:platform" deps --all > ${internal_sdk_deps}
+
+    for dep in "${dep_list[@]}"; do
+        if [[ "${dep}" == *"sdk/fidl"* ]]; then
+            fidl="$(echo $dep | cut -d ":" -f1 | cut -d "/" -f5)"
+            dep_sdk="//sdk/fidl/${fidl}:${fidl}_sdk"
+        else
+            dep_sdk="$(echo ${dep} | cut -d "(" -f1)_sdk"
+        fi
+
+        if [[ $(grep ${dep_sdk} ${public_sdk_deps} | wc -l) -gt 0 ]]; then
+            core_deps+=( "${dep_sdk}" )
+            continue
+        fi
+
+        if [[ $(grep ${dep_sdk} ${internal_sdk_deps} | wc -l) -gt 0 ]]; then
+            platform_deps+=( "${dep_sdk}" )
+            continue
+        fi
+
+        non_sdk+=( "${dep}" )
+    done
+
+    fx-info "Result:"
+    echo
+    echo "    Core:"
+    for dep in "${core_deps[@]}"; do
+        echo "      ${dep}"
+    done
+
+    echo "    Platform:"
+    for dep in "${platform_deps[@]}"; do
+        echo "      ${dep}"
+    done
+
+    echo "    Not in SDK:"
+    for dep in "${non_sdk[@]}"; do
+        echo "      ${dep}"
+    done
+    rm -rf tmp
+}
+
+main "$@"

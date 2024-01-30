@@ -43,4 +43,4 @@ per-file contrib/publish,contrib/publish.py,contrib/terminal.py,tests/subcommand
 
 per-file metrics,lib/metrics.sh,lib/metrics_custom_report.sh,tests/fx-internal/metrics_test = file: /src/lib/analytics/OWNERS
 
-per-file create-pb-zip = lijiaming@google.com,awolter@google.com
+per-file create-pb-zip, sdk-deps = lijiaming@google.com,awolter@google.com, chaselatta@google.com
