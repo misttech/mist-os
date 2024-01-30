@@ -66,9 +66,9 @@ EmulatedPeer::Result EmulatedPeer::NewLowEnergy(
   // BR/EDR and LE transport emulation logic.
   auto peer = std::make_unique<bt::testing::FakePeer>(address, fake_controller->pw_dispatcher(),
                                                       connectable, scannable);
-  peer->SetAdvertisingData(adv);
+  peer->set_advertising_data(adv);
   if (scannable) {
-    peer->SetScanResponse(/*should_batch_reports=*/false, scan_response);
+    peer->set_scan_response(/*should_batch_reports=*/false, scan_response);
   }
 
   if (!fake_controller->AddPeer(std::move(peer))) {

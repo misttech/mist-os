@@ -197,7 +197,7 @@ class LowEnergyDiscoveryManagerTest : public TestingBase {
         '0');
     auto fake_peer =
         std::make_unique<FakePeer>(kAddress0, dispatcher(), true, true);
-    fake_peer->SetAdvertisingData(kAdvData0);
+    fake_peer->set_advertising_data(kAdvData0);
     test_device()->AddPeer(std::move(fake_peer));
 
     // Peer 1
@@ -213,7 +213,7 @@ class LowEnergyDiscoveryManagerTest : public TestingBase {
         0x0d,
         0x18);
     fake_peer = std::make_unique<FakePeer>(kAddress1, dispatcher(), true, true);
-    fake_peer->SetAdvertisingData(kAdvData1);
+    fake_peer->set_advertising_data(kAdvData1);
     test_device()->AddPeer(std::move(fake_peer));
 
     // Peer 2
@@ -236,7 +236,7 @@ class LowEnergyDiscoveryManagerTest : public TestingBase {
         '2');
     fake_peer =
         std::make_unique<FakePeer>(kAddress2, dispatcher(), false, false);
-    fake_peer->SetAdvertisingData(kAdvData2);
+    fake_peer->set_advertising_data(kAdvData2);
     test_device()->AddPeer(std::move(fake_peer));
 
     // Peer 3
@@ -259,7 +259,7 @@ class LowEnergyDiscoveryManagerTest : public TestingBase {
         '3');
     fake_peer =
         std::make_unique<FakePeer>(kAddress3, dispatcher(), false, false);
-    fake_peer->SetAdvertisingData(kAdvData3);
+    fake_peer->set_advertising_data(kAdvData3);
     test_device()->AddPeer(std::move(fake_peer));
   }
 

@@ -505,7 +505,7 @@ class FakeController final : public ControllerTestDoubleBase,
   //
   // Does nothing if a LE scan is not currently enabled or if the peer doesn't
   // support advertising.
-  void SendSingleAdvertisingReport(const FakePeer& peer);
+  void SendAdvertisingReport(const FakePeer& peer);
 
   // Notifies |controller_parameters_cb_|.
   void NotifyControllerParametersChanged();
