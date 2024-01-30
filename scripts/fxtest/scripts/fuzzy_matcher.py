@@ -306,7 +306,11 @@ class BuildFileMatcher:
                         if file == "BUILD.gn":
                             build_file_paths.append(os.path.join(root, file))
 
-        self._package_finder = re.compile(r"test_package\(\"([^\"]+)\"\)")
+        # This pattern matches any test *something* package rules too.
+        # For example, "fuchsia_test_with_expectations_package"
+        self._package_finder = re.compile(
+            r"test_[\w_\-]*package\(\"([^\"]+)\"\)"
+        )
         self._component_finder = re.compile(r"test_component\(\"([^\"]+)\"\)")
         self._package_name_finder = re.compile(
             r"package_name\s*=\s*\"([^\"]+)\""
@@ -347,7 +351,7 @@ class BuildFileMatcher:
         The algorithm in this method is approximate, and makes the following
         assumptions based on typical test target definitions in the Fuchsia
         source tree:
-        - Test package rules end in "_test_package"
+        - Test package rules contain "_test" followed by "_package"
         - Test component rules end in "_test_component"
         - Test packages may have their name overridden by "package_name"
         - Test packages may contain "test_components". If one does,

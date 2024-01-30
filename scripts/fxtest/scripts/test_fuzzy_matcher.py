@@ -183,6 +183,14 @@ fuchsia_test_package("{x}") {{
 """
 )
 
+TEST_PACKAGE_CUSTOM_NAME = (
+    lambda name, x: f"""
+{name}("{x}") {{
+
+}}
+"""
+)
+
 TEST_COMPONENT = (
     lambda x: f"""
 fuchsia_test_component("{x}") {{
@@ -348,6 +356,45 @@ class TestBuildFileMatcher(unittest.TestCase):
                     )
                 ],
                 [("component-real-name", "--with //src/nested:test-package")],
+            )
+
+    def test_custom_package_name(self):
+        with tempfile.TemporaryDirectory() as dir:
+            os.makedirs(os.path.join(dir, "src"))
+            with open(os.path.join(dir, "src", "BUILD.gn"), "w") as f:
+                f.write(
+                    TEST_PACKAGE_CUSTOM_NAME(
+                        "fuchsia_test_with_expectations_package",
+                        "my-test-package",
+                    )
+                )
+                f.write(
+                    TEST_PACKAGE_CUSTOM_NAME(
+                        "test_but_does_not_match", "other-package-name"
+                    )
+                )
+
+            build_matcher = fuzzy_matcher.BuildFileMatcher(dir)
+            matcher = fuzzy_matcher.Matcher(threshold=1)
+
+            self.assertEqual(
+                [
+                    (val.matched_name, val.full_suggestion)
+                    for val in build_matcher.find_matches(
+                        "my-test-package", matcher
+                    )
+                ],
+                [("my-test-package", "--with //src:my-test-package")],
+            )
+
+            self.assertEqual(
+                [
+                    (val.matched_name, val.full_suggestion)
+                    for val in build_matcher.find_matches(
+                        "other-package-name", matcher
+                    )
+                ],
+                [],
             )
 
 
