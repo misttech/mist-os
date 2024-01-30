@@ -494,7 +494,7 @@ void DetectForkAndContinue(pid_t child_pid, bool is_seized, bool child_stops_on_
 
     // Get the grandchild's pid as reported by ptrace
     EXPECT_EQ(0, ptrace(PTRACE_GETEVENTMSG, child_pid, 0, &grandchild_pid)) << strerror(errno);
-    EXPECT_EQ(0, ptrace(PTRACE_CONT, child_pid, 0, 0));
+    EXPECT_EQ(0, ptrace(PTRACE_CONT, child_pid, 0, 0)) << strerror(errno);
     // A grandchild started with TRACEFORK will start with a SIGSTOP or a PTRACE_EVENT_STOP
     // (depending on whether we used PTRACE_SEIZE to attach).
     EXPECT_EQ(grandchild_pid, waitpid(grandchild_pid, &status, 0)) << strerror(errno);
@@ -534,6 +534,9 @@ void DetectForkAndContinue(pid_t child_pid, bool is_seized, bool child_stops_on_
 }  // namespace
 
 TEST(PtraceTest, PtraceEventStopWithFork) {
+  if (!test_helper::IsStarnix()) {
+    GTEST_SKIP() << "This test does not work on Linux in CQ";
+  }
   pid_t child_pid = ForkUsingClone3(false, 0);
   if (HasFatalFailure()) {
     return;
@@ -549,6 +552,9 @@ TEST(PtraceTest, PtraceEventStopWithFork) {
 }
 
 TEST(PtraceTest, PtraceEventStopWithForkAndSeize) {
+  if (!test_helper::IsStarnix()) {
+    GTEST_SKIP() << "This test does not work on Linux in CQ";
+  }
   pid_t child_pid = ForkUsingClone3(true, 0);
   if (HasFatalFailure()) {
     return;
@@ -562,8 +568,6 @@ TEST(PtraceTest, PtraceEventStopWithForkAndSeize) {
   DetectForkAndContinue(child_pid, true, true);
 }
 
-#if 0
-// To be fixed
 TEST(PtraceTest, PtraceEventStopWithForkClonePtrace) {
   pid_t child_pid = ForkUsingClone3(false, CLONE_PTRACE);
   if (HasFatalFailure()) {
@@ -575,7 +579,6 @@ TEST(PtraceTest, PtraceEventStopWithForkClonePtrace) {
 
   DetectForkAndContinue(child_pid, false, false);
 }
-#endif
 
 constexpr int kBadExitStatus = 0xabababab;
 

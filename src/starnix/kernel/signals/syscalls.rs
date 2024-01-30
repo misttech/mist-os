@@ -716,7 +716,7 @@ fn wait_on_pid(
                     &mut |task: WeakRef<Task>, task_state: &TaskMutableState| {
                         if let Some(ptrace) = &task_state.ptrace {
                             has_any_tracee = true;
-                            ptrace.tracer_waiters.wait_async(&waiter);
+                            ptrace.tracer_waiters().wait_async(&waiter);
                             if let Some(task_ref) = task.upgrade() {
                                 if ptrace.is_waitable(task_ref.load_stopped(), options) {
                                     has_waitable_tracee = true;

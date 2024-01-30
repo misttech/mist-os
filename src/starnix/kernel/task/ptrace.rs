@@ -143,7 +143,7 @@ impl PtraceEventData {
 
 /// The ptrace state that a new task needs to connect to the same tracer as the
 /// task that clones it.
-#[derive(Copy, Clone, PartialEq)]
+#[derive(Clone)]
 pub struct PtraceCoreState {
     /// The pid of the tracer
     pub pid: pid_t,
@@ -154,6 +154,10 @@ pub struct PtraceCoreState {
 
     /// The options set by PTRACE_SETOPTIONS
     pub options: PtraceOptions,
+
+    /// The tracer waits on this WaitQueue to find out if the tracee has done
+    /// something worth being notified about.
+    pub tracer_waiters: Arc<WaitQueue>,
 }
 
 impl PtraceCoreState {
@@ -170,10 +174,6 @@ pub struct PtraceState {
     /// The tracee waits on this WaitQueue to find out when it should stop or wake
     /// for ptrace-related shenanigans.
     pub tracee_waiters: WaitQueue,
-
-    /// The tracer waits on this WaitQueue to find out if the tracee has done
-    /// something worth being notified about.
-    pub tracer_waiters: WaitQueue,
 
     /// The signal that caused the task to enter the given state (for
     /// signal-delivery-stop)
@@ -201,9 +201,13 @@ pub struct PtraceState {
 impl PtraceState {
     pub fn new(pid: pid_t, attach_type: PtraceAttachType, options: PtraceOptions) -> Self {
         PtraceState {
-            core_state: PtraceCoreState { pid, attach_type, options },
+            core_state: PtraceCoreState {
+                pid,
+                attach_type,
+                options,
+                tracer_waiters: Arc::new(WaitQueue::default()),
+            },
             tracee_waiters: WaitQueue::default(),
-            tracer_waiters: WaitQueue::default(),
             last_signal: None,
             last_signal_waitable: false,
             event_data: None,
@@ -293,6 +297,10 @@ impl PtraceState {
     /// Returns enough of the ptrace state to propagate it to a fork / clone / vforked task.
     pub fn get_core_state(&self) -> PtraceCoreState {
         self.core_state.clone()
+    }
+
+    pub fn tracer_waiters(&self) -> &Arc<WaitQueue> {
+        &self.core_state.tracer_waiters
     }
 
     /// Returns an (i32, ptrace_syscall_info) pair.  The ptrace_syscall_info is
@@ -395,7 +403,7 @@ impl PtraceState {
         };
 
         if !self.has_option(trace_type)
-            && clone_args.flags & (starnix_uapi::CLONE_PTRACE as u64) == 0
+            && (clone_args.flags & (starnix_uapi::CLONE_PTRACE as u64) == 0)
         {
             return (PtraceOptions::empty(), None);
         }
@@ -856,6 +864,10 @@ pub fn ptrace_attach_from_state(
         )?;
     }
     let mut state = tracee_task.write();
+    if let Some(ref mut ptrace) = &mut state.ptrace {
+        ptrace.core_state.tracer_waiters = Arc::clone(&ptrace_state.tracer_waiters);
+    }
+
     // The newly started tracee starts with a signal that depends on the attach type.
     let signal = if ptrace_state.attach_type == PtraceAttachType::Seize {
         if let Some(ref mut ptrace) = &mut state.ptrace {

@@ -976,7 +976,14 @@ impl ThreadGroup {
             .filter(|tracee_pid| match selector {
                 ProcessSelector::Pid(pid) => pid == **tracee_pid,
                 ProcessSelector::Any => true,
-                _ => false,
+                ProcessSelector::Pgid(pgid) => {
+                    if let Some(task_ref) = pids.get_task(**tracee_pid).upgrade() {
+                        pids.get_process_group(pgid).as_ref()
+                            == Some(&task_ref.thread_group.read().process_group)
+                    } else {
+                        false
+                    }
+                }
             })
             .map(|tracee_pid| pids.get_task(*tracee_pid).clone())
         {

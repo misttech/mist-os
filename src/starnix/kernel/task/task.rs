@@ -413,7 +413,7 @@ impl TaskMutableState {
 
     pub fn notify_ptracers(&mut self) {
         if let Some(ptrace) = &self.ptrace {
-            ptrace.tracer_waiters.notify_all();
+            ptrace.tracer_waiters().notify_all();
         }
     }
 
