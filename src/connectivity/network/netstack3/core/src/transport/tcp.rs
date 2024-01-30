@@ -155,7 +155,7 @@ impl From<IcmpErrorCode> for Option<ConnectionError> {
                 }
                 Icmpv6DestUnreachableCode::BeyondScope => Some(ConnectionError::NetworkUnreachable),
                 Icmpv6DestUnreachableCode::AddrUnreachable => {
-                    Some(ConnectionError::NetworkUnreachable)
+                    Some(ConnectionError::HostUnreachable)
                 }
                 Icmpv6DestUnreachableCode::PortUnreachable => {
                     Some(ConnectionError::PortUnreachable)
