@@ -433,7 +433,7 @@ class FFX:
             ) from err
 
     def get_target_ssh_address(
-        self, timeout: float = _TIMEOUTS["FFX_CLI"]
+        self, timeout: float | None = _TIMEOUTS["FFX_CLI"]
     ) -> custom_types.TargetSshAddress:
         """Returns the target's ssh ip address and port information.
 

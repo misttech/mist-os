@@ -120,7 +120,10 @@ class SshTests(unittest.TestCase):
             "target_ssh_address"
         ]
         self.assertEqual(
-            self.ssh_obj_wo_ip.run(command="some_command"), "some output"
+            self.ssh_obj_wo_ip.run(
+                command="some_command", get_ssh_addr_timeout=3
+            ),
+            "some output",
         )
 
         mock_popen.assert_called_with(
@@ -139,6 +142,7 @@ class SshTests(unittest.TestCase):
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
         )
+        self.ffx_obj.get_target_ssh_address.assert_called_with(timeout=3)
 
     @mock.patch.object(ssh.subprocess, "Popen", autospec=True)
     def test_ssh_run_with_device_ip(self, mock_popen) -> None:
@@ -213,8 +217,7 @@ class SshTests(unittest.TestCase):
     def test_ssh_popen(self, mock_popen) -> None:
         """Testcase for SSH.popen()"""
         self.assertEqual(
-            self.ssh_obj_with_ip.popen("some_command"),
-            mock_popen.return_value,
+            self.ssh_obj_with_ip.popen("some_command"), mock_popen.return_value
         )
         mock_popen.assert_called()
 
@@ -224,10 +227,11 @@ class SshTests(unittest.TestCase):
             "target_ssh_address"
         ]
         self.assertEqual(
-            self.ssh_obj_wo_ip.target_address, _MOCK_ARGS["target_ssh_address"]
+            self.ssh_obj_wo_ip.get_target_address(),
+            _MOCK_ARGS["target_ssh_address"],
         )
-        self.ffx_obj.get_target_ssh_address.assert_called()
-        address = self.ssh_obj_with_ip.target_address
+        self.ffx_obj.get_target_ssh_address.assert_called_with(timeout=10)
+        address = self.ssh_obj_with_ip.get_target_address()
         self.assertEqual(address.ip, _INPUT_ARGS["device_ssh_ipv4_no_port"].ip)
         self.assertEqual(
             address.port, _INPUT_ARGS["device_ssh_ipv4_no_port"].port

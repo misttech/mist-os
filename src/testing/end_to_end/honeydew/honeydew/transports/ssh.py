@@ -25,6 +25,7 @@ _TIMEOUTS: dict[str, float] = {
     "COMMAND_ARG": 3,
     "COMMAND_RESPONSE": 60,
     "CONNECTION": 60,
+    "FFX_CLI": 10,
 }
 
 _OPTIONS_LIST: list[str] = [
@@ -104,9 +105,13 @@ class SSH:
             ) from err
         _LOGGER.debug("%s is available via ssh.", self._name)
 
-    @property
-    def target_address(self) -> custom_types.TargetSshAddress:
+    def get_target_address(
+        self, timeout: float | None = _TIMEOUTS["FFX_CLI"]
+    ) -> custom_types.TargetSshAddress:
         """Gets the address used on SSH.
+
+        Args:
+            timeout: How long in sec to wait to get the device's SSH address.
 
         Returns:
             The IP address and port used for SSH.
@@ -115,16 +120,22 @@ class SSH:
             return custom_types.TargetSshAddress(
                 ip=self._ip_port.ip, port=self._ip_port.port
             )
-        return self._ffx_transport.get_target_ssh_address()
+        return self._ffx_transport.get_target_ssh_address(timeout=timeout)
 
     def run(
-        self, command: str, timeout: float = _TIMEOUTS["COMMAND_RESPONSE"]
+        self,
+        command: str,
+        timeout: float | None = _TIMEOUTS["COMMAND_RESPONSE"],
+        get_ssh_addr_timeout: float | None = _TIMEOUTS["FFX_CLI"],
     ) -> str:
         """Run command on Fuchsia device from host via SSH and return output.
 
         Args:
             command: Command to run on the Fuchsia device.
             timeout: How long in sec to wait for SSH command to complete.
+            get_ssh_addr_timeout: If `ip_port` was not provided during the initialization,
+                `FFX` transport will be used to get the device SSH address.
+
 
         Returns:
             Command output.
@@ -133,7 +144,7 @@ class SSH:
             errors.SSHCommandError: On failure.
             errors.FfxCommandError: If failed to get the target SSH address.
         """
-        process = self.popen(command)
+        process = self.popen(command, get_ssh_addr_timeout=get_ssh_addr_timeout)
         stdout, stderr = process.communicate(timeout=timeout)
         if process.returncode != 0:
             if stdout:
@@ -150,7 +161,11 @@ class SSH:
         )
         return stdout.decode()
 
-    def popen(self, command: str) -> subprocess.Popen[Any]:
+    def popen(
+        self,
+        command: str,
+        get_ssh_addr_timeout: float | None = _TIMEOUTS["FFX_CLI"],
+    ) -> subprocess.Popen[Any]:
         """Run command on Fuchsia device from host via SSH and return the underlying subprocess.
 
         It is up to callers to detect and handle potential errors, and make sure
@@ -159,6 +174,8 @@ class SSH:
 
         Args:
             command: Command to run on the Fuchsia device.
+            get_ssh_addr_timeout: If `ip_port` was not provided during the initialization,
+                the `FFX` transport will be used to get the device SSH address.
 
         Returns:
             The underlying subprocess.
@@ -171,7 +188,7 @@ class SSH:
         port: int | None = None
         ssh_command: str
 
-        address = self.target_address
+        address = self.get_target_address(timeout=get_ssh_addr_timeout)
         ip, port = address.ip, address.port
 
         if port:
