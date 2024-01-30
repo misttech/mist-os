@@ -3495,7 +3495,8 @@ impl BinderDriver {
                         .selinux_state
                         .as_ref()
                         .expect("Using selinux state without SELinux enabled")
-                        .current_sid;
+                        .current_sid
+                        .clone();
                     let mut security_context = security_server
                         .sid_to_security_context(&sid)
                         .map_or(FsString::default(), |context| FsString::from(context.to_string()));

@@ -2,8 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use super::{AccessVector, ObjectClass, SecurityId};
+use super::SecurityId;
 
+use selinux_common::AbstractObjectClass;
+use selinux_policy::AccessVector;
 use starnix_sync::Mutex;
 use std::sync::{
     atomic::{AtomicU64, Ordering},
@@ -19,7 +21,7 @@ pub trait Query {
         &self,
         source_sid: SecurityId,
         target_sid: SecurityId,
-        target_class: ObjectClass,
+        target_class: AbstractObjectClass,
     ) -> AccessVector;
 }
 
@@ -32,7 +34,7 @@ pub trait QueryMut {
         &mut self,
         source_sid: SecurityId,
         target_sid: SecurityId,
-        target_class: ObjectClass,
+        target_class: AbstractObjectClass,
     ) -> AccessVector;
 }
 
@@ -41,7 +43,7 @@ impl<Q: Query> QueryMut for Q {
         &mut self,
         source_sid: SecurityId,
         target_sid: SecurityId,
-        target_class: ObjectClass,
+        target_class: AbstractObjectClass,
     ) -> AccessVector {
         (self as &dyn Query).query(source_sid, target_sid, target_class)
     }
@@ -81,7 +83,7 @@ impl Query for DenyAll {
         &self,
         _source_sid: SecurityId,
         _target_sid: SecurityId,
-        _target_class: ObjectClass,
+        _target_class: AbstractObjectClass,
     ) -> AccessVector {
         AccessVector::NONE
     }
@@ -95,11 +97,11 @@ impl Reset for DenyAll {
     }
 }
 
-#[derive(Clone, Copy, Default)]
+#[derive(Clone, Default)]
 struct QueryAndResult {
     source_sid: SecurityId,
     target_sid: SecurityId,
-    target_class: ObjectClass,
+    target_class: AbstractObjectClass,
     access_vector: AccessVector,
 }
 
@@ -124,7 +126,7 @@ impl<D: QueryMut> QueryMut for Empty<D> {
         &mut self,
         source_sid: SecurityId,
         target_sid: SecurityId,
-        target_class: ObjectClass,
+        target_class: AbstractObjectClass,
     ) -> AccessVector {
         self.delegate.query(source_sid, target_sid, target_class)
     }
@@ -137,7 +139,7 @@ impl<D: ResetMut> ResetMut for Empty<D> {
 }
 
 /// Default size of a fixed-sized (pre-allocated) access vector cache.
-const DEFAULT_FIXED_SIZE: usize = 10;
+pub(crate) const DEFAULT_FIXED_SIZE: usize = 10;
 
 /// An access vector cache of fixed size and memory allocation. The underlying caching strategy is
 /// FIFO. Entries are evicted one at a time when entries are added to a full cache.
@@ -164,8 +166,12 @@ impl<D, const SIZE: usize> Fixed<D, SIZE> {
         if SIZE == 0 {
             panic!("cannot instantiate fixed access vector cache of size 0");
         }
-        let empty_cache_item: QueryAndResult = QueryAndResult::default();
-        Self { cache: [empty_cache_item; SIZE], next_index: 0, is_full: false, delegate }
+        Self {
+            cache: std::array::from_fn(|_| QueryAndResult::default()),
+            next_index: 0,
+            is_full: false,
+            delegate,
+        }
     }
 
     /// Returns a boolean indicating whether the local cache is empty.
@@ -190,7 +196,7 @@ impl<D: QueryMut, const SIZE: usize> QueryMut for Fixed<D, SIZE> {
         &mut self,
         source_sid: SecurityId,
         target_sid: SecurityId,
-        target_class: ObjectClass,
+        target_class: AbstractObjectClass,
     ) -> AccessVector {
         if !self.is_empty() {
             let mut index = if self.next_index == 0 { SIZE - 1 } else { self.next_index - 1 };
@@ -211,7 +217,8 @@ impl<D: QueryMut, const SIZE: usize> QueryMut for Fixed<D, SIZE> {
             }
         }
 
-        let access_vector = self.delegate.query(source_sid, target_sid, target_class);
+        let access_vector =
+            self.delegate.query(source_sid.clone(), target_sid.clone(), target_class.clone());
 
         self.insert(QueryAndResult { source_sid, target_sid, target_class, access_vector });
 
@@ -260,7 +267,7 @@ impl<D: QueryMut> Query for Locked<D> {
         &self,
         source_sid: SecurityId,
         target_sid: SecurityId,
-        target_class: ObjectClass,
+        target_class: AbstractObjectClass,
     ) -> AccessVector {
         self.delegate.lock().query(source_sid, target_sid, target_class)
     }
@@ -310,7 +317,7 @@ impl<Q: Query> Query for Arc<Q> {
         &self,
         source_sid: SecurityId,
         target_sid: SecurityId,
-        target_class: ObjectClass,
+        target_class: AbstractObjectClass,
     ) -> AccessVector {
         self.as_ref().query(source_sid, target_sid, target_class)
     }
@@ -327,7 +334,7 @@ impl<Q: Query> Query for Weak<Q> {
         &self,
         source_sid: SecurityId,
         target_sid: SecurityId,
-        target_class: ObjectClass,
+        target_class: AbstractObjectClass,
     ) -> AccessVector {
         self.upgrade()
             .map(|q| q.query(source_sid, target_sid, target_class))
@@ -370,7 +377,7 @@ impl<D: QueryMut + ResetMut> QueryMut for ThreadLocalQuery<D> {
         &mut self,
         source_sid: SecurityId,
         target_sid: SecurityId,
-        target_class: ObjectClass,
+        target_class: AbstractObjectClass,
     ) -> AccessVector {
         let version = self.active_version.as_ref().version();
         if self.current_version != version {
@@ -383,10 +390,17 @@ impl<D: QueryMut + ResetMut> QueryMut for ThreadLocalQuery<D> {
     }
 }
 
+/// Default size of an access vector cache shared by all threads in the system.
+pub(crate) const DEFAULT_SHARED_SIZE: usize = 1000;
+
 /// Composite access vector cache manager that delegates queries to security server type, `SS`, and
 /// owns a shared cache of size `SHARED_SIZE`, and can produce thread-local caches of size
 /// `THREAD_LOCAL_SIZE`.
-pub struct Manager<SS, const SHARED_SIZE: usize = 1000, const THREAD_LOCAL_SIZE: usize = 10> {
+pub struct Manager<
+    SS,
+    const SHARED_SIZE: usize = DEFAULT_SHARED_SIZE,
+    const THREAD_LOCAL_SIZE: usize = DEFAULT_FIXED_SIZE,
+> {
     shared_cache: Locked<Fixed<Weak<SS>, SHARED_SIZE>>,
     thread_local_version: Arc<AtomicVersion>,
 }
@@ -413,8 +427,8 @@ impl<SS, const SHARED_SIZE: usize, const THREAD_LOCAL_SIZE: usize>
 
     /// Returns a shared reference to the shared cache managed by this manager. This operation does
     /// not copy the cache, but it does perform an atomic operation to update a reference count.
-    pub fn get_shared_cache(&self) -> Locked<Fixed<Weak<SS>, SHARED_SIZE>> {
-        self.shared_cache.clone()
+    pub fn get_shared_cache(&self) -> &Locked<Fixed<Weak<SS>, SHARED_SIZE>> {
+        &self.shared_cache
     }
 
     /// Constructs a new thread-local cache that will delegate to the shared cache managed by this
@@ -454,6 +468,8 @@ mod tests {
     use super::*;
 
     use rand::{distributions::Uniform, thread_rng, Rng as _};
+    use selinux_common::ObjectClass;
+    use selinux_policy::testing::{ACCESS_VECTOR_0001, ACCESS_VECTOR_0010};
     use std::{
         collections::{HashMap, HashSet},
         sync::{
@@ -485,7 +501,7 @@ mod tests {
             &self,
             source_sid: SecurityId,
             target_sid: SecurityId,
-            target_class: ObjectClass,
+            target_class: AbstractObjectClass,
         ) -> AccessVector {
             self.query_count.fetch_add(1, Ordering::Relaxed);
             self.delegate.query(source_sid, target_sid, target_class)
@@ -503,16 +519,16 @@ mod tests {
     #[fuchsia::test]
     fn empty_access_vector_cache_default_deny_all() {
         let mut avc = Empty::<DenyAll>::default();
-        assert_eq!(AccessVector::NONE, avc.query(0.into(), 0.into(), ObjectClass::Process));
+        assert_eq!(AccessVector::NONE, avc.query(0.into(), 0.into(), ObjectClass::Process.into()));
     }
 
     #[fuchsia::test]
     fn fixed_access_vector_cache_add_entry() {
         let mut avc = Fixed::<_, 10>::new(Counter::<DenyAll>::default());
         assert_eq!(0, avc.delegate.query_count());
-        assert_eq!(AccessVector::NONE, avc.query(0.into(), 0.into(), ObjectClass::Process));
+        assert_eq!(AccessVector::NONE, avc.query(0.into(), 0.into(), ObjectClass::Process.into()));
         assert_eq!(1, avc.delegate.query_count());
-        assert_eq!(AccessVector::NONE, avc.query(0.into(), 0.into(), ObjectClass::Process));
+        assert_eq!(AccessVector::NONE, avc.query(0.into(), 0.into(), ObjectClass::Process.into()));
         assert_eq!(1, avc.delegate.query_count());
         assert_eq!(1, avc.next_index);
         assert_eq!(false, avc.is_full);
@@ -527,7 +543,7 @@ mod tests {
         assert_eq!(false, avc.is_full);
 
         assert_eq!(0, avc.delegate.query_count());
-        assert_eq!(AccessVector::NONE, avc.query(0.into(), 0.into(), ObjectClass::Process));
+        assert_eq!(AccessVector::NONE, avc.query(0.into(), 0.into(), ObjectClass::Process.into()));
         assert_eq!(1, avc.delegate.query_count());
         assert_eq!(1, avc.next_index);
         assert_eq!(false, avc.is_full);
@@ -542,7 +558,7 @@ mod tests {
         let mut avc = Fixed::<_, 10>::new(Counter::<DenyAll>::default());
 
         for i in 0..10 {
-            avc.query(i.into(), 0.into(), ObjectClass::Process);
+            avc.query(i.into(), 0.into(), ObjectClass::Process.into());
         }
         assert_eq!(0, avc.next_index);
         assert_eq!(true, avc.is_full);
@@ -552,7 +568,7 @@ mod tests {
         assert_eq!(false, avc.is_full);
 
         for i in 0..10 {
-            avc.query(0.into(), i.into(), ObjectClass::Process);
+            avc.query(0.into(), i.into(), ObjectClass::Process.into());
         }
         assert_eq!(0, avc.next_index);
         assert_eq!(true, avc.is_full);
@@ -568,31 +584,31 @@ mod tests {
 
         // Fill with (i, 0, 0 => 0), then overwrite (0, 0, 0 => 0) with (10, 0, 0 => 0).
         for i in 0..11 {
-            avc.query(i.into(), 0.into(), ObjectClass::Process);
+            avc.query(i.into(), 0.into(), ObjectClass::Process.into());
         }
         assert_eq!(1, avc.next_index);
         assert_eq!(true, avc.is_full);
 
         // Query (0, 0, 0) should miss, then overwrite (1, 0, 0 => 0) with (0, 0, 0 => 0).
         let delegate_query_count = avc.delegate.query_count();
-        avc.query(0.into(), 0.into(), ObjectClass::Process);
+        avc.query(0.into(), 0.into(), ObjectClass::Process.into());
         assert_eq!(delegate_query_count + 1, avc.delegate.query_count());
 
         // Query (2, 0, 0) should still hit.
         let delegate_query_count = avc.delegate.query_count();
-        avc.query(2.into(), 0.into(), ObjectClass::Process);
+        avc.query(2.into(), 0.into(), ObjectClass::Process.into());
         assert_eq!(delegate_query_count, avc.delegate.query_count());
 
         // Cache is not LRU: Querying (0, 0, 0), then (i + 100, 0, 0) repeatedly will evict
         // (0, 0, 0 => ...) from the cache after filling the cache with (i + 100, 0, 0 => ...)
         // entries.
         for i in 0..10 {
-            avc.query(0.into(), 0.into(), ObjectClass::Process);
-            avc.query((i + 100).into(), 0.into(), ObjectClass::Process);
+            avc.query(0.into(), 0.into(), ObjectClass::Process.into());
+            avc.query((i + 100).into(), 0.into(), ObjectClass::Process.into());
         }
         // Query (0, 0, 0) should now miss.
         let delegate_query_count = avc.delegate.query_count();
-        avc.query(0.into(), 0.into(), ObjectClass::Process);
+        avc.query(0.into(), 0.into(), ObjectClass::Process.into());
         assert_eq!(delegate_query_count + 1, avc.delegate.query_count());
     }
 
@@ -605,13 +621,16 @@ mod tests {
         assert_eq!(0, avc.delegate.reset_count());
         cache_version.reset();
         assert_eq!(0, avc.delegate.reset_count());
-        avc.query(0.into(), 0.into(), ObjectClass::Process);
+        avc.query(0.into(), 0.into(), ObjectClass::Process.into());
         assert_eq!(1, avc.delegate.reset_count());
     }
 
     const NO_RIGHTS: u32 = 0;
     const READ_RIGHTS: u32 = 1;
     const WRITE_RIGHTS: u32 = 2;
+
+    const ACCESS_VECTOR_READ: AccessVector = ACCESS_VECTOR_0001;
+    const ACCESS_VECTOR_WRITE: AccessVector = ACCESS_VECTOR_0010;
 
     struct PolicyServer {
         policy: Arc<AtomicU32>,
@@ -631,15 +650,15 @@ mod tests {
             &self,
             _source_sid: SecurityId,
             _target_sid: SecurityId,
-            _target_class: ObjectClass,
+            _target_class: AbstractObjectClass,
         ) -> AccessVector {
             let policy = self.policy.as_ref().load(Ordering::Relaxed);
             if policy == NO_RIGHTS {
                 AccessVector::NONE
             } else if policy == READ_RIGHTS {
-                AccessVector::READ
+                ACCESS_VECTOR_READ
             } else if policy == WRITE_RIGHTS {
-                AccessVector::WRITE
+                ACCESS_VECTOR_WRITE
             } else {
                 panic!("query found invalid policy: {}", policy);
             }
@@ -676,7 +695,7 @@ mod tests {
             let mut trace = vec![];
 
             for _ in 0..2000 {
-                trace.push(query_avc.query(0.into(), 0.into(), ObjectClass::Process))
+                trace.push(query_avc.query(0.into(), 0.into(), ObjectClass::Process.into()))
             }
 
             tx.send(trace).expect("send trace");
@@ -758,13 +777,19 @@ mod tests {
             let mut trace = vec![];
 
             for sid in thread_rng().sample_iter(&Uniform::new(0, 20)).take(2000) {
-                trace.push((sid, avc_for_query_1.query(sid.into(), 0.into(), ObjectClass::Process)))
+                trace.push((
+                    sid,
+                    avc_for_query_1.query(sid.into(), 0.into(), ObjectClass::Process.into()),
+                ))
             }
 
             rx_last_policy_change_1.await.expect("receive last-policy-change signal (1)");
 
             for sid in thread_rng().sample_iter(&Uniform::new(0, 20)).take(10) {
-                trace.push((sid, avc_for_query_1.query(sid.into(), 0.into(), ObjectClass::Process)))
+                trace.push((
+                    sid,
+                    avc_for_query_1.query(sid.into(), 0.into(), ObjectClass::Process.into()),
+                ))
             }
 
             tx1.send(trace).expect("send trace 1");
@@ -776,7 +801,7 @@ mod tests {
             //
 
             for item in avc_for_query_1.delegate.lock().cache.iter() {
-                assert_eq!(AccessVector::WRITE, item.access_vector);
+                assert_eq!(ACCESS_VECTOR_WRITE, item.access_vector);
             }
         });
         let (tx2, rx2) = futures::channel::oneshot::channel();
@@ -785,13 +810,19 @@ mod tests {
             let mut trace = vec![];
 
             for sid in thread_rng().sample_iter(&Uniform::new(10, 30)).take(2000) {
-                trace.push((sid, avc_for_query_2.query(sid.into(), 0.into(), ObjectClass::Process)))
+                trace.push((
+                    sid,
+                    avc_for_query_2.query(sid.into(), 0.into(), ObjectClass::Process.into()),
+                ))
             }
 
             rx_last_policy_change_2.await.expect("receive last-policy-change signal (2)");
 
             for sid in thread_rng().sample_iter(&Uniform::new(10, 30)).take(10) {
-                trace.push((sid, avc_for_query_2.query(sid.into(), 0.into(), ObjectClass::Process)))
+                trace.push((
+                    sid,
+                    avc_for_query_2.query(sid.into(), 0.into(), ObjectClass::Process.into()),
+                ))
             }
 
             tx2.send(trace).expect("send trace 2");
@@ -803,7 +834,7 @@ mod tests {
             //
 
             for item in avc_for_query_2.delegate.lock().cache.iter() {
-                assert_eq!(AccessVector::WRITE, item.access_vector);
+                assert_eq!(ACCESS_VECTOR_WRITE, item.access_vector);
             }
         });
 
@@ -899,15 +930,15 @@ mod tests {
             &self,
             _source_sid: SecurityId,
             _target_sid: SecurityId,
-            _target_class: ObjectClass,
+            _target_class: AbstractObjectClass,
         ) -> AccessVector {
             let policy = self.policy.as_ref().load(Ordering::Relaxed);
             if policy == NO_RIGHTS {
                 AccessVector::NONE
             } else if policy == READ_RIGHTS {
-                AccessVector::READ
+                ACCESS_VECTOR_READ
             } else if policy == WRITE_RIGHTS {
-                AccessVector::WRITE
+                ACCESS_VECTOR_WRITE
             } else {
                 panic!("query found invalid policy: {}", policy);
             }
@@ -986,13 +1017,19 @@ mod tests {
             let mut trace = vec![];
 
             for sid in thread_rng().sample_iter(&Uniform::new(0, 20)).take(2000) {
-                trace.push((sid, avc_for_query_1.query(sid.into(), 0.into(), ObjectClass::Process)))
+                trace.push((
+                    sid,
+                    avc_for_query_1.query(sid.into(), 0.into(), ObjectClass::Process.into()),
+                ))
             }
 
             rx_last_policy_change_1.await.expect("receive last-policy-change signal (1)");
 
             for sid in thread_rng().sample_iter(&Uniform::new(0, 20)).take(10) {
-                trace.push((sid, avc_for_query_1.query(sid.into(), 0.into(), ObjectClass::Process)))
+                trace.push((
+                    sid,
+                    avc_for_query_1.query(sid.into(), 0.into(), ObjectClass::Process.into()),
+                ))
             }
 
             tx1.send(trace).expect("send trace 1");
@@ -1004,7 +1041,7 @@ mod tests {
             //
 
             for item in avc_for_query_1.delegate.cache.iter() {
-                assert_eq!(AccessVector::WRITE, item.access_vector);
+                assert_eq!(ACCESS_VECTOR_WRITE, item.access_vector);
             }
         });
         let (tx2, rx2) = futures::channel::oneshot::channel();
@@ -1013,13 +1050,19 @@ mod tests {
             let mut trace = vec![];
 
             for sid in thread_rng().sample_iter(&Uniform::new(10, 30)).take(2000) {
-                trace.push((sid, avc_for_query_2.query(sid.into(), 0.into(), ObjectClass::Process)))
+                trace.push((
+                    sid,
+                    avc_for_query_2.query(sid.into(), 0.into(), ObjectClass::Process.into()),
+                ))
             }
 
             rx_last_policy_change_2.await.expect("receive last-policy-change signal (2)");
 
             for sid in thread_rng().sample_iter(&Uniform::new(10, 30)).take(10) {
-                trace.push((sid, avc_for_query_2.query(sid.into(), 0.into(), ObjectClass::Process)))
+                trace.push((
+                    sid,
+                    avc_for_query_2.query(sid.into(), 0.into(), ObjectClass::Process.into()),
+                ))
             }
 
             tx2.send(trace).expect("send trace 2");
@@ -1031,7 +1074,7 @@ mod tests {
             //
 
             for item in avc_for_query_2.delegate.cache.iter() {
-                assert_eq!(AccessVector::WRITE, item.access_vector);
+                assert_eq!(ACCESS_VECTOR_WRITE, item.access_vector);
             }
         });
 
@@ -1117,11 +1160,11 @@ mod tests {
         let shared_cache = security_server.manager().shared_cache.delegate.lock();
         if shared_cache.is_full {
             for item in shared_cache.cache.iter() {
-                assert_eq!(AccessVector::WRITE, item.access_vector);
+                assert_eq!(ACCESS_VECTOR_WRITE, item.access_vector);
             }
         } else {
             for i in 0..shared_cache.next_index {
-                assert_eq!(AccessVector::WRITE, shared_cache.cache[i].access_vector);
+                assert_eq!(ACCESS_VECTOR_WRITE, shared_cache.cache[i].access_vector);
             }
         }
     }

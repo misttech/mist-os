@@ -4,6 +4,8 @@
 
 use selinux_policy::{metadata::HandleUnknown, parse_policy_by_reference, parse_policy_by_value};
 
+use anyhow::Context as _;
+use selinux_common::{Permission, ProcessPermission};
 use serde::Deserialize;
 use std::io::Read as _;
 
@@ -36,6 +38,7 @@ impl PartialEq<HandleUnknown> for LocalHandleUnknown {
     }
 }
 
+#[cfg(feature = "selinux_policy_test_api")]
 #[test]
 fn known_policies() {
     let policies_dir = format!("{}/{}", TESTDATA_DIR, POLICIES_SUBDIR);
@@ -63,7 +66,18 @@ fn known_policies() {
 
         let (policy, returned_policy_bytes) =
             parse_policy_by_value(policy_bytes.clone()).expect("parse policy");
-        let policy = policy.validate().expect("validate policy");
+
+        // "minimal" policy is syntactically valid but does not contain all "well-known" elements
+        // that are validated by `Policy::validate()`.
+        if policy_path.file_name().expect("policy file name") == "minimal" {
+            policy.parsed_policy().validate().expect("validate policy");
+            continue;
+        }
+
+        let policy = policy
+            .validate()
+            .with_context(|| format!("policy path: {:?}", policy_path))
+            .expect("validate policy");
 
         assert_eq!(expectations.expected_policy_version, policy.policy_version());
         assert_eq!(&expectations.expected_handle_unknown, policy.handle_unknown());
@@ -82,19 +96,39 @@ fn known_policies() {
 }
 
 #[test]
+fn policy_lookup() {
+    let testsuite_policy_path = format!("{}/{}/selinux_testsuite", TESTDATA_DIR, POLICIES_SUBDIR);
+    let mut policy_file =
+        std::fs::File::open(&testsuite_policy_path).expect("open selinux testsuite policy file");
+    let mut policy_bytes = vec![];
+    policy_file.read_to_end(&mut policy_bytes).expect("read selinux testsuite policy file");
+    let (policy, _) = parse_policy_by_value(policy_bytes.clone()).expect("parse policy");
+    let policy = policy.validate().expect("validate selinux testsuite policy");
+
+    policy
+        .is_explicitly_allowed(
+            "unconfined_t",
+            "unconfined_t",
+            Permission::Process(ProcessPermission::Fork),
+        )
+        .expect("check for `allow unconfined_t unconfined_t:process fork;` in policy");
+}
+
+#[cfg(feature = "selinux_policy_test_api")]
+#[test]
 fn explicit_allow_type_type() {
     let policy_path =
         format!("{}/{}/allow_a_t_b_t_class0_perm0_policy.pp", TESTDATA_DIR, MICRO_POLICIES_SUBDIR);
     let policy_bytes = std::fs::read(&policy_path).expect("read policy from file");
-    let policy = parse_policy_by_reference(policy_bytes.as_slice())
-        .expect("parse policy")
-        .validate()
-        .expect("validate policy");
-    assert!(policy
-        .is_explicitly_allowed("a_t", "b_t", "class0", "perm0")
+    let policy = parse_policy_by_reference(policy_bytes.as_slice()).expect("parse policy");
+    let parsed_policy = policy.parsed_policy();
+    parsed_policy.validate().expect("validate policy");
+    assert!(parsed_policy
+        .is_explicitly_allowed_custom("a_t", "b_t", "class0", "perm0")
         .expect("query well-formed"));
 }
 
+#[cfg(feature = "selinux_policy_test_api")]
 #[test]
 fn no_explicit_allow_type_type() {
     let policy_path = format!(
@@ -102,15 +136,15 @@ fn no_explicit_allow_type_type() {
         TESTDATA_DIR, MICRO_POLICIES_SUBDIR
     );
     let policy_bytes = std::fs::read(&policy_path).expect("read policy from file");
-    let policy = parse_policy_by_reference(policy_bytes.as_slice())
-        .expect("parse policy")
-        .validate()
-        .expect("validate policy");
-    assert!(!policy
-        .is_explicitly_allowed("a_t", "b_t", "class0", "perm0")
+    let policy = parse_policy_by_reference(policy_bytes.as_slice()).expect("parse policy");
+    let parsed_policy = policy.parsed_policy();
+    parsed_policy.validate().expect("validate policy");
+    assert!(!parsed_policy
+        .is_explicitly_allowed_custom("a_t", "b_t", "class0", "perm0")
         .expect("query well-formed"));
 }
 
+#[cfg(feature = "selinux_policy_test_api")]
 #[test]
 fn explicit_allow_type_attr() {
     let policy_path = format!(
@@ -118,15 +152,15 @@ fn explicit_allow_type_attr() {
         TESTDATA_DIR, MICRO_POLICIES_SUBDIR
     );
     let policy_bytes = std::fs::read(&policy_path).expect("read policy from file");
-    let policy = parse_policy_by_reference(policy_bytes.as_slice())
-        .expect("parse policy")
-        .validate()
-        .expect("validate policy");
-    assert!(policy
-        .is_explicitly_allowed("a_t", "b_t", "class0", "perm0")
+    let policy = parse_policy_by_reference(policy_bytes.as_slice()).expect("parse policy");
+    let parsed_policy = policy.parsed_policy();
+    parsed_policy.validate().expect("validate policy");
+    assert!(parsed_policy
+        .is_explicitly_allowed_custom("a_t", "b_t", "class0", "perm0")
         .expect("query well-formed"));
 }
 
+#[cfg(feature = "selinux_policy_test_api")]
 #[test]
 fn no_explicit_allow_type_attr() {
     let policy_path = format!(
@@ -134,15 +168,15 @@ fn no_explicit_allow_type_attr() {
         TESTDATA_DIR, MICRO_POLICIES_SUBDIR
     );
     let policy_bytes = std::fs::read(&policy_path).expect("read policy from file");
-    let policy = parse_policy_by_reference(policy_bytes.as_slice())
-        .expect("parse policy")
-        .validate()
-        .expect("validate policy");
-    assert!(!policy
-        .is_explicitly_allowed("a_t", "b_t", "class0", "perm0")
+    let policy = parse_policy_by_reference(policy_bytes.as_slice()).expect("parse policy");
+    let parsed_policy = policy.parsed_policy();
+    parsed_policy.validate().expect("validate policy");
+    assert!(!parsed_policy
+        .is_explicitly_allowed_custom("a_t", "b_t", "class0", "perm0")
         .expect("query well-formed"));
 }
 
+#[cfg(feature = "selinux_policy_test_api")]
 #[test]
 fn explicit_allow_attr_attr() {
     let policy_path = format!(
@@ -150,15 +184,15 @@ fn explicit_allow_attr_attr() {
         TESTDATA_DIR, MICRO_POLICIES_SUBDIR
     );
     let policy_bytes = std::fs::read(&policy_path).expect("read policy from file");
-    let policy = parse_policy_by_reference(policy_bytes.as_slice())
-        .expect("parse policy")
-        .validate()
-        .expect("validate policy");
-    assert!(policy
-        .is_explicitly_allowed("a_t", "b_t", "class0", "perm0")
+    let policy = parse_policy_by_reference(policy_bytes.as_slice()).expect("parse policy");
+    let parsed_policy = policy.parsed_policy();
+    parsed_policy.validate().expect("validate policy");
+    assert!(parsed_policy
+        .is_explicitly_allowed_custom("a_t", "b_t", "class0", "perm0")
         .expect("query well-formed"));
 }
 
+#[cfg(feature = "selinux_policy_test_api")]
 #[test]
 fn no_explicit_allow_attr_attr() {
     let policy_path = format!(
@@ -166,11 +200,33 @@ fn no_explicit_allow_attr_attr() {
         TESTDATA_DIR, MICRO_POLICIES_SUBDIR
     );
     let policy_bytes = std::fs::read(&policy_path).expect("read policy from file");
-    let policy = parse_policy_by_reference(policy_bytes.as_slice())
-        .expect("parse policy")
-        .validate()
-        .expect("validate policy");
-    assert!(!policy
-        .is_explicitly_allowed("a_t", "b_t", "class0", "perm0")
+    let policy = parse_policy_by_reference(policy_bytes.as_slice()).expect("parse policy");
+    let parsed_policy = policy.parsed_policy();
+    parsed_policy.validate().expect("validate policy");
+    assert!(!parsed_policy
+        .is_explicitly_allowed_custom("a_t", "b_t", "class0", "perm0")
         .expect("query well-formed"));
+}
+
+#[cfg(feature = "selinux_policy_test_api")]
+#[test]
+fn compute_explicitly_allowed_multiple_attributes() {
+    let policy_path = format!(
+        "{}/{}/allow_a_t_a1_attr_class0_perm0_a2_attr_class0_perm1_policy.pp",
+        TESTDATA_DIR, MICRO_POLICIES_SUBDIR
+    );
+    let policy_bytes = std::fs::read(&policy_path).expect("read policy from file");
+    let policy = parse_policy_by_reference(policy_bytes.as_slice()).expect("parse policy");
+    let parsed_policy = policy.parsed_policy();
+    parsed_policy.validate().expect("validate policy");
+    let raw_access_vector = parsed_policy
+        .compute_explicitly_allowed_custom("a_t", "a_t", "class0")
+        .expect("well-formed query")
+        .into_raw();
+
+    // Two separate attributes are each allowed one permission on `[attr] self:class0`. Both
+    // attributes are associated with "a_t". No other `allow` statements appear in the policy
+    // in relation to "a_t". Therefore, we expect exactly two 1's in the access vector for
+    // query `("a_t", "a_t", "class0")`.
+    assert_eq!(2, raw_access_vector.count_ones());
 }

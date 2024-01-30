@@ -16,7 +16,6 @@ rustc_library("core") {
     "//src/starnix/lib/selinux/common",
     "//src/starnix/lib/selinux/policy",
     "//third_party/rust_crates:anyhow",
-    "//third_party/rust_crates:bitflags",
     "//third_party/rust_crates:zerocopy",
   ]
   test_deps = [
@@ -32,7 +31,7 @@ rustc_library("core") {
     "security_server.rs",
     "seq_lock.rs",
   ]
-  inputs = [ "../testdata/policies/minimal" ]
+  inputs = [ "../testdata/policies/emulator" ]
   configs += [ "//src/starnix/config:starnix_clippy_lints" ]
 }
 

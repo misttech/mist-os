@@ -4,14 +4,20 @@
 
 use crate::{
     access_vector_cache::{Manager as AvcManager, Query, QueryMut},
+    permission_check::{PermissionCheck, PermissionCheckImpl},
     seq_lock::SeqLock,
-    AccessVector, ObjectClass, ProcessPermission, SecurityId,
+    SecurityId,
 };
 
 use anyhow;
 use fuchsia_zircon::{self as zx};
-use selinux_common::security_context::SecurityContext;
-use selinux_policy::{metadata::HandleUnknown, parse_policy_by_value, parser::ByValue, Policy};
+use selinux_common::{
+    security_context::SecurityContext, AbstractObjectClass, ClassPermission, Permission,
+};
+use selinux_policy::{
+    metadata::HandleUnknown, parse_policy_by_value, parser::ByValue, AccessVector,
+    AccessVectorComputer, Policy,
+};
 use starnix_sync::Mutex;
 use std::{collections::HashMap, ops::DerefMut, sync::Arc};
 use zerocopy::{AsBytes, NoCell};
@@ -25,6 +31,14 @@ const SELINUX_STATUS_VERSION: u32 = 1;
 pub enum Mode {
     Enable,
     Fake,
+}
+
+pub trait SecurityServerStatus {
+    /// Returns true if access decisions by the security server should be enforced by hooks.
+    fn is_enforcing(&self) -> bool;
+
+    /// Returns true if the security server is using a hard-coded fake policy.
+    fn is_fake(&self) -> bool;
 }
 
 struct LoadedPolicy {
@@ -101,17 +115,23 @@ impl SecurityServer {
         security_server
     }
 
+    /// Converts a shared pointer to [`SecurityServer`] to a [`PermissionCheck`] without consuming
+    /// the pointer.
+    pub fn as_permission_check<'a>(self: &'a Arc<Self>) -> impl PermissionCheck + 'a {
+        PermissionCheckImpl::new(self, self.avc_manager.get_shared_cache())
+    }
+
     /// Returns the security ID mapped to `security_context`, creating it if it does not exist.
     ///
     /// All objects with the same security context will have the same SID associated.
     pub fn security_context_to_sid(&self, security_context: &SecurityContext) -> SecurityId {
         let mut state = self.state.lock();
         let existing_sid =
-            state.sids.iter().find(|(_, sc)| sc == &security_context).map(|(sid, _)| *sid);
+            state.sids.iter().find(|(_, sc)| sc == &security_context).map(|(sid, _)| sid.clone());
         existing_sid.unwrap_or_else(|| {
             // Create and insert a new SID for `security_context`.
             let sid = SecurityId::from(state.sids.len() as u64);
-            if state.sids.insert(sid, security_context.clone()).is_some() {
+            if state.sids.insert(sid.clone(), security_context.clone()).is_some() {
                 panic!("impossible error: SID already exists.");
             }
             sid
@@ -155,12 +175,6 @@ impl SecurityServer {
         self.with_state_and_update_status(|state| state.enforcing = enforcing);
     }
 
-    /// Returns true if access decisions by the [`SecurityServer`] should be
-    /// enforced by hooks.
-    pub fn enforcing(&self) -> bool {
-        self.state.lock().enforcing
-    }
-
     /// Returns true if the policy requires unknown class / permissions to be
     /// denied. Defaults to true until a policy is loaded.
     pub fn deny_unknown(&self) -> bool {
@@ -181,52 +195,44 @@ impl SecurityServer {
         }
     }
 
-    // TODO: make more general, for any object class and multiple permissions.
-    pub fn has_process_permission(
+    /// Computes the precise access vector for `source_sid` targeting `target_sid` as class
+    /// `target_class`.
+    ///
+    /// TODO(http://b/305722921): Implement complete access decision logic. For now, the security
+    /// server abides by explicit `allow [source] [target]:[class] [permissions..];` statements.
+    pub fn compute_access_vector(
         &self,
         source_sid: SecurityId,
         target_sid: SecurityId,
-        permission: ProcessPermission,
-    ) -> bool {
-        if self.state.lock().policy.as_ref().is_none() {
-            return true;
-        }
-        // TODO(http://b/320437139): check AVC before computing permission.
-        let source_target_and_policy = {
-            let state = self.state.lock();
-            (
-                state.sids.get(&source_sid).map(Clone::clone),
-                state.sids.get(&target_sid).map(Clone::clone),
-                state.policy.clone(),
-            )
+        target_class: AbstractObjectClass,
+    ) -> AccessVector {
+        let policy = match self.state.lock().policy.as_ref().map(Clone::clone) {
+            Some(policy) => policy,
+            // Policy is "allow all" when no policy is loaded, regardless of enforcing state.
+            None => return AccessVector::ALL,
         };
 
-        if let (Some(source_security_context), Some(target_security_context), Some(policy)) =
-            source_target_and_policy
+        if let (Some(source_security_context), Some(target_security_context)) =
+            (self.sid_to_security_context(&source_sid), self.sid_to_security_context(&target_sid))
         {
-            policy
-                .parsed
-                .is_explicitly_allowed(
-                    source_security_context.type_(),
-                    target_security_context.type_(),
-                    ObjectClass::Process.policy_name(),
-                    permission.policy_name(),
-                )
-                .unwrap_or(false)
+            let source_type = source_security_context.type_();
+            let target_type: &str = target_security_context.type_();
+            match target_class {
+                AbstractObjectClass::System(target_class) => policy
+                    .parsed
+                    .compute_explicitly_allowed(source_type, target_type, target_class)
+                    .unwrap_or(AccessVector::NONE),
+                AbstractObjectClass::Custom(target_class) => policy
+                    .parsed
+                    .compute_explicitly_allowed_custom(source_type, target_type, &target_class)
+                    .unwrap_or(AccessVector::NONE),
+                // No meaningful policy can be determined without target class.
+                _ => AccessVector::NONE,
+            }
         } else {
-            false
+            // No meaningful policy can be determined without source and target types.
+            AccessVector::NONE
         }
-    }
-
-    pub fn compute_access_vector(
-        &self,
-        _source_sid: SecurityId,
-        _target_sid: SecurityId,
-        _target_class: ObjectClass,
-    ) -> AccessVector {
-        // TODO(http://b/305722921): implement access decision logic. For now, the security server
-        // allows all permissions.
-        AccessVector::ALL
     }
 
     /// Returns a read-only VMO containing the SELinux "status" structure.
@@ -234,16 +240,8 @@ impl SecurityServer {
         self.state.lock().status.get_readonly_vmo()
     }
 
-    /// Returns true if the `SecurityServer` is using hard-code fake policy.
-    pub fn is_fake(&self) -> bool {
-        match self.mode {
-            Mode::Fake => true,
-            _ => false,
-        }
-    }
-
     /// Returns a reference to the shared access vector cache that delebates cache misses to `self`.
-    pub fn get_shared_avc(&self) -> impl Query {
+    pub fn get_shared_avc(&self) -> &impl Query {
         self.avc_manager.get_shared_cache()
     }
 
@@ -267,14 +265,52 @@ impl SecurityServer {
     }
 }
 
+impl SecurityServerStatus for SecurityServer {
+    fn is_enforcing(&self) -> bool {
+        self.state.lock().enforcing
+    }
+
+    fn is_fake(&self) -> bool {
+        match self.mode {
+            Mode::Fake => true,
+            _ => false,
+        }
+    }
+}
+
 impl Query for SecurityServer {
     fn query(
         &self,
         source_sid: SecurityId,
         target_sid: SecurityId,
-        target_class: ObjectClass,
+        target_class: AbstractObjectClass,
     ) -> AccessVector {
         self.compute_access_vector(source_sid, target_sid, target_class)
+    }
+}
+
+impl AccessVectorComputer for SecurityServer {
+    fn access_vector_from_permission<P: ClassPermission + Into<Permission> + 'static>(
+        &self,
+        permission: P,
+    ) -> AccessVector {
+        match &self.state.lock().policy {
+            Some(policy) => policy.parsed.access_vector_from_permission(permission),
+            None => AccessVector::NONE,
+        }
+    }
+
+    fn access_vector_from_permissions<
+        P: ClassPermission + Into<Permission> + 'static,
+        PI: IntoIterator<Item = P>,
+    >(
+        &self,
+        permissions: PI,
+    ) -> AccessVector {
+        match &self.state.lock().policy {
+            Some(policy) => policy.parsed.access_vector_from_permissions(permissions),
+            None => AccessVector::NONE,
+        }
     }
 }
 
@@ -312,11 +348,12 @@ struct SeLinuxStatusValue {
 mod tests {
     use super::*;
 
-    use fuchsia_zircon::AsHandleRef;
+    use fuchsia_zircon::AsHandleRef as _;
+    use selinux_common::ObjectClass;
     use std::mem::size_of;
     use zerocopy::{FromBytes, FromZeroes};
 
-    const MINIMAL_BINARY_POLICY: &[u8] = include_bytes!("../testdata/policies/minimal");
+    const EMULATOR_BINARY_POLICY: &[u8] = include_bytes!("../testdata/policies/emulator");
 
     #[fuchsia::test]
     fn sid_to_security_context() {
@@ -366,7 +403,7 @@ mod tests {
         let sid1 = security_server.security_context_to_sid(&security_context1);
         let sid2 = security_server.security_context_to_sid(&security_context2);
         assert_eq!(
-            security_server.compute_access_vector(sid1, sid2, ObjectClass::Process),
+            security_server.compute_access_vector(sid1, sid2, ObjectClass::Process.into()),
             AccessVector::ALL
         );
     }
@@ -382,10 +419,13 @@ mod tests {
 
     #[fuchsia::test]
     fn loaded_policy_can_be_retrieved() {
-        let policy_bytes = MINIMAL_BINARY_POLICY.to_vec();
+        let policy_bytes = EMULATOR_BINARY_POLICY.to_vec();
         let security_server = SecurityServer::new(Mode::Enable);
-        assert!(security_server.load_policy(policy_bytes).is_ok());
-        assert_eq!(MINIMAL_BINARY_POLICY, security_server.get_binary_policy().as_slice());
+        assert_eq!(
+            Ok(()),
+            security_server.load_policy(policy_bytes).map_err(|e| format!("{:?}", e))
+        );
+        assert_eq!(EMULATOR_BINARY_POLICY, security_server.get_binary_policy().as_slice());
     }
 
     #[fuchsia::test]
@@ -398,10 +438,10 @@ mod tests {
     #[fuchsia::test]
     fn enforcing_mode_is_reported() {
         let security_server = SecurityServer::new(Mode::Enable);
-        assert!(!security_server.enforcing());
+        assert!(!security_server.is_enforcing());
 
         security_server.set_enforcing(true);
-        assert!(security_server.enforcing());
+        assert!(security_server.is_enforcing());
     }
 
     #[fuchsia::test]

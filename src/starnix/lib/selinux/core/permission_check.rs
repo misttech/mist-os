@@ -3,9 +3,14 @@
 // found in the LICENSE file.
 
 use super::{
-    access_vector_cache::{Query, QueryMut},
-    AccessVector, ObjectClass, SecurityId,
+    access_vector_cache::{Fixed, Locked, Query, QueryMut, DEFAULT_SHARED_SIZE},
+    security_server::{SecurityServer, SecurityServerStatus},
+    SecurityId,
 };
+
+use selinux_common::{AbstractObjectClass, ClassPermission, Permission};
+use selinux_policy::{AccessVector, AccessVectorComputer};
+use std::sync::{Arc, Weak};
 
 /// Private module for sealed traits with tightly controlled implementations.
 mod private {
@@ -17,7 +22,7 @@ mod private {
 }
 
 /// Extension of [`Query`] that integrates sealed `has_permission()` trait method.
-pub trait PermissionCheck: Query + private::PermissionCheck {
+pub trait PermissionCheck: AccessVectorComputer + Query + private::PermissionCheck {
     /// Returns true if and only if all `permissions` are granted to `source_sid` acting on
     /// `target_sid` as a `target_class`.
     ///
@@ -25,26 +30,49 @@ pub trait PermissionCheck: Query + private::PermissionCheck {
     ///
     /// *Do not provide alternative implementations of this trait.* There must be one consistent
     /// way of computing `has_permission()` in terms of `Query::query()`.
-    fn has_permission(
+    fn has_permission<P: ClassPermission + Into<Permission> + 'static>(
         &self,
         source_sid: SecurityId,
         target_sid: SecurityId,
-        target_class: ObjectClass,
-        permissions: AccessVector,
+        permission: P,
     ) -> bool {
-        let access_vector = self.query(source_sid, target_sid, target_class);
-        permissions & access_vector == permissions
+        let target_class = permission.class();
+        let permission_access_vector = self.access_vector_from_permission(permission);
+        let permitted_access_vector = self.query(source_sid, target_sid, target_class.into());
+        permission_access_vector & permitted_access_vector == permission_access_vector
+    }
+
+    fn has_permissions<
+        P: ClassPermission + Into<Permission> + 'static,
+        PI: IntoIterator<Item = P>,
+    >(
+        &self,
+        source_sid: SecurityId,
+        target_sid: SecurityId,
+        permissions: PI,
+    ) -> bool {
+        let mut permissions = permissions.into_iter().peekable();
+        let target_class = match permissions.peek() {
+            Some(permission) => permission.class(),
+            None => return true,
+        };
+        let permissions_access_vector = self.access_vector_from_permissions(permissions);
+        let permitted_access_vector = self.query(source_sid, target_sid, target_class.into());
+        permissions_access_vector & permitted_access_vector == permissions_access_vector
     }
 }
 
-/// Every [`Query`] implements [`private::PermissionCheck`].
-impl<Q: Query> private::PermissionCheck for Q {}
+/// Every [`AccessVectorComputer`] + [`Query`] implements [`private::PermissionCheck`].
+impl<Q: AccessVectorComputer + Query> private::PermissionCheck for Q {}
 
-/// Every [`Query`] implements [`PermissionCheck`] *without overriding `has_permission()`*.
-impl<Q: Query> PermissionCheck for Q {}
+/// Every [`AccessVectorComputer`] + [`Query`] implements [`PermissionCheck`] *without overriding
+/// associated functions*.
+impl<Q: AccessVectorComputer + Query> PermissionCheck for Q {}
 
 /// Extension of [`QueryMut`] that integrates sealed `has_permission()` trait method.
-pub trait PermissionCheckMut: QueryMut + private::PermissionCheckMut {
+pub trait PermissionCheckMut:
+    AccessVectorComputer + QueryMut + private::PermissionCheckMut
+{
     /// Returns true if and only if all `permissions` are granted to `source_sid` acting on
     /// `target_sid` as a `target_class`.
     ///
@@ -52,129 +80,307 @@ pub trait PermissionCheckMut: QueryMut + private::PermissionCheckMut {
     ///
     /// *Do not provide alternative implementations of this trait.* There must be one consistent
     /// way of computing `has_permission()` in terms of `QueryMut::query()`.
-    fn has_permission(
+    fn has_permission<P: ClassPermission + Into<Permission> + 'static>(
         &mut self,
         source_sid: SecurityId,
         target_sid: SecurityId,
-        target_class: ObjectClass,
-        permissions: AccessVector,
+        permission: P,
     ) -> bool {
-        let access_vector = self.query(source_sid, target_sid, target_class);
-        permissions & access_vector == permissions
+        let target_class = permission.class();
+        let permission_access_vector = self.access_vector_from_permission(permission);
+        let permitted_access_vector = self.query(source_sid, target_sid, target_class.into());
+        permission_access_vector & permitted_access_vector == permission_access_vector
+    }
+
+    fn has_permissions<
+        P: ClassPermission + Into<Permission> + 'static,
+        PI: IntoIterator<Item = P>,
+    >(
+        &mut self,
+        source_sid: SecurityId,
+        target_sid: SecurityId,
+        permissions: PI,
+    ) -> bool {
+        let mut permissions = permissions.into_iter().peekable();
+        let target_class = match permissions.peek() {
+            Some(permission) => permission.class(),
+            None => return true,
+        };
+        let permissions_access_vector = self.access_vector_from_permissions(permissions);
+        let permitted_access_vector = self.query(source_sid, target_sid, target_class.into());
+        permissions_access_vector & permitted_access_vector == permissions_access_vector
     }
 }
 
 /// Every [`QueryMut`] implements [`private::PermissionCheckMut`].
-impl<QM: QueryMut> private::PermissionCheckMut for QM {}
+impl<QM: AccessVectorComputer + QueryMut> private::PermissionCheckMut for QM {}
 
-/// Every [`QueryMut`] implements [`PermissionCheckMut`] *without overriding `has_permission()`*.
-impl<QM: QueryMut> PermissionCheckMut for QM {}
+/// Every [`QueryMut`] implements [`PermissionCheckMut`] *without overriding associated functions*.
+impl<QM: AccessVectorComputer + QueryMut> PermissionCheckMut for QM {}
+
+pub struct PermissionCheckImpl<'a> {
+    security_server: &'a Arc<SecurityServer>,
+    access_vector_cache: &'a Locked<Fixed<Weak<SecurityServer>, DEFAULT_SHARED_SIZE>>,
+}
+
+impl<'a> PermissionCheckImpl<'a> {
+    pub(crate) fn new(
+        security_server: &'a Arc<SecurityServer>,
+        access_vector_cache: &'a Locked<Fixed<Weak<SecurityServer>, DEFAULT_SHARED_SIZE>>,
+    ) -> Self {
+        Self { security_server, access_vector_cache }
+    }
+}
+
+impl<'a> SecurityServerStatus for PermissionCheckImpl<'a> {
+    fn is_enforcing(&self) -> bool {
+        self.security_server.is_enforcing()
+    }
+
+    fn is_fake(&self) -> bool {
+        self.security_server.is_fake()
+    }
+}
+
+impl<'a> AccessVectorComputer for PermissionCheckImpl<'a> {
+    fn access_vector_from_permission<P: ClassPermission + Into<Permission> + 'static>(
+        &self,
+        permission: P,
+    ) -> AccessVector {
+        self.security_server.access_vector_from_permission(permission)
+    }
+
+    fn access_vector_from_permissions<
+        P: ClassPermission + Into<Permission> + 'static,
+        PI: IntoIterator<Item = P>,
+    >(
+        &self,
+        permissions: PI,
+    ) -> AccessVector {
+        self.security_server.access_vector_from_permissions(permissions)
+    }
+}
+
+impl<'a> Query for PermissionCheckImpl<'a> {
+    fn query(
+        &self,
+        source_sid: SecurityId,
+        target_sid: SecurityId,
+        target_class: AbstractObjectClass,
+    ) -> AccessVector {
+        self.access_vector_cache.query(source_sid, target_sid, target_class)
+    }
+}
 
 #[cfg(test)]
 mod tests {
     use super::{super::access_vector_cache::DenyAll, *};
 
+    use selinux_common::{AbstractObjectClass, ProcessPermission};
+    use selinux_policy::{
+        testing::{ACCESS_VECTOR_0001, ACCESS_VECTOR_0010},
+        AccessVector, AccessVectorComputer,
+    };
+    use std::any::Any;
+
+    fn access_vector_from_permission<P: ClassPermission + Into<Permission> + 'static>(
+        permission: P,
+    ) -> AccessVector {
+        let any = &permission as &dyn Any;
+        let permission_ref = match any.downcast_ref::<ProcessPermission>() {
+            Some(permission_ref) => permission_ref,
+            None => return AccessVector::NONE,
+        };
+
+        match permission_ref {
+            ProcessPermission::Fork => ACCESS_VECTOR_0001,
+            ProcessPermission::Transition => ACCESS_VECTOR_0010,
+            // Code below will be needed when `ProcessPermission` has more than two variants.
+            // _ => AccessVector::NONE,
+        }
+    }
+
+    fn access_vector_from_permissions<
+        'a,
+        P: ClassPermission + Into<Permission> + 'static,
+        PI: IntoIterator<Item = P>,
+    >(
+        permissions: PI,
+    ) -> AccessVector {
+        let mut access_vector = AccessVector::NONE;
+        for permission in permissions.into_iter() {
+            access_vector |= access_vector_from_permission(permission);
+        }
+        access_vector
+    }
+
+    #[derive(Default)]
+    pub struct DenyAllPermissions(DenyAll);
+
+    impl Query for DenyAllPermissions {
+        fn query(
+            &self,
+            source_sid: SecurityId,
+            target_sid: SecurityId,
+            target_class: AbstractObjectClass,
+        ) -> AccessVector {
+            self.0.query(source_sid, target_sid, target_class)
+        }
+    }
+
+    impl AccessVectorComputer for DenyAllPermissions {
+        fn access_vector_from_permission<P: ClassPermission + Into<Permission> + 'static>(
+            &self,
+            permission: P,
+        ) -> AccessVector {
+            access_vector_from_permission(permission)
+        }
+
+        fn access_vector_from_permissions<
+            'a,
+            P: ClassPermission + Into<Permission> + 'static,
+            PI: IntoIterator<Item = P>,
+        >(
+            &self,
+            permissions: PI,
+        ) -> AccessVector {
+            access_vector_from_permissions(permissions)
+        }
+    }
+
     /// A [`Query`] that permits all [`AccessVector`].
     #[derive(Default)]
-    pub struct AllowAll;
+    struct AllowAllPermissions;
 
-    impl Query for AllowAll {
+    impl Query for AllowAllPermissions {
         fn query(
             &self,
             _source_sid: SecurityId,
             _target_sid: SecurityId,
-            _target_class: ObjectClass,
+            _target_class: AbstractObjectClass,
         ) -> AccessVector {
-            !AccessVector::NONE
+            AccessVector::ALL
+        }
+    }
+
+    impl AccessVectorComputer for AllowAllPermissions {
+        fn access_vector_from_permission<P: ClassPermission + Into<Permission> + 'static>(
+            &self,
+            permission: P,
+        ) -> AccessVector {
+            access_vector_from_permission(permission)
+        }
+
+        fn access_vector_from_permissions<
+            'a,
+            P: ClassPermission + Into<Permission> + 'static,
+            PI: IntoIterator<Item = P>,
+        >(
+            &self,
+            permissions: PI,
+        ) -> AccessVector {
+            access_vector_from_permissions(permissions)
         }
     }
 
     #[fuchsia::test]
     fn has_permission_both() {
-        let mut deny_all: DenyAll = Default::default();
-        let mut allow_all: AllowAll = Default::default();
+        let mut deny_all: DenyAllPermissions = Default::default();
+        let mut allow_all: AllowAllPermissions = Default::default();
 
-        for permissions in
-            [AccessVector::READ, AccessVector::WRITE, AccessVector::READ | AccessVector::WRITE]
-        {
-            // DenyAll denies.
+        let permissions = ProcessPermission::all_variants();
+        for permission in permissions.iter() {
+            // DenyAllPermissions denies.
             assert_eq!(
                 false,
-                (&deny_all).has_permission(
-                    0.into(),
-                    0.into(),
-                    ObjectClass::Process,
-                    permissions.clone(),
-                )
+                PermissionCheck::has_permission(&deny_all, 0.into(), 0.into(), permission.clone())
             );
             assert_eq!(
                 false,
-                (&mut deny_all).has_permission(
+                PermissionCheckMut::has_permission(
+                    &mut deny_all,
                     0.into(),
                     0.into(),
-                    ObjectClass::Process,
-                    permissions.clone(),
+                    permission.clone()
                 )
             );
-
-            // AcceptAll accepts.
+            // AllowAllPermissions allows.
             assert_eq!(
                 true,
-                (&allow_all).has_permission(
-                    0.into(),
-                    0.into(),
-                    ObjectClass::Process,
-                    permissions.clone(),
-                )
+                PermissionCheck::has_permission(&allow_all, 0.into(), 0.into(), permission.clone())
             );
             assert_eq!(
                 true,
-                (&mut allow_all).has_permission(
+                PermissionCheckMut::has_permission(
+                    &mut allow_all,
                     0.into(),
                     0.into(),
-                    ObjectClass::Process,
-                    permissions,
+                    permission.clone()
                 )
             );
         }
 
-        // DenyAll accepts on the empty access vector.
+        // DenyAllPermissions denies.
         assert_eq!(
-            true,
-            (&deny_all).has_permission(
-                0.into(),
-                0.into(),
-                ObjectClass::Process,
-                AccessVector::NONE
-            )
+            false,
+            PermissionCheck::has_permissions(&deny_all, 0.into(), 0.into(), permissions.clone())
         );
         assert_eq!(
-            true,
-            (&allow_all).has_permission(
+            false,
+            PermissionCheckMut::has_permissions(
+                &mut deny_all,
                 0.into(),
                 0.into(),
-                ObjectClass::Process,
-                AccessVector::NONE,
+                permissions.clone()
             )
         );
 
-        // AcceptAll accepts on the empty access vector.
+        // AllowAllPermissions allows.
         assert_eq!(
             true,
-            (&mut deny_all).has_permission(
+            PermissionCheck::has_permissions(&allow_all, 0.into(), 0.into(), permissions.clone())
+        );
+        assert_eq!(
+            true,
+            PermissionCheckMut::has_permissions(&mut allow_all, 0.into(), 0.into(), permissions)
+        );
+
+        // DenyAllPermissions and AllowAllPermissions vacuously accept empty permissions collection.
+        let empty_permissions = [] as [ProcessPermission; 0];
+        assert_eq!(
+            true,
+            PermissionCheck::has_permissions(
+                &deny_all,
                 0.into(),
                 0.into(),
-                ObjectClass::Process,
-                AccessVector::NONE,
+                empty_permissions.clone()
             )
         );
         assert_eq!(
             true,
-            (&mut allow_all).has_permission(
+            PermissionCheckMut::has_permissions(
+                &mut deny_all,
                 0.into(),
                 0.into(),
-                ObjectClass::Process,
-                AccessVector::NONE,
+                empty_permissions.clone()
+            )
+        );
+        assert_eq!(
+            true,
+            PermissionCheck::has_permissions(
+                &allow_all,
+                0.into(),
+                0.into(),
+                empty_permissions.clone()
+            )
+        );
+        assert_eq!(
+            true,
+            PermissionCheckMut::has_permissions(
+                &mut allow_all,
+                0.into(),
+                0.into(),
+                empty_permissions
             )
         );
     }

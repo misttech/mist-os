@@ -13,7 +13,8 @@ pub fn check_task_create_access(current_task: &CurrentTask) -> Result<(), Errno>
         Some(security_server) => {
             let group_state = current_task.thread_group.read();
             thread_group_hooks::check_task_create_access(
-                security_server,
+                security_server.as_ref(),
+                &security_server.as_permission_check(),
                 &group_state.selinux_state,
             )
         }
@@ -28,7 +29,11 @@ pub fn check_exec_access(
         None => return Ok(None),
         Some(security_server) => {
             let group_state = current_task.thread_group.read();
-            thread_group_hooks::check_exec_access(security_server, &group_state.selinux_state)
+            thread_group_hooks::check_exec_access(
+                security_server.as_ref(),
+                &security_server.as_permission_check(),
+                &group_state.selinux_state,
+            )
         }
     }
 }
@@ -42,7 +47,8 @@ pub fn update_state_on_exec(
     if let Some(security_server) = &current_task.kernel().security_server {
         let mut thread_group_state = current_task.thread_group.write();
         thread_group_hooks::update_state_on_exec(
-            security_server,
+            security_server.as_ref(),
+            &security_server.as_permission_check(),
             &mut thread_group_state.selinux_state,
             elf_selinux_state,
         );

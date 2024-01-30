@@ -2,17 +2,22 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use selinux::{security_server::SecurityServer, ProcessPermission, SecurityId};
-use selinux_common::security_context::SecurityContext;
+use selinux::{
+    permission_check::PermissionCheck,
+    security_server::{SecurityServer, SecurityServerStatus},
+    SecurityId,
+};
+use selinux_common::{security_context::SecurityContext, ProcessPermission};
 use starnix_uapi::{error, errors::Errno};
 use std::sync::Arc;
 
 /// Checks if creating a task is allowed.
 pub(crate) fn check_task_create_access(
-    security_server: &Arc<SecurityServer>,
+    status: &impl SecurityServerStatus,
+    permission_check: &impl PermissionCheck,
     selinux_state: &Option<SeLinuxThreadGroupState>,
 ) -> Result<(), Errno> {
-    if security_server.is_fake() || !security_server.enforcing() {
+    if status.is_fake() || !status.is_enforcing() {
         // No-op if SELinux is in fake mode or not enforcing.
         return Ok(());
     }
@@ -21,9 +26,10 @@ pub(crate) fn check_task_create_access(
         let sid = selinux_state.current_sid.clone();
         // When creating a process there is no transition involved, the source and target SIDs
         // are the current SID.
-        match security_server.has_process_permission(sid, sid, ProcessPermission::Fork) {
-            true => Ok(()),
-            false => error!(EACCES),
+        if permission_check.has_permission(sid.clone(), sid, ProcessPermission::Fork) {
+            Ok(())
+        } else {
+            error!(EACCES)
         }
     });
 }
@@ -31,17 +37,18 @@ pub(crate) fn check_task_create_access(
 /// Checks the SELinux permissions required for exec. Returns the SELinux state of a resolved
 /// elf if all required permissions are allowed.
 pub(crate) fn check_exec_access(
-    security_server: &Arc<SecurityServer>,
+    status: &impl SecurityServerStatus,
+    permission_check: &impl PermissionCheck,
     selinux_state: &Option<SeLinuxThreadGroupState>,
 ) -> Result<Option<SeLinuxResolvedElfState>, Errno> {
-    if security_server.is_fake() || !security_server.enforcing() {
+    if status.is_fake() || !status.is_enforcing() {
         // No-op if SELinux is in fake mode or not enforcing.
         return Ok(None);
     }
 
     return selinux_state.as_ref().map_or(Ok(None), |selinux_state| {
-        let current_sid = selinux_state.current_sid;
-        let new_sid = if let Some(exec_sid) = selinux_state.exec_sid {
+        let current_sid = &selinux_state.current_sid;
+        let new_sid = if let Some(exec_sid) = &selinux_state.exec_sid {
             // Use the proc exec SID if set.
             exec_sid
         } else {
@@ -56,9 +63,9 @@ pub(crate) fn check_exec_access(
             // rights to the executable file.
         } else {
             // Domain transition, check that transition is allowed.
-            if !security_server.has_process_permission(
-                current_sid,
-                new_sid,
+            if !permission_check.has_permission(
+                current_sid.clone(),
+                new_sid.clone(),
                 ProcessPermission::Transition,
             ) {
                 return error!(EACCES);
@@ -69,18 +76,19 @@ pub(crate) fn check_exec_access(
             // - allow rule from `current_sid` to the executable's security context for read
             //   and execute permissions
         }
-        return Ok(Some(SeLinuxResolvedElfState { sid: new_sid }));
+        return Ok(Some(SeLinuxResolvedElfState { sid: new_sid.clone() }));
     });
 }
 
 /// Updates the SELinux thread group state on exec, using the security ID associated with the
 /// resolved elf.
 pub(crate) fn update_state_on_exec(
-    security_server: &Arc<SecurityServer>,
+    status: &impl SecurityServerStatus,
+    _permission_check: &impl PermissionCheck,
     selinux_state: &mut Option<SeLinuxThreadGroupState>,
     elf_selinux_state: &Option<SeLinuxResolvedElfState>,
 ) {
-    if security_server.is_fake() || !security_server.enforcing() {
+    if status.is_fake() || !status.is_enforcing() {
         // No-op if SELinux is in fake mode or not enforcing.
         return;
     }
@@ -88,8 +96,8 @@ pub(crate) fn update_state_on_exec(
     // TODO(http://b/316181721): check if the previous state needs to be updated regardless.
     if let Some(elf_selinux_state) = elf_selinux_state {
         selinux_state.as_mut().map(|selinux_state| {
-            selinux_state.previous_sid = selinux_state.current_sid;
-            selinux_state.current_sid = elf_selinux_state.sid;
+            selinux_state.previous_sid = selinux_state.current_sid.clone();
+            selinux_state.current_sid = elf_selinux_state.sid.clone();
             selinux_state
         });
     }
@@ -125,7 +133,11 @@ impl SeLinuxThreadGroupState {
             &SecurityContext::try_from("unconfined_u:unconfined_r:unconfined_t:s0-s0:c0-c1023")
                 .unwrap(),
         );
-        SeLinuxThreadGroupState { current_sid: sid, previous_sid: sid, ..Default::default() }
+        SeLinuxThreadGroupState {
+            current_sid: sid.clone(),
+            previous_sid: sid,
+            ..Default::default()
+        }
     }
 }
 
@@ -151,7 +163,14 @@ mod tests {
         security_server.set_enforcing(true);
         let selinux_state = Some(SeLinuxThreadGroupState::new_default(&security_server));
 
-        assert_eq!(check_task_create_access(&security_server, &selinux_state), Ok(()));
+        assert_eq!(
+            check_task_create_access(
+                security_server.as_ref(),
+                &security_server.as_permission_check(),
+                &selinux_state
+            ),
+            Ok(())
+        );
     }
 
     #[fuchsia::test]
@@ -160,7 +179,14 @@ mod tests {
         security_server.set_enforcing(false);
         let selinux_state = Some(SeLinuxThreadGroupState::new_default(&security_server));
 
-        assert_eq!(check_task_create_access(&security_server, &selinux_state), Ok(()));
+        assert_eq!(
+            check_task_create_access(
+                security_server.as_ref(),
+                &security_server.as_permission_check(),
+                &selinux_state
+            ),
+            Ok(())
+        );
     }
 
     #[fuchsia::test]
@@ -174,7 +200,7 @@ mod tests {
             SecurityContext::try_from("u:object_r:fork_yes_t").expect("invalid security context");
         let sid = security_server.security_context_to_sid(&security_context);
         let selinux_state = Some(SeLinuxThreadGroupState {
-            current_sid: sid,
+            current_sid: sid.clone(),
             exec_sid: None,
             fscreate_sid: None,
             keycreate_sid: None,
@@ -182,7 +208,14 @@ mod tests {
             sockcreate_sid: None,
         });
 
-        assert_eq!(check_task_create_access(&security_server, &selinux_state), Ok(()));
+        assert_eq!(
+            check_task_create_access(
+                security_server.as_ref(),
+                &security_server.as_permission_check(),
+                &selinux_state
+            ),
+            Ok(())
+        );
     }
 
     #[fuchsia::test]
@@ -196,7 +229,7 @@ mod tests {
             SecurityContext::try_from("u:object_r:fork_no_t").expect("invalid security context");
         let sid = security_server.security_context_to_sid(&security_context);
         let selinux_state = Some(SeLinuxThreadGroupState {
-            current_sid: sid,
+            current_sid: sid.clone(),
             exec_sid: None,
             fscreate_sid: None,
             keycreate_sid: None,
@@ -204,7 +237,14 @@ mod tests {
             sockcreate_sid: None,
         });
 
-        assert_eq!(check_task_create_access(&security_server, &selinux_state), error!(EACCES));
+        assert_eq!(
+            check_task_create_access(
+                security_server.as_ref(),
+                &security_server.as_permission_check(),
+                &selinux_state
+            ),
+            error!(EACCES)
+        );
     }
 
     #[fuchsia::test]
@@ -213,7 +253,14 @@ mod tests {
         security_server.set_enforcing(true);
         let selinux_state = Some(SeLinuxThreadGroupState::new_default(&security_server));
 
-        assert_eq!(check_exec_access(&security_server, &selinux_state), Ok(None));
+        assert_eq!(
+            check_exec_access(
+                security_server.as_ref(),
+                &security_server.as_permission_check(),
+                &selinux_state
+            ),
+            Ok(None)
+        );
     }
 
     #[fuchsia::test]
@@ -222,7 +269,14 @@ mod tests {
         security_server.set_enforcing(false);
         let selinux_state = Some(SeLinuxThreadGroupState::new_default(&security_server));
 
-        assert_eq!(check_exec_access(&security_server, &selinux_state), Ok(None));
+        assert_eq!(
+            check_exec_access(
+                security_server.as_ref(),
+                &security_server.as_permission_check(),
+                &selinux_state
+            ),
+            Ok(None)
+        );
     }
 
     #[fuchsia::test]
@@ -241,8 +295,8 @@ mod tests {
                 .expect("invalid security context");
         let exec_sid = security_server.security_context_to_sid(&exec_security_context);
         let selinux_state = Some(SeLinuxThreadGroupState {
-            current_sid: current_sid,
-            exec_sid: Some(exec_sid),
+            current_sid: current_sid.clone(),
+            exec_sid: Some(exec_sid.clone()),
             fscreate_sid: None,
             keycreate_sid: None,
             previous_sid: current_sid,
@@ -250,7 +304,11 @@ mod tests {
         });
 
         assert_eq!(
-            check_exec_access(&security_server, &selinux_state),
+            check_exec_access(
+                security_server.as_ref(),
+                &security_server.as_permission_check(),
+                &selinux_state
+            ),
             Ok(Some(SeLinuxResolvedElfState { sid: exec_sid }))
         );
     }
@@ -270,7 +328,7 @@ mod tests {
                 .expect("invalid security context");
         let exec_sid = security_server.security_context_to_sid(&exec_security_context);
         let selinux_state = Some(SeLinuxThreadGroupState {
-            current_sid: current_sid,
+            current_sid: current_sid.clone(),
             exec_sid: Some(exec_sid),
             fscreate_sid: None,
             keycreate_sid: None,
@@ -278,7 +336,14 @@ mod tests {
             sockcreate_sid: None,
         });
 
-        assert_eq!(check_exec_access(&security_server, &selinux_state), error!(EACCES));
+        assert_eq!(
+            check_exec_access(
+                security_server.as_ref(),
+                &security_server.as_permission_check(),
+                &selinux_state
+            ),
+            error!(EACCES)
+        );
     }
 
     #[fuchsia::test]
@@ -291,9 +356,14 @@ mod tests {
         let elf_security_context =
             SecurityContext::try_from("u:object_r:type_t").expect("invalid security context");
         let elf_sid = security_server.security_context_to_sid(&elf_security_context);
-        let elf_state = SeLinuxResolvedElfState { sid: elf_sid };
+        let elf_state = SeLinuxResolvedElfState { sid: elf_sid.clone() };
         assert_ne!(elf_sid, initial_state.current_sid);
-        update_state_on_exec(&security_server, &mut selinux_state, &Some(elf_state));
+        update_state_on_exec(
+            security_server.as_ref(),
+            &security_server.as_permission_check(),
+            &mut selinux_state,
+            &Some(elf_state),
+        );
         assert_eq!(selinux_state.expect("missing SELinux state"), initial_state);
     }
 
@@ -307,9 +377,14 @@ mod tests {
         let elf_security_context =
             SecurityContext::try_from("u:object_r:type_t").expect("invalid security context");
         let elf_sid = security_server.security_context_to_sid(&elf_security_context);
-        let elf_state = SeLinuxResolvedElfState { sid: elf_sid };
+        let elf_state = SeLinuxResolvedElfState { sid: elf_sid.clone() };
         assert_ne!(elf_sid, initial_state.current_sid);
-        update_state_on_exec(&security_server, &mut selinux_state, &Some(elf_state));
+        update_state_on_exec(
+            security_server.as_ref(),
+            &security_server.as_permission_check(),
+            &mut selinux_state,
+            &Some(elf_state),
+        );
         assert_eq!(selinux_state.expect("missing SELinux state"), initial_state);
     }
 
@@ -320,7 +395,12 @@ mod tests {
 
         let initial_state = SeLinuxThreadGroupState::new_default(&security_server);
         let mut selinux_state = Some(initial_state.clone());
-        update_state_on_exec(&security_server, &mut selinux_state, &None);
+        update_state_on_exec(
+            security_server.as_ref(),
+            &security_server.as_permission_check(),
+            &mut selinux_state,
+            &None,
+        );
         assert_eq!(selinux_state.expect("missing SELinux state"), initial_state);
     }
 
@@ -335,9 +415,14 @@ mod tests {
         let elf_security_context =
             SecurityContext::try_from("u:object_r:type_t").expect("invalid security context");
         let elf_sid = security_server.security_context_to_sid(&elf_security_context);
-        let elf_state = SeLinuxResolvedElfState { sid: elf_sid };
+        let elf_state = SeLinuxResolvedElfState { sid: elf_sid.clone() };
         assert_ne!(elf_sid, initial_state.current_sid);
-        update_state_on_exec(&security_server, &mut selinux_state, &Some(elf_state));
+        update_state_on_exec(
+            security_server.as_ref(),
+            &security_server.as_permission_check(),
+            &mut selinux_state,
+            &Some(elf_state),
+        );
         assert_eq!(
             selinux_state.expect("missing SELinux state"),
             SeLinuxThreadGroupState {

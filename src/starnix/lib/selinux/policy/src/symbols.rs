@@ -627,6 +627,11 @@ impl<PS: ParseStrategy> Class<PS> {
     pub fn has_common(&self) -> bool {
         self.common_name_bytes().len() != 0
     }
+
+    /// Returns the full listing of permissions used in this policy.
+    pub fn permissions(&self) -> &Permissions<PS> {
+        &self.constraints.metadata.data
+    }
 }
 
 impl<PS: ParseStrategy> Parse<PS> for Class<PS>

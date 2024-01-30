@@ -7,11 +7,11 @@ import("//build/rust/rustc_library.gni")
 import("//build/rust/rustc_test.gni")
 import("//build/testing/host_test_data.gni")
 
-rustc_library("policy") {
+policy = {
   name = "selinux_policy"
   edition = "2021"
-  with_unit_tests = true
   deps = [
+    "//src/starnix/lib/selinux/common",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:bstr",
     "//third_party/rust_crates:once_cell",
@@ -22,12 +22,21 @@ rustc_library("policy") {
     "src/arrays.rs",
     "src/error.rs",
     "src/extensible_bitmap.rs",
+    "src/index.rs",
     "src/lib.rs",
     "src/metadata.rs",
+    "src/parsed_policy.rs",
     "src/parser.rs",
     "src/symbols.rs",
   ]
-  configs += [ "//src/starnix/config:starnix_clippy_lints" ]
+}
+
+additional_policy_configs = [ "//src/starnix/config:starnix_clippy_lints" ]
+
+rustc_library("policy") {
+  with_unit_tests = true
+  configs += additional_policy_configs
+  forward_variables_from(policy, "*")
 }
 
 fuchsia_unittest_package("selinux_policy-tests") {
@@ -35,6 +44,15 @@ fuchsia_unittest_package("selinux_policy-tests") {
 }
 
 if (is_host) {
+  rustc_library("policy_for_host_tests") {
+    testonly = true
+    with_unit_tests = false
+    output_dir = "$target_out_dir/host_test_lib"
+    features = [ "selinux_policy_test_api" ]
+    configs += additional_policy_configs
+    forward_variables_from(policy, "*")
+  }
+
   testdata_policies = [
     "emulator",
     "minimal",
@@ -60,6 +78,7 @@ if (is_host) {
 
   testdata_micro_policies = [
     "allow_a_attr_b_attr_class0_perm0",
+    "allow_a_t_a1_attr_class0_perm0_a2_attr_class0_perm1",
     "allow_a_t_b_attr_class0_perm0",
     "allow_a_t_b_t_class0_perm0",
     "minimal",
@@ -81,7 +100,7 @@ if (is_host) {
     outputs = [ "$target_out_dir/testdata/micro_policies/{{source_file_part}}" ]
   }
 
-  config("config") {
+  config("host_test_config") {
     testdata_dir = "$target_out_dir/testdata"
     rustenv = [ "TESTDATA_DIR=" + rebase_path(testdata_dir, root_build_dir) ]
   }
@@ -91,14 +110,17 @@ if (is_host) {
     source_root = "host_tests/lib.rs"
     sources = [ "host_tests/lib.rs" ]
     deps = [
-      ":policy",
+      ":policy_for_host_tests",
       ":testdata_expectations",
       ":testdata_micro_policies",
       ":testdata_policies",
+      "//src/starnix/lib/selinux/common",
+      "//third_party/rust_crates:anyhow",
       "//third_party/rust_crates:serde",
       "//third_party/rust_crates:serde_json5",
     ]
-    configs += [ ":config" ]
+    configs += [ ":host_test_config" ]
+    features = [ "selinux_policy_test_api" ]
   }
 }
 

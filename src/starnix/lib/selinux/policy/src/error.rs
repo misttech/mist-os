@@ -64,3 +64,16 @@ pub enum ValidateError {
     #[error("required validation routine not implemented")]
     NotImplemented,
 }
+
+/// Structured errors that may be encountered querying a binary policy.
+#[derive(Debug, Error, PartialEq)]
+pub enum QueryError {
+    #[error("the class {class_name:?} does not exist")]
+    UnknownClass { class_name: String },
+    #[error("the permission {permission_name:?} does not exist for class {class_name:?}")]
+    UnknownPermission { class_name: String, permission_name: String },
+    #[error("the source type {source_type_name:?} does not exist")]
+    UnknownSourceType { source_type_name: String },
+    #[error("the target type {target_type_name:?} does not exist")]
+    UnknownTargetType { target_type_name: String },
+}

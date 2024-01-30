@@ -14,7 +14,7 @@ use crate::{
     },
 };
 
-use selinux::security_server::SecurityServer;
+use selinux::security_server::{SecurityServer, SecurityServerStatus as _};
 use selinux_common::security_context::SecurityContext;
 use selinux_policy::SUPPORTED_POLICY_VERSION;
 use starnix_logging::{log_error, log_info, track_stub};
@@ -204,7 +204,7 @@ impl BytesFileOps for SeEnforce {
     }
 
     fn read(&self, _current_task: &CurrentTask) -> Result<Cow<'_, [u8]>, Errno> {
-        Ok(format!("{}", self.security_server.enforcing() as u32).as_bytes().to_vec().into())
+        Ok(format!("{}", self.security_server.is_enforcing() as u32).as_bytes().to_vec().into())
     }
 }
 
@@ -521,12 +521,12 @@ impl BytesFileOps for SeProcAttrNode {
                 let sid = {
                     let tg = task.thread_group.read();
                     tg.selinux_state.as_ref().and_then(|selinux_state| match self.attr {
-                        Current => Some(selinux_state.current_sid),
-                        Exec => selinux_state.exec_sid,
-                        FsCreate => selinux_state.fscreate_sid,
-                        KeyCreate => selinux_state.keycreate_sid,
-                        Previous => Some(selinux_state.previous_sid),
-                        SockCreate => selinux_state.sockcreate_sid,
+                        Current => Some(selinux_state.current_sid.clone()),
+                        Exec => selinux_state.exec_sid.clone(),
+                        FsCreate => selinux_state.fscreate_sid.clone(),
+                        KeyCreate => selinux_state.keycreate_sid.clone(),
+                        Previous => Some(selinux_state.previous_sid.clone()),
+                        SockCreate => selinux_state.sockcreate_sid.clone(),
                     })
                 };
 
