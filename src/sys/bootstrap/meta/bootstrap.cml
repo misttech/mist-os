@@ -594,6 +594,14 @@
             to: "#power_manager",
         },
         {
+            protocol: [ "fuchsia.component.Binder" ],
+            from: "#cpu_manager",
+            to: "#power_manager",
+
+            // Weak to resolve dependency cycles
+            dependency: "weak",
+        },
+        {
             protocol: [
                 "fuchsia.kernel.CpuResource",
                 "fuchsia.kernel.Stats",
@@ -1282,6 +1290,10 @@
                 "fuchsia.thermal.ClientStateConnector",
             ],
             from: "#power_manager",
+        },
+        {
+            protocol: [ "fuchsia.component.Binder" ],
+            from: "#cpu_manager",
         },
         {
             protocol: [

@@ -29,6 +29,7 @@ power_manager_deps = [
   ":power_manager_metrics_rustlib",
   "system_power_mode_config/parser",
   "thermal_config/parser",
+  "//sdk/fidl/fuchsia.component:fuchsia.component_rust",
   "//sdk/fidl/fuchsia.device.manager:fuchsia.device.manager_rust",
   "//sdk/fidl/fuchsia.feedback:fuchsia.feedback_rust",
   "//sdk/fidl/fuchsia.hardware.cpu.ctrl:fuchsia.hardware.cpu.ctrl_rust",
