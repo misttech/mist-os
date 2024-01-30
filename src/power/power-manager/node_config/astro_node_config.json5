@@ -89,6 +89,7 @@
     type: "ThermalStateHandler",
     name: "thermal_state_handler",
     config: {
+      enable_cpu_thermal_state_connector: false,
       enable_client_state_connector: true
     },
     dependencies: {

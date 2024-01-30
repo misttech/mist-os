@@ -39,6 +39,10 @@ pub enum Message {
     /// Arg1: the topological path which uniquely identifies a specific temperature sensor
     UpdateThermalLoad(ThermalLoad, String),
 
+    /// Communicate a new thermal load value specifically for CPU thermal client
+    /// Arg: a ThermalLoad value which represents the severity of CPU thermal load
+    UpdateCpuThermalLoad(ThermalLoad),
+
     /// Get the current performance state
     GetPerformanceState,
 
@@ -102,6 +106,9 @@ pub enum MessageReturn {
 
     /// There is no arg in this MessageReturn type. It only serves as an ACK.
     UpdateThermalLoad,
+
+    /// There is no arg in this MessageReturn type. It only serves as an ACK.
+    UpdateCpuThermalLoad,
 
     /// Arg: the performance state returned from the node
     GetPerformanceState(u32),

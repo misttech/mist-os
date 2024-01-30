@@ -61,6 +61,7 @@ pub struct ThermalStateHandlerBuilder<'a, 'b> {
     outgoing_svc_dir: Option<ServiceFsDir<'a, ServiceObjLocal<'b, ()>>>,
     inspect_root: Option<&'a inspect::Node>,
     platform_metrics: Option<Rc<dyn Node>>,
+    enable_cpu_thermal_state_connector: bool,
     enable_client_state_connector: bool,
 }
 
@@ -76,6 +77,9 @@ impl<'a, 'b> ThermalStateHandlerBuilder<'a, 'b> {
         #[derive(Deserialize)]
         struct Config {
             thermal_config_path: Option<String>,
+            /// Allow CPU thermal client to connect to `fuchsia.thermal.ClientStateConnector`
+            /// service only if true (required).
+            enable_cpu_thermal_state_connector: bool,
             /// Enable FIDL `fuchsia.thermal.ClientStateConnector` service only if true (required).
             enable_client_state_connector: bool,
         }
@@ -98,12 +102,15 @@ impl<'a, 'b> ThermalStateHandlerBuilder<'a, 'b> {
         let node_name = data.name;
 
         let thermal_config_path = data.config.thermal_config_path;
+        let enable_cpu_thermal_state_connector = data.config.enable_cpu_thermal_state_connector;
         let enable_client_state_connector = data.config.enable_client_state_connector;
 
         // Use `thermal_config_path` if it was provided, otherwise default to `THERMAL_CONFIG_PATH`
         let config_path = thermal_config_path.unwrap_or(Self::THERMAL_CONFIG_PATH.to_string());
 
         // Read the thermal config file from `config_path`
+        // TODO(b/320705983): Update the thermal config file to identify a more general
+        // configuration for thermal loads.
         let thermal_config = ThermalConfig::read(&Path::new(&config_path)).ok();
 
         // Clone the platform_metrics node, if specified.
@@ -116,6 +123,7 @@ impl<'a, 'b> ThermalStateHandlerBuilder<'a, 'b> {
             outgoing_svc_dir: Some(service_fs.dir("svc")),
             inspect_root: None,
             platform_metrics,
+            enable_cpu_thermal_state_connector,
             enable_client_state_connector,
         }
     }
@@ -133,17 +141,19 @@ impl<'a, 'b> ThermalStateHandlerBuilder<'a, 'b> {
         let metrics_tracker =
             MetricsTracker::new(inspect.create_child("ThermalLoadStates"), self.platform_metrics);
 
-        let enable_client_state_connector = self.enable_client_state_connector;
-
         let node = Rc::new(ThermalStateHandler {
-            client_states: ClientStates::new(thermal_config, &inspect),
+            client_states: ClientStates::new(
+                thermal_config,
+                &inspect,
+                self.enable_cpu_thermal_state_connector,
+            ),
             metrics_tracker: RefCell::new(metrics_tracker),
             _inspect: inspect,
         });
 
         // Publish the Controller service only if both enable_client_state_connector = true
         // and we were provided with a ServiceFs
-        if enable_client_state_connector {
+        if self.enable_client_state_connector {
             if let Some(outgoing_svc_dir) = self.outgoing_svc_dir {
                 node.clone().publish_connector_service(outgoing_svc_dir);
             }
@@ -176,20 +186,38 @@ struct ThermalState(u32);
 struct ClientStates(RefCell<HashMap<String, ClientState>>);
 
 impl ClientStates {
-    /// Creates a new `ClientStates` instance based on the provided `ThermalConfig`.
+    const CPU_CLIENT_TYPE: &'static str = "CPU";
+
+    /// Creates a new `ClientStates`.
     ///
-    /// The underlying map of the new `ClientStates` instance is created to contain a `ClientState`
-    /// entry for each client type present in the provided `ThermalConfig`.
-    fn new(thermal_config: ThermalConfig, inspect_parent: &inspect::Node) -> Self {
-        let client_states =
+    /// For each client type that is present in the provided ThermalConfig, create a new entry that
+    /// maps the client type to a ClientState. If enable_cpu_thermal_state_connector is true, also
+    /// add a new CPU thermal client.
+    fn new(
+        thermal_config: ThermalConfig,
+        inspect_parent: &inspect::Node,
+        enable_cpu_thermal_state_connector: bool,
+    ) -> Self {
+        let mut client_states =
             HashMap::from_iter(thermal_config.into_iter().map(|(client_type, client_config)| {
                 let client_state = ClientState::new(
-                    client_config,
+                    Some(client_config),
                     new_state_broker(),
                     ClientStateInspect::new(inspect_parent.create_child(&client_type)),
                 );
                 (client_type, client_state)
             }));
+
+        if enable_cpu_thermal_state_connector {
+            client_states.insert(
+                Self::CPU_CLIENT_TYPE.to_string(),
+                ClientState::new(
+                    None,
+                    new_state_broker(),
+                    ClientStateInspect::new(inspect_parent.create_child(Self::CPU_CLIENT_TYPE)),
+                ),
+            );
+        }
 
         Self(RefCell::new(client_states))
     }
@@ -210,6 +238,23 @@ impl ClientStates {
             .borrow_mut()
             .values_mut()
             .for_each(|client_state| client_state.process_new_thermal_load(thermal_load, sensor));
+    }
+
+    /// Processes a new CPU thermal load.
+    ///
+    /// This function takes the new thermal load value and simply passes it through to the "CPU"
+    /// client entry.
+    fn process_new_cpu_thermal_load(&self, thermal_load: ThermalLoad) {
+        fuchsia_trace::duration!(
+            "power_manager",
+            "ThermalStateHandler::process_new_cpu_thermal_load",
+            "thermal_load" => thermal_load.0
+        );
+
+        match self.0.borrow_mut().get_mut(Self::CPU_CLIENT_TYPE) {
+            Some(client_state) => client_state.process_new_cpu_thermal_load(thermal_load),
+            None => tracing::error!("CPU thermal client is not enabled"),
+        }
     }
 
     /// Connects a `fuchsia.thermal.ClientStateWatcher` request stream to a specific client type.
@@ -240,7 +285,7 @@ impl ClientStates {
 /// Stores the configuration and state for a single thermal client.
 struct ClientState {
     /// Vector of `TripPointState`s which forms the client's thermal config.
-    trip_point_states: Vec<TripPointState>,
+    trip_point_states: Option<Vec<TripPointState>>,
 
     /// We pass new thermal state values to the publisher, which takes care of updating the remote
     /// clients using hanging-gets.
@@ -259,16 +304,22 @@ struct ClientState {
 
 impl ClientState {
     fn new(
-        client_config: ClientConfig,
+        client_config: Option<ClientConfig>,
         state_broker: ClientStateBroker,
         inspect: ClientStateInspect,
     ) -> Self {
         // Create a vector of `TripPointState`s according to the provided `ClientConfig`
-        let mut trip_point_states = create_trip_point_states_from_client_config(client_config);
+        let trip_point_states = match client_config {
+            Some(config) => {
+                let mut states = create_trip_point_states_from_client_config(config);
+                states.sort_by(|tps0, tps1| tps1.state.0.cmp(&tps0.state.0));
+                Some(states)
+            }
+            None => None,
+        };
 
         // Sort the vector in decreasing state order so when we iterate it in `get_thermal_state` we
         // select the highest thermal state
-        trip_point_states.sort_by(|tps0, tps1| tps1.state.0.cmp(&tps0.state.0));
 
         Self {
             trip_point_states,
@@ -293,6 +344,7 @@ impl ClientState {
     fn update_active_trip_points(&mut self, thermal_load: ThermalLoad, sensor: &str) {
         self.trip_point_states
             .iter_mut()
+            .flatten()
             .filter(|trip_point| trip_point.sensor == sensor)
             .for_each(|trip_point| {
                 // For a trip point to be marked active, the thermal load must be at least greater
@@ -314,7 +366,7 @@ impl ClientState {
     /// first encountered active trip point. Since `trip_point_states` is sorted in decreasing state
     /// order, this iteration will yield the highest thermal state of all activate trip points.
     fn get_thermal_state(&self) -> ThermalState {
-        match self.trip_point_states.iter().find(|trip_point| trip_point.is_active) {
+        match self.trip_point_states.iter().flatten().find(|trip_point| trip_point.is_active) {
             Some(trip_point_state) => trip_point_state.state,
             None => ThermalState(0),
         }
@@ -331,6 +383,20 @@ impl ClientState {
         self.update_active_trip_points(thermal_load, sensor);
 
         let new_thermal_state = self.get_thermal_state();
+        if new_thermal_state != self.thermal_state {
+            self.thermal_state = new_thermal_state;
+            self.inspect.thermal_state.set(new_thermal_state.0.into());
+            self.state_publisher.set(new_thermal_state);
+        }
+    }
+
+    /// Processes a new CPU thermal load.
+    ///
+    /// We use an equally valued thermal state to represent each thermal load. If the thermal state
+    /// has changed, then the new value is passed to the publisher, where remote thermal clients
+    /// will see the new value.
+    fn process_new_cpu_thermal_load(&mut self, thermal_load: ThermalLoad) {
+        let new_thermal_state = ThermalState(thermal_load.0);
         if new_thermal_state != self.thermal_state {
             self.thermal_state = new_thermal_state;
             self.inspect.thermal_state.set(new_thermal_state.0.into());
@@ -531,6 +597,33 @@ impl ThermalStateHandler {
 
         Ok(MessageReturn::UpdateThermalLoad)
     }
+
+    /// Handles an `UpdateCpuThermalLoad` message.
+    ///
+    /// The new thermal load is checked for validity then passed on to the CPU client entry for
+    /// further processing.
+    async fn handle_update_cpu_thermal_load(
+        &self,
+        thermal_load: ThermalLoad,
+    ) -> Result<MessageReturn, PowerManagerError> {
+        fuchsia_trace::duration!(
+            "power_manager",
+            "ThermalStateHandler::handle_update_cpu_thermal_load",
+            "thermal_load" => thermal_load.0
+        );
+
+        if thermal_load > ThermalLoad(fthermal::MAX_THERMAL_LOAD) {
+            return Err(PowerManagerError::InvalidArgument(format!(
+                "Thermal load {:?} exceeds max {}",
+                thermal_load,
+                fthermal::MAX_THERMAL_LOAD
+            )));
+        }
+
+        self.client_states.process_new_cpu_thermal_load(thermal_load);
+
+        Ok(MessageReturn::UpdateCpuThermalLoad)
+    }
 }
 
 #[async_trait(?Send)]
@@ -543,6 +636,9 @@ impl Node for ThermalStateHandler {
         match msg {
             Message::UpdateThermalLoad(thermal_load, sensor) => {
                 self.handle_update_thermal_load(*thermal_load, sensor).await
+            }
+            Message::UpdateCpuThermalLoad(thermal_load) => {
+                self.handle_update_cpu_thermal_load(*thermal_load).await
             }
             _ => Err(PowerManagerError::Unsupported),
         }
@@ -737,6 +833,7 @@ mod tests {
             "type": "ThermalStateHandler",
             "name": "thermal_state_handler",
             "config": {
+              "enable_cpu_thermal_state_connector": false,
               "enable_client_state_connector": false,
             },
             "dependencies": {
@@ -760,6 +857,7 @@ mod tests {
             "type": "ThermalStateHandler",
             "name": "thermal_state_handler",
             "config": {
+              "enable_cpu_thermal_state_connector": false,
               "enable_client_state_connector": false,
             },
         });
@@ -797,6 +895,7 @@ mod tests {
             thermal_config: Some(thermal_config),
             outgoing_svc_dir: Some(service_fs.root_dir()),
             platform_metrics: None,
+            enable_cpu_thermal_state_connector: false,
             enable_client_state_connector: true,
         }
         .build()
@@ -868,6 +967,93 @@ mod tests {
         );
     }
 
+    /// Tests that CPU thermal client is correctly handled.
+    #[test]
+    fn test_cpu_thermal_state_connector() {
+        let mut executor = fasync::TestExecutor::new();
+        let mut service_fs = ServiceFs::new_local();
+
+        let thermal_config = ThermalConfig::new().add_client_config(
+            "client1",
+            ClientConfig::new().add_thermal_state(vec![TripPoint::new("sensor1", 5, 10)]),
+        );
+
+        let inspector = inspect::Inspector::default();
+        let node = ThermalStateHandlerBuilder {
+            node_name: "thermal_state_handler".to_string(),
+            inspect_root: Some(inspector.root()),
+            thermal_config: Some(thermal_config),
+            outgoing_svc_dir: Some(service_fs.root_dir()),
+            platform_metrics: None,
+            enable_cpu_thermal_state_connector: true,
+            enable_client_state_connector: true,
+        }
+        .build()
+        .unwrap();
+
+        let test_env = TestEnv::new(service_fs);
+
+        // Check for default initialized values
+        assert_data_tree!(
+            inspector,
+            root: {
+                thermal_state_handler: {
+                    ThermalLoadStates: {},
+                    CPU: {
+                        thermal_state: 0u64,
+                        connect_count: 0u64
+                    },
+                    client1: {
+                        thermal_state: 0u64,
+                        connect_count: 0u64
+                    }
+                }
+            }
+        );
+
+        // Connect CPU client and verify its `connect_count` is incremented
+        let cpu_client = test_env.connect_client("CPU");
+        assert_matches!(cpu_client.get_thermal_state(&mut executor), Ok(Some(ThermalState(0))));
+
+        assert_data_tree!(
+            inspector,
+            root: {
+                thermal_state_handler: {
+                    ThermalLoadStates: {},
+                    CPU: {
+                        thermal_state: 0u64,
+                        connect_count: 1u64
+                    },
+                    client1: {
+                        thermal_state: 0u64,
+                        connect_count: 0u64
+                    }
+                }
+            }
+        );
+
+        // Update the thermal state for CPU client and verify its `thermal_state` is updated
+        executor.run_singlethreaded(node.handle_update_cpu_thermal_load(ThermalLoad(11))).unwrap();
+        assert_matches!(cpu_client.get_thermal_state(&mut executor), Ok(Some(ThermalState(11))));
+
+        assert_data_tree!(
+            inspector,
+            root: {
+                thermal_state_handler: {
+                    ThermalLoadStates: {},
+                    CPU: {
+                        thermal_state: 11u64,
+                        connect_count: 1u64
+                    },
+                    client1: {
+                        thermal_state: 0u64,
+                        connect_count: 0u64
+                    }
+                }
+            }
+        );
+    }
+
     /// Tests that the server correctly implements the hanging-get pattern.
     #[test]
     fn test_hanging_get() {
@@ -885,6 +1071,7 @@ mod tests {
             thermal_config: Some(thermal_config),
             outgoing_svc_dir: Some(service_fs.root_dir()),
             platform_metrics: None,
+            enable_cpu_thermal_state_connector: false,
             enable_client_state_connector: true,
         }
         .build()
@@ -928,6 +1115,7 @@ mod tests {
             thermal_config: Some(ThermalConfig::new()),
             outgoing_svc_dir: Some(service_fs.root_dir()),
             platform_metrics: None,
+            enable_cpu_thermal_state_connector: false,
             enable_client_state_connector: true,
         }
         .build()
@@ -957,6 +1145,7 @@ mod tests {
             thermal_config: Some(thermal_config),
             outgoing_svc_dir: Some(service_fs.root_dir()),
             platform_metrics: None,
+            enable_cpu_thermal_state_connector: false,
             enable_client_state_connector: false,
         }
         .build()
@@ -983,6 +1172,7 @@ mod tests {
             outgoing_svc_dir: None,
             inspect_root: None,
             platform_metrics: None,
+            enable_cpu_thermal_state_connector: false,
             enable_client_state_connector: false,
         }
         .build()
@@ -1016,6 +1206,7 @@ mod tests {
             thermal_config: Some(thermal_config),
             outgoing_svc_dir: Some(service_fs.root_dir()),
             platform_metrics: None,
+            enable_cpu_thermal_state_connector: false,
             enable_client_state_connector: true,
         }
         .build()
@@ -1060,6 +1251,7 @@ mod tests {
             thermal_config: Some(thermal_config),
             outgoing_svc_dir: Some(service_fs.root_dir()),
             platform_metrics: None,
+            enable_cpu_thermal_state_connector: false,
             enable_client_state_connector: true,
         }
         .build()
@@ -1104,6 +1296,7 @@ mod tests {
             thermal_config: Some(ThermalConfig::new()),
             outgoing_svc_dir: None,
             platform_metrics: Some(mock_platform_metrics.clone()),
+            enable_cpu_thermal_state_connector: false,
             enable_client_state_connector: false,
         }
         .build()

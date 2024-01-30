@@ -261,6 +261,7 @@
     type: "ThermalStateHandler",
     name: "audio_thermal_state_handler",
     config: {
+      enable_cpu_thermal_state_connector: false,
       enable_client_state_connector: true,
     }
     // platform_metrics are disabled for this node.
@@ -269,6 +270,7 @@
     type: "ThermalStateHandler",
     name: "cpu_thermal_state_handler",
     config: {
+      enable_cpu_thermal_state_connector: false,
       enable_client_state_connector: false,
     },
     dependencies: {

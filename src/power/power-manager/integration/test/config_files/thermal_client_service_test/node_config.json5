@@ -35,6 +35,7 @@
         name: "thermal_state_handler",
         config: {
             thermal_config_path: "/pkg/thermal_client_service_test/thermal_config.json5",
+            enable_cpu_thermal_state_connector: false,
             enable_client_state_connector: true,
         },
         dependencies: {

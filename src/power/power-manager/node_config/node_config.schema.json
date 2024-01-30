@@ -624,6 +624,9 @@
                                 "items": {
                                     "type": "string"
                                 }
+                            },
+                            "cpu_thermal_load_notify_node": {
+                                "type": "string"
                             }
                         },
                         "additionalProperties": false,
@@ -823,11 +826,15 @@
                             },
                             "enable_client_state_connector": {
                                 "type": "boolean"
+                            },
+                            "enable_cpu_thermal_state_connector": {
+                                "type": "boolean"
                             }
                         },
                         "additionalProperties": false,
                         "required": [
-                            "enable_client_state_connector"
+                            "enable_client_state_connector",
+                            "enable_cpu_thermal_state_connector"
                         ]
                     },
                     "dependencies": {

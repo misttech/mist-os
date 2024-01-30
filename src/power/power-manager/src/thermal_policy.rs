@@ -72,6 +72,7 @@ impl<'a> ThermalPolicyBuilder<'a> {
             system_power_handler_node: String,
             temperature_handler_node: String,
             thermal_load_notify_nodes: Vec<String>,
+            cpu_thermal_load_notify_node: Option<String>,
             platform_metrics_node: String,
         }
 
@@ -91,6 +92,10 @@ impl<'a> ThermalPolicyBuilder<'a> {
                 .iter()
                 .map(|node_name| nodes[node_name].clone())
                 .collect(),
+            cpu_thermal_load_notify_node: data
+                .dependencies
+                .cpu_thermal_load_notify_node
+                .map(|p| nodes[&p].clone()),
             platform_metrics_node: nodes[&data.dependencies.platform_metrics_node].clone(),
             policy_params: ThermalPolicyParams {
                 controller_params: ThermalControllerParams {
@@ -178,6 +183,10 @@ pub struct ThermalConfig {
     /// The nodes that are interested in receiving updated thermal load values. It is expected that
     /// these nodes respond to the UpdateThermalLoad message.
     pub thermal_load_notify_nodes: Vec<Rc<dyn Node>>,
+
+    /// The node that is interested in receiving updated CPU thermal load values. It is expected
+    /// that this node respond to the UpdateCpuThermalLoad message.
+    pub cpu_thermal_load_notify_node: Option<Rc<dyn Node>>,
 
     /// All parameter values relating to the thermal policy itself
     pub policy_params: ThermalPolicyParams,
@@ -436,6 +445,15 @@ impl ThermalPolicy {
         .into_iter()
         .collect::<Result<Vec<_>, _>>()?;
 
+        if let Some(cpu_thermal_load_notify_node) = &self.config.cpu_thermal_load_notify_node {
+            self.send_message(
+                &cpu_thermal_load_notify_node,
+                &Message::UpdateCpuThermalLoad(new_load),
+            )
+            .await
+            .map_err(|e| format_err!("Failed to send cpu thermal load: {}", e))?;
+        }
+
         Ok(())
     }
 
@@ -623,6 +641,7 @@ pub mod tests {
             temperature_node: create_dummy_node(),
             sys_pwr_handler: create_dummy_node(),
             thermal_load_notify_nodes: vec![create_dummy_node()],
+            cpu_thermal_load_notify_node: None,
             policy_params: default_policy_params(),
             platform_metrics_node: create_dummy_node(),
         };
@@ -647,6 +666,7 @@ pub mod tests {
             temperature_node: create_dummy_node(),
             sys_pwr_handler: create_dummy_node(),
             thermal_load_notify_nodes: vec![create_dummy_node()],
+            cpu_thermal_load_notify_node: None,
             policy_params,
             platform_metrics_node: create_dummy_node(),
         };
@@ -671,6 +691,7 @@ pub mod tests {
             ),
             sys_pwr_handler: mock_maker.make("SysPwrNode", vec![]),
             thermal_load_notify_nodes: vec![mock_maker.make("ThermalLoadNotify", vec![])],
+            cpu_thermal_load_notify_node: None,
             policy_params: default_policy_params(),
             platform_metrics_node: create_dummy_node(),
         };
@@ -706,8 +727,8 @@ pub mod tests {
     }
 
     /// Tests that well-formed configuration JSON does not panic the `new_from_json` function.
-    #[fasync::run_singlethreaded(test)]
-    async fn test_new_from_json() {
+    #[test]
+    fn test_new_from_json() {
         let json_data = json::json!({
             "type": "ThermalPolicy",
             "name": "thermal_policy",
@@ -733,6 +754,40 @@ pub mod tests {
         nodes.insert("temperature".to_string(), create_dummy_node());
         nodes.insert("sys_power".to_string(), create_dummy_node());
         nodes.insert("thermal_load_notify".to_string(), create_dummy_node());
+        nodes.insert("cpu_control".to_string(), create_dummy_node());
+        nodes.insert("metrics".to_string(), create_dummy_node());
+        let _ = ThermalPolicyBuilder::new_from_json(json_data, &nodes);
+    }
+
+    #[test]
+    fn test_new_from_json_with_cpu_thermal_load_notify_node() {
+        let json_data = json::json!({
+            "type": "ThermalPolicy",
+            "name": "thermal_policy",
+            "config": {
+                "thermal_shutdown_temperature": 95.0,
+                "controller_params": {
+                    "sample_interval": 1.0,
+                    "filter_time_constant": 5.0,
+                    "target_temperature": 80.0,
+                    "e_integral_min": -20.0,
+                    "e_integral_max": 0.0,
+                }
+            },
+            "dependencies": {
+                "system_power_handler_node": "sys_power",
+                "temperature_handler_node": "temperature",
+                "thermal_load_notify_nodes": ["thermal_load_notify", "cpu_control"],
+                "cpu_thermal_load_notify_node": "cpu_thermal_load_notify",
+                "platform_metrics_node": "metrics"
+              },
+        });
+
+        let mut nodes: HashMap<String, Rc<dyn Node>> = HashMap::new();
+        nodes.insert("temperature".to_string(), create_dummy_node());
+        nodes.insert("sys_power".to_string(), create_dummy_node());
+        nodes.insert("thermal_load_notify".to_string(), create_dummy_node());
+        nodes.insert("cpu_thermal_load_notify".to_string(), create_dummy_node());
         nodes.insert("cpu_control".to_string(), create_dummy_node());
         nodes.insert("metrics".to_string(), create_dummy_node());
         let _ = ThermalPolicyBuilder::new_from_json(json_data, &nodes);
@@ -768,6 +823,7 @@ pub mod tests {
             temperature_node: mock_temperature.clone(),
             sys_pwr_handler: create_dummy_node(),
             thermal_load_notify_nodes: vec![create_dummy_node()],
+            cpu_thermal_load_notify_node: None,
             platform_metrics_node: mock_metrics.clone(),
             policy_params,
         })
@@ -866,6 +922,7 @@ pub mod tests {
                     msg_ok_return!(UpdateThermalLoad),
                 )],
             )],
+            cpu_thermal_load_notify_node: None,
             policy_params: default_policy_params(),
             platform_metrics_node: create_dummy_node(),
         };
@@ -902,6 +959,7 @@ pub mod tests {
             ),
             sys_pwr_handler: create_dummy_node(),
             thermal_load_notify_nodes: vec![mock_notify1.clone(), mock_notify2.clone()],
+            cpu_thermal_load_notify_node: None,
             policy_params: default_policy_params(),
             platform_metrics_node: create_dummy_node(),
         };
@@ -931,6 +989,61 @@ pub mod tests {
         mock_notify2.add_msg_response_pair((
             msg_eq!(UpdateThermalLoad(ThermalLoad(20), "Sensor1".to_string())),
             msg_ok_return!(UpdateThermalLoad),
+        ));
+        assert_eq!(node.process_thermal_load(ThermalLoad(20)).await.unwrap(), ());
+    }
+
+    #[allow(clippy::unit_cmp)] // TODO(https://fxbug.dev/95036)
+    /// Tests that each of the configured `cpu_thermal_load_notify_node` node receive an
+    /// UpdateCpuThermalLoad message as expected.
+    #[fasync::run_singlethreaded(test)]
+    async fn test_cpu_thermal_load_notify_node() {
+        let mut mock_maker = MockNodeMaker::new();
+
+        let mock_notify = mock_maker.make("ThermalLoad", vec![]);
+        let mock_cpu_notify = mock_maker.make("CpuThermalLoadNotify", vec![]);
+
+        // Set up the ThermalPolicy node
+        let thermal_config = ThermalConfig {
+            temperature_node: mock_maker.make(
+                "TemperatureNode",
+                vec![(
+                    msg_eq!(GetDriverPath),
+                    msg_ok_return!(GetDriverPath("Sensor1".to_string())),
+                )],
+            ),
+            sys_pwr_handler: create_dummy_node(),
+            thermal_load_notify_nodes: vec![mock_notify.clone()],
+            cpu_thermal_load_notify_node: Some(mock_cpu_notify.clone()),
+            policy_params: default_policy_params(),
+            platform_metrics_node: create_dummy_node(),
+        };
+
+        let node = ThermalPolicyBuilder::new(thermal_config)
+            .build(&FuturesUnordered::new())
+            .await
+            .unwrap();
+
+        // When `process_thermal_load` runs, the mocks will verify they each receive the
+        // UpdateThermalLoad or UpdateCpuThermalLoad message
+        mock_notify.add_msg_response_pair((
+            msg_eq!(UpdateThermalLoad(ThermalLoad(20), "Sensor1".to_string())),
+            msg_ok_return!(UpdateThermalLoad),
+        ));
+        mock_cpu_notify.add_msg_response_pair((
+            msg_eq!(UpdateCpuThermalLoad(ThermalLoad(20))),
+            msg_ok_return!(UpdateCpuThermalLoad),
+        ));
+        assert_eq!(node.process_thermal_load(ThermalLoad(20)).await.unwrap(), ());
+
+        // Even if thermal load is unchanged, the nodes should still be updated
+        mock_notify.add_msg_response_pair((
+            msg_eq!(UpdateThermalLoad(ThermalLoad(20), "Sensor1".to_string())),
+            msg_ok_return!(UpdateThermalLoad),
+        ));
+        mock_cpu_notify.add_msg_response_pair((
+            msg_eq!(UpdateCpuThermalLoad(ThermalLoad(20))),
+            msg_ok_return!(UpdateCpuThermalLoad),
         ));
         assert_eq!(node.process_thermal_load(ThermalLoad(20)).await.unwrap(), ());
     }
