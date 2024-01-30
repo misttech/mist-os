@@ -35,7 +35,6 @@
 
 #include <fbl/unique_fd.h>
 #include <gtest/gtest.h>
-#include <sdk/lib/vfs/cpp/flags.h>
 #include <sdk/lib/vfs/cpp/pseudo_dir.h>
 #include <sdk/lib/vfs/cpp/vmo_file.h>
 
