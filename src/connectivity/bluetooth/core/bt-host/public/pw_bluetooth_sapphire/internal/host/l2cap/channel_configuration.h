@@ -186,6 +186,39 @@ class ChannelConfiguration final {
     uint16_t mps_;
   };
 
+  // Frame Check Sequence (FCS) option (Core Spec v5.4, Vol 3, Part A, Sec 5.5)
+  // Specifies the type of frame check sequence that will be included on S/I
+  // frames. Makes it possible to disable FCS if both entities agree.
+  class FrameCheckSequenceOption final : public ConfigurationOptionInterface {
+   public:
+    static constexpr OptionType kType = OptionType::kFCS;
+    static constexpr uint8_t kPayloadLength =
+        sizeof(FrameCheckSequenceOptionPayload);
+    static constexpr size_t kEncodedSize =
+        sizeof(ConfigurationOption) + kPayloadLength;
+
+    explicit FrameCheckSequenceOption(FcsType fcs_type) : fcs_type_(fcs_type) {}
+
+    // |data_buf| must contain encoded Frame Check Sequence option data. The
+    // option will be initialized with the encoded FCS type field
+    explicit FrameCheckSequenceOption(const ByteBuffer& data_buf);
+
+    FcsType fcs_type() const { return fcs_type_; }
+
+    // ConfigurationOptionInterface overrides
+
+    DynamicByteBuffer Encode() const override;
+
+    std::string ToString() const override;
+
+    OptionType type() const override { return kType; }
+
+    size_t size() const override { return kEncodedSize; }
+
+   private:
+    FcsType fcs_type_;
+  };
+
   // Flush Timeout option (Core Spec v5.1, Vol 3, Part A, Sec 5.2).
   // Specifies flush timeout that sender of this option is going to use.
   class FlushTimeoutOption final : public ConfigurationOptionInterface {
@@ -283,6 +316,11 @@ class ChannelConfiguration final {
     flush_timeout_option_ = std::move(option);
   }
 
+  void set_frame_check_sequence_option(
+      std::optional<FrameCheckSequenceOption> option) {
+    fcs_option_ = std::move(option);
+  }
+
   // Returns MtuOption only if it has been previously read or set.
   const std::optional<MtuOption>& mtu_option() const { return mtu_option_; }
 
@@ -295,6 +333,12 @@ class ChannelConfiguration final {
 
   const std::optional<FlushTimeoutOption>& flush_timeout_option() const {
     return flush_timeout_option_;
+  }
+
+  // Returns FrameCheckSequenceOption only if it has been previously set.
+  const std::optional<FrameCheckSequenceOption>& frame_check_sequence_option()
+      const {
+    return fcs_option_;
   }
 
   // Returns unknown options previously decoded by |ReadOptions|. Used for
@@ -310,6 +354,9 @@ class ChannelConfiguration final {
       RetransmissionAndFlowControlOption option) {
     retransmission_flow_control_option_ = option;
   }
+  void OnReadFrameCheckSequenceOption(FrameCheckSequenceOption option) {
+    fcs_option_ = option;
+  }
   void OnReadFlushTimeoutOption(FlushTimeoutOption option) {
     flush_timeout_option_ = option;
   }
@@ -322,6 +369,7 @@ class ChannelConfiguration final {
   std::optional<MtuOption> mtu_option_;
   std::optional<RetransmissionAndFlowControlOption>
       retransmission_flow_control_option_;
+  std::optional<FrameCheckSequenceOption> fcs_option_;
   std::optional<FlushTimeoutOption> flush_timeout_option_;
   std::vector<UnknownOption> unknown_options_;
 };  // ChannelConfiguration
