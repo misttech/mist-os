@@ -66,12 +66,12 @@ class FlatlandViewTest : public gtest::TestLoopFixture {
   sys::testing::ComponentContextProvider provider_;
   std::unique_ptr<FakeFlatland> fake_flatland_;
   std::unique_ptr<FlatlandView> view_;
-  float width_ = 0;
-  float height_ = 0;
+  uint32_t width_ = 0;
+  uint32_t height_ = 0;
 };
 
 TEST_F(FlatlandViewTest, Initialize) {
-  FlatlandView::ResizeCallback resize_callback = [this](float width, float height) {
+  FlatlandView::ResizeCallback resize_callback = [this](uint32_t width, uint32_t height) {
     width_ = width;
     height_ = height;
     QuitLoop();

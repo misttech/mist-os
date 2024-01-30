@@ -183,12 +183,12 @@ class FakeFlatland : public fuchsia::ui::composition::testing::Allocator_TestBas
 
   uint32_t presented_count() {
     std::unique_lock<std::mutex> lock(mutex_);
-    return presented_.size();
+    return static_cast<uint32_t>(presented_.size());
   }
 
   uint32_t acquire_fences_count() {
     std::unique_lock<std::mutex> lock(mutex_);
-    return acquire_fences_.size();
+    return static_cast<uint32_t>(acquire_fences_.size());
   }
 
   struct Presented {

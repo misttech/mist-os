@@ -48,9 +48,6 @@ test("test_image_pipe_swapchain") {
     "//src/lib/vulkan/flatland_view",
     "//zircon/system/ulib/zx",
   ]
-
-  # TODO(https://fxbug.dev/42136089): delete the below and fix compiler warnings
-  configs += [ "//build/config:Wno-conversion" ]
 }
 
 test("test_image_pipe_swapchain_hermetic") {
