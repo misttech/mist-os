@@ -24,14 +24,6 @@ archive_path_suffix = "_latest"
 # Also override or templatize `./config/web_context_provider.core_shard.cml.
 repository = "fuchsia.com"
 
-declare_args() {
-  # Whether to use the most recent (canary) version of prebuilt Chromium
-  # components. This is the only supported configuration.
-  # TODO(https://fxbug.dev/42149832): Remove once all builds setting it have been updated.
-  use_chromium_canary = true
-}
-assert(use_chromium_canary)
-
 generate_fuchsia_web_targets("chromium") {
 }
 
