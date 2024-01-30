@@ -4,8 +4,8 @@
 // license that can be found in the LICENSE file or at
 // https://opensource.org/licenses/MIT
 
-#ifndef ZIRCON_KERNEL_DEV_INTERRUPT_ARM_GIC_V2_ARM_GICV2_H_
-#define ZIRCON_KERNEL_DEV_INTERRUPT_ARM_GIC_V2_ARM_GICV2_H_
+#ifndef ZIRCON_KERNEL_DEV_INTERRUPT_GIC_V2_ARM_GICV2_H_
+#define ZIRCON_KERNEL_DEV_INTERRUPT_GIC_V2_ARM_GICV2_H_
 
 #include <lib/fit/function.h>
 
@@ -63,4 +63,4 @@ class CpuMaskTranslator {
 uint8_t gic_determine_local_mask(
     fit::inline_function<uint32_t(int), sizeof(void*)> fetch_gicd_targetsr_reg);
 
-#endif  // ZIRCON_KERNEL_DEV_INTERRUPT_ARM_GIC_V2_ARM_GICV2_H_
+#endif  // ZIRCON_KERNEL_DEV_INTERRUPT_GIC_V2_ARM_GICV2_H_
