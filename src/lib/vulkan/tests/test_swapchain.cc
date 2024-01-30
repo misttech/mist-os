@@ -254,9 +254,10 @@ class TestSwapchain {
 
   TestSwapchain(std::vector<const char*> instance_layers, bool protected_memory)
       : protected_memory_(protected_memory) {
-    std::vector<const char*> instance_ext{VK_KHR_SURFACE_EXTENSION_NAME,
-                                          VK_FUCHSIA_IMAGEPIPE_SURFACE_EXTENSION_NAME,
-                                          VK_EXT_DEBUG_UTILS_EXTENSION_NAME};
+    std::vector<const char*> instance_ext{
+        VK_KHR_SURFACE_EXTENSION_NAME, VK_KHR_GET_SURFACE_CAPABILITIES_2_EXTENSION_NAME,
+        VK_KHR_SURFACE_PROTECTED_CAPABILITIES_EXTENSION_NAME,
+        VK_FUCHSIA_IMAGEPIPE_SURFACE_EXTENSION_NAME, VK_EXT_DEBUG_UTILS_EXTENSION_NAME};
     std::vector<const char*> device_ext{VK_KHR_SWAPCHAIN_EXTENSION_NAME};
 
     const VkValidationFeatureEnableEXT sync_validation =
@@ -338,6 +339,8 @@ class TestSwapchain {
         vkGetInstanceProcAddr(vk_instance_, "vkCreateDebugUtilsMessengerEXT"));
     get_surface_support_khr_ = reinterpret_cast<PFN_vkGetPhysicalDeviceSurfaceSupportKHR>(
         vkGetInstanceProcAddr(vk_instance_, "vkGetPhysicalDeviceSurfaceSupportKHR"));
+    get_surface_caps2_khr_ = reinterpret_cast<PFN_vkGetPhysicalDeviceSurfaceCapabilities2KHR>(
+        vkGetInstanceProcAddr(vk_instance_, "vkGetPhysicalDeviceSurfaceCapabilities2KHR"));
 
     VkDebugUtilsMessengerCreateInfoEXT callback = {
         .sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT,
@@ -436,6 +439,25 @@ class TestSwapchain {
   }
 
   void ValidateSurfaceForDevice(VkSurfaceKHR surface) {
+    VkSurfaceProtectedCapabilitiesKHR surface_protected_caps = {
+        .sType = VK_STRUCTURE_TYPE_SURFACE_PROTECTED_CAPABILITIES_KHR,
+        .pNext = nullptr,
+    };
+    VkSurfaceCapabilities2KHR surface_caps2 = {
+        .sType = VK_STRUCTURE_TYPE_SURFACE_CAPABILITIES_2_KHR,
+        .pNext = &surface_protected_caps,
+    };
+    VkPhysicalDeviceSurfaceInfo2KHR surface_info = {
+        .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SURFACE_INFO_2_KHR,
+        .pNext = nullptr,
+        .surface = surface,
+    };
+    ASSERT_TRUE(get_surface_caps2_khr_);
+    EXPECT_EQ(VK_SUCCESS,
+              get_surface_caps2_khr_(vk_physical_device_, &surface_info, &surface_caps2));
+    if (protected_memory_) {
+      EXPECT_TRUE(surface_protected_caps.supportsProtected);
+    }
     VkBool32 surface_supported = false;
     EXPECT_EQ(VK_SUCCESS, get_surface_support_khr_(vk_physical_device_, /*queue_family_index*/ 0,
                                                    surface, &surface_supported));
@@ -597,6 +619,7 @@ class TestSwapchain {
   VkCommandPool vk_command_pool_ = VK_NULL_HANDLE;
   VkQueue vk_queue_ = VK_NULL_HANDLE;
   VkDebugUtilsMessengerEXT messenger_cb_ = nullptr;
+  PFN_vkGetPhysicalDeviceSurfaceCapabilities2KHR get_surface_caps2_khr_;
   PFN_vkGetPhysicalDeviceSurfaceSupportKHR get_surface_support_khr_;
   PFN_vkCreateSwapchainKHR create_swapchain_khr_;
   PFN_vkDestroySwapchainKHR destroy_swapchain_khr_;

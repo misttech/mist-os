@@ -134,18 +134,29 @@ static const VkExtensionProperties instance_extensions[] = {
         .specVersion = 25,
     },
     {
+        .extensionName = VK_KHR_GET_SURFACE_CAPABILITIES_2_EXTENSION_NAME,
+        .specVersion = 1,
+    },
+    {
+        .extensionName = VK_KHR_SURFACE_PROTECTED_CAPABILITIES_EXTENSION_NAME,
+        .specVersion = 1,
+    },
+    {
 #if defined(VK_USE_PLATFOM_FUCHSIA)
         .extensionName = VK_FUCHSIA_IMAGEPIPE_SURFACE_EXTENSION_NAME,
 #elif defined(VK_USE_PLATFORM_WAYLAND_KHR)
         .extensionName = VK_KHR_WAYLAND_SURFACE_EXTENSION_NAME,
 #endif
         .specVersion = 1,
-    }};
+    },
+};
 
-static const VkExtensionProperties device_extensions[] = {{
-    .extensionName = VK_KHR_SWAPCHAIN_EXTENSION_NAME,
-    .specVersion = 68,
-}};
+static const VkExtensionProperties device_extensions[] = {
+    {
+        .extensionName = VK_KHR_SWAPCHAIN_EXTENSION_NAME,
+        .specVersion = 68,
+    },
+};
 
 constexpr VkLayerProperties swapchain_layer = {
     SWAPCHAIN_SURFACE_NAME,
@@ -589,9 +600,9 @@ VKAPI_ATTR VkResult VKAPI_CALL CreateImagePipeSurfaceFUCHSIA(
     VkInstance instance, const VkImagePipeSurfaceCreateInfoFUCHSIA* pCreateInfo,
     const VkAllocationCallbacks* pAllocator, VkSurfaceKHR* pSurface) {
 #elif defined(VK_USE_PLATFORM_WAYLAND_KHR)
-VKAPI_ATTR VkResult VKAPI_CALL CreateWaylandSurfaceKHR(
-    VkInstance instance, const VkWaylandSurfaceCreateInfoKHR* pCreateInfo,
-    const VkAllocationCallbacks* pAllocator, VkSurfaceKHR* pSurface) {
+VKAPI_ATTR VkResult VKAPI_CALL
+CreateWaylandSurfaceKHR(VkInstance instance, const VkWaylandSurfaceCreateInfoKHR* pCreateInfo,
+                        const VkAllocationCallbacks* pAllocator, VkSurfaceKHR* pSurface) {
 
 #else
 #error Unsupported
@@ -631,9 +642,9 @@ VKAPI_ATTR void VKAPI_CALL DestroySurfaceKHR(VkInstance instance, VkSurfaceKHR v
   delete surface;
 }
 
-VKAPI_ATTR VkResult VKAPI_CALL GetPhysicalDeviceSurfaceCapabilitiesKHR(
-    VkPhysicalDevice physicalDevice, VkSurfaceKHR surface,
-    VkSurfaceCapabilitiesKHR* pSurfaceCapabilities) {
+VKAPI_ATTR VkResult VKAPI_CALL
+GetPhysicalDeviceSurfaceCapabilitiesKHR(VkPhysicalDevice physicalDevice, VkSurfaceKHR surface,
+                                        VkSurfaceCapabilitiesKHR* pSurfaceCapabilities) {
   VkLayerInstanceDispatchTable* instance_dispatch_table =
       GetLayerDataPtr(get_dispatch_key(physicalDevice), layer_data_map)
           ->instance_dispatch_table.get();
@@ -666,9 +677,23 @@ VKAPI_ATTR VkResult VKAPI_CALL GetPhysicalDeviceSurfaceCapabilitiesKHR(
   return VK_SUCCESS;
 }
 
-VKAPI_ATTR VkResult VKAPI_CALL GetPhysicalDeviceSurfaceFormatsKHR(
-    VkPhysicalDevice physicalDevice, const VkSurfaceKHR surface, uint32_t* pCount,
-    VkSurfaceFormatKHR* pSurfaceFormats) {
+VKAPI_ATTR VkResult VKAPI_CALL GetPhysicalDeviceSurfaceCapabilities2KHR(
+    VkPhysicalDevice physicalDevice, const VkPhysicalDeviceSurfaceInfo2KHR* pSurfaceInfo,
+    VkSurfaceCapabilities2KHR* pSurfaceCapabilities) {
+  auto protected_caps =
+      static_cast<VkSurfaceProtectedCapabilitiesKHR*>(pSurfaceCapabilities->pNext);
+  if (protected_caps &&
+      protected_caps->sType == VK_STRUCTURE_TYPE_SURFACE_PROTECTED_CAPABILITIES_KHR) {
+    protected_caps->supportsProtected = VK_TRUE;
+  }
+
+  return GetPhysicalDeviceSurfaceCapabilitiesKHR(physicalDevice, pSurfaceInfo->surface,
+                                                 &pSurfaceCapabilities->surfaceCapabilities);
+}
+
+VKAPI_ATTR VkResult VKAPI_CALL
+GetPhysicalDeviceSurfaceFormatsKHR(VkPhysicalDevice physicalDevice, const VkSurfaceKHR surface,
+                                   uint32_t* pCount, VkSurfaceFormatKHR* pSurfaceFormats) {
   SupportedImageProperties& supported_properties =
       reinterpret_cast<ImagePipeSurface*>(surface)->GetSupportedImageProperties();
   if (pSurfaceFormats == nullptr) {
@@ -683,9 +708,32 @@ VKAPI_ATTR VkResult VKAPI_CALL GetPhysicalDeviceSurfaceFormatsKHR(
   return VK_SUCCESS;
 }
 
-VKAPI_ATTR VkResult VKAPI_CALL GetPhysicalDeviceSurfacePresentModesKHR(
-    VkPhysicalDevice physicalDevice, const VkSurfaceKHR surface, uint32_t* pCount,
-    VkPresentModeKHR* pPresentModes) {
+VKAPI_ATTR VkResult VKAPI_CALL GetPhysicalDeviceSurfaceFormats2KHR(
+    VkPhysicalDevice physicalDevice, const VkPhysicalDeviceSurfaceInfo2KHR* pSurfaceInfo,
+    uint32_t* pSurfaceFormatCount, VkSurfaceFormat2KHR* pSurfaceFormats) {
+  SupportedImageProperties& supported_properties =
+      reinterpret_cast<ImagePipeSurface*>(pSurfaceInfo->surface)->GetSupportedImageProperties();
+  if (pSurfaceFormats == nullptr) {
+    *pSurfaceFormatCount = to_uint32(supported_properties.formats.size());
+    return VK_SUCCESS;
+  }
+
+  assert(*pSurfaceFormatCount >= supported_properties.formats.size());
+
+  for (size_t i = 0; i < supported_properties.formats.size(); i++) {
+    pSurfaceFormats[i] = {
+        .sType = VK_STRUCTURE_TYPE_SURFACE_FORMAT_2_KHR,
+        .pNext = nullptr,
+        .surfaceFormat = supported_properties.formats[i],
+    };
+  }
+  *pSurfaceFormatCount = to_uint32(supported_properties.formats.size());
+  return VK_SUCCESS;
+}
+
+VKAPI_ATTR VkResult VKAPI_CALL
+GetPhysicalDeviceSurfacePresentModesKHR(VkPhysicalDevice physicalDevice, const VkSurfaceKHR surface,
+                                        uint32_t* pCount, VkPresentModeKHR* pPresentModes) {
   LayerData* layer_data = GetLayerDataPtr(get_dispatch_key(physicalDevice), layer_data_map);
   return reinterpret_cast<ImagePipeSurface*>(surface)->GetPresentModes(
       physicalDevice, layer_data->instance_dispatch_table.get(), pCount, pPresentModes);
@@ -893,9 +941,9 @@ VKAPI_ATTR VkResult VKAPI_CALL EnumerateInstanceExtensionProperties(
   return VK_ERROR_LAYER_NOT_PRESENT;
 }
 
-VKAPI_ATTR VkResult VKAPI_CALL EnumerateDeviceExtensionProperties(
-    VkPhysicalDevice physicalDevice, const char* pLayerName, uint32_t* pCount,
-    VkExtensionProperties* pProperties) {
+VKAPI_ATTR VkResult VKAPI_CALL
+EnumerateDeviceExtensionProperties(VkPhysicalDevice physicalDevice, const char* pLayerName,
+                                   uint32_t* pCount, VkExtensionProperties* pProperties) {
   if (pLayerName && !strcmp(pLayerName, swapchain_layer.layerName))
     return util_GetExtensionProperties(std::size(device_extensions), device_extensions, pCount,
                                        pProperties);
@@ -989,8 +1037,12 @@ static inline PFN_vkVoidFunction layer_intercept_instance_proc(const char* name)
     return reinterpret_cast<PFN_vkVoidFunction>(GetPhysicalDeviceSurfaceCapabilitiesKHR);
   if (!strcmp("GetPhysicalDeviceSurfaceFormatsKHR", name))
     return reinterpret_cast<PFN_vkVoidFunction>(GetPhysicalDeviceSurfaceFormatsKHR);
+  if (!strcmp("GetPhysicalDeviceSurfaceFormats2KHR", name))
+    return reinterpret_cast<PFN_vkVoidFunction>(GetPhysicalDeviceSurfaceFormats2KHR);
   if (!strcmp("GetPhysicalDeviceSurfacePresentModesKHR", name))
     return reinterpret_cast<PFN_vkVoidFunction>(GetPhysicalDeviceSurfacePresentModesKHR);
+  if (!strcmp("GetPhysicalDeviceSurfaceCapabilities2KHR", name))
+    return reinterpret_cast<PFN_vkVoidFunction>(GetPhysicalDeviceSurfaceCapabilities2KHR);
 #if defined(VK_USE_PLATFORM_FUCHSIA)
   if (!strcmp("CreateImagePipeSurfaceFUCHSIA", name))
     return reinterpret_cast<PFN_vkVoidFunction>(CreateImagePipeSurfaceFUCHSIA);
@@ -1074,8 +1126,8 @@ VK_LAYER_EXPORT VKAPI_ATTR VkResult VKAPI_CALL vkEnumerateInstanceExtensionPrope
                                                                     pProperties);
 }
 
-VK_LAYER_EXPORT VKAPI_ATTR VkResult VKAPI_CALL vkEnumerateInstanceLayerProperties(
-    uint32_t* pCount, VkLayerProperties* pProperties) {
+VK_LAYER_EXPORT VKAPI_ATTR VkResult VKAPI_CALL
+vkEnumerateInstanceLayerProperties(uint32_t* pCount, VkLayerProperties* pProperties) {
   return image_pipe_swapchain::EnumerateInstanceLayerProperties(pCount, pProperties);
 }
 
@@ -1085,9 +1137,9 @@ VK_LAYER_EXPORT VKAPI_ATTR VkResult VKAPI_CALL vkEnumerateDeviceLayerProperties(
   return image_pipe_swapchain::EnumerateDeviceLayerProperties(VK_NULL_HANDLE, pCount, pProperties);
 }
 
-VK_LAYER_EXPORT VKAPI_ATTR VkResult VKAPI_CALL vkEnumerateDeviceExtensionProperties(
-    VkPhysicalDevice physicalDevice, const char* pLayerName, uint32_t* pCount,
-    VkExtensionProperties* pProperties) {
+VK_LAYER_EXPORT VKAPI_ATTR VkResult VKAPI_CALL
+vkEnumerateDeviceExtensionProperties(VkPhysicalDevice physicalDevice, const char* pLayerName,
+                                     uint32_t* pCount, VkExtensionProperties* pProperties) {
   assert(physicalDevice == VK_NULL_HANDLE);
   return image_pipe_swapchain::EnumerateDeviceExtensionProperties(VK_NULL_HANDLE, pLayerName,
                                                                   pCount, pProperties);
@@ -1098,7 +1150,7 @@ VK_LAYER_EXPORT VKAPI_ATTR PFN_vkVoidFunction VKAPI_CALL vkGetDeviceProcAddr(VkD
   return image_pipe_swapchain::GetDeviceProcAddr(dev, funcName);
 }
 
-VK_LAYER_EXPORT VKAPI_ATTR PFN_vkVoidFunction VKAPI_CALL vkGetInstanceProcAddr(
-    VkInstance instance, const char* funcName) {
+VK_LAYER_EXPORT VKAPI_ATTR PFN_vkVoidFunction VKAPI_CALL
+vkGetInstanceProcAddr(VkInstance instance, const char* funcName) {
   return image_pipe_swapchain::GetInstanceProcAddr(instance, funcName);
 }

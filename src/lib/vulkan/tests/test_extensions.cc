@@ -14,7 +14,9 @@ static const char* kLayerName = "VK_LAYER_FUCHSIA_imagepipe_swapchain";
 static const std::vector<const char*> kLayers = {kLayerName};
 
 static const std::vector<const char*> kExpectedInstanceExtensions = {
-    VK_KHR_SURFACE_EXTENSION_NAME, VK_FUCHSIA_IMAGEPIPE_SURFACE_EXTENSION_NAME};
+    VK_KHR_SURFACE_EXTENSION_NAME, VK_KHR_GET_SURFACE_CAPABILITIES_2_EXTENSION_NAME,
+    VK_KHR_SURFACE_PROTECTED_CAPABILITIES_EXTENSION_NAME,
+    VK_FUCHSIA_IMAGEPIPE_SURFACE_EXTENSION_NAME};
 
 static const std::vector<const char*> kExpectedDeviceExtensions = {VK_KHR_SWAPCHAIN_EXTENSION_NAME};
 
