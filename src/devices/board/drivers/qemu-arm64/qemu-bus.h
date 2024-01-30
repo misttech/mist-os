@@ -23,7 +23,9 @@ class QemuArm64 : public ddk::Device<QemuArm64> {
       : ddk::Device<QemuArm64>(parent),
         pbus_(std::move(pbus)),
         pci_root_host_(zx::unowned_resource(get_root_resource(parent)),
-                       zx::unowned_resource(get_mmio_resource(parent)), PCI_ADDRESS_SPACE_MEMORY) {}
+                       zx::unowned_resource(get_mmio_resource(parent)),
+                       zx::unowned_resource(get_ioport_resource(parent)),
+                       PCI_ADDRESS_SPACE_MEMORY) {}
 
   static zx_status_t Create(void* ctx, zx_device_t* parent);
 

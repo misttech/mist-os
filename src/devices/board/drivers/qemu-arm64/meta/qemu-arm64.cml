@@ -17,6 +17,7 @@
     use: [
         { protocol: "fuchsia.boot.RootResource" },
         { protocol: "fuchsia.kernel.MmioResource" },
+        { protocol: "fuchsia.kernel.IoportResource" },
         { service: "fuchsia.hardware.platform.bus.Service" },
     ],
 }

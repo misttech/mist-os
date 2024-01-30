@@ -413,7 +413,8 @@ zx_status_t pci_root_host_init(zx_device_t* parent, acpi::Acpi* acpi) {
 #endif
     RootHost =
         std::make_unique<PciRootHost>(zx::unowned_resource(get_root_resource(parent)),
-                                      zx::unowned_resource(get_mmio_resource(parent)), io_type);
+                                      zx::unowned_resource(get_mmio_resource(parent)),
+                                      zx::unowned_resource(get_ioport_resource(parent)), io_type);
   }
 
   zx_status_t st = read_mcfg_table(&RootHost->mcfgs());

@@ -64,9 +64,10 @@ class PciRootHost {
   std::vector<McfgAllocation>& mcfgs() { return mcfgs_; }
 
   PciRootHost(zx::unowned_resource unowned_root, zx::unowned_resource unowned_mmio,
-              pci_address_space_t io_type)
+              zx::unowned_resource unowned_ioport, pci_address_space_t io_type)
       : root_resource_(std::move(unowned_root)),
         mmio_resource_(std::move(unowned_mmio)),
+        ioport_resource_(std::move(unowned_ioport)),
         io_type_(io_type) {
     ZX_ASSERT(zx::port::create(0, &eventpair_port_) == ZX_OK);
   }
@@ -172,6 +173,7 @@ class PciRootHost {
   zx::port eventpair_port_ __TA_GUARDED(lock_);
   const zx::unowned_resource root_resource_;
   const zx::unowned_resource mmio_resource_;
+  const zx::unowned_resource ioport_resource_;
   // Depending on platform 'IO' in PCI can be either memory mapped, or something more akin to PIO.
   const pci_address_space_t io_type_;
 };

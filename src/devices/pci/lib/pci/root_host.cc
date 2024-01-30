@@ -53,7 +53,7 @@ zx::result<zx_paddr_t> PciRootHost::Allocate(AllocationType type, uint32_t kind,
       rsrc_kind = ZX_RSRC_KIND_MMIO;
     } else {
       rsrc_kind = ZX_RSRC_KIND_IOPORT;
-      rsrc = root_resource_->borrow();
+      rsrc = ioport_resource_->borrow();
     }
   } else if (type == kMmio32) {
     allocator = &mmio32_alloc_;
