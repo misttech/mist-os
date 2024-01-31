@@ -21,12 +21,6 @@
 
 namespace {
 
-#if defined(__x86_64__) || defined(__aarch64__)
-constexpr bool kUseUnifiedAspace = true;
-#else
-constexpr bool kUseUnifiedAspace = false;
-#endif  // defined(__x86_64__) || defined(__arch64__)
-
 void RunRestrictedMode(zx_vaddr_t cs_addr, zx_vaddr_t stack_addr,
                        std::optional<zx_excp_type_t> expected_exception, zx_status_t* result) {
   // Set up the restricted state.
@@ -77,16 +71,13 @@ void RunRestrictedMode(zx_vaddr_t cs_addr, zx_vaddr_t stack_addr,
   }
 
   // Validate that the restricted mode routine wrote the right value to the stack without going
-  // through zx_vmo_read. This only works when unified address spaces are enabled, which is
-  // currently only on x86.
-  if constexpr (kUseUnifiedAspace) {
-    uint8_t expected[8] = {0xdd, 0xdd, 0xcc, 0xcc, 0xbb, 0xbb, 0xaa, 0xaa};
-    uint8_t* stack_values = reinterpret_cast<uint8_t*>(stack_addr - 8);
-    for (size_t i = 0; i < sizeof(expected); i++) {
-      if (expected[i] != stack_values[i]) {
-        *result = ZX_ERR_INTERNAL;
-        return;
-      }
+  // through zx_vmo_read.
+  uint8_t expected[8] = {0xdd, 0xdd, 0xcc, 0xcc, 0xbb, 0xbb, 0xaa, 0xaa};
+  uint8_t* stack_values = reinterpret_cast<uint8_t*>(stack_addr - 8);
+  for (size_t i = 0; i < sizeof(expected); i++) {
+    if (expected[i] != stack_values[i]) {
+      *result = ZX_ERR_INTERNAL;
+      return;
     }
   }
 }
