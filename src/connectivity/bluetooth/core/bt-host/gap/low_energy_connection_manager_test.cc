@@ -2716,6 +2716,11 @@ TEST_F(LowEnergyConnectionManagerTest,
   ASSERT_TRUE(conn_handle1);
   EXPECT_TRUE(conn_handle1->active());
 
+  EXPECT_EQ(conn_handle0->role(),
+            pw::bluetooth::emboss::ConnectionRole::PERIPHERAL);
+  EXPECT_EQ(conn_handle1->role(),
+            pw::bluetooth::emboss::ConnectionRole::PERIPHERAL);
+
   EXPECT_EQ(1u, hci_update_conn_param_count0);
   EXPECT_EQ(1u, l2cap_conn_param_update_count0);
   EXPECT_EQ(1u, hci_update_conn_param_count1);
@@ -2844,6 +2849,8 @@ TEST_F(
   RunFor(kLEConnectionPausePeripheral);
   ASSERT_TRUE(conn_handle);
   EXPECT_TRUE(conn_handle->active());
+  EXPECT_EQ(conn_handle->role(),
+            pw::bluetooth::emboss::ConnectionRole::PERIPHERAL);
   EXPECT_EQ(0u, hci_update_conn_param_count);
   EXPECT_EQ(0u, l2cap_conn_param_update_count);
 
@@ -2906,6 +2913,8 @@ TEST_F(LowEnergyConnectionManagerTest, HciUpdateConnParamsAfterInterrogation) {
   RunUntilIdle();
   ASSERT_TRUE(conn_handle);
   EXPECT_TRUE(conn_handle->active());
+  EXPECT_EQ(conn_handle->role(),
+            pw::bluetooth::emboss::ConnectionRole::PERIPHERAL);
   EXPECT_EQ(0u, l2cap_conn_param_update_count);
   EXPECT_EQ(0u, hci_update_conn_param_count);
 
