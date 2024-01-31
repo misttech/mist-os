@@ -129,11 +129,11 @@ async fn lock_repository(dir: &Utf8Path) -> Result<Lockfile> {
 
 async fn repo_publish(cmd: &RepoPublishCommand) -> Result<()> {
     if !cmd.repo_path.exists() {
-        std::fs::create_dir(&cmd.repo_path).expect("creating repository parent dir");
+        std::fs::create_dir_all(&cmd.repo_path).expect("creating repository parent dir");
     }
     let dir = cmd.repo_path.join("repository");
     if !dir.exists() {
-        std::fs::create_dir(&dir).expect("creating repository dir");
+        std::fs::create_dir_all(&dir).expect("creating repository dir");
     }
     let lock_file = lock_repository(&dir).await?;
     let publish_result = repo_publish_oneshot(cmd).await;
@@ -574,30 +574,39 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_repository_should_create_repo_with_keys_if_it_does_not_exist() {
-        let tempdir = tempfile::tempdir().unwrap();
-        let root = Utf8Path::from_path(tempdir.path()).unwrap();
+        let subdirs = vec![
+            // Run a test in the tempdir as provided ...
+            "",
+            // ... and in a to-be-created subdir
+            "nonexistent",
+        ];
+        for subdir in subdirs {
+            let tempdir = tempfile::tempdir().unwrap();
+            let fqdir = tempdir.into_path().join(subdir);
+            let root = Utf8Path::from_path(fqdir.as_path()).unwrap();
 
-        let repo_keys_path = root.join("keys");
-        let repo_path = root.join("repo");
+            let repo_keys_path = root.join("keys");
+            let repo_path = root.join("repo");
 
-        test_utils::make_repo_keys_dir(&repo_keys_path);
+            test_utils::make_repo_keys_dir(&repo_keys_path);
 
-        let cmd = RepoPublishCommand {
-            trusted_keys: Some(repo_keys_path),
-            repo_path: repo_path.to_path_buf(),
-            ..default_command_for_test()
-        };
+            let cmd = RepoPublishCommand {
+                trusted_keys: Some(repo_keys_path),
+                repo_path: repo_path.to_path_buf(),
+                ..default_command_for_test()
+            };
 
-        assert_matches!(cmd_repo_publish(cmd).await, Ok(()));
+            assert_matches!(cmd_repo_publish(cmd).await, Ok(()));
 
-        let repo = PmRepository::new(repo_path);
-        let mut repo_client = RepoClient::from_trusted_remote(repo).await.unwrap();
+            let repo = PmRepository::new(repo_path);
+            let mut repo_client = RepoClient::from_trusted_remote(repo).await.unwrap();
 
-        assert_matches!(repo_client.update().await, Ok(true));
-        assert_eq!(repo_client.database().trusted_root().version(), 1);
-        assert_eq!(repo_client.database().trusted_targets().map(|m| m.version()), Some(1));
-        assert_eq!(repo_client.database().trusted_snapshot().map(|m| m.version()), Some(1));
-        assert_eq!(repo_client.database().trusted_timestamp().map(|m| m.version()), Some(1));
+            assert_matches!(repo_client.update().await, Ok(true));
+            assert_eq!(repo_client.database().trusted_root().version(), 1);
+            assert_eq!(repo_client.database().trusted_targets().map(|m| m.version()), Some(1));
+            assert_eq!(repo_client.database().trusted_snapshot().map(|m| m.version()), Some(1));
+            assert_eq!(repo_client.database().trusted_timestamp().map(|m| m.version()), Some(1));
+        }
     }
 
     #[fuchsia::test]

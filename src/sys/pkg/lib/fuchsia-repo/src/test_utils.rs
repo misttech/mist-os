@@ -141,7 +141,7 @@ fn copy_dir(from: &Path, to: &Path) -> Result<()> {
             if to_path.exists() {
                 continue;
             } else {
-                create_dir(&to_path).with_context(|| format!("creating {to_path:?}"))?;
+                create_dir_all(&to_path).with_context(|| format!("creating {to_path:?}"))?;
             }
         } else {
             copy(entry.path(), &to_path)
