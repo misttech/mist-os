@@ -287,6 +287,15 @@ config("rtti") {
 
 config("no_rtti") {
   cflags_cc = [ "-fno-rtti" ]
+
+  if (is_kernel && is_fuchsia && !is_gcc) {
+    cflags_cc += [
+      # Remove the unused rtti component from vtables.
+      "-Xclang",
+      "-fexperimental-omit-vtable-rtti",
+    ]
+  }
+
   cflags_objcc = cflags_cc
   ldflags = cflags_cc
 }

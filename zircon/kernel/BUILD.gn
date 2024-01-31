@@ -236,12 +236,6 @@ config("standalone") {
     # compiler driver from passing -pie, so negate it.  BFD ld doesn't
     # have --no-pie, but arm64-elf-gcc doesn't pass -pie either.
     ldflags += [ "-Wl,--no-pie" ]
-
-    cflags_cc += [
-      # Remove the unused rtti component from vtables.
-      "-Xclang",
-      "-fexperimental-omit-vtable-rtti",
-    ]
   }
 
   configs = [ "//build/config:no_exceptions" ]
