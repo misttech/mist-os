@@ -67,6 +67,24 @@ enum class SegType {
   kSegTypeMax,
 };
 
+class ChildInodeInfo : public fbl::DoublyLinkedListable<std::unique_ptr<ChildInodeInfo>> {
+ public:
+  ChildInodeInfo() = delete;
+  ChildInodeInfo(const ChildInodeInfo &) = delete;
+  ChildInodeInfo &operator=(const ChildInodeInfo &) = delete;
+  ChildInodeInfo(ChildInodeInfo &&) = delete;
+  ChildInodeInfo &operator=(ChildInodeInfo &&) = delete;
+  ChildInodeInfo(nid_t id, FileType ftype) : id_(id), ftype_(ftype) {}
+  nid_t Id() const { return id_; }
+  FileType Ftype() const { return ftype_; }
+
+ private:
+  const nid_t id_;
+  const FileType ftype_ = FileType::kFtUnknown;
+};
+
+using ChildList = fbl::DoublyLinkedList<std::unique_ptr<ChildInodeInfo>>;
+
 #if 0  // porting needed
 struct DumpOption {
   nid_t nid;
@@ -116,6 +134,7 @@ class FsckWorker {
                                  NodeType ntype);
 
   // Below traverse functions describe how to iterate over for each data structures.
+  zx_status_t TraverseInode(nid_t ino, FileType ftype);
   zx::result<TraverseResult> TraverseInodeBlock(const Node &node_block, NodeInfo node_info,
                                                 FileType ftype);
   zx::result<TraverseResult> TraverseDnodeBlock(const Inode *inode, const Node &node_block,
@@ -137,8 +156,8 @@ class FsckWorker {
 
   void PrintRawSuperblockInfo();
   void PrintCheckpointInfo();
-  void PrintInodeInfo(Inode &inode);
-  void PrintNodeInfo(Node &node_block);
+  void PrintInodeInfo(const Inode &inode);
+  void PrintNodeInfo(const Node &node_block);
 
   // Fsck checks f2fs consistency as below.
   // 1. It loads a valid superblock, and it obtains valid node/inode/block count information.
@@ -280,6 +299,7 @@ class FsckWorker {
 
   RawBitmap sit_area_bitmap_;
   uint32_t sit_area_bitmap_size_ = 0;
+  ChildList inode_list_;
 };
 
 zx_status_t Fsck(std::unique_ptr<BcacheMapper> bc, const FsckOptions &options,

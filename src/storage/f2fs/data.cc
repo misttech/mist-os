@@ -71,39 +71,6 @@ zx::result<block_t> VnodeF2fs::FindDataBlkAddr(pgoff_t index) {
   return zx::ok((*dnode_page_or).GetPage<NodePage>().GetBlockAddr(ofs_in_dnode));
 }
 
-zx::result<LockedPage> VnodeF2fs::FindDataPage(pgoff_t index, bool do_read) {
-  fbl::RefPtr<Page> page;
-  if (FindPage(index, &page) == ZX_OK && page->IsUptodate()) {
-    LockedPage locked_page = LockedPage(std::move(page));
-    return zx::ok(std::move(locked_page));
-  }
-
-  auto addr_or = FindDataBlkAddr(index);
-  if (addr_or.is_error()) {
-    return addr_or.take_error();
-  }
-  if (*addr_or == kNullAddr) {
-    return zx::error(ZX_ERR_NOT_FOUND);
-  } else if (*addr_or == kNewAddr) {
-    // By fallocate(), there is no cached page, but with kNewAddr
-    return zx::error(ZX_ERR_INVALID_ARGS);
-  }
-
-  LockedPage locked_page;
-  if (zx_status_t err = GrabCachePage(index, &locked_page); err != ZX_OK) {
-    return zx::error(err);
-  }
-
-  if (do_read) {
-    if (auto status = fs()->MakeReadOperation(locked_page, *addr_or, PageType::kData);
-        status.is_error()) {
-      return status.take_error();
-    }
-  }
-
-  return zx::ok(std::move(locked_page));
-}
-
 zx::result<LockedPagesAndAddrs> VnodeF2fs::FindDataBlockAddrsAndPages(const pgoff_t start,
                                                                       const pgoff_t end) {
   LockedPagesAndAddrs addrs_and_pages;

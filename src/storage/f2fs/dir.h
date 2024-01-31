@@ -28,6 +28,8 @@ class Dir : public VnodeF2fs, public fbl::Recyclable<Dir> {
                                      [[maybe_unused]] fs::Rights rights,
                                      fs::VnodeRepresentation *info) final;
 
+  zx::result<LockedPage> FindDataPage(pgoff_t index, bool do_read = true);
+
   // Lookup
   zx_status_t Lookup(std::string_view name, fbl::RefPtr<fs::Vnode> *out) final
       __TA_EXCLUDES(mutex_);

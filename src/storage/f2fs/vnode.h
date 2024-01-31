@@ -141,7 +141,6 @@ class VnodeF2fs : public fs::PagedVnode,
   zx_status_t ReserveNewBlock(NodePage &node_page, size_t ofs_in_node);
 
   zx::result<block_t> FindDataBlkAddr(pgoff_t index);
-  zx::result<LockedPage> FindDataPage(pgoff_t index, bool do_read = true);
   // This function returns block addresses and LockedPages for requested offsets. If there is no
   // node page of a offset or the block address is not assigned, this function adds null LockedPage
   // and kNullAddr to LockedPagesAndAddrs struct. A caller should consider the null LockedPage and

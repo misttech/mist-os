@@ -419,12 +419,6 @@ TEST_P(DirectoryTest, RmdirOnlyAllowsDirectories) {
 }
 
 TEST_P(DirectoryTest, Deep) {
-  // TODO(https://fxbug.dev/42076602): Fix stack overflow in f2fs fsck
-  if (fs().GetTraits().name == "f2fs") {
-    std::cout << "Skipped test" << std::endl;
-    return;
-  }
-
   // Make sure it's possible to create a directory that's 200 levels deep.
   std::string path = GetPath("a");
   for (int i = 0; i < 200; ++i) {

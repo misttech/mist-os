@@ -314,7 +314,6 @@ zx::result<TraverseResult> FsckWorker::CheckNodeBlock(const Inode *inode, nid_t 
   uint64_t block_count = 0;
   uint32_t link_count = 0;
 
-  // Use heap memory as CheckNodeBlock is called recursively.
   auto node_block_ptr = std::make_unique<BlockBuffer<Node>>();
   auto &node_block = *node_block_ptr;
   // Read the node block.
@@ -340,7 +339,8 @@ zx::result<TraverseResult> FsckWorker::CheckNodeBlock(const Inode *inode, nid_t 
     zx::result<TraverseResult> ret;
     switch (ntype) {
       case NodeType::kTypeInode:
-        ret = TraverseInodeBlock(*node_block, node_info, ftype);
+        inode_list_.push_back(std::make_unique<ChildInodeInfo>(nid, ftype));
+        ret = zx::ok(TraverseResult{0, 0});
         break;
       case NodeType::kTypeDirectNode:
         ret = TraverseDnodeBlock(inode, *node_block, node_info, ftype);
@@ -359,24 +359,8 @@ zx::result<TraverseResult> FsckWorker::CheckNodeBlock(const Inode *inode, nid_t 
     if (ret.is_error()) {
       return ret.take_error();
     }
-
     block_count += ret->block_count;
     link_count += ret->link_count;
-
-    if (ntype == NodeType::kTypeInode) {
-      uint32_t i_links = LeToCpu(node_block->i.i_links);
-      uint64_t i_blocks = LeToCpu(node_block->i.i_blocks);
-      if (i_blocks != block_count) {
-        FX_LOGS(WARNING) << "\tfile[0x" << std::hex << nid << "] i_blocks != block_count";
-        PrintNodeInfo(*node_block);
-        return zx::error(ZX_ERR_INTERNAL);
-      }
-      if (ftype == FileType::kFtDir && i_links != link_count) {
-        FX_LOGS(WARNING) << "\tdir[0x" << std::hex << nid << "] i_links != link_count";
-        PrintNodeInfo(*node_block);
-        return zx::error(ZX_ERR_INTERNAL);
-      }
-    }
   }
   return zx::ok(TraverseResult{block_count, link_count});
 }
@@ -463,6 +447,18 @@ zx::result<TraverseResult> FsckWorker::TraverseInodeBlock(const Node &node_block
       }
     }
   } while (false);
+
+  uint32_t i_links = LeToCpu(node_block.i.i_links);
+  if (i_blocks != block_count) {
+    FX_LOGS(WARNING) << "\tfile[0x" << std::hex << nid << "] i_blocks != block_count";
+    PrintNodeInfo(node_block);
+    return zx::error(ZX_ERR_INTERNAL);
+  }
+  if (ftype == FileType::kFtDir && i_links != child_count) {
+    FX_LOGS(WARNING) << "\tdir[0x" << std::hex << nid << "] i_links != link_count";
+    PrintNodeInfo(node_block);
+    return zx::error(ZX_ERR_INTERNAL);
+  }
 
   return zx::ok(TraverseResult{block_count, child_count});
 }
@@ -623,6 +619,27 @@ zx_status_t FsckWorker::CheckDataBlock(uint32_t block_address, uint32_t &child_c
   return ZX_OK;
 }
 
+zx_status_t FsckWorker::TraverseInode(nid_t ino, FileType ftype) {
+  auto status = CheckNodeBlock(nullptr, ino, ftype, NodeType::kTypeInode);
+  if (status.is_error()) {
+    return status.error_value();
+  }
+  ZX_DEBUG_ASSERT(!inode_list_.is_empty());
+  do {
+    auto inode_info = inode_list_.pop_front();
+    auto node_block = std::make_unique<BlockBuffer<Node>>();
+    auto node_info = ReadNodeBlock(inode_info->Id(), *node_block);
+    if (node_info.is_error()) {
+      return node_info.error_value();
+    }
+    if (auto ret = TraverseInodeBlock(**node_block, *node_info, inode_info->Ftype());
+        ret.is_error()) {
+      return ret.error_value();
+    }
+  } while (!inode_list_.is_empty());
+  return ZX_OK;
+}
+
 zx_status_t FsckWorker::CheckOrphanNodes() {
   block_t start_blk, orphan_blkaddr;
 
@@ -643,10 +660,8 @@ zx_status_t FsckWorker::CheckOrphanNodes() {
       if (fsck_options_.verbose) {
         FX_LOGS(INFO) << "\t[" << std::hex << i << "] ino [0x" << ino << "]";
       }
-
-      auto status = CheckNodeBlock(nullptr, ino, FileType::kFtOrphan, NodeType::kTypeInode);
-      if (status.is_error()) {
-        return status.error_value();
+      if (zx_status_t ret = TraverseInode(ino, FileType::kFtOrphan); ret != ZX_OK) {
+        return ret;
       }
     }
   }
@@ -1117,7 +1132,7 @@ zx_status_t FsckWorker::Repair() {
   return ZX_OK;
 }
 
-void FsckWorker::PrintInodeInfo(Inode &inode) {
+void FsckWorker::PrintInodeInfo(const Inode &inode) {
   uint32_t namelen = LeToCpu(inode.i_namelen);
 
   DisplayMember(sizeof(uint32_t), inode.i_mode, "i_mode");
@@ -1141,9 +1156,11 @@ void FsckWorker::PrintInodeInfo(Inode &inode) {
   DisplayMember(sizeof(uint32_t), inode.i_pino, "i_pino");
 
   if (namelen) {
+    char name[kMaxNameLen];
     DisplayMember(sizeof(uint32_t), inode.i_namelen, "i_namelen");
-    inode.i_name[namelen] = '\0';
-    DisplayMember(sizeof(char), inode.i_name, "i_name");
+    std::memcpy(name, inode.i_name, kMaxNameLen);
+    name[std::min(namelen, kMaxNameLen)] = '\0';
+    DisplayMember(sizeof(char), name, "i_name");
   }
 
   FX_LOGS(INFO) << "\ti_ext: fofs: " << std::hex << inode.i_ext.fofs
@@ -1169,7 +1186,7 @@ void FsckWorker::PrintInodeInfo(Inode &inode) {
   DisplayMember(sizeof(uint32_t), inode.i_nid[4], "i_nid[4]");  // double indirect
 }
 
-void FsckWorker::PrintNodeInfo(Node &node_block) {
+void FsckWorker::PrintNodeInfo(const Node &node_block) {
   nid_t ino = LeToCpu(node_block.footer.ino);
   nid_t nid = LeToCpu(node_block.footer.nid);
   if (ino == nid) {
@@ -1979,11 +1996,10 @@ zx_status_t FsckWorker::DoFsck() {
     return status;
   }
 
-  // Traverse all block recursively from root inode
-  if (auto status = CheckNodeBlock(nullptr, superblock_info_->GetRootIno(), FileType::kFtDir,
-                                   NodeType::kTypeInode);
-      status.is_error()) {
-    return status.error_value();
+  // Traverse all inodes from root inode
+  if (zx_status_t ret = TraverseInode(superblock_info_->GetRootIno(), FileType::kFtDir);
+      ret != ZX_OK) {
+    return ret;
   }
 
   if (auto status = Verify(); status != ZX_OK) {
