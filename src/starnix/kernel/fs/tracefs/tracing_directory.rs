@@ -15,7 +15,7 @@ use starnix_uapi::errors::Errno;
 
 use std::{collections::HashMap, sync::Mutex};
 
-use fuchsia_trace::{Scope, TraceCategoryContext};
+use fuchsia_trace::{ArgValue, Scope, TraceCategoryContext};
 use fuchsia_zircon as zx;
 use fuchsia_zircon::sys::zx_ticks_t;
 
@@ -93,6 +93,14 @@ impl FileOps for TraceMarkerFile {
                                 &[],
                             );
                         }
+                        ATraceEvent::Counter { name, value } => {
+                            // ATrace only supplies one name in each counter record,
+                            // so it appears that counters are not intended to be grouped.
+                            // As such, we use the name both for the record name and
+                            // the arg name.
+                            let arg = ArgValue::of(name, value);
+                            context.write_counter_with_inline_name(name, 0, &[arg]);
+                        }
                     }
                 }
             }
@@ -110,6 +118,7 @@ enum ATraceEvent<'a> {
     Instant { name: &'a str },
     AsyncBegin { name: &'a str, correlation_id: u64 },
     AsyncEnd { name: &'a str, correlation_id: u64 },
+    Counter { name: &'a str, value: i64 },
 }
 
 impl<'a> ATraceEvent<'a> {
@@ -133,6 +142,9 @@ impl<'a> ATraceEvent<'a> {
         } else if chunks.len() >= 4 && chunks[0] == "F" {
             let correlation_id = chunks[3].parse::<u64>().ok()?;
             return Some(ATraceEvent::AsyncEnd { name: chunks[2], correlation_id });
+        } else if chunks.len() >= 4 && chunks[0] == "C" {
+            let value = chunks[3].parse::<i64>().ok()?;
+            return Some(ATraceEvent::Counter { name: chunks[2], value });
         }
         None
     }
@@ -160,6 +172,10 @@ mod tests {
         assert_eq!(
             ATraceEvent::parse("F|1636|async_name|123"),
             Some(ATraceEvent::AsyncEnd { name: "async_name", correlation_id: 123 }),
+        );
+        assert_eq!(
+            ATraceEvent::parse("C|1636|counter_name|123"),
+            Some(ATraceEvent::Counter { name: "counter_name", value: 123 }),
         );
     }
 }

@@ -1020,6 +1020,11 @@ impl TraceCategoryContext {
         }
     }
 
+    pub fn write_counter_with_inline_name(&self, name: &str, counter_id: u64, args: &[Arg<'_>]) {
+        let name_ref = trace_make_inline_string_ref(name);
+        self.write_counter(name_ref, counter_id, args);
+    }
+
     fn write_duration(
         &self,
         name_ref: sys::trace_string_ref_t,
