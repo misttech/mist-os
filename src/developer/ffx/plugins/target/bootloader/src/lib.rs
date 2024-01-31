@@ -31,6 +31,7 @@ use fuchsia_async::{Time, Timer};
 use std::io::{stdin, Write};
 use std::net::SocketAddr;
 use std::sync::Once;
+use usb_fastboot_discovery::FASTBOOT_USB_DISCOVERY_ADDITIONAL_PRODUCTS;
 
 const MISSING_ZBI: &str = "Error: vbmeta parameter must be used with zbi parameter";
 
@@ -134,7 +135,19 @@ impl FfxMain for BootloaderTool {
                 let serial_num = info.serial_number.ok_or_else(|| {
                     anyhow!("Target was detected in Fastboot USB but did not have a serial number")
                 })?;
-                let proxy = usb_proxy(serial_num).await?;
+
+                let additional_products =
+                    ffx_config::get::<Vec<u16>, _>(FASTBOOT_USB_DISCOVERY_ADDITIONAL_PRODUCTS)
+                        .await
+                        .unwrap_or_else(|e| {
+                            tracing::warn!(
+                                "Error getting config value {}. Err: {}. proceeding with empty vec",
+                                e,
+                                FASTBOOT_USB_DISCOVERY_ADDITIONAL_PRODUCTS
+                            );
+                            vec![]
+                        });
+                let proxy = usb_proxy(serial_num, additional_products).await?;
                 bootloader_impl(proxy, self.cmd, &mut writer).await
             }
             Some(FidlFastbootInterface::Udp) => {

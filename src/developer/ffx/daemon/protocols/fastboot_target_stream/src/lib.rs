@@ -14,6 +14,7 @@ use futures::TryStreamExt;
 use protocols::prelude::*;
 use std::rc::Rc;
 use usb_fastboot_discovery::find_serial_numbers;
+use usb_fastboot_discovery::FASTBOOT_USB_DISCOVERY_ADDITIONAL_PRODUCTS;
 
 struct Inner {
     events_in: async_channel::Receiver<ffx::FastbootTarget>,
@@ -61,7 +62,18 @@ impl FidlProtocol for FastbootTargetStreamProtocol {
         }
         self.fastboot_task.replace(Task::local(async move {
             loop {
-                let fastboot_serials = find_serial_numbers();
+                let additional_products =
+                    ffx_config::get::<Vec<u16>, _>(FASTBOOT_USB_DISCOVERY_ADDITIONAL_PRODUCTS)
+                        .await
+                        .unwrap_or_else(|e| {
+                            tracing::warn!(
+                                "Error getting config value {}. Err: {}. proceeding with empty vec",
+                                e,
+                                FASTBOOT_USB_DISCOVERY_ADDITIONAL_PRODUCTS
+                            );
+                            vec![]
+                        });
+                let fastboot_serials = find_serial_numbers(&additional_products);
                 if let Some(inner) = inner.upgrade() {
                     for serial in fastboot_serials {
                         let _ = inner

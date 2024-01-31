@@ -20,7 +20,7 @@ use usb_bulk::AsyncInterface;
 //
 
 pub enum FastbootConnectionKind {
-    Usb(String),
+    Usb(String, Vec<u16>),
     Tcp(String, SocketAddr),
     Udp(String, SocketAddr),
 }
@@ -42,8 +42,8 @@ impl FastbootConnectionFactory for ConnectionFactory {
         connection: FastbootConnectionKind,
     ) -> Result<Box<dyn FastbootInterface>> {
         match connection {
-            FastbootConnectionKind::Usb(serial_number) => {
-                Ok(Box::new(usb_proxy(serial_number).await?))
+            FastbootConnectionKind::Usb(serial_number, additional_products) => {
+                Ok(Box::new(usb_proxy(serial_number, additional_products).await?))
             }
             FastbootConnectionKind::Tcp(target_name, addr) => {
                 Ok(Box::new(tcp_proxy(target_name, &addr).await?))
@@ -60,8 +60,11 @@ impl FastbootConnectionFactory for ConnectionFactory {
 //
 
 /// Creates a FastbootProxy over USB for a device with the given serial number
-pub async fn usb_proxy(serial_number: String) -> Result<FastbootProxy<AsyncInterface>> {
-    let mut interface_factory = UsbFactory::new(serial_number.clone());
+pub async fn usb_proxy(
+    serial_number: String,
+    additional_products: Vec<u16>,
+) -> Result<FastbootProxy<AsyncInterface>> {
+    let mut interface_factory = UsbFactory::new(serial_number.clone(), additional_products);
     let interface = interface_factory.open().await.with_context(|| {
         format!("Failed to open target usb interface by serial {serial_number}")
     })?;
