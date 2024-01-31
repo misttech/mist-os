@@ -15,17 +15,25 @@
 const char kServicePath[] = "/svc/fuchsia.tracing.provider.Registry";
 
 EXPORT zx_status_t trace_provider_connect_with_fdio(zx_handle_t* out_client) {
-  // Connect to the trace registry.
-  zx::channel registry_client;
-  zx::channel registry_service;
+  // NOTE: We clearly make this distinction (that this method uses fdio) as some tracing clients
+  // (i.e. magma) want to use tracing, but also do not want to take a dependency on fdio.
+  //
+  // Most non magma clients are happy to take the fdio dependency in exchange for not needing to do
+  // manual fidl channel handling so we also expose this helper method.
+  //
+  // We could use component::Connect here, but we'd take an additional dependency on the component
+  // library.
+  zx::channel registry_client, registry_service;
   zx_status_t status = zx::channel::create(0u, &registry_client, &registry_service);
-  if (status != ZX_OK)
+  if (status != ZX_OK) {
     return status;
+  }
 
   status = fdio_service_connect(kServicePath,
                                 registry_service.release());  // takes ownership
-  if (status != ZX_OK)
+  if (status != ZX_OK) {
     return status;
+  }
 
   *out_client = registry_client.release();
   return ZX_OK;
