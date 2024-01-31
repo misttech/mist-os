@@ -30,6 +30,7 @@ host_test_data("empty-repo-metadata") {
   outputs = [ "$root_out_dir/test_data/ffx_lib_pkg/empty-repo/repository/{{source_file_part}}" ]
 }
 
+relative_root_out_dir = rebase_path(root_out_dir, root_build_dir)
 rustc_library("pkg") {
   name = "pkg"
   edition = "2021"
@@ -76,6 +77,8 @@ rustc_library("pkg") {
     "src/repo.rs",
     "src/tunnel.rs",
   ]
+
+  rustenv = [ "ROOT_OUT_DIR=$relative_root_out_dir" ]
 }
 
 group("tests") {

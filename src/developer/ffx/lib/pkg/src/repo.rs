@@ -551,7 +551,8 @@ pub fn create_repo_host(
 mod tests {
     use {super::*, assert_matches::assert_matches, std::fs, std::net::Ipv4Addr};
 
-    const EMPTY_REPO_PATH: &str = "host_x64/test_data/ffx_lib_pkg/empty-repo";
+    const EMPTY_REPO_PATH: &str =
+        concat!(env!("ROOT_OUT_DIR"), "/test_data/ffx_lib_pkg/empty-repo");
 
     fn pm_repo_spec() -> RepositorySpec {
         let path = fs::canonicalize(EMPTY_REPO_PATH).unwrap();
