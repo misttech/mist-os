@@ -63,8 +63,8 @@ use crate::{
             FakeFrameCtx, FakeInstant, FakeNetworkContext, FakeTimerCtx, FakeTimerCtxExt,
             WithFakeFrameContext, WithFakeTimerContext,
         },
-        EventContext, InstantBindingsTypes, InstantContext, RngContext, SyncCtx, TimerContext,
-        TimerHandler, TracingContext, UnlockedCoreCtx,
+        EventContext, InstantBindingsTypes, InstantContext, RngContext, TimerContext, TimerHandler,
+        TracingContext, UnlockedCoreCtx,
     },
     device::{
         ethernet::MaxEthernetFrameSize,
@@ -85,7 +85,7 @@ use crate::{
         types::{AddableEntry, AddableMetric, RawMetric},
         IpLayerEvent,
     },
-    state::StackStateBuilder,
+    state::{StackState, StackStateBuilder},
     sync::Mutex,
     time::TimerId,
     transport::{
@@ -99,7 +99,7 @@ use crate::{
         },
         udp::{self, UdpBindingsContext},
     },
-    BindingsTypes, CoreCtx,
+    BindingsTypes,
 };
 
 /// NDP test utilities.
@@ -164,7 +164,7 @@ where
 }
 
 /// Context available during the execution of the netstack.
-pub type Ctx<BT> = ContextPair<SyncCtx<BT>, BT>;
+pub type Ctx<BT> = ContextPair<StackState<BT>, BT>;
 
 impl<BC: crate::BindingsContext + Default> Default for Ctx<BC> {
     fn default() -> Self {
@@ -176,19 +176,19 @@ impl<BC: crate::BindingsContext + Default> Ctx<BC> {
     pub(crate) fn new_with_builder(builder: StackStateBuilder) -> Self {
         let mut bindings_ctx = Default::default();
         let state = builder.build_with_ctx(&mut bindings_ctx);
-        Self { core_ctx: SyncCtx { state }, bindings_ctx }
+        Self { core_ctx: state, bindings_ctx }
     }
 }
 
 impl<CC, BC> ContextPair<CC, BC>
 where
-    CC: Borrow<SyncCtx<BC>>,
+    CC: Borrow<StackState<BC>>,
     BC: BindingsTypes,
 {
     /// Retrieves a [`crate::api::CoreApi`] from this [`Ctx`].
     pub fn core_api(&mut self) -> crate::api::CoreApi<'_, &mut BC> {
         let Self { core_ctx, bindings_ctx } = self;
-        CC::borrow(core_ctx).state.api(bindings_ctx)
+        CC::borrow(core_ctx).api(bindings_ctx)
     }
 
     /// Retrieves the core and bindings context, respectively.
@@ -197,18 +197,18 @@ where
     /// a core context.
     pub fn contexts(&mut self) -> (UnlockedCoreCtx<'_, BC>, &mut BC) {
         let Self { core_ctx, bindings_ctx } = self;
-        (UnlockedCoreCtx::new(&CC::borrow(core_ctx).state), bindings_ctx)
+        (UnlockedCoreCtx::new(&CC::borrow(core_ctx)), bindings_ctx)
     }
 
     /// Like [`ContextPair::contexts`], but retrieves only the core context.
     pub fn core_ctx(&self) -> UnlockedCoreCtx<'_, BC> {
-        UnlockedCoreCtx::new(&CC::borrow(&self.core_ctx).state)
+        UnlockedCoreCtx::new(&CC::borrow(&self.core_ctx))
     }
 
     /// Retrieves a [`TestApi`] from this [`Ctx`].
     pub fn test_api(&mut self) -> TestApi<'_, BC> {
         let Self { core_ctx, bindings_ctx } = self;
-        TestApi(UnlockedCoreCtx::new(&CC::borrow(core_ctx).state), bindings_ctx)
+        TestApi(UnlockedCoreCtx::new(&CC::borrow(core_ctx)), bindings_ctx)
     }
 }
 
@@ -423,7 +423,7 @@ impl<BC: BindingsTypes> Ctx<BC> {
         for<'a> UnlockedCoreCtx<'a, BC>: TimerHandler<BC, Id>,
     {
         let Self { core_ctx, bindings_ctx } = self;
-        bindings_ctx.trigger_next_timer(&mut CoreCtx::new_deprecated(core_ctx))
+        bindings_ctx.trigger_next_timer(&mut core_ctx.context())
     }
 
     /// Shortcut for [`FakeTimerCtxExt::trigger_timers_for`].
@@ -433,7 +433,7 @@ impl<BC: BindingsTypes> Ctx<BC> {
         for<'a> UnlockedCoreCtx<'a, BC>: TimerHandler<BC, Id>,
     {
         let Self { core_ctx, bindings_ctx } = self;
-        bindings_ctx.trigger_timers_for(duration, &mut CoreCtx::new_deprecated(core_ctx))
+        bindings_ctx.trigger_timers_for(duration, &mut core_ctx.context())
     }
 
     /// Shortcut for [`FaketimerCtx::trigger_timers_until_instant`].
@@ -443,7 +443,7 @@ impl<BC: BindingsTypes> Ctx<BC> {
         for<'a> UnlockedCoreCtx<'a, BC>: TimerHandler<BC, Id>,
     {
         let Self { core_ctx, bindings_ctx } = self;
-        bindings_ctx.trigger_timers_until_instant(instant, &mut CoreCtx::new_deprecated(core_ctx))
+        bindings_ctx.trigger_timers_until_instant(instant, &mut core_ctx.context())
     }
 
     /// Shortcut for [`FakeTimerCtxExt::trigger_timers_until_and_expect_unordered`].
@@ -460,7 +460,7 @@ impl<BC: BindingsTypes> Ctx<BC> {
         bindings_ctx.trigger_timers_until_and_expect_unordered(
             instant,
             timers,
-            &mut CoreCtx::new_deprecated(core_ctx),
+            &mut core_ctx.context(),
         )
     }
 }
@@ -560,8 +560,8 @@ impl FakeBindingsCtxState {
 
 /// Shorthand for [`Ctx`] with a [`FakeBindingsCtx`].
 pub type FakeCtx = Ctx<FakeBindingsCtx>;
-/// Shorthand for [`SyncCtx`] that uses a [`FakeBindingsCtx`].
-pub type FakeCoreCtx = SyncCtx<FakeBindingsCtx>;
+/// Shorthand for [`StackState`] that uses a [`FakeBindingsCtx`].
+pub type FakeCoreCtx = StackState<FakeBindingsCtx>;
 
 /// Test-only implementation of [`crate::BindingsContext`].
 #[derive(Default, Clone)]
@@ -1760,7 +1760,7 @@ mod tests {
 
         net.with_context("alice", |Ctx { core_ctx, bindings_ctx }| {
             IpSocketHandler::<Ipv4, _>::send_oneshot_ip_packet(
-                &mut CoreCtx::new_deprecated(&*core_ctx),
+                &mut core_ctx.context(),
                 bindings_ctx,
                 None, // device
                 None, // local_ip
@@ -2022,7 +2022,7 @@ mod tests {
             mtu: None,
         };
         IpLayerHandler::<A::Version, _>::send_ip_packet_from_device(
-            &mut CoreCtx::new_deprecated(core_ctx),
+            &mut core_ctx.context(),
             bindings_ctx,
             meta,
             Buf::new(vec![1, 2, 3, 4], ..),

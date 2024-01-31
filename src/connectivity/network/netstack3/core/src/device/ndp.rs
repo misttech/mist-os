@@ -174,7 +174,7 @@ mod tests {
             TestIpExt, DEFAULT_INTERFACE_METRIC, FAKE_CONFIG_V6, IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
         },
         time::TimerIdInner,
-        CoreCtx, Instant, TimerId,
+        Instant, TimerId,
     };
 
     #[derive(Debug, PartialEq, Copy, Clone)]
@@ -365,7 +365,7 @@ mod tests {
             assert_empty(bindings_ctx.frames_sent().iter());
 
             crate::ip::send_ip_packet_from_device::<Ipv6, _, _, _>(
-                &mut CoreCtx::new_deprecated(core_ctx),
+                &mut core_ctx.context(),
                 bindings_ctx,
                 SendIpPacketMeta {
                     device: &local_device_id,
@@ -388,7 +388,7 @@ mod tests {
 
         let _: StepResult = net.step();
         assert_eq!(
-            net.core_ctx("remote").state.ndp_counters().rx.neighbor_solicitation.get(),
+            net.core_ctx("remote").ndp_counters().rx.neighbor_solicitation.get(),
             1,
             "remote received solicitation"
         );
@@ -398,7 +398,7 @@ mod tests {
         let _: StepResult = net.step();
 
         assert_eq!(
-            net.core_ctx("local").state.ndp_counters().rx.neighbor_advertisement.get(),
+            net.core_ctx("local").ndp_counters().rx.neighbor_advertisement.get(),
             1,
             "local received advertisement"
         );
@@ -409,7 +409,7 @@ mod tests {
             assert_eq!(bindings_ctx.frames_sent().len(), 1);
         });
         let _: StepResult = net.step();
-        assert_eq!(net.core_ctx("remote").state.icmp_rx_counters::<Ipv6>().echo_request.get(), 1);
+        assert_eq!(net.core_ctx("remote").icmp_rx_counters::<Ipv6>().echo_request.get(), 1);
 
         // TODO(brunodalbo): We should be able to verify that remote also sends
         //  back an echo reply, but we're having some trouble with IPv6 link
@@ -501,12 +501,12 @@ mod tests {
         // They should now realize the address they intend to use has a
         // duplicate in the local network.
         with_assigned_ipv6_addr_subnets(
-            &mut CoreCtx::new_deprecated(&*net.core_ctx("local")),
+            &mut net.context("local").core_ctx(),
             &local_device_id,
             |addrs| assert_empty(addrs),
         );
         with_assigned_ipv6_addr_subnets(
-            &mut CoreCtx::new_deprecated(&*net.core_ctx("remote")),
+            &mut net.context("remote").core_ctx(),
             &remote_device_id,
             |addrs| assert_empty(addrs),
         );
@@ -623,7 +623,7 @@ mod tests {
 
         assert_eq!(
             with_assigned_ipv6_addr_subnets(
-                &mut CoreCtx::new_deprecated(&*net.core_ctx("remote")),
+                &mut net.context("remote").core_ctx(),
                 &remote_device_id,
                 |addrs| addrs.count()
             ),
@@ -819,7 +819,7 @@ mod tests {
         // duplicate in the local network.
         assert_eq!(
             with_assigned_ipv6_addr_subnets(
-                &mut CoreCtx::new_deprecated(&*net.core_ctx("local")),
+                &mut net.context("local").core_ctx(),
                 &local_device_id,
                 |a| a.count()
             ),
@@ -827,7 +827,7 @@ mod tests {
         );
         assert_eq!(
             with_assigned_ipv6_addr_subnets(
-                &mut CoreCtx::new_deprecated(&*net.core_ctx("remote")),
+                &mut net.context("remote").core_ctx(),
                 &remote_device_id,
                 |a| a.count()
             ),
@@ -1076,7 +1076,7 @@ mod tests {
             Some(FrameDestination::Multicast),
             icmpv6_packet_buf,
         );
-        assert_eq!(ctx.core_ctx.state.ndp_counters().rx.router_solicitation.get(), 0);
+        assert_eq!(ctx.core_ctx.ndp_counters().rx.router_solicitation.get(), 0);
     }
 
     #[test]
@@ -1122,7 +1122,7 @@ mod tests {
             Some(FrameDestination::Individual { local: true }),
             icmpv6_packet_buf,
         );
-        assert_eq!(ctx.core_ctx.state.ndp_counters().rx.router_advertisement.get(), 0);
+        assert_eq!(ctx.core_ctx.ndp_counters().rx.router_advertisement.get(), 0);
 
         // Test receiving NDP RA where source IP is a link local address (should
         // receive).
@@ -1134,7 +1134,7 @@ mod tests {
             Some(FrameDestination::Individual { local: true }),
             icmpv6_packet_buf,
         );
-        assert_eq!(ctx.core_ctx.state.ndp_counters().rx.router_advertisement.get(), 1);
+        assert_eq!(ctx.core_ctx.ndp_counters().rx.router_advertisement.get(), 1);
     }
 
     #[test]
@@ -1261,7 +1261,7 @@ mod tests {
             Some(FrameDestination::Multicast),
             icmpv6_packet_buf,
         );
-        assert_eq!(ctx.core_ctx.state.ndp_counters().rx.router_advertisement.get(), 1);
+        assert_eq!(ctx.core_ctx.ndp_counters().rx.router_advertisement.get(), 1);
         assert_eq!(
             crate::ip::IpDeviceContext::<Ipv6, _>::get_mtu(&mut ctx.core_ctx(), &device),
             hw_mtu
@@ -1280,7 +1280,7 @@ mod tests {
             Some(FrameDestination::Multicast),
             icmpv6_packet_buf,
         );
-        assert_eq!(ctx.core_ctx.state.ndp_counters().rx.router_advertisement.get(), 2);
+        assert_eq!(ctx.core_ctx.ndp_counters().rx.router_advertisement.get(), 2);
         assert_eq!(
             crate::ip::IpDeviceContext::<Ipv6, _>::get_mtu(&mut ctx.core_ctx(), &device),
             hw_mtu
@@ -1299,7 +1299,7 @@ mod tests {
             Some(FrameDestination::Multicast),
             icmpv6_packet_buf,
         );
-        assert_eq!(ctx.core_ctx.state.ndp_counters().rx.router_advertisement.get(), 3);
+        assert_eq!(ctx.core_ctx.ndp_counters().rx.router_advertisement.get(), 3);
         assert_eq!(
             crate::ip::IpDeviceContext::<Ipv6, _>::get_mtu(&mut ctx.core_ctx(), &device),
             Ipv6::MINIMUM_LINK_MTU,
@@ -2172,7 +2172,7 @@ mod tests {
         receive_prefix_update(&mut ctx, &device, src_ip, subnet, 9000, 10000);
 
         // Verify that `conflicted_addr` was generated and rejected.
-        assert_eq!(ctx.core_ctx.state.slaac_counters().generated_slaac_addr_exists.get(), 1);
+        assert_eq!(ctx.core_ctx.slaac_counters().generated_slaac_addr_exists.get(), 1);
 
         // Should have gotten a new temporary IP.
         let temporary_slaac_addresses =
@@ -2296,7 +2296,7 @@ mod tests {
         // Set the retransmit timer between neighbor solicitations to be greater
         // than the preferred lifetime of the prefix.
         Ipv6DeviceHandler::set_discovered_retrans_timer(
-            &mut CoreCtx::new_deprecated(core_ctx),
+            &mut core_ctx.context(),
             bindings_ctx,
             &device,
             const_unwrap::const_unwrap_option(NonZeroDuration::from_secs(10)),
@@ -3110,7 +3110,7 @@ mod tests {
         // REGEN_ADVANCE to be large, which increases the window between when an
         // address is regenerated and when it becomes deprecated.
         Ipv6DeviceHandler::set_discovered_retrans_timer(
-            &mut CoreCtx::new_deprecated(core_ctx),
+            &mut core_ctx.context(),
             bindings_ctx,
             &device,
             NonZeroDuration::new(max_preferred_lifetime / 4).unwrap(),

@@ -73,6 +73,11 @@ impl<BT: BindingsTypes> StackState<BT> {
         CoreApi::new(CtxPair { core_ctx: CoreCtx::new(self), bindings_ctx })
     }
 
+    #[cfg(any(test, feature = "testutils"))]
+    pub(crate) fn context(&self) -> crate::context::UnlockedCoreCtx<'_, BT> {
+        crate::context::UnlockedCoreCtx::new(self)
+    }
+
     pub(crate) fn ip_counters<I: IpLayerIpExt>(&self) -> &IpCounters<I> {
         I::map_ip(
             IpInvariant(self),

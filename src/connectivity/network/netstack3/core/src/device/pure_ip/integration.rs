@@ -366,11 +366,11 @@ mod tests {
             .unwrap_b();
 
         // Receive a frame from the network and verify delivery to the IP layer.
-        assert_eq!(ctx.core_ctx.state.ip_counters::<I>().receive_ip_packet.get(), 0);
+        assert_eq!(ctx.core_ctx.ip_counters::<I>().receive_ip_packet.get(), 0);
         ctx.core_api().device::<PureIpDevice>().receive_frame(
             PureIpDeviceFrameMetadata { device_id: device, ip_version: I::VERSION },
             packet,
         );
-        assert_eq!(ctx.core_ctx.state.ip_counters::<I>().receive_ip_packet.get(), 1);
+        assert_eq!(ctx.core_ctx.ip_counters::<I>().receive_ip_packet.get(), 1);
     }
 }

@@ -3285,24 +3285,20 @@ mod tests {
             // TODO(https://fxbug.dev/42084333): Redesign iterating through
             // assert_counters once CounterContext is removed.
             let count = match *counter {
-                "send_ipv4_packet" => core_ctx.state.ipv4.inner.counters().send_ip_packet.get(),
-                "send_ipv6_packet" => core_ctx.state.ipv6.inner.counters().send_ip_packet.get(),
-                "echo_request" => core_ctx.state.icmp_rx_counters::<I>().echo_request.get(),
-                "timestamp_request" => {
-                    core_ctx.state.icmp_rx_counters::<I>().timestamp_request.get()
-                }
+                "send_ipv4_packet" => core_ctx.ipv4.inner.counters().send_ip_packet.get(),
+                "send_ipv6_packet" => core_ctx.ipv6.inner.counters().send_ip_packet.get(),
+                "echo_request" => core_ctx.icmp_rx_counters::<I>().echo_request.get(),
+                "timestamp_request" => core_ctx.icmp_rx_counters::<I>().timestamp_request.get(),
                 "protocol_unreachable" => {
-                    core_ctx.state.icmp_tx_counters::<I>().protocol_unreachable.get()
+                    core_ctx.icmp_tx_counters::<I>().protocol_unreachable.get()
                 }
-                "port_unreachable" => core_ctx.state.icmp_tx_counters::<I>().port_unreachable.get(),
-                "net_unreachable" => core_ctx.state.icmp_tx_counters::<I>().net_unreachable.get(),
-                "ttl_expired" => core_ctx.state.icmp_tx_counters::<I>().ttl_expired.get(),
-                "packet_too_big" => core_ctx.state.icmp_tx_counters::<I>().packet_too_big.get(),
-                "parameter_problem" => {
-                    core_ctx.state.icmp_tx_counters::<I>().parameter_problem.get()
-                }
-                "dest_unreachable" => core_ctx.state.icmp_tx_counters::<I>().dest_unreachable.get(),
-                "error" => core_ctx.state.icmp_tx_counters::<I>().error.get(),
+                "port_unreachable" => core_ctx.icmp_tx_counters::<I>().port_unreachable.get(),
+                "net_unreachable" => core_ctx.icmp_tx_counters::<I>().net_unreachable.get(),
+                "ttl_expired" => core_ctx.icmp_tx_counters::<I>().ttl_expired.get(),
+                "packet_too_big" => core_ctx.icmp_tx_counters::<I>().packet_too_big.get(),
+                "parameter_problem" => core_ctx.icmp_tx_counters::<I>().parameter_problem.get(),
+                "dest_unreachable" => core_ctx.icmp_tx_counters::<I>().dest_unreachable.get(),
+                "error" => core_ctx.icmp_tx_counters::<I>().error.get(),
                 c => panic!("unrecognized counter: {c}"),
             };
             assert!(count > 0, "counter at zero: {counter}");

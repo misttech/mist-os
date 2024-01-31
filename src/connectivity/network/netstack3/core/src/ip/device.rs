@@ -1805,7 +1805,7 @@ mod tests {
     use net_types::{ip::Ipv6, LinkLocalAddr};
 
     use crate::{
-        context::{testutil::FakeInstant, CoreCtx},
+        context::testutil::FakeInstant,
         device::{
             ethernet::{EthernetCreationProperties, EthernetLinkDevice, MaxEthernetFrameSize},
             loopback::{LoopbackCreationProperties, LoopbackDevice},
@@ -1906,7 +1906,7 @@ mod tests {
 
         // Assert that static ARP entries are flushed on link down.
         nud::testutil::assert_neighbor_unknown::<Ipv4, _, _, _>(
-            &mut CoreCtx::new_deprecated(&ctx.core_ctx),
+            &mut ctx.core_ctx(),
             ethernet_device_id,
             addr,
         );
@@ -1996,7 +1996,7 @@ mod tests {
 
         assert_eq!(
             IpDeviceStateContext::<Ipv6, _>::with_address_ids(
-                &mut CoreCtx::new_deprecated(&ctx.core_ctx),
+                &mut ctx.core_ctx(),
                 device_id,
                 |addrs, _core_ctx| {
                     addrs.map(|addr_id| addr_id.addr_sub().addr().get()).collect::<HashSet<_>>()
@@ -2173,8 +2173,10 @@ mod tests {
             ]
         );
 
+        let (mut core_ctx, bindings_ctx) = ctx.contexts();
+        let core_ctx = &mut core_ctx;
         IpDeviceStateContext::<Ipv6, _>::with_address_ids(
-            &mut CoreCtx::new_deprecated(&ctx.core_ctx),
+            core_ctx,
             &device_id,
             |addrs, _core_ctx| {
                 assert_empty(addrs);
@@ -2182,26 +2184,17 @@ mod tests {
         );
 
         // Assert that static NDP entry was removed on link down.
-        nud::testutil::assert_neighbor_unknown::<Ipv6, _, _, _>(
-            &mut CoreCtx::new_deprecated(&ctx.core_ctx),
-            ethernet_device_id,
-            addr,
-        );
+        nud::testutil::assert_neighbor_unknown::<Ipv6, _, _, _>(core_ctx, ethernet_device_id, addr);
 
         let multicast_addr = Ipv6::ALL_ROUTERS_LINK_LOCAL_MULTICAST_ADDRESS;
-        join_ip_multicast::<Ipv6, _, _>(
-            &mut CoreCtx::new_deprecated(&ctx.core_ctx),
-            &mut ctx.bindings_ctx,
-            &device_id,
-            multicast_addr,
-        );
+        join_ip_multicast::<Ipv6, _, _>(core_ctx, bindings_ctx, &device_id, multicast_addr);
         ctx.core_api()
             .device_ip::<Ipv6>()
             .add_ip_addr_subnet(&device_id, ll_addr.replace_witness().unwrap())
             .expect("add MAC based IPv6 link-local address");
         assert_eq!(
             IpDeviceStateContext::<Ipv6, _>::with_address_ids(
-                &mut CoreCtx::new_deprecated(&ctx.core_ctx),
+                &mut ctx.core_ctx(),
                 &device_id,
                 |addrs, _core_ctx| {
                     addrs.map(|addr_id| addr_id.addr_sub().addr().get()).collect::<HashSet<_>>()
@@ -2274,11 +2267,14 @@ mod tests {
 
         // Verify that a redundant "disable" does not generate any events.
         test_disable_device(&mut ctx, false);
-        assert_eq!(ctx.bindings_ctx.take_events()[..], []);
+
+        let (mut core_ctx, bindings_ctx) = ctx.contexts();
+        let core_ctx = &mut core_ctx;
+        assert_eq!(bindings_ctx.take_events()[..], []);
 
         assert_eq!(
             IpDeviceStateContext::<Ipv6, _>::with_address_ids(
-                &mut CoreCtx::new_deprecated(&ctx.core_ctx),
+                core_ctx,
                 &device_id,
                 |addrs, _core_ctx| {
                     addrs.map(|addr_id| addr_id.addr_sub().addr().get()).collect::<HashSet<_>>()
@@ -2288,12 +2284,7 @@ mod tests {
             "manual addresses should not be removed on device disable"
         );
 
-        leave_ip_multicast::<Ipv6, _, _>(
-            &mut CoreCtx::new_deprecated(&ctx.core_ctx),
-            &mut ctx.bindings_ctx,
-            &device_id,
-            multicast_addr,
-        );
+        leave_ip_multicast::<Ipv6, _, _>(core_ctx, bindings_ctx, &device_id, multicast_addr);
         test_enable_device(&mut ctx, None, false);
         assert_eq!(
             ctx.bindings_ctx.take_events()[..],
@@ -2398,7 +2389,7 @@ mod tests {
         // removed.
         assert_eq!(
             Ipv6DeviceHandler::remove_duplicate_tentative_address(
-                &mut CoreCtx::new_deprecated(core_ctx),
+                &mut core_ctx.context(),
                 bindings_ctx,
                 &device_id,
                 assigned_addr.ipv6_unicast_addr()
@@ -2417,7 +2408,7 @@ mod tests {
 
         assert_eq!(
             IpDeviceStateContext::<Ipv6, _>::with_address_ids(
-                &mut CoreCtx::new_deprecated(core_ctx),
+                &mut core_ctx.context(),
                 &device_id,
                 |addrs, _core_ctx| {
                     addrs.map(|addr_id| addr_id.addr_sub().addr().get()).collect::<HashSet<_>>()
@@ -2757,7 +2748,7 @@ mod tests {
 
         assert_eq!(
             IpDeviceStateContext::<Ipv6, _>::with_address_ids(
-                &mut CoreCtx::new_deprecated(&ctx.core_ctx),
+                &mut ctx.core_ctx(),
                 &device_id,
                 |addrs, _core_ctx| {
                     addrs.map(|addr_id| addr_id.addr_sub().addr().get()).collect::<HashSet<_>>()

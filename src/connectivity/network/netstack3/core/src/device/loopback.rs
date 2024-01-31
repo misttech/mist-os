@@ -566,7 +566,6 @@ mod tests {
         testutil::{
             FakeBindingsCtx, FakeEventDispatcherConfig, TestIpExt, DEFAULT_INTERFACE_METRIC,
         },
-        CoreCtx,
     };
 
     use super::*;
@@ -587,17 +586,11 @@ mod tests {
         crate::device::testutil::enable_device(&mut ctx, &device);
 
         assert_eq!(
-            crate::ip::IpDeviceContext::<Ipv4, _>::get_mtu(
-                &mut CoreCtx::new_deprecated(&ctx.core_ctx),
-                &device
-            ),
+            crate::ip::IpDeviceContext::<Ipv4, _>::get_mtu(&mut ctx.core_ctx(), &device),
             MTU
         );
         assert_eq!(
-            crate::ip::IpDeviceContext::<Ipv6, _>::get_mtu(
-                &mut CoreCtx::new_deprecated(&ctx.core_ctx),
-                &device
-            ),
+            crate::ip::IpDeviceContext::<Ipv6, _>::get_mtu(&mut ctx.core_ctx(), &device),
             MTU
         );
     }
@@ -618,7 +611,7 @@ mod tests {
 
         let get_addrs = |ctx: &mut crate::testutil::FakeCtx| {
             crate::ip::device::IpDeviceStateContext::<I, _>::with_address_ids(
-                &mut CoreCtx::new_deprecated(&ctx.core_ctx),
+                &mut ctx.core_ctx(),
                 &device,
                 |addrs, _core_ctx| addrs.map(|a| SpecifiedAddr::from(a.addr())).collect::<Vec<_>>(),
             )
@@ -660,19 +653,13 @@ mod tests {
         const BODY: &[u8] = b"IP body".as_slice();
 
         let body = Buf::new(Vec::from(BODY), ..);
-        send_ip_frame(
-            &mut CoreCtx::new_deprecated(core_ctx),
-            bindings_ctx,
-            &device,
-            local_addr,
-            body,
-        )
-        .expect("can send");
+        send_ip_frame(&mut core_ctx.context(), bindings_ctx, &device, local_addr, body)
+            .expect("can send");
 
         // There is no transmit queue so the frames will immediately go into the
         // receive queue.
         let mut frames = ReceiveQueueContext::<LoopbackDevice, _>::with_receive_queue_mut(
-            &mut CoreCtx::new_deprecated(core_ctx),
+            &mut core_ctx.context(),
             &device,
             |queue_state| queue_state.take_frames().map(|((), frame)| frame).collect::<Vec<_>>(),
         );

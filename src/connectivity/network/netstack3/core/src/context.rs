@@ -283,15 +283,6 @@ pub trait ReferenceNotifiers {
     ) -> (Self::ReferenceNotifier<T>, Self::ReferenceReceiver<T>);
 }
 
-/// The synchronized context.
-// TODO(https://fxbug.dev/42083910): Remove this type once the API no longer
-// requires it.
-#[cfg(any(test, feature = "testutils"))]
-pub struct SyncCtx<BT: BindingsTypes> {
-    /// Contains the state of the stack.
-    pub state: StackState<BT>,
-}
-
 /// Provides access to core context implementations.
 ///
 /// `L` is the current lock level of `CoreCtx`. The alias [`UnlockedCoreCtx`] is
@@ -463,14 +454,6 @@ mod locked {
         /// Creates a new `CoreCtx` from a borrowed [`StackState`].
         pub fn new(stack_state: &'a StackState<BT>) -> Self {
             Self(ExternalLocked::new(stack_state))
-        }
-
-        /// Creates a new `CoreCtx` from a borrowed [`SyncCtx`].
-        // TODO(https://fxbug.dev/42083910): This is a transitional method
-        // before we get rid of SyncCtx altogether.
-        #[cfg(any(test, feature = "testutils"))]
-        pub(crate) fn new_deprecated(sync_ctx: &'a crate::context::SyncCtx<BT>) -> Self {
-            Self(ExternalLocked::new(&sync_ctx.state))
         }
     }
 

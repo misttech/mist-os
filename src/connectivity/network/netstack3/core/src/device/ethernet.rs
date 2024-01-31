@@ -1844,14 +1844,14 @@ mod tests {
         match addr.into() {
             IpAddr::V4(addr) => {
                 crate::ip::device::IpDeviceStateContext::<Ipv4, _>::with_address_ids(
-                    &mut CoreCtx::new_deprecated(core_ctx),
+                    &mut core_ctx.context(),
                     device,
                     |mut addrs, _core_ctx| addrs.any(|a| a.addr().addr() == addr.get()),
                 )
             }
             IpAddr::V6(addr) => {
                 crate::ip::device::IpDeviceStateContext::<Ipv6, _>::with_address_ids(
-                    &mut CoreCtx::new_deprecated(core_ctx),
+                    &mut core_ctx.context(),
                     device,
                     |mut addrs, _core_ctx| addrs.any(|a| a.addr().addr() == addr.get()),
                 )
@@ -1939,10 +1939,7 @@ mod tests {
             .device::<EthernetLinkDevice>()
             .receive_frame(RecvEthernetFrameMeta { device_id: eth_device }, Buf::new(bytes, ..));
 
-        assert_eq!(
-            ctx.core_ctx.state.ip_counters::<I>().receive_ip_packet.get(),
-            expected_received
-        );
+        assert_eq!(ctx.core_ctx.ip_counters::<I>().receive_ip_packet.get(), expected_received);
     }
 
     #[test]
@@ -2133,28 +2130,22 @@ mod tests {
             .unwrap_b();
 
         // Accept packet destined for this device if promiscuous mode is off.
-        set_promiscuous_mode(&mut CoreCtx::new_deprecated(&ctx.core_ctx), &eth_device, false);
+        set_promiscuous_mode(&mut ctx.core_ctx(), &eth_device, false);
         ctx.core_api()
             .device::<EthernetLinkDevice>()
             .receive_frame(RecvEthernetFrameMeta { device_id: eth_device.clone() }, buf.clone());
 
-        assert_eq!(ctx.core_ctx.state.ip_counters::<I>().dispatch_receive_ip_packet.get(), 1);
-        assert_eq!(
-            ctx.core_ctx.state.ip_counters::<I>().dispatch_receive_ip_packet_other_host.get(),
-            0
-        );
+        assert_eq!(ctx.core_ctx.ip_counters::<I>().dispatch_receive_ip_packet.get(), 1);
+        assert_eq!(ctx.core_ctx.ip_counters::<I>().dispatch_receive_ip_packet_other_host.get(), 0);
 
         // Accept packet destined for this device if promiscuous mode is on.
-        set_promiscuous_mode(&mut CoreCtx::new_deprecated(&ctx.core_ctx), &eth_device, true);
+        set_promiscuous_mode(&mut ctx.core_ctx(), &eth_device, true);
         ctx.core_api()
             .device::<EthernetLinkDevice>()
             .receive_frame(RecvEthernetFrameMeta { device_id: eth_device.clone() }, buf);
 
-        assert_eq!(ctx.core_ctx.state.ip_counters::<I>().dispatch_receive_ip_packet.get(), 2);
-        assert_eq!(
-            ctx.core_ctx.state.ip_counters::<I>().dispatch_receive_ip_packet_other_host.get(),
-            0
-        );
+        assert_eq!(ctx.core_ctx.ip_counters::<I>().dispatch_receive_ip_packet.get(), 2);
+        assert_eq!(ctx.core_ctx.ip_counters::<I>().dispatch_receive_ip_packet_other_host.get(), 0);
 
         let buf = Buf::new(Vec::new(), ..)
             .encapsulate(I::PacketBuilder::new(
@@ -2176,26 +2167,23 @@ mod tests {
 
         // Reject packet not destined for this device if promiscuous mode is
         // off.
-        set_promiscuous_mode(&mut CoreCtx::new_deprecated(&ctx.core_ctx), &eth_device, false);
+        set_promiscuous_mode(&mut ctx.core_ctx(), &eth_device, false);
         ctx.core_api()
             .device::<EthernetLinkDevice>()
             .receive_frame(RecvEthernetFrameMeta { device_id: eth_device.clone() }, buf.clone());
 
-        assert_eq!(ctx.core_ctx.state.ip_counters::<I>().dispatch_receive_ip_packet.get(), 2);
-        assert_eq!(
-            ctx.core_ctx.state.ip_counters::<I>().dispatch_receive_ip_packet_other_host.get(),
-            0
-        );
+        assert_eq!(ctx.core_ctx.ip_counters::<I>().dispatch_receive_ip_packet.get(), 2);
+        assert_eq!(ctx.core_ctx.ip_counters::<I>().dispatch_receive_ip_packet_other_host.get(), 0);
 
         // Accept packet not destined for this device if promiscuous mode is on.
-        set_promiscuous_mode(&mut CoreCtx::new_deprecated(&ctx.core_ctx), &eth_device, true);
+        set_promiscuous_mode(&mut ctx.core_ctx(), &eth_device, true);
         ctx.core_api()
             .device::<EthernetLinkDevice>()
             .receive_frame(RecvEthernetFrameMeta { device_id: eth_device.clone() }, buf);
 
-        assert_eq!(ctx.core_ctx.state.ip_counters::<I>().dispatch_receive_ip_packet.get(), 3);
+        assert_eq!(ctx.core_ctx.ip_counters::<I>().dispatch_receive_ip_packet.get(), 3);
         assert_eq!(
-            ctx.core_ctx.state.ip_counters::<I>().dispatch_receive_ip_packet_other_host.get(),
+            ctx.core_ctx.ip_counters::<I>().dispatch_receive_ip_packet_other_host.get(),
             u64::from(is_other_host)
         );
     }
@@ -2304,7 +2292,7 @@ mod tests {
             buf,
         );
         assert_eq!(
-            ctx.core_ctx.state.ip_counters::<A::Version>().dispatch_receive_ip_packet.get(),
+            ctx.core_ctx.ip_counters::<A::Version>().dispatch_receive_ip_packet.get(),
             expected
         );
     }
@@ -2494,7 +2482,7 @@ mod tests {
         let addr_sub1 = AddrSubnet::new(ip1.get(), 64).unwrap();
         let addr_sub2 = AddrSubnet::new(ip2.get(), 64).unwrap();
 
-        assert_eq!(ctx.core_ctx.state.ip_counters::<Ipv6>().dispatch_receive_ip_packet.get(), 0);
+        assert_eq!(ctx.core_ctx.ip_counters::<Ipv6>().dispatch_receive_ip_packet.get(), 0);
 
         // Add ip1 to the device.
         //

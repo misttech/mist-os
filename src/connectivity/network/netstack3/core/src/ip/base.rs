@@ -3598,10 +3598,10 @@ mod tests {
             buf,
         );
 
-        assert_eq!(ctx.core_ctx.state.ipv4.icmp_tx_counters().parameter_problem.get(), 0);
-        assert_eq!(ctx.core_ctx.state.ipv6.icmp_tx_counters().parameter_problem.get(), 0);
-        assert_eq!(ctx.core_ctx.state.ipv4.inner.counters.dispatch_receive_ip_packet.get(), 0);
-        assert_eq!(ctx.core_ctx.state.ipv6.inner.counters.dispatch_receive_ip_packet.get(), 0);
+        assert_eq!(ctx.core_ctx.ipv4.icmp_tx_counters().parameter_problem.get(), 0);
+        assert_eq!(ctx.core_ctx.ipv6.icmp_tx_counters().parameter_problem.get(), 0);
+        assert_eq!(ctx.core_ctx.ipv4.inner.counters.dispatch_receive_ip_packet.get(), 0);
+        assert_eq!(ctx.core_ctx.ipv6.inner.counters.dispatch_receive_ip_packet.get(), 0);
     }
 
     #[test]
@@ -3672,11 +3672,8 @@ mod tests {
             false,
         );
         ctx.test_api().receive_ip_packet::<Ipv6, _>(&device, Some(frame_dst), buf);
-        assert_eq!(
-            ctx.core_ctx.state.icmp_tx_counters::<Ipv6>().parameter_problem.get(),
-            expected_icmps
-        );
-        assert_eq!(ctx.core_ctx.state.ipv6.inner.counters.dispatch_receive_ip_packet.get(), 1);
+        assert_eq!(ctx.core_ctx.icmp_tx_counters::<Ipv6>().parameter_problem.get(), expected_icmps);
+        assert_eq!(ctx.core_ctx.ipv6.inner.counters.dispatch_receive_ip_packet.get(), 1);
         assert_eq!(u64::try_from(ctx.bindings_ctx.frames_sent().len()).unwrap(), expected_icmps);
 
         // Test with unrecognized option type set with
@@ -3688,10 +3685,7 @@ mod tests {
             false,
         );
         ctx.test_api().receive_ip_packet::<Ipv6, _>(&device, Some(frame_dst), buf);
-        assert_eq!(
-            ctx.core_ctx.state.icmp_tx_counters::<Ipv6>().parameter_problem.get(),
-            expected_icmps
-        );
+        assert_eq!(ctx.core_ctx.icmp_tx_counters::<Ipv6>().parameter_problem.get(), expected_icmps);
         assert_eq!(u64::try_from(ctx.bindings_ctx.frames_sent().len()).unwrap(), expected_icmps);
 
         // Test with unrecognized option type set with
@@ -3705,10 +3699,7 @@ mod tests {
         );
         ctx.test_api().receive_ip_packet::<Ipv6, _>(&device, Some(frame_dst), buf);
         expected_icmps += 1;
-        assert_eq!(
-            ctx.core_ctx.state.icmp_tx_counters::<Ipv6>().parameter_problem.get(),
-            expected_icmps
-        );
+        assert_eq!(ctx.core_ctx.icmp_tx_counters::<Ipv6>().parameter_problem.get(), expected_icmps);
         assert_eq!(u64::try_from(ctx.bindings_ctx.frames_sent().len()).unwrap(), expected_icmps);
         verify_icmp_for_unrecognized_ext_hdr_option(
             &mut ctx.bindings_ctx,
@@ -3728,10 +3719,7 @@ mod tests {
         );
         ctx.test_api().receive_ip_packet::<Ipv6, _>(&device, Some(frame_dst), buf);
         expected_icmps += 1;
-        assert_eq!(
-            ctx.core_ctx.state.icmp_tx_counters::<Ipv6>().parameter_problem.get(),
-            expected_icmps
-        );
+        assert_eq!(ctx.core_ctx.icmp_tx_counters::<Ipv6>().parameter_problem.get(), expected_icmps);
         assert_eq!(u64::try_from(ctx.bindings_ctx.frames_sent().len()).unwrap(), expected_icmps);
         verify_icmp_for_unrecognized_ext_hdr_option(
             &mut ctx.bindings_ctx,
@@ -3751,10 +3739,7 @@ mod tests {
         );
         ctx.test_api().receive_ip_packet::<Ipv6, _>(&device, Some(frame_dst), buf);
         expected_icmps += 1;
-        assert_eq!(
-            ctx.core_ctx.state.icmp_tx_counters::<Ipv6>().parameter_problem.get(),
-            expected_icmps
-        );
+        assert_eq!(ctx.core_ctx.icmp_tx_counters::<Ipv6>().parameter_problem.get(), expected_icmps);
         assert_eq!(u64::try_from(ctx.bindings_ctx.frames_sent().len()).unwrap(), expected_icmps);
         verify_icmp_for_unrecognized_ext_hdr_option(
             &mut ctx.bindings_ctx,
@@ -3774,17 +3759,14 @@ mod tests {
         );
         // Do not expect an ICMP response for this packet
         ctx.test_api().receive_ip_packet::<Ipv6, _>(&device, Some(frame_dst), buf);
-        assert_eq!(
-            ctx.core_ctx.state.icmp_tx_counters::<Ipv6>().parameter_problem.get(),
-            expected_icmps
-        );
+        assert_eq!(ctx.core_ctx.icmp_tx_counters::<Ipv6>().parameter_problem.get(), expected_icmps);
         assert_eq!(u64::try_from(ctx.bindings_ctx.frames_sent().len()).unwrap(), expected_icmps);
 
         // None of our tests should have sent an icmpv4 packet, or dispatched an
         // IP packet after the first.
 
-        assert_eq!(ctx.core_ctx.state.icmp_tx_counters::<Ipv4>().parameter_problem.get(), 0);
-        assert_eq!(ctx.core_ctx.state.ipv6.inner.counters.dispatch_receive_ip_packet.get(), 1);
+        assert_eq!(ctx.core_ctx.icmp_tx_counters::<Ipv4>().parameter_problem.get(), 0);
+        assert_eq!(ctx.core_ctx.ipv6.inner.counters.dispatch_receive_ip_packet.get(), 1);
     }
 
     #[ip_test]
@@ -3793,14 +3775,14 @@ mod tests {
         let device: DeviceId<_> = device_ids[0].clone().into();
         let fragment_id = 5;
 
-        assert_eq!(ctx.core_ctx.state.ip_counters::<I>().dispatch_receive_ip_packet.get(), 0);
+        assert_eq!(ctx.core_ctx.ip_counters::<I>().dispatch_receive_ip_packet.get(), 0);
 
         // Test that a non fragmented packet gets dispatched right away.
 
         process_ip_fragment::<I>(&mut ctx, &device, fragment_id, 0, 1);
 
         // Make sure the packet got dispatched.
-        assert_eq!(ctx.core_ctx.state.ip_counters::<I>().dispatch_receive_ip_packet.get(), 1);
+        assert_eq!(ctx.core_ctx.ip_counters::<I>().dispatch_receive_ip_packet.get(), 1);
     }
 
     #[ip_test]
@@ -3819,14 +3801,14 @@ mod tests {
         process_ip_fragment::<I>(&mut ctx, &device, fragment_id, 1, 3);
 
         // Make sure no packets got dispatched yet.
-        assert_eq!(ctx.core_ctx.state.ip_counters::<I>().dispatch_receive_ip_packet.get(), 0);
+        assert_eq!(ctx.core_ctx.ip_counters::<I>().dispatch_receive_ip_packet.get(), 0);
 
         // Process fragment #2
         process_ip_fragment::<I>(&mut ctx, &device, fragment_id, 2, 3);
 
         // Make sure the packet finally got dispatched now that the final
         // fragment has been 'received'.
-        assert_eq!(ctx.core_ctx.state.ip_counters::<I>().dispatch_receive_ip_packet.get(), 1);
+        assert_eq!(ctx.core_ctx.ip_counters::<I>().dispatch_receive_ip_packet.get(), 1);
     }
 
     #[ip_test]
@@ -3850,33 +3832,33 @@ mod tests {
         process_ip_fragment::<I>(&mut ctx, &device, fragment_id_1, 0, 3);
 
         // Make sure no packets got dispatched yet.
-        assert_eq!(ctx.core_ctx.state.ip_counters::<I>().dispatch_receive_ip_packet.get(), 0);
+        assert_eq!(ctx.core_ctx.ip_counters::<I>().dispatch_receive_ip_packet.get(), 0);
 
         // Process a packet that does not require reassembly (packet #2, fragment #0).
         process_ip_fragment::<I>(&mut ctx, &device, fragment_id_2, 0, 1);
 
         // Make packet #1 got dispatched since it didn't need reassembly.
-        assert_eq!(ctx.core_ctx.state.ip_counters::<I>().dispatch_receive_ip_packet.get(), 1);
+        assert_eq!(ctx.core_ctx.ip_counters::<I>().dispatch_receive_ip_packet.get(), 1);
 
         // Process packet #0, fragment #2
         process_ip_fragment::<I>(&mut ctx, &device, fragment_id_0, 2, 3);
 
         // Make sure no other packets got dispatched yet.
-        assert_eq!(ctx.core_ctx.state.ip_counters::<I>().dispatch_receive_ip_packet.get(), 1);
+        assert_eq!(ctx.core_ctx.ip_counters::<I>().dispatch_receive_ip_packet.get(), 1);
 
         // Process packet #0, fragment #0
         process_ip_fragment::<I>(&mut ctx, &device, fragment_id_0, 0, 3);
 
         // Make sure that packet #0 finally got dispatched now that the final
         // fragment has been 'received'.
-        assert_eq!(ctx.core_ctx.state.ip_counters::<I>().dispatch_receive_ip_packet.get(), 2);
+        assert_eq!(ctx.core_ctx.ip_counters::<I>().dispatch_receive_ip_packet.get(), 2);
 
         // Process packet #1, fragment #1
         process_ip_fragment::<I>(&mut ctx, &device, fragment_id_1, 1, 3);
 
         // Make sure the packet finally got dispatched now that the final
         // fragment has been 'received'.
-        assert_eq!(ctx.core_ctx.state.ip_counters::<I>().dispatch_receive_ip_packet.get(), 3);
+        assert_eq!(ctx.core_ctx.ip_counters::<I>().dispatch_receive_ip_packet.get(), 3);
     }
 
     #[ip_test]
@@ -3926,7 +3908,7 @@ mod tests {
         // technically received all the fragments, this fragment (#2) arrived
         // too late and the reassembly timer was triggered, causing the prior
         // fragment data to be discarded.
-        assert_eq!(ctx.core_ctx.state.ip_counters::<I>().dispatch_receive_ip_packet.get(), 0);
+        assert_eq!(ctx.core_ctx.ip_counters::<I>().dispatch_receive_ip_packet.get(), 0);
     }
 
     #[ip_test]
@@ -3979,11 +3961,11 @@ mod tests {
 
         // Make sure no packets got dispatched yet.
         assert_eq!(
-            net.context("alice").core_ctx.state.ip_counters::<I>().dispatch_receive_ip_packet.get(),
+            net.context("alice").core_ctx.ip_counters::<I>().dispatch_receive_ip_packet.get(),
             0
         );
         assert_eq!(
-            net.context("bob").core_ctx.state.ip_counters::<I>().dispatch_receive_ip_packet.get(),
+            net.context("bob").core_ctx.ip_counters::<I>().dispatch_receive_ip_packet.get(),
             0
         );
 
@@ -3996,11 +3978,11 @@ mod tests {
         // Make sure the packet finally got dispatched now that the final
         // fragment has been received by bob.
         assert_eq!(
-            net.context("alice").core_ctx.state.ip_counters::<I>().dispatch_receive_ip_packet.get(),
+            net.context("alice").core_ctx.ip_counters::<I>().dispatch_receive_ip_packet.get(),
             0
         );
         assert_eq!(
-            net.context("bob").core_ctx.state.ip_counters::<I>().dispatch_receive_ip_packet.get(),
+            net.context("bob").core_ctx.ip_counters::<I>().dispatch_receive_ip_packet.get(),
             1
         );
 
@@ -4059,8 +4041,8 @@ mod tests {
 
         let Ctx { core_ctx, bindings_ctx } = &mut ctx;
         // Should not have dispatched the packet.
-        assert_eq!(core_ctx.state.ipv6.inner.counters.dispatch_receive_ip_packet.get(), 0);
-        assert_eq!(core_ctx.state.icmp_tx_counters::<Ipv6>().packet_too_big.get(), 1);
+        assert_eq!(core_ctx.ipv6.inner.counters.dispatch_receive_ip_packet.get(), 0);
+        assert_eq!(core_ctx.icmp_tx_counters::<Ipv6>().packet_too_big.get(), 1);
 
         // Should have sent out one frame though.
         assert_eq!(bindings_ctx.frames_sent().len(), 1);
@@ -4182,15 +4164,11 @@ mod tests {
         ctx.test_api().receive_ip_packet::<I, _>(&device, Some(frame_dst), packet_buf);
 
         // Should have dispatched the packet.
-        assert_eq!(ctx.core_ctx.state.ip_counters::<I>().dispatch_receive_ip_packet.get(), 1);
+        assert_eq!(ctx.core_ctx.ip_counters::<I>().dispatch_receive_ip_packet.get(), 1);
 
         assert_eq!(
-            I::get_pmtu(
-                &ctx.core_ctx.state,
-                fake_config.local_ip.get(),
-                fake_config.remote_ip.get()
-            )
-            .unwrap(),
+            I::get_pmtu(&ctx.core_ctx, fake_config.local_ip.get(), fake_config.remote_ip.get())
+                .unwrap(),
             new_mtu1
         );
 
@@ -4211,16 +4189,12 @@ mod tests {
         ctx.test_api().receive_ip_packet::<I, _>(&device, Some(frame_dst), packet_buf);
 
         // Should have dispatched the packet.
-        assert_eq!(ctx.core_ctx.state.ip_counters::<I>().dispatch_receive_ip_packet.get(), 2);
+        assert_eq!(ctx.core_ctx.ip_counters::<I>().dispatch_receive_ip_packet.get(), 2);
 
         // The PMTU should not have updated to `new_mtu2`
         assert_eq!(
-            I::get_pmtu(
-                &ctx.core_ctx.state,
-                fake_config.local_ip.get(),
-                fake_config.remote_ip.get()
-            )
-            .unwrap(),
+            I::get_pmtu(&ctx.core_ctx, fake_config.local_ip.get(), fake_config.remote_ip.get())
+                .unwrap(),
             new_mtu1
         );
 
@@ -4241,16 +4215,12 @@ mod tests {
         ctx.test_api().receive_ip_packet::<I, _>(&device, Some(frame_dst), packet_buf);
 
         // Should have dispatched the packet.
-        assert_eq!(ctx.core_ctx.state.ip_counters::<I>().dispatch_receive_ip_packet.get(), 3);
+        assert_eq!(ctx.core_ctx.ip_counters::<I>().dispatch_receive_ip_packet.get(), 3);
 
         // The PMTU should have updated to 1900.
         assert_eq!(
-            I::get_pmtu(
-                &ctx.core_ctx.state,
-                fake_config.local_ip.get(),
-                fake_config.remote_ip.get()
-            )
-            .unwrap(),
+            I::get_pmtu(&ctx.core_ctx, fake_config.local_ip.get(), fake_config.remote_ip.get())
+                .unwrap(),
             new_mtu3
         );
     }
@@ -4283,14 +4253,10 @@ mod tests {
         ctx.test_api().receive_ip_packet::<I, _>(&device, Some(frame_dst), packet_buf);
 
         // Should have dispatched the packet.
-        assert_eq!(ctx.core_ctx.state.ip_counters::<I>().dispatch_receive_ip_packet.get(), 1);
+        assert_eq!(ctx.core_ctx.ip_counters::<I>().dispatch_receive_ip_packet.get(), 1);
 
         assert_eq!(
-            I::get_pmtu(
-                &ctx.core_ctx.state,
-                fake_config.local_ip.get(),
-                fake_config.remote_ip.get()
-            ),
+            I::get_pmtu(&ctx.core_ctx, fake_config.local_ip.get(), fake_config.remote_ip.get()),
             None
         );
     }
@@ -4333,17 +4299,13 @@ mod tests {
         ctx.test_api().receive_ip_packet::<Ipv4, _>(&device, Some(frame_dst), packet_buf);
 
         // Should have dispatched the packet.
-        assert_eq!(ctx.core_ctx.state.ipv4.inner.counters.dispatch_receive_ip_packet.get(), 1);
+        assert_eq!(ctx.core_ctx.ipv4.inner.counters.dispatch_receive_ip_packet.get(), 1);
 
         // Should have decreased PMTU value to the next lower PMTU
         // plateau from `crate::ip::path_mtu::PMTU_PLATEAUS`.
         assert_eq!(
-            Ipv4::get_pmtu(
-                &ctx.core_ctx.state,
-                fake_config.local_ip.get(),
-                fake_config.remote_ip.get()
-            )
-            .unwrap(),
+            Ipv4::get_pmtu(&ctx.core_ctx, fake_config.local_ip.get(), fake_config.remote_ip.get())
+                .unwrap(),
             Mtu::new(508),
         );
 
@@ -4362,17 +4324,13 @@ mod tests {
         ctx.test_api().receive_ip_packet::<Ipv4, _>(&device, Some(frame_dst), packet_buf);
 
         // Should have dispatched the packet.
-        assert_eq!(ctx.core_ctx.state.ipv4.inner.counters.dispatch_receive_ip_packet.get(), 2);
+        assert_eq!(ctx.core_ctx.ipv4.inner.counters.dispatch_receive_ip_packet.get(), 2);
 
         // Should not have updated PMTU as there is no other valid
         // lower PMTU value.
         assert_eq!(
-            Ipv4::get_pmtu(
-                &ctx.core_ctx.state,
-                fake_config.local_ip.get(),
-                fake_config.remote_ip.get()
-            )
-            .unwrap(),
+            Ipv4::get_pmtu(&ctx.core_ctx, fake_config.local_ip.get(), fake_config.remote_ip.get())
+                .unwrap(),
             Mtu::new(508),
         );
 
@@ -4391,17 +4349,13 @@ mod tests {
         ctx.test_api().receive_ip_packet::<Ipv4, _>(&device, Some(frame_dst), packet_buf);
 
         // Should have dispatched the packet.
-        assert_eq!(ctx.core_ctx.state.ipv4.inner.counters.dispatch_receive_ip_packet.get(), 3);
+        assert_eq!(ctx.core_ctx.ipv4.inner.counters.dispatch_receive_ip_packet.get(), 3);
 
         // Should have decreased PMTU value to the next lower PMTU
         // plateau from `crate::ip::path_mtu::PMTU_PLATEAUS`.
         assert_eq!(
-            Ipv4::get_pmtu(
-                &ctx.core_ctx.state,
-                fake_config.local_ip.get(),
-                fake_config.remote_ip.get()
-            )
-            .unwrap(),
+            Ipv4::get_pmtu(&ctx.core_ctx, fake_config.local_ip.get(), fake_config.remote_ip.get())
+                .unwrap(),
             Mtu::new(68),
         );
 
@@ -4423,16 +4377,12 @@ mod tests {
         ctx.test_api().receive_ip_packet::<Ipv4, _>(&device, Some(frame_dst), packet_buf);
 
         // Should have dispatched the packet.
-        assert_eq!(ctx.core_ctx.state.ipv4.inner.counters.dispatch_receive_ip_packet.get(), 4);
+        assert_eq!(ctx.core_ctx.ipv4.inner.counters.dispatch_receive_ip_packet.get(), 4);
 
         // Should not have updated the PMTU as the current PMTU is lower.
         assert_eq!(
-            Ipv4::get_pmtu(
-                &ctx.core_ctx.state,
-                fake_config.local_ip.get(),
-                fake_config.remote_ip.get()
-            )
-            .unwrap(),
+            Ipv4::get_pmtu(&ctx.core_ctx, fake_config.local_ip.get(), fake_config.remote_ip.get())
+                .unwrap(),
             Mtu::new(68),
         );
     }
@@ -4471,8 +4421,8 @@ mod tests {
 
         let Ctx { core_ctx, bindings_ctx } = &mut ctx;
         // Should not have dispatched the packet.
-        assert_eq!(core_ctx.state.ipv6.inner.counters.receive_ip_packet.get(), 1);
-        assert_eq!(core_ctx.state.ipv6.inner.counters.dispatch_receive_ip_packet.get(), 0);
+        assert_eq!(core_ctx.ipv6.inner.counters.receive_ip_packet.get(), 1);
+        assert_eq!(core_ctx.ipv6.inner.counters.dispatch_receive_ip_packet.get(), 0);
 
         // In IPv6, the next header value (ICMP(v4)) would have been considered
         // unrecognized so an ICMP parameter problem response SHOULD be sent,
@@ -4514,8 +4464,8 @@ mod tests {
         ctx.test_api().receive_ip_packet::<Ipv4, _>(&device, Some(frame_dst), buf);
 
         // Should have dispatched the packet but resulted in an ICMP error.
-        assert_eq!(ctx.core_ctx.state.ipv4.inner.counters.dispatch_receive_ip_packet.get(), 1);
-        assert_eq!(ctx.core_ctx.state.icmp_tx_counters::<Ipv4>().dest_unreachable.get(), 1);
+        assert_eq!(ctx.core_ctx.ipv4.inner.counters.dispatch_receive_ip_packet.get(), 1);
+        assert_eq!(ctx.core_ctx.icmp_tx_counters::<Ipv4>().dest_unreachable.get(), 1);
         assert_eq!(ctx.bindings_ctx.frames_sent().len(), 1);
         let buf = &ctx.bindings_ctx.frames_sent()[0].1[..];
         let (_, _, _, _, _, _, code) = parse_icmp_packet_in_ip_packet_in_ethernet_frame::<
@@ -4568,19 +4518,19 @@ mod tests {
             .receive_frame(RecvEthernetFrameMeta { device_id: eth_device.clone() }, buf.clone());
 
         let Ctx { core_ctx, bindings_ctx } = &mut ctx;
-        assert_eq!(core_ctx.state.ip_counters::<I>().dispatch_receive_ip_packet.get(), 0);
+        assert_eq!(core_ctx.ip_counters::<I>().dispatch_receive_ip_packet.get(), 0);
 
         // Join the multicast group and receive the packet, we should dispatch
         // it.
         match multi_addr.into() {
             IpAddr::V4(multicast_addr) => crate::ip::device::join_ip_multicast::<Ipv4, _, _>(
-                &mut CoreCtx::new_deprecated(core_ctx),
+                &mut core_ctx.context(),
                 bindings_ctx,
                 &device,
                 multicast_addr,
             ),
             IpAddr::V6(multicast_addr) => crate::ip::device::join_ip_multicast::<Ipv6, _, _>(
-                &mut CoreCtx::new_deprecated(core_ctx),
+                &mut core_ctx.context(),
                 bindings_ctx,
                 &device,
                 multicast_addr,
@@ -4592,19 +4542,19 @@ mod tests {
             .receive_frame(RecvEthernetFrameMeta { device_id: eth_device.clone() }, buf.clone());
 
         let Ctx { core_ctx, bindings_ctx } = &mut ctx;
-        assert_eq!(core_ctx.state.ip_counters::<I>().dispatch_receive_ip_packet.get(), 1);
+        assert_eq!(core_ctx.ip_counters::<I>().dispatch_receive_ip_packet.get(), 1);
 
         // Leave the multicast group and receive the packet, we should not
         // dispatch it.
         match multi_addr.into() {
             IpAddr::V4(multicast_addr) => crate::ip::device::leave_ip_multicast::<Ipv4, _, _>(
-                &mut CoreCtx::new_deprecated(core_ctx),
+                &mut core_ctx.context(),
                 bindings_ctx,
                 &device,
                 multicast_addr,
             ),
             IpAddr::V6(multicast_addr) => crate::ip::device::leave_ip_multicast::<Ipv6, _, _>(
-                &mut CoreCtx::new_deprecated(core_ctx),
+                &mut core_ctx.context(),
                 bindings_ctx,
                 &device,
                 multicast_addr,
@@ -4614,7 +4564,7 @@ mod tests {
         ctx.core_api()
             .device::<EthernetLinkDevice>()
             .receive_frame(RecvEthernetFrameMeta { device_id: eth_device.clone() }, buf);
-        assert_eq!(ctx.core_ctx.state.ip_counters::<I>().dispatch_receive_ip_packet.get(), 1);
+        assert_eq!(ctx.core_ctx.ip_counters::<I>().dispatch_receive_ip_packet.get(), 1);
     }
 
     #[test]
@@ -4672,7 +4622,7 @@ mod tests {
         // Received packet should not have been dispatched.
         ctx.test_api().receive_ip_packet::<Ipv6, _>(&device, Some(frame_dst), buf.clone());
 
-        assert_eq!(ctx.core_ctx.state.ipv6.inner.counters.dispatch_receive_ip_packet.get(), 0);
+        assert_eq!(ctx.core_ctx.ipv6.inner.counters.dispatch_receive_ip_packet.get(), 0);
 
         // Wait until DAD is complete. Arbitrarily choose a year in the future
         // as a time after which we're confident DAD will be complete. We can't
@@ -4687,7 +4637,7 @@ mod tests {
 
         // Received packet should have been dispatched.
         ctx.test_api().receive_ip_packet::<Ipv6, _>(&device, Some(frame_dst), buf);
-        assert_eq!(ctx.core_ctx.state.ipv6.inner.counters.dispatch_receive_ip_packet.get(), 1);
+        assert_eq!(ctx.core_ctx.ipv6.inner.counters.dispatch_receive_ip_packet.get(), 1);
 
         // Set the new IP (this should trigger DAD).
         let ip = config.local_ip.get();
@@ -4704,7 +4654,7 @@ mod tests {
 
         // Received packet should not have been dispatched.
         ctx.test_api().receive_ip_packet::<Ipv6, _>(&device, Some(frame_dst), buf.clone());
-        assert_eq!(ctx.core_ctx.state.ipv6.inner.counters.dispatch_receive_ip_packet.get(), 1);
+        assert_eq!(ctx.core_ctx.ipv6.inner.counters.dispatch_receive_ip_packet.get(), 1);
 
         // Make sure all timers are done (DAD to complete on the interface due
         // to new IP).
@@ -4715,7 +4665,7 @@ mod tests {
 
         // Received packet should have been dispatched.
         ctx.test_api().receive_ip_packet::<Ipv6, _>(&device, Some(frame_dst), buf);
-        assert_eq!(ctx.core_ctx.state.ipv6.inner.counters.dispatch_receive_ip_packet.get(), 2);
+        assert_eq!(ctx.core_ctx.ipv6.inner.counters.dispatch_receive_ip_packet.get(), 2);
     }
 
     #[test]
@@ -4754,7 +4704,7 @@ mod tests {
             Some(FrameDestination::Individual { local: true }),
             buf,
         );
-        assert_eq!(ctx.core_ctx.state.ipv6.inner.counters.version_rx.non_unicast_source.get(), 1);
+        assert_eq!(ctx.core_ctx.ipv6.inner.counters.version_rx.non_unicast_source.get(), 1);
     }
 
     #[test]
@@ -4791,7 +4741,7 @@ mod tests {
         // Receive packet addressed to us.
         assert_eq!(
             receive_ipv4_packet_action(
-                &mut CoreCtx::new_deprecated(core_ctx),
+                &mut core_ctx.context(),
                 bindings_ctx,
                 &v4_dev,
                 v4_config.local_ip
@@ -4800,7 +4750,7 @@ mod tests {
         );
         assert_eq!(
             receive_ipv6_packet_action(
-                &mut CoreCtx::new_deprecated(core_ctx),
+                &mut core_ctx.context(),
                 bindings_ctx,
                 &v6_dev,
                 v6_config.local_ip
@@ -4811,7 +4761,7 @@ mod tests {
         // Receive packet addressed to the IPv4 subnet broadcast address.
         assert_eq!(
             receive_ipv4_packet_action(
-                &mut CoreCtx::new_deprecated(core_ctx),
+                &mut core_ctx.context(),
                 bindings_ctx,
                 &v4_dev,
                 SpecifiedAddr::new(v4_subnet.broadcast()).unwrap()
@@ -4822,7 +4772,7 @@ mod tests {
         // Receive packet addressed to the IPv4 limited broadcast address.
         assert_eq!(
             receive_ipv4_packet_action(
-                &mut CoreCtx::new_deprecated(core_ctx),
+                &mut core_ctx.context(),
                 bindings_ctx,
                 &v4_dev,
                 Ipv4::LIMITED_BROADCAST_ADDRESS
@@ -4832,14 +4782,14 @@ mod tests {
 
         // Receive packet addressed to a multicast address we're subscribed to.
         crate::ip::device::join_ip_multicast::<Ipv4, _, _>(
-            &mut CoreCtx::new_deprecated(core_ctx),
+            &mut core_ctx.context(),
             bindings_ctx,
             &v4_dev,
             Ipv4::ALL_ROUTERS_MULTICAST_ADDRESS,
         );
         assert_eq!(
             receive_ipv4_packet_action(
-                &mut CoreCtx::new_deprecated(core_ctx),
+                &mut core_ctx.context(),
                 bindings_ctx,
                 &v4_dev,
                 Ipv4::ALL_ROUTERS_MULTICAST_ADDRESS.into_specified()
@@ -4850,7 +4800,7 @@ mod tests {
         // Receive packet addressed to the all-nodes multicast address.
         assert_eq!(
             receive_ipv6_packet_action(
-                &mut CoreCtx::new_deprecated(core_ctx),
+                &mut core_ctx.context(),
                 bindings_ctx,
                 &v6_dev,
                 Ipv6::ALL_NODES_LINK_LOCAL_MULTICAST_ADDRESS.into_specified()
@@ -4861,7 +4811,7 @@ mod tests {
         // Receive packet addressed to a multicast address we're subscribed to.
         assert_eq!(
             receive_ipv6_packet_action(
-                &mut CoreCtx::new_deprecated(core_ctx),
+                &mut core_ctx.context(),
                 bindings_ctx,
                 &v6_dev,
                 v6_config.local_ip.to_solicited_node_address().into_specified(),
@@ -4910,7 +4860,7 @@ mod tests {
             let tentative: UnicastAddr<Ipv6Addr> = local_mac.to_ipv6_link_local().addr().get();
             assert_eq!(
                 receive_ipv6_packet_action(
-                    &mut CoreCtx::new_deprecated(core_ctx),
+                    &mut core_ctx.context(),
                     bindings_ctx,
                     &device,
                     tentative.into_specified()
@@ -4926,7 +4876,7 @@ mod tests {
         // disabled on the inbound interface.
         assert_eq!(
             receive_ipv4_packet_action(
-                &mut CoreCtx::new_deprecated(core_ctx),
+                &mut core_ctx.context(),
                 bindings_ctx,
                 &v4_dev,
                 v4_config.remote_ip
@@ -4935,7 +4885,7 @@ mod tests {
         );
         assert_eq!(
             receive_ipv6_packet_action(
-                &mut CoreCtx::new_deprecated(core_ctx),
+                &mut core_ctx.context(),
                 bindings_ctx,
                 &v6_dev,
                 v6_config.remote_ip
@@ -4950,7 +4900,7 @@ mod tests {
         let Ctx { core_ctx, bindings_ctx } = &mut ctx;
         assert_eq!(
             receive_ipv4_packet_action(
-                &mut CoreCtx::new_deprecated(core_ctx),
+                &mut core_ctx.context(),
                 bindings_ctx,
                 &v4_dev,
                 v4_config.remote_ip
@@ -4961,7 +4911,7 @@ mod tests {
         );
         assert_eq!(
             receive_ipv6_packet_action(
-                &mut CoreCtx::new_deprecated(core_ctx),
+                &mut core_ctx.context(),
                 bindings_ctx,
                 &v6_dev,
                 v6_config.remote_ip
@@ -4973,11 +4923,11 @@ mod tests {
 
         // Receive packet destined to a host with no route when forwarding is
         // enabled both globally and on the inbound device.
-        *core_ctx.state.ipv4.inner.table.write() = Default::default();
-        *core_ctx.state.ipv6.inner.table.write() = Default::default();
+        *core_ctx.ipv4.inner.table.write() = Default::default();
+        *core_ctx.ipv6.inner.table.write() = Default::default();
         assert_eq!(
             receive_ipv4_packet_action(
-                &mut CoreCtx::new_deprecated(core_ctx),
+                &mut core_ctx.context(),
                 bindings_ctx,
                 &v4_dev,
                 v4_config.remote_ip
@@ -4986,7 +4936,7 @@ mod tests {
         );
         assert_eq!(
             receive_ipv6_packet_action(
-                &mut CoreCtx::new_deprecated(core_ctx),
+                &mut core_ctx.context(),
                 bindings_ctx,
                 &v6_dev,
                 v6_config.remote_ip

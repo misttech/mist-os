@@ -215,7 +215,6 @@ mod tests {
     use crate::{
         device::DeviceId,
         testutil::{Ctx, FakeEventDispatcherBuilder, FAKE_CONFIG_V6},
-        CoreCtx,
     };
 
     #[test]
@@ -238,7 +237,7 @@ mod tests {
 
         assert_eq!(
             handle_extension_headers(
-                &mut CoreCtx::new_deprecated(&core_ctx),
+                &mut core_ctx.context(),
                 &device_id,
                 Some(frame_dst),
                 &packet,

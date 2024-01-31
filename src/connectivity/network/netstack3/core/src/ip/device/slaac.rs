@@ -2906,11 +2906,9 @@ mod tests {
 
         // Disabling IP should remove all the SLAAC addresses.
         set_ip_enabled(&mut ctx, false /* enabled */);
-        let addrs = with_assigned_ipv6_addr_subnets(
-            &mut CoreCtx::new_deprecated(&ctx.core_ctx),
-            &device_id,
-            |addrs| addrs.filter(|a| !a.addr().is_link_local()).collect::<Vec<_>>(),
-        );
+        let addrs = with_assigned_ipv6_addr_subnets(&mut ctx.core_ctx(), &device_id, |addrs| {
+            addrs.filter(|a| !a.addr().is_link_local()).collect::<Vec<_>>()
+        });
         assert_matches!(addrs[..], []);
         ctx.bindings_ctx.timer_ctx().assert_no_timers_installed();
     }
