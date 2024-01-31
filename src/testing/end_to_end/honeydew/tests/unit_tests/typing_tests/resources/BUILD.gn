@@ -12,5 +12,6 @@ python_library("resources") {
   sources = [
     "__init__.py",
     "one_by_one_green.bgra",
+    "one_by_one_green.png",
   ]
 }

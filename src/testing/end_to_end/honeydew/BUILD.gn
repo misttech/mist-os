@@ -76,6 +76,7 @@ python_library("honeydew") {
   library_deps = [
     ":honeydew_fidl_ir_and_deps",
     "//src/developer/ffx/lib/fuchsia-controller:fidl_bindings",
+    "//third_party/pypng",
   ]
 }
 

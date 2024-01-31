@@ -24,6 +24,7 @@ dependencies = []
 test = [
     "parameterized==0.7.4",   # for unit tests
     "mobly==1.12.1",          # for functional tests
+    "pypng==0.20220715.0",    # lacewing dependency
 ]
 # Coding guidelines related dependencies
 guidelines = [

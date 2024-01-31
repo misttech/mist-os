@@ -7,7 +7,9 @@
 import pathlib
 import tempfile
 import unittest
+from array import array
 
+import png
 from parameterized import parameterized
 
 # Disabling pylint to reduce verbosity for widely used trivial types
@@ -27,11 +29,29 @@ WHITE = Pixel(255, 255, 255)
 TRANSPARENT = Pixel(0, 0, 0, 0)
 
 
+def rgba(pixel: Pixel) -> list[int]:
+    """Converts the given pixel into a rgba list of ints"""
+    return [pixel.red, pixel.green, pixel.blue, pixel.alpha]
+
+
+def bgra(pixel: Pixel) -> list[int]:
+    """Converts the given pixel into a bgra list of ints"""
+    return [pixel.blue, pixel.green, pixel.red, pixel.alpha]
+
+
+def rgba_data(*pixels: Pixel) -> bytes:
+    """Converts the given pixels into a rgba byte array"""
+    out = bytearray()
+    for p in pixels:
+        out.extend(rgba(p))
+    return bytes(out)
+
+
 def bgra_data(*pixels: Pixel) -> bytes:
     """Converts the given pixels into a bgra byte array"""
     out = bytearray()
     for p in pixels:
-        out.extend([p.blue, p.green, p.red, p.alpha])
+        out.extend(bgra(p))
     return bytes(out)
 
 
@@ -39,9 +59,9 @@ class ScreenshotImageTest(unittest.TestCase):
     """Unit tests for honeydew.affordances.ui.ScreenshotImage"""
 
     def test_ctor(self) -> None:
-        image = ScreenshotImage(size=Size(1, 1), data=bgra_data(GREEN))
+        image = ScreenshotImage(size=Size(1, 1), data=rgba_data(GREEN))
         self.assertEqual(image.size, Size(1, 1))
-        self.assertEqual(image.data, bgra_data(GREEN))
+        self.assertEqual(image.data, rgba_data(GREEN))
 
     def test_ctor_empty_image(self) -> None:
         image = ScreenshotImage(size=Size(0, 0), data=b"")
@@ -50,10 +70,10 @@ class ScreenshotImageTest(unittest.TestCase):
 
     def test_ctor_bad_args(self) -> None:
         with self.assertRaisesRegex(ValueError, "Invalid image size.*"):
-            ScreenshotImage(size=Size(-1, 1), data=bgra_data(GREEN))
+            ScreenshotImage(size=Size(-1, 1), data=rgba_data(GREEN))
 
         with self.assertRaisesRegex(ValueError, "Invalid image size.*"):
-            ScreenshotImage(size=Size(1, -1), data=bgra_data(GREEN))
+            ScreenshotImage(size=Size(1, -1), data=rgba_data(GREEN))
 
         with self.assertRaisesRegex(
             ValueError, "Data length must be a multiple of 4"
@@ -62,40 +82,92 @@ class ScreenshotImageTest(unittest.TestCase):
 
         with self.assertRaisesRegex(ValueError, "Expected data length 24.*"):
             ScreenshotImage(
-                size=Size(2, 3), data=bgra_data(GREEN, GREEN, GREEN, GREEN)
+                size=Size(2, 3), data=rgba_data(GREEN, GREEN, GREEN, GREEN)
             )
 
-    def test_save(self) -> None:
+    def test_save_bgra(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             image_file = pathlib.Path(tmpdir) / "image.bgra"
-            image = ScreenshotImage(size=Size(1, 1), data=bgra_data(GREEN))
+            image = ScreenshotImage(
+                size=Size(2, 2), data=rgba_data(GREEN, BLUE, RED, TRANSPARENT)
+            )
             image.save(str(image_file))
-            self.assertEqual(image.data, image_file.read_bytes())
+            self.assertEqual(
+                image_file.read_bytes(),
+                bytes(bgra(GREEN) + bgra(BLUE) + bgra(RED) + bgra(TRANSPARENT)),
+            )
 
-    def test_save_only_bgra_is_supported(self) -> None:
-        image = ScreenshotImage(size=Size(1, 1), data=bgra_data(GREEN))
+    def test_save_png(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            image_file = pathlib.Path(tmpdir) / "image.png"
+            image = ScreenshotImage(
+                size=Size(3, 2),
+                data=rgba_data(GREEN, BLUE, RED, TRANSPARENT, BLACK, WHITE),
+            )
+            image.save(str(image_file))
+
+            (actual_width, actual_height, actual_data, _) = png.Reader(
+                str(image_file)
+            ).read_flat()
+            self.assertEqual(actual_width, 3)
+            self.assertEqual(actual_height, 2)
+            self.assertEqual(actual_data, array("B", image.data))
+
+    def test_save_unsupported_file_type(self) -> None:
+        image = ScreenshotImage(size=Size(1, 1), data=rgba_data(GREEN))
         with self.assertRaisesRegex(
-            ValueError, "Only \\.bgra files are supported.*"
+            ValueError, "Only .* files are supported.*"
         ):
-            image.save("foo.png")
+            image.save("foo.jpg")
 
-    def test_load_from_path(self) -> None:
+    def test_load_from_path_bgra(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             image_file = pathlib.Path(tmpdir) / "image.bgra"
 
-            # A 1x1 image with a green bgra pixel
-            expected_bytes = bgra_data(GREEN)
-            image_file.write_bytes(expected_bytes)
+            # Prepare a a 2x3 image:
+            image_file.write_bytes(
+                bgra_data(GREEN, BLUE, RED, TRANSPARENT, BLACK, WHITE)
+            )
+
             image = ScreenshotImage.load_from_path(str(image_file))
-            self.assertEqual(expected_bytes, image.data)
+            # bgra files have no size information, so read as a 6x1 image:
+            self.assertEqual(image.size.width, 6)
+            self.assertEqual(image.size.height, 1)
+            self.assertEqual(
+                rgba_data(GREEN, BLUE, RED, TRANSPARENT, BLACK, WHITE),
+                image.data,
+            )
 
-    def test_load_from_path_only_bgra_is_supported(self) -> None:
+    def test_load_from_path_png(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            image_file = pathlib.Path(tmpdir) / "image.png"
+
+            # Prepare a 2x3 image
+            png.from_array(
+                [
+                    rgba(GREEN) + rgba(BLUE),
+                    rgba(RED) + rgba(TRANSPARENT),
+                    rgba(BLACK) + rgba(WHITE),
+                ],
+                mode="RGBA",
+            ).save(str(image_file))
+
+            image = ScreenshotImage.load_from_path(str(image_file))
+            self.assertEqual(image.size.width, 2)
+            self.assertEqual(image.size.height, 3)
+            self.assertEqual(
+                image.data,
+                rgba_data(GREEN, BLUE, RED, TRANSPARENT, BLACK, WHITE),
+            )
+
+    def test_load_from_path_unsupported_file_type(self) -> None:
         with self.assertRaisesRegex(
-            ValueError, "Only \\.bgra files are supported.*"
+            ValueError, "Only .* files are supported.*"
         ):
-            ScreenshotImage.load_from_path("foo.png")
+            ScreenshotImage.load_from_path("foo.jpg")
 
-    def test_load_from_resource(self) -> None:
+    @parameterized.expand([("png"), ("bgra")])
+    def test_load_from_resource(self, suffix) -> None:
         # Unfortunately cannot just import the `resources` subpackage since
         # it has a different absolute package name when the test runs in `fx test`
         # (just "resources") and in `conformance.sh` (named `tests.unit_tests.affordances_tests.ui.resources`)
@@ -104,20 +176,20 @@ class ScreenshotImageTest(unittest.TestCase):
             __name__.split(".")[0:-1] + ["resources"]
         )
         image = ScreenshotImage.load_from_resource(
-            resources_package_name, "one_by_one_green.bgra"
+            resources_package_name, f"one_by_one_green.{suffix}"
         )
         self.assertEqual(image.size.width, 1)
         self.assertEqual(image.size.height, 1)
-        self.assertEqual(image.data, bgra_data(GREEN))
+        self.assertEqual(image.data, rgba_data(GREEN))
 
     def test_load_from_resource_only_bgra_is_supported(self) -> None:
         with self.assertRaisesRegex(
-            ValueError, "Only \\.bgra files are supported.*"
+            ValueError, "Only .* files are supported.*"
         ):
-            ScreenshotImage.load_from_resource("foo", "bar.png")
+            ScreenshotImage.load_from_resource("foo", "bar.jpg")
 
     def test_get_pixel(self) -> None:
-        image_bytes = bgra_data(RED, GREEN, BLUE, WHITE)
+        image_bytes = rgba_data(RED, GREEN, BLUE, WHITE)
         image = ScreenshotImage(size=Size(2, 2), data=image_bytes)
 
         self.assertEqual(image.get_pixel(0, 0), RED)
@@ -125,7 +197,7 @@ class ScreenshotImageTest(unittest.TestCase):
         self.assertEqual(image.get_pixel(0, 1), BLUE)
         self.assertEqual(image.get_pixel(1, 1), WHITE)
 
-        image = ScreenshotImage(size=Size(1, 1), data=bgra_data(RED))
+        image = ScreenshotImage(size=Size(1, 1), data=rgba_data(RED))
         self.assertEqual(image.get_pixel(0, 0), RED)
 
     @parameterized.expand(
@@ -137,7 +209,7 @@ class ScreenshotImageTest(unittest.TestCase):
         ]
     )
     def test_get_pixel_out_of_bounds(self, x, y) -> None:
-        image_bytes = bgra_data(RED, GREEN, BLUE, WHITE)
+        image_bytes = rgba_data(RED, GREEN, BLUE, WHITE)
         image = ScreenshotImage(size=Size(2, 2), data=image_bytes)
 
         with self.assertRaisesRegex(
@@ -146,7 +218,7 @@ class ScreenshotImageTest(unittest.TestCase):
             image.get_pixel(x, y)
 
     def test_histogram(self):
-        image_bytes = bgra_data(RED, RED, BLUE)
+        image_bytes = rgba_data(RED, RED, BLUE)
         image = ScreenshotImage(size=Size(3, 1), data=image_bytes)
 
         self.assertDictEqual(
@@ -182,16 +254,16 @@ class ScreenshotImageTest(unittest.TestCase):
         ]
     )
     def test_pixel_similarity(self, pixels1, pixels2, expected_similarity):
-        image1 = ScreenshotImage(size=Size(2, 2), data=bgra_data(*pixels1))
-        image2 = ScreenshotImage(size=Size(2, 2), data=bgra_data(*pixels2))
+        image1 = ScreenshotImage(size=Size(2, 2), data=rgba_data(*pixels1))
+        image2 = ScreenshotImage(size=Size(2, 2), data=rgba_data(*pixels2))
         self.assertEqual(
             image1.pixel_similarity(image2),
             expected_similarity,
         )
 
     def test_pixel_similarity_different_sized_images(self):
-        image1 = ScreenshotImage(size=Size(1, 1), data=bgra_data(RED))
-        image2 = ScreenshotImage(size=Size(2, 1), data=bgra_data(GREEN, RED))
+        image1 = ScreenshotImage(size=Size(1, 1), data=rgba_data(RED))
+        image2 = ScreenshotImage(size=Size(2, 1), data=rgba_data(GREEN, RED))
 
         with self.assertRaises(ValueError):
             image1.pixel_similarity(image2)
@@ -221,16 +293,16 @@ class ScreenshotImageTest(unittest.TestCase):
         ]
     )
     def test_histogram_similarity(self, pixel1, pixels2, expected_similarity):
-        image1 = ScreenshotImage(size=Size(2, 2), data=bgra_data(*pixel1))
-        image2 = ScreenshotImage(size=Size(2, 2), data=bgra_data(*pixels2))
+        image1 = ScreenshotImage(size=Size(2, 2), data=rgba_data(*pixel1))
+        image2 = ScreenshotImage(size=Size(2, 2), data=rgba_data(*pixels2))
         self.assertEqual(
             image1.histogram_similarity(image2),
             expected_similarity,
         )
 
     def test_histogram_similarity_different_sized_images(self):
-        image1 = ScreenshotImage(size=Size(1, 1), data=bgra_data(RED))
-        image2 = ScreenshotImage(size=Size(2, 1), data=bgra_data(GREEN, RED))
+        image1 = ScreenshotImage(size=Size(1, 1), data=rgba_data(RED))
+        image2 = ScreenshotImage(size=Size(2, 1), data=rgba_data(GREEN, RED))
 
         with self.assertRaises(ValueError):
             image1.histogram_similarity(image2)

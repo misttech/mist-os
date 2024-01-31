@@ -17,7 +17,7 @@ _FFX_SCREENSHOT_CMD: list[str] = [
     "target",
     "screenshot",
     "--format",
-    "bgra",
+    "png",
     "-d",
 ]
 
@@ -40,8 +40,8 @@ class Screenshot(screenshot.Screenshot):
         """
 
         with tempfile.TemporaryDirectory() as temp_dir:
-            # ffx screenshot always outputs a file named screenshot.bgra
-            path = os.path.join(temp_dir, "screenshot.bgra")
+            # ffx screenshot always outputs a file named screenshot.png
+            path = os.path.join(temp_dir, "screenshot.png")
             self._ffx.run(cmd=_FFX_SCREENSHOT_CMD + [temp_dir])
             image = screenshot_image.ScreenshotImage.load_from_path(path)
             _LOGGER.debug("Screenshot taken")

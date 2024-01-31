@@ -68,9 +68,7 @@ class ScreenshotAffordanceTests(fuchsia_base_test.FuchsiaBaseTest):
         image = self.device.screenshot.take()
 
         # Save screenshot for debugging
-        file_name = f"screeshot_{image.size.width}x{image.size.height}.bgra"
-        # .bgra can be converted to png using:
-        # `convert -size widthxheight -depth 8 foo.bgra foo.png`
+        file_name = f"screenshot_{image.size.width}x{image.size.height}.png"
 
         _LOGGER.info("Saving screenshot to %s.", file_name)
         image.save(os.path.join(self.test_case_path, file_name))

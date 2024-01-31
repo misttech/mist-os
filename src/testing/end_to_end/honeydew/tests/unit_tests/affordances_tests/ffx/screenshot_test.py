@@ -8,6 +8,8 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
+import png
+
 from honeydew.affordances.ffx.ui import screenshot as ffx_screenshot
 from honeydew.transports import ffx as ffx_transport
 
@@ -21,16 +23,18 @@ class ScreenshotFfxTests(unittest.TestCase):
         self.screenshot_obj = ffx_screenshot.Screenshot(ffx=self.mock_ffx)
 
     def test_take_screenshot(self) -> None:
-        # An image with a single bgra green pixel:
-        expected_img_bytes = b"\x00\xff\x00\xff"
+        # An image with a single pixel:
+        expected_img_bytes = [100, 50, 255, 255]
 
         def mock_run(cmd: list[str]) -> str:
-            expected_cmd = ["target", "screenshot", "--format", "bgra", "-d"]
+            expected_cmd = ["target", "screenshot", "--format", "png", "-d"]
             self.assertEqual(expected_cmd, cmd[0:-1])
             output_dir = Path(cmd[-1])
-            output_file = output_dir / "screenshot.bgra"
-            output_file.write_bytes(expected_img_bytes)
-            return f"output: {output_file}"
+            fake_output_file = output_dir / "screenshot.png"
+            png.from_array([expected_img_bytes], mode="RGBA").save(
+                fake_output_file
+            )
+            return f"output: {fake_output_file}"
 
         self.mock_ffx.run = mock.MagicMock(side_effect=mock_run)
 
@@ -39,4 +43,4 @@ class ScreenshotFfxTests(unittest.TestCase):
         self.mock_ffx.run.assert_called_once()
         self.assertEqual(img.size.width, 1.0)
         self.assertEqual(img.size.height, 1.0)
-        self.assertEqual(img.data, expected_img_bytes)
+        self.assertEqual(img.data, bytes(expected_img_bytes))

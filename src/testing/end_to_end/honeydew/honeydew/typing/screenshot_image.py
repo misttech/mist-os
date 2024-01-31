@@ -3,8 +3,11 @@
 # found in the LICENSE file.
 """Abstract base class for Screenshot affordance."""
 
+import enum
 from dataclasses import dataclass
 from importlib import resources as impresources
+
+import png
 
 from honeydew.interfaces.affordances.ui import custom_types
 from honeydew.typing import ui as ui_types
@@ -12,14 +15,44 @@ from honeydew.typing import ui as ui_types
 _BYTES_PER_PIXEL: int = 4
 
 
+class ScreenshotImageType(enum.StrEnum):
+    """Supported screenshot image types"""
+
+    PNG = "png"
+    BGRA = "bgra"
+
+    @staticmethod
+    def from_file_path(path: str) -> "ScreenshotImageType":
+        """Extract ScreenshotImageType from a path's extension.
+
+        Args:
+            path (str): File path.
+
+        Raises:
+            ValueError: If the extension isn't supported.
+
+        Returns:
+            ScreenshotImageType: The matching type.
+        """
+        path_suffix = path.split(".")[-1].lower()
+        for t in ScreenshotImageType:
+            if path_suffix == t:
+                return t
+        raise ValueError(
+            f"Only {[t for t in ScreenshotImageType]} files are supported but got '{path}'"
+        )
+
+
 @dataclass(frozen=True)
 class ScreenshotImage:
     """Image from screenshot and the size of image
 
-    The format is 32bit BGRA pixels in sRGB color space.
+    The format is 32bit RGBA pixels in sRGB color space.
     """
 
+    # Size of the image
     size: custom_types.Size
+    # pixel data - 4 bytes per pixel
     data: bytes
 
     def __post_init__(self) -> None:
@@ -56,10 +89,9 @@ class ScreenshotImage:
         Returns:
             ScreenshotImage: The loaded image.
         """
-        if not path.endswith(".bgra"):
-            raise ValueError(f"Only .bgra files are supported but got {path}")
+        file_type = ScreenshotImageType.from_file_path(path)
         with open(path, "rb") as f:
-            return ScreenshotImage._from_data(f.read())
+            return ScreenshotImage._from_data(f.read(), file_type)
 
     @staticmethod
     def load_from_resource(
@@ -94,35 +126,84 @@ class ScreenshotImage:
         Returns:
             ScreenshotImage: An image read from the resources.
         """
-        if not file_name.endswith(".bgra"):
-            raise ValueError(
-                f"Only .bgra files are supported but got {file_name}"
-            )
+        file_type = ScreenshotImageType.from_file_path(file_name)
         resource_file = impresources.open_binary(package_name, file_name)
-        return ScreenshotImage._from_data(resource_file.read())
+        return ScreenshotImage._from_data(resource_file.read(), file_type)
 
     @staticmethod
-    def _from_data(data: bytes) -> "ScreenshotImage":
-        # Since `ffx target screenshot` bgra files don't contain size
-        # information assume a single row of pixels.
-        # TODO(b/318880340): Support PNGs which have embedded size info.
-        width = len(data) // _BYTES_PER_PIXEL
-        height = 1
-        return ScreenshotImage(custom_types.Size(width, height), data)
+    def _from_data(
+        data: bytes, file_type: ScreenshotImageType
+    ) -> "ScreenshotImage":
+        match file_type:
+            case ScreenshotImageType.BGRA:
+                # Since `ffx target screenshot` bgra files don't contain size
+                # information assume a single row of pixels.
+                width = len(data) // _BYTES_PER_PIXEL
+                height = 1
+                data = ScreenshotImage._swap_rgba_and_bgra(data)
+                return ScreenshotImage(custom_types.Size(width, height), data)
+            case ScreenshotImageType.PNG:
+                (width, height, rows, _) = png.Reader(bytes=data).asRGBA8()
+                # Flatten 2d array in a 1d array:
+                image_data = bytearray()
+                for row in rows:
+                    image_data.extend(row)
+                return ScreenshotImage(
+                    custom_types.Size(width, height), bytes(image_data)
+                )
+
+    @staticmethod
+    def _swap_rgba_and_bgra(pixel_data: bytes) -> bytes:
+        """Converts pixel_data from rgba to bgra, or vice versa by swapping the r and b channels."""
+        swapped = bytearray(pixel_data)
+        for i in range(0, len(swapped), 4):
+            c = swapped[i]
+            swapped[i] = swapped[i + 2]
+            swapped[i + 2] = c
+        return bytes(swapped)
 
     def save(self, path: str) -> None:
         """Saves the image to the given path.
 
         Raises:
-            ValueError: Only .bgra file output is currently supported.
+            ValueError: Only .bgra and .png file output is currently supported.
 
         Args:
             path (str): Destination for file storage.
         """
-        if not path.endswith(".bgra"):
-            raise ValueError(f"Only .bgra files are supported but got {path}")
-        with open(path, "wb") as f:
-            f.write(self.data)
+
+        file_type = ScreenshotImageType.from_file_path(path)
+
+        match file_type:
+            case ScreenshotImageType.BGRA:
+                with open(path, "wb") as f:
+                    f.write(ScreenshotImage._swap_rgba_and_bgra(self.data))
+            case ScreenshotImageType.PNG:
+                # png lib needs the png data in 2d array
+                png_rows = []
+                for y in range(0, self.size.height):
+                    row_offset = self._data_offset(0, y)
+                    row_end_offset = (
+                        row_offset + self.size.width * _BYTES_PER_PIXEL
+                    )
+                    png_row = self.data[row_offset:row_end_offset]
+                    png_rows.append(png_row)
+                png.from_array(png_rows, "RGBA").save(path)
+
+    def _data_offset(self, x: int, y: int) -> int:
+        """Returns the data offset for a given coordinate.
+
+        Raises:
+            ValueError: If the pixels are outside of the image.
+
+        Returns:
+            int: The data offset for a given coordinate.
+        """
+        if x < 0 or y < 0 or x >= self.size.width or y >= self.size.height:
+            raise ValueError(
+                f"Pixel coordinates {x},{y} are outside of image {self.size}"
+            )
+        return (x + y * self.size.width) * _BYTES_PER_PIXEL
 
     def get_pixel(self, x: int, y: int) -> ui_types.Pixel:
         """Returns the pixel at the given x,y
@@ -133,19 +214,14 @@ class ScreenshotImage:
         Returns:
             Pixel: The pixel at the given x,y positions.
         """
-        if x < 0 or y < 0 or x >= self.size.width or y >= self.size.height:
-            raise ValueError(
-                f"Pixel coordinates {x},{y} are outside of image {self.size}"
-            )
-        offset = (x + y * self.size.width) * _BYTES_PER_PIXEL
-        return self._get_pixel_at_offset(offset)
+        return self._get_pixel_at_offset(self._data_offset(x, y))
 
     def _get_pixel_at_offset(self, offset: int) -> ui_types.Pixel:
-        # Parse bgra bytes:
+        # Parse rgba bytes:
         return ui_types.Pixel(
-            blue=self.data[offset + 0],
+            red=self.data[offset + 0],
             green=self.data[offset + 1],
-            red=self.data[offset + 2],
+            blue=self.data[offset + 2],
             alpha=self.data[offset + 3],
         )
 

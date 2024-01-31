@@ -14,7 +14,10 @@ if (is_host) {
 
   python_host_test("screenshot_ffx_test") {
     main_source = "screenshot_test.py"
-    libraries = [ "//src/testing/end_to_end/honeydew" ]
+    libraries = [
+      "//src/testing/end_to_end/honeydew",
+      "//third_party/pypng",
+    ]
     main_callable = "unittest.main"
     extra_args = [ "-v" ]
   }

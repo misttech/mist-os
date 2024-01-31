@@ -11,6 +11,7 @@ if (is_host) {
       "//src/testing/end_to_end/honeydew",
       "//src/testing/end_to_end/honeydew/tests/unit_tests/typing_tests/resources",
       "//third_party/parameterized",
+      "//third_party/pypng",
     ]
     main_callable = "unittest.main"
     extra_args = [ "-v" ]
