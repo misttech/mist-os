@@ -81,6 +81,8 @@ if (toolchain_base_environment == "kernel") {
       "thread.cc",
       "timer.cc",
       "user_copy_c.cc",
+      "vector.cc",
+      "vector_asm.S",
     ]
     deps = [
       ":boot-mmu",

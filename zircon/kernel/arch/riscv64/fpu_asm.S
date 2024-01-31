@@ -10,7 +10,7 @@
 
 // Put these routines in this file separate from others so the F and D bits
 // of the architecture can be added to allow for floating point instructions
-.attribute arch, "rv64imafdc_zicsr"
+.option arch, +f, +d
 
 // Zero out the FPU single and double precision hardware state
 // void riscv64_fpu_zero();

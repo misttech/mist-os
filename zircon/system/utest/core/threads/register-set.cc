@@ -10,7 +10,15 @@
 #include <string.h>
 #include <zircon/hw/debug/arm64.h>
 
+#include <cstdint>
+
 #include <zxtest/zxtest.h>
+
+#ifdef __riscv
+
+constexpr size_t kRiscvVlenb = 16;
+
+#endif
 
 namespace {
 
@@ -128,7 +136,22 @@ void vector_regs_fill_test_values(zx_thread_state_vector_regs_t* regs) {
 
 #elif defined(__riscv)
 
-  // TODO(https://fxbug.dev/42075221): No vector register (V extn) support on RISC-V yet.
+  // As a mildly interesting test case, we set an element width of 64 bytes and
+  // a grouping of 4 vector registers per operation, operating on up to 4
+  // elements at a time.
+  constexpr uint64_t kSew64 = 0b011 << 3;
+  constexpr uint64_t kLmul4 = 0b010;
+  const uint64_t vlmax = (kRiscvVlenb * 8) * 4 / 64;
+  regs->vcsr = 0;
+  regs->vstart = 0;
+  regs->vtype = kSew64 | kLmul4;
+  regs->vl = vlmax / 2;
+  for (uint8_t i = 0; i < 32; i++) {
+    static_assert(sizeof(regs->v[i]) == 16);
+    for (uint8_t j = 0; j < kRiscvVlenb; j++) {
+      regs->v[i].contents[j] = j == 0 ? i : j;
+    }
+  }
 
 #else
 
@@ -342,7 +365,7 @@ void vector_regs_expect_unsupported_are_zero(const zx_thread_state_vector_regs_t
 
 #elif defined(__riscv)
 
-  // TODO(https://fxbug.dev/42075221): No vector register (V extn) support on RISC-V yet.
+  // All RISC-V vector registers are supported.
 
 #else
 
@@ -370,8 +393,13 @@ void vector_regs_expect_eq(const zx_thread_state_vector_regs_t& regs1,
   }
 
 #elif defined(__riscv)
-
-  // TODO(https://fxbug.dev/42075221): No vector register (V extn) support on RISC-V yet.
+  for (size_t i = 0; i < 32; i++) {
+    EXPECT_BYTES_EQ(regs2.v[i].contents, regs1.v[i].contents, kRiscvVlenb, "(i = %zu)", i);
+  }
+  EXPECT_EQ(regs2.vcsr, regs1.vcsr);
+  EXPECT_EQ(regs2.vl, regs1.vl);
+  EXPECT_EQ(regs2.vstart, regs1.vstart);
+  EXPECT_EQ(regs2.vtype, regs1.vtype);
 
 #else
 

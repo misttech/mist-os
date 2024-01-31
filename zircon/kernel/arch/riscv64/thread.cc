@@ -10,9 +10,13 @@
 #include <string.h>
 #include <sys/types.h>
 #include <trace.h>
+#include <zircon/errors.h>
+#include <zircon/types.h>
 
 #include <arch/riscv64.h>
+#include <arch/riscv64/feature.h>
 #include <arch/riscv64/mp.h>
+#include <arch/riscv64/vector.h>
 #include <arch/vm.h>
 #include <kernel/thread.h>
 
@@ -70,11 +74,13 @@ void arch_setup_uspace_iframe(iframe_t* iframe, uintptr_t pc, uintptr_t sp, uint
   // Current interrupt enable state set to disabled, which will matter when the
   // arch_uspace_entry loads sstatus temporarily before switching to user space.
   // Set user space bitness to 64bit.
-  // Set the fpu to the initial state, with the implicit assumption that the context switch
-  // routine would have defaulted the FPU state a the time this thread enters user space.
-  // All other bits set to zero, default options.
-  iframe->status =
-      RISCV64_CSR_SSTATUS_PIE | RISCV64_CSR_SSTATUS_UXL_64BIT | RISCV64_CSR_SSTATUS_FS_INITIAL;
+  // Set the fpu and vector registers to the initial state, with the implicit
+  // assumption that the context switch routine would have defaulted the
+  // FPU/vector state a the time this thread enters user space. All other bits
+  // set to zero, default options.
+  iframe->status = RISCV64_CSR_SSTATUS_PIE | RISCV64_CSR_SSTATUS_UXL_64BIT |
+                   RISCV64_CSR_SSTATUS_FS_INITIAL |
+                   (riscv_feature_vector ? RISCV64_CSR_SSTATUS_VS_INITIAL : 0);
 }
 
 // Switch to user mode, set the user stack pointer to user_stack_top, save the
@@ -105,29 +111,41 @@ void arch_context_switch(Thread* oldthread, Thread* newthread) {
   // Wipe out any LR/SC reservations this cpu may have.
   __asm__ volatile("sc.w zero, zero, %0" ::"A"(memory_reservation_scratch) : "memory");
 
-  // FPU context switch
-  // Based on a combination of the current hardware state and whether or not the threads have
-  // a dirty flag set, conditionally save and/or restore hardware state.
+  // FPU and vector context switch
+  // Based on a combination of the current hardware state and whether or not the
+  // threads have the dirty flags set, conditionally save and/or restore
+  // hardware state.
   if constexpr (LOCAL_TRACE) {
     uint64_t status = riscv64_csr_read(RISCV64_CSR_SSTATUS);
     uint64_t fpu_status = status & RISCV64_CSR_SSTATUS_FS_MASK;
-    LTRACEF("fpu: sstatus.fp %#lx, sd %u, old.dirty %u, new.dirty %u\n",
-            fpu_status >> RISCV64_CSR_SSTATUS_FS_SHIFT, !!(status & RISCV64_CSR_SSTATUS_SD),
+    uint64_t vector_status = status & RISCV64_CSR_SSTATUS_VS_MASK;
+    LTRACEF("fpu: sstatus.fp %#lx, sstatus.vs %#lx, sd %u, old.dirty %u, new.dirty %u\n",
+            fpu_status >> RISCV64_CSR_SSTATUS_FS_SHIFT,
+            vector_status >> RISCV64_CSR_SSTATUS_VS_SHIFT, !!(status & RISCV64_CSR_SSTATUS_SD),
             oldthread->arch().fpu_dirty, newthread->arch().fpu_dirty);
   }
 
   Riscv64FpuStatus current_fpu_status = riscv64_fpu_status();
+  Riscv64VectorStatus current_vector_status = riscv64_vector_status();
   if (likely(!oldthread->IsUserStateSavedLocked())) {
-    // Save the fpu state for the old (current) thread, returns whether or not
-    // the fpu hardware is currently in the initial state.
+    // Save the fpu and vector state for the old (current) thread, depending on
+    // whether the fpu or vector hardware is currently in the initial state.
     DEBUG_ASSERT(oldthread == Thread::Current().Get());
     riscv64_thread_fpu_save(oldthread, current_fpu_status);
+
+    if (riscv_feature_vector) {
+      riscv64_thread_vector_save(oldthread, current_vector_status);
+    }
   }
-  // Always restore the new threads fpu state even if it is probably going to be restored
-  // by a higher layer later with a call to arch_restore_user_state. Though it may be extra
-  // work in this case, it avoids potential issues with state getting out of sync if the
-  // kernel panicked or the higher layer forgot to restore.
+  // Always restore the new thread's fpu and vector state even if it is
+  // probably going to be restored by a higher layer later with a call to
+  // arch_restore_user_state. Though it may be extra work in this case, it
+  // avoids potential issues with state getting out of sync if the kernel
+  // panicked or the higher layer forgot to restore.
   riscv64_thread_fpu_restore(newthread, current_fpu_status);
+  if (riscv_feature_vector) {
+    riscv64_thread_vector_restore(newthread, current_vector_status);
+  }
 
   // Set the percpu in_restricted_mode field.
   const bool in_restricted =
@@ -159,11 +177,17 @@ vaddr_t arch_thread_get_blocked_fp(Thread* t) {
 
 void arch_save_user_state(Thread* thread) {
   riscv64_thread_fpu_save(thread, riscv64_fpu_status());
+  if (riscv_feature_vector) {
+    riscv64_thread_vector_save(thread, riscv64_vector_status());
+  }
   // Not saving debug state because there isn't any.
 }
 
 void arch_restore_user_state(Thread* thread) {
   riscv64_thread_fpu_restore(thread, riscv64_fpu_status());
+  if (riscv_feature_vector) {
+    riscv64_thread_vector_restore(thread, riscv64_vector_status());
+  }
 }
 
 void arch_set_suspended_general_regs(struct Thread* thread, GeneralRegsSource source,

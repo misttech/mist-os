@@ -51,13 +51,13 @@ void riscv64_init_percpu() {
   // disable all cache instructions and FIOM bit for user space (for now)
   riscv64_csr_write(RISCV64_CSR_SENVCFG, 0);
 
-  // Zero out the fpu state and set to initial
+  // Zero out the fpu state, and set to initial
   riscv64_fpu_zero();
 }
 
 // Called in start.S prior to entering the main kernel.
 // Bootstraps the boot cpu as cpu 0 intrinsically, though it may have a nonzero hart.
-extern "C" void riscv64_boot_cpu_init(PhysHandoff* handoff) {
+extern "C" void riscv64_boot_cpu_init(const PhysHandoff* handoff) {
   uint32_t hart_id = static_cast<uint32_t>(handoff->arch_handoff.boot_hart_id);
   riscv64_init_percpu();
   riscv64_mp_early_init_percpu(hart_id, 0);
@@ -88,6 +88,13 @@ void arch_init() TA_NO_THREAD_SAFETY_ANALYSIS {
 }
 
 void arch_late_init_percpu() {
+  // While it would be nicer to zero out vector state - and set it to initial -
+  // earlier and next to the call to do so for FPU state, that is too early for
+  // `riscv_feature_vector` to have been set.
+  if (riscv_feature_vector) {
+    riscv64_vector_zero();
+  }
+
   // per cpu on each secondary (and the boot cpu a second time)
   mp_set_curr_cpu_online(true);
 }

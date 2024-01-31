@@ -10,4 +10,13 @@ source_set("fpu") {
     "//zircon/system/ulib/zx",
     "//zircon/system/ulib/zxtest",
   ]
+
+  # Disable auto-vectorization in the case of RISC-V to ensure that FPU
+  # instructions are emitted and that we are indeed indirectly testing the
+  # context switching of FPU state. For other architectures, FPU and vector
+  # state coincide, so auto-vectorization is okay and still results in the
+  # intended logic being exercised.
+  if (current_cpu == "riscv64") {
+    cflags = [ "-fno-vectorize" ]
+  }
 }

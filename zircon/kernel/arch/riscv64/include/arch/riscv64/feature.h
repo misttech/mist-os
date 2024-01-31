@@ -14,9 +14,14 @@
 extern bool riscv_feature_cboz;
 extern bool riscv_feature_cbom;
 extern bool riscv_feature_svpbmt;
+extern bool riscv_feature_vector;
 
 extern uint32_t riscv_cboz_size;
 extern uint32_t riscv_cbom_size;
+
+// The length of the vector registers in bytes. A value of 0 corresponds to the
+// hardware not supporting vectors.
+extern uint64_t riscv_vlenb;
 
 void riscv64_feature_early_init();
 void riscv64_feature_init();

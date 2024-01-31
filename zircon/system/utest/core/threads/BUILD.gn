@@ -15,6 +15,7 @@ source_set("threads") {
     ":register-set-asm",
     ":thread-functions",
     "//zircon/kernel/lib/arch",
+    "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/mini-process",
     "//zircon/system/ulib/runtime",
     "//zircon/system/ulib/test-exceptions",

@@ -14,6 +14,7 @@
 #include <zircon/tls.h>
 
 #include <arch/riscv64/fpu.h>
+#include <arch/riscv64/vector.h>
 
 struct arch_thread {
   // The compiler knows the position of these two fields relative to tp, which
@@ -37,11 +38,15 @@ struct arch_thread {
   // If non-NULL, address to return to on data fault.
   uint64_t data_fault_resume;
 
-  // Record whether or not the floating point state was ever modified on this thread.
+  // Record whether or not the floating point or vector state was ever modified
+  // on this thread.
   bool fpu_dirty;
+  bool vector_dirty;
 
-  // Full snapshot of the double precision state at context switch time
+  // Full snapshot of the double precision and vector state at context switch
+  // time.
   riscv64_fpu_state fpu_state;
+  riscv64_vector_state vector_state;
 };
 
 #define thread_pointer_offsetof(field)        \

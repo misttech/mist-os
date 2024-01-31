@@ -12,6 +12,14 @@
 
 #elif defined(__riscv)
 
+// If vector instructions are not already enabled, do so at the assembler level.
+//
+// TODO(https://fxbug.dev/42075221): Remove once V is universally enabled at the
+// compiler level.
+#ifndef __riscv_v
+.option arch, +v
+#endif
+
 #define JUMP j
 
 #elif defined(__x86_64__)
@@ -255,8 +263,31 @@
   ldp q30, q31, [x0]
 
 #elif defined(__riscv)
+  // For indexing into the memory from which we want to load 8 vector
+  // registers at a time, compute 8 * VLENB.
+  csrr  a1, vlenb
+  slli  a1, a1, 3
 
-// TODO(https://fxbug.dev/42075221): RISC-V vector state not supported yet.
+  addi    t0, a0, RISCV64_VECTOR_STATE_V
+  vl8r.v  v0, (t0)
+  add     t0, t0, a1
+  vl8r.v  v8, (t0)
+  add     t0, t0, a1
+  vl8r.v  v16, (t0)
+  add     t0, t0, a1
+  vl8r.v  v24, (t0)
+
+  lw      a1, RISCV64_VECTOR_STATE_VCSR(a0)
+  csrw    vcsr, a1
+
+  lw      a1, RISCV64_VECTOR_STATE_VL(a0)
+  lw      a2, RISCV64_VECTOR_STATE_VTYPE(a0)
+  vsetvl  zero, a1, a2
+
+  // Any vector operation will reset `vstart`, so be sure to install this
+  // value last.
+  lw      a1, RISCV64_VECTOR_STATE_VSTART(a0)
+  csrw    vstart, a1
 
 #else
 
@@ -495,7 +526,34 @@
 
 #elif defined(__riscv)
 
-  // TODO(https://fxbug.dev/42075221): RISC-V vector state not supported yet.
+  // Any vector operation will reset `vstart`, so be sure to save this
+  // value first.
+  csrr    a0, vstart
+  sd      a0, RISCV64_VECTOR_STATE_VSTART(sp)
+
+  csrr    a0, vcsr
+  sd      a0, RISCV64_VECTOR_STATE_VCSR(sp)
+
+  csrr    a0, vl
+  sd      a0, RISCV64_VECTOR_STATE_VL(sp)
+
+  csrr    a0, vtype
+  sd      a0, RISCV64_VECTOR_STATE_VTYPE(sp)
+
+  // For indexing into the memory at which we want to store 8 vector registers
+  // at a time, compute 8 * VLENB.
+  csrr  a1, vlenb
+  slli  a1, a1, 3
+
+  addi    a0, sp, RISCV64_VECTOR_STATE_V
+  vs8r.v  v0, (a0)
+  add     a0, a0, a1
+  vs8r.v  v8, (a0)
+  add     a0, a0, a1
+  vs8r.v  v16, (a0)
+  add     a0, a0, a1
+  vs8r.v  v24, (a0)
+
   call zx_thread_exit
   unimp
 

@@ -206,11 +206,28 @@ typedef struct {
 } zx_riscv64_thread_state_fp_regs_t;
 
 // Value for ZX_THREAD_STATE_VECTOR_REGS on RISC-V platforms.
-// Not supported yet.
-// In future, see https://github.com/riscv/riscv-v-spec/blob/master/v-spec.adoc
+//
+// See https://github.com/riscv/riscv-v-spec/blob/master/v-spec.adoc.
 typedef struct {
-  // Avoids sizing differences for empty structs between C and C++.
-  uint32_t unused;
+  // The 32 vector registers, each currently assumed to have 16-byte lengths.
+  struct {
+    uint8_t contents[16];
+  } v[32];
+
+  // The contents of the `vcsr` CSR, the control and status register.
+  uint64_t vcsr;
+
+  // The contents of the `vstart` CSR, specifying the index of the first element
+  // to be executed by a vector instruction
+  uint64_t vstart;
+
+  // The contents of the `vl` CSR, specifying the number of elements to be
+  // updated with results from a vector instruction.
+  uint64_t vl;
+
+  // The contents of the `vtype` CSR, providing the default type used to
+  // interpret the contents of the registers (e.g., element width and grouping).
+  uint64_t vtype;
 } zx_riscv64_thread_state_vector_regs_t;
 
 // Value for ZX_THREAD_STATE_DEBUG_REGS on RISC-V platforms.
