@@ -346,6 +346,7 @@ class DeviceInterface : public fidl::WireServer<netdev::Device>,
 
   // Event hooks used in tests:
   fit::function<void(const char*)> evt_session_started_;
+  // NB: This will be called with control_lock_ held.
   fit::function<void(const char*)> evt_session_died_;
   fit::function<void(uint64_t)> evt_rx_queue_packet_;
   fit::function<void()> evt_tx_complete_;

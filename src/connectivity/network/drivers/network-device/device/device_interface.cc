@@ -1316,7 +1316,7 @@ void DeviceInterface::NotifyDeadSession(Session& dead_session) {
 
   // Now find it in sessions and remove it.
   std::unique_ptr<Session> session_ptr;
-  control_lock_.Acquire();
+  fbl::AutoLock lock(&control_lock_);
   if (&dead_session == primary_session_.get()) {
     // Nullify primary session.
     session_ptr = std::move(primary_session_);
@@ -1325,39 +1325,18 @@ void DeviceInterface::NotifyDeadSession(Session& dead_session) {
     session_ptr = sessions_.erase(dead_session);
   }
 
-  // we can destroy the session immediately.
-  if (session_ptr->ShouldDestroy()) {
-    LOGF_TRACE("%s('%s') destroying session", __FUNCTION__, dead_session.name());
-    ReleaseVmo(*session_ptr, [this] {
-      control_lock_.Acquire();
-      ContinueTeardown(TeardownState::SESSIONS);
-    });
-    control_lock_.Release();
-
-    if (evt_session_died_) {
-      evt_session_died_(session_ptr->name());
-    }
-
-    session_ptr = nullptr;
-    return;
-  }
-
-  // otherwise, add it to the list of dead sessions so we can wait for buffers to be returned before
-  // destroying it.
-  LOGF_TRACE(
-      "%s('%s') session is dead, waiting for buffers to be "
-      "reclaimed",
-      __FUNCTION__, session_ptr->name());
+  // Add the session to the list of dead sessions so we can wait for buffers to be returned and
+  // ReleaseVmo to complete before destroying it.
+  LOGF_TRACE("%s('%s') session is dead, waiting for buffers to be reclaimed", __FUNCTION__,
+             session_ptr->name());
   dead_sessions_.push_back(std::move(session_ptr));
-  control_lock_.Release();
+  // The session may also be eligible for immediate destruction if all buffers are already returned.
+  // Let PruneDeadSessions do the checking and cleanup work.
+  PruneDeadSessions();
 }
 
 void DeviceInterface::PruneDeadSessions() __TA_REQUIRES_SHARED(control_lock_) {
-  auto it = dead_sessions_.begin();
-  while (it != dead_sessions_.end()) {
-    Session& session = *it;
-    // increment iterator before erasing, because of DoublyLinkedList
-    ++it;
+  for (auto& session : dead_sessions_) {
     if (session.ShouldDestroy()) {
       // Schedule for destruction.
       //
@@ -1370,23 +1349,16 @@ void DeviceInterface::PruneDeadSessions() __TA_REQUIRES_SHARED(control_lock_) {
         fbl::AutoLock lock(&control_lock_);
         LOGF_TRACE("destroying %s", session.name());
         // The callback for ReleaseVmo is never called inline. Otherwise this would deadlock as the
-        // control lock is held when this is called. Because the control lock is held here the call
-        // to ContinueTeardown in the callback is guaranteed to happen AFTER the session is erased
-        // from dead_sessions_ below.
-        ReleaseVmo(session, [this] {
+        // control lock is held when this is called.
+        ReleaseVmo(session, [&session, this] {
+          const std::string session_name = session.name();
           control_lock_.Acquire();
+          dead_sessions_.erase(session);
+          if (evt_session_died_) {
+            evt_session_died_(session_name.c_str());
+          }
           ContinueTeardown(TeardownState::SESSIONS);
         });
-        std::string session_name;
-        if (evt_session_died_) {
-          // If needed, make a copy of the session name before it's destructed.
-          session_name = session.name();
-        }
-        dead_sessions_.erase(session);
-        lock.release();
-        if (evt_session_died_) {
-          evt_session_died_(session_name.c_str());
-        }
       });
     } else {
       LOGF_TRACE("%s: %s still pending", __FUNCTION__, session.name());
