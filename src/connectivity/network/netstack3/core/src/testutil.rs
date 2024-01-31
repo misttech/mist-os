@@ -20,6 +20,7 @@ use core::{
     time::Duration,
 };
 
+use lock_order::wrap::prelude::*;
 use net_types::{
     ethernet::Mac,
     ip::{
@@ -212,19 +213,21 @@ where
 }
 
 /// An API struct for test utilities.
-// TODO(https://fxbug.dev/42083910): Remove dead code allowance once testutil
-// public functions are moved here.
-#[allow(dead_code)]
 pub struct TestApi<'a, BT: BindingsTypes>(UnlockedCoreCtx<'a, BT>, &'a mut BT);
 
 impl<'l, BC> TestApi<'l, BC>
 where
     BC: crate::BindingsContext,
 {
-    #[cfg(test)]
     fn contexts(&mut self) -> (&mut UnlockedCoreCtx<'l, BC>, &mut BC) {
         let Self(core_ctx, bindings_ctx) = self;
         (core_ctx, bindings_ctx)
+    }
+
+    fn core_api(&mut self) -> crate::api::CoreApi<'_, &mut BC> {
+        let (core_ctx, bindings_ctx) = self.contexts();
+        let core_ctx = core_ctx.as_owned();
+        crate::api::CoreApi::new(crate::context::CtxPair { core_ctx, bindings_ctx })
     }
 
     /// Joins the multicast group `multicast_addr` for `device`.
@@ -328,6 +331,84 @@ where
             }
             IpVersion::V6 => {
                 crate::ip::receive_ipv6_packet(core_ctx, bindings_ctx, device, frame_dst, buffer)
+            }
+        }
+    }
+
+    /// Add a route directly to the forwarding table.
+    pub fn add_route(
+        &mut self,
+        entry: crate::ip::types::AddableEntryEither<crate::device::DeviceId<BC>>,
+    ) -> Result<(), crate::ip::forwarding::AddRouteError> {
+        let (core_ctx, bindings_ctx) = self.contexts();
+        match entry {
+            crate::ip::types::AddableEntryEither::V4(entry) => {
+                crate::ip::forwarding::testutil::add_route::<Ipv4, _, _>(
+                    core_ctx,
+                    bindings_ctx,
+                    entry,
+                )
+            }
+            crate::ip::types::AddableEntryEither::V6(entry) => {
+                crate::ip::forwarding::testutil::add_route::<Ipv6, _, _>(
+                    core_ctx,
+                    bindings_ctx,
+                    entry,
+                )
+            }
+        }
+    }
+
+    /// Delete a route from the forwarding table, returning `Err` if no route
+    /// was found to be deleted.
+    pub fn del_routes_to_subnet(
+        &mut self,
+        subnet: net_types::ip::SubnetEither,
+    ) -> crate::error::Result<()> {
+        let (core_ctx, bindings_ctx) = self.contexts();
+        match subnet {
+            SubnetEither::V4(subnet) => crate::ip::forwarding::testutil::del_routes_to_subnet::<
+                Ipv4,
+                _,
+                _,
+            >(core_ctx, bindings_ctx, subnet),
+            SubnetEither::V6(subnet) => crate::ip::forwarding::testutil::del_routes_to_subnet::<
+                Ipv6,
+                _,
+                _,
+            >(core_ctx, bindings_ctx, subnet),
+        }
+        .map_err(From::from)
+    }
+
+    /// Deletes all routes targeting `device`.
+    pub(crate) fn del_device_routes(&mut self, device: &DeviceId<BC>) {
+        let (core_ctx, bindings_ctx) = self.contexts();
+        crate::ip::forwarding::testutil::del_device_routes::<Ipv4, _, _>(
+            core_ctx,
+            bindings_ctx,
+            device,
+        );
+        crate::ip::forwarding::testutil::del_device_routes::<Ipv6, _, _>(
+            core_ctx,
+            bindings_ctx,
+            device,
+        );
+    }
+
+    /// Removes all of the routes through the device, then removes the device.
+    pub fn clear_routes_and_remove_ethernet_device(
+        &mut self,
+        ethernet_device: crate::device::EthernetDeviceId<BC>,
+    ) {
+        let device_id = ethernet_device.into();
+        self.del_device_routes(&device_id);
+        let ethernet_device =
+            assert_matches!(device_id, crate::device::DeviceId::Ethernet(id) => id);
+        match self.core_api().device().remove_device(ethernet_device) {
+            crate::device::RemoveDeviceResult::Removed(_external_state) => {}
+            crate::device::RemoveDeviceResult::Deferred(_reference_receiver) => {
+                panic!("failed to remove ethernet device")
             }
         }
     }
@@ -1335,19 +1416,15 @@ impl FakeEventDispatcherBuilder {
                 .expect("error inserting static NDP entry");
         }
 
-        let Ctx { core_ctx, bindings_ctx } = &mut ctx;
         for (subnet, idx) in device_routes {
             let device = &idx_to_device_id[idx];
-            crate::testutil::add_route(
-                core_ctx,
-                bindings_ctx,
-                crate::ip::types::AddableEntryEither::without_gateway(
+            ctx.test_api()
+                .add_route(crate::ip::types::AddableEntryEither::without_gateway(
                     subnet,
                     device.clone().into(),
                     AddableMetric::ExplicitMetric(RawMetric(0)),
-                ),
-            )
-            .expect("add device route");
+                ))
+                .expect("add device route");
         }
 
         (ctx, idx_to_device_id)
@@ -1607,92 +1684,6 @@ impl<I: Ip> From<nud::Event<Mac, EthernetDeviceId<FakeBindingsCtx>, I, FakeInsta
 
 pub(crate) const IPV6_MIN_IMPLIED_MAX_FRAME_SIZE: MaxEthernetFrameSize =
     const_unwrap::const_unwrap_option(MaxEthernetFrameSize::from_mtu(Ipv6::MINIMUM_LINK_MTU));
-
-/// Add a route directly to the forwarding table.
-#[cfg(any(test, feature = "testutils"))]
-pub fn add_route<BC: crate::BindingsContext>(
-    core_ctx: &crate::context::SyncCtx<BC>,
-    bindings_ctx: &mut BC,
-    entry: crate::ip::types::AddableEntryEither<crate::device::DeviceId<BC>>,
-) -> Result<(), crate::ip::forwarding::AddRouteError> {
-    let mut core_ctx = CoreCtx::new_deprecated(core_ctx);
-    match entry {
-        crate::ip::types::AddableEntryEither::V4(entry) => {
-            crate::ip::forwarding::testutil::add_route::<Ipv4, _, _>(
-                &mut core_ctx,
-                bindings_ctx,
-                entry,
-            )
-        }
-        crate::ip::types::AddableEntryEither::V6(entry) => {
-            crate::ip::forwarding::testutil::add_route::<Ipv6, _, _>(
-                &mut core_ctx,
-                bindings_ctx,
-                entry,
-            )
-        }
-    }
-}
-
-/// Delete a route from the forwarding table, returning `Err` if no route was
-/// found to be deleted.
-#[cfg(any(test, feature = "testutils"))]
-pub fn del_routes_to_subnet<BC: crate::BindingsContext>(
-    core_ctx: &crate::context::SyncCtx<BC>,
-    bindings_ctx: &mut BC,
-    subnet: net_types::ip::SubnetEither,
-) -> crate::error::Result<()> {
-    let mut core_ctx = CoreCtx::new_deprecated(core_ctx);
-
-    match subnet {
-        SubnetEither::V4(subnet) => crate::ip::forwarding::testutil::del_routes_to_subnet::<
-            Ipv4,
-            _,
-            _,
-        >(&mut core_ctx, bindings_ctx, subnet),
-        SubnetEither::V6(subnet) => crate::ip::forwarding::testutil::del_routes_to_subnet::<
-            Ipv6,
-            _,
-            _,
-        >(&mut core_ctx, bindings_ctx, subnet),
-    }
-    .map_err(From::from)
-}
-
-pub(crate) fn del_device_routes<BC: crate::BindingsContext>(
-    core_ctx: &crate::context::SyncCtx<BC>,
-    bindings_ctx: &mut BC,
-    device: &DeviceId<BC>,
-) {
-    let mut core_ctx = CoreCtx::new_deprecated(core_ctx);
-    crate::ip::forwarding::testutil::del_device_routes::<Ipv4, _, _>(
-        &mut core_ctx,
-        bindings_ctx,
-        device,
-    );
-    crate::ip::forwarding::testutil::del_device_routes::<Ipv6, _, _>(
-        &mut core_ctx,
-        bindings_ctx,
-        device,
-    );
-}
-
-/// Removes all of the routes through the device, then removes the device.
-pub fn clear_routes_and_remove_ethernet_device<BC: crate::BindingsContext>(
-    core_ctx: &crate::context::SyncCtx<BC>,
-    bindings_ctx: &mut BC,
-    ethernet_device: crate::device::EthernetDeviceId<BC>,
-) {
-    let device_id = crate::device::DeviceId::Ethernet(ethernet_device);
-    del_device_routes(core_ctx, bindings_ctx, &device_id);
-    let ethernet_device = assert_matches!(device_id, crate::device::DeviceId::Ethernet(id) => id);
-    match core_ctx.state.api(bindings_ctx).device().remove_device(ethernet_device) {
-        crate::device::RemoveDeviceResult::Removed(_external_state) => {}
-        crate::device::RemoveDeviceResult::Deferred(_reference_receiver) => {
-            panic!("failed to remove ethernet device")
-        }
-    }
-}
 
 /// A convenient monotonically increasing identifier to use as the bindings'
 /// `DeviceIdentifier` in tests.

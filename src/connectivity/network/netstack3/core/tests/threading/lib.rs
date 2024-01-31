@@ -257,18 +257,17 @@ fn neighbor_resolution_and_send_queued_packets_atomic<I: Ip + TestIpExt>() {
         let device = indexes_to_device_ids.into_iter().nth(dev_index).unwrap();
         let mut ctx = ContextPair { core_ctx: Arc::new(core_ctx), bindings_ctx };
 
-        netstack3_core::testutil::add_route(
-            &ctx.core_ctx,
-            &mut ctx.bindings_ctx,
-            AddableEntry::with_gateway(
-                I::DEVICE_GATEWAY,
-                device.clone().into(),
-                SpecifiedAddr::new(I::NEIGHBOR_ADDR).unwrap(),
-                AddableMetric::ExplicitMetric(RawMetric(0)),
+        ctx.test_api()
+            .add_route(
+                AddableEntry::with_gateway(
+                    I::DEVICE_GATEWAY,
+                    device.clone().into(),
+                    SpecifiedAddr::new(I::NEIGHBOR_ADDR).unwrap(),
+                    AddableMetric::ExplicitMetric(RawMetric(0)),
+                )
+                .into(),
             )
-            .into(),
-        )
-        .unwrap();
+            .unwrap();
 
         const LOCAL_PORT: NonZeroU16 = const_unwrap_option(NonZeroU16::new(22222));
         const REMOTE_PORT: NonZeroU16 = const_unwrap_option(NonZeroU16::new(33333));
@@ -358,11 +357,7 @@ fn neighbor_resolution_and_send_queued_packets_atomic<I: Ip + TestIpExt>() {
         // Remove the device so that existing NUD timers get cleaned up;
         // otherwise, they would hold dangling references to the device when the
         // core context is dropped at the end of the test.
-        netstack3_core::testutil::clear_routes_and_remove_ethernet_device(
-            &ctx.core_ctx,
-            &mut ctx.bindings_ctx,
-            device,
-        );
+        ctx.test_api().clear_routes_and_remove_ethernet_device(device);
     })
 }
 
@@ -380,18 +375,17 @@ fn new_incomplete_neighbor_schedule_timer_atomic<I: Ip + TestIpExt>() {
         let mut ctx = ContextPair { core_ctx: Arc::new(core_ctx), bindings_ctx };
         let device = indexes_to_device_ids.into_iter().nth(dev_index).unwrap();
 
-        netstack3_core::testutil::add_route(
-            &ctx.core_ctx,
-            &mut ctx.bindings_ctx,
-            AddableEntry::with_gateway(
-                I::DEVICE_GATEWAY,
-                device.clone().into(),
-                SpecifiedAddr::new(I::NEIGHBOR_ADDR).unwrap(),
-                AddableMetric::ExplicitMetric(RawMetric(0)),
+        ctx.test_api()
+            .add_route(
+                AddableEntry::with_gateway(
+                    I::DEVICE_GATEWAY,
+                    device.clone().into(),
+                    SpecifiedAddr::new(I::NEIGHBOR_ADDR).unwrap(),
+                    AddableMetric::ExplicitMetric(RawMetric(0)),
+                )
+                .into(),
             )
-            .into(),
-        )
-        .unwrap();
+            .unwrap();
 
         const LOCAL_PORT: NonZeroU16 = const_unwrap_option(NonZeroU16::new(22222));
         const REMOTE_PORT: NonZeroU16 = const_unwrap_option(NonZeroU16::new(33333));
@@ -447,10 +441,6 @@ fn new_incomplete_neighbor_schedule_timer_atomic<I: Ip + TestIpExt>() {
 
         // Remove the device so that existing references to it get cleaned up
         // before the core context is dropped at the end of the test.
-        netstack3_core::testutil::clear_routes_and_remove_ethernet_device(
-            &ctx.core_ctx,
-            &mut ctx.bindings_ctx,
-            device,
-        );
+        ctx.test_api().clear_routes_and_remove_ethernet_device(device);
     })
 }

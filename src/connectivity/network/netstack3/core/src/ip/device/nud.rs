@@ -5405,12 +5405,8 @@ mod tests {
         // otherwise, they would hold dangling references to the devices when
         // the `StackState`s are dropped at the end of the test.
         for (ctx, device) in [("local", local_device), ("remote", remote_device)] {
-            net.with_context(ctx, |testutil::FakeCtx { core_ctx, bindings_ctx }| {
-                crate::testutil::clear_routes_and_remove_ethernet_device(
-                    core_ctx,
-                    bindings_ctx,
-                    device,
-                );
+            net.with_context(ctx, |ctx| {
+                ctx.test_api().clear_routes_and_remove_ethernet_device(device);
             });
         }
     }
@@ -5477,12 +5473,8 @@ mod tests {
         // otherwise, they would hold dangling references to the devices when
         // the `StackState`s are dropped at the end of the test.
         for (ctx, device) in [("local", local_device), ("remote", remote_device)] {
-            net.with_context(ctx, |testutil::FakeCtx { core_ctx, bindings_ctx }| {
-                crate::testutil::clear_routes_and_remove_ethernet_device(
-                    core_ctx,
-                    bindings_ctx,
-                    device,
-                );
+            net.with_context(ctx, |ctx| {
+                ctx.test_api().clear_routes_and_remove_ethernet_device(device);
             });
         }
     }

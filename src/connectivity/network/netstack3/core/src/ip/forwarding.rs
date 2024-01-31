@@ -1179,10 +1179,7 @@ mod tests {
             ))
         };
 
-        assert_eq!(
-            crate::testutil::add_route(&ctx.core_ctx, &mut ctx.bindings_ctx, route_to_add),
-            Ok(())
-        );
+        assert_eq!(ctx.test_api().add_route(route_to_add), Ok(()));
 
         // It still won't resolve successfully because the device is not enabled yet.
         assert_eq!(ctx.core_api().routes_any().select_device_for_gateway(gateway), None);
@@ -1245,40 +1242,30 @@ mod tests {
             .into();
         let gateway_device = device_id.clone();
 
-        let crate::testutil::FakeCtx { core_ctx, bindings_ctx } = &mut ctx;
-
         // Attempt to add the gateway route when there is no known route to the
         // gateway.
         assert_eq!(
-            crate::testutil::add_route(
-                core_ctx,
-                bindings_ctx,
-                AddableEntryEither::from(AddableEntry::with_gateway(
-                    gateway_subnet,
-                    gateway_device.clone(),
-                    I::FAKE_CONFIG.remote_ip,
-                    AddableMetric::ExplicitMetric(RawMetric(0))
-                ))
-            ),
+            ctx.test_api().add_route(AddableEntryEither::from(AddableEntry::with_gateway(
+                gateway_subnet,
+                gateway_device.clone(),
+                I::FAKE_CONFIG.remote_ip,
+                AddableMetric::ExplicitMetric(RawMetric(0))
+            ))),
             expected_first_result,
         );
 
         assert_eq!(
-            crate::testutil::del_routes_to_subnet(core_ctx, bindings_ctx, gateway_subnet.into()),
+            ctx.test_api().del_routes_to_subnet(gateway_subnet.into()),
             expected_first_result.map_err(|_: AddRouteError| error::NetstackError::NotFound),
         );
 
         // Then, add a route to the gateway, and try again, expecting success.
         assert_eq!(
-            crate::testutil::add_route(
-                core_ctx,
-                bindings_ctx,
-                AddableEntryEither::from(AddableEntry::without_gateway(
-                    I::FAKE_CONFIG.subnet,
-                    device_id.clone(),
-                    AddableMetric::ExplicitMetric(RawMetric(0))
-                ))
-            ),
+            ctx.test_api().add_route(AddableEntryEither::from(AddableEntry::without_gateway(
+                I::FAKE_CONFIG.subnet,
+                device_id.clone(),
+                AddableMetric::ExplicitMetric(RawMetric(0))
+            ))),
             Ok(())
         );
 
@@ -1286,16 +1273,12 @@ mod tests {
             crate::device::testutil::enable_device(&mut ctx, &device_id);
         }
         assert_eq!(
-            crate::testutil::add_route(
-                &ctx.core_ctx,
-                &mut ctx.bindings_ctx,
-                AddableEntryEither::from(AddableEntry::with_gateway(
-                    gateway_subnet,
-                    gateway_device,
-                    I::FAKE_CONFIG.remote_ip,
-                    AddableMetric::ExplicitMetric(RawMetric(0))
-                ))
-            ),
+            ctx.test_api().add_route(AddableEntryEither::from(AddableEntry::with_gateway(
+                gateway_subnet,
+                gateway_device,
+                I::FAKE_CONFIG.remote_ip,
+                AddableMetric::ExplicitMetric(RawMetric(0))
+            ))),
             expected_second_result,
         );
     }
@@ -1320,15 +1303,11 @@ mod tests {
                 metric,
             );
         assert_eq!(
-            crate::testutil::add_route(
-                &ctx.core_ctx,
-                &mut ctx.bindings_ctx,
-                AddableEntryEither::from(AddableEntry::without_gateway(
-                    I::FAKE_CONFIG.subnet,
-                    device_id.clone().into(),
-                    AddableMetric::MetricTracksInterface
-                ))
-            ),
+            ctx.test_api().add_route(AddableEntryEither::from(AddableEntry::without_gateway(
+                I::FAKE_CONFIG.subnet,
+                device_id.clone().into(),
+                AddableMetric::MetricTracksInterface
+            ))),
             Ok(())
         );
         assert_eq!(
@@ -1343,10 +1322,6 @@ mod tests {
         );
 
         // Remove the device and routes to clear all dangling references.
-        crate::testutil::clear_routes_and_remove_ethernet_device(
-            &ctx.core_ctx,
-            &mut ctx.bindings_ctx,
-            device_id,
-        );
+        ctx.test_api().clear_routes_and_remove_ethernet_device(device_id);
     }
 }

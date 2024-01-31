@@ -2001,7 +2001,6 @@ mod tests {
                 (local_ip, Some(local_ip))
             }
         };
-        let Ctx { core_ctx, bindings_ctx } = &mut ctx;
         let to_ip = match remote_ip_type {
             AddressType::LocallyOwned => local_ip,
             AddressType::Remote => remote_ip,
@@ -2009,11 +2008,11 @@ mod tests {
                 panic!("remote_ip_type cannot be unspecified")
             }
             AddressType::Unroutable => {
-                crate::testutil::del_routes_to_subnet(core_ctx, bindings_ctx, subnet.into())
-                    .unwrap();
+                ctx.test_api().del_routes_to_subnet(subnet.into()).unwrap();
                 remote_ip
             }
         };
+        let Ctx { core_ctx, bindings_ctx } = &mut ctx;
 
         let get_expected_result = |template| expected_result.map(|()| template);
         let weak_local_device = local_device.as_ref().map(|d| d.downgrade());
@@ -2100,17 +2099,13 @@ mod tests {
             .device_ip::<I>()
             .add_ip_addr_subnet(&device_id, AddrSubnet::new(remote_ip.get(), 16).unwrap())
             .unwrap();
-        let Ctx { core_ctx, bindings_ctx } = &mut ctx;
-        crate::testutil::add_route(
-            core_ctx,
-            bindings_ctx,
-            AddableEntryEither::without_gateway(
+        ctx.test_api()
+            .add_route(AddableEntryEither::without_gateway(
                 subnet.into(),
                 device_id,
                 AddableMetric::ExplicitMetric(RawMetric(0)),
-            ),
-        )
-        .unwrap();
+            ))
+            .unwrap();
 
         let loopback_device_id = ctx
             .core_api()
@@ -2359,26 +2354,23 @@ mod tests {
             .add_ip_addr_subnet(&device_id, AddrSubnet::new(local_ip.get(), 16).unwrap())
             .unwrap();
 
-        let Ctx { core_ctx, bindings_ctx } = &mut ctx;
         // Use multicast remote addresses since unicast addresses would trigger
         // ARP/NDP requests.
-        crate::testutil::add_route(
-            core_ctx,
-            bindings_ctx,
-            AddableEntryEither::without_gateway(
+        ctx.test_api()
+            .add_route(AddableEntryEither::without_gateway(
                 I::MULTICAST_SUBNET.into(),
                 device_id,
                 AddableMetric::ExplicitMetric(RawMetric(0)),
-            ),
-        )
-        .expect("add device route");
+            ))
+            .expect("add device route");
         let remote_ip = I::multicast_addr(0);
         let options = SetHopLimitFor(remote_ip);
         let other_remote_ip = I::multicast_addr(1);
 
+        let (mut core_ctx, bindings_ctx) = ctx.contexts();
         let mut send_to = |destination_ip| {
             let sock = IpSocketHandler::<I, _>::new_ip_socket(
-                &mut CoreCtx::new_deprecated(core_ctx),
+                &mut core_ctx,
                 bindings_ctx,
                 None,
                 None,
@@ -2389,7 +2381,7 @@ mod tests {
             .unwrap();
 
             IpSocketHandler::<I, _>::send_ip_packet(
-                &mut CoreCtx::new_deprecated(core_ctx),
+                &mut core_ctx,
                 bindings_ctx,
                 &sock,
                 (&[0u8][..]).into_serializer(),
@@ -2479,20 +2471,17 @@ mod tests {
             .device_ip::<I>()
             .add_ip_addr_subnet(&device_id, AddrSubnet::new(local_ip.get(), 16).unwrap())
             .unwrap();
-        let Ctx { core_ctx, bindings_ctx } = &mut ctx;
-        crate::testutil::add_route(
-            core_ctx,
-            bindings_ctx,
-            AddableEntryEither::without_gateway(
+        ctx.test_api()
+            .add_route(AddableEntryEither::without_gateway(
                 I::MULTICAST_SUBNET.into(),
                 device_id.clone(),
                 AddableMetric::ExplicitMetric(RawMetric(0)),
-            ),
-        )
-        .unwrap();
+            ))
+            .unwrap();
 
+        let (mut core_ctx, bindings_ctx) = ctx.contexts();
         let ip_sock = IpSocketHandler::<I, _>::new_ip_socket(
-            &mut CoreCtx::new_deprecated(core_ctx),
+            &mut core_ctx,
             bindings_ctx,
             None,
             None,
@@ -2504,7 +2493,7 @@ mod tests {
 
         let expected = if remove_device {
             // Clear routes on the device before removing it.
-            crate::testutil::del_device_routes(core_ctx, bindings_ctx, &device_id);
+            ctx.test_api().del_device_routes(&device_id);
 
             // Don't keep any strong device IDs to the device before removing.
             core::mem::drop(device_id);
@@ -2512,22 +2501,12 @@ mod tests {
             Err(MmsError::NoDevice(ResolveRouteError::Unreachable))
         } else {
             Ok(Mms::from_mtu::<I>(
-                IpDeviceContext::<I, _>::get_mtu(
-                    &mut CoreCtx::new_deprecated(core_ctx),
-                    &device_id,
-                ),
+                IpDeviceContext::<I, _>::get_mtu(&mut ctx.core_ctx(), &device_id),
                 0, /* no ip options/ext hdrs used */
             )
             .unwrap())
         };
-        let Ctx { core_ctx, bindings_ctx } = &mut ctx;
-        assert_eq!(
-            DeviceIpSocketHandler::get_mms(
-                &mut CoreCtx::new_deprecated(core_ctx),
-                bindings_ctx,
-                &ip_sock
-            ),
-            expected,
-        );
+        let (mut core_ctx, bindings_ctx) = ctx.contexts();
+        assert_eq!(DeviceIpSocketHandler::get_mms(&mut core_ctx, bindings_ctx, &ip_sock), expected,);
     }
 }

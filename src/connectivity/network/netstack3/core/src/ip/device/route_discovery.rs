@@ -780,16 +780,13 @@ mod tests {
         ctx: &mut crate::testutil::FakeCtx,
         device: &DeviceId<crate::testutil::FakeBindingsCtx>,
     ) {
-        crate::testutil::add_route(
-            &ctx.core_ctx,
-            &mut ctx.bindings_ctx,
-            AddableEntryEither::from(AddableEntry::without_gateway(
+        ctx.test_api()
+            .add_route(AddableEntryEither::from(AddableEntry::without_gateway(
                 LINK_LOCAL_SUBNET,
                 device.clone(),
                 AddableMetric::MetricTracksInterface,
-            )),
-        )
-        .unwrap()
+            )))
+            .unwrap()
     }
 
     fn discovered_route_to_entry(

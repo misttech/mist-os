@@ -5189,16 +5189,13 @@ mod tests {
         let (mut ctx, device_ids) = make_test_ctx::<I>();
 
         // Add a route to the remote address only for Device::First.
-        crate::testutil::add_route(
-            &ctx.core_ctx,
-            &mut ctx.bindings_ctx,
-            AddableEntryEither::without_gateway(
+        ctx.test_api()
+            .add_route(AddableEntryEither::without_gateway(
                 Subnet::new(*remote_ip::<I>(), <I::Addr as IpAddress>::BYTES * 8).unwrap().into(),
                 device_ids[Device::First.index()].clone(),
                 AddableMetric::ExplicitMetric(RawMetric(0)),
-            ),
-        )
-        .unwrap();
+            ))
+            .unwrap();
 
         let result = do_route_lookup(&mut ctx, device_ids, egress_device, local_ip, dest_ip);
         assert_eq!(result, expected_result);
@@ -5237,18 +5234,15 @@ mod tests {
         // Add a route to the remote address for both devices, with preference
         // for the first.
         for device in [Device::First, Device::Second] {
-            crate::testutil::add_route(
-                &ctx.core_ctx,
-                &mut ctx.bindings_ctx,
-                AddableEntryEither::without_gateway(
+            ctx.test_api()
+                .add_route(AddableEntryEither::without_gateway(
                     Subnet::new(*remote_ip::<I>(), <I::Addr as IpAddress>::BYTES * 8)
                         .unwrap()
                         .into(),
                     device_ids[device.index()].clone(),
                     AddableMetric::ExplicitMetric(RawMetric(device.index().try_into().unwrap())),
-                ),
-            )
-            .unwrap();
+                ))
+                .unwrap();
         }
 
         let result = do_route_lookup(
