@@ -12,7 +12,11 @@ config("riscv64") {
   _features -= fuchsia_riscv_implicit_features
   _features += fuchsia_riscv_implicit_features
 
-  _march = fuchsia_riscv_profile.base
+  _letters = fuchsia_riscv_profile.u64_mandatory_letters
+  _letters += fuchsia_riscv_implicit_feature_letters
+  _letters -= fuchsia_riscv_implicit_feature_letters
+  _letters += fuchsia_riscv_implicit_feature_letters
+  _march = "rv64" + string_join("", _letters)
   foreach(feature, _features) {
     _march += "_$feature"
   }

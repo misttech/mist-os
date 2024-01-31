@@ -8,19 +8,22 @@
 # Each member of the scope is itself a scope, with members `u64` and `s64`,
 # each of which has these members:
 #
-#  * base
-#    - Required: the "mandatory base" ISA feature set, "rv64" with a suffix of
-#    single letters.  This also includes all the single-letter extensions
-#    listed in "mandatory extensions". It may use the shorthands like G.
-#    - Type: string
+#  * u64_mandatory_letters, s64_mandatory_letters
+#     - Required: List of the mandatory, single-letter extensions within the
+#       profile.
+#     - Type: list(string)
 #
 #  * u64_mandatory, s64_mandatory
-#     - Required: List of extension names: the profile "mandatory extensions".
-#     This omits the single-letter extensions, which are included in $base.
+#     - Required: List of the other mandatory extensions within the profile.
+#     - Type: list(string)
+#
+#  * u64_optional_letters, s64_optional_letters
+#     - Required: List of the optional, single-letter extensions within the
+#       profile.
 #     - Type: list(string)
 #
 #  * u64_optional, s64_optional
-#     - Required: List of extension names: the profile "optional extensions".
+#     - Required: List of the other optional extensions within the profile.
 #     - Type: list(string)
 #
 # **Note:** Extensions that Clang doesn't parse in `-march` syntax are
@@ -29,25 +32,29 @@
 #
 riscv_profiles = {
   rvi20 = {
-    u64 = {
-      base = "rv64i"
-      u64_mandtaory = []
-      u64_optional = [
-        "m",
-        "a",
-        "f",
-        "d",
-        "c",
-        "zifencei",
-        "zicntr",
-        "zihpm",
-      ]
-    }
+    u64_mandatory_letters = [ "i" ]
+    u64_mandatory = []
+    u64_optional_letters = [
+      "m",
+      "a",
+      "f",
+      "d",
+      "c",
+    ]
+    u64_optional = [
+      "zifencei",
+      "zicntr",
+      "zihpm",
+    ]
+
     # There is no RVI20S64 profile.
   }
 
   rva20 = {
-    base = "rv64gc"  # G = IMAFD + Zicsr + Zifencei
+    u64_mandatory_letters = [
+      "g",  # G = IMAFD + Zicsr + Zifencei
+      "c",
+    ]
     u64_mandatory = [
       # These are mandatory extensions, but they're implied by G.
       #
@@ -72,6 +79,7 @@ riscv_profiles = {
       # "za128rs",
       # "zicclsm",
     ]
+    u64_optional_letters = []
     u64_optional = [
       # Clang doesn't understand this, but it's just CSRs.
       "zihpm",
@@ -79,6 +87,7 @@ riscv_profiles = {
 
     # The s64 details aren't relevant to the compiler, since they are all just
     # CSRs, features in CSRs, or characteristics of CPU behavior.
+    s64_mandatory_letters = u64_mandatory_letters
     s64_mandatory = [
       "zifencei",
       "ss1p11",
@@ -89,6 +98,7 @@ riscv_profiles = {
       "sstvecd",
       "sstvala",
     ]
+    s64_optional_letters = []
     s64_optional = [
       "zihpm",
       "sv48",
@@ -97,7 +107,7 @@ riscv_profiles = {
   }
 
   rva22 = {
-    base = "rv64gc"  # G = IMAFD + Zicsr + Zifencei
+    u64_mandatory_letters = rva20.u64_mandatory_letters
     u64_mandatory = rva20.u64_mandatory + [
                       "zihintpause",
                       "zba",
@@ -109,12 +119,14 @@ riscv_profiles = {
                       "zfhmin",
                       "zkt",
                     ]
+    u64_optional_letters = [ "v" ]
     u64_optional = rva20.u64_optional + u64_mandatory - u64_mandatory + [
                      "zfh",
-                     "v",
                      "zkn",
                      "zks",
                    ]
+
+    s64_mandatory_letters = u64_mandatory_letters
     s64_mandatory = [
       "zifencei",
       "ss1p12",
@@ -128,6 +140,7 @@ riscv_profiles = {
       "svpbmt",
       "svinval",
     ]
+    s64_optional_letters = []
     s64_optional = [
       "sv48",
       "sv57",
@@ -155,6 +168,7 @@ fuchsia_riscv_profile = riscv_profiles.rva22
 # This list is also added into the `-march` string (less redundancies).
 # These are features that, even if they aren't actually supported by the
 # hardware, are guaranteed harmless to use.
+fuchsia_riscv_implicit_feature_letters = []
 fuchsia_riscv_implicit_features = []
 
 # This is the basic machine ABI that's standard for fuchsia-riscv64 user code.
