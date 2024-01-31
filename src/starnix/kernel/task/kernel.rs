@@ -57,6 +57,7 @@ use std::{
 #[derive(Debug, Default, Clone, Copy)]
 pub struct KernelFeatures {
     pub bpf_v2: bool,
+    pub log_dump_on_exit: bool,
 }
 
 /// The shared, mutable state for the entire Starnix kernel.
