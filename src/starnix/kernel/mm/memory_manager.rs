@@ -531,37 +531,18 @@ impl PrivateAnonymousMemoryManager {
         source: &std::ops::Range<UserAddress>,
         dest: UserAddress,
     ) -> Result<(), Errno> {
-        // TODO(b/310255065): Use zx_vmo_transfer_data() when available to perform this operation.
-
         let length = source.end - source.start;
-
-        // Map the destination range into the normal aspace.
         let dest_vmo_offset = dest.ptr() as u64;
-        let address = fuchsia_runtime::vmar_root_self()
-            .map(
-                0,
-                &self.backing,
+        let source_vmo_offset = source.start.ptr() as u64;
+        self.backing
+            .transfer_data(
+                fuchsia_zircon::TransferDataOptions::empty(),
                 dest_vmo_offset,
-                length as usize,
-                zx::VmarFlags::PERM_WRITE | zx::VmarFlags::PERM_READ,
+                length.try_into().unwrap(),
+                &self.backing,
+                source_vmo_offset,
             )
             .map_err(impossible_error)?;
-        // Copy data from the source range into the destination mapping using zx_vmo_read().
-        let dest_slice =
-            unsafe { std::slice::from_raw_parts_mut(address as *mut u8, length as usize) };
-        let source_vmo_offset = source.start.ptr() as u64;
-        self.backing.read(dest_slice, source_vmo_offset).map_err(impossible_error)?;
-
-        // Unmap the destination range from the normal aspace.
-        unsafe {
-            fuchsia_runtime::vmar_root_self()
-                .unmap(address, length as usize)
-                .map_err(impossible_error)?;
-        }
-
-        // Zero out the source range.
-        self.zero(source.start, length)?;
-
         Ok(())
     }
 
