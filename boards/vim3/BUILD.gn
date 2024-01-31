@@ -299,24 +299,20 @@ board_input_bundle("main_bundle") {
     # These are enabled because vim3 requires physically contiguous
     # framebuffers, which requires a significant contiguous_memory_size, which
     # would strand pages when not used by sysmem buffers without these options.
-    "kernel.ppb.loan=true",
-    "kernel.ppb.borrow-in-supplypages=true",
-    "kernel.ppb.borrow-on-mru=true",
-    "kernel.ppb.replace-on-unloan=true",
-
+    #
     # "k ppb stats" (see also "k ppb help") can be used to check whether the
     # vast majority of loaned pages are absorbed by using them for pager-backed
     # VMOs when running a relevant workload (not just mostly idle), or if some
     # loaned pages remain stranded even as the system approaches OOM. As long as
     # loaned free pages hits a low fraction of this value before any overall
     # OOM, pages aren't being stranded when it really matters.
-    #
-    # 306 MiB, but with unused pages loaned back to zircon (see kernel.ppb
-    # settings above). This value can leave some loaned and free pages just
-    # after boot, where not all the loaned pages are used by pager-backed VMOs.
-    # Whether those pages get absorbed later by pager-backed VMOs depends on
-    # workload.
-    "driver.sysmem.contiguous_memory_size=320864256",
+    "kernel.ppb.loan=true",
+    "kernel.ppb.borrow-in-supplypages=true",
+    "kernel.ppb.borrow-on-mru=true",
+    "kernel.ppb.replace-on-unloan=true",
+
+    # the default contiguous_memory_size is set in vim3-sysmem.cc, but can be
+    # overridden here with driver.sysmem.contiguous_memory_size
   ]
 }
 
