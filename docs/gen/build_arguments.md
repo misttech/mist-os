@@ -8469,16 +8469,6 @@ Set to true to enable compiling with ccache
 
 From //build/toolchain/ccache.gni:9
 
-### use_chromium_canary
-
-Whether to use the most recent (canary) version of prebuilt Chromium
-components. This is the only supported configuration.
-TODO(https://fxbug.dev/42149832): Remove once all builds setting it have been updated.
-
-**Current value (from the default):** `true`
-
-From //src/chromium/BUILD.gn:31
-
 ### use_dbus
 
 **Current value (from the default):** `false`
