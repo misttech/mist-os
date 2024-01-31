@@ -43,5 +43,10 @@
             from: "parent",
             to: "#metrics-logger-standalone",
         },
+        {
+            protocol: "fuchsia.ui.activity.Provider",
+            from: "#activity",
+            to: "#metrics-logger-standalone",
+        },
     ],
 }

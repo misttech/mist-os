@@ -7,14 +7,17 @@ use {
     crate::MIN_INTERVAL_FOR_SYSLOG_MS,
     anyhow::{format_err, Error, Result},
     async_trait::async_trait,
+    diagnostics_hierarchy::LinearHistogramParams,
     fidl_fuchsia_hardware_power_sensor as fpower,
     fidl_fuchsia_hardware_temperature as ftemperature, fidl_fuchsia_power_metrics as fmetrics,
-    fuchsia_async as fasync,
-    fuchsia_inspect::{self as inspect, ArrayProperty, Property},
+    fidl_fuchsia_ui_activity as factivity, fuchsia_async as fasync,
+    fuchsia_inspect::{
+        self as inspect, ArrayProperty, HistogramProperty, IntLinearHistogramProperty, Property,
+    },
     fuchsia_zircon as zx,
     futures::{stream::FuturesUnordered, StreamExt},
-    std::{cmp::Ordering, collections::HashMap, rc::Rc},
-    tracing::{error, info},
+    std::{cell::Cell, cmp::Ordering, collections::HashMap, rc::Rc},
+    tracing::{error, info, warn},
 };
 
 // The fuchsia.hardware.temperature.Device is composed into fuchsia.hardware.thermal.Device, and
@@ -29,6 +32,11 @@ pub type TemperatureDriver = Driver<ftemperature::DeviceProxy>;
 pub type PowerDriver = Driver<fpower::DeviceProxy>;
 pub type TemperatureLogger = SensorLogger<ftemperature::DeviceProxy>;
 pub type PowerLogger = SensorLogger<fpower::DeviceProxy>;
+pub type TemperatureLoggerArgs<'a> = SensorLoggerArgs<'a, ftemperature::DeviceProxy>;
+pub type PowerLoggerArgs<'a> = SensorLoggerArgs<'a, fpower::DeviceProxy>;
+
+const HISTOGRAM_PARAMS: LinearHistogramParams<i64> =
+    LinearHistogramParams { floor: 0, step_size: 50, buckets: 100 };
 
 pub async fn generate_temperature_drivers(
     driver_aliases: HashMap<String, String>,
@@ -71,6 +79,10 @@ pub trait Sensor<T> {
     fn sensor_type() -> SensorType;
     fn unit() -> String;
     async fn read_data(sensor: &T) -> Result<f32, Error>;
+
+    // TODO(b/322867602): Make units consistent.
+    fn unit_for_sampler() -> String;
+    fn sampler_multiplier() -> f32;
 }
 
 #[async_trait(?Send)]
@@ -92,6 +104,14 @@ impl Sensor<ftemperature::DeviceProxy> for ftemperature::DeviceProxy {
             Err(e) => Err(format_err!("get_temperature_celsius IPC failed: {}", e)),
         }
     }
+
+    fn unit_for_sampler() -> String {
+        String::from("°C")
+    }
+
+    fn sampler_multiplier() -> f32 {
+        1.0
+    }
 }
 
 #[async_trait(?Send)]
@@ -112,6 +132,15 @@ impl Sensor<fpower::DeviceProxy> for fpower::DeviceProxy {
             },
             Err(e) => Err(format_err!("get_power_watts IPC failed: {}", e)),
         }
+    }
+
+    // TODO(b/322867602): Make units consistent.
+    fn unit_for_sampler() -> String {
+        String::from("mW")
+    }
+
+    fn sampler_multiplier() -> f32 {
+        1000.0
     }
 }
 
@@ -222,9 +251,41 @@ struct StatisticsTracker {
     statistics_start_time: fasync::Time,
 }
 
+pub struct SensorLoggerArgs<'a, T> {
+    /// List of sensor drivers.
+    pub drivers: Rc<Vec<Driver<T>>>,
+
+    /// Activity listener to check idleness of the device.
+    pub activity_listener: Option<ActivityListener>,
+
+    /// Polling interval from the sensors.
+    pub sampling_interval_ms: u32,
+
+    /// Time between statistics calculations.
+    pub statistics_interval_ms: Option<u32>,
+
+    /// Amount of time to log sensor data.
+    pub duration_ms: Option<u32>,
+
+    /// Root inspect node to post sensor statistics.
+    pub client_inspect: &'a inspect::Node,
+
+    /// ID of the client requesting to collect sensor stats.
+    pub client_id: String,
+
+    /// Whether to output samples to syslog.
+    pub output_samples_to_syslog: bool,
+
+    /// Whether to output computed statistics to syslog.
+    pub output_stats_to_syslog: bool,
+}
+
 pub struct SensorLogger<T> {
     /// List of sensor drivers.
     drivers: Rc<Vec<Driver<T>>>,
+
+    /// Activity listener to check idleness of the device.
+    activity_listener: ActivityListener,
 
     /// Polling interval from the sensors.
     sampling_interval: zx::Duration,
@@ -240,26 +301,33 @@ pub struct SensorLogger<T> {
     /// Client associated with this logger.
     client_id: String,
 
+    /// Statistics tracker to collect samples and calculate stats.
     statistics_tracker: Option<StatisticsTracker>,
 
+    /// Inspect data manager.
     inspect: InspectData,
 
+    /// Whether to output samples to syslog.
     output_samples_to_syslog: bool,
 
+    /// Whether to output computed statistics to syslog.
     output_stats_to_syslog: bool,
 }
 
 impl<T: Sensor<T>> SensorLogger<T> {
-    pub async fn new(
-        drivers: Rc<Vec<Driver<T>>>,
-        sampling_interval_ms: u32,
-        statistics_interval_ms: Option<u32>,
-        duration_ms: Option<u32>,
-        client_inspect: &inspect::Node,
-        client_id: String,
-        output_samples_to_syslog: bool,
-        output_stats_to_syslog: bool,
-    ) -> Result<Self, fmetrics::RecorderError> {
+    pub async fn new(args: SensorLoggerArgs<'_, T>) -> Result<Self, fmetrics::RecorderError> {
+        let SensorLoggerArgs::<'_, T> {
+            drivers,
+            activity_listener,
+            sampling_interval_ms,
+            statistics_interval_ms,
+            duration_ms,
+            client_inspect,
+            client_id,
+            output_samples_to_syslog,
+            output_stats_to_syslog,
+        } = args;
+
         if let Some(interval) = statistics_interval_ms {
             if sampling_interval_ms > interval
                 || duration_ms.is_some_and(|d| d <= interval)
@@ -295,7 +363,14 @@ impl<T: Sensor<T>> SensorLogger<T> {
             SensorType::Temperature => "TemperatureLogger",
             SensorType::Power => "PowerLogger",
         };
-        let inspect = InspectData::new(client_inspect, logger_name, driver_names, T::unit());
+        let inspect = InspectData::new(
+            client_inspect,
+            logger_name,
+            driver_names,
+            T::unit(),
+            T::unit_for_sampler(),
+            T::sampler_multiplier(),
+        );
 
         Ok(SensorLogger {
             drivers,
@@ -307,6 +382,10 @@ impl<T: Sensor<T>> SensorLogger<T> {
             inspect,
             output_samples_to_syslog,
             output_stats_to_syslog,
+            activity_listener: activity_listener.unwrap_or_else(|| {
+                warn!("No ActivityListener supplied. Running with unknown activity state.");
+                ActivityListener::new_disconnected()
+            }),
         })
     }
 
@@ -425,6 +504,7 @@ impl<T: Sensor<T>> SensorLogger<T> {
                         max,
                         avg,
                         med,
+                        self.activity_listener.idleness.get(),
                     );
 
                     trace_args_statistics[Statistics::Min as usize]
@@ -471,6 +551,50 @@ impl<T: Sensor<T>> SensorLogger<T> {
     }
 }
 
+#[derive(Debug)]
+pub struct ActivityListener {
+    idleness: Rc<Cell<Idleness>>,
+}
+
+impl ActivityListener {
+    pub fn new_disconnected() -> Self {
+        Self { idleness: Rc::new(Cell::new(Idleness::Unknown)) }
+    }
+
+    pub fn new(provider: factivity::ProviderProxy) -> Result<Self> {
+        let idleness = Rc::new(Cell::new(Idleness::Unknown));
+        let (client_end, mut listener_stream) =
+            fidl::endpoints::create_request_stream::<factivity::ListenerMarker>()?;
+        provider.watch_state(client_end)?;
+
+        let self_idleness = idleness.clone();
+        fasync::Task::local(async move {
+            while let Some(Ok(event)) = listener_stream.next().await {
+                match event {
+                    factivity::ListenerRequest::OnStateChanged {
+                        state,
+                        transition_time: _,
+                        responder,
+                    } => {
+                        let new_idleness = match state {
+                            factivity::State::Unknown => Idleness::Unknown,
+                            factivity::State::Idle => Idleness::Idle,
+                            factivity::State::Active => Idleness::Active,
+                        };
+
+                        self_idleness.set(new_idleness);
+
+                        let _ = responder.send();
+                    }
+                }
+            }
+        })
+        .detach();
+
+        Ok(Self { idleness })
+    }
+}
+
 enum Statistics {
     Min = 0,
     Max,
@@ -478,16 +602,35 @@ enum Statistics {
     Median,
 }
 
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+enum Idleness {
+    Unknown = 0,
+    Idle,
+    Active,
+}
+
+impl Idleness {
+    pub fn as_str(&self) -> &str {
+        match self {
+            Idleness::Unknown => "unknown",
+            Idleness::Idle => "idle",
+            Idleness::Active => "active",
+        }
+    }
+}
+
 struct InspectData {
     data: Vec<inspect::DoubleProperty>,
+    histograms_by_idleness: HashMap<Idleness, Vec<Vec<IntLinearHistogramProperty>>>,
     statistics: Vec<Vec<inspect::DoubleProperty>>,
     statistics_periods: Vec<inspect::IntArrayProperty>,
     elapsed_millis: Option<inspect::IntProperty>,
     sensor_nodes: Vec<inspect::Node>,
-    statistics_nodes: Vec<inspect::Node>,
     logger_root: inspect::Node,
     sensor_names: Vec<String>,
     unit: String,
+    unit_for_sampler: String,
+    sampler_multiplier: f32,
 }
 
 impl InspectData {
@@ -496,47 +639,69 @@ impl InspectData {
         logger_name: &str,
         sensor_names: Vec<String>,
         unit: String,
+        unit_for_sampler: String,
+        sampler_multiplier: f32,
     ) -> Self {
         Self {
             logger_root: parent.create_child(logger_name),
             data: Vec::new(),
+            histograms_by_idleness: HashMap::new(),
             statistics: Vec::new(),
             statistics_periods: Vec::new(),
-            statistics_nodes: Vec::new(),
             elapsed_millis: None,
             sensor_nodes: Vec::new(),
             sensor_names,
             unit,
+            unit_for_sampler,
+            sampler_multiplier,
         }
     }
 
     fn init_nodes_for_logging_data(&mut self) {
-        self.elapsed_millis = Some(self.logger_root.create_int("elapsed time (ms)", std::i64::MIN));
-        self.sensor_nodes =
-            self.sensor_names.iter().map(|name| self.logger_root.create_child(name)).collect();
-        for node in self.sensor_nodes.iter() {
-            self.data.push(node.create_double(format!("data ({})", self.unit), f64::MIN));
-        }
+        self.logger_root.atomic_update(|logger_root| {
+            self.elapsed_millis = Some(logger_root.create_int("elapsed time (ms)", std::i64::MIN));
+            self.sensor_nodes =
+                self.sensor_names.iter().map(|name| logger_root.create_child(name)).collect();
+            for node in self.sensor_nodes.iter() {
+                self.data.push(node.create_double(format!("data ({})", self.unit), f64::MIN));
+            }
+        });
     }
 
-    fn init_stats_nodes(&mut self) {
+    fn init_nodes_for_logging_stats(&mut self) {
         for node in self.sensor_nodes.iter() {
-            let statistics_node = node.create_child("statistics");
+            node.atomic_update(|node| {
+                node.record_child("histograms", |histograms_node| {
+                    histograms_node.record_string("unit", &self.unit_for_sampler);
+                    for idleness in [Idleness::Unknown, Idleness::Idle, Idleness::Active] {
+                        histograms_node.record_child(idleness.as_str(), |n| {
+                            self.histograms_by_idleness.entry(idleness).or_default().push(vec![
+                                n.create_int_linear_histogram("min", HISTOGRAM_PARAMS.clone()),
+                                n.create_int_linear_histogram("max", HISTOGRAM_PARAMS.clone()),
+                                n.create_int_linear_histogram("average", HISTOGRAM_PARAMS.clone()),
+                                n.create_int_linear_histogram("median", HISTOGRAM_PARAMS.clone()),
+                            ]);
+                        });
+                    }
+                });
 
-            let statistics_period = statistics_node.create_int_array("(start ms, end ms]", 2);
-            statistics_period.set(0, std::i64::MIN);
-            statistics_period.set(1, std::i64::MIN);
-            self.statistics_periods.push(statistics_period);
+                node.record_child("statistics", |statistics_node| {
+                    let statistics_period =
+                        statistics_node.create_int_array("(start ms, end ms]", 2);
+                    statistics_period.set(0, std::i64::MIN);
+                    statistics_period.set(1, std::i64::MIN);
+                    self.statistics_periods.push(statistics_period);
 
-            // The indices of the statistics child nodes match the sequence defined in
-            // `Statistics`.
-            self.statistics.push(vec![
-                statistics_node.create_double(format!("min ({})", self.unit), f64::MIN),
-                statistics_node.create_double(format!("max ({})", self.unit), f64::MIN),
-                statistics_node.create_double(format!("average ({})", self.unit), f64::MIN),
-                statistics_node.create_double(format!("median ({})", self.unit), f64::MIN),
-            ]);
-            self.statistics_nodes.push(statistics_node);
+                    // The indices of the statistics child nodes match the sequence defined in
+                    // `Statistics`.
+                    self.statistics.push(vec![
+                        statistics_node.create_double(format!("min ({})", self.unit), f64::MIN),
+                        statistics_node.create_double(format!("max ({})", self.unit), f64::MIN),
+                        statistics_node.create_double(format!("average ({})", self.unit), f64::MIN),
+                        statistics_node.create_double(format!("median ({})", self.unit), f64::MIN),
+                    ]);
+                });
+            });
         }
     }
 
@@ -557,16 +722,27 @@ impl InspectData {
         max: f32,
         avg: f32,
         med: f32,
+        idleness: Idleness,
     ) {
-        if self.statistics_nodes.is_empty() {
-            self.init_stats_nodes();
+        if self.statistics.is_empty() {
+            self.init_nodes_for_logging_stats();
         }
+
         self.statistics_periods[index].set(0, start_time);
         self.statistics_periods[index].set(1, end_time);
+
         self.statistics[index][Statistics::Min as usize].set(min as f64);
         self.statistics[index][Statistics::Max as usize].set(max as f64);
         self.statistics[index][Statistics::Avg as usize].set(avg as f64);
         self.statistics[index][Statistics::Median as usize].set(med as f64);
+
+        let histograms =
+            self.histograms_by_idleness.get(&idleness).expect("histograms not initialized");
+        histograms[index][Statistics::Min as usize].insert((min * self.sampler_multiplier) as i64);
+        histograms[index][Statistics::Max as usize].insert((max * self.sampler_multiplier) as i64);
+        histograms[index][Statistics::Avg as usize].insert((avg * self.sampler_multiplier) as i64);
+        histograms[index][Statistics::Median as usize]
+            .insert((med * self.sampler_multiplier) as i64);
     }
 }
 
@@ -575,9 +751,12 @@ pub mod tests {
     use {
         super::*,
         assert_matches::assert_matches,
-        diagnostics_assertions::assert_data_tree,
+        diagnostics_assertions::{assert_data_tree, HistogramAssertion},
         futures::{task::Poll, FutureExt, TryStreamExt},
-        std::{cell::Cell, pin::Pin},
+        std::{
+            cell::{Cell, OnceCell},
+            pin::Pin,
+        },
     };
 
     fn setup_fake_temperature_driver(
@@ -773,16 +952,17 @@ pub mod tests {
         let client_id = "test".to_string();
         let client_inspect = runner.inspect_root.create_child(&client_id);
         let poll = runner.executor.run_until_stalled(
-            &mut TemperatureLogger::new(
-                runner.temperature_drivers.clone(),
-                100,
-                None,
-                Some(1_000),
-                &client_inspect,
-                client_id,
-                false,
-                false,
-            )
+            &mut TemperatureLogger::new(TemperatureLoggerArgs {
+                drivers: runner.temperature_drivers.clone(),
+                activity_listener: None,
+                sampling_interval_ms: 100,
+                statistics_interval_ms: None,
+                duration_ms: Some(1_000),
+                client_inspect: &client_inspect,
+                client_id: client_id,
+                output_samples_to_syslog: false,
+                output_stats_to_syslog: false,
+            })
             .boxed_local(),
         );
 
@@ -854,16 +1034,17 @@ pub mod tests {
         let client_id = "test".to_string();
         let client_inspect = runner.inspect_root.create_child(&client_id);
         let poll = runner.executor.run_until_stalled(
-            &mut PowerLogger::new(
-                runner.power_drivers.clone(),
-                100,
-                Some(100),
-                Some(200),
-                &client_inspect,
-                client_id,
-                false,
-                false,
-            )
+            &mut PowerLogger::new(PowerLoggerArgs {
+                drivers: runner.power_drivers.clone(),
+                activity_listener: None,
+                sampling_interval_ms: 100,
+                statistics_interval_ms: Some(100),
+                duration_ms: Some(200),
+                client_inspect: &client_inspect,
+                client_id: client_id,
+                output_samples_to_syslog: false,
+                output_stats_to_syslog: false,
+            })
             .boxed_local(),
         );
 
@@ -896,7 +1077,7 @@ pub mod tests {
                     test: {
                         PowerLogger: {
                             "elapsed time (ms)": 100i64,
-                            "power_1": {
+                            "power_1": contains {
                                 "data (W)":2.0,
                                 "statistics": {
                                     "(start ms, end ms]": vec![0i64, 100i64],
@@ -906,7 +1087,7 @@ pub mod tests {
                                     "median (W)": 2.0,
                                 }
                             },
-                            "/dev/fake/power_2": {
+                            "/dev/fake/power_2": contains {
                                 "data (W)": 5.0,
                                 "statistics": {
                                     "(start ms, end ms]": vec![0i64, 100i64],
@@ -942,16 +1123,17 @@ pub mod tests {
         let client_id = "test".to_string();
         let client_inspect = runner.inspect_root.create_child(&client_id);
         let poll = runner.executor.run_until_stalled(
-            &mut TemperatureLogger::new(
-                runner.temperature_drivers.clone(),
-                100,
-                Some(300),
-                Some(1_000),
-                &client_inspect,
-                client_id,
-                false,
-                false,
-            )
+            &mut TemperatureLogger::new(TemperatureLoggerArgs {
+                drivers: runner.temperature_drivers.clone(),
+                activity_listener: None,
+                sampling_interval_ms: 100,
+                statistics_interval_ms: Some(300),
+                duration_ms: Some(1_000),
+                client_inspect: &client_inspect,
+                client_id: client_id,
+                output_samples_to_syslog: false,
+                output_stats_to_syslog: false,
+            })
             .boxed_local(),
         );
 
@@ -996,7 +1178,7 @@ pub mod tests {
                             test: {
                                 TemperatureLogger: {
                                     "elapsed time (ms)": 100 * (i + 1 as i64),
-                                    "cpu": {
+                                    "cpu": contains {
                                         "data (°C)": (30 + i) as f64,
                                         "statistics": {
                                             "(start ms, end ms]":
@@ -1008,7 +1190,7 @@ pub mod tests {
                                             "median (°C)": (29 + i - (i + 1) % 3) as f64,
                                         }
                                     },
-                                    "/dev/fake/gpu_temperature": {
+                                    "/dev/fake/gpu_temperature": contains {
                                         "data (°C)": (40 + i) as f64,
                                         "statistics": {
                                             "(start ms, end ms]":
@@ -1030,6 +1212,298 @@ pub mod tests {
 
         // With one more time step, the end time has been reached.
         runner.iterate_task(&mut task);
+        assert_data_tree!(
+            runner.inspector,
+            root: {
+                MetricsLogger: {
+                    test: {
+                    }
+                }
+            }
+        );
+    }
+
+    #[test]
+    fn test_logging_power_to_inspect_updates_histograms() {
+        let mut runner = Runner::new();
+
+        runner.power_1.set(3.0);
+        runner.power_2.set(7.0);
+
+        let (provider_proxy, mut provider_stream) =
+            fidl::endpoints::create_proxy_and_stream::<factivity::ProviderMarker>().unwrap();
+        let listener_proxy: Rc<OnceCell<factivity::ListenerProxy>> = Rc::new(OnceCell::new());
+        let listener_proxy2 = listener_proxy.clone();
+
+        fasync::Task::local(async move {
+            while let Some(Ok(req)) = provider_stream.next().await {
+                match req {
+                    factivity::ProviderRequest::WatchState { listener, .. } => {
+                        listener_proxy2.set(listener.into_proxy().unwrap()).unwrap();
+                    }
+                }
+            }
+        })
+        .detach();
+
+        let client_id = "test".to_string();
+        let client_inspect = runner.inspect_root.create_child(&client_id);
+        let poll = runner.executor.run_until_stalled(
+            &mut PowerLogger::new(PowerLoggerArgs {
+                drivers: runner.power_drivers.clone(),
+                activity_listener: ActivityListener::new(provider_proxy).ok(),
+                sampling_interval_ms: 100,
+                statistics_interval_ms: Some(100),
+                duration_ms: Some(400),
+                client_inspect: &client_inspect,
+                client_id: client_id,
+                output_samples_to_syslog: false,
+                output_stats_to_syslog: false,
+            })
+            .boxed_local(),
+        );
+
+        let power_logger = match poll {
+            Poll::Ready(Ok(power_logger)) => power_logger,
+            _ => panic!("Failed to create PowerLogger"),
+        };
+        let mut task = power_logger.log_data().boxed_local();
+        assert_matches!(runner.executor.run_until_stalled(&mut task), Poll::Pending);
+
+        // Check PowerLogger added before first power sensor poll.
+        assert_data_tree!(
+            runner.inspector,
+            root: {
+                MetricsLogger: {
+                    test: {
+                        PowerLogger: {
+                        }
+                    }
+                }
+            }
+        );
+
+        // Run 1 logging task.
+        assert!(runner.iterate_task(&mut task));
+
+        fn histogram(values: impl IntoIterator<Item = i64>) -> HistogramAssertion<i64> {
+            let mut h = HistogramAssertion::linear(LinearHistogramParams::<i64> {
+                floor: 0,
+                step_size: 50,
+                buckets: 100,
+            });
+            h.insert_values(values);
+            h
+        }
+
+        assert_data_tree!(
+            runner.inspector,
+            root: {
+                MetricsLogger: {
+                    test: {
+                        PowerLogger: {
+                            "elapsed time (ms)": 100i64,
+                            "power_1": contains {
+                                "histograms": {
+                                    "unit": "mW",
+                                    "active": {
+                                        "min": histogram([]),
+                                        "max": histogram([]),
+                                        "average": histogram([]),
+                                        "median": histogram([]),
+                                    },
+                                    "unknown": {
+                                        "min": histogram([3000i64]),
+                                        "max": histogram([3000i64]),
+                                        "average": histogram([3000i64]),
+                                        "median": histogram([3000i64]),
+                                    },
+                                    "idle": {
+                                        "min": histogram([]),
+                                        "max": histogram([]),
+                                        "average": histogram([]),
+                                        "median": histogram([]),
+                                    }
+                                }
+                            },
+                            "/dev/fake/power_2": contains {
+                                "histograms": {
+                                    "unit": "mW",
+                                    "active": {
+                                        "min": histogram([]),
+                                        "max": histogram([]),
+                                        "average": histogram([]),
+                                        "median": histogram([]),
+                                    },
+                                    "unknown": {
+                                        "min": histogram([7000i64]),
+                                        "max": histogram([7000i64]),
+                                        "average": histogram([7000i64]),
+                                        "median": histogram([7000i64]),
+                                    },
+                                    "idle": {
+                                        "min": histogram([]),
+                                        "max": histogram([]),
+                                        "average": histogram([]),
+                                        "median": histogram([]),
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        );
+
+        assert!(runner.iterate_task(
+            &mut listener_proxy
+                .get()
+                .unwrap()
+                .on_state_changed(factivity::State::Idle, 101i64)
+                .map(|f| f.unwrap())
+                .boxed_local(),
+        ));
+        runner.power_1.set(3.2);
+        runner.power_2.set(7.2);
+
+        // Run 1 logging task.
+        assert!(runner.iterate_task(&mut task));
+        assert_data_tree!(
+            runner.inspector,
+            root: {
+                MetricsLogger: {
+                    test: {
+                        PowerLogger: {
+                            "elapsed time (ms)": 200i64,
+                            "power_1": contains {
+                                "histograms": {
+                                    "unit": "mW",
+                                    "idle": {
+                                        "min": histogram([3200i64]),
+                                        "max": histogram([3200i64]),
+                                        "average": histogram([3200i64]),
+                                        "median": histogram([3200i64]),
+
+                                    },
+                                    "unknown": {
+                                        "min": histogram([3000i64]),
+                                        "max": histogram([3000i64]),
+                                        "average": histogram([3000i64]),
+                                        "median": histogram([3000i64]),
+
+                                    },
+                                    "active": {
+                                        "min": histogram([]),
+                                        "max": histogram([]),
+                                        "average": histogram([]),
+                                        "median": histogram([]),
+                                    }
+                                }
+                            },
+                            "/dev/fake/power_2": contains {
+                                "histograms": {
+                                    "unit": "mW",
+                                    "idle": {
+                                        "min": histogram([7200i64]),
+                                        "max": histogram([7200i64]),
+                                        "average": histogram([7200i64]),
+                                        "median": histogram([7200i64]),
+                                    },
+                                    "unknown": {
+                                        "min": histogram([7000i64]),
+                                        "max": histogram([7000i64]),
+                                        "average": histogram([7000i64]),
+                                        "median": histogram([7000i64]),
+
+                                    },
+                                    "active": {
+                                        "min": histogram([]),
+                                        "max": histogram([]),
+                                        "average": histogram([]),
+                                        "median": histogram([]),
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        );
+
+        assert!(runner.iterate_task(
+            &mut listener_proxy
+                .get()
+                .unwrap()
+                .on_state_changed(factivity::State::Active, 201i64)
+                .map(|f| f.unwrap())
+                .boxed_local(),
+        ));
+        runner.power_1.set(3.5);
+        runner.power_2.set(7.5);
+
+        // Run 1 logging task.
+        assert!(runner.iterate_task(&mut task));
+        assert_data_tree!(
+            runner.inspector,
+            root: {
+                MetricsLogger: {
+                    test: {
+                        PowerLogger: {
+                            "elapsed time (ms)": 300i64,
+                            "power_1": contains {
+                                "histograms": {
+                                    "unit": "mW",
+                                    "active": {
+                                        "min": histogram([3500i64]),
+                                        "max": histogram([3500i64]),
+                                        "average": histogram([3500i64]),
+                                        "median": histogram([3500i64]),
+                                    },
+                                    "unknown": {
+                                        "min": histogram([3000i64]),
+                                        "max": histogram([3000i64]),
+                                        "average": histogram([3000i64]),
+                                        "median": histogram([3000i64]),
+                                    },
+                                    "idle": {
+                                        "min": histogram([3200i64]),
+                                        "max": histogram([3200i64]),
+                                        "average": histogram([3200i64]),
+                                        "median": histogram([3200i64]),
+                                    }
+                                }
+                            },
+                            "/dev/fake/power_2": contains {
+                                "histograms": {
+                                    "unit": "mW",
+                                    "active": {
+                                        "min": histogram([7500i64]),
+                                        "max": histogram([7500i64]),
+                                        "average": histogram([7500i64]),
+                                        "median": histogram([7500i64]),
+                                    },
+                                    "unknown": {
+                                        "min": histogram([7000i64]),
+                                        "max": histogram([7000i64]),
+                                        "average": histogram([7000i64]),
+                                        "median": histogram([7000i64]),
+                                    },
+                                    "idle": {
+                                        "min": histogram([7200i64]),
+                                        "max": histogram([7200i64]),
+                                        "average": histogram([7200i64]),
+                                        "median": histogram([7200i64]),
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        );
+
+        // Finish the remaining task.
+        assert!(runner.iterate_task(&mut task));
         assert_data_tree!(
             runner.inspector,
             root: {

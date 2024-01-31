@@ -14,14 +14,16 @@ use {
     crate::gpu_usage_logger::{generate_gpu_drivers, GpuDriver, GpuUsageLogger},
     crate::network_activity_logger::{generate_network_devices, NetworkActivityLoggerBuilder},
     crate::sensor_logger::{
-        generate_power_drivers, generate_temperature_drivers, PowerDriver, PowerLogger,
-        TemperatureDriver, TemperatureLogger,
+        generate_power_drivers, generate_temperature_drivers, ActivityListener, PowerDriver,
+        PowerLogger, PowerLoggerArgs, TemperatureDriver, TemperatureLogger, TemperatureLoggerArgs,
     },
     anyhow::{Error, Result},
     argh::FromArgs,
+    fidl::endpoints::ProtocolMarker,
     fidl_fuchsia_hardware_network as fhwnet,
     fidl_fuchsia_power_metrics::{self as fmetrics, RecorderRequest},
-    fuchsia_async as fasync,
+    fidl_fuchsia_ui_activity as factivity, fuchsia_async as fasync,
+    fuchsia_component::client::connect_to_protocol,
     fuchsia_component::server::ServiceFs,
     fuchsia_inspect as inspect,
     futures::{
@@ -38,7 +40,7 @@ use {
         pin::Pin,
         rc::Rc,
     },
-    tracing::{error, info},
+    tracing::{error, info, warn},
 };
 
 // Max number of clients that can log concurrently. This limit is chosen mostly arbitrarily to allow
@@ -363,16 +365,19 @@ impl MetricsLoggerServer {
                     statistics_args,
                 }) => {
                     let drivers = self.get_temperature_drivers().await?;
-                    let temperature_logger = TemperatureLogger::new(
+                    let activity_listener = create_activity_listener();
+
+                    let temperature_logger = TemperatureLogger::new(TemperatureLoggerArgs {
                         drivers,
+                        activity_listener,
                         sampling_interval_ms,
-                        statistics_args.map(|i| i.statistics_interval_ms),
+                        statistics_interval_ms: statistics_args.map(|i| i.statistics_interval_ms),
                         duration_ms,
-                        &client_inspect,
-                        String::from(&client_id.to_string()),
+                        client_inspect: &client_inspect,
+                        client_id: String::from(&client_id.to_string()),
                         output_samples_to_syslog,
                         output_stats_to_syslog,
-                    )
+                    })
                     .await?;
                     futures.push(Box::new(temperature_logger.log_data()));
                 }
@@ -381,16 +386,19 @@ impl MetricsLoggerServer {
                     statistics_args,
                 }) => {
                     let drivers = self.get_power_drivers().await?;
-                    let power_logger = PowerLogger::new(
-                        drivers,
-                        sampling_interval_ms,
-                        statistics_args.map(|i| i.statistics_interval_ms),
-                        duration_ms,
-                        &client_inspect,
-                        String::from(&client_id.to_string()),
-                        output_samples_to_syslog,
-                        output_stats_to_syslog,
-                    )
+                    let activity_listener = create_activity_listener();
+
+                    let power_logger = PowerLogger::new(PowerLoggerArgs {
+                        drivers: drivers,
+                        activity_listener: activity_listener,
+                        sampling_interval_ms: sampling_interval_ms,
+                        statistics_interval_ms: statistics_args.map(|i| i.statistics_interval_ms),
+                        duration_ms: duration_ms,
+                        client_inspect: &client_inspect,
+                        client_id: String::from(&client_id.to_string()),
+                        output_samples_to_syslog: output_samples_to_syslog,
+                        output_stats_to_syslog: output_stats_to_syslog,
+                    })
                     .await?;
                     futures.push(Box::new(power_logger.log_data()));
                 }
@@ -543,6 +551,24 @@ impl MetricsLoggerServer {
         .await
         .expect("logging to start");
         self.client_tasks.borrow_mut().remove(STANDALONE_CLIENT_ID).unwrap().await;
+    }
+}
+
+fn create_activity_listener() -> Option<ActivityListener> {
+    let proxy = match connect_to_protocol::<factivity::ProviderMarker>() {
+        Ok(proxy) => proxy,
+        Err(e) => {
+            warn!("Failed to connect to {}: {:?}", factivity::ProviderMarker::DEBUG_NAME, e);
+            return None;
+        }
+    };
+
+    match ActivityListener::new(proxy) {
+        Ok(a) => Some(a),
+        Err(e) => {
+            warn!("Failed to create activity listener: {:?}", e);
+            None
+        }
     }
 }
 
@@ -1941,7 +1967,7 @@ mod tests {
                 MetricsLogger: {
                     "metrics-logger-standalone": {
                         TemperatureLogger: contains {
-                            "cpu": {
+                            "cpu": contains {
                                 "data (°C)": 21.0,
                                 "statistics": contains {
                                     "min (°C)": 21.0,
@@ -1950,7 +1976,7 @@ mod tests {
                                     "median (°C)": 21.0,
                                 }
                             },
-                            "/dev/fake/gpu_temperature": {
+                            "/dev/fake/gpu_temperature": contains {
                                 "data (°C)": 52.0,
                                 "statistics": contains {
                                     "min (°C)": 52.0,
@@ -1961,7 +1987,7 @@ mod tests {
                             }
                         },
                         PowerLogger: contains {
-                            "power_1": {
+                            "power_1": contains {
                                 "data (W)": 14.0,
                                 "statistics": contains {
                                     "min (W)": 14.0,
@@ -1970,7 +1996,7 @@ mod tests {
                                     "median (W)": 14.0,
                                 }
                             },
-                            "/dev/fake/power_2": {
+                            "/dev/fake/power_2": contains {
                                 "data (W)": 106.0,
                                 "statistics": contains {
                                     "min (W)": 106.0,
