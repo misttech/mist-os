@@ -354,6 +354,8 @@ void heap_page_free(void* _ptr, size_t pages) {
   }
 }
 
+void heap_report_alloc_failure() { pmm_report_alloc_failure(); }
+
 #include <lib/console.h>
 
 static int cmd_heap(int argc, const cmd_args* argv, uint32_t flags);

@@ -930,6 +930,8 @@ NO_ASAN void* cmpct_alloc(size_t size) {
     // we succeed or get too small.
     while (heap_grow(growby) == ZX_ERR_NO_MEMORY) {
       if (growby <= rounded_up) {
+        guard.Release();
+        heap_report_alloc_failure();
         return NULL;
       }
       growby = std::max(growby >> 1, rounded_up);

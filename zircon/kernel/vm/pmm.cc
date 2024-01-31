@@ -578,6 +578,8 @@ void pmm_print_physical_page_borrowing_stats() {
       loan_cancelled_pages * PAGE_SIZE / MB, total_bytes / PAGE_SIZE, total_bytes / MB);
 }
 
+void pmm_report_alloc_failure() { pmm_node.ReportAllocFailure(); }
+
 STATIC_COMMAND_START
 STATIC_COMMAND_MASKED("pmm", "physical memory manager", &cmd_pmm, CMD_AVAIL_ALWAYS)
 STATIC_COMMAND_END(pmm)

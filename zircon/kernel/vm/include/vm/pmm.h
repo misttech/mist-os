@@ -228,4 +228,7 @@ bool pmm_has_alloc_failed_no_mem();
 
 void pmm_print_physical_page_borrowing_stats();
 
+// See PmmNode::ReportAllocFailure.
+void pmm_report_alloc_failure();
+
 #endif  // ZIRCON_KERNEL_VM_INCLUDE_VM_PMM_H_

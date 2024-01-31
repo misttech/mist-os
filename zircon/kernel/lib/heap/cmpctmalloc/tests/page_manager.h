@@ -31,6 +31,15 @@ class PageManager {
   void* AllocatePages(size_t num_pages);
   void FreePages(void* p, size_t num_pages);
 
+  // Tells the PageManager to fail the next |count| |AllocatePages| calls.
+  void FailNext(size_t count);
+
+  // Called by cmpctmalloc via |heap_report_alloc_failure|.
+  void IncFailuresReported();
+
+  // Returns the number of times |IncFailureCount| was called.
+  size_t GetFailuresReported() const;
+
  private:
   struct PageAlignedDeleter {
     void operator()(char* ptr) const { operator delete[](ptr, std::align_val_t{ZX_PAGE_SIZE}); }
@@ -114,6 +123,11 @@ class PageManager {
   // a pointer to the block that contains it, if one exists.
   using BlockMap = std::map<char*, Block, std::greater<char*>>;
   BlockMap blocks_;
+
+  // The number of |AllocatePages| calls that should fail.
+  size_t num_calls_to_fail_{};
+  // The number of observed failures as reported via |IncFailureCount|.
+  size_t num_failures_reported_{};
 };
 
 #endif  // ZIRCON_KERNEL_LIB_HEAP_CMPCTMALLOC_TESTS_PAGE_MANAGER_H_

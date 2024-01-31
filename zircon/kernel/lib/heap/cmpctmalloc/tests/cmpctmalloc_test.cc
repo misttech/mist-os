@@ -6,6 +6,7 @@
 
 #include "cmpctmalloc.h"
 
+#include <lib/fit/defer.h>
 #include <lib/heap.h>
 #include <lib/zircon-internal/align.h>
 #include <math.h>
@@ -136,6 +137,10 @@ void heap_page_free(void* ptr, size_t pages) {
   ZX_ASSERT(page_manager != nullptr);
   page_manager->FreePages(ptr, pages);
 }
+void heap_report_alloc_failure() {
+  ZX_ASSERT(page_manager != nullptr);
+  page_manager->IncFailuresReported();
+}
 
 namespace {
 
@@ -152,7 +157,10 @@ class CmpctmallocTest : public zxtest::Test {
   PageManager page_manager_;
 };
 
-TEST_F(CmpctmallocTest, ZeroAllocIsNull) { EXPECT_NULL(cmpct_alloc(0)); }
+TEST_F(CmpctmallocTest, ZeroAllocIsNull) {
+  EXPECT_NULL(cmpct_alloc(0));
+  EXPECT_EQ(0, page_manager->GetFailuresReported());
+}
 
 TEST_F(CmpctmallocTest, NullCanBeFreed) { cmpct_free(nullptr); }
 
@@ -234,6 +242,7 @@ TEST_F(CmpctmallocTest, LargeAllocsAreNull) {
   cmpct_free(p);
   p = cmpct_alloc(kHeapMaxAllocSize + 1);
   EXPECT_NULL(p);
+  EXPECT_EQ(0, page_manager->GetFailuresReported());
 }
 
 TEST_F(CmpctmallocTest, CachedAllocationIsEfficientlyUsed) {
@@ -265,6 +274,48 @@ TEST_F(CmpctmallocTest, CachedAllocationIsEfficientlyUsed) {
     allocations.pop_back();
   }
   EXPECT_GT(heap_cached_bytes(), 0);
+}
+
+TEST_F(CmpctmallocTest, RetryOnHeapAllocBytesUltimatelySucceeds) {
+  // Allocate until we successfull grow the heap (despite needing to retry).
+  page_manager->FailNext(3);
+  constexpr size_t kAllocSize = 1000;
+  std::vector<void*> allocations;
+  auto cleanup = fit::defer([&] {
+    while (!allocations.empty()) {
+      cmpct_free(allocations.back());
+      allocations.pop_back();
+    }
+  });
+
+  bool grown = false;
+  while (!grown) {
+    size_t before = heap_used_bytes();
+    allocations.push_back(cmpct_alloc(kAllocSize));
+    size_t after = heap_used_bytes();
+    grown = (after > before);
+  }
+
+  // See that the heap never reported failures.
+  EXPECT_EQ(0, page_manager->GetFailuresReported());
+}
+
+TEST_F(CmpctmallocTest, RetryOnHeapAllocBytesUltimatelyFails) {
+  page_manager->FailNext(std::numeric_limits<size_t>::max());
+  constexpr size_t kAllocSize = 1000;
+  std::vector<void*> allocations;
+  auto cleanup = fit::defer([&] {
+    while (!allocations.empty()) {
+      cmpct_free(allocations.back());
+      allocations.pop_back();
+    }
+  });
+
+  while (void* p = cmpct_alloc(kAllocSize)) {
+    allocations.push_back(p);
+  }
+
+  EXPECT_EQ(1, page_manager->GetFailuresReported());
 }
 
 }  // namespace

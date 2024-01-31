@@ -9,10 +9,14 @@
 #include <lib/zircon-internal/align.h>
 
 void* PageManager::AllocatePages(size_t num_pages) {
+  if (num_calls_to_fail_ > 0) {
+    --num_calls_to_fail_;
+    return nullptr;
+  }
+
   Block block(num_pages);
   ZX_ASSERT(
-      Block::RangeIsCleanFilled(block.contents.get(), block.contents.get() + block.size_bytes
-));
+      Block::RangeIsCleanFilled(block.contents.get(), block.contents.get() + block.size_bytes));
   char* ptr = block.contents.get();
   ZX_ASSERT(ZX_IS_PAGE_ALIGNED(ptr));
   blocks_.insert({ptr, std::move(block)});
@@ -59,3 +63,9 @@ void PageManager::FreePages(void* p, size_t num_pages) {
     block = nullptr;
   }
 }
+
+void PageManager::FailNext(size_t count) { num_calls_to_fail_ = count; }
+
+void PageManager::IncFailuresReported() { ++num_failures_reported_; }
+
+size_t PageManager::GetFailuresReported() const { return num_failures_reported_; }

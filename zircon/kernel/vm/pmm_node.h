@@ -150,6 +150,10 @@ class PmmNode {
   // does nothing.
   void SeedRandomShouldWait();
 
+  // Tell this PmmNode that we've failed a user-visible allocation.  Calling this method will
+  // (optionally) trigger an asynchronous OOM response.
+  void ReportAllocFailure() TA_EXCL(lock_);
+
  private:
   void FreePageHelperLocked(vm_page* page) TA_REQ(lock_);
   void FreeListLocked(list_node* list) TA_REQ(lock_);
@@ -206,7 +210,7 @@ class PmmNode {
 
   // This method should be called when the PMM fails to allocate in a user-visible way and will
   // (optionally) trigger an asynchronous OOM response.
-  void ReportAllocFailure() TA_REQ(lock_);
+  void ReportAllocFailureLocked() TA_REQ(lock_);
 
   fbl::Canary<fbl::magic("PNOD")> canary_;
 

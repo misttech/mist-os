@@ -285,7 +285,7 @@ zx_status_t PmmNode::AllocPage(uint alloc_flags, vm_page_t** page_out, paddr_t* 
   if (!page) {
     if (!must_borrow) {
       // Allocation failures from the regular free list are likely to become user-visible.
-      ReportAllocFailure();
+      ReportAllocFailureLocked();
     }
     return ZX_ERR_NO_MEMORY;
   }
@@ -360,7 +360,7 @@ zx_status_t PmmNode::AllocPages(size_t count, uint alloc_flags, list_node* list)
     }
     if (!must_borrow) {
       // Allocation failures from the regular free list are likely to become user-visible.
-      ReportAllocFailure();
+      ReportAllocFailureLocked();
     }
     return ZX_ERR_NO_MEMORY;
   }
@@ -1064,7 +1064,7 @@ void PmmNode::ForPagesInPhysRangeLocked(paddr_t start, size_t count, F func) {
   DEBUG_ASSERT(page_addr == end);
 }
 
-void PmmNode::ReportAllocFailure() {
+void PmmNode::ReportAllocFailureLocked() {
   kcounter_add(pmm_alloc_failed, 1);
 
   // Update before signaling the MemoryWatchdog to ensure it observes the update.
@@ -1078,6 +1078,11 @@ void PmmNode::ReportAllocFailure() {
     // trying to do here is signal and unblock the MemoryWatchdog's worker thread.
     mem_avail_state_callback_(mem_avail_state_context_, mem_avail_state_cur_index_);
   }
+}
+
+void PmmNode::ReportAllocFailure() {
+  Guard<Mutex> guard{&lock_};
+  ReportAllocFailureLocked();
 }
 
 void PmmNode::SeedRandomShouldWait() {
