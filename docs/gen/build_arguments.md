@@ -5699,6 +5699,14 @@ If this list is empty, pw_toolchain_size_diff targets become no-ops.
 
 From //third_party/pigweed/src/pw_bloat/bloat.gni:37
 
+### pw_build_COLORIZE_OUTPUT
+
+Controls whether compilers and other tools are told to use colorized output.
+
+**Current value (from the default):** `true`
+
+From //third_party/pigweed/src/pw_build/defaults.gni:61
+
 ### pw_build_DEFAULT_MODULE_CONFIG
 
 The default implementation for all Pigweed module configurations.
@@ -7500,7 +7508,7 @@ toolchain, so that recompilations with the new compiler can be triggered.
 When using the prebuilt, this is ignored and the CIPD instance ID of the
 prebuilt is used.
 
-**Current value (from the default):** `"RQLOwpxB0bbElhOePI1h8AFT0W944nXuBxJ1dL13JgcC"`
+**Current value (from the default):** `"lIUggkfnhQdy09Q1fn6QwNXneZ-5-6FH95Gg0FaCoFcC"`
 
 From //build/rust/config.gni:38
 
