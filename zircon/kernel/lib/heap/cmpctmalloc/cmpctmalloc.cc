@@ -617,7 +617,9 @@ static void add_to_heap(void* new_area, size_t size) TA_REQ(TheHeapLock::Get()) 
 
 // Create a new free-list entry of at least size bytes (including the
 // allocation header).  Called with the lock, apart from during init.
-NO_ASAN static zx_status_t heap_grow(size_t size) TA_REQ(TheHeapLock::Get()) {
+//
+// Returns true on success, false on failure.
+NO_ASAN static bool heap_grow(size_t size) TA_REQ(TheHeapLock::Get()) {
   // This function accesses field members of header_t which are poisoned so it
   // has to be NO_ASAN.
 
@@ -672,7 +674,7 @@ NO_ASAN static zx_status_t heap_grow(size_t size) TA_REQ(TheHeapLock::Get()) {
 #ifdef _KERNEL
       kcounter_add(malloc_heap_grow_fail, 1);
 #endif
-      return ZX_ERR_NO_MEMORY;
+      return false;
     }
     LTRACEF("Growing heap by 0x%zx bytes, new ptr %p\n", size, ptr);
     theheap.size += size;
@@ -680,7 +682,7 @@ NO_ASAN static zx_status_t heap_grow(size_t size) TA_REQ(TheHeapLock::Get()) {
 
   add_to_heap(ptr, size);
 
-  return ZX_OK;
+  return true;
 }
 
 // Use HEAP_ENABLE_TESTS to enable internal testing. The tests are not useful
@@ -928,7 +930,7 @@ NO_ASAN void* cmpct_alloc(size_t size) {
     ZX_DEBUG_ASSERT(growby >= rounded_up);
     // Try to add a new OS allocation to the heap, reducing the size until
     // we succeed or get too small.
-    while (heap_grow(growby) == ZX_ERR_NO_MEMORY) {
+    while (!heap_grow(growby)) {
       if (growby <= rounded_up) {
         guard.Release();
         heap_report_alloc_failure();
@@ -1149,7 +1151,8 @@ void cmpct_init(void) {
   theheap.remaining = 0;
   theheap.cached_os_alloc = NULL;
 
-  heap_grow(kHeapUsableGrowSize);
+  const bool success = heap_grow(kHeapUsableGrowSize);
+  ZX_ASSERT(success);
 }
 
 void cmpct_dump(CmpctDumpOptions options) {
