@@ -980,7 +980,7 @@ NO_ASAN void* cmpct_alloc(size_t size) {
 #endif  //  KERNEL_ASAN
 
   guard.Release();
-  if (result && alloc_size < g_fill_on_alloc_threshold) {
+  if (alloc_size < g_fill_on_alloc_threshold) {
     memset(result, 0, alloc_size);
   }
   return result;
