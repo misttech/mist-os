@@ -874,6 +874,7 @@ sdk_molecule("driver_atoms") {
     "//src/lib/ddk:ddk_metadata_sdk",
     "//src/lib/fidl/cpp:cpp_sdk",
     "//zircon/system/ulib/hwreg:hwreg_sdk_sdk",
+    "//zircon/system/ulib/hwreg-i2c:hwreg-i2c_sdk_sdk",
   ]
 
   host_tools_deps = [ ":driver_host_tools" ]
