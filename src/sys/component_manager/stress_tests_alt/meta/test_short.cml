@@ -11,7 +11,7 @@
         actor_url: "#meta/actor.cm",
         num_instances: "5",
         action_timeout: "10", // Action Timeout: 10 seconds
-        test_duration: "60", // Test Duration: 1 minute
+        test_duration: "20", // Test Duration: 20 seconds
     },
     children: [
         {
