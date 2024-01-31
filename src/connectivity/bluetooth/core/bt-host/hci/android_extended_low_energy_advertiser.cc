@@ -49,8 +49,7 @@ AndroidExtendedLowEnergyAdvertiser::~AndroidExtendedLowEnergyAdvertiser() {
   StopAdvertising();
 }
 
-std::optional<EmbossCommandPacket>
-AndroidExtendedLowEnergyAdvertiser::BuildEnablePacket(
+EmbossCommandPacket AndroidExtendedLowEnergyAdvertiser::BuildEnablePacket(
     const DeviceAddress& address,
     pw::bluetooth::emboss::GenericEnableParam enable) {
   std::optional<hci_spec::AdvertisingHandle> handle =
@@ -204,7 +203,7 @@ AndroidExtendedLowEnergyAdvertiser::BuildUnsetScanResponse(
   return packet;
 }
 
-std::optional<EmbossCommandPacket>
+EmbossCommandPacket
 AndroidExtendedLowEnergyAdvertiser::BuildRemoveAdvertisingSet(
     const DeviceAddress& address) {
   std::optional<hci_spec::AdvertisingHandle> handle =
