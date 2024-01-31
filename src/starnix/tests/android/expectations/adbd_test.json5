@@ -17,6 +17,9 @@
 
                 // Flaky test.
                 "LocalSocketTest.smoke",
+
+                // TODO(https://fxbug.dev/323209351): Re-enable flaky test.
+                "FdeventTest.timeout",
             ],
         },
     ],
