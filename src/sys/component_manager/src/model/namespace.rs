@@ -17,13 +17,13 @@ use {
         route_to_storage_decl, verify_instance_in_component_id_index, RouteRequest,
     },
     cm_rust::{self, ComponentDecl, UseDecl, UseStorageDecl},
-    fidl::{endpoints::ClientEnd, epitaph::ChannelEpitaphExt, prelude::*},
+    fidl::{endpoints::ClientEnd, prelude::*},
     fidl_fuchsia_io as fio, fuchsia_zircon as zx,
     futures::{
         channel::mpsc::{unbounded, UnboundedSender},
         StreamExt,
     },
-    sandbox::{AnyCapability, Directory, Open, Unit},
+    sandbox::{AnyCapability, Directory, Open},
     serve_processargs::NamespaceBuilder,
     std::{collections::HashSet, sync::Arc},
     tracing::{error, warn},
@@ -329,19 +329,16 @@ fn service_or_protocol_use(use_: UseDecl, component: WeakComponentInstance) -> B
                     .await;
                     match result {
                         Ok(capability) => {
-                            if let Ok(_unit) = Unit::try_from(capability.clone()) {
-                                server_end
-                                    .close_with_epitaph(zx::Status::NOT_FOUND)
-                                    .unwrap_or_else(
-                                        |error| tracing::debug!(%error, "failed to send epitaph"),
-                                    );
-                                return;
-                            }
-                            let open: Open = capability
-                                .try_into_open()
-                                .expect("router returned unexpected capability type");
-                            open.open(scope, flags, relative_path, server_end);
-                            return;
+                            return routing::open_capability(
+                                capability,
+                                &target,
+                                &RouteRequest::UseProtocol(use_protocol_decl.clone()),
+                                scope,
+                                flags,
+                                relative_path,
+                                server_end,
+                            )
+                            .await;
                         }
                         Err(_) => {
                             // Fallthrough to legacy routing below, which will attempt

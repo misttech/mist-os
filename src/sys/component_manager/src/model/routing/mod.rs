@@ -25,10 +25,12 @@ use {
     async_trait::async_trait,
     cm_rust::{ExposeDecl, ExposeDeclCommon, UseStorageDecl},
     fidl::epitaph::ChannelEpitaphExt,
-    fuchsia_zircon as zx,
+    fidl_fuchsia_io as fio, fuchsia_zircon as zx,
     moniker::MonikerBase,
+    sandbox::{AnyCapability, Open, Unit},
     std::{collections::BTreeMap, sync::Arc},
     tracing::{debug, info, warn},
+    vfs::execution_scope::ExecutionScope,
 };
 
 pub type RouteRequest = ::routing::RouteRequest;
@@ -90,6 +92,39 @@ fn check_source_for_void(
         return Err(crate::model::error::OpenError::SourceInstanceNotFound.into());
     };
     Ok(())
+}
+
+fn capability_into_open(
+    capability: AnyCapability,
+    moniker: &moniker::Moniker,
+) -> Result<Open, RouteOrOpenError> {
+    if let Ok(_) = Unit::try_from(capability.clone()) {
+        debug!(
+            "Optional capability was not available for target component `{}`\n{}",
+            &moniker, ROUTE_ERROR_HELP
+        );
+        return Err(crate::model::error::OpenError::SourceInstanceNotFound.into());
+    };
+    let open: Open = capability
+        .try_into_open()
+        .map_err(crate::model::error::BedrockOpenError::from)
+        .map_err(crate::model::error::OpenError::from)?;
+    Ok(open)
+}
+
+pub(super) async fn open_capability(
+    capability: AnyCapability,
+    target: &Arc<ComponentInstance>,
+    route_request: &RouteRequest,
+    scope: ExecutionScope,
+    flags: fio::OpenFlags,
+    path: vfs::path::Path,
+    server_end: zx::Channel,
+) {
+    match capability_into_open(capability, &target.moniker) {
+        Ok(open) => open.open(scope, flags, path, server_end),
+        Err(err) => report_routing_failure(route_request, target, err.into(), server_end).await,
+    }
 }
 
 /// Routes a capability from `target` to its source. Opens the capability if routing succeeds.
