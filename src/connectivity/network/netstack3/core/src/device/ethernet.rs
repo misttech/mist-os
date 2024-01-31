@@ -1422,10 +1422,7 @@ mod tests {
 
     use super::*;
     use crate::{
-        context::{
-            testutil::{FakeFrameCtx, FakeInstant, FakeLinkResolutionNotifier},
-            SyncCtx,
-        },
+        context::testutil::{FakeFrameCtx, FakeInstant, FakeLinkResolutionNotifier},
         device::{
             arp::ArpCounters,
             socket::Frame,
@@ -1433,16 +1430,12 @@ mod tests {
             DeviceId,
         },
         error::NotFoundError,
-        ip::{
-            device::{
-                api::AddIpAddrSubnetError,
-                config::{IpDeviceConfigurationUpdate, Ipv6DeviceConfigurationUpdate},
-                nud::{self, api::NeighborApi, DynamicNeighborUpdateSource},
-                slaac::SlaacConfiguration,
-                IpAddressId as _,
-            },
-            receive_ip_packet,
-            testutil::is_in_ip_multicast,
+        ip::device::{
+            api::AddIpAddrSubnetError,
+            config::{IpDeviceConfigurationUpdate, Ipv6DeviceConfigurationUpdate},
+            nud::{self, api::NeighborApi, DynamicNeighborUpdateSource},
+            slaac::SlaacConfiguration,
+            IpAddressId as _,
         },
         testutil::{
             add_arp_or_ndp_table_entry, assert_empty, new_rng, FakeEventDispatcherBuilder,
@@ -2050,13 +2043,7 @@ mod tests {
 
         // Receiving a packet not destined for the node should only result in a
         // dest unreachable message if routing is enabled.
-        receive_ip_packet::<_, _, I>(
-            &ctx.core_ctx,
-            &mut ctx.bindings_ctx,
-            &device,
-            Some(frame_dst),
-            buf.clone(),
-        );
+        ctx.test_api().receive_ip_packet::<I, _>(&device, Some(frame_dst), buf.clone());
         assert_empty(ctx.bindings_ctx.frames_sent().iter());
 
         // Set routing and expect packets to be forwarded.
@@ -2067,13 +2054,7 @@ mod tests {
 
         // Should route the packet since routing fully enabled (netstack &
         // device).
-        receive_ip_packet::<_, _, I>(
-            &ctx.core_ctx,
-            &mut ctx.bindings_ctx,
-            &device,
-            Some(frame_dst),
-            buf.clone(),
-        );
+        ctx.test_api().receive_ip_packet::<I, _>(&device, Some(frame_dst), buf.clone());
         {
             assert_eq!(ctx.bindings_ctx.frames_sent().len(), 1);
             let frames = ctx.bindings_ctx.frames_sent();
@@ -2104,13 +2085,7 @@ mod tests {
             .ok()
             .unwrap()
             .unwrap_b();
-        receive_ip_packet::<_, _, I>(
-            &ctx.core_ctx,
-            &mut ctx.bindings_ctx,
-            &device,
-            Some(frame_dst),
-            buf_unknown_dest,
-        );
+        ctx.test_api().receive_ip_packet::<I, _>(&device, Some(frame_dst), buf_unknown_dest);
         assert_eq!(ctx.bindings_ctx.frames_sent().len(), 2);
         check_icmp::<I>(&ctx.bindings_ctx.frames_sent()[1].1);
 
@@ -2120,13 +2095,7 @@ mod tests {
         check_other_is_forwarding_enabled::<I>(&mut ctx, &device, false);
 
         // Should not route packets anymore
-        receive_ip_packet::<_, _, I>(
-            &ctx.core_ctx,
-            &mut ctx.bindings_ctx,
-            &device,
-            Some(frame_dst),
-            buf,
-        );
+        ctx.test_api().receive_ip_packet::<I, _>(&device, Some(frame_dst), buf);
         assert_eq!(ctx.bindings_ctx.frames_sent().len(), 2);
     }
 
@@ -2317,7 +2286,6 @@ mod tests {
     ) where
         A::Version: TestIpExt,
     {
-        let crate::testutil::FakeCtx { core_ctx, bindings_ctx } = ctx;
         let buf = Buf::new(Vec::new(), ..)
             .encapsulate(<<A::Version as IpExt>::PacketBuilder as IpPacketBuilder<_>>::new(
                 src_ip,
@@ -2330,15 +2298,13 @@ mod tests {
             .unwrap()
             .into_inner();
 
-        receive_ip_packet::<_, _, A::Version>(
-            core_ctx,
-            bindings_ctx,
+        ctx.test_api().receive_ip_packet::<A::Version, _>(
             device,
             Some(FrameDestination::Individual { local: true }),
             buf,
         );
         assert_eq!(
-            core_ctx.state.ip_counters::<A::Version>().dispatch_receive_ip_packet.get(),
+            ctx.core_ctx.state.ip_counters::<A::Version>().dispatch_receive_ip_packet.get(),
             expected
         );
     }
@@ -2406,55 +2372,12 @@ mod tests {
         receive_simple_ip_packet_test(&mut ctx, &device, from_ip, ip2.get(), 4);
     }
 
-    fn join_ip_multicast<A: IpAddress, BC: BindingsContext>(
-        core_ctx: &SyncCtx<BC>,
-        bindings_ctx: &mut BC,
-        device: &DeviceId<BC>,
-        multicast_addr: MulticastAddr<A>,
-    ) {
-        match multicast_addr.into() {
-            IpAddr::V4(multicast_addr) => crate::ip::device::join_ip_multicast::<Ipv4, _, _>(
-                &mut CoreCtx::new_deprecated(core_ctx),
-                bindings_ctx,
-                device,
-                multicast_addr,
-            ),
-            IpAddr::V6(multicast_addr) => crate::ip::device::join_ip_multicast::<Ipv6, _, _>(
-                &mut CoreCtx::new_deprecated(core_ctx),
-                bindings_ctx,
-                device,
-                multicast_addr,
-            ),
-        }
-    }
-
-    fn leave_ip_multicast<A: IpAddress, BC: BindingsContext>(
-        core_ctx: &SyncCtx<BC>,
-        bindings_ctx: &mut BC,
-        device: &DeviceId<BC>,
-        multicast_addr: MulticastAddr<A>,
-    ) {
-        match multicast_addr.into() {
-            IpAddr::V4(multicast_addr) => crate::ip::device::leave_ip_multicast::<Ipv4, _, _>(
-                &mut CoreCtx::new_deprecated(core_ctx),
-                bindings_ctx,
-                device,
-                multicast_addr,
-            ),
-            IpAddr::V6(multicast_addr) => crate::ip::device::leave_ip_multicast::<Ipv6, _, _>(
-                &mut CoreCtx::new_deprecated(core_ctx),
-                bindings_ctx,
-                device,
-                multicast_addr,
-            ),
-        }
-    }
-
     /// Test that we can join and leave a multicast group, but we only truly
     /// leave it after calling `leave_ip_multicast` the same number of times as
     /// `join_ip_multicast`.
     #[ip_test]
-    fn test_ip_join_leave_multicast_addr_ref_count<I: Ip + TestIpExt>() {
+    #[netstack3_macros::context_ip_bounds(I, crate::testutil::FakeBindingsCtx, crate)]
+    fn test_ip_join_leave_multicast_addr_ref_count<I: Ip + TestIpExt + crate::IpExt>() {
         let config = I::FAKE_CONFIG;
         let mut ctx = crate::testutil::FakeCtx::default();
 
@@ -2470,36 +2393,35 @@ mod tests {
             )
             .into();
         crate::device::testutil::enable_device(&mut ctx, &device);
-        let crate::testutil::FakeCtx { core_ctx, bindings_ctx } = &mut ctx;
-
         let multicast_addr = I::get_multicast_addr(3);
+        let mut test_api = ctx.test_api();
 
         // Should not be in the multicast group yet.
-        assert!(!is_in_ip_multicast(core_ctx, &device, multicast_addr));
+        assert!(!test_api.is_in_ip_multicast(&device, multicast_addr));
 
         // Join the multicast group.
-        join_ip_multicast(core_ctx, bindings_ctx, &device, multicast_addr);
-        assert!(is_in_ip_multicast(core_ctx, &device, multicast_addr));
+        test_api.join_ip_multicast(&device, multicast_addr);
+        assert!(test_api.is_in_ip_multicast(&device, multicast_addr));
 
         // Leave the multicast group.
-        leave_ip_multicast(core_ctx, bindings_ctx, &device, multicast_addr);
-        assert!(!is_in_ip_multicast(core_ctx, &device, multicast_addr));
+        test_api.leave_ip_multicast(&device, multicast_addr);
+        assert!(!test_api.is_in_ip_multicast(&device, multicast_addr));
 
         // Join the multicst group.
-        join_ip_multicast(core_ctx, bindings_ctx, &device, multicast_addr);
-        assert!(is_in_ip_multicast(core_ctx, &device, multicast_addr));
+        test_api.join_ip_multicast(&device, multicast_addr);
+        assert!(test_api.is_in_ip_multicast(&device, multicast_addr));
 
         // Join it again...
-        join_ip_multicast(core_ctx, bindings_ctx, &device, multicast_addr);
-        assert!(is_in_ip_multicast(core_ctx, &device, multicast_addr));
+        test_api.join_ip_multicast(&device, multicast_addr);
+        assert!(test_api.is_in_ip_multicast(&device, multicast_addr));
 
         // Leave it (still in it because we joined twice).
-        leave_ip_multicast(core_ctx, bindings_ctx, &device, multicast_addr);
-        assert!(is_in_ip_multicast(core_ctx, &device, multicast_addr));
+        test_api.leave_ip_multicast(&device, multicast_addr);
+        assert!(test_api.is_in_ip_multicast(&device, multicast_addr));
 
         // Leave it again... (actually left now).
-        leave_ip_multicast(core_ctx, bindings_ctx, &device, multicast_addr);
-        assert!(!is_in_ip_multicast(core_ctx, &device, multicast_addr));
+        test_api.leave_ip_multicast(&device, multicast_addr);
+        assert!(!test_api.is_in_ip_multicast(&device, multicast_addr));
     }
 
     /// Test leaving a multicast group a device has not yet joined.
@@ -2509,8 +2431,9 @@ mod tests {
     /// This method should always panic as leaving an unjoined multicast group
     /// is a panic condition.
     #[ip_test]
+    #[netstack3_macros::context_ip_bounds(I, crate::testutil::FakeBindingsCtx, crate)]
     #[should_panic(expected = "attempted to leave IP multicast group we were not a member of:")]
-    fn test_ip_leave_unjoined_multicast<I: Ip + TestIpExt>() {
+    fn test_ip_leave_unjoined_multicast<I: Ip + TestIpExt + crate::IpExt>() {
         let config = I::FAKE_CONFIG;
         let mut ctx = crate::testutil::FakeCtx::default();
         let device = ctx
@@ -2525,15 +2448,15 @@ mod tests {
             )
             .into();
         crate::device::testutil::enable_device(&mut ctx, &device);
-        let crate::testutil::FakeCtx { core_ctx, bindings_ctx } = &mut ctx;
-
         let multicast_addr = I::get_multicast_addr(3);
 
+        let mut test_api = ctx.test_api();
+
         // Should not be in the multicast group yet.
-        assert!(!is_in_ip_multicast(core_ctx, &device, multicast_addr));
+        assert!(!test_api.is_in_ip_multicast(&device, multicast_addr));
 
         // Leave it (this should panic).
-        leave_ip_multicast(core_ctx, bindings_ctx, &device, multicast_addr);
+        test_api.leave_ip_multicast(&device, multicast_addr);
     }
 
     #[test]

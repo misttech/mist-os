@@ -167,8 +167,6 @@ mod tests {
                 IpAddressId as _, Ipv6DeviceAddr, Ipv6DeviceHandler, Ipv6DeviceTimerId,
             },
             icmp::REQUIRED_NDP_IP_PACKET_HOP_LIMIT,
-            receive_ip_packet,
-            testutil::is_in_ip_multicast,
             SendIpPacketMeta,
         },
         testutil::{
@@ -489,8 +487,14 @@ mod tests {
         });
 
         // Both devices should be in the solicited-node multicast group.
-        assert!(is_in_ip_multicast(net.core_ctx("local"), &local_device_id, multicast_addr));
-        assert!(is_in_ip_multicast(net.core_ctx("remote"), &remote_device_id, multicast_addr));
+        assert!(net
+            .context("local")
+            .test_api()
+            .is_in_ip_multicast(&local_device_id, multicast_addr));
+        assert!(net
+            .context("remote")
+            .test_api()
+            .is_in_ip_multicast(&remote_device_id, multicast_addr));
 
         let _: StepResult = net.step();
 
@@ -508,8 +512,14 @@ mod tests {
         );
 
         // Both devices should not be in the multicast group
-        assert!(!is_in_ip_multicast(&&*net.core_ctx("local"), &local_device_id, multicast_addr));
-        assert!(!is_in_ip_multicast(&&*net.core_ctx("remote"), &remote_device_id, multicast_addr));
+        assert!(!net
+            .context("local")
+            .test_api()
+            .is_in_ip_multicast(&local_device_id, multicast_addr));
+        assert!(!net
+            .context("remote")
+            .test_api()
+            .is_in_ip_multicast(&remote_device_id, multicast_addr));
     }
 
     fn dad_timer_id(
@@ -575,8 +585,14 @@ mod tests {
         });
 
         // Only local should be in the solicited node multicast group.
-        assert!(is_in_ip_multicast(net.core_ctx("local"), &local_device_id, multicast_addr));
-        assert!(!is_in_ip_multicast(net.core_ctx("remote"), &remote_device_id, multicast_addr));
+        assert!(net
+            .context("local")
+            .test_api()
+            .is_in_ip_multicast(&local_device_id, multicast_addr));
+        assert!(!net
+            .context("remote")
+            .test_api()
+            .is_in_ip_multicast(&remote_device_id, multicast_addr));
 
         net.with_context("local", |ctx| {
             assert_eq!(
@@ -594,8 +610,14 @@ mod tests {
             ctx.core_api().device_ip::<Ipv6>().add_ip_addr_subnet(&remote_device_id, addr).unwrap();
         });
         // Local & remote should be in the multicast group.
-        assert!(is_in_ip_multicast(net.core_ctx("local"), &local_device_id, multicast_addr));
-        assert!(is_in_ip_multicast(net.core_ctx("remote"), &remote_device_id, multicast_addr));
+        assert!(net
+            .context("local")
+            .test_api()
+            .is_in_ip_multicast(&local_device_id, multicast_addr));
+        assert!(net
+            .context("remote")
+            .test_api()
+            .is_in_ip_multicast(&remote_device_id, multicast_addr));
 
         let _: StepResult = net.step();
 
@@ -619,8 +641,14 @@ mod tests {
         );
 
         // Only local should be in the solicited node multicast group.
-        assert!(is_in_ip_multicast(net.core_ctx("local"), &local_device_id, multicast_addr));
-        assert!(!is_in_ip_multicast(net.core_ctx("remote"), &remote_device_id, multicast_addr));
+        assert!(net
+            .context("local")
+            .test_api()
+            .is_in_ip_multicast(&local_device_id, multicast_addr));
+        assert!(!net
+            .context("remote")
+            .test_api()
+            .is_in_ip_multicast(&remote_device_id, multicast_addr));
     }
 
     #[test]
@@ -1024,9 +1052,7 @@ mod tests {
 
         // Test receiving NDP RS when not a router (should not receive)
 
-        let (Ctx { core_ctx, mut bindings_ctx }, device_ids) =
-            FakeEventDispatcherBuilder::from_config(config).build();
-        let core_ctx = &core_ctx;
+        let (mut ctx, device_ids) = FakeEventDispatcherBuilder::from_config(config).build();
         let device_id: DeviceId<_> = device_ids[0].clone().into();
 
         let icmpv6_packet_buf = OptionSequenceBuilder::new(options.iter())
@@ -1045,14 +1071,12 @@ mod tests {
             ))
             .serialize_vec_outer()
             .unwrap();
-        receive_ip_packet::<_, _, Ipv6>(
-            &core_ctx,
-            &mut bindings_ctx,
+        ctx.test_api().receive_ip_packet::<Ipv6, _>(
             &device_id,
             Some(FrameDestination::Multicast),
             icmpv6_packet_buf,
         );
-        assert_eq!(core_ctx.state.ndp_counters().rx.router_solicitation.get(), 0);
+        assert_eq!(ctx.core_ctx.state.ndp_counters().rx.router_solicitation.get(), 0);
     }
 
     #[test]
@@ -1086,37 +1110,31 @@ mod tests {
         let config = Ipv6::FAKE_CONFIG;
         let src_mac = [10, 11, 12, 13, 14, 15];
         let src_ip = Ipv6Addr::from([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 192, 168, 0, 10]);
-        let (Ctx { core_ctx, mut bindings_ctx }, device_ids) =
-            FakeEventDispatcherBuilder::from_config(config.clone()).build();
-        let core_ctx = &core_ctx;
+        let (mut ctx, device_ids) = FakeEventDispatcherBuilder::from_config(config.clone()).build();
         let device_id: DeviceId<_> = device_ids[0].clone().into();
 
         // Test receiving NDP RA where source IP is not a link local address
         // (should not receive).
 
         let icmpv6_packet_buf = router_advertisement_message(src_ip, config.local_ip.get());
-        receive_ip_packet::<_, _, Ipv6>(
-            &core_ctx,
-            &mut bindings_ctx,
+        ctx.test_api().receive_ip_packet::<Ipv6, _>(
             &device_id,
             Some(FrameDestination::Individual { local: true }),
             icmpv6_packet_buf,
         );
-        assert_eq!(core_ctx.state.ndp_counters().rx.router_advertisement.get(), 0);
+        assert_eq!(ctx.core_ctx.state.ndp_counters().rx.router_advertisement.get(), 0);
 
         // Test receiving NDP RA where source IP is a link local address (should
         // receive).
 
         let src_ip = Mac::new(src_mac).to_ipv6_link_local().addr().get();
         let icmpv6_packet_buf = router_advertisement_message(src_ip, config.local_ip.get());
-        receive_ip_packet::<_, _, Ipv6>(
-            &core_ctx,
-            &mut bindings_ctx,
+        ctx.test_api().receive_ip_packet::<Ipv6, _>(
             &device_id,
             Some(FrameDestination::Individual { local: true }),
             icmpv6_packet_buf,
         );
-        assert_eq!(core_ctx.state.ndp_counters().rx.router_advertisement.get(), 1);
+        assert_eq!(ctx.core_ctx.state.ndp_counters().rx.router_advertisement.get(), 1);
     }
 
     #[test]
@@ -1124,8 +1142,7 @@ mod tests {
         // Sets the hop limit with a router advertisement and sends a packet to
         // make sure the packet uses the new hop limit.
         fn inner_test(
-            core_ctx: &crate::testutil::FakeCoreCtx,
-            bindings_ctx: &mut crate::testutil::FakeBindingsCtx,
+            ctx: &mut crate::testutil::FakeCtx,
             device_id: &DeviceId<crate::testutil::FakeBindingsCtx>,
             hop_limit: u8,
             frame_offset: usize,
@@ -1150,19 +1167,15 @@ mod tests {
                 .serialize_vec_outer()
                 .unwrap()
                 .unwrap_b();
-            receive_ip_packet::<_, _, Ipv6>(
-                core_ctx,
-                bindings_ctx,
+            ctx.test_api().receive_ip_packet::<Ipv6, _>(
                 device_id,
                 Some(FrameDestination::Multicast),
                 icmpv6_packet_buf,
             );
-            assert_eq!(
-                get_ipv6_hop_limit(&mut CoreCtx::new_deprecated(core_ctx), device_id).get(),
-                hop_limit
-            );
+            let (mut core_ctx, bindings_ctx) = ctx.contexts();
+            assert_eq!(get_ipv6_hop_limit(&mut core_ctx, device_id).get(), hop_limit);
             crate::ip::send_ip_packet_from_device::<Ipv6, _, _, _>(
-                &mut CoreCtx::new_deprecated(core_ctx),
+                &mut core_ctx,
                 bindings_ctx,
                 SendIpPacketMeta {
                     device: device_id,
@@ -1186,16 +1199,15 @@ mod tests {
             assert_eq!(buf[7], hop_limit);
         }
 
-        let (Ctx { core_ctx, mut bindings_ctx }, device_ids) =
+        let (mut ctx, device_ids) =
             FakeEventDispatcherBuilder::from_config(Ipv6::FAKE_CONFIG).build();
-        let core_ctx = &core_ctx;
         let device_id: DeviceId<_> = device_ids[0].clone().into();
 
         // Set hop limit to 100.
-        inner_test(&core_ctx, &mut bindings_ctx, &device_id, 100, 0);
+        inner_test(&mut ctx, &device_id, 100, 0);
 
         // Set hop limit to 30.
-        inner_test(&core_ctx, &mut bindings_ctx, &device_id, 30, 1);
+        inner_test(&mut ctx, &device_id, 30, 1);
     }
 
     #[test]
@@ -1238,26 +1250,20 @@ mod tests {
         let src_ip = src_mac.to_ipv6_link_local().addr();
 
         crate::device::testutil::enable_device(&mut ctx, &device);
-        let Ctx { core_ctx, bindings_ctx } = &mut ctx;
 
         // Receive a new RA with a valid MTU option (but the new MTU should only
         // be 5000 as that is the max MTU of the device).
 
         let icmpv6_packet_buf =
             packet_buf(src_ip.get(), Ipv6::ALL_NODES_LINK_LOCAL_MULTICAST_ADDRESS.get(), 5781);
-        receive_ip_packet::<_, _, Ipv6>(
-            core_ctx,
-            bindings_ctx,
+        ctx.test_api().receive_ip_packet::<Ipv6, _>(
             &device,
             Some(FrameDestination::Multicast),
             icmpv6_packet_buf,
         );
-        assert_eq!(core_ctx.state.ndp_counters().rx.router_advertisement.get(), 1);
+        assert_eq!(ctx.core_ctx.state.ndp_counters().rx.router_advertisement.get(), 1);
         assert_eq!(
-            crate::ip::IpDeviceContext::<Ipv6, _>::get_mtu(
-                &mut CoreCtx::new_deprecated(core_ctx),
-                &device
-            ),
+            crate::ip::IpDeviceContext::<Ipv6, _>::get_mtu(&mut ctx.core_ctx(), &device),
             hw_mtu
         );
 
@@ -1269,19 +1275,14 @@ mod tests {
             Ipv6::ALL_NODES_LINK_LOCAL_MULTICAST_ADDRESS.get(),
             u32::from(Ipv6::MINIMUM_LINK_MTU) - 1,
         );
-        receive_ip_packet::<_, _, Ipv6>(
-            core_ctx,
-            bindings_ctx,
+        ctx.test_api().receive_ip_packet::<Ipv6, _>(
             &device,
             Some(FrameDestination::Multicast),
             icmpv6_packet_buf,
         );
-        assert_eq!(core_ctx.state.ndp_counters().rx.router_advertisement.get(), 2);
+        assert_eq!(ctx.core_ctx.state.ndp_counters().rx.router_advertisement.get(), 2);
         assert_eq!(
-            crate::ip::IpDeviceContext::<Ipv6, _>::get_mtu(
-                &mut CoreCtx::new_deprecated(core_ctx),
-                &device
-            ),
+            crate::ip::IpDeviceContext::<Ipv6, _>::get_mtu(&mut ctx.core_ctx(), &device),
             hw_mtu
         );
 
@@ -1293,19 +1294,14 @@ mod tests {
             Ipv6::ALL_NODES_LINK_LOCAL_MULTICAST_ADDRESS.get(),
             Ipv6::MINIMUM_LINK_MTU.into(),
         );
-        receive_ip_packet::<_, _, Ipv6>(
-            core_ctx,
-            bindings_ctx,
+        ctx.test_api().receive_ip_packet::<Ipv6, _>(
             &device,
             Some(FrameDestination::Multicast),
             icmpv6_packet_buf,
         );
-        assert_eq!(core_ctx.state.ndp_counters().rx.router_advertisement.get(), 3);
+        assert_eq!(ctx.core_ctx.state.ndp_counters().rx.router_advertisement.get(), 3);
         assert_eq!(
-            crate::ip::IpDeviceContext::<Ipv6, _>::get_mtu(
-                &mut CoreCtx::new_deprecated(core_ctx),
-                &device
-            ),
+            crate::ip::IpDeviceContext::<Ipv6, _>::get_mtu(&mut ctx.core_ctx(), &device),
             Ipv6::MINIMUM_LINK_MTU,
         );
     }
@@ -1784,10 +1780,7 @@ mod tests {
             100,
             0,
         );
-        let Ctx { core_ctx, bindings_ctx } = &mut ctx;
-        receive_ip_packet::<_, _, Ipv6>(
-            core_ctx,
-            bindings_ctx,
+        ctx.test_api().receive_ip_packet::<Ipv6, _>(
             &device,
             Some(FrameDestination::Multicast),
             icmpv6_packet_buf,
@@ -2238,9 +2231,7 @@ mod tests {
             9000,
             10000,
         );
-        receive_ip_packet::<_, _, Ipv6>(
-            &ctx.core_ctx,
-            &mut ctx.bindings_ctx,
+        ctx.test_api().receive_ip_packet::<Ipv6, _>(
             &device,
             Some(FrameDestination::Multicast),
             icmpv6_packet_buf,
@@ -2389,10 +2380,7 @@ mod tests {
             valid_lifetime,
             preferred_lifetime,
         );
-        let Ctx { core_ctx, bindings_ctx } = ctx;
-        receive_ip_packet::<_, _, Ipv6>(
-            core_ctx,
-            bindings_ctx,
+        ctx.test_api().receive_ip_packet::<Ipv6, _>(
             &device,
             Some(FrameDestination::Multicast),
             icmpv6_packet_buf,
@@ -2728,9 +2716,7 @@ mod tests {
         let solicited_flag = false;
         let override_flag = true;
 
-        receive_ip_packet::<_, _, Ipv6>(
-            &ctx.core_ctx,
-            &mut ctx.bindings_ctx,
+        ctx.test_api().receive_ip_packet::<Ipv6, _>(
             &device,
             Some(FrameDestination::Multicast),
             testutil::neighbor_advertisement_ip_packet(
@@ -3479,17 +3465,14 @@ mod tests {
             VALID_LIFETIME_SECS,
             PREFERRED_LIFETIME_SECS,
         );
-        let Ctx { core_ctx, bindings_ctx } = &mut ctx;
-        receive_ip_packet::<_, _, Ipv6>(
-            core_ctx,
-            bindings_ctx,
+        ctx.test_api().receive_ip_packet::<Ipv6, _>(
             &device,
             Some(FrameDestination::Multicast),
             icmpv6_packet_buf,
         );
 
         // Should have gotten a new IP.
-        let now = bindings_ctx.now();
+        let now = ctx.bindings_ctx.now();
         let valid_until = now + Duration::from_secs(VALID_LIFETIME_SECS.into());
         let expected_address_entry = GlobalIpv6Addr {
             addr_sub: AddrSubnet::<Ipv6Addr, _>::new(expected_addr.into(), prefix_length).unwrap(),

@@ -1690,11 +1690,10 @@ mod tests {
                 Ipv6DeviceConfigurationUpdate,
             },
             icmp::REQUIRED_NDP_IP_PACKET_HOP_LIMIT,
-            receive_ip_packet,
             testutil::FakeIpDeviceIdCtx,
         },
         testutil::{
-            assert_empty, Ctx, FakeCryptoRng, FakeEventDispatcherConfig, TestIpExt as _,
+            assert_empty, FakeCryptoRng, FakeEventDispatcherConfig, TestIpExt as _,
             DEFAULT_INTERFACE_METRIC, IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
         },
     };
@@ -2804,13 +2803,10 @@ mod tests {
                 .unwrap();
         };
         set_ip_enabled(&mut ctx, true /* enabled */);
-        let Ctx { core_ctx, bindings_ctx } = &mut ctx;
-        bindings_ctx.timer_ctx().assert_no_timers_installed();
+        ctx.bindings_ctx.timer_ctx().assert_no_timers_installed();
 
         // Generate stable and temporary SLAAC addresses.
-        receive_ip_packet::<_, _, Ipv6>(
-            core_ctx,
-            bindings_ctx,
+        ctx.test_api().receive_ip_packet::<Ipv6, _>(
             &device_id,
             Some(FrameDestination::Multicast),
             build_slaac_ra_packet(
@@ -2826,11 +2822,9 @@ mod tests {
         let stable_addr_sub =
             calculate_addr_sub(SUBNET, local_mac.to_eui64_with_magic(Mac::DEFAULT_EUI_MAGIC));
 
-        let addrs = with_assigned_ipv6_addr_subnets(
-            &mut CoreCtx::new_deprecated(core_ctx),
-            &device_id,
-            |addrs| addrs.filter(|a| !a.addr().is_link_local()).collect::<Vec<_>>(),
-        );
+        let addrs = with_assigned_ipv6_addr_subnets(&mut ctx.core_ctx(), &device_id, |addrs| {
+            addrs.filter(|a| !a.addr().is_link_local()).collect::<Vec<_>>()
+        });
         let (stable_addr_sub, temp_addr_sub) = assert_matches!(
             addrs[..],
             [a1, a2] => {
@@ -2848,7 +2842,7 @@ mod tests {
                 }
             }
         );
-        let now = bindings_ctx.now();
+        let now = ctx.bindings_ctx.now();
         let stable_addr_lifetime_until = now + TWO_HOURS.get();
         let temp_addr_lifetime_until = now + ONE_HOUR.get();
 
@@ -2871,7 +2865,7 @@ mod tests {
         let temp_addr_preferred_until_end = now + ONE_HOUR.get();
         let temp_addr_preferred_until_start =
             temp_addr_preferred_until_end - ((ONE_HOUR.get() * 3) / 5);
-        bindings_ctx.timer_ctx().assert_some_timers_installed([
+        ctx.bindings_ctx.timer_ctx().assert_some_timers_installed([
             (
                 SlaacTimerId::new_invalidate_slaac_address(
                     device_id.clone(),

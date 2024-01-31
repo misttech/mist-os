@@ -29,7 +29,10 @@ use net_types::{
     SpecifiedAddr, UnicastAddr, Witness as _,
 };
 #[cfg(test)]
-use net_types::{ip::IpAddr, MulticastAddr, NonMappedAddr};
+use net_types::{
+    ip::{IpAddr, IpVersion},
+    MulticastAddr, NonMappedAddr,
+};
 use packet::{Buf, BufferMut};
 #[cfg(test)]
 use packet_formats::ip::IpProto;
@@ -199,6 +202,134 @@ where
     /// Like [`ContextPair::contexts`], but retrieves only the core context.
     pub fn core_ctx(&self) -> UnlockedCoreCtx<'_, BC> {
         UnlockedCoreCtx::new(&CC::borrow(&self.core_ctx).state)
+    }
+
+    /// Retrieves a [`TestApi`] from this [`Ctx`].
+    pub fn test_api(&mut self) -> TestApi<'_, BC> {
+        let Self { core_ctx, bindings_ctx } = self;
+        TestApi(UnlockedCoreCtx::new(&CC::borrow(core_ctx).state), bindings_ctx)
+    }
+}
+
+/// An API struct for test utilities.
+// TODO(https://fxbug.dev/42083910): Remove dead code allowance once testutil
+// public functions are moved here.
+#[allow(dead_code)]
+pub struct TestApi<'a, BT: BindingsTypes>(UnlockedCoreCtx<'a, BT>, &'a mut BT);
+
+impl<'l, BC> TestApi<'l, BC>
+where
+    BC: crate::BindingsContext,
+{
+    #[cfg(test)]
+    fn contexts(&mut self) -> (&mut UnlockedCoreCtx<'l, BC>, &mut BC) {
+        let Self(core_ctx, bindings_ctx) = self;
+        (core_ctx, bindings_ctx)
+    }
+
+    /// Joins the multicast group `multicast_addr` for `device`.
+    #[netstack3_macros::context_ip_bounds(A::Version, BC, crate)]
+    #[cfg(test)]
+    pub fn join_ip_multicast<A: IpAddress>(
+        &mut self,
+        device: &DeviceId<BC>,
+        multicast_addr: MulticastAddr<A>,
+    ) where
+        A::Version: crate::IpExt,
+    {
+        let (core_ctx, bindings_ctx) = self.contexts();
+        crate::ip::device::join_ip_multicast::<A::Version, _, _>(
+            core_ctx,
+            bindings_ctx,
+            device,
+            multicast_addr,
+        );
+    }
+
+    /// Leaves the multicast group `multicast_addr` for `device`.
+    #[cfg(test)]
+    #[netstack3_macros::context_ip_bounds(A::Version, BC, crate)]
+    pub fn leave_ip_multicast<A: IpAddress>(
+        &mut self,
+        device: &DeviceId<BC>,
+        multicast_addr: MulticastAddr<A>,
+    ) where
+        A::Version: crate::IpExt,
+    {
+        let (core_ctx, bindings_ctx) = self.contexts();
+        crate::ip::device::leave_ip_multicast::<A::Version, _, _>(
+            core_ctx,
+            bindings_ctx,
+            device,
+            multicast_addr,
+        );
+    }
+
+    /// Returns whether `device` is in the multicast group `addr`.
+    #[cfg(test)]
+    #[netstack3_macros::context_ip_bounds(A::Version, BC, crate)]
+    pub fn is_in_ip_multicast<A: IpAddress>(
+        &mut self,
+        device: &DeviceId<BC>,
+        addr: MulticastAddr<A>,
+    ) -> bool
+    where
+        A::Version: crate::IpExt,
+    {
+        use crate::ip::{
+            AddressStatus, IpDeviceStateContext, IpLayerIpExt, Ipv4PresentAddressStatus,
+            Ipv6PresentAddressStatus,
+        };
+
+        let (core_ctx, _) = self.contexts();
+        let addr_status = IpDeviceStateContext::<A::Version, _>::address_status_for_device(
+            core_ctx,
+            addr.into_specified(),
+            device,
+        );
+        let status = match addr_status {
+            AddressStatus::Present(p) => p,
+            AddressStatus::Unassigned => return false,
+        };
+        #[derive(GenericOverIp)]
+        #[generic_over_ip(I, Ip)]
+        struct Wrap<I: IpLayerIpExt>(I::AddressStatus);
+        A::Version::map_ip(
+            Wrap(status),
+            |Wrap(v4)| match v4 {
+                Ipv4PresentAddressStatus::Multicast => true,
+                Ipv4PresentAddressStatus::LimitedBroadcast
+                | Ipv4PresentAddressStatus::SubnetBroadcast
+                | Ipv4PresentAddressStatus::Unicast => false,
+            },
+            |Wrap(v6)| match v6 {
+                Ipv6PresentAddressStatus::Multicast => true,
+                Ipv6PresentAddressStatus::UnicastAssigned
+                | Ipv6PresentAddressStatus::UnicastTentative => false,
+            },
+        )
+    }
+
+    /// Receive an IP packet from a device.
+    ///
+    /// `receive_ip_packet` injects a packet directly at the IP layer for this
+    /// context.
+    #[cfg(test)]
+    pub fn receive_ip_packet<I: Ip, B: BufferMut>(
+        &mut self,
+        device: &DeviceId<BC>,
+        frame_dst: Option<crate::device::FrameDestination>,
+        buffer: B,
+    ) {
+        let (core_ctx, bindings_ctx) = self.contexts();
+        match I::VERSION {
+            IpVersion::V4 => {
+                crate::ip::receive_ipv4_packet(core_ctx, bindings_ctx, device, frame_dst, buffer)
+            }
+            IpVersion::V6 => {
+                crate::ip::receive_ipv6_packet(core_ctx, bindings_ctx, device, frame_dst, buffer)
+            }
+        }
     }
 }
 

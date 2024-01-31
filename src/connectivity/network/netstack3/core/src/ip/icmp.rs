@@ -2966,7 +2966,6 @@ mod tests {
             },
             icmp::socket::{IcmpEchoSocketApi, SocketId, SocketsState, StateContext},
             path_mtu::testutil::FakePmtuState,
-            receive_ip_packet,
             socket::testutil::{FakeDeviceConfig, FakeDualStackIpSocketCtx},
             testutil::DualStackSendIpPacketMeta,
             types::RoutableIpAddr,
@@ -3275,15 +3274,13 @@ mod tests {
 
         let device: DeviceId<_> = device_ids[0].clone().into();
         set_forwarding_enabled::<_, I>(&mut ctx, &device, true);
-        let Ctx { core_ctx, bindings_ctx } = &mut ctx;
-        receive_ip_packet::<_, _, I>(
-            core_ctx,
-            bindings_ctx,
+        ctx.test_api().receive_ip_packet::<I, _>(
             &device,
             Some(FrameDestination::Individual { local: true }),
             buffer,
         );
 
+        let Ctx { core_ctx, bindings_ctx } = &mut ctx;
         for counter in assert_counters {
             // TODO(https://fxbug.dev/42084333): Redesign iterating through
             // assert_counters once CounterContext is removed.

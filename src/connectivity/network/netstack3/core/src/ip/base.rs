@@ -1926,29 +1926,6 @@ macro_rules! try_parse_ip_packet {
     }};
 }
 
-/// Receive an IP packet from a device.
-///
-/// `receive_ip_packet` calls [`receive_ipv4_packet`] or [`receive_ipv6_packet`]
-/// depending on the type parameter, `I`.
-#[cfg(test)]
-pub(crate) fn receive_ip_packet<B: BufferMut, BC: BindingsContext, I: Ip>(
-    core_ctx: &crate::context::SyncCtx<BC>,
-    bindings_ctx: &mut BC,
-    device: &DeviceId<BC>,
-    frame_dst: Option<FrameDestination>,
-    buffer: B,
-) {
-    let mut core_ctx = CoreCtx::new_deprecated(core_ctx);
-    match I::VERSION {
-        IpVersion::V4 => {
-            receive_ipv4_packet(&mut core_ctx, bindings_ctx, device, frame_dst, buffer)
-        }
-        IpVersion::V6 => {
-            receive_ipv6_packet(&mut core_ctx, bindings_ctx, device, frame_dst, buffer)
-        }
-    }
-}
-
 /// Receive an IPv4 packet from a device.
 ///
 /// `frame_dst` specifies how this packet was received; see [`FrameDestination`]
@@ -3159,12 +3136,11 @@ pub(crate) mod testutil {
 
     use alloc::collections::HashSet;
 
-    use net_types::{ip::IpAddr, MulticastAddr};
+    use net_types::MulticastAddr;
 
     use crate::{
         context::{testutil::FakeInstant, RngContext},
         device::testutil::{FakeStrongDeviceId, FakeWeakDeviceId},
-        testutil::{FakeBindingsCtx, FakeCoreCtx},
     };
 
     impl<S: AsRef<FakeIpDeviceIdCtx<D>>, Meta, D: StrongId + 'static> DeviceIdContext<AnyDevice>
@@ -3317,45 +3293,6 @@ pub(crate) mod testutil {
         }
     }
 
-    pub(crate) fn is_in_ip_multicast<A: IpAddress>(
-        core_ctx: &FakeCoreCtx,
-        device: &DeviceId<FakeBindingsCtx>,
-        addr: MulticastAddr<A>,
-    ) -> bool {
-        let mut core_ctx = CoreCtx::new_deprecated(core_ctx);
-        match addr.into() {
-            IpAddr::V4(addr) => {
-                match IpDeviceStateContext::<Ipv4, _>::address_status_for_device(
-                    &mut core_ctx,
-                    addr.into_specified(),
-                    device,
-                ) {
-                    AddressStatus::Present(Ipv4PresentAddressStatus::Multicast) => true,
-                    AddressStatus::Unassigned => false,
-                    AddressStatus::Present(
-                        Ipv4PresentAddressStatus::Unicast
-                        | Ipv4PresentAddressStatus::LimitedBroadcast
-                        | Ipv4PresentAddressStatus::SubnetBroadcast,
-                    ) => unreachable!(),
-                }
-            }
-            IpAddr::V6(addr) => {
-                match IpDeviceStateContext::<Ipv6, _>::address_status_for_device(
-                    &mut core_ctx,
-                    addr.into_specified(),
-                    device,
-                ) {
-                    AddressStatus::Present(Ipv6PresentAddressStatus::Multicast) => true,
-                    AddressStatus::Unassigned => false,
-                    AddressStatus::Present(
-                        Ipv6PresentAddressStatus::UnicastAssigned
-                        | Ipv6PresentAddressStatus::UnicastTentative,
-                    ) => unreachable!(),
-                }
-            }
-        }
-    }
-
     impl<
             I: Ip,
             BC: RngContext + InstantContext<Instant = FakeInstant>,
@@ -3434,7 +3371,6 @@ mod tests {
                 },
                 slaac::SlaacConfiguration,
             },
-            testutil::is_in_ip_multicast,
             types::{AddableEntryEither, AddableMetric, RawMetric},
         },
         state::StackState,
@@ -3585,9 +3521,7 @@ mod tests {
         body.extend(fragment_offset * 8..fragment_offset * 8 + 8);
         let buffer =
             Buf::new(body, ..).encapsulate(builder).serialize_vec_outer().unwrap().into_inner();
-        receive_ip_packet::<_, _, Ipv4>(
-            &ctx.core_ctx,
-            &mut ctx.bindings_ctx,
+        ctx.test_api().receive_ip_packet::<Ipv4, _>(
             device,
             Some(FrameDestination::Individual { local: true }),
             buffer,
@@ -3624,9 +3558,7 @@ mod tests {
         let payload_len = u16::try_from(bytes.len() - 40).unwrap();
         bytes[4..6].copy_from_slice(&payload_len.to_be_bytes());
         let buffer = Buf::new(bytes, ..);
-        receive_ip_packet::<_, _, Ipv6>(
-            &ctx.core_ctx,
-            &mut ctx.bindings_ctx,
+        ctx.test_api().receive_ip_packet::<Ipv6, _>(
             device,
             Some(FrameDestination::Individual { local: true }),
             buffer,
@@ -3635,9 +3567,7 @@ mod tests {
 
     #[test]
     fn test_ipv6_icmp_parameter_problem_non_must() {
-        let (Ctx { core_ctx, mut bindings_ctx }, device_ids) =
-            FakeEventDispatcherBuilder::from_config(FAKE_CONFIG_V6).build();
-        let core_ctx = &core_ctx;
+        let (mut ctx, device_ids) = FakeEventDispatcherBuilder::from_config(FAKE_CONFIG_V6).build();
         let device: DeviceId<_> = device_ids[0].clone().into();
 
         // Test parsing an IPv6 packet with invalid next header value which
@@ -3662,25 +3592,21 @@ mod tests {
         bytes[24..40].copy_from_slice(FAKE_CONFIG_V6.local_ip.bytes());
         let buf = Buf::new(bytes, ..);
 
-        receive_ip_packet::<_, _, Ipv6>(
-            &core_ctx,
-            &mut bindings_ctx,
+        ctx.test_api().receive_ip_packet::<Ipv6, _>(
             &device,
             Some(FrameDestination::Individual { local: true }),
             buf,
         );
 
-        assert_eq!(core_ctx.state.ipv4.icmp_tx_counters().parameter_problem.get(), 0);
-        assert_eq!(core_ctx.state.ipv6.icmp_tx_counters().parameter_problem.get(), 0);
-        assert_eq!(core_ctx.state.ipv4.inner.counters.dispatch_receive_ip_packet.get(), 0);
-        assert_eq!(core_ctx.state.ipv6.inner.counters.dispatch_receive_ip_packet.get(), 0);
+        assert_eq!(ctx.core_ctx.state.ipv4.icmp_tx_counters().parameter_problem.get(), 0);
+        assert_eq!(ctx.core_ctx.state.ipv6.icmp_tx_counters().parameter_problem.get(), 0);
+        assert_eq!(ctx.core_ctx.state.ipv4.inner.counters.dispatch_receive_ip_packet.get(), 0);
+        assert_eq!(ctx.core_ctx.state.ipv6.inner.counters.dispatch_receive_ip_packet.get(), 0);
     }
 
     #[test]
     fn test_ipv6_icmp_parameter_problem_must() {
-        let (Ctx { core_ctx, mut bindings_ctx }, device_ids) =
-            FakeEventDispatcherBuilder::from_config(FAKE_CONFIG_V6).build();
-        let core_ctx = &core_ctx;
+        let (mut ctx, device_ids) = FakeEventDispatcherBuilder::from_config(FAKE_CONFIG_V6).build();
         let device: DeviceId<_> = device_ids[0].clone().into();
 
         // Test parsing an IPv6 packet where we MUST send an ICMP parameter problem
@@ -3713,16 +3639,14 @@ mod tests {
         bytes[8..24].copy_from_slice(FAKE_CONFIG_V6.remote_ip.bytes());
         bytes[24..40].copy_from_slice(FAKE_CONFIG_V6.local_ip.bytes());
         let buf = Buf::new(bytes, ..);
-        receive_ip_packet::<_, _, Ipv6>(
-            &core_ctx,
-            &mut bindings_ctx,
+        ctx.test_api().receive_ip_packet::<Ipv6, _>(
             &device,
             Some(FrameDestination::Individual { local: true }),
             buf,
         );
-        assert_eq!(bindings_ctx.frames_sent().len(), 1);
+        assert_eq!(ctx.bindings_ctx.frames_sent().len(), 1);
         verify_icmp_for_unrecognized_ext_hdr_option(
-            &mut bindings_ctx,
+            &mut ctx.bindings_ctx,
             Icmpv6ParameterProblemCode::ErroneousHeaderField,
             42,
             0,
@@ -3731,9 +3655,7 @@ mod tests {
 
     #[test]
     fn test_ipv6_unrecognized_ext_hdr_option() {
-        let (Ctx { core_ctx, mut bindings_ctx }, device_ids) =
-            FakeEventDispatcherBuilder::from_config(FAKE_CONFIG_V6).build();
-        let core_ctx = &core_ctx;
+        let (mut ctx, device_ids) = FakeEventDispatcherBuilder::from_config(FAKE_CONFIG_V6).build();
         let device: DeviceId<_> = device_ids[0].clone().into();
         let mut expected_icmps = 0;
         let mut bytes = [0; 64];
@@ -3749,19 +3671,13 @@ mod tests {
             ExtensionHeaderOptionAction::SkipAndContinue,
             false,
         );
-        receive_ip_packet::<_, _, Ipv6>(
-            &core_ctx,
-            &mut bindings_ctx,
-            &device,
-            Some(frame_dst),
-            buf,
-        );
+        ctx.test_api().receive_ip_packet::<Ipv6, _>(&device, Some(frame_dst), buf);
         assert_eq!(
-            core_ctx.state.icmp_tx_counters::<Ipv6>().parameter_problem.get(),
+            ctx.core_ctx.state.icmp_tx_counters::<Ipv6>().parameter_problem.get(),
             expected_icmps
         );
-        assert_eq!(core_ctx.state.ipv6.inner.counters.dispatch_receive_ip_packet.get(), 1);
-        assert_eq!(u64::try_from(bindings_ctx.frames_sent().len()).unwrap(), expected_icmps);
+        assert_eq!(ctx.core_ctx.state.ipv6.inner.counters.dispatch_receive_ip_packet.get(), 1);
+        assert_eq!(u64::try_from(ctx.bindings_ctx.frames_sent().len()).unwrap(), expected_icmps);
 
         // Test with unrecognized option type set with
         // action = discard.
@@ -3771,18 +3687,12 @@ mod tests {
             ExtensionHeaderOptionAction::DiscardPacket,
             false,
         );
-        receive_ip_packet::<_, _, Ipv6>(
-            &core_ctx,
-            &mut bindings_ctx,
-            &device,
-            Some(frame_dst),
-            buf,
-        );
+        ctx.test_api().receive_ip_packet::<Ipv6, _>(&device, Some(frame_dst), buf);
         assert_eq!(
-            core_ctx.state.icmp_tx_counters::<Ipv6>().parameter_problem.get(),
+            ctx.core_ctx.state.icmp_tx_counters::<Ipv6>().parameter_problem.get(),
             expected_icmps
         );
-        assert_eq!(u64::try_from(bindings_ctx.frames_sent().len()).unwrap(), expected_icmps);
+        assert_eq!(u64::try_from(ctx.bindings_ctx.frames_sent().len()).unwrap(), expected_icmps);
 
         // Test with unrecognized option type set with
         // action = discard & send icmp
@@ -3793,21 +3703,15 @@ mod tests {
             ExtensionHeaderOptionAction::DiscardPacketSendIcmp,
             false,
         );
-        receive_ip_packet::<_, _, Ipv6>(
-            &core_ctx,
-            &mut bindings_ctx,
-            &device,
-            Some(frame_dst),
-            buf,
-        );
+        ctx.test_api().receive_ip_packet::<Ipv6, _>(&device, Some(frame_dst), buf);
         expected_icmps += 1;
         assert_eq!(
-            core_ctx.state.icmp_tx_counters::<Ipv6>().parameter_problem.get(),
+            ctx.core_ctx.state.icmp_tx_counters::<Ipv6>().parameter_problem.get(),
             expected_icmps
         );
-        assert_eq!(u64::try_from(bindings_ctx.frames_sent().len()).unwrap(), expected_icmps);
+        assert_eq!(u64::try_from(ctx.bindings_ctx.frames_sent().len()).unwrap(), expected_icmps);
         verify_icmp_for_unrecognized_ext_hdr_option(
-            &mut bindings_ctx,
+            &mut ctx.bindings_ctx,
             Icmpv6ParameterProblemCode::UnrecognizedIpv6Option,
             48,
             usize::try_from(expected_icmps).unwrap() - 1,
@@ -3822,21 +3726,15 @@ mod tests {
             ExtensionHeaderOptionAction::DiscardPacketSendIcmp,
             true,
         );
-        receive_ip_packet::<_, _, Ipv6>(
-            &core_ctx,
-            &mut bindings_ctx,
-            &device,
-            Some(frame_dst),
-            buf,
-        );
+        ctx.test_api().receive_ip_packet::<Ipv6, _>(&device, Some(frame_dst), buf);
         expected_icmps += 1;
         assert_eq!(
-            core_ctx.state.icmp_tx_counters::<Ipv6>().parameter_problem.get(),
+            ctx.core_ctx.state.icmp_tx_counters::<Ipv6>().parameter_problem.get(),
             expected_icmps
         );
-        assert_eq!(u64::try_from(bindings_ctx.frames_sent().len()).unwrap(), expected_icmps);
+        assert_eq!(u64::try_from(ctx.bindings_ctx.frames_sent().len()).unwrap(), expected_icmps);
         verify_icmp_for_unrecognized_ext_hdr_option(
-            &mut bindings_ctx,
+            &mut ctx.bindings_ctx,
             Icmpv6ParameterProblemCode::UnrecognizedIpv6Option,
             48,
             usize::try_from(expected_icmps).unwrap() - 1,
@@ -3851,21 +3749,15 @@ mod tests {
             ExtensionHeaderOptionAction::DiscardPacketSendIcmpNoMulticast,
             false,
         );
-        receive_ip_packet::<_, _, Ipv6>(
-            &core_ctx,
-            &mut bindings_ctx,
-            &device,
-            Some(frame_dst),
-            buf,
-        );
+        ctx.test_api().receive_ip_packet::<Ipv6, _>(&device, Some(frame_dst), buf);
         expected_icmps += 1;
         assert_eq!(
-            core_ctx.state.icmp_tx_counters::<Ipv6>().parameter_problem.get(),
+            ctx.core_ctx.state.icmp_tx_counters::<Ipv6>().parameter_problem.get(),
             expected_icmps
         );
-        assert_eq!(u64::try_from(bindings_ctx.frames_sent().len()).unwrap(), expected_icmps);
+        assert_eq!(u64::try_from(ctx.bindings_ctx.frames_sent().len()).unwrap(), expected_icmps);
         verify_icmp_for_unrecognized_ext_hdr_option(
-            &mut bindings_ctx,
+            &mut ctx.bindings_ctx,
             Icmpv6ParameterProblemCode::UnrecognizedIpv6Option,
             48,
             usize::try_from(expected_icmps).unwrap() - 1,
@@ -3881,24 +3773,18 @@ mod tests {
             true,
         );
         // Do not expect an ICMP response for this packet
-        receive_ip_packet::<_, _, Ipv6>(
-            &core_ctx,
-            &mut bindings_ctx,
-            &device,
-            Some(frame_dst),
-            buf,
-        );
+        ctx.test_api().receive_ip_packet::<Ipv6, _>(&device, Some(frame_dst), buf);
         assert_eq!(
-            core_ctx.state.icmp_tx_counters::<Ipv6>().parameter_problem.get(),
+            ctx.core_ctx.state.icmp_tx_counters::<Ipv6>().parameter_problem.get(),
             expected_icmps
         );
-        assert_eq!(u64::try_from(bindings_ctx.frames_sent().len()).unwrap(), expected_icmps);
+        assert_eq!(u64::try_from(ctx.bindings_ctx.frames_sent().len()).unwrap(), expected_icmps);
 
         // None of our tests should have sent an icmpv4 packet, or dispatched an
         // IP packet after the first.
 
-        assert_eq!(core_ctx.state.icmp_tx_counters::<Ipv4>().parameter_problem.get(), 0);
-        assert_eq!(core_ctx.state.ipv6.inner.counters.dispatch_receive_ip_packet.get(), 1);
+        assert_eq!(ctx.core_ctx.state.icmp_tx_counters::<Ipv4>().parameter_problem.get(), 0);
+        assert_eq!(ctx.core_ctx.state.ipv6.inner.counters.dispatch_receive_ip_packet.get(), 1);
     }
 
     #[ip_test]
@@ -4146,7 +4032,6 @@ mod tests {
         let device: DeviceId<_> = device_ids[0].clone().into();
         set_forwarding_enabled::<_, Ipv6>(&mut ctx, &device, true);
         let frame_dst = FrameDestination::Individual { local: true };
-        let Ctx { core_ctx, bindings_ctx } = &mut ctx;
 
         // Construct an IPv6 packet that is too big for our MTU (MTU = 1280;
         // body itself is 5000). Note, the final packet will be larger because
@@ -4166,14 +4051,13 @@ mod tests {
             .serialize_vec_outer()
             .unwrap();
         // Receive the IP packet.
-        receive_ip_packet::<_, _, Ipv6>(
-            core_ctx,
-            bindings_ctx,
+        ctx.test_api().receive_ip_packet::<Ipv6, _>(
             &device,
             Some(frame_dst),
             ipv6_packet_buf.clone(),
         );
 
+        let Ctx { core_ctx, bindings_ctx } = &mut ctx;
         // Should not have dispatched the packet.
         assert_eq!(core_ctx.state.ipv6.inner.counters.dispatch_receive_ip_packet.get(), 0);
         assert_eq!(core_ctx.state.icmp_tx_counters::<Ipv6>().packet_too_big.get(), 1);
@@ -4277,9 +4161,8 @@ mod tests {
         // less than the current value.
 
         let fake_config = I::FAKE_CONFIG;
-        let (Ctx { core_ctx, mut bindings_ctx }, device_ids) =
+        let (mut ctx, device_ids) =
             FakeEventDispatcherBuilder::from_config(fake_config.clone()).build();
-        let core_ctx = &core_ctx;
         let device: DeviceId<_> = device_ids[0].clone().into();
         let frame_dst = FrameDestination::Individual { local: true };
 
@@ -4296,20 +4179,18 @@ mod tests {
         );
 
         // Receive the IP packet.
-        receive_ip_packet::<_, _, I>(
-            &core_ctx,
-            &mut bindings_ctx,
-            &device,
-            Some(frame_dst),
-            packet_buf,
-        );
+        ctx.test_api().receive_ip_packet::<I, _>(&device, Some(frame_dst), packet_buf);
 
         // Should have dispatched the packet.
-        assert_eq!(core_ctx.state.ip_counters::<I>().dispatch_receive_ip_packet.get(), 1);
+        assert_eq!(ctx.core_ctx.state.ip_counters::<I>().dispatch_receive_ip_packet.get(), 1);
 
         assert_eq!(
-            I::get_pmtu(&core_ctx.state, fake_config.local_ip.get(), fake_config.remote_ip.get())
-                .unwrap(),
+            I::get_pmtu(
+                &ctx.core_ctx.state,
+                fake_config.local_ip.get(),
+                fake_config.remote_ip.get()
+            )
+            .unwrap(),
             new_mtu1
         );
 
@@ -4327,21 +4208,19 @@ mod tests {
         );
 
         // Receive the IP packet.
-        receive_ip_packet::<_, _, I>(
-            &core_ctx,
-            &mut bindings_ctx,
-            &device,
-            Some(frame_dst),
-            packet_buf,
-        );
+        ctx.test_api().receive_ip_packet::<I, _>(&device, Some(frame_dst), packet_buf);
 
         // Should have dispatched the packet.
-        assert_eq!(core_ctx.state.ip_counters::<I>().dispatch_receive_ip_packet.get(), 2);
+        assert_eq!(ctx.core_ctx.state.ip_counters::<I>().dispatch_receive_ip_packet.get(), 2);
 
         // The PMTU should not have updated to `new_mtu2`
         assert_eq!(
-            I::get_pmtu(&core_ctx.state, fake_config.local_ip.get(), fake_config.remote_ip.get())
-                .unwrap(),
+            I::get_pmtu(
+                &ctx.core_ctx.state,
+                fake_config.local_ip.get(),
+                fake_config.remote_ip.get()
+            )
+            .unwrap(),
             new_mtu1
         );
 
@@ -4359,21 +4238,19 @@ mod tests {
         );
 
         // Receive the IP packet.
-        receive_ip_packet::<_, _, I>(
-            &core_ctx,
-            &mut bindings_ctx,
-            &device,
-            Some(frame_dst),
-            packet_buf,
-        );
+        ctx.test_api().receive_ip_packet::<I, _>(&device, Some(frame_dst), packet_buf);
 
         // Should have dispatched the packet.
-        assert_eq!(core_ctx.state.ip_counters::<I>().dispatch_receive_ip_packet.get(), 3);
+        assert_eq!(ctx.core_ctx.state.ip_counters::<I>().dispatch_receive_ip_packet.get(), 3);
 
         // The PMTU should have updated to 1900.
         assert_eq!(
-            I::get_pmtu(&core_ctx.state, fake_config.local_ip.get(), fake_config.remote_ip.get())
-                .unwrap(),
+            I::get_pmtu(
+                &ctx.core_ctx.state,
+                fake_config.local_ip.get(),
+                fake_config.remote_ip.get()
+            )
+            .unwrap(),
             new_mtu3
         );
     }
@@ -4385,9 +4262,8 @@ mod tests {
         // is less than the min MTU.
 
         let fake_config = I::FAKE_CONFIG;
-        let (Ctx { core_ctx, mut bindings_ctx }, device_ids) =
+        let (mut ctx, device_ids) =
             FakeEventDispatcherBuilder::from_config(fake_config.clone()).build();
-        let core_ctx = &core_ctx;
         let device: DeviceId<_> = device_ids[0].clone().into();
         let frame_dst = FrameDestination::Individual { local: true };
 
@@ -4404,19 +4280,17 @@ mod tests {
         );
 
         // Receive the IP packet.
-        receive_ip_packet::<_, _, I>(
-            &core_ctx,
-            &mut bindings_ctx,
-            &device,
-            Some(frame_dst),
-            packet_buf,
-        );
+        ctx.test_api().receive_ip_packet::<I, _>(&device, Some(frame_dst), packet_buf);
 
         // Should have dispatched the packet.
-        assert_eq!(core_ctx.state.ip_counters::<I>().dispatch_receive_ip_packet.get(), 1);
+        assert_eq!(ctx.core_ctx.state.ip_counters::<I>().dispatch_receive_ip_packet.get(), 1);
 
         assert_eq!(
-            I::get_pmtu(&core_ctx.state, fake_config.local_ip.get(), fake_config.remote_ip.get()),
+            I::get_pmtu(
+                &ctx.core_ctx.state,
+                fake_config.local_ip.get(),
+                fake_config.remote_ip.get()
+            ),
             None
         );
     }
@@ -4437,9 +4311,8 @@ mod tests {
         // Required from a node that does not implement RFC 1191.
 
         let fake_config = Ipv4::FAKE_CONFIG;
-        let (Ctx { core_ctx, mut bindings_ctx }, device_ids) =
+        let (mut ctx, device_ids) =
             FakeEventDispatcherBuilder::from_config(fake_config.clone()).build();
-        let core_ctx = &core_ctx;
         let device: DeviceId<_> = device_ids[0].clone().into();
         let frame_dst = FrameDestination::Individual { local: true };
 
@@ -4457,22 +4330,16 @@ mod tests {
         );
 
         // Receive the IP packet.
-        receive_ip_packet::<_, _, Ipv4>(
-            &core_ctx,
-            &mut bindings_ctx,
-            &device,
-            Some(frame_dst),
-            packet_buf,
-        );
+        ctx.test_api().receive_ip_packet::<Ipv4, _>(&device, Some(frame_dst), packet_buf);
 
         // Should have dispatched the packet.
-        assert_eq!(core_ctx.state.ipv4.inner.counters.dispatch_receive_ip_packet.get(), 1);
+        assert_eq!(ctx.core_ctx.state.ipv4.inner.counters.dispatch_receive_ip_packet.get(), 1);
 
         // Should have decreased PMTU value to the next lower PMTU
         // plateau from `crate::ip::path_mtu::PMTU_PLATEAUS`.
         assert_eq!(
             Ipv4::get_pmtu(
-                &core_ctx.state,
+                &ctx.core_ctx.state,
                 fake_config.local_ip.get(),
                 fake_config.remote_ip.get()
             )
@@ -4492,22 +4359,16 @@ mod tests {
         );
 
         // Receive the IP packet.
-        receive_ip_packet::<_, _, Ipv4>(
-            &core_ctx,
-            &mut bindings_ctx,
-            &device,
-            Some(frame_dst),
-            packet_buf,
-        );
+        ctx.test_api().receive_ip_packet::<Ipv4, _>(&device, Some(frame_dst), packet_buf);
 
         // Should have dispatched the packet.
-        assert_eq!(core_ctx.state.ipv4.inner.counters.dispatch_receive_ip_packet.get(), 2);
+        assert_eq!(ctx.core_ctx.state.ipv4.inner.counters.dispatch_receive_ip_packet.get(), 2);
 
         // Should not have updated PMTU as there is no other valid
         // lower PMTU value.
         assert_eq!(
             Ipv4::get_pmtu(
-                &core_ctx.state,
+                &ctx.core_ctx.state,
                 fake_config.local_ip.get(),
                 fake_config.remote_ip.get()
             )
@@ -4527,22 +4388,16 @@ mod tests {
         );
 
         // Receive the IP packet.
-        receive_ip_packet::<_, _, Ipv4>(
-            &core_ctx,
-            &mut bindings_ctx,
-            &device,
-            Some(frame_dst),
-            packet_buf,
-        );
+        ctx.test_api().receive_ip_packet::<Ipv4, _>(&device, Some(frame_dst), packet_buf);
 
         // Should have dispatched the packet.
-        assert_eq!(core_ctx.state.ipv4.inner.counters.dispatch_receive_ip_packet.get(), 3);
+        assert_eq!(ctx.core_ctx.state.ipv4.inner.counters.dispatch_receive_ip_packet.get(), 3);
 
         // Should have decreased PMTU value to the next lower PMTU
         // plateau from `crate::ip::path_mtu::PMTU_PLATEAUS`.
         assert_eq!(
             Ipv4::get_pmtu(
-                &core_ctx.state,
+                &ctx.core_ctx.state,
                 fake_config.local_ip.get(),
                 fake_config.remote_ip.get()
             )
@@ -4565,21 +4420,15 @@ mod tests {
         );
 
         // Receive the IP packet.
-        receive_ip_packet::<_, _, Ipv4>(
-            &core_ctx,
-            &mut bindings_ctx,
-            &device,
-            Some(frame_dst),
-            packet_buf,
-        );
+        ctx.test_api().receive_ip_packet::<Ipv4, _>(&device, Some(frame_dst), packet_buf);
 
         // Should have dispatched the packet.
-        assert_eq!(core_ctx.state.ipv4.inner.counters.dispatch_receive_ip_packet.get(), 4);
+        assert_eq!(ctx.core_ctx.state.ipv4.inner.counters.dispatch_receive_ip_packet.get(), 4);
 
         // Should not have updated the PMTU as the current PMTU is lower.
         assert_eq!(
             Ipv4::get_pmtu(
-                &core_ctx.state,
+                &ctx.core_ctx.state,
                 fake_config.local_ip.get(),
                 fake_config.remote_ip.get()
             )
@@ -4618,9 +4467,9 @@ mod tests {
             .unwrap();
 
         crate::device::testutil::enable_device(&mut ctx, &device);
-        let Ctx { core_ctx, bindings_ctx } = &mut ctx;
-        receive_ip_packet::<_, _, Ipv6>(core_ctx, bindings_ctx, &device, Some(frame_dst), buf);
+        ctx.test_api().receive_ip_packet::<Ipv6, _>(&device, Some(frame_dst), buf);
 
+        let Ctx { core_ctx, bindings_ctx } = &mut ctx;
         // Should not have dispatched the packet.
         assert_eq!(core_ctx.state.ipv6.inner.counters.receive_ip_packet.get(), 1);
         assert_eq!(core_ctx.state.ipv6.inner.counters.dispatch_receive_ip_packet.get(), 0);
@@ -4635,9 +4484,8 @@ mod tests {
     #[test]
     fn test_invalid_icmpv6_in_ipv4() {
         let ip_config = Ipv4::FAKE_CONFIG;
-        let (Ctx { core_ctx, mut bindings_ctx }, device_ids) =
+        let (mut ctx, device_ids) =
             FakeEventDispatcherBuilder::from_config(ip_config.clone()).build();
-        let core_ctx = &core_ctx;
         // First possible device id.
         let device: DeviceId<_> = device_ids[0].clone().into();
         let frame_dst = FrameDestination::Individual { local: true };
@@ -4663,19 +4511,13 @@ mod tests {
             .serialize_vec_outer()
             .unwrap();
 
-        receive_ip_packet::<_, _, Ipv4>(
-            &core_ctx,
-            &mut bindings_ctx,
-            &device,
-            Some(frame_dst),
-            buf,
-        );
+        ctx.test_api().receive_ip_packet::<Ipv4, _>(&device, Some(frame_dst), buf);
 
         // Should have dispatched the packet but resulted in an ICMP error.
-        assert_eq!(core_ctx.state.ipv4.inner.counters.dispatch_receive_ip_packet.get(), 1);
-        assert_eq!(core_ctx.state.icmp_tx_counters::<Ipv4>().dest_unreachable.get(), 1);
-        assert_eq!(bindings_ctx.frames_sent().len(), 1);
-        let buf = &bindings_ctx.frames_sent()[0].1[..];
+        assert_eq!(ctx.core_ctx.state.ipv4.inner.counters.dispatch_receive_ip_packet.get(), 1);
+        assert_eq!(ctx.core_ctx.state.icmp_tx_counters::<Ipv4>().dest_unreachable.get(), 1);
+        assert_eq!(ctx.bindings_ctx.frames_sent().len(), 1);
+        let buf = &ctx.bindings_ctx.frames_sent()[0].1[..];
         let (_, _, _, _, _, _, code) = parse_icmp_packet_in_ip_packet_in_ethernet_frame::<
             Ipv4,
             _,
@@ -4687,7 +4529,8 @@ mod tests {
     }
 
     #[ip_test]
-    fn test_joining_leaving_ip_multicast_group<I: Ip + TestIpExt + packet_formats::ip::IpExt>() {
+    #[netstack3_macros::context_ip_bounds(I, FakeBindingsCtx, crate)]
+    fn test_joining_leaving_ip_multicast_group<I: Ip + TestIpExt + crate::IpExt>() {
         // Test receiving a packet destined to a multicast IP (and corresponding
         // multicast MAC).
 
@@ -4719,7 +4562,7 @@ mod tests {
         // Should not have dispatched the packet since we are not in the
         // multicast group `multi_addr`.
 
-        assert!(!is_in_ip_multicast(&ctx.core_ctx, &device, multi_addr));
+        assert!(!ctx.test_api().is_in_ip_multicast(&device, multi_addr));
         ctx.core_api()
             .device::<EthernetLinkDevice>()
             .receive_frame(RecvEthernetFrameMeta { device_id: eth_device.clone() }, buf.clone());
@@ -4743,7 +4586,7 @@ mod tests {
                 multicast_addr,
             ),
         }
-        assert!(is_in_ip_multicast(core_ctx, &device, multi_addr));
+        assert!(ctx.test_api().is_in_ip_multicast(&device, multi_addr));
         ctx.core_api()
             .device::<EthernetLinkDevice>()
             .receive_frame(RecvEthernetFrameMeta { device_id: eth_device.clone() }, buf.clone());
@@ -4767,7 +4610,7 @@ mod tests {
                 multicast_addr,
             ),
         }
-        assert!(!is_in_ip_multicast(core_ctx, &device, multi_addr));
+        assert!(!ctx.test_api().is_in_ip_multicast(&device, multi_addr));
         ctx.core_api()
             .device::<EthernetLinkDevice>()
             .receive_frame(RecvEthernetFrameMeta { device_id: eth_device.clone() }, buf);
@@ -4815,7 +4658,6 @@ mod tests {
                 },
             )
             .unwrap();
-        let Ctx { core_ctx, bindings_ctx } = &mut ctx;
 
         let frame_dst = FrameDestination::Individual { local: true };
 
@@ -4828,14 +4670,9 @@ mod tests {
             .into_inner();
 
         // Received packet should not have been dispatched.
-        receive_ip_packet::<_, _, Ipv6>(
-            core_ctx,
-            bindings_ctx,
-            &device,
-            Some(frame_dst),
-            buf.clone(),
-        );
-        assert_eq!(core_ctx.state.ipv6.inner.counters.dispatch_receive_ip_packet.get(), 0);
+        ctx.test_api().receive_ip_packet::<Ipv6, _>(&device, Some(frame_dst), buf.clone());
+
+        assert_eq!(ctx.core_ctx.state.ipv6.inner.counters.dispatch_receive_ip_packet.get(), 0);
 
         // Wait until DAD is complete. Arbitrarily choose a year in the future
         // as a time after which we're confident DAD will be complete. We can't
@@ -4844,18 +4681,12 @@ mod tests {
         //
         // TODO(https://fxbug.dev/42125450): Once this test is contextified, use a
         // more precise condition to ensure that DAD is complete.
-        let now = bindings_ctx.now();
+        let now = ctx.bindings_ctx.now();
         let _: Vec<_> =
             ctx.trigger_timers_until_instant(now + Duration::from_secs(60 * 60 * 24 * 365));
 
         // Received packet should have been dispatched.
-        receive_ip_packet::<_, _, Ipv6>(
-            &ctx.core_ctx,
-            &mut ctx.bindings_ctx,
-            &device,
-            Some(frame_dst),
-            buf,
-        );
+        ctx.test_api().receive_ip_packet::<Ipv6, _>(&device, Some(frame_dst), buf);
         assert_eq!(ctx.core_ctx.state.ipv6.inner.counters.dispatch_receive_ip_packet.get(), 1);
 
         // Set the new IP (this should trigger DAD).
@@ -4864,7 +4695,6 @@ mod tests {
             .device_ip::<Ipv6>()
             .add_ip_addr_subnet(&device, AddrSubnet::new(ip, 128).unwrap())
             .unwrap();
-        let Ctx { core_ctx, bindings_ctx } = &mut ctx;
 
         let buf = Buf::new(vec![0; 10], ..)
             .encapsulate(Ipv6PacketBuilder::new(config.remote_ip, ip, 64, IpProto::Udp.into()))
@@ -4873,14 +4703,8 @@ mod tests {
             .into_inner();
 
         // Received packet should not have been dispatched.
-        receive_ip_packet::<_, _, Ipv6>(
-            core_ctx,
-            bindings_ctx,
-            &device,
-            Some(frame_dst),
-            buf.clone(),
-        );
-        assert_eq!(core_ctx.state.ipv6.inner.counters.dispatch_receive_ip_packet.get(), 1);
+        ctx.test_api().receive_ip_packet::<Ipv6, _>(&device, Some(frame_dst), buf.clone());
+        assert_eq!(ctx.core_ctx.state.ipv6.inner.counters.dispatch_receive_ip_packet.get(), 1);
 
         // Make sure all timers are done (DAD to complete on the interface due
         // to new IP).
@@ -4890,13 +4714,7 @@ mod tests {
         let _: Vec<_> = ctx.trigger_timers_until_instant(FakeInstant::LATEST);
 
         // Received packet should have been dispatched.
-        receive_ip_packet::<_, _, Ipv6>(
-            &ctx.core_ctx,
-            &mut ctx.bindings_ctx,
-            &device,
-            Some(frame_dst),
-            buf,
-        );
+        ctx.test_api().receive_ip_packet::<Ipv6, _>(&device, Some(frame_dst), buf);
         assert_eq!(ctx.core_ctx.state.ipv6.inner.counters.dispatch_receive_ip_packet.get(), 2);
     }
 
@@ -4918,7 +4736,6 @@ mod tests {
             )
             .into();
         crate::device::testutil::enable_device(&mut ctx, &device);
-        let Ctx { core_ctx, bindings_ctx } = &mut ctx;
 
         let ip: Ipv6Addr = cfg.local_mac.to_ipv6_link_local().addr().get();
         let buf = Buf::new(vec![0; 10], ..)
@@ -4932,14 +4749,12 @@ mod tests {
             .unwrap()
             .into_inner();
 
-        receive_ip_packet::<_, _, Ipv6>(
-            core_ctx,
-            bindings_ctx,
+        ctx.test_api().receive_ip_packet::<Ipv6, _>(
             &device,
             Some(FrameDestination::Individual { local: true }),
             buf,
         );
-        assert_eq!(core_ctx.state.ipv6.inner.counters.version_rx.non_unicast_source.get(), 1);
+        assert_eq!(ctx.core_ctx.state.ipv6.inner.counters.version_rx.non_unicast_source.get(), 1);
     }
 
     #[test]

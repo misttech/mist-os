@@ -2490,7 +2490,6 @@ mod tests {
                 Ipv6DeviceConfigurationUpdate,
             },
             icmp::REQUIRED_NDP_IP_PACKET_HOP_LIMIT,
-            receive_ip_packet,
         },
         testutil::{
             self, FakeEventDispatcherConfig, TestIpExt as _, DEFAULT_INTERFACE_METRIC,
@@ -4903,7 +4902,6 @@ mod tests {
             .into();
 
         set_ip_device_enabled::<Ipv6>(&mut ctx, &device_id, true, false);
-        let testutil::FakeCtx { core_ctx, bindings_ctx } = &mut ctx;
 
         let remote_mac_bytes = remote_mac.bytes();
         let options = vec![NdpOptionBuilder::SourceLinkLayerAddress(&remote_mac_bytes[..])];
@@ -4932,9 +4930,7 @@ mod tests {
 
         // First receive a Router Advertisement without the source link layer
         // and make sure no new neighbor gets added.
-        receive_ip_packet::<_, _, Ipv6>(
-            core_ctx,
-            bindings_ctx,
+        ctx.test_api().receive_ip_packet::<Ipv6, _>(
             &device_id,
             Some(FrameDestination::Multicast),
             ra_packet_buf(&[][..]),
@@ -4943,9 +4939,7 @@ mod tests {
         assert_neighbors::<Ipv6, _, _>(&mut ctx.core_ctx(), &link_device_id, Default::default());
 
         // RA with a source link layer option should create a new entry.
-        receive_ip_packet::<_, _, Ipv6>(
-            &ctx.core_ctx,
-            &mut ctx.bindings_ctx,
+        ctx.test_api().receive_ip_packet::<Ipv6, _>(
             &device_id,
             Some(FrameDestination::Multicast),
             ra_packet_buf(&options[..]),
@@ -5011,11 +5005,10 @@ mod tests {
             .device_ip::<Ipv6>()
             .add_ip_addr_subnet(&device_id, AddrSubnet::new(LOCAL_IP, Ipv6Addr::BYTES * 8).unwrap())
             .unwrap();
-        let testutil::FakeCtx { core_ctx, bindings_ctx } = &mut ctx;
         if let Some(NonZeroU8 { .. }) = dad_transmits {
             // Take DAD message.
             assert_matches!(
-                &bindings_ctx.take_frames()[..],
+                &ctx.bindings_ctx.take_frames()[..],
                 [(got_device_id, got_frame)] => {
                     assert_eq!(got_device_id, &link_device_id);
 
@@ -5044,9 +5037,7 @@ mod tests {
         let src_ip = remote_mac.to_ipv6_link_local().addr();
         let snmc = target_addr.to_solicited_node_address();
         let dst_ip = snmc.get();
-        receive_ip_packet::<_, _, Ipv6>(
-            core_ctx,
-            bindings_ctx,
+        ctx.test_api().receive_ip_packet::<Ipv6, _>(
             &device_id,
             Some(FrameDestination::Multicast),
             neighbor_solicitation_ip_packet(**src_ip, dst_ip, target_addr, *remote_mac),
@@ -5056,7 +5047,7 @@ mod tests {
         // new state of the neighbor table.
         let expected_neighbors = if expect_handle {
             assert_matches!(
-                &bindings_ctx.take_frames()[..],
+                &ctx.bindings_ctx.take_frames()[..],
                 [(got_device_id, got_frame)] => {
                     assert_eq!(got_device_id, &link_device_id);
 
@@ -5090,7 +5081,7 @@ mod tests {
                 })),
             )])
         } else {
-            assert_matches!(&bindings_ctx.take_frames()[..], []);
+            assert_matches!(&ctx.bindings_ctx.take_frames()[..], []);
             HashMap::default()
         };
 
@@ -5151,21 +5142,16 @@ mod tests {
             )
         };
 
-        let testutil::Ctx { core_ctx, bindings_ctx } = &mut ctx;
         // NeighborAdvertisements should not create a new entry even if
         // the advertisement has both the solicited and override flag set.
-        receive_ip_packet::<_, _, Ipv6>(
-            core_ctx,
-            bindings_ctx,
+        ctx.test_api().receive_ip_packet::<Ipv6, _>(
             &device_id,
             Some(FrameDestination::Multicast),
             na_packet_buf(false, false),
         );
         let link_device_id = device_id.clone().try_into().unwrap();
         assert_neighbors::<Ipv6, _, _>(&mut ctx.core_ctx(), &link_device_id, Default::default());
-        receive_ip_packet::<_, _, Ipv6>(
-            &ctx.core_ctx,
-            &mut ctx.bindings_ctx,
+        ctx.test_api().receive_ip_packet::<Ipv6, _>(
             &device_id,
             Some(FrameDestination::Multicast),
             na_packet_buf(true, true),
@@ -5238,9 +5224,7 @@ mod tests {
         );
 
         // A Neighbor advertisement should now update the entry.
-        receive_ip_packet::<_, _, Ipv6>(
-            &ctx.core_ctx,
-            &mut ctx.bindings_ctx,
+        ctx.test_api().receive_ip_packet::<Ipv6, _>(
             &device_id,
             Some(FrameDestination::Multicast),
             na_packet_buf(true, true),
