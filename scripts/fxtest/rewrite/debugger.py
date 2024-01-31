@@ -15,7 +15,11 @@ import random
 import tempfile
 
 
-def spawn(tests: typing.List[test_list_file.Test]) -> subprocess.Popen:
+def spawn(
+    tests: typing.List[test_list_file.Test],
+    break_on_failure: bool = False,
+    breakpoints: typing.List[str] = [],
+) -> subprocess.Popen:
     """Spawn zxdb in a subprocess.
 
     Spawn zxdb and attach to |tests|, while waiting for a test failure reported by either
@@ -61,14 +65,22 @@ def spawn(tests: typing.List[test_list_file.Test]) -> subprocess.Popen:
         "embedded",
         "--stream-file",
         fifo,
-        # TODO(https://fxbug.dev/322225894): This shouldn't be needed, but rust tests install a
-        # non-abort panic hook, which doesn't raise an exception that the debugger can catch. This
-        # breakpoint will ensure that the test stops if the panic hook is run. Regular rust binaries
-        # do not have this issue, so this typically isn't needed when debugging non-tests. For C++
-        # tests this will appear as a breakpoint that never resolves to any symbol.
-        "--execute",
-        "break std::panicking::default_hook",
     ]
+
+    # TODO(https://fxbug.dev/322225894): This shouldn't be needed, but rust tests install a
+    # non-abort panic hook, which doesn't raise an exception that the debugger can catch. This
+    # breakpoint will ensure that the test stops if the panic hook is run. Regular rust binaries
+    # do not have this issue, so this typically isn't needed when debugging non-tests. For C++
+    # tests this will appear as a breakpoint that never resolves to any symbol.
+    if break_on_failure:
+        zxdb_args += [
+            "--execute",
+            "break std::panicking::default_hook",
+        ]
+
+    # Add the requested breakpoints.
+    for bp in breakpoints:
+        zxdb_args += ["--execute", f"break {bp}"]
 
     # Use start_new_session, rather than just using os.setpgrp as a preexec function. This enables
     # the subprocess to also control the tty, which zxdb requires, as well as terminating the entire

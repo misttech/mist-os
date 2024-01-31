@@ -50,6 +50,7 @@ class Flags:
     also_run_disabled_tests: bool
     show_full_moniker_in_logs: bool
     break_on_failure: bool
+    breakpoints: typing.List[str]
     extra_args: typing.List[str]
 
     output: bool
@@ -110,8 +111,11 @@ class Flags:
             if self.status is None:
                 self.status = termout.is_valid()
 
-        if self.break_on_failure:
+        if self.has_debugger():
             self.status = False
+
+    def has_debugger(self) -> bool:
+        return bool(self.break_on_failure or self.breakpoints)
 
 
 class FlagError(Exception):
@@ -355,8 +359,19 @@ def parse_args(
     execution.add_argument(
         "--break-on-failure",
         action="store_true",
-        help="If True, any test case failures will stop test execution and launch zxdb attached to the failed test case, if the test runner supports stopping. Implies --no-status. Note: this flag is experimental",
+        help="""If set, any test case failures will stop test execution and launch zxdb attached
+        to the failed test case, if the test runner supports this feature. Implies --no-status.
+        Note: this flag is experimental""",
         default=False,
+    )
+    execution.add_argument(
+        "--breakpoint",
+        nargs="*",
+        dest="breakpoints",
+        help="""Run the test with zxdb attached and set the given breakpoint. For example,
+        --breakpoint=my_source_file.cc:37 will insert a breakpoint at line 37 of any file
+        named my_source_file.cc. Implies --no-status. Note: this flag is experimental""",
+        default=[],
     )
 
     output = parser.add_argument_group("Output Options")
