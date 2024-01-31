@@ -8,6 +8,7 @@ group("tests") {
     "gpio-controllers:tests",
     "i2c-controllers:tests",
     "interrupt-controllers:tests",
+    "mali-gpu:tests",
     "registers:tests",
   ]
   testonly = true
