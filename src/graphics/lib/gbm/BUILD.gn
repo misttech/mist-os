@@ -2,15 +2,19 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-group("gbm") {
-  public_deps = [ "//third_party/mesa/src/gbm" ]
+shared_library("gbm-stub") {
+  output_name = "gbm"
+  testonly = true
+  sources = [ "gbm_stub.c" ]
+  public_deps = [ "//third_party/mesa/include:gbm-header" ]
+  configs -= [ "//build/config:symbol_visibility_hidden" ]
 }
 
 executable("gbm_test") {
   testonly = true
   sources = [ "test_magma.cc" ]
   deps = [
-    ":gbm",
+    ":gbm-stub",
     "//src/lib/fxl/test:gtest_main",
     "//third_party/mesa/include:drm-uapi",
   ]
