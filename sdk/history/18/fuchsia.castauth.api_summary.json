@@ -18,6 +18,31 @@
     },
     {
         "kind": "protocol/member",
+        "name": "fuchsia.castauth/CastCertificateRetriever.GetCertificateChain",
+        "strictness": "strict",
+        "ordinal": "6205858529349826154",
+        "direction": "two_way",
+        "response": "fuchsia.castauth/CastCertificateRetriever_GetCertificateChain_Response",
+        "error": "fuchsia.castauth/ErrorCode"
+    },
+    {
+        "kind": "protocol",
+        "name": "fuchsia.castauth/CastCertificateRetriever",
+        "openness": "closed",
+        "transport": "channel"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.castauth/CastCertificateRetriever_GetCertificateChain_Response.cert_chain",
+        "ordinal": "1",
+        "type": "vector<vector<uint8>:2048>:16"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.castauth/CastCertificateRetriever_GetCertificateChain_Response"
+    },
+    {
+        "kind": "protocol/member",
         "name": "fuchsia.castauth/CastKeySigner.GetCertificateChain",
         "strictness": "strict",
         "ordinal": "3765234482248766636",
@@ -86,6 +111,18 @@
         "name": "fuchsia.castauth/ErrorCode",
         "strictness": "strict",
         "type": "uint32"
+    },
+    {
+        "kind": "const",
+        "name": "fuchsia.castauth/MAX_CERT_CHAIN_SIZE",
+        "type": "uint64",
+        "value": "16"
+    },
+    {
+        "kind": "const",
+        "name": "fuchsia.castauth/MAX_CERT_SIZE",
+        "type": "uint64",
+        "value": "2048"
     },
     {
         "kind": "library",

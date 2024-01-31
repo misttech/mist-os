@@ -19,6 +19,15 @@ type ErrorCode = strict enum {
     CRYPTO_ERROR = 2;
 };
 
+/// The maximum size a certificate may be returned from `GetCertificateChain`
+/// in the protocols of this library, in bytes.
+@available(added=18)
+const MAX_CERT_SIZE uint64 = 2048;
+/// The maximum number of certificates that may be returned from
+/// `GetCertificateChain` in the protocols of this library.
+@available(added=18)
+const MAX_CERT_CHAIN_SIZE uint64 = 16;
+
 /// This FIDL interface is used to sign with hardware Cast key.
 /// It is intended for short-term use only and will not be supported on all
 /// devices. It will eventually be replaced by an attestation service.
@@ -40,7 +49,30 @@ closed protocol CastKeySigner {
     /// The return value is the error code or the certificate chain if
     /// the operation succeeds. The chain contains Cast key cert,
     /// one or more intermediate CA certs and root CA cert.
+    @available(added=18)
+    strict GetCertificateChain() -> (struct {
+        cert_chain vector<vector<uint8>:MAX_CERT_SIZE>:MAX_CERT_CHAIN_SIZE;
+    }) error ErrorCode;
+
+    @available(replaced=18)
     strict GetCertificateChain() -> (struct {
         cert_chain vector<vector<uint8>:2048>:16;
+    }) error ErrorCode;
+};
+
+/// This protocol allows accessing the Cast certificate without also granting
+/// the capability to sign messages using the Cast key. Otherwise, the
+/// functionality of `GetCertificateChain` should be identical to
+/// `CastKeySigner`.
+@discoverable
+@available(added=18)
+closed protocol CastCertificateRetriever {
+    /// Get the Cast certificate chain.
+    ///
+    /// The return value is the error code or the certificate chain if
+    /// the operation succeeds. The chain contains Cast key cert,
+    /// one or more intermediate CA certs and root CA cert.
+    strict GetCertificateChain() -> (struct {
+        cert_chain vector<vector<uint8>:MAX_CERT_SIZE>:MAX_CERT_CHAIN_SIZE;
     }) error ErrorCode;
 };
