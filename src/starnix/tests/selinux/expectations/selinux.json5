@@ -12,7 +12,6 @@
         {
             type: "expect_failure",
             matchers: [
-                "*selinux_domain_trans*",
                 "*selinux_entrypoint*",
                 "*selinux_execshare*",
                 "*selinux_exectrace*",
