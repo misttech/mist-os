@@ -123,6 +123,27 @@ impl<T: AsRef<str>> CheckEnv for AvailabilityFlag<T> {
     }
 }
 
+/// A connector lets a tool make multiple attempts to connect to an object. It
+/// retains the environment in the tool body to allow this.
+pub struct Connector<T: TryFromEnv> {
+    env: FhoEnvironment,
+    _connects_to: std::marker::PhantomData<T>,
+}
+
+impl<T: TryFromEnv> Connector<T> {
+    /// Try to get a `T` from the environment.
+    pub async fn try_connect(&self) -> Result<T> {
+        T::try_from_env(&self.env).await
+    }
+}
+
+#[async_trait(?Send)]
+impl<T: TryFromEnv> TryFromEnv for Connector<T> {
+    async fn try_from_env(env: &FhoEnvironment) -> Result<Self> {
+        Ok(Connector { env: env.clone(), _connects_to: Default::default() })
+    }
+}
+
 /// Allows you to defer the initialization of an object in your tool struct
 /// until you need it (if at all) or apply additional combinators on it (like
 /// custom timeout logic or anything like that).
