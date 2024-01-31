@@ -33,7 +33,7 @@ use starnix_uapi::{
         Capabilities, Credentials, SecureBits, CAP_SETGID, CAP_SETPCAP, CAP_SETUID, CAP_SYS_ADMIN,
         CAP_SYS_NICE, CAP_SYS_PTRACE,
     },
-    c_int, clone_args, errno, error,
+    c_char, c_int, clone_args, errno, error,
     errors::Errno,
     file_mode::FileMode,
     gid_t,
@@ -855,6 +855,17 @@ pub fn sys_sched_get_priority_max(
     max_priority_for_sched_policy(policy)
 }
 
+pub fn sys_ioprio_set(
+    _locked: &mut Locked<'_, Unlocked>,
+    _current_task: &mut CurrentTask,
+    _which: i32,
+    _who: i32,
+    _ioprio: i32,
+) -> Result<(), Errno> {
+    track_stub!(TODO("https://fxbug.dev/297591758"), "ioprio_set()");
+    error!(ENOSYS)
+}
+
 pub fn sys_prctl(
     locked: &mut Locked<'_, Unlocked>,
     current_task: &mut CurrentTask,
@@ -1220,6 +1231,18 @@ pub fn sys_prlimit64(
         current_task.write_object(user_old_limit, &old_limit)?;
     }
     Ok(())
+}
+
+pub fn sys_quotactl(
+    _locked: &mut Locked<'_, Unlocked>,
+    _current_task: &CurrentTask,
+    _cmd: i32,
+    _special: UserRef<c_char>,
+    _id: i32,
+    _addr: UserRef<c_char>,
+) -> Result<SyscallResult, Errno> {
+    track_stub!(TODO("https://fxbug.dev/297302197"), "quotacl()");
+    error!(ENOSYS)
 }
 
 pub fn sys_capget(

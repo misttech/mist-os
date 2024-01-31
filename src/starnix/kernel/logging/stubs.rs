@@ -132,6 +132,9 @@ impl BugRef {
             return None;
         }
         let (scheme_and_domain, number_str) = url.split_at(expected_prefix.len());
+        if number_str.is_empty() {
+            return None;
+        }
 
         // The standard library doesn't seem to have a const string or slice equality function.
         {
@@ -189,6 +192,11 @@ mod tests {
     #[test]
     fn missing_prefix_fails() {
         assert_eq!(BugRef::from_str("1234567890"), None);
+    }
+
+    #[test]
+    fn missing_number_fails() {
+        assert_eq!(BugRef::from_str("https://fxbug.dev/"), None);
     }
 
     #[test]

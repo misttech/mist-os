@@ -115,6 +115,16 @@ pub fn sys_gettimeofday(
     Ok(())
 }
 
+pub fn sys_settimeofday(
+    _locked: &mut Locked<'_, Unlocked>,
+    _current_task: &CurrentTask,
+    _tv: UserRef<timeval>,
+    _tz: UserRef<timezone>,
+) -> Result<(), Errno> {
+    track_stub!(TODO("https://fxbug.dev/297305428"), "settimeofday()");
+    error!(ENOSYS)
+}
+
 pub fn sys_clock_nanosleep(
     _locked: &mut Locked<'_, Unlocked>,
     current_task: &mut CurrentTask,

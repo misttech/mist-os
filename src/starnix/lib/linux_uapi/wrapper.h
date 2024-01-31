@@ -51,6 +51,7 @@
 #include <linux/netfilter_ipv6/ip6_tables.h>
 #include <linux/netlink.h>
 #include <linux/oom.h>
+#include <linux/perf_event.h>
 #include <linux/personality.h>
 #include <linux/pidfd.h>
 #include <linux/poll.h>

@@ -12,7 +12,7 @@ use starnix_sync::{Locked, Unlocked};
 use crate::{
     mm::{MemoryAccessor, MemoryAccessorExt},
     task::CurrentTask,
-    vfs::FsString,
+    vfs::{FdNumber, FsString},
 };
 use starnix_logging::{log_error, log_info, log_warn, track_stub};
 use starnix_syscalls::{
@@ -22,9 +22,9 @@ use starnix_uapi::{
     auth::{CAP_SYS_ADMIN, CAP_SYS_BOOT},
     c_char, errno, error,
     errors::Errno,
-    from_status_like_fdio,
+    from_status_like_fdio, perf_event_attr,
     personality::PersonalityFlags,
-    uapi,
+    pid_t, uapi,
     user_address::{UserAddress, UserCString, UserRef},
     utsname, GRND_NONBLOCK, GRND_RANDOM, LINUX_REBOOT_CMD_CAD_OFF, LINUX_REBOOT_CMD_CAD_ON,
     LINUX_REBOOT_CMD_HALT, LINUX_REBOOT_CMD_KEXEC, LINUX_REBOOT_CMD_RESTART,
@@ -292,4 +292,17 @@ pub fn sys_personality(
         state.personality = PersonalityFlags::from_bits_retain(persona);
     }
     Ok(previous_value.into())
+}
+
+pub fn sys_perf_event_open(
+    _locked: &mut Locked<'_, Unlocked>,
+    _current_task: &CurrentTask,
+    _attr: UserRef<perf_event_attr>,
+    __pid: pid_t,
+    _cpu: i32,
+    _group_fd: FdNumber,
+    _flags: u64,
+) -> Result<SyscallResult, Errno> {
+    track_stub!(TODO("https://fxbug.dev/287120583"), "perf_event_open()");
+    error!(ENOSYS)
 }

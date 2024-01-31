@@ -495,6 +495,15 @@ pub fn sys_mlock(
     Ok(())
 }
 
+pub fn sys_mlockall(
+    _locked: &mut Locked<'_, Unlocked>,
+    _current_task: &CurrentTask,
+    _flags: u64,
+) -> Result<(), Errno> {
+    track_stub!(TODO("https://fxbug.dev/297292097"), "mlockall()");
+    error!(ENOSYS)
+}
+
 pub fn sys_munlock(
     _locked: &mut Locked<'_, Unlocked>,
     _current_task: &CurrentTask,
@@ -503,6 +512,17 @@ pub fn sys_munlock(
 ) -> Result<(), Errno> {
     track_stub!(TODO("https://fxbug.dev/297591218"), "munlock");
     Ok(())
+}
+
+pub fn sys_mincore(
+    _locked: &mut Locked<'_, Unlocked>,
+    _current_task: &CurrentTask,
+    _addr: UserAddress,
+    _length: usize,
+    _out: UserRef<u8>,
+) -> Result<(), Errno> {
+    track_stub!(TODO("https://fxbug.dev/297372240"), "mincore()");
+    error!(ENOSYS)
 }
 
 #[cfg(test)]
