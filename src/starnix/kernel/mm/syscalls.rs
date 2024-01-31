@@ -330,6 +330,16 @@ pub fn sys_process_vm_writev(
     }
 }
 
+pub fn sys_process_mrelease(
+    _locked: &mut Locked<'_, Unlocked>,
+    _current_task: &CurrentTask,
+    _pidfd: FdNumber,
+    _flags: u32,
+) -> Result<(), Errno> {
+    track_stub!(TODO("https://fxbug.dev/323172557"), "process_mrelease()");
+    error!(ENOSYS)
+}
+
 pub fn sys_membarrier(
     _locked: &mut Locked<'_, Unlocked>,
     _current_task: &CurrentTask,

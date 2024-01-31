@@ -51,7 +51,8 @@ pub fn dispatch_syscall(
         mm::syscalls::{
             sys_brk, sys_futex, sys_get_robust_list, sys_madvise, sys_membarrier, sys_mincore,
             sys_mlock, sys_mlockall, sys_mmap, sys_mprotect, sys_mremap, sys_msync, sys_munlock,
-            sys_munmap, sys_process_vm_readv, sys_process_vm_writev, sys_set_robust_list,
+            sys_munmap, sys_process_mrelease, sys_process_vm_readv, sys_process_vm_writev,
+            sys_set_robust_list,
         },
         signals::syscalls::{
             sys_kill, sys_pidfd_send_signal, sys_restart_syscall, sys_rt_sigaction,
@@ -330,6 +331,7 @@ pub fn dispatch_syscall(
         preadv[4],
         preadv2[6],
         prlimit64[4],
+        process_mrelease[2],
         process_vm_readv[6],
         process_vm_writev[6],
         pselect6[6],
