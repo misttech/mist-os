@@ -10,7 +10,7 @@ go_library(
     name = "orchestrate",
     srcs = [
         "config.go",
-        "runner.go",
+        "orchestrator.go",
         "serial.go",
     ],
     importpath = "go.fuchsia.dev/fuchsia/tools/orchestrate",

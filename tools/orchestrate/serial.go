@@ -47,7 +47,7 @@ func StartSerialLogging(deviceConfig *DeviceConfig) (*SerialLogging, error) {
 }
 
 // Symbolize the log file.
-func (s *SerialLogging) Symbolize(runner *FtxRunner) {
+func (s *SerialLogging) Symbolize(runner *TestOrchestrator) {
 	if err := runner.Symbolize(serialLog, serialSymLog); err != nil {
 		fmt.Printf("serial runner.Symbolize: %v\n", err)
 	}

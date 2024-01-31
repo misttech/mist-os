@@ -20,8 +20,8 @@ import (
 	utils "go.fuchsia.dev/fuchsia/tools/orchestrate/utils"
 )
 
-// FtxRunner uses FFX to run Fuchsia component tests.
-type FtxRunner struct {
+// TestOrchestrator uses FFX to run Fuchsia component tests.
+type TestOrchestrator struct {
 	ffx           *ffx.Ffx
 	deviceConfig  *DeviceConfig
 	ffxLogProc    *os.Process
@@ -37,14 +37,14 @@ var (
 	summaryPath   = filepath.Join(os.Getenv("TEST_UNDECLARED_OUTPUTS_DIR"), "summary.json")
 )
 
-// NewFtxRunner creates a FtxRunner with default dependencies.
-func NewFtxRunner(deviceConfig *DeviceConfig) *FtxRunner {
-	return &FtxRunner{
+// NewTestOrchestrator creates a TestOrchestrator with default dependencies.
+func NewTestOrchestrator(deviceConfig *DeviceConfig) *TestOrchestrator {
+	return &TestOrchestrator{
 		deviceConfig: deviceConfig,
 	}
 }
 
-func (r *FtxRunner) instantiateFfx(in *RunInput) error {
+func (r *TestOrchestrator) instantiateFfx(in *RunInput) error {
 	wd, err := os.Getwd()
 	if err != nil {
 		return fmt.Errorf("os.Getwd: %w", err)
@@ -62,14 +62,14 @@ func (r *FtxRunner) instantiateFfx(in *RunInput) error {
 }
 
 // Run executes tests.
-func (r *FtxRunner) Run(in *RunInput, testCmd []string) error {
+func (r *TestOrchestrator) Run(in *RunInput, testCmd []string) error {
 	if len(in.Hardware.Cipd) > 0 {
-		fmt.Println("=== ftxrunner - Downloading CIPD packages (0/6) ===")
+		fmt.Println("=== orchestrate - Downloading CIPD packages (0/6) ===")
 		if err := r.cipdEnsure(in); err != nil {
 			return fmt.Errorf("cipdEnsure: %w", err)
 		}
 	}
-	fmt.Println("=== ftxrunner - Setting up ffx (1/6) ===")
+	fmt.Println("=== orchestrate - Setting up ffx (1/6) ===")
 	if err := r.instantiateFfx(in); err != nil {
 		return fmt.Errorf("instantiateFfx: %w", err)
 	}
@@ -82,26 +82,26 @@ func (r *FtxRunner) Run(in *RunInput, testCmd []string) error {
 		return fmt.Errorf("setupFfx: %w", err)
 	}
 	defer r.stopDaemon()
-	fmt.Println("=== ftxrunner - Downloading Product Bundle (2/6) ===")
+	fmt.Println("=== orchestrate - Downloading Product Bundle (2/6) ===")
 	productDir, err := r.downloadProductBundle(in)
 	if err != nil {
 		return fmt.Errorf("downloadProductBundle: %w", err)
 	}
-	fmt.Println("=== ftxrunner - Flashing Device (3/6) ===")
+	fmt.Println("=== orchestrate - Flashing Device (3/6) ===")
 	if err := r.flashDevice(productDir); err != nil {
 		return fmt.Errorf("flashDevice: %w", err)
 	}
-	fmt.Println("=== ftxrunner - Serving Packages (4/6) ===")
+	fmt.Println("=== orchestrate - Serving Packages (4/6) ===")
 	if err := r.servePackages(in, productDir); err != nil {
 		return fmt.Errorf("servePackages: %w", err)
 	}
 	defer r.stopPackageServer()
-	fmt.Println("=== ftxrunner - Reach Device (5/6) ===")
+	fmt.Println("=== orchestrate - Reach Device (5/6) ===")
 	if err := r.reachDevice(); err != nil {
 		return fmt.Errorf("reachDevice: %w", err)
 	}
 	defer r.stopFfxLog()
-	fmt.Println("=== ftxrunner - Test (6/6) ===")
+	fmt.Println("=== orchestrate - Test (6/6) ===")
 	if err := r.test(testCmd, in); err != nil {
 		return fmt.Errorf("test: %w", err)
 	}
@@ -109,7 +109,7 @@ func (r *FtxRunner) Run(in *RunInput, testCmd []string) error {
 }
 
 /* Step 0 - Downloading CIPD packages. */
-func (r *FtxRunner) cipdEnsure(in *RunInput) error {
+func (r *TestOrchestrator) cipdEnsure(in *RunInput) error {
 	wd, err := os.Getwd()
 	if err != nil {
 		return fmt.Errorf("os.Getwd: %w", err)
@@ -141,7 +141,7 @@ func (r *FtxRunner) cipdEnsure(in *RunInput) error {
 }
 
 /* Step 1 - Setting up ffx. */
-func (r *FtxRunner) setupFfx() error {
+func (r *TestOrchestrator) setupFfx() error {
 	cmds := [][]string{
 		{"config", "set", "log.level", "Debug"},
 		{"config", "set", "test.experimental_json_input", "true"},
@@ -170,7 +170,7 @@ func (r *FtxRunner) setupFfx() error {
 	return nil
 }
 
-func (r *FtxRunner) dumpFfxConfig() error {
+func (r *TestOrchestrator) dumpFfxConfig() error {
 	logFile, err := os.Create(ffxConfigDump)
 	if err != nil {
 		return fmt.Errorf("os.Create: %w", err)
@@ -186,7 +186,7 @@ func (r *FtxRunner) dumpFfxConfig() error {
 	return cmd.Run()
 }
 
-func (r *FtxRunner) daemonStart() error {
+func (r *TestOrchestrator) daemonStart() error {
 	logFile, err := os.Create(ffxDaemonLog)
 	if err != nil {
 		return fmt.Errorf("os.Create: %w", err)
@@ -216,7 +216,7 @@ func appendPath(environ []string, dirs ...string) []string {
 }
 
 /* Step 2 - Downloading product bundle. */
-func (r *FtxRunner) downloadProductBundle(in *RunInput) (string, error) {
+func (r *TestOrchestrator) downloadProductBundle(in *RunInput) (string, error) {
 	wd, err := os.Getwd()
 	if err != nil {
 		return "", fmt.Errorf("os.Getwd: %w", err)
@@ -239,7 +239,7 @@ func (r *FtxRunner) downloadProductBundle(in *RunInput) (string, error) {
 }
 
 /* Step 3 - Flashing device. */
-func (r *FtxRunner) flashDevice(productDir string) error {
+func (r *TestOrchestrator) flashDevice(productDir string) error {
 	if err := r.ffx.Flash(r.deviceConfig.FastbootSerial, productDir, ""); err != nil {
 		return fmt.Errorf("ffx flash: %w", err)
 	}
@@ -247,7 +247,7 @@ func (r *FtxRunner) flashDevice(productDir string) error {
 }
 
 /* Step 4 - Serving packages. */
-func (r *FtxRunner) servePackages(in *RunInput, productDir string) error {
+func (r *TestOrchestrator) servePackages(in *RunInput, productDir string) error {
 	if out, err := r.ffx.RunCmdSync("repository", "add-from-pm", productDir); err != nil {
 		return fmt.Errorf("ffx repository add-from-pm: %w out: %s", err, out)
 	}
@@ -270,7 +270,7 @@ func (r *FtxRunner) servePackages(in *RunInput, productDir string) error {
 	return nil
 }
 
-func (r *FtxRunner) serveAndWait() error {
+func (r *TestOrchestrator) serveAndWait() error {
 	port := os.Getenv("FUCHSIA_PACKAGE_SERVER_PORT")
 	if port == "" {
 		port = "8083"
@@ -297,7 +297,7 @@ func (r *FtxRunner) serveAndWait() error {
 }
 
 /* Step 5 - Reach Device */
-func (r *FtxRunner) reachDevice() error {
+func (r *TestOrchestrator) reachDevice() error {
 	addr := r.deviceConfig.Network.IPv4
 	if _, err := r.ffx.RunCmdSync("target", "add", addr, "--nowait"); err != nil {
 		return fmt.Errorf("ffx target add: %w", err)
@@ -326,7 +326,7 @@ func (r *FtxRunner) reachDevice() error {
 	return nil
 }
 
-func (r *FtxRunner) dumpFfxLog() error {
+func (r *TestOrchestrator) dumpFfxLog() error {
 	logFile, err := os.Create(targetLog)
 	if err != nil {
 		return fmt.Errorf("os.Create: %w", err)
@@ -348,7 +348,7 @@ func (r *FtxRunner) dumpFfxLog() error {
 }
 
 /* Step 6 - Test */
-func (r *FtxRunner) test(testCmd []string, in *RunInput) error {
+func (r *TestOrchestrator) test(testCmd []string, in *RunInput) error {
 	wd, err := os.Getwd()
 	if err != nil {
 		return fmt.Errorf("os.Getwd: %w", err)
@@ -407,7 +407,7 @@ type testSummary struct {
 	Success bool `json:"success"`
 }
 
-func (r *FtxRunner) writeTestSummary(testErr error) error {
+func (r *TestOrchestrator) writeTestSummary(testErr error) error {
 	if testErr != nil {
 		fmt.Printf("Tests failed: %v\n", testErr)
 	}
@@ -435,20 +435,20 @@ func writeJSON(filename string, data any) error {
 }
 
 /* Cleanup */
-func (r *FtxRunner) stopPackageServer() {
+func (r *TestOrchestrator) stopPackageServer() {
 	_, err := r.ffx.RunCmdSync("repository", "server", "stop")
 	if err != nil {
 		fmt.Printf("ffx repository server stop: %v", err)
 	}
 }
 
-func (r *FtxRunner) stopDaemon() {
+func (r *TestOrchestrator) stopDaemon() {
 	if _, err := r.ffx.RunCmdSync("daemon", "stop", "--no-wait"); err != nil {
 		fmt.Printf("ffx daemon stop: %v", err)
 	}
 }
 
-func (r *FtxRunner) stopFfxLog() {
+func (r *TestOrchestrator) stopFfxLog() {
 	if r.ffxLogProc == nil {
 		return
 	}
@@ -465,7 +465,7 @@ func (r *FtxRunner) stopFfxLog() {
 }
 
 // Symbolize uses ffx to symbolize the log output.
-func (r *FtxRunner) Symbolize(input, output string) error {
+func (r *TestOrchestrator) Symbolize(input, output string) error {
 	logFile, err := os.Open(input)
 	if err != nil {
 		return fmt.Errorf("os.Open(%q): %w", input, err)

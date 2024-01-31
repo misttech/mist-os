@@ -58,7 +58,7 @@ func (r *runCmd) Execute(_ context.Context, f *flag.FlagSet, _ ...any) subcomman
 	if err = dumpEnv(); err != nil {
 		fmt.Printf("Dumping env failed: %v\n", err)
 	}
-	runner := orchestrate.NewFtxRunner(deviceConfig)
+	runner := orchestrate.NewTestOrchestrator(deviceConfig)
 	defer serialLog.Symbolize(runner)
 	if err := runner.Run(runInput, f.Args()); err != nil {
 		fmt.Printf("Runner failed: %v\n", err)
