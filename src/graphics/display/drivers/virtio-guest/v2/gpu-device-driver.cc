@@ -4,10 +4,12 @@
 
 #include "src/graphics/display/drivers/virtio-guest/v2/gpu-device-driver.h"
 
+#include <fidl/fuchsia.hardware.display.engine/cpp/driver/wire.h>
 #include <fidl/fuchsia.hardware.pci/cpp/wire.h>
 #include <fidl/fuchsia.sysmem/cpp/wire.h>
-#include <lib/ddk/debug.h>
 #include <lib/driver/component/cpp/driver_export.h>
+#include <lib/driver/component/cpp/node_add_args.h>
+#include <lib/driver/legacy-bind-constants/legacy-bind-constants.h>
 #include <lib/fit/defer.h>
 #include <lib/sysmem-version/sysmem-version.h>
 #include <zircon/compiler.h>
@@ -21,6 +23,9 @@
 #include <optional>
 #include <utility>
 
+#include <bind/fuchsia/display/cpp/bind.h>
+
+#include "lib/driver/logging/cpp/structured_logger.h"
 #include "src/graphics/display/drivers/virtio-guest/v2/gpu-device.h"
 #include "src/graphics/display/drivers/virtio-guest/v2/virtio-abi.h"
 #include "src/lib/fxl/strings/string_printf.h"
@@ -40,11 +45,9 @@ zx_status_t ResponseTypeToZxStatus(virtio_abi::ControlType type) {
 
 }  // namespace
 
-// DDK level ops
-
 GpuDeviceDriver::GpuDeviceDriver(fdf::DriverStartArgs start_args,
                                  fdf::UnownedSynchronizedDispatcher driver_dispatcher)
-    : DriverBase("virtio-gpu", std::move(start_args), std::move(driver_dispatcher)) {}
+    : DriverBase("virtio-gpu-display", std::move(start_args), std::move(driver_dispatcher)) {}
 
 GpuDeviceDriver::~GpuDeviceDriver() {}
 
@@ -76,7 +79,7 @@ zx_status_t GpuDeviceDriver::get_display_info() {
       continue;
     }
 
-    // Save the first valid pmode we see
+    // Save the first valid pmode we see.
     pmode_ = response.scanouts[i];
     pmode_id_ = i;
   }
@@ -206,7 +209,7 @@ zx_status_t GpuDeviceDriver::transfer_to_host_2d(uint32_t resource_id, uint32_t 
 zx_status_t GpuDeviceDriver::Stage2Init() {
   FDF_LOG(TRACE, "Stage2Init()");
 
-  // Get the display info and see if we find a valid pmode
+  // Get the display info and see if we find a valid pmode.
   zx_status_t status = get_display_info();
   if (status != ZX_OK) {
     FDF_LOG(ERROR, "Failed to get display info: %s", zx_status_get_string(status));
@@ -267,13 +270,55 @@ void GpuDeviceDriver::Start(fdf::StartCompleter completer) {
     return;
   }
 
+  // Provide fuchsia.hardware.display.engine.Engine by
+  // serving fuchsia.hardware.display.engine.Service.
+  auto protocol =
+      [this](fdf::ServerEnd<fuchsia_hardware_display_engine::Engine> server_end) mutable {
+        fdf::BindServer(fdf::Dispatcher::GetCurrent()->get(), std::move(server_end), device_.get());
+      };
+  fuchsia_hardware_display_engine::Service::InstanceHandler handler(
+      {.engine = std::move(protocol)});
+  auto result =
+      outgoing()->AddService<fuchsia_hardware_display_engine::Service>(std::move(handler));
+  if (result.is_error()) {
+    completer(result.take_error());
+    return;
+  }
+
   // Following example in driver_base.h; do all Connects and AddServices first.
   parent_node_.Bind(std::move(node()));
+
+  // Allow adding a child node.
+  fidl::Arena arena;
+  auto offers = std::vector{
+      fdf::MakeOffer<fuchsia_hardware_display_engine::Service>(arena, "virtio-gpu-display")};
+
+  // TODO(https://fxbug.dev/322365329): Remove this when the Display Coordinator is
+  // migrated to DFv2.
+  // Allow DFV1 child (display coordinator) to bind.
+  auto properties = std::vector{
+      fdf::MakeProperty(arena, BIND_PROTOCOL, bind_fuchsia_display::BIND_PROTOCOL_CONTROLLER_IMPL)};
+  auto args = fuchsia_driver_framework::wire::NodeAddArgs::Builder(arena)
+                  .name(arena, "virtio-gpu-display")
+                  .offers(offers)
+                  .properties(properties)
+                  .Build();
+
+  zx::result controller_endpoints =
+      fidl::CreateEndpoints<fuchsia_driver_framework::NodeController>();
+  ZX_ASSERT(controller_endpoints.is_ok());
+  auto add_result = parent_node_->AddChild(args, std::move(controller_endpoints->server), {});
+  if (!add_result.ok()) {
+    FDF_SLOG(ERROR, "Failed to add child", KV("status", result.status_string()));
+    completer(zx::error(add_result.status()));
+    return;
+  }
+  controller_.Bind(std::move(controller_endpoints->client));
 
   auto defer_teardown = fit::defer([this]() { parent_node_ = {}; });
 
   {
-    // Create and initialize device
+    // Create and initialize device.
     auto result = GpuDevice::Create(std::move(pci_client_end.value()));
     if (result.is_error()) {
       completer(result.take_error());

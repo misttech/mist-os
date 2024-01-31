@@ -5,6 +5,7 @@
 #ifndef SRC_GRAPHICS_DISPLAY_DRIVERS_VIRTIO_GUEST_V2_GPU_DEVICE_H_
 #define SRC_GRAPHICS_DISPLAY_DRIVERS_VIRTIO_GUEST_V2_GPU_DEVICE_H_
 
+#include <fidl/fuchsia.hardware.display.engine/cpp/driver/wire.h>
 #include <fidl/fuchsia.hardware.pci/cpp/wire.h>
 #include <fidl/fuchsia.hardware.sysmem/cpp/wire.h>
 #include <lib/driver/component/cpp/driver_base.h>
@@ -31,7 +32,8 @@
 namespace virtio_display {
 
 // Implements the guest OS driver side of the VIRTIO GPU device specification.
-class GpuDevice : public virtio::Device {
+class GpuDevice : public virtio::Device,
+                  public fdf::WireServer<fuchsia_hardware_display_engine::Engine> {
  public:
   // Exposed for testing. Production code must use the Create() factory method.
   //
@@ -55,6 +57,40 @@ class GpuDevice : public virtio::Device {
 
   static zx::result<std::unique_ptr<GpuDevice>> Create(
       fidl::ClientEnd<fuchsia_hardware_pci::Device> client_end);
+
+  // `fuchsia.hardware.display.engine/Engine` implementation
+  void ImportBufferCollection(ImportBufferCollectionRequestView request, fdf::Arena& arena,
+                              ImportBufferCollectionCompleter::Sync& completer) override {}
+  void ReleaseBufferCollection(ReleaseBufferCollectionRequestView request, fdf::Arena& arena,
+                               ReleaseBufferCollectionCompleter::Sync& completer) override {}
+  void ImportImage(ImportImageRequestView request, fdf::Arena& arena,
+                   ImportImageCompleter::Sync& completer) override {}
+  void ImportImageForCapture(ImportImageForCaptureRequestView request, fdf::Arena& arena,
+                             ImportImageForCaptureCompleter::Sync& completer) override {}
+  void ReleaseImage(ReleaseImageRequestView request, fdf::Arena& arena,
+                    ReleaseImageCompleter::Sync& completer) override {}
+  void CheckConfiguration(CheckConfigurationRequestView request, fdf::Arena& arena,
+                          CheckConfigurationCompleter::Sync& completer) override {}
+  void ApplyConfiguration(ApplyConfigurationRequestView request, fdf::Arena& arena,
+                          ApplyConfigurationCompleter::Sync& completer) override {}
+  void SetEld(SetEldRequestView request, fdf::Arena& arena,
+              SetEldCompleter::Sync& completer) override {}
+  void GetSysmemConnection(GetSysmemConnectionRequestView request, fdf::Arena& arena,
+                           GetSysmemConnectionCompleter::Sync& completer) override {}
+  void SetBufferCollectionConstraints(
+      SetBufferCollectionConstraintsRequestView request, fdf::Arena& arena,
+      SetBufferCollectionConstraintsCompleter::Sync& completer) override {}
+  void SetDisplayPower(SetDisplayPowerRequestView request, fdf::Arena& arena,
+                       SetDisplayPowerCompleter::Sync& completer) override {}
+  void StartCapture(StartCaptureRequestView request, fdf::Arena& arena,
+                    StartCaptureCompleter::Sync& completer) override {}
+  void ReleaseCapture(ReleaseCaptureRequestView request, fdf::Arena& arena,
+                      ReleaseCaptureCompleter::Sync& completer) override {}
+  void IsCaptureCompleted(fdf::Arena& arena,
+                          IsCaptureCompletedCompleter::Sync& completer) override {}
+  void handle_unknown_method(
+      fidl::UnknownMethodMetadata<fuchsia_hardware_display_engine::Engine> metadata,
+      fidl::UnknownMethodCompleter::Sync& completer) override;
 
   zx_status_t Init() override;
   void IrqRingUpdate() override;

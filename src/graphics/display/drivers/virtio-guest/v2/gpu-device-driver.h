@@ -41,7 +41,7 @@ class GpuDeviceDriver : public fdf::DriverBase {
   const virtio_abi::ScanoutInfo* pmode() const { return &pmode_; }
 
  private:
-  // Internal routines
+  // Internal routines.
   zx_status_t get_display_info();
   zx_status_t allocate_2d_resource(uint32_t* resource_id, uint32_t width, uint32_t height,
                                    fuchsia_images2::wire::PixelFormat pixel_format);
@@ -55,8 +55,9 @@ class GpuDeviceDriver : public fdf::DriverBase {
 
   std::unique_ptr<GpuDevice> device_;
   fidl::WireSyncClient<fuchsia_driver_framework::Node> parent_node_;
+  fidl::WireSyncClient<fuchsia_driver_framework::NodeController> controller_;
 
-  // A saved copy of the display
+  // A saved copy of the display.
   virtio_abi::ScanoutInfo pmode_ = {};
   int pmode_id_ = -1;
 

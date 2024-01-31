@@ -165,9 +165,8 @@ class MockAllocator : public fidl::testing::WireTestBase<fuchsia_sysmem::Allocat
   mutable fbl::Mutex lock_;
   std::unordered_map<display::DriverBufferCollectionId, BufferCollection> active_buffer_collections_
       __TA_GUARDED(lock_);
-  std::vector<
-      fidl::ClientEnd<fuchsia_sysmem::BufferCollectionToken>> inactive_buffer_collection_tokens_
-      __TA_GUARDED(lock_);
+  std::vector<fidl::ClientEnd<fuchsia_sysmem::BufferCollectionToken>>
+      inactive_buffer_collection_tokens_ __TA_GUARDED(lock_);
 
   display::DriverBufferCollectionId next_buffer_collection_id_ =
       display::DriverBufferCollectionId(0);
@@ -297,11 +296,20 @@ class VirtioGpuTest : public ::testing::Test {
  public:
   VirtioGpuTest() = default;
   void SetUp() override {
-    // Create start args
+    // Create start args.
     zx::result start_args = node_server_.SyncCall(&fdf_testing::TestNode::CreateStartArgsAndServe);
     EXPECT_EQ(ZX_OK, start_args.status_value());
 
-    // Start the test environment
+    // Serve outgoing directory.
+    driver_outgoing_ = std::move(start_args->outgoing_directory_client);
+    auto svc_endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
+    EXPECT_EQ(ZX_OK, svc_endpoints.status_value());
+    zx_status_t status = fdio_open_at(driver_outgoing_.handle()->get(), "/svc",
+                                      static_cast<uint32_t>(fuchsia_io::OpenFlags::kDirectory),
+                                      svc_endpoints->server.TakeChannel().release());
+    EXPECT_EQ(ZX_OK, status);
+
+    // Setup the test environment.
     zx::result init_result = test_environment_.SyncCall(
         &TestEnvironmentLocal::Initialize, std::move(start_args->incoming_directory_server));
     EXPECT_EQ(ZX_OK, init_result.status_value());
@@ -312,7 +320,7 @@ class VirtioGpuTest : public ::testing::Test {
                                           fuchsia_hardware_pci::Service>,
         std::move(pci_handler));
 
-    // Serve Fake Sysmem
+    // Serve Fake Sysmem.
     fuchsia_hardware_sysmem::Service::InstanceHandler sysmem_handler =
         sysmem_server_.SyncCall(&FakeSysmem::GetInstanceHandler);
     test_environment_.SyncCall(
@@ -320,7 +328,7 @@ class VirtioGpuTest : public ::testing::Test {
                                           fuchsia_hardware_sysmem::Service>,
         std::move(sysmem_handler));
 
-    // Start driver
+    // Start driver.
     zx::result start_result = runtime_.RunToCompletion(
         driver_.SyncCall(&fdf_testing::DriverUnderTest<virtio_display::GpuDeviceDriver>::Start,
                          std::move(start_args->start_args)));
@@ -355,6 +363,8 @@ class VirtioGpuTest : public ::testing::Test {
   async_patterns::TestDispatcherBound<FakePciParent> fake_pci_parent_{env_dispatcher(),
                                                                       std::in_place};
   async_patterns::TestDispatcherBound<FakeSysmem> sysmem_server_{env_dispatcher(), std::in_place};
+
+  fidl::ClientEnd<fuchsia_io::Directory> driver_outgoing_;
 };
 
 TEST_F(VirtioGpuTest, CreateAndStartDriver) {}

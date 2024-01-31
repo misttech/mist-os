@@ -121,6 +121,12 @@ zx::result<std::unique_ptr<GpuDevice>> GpuDevice::Create(
   return zx::ok(std::move(device));
 }
 
+void GpuDevice::handle_unknown_method(
+    fidl::UnknownMethodMetadata<fuchsia_hardware_display_engine::Engine> metadata,
+    fidl::UnknownMethodCompleter::Sync& completer) {
+  FDF_LOG(WARNING, "Received an unknown method with ordinal %lu", metadata.method_ordinal);
+}
+
 zx_status_t GpuDevice::Init() {
   DeviceReset();
 
