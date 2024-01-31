@@ -82,6 +82,11 @@ if (is_host) {
 
   group("tests") {
     testonly = true
-    deps = [ ":lib_test" ]
+    deps = [
+      ":lib_test",
+      "//src/developer/ffx/lib/fastboot/interface:lib_test",
+      "//src/developer/ffx/lib/fastboot/transport/factory:lib_test",
+      "//src/developer/ffx/lib/fastboot/transport/interface:lib_test",
+    ]
   }
 }

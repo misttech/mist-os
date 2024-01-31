@@ -21,8 +21,8 @@ use usb_bulk::AsyncInterface;
 
 pub enum FastbootConnectionKind {
     Usb(String),
-    Tcp(SocketAddr),
-    Udp(SocketAddr),
+    Tcp(String, SocketAddr),
+    Udp(String, SocketAddr),
 }
 
 #[async_trait(?Send)]
@@ -45,8 +45,12 @@ impl FastbootConnectionFactory for ConnectionFactory {
             FastbootConnectionKind::Usb(serial_number) => {
                 Ok(Box::new(usb_proxy(serial_number).await?))
             }
-            FastbootConnectionKind::Tcp(addr) => Ok(Box::new(tcp_proxy(&addr).await?)),
-            FastbootConnectionKind::Udp(addr) => Ok(Box::new(udp_proxy(&addr).await?)),
+            FastbootConnectionKind::Tcp(target_name, addr) => {
+                Ok(Box::new(tcp_proxy(target_name, &addr).await?))
+            }
+            FastbootConnectionKind::Udp(target_name, addr) => {
+                Ok(Box::new(udp_proxy(target_name, &addr).await?))
+            }
         }
     }
 }
@@ -69,13 +73,27 @@ pub async fn usb_proxy(serial_number: String) -> Result<FastbootProxy<AsyncInter
 // TcpInterface
 //
 
+const TCP_N_OPEN_RETRIES: u64 = 5;
+const TCP_RETRY_WAIT_SECONDS: u64 = 1;
+
 /// Creates a FastbootProxy over TCP for a device at the given SocketAddr
-pub async fn tcp_proxy(addr: &SocketAddr) -> Result<FastbootProxy<TcpNetworkInterface>> {
-    let mut factory = TcpFactory::new(*addr);
+pub async fn tcp_proxy(
+    target_name: String,
+    addr: &SocketAddr,
+) -> Result<FastbootProxy<TcpNetworkInterface>> {
+    let target_name = if target_name.is_empty() {
+        tracing::info!("Creating TCP Proxy for target at address: {}. Given name is empty, using address for matching", addr);
+        addr.to_string()
+    } else {
+        target_name
+    };
+
+    let mut factory =
+        TcpFactory::new(target_name, *addr, TCP_N_OPEN_RETRIES, TCP_RETRY_WAIT_SECONDS);
     let interface = factory
         .open()
         .await
-        .with_context(|| format!("connecting via TCP to Fastboot address: {addr}"))?;
+        .with_context(|| format!("FastbootProxy connecting via TCP to Fastboot address: {addr}"))?;
     Ok(FastbootProxy::<TcpNetworkInterface>::new(addr.to_string(), interface, factory))
 }
 
@@ -83,9 +101,23 @@ pub async fn tcp_proxy(addr: &SocketAddr) -> Result<FastbootProxy<TcpNetworkInte
 // UdpInterface
 //
 
+const UDP_N_OPEN_RETRIES: u64 = 5;
+const UDP_RETRY_WAIT_SECONDS: u64 = 1;
+
 /// Creates a FastbootProxy over TCP for a device at the given SocketAddr
-pub async fn udp_proxy(addr: &SocketAddr) -> Result<FastbootProxy<UdpNetworkInterface>> {
-    let mut factory = UdpFactory::new(*addr);
+pub async fn udp_proxy(
+    target_name: String,
+    addr: &SocketAddr,
+) -> Result<FastbootProxy<UdpNetworkInterface>> {
+    let target_name = if target_name.is_empty() {
+        tracing::info!("Creating UDP Proxy for target at address: {}. Given name is empty, using address for matching", addr);
+        addr.to_string()
+    } else {
+        target_name
+    };
+
+    let mut factory =
+        UdpFactory::new(target_name, *addr, UDP_N_OPEN_RETRIES, UDP_RETRY_WAIT_SECONDS);
     let interface = factory
         .open()
         .await

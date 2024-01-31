@@ -15,7 +15,6 @@ if (is_host) {
     deps = [
       "//src/developer/fastboot:lib",
       "//src/developer/ffx/config:lib",
-      "//src/lib/fuchsia-async",
       "//third_party/rust_crates:anyhow",
       "//third_party/rust_crates:async-trait",
       "//third_party/rust_crates:chrono",
@@ -25,10 +24,10 @@ if (is_host) {
     ]
 
     test_deps = [
-      "//third_party/rust_crates:maplit",
+      "//src/lib/fuchsia-async",
       "//third_party/rust_crates:pretty_assertions",
       "//third_party/rust_crates:rand",
-      "//third_party/rust_crates:regex",
+      "//third_party/rust_crates:tempfile",
     ]
 
     sources = [

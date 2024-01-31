@@ -134,7 +134,7 @@ impl InterfaceFactory<Interface> for UsbFactory {
 
     async fn close(&self) {
         if let Some(s) = &self.serial {
-            tracing::debug!("dropping in use serial: {s}");
+            tracing::debug!("dropping daemon in use serial: {s}");
         }
     }
 

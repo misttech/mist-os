@@ -23,12 +23,7 @@ rustc_library("lib") {
     "//third_party/rust_crates:zerocopy",
   ]
 
-  test_deps = [
-    "//third_party/rust_crates:maplit",
-    "//third_party/rust_crates:pretty_assertions",
-    "//third_party/rust_crates:rand",
-    "//third_party/rust_crates:regex",
-  ]
+  test_deps = []
 
   sources = [
     "src/lib.rs",
