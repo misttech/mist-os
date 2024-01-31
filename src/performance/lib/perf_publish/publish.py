@@ -58,8 +58,8 @@ def publish_fuchsiaperf(
         env: map holding the environment variables.
         runtime_deps_dir: directory in which to look for necessary dependencies such as the expected
              metric names file, catapult converter, etc. Defaults to the test runtime_deps dir.
-        expected_metric_names_filename: allows to optionally validate the metrics in the perf file
-            against a set of expected metrics.
+        expected_metric_names_filename: name of file containing expected metric names to validate
+            the actual metrics against.
     """
     converter = CatapultConverter.from_env(
         fuchsia_perf_file_paths,
@@ -90,8 +90,8 @@ class CatapultConverter:
         Args:
             fuchsia_perf_file_paths: paths to the fuchsiaperf.json files containing the metrics.
                 These will be summarized into a single fuchsiaperf.json file.
-            expected_metric_names_filename: allows to optionally validate the metrics in the perf
-                file.
+            expected_metric_names_filename: name of file containing expected metric names to
+                validate the actual metrics against.
             fuchsia_expected_metric_names_dest_dir: directory to which expected metrics are written.
             current_time: the current time, useful for testing. Defaults to time.time.
             subprocess_check_call: allows to execute a process raising an exception on error.
@@ -225,8 +225,8 @@ class CatapultConverter:
 
         Args:
             fuchsia_perf_file_paths: paths to the fuchsiaperf.json files containing the metrics.
-            expected_metric_names_filename: allows to optionally validate the metrics in the perf
-                file.
+            expected_metric_names_filename: name of file containing expected metric names to
+                validate the actual metrics against.
             env: map holding the environment variables.
             current_time: the current time, useful for testing. Defaults to time.time.
             runtime_deps_dir: directory in which to look for necessary dependencies such as the expected
