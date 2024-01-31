@@ -1269,11 +1269,11 @@ mod tests {
                             enable_stable_addresses: true,
                             ..Default::default()
                         }),
-                        ip_config: Some(IpDeviceConfigurationUpdate {
+                        ip_config: IpDeviceConfigurationUpdate {
                             ip_enabled: Some(ip_enabled),
                             gmp_enabled: Some(gmp_enabled),
                             ..Default::default()
-                        }),
+                        },
                         ..Default::default()
                     },
                 )

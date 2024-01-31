@@ -1336,11 +1336,11 @@ mod tests {
                 .update_configuration(
                     &device_id,
                     Ipv4DeviceConfigurationUpdate {
-                        ip_config: Some(IpDeviceConfigurationUpdate {
+                        ip_config: IpDeviceConfigurationUpdate {
                             ip_enabled: Some(ip_enabled),
                             gmp_enabled: Some(gmp_enabled),
                             ..Default::default()
-                        }),
+                        },
                         ..Default::default()
                     },
                 )

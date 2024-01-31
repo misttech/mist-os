@@ -855,10 +855,10 @@ fn set_configuration(
             }
             (
                 Some(Ipv4DeviceConfigurationUpdate {
-                    ip_config: Some(IpDeviceConfigurationUpdate {
+                    ip_config: IpDeviceConfigurationUpdate {
                         forwarding_enabled: forwarding,
                         ..Default::default()
-                    }),
+                    },
                     ..Default::default()
                 }),
                 arp.map(TryIntoCore::try_into_core).transpose().map_err(
@@ -892,10 +892,10 @@ fn set_configuration(
 
             (
                 Some(Ipv6DeviceConfigurationUpdate {
-                    ip_config: Some(IpDeviceConfigurationUpdate {
+                    ip_config: IpDeviceConfigurationUpdate {
                         forwarding_enabled: forwarding,
                         ..Default::default()
-                    }),
+                    },
                     ..Default::default()
                 }),
                 ndp.map(TryIntoCore::try_into_core).transpose().map_err(
@@ -947,51 +947,38 @@ fn set_configuration(
     // Apply both updates now that we have checked for errors and get the deltas
     // back. If we didn't apply updates, use the default struct to construct the
     // delta responses.
-    let ipv4 = {
-        let Ipv4DeviceConfigurationUpdate { ip_config } = ipv4_update
-            .map(|u| ctx.api().device_ip::<Ipv4>().apply_configuration(u))
-            .unwrap_or_default();
-        ip_config.map(
-            move |IpDeviceConfigurationUpdate {
-                      forwarding_enabled,
-                      ip_enabled: _,
-                      gmp_enabled: _,
-                  }| {
-                fnet_interfaces_admin::Ipv4Configuration {
-                    forwarding: forwarding_enabled,
-                    multicast_forwarding: None,
-                    igmp: None,
-                    arp: arp.map(IntoFidl::into_fidl),
-                    __source_breaking: fidl::marker::SourceBreaking,
-                }
-            },
-        )
-    };
-    let ipv6 = {
+    let ipv4 = ipv4_update.map(|u| {
+        let Ipv4DeviceConfigurationUpdate { ip_config } =
+            ctx.api().device_ip::<Ipv4>().apply_configuration(u);
+        let IpDeviceConfigurationUpdate { forwarding_enabled, ip_enabled: _, gmp_enabled: _ } =
+            ip_config;
+        fnet_interfaces_admin::Ipv4Configuration {
+            forwarding: forwarding_enabled,
+            multicast_forwarding: None,
+            igmp: None,
+            arp: arp.map(IntoFidl::into_fidl),
+            __source_breaking: fidl::marker::SourceBreaking,
+        }
+    });
+
+    let ipv6 = ipv6_update.map(|u| {
         let Ipv6DeviceConfigurationUpdate {
             ip_config,
             dad_transmits: _,
             max_router_solicitations: _,
             slaac_config: _,
-        } = ipv6_update
-            .map(|u| ctx.api().device_ip::<Ipv6>().apply_configuration(u))
-            .unwrap_or_default();
-        ip_config.map(
-            move |IpDeviceConfigurationUpdate {
-                      forwarding_enabled,
-                      ip_enabled: _,
-                      gmp_enabled: _,
-                  }| {
-                fnet_interfaces_admin::Ipv6Configuration {
-                    forwarding: forwarding_enabled,
-                    multicast_forwarding: None,
-                    mld: None,
-                    ndp: ndp.map(IntoFidl::into_fidl),
-                    __source_breaking: fidl::marker::SourceBreaking,
-                }
-            },
-        )
-    };
+        } = ctx.api().device_ip::<Ipv6>().apply_configuration(u);
+
+        let IpDeviceConfigurationUpdate { forwarding_enabled, ip_enabled: _, gmp_enabled: _ } =
+            ip_config;
+        fnet_interfaces_admin::Ipv6Configuration {
+            forwarding: forwarding_enabled,
+            multicast_forwarding: None,
+            mld: None,
+            ndp: ndp.map(IntoFidl::into_fidl),
+            __source_breaking: fidl::marker::SourceBreaking,
+        }
+    });
     Ok(fnet_interfaces_admin::Configuration {
         ipv4,
         ipv6,
@@ -1867,10 +1854,8 @@ mod enabled {
                 }
             };
 
-            let ip_config = Some(IpDeviceConfigurationUpdate {
-                ip_enabled: Some(dev_enabled),
-                ..Default::default()
-            });
+            let ip_config =
+                IpDeviceConfigurationUpdate { ip_enabled: Some(dev_enabled), ..Default::default() };
 
             // The update functions from core are already capable of identifying
             // deltas and return the previous values for us. Log the deltas for
@@ -1884,7 +1869,6 @@ mod enabled {
                 )
                 .expect("changing ip_enabled should never fail")
                 .ip_config
-                .expect("ip config must be informed")
                 .ip_enabled
                 .expect("ip enabled must be informed");
 
@@ -1897,7 +1881,6 @@ mod enabled {
                 )
                 .expect("changing ip_enabled should never fail")
                 .ip_config
-                .expect("ip config must be informed")
                 .ip_enabled
                 .expect("ip enabled must be informed");
 

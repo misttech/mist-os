@@ -463,10 +463,7 @@ mod tests {
                 enable_stable_addresses: true,
                 ..Default::default()
             }),
-            ip_config: Some(IpDeviceConfigurationUpdate {
-                ip_enabled: Some(true),
-                ..Default::default()
-            }),
+            ip_config: IpDeviceConfigurationUpdate { ip_enabled: Some(true), ..Default::default() },
             ..Default::default()
         };
         net.with_context("local", |ctx| {
@@ -562,10 +559,7 @@ mod tests {
         let update = Ipv6DeviceConfigurationUpdate {
             // Doesn't matter as long as we perform DAD.
             dad_transmits: Some(NonZeroU8::new(1)),
-            ip_config: Some(IpDeviceConfigurationUpdate {
-                ip_enabled: Some(true),
-                ..Default::default()
-            }),
+            ip_config: IpDeviceConfigurationUpdate { ip_enabled: Some(true), ..Default::default() },
             ..Default::default()
         };
         let addr = AddrSubnet::<Ipv6Addr, _>::new(local_ip().into(), 128).unwrap();
@@ -675,10 +669,10 @@ mod tests {
                 &dev_id,
                 Ipv6DeviceConfigurationUpdate {
                     dad_transmits: Some(NonZeroU8::new(1)),
-                    ip_config: Some(IpDeviceConfigurationUpdate {
+                    ip_config: IpDeviceConfigurationUpdate {
                         ip_enabled: Some(true),
                         ..Default::default()
-                    }),
+                    },
                     ..Default::default()
                 },
             )
@@ -724,10 +718,10 @@ mod tests {
                 &dev_id,
                 Ipv6DeviceConfigurationUpdate {
                     dad_transmits: Some(NonZeroU8::new(3)),
-                    ip_config: Some(IpDeviceConfigurationUpdate {
+                    ip_config: IpDeviceConfigurationUpdate {
                         ip_enabled: Some(true),
                         ..Default::default()
-                    }),
+                    },
                     ..Default::default()
                 },
             )
@@ -756,10 +750,7 @@ mod tests {
 
         let update = Ipv6DeviceConfigurationUpdate {
             dad_transmits: Some(NonZeroU8::new(3)),
-            ip_config: Some(IpDeviceConfigurationUpdate {
-                ip_enabled: Some(true),
-                ..Default::default()
-            }),
+            ip_config: IpDeviceConfigurationUpdate { ip_enabled: Some(true), ..Default::default() },
             ..Default::default()
         };
         net.with_context("local", |ctx| {
@@ -885,10 +876,10 @@ mod tests {
                 Ipv6DeviceConfigurationUpdate {
                     dad_transmits: Some(NonZeroU8::new(3)),
                     max_router_solicitations: Some(None),
-                    ip_config: Some(IpDeviceConfigurationUpdate {
+                    ip_config: IpDeviceConfigurationUpdate {
                         ip_enabled: Some(true),
                         ..Default::default()
-                    }),
+                    },
                     ..Default::default()
                 },
             )
@@ -965,10 +956,10 @@ mod tests {
                 Ipv6DeviceConfigurationUpdate {
                     dad_transmits: Some(NonZeroU8::new(3)),
                     max_router_solicitations: Some(None),
-                    ip_config: Some(IpDeviceConfigurationUpdate {
+                    ip_config: IpDeviceConfigurationUpdate {
                         ip_enabled: Some(true),
                         ..Default::default()
-                    }),
+                    },
                     ..Default::default()
                 },
             )
@@ -1362,10 +1353,10 @@ mod tests {
                         enable_stable_addresses: true,
                         ..Default::default()
                     }),
-                    ip_config: Some(IpDeviceConfigurationUpdate {
+                    ip_config: IpDeviceConfigurationUpdate {
                         ip_enabled: Some(true),
                         ..Default::default()
-                    }),
+                    },
                     ..Default::default()
                 },
             )
@@ -1459,10 +1450,10 @@ mod tests {
                         enable_stable_addresses: true,
                         ..Default::default()
                     }),
-                    ip_config: Some(IpDeviceConfigurationUpdate {
+                    ip_config: IpDeviceConfigurationUpdate {
                         ip_enabled: Some(true),
                         ..Default::default()
-                    }),
+                    },
                     ..Default::default()
                 },
             )
@@ -1534,10 +1525,10 @@ mod tests {
                     // Doesn't matter as long as we are configured to send at least 2
                     // solicitations.
                     max_router_solicitations: Some(NonZeroU8::new(2)),
-                    ip_config: Some(IpDeviceConfigurationUpdate {
+                    ip_config: IpDeviceConfigurationUpdate {
                         ip_enabled: Some(true),
                         ..Default::default()
-                    }),
+                    },
                     ..Default::default()
                 },
             )
@@ -1643,10 +1634,10 @@ mod tests {
                 &device,
                 Ipv6DeviceConfigurationUpdate {
                     dad_transmits: Some(NonZeroU8::new(DUP_ADDR_DETECT_TRANSMITS)),
-                    ip_config: Some(IpDeviceConfigurationUpdate {
+                    ip_config: IpDeviceConfigurationUpdate {
                         ip_enabled: Some(true),
                         ..Default::default()
-                    }),
+                    },
                     ..Default::default()
                 },
             )
@@ -2283,10 +2274,10 @@ mod tests {
                         enable_stable_addresses: true,
                         ..Default::default()
                     }),
-                    ip_config: Some(IpDeviceConfigurationUpdate {
+                    ip_config: IpDeviceConfigurationUpdate {
                         ip_enabled: Some(true),
                         ..Default::default()
-                    }),
+                    },
                     ..Default::default()
                 },
             )
@@ -2510,10 +2501,10 @@ mod tests {
                         enable_stable_addresses: true,
                         ..Default::default()
                     }),
-                    ip_config: Some(IpDeviceConfigurationUpdate {
+                    ip_config: IpDeviceConfigurationUpdate {
                         ip_enabled: Some(true),
                         ..Default::default()
-                    }),
+                    },
                     ..Default::default()
                 },
             )
@@ -2633,10 +2624,10 @@ mod tests {
                     // Doesn't matter as long as we perform DAD.
                     dad_transmits: Some(NonZeroU8::new(1)),
                     slaac_config: Some(slaac_config),
-                    ip_config: Some(IpDeviceConfigurationUpdate {
+                    ip_config: IpDeviceConfigurationUpdate {
                         ip_enabled: Some(true),
                         ..Default::default()
-                    }),
+                    },
                     ..Default::default()
                 },
             )
@@ -2777,10 +2768,10 @@ mod tests {
                     // Doesn't matter as long as we perform DAD.
                     dad_transmits: Some(NonZeroU8::new(1)),
                     slaac_config: Some(slaac_config),
-                    ip_config: Some(IpDeviceConfigurationUpdate {
+                    ip_config: IpDeviceConfigurationUpdate {
                         ip_enabled: Some(true),
                         ..Default::default()
-                    }),
+                    },
                     ..Default::default()
                 },
             )
@@ -2900,10 +2891,10 @@ mod tests {
                 &device,
                 Ipv6DeviceConfigurationUpdate {
                     slaac_config: Some(slaac_config),
-                    ip_config: Some(IpDeviceConfigurationUpdate {
+                    ip_config: IpDeviceConfigurationUpdate {
                         ip_enabled: Some(true),
                         ..Default::default()
-                    }),
+                    },
                     ..Default::default()
                 },
             )
@@ -3064,10 +3055,10 @@ mod tests {
                 &device,
                 Ipv6DeviceConfigurationUpdate {
                     dad_transmits: Some(None),
-                    ip_config: Some(IpDeviceConfigurationUpdate {
+                    ip_config: IpDeviceConfigurationUpdate {
                         ip_enabled: Some(true),
                         ..Default::default()
-                    }),
+                    },
                     ..Default::default()
                 },
             )
@@ -3430,10 +3421,10 @@ mod tests {
                         enable_stable_addresses: true,
                         ..Default::default()
                     }),
-                    ip_config: Some(IpDeviceConfigurationUpdate {
+                    ip_config: IpDeviceConfigurationUpdate {
                         ip_enabled: Some(true),
                         ..Default::default()
-                    }),
+                    },
                     ..Default::default()
                 },
             )

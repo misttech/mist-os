@@ -536,7 +536,7 @@ pub(crate) mod testutil {
         device: &DeviceId<BC>,
     ) {
         let ip_config =
-            Some(IpDeviceConfigurationUpdate { ip_enabled: Some(true), ..Default::default() });
+            IpDeviceConfigurationUpdate { ip_enabled: Some(true), ..Default::default() };
         let _: Ipv4DeviceConfigurationUpdate = ctx
             .core_api()
             .device_ip::<Ipv4>()
@@ -756,7 +756,7 @@ mod tests {
                             enable_stable_addresses: true,
                             ..Default::default()
                         }),
-                        ip_config: Some(ip_config),
+                        ip_config,
                         ..Default::default()
                     },
                 )
@@ -868,10 +868,10 @@ mod tests {
                         enable_stable_addresses: true,
                         ..Default::default()
                     }),
-                    ip_config: Some(IpDeviceConfigurationUpdate {
+                    ip_config: IpDeviceConfigurationUpdate {
                         ip_enabled: Some(true),
                         ..Default::default()
-                    }),
+                    },
                     ..Default::default()
                 },
             )

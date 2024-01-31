@@ -326,7 +326,7 @@ pub trait IpDeviceIpExt: IpDeviceStateIpExt {
     type ManualAddressConfig<I: Instant>: Default + Debug + Into<Self::AddressConfig<I>>;
     type AddressState<I: Instant>: 'static + Inspectable;
     type ConfigurationUpdate: From<IpDeviceConfigurationUpdate>
-        + AsRef<Option<IpDeviceConfigurationUpdate>>
+        + AsRef<IpDeviceConfigurationUpdate>
         + Debug;
     type ConfigurationAndFlags: From<(Self::Configuration, IpDeviceFlags)>
         + AsRef<IpDeviceConfiguration>
@@ -1785,7 +1785,7 @@ pub(crate) mod testutil {
             .device_ip::<I>()
             .update_configuration(device, make_update(enabled).into())
             .unwrap();
-        assert_eq!(prev.as_ref(), &Some(make_update(prev_enabled)),);
+        assert_eq!(prev.as_ref(), &make_update(prev_enabled),);
     }
 }
 
@@ -2037,10 +2037,10 @@ mod tests {
                         enable_stable_addresses: true,
                         ..Default::default()
                     }),
-                    ip_config: Some(IpDeviceConfigurationUpdate {
+                    ip_config: IpDeviceConfigurationUpdate {
                         gmp_enabled: Some(true),
                         ..Default::default()
-                    }),
+                    },
                     ..Default::default()
                 },
             )
@@ -2340,10 +2340,10 @@ mod tests {
                         enable_stable_addresses: true,
                         ..Default::default()
                     }),
-                    ip_config: Some(IpDeviceConfigurationUpdate {
+                    ip_config: IpDeviceConfigurationUpdate {
                         gmp_enabled: Some(true),
                         ..Default::default()
-                    }),
+                    },
                     ..Default::default()
                 },
             )
@@ -2485,19 +2485,19 @@ mod tests {
             api.update_configuration(
                 &device_id,
                 Ipv4DeviceConfigurationUpdate {
-                    ip_config: Some(IpDeviceConfigurationUpdate {
+                    ip_config: IpDeviceConfigurationUpdate {
                         ip_enabled: Some(true),
                         forwarding_enabled: Some(false),
                         gmp_enabled: Some(true),
-                    }),
+                    },
                 },
             ),
             Ok(Ipv4DeviceConfigurationUpdate {
-                ip_config: Some(IpDeviceConfigurationUpdate {
+                ip_config: IpDeviceConfigurationUpdate {
                     ip_enabled: Some(false),
                     forwarding_enabled: Some(false),
                     gmp_enabled: Some(false),
-                }),
+                },
             }),
         );
 
@@ -2506,19 +2506,19 @@ mod tests {
             api.update_configuration(
                 &device_id,
                 Ipv4DeviceConfigurationUpdate {
-                    ip_config: Some(IpDeviceConfigurationUpdate {
+                    ip_config: IpDeviceConfigurationUpdate {
                         ip_enabled: Some(true),
                         forwarding_enabled: Some(true),
                         gmp_enabled: None,
-                    }),
+                    },
                 },
             ),
             Ok(Ipv4DeviceConfigurationUpdate {
-                ip_config: Some(IpDeviceConfigurationUpdate {
+                ip_config: IpDeviceConfigurationUpdate {
                     ip_enabled: Some(true),
                     forwarding_enabled: Some(false),
                     gmp_enabled: None,
-                }),
+                },
             }),
         );
 
@@ -2528,19 +2528,19 @@ mod tests {
             api.update_configuration(
                 &device_id,
                 Ipv4DeviceConfigurationUpdate {
-                    ip_config: Some(IpDeviceConfigurationUpdate {
+                    ip_config: IpDeviceConfigurationUpdate {
                         ip_enabled: None,
                         forwarding_enabled: None,
                         gmp_enabled: Some(true),
-                    }),
+                    },
                 },
             ),
             Ok(Ipv4DeviceConfigurationUpdate {
-                ip_config: Some(IpDeviceConfigurationUpdate {
+                ip_config: IpDeviceConfigurationUpdate {
                     ip_enabled: None,
                     forwarding_enabled: None,
                     gmp_enabled: Some(true),
-                }),
+                },
             }),
         );
 
@@ -2549,19 +2549,19 @@ mod tests {
             api.update_configuration(
                 &device_id,
                 Ipv4DeviceConfigurationUpdate {
-                    ip_config: Some(IpDeviceConfigurationUpdate {
+                    ip_config: IpDeviceConfigurationUpdate {
                         ip_enabled: Some(false),
                         forwarding_enabled: Some(false),
                         gmp_enabled: Some(false),
-                    }),
+                    },
                 },
             ),
             Ok(Ipv4DeviceConfigurationUpdate {
-                ip_config: Some(IpDeviceConfigurationUpdate {
+                ip_config: IpDeviceConfigurationUpdate {
                     ip_enabled: Some(true),
                     forwarding_enabled: Some(true),
                     gmp_enabled: Some(true),
-                }),
+                },
             }),
         );
     }
@@ -2602,22 +2602,22 @@ mod tests {
                         enable_stable_addresses: true,
                         temporary_address_configuration: None
                     }),
-                    ip_config: Some(IpDeviceConfigurationUpdate {
+                    ip_config: IpDeviceConfigurationUpdate {
                         ip_enabled: Some(true),
                         forwarding_enabled: Some(false),
                         gmp_enabled: Some(true),
-                    }),
+                    },
                 },
             ),
             Ok(Ipv6DeviceConfigurationUpdate {
                 dad_transmits: Some(None),
                 max_router_solicitations: Some(None),
                 slaac_config: Some(SlaacConfiguration::default()),
-                ip_config: Some(IpDeviceConfigurationUpdate {
+                ip_config: IpDeviceConfigurationUpdate {
                     ip_enabled: Some(false),
                     forwarding_enabled: Some(false),
                     gmp_enabled: Some(false),
-                }),
+                },
             }),
         );
 
@@ -2629,22 +2629,22 @@ mod tests {
                     dad_transmits: None,
                     max_router_solicitations: None,
                     slaac_config: None,
-                    ip_config: Some(IpDeviceConfigurationUpdate {
+                    ip_config: IpDeviceConfigurationUpdate {
                         ip_enabled: Some(true),
                         forwarding_enabled: Some(true),
                         gmp_enabled: None,
-                    }),
+                    },
                 },
             ),
             Ok(Ipv6DeviceConfigurationUpdate {
                 dad_transmits: None,
                 max_router_solicitations: None,
                 slaac_config: None,
-                ip_config: Some(IpDeviceConfigurationUpdate {
+                ip_config: IpDeviceConfigurationUpdate {
                     ip_enabled: Some(true),
                     forwarding_enabled: Some(false),
                     gmp_enabled: None,
-                }),
+                },
             }),
         );
 
@@ -2657,22 +2657,22 @@ mod tests {
                     dad_transmits: None,
                     max_router_solicitations: None,
                     slaac_config: None,
-                    ip_config: Some(IpDeviceConfigurationUpdate {
+                    ip_config: IpDeviceConfigurationUpdate {
                         ip_enabled: None,
                         forwarding_enabled: None,
                         gmp_enabled: Some(true),
-                    }),
+                    },
                 },
             ),
             Ok(Ipv6DeviceConfigurationUpdate {
                 dad_transmits: None,
                 max_router_solicitations: None,
                 slaac_config: None,
-                ip_config: Some(IpDeviceConfigurationUpdate {
+                ip_config: IpDeviceConfigurationUpdate {
                     ip_enabled: None,
                     forwarding_enabled: None,
                     gmp_enabled: Some(true),
-                }),
+                },
             }),
         );
 
@@ -2684,11 +2684,11 @@ mod tests {
                     dad_transmits: Some(None),
                     max_router_solicitations: Some(None),
                     slaac_config: Some(SlaacConfiguration::default()),
-                    ip_config: Some(IpDeviceConfigurationUpdate {
+                    ip_config: IpDeviceConfigurationUpdate {
                         ip_enabled: Some(false),
                         forwarding_enabled: Some(false),
                         gmp_enabled: Some(false),
-                    }),
+                    },
                 },
             ),
             Ok(Ipv6DeviceConfigurationUpdate {
@@ -2698,11 +2698,11 @@ mod tests {
                     enable_stable_addresses: true,
                     temporary_address_configuration: None
                 }),
-                ip_config: Some(IpDeviceConfigurationUpdate {
+                ip_config: IpDeviceConfigurationUpdate {
                     ip_enabled: Some(true),
                     forwarding_enabled: Some(true),
                     gmp_enabled: Some(true),
-                }),
+                },
             }),
         );
     }

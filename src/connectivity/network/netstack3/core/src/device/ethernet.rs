@@ -2540,10 +2540,10 @@ mod tests {
                         enable_stable_addresses: true,
                         ..Default::default()
                     }),
-                    ip_config: Some(IpDeviceConfigurationUpdate {
+                    ip_config: IpDeviceConfigurationUpdate {
                         ip_enabled: Some(true),
                         ..Default::default()
-                    }),
+                    },
                     ..Default::default()
                 },
             )

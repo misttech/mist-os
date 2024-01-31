@@ -533,11 +533,11 @@ impl DeviceHandler {
         let mut secret_key = [0; STABLE_IID_SECRET_KEY_BYTES];
         ctx.rng().fill(&mut secret_key);
 
-        let ip_config = Some(IpDeviceConfigurationUpdate {
+        let ip_config = IpDeviceConfigurationUpdate {
             ip_enabled: Some(false),
             forwarding_enabled: Some(false),
             gmp_enabled: Some(true),
-        });
+        };
 
         let _: Ipv6DeviceConfigurationUpdate = ctx
             .api()

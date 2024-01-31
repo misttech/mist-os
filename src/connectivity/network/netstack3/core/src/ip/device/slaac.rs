@@ -2793,10 +2793,10 @@ mod tests {
                 .update_configuration(
                     &device_id,
                     Ipv6DeviceConfigurationUpdate {
-                        ip_config: Some(IpDeviceConfigurationUpdate {
+                        ip_config: IpDeviceConfigurationUpdate {
                             ip_enabled: Some(enabled),
                             ..Default::default()
-                        }),
+                        },
                         ..Default::default()
                     },
                 )

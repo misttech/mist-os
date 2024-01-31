@@ -746,10 +746,10 @@ mod tests {
             .update_configuration(
                 &device_id,
                 Ipv6DeviceConfigurationUpdate {
-                    ip_config: Some(IpDeviceConfigurationUpdate {
+                    ip_config: IpDeviceConfigurationUpdate {
                         ip_enabled: Some(true),
                         ..Default::default()
-                    }),
+                    },
                     ..Default::default()
                 },
             )
@@ -1164,10 +1164,10 @@ mod tests {
             .update_configuration(
                 &device_id,
                 Ipv6DeviceConfigurationUpdate {
-                    ip_config: Some(IpDeviceConfigurationUpdate {
+                    ip_config: IpDeviceConfigurationUpdate {
                         ip_enabled: Some(false),
                         ..Default::default()
-                    }),
+                    },
                     ..Default::default()
                 },
             )
