@@ -695,9 +695,11 @@ block_t Dir::GetBlockAddr(LockedPage &page) { return GetBlockAddrOnDataSegment(p
 
 zx::result<LockedPage> Dir::FindDataPage(pgoff_t index, bool do_read) {
   fbl::RefPtr<Page> page;
-  if (FindPage(index, &page) == ZX_OK && page->IsUptodate()) {
+  if (FindPage(index, &page) == ZX_OK) {
     LockedPage locked_page = LockedPage(std::move(page));
-    return zx::ok(std::move(locked_page));
+    if (locked_page->IsUptodate()) {
+      return zx::ok(std::move(locked_page));
+    }
   }
 
   auto addr_or = FindDataBlkAddr(index);

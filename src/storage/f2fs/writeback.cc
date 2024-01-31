@@ -62,17 +62,19 @@ fpromise::promise<> Writer::GetTaskForWriteIO(sync_completion_t *completion) {
                                          zx_status_t io_status) mutable {
                 while (!pages.is_empty()) {
                   auto page = pages.pop_front();
-                  if (io_status != ZX_OK && page->IsUptodate()) {
-                    if (page->GetVnode().IsMeta() || io_status == ZX_ERR_UNAVAILABLE ||
-                        io_status == ZX_ERR_PEER_CLOSED) {
-                      // When it fails to write metadata or the block device is not available,
-                      // set kCpErrorFlag to enter read-only mode.
-                      page->fs()->GetSuperblockInfo().SetCpFlags(CpFlag::kCpErrorFlag);
-                    } else {
-                      // When IO errors occur with node and data Pages, just set a dirty flag
-                      // to retry it with another LBA.
-                      LockedPage locked_page(page);
-                      locked_page.SetDirty();
+                  if (io_status != ZX_OK) {
+                    LockedPage locked_page(page);
+                    if (locked_page->IsUptodate()) {
+                      if (locked_page->GetVnode().IsMeta() || io_status == ZX_ERR_UNAVAILABLE ||
+                          io_status == ZX_ERR_PEER_CLOSED) {
+                        // When it fails to write metadata or the block device is not available,
+                        // set kCpErrorFlag to enter read-only mode.
+                        locked_page->fs()->GetSuperblockInfo().SetCpFlags(CpFlag::kCpErrorFlag);
+                      } else {
+                        // When IO errors occur with node and data Pages, just set a dirty flag
+                        // to retry it with another LBA.
+                        locked_page.SetDirty();
+                      }
                     }
                   }
                   page->ClearSync();

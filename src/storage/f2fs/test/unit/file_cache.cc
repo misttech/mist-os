@@ -186,13 +186,13 @@ TEST_F(FileCacheTest, WritebackOperation) {
 
   // The Pages should be kept but not set to uptodate since kernel can evict any clean pages.
   {
-    fbl::RefPtr<Page> page;
-    ASSERT_EQ(file.FindPage(0, &page), ZX_OK);
+    LockedPage page;
+    ASSERT_EQ(file.GrabCachePage(0, &page), ZX_OK);
     ASSERT_EQ(page->IsUptodate(), false);
   }
   {
-    fbl::RefPtr<Page> page;
-    ASSERT_EQ(file.FindPage(1, &page), ZX_OK);
+    LockedPage page;
+    ASSERT_EQ(file.GrabCachePage(1, &page), ZX_OK);
     ASSERT_EQ(page->IsUptodate(), false);
   }
 

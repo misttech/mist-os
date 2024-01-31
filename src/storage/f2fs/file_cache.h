@@ -23,15 +23,16 @@ class VnodeF2fs;
 class FileCache;
 
 enum class PageFlag {
-  kPageUptodate = 0,  // It is uptodate. No need to read blocks from disk.
-  kPageDirty,         // It needs to be written out.
-  kPageWriteback,     // It is under writeback.
-  kPageLocked,        // It is locked. Wait for it to be unlocked.
-  kPageVmoLocked,     // Its vmo is locked to prevent mm from reclaiming it.
-  kPageActive,        // It is being referenced.
-  kPageColdData,      // It is under garbage collecting. It must not be inplace updated.
-  kPageCommit,        // It is logged with pre-flush and flush.
-  kPageSync,          // It is logged with flush.
+  kPageUptodate =
+      0,       // It is uptodate. No need to read blocks from disk if the backing page is present.
+  kPageDirty,  // It needs to be written out.
+  kPageWriteback,  // It is under writeback.
+  kPageLocked,     // It is locked. Wait for it to be unlocked.
+  kPageVmoLocked,  // Its vmo is locked to prevent mm from reclaiming it.
+  kPageActive,     // It is being referenced.
+  kPageColdData,   // It is under garbage collecting. It must not be inplace updated.
+  kPageCommit,     // It is logged with pre-flush and flush.
+  kPageSync,       // It is logged with flush.
   kPageFlagSize,
 };
 
@@ -101,7 +102,7 @@ class Page : public PageRefCounted<Page>,
     return static_cast<U *>(addr_);
   }
 
-  bool IsUptodate() const { return TestFlag(PageFlag::kPageUptodate); }
+  bool IsUptodate() const;
   bool IsDirty() const { return TestFlag(PageFlag::kPageDirty); }
   bool IsWriteback() const { return TestFlag(PageFlag::kPageWriteback); }
   bool IsLocked() const { return TestFlag(PageFlag::kPageLocked); }

@@ -101,12 +101,21 @@ void Page::Invalidate() {
   ClearUptodate();
 }
 
+bool Page::IsUptodate() const {
+  ZX_DEBUG_ASSERT(IsLocked());
+  if (!TestFlag(PageFlag::kPageUptodate)) {
+    return false;
+  }
+  return !GetVmoManager().IsPaged() || IsDirty() || IsWriteback();
+}
+
 bool Page::SetUptodate() {
   ZX_DEBUG_ASSERT(IsLocked());
   return SetFlag(PageFlag::kPageUptodate);
 }
 
 void Page::ClearUptodate() {
+  ZX_DEBUG_ASSERT(IsLocked());
   // block_addr_ is valid only when the uptodate flag is set.
   block_addr_ = kNullAddr;
   ClearFlag(PageFlag::kPageUptodate);
@@ -120,6 +129,7 @@ void Page::WaitOnWriteback() {
 }
 
 bool Page::SetWriteback() {
+  ZX_DEBUG_ASSERT(IsLocked());
   bool ret = SetFlag(PageFlag::kPageWriteback);
   if (!ret) {
     fs()->GetSuperblockInfo().IncreasePageCount(CountType::kWriteback);
@@ -150,7 +160,7 @@ void Page::SetColdData() {
 }
 
 zx::result<> Page::SetBlockAddr(block_t addr) {
-  if (IsLocked() && IsUptodate()) {
+  if (IsLocked() && TestFlag(PageFlag::kPageUptodate)) {
     block_addr_ = addr;
     return zx::ok();
   }
