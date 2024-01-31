@@ -16,10 +16,10 @@ namespace amlogic_display {
 
 namespace {
 
-TEST(PanelConfig, Tv070wsmFt) {
-  const PanelConfig* config_tv070wsm_ft = GetPanelConfig(PANEL_TV070WSM_FT);
-  ASSERT_NE(config_tv070wsm_ft, nullptr);
-  EXPECT_STREQ(config_tv070wsm_ft->name, "TV070WSM_FT");
+TEST(PanelConfig, Tv070wsmFtAstro) {
+  const PanelConfig* config_tv070wsm_ft_astro = GetPanelConfig(PANEL_TV070WSM_FT_ASTRO);
+  ASSERT_NE(config_tv070wsm_ft_astro, nullptr);
+  EXPECT_STREQ(config_tv070wsm_ft_astro->name, "TV070WSM_FT_ASTRO");
 }
 
 TEST(PanelConfig, P070acbFt) {
@@ -76,6 +76,12 @@ TEST(PanelConfig, Mtf050fhdi03) {
   EXPECT_STREQ(config_mtf050fhdi_03->name, "MTF050FHDI_03");
 }
 
+TEST(PanelConfig, Tv070wsmFtNelson) {
+  const PanelConfig* config_tv070wsm_ft_nelson = GetPanelConfig(PANEL_TV070WSM_FT_NELSON);
+  ASSERT_NE(config_tv070wsm_ft_nelson, nullptr);
+  EXPECT_STREQ(config_tv070wsm_ft_nelson->name, "TV070WSM_FT_NELSON");
+}
+
 TEST(PanelConfig, InvalidPanels) {
   const PanelConfig* config_0x04 = GetPanelConfig(0x04);
   EXPECT_EQ(config_0x04, nullptr);
@@ -86,7 +92,7 @@ TEST(PanelConfig, InvalidPanels) {
   const PanelConfig* config_0x06 = GetPanelConfig(0x06);
   EXPECT_EQ(config_0x06, nullptr);
 
-  const PanelConfig* config_overly_large = GetPanelConfig(0x0d);
+  const PanelConfig* config_overly_large = GetPanelConfig(0x0e);
   EXPECT_EQ(config_overly_large, nullptr);
 
   const PanelConfig* config_unknown = GetPanelConfig(PANEL_UNKNOWN);
@@ -100,11 +106,12 @@ TEST(PanelDisplaySetting, P070acbFt) {
   EXPECT_EQ(timing_p070acb_ft->v_active, 1024u);
 }
 
-TEST(PanelDisplaySetting, Tv070wsmFt) {
-  const display_setting_t* timing_tv070wsm_ft = GetPanelDisplaySetting(PANEL_TV070WSM_FT);
-  ASSERT_NE(timing_tv070wsm_ft, nullptr);
-  EXPECT_EQ(timing_tv070wsm_ft->h_active, 600u);
-  EXPECT_EQ(timing_tv070wsm_ft->v_active, 1024u);
+TEST(PanelDisplaySetting, Tv070wsmFtAstro) {
+  const display_setting_t* timing_tv070wsm_ft_astro =
+      GetPanelDisplaySetting(PANEL_TV070WSM_FT_ASTRO);
+  ASSERT_NE(timing_tv070wsm_ft_astro, nullptr);
+  EXPECT_EQ(timing_tv070wsm_ft_astro->h_active, 600u);
+  EXPECT_EQ(timing_tv070wsm_ft_astro->v_active, 1024u);
 }
 
 TEST(PanelDisplaySetting, Kd070d82Ft) {
@@ -163,6 +170,14 @@ TEST(PanelDisplaySetting, Mtf050fhdi03) {
   EXPECT_EQ(timing_mtf050fhdi_03->v_active, 1920u);
 }
 
+TEST(PanelDisplaySetting, Tv070wsmFtNelson) {
+  const display_setting_t* timing_tv070wsm_ft_nelson =
+      GetPanelDisplaySetting(PANEL_TV070WSM_FT_NELSON);
+  ASSERT_NE(timing_tv070wsm_ft_nelson, nullptr);
+  EXPECT_EQ(timing_tv070wsm_ft_nelson->h_active, 600u);
+  EXPECT_EQ(timing_tv070wsm_ft_nelson->v_active, 1024u);
+}
+
 TEST(PanelDisplaySetting, InvalidPanels) {
   const display_setting_t* timing_0x04 = GetPanelDisplaySetting(0x04);
   EXPECT_EQ(timing_0x04, nullptr);
@@ -173,7 +188,7 @@ TEST(PanelDisplaySetting, InvalidPanels) {
   const display_setting_t* timing_0x06 = GetPanelDisplaySetting(0x06);
   EXPECT_EQ(timing_0x06, nullptr);
 
-  const display_setting_t* timing_overly_large = GetPanelDisplaySetting(0x0d);
+  const display_setting_t* timing_overly_large = GetPanelDisplaySetting(0x0e);
   EXPECT_EQ(timing_overly_large, nullptr);
 
   const display_setting_t* timing_unknown = GetPanelDisplaySetting(PANEL_UNKNOWN);
@@ -187,11 +202,13 @@ TEST(RefreshRate, P070acbFt) {
   EXPECT_EQ(timing_p070acb_ft.vertical_field_refresh_rate_millihertz(), 60'000);
 }
 
-TEST(RefreshRate, Tv070wsmFt) {
-  const display_setting_t* setting_tv070wsm_ft = GetPanelDisplaySetting(PANEL_TV070WSM_FT);
-  ASSERT_NE(setting_tv070wsm_ft, nullptr);
-  const display::DisplayTiming timing_tv070wsm_ft = display::ToDisplayTiming(*setting_tv070wsm_ft);
-  EXPECT_EQ(timing_tv070wsm_ft.vertical_field_refresh_rate_millihertz(), 60'000);
+TEST(RefreshRate, Tv070wsmFtAstro) {
+  const display_setting_t* setting_tv070wsm_ft_astro =
+      GetPanelDisplaySetting(PANEL_TV070WSM_FT_ASTRO);
+  ASSERT_NE(setting_tv070wsm_ft_astro, nullptr);
+  const display::DisplayTiming timing_tv070wsm_ft_astro =
+      display::ToDisplayTiming(*setting_tv070wsm_ft_astro);
+  EXPECT_EQ(timing_tv070wsm_ft_astro.vertical_field_refresh_rate_millihertz(), 60'000);
 }
 
 TEST(RefreshRate, Kd070d82Ft) {
@@ -257,6 +274,15 @@ TEST(RefreshRate, Mtf050fhdi03) {
   const display::DisplayTiming timing_mtf050fhdi_03 =
       display::ToDisplayTiming(*setting_mtf050fhdi_03);
   EXPECT_EQ(timing_mtf050fhdi_03.vertical_field_refresh_rate_millihertz(), 55'428);
+}
+
+TEST(RefreshRate, Tv070wsmFtNelson) {
+  const display_setting_t* setting_tv070wsm_ft_nelson =
+      GetPanelDisplaySetting(PANEL_TV070WSM_FT_NELSON);
+  ASSERT_NE(setting_tv070wsm_ft_nelson, nullptr);
+  const display::DisplayTiming timing_tv070wsm_ft_nelson =
+      display::ToDisplayTiming(*setting_tv070wsm_ft_nelson);
+  EXPECT_EQ(timing_tv070wsm_ft_nelson.vertical_field_refresh_rate_millihertz(), 60'000);
 }
 
 }  // namespace

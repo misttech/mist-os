@@ -10,9 +10,9 @@
 
 // Panel: BOE TV070WSM-TG1
 // DDIC: Fitipower JD9364
-// Board: Astro, Nelson
-// Touch IC: FocalTech FT3x27 (Astro), Goodix GT6853 (Nelson)
-#define PANEL_TV070WSM_FT UINT8_C(0x00)
+// Board: Astro
+// Touch IC: FocalTech FT3x27 (Astro)
+#define PANEL_TV070WSM_FT_ASTRO UINT8_C(0x00)
 
 // Panel: Innolux P070ACB-DB0
 // DDIC: Fitipower JD9364
@@ -72,6 +72,12 @@
 // Board: VIM3
 // Touch IC: FocalTech FT5336
 #define PANEL_MTF050FHDI_03 UINT8_C(0x0c)
+
+// Panel: BOE TV070WSM-TG1
+// DDIC: Fitipower JD9364
+// Board: Nelson
+// Touch IC: Goodix GT6853 (Nelson)
+#define PANEL_TV070WSM_FT_NELSON UINT8_C(0x0d)
 
 #define PANEL_UNKNOWN UINT8_C(0xFF)
 

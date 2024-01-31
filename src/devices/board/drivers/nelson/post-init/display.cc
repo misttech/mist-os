@@ -98,13 +98,13 @@ static const std::vector<fpbus::Bti> display_btis{
 // driver.
 
 uint32_t uboot_mapping[] = {
-    PANEL_UNKNOWN,           // 0 - invalid
-    PANEL_KD070D82_FT,       // 1
-    PANEL_TV070WSM_FT,       // 2
-    PANEL_P070ACB_FT,        // 3 - should be unused
-    PANEL_KD070D82_FT_9365,  // 4
-    PANEL_TV070WSM_FT_9365,  // 5
-    PANEL_TV070WSM_ST7703I,  // 6
+    PANEL_UNKNOWN,             // 0 - invalid
+    PANEL_KD070D82_FT,         // 1
+    PANEL_TV070WSM_FT_NELSON,  // 2
+    PANEL_P070ACB_FT,          // 3 - should be unused
+    PANEL_KD070D82_FT_9365,    // 4
+    PANEL_TV070WSM_FT_9365,    // 5
+    PANEL_TV070WSM_ST7703I,    // 6
 };
 zx::result<> PostInit::InitDisplay() {
   uint32_t bootloader_display_id = display_id_;
@@ -134,7 +134,7 @@ zx::result<> PostInit::InitDisplay() {
   if (display_panel_info[0].panel_type == PANEL_UNKNOWN) {
     switch (display_id_) {
       case 0b10:
-        display_panel_info[0].panel_type = PANEL_TV070WSM_FT;
+        display_panel_info[0].panel_type = PANEL_TV070WSM_FT_NELSON;
         break;
       case 0b11:
         display_panel_info[0].panel_type = PANEL_TV070WSM_FT_9365;

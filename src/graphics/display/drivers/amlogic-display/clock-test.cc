@@ -19,8 +19,8 @@ namespace {
 
 const std::vector<display_setting_t> kDisplaySettingsForTesting = [] {
   static constexpr uint32_t kPanelIdsToTest[] = {
-      PANEL_TV070WSM_FT, PANEL_P070ACB_FT,  PANEL_P101DEZ_FT,
-      PANEL_TV101WXM_FT, PANEL_KD070D82_FT, PANEL_TV070WSM_ST7703I,
+      PANEL_TV070WSM_FT_ASTRO, PANEL_P070ACB_FT,       PANEL_P101DEZ_FT,         PANEL_TV101WXM_FT,
+      PANEL_KD070D82_FT,       PANEL_TV070WSM_ST7703I, PANEL_TV070WSM_FT_NELSON,
   };
 
   std::vector<display_setting_t> display_settings = {};
@@ -54,7 +54,8 @@ TEST(AmlogicDisplayClock, PllTimingHdmiPllClockRatioCalculatedCorrectly) {
   // This test ensures that the calculated clock ratios match the hardcoded
   // values removed in Ie2c4721b14a92977ef31dd2951dc4cac207cb60e.
 
-  const display_setting_t* display_setting_tv070wsm_ft = GetPanelDisplaySetting(PANEL_TV070WSM_FT);
+  const display_setting_t* display_setting_tv070wsm_ft =
+      GetPanelDisplaySetting(PANEL_TV070WSM_FT_ASTRO);
   ASSERT_NE(display_setting_tv070wsm_ft, nullptr);
   zx::result<PllConfig> pll_tv070wsm_ft = Clock::GenerateHPLL(*display_setting_tv070wsm_ft);
   static constexpr int kExpectedHdmiPllClockRatioTv070wsmFt = 8;

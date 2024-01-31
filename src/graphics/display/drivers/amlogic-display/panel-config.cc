@@ -15,9 +15,9 @@ namespace amlogic_display {
 
 namespace {
 
-constexpr PanelConfig kTv070wsmFtPanelConfig = {
-    .name = "TV070WSM_FT",
-    .dsi_on = lcd_init_sequence_TV070WSM_FT,
+constexpr PanelConfig kTv070wsmFtAstroPanelConfig = {
+    .name = "TV070WSM_FT_ASTRO",
+    .dsi_on = lcd_init_sequence_TV070WSM_FT_ASTRO,
     .dsi_off = lcd_shutdown_sequence,
     .power_on = kLcdPowerOnSequenceForAstroSherlockNelson,
     .power_off = kLcdPowerOffSequenceForAstroSherlockNelson,
@@ -209,13 +209,21 @@ constexpr display_setting_t kMtf050fhdi03DisplaySetting = {
     .vsync_pol = 0,
 };
 
+constexpr PanelConfig kTv070wsmFtNelsonPanelConfig = {
+    .name = "TV070WSM_FT_NELSON",
+    .dsi_on = lcd_init_sequence_TV070WSM_FT_NELSON,
+    .dsi_off = lcd_shutdown_sequence,
+    .power_on = kLcdPowerOnSequenceForAstroSherlockNelson,
+    .power_off = kLcdPowerOffSequenceForAstroSherlockNelson,
+};
+
 }  // namespace
 
 const PanelConfig* GetPanelConfig(uint32_t panel_type) {
   // LINT.IfChange
   switch (panel_type) {
-    case PANEL_TV070WSM_FT:
-      return &kTv070wsmFtPanelConfig;
+    case PANEL_TV070WSM_FT_ASTRO:
+      return &kTv070wsmFtAstroPanelConfig;
     case PANEL_P070ACB_FT:
       return &kP070acbFtPanelConfig;
     case PANEL_TV101WXM_FT:
@@ -234,6 +242,8 @@ const PanelConfig* GetPanelConfig(uint32_t panel_type) {
       return &kTv070wsmSt7703iPanelConfig;
     case PANEL_MTF050FHDI_03:
       return &kVim3Ts050PanelConfig;
+    case PANEL_TV070WSM_FT_NELSON:
+      return &kTv070wsmFtNelsonPanelConfig;
   }
   // LINT.ThenChange(//src/graphics/display/lib/device-protocol-display/include/lib/device-protocol/display-panel.h)
   return nullptr;
@@ -242,7 +252,8 @@ const PanelConfig* GetPanelConfig(uint32_t panel_type) {
 const display_setting_t* GetPanelDisplaySetting(uint32_t panel_type) {
   // LINT.IfChange
   switch (panel_type) {
-    case PANEL_TV070WSM_FT:
+    case PANEL_TV070WSM_FT_ASTRO:
+    case PANEL_TV070WSM_FT_NELSON:
     case PANEL_TV070WSM_FT_9365:
       return &kTv070wsmFitipowerDisplaySetting;
     case PANEL_P070ACB_FT:

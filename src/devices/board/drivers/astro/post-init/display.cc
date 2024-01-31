@@ -110,7 +110,7 @@ zx::result<> PostInit::InitDisplay() {
   if (display_id_) {
     display_panel_info[0].panel_type = PANEL_P070ACB_FT;
   } else {
-    display_panel_info[0].panel_type = PANEL_TV070WSM_FT;
+    display_panel_info[0].panel_type = PANEL_TV070WSM_FT_ASTRO;
   }
   display_panel_metadata[0].data() =
       std::vector(reinterpret_cast<uint8_t*>(&display_panel_info),
