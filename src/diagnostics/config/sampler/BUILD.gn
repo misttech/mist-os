@@ -14,6 +14,7 @@ sampler_files = [
   "driver_manager_all.json",
   "fshost.json",
   "netstack.json",
+  "power_metrics_recorder.json",
   "setui.json",
   "system-update-committer.json",
 

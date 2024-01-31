@@ -1,0 +1,222 @@
+{
+    "metrics": [
+        {
+            "selector": "core/metrics-logger-standalone:root/MetricsLogger/metrics-logger-standalone/PowerLogger/power_mlb/histograms/unknown:min",
+            "metric_id": 1004,
+            "metric_type": "IntHistogram",
+            "event_codes": [
+                1,
+                0
+            ]
+        },
+        {
+            "selector": "core/metrics-logger-standalone:root/MetricsLogger/metrics-logger-standalone/PowerLogger/power_mlb/histograms/unknown:max",
+            "metric_id": 1005,
+            "metric_type": "IntHistogram",
+            "event_codes": [
+                1,
+                0
+            ]
+        },
+        {
+            "selector": "core/metrics-logger-standalone:root/MetricsLogger/metrics-logger-standalone/PowerLogger/power_mlb/histograms/unknown:average",
+            "metric_id": 1006,
+            "metric_type": "IntHistogram",
+            "event_codes": [
+                1,
+                0
+            ]
+        },
+        {
+            "selector": "core/metrics-logger-standalone:root/MetricsLogger/metrics-logger-standalone/PowerLogger/power_mlb/histograms/unknown:median",
+            "metric_id": 1007,
+            "metric_type": "IntHistogram",
+            "event_codes": [
+                1,
+                0
+            ]
+        },
+        {
+            "selector": "core/metrics-logger-standalone:root/MetricsLogger/metrics-logger-standalone/PowerLogger/power_speakers/histograms/unknown:min",
+            "metric_id": 1004,
+            "metric_type": "IntHistogram",
+            "event_codes": [
+                2,
+                0
+            ]
+        },
+        {
+            "selector": "core/metrics-logger-standalone:root/MetricsLogger/metrics-logger-standalone/PowerLogger/power_speakers/histograms/unknown:max",
+            "metric_id": 1005,
+            "metric_type": "IntHistogram",
+            "event_codes": [
+                2,
+                0
+            ]
+        },
+        {
+            "selector": "core/metrics-logger-standalone:root/MetricsLogger/metrics-logger-standalone/PowerLogger/power_speakers/histograms/unknown:average",
+            "metric_id": 1006,
+            "metric_type": "IntHistogram",
+            "event_codes": [
+                2,
+                0
+            ]
+        },
+        {
+            "selector": "core/metrics-logger-standalone:root/MetricsLogger/metrics-logger-standalone/PowerLogger/power_speakers/histograms/unknown:median",
+            "metric_id": 1007,
+            "metric_type": "IntHistogram",
+            "event_codes": [
+                2,
+                0
+            ]
+        },
+        {
+            "selector": "core/metrics-logger-standalone:root/MetricsLogger/metrics-logger-standalone/PowerLogger/power_mlb/histograms/idle:min",
+            "metric_id": 1004,
+            "metric_type": "IntHistogram",
+            "event_codes": [
+                1,
+                1
+            ]
+        },
+        {
+            "selector": "core/metrics-logger-standalone:root/MetricsLogger/metrics-logger-standalone/PowerLogger/power_mlb/histograms/idle:max",
+            "metric_id": 1005,
+            "metric_type": "IntHistogram",
+            "event_codes": [
+                1,
+                1
+            ]
+        },
+        {
+            "selector": "core/metrics-logger-standalone:root/MetricsLogger/metrics-logger-standalone/PowerLogger/power_mlb/histograms/idle:average",
+            "metric_id": 1006,
+            "metric_type": "IntHistogram",
+            "event_codes": [
+                1,
+                1
+            ]
+        },
+        {
+            "selector": "core/metrics-logger-standalone:root/MetricsLogger/metrics-logger-standalone/PowerLogger/power_mlb/histograms/idle:median",
+            "metric_id": 1007,
+            "metric_type": "IntHistogram",
+            "event_codes": [
+                1,
+                1
+            ]
+        },
+        {
+            "selector": "core/metrics-logger-standalone:root/MetricsLogger/metrics-logger-standalone/PowerLogger/power_speakers/histograms/idle:min",
+            "metric_id": 1004,
+            "metric_type": "IntHistogram",
+            "event_codes": [
+                2,
+                1
+            ]
+        },
+        {
+            "selector": "core/metrics-logger-standalone:root/MetricsLogger/metrics-logger-standalone/PowerLogger/power_speakers/histograms/idle:max",
+            "metric_id": 1005,
+            "metric_type": "IntHistogram",
+            "event_codes": [
+                2,
+                1
+            ]
+        },
+        {
+            "selector": "core/metrics-logger-standalone:root/MetricsLogger/metrics-logger-standalone/PowerLogger/power_speakers/histograms/idle:average",
+            "metric_id": 1006,
+            "metric_type": "IntHistogram",
+            "event_codes": [
+                2,
+                1
+            ]
+        },
+        {
+            "selector": "core/metrics-logger-standalone:root/MetricsLogger/metrics-logger-standalone/PowerLogger/power_speakers/histograms/idle:median",
+            "metric_id": 1007,
+            "metric_type": "IntHistogram",
+            "event_codes": [
+                2,
+                1
+            ]
+        },
+        {
+            "selector": "core/metrics-logger-standalone:root/MetricsLogger/metrics-logger-standalone/PowerLogger/power_mlb/histograms/active:min",
+            "metric_id": 1004,
+            "metric_type": "IntHistogram",
+            "event_codes": [
+                1,
+                2
+            ]
+        },
+        {
+            "selector": "core/metrics-logger-standalone:root/MetricsLogger/metrics-logger-standalone/PowerLogger/power_mlb/histograms/active:max",
+            "metric_id": 1005,
+            "metric_type": "IntHistogram",
+            "event_codes": [
+                1,
+                2
+            ]
+        },
+        {
+            "selector": "core/metrics-logger-standalone:root/MetricsLogger/metrics-logger-standalone/PowerLogger/power_mlb/histograms/active:average",
+            "metric_id": 1006,
+            "metric_type": "IntHistogram",
+            "event_codes": [
+                1,
+                2
+            ]
+        },
+        {
+            "selector": "core/metrics-logger-standalone:root/MetricsLogger/metrics-logger-standalone/PowerLogger/power_mlb/histograms/active:median",
+            "metric_id": 1007,
+            "metric_type": "IntHistogram",
+            "event_codes": [
+                1,
+                2
+            ]
+        },
+        {
+            "selector": "core/metrics-logger-standalone:root/MetricsLogger/metrics-logger-standalone/PowerLogger/power_speakers/histograms/active:min",
+            "metric_id": 1004,
+            "metric_type": "IntHistogram",
+            "event_codes": [
+                2,
+                2
+            ]
+        },
+        {
+            "selector": "core/metrics-logger-standalone:root/MetricsLogger/metrics-logger-standalone/PowerLogger/power_speakers/histograms/active:max",
+            "metric_id": 1005,
+            "metric_type": "IntHistogram",
+            "event_codes": [
+                2,
+                2
+            ]
+        },
+        {
+            "selector": "core/metrics-logger-standalone:root/MetricsLogger/metrics-logger-standalone/PowerLogger/power_speakers/histograms/active:average",
+            "metric_id": 1006,
+            "metric_type": "IntHistogram",
+            "event_codes": [
+                2,
+                2
+            ]
+        },
+        {
+            "selector": "core/metrics-logger-standalone:root/MetricsLogger/metrics-logger-standalone/PowerLogger/power_speakers/histograms/active:median",
+            "metric_id": 1007,
+            "metric_type": "IntHistogram",
+            "event_codes": [
+                2,
+                2
+            ]
+        }
+    ],
+    "poll_rate_sec": 600,
+    "project_id": 3
+}
