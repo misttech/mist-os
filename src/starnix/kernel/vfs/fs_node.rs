@@ -627,6 +627,12 @@ pub trait FsNodeOps: Send + Sync + AsAny + 'static {
         error!(EINVAL)
     }
 
+    /// Update the supplied info with initial state (e.g. size) for the node.
+    ///
+    /// FsNode calls this method when created, to allow the FsNodeOps to
+    /// set appropriate initial values in the FsNodeInfo.
+    fn initial_info(&self, _info: &mut FsNodeInfo) {}
+
     /// Update node.info as needed.
     ///
     /// FsNode calls this method before converting the FsNodeInfo struct into
@@ -1003,6 +1009,13 @@ impl FsNode {
         info: FsNodeInfo,
         credentials: &Credentials,
     ) -> Self {
+        // Allow the FsNodeOps to populate initial info.
+        let info = {
+            let mut info = info;
+            ops.initial_info(&mut info);
+            info
+        };
+
         let fifo = if info.mode.is_fifo() {
             let mut default_pipe_capacity = (*PAGE_SIZE * 16) as usize;
             if !credentials.has_capability(CAP_SYS_RESOURCE) {

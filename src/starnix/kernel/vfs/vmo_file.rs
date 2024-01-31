@@ -47,6 +47,12 @@ impl FsNodeOps for VmoFileNode {
     fs_node_impl_not_dir!();
     fs_node_impl_xattr_delegate!(self, self.xattrs);
 
+    fn initial_info(&self, info: &mut FsNodeInfo) {
+        if let Some(size) = self.vmo.get_content_size().ok() {
+            info.size = size as usize;
+        }
+    }
+
     fn create_file_ops(
         &self,
         node: &FsNode,
