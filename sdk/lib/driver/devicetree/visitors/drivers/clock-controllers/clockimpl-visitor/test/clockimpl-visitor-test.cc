@@ -46,11 +46,51 @@ TEST(ClockImplVisitorTest, TestClocksProperty) {
       clock_tester->env().SyncCall(&fdf_devicetree::testing::FakeEnvWrapper::pbus_node_size);
 
   uint32_t node_tested_count = 0;
+  uint32_t mgr_request_idx = 0;
   for (size_t i = 0; i < node_count; i++) {
     auto node =
         clock_tester->env().SyncCall(&fdf_devicetree::testing::FakeEnvWrapper::pbus_nodes_at, i);
 
-    if (node.name()->find("clock-controller") != std::string::npos) {
+    if (node.name()->find("clock-controller-ffffa000") != std::string::npos) {
+      auto metadata = clock_tester->env()
+                          .SyncCall(&fdf_devicetree::testing::FakeEnvWrapper::pbus_nodes_at, i)
+                          .metadata();
+
+      // Test metadata properties.
+      ASSERT_TRUE(metadata);
+      ASSERT_EQ(2lu, metadata->size());
+
+      // ID metadata
+      std::vector<uint8_t> metadata_blob_1 = std::move(*(*metadata)[0].data());
+      auto metadata_start = reinterpret_cast<clock_id_t*>(metadata_blob_1.data());
+      std::vector<clock_id_t> clock_ids(
+          metadata_start, metadata_start + (metadata_blob_1.size() / sizeof(clock_id_t)));
+      ASSERT_EQ(clock_ids.size(), 2lu);
+      EXPECT_EQ(clock_ids[0].clock_id, static_cast<uint32_t>(CLK_ID1));
+      EXPECT_EQ(clock_ids[1].clock_id, static_cast<uint32_t>(CLK_ID2));
+
+      // Init steps metadata
+      std::vector<uint8_t> metadata_blob_2 = std::move(*(*metadata)[1].data());
+      fit::result init_steps =
+          fidl::Unpersist<fuchsia_hardware_clockimpl::InitMetadata>(cpp20::span(metadata_blob_2));
+      ASSERT_TRUE(init_steps.is_ok());
+      // Steps expected - Disable for CLK_ID3, SetInput as CLK_ID5, Enable for CLK_ID3
+      ASSERT_EQ(init_steps->steps().size(), 3lu);
+      EXPECT_EQ(init_steps->steps()[0].id(), static_cast<uint32_t>(CLK_ID3));
+      EXPECT_EQ(init_steps->steps()[0].call().Which(),
+                fuchsia_hardware_clockimpl::InitCall::Tag::kDisable);
+      EXPECT_EQ(init_steps->steps()[1].id(), static_cast<uint32_t>(CLK_ID3));
+      EXPECT_EQ(init_steps->steps()[1].call().Which(),
+                fuchsia_hardware_clockimpl::InitCall::Tag::kInputIdx);
+      EXPECT_EQ(init_steps->steps()[1].call().input_idx().value(), static_cast<uint32_t>(CLK_ID5));
+      EXPECT_EQ(init_steps->steps()[2].id(), static_cast<uint32_t>(CLK_ID3));
+      EXPECT_EQ(init_steps->steps()[2].call().Which(),
+                fuchsia_hardware_clockimpl::InitCall::Tag::kEnable);
+
+      node_tested_count++;
+    }
+
+    if (node.name()->find("clock-controller-ffffb000") != std::string::npos) {
       auto metadata = clock_tester->env()
                           .SyncCall(&fdf_devicetree::testing::FakeEnvWrapper::pbus_nodes_at, i)
                           .metadata();
@@ -59,23 +99,34 @@ TEST(ClockImplVisitorTest, TestClocksProperty) {
       ASSERT_TRUE(metadata);
       ASSERT_EQ(1lu, metadata->size());
 
-      // ID metadata
+      // Init steps metadata
       std::vector<uint8_t> metadata_blob = std::move(*(*metadata)[0].data());
-      auto metadata_start = reinterpret_cast<clock_id_t*>(metadata_blob.data());
-      std::vector<clock_id_t> clock_ids(
-          metadata_start, metadata_start + (metadata_blob.size() / sizeof(clock_id_t)));
-      ASSERT_EQ(clock_ids.size(), 2lu);
-      EXPECT_EQ(clock_ids[0].clock_id, static_cast<uint32_t>(CLK_ID1));
-      EXPECT_EQ(clock_ids[1].clock_id, static_cast<uint32_t>(CLK_ID2));
+      fit::result init_steps =
+          fidl::Unpersist<fuchsia_hardware_clockimpl::InitMetadata>(cpp20::span(metadata_blob));
+      ASSERT_TRUE(init_steps.is_ok());
+      // Steps expected - Disable for CLK_ID4, SetRateHz as CLK_ID4_RATE, Enable for CLK_ID4
+      ASSERT_EQ(init_steps->steps().size(), 3lu);
+      EXPECT_EQ(init_steps->steps()[0].id(), static_cast<uint32_t>(CLK_ID4));
+      EXPECT_EQ(init_steps->steps()[0].call().Which(),
+                fuchsia_hardware_clockimpl::InitCall::Tag::kDisable);
+      EXPECT_EQ(init_steps->steps()[1].id(), static_cast<uint32_t>(CLK_ID4));
+      EXPECT_EQ(init_steps->steps()[1].call().Which(),
+                fuchsia_hardware_clockimpl::InitCall::Tag::kRateHz);
+      EXPECT_EQ(init_steps->steps()[1].call().rate_hz().value(),
+                static_cast<uint32_t>(CLK_ID4_RATE));
+      EXPECT_EQ(init_steps->steps()[2].id(), static_cast<uint32_t>(CLK_ID4));
+      EXPECT_EQ(init_steps->steps()[2].call().Which(),
+                fuchsia_hardware_clockimpl::InitCall::Tag::kEnable);
 
       node_tested_count++;
     }
+
     if (node.name()->find("video") != std::string::npos) {
-      ASSERT_EQ(1lu, clock_tester->env().SyncCall(
+      ASSERT_EQ(2lu, clock_tester->env().SyncCall(
                          &fdf_devicetree::testing::FakeEnvWrapper::mgr_requests_size));
 
       auto mgr_request = clock_tester->env().SyncCall(
-          &fdf_devicetree::testing::FakeEnvWrapper::mgr_requests_at, 0);
+          &fdf_devicetree::testing::FakeEnvWrapper::mgr_requests_at, mgr_request_idx++);
       ASSERT_TRUE(mgr_request.parents().has_value());
       ASSERT_EQ(3lu, mgr_request.parents()->size());
 
@@ -87,7 +138,7 @@ TEST(ClockImplVisitorTest, TestClocksProperty) {
                               "fuchsia.clock.FUNCTION." + std::string(CLK1_NAME))}},
           (*mgr_request.parents())[1].properties(), false));
       EXPECT_TRUE(fdf_devicetree::testing::CheckHasBindRules(
-          {{fdf::MakeAcceptBindRule(bind_fuchsia::PROTOCOL,
+          {{fdf::MakeAcceptBindRule(bind_fuchsia::FIDL_PROTOCOL,
                                     bind_fuchsia_clock::BIND_FIDL_PROTOCOL_SERVICE),
             fdf::MakeAcceptBindRule(bind_fuchsia::CLOCK_ID, static_cast<uint32_t>(CLK_ID1))}},
           (*mgr_request.parents())[1].bind_rules(), false));
@@ -99,14 +150,41 @@ TEST(ClockImplVisitorTest, TestClocksProperty) {
                               "fuchsia.clock.FUNCTION." + std::string(CLK2_NAME))}},
           (*mgr_request.parents())[2].properties(), false));
       EXPECT_TRUE(fdf_devicetree::testing::CheckHasBindRules(
-          {{fdf::MakeAcceptBindRule(bind_fuchsia::PROTOCOL,
+          {{fdf::MakeAcceptBindRule(bind_fuchsia::FIDL_PROTOCOL,
                                     bind_fuchsia_clock::BIND_FIDL_PROTOCOL_SERVICE),
             fdf::MakeAcceptBindRule(bind_fuchsia::CLOCK_ID, static_cast<uint32_t>(CLK_ID2))}},
           (*mgr_request.parents())[2].bind_rules(), false));
+
+      node_tested_count++;
+    }
+
+    if (node.name()->find("audio") != std::string::npos) {
+      ASSERT_EQ(2lu, clock_tester->env().SyncCall(
+                         &fdf_devicetree::testing::FakeEnvWrapper::mgr_requests_size));
+
+      auto mgr_request = clock_tester->env().SyncCall(
+          &fdf_devicetree::testing::FakeEnvWrapper::mgr_requests_at, mgr_request_idx++);
+      ASSERT_TRUE(mgr_request.parents().has_value());
+      ASSERT_EQ(3lu, mgr_request.parents()->size());
+
+      // 1st parent is pdev. Skipping that.
+      for (size_t i = 1; i < 3; i++) {
+        EXPECT_TRUE(fdf_devicetree::testing::CheckHasProperties(
+            {{
+                fdf::MakeProperty(bind_fuchsia::INIT_STEP,
+                                  bind_fuchsia_clock::BIND_INIT_STEP_CLOCK),
+            }},
+            (*mgr_request.parents())[i].properties(), false));
+        EXPECT_TRUE(fdf_devicetree::testing::CheckHasBindRules(
+            {{fdf::MakeAcceptBindRule(bind_fuchsia::INIT_STEP,
+                                      bind_fuchsia_clock::BIND_INIT_STEP_CLOCK)}},
+            (*mgr_request.parents())[i].bind_rules(), false));
+      }
+      node_tested_count++;
     }
   }
 
-  ASSERT_EQ(node_tested_count, 1u);
+  ASSERT_EQ(node_tested_count, 4u);
 }
 
 }  // namespace clock_impl_dt

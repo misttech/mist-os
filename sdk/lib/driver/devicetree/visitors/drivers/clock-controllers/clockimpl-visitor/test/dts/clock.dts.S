@@ -15,14 +15,25 @@
       compatible = "fuchsia,clock";
       reg = <0x0 0xffffa000 0x0 0x1000>;
       #clock-cells = <1>;
-      phandle = <TEST_PHANDLE>;
     };
 
-    video@0 {
-      reg = <0x0 0x0 0x0 0x100>;
+    clkB: clock-controller@ffffb000 {
+      compatible = "fuchsia,clock";
+      reg = <0x0 0xffffb000 0x0 0x1000>;
+      #clock-cells = <1>;
+    };
+
+    video {
       compatible = "test-video";
       clocks = <&clkA CLK_ID1 &clkA CLK_ID2>;
       clock-names = CLK1_NAME, CLK2_NAME;
+    };
+
+    audio {
+      compatible = "test-audio";
+      assigned-clocks = <&clkA CLK_ID3 &clkB CLK_ID4>;
+      assigned-clock-rates = <0 CLK_ID4_RATE>;
+      assigned-clock-parents = <&clkA CLK_ID5>;
     };
 
 };

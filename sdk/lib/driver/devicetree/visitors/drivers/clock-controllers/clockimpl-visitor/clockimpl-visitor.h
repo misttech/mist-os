@@ -21,6 +21,9 @@ class ClockImplVisitor : public fdf_devicetree::Visitor {
   static constexpr char kClockReference[] = "clocks";
   static constexpr char kClockCells[] = "#clock-cells";
   static constexpr char kClockNames[] = "clock-names";
+  static constexpr char kAssignedClocks[] = "assigned-clocks";
+  static constexpr char kAssignedClockParents[] = "assigned-clock-parents";
+  static constexpr char kAssignedClockRates[] = "assigned-clock-rates";
 
   ClockImplVisitor();
 
@@ -29,9 +32,11 @@ class ClockImplVisitor : public fdf_devicetree::Visitor {
   zx::result<> Visit(fdf_devicetree::Node& node,
                      const devicetree::PropertyDecoder& decoder) override;
 
+
  private:
   struct ClockController {
     std::vector<uint8_t> clock_ids_metadata;
+    fuchsia_hardware_clockimpl::InitMetadata init_metadata;
   };
 
   // Return an existing or a new instance of ClockController.
@@ -44,9 +49,14 @@ class ClockImplVisitor : public fdf_devicetree::Visitor {
                                    std::optional<std::string_view> clock_name);
 
   // Helper to parse clock init hog to produce fuchsia_hardware_clockimpl::InitStep.
-  zx::result<> ParseInitChild(fdf_devicetree::Node& child);
+  zx::result<> ParseInitChild(fdf_devicetree::Node& child, fdf_devicetree::ReferenceNode& parent,
+                              fdf_devicetree::PropertyCells specifiers,
+                              std::optional<fdf_devicetree::PropertyValue> clock_rate,
+                              std::optional<fdf_devicetree::PropertyValue> clock_parent);
 
   zx::result<> AddChildNodeSpec(fdf_devicetree::Node& child, uint32_t id, std::string clock_name);
+
+  zx::result<> AddInitChildNodeSpec(fdf_devicetree::Node& child);
 
   bool is_match(std::string_view node_name);
 
