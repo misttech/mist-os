@@ -263,9 +263,9 @@ pub fn sysctl_directory(current_task: &CurrentTask, fs: &FileSystemHandle) -> Fs
         );
         dir.entry(
             current_task,
-            "unprivileged_bpf_disable",
+            "unprivileged_bpf_disabled",
             StubSysctl::new_node(
-                "/proc/sys/kernel/unprivileged_bpf_disable",
+                "/proc/sys/kernel/unprivileged_bpf_disabled",
                 bug_ref!("https://fxbug.dev/322874504"),
             ),
             mode,
@@ -677,10 +677,28 @@ impl ProcSysNetDev {
                 );
                 dir.entry(
                     current_task,
+                    "accept_ra_defrtr",
+                    StubSysctl::new_node(
+                        "/proc/sys/net/ipv6/DEVICE/conf/accept_ra_defrtr",
+                        bug_ref!("https://fxbug.dev/322907588"),
+                    ),
+                    file_mode,
+                );
+                dir.entry(
+                    current_task,
                     "accept_ra_info_min_plen",
                     StubSysctl::new_node(
                         "/proc/sys/net/ipv6/DEVICE/conf/accept_ra_info_min_plen",
                         bug_ref!("https://fxbug.dev/297439563"),
+                    ),
+                    file_mode,
+                );
+                dir.entry(
+                    current_task,
+                    "accept_ra_rt_info_min_plen",
+                    StubSysctl::new_node(
+                        "/proc/sys/net/ipv6/DEVICE/conf/accept_ra_rt_info_min_plen",
+                        bug_ref!("https://fxbug.dev/322908046"),
                     ),
                     file_mode,
                 );
@@ -774,6 +792,15 @@ impl ProcSysNetDev {
                     ),
                     file_mode,
                 );
+                dir.entry(
+                    current_task,
+                    "forwarding",
+                    StubSysctl::new_node(
+                        "/proc/sys/net/ipv6/DEVICE/conf/forwarding",
+                        bug_ref!("https://fxbug.dev/322907925"),
+                    ),
+                    file_mode,
+                );
                 dir.build(current_task)
             },
             ipv6_neigh: {
@@ -859,7 +886,7 @@ fn sysctl_net_diretory(current_task: &CurrentTask, fs: &FileSystemHandle) -> FsN
             current_task,
             "bpf_jit_enable",
             StubSysctl::new_node(
-                "/proc/sys/net/bpf_jit_enable",
+                "/proc/sys/net/core/bpf_jit_enable",
                 bug_ref!("https://fxbug.dev/322874627"),
             ),
             file_mode,
@@ -868,8 +895,35 @@ fn sysctl_net_diretory(current_task: &CurrentTask, fs: &FileSystemHandle) -> FsN
             current_task,
             "bpf_jit_kallsyms",
             StubSysctl::new_node(
-                "/proc/sys/net/bpf_jit_kallsyms",
+                "/proc/sys/net/core/bpf_jit_kallsyms",
                 bug_ref!("https://fxbug.dev/322874163"),
+            ),
+            file_mode,
+        );
+        dir.entry(
+            current_task,
+            "rmem_max",
+            StubSysctl::new_node(
+                "/proc/sys/net/core/rmem_max",
+                bug_ref!("https://fxbug.dev/322906968"),
+            ),
+            file_mode,
+        );
+        dir.entry(
+            current_task,
+            "wmem_max",
+            StubSysctl::new_node(
+                "/proc/sys/net/core/wmem_max",
+                bug_ref!("https://fxbug.dev/322907334"),
+            ),
+            file_mode,
+        );
+        dir.entry(
+            current_task,
+            "xfrm_acq_expires",
+            StubSysctl::new_node(
+                "/proc/sys/net/core/xfrm_acq_expires",
+                bug_ref!("https://fxbug.dev/322907718"),
             ),
             file_mode,
         );

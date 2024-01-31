@@ -10,10 +10,10 @@ use crate::{
         buffers::InputBuffer, fileops_impl_delegate_read_and_seek, fs_node_impl_dir_readonly,
         fs_node_impl_not_dir, BytesFile, DirectoryEntryType, DynamicFile, DynamicFileBuf,
         DynamicFileSource, FileObject, FileOps, FsNode, FsNodeHandle, FsNodeInfo, FsNodeOps, FsStr,
-        VecDirectory, VecDirectoryEntry, DEFAULT_BYTES_PER_BLOCK,
+        StubEmptyFile, VecDirectory, VecDirectoryEntry, DEFAULT_BYTES_PER_BLOCK,
     },
 };
-use starnix_logging::track_stub;
+use starnix_logging::{bug_ref, track_stub};
 use starnix_sync::{Locked, WriteOps};
 use starnix_uapi::{
     auth::FsCred, device_type::DeviceType, errno, error, errors::Errno, file_mode::mode,
@@ -201,11 +201,23 @@ impl FsNodeOps for BlockDeviceQueueDirectory {
         _current_task: &CurrentTask,
         _flags: OpenFlags,
     ) -> Result<Box<dyn FileOps>, Errno> {
-        Ok(VecDirectory::new_file(vec![VecDirectoryEntry {
-            entry_type: DirectoryEntryType::REG,
-            name: b"read_ahead_kb".into(),
-            inode: None,
-        }]))
+        Ok(VecDirectory::new_file(vec![
+            VecDirectoryEntry {
+                entry_type: DirectoryEntryType::REG,
+                name: b"nr_requests".into(),
+                inode: None,
+            },
+            VecDirectoryEntry {
+                entry_type: DirectoryEntryType::REG,
+                name: b"read_ahead_kb".into(),
+                inode: None,
+            },
+            VecDirectoryEntry {
+                entry_type: DirectoryEntryType::REG,
+                name: b"scheduler".into(),
+                inode: None,
+            },
+        ]))
     }
 
     fn lookup(
@@ -215,9 +227,25 @@ impl FsNodeOps for BlockDeviceQueueDirectory {
         name: &FsStr,
     ) -> Result<FsNodeHandle, Errno> {
         match &**name {
+            b"nr_requests" => Ok(node.fs().create_node(
+                current_task,
+                StubEmptyFile::new_node(
+                    "/sys/block/DEVICE/queue/nr_requests",
+                    bug_ref!("https://fxbug.dev/322906857"),
+                ),
+                FsNodeInfo::new_factory(mode!(IFREG, 0o644), FsCred::root()),
+            )),
             b"read_ahead_kb" => Ok(node.fs().create_node(
                 current_task,
                 ReadAheadKbNode,
+                FsNodeInfo::new_factory(mode!(IFREG, 0o644), FsCred::root()),
+            )),
+            b"scheduler" => Ok(node.fs().create_node(
+                current_task,
+                StubEmptyFile::new_node(
+                    "/sys/block/DEVICE/queue/scheduler",
+                    bug_ref!("https://fxbug.dev/322907749"),
+                ),
                 FsNodeInfo::new_factory(mode!(IFREG, 0o644), FsCred::root()),
             )),
             _ => {

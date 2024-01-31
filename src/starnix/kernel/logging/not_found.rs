@@ -20,6 +20,9 @@ const IGNORED_PATH_PREFIXES: &[&str] = &[
     "/dev/cpuctl",
     "/dev/cpuset",
     "/dev/stune",
+    // This path should only be implemented on ARM, ignore it everywhere else.
+    #[cfg(not(target_arch = "aarch64"))]
+    "/proc/sys/abi/swp",
     //TODO(https://fxbug.dev/306735736) stubbing these device directories seems to break adb.
     "/sys/class/android_usb",
     // TODO(https://fxbug.dev/322165853) these directories have dynamically generated contents that
