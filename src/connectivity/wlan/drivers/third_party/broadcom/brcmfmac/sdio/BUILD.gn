@@ -28,6 +28,7 @@ source_set("sdio") {
   deps = [
     "//sdk/fidl/fuchsia.hardware.gpio:fuchsia.hardware.gpio_cpp",
     "//sdk/fidl/fuchsia.wlan.phyimpl:fuchsia.wlan.phyimpl_bindlib_cpp",
+    "//sdk/lib/fit",
     "//src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac:bcdc",
     "//src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac:debug",
     "//src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac:timer",

@@ -17,6 +17,7 @@
 #include <lib/async-loop/default.h>
 #include <lib/ddk/binding_driver.h>
 #include <lib/ddk/metadata.h>
+#include <lib/fit/defer.h>
 #include <lib/zircon-internal/align.h>
 
 #include <limits>
@@ -134,16 +135,27 @@ zx_status_t SdioDevice::DeviceInit() {
 
   std::unique_ptr<brcmf_bus> bus;
   if ((status = brcmf_sdio_register(drvr(), fidl_gpios, &bus)) != ZX_OK) {
+    BRCMF_ERR("brcmf_sdio_register failed: %s", zx_status_get_string(status));
     return status;
   }
 
+  // If the method fails after this point the bus object has to be destroyed by calling
+  // brcmf_sdio_exit to ensure proper destruction of all objects created during registration.
+  auto on_error = fit::defer([bus = bus.get()] { brcmf_sdio_exit(bus); });
+
   if ((status = brcmf_sdio_load_files(drvr(), false)) != ZX_OK) {
+    BRCMF_ERR("brcmf_sdio_load_files failed: %s", zx_status_get_string(status));
     return status;
   }
 
   if ((status = brcmf_bus_started(drvr(), false)) != ZX_OK) {
+    BRCMF_ERR("brcmf_bus_started failed: %s", zx_status_get_string(status));
     return status;
   }
+
+  // Now that everything has succeeded we should not call brcmf_sdio_exit anymore. The bus object
+  // will be destroyed as part of SdioDevice shutting down.
+  on_error.cancel();
 
   brcmf_bus_ = std::move(bus);
   return ZX_OK;
