@@ -108,11 +108,24 @@ async fn test_basic_driver() -> Result<()> {
     // Check to make sure our topological devfs connections is working.
     device_watcher::recursive_wait(&devfs_client, "sys/test").await?;
 
-    // Connect to the device. No need to loop/wait for the service instance
-    // since we have already received an ack from the driver.
-    let service = realm.open_service::<ctf::ServiceMarker>().await?;
-    let instances = query_service_instances(&service).await?;
-    assert_eq!(1, instances.len());
+    // Connect to the device. We have already received an ack from the driver, but sometimes
+    // seeing the item in the service directory doesn't happen immediately. So we loop until it
+    // shows up.
+    let mut instances: Vec<String>;
+    let mut attempts: u32 = 0;
+    loop {
+        let service = realm.open_service::<ctf::ServiceMarker>().await?;
+        instances = query_service_instances(&service).await?;
+        if instances.len() == 1 {
+            break;
+        }
+
+        attempts += 1;
+        if attempts > 100 {
+            return Err(anyhow!("No instance found within the service directory."));
+        }
+    }
+
     let service_instance =
         realm.connect_to_service_instance::<ctf::ServiceMarker>(instances.first().unwrap()).await?;
     let device = service_instance.connect_to_device()?;
