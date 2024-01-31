@@ -18,8 +18,15 @@ const TOTAL_BLOBFS_GERRIT_COMPONENT_NAME: &str = "Total BlobFS contents";
 
 /// Verifies that the product budget is not exceeded.
 pub async fn verify_product_budgets(args: ProductSizeCheckArgs) -> Result<bool> {
-    let assembly_manifest: AssemblyManifest =
-        AssemblyManifest::try_load_from(&args.assembly_manifest)?;
+    let assembly_manifest = if args.assembly_manifest.starts_with("gs://") {
+        let (bucket, object) = split_gs_url(args.assembly_manifest.as_str())?;
+        let output_path = gcs_download(bucket, object, args.auth.clone())
+            .await
+            .context("download assembly manifest")?;
+        AssemblyManifest::try_load_from(output_path)?
+    } else {
+        AssemblyManifest::try_load_from(&args.assembly_manifest)?
+    };
 
     let blobfs_contents = match extract_blob_contents(&assembly_manifest) {
         Some(contents) => contents,
