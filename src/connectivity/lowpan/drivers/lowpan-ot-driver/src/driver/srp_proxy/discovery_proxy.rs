@@ -215,7 +215,7 @@ impl DiscoveryProxy {
             .inspect_err(move |err| {
                 // Due to https://fxbug.dev/42182233, the subscription will close
                 // if the servicesubscriber that created it is closed.
-                // TODO(https://fxbug.dev/99755): Remove this line once https://fxbug.dev/42182233 is fixed.
+                // TODO(https://fxbug.dev/42182233): Remove this line once https://fxbug.dev/42182233 is fixed.
                 #[allow(clippy::redundant_clone)]
                 let _ = subscriber.clone();
 
@@ -324,7 +324,7 @@ impl DiscoveryProxy {
                 // Due to https://fxbug.dev/42182233, the subscription will close
                 // if the servicesubscriber that created it is closed.
                 // The bug tracking the specific issue this fixes is <b/241818894>.
-                // TODO(https://fxbug.dev/99755): Remove this line once https://fxbug.dev/42182233 is fixed.
+                // TODO(https://fxbug.dev/42182233): Remove this line once https://fxbug.dev/42182233 is fixed.
                 #[allow(clippy::redundant_clone)]
                 let _ = subscriber.clone();
 

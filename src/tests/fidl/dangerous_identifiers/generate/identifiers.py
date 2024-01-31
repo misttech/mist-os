@@ -273,7 +273,7 @@ IDENTIFIERS = [
     Identifier("typeof", RUST_KEYWORD),
     Identifier("uint16", FIDL_PRIMITIVE),
     # We use uint32 as a type in some tests which makes it conflict.
-    # See also: https://fxbug.dev/38124 https://fxbug.dev/42160762)
+    # See also: https://fxbug.dev/42113840 https://fxbug.dev/42160762)
     Identifier(
         "uint32",
         [

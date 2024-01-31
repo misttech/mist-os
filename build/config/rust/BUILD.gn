@@ -76,7 +76,7 @@ config("incremental") {
 config("one_codegen_unit") {
   # Disable codegen parallelism.
   # Trades incremental rebuild speed for smaller code size.
-  # See: https://fxbug.dev/74435, https://fxbug.dev/42160867
+  # See: https://fxbug.dev/42154118, https://fxbug.dev/42160867
   if (rust_incremental == "") {
     rustflags = [ "-Ccodegen-units=1" ]
   }

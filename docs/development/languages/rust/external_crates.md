@@ -334,7 +334,7 @@ paths.
 ### Update frequency
 
 A member of the Rust on Fuchsia team is currently responsible for running the
-tool on a regular cadence. See [https://fxbug.dev/73348](https://fxbug.dev/42152910)
+tool on a regular cadence. See [https://fxbug.dev/42152910](https://fxbug.dev/42152910)
 to track the process of automating updates to OWNERS files.
 
 ## Overriding locally

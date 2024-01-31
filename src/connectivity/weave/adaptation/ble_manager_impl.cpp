@@ -245,7 +245,7 @@ bool BLEManagerImpl::SendIndication(BLE_CONNECTION_OBJECT conId, const WeaveBleU
   connection_state->pending_ind_buf = data;
   data = nullptr;
 
-  // TODO(https://fxbug.dev/53070, https://fxbug.dev/42131435): The peer confirmation currently isn't returned to the
+  // TODO(https://fxbug.dev/42130443, https://fxbug.dev/42131435): The peer confirmation currently isn't returned to the
   // caller. Proceed as if the confirmation is received, to avoid closing the connection. When the
   // bug is fixed, block until the confirmation is received and handle it.
   PacketBuffer::Free(connection_state->pending_ind_buf);

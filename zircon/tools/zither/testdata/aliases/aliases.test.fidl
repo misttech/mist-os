@@ -43,7 +43,7 @@ alias ArrayAlias = array<uint32, 4>;
 
 alias NestedArrayAlias = array<array<Struct, 8>, 4>;
 
-// TODO(https://fxbug.dev/105758, https://fxbug.dev/42172915): Aliases are currently broken.
+// TODO(https://fxbug.dev/42057022, https://fxbug.dev/42172915): Aliases are currently broken.
 // Exercise more complicated alias declarations when fixed:
 // * alias of alias
 // * array of aliases

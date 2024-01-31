@@ -45,7 +45,7 @@ class ChannelManagerMockControllerTest : public TestingBase {
         hci::DataBufferInfo(kMaxDataPacketLength, kBufferMaxNumPackets);
     InitializeACLDataChannel(bredr_buffer_info);
 
-    // TODO(https://fxbug.dev/63074): Remove assumptions about channel ordering
+    // TODO(https://fxbug.dev/42141538): Remove assumptions about channel ordering
     // so we can turn random ids on.
     channel_manager_ = ChannelManager::Create(transport()->acl_data_channel(),
                                               transport()->command_channel(),

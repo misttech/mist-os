@@ -4,7 +4,7 @@ Fuchsia's infrastructure for reporting performance test results has a
 set of checked-in expectations for the names of the metrics that each
 performance test may produce.  This is also referred to as the metric
 names allowlist.  This was added in
-[https://fxbug.dev/105202](https://fxbug.dev/42056406).
+[https://fxbug.dev/42056406](https://fxbug.dev/42056406).
 
 If the set of metrics produced by a performance test does not match
 those listed in the test's expectations file, the test will fail when

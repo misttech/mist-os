@@ -347,7 +347,7 @@
                     "/bootstrap/netsvc",
                     "/core",
 
-                    // TODO(https://fxbug.dev/98755): Remove once https://fxbug.dev/42167600 is fixed.
+                    // TODO(https://fxbug.dev/42181123): Remove once https://fxbug.dev/42167600 is fixed.
                     "/core/sl4f",
 
                     // TODO(https://fxbug.dev/42080863): Remove once the shell tools that use this capability

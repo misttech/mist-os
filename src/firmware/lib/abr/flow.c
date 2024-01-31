@@ -392,7 +392,7 @@ AbrResult AbrMarkSlotSuccessful(const AbrOps* abr_ops, AbrSlotIndex slot_index) 
 
   /* Remove any success mark on the other slot.
    *
-   * TODO(https://fxbug.dev/64255): Remove this logic once the fix for https://fxbug.dev/42142627 has rolled out.
+   * TODO(https://fxbug.dev/42142842): Remove this logic once the fix for https://fxbug.dev/42142627 has rolled out.
    */
   other_slot_index = 1 - slot_index;
   if (is_slot_bootable(&abr_data.slot_data[other_slot_index])) {

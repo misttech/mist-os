@@ -217,7 +217,7 @@ TEST_F(NetStreamSocketsTest, Sendmmsg) {
   int result = sendmmsg(client().get(), &header, 0u, 0u);
   if (kIsFuchsia) {
     // Fuchsia does not support sendmmsg().
-    // TODO(https://fxbug.dev/45262, https://fxbug.dev/42118897): Implement sendmmsg().
+    // TODO(https://fxbug.dev/42121767, https://fxbug.dev/42118897): Implement sendmmsg().
     EXPECT_EQ(result, -1);
     EXPECT_EQ(errno, ENOSYS) << strerror(errno);
   } else {

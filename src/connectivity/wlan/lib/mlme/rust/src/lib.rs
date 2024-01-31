@@ -173,7 +173,7 @@ fn should_enable_minstrel(mac_sublayer: &fidl_common::MacSublayerSupport) -> boo
 }
 
 const MINSTREL_UPDATE_INTERVAL: std::time::Duration = std::time::Duration::from_millis(100);
-// Remedy for https://fxbug.dev/8165 (https://fxbug.dev/42108316)
+// Remedy for https://fxbug.dev/42162128 (https://fxbug.dev/42108316)
 // See |DATA_FRAME_INTERVAL_NANOS|
 // in //src/connectivity/wlan/testing/hw-sim/test/rate_selection/src/lib.rs
 // Ensure at least one probe frame (generated every 16 data frames)

@@ -251,7 +251,7 @@ impl StreamEndpoint {
         self.transport = Some(Arc::new(RwLock::new(c)));
         self.try_flush_timeout(Self::SRC_FLUSH_TIMEOUT);
         self.stream_held = Arc::new(Mutex::new(false));
-        // TODO(jamuraa, https://fxbug.dev/1009, https://fxbug.dev/42051776): Reporting and Recovery channels
+        // TODO(jamuraa, https://fxbug.dev/42051664, https://fxbug.dev/42051776): Reporting and Recovery channels
         self.set_state(StreamState::Open);
         Ok(false)
     }

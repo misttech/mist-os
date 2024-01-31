@@ -48,7 +48,7 @@
     FIDL versioning support and various system components using FIDL interfaces.
   area: Driver Framework
   category: [Quality]
-  bug: [https://fxbug.dev/102231, https://fxbug.dev/42053150]
+  bug: [https://fxbug.dev/42053145, https://fxbug.dev/42053150]
 
 - workstream: |
     UEFI productionization (including Secure Boot).
@@ -82,7 +82,7 @@
     Fxfs and storage performance.
   area: Storage
   category: [Performance, Quality]
-  bug: [https://fxbug.dev/102657, https://fxbug.dev/102659, https://fxbug.dev/42053622]
+  bug: [https://fxbug.dev/42053617, https://fxbug.dev/42053619, https://fxbug.dev/42053622]
 
 - workstream: |
     Continuous improvements to virtualization stack including an execution model
@@ -90,7 +90,7 @@
     Rust.
   area: Virtualization
   category: [Platform Evolution, Simplicity and Tech Debt]
-  bug: [https://fxbug.dev/102873, https://fxbug.dev/42053855]
+  bug: [https://fxbug.dev/42053856, https://fxbug.dev/42053855]
 
 - workstream: |
     Fuchsia toolchain improvements such as using LLVM IFS for ELF ABI tracking,

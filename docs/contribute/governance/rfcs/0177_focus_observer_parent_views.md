@@ -30,7 +30,7 @@ responsibility of a parent view is to monitor [view focus][view-focus] state:
     child view.
     *   For example, a parent view's request to move focus to its child view
         fails if the parent's view is not in the view tree's
-        [focus chain][focus-chain] ([https://fxbug.dev/87577](https://fxbug.dev/42168713)).
+        [focus chain][focus-chain] ([https://fxbug.dev/42168713](https://fxbug.dev/42168713)).
 1.  If view focus moved to a child view, to identify *which child* presently has
     view focus.
     *   For example, if the user moved focus to a view by touching it, a parent

@@ -1450,7 +1450,7 @@ func newSyscallFamily(protocol fidlgen.Protocol, decls declMap) (*SyscallFamily,
 				return nil, err
 			}
 
-			// TODO(https://fxbug.dev/105758, https://fxbug.dev/42065140): The name of an aliased
+			// TODO(https://fxbug.dev/42057022, https://fxbug.dev/42065140): The name of an aliased
 			// error type does not yet survive into the IR (just the full
 			// resolution). So, to account for the major case of wanting to use
 			// `zx/Status` as an error type - while in its alias form - we

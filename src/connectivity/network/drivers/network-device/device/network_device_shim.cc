@@ -390,7 +390,7 @@ void NetworkDeviceShim::NetworkDeviceIfcCompleteTx(const tx_result_t* tx_list, s
 }
 
 void NetworkDeviceShim::NetworkDeviceIfcSnoop(const rx_buffer_t* rx_list, size_t rx_count) {
-  // TODO(https://fxbug.dev/43028): Not implemented in netdev, implement here as well when needed.
+  // TODO(https://fxbug.dev/42119287): Not implemented in netdev, implement here as well when needed.
 }
 
 }  // namespace network

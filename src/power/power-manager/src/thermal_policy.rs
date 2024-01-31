@@ -993,7 +993,7 @@ pub mod tests {
         assert_eq!(node.process_thermal_load(ThermalLoad(20)).await.unwrap(), ());
     }
 
-    #[allow(clippy::unit_cmp)] // TODO(https://fxbug.dev/95036)
+    #[allow(clippy::unit_cmp)] // TODO(https://fxbug.dev/42176998)
     /// Tests that each of the configured `cpu_thermal_load_notify_node` node receive an
     /// UpdateCpuThermalLoad message as expected.
     #[fasync::run_singlethreaded(test)]

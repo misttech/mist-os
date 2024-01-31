@@ -33,7 +33,7 @@ use {
         CLIENT_MAC_ADDR, ETH_DST_MAC,
     },
 };
-// Remedy for https://fxbug.dev/8165 (https://fxbug.dev/42108316)
+// Remedy for https://fxbug.dev/42162128 (https://fxbug.dev/42108316)
 // Refer to |KMinstrelUpdateIntervalForHwSim| in //src/connectivity/wlan/drivers/wlan/device.cpp
 const DATA_FRAME_INTERVAL_NANOS: i64 = 4_000_000;
 

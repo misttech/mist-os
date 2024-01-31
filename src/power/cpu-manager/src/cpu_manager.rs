@@ -134,7 +134,7 @@ impl CpuManager {
                     .build()?
             }
 
-            // TODO(fxbug.dev/111155): Remove async node creation
+            // TODO(fxbug.dev/42062455): Remove async node creation
             "CpuStatsHandler" => {
                 cpu_stats_handler::CpuStatsHandlerBuilder::new_from_json(json_data, &self.nodes)
                     .build()
@@ -148,7 +148,7 @@ impl CpuManager {
                 .build()?
             }
 
-            // TODO(fxbug.dev/111155): Remove async node creation
+            // TODO(fxbug.dev/42062455): Remove async node creation
             "SyscallHandler" => syscall_handler::SyscallHandlerBuilder::new().build().await?,
 
             unknown => panic!("Unknown node type: {}", unknown),

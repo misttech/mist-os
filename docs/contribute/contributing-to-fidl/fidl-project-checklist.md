@@ -98,14 +98,14 @@ natural and wire APIs; the wire APIs were called LLCPP).
     on Fuchsia), and cannot use thread local storage. The lack of RELRO
     precludes const global/static variables whose initializer contains non-NULL
     pointer values, which rules out many libraries including FIDL bindings. This
-    will be addressed by [https://fxbug.dev/121753](https://fxbug.dev/42072759).
+    will be addressed by [https://fxbug.dev/42072759](https://fxbug.dev/42072759).
   * [ldmsg]: used by the C library to load libraries during process startup. It
     cannot use full-fledged FIDL bindings due to
     [sanitizer ABI requirements][sanitizer-abi]. This will be addressed by
-    [https://fxbug.dev/121817](https://fxbug.dev/42072830).
+    [https://fxbug.dev/42072830](https://fxbug.dev/42072830).
   * [libc sanitizers/debugdata][debugdata]: the sanitizer support libraries
     themselves cannot use functions built with sanitizers. This will be
-    addressed by [https://fxbug.dev/121754](https://fxbug.dev/42072760).
+    addressed by [https://fxbug.dev/42072760](https://fxbug.dev/42072760).
 
 ## Horizontal testing requirements
 

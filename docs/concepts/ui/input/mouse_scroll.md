@@ -50,7 +50,7 @@ example:
     multiplying detents with a fixed line-movement constant.
 *   Offering a centralized pixel-distance interpretation for scroll values,
     instead of delegating that interpration to each UI client. This is work in
-    progress, see [https://fxbug.dev/85388](https://fxbug.dev/42166281).
+    progress, see [https://fxbug.dev/42166281](https://fxbug.dev/42166281).
 
 Generally, these fields may be extended in the future, to support a richer or
 more precise interpretation of scroll movement. Pixel-distance interpretation is

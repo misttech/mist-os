@@ -89,7 +89,7 @@ fuchsia_test_package("vkreadback_test_package") {
   test_components = [ ":vkreadback_test_component" ]
   subpackages = [ ":vkreadback_test_child_package" ]
   test_specs = {
-    # TODO(https://fxbug.dev/47373): Restore astro_env when https://fxbug.dev/42120999 is fixed.
+    # TODO(https://fxbug.dev/42124112): Restore astro_env when https://fxbug.dev/42120999 is fixed.
     environments = vulkan_envs + [ astro_env ] - [ astro_env ]
   }
 }

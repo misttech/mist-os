@@ -1099,7 +1099,7 @@ alias ArrayAlias = array<uint32, 4>;
 
 alias NestedArrayAlias = array<array<Struct, 8>, 4>;
 
-// TODO(https://fxbug.dev/105758, https://fxbug.dev/42172915): Aliases are currently broken.
+// TODO(https://fxbug.dev/42057022, https://fxbug.dev/42172915): Aliases are currently broken.
 // Exercise more complicated aliases (e.g., aliases of aliases) when fixed.
 
 `)
@@ -1601,7 +1601,7 @@ closed protocol SyscallWithParameters {
 	}
 }
 
-// TODO(https://fxbug.dev/105758, https://fxbug.dev/42065140): Tests a workaround for these bugs,
+// TODO(https://fxbug.dev/42057022, https://fxbug.dev/42065140): Tests a workaround for these bugs,
 // needed until one of them is fixed.
 func TestCanSummarizeSyscallsWithZxStatusErrors(t *testing.T) {
 	wd := t.TempDir()

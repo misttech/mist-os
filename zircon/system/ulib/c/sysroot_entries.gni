@@ -88,7 +88,7 @@ sysroot_uninstrumented_libc_entries = [
         "zircon/types.h",
 
         # Note: Most of zircon/device is excluded from SDKs.
-        # TODO(https://fxbug.dev/7610,https://fxbug.dev/42107431): remove this allowlist.
+        # TODO(https://fxbug.dev/42155967,https://fxbug.dev/42107431): remove this allowlist.
         "zircon/device/audio.h",
       ]
 

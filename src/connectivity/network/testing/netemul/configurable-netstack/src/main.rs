@@ -93,7 +93,7 @@ impl Into<fnetemul::ConfigurationError> for InterfaceConfigError {
             | InterfaceConfigError::DeviceConnectionNotProvided => {
                 fnetemul::ConfigurationError::InvalidArguments
             }
-            // TODO(https://fxbug.dev/95738, https://fxbug.dev/42177895): map invalid arguments
+            // TODO(https://fxbug.dev/42177777, https://fxbug.dev/42177895): map invalid arguments
             // errors from the netstack to `ConfigurationError.INVALID_ARGUMENTS` rather
             // than `ConfigurationError.REJECTED_BY_NETSTACK`.
             InterfaceConfigError::Netstack(_) => fnetemul::ConfigurationError::RejectedByNetstack,

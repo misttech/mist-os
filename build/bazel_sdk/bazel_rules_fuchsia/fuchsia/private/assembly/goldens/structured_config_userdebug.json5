@@ -11,7 +11,7 @@
             },
         },
         "fuchsia-pkg://fuchsia.com/fonts#meta/fonts.cm": {
-            // TODO(fxbug.dev/126302): Remove transitional once all
+            // TODO(fxbug.dev/42077070): Remove transitional once all
             // builds use the config field.
             transitional: true,
             fields: {
@@ -22,7 +22,7 @@
                     // The "" value is skipped by the fonts server.
                     expected_value: "",
 
-                    // TODO(fxbug.dev/128561): Remove once transition ends.
+                    // TODO(fxbug.dev/42079026): Remove once transition ends.
                     transitional: true,
                 },
             },

@@ -642,12 +642,12 @@ func (c *compiler) computeHandleSubtype(t fidlgen.Type) (fidlgen.ObjectType, boo
 	case fidlgen.HandleType:
 		return fidlgen.ObjectType(t.ObjType), true
 	case fidlgen.RequestType:
-		// TODO(https://fxbug.dev/45998 & https://fxbug.dev/42143256): Currently, fidlc does not emit an
+		// TODO(https://fxbug.dev/42122583 & https://fxbug.dev/42143256): Currently, fidlc does not emit an
 		// object type for request types. Internally, fidlc does not interpret
 		// request types as special channel handles.
 		return fidlgen.ObjectTypeChannel, true
 	case fidlgen.IdentifierType:
-		// TODO(https://fxbug.dev/45998 & https://fxbug.dev/42143256): Same issue as above, but for the
+		// TODO(https://fxbug.dev/42122583 & https://fxbug.dev/42143256): Same issue as above, but for the
 		// reciprocal. Once we properly represent `client_end:P` and
 		// `server_end:P` as further constraints on a handle, we can solve this
 		// cleanly.

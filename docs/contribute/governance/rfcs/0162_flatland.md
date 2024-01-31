@@ -143,7 +143,7 @@ We are planning to eventually convert every graphics example to Flatland. We do
 not have any clients that strictly need to live in a 3D world. We are currently
 working on having a Flatland presenter to be the basis for the addition and
 migration of in-tree integration tests
-[https://fxbug.dev/76315](https://fxbug.dev/42156206). This will prepare us towards the
+[https://fxbug.dev/42156206](https://fxbug.dev/42156206). This will prepare us towards the
 future migration of some critical external clients, such as Flutter and
 Chromium.
 
@@ -237,17 +237,17 @@ There are some areas that we plan to work on for improving Flatland API:
 
 * Each Flatland instance will have a ViewRef associated with it, and methods to
   grab a ViewRef of yourself and your children. See
-  [https://fxbug.dev/79630](https://fxbug.dev/42159888).
+  [https://fxbug.dev/42159888](https://fxbug.dev/42159888).
 * A "factory function" to bind input protocols to a specific Flatland instance,
   thus limiting their scope to the instance's view sub-tree. See
-  [https://fxbug.dev/79661](https://fxbug.dev/42159922).
+  [https://fxbug.dev/42159922](https://fxbug.dev/42159922).
 * Size and metrics flow one way, from parent to child, but the parent (and the
   mediating server) doesn't know which frame those size and metrics take effect,
   except for the very first frame. This has knock-on effects: user can see
   imperfect frames, and other APIs are exposed to latency in client logic. See
-  [https://fxbug.dev/76440](https://fxbug.dev/42156345).
+  [https://fxbug.dev/42156345](https://fxbug.dev/42156345).
 * Synchronizing Present() across multiple instances is considered but not yet
-  solved. See [https://fxbug.dev/79673](https://fxbug.dev/42159935).
+  solved. See [https://fxbug.dev/42159935](https://fxbug.dev/42159935).
 * Flatland will live under fuchsia.ui.composition namespace along with its
   dependencies. fuchsia.scenic.allocation and fuchsia.scenic.scheduling are also
-  moving under there. See [https://fxbug.dev/78648](https://fxbug.dev/42158797).
+  moving under there. See [https://fxbug.dev/42158797](https://fxbug.dev/42158797).

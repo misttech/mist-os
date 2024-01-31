@@ -79,7 +79,7 @@ bool GlobalEscherUsesSwiftShader();
 bool GlobalEscherUsesVirtualGpu();
 
 // Skip the test if Escher uses a specific device or a specific type of device.
-// TODO(https://fxbug.dev/49863), TODO(https://fxbug.dev/42131569): This is a workaround since some tests doesn't work
+// TODO(https://fxbug.dev/42126878), TODO(https://fxbug.dev/42131569): This is a workaround since some tests doesn't work
 // on SwiftShader ICD and FEMU. We should remove this macro after these issues
 // are resolved.
 #define SKIP_TEST_IF_ESCHER_USES_DEVICE(DeviceType)                                          \

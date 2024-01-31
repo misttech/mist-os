@@ -53,7 +53,7 @@ constexpr char kNotAFdrFile[] = "/data/not_a_fdr.txt";
 // all and specifically the data from memory_monitor) is included in the snapshot.zip generated
 // by the Feedback service. The memory_monitor Inspect data is critical to debug OOM crash
 // reports.
-// TODO(https://fxbug.dev/46216, https://fxbug.dev/42125347): remove delay.
+// TODO(https://fxbug.dev/42122827, https://fxbug.dev/42125347): remove delay.
 constexpr zx::duration kOOMCrashReportingDelay = zx::sec(90);
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////

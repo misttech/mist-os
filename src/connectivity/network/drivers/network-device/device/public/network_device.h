@@ -21,7 +21,7 @@ namespace network {
 
 namespace netdev = fuchsia_hardware_network;
 
-// TODO(https://fxbug.dev/133736): Remove this and related artifacts once all parents have migrated
+// TODO(https://fxbug.dev/42083623): Remove this and related artifacts once all parents have migrated
 // to FIDL.
 class NetworkDeviceImplBinder {
  public:

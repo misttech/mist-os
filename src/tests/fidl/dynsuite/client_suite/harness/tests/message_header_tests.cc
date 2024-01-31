@@ -32,7 +32,7 @@ CLIENT_TEST(60, ReceiveEventBadMagicNumber) {
   ASSERT_TRUE(reporter_event.fidl_error().has_value());
   ASSERT_EQ(reporter_event.fidl_error().value(), fidl_clientsuite::FidlErrorKind::kDecodingError);
 
-  // TODO(https://fxbug.dev/78906, https://fxbug.dev/42153903): Clients should close the channel
+  // TODO(https://fxbug.dev/42159083, https://fxbug.dev/42153903): Clients should close the channel
   // when an error occurs, but many of them don't actually.
   // ASSERT_TRUE(server_end().is_signal_present(ZX_CHANNEL_PEER_CLOSED));
 }
@@ -50,7 +50,7 @@ CLIENT_TEST(61, ReceiveEventUnexpectedTxid) {
   ASSERT_EQ(reporter_event.fidl_error().value(),
             fidl_clientsuite::FidlErrorKind::kUnexpectedMessage);
 
-  // TODO(https://fxbug.dev/78906, https://fxbug.dev/42153903): Clients should close the channel
+  // TODO(https://fxbug.dev/42159083, https://fxbug.dev/42153903): Clients should close the channel
   // when an error occurs, but many of them don't actually.
   // ASSERT_TRUE(server_end().is_signal_present(ZX_CHANNEL_PEER_CLOSED));
 }
@@ -68,7 +68,7 @@ CLIENT_TEST(62, ReceiveEventUnknownOrdinal) {
   ASSERT_EQ(reporter_event.fidl_error().value(),
             fidl_clientsuite::FidlErrorKind::kUnexpectedMessage);
 
-  // TODO(https://fxbug.dev/78906, https://fxbug.dev/42153903): Clients should close the channel
+  // TODO(https://fxbug.dev/42159083, https://fxbug.dev/42153903): Clients should close the channel
   // when an error occurs, but many of them don't actually.
   // ASSERT_TRUE(server_end().is_signal_present(ZX_CHANNEL_PEER_CLOSED));
 }
@@ -95,7 +95,7 @@ CLIENT_TEST(63, ReceiveResponseBadMagicNumber) {
   ASSERT_OK(server_end().write(response));
   WAIT_UNTIL_CALLBACK_RUN();
 
-  // TODO(https://fxbug.dev/78906, https://fxbug.dev/42153903): Clients should close the channel
+  // TODO(https://fxbug.dev/42159083, https://fxbug.dev/42153903): Clients should close the channel
   // when an error occurs, but many of them don't actually.
   // ASSERT_TRUE(server_end().is_signal_present(ZX_CHANNEL_PEER_CLOSED));
 }
@@ -130,7 +130,7 @@ CLIENT_TEST(64, ReceiveResponseUnexpectedTxid) {
   ASSERT_OK(server_end().write(response));
   WAIT_UNTIL_CALLBACK_RUN();
 
-  // TODO(https://fxbug.dev/78906, https://fxbug.dev/42153903): Clients should close the channel
+  // TODO(https://fxbug.dev/42159083, https://fxbug.dev/42153903): Clients should close the channel
   // when an error occurs, but many of them don't actually.
   // ASSERT_TRUE(server_end().is_signal_present(ZX_CHANNEL_PEER_CLOSED));
 }
@@ -153,7 +153,7 @@ CLIENT_TEST(65, ReceiveResponseWrongOrdinalKnown) {
   ASSERT_OK(server_end().write(response));
   WAIT_UNTIL_CALLBACK_RUN();
 
-  // TODO(https://fxbug.dev/78906, https://fxbug.dev/42153903): Clients should close the channel
+  // TODO(https://fxbug.dev/42159083, https://fxbug.dev/42153903): Clients should close the channel
   // when an error occurs, but many of them don't actually.
   // ASSERT_TRUE(server_end().is_signal_present(ZX_CHANNEL_PEER_CLOSED));
 }
@@ -174,7 +174,7 @@ CLIENT_TEST(67, ReceiveResponseWrongOrdinalUnknown) {
   ASSERT_OK(server_end().write(response));
   WAIT_UNTIL_CALLBACK_RUN();
 
-  // TODO(https://fxbug.dev/78906, https://fxbug.dev/42153903): Clients should close the channel
+  // TODO(https://fxbug.dev/42159083, https://fxbug.dev/42153903): Clients should close the channel
   // when an error occurs, but many of them don't actually.
   // ASSERT_TRUE(server_end().is_signal_present(ZX_CHANNEL_PEER_CLOSED));
 }

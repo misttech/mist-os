@@ -495,7 +495,7 @@ class fidl::Event<Method> { ... };
 * When the event does not use the error syntax:
   - When the event has a body, `fidl::Event<FooMethod>` inherits
     `FooMethodPayload`, i.e. the domain object type representing the event body.
-    See [https://fxbug.dev/90118](https://fxbug.dev/42171535).
+    See [https://fxbug.dev/42171535](https://fxbug.dev/42171535).
   - When the event has no body, `fidl::Event<FooMethod>` is empty.
 * When the event uses the error syntax:
   - When the success payload is not an empty struct, `fidl::Event<FooMethod>`

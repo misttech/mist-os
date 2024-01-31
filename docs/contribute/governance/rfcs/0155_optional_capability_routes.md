@@ -62,7 +62,7 @@ component uses an unavailable capability, but it unfortunately also allows
 builds to succeed when the capability route is misconfigured on builds where the
 capability _is_ available.
 
-Additionally once [https://fxbug.dev/92889][https://fxbug.dev/42174612] is resolved, scrutiny will also
+Additionally once [https://fxbug.dev/42174612][https://fxbug.dev/42174612] is resolved, scrutiny will also
 be validating capability routes that originate in the session realms. Oftentimes
 the session components depend on capabilities originating from outside of the
 session, which will add friction if one of these components wishes to be added

@@ -179,7 +179,7 @@ the validity of doc comments in `fidldoc` and rejecting to generate reference
 documents. (In both examples, graceful degradation is what is expected.)
 
 Allowing late validation invites an unpleasant kind of breakage-at-a-distance
-(e.g. [https://fxbug.dev/65465](https://fxbug.dev/42144169)): in a world where FIDL
+(e.g. [https://fxbug.dev/42144169](https://fxbug.dev/42144169)): in a world where FIDL
 libraries are provided as SDK artifacts, and integrated into downstream
 repositories, the developer running the backend is likely different from the
 FIDL library author. As a result, providing warnings or errors to the developer
@@ -220,7 +220,7 @@ changed and evolved. Keeping the IR and the downstream ecosystem thriving is
 already a large amount of scope (pragmatically speaking, i.e. number of people
 making changes to support this area). As the source language stabilizes,
 allowing tools or APIs to do direct source manipulation is something we might
-look at (e.g. [https://fxbug.dev/75672](https://fxbug.dev/42155491)), and work to enable.
+look at (e.g. [https://fxbug.dev/42155491](https://fxbug.dev/42155491)), and work to enable.
 
 ### Scaling compilation {#scaling-compilation}
 

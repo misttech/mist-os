@@ -25,7 +25,7 @@
             path: "/data",
         },
 
-        // TODO(https://fxbug.dev/98755): Remove once https://fxbug.dev/42167600 is fixed.
+        // TODO(https://fxbug.dev/42181123): Remove once https://fxbug.dev/42167600 is fixed.
         {
             directory: "tmp",
             rights: [ "rw*" ],
