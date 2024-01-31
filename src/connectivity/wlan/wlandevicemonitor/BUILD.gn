@@ -56,16 +56,13 @@ wlandevicemonitor_srcs = [
 ]
 
 wlandevicemonitor_test_deps = [
-  "//sdk/fidl/fuchsia.driver.test:fuchsia.driver.test_rust",
-  "//sdk/fidl/fuchsia.wlan.ieee80211:fuchsia.wlan.ieee80211_rust",
-  "//sdk/fidl/fuchsia.wlan.tap:fuchsia.wlan.tap_rust",
   "//src/connectivity/wlan/lib/common/rust/:wlan-common",
   "//src/connectivity/wlan/lib/ieee80211",
-  "//src/connectivity/wlan/testing/wlantap-client",
+  "//src/lib/fdio/rust:fdio",
+  "//src/lib/fidl/rust/fidl",
   "//src/lib/fuchsia",
-  "//src/lib/fuchsia-component",
+  "//src/storage/lib/vfs/rust:vfs",
   "//third_party/rust_crates:test-case",
-  "//third_party/rust_crates:zerocopy",
 ]
 
 rustc_binary("bin") {
@@ -128,22 +125,11 @@ fuchsia_package("wlandevicemonitor-legacy-privacy") {
   ]
 }
 
-fuchsia_component("wlandevicemonitor-test-component") {
-  testonly = true
-  deps = [
-    ":bin_test",
-    "//sdk/lib/driver_test_realm",
-    "//src/connectivity/wlan/testing:wlan_test_driver_deps",
-    "//src/devices/misc/drivers/test-parent",
-  ]
-  manifest = "meta/wlandevicemonitor_bin_test.cml"
-}
-
-fuchsia_test_package("wlandevicemonitor-tests") {
-  test_components = [ ":wlandevicemonitor-test-component" ]
+fuchsia_unittest_package("wlandevicemonitor-tests") {
   test_specs = {
     log_settings = {
       max_severity = "ERROR"
     }
   }
+  deps = [ ":bin_test" ]
 }

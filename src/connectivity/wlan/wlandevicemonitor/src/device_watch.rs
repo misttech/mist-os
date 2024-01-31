@@ -83,114 +83,94 @@ pub fn watch_phy_devices<'a>(
 mod tests {
     use {
         super::*,
-        crate::PHY_PATH,
-        fidl_fuchsia_driver_test as fdt, fidl_fuchsia_wlan_common as fidl_wlan_common,
-        fidl_fuchsia_wlan_device::{self as fidl_wlan_dev},
-        fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211, fidl_fuchsia_wlan_tap as fidl_wlantap,
+        fidl_fuchsia_wlan_device::{ConnectorRequest, ConnectorRequestStream},
         fuchsia_async as fasync,
-        fuchsia_component::client::connect_to_protocol,
         fuchsia_zircon::DurationNum as _,
         futures::{pin_mut, poll, stream::StreamExt as _, task::Poll},
-        std::convert::TryInto as _,
-        wlan_common::{ie::*, test_utils::ExpectWithin},
-        wlantap_client,
-        zerocopy::AsBytes,
+        std::sync::Arc,
+        tracing::info,
+        vfs::{
+            directory::entry::DirectoryEntry, execution_scope::ExecutionScope, path::Path,
+            pseudo_directory,
+        },
+        wlan_common::test_utils::ExpectWithin,
     };
 
     #[fasync::run_singlethreaded(test)]
-    async fn watch_phys() {
-        // Connect to and start driver test realm
-        let driver_test_realm_proxy = connect_to_protocol::<fdt::RealmMarker>()
-            .expect("Failed to connect to driver test realm");
+    async fn watch_single_phy() {
+        let fake_dir = pseudo_directory! {
+            "123" => serve_device_connector(),
+        };
 
-        let _ = driver_test_realm_proxy
-            .start(fdt::RealmArgs { use_driver_framework_v2: Some(true), ..Default::default() })
-            .await
-            .expect("FIDL error when starting driver test realm");
+        serve_and_bind_vfs(fake_dir.clone(), "/test-dev");
 
-        let phy_watcher = watch_phy_devices(PHY_PATH).expect("Failed to create phy_watcher");
+        let phy_watcher = watch_phy_devices("/test-dev").expect("Failed to create phy_watcher");
         pin_mut!(phy_watcher);
 
-        let wlantap =
-            wlantap_client::Wlantap::open().await.expect("Failed to connect to wlantapctl");
-
-        // Create an intentionally unused variable instead of a plain
-        // underscore. Otherwise, this end of the channel will be
-        // dropped and cause the phy device to begin unbinding.
-        let wlantap_phy =
-            wlantap.create_phy(create_wlantap_config()).await.expect("failed to create PHY");
         phy_watcher
             .next()
             .expect_within(60.seconds(), "phy_watcher did not respond")
             .await
             .expect("phy_watcher ended without yielding a phy")
             .expect("phy_watcher returned an error");
+
         if let Poll::Ready(..) = poll!(phy_watcher.next()) {
             panic!("phy_watcher found more than one phy");
         }
-
-        let () = wlantap_phy.shutdown().await.expect("shutdown operation failed");
     }
 
-    fn create_wlantap_config() -> fidl_wlantap::WlantapPhyConfig {
-        fidl_wlantap::WlantapPhyConfig {
-            sta_addr: [1; 6],
-            supported_phys: vec![
-                fidl_wlan_common::WlanPhyType::Dsss,
-                fidl_wlan_common::WlanPhyType::Hr,
-                fidl_wlan_common::WlanPhyType::Ofdm,
-                fidl_wlan_common::WlanPhyType::Erp,
-                fidl_wlan_common::WlanPhyType::Ht,
-            ],
-            mac_role: fidl_wlan_common::WlanMacRole::Client,
-            hardware_capability: 0,
-            bands: vec![create_2_4_ghz_band_info()],
-            name: String::from("devwatchtap"),
-            quiet: false,
-            discovery_support: fidl_wlan_common::DiscoverySupport {
-                scan_offload: fidl_wlan_common::ScanOffloadExtension {
-                    supported: false,
-                    scan_cancel_supported: false,
-                },
-                probe_response_offload: fidl_wlan_common::ProbeResponseOffloadExtension {
-                    supported: false,
-                },
-            },
-            mac_sublayer_support: fidl_wlan_common::MacSublayerSupport {
-                rate_selection_offload: fidl_wlan_common::RateSelectionOffloadExtension {
-                    supported: false,
-                },
-                data_plane: fidl_wlan_common::DataPlaneExtension {
-                    data_plane_type: fidl_wlan_common::DataPlaneType::EthernetDevice,
-                },
-                device: fidl_wlan_common::DeviceExtension {
-                    is_synthetic: false,
-                    mac_implementation_type: fidl_wlan_common::MacImplementationType::Softmac,
-                    tx_status_report_supported: false,
-                },
-            },
-            security_support: fidl_wlan_common::SecuritySupport {
-                sae: fidl_wlan_common::SaeFeature {
-                    driver_handler_supported: false,
-                    sme_handler_supported: false,
-                },
-                mfp: fidl_wlan_common::MfpFeature { supported: false },
-            },
-            spectrum_management_support: fidl_wlan_common::SpectrumManagementSupport {
-                dfs: fidl_wlan_common::DfsFeature { supported: false },
-            },
+    #[fasync::run_singlethreaded(test)]
+    async fn watch_multiple_phys() {
+        let fake_dir = pseudo_directory! {
+            "123" => serve_device_connector(),
+            "456" => serve_device_connector(),
+        };
+
+        serve_and_bind_vfs(fake_dir.clone(), "/test-dev");
+
+        let phy_watcher = watch_phy_devices("/test-dev").expect("Failed to create phy_watcher");
+        pin_mut!(phy_watcher);
+
+        for _ in 0..2 {
+            phy_watcher
+                .next()
+                .expect_within(60.seconds(), "phy_watcher did not respond")
+                .await
+                .expect("phy_watcher ended without yielding a phy")
+                .expect("phy_watcher returned an error");
+        }
+
+        if let Poll::Ready(..) = poll!(phy_watcher.next()) {
+            panic!("phy_watcher found more than one phy");
         }
     }
 
-    fn create_2_4_ghz_band_info() -> fidl_wlan_dev::BandInfo {
-        fidl_wlan_dev::BandInfo {
-            band: fidl_wlan_common::WlanBand::TwoGhz,
-            ht_caps: Some(Box::new(fidl_ieee80211::HtCapabilities {
-                bytes: fake_ht_capabilities().as_bytes().try_into().unwrap(),
-            })),
-            vht_caps: None,
-            rates: vec![2, 4, 11, 22, 12, 18, 24, 36, 48, 72, 96, 108],
-            operating_channels: vec![1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14],
-        }
+    fn serve_and_bind_vfs(vfs_dir: Arc<dyn DirectoryEntry>, path: &'static str) {
+        let (client, server) = fidl::endpoints::create_endpoints();
+        let scope = ExecutionScope::new();
+        vfs_dir.open(
+            scope.clone(),
+            fidl_fuchsia_io::OpenFlags::RIGHT_READABLE | fidl_fuchsia_io::OpenFlags::DIRECTORY,
+            Path::dot(),
+            fidl::endpoints::ServerEnd::new(server.into_channel()),
+        );
+
+        let ns = fdio::Namespace::installed().expect("failed to get installed namespace");
+        ns.bind(path, client).expect("Failed to bind dev in namespace");
+    }
+
+    fn serve_device_connector() -> Arc<vfs::service::Service> {
+        vfs::service::host(move |mut stream: ConnectorRequestStream| async move {
+            while let Some(request) = stream.next().await {
+                match request {
+                    Ok(ConnectorRequest::Connect { request: _request, .. }) => {
+                        info!("device connector got connect request");
+                    }
+                    Err(e) => {
+                        panic!("Unexpected error in device connector {:?}", e);
+                    }
+                }
+            }
+        })
     }
 }
