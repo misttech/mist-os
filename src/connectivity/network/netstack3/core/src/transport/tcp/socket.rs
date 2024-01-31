@@ -34,8 +34,8 @@ use assert_matches::assert_matches;
 use derivative::Derivative;
 use net_types::{
     ip::{
-        GenericOverIp, Ip, IpAddr, IpAddress, IpInvariant, IpVersionMarker, Ipv4, Ipv4Addr, Ipv6,
-        Ipv6Addr,
+        GenericOverIp, Ip, IpAddr, IpAddress, IpInvariant, IpVersion, IpVersionMarker, Ipv4,
+        Ipv4Addr, Ipv6, Ipv6Addr,
     },
     AddrAndZone, SpecifiedAddr, ZonedAddr,
 };
@@ -54,6 +54,7 @@ use crate::{
     data_structures::socketmap::{IterShadows as _, SocketMap},
     device::{self, AnyDevice, DeviceIdContext},
     error::{ExistsError, LocalAddressError, ZonedAddressError},
+    inspect::{Inspector, SocketAddressZoneProvider},
     ip::{
         icmp::IcmpErrorCode,
         socket::{
@@ -3155,15 +3156,14 @@ where
     }
 
     /// Provides access to shared and per-socket TCP stats via a visitor.
-    pub fn with_info<
-        V: InfoVisitor<I, <C::CoreContext as DeviceIdContext<AnyDevice>>::WeakDeviceId>,
-    >(
-        &mut self,
-        visitor: &mut V,
-    ) {
+    pub fn inspect<N>(&mut self, inspector: &mut N)
+    where
+        N: Inspector
+            + SocketAddressZoneProvider<<C::CoreContext as DeviceIdContext<AnyDevice>>::WeakDeviceId>,
+    {
         self.core_ctx().for_each_socket(|socket_state, converter| {
-            let stats: Option<SocketStats<I, _>> = match socket_state {
-                TcpSocketState::Unbound(_) => Some(SocketStats { local: None, remote: None }),
+            let (local, remote) = match socket_state {
+                TcpSocketState::Unbound(_) => (None, None),
                 TcpSocketState::Bound(BoundSocketState::Listener((_state, _sharing, addr))) => {
                     let Some(ListenerAddr { ip: ListenerIpAddr { identifier, addr }, ref device }) =
                         try_into_this_stack_listener_addr::<I, C::BindingsContext, C::CoreContext>(
@@ -3178,7 +3178,7 @@ where
                         ip: maybe_zoned(*addr.as_ref(), device),
                         port: *identifier,
                     });
-                    Some(SocketStats { local, remote: None })
+                    (local, None)
                 }
                 TcpSocketState::Bound(BoundSocketState::Connected((state, _sharing))) => {
                     let (defunct, addr) = match converter {
@@ -3192,30 +3192,60 @@ where
                             EitherStack::OtherStack((_conn, _addr)) => return,
                         },
                     };
-                    (!defunct).then(|| {
-                        let ConnAddr {
-                            ip:
-                                ConnIpAddr {
-                                    local: (local_ip, local_port),
-                                    remote: (remote_ip, remote_port),
-                                },
-                            ref device,
-                        } = *addr;
-                        let local = Some(SocketAddr {
-                            ip: maybe_zoned(*local_ip.as_ref(), device),
-                            port: local_port,
-                        });
-                        let remote = Some(SocketAddr {
-                            ip: maybe_zoned(*remote_ip.as_ref(), device),
-                            port: remote_port,
-                        });
-                        SocketStats { local, remote }
-                    })
+                    if defunct {
+                        return;
+                    }
+                    let ConnAddr {
+                        ip:
+                            ConnIpAddr {
+                                local: (local_ip, local_port),
+                                remote: (remote_ip, remote_port),
+                            },
+                        ref device,
+                    } = *addr;
+                    let local = Some(SocketAddr {
+                        ip: maybe_zoned(*local_ip.as_ref(), device),
+                        port: local_port,
+                    });
+                    let remote = Some(SocketAddr {
+                        ip: maybe_zoned(*remote_ip.as_ref(), device),
+                        port: remote_port,
+                    });
+                    (local, remote)
                 }
             };
-            if let Some(stats) = stats {
-                visitor.visit(stats);
-            }
+            inspector.record_unnamed_child(|node| {
+                node.record_str("TransportProtocol", "TCP");
+                node.record_str(
+                    "NetworkProtocol",
+                    match I::VERSION {
+                        IpVersion::V4 => "IPv4",
+                        IpVersion::V6 => "IPv6",
+                    },
+                );
+                match local {
+                    None => node.record_str("LocalAddress", "[NOT BOUND]"),
+                    Some(addr) => node.record_display(
+                        "LocalAddress",
+                        addr.map_zone(|device| {
+                            <N as SocketAddressZoneProvider<_>>::device_identifier_as_address_zone(
+                                device,
+                            )
+                        }),
+                    ),
+                };
+                match remote {
+                    None => node.record_str("RemoteAddress", "[NOT CONNECTED]"),
+                    Some(addr) => node.record_display(
+                        "RemoteAddress",
+                        addr.map_zone(|device| {
+                            <N as SocketAddressZoneProvider<_>>::device_identifier_as_address_zone(
+                                device,
+                            )
+                        }),
+                    ),
+                };
+            });
         });
     }
 }
@@ -3816,20 +3846,6 @@ where
         },
         conn_addr,
     ))
-}
-
-/// Statistics about an individual socket.
-pub struct SocketStats<I: Ip, D> {
-    /// The local address of the socket.
-    pub local: Option<SocketAddr<I::Addr, D>>,
-    /// The remote address of the socket.
-    pub remote: Option<SocketAddr<I::Addr, D>>,
-}
-
-/// Visitor for socket state.
-pub trait InfoVisitor<I: Ip, D> {
-    /// Called once for each TCP socket in the system.
-    fn visit(&mut self, state: SocketStats<I, D>);
 }
 
 /// Information about a socket.

@@ -117,3 +117,11 @@ pub trait InspectableValue {
     /// Records this value into `inspector`.
     fn record<I: Inspector>(&self, name: &str, inspector: &mut I);
 }
+
+/// Provides a `Display` representations of an IPv6 scoped address zone that is
+/// specialized for exporting to Inspect.
+pub trait SocketAddressZoneProvider<D> {
+    /// Returns the `Display` representation of the IPv6 scoped address zone
+    /// associated with `D`.
+    fn device_identifier_as_address_zone(id: D) -> impl Display;
+}

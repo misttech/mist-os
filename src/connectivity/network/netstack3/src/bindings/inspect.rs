@@ -11,12 +11,12 @@ use std::{fmt::Debug, string::ToString as _};
 
 use fuchsia_inspect::Node;
 use net_types::{
-    ip::{Ip, IpAddress, IpVersion, Ipv4, Ipv6},
+    ip::{Ip, IpAddress, Ipv4, Ipv6},
     Witness as _,
 };
 use netstack3_core::{
     device::{DeviceId, EthernetLinkDevice, WeakDeviceId},
-    neighbor, tcp,
+    neighbor,
 };
 
 use crate::bindings::{
@@ -98,39 +98,20 @@ impl<'a> netstack3_core::inspect::Inspector for BindingsInspector<'a> {
     }
 }
 
+impl<'a> netstack3_core::inspect::SocketAddressZoneProvider<WeakDeviceId<BindingsCtx>>
+    for BindingsInspector<'a>
+{
+    fn device_identifier_as_address_zone(id: WeakDeviceId<BindingsCtx>) -> impl std::fmt::Display {
+        id.bindings_id().id
+    }
+}
+
 /// Publishes netstack3 socket diagnostics data to Inspect.
 pub(crate) fn sockets(ctx: &mut Ctx) -> fuchsia_inspect::Inspector {
-    impl<'a, I: Ip> tcp::InfoVisitor<I, WeakDeviceId<BindingsCtx>> for DualIpVisitor<'a> {
-        fn visit(&mut self, socket: tcp::SocketStats<I, WeakDeviceId<BindingsCtx>>) {
-            let tcp::SocketStats { local, remote } = socket;
-            self.record_unique_child(|node| {
-                node.record_string("TransportProtocol", "TCP");
-                node.record_string(
-                    "NetworkProtocol",
-                    match I::VERSION {
-                        IpVersion::V4 => "IPv4",
-                        IpVersion::V6 => "IPv6",
-                    },
-                );
-                node.record_string(
-                    "LocalAddress",
-                    local.map_or("[NOT BOUND]".into(), |socket| {
-                        format!("{}", socket.map_zone(|device| device.bindings_id().id))
-                    }),
-                );
-                node.record_string(
-                    "RemoteAddress",
-                    remote.map_or("[NOT CONNECTED]".into(), |socket| {
-                        format!("{}", socket.map_zone(|device| device.bindings_id().id))
-                    }),
-                )
-            })
-        }
-    }
     let inspector = fuchsia_inspect::Inspector::new(Default::default());
-    let mut visitor = DualIpVisitor::new(inspector.root());
-    ctx.api().tcp::<Ipv4>().with_info(&mut visitor);
-    ctx.api().tcp::<Ipv6>().with_info(&mut visitor);
+    let mut bindings_inspector = BindingsInspector::new(inspector.root());
+    ctx.api().tcp::<Ipv4>().inspect(&mut bindings_inspector);
+    ctx.api().tcp::<Ipv6>().inspect(&mut bindings_inspector);
     inspector
 }
 

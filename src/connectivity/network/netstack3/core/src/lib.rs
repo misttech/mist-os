@@ -112,7 +112,7 @@ pub mod inspect {
     pub(crate) use base::*;
 
     // Re-exported types.
-    pub use base::{InspectableValue, Inspector};
+    pub use base::{InspectableValue, Inspector, SocketAddressZoneProvider};
 }
 
 /// Methods for dealing with ICMP sockets.
@@ -217,9 +217,9 @@ pub mod tcp {
         },
         segment::Payload,
         socket::{
-            AcceptError, BindError, BoundInfo, ConnectError, ConnectionInfo, InfoVisitor,
-            ListenError, ListenerNotifier, NoConnection, SetDeviceError, SetReuseAddrError,
-            SocketAddr, SocketInfo, SocketStats, TcpBindingsTypes, TcpSocketId, UnboundInfo,
+            AcceptError, BindError, BoundInfo, ConnectError, ConnectionInfo, ListenError,
+            ListenerNotifier, NoConnection, SetDeviceError, SetReuseAddrError, SocketAddr,
+            SocketInfo, TcpBindingsTypes, TcpSocketId, UnboundInfo,
         },
         state::Takeable,
         BufferSizes, ConnectionError, SocketOptions, DEFAULT_FIN_WAIT2_TIMEOUT,
