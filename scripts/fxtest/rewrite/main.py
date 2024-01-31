@@ -422,12 +422,11 @@ async def validate_test_selections(
                 suggestion_args = [
                     "search-tests",
                     f"--max-results={flags.suggestion_count}",
+                    "--color" if flags.style else "--no-color",
                     arg,
                 ]
                 if threshold is not None:
                     suggestion_args += ["--threshold", str(threshold)]
-                if not flags.style:
-                    suggestion_args += ["--no-color"]
                 return [name] + suggestion_args
 
             arg_threshold_pairs = []

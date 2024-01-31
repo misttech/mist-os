@@ -366,8 +366,8 @@ class TestMainIntegration(unittest.IsolatedAsyncioTestCase):
                         "fx",
                         "search-tests",
                         f"--max-results={expected_suggestion_count}",
-                        "non_existent_test_does_not_match",
                         "--no-color",
+                        "non_existent_test_does_not_match",
                     ]
                 ],
             )

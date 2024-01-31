@@ -682,11 +682,14 @@ async def _console_event_loop(
                 )
 
         if next_event.error:
-            # Highlight all errors.
-            lines_to_print.append(
-                statusinfo.error_highlight(
-                    "ERROR: " + next_event.error, style=flags.style
-                )
+            # Highlight all errors, adding an extra line to prevent overwrite.
+            # TODO(https://fxbug.dev/323028379): Ensure this doesn't get overwritten.
+            lines_to_print.extend(
+                [
+                    statusinfo.error_highlight(line, style=flags.style)
+                    for line in ("ERROR: " + next_event.error).splitlines()
+                    + [""]
+                ]
             )
 
         if lines_to_print:
