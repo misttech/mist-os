@@ -502,6 +502,7 @@ suite_labels = [
   loopback_test_label,
   raw_packet_test_label,
   tcp_blocking_test_label,
+  tcp_test_label,
   udp_raw_test_label,
   udp_test_label,
   udp_unbound_test_label,
