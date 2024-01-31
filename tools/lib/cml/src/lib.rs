@@ -2786,6 +2786,9 @@ pub struct Use {
     /// - `transitional`: the source may omit the route completely without even having to route
     ///     from `void`. Used for soft transitions that introduce new capabilities.
     /// This property is disallowed for runner capabilities, which are always `required`.
+    ///
+    /// For more information, see the
+    /// [availability][/docs/concepts/components/v2/capabilities/availability.md] documentation.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub availability: Option<Availability>,
 
@@ -2910,6 +2913,9 @@ pub struct Expose {
     ///     `optional`.
     /// - `transitional`: like `optional`, but will tolerate a missing source. Use this
     ///     only to avoid validation errors during transitional periods of multi-step code changes.
+    ///
+    /// For more information, see the
+    /// [availability][/docs/concepts/components/v2/capabilities/availability.md] documentation.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub availability: Option<Availability>,
 
@@ -3102,6 +3108,9 @@ pub struct Offer {
     ///     `optional`.
     /// - `transitional`: like `optional`, but will tolerate a missing source. Use this
     ///     only to avoid validation errors during transitional periods of multi-step code changes.
+    ///
+    /// For more information, see the
+    /// [availability][/docs/concepts/components/v2/capabilities/availability.md] documentation.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub availability: Option<Availability>,
 

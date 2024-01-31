@@ -195,6 +195,8 @@ declaration:
 }
 ```
 
+For more information on how `availability` works, see [Availability][doc-availability].
+
 ### Client library includes {#component-manifest-includes}
 
 As shown above, the component manifest supports "include" syntax, which allows
@@ -1356,6 +1358,7 @@ For more details on building capability routes, see [Connect components][doc-con
 [cml-program]: https://fuchsia.dev/reference/cml#program
 [components-migration]: /docs/contribute/open_projects/components/migration.md
 [cpp-syslog]: /docs/development/languages/c-cpp/logging.md#component_manifest_dependency
+[doc-availability]: /docs/concepts/components/v2/capabilities/availability.md
 [doc-connect]: /docs/development/components/connect.md
 [doc-inspect]: /docs/development/diagnostics/inspect/README.md
 [executable]: https://gn.googlesource.com/gn/+/HEAD/docs/reference.md#func_executable

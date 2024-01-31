@@ -573,6 +573,9 @@ this component and the capability's source.
     - `transitional`: the source may omit the route completely without even having to route
         from `void`. Used for soft transitions that introduce new capabilities.
     This property is disallowed for runner capabilities, which are always `required`.
+
+    For more information, see the
+    [availability][/docs/concepts/components/v2/capabilities/availability.md] documentation.
 - `config_key`: (_optional `string`_) (`config` only) The configuration key in the component's `config` block that this capability
     will set.
 
@@ -658,6 +661,9 @@ One and only one of the capability type keys (`protocol`, `directory`, `service`
         `optional`.
     - `transitional`: like `optional`, but will tolerate a missing source. Use this
         only to avoid validation errors during transitional periods of multi-step code changes.
+
+    For more information, see the
+    [availability][/docs/concepts/components/v2/capabilities/availability.md] documentation.
 - `source_availability`: (_optional `string`_) Whether or not the source of this offer must exist. One of:
     - `required` (default): the source (`from`) must be defined in this manifest.
     - `unknown`: the source of this offer will be rewritten to `void` if its source (`from`)
@@ -759,6 +765,9 @@ instance or a [child collection][doc-collections].
         `optional`.
     - `transitional`: like `optional`, but will tolerate a missing source. Use this
         only to avoid validation errors during transitional periods of multi-step code changes.
+
+    For more information, see the
+    [availability][/docs/concepts/components/v2/capabilities/availability.md] documentation.
 - `source_availability`: (_optional `string`_) Whether or not the source of this offer must exist. One of:
     - `required` (default): the source (`from`) must be defined in this manifest.
     - `unknown`: the source of this offer will be rewritten to `void` if its source (`from`)

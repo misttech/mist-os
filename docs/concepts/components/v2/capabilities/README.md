@@ -30,6 +30,9 @@ the framework for the realms where they are assigned. Capabilities routed to
 environments are accessed and used by the framework. Component instances do not
 have runtime access to the capabilities in their environment.
 
+The [availability][capability-availability] feature lets components declare expectations
+about the circumstances under which they expect capabilities to be available.
+
 ### Routing terminology {#routing-terminology}
 
 Routing terminology divides into the following categories:
@@ -118,6 +121,7 @@ For more information on how components connect to capabilities at runtime, see
 [capability-storage]: /docs/concepts/components/v2/capabilities/storage.md
 [capability-resolver]: /docs/concepts/components/v2/capabilities/resolver.md
 [capability-runner]: /docs/concepts/components/v2/capabilities/runner.md
+[capability-availability]: /docs/concepts/components/v2/capabilities/availability.md
 [doc-children]: /docs/concepts/components/v2/realms.md##child-component-instances
 [doc-collections]: /docs/concepts/components/v2/realms.md#collections
 [doc-component-manifest]: /docs/concepts/components/v2/component_manifests.md
