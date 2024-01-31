@@ -6,8 +6,9 @@
 #define LIB_DRIVER_DEVICETREE_VISITORS_DEFAULT_BTI_BTI_H_
 
 #include <lib/driver/devicetree/manager/visitor.h>
-#include <lib/driver/devicetree/visitors/reference-property.h>
+#include <lib/driver/devicetree/visitors/property-parser.h>
 
+#include <memory>
 #include <vector>
 
 namespace fdf_devicetree {
@@ -27,7 +28,7 @@ class BtiVisitor : public Visitor {
                                    PropertyCells reference_cells);
 
   std::vector<Phandle> iommu_nodes_;
-  ReferencePropertyParser reference_parser_;
+  std::unique_ptr<PropertyParser> reference_parser_;
 };
 
 }  // namespace fdf_devicetree

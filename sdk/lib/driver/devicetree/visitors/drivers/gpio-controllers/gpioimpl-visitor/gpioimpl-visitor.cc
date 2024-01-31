@@ -14,6 +14,7 @@
 #include <zircon/errors.h>
 
 #include <cstdint>
+#include <memory>
 #include <optional>
 #include <string_view>
 #include <utility>
@@ -22,8 +23,6 @@
 #include <bind/fuchsia/cpp/bind.h>
 #include <bind/fuchsia/gpio/cpp/bind.h>
 #include <ddk/metadata/gpio.h>
-
-#include "src/lib/ddk/include/ddk/metadata/gpio.h"
 
 namespace gpio_impl_dt {
 
@@ -64,15 +63,13 @@ class GpioCells {
 }  // namespace
 
 // TODO(b/314693127): Name of the reference property can be *-gpios.
-GpioImplVisitor::GpioImplVisitor()
-    : gpio_parser_(
-          "gpios", "#gpio-cells", "gpio-names",
-          [this](fdf_devicetree::ReferenceNode& node) { return this->is_match(node.properties()); },
-          [this](fdf_devicetree::Node& child, fdf_devicetree::ReferenceNode& parent,
-                 fdf_devicetree::PropertyCells specifiers,
-                 std::optional<std::string> reference_name) {
-            return this->ParseReferenceChild(child, parent, specifiers, std::move(reference_name));
-          }) {}
+GpioImplVisitor::GpioImplVisitor() {
+  fdf_devicetree::Properties properties = {};
+  properties.emplace_back(
+      std::make_unique<fdf_devicetree::ReferenceProperty>(kGpioReference, kGpioCells));
+  properties.emplace_back(std::make_unique<fdf_devicetree::StringListProperty>(kGpioNames));
+  gpio_parser_ = std::make_unique<fdf_devicetree::PropertyParser>(std::move(properties));
+}
 
 bool GpioImplVisitor::is_match(
     const std::unordered_map<std::string_view, devicetree::PropertyValue>& properties) {
@@ -82,23 +79,44 @@ bool GpioImplVisitor::is_match(
 
 zx::result<> GpioImplVisitor::Visit(fdf_devicetree::Node& node,
                                     const devicetree::PropertyDecoder& decoder) {
-  zx::result result;
   auto gpio_hog = node.properties().find("gpio-hog");
 
   if (gpio_hog != node.properties().end()) {
     // Node containing gpio-hog property are to be parsed differently. They will be used to
     // construct gpio init step metadata.
-    result = ParseInitChild(node);
+    auto result = ParseInitChild(node);
+    if (result.is_error()) {
+      FDF_LOG(ERROR, "Gpio visitor failed for node '%s' : %s", node.name().c_str(),
+              result.status_string());
+    }
   } else {
-    result = gpio_parser_.Visit(node, decoder);
+    auto parser_output = gpio_parser_->Parse(node);
+
+    if (parser_output->find(kGpioReference) == parser_output->end()) {
+      return zx::ok();
+    }
+
+    if (parser_output->find(kGpioNames) == parser_output->end() ||
+        (*parser_output)[kGpioReference].size() != (*parser_output)[kGpioReference].size()) {
+      // We need a clock names to generate bind rules.
+      FDF_LOG(ERROR, "Gpio reference '%s' does not have valid gpio names field.",
+              node.name().c_str());
+      return zx::error(ZX_ERR_INVALID_ARGS);
+    }
+
+    for (uint32_t index = 0; index < (*parser_output)[kGpioReference].size(); index++) {
+      auto reference = (*parser_output)[kGpioReference][index].AsReference();
+      if (reference && is_match(reference->first.properties())) {
+        auto result = ParseReferenceChild(node, reference->first, reference->second,
+                                          (*parser_output)[kGpioNames][index].AsString());
+        if (result.is_error()) {
+          return result.take_error();
+        }
+      }
+    }
   }
 
-  if (result.is_error()) {
-    FDF_LOG(ERROR, "Gpio visitor failed for node '%s' : %s", node.name().c_str(),
-            result.status_string());
-  }
-
-  return result;
+  return zx::ok();
 }
 
 zx::result<> GpioImplVisitor::AddChildNodeSpec(fdf_devicetree::Node& child, uint32_t pin,
@@ -231,11 +249,12 @@ GpioImplVisitor::GpioController& GpioImplVisitor::GetController(fdf_devicetree::
 zx::result<> GpioImplVisitor::ParseReferenceChild(fdf_devicetree::Node& child,
                                                   fdf_devicetree::ReferenceNode& parent,
                                                   fdf_devicetree::PropertyCells specifiers,
-                                                  std::optional<std::string> reference_name) {
-  if (!reference_name) {
+                                                  std::optional<std::string_view> gpio_name) {
+  if (!gpio_name) {
     FDF_LOG(ERROR, "Gpio reference '%s' does not have a name", child.name().c_str());
     return zx::error(ZX_ERR_INVALID_ARGS);
   }
+  auto reference_name = std::string(*gpio_name);
 
   auto& controller = GetController(*parent.phandle());
 
@@ -249,16 +268,16 @@ zx::result<> GpioImplVisitor::ParseReferenceChild(fdf_devicetree::Node& child,
   auto cells = GpioCells(specifiers);
   gpio_pin_t pin;
   pin.pin = cells.pin();
-  strncpy(pin.name, reference_name->c_str(), sizeof(pin.name));
+  strncpy(pin.name, reference_name.c_str(), sizeof(pin.name));
 
   FDF_LOG(DEBUG, "Gpio pin added - pin 0x%x name '%s' to controller '%s'", cells.pin(),
-          reference_name->c_str(), parent.name().c_str());
+          reference_name.c_str(), parent.name().c_str());
 
   controller.gpio_pins_metadata.insert(controller.gpio_pins_metadata.end(),
                                        reinterpret_cast<const uint8_t*>(&pin),
                                        reinterpret_cast<const uint8_t*>(&pin) + sizeof(gpio_pin_t));
 
-  return AddChildNodeSpec(child, pin.pin, *reference_name);
+  return AddChildNodeSpec(child, pin.pin, reference_name);
 }
 
 zx::result<> GpioImplVisitor::FinalizeNode(fdf_devicetree::Node& node) {

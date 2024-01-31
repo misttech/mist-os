@@ -37,7 +37,7 @@ source_set("driver-visitor") {
   public = [ "driver-visitor.h" ]
   deps = [ "//sdk/lib/driver/logging/cpp" ]
   public_deps = [
-    ":reference-property",
+    ":property-parser",
     "//sdk/lib/driver/devicetree/manager:headers",
     "//zircon/system/ulib/zx",
   ]
@@ -56,9 +56,9 @@ source_set("registration") {
   ]
 }
 
-source_set("reference-property") {
-  sources = [ "reference-property.cc" ]
-  public = [ "reference-property.h" ]
+source_set("property-parser") {
+  sources = [ "property-parser.cc" ]
+  public = [ "property-parser.h" ]
   deps = [
     ":common-types",
     "//sdk/lib/driver/logging/cpp",
@@ -73,7 +73,7 @@ source_set("interrupt-parser") {
   sources = [ "interrupt-parser.cc" ]
   public = [ "interrupt-parser.h" ]
   deps = [ "//sdk/lib/driver/logging/cpp" ]
-  public_deps = [ ":reference-property" ]
+  public_deps = [ ":property-parser" ]
 }
 
 source_set("common-types") {

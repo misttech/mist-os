@@ -9,39 +9,46 @@
 
 #include <cstdint>
 #include <optional>
+#include <utility>
+#include <vector>
 
 namespace fdf_devicetree {
 
-InterruptParser::InterruptParser(ReferenceNodeMatchCallback node_matcher,
-                                 ReferenceChildCallback child_callback)
-    : ReferencePropertyParser(
-          "interrupts-extended", "#interrupt-cells", std::nullopt,
-          [this](fdf_devicetree::ReferenceNode& node) { return this->node_matcher_(node); },
-          [this](fdf_devicetree::Node& child, fdf_devicetree::ReferenceNode& parent,
-                 fdf_devicetree::PropertyCells specifiers,
-                 std::optional<std::string> reference_name) {
-            return this->child_callback_(child, parent, specifiers, reference_name);
-          }),
-      node_matcher_(std::move(node_matcher)),
-      child_callback_(std::move(child_callback)) {}
+auto make_interrupt_properties = []() {
+  Properties props = {};
+  props.emplace_back(std::make_unique<ReferenceProperty>(InterruptParser::kInterruptsExtended,
+                                                         InterruptParser::kInterruptCells));
+  return props;
+};
 
-zx::result<> InterruptParser::Visit(fdf_devicetree::Node& node,
-                                    const devicetree::PropertyDecoder& decoder) {
-  auto status = ReferencePropertyParser::Visit(node, decoder);
-  if (status.is_error()) {
+InterruptParser::InterruptParser() : PropertyParser(make_interrupt_properties()) {}
+
+zx::result<PropertyValues> InterruptParser::Parse(Node& node) {
+  auto interrupt_values = PropertyParser::Parse(node);
+  if (interrupt_values.is_error()) {
     FDF_LOG(ERROR, "Interrupts-extended parser failed for node '%s - %s", node.name().c_str(),
-            status.status_string());
-    return status.take_error();
+            interrupt_values.status_string());
+    return interrupt_values.take_error();
   }
 
-  auto interrupts_property = node.properties().find("interrupts");
+  // "interrupts-extended" takes precedence over "interrupts". Return if kInterruptsExtended
+  // exists.
+  if (interrupt_values->find(kInterruptsExtended) != interrupt_values->end()) {
+    return zx::ok(*interrupt_values);
+  }
+
+  // Convert "interrupts" property into "interrupts-extended" ReferenceProperty type for ease of
+  // processing it in the interrupt visitor.
+
+  // Return early if there are no "interrupts" property for this node.
+  auto interrupts_property = node.properties().find(kInterrupts);
   if (interrupts_property == node.properties().end()) {
-    return zx::ok();
+    return zx::ok(*interrupt_values);
   }
 
   // Find the interrupt parent.
-  fdf_devicetree::ReferenceNode interrupt_parent(nullptr);
-  fdf_devicetree::ParentNode current(&node);
+  ReferenceNode interrupt_parent(nullptr);
+  ParentNode current(&node);
   // Traverse the parent chain upwards until interrupt parent or interrupt controller is
   // encountered.
   while (current) {
@@ -55,7 +62,7 @@ zx::result<> InterruptParser::Visit(fdf_devicetree::Node& node,
       auto result = node.GetReferenceNode(*phandle);
       if (result.is_error()) {
         FDF_LOG(ERROR, "Failed to get reference node for phandle %d - %s ", *phandle,
-                status.status_string());
+                result.status_string());
         return result.take_error();
       }
       interrupt_parent = *result;
@@ -75,14 +82,7 @@ zx::result<> InterruptParser::Visit(fdf_devicetree::Node& node,
     return zx::error(ZX_ERR_NOT_FOUND);
   }
 
-  // Parse interrupt by calling the child callback, if the interrupt parent is related to the
-  // current visitor.
-
-  if (!node_matcher_(interrupt_parent)) {
-    return zx::ok();
-  }
-
-  auto cell_width_prop = interrupt_parent.properties().find("#interrupt-cells");
+  auto cell_width_prop = interrupt_parent.properties().find(kInterruptCells);
   if (cell_width_prop == current.properties().end()) {
     FDF_LOG(
         ERROR,
@@ -108,18 +108,15 @@ zx::result<> InterruptParser::Visit(fdf_devicetree::Node& node,
     return zx::error(ZX_ERR_INVALID_ARGS);
   }
 
-  for (size_t idx = 0; idx < cell_count; idx += cell_width.value()) {
+  std::vector<PropertyValue> interrupt_references;
+  for (size_t offset = 0; offset < cell_count; offset += cell_width.value()) {
     PropertyCells interrupt = interrupts_property->second.AsBytes().subspan(
-        idx * sizeof(uint32_t), (*cell_width) * sizeof(uint32_t));
-    auto status = child_callback_(node, interrupt_parent, interrupt, std::nullopt);
-    if (status.is_error()) {
-      FDF_LOG(ERROR, "Failed to parse interrupt elements of node '%s' - %s", node.name().c_str(),
-              status.status_string());
-      return status.take_error();
-    }
+        offset * sizeof(uint32_t), (*cell_width) * sizeof(uint32_t));
+    interrupt_references.emplace_back(interrupt, interrupt_parent);
   }
+  (*interrupt_values)[kInterruptsExtended] = std::move(interrupt_references);
 
-  return zx::ok();
+  return zx::ok(*interrupt_values);
 }
 
 }  // namespace fdf_devicetree

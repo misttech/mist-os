@@ -15,8 +15,9 @@
 #include <zircon/assert.h>
 
 #include <cstdint>
+#include <memory>
 #include <optional>
-#include <string_view>
+#include <string>
 #include <utility>
 #include <vector>
 
@@ -73,17 +74,47 @@ class RegisterCells {
 
 }  // namespace
 
-RegistersVisitor::RegistersVisitor()
-    : DriverVisitor({"fuchsia,registers"}),
-      register_parser_(
-          "registers", "#register-cells", "register-names",
-          [this](fdf_devicetree::ReferenceNode& node) { return this->is_match(node.properties()); },
-          [this](fdf_devicetree::Node& child, fdf_devicetree::ReferenceNode& parent,
-                 fdf_devicetree::PropertyCells specifiers,
-                 std::optional<std::string> reference_name) {
-            return this->ParseReferenceChild(child, parent, specifiers, std::move(reference_name));
-          }) {
-  fdf_devicetree::DriverVisitor::AddReferencePropertyParser(&register_parser_);
+RegistersVisitor::RegistersVisitor() : DriverVisitor({"fuchsia,registers"}) {
+  fdf_devicetree::Properties properties = {};
+  properties.emplace_back(std::make_unique<fdf_devicetree::StringListProperty>(kRegisterNames));
+  properties.emplace_back(
+      std::make_unique<fdf_devicetree::ReferenceProperty>(kRegisterReference, kRegisterCells));
+  register_parser_ = std::make_unique<fdf_devicetree::PropertyParser>(std::move(properties));
+}
+
+zx::result<> RegistersVisitor::Visit(fdf_devicetree::Node& node,
+                                     const devicetree::PropertyDecoder& decoder) {
+  // Call register parser on all nodes, not just the register device node as we need to parse
+  // register reference properties.
+  auto parser_output = register_parser_->Parse(node);
+  if (parser_output.is_error()) {
+    return parser_output.take_error();
+  }
+
+  if (parser_output->find(kRegisterReference) == parser_output->end()) {
+    return zx::ok();
+  }
+
+  size_t count = (*parser_output)[kRegisterReference].size();
+  std::vector<std::optional<std::string>> register_names(count);
+  if (parser_output->find(kRegisterNames) != parser_output->end()) {
+    size_t name_idx = 0;
+    for (auto& names : (*parser_output)[kRegisterNames]) {
+      register_names[name_idx++] = names.AsString();
+    }
+  }
+
+  for (uint32_t index = 0; index < count; index++) {
+    auto reference = (*parser_output)[kRegisterReference][index].AsReference();
+    if (reference && is_match(reference->first.properties())) {
+      auto result =
+          ParseRegisterChild(node, reference->first, reference->second, register_names[index]);
+      if (result.is_error()) {
+        return result.take_error();
+      }
+    }
+  }
+  return zx::ok();
 }
 
 zx::result<> RegistersVisitor::AddChildNodeSpec(fdf_devicetree::Node& child,
@@ -110,10 +141,10 @@ zx::result<> RegistersVisitor::AddChildNodeSpec(fdf_devicetree::Node& child,
   return zx::ok();
 }
 
-zx::result<> RegistersVisitor::ParseReferenceChild(fdf_devicetree::Node& child,
-                                                   fdf_devicetree::ReferenceNode& parent,
-                                                   fdf_devicetree::PropertyCells specifiers,
-                                                   std::optional<std::string> reference_name) {
+zx::result<> RegistersVisitor::ParseRegisterChild(fdf_devicetree::Node& child,
+                                                  fdf_devicetree::ReferenceNode& parent,
+                                                  fdf_devicetree::PropertyCells specifiers,
+                                                  std::optional<std::string> register_name) {
   auto controller_iter = register_controllers_.find(*parent.phandle());
   if (controller_iter == register_controllers_.end()) {
     register_controllers_[*parent.phandle()] = RegisterController();
@@ -133,13 +164,15 @@ zx::result<> RegistersVisitor::ParseReferenceChild(fdf_devicetree::Node& child,
     }
   }
 
-  std::string register_name = reference_name.value_or(child.name());
-  if (!reference_name) {
-    FDF_LOG(DEBUG, "Register reference '%s' does not have a register name.", child.name().c_str());
+  if (!register_name) {
+    FDF_LOG(DEBUG,
+            "Register reference '%s' does not have a register name, will be using child name.",
+            child.name().c_str());
   }
 
   // Check if a register for the name already exists.
-  auto register_it = controller.registers.find(register_name);
+  std::string name = register_name.value_or(child.name());
+  auto register_it = controller.registers.find(name);
   RegistersMetadataEntry register_entry =
       register_it != controller.registers.end() ? register_it->second : RegistersMetadataEntry();
 
@@ -159,20 +192,20 @@ zx::result<> RegistersVisitor::ParseReferenceChild(fdf_devicetree::Node& child,
   FDF_LOG(DEBUG,
           "Mask added to controller '%s'- mask 0x%lx(%d) offset 0x%lx overlap %d bind name '%s'",
           parent.name().c_str(), cells.mask_as_u64(), cells.size(), *mask.mmio_offset(),
-          *mask.overlap_check_on(), register_name.c_str());
+          *mask.overlap_check_on(), name.c_str());
 
   if (!register_entry.masks()) {
     register_entry.masks() = std::vector<MaskEntry>();
   }
 
   register_entry.masks()->push_back(std::move(mask));
-  register_entry.name(register_name);
+  register_entry.name(name);
 
   // For now supporting only one mmio region per devicetree node.
   register_entry.mmio_id(0);
-  controller.registers[register_name] = register_entry;
+  controller.registers[name] = register_entry;
 
-  return AddChildNodeSpec(child, reference_name);
+  return AddChildNodeSpec(child, register_name);
 }
 
 zx::result<> RegistersVisitor::DriverFinalizeNode(fdf_devicetree::Node& node) {

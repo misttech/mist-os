@@ -41,23 +41,35 @@ class IommuCell {
   devicetree::PropEncodedArray<IommuPropertyElement> property_array_;
 };
 
-BtiVisitor::BtiVisitor()
-    : reference_parser_(
-          kBtiProp, kIommuCellsProp, std::nullopt,
-          [this](ReferenceNode& node) { return this->IsIommu(node.name()); },
-          [this](Node& child, ReferenceNode& parent, PropertyCells reference_cells,
-                 std::optional<std::string> reference_name) {
-            return this->ReferenceChildVisit(child, parent, reference_cells);
-          }) {}
+BtiVisitor::BtiVisitor() {
+  fdf_devicetree::Properties properties = {};
+  properties.emplace_back(
+      std::make_unique<fdf_devicetree::ReferenceProperty>(kBtiProp, kIommuCellsProp));
+  reference_parser_ = std::make_unique<fdf_devicetree::PropertyParser>(std::move(properties));
+}
 
 bool BtiVisitor::IsIommu(std::string_view node_name) { return node_name == "iommu"; }
 
 zx::result<> BtiVisitor::Visit(Node& node, const devicetree::PropertyDecoder& decoder) {
-  zx::result result = reference_parser_.Visit(node, decoder);
-  if (result.is_error()) {
+  zx::result parser_output = reference_parser_->Parse(node);
+  if (parser_output.is_error()) {
     FDF_LOG(ERROR, "Failed to parse reference for node '%.*s'", (int)node.name().length(),
             node.name().data());
-    return result.take_error();
+    return parser_output.take_error();
+  }
+
+  if (parser_output->find(kBtiProp) == parser_output->end()) {
+    return zx::ok();
+  }
+
+  for (uint32_t index = 0; index < (*parser_output)[kBtiProp].size(); index++) {
+    auto reference = (*parser_output)[kBtiProp][index].AsReference();
+    if (reference && IsIommu(reference->first.name())) {
+      auto result = ReferenceChildVisit(node, reference->first, reference->second);
+      if (result.is_error()) {
+        return result.take_error();
+      }
+    }
   }
 
   return zx::ok();

@@ -1,0 +1,129 @@
+// Copyright 2024 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+
+#include <lib/driver/devicetree/visitors/common-types.h>
+#include <lib/driver/devicetree/visitors/property-parser.h>
+#include <lib/driver/logging/cpp/logger.h>
+#include <lib/driver/logging/cpp/structured_logger.h>
+
+#include <cstdint>
+#include <optional>
+
+namespace fdf_devicetree {
+
+zx::result<PropertyValues> PropertyParser::Parse(Node& node) {
+  PropertyValues all_values;
+
+  for (auto& property : properties_) {
+    auto raw_value = node.properties().find(property->name());
+    if (raw_value != node.properties().end()) {
+      auto property_values = property->Parse(node, raw_value->second.AsBytes());
+      if (property_values.is_error()) {
+        FDF_LOG(ERROR, "Node '%s' has an invalid property '%s'", node.name().c_str(),
+                property->name().c_str());
+        return property_values.take_error();
+      }
+      all_values[property->name()] = std::move(*property_values);
+    } else {
+      FDF_LOG(DEBUG, "Node '%s' does not have property '%s'", node.name().c_str(),
+              property->name().c_str());
+    }
+  }
+  return zx::ok(std::move(all_values));
+}
+
+zx::result<std::vector<PropertyValue>> Uint32ArrayProperty::Parse(
+    Node& node, devicetree::ByteView bytes) const {
+  if (bytes.size() % sizeof(uint32_t) != 0) {
+    return zx::error(ZX_ERR_INVALID_ARGS);
+  }
+  std::vector<PropertyValue> values = {};
+  for (size_t i = 0; i < bytes.size(); i += sizeof(uint32_t)) {
+    auto entry = bytes.subspan(i, sizeof(uint32_t));
+    values.emplace_back(entry);
+  }
+  return zx::ok(std::move(values));
+}
+
+zx::result<std::vector<PropertyValue>> StringListProperty::Parse(Node& node,
+                                                                 devicetree::ByteView bytes) const {
+  auto list = devicetree::PropertyValue(bytes).AsStringList();
+  if (!list) {
+    return zx::error(ZX_ERR_INVALID_ARGS);
+  }
+
+  std::vector<PropertyValue> values = {};
+  uint32_t offset = 0;
+  for (auto entry : *list) {
+    size_t length = entry.length() + 1;
+    devicetree::ByteView entry_bytes = bytes.subspan(offset, length);
+    offset += length;
+    values.emplace_back(entry_bytes);
+  }
+  return zx::ok(std::move(values));
+}
+
+zx::result<std::vector<PropertyValue>> ReferenceProperty::Parse(Node& node,
+                                                                devicetree::ByteView bytes) const {
+  if (bytes.size() % sizeof(uint32_t) != 0) {
+    return zx::error(ZX_ERR_INVALID_ARGS);
+  }
+
+  auto cells = Uint32Array(bytes);
+
+  std::vector<PropertyValue> values = {};
+  for (size_t cell_offset = 0; cell_offset < cells.size();) {
+    auto phandle = cells[cell_offset];
+    auto reference = node.GetReferenceNode(phandle);
+    if (reference.is_error()) {
+      FDF_LOG(ERROR, "Node '%s' has invalid reference in '%s' property to %d.", node.name().c_str(),
+              name().c_str(), phandle);
+      return zx::error(ZX_ERR_INVALID_ARGS);
+    }
+
+    // Advance past phandle.
+    cell_offset++;
+
+    auto cell_specifier = reference->properties().find(cell_specifier_);
+    if (cell_specifier == reference->properties().end()) {
+      FDF_LOG(ERROR, "Reference node '%s' does not have '%s' property.", reference->name().c_str(),
+              cell_specifier_.c_str());
+      return zx::error(ZX_ERR_INVALID_ARGS);
+    }
+    auto cell_width = cell_specifier->second.AsUint32();
+    if (!cell_width) {
+      FDF_LOG(ERROR, "Reference node '%s' has invalid '%s' property.", reference->name().c_str(),
+              cell_specifier_.c_str());
+
+      return zx::error(ZX_ERR_INVALID_ARGS);
+    }
+    size_t width_in_bytes = (*cell_width) * sizeof(uint32_t);
+    size_t byteview_offset = cell_offset * sizeof(uint32_t);
+    cell_offset += (*cell_width);
+
+    if (byteview_offset > bytes.size() || (width_in_bytes > bytes.size() - byteview_offset)) {
+      FDF_LOG(
+          ERROR,
+          "Reference node '%s' has less data than expected '%s' property. Expected %zu bytes, remaining %zu bytes",
+          reference->name().c_str(), cell_specifier_.c_str(), width_in_bytes,
+          bytes.size() - byteview_offset);
+      return zx::error(ZX_ERR_INVALID_ARGS);
+    }
+
+    PropertyCells reference_cells = bytes.subspan(byteview_offset, width_in_bytes);
+
+    values.emplace_back(reference_cells, *reference);
+  }
+
+  return zx::ok(std::move(values));
+}
+
+std::optional<std::pair<ReferenceNode, PropertyCells>> PropertyValue::AsReference() {
+  if (!parent_) {
+    return std::nullopt;
+  }
+  return {{*parent_, devicetree::PropertyValue::AsBytes()}};
+}
+
+}  // namespace fdf_devicetree

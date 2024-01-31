@@ -28,14 +28,6 @@ bool DriverVisitor::is_match(
 }
 
 zx::result<> DriverVisitor::Visit(Node& node, const devicetree::PropertyDecoder& decoder) {
-  // Call all registered reference property parsers.
-  for (auto reference_parser : reference_parsers_) {
-    zx::result result = reference_parser->Visit(node, decoder);
-    if (result.is_error()) {
-      return result.take_error();
-    }
-  }
-
   // If this node matches the driver, call the visitor.
   if (is_match(node.properties())) {
     return DriverVisit(node, decoder);

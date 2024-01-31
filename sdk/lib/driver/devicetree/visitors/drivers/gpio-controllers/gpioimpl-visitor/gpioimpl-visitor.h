@@ -8,26 +8,25 @@
 #include <fidl/fuchsia.hardware.gpio/cpp/fidl.h>
 #include <fidl/fuchsia.hardware.gpioimpl/cpp/fidl.h>
 #include <lib/driver/devicetree/visitors/driver-visitor.h>
-#include <lib/driver/devicetree/visitors/reference-property.h>
+#include <lib/driver/devicetree/visitors/property-parser.h>
 
 #include <cstdint>
+#include <memory>
 
 namespace gpio_impl_dt {
 
 class GpioImplVisitor : public fdf_devicetree::Visitor {
  public:
+  static constexpr char kGpioReference[] = "gpios";
+  static constexpr char kGpioCells[] = "#gpio-cells";
+  static constexpr char kGpioNames[] = "gpio-names";
+
   GpioImplVisitor();
 
   zx::result<> FinalizeNode(fdf_devicetree::Node& node) override;
 
   zx::result<> Visit(fdf_devicetree::Node& node,
                      const devicetree::PropertyDecoder& decoder) override;
-
-  // Helper to parse nodes with a reference to gpio-controller in "gpios" property.
-  zx::result<> ParseReferenceChild(fdf_devicetree::Node& child,
-                                   fdf_devicetree::ReferenceNode& parent,
-                                   fdf_devicetree::PropertyCells specifiers,
-                                   std::optional<std::string> reference_name);
 
  private:
   struct GpioController {
@@ -38,6 +37,12 @@ class GpioImplVisitor : public fdf_devicetree::Visitor {
   // Return an existing or a new instance of GpioController.
   GpioController& GetController(fdf_devicetree::Phandle phandle);
 
+  // Helper to parse nodes with a reference to gpio-controller in "gpios" property.
+  zx::result<> ParseReferenceChild(fdf_devicetree::Node& child,
+                                   fdf_devicetree::ReferenceNode& parent,
+                                   fdf_devicetree::PropertyCells specifiers,
+                                   std::optional<std::string_view> gpio_name);
+
   // Helper to parse gpio init hog to produce fuchsia_hardware_gpioimpl::InitStep.
   zx::result<> ParseInitChild(fdf_devicetree::Node& child);
 
@@ -46,7 +51,7 @@ class GpioImplVisitor : public fdf_devicetree::Visitor {
   bool is_match(const std::unordered_map<std::string_view, devicetree::PropertyValue>& properties);
 
   std::map<fdf_devicetree::Phandle, GpioController> gpio_controllers_;
-  fdf_devicetree::ReferencePropertyParser gpio_parser_;
+  std::unique_ptr<fdf_devicetree::PropertyParser> gpio_parser_;
 };
 
 }  // namespace gpio_impl_dt

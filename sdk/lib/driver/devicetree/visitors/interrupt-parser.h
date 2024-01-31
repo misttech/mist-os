@@ -5,24 +5,18 @@
 #ifndef LIB_DRIVER_DEVICETREE_VISITORS_INTERRUPT_PARSER_H_
 #define LIB_DRIVER_DEVICETREE_VISITORS_INTERRUPT_PARSER_H_
 
-#include <lib/driver/devicetree/visitors/reference-property.h>
+#include <lib/driver/devicetree/visitors/property-parser.h>
 
 namespace fdf_devicetree {
 
-class InterruptParser : public ReferencePropertyParser {
+class InterruptParser : public PropertyParser {
  public:
-  using ReferencePropertyParser::ReferenceChildCallback;
-  using ReferencePropertyParser::ReferenceNodeMatchCallback;
+  static constexpr char kInterruptsExtended[] = "interrupts-extended";
+  static constexpr char kInterruptCells[] = "#interrupt-cells";
+  static constexpr char kInterrupts[] = "interrupts";
 
-  explicit InterruptParser(ReferenceNodeMatchCallback node_matcher,
-                           ReferenceChildCallback child_callback);
-
-  zx::result<> Visit(fdf_devicetree::Node& node,
-                     const devicetree::PropertyDecoder& decoder) override;
-
- private:
-  ReferenceNodeMatchCallback node_matcher_;
-  ReferenceChildCallback child_callback_;
+  explicit InterruptParser();
+  zx::result<PropertyValues> Parse(Node& node) override;
 };
 
 }  // namespace fdf_devicetree

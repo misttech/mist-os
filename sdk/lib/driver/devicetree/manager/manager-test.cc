@@ -185,23 +185,47 @@ TEST_F(ManagerTest, TestReferences) {
     using Property1Specifier = devicetree::PropEncodedArrayElement<PROPERTY1_CELLS>;
 
     ReferenceParentVisitor() : DriverVisitor({"fuchsia,reference-parent"}) {
-      parser1_ = std::make_unique<ReferencePropertyParser>(
-          "property1", "#property1-cells", std::nullopt,
-          [this](ReferenceNode& node) { return this->is_match(node.properties()); },
-          [this](Node& child, ReferenceNode& parent, devicetree::ByteView reference_cells,
-                 std::optional<std::string> reference_name) {
-            return this->Property1ReferenceChildVisit(child, parent, reference_cells);
-          });
-      parser2_ = std::make_unique<ReferencePropertyParser>(
-          "property2", "#property2-cells", "property2-names",
-          [this](ReferenceNode& node) { return this->is_match(node.properties()); },
-          [this](Node& child, ReferenceNode& parent, devicetree::ByteView reference_cells,
-                 std::optional<std::string> reference_name) {
-            return this->Property2ReferenceChildVisit(child, parent, reference_cells,
-                                                      std::move(reference_name));
-          });
-      DriverVisitor::AddReferencePropertyParser(parser1_.get());
-      DriverVisitor::AddReferencePropertyParser(parser2_.get());
+      Properties props = {};
+      props.emplace_back(std::make_unique<ReferenceProperty>("property1", "#property1-cells"));
+      props.emplace_back(std::make_unique<ReferenceProperty>("property2", "#property2-cells"));
+      props.emplace_back(std::make_unique<StringListProperty>("property2-names"));
+      parser_ = std::make_unique<PropertyParser>(std::move(props));
+    }
+
+    zx::result<> Visit(Node& node, const devicetree::PropertyDecoder& decoder) override {
+      auto parser_output = parser_->Parse(node);
+      if (parser_output.is_error()) {
+        return parser_output.take_error();
+      }
+
+      if (parser_output->find("property1") != parser_output->end()) {
+        for (auto& value : (*parser_output)["property1"]) {
+          auto reference = value.AsReference();
+          if (reference && is_match(reference->first.properties())) {
+            reference1_specifier =
+                devicetree::PropEncodedArray<Property1Specifier>(reference->second, 1);
+            reference1_count++;
+          }
+        }
+      }
+
+      if (parser_output->find("property2") != parser_output->end() &&
+          parser_output->find("property2-names") != parser_output->end()) {
+        size_t index = 0;
+        for (auto& value : (*parser_output)["property2"]) {
+          auto reference = value.AsReference();
+          if (reference && is_match(reference->first.properties())) {
+            auto name = (*parser_output)["property2-names"][index].AsString();
+            ZX_ASSERT(name);
+            reference2_names.push_back(std::string(*name));
+            reference2_parent_names.push_back(reference->first.name());
+            reference2_count++;
+          }
+          index++;
+        }
+      }
+
+      return DriverVisitor::Visit(node, decoder);
     }
 
     zx::result<> DriverVisit(Node& node, const devicetree::PropertyDecoder& decoder) override {
@@ -216,22 +240,6 @@ TEST_F(ManagerTest, TestReferences) {
       return zx::ok();
     }
 
-    zx::result<> Property1ReferenceChildVisit(Node& child, ReferenceNode& parent,
-                                              PropertyCells reference_cells) {
-      reference1_specifier = devicetree::PropEncodedArray<Property1Specifier>(reference_cells, 1);
-      reference1_count++;
-      return zx::ok();
-    }
-
-    zx::result<> Property2ReferenceChildVisit(Node& child, ReferenceNode& parent,
-                                              PropertyCells reference_cells,
-                                              std::optional<std::string> reference_name) {
-      reference2_names.push_back(*reference_name);
-      reference2_parent_names.push_back(parent.name());
-      reference2_count++;
-      return zx::ok();
-    }
-
     size_t visit_called = 0;
     size_t finalize_called = 0;
     size_t reference1_count = 0;
@@ -241,8 +249,7 @@ TEST_F(ManagerTest, TestReferences) {
     std::vector<std::string> reference2_parent_names;
 
    private:
-    std::unique_ptr<ReferencePropertyParser> parser1_;
-    std::unique_ptr<ReferencePropertyParser> parser2_;
+    std::unique_ptr<PropertyParser> parser_;
   };
 
   auto parent_visitor = std::make_unique<ReferenceParentVisitor>();

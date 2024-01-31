@@ -14,13 +14,16 @@ class ArmGicV2Visitor : public fdf_devicetree::DriverVisitor {
  public:
   explicit ArmGicV2Visitor();
 
-  zx::result<> DriverVisit(fdf_devicetree::Node& node,
-                           const devicetree::PropertyDecoder& decoder) override;
-
-  zx::result<> ChildParser(fdf_devicetree::Node& child, fdf_devicetree::ReferenceNode& parent,
-                           fdf_devicetree::PropertyCells interrupt_cells);
+  zx::result<> Visit(fdf_devicetree::Node& node,
+                     const devicetree::PropertyDecoder& decoder) override;
 
  private:
+  zx::result<> ParseInterrupts(fdf_devicetree::Node& node,
+                               std::vector<fdf_devicetree::PropertyValue>& interrupts);
+
+  zx::result<> ParseInterrupt(fdf_devicetree::Node& child, fdf_devicetree::ReferenceNode& parent,
+                              fdf_devicetree::PropertyCells interrupt_cells);
+
   fdf_devicetree::InterruptParser interrupt_parser_;
 };
 

@@ -7,7 +7,7 @@
 
 #include <fidl/fuchsia.hardware.i2c.businfo/cpp/fidl.h>
 #include <lib/driver/devicetree/visitors/driver-visitor.h>
-#include <lib/driver/devicetree/visitors/reference-property.h>
+#include <lib/driver/devicetree/visitors/property-parser.h>
 
 #include <cstdint>
 

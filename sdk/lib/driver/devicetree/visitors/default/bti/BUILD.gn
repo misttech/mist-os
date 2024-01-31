@@ -20,7 +20,7 @@ source_set("bti") {
 
   public_deps = [
     "//sdk/lib/driver/devicetree/manager:headers",
-    "//sdk/lib/driver/devicetree/visitors:reference-property",
+    "//sdk/lib/driver/devicetree/visitors:property-parser",
     "//zircon/system/ulib/zx",
   ]
 }

@@ -10,6 +10,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <string_view>
+#include <vector>
 
 #include "arm-gicv2.h"
 
@@ -97,25 +98,43 @@ class InterruptPropertyV2 {
 
 ArmGicV2Visitor::ArmGicV2Visitor()
     : fdf_devicetree::DriverVisitor(
-          std::vector<std::string>(kGicCompatibleDevices.begin(), kGicCompatibleDevices.end())),
-      interrupt_parser_(
-          [this](fdf_devicetree::ReferenceNode& node) { return this->is_match(node.properties()); },
-          [this](fdf_devicetree::Node& child, fdf_devicetree::ReferenceNode& parent,
-                 fdf_devicetree::PropertyCells specifiers,
-                 std::optional<std::string> reference_name) {
-            return this->ChildParser(child, parent, specifiers);
-          }) {
-  fdf_devicetree::DriverVisitor::AddReferencePropertyParser(&interrupt_parser_);
-}
+          std::vector<std::string>(kGicCompatibleDevices.begin(), kGicCompatibleDevices.end())) {}
 
-zx::result<> ArmGicV2Visitor::DriverVisit(fdf_devicetree::Node& node,
-                                          const devicetree::PropertyDecoder& decoder) {
+zx::result<> ArmGicV2Visitor::Visit(fdf_devicetree::Node& node,
+                                    const devicetree::PropertyDecoder& decoder) {
+  auto parser_output = interrupt_parser_.Parse(node);
+  if (parser_output.is_error()) {
+    return parser_output.take_error();
+  }
+
+  // Interrupt parser converts all interrupts into kInterruptsExtended. No need to look for
+  // kInterrupts property.
+  if (parser_output->find(fdf_devicetree::InterruptParser::kInterruptsExtended) !=
+      parser_output->end()) {
+    return ParseInterrupts(node,
+                           (*parser_output)[fdf_devicetree::InterruptParser::kInterruptsExtended]);
+  }
+
   return zx::ok();
 }
 
-zx::result<> ArmGicV2Visitor::ChildParser(fdf_devicetree::Node& child,
-                                          fdf_devicetree::ReferenceNode& parent,
-                                          fdf_devicetree::PropertyCells interrupt_cells) {
+zx::result<> ArmGicV2Visitor::ParseInterrupts(
+    fdf_devicetree::Node& node, std::vector<fdf_devicetree::PropertyValue>& interrupts) {
+  for (uint32_t index = 0; index < interrupts.size(); index++) {
+    auto reference = interrupts[index].AsReference();
+    if (reference && is_match(reference->first.properties())) {
+      auto result = ParseInterrupt(node, reference->first, reference->second);
+      if (result.is_error()) {
+        return result.take_error();
+      }
+    }
+  }
+  return zx::ok();
+}
+
+zx::result<> ArmGicV2Visitor::ParseInterrupt(fdf_devicetree::Node& child,
+                                             fdf_devicetree::ReferenceNode& parent,
+                                             fdf_devicetree::PropertyCells interrupt_cells) {
   if (interrupt_cells.size() != (3 * sizeof(uint32_t))) {
     FDF_LOG(
         ERROR,

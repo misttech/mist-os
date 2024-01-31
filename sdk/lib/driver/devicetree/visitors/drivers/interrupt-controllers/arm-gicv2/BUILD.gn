@@ -24,7 +24,7 @@ source_set("arm-gicv2-visitor") {
   public_deps = [
     "//sdk/lib/driver/devicetree/visitors:driver-visitor",
     "//sdk/lib/driver/devicetree/visitors:interrupt-parser",
-    "//sdk/lib/driver/devicetree/visitors:reference-property",
+    "//sdk/lib/driver/devicetree/visitors:property-parser",
   ]
 }
 

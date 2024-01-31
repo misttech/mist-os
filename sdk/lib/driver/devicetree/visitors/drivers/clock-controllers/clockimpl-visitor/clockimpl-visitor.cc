@@ -14,10 +14,8 @@
 #include <zircon/errors.h>
 
 #include <cstdint>
-#include <optional>
-#include <string_view>
+#include <memory>
 #include <utility>
-#include <vector>
 
 #include <bind/fuchsia/clock/cpp/bind.h>
 #include <bind/fuchsia/cpp/bind.h>
@@ -41,15 +39,13 @@ class ClockCells {
 
 }  // namespace
 
-ClockImplVisitor::ClockImplVisitor()
-    : clock_parser_(
-          "clocks", "#clock-cells", "clock-names",
-          [this](fdf_devicetree::ReferenceNode& node) { return this->is_match(node.name()); },
-          [this](fdf_devicetree::Node& child, fdf_devicetree::ReferenceNode& parent,
-                 fdf_devicetree::PropertyCells specifiers,
-                 std::optional<std::string> reference_name) {
-            return this->ParseReferenceChild(child, parent, specifiers, std::move(reference_name));
-          }) {}
+ClockImplVisitor::ClockImplVisitor() {
+  fdf_devicetree::Properties properties = {};
+  properties.emplace_back(std::make_unique<fdf_devicetree::StringListProperty>(kClockNames));
+  properties.emplace_back(
+      std::make_unique<fdf_devicetree::ReferenceProperty>(kClockReference, kClockCells));
+  clock_parser_ = std::make_unique<fdf_devicetree::PropertyParser>(std::move(properties));
+}
 
 bool ClockImplVisitor::is_match(std::string_view name) {
   return name.find("clock-controller") != std::string::npos;
@@ -57,13 +53,37 @@ bool ClockImplVisitor::is_match(std::string_view name) {
 
 zx::result<> ClockImplVisitor::Visit(fdf_devicetree::Node& node,
                                      const devicetree::PropertyDecoder& decoder) {
-  zx::result result = clock_parser_.Visit(node, decoder);
-  if (result.is_error()) {
+  zx::result parser_output = clock_parser_->Parse(node);
+  if (parser_output.is_error()) {
     FDF_LOG(ERROR, "Clock visitor failed for node '%s' : %s", node.name().c_str(),
-            result.status_string());
+            parser_output.status_string());
+    return parser_output.take_error();
   }
 
-  return result;
+  if (parser_output->find(kClockReference) == parser_output->end()) {
+    return zx::ok();
+  }
+
+  if (parser_output->find(kClockNames) == parser_output->end() ||
+      (*parser_output)[kClockReference].size() != (*parser_output)[kClockReference].size()) {
+    // We need a clock names to generate bind rules.
+    FDF_LOG(ERROR, "Clock reference '%s' does not have valid clock names property.",
+            node.name().c_str());
+    return zx::error(ZX_ERR_INVALID_ARGS);
+  }
+
+  for (uint32_t index = 0; index < (*parser_output)[kClockReference].size(); index++) {
+    auto reference = (*parser_output)[kClockReference][index].AsReference();
+    if (reference && is_match(reference->first.name())) {
+      auto result = ParseReferenceChild(node, reference->first, reference->second,
+                                        (*parser_output)[kClockNames][index].AsString());
+      if (result.is_error()) {
+        return result.take_error();
+      }
+    }
+  }
+
+  return zx::ok();
 }
 
 zx::result<> ClockImplVisitor::AddChildNodeSpec(fdf_devicetree::Node& child, uint32_t id,
@@ -99,12 +119,13 @@ ClockImplVisitor::ClockController& ClockImplVisitor::GetController(
 zx::result<> ClockImplVisitor::ParseReferenceChild(fdf_devicetree::Node& child,
                                                    fdf_devicetree::ReferenceNode& parent,
                                                    fdf_devicetree::PropertyCells specifiers,
-                                                   std::optional<std::string> reference_name) {
-  if (!reference_name) {
-    // We need a clock name to generate bind rules.
-    FDF_LOG(ERROR, "Clock reference '%s' does not have a name", child.name().c_str());
+                                                   std::optional<std::string_view> clock_name) {
+  if (!clock_name) {
+    FDF_LOG(ERROR, "Clock reference '%s' does not have a valid name", child.name().c_str());
     return zx::error(ZX_ERR_INVALID_ARGS);
   }
+
+  auto reference_name = std::string(*clock_name);
 
   auto& controller = GetController(*parent.phandle());
 
@@ -120,13 +141,13 @@ zx::result<> ClockImplVisitor::ParseReferenceChild(fdf_devicetree::Node& child,
   id.clock_id = cells.id();
 
   FDF_LOG(DEBUG, "Clock ID added - ID 0x%x name '%s' to controller '%s'", cells.id(),
-          reference_name->c_str(), parent.name().c_str());
+          reference_name.c_str(), parent.name().c_str());
 
   controller.clock_ids_metadata.insert(controller.clock_ids_metadata.end(),
                                        reinterpret_cast<const uint8_t*>(&id),
                                        reinterpret_cast<const uint8_t*>(&id) + sizeof(clock_id_t));
 
-  return AddChildNodeSpec(child, id.clock_id, *reference_name);
+  return AddChildNodeSpec(child, id.clock_id, reference_name);
 }
 
 zx::result<> ClockImplVisitor::FinalizeNode(fdf_devicetree::Node& node) {
