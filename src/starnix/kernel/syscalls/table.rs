@@ -107,8 +107,8 @@ pub fn dispatch_syscall(
                 sys_readlinkat, sys_readv, sys_removexattr, sys_renameat2, sys_sendfile,
                 sys_setxattr, sys_splice, sys_statfs, sys_statx, sys_symlinkat, sys_sync,
                 sys_syncfs, sys_tee, sys_timerfd_create, sys_timerfd_gettime, sys_timerfd_settime,
-                sys_truncate, sys_umask, sys_umount2, sys_unlinkat, sys_utimensat, sys_vmsplice,
-                sys_write, sys_writev,
+                sys_truncate, sys_umask, sys_umount2, sys_unlinkat, sys_utimensat, sys_write,
+                sys_writev,
             },
         },
     };
@@ -439,7 +439,6 @@ pub fn dispatch_syscall(
         unshare[1],
         utimensat[4],
         #[cfg(target_arch = "x86_64")] vfork[0],
-        vmsplice[4],
         wait4[4],
         waitid[5],
         write[3],
