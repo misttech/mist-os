@@ -6,8 +6,12 @@ use crate::ssh::do_ssh;
 use crate::target::choose_target;
 use anyhow::Result;
 use argh::FromArgs;
-use mdns_discovery::{discover_targets, MDNS_PORT};
-use std::time::Duration;
+use discovery::{wait_for_devices, DiscoverySources, TargetEvent, TargetState};
+use futures::Stream;
+use futures::StreamExt;
+use std::{collections::HashMap, time::Duration};
+use target::TargetInfo;
+use timeout::timeout;
 use tracing_subscriber::filter::LevelFilter;
 
 mod logging;
@@ -58,7 +62,15 @@ async fn main() -> Result<()> {
 
     tracing::trace!("Discoving targets...");
     let wait_duration = Duration::from_secs(args.wait_for_target_time);
-    let targets = discover_targets(wait_duration, MDNS_PORT).await?;
+
+    // Only want added events
+    let device_stream = wait_for_devices(
+        |_: &_| true,
+        true,
+        false,
+        DiscoverySources::MDNS | DiscoverySources::USB,
+    )?;
+    let targets = discover_target_events(device_stream, wait_duration).await?;
 
     let target = choose_target(targets, args.target_name).await?;
 
@@ -66,4 +78,53 @@ async fn main() -> Result<()> {
     tracing::info!("Additional port forwards: {:?}", args.additional_port_forwards);
     do_ssh(args.host, target, args.repository_port, args.additional_port_forwards)?;
     Ok(())
+}
+
+async fn discover_target_events(
+    mut stream: impl Stream<Item = Result<TargetEvent>> + std::marker::Unpin,
+    wait_time: Duration,
+) -> Result<Vec<TargetInfo>> {
+    let mut targets = HashMap::new();
+    let task = async {
+        if let Some(s) = stream.next().await {
+            if let Ok(event) = s {
+                match event {
+                    TargetEvent::Removed(handle) => {
+                        targets.remove(&handle.node_name.unwrap_or_else(|| "".to_string()));
+                    }
+                    TargetEvent::Added(handle) => match handle.state {
+                        TargetState::Product(addr) => {
+                            targets
+                                .insert(handle.node_name.unwrap_or_else(|| "".to_string()), addr);
+                        }
+                        TargetState::Fastboot(_) => {
+                            tracing::warn!("Discovered Target: {:#?} in Fastboot mode. It cannot be used with `funnel`. Skipping", handle.node_name);
+                        }
+                        TargetState::Zedboot => {
+                            tracing::warn!("Discovered Target: {:#?} in Zedboot mode. It cannot be used with `funnel`. Skipping.", handle.node_name);
+                        }
+                        TargetState::Unknown => {
+                            tracing::warn!("Discovered a target in an unknwn state. Skipping");
+                        }
+                    },
+                }
+            }
+        }
+    };
+    match timeout(wait_time, task).await {
+        Ok(_) => {
+            tracing::warn!("Got an okay result from the discover target loop.... this shouldnt happen we should always timeout.")
+        }
+        Err(_) => {
+            tracing::trace!("Timeout reached");
+        }
+    }
+    let res = targets
+        .iter()
+        .map(|(nodename, address)| TargetInfo {
+            nodename: nodename.to_string(),
+            addresses: vec![*address],
+        })
+        .collect();
+    Ok(res)
 }
