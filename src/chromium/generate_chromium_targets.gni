@@ -30,8 +30,10 @@ template("generate_fuchsia_web_targets") {
   repository = invoker.repository
 
   # WebEngine - a Chromium implementation of `fuchsia.web`.
-  # Only Products that want to include WebEngine should depend on this target.
-  # Legacy in-tree tests depend on ":web_context_provider_for_test" below.
+  # Only buildbot bundles that need WebEngine to run tests should depend on
+  # this target. See https://fxbug.dev/42070261 for why this is necessary.
+  # The in-tree tests themselves depend on ":web_context_provider_for_test"
+  # below.
   group("web_engine") {
     visibility += [
       # Allow developers to include it using `--with-cache` or `--with`.
@@ -40,23 +42,17 @@ template("generate_fuchsia_web_targets") {
       "//:developer_cache_packages",
       "//:developer_universe_packages",
 
-      # TODO(https://fxbug.dev/42070108): Remove when deps is removed from
-      # //products/terminal.gni.
-      "//:legacy_cache_packages",
-
       # Allow buildbot bundles to include it so that tests can be run.
       "//bundles/buildbot/*",
-
-      # Allow any out-of-tree Product to include it. (This also allows
-      #  out-of-tree tests to depend on it, though that is discouraged.)
-      "//vendor/*",
     ]
     deps = [ ":web_engine_pkg" ]
+    testonly = true
   }
 
   # Used by integration tests to indicate they need WebEngine, specifically the
   # `context_provider.cm` Component, in the Products on which they run. It has
-  # no effect.
+  # no effect. Bots and developers running such tests must build and depend on,
+  # respectively, ":web_engine".
   # TODO(https://fxbug.dev/42070261): Remove once a better solution is available.
   group("web_context_provider_for_test") {
     # No new tests relying on WebEngine should be added in tree.
