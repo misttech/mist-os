@@ -46,7 +46,7 @@ dap::StackTraceResponse PopulateStackTraceResponse(DebugAdapterContext* ctx, Thr
     frame.line = location.file_line().line();
     frame.column = location.column();
     frame.name = location.symbol().Get()->GetFullName();
-    frame.id = ctx->IdForFrame(stack[i], i);
+    frame.id = ctx->IdForFrame(thread->GetKoid(), i);
     response.stackFrames.push_back(frame);
   }
   response.totalFrames = total_frames;

@@ -5,7 +5,6 @@
 #include "src/developer/debug/zxdb/debug_adapter/handlers/request_breakpoint.h"
 
 #include "src/developer/debug/zxdb/client/breakpoint.h"
-#include "src/developer/debug/zxdb/client/breakpoint_location.h"
 #include "src/developer/debug/zxdb/client/breakpoint_settings.h"
 #include "src/developer/debug/zxdb/client/session.h"
 
@@ -58,7 +57,8 @@ dap::ResponseOrError<dap::SetBreakpointsResponse> OnRequestBreakpoint(
       ctx->StoreBreakpointForSource(file, breakpoint);
 
       dap::Breakpoint response_bp;
-      response_bp.verified = false;
+      response_bp.verified = (!breakpoint->GetLocations().empty());
+      response_bp.id = ctx->IdForBreakpoint(breakpoint);
       response_bp.source = req.source;
       response_bp.line = request_bp.line;
       response.breakpoints.push_back(response_bp);

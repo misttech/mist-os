@@ -4,11 +4,13 @@
 
 #include "context.h"
 
+#include <cstdint>
+#include <vector>
+
 #include "src/developer/debug/shared/logging/logging.h"
 #include "src/developer/debug/zxdb/client/breakpoint.h"
 #include "src/developer/debug/zxdb/client/process.h"
 #include "src/developer/debug/zxdb/client/session.h"
-#include "src/developer/debug/zxdb/client/setting_schema_definition.h"
 #include "src/developer/debug/zxdb/client/thread.h"
 #include "src/developer/debug/zxdb/debug_adapter/handlers/request_attach.h"
 #include "src/developer/debug/zxdb/debug_adapter/handlers/request_breakpoint.h"
@@ -78,6 +80,7 @@ DebugAdapterContext::~DebugAdapterContext() {
   if (init_done_) {
     session()->thread_observers().RemoveObserver(this);
     session()->process_observers().RemoveObserver(this);
+    session()->breakpoint_observers().RemoveObserver(this);
   }
   DeleteAllBreakpoints();
   session()->RemoveObserver(this);
@@ -210,6 +213,7 @@ void DebugAdapterContext::Init() {
   // Register to zxdb session events
   session()->thread_observers().AddObserver(this);
   session()->process_observers().AddObserver(this);
+  session()->breakpoint_observers().AddObserver(this);
 
   init_done_ = true;
 }
@@ -270,11 +274,6 @@ void DebugAdapterContext::OnThreadStopped(Thread* thread, const StopInfo& info) 
 
 void DebugAdapterContext::DidUpdateStackFrames(Thread* thread) {
   DeleteFrameIdsForThread(thread);
-  if (supports_invalidate_event_) {
-    dap::InvalidatedEvent event;
-    event.threadId = thread->GetKoid();
-    dap_->send(event);
-  }
 }
 
 void DebugAdapterContext::DidCreateProcess(Process* process, uint64_t timestamp) {
@@ -311,6 +310,30 @@ void DebugAdapterContext::WillDestroyProcess(Process* process, DestroyReason rea
       dap_->send(exit_event);
       break;
   }
+}
+
+int64_t DebugAdapterContext::IdForBreakpoint(Breakpoint* breakpoint) {
+  auto item = breakpoint_to_id_.find(breakpoint);
+  if (item != breakpoint_to_id_.end()) {
+    return item->second;
+  }
+
+  int64_t current_breakpoint_id = next_breakpoint_id_++;
+  breakpoint_to_id_[breakpoint] = current_breakpoint_id;
+  return current_breakpoint_id;
+}
+
+void DebugAdapterContext::OnBreakpointMatched(Breakpoint* breakpoint, bool user_requested) {
+  BreakpointSettings settings = breakpoint->GetSettings();
+
+  dap::Breakpoint bp;
+  bp.verified = true;
+  bp.id = IdForBreakpoint(breakpoint);
+
+  dap::BreakpointEvent breakpoint_event;
+  breakpoint_event.reason = "changed";
+  breakpoint_event.breakpoint = bp;
+  dap_->send(breakpoint_event);
 }
 
 Thread* DebugAdapterContext::GetThread(uint64_t koid) {
@@ -356,9 +379,9 @@ Err DebugAdapterContext::CheckStoppedThread(Thread* thread) {
   return Err();
 }
 
-int64_t DebugAdapterContext::IdForFrame(Frame* frame, int stack_index) {
+int64_t DebugAdapterContext::IdForFrame(uint64_t thread_koid, int stack_index) {
   FrameRecord record = {};
-  record.thread_koid = frame->GetThread()->GetKoid();
+  record.thread_koid = thread_koid;
   record.stack_index = stack_index;
 
   for (auto const& it : id_to_frame_) {
@@ -367,7 +390,7 @@ int64_t DebugAdapterContext::IdForFrame(Frame* frame, int stack_index) {
     }
   }
 
-  int current_frame_id = next_frame_id_++;
+  int64_t current_frame_id = next_frame_id_++;
   id_to_frame_[current_frame_id] = record;
   return current_frame_id;
 }
@@ -395,7 +418,20 @@ Frame* DebugAdapterContext::FrameforId(int64_t id) {
 void DebugAdapterContext::DeleteFrameIdsForThread(Thread* thread) {
   auto thread_koid = thread->GetKoid();
   for (auto it = id_to_frame_.begin(); it != id_to_frame_.end();) {
-    if (it->second.thread_koid == thread_koid) {
+    // We don't really know what changed. We don't want to invalidate the frame ID every time
+    // since one of the update cases is that the frames have been appended to (so existing indices
+    // are still valid) or that symbols are loaded (normally this means that the frames are
+    // unchanged, though inline frames can get expanded in some cases).
+    //
+    // As a result, keep the ID unchanged unless it's now out-of-bounds. This avoids resetting any
+    // state in the more common cases.
+    if ((it->second.thread_koid == thread_koid) &&
+        (static_cast<size_t>(it->second.stack_index) >= thread->GetStack().size())) {
+      if (supports_invalidate_event_) {
+        dap::InvalidatedEvent event;
+        event.stackFrameId = IdForFrame(thread_koid, it->second.stack_index);
+        dap_->send(event);
+      }
       DeleteVariablesIdsForFrameId(it->first);
       it = id_to_frame_.erase(it);
     } else {
@@ -473,6 +509,7 @@ void DebugAdapterContext::DeleteBreakpointsForSource(const std::string& source) 
 
   for (auto& bp : it->second) {
     if (bp) {
+      breakpoint_to_id_.erase(bp.get());
       session()->system().DeleteBreakpoint(bp.get());
     }
   }

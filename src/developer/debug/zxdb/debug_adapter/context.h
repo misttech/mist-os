@@ -12,6 +12,7 @@
 #include <dap/session.h>
 
 #include "src/developer/debug/shared/stream_buffer.h"
+#include "src/developer/debug/zxdb/client/breakpoint_observer.h"
 #include "src/developer/debug/zxdb/client/frame.h"
 #include "src/developer/debug/zxdb/client/process_observer.h"
 #include "src/developer/debug/zxdb/client/session_observer.h"
@@ -52,7 +53,10 @@ struct VariablesRecord {
 // Handles processing requests from debug adapter client with help from zxdb client session and dap
 // library.
 // Note: All methods in this class need to be executed on main thread to avoid concurrency bugs.
-class DebugAdapterContext : public ThreadObserver, ProcessObserver, SessionObserver {
+class DebugAdapterContext : public ThreadObserver,
+                            ProcessObserver,
+                            SessionObserver,
+                            BreakpointObserver {
  public:
   using DestroyConnectionCallback = std::function<void()>;
 
@@ -87,6 +91,9 @@ class DebugAdapterContext : public ThreadObserver, ProcessObserver, SessionObser
   void WillDestroyProcess(Process* process, DestroyReason reason, int exit_code,
                           uint64_t timestamp) override;
 
+  // BreakpointObserver implementation:
+  void OnBreakpointMatched(Breakpoint* breakpoint, bool user_requested) override;
+
   Thread* GetThread(uint64_t koid);
 
   // Checks if thread is in stopped state; returns error if not stopped.
@@ -94,7 +101,7 @@ class DebugAdapterContext : public ThreadObserver, ProcessObserver, SessionObser
   Err CheckStoppedThread(Thread* thread);
 
   // Helper methods to get/set frame to ID mapping
-  int64_t IdForFrame(Frame* frame, int stack_index);
+  int64_t IdForFrame(uint64_t thread_koid, int stack_index);
   Frame* FrameforId(int64_t id);
   void DeleteFrameIdsForThread(Thread* thread);
 
@@ -108,6 +115,9 @@ class DebugAdapterContext : public ThreadObserver, ProcessObserver, SessionObser
   // Helper methods to get/set breakpoint to source file mapping.
   void StoreBreakpointForSource(const std::string& source, Breakpoint* bp);
   std::vector<fxl::WeakPtr<Breakpoint>>* GetBreakpointsForSource(const std::string& source);
+
+  // Helper methods to get/set breakpoint to ID mapping
+  int64_t IdForBreakpoint(Breakpoint* breakpoint);
 
   // TODO(https://fxbug.dev/42148521): These 2 method deletes all breakpoints added by the debug adapter.
   // Breakpoints added from console are not deleted.
@@ -133,6 +143,9 @@ class DebugAdapterContext : public ThreadObserver, ProcessObserver, SessionObser
 
   std::map<int64_t, VariablesRecord> id_to_variables_;
   int64_t next_variables_id_ = 1;
+
+  std::map<const Breakpoint*, int64_t> breakpoint_to_id_;
+  int64_t next_breakpoint_id_ = 1;
 
   DestroyConnectionCallback destroy_connection_cb_;
 
