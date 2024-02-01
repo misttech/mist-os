@@ -5,6 +5,7 @@
 import("//build/compiled_action.gni")
 import("//build/config/fuchsia/platform_version.gni")
 import("//build/json/validate_json.gni")
+import("//build/python/python_action.gni")
 import("config.gni")
 import("meta/version.gni")
 import("sdk_molecule.gni")
@@ -154,15 +155,12 @@ template("sdk_collection") {
 
   # Generates a metadata file (meta/manifest.json) describing the various
   # parts of the SDK collection.
-  action(labels.sdk_meta) {
+  python_action(labels.sdk_meta) {
     forward_variables_from(invoker, [ "testonly" ])
 
-    script = "//build/sdk/generate_meta.py"
+    binary_label = "//build/sdk:generate_meta"
 
-    inputs = [
-      files.local_manifest,
-      "//build/sdk/sdk_common.py",
-    ]
+    inputs = [ files.local_manifest ]
 
     outputs = [ files.sdk_meta ]
 
@@ -214,12 +212,10 @@ template("sdk_collection") {
 
   # Generate an input tarmaker manifest that will be used to create
   # a tarball archive from the content listed in final_manifest.
-  action(labels.tarmaker_manifest) {
+  python_action(labels.tarmaker_manifest) {
     forward_variables_from(invoker, [ "testonly" ])
 
-    script = "//build/sdk/generate_archive_manifest.py"
-
-    sources = [ "//build/sdk/sdk_common.py" ]
+    binary_label = "//build/sdk:generate_archive_manifest"
 
     inputs = [ files.final_manifest ]
 

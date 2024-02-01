@@ -2,21 +2,15 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import("//build/python/python_binary.gni")
 import("//build/python/python_host_test.gni")
-
-if (is_host) {
-  python_host_test("sdk_common_unittests") {
-    main_source = "sdk_common_unittest.py"
-    sources = [ "sdk_common.py" ]
-  }
-}
 
 group("tests") {
   testonly = true
 
   deps = [
-    ":sdk_common_unittests($host_toolchain)",
     "meta:tests($host_toolchain)",
+    "sdk_common:tests",
     "tests",
   ]
 }
@@ -136,4 +130,28 @@ group("sdk_versioned_shared_libraries") {
 group("sdk_versioned_shared_libraries_allowlist") {
   visibility = _sdk_versioned_shared_libraries_list +
                [ ":sdk_versioned_shared_libraries" ]
+}
+
+python_binary("create_atom_manifest") {
+  visibility = [ "*" ]
+  main_source = "create_atom_manifest.py"
+  deps = [ "//build/sdk/sdk_common" ]
+}
+
+python_binary("create_molecule_manifest") {
+  visibility = [ "*" ]
+  main_source = "create_molecule_manifest.py"
+  deps = [ "//build/sdk/sdk_common" ]
+}
+
+python_binary("generate_archive_manifest") {
+  visibility = [ "*" ]
+  main_source = "generate_archive_manifest.py"
+  deps = [ "//build/sdk/sdk_common" ]
+}
+
+python_binary("generate_meta") {
+  visibility = [ "*" ]
+  main_source = "generate_meta.py"
+  deps = [ "//build/sdk/sdk_common" ]
 }

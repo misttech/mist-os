@@ -2,6 +2,8 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import("//build/python/python_action.gni")
+
 # An empty SDK atom.
 #
 # Should be used in very specific situations where SDK elements are injected in
@@ -47,16 +49,12 @@ template("sdk_noop_atom") {
            "Must define category for API verification.")
     assert(defined(invoker.type), "Must define type for API verification.")
 
-    action(target_name) {
+    python_action(target_name) {
       depfile = "${manifest_file}.d"
-      script = "//build/sdk/create_atom_manifest.py"
+      binary_label = "//build/sdk:create_atom_manifest"
 
       public_deps = [ ":${meta_target_name}" ]
 
-      inputs = [
-        # Imported by the action's script.
-        "//build/sdk/sdk_common.py",
-      ]
       outputs = [ manifest_file ]
 
       args = [

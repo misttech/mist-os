@@ -5,6 +5,7 @@
 import("//build/compiled_action.gni")
 import("//build/config/fuchsia/platform_version.gni")
 import("//build/json/validate_json.gni")
+import("//build/python/python_action.gni")
 import("//build/sdk/plasa/config.gni")
 import("//build/testing/golden_files.gni")
 import("config.gni")
@@ -298,7 +299,7 @@ template("sdk_atom") {
   }
 
   # Builds a manifest representing this element.
-  action(target_name) {
+  python_action(target_name) {
     forward_variables_from(invoker,
                            [
                              "metadata",
@@ -314,17 +315,14 @@ template("sdk_atom") {
     manifest = "$target_gen_dir/$target_name.sdk"
     depfile = "$manifest.d"
 
-    script = "//build/sdk/create_atom_manifest.py"
+    binary_label = "//build/sdk:create_atom_manifest"
 
     public_deps = gn_deps + [ ":$meta_target_name" ]
     if (_verify_api) {
       public_deps += [ ":$verify_api_target_name" ]
     }
 
-    inputs = dep_manifests + file_inputs + [
-               # Imported by the action's script.
-               "//build/sdk/sdk_common.py",
-             ]
+    inputs = dep_manifests + file_inputs
 
     outputs = [ manifest ]
 
