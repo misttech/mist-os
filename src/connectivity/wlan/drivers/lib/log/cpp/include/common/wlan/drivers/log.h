@@ -80,6 +80,16 @@
   TRACE_DURATION("wlan", name, "line", TA_UINT64(line), "filename", TA_STRING(file_name), \
                  ##__VA_ARGS__);
 
+// The name_literal used here should be the same as defined in
+// wlan_trace::names::NAME_WLANSOFTMAC_TX.
+#define WLAN_TRACE_ASYNC_BEGIN_TX(async_id, origin) \
+  TRACE_ASYNC_BEGIN("wlan", "wlansoftmac:tx", async_id, "origin", TA_STRING(origin));
+
+// The name_literal used here should be the same as defined in
+// wlan_trace::names::NAME_WLANSOFTMAC_TX.
+#define WLAN_TRACE_ASYNC_END_TX(async_id, status) \
+  TRACE_ASYNC_END("wlan", "wlansoftmac:tx", async_id, "status", TA_INT64(status));
+
 #define FMT_MAC "%02x:%02x:%02x:%02x:%02x:%02x"
 #define FMT_MAC_ARGS(arr) (arr)[0], (arr)[1], (arr)[2], (arr)[3], (arr)[4], (arr)[5]
 

@@ -12,8 +12,10 @@ use {
     futures::channel::mpsc,
     ieee80211::MacAddr,
     std::{ffi::c_void, fmt::Display, sync::Arc},
+    trace::Id as TraceId,
     tracing::error,
     wlan_common::{mac::FrameControl, tx_vector, TimeUnit},
+    wlan_trace as wtrace,
 };
 
 pub mod completers {
@@ -236,7 +238,14 @@ pub trait DeviceOps {
         &mut self,
     ) -> Result<fidl_common::SpectrumManagementSupport, zx::Status>;
     fn deliver_eth_frame(&mut self, slice: &[u8]) -> Result<(), zx::Status>;
-    fn send_wlan_frame(&mut self, buf: OutBuf, tx_flags: u32) -> Result<(), zx::Status>;
+    /// Sends the given |buf| as a frame over the air. If the caller does not pass an |async_id| to this
+    /// function, then this function will generate its own |async_id| and end the trace if an error occurs.
+    fn send_wlan_frame(
+        &mut self,
+        buf: OutBuf,
+        tx_flags: u32,
+        async_id: Option<TraceId>,
+    ) -> Result<(), zx::Status>;
 
     fn set_ethernet_status(&mut self, status: LinkStatus) -> Result<(), zx::Status>;
     fn set_ethernet_up(&mut self) -> Result<(), zx::Status> {
@@ -435,9 +444,26 @@ impl DeviceOps for Device {
         zx::ok(status)
     }
 
-    fn send_wlan_frame(&mut self, buf: OutBuf, mut tx_flags: u32) -> Result<(), zx::Status> {
+    fn send_wlan_frame(
+        &mut self,
+        buf: OutBuf,
+        mut tx_flags: u32,
+        async_id: Option<TraceId>,
+    ) -> Result<(), zx::Status> {
+        let async_id_provided = async_id.is_some();
+        let async_id = async_id.unwrap_or_else(|| {
+            let async_id = TraceId::new();
+            wtrace::async_begin_wlansoftmac_tx(async_id, "mlme");
+            async_id
+        });
+        trace::duration!("wlan", "Device::send_data_frame");
+
         if buf.as_slice().len() < REQUIRED_WLAN_HEADER_LEN {
-            return Err(zx::Status::BUFFER_TOO_SMALL);
+            let status = zx::Status::BUFFER_TOO_SMALL;
+            if !async_id_provided {
+                wtrace::async_end_wlansoftmac_tx(async_id, status);
+            }
+            return Err(status);
         }
         // Unwrap is safe since the byte slice is always the same size.
         let frame_control =
@@ -454,7 +480,13 @@ impl DeviceOps for Device {
 
         let tx_info = wlan_common::tx_vector::TxVector::from_idx(tx_vector_idx)
             .to_banjo_tx_info(tx_flags, self.minstrel.is_some());
-        zx::ok((self.raw_device.queue_tx)(self.raw_device.device, 0, buf, tx_info))
+        zx::ok((self.raw_device.queue_tx)(self.raw_device.device, 0, buf, tx_info, async_id))
+            .map_err(|s| {
+                if !async_id_provided {
+                    wtrace::async_end_wlansoftmac_tx(async_id, s);
+                }
+                s
+            })
     }
 
     fn set_ethernet_status(&mut self, status: LinkStatus) -> Result<(), zx::Status> {
@@ -713,6 +745,7 @@ pub struct DeviceInterface {
         options: u32,
         buf: OutBuf,
         tx_info: banjo_wlan_softmac::WlanTxInfo,
+        async_id: TraceId,
     ) -> i32,
     /// Reports the current status to the ethernet driver.
     set_ethernet_status: extern "C" fn(device: *mut c_void, status: u32) -> i32,
@@ -1187,7 +1220,12 @@ pub mod test_utils {
             Ok(())
         }
 
-        fn send_wlan_frame(&mut self, buf: OutBuf, _tx_flags: u32) -> Result<(), zx::Status> {
+        fn send_wlan_frame(
+            &mut self,
+            buf: OutBuf,
+            _tx_flags: u32,
+            _async_id: Option<TraceId>,
+        ) -> Result<(), zx::Status> {
             let mut state = self.state.lock();
             if state.config.send_wlan_frame_fails {
                 buf.free();

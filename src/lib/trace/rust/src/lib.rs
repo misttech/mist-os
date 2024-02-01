@@ -63,6 +63,7 @@ pub fn trace_state() -> TraceState {
 }
 
 /// An identifier for flows and async spans.
+#[repr(transparent)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Id(u64);
 

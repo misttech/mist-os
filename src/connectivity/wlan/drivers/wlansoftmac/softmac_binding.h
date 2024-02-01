@@ -17,6 +17,7 @@
 #include <lib/fdf/cpp/dispatcher.h>
 #include <lib/inspect/cpp/inspect.h>
 #include <lib/operation/ethernet.h>
+#include <lib/trace/event.h>
 #include <lib/zx/channel.h>
 #include <lib/zx/result.h>
 #include <zircon/compiler.h>
@@ -52,7 +53,8 @@ class SoftmacBinding : public DeviceInterface {
                     zx::channel* out_sme_channel) final;
   zx_status_t DeliverEthernet(cpp20::span<const uint8_t> eth_frame) final
       __TA_EXCLUDES(ethernet_proxy_lock_);
-  zx_status_t QueueTx(UsedBuffer used_buffer, wlan_tx_info_t tx_info) final;
+  zx_status_t QueueTx(UsedBuffer used_buffer, wlan_tx_info_t tx_info,
+                      trace_async_id_t async_id) final;
   zx_status_t SetEthernetStatus(uint32_t status) final __TA_EXCLUDES(ethernet_proxy_lock_);
 
  private:

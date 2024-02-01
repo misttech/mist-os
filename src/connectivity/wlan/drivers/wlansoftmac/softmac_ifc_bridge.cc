@@ -11,6 +11,7 @@
 #include <lib/fidl/cpp/wire/client.h>
 #include <lib/fidl_driver/cpp/transport.h>
 #include <lib/sync/cpp/completion.h>
+#include <lib/trace/event.h>
 #include <lib/zx/result.h>
 
 #include "convert.h"

@@ -17,7 +17,7 @@ use {
     },
     banjo_fuchsia_wlan_softmac as banjo_wlan_softmac, fidl_fuchsia_wlan_common as fidl_common,
     fidl_fuchsia_wlan_minstrel as fidl_minstrel, fidl_fuchsia_wlan_mlme as fidl_mlme,
-    fuchsia_zircon as zx,
+    fuchsia_trace as trace, fuchsia_zircon as zx,
     ieee80211::{Bssid, MacAddr, Ssid},
     std::fmt,
     tracing::{debug, error, info, trace, warn},
@@ -39,6 +39,7 @@ struct BufferedFrame {
     in_buf: InBuf,
     bytes_written: usize,
     tx_flags: u32,
+    async_id: trace::Id,
 }
 
 /// Rejection reasons for why a frame was not proceessed.
@@ -153,8 +154,12 @@ impl<D: DeviceOps> crate::MlmeImpl for Ap<D> {
     ) {
         Self::handle_mac_frame_rx(self, frame, rx_info)
     }
-    fn handle_eth_frame_tx(&mut self, bytes: &[u8]) -> Result<(), anyhow::Error> {
-        Self::handle_eth_frame_tx(self, bytes);
+    fn handle_eth_frame_tx(
+        &mut self,
+        bytes: &[u8],
+        async_id: trace::Id,
+    ) -> Result<(), anyhow::Error> {
+        Self::handle_eth_frame_tx(self, bytes, async_id);
         Ok(())
     }
     fn handle_scan_complete(&mut self, _status: zx::Status, _scan_id: u64) {
@@ -381,7 +386,7 @@ impl<D: DeviceOps> Ap<D> {
         })
     }
 
-    pub fn handle_eth_frame_tx(&mut self, frame: &[u8]) {
+    pub fn handle_eth_frame_tx(&mut self, frame: &[u8], async_id: trace::Id) {
         let bss = match self.bss.as_mut() {
             Some(bss) => bss,
             None => {
@@ -399,7 +404,7 @@ impl<D: DeviceOps> Ap<D> {
                 }
             };
 
-        if let Err(e) = bss.handle_eth_frame(&mut self.ctx, *hdr, body) {
+        if let Err(e) = bss.handle_eth_frame(&mut self.ctx, *hdr, body, async_id) {
             e.log("failed to handle Ethernet frame")
         }
     }
@@ -564,12 +569,10 @@ mod tests {
             .expect("expected OK");
         fake_device_state.lock().wlan_queue.clear();
 
-        ap.handle_eth_frame_tx(&make_eth_frame(
-            *CLIENT_ADDR,
-            *CLIENT_ADDR2,
-            0x1234,
-            &[1, 2, 3, 4, 5][..],
-        ));
+        ap.handle_eth_frame_tx(
+            &make_eth_frame(*CLIENT_ADDR, *CLIENT_ADDR2, 0x1234, &[1, 2, 3, 4, 5][..]),
+            0.into(),
+        );
 
         assert_eq!(fake_device_state.lock().wlan_queue.len(), 1);
         assert_eq!(
@@ -608,12 +611,10 @@ mod tests {
             )
             .expect("expected InfraBss::new ok"),
         );
-        ap.handle_eth_frame_tx(&make_eth_frame(
-            *CLIENT_ADDR2,
-            *CLIENT_ADDR,
-            0x1234,
-            &[1, 2, 3, 4, 5][..],
-        ));
+        ap.handle_eth_frame_tx(
+            &make_eth_frame(*CLIENT_ADDR2, *CLIENT_ADDR, 0x1234, &[1, 2, 3, 4, 5][..]),
+            0.into(),
+        );
     }
 
     fn mock_rx_info(ap: &Ap<FakeDevice>) -> banjo_wlan_softmac::WlanRxInfo {
@@ -723,12 +724,10 @@ mod tests {
             mock_rx_info(&ap),
         );
 
-        ap.handle_eth_frame_tx(&make_eth_frame(
-            *CLIENT_ADDR,
-            *CLIENT_ADDR2,
-            0x1234,
-            &[1, 2, 3, 4, 5][..],
-        ));
+        ap.handle_eth_frame_tx(
+            &make_eth_frame(*CLIENT_ADDR, *CLIENT_ADDR2, 0x1234, &[1, 2, 3, 4, 5][..]),
+            0.into(),
+        );
         assert_eq!(fake_device_state.lock().wlan_queue.len(), 0);
 
         // Send a PS-Poll.

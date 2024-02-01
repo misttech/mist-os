@@ -11,6 +11,7 @@
 #include <lib/fidl/cpp/wire/channel.h>
 #include <lib/fit/function.h>
 #include <lib/sync/cpp/completion.h>
+#include <lib/trace/event.h>
 #include <zircon/status.h>
 
 #include <wlan/drivers/log.h>
@@ -74,10 +75,10 @@ zx::result<std::unique_ptr<SoftmacBridge>> SoftmacBridge::New(
         return DeviceInterface::from(device_interface)->DeliverEthernet({data, len});
       },
       .queue_tx = [](void* device_interface, uint32_t options, wlansoftmac_out_buf_t buf,
-                     wlan_tx_info_t tx_info) -> zx_status_t {
+                     wlan_tx_info_t tx_info, trace_async_id_t async_id) -> zx_status_t {
         WLAN_LAMBDA_TRACE_DURATION("rust_device_interface_t.queue_tx");
         return DeviceInterface::from(device_interface)
-            ->QueueTx(UsedBuffer::FromOutBuf(buf), tx_info);
+            ->QueueTx(UsedBuffer::FromOutBuf(buf), tx_info, async_id);
       },
       .set_ethernet_status = [](void* device_interface, uint32_t status) -> zx_status_t {
         WLAN_LAMBDA_TRACE_DURATION("rust_device_interface_t.set_ethernet_status");
@@ -91,9 +92,9 @@ zx::result<std::unique_ptr<SoftmacBridge>> SoftmacBridge::New(
     return endpoints.take_error();
   }
 
-  // Bind the WlanSoftmacBridge server on softmac_bridge_server_dispatcher. When the task completes,
-  // it will signal server_binding_task_complete, primarily to indicate the captured softmac_bridge
-  // pointer is no longer in use by the task.
+  // Bind the WlanSoftmacBridge server on softmac_bridge_server_dispatcher. When the task
+  // completes, it will signal server_binding_task_complete, primarily to indicate the captured
+  // softmac_bridge pointer is no longer in use by the task.
   libsync::Completion server_binding_task_complete;
   async::PostTask(
       softmac_bridge_server_dispatcher.async_dispatcher(),
@@ -335,15 +336,17 @@ void SoftmacBridge::UpdateWmmParameters(UpdateWmmParametersRequestView request,
   DispatchAndComplete(__func__, dispatcher, completer);
 }
 
-void SoftmacBridge::QueueEthFrameTx(eth::BorrowedOperation<> op) {
+void SoftmacBridge::QueueEthFrameTx(eth::BorrowedOperation<> op, trace_async_id_t async_id) {
   WLAN_TRACE_DURATION();
   if (rust_handle_ == nullptr) {
-    op.Complete(ZX_ERR_BAD_STATE);
+    auto status = ZX_ERR_BAD_STATE;
+    op.Complete(status);
+    WLAN_TRACE_ASYNC_END_TX(async_id, status);
     return;
   }
 
   wlan_span_t span{.data = op.operation()->data_buffer, .size = op.operation()->data_size};
-  op.Complete(sta_queue_eth_frame_tx(rust_handle_, span));
+  op.Complete(sta_queue_eth_frame_tx(rust_handle_, span, async_id));
 }
 
 template <typename FidlMethod>

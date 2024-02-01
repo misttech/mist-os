@@ -48,7 +48,7 @@ use {
         wmm,
     },
     wlan_frame_writer::{write_frame, write_frame_with_dynamic_buf, write_frame_with_fixed_buf},
-    wlan_sme,
+    wlan_sme, wlan_trace as wtrace,
     zerocopy::ByteSlice,
 };
 
@@ -134,8 +134,13 @@ impl<D: DeviceOps> crate::MlmeImpl for ClientMlme<D> {
         trace::duration!("wlan", "ClientMlme::handle_mac_frame_rx");
         Self::on_mac_frame_rx(self, bytes, rx_info)
     }
-    fn handle_eth_frame_tx(&mut self, bytes: &[u8]) -> Result<(), anyhow::Error> {
-        Self::on_eth_frame_tx(self, bytes).map_err(From::from)
+    fn handle_eth_frame_tx(
+        &mut self,
+        bytes: &[u8],
+        async_id: trace::Id,
+    ) -> Result<(), anyhow::Error> {
+        trace::duration!("wlan", "ClientMlme::handle_eth_frame_tx");
+        Self::on_eth_frame_tx(self, bytes, async_id).map_err(From::from)
     }
     fn handle_scan_complete(&mut self, status: zx::Status, scan_id: u64) {
         Self::handle_scan_complete(self, status, scan_id);
@@ -490,7 +495,12 @@ impl<D: DeviceOps> ClientMlme<D> {
         Ok(())
     }
 
-    pub fn on_eth_frame_tx<B: ByteSlice>(&mut self, bytes: B) -> Result<(), Error> {
+    pub fn on_eth_frame_tx<B: ByteSlice>(
+        &mut self,
+        bytes: B,
+        async_id: trace::Id,
+    ) -> Result<(), Error> {
+        trace::duration!("wlan", "ClientMlme::on_eth_frame_tx");
         match self.sta.as_mut() {
             None => Err(Error::Status(
                 format!("Ethernet frame dropped (Client does not exist)."),
@@ -498,7 +508,7 @@ impl<D: DeviceOps> ClientMlme<D> {
             )),
             Some(sta) => sta
                 .bind(&mut self.ctx, &mut self.scanner, &mut self.channel_state)
-                .on_eth_frame_tx(bytes),
+                .on_eth_frame_tx(bytes, async_id),
         }
     }
 
@@ -612,7 +622,7 @@ impl Client {
         })?;
         let out_buf = OutBuf::from(buf, bytes_written);
         ctx.device
-            .send_wlan_frame(out_buf, 0)
+            .send_wlan_frame(out_buf, 0, None)
             .map_err(|error| Error::Status(format!("error sending power management frame"), error))
     }
 
@@ -802,7 +812,7 @@ impl<'a, D: DeviceOps> BoundClient<'a, D> {
         let out_buf = OutBuf::from(buf, bytes_written);
         self.ctx
             .device
-            .send_wlan_frame(out_buf, 0)
+            .send_wlan_frame(out_buf, 0, None)
             .map_err(|s| Error::Status(format!("error sending keep alive frame"), s))
     }
 
@@ -833,7 +843,9 @@ impl<'a, D: DeviceOps> BoundClient<'a, D> {
         result
     }
 
-    /// Sends the given payload as a data frame over the air.
+    /// Sends the given |payload| as a data frame over the air. If the caller does not pass an |async_id| to
+    /// this function, then this function will generate its own |async_id| and end the trace if an error
+    /// occurs.
     pub fn send_data_frame(
         &mut self,
         src: MacAddr,
@@ -842,7 +854,16 @@ impl<'a, D: DeviceOps> BoundClient<'a, D> {
         qos_ctrl: bool,
         ether_type: u16,
         payload: &[u8],
+        async_id: Option<trace::Id>,
     ) -> Result<(), Error> {
+        let async_id_provided = async_id.is_some();
+        let async_id = async_id.unwrap_or_else(|| {
+            let async_id = trace::Id::new();
+            wtrace::async_begin_wlansoftmac_tx(async_id, "mlme");
+            async_id
+        });
+        trace::duration!("wlan", "BoundClient::send_data_frame");
+
         let qos_ctrl = if qos_ctrl {
             Some(
                 wmm::derive_tid(ether_type, payload)
@@ -895,16 +916,24 @@ impl<'a, D: DeviceOps> BoundClient<'a, D> {
                 mac::LlcHdr: &data_writer::make_snap_llc_hdr(ether_type),
             },
             payload: payload,
+        })
+        .map_err(|e| {
+            if !async_id_provided {
+                wtrace::async_end_wlansoftmac_tx(async_id, zx::Status::INTERNAL);
+            }
+            e
         })?;
         let out_buf = OutBuf::from(buf, bytes_written);
         let tx_flags = match ether_type {
             mac::ETHER_TYPE_EAPOL => banjo_wlan_softmac::WlanTxInfoFlags::FAVOR_RELIABILITY.0,
             _ => 0,
         };
-        self.ctx
-            .device
-            .send_wlan_frame(out_buf, tx_flags)
-            .map_err(|s| Error::Status(format!("error sending data frame"), s))
+        self.ctx.device.send_wlan_frame(out_buf, tx_flags, Some(async_id)).map_err(|s| {
+            if !async_id_provided {
+                wtrace::async_end_wlansoftmac_tx(async_id, s);
+            }
+            Error::Status(format!("error sending data frame"), s)
+        })
     }
 
     /// Sends an MLME-EAPOL.indication to MLME's SME peer.
@@ -945,6 +974,7 @@ impl<'a, D: DeviceOps> BoundClient<'a, D> {
             false, /* don't use QoS */
             mac::ETHER_TYPE_EAPOL,
             eapol_frame,
+            None,
         );
         let result_code = match result {
             Ok(()) => fidl_mlme::EapolResultCode::Success,
@@ -1001,10 +1031,15 @@ impl<'a, D: DeviceOps> BoundClient<'a, D> {
         self.sta.state = Some(self.sta.state.take().unwrap().on_mac_frame(self, bytes, rx_info));
     }
 
-    pub fn on_eth_frame_tx<B: ByteSlice>(&mut self, frame: B) -> Result<(), Error> {
+    pub fn on_eth_frame_tx<B: ByteSlice>(
+        &mut self,
+        frame: B,
+        async_id: trace::Id,
+    ) -> Result<(), Error> {
+        trace::duration!("wlan", "BoundClient::on_eth_frame_tx");
         // Safe: |state| is never None and always replaced with Some(..).
         let state = self.sta.state.take().unwrap();
-        let result = state.on_eth_frame(self, frame);
+        let result = state.on_eth_frame(self, frame, async_id);
         self.sta.state.replace(state);
         result
     }
@@ -1138,7 +1173,7 @@ impl<'a, D: DeviceOps> BoundClient<'a, D> {
     }
 
     fn send_mgmt_or_ctrl_frame(&mut self, out_buf: OutBuf) -> Result<(), zx::Status> {
-        self.ctx.device.send_wlan_frame(out_buf, 0)
+        self.ctx.device.send_wlan_frame(out_buf, 0, None)
     }
 }
 
@@ -1835,7 +1870,7 @@ mod tests {
         me.make_client_station();
         let mut client = me.get_bound_client().expect("client should be present");
         client
-            .send_data_frame(*IFACE_MAC, [4; 6].into(), false, false, 0x1234, &payload[..])
+            .send_data_frame(*IFACE_MAC, [4; 6].into(), false, false, 0x1234, &payload[..], None)
             .expect("error delivering WLAN frame");
         assert_eq!(m.fake_device_state.lock().wlan_queue.len(), 1);
         #[rustfmt::skip]
@@ -1871,6 +1906,7 @@ mod tests {
                 true,
                 0x0800,              // IPv4
                 &[1, 0xB0, 3, 4, 5], // DSCP = 0b101100 (i.e. VOICE-ADMIT)
+                None,
             )
             .expect("error delivering WLAN frame");
         assert_eq!(m.fake_device_state.lock().wlan_queue.len(), 1);
@@ -1908,6 +1944,7 @@ mod tests {
                 true,
                 0x86DD,                         // IPv6
                 &[0b0101, 0b10000000, 3, 4, 5], // DSCP = 0b010110 (i.e. AF23)
+                None,
             )
             .expect("error delivering WLAN frame");
         assert_eq!(m.fake_device_state.lock().wlan_queue.len(), 1);
@@ -1939,7 +1976,7 @@ mod tests {
         me.make_client_station();
         let mut client = me.get_bound_client().expect("client should be present");
         client
-            .send_data_frame([3; 6].into(), [4; 6].into(), false, false, 0x1234, &payload[..])
+            .send_data_frame([3; 6].into(), [4; 6].into(), false, false, 0x1234, &payload[..], None)
             .expect("error delivering WLAN frame");
         assert_eq!(m.fake_device_state.lock().wlan_queue.len(), 1);
         #[rustfmt::skip]

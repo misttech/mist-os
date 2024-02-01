@@ -13,6 +13,7 @@
 #include <fuchsia/wlan/ieee80211/c/banjo.h>
 #include <fuchsia/wlan/internal/c/banjo.h>
 #include <fuchsia/wlan/softmac/c/banjo.h>
+#include <lib/trace/event.h>
 #include <stdarg.h>
 #include <stdbool.h>
 #include <stdint.h>
@@ -73,7 +74,7 @@ typedef struct {
    * Deliver a WLAN frame directly through the firmware.
    */
   int32_t (*queue_tx)(void *device, uint32_t options, wlansoftmac_out_buf_t buf,
-                      wlan_tx_info_t tx_info);
+                      wlan_tx_info_t tx_info, trace_async_id_t async_id);
   /**
    * Reports the current status to the ethernet driver.
    */
@@ -147,6 +148,16 @@ extern "C" zx_status_t start_and_run_bridged_wlansoftmac(
 extern "C" void stop_bridged_wlansoftmac(void *completer, void (*run_completer)(void *completer),
                                          wlansoftmac_handle_t *softmac);
 
-extern "C" zx_status_t sta_queue_eth_frame_tx(wlansoftmac_handle_t *softmac, wlan_span_t frame);
+/**
+ * FFI interface: Queue an ethernet frame to be sent over the air. The caller should either end the
+ * async trace event corresponding to |async_id| if an error occurs or deferred ending the trace to
+ * a later call into the C++ portion of wlansoftmac.
+ *
+ * Assuming no errors occur, the Rust portion of wlansoftmac will eventually
+ * rust_device_interface_t.queue_tx() with the same |async_id|. At that point, the C++ portion of
+ * wlansoftmac will assume responsibility for ending the async trace event.
+ */
+extern "C" zx_status_t sta_queue_eth_frame_tx(wlansoftmac_handle_t *softmac, wlan_span_t frame,
+                                              trace_async_id_t async_id);
 
 #endif  // SRC_CONNECTIVITY_WLAN_DRIVERS_WLANSOFTMAC_RUST_DRIVER_C_BINDING_BINDINGS_H_

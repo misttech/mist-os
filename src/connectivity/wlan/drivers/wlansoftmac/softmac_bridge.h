@@ -12,6 +12,7 @@
 #include <lib/fidl/cpp/wire/server.h>
 #include <lib/fidl_driver/cpp/wire_client.h>
 #include <lib/operation/ethernet.h>
+#include <lib/trace/event.h>
 #include <lib/zx/result.h>
 
 #include <wlan/drivers/log.h>
@@ -58,7 +59,7 @@ class SoftmacBridge : public fidl::WireServer<fuchsia_wlan_softmac::WlanSoftmacB
   void UpdateWmmParameters(UpdateWmmParametersRequestView request,
                            UpdateWmmParametersCompleter::Sync& completer) final;
 
-  void QueueEthFrameTx(eth::BorrowedOperation<> op);
+  void QueueEthFrameTx(eth::BorrowedOperation<> op, trace_async_id_t async_id);
 
  private:
   explicit SoftmacBridge(DeviceInterface* device_interface,

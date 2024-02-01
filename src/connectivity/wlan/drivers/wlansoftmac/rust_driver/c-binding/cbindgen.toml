@@ -15,6 +15,7 @@ style = "type"
 
 sys_includes = [
     "zircon/types.h",
+    "lib/trace/event.h",
 
     # Banjo types.
     "fuchsia/wlan/softmac/c/banjo.h",   # wlan_softmac_query_response_t, wlan_hw_scan_config_t,
@@ -36,6 +37,7 @@ include = [
     "InBuf",
     "OutBuf",
     "WlanSoftmacHandle",
+    "TraceId",
 ]
 
 exclude = [
@@ -66,6 +68,7 @@ exclude = [
 "InBuf" = "wlansoftmac_in_buf_t"
 "OutBuf" = "wlansoftmac_out_buf_t"
 "WlanSoftmacHandle" = "wlansoftmac_handle_t"
+"TraceId" = "trace_async_id_t"
 
 # Banjo types.
 "JoinBssRequest" = "join_bss_request_t"

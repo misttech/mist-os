@@ -20,6 +20,7 @@
 #include <lib/fit/result.h>
 #include <lib/operation/ethernet.h>
 #include <lib/sync/cpp/completion.h>
+#include <lib/trace/event.h>
 #include <lib/zx/channel.h>
 #include <lib/zx/result.h>
 #include <lib/zx/thread.h>
@@ -331,9 +332,12 @@ void SoftmacBinding::EthernetImplStop() {
 
 void SoftmacBinding::EthernetImplQueueTx(uint32_t options, ethernet_netbuf_t* netbuf,
                                          ethernet_impl_queue_tx_callback callback, void* cookie) {
+  trace_async_id_t async_id = TRACE_NONCE();
+  WLAN_TRACE_ASYNC_BEGIN_TX(async_id, "ethernet");
+
   WLAN_TRACE_DURATION();
   eth::BorrowedOperation<> op(netbuf, callback, cookie, sizeof(ethernet_netbuf_t));
-  softmac_bridge_->QueueEthFrameTx(std::move(op));
+  softmac_bridge_->QueueEthFrameTx(std::move(op), async_id);
 }
 
 zx_status_t SoftmacBinding::EthernetImplSetParam(uint32_t param, int32_t value,
@@ -420,21 +424,26 @@ zx_status_t SoftmacBinding::DeliverEthernet(cpp20::span<const uint8_t> eth_frame
   return ZX_OK;
 }
 
-zx_status_t SoftmacBinding::QueueTx(UsedBuffer used_buffer, wlan_tx_info_t tx_info) {
+zx_status_t SoftmacBinding::QueueTx(UsedBuffer used_buffer, wlan_tx_info_t tx_info,
+                                    trace_async_id_t async_id) {
   WLAN_TRACE_DURATION();
   ZX_DEBUG_ASSERT(used_buffer.size() <= std::numeric_limits<uint16_t>::max());
+
+  zx_status_t status = ZX_OK;
 
   auto arena = fdf::Arena::Create(0, 0);
   if (arena.is_error()) {
     lerror("Arena creation failed: %s", arena.status_string());
-    return ZX_ERR_INTERNAL;
+    status = ZX_ERR_INTERNAL;
+    WLAN_TRACE_ASYNC_END_TX(async_id, status);
+    return status;
   }
 
   fuchsia_wlan_softmac::wire::WlanTxPacket fidl_tx_packet;
-  zx_status_t status = status =
-      ConvertTxPacket(used_buffer.data(), used_buffer.size(), tx_info, &fidl_tx_packet);
+  status = ConvertTxPacket(used_buffer.data(), used_buffer.size(), tx_info, &fidl_tx_packet);
   if (status != ZX_OK) {
     lerror("WlanTxPacket conversion failed: %s", zx_status_get_string(status));
+    WLAN_TRACE_ASYNC_END_TX(async_id, status);
     return status;
   }
 
@@ -442,14 +451,20 @@ zx_status_t SoftmacBinding::QueueTx(UsedBuffer used_buffer, wlan_tx_info_t tx_in
 
   if (!result.ok()) {
     lerror("QueueTx failed (FIDL error %s)", result.status_string());
-    return result.status();
+    status = result.status();
+    WLAN_TRACE_ASYNC_END_TX(async_id, status);
+    return status;
   }
   if (result->is_error()) {
     lerror("QueueTx failed (status %s)", zx_status_get_string(result->error_value()));
-    return result->error_value();
+    status = result->error_value();
+    WLAN_TRACE_ASYNC_END_TX(async_id, status);
+    return status;
   }
 
-  return ZX_OK;
+  ZX_DEBUG_ASSERT(status == ZX_OK);
+  WLAN_TRACE_ASYNC_END_TX(async_id, status);
+  return status;
 }
 
 zx_status_t SoftmacBinding::SetEthernetStatus(uint32_t status) {

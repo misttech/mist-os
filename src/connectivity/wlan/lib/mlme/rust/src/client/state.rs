@@ -699,7 +699,9 @@ impl Associated {
         &self,
         sta: &mut BoundClient<'_, D>,
         frame: B,
+        async_id: trace::Id,
     ) -> Result<(), Error> {
+        trace::duration!("wlan", "Associated::on_eth_frame");
         let mac::EthernetFrame { hdr, body } = match mac::EthernetFrame::parse(frame) {
             Some(eth_frame) => eth_frame,
             None => {
@@ -724,6 +726,7 @@ impl Associated {
             self.0.qos.is_enabled(),
             hdr.ether_type.to_native(),
             &body,
+            Some(async_id),
         )
     }
 
@@ -1153,9 +1156,11 @@ impl States {
         &self,
         sta: &mut BoundClient<'_, D>,
         frame: B,
+        async_id: trace::Id,
     ) -> Result<(), Error> {
+        trace::duration!("wlan", "States::on_eth_frame");
         match self {
-            States::Associated(state) => state.on_eth_frame(sta, frame),
+            States::Associated(state) => state.on_eth_frame(sta, frame, async_id),
             _ => Err(Error::Status(
                 format!("Not associated. Ethernet dropped"),
                 zx::Status::BAD_STATE,
@@ -3224,7 +3229,7 @@ mod tests {
             29, // more payload
         ];
 
-        state.on_eth_frame(&mut sta, &eth_frame[..]).expect("all good");
+        state.on_eth_frame(&mut sta, &eth_frame[..], 0.into()).expect("all good");
 
         assert_eq!(m.fake_device_state.lock().wlan_queue.len(), 1);
         let (data_frame, _tx_flags) = m.fake_device_state.lock().wlan_queue.remove(0);
@@ -3273,7 +3278,7 @@ mod tests {
         let eth_frame = &[100; 14]; // An ethernet frame must be at least 14 bytes long.
 
         let error = state
-            .on_eth_frame(&mut sta, &eth_frame[..])
+            .on_eth_frame(&mut sta, &eth_frame[..], 0.into())
             .expect_err("Ethernet frame is dropped when client is off channel");
         assert_variant!(error, Error::Status(_str, status) =>
             assert_eq!(status, zx::Status::BAD_STATE),
@@ -3293,8 +3298,9 @@ mod tests {
 
         let eth_frame = &[100; 13]; // Needs at least 14 bytes for header.
 
-        let error =
-            state.on_eth_frame(&mut sta, &eth_frame[..]).expect_err("Ethernet frame is too short");
+        let error = state
+            .on_eth_frame(&mut sta, &eth_frame[..], 0.into())
+            .expect_err("Ethernet frame is too short");
         assert_variant!(error, Error::Status(_str, status) =>
             assert_eq!(status, zx::Status::IO_DATA_INTEGRITY),
             "error should contain a status"
@@ -3314,7 +3320,7 @@ mod tests {
         let eth_frame = &[100; 14]; // long enough for ethernet header.
 
         let error = state
-            .on_eth_frame(&mut sta, &eth_frame[..])
+            .on_eth_frame(&mut sta, &eth_frame[..], 0.into())
             .expect_err("Ethernet frame canot be sent when controlled port is closed");
         assert_variant!(error, Error::Status(_str, status) =>
             assert_eq!(status, zx::Status::BAD_STATE),
@@ -3334,7 +3340,7 @@ mod tests {
         let eth_frame = &[100; 14]; // long enough for ethernet header.
 
         let error = state
-            .on_eth_frame(&mut sta, &eth_frame[..])
+            .on_eth_frame(&mut sta, &eth_frame[..], 0.into())
             .expect_err("Ethernet frame cannot be sent in Joined state");
         assert_variant !(error, Error::Status(_str, status) =>
             assert_eq!(status, zx::Status::BAD_STATE),

@@ -12,7 +12,7 @@ use {
     },
     banjo_fuchsia_wlan_softmac as banjo_softmac, fidl_fuchsia_wlan_common as fidl_common,
     fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211, fidl_fuchsia_wlan_mlme as fidl_mlme,
-    fidl_fuchsia_wlan_softmac as fidl_softmac, fuchsia_zircon as zx,
+    fidl_fuchsia_wlan_softmac as fidl_softmac, fuchsia_trace as trace, fuchsia_zircon as zx,
     ieee80211::{MacAddr, MacAddrBytes, Ssid},
     std::collections::VecDeque,
     tracing::warn,
@@ -25,6 +25,7 @@ use {
         TimeUnit,
     },
     wlan_statemachine::StateMachine,
+    wlan_trace as wtrace,
     zerocopy::ByteSlice,
 };
 
@@ -264,7 +265,7 @@ impl RemoteClient {
                 fidl_ieee80211::ReasonCode::ReasonInactivity.into(),
             )
             .map_err(ClientRejection::WlanSendError)?;
-        self.send_wlan_frame(ctx, in_buf, bytes_written, 0).map_err(|s| {
+        self.send_wlan_frame(ctx, in_buf, bytes_written, 0, None).map_err(|s| {
             ClientRejection::WlanSendError(Error::Status(
                 format!("error sending disassoc frame on BSS idle timeout"),
                 s,
@@ -374,7 +375,7 @@ impl RemoteClient {
         )?;
         // TODO(https://fxbug.dev/42172646) - Added to help investigate hw-sim test. Remove later
         tracing::info!("Sending auth frame to driver: {} bytes", bytes_written);
-        self.send_wlan_frame(ctx, in_buf, bytes_written, 0)
+        self.send_wlan_frame(ctx, in_buf, bytes_written, 0, None)
             .map_err(|s| Error::Status(format!("error sending auth frame"), s))
     }
 
@@ -397,7 +398,7 @@ impl RemoteClient {
 
         let (in_buf, bytes_written) =
             ctx.make_deauth_frame(self.addr.clone(), reason_code.into())?;
-        self.send_wlan_frame(ctx, in_buf, bytes_written, 0)
+        self.send_wlan_frame(ctx, in_buf, bytes_written, 0, None)
             .map_err(|s| Error::Status(format!("error sending deauth frame"), s))
     }
 
@@ -509,7 +510,7 @@ impl RemoteClient {
                 },
             ),
         }?;
-        self.send_wlan_frame(ctx, in_buf, bytes_written, 0)
+        self.send_wlan_frame(ctx, in_buf, bytes_written, 0, None)
             .map_err(|s| Error::Status(format!("error sending assoc frame"), s))
     }
 
@@ -532,7 +533,7 @@ impl RemoteClient {
 
         let (in_buf, bytes_written) =
             ctx.make_disassoc_frame(self.addr.clone(), ReasonCode(reason_code))?;
-        self.send_wlan_frame(ctx, in_buf, bytes_written, 0)
+        self.send_wlan_frame(ctx, in_buf, bytes_written, 0, None)
             .map_err(|s| Error::Status(format!("error sending disassoc frame"), s))
     }
 
@@ -574,6 +575,7 @@ impl RemoteClient {
             in_buf,
             bytes_written,
             banjo_softmac::WlanTxInfoFlags::FAVOR_RELIABILITY.0,
+            None,
         )
         .map_err(|s| Error::Status(format!("error sending eapol frame"), s))
     }
@@ -644,12 +646,14 @@ impl RemoteClient {
                             fidl_ieee80211::StatusCode::UnsupportedAuthAlgorithm.into(),
                         )
                         .map_err(ClientRejection::WlanSendError)?;
-                    return self.send_wlan_frame(ctx, in_buf, bytes_written, 0).map_err(|s| {
-                        ClientRejection::WlanSendError(Error::Status(
-                            format!("failed to send auth frame"),
-                            s,
-                        ))
-                    });
+                    return self.send_wlan_frame(ctx, in_buf, bytes_written, 0, None).map_err(
+                        |s| {
+                            ClientRejection::WlanSendError(Error::Status(
+                                format!("failed to send auth frame"),
+                                s,
+                            ))
+                        },
+                    );
                 }
             },
         )
@@ -697,7 +701,7 @@ impl RemoteClient {
 
                 match ps_state {
                     PowerSaveState::Dozing { buffered } => {
-                        let BufferedFrame { mut in_buf, bytes_written, tx_flags } =
+                        let BufferedFrame { mut in_buf, bytes_written, tx_flags, async_id } =
                             match buffered.pop_front() {
                                 Some(buffered) => buffered,
                                 None => {
@@ -711,17 +715,21 @@ impl RemoteClient {
                             frame_writer::set_more_data(
                                 &mut in_buf.as_mut_slice()[..bytes_written],
                             )
-                            .map_err(ClientRejection::WlanSendError)?;
+                            .map_err(|e| {
+                                wtrace::async_end_wlansoftmac_tx(async_id, zx::Status::INTERNAL);
+                                ClientRejection::WlanSendError(e)
+                            })?;
                         }
 
                         ctx.device
-                            .send_wlan_frame(OutBuf::from(in_buf, bytes_written), tx_flags)
+                            .send_wlan_frame(OutBuf::from(in_buf, bytes_written), tx_flags, None)
                             .map_err(|s| {
-                            ClientRejection::WlanSendError(Error::Status(
-                                format!("error sending buffered frame on PS-Poll"),
-                                s,
-                            ))
-                        })?;
+                                wtrace::async_end_wlansoftmac_tx(async_id, s);
+                                ClientRejection::WlanSendError(Error::Status(
+                                    format!("error sending buffered frame on PS-Poll"),
+                                    s,
+                                ))
+                            })?;
                     }
                     _ => {
                         return Err(ClientRejection::NotPermitted);
@@ -772,7 +780,7 @@ impl RemoteClient {
                     PowerSaveState::Dozing { buffered } => buffered.into_iter().peekable(),
                 };
 
-                while let Some(BufferedFrame { mut in_buf, bytes_written, tx_flags }) =
+                while let Some(BufferedFrame { mut in_buf, bytes_written, tx_flags, async_id }) =
                     buffered.next()
                 {
                     if buffered.peek().is_some() {
@@ -790,7 +798,11 @@ impl RemoteClient {
                             .map_err(ClientRejection::WlanSendError)?;
                     }
                     ctx.device
-                        .send_wlan_frame(OutBuf::from(in_buf, bytes_written), tx_flags)
+                        .send_wlan_frame(
+                            OutBuf::from(in_buf, bytes_written),
+                            tx_flags,
+                            Some(async_id),
+                        )
                         .map_err(|s| {
                             ClientRejection::WlanSendError(Error::Status(
                                 format!("error sending buffered frame on wake"),
@@ -868,7 +880,7 @@ impl RemoteClient {
                 let (in_buf, bytes_written) = ctx
                     .make_deauth_frame(self.addr, reason_code.into())
                     .map_err(ClientRejection::WlanSendError)?;
-                self.send_wlan_frame(ctx, in_buf, bytes_written, 0).map_err(|s| {
+                self.send_wlan_frame(ctx, in_buf, bytes_written, 0, None).map_err(|s| {
                     ClientRejection::WlanSendError(Error::Status(
                         format!("failed to send deauth frame"),
                         s,
@@ -882,7 +894,7 @@ impl RemoteClient {
                 let (in_buf, bytes_written) = ctx
                     .make_disassoc_frame(self.addr, reason_code.into())
                     .map_err(ClientRejection::WlanSendError)?;
-                self.send_wlan_frame(ctx, in_buf, bytes_written, 0).map_err(|s| {
+                self.send_wlan_frame(ctx, in_buf, bytes_written, 0, None).map_err(|s| {
                     ClientRejection::WlanSendError(Error::Status(
                         format!("failed to send disassoc frame"),
                         s,
@@ -1045,6 +1057,7 @@ impl RemoteClient {
         src_addr: MacAddr,
         ether_type: u16,
         body: &[u8],
+        async_id: trace::Id,
     ) -> Result<(), ClientRejection> {
         let eapol_controlled_port = match self.state.as_ref() {
             State::Associated { eapol_controlled_port, .. } => eapol_controlled_port,
@@ -1068,7 +1081,8 @@ impl RemoteClient {
                 ether_type, body,
             )
             .map_err(ClientRejection::WlanSendError)?;
-        self.send_wlan_frame(ctx, in_buf, bytes_written, 0).map_err(|s| {
+
+        self.send_wlan_frame(ctx, in_buf, bytes_written, 0, Some(async_id)).map_err(move |s| {
             ClientRejection::WlanSendError(Error::Status(format!("error sending eapol frame"), s))
         })
     }
@@ -1079,18 +1093,31 @@ impl RemoteClient {
         in_buf: InBuf,
         bytes_written: usize,
         tx_flags: u32,
+        async_id: Option<trace::Id>,
     ) -> Result<(), zx::Status> {
+        let async_id = async_id.unwrap_or_else(|| {
+            let async_id = trace::Id::new();
+            wtrace::async_begin_wlansoftmac_tx(async_id, "mlme");
+            async_id
+        });
+
         match self.state.as_mut() {
             State::Associated { ps_state, .. } => match ps_state {
-                PowerSaveState::Awake => {
-                    ctx.device.send_wlan_frame(OutBuf::from(in_buf, bytes_written), tx_flags)
-                }
+                PowerSaveState::Awake => ctx.device.send_wlan_frame(
+                    OutBuf::from(in_buf, bytes_written),
+                    tx_flags,
+                    Some(async_id),
+                ),
                 PowerSaveState::Dozing { buffered } => {
-                    buffered.push_back(BufferedFrame { in_buf, bytes_written, tx_flags });
+                    buffered.push_back(BufferedFrame { in_buf, bytes_written, tx_flags, async_id });
                     Ok(())
                 }
             },
-            _ => ctx.device.send_wlan_frame(OutBuf::from(in_buf, bytes_written), tx_flags),
+            _ => ctx.device.send_wlan_frame(
+                OutBuf::from(in_buf, bytes_written),
+                tx_flags,
+                Some(async_id),
+            ),
         }
     }
 }
@@ -1742,10 +1769,24 @@ mod tests {
 
         // Send a bunch of Ethernet frames.
         r_sta
-            .handle_eth_frame(&mut ctx, *CLIENT_ADDR2, *CLIENT_ADDR, 0x1234, &[1, 2, 3, 4, 5][..])
+            .handle_eth_frame(
+                &mut ctx,
+                *CLIENT_ADDR2,
+                *CLIENT_ADDR,
+                0x1234,
+                &[1, 2, 3, 4, 5][..],
+                0.into(),
+            )
             .expect("expected OK");
         r_sta
-            .handle_eth_frame(&mut ctx, *CLIENT_ADDR2, *CLIENT_ADDR, 0x1234, &[6, 7, 8, 9, 0][..])
+            .handle_eth_frame(
+                &mut ctx,
+                *CLIENT_ADDR2,
+                *CLIENT_ADDR,
+                0x1234,
+                &[6, 7, 8, 9, 0][..],
+                0.into(),
+            )
             .expect("expected OK");
 
         // Make sure nothing has been actually sent to the WLAN queue.
@@ -1927,7 +1968,14 @@ mod tests {
             ps_state: PowerSaveState::Awake,
         });
         r_sta
-            .handle_eth_frame(&mut ctx, *CLIENT_ADDR2, *CLIENT_ADDR, 0x1234, &[1, 2, 3, 4, 5][..])
+            .handle_eth_frame(
+                &mut ctx,
+                *CLIENT_ADDR2,
+                *CLIENT_ADDR,
+                0x1234,
+                &[1, 2, 3, 4, 5][..],
+                0.into(),
+            )
             .expect("expected OK");
         assert_eq!(fake_device_state.lock().wlan_queue.len(), 1);
         #[rustfmt::skip]
@@ -1962,7 +2010,8 @@ mod tests {
                     *CLIENT_ADDR2,
                     *CLIENT_ADDR,
                     0x1234,
-                    &[1, 2, 3, 4, 5][..]
+                    &[1, 2, 3, 4, 5][..],
+                    0.into()
                 )
                 .expect_err("expected error"),
             ClientRejection::NotAssociated
@@ -1989,7 +2038,8 @@ mod tests {
                     *CLIENT_ADDR2,
                     *CLIENT_ADDR,
                     0x1234,
-                    &[1, 2, 3, 4, 5][..]
+                    &[1, 2, 3, 4, 5][..],
+                    0.into()
                 )
                 .expect_err("expected error"),
             ClientRejection::ControlledPortClosed
@@ -2010,7 +2060,14 @@ mod tests {
             ps_state: PowerSaveState::Awake,
         });
         r_sta
-            .handle_eth_frame(&mut ctx, *CLIENT_ADDR2, *CLIENT_ADDR, 0x1234, &[1, 2, 3, 4, 5][..])
+            .handle_eth_frame(
+                &mut ctx,
+                *CLIENT_ADDR2,
+                *CLIENT_ADDR,
+                0x1234,
+                &[1, 2, 3, 4, 5][..],
+                0.into(),
+            )
             .expect("expected OK");
         assert_eq!(fake_device_state.lock().wlan_queue.len(), 1);
         #[rustfmt::skip]
@@ -2618,10 +2675,24 @@ mod tests {
 
         // Send a bunch of Ethernet frames.
         r_sta
-            .handle_eth_frame(&mut ctx, *CLIENT_ADDR2, *CLIENT_ADDR, 0x1234, &[1, 2, 3, 4, 5][..])
+            .handle_eth_frame(
+                &mut ctx,
+                *CLIENT_ADDR2,
+                *CLIENT_ADDR,
+                0x1234,
+                &[1, 2, 3, 4, 5][..],
+                0.into(),
+            )
             .expect("expected OK");
         r_sta
-            .handle_eth_frame(&mut ctx, *CLIENT_ADDR2, *CLIENT_ADDR, 0x1234, &[6, 7, 8, 9, 0][..])
+            .handle_eth_frame(
+                &mut ctx,
+                *CLIENT_ADDR2,
+                *CLIENT_ADDR,
+                0x1234,
+                &[6, 7, 8, 9, 0][..],
+                0.into(),
+            )
             .expect("expected OK");
 
         assert!(r_sta.has_buffered_frames());

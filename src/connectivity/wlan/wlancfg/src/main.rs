@@ -17,7 +17,7 @@ use {
     fuchsia_component::server::ServiceFs,
     fuchsia_inspect::component,
     fuchsia_inspect_contrib::auto_persist,
-    fuchsia_trace as ftrace, fuchsia_trace_provider as ftrace_provider,
+    fuchsia_trace_provider as ftrace_provider,
     fuchsia_zircon::prelude::*,
     futures::{
         self,
@@ -470,11 +470,7 @@ async fn main() {
     diagnostics_log::initialize(options).unwrap();
     fuchsia_trace_provider::trace_provider_create_with_fdio();
     ftrace_provider::trace_provider_create_with_fdio();
-    ftrace::instant!(
-        wtrace::CATEGORY_WLAN!(),
-        wtrace::NAME_WLANCFG_START!(),
-        ftrace::Scope::Process
-    );
+    wtrace::instant_wlancfg_start();
     if let Err(e) = run_all_futures().await {
         error!("{:?}", e);
     }

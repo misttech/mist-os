@@ -2,6 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-fuchsia_trace::string_name_macro!(CATEGORY_WLAN, "wlan");
-fuchsia_trace::string_name_macro!(NAME_WLANCFG_START, "wlancfg:start");
-fuchsia_trace::string_name_macro!(NAME_WLANSTACK_START, "wlanstack:start");
+use core::ffi::CStr;
+
+pub const CATEGORY_WLAN: &'static CStr = unsafe { CStr::from_bytes_with_nul_unchecked(b"wlan\0") };
+pub const NAME_WLANCFG_START: &'static CStr =
+    unsafe { CStr::from_bytes_with_nul_unchecked(b"wlancfg:start\0") };
+// This name should be the same as defined in
+// //src/connectivity/wlan/drivers/lib/log/cpp/include/common/wlan/drivers/log.h
+pub const NAME_WLANSOFTMAC_TX: &'static CStr =
+    unsafe { CStr::from_bytes_with_nul_unchecked(b"wlansoftmac:tx\0") };

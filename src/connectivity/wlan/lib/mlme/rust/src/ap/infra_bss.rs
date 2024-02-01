@@ -17,7 +17,7 @@ use {
     },
     anyhow::format_err,
     fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_mlme as fidl_mlme,
-    fidl_fuchsia_wlan_softmac as fidl_softmac, fuchsia_zircon as zx,
+    fidl_fuchsia_wlan_softmac as fidl_softmac, fuchsia_trace as trace, fuchsia_zircon as zx,
     ieee80211::{MacAddr, MacAddrBytes, Ssid},
     std::{
         collections::{HashMap, VecDeque},
@@ -312,7 +312,7 @@ impl InfraBss {
                 self.rsne.as_ref().map_or(&[], |rsne| &rsne),
             )
             .map_err(|e| Rejection::Client(client_addr, ClientRejection::WlanSendError(e)))?;
-        ctx.device.send_wlan_frame(OutBuf::from(in_buf, bytes_written), 0).map_err(|s| {
+        ctx.device.send_wlan_frame(OutBuf::from(in_buf, bytes_written), 0, None).map_err(|s| {
             Rejection::Client(
                 client_addr,
                 ClientRejection::WlanSendError(Error::Status(
@@ -515,6 +515,7 @@ impl InfraBss {
         ctx: &mut Context<D>,
         hdr: EthernetIIHdr,
         body: &[u8],
+        async_id: trace::Id,
     ) -> Result<(), Rejection> {
         let (in_buf, bytes_written) = ctx
             .make_data_frame(
@@ -529,8 +530,9 @@ impl InfraBss {
         let tx_flags: u32 = 0;
 
         if !self.clients.values().any(|client| client.dozing()) {
-            ctx.device.send_wlan_frame(OutBuf::from(in_buf, bytes_written), tx_flags).map_err(
-                |s| {
+            ctx.device
+                .send_wlan_frame(OutBuf::from(in_buf, bytes_written), tx_flags, Some(async_id))
+                .map_err(move |s| {
                     Rejection::Client(
                         hdr.da,
                         ClientRejection::WlanSendError(Error::Status(
@@ -538,10 +540,14 @@ impl InfraBss {
                             s,
                         )),
                     )
-                },
-            )?;
+                })?;
         } else {
-            self.group_buffered.push_back(BufferedFrame { in_buf, bytes_written, tx_flags });
+            self.group_buffered.push_back(BufferedFrame {
+                in_buf,
+                bytes_written,
+                tx_flags,
+                async_id,
+            });
         }
 
         Ok(())
@@ -552,9 +558,10 @@ impl InfraBss {
         ctx: &mut Context<D>,
         hdr: EthernetIIHdr,
         body: &[u8],
+        async_id: trace::Id,
     ) -> Result<(), Rejection> {
         if hdr.da.is_multicast() {
-            return self.handle_multicast_eth_frame(ctx, hdr, body);
+            return self.handle_multicast_eth_frame(ctx, hdr, body, async_id);
         }
 
         // Handle the frame, pretending that the client is an unauthenticated client if we don't
@@ -565,7 +572,7 @@ impl InfraBss {
             .get_mut(&hdr.da)
             .unwrap_or_else(|| maybe_client.get_or_insert(RemoteClient::new(hdr.da)));
         client
-            .handle_eth_frame(ctx, hdr.da, hdr.sa, hdr.ether_type.to_native(), body)
+            .handle_eth_frame(ctx, hdr.da, hdr.sa, hdr.ether_type.to_native(), body, async_id)
             .map_err(|e| Rejection::Client(client.addr, e))
     }
 
@@ -583,12 +590,14 @@ impl InfraBss {
         self.dtim_count = self.dtim_period;
 
         let mut buffered = self.group_buffered.drain(..).peekable();
-        while let Some(BufferedFrame { mut in_buf, bytes_written, tx_flags }) = buffered.next() {
+        while let Some(BufferedFrame { mut in_buf, bytes_written, tx_flags, async_id }) =
+            buffered.next()
+        {
             if buffered.peek().is_some() {
                 frame_writer::set_more_data(&mut in_buf.as_mut_slice()[..bytes_written])?;
             }
             ctx.device
-                .send_wlan_frame(OutBuf::from(in_buf, bytes_written), tx_flags)
+                .send_wlan_frame(OutBuf::from(in_buf, bytes_written), tx_flags, Some(async_id))
                 .map_err(|s| Error::Status(format!("error sending buffered frame on wake"), s))?;
         }
 
@@ -1589,6 +1598,7 @@ mod tests {
                 ether_type: BigEndianU16::from_native(0x1234),
             },
             &[1, 2, 3, 4, 5][..],
+            0.into(),
         )
         .expect("expected OK");
 
@@ -1628,6 +1638,7 @@ mod tests {
                     ether_type: BigEndianU16::from_native(0x1234)
                 },
                 &[1, 2, 3, 4, 5][..],
+                0.into(),
             )
             .expect_err("expected error"),
             Rejection::Client(_, ClientRejection::NotAssociated)
@@ -1670,6 +1681,7 @@ mod tests {
                     ether_type: BigEndianU16::from_native(0x1234)
                 },
                 &[1, 2, 3, 4, 5][..],
+                0.into(),
             )
             .expect_err("expected error"),
             Rejection::Client(_, ClientRejection::ControlledPortClosed)
@@ -1713,6 +1725,7 @@ mod tests {
                 ether_type: BigEndianU16::from_native(0x1234),
             },
             &[1, 2, 3, 4, 5][..],
+            0.into(),
         )
         .expect("expected OK");
 
@@ -1904,6 +1917,7 @@ mod tests {
                 ether_type: BigEndianU16::from_native(0x1234),
             },
             &[1, 2, 3, 4, 5][..],
+            0.into(),
         )
         .expect("expected OK");
     }
@@ -1964,6 +1978,7 @@ mod tests {
                 ether_type: BigEndianU16::from_native(0x1234),
             },
             &[1, 2, 3, 4, 5][..],
+            0.into(),
         )
         .expect("expected OK");
         assert_eq!(fake_device_state.lock().wlan_queue.len(), 0);
@@ -2330,6 +2345,7 @@ mod tests {
                 ether_type: BigEndianU16::from_native(0x1234),
             },
             &[1, 2, 3, 4, 5][..],
+            0.into(),
         )
         .expect("expected OK");
 
