@@ -33,7 +33,7 @@ TEST(Index, IndexDump) {
 
   // Symbol index.
   std::ostringstream out;
-  index.root().Dump(out, setup.symbols()->symbol_factory(), 0);
+  index.root().Dump(out, setup.symbols()->GetSymbolFactory(), 0);
   const char kExpected[] = R"(  Namespaces:
     <<empty index string>>
       Functions:
@@ -133,7 +133,7 @@ zxdb_symbol_test2.cc -> ../../src/developer/debug/zxdb/symbols/test_data/zxdb_sy
   Index slow_index;
   slow_index.CreateIndex(*setup.symbols()->binary(), IndexNode::SymbolRef::kMainBinary, true);
   out = std::ostringstream();
-  slow_index.root().Dump(out, setup.symbols()->symbol_factory(), 0);
+  slow_index.root().Dump(out, setup.symbols()->GetSymbolFactory(), 0);
   EXPECT_EQ(kExpected, out.str());
 }
 
@@ -242,7 +242,7 @@ TEST(Index, IndexDwo) {
   Index index;
   index.CreateIndex(*setup.symbols()->binary(), IndexNode::SymbolRef::kMainBinary);
   std::ostringstream out;
-  index.root().Dump(out, setup.symbols()->symbol_factory(), 0);
+  index.root().Dump(out, setup.symbols()->GetSymbolFactory(), 0);
 
   const char kExpected[] = R"(  Types:
     char: 0x3d
@@ -271,7 +271,7 @@ TEST(Index, Fission) {
   Index index;
   index.CreateIndex(*setup.symbols()->binary(), IndexNode::SymbolRef::kMainBinary);
   std::ostringstream out;
-  index.root().Dump(out, setup.symbols()->symbol_factory(), 0);
+  index.root().Dump(out, setup.symbols()->GetSymbolFactory(), 0);
 
   // In this binary there are no symbols, everything is in the .dwo files.
   EXPECT_EQ("", out.str());

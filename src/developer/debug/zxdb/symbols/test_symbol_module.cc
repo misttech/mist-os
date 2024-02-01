@@ -125,9 +125,9 @@ TestSymbolModule::~TestSymbolModule() = default;
 
 Err TestSymbolModule::Init(const std::string& build_dir, bool should_index) {
   auto binary = std::make_unique<DwarfBinaryImpl>(sym_name_, binary_name_, std::string());
-  if (Err err = binary->Load(); err.has_error())
+  symbols_ = fxl::MakeRefCounted<ModuleSymbolsImpl>(std::move(binary), build_dir);
+  if (Err err = symbols_->Load(should_index); err.has_error())
     return err;
-  symbols_ = fxl::MakeRefCounted<ModuleSymbolsImpl>(std::move(binary), build_dir, should_index);
   return Err();
 }
 

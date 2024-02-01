@@ -152,20 +152,26 @@ bool HasOnlySupportedSpecialIdentifierTypes(const Identifier& ident) {
 // This class glues everything together for the DWO via the DwarfSymbolFactory::Delegate interface.
 class ModuleSymbolsImpl::DwoInfo final : public DwarfSymbolFactory::Delegate {
  public:
-  DwoInfo(std::unique_ptr<DwarfBinaryImpl> binary, SkeletonUnit skeleton,
-          fxl::WeakPtr<ModuleSymbols> module_symbols)
-      : binary_(std::move(binary)),
-        skeleton_(std::move(skeleton)),
+  // Must call Load() which must succeed before using.
+  DwoInfo(SkeletonUnit skeleton, fxl::WeakPtr<ModuleSymbols> module_symbols)
+      : skeleton_(std::move(skeleton)),
         module_symbols_(std::move(module_symbols)),
-        weak_factory_(this) {
-    symbol_factory_ = fxl::MakeRefCounted<DwarfSymbolFactory>(weak_factory_.GetWeakPtr(),
-                                                              DwarfSymbolFactory::kDWO);
+        weak_factory_(this) {}
+
+  Err Load(const std::string& name, const std::string& binary_name) {
+    binary_ = std::make_unique<DwarfBinaryImpl>(name, binary_name, std::string());
+    if (Err err = binary_->Load(weak_factory_.GetWeakPtr(), DwarfSymbolFactory::kDWO);
+        err.has_error()) {
+      binary_.reset();
+      return err;
+    }
+    return Err();
   }
 
-  SymbolFactory* symbol_factory() { return symbol_factory_.get(); }
+  DwarfBinaryImpl* binary() { return binary_.get(); }
+  const SymbolFactory* symbol_factory() { return binary_->GetSymbolFactory(); }
 
   // DwarfSymbolFactory::Delegate implementation.
-  DwarfBinaryImpl* GetDwarfBinaryImpl() override { return binary_.get(); }
   std::string GetBuildDirForSymbolFactory() override { return skeleton_.comp_dir; }
   fxl::WeakPtr<ModuleSymbols> GetModuleSymbols() override { return module_symbols_; }
   CompileUnit* GetSkeletonCompileUnit() override {
@@ -185,10 +191,9 @@ class ModuleSymbolsImpl::DwoInfo final : public DwarfSymbolFactory::Delegate {
   }
 
  private:
-  std::unique_ptr<DwarfBinaryImpl> binary_;  // Guaranteed non-null.
+  std::unique_ptr<DwarfBinaryImpl> binary_;  // Guaranteed non-null after Load() succeeds.
   SkeletonUnit skeleton_;  // Refers to the skeleton in the main binary corresponding to this DWO.
   fxl::WeakPtr<ModuleSymbols> module_symbols_;
-  fxl::RefPtr<SymbolFactory> symbol_factory_;
 
   // Lazily constructed & cached unit corresponding to the skeleton.
   fxl::RefPtr<CompileUnit> skeleton_unit_;
@@ -197,24 +202,30 @@ class ModuleSymbolsImpl::DwoInfo final : public DwarfSymbolFactory::Delegate {
 };
 
 ModuleSymbolsImpl::ModuleSymbolsImpl(std::unique_ptr<DwarfBinaryImpl> binary,
-                                     const std::string& build_dir, bool create_index)
+                                     const std::string& build_dir)
     : binary_(std::move(binary)),
       build_dir_(build_dir),
       weak_factory_(this),
-      symbol_weak_factory_(this) {
-  symbol_factory_ = fxl::MakeRefCounted<DwarfSymbolFactory>(symbol_weak_factory_.GetWeakPtr(),
-                                                            DwarfSymbolFactory::kMainBinary);
-  FillElfSymbols();
-
-  if (create_index) {
-    CreateIndex();
-  }
-}
+      symbol_weak_factory_(this) {}
 
 ModuleSymbolsImpl::~ModuleSymbolsImpl() = default;
 
 fxl::WeakPtr<ModuleSymbolsImpl> ModuleSymbolsImpl::GetWeakPtr() {
   return weak_factory_.GetWeakPtr();
+}
+
+Err ModuleSymbolsImpl::Load(bool create_index) {
+  if (Err err = binary_->Load(symbol_weak_factory_.GetWeakPtr(), DwarfSymbolFactory::kMainBinary);
+      err.has_error()) {
+    return err;
+  }
+
+  FillElfSymbols();
+
+  if (create_index) {
+    CreateIndex();
+  }
+  return Err();
 }
 
 ModuleSymbolStatus ModuleSymbolsImpl::GetStatus() const {
@@ -236,7 +247,9 @@ std::string ModuleSymbolsImpl::GetBuildDir() const { return build_dir_; }
 
 uint64_t ModuleSymbolsImpl::GetMappedLength() const { return binary_->GetMappedLength(); }
 
-const SymbolFactory* ModuleSymbolsImpl::GetSymbolFactory() const { return symbol_factory_.get(); }
+const SymbolFactory* ModuleSymbolsImpl::GetSymbolFactory() const {
+  return binary_->GetSymbolFactory();
+}
 
 std::vector<Location> ModuleSymbolsImpl::ResolveInputLocation(const SymbolContext& symbol_context,
                                                               const InputLocation& input_location,
@@ -371,7 +384,7 @@ LazySymbol ModuleSymbolsImpl::IndexSymbolRefToSymbol(const IndexNode::SymbolRef&
     case IndexNode::SymbolRef::kDwarfDeclaration:
       // Handled by the DWARF symbol factory.
       if (ref.dwo_index() == IndexNode::SymbolRef::kMainBinary) {
-        return symbol_factory_->MakeLazy(ref.offset());
+        return GetSymbolFactory()->MakeLazy(ref.offset());
       } else {
         // The dwo_index is set: it is a reference into our dwos_ array.
         FX_CHECK(ref.dwo_index() >= 0 && ref.dwo_index() < static_cast<int32_t>(dwos_.size()));
@@ -533,8 +546,10 @@ std::optional<Location> ModuleSymbolsImpl::DwarfLocationForAddress(
   // TODO(bug 5544) handle addresses that aren't code like global variables.
   uint64_t relative_address = symbol_context.AbsoluteToRelative(absolute_address);
   fxl::RefPtr<DwarfUnit> unit = binary_->UnitForRelativeAddress(relative_address);
-  if (!unit)  // No DWARF symbol.
+  if (!unit)  // No DWARF unit symbol.
     return std::nullopt;
+
+  // TODO(brettw) add support for skeleton compilation units here.
 
   FileLine file_line;
   int column = 0;
@@ -555,7 +570,7 @@ std::optional<Location> ModuleSymbolsImpl::DwarfLocationForAddress(
     if (uint64_t fn_die_offset = unit->FunctionDieOffsetForRelativeAddress(relative_address)) {
       // FunctionForRelativeAddress() will return the most specific inlined function for the
       // address.
-      lazy_function = symbol_factory_->MakeLazy(fn_die_offset);
+      lazy_function = GetSymbolFactory()->MakeLazy(fn_die_offset);
       function = RefPtrTo(lazy_function.Get()->As<Function>());
 
       // The is_inline() check is strictly unnecessary since ambiguous inline computations will
@@ -818,7 +833,7 @@ void ModuleSymbolsImpl::ResolveLineInputLocationForFile(const SymbolContext& sym
       continue;  // Some kind of corruption.
 
     if (auto fn =
-            RefPtrTo(symbol_factory_->CreateSymbol(match.function_die_offset)->As<Function>())) {
+            RefPtrTo(GetSymbolFactory()->CreateSymbol(match.function_die_offset)->As<Function>())) {
       // Make sure we have the outermost function and not some random code block inside it.
       //
       // If GetContainingFunction() returns a different function that we put in (i.e. we put in
@@ -892,9 +907,8 @@ void ModuleSymbolsImpl::CreateIndex() {
       dwo_path = std::filesystem::path(build_dir_) / comp_dir / skeleton.dwo_name;
     }
 
-    auto dwo_binary =
-        std::make_unique<DwarfBinaryImpl>(dwo_path.string(), dwo_path.string(), std::string());
-    if (Err err = dwo_binary->Load(); err.has_error()) {
+    auto dwo_info = std::make_unique<DwoInfo>(skeleton, GetWeakPtr());
+    if (Err err = dwo_info->Load(dwo_path.string(), dwo_path.string()); err.has_error()) {
       // TODO(brettw) have a better way to report this error/warning to the frontend.
       fprintf(stderr, "Can't load DWO binary %s\n", dwo_path.c_str());
       continue;
@@ -904,10 +918,10 @@ void ModuleSymbolsImpl::CreateIndex() {
     // for each .dwo file can be done in a thread pool since they're independent, and only the final
     // merging needs to be done back on the main thread.
     Index dwo_index;
-    dwo_index.CreateIndex(*dwo_binary, static_cast<int32_t>(dwos_.size()));
+    dwo_index.CreateIndex(*dwo_info->binary(), static_cast<int32_t>(dwos_.size()));
     index_.root().MergeFrom(dwo_index.root());
 
-    dwos_.push_back(std::make_unique<DwoInfo>(std::move(dwo_binary), skeleton, GetWeakPtr()));
+    dwos_.push_back(std::move(dwo_info));
   }
 }
 

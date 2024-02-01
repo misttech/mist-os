@@ -16,7 +16,7 @@ namespace zxdb {
 namespace {
 
 void DumpMap(const IndexNode::Map& map, int indent, const char* heading,
-             SymbolFactory* factory_for_loc, std::ostream& out) {
+             const SymbolFactory* factory_for_loc, std::ostream& out) {
   if (map.empty())
     return;
 
@@ -107,15 +107,16 @@ std::string IndexNode::AsString(int indent_level) const {
   return out.str();
 }
 
-void IndexNode::Dump(std::ostream& out, SymbolFactory* factory_for_loc, int indent_level) const {
+void IndexNode::Dump(std::ostream& out, const SymbolFactory* factory_for_loc,
+                     int indent_level) const {
   DumpMap(namespaces(), indent_level + 1, "Namespaces:", factory_for_loc, out);
   DumpMap(types(), indent_level + 1, "Types:", factory_for_loc, out);
   DumpMap(functions(), indent_level + 1, "Functions:", factory_for_loc, out);
   DumpMap(vars(), indent_level + 1, "Variables:", factory_for_loc, out);
 }
 
-void IndexNode::Dump(const std::string& name, std::ostream& out, SymbolFactory* factory_for_loc,
-                     int indent_level) const {
+void IndexNode::Dump(const std::string& name, std::ostream& out,
+                     const SymbolFactory* factory_for_loc, int indent_level) const {
   out << std::string(indent_level * 2, ' ');
   if (name.empty())
     out << "<<empty index string>>";

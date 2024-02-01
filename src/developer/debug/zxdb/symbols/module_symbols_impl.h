@@ -44,8 +44,14 @@ class Variable;
 // objects for each .dwo file.
 class ModuleSymbolsImpl final : public ModuleSymbols, public DwarfSymbolFactory::Delegate {
  public:
+  // Must be called and after the constructor.
+  //
+  // If create_index is true, an index will be created for fast symbol lookup.
+  // Normal callers will always want to create the index, unless you don't need to query a symbol
+  // from its name, e.g., in some test scenarios or in symbolizer.
+  Err Load(bool create_index);
+
   DwarfBinaryImpl* binary() { return binary_.get(); }
-  SymbolFactory* symbol_factory() { return symbol_factory_.get(); }
 
   fxl::WeakPtr<ModuleSymbolsImpl> GetWeakPtr();
 
@@ -73,7 +79,6 @@ class ModuleSymbolsImpl final : public ModuleSymbols, public DwarfSymbolFactory:
   //
   // This implementation is for the DwarfBinary of the main binary's symbol file. If there are
   // referenced .dwo files, those will be implemented by DwoInfo.
-  DwarfBinaryImpl* GetDwarfBinaryImpl() override { return binary_.get(); }
   std::string GetBuildDirForSymbolFactory() override { return build_dir_; }
   fxl::WeakPtr<ModuleSymbols> GetModuleSymbols() override { return GetWeakPtr(); }
   CompileUnit* GetSkeletonCompileUnit() override {
@@ -89,14 +94,11 @@ class ModuleSymbolsImpl final : public ModuleSymbols, public DwarfSymbolFactory:
 
   // The input binary must be successfully initialized already.
   //
+  // Must call Load() after this to initialize things.
+  //
   // The build_dir, if not empty, will be used to override the compilation_dir of FileLine objects,
   // which is useful because in Fuchsia checkout, the compilation_dir will always be ".".
-  //
-  // If create_index is true, an index will be created for fast symbol lookup.
-  // Normal callers will always want to create the index, unless you don't need to query a symbol
-  // from its name, e.g., in some test scenarios or in symbolizer.
-  explicit ModuleSymbolsImpl(std::unique_ptr<DwarfBinaryImpl> binary, const std::string& build_dir,
-                             bool create_index = true);
+  explicit ModuleSymbolsImpl(std::unique_ptr<DwarfBinaryImpl> binary, const std::string& build_dir);
   ~ModuleSymbolsImpl() override;
 
   // Helpers for ResolveInputLocation() for the different types of inputs.
@@ -170,7 +172,7 @@ class ModuleSymbolsImpl final : public ModuleSymbols, public DwarfSymbolFactory:
   // Fills the forward and backward indices for ELF symbols.
   void FillElfSymbols();
 
-  std::unique_ptr<DwarfBinaryImpl> binary_;  // Guaranteed non-null.
+  std::unique_ptr<DwarfBinaryImpl> binary_;  // Guaranteed non-null after Load() succeeds.
 
   // .dwo files are separate per-source symbols that are referenced by the main binary. Populated
   // by CreateIndex().
@@ -203,8 +205,6 @@ class ModuleSymbolsImpl final : public ModuleSymbols, public DwarfSymbolFactory:
   // All symbols in the mangled_elf_symbols_ map (pointers owned by that structure) sorted by the
   // relative address. Theoretically there can be more than one symbol for the same address.
   std::vector<const ElfSymbolRecord*> elf_addresses_;
-
-  fxl::RefPtr<SymbolFactory> symbol_factory_;
 
   fxl::WeakPtrFactory<ModuleSymbolsImpl> weak_factory_;
   fxl::WeakPtrFactory<DwarfSymbolFactory::Delegate> symbol_weak_factory_;

@@ -69,7 +69,7 @@ Err SystemSymbols::GetModule(const std::string& name, const std::string& build_i
     }
   }
 
-  auto entry = build_id_index_.EntryForBuildID(build_id);
+  BuildIDIndex::Entry entry = build_id_index_.EntryForBuildID(build_id);
 
   if (enable_local_fallback_ && entry.debug_info.empty()) {
     // Local fallback is enabled and the name could be an absolute local path. See if the binary
@@ -94,12 +94,12 @@ Err SystemSymbols::GetModule(const std::string& name, const std::string& build_i
     return Err();  // No symbols synchronously available.
 
   auto binary = std::make_unique<DwarfBinaryImpl>(entry.debug_info, entry.binary, build_id);
-  if (Err err = binary->Load(); err.has_error())
-    return err;  // Symbols corrupt.
+  auto module_impl = fxl::MakeRefCounted<ModuleSymbolsImpl>(std::move(binary), entry.build_dir);
+  if (Err err = module_impl->Load(create_index_); err.has_error()) {
+    return err;
+  }
 
-  *module =
-      fxl::MakeRefCounted<ModuleSymbolsImpl>(std::move(binary), entry.build_dir, create_index_);
-
+  *module = module_impl;                // Save to output parameter (as base class pointer).
   SaveModule(build_id, module->get());  // Save in cache for future use.
   return Err();
 }

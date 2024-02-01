@@ -21,6 +21,7 @@ class ObjectFile;
 
 namespace zxdb {
 
+class DwarfSymbolFactory;
 class SymbolContext;
 
 // Represents the low-level DWARF file. It provides a mockable wrapper around a llvm::DWARFContext.
@@ -46,6 +47,8 @@ class DwarfBinary {
   virtual std::string GetName() const = 0;
   virtual std::string GetBuildID() const = 0;
   virtual std::time_t GetModificationTime() const = 0;
+
+  virtual const DwarfSymbolFactory* GetSymbolFactory() const = 0;
 
   // Return whether this module has been given the opportunity to include symbols from the binary
   // itself, such as PLT entries.

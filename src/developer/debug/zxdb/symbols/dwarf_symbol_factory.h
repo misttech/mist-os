@@ -44,7 +44,6 @@ class DwarfSymbolFactory : public SymbolFactory {
   // reference cycle.
   class Delegate {
    public:
-    virtual DwarfBinaryImpl* GetDwarfBinaryImpl() = 0;
     virtual std::string GetBuildDirForSymbolFactory() = 0;
     virtual fxl::WeakPtr<ModuleSymbols> GetModuleSymbols() = 0;
 
@@ -63,7 +62,8 @@ class DwarfSymbolFactory : public SymbolFactory {
   FRIEND_REF_COUNTED_THREAD_SAFE(DwarfSymbolFactory);
   FRIEND_MAKE_REF_COUNTED(DwarfSymbolFactory);
 
-  DwarfSymbolFactory(fxl::WeakPtr<Delegate> delegate, FileType file_type);
+  DwarfSymbolFactory(fxl::WeakPtr<DwarfBinaryImpl> binary, fxl::WeakPtr<Delegate> delegate,
+                     FileType file_type);
   ~DwarfSymbolFactory() override;
 
   LazySymbol MakeLazy(const llvm::DWARFDie& die) const;
@@ -124,8 +124,9 @@ class DwarfSymbolFactory : public SymbolFactory {
                                                const llvm::DWARFFormValue& form) const;
   std::optional<uint64_t> GetAddrFromIndex(const llvm::DWARFDie& die, uint64_t index) const;
 
-  // This can be null if the module is unloaded but there are still some dangling type references to
-  // it.
+  // These can be null if the module is unloaded but there are still some dangling type references
+  // to them.
+  fxl::WeakPtr<DwarfBinaryImpl> binary_;
   fxl::WeakPtr<Delegate> delegate_;
 
   FileType file_type_;

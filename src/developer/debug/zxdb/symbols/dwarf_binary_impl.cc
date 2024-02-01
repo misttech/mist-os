@@ -174,6 +174,10 @@ std::string DwarfBinaryImpl::GetBuildID() const { return build_id_; }
 
 std::time_t DwarfBinaryImpl::GetModificationTime() const { return modification_time_; }
 
+const DwarfSymbolFactory* DwarfBinaryImpl::GetSymbolFactory() const {
+  return symbol_factory_.get();
+}
+
 bool DwarfBinaryImpl::HasBinary() const {
   if (!binary_name_.empty())
     return true;
@@ -184,7 +188,11 @@ bool DwarfBinaryImpl::HasBinary() const {
   return false;
 }
 
-Err DwarfBinaryImpl::Load() {
+Err DwarfBinaryImpl::Load(fxl::WeakPtr<DwarfSymbolFactory::Delegate> delegate,
+                          DwarfSymbolFactory::FileType file_type) {
+  symbol_factory_ = fxl::MakeRefCounted<DwarfSymbolFactory>(weak_factory_.GetWeakPtr(),
+                                                            std::move(delegate), file_type);
+
   if (auto debug = elflib::ElfLib::Create(name_)) {
     if (debug->ProbeHasProgramBits()) {
       // Found in ".debug" file.

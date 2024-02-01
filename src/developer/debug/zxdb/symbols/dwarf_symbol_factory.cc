@@ -104,12 +104,13 @@ bool IsAddrXForm(llvm::dwarf::Form form) {
 
 }  // namespace
 
-DwarfSymbolFactory::DwarfSymbolFactory(fxl::WeakPtr<Delegate> delegate, FileType file_type)
-    : delegate_(std::move(delegate)), file_type_(file_type) {}
+DwarfSymbolFactory::DwarfSymbolFactory(fxl::WeakPtr<DwarfBinaryImpl> binary,
+                                       fxl::WeakPtr<Delegate> delegate, FileType file_type)
+    : binary_(std::move(binary)), delegate_(std::move(delegate)), file_type_(file_type) {}
 DwarfSymbolFactory::~DwarfSymbolFactory() = default;
 
 fxl::RefPtr<Symbol> DwarfSymbolFactory::CreateSymbol(uint64_t die_offset) const {
-  if (!delegate_)
+  if (!binary_ || !delegate_)
     return fxl::MakeRefCounted<Symbol>();
 
   // LLVMContext::getDIEForOffset() only works for normal (non-DWO) units so we have to look up
@@ -130,7 +131,10 @@ fxl::RefPtr<Symbol> DwarfSymbolFactory::CreateSymbol(uint64_t die_offset) const 
 }
 
 llvm::DWARFContext* DwarfSymbolFactory::GetLLVMContext() const {
-  return delegate_->GetDwarfBinaryImpl()->GetLLVMContext();
+  if (binary_) {
+    return binary_->GetLLVMContext();
+  }
+  return nullptr;
 }
 
 fxl::RefPtr<Symbol> DwarfSymbolFactory::DecodeSymbol(const llvm::DWARFDie& die) const {
@@ -618,8 +622,10 @@ fxl::RefPtr<Symbol> DwarfSymbolFactory::DecodeCompileUnit(const llvm::DWARFDie& 
   if (language && *language >= 0 && *language < static_cast<int>(DwarfLang::kLast))
     lang_enum = static_cast<DwarfLang>(*language);
 
+  // The weak "binary_" pointer should have already been checked for null by CreateSymbol() so we
+  // can dereference unconditionally.
   fxl::RefPtr<DwarfUnit> dwarf_unit =
-      fxl::MakeRefCounted<DwarfUnitImpl>(delegate_->GetDwarfBinaryImpl(), die.getDwarfUnit());
+      fxl::MakeRefCounted<DwarfUnitImpl>(binary_.get(), die.getDwarfUnit());
 
   // We know the delegate_ is valid, that was checked on entry to CreateSymbol().
   return fxl::MakeRefCounted<CompileUnit>(tag, delegate_->GetModuleSymbols(), std::move(dwarf_unit),

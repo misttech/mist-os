@@ -10,6 +10,7 @@
 #include "llvm/DebugInfo/DWARF/DWARFUnit.h"
 #include "src/developer/debug/zxdb/common/err.h"
 #include "src/developer/debug/zxdb/symbols/dwarf_binary.h"
+#include "src/developer/debug/zxdb/symbols/dwarf_symbol_factory.h"
 #include "src/lib/fxl/memory/weak_ptr.h"
 
 namespace llvm {
@@ -35,12 +36,14 @@ class DwarfBinaryImpl final : public DwarfBinary {
 
   fxl::WeakPtr<DwarfBinaryImpl> GetWeakPtr();
 
-  Err Load();
+  Err Load(fxl::WeakPtr<DwarfSymbolFactory::Delegate> delegate,
+           DwarfSymbolFactory::FileType file_type);
 
   // DwarfBinary implementation.
   std::string GetName() const override;
   std::string GetBuildID() const override;
   std::time_t GetModificationTime() const override;
+  const DwarfSymbolFactory* GetSymbolFactory() const override;
   bool HasBinary() const override;
   llvm::object::ObjectFile* GetLLVMObjectFile() override;
   llvm::DWARFContext* GetLLVMContext() override;
@@ -74,6 +77,8 @@ class DwarfBinaryImpl final : public DwarfBinary {
 
   std::map<std::string, llvm::ELF::Elf64_Sym> elf_symbols_;
   std::map<std::string, uint64_t> plt_symbols_;
+
+  fxl::RefPtr<DwarfSymbolFactory> symbol_factory_;
 
   // Holds the mapping between LLVM units and our cached unit wrappers that reference them.
   mutable std::map<const llvm::DWARFUnit*, fxl::RefPtr<DwarfUnit>> unit_map_;

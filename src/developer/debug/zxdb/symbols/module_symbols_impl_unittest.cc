@@ -600,7 +600,7 @@ TEST(ModuleSymbols, IndexFission) {
   // The index in the ModuleSymbolsImpl should have the unified symbols from all .dwo files.
   // Compare to the Index.Fission test which doesn't do the merging.
   std::ostringstream out;
-  setup.symbols()->index_.root().Dump(out, setup.symbols()->symbol_factory(), 0);
+  setup.symbols()->index_.root().Dump(out, setup.symbols()->GetSymbolFactory(), 0);
 
   const char kExpected[] = R"(  Types:
     char: 0x3d, 0x3d
