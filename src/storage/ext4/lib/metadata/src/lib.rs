@@ -66,6 +66,15 @@ impl Metadata {
 
     /// Add a child at `path` with inode number `inode_num`.
     pub fn add_child(&mut self, path: &[&str], inode_num: u64) {
+        for component in path {
+            assert!(
+                *component != "."
+                    && *component != ".."
+                    && !component.contains(|c| c == '/' || c == '\0'),
+                "Invalid path component {component:?} in {path:?}"
+            );
+        }
+
         let mut node = self.nodes.get_mut(&ROOT_INODE_NUM).unwrap().directory_mut().unwrap();
         let mut iter = path.iter();
         let name = iter.next_back().unwrap();
@@ -220,9 +229,9 @@ mod tests {
         m.insert_directory(3, S_IFDIR | 0o775, 2, 3, xattr.clone());
         m.add_child(&["foo"], 3);
         m.insert_file(4, S_IFREG | 0o644, 2, 3, xattr.clone());
-        m.add_child(&["foo/bar"], 4);
+        m.add_child(&["foo", "bar"], 4);
         m.insert_symlink(5, "symlink-target".to_string(), S_IFLNK | 0o777, 2, 3, xattr.clone());
-        m.add_child(&["foo/baz"], 5);
+        m.add_child(&["foo", "baz"], 5);
 
         let m = Metadata::deserialize(&m.serialize()).expect("deserialize failed");
         let node = m.get(ROOT_INODE_NUM).expect("root not found");
@@ -240,7 +249,7 @@ mod tests {
         assert_eq!(node.gid, 3);
         assert_eq!(&node.extended_attributes, &xattr);
 
-        assert_eq!(m.lookup(ROOT_INODE_NUM, "foo/bar").expect("foo/bar not found"), 4);
+        assert_eq!(m.lookup(3, "bar").expect("foo/bar not found"), 4);
         let node = m.get(4).expect("root not found");
         assert_matches!(node.info(), NodeInfo::File(_));
         assert_eq!(node.mode, S_IFREG | 0o644);
@@ -248,7 +257,7 @@ mod tests {
         assert_eq!(node.gid, 3);
         assert_eq!(&node.extended_attributes, &xattr);
 
-        assert_eq!(m.lookup(ROOT_INODE_NUM, "foo/baz").expect("foo/baz not found"), 5);
+        assert_eq!(m.lookup(3, "baz").expect("foo/baz not found"), 5);
         let node = m.get(5).expect("root not found");
         assert_matches!(node.info(), NodeInfo::Symlink(_));
         assert_eq!(node.mode, S_IFLNK | 0o777);
