@@ -33,6 +33,41 @@ constexpr void UpdateBits(uint32_t* x, uint32_t mask, uint32_t loc, uint32_t val
   *x |= ((val << loc) & mask);
 }
 
+// Translates a FIDL sdmmc request (fuchsia_hardware_sdmmc::wire::SdmmcReq) into a Banjo one
+// (sdmmc_req_t). The supplied buffer_region_ptr is used to house the sdmmc_req_t.buffers vector
+// (hence buffer_region_ptr must outlive the returned sdmmc_req_t).
+zx::result<sdmmc_req_t> FidlToBanjoReq(const fuchsia_hardware_sdmmc::wire::SdmmcReq& wire_req,
+                                       sdmmc_buffer_region_t* buffer_region_ptr) {
+  const sdmmc_req_t banjo_req = {
+      .cmd_idx = wire_req.cmd_idx,
+      .cmd_flags = wire_req.cmd_flags,
+      .arg = wire_req.arg,
+      .blocksize = wire_req.blocksize,
+      .suppress_error_messages = wire_req.suppress_error_messages,
+      .client_id = wire_req.client_id,
+      .buffers_list = buffer_region_ptr,
+      .buffers_count = wire_req.buffers.count(),
+  };
+
+  for (size_t i = 0; i < wire_req.buffers.count(); i++) {
+    if (wire_req.buffers[i].type == fuchsia_hardware_sdmmc::wire::SdmmcBufferType::kVmoId) {
+      buffer_region_ptr->type = SDMMC_BUFFER_TYPE_VMO_ID;
+      buffer_region_ptr->buffer.vmo_id = wire_req.buffers[i].buffer.vmo_id();
+    } else {
+      if (wire_req.buffers[i].type != fuchsia_hardware_sdmmc::wire::SdmmcBufferType::kVmoHandle) {
+        return zx::error(ZX_ERR_INVALID_ARGS);
+      }
+      buffer_region_ptr->type = SDMMC_BUFFER_TYPE_VMO_HANDLE;
+      buffer_region_ptr->buffer.vmo = wire_req.buffers[i].buffer.vmo().get();
+    }
+    buffer_region_ptr->offset = wire_req.buffers[i].offset;
+    buffer_region_ptr->size = wire_req.buffers[i].size;
+
+    buffer_region_ptr++;
+  }
+  return zx::ok(banjo_req);
+}
+
 // Translates a Banjo sdmmc request (sdmmc_req_t) into a FIDL one
 // (fuchsia_hardware_sdmmc::wire::SdmmcReq).
 zx::result<fuchsia_hardware_sdmmc::wire::SdmmcReq> BanjoToFidlReq(const sdmmc_req_t& banjo_req,
@@ -265,54 +300,37 @@ zx_status_t SdmmcDevice::SdmmcWaitForState(uint32_t desired_state) {
   return ZX_ERR_TIMED_OUT;
 }
 
-// TODO(b/300145353): Consider refactoring to avoid recursive calling.
-void SdmmcDevice::SdmmcIoRequestWithRetries(std::vector<sdmmc_req_t> reqs,
-                                            fit::function<void(zx_status_t, uint32_t)> callback,
-                                            uint32_t retries) {
-  const bool last_retry = retries >= (kTryAttempts - 1);
-  for (auto& req : reqs) {
-    req.suppress_error_messages = !last_retry;
-  }
-
+zx_status_t SdmmcDevice::SdmmcIoRequest(
+    fdf::Arena arena, fidl::VectorView<fuchsia_hardware_sdmmc::wire::SdmmcReq> reqs,
+    sdmmc_buffer_region_t* buffer_region_ptr) {
+  zx_status_t status = ZX_OK;
   if (!using_fidl_) {
-    zx_status_t status = ZX_OK;
     for (const auto& req : reqs) {
+      const zx::result<sdmmc_req_t> banjo_req = FidlToBanjoReq(req, buffer_region_ptr);
+      if (banjo_req.is_error()) {
+        return banjo_req.status_value();  // Not retrying if request can't be translated to Banjo.
+      }
       uint32_t unused_response[4];
-      status = host_.Request(&req, unused_response);
+      status = host_.Request(&*banjo_req, unused_response);
       if (status != ZX_OK) {
-        SdmmcStopForRetry();
         break;
       }
     }
-    if (status != ZX_OK && !last_retry) {
-      return SdmmcIoRequestWithRetries(std::move(reqs), std::move(callback), retries + 1);
-    } else {
-      return callback(status, retries);
+  } else {
+    auto result = client_.sync().buffer(arena)->Request(reqs);
+    if (!result.ok()) {
+      FDF_LOGL(ERROR, logger(), "Failed to call Request: %s", result.status_string());
+      return result.status();  // Not retrying if FIDL error.
+    }
+    if (result->is_error()) {
+      status = result->error_value();
     }
   }
 
-  fdf::Arena arena('SDMC');
-  zx::result<fidl::VectorView<fuchsia_hardware_sdmmc::wire::SdmmcReq>> wire_req_vector =
-      BanjoToFidlReqVector(reqs.data(), reqs.size(), &arena, logger());
-  if (wire_req_vector.is_error()) {
-    return callback(wire_req_vector.error_value(), retries);
-  }
-
-  auto result = client_.sync().buffer(arena)->Request(*wire_req_vector);
-  if (!result.ok()) {
-    FDF_LOGL(ERROR, logger(), "Request request failed: %s", result.status_string());
-    return callback(result.status(), retries);  // Not retrying if FIDL error.
-  }
-
-  if (result->is_error()) {
+  if (status != ZX_OK) {
     SdmmcStopForRetry();
-    if (!last_retry) {
-      return SdmmcIoRequestWithRetries(std::move(reqs), std::move(callback), retries + 1);
-    } else {
-      return callback(result->error_value(), retries);
-    }
   }
-  return callback(ZX_OK, retries);
+  return status;
 }
 
 void SdmmcDevice::SdmmcStopForRetry() {

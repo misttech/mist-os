@@ -28,6 +28,8 @@ class SdmmcRootDevice;
 // required.
 class SdmmcDevice {
  public:
+  static constexpr uint32_t kTryAttempts = 10;  // 1 initial + 9 retries.
+
   explicit SdmmcDevice(SdmmcRootDevice* root_device) : root_device_(root_device) {}
 
   // For testing using Banjo.
@@ -58,12 +60,11 @@ class SdmmcDevice {
   zx_status_t SdmmcSendStatus(uint32_t* status);
   zx_status_t SdmmcStopTransmission(uint32_t* status = nullptr);
   zx_status_t SdmmcWaitForState(uint32_t desired_state);
-  // Retries a collection of IO requests by recursively calling itself (|retries| is used to track
-  // the retry count). STOP_TRANSMISSION is issued after every attempt that results in an error, but
-  // not after the request succeeds. Invokes |callback| with the final status and retry count.
-  void SdmmcIoRequestWithRetries(std::vector<sdmmc_req_t> reqs,
-                                 fit::function<void(zx_status_t, uint32_t)> callback,
-                                 uint32_t retries = 0);
+  // Issues a collection of IO requests. STOP_TRANSMISSION is issued if the request(s) fail.
+  // |buffer_region_ptr| is used for FIDL-to-Banjo request translation.
+  zx_status_t SdmmcIoRequest(fdf::Arena arena,
+                             fidl::VectorView<fuchsia_hardware_sdmmc::wire::SdmmcReq> reqs,
+                             sdmmc_buffer_region_t* buffer_region_ptr);
 
   // SD ops
   zx_status_t SdSendOpCond(uint32_t flags, uint32_t* ocr);
@@ -118,8 +119,6 @@ class SdmmcDevice {
   fdf::Logger& logger();
 
  private:
-  static constexpr uint32_t kTryAttempts = 10;  // 1 initial + 9 retries.
-
   // Retry each request retries_ times (with wait_time delay in between) by default. Requests are
   // always tried at least once.
   zx_status_t Request(const sdmmc_req_t& req, uint32_t response[4], uint32_t retries = 0,

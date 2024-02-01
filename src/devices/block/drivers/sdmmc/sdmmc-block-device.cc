@@ -28,6 +28,27 @@ constexpr size_t kTranMaxAttempts = 10;
 // Boot and RPMB partition sizes are in units of 128 KiB/KB.
 constexpr uint32_t kBootSizeMultiplier = 128 * 1024;
 
+// Populates and returns a fuchsia_hardware_sdmmc::wire::SdmmcBufferRegion using the supplied
+// arguments.
+zx::result<fuchsia_hardware_sdmmc::wire::SdmmcBufferRegion> GetBufferRegion(zx_handle_t vmo,
+                                                                            uint64_t offset,
+                                                                            uint64_t size,
+                                                                            fdf::Logger& logger) {
+  zx::vmo dup;
+  zx_status_t status = zx_handle_duplicate(vmo, ZX_RIGHT_SAME_RIGHTS, dup.reset_and_get_address());
+  if (status != ZX_OK) {
+    FDF_LOGL(ERROR, logger, "Failed to duplicate vmo: %s", zx_status_get_string(status));
+    return zx::error(status);
+  }
+
+  fuchsia_hardware_sdmmc::wire::SdmmcBufferRegion buffer_region;
+  buffer_region.buffer = fuchsia_hardware_sdmmc::wire::SdmmcBuffer::WithVmo(std::move(dup));
+  buffer_region.type = fuchsia_hardware_sdmmc::wire::SdmmcBufferType::kVmoHandle;
+  buffer_region.offset = offset;
+  buffer_region.size = size;
+  return zx::ok(std::move(buffer_region));
+}
+
 }  // namespace
 
 namespace sdmmc {
@@ -236,16 +257,37 @@ void SdmmcBlockDevice::StopWorkerDispatcher(std::optional<fdf::PrepareStopComple
   }
 }
 
-void SdmmcBlockDevice::ReadWrite(std::vector<BlockOperation>& btxns,
-                                 const EmmcPartition partition) {
+zx_status_t SdmmcBlockDevice::ReadWriteWithRetries(std::vector<BlockOperation>& btxns,
+                                                   const EmmcPartition partition) {
   zx_status_t st = SetPartition(partition);
   if (st != ZX_OK) {
-    for (auto& btxn : btxns) {
-      BlockComplete(btxn, st);
-    }
-    return;
+    return st;
   }
 
+  uint32_t attempts = 0;
+  while (true) {
+    attempts++;
+    const bool last_attempt = attempts >= sdmmc_->kTryAttempts;
+
+    st = ReadWriteAttempt(btxns, !last_attempt);
+
+    if (st == ZX_OK || last_attempt) {
+      break;
+    }
+  }
+
+  properties_.io_retries_.Add(attempts - 1);
+  if (st != ZX_OK) {
+    FDF_LOGL(ERROR, logger(), "do_txn error: %s", zx_status_get_string(st));
+    properties_.io_errors_.Add(1);
+  }
+
+  FDF_LOGL(DEBUG, logger(), "do_txn complete");
+  return st;
+}
+
+zx_status_t SdmmcBlockDevice::ReadWriteAttempt(std::vector<BlockOperation>& btxns,
+                                               bool suppress_error_messages) {
   // For single-block transfers, we could get higher performance by using SDMMC_READ_BLOCK/
   // SDMMC_WRITE_BLOCK without the need to SDMMC_SET_BLOCK_COUNT or SDMMC_STOP_TRANSMISSION.
   // However, we always do multiple-block transfers for simplicity.
@@ -268,31 +310,30 @@ void SdmmcBlockDevice::ReadWrite(std::vector<BlockOperation>& btxns,
            txn.command.opcode, txn.offset_vmo, total_data_transfer_blocks, btxns.size(),
            block_info_.block_size, block_info_.max_transfer_size);
 
-  sdmmc_buffer_region_t* buffer_region_ptr = readwrite_metadata_.buffer_regions.get();
-  std::vector<sdmmc_req_t> reqs;
+  fdf::Arena arena('SDMC');
+  fidl::VectorView<fuchsia_hardware_sdmmc::wire::SdmmcReq> reqs;
   if (!command_packing) {
     // TODO(https://fxbug.dev/42076962): Consider using SDMMC_CMD_AUTO23, which is likely to enhance
     // performance.
-    reqs.push_back({
-        .cmd_idx = SDMMC_SET_BLOCK_COUNT,
-        .cmd_flags = SDMMC_SET_BLOCK_COUNT_FLAGS,
-        .arg = total_data_transfer_blocks,
-    });
+    reqs.Allocate(arena, 2);
 
-    *buffer_region_ptr = {
-        .buffer = {.vmo = txn.vmo},
-        .type = SDMMC_BUFFER_TYPE_VMO_HANDLE,
-        .offset = txn.offset_vmo * block_info_.block_size,
-        .size = txn.length * block_info_.block_size,
-    };
-    reqs.push_back({
-        .cmd_idx = cmd_idx,
-        .cmd_flags = cmd_flags,
-        .arg = static_cast<uint32_t>(txn.offset_dev),
-        .blocksize = block_info_.block_size,
-        .buffers_list = buffer_region_ptr,
-        .buffers_count = 1,
-    });
+    auto& set_block_count = reqs[0];
+    set_block_count.cmd_idx = SDMMC_SET_BLOCK_COUNT;
+    set_block_count.cmd_flags = SDMMC_SET_BLOCK_COUNT_FLAGS;
+    set_block_count.arg = total_data_transfer_blocks;
+
+    auto& rw_multiple_block = reqs[1];
+    rw_multiple_block.cmd_idx = cmd_idx;
+    rw_multiple_block.cmd_flags = cmd_flags;
+    rw_multiple_block.arg = static_cast<uint32_t>(txn.offset_dev);
+    rw_multiple_block.blocksize = block_info_.block_size;
+    rw_multiple_block.buffers.Allocate(arena, 1);
+    auto buffer_region = GetBufferRegion(txn.vmo, txn.offset_vmo * block_info_.block_size,
+                                         txn.length * block_info_.block_size, logger());
+    if (buffer_region.is_error()) {
+      return buffer_region.status_value();
+    }
+    rw_multiple_block.buffers[0] = *std::move(buffer_region);
   } else {
     // Form packed command header (section 6.6.29.1, eMMC standard 5.1)
     readwrite_metadata_.packed_command_header_data->rw = is_read ? 1 : 2;
@@ -303,81 +344,86 @@ void SdmmcBlockDevice::ReadWrite(std::vector<BlockOperation>& btxns,
     // TODO(https://fxbug.dev/42083080): Consider pre-registering the packed command header VMO with
     // the SDMMC driver to avoid pinning and unpinning for each transfer. Also handle the cache ops
     // here.
-    *buffer_region_ptr = {
-        .buffer = {.vmo = readwrite_metadata_.packed_command_header_vmo.get()},
-        .type = SDMMC_BUFFER_TYPE_VMO_HANDLE,
-        .offset = 0,
-        .size = block_info_.block_size,
-    };
-    // Only the first region above points to the header; subsequent regions point to the data.
-    buffer_region_ptr++;
+    // Packed write: SET_BLOCK_COUNT (header+data) -> WRITE_MULTIPLE_BLOCK (header+data)
+    // Packed read: SET_BLOCK_COUNT (header) -> WRITE_MULTIPLE_BLOCK (header) ->
+    //              SET_BLOCK_COUNT (data) -> READ_MULTIPLE_BLOCK (data)
+    int request_index_offset;
+    if (!is_read) {
+      request_index_offset = 0;
+      reqs.Allocate(arena, 2);
+    } else {
+      request_index_offset = 2;
+      reqs.Allocate(arena, 4);
+
+      auto& set_block_count = reqs[0];
+      set_block_count.cmd_idx = SDMMC_SET_BLOCK_COUNT;
+      set_block_count.cmd_flags = SDMMC_SET_BLOCK_COUNT_FLAGS;
+      set_block_count.arg = MMC_SET_BLOCK_COUNT_PACKED | 1;  // 1 header block.
+
+      auto& write_multiple_block = reqs[1];
+      write_multiple_block.cmd_idx = SDMMC_WRITE_MULTIPLE_BLOCK;
+      write_multiple_block.cmd_flags = SDMMC_WRITE_MULTIPLE_BLOCK_FLAGS;
+      write_multiple_block.arg = static_cast<uint32_t>(txn.offset_dev);
+      write_multiple_block.blocksize = block_info_.block_size;
+      write_multiple_block.buffers.Allocate(arena, 1);  // 1 header block.
+      // The first buffer region points to the header (packed read case).
+      auto buffer_region = GetBufferRegion(readwrite_metadata_.packed_command_header_vmo.get(), 0,
+                                           block_info_.block_size, logger());
+      if (buffer_region.is_error()) {
+        return buffer_region.status_value();
+      }
+      write_multiple_block.buffers[0] = *std::move(buffer_region);
+    }
+
+    auto& set_block_count = reqs[request_index_offset];
+    set_block_count.cmd_idx = SDMMC_SET_BLOCK_COUNT;
+    set_block_count.cmd_flags = SDMMC_SET_BLOCK_COUNT_FLAGS;
+    set_block_count.arg = MMC_SET_BLOCK_COUNT_PACKED |
+                          (is_read ? total_data_transfer_blocks
+                                   : (total_data_transfer_blocks + 1));  // +1 for header block.
+
+    auto& rw_multiple_block = reqs[request_index_offset + 1];
+    rw_multiple_block.cmd_idx = cmd_idx;
+    rw_multiple_block.cmd_flags = cmd_flags;
+    rw_multiple_block.arg = static_cast<uint32_t>(txn.offset_dev);
+    rw_multiple_block.blocksize = block_info_.block_size;
+
+    int buffer_index_offset;
+    if (is_read) {
+      buffer_index_offset = 0;
+      rw_multiple_block.buffers.Allocate(arena, btxns.size());
+    } else {
+      buffer_index_offset = 1;
+      rw_multiple_block.buffers.Allocate(arena, btxns.size() + 1);  // +1 for header block.
+      // The first buffer region points to the header (packed write case).
+      auto buffer_region = GetBufferRegion(readwrite_metadata_.packed_command_header_vmo.get(), 0,
+                                           block_info_.block_size, logger());
+      if (buffer_region.is_error()) {
+        return buffer_region.status_value();
+      }
+      rw_multiple_block.buffers[0] = *std::move(buffer_region);
+    }
+
+    // The following buffer regions point to the data.
     for (size_t i = 0; i < btxns.size(); i++) {
       const block_read_write_t& rw = btxns[i].operation()->rw;
       readwrite_metadata_.packed_command_header_data->arg[i].cmd23_arg = rw.length;
       readwrite_metadata_.packed_command_header_data->arg[i].cmdXX_arg =
           static_cast<uint32_t>(rw.offset_dev);
 
-      *buffer_region_ptr = {
-          .buffer = {.vmo = rw.vmo},
-          .type = SDMMC_BUFFER_TYPE_VMO_HANDLE,
-          .offset = rw.offset_vmo * block_info_.block_size,
-          .size = rw.length * block_info_.block_size,
-      };
-      buffer_region_ptr++;
+      auto buffer_region = GetBufferRegion(rw.vmo, rw.offset_vmo * block_info_.block_size,
+                                           rw.length * block_info_.block_size, logger());
+      if (buffer_region.is_error()) {
+        return buffer_region.status_value();
+      }
+      rw_multiple_block.buffers[buffer_index_offset + i] = *std::move(buffer_region);
     }
-
-    // Packed write: SET_BLOCK_COUNT (header+data) -> WRITE_MULTIPLE_BLOCK (header+data)
-    // Packed read: SET_BLOCK_COUNT (header) -> WRITE_MULTIPLE_BLOCK (header) ->
-    //              SET_BLOCK_COUNT (data) -> READ_MULTIPLE_BLOCK (data)
-    if (is_read) {
-      reqs.push_back({
-          .cmd_idx = SDMMC_SET_BLOCK_COUNT,
-          .cmd_flags = SDMMC_SET_BLOCK_COUNT_FLAGS,
-          .arg = MMC_SET_BLOCK_COUNT_PACKED | 1,  // 1 header block.
-      });
-
-      reqs.push_back({
-          .cmd_idx = SDMMC_WRITE_MULTIPLE_BLOCK,
-          .cmd_flags = SDMMC_WRITE_MULTIPLE_BLOCK_FLAGS,
-          .arg = static_cast<uint32_t>(txn.offset_dev),
-          .blocksize = block_info_.block_size,
-          .buffers_list = readwrite_metadata_.buffer_regions.get(),
-          .buffers_count = 1,  // 1 header block.
-      });
-    }
-
-    reqs.push_back({
-        .cmd_idx = SDMMC_SET_BLOCK_COUNT,
-        .cmd_flags = SDMMC_SET_BLOCK_COUNT_FLAGS,
-        .arg = MMC_SET_BLOCK_COUNT_PACKED |
-               (is_read ? total_data_transfer_blocks
-                        : (total_data_transfer_blocks + 1)),  // +1 for header block.
-    });
-
-    reqs.push_back({
-        .cmd_idx = cmd_idx,
-        .cmd_flags = cmd_flags,
-        .arg = static_cast<uint32_t>(txn.offset_dev),
-        .blocksize = block_info_.block_size,
-        .buffers_list = is_read ? readwrite_metadata_.buffer_regions.get() + 1
-                                : readwrite_metadata_.buffer_regions.get(),
-        .buffers_count = is_read ? btxns.size() : btxns.size() + 1,  // +1 for header block.
-    });
   }
 
-  auto callback = [this, btxns = std::move(btxns)](zx_status_t status, uint32_t retries) mutable {
-    properties_.io_retries_.Add(retries);
-    if (status != ZX_OK) {
-      FDF_LOGL(ERROR, logger(), "do_txn error: %s", zx_status_get_string(status));
-      properties_.io_errors_.Add(1);
-    }
-
-    FDF_LOGL(DEBUG, logger(), "do_txn complete");
-    for (auto& btxn : btxns) {
-      BlockComplete(btxn, status);
-    }
-  };
-  sdmmc_->SdmmcIoRequestWithRetries(std::move(reqs), std::move(callback));
+  for (auto& req : reqs) {
+    req.suppress_error_messages = suppress_error_messages;
+  }
+  return sdmmc_->SdmmcIoRequest(std::move(arena), reqs, readwrite_metadata_.buffer_regions.get());
 }
 
 zx_status_t SdmmcBlockDevice::Flush() {
@@ -712,7 +758,7 @@ void SdmmcBlockDevice::HandleBlockOps(block::BorrowedOperationQueue<PartitionInf
         }
       }
 
-      ReadWrite(btxns, partition);
+      status = ReadWriteWithRetries(btxns, partition);
 
       TRACE_DURATION_END("sdmmc", trace_name, "opcode", TA_INT32(bop.rw.command.opcode), "extra",
                          TA_INT32(bop.rw.extra), "length", TA_INT32(bop.rw.length), "offset_vmo",
@@ -726,8 +772,6 @@ void SdmmcBlockDevice::HandleBlockOps(block::BorrowedOperationQueue<PartitionInf
       TRACE_DURATION_END("sdmmc", "trim", "opcode", TA_INT32(bop.trim.command.opcode), "length",
                          TA_INT32(bop.trim.length), "offset_dev", TA_INT64(bop.trim.offset_dev),
                          "txn_status", TA_INT32(status));
-
-      BlockComplete(btxns[0], status);
     } else if (op == BLOCK_OPCODE_FLUSH) {
       TRACE_DURATION_BEGIN("sdmmc", "flush");
 
@@ -735,16 +779,16 @@ void SdmmcBlockDevice::HandleBlockOps(block::BorrowedOperationQueue<PartitionInf
 
       TRACE_DURATION_END("sdmmc", "flush", "opcode", TA_INT32(bop.command.opcode), "txn_status",
                          TA_INT32(status));
-
-      BlockComplete(btxns[0], status);
     } else {
       // should not get here
       FDF_LOGL(ERROR, logger(), "invalid block op %d", op);
       TRACE_INSTANT("sdmmc", "unknown", TRACE_SCOPE_PROCESS, "opcode",
                     TA_INT32(bop.rw.command.opcode), "txn_status", TA_INT32(status));
       __UNREACHABLE;
+    }
 
-      BlockComplete(btxns[0], status);
+    for (auto& btxn : btxns) {
+      BlockComplete(btxn, status);
     }
   }
 }

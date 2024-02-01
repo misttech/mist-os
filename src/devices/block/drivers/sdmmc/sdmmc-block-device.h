@@ -144,7 +144,8 @@ class SdmmcBlockDevice {
   // until both queues are empty.
   static constexpr size_t kRoundRobinRequestCount = 16;
 
-  void ReadWrite(std::vector<BlockOperation>& btxns, EmmcPartition partition);
+  zx_status_t ReadWriteWithRetries(std::vector<BlockOperation>& btxns, EmmcPartition partition);
+  zx_status_t ReadWriteAttempt(std::vector<BlockOperation>& btxns, bool suppress_error_messages);
   zx_status_t Flush();
   zx_status_t Trim(const block_trim_t& txn, const EmmcPartition partition);
   zx_status_t SetPartition(const EmmcPartition partition);
