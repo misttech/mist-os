@@ -30,7 +30,6 @@ use {
 lazy_static! {
     static ref BSS: Bssid = [0x65, 0x74, 0x68, 0x6e, 0x65, 0x74].into();
 }
-const PAYLOAD: &[u8] = &[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15];
 
 async fn send_and_receive<'a>(
     session: &'a netdevice_client::Session,
@@ -51,47 +50,54 @@ async fn verify_tx_and_rx(
     session: &netdevice_client::Session,
     port: &netdevice_client::Port,
     helper: &mut test_utils::TestHelper,
+    payload_size: usize,
 ) {
-    let mut buf: Vec<u8> = Vec::new();
-    netdevice_helper::write_fake_frame(*ETH_DST_MAC, *CLIENT_MAC_ADDR, PAYLOAD, &mut buf);
-
-    let tx_rx_fut = send_and_receive(session, port, &buf);
-    pin_mut!(tx_rx_fut);
-
     let phy = helper.proxy();
-    let mut actual = Vec::new();
+    let mock_payload = vec![7; payload_size];
+    for _ in 0..25 {
+        let mut buf: Vec<u8> = Vec::new();
+        netdevice_helper::write_fake_frame(
+            *ETH_DST_MAC,
+            *CLIENT_MAC_ADDR,
+            &mock_payload[..],
+            &mut buf,
+        );
+        let tx_rx_fut = send_and_receive(session, port, &buf);
+        pin_mut!(tx_rx_fut);
 
-    let (header, payload) = helper
-        .run_until_complete_or_timeout(
-            5.seconds(),
-            "verify ethernet_tx_rx",
-            event::on_transmit(event::extract(|frame: Buffered<DataFrame>| {
-                for mac::Msdu { dst_addr, src_addr, llc_frame } in frame.msdus() {
-                    if dst_addr == *ETH_DST_MAC && src_addr == *CLIENT_MAC_ADDR {
-                        assert_eq!(llc_frame.hdr.protocol_id.to_native(), mac::ETHER_TYPE_IPV4);
-                        actual.clear();
-                        actual.extend_from_slice(llc_frame.body);
-                        rx_wlan_data_frame(
-                            &Channel::new(1, Cbw::Cbw20),
-                            &CLIENT_MAC_ADDR,
-                            &(*BSS).into(),
-                            &ETH_DST_MAC,
-                            &PAYLOAD,
-                            mac::ETHER_TYPE_IPV4,
-                            &phy,
-                        )
-                        .expect("sending wlan data frame");
+        let mut sent_payload = Vec::new();
+        let (header, received_payload) = helper
+            .run_until_complete_or_timeout(
+                5.seconds(),
+                "verify ethernet_tx_rx",
+                event::on_transmit(event::extract(|frame: Buffered<DataFrame>| {
+                    for mac::Msdu { dst_addr, src_addr, llc_frame } in frame.msdus() {
+                        if dst_addr == *ETH_DST_MAC && src_addr == *CLIENT_MAC_ADDR {
+                            assert_eq!(llc_frame.hdr.protocol_id.to_native(), mac::ETHER_TYPE_IPV4);
+                            sent_payload.clear();
+                            sent_payload.extend_from_slice(llc_frame.body);
+                            rx_wlan_data_frame(
+                                &Channel::new(1, Cbw::Cbw20),
+                                &CLIENT_MAC_ADDR,
+                                &(*BSS).into(),
+                                &ETH_DST_MAC,
+                                &mock_payload[..],
+                                mac::ETHER_TYPE_IPV4,
+                                &phy,
+                            )
+                            .expect("sending wlan data frame");
+                        }
                     }
-                }
-            })),
-            tx_rx_fut,
-        )
-        .await;
-    assert_eq!(&actual[..], PAYLOAD);
-    assert_eq!(header.da, *CLIENT_MAC_ADDR);
-    assert_eq!(header.sa, *ETH_DST_MAC);
-    assert_eq!(header.ether_type.to_native(), mac::ETHER_TYPE_IPV4);
-    assert_eq!(&payload[..], PAYLOAD);
+                })),
+                tx_rx_fut,
+            )
+            .await;
+        assert_eq!(&sent_payload[..], &mock_payload[..]);
+        assert_eq!(header.da, *CLIENT_MAC_ADDR);
+        assert_eq!(header.sa, *ETH_DST_MAC);
+        assert_eq!(header.ether_type.to_native(), mac::ETHER_TYPE_IPV4);
+        assert_eq!(&received_payload[..], &mock_payload[..]);
+    }
 }
 
 /// Test an ethernet device using netdevice backed by WLAN device and send and receive data
@@ -117,5 +123,13 @@ async fn ethernet_tx_rx() {
     .await;
 
     let (session, port) = helper.start_netdevice_session(*CLIENT_MAC_ADDR).await;
-    verify_tx_and_rx(&session, &port, &mut helper).await;
+
+    // 15 byte MTUs
+    verify_tx_and_rx(&session, &port, &mut helper, 15).await;
+    // 100 byte MTUs
+    verify_tx_and_rx(&session, &port, &mut helper, 100).await;
+    // 1KB MTUs
+    verify_tx_and_rx(&session, &port, &mut helper, 1000).await;
+    // Maximum size 1500KB MTUs
+    verify_tx_and_rx(&session, &port, &mut helper, 1500).await;
 }
