@@ -5,32 +5,6 @@
 #ifndef ZIRCON_SYSCALLS_NEXT_H_
 #define ZIRCON_SYSCALLS_NEXT_H_
 
-#ifndef _KERNEL
-
-#include <zircon/syscalls.h>
-
-__BEGIN_CDECLS
-
-// Make sure this matches <zircon/syscalls.h>.
-#define _ZX_SYSCALL_DECL(name, type, attrs, nargs, arglist, prototype) \
-  extern attrs type zx_##name prototype;                               \
-  extern attrs type _zx_##name prototype;
-
-#ifdef __clang__
-#define _ZX_SYSCALL_ANNO(attr) __attribute__((attr))
-#else
-#define _ZX_SYSCALL_ANNO(attr)  // Nothing for compilers without the support.
-#endif
-
-#include <zircon/syscalls/internal/cdecls-next.inc>
-
-#undef _ZX_SYSCALL_ANNO
-#undef _ZX_SYSCALL_DECL
-
-__END_CDECLS
-
-#endif  // !_KERNEL
-
 #include <stdint.h>
 #include <zircon/compiler.h>
 #include <zircon/syscalls/debug.h>
@@ -133,4 +107,31 @@ typedef struct zx_info_memory_attribution {
 } zx_info_memory_attribution_t;
 
 // ====== End of kernel-based memory attribution support ====== //
+
+#ifndef _KERNEL
+
+#include <zircon/syscalls.h>
+
+__BEGIN_CDECLS
+
+// Make sure this matches <zircon/syscalls.h>.
+#define _ZX_SYSCALL_DECL(name, type, attrs, nargs, arglist, prototype) \
+  extern attrs type zx_##name prototype;                               \
+  extern attrs type _zx_##name prototype;
+
+#ifdef __clang__
+#define _ZX_SYSCALL_ANNO(attr) __attribute__((attr))
+#else
+#define _ZX_SYSCALL_ANNO(attr)  // Nothing for compilers without the support.
+#endif
+
+#include <zircon/syscalls/internal/cdecls-next.inc>
+
+#undef _ZX_SYSCALL_ANNO
+#undef _ZX_SYSCALL_DECL
+
+__END_CDECLS
+
+#endif  // !_KERNEL
+
 #endif  // ZIRCON_SYSCALLS_NEXT_H_
