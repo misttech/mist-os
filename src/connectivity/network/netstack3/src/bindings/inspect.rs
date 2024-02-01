@@ -7,50 +7,21 @@
 //! This module provides utilities for publishing netstack3 diagnostics data to
 //! Inspect.
 
-use std::{
-    fmt::{Debug, Display},
-    string::ToString as _,
-};
+use std::{fmt::Display, string::ToString as _};
 
 use fuchsia_inspect::Node;
 use net_types::{
-    ip::{IpAddress, Ipv4, Ipv6},
+    ip::{Ipv4, Ipv6},
     Witness as _,
 };
-use netstack3_core::{
-    device::{DeviceId, EthernetLinkDevice, WeakDeviceId},
-    neighbor,
-};
+use netstack3_core::device::{DeviceId, EthernetLinkDevice, WeakDeviceId};
 
 use crate::bindings::{
     devices::{
         DeviceIdAndName, DeviceSpecificInfo, DynamicCommonInfo, DynamicNetdeviceInfo, NetdeviceInfo,
     },
-    BindingsCtx, Ctx, DeviceIdExt as _, StackTime,
+    BindingsCtx, Ctx, DeviceIdExt as _,
 };
-
-/// A visitor for diagnostics data that has distinct Ipv4 and Ipv6 variants.
-struct DualIpVisitor<'a> {
-    node: &'a Node,
-    count: usize,
-}
-
-impl<'a> DualIpVisitor<'a> {
-    fn new(node: &'a Node) -> Self {
-        Self { node, count: 0 }
-    }
-
-    /// Records a child Inspect node with an incrementing id that is unique
-    /// across IP versions.
-    fn record_unique_child<F>(&mut self, f: F)
-    where
-        F: FnOnce(&Node),
-    {
-        let Self { node, count } = self;
-        let id = core::mem::replace(count, *count + 1);
-        node.record_child(format!("{id}"), f)
-    }
-}
 
 struct BindingsInspector<'a> {
     node: &'a Node,
@@ -215,33 +186,6 @@ pub(crate) fn devices(ctx: &mut Ctx) -> fuchsia_inspect::Inspector {
 }
 
 pub(crate) fn neighbors(mut ctx: Ctx) -> fuchsia_inspect::Inspector {
-    impl<'a, A: IpAddress, LinkAddress: Debug> neighbor::NeighborVisitor<A, LinkAddress, StackTime>
-        for DualIpVisitor<'a>
-    {
-        fn visit_neighbors(
-            &mut self,
-            neighbors: impl Iterator<Item = neighbor::NeighborStateInspect<A, LinkAddress, StackTime>>,
-        ) {
-            for neighbor in neighbors {
-                let netstack3_core::neighbor::NeighborStateInspect {
-                    state,
-                    ip_address,
-                    link_address,
-                    last_confirmed_at,
-                } = neighbor;
-                self.record_unique_child(|node| {
-                    node.record_string("State", state);
-                    node.record_string("IpAddress", format!("{}", ip_address));
-                    if let Some(link_address) = link_address {
-                        node.record_string("LinkAddress", format!("{:?}", link_address));
-                    };
-                    if let Some(StackTime(last_confirmed_at)) = last_confirmed_at {
-                        node.record_int("LastConfirmedAt", last_confirmed_at.into_nanos());
-                    }
-                })
-            }
-        }
-    }
     let inspector = fuchsia_inspect::Inspector::new(Default::default());
 
     // Get a snapshot of all supported devices. Ethernet is the only device type
@@ -257,13 +201,13 @@ pub(crate) fn neighbors(mut ctx: Ctx) -> fuchsia_inspect::Inspector {
     });
     for device in ethernet_devices {
         inspector.root().record_child(&device.bindings_id().name, |node| {
-            let mut visitor = DualIpVisitor::new(node);
+            let mut inspector = BindingsInspector::new(node);
             ctx.api()
                 .neighbor::<Ipv4, EthernetLinkDevice>()
-                .inspect_neighbors(&device, &mut visitor);
+                .inspect_neighbors(&device, &mut inspector);
             ctx.api()
                 .neighbor::<Ipv6, EthernetLinkDevice>()
-                .inspect_neighbors(&device, &mut visitor);
+                .inspect_neighbors(&device, &mut inspector);
         });
     }
     inspector

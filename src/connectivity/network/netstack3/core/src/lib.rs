@@ -160,10 +160,10 @@ pub mod ip {
 pub mod neighbor {
     // Re-exported types.
     pub use crate::ip::device::nud::{
-        api::{NeighborRemovalError, NeighborVisitor, StaticNeighborInsertionError},
+        api::{NeighborRemovalError, StaticNeighborInsertionError},
         Event, EventDynamicState, EventKind, EventState, LinkResolutionContext,
-        LinkResolutionNotifier, LinkResolutionResult, NeighborStateInspect, NudUserConfig,
-        NudUserConfigUpdate, MAX_ENTRIES,
+        LinkResolutionNotifier, LinkResolutionResult, NudUserConfig, NudUserConfigUpdate,
+        MAX_ENTRIES,
     };
 }
 

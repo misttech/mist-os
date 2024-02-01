@@ -4,7 +4,7 @@
 
 //! Neighbor API structs.
 
-use core::marker::PhantomData;
+use core::{fmt::Display, marker::PhantomData};
 
 use net_types::{
     ip::{Ip, IpAddress, IpVersionMarker, Ipv4, Ipv6},
@@ -13,13 +13,14 @@ use net_types::{
 use thiserror::Error;
 
 use crate::{
-    context::{ContextPair, EventContext as _, InstantBindingsTypes, InstantContext as _},
+    context::{ContextPair, EventContext as _, InstantContext as _},
     device::{link::LinkDevice, DeviceIdContext},
     error::NotFoundError,
+    inspect::Inspector,
     ip::device::nud::{
-        DynamicNeighborState, Entry, Event, Incomplete, LinkResolutionContext,
-        LinkResolutionNotifier, LinkResolutionResult, NeighborState, NeighborStateInspect,
-        NudBindingsContext, NudContext, NudHandler, NudState,
+        Delay, DynamicNeighborState, Entry, Event, Incomplete, LinkResolutionContext,
+        LinkResolutionNotifier, LinkResolutionResult, NeighborState, NudBindingsContext,
+        NudContext, NudHandler, NudState, Probe, Reachable, Stale, Unreachable,
     },
 };
 
@@ -74,15 +75,6 @@ impl<I: Ip, D, C> NeighborApi<I, D, C> {
     pub(crate) fn new(ctx: C) -> Self {
         Self(ctx, IpVersionMarker::new(), PhantomData)
     }
-}
-
-/// Visitor for NUD state.
-pub trait NeighborVisitor<A: IpAddress, LinkAddress, T> {
-    /// Performs a user-defined operation over an iterator of neighbor state.
-    fn visit_neighbors(
-        &mut self,
-        neighbors: impl Iterator<Item = NeighborStateInspect<A, LinkAddress, T>>,
-    );
 }
 
 impl<I, D, C> NeighborApi<I, D, C>
@@ -271,18 +263,56 @@ where
         })
     }
 
-    /// Provides access to NUD state via a `visitor`.
-    pub fn inspect_neighbors<V>(
+    /// Writes `device`'s neighbor state information into `inspector`.
+    pub fn inspect_neighbors<N: Inspector>(
         &mut self,
         device: &<C::CoreContext as DeviceIdContext<D>>::DeviceId,
-        visitor: &mut V,
+        inspector: &mut N,
     ) where
-        V: NeighborVisitor<
-            I::Addr,
-            D::Address,
-            <C::BindingsContext as InstantBindingsTypes>::Instant,
-        >,
+        D::Address: Display,
     {
-        self.core_ctx().with_nud_state(device, |nud| visitor.visit_neighbors(nud.state_iter()))
+        self.core_ctx().with_nud_state(device, |nud| {
+            nud.neighbors.iter().for_each(|(ip_address, state)| {
+                let (state, link_address, last_confirmed_at) = match state {
+                    NeighborState::Static(addr) => ("Static", Some(addr), None),
+                    NeighborState::Dynamic(dynamic_state) => match dynamic_state {
+                        DynamicNeighborState::Incomplete(Incomplete {
+                            transmit_counter: _,
+                            pending_frames: _,
+                            notifiers: _,
+                            _marker,
+                        }) => ("Incomplete", None, None),
+                        DynamicNeighborState::Reachable(Reachable {
+                            link_address,
+                            last_confirmed_at,
+                        }) => ("Reachable", Some(link_address), Some(last_confirmed_at)),
+                        DynamicNeighborState::Stale(Stale { link_address }) => {
+                            ("Stale", Some(link_address), None)
+                        }
+                        DynamicNeighborState::Delay(Delay { link_address }) => {
+                            ("Delay", Some(link_address), None)
+                        }
+                        DynamicNeighborState::Probe(Probe {
+                            link_address,
+                            transmit_counter: _,
+                        }) => ("Probe", Some(link_address), None),
+                        DynamicNeighborState::Unreachable(Unreachable {
+                            link_address,
+                            mode: _,
+                        }) => ("Unreachable", Some(link_address), None),
+                    },
+                };
+                inspector.record_unnamed_child(|inspector| {
+                    inspector.record_str("State", state);
+                    inspector.record_ip_addr("IpAddress", ip_address.get());
+                    if let Some(link_address) = link_address {
+                        inspector.record_display("LinkAddress", link_address);
+                    };
+                    if let Some(last_confirmed_at) = last_confirmed_at {
+                        inspector.record_inspectable_value("LastConfirmedAt", last_confirmed_at);
+                    }
+                });
+            })
+        })
     }
 }

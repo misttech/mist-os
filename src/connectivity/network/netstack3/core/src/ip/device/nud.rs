@@ -1489,61 +1489,6 @@ pub struct NudState<I: Ip, D: LinkDevice, Time: Instant, N: LinkResolutionNotifi
     neighbors: HashMap<SpecifiedAddr<I::Addr>, NeighborState<D, Time, N>>,
     last_gc: Option<Time>,
 }
-
-impl<I: Ip, D: LinkDevice, T: Instant, N: LinkResolutionNotifier<D>> NudState<I, D, T, N> {
-    pub(crate) fn state_iter(
-        &self,
-    ) -> impl Iterator<Item = NeighborStateInspect<I::Addr, D::Address, T>> + '_ {
-        self.neighbors.iter().map(|(ip_address, state)| {
-            let (state, link_address, last_confirmed_at) = match state {
-                NeighborState::Static(addr) => ("Static", Some(*addr), None),
-                NeighborState::Dynamic(dynamic_state) => match dynamic_state {
-                    DynamicNeighborState::Incomplete(Incomplete {
-                        transmit_counter: _,
-                        pending_frames: _,
-                        notifiers: _,
-                        _marker,
-                    }) => ("Incomplete", None, None),
-                    DynamicNeighborState::Reachable(Reachable {
-                        link_address,
-                        last_confirmed_at,
-                    }) => ("Reachable", Some(*link_address), Some(*last_confirmed_at)),
-                    DynamicNeighborState::Stale(Stale { link_address }) => {
-                        ("Stale", Some(*link_address), None)
-                    }
-                    DynamicNeighborState::Delay(Delay { link_address }) => {
-                        ("Delay", Some(*link_address), None)
-                    }
-                    DynamicNeighborState::Probe(Probe { link_address, transmit_counter: _ }) => {
-                        ("Probe", Some(*link_address), None)
-                    }
-                    DynamicNeighborState::Unreachable(Unreachable { link_address, mode: _ }) => {
-                        ("Unreachable", Some(*link_address), None)
-                    }
-                },
-            };
-            NeighborStateInspect {
-                state: state,
-                ip_address: *ip_address,
-                link_address,
-                last_confirmed_at,
-            }
-        })
-    }
-}
-
-/// A snapshot of the state of a neighbor, for exporting to Inspect.
-pub struct NeighborStateInspect<A, LinkAddress, T> {
-    /// The NUD state of the neighbor.
-    pub state: &'static str,
-    /// The neighbor's IP address.
-    pub ip_address: SpecifiedAddr<A>,
-    /// The neighbor's link address.
-    pub link_address: Option<LinkAddress>,
-    /// The last instant at which the neighbor's reachability was confirmed.
-    pub last_confirmed_at: Option<T>,
-}
-
 /// The bindings context for NUD.
 pub trait NudBindingsContext<I: Ip, D: LinkDevice, DeviceId>:
     TimerContext<NudTimerId<I, D, DeviceId>>
