@@ -165,10 +165,7 @@ impl<K: Key, V: Value> Iterator<'_, K, V> {
         }
         Ok(offset)
     }
-}
 
-#[async_trait]
-impl<'iter, K: Key, V: Value> LayerIterator<K, V> for Iterator<'iter, K, V> {
     async fn advance(&mut self) -> Result<(), Error> {
         if self.item_index >= self.item_count {
             if self.pos >= self.layer.size {
@@ -213,6 +210,13 @@ impl<'iter, K: Key, V: Value> LayerIterator<K, V> for Iterator<'iter, K, V> {
         });
         self.item_index += 1;
         Ok(())
+    }
+}
+
+#[async_trait]
+impl<'iter, K: Key, V: Value> LayerIterator<K, V> for Iterator<'iter, K, V> {
+    async fn advance(&mut self) -> Result<(), Error> {
+        self.advance().await
     }
 
     fn get(&self) -> Option<ItemRef<'_, K, V>> {
