@@ -37,7 +37,7 @@ impl GA4MetricsService {
     }
 
     /// Returns Analytics disclosure notice according to PDD rules.
-    pub(crate) fn get_notice(&self) -> Option<String> {
+    pub fn get_notice(&self) -> Option<String> {
         match self.state.status {
             MetricsStatus::NewUser => Some(FULL_NOTICE.to_string()),
             MetricsStatus::NewToTool => Some(BRIEF_NOTICE.to_string()),
@@ -46,12 +46,12 @@ impl GA4MetricsService {
     }
 
     /// Records Analytics participation status.
-    pub(crate) fn set_opt_in_status(&mut self, enabled: bool) -> Result<()> {
+    pub fn set_opt_in_status(&mut self, enabled: bool) -> Result<()> {
         self.state.set_opt_in_status(enabled)
     }
 
     /// Returns Analytics participation status.
-    pub(crate) fn is_opted_in(&self) -> bool {
+    pub fn is_opted_in(&self) -> bool {
         self.state.is_opted_in()
     }
 
@@ -62,14 +62,14 @@ impl GA4MetricsService {
     }
 
     /// Adds a launch event to the Post
-    pub(crate) async fn add_launch_event(&mut self, args: Option<&str>) -> Result<()> {
+    pub async fn add_launch_event(&mut self, args: Option<&str>) -> Result<()> {
         self.add_custom_event(None, args, args, BTreeMap::new(), Some("launch")).await
     }
 
     /// Adds an event to the post with open-ended parameters
     /// while still honoring the UA Event parameters already
     /// in use.
-    pub(crate) async fn add_custom_event(
+    pub async fn add_custom_event(
         &mut self,
         category: Option<&str>,
         action: Option<&str>,
@@ -96,11 +96,7 @@ impl GA4MetricsService {
     /// conforming to the UA Event parameters already
     /// in use.
     // TODO With GA4's flexibility, rework exception reporting to be more informative
-    pub(crate) async fn add_crash_event(
-        &mut self,
-        description: &str,
-        fatal: Option<&bool>,
-    ) -> Result<()> {
+    pub async fn add_crash_event(&mut self, description: &str, fatal: Option<&bool>) -> Result<()> {
         if !self.is_opted_in() {
             return Ok(());
         }
@@ -110,7 +106,7 @@ impl GA4MetricsService {
     }
 
     /// Records a timing event from the app.
-    pub(crate) async fn add_timing_event(
+    pub async fn add_timing_event(
         &mut self,
         category: Option<&str>,
         time: u64,
@@ -135,7 +131,7 @@ impl GA4MetricsService {
 
     /// Sends the Post, with all accumulated events
     /// to the Google Analytics service.
-    pub(crate) async fn send_events(&mut self) -> Result<()> {
+    pub async fn send_events(&mut self) -> Result<()> {
         if !self.is_opted_in() {
             return Ok(());
         }

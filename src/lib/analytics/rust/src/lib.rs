@@ -174,17 +174,6 @@ pub async fn opt_out_for_this_invocation() -> Result<()> {
 /// Returns an error if init has not been called.
 /// TODO(https://fxbug.dev/42077438) remove this once we remove UA
 pub async fn add_launch_event(args: Option<&str>) -> Result<()> {
-    let svc = METRICS_SERVICE.lock().await;
-    match &svc.init_state {
-        MetricsServiceInitStatus::INITIALIZED => {
-            svc.inner_add_launch_event(args, None).await?;
-        }
-        MetricsServiceInitStatus::UNINITIALIZED => {
-            tracing::error!("add_launch_event called on uninitialized METRICS_SERVICE");
-            bail!(INIT_ERROR)
-        }
-    }
-
     let mut ga4_svc = ga4_metrics().await?;
     ga4_svc.add_launch_event(args).await?;
     ga4_svc.send_events().await
@@ -194,16 +183,6 @@ pub async fn add_launch_event(args: Option<&str>) -> Result<()> {
 /// Returns an error if init has not been called.
 /// TODO(https://fxbug.dev/42077438) remove this once we remove UA
 pub async fn add_crash_event(description: &str, fatal: Option<&bool>) -> Result<()> {
-    let svc = METRICS_SERVICE.lock().await;
-    match &svc.init_state {
-        MetricsServiceInitStatus::INITIALIZED => {
-            svc.inner_add_crash_event(description, fatal, None).await?;
-        }
-        MetricsServiceInitStatus::UNINITIALIZED => {
-            tracing::error!("add_crash_event called on uninitialized METRICS_SERVICE");
-            bail!(INIT_ERROR)
-        }
-    }
     let mut ga4_svc = ga4_metrics().await?;
     ga4_svc.add_crash_event(description, fatal).await?;
     ga4_svc.send_events().await
@@ -219,25 +198,6 @@ pub async fn add_timing_event(
     label: Option<&str>,
     custom_dimensions: BTreeMap<&str, String>,
 ) -> Result<()> {
-    let svc = METRICS_SERVICE.lock().await;
-    match &svc.init_state {
-        MetricsServiceInitStatus::INITIALIZED => {
-            svc.inner_add_timing_event(
-                category,
-                duration_str.clone(),
-                variable,
-                label,
-                custom_dimensions.clone(),
-                None,
-            )
-            .await?;
-        }
-        MetricsServiceInitStatus::UNINITIALIZED => {
-            tracing::error!("add_timing_event called on uninitialized METRICS_SERVICE");
-            bail!(INIT_ERROR)
-        }
-    }
-
     let duration = match duration_str.parse() {
         Ok(t) => t,
         Err(e) => bail!("Unable to process time {}", e),
@@ -257,18 +217,6 @@ pub async fn add_custom_event(
     label: Option<&str>,
     custom_dimensions: BTreeMap<&str, String>,
 ) -> Result<()> {
-    let svc = METRICS_SERVICE.lock().await;
-    match &svc.init_state {
-        MetricsServiceInitStatus::INITIALIZED => {
-            svc.inner_add_custom_event(category, action, label, custom_dimensions.clone(), None)
-                .await?;
-        }
-        MetricsServiceInitStatus::UNINITIALIZED => {
-            tracing::error!("add_custom_event called on uninitialized METRICS_SERVICE");
-            bail!(INIT_ERROR)
-        }
-    }
-
     let custom_dimensions_ga4 = convert_to_ga4values(custom_dimensions);
     let mut ga4_svc = ga4_metrics().await?;
     ga4_svc.add_custom_event(category, action, label, custom_dimensions_ga4, category).await?;

@@ -62,14 +62,6 @@ impl MetricsService {
         MetricsEventBatch::new()
     }
 
-    pub(crate) async fn inner_add_launch_event(
-        &self,
-        args: Option<&str>,
-        batch_collector: Option<&mut MetricsEventBatch>,
-    ) -> Result<()> {
-        self.inner_add_custom_event(None, args, args, BTreeMap::new(), batch_collector).await
-    }
-
     pub(crate) async fn inner_add_custom_event(
         &self,
         category: Option<&str>,
