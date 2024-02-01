@@ -56,25 +56,11 @@ fuchsia_driver("aml-sdmmc-driver") {
   ]
 }
 
-# TODO(hanbinyoon): Transition users to the identical component below, and then remove this.
-fuchsia_driver_component("aml-sdmmc-dfv2") {
-  component_name = "aml-sdmmc-dfv2"
-  deps = [ ":aml-sdmmc-driver" ]
-  info = "aml-sdmmc-info.json"
-  manifest = "meta/aml-sdmmc.cml"
-}
-
 fuchsia_driver_component("aml-sdmmc") {
   component_name = "aml-sdmmc"
   deps = [ ":aml-sdmmc-driver" ]
   info = "aml-sdmmc-info.json"
   manifest = "meta/aml-sdmmc.cml"
-}
-
-# TODO(hanbinyoon): Transition users to the identical package below, and then remove this.
-fuchsia_driver_package("package-dfv2") {
-  package_name = "aml-sdmmc-dfv2"
-  driver_components = [ ":aml-sdmmc-dfv2" ]
 }
 
 fuchsia_driver_package("package") {
