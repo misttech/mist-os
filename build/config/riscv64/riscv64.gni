@@ -171,6 +171,12 @@ fuchsia_riscv_profile = riscv_profiles.rva22
 fuchsia_riscv_implicit_feature_letters = []
 fuchsia_riscv_implicit_features = []
 
+# Additional standard ISA extensions to be added to the `-march` string
+# (although care must be taken to list these in the string before non-standard
+# extensions).
+fuchsia_riscv_extra_feature_letters = [ "v" ]
+fuchsia_riscv_extra_features = []
+
 # This is the basic machine ABI that's standard for fuchsia-riscv64 user code.
 # This sets the `-mabi` string.
 fuchsia_riscv_abi = "lp64d"
