@@ -2,8 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{
-    device::{kobject::DeviceMetadata, magma::MagmaFile, DeviceMode},
+use crate::MagmaFile;
+use starnix_core::{
+    device::{kobject::DeviceMetadata, DeviceMode},
     fs::sysfs::DeviceDirectory,
     task::CurrentTask,
     vfs::{FileOps, FsNode},

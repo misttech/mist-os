@@ -4,27 +4,17 @@
 
 #![allow(non_upper_case_globals)]
 
-use super::{
+use crate::{
     ffi::{
         create_connection, create_image, device_import, device_release, execute_command,
         execute_immediate_commands, export_buffer, flush, get_buffer_handle, import_semaphore2,
         query, read_notification_channel, release_connection,
     },
-    magma::{read_control_and_response, read_magma_command_and_type, StarnixPollItem},
-};
-use crate::{
-    device::{
-        magma::image_file::{ImageFile, ImageInfo},
-        sync_file::{SyncFence, SyncFile, SyncPoint, Timeline},
-    },
-    fs::fuchsia::RemoteFileObject,
-    mm::{MemoryAccessorExt, ProtectionFlags},
-    task::CurrentTask,
-    vfs::{
-        buffers::{InputBuffer, OutputBuffer},
-        fileops_impl_nonseekable, Anon, FdFlags, FdNumber, FileObject, FileOps, FsNode,
-        VmoFileObject,
-    },
+    image_file::ImageFile,
+    image_file::ImageInfo,
+    magma::read_control_and_response,
+    magma::read_magma_command_and_type,
+    magma::StarnixPollItem,
 };
 use fidl_fuchsia_logger;
 use fuchsia_zircon as zx;
@@ -145,6 +135,17 @@ use magma::{
     MAGMA_CACHE_POLICY_CACHED, MAGMA_IMPORT_SEMAPHORE_ONE_SHOT, MAGMA_POLL_CONDITION_SIGNALED,
     MAGMA_POLL_TYPE_SEMAPHORE, MAGMA_STATUS_INVALID_ARGS, MAGMA_STATUS_MEMORY_ERROR,
     MAGMA_STATUS_OK, MAGMA_STATUS_TIMED_OUT,
+};
+use starnix_core::{
+    device::sync_file::{SyncFence, SyncFile, SyncPoint, Timeline},
+    fileops_impl_nonseekable,
+    fs::fuchsia::RemoteFileObject,
+    mm::{MemoryAccessorExt, ProtectionFlags},
+    task::CurrentTask,
+    vfs::{
+        buffers::{InputBuffer, OutputBuffer},
+        Anon, FdFlags, FdNumber, FileObject, FileOps, FsNode, VmoFileObject,
+    },
 };
 use starnix_lifecycle::AtomicU64Counter;
 use starnix_logging::{impossible_error, log_error, log_warn, set_zx_name, track_stub};

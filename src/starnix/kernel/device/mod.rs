@@ -18,7 +18,6 @@ pub mod framebuffer;
 pub mod input;
 pub mod kobject;
 pub mod loop_device;
-pub mod magma;
 pub mod mem;
 pub mod misc;
 pub mod perfetto_consumer;

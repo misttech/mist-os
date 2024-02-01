@@ -6,13 +6,13 @@ use anyhow::{anyhow, Context, Error};
 use bstr::BString;
 use fuchsia_zircon as zx;
 use gralloc::gralloc_device_init;
+use magma_device::magma_device_init;
 use selinux::security_server;
 use starnix_core::{
     device::{
         ashmem::ashmem_device_init,
         framebuffer::{fb_device_init, AspectRatio},
         input::init_input_devices,
-        magma::magma_device_init,
         perfetto_consumer::start_perfetto_consumer_thread,
     },
     task::{CurrentTask, Kernel, KernelFeatures},

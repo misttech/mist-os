@@ -11,7 +11,7 @@ use crate::{
     fs::sysfs::DeviceDirectory,
     mm::MemoryAccessorExt,
     task::{CurrentTask, Kernel},
-    vfs::{fileops_impl_seekable, fileops_impl_vmo, FileObject, FileOps, FsNode},
+    vfs::{fileops_impl_vmo, FileObject, FileOps, FsNode},
 };
 use fidl_fuchsia_io as fio;
 use fidl_fuchsia_math as fmath;

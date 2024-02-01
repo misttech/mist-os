@@ -12,8 +12,7 @@ use crate::{
     mm::{MemoryAccessor, MemoryAccessorExt},
     task::CurrentTask,
     vfs::{
-        default_ioctl, fileops_impl_seekable, fileops_impl_vmo, FileObject, FileOps,
-        FileSystemCreator, FsNode, FsString,
+        default_ioctl, fileops_impl_vmo, FileObject, FileOps, FileSystemCreator, FsNode, FsString,
     },
 };
 use linux_uapi::{

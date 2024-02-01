@@ -8,9 +8,9 @@ use crate::{
     vfs::{
         anon_fs,
         buffers::{InputBuffer, OutputBuffer},
-        fileops_impl_seekable, fs_node_impl_not_dir, fs_node_impl_xattr_delegate, DirEntry,
-        FallocMode, FileHandle, FileObject, FileOps, FsNode, FsNodeInfo, FsNodeOps, FsString,
-        MemoryXattrStorage, MountInfo, NamespaceNode, MAX_LFS_FILESIZE,
+        fs_node_impl_not_dir, fs_node_impl_xattr_delegate, DirEntry, FallocMode, FileHandle,
+        FileObject, FileOps, FsNode, FsNodeInfo, FsNodeOps, FsString, MemoryXattrStorage,
+        MountInfo, NamespaceNode, MAX_LFS_FILESIZE,
     },
 };
 use fidl::HandleBased;
@@ -314,30 +314,31 @@ impl VmoFileObject {
     }
 }
 
+#[macro_export]
 macro_rules! fileops_impl_vmo {
     ($self:ident, $vmo:expr) => {
-        fileops_impl_seekable!();
+        $crate::fileops_impl_seekable!();
 
         fn read(
             &$self,
             _locked: &mut starnix_sync::Locked<'_, starnix_sync::ReadOps>,
-            file: &crate::vfs::FileObject,
-            _current_task: &crate::task::CurrentTask,
+            file: &$crate::vfs::FileObject,
+            _current_task: &$crate::task::CurrentTask,
             offset: usize,
-            data: &mut dyn crate::vfs::buffers::OutputBuffer,
+            data: &mut dyn $crate::vfs::buffers::OutputBuffer,
         ) -> Result<usize, starnix_uapi::errors::Errno> {
-            crate::vfs::VmoFileObject::read($vmo, file, offset, data)
+            $crate::vfs::VmoFileObject::read($vmo, file, offset, data)
         }
 
         fn write(
             &$self,
             _locked: &mut starnix_sync::Locked<'_, starnix_sync::WriteOps>,
-            file: &crate::vfs::FileObject,
-            current_task: &crate::task::CurrentTask,
+            file: &$crate::vfs::FileObject,
+            current_task: &$crate::task::CurrentTask,
             offset: usize,
-            data: &mut dyn crate::vfs::buffers::InputBuffer,
+            data: &mut dyn $crate::vfs::buffers::InputBuffer,
         ) -> Result<usize, starnix_uapi::errors::Errno> {
-            crate::vfs::VmoFileObject::write($vmo, file, current_task, offset, data)
+            $crate::vfs::VmoFileObject::write($vmo, file, current_task, offset, data)
         }
 
         fn get_vmo(
@@ -345,9 +346,9 @@ macro_rules! fileops_impl_vmo {
             file: &FileObject,
             current_task: &CurrentTask,
             _length: Option<usize>,
-            prot: crate::mm::ProtectionFlags,
+            prot: $crate::mm::ProtectionFlags,
         ) -> Result<Arc<fuchsia_zircon::Vmo>, starnix_uapi::errors::Errno> {
-            crate::vfs::VmoFileObject::get_vmo($vmo, file, current_task, prot)
+            $crate::vfs::VmoFileObject::get_vmo($vmo, file, current_task, prot)
         }
     }
 }

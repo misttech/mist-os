@@ -465,6 +465,7 @@ macro_rules! fileops_impl_delegate_read_and_seek {
 }
 
 /// Implements [`FileOps::seek`] in a way that makes sense for seekable files.
+#[macro_export]
 macro_rules! fileops_impl_seekable {
     () => {
         fn is_seekable(&self) -> bool {
@@ -473,13 +474,13 @@ macro_rules! fileops_impl_seekable {
 
         fn seek(
             &self,
-            file: &crate::vfs::FileObject,
-            current_task: &crate::task::CurrentTask,
+            file: &$crate::vfs::FileObject,
+            current_task: &$crate::task::CurrentTask,
             current_offset: starnix_uapi::off_t,
-            target: crate::vfs::SeekTarget,
+            target: $crate::vfs::SeekTarget,
         ) -> Result<starnix_uapi::off_t, starnix_uapi::errors::Errno> {
-            crate::vfs::default_seek(current_offset, target, |offset| {
-                let eof_offset = crate::vfs::default_eof_offset(file, current_task)?;
+            $crate::vfs::default_seek(current_offset, target, |offset| {
+                let eof_offset = $crate::vfs::default_eof_offset(file, current_task)?;
                 offset.checked_add(eof_offset).ok_or_else(|| starnix_uapi::errno!(EINVAL))
             })
         }
@@ -487,6 +488,7 @@ macro_rules! fileops_impl_seekable {
 }
 
 /// Implements [`FileOps`] methods in a way that makes sense for non-seekable files.
+#[macro_export]
 macro_rules! fileops_impl_nonseekable {
     () => {
         fn is_seekable(&self) -> bool {
@@ -495,10 +497,10 @@ macro_rules! fileops_impl_nonseekable {
 
         fn seek(
             &self,
-            _file: &crate::vfs::FileObject,
-            _current_task: &crate::task::CurrentTask,
+            _file: &$crate::vfs::FileObject,
+            _current_task: &$crate::task::CurrentTask,
             _current_offset: starnix_uapi::off_t,
-            _target: crate::vfs::SeekTarget,
+            _target: $crate::vfs::SeekTarget,
         ) -> Result<starnix_uapi::off_t, starnix_uapi::errors::Errno> {
             starnix_uapi::error!(ESPIPE)
         }

@@ -2,16 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{
-    task::CurrentTask,
-    vfs::{
-        fileops_impl_seekable, fileops_impl_vmo, Anon, FileHandle, FileObject, FileOps, FsNodeInfo,
-    },
-};
 use fidl_fuchsia_ui_composition as fuicomp;
 use fuchsia_zircon as zx;
 use fuchsia_zircon::{AsHandleRef, HandleBased};
 use magma::magma_image_info_t;
+use starnix_core::{
+    fileops_impl_vmo,
+    task::CurrentTask,
+    vfs::{Anon, FileHandle, FileObject, FileOps, FsNodeInfo},
+};
 use starnix_uapi::{file_mode::FileMode, open_flags::OpenFlags};
 use std::sync::Arc;
 

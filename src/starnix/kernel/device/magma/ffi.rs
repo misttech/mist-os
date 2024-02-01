@@ -3,17 +3,12 @@
 // found in the LICENSE file.
 
 use crate::{
-    device::magma::{
-        file::{
-            BufferInfo, ConnectionInfo, ConnectionMap, DeviceMap, MagmaBuffer, MagmaConnection,
-            MagmaDevice, MagmaSemaphore,
-        },
-        image_file::{ImageFile, ImageInfo},
-        magma::create_drm_image,
+    file::{
+        BufferInfo, ConnectionInfo, ConnectionMap, DeviceMap, MagmaBuffer, MagmaConnection,
+        MagmaDevice, MagmaSemaphore,
     },
-    mm::{MemoryAccessor, MemoryAccessorExt},
-    task::CurrentTask,
-    vfs::{Anon, FdFlags, FsNodeInfo, VmoFileObject},
+    image_file::{ImageFile, ImageInfo},
+    magma::create_drm_image,
 };
 use fuchsia_zircon::{
     AsHandleRef, HandleBased, {self as zx},
@@ -51,6 +46,11 @@ use magma::{
     virtio_magma_virt_connection_create_image_resp_t, virtmagma_command_descriptor,
     MAGMA_QUERY_VENDOR_ID, MAGMA_STATUS_INVALID_ARGS, MAGMA_STATUS_OK, MAGMA_VENDOR_ID_INTEL,
     MAGMA_VENDOR_ID_MALI,
+};
+use starnix_core::{
+    mm::{MemoryAccessor, MemoryAccessorExt},
+    task::CurrentTask,
+    vfs::{Anon, FdFlags, FsNodeInfo, VmoFileObject},
 };
 use starnix_logging::track_stub;
 use starnix_uapi::{
