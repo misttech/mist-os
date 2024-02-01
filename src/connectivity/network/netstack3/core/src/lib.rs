@@ -112,7 +112,7 @@ pub mod inspect {
     pub(crate) use base::*;
 
     // Re-exported types.
-    pub use base::{InspectableValue, Inspector, SocketAddressZoneProvider};
+    pub use base::{InspectableValue, Inspector, InspectorDeviceExt};
 }
 
 /// Methods for dealing with ICMP sockets.
@@ -170,7 +170,6 @@ pub mod neighbor {
 /// Types and utilities for dealing with routes.
 pub mod routes {
     // Re-exported types.
-    pub use crate::ip::api::RoutesVisitor;
     pub use crate::ip::forwarding::AddRouteError;
     pub use crate::ip::types::{
         AddableEntry, AddableEntryEither, AddableMetric, Entry, EntryEither, Generation, Metric,

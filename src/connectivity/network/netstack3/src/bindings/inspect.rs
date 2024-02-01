@@ -7,11 +7,14 @@
 //! This module provides utilities for publishing netstack3 diagnostics data to
 //! Inspect.
 
-use std::{fmt::Debug, string::ToString as _};
+use std::{
+    fmt::{Debug, Display},
+    string::ToString as _,
+};
 
 use fuchsia_inspect::Node;
 use net_types::{
-    ip::{Ip, IpAddress, Ipv4, Ipv6},
+    ip::{IpAddress, Ipv4, Ipv6},
     Witness as _,
 };
 use netstack3_core::{
@@ -98,10 +101,34 @@ impl<'a> netstack3_core::inspect::Inspector for BindingsInspector<'a> {
     }
 }
 
-impl<'a> netstack3_core::inspect::SocketAddressZoneProvider<WeakDeviceId<BindingsCtx>>
+impl<'a> netstack3_core::inspect::InspectorDeviceExt<DeviceId<BindingsCtx>>
     for BindingsInspector<'a>
 {
-    fn device_identifier_as_address_zone(id: WeakDeviceId<BindingsCtx>) -> impl std::fmt::Display {
+    fn record_device<I: netstack3_core::Inspector>(
+        inspector: &mut I,
+        name: &str,
+        device: &DeviceId<BindingsCtx>,
+    ) {
+        inspector.record_uint(name, device.bindings_id().id)
+    }
+
+    fn device_identifier_as_address_zone(id: DeviceId<BindingsCtx>) -> impl Display {
+        id.bindings_id().id
+    }
+}
+
+impl<'a> netstack3_core::inspect::InspectorDeviceExt<WeakDeviceId<BindingsCtx>>
+    for BindingsInspector<'a>
+{
+    fn record_device<I: netstack3_core::Inspector>(
+        inspector: &mut I,
+        name: &str,
+        device: &WeakDeviceId<BindingsCtx>,
+    ) {
+        inspector.record_uint(name, device.bindings_id().id)
+    }
+
+    fn device_identifier_as_address_zone(id: WeakDeviceId<BindingsCtx>) -> impl Display {
         id.bindings_id().id
     }
 }
@@ -117,47 +144,10 @@ pub(crate) fn sockets(ctx: &mut Ctx) -> fuchsia_inspect::Inspector {
 
 /// Publishes netstack3 routing table diagnostics data to Inspect.
 pub(crate) fn routes(ctx: &mut Ctx) -> fuchsia_inspect::Inspector {
-    impl<'a, I: Ip> netstack3_core::routes::RoutesVisitor<'a, I, DeviceId<BindingsCtx>>
-        for DualIpVisitor<'a>
-    {
-        fn visit<'b>(
-            &mut self,
-            per_route: impl Iterator<Item = &'b netstack3_core::routes::Entry<I::Addr, DeviceId<BindingsCtx>>>
-                + 'b,
-        ) where
-            'a: 'b,
-        {
-            for route in per_route {
-                self.record_unique_child(|node| {
-                    let netstack3_core::routes::Entry { subnet, device, gateway, metric } = route;
-                    node.record_string("Destination", format!("{}", subnet));
-                    node.record_uint("InterfaceId", device.bindings_id().id.into());
-                    match gateway {
-                        Some(gateway) => {
-                            node.record_string("Gateway", format!("{}", gateway));
-                        }
-                        None => {
-                            node.record_string("Gateway", "[NONE]");
-                        }
-                    }
-                    match metric {
-                        netstack3_core::routes::Metric::MetricTracksInterface(metric) => {
-                            node.record_uint("Metric", (*metric).into());
-                            node.record_bool("MetricTracksInterface", true);
-                        }
-                        netstack3_core::routes::Metric::ExplicitMetric(metric) => {
-                            node.record_uint("Metric", (*metric).into());
-                            node.record_bool("MetricTracksInterface", false);
-                        }
-                    }
-                })
-            }
-        }
-    }
     let inspector = fuchsia_inspect::Inspector::new(Default::default());
-    let mut visitor = DualIpVisitor::new(inspector.root());
-    ctx.api().routes::<Ipv4>().with_routes(&mut visitor);
-    ctx.api().routes::<Ipv6>().with_routes(&mut visitor);
+    let mut bindings_inspector = BindingsInspector::new(inspector.root());
+    ctx.api().routes::<Ipv4>().inspect(&mut bindings_inspector);
+    ctx.api().routes::<Ipv6>().inspect(&mut bindings_inspector);
     inspector
 }
 

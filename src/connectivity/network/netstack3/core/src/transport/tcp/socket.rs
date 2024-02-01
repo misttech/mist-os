@@ -54,7 +54,7 @@ use crate::{
     data_structures::socketmap::{IterShadows as _, SocketMap},
     device::{self, AnyDevice, DeviceIdContext},
     error::{ExistsError, LocalAddressError, ZonedAddressError},
-    inspect::{Inspector, SocketAddressZoneProvider},
+    inspect::{Inspector, InspectorDeviceExt},
     ip::{
         icmp::IcmpErrorCode,
         socket::{
@@ -3246,7 +3246,7 @@ where
     pub fn inspect<N>(&mut self, inspector: &mut N)
     where
         N: Inspector
-            + SocketAddressZoneProvider<<C::CoreContext as DeviceIdContext<AnyDevice>>::WeakDeviceId>,
+            + InspectorDeviceExt<<C::CoreContext as DeviceIdContext<AnyDevice>>::WeakDeviceId>,
     {
         self.core_ctx().for_each_socket(|socket_state| {
             let (local, remote) = match socket_state {
@@ -3279,22 +3279,14 @@ where
                     None => node.record_str("LocalAddress", "[NOT BOUND]"),
                     Some(addr) => node.record_display(
                         "LocalAddress",
-                        addr.map_zone(|device| {
-                            <N as SocketAddressZoneProvider<_>>::device_identifier_as_address_zone(
-                                device,
-                            )
-                        }),
+                        addr.map_zone(|device| N::device_identifier_as_address_zone(device)),
                     ),
                 };
                 match remote {
                     None => node.record_str("RemoteAddress", "[NOT CONNECTED]"),
                     Some(addr) => node.record_display(
                         "RemoteAddress",
-                        addr.map_zone(|device| {
-                            <N as SocketAddressZoneProvider<_>>::device_identifier_as_address_zone(
-                                device,
-                            )
-                        }),
+                        addr.map_zone(|device| N::device_identifier_as_address_zone(device)),
                     ),
                 };
             });

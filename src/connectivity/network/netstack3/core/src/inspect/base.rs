@@ -118,10 +118,17 @@ pub trait InspectableValue {
     fn record<I: Inspector>(&self, name: &str, inspector: &mut I);
 }
 
-/// Provides a `Display` representations of an IPv6 scoped address zone that is
-/// specialized for exporting to Inspect.
-pub trait SocketAddressZoneProvider<D> {
+/// An extension to `Inspector` that allows transforming and recording device
+/// identifiers.
+///
+/// How to record device IDs is delegated to bindings via this trait, so we
+/// don't need to propagate `InspectableValue` implementations everywhere in
+/// core unnecessarily.
+pub trait InspectorDeviceExt<D> {
+    /// Records an entry named `name` with value `device`.
+    fn record_device<I: Inspector>(inspector: &mut I, name: &str, device: &D);
+
     /// Returns the `Display` representation of the IPv6 scoped address zone
     /// associated with `D`.
-    fn device_identifier_as_address_zone(id: D) -> impl Display;
+    fn device_identifier_as_address_zone(device: D) -> impl Display;
 }

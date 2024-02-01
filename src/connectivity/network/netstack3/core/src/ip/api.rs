@@ -8,17 +8,18 @@ use alloc::vec::Vec;
 use core::{cmp::Ord, iter::Extend};
 use net_types::{
     ip::{Ip, IpAddr, IpVersionMarker, Ipv4, Ipv6},
-    SpecifiedAddr,
+    SpecifiedAddr, Witness as _,
 };
 
 use crate::{
     context::ContextPair,
     device::{AnyDevice, DeviceIdContext},
+    inspect::{Inspector, InspectorDeviceExt},
     ip::{
         base::{IpLayerBindingsContext, IpLayerContext, ResolveRouteError},
         device::{IpDeviceBindingsContext, IpDeviceConfigurationContext, IpDeviceIpExt},
         types::{
-            Destination, Entry, EntryAndGeneration, EntryEither, NextHop, OrderedEntry,
+            Destination, Entry, EntryAndGeneration, EntryEither, Metric, NextHop, OrderedEntry,
             ResolvedRoute, RoutableIpAddr,
         },
         IpLayerIpExt, IpStateContext,
@@ -32,14 +33,6 @@ impl<I: Ip, C> RoutesApi<I, C> {
     pub(crate) fn new(ctx: C) -> Self {
         Self(ctx, IpVersionMarker::new())
     }
-}
-
-/// Visitor for route table state.
-pub trait RoutesVisitor<'a, I: Ip, D: 'a> {
-    /// Consumes an Entry iterator.
-    fn visit<'b>(&mut self, stats: impl Iterator<Item = &'b Entry<I::Addr, D>> + 'b)
-    where
-        'a: 'b;
 }
 
 impl<I, C> RoutesApi<I, C>
@@ -101,12 +94,36 @@ where
         })
     }
 
-    /// Provides access to the state of the route table via a visitor.
-    pub fn with_routes<'a, V>(&mut self, cb: &mut V)
-    where
-        V: RoutesVisitor<'a, I, <C::CoreContext as DeviceIdContext<AnyDevice>>::DeviceId>,
-    {
-        self.core_ctx().with_ip_routing_table(|_core_ctx, table| cb.visit(table.iter_table()))
+    /// Writes routing table information to the provided `inspector`.
+    pub fn inspect<
+        'a,
+        N: Inspector + InspectorDeviceExt<<C::CoreContext as DeviceIdContext<AnyDevice>>::DeviceId>,
+    >(
+        &mut self,
+        inspector: &mut N,
+    ) {
+        self.core_ctx().with_ip_routing_table(|_core_ctx, table| {
+            for Entry { subnet, device, gateway, metric } in table.iter_table() {
+                inspector.record_unnamed_child(|inspector| {
+                    inspector.record_display("Destination", subnet);
+                    N::record_device(inspector, "InterfaceId", device);
+                    match gateway {
+                        Some(gateway) => {
+                            inspector.record_ip_addr("Gateway", gateway.get());
+                        }
+                        None => {
+                            inspector.record_str("Gateway", "[NONE]");
+                        }
+                    }
+                    let (metric, tracks_interface) = match metric {
+                        Metric::MetricTracksInterface(metric) => (metric, true),
+                        Metric::ExplicitMetric(metric) => (metric, false),
+                    };
+                    inspector.record_uint("Metric", *metric);
+                    inspector.record_bool("MetricTracksInterface", tracks_interface);
+                });
+            }
+        })
     }
 
     /// Set the routes in the routing table.
