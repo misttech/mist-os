@@ -297,6 +297,24 @@ async fn verify_package_cached(
     dir
 }
 
+// Verifies that:
+//   1. `pkg` can be opened via PackageCache.GetCached.
+//   2. `pkg` matches the package directory obtained from PackageCache.GetCached.
+//
+// Does *not* verify that `pkg`'s subpackages can be obtained.
+//
+// Returns the package directory obtained from PackageCache.GetCached.
+async fn verify_get_cached(proxy: &fpkg::PackageCacheProxy, pkg: &Package) -> fio::DirectoryProxy {
+    let (dir, dir_server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
+    let () = proxy
+        .get_cached(&fpkg_ext::BlobId::from(*pkg.hash()).into(), dir_server_end)
+        .await
+        .unwrap()
+        .unwrap();
+    let () = pkg.verify_contents(&dir).await.unwrap();
+    dir
+}
+
 pub async fn replace_retained_packages(
     proxy: &fpkg::RetainedPackagesProxy,
     packages: &[fpkg_ext::BlobId],

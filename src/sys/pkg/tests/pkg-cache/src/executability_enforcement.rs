@@ -61,6 +61,10 @@ async fn verify_package_executability(
     let dir = crate::verify_package_cached(&env.proxies.package_cache, &pkg).await;
     let () = verify_flags(&dir, expected_flags).await;
 
+    // Verify GetCached flags
+    let dir = crate::verify_get_cached(&env.proxies.package_cache, &pkg).await;
+    let () = verify_flags(&dir, expected_flags).await;
+
     let () = env.stop().await;
 }
 

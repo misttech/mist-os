@@ -104,8 +104,19 @@ pub(crate) async fn serve(
                     drop(node);
                     responder.send(response.map_err(|status| status.into_raw()))?;
                 }
-                PackageCacheRequest::GetCached { .. } => {
-                    error!("PackageCache.GetCached is not implemented");
+                PackageCacheRequest::GetCached { meta_far, dir, responder } => {
+                    let () = responder.send(
+                        get_cached(
+                            package_index.as_ref(),
+                            base_packages.as_ref(),
+                            executability_restrictions,
+                            &blobfs,
+                            BlobId::from(meta_far).into(),
+                            dir,
+                            scope.clone(),
+                        )
+                        .await,
+                    )?;
                 }
                 PackageCacheRequest::BasePackageIndex { iterator, control_handle: _ } => {
                     let stream = iterator.into_stream()?;
@@ -717,6 +728,49 @@ async fn serve_package_index(
     serve_fidl_iterator_from_slice(stream, package_entries).await.unwrap_or_else(|e| {
         error!("error serving PackageIndexIteratorRequestStream protocol: {:#}", anyhow!(e))
     })
+}
+
+async fn get_cached(
+    package_index: &async_lock::RwLock<PackageIndex>,
+    base_packages: &BasePackages,
+    executability_restrictions: system_image::ExecutabilityRestrictions,
+    blobfs: &blobfs::Client,
+    meta_far: Hash,
+    dir: ServerEnd<fio::DirectoryMarker>,
+    scope: package_directory::ExecutionScope,
+) -> Result<(), fpkg::GetCachedError> {
+    let pkg = package_directory::RootDir::new(blobfs.clone(), meta_far).await.map_err(|e| {
+        let err = match e {
+            package_directory::Error::MissingMetaFar => fpkg::GetCachedError::NotCached,
+            _ => fpkg::GetCachedError::Internal,
+        };
+        error!("get_cached: creating RootDir {}: {:#}", meta_far, anyhow!(e));
+        err
+    })?;
+
+    let package_status = get_package_status(base_packages, package_index, &meta_far).await;
+    // Make sure clients are only using this for already cached packages.
+    match package_status {
+        PackageStatus::Base | PackageStatus::Active => (),
+        PackageStatus::Other => {
+            let missing = blobfs
+                .filter_to_missing_blobs(&pkg.external_file_hashes().copied().collect(), None)
+                .await;
+            if !missing.is_empty() {
+                error!("get_cached: missing content blobs for {}: {:?}", meta_far, missing);
+                return Err(fpkg::GetCachedError::NotCached);
+            }
+        }
+    }
+
+    let () = pkg.open(
+        scope,
+        make_pkgdir_flags(executability_status(executability_restrictions, &package_status)),
+        vfs::path::Path::dot(),
+        dir.into_channel().into(),
+    );
+
+    Ok(())
 }
 
 #[cfg(test)]
