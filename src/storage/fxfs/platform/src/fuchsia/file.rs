@@ -157,7 +157,7 @@ impl FxFile {
     /// being removed. (See use of cache in `FxVolume::flush_all_files`.)
     #[trace]
     pub async fn flush(this: &OpenedNode<FxFile>) -> Result<(), Error> {
-        this.handle.flush().await
+        this.handle.flush().await.map(|_| ())
     }
 
     pub fn get_block_size(&self) -> u64 {
@@ -204,50 +204,35 @@ impl FxFile {
     /// Decrements the open count by one and optionally flushes contents to disk if the count
     /// drops to zero. This function also takes care of purging files that were
     /// 'marked_to_be_purged' due to being deleted while still open.
-    fn open_count_sub_one_and_maybe_flush(self: Arc<Self>, flush_on_last: bool) {
-        let old = if flush_on_last {
-            let mut old = self.open_count.load(Ordering::Relaxed);
-            loop {
-                // open count should be above zero (ignoring TO_BE_PURGED bit)
-                assert!(old & !TO_BE_PURGED > 0);
-                // Nb: old == 1 here also implies TO_BE_PURGED is NOT set.
-                // There is no point in flushing a file that is about to be purged.
-                if old == 1 && self.handle.needs_flush() {
-                    // If the file dereferenced to zero, we spawn a task to do a final flush.
-                    // Due to concurrency, we may have to do this a few times until needs_flush()
-                    // returns false.
-                    self.handle.owner().clone().spawn(async move {
-                        // Avoid infinite loops for errors.
-                        let can_flush_again = self.handle.flush().await.is_ok();
-                        self.open_count_sub_one_and_maybe_flush(can_flush_again);
-                    });
-                    return;
-                }
-                match self.open_count.compare_exchange_weak(
-                    old,
-                    old - 1,
-                    Ordering::Relaxed,
-                    Ordering::Relaxed,
-                ) {
-                    Ok(_) => break,
-                    Err(x) => old = x,
-                }
-            }
-            old
-        } else {
-            let old = self.open_count.fetch_sub(1, Ordering::Relaxed);
-            assert!(old & !TO_BE_PURGED > 0);
-            old
-        };
-        // TO_BE_PURGED is the top-most bit of count and used to indicate that an object
-        // should be tombstoned when the open count drops to zero.
-        // Actual purging is queued to be done asynchronously.
+    fn open_count_sub_one_and_maybe_flush(self: Arc<Self>) {
+        let old = self.open_count.fetch_sub(1, Ordering::Relaxed);
+        assert!(old & !TO_BE_PURGED > 0);
+
+        // TO_BE_PURGED is the top-most bit of count and used to indicate that an object should be
+        // tombstoned when the open count drops to zero. Actual purging is queued to be done
+        // asynchronously. We don't need to do any flushing in this case - if the file is going to
+        // be deleted anyway, there is no point.
         if old == TO_BE_PURGED + 1 {
-            let store = self.handle.store();
-            store
-                .filesystem()
-                .graveyard()
-                .queue_tombstone(store.store_object_id(), self.object_id());
+            self.handle.owner().clone().spawn(async move {
+                let store = self.handle.store();
+                let fs = store.filesystem();
+                // Take a truncate lock on the object, because flush also takes this lock, so this
+                // will make sure any previously triggered flushes will complete before we purge.
+                let keys =
+                    lock_keys![LockKey::truncate(store.store_object_id(), self.handle.object_id())];
+                let _flush_guard = fs.lock_manager().write_lock(keys).await;
+                store
+                    .filesystem()
+                    .graveyard()
+                    .queue_tombstone(store.store_object_id(), self.object_id());
+            });
+        } else if old == 1 && self.handle.needs_flush() {
+            // If this file is no longer referenced by anything, do a final flush if needed.
+            self.handle.owner().clone().spawn(async move {
+                if let Err(error) = self.handle.flush().await {
+                    tracing::warn!(?error, "flush on close failed");
+                }
+            });
         }
     }
 }
@@ -278,7 +263,7 @@ impl FxNode for FxFile {
     }
 
     fn open_count_sub_one(self: Arc<Self>) {
-        self.open_count_sub_one_and_maybe_flush(true);
+        self.open_count_sub_one_and_maybe_flush();
     }
 
     fn object_descriptor(&self) -> ObjectDescriptor {

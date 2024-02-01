@@ -576,6 +576,9 @@ impl PagedObjectHandle {
         // If the VMO is shrunk between getting the VMO's size and calling query_dirty_ranges or
         // reading the cached data then the flush could fail. This lock is held to prevent the file
         // from shrinking while it's being flushed.
+        // NB: FxFile.open_count_sub_one_and_maybe_flush relies on this lock being taken to make
+        // sure any flushes are done before it adds a file tombstone if the file is going to be
+        // purged. If this lock key changes, it should change there as well.
         let keys = lock_keys![LockKey::truncate(store.store_object_id(), self.handle.object_id())];
         let _truncate_guard = fs.lock_manager().write_lock(keys).await;
 
@@ -2350,6 +2353,60 @@ mod tests {
         .join()
         .unwrap();
 
+        fixture.close().await;
+    }
+
+    #[fuchsia::test]
+    async fn test_file_vmo_write_beyond_content_size_doesnt_break_flush() {
+        let fixture = TestFixture::new_unencrypted().await;
+        let root = fixture.root();
+
+        let file = open_file_checked(
+            &root,
+            fio::OpenFlags::CREATE
+                | fio::OpenFlags::RIGHT_READABLE
+                | fio::OpenFlags::RIGHT_WRITABLE
+                | fio::OpenFlags::NOT_DIRECTORY,
+            FILE_NAME,
+        )
+        .await;
+
+        // Write out three pages initially.
+        let page_size = zx::system_get_page_size() as u64;
+        let file_size = page_size * 3;
+        fuchsia_fs::file::write(&file, &vec![1u8; file_size as usize]).await.unwrap();
+        file.sync().await.unwrap().map_err(zx::Status::from_raw).unwrap();
+
+        // Get the backing memory for the file. Confirm the length of the vmo and the reported
+        // content size.
+        let vmo = file
+            .get_backing_memory(fio::VmoFlags::READ | fio::VmoFlags::WRITE)
+            .await
+            .unwrap()
+            .map_err(zx::Status::from_raw)
+            .unwrap();
+        assert_eq!(vmo.get_content_size().unwrap(), file_size);
+        assert_eq!(vmo.get_size().unwrap(), file_size);
+
+        // Resize the file down to one page. Confirm the content size is updated, but the vmo size
+        // stays the same.
+        file.resize(page_size).await.unwrap().map_err(zx::Status::from_raw).unwrap();
+        file.sync().await.unwrap().map_err(zx::Status::from_raw).unwrap();
+        assert_eq!(vmo.get_content_size().unwrap(), page_size);
+        assert_eq!(vmo.get_size().unwrap(), file_size);
+
+        // Write some data to the vmo, beyond the current content size. This does _not_ update the
+        // content size, but it does make pages dirty beyond the end of the file.
+        unblock(move || {
+            vmo.write(&[1, 2, 3, 4], page_size * 2).unwrap();
+            // Writing this data to the vmo shouldn't update the content size.
+            assert_eq!(vmo.get_content_size().unwrap(), page_size);
+            assert_eq!(vmo.get_size().unwrap(), file_size);
+        })
+        .await;
+
+        // https://fxbug.dev/318434279 - the dirty pages beyond the end of the file cause shutdown
+        // to stall forever, waiting for an infinitely looping flush attempt.
         fixture.close().await;
     }
 }
