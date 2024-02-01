@@ -4,7 +4,7 @@ use addr::TargetAddr;
 // found in the LICENSE file.
 //
 use anyhow::{anyhow, bail, Result};
-use std::io::{BufRead, Write};
+use std::io::{stdin, stdout, BufRead, Write};
 
 #[derive(Debug, Clone, PartialEq, Default)]
 pub(crate) struct TargetInfo {
@@ -12,16 +12,7 @@ pub(crate) struct TargetInfo {
     pub(crate) addresses: Vec<TargetAddr>,
 }
 
-pub async fn choose_target<R, W>(
-    input: &mut R,
-    output: &mut W,
-    targets: Vec<TargetInfo>,
-    def: Option<String>,
-) -> Result<TargetInfo>
-where
-    R: BufRead,
-    W: Write,
-{
+pub async fn choose_target(targets: Vec<TargetInfo>, def: Option<String>) -> Result<TargetInfo> {
     // If they specified a target...
     if let Some(t) = def {
         let filtered_targets =
@@ -35,21 +26,20 @@ where
 
     match targets.len() {
         0 => {
-            bail!("No valid targets discovered.\nEnsure your Target is in Product mode or Fastboot Over TCP")
+            bail!("No targets discovered")
         }
         1 => {
             let first = targets.first();
             match first {
                 Some(f) => Ok(f.clone()),
-                None => bail!(
-                    "Internal error: list of targets was length 1, but the `first` one was None."
-                ),
+                None => bail!("No targets"),
             }
         }
         _ => {
             // Okay there is more than one target available and they haven't
             // specified a target to use, lets prompt them for one
-            prompt_for_target(input, output, targets).await
+            let stdin = stdin().lock();
+            prompt_for_target(stdin, stdout(), targets).await
         }
     }
 }
