@@ -42,7 +42,7 @@ use packet_formats::{
     ipv4::{Ipv4FragmentType, Ipv4Header},
     ipv6::{ExtHdrParseError, Ipv6Header},
 };
-use tracing::{debug, error, trace};
+use tracing::{debug, error, trace, warn};
 use zerocopy::ByteSlice;
 
 use crate::{
@@ -1180,9 +1180,8 @@ impl<
                     Icmpv4ErrorCode::TimeExceeded(time_exceeded.code()),
                 );
             }
-            Icmpv4Packet::Redirect(_) => log_unimplemented!(
-                (),
-                "<IcmpIpTransportContext as IpTransportContext<Ipv4>>::receive_ip_packet::redirect"
+            Icmpv4Packet::Redirect(_) => warn!(
+                "Unimplemented: <IcmpIpTransportContext as IpTransportContext<Ipv4>>::receive_ip_packet::redirect"
             ),
             Icmpv4Packet::ParameterProblem(parameter_problem) => {
                 core_ctx.increment(|counters: &IcmpRxCounters<Ipv4>| &counters.parameter_problem);

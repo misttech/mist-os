@@ -4332,7 +4332,9 @@ where
                 }
             }
         }
-        log_unimplemented!((), "https://fxbug.dev/42115343: Implement this by looking up a route");
+        tracing::warn!("Unimplemented: Interface selection without a source addr");
+        // TODO(https://fxbug.dev/42115343): Select a device by looking up a
+        // route to the remote_addr.
         Err(SetMulticastMembershipError::NoDeviceAvailable)
     })
 }
