@@ -2,15 +2,20 @@
     "extraPaths": [
         "build/python/modules",
         "build/python/tests",
+        "src/developer/ffx/lib/fuchsia-controller/python",
+        "src/testing/end_to_end/honeydew",
+        "third_party/antlion/packages",
+        "third_party/jellyfish/jellyfish/jellyfish",
         "third_party/jinja2",
         "third_party/mako",
+        "third_party/mobly/src",
+        "third_party/github.com/jd/tenacity/src",
         "third_party/parameterized/src",
-        "third_party/jellyfish/jellyfish/jellyfish"
+        "third_party/pyyaml/src"
     ],
     "exclude": [
         "out",
         "prebuilt",
-        "third_party",
         "**/prebuilt_symlink",
         "**/__pycache__"
     ]
