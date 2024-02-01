@@ -70,10 +70,10 @@
   // On entry a0 contains the argument: the address of the GOT slot range.
   tlsdesc.load a0, tlsdesc.value_offset(a0)
 
-  tlsdesc.sub a0, a0, tp
-
   // On exit a0 contains the return value: offset from tp.
   .cfi_undefined a0
+
+  tlsdesc.sub a0, a0, tp
 
   // The caller's return address is in t0, with ra preserved.
   jr t0
