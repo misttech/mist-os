@@ -14,7 +14,7 @@ impl DefineSubsystemConfiguration<BluetoothConfig> for BluetoothSubsystemConfig 
     ) -> anyhow::Result<()> {
         // Snoop is only useful when Inspect filtering is turned on. In practice, this is in Eng &
         // UserDebug builds.
-        match (context.build_type, config.snoop) {
+        match (context.build_type, config.snoop()) {
             (BuildType::User, _) => {}
             (_, Snoop::Eager) => {
                 builder.platform_bundle("bluetooth_snoop_eager");
@@ -25,8 +25,8 @@ impl DefineSubsystemConfiguration<BluetoothConfig> for BluetoothSubsystemConfig 
             (_, Snoop::None) => {}
         }
 
-        // TODO(b/292109810): Add rules for the Bluetooth core realm & profiles once the platform
-        // configuration has been fully defined.
+        // TODO(b/292109810): Add rules for Bluetooth profiles once the platform configuration has
+        // been fully defined.
         Ok(())
     }
 }
