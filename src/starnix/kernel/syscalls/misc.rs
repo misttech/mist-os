@@ -227,12 +227,20 @@ pub fn sys_reboot(
             let proxy = connect_to_protocol_sync::<fpower::AdminMarker>()
                 .expect("couldn't connect to fuchsia.hardware.power.statecontrol.Admin");
 
+            if reboot_args.contains(&&b"bootloader"[..]) {
+                match proxy.reboot_to_bootloader(zx::Time::INFINITE) {
+                    Ok(_) => {
+                        log_info!("Rebooting to bootloader");
+                        // System is rebooting... wait until runtime ends.
+                        zx::Time::INFINITE.sleep();
+                    }
+                    Err(e) => panic!("Failed to reboot, status: {e}"),
+                }
+            }
+
             let reboot_reason = if reboot_args.contains(&&b"ota_update"[..]) {
                 fpower::RebootReason::SystemUpdate
-            } else if reboot_args.is_empty()
-                || reboot_args.contains(&&b"shell"[..])
-                || reboot_args.contains(&&b"bootloader"[..])
-            {
+            } else if reboot_args.is_empty() || reboot_args.contains(&&b"shell"[..]) {
                 fpower::RebootReason::UserRequest
             } else {
                 log_warn!("Unknown reboot args: {arg_bytes}");
