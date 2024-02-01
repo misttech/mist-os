@@ -8,8 +8,6 @@
 #include <fidl/fuchsia.hardware.sysmem/cpp/wire.h>
 #include <lib/driver/component/cpp/driver_base.h>
 #include <lib/driver/devfs/cpp/connector.h>
-#include <lib/virtio/device.h>
-#include <lib/virtio/ring.h>
 #include <lib/zx/vmo.h>
 #include <semaphore.h>
 #include <zircon/compiler.h>
@@ -17,6 +15,8 @@
 
 #include <cstdlib>
 #include <memory>
+
+#include <fbl/mutex.h>
 
 #include "src/graphics/display/drivers/virtio-guest/v2/virtio-abi.h"
 

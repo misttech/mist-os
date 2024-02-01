@@ -11,8 +11,6 @@
 #include <lib/driver/component/cpp/driver_base.h>
 #include <lib/driver/devfs/cpp/connector.h>
 #include <lib/stdcompat/span.h>
-#include <lib/virtio/device.h>
-#include <lib/virtio/ring.h>
 #include <lib/zx/bti.h>
 #include <lib/zx/result.h>
 #include <lib/zx/vmo.h>
@@ -32,8 +30,7 @@
 namespace virtio_display {
 
 // Implements the guest OS driver side of the VIRTIO GPU device specification.
-class GpuDevice : public virtio::Device,
-                  public fdf::WireServer<fuchsia_hardware_display_engine::Engine> {
+class GpuDevice : public fdf::WireServer<fuchsia_hardware_display_engine::Engine> {
  public:
   // Exposed for testing. Production code must use the Create() factory method.
   //
@@ -49,8 +46,7 @@ class GpuDevice : public virtio::Device,
   // `virtio_queue_buffer_pool_pin` for the duration of its lifetime. They are
   // intended to keep the memory backing `virtio_queue_buffer_pool` alive and
   // pinned to `virtio_queue_buffer_pool_physical_address`.
-  GpuDevice(zx::bti bti, std::unique_ptr<virtio::Backend> backend,
-            zx::vmo virtio_queue_buffer_pool_vmo, zx::pmt virtio_queue_buffer_pool_pin,
+  GpuDevice(zx::vmo virtio_queue_buffer_pool_vmo, zx::pmt virtio_queue_buffer_pool_pin,
             zx_paddr_t virtio_queue_buffer_pool_physical_address,
             cpp20::span<uint8_t> virtio_queue_buffer_pool);
   ~GpuDevice() override;
@@ -92,10 +88,8 @@ class GpuDevice : public virtio::Device,
       fidl::UnknownMethodMetadata<fuchsia_hardware_display_engine::Engine> metadata,
       fidl::UnknownMethodCompleter::Sync& completer) override;
 
-  zx_status_t Init() override;
-  void IrqRingUpdate() override;
-  void IrqConfigChange() override;
-  const char* tag() const override { return "virtio-gpu"; }
+  zx_status_t Init();
+  const static char* tag() { return "virtio-gpu"; }
 
   // Synchronous request/response exchange on the main virtqueue.
   //
@@ -119,13 +113,6 @@ class GpuDevice : public virtio::Device,
   const ResponseType& ExchangeRequestResponse(const RequestType& request);
 
  private:
-  // Called when the virtio device notifies the driver of having used a buffer.
-  //
-  // `used_descriptor_index` is the virtqueue descriptor table index pointing to
-  // the data that was consumed by the device. The indicated buffer, as well as
-  // all the linked buffers, are now owned by the driver.
-  void VirtioBufferUsedByDevice(uint32_t used_descriptor_index) __TA_REQUIRES(virtio_queue_mutex_);
-
   // Ensures that a single ExchangeRequestResponse() call is in progress.
   fbl::Mutex exchange_request_response_mutex_;
 
@@ -142,19 +129,11 @@ class GpuDevice : public virtio::Device,
   // nullopt iff no ExchangeRequestResponse() is in progress.
   std::optional<uint16_t> virtio_queue_request_index_ __TA_GUARDED(virtio_queue_mutex_);
 
-  // The GPU device's control virtqueue.
-  //
-  // Defined in the VIRTIO spec Section 5.7.2 "GPU Device" > "Virtqueues".
-  virtio::Ring virtio_queue_ __TA_GUARDED(virtio_queue_mutex_);
-
   // Backs `virtio_queue_buffer_pool_`.
   const zx::vmo virtio_queue_buffer_pool_vmo_;
 
   // Pins `virtio_queue_buffer_pool_vmo_` at a known physical address.
   const zx::pmt virtio_queue_buffer_pool_pin_;
-
-  // The starting address of `virtio_queue_buffer_pool_`.
-  const zx_paddr_t virtio_queue_buffer_pool_physical_address_;
 
   // Memory pinned at a known physical address, used for virtqueue buffers.
   //
@@ -202,38 +181,15 @@ const ResponseType& GpuDevice::ExchangeRequestResponse(const RequestType& reques
   // second (chained) descriptor will point to the response buffer.
 
   uint16_t request_descriptor_index;
-  vring_desc* const request_descriptor =
-      virtio_queue_.AllocDescChain(/*count=*/2, &request_descriptor_index);
-  ZX_ASSERT(request_descriptor);
   virtio_queue_request_index_ = request_descriptor_index;
 
   cpp20::span<uint8_t> request_span = virtio_queue_buffer_pool_.subspan(0, request_size);
   std::memcpy(request_span.data(), &request, request_size);
 
-  const zx_paddr_t request_physical_address = virtio_queue_buffer_pool_physical_address_;
-  request_descriptor->addr = request_physical_address;
-  static_assert(request_size <= std::numeric_limits<uint32_t>::max());
-  request_descriptor->len = static_cast<uint32_t>(request_size);
-  request_descriptor->flags = VRING_DESC_F_NEXT;
-
-  vring_desc* const response_descriptor = virtio_queue_.DescFromIndex(request_descriptor->next);
-  ZX_ASSERT(response_descriptor);
-
   cpp20::span<uint8_t> response_span =
       virtio_queue_buffer_pool_.subspan(request_size, response_size);
   std::fill(response_span.begin(), response_span.end(), 0);
-
-  const zx_paddr_t response_physical_address = request_physical_address + request_size;
-  response_descriptor->addr = response_physical_address;
   static_assert(response_size <= std::numeric_limits<uint32_t>::max());
-  response_descriptor->len = static_cast<uint32_t>(response_size);
-  response_descriptor->flags = VRING_DESC_F_WRITE;
-
-  // Submit the transfer & wait for the response
-  virtio_queue_.SubmitChain(request_descriptor_index);
-  virtio_queue_.Kick();
-
-  virtio_queue_buffer_used_signal_.Wait(&virtio_queue_mutex_);
 
   return *reinterpret_cast<ResponseType*>(response_span.data());
 }

@@ -206,31 +206,6 @@ zx_status_t GpuDeviceDriver::transfer_to_host_2d(uint32_t resource_id, uint32_t 
   return ResponseTypeToZxStatus(response.header.type);
 }
 
-zx_status_t GpuDeviceDriver::Stage2Init() {
-  FDF_LOG(TRACE, "Stage2Init()");
-
-  // Get the display info and see if we find a valid pmode.
-  zx_status_t status = get_display_info();
-  if (status != ZX_OK) {
-    FDF_LOG(ERROR, "Failed to get display info: %s", zx_status_get_string(status));
-    return status;
-  }
-
-  if (pmode_id_ < 0) {
-    FDF_LOG(ERROR, "Failed to find a pmode");
-    return ZX_ERR_NOT_FOUND;
-  }
-
-  FDF_LOG(INFO,
-          "Found display at (%" PRIu32 ", %" PRIu32 ") size %" PRIu32 "x%" PRIu32
-          ", flags 0x%08" PRIx32,
-          pmode_.geometry.placement_x, pmode_.geometry.placement_y, pmode_.geometry.width,
-          pmode_.geometry.height, pmode_.flags);
-
-  FDF_LOG(TRACE, "Start() completed");
-  return ZX_OK;
-}
-
 zx_koid_t GetKoid(zx_handle_t handle) {
   zx_info_handle_basic_t info;
   zx_status_t status =
@@ -329,24 +304,13 @@ void GpuDeviceDriver::Start(fdf::StartCompleter completer) {
   }
 
   defer_teardown.cancel();
-
-  async::PostTask(dispatcher(), [this, completer = std::move(completer)]() mutable {
-    zx_status_t status = Stage2Init();
-    completer(zx::make_result(status));
-  });
+  completer(zx::make_result(ZX_OK));
 }
 
-void GpuDeviceDriver::Stop() {
-  if (device_) {
-    device_->Release();
-  }
-}
+void GpuDeviceDriver::Stop() {}
 
 void GpuDeviceDriver::PrepareStop(fdf::PrepareStopCompleter completer) { completer(zx::ok()); }
 
 }  // namespace virtio_display
 
 FUCHSIA_DRIVER_EXPORT(virtio_display::GpuDeviceDriver);
-
-// TODO(b/282968393): remove when libdriver dep removed from bus/lib/virtio
-zx_driver_rec_t __zircon_driver_rec__ = {};

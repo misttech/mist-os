@@ -4,6 +4,7 @@
 
 #include "src/graphics/display/drivers/virtio-guest/v2/gpu-device-driver.h"
 
+#include <fidl/fuchsia.hardware.pci/cpp/wire_test_base.h>
 #include <fidl/fuchsia.hardware.sysmem/cpp/wire_test_base.h>
 #include <fidl/fuchsia.sysmem/cpp/wire_test_base.h>
 #include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
@@ -333,8 +334,7 @@ class VirtioGpuTest : public ::testing::Test {
         driver_.SyncCall(&fdf_testing::DriverUnderTest<virtio_display::GpuDeviceDriver>::Start,
                          std::move(start_args->start_args)));
 
-    // TODO(https://fxbug.dev/42084608): This should be ZX_OK once all the mocks are in place.
-    EXPECT_EQ(ZX_ERR_PEER_CLOSED, start_result.status_value());
+    EXPECT_EQ(ZX_OK, start_result.status_value());
   }
 
   void TearDown() override {
