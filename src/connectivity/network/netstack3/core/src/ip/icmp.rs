@@ -42,7 +42,7 @@ use packet_formats::{
     ipv4::{Ipv4FragmentType, Ipv4Header},
     ipv6::{ExtHdrParseError, Ipv6Header},
 };
-use tracing::{debug, error, trace, warn};
+use tracing::{debug, error, trace};
 use zerocopy::ByteSlice;
 
 use crate::{
@@ -1180,7 +1180,8 @@ impl<
                     Icmpv4ErrorCode::TimeExceeded(time_exceeded.code()),
                 );
             }
-            Icmpv4Packet::Redirect(_) => warn!(
+            // TODO(https://fxbug.dev/323400954): Support ICMP Redirect.
+            Icmpv4Packet::Redirect(_) => debug!(
                 "Unimplemented: <IcmpIpTransportContext as IpTransportContext<Ipv4>>::receive_ip_packet::redirect"
             ),
             Icmpv4Packet::ParameterProblem(parameter_problem) => {
