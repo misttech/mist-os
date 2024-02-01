@@ -17,7 +17,6 @@ use tracing::{error, info};
 
 mod api_metrics;
 mod channel;
-mod cobalt;
 mod configuration;
 mod feedback_annotation;
 mod fidl;
@@ -130,11 +129,6 @@ async fn main_inner() -> Result<(), Error> {
     )
     .start()
     .await;
-
-    // Notify Cobalt of the current channel and set the current app id in any feedback reports.
-    futures.push(
-        cobalt::notify_cobalt_current_software_distribution(Rc::clone(&app_set)).boxed_local(),
-    );
 
     futures.push(feedback_annotation::publish_ids_to_feedback(Rc::clone(&app_set)).boxed_local());
 

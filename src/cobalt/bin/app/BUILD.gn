@@ -50,6 +50,8 @@ source_set("lib") {
     "cobalt_controller_impl.h",
     "configuration_data.cc",
     "configuration_data.h",
+    "current_channel_provider.cc",
+    "current_channel_provider.h",
     "diagnostics_impl.cc",
     "diagnostics_impl.h",
     "metric_event_logger_factory_impl.cc",
@@ -70,6 +72,7 @@ source_set("lib") {
     "//sdk/fidl/fuchsia.cobalt:fuchsia.cobalt_hlcpp",
     "//sdk/fidl/fuchsia.metrics:fuchsia.metrics_hlcpp",
     "//sdk/fidl/fuchsia.process.lifecycle:fuchsia.process.lifecycle_hlcpp",
+    "//sdk/fidl/fuchsia.update.channel:fuchsia.update.channel_cpp",
     "//sdk/lib/inspect/component/cpp",
     "//sdk/lib/sys/cpp",
     "//sdk/lib/syslog/cpp",
@@ -96,7 +99,10 @@ source_set("lib") {
     "//zircon/system/ulib/async-loop:async-loop-cpp",
     "//zircon/system/ulib/async-loop:async-loop-default",
   ]
-  deps = [ "//sdk/lib/fit-promise" ]
+  deps = [
+    "//sdk/lib/component/incoming/cpp:cpp",
+    "//sdk/lib/fit-promise",
+  ]
 }
 
 executable("app") {
@@ -207,6 +213,7 @@ executable("cobalt_app_unittests") {
     "cobalt_app_test.cc",
     "cobalt_controller_impl_test.cc",
     "configuration_data_test.cc",
+    "current_channel_provider_test.cc",
     "diagnostics_impl_test.cc",
     "metric_event_logger_impl_test.cc",
     "system_data_updater_impl_test.cc",
@@ -225,6 +232,7 @@ executable("cobalt_app_unittests") {
     "//src/lib/fsl",
     "//src/lib/fxl/test:gtest_main",
     "//src/lib/testing/loop_fixture",
+    "//src/lib/testing/predicates",
     "//third_party/cobalt/src/logger:fake_logger",
     "//third_party/cobalt/src/logger:logger_test_utils",
     "//third_party/cobalt/src/public/lib:report_spec",

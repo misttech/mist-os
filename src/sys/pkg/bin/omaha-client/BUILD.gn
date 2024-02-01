@@ -19,7 +19,6 @@ rustc_library("lib") {
     ":mos_metrics_registry_rustlib",
     ":omaha-client-structured-config-lib",
     "//sdk/fidl/fuchsia.boot:fuchsia.boot_rust",
-    "//sdk/fidl/fuchsia.cobalt:fuchsia.cobalt_rust",
     "//sdk/fidl/fuchsia.feedback:fuchsia.feedback_rust",
     "//sdk/fidl/fuchsia.hardware.power.statecontrol:fuchsia.hardware.power.statecontrol_rust",
     "//sdk/fidl/fuchsia.metrics:fuchsia.metrics_rust",
@@ -72,7 +71,6 @@ rustc_library("lib") {
   sources = [
     "src/api_metrics.rs",
     "src/channel.rs",
-    "src/cobalt.rs",
     "src/configuration.rs",
     "src/feedback_annotation.rs",
     "src/fidl.rs",

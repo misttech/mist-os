@@ -250,7 +250,7 @@ TEST_F(CobaltAppTest, SetSoftwareDistributionInfo) {
       std::move(info), [&](fuchsia::cobalt::Status status_) { status = status_; });
   RunLoopUntilIdle();
   ASSERT_EQ(status, fuchsia::cobalt::Status::OK);
-  EXPECT_EQ(fake_service_->system_data()->channel(), "new-channel-name");
+  EXPECT_EQ(fake_service_->system_data()->channel(), "Testing Channel");
 }
 
 TEST_F(CobaltAppTest, CreateMetricEventLogger) {

@@ -4,6 +4,7 @@
 
 #include "src/cobalt/bin/app/cobalt_app.h"
 
+#include <lib/component/incoming/cpp/protocol.h>
 #include <lib/inspect/cpp/inspect.h>
 
 #include <memory>
@@ -12,6 +13,7 @@
 #include "lib/fidl/cpp/interface_request.h"
 #include "lib/sys/cpp/component_context.h"
 #include "src/cobalt/bin/app/aggregate_and_upload_impl.h"
+#include "src/cobalt/bin/app/current_channel_provider.h"
 #include "src/cobalt/bin/app/diagnostics_impl.h"
 #include "src/cobalt/bin/app/metric_event_logger_factory_impl.h"
 #include "src/cobalt/bin/app/utils.h"
@@ -40,12 +42,29 @@ constexpr char kLocalAggregationPath[] = "/data/local_aggregate_storage";
 constexpr char kObsHistoryProtoStorePath[] = "/data/obs_history_store";
 constexpr char kLocalLogFilePath[] = "/data/cobalt_observations.pb";
 
-// Used for caching system data fields in fuchsia.
-constexpr char kSystemDataCachePrefix[] = "/data/system_data_";
 // Used for caching the SystemData history in cobalt internally.
 constexpr char kSystemDataCachePath[] = "/data/system_data_history";
 
 const size_t kClearcutMaxRetries = 5;
+
+namespace {
+
+std::unique_ptr<CurrentChannelProvider> CreateCurrentChannelProvider(
+    async_dispatcher_t* dispatcher, inspect::Node system_data_node,
+    const std::string& current_channel) {
+  zx::result client_end = component::Connect<fuchsia_update_channel::Provider>();
+  if (!client_end.is_ok()) {
+    FX_LOGS(ERROR)
+        << "Synchronous error when connecting to the |fuchsia_update_channel::Provider| protocol: "
+        << client_end.status_string();
+    return nullptr;
+  }
+
+  return std::make_unique<CurrentChannelProvider>(dispatcher, std::move(client_end).value(),
+                                                  std::move(system_data_node), current_channel);
+}
+
+}  // namespace
 
 std::unique_ptr<CobaltRegistry> ReadRegistry(const std::string& global_metrics_registry_path) {
   std::ifstream registry_file_stream;
@@ -190,7 +209,11 @@ CobaltApp::CobaltApp(
       inspect_node_(std::move(inspect_node)),
       inspect_config_node_(std::move(inspect_config_node)),
       cobalt_service_(std::move(cobalt_service)),
-      validated_clock_(std::move(validated_clock)) {
+      validated_clock_(std::move(validated_clock)),
+      current_channel_provider_(
+          CreateCurrentChannelProvider(dispatcher, inspect_node_.CreateChild("system_data"),
+                                       cobalt_service_->system_data()->channel())),
+      system_data_updater_impl_(std::make_unique<SystemDataUpdaterImpl>()) {
   validated_clock_->AwaitExternalSource([this, start_event_aggregator_worker]() {
     // Now that the clock is accurate, notify CobaltService.
     cobalt_service_->SystemClockIsAccurate(std::make_unique<util::SystemClock>(),
@@ -211,10 +234,16 @@ CobaltApp::CobaltApp(
         std::move(lifecycle_handle), dispatcher);
   }
 
-  // Create SystemDataUpdater protocol implementation and start serving it.
-  system_data_updater_impl_.reset(
-      new SystemDataUpdaterImpl(inspect_node_.CreateChild("system_data"),
-                                cobalt_service_->system_data(), kSystemDataCachePrefix));
+  if (current_channel_provider_ != nullptr) {
+    current_channel_provider_->GetCurrentChannel([this](const std::string& current_channel) {
+      const system_data::SoftwareDistributionInfo info{
+          .channel = current_channel,
+      };
+      cobalt_service_->system_data()->SetSoftwareDistributionInfo(info);
+    });
+  }
+
+  // Start serving SystemDataUpdater protocol.
   context_->outgoing()->AddPublicService(
       system_data_updater_bindings_.GetHandler(system_data_updater_impl_.get()));
 

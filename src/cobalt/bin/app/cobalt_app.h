@@ -24,6 +24,7 @@
 #include "src/cobalt/bin/app/aggregate_and_upload_impl.h"
 #include "src/cobalt/bin/app/cobalt_controller_impl.h"
 #include "src/cobalt/bin/app/configuration_data.h"
+#include "src/cobalt/bin/app/current_channel_provider.h"
 #include "src/cobalt/bin/app/diagnostics_impl.h"
 #include "src/cobalt/bin/app/process_lifecycle_impl.h"
 #include "src/cobalt/bin/app/system_data_updater_impl.h"
@@ -138,6 +139,10 @@ class CobaltApp {
   fidl::BindingSet<fuchsia::metrics::MetricEventLoggerFactory>
       metric_event_logger_factory_bindings_;
 
+  std::unique_ptr<CurrentChannelProvider> current_channel_provider_;
+
+  // TODO: b/315496857 - Delete SystemDataUpdaterImpl once fuchsia::cobalt::SystemDataUpdater is
+  // removed and out of the support window.
   std::unique_ptr<fuchsia::cobalt::SystemDataUpdater> system_data_updater_impl_;
   fidl::BindingSet<fuchsia::cobalt::SystemDataUpdater> system_data_updater_bindings_;
 

@@ -4,9 +4,19 @@
 library fuchsia.cobalt;
 
 /// Channels should not be longer than this.
+///
+/// # Deprecation
+///
+/// The SystemDataUpdater protocol is deprecated so this type is no longer needed.
+@available(deprecated=18, note="SystemDataUpdater protocol is deprecated")
 const MAX_CHANNEL_NAME_LENGTH uint32 = 256;
 
 /// Response codes for Logger operations.
+///
+/// # Deprecation
+///
+/// The SystemDataUpdater protocol is deprecated so this type is no longer needed.
+@available(deprecated=18, note="SystemDataUpdater protocol is deprecated")
 type Status = strict enum : int32 {
     OK = 0;
 
@@ -34,6 +44,11 @@ type Status = strict enum : int32 {
 /////////////////////////////////////////////////////////////////////
 
 /// A collection of fields describing a system's software distribution.
+///
+/// # Deprecation
+///
+/// The SystemDataUpdater protocol is deprecated so this type is no longer needed.
+@available(deprecated=18, note="SystemDataUpdater protocol is deprecated")
 type SoftwareDistributionInfo = table {
     /// The channel that the device last used as an update source. This value
     /// may be empty to indicate that the device is not currently associated
@@ -44,7 +59,15 @@ type SoftwareDistributionInfo = table {
 /// The SystemDataUpdater interface allows callers to update the state of
 /// the SystemProfile in Cobalt. The changes are global and affect all loggers
 /// running on the device.
+///
+/// # Deprecation
+///
+/// This protocol does not have any special properties compared to fuchsia.update.channel/Provider
+/// other than requiring another component to push the current channel to Cobalt, rather than
+/// having Cobalt pull the value. This protocol is deprecated and Cobalt is now retrieving the
+/// channel via the standard fuchsia.update.channel/Provider::GetCurrent method.
 @discoverable
+@available(deprecated=18, note="channel retrieved through fuchsia.update.channel/Provider")
 closed protocol SystemDataUpdater {
     /// Sets Cobalt's view of the system-wide distribution information replacing the
     /// existing values.

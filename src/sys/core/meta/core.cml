@@ -599,6 +599,13 @@
             // product and non-eng builds of any product.
             source_availability: "unknown",
         },
+        {
+            protocol: "fuchsia.update.channel.Provider",
+            from: "#system-update",
+            to: "#cobalt",
+            dependency: "weak",
+            availability: "optional",
+        },
     ],
     expose: [
         {

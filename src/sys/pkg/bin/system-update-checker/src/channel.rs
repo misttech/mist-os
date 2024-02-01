@@ -5,13 +5,8 @@
 use crate::connect::*;
 use anyhow::anyhow;
 use fidl_fuchsia_boot::ArgumentsMarker;
-use fidl_fuchsia_cobalt::{
-    SoftwareDistributionInfo, Status as CobaltStatus, SystemDataUpdaterMarker,
-    SystemDataUpdaterProxy,
-};
 use fidl_fuchsia_pkg::RepositoryManagerMarker;
 use fidl_fuchsia_pkg_ext::RepositoryConfig;
-use fuchsia_async as fasync;
 use fuchsia_sync::Mutex;
 use fuchsia_url::AbsolutePackageUrl;
 use serde::{Deserialize, Serialize};
@@ -20,15 +15,14 @@ use std::convert::TryInto;
 use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
-use std::time::Duration;
 use thiserror::Error;
-use tracing::{error, info, warn};
+use tracing::{error, warn};
 
 static CHANNEL_PACKAGE_MAP: &str = "channel_package_map.json";
 
-pub async fn build_current_channel_manager_and_notifier<S: ServiceConnect>(
+pub async fn build_current_channel_manager<S: ServiceConnect>(
     service_connector: S,
-) -> Result<(CurrentChannelManager, CurrentChannelNotifier<S>), anyhow::Error> {
+) -> Result<CurrentChannelManager, anyhow::Error> {
     let current_channel = if let Some(channel) =
         lookup_channel_from_vbmeta(&service_connector).await.unwrap_or_else(|e| {
             warn!("Failed to read current_channel from vbmeta: {:#}", anyhow!(e));
@@ -39,84 +33,7 @@ pub async fn build_current_channel_manager_and_notifier<S: ServiceConnect>(
         String::new()
     };
 
-    Ok((
-        CurrentChannelManager::new(current_channel.clone()),
-        CurrentChannelNotifier::new(service_connector, current_channel),
-    ))
-}
-
-pub struct CurrentChannelNotifier<S = ServiceConnector> {
-    service_connector: S,
-    channel: String,
-}
-
-impl<S: ServiceConnect> CurrentChannelNotifier<S> {
-    fn new(service_connector: S, channel: String) -> Self {
-        CurrentChannelNotifier { service_connector, channel }
-    }
-
-    async fn notify_cobalt(service_connector: &S, current_channel: String) {
-        loop {
-            let cobalt = Self::connect(service_connector).await;
-            let distribution_info = SoftwareDistributionInfo {
-                current_channel: Some(current_channel.clone()),
-                ..Default::default()
-            };
-
-            info!("calling cobalt.SetSoftwareDistributionInfo(\"{:?}\")", distribution_info);
-
-            match cobalt.set_software_distribution_info(&distribution_info).await {
-                Ok(CobaltStatus::Ok) => {
-                    return;
-                }
-                Ok(CobaltStatus::EventTooBig) => {
-                    warn!(
-                        "cobalt.SetSoftwareDistributionInfo returned Status.EVENT_TOO_BIG, retrying"
-                    );
-                }
-                Ok(status) => {
-                    // Not much we can do about the other status codes but log.
-                    error!(
-                        "cobalt.SetSoftwareDistributionInfo returned non-OK status: {:?}",
-                        status
-                    );
-                    return;
-                }
-                Err(err) => {
-                    // channel broken, so log the error and reconnect.
-                    warn!(
-                        "cobalt.SetSoftwareDistributionInfo returned error: {:#}, retrying",
-                        anyhow!(err)
-                    );
-                }
-            }
-
-            Self::sleep().await;
-        }
-    }
-
-    pub async fn run(self) {
-        let Self { service_connector, channel } = self;
-        Self::notify_cobalt(&service_connector, channel).await;
-    }
-
-    async fn connect(service_connector: &S) -> SystemDataUpdaterProxy {
-        loop {
-            match service_connector.connect_to_service::<SystemDataUpdaterMarker>() {
-                Ok(cobalt) => {
-                    return cobalt;
-                }
-                Err(err) => {
-                    error!("error connecting to cobalt: {:#}", anyhow!(err));
-                    Self::sleep().await
-                }
-            }
-        }
-    }
-
-    async fn sleep() {
-        fasync::Timer::new(Duration::from_secs(5)).await;
-    }
+    Ok(CurrentChannelManager::new(current_channel))
 }
 
 #[derive(Clone)]
@@ -292,19 +209,16 @@ mod tests {
     use super::*;
     use fidl::endpoints::{DiscoverableProtocolMarker, RequestStream};
     use fidl_fuchsia_boot::{ArgumentsRequest, ArgumentsRequestStream};
-    use fidl_fuchsia_cobalt::{SystemDataUpdaterRequest, SystemDataUpdaterRequestStream};
     use fidl_fuchsia_pkg::{
         RepositoryIteratorRequest, RepositoryManagerRequest, RepositoryManagerRequestStream,
     };
     use fidl_fuchsia_pkg_ext::RepositoryConfigBuilder;
-    use fuchsia_async::DurationExt;
+    use fuchsia_async as fasync;
     use fuchsia_component::server::ServiceFs;
     use fuchsia_sync::Mutex;
     use fuchsia_url::RepositoryUrl;
-    use fuchsia_zircon::DurationNum;
     use futures::prelude::*;
-    use futures::task::Poll;
-    use futures::{future::FutureExt, stream::StreamExt};
+    use futures::stream::StreamExt;
     use std::sync::Arc;
 
     fn serve_ota_channel_arguments(
@@ -326,281 +240,43 @@ mod tests {
     }
 
     #[fuchsia_async::run_singlethreaded(test)]
-    async fn test_current_channel_manager_and_notifier_uses_vbmeta() {
+    async fn test_current_channel_manager_uses_vbmeta() {
         let (connector, svc_dir) =
             NamespacedServiceConnector::bind("/test/current_channel_manager/svc")
                 .expect("ns to bind");
 
         let mut fs = ServiceFs::new_local();
-        let channel = Arc::new(Mutex::new(None));
-        let chan = channel.clone();
 
-        fs.add_fidl_service(move |mut stream: SystemDataUpdaterRequestStream| {
-            let chan = chan.clone();
-
-            fasync::Task::local(async move {
-                while let Some(req) = stream.try_next().await.unwrap_or(None) {
-                    match req {
-                        SystemDataUpdaterRequest::SetSoftwareDistributionInfo {
-                            info,
-                            responder,
-                        } => {
-                            *chan.lock() = info.current_channel;
-                            responder.send(CobaltStatus::Ok).unwrap();
-                        }
-                    }
-                }
-            })
-            .detach()
-        })
-        .add_fidl_service(move |stream: ArgumentsRequestStream| {
+        fs.add_fidl_service(move |stream: ArgumentsRequestStream| {
             serve_ota_channel_arguments(stream, Some("stable")).detach()
         })
         .serve_connection(svc_dir)
         .expect("serve_connection");
 
         fasync::Task::local(fs.collect()).detach();
-        let (m, c) = build_current_channel_manager_and_notifier(connector).await.unwrap();
+        let m = build_current_channel_manager(connector).await.unwrap();
 
         assert_eq!(&m.channel, "stable");
-        assert_eq!(&c.channel, "stable");
-
-        c.run().await;
-
-        let lock = channel.lock();
-        assert_eq!(lock.as_deref(), Some("stable"));
     }
 
     #[fuchsia_async::run_singlethreaded(test)]
-    async fn test_current_channel_manager_and_notifier_uses_fallback() {
+    async fn test_current_channel_manager_uses_fallback() {
         let (connector, svc_dir) =
             NamespacedServiceConnector::bind("/test/current_channel_manager/svc")
                 .expect("ns to bind");
 
         let mut fs = ServiceFs::new_local();
-        let channel = Arc::new(Mutex::new(None));
-        let chan = channel.clone();
 
-        fs.add_fidl_service(move |mut stream: SystemDataUpdaterRequestStream| {
-            let chan = chan.clone();
-
-            fasync::Task::local(async move {
-                while let Some(req) = stream.try_next().await.unwrap_or(None) {
-                    match req {
-                        SystemDataUpdaterRequest::SetSoftwareDistributionInfo {
-                            info,
-                            responder,
-                        } => {
-                            *chan.lock() = info.current_channel;
-                            responder.send(CobaltStatus::Ok).unwrap();
-                        }
-                    }
-                }
-            })
-            .detach()
-        })
-        .add_fidl_service(move |stream: ArgumentsRequestStream| {
+        fs.add_fidl_service(move |stream: ArgumentsRequestStream| {
             serve_ota_channel_arguments(stream, None).detach()
         })
         .serve_connection(svc_dir)
         .expect("serve_connection");
 
         fasync::Task::local(fs.collect()).detach();
-        let (m, c) = build_current_channel_manager_and_notifier(connector).await.unwrap();
+        let m = build_current_channel_manager(connector).await.unwrap();
 
         assert_eq!(m.channel, "");
-        assert_eq!(c.channel, "");
-
-        c.run().await;
-
-        let lock = channel.lock();
-        assert_eq!(lock.as_deref(), Some(""));
-    }
-
-    #[test]
-    fn test_current_channel_notifier_retries() {
-        #[derive(Debug, Clone)]
-        enum FlakeMode {
-            ErrorOnConnect,
-            DropConnection,
-            StatusOnCall(CobaltStatus),
-        }
-
-        #[derive(Debug, Clone)]
-        struct State {
-            mode: Option<FlakeMode>,
-            channel: Option<String>,
-            connect_count: u64,
-            call_count: u64,
-        }
-
-        #[derive(Clone, Debug)]
-        struct FlakeyServiceConnector {
-            state: Arc<Mutex<State>>,
-        }
-
-        impl FlakeyServiceConnector {
-            fn new() -> Self {
-                Self {
-                    state: Arc::new(Mutex::new(State {
-                        mode: Some(FlakeMode::ErrorOnConnect),
-                        channel: None,
-                        connect_count: 0,
-                        call_count: 0,
-                    })),
-                }
-            }
-            fn set_flake_mode(&self, mode: impl Into<Option<FlakeMode>>) {
-                self.state.lock().mode = mode.into();
-            }
-            fn channel(&self) -> Option<String> {
-                self.state.lock().channel.clone()
-            }
-            fn connect_count(&self) -> u64 {
-                self.state.lock().connect_count
-            }
-            fn call_count(&self) -> u64 {
-                self.state.lock().call_count
-            }
-        }
-
-        impl ServiceConnect for FlakeyServiceConnector {
-            fn connect_to_service<P: DiscoverableProtocolMarker>(
-                &self,
-            ) -> Result<P::Proxy, anyhow::Error> {
-                let mode = if P::PROTOCOL_NAME == SystemDataUpdaterMarker::PROTOCOL_NAME {
-                    // Only flake connections to cobalt.
-                    self.state.lock().connect_count += 1;
-                    self.state.lock().mode.clone()
-                } else {
-                    None
-                };
-                match mode {
-                    Some(FlakeMode::ErrorOnConnect) => {
-                        Err(anyhow::format_err!("test error on connect"))
-                    }
-                    Some(FlakeMode::DropConnection) => {
-                        let (proxy, _stream) = fidl::endpoints::create_proxy::<P>().unwrap();
-                        Ok(proxy)
-                    }
-                    Some(FlakeMode::StatusOnCall(status)) => {
-                        let (proxy, stream) =
-                            fidl::endpoints::create_proxy_and_stream::<P>().unwrap();
-                        let mut stream: SystemDataUpdaterRequestStream = stream.cast_stream();
-
-                        let state = self.state.clone();
-                        fasync::Task::local(async move {
-                            while let Some(req) = stream.try_next().await.unwrap() {
-                                match req {
-                                    SystemDataUpdaterRequest::SetSoftwareDistributionInfo {
-                                        info: _info,
-                                        responder,
-                                    } => {
-                                        state.lock().call_count += 1;
-                                        responder.send(status).unwrap();
-                                    }
-                                }
-                            }
-                        })
-                        .detach();
-                        Ok(proxy)
-                    }
-                    None => {
-                        let (proxy, stream) =
-                            fidl::endpoints::create_proxy_and_stream::<P>().unwrap();
-
-                        match P::PROTOCOL_NAME {
-                            SystemDataUpdaterMarker::PROTOCOL_NAME => {
-                                let mut stream: SystemDataUpdaterRequestStream =
-                                    stream.cast_stream();
-
-                                let state = self.state.clone();
-                                fasync::Task::local(async move {
-                                    while let Some(req) = stream.try_next().await.unwrap() {
-                                        match req {
-                                        SystemDataUpdaterRequest::SetSoftwareDistributionInfo {
-                                            info,
-                                            responder,
-                                        } => {
-                                            state.lock().call_count += 1;
-                                            state.lock().channel = info.current_channel;
-                                            responder.send(CobaltStatus::Ok).unwrap();
-                                        }
-                                    }
-                                    }
-                                })
-                                .detach();
-                            }
-                            ArgumentsMarker::PROTOCOL_NAME => {
-                                serve_ota_channel_arguments(stream.cast_stream(), Some("stable"))
-                                    .detach();
-                            }
-                            _ => unimplemented!(),
-                        };
-                        Ok(proxy)
-                    }
-                }
-            }
-        }
-
-        let connector = FlakeyServiceConnector::new();
-        let future = build_current_channel_manager_and_notifier(connector.clone());
-        let mut real_executor = fasync::TestExecutor::new();
-        let (_, c) =
-            real_executor.run_singlethreaded(future).expect("failed to construct channel_manager");
-        std::mem::drop(real_executor);
-        let mut task = c.run().boxed();
-        let mut executor = fasync::TestExecutor::new_with_fake_time();
-
-        assert_eq!(executor.run_until_stalled(&mut task), Poll::Pending);
-
-        // Retries if connecting fails
-        assert_eq!(executor.wake_expired_timers(), false);
-        executor.set_fake_time(5.seconds().after_now());
-        assert_eq!(executor.wake_expired_timers(), true);
-        assert_eq!(executor.run_until_stalled(&mut task), Poll::Pending);
-        assert_eq!(connector.connect_count(), 2);
-
-        // Retries if a fidl error occurs during the request
-        connector.set_flake_mode(FlakeMode::DropConnection);
-        executor.set_fake_time(5.seconds().after_now());
-        assert_eq!(executor.wake_expired_timers(), true);
-        assert_eq!(executor.run_until_stalled(&mut task), Poll::Pending);
-        assert_eq!(connector.connect_count(), 3);
-
-        // Retries on expected Cobalt error status codes
-        connector.set_flake_mode(FlakeMode::StatusOnCall(CobaltStatus::EventTooBig));
-        executor.set_fake_time(5.seconds().after_now());
-        assert_eq!(connector.call_count(), 0);
-        assert_eq!(executor.wake_expired_timers(), true);
-        assert_eq!(executor.run_until_stalled(&mut task), Poll::Pending);
-        assert_eq!(connector.connect_count(), 4);
-        assert_eq!(connector.call_count(), 1);
-
-        // Stops trying when it eventually succeeds
-        connector.set_flake_mode(None);
-        executor.set_fake_time(5.seconds().after_now());
-        assert_eq!(executor.wake_expired_timers(), true);
-        assert_eq!(connector.channel(), None);
-        assert_eq!(executor.run_until_stalled(&mut task), Poll::Ready(()));
-        assert_eq!(connector.connect_count(), 5);
-        assert_eq!(connector.call_count(), 2);
-        assert_eq!(connector.channel(), Some("stable".to_owned()));
-
-        std::mem::drop(executor);
-        let mut real_executor = fasync::TestExecutor::new();
-        // Bails out if Cobalt responds with an unexpected status code
-        let connector = FlakeyServiceConnector::new();
-        let future = build_current_channel_manager_and_notifier(connector.clone());
-        let (_, c) =
-            real_executor.run_singlethreaded(future).expect("failed to construct channel_manager");
-        std::mem::drop(real_executor);
-        let mut task = c.run().boxed();
-        let mut executor = fasync::TestExecutor::new_with_fake_time();
-        connector.set_flake_mode(FlakeMode::StatusOnCall(CobaltStatus::InvalidArguments));
-        assert_eq!(executor.run_until_stalled(&mut task), Poll::Ready(()));
-        assert_eq!(connector.connect_count(), 1);
-        assert_eq!(connector.call_count(), 1);
     }
 
     async fn check_target_channel_manager_remembers_channel(

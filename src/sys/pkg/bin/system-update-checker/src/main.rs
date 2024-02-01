@@ -58,9 +58,8 @@ async fn main_inner() -> Result<(), Error> {
 
     let futures = FuturesUnordered::new();
 
-    let (current_channel_manager, current_channel_notifier) =
-        channel::build_current_channel_manager_and_notifier(connect::ServiceConnector).await?;
-    futures.push(current_channel_notifier.run().boxed());
+    let current_channel_manager =
+        channel::build_current_channel_manager(connect::ServiceConnector).await?;
     let current_channel_manager = Arc::new(current_channel_manager);
 
     let (update_manager, update_manager_fut) = RealUpdateManager::new(
