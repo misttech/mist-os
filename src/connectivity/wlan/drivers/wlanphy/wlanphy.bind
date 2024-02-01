@@ -4,4 +4,8 @@
 
 using fuchsia.wlan.phyimpl;
 
-fuchsia.wlan.phyimpl.WlanPhyImpl == fuchsia.wlan.phyimpl.WlanPhyImpl.DriverTransport;
+if fuchsia.wlan.phyimpl.WlanPhyImpl == fuchsia.wlan.phyimpl.WlanPhyImpl.DriverTransport {
+    true;
+} else {
+    fuchsia.wlan.phyimpl.Service == fuchsia.wlan.phyimpl.Service.DriverTransport;
+}
