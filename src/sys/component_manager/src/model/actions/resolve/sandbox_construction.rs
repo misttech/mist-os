@@ -24,23 +24,6 @@ use {
     tracing::warn,
 };
 
-pub struct CapabilitySourceFactory {
-    factory_fn: Box<dyn FnOnce(WeakComponentInstance) -> CapabilitySource + Send + 'static>,
-}
-
-impl CapabilitySourceFactory {
-    fn new<F>(factory_fn: F) -> Self
-    where
-        F: FnOnce(WeakComponentInstance) -> CapabilitySource + Send + 'static,
-    {
-        Self { factory_fn: Box::new(factory_fn) }
-    }
-
-    pub fn run(self, component: WeakComponentInstance) -> CapabilitySource {
-        (self.factory_fn)(component)
-    }
-}
-
 /// The dicts a component receives from its parent.
 #[derive(Default, Clone)]
 pub struct ComponentInput {
@@ -248,10 +231,10 @@ fn extend_dict_with_use(
             let source_name = use_.source_name().clone();
             LaunchTaskOnReceive::new_hook_launch_task(
                 component,
-                CapabilitySourceFactory::new(move |component| CapabilitySource::Framework {
+                CapabilitySource::Framework {
                     capability: InternalCapability::Protocol(source_name),
-                    component,
-                }),
+                    component: component.into(),
+                },
             )
             .into_router()
         }
@@ -259,10 +242,10 @@ fn extend_dict_with_use(
             let use_ = use_.clone();
             LaunchTaskOnReceive::new_hook_launch_task(
                 component,
-                CapabilitySourceFactory::new(move |component| CapabilitySource::Capability {
+                CapabilitySource::Capability {
                     source_capability: ComponentCapability::Use(use_.clone()),
-                    component,
-                }),
+                    component: component.into(),
+                },
             )
             .into_router()
         }
@@ -410,10 +393,10 @@ fn extend_dict_with_offer(
             let source_name = offer.source_name().clone();
             LaunchTaskOnReceive::new_hook_launch_task(
                 component,
-                CapabilitySourceFactory::new(move |component| CapabilitySource::Framework {
+                CapabilitySource::Framework {
                     capability: InternalCapability::Protocol(source_name),
-                    component,
-                }),
+                    component: component.into(),
+                },
             )
             .into_router()
         }
@@ -421,10 +404,10 @@ fn extend_dict_with_offer(
             let offer = offer.clone();
             LaunchTaskOnReceive::new_hook_launch_task(
                 component,
-                CapabilitySourceFactory::new(move |component| CapabilitySource::Capability {
+                CapabilitySource::Capability {
                     source_capability: ComponentCapability::Offer(offer.clone()),
-                    component,
-                }),
+                    component: component.into(),
+                },
             )
             .into_router()
         }
@@ -506,10 +489,10 @@ fn extend_dict_with_expose(
             let source_name = expose.source_name().clone();
             LaunchTaskOnReceive::new_hook_launch_task(
                 component,
-                CapabilitySourceFactory::new(move |component| CapabilitySource::Framework {
+                CapabilitySource::Framework {
                     capability: InternalCapability::Protocol(source_name),
-                    component,
-                }),
+                    component: component.into(),
+                },
             )
             .into_router()
         }
@@ -517,10 +500,10 @@ fn extend_dict_with_expose(
             let expose = expose.clone();
             LaunchTaskOnReceive::new_hook_launch_task(
                 component,
-                CapabilitySourceFactory::new(move |component| CapabilitySource::Capability {
+                CapabilitySource::Capability {
                     source_capability: ComponentCapability::Expose(expose.clone()),
-                    component,
-                }),
+                    component: component.into(),
+                },
             )
             .into_router()
         }

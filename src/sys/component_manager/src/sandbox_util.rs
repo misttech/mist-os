@@ -4,7 +4,6 @@
 
 use {
     crate::model::{
-        actions::resolve::sandbox_construction::CapabilitySourceFactory,
         component::{ComponentInstance, WeakComponentInstance},
         routing::router::{Completer, Request, Routable, Router},
     },
@@ -313,10 +312,9 @@ impl LaunchTaskOnReceive {
     // open that.
     pub fn new_hook_launch_task(
         component: &Arc<ComponentInstance>,
-        cap_source_factory: CapabilitySourceFactory,
+        capability_source: CapabilitySource<ComponentInstance>,
     ) -> LaunchTaskOnReceive {
         let weak_component = WeakComponentInstance::new(component);
-        let capability_source = cap_source_factory.run(weak_component.clone());
         LaunchTaskOnReceive::new(
             component.nonblocking_task_group().as_weak(),
             "framework hook dispatcher",
