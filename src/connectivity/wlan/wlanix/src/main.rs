@@ -30,7 +30,7 @@ use {
     nl80211::{Nl80211, Nl80211Attr, Nl80211BandAttr, Nl80211Cmd, Nl80211FrequencyAttr},
 };
 
-const IFACE_NAME: &str = "fnpwlan";
+const IFACE_NAME: &str = "wlan";
 
 async fn handle_wifi_sta_iface_request(req: fidl_wlanix::WifiStaIfaceRequest) -> Result<(), Error> {
     match req {
@@ -857,7 +857,6 @@ async fn handle_nl80211_message<I: IfaceManager>(
                     Nl80211Cmd::NewInterface,
                     vec![
                         Nl80211Attr::IfaceIndex(iface.id.into()),
-                        // TODO(b/316037906): Populate this with the real iface name assigned by netcfg.
                         Nl80211Attr::IfaceName(IFACE_NAME.to_string()),
                         Nl80211Attr::Mac(iface.sta_addr),
                     ],
