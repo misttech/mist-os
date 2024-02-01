@@ -35,7 +35,6 @@
                 "All/SocketInetLoopbackTest.TCPListenUnbound/ListenV6Any_ConnectV4MappedLoopback",
                 "All/SocketInetLoopbackTest.TCPListenShutdown/ListenV6Any_ConnectV4MappedAny",
                 "All/SocketInetLoopbackTest.TCPListenShutdown/ListenV6Any_ConnectV4MappedLoopback",
-                "AllFamilies/SocketMultiProtocolInetLoopbackTest.DualStackV6AnyReservesEverything/TCP",
                 "AllFamilies/SocketMultiProtocolInetLoopbackTest.V4EphemeralPortReserved/TCP",
 
                 // Netstack3 does not have complete support for multicast sockets.
@@ -127,6 +126,10 @@
 
                 // TODO(https://fxbug.dev/42069631): This test sometimes times out in CI.
                 "All/SocketInetLoopbackTest.TCPListenShutdownListen/*",
+
+                // TODO(https://issues.fuchsia.dev/319117141): Support listening
+                // in both stacks.
+                "AllFamilies/SocketMultiProtocolInetLoopbackTest.DualStackV6AnyReservesEverything/TCP",
             ],
         },
     ],
