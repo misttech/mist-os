@@ -21,10 +21,10 @@ use starnix_syscalls::{SyscallResult, SUCCESS};
 use starnix_uapi::{
     bpf_attr__bindgen_ty_1, bpf_attr__bindgen_ty_10, bpf_attr__bindgen_ty_12,
     bpf_attr__bindgen_ty_2, bpf_attr__bindgen_ty_4, bpf_attr__bindgen_ty_5, bpf_attr__bindgen_ty_9,
-    bpf_cmd, bpf_cmd_BPF_BTF_LOAD, bpf_cmd_BPF_MAP_CREATE, bpf_cmd_BPF_MAP_GET_NEXT_KEY,
-    bpf_cmd_BPF_MAP_LOOKUP_ELEM, bpf_cmd_BPF_MAP_UPDATE_ELEM, bpf_cmd_BPF_OBJ_GET,
-    bpf_cmd_BPF_OBJ_GET_INFO_BY_FD, bpf_cmd_BPF_OBJ_PIN, bpf_cmd_BPF_PROG_ATTACH,
-    bpf_cmd_BPF_PROG_LOAD, bpf_cmd_BPF_PROG_QUERY, bpf_insn, bpf_map_info,
+    bpf_cmd, bpf_cmd_BPF_BTF_LOAD, bpf_cmd_BPF_MAP_CREATE, bpf_cmd_BPF_MAP_DELETE_ELEM,
+    bpf_cmd_BPF_MAP_GET_NEXT_KEY, bpf_cmd_BPF_MAP_LOOKUP_ELEM, bpf_cmd_BPF_MAP_UPDATE_ELEM,
+    bpf_cmd_BPF_OBJ_GET, bpf_cmd_BPF_OBJ_GET_INFO_BY_FD, bpf_cmd_BPF_OBJ_PIN,
+    bpf_cmd_BPF_PROG_ATTACH, bpf_cmd_BPF_PROG_LOAD, bpf_cmd_BPF_PROG_QUERY, bpf_insn, bpf_map_info,
     bpf_map_type_BPF_MAP_TYPE_DEVMAP, bpf_map_type_BPF_MAP_TYPE_DEVMAP_HASH, bpf_prog_info, errno,
     error,
     errors::Errno,
@@ -168,7 +168,23 @@ pub fn sys_bpf(
             let value =
                 current_task.read_memory_to_vec(user_value, map.schema.value_size as usize)?;
 
-            map.update(locked, current_task, key, value, flags)?;
+            map.update(locked, key, value, flags)?;
+            Ok(SUCCESS)
+        }
+
+        bpf_cmd_BPF_MAP_DELETE_ELEM => {
+            let elem_attr: bpf_attr__bindgen_ty_2 = read_attr(current_task, attr_addr, attr_size)?;
+            log_trace!("BPF_MAP_DELETE_ELEM");
+            let map_fd = FdNumber::from_raw(elem_attr.map_fd as i32);
+            let map = get_bpf_object(current_task, map_fd)?;
+            let map = map.downcast::<Map>().ok_or_else(|| errno!(EINVAL))?;
+
+            let key = current_task.read_memory_to_vec(
+                UserAddress::from(elem_attr.key),
+                map.schema.key_size as usize,
+            )?;
+
+            map.delete(locked, key)?;
             Ok(SUCCESS)
         }
 

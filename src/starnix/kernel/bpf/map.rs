@@ -100,7 +100,6 @@ impl Map {
     pub fn update(
         &self,
         locked: &mut Locked<'_, Unlocked>,
-        _current_task: &CurrentTask,
         key: Vec<u8>,
         value: Vec<u8>,
         flags: u64,
@@ -136,6 +135,25 @@ impl Map {
                     return error!(EEXIST);
                 }
                 entries[self.schema.array_range_for_index(index)].copy_from_slice(&value);
+            }
+        }
+        Ok(())
+    }
+
+    pub fn delete(&self, locked: &mut Locked<'_, Unlocked>, key: Vec<u8>) -> Result<(), Errno> {
+        let mut entries = self.entries.lock(locked);
+        match entries.deref_mut() {
+            MapStore::Hash(ref mut entries) => {
+                if entries.remove(&key).is_none() {
+                    return error!(ENOENT);
+                }
+            }
+            MapStore::Array(_) => {
+                // From https://man7.org/linux/man-pages/man2/bpf.2.html:
+                //
+                //  map_delete_elem() fails with the error EINVAL, since
+                //  elements cannot be deleted.
+                return error!(EINVAL);
             }
         }
         Ok(())
