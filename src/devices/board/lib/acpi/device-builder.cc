@@ -32,11 +32,11 @@ static const zx_bind_inst_t kSysmemFragment[] = {
     BI_MATCH_IF(EQ, BIND_FIDL_PROTOCOL, ZX_FIDL_PROTOCOL_SYSMEM),
 };
 
-const std::vector<ddk::BindRule> kSysmemBindRules = {
-    ddk::MakeAcceptBindRule(bind_fuchsia::PROTOCOL, bind_fuchsia_sysmem::BIND_PROTOCOL_DEVICE)};
+const std::vector<ddk::BindRule> kSysmemBindRules = {ddk::MakeAcceptBindRule(
+    bind_fuchsia::FIDL_PROTOCOL, bind_fuchsia_sysmem::BIND_FIDL_PROTOCOL_DEVICE)};
 
 const std::vector<device_bind_prop_t> kSysmemProperties = {
-    ddk::MakeProperty(bind_fuchsia::PROTOCOL, bind_fuchsia_sysmem::BIND_PROTOCOL_DEVICE)};
+    ddk::MakeProperty(bind_fuchsia::FIDL_PROTOCOL, bind_fuchsia_sysmem::BIND_FIDL_PROTOCOL_DEVICE)};
 
 }  // namespace
 
