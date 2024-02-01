@@ -18,7 +18,6 @@ if (is_host) {
       "//src/lib/usb_bulk/rust:lib",
       "//third_party/rust_crates:anyhow",
       "//third_party/rust_crates:async-channel",
-      "//third_party/rust_crates:thiserror",
       "//third_party/rust_crates:tracing",
     ]
 

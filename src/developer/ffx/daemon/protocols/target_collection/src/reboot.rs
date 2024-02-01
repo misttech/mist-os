@@ -34,7 +34,6 @@ use tokio::sync::{
     mpsc,
     mpsc::{Receiver, Sender},
 };
-use usb_fastboot_discovery::FASTBOOT_USB_DISCOVERY_ADDITIONAL_PRODUCTS;
 
 // TODO(125639): Remove when Power Manager stabilizes
 /// Configuration flag which enables using `dm` over ssh to reboot the target
@@ -134,23 +133,8 @@ impl RebootController {
                         FastbootInterface::Usb => {
                             let serial =
                                 self.target.serial().ok_or_else(|| anyhow!("No serial number"))?;
-                            let additional_products = ffx_config::get::<Vec<u16>, _>(
-                                FASTBOOT_USB_DISCOVERY_ADDITIONAL_PRODUCTS,
-                            )
-                            .await
-                            .unwrap_or_else(|e| {
-                                tracing::warn!(
-                                "Error getting config value {}. Err: {}. proceeding with empty vec",
-                                e,
-                                FASTBOOT_USB_DISCOVERY_ADDITIONAL_PRODUCTS
-                                );
-                                vec![]
-                            });
                             self.fastboot_connection_builder
-                                .build_interface(FastbootConnectionKind::Usb(
-                                    serial,
-                                    additional_products,
-                                ))
+                                .build_interface(FastbootConnectionKind::Usb(serial))
                                 .await?
                         }
                     };
@@ -203,23 +187,8 @@ impl RebootController {
                         FastbootInterface::Usb => {
                             let serial =
                                 self.target.serial().ok_or_else(|| anyhow!("No serial number"))?;
-                            let additional_products = ffx_config::get::<Vec<u16>, _>(
-                                FASTBOOT_USB_DISCOVERY_ADDITIONAL_PRODUCTS,
-                            )
-                            .await
-                            .unwrap_or_else(|e| {
-                                tracing::warn!(
-                                "Error getting config value {}. Err: {}. proceeding with empty vec",
-                                e,
-                                FASTBOOT_USB_DISCOVERY_ADDITIONAL_PRODUCTS
-                                );
-                                vec![]
-                            });
                             self.fastboot_connection_builder
-                                .build_interface(FastbootConnectionKind::Usb(
-                                    serial,
-                                    additional_products,
-                                ))
+                                .build_interface(FastbootConnectionKind::Usb(serial))
                                 .await?
                         }
                     };
@@ -526,7 +495,6 @@ mod tests {
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_fastboot_reboot_recovery() -> Result<()> {
-        let _env = ffx_config::test_init().await.unwrap();
         let (target, proxy) = setup_usb().await;
         target.set_state(TargetConnectionState::Fastboot(Instant::now()));
         assert!(proxy.reboot(TargetRebootState::Recovery).await?.is_err());
@@ -535,7 +503,6 @@ mod tests {
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_fastboot_reboot_bootloader() -> Result<()> {
-        let _env = ffx_config::test_init().await.unwrap();
         let (target, proxy) = setup_usb().await;
         target.set_state(TargetConnectionState::Fastboot(Instant::now()));
         proxy

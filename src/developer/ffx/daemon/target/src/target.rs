@@ -38,9 +38,7 @@ use std::{
     time::{Duration, Instant, SystemTime},
 };
 use usb_bulk::AsyncInterface as Interface;
-use usb_fastboot_discovery::{
-    open_interface_with_serial, FASTBOOT_USB_DISCOVERY_ADDITIONAL_PRODUCTS,
-};
+use usb_fastboot_discovery::open_interface_with_serial;
 
 mod identity;
 mod update;
@@ -958,16 +956,11 @@ impl Target {
             return Err(anyhow!("Cannot open USB interface for disabled target"));
         }
 
-        let additional_products =
-            ffx_config::get::<Vec<u16>, _>(FASTBOOT_USB_DISCOVERY_ADDITIONAL_PRODUCTS)
-                .await
-                .context("get config FASTBOOT_USB_DISCOVERY_ADDITIONAL_PRODUCTS")?;
-
         let id = self.identity();
         match id.as_ref().and_then(|i| i.serial()) {
             Some(s) => Ok((
                 s.to_string(),
-                open_interface_with_serial(s, &additional_products).await.with_context(|| {
+                open_interface_with_serial(s).await.with_context(|| {
                     format!("Failed to open target usb interface by serial {s}")
                 })?,
             )),

@@ -11,11 +11,7 @@ use fastboot::{
 use fuchsia_async::{Task, Timer};
 use std::collections::BTreeSet;
 use std::time::Duration;
-use thiserror::Error;
 use usb_bulk::{AsyncInterface as Interface, InterfaceInfo, Open};
-
-pub const FASTBOOT_USB_DISCOVERY_ADDITIONAL_PRODUCTS: &'static str =
-    "fastboot.usb_discovery.additional_products";
 
 // USB fastboot interface IDs
 const FASTBOOT_AND_CDC_ETH_USB_DEV_PRODUCT: u16 = 0xa027;
@@ -23,112 +19,25 @@ const FASTBOOT_USB_INTERFACE_CLASS: u8 = 0xff;
 const FASTBOOT_USB_INTERFACE_SUBCLASS: u8 = 0x42;
 const FASTBOOT_USB_INTERFACE_PROTOCOL: u8 = 0x03;
 
-// Valid USB Product Identifiers
-const USB_DEV_PRODUCTS: [u16; 3] = [0x4ee0, 0x0d02, FASTBOOT_AND_CDC_ETH_USB_DEV_PRODUCT];
-
-// Vendor ID
-const USB_DEV_VENDOR: u16 = 0x18d1;
-
 //TODO(https://fxbug.dev/42130068) - serial info will probably get rolled into the target struct
 
-#[derive(Error, Debug, Clone)]
-enum InterfaceCheckError {
-    #[error("Invalid IFC Class. Found {}, want {}", found_class, FASTBOOT_USB_INTERFACE_CLASS)]
-    InvalidIfcClass { found_class: u8 },
-    #[error(
-        "Invalid IFC Subclass. Found {}, want {}",
-        found_subclass,
-        FASTBOOT_USB_INTERFACE_SUBCLASS
-    )]
-    InvalidIfcSubclass { found_subclass: u8 },
-    #[error(
-        "Invalid IFC Protocol. Found {}, want {}",
-        found_protocol,
-        FASTBOOT_USB_INTERFACE_PROTOCOL
-    )]
-    InvalidIfcProtocol { found_protocol: u8 },
-    #[error("Invalid Device Vendor. Found {}, want {}", found_vendor, USB_DEV_VENDOR)]
-    InvalidDevVendor { found_vendor: u16 },
-    #[error("Invalid Device Product. Found {}, want {:?}", found_product, valid_products)]
-    InvalidDevProduct { found_product: u16, valid_products: Vec<u16> },
+fn is_fastboot_match(info: &InterfaceInfo) -> bool {
+    (info.dev_vendor == 0x18d1)
+        && ((info.dev_product == 0x4ee0)
+            || (info.dev_product == 0x0d02)
+            || (info.dev_product == FASTBOOT_AND_CDC_ETH_USB_DEV_PRODUCT))
+        && (info.ifc_class == FASTBOOT_USB_INTERFACE_CLASS)
+        && (info.ifc_subclass == FASTBOOT_USB_INTERFACE_SUBCLASS)
+        && (info.ifc_protocol == FASTBOOT_USB_INTERFACE_PROTOCOL)
 }
 
-fn valid_ifc_class(info: &InterfaceInfo) -> Result<(), InterfaceCheckError> {
-    if info.ifc_class == FASTBOOT_USB_INTERFACE_CLASS {
-        Ok(())
-    } else {
-        Err(InterfaceCheckError::InvalidIfcClass { found_class: info.ifc_class })
-    }
-}
-
-fn valid_ifc_subclass(info: &InterfaceInfo) -> Result<(), InterfaceCheckError> {
-    if info.ifc_subclass == FASTBOOT_USB_INTERFACE_SUBCLASS {
-        Ok(())
-    } else {
-        Err(InterfaceCheckError::InvalidIfcSubclass { found_subclass: info.ifc_subclass })
-    }
-}
-
-fn valid_ifc_protocol(info: &InterfaceInfo) -> Result<(), InterfaceCheckError> {
-    if info.ifc_protocol == FASTBOOT_USB_INTERFACE_PROTOCOL {
-        Ok(())
-    } else {
-        Err(InterfaceCheckError::InvalidIfcProtocol { found_protocol: info.ifc_protocol })
-    }
-}
-
-fn valid_dev_vendor(info: &InterfaceInfo) -> Result<(), InterfaceCheckError> {
-    if info.dev_vendor == USB_DEV_VENDOR {
-        Ok(())
-    } else {
-        Err(InterfaceCheckError::InvalidDevVendor { found_vendor: info.dev_vendor })
-    }
-}
-
-fn valid_dev_product(
-    info: &InterfaceInfo,
-    additional_products: &Vec<u16>,
-) -> Result<(), InterfaceCheckError> {
-    let mut valid_products = USB_DEV_PRODUCTS.to_vec();
-    valid_products.extend_from_slice(additional_products);
-    if valid_products.contains(&info.dev_product) {
-        Ok(())
-    } else {
-        Err(InterfaceCheckError::InvalidDevProduct {
-            found_product: info.dev_product,
-            valid_products,
-        })
-    }
-}
-
-fn is_fastboot_match(info: &InterfaceInfo, additional_products: &Vec<u16>) -> bool {
-    let mut results = vec![];
-
-    results.push(valid_dev_vendor(info));
-    results.push(valid_dev_product(info, additional_products));
-    results.push(valid_ifc_class(info));
-    results.push(valid_ifc_subclass(info));
-    results.push(valid_ifc_protocol(info));
-
-    let errs: Vec<_> = results.into_iter().filter_map(|r| r.err()).collect();
-
-    if !errs.is_empty() {
-        tracing::debug!(
-            "Interface is not valid fastboot match. Encountered errors: \n\t{}",
-            errs.clone().into_iter().map(|e| e.to_string()).collect::<Vec<_>>().join("\n\t")
-        );
-    }
-
-    errs.is_empty()
-}
-
-fn enumerate_interfaces<F>(mut cb: F, additional_products: &Vec<u16>)
+fn enumerate_interfaces<F>(mut cb: F)
 where
     F: FnMut(&InterfaceInfo),
 {
     tracing::debug!("Enumerating USB fastboot interfaces");
     let mut cb = |info: &InterfaceInfo| -> bool {
-        if is_fastboot_match(info, additional_products) {
+        if is_fastboot_match(info) {
             cb(info)
         }
         // Do not open anything.
@@ -138,20 +47,20 @@ where
     let _result = Interface::check(&mut cb);
 }
 
-pub fn find_serial_numbers(additional_products: &Vec<u16>) -> Vec<String> {
+pub fn find_serial_numbers() -> Vec<String> {
     let mut serials = Vec::new();
     let cb = |info: &InterfaceInfo| serials.push(extract_serial_number(info));
-    enumerate_interfaces(cb, additional_products);
+    enumerate_interfaces(cb);
     serials
 }
 
-fn open_interface<F>(mut cb: F, additional_products: &Vec<u16>) -> Result<Interface>
+fn open_interface<F>(mut cb: F) -> Result<Interface>
 where
     F: FnMut(&InterfaceInfo) -> bool,
 {
     tracing::debug!("Selecting USB fastboot interface to open");
     let mut open_cb = |info: &InterfaceInfo| -> bool {
-        if is_fastboot_match(info, additional_products) {
+        if is_fastboot_match(info) {
             cb(info)
         } else {
             // Do not open.
@@ -172,16 +81,11 @@ fn extract_serial_number(info: &InterfaceInfo) -> String {
 }
 
 #[tracing::instrument]
-pub async fn open_interface_with_serial(
-    serial: &str,
-    additional_products: &Vec<u16>,
-) -> Result<Interface> {
+pub async fn open_interface_with_serial(serial: &str) -> Result<Interface> {
     tracing::debug!("Opening USB fastboot interface with serial number: {}", serial);
-    let mut interface = open_interface(
-        |info: &InterfaceInfo| -> bool { extract_serial_number(info) == *serial },
-        additional_products,
-    )
-    .with_context(|| format!("opening interface with serial number: {}", serial))?;
+    let mut interface =
+        open_interface(|info: &InterfaceInfo| -> bool { extract_serial_number(info) == *serial })
+            .with_context(|| format!("opening interface with serial number: {}", serial))?;
     match send(Command::GetVar(ClientVariable::Version), &mut interface).await {
         Ok(Reply::Okay(version)) =>
         // Only support 0.4 right now.
@@ -202,13 +106,11 @@ pub trait FastbootUsbTester: Send + 'static {
     async fn is_fastboot_usb(&mut self, serial: &str) -> bool;
 }
 
-struct OpenInterfaceFastbootUsbTester {
-    additional_products: Vec<u16>,
-}
+struct OpenInterfaceFastbootUsbTester;
 
 impl FastbootUsbTester for OpenInterfaceFastbootUsbTester {
     async fn is_fastboot_usb(&mut self, serial: &str) -> bool {
-        open_interface_with_serial(serial, &self.additional_products).await.is_ok()
+        open_interface_with_serial(serial).await.is_ok()
     }
 }
 
@@ -221,20 +123,12 @@ impl FastbootUsbTester for OpenInterfaceFastbootUsbTester {
 ///
 /// This calls AsyncInterface::check which does _not_ drain the USB's device's
 /// buffer upon connecting
-pub struct UnversionedFastbootUsbTester {
-    additional_products: Vec<u16>,
-}
-
-impl UnversionedFastbootUsbTester {
-    pub fn new(additional_products: Vec<u16>) -> Self {
-        Self { additional_products }
-    }
-}
+pub struct UnversionedFastbootUsbTester;
 
 impl FastbootUsbTester for UnversionedFastbootUsbTester {
     async fn is_fastboot_usb(&mut self, serial: &str) -> bool {
         let mut open_cb = |info: &InterfaceInfo| -> bool {
-            if is_fastboot_match(info, &self.additional_products) {
+            if is_fastboot_match(info) {
                 extract_serial_number(info) == *serial
             } else {
                 // Do not open.
@@ -285,30 +179,14 @@ where
     }
 }
 
-pub struct RecommendedSerialNumberFinder {
-    additional_products: Vec<u16>,
-}
-
-impl RecommendedSerialNumberFinder {
-    pub fn new(additional_products: Vec<u16>) -> Self {
-        Self { additional_products }
-    }
-}
-
-impl SerialNumberFinder for RecommendedSerialNumberFinder {
-    fn find_serial_numbers(&mut self) -> Vec<String> {
-        find_serial_numbers(&self.additional_products)
-    }
-}
-
 pub fn recommended_watcher<F>(event_handler: F) -> Result<FastbootUsbWatcher>
 where
     F: FastbootEventHandler,
 {
     Ok(FastbootUsbWatcher::new(
         event_handler,
-        RecommendedSerialNumberFinder { additional_products: vec![] },
-        OpenInterfaceFastbootUsbTester { additional_products: vec![] },
+        find_serial_numbers,
+        OpenInterfaceFastbootUsbTester {},
         Duration::from_secs(1),
     ))
 }
@@ -485,68 +363,5 @@ mod test {
         );
         // Reiterating... serial ABCD was not in fastboot so it should not appear in our results
         Ok(())
-    }
-
-    #[test]
-    fn test_is_valid_fastboot_valid() -> () {
-        let info = InterfaceInfo {
-            dev_vendor: 0x18d1,
-            dev_product: 0xa027,
-            dev_class: 1,
-            dev_subclass: 1,
-            dev_protocol: 0x3,
-            ifc_class: 0xff,
-            ifc_subclass: 0x42,
-            ifc_protocol: 0x3,
-            has_bulk_in: 1,
-            has_bulk_out: 1,
-            writable: 1,
-            serial_number: [0xff; 256],
-            device_path: [0xff; 256],
-        };
-        let additional_products = vec![];
-        assert!(is_fastboot_match(&info, &additional_products));
-    }
-
-    #[test]
-    fn test_is_valid_fastboot_invalid() -> () {
-        let info = InterfaceInfo {
-            dev_vendor: 0x18d2,
-            dev_product: 0xa027,
-            dev_class: 1,
-            dev_subclass: 1,
-            dev_protocol: 0x3,
-            ifc_class: 0xff,
-            ifc_subclass: 0x42,
-            ifc_protocol: 0x3,
-            has_bulk_in: 1,
-            has_bulk_out: 1,
-            writable: 1,
-            serial_number: [0xff; 256],
-            device_path: [0xff; 256],
-        };
-        let additional_products = vec![];
-        assert!(!is_fastboot_match(&info, &additional_products));
-    }
-
-    #[test]
-    fn test_is_valid_fastboot_additional_products() -> () {
-        let info = InterfaceInfo {
-            dev_vendor: 0x18d1,
-            dev_product: 0xa028,
-            dev_class: 1,
-            dev_subclass: 1,
-            dev_protocol: 0x3,
-            ifc_class: 0xff,
-            ifc_subclass: 0x42,
-            ifc_protocol: 0x3,
-            has_bulk_in: 1,
-            has_bulk_out: 1,
-            writable: 1,
-            serial_number: [0xff; 256],
-            device_path: [0xff; 256],
-        };
-        let additional_products = vec![0xa028];
-        assert!(is_fastboot_match(&info, &additional_products));
     }
 }

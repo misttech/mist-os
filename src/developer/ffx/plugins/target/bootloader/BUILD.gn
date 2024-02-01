@@ -12,14 +12,12 @@ ffx_plugin("ffx_bootloader") {
   args_deps = [ "//src/developer/ffx/lib/fastboot:lib" ]
 
   deps = [
-    "//src/developer/ffx/config:lib",
     "//src/developer/ffx/fidl:fuchsia.developer.ffx_rust",
     "//src/developer/ffx/lib/addr:lib",
     "//src/developer/ffx/lib/errors:lib",
     "//src/developer/ffx/lib/fastboot:lib",
     "//src/developer/ffx/lib/fastboot/interface:lib",
     "//src/developer/ffx/lib/fho:lib",
-    "//src/developer/ffx/lib/usb_fastboot_discovery:lib",
     "//src/lib/fuchsia-async",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:async-trait",

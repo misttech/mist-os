@@ -9,8 +9,8 @@ use fuchsia_async::Duration;
 use futures::channel::oneshot::{channel, Sender};
 use usb_bulk::AsyncInterface;
 use usb_fastboot_discovery::{
-    open_interface_with_serial, FastbootEvent, FastbootEventHandler, FastbootUsbWatcher,
-    RecommendedSerialNumberFinder, UnversionedFastbootUsbTester,
+    find_serial_numbers, open_interface_with_serial, FastbootEvent, FastbootEventHandler,
+    FastbootUsbWatcher, UnversionedFastbootUsbTester,
 };
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -20,12 +20,11 @@ use usb_fastboot_discovery::{
 #[derive(Default, Debug, Clone)]
 pub struct UsbFactory {
     serial: String,
-    additional_products: Vec<u16>,
 }
 
 impl UsbFactory {
-    pub fn new(serial: String, additional_products: Vec<u16>) -> Self {
-        Self { serial, additional_products }
+    pub fn new(serial: String) -> Self {
+        Self { serial }
     }
 }
 
@@ -34,13 +33,11 @@ trait UsbLiveTester: Send + Clone {
 }
 
 #[derive(Clone)]
-struct OpenInterfaceLiveTester {
-    additional_products: Vec<u16>,
-}
+struct OpenInterfaceLiveTester;
 
 impl UsbLiveTester for OpenInterfaceLiveTester {
     async fn is_usb_live(self, serial: &String) -> bool {
-        open_interface_with_serial(serial.as_str(), &self.additional_products).await.is_ok()
+        open_interface_with_serial(serial.as_str()).await.is_ok()
     }
 }
 
@@ -114,9 +111,7 @@ where
 #[async_trait(?Send)]
 impl InterfaceFactoryBase<AsyncInterface> for UsbFactory {
     async fn open(&mut self) -> Result<AsyncInterface> {
-        let interface = open_interface_with_serial(&self.serial, &self.additional_products)
-            .await
-            .with_context(|| {
+        let interface = open_interface_with_serial(&self.serial).await.with_context(|| {
             format!("Failed to open target usb interface by serial {}", self.serial)
         })?;
         tracing::debug!("serial now in use: {}", self.serial);
@@ -138,16 +133,16 @@ impl InterfaceFactoryBase<AsyncInterface> for UsbFactory {
         let handler = UsbTargetHandler {
             tx: Some(tx),
             target_serial: self.serial.clone(),
-            test: OpenInterfaceLiveTester { additional_products: self.additional_products.clone() },
+            test: OpenInterfaceLiveTester {},
         };
 
         // This is usb therefore we only need to find usb targets
         let watcher = FastbootUsbWatcher::new(
             handler,
-            RecommendedSerialNumberFinder::new(self.additional_products.clone()),
+            find_serial_numbers,
             // This tester will not attempt to talk to the USB devices to extract version info, it
             // only inspects the USB interface
-            UnversionedFastbootUsbTester::new(self.additional_products.clone()),
+            UnversionedFastbootUsbTester {},
             Duration::from_secs(1),
         );
 

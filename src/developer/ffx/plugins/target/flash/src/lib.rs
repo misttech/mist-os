@@ -24,7 +24,6 @@ use fuchsia_async::Timer;
 use std::io::Write;
 use std::net::SocketAddr;
 use termion::{color, style};
-use usb_fastboot_discovery::FASTBOOT_USB_DISCOVERY_ADDITIONAL_PRODUCTS;
 
 const SSH_OEM_COMMAND: &str = "add-staged-bootloader-file ssh.authorized_keys";
 
@@ -168,19 +167,7 @@ async fn flash_plugin_impl<W: Write>(
             let serial_num = info.serial_number.ok_or_else(|| {
                 anyhow!("Target was detected in Fastboot USB but did not have a serial number")
             })?;
-
-            let additional_products =
-                ffx_config::get::<Vec<u16>, _>(FASTBOOT_USB_DISCOVERY_ADDITIONAL_PRODUCTS)
-                    .await
-                    .unwrap_or_else(|e| {
-                        tracing::warn!(
-                            "Error getting config value {}. Err: {}. proceeding with empty vec",
-                            e,
-                            FASTBOOT_USB_DISCOVERY_ADDITIONAL_PRODUCTS
-                        );
-                        vec![]
-                    });
-            let mut proxy = usb_proxy(serial_num, additional_products).await?;
+            let mut proxy = usb_proxy(serial_num).await?;
             from_manifest(&mut writer, cmd, &mut proxy).await.map_err(fho::Error::from)
         }
         Some(FidlFastbootInterface::Udp) => {
