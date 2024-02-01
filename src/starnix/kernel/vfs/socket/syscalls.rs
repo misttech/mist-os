@@ -163,6 +163,7 @@ pub fn sys_bind(
             | SocketDomain::Vsock
             | SocketDomain::Inet6
             | SocketDomain::Netlink
+            | SocketDomain::Key
             | SocketDomain::Packet => error!(EINVAL),
             SocketDomain::Inet => error!(EAFNOSUPPORT),
         };

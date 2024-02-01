@@ -53,6 +53,7 @@
 #include <linux/oom.h>
 #include <linux/perf_event.h>
 #include <linux/personality.h>
+#include <linux/pfkeyv2.h>
 #include <linux/pidfd.h>
 #include <linux/poll.h>
 #include <linux/prctl.h>

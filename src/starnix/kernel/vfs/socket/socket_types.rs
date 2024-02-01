@@ -64,7 +64,14 @@ pub enum SocketDomain {
 
     /// An AF_PACKET socket.
     Packet,
+
+    /// An AF_KEY socket.
+    Key,
 }
+
+/// The AF_KEY constant does not appear in the Linux UAPI headers. Instead, the value is defined in
+/// libc headers.
+const AF_KEY: u16 = 15;
 
 impl SocketDomain {
     pub fn from_raw(raw: u16) -> Option<SocketDomain> {
@@ -75,6 +82,7 @@ impl SocketDomain {
             AF_INET6 => Some(Self::Inet6),
             AF_NETLINK => Some(Self::Netlink),
             AF_PACKET => Some(Self::Packet),
+            AF_KEY => Some(Self::Key),
             _ => None,
         }
     }
@@ -87,6 +95,7 @@ impl SocketDomain {
             Self::Inet6 => AF_INET6,
             Self::Netlink => AF_NETLINK,
             Self::Packet => AF_PACKET,
+            Self::Key => AF_KEY,
         }
     }
 
@@ -189,6 +198,10 @@ impl SocketAddress {
             SocketDomain::Netlink => SocketAddress::Netlink(NetlinkAddress::default()),
             SocketDomain::Packet => {
                 SocketAddress::Packet(uapi::sockaddr_ll::default().as_bytes().to_vec())
+            }
+            SocketDomain::Key => {
+                // We currently stub AF_KEY domain sockets as Unix domain sockets.
+                SocketAddress::Unix(FsString::default())
             }
         }
     }

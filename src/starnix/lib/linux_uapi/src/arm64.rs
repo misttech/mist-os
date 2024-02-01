@@ -3728,6 +3728,122 @@ pub const PERF_MEM_HOPS_1: u32 = 2;
 pub const PERF_MEM_HOPS_2: u32 = 3;
 pub const PERF_MEM_HOPS_3: u32 = 4;
 pub const PERF_MEM_HOPS_SHIFT: u32 = 43;
+pub const PF_KEY_V2: u32 = 2;
+pub const PFKEYV2_REVISION: u32 = 199806;
+pub const SADB_RESERVED: u32 = 0;
+pub const SADB_GETSPI: u32 = 1;
+pub const SADB_UPDATE: u32 = 2;
+pub const SADB_ADD: u32 = 3;
+pub const SADB_DELETE: u32 = 4;
+pub const SADB_GET: u32 = 5;
+pub const SADB_ACQUIRE: u32 = 6;
+pub const SADB_REGISTER: u32 = 7;
+pub const SADB_EXPIRE: u32 = 8;
+pub const SADB_FLUSH: u32 = 9;
+pub const SADB_DUMP: u32 = 10;
+pub const SADB_X_PROMISC: u32 = 11;
+pub const SADB_X_PCHANGE: u32 = 12;
+pub const SADB_X_SPDUPDATE: u32 = 13;
+pub const SADB_X_SPDADD: u32 = 14;
+pub const SADB_X_SPDDELETE: u32 = 15;
+pub const SADB_X_SPDGET: u32 = 16;
+pub const SADB_X_SPDACQUIRE: u32 = 17;
+pub const SADB_X_SPDDUMP: u32 = 18;
+pub const SADB_X_SPDFLUSH: u32 = 19;
+pub const SADB_X_SPDSETIDX: u32 = 20;
+pub const SADB_X_SPDEXPIRE: u32 = 21;
+pub const SADB_X_SPDDELETE2: u32 = 22;
+pub const SADB_X_NAT_T_NEW_MAPPING: u32 = 23;
+pub const SADB_X_MIGRATE: u32 = 24;
+pub const SADB_MAX: u32 = 24;
+pub const SADB_SAFLAGS_PFS: u32 = 1;
+pub const SADB_SAFLAGS_NOPMTUDISC: u32 = 536870912;
+pub const SADB_SAFLAGS_DECAP_DSCP: u32 = 1073741824;
+pub const SADB_SAFLAGS_NOECN: u32 = 2147483648;
+pub const SADB_SASTATE_LARVAL: u32 = 0;
+pub const SADB_SASTATE_MATURE: u32 = 1;
+pub const SADB_SASTATE_DYING: u32 = 2;
+pub const SADB_SASTATE_DEAD: u32 = 3;
+pub const SADB_SASTATE_MAX: u32 = 3;
+pub const SADB_SATYPE_UNSPEC: u32 = 0;
+pub const SADB_SATYPE_AH: u32 = 2;
+pub const SADB_SATYPE_ESP: u32 = 3;
+pub const SADB_SATYPE_RSVP: u32 = 5;
+pub const SADB_SATYPE_OSPFV2: u32 = 6;
+pub const SADB_SATYPE_RIPV2: u32 = 7;
+pub const SADB_SATYPE_MIP: u32 = 8;
+pub const SADB_X_SATYPE_IPCOMP: u32 = 9;
+pub const SADB_SATYPE_MAX: u32 = 9;
+pub const SADB_AALG_NONE: u32 = 0;
+pub const SADB_AALG_MD5HMAC: u32 = 2;
+pub const SADB_AALG_SHA1HMAC: u32 = 3;
+pub const SADB_X_AALG_SHA2_256HMAC: u32 = 5;
+pub const SADB_X_AALG_SHA2_384HMAC: u32 = 6;
+pub const SADB_X_AALG_SHA2_512HMAC: u32 = 7;
+pub const SADB_X_AALG_RIPEMD160HMAC: u32 = 8;
+pub const SADB_X_AALG_AES_XCBC_MAC: u32 = 9;
+pub const SADB_X_AALG_SM3_256HMAC: u32 = 10;
+pub const SADB_X_AALG_NULL: u32 = 251;
+pub const SADB_AALG_MAX: u32 = 251;
+pub const SADB_EALG_NONE: u32 = 0;
+pub const SADB_EALG_DESCBC: u32 = 2;
+pub const SADB_EALG_3DESCBC: u32 = 3;
+pub const SADB_X_EALG_CASTCBC: u32 = 6;
+pub const SADB_X_EALG_BLOWFISHCBC: u32 = 7;
+pub const SADB_EALG_NULL: u32 = 11;
+pub const SADB_X_EALG_AESCBC: u32 = 12;
+pub const SADB_X_EALG_AESCTR: u32 = 13;
+pub const SADB_X_EALG_AES_CCM_ICV8: u32 = 14;
+pub const SADB_X_EALG_AES_CCM_ICV12: u32 = 15;
+pub const SADB_X_EALG_AES_CCM_ICV16: u32 = 16;
+pub const SADB_X_EALG_AES_GCM_ICV8: u32 = 18;
+pub const SADB_X_EALG_AES_GCM_ICV12: u32 = 19;
+pub const SADB_X_EALG_AES_GCM_ICV16: u32 = 20;
+pub const SADB_X_EALG_CAMELLIACBC: u32 = 22;
+pub const SADB_X_EALG_NULL_AES_GMAC: u32 = 23;
+pub const SADB_X_EALG_SM4CBC: u32 = 24;
+pub const SADB_EALG_MAX: u32 = 253;
+pub const SADB_X_EALG_SERPENTCBC: u32 = 252;
+pub const SADB_X_EALG_TWOFISHCBC: u32 = 253;
+pub const SADB_X_CALG_NONE: u32 = 0;
+pub const SADB_X_CALG_OUI: u32 = 1;
+pub const SADB_X_CALG_DEFLATE: u32 = 2;
+pub const SADB_X_CALG_LZS: u32 = 3;
+pub const SADB_X_CALG_LZJH: u32 = 4;
+pub const SADB_X_CALG_MAX: u32 = 4;
+pub const SADB_EXT_RESERVED: u32 = 0;
+pub const SADB_EXT_SA: u32 = 1;
+pub const SADB_EXT_LIFETIME_CURRENT: u32 = 2;
+pub const SADB_EXT_LIFETIME_HARD: u32 = 3;
+pub const SADB_EXT_LIFETIME_SOFT: u32 = 4;
+pub const SADB_EXT_ADDRESS_SRC: u32 = 5;
+pub const SADB_EXT_ADDRESS_DST: u32 = 6;
+pub const SADB_EXT_ADDRESS_PROXY: u32 = 7;
+pub const SADB_EXT_KEY_AUTH: u32 = 8;
+pub const SADB_EXT_KEY_ENCRYPT: u32 = 9;
+pub const SADB_EXT_IDENTITY_SRC: u32 = 10;
+pub const SADB_EXT_IDENTITY_DST: u32 = 11;
+pub const SADB_EXT_SENSITIVITY: u32 = 12;
+pub const SADB_EXT_PROPOSAL: u32 = 13;
+pub const SADB_EXT_SUPPORTED_AUTH: u32 = 14;
+pub const SADB_EXT_SUPPORTED_ENCRYPT: u32 = 15;
+pub const SADB_EXT_SPIRANGE: u32 = 16;
+pub const SADB_X_EXT_KMPRIVATE: u32 = 17;
+pub const SADB_X_EXT_POLICY: u32 = 18;
+pub const SADB_X_EXT_SA2: u32 = 19;
+pub const SADB_X_EXT_NAT_T_TYPE: u32 = 20;
+pub const SADB_X_EXT_NAT_T_SPORT: u32 = 21;
+pub const SADB_X_EXT_NAT_T_DPORT: u32 = 22;
+pub const SADB_X_EXT_NAT_T_OA: u32 = 23;
+pub const SADB_X_EXT_SEC_CTX: u32 = 24;
+pub const SADB_X_EXT_KMADDRESS: u32 = 25;
+pub const SADB_X_EXT_FILTER: u32 = 26;
+pub const SADB_EXT_MAX: u32 = 26;
+pub const SADB_IDENTTYPE_RESERVED: u32 = 0;
+pub const SADB_IDENTTYPE_PREFIX: u32 = 1;
+pub const SADB_IDENTTYPE_FQDN: u32 = 2;
+pub const SADB_IDENTTYPE_USERFQDN: u32 = 3;
+pub const SADB_IDENTTYPE_MAX: u32 = 3;
 pub const PIDFD_NONBLOCK: u32 = 2048;
 pub const PR_SET_PDEATHSIG: u32 = 1;
 pub const PR_GET_PDEATHSIG: u32 = 2;
@@ -13544,6 +13660,220 @@ pub const PER_OSF4: _bindgen_ty_59 = 15;
 pub const PER_HPUX: _bindgen_ty_59 = 16;
 pub const PER_MASK: _bindgen_ty_59 = 255;
 pub type _bindgen_ty_59 = crate::types::c_uint;
+#[repr(C, packed)]
+#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, NoCell, FromZeros)]
+pub struct sadb_msg {
+    pub sadb_msg_version: __u8,
+    pub sadb_msg_type: __u8,
+    pub sadb_msg_errno: __u8,
+    pub sadb_msg_satype: __u8,
+    pub sadb_msg_len: __u16,
+    pub sadb_msg_reserved: __u16,
+    pub sadb_msg_seq: __u32,
+    pub sadb_msg_pid: __u32,
+}
+#[repr(C, packed)]
+#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, NoCell, FromZeros)]
+pub struct sadb_ext {
+    pub sadb_ext_len: __u16,
+    pub sadb_ext_type: __u16,
+}
+#[repr(C, packed)]
+#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, NoCell, FromZeros)]
+pub struct sadb_sa {
+    pub sadb_sa_len: __u16,
+    pub sadb_sa_exttype: __u16,
+    pub sadb_sa_spi: __be32,
+    pub sadb_sa_replay: __u8,
+    pub sadb_sa_state: __u8,
+    pub sadb_sa_auth: __u8,
+    pub sadb_sa_encrypt: __u8,
+    pub sadb_sa_flags: __u32,
+}
+#[repr(C, packed)]
+#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, NoCell, FromZeros)]
+pub struct sadb_lifetime {
+    pub sadb_lifetime_len: __u16,
+    pub sadb_lifetime_exttype: __u16,
+    pub sadb_lifetime_allocations: __u32,
+    pub sadb_lifetime_bytes: __u64,
+    pub sadb_lifetime_addtime: __u64,
+    pub sadb_lifetime_usetime: __u64,
+}
+#[repr(C, packed)]
+#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, NoCell, FromZeros)]
+pub struct sadb_address {
+    pub sadb_address_len: __u16,
+    pub sadb_address_exttype: __u16,
+    pub sadb_address_proto: __u8,
+    pub sadb_address_prefixlen: __u8,
+    pub sadb_address_reserved: __u16,
+}
+#[repr(C, packed)]
+#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, NoCell, FromZeros)]
+pub struct sadb_key {
+    pub sadb_key_len: __u16,
+    pub sadb_key_exttype: __u16,
+    pub sadb_key_bits: __u16,
+    pub sadb_key_reserved: __u16,
+}
+#[repr(C, packed)]
+#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, NoCell, FromZeros)]
+pub struct sadb_ident {
+    pub sadb_ident_len: __u16,
+    pub sadb_ident_exttype: __u16,
+    pub sadb_ident_type: __u16,
+    pub sadb_ident_reserved: __u16,
+    pub sadb_ident_id: __u64,
+}
+#[repr(C, packed)]
+#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, NoCell, FromZeros)]
+pub struct sadb_sens {
+    pub sadb_sens_len: __u16,
+    pub sadb_sens_exttype: __u16,
+    pub sadb_sens_dpd: __u32,
+    pub sadb_sens_sens_level: __u8,
+    pub sadb_sens_sens_len: __u8,
+    pub sadb_sens_integ_level: __u8,
+    pub sadb_sens_integ_len: __u8,
+    pub sadb_sens_reserved: __u32,
+}
+#[repr(C, packed)]
+#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, NoCell, FromZeros)]
+pub struct sadb_prop {
+    pub sadb_prop_len: __u16,
+    pub sadb_prop_exttype: __u16,
+    pub sadb_prop_replay: __u8,
+    pub sadb_prop_reserved: [__u8; 3usize],
+}
+#[repr(C, packed)]
+#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, NoCell, FromZeros)]
+pub struct sadb_comb {
+    pub sadb_comb_auth: __u8,
+    pub sadb_comb_encrypt: __u8,
+    pub sadb_comb_flags: __u16,
+    pub sadb_comb_auth_minbits: __u16,
+    pub sadb_comb_auth_maxbits: __u16,
+    pub sadb_comb_encrypt_minbits: __u16,
+    pub sadb_comb_encrypt_maxbits: __u16,
+    pub sadb_comb_reserved: __u32,
+    pub sadb_comb_soft_allocations: __u32,
+    pub sadb_comb_hard_allocations: __u32,
+    pub sadb_comb_soft_bytes: __u64,
+    pub sadb_comb_hard_bytes: __u64,
+    pub sadb_comb_soft_addtime: __u64,
+    pub sadb_comb_hard_addtime: __u64,
+    pub sadb_comb_soft_usetime: __u64,
+    pub sadb_comb_hard_usetime: __u64,
+}
+#[repr(C, packed)]
+#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, NoCell, FromZeros)]
+pub struct sadb_supported {
+    pub sadb_supported_len: __u16,
+    pub sadb_supported_exttype: __u16,
+    pub sadb_supported_reserved: __u32,
+}
+#[repr(C, packed)]
+#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, NoCell, FromZeros)]
+pub struct sadb_alg {
+    pub sadb_alg_id: __u8,
+    pub sadb_alg_ivlen: __u8,
+    pub sadb_alg_minbits: __u16,
+    pub sadb_alg_maxbits: __u16,
+    pub sadb_alg_reserved: __u16,
+}
+#[repr(C, packed)]
+#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, NoCell, FromZeros)]
+pub struct sadb_spirange {
+    pub sadb_spirange_len: __u16,
+    pub sadb_spirange_exttype: __u16,
+    pub sadb_spirange_min: __u32,
+    pub sadb_spirange_max: __u32,
+    pub sadb_spirange_reserved: __u32,
+}
+#[repr(C, packed)]
+#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, NoCell, FromZeros)]
+pub struct sadb_x_kmprivate {
+    pub sadb_x_kmprivate_len: __u16,
+    pub sadb_x_kmprivate_exttype: __u16,
+    pub sadb_x_kmprivate_reserved: __u32,
+}
+#[repr(C, packed)]
+#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, NoCell, FromZeros)]
+pub struct sadb_x_sa2 {
+    pub sadb_x_sa2_len: __u16,
+    pub sadb_x_sa2_exttype: __u16,
+    pub sadb_x_sa2_mode: __u8,
+    pub sadb_x_sa2_reserved1: __u8,
+    pub sadb_x_sa2_reserved2: __u16,
+    pub sadb_x_sa2_sequence: __u32,
+    pub sadb_x_sa2_reqid: __u32,
+}
+#[repr(C, packed)]
+#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, NoCell, FromZeros)]
+pub struct sadb_x_policy {
+    pub sadb_x_policy_len: __u16,
+    pub sadb_x_policy_exttype: __u16,
+    pub sadb_x_policy_type: __u16,
+    pub sadb_x_policy_dir: __u8,
+    pub sadb_x_policy_reserved: __u8,
+    pub sadb_x_policy_id: __u32,
+    pub sadb_x_policy_priority: __u32,
+}
+#[repr(C, packed)]
+#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, NoCell, FromZeros)]
+pub struct sadb_x_ipsecrequest {
+    pub sadb_x_ipsecrequest_len: __u16,
+    pub sadb_x_ipsecrequest_proto: __u16,
+    pub sadb_x_ipsecrequest_mode: __u8,
+    pub sadb_x_ipsecrequest_level: __u8,
+    pub sadb_x_ipsecrequest_reserved1: __u16,
+    pub sadb_x_ipsecrequest_reqid: __u32,
+    pub sadb_x_ipsecrequest_reserved2: __u32,
+}
+#[repr(C, packed)]
+#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, NoCell, FromZeros)]
+pub struct sadb_x_nat_t_type {
+    pub sadb_x_nat_t_type_len: __u16,
+    pub sadb_x_nat_t_type_exttype: __u16,
+    pub sadb_x_nat_t_type_type: __u8,
+    pub sadb_x_nat_t_type_reserved: [__u8; 3usize],
+}
+#[repr(C, packed)]
+#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, NoCell, FromZeros)]
+pub struct sadb_x_nat_t_port {
+    pub sadb_x_nat_t_port_len: __u16,
+    pub sadb_x_nat_t_port_exttype: __u16,
+    pub sadb_x_nat_t_port_port: __be16,
+    pub sadb_x_nat_t_port_reserved: __u16,
+}
+#[repr(C, packed)]
+#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, NoCell, FromZeros)]
+pub struct sadb_x_sec_ctx {
+    pub sadb_x_sec_len: __u16,
+    pub sadb_x_sec_exttype: __u16,
+    pub sadb_x_ctx_alg: __u8,
+    pub sadb_x_ctx_doi: __u8,
+    pub sadb_x_ctx_len: __u16,
+}
+#[repr(C, packed)]
+#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, NoCell, FromZeros)]
+pub struct sadb_x_kmaddress {
+    pub sadb_x_kmaddress_len: __u16,
+    pub sadb_x_kmaddress_exttype: __u16,
+    pub sadb_x_kmaddress_reserved: __u32,
+}
+#[repr(C, packed)]
+#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, NoCell, FromZeros)]
+pub struct sadb_x_filter {
+    pub sadb_x_filter_len: __u16,
+    pub sadb_x_filter_exttype: __u16,
+    pub sadb_x_filter_saddr: [__u32; 4usize],
+    pub sadb_x_filter_daddr: [__u32; 4usize],
+    pub sadb_x_filter_family: __u16,
+    pub sadb_x_filter_splen: __u8,
+    pub sadb_x_filter_dplen: __u8,
+}
 #[repr(C)]
 #[derive(Debug, Copy, Clone, AsBytes, FromBytes, NoCell, FromZeros)]
 pub struct prctl_mm_map {

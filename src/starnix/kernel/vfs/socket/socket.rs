@@ -273,6 +273,13 @@ fn create_socket_ops(
                 error!(EPERM)
             }
         }
+        SocketDomain::Key => {
+            track_stub!(
+                TODO("https://fxbug.dev/323365389"),
+                "Returning a UnixSocket instead of a KeySocket"
+            );
+            Ok(Box::new(UnixSocket::new(SocketType::Datagram)))
+        }
     }
 }
 
