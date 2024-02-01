@@ -50,6 +50,7 @@ TEST_F(Vim3DevicetreeTest, DevicetreeEnumeration) {
       "sys/platform/canvas-ff638000",
       "sys/platform/adc-9000",
       "sys/platform/gpio-controller-ff634400",
+      "sys/platform/audio-controller-ff642000",
   };
   ASSERT_TRUE(board_test_.StartRealm().is_ok());
   ASSERT_TRUE(board_test_.WaitOnDevices(device_node_paths).is_ok());
