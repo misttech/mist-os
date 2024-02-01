@@ -70,6 +70,10 @@ impl Client {
     /// Errors if the package is not already cached.
     /// Always uses open package tracking GC protection, because OTA (the only client of Retained
     /// GC protection), should never need to get an already cached package.
+    ///
+    /// Compared to `get_cached`:
+    ///   * Activates `meta_far_blob` in the dynamic index
+    ///   * Must not be called concurrently with the same `meta_far_blob`
     pub async fn get_already_cached(
         &self,
         meta_far_blob: BlobId,
@@ -99,6 +103,31 @@ impl Client {
         }
 
         get.finish().await.map_err(GetAlreadyCachedError::FinishGet)
+    }
+
+    /// Uses PackageCache.GetCached to obtain the package directory of a package that is already
+    /// cached (all blobs are already in blobfs).
+    /// Errors if the package is not already cached.
+    /// Does not protect the package from GC, so clients should only use this method on packages
+    /// that have GC protection from another source (e.g. they are subpackages of a protected
+    /// package).
+    ///
+    /// Compared to `get_already_cached`:
+    ///   * Does not activate `meta_far` in the dynamic index
+    ///   * Can be called concurrently with the same `meta_far`
+    pub async fn get_cached(&self, meta_far: BlobId) -> Result<PackageDirectory, GetCachedError> {
+        let (pkg_dir, pkg_dir_server_end) =
+            PackageDirectory::create_request().map_err(GetCachedError::CreatingHandles)?;
+        let () = self
+            .proxy
+            .get_cached(&meta_far.into(), pkg_dir_server_end)
+            .await
+            .map_err(GetCachedError::CallingGetCached)?
+            .map_err(|e| match e {
+                fpkg::GetCachedError::NotCached => GetCachedError::NotCached,
+                fpkg::GetCachedError::Internal => GetCachedError::Internal,
+            })?;
+        Ok(pkg_dir)
     }
 }
 
@@ -133,6 +162,22 @@ impl GetAlreadyCachedError {
             MissingMetaFar | MissingContentBlobs(..) => true,
         }
     }
+}
+
+#[derive(thiserror::Error, Debug)]
+#[allow(missing_docs)]
+pub enum GetCachedError {
+    #[error("creating handles")]
+    CreatingHandles(#[source] fidl::Error),
+
+    #[error("calling GetCached FIDL")]
+    CallingGetCached(#[source] fidl::Error),
+
+    #[error("the package was not cached")]
+    NotCached,
+
+    #[error("internal")]
+    Internal,
 }
 
 #[derive(Debug, Clone)]

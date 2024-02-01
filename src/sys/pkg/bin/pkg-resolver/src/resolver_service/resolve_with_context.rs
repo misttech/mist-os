@@ -88,7 +88,7 @@ async fn resolve_relative_impl(
         return Err(ResolveWithContextError::EmptyContext);
     };
     let superpackage = pkg_cache
-        .get_already_cached(*super_blob)
+        .get_cached(*super_blob)
         .await
         .map_err(ResolveWithContextError::MissingSuperpackage)?;
     let subpackages = superpackage.meta_subpackages().await?;
@@ -102,7 +102,7 @@ async fn resolve_relative_impl(
     // from GC, so the subpackage should already be cached.
     // https://fuchsia.dev/fuchsia-src/contribute/governance/rfcs/0154_subpackages#eager_package_loading
     let () = pkg_cache
-        .get_already_cached(subpackage)
+        .get_cached(subpackage)
         .await
         .map_err(ResolveWithContextError::MissingSubpackage)?
         .reopen(dir)
@@ -120,7 +120,7 @@ enum ResolveWithContextError {
     EmptyContext,
 
     #[error("the superpackage was not cached")]
-    MissingSuperpackage(#[source] pkg::cache::GetAlreadyCachedError),
+    MissingSuperpackage(#[source] pkg::cache::GetCachedError),
 
     #[error("loading superpackage's subpackage manifest")]
     SubpackageManifest(#[from] fuchsia_pkg::package_directory::LoadMetaSubpackagesError),
@@ -129,7 +129,7 @@ enum ResolveWithContextError {
     NotASubpackage,
 
     #[error("the subpackage was not cached")]
-    MissingSubpackage(#[source] pkg::cache::GetAlreadyCachedError),
+    MissingSubpackage(#[source] pkg::cache::GetCachedError),
 
     #[error("reopening subpackage onto the request handle")]
     Reopen(#[source] fuchsia_pkg::package_directory::CloneError),
