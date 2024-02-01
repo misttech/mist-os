@@ -5,7 +5,7 @@
 use {
     crate::model::{
         component::{ComponentInstance, WeakComponentInstance},
-        routing::router::{Completer, Request, Routable, Router},
+        routing::router::{Completer, Request, Router},
     },
     crate::PathBuf,
     ::routing::{
@@ -92,11 +92,9 @@ pub trait DictExt {
     where
         C: ErasedCapability + Capability;
 
-    /// Returns a router configured to route at `path`, if a [Routable]
-    /// capability exists at `path.first()`. / Returns None otherwise.
-    fn get_routable<'a, C>(&self, path: impl DoubleEndedIterator<Item = &'a str>) -> Option<Router>
-    where
-        C: ErasedCapability + Capability + Routable;
+    /// Returns a [Router] configured to route at `path`, if one exists at `path.first()`. /
+    /// Returns None otherwise.
+    fn get_router<'a>(&self, path: impl DoubleEndedIterator<Item = &'a str>) -> Option<Router>;
 
     /// Inserts the capability at the path. Intermediary dictionaries are created as needed.
     fn insert_capability<'a, C>(&self, path: impl Iterator<Item = &'a str>, capability: C)
@@ -149,18 +147,12 @@ impl DictExt for Dict {
         }
     }
 
-    fn get_routable<'a, C>(
-        &self,
-        mut path: impl DoubleEndedIterator<Item = &'a str>,
-    ) -> Option<Router>
-    where
-        C: ErasedCapability + Capability + Routable,
-    {
+    fn get_router<'a>(&self, mut path: impl DoubleEndedIterator<Item = &'a str>) -> Option<Router> {
         let first = path.next().unwrap();
-        let Some(capability) = self.get_capability::<C>(iter::once(first)) else {
+        let Some(router) = self.get_capability::<Router>(iter::once(first)) else {
             return None;
         };
-        Some(Router::from_routable(capability).with_path(path))
+        Some(router.with_path(path))
     }
 
     fn insert_capability<'a, C>(&self, mut path: impl Iterator<Item = &'a str>, capability: C)

@@ -17,6 +17,7 @@ use {
         route_to_storage_decl, verify_instance_in_component_id_index, RouteRequest,
     },
     cm_rust::{self, ComponentDecl, UseDecl, UseStorageDecl},
+    cm_types::IterablePath,
     fidl::{endpoints::ClientEnd, prelude::*},
     fidl_fuchsia_io as fio, fuchsia_zircon as zx,
     futures::{

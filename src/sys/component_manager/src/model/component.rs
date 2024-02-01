@@ -4,7 +4,6 @@
 
 use {
     crate::bedrock::program::{self as program, ComponentStopOutcome, Program, StopRequestSuccess},
-    crate::capability::CapabilitySource,
     crate::framework::controller,
     crate::model::{
         actions::{
@@ -1520,8 +1519,12 @@ pub struct ResolvedInstanceState {
     /// The dict containing all capabilities that we use.
     pub program_input_dict: Dict,
 
-    /// The dict containing all capabilities that we declare.
+    /// The dict containing all capabilities that we declare, as Routers.
     program_output_dict: Dict,
+
+    /// The dict containing all Dictionary capabilities declared by the component, represented
+    /// as [Dict]s.
+    declared_dictionaries: Dict,
 
     /// Dictionary of extra capabilities passed to the component when it is started.
     // TODO(b/322564390): Move this into `ExecutionState` once stop action releases lock on it
@@ -1546,7 +1549,7 @@ impl ResolvedInstanceState {
 
         let environments = Self::instantiate_environments(component, &resolved_component.decl);
         let decl = resolved_component.decl.clone();
-        let program_output_dict = Self::build_program_output_dict(component, &decl);
+        let declared_dictionaries = Self::build_declared_dictionaries(&decl);
 
         let mut state = Self {
             weak_component,
@@ -1565,7 +1568,8 @@ impl ResolvedInstanceState {
             component_input,
             component_output_dict: Dict::new(),
             program_input_dict: Dict::new(),
-            program_output_dict,
+            program_output_dict: Dict::new(),
+            declared_dictionaries,
             incoming_dict: None,
             collection_dicts: HashMap::new(),
         };
@@ -1579,61 +1583,34 @@ impl ResolvedInstanceState {
             &state.component_output_dict,
             &state.program_input_dict,
             &state.program_output_dict,
+            &state.declared_dictionaries,
             &mut state.collection_dicts,
         );
         state.discover_static_children(component_sandbox.child_inputs).await;
         Ok(state)
     }
 
-    /// Builds the program output dict given the resolved `decl`.
-    ///
-    /// The program output dict is a dict of routers, keyed by capability name.
-    /// Each router will request the corresponding capability from the program, which involves:
-    /// - Policy check
-    /// - Start component
-    /// - Capability requested hook
-    /// - Open within outgoing directory
-    pub fn build_program_output_dict(
-        component: &Arc<ComponentInstance>,
-        decl: &ComponentDecl,
-    ) -> Dict {
-        // Wrap the started router with policy checks, such that we don't perform extra work
-        // given requests that violate policy.
-        let program_output_dict = Dict::new();
-        let weak_component = WeakComponentInstance::new(component);
+    /// Builds a [Dict] containing all `dictionary` capabilities declared by the component.
+    /// This will be used during sandbox construction to populate the program output dict
+    /// with [Dict] [Router]s.
+    fn build_declared_dictionaries(decl: &ComponentDecl) -> Dict {
+        let declared_dictionaries = Dict::new();
         for capability in &decl.capabilities {
-            // We only support protocol and directory capabilities right now
             match &capability {
-                cm_rust::CapabilityDecl::Protocol(p) => {
-                    let router = Self::start_component_on_request(
-                        component,
-                        decl,
-                        capability.name().clone(),
-                    );
-                    let router = router.with_policy_check(
-                        CapabilitySource::Component {
-                            capability: ComponentCapability::Protocol(p.clone()),
-                            component: weak_component.clone(),
-                        },
-                        component.policy_checker().clone(),
-                    );
-                    program_output_dict
-                        .insert_capability(iter::once(capability.name().as_str()), router);
-                }
                 cm_rust::CapabilityDecl::Dictionary(_) => {
                     // The dictionary will be filled in by [build_component_sandbox].
-                    program_output_dict
+                    declared_dictionaries
                         .insert_capability(iter::once(capability.name().as_str()), Dict::new());
                 }
-                _ => continue,
+                _ => {}
             }
         }
-        program_output_dict
+        declared_dictionaries
     }
 
     /// Returns a router that starts the component upon a capability request,
     /// then delegates the request to the program outgoing dict of the component.
-    fn start_component_on_request(
+    pub fn start_component_on_request(
         component: &Arc<ComponentInstance>,
         decl: &ComponentDecl,
         capability_name: Name,

@@ -6,7 +6,7 @@ use {
     crate::{
         capability::CapabilitySource,
         model::{
-            component::{ComponentInstance, WeakComponentInstance},
+            component::{ComponentInstance, ResolvedInstanceState, WeakComponentInstance},
             routing::router::{Completer, Request, Router},
         },
         sandbox_util::{DictExt, LaunchTaskOnReceive},
@@ -17,7 +17,7 @@ use {
         error::{ComponentInstanceError, RoutingError},
     },
     cm_rust::{self, ExposeDeclCommon, OfferDeclCommon, SourceName, SourcePath, UseDeclCommon},
-    cm_types::{Name, SeparatedPath},
+    cm_types::{IterablePath, Name},
     moniker::{ChildName, ChildNameBase, MonikerBase},
     sandbox::{Capability, Dict, ErasedCapability, Open, Unit},
     std::{collections::HashMap, iter, sync::Arc},
@@ -64,6 +64,7 @@ pub fn build_component_sandbox(
     component_output_dict: &Dict,
     program_input_dict: &Dict,
     program_output_dict: &Dict,
+    declared_dictionaries: &Dict,
     collection_dicts: &mut HashMap<Name, Dict>,
 ) -> ComponentSandbox {
     let mut output = ComponentSandbox::default();
@@ -75,6 +76,16 @@ pub fn build_component_sandbox(
 
     for collection in &decl.collections {
         collection_dicts.insert(collection.name.clone(), Dict::new());
+    }
+
+    for capability in &decl.capabilities {
+        extend_dict_with_capability(
+            component,
+            decl,
+            capability,
+            program_output_dict,
+            declared_dictionaries,
+        );
     }
 
     for use_ in &decl.uses {
@@ -108,7 +119,7 @@ pub fn build_component_sandbox(
                 collection_dicts.entry(name.clone()).or_insert(Dict::new())
             }
             cm_rust::OfferTarget::Capability(name) => {
-                let mut entries = program_output_dict.lock_entries();
+                let mut entries = declared_dictionaries.lock_entries();
                 _placeholder_dict = Some(
                     entries
                         .entry(name.to_string())
@@ -141,6 +152,44 @@ pub fn build_component_sandbox(
     }
 
     output
+}
+
+/// Adds `capability` to the program output dict given the resolved `decl`. The program output dict
+/// is a dict of routers, keyed by capability name.
+fn extend_dict_with_capability(
+    component: &Arc<ComponentInstance>,
+    decl: &cm_rust::ComponentDecl,
+    capability: &cm_rust::CapabilityDecl,
+    program_output_dict: &Dict,
+    declared_dictionaries: &Dict,
+) {
+    match capability {
+        cm_rust::CapabilityDecl::Protocol(p) => {
+            let router = ResolvedInstanceState::start_component_on_request(
+                component,
+                decl,
+                capability.name().clone(),
+            );
+            let router = router.with_policy_check(
+                CapabilitySource::Component {
+                    capability: ComponentCapability::Protocol(p.clone()),
+                    component: component.as_weak(),
+                },
+                component.policy_checker().clone(),
+            );
+            program_output_dict.insert_capability(iter::once(capability.name().as_str()), router);
+        }
+        cm_rust::CapabilityDecl::Dictionary(d) => {
+            let dict = declared_dictionaries
+                .get_capability::<Dict>(iter::once(d.name.as_str()))
+                .expect("dictionary should exist");
+            let router = Router::from_routable(dict);
+            program_output_dict.insert_capability(iter::once(d.name.as_str()), router);
+        }
+        _ => {
+            // Capabilities not supported in bedrock yet.
+        }
+    }
 }
 
 /// Extends the given dict based on offer declarations. All offer declarations in `offers` are
@@ -190,21 +239,10 @@ fn extend_dict_with_use(
             use_from_parent_router(component_input, source_path.to_owned(), component.as_weak())
         }
         cm_rust::UseSource::Self_ => {
-            if source_path.dirname.is_some() {
-                let Some(router) =
-                    program_output_dict.get_routable::<Dict>(source_path.iter_segments())
-                else {
-                    return;
-                };
-                router
-            } else {
-                let Some(router) =
-                    program_output_dict.get_routable::<Router>(source_path.iter_segments())
-                else {
-                    return;
-                };
-                router
-            }
+            let Some(router) = program_output_dict.get_router(source_path.iter_segments()) else {
+                return;
+            };
+            router
         }
         cm_rust::UseSource::Child(child_name) => {
             let child_name = ChildName::parse(child_name).expect("invalid child name");
@@ -264,7 +302,7 @@ fn extend_dict_with_use(
 /// unless it is overridden by an eponymous capability in the `incoming_dict` when started.
 fn use_from_parent_router(
     component_input: &ComponentInput,
-    source_path: SeparatedPath,
+    source_path: impl IterablePath + 'static,
     weak_component: WeakComponentInstance,
 ) -> Router {
     let component_input_capability = Router::from_routable(component_input.capabilities.clone())
@@ -334,7 +372,7 @@ fn extend_dict_with_offer(
     }
     let source_path = offer.source_path();
     let target_name = offer.target_name();
-    if target_dict.get_routable::<Router>(source_path.iter_segments()).is_some() {
+    if target_dict.get_router(source_path.iter_segments()).is_some() {
         warn!(
             "duplicate sources for protocol {} in a dict, unable to populate dict entry",
             target_name
@@ -344,29 +382,17 @@ fn extend_dict_with_offer(
     }
     let router = match offer.source() {
         cm_rust::OfferSource::Parent => {
-            let Some(router) =
-                component_input.capabilities.get_routable::<Router>(source_path.iter_segments())
+            let Some(router) = component_input.capabilities.get_router(source_path.iter_segments())
             else {
                 return;
             };
             router
         }
         cm_rust::OfferSource::Self_ => {
-            if matches!(offer, cm_rust::OfferDecl::Dictionary(_)) || source_path.dirname.is_some() {
-                let Some(router) =
-                    program_output_dict.get_routable::<Dict>(source_path.iter_segments())
-                else {
-                    return;
-                };
-                router
-            } else {
-                let Some(router) =
-                    program_output_dict.get_routable::<Router>(source_path.iter_segments())
-                else {
-                    return;
-                };
-                router
-            }
+            let Some(router) = program_output_dict.get_router(source_path.iter_segments()) else {
+                return;
+            };
+            router
         }
         cm_rust::OfferSource::Child(child_ref) => {
             let child_name: ChildName = child_ref.clone().try_into().expect("invalid child ref");
@@ -444,22 +470,10 @@ fn extend_dict_with_expose(
 
     let router = match expose.source() {
         cm_rust::ExposeSource::Self_ => {
-            if matches!(expose, cm_rust::ExposeDecl::Dictionary(_)) || source_path.dirname.is_some()
-            {
-                let Some(router) =
-                    program_output_dict.get_routable::<Dict>(source_path.iter_segments())
-                else {
-                    return;
-                };
-                router
-            } else {
-                let Some(router) =
-                    program_output_dict.get_routable::<Router>(source_path.iter_segments())
-                else {
-                    return;
-                };
-                router
-            }
+            let Some(router) = program_output_dict.get_router(source_path.iter_segments()) else {
+                return;
+            };
+            router
         }
         cm_rust::ExposeSource::Child(child_name) => {
             let child_name = ChildName::parse(child_name).expect("invalid static child name");
@@ -524,7 +538,7 @@ fn new_unit_router() -> Router {
 fn new_forwarding_router_to_child(
     component: &Arc<ComponentInstance>,
     weak_child: WeakComponentInstance,
-    capability_path: SeparatedPath,
+    capability_path: impl IterablePath + 'static,
     expose_not_found_error: RoutingError,
 ) -> Router {
     let task_group = component.nonblocking_task_group().as_weak();
@@ -541,7 +555,7 @@ fn new_forwarding_router_to_child(
 
 async fn forward_request_to_child(
     weak_child: WeakComponentInstance,
-    capability_path: SeparatedPath,
+    capability_path: impl IterablePath + 'static,
     expose_not_found_error: RoutingError,
     request: Request,
     completer: Completer,
@@ -553,9 +567,8 @@ async fn forward_request_to_child(
             .lock_resolved_state()
             .await
             .map_err(|e| ComponentInstanceError::resolve_failed(child.moniker.clone(), e))?;
-        if let Some(router) = child_state
-            .component_output_dict
-            .get_routable::<Router>(capability_path.iter_segments())
+        if let Some(router) =
+            child_state.component_output_dict.get_router(capability_path.iter_segments())
         {
             router.route(request, completer.take().unwrap());
             return Ok(());

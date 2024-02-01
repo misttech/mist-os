@@ -307,10 +307,6 @@ impl Path {
         self.0.split()
     }
 
-    pub fn iter_segments(&self) -> impl DoubleEndedIterator<Item = &str> {
-        self.0.iter_segments()
-    }
-
     pub fn as_str(&self) -> &str {
         &self.0.as_str()
     }
@@ -325,6 +321,12 @@ impl Path {
 
     pub fn basename(&self) -> &str {
         self.0.basename()
+    }
+}
+
+impl IterablePath for Path {
+    fn iter_segments(&self) -> Box<dyn DoubleEndedIterator<Item = &str> + '_> {
+        Box::new(self.0.iter_segments())
     }
 }
 
@@ -428,13 +430,17 @@ impl RelativePath {
     pub fn as_str(&self) -> &str {
         &*self.0
     }
+}
 
-    pub fn iter_segments(&self) -> impl DoubleEndedIterator<Item = &str> {
-        self.0
+impl IterablePath for RelativePath {
+    fn iter_segments(&self) -> Box<dyn DoubleEndedIterator<Item = &str> + '_> {
+        let i = self
+            .0
             .as_str()
             .split('/')
             // `split('/')` produces empty segments if there is nothing before or after a slash.
-            .filter(|s| !s.is_empty())
+            .filter(|s| !s.is_empty());
+        Box::new(i)
     }
 }
 
@@ -525,15 +531,6 @@ pub struct BorrowedSeparatedPath<'a> {
 }
 
 impl BorrowedSeparatedPath<'_> {
-    /// Returns an iterator over the segments in this path.
-    pub fn iter_segments(&self) -> Box<dyn DoubleEndedIterator<Item = &str> + '_> {
-        if let Some(d) = self.dirname {
-            Box::new(d.iter_segments().chain(iter::once(self.basename)))
-        } else {
-            Box::new(iter::once(self.basename))
-        }
-    }
-
     /// Converts this [BorrowedSeparatedPath] to the owned type.
     pub fn to_owned(&self) -> SeparatedPath {
         SeparatedPath { dirname: self.dirname.map(Clone::clone), basename: self.basename.into() }
@@ -550,6 +547,16 @@ impl fmt::Display for BorrowedSeparatedPath<'_> {
     }
 }
 
+impl IterablePath for BorrowedSeparatedPath<'_> {
+    fn iter_segments(&self) -> Box<dyn DoubleEndedIterator<Item = &str> + '_> {
+        if let Some(d) = self.dirname {
+            Box::new(d.iter_segments().chain(iter::once(self.basename)))
+        } else {
+            Box::new(iter::once(self.basename))
+        }
+    }
+}
+
 /// Path that separates the dirname and basename as different variables (owned
 /// type). Convenient for path representations that split the dirname and
 /// basename, like Fuchsia component decl.
@@ -560,18 +567,19 @@ pub struct SeparatedPath {
 }
 
 impl SeparatedPath {
-    /// Returns an iterator over the segments in this path.
-    pub fn iter_segments(&self) -> Box<dyn DoubleEndedIterator<Item = &str> + '_> {
+    /// Obtains a reference to this [SeparatedPath] as the borrowed type.
+    pub fn as_ref(&self) -> BorrowedSeparatedPath<'_> {
+        BorrowedSeparatedPath { dirname: self.dirname.as_ref(), basename: &self.basename }
+    }
+}
+
+impl IterablePath for SeparatedPath {
+    fn iter_segments(&self) -> Box<dyn DoubleEndedIterator<Item = &str> + '_> {
         if let Some(d) = &self.dirname {
             Box::new(d.iter_segments().chain(iter::once(self.basename.as_str())))
         } else {
             Box::new(iter::once(self.basename.as_str()))
         }
-    }
-
-    /// Obtains a reference to this [SeparatedPath] as the borrowed type.
-    pub fn as_ref(&self) -> BorrowedSeparatedPath<'_> {
-        BorrowedSeparatedPath { dirname: self.dirname.as_ref(), basename: &self.basename }
     }
 }
 
@@ -583,6 +591,12 @@ impl fmt::Display for SeparatedPath {
             write!(f, "{}", self.basename)
         }
     }
+}
+
+/// Trait implemented by path types that provides an API to iterate over path segments.
+pub trait IterablePath: Clone + Send + Sync {
+    /// Returns a double-sided iterator over the segments in this path.
+    fn iter_segments(&self) -> Box<dyn DoubleEndedIterator<Item = &str> + '_>;
 }
 
 /// A component URL. The URL is validated, but represented as a string to avoid
