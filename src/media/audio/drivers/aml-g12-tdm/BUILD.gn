@@ -144,7 +144,6 @@ driver_bind_rules("aml-g12-composite-bind") {
     "//src/devices/bind/fuchsia.amlogic.platform",
     "//src/devices/bind/fuchsia.amlogic.platform.a311d",
     "//src/devices/bind/fuchsia.clock",
-    "//src/devices/bind/fuchsia.devicetree",
     "//src/devices/bind/fuchsia.gpio",
     "//src/devices/bind/fuchsia.platform",
   ]
