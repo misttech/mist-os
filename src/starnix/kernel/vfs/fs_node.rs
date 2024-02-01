@@ -9,7 +9,11 @@ use crate::{
     task::{CurrentTask, Kernel, WaitQueue, Waiter},
     time::utc,
     vfs::{
-        fsverity::FsVerityState, inotify, pipe::Pipe, rw_queue::RwQueue, socket::SocketHandle,
+        fsverity::FsVerityState,
+        inotify,
+        pipe::{Pipe, PipeHandle},
+        rw_queue::RwQueue,
+        socket::SocketHandle,
         FileObject, FileOps, FileSystem, FileSystemHandle, FileWriteGuard, FileWriteGuardMode,
         FileWriteGuardState, FsNodeReleaser, FsStr, FsString, MountInfo, NamespaceNode, OPathOps,
         RecordLockCommand, RecordLockOwner, RecordLocks, WeakFileHandle,
@@ -83,7 +87,7 @@ pub struct FsNode {
     /// The pipe located at this node, if any.
     ///
     /// Used if, and only if, the node has a mode of FileMode::IFIFO.
-    fifo: Option<Arc<Mutex<Pipe>>>,
+    pub fifo: Option<PipeHandle>,
 
     /// The socket located at this node, if any.
     ///
@@ -1158,7 +1162,7 @@ impl FsNode {
                 rdev,
                 DeviceMode::Block,
             ),
-            FileMode::IFIFO => Pipe::open(self.fifo.as_ref().unwrap(), flags),
+            FileMode::IFIFO => Pipe::open(current_task, self.fifo.as_ref().unwrap(), flags),
             // UNIX domain sockets can't be opened.
             FileMode::IFSOCK => error!(ENXIO),
             _ => self.create_file_ops(current_task, flags),

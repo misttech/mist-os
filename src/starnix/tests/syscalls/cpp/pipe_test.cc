@@ -3,8 +3,10 @@
 // found in the LICENSE file.
 
 #include <fcntl.h>
+#include <signal.h>
 #include <unistd.h>
 
+#include <fbl/unique_fd.h>
 #include <gtest/gtest.h>
 
 #include "src/starnix/tests/syscalls/cpp/test_helper.h"
@@ -42,15 +44,56 @@ TEST(PipeTest, BlockingSmallWrites) {
 TEST(PipeTest, SpliceShortRead) {
   char* tmp = getenv("TEST_TMPDIR");
   std::string path = tmp == nullptr ? "/tmp/test_file" : std::string(tmp) + "/test_file";
-  int fd = open(path.c_str(), O_RDWR | O_CREAT | O_TRUNC, 0777);
-  ASSERT_GE(fd, 0);
-  ASSERT_EQ(write(fd, "hello", 5), 5);
+  fbl::unique_fd fd(open(path.c_str(), O_RDWR | O_CREAT | O_TRUNC, 0777));
+  ASSERT_TRUE(fd.is_valid());
+  ASSERT_EQ(write(fd.get(), "hello", 5), 5);
   int pipefd[2];
   SAFE_SYSCALL(pipe2(pipefd, 0));
   off64_t offset = 0;
-  ASSERT_EQ(splice(fd, &offset, pipefd[1], nullptr, 100, 0), 5);
+  ASSERT_EQ(splice(fd.get(), &offset, pipefd[1], nullptr, 100, 0), 5);
   char buffer[100];
   ASSERT_EQ(read(pipefd[0], buffer, 10), 5);
   ASSERT_EQ(strncmp(buffer, "hello", 5), 0);
 }
+
+std::string CreateNewFifo() {
+  char* tmp = getenv("TEST_TMPDIR");
+  std::string dir_path = tmp == nullptr ? "/tmp/dirXXXXXX" : std::string(tmp) + "/dirXXXXXX";
+  mkdtemp(&dir_path[0]);
+  std::string fifo_path = dir_path + "/fifo";
+  EXPECT_EQ(mkfifo(fifo_path.c_str(), 0600), 0);
+  return fifo_path;
+}
+
+TEST(PipeTest, OpenFifoRW) {
+  std::string path = CreateNewFifo();
+  // Open and close the the fifo once.
+  fbl::unique_fd fifo(open(path.c_str(), O_RDWR));
+  ASSERT_TRUE(fifo.is_valid());
+}
+
+TEST(PipeTest, OpenFifoRo_NotBlocking) {
+  std::string path = CreateNewFifo();
+  // Reopen the fifo and check it is not disconnected.
+  fbl::unique_fd fifo(open(path.c_str(), O_RDONLY | O_NONBLOCK));
+  ASSERT_TRUE(fifo.is_valid());
+}
+
+void on_alarm(int) {}
+
+TEST(PipeTest, OpenFifoBlock) {
+  test_helper::ForkHelper helper;
+  helper.RunInForkedProcess([] {
+    std::string path = CreateNewFifo();
+    struct sigaction act;
+    act.sa_handler = on_alarm;
+    act.sa_flags = 0;
+    sigaction(SIGALRM, &act, nullptr);
+    alarm(1);
+    int fd = open(path.c_str(), O_RDONLY);
+    ASSERT_EQ(fd, -1);
+    ASSERT_EQ(errno, EINTR);
+  });
+}
+
 }  // namespace

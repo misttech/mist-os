@@ -194,7 +194,6 @@
                 "FcntlSignalTest.SetSigDupBothRegisteredAfterDup",
                 "FcntlSignalTest.SetSigDupUnregisterOld",
                 "FcntlSignalTest.SetSigDupUnregisterNew",
-                "FifoTest.OpenBlockedAndInterrupted",
                 "FcntlLockTest.GetLockRespectsPIDNamespace",
 
                 // fork_test
@@ -1061,6 +1060,9 @@
 
                 // Skip for roll
                 "RtSignalTest.ValueDelivered",
+
+                // Depend on missing timer feature.
+                "FifoTest.OpenBlockedAndInterrupted",
             ],
         },
     ],

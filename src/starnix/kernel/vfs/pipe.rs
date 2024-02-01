@@ -5,7 +5,7 @@
 use crate::{
     mm::{read_to_vec, MemoryAccessorExt, PAGE_SIZE},
     signals::{send_standard_signal, SignalInfo},
-    task::{CurrentTask, EventHandler, Kernel, WaitCanceler, WaitQueue, Waiter},
+    task::{CurrentTask, EventHandler, Kernel, WaitCallback, WaitCanceler, WaitQueue, Waiter},
     vfs::{
         buffers::{
             Buffer, InputBuffer, InputBufferCallback, MessageQueue, OutputBuffer,
@@ -13,7 +13,7 @@ use crate::{
         },
         default_fcntl, default_ioctl, fileops_impl_nonseekable, CacheMode, FileHandle, FileObject,
         FileOps, FileSystem, FileSystemHandle, FileSystemOps, FileSystemOptions, FsNodeInfo, FsStr,
-        MountInfo, SpecialNode,
+        SpecialNode,
     },
 };
 use starnix_sync::{FileOpsIoctl, LockBefore, Locked, Mutex, MutexGuard, ReadOps, WriteOps};
@@ -28,8 +28,7 @@ use starnix_uapi::{
     statfs, uapi,
     user_address::{UserAddress, UserRef},
     user_buffer::UserBuffer,
-    vfs::default_statfs,
-    vfs::FdEvents,
+    vfs::{default_statfs, FdEvents},
     FIONREAD, F_GETPIPE_SZ, F_SETPIPE_SZ, PIPEFS_MAGIC,
 };
 use std::{cmp::Ordering, convert::TryInto, sync::Arc};
@@ -76,14 +75,23 @@ impl Pipe {
         }))
     }
 
-    pub fn open(pipe: &Arc<Mutex<Self>>, flags: OpenFlags) -> Result<Box<dyn FileOps>, Errno> {
+    pub fn open(
+        current_task: &CurrentTask,
+        pipe: &Arc<Mutex<Self>>,
+        flags: OpenFlags,
+    ) -> Result<Box<dyn FileOps>, Errno> {
         let mut events = FdEvents::empty();
         let mut pipe_locked = pipe.lock();
+        let mut must_wait_events = FdEvents::empty();
         if flags.can_read() {
             if !pipe_locked.had_reader {
                 events |= FdEvents::POLLOUT;
             }
             pipe_locked.add_reader();
+            if !flags.contains(OpenFlags::NONBLOCK) && !flags.can_write() && !pipe_locked.had_writer
+            {
+                must_wait_events |= FdEvents::POLLIN;
+            }
         }
         if flags.can_write() {
             // https://man7.org/linux/man-pages/man2/open.2.html says:
@@ -98,11 +106,43 @@ impl Pipe {
                 events |= FdEvents::POLLIN;
             }
             pipe_locked.add_writer();
+            if !flags.contains(OpenFlags::NONBLOCK) && !pipe_locked.had_reader {
+                must_wait_events |= FdEvents::POLLOUT;
+            }
         }
         if events != FdEvents::empty() {
             pipe_locked.waiters.notify_fd_events(events);
         }
-        Ok(Box::new(PipeFileObject { pipe: Arc::clone(pipe) }))
+        let ops = PipeFileObject { pipe: Arc::clone(pipe) };
+        if must_wait_events == FdEvents::empty() {
+            return Ok(Box::new(ops));
+        }
+
+        // Ensures that the new PipeFileObject is closed if is it dropped before being returned.
+        let ops = scopeguard::guard(ops, |ops| {
+            ops.on_close(flags);
+        });
+
+        // Wait for the pipe to be connected.
+        let waiter = Waiter::new();
+        loop {
+            pipe_locked.waiters.wait_async_fd_events(
+                &waiter,
+                must_wait_events,
+                WaitCallback::none(),
+            );
+            std::mem::drop(pipe_locked);
+            match waiter.wait(current_task) {
+                Err(e) => {
+                    return Err(e);
+                }
+                _ => {}
+            }
+            pipe_locked = pipe.lock();
+            if pipe_locked.had_writer && pipe_locked.had_reader {
+                return Ok(Box::new(scopeguard::ScopeGuard::into_inner(ops)));
+            }
+        }
     }
 
     /// Increments the reader count for this pipe by 1.
@@ -115,6 +155,17 @@ impl Pipe {
     pub fn add_writer(&mut self) {
         self.writer_count += 1;
         self.had_writer = true;
+    }
+
+    /// Called whenever a fd to the pipe is closed. Reset the pipe state if there is not more
+    /// reader or writer.
+    pub fn on_close(&mut self) {
+        if self.reader_count == 0 && self.writer_count == 0 {
+            self.had_reader = false;
+            self.had_writer = false;
+            self.messages = MessageQueue::new(self.messages.capacity());
+            self.waiters = WaitQueue::default();
+        }
     }
 
     fn capacity(&self) -> usize {
@@ -327,13 +378,16 @@ pub fn new_pipe(current_task: &CurrentTask) -> Result<(FileHandle, FileHandle), 
         info.blksize = ATOMIC_IO_BYTES.into();
         info
     });
+    let pipe = node.fifo.as_ref().unwrap();
+    {
+        let mut state = pipe.lock();
+        state.add_reader();
+        state.add_writer();
+    }
 
     let open = |flags: OpenFlags| {
-        Ok(FileObject::new_anonymous(
-            node.open(current_task, &MountInfo::detached(), flags, false)?,
-            Arc::clone(&node),
-            flags,
-        ))
+        let ops = PipeFileObject { pipe: Arc::clone(pipe) };
+        Ok(FileObject::new_anonymous(Box::new(ops), Arc::clone(&node), flags))
     };
 
     Ok((open(OpenFlags::RDONLY)?, open(OpenFlags::WRONLY)?))
@@ -362,31 +416,7 @@ impl FileOps for PipeFileObject {
     fileops_impl_nonseekable!();
 
     fn close(&self, file: &FileObject, _current_task: &CurrentTask) {
-        let mut events = FdEvents::empty();
-        let mut pipe = self.pipe.lock();
-        let flags = file.flags();
-        if flags.can_read() {
-            assert!(pipe.reader_count > 0);
-            pipe.reader_count -= 1;
-            if pipe.reader_count == 0 {
-                events |= FdEvents::POLLOUT;
-            }
-        }
-        if flags.can_write() {
-            assert!(pipe.writer_count > 0);
-            pipe.writer_count -= 1;
-            if pipe.writer_count == 0 {
-                if pipe.reader_count > 0 {
-                    events |= FdEvents::POLLHUP;
-                }
-                if !pipe.messages.is_empty() {
-                    events |= FdEvents::POLLIN;
-                }
-            }
-        }
-        if events != FdEvents::empty() {
-            pipe.waiters.notify_fd_events(events);
-        }
+        self.on_close(file.flags());
     }
 
     fn read(
@@ -636,6 +666,35 @@ impl<'a> InputBuffer for SpliceInputBuffer<'a> {
 }
 
 impl PipeFileObject {
+    /// Called whenever a fd to a pipe is closed.
+    fn on_close(&self, flags: OpenFlags) {
+        let mut events = FdEvents::empty();
+        let mut pipe = self.pipe.lock();
+        if flags.can_read() {
+            assert!(pipe.reader_count > 0);
+            pipe.reader_count -= 1;
+            if pipe.reader_count == 0 {
+                events |= FdEvents::POLLOUT;
+            }
+        }
+        if flags.can_write() {
+            assert!(pipe.writer_count > 0);
+            pipe.writer_count -= 1;
+            if pipe.writer_count == 0 {
+                if pipe.reader_count > 0 {
+                    events |= FdEvents::POLLHUP;
+                }
+                if !pipe.messages.is_empty() {
+                    events |= FdEvents::POLLIN;
+                }
+            }
+        }
+        if events != FdEvents::empty() {
+            pipe.waiters.notify_fd_events(events);
+        }
+        pipe.on_close();
+    }
+
     /// Returns the result of `pregen` and a lock on pipe, once `condition` returns true, ensuring
     /// `pregen` is run before the pipe is locked.
     ///
