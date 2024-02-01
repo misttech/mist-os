@@ -7,7 +7,7 @@ pub use core_macros::{ffx_command, ffx_plugin};
 use anyhow::Result;
 use async_trait::async_trait;
 use ffx_writer::Writer;
-use fidl_fuchsia_developer_ffx::{DaemonProxy, TargetProxy, VersionInfo};
+use fidl_fuchsia_developer_ffx::{DaemonProxy, FastbootProxy, TargetProxy, VersionInfo};
 use fidl_fuchsia_developer_remotecontrol::RemoteControlProxy;
 
 /// Exports used in macros
@@ -28,6 +28,7 @@ pub trait Injector {
     /// Attempts to get a handle to the ffx daemon.
     async fn try_daemon(&self) -> Result<Option<DaemonProxy>>;
     async fn remote_factory(&self) -> Result<RemoteControlProxy>;
+    async fn fastboot_factory(&self) -> Result<FastbootProxy>;
     async fn target_factory(&self) -> Result<TargetProxy>;
     async fn is_experiment(&self, key: &str) -> bool;
     async fn build_info(&self) -> Result<VersionInfo>;

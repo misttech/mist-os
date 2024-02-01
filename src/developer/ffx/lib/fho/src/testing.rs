@@ -12,7 +12,7 @@ use ffx_command::{FfxCommandLine, Result};
 use ffx_config::EnvironmentContext;
 use ffx_core::Injector;
 use ffx_writer::Writer;
-use fidl_fuchsia_developer_ffx::{DaemonProxy, TargetProxy, VersionInfo};
+use fidl_fuchsia_developer_ffx::{DaemonProxy, FastbootProxy, TargetProxy, VersionInfo};
 use fidl_fuchsia_developer_remotecontrol::RemoteControlProxy;
 use std::{future::Future, pin::Pin, sync::Arc};
 
@@ -51,6 +51,7 @@ impl ToolEnv {
     factory_func!(daemon_factory_closure, DaemonProxy);
     factory_func!(try_daemon_closure, Option<DaemonProxy>);
     factory_func!(remote_factory_closure, RemoteControlProxy);
+    factory_func!(fastboot_factory_closure, FastbootProxy);
     factory_func!(target_factory_closure, TargetProxy);
     factory_func!(build_info_closure, VersionInfo);
     factory_func!(writer_closure, Writer);
@@ -106,6 +107,8 @@ pub struct FakeInjector {
         Box<dyn Fn() -> Pin<Box<dyn Future<Output = anyhow::Result<Option<DaemonProxy>>>>>>,
     remote_factory_closure:
         Box<dyn Fn() -> Pin<Box<dyn Future<Output = anyhow::Result<RemoteControlProxy>>>>>,
+    fastboot_factory_closure:
+        Box<dyn Fn() -> Pin<Box<dyn Future<Output = anyhow::Result<FastbootProxy>>>>>,
     target_factory_closure:
         Box<dyn Fn() -> Pin<Box<dyn Future<Output = anyhow::Result<TargetProxy>>>>>,
     is_experiment_closure: Box<dyn Fn(&str) -> Pin<Box<dyn Future<Output = bool>>>>,
@@ -119,6 +122,7 @@ impl Default for FakeInjector {
             daemon_factory_closure: Box::new(|| Box::pin(async { unimplemented!() })),
             try_daemon_closure: Box::new(|| Box::pin(async { unimplemented!() })),
             remote_factory_closure: Box::new(|| Box::pin(async { unimplemented!() })),
+            fastboot_factory_closure: Box::new(|| Box::pin(async { unimplemented!() })),
             target_factory_closure: Box::new(|| Box::pin(async { unimplemented!() })),
             is_experiment_closure: Box::new(|_| Box::pin(async { unimplemented!() })),
             build_info_closure: Box::new(|| Box::pin(async { unimplemented!() })),
@@ -139,6 +143,10 @@ impl Injector for FakeInjector {
 
     async fn remote_factory(&self) -> anyhow::Result<RemoteControlProxy> {
         (self.remote_factory_closure)().await
+    }
+
+    async fn fastboot_factory(&self) -> anyhow::Result<FastbootProxy> {
+        (self.fastboot_factory_closure)().await
     }
 
     async fn target_factory(&self) -> anyhow::Result<TargetProxy> {

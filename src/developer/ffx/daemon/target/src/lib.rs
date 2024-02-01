@@ -20,6 +20,7 @@ pub(crate) const ZEDBOOT_MAX_AGE: Duration =
 /// RCS connection retry delay.
 pub(crate) const RETRY_DELAY: Duration = Duration::from_millis(200);
 
+pub mod fastboot;
 mod overnet;
 pub mod target;
 pub mod target_collection;

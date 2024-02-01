@@ -384,6 +384,13 @@ impl TryFromEnv for ffx_fidl::TargetProxy {
 }
 
 #[async_trait(?Send)]
+impl TryFromEnv for ffx_fidl::FastbootProxy {
+    async fn try_from_env(env: &FhoEnvironment) -> Result<Self> {
+        env.injector.fastboot_factory().await.user_message("Failed to create fastboot proxy")
+    }
+}
+
+#[async_trait(?Send)]
 impl TryFromEnv for fidl_fuchsia_developer_remotecontrol::RemoteControlProxy {
     async fn try_from_env(env: &FhoEnvironment) -> Result<Self> {
         match env.injector.remote_factory().await {

@@ -29,6 +29,7 @@ pub const MISSING_CREDENTIALS: &str =
 pub mod cmd;
 pub mod crypto;
 pub mod fastboot;
+pub mod fidl_fastboot_compatibility;
 pub mod vars;
 
 pub trait Partition {
