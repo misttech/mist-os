@@ -1510,9 +1510,10 @@ pub enum SendToError {
     /// to use for the send operation.
     #[error("could not create a temporary connection socket: {}", _0)]
     CreateSock(IpSockCreationError),
-    /// An MTU was exceeded.
-    #[error("the maximum transmission unit (MTU) was exceeded")]
-    Mtu,
+    /// An error was encountered while trying to send via the temporary IP
+    /// socket.
+    #[error("could not send via temporary socket: {}", _0)]
+    Send(IpSockSendError),
     /// There was a problem with the remote address relating to its zone.
     #[error("zone error: {}", _0)]
     Zone(ZonedAddressError),
@@ -2126,7 +2127,7 @@ where
                         datagram::SendToError::NotWriteable => SendToError::NotWriteable,
                         datagram::SendToError::Zone(e) => SendToError::Zone(e),
                         datagram::SendToError::CreateAndSend(e) => match e {
-                            IpSockCreateAndSendError::Mtu => SendToError::Mtu,
+                            IpSockCreateAndSendError::Send(e) => SendToError::Send(e),
                             IpSockCreateAndSendError::Create(e) => SendToError::CreateSock(e),
                         },
                         datagram::SendToError::RemoteUnexpectedlyMapped => {

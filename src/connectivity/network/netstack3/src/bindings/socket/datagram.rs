@@ -32,7 +32,7 @@ use netstack3_core::{
     device::{DeviceId, WeakDeviceId},
     error::{LocalAddressError, NotSupportedError, SocketError},
     icmp::{self, IcmpEchoBindingsContext},
-    ip::IpSockCreateAndSendError,
+    ip::{IpSockCreateAndSendError, IpSockSendError},
     socket::{
         self as core_socket, ConnectError, ExpectedConnError, ExpectedUnboundError,
         MulticastInterfaceSelector, MulticastMembershipInterfaceSelector, NotDualStackCapableError,
@@ -851,9 +851,14 @@ impl<E> IntoErrno for core_socket::SendToError<E> {
         match self {
             core_socket::SendToError::NotWriteable => fposix::Errno::Epipe,
             core_socket::SendToError::Zone(err) => err.into_errno(),
-            core_socket::SendToError::CreateAndSend(IpSockCreateAndSendError::Mtu) => {
-                fposix::Errno::Emsgsize
-            }
+            // NB: Mapping MTU to EMSGSIZE is different from the impl on
+            // `IpSockSendError` which maps to EINVAL instead.
+            core_socket::SendToError::CreateAndSend(IpSockCreateAndSendError::Send(
+                IpSockSendError::Mtu,
+            )) => fposix::Errno::Emsgsize,
+            core_socket::SendToError::CreateAndSend(IpSockCreateAndSendError::Send(
+                IpSockSendError::Unroutable(err),
+            )) => err.into_errno(),
             core_socket::SendToError::CreateAndSend(IpSockCreateAndSendError::Create(err)) => {
                 err.into_errno()
             }

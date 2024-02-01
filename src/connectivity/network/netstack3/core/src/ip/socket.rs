@@ -44,10 +44,6 @@ pub trait IpSocketHandler<I: IpExt, BC>: DeviceIdContext<AnyDevice> {
     /// `new_ip_socket` returns an error if no route to the remote was found in
     /// the forwarding table or if the given local IP address is not valid for
     /// the found route.
-    ///
-    /// The builder may be used to override certain default parameters. Passing
-    /// `None` for the `builder` parameter is equivalent to passing
-    /// `Some(Default::default())`.
     fn new_ip_socket<O>(
         &mut self,
         bindings_ctx: &mut BC,
@@ -84,7 +80,7 @@ pub trait IpSocketHandler<I: IpExt, BC>: DeviceIdContext<AnyDevice> {
 
     /// Creates a temporary IP socket and sends a single packet on it.
     ///
-    /// `local_ip`, `remote_ip`, `proto`, and `builder` are passed directly to
+    /// `local_ip`, `remote_ip`, `proto`, and `options` are passed directly to
     /// [`IpSocketHandler::new_ip_socket`]. `get_body_from_src_ip` is given the
     /// source IP address for the packet - which may have been chosen
     /// automatically if `local_ip` is `None` - and returns the body to be
@@ -100,14 +96,10 @@ pub trait IpSocketHandler<I: IpExt, BC>: DeviceIdContext<AnyDevice> {
     ///
     /// # Errors
     ///
-    /// If an error is encountered while sending the packet, the body returned
-    /// from `get_body_from_src_ip` will be returned along with the error. If an
-    /// error is encountered while constructing the temporary IP socket,
-    /// `get_body_from_src_ip` will be called on an arbitrary IP address in
-    /// order to obtain a body to return. In the case where a buffer was passed
-    /// by ownership to `get_body_from_src_ip`, this allows the caller to
-    /// recover that buffer. `get_body_from_src_ip` is fallible, and if there's
-    /// an error, it will be returned as well.
+    /// If an error is encountered while constructing the temporary IP socket
+    /// or sending the packet, `options` will be returned along with the
+    /// error. `get_body_from_src_ip` is fallible, and if there's an error,
+    /// it will be returned as well.
     fn send_oneshot_ip_packet_with_fallible_serializer<S, E, F, O>(
         &mut self,
         bindings_ctx: &mut BC,
@@ -125,31 +117,18 @@ pub trait IpSocketHandler<I: IpExt, BC>: DeviceIdContext<AnyDevice> {
         F: FnOnce(SocketIpAddr<I::Addr>) -> Result<S, E>,
         O: SendOptions<I>,
     {
-        // We use a `match` instead of `map_err` because `map_err` would require passing a closure
-        // which takes ownership of `get_body_from_src_ip`, which we also use in the success case.
-        match self.new_ip_socket(bindings_ctx, device, local_ip, remote_ip, proto, options) {
-            Err((err, options)) => {
-                Err(SendOneShotIpPacketError::CreateAndSendError { err: err.into(), options })
-            }
-            Ok(tmp) => {
-                let packet = get_body_from_src_ip(*tmp.local_ip())
-                    .map_err(SendOneShotIpPacketError::SerializeError)?;
-                self.send_ip_packet(bindings_ctx, &tmp, packet, mtu).map_err(|(_body, err)| {
-                    match err {
-                        IpSockSendError::Mtu => {
-                            let IpSock { options, definition: _ } = tmp;
-                            SendOneShotIpPacketError::CreateAndSendError {
-                                err: IpSockCreateAndSendError::Mtu,
-                                options,
-                            }
-                        }
-                        IpSockSendError::Unroutable(_) => {
-                            unreachable!("socket which was just created should still be routable")
-                        }
-                    }
-                })
-            }
-        }
+        let tmp = self
+            .new_ip_socket(bindings_ctx, device, local_ip, remote_ip, proto, options)
+            .map_err(|(err, options)| SendOneShotIpPacketError::CreateAndSendError {
+                err: err.into(),
+                options,
+            })?;
+        let packet = get_body_from_src_ip(*tmp.local_ip())
+            .map_err(SendOneShotIpPacketError::SerializeError)?;
+        self.send_ip_packet(bindings_ctx, &tmp, packet, mtu).map_err(|(_body, err)| {
+            let IpSock { options, definition: _ } = tmp;
+            SendOneShotIpPacketError::CreateAndSendError { err: err.into(), options }
+        })
     }
 
     /// Sends a one-shot IP packet but with a non-fallible serializer.
@@ -213,12 +192,9 @@ impl From<SerializeError<Infallible>> for IpSockSendError {
 /// An error in sending a packet on a temporary IP socket.
 #[derive(Error, Copy, Clone, Debug)]
 pub enum IpSockCreateAndSendError {
-    /// An MTU was exceeded.
-    ///
-    /// This could be caused by an MTU at any layer of the stack, including both
-    /// device MTUs and packet format body size limits.
-    #[error("a maximum transmission unit (MTU) was exceeded")]
-    Mtu,
+    /// Cannot send via temporary socket.
+    #[error("cannot send via temporary socket: {}", _0)]
+    Send(#[from] IpSockSendError),
     /// The temporary socket could not be created.
     #[error("the temporary socket could not be created: {}", _0)]
     Create(#[from] IpSockCreationError),
@@ -457,6 +433,10 @@ impl<
         // the socket. We do not care about the actual destination here because
         // we will recalculate it when we send a packet so that the best route
         // available at the time is used for each outgoing packet.
+        //
+        // TODO(https://fxbug.dev/323389672): Cache a reference to the route to
+        // avoid the route lookup on send as long as the routing table hasn't
+        // changed in between these operations.
         let ResolvedRoute { src_addr, device: route_device, next_hop: _ } =
             match self.lookup_route(bindings_ctx, device, local_ip, remote_ip) {
                 Ok(r) => r,

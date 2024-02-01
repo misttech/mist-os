@@ -629,7 +629,10 @@ impl IntoErrno for udp::SendToError {
             Self::NotWriteable => Errno::Epipe,
             Self::CreateSock(err) => err.into_errno(),
             Self::Zone(err) => err.into_errno(),
-            Self::Mtu => Errno::Emsgsize,
+            // NB: Mapping MTU to EMSGSIZE is different from the impl on
+            // `IpSockSendError` which maps to EINVAL instead.
+            Self::Send(IpSockSendError::Mtu) => Errno::Emsgsize,
+            Self::Send(IpSockSendError::Unroutable(err)) => err.into_errno(),
             Self::RemotePortUnset => Errno::Einval,
             Self::RemoteUnexpectedlyMapped => Errno::Enetunreach,
             Self::RemoteUnexpectedlyNonMapped => Errno::Eafnosupport,
