@@ -56,7 +56,12 @@ class __OWNER(T) InlineArray {
 
   T* get() const { return ptr_; }
 
-  T& operator[](size_t i) const {
+  T& operator[](size_t i) {
+    ZX_DEBUG_ASSERT(i < count_);
+    return ptr_[i];
+  }
+
+  const T& operator[](size_t i) const {
     ZX_DEBUG_ASSERT(i < count_);
     return ptr_[i];
   }

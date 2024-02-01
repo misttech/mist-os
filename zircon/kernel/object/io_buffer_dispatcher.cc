@@ -81,7 +81,7 @@ zx_status_t IoBufferDispatcher::Create(uint64_t options,
 
   Guard<CriticalMutex> guard{&shared_regions->state_lock};
   for (unsigned i = 0; i < region_configs.size(); i++) {
-    zx_iob_region_t& region_config = region_configs[i];
+    zx_iob_region_t region_config = region_configs[i];
     if (region_config.type != ZX_IOB_REGION_TYPE_PRIVATE) {
       return ZX_ERR_INVALID_ARGS;
     }
