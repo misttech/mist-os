@@ -99,7 +99,8 @@ def spawn(
 
     atexit.register(_cleanup)
 
-    # Replace stdout with the named pipe we created.
-    sys.stdout = open(fifo, "w")
+    # Replace stdout with the named pipe we created and enable line buffering.
+    # Note: 1 == line buffered. See https://docs.python.org/3/library/functions.html#open.
+    sys.stdout = open(fifo, "w", 1)
 
     return debugger_process
