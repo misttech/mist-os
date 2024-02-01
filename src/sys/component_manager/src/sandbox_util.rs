@@ -4,10 +4,15 @@
 
 use {
     crate::model::{
+        actions::resolve::sandbox_construction::CapabilitySourceFactory,
         component::{ComponentInstance, WeakComponentInstance},
         routing::router::{Completer, Request, Routable, Router},
     },
-    ::routing::{capability_source::CapabilitySource, policy::GlobalPolicyChecker},
+    crate::PathBuf,
+    ::routing::{
+        capability_source::CapabilitySource, component_instance::ComponentInstanceInterface,
+        policy::GlobalPolicyChecker,
+    },
     cm_types::Name,
     cm_util::WeakTaskGroup,
     fidl::{
@@ -18,11 +23,12 @@ use {
     fidl_fuchsia_component_sandbox as fsandbox, fidl_fuchsia_io as fio,
     fuchsia_zircon::{self as zx},
     futures::future::BoxFuture,
+    futures::FutureExt,
     lazy_static::lazy_static,
-    sandbox::{AnyCapability, Capability, Dict, ErasedCapability, Message, Open, Receiver, Sender},
+    sandbox::{AnyCapability, Capability, Dict, ErasedCapability, Open},
     std::iter,
     std::sync::{self, Arc},
-    tracing::{info, warn},
+    tracing::warn,
     vfs::{directory::entry::DirectoryEntry, execution_scope::ExecutionScope, path::Path},
 };
 
@@ -37,6 +43,32 @@ pub fn take_handle_as_stream<P: ProtocolMarker>(channel: zx::Channel) -> P::Requ
     P::RequestStream::from_channel(channel)
 }
 
+/// If the protocol connection request requires serving the `fuchsia.io/Node`
+/// protocol, serve that internally and return `None`. Otherwise, handle the
+/// connection flags such as `DESCRIBE` and return the server endpoint such
+/// that a custom FIDL protocol may be served on it.
+fn unwrap_server_end_or_serve_node(
+    channel: zx::Channel,
+    flags: fidl_fuchsia_io::OpenFlags,
+) -> Option<zx::Channel> {
+    let server_end_return = Arc::new(sync::Mutex::new(None));
+    let server_end_return_clone = server_end_return.clone();
+    let service = vfs::service::endpoint(
+        move |_scope: ExecutionScope, server_end: fuchsia_async::Channel| {
+            let mut server_end_return = server_end_return_clone.lock().unwrap();
+            *server_end_return = Some(server_end.into_zx_channel());
+        },
+    );
+    service.open(ExecutionScope::new(), flags, Path::dot(), channel.into());
+
+    let mut server_end_return = server_end_return.lock().unwrap();
+    if let Some(server_end) = server_end_return.take() {
+        Some(server_end)
+    } else {
+        None
+    }
+}
+
 pub trait ProtocolPayloadExt {
     /// If the protocol connection request requires serving the `fuchsia.io/Node`
     /// protocol, serve that internally and return `None`. Otherwise, handle the
@@ -47,24 +79,7 @@ pub trait ProtocolPayloadExt {
 
 impl ProtocolPayloadExt for fsandbox::ProtocolPayload {
     fn unwrap_server_end_or_serve_node(self) -> Option<zx::Channel> {
-        let server_end_return = Arc::new(sync::Mutex::new(None));
-        let server_end_return_clone = server_end_return.clone();
-        let service = vfs::service::endpoint(
-            move |_scope: ExecutionScope, server_end: fuchsia_async::Channel| {
-                let mut server_end_return = server_end_return_clone.lock().unwrap();
-                *server_end_return = Some(server_end.into_zx_channel());
-            },
-        );
-        let flags = self.flags;
-        let server_end = self.channel;
-        service.open(ExecutionScope::new(), flags, Path::dot(), server_end.into());
-
-        let mut server_end_return = server_end_return.lock().unwrap();
-        if let Some(server_end) = server_end_return.take() {
-            Some(server_end)
-        } else {
-            None
-        }
+        unwrap_server_end_or_serve_node(self.channel, self.flags)
     }
 }
 
@@ -206,59 +221,9 @@ impl DictExt for Dict {
     }
 }
 
-// This is an adaptor from a `Sender<Message>` to `Router`.
-//
-// When the router receives a message, it will return an `Open` capability that will
-// send a message with a pipelined server endpoint via the `Sender`, along with
-// attribution information in the router `request`.
-//
-// TODO(b/310741884): This is a temporary adaptor to transition us from a one-step
-// capability request to two-steps (route and open). At the end of the transition,
-// `Sender<Message>` and `Receiver<Message>` would disappear. We'll only be left
-// with `Open`, which may represent a protocol capability.
-pub fn new_terminating_router(sender: Sender<WeakComponentInstance>) -> Router {
-    Router::new(move |request: Request, completer: Completer| {
-        let sender = sender.clone();
-        let target = request.target.clone();
-        let open_fn = move |_scope: ExecutionScope,
-                            flags: fio::OpenFlags,
-                            path: Path,
-                            server_end: zx::Channel| {
-            // TODO(b/310741884): Right now we are haphazardly validating the
-            // path, but this operation should be handled automatically inside
-            // an `Open` which represents a protocol capability. To do that, a
-            // capability provider need to provide capabilities by vending
-            // `Open` objects.
-            //
-            // Furthermore, once we route other capability types via bedrock,
-            // sometimes those types do want to carry non-empty paths. The
-            // `Open` signature will provide a uniform interface for both.
-            if !path.is_empty() {
-                let moniker = &target.moniker;
-                warn!(
-                    "{moniker} accessed a protocol capability with non-empty path {path:?}. \
-                This is not supported."
-                );
-                let _ = server_end.close_with_epitaph(zx::Status::NOT_DIR);
-                return;
-            }
-            if let Err(_e) = sender.send(Message {
-                payload: fsandbox::ProtocolPayload { channel: server_end.into(), flags },
-                target: target.clone(),
-            }) {
-                info!("failed to send capability: receiver has been destroyed");
-            }
-        };
-        let open = Open::new(open_fn, fio::DirentType::Service);
-        let open = Box::new(open) as AnyCapability;
-        open.route(request, completer);
-    })
-}
-
 /// Waits for a new message on a receiver, and launches a new async task on a `WeakTaskGroup` to
 /// handle each new message from the receiver.
 pub struct LaunchTaskOnReceive {
-    receiver: Receiver<WeakComponentInstance>,
     task_to_launch: Arc<
         dyn Fn(zx::Channel, WeakComponentInstance) -> BoxFuture<'static, Result<(), anyhow::Error>>
             + Sync
@@ -277,7 +242,6 @@ impl LaunchTaskOnReceive {
     pub fn new(
         task_group: WeakTaskGroup,
         task_name: impl Into<String>,
-        receiver: Receiver<WeakComponentInstance>,
         policy: Option<(GlobalPolicyChecker, CapabilitySource<ComponentInstance>)>,
         task_to_launch: Arc<
             dyn Fn(
@@ -289,33 +253,104 @@ impl LaunchTaskOnReceive {
                 + 'static,
         >,
     ) -> Self {
-        Self { receiver, task_to_launch, task_group, policy, task_name: task_name.into() }
+        Self { task_to_launch, task_group, policy, task_name: task_name.into() }
     }
 
-    pub async fn run(self) {
-        while let Some(message) = self.receiver.receive().await {
-            if let Some((policy_checker, capability_source)) = &self.policy {
-                if let Err(_e) =
-                    policy_checker.can_route_capability(&capability_source, &message.target.moniker)
-                {
-                    // The `can_route_capability` function above will log an error, so we don't
-                    // have to.
-                    let _ = message.payload.channel.close_with_epitaph(zx::Status::ACCESS_DENIED);
-                    continue;
+    pub fn into_open(self: Arc<Self>, target: WeakComponentInstance) -> Open {
+        Open::new(
+            move |_scope: ExecutionScope,
+                  flags: fio::OpenFlags,
+                  path: vfs::path::Path,
+                  server_end: zx::Channel| {
+                let Some(server_end) = unwrap_server_end_or_serve_node(server_end, flags) else {
+                    return;
+                };
+                if !path.is_empty() {
+                    let moniker = &target.moniker;
+                    warn!(
+                        "{moniker} accessed a protocol capability with non-empty path {path:?}. \
+                    This is not supported."
+                    );
+                    let _ = server_end.close_with_epitaph(zx::Status::NOT_DIR);
+                    return;
                 }
-            }
+                self.launch_task(server_end, target.clone());
+            },
+            fio::DirentType::Service,
+        )
+    }
 
-            let Some(server_end) = message.payload.unwrap_server_end_or_serve_node() else {
-                continue;
-            };
-            let fut = (self.task_to_launch)(server_end, message.target);
-            let task_name = self.task_name.clone();
-            self.task_group.spawn(async move {
-                if let Err(error) = fut.await {
-                    warn!(%error, "{} failed", task_name);
-                }
-            });
+    pub fn into_router(self) -> Router {
+        let me = Arc::new(self);
+        Router::new(move |request: Request, completer: Completer| {
+            completer.complete(Ok(Box::new(me.clone().into_open(request.target)) as AnyCapability));
+        })
+    }
+
+    fn launch_task(&self, channel: zx::Channel, instance: WeakComponentInstance) {
+        if let Some((policy_checker, capability_source)) = &self.policy {
+            if let Err(_e) =
+                policy_checker.can_route_capability(&capability_source, &instance.moniker)
+            {
+                // The `can_route_capability` function above will log an error, so we don't
+                // have to.
+                let _ = channel.close_with_epitaph(zx::Status::ACCESS_DENIED);
+                return;
+            }
         }
+
+        let fut = (self.task_to_launch)(channel, instance);
+        let task_name = self.task_name.clone();
+        self.task_group.spawn(async move {
+            if let Err(error) = fut.await {
+                warn!(%error, "{} failed", task_name);
+            }
+        });
+    }
+
+    // Create a new LaunchTaskOnReceive that represents a framework hook task.
+    // The task that this launches finds the components internal provider and will
+    // open that.
+    pub fn new_hook_launch_task(
+        component: &Arc<ComponentInstance>,
+        cap_source_factory: CapabilitySourceFactory,
+    ) -> LaunchTaskOnReceive {
+        let weak_component = WeakComponentInstance::new(component);
+        let capability_source = cap_source_factory.run(weak_component.clone());
+        LaunchTaskOnReceive::new(
+            component.nonblocking_task_group().as_weak(),
+            "framework hook dispatcher",
+            Some((component.context.policy().clone(), capability_source.clone())),
+            Arc::new(move |mut channel, target| {
+                let weak_component = weak_component.clone();
+                let capability_source = capability_source.clone();
+                async move {
+                    if let Ok(target) = target.upgrade() {
+                        if let Ok(component) = weak_component.upgrade() {
+                            if let Some(provider) = target
+                                .context
+                                .find_internal_provider(&capability_source, target.as_weak())
+                                .await
+                            {
+                                provider
+                                    .open(
+                                        component.nonblocking_task_group(),
+                                        fio::OpenFlags::empty(),
+                                        PathBuf::from(""),
+                                        &mut channel,
+                                    )
+                                    .await?;
+                                return Ok(());
+                            }
+                        }
+
+                        let _ = channel.close_with_epitaph(zx::Status::UNAVAILABLE);
+                    }
+                    Ok(())
+                }
+                .boxed()
+            }),
+        )
     }
 }
 
@@ -325,6 +360,7 @@ pub mod tests {
     use assert_matches::assert_matches;
     use fidl::endpoints::ClientEnd;
     use futures::StreamExt;
+    use sandbox::Receiver;
     use std::iter;
 
     #[fuchsia::test]

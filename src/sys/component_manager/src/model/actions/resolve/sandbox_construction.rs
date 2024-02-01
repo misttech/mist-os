@@ -9,7 +9,7 @@ use {
             component::{ComponentInstance, WeakComponentInstance},
             routing::router::{Completer, Request, Router},
         },
-        sandbox_util::{new_terminating_router, DictExt},
+        sandbox_util::{DictExt, LaunchTaskOnReceive},
     },
     ::routing::{
         capability_source::{ComponentCapability, InternalCapability},
@@ -19,7 +19,7 @@ use {
     cm_rust::{self, ExposeDeclCommon, OfferDeclCommon, SourceName, SourcePath, UseDeclCommon},
     cm_types::{Name, SeparatedPath},
     moniker::{ChildName, ChildNameBase, MonikerBase},
-    sandbox::{Capability, Dict, ErasedCapability, Open, Receiver, Unit},
+    sandbox::{Capability, Dict, ErasedCapability, Open, Unit},
     std::{collections::HashMap, iter, sync::Arc},
     tracing::warn,
 };
@@ -69,9 +69,6 @@ impl ComponentInput {
 pub struct ComponentSandbox {
     /// Initial dicts for children and collections
     pub child_inputs: HashMap<Name, ComponentInput>,
-    /// Capability source factories and receivers for capabilities that are dispatched through the
-    /// hook system.
-    pub sources_and_receivers: Vec<(CapabilitySourceFactory, Receiver<WeakComponentInstance>)>,
 }
 
 /// Once a component has been resolved and its manifest becomes known, this function produces the
@@ -105,7 +102,6 @@ pub fn build_component_sandbox(
             program_input_dict,
             program_output_dict,
             use_,
-            &mut output.sources_and_receivers,
         );
     }
 
@@ -148,7 +144,6 @@ pub fn build_component_sandbox(
             program_output_dict,
             offer,
             target_dict,
-            &mut output.sources_and_receivers,
         );
     }
 
@@ -159,7 +154,6 @@ pub fn build_component_sandbox(
             program_output_dict,
             expose,
             component_output_dict,
-            &mut output.sources_and_receivers,
         );
     }
 
@@ -175,8 +169,7 @@ pub fn extend_dict_with_offers(
     program_output_dict: &Dict,
     dynamic_offers: &Vec<cm_rust::OfferDecl>,
     target_input: &mut ComponentInput,
-) -> Vec<(CapabilitySourceFactory, Receiver<WeakComponentInstance>)> {
-    let mut sources_and_receivers = vec![];
+) {
     for offer in dynamic_offers {
         extend_dict_with_offer(
             component,
@@ -185,10 +178,8 @@ pub fn extend_dict_with_offers(
             program_output_dict,
             offer,
             &mut target_input.capabilities,
-            &mut sources_and_receivers,
         );
     }
-    sources_and_receivers
 }
 
 fn supported_use(use_: &cm_rust::UseDecl) -> Option<&cm_rust::UseProtocolDecl> {
@@ -205,7 +196,6 @@ fn extend_dict_with_use(
     program_input_dict: &Dict,
     program_output_dict: &Dict,
     use_: &cm_rust::UseDecl,
-    sources_and_receivers: &mut Vec<(CapabilitySourceFactory, Receiver<WeakComponentInstance>)>,
 ) {
     let Some(use_protocol) = supported_use(use_) else {
         return;
@@ -255,28 +245,26 @@ fn extend_dict_with_use(
                 );
                 return;
             }
-            let (receiver, sender) = Receiver::new();
             let source_name = use_.source_name().clone();
-            sources_and_receivers.push((
+            LaunchTaskOnReceive::new_hook_launch_task(
+                component,
                 CapabilitySourceFactory::new(move |component| CapabilitySource::Framework {
                     capability: InternalCapability::Protocol(source_name),
                     component,
                 }),
-                receiver,
-            ));
-            new_terminating_router(sender)
+            )
+            .into_router()
         }
         cm_rust::UseSource::Capability(_) => {
-            let (receiver, sender) = Receiver::new();
             let use_ = use_.clone();
-            sources_and_receivers.push((
+            LaunchTaskOnReceive::new_hook_launch_task(
+                component,
                 CapabilitySourceFactory::new(move |component| CapabilitySource::Capability {
                     source_capability: ComponentCapability::Use(use_.clone()),
                     component,
                 }),
-                receiver,
-            ));
-            new_terminating_router(sender)
+            )
+            .into_router()
         }
         // Unimplemented
         cm_rust::UseSource::Debug | cm_rust::UseSource::Environment => return,
@@ -356,7 +344,6 @@ fn extend_dict_with_offer(
     program_output_dict: &Dict,
     offer: &cm_rust::OfferDecl,
     target_dict: &mut Dict,
-    sources_and_receivers: &mut Vec<(CapabilitySourceFactory, Receiver<WeakComponentInstance>)>,
 ) {
     // We only support protocol and dictionary capabilities right now
     if !is_supported_offer(offer) {
@@ -421,23 +408,25 @@ fn extend_dict_with_offer(
                 return;
             }
             let source_name = offer.source_name().clone();
-            new_router_for_cm_hosted_receiver(
-                sources_and_receivers,
+            LaunchTaskOnReceive::new_hook_launch_task(
+                component,
                 CapabilitySourceFactory::new(move |component| CapabilitySource::Framework {
                     capability: InternalCapability::Protocol(source_name),
                     component,
                 }),
             )
+            .into_router()
         }
         cm_rust::OfferSource::Capability(_) => {
             let offer = offer.clone();
-            new_router_for_cm_hosted_receiver(
-                sources_and_receivers,
+            LaunchTaskOnReceive::new_hook_launch_task(
+                component,
                 CapabilitySourceFactory::new(move |component| CapabilitySource::Capability {
                     source_capability: ComponentCapability::Offer(offer.clone()),
                     component,
                 }),
             )
+            .into_router()
         }
         cm_rust::OfferSource::Void => new_unit_router(),
         // This is only relevant for services, so this arm is never reached.
@@ -459,7 +448,6 @@ fn extend_dict_with_expose(
     program_output_dict: &Dict,
     expose: &cm_rust::ExposeDecl,
     target_dict: &Dict,
-    sources_and_receivers: &mut Vec<(CapabilitySourceFactory, Receiver<WeakComponentInstance>)>,
 ) {
     if !is_supported_expose(expose) {
         return;
@@ -516,23 +504,25 @@ fn extend_dict_with_expose(
                 return;
             }
             let source_name = expose.source_name().clone();
-            new_router_for_cm_hosted_receiver(
-                sources_and_receivers,
+            LaunchTaskOnReceive::new_hook_launch_task(
+                component,
                 CapabilitySourceFactory::new(move |component| CapabilitySource::Framework {
                     capability: InternalCapability::Protocol(source_name),
                     component,
                 }),
             )
+            .into_router()
         }
         cm_rust::ExposeSource::Capability(_) => {
             let expose = expose.clone();
-            new_router_for_cm_hosted_receiver(
-                sources_and_receivers,
+            LaunchTaskOnReceive::new_hook_launch_task(
+                component,
                 CapabilitySourceFactory::new(move |component| CapabilitySource::Capability {
                     source_capability: ComponentCapability::Expose(expose.clone()),
                     component,
                 }),
             )
+            .into_router()
         }
         cm_rust::ExposeSource::Void => new_unit_router(),
         // This is only relevant for services, so this arm is never reached.
@@ -546,15 +536,6 @@ fn extend_dict_with_expose(
 
 fn new_unit_router() -> Router {
     Router::new(|_: Request, completer: Completer| completer.complete(Ok(Box::new(Unit {}))))
-}
-
-fn new_router_for_cm_hosted_receiver(
-    sources_and_receivers: &mut Vec<(CapabilitySourceFactory, Receiver<WeakComponentInstance>)>,
-    cap_source_factory: CapabilitySourceFactory,
-) -> Router {
-    let (receiver, sender) = Receiver::new();
-    sources_and_receivers.push((cap_source_factory, receiver));
-    new_terminating_router(sender)
 }
 
 fn new_forwarding_router_to_child(

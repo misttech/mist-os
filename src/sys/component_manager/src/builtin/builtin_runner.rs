@@ -16,7 +16,7 @@ use fuchsia_zircon::{self as zx, Clock};
 use futures::{future::BoxFuture, Future, FutureExt, TryStreamExt};
 use routing::policy::ScopedPolicyChecker;
 use runner::component::{ChannelEpitaph, Controllable, Controller};
-use sandbox::{Capability, Dict, Receiver};
+use sandbox::{Capability, Dict};
 use std::sync::Arc;
 use thiserror::Error;
 use tracing::warn;
@@ -25,6 +25,7 @@ use zx::{AsHandleRef, HandleBased, Task};
 
 use crate::{
     builtin::runner::BuiltinRunnerFactory,
+    model::component::WeakComponentInstance,
     model::token::{InstanceRegistry, InstanceToken},
     sandbox_util,
     sandbox_util::LaunchTaskOnReceive,
@@ -185,7 +186,6 @@ impl BuiltinRunnerFactory for BuiltinRunner {
 
 /// The program of the ELF runner component.
 struct ElfRunnerProgram {
-    inner: Arc<Inner>,
     task_group: TaskGroup,
     execution_scope: ExecutionScope,
     output: Dict,
@@ -202,70 +202,61 @@ impl ElfRunnerProgram {
     /// - `job`: Each ELF component run by this runner will live inside a job that is a
     ///   child of the provided job.
     fn new(job: zx::Job, resources: Arc<ElfRunnerResources>) -> Self {
-        let (elf_runner_receiver, elf_runner_sender) = Receiver::new();
-        let (snapshot_provider_receiver, snapshot_provider_sender) = Receiver::new();
-
-        let output = Dict::new();
-        let svc = Dict::new();
-        {
-            let mut entries = svc.lock_entries();
-            entries.insert(
-                fcrunner::ComponentRunnerMarker::PROTOCOL_NAME.to_string(),
-                Box::new(elf_runner_sender),
-            );
-            entries.insert(
-                freport::SnapshotProviderMarker::PROTOCOL_NAME.to_string(),
-                Box::new(snapshot_provider_sender),
-            );
-        }
-        output.lock_entries().insert(SVC.to_string(), Box::new(svc));
-
         let elf_runner = elf_runner::ElfRunner::new(
             job.duplicate_handle(zx::Rights::SAME_RIGHTS).unwrap(),
             (resources.launcher_connector)(),
             resources.utc_clock.clone(),
             resources.crash_records.clone(),
         );
-        let inner = Inner { resources, elf_runner: Arc::new(elf_runner) };
-        let this = Self {
-            inner: Arc::new(inner),
-            task_group: TaskGroup::new(),
-            execution_scope: ExecutionScope::new(),
-            output,
-            job,
-        };
-        let inner = this.inner.clone();
-        let launch = LaunchTaskOnReceive::new(
-            this.task_group.as_weak(),
+        let inner = Arc::new(Inner { resources, elf_runner: Arc::new(elf_runner) });
+
+        let task_group = TaskGroup::new();
+
+        let inner_clone = inner.clone();
+        let elf_runner = Arc::new(LaunchTaskOnReceive::new(
+            task_group.as_weak(),
             fcrunner::ComponentRunnerMarker::PROTOCOL_NAME,
-            elf_runner_receiver,
             None,
             Arc::new(move |server_end, _| {
-                inner
+                inner_clone
                     .clone()
                     .serve_component_runner(sandbox_util::take_handle_as_stream::<
                         fcrunner::ComponentRunnerMarker,
                     >(server_end))
                     .boxed()
             }),
-        );
-        this.task_group.spawn(launch.run());
-        let inner = this.inner.clone();
-        let launch = LaunchTaskOnReceive::new(
-            this.task_group.as_weak(),
+        ));
+
+        let inner_clone = inner.clone();
+        let snapshot_provider = Arc::new(LaunchTaskOnReceive::new(
+            task_group.as_weak(),
             freport::SnapshotProviderMarker::PROTOCOL_NAME,
-            snapshot_provider_receiver,
             None,
             Arc::new(move |server_end, _| {
-                inner.clone().elf_runner.serve_memory_reporter(
+                inner_clone.clone().elf_runner.serve_memory_reporter(
                     sandbox_util::take_handle_as_stream::<freport::SnapshotProviderMarker>(
                         server_end,
                     ),
                 );
                 std::future::ready(Result::<(), anyhow::Error>::Ok(())).boxed()
             }),
-        );
-        this.task_group.spawn(launch.run());
+        ));
+        let output = Dict::new();
+        let svc = Dict::new();
+        {
+            let mut entries = svc.lock_entries();
+            entries.insert(
+                fcrunner::ComponentRunnerMarker::PROTOCOL_NAME.to_string(),
+                Box::new(elf_runner.into_open(WeakComponentInstance::invalid())),
+            );
+            entries.insert(
+                freport::SnapshotProviderMarker::PROTOCOL_NAME.to_string(),
+                Box::new(snapshot_provider.into_open(WeakComponentInstance::invalid())),
+            );
+        }
+        output.lock_entries().insert(SVC.to_string(), Box::new(svc));
+
+        let this = Self { task_group, execution_scope: ExecutionScope::new(), output, job };
         this
     }
 

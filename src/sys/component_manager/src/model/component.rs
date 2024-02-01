@@ -9,8 +9,7 @@ use {
     crate::model::{
         actions::{
             resolve::sandbox_construction::{
-                self, build_component_sandbox, extend_dict_with_offers, CapabilitySourceFactory,
-                ComponentInput,
+                self, build_component_sandbox, extend_dict_with_offers, ComponentInput,
             },
             shutdown, start, ActionSet, DestroyAction, DiscoverAction, ResolveAction,
             ShutdownAction, ShutdownType, StartAction, StopAction, UnresolveAction,
@@ -33,7 +32,7 @@ use {
         routing_fns::route_fn,
         token::{InstanceToken, InstanceTokenState},
     },
-    crate::sandbox_util::{DictExt, LaunchTaskOnReceive},
+    crate::sandbox_util::DictExt,
     ::namespace::Entry as NamespaceEntry,
     ::routing::{
         capability_source::{BuiltinCapabilities, ComponentCapability, NamespaceCapabilities},
@@ -79,7 +78,7 @@ use {
         lock::{MappedMutexGuard, Mutex, MutexGuard},
     },
     moniker::{ChildName, ChildNameBase, Moniker, MonikerBase},
-    sandbox::{AnyCapability, Capability, Dict, Open, Receiver},
+    sandbox::{AnyCapability, Capability, Dict, Open},
     std::iter::Iterator,
     std::{
         boxed::Box,
@@ -87,7 +86,6 @@ use {
         collections::{HashMap, HashSet},
         convert::TryFrom,
         fmt, iter,
-        path::PathBuf,
         sync::{Arc, Weak},
         time::Duration,
     },
@@ -1584,7 +1582,6 @@ impl ResolvedInstanceState {
             &mut state.collection_dicts,
         );
         state.discover_static_children(component_sandbox.child_inputs).await;
-        state.dispatch_receivers_to_providers(component, component_sandbox.sources_and_receivers);
         Ok(state)
     }
 
@@ -1716,58 +1713,6 @@ impl ResolvedInstanceState {
             dict.insert_capability(iter::once(name), router);
         }
         dict
-    }
-
-    fn dispatch_receivers_to_providers(
-        &self,
-        component: &Arc<ComponentInstance>,
-        sources_and_receivers: Vec<(CapabilitySourceFactory, Receiver<WeakComponentInstance>)>,
-    ) {
-        for (cap_source_factory, receiver) in sources_and_receivers {
-            let weak_component = WeakComponentInstance::new(component);
-            let capability_source = cap_source_factory.run(weak_component.clone());
-            self.execution_scope.spawn(
-                LaunchTaskOnReceive::new(
-                    component.nonblocking_task_group().as_weak(),
-                    "framework hook dispatcher",
-                    receiver,
-                    Some((component.context.policy().clone(), capability_source.clone())),
-                    Arc::new(move |mut channel, target| {
-                        let weak_component = weak_component.clone();
-                        let capability_source = capability_source.clone();
-                        async move {
-                            if let Ok(target) = target.upgrade() {
-                                if let Ok(component) = weak_component.upgrade() {
-                                    if let Some(provider) = target
-                                        .context
-                                        .find_internal_provider(
-                                            &capability_source,
-                                            target.as_weak(),
-                                        )
-                                        .await
-                                    {
-                                        provider
-                                            .open(
-                                                component.nonblocking_task_group(),
-                                                fio::OpenFlags::empty(),
-                                                PathBuf::from(""),
-                                                &mut channel,
-                                            )
-                                            .await?;
-                                        return Ok(());
-                                    }
-                                }
-
-                                let _ = channel.close_with_epitaph(zx::Status::UNAVAILABLE);
-                            }
-                            Ok(())
-                        }
-                        .boxed()
-                    }),
-                )
-                .run(),
-            );
-        }
     }
 
     /// Returns a reference to the component's validated declaration.
@@ -2130,7 +2075,7 @@ impl ResolvedInstanceState {
             ChildName::try_new(child.name.as_str(), collection.map(|c| c.name.as_str()))?;
 
         if !dynamic_offers.is_empty() {
-            let sources_and_receivers = extend_dict_with_offers(
+            extend_dict_with_offers(
                 component,
                 &self.children,
                 &self.component_input,
@@ -2138,7 +2083,6 @@ impl ResolvedInstanceState {
                 &dynamic_offers,
                 &mut child_input,
             );
-            self.dispatch_receivers_to_providers(component, sources_and_receivers);
         }
 
         if self.get_child(&child_moniker).is_some() {

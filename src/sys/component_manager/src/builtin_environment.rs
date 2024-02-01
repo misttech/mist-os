@@ -78,7 +78,7 @@ use {
             token::InstanceRegistry,
         },
         root_stop_notifier::RootStopNotifier,
-        sandbox_util::{new_terminating_router, LaunchTaskOnReceive},
+        sandbox_util::LaunchTaskOnReceive,
     },
     ::routing::{
         capability_source::{CapabilitySource, InternalCapability},
@@ -89,7 +89,6 @@ use {
     cm_config::{RuntimeConfig, VmexSource},
     cm_rust::{Availability, RunnerRegistration, UseEventStreamDecl, UseSource},
     cm_types::Name,
-    cm_util::TaskGroup,
     cstr::cstr,
     elf_runner::{
         crash_info::CrashRecords,
@@ -107,9 +106,8 @@ use {
     fuchsia_runtime::{take_startup_handle, HandleInfo, HandleType},
     fuchsia_zbi::{ZbiParser, ZbiType},
     fuchsia_zircon::{self as zx, Clock, HandleBased, Resource},
-    futures::{future::BoxFuture, sink::drain, stream::FuturesUnordered, FutureExt, StreamExt},
+    futures::{future::BoxFuture, FutureExt, StreamExt},
     moniker::{Moniker, MonikerBase},
-    sandbox::Receiver,
     std::{iter, sync::Arc},
     tracing::{info, warn},
 };
@@ -376,7 +374,6 @@ impl BuiltinEnvironmentBuilder {
 /// Constructs a [ComponentInput] that contains built-in capabilities.
 struct RootComponentInputBuilder {
     input: ComponentInput,
-    builtin_task_launchers: Vec<LaunchTaskOnReceive>,
     top_instance: Arc<ComponentManagerInstance>,
     policy_checker: GlobalPolicyChecker,
     builtin_capabilities: Vec<cm_rust::CapabilityDecl>,
@@ -389,7 +386,6 @@ impl RootComponentInputBuilder {
     ) -> Self {
         Self {
             input: ComponentInput::empty(),
-            builtin_task_launchers: Vec::new(),
             top_instance,
             policy_checker: GlobalPolicyChecker::new(runtime_config.security_policy.clone()),
             builtin_capabilities: runtime_config.builtin_capabilities.clone(),
@@ -418,33 +414,26 @@ impl RootComponentInputBuilder {
             // capability to the input.
             return;
         }
-        let (receiver, sender) = Receiver::new();
-        let router = new_terminating_router(sender);
-        self.input.insert_capability(iter::once(P::PROTOCOL_NAME), router);
 
         let capability_source = CapabilitySource::Builtin {
             capability: InternalCapability::Protocol(name.clone()),
             top_instance: Arc::downgrade(&self.top_instance),
         };
-        self.builtin_task_launchers.push(LaunchTaskOnReceive::new(
+
+        let launch = LaunchTaskOnReceive::new(
             self.top_instance.task_group().as_weak(),
             name,
-            receiver,
             Some((self.policy_checker.clone(), capability_source)),
             Arc::new(move |server_end, _| {
                 task_to_launch(crate::sandbox_util::take_handle_as_stream::<P>(server_end)).boxed()
             }),
-        ));
+        );
+
+        self.input.insert_capability(iter::once(P::PROTOCOL_NAME), launch.into_router());
     }
 
-    fn build(self) -> (ComponentInput, fasync::Task<()>) {
-        let builtin_receivers_future: FuturesUnordered<_> =
-            self.builtin_task_launchers.into_iter().map(LaunchTaskOnReceive::run).collect();
-        let builtin_receivers_task = fasync::Task::spawn(async move {
-            // The result here is irrelevant because the stream is infallible
-            let _ = builtin_receivers_future.map(Result::Ok).forward(drain()).await;
-        });
-        (self.input, builtin_receivers_task)
+    fn build(self) -> ComponentInput {
+        self.input
     }
 }
 
@@ -475,7 +464,6 @@ pub struct BuiltinEnvironment {
     pub num_threads: usize,
     pub realm_builder_resolver: Option<Arc<RealmBuilderResolver>>,
     pub root_component_input: ComponentInput,
-    _builtin_receivers_task_group: TaskGroup,
     _service_fs_task: Option<fasync::Task<()>>,
 }
 
@@ -1052,9 +1040,7 @@ impl BuiltinEnvironment {
         let node = inspect::stats::Node::new(&inspector, inspector.root());
         inspector.root().record(node.take());
 
-        let (root_component_input, builtin_receivers_task) = root_input_builder.build();
-        let builtin_receivers_task_group = TaskGroup::new();
-        builtin_receivers_task_group.spawn(builtin_receivers_task);
+        let root_component_input = root_input_builder.build();
 
         Ok(BuiltinEnvironment {
             model,
@@ -1074,7 +1060,6 @@ impl BuiltinEnvironment {
             num_threads,
             realm_builder_resolver,
             root_component_input,
-            _builtin_receivers_task_group: builtin_receivers_task_group,
             _service_fs_task: None,
         })
     }
@@ -1271,26 +1256,21 @@ impl BuiltinEnvironment {
     ) where
         P: ProtocolMarker,
     {
-        let (receiver, sender) = Receiver::new();
-        let router = new_terminating_router(sender);
-        self.root_component_input.insert_capability(iter::once(name.as_str()), router);
-
         let capability_source = CapabilitySource::Builtin {
             capability: InternalCapability::Protocol(name.clone()),
             top_instance: Arc::downgrade(self.model.top_instance()),
         };
 
-        let launch_task_on_receive = LaunchTaskOnReceive::new(
+        let launch = LaunchTaskOnReceive::new(
             self.model.top_instance().task_group().as_weak(),
-            name,
-            receiver,
+            name.clone(),
             Some((self.model.root().context.policy().clone(), capability_source)),
             Arc::new(move |server_end, _| {
                 task_to_launch(crate::sandbox_util::take_handle_as_stream::<P>(server_end)).boxed()
             }),
         );
-
-        self._builtin_receivers_task_group.spawn(launch_task_on_receive.run());
+        self.root_component_input
+            .insert_capability(iter::once(name.as_str()), launch.into_router());
     }
 
     #[cfg(test)]
