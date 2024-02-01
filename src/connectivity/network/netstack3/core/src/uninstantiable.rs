@@ -338,12 +338,6 @@ impl<I: IpExt, C, P: IpSocketHandler<I, C>> IpSocketHandler<I, C> for Uninstanti
     }
 }
 
-impl<P> tcp_socket::AsSingleStack<P> for UninstantiableWrapper<P> {
-    fn as_single_stack(&mut self) -> &mut P {
-        self.uninstantiable_unreachable()
-    }
-}
-
 impl<P> tcp_socket::AsThisStack<P> for UninstantiableWrapper<P> {
     fn as_this_stack(&mut self) -> &mut P {
         self.uninstantiable_unreachable()

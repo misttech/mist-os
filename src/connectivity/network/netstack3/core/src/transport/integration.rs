@@ -79,12 +79,7 @@ where
         // Do nothing, we use this function to assert on deferred destruction.
     }
 
-    fn for_each_socket<
-        F: FnMut(
-            &TcpSocketState<Ipv4, Self::WeakDeviceId, BC>,
-            MaybeDualStack<Self::DualStackConverter, Self::SingleStackConverter>,
-        ),
-    >(
+    fn for_each_socket<F: FnMut(&TcpSocketState<Ipv4, Self::WeakDeviceId, BC>)>(
         &mut self,
         mut cb: F,
     ) {
@@ -94,7 +89,7 @@ where
             let mut locked = locked.adopt(id);
             let guard = locked
                 .read_lock_with::<crate::lock_ordering::TcpSocketState<Ipv4>, _>(|c| c.right());
-            cb(&*guard, MaybeDualStack::NotDualStack(()));
+            cb(&*guard);
         });
     }
 
@@ -148,13 +143,8 @@ where
 {
     type ThisStackIpTransportAndDemuxCtx<'a> =
         CoreCtx<'a, BC, crate::lock_ordering::TcpSocketState<Ipv6>>;
-    // TODO(https://fxbug.dev/42085913): Use `UninstantiableWrapper<Self>` as
-    // the single stack ctx once the `AsSingleStack` bound has been dropped
-    // from [`TcpContext::DualStackIpTransportAndDemuxCtx`] (It's not
-    // possible for `Self` to implement
-    // `AsSingleStack<UninstantiableWrapper<Self>>`).
     type SingleStackIpTransportAndDemuxCtx<'a> =
-        CoreCtx<'a, BC, crate::lock_ordering::TcpSocketState<Ipv6>>;
+        UninstantiableWrapper<CoreCtx<'a, BC, crate::lock_ordering::TcpSocketState<Ipv6>>>;
 
     type DualStackIpTransportAndDemuxCtx<'a> =
         CoreCtx<'a, BC, crate::lock_ordering::TcpSocketState<Ipv6>>;
@@ -177,12 +167,7 @@ where
         // Do nothing, we use this function to assert on deferred destruction.
     }
 
-    fn for_each_socket<
-        F: FnMut(
-            &TcpSocketState<Ipv6, Self::WeakDeviceId, BC>,
-            MaybeDualStack<Self::DualStackConverter, Self::SingleStackConverter>,
-        ),
-    >(
+    fn for_each_socket<F: FnMut(&TcpSocketState<Ipv6, Self::WeakDeviceId, BC>)>(
         &mut self,
         mut cb: F,
     ) {
@@ -192,7 +177,7 @@ where
             let mut locked = locked.adopt(id);
             let guard = locked
                 .read_lock_with::<crate::lock_ordering::TcpSocketState<Ipv6>, _>(|c| c.right());
-            cb(&*guard, MaybeDualStack::DualStack(()));
+            cb(&*guard);
         });
     }
 
