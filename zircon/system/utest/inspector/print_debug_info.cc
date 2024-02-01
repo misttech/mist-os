@@ -133,7 +133,10 @@ __asm__(
     // a val_expression rule to test the unwinder's val_expression support.
     // DW_CFA_val_expression, regno 1, BLOCK(DW_OP_breg1 0)
     ".cfi_escape 0x16, 1, 2, 0x71, 0\n"
+    ".option push\n"
+    ".option arch, +c\n"
     "c.ebreak\n"
+    ".option pop\n"
 #elif defined(__x86_64__)
     ".cfi_return_column 16\n"
     // DW_CFA_val_expression, regno 16, BLOCK(DW_OP_breg16 0)

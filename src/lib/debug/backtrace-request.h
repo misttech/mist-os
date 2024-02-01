@@ -33,8 +33,11 @@ __ALWAYS_INLINE static inline void software_break(uint64_t magic) {
 #endif
 #ifdef __riscv
   __asm__ volatile(
+      ".option push\n"
+      ".option arch, +c\n"
       "mv a0, %0\n"
-      "c.ebreak"
+      "c.ebreak\n"
+      ".option pop"
       :
       : "r"(magic)
       : "a0");
