@@ -17,6 +17,7 @@ use net_declare::{fidl_ip, fidl_ip_v4_with_prefix, fidl_mac};
 use netemul::{RealmUdpSocket as _, TestInterface, TestNetwork, TestRealm, TestSandbox};
 use netstack_testing_common::Result;
 use netstack_testing_common::{
+    interfaces::TestInterfaceExt as _,
     nud::FrameMetadata,
     realms::{Netstack, NetstackVersion, TestRealmExt as _, TestSandboxExt as _},
 };
@@ -379,6 +380,10 @@ async fn neigh_list_entries<N: Netstack>(name: &str) {
     let network = sandbox.create_network("net").await.expect("failed to create network");
 
     let (alice, bob) = create_neighbor_realms::<N>(&sandbox, &network, name).await;
+    // Apply the NUD flake workaround, since we expect all neighbor resolution
+    // to succeed in this test case.
+    alice.ep.apply_nud_flake_workaround().await.expect("nud flake workaround");
+    bob.ep.apply_nud_flake_workaround().await.expect("nud flake workaround");
 
     let mut alice_iter = get_entry_iterator(
         &alice.realm,
