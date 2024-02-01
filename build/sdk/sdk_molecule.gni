@@ -2,6 +2,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import("//build/json/validate_json.gni")
 import("//build/python/python_action.gni")
 import("//build/sdk/config.gni")
 
@@ -63,8 +64,17 @@ template("sdk_molecule") {
     output_name = invoker.output_name
   }
 
+  labels = {
+    manifest = "${target_name}.manifest"
+    validate = "${target_name}.validate"
+  }
+
+  files = {
+    manifest = "$target_gen_dir/$output_name.sdk"
+  }
+
   # Builds a manifest representing members of the group.
-  python_action(target_name) {
+  python_action(labels.manifest) {
     forward_variables_from(invoker,
                            [
                              "assert_no_deps",
@@ -72,19 +82,17 @@ template("sdk_molecule") {
                              "visibility",
                            ])
 
-    manifest = "$target_gen_dir/$output_name.sdk"
-
     binary_label = "//build/sdk:create_molecule_manifest"
 
     deps = gn_deps
 
     inputs = dep_manifests
 
-    outputs = [ manifest ]
+    outputs = [ files.manifest ]
 
     args = [
              "--out",
-             rebase_path(manifest, root_build_dir),
+             rebase_path(files.manifest, root_build_dir),
              "--deps",
            ] + rebase_path(dep_manifests, root_build_dir)
 
@@ -94,5 +102,33 @@ template("sdk_molecule") {
         invoker.category,
       ]
     }
+  }
+
+  # Verifies that the manifest is valid.
+  validate_json(labels.validate) {
+    forward_variables_from(invoker,
+                           [
+                             "testonly",
+                             "visibility",
+                           ])
+
+    data = files.manifest
+
+    schema = "//build/sdk/manifest_schema.json"
+
+    use_valico = true
+
+    deps = [ ":${labels.manifest}" ]
+  }
+
+  group(target_name) {
+    forward_variables_from(invoker,
+                           [
+                             "assert_no_deps",
+                             "testonly",
+                             "visibility",
+                           ])
+    public_deps = [ ":${labels.manifest}" ]
+    deps = [ ":${labels.validate}" ]
   }
 }

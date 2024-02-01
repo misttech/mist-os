@@ -82,6 +82,26 @@
                     "items": {
                         "$ref": "#/definitions/atomId"
                     }
+                },
+                "type": {
+                    "description": "The type of this atom's content",
+                    "type": "string",
+                    "enum": [
+                        "bind_library",
+                        "cc_prebuilt_library",
+                        "cc_source_library",
+                        "companion_host_tool",
+                        "dart_library",
+                        "data",
+                        "documentation",
+                        "ffx_tool",
+                        "fidl_library",
+                        "host_tool",
+                        "loadable_module",
+                        "package",
+                        "sysroot",
+                        "version_history"
+                    ]
                 }
             },
             "required": [

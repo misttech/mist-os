@@ -320,7 +320,7 @@ template("sdk_fuchsia_package") {
 
       id = "sdk://packages/${invoker.distribution_name}"
       category = invoker.category
-      type = "fuchsia_package"
+      type = "package"
     }
 
     # Suppress unused variable warnings.
