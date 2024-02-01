@@ -5,9 +5,14 @@
 #ifndef ZIRCON_AVAILABILITY_H_
 #define ZIRCON_AVAILABILITY_H_
 
-// Emulate a "HEAD" API level since it is not supported directly by clang.
-// Fuchsia API levels are unsigned 64-bit integers, but clang stores API levels as 32-bit,
-// so we define this as `((uint32_t)-1)`. clang expects API levels to be literals.
+// The value of __Fuchsia_API_level__ when the target API level is HEAD.
+// While Fuchsia API levels are unsigned 64-bit integers, Clang only supports
+// 32-bit version segments, so we use the special value of `UINT32_MAX` to
+// represent builds targeting HEAD/LEGACY.
+// Note that while the FIDL definition of `HEAD` is one less than the largest
+// unsigned 64-bit value (that is, the equivalent of `UINT64_MAX - 1`), this is
+// the largest possible unsigned 32-bit value (`UINT32_MAX`).
+// TODO(https://fxbug.dev/321269965): Resolve this FIDL-Clang discrepancy.
 #define FUCHSIA_HEAD 4294967295
 
 #if defined(__Fuchsia_API_level__) && defined(__clang__)

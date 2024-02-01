@@ -30,8 +30,9 @@ if (override_target_api_level == -1) {
   # not really meant to be used by SDK users unless they want to try some
   # unreleased APIs.
 
-  # We use `UINT32_MAX` to represent the HEAD API level in Clang (Clang
-  # stores API levels as 32-bit integers).
+  # Due to limitations in Clang, we use `UINT32_MAX` to represent the HEAD API
+  # level. See zircon/availability.h.
+  # TODO(https://fxbug.dev/321269965): Resolve this FIDL-Clang discrepancy.
   platform_version.clang_fuchsia_api_level = 4294967295
 
   # By default the FIDL APIs are compiled at the "LEGACY" level. This level is
