@@ -2,9 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::TargetInfo;
 use addr::TargetAddr;
 use anyhow::{anyhow, Result};
+use fidl_fuchsia_developer_ffx::TargetInfo;
 use std::process::Command;
 
 pub(crate) fn do_ssh(
@@ -30,7 +30,13 @@ fn build_ssh_args(
     repo_port: u32,
     additional_port_forwards: Vec<u32>,
 ) -> Result<Vec<String>> {
-    let mut addrs: Vec<TargetAddr> = target.addresses.into_iter().collect::<Vec<TargetAddr>>();
+    let mut addrs: Vec<TargetAddr> = target
+        .addresses
+        .ok_or("target address list uninitialized")
+        .map_err(|e| anyhow!("Error getting target addresses: {}", e))?
+        .into_iter()
+        .map(|addrinfo| TargetAddr::from(addrinfo))
+        .collect::<Vec<TargetAddr>>();
 
     // Flip the sorting so that Ipv6 comes before Ipv4 as we will take the first
     // address, and (generally) Ipv4 addresses from the Target are ephemeral
@@ -103,8 +109,9 @@ mod test {
         });
 
         let target = TargetInfo {
-            nodename: "kiriona".to_string(),
-            addresses: vec![src_ipv4.into(), src.into()],
+            nodename: Some("kiriona".to_string()),
+            addresses: Some(vec![src_ipv4, src]),
+            ..Default::default()
         };
 
         let got = build_ssh_args(target, 8081, vec![5555])?;
@@ -141,11 +148,8 @@ mod test {
             scope_id: 2,
         });
 
-        let target = TargetInfo {
-            nodename: "ianthe".to_string(),
-            addresses: vec![src.into()],
-            ..Default::default()
-        };
+        let target =
+            TargetInfo { nodename: None, addresses: Some(vec![src]), ..Default::default() };
 
         let got = build_ssh_args(target, 8081, vec![])?;
 
@@ -173,12 +177,7 @@ mod test {
 
     #[test]
     fn test_make_args_returns_err_on_no_addresses() {
-        let nodename = "cytherea".to_string();
-        {
-            let target = TargetInfo { nodename: nodename.clone(), ..Default::default() };
-            let res = build_ssh_args(target, 9091, vec![]);
-            assert!(res.is_err());
-        }
+        let nodename = Some("cytherea".to_string());
         {
             let target = TargetInfo { nodename: nodename.clone(), ..Default::default() };
             let res = build_ssh_args(target, 9091, vec![]);
@@ -186,7 +185,16 @@ mod test {
         }
         {
             let target =
-                TargetInfo { nodename: nodename.clone(), addresses: vec![], ..Default::default() };
+                TargetInfo { nodename: nodename.clone(), addresses: None, ..Default::default() };
+            let res = build_ssh_args(target, 9091, vec![]);
+            assert!(res.is_err());
+        }
+        {
+            let target = TargetInfo {
+                nodename: nodename.clone(),
+                addresses: Some(vec![]),
+                ..Default::default()
+            };
             let res = build_ssh_args(target, 9091, vec![]);
             assert!(res.is_err());
         }
@@ -195,8 +203,8 @@ mod test {
     #[test]
     fn test_make_args_returns_err_on_empty_addresses() {
         let target = TargetInfo {
-            nodename: "cytherera".to_string(),
-            addresses: vec![],
+            nodename: Some("cytherera".to_string()),
+            addresses: None,
             ..Default::default()
         };
         let res = build_ssh_args(target, 9091, vec![]);
