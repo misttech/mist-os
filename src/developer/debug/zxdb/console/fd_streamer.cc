@@ -11,28 +11,34 @@
 
 namespace zxdb {
 
-std::unique_ptr<debug::BufferedFD> StreamFDToConsole(fbl::unique_fd fd) {
+std::unique_ptr<debug::BufferedFD> StreamFDToConsole(fbl::unique_fd fd, Console* console) {
   auto streamer = std::make_unique<debug::BufferedFD>(std::move(fd));
-  streamer->set_data_available_callback([streamer = streamer.get()]() {
-    Console* console = Console::get();
-    if (!console)
-      return;
+  streamer->set_data_available_callback(
+      [streamer = streamer.get(), console = console->GetWeakPtr()]() {
+        if (!console)
+          return;
 
-    OutputBuffer data;
-    constexpr size_t kReadSize = 4024;  // Read in 4K chunks for no particular reason.
-    auto& stream = streamer->stream();
-    while (true) {
-      char buf[kReadSize];
+        OutputBuffer data;
+        constexpr size_t kReadSize = 4024;  // Read in 4K chunks for no particular reason.
+        auto& stream = streamer->stream();
+        while (true) {
+          char buf[kReadSize];
 
-      size_t read_amount = stream.Read(buf, kReadSize);
-      data.Append(std::string(buf, read_amount));
+          size_t read_amount = stream.Read(buf, kReadSize);
+          data.Append(std::string(buf, read_amount));
 
-      if (read_amount < kReadSize)
-        break;
-    }
-    if (!data.empty()) {
-      console->Write(data, false);
-    }
+          if (read_amount < kReadSize)
+            break;
+        }
+        if (!data.empty()) {
+          console->Write(data, false);
+        }
+      });
+  streamer->set_error_callback([console = console->GetWeakPtr()]() {
+    FX_DCHECK(console);
+
+    // When the other end of the streamer closes, it's time to cleanup and shut down.
+    console->Quit();
   });
   streamer->Start();
   return streamer;

@@ -252,7 +252,7 @@ int ConsoleMain(int argc, const char* argv[]) {
         loop.Cleanup();
         return EXIT_FAILURE;
       }
-      file_streamers.emplace_back(StreamFDToConsole(std::move(fd)));
+      file_streamers.emplace_back(StreamFDToConsole(std::move(fd), console.get()));
     }
 
     // Run the actions and then initialize the console to enter interactive mode. Errors in
