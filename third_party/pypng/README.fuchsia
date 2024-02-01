@@ -1,6 +1,6 @@
 Name: PyPNG
 License: MIT
-License File: LICENSE
+License File: src/LICENCE
 Upstream Git: https://fuchsia.googlesource.com/third_party/gitlab.com/drj11/pypng
 URL: https://gitlab.com/drj11/pypng/
 Description:
