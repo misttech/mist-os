@@ -88,7 +88,6 @@ impl CapabilityProvider for DefaultComponentCapabilityProvider {
                     channel: channel::take_channel(server_end),
                     flags,
                 },
-                target: (),
             });
             return Ok(());
         }

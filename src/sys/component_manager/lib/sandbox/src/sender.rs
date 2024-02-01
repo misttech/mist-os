@@ -14,16 +14,14 @@ use tracing::warn;
 use vfs::execution_scope::ExecutionScope;
 
 #[derive(Debug)]
-pub struct Message<T: Default + Debug + Send + Sync + 'static> {
+pub struct Message {
     pub payload: fsandbox::ProtocolPayload,
-    // TODO(https://fxbug.dev/315508244): Divorce target from Sender
-    pub target: T,
 }
 
 /// A capability that transfers another capability to a [Receiver].
 #[derive(Capability, Debug)]
-pub struct Sender<T: Default + Debug + Send + Sync + 'static> {
-    inner: mpsc::UnboundedSender<Message<T>>,
+pub struct Sender {
+    inner: mpsc::UnboundedSender<Message>,
 
     /// The FIDL representation of this `Sender`.
     ///
@@ -32,14 +30,14 @@ pub struct Sender<T: Default + Debug + Send + Sync + 'static> {
     client_end: Option<ClientEnd<fsandbox::SenderMarker>>,
 }
 
-impl<T: Default + Debug + Send + Sync + 'static> Clone for Sender<T> {
+impl Clone for Sender {
     fn clone(&self) -> Self {
         Self { inner: self.inner.clone(), client_end: None }
     }
 }
 
-impl<T: Default + Debug + Send + Sync + 'static> Sender<T> {
-    pub(crate) fn new(sender: mpsc::UnboundedSender<Message<T>>) -> Self {
+impl Sender {
+    pub(crate) fn new(sender: mpsc::UnboundedSender<Message>) -> Self {
         Self { inner: sender, client_end: None }
     }
 
@@ -47,15 +45,12 @@ impl<T: Default + Debug + Send + Sync + 'static> Sender<T> {
         &self,
         channel: zx::Channel,
         flags: fio::OpenFlags,
-    ) -> Result<(), mpsc::TrySendError<Message<T>>> {
-        let msg = Message::<T> {
-            payload: fsandbox::ProtocolPayload { channel, flags },
-            target: Default::default(),
-        };
+    ) -> Result<(), mpsc::TrySendError<Message>> {
+        let msg = Message { payload: fsandbox::ProtocolPayload { channel, flags } };
         self.send(msg)
     }
 
-    pub fn send(&self, msg: Message<T>) -> Result<(), mpsc::TrySendError<Message<T>>> {
+    pub fn send(&self, msg: Message) -> Result<(), mpsc::TrySendError<Message>> {
         self.inner.unbounded_send(msg)
     }
 
@@ -102,8 +97,8 @@ impl<T: Default + Debug + Send + Sync + 'static> Sender<T> {
     }
 }
 
-impl<T: Default + Debug + Send + Sync + 'static> From<Sender<T>> for Open {
-    fn from(sender: Sender<T>) -> Self {
+impl From<Sender> for Open {
+    fn from(sender: Sender) -> Self {
         let open_fn = move |_scope: ExecutionScope,
                             flags: fio::OpenFlags,
                             path: vfs::path::Path,
@@ -119,17 +114,15 @@ impl<T: Default + Debug + Send + Sync + 'static> From<Sender<T>> for Open {
     }
 }
 
-impl<T: Default + Debug + Send + Sync + 'static> Capability for Sender<T> {
+impl Capability for Sender {
     fn try_into_open(self) -> Result<Open, ConversionError> {
         Ok(self.into())
     }
 }
 
-impl<T: Default + Debug + Send + Sync + 'static> From<Sender<T>>
-    for ClientEnd<fsandbox::SenderMarker>
-{
+impl From<Sender> for ClientEnd<fsandbox::SenderMarker> {
     /// Serves the `fuchsia.sandbox.Sender` protocol for this Sender and moves it into the registry.
-    fn from(mut sender: Sender<T>) -> ClientEnd<fsandbox::SenderMarker> {
+    fn from(mut sender: Sender) -> ClientEnd<fsandbox::SenderMarker> {
         sender.client_end.take().unwrap_or_else(|| {
             let (client_end, sender_stream) =
                 create_request_stream::<fsandbox::SenderMarker>().unwrap();
@@ -139,8 +132,8 @@ impl<T: Default + Debug + Send + Sync + 'static> From<Sender<T>>
     }
 }
 
-impl<T: Default + Debug + Send + Sync + 'static> From<Sender<T>> for fsandbox::Capability {
-    fn from(sender: Sender<T>) -> Self {
+impl From<Sender> for fsandbox::Capability {
+    fn from(sender: Sender) -> Self {
         fsandbox::Capability::Sender(sender.into())
     }
 }
@@ -158,7 +151,7 @@ mod tests {
     /// and capabilities sent to the original and clone arrive at the same Receiver.
     #[fuchsia::test]
     async fn fidl_clone() {
-        let (receiver, sender) = Receiver::<()>::new();
+        let (receiver, sender) = Receiver::new();
 
         // Send a channel through the Sender.
         let (ch1, _ch2) = zx::Channel::create();

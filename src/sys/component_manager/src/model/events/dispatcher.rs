@@ -216,7 +216,6 @@ mod tests {
                     channel: capability_server_end,
                     flags: fio::OpenFlags::empty(),
                 },
-                target: (),
             })
             .unwrap();
         dispatcher.dispatch(&event).await

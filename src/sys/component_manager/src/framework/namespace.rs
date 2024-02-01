@@ -202,7 +202,7 @@ mod tests {
         let mut namespace_pairs = vec![];
         for (path, response) in [("/svc", "first"), ("/zzz/svc", "second")] {
             // Initialize the host and sender/receiver pair.
-            let (receiver, sender) = Receiver::<()>::new();
+            let (receiver, sender) = Receiver::new();
 
             // Serve an Echo request handler on the Receiver.
             tasks.add(fasync::Task::spawn(async move {
@@ -268,7 +268,7 @@ mod tests {
         let mut namespace_pairs = vec![];
         for path in ["/svc", "/svc/shadow"] {
             // Initialize the host and sender/receiver pair.
-            let (receiver, sender) = Receiver::<()>::new();
+            let (receiver, sender) = Receiver::new();
 
             // Serve an Echo request handler on the Receiver.
             tasks.add(fasync::Task::spawn(async move {

@@ -13,17 +13,16 @@ use futures::{
     lock::Mutex,
     StreamExt,
 };
-use std::fmt::Debug;
 use std::pin::pin;
 use std::sync::Arc;
 
 /// A capability that transfers another capability to a [Sender].
 #[derive(Capability, Derivative)]
 #[derivative(Debug)]
-pub struct Receiver<T: Default + Debug + Send + Sync + 'static> {
+pub struct Receiver {
     /// `inner` uses an async mutex because it will be locked across an await point
     /// when asynchronously waiting for the next message.
-    inner: Arc<Mutex<UnboundedReceiver<Message<T>>>>,
+    inner: Arc<Mutex<UnboundedReceiver<Message>>>,
 
     /// The FIDL representation of this `Receiver`.
     ///
@@ -32,14 +31,14 @@ pub struct Receiver<T: Default + Debug + Send + Sync + 'static> {
     server_end: Option<ServerEnd<fsandbox::ReceiverMarker>>,
 }
 
-impl<T: Default + Debug + Send + Sync + 'static> Clone for Receiver<T> {
+impl Clone for Receiver {
     fn clone(&self) -> Self {
         Self { inner: self.inner.clone(), server_end: None }
     }
 }
 
-impl<T: Default + Debug + Send + Sync + 'static> Receiver<T> {
-    pub fn new() -> (Self, Sender<T>) {
+impl Receiver {
+    pub fn new() -> (Self, Sender) {
         let (sender, receiver) = mpsc::unbounded();
         let receiver = Self { inner: Arc::new(Mutex::new(receiver)), server_end: None };
         (receiver, Sender::new(sender))
@@ -47,7 +46,7 @@ impl<T: Default + Debug + Send + Sync + 'static> Receiver<T> {
 
     /// Waits to receive a message, or return `None` if there are no more messages and all
     /// senders are dropped.
-    pub async fn receive(&self) -> Option<Message<T>> {
+    pub async fn receive(&self) -> Option<Message> {
         let mut receiver_guard = self.inner.lock().await;
         receiver_guard.next().await
     }
@@ -95,12 +94,10 @@ impl<T: Default + Debug + Send + Sync + 'static> Receiver<T> {
     }
 }
 
-impl<T: Default + Debug + Send + Sync + 'static> Capability for Receiver<T> {}
+impl Capability for Receiver {}
 
-impl<T: Default + Debug + Send + Sync + 'static> From<Receiver<T>>
-    for ServerEnd<fsandbox::ReceiverMarker>
-{
-    fn from(mut receiver: Receiver<T>) -> Self {
+impl From<Receiver> for ServerEnd<fsandbox::ReceiverMarker> {
+    fn from(mut receiver: Receiver) -> Self {
         receiver.server_end.take().unwrap_or_else(|| {
             let (receiver_proxy, server_end) = create_proxy::<fsandbox::ReceiverMarker>().unwrap();
             receiver.handle_and_register(receiver_proxy, server_end.get_koid().unwrap());
@@ -109,8 +106,8 @@ impl<T: Default + Debug + Send + Sync + 'static> From<Receiver<T>>
     }
 }
 
-impl<T: Default + Debug + Send + Sync + 'static> From<Receiver<T>> for fsandbox::Capability {
-    fn from(receiver: Receiver<T>) -> Self {
+impl From<Receiver> for fsandbox::Capability {
+    fn from(receiver: Receiver) -> Self {
         fsandbox::Capability::Receiver(receiver.into())
     }
 }
@@ -125,7 +122,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn send_and_receive() {
-        let (receiver, sender) = Receiver::<()>::new();
+        let (receiver, sender) = Receiver::new();
 
         let (ch1, ch2) = zx::Channel::create();
         sender.send_channel(ch1, fio::OpenFlags::empty()).unwrap();
@@ -139,7 +136,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn send_fail_when_receiver_dropped() {
-        let (receiver, sender) = Receiver::<()>::new();
+        let (receiver, sender) = Receiver::new();
 
         drop(receiver);
 
@@ -150,7 +147,7 @@ mod tests {
     #[test]
     fn receive_blocks_while_sender_alive() {
         let mut ex = fasync::TestExecutor::new();
-        let (receiver, sender) = Receiver::<()>::new();
+        let (receiver, sender) = Receiver::new();
 
         {
             let mut fut = std::pin::pin!(receiver.receive());
@@ -167,7 +164,7 @@ mod tests {
     /// It should be possible to conclusively ensure that no more messages will arrive.
     #[fuchsia::test]
     async fn drain_receiver() {
-        let (receiver, sender) = Receiver::<()>::new();
+        let (receiver, sender) = Receiver::new();
 
         let (ch1, _ch2) = zx::Channel::create();
         sender.send_channel(ch1, fio::OpenFlags::empty()).unwrap();
@@ -185,7 +182,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn receiver_fidl() {
-        let (receiver, sender) = Receiver::<()>::new();
+        let (receiver, sender) = Receiver::new();
 
         let (ch1, ch2) = zx::Channel::create();
         sender.send_channel(ch1, fio::OpenFlags::empty()).unwrap();

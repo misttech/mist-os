@@ -207,20 +207,20 @@ impl HooksRegistration {
 /// opportunity to monitor requests for the corresponding capability.
 #[derive(Clone)]
 pub struct CapabilityReceiver {
-    inner: Arc<StdMutex<Option<Receiver<()>>>>,
+    inner: Arc<StdMutex<Option<Receiver>>>,
 }
 
 impl CapabilityReceiver {
     /// Creates a [`CapabilityReceiver`] that receives connection requests sent via the
     /// [`Sender`] capability.
-    pub fn new() -> (Self, Sender<()>) {
-        let (receiver, sender) = Receiver::<()>::new();
+    pub fn new() -> (Self, Sender) {
+        let (receiver, sender) = Receiver::new();
         let inner = Arc::new(StdMutex::new(Some(receiver)));
         (Self { inner }, sender)
     }
 
     /// Take the opportunity to monitor requests.
-    pub fn take(&self) -> Option<Receiver<()>> {
+    pub fn take(&self) -> Option<Receiver> {
         self.inner.lock().unwrap().take()
     }
 

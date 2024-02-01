@@ -12,7 +12,7 @@ use {
 #[must_use = "invoke resume() otherwise the client will be halted indefinitely!"]
 pub struct Trigger {
     // This Sender is used to unblock the client that sent the trigger.
-    responder: oneshot::Sender<()>,
+    responder: oneshot::Sender,
 }
 
 impl Trigger {
@@ -32,7 +32,7 @@ impl TriggerSender {
     }
 
     /// Sends the event to a receiver. Returns a responder which can be blocked on.
-    async fn send(&self) -> Result<oneshot::Receiver<()>, Error> {
+    async fn send(&self) -> Result<oneshot::Receiver, Error> {
         let (responder_tx, responder_rx) = oneshot::channel();
         {
             let mut tx = self.tx.lock().await;

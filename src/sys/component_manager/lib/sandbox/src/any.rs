@@ -112,9 +112,10 @@ impl TryFrom<fsandbox::Capability> for AnyCapability {
                     // FIXME: We need a concrete Sender type here but don't know the generic
                     // type, so use (). This should be fixed by making Sender
                     // non-generic.
-                    let sender: &mut Sender<()> = any.deref_mut().try_into().expect(
-                        "BUG: registry has a non-Sender<()> capability under a Sender koid",
-                    );
+                    let sender: &mut Sender = any
+                        .deref_mut()
+                        .try_into()
+                        .expect("BUG: registry has a non-Sender capability under a Sender koid");
                     sender.set_client_end(client_end);
                 }
                 Ok(any)
@@ -126,8 +127,8 @@ impl TryFrom<fsandbox::Capability> for AnyCapability {
                     // FIXME: We need a concrete Receiver type here but don't know the generic
                     // type, so use (). This should be fixed by making Receiver
                     // non-generic.
-                    let receiver: &mut Receiver<()> = any.deref_mut().try_into().expect(
-                        "BUG: registry has a non-Receiver<()> capability under a Receiver koid",
+                    let receiver: &mut Receiver = any.deref_mut().try_into().expect(
+                        "BUG: registry has a non-Receiver capability under a Receiver koid",
                     );
                     receiver.set_server_end(server_end);
                 }

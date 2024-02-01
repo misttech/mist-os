@@ -478,7 +478,7 @@ mod tests {
     async fn route_and_use_sender_with_dropped_receiver() {
         // We want to test vending a sender with a router, dropping the associated receiver, and
         // then using the sender. The objective is to observe an error, and not panic.
-        let (receiver, sender) = Receiver::<()>::new();
+        let (receiver, sender) = Receiver::new();
         let router = Router::new(move |_request, completer| {
             completer.complete(Ok(Box::new(sender.clone())))
         });
@@ -494,14 +494,13 @@ mod tests {
         )
         .await
         .unwrap();
-        let sender: Sender<()> = capability.try_into().unwrap();
+        let sender: Sender = capability.try_into().unwrap();
 
         drop(receiver);
         let (ch1, _ch2) = zx::Channel::create();
         assert!(sender
             .send(Message {
                 payload: fsandbox::ProtocolPayload { channel: ch1, flags: fio::OpenFlags::empty() },
-                target: (),
             })
             .is_err());
     }

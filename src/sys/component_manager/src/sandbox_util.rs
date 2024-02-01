@@ -365,7 +365,7 @@ pub mod tests {
 
     #[fuchsia::test]
     async fn unwrap_server_end_or_serve_node_node_reference_and_describe() {
-        let (receiver, sender) = Receiver::<()>::new();
+        let (receiver, sender) = Receiver::new();
         let open: Open = sender.into();
         let (client_end, server_end) = zx::Channel::create();
         let scope = ExecutionScope::new();
@@ -393,7 +393,7 @@ pub mod tests {
 
     #[fuchsia::test]
     async fn unwrap_server_end_or_serve_node_describe() {
-        let (receiver, sender) = Receiver::<()>::new();
+        let (receiver, sender) = Receiver::new();
         let open: Open = sender.into();
         let (client_end, server_end) = zx::Channel::create();
         let scope = ExecutionScope::new();
@@ -416,7 +416,7 @@ pub mod tests {
 
     #[fuchsia::test]
     async fn unwrap_server_end_or_serve_node_empty() {
-        let (receiver, sender) = Receiver::<()>::new();
+        let (receiver, sender) = Receiver::new();
         let open: Open = sender.into();
         let (client_end, server_end) = zx::Channel::create();
         let scope = ExecutionScope::new();
@@ -435,7 +435,7 @@ pub mod tests {
     async fn get_capability() {
         let sub_dict = Dict::new();
         sub_dict.lock_entries().insert("bar".to_string(), Box::new(Dict::new()));
-        let (receiver, _) = Receiver::<()>::new();
+        let (receiver, _) = Receiver::new();
         sub_dict.lock_entries().insert("baz".to_string(), Box::new(receiver));
 
         let test_dict = Dict::new();
@@ -448,7 +448,7 @@ pub mod tests {
         assert!(test_dict.get_capability::<Dict>(["foo", "bar"].into_iter()).is_some());
         assert!(test_dict.get_capability::<Dict>(["foo", "nonexistent"].into_iter()).is_none());
         assert!(test_dict.get_capability::<Dict>(["foo", "baz"].into_iter()).is_none());
-        assert!(test_dict.get_capability::<Receiver<()>>(["foo", "baz"].into_iter()).is_some());
+        assert!(test_dict.get_capability::<Receiver>(["foo", "baz"].into_iter()).is_some());
     }
 
     #[fuchsia::test]
@@ -457,9 +457,9 @@ pub mod tests {
         test_dict.insert_capability(["foo", "bar"].into_iter(), Dict::new());
         assert!(test_dict.get_capability::<Dict>(["foo", "bar"].into_iter()).is_some());
 
-        let (receiver, _) = Receiver::<()>::new();
+        let (receiver, _) = Receiver::new();
         test_dict.insert_capability(["foo", "baz"].into_iter(), receiver);
-        assert!(test_dict.get_capability::<Receiver<()>>(["foo", "baz"].into_iter()).is_some());
+        assert!(test_dict.get_capability::<Receiver>(["foo", "baz"].into_iter()).is_some());
     }
 
     #[fuchsia::test]

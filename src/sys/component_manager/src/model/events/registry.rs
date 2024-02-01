@@ -440,7 +440,6 @@ mod tests {
                     channel: capability_server_end,
                     flags: fio::OpenFlags::empty(),
                 },
-                target: (),
             })
             .unwrap();
         registry.dispatch(&event).await;

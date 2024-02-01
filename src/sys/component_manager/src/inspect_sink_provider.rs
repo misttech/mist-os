@@ -69,7 +69,6 @@ impl EventSynthesisProvider for InspectSinkProvider {
                     channel: server.into_channel(),
                     flags: fio::OpenFlags::empty(),
                 },
-                target: (),
             });
             vec![Event::new_builtin(EventPayload::CapabilityRequested {
                 source_moniker,

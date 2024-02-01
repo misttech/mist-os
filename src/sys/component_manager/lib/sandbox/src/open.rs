@@ -653,7 +653,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_sender_into_open() {
-        let (receiver, sender) = Receiver::<()>::new();
+        let (receiver, sender) = Receiver::new();
         let open: Open = sender.try_into_open().unwrap();
         let (client_end, server_end) = zx::Channel::create();
         let scope = ExecutionScope::new();
@@ -669,7 +669,7 @@ mod tests {
     fn test_sender_into_open_extra_path() {
         let mut ex = fasync::TestExecutor::new();
 
-        let (receiver, sender) = Receiver::<()>::new();
+        let (receiver, sender) = Receiver::new();
         let open: Open = sender.try_into_open().unwrap();
         let (client_end, server_end) = zx::Channel::create();
         let scope = ExecutionScope::new();
@@ -691,7 +691,7 @@ mod tests {
     #[fuchsia::test]
     async fn test_sender_into_open_via_dict() {
         let dict = Dict::new();
-        let (receiver, sender) = Receiver::<()>::new();
+        let (receiver, sender) = Receiver::new();
         dict.lock_entries().insert("echo".to_owned(), Box::new(sender));
 
         let open: Open = dict.try_into_open().unwrap();
@@ -711,7 +711,7 @@ mod tests {
         let mut ex = fasync::TestExecutor::new();
 
         let dict = Dict::new();
-        let (receiver, sender) = Receiver::<()>::new();
+        let (receiver, sender) = Receiver::new();
         dict.lock_entries().insert("echo".to_owned(), Box::new(sender));
 
         let open: Open = dict.try_into_open().unwrap();
