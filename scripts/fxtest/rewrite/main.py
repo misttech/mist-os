@@ -8,7 +8,6 @@ import asyncio
 import atexit
 from dataclasses import dataclass
 from dataclasses import field
-import debugger
 import functools
 import gzip
 import json
@@ -23,6 +22,7 @@ import args
 import config
 import console
 import dataparse
+import debugger
 import environment
 import event
 import execution

@@ -2,17 +2,17 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-import typing
-import test_list_file
-
 import atexit
 import os
-import string
+import random
 import signal
+import string
 import subprocess
 import sys
-import random
 import tempfile
+import typing
+
+import test_list_file
 
 
 def spawn(
