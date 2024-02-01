@@ -785,30 +785,6 @@ zx_status_t AmlClock::Create(zx_device_t* parent) {
     return status;
   }
 
-  if (info.pid == 0) {
-    // TODO(https://fxbug.dev/318736574) : Remove and rely only on GetDeviceInfo.
-    pdev_board_info_t board_info;
-    if ((status = pdev.GetBoardInfo(&board_info)) != ZX_OK) {
-      zxlogf(ERROR, "aml-clk: GetBoardInfo failed, status = %d", status);
-      return status;
-    }
-
-    if (board_info.vid == PDEV_VID_KHADAS) {
-      switch (board_info.pid) {
-        case PDEV_PID_VIM3:
-          info.pid = PDEV_PID_AMLOGIC_A311D;
-          info.did = PDEV_DID_AMLOGIC_G12B_CLK;
-          break;
-        default:
-          zxlogf(ERROR, "Unsupported PID 0x%x for VID 0x%x", board_info.pid, board_info.vid);
-          return ZX_ERR_INVALID_ARGS;
-      }
-    } else {
-      zxlogf(ERROR, "Unsupported VID 0x%x", board_info.vid);
-      return ZX_ERR_INVALID_ARGS;
-    }
-  }
-
   if (info.mmio_count > kMsrMmio) {
     status = pdev.MapMmio(kMsrMmio, &msr_mmio);
     if (status != ZX_OK) {
