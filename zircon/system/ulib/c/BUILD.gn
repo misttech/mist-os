@@ -27,6 +27,7 @@ libc_components = [
   "scudo",
   "stdio",
   "stdlib",
+  "errno",
 ]
 
 libc_testonly_components = []

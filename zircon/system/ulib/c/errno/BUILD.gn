@@ -5,9 +5,12 @@
 import("../libc.gni")
 
 libc_source_set("errno") {
-  # For now we only want to include this for tests.
-  testonly = true
-
   dir = "$llvm_libc/src/errno"
   sources = [ "libc_errno.cpp" ]
+}
+
+# No unittests, but define this target because it is required of every
+# libc_component.
+libc_test("unittests") {
+  sources = []
 }
