@@ -17,8 +17,9 @@
 		iommus = <&dummy_iommu 2>;
 	};
 
-	clock-controller@ff63c000 {
+	clock: clock-controller@ff63c000 {
 		compatible = "amlogic,g12b-clk";
 		reg = <0x00 0xff63c000 0x00 0x2000>, <0x00 0xff620000 0x00 0x10000>, <0x00 0xffd18000 0x00 0x1000>;
+		#clock-cells = <1>;
 	};
 }
