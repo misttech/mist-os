@@ -179,6 +179,50 @@ def _flatten_comma_list(items: Iterable[str]) -> Iterable[str]:
         yield from item.split(",")
 
 
+def build_metadata_flags() -> Sequence[str]:
+    """Convert environment variables into build metadata flags."""
+    result_flags = []
+
+    # Propagate some build metadata from the environment.
+    # Some of these values are set by infra.
+    def forward_build_metadata_from_env(var: str) -> Optional[str]:
+        env_value = os.environ.get(var)  # set by infra
+        if env_value is None:
+            return None
+
+        result_flags.append(f"--build_metadata={var}={env_value}")
+        return env_value
+
+    bb_id = forward_build_metadata_from_env("BUILDBUCKET_ID")
+
+    # Provide click-able/paste-able link for convenience.
+    if bb_id:
+        result_flags.append(
+            f"--build_metadata=SIBLING_BUILDS_LINK=http://sponge/invocations/?q=BUILDBUCKET_ID:{bb_id}"
+        )
+        if "/led/" in bb_id:
+            result_flags.append(
+                f"--build_metadata=PARENT_BUILD_LINK=go/lucibuild/{bb_id}/+/build.proto"
+            )
+        else:
+            result_flags.append(
+                f"--build_metadata=PARENT_BUILD_LINK=go/bbid/{bb_id}"
+            )
+
+    forward_build_metadata_from_env("BUILDBUCKET_BUILDER")
+
+    # Developers' builds will have one uuid per `fx build` invocation
+    # that can be used to correlate multiple bazel sub-builds.
+    fx_build_id = forward_build_metadata_from_env("FX_BUILD_UUID")
+
+    if fx_build_id:
+        result_flags.append(
+            f"--build_metadata=SIBLING_BUILDS_LINK=http://sponge/invocations/?q=FX_BUILD_UUID:{fx_build_id}"
+        )
+
+    return result_flags
+
+
 def main():
     parser = argparse.ArgumentParser(
         description=__doc__,
@@ -545,43 +589,6 @@ def main():
         for name, path in repo_override_map.items()
     ]
 
-    # Propagate some build metadata from the environment.
-    # Some of these values are set by infra.
-    def forward_build_metadata_from_env(var: str) -> Optional[str]:
-        env_value = os.environ.get(var)  # set by infra
-        if env_value is None:
-            return None
-
-        bazel_common_args.append(f"--build_metadata={var}={env_value}")
-        return env_value
-
-    bb_id = forward_build_metadata_from_env("BUILDBUCKET_ID")
-
-    # Provide click-able/paste-able link for convenience.
-    if bb_id:
-        bazel_common_args.append(
-            f"--build_metadata=SIBLING_BUILDS_LINK=http://sponge/invocations/?q=BUILDBUCKET_ID:{bb_id}"
-        )
-        if "/led/" in bb_id:
-            bazel_common_args.append(
-                f"--build_metadata=PARENT_BUILD_LINK=go/lucibuild/{bb_id}/+/build.proto"
-            )
-        else:
-            bazel_common_args.append(
-                f"--build_metadata=PARENT_BUILD_LINK=go/bbid/{bb_id}"
-            )
-
-    forward_build_metadata_from_env("BUILDBUCKET_BUILDER")
-
-    # Developers' builds will have one uuid per `fx build` invocation
-    # that can be used to correlate multiple bazel sub-builds.
-    fx_build_id = forward_build_metadata_from_env("FX_BUILD_UUID")
-
-    if fx_build_id:
-        bazel_common_args.append(
-            f"--build_metadata=SIBLING_BUILDS_LINK=http://sponge/invocations/?q=FX_BUILD_UUID:{fx_build_id}"
-        )
-
     # These argument remove verbose output from Bazel, used in queries.
     bazel_quiet_args = [
         "--noshow_loading_progress",
@@ -612,12 +619,11 @@ def main():
         "--experimental_writable_outputs",
     ]
 
-    # Forward additional --config's.
-    bazel_config_args.extend(
+    # Forward additional --config's, intended for `bazel test`.
+    # These configs should not affect the build graph.
+    bazel_test_args = [
         f"--config={cfg}" for cfg in _flatten_comma_list(args.bazel_config)
-    )
-
-    bazel_test_args = []
+    ]
 
     if args.quiet:
         bazel_common_args += bazel_quiet_args
@@ -633,10 +639,12 @@ def main():
         ("resultstore", "BAZEL_resultstore_socket_path", "--bes_proxy"),
         ("remote", "BAZEL_rbe_socket_path", "--remote_proxy"),
     ):
-        if f"--config={config_arg}" in bazel_config_args:
+        if f"--config={config_arg}" in bazel_test_args:
             env_value = os.environ.get(env_var)
             if env_value:
                 bazel_test_args += [f"{bazel_flag}=unix://{env_value}"]
+
+    bazel_test_args += build_metadata_flags()
 
     if args.bazel_build_events_log_json:
         args.bazel_build_events_log_json.parent.mkdir(
