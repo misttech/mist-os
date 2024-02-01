@@ -14,10 +14,8 @@ use ffx_daemon::{get_daemon_proxy_single_link, is_daemon_running_at_path, Daemon
 use ffx_metrics::add_ffx_rcs_protocol_event;
 use ffx_target::{get_remote_proxy, open_target_with_fut, TargetKind};
 use ffx_writer::{Format, Writer};
-use fidl::endpoints::{create_proxy, Proxy};
-use fidl_fuchsia_developer_ffx::{
-    DaemonError, DaemonProxy, FastbootMarker, FastbootProxy, TargetInfo, TargetProxy, VersionInfo,
-};
+use fidl::endpoints::Proxy;
+use fidl_fuchsia_developer_ffx::{DaemonError, DaemonProxy, TargetInfo, TargetProxy, VersionInfo};
 use fidl_fuchsia_developer_remotecontrol::RemoteControlProxy;
 use futures::FutureExt;
 use std::future::Future;
@@ -163,22 +161,6 @@ impl Injection {
     }
 
     #[tracing::instrument]
-    async fn fastboot_factory_inner(&self) -> Result<FastbootProxy> {
-        let daemon_proxy = self.daemon_factory().await?;
-        let target = self.target.clone();
-        let (target_proxy, target_proxy_fut) = open_target_with_fut(
-            target,
-            self.is_default_target(),
-            daemon_proxy.clone(),
-            self.env_context.get_proxy_timeout().await?,
-        )?;
-        target_proxy_fut.await?;
-        let (fastboot_proxy, fastboot_server_end) = create_proxy::<FastbootMarker>()?;
-        target_proxy.open_fastboot(fastboot_server_end)?;
-        Ok(fastboot_proxy)
-    }
-
-    #[tracing::instrument]
     async fn target_factory_inner(&self) -> Result<TargetProxy> {
         let target = self.target.clone();
         let daemon_proxy = self.daemon_factory().await?;
@@ -243,23 +225,12 @@ impl Injector for Injection {
     }
 
     #[tracing::instrument]
-    async fn fastboot_factory(&self) -> Result<FastbootProxy> {
-        let target = self.target.clone();
-        let timeout_error = self.daemon_timeout_error();
-        let proxy_timeout = self.env_context.get_proxy_timeout().await?;
-        timeout(proxy_timeout, self.fastboot_factory_inner()).await.map_err(|_| {
-            tracing::warn!("Timed out getting fastboot proxy for: {:?}", target);
-            timeout_error
-        })?
-    }
-
-    #[tracing::instrument]
     async fn target_factory(&self) -> Result<TargetProxy> {
         let target = self.target.clone();
         let timeout_error = self.daemon_timeout_error();
         let proxy_timeout = self.env_context.get_proxy_timeout().await?;
         timeout(proxy_timeout, self.target_factory_inner()).await.map_err(|_| {
-            tracing::warn!("Timed out getting fastboot proxy for: {:?}", target);
+            tracing::warn!("Timed out getting target proxy for: {:?}", target);
             timeout_error
         })?
     }

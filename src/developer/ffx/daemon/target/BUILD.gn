@@ -11,13 +11,9 @@ rustc_library("lib") {
 
   deps = [
     "//sdk/fidl/fuchsia.developer.remotecontrol:fuchsia.developer.remotecontrol_rust",
-    "//sdk/fidl/fuchsia.hardware.power.statecontrol:fuchsia.hardware.power.statecontrol_rust",
-    "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
     "//sdk/fidl/fuchsia.net:fuchsia.net_rust",
-    "//sdk/fidl/fuchsia.sys2:fuchsia.sys2_rust",
     "//src/connectivity/overnet/lib/circuit",
     "//src/connectivity/overnet/lib/core",
-    "//src/developer/fastboot:lib",
     "//src/developer/ffx/config:lib",
     "//src/developer/ffx/daemon/core:lib",
     "//src/developer/ffx/daemon/events:lib",
@@ -26,12 +22,9 @@ rustc_library("lib") {
     "//src/developer/ffx/lib/compat_info:lib",
     "//src/developer/ffx/lib/fastboot:lib",
     "//src/developer/ffx/lib/fastboot/interface:lib",
-    "//src/developer/ffx/lib/fastboot/transport/interface:lib",
-    "//src/developer/ffx/lib/metrics:lib",
     "//src/developer/ffx/lib/netext:lib",
     "//src/developer/ffx/lib/rcs:lib",
     "//src/developer/ffx/lib/ssh:lib",
-    "//src/developer/ffx/lib/timeout:lib",
     "//src/developer/ffx/lib/usb_fastboot_discovery:lib",
     "//src/lib/async-utils",
     "//src/lib/fidl/rust/fidl",
@@ -63,16 +56,9 @@ rustc_library("lib") {
     "//src/lib/fuchsia",
     "//third_party/rust_crates:assert_matches",
     "//third_party/rust_crates:async-channel",
-    "//third_party/rust_crates:serial_test",
-    "//third_party/rust_crates:tempfile",
   ]
 
   sources = [
-    "src/fastboot/client.rs",
-    "src/fastboot/mod.rs",
-    "src/fastboot/network/mod.rs",
-    "src/fastboot/network/tcp.rs",
-    "src/fastboot/network/udp.rs",
     "src/lib.rs",
     "src/overnet/host_pipe.rs",
     "src/overnet/mod.rs",
