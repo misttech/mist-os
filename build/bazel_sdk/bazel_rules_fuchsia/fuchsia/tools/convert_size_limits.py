@@ -218,6 +218,9 @@ def main():
             total_budget_bytes=args.max_blob_contents_size,
         )
 
+        if "dedup_blobs" in size_limits:
+            output_contents["dedup_blobs"] = size_limits["dedup_blobs"]
+
         # Ensure the outputfile is closed early.
         with args.output as output:
             json.dump(output_contents, output, indent=2)

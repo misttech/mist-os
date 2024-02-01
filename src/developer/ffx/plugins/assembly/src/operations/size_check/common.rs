@@ -7,7 +7,7 @@ use serde::Serialize;
 use std::collections::HashSet;
 use std::fmt;
 
-#[derive(Debug, Serialize, Eq, PartialEq, Default)]
+#[derive(Debug, Clone, Serialize, Eq, PartialEq, Default)]
 pub struct PackageSizeInfo {
     pub name: String,
     /// Space used by this package in blobfs if each blob is counted fully.
