@@ -35,7 +35,7 @@ caution.
 
 The API surface described by the IDK is governed by the [Fuchsia API
 Council](/docs/contribute/governance/api_council.md) and should conform to the
-appropriate [API rubrics](/docs/concepts/api/README.md).
+appropriate [API rubrics](/docs/development/api/README.md).
 
 ## Listing of FIDL libraries
 

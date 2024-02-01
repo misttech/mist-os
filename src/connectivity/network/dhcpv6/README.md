@@ -62,7 +62,7 @@ The imperative shell:
 ## Watcher APIs
 
 Watcher APIs use the
-[hanging get pattern](../../../../docs/concepts/api/fidl.md#hanging-get) to
+[hanging get pattern](../../../../docs/development/api/fidl.md#hanging-get) to
 allow watchers to pull changes from servers. Pulling is preferred over pushing
 (i.e. the server pushes data to the client) because pull models have built-in
 flow control since the client naturally limits the rate at which the server

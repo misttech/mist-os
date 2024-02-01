@@ -129,5 +129,5 @@ At present, these are the libraries considered in this document:
    + not included in SDK
    + used via fdio which is included in SDK
 
-[library_structure]: /docs/concepts/api/fidl.md#library_structure
+[library_structure]: /docs/development/api/fidl.md#library_structure
 [`netlink`]: https://man7.org/linux/man-pages/man7/netlink.7.html
