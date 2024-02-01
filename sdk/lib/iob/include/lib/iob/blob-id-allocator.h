@@ -10,6 +10,8 @@
 #include <atomic>
 #include <cstdint>
 #include <limits>
+#include <type_traits>
+#include <utility>
 
 #ifndef LIB_IOB_BLOB_ID_ALLOCATOR_H_
 #define LIB_IOB_BLOB_ID_ALLOCATOR_H_
@@ -103,6 +105,29 @@ class BlobIdAllocator {
 
   // Attempts to store the provided blob and allocate its ID.
   fit::result<AllocateError, uint32_t> Allocate(cpp20::span<const std::byte> blob) {
+    return Allocate(
+        [](cpp20::span<const std::byte> src, cpp20::span<std::byte> dest) {
+          // This check should already be made with any failure gracefully
+          // handled by the time this is called.
+          ZX_DEBUG_ASSERT(src.size() <= dest.size());
+          memcpy(dest.data(), src.data(), src.size());
+        },
+        blob, blob.size());
+  }
+
+  // A variation of the allocation routine that abstracts the representation of
+  // the supplied blob and the manner in which it is copied. This of particular
+  // value to the use of this library in kernel, which requires care in dealing
+  // with user-supplied memory.
+  //
+  // `CopyBlob`, which performs the copy of blob to a specified destination, is
+  // a callable of input signature `(Blob src, cpp20::span<std::byte> dest)` and
+  // unspecified return type.
+  //
+  template <typename Blob, typename CopyBlob>
+  fit::result<AllocateError, uint32_t> Allocate(CopyBlob&& copy, Blob blob, size_t blob_size) {
+    static_assert(std::is_invocable_v<CopyBlob, Blob, cpp20::span<std::byte>>);
+
     cpp20::atomic_ref<Header> ref = header();
     Header hdr = ref.load(std::memory_order_relaxed);
     bool retry = true;
@@ -114,12 +139,12 @@ class BlobIdAllocator {
         remaining = result.value();
       }
 
-      if (remaining < sizeof(Index) || remaining - sizeof(Index) < blob.size()) {
+      if (remaining < sizeof(Index) || remaining - sizeof(Index) < blob_size) {
         return fit::error{AllocateError::kOutOfMemory};
       }
       Header updated = {
           .next_id = hdr.next_id + 1,
-          .blob_head = hdr.blob_head - static_cast<uint32_t>(blob.size()),
+          .blob_head = hdr.blob_head - static_cast<uint32_t>(blob_size),
       };
       retry = !ref.compare_exchange_weak(hdr, updated, std::memory_order_relaxed);
     }
@@ -127,7 +152,7 @@ class BlobIdAllocator {
     // When the loop terminates `hdr` reflects the header just prior to the
     // update.
     auto [id, offset] = hdr;
-    offset -= static_cast<uint32_t>(blob.size());
+    offset -= static_cast<uint32_t>(blob_size);
 
     // We store the blob and then store the index with release semantics to
     // ensure the following:
@@ -135,12 +160,12 @@ class BlobIdAllocator {
     //     blob.
     // (2) The write of the index stays ordered before subsequent reads, which
     //     are made with release semantics.
-    memcpy(&bytes_[offset], blob.data(), blob.size());
+    std::forward<CopyBlob>(copy)(blob, bytes_.subspan(offset, blob_size));
 
     // Before overwriting, to be safe, check that the index is in the initial
     // state (i.e., empty).
     Index empty = {0, 0};
-    Index index{.size = static_cast<uint32_t>(blob.size()), .offset = offset};
+    Index index{.size = static_cast<uint32_t>(blob_size), .offset = offset};
     if (!GetIndex(id).compare_exchange_strong(empty,                         //
                                               index,                         //
                                               std::memory_order_release)) {  //
