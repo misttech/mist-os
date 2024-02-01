@@ -97,7 +97,7 @@ zx::result<> GpioImplVisitor::Visit(fdf_devicetree::Node& node,
     }
 
     if (parser_output->find(kGpioNames) == parser_output->end() ||
-        (*parser_output)[kGpioReference].size() != (*parser_output)[kGpioReference].size()) {
+        (*parser_output)[kGpioNames].size() != (*parser_output)[kGpioReference].size()) {
       // We need a clock names to generate bind rules.
       FDF_LOG(ERROR, "Gpio reference '%s' does not have valid gpio names field.",
               node.name().c_str());
