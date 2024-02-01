@@ -951,10 +951,16 @@ where
             // Wait for an acknowledgement.
             loop {
                 let mut pb = &mut buffer[..];
-                let ack = read_message::<tftp::TftpPacket<_>, _>(&mut pb, &sock, socket_addr)
+                let ack = match read_message::<tftp::TftpPacket<_>, _>(&mut pb, &sock, socket_addr)
                     .await
-                    .into_ack()
-                    .expect("unexpected response");
+                {
+                    tftp::TftpPacket::Ack(ack) => ack,
+                    tftp::TftpPacket::OptionAck(oack) => {
+                        println!("ignoring {oack:?} at {index}, might be retransmit");
+                        continue;
+                    }
+                    packet => panic!("unexpected message {packet:?}"),
+                };
                 if ack.block() == index {
                     break None;
                 }
