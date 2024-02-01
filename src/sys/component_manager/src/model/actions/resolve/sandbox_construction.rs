@@ -13,12 +13,13 @@ use {
     },
     ::routing::{
         capability_source::{ComponentCapability, InternalCapability},
+        component_instance::ComponentInstanceInterface,
         error::{ComponentInstanceError, RoutingError},
     },
     cm_rust::{self, ExposeDeclCommon, OfferDeclCommon, SourceName, SourcePath, UseDeclCommon},
     cm_types::{Name, SeparatedPath},
     moniker::{ChildName, ChildNameBase, MonikerBase},
-    sandbox::{Capability, Dict, ErasedCapability, Receiver, Unit},
+    sandbox::{Capability, Dict, ErasedCapability, Open, Receiver, Unit},
     std::{collections::HashMap, iter, sync::Arc},
     tracing::warn,
 };
@@ -213,12 +214,7 @@ fn extend_dict_with_use(
     let source_path = use_.source_path();
     let router = match use_.source() {
         cm_rust::UseSource::Parent => {
-            let Some(router) =
-                component_input.capabilities.get_routable::<Router>(source_path.iter_segments())
-            else {
-                return;
-            };
-            router
+            use_from_parent_router(component_input, source_path.to_owned(), component.as_weak())
         }
         cm_rust::UseSource::Self_ => {
             if source_path.dirname.is_some() {
@@ -289,6 +285,64 @@ fn extend_dict_with_use(
         use_protocol.target_path.iter_segments(),
         router.with_availability(*use_.availability()),
     );
+}
+
+/// Builds a router that obtains a capability that the program uses from `parent`.
+///
+/// The capability is usually an entry in the `component_input.capabilities` dict
+/// unless it is overridden by an eponymous capability in the `incoming_dict` when started.
+fn use_from_parent_router(
+    component_input: &ComponentInput,
+    source_path: SeparatedPath,
+    weak_component: WeakComponentInstance,
+) -> Router {
+    let component_input_capability = Router::from_routable(component_input.capabilities.clone())
+        .with_path(source_path.iter_segments());
+
+    Router::new(move |request, completer| {
+        let source_path = source_path.clone();
+        let component_input_capability = component_input_capability.clone();
+        let Ok(component) = weak_component.upgrade() else {
+            return completer.complete(Err(RoutingError::from(
+                ComponentInstanceError::InstanceNotFound {
+                    moniker: weak_component.moniker.clone(),
+                },
+            )
+            .into()));
+        };
+        component.clone().blocking_task_group().spawn(async move {
+            let state = match component.lock_resolved_state().await {
+                Ok(state) => state,
+                Err(err) => {
+                    return completer.complete(Err(RoutingError::from(
+                        ComponentInstanceError::resolve_failed(component.moniker.clone(), err),
+                    )
+                    .into()))
+                }
+            };
+            // Try to get the capability from the incoming dict, which was passed when the child was
+            // started.
+            //
+            // Unlike the program input dict below that contains Routers created by
+            // component manager, the incoming dict may contain capabilities created externally.
+            // Currently there is no way to create a Router externally, so assume these
+            // are Open capabilities and convert them to Router here.
+            //
+            // TODO(https://fxbug.dev/319542502): Convert from the external Router type, once it
+            // exists.
+            let router = state
+                .incoming_dict
+                .as_ref()
+                .and_then(|dict| {
+                    dict.get_capability::<Open>(source_path.iter_segments())
+                        .map(Router::from_routable)
+                })
+                // Try to get the capability from the component input dict, created from static
+                // routes when the component was resolved.
+                .unwrap_or(component_input_capability);
+            router.route(request, completer);
+        });
+    })
 }
 
 fn is_supported_offer(offer: &cm_rust::OfferDecl) -> bool {

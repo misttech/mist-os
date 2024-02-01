@@ -121,6 +121,23 @@ impl Router {
         (self.route_fn)(request, completer)
     }
 
+    /// Returns an router that requests capabilities from the specified `path` relative
+    /// to the base router, i.e. attenuates the base router to the subset of capabilities
+    /// that live under `path`.
+    pub fn with_path<'a>(self, path: impl DoubleEndedIterator<Item = &'a str>) -> Router {
+        let segments: Vec<_> = path.map(|s| s.to_string()).rev().collect();
+        if segments.is_empty() {
+            return self;
+        }
+        let route_fn = move |mut request: Request, completer: Completer| {
+            for name in &segments {
+                request.relative_path.prepend(name.clone());
+            }
+            self.route(request, completer);
+        };
+        Router::new(route_fn)
+    }
+
     /// Returns a router that ensures the capability request has an availability
     /// strength that is at least the provided `availability`.
     pub fn with_availability(self, availability: Availability) -> Router {
@@ -410,6 +427,7 @@ mod tests {
     use super::*;
     use assert_matches::assert_matches;
     use sandbox::{Data, Message, Receiver, Sender};
+    use std::iter;
 
     #[fuchsia::test]
     async fn availability_good() {
@@ -486,5 +504,61 @@ mod tests {
                 target: (),
             })
             .is_err());
+    }
+
+    #[fuchsia::test]
+    async fn with_path() {
+        let source: AnyCapability = Box::new(Data::String("hello".to_string()));
+        let dict1 = Dict::new();
+        dict1.lock_entries().insert("source".to_owned(), source);
+        let dict2 = Dict::new();
+        dict2.lock_entries().insert("dict1".to_owned(), Box::new(dict1));
+
+        let base_router = Router::from_routable(dict2);
+        let downscoped_router = base_router.with_path(iter::once("dict1"));
+
+        let capability = route(
+            &downscoped_router,
+            Request {
+                rights: None,
+                relative_path: Path::new("source"),
+                availability: Availability::Optional,
+                target: WeakComponentInstance::invalid(),
+            },
+        )
+        .await
+        .unwrap();
+        let capability: Data = capability.try_into().unwrap();
+        assert_eq!(capability, Data::String("hello".to_string()));
+    }
+
+    #[fuchsia::test]
+    async fn with_path_deep() {
+        let source: AnyCapability = Box::new(Data::String("hello".to_string()));
+        let dict1 = Dict::new();
+        dict1.lock_entries().insert("source".to_owned(), source);
+        let dict2 = Dict::new();
+        dict2.lock_entries().insert("dict1".to_owned(), Box::new(dict1));
+        let dict3 = Dict::new();
+        dict3.lock_entries().insert("dict2".to_owned(), Box::new(dict2));
+        let dict4 = Dict::new();
+        dict4.lock_entries().insert("dict3".to_owned(), Box::new(dict3));
+
+        let base_router = Router::from_routable(dict4);
+        let downscoped_router = base_router.with_path(vec!["dict3", "dict2"].into_iter());
+
+        let capability = route(
+            &downscoped_router,
+            Request {
+                rights: None,
+                relative_path: Path::new("dict1/source"),
+                availability: Availability::Optional,
+                target: WeakComponentInstance::invalid(),
+            },
+        )
+        .await
+        .unwrap();
+        let capability: Data = capability.try_into().unwrap();
+        assert_eq!(capability, Data::String("hello".to_string()));
     }
 }

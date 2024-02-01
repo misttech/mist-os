@@ -146,18 +146,7 @@ impl DictExt for Dict {
         let Some(capability) = self.get_capability::<C>(iter::once(first)) else {
             return None;
         };
-        let router = Router::from_routable(capability);
-        let segments: Vec<_> = path.map(|s| s.to_string()).rev().collect();
-        if segments.is_empty() {
-            return Some(router);
-        }
-        let route_fn = move |mut request: Request, completer: Completer| {
-            for name in &segments {
-                request.relative_path.prepend(name.clone());
-            }
-            router.route(request, completer);
-        };
-        Some(Router::new(route_fn))
+        Some(Router::from_routable(capability).with_path(path))
     }
 
     fn insert_capability<'a, C>(&self, mut path: impl Iterator<Item = &'a str>, capability: C)
