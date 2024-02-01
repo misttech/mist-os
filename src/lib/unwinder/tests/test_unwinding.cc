@@ -23,6 +23,7 @@ namespace {
 // Use global variables to avoid captures in lambdas.
 std::vector<Frame> frames;
 std::vector<uint64_t> expected_pcs;
+uint64_t test_start_pc;
 
 // Call a sequence of functions recursively and record the return addresses in |expected_pcs|
 // At the end, unwind the stack using |UnwindLocal()| and save to |frames|. For example,
@@ -66,33 +67,53 @@ void check_stack() {
   }
 }
 
-// It should be possible to interoperate between FP unwinder and CFI unwinder.
-TEST(Unwinder, HybridUnwinding) {
+template <typename F1, typename... FN>
+[[gnu::noinline]] int TestStart(F1 f1, FN... fn) {
   frames.clear();
   expected_pcs.clear();
+  test_start_pc = 0;
 
-  int res = call_sequence(FpOnly, FpOnly, CfiOnly, FpOnly);
+  int res = call_sequence(f1, fn...);
+  test_start_pc = reinterpret_cast<uint64_t>(__builtin_return_address(0));
+  expected_pcs.push_back(test_start_pc);
+  return res;
+}
+
+size_t GetTestStartFrameIndex() {
+  size_t start_idx = 0;
+  for (auto& frame : frames) {
+    if (uint64_t pc; frame.regs.GetPC(pc).ok() && pc == test_start_pc) {
+      return start_idx;
+    }
+    start_idx++;
+  }
+  return -1;
+}
+
+// It should be possible to interoperate between FP unwinder and CFI unwinder.
+TEST(Unwinder, HybridUnwinding) {
+  int res = TestStart(FpOnly, FpOnly, CfiOnly, FpOnly);
 
   ASSERT_EQ(res, 31);
-  ASSERT_GE(frames.size(), 10ul);
+
+  // FpOnly, CfiOnly, FpOnly, FpOnly could be the first four frames before the TestStart().
+  EXPECT_GE(GetTestStartFrameIndex(), 4ul);
 
   check_stack();
 }
 
 #if __has_feature(shadow_call_stack)
 TEST(Unwinder, Scs) {
-  frames.clear();
-  expected_pcs.clear();
-
   // SCS unwinder cannot be combined with other unwinders, e.g.
   // (CFI -> SCS means unwinding using CFI first, then using SCS.)
   //  * CFI -> SCS will work, because CFI also recovers x18.
   //  * FP -> SCS won't work, because FP doesn't recover x18.
   //  * SCS -> FP and SCS -> CFI won't work, because SCS only recovers PC and x18.
-  int res = call_sequence(ScsOnly, ScsOnly, ScsOnly, CfiOnly);
+  int res = TestStart(ScsOnly, ScsOnly, ScsOnly, CfiOnly);
 
   ASSERT_EQ(res, 301);
-  ASSERT_GE(frames.size(), 10ul);
+  // CfiOnly, ScsOnly, ScsOnly, ScsOnly could be the first four frames before the TestStart().
+  ASSERT_GE(GetTestStartFrameIndex(), 4ul);
 
   check_stack();
 }
