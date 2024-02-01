@@ -6,6 +6,7 @@ use std::{any::TypeId, fmt::Display, ops::ControlFlow};
 
 mod macros;
 
+use ffx_validation_proc_macro::schema;
 pub use ffx_validation_proc_macro::Schema;
 
 /// Walks through a schema type's structure and collects its constituents.
@@ -247,43 +248,11 @@ macro_rules! impl_prim {
     };
 }
 
-// TODO: Migrate to use the schema macro when #[transparent] type aliases are implemented
 impl_prim!(Integer: u64 u32 u16 u8 i64 i32 i16 i8);
 impl_prim!(Double: f32 f64);
 impl_prim!(Bool: bool);
 impl_prim!(String: str String);
 impl_prim!(Any: serde_json::Value);
-
-impl<T: Schema> Schema for Option<T> {
-    fn walk_schema(walker: &mut dyn Walker) -> ControlFlow<()> {
-        T::walk_schema(walker)?;
-        json::Null::walk_schema(walker)
-    }
-}
-
-impl<T: Schema> Schema for Box<T> {
-    fn walk_schema(walker: &mut dyn Walker) -> ControlFlow<()> {
-        T::walk_schema(walker)
-    }
-}
-
-impl<T: Schema> Schema for Vec<T> {
-    fn walk_schema(walker: &mut dyn Walker) -> ControlFlow<()> {
-        <[T] as Schema>::walk_schema(walker)
-    }
-}
-
-impl<K: Schema + Eq + std::hash::Hash, V: Schema> Schema for std::collections::HashMap<K, V> {
-    fn walk_schema(walker: &mut dyn Walker) -> ControlFlow<()> {
-        json::Map::<K, V>::walk_schema(walker)
-    }
-}
-
-impl<K: Schema + Ord, V: Schema> Schema for std::collections::BTreeMap<K, V> {
-    fn walk_schema(walker: &mut dyn Walker) -> ControlFlow<()> {
-        json::Map::<K, V>::walk_schema(walker)
-    }
-}
 
 impl Schema for () {
     fn walk_schema(walker: &mut dyn Walker) -> ControlFlow<()> {
@@ -321,3 +290,21 @@ macro_rules! make_tuple {
 }
 
 make_tuple!(A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P,);
+
+schema! {
+    #[transparent]
+    impl<T: Schema> for Option<T> = T?;
+
+    #[transparent]
+    impl<T: Schema> for Box<T> = T;
+
+    #[transparent]
+    impl<T: Schema> for Vec<T> = [T];
+
+    #[transparent]
+    impl<K: Schema + Eq + std::hash::Hash, V: Schema> for std::collections::HashMap<K, V> =
+        json::Map::<K, V>;
+
+    #[transparent]
+    impl<K: Schema + Ord, V: Schema> for std::collections::BTreeMap<K, V> = json::Map::<K, V>;
+}
