@@ -47,7 +47,6 @@ use {
 #[derive(Debug, Clone)]
 pub struct CachingPackageServer<S> {
     non_meta_storage: S,
-    // open_packages and cleanup_sender are never locked at the same time
     open_packages: Arc<
         std::sync::Mutex<
             HashMap<
@@ -58,14 +57,8 @@ pub struct CachingPackageServer<S> {
     >,
     // Sends the scope and hash for newly added packages to the cleanup future that removes
     // packages from `open_packages` when their last connection closes.
-    cleanup_sender: Arc<
-        futures::lock::Mutex<
-            futures::channel::mpsc::Sender<(
-                vfs::execution_scope::ExecutionScope,
-                fuchsia_hash::Hash,
-            )>,
-        >,
-    >,
+    cleanup_sender:
+        futures::channel::mpsc::Sender<(vfs::execution_scope::ExecutionScope, fuchsia_hash::Hash)>,
 }
 
 impl<S: package_directory::NonMetaStorage + Clone> CachingPackageServer<S> {
@@ -82,14 +75,7 @@ impl<S: package_directory::NonMetaStorage + Clone> CachingPackageServer<S> {
         )>(0);
         let open_packages = Arc::new(std::sync::Mutex::new(HashMap::new()));
         let gc_fut = gc_closed_packages(Arc::clone(&open_packages), recv);
-        (
-            Self {
-                non_meta_storage,
-                open_packages,
-                cleanup_sender: Arc::new(futures::lock::Mutex::new(cleanup_sender)),
-            },
-            gc_fut,
-        )
+        (Self { non_meta_storage, open_packages, cleanup_sender }, gc_fut)
     }
 
     /// Uses the `non_meta_storage` provided to `Self::new` to serve the package indicated by
@@ -154,8 +140,7 @@ impl<S: package_directory::NonMetaStorage + Clone> CachingPackageServer<S> {
         if let Some(scope) = scope_for_new_entry {
             let () = self
                 .cleanup_sender
-                .lock()
-                .await
+                .clone()
                 .send((scope, hash))
                 .await
                 .expect("cache outlived cleanup future");
