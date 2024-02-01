@@ -113,7 +113,7 @@ From //build/images/args.gni:141
 
 **Current value (from the default):** `true`
 
-From //build/config/fuchsia/platform_version.gni:54
+From //build/config/fuchsia/platform_version.gni:55
 
 ### archivist_max_cached_logs_bytes
 
@@ -2451,7 +2451,7 @@ This should be set to the path of the llvm compiler-rt/builtins directory.
 
 **Current value (from the default):** `""`
 
-From //third_party/pigweed/src/third_party/llvm_builtins/BUILD.gn:22
+From //third_party/pigweed/src/third_party/llvm_builtins/BUILD.gn:23
 
 ### dir_pw_third_party_mbedtls
 
@@ -3885,7 +3885,7 @@ platform-version-roller when the API level is incremented.
 
 **Current value (from the default):** `false`
 
-From //build/config/fuchsia/platform_version.gni:53
+From //build/config/fuchsia/platform_version.gni:54
 
 ### include_shell_commands_package
 
@@ -5750,7 +5750,7 @@ available.
 
 **Current value (from the default):** `"executable"`
 
-From //third_party/pigweed/src/pw_build/gn_internal/build_target.gni:33
+From //third_party/pigweed/src/pw_build/gn_internal/build_target.gni:39
 
 ### pw_build_EXECUTABLE_TARGET_TYPE_FILE
 
@@ -5761,7 +5761,7 @@ If pw_build_EXECUTABLE_TARGET_TYPE is not the default of `executable`, this
 
 **Current value (from the default):** `""`
 
-From //third_party/pigweed/src/pw_build/gn_internal/build_target.gni:39
+From //third_party/pigweed/src/pw_build/gn_internal/build_target.gni:45
 
 ### pw_build_LINK_DEPS
 
@@ -5894,6 +5894,17 @@ toolchain to avoid unnecessary duplication in the build.
 **Current value (from the default):** `"//third_party/pigweed/src/pw_build/python_toolchain:python"`
 
 From //third_party/pigweed/src/pw_build/python_gn_args.gni:20
+
+### pw_build_TOOLCHAIN_LINK_DEPS
+
+pw_build_TOOLCHAIN_LINK_DEPS is used by pw_toolchain module to set default
+libary dependencies. Generally, this is not intended to be user-facing, but
+if something is introduced here that you need to remove, you can do so by
+overriding this variable in your own toolchain.
+
+**Current value (from the default):** `[]`
+
+From //third_party/pigweed/src/pw_build/gn_internal/build_target.gni:32
 
 ### pw_checksum_CONFIG
 
@@ -6609,7 +6620,15 @@ the current toolchain.
 
 **Current value (from the default):** `""`
 
-From //third_party/pigweed/src/third_party/llvm_builtins/BUILD.gn:26
+From //third_party/pigweed/src/third_party/llvm_builtins/BUILD.gn:27
+
+### pw_third_party_llvm_builtins_ignore_list
+
+List of files to be excluded from the builtins repo.
+
+**Current value (from the default):** `[]`
+
+From //third_party/pigweed/src/third_party/llvm_builtins/BUILD.gn:30
 
 ### pw_third_party_mbedtls_CONFIG_HEADER
 
