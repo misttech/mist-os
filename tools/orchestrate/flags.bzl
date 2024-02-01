@@ -38,4 +38,10 @@ ENABLED_EXPERIMENTS = [
 
     # Controls whether the subrunner dumps ffx logs to stdout.
     "subrunner-ffx-logging",
+
+    # TODO(b/322928092): Disable and remove experiment once `no-orchestrate-*`
+    # is removed.
+    # Controls whether orchestrate exits with non-zero status code on test
+    # failures in addition to writing to summary.json.
+    "orchestrate-error-on-test-failure",
 ]

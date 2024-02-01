@@ -54,9 +54,9 @@ type HardwareRunInput struct {
 	TransferURL string `json:"transfer_url"`
 	// Fuchsia packages archives to publish with "ffx repository publish".
 	PackageArchives []string `json:"package_archives"`
-	// Build IDs to symbolize with "ffx debug symbol-index add"
+	// Build IDs to symbolize with "ffx debug symbol-index add".
 	BuildIds []string `json:"build_ids"`
-	// ffx binary path
+	// ffx binary path.
 	FfxPath string `json:"ffx_path"`
 	// Map of CIPD destination to CIPD package path:version.
 	Cipd map[string]string `json:"cipd"`
@@ -66,8 +66,19 @@ type HardwareRunInput struct {
 
 // RunInput is the struct that defines how to run a test.
 type RunInput struct {
-	// Configs specific for hardware
+	// Global experiments enabled for this run.
+	ExperimentSlice []string `json:"experiments"`
+	// Configs specific for hardware.
 	Hardware HardwareRunInput `json:"hardware"`
+}
+
+func (ri *RunInput) HasExperiment(experiment string) bool {
+	for _, given_experiment := range ri.ExperimentSlice {
+		if given_experiment == experiment {
+			return true
+		}
+	}
+	return false
 }
 
 // ReadRunInput reads RunInput from a given path.

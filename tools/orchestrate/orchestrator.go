@@ -390,14 +390,19 @@ func (r *TestOrchestrator) test(testCmd []string, in *RunInput) error {
 	cmd.Env = appendPath(cmd.Env, sshDir, ffxDir)
 
 	fmt.Printf("Running test: %+v\n", cmd.Args)
-	err = cmd.Run()
+	testErr := cmd.Run()
 	fmt.Printf("Pausing 10 seconds for log flush...\n")
 	time.Sleep(10 * time.Second)
 	if _, err := r.ffx.RunCmdSync("target", "snapshot", "-d", os.Getenv("TEST_UNDECLARED_OUTPUTS_DIR")); err != nil {
 		fmt.Printf("target snapshot: %v\n", err)
 	}
-	if err = r.writeTestSummary(err); err != nil {
+	if err := r.writeTestSummary(testErr); err != nil {
 		return fmt.Errorf("writeTestSummary: %w", err)
+	}
+	// TODO(b/322928092): Disable and remove this once `orchestrate` is the
+	// entrypoint for all bazel_build_test_upload invocations.
+	if in.HasExperiment("orchestrate-error-on-test-failure") && testErr != nil {
+		return fmt.Errorf("Test Failures: %w", err)
 	}
 	return nil
 }
