@@ -361,8 +361,8 @@ zx_status_t ScsiDevice::WorkerThread() {
     max_sectors = std::min(config_.max_sectors, SCSI_MAX_XFER_SECTORS);
   }
 
-  scsi::DiskOptions options(/*check_unmap_support*/ false, /*use_mode_sense_6*/ false,
-                            /*use_read_write_12*/ false);
+  scsi::DiskOptions options(/*check_unmap_support=*/false, /*use_mode_sense_6=*/true,
+                            /*use_read_write_12=*/false);
 
   // virtio-scsi nominally supports multiple channels, but the device support is not
   // complete. The device encoding for targets in commands does not allow encoding the
