@@ -14,7 +14,6 @@ use futures::io::{AsyncRead, AsyncWrite};
 pub trait InterfaceFactoryBase<T: AsyncRead + AsyncWrite + Unpin> {
     async fn open(&mut self) -> Result<T>;
     async fn close(&self);
-    async fn rediscover(&mut self) -> Result<()>;
 }
 
 #[async_trait(?Send)]

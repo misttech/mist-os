@@ -1275,9 +1275,7 @@ impl Target {
         match self.fastboot_address() {
             None => Ok(false),
             Some(addr) => {
-                let target_name = self.nodename_str();
-                let mut fastboot_interface =
-                    tcp_proxy(target_name, &SocketAddr::from(addr.0)).await?;
+                let mut fastboot_interface = tcp_proxy(&SocketAddr::from(addr.0)).await?;
                 // Dont care what the result is, just need to get it
                 let _result = fastboot_interface.get_var(&"version".to_string()).await?;
                 Ok(true)

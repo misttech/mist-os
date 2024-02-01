@@ -192,25 +192,6 @@ impl Open<AsyncInterface> for AsyncInterface {
     where
         F: FnMut(&InterfaceInfo) -> bool,
     {
-        Self::open_interface(matcher, true)
-    }
-}
-
-impl AsyncInterface {
-    /// Opens the interface with the matcher (not draining the
-    /// device's buffer), and returns if the connection could be successfully opened
-    pub fn check<F>(matcher: &mut F) -> bool
-    where
-        F: FnMut(&InterfaceInfo) -> bool,
-    {
-        tracing::debug!("AsyncInterface checking interface");
-        Self::open_interface(matcher, false).is_ok()
-    }
-
-    pub fn open_interface<F>(matcher: &mut F, drain_input_queue: bool) -> Result<Self>
-    where
-        F: FnMut(&InterfaceInfo) -> bool,
-    {
         let mut serial = None;
         let mut cb = |info: &InterfaceInfo| -> bool {
             if matcher(info) {
@@ -229,16 +210,9 @@ impl AsyncInterface {
         };
         Interface::open(&mut cb).and_then(|mut iface| match serial {
             Some(s) => {
-                tracing::debug!("AsyncInterface open_interface() for serial {}.", s);
-                if drain_input_queue {
-                    tracing::debug!(
-                        "AsyncInterface open_interface() for serial {}. About to clear buffer",
-                        s
-                    );
-                    // Clears out anything that was in the usb buffer waiting.
-                    let mut buffer = Vec::new();
-                    let _read_res = iface.read_to_end(&mut buffer);
-                }
+                // Clears out anything that was in the usb buffer waiting.
+                let mut buffer = Vec::new();
+                let _read_res = iface.read_to_end(&mut buffer);
 
                 let mut write_guard = IFACE_REGISTRY
                     .write()

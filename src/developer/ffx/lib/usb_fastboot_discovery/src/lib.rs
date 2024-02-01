@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use anyhow::{anyhow, bail, Context, Result};
+use anyhow::{anyhow, bail, Result};
 use fastboot::{
     command::{ClientVariable, Command},
     reply::Reply,
@@ -43,8 +43,7 @@ where
         // Do not open anything.
         false
     };
-    // Do not open anything. Check does not drain the input queue
-    let _result = Interface::check(&mut cb);
+    let _result = Interface::open(&mut cb);
 }
 
 pub fn find_serial_numbers() -> Vec<String> {
@@ -59,6 +58,7 @@ where
     F: FnMut(&InterfaceInfo) -> bool,
 {
     tracing::debug!("Selecting USB fastboot interface to open");
+
     let mut open_cb = |info: &InterfaceInfo| -> bool {
         if is_fastboot_match(info) {
             cb(info)
@@ -84,8 +84,7 @@ fn extract_serial_number(info: &InterfaceInfo) -> String {
 pub async fn open_interface_with_serial(serial: &str) -> Result<Interface> {
     tracing::debug!("Opening USB fastboot interface with serial number: {}", serial);
     let mut interface =
-        open_interface(|info: &InterfaceInfo| -> bool { extract_serial_number(info) == *serial })
-            .with_context(|| format!("opening interface with serial number: {}", serial))?;
+        open_interface(|info: &InterfaceInfo| -> bool { extract_serial_number(info) == *serial })?;
     match send(Command::GetVar(ClientVariable::Version), &mut interface).await {
         Ok(Reply::Okay(version)) =>
         // Only support 0.4 right now.
@@ -100,8 +99,7 @@ pub async fn open_interface_with_serial(serial: &str) -> Result<Interface> {
     }
 }
 
-#[allow(async_fn_in_trait)]
-pub trait FastbootUsbTester: Send + 'static {
+trait FastbootUsbTester: Send + 'static {
     /// Checks if the interface with the given serial number is in Fastboot
     async fn is_fastboot_usb(&mut self, serial: &str) -> bool;
 }
@@ -111,31 +109,6 @@ struct OpenInterfaceFastbootUsbTester;
 impl FastbootUsbTester for OpenInterfaceFastbootUsbTester {
     async fn is_fastboot_usb(&mut self, serial: &str) -> bool {
         open_interface_with_serial(serial).await.is_ok()
-    }
-}
-
-/// Checks if the USB Interface for the given serial is live and a fastboot match
-/// by inspecting the Interface Information.
-///
-/// This does not mean that the device is ready to respond to any fastboot commands,
-/// only that the USB Device with the given serial number exists and declares itself
-/// to be a Fastboot device.
-///
-/// This calls AsyncInterface::check which does _not_ drain the USB's device's
-/// buffer upon connecting
-pub struct UnversionedFastbootUsbTester;
-
-impl FastbootUsbTester for UnversionedFastbootUsbTester {
-    async fn is_fastboot_usb(&mut self, serial: &str) -> bool {
-        let mut open_cb = |info: &InterfaceInfo| -> bool {
-            if is_fastboot_match(info) {
-                extract_serial_number(info) == *serial
-            } else {
-                // Do not open.
-                false
-            }
-        };
-        Interface::check(&mut open_cb)
     }
 }
 
@@ -166,7 +139,7 @@ where
     }
 }
 
-pub trait SerialNumberFinder: Send + 'static {
+trait SerialNumberFinder: Send + 'static {
     fn find_serial_numbers(&mut self) -> Vec<String>;
 }
 
@@ -192,7 +165,7 @@ where
 }
 
 impl FastbootUsbWatcher {
-    pub fn new<F, W, O>(event_handler: F, finder: W, opener: O, interval: Duration) -> Self
+    fn new<F, W, O>(event_handler: F, finder: W, opener: O, interval: Duration) -> Self
     where
         F: FastbootEventHandler,
         W: SerialNumberFinder,
