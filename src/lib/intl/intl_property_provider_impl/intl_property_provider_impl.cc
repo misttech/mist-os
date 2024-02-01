@@ -252,14 +252,14 @@ void IntlPropertyProviderImpl::Start() {
 
 void IntlPropertyProviderImpl::GetProfile(
     fuchsia::intl::PropertyProvider::GetProfileCallback callback) {
-  FX_VLOGS(1) << "Received GetProfile request";
+  FX_LOGS(DEBUG) << "Received GetProfile request";
   get_profile_queue_.push(std::move(callback));
   ProcessProfileRequests();
 }
 
 void IntlPropertyProviderImpl::StartSettingsWatcher() {
   settings_client_->Watch([this](fuchsia::settings::IntlSettings settings) {
-    FX_VLOGS(2) << "New settings value: " << settings;
+    FX_LOGS(DEBUG) << "New settings value: " << settings;
     fuchsia::intl::merge::Data new_profile_data = GetDefaultRawData(raw_profile_data_);
     Merge(settings, &new_profile_data);
     UpdateRawData(std::move(new_profile_data));
@@ -292,7 +292,7 @@ bool IntlPropertyProviderImpl::UpdateRawData(fuchsia::intl::merge::Data new_raw_
   raw_profile_data_ = std::move(new_raw_data);
   // Invalidate the existing cached profile.
   intl_profile_ = std::nullopt;
-  FX_VLOGS(1) << "Updated raw data";
+  FX_LOGS(DEBUG) << "Updated raw data";
   for (const auto& binding : property_provider_bindings_.bindings()) {
     binding->events().OnChange();
   }
@@ -302,17 +302,17 @@ bool IntlPropertyProviderImpl::UpdateRawData(fuchsia::intl::merge::Data new_raw_
 
 void IntlPropertyProviderImpl::ProcessProfileRequests() {
   if (!IsRawDataInitialized()) {
-    FX_VLOGS(1) << "Raw data not yet initialized";
+    FX_LOGS(DEBUG) << "Raw data not yet initialized";
     return;
   }
 
   auto profile_result = GetProfileInternal();
   if (profile_result.is_error()) {
-    FX_VLOGS(1) << "Profile not updated: error was: " << profile_result.error();
+    FX_LOGS(DEBUG) << "Profile not updated: error was: " << profile_result.error();
     return;
   }
 
-  FX_VLOGS(1) << "Processing request queue (" << get_profile_queue_.size() << ")";
+  FX_LOGS(DEBUG) << "Processing request queue (" << get_profile_queue_.size() << ")";
   while (!get_profile_queue_.empty()) {
     auto& callback = get_profile_queue_.front();
     auto var = fidl::Clone(profile_result.value());
