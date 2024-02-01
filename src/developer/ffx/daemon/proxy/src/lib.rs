@@ -6,7 +6,6 @@ use std::time::Duration;
 
 use anyhow::{Context as _, Result};
 use async_trait::async_trait;
-use async_utils::async_once::Once;
 use errors::{ffx_bail, ffx_error, FfxError};
 use ffx_command_error::FfxContext;
 use ffx_config::EnvironmentContext;
@@ -21,6 +20,7 @@ use fidl_fuchsia_developer_ffx::{
 };
 use fidl_fuchsia_developer_remotecontrol::RemoteControlProxy;
 use futures::FutureExt;
+use std::future::Future;
 use std::sync::Arc;
 use timeout::timeout;
 
@@ -36,14 +36,65 @@ pub enum DaemonVersionCheck {
     CheckApiLevel(u64),
 }
 
+/// Lock-protected contents of [ProxyState]
+enum ProxyStateInner<T: Proxy + Clone> {
+    Uninitialized,
+    Initialized(T),
+    Failed,
+}
+
+impl<T: Proxy + Clone> ProxyStateInner<T> {
+    /// See [ProxyState::get_or_try_init]
+    async fn get_or_try_init<F: Future<Output = Result<T>>>(
+        &mut self,
+        mut f: impl FnMut(bool) -> F,
+    ) -> Result<T> {
+        if matches!(self, ProxyStateInner::Uninitialized) {
+            *self = ProxyStateInner::Initialized(f(true).await?)
+        }
+        match self {
+            ProxyStateInner::Uninitialized => unreachable!(),
+            ProxyStateInner::Initialized(x) if !x.is_closed() => Ok(x.clone()),
+            _ => {
+                *self = ProxyStateInner::Failed;
+                let proxy = f(false).await?;
+                *self = ProxyStateInner::Initialized(proxy.clone());
+                Ok(proxy)
+            }
+        }
+    }
+}
+
+/// Container for a FIDL proxy which can be initialized lazily, and which will
+/// re-initialize when the proxy is closed if possible.
+struct ProxyState<T: Proxy + Clone>(futures::lock::Mutex<ProxyStateInner<T>>);
+
+impl<T: Proxy + Clone> Default for ProxyState<T> {
+    fn default() -> Self {
+        ProxyState(futures::lock::Mutex::new(ProxyStateInner::Uninitialized))
+    }
+}
+
+impl<T: Proxy + Clone> ProxyState<T> {
+    /// Gets the proxy contained in this [`ProxyState`]. If the proxy hasn't
+    /// been set, *or* it is in a closed state, the closure will be called to
+    /// get a future which will construct a new proxy with which to initialize.
+    async fn get_or_try_init<F: Future<Output = Result<T>>>(
+        &self,
+        f: impl FnMut(bool) -> F,
+    ) -> Result<T> {
+        self.0.lock().await.get_or_try_init(f).await
+    }
+}
+
 pub struct Injection {
     env_context: EnvironmentContext,
     daemon_check: DaemonVersionCheck,
     format: Option<Format>,
     target: Option<TargetKind>,
     node: Arc<overnet_core::Router>,
-    daemon_once: Once<DaemonProxy>,
-    remote_once: Once<RemoteControlProxy>,
+    daemon_once: ProxyState<DaemonProxy>,
+    remote_once: ProxyState<RemoteControlProxy>,
 }
 
 const CONFIG_DAEMON_AUTOSTART: &str = "daemon.autostart";
@@ -158,31 +209,35 @@ impl Injector for Injection {
     #[tracing::instrument]
     async fn daemon_factory(&self) -> Result<DaemonProxy> {
         let autostart = self.env_context.query(CONFIG_DAEMON_AUTOSTART).get().await.unwrap_or(true);
-        let start_mode =
-            if autostart { DaemonStart::AutoStart } else { DaemonStart::DoNotAutoStart };
         self.daemon_once
-            .get_or_try_init(init_daemon_proxy(
-                start_mode,
-                Arc::clone(&self.node),
-                self.env_context.clone(),
-                self.daemon_check.clone(),
-            ))
+            .get_or_try_init(|first_connection| {
+                let start_mode =
+                    if autostart { DaemonStart::AutoStart } else { DaemonStart::DoNotAutoStart };
+                init_daemon_proxy(
+                    start_mode,
+                    Arc::clone(&self.node),
+                    self.env_context.clone(),
+                    self.daemon_check.clone(),
+                    first_connection,
+                )
+            })
             .await
-            .map(|proxy| proxy.clone())
     }
 
     #[tracing::instrument]
     async fn try_daemon(&self) -> Result<Option<DaemonProxy>> {
         let result = self
             .daemon_once
-            .get_or_try_init(init_daemon_proxy(
-                DaemonStart::DoNotAutoStart,
-                Arc::clone(&self.node),
-                self.env_context.clone(),
-                self.daemon_check.clone(),
-            ))
+            .get_or_try_init(|first_connection| {
+                init_daemon_proxy(
+                    DaemonStart::DoNotAutoStart,
+                    Arc::clone(&self.node),
+                    self.env_context.clone(),
+                    self.daemon_check.clone(),
+                    first_connection,
+                )
+            })
             .await
-            .map(|proxy| proxy.clone())
             .ok();
         Ok(result)
     }
@@ -214,17 +269,18 @@ impl Injector for Injection {
         let target = self.target.clone();
         let timeout_error = self.daemon_timeout_error();
         let proxy_timeout = self.env_context.get_proxy_timeout().await?;
-        let mut target_info = None;
+        let target_info = std::sync::Mutex::new(None);
         let proxy = timeout(proxy_timeout, async {
             self.remote_once
-                .get_or_try_init(self.init_remote_proxy(&mut target_info))
+                .get_or_try_init(|_| async {
+                    self.init_remote_proxy(&mut *target_info.lock().unwrap()).await
+                })
                 .await
-                .map(|proxy| proxy.clone())
         })
         .await
         .map_err(|_| {
             tracing::warn!("Timed out getting remote control proxy for: {:?}", target);
-            match target_info {
+            match target_info.lock().unwrap().take() {
                 Some(TargetInfo { nodename: Some(name), .. }) => FfxError::DaemonError {
                     err: DaemonError::Timeout,
                     target: Some(name),
@@ -283,6 +339,7 @@ async fn init_daemon_proxy(
     node: Arc<overnet_core::Router>,
     context: EnvironmentContext,
     version_check: DaemonVersionCheck,
+    first_connection: bool,
 ) -> Result<DaemonProxy> {
     let ascendd_path = context.get_ascendd_path().await?;
 
@@ -316,24 +373,25 @@ async fn init_daemon_proxy(
     // Check the version against the given comparison scheme.
     tracing::debug!("Checking daemon version: {version_check:?}");
     tracing::debug!("Daemon version info: {daemon_version_info:?}");
-    let matched_proxy = match (version_check, daemon_version_info) {
-        (DaemonVersionCheck::SameBuildId(ours), VersionInfo { build_id: Some(daemon), .. })
+    let matched_proxy = match (first_connection, version_check, daemon_version_info) {
+        (false, _, _) => true,
+        (_, DaemonVersionCheck::SameBuildId(ours), VersionInfo { build_id: Some(daemon), .. })
             if ours == daemon =>
         {
             true
         }
-        (DaemonVersionCheck::SameVersionInfo(ours), daemon)
+        (_, DaemonVersionCheck::SameVersionInfo(ours), daemon)
             if ours.build_version == daemon.build_version
                 && ours.commit_hash == daemon.commit_hash
                 && ours.commit_timestamp == daemon.commit_timestamp =>
         {
             true
         }
-        (DaemonVersionCheck::CheckApiLevel(ours), VersionInfo { api_level: Some(daemon), .. })
-            if ours == daemon =>
-        {
-            true
-        }
+        (
+            _,
+            DaemonVersionCheck::CheckApiLevel(ours),
+            VersionInfo { api_level: Some(daemon), .. },
+        ) if ours == daemon => true,
         _ => false,
     };
 
@@ -442,6 +500,7 @@ mod test {
             overnet_core::Router::new(None).unwrap(),
             test_env.context.clone(),
             DaemonVersionCheck::SameBuildId("testcurrenthash".to_owned()),
+            true,
         )
         .await;
         let str = format!("{}", res.err().unwrap());
@@ -462,6 +521,7 @@ mod test {
             overnet_core::Router::new(None).unwrap(),
             test_env.context.clone(),
             DaemonVersionCheck::SameBuildId("testcurrenthash".to_owned()),
+            true,
         )
         .await;
         let str = format!("{}", res.err().unwrap());
@@ -580,6 +640,7 @@ mod test {
             local_node,
             test_env.context.clone(),
             DaemonVersionCheck::SameBuildId("testcurrenthash".to_owned()),
+            true,
         )
         .await
         .unwrap();
@@ -613,6 +674,7 @@ mod test {
             local_node,
             test_env.context.clone(),
             DaemonVersionCheck::SameBuildId("testcurrenthash".to_owned()),
+            true,
         )
         .await
         .unwrap();
@@ -637,6 +699,7 @@ mod test {
             local_node,
             test_env.context.clone(),
             DaemonVersionCheck::SameBuildId("testcurrenthash".to_owned()),
+            true,
         )
         .await
         .unwrap();
@@ -661,6 +724,7 @@ mod test {
             local_node,
             test_env.context.clone(),
             DaemonVersionCheck::SameBuildId("testcurrenthash".to_owned()),
+            true,
         )
         .await;
         assert!(err.is_err());
