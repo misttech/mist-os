@@ -22,6 +22,13 @@ open protocol Puppet {
     }) -> (resource struct {
         client client_end:LazyInspectPuppet;
     });
+
+    // Causes the puppet to crash with an optional error message.
+    //
+    // The connection will be closed after this is called.
+    flexible Crash(struct{
+        message LogMessage;
+    });
 };
 
 /// LoggerPuppet emits log messages when requested.
@@ -40,7 +47,7 @@ open protocol LogPuppet {
     flexible Log(table {
         1: message LogMessage;
         2: severity fuchsia.diagnostics.Severity;
-    });
+    }) -> ();
 
     // Blocks the caller until the next time an interest change event is observed.
     // Messages are lost if they are emitted using LogPuppet.Log before the
@@ -63,7 +70,7 @@ open protocol InspectPuppet {
         key string:MAX;
         value string:MAX;
     });
- 
+
     /// Records an integer inspect property.
     flexible RecordInt(struct {
         key string:MAX;

@@ -39,6 +39,7 @@ rustc_test("integration_tests_bin") {
     "//src/sys/lib/component-events",
     "//src/testing/realm_proxy/client",
     "//third_party/rust_crates:anyhow",
+    "//third_party/rust_crates:async-trait",
     "//third_party/rust_crates:difference",
     "//third_party/rust_crates:futures",
     "//third_party/rust_crates:lazy_static",
@@ -48,6 +49,7 @@ rustc_test("integration_tests_bin") {
   ]
 
   sources = [
+    "src/assert.rs",
     "src/constants.rs",
     "src/inspect/mod.rs",
     "src/inspect/reader.rs",
@@ -65,6 +67,7 @@ rustc_test("integration_tests_bin") {
     "src/logs/selectors.rs",
     "src/logs/sorting.rs",
     "src/logs/utils.rs",
+    "src/puppet.rs",
     "src/test_topology.rs",
     "src/utils.rs",
   ]

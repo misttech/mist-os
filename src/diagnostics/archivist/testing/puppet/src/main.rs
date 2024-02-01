@@ -120,6 +120,9 @@ async fn handle_puppet_request(
     request: fpuppet::PuppetRequest,
 ) -> Result<(), Error> {
     match request {
+        fpuppet::PuppetRequest::Crash { message, .. } => {
+            panic!("{message}");
+        }
         fpuppet::PuppetRequest::EmitExampleInspectData { rows, columns, .. } => {
             inspect_testing::emit_example_inspect_data(inspect_testing::Options {
                 rows: rows as usize,
@@ -156,7 +159,7 @@ async fn handle_puppet_request(
             eprintln!("{message}");
             Ok(())
         }
-        fpuppet::PuppetRequest::Log { payload, .. } => {
+        fpuppet::PuppetRequest::Log { payload, responder, .. } => {
             let request = LogRequest::try_from(payload).context("Log")?;
             let LogRequest { message, severity, .. } = request;
 
@@ -167,7 +170,7 @@ async fn handle_puppet_request(
                 Severity::Warn => warn!("{message}"),
                 _ => unimplemented!("Logging with severity: {severity:?}"),
             }
-
+            responder.send()?;
             Ok(())
         }
         fpuppet::PuppetRequest::WaitForInterestChange { responder } => {

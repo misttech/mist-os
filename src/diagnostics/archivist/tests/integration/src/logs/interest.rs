@@ -2,16 +2,16 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::assert::assert_logs_sequence;
+use crate::puppet::PuppetProxyExt;
 use crate::test_topology;
 use anyhow::{Context, Error};
-use diagnostics_data::LogsData;
 use diagnostics_reader::{ArchiveReader, Logs};
 use fidl_fuchsia_archivist_test as ftest;
 use fidl_fuchsia_diagnostics::{
     ArchiveAccessorMarker, ComponentSelector, Interest, LogInterestSelector, LogSettingsMarker,
     LogSettingsProxy, Severity,
 };
-use futures::{Stream, StreamExt};
 use selectors::{self, parse_component_selector, VerboseError};
 
 // This test verifies that a component only emits messages at or above its
@@ -20,8 +20,11 @@ use selectors::{self, parse_component_selector, VerboseError};
 #[fuchsia::test]
 async fn set_interest() {
     const PUPPET_NAME: &str = "puppet";
+    const REALM_NAME: &str = "set_interest";
+    const PUPPET_MONIKER: &str = PUPPET_NAME;
 
     let realm_proxy = test_topology::create_realm(&ftest::RealmOptions {
+        realm_name: Some(REALM_NAME.to_string()),
         puppets: Some(vec![ftest::PuppetDecl { name: PUPPET_NAME.to_string() }]),
         ..Default::default()
     })
@@ -56,17 +59,19 @@ async fn set_interest() {
 
     // Log one info message before the first debug message to confirm the debug
     // message isn't skipped because of a race condition.
-    puppet.log_messages(vec![
-        (Severity::Info, "A1"),
-        (Severity::Debug, "B1"), // not observed.
-        (Severity::Info, "C1"),
-        (Severity::Warn, "D1"),
-        (Severity::Error, "E1"),
-    ]);
+    puppet
+        .log_messages(vec![
+            (Severity::Info, "A1"),
+            (Severity::Debug, "B1"), // not observed.
+            (Severity::Info, "C1"),
+            (Severity::Warn, "D1"),
+            (Severity::Error, "E1"),
+        ])
+        .await;
 
-    assert_ordered_logs(
+    assert_logs_sequence(
         &mut logs,
-        PUPPET_NAME,
+        PUPPET_MONIKER,
         vec![
             (Severity::Info, "A1"),
             (Severity::Info, "C1"),
@@ -80,16 +85,18 @@ async fn set_interest() {
     component_log_settings.set_interest(&log_settings, Severity::Debug).await.unwrap();
     response = puppet.wait_for_interest_change().await.unwrap();
     assert_eq!(response.severity, Some(Severity::Debug));
-    puppet.log_messages(vec![
-        (Severity::Debug, "A2"),
-        (Severity::Info, "B2"),
-        (Severity::Warn, "C2"),
-        (Severity::Error, "D2"),
-    ]);
+    puppet
+        .log_messages(vec![
+            (Severity::Debug, "A2"),
+            (Severity::Info, "B2"),
+            (Severity::Warn, "C2"),
+            (Severity::Error, "D2"),
+        ])
+        .await;
 
-    assert_ordered_logs(
+    assert_logs_sequence(
         &mut logs,
-        PUPPET_NAME,
+        PUPPET_MONIKER,
         vec![
             (Severity::Debug, "A2"),
             (Severity::Info, "B2"),
@@ -103,16 +110,18 @@ async fn set_interest() {
     component_log_settings.set_interest(&log_settings, Severity::Warn).await.unwrap();
     response = puppet.wait_for_interest_change().await.unwrap();
     assert_eq!(response.severity, Some(Severity::Warn));
-    puppet.log_messages(vec![
-        (Severity::Debug, "A3"), // Not observed.
-        (Severity::Info, "B3"),  // Not observed.
-        (Severity::Warn, "C3"),
-        (Severity::Error, "D3"),
-    ]);
+    puppet
+        .log_messages(vec![
+            (Severity::Debug, "A3"), // Not observed.
+            (Severity::Info, "B3"),  // Not observed.
+            (Severity::Warn, "C3"),
+            (Severity::Error, "D3"),
+        ])
+        .await;
 
-    assert_ordered_logs(
+    assert_logs_sequence(
         &mut logs,
-        PUPPET_NAME,
+        PUPPET_MONIKER,
         vec![(Severity::Warn, "C3"), (Severity::Error, "D3")],
     )
     .await;
@@ -121,14 +130,16 @@ async fn set_interest() {
     component_log_settings.set_interest(&log_settings, Severity::Error).await.unwrap();
     response = puppet.wait_for_interest_change().await.unwrap();
     assert_eq!(response.severity, Some(Severity::Error));
-    puppet.log_messages(vec![
-        (Severity::Debug, "A4"), // Not observed.
-        (Severity::Info, "B4"),  // Not observed.
-        (Severity::Warn, "C4"),  // Not observed.
-        (Severity::Error, "D4"),
-    ]);
+    puppet
+        .log_messages(vec![
+            (Severity::Debug, "A4"), // Not observed.
+            (Severity::Info, "B4"),  // Not observed.
+            (Severity::Warn, "C4"),  // Not observed.
+            (Severity::Error, "D4"),
+        ])
+        .await;
 
-    assert_ordered_logs(&mut logs, PUPPET_NAME, vec![(Severity::Error, "D4")]).await;
+    assert_logs_sequence(&mut logs, PUPPET_MONIKER, vec![(Severity::Error, "D4")]).await;
 
     // Disconnecting the protocol, brings back an EMPTY interest, which defaults to Severity::Info.
     drop(log_settings);
@@ -137,17 +148,19 @@ async fn set_interest() {
 
     // Again, log one info message before the first debug message to confirm the
     // debug message isn't skipped because of a race condition.
-    puppet.log_messages(vec![
-        (Severity::Debug, "A5"), // Not observed.
-        (Severity::Info, "B5"),
-        (Severity::Info, "C5"),
-        (Severity::Warn, "D5"),
-        (Severity::Error, "E5"),
-    ]);
+    puppet
+        .log_messages(vec![
+            (Severity::Debug, "A5"), // Not observed.
+            (Severity::Info, "B5"),
+            (Severity::Info, "C5"),
+            (Severity::Warn, "D5"),
+            (Severity::Error, "E5"),
+        ])
+        .await;
 
-    assert_ordered_logs(
+    assert_logs_sequence(
         &mut logs,
-        PUPPET_NAME,
+        PUPPET_MONIKER,
         vec![
             (Severity::Info, "B5"),
             (Severity::Info, "C5"),
@@ -164,10 +177,13 @@ async fn set_interest() {
 #[fuchsia::test]
 async fn set_interest_before_startup() {
     const PUPPET_NAME: &str = "puppet";
+    const REALM_NAME: &str = "set_interest_before_startup";
+    const PUPPET_MONIKER: &str = PUPPET_NAME;
 
     // Create the test realm.
     // We won't connect to the puppet until after we've configured logging interest.
     let realm_proxy = test_topology::create_realm(&ftest::RealmOptions {
+        realm_name: Some(REALM_NAME.to_string()),
         puppets: Some(vec![ftest::PuppetDecl { name: PUPPET_NAME.to_string() }]),
         ..Default::default()
     })
@@ -196,10 +212,9 @@ async fn set_interest_before_startup() {
 
     let response = puppet.wait_for_interest_change().await.unwrap();
     assert_eq!(response.severity, Some(Severity::Debug));
-    puppet.log_messages(vec![
-        (Severity::Debug, "debugging world"),
-        (Severity::Info, "Hello, world!"),
-    ]);
+    puppet
+        .log_messages(vec![(Severity::Debug, "debugging world"), (Severity::Info, "Hello, world!")])
+        .await;
 
     let mut logs = ArchiveReader::new()
         .with_archive(accessor)
@@ -207,44 +222,12 @@ async fn set_interest_before_startup() {
         .expect("subscribe to logs");
 
     // Assert logs include the Severity::Debug log.
-    assert_ordered_logs(
+    assert_logs_sequence(
         &mut logs,
-        PUPPET_NAME,
+        PUPPET_MONIKER,
         vec![(Severity::Debug, "debugging world"), (Severity::Info, "Hello, world!")],
     )
     .await;
-}
-
-type Message = (Severity, &'static str);
-
-async fn assert_ordered_logs<'a, S>(mut logs: S, component_name: &str, messages: Vec<Message>)
-where
-    S: Stream<Item = Result<LogsData, diagnostics_reader::Error>> + std::marker::Unpin,
-{
-    for (expected_severity, expected_msg) in messages {
-        let log = logs.next().await.expect("got log response").expect("log isn't an error");
-        let log_component_url = log.metadata.component_url.clone().unwrap();
-        assert!(log_component_url.ends_with(component_name));
-        assert_eq!(log.msg().unwrap(), expected_msg);
-        assert_eq!(log.metadata.severity, expected_severity);
-    }
-}
-
-trait PuppetProxyExt {
-    fn log_messages(&self, messages: Vec<Message>);
-}
-
-impl PuppetProxyExt for ftest::PuppetProxy {
-    fn log_messages(&self, messages: Vec<Message>) {
-        for (severity, message) in messages {
-            let request = &ftest::LogPuppetLogRequest {
-                severity: Some(severity),
-                message: Some(message.to_string()),
-                ..Default::default()
-            };
-            self.log(request).expect("log succeeds");
-        }
-    }
 }
 
 // A helper struct that modifies log settings for a set of components matched by a given

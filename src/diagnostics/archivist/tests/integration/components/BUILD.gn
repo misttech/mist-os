@@ -35,23 +35,6 @@ rustc_binary("log_and_exit_component_bin") {
   configs += [ "//build/config/rust/lints:clippy_warn_all" ]
 }
 
-rustc_binary("log_and_crash_component_bin") {
-  testonly = true
-  output_name = "log_and_crash"
-  edition = "2021"
-  source_root = "src/log_and_crash.rs"
-  deps = [
-    "//sdk/fidl/fuchsia.logger:fuchsia.logger_rust",
-    "//src/lib/diagnostics/log/message/rust",
-    "//src/lib/fuchsia-async",
-    "//src/lib/fuchsia-component",
-    "//src/lib/zircon/rust:fuchsia-zircon",
-  ]
-
-  sources = [ "src/log_and_crash.rs" ]
-  configs += [ "//build/config/rust/lints:clippy_warn_all" ]
-}
-
 rustc_binary("log_on_interest_bin") {
   testonly = true
   output_name = "log_on_interest"
@@ -110,13 +93,6 @@ fuchsia_component("log_and_exit_component") {
   manifest = "meta/log-and-exit.cml"
 }
 
-fuchsia_component("log_and_crash_component") {
-  component_name = "log-and-crash"
-  testonly = true
-  deps = [ ":log_and_crash_component_bin" ]
-  manifest = "meta/log-and-crash.cml"
-}
-
 fuchsia_component("log_on_interest_component") {
   component_name = "log-on-interest"
   testonly = true
@@ -154,7 +130,6 @@ group("components") {
   testonly = true
   deps = [
     ":component_with_children",
-    ":log_and_crash_component",
     ":log_and_exit_component",
     ":log_on_interest_component",
     ":logging_component",

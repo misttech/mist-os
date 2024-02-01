@@ -4,22 +4,17 @@
 
 use component_events::{events::*, matcher::*};
 
-pub async fn wait_for_component_stopped(
-    instance_child_name: &str,
-    component: &str,
-    status_match: ExitStatusMatcher,
-) {
+pub(crate) async fn wait_for_component_to_crash(moniker: &str) {
     let mut event_stream = EventStream::open().await.unwrap();
-    wait_for_component_stopped_event(
-        instance_child_name,
-        component,
-        status_match,
-        &mut event_stream,
-    )
-    .await;
+    EventMatcher::ok()
+        .stop(Some(ExitStatusMatcher::AnyCrash))
+        .moniker(moniker)
+        .wait::<Stopped>(&mut event_stream)
+        .await
+        .unwrap();
 }
 
-pub async fn wait_for_component_stopped_event(
+pub(crate) async fn wait_for_component_stopped_event(
     instance_child_name: &str,
     component: &str,
     status_match: ExitStatusMatcher,
