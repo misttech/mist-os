@@ -4,7 +4,7 @@
 
 use {
     serde::{Deserialize, Serialize},
-    std::collections::HashMap,
+    std::collections::BTreeMap,
     thiserror::Error,
 };
 
@@ -28,12 +28,12 @@ pub enum MetadataError {
 
 #[derive(Serialize, Deserialize)]
 pub struct Metadata {
-    nodes: HashMap<u64, Node>,
+    nodes: BTreeMap<u64, Node>,
 }
 
 impl Metadata {
     pub fn new() -> Self {
-        Self { nodes: HashMap::new() }
+        Self { nodes: BTreeMap::new() }
     }
 
     /// Finds the node with name `name` in directory with inode number `parent`.
@@ -98,7 +98,7 @@ impl Metadata {
         self.nodes.insert(
             inode_num,
             Node {
-                info: NodeInfo::Directory(Directory { children: HashMap::new() }),
+                info: NodeInfo::Directory(Directory { children: BTreeMap::new() }),
                 mode,
                 uid,
                 gid,
@@ -147,7 +147,7 @@ impl Metadata {
     }
 }
 
-pub type ExtendedAttributes = HashMap<Box<[u8]>, Box<[u8]>>;
+pub type ExtendedAttributes = BTreeMap<Box<[u8]>, Box<[u8]>>;
 
 #[derive(Serialize, Deserialize)]
 pub struct Node {
@@ -201,7 +201,7 @@ pub enum NodeInfo {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Directory {
-    pub children: HashMap<String, u64>,
+    pub children: BTreeMap<String, u64>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -217,13 +217,13 @@ mod tests {
     use {
         super::{Metadata, NodeInfo, ROOT_INODE_NUM, S_IFDIR, S_IFLNK, S_IFREG},
         assert_matches::assert_matches,
-        std::collections::HashMap,
+        std::collections::BTreeMap,
     };
 
     #[test]
     fn test_serialize_and_deserialize() {
         let mut m = Metadata::new();
-        let xattr: HashMap<_, _> =
+        let xattr: BTreeMap<_, _> =
             [((*b"a").into(), (*b"apple").into()), ((*b"b").into(), (*b"ball").into())].into();
         m.insert_directory(ROOT_INODE_NUM, S_IFDIR | 0o755, 2, 3, Default::default());
         m.insert_directory(3, S_IFDIR | 0o775, 2, 3, xattr.clone());
@@ -264,5 +264,28 @@ mod tests {
         assert_eq!(node.uid, 2);
         assert_eq!(node.gid, 3);
         assert_eq!(&node.extended_attributes, &xattr);
+    }
+
+    #[test]
+    fn test_serialization_is_deterministic() {
+        // Builds a Metadata instance with fixed contents.
+        let build_fs = || {
+            let mut m = Metadata::new();
+            let xattr: BTreeMap<_, _> =
+                [((*b"a").into(), (*b"apple").into()), ((*b"b").into(), (*b"ball").into())].into();
+            m.insert_directory(ROOT_INODE_NUM, S_IFDIR | 0o755, 2, 3, Default::default());
+            m.insert_directory(3, S_IFDIR | 0o775, 2, 3, xattr.clone());
+            m.add_child(&["foo"], 3);
+            m.insert_file(4, S_IFREG | 0o644, 2, 3, xattr.clone());
+            m.add_child(&["foo", "bar"], 4);
+            m.insert_symlink(5, "symlink-target".to_string(), S_IFLNK | 0o777, 2, 3, xattr.clone());
+            m.add_child(&["foo", "baz"], 5);
+            m
+        };
+
+        // Build it twice and verify that the serialized representations match.
+        let data1 = build_fs().serialize();
+        let data2 = build_fs().serialize();
+        assert_eq!(data1, data2);
     }
 }

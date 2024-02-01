@@ -5,7 +5,7 @@
 use anyhow::{bail, Context, Result};
 use std::{
     cell::{Cell, RefCell},
-    collections::HashMap,
+    collections::{BTreeMap, HashMap},
     fs::create_dir_all,
     io::{copy, Read},
     path::{Path, PathBuf},
@@ -319,9 +319,9 @@ impl Metadata {
         self.gid
     }
 
-    pub fn extended_attributes(&self) -> HashMap<Box<[u8]>, Box<[u8]>> {
+    pub fn extended_attributes(&self) -> BTreeMap<Box<[u8]>, Box<[u8]>> {
         // TODO(fdurso): Not supported yet.
-        HashMap::new()
+        BTreeMap::new()
     }
 
     pub fn inode_num(&self) -> u64 {

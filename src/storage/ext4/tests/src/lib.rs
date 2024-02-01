@@ -5,7 +5,7 @@
 use {
     assert_matches::assert_matches,
     ext4_metadata::{Metadata, NodeInfo, Symlink, ROOT_INODE_NUM},
-    std::collections::HashMap,
+    std::collections::BTreeMap,
 };
 
 // To generate the test image:
@@ -57,7 +57,7 @@ fn test_read_image() {
     assert_eq!(node.mode, 0o100640);
     assert_eq!(node.uid, UID);
     assert_eq!(node.gid, GID);
-    let xattr: HashMap<_, _> =
+    let xattr: BTreeMap<_, _> =
         [((*b"user.a").into(), (*b"apple").into()), ((*b"user.b").into(), (*b"ball").into())]
             .into();
     assert_eq!(&node.extended_attributes, &xattr);
