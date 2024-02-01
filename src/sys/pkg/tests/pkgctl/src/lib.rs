@@ -456,6 +456,9 @@ impl MockPackageCacheService {
                         .push(CapturedPackageCacheRequest::Get { meta_far_blob_id: meta_far_blob });
                     let () = self.handle_get(meta_far_blob, needed_blobs, dir, responder).await;
                 }
+                PackageCacheRequest::GetCached { .. } => {
+                    panic!("should only support Get requests, received GetCached")
+                }
                 PackageCacheRequest::BasePackageIndex { .. } => {
                     panic!("should only support Get requests, received BasePackageIndex")
                 }

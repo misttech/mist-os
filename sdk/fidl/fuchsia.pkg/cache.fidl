@@ -23,6 +23,10 @@ closed protocol PackageCache {
     /// This method does not guarantee the missing blobs have been persisted. In order to guarantee
     /// missing blobs are persisted, clients should call ['Sync'].
     ///
+    /// Clients must not make concurrent `Get()` calls for the same `meta_far_blob`, even across
+    /// different `PackageCache` connections, *unless* the `meta_far_blob` is in base or already
+    /// active in the dynamic index. Violating this may result in `Get()` errors.
+    ///
     /// + request `meta_far_blob` the blob info for the package's meta.far.
     /// + request `needed_blobs` an iterator over all the blobs in the package that
     ///   are not present on the system.
@@ -37,6 +41,22 @@ closed protocol PackageCache {
         needed_blobs server_end:NeededBlobs;
         dir server_end:<fuchsia.io.Directory, optional>;
     }) -> () error zx.Status;
+
+    /// Gets the package directory if it (the meta.far and all content blobs, but not
+    /// necessarily subpackage blobs) is present on the local system.
+    /// Otherwise, an error will be returned.
+    /// This method does not protect the package from garbage collection, therefore
+    /// callers must only use this method when the package has protection from some other
+    /// source, e.g. the package is in base or the package is a subpackage and its superpackage is
+    /// protected.
+    ///
+    /// + request `meta_far` the hash of the package's meta.far.
+    /// + request `dir` the channel on which the package directory will be served.
+    /// * error a GetCachedError value indicating failure.
+    strict GetCached(resource struct {
+        meta_far BlobId;
+        dir server_end:<fuchsia.io.Directory>;
+    }) -> () error GetCachedError;
 
     /// Retrieves a chunk iterator to the base package index.
     ///
@@ -70,6 +90,15 @@ type GcProtection = strict enum {
     /// controlled by the [`RetainedPackages`] protocol. Client is responsible for ensuring
     /// the package is in the Retained index.
     RETAINED = 2;
+};
+
+/// Error type for [`PackageCache.GetCached`].
+type GetCachedError = strict enum {
+    /// Some of the package's blobs were missing from Blobfs.
+    NOT_CACHED = 1;
+
+    /// An unspecified error occurred.
+    INTERNAL = 2;
 };
 
 /// Error type for [`NeededBlobs.OpenMetaBlob`] and [`NeededBlobs.OpenBlob`].

@@ -104,6 +104,9 @@ pub(crate) async fn serve(
                     drop(node);
                     responder.send(response.map_err(|status| status.into_raw()))?;
                 }
+                PackageCacheRequest::GetCached { .. } => {
+                    error!("PackageCache.GetCached is not implemented");
+                }
                 PackageCacheRequest::BasePackageIndex { iterator, control_handle: _ } => {
                     let stream = iterator.into_stream()?;
                     let () = serve_package_index(
