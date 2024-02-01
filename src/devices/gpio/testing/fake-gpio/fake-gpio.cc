@@ -6,10 +6,25 @@
 
 #include <fidl/fuchsia.hardware.gpio/cpp/common_types.h>
 #include <lib/async/default.h>
+#include <lib/fdf/cpp/dispatcher.h>
 #include <zircon/errors.h>
 
 #include <atomic>
 #include <variant>
+
+namespace {
+
+// Get the correct dispatcher for the test environment
+async_dispatcher_t* GetDefaultDispatcher() {
+  async_dispatcher_t* current_fdf_dispatcher = fdf::Dispatcher::GetCurrent()->async_dispatcher();
+  if (current_fdf_dispatcher) {
+    return current_fdf_dispatcher;
+  }
+
+  return async_get_default_dispatcher();
+}
+
+}  // anonymous namespace
 
 namespace fake_gpio {
 
@@ -166,15 +181,15 @@ std::vector<State> FakeGpio::GetStateLog() { return state_log_; }
 fidl::ClientEnd<fuchsia_hardware_gpio::Gpio> FakeGpio::Connect() {
   zx::result endpoints = fidl::CreateEndpoints<fuchsia_hardware_gpio::Gpio>();
   ZX_ASSERT(endpoints.is_ok());
-  bindings_.AddBinding(async_get_default_dispatcher(), std::move(endpoints->server), this,
+  bindings_.AddBinding(GetDefaultDispatcher(), std::move(endpoints->server), this,
                        fidl::kIgnoreBindingClosure);
   return std::move(endpoints->client);
 }
 
 fuchsia_hardware_gpio::Service::InstanceHandler FakeGpio::CreateInstanceHandler() {
   return fuchsia_hardware_gpio::Service::InstanceHandler(
-      {.device = bindings_.CreateHandler(this, async_get_default_dispatcher(),
-                                         fidl::kIgnoreBindingClosure)});
+      {.device =
+           bindings_.CreateHandler(this, GetDefaultDispatcher(), fidl::kIgnoreBindingClosure)});
 }
 
 fuchsia_hardware_gpio::GpioPolarity FakeGpio::GetCurrentPolarity() {
