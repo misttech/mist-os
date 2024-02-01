@@ -135,91 +135,25 @@ pub fn schema_derive(input: proc_macro::TokenStream) -> proc_macro::TokenStream 
         }));
     }
 
-    let out_item = match item.data {
+    let ty = match item.data {
         syn::Data::Struct(struct_item) => {
-            let ty = match struct_item.fields {
-                // struct Name; -> null type
-                syn::Fields::Unit => SchemaType::Null,
-                // struct Name { field: u32 } -> struct { field: u32 }
-                syn::Fields::Named(fields) => {
-                    let mut out_fields = Punctuated::new();
-                    for (field, comma) in fields.named.pairs().map(|p| p.into_tuple()) {
-                        out_fields.push_value(SchemaField {
-                            key: SchemaStructKey {
-                                name: field.ident.clone().unwrap(),
-                                // TODO(https://fxbug.dev/320578372): Optional field attribute
-                                // #[schema(optional)] or #[serde(optional)]
-                                optional: false,
-                            },
-                            value: SchemaType::Alias(field.ty.clone()),
-                        });
-                        if let Some(comma) = comma {
-                            out_fields.push_punct(comma.clone());
-                        }
-
-                        // Add schema bound to the where clause.
-                        // for struct MyStruct { field: Type } -> impl ... where Type: Schema
-                        //                                                       ^^^^^^^^^^^^
-                        clauses.push(WherePredicate::Type(syn::PredicateType {
-                            lifetimes: None,
-                            bounded_ty: field.ty.clone(),
-                            colon_token: Default::default(),
-                            bounds: Punctuated::from_iter([schema_trait_bound.clone()]),
-                        }));
-                    }
-                    SchemaType::Struct { fields: out_fields }
-                }
-                // struct Name(u32, String); -> (u32, String)
-                syn::Fields::Unnamed(fields) => {
-                    let mut elems = Punctuated::new();
-                    for (field, comma) in fields.unnamed.pairs().map(|p| p.into_tuple()) {
-                        elems.push_value(SchemaType::Alias(field.ty.clone()));
-                        if let Some(comma) = comma {
-                            elems.push_punct(comma.clone());
-                        }
-
-                        // Add schema bound to the where clause.
-                        // for struct MyStruct { field: Type } -> impl ... where Type: Schema
-                        //                                                       ^^^^^^^^^^^^
-                        clauses.push(WherePredicate::Type(syn::PredicateType {
-                            lifetimes: None,
-                            bounded_ty: field.ty.clone(),
-                            colon_token: Default::default(),
-                            bounds: Punctuated::from_iter([schema_trait_bound.clone()]),
-                        }));
-                    }
-                    if elems.len() == 1 {
-                        // Serde newtype struct
-                        elems.pop().unwrap().into_value()
+            schema_from_fields(struct_item.fields, &mut clauses, &schema_trait_bound)
+        }
+        syn::Data::Enum(enum_item) => SchemaType::Enum {
+            variants: enum_item
+                .variants
+                .into_pairs()
+                .map(|p| p.into_tuple())
+                .map(|(variant, comma)| {
+                    let ty = if let syn::Fields::Unit = variant.fields {
+                        None
                     } else {
-                        // Serde tuple struct
-                        SchemaType::Tuple(elems)
-                    }
-                }
-            };
-
-            let name = item.ident;
-            let (_, ty_args, _) = item.generics.split_for_impl();
-            let impl_path = quote!(#name #ty_args);
-
-            item.generics.make_where_clause().predicates.extend(clauses);
-
-            SchemaItem::Impl(SchemaImplItem {
-                generics: item.generics,
-                impl_path,
-                ty,
-                attr: ImplItemAttr::default(),
-            })
-        }
-        // TODO(https://fxbug.dev/320578550): Support enums
-        syn::Data::Enum(_enum_item) => {
-            return syn::Error::new(
-                item.ident.span(),
-                "Enums not supported: https://fxbug.dev/320578550",
-            )
-            .into_compile_error()
-            .into()
-        }
+                        Some(schema_from_fields(variant.fields, &mut clauses, &schema_trait_bound))
+                    };
+                    syn::punctuated::Pair::new(SchemaEnumVariant { name: variant.ident, ty }, comma)
+                })
+                .collect(),
+        },
         _ => {
             return syn::Error::new(item.ident.span(), "Unions are not supported")
                 .into_compile_error()
@@ -227,7 +161,90 @@ pub fn schema_derive(input: proc_macro::TokenStream) -> proc_macro::TokenStream 
         }
     };
 
+    let out_item = {
+        let name = item.ident;
+        let (_, ty_args, _) = item.generics.split_for_impl();
+        let impl_path = quote!(#name #ty_args);
+
+        item.generics.make_where_clause().predicates.extend(clauses);
+
+        SchemaItem::Impl(SchemaImplItem {
+            generics: item.generics,
+            impl_path,
+            ty,
+            attr: ImplItemAttr::default(),
+        })
+    };
+
     out_item.build().into()
+}
+
+/// Turns struct or enum variant fields into a schema type.
+fn schema_from_fields(
+    fields: syn::Fields,
+    clauses: &mut Vec<WherePredicate>,
+    schema_trait_bound: &syn::TypeParamBound,
+) -> SchemaType {
+    match fields {
+        // struct Name; -> null type
+        syn::Fields::Unit => SchemaType::Null,
+        // struct Name { field: u32 } -> struct { field: u32 }
+        syn::Fields::Named(fields) => {
+            let mut out_fields = Punctuated::new();
+            for (field, comma) in fields.named.pairs().map(|p| p.into_tuple()) {
+                out_fields.push_value(SchemaField {
+                    key: SchemaStructKey {
+                        name: field.ident.clone().unwrap(),
+                        // TODO(https://fxbug.dev/320578372): Optional field attribute
+                        // #[schema(optional)] or #[serde(optional)]
+                        optional: false,
+                    },
+                    value: SchemaType::Alias(field.ty.clone()),
+                });
+                if let Some(comma) = comma {
+                    out_fields.push_punct(comma.clone());
+                }
+
+                // Add schema bound to the where clause.
+                // for struct MyStruct { field: Type } -> impl ... where Type: Schema
+                //                                                       ^^^^^^^^^^^^
+                clauses.push(WherePredicate::Type(syn::PredicateType {
+                    lifetimes: None,
+                    bounded_ty: field.ty.clone(),
+                    colon_token: Default::default(),
+                    bounds: Punctuated::from_iter([schema_trait_bound.clone()]),
+                }));
+            }
+            SchemaType::Struct { fields: out_fields }
+        }
+        // struct Name(u32, String); -> (u32, String)
+        syn::Fields::Unnamed(fields) => {
+            let mut elems = Punctuated::new();
+            for (field, comma) in fields.unnamed.pairs().map(|p| p.into_tuple()) {
+                elems.push_value(SchemaType::Alias(field.ty.clone()));
+                if let Some(comma) = comma {
+                    elems.push_punct(comma.clone());
+                }
+
+                // Add schema bound to the where clause.
+                // for struct MyStruct { field: Type } -> impl ... where Type: Schema
+                //                                                       ^^^^^^^^^^^^
+                clauses.push(WherePredicate::Type(syn::PredicateType {
+                    lifetimes: None,
+                    bounded_ty: field.ty.clone(),
+                    colon_token: Default::default(),
+                    bounds: Punctuated::from_iter([schema_trait_bound.clone()]),
+                }));
+            }
+            if elems.len() == 1 {
+                // Serde newtype struct
+                elems.pop().unwrap().into_value()
+            } else {
+                // Serde tuple struct
+                SchemaType::Tuple(elems)
+            }
+        }
+    }
 }
 
 fn stringify_ident(id: &Ident) -> String {

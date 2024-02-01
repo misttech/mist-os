@@ -95,5 +95,29 @@ mod test {
         c: Option<T>,
     }
 
-    // TODO(https://fxbug.dev/320578550): Enums
+    #[derive(Schema)]
+    #[allow(dead_code)]
+    enum DeriveEnum {
+        One,
+        Two,
+        Three,
+    }
+
+    #[derive(Schema)]
+    #[allow(dead_code)]
+    enum DeriveDataEnum {
+        Neither,
+        Num(u32),
+        NumTriple(u32, u32, u32),
+        Str(String),
+        Both { num: u32, str: String },
+    }
+
+    #[derive(Schema)]
+    #[allow(dead_code)]
+    enum DeriveStrangeEnum {
+        A,
+        B(),
+        C {},
+    }
 }
