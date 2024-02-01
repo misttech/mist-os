@@ -1,0 +1,35 @@
+Name: mypy
+License: MIT License
+License File: src/LICENSE
+Upstream Git: https://github.com/python/mypy
+Description:
+
+mypy is static typing for Python
+
+
+Changes made to Work with Fuchsia:
+
+* Added main.py, which is necessary for python_binary template.
+* `setup_mypy.py` unzips the mypy for use by other Python tools within
+  Fuchsia's build environment.
+
+
+To update mypy and dependencies, follow these steps:
+
+* Change the mypy version number in the
+  `integration/third_party/pylibs/requirements.txt` file.
+* Run `integration/third_party/pylibs/update-pylibs.sh` script which updates
+  the transitive deps.
+* checkout mypy source code to the updated revision in pylibs
+  ```
+  cd third_party/pylibs/mypy/src/mypy
+  git checkout <revision_ID_from_pylibs>
+  fx build
+  # Make sure build was sucessfull and run mypy.pyz
+  fuchsia-vendored-python out/default/obj/third_party/pylibs/mypy/mypy.pyz -h
+  ```
+* To get list of source files added to python_library("mypy_lib") build run:
+  ```
+  cd third_party/pylibs/mypy/src/mypy
+  find . \( -name "*.py" -o -name "*.pyi" \) ! -path  "*test/*"
+  ```
