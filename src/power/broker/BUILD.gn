@@ -20,6 +20,7 @@ fidl("fuchsia.power.broker") {
     "//sdk/fidl/fuchsia.power.system/*:*",
     "//src/power/broker/*:*",
     "//src/power/system-activity-governor/*:*",
+    "//vendor/*",
   ]
 }
 
