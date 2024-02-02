@@ -12,6 +12,7 @@ use fuchsia_inspect::{
 use fuchsia_zircon as zx;
 use futures::lock::Mutex;
 use futures::FutureExt;
+use inspect::Node;
 use std::cell::RefCell;
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::fmt::Debug;
@@ -126,45 +127,56 @@ impl EventCounters {
     }
 }
 
-struct CircularBuffer {
+pub(crate) struct CircularBuffer<T> {
     // Size of CircularBuffer
     _size: usize,
     // VecDeque of recent events with capacity of `size`
-    _events: VecDeque<InputEvent>,
+    _events: VecDeque<T>,
 }
 
-impl CircularBuffer {
-    fn new(size: usize) -> Self {
+pub(crate) trait BufferNode {
+    fn get_name(&self) -> &'static str;
+    fn record_inspect(&self, node: &Node);
+}
+
+impl<T> CircularBuffer<T>
+where
+    T: BufferNode,
+{
+    pub(crate) fn new(size: usize) -> Self {
         let events = VecDeque::with_capacity(size);
         CircularBuffer { _size: size, _events: events }
     }
 
-    fn push(&mut self, event: InputEvent) {
+    pub(crate) fn push(&mut self, event: T) {
         if self._events.len() >= self._size {
             std::mem::drop(self._events.pop_front());
         }
         self._events.push_back(event);
     }
 
-    fn record_all_lazy_inspect(&self, inspector: inspect::Inspector) -> inspect::Inspector {
-        self._events.iter().enumerate().for_each(|(i, &ref event)| {
-            let event_clone = event.clone();
-
+    pub(crate) fn record_all_lazy_inspect(
+        &self,
+        inspector: inspect::Inspector,
+    ) -> inspect::Inspector {
+        self._events.iter().enumerate().for_each(|(i, event)| {
             // Include leading zeros so Inspect will display events in correct numerical order.
             // Inspect displays nodes in alphabetical order by default.
-            let mut prefix = "";
-            if i < 10 {
-                prefix = "00";
-            } else if i < 100 {
-                prefix = "0";
-            }
-
-            inspector.root().record_child(
-                format!("{}{}_{}", prefix, i, event_clone.get_event_type()),
-                move |node| event_clone.record_inspect(node),
-            );
+            inspector.root().record_child(format!("{:03}_{}", i, event.get_name()), move |node| {
+                event.record_inspect(node)
+            });
         });
         inspector
+    }
+}
+
+impl BufferNode for InputEvent {
+    fn get_name(&self) -> &'static str {
+        self.get_event_type()
+    }
+
+    fn record_inspect(&self, node: &Node) {
+        InputEvent::record_inspect(self, node);
     }
 }
 
@@ -188,7 +200,7 @@ pub struct InspectHandler<F> {
     /// An inventory of event counters by type.
     events_by_type: HashMap<EventType, EventCounters>,
     /// Log of recent events in the order they were received.
-    recent_events_log: Option<Arc<Mutex<CircularBuffer>>>,
+    recent_events_log: Option<Arc<Mutex<CircularBuffer<InputEvent>>>>,
     /// Histogram of latency from the binding timestamp for an `InputEvent` until
     /// the time the `InputEvent` was observed by this handler. Reported in milliseconds,
     /// because values less than 1 msec aren't especially interesting.
@@ -319,7 +331,10 @@ impl<F> InspectHandler<F> {
     }
 }
 
-fn record_lazy_recent_events(node: &inspect::Node, recent_events: Arc<Mutex<CircularBuffer>>) {
+fn record_lazy_recent_events(
+    node: &inspect::Node,
+    recent_events: Arc<Mutex<CircularBuffer<InputEvent>>>,
+) {
     node.record_lazy_child("recent_events_log", move || {
         let recent_events_clone = Arc::clone(&recent_events);
         async move {

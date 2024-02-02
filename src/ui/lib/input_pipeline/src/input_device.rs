@@ -549,7 +549,7 @@ impl InputEvent {
     }
 
     // Returns event type as string.
-    pub fn get_event_type(&self) -> &str {
+    pub fn get_event_type(&self) -> &'static str {
         match self.device_event {
             InputDeviceEvent::Keyboard(_) => "keyboard_event",
             InputDeviceEvent::LightSensor(_) => "light_sensor_event",

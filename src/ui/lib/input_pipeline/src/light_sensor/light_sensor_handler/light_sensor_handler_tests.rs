@@ -13,6 +13,7 @@ use crate::light_sensor::calibrator::Calibrate;
 use crate::light_sensor::types::{AdjustmentSetting, Rgbc, SensorConfiguration};
 use crate::light_sensor_binding::{LightSensorDeviceDescriptor, LightSensorEvent};
 use assert_matches::assert_matches;
+use diagnostics_assertions::AnyProperty;
 use fasync::Task;
 use fidl::endpoints::create_proxy_and_stream;
 use fidl_fuchsia_input_report::{
@@ -179,7 +180,11 @@ async fn active_setting_adjusts_down_on_saturation() {
     let (device_proxy, called, task) = get_mock_device_proxy();
     let mut active_setting = ActiveSetting::new(get_adjustment_settings(), 1);
     let result = active_setting
-        .adjust(Rgbc { red: 21_067, green: 20_395, blue: 20_939, clear: 65_085 }, &device_proxy)
+        .adjust(
+            Rgbc { red: 21_067, green: 20_395, blue: 20_939, clear: 65_085 },
+            &device_proxy,
+            |_| std::future::ready(()),
+        )
         .await;
     assert_matches!(result, Err(SaturatedError::Saturated));
     assert_matches!(&*called.borrow(), &Some(FeatureReport {
@@ -223,7 +228,7 @@ async fn active_setting_adjusts_down_on_saturation() {
 async fn active_setting_adjusts_down_on_single_channel_saturation(rgbc: Rgbc<u16>) {
     let (device_proxy, called, task) = get_mock_device_proxy();
     let mut active_setting = ActiveSetting::new(get_adjustment_settings(), 1);
-    let result = active_setting.adjust(rgbc, &device_proxy).await;
+    let result = active_setting.adjust(rgbc, &device_proxy, |_| std::future::ready(())).await;
     // Result is err because adjusting down occurs due to saturation.
     assert_matches!(result, Err(SaturatedError::Saturated));
     assert_matches!(&*called.borrow(), &Some(FeatureReport {
@@ -273,7 +278,7 @@ async fn active_setting_adjusts_down_on_single_channel_saturation(rgbc: Rgbc<u16
 async fn active_setting_adjusts_up_on_low_readings(rgbc: Rgbc<u16>) {
     let (device_proxy, called, task) = get_mock_device_proxy();
     let mut active_setting = ActiveSetting::new(get_adjustment_settings(), 1);
-    let result = active_setting.adjust(rgbc, &device_proxy).await;
+    let result = active_setting.adjust(rgbc, &device_proxy, |_| std::future::ready(())).await;
     // Ok-true signifies the adjustment was pulled up to a higher sensitivity.
     assert_matches!(result, Ok(true));
     assert_matches!(&*called.borrow(), &Some(FeatureReport {
@@ -318,7 +323,10 @@ async fn active_setting_adjusts_up_on_low_readings(rgbc: Rgbc<u16>) {
 async fn active_setting_does_not_adjust_on_high_readings(rgbc: Rgbc<u16>) {
     let (device_proxy, called, task) = get_mock_device_proxy();
     let mut active_setting = ActiveSetting::new(get_adjustment_settings(), 1);
-    active_setting.adjust(rgbc, &device_proxy).await.expect("should succeed");
+    active_setting
+        .adjust(rgbc, &device_proxy, |_| std::future::ready(()))
+        .await
+        .expect("should succeed");
     assert_matches!(&*called.borrow(), &None);
     drop(device_proxy);
     task.await;
@@ -330,7 +338,11 @@ async fn active_setting_adjusts_down_on_saturation_reports_error() {
         get_mock_device_proxy_with_response(None, Err(zx::sys::ZX_ERR_CONNECTION_RESET));
     let mut active_setting = ActiveSetting::new(get_adjustment_settings(), 1);
     active_setting
-        .adjust(Rgbc { red: 21_067, green: 20_395, blue: 20_939, clear: 65_085 }, &device_proxy)
+        .adjust(
+            Rgbc { red: 21_067, green: 20_395, blue: 20_939, clear: 65_085 },
+            &device_proxy,
+            |_| std::future::ready(()),
+        )
         .await
         .expect_err("should fail");
     drop(device_proxy);
@@ -343,7 +355,9 @@ async fn active_setting_adjusts_down_on_single_channel_saturation_reports_error(
         get_mock_device_proxy_with_response(None, Err(zx::sys::ZX_ERR_CONNECTION_RESET));
     let mut active_setting = ActiveSetting::new(get_adjustment_settings(), 1);
     active_setting
-        .adjust(Rgbc { red: 65_535, green: 0, blue: 0, clear: 0 }, &device_proxy)
+        .adjust(Rgbc { red: 65_535, green: 0, blue: 0, clear: 0 }, &device_proxy, |_| {
+            std::future::ready(())
+        })
         .await
         .expect_err("should fail");
     drop(device_proxy);
@@ -356,7 +370,9 @@ async fn active_setting_adjusts_up_on_low_readings_reports_error() {
         get_mock_device_proxy_with_response(None, Err(zx::sys::ZX_ERR_CONNECTION_RESET));
     let mut active_setting = ActiveSetting::new(get_adjustment_settings(), 1);
     active_setting
-        .adjust(Rgbc { red: 14_745, green: 0, blue: 0, clear: 0 }, &device_proxy)
+        .adjust(Rgbc { red: 14_745, green: 0, blue: 0, clear: 0 }, &device_proxy, |_| {
+            std::future::ready(())
+        })
         .await
         .expect_err("should fail");
     drop(device_proxy);
@@ -872,6 +888,7 @@ fn light_sensor_handler_initialized_with_inspect_node() {
                 events_saturated_count: 0u64,
                 events_handled_count: 0u64,
                 last_received_timestamp_ns: 0u64,
+                recent_feature_events_log: {},
                 "fuchsia.inspect.Health": {
                     status: "STARTING_UP",
                     // Timestamp value is unpredictable and not relevant in this context,
@@ -1010,6 +1027,23 @@ async fn light_sensor_handler_inspect_counts_events() {
                 events_saturated_count: 1u64,
                 events_handled_count: 2u64,
                 last_received_timestamp_ns: last_event_timestamp,
+                recent_feature_events_log: {
+                  "000_feature_report_update_event": {
+                    event_time: AnyProperty,
+                    sampling_rate: 433_680_i64,
+                    sensitivity: 1_i64,
+                  },
+                  "001_feature_report_update_event": {
+                    event_time: AnyProperty,
+                    sampling_rate: 433_680_i64,
+                    sensitivity: 4_i64,
+                  },
+                  "002_feature_report_update_event": {
+                    event_time: AnyProperty,
+                    sampling_rate: 433_680_i64,
+                    sensitivity: 1_i64,
+                  },
+                },
                 "fuchsia.inspect.Health": {
                     status: "STARTING_UP",
                     // Timestamp value is unpredictable and not relevant in this context,

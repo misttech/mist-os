@@ -4,6 +4,7 @@
 
 use crate::input_device::{Handled, InputDeviceDescriptor, InputDeviceEvent, InputEvent};
 use crate::input_handler::{InputHandler, InputHandlerStatus};
+use crate::inspect_handler::{BufferNode, CircularBuffer};
 use crate::light_sensor::calibrator::{Calibrate, Calibrator};
 use crate::light_sensor::led_watcher::{CancelableTask, LedWatcher, LedWatcherHandle};
 use crate::light_sensor::types::{AdjustmentSetting, Calibration, Rgbc, SensorConfiguration};
@@ -20,9 +21,11 @@ use fidl_fuchsia_ui_brightness::ControlProxy as BrightnessControlProxy;
 use fuchsia_inspect::{self, health::Reporter, NumericProperty};
 use fuchsia_zircon as zx;
 use futures::channel::oneshot;
-use futures::TryStreamExt;
+use futures::lock::Mutex;
+use futures::{Future, FutureExt, TryStreamExt};
 use std::cell::RefCell;
 use std::rc::Rc;
+use std::sync::Arc;
 
 type NotifyFn = Box<dyn Fn(&LightSensorData, SensorWatchResponder) -> bool>;
 type SensorHangingGet = HangingGet<LightSensorData, SensorWatchResponder, NotifyFn>;
@@ -71,11 +74,15 @@ impl ActiveSetting {
     /// Update sensor if it's near or past a saturation point. Returns a saturation error if the
     /// sensor is saturated, `true` if the sensor is not saturated but still pulled up, and `false`
     /// otherwise.
-    async fn adjust(
+    async fn adjust<Fut>(
         &mut self,
         reading: Rgbc<u16>,
         device_proxy: &InputDeviceProxy,
-    ) -> Result<bool, SaturatedError> {
+        track_feature_update: impl Fn(FeatureEvent) -> Fut,
+    ) -> Result<bool, SaturatedError>
+    where
+        Fut: Future<Output = ()>,
+    {
         let saturation_point =
             (num_cycles(self.active_setting().atime) * MAX_COUNT_PER_CYCLE).min(MAX_SATURATION);
         let gain_up_margin = saturation_point / GAIN_UP_MARGIN_DIVISOR;
@@ -86,7 +93,9 @@ impl ActiveSetting {
         if saturated(reading) {
             if self.adjust_down() {
                 tracing::info!("adjusting down due to saturation sentinel");
-                self.update_device(&device_proxy).await.context("updating light sensor device")?;
+                self.update_device(&device_proxy, track_feature_update)
+                    .await
+                    .context("updating light sensor device")?;
             }
             return Err(SaturatedError::Saturated);
         }
@@ -96,7 +105,7 @@ impl ActiveSetting {
             if value >= saturation_point {
                 if self.adjust_down() {
                     tracing::info!("adjusting down due to saturation point");
-                    self.update_device(&device_proxy)
+                    self.update_device(&device_proxy, track_feature_update)
                         .await
                         .context("updating light sensor device")?;
                 }
@@ -109,7 +118,9 @@ impl ActiveSetting {
         if pull_up {
             if self.adjust_up() {
                 tracing::info!("adjusting up");
-                self.update_device(&device_proxy).await.context("updating light sensor device")?;
+                self.update_device(&device_proxy, track_feature_update)
+                    .await
+                    .context("updating light sensor device")?;
                 return Ok(true);
             }
         }
@@ -117,7 +128,14 @@ impl ActiveSetting {
         Ok(false)
     }
 
-    async fn update_device(&self, device_proxy: &InputDeviceProxy) -> Result<(), Error> {
+    async fn update_device<Fut>(
+        &self,
+        device_proxy: &InputDeviceProxy,
+        track_feature_update: impl Fn(FeatureEvent) -> Fut,
+    ) -> Result<(), Error>
+    where
+        Fut: Future<Output = ()>,
+    {
         let active_setting = self.active_setting();
         let feature_report = device_proxy
             .get_feature_report()
@@ -129,18 +147,19 @@ impl ActiveSetting {
                     zx::Status::from_raw(e),
                 )
             })?;
+        let feature_report = FeatureReport {
+            sensor: Some(SensorFeatureReport {
+                sensitivity: Some(vec![active_setting.gain as i64]),
+                // Feature report expects sampling rate in microseconds.
+                sampling_rate: Some(to_us(active_setting.atime) as i64),
+                ..(feature_report
+                    .sensor
+                    .ok_or_else(|| format_err!("missing sensor in feature_report"))?)
+            }),
+            ..feature_report
+        };
         device_proxy
-            .set_feature_report(&FeatureReport {
-                sensor: Some(SensorFeatureReport {
-                    sensitivity: Some(vec![active_setting.gain as i64]),
-                    // Feature report expects sampling rate in microseconds.
-                    sampling_rate: Some(to_us(active_setting.atime) as i64),
-                    ..(feature_report
-                        .sensor
-                        .ok_or_else(|| format_err!("missing sensor in feature_report"))?)
-                }),
-                ..feature_report
-            })
+            .set_feature_report(&feature_report)
             .await
             .context("calling set_feature_report")?
             .map_err(|e| {
@@ -148,7 +167,11 @@ impl ActiveSetting {
                     "updating feature report on light sensor device: {:?}",
                     zx::Status::from_raw(e),
                 )
-            })
+            })?;
+        if let Some(feature_event) = FeatureEvent::maybe_new(feature_report) {
+            (track_feature_update)(feature_event).await;
+        }
+        Ok(())
     }
 
     fn active_setting(&self) -> AdjustmentSetting {
@@ -188,6 +211,35 @@ impl ActiveSetting {
     }
 }
 
+struct FeatureEvent {
+    event_time: zx::Time,
+    sampling_rate: i64,
+    sensitivity: i64,
+}
+
+impl FeatureEvent {
+    fn maybe_new(report: FeatureReport) -> Option<Self> {
+        let sensor = report.sensor?;
+        Some(FeatureEvent {
+            sampling_rate: sensor.sampling_rate?,
+            sensitivity: *sensor.sensitivity?.get(0)?,
+            event_time: zx::Time::get_monotonic(),
+        })
+    }
+}
+
+impl BufferNode for FeatureEvent {
+    fn get_name(&self) -> &'static str {
+        "feature_report_update_event"
+    }
+
+    fn record_inspect(&self, node: &fuchsia_inspect::Node) {
+        node.record_int("sampling_rate", self.sampling_rate);
+        node.record_int("sensitivity", self.sensitivity);
+        node.record_int("event_time", self.event_time.into_nanos());
+    }
+}
+
 pub struct LightSensorHandler<T> {
     hanging_get: RefCell<SensorHangingGet>,
     calibrator: Option<T>,
@@ -198,6 +250,7 @@ pub struct LightSensorHandler<T> {
     product_id: u32,
     /// The inventory of this handler's Inspect status.
     inspect_status: InputHandlerStatus,
+    feature_updates: Arc<Mutex<CircularBuffer<FeatureEvent>>>,
 
     // Additional inspect properties specific to LightSensorHandler
 
@@ -273,12 +326,24 @@ impl<T> LightSensorHandler<T> {
                 true
             },
         ) as NotifyFn));
+        let feature_updates = Arc::new(Mutex::new(CircularBuffer::new(5)));
         let active_setting =
             RefCell::new(ActiveSettingState::Uninitialized(configuration.settings));
         let events_saturated_count =
             inspect_status.inspect_node.create_uint("events_saturated_count", 0);
         let clients_connected_count =
             inspect_status.inspect_node.create_uint("clients_connected_count", 0);
+        inspect_status.inspect_node.record_lazy_child("recent_feature_events_log", {
+            let feature_updates = Arc::clone(&feature_updates);
+            move || {
+                let feature_updates = Arc::clone(&feature_updates);
+                async move {
+                    let inspector = fuchsia_inspect::Inspector::default();
+                    Ok(feature_updates.lock().await.record_all_lazy_inspect(inspector))
+                }
+                .boxed()
+            }
+        });
         Rc::new(Self {
             hanging_get,
             calibrator,
@@ -290,6 +355,7 @@ impl<T> LightSensorHandler<T> {
             inspect_status,
             events_saturated_count,
             clients_connected_count,
+            feature_updates,
         })
     }
 
@@ -360,13 +426,18 @@ where
         // change after this call.
         let (initial_setting, pulled_up) = {
             let mut active_setting_state = self.active_setting.borrow_mut();
+            let track_feature_update = |feature_event| async move {
+                self.feature_updates.lock().await.push(feature_event);
+            };
             match &mut *active_setting_state {
                 ActiveSettingState::Uninitialized(ref mut adjustment_settings) => {
                     let active_setting = ActiveSetting::new(std::mem::take(adjustment_settings), 0);
-                    if let Err(e) = active_setting.update_device(&device_proxy).await {
+                    if let Err(e) =
+                        active_setting.update_device(&device_proxy, track_feature_update).await
+                    {
                         tracing::error!(
                             "Unable to set initial settings for sensor. Falling back \
-                                         to static setting: {e:?}"
+                                        to static setting: {e:?}"
                         );
                         // Switch to a static state because this sensor cannot change its settings.
                         let setting = active_setting.settings[0];
@@ -382,14 +453,15 @@ where
                 }
                 ActiveSettingState::Initialized(ref mut active_setting) => {
                     let initial_setting = active_setting.active_setting();
-                    let pulled_up = active_setting.adjust(reading, device_proxy).await.map_err(
-                        |e| match e {
+                    let pulled_up = active_setting
+                        .adjust(reading, device_proxy, track_feature_update)
+                        .await
+                        .map_err(|e| match e {
                             SaturatedError::Saturated => SaturatedError::Saturated,
                             SaturatedError::Anyhow(e) => {
                                 SaturatedError::Anyhow(e.context("adjusting active setting"))
                             }
-                        },
-                    )?;
+                        })?;
                     (initial_setting, pulled_up)
                 }
                 ActiveSettingState::Static(setting) => (*setting, false),
