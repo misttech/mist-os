@@ -23,6 +23,7 @@ if (is_host) {
       "data/cpu_metric.json",
       "data/cpu_metric_system_metrics_logger.json",
       "data/fps_metric.json",
+      "data/scenic_metric.json",
     ]
 
     outputs = [ "${target_out_dir}/runtime_deps/{{source_file_part}}" ]

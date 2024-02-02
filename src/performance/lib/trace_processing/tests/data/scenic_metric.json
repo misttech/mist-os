@@ -1,0 +1,279 @@
+{
+    "displayTimeUnit": "ns",
+    "traceEvents": [
+        {
+            "cat": "gfx",
+            "name": "Display::Fence::OnReady",
+            "ts": 100,
+            "pid": 5693,
+            "tid": 14044,
+            "ph": "X",
+            "dur": 10,
+            "args": {
+                "display_id": 1
+            }
+        },
+        {
+            "cat": "gfx",
+            "name": "Display::Fence::OnReady",
+            "ts": 200,
+            "pid": 5693,
+            "tid": 14044,
+            "ph": "X",
+            "dur": 10,
+            "args": {
+                "display_id": 1
+            }
+        },
+        {
+            "cat": "gfx",
+            "name": "ApplyScheduledSessionUpdates",
+            "ts": 290,
+            "pid": 582653,
+            "tid": 582658,
+            "ph": "X",
+            "dur": 5
+        },
+        {
+            "cat": "gfx",
+            "name": "schedule_to_render",
+            "ts": 292,
+            "pid": 582653,
+            "tid": 582658,
+            "ph": "s",
+            "id": "1001"
+        },
+        {
+            "cat": "gfx",
+            "name": "schedule_to_render",
+            "ts": 310,
+            "pid": 582653,
+            "tid": 582658,
+            "ph": "f",
+            "bp": "e",
+            "id": "1001"
+        },
+        {
+            "cat": "gfx",
+            "name": "RenderFrame",
+            "ts": 300,
+            "pid": 582653,
+            "tid": 582658,
+            "ph": "X",
+            "dur": 80,
+            "args": {
+                "frame_number": 1,
+                "time": 0.4
+            }
+        },
+        {
+            "cat": "gfx",
+            "name": "render_to_vsync",
+            "ts": 350,
+            "pid": 582653,
+            "tid": 582658,
+            "ph": "s",
+            "id": "101"
+        },
+        {
+            "cat": "gfx",
+            "name": "render_to_vsync",
+            "ts": 405,
+            "pid": 5693,
+            "tid": 14044,
+            "ph": "f",
+            "bp": "e",
+            "id": "101"
+        },
+        {
+            "cat": "gfx",
+            "name": "Display::Fence::OnReady",
+            "ts": 400,
+            "pid": 5693,
+            "tid": 14044,
+            "ph": "X",
+            "dur": 10,
+            "args": {
+                "display_id": 1
+            }
+        },
+        {
+            "cat": "gfx",
+            "name": "ApplyScheduledSessionUpdates",
+            "ts": 390,
+            "pid": 582653,
+            "tid": 582658,
+            "ph": "X",
+            "dur": 5
+        },
+        {
+            "cat": "gfx",
+            "name": "schedule_to_render",
+            "ts": 392,
+            "pid": 582653,
+            "tid": 582658,
+            "ph": "s",
+            "id": "1002"
+        },
+        {
+            "cat": "gfx",
+            "name": "schedule_to_render",
+            "ts": 410,
+            "pid": 582653,
+            "tid": 582658,
+            "ph": "f",
+            "bp": "e",
+            "id": "1002"
+        },
+        {
+            "cat": "gfx",
+            "name": "RenderFrame",
+            "ts": 400,
+            "pid": 582653,
+            "tid": 582658,
+            "ph": "X",
+            "dur": 70,
+            "args": {
+                "frame_number": 2,
+                "time": 0.4
+            }
+        },
+        {
+            "cat": "gfx",
+            "name": "render_to_vsync",
+            "ts": 450,
+            "pid": 582653,
+            "tid": 582658,
+            "ph": "s",
+            "id": "102"
+        },
+        {
+            "cat": "gfx",
+            "name": "render_to_vsync",
+            "ts": 505,
+            "pid": 5693,
+            "tid": 14044,
+            "ph": "f",
+            "bp": "e",
+            "id": "102"
+        },
+        {
+            "cat": "gfx",
+            "name": "Display::Fence::OnReady",
+            "ts": 502,
+            "pid": 5693,
+            "tid": 14044,
+            "ph": "X",
+            "dur": 10,
+            "args": {
+                "display_id": 1
+            }
+        },
+        {
+            "cat": "gfx",
+            "name": "ApplyScheduledSessionUpdates",
+            "ts": 490,
+            "pid": 582653,
+            "tid": 582658,
+            "ph": "X",
+            "dur": 5
+        },
+        {
+            "cat": "gfx",
+            "name": "schedule_to_render",
+            "ts": 492,
+            "pid": 582653,
+            "tid": 582658,
+            "ph": "s",
+            "id": "1003"
+        },
+        {
+            "cat": "gfx",
+            "name": "schedule_to_render",
+            "ts": 510,
+            "pid": 582653,
+            "tid": 582658,
+            "ph": "f",
+            "bp": "e",
+            "id": "1003"
+        },
+        {
+            "cat": "gfx",
+            "name": "RenderFrame",
+            "ts": 500,
+            "pid": 582653,
+            "tid": 582658,
+            "ph": "X",
+            "dur": 90,
+            "args": {
+                "frame_number": 3,
+                "time": 0.4
+            }
+        },
+        {
+            "cat": "gfx",
+            "name": "Display::Fence::OnReady",
+            "ts": 600,
+            "pid": 5693,
+            "tid": 14044,
+            "ph": "X",
+            "dur": 10,
+            "args": {
+                "display_id": 1
+            }
+        },
+        {
+            "cat": "gfx",
+            "name": "RenderFrame",
+            "ts": 600,
+            "pid": 582653,
+            "tid": 582658,
+            "ph": "X",
+            "dur": 80,
+            "args": {
+                "frame_number": 4,
+                "time": 0.4
+            }
+        },
+        {
+            "cat": "gfx",
+            "name": "render_to_vsync",
+            "ts": 650,
+            "pid": 582653,
+            "tid": 582658,
+            "ph": "s",
+            "id": "103"
+        },
+        {
+            "cat": "gfx",
+            "name": "render_to_vsync",
+            "ts": 705,
+            "pid": 5693,
+            "tid": 14044,
+            "ph": "f",
+            "bp": "e",
+            "id": "103"
+        },
+        {
+            "cat": "gfx",
+            "name": "Display::Fence::OnReady",
+            "ts": 700,
+            "pid": 5693,
+            "tid": 14044,
+            "ph": "X",
+            "dur": 10,
+            "args": {
+                "display_id": 1
+            }
+        },
+        {
+            "cat": "gfx",
+            "name": "ApplyScheduledSessionUpdates",
+            "ts": 890,
+            "pid": 582653,
+            "tid": 582658,
+            "ph": "X",
+            "dur": 5
+        }
+    ]
+}

@@ -43,21 +43,15 @@ def metrics_processor(
         type=trace_model.DurationEvent,
     )
 
-    def find_nearest_vsync_event(
-        event: trace_model.Event,
-    ) -> trace_model.Event:
-        filtered_following_events = trace_utils.filter_events(
-            trace_utils.get_following_events(event),
-            category=_EVENT_CATEGORY,
-            name=_DISPLAY_VSYNC_EVENT_NAME,
-            type=trace_model.DurationEvent,
-        )
-        return next(filtered_following_events, None)
-
     vsync_events: List[trace_model.Event] = list(
         filter(
             lambda item: item is not None,
-            map(find_nearest_vsync_event, cpu_render_start_events),
+            map(
+                lambda e: trace_utils.get_nearest_following_event(
+                    e, _EVENT_CATEGORY, _DISPLAY_VSYNC_EVENT_NAME
+                ),
+                cpu_render_start_events,
+            ),
         )
     )
 

@@ -187,3 +187,27 @@ def get_following_events(
 
     for connected_event in sorted(visited, key=by_start_time):
         yield connected_event
+
+
+def get_nearest_following_event(
+    event: trace_model.Event,
+    following_event_category: str,
+    following_event_name: str,
+) -> trace_model.Event:
+    """Find the nearest target event that is flow connected and follow |event|.
+
+    Args:
+      event: The starting event.
+      following_event_category: Trace category of the target event.
+      following_event_name: Trace event name of the target event.
+
+    Returns:
+      Flow connected events. If nothing is found, None.
+    """
+    filtered_following_events = filter_events(
+        get_following_events(event),
+        category=following_event_category,
+        name=following_event_name,
+        type=trace_model.DurationEvent,
+    )
+    return next(filtered_following_events, None)

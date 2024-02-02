@@ -10,6 +10,7 @@ import unittest
 
 import trace_processing.metrics.cpu as cpu_metrics
 import trace_processing.metrics.fps as fps_metrics
+import trace_processing.metrics.scenic as scenic_metrics
 import trace_processing.trace_importing as trace_importing
 import trace_processing.trace_metrics as trace_metrics
 import trace_processing.trace_model as trace_model
@@ -138,3 +139,54 @@ class TraceMetricsTest(unittest.TestCase):
         self.assertAlmostEqual(aggregated_results[6].values[0], 10000000.0)
         self.assertEqual(aggregated_results[7].label, "FpsAverage")
         self.assertAlmostEqual(aggregated_results[7].values[0], 7500000.0)
+
+    def test_scenic_metrics(self) -> None:
+        model: trace_model.Model = trace_importing.create_model_from_file_path(
+            os.path.join(self._runtime_deps_path, "scenic_metric.json")
+        )
+        results: List[
+            trace_metrics.TestCaseResult
+        ] = scenic_metrics.metrics_processor(model, {})
+        self.assertAlmostEqual(results[0].values[0], 0.09)
+        self.assertAlmostEqual(results[0].values[1], 0.08)
+        self.assertAlmostEqual(results[0].values[2], 0.1)
+        self.assertAlmostEqual(results[1].values[0], 0.11)
+        self.assertAlmostEqual(results[1].values[1], 0.112)
+        aggregated_results: List[
+            trace_metrics.TestCaseResult
+        ] = scenic_metrics.metrics_processor(
+            model, {"aggregateMetricsOnly": True}
+        )
+        self.assertEqual(len(aggregated_results), 16)
+        self.assertEqual(aggregated_results[0].label, "RenderCpuP5")
+        self.assertAlmostEqual(aggregated_results[0].values[0], 0.081)
+        self.assertEqual(aggregated_results[1].label, "RenderCpuP25")
+        self.assertAlmostEqual(aggregated_results[1].values[0], 0.085)
+        self.assertEqual(aggregated_results[2].label, "RenderCpuP50")
+        self.assertAlmostEqual(aggregated_results[2].values[0], 0.09)
+        self.assertEqual(aggregated_results[3].label, "RenderCpuP75")
+        self.assertAlmostEqual(aggregated_results[3].values[0], 0.095)
+        self.assertEqual(aggregated_results[4].label, "RenderCpuP95")
+        self.assertAlmostEqual(aggregated_results[4].values[0], 0.099)
+        self.assertEqual(aggregated_results[5].label, "RenderCpuMin")
+        self.assertAlmostEqual(aggregated_results[5].values[0], 0.08)
+        self.assertEqual(aggregated_results[6].label, "RenderCpuMax")
+        self.assertAlmostEqual(aggregated_results[6].values[0], 0.1)
+        self.assertEqual(aggregated_results[7].label, "RenderCpuAverage")
+        self.assertAlmostEqual(aggregated_results[7].values[0], 0.09)
+        self.assertEqual(aggregated_results[8].label, "RenderTotalP5")
+        self.assertAlmostEqual(aggregated_results[8].values[0], 0.1101)
+        self.assertEqual(aggregated_results[9].label, "RenderTotalP25")
+        self.assertAlmostEqual(aggregated_results[9].values[0], 0.1105)
+        self.assertEqual(aggregated_results[10].label, "RenderTotalP50")
+        self.assertAlmostEqual(aggregated_results[10].values[0], 0.111)
+        self.assertEqual(aggregated_results[11].label, "RenderTotalP75")
+        self.assertAlmostEqual(aggregated_results[11].values[0], 0.1115)
+        self.assertEqual(aggregated_results[12].label, "RenderTotalP95")
+        self.assertAlmostEqual(aggregated_results[12].values[0], 0.1119)
+        self.assertEqual(aggregated_results[13].label, "RenderTotalMin")
+        self.assertAlmostEqual(aggregated_results[13].values[0], 0.11)
+        self.assertEqual(aggregated_results[14].label, "RenderTotalMax")
+        self.assertAlmostEqual(aggregated_results[14].values[0], 0.112)
+        self.assertEqual(aggregated_results[15].label, "RenderTotalAverage")
+        self.assertAlmostEqual(aggregated_results[15].values[0], 0.111)
