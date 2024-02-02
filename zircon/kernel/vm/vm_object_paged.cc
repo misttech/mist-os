@@ -1017,6 +1017,39 @@ zx_status_t VmObjectPaged::CommitRangeInternal(uint64_t offset, uint64_t len, bo
       return commit_status;
     }
 
+    // Handle the contiguous case separately because most of the following code (replacing with
+    // non-loaned pages and dirtying pages) does not apply to contiguous VMOs anyway. More
+    // importantly that code will cancel page requests if required. Contiguous VMOs are backed by a
+    // physical page provider which does not handle page request cancelation well, more specifically
+    // a page request regeneration after cancelation breaks the assumption of all processed page
+    // requests being unique. So avoid cancelation altogether, which is not needed for contiguous
+    // VMOs anyway, as the only page request type we can encounter here are read page requests. More
+    // details can be found in https://fxbug.dev/42080926.
+    if (is_contiguous()) {
+      // Pages owned by contiguous VMOs are by definition non-loaned, so we can directly pin any
+      // committed pages.
+      if (pin && committed_len > 0) {
+        // Verify that we are starting the pin after the previously pinned range, as we do not want
+        // to repeatedly pin the same pages.
+        ASSERT(pinned_end_offset == offset);
+        zx_status_t pin_status = cow_pages_locked()->PinRangeLocked(offset, committed_len);
+        if (pin_status != ZX_OK) {
+          return pin_status;
+        }
+        pinned_end_offset = offset + committed_len;
+      }
+      // Update how much was committed, and then wait on the page request (if any).
+      zx_status_t wait_status = advance_processed_range(
+          committed_len, /*wait_on_page_request=*/commit_status == ZX_ERR_SHOULD_WAIT);
+      if (wait_status != ZX_OK) {
+        return wait_status;
+      }
+      // Continue to the top of the while loop.
+      continue;
+    }
+
+    // We've already handled the contiguous case above.
+    DEBUG_ASSERT(!is_contiguous());
     // If we're required to pin, try to pin the committed range before waiting on the page_request,
     // which has been populated to request pages beyond the committed range.
     // Even though the page_request has already been initialized, we choose to first completely

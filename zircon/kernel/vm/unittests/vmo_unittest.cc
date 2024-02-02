@@ -4197,6 +4197,109 @@ static bool vmo_snapshot_modified_test() {
   END_TEST;
 }
 
+// Regression test for https://fxbug.dev/42080926. Concurrent pinning of different ranges in a
+// contiguous VMO that has its pages loaned.
+static bool vmo_pin_race_loaned_test() {
+  BEGIN_TEST;
+
+  AutoVmScannerDisable scanner_disable;
+
+  const uint32_t kTryCount = 5000;
+  for (uint32_t try_ordinal = 0; try_ordinal < kTryCount; ++try_ordinal) {
+    bool loaning_was_enabled = pmm_physical_page_borrowing_config()->is_loaning_enabled();
+    bool borrowing_was_enabled =
+        pmm_physical_page_borrowing_config()->is_borrowing_in_supplypages_enabled();
+    pmm_physical_page_borrowing_config()->set_loaning_enabled(true);
+    pmm_physical_page_borrowing_config()->set_borrowing_in_supplypages_enabled(true);
+    auto cleanup = fit::defer([loaning_was_enabled, borrowing_was_enabled] {
+      pmm_physical_page_borrowing_config()->set_loaning_enabled(loaning_was_enabled);
+      pmm_physical_page_borrowing_config()->set_borrowing_in_supplypages_enabled(
+          borrowing_was_enabled);
+    });
+
+    const int kNumLoaned = 10;
+    fbl::RefPtr<VmObjectPaged> contiguous_vmo;
+    zx_status_t status = VmObjectPaged::CreateContiguous(
+        PMM_ALLOC_FLAG_ANY, (kNumLoaned + 1) * PAGE_SIZE,
+        /*alignment_log2=*/0, AttributionObject::GetKernelAttribution(), &contiguous_vmo);
+    ASSERT_EQ(ZX_OK, status);
+    vm_page_t* pages[kNumLoaned];
+    for (int i = 0; i < kNumLoaned; i++) {
+      pages[i] = contiguous_vmo->DebugGetPage((i + 1) * PAGE_SIZE);
+    }
+    status = contiguous_vmo->DecommitRange(PAGE_SIZE, kNumLoaned * PAGE_SIZE);
+    ASSERT_TRUE(status == ZX_OK);
+
+    uint32_t iteration_count = 0;
+    const uint32_t kMaxIterations = 1000;
+    int loaned = 0;
+    do {
+      // Create a pager-backed VMO with a single page.
+      fbl::RefPtr<VmObjectPaged> vmo;
+      vm_page_t* page;
+      status = make_committed_pager_vmo(1, /*trap_dirty=*/false, /*resizable=*/false, &page, &vmo);
+      ASSERT_EQ(ZX_OK, status);
+      ++iteration_count;
+      for (int i = 0; i < kNumLoaned; i++) {
+        if (page == pages[i]) {
+          ASSERT_TRUE(page->is_loaned());
+          loaned++;
+        }
+      }
+    } while (loaned < kNumLoaned && iteration_count < kMaxIterations);
+
+    // If we hit this iteration count, something almost certainly went wrong...
+    ASSERT_TRUE(iteration_count < kMaxIterations);
+    ASSERT_EQ(kNumLoaned, loaned);
+
+    Thread* threads[kNumLoaned];
+    struct thread_state {
+      VmObjectPaged* vmo;
+      int index;
+    } states[kNumLoaned];
+
+    for (int i = 0; i < kNumLoaned; i++) {
+      states[i].vmo = contiguous_vmo.get();
+      states[i].index = i;
+      threads[i] = Thread::Create(
+          "worker",
+          [](void* arg) -> int {
+            auto state = static_cast<struct thread_state*>(arg);
+
+            zx_status_t status;
+            if (state->index == 0) {
+              status = state->vmo->CommitRangePinned(0, 2 * PAGE_SIZE, false);
+            } else {
+              status =
+                  state->vmo->CommitRangePinned((state->index + 1) * PAGE_SIZE, PAGE_SIZE, false);
+            }
+            if (status != ZX_OK) {
+              return -1;
+            }
+            return 0;
+          },
+          &states[i], DEFAULT_PRIORITY);
+    }
+
+    for (int i = 0; i < kNumLoaned; i++) {
+      threads[i]->Resume();
+    }
+
+    for (int i = 0; i < kNumLoaned; i++) {
+      int ret;
+      threads[i]->Join(&ret, ZX_TIME_INFINITE);
+      EXPECT_EQ(0, ret);
+    }
+
+    for (int i = 0; i < kNumLoaned; i++) {
+      EXPECT_EQ(pages[i], contiguous_vmo->DebugGetPage((i + 1) * PAGE_SIZE));
+    }
+    contiguous_vmo->Unpin(0, (kNumLoaned + 1) * PAGE_SIZE);
+  }
+
+  END_TEST;
+}
+
 UNITTEST_START_TESTCASE(vmo_tests)
 VM_UNITTEST(vmo_create_test)
 VM_UNITTEST(vmo_create_maximum_size)
@@ -4259,6 +4362,7 @@ VM_UNITTEST(vmo_pinned_wrapper_test)
 VM_UNITTEST(vmo_dedup_dirty_test)
 VM_UNITTEST(vmo_high_priority_reclaim_test)
 VM_UNITTEST(vmo_snapshot_modified_test)
+VM_UNITTEST(vmo_pin_race_loaned_test)
 UNITTEST_END_TESTCASE(vmo_tests, "vmo", "VmObject tests")
 
 }  // namespace vm_unittest

@@ -95,6 +95,11 @@ void PhysicalPageProvider::ClearAsyncRequest(PageRequest* request) {
   // No need to chase down any currently-processing request here, since before processing a request,
   // we stash the values of all fields we need from the PageRequest under the lock.  So any
   // currently-processing request is independent from the PageRequest that started it.
+  //
+  // TODO(https://fxbug.dev/42080926): There is an issue however with not tracking down
+  // currently-processing requests. While the request is being processed, a new request for the same
+  // range can be generated again (since we "canceled" the current one), which will break
+  // assumptions around only ever processing unique ranges. More details in the linked bug.
 }
 
 void PhysicalPageProvider::SwapAsyncRequest(PageRequest* old, PageRequest* new_req) {
