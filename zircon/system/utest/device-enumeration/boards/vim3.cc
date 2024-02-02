@@ -34,8 +34,8 @@ TEST_F(DeviceEnumerationTest, Vim3Test) {
       "sys/platform/05:06:9/ethernet_mac/aml-ethernet/dwmac/dwmac/Designware-MAC/netdevice-migration/network-device",
       "sys/platform/05:06:9/ethernet_mac/aml-ethernet",
       "sys/platform/05:00:7/aml_sd/aml-sd-emmc/sdmmc",
-      "sys/platform/05:00:6/vim3-sdio/aml-sd-emmc/sdmmc/sdmmc-sdio/sdmmc-sdio-1",
-      "sys/platform/05:00:6/vim3-sdio/aml-sd-emmc/sdmmc/sdmmc-sdio/sdmmc-sdio-2",
+      "sys/platform/05:00:6/vim3_sdio/aml-sd-emmc/sdmmc/sdmmc-sdio/sdmmc-sdio-1",
+      "sys/platform/05:00:6/vim3_sdio/aml-sd-emmc/sdmmc/sdmmc-sdio/sdmmc-sdio-2",
       "sys/platform/05:06:1c/aml_nna",
       "sys/platform/00:00:29",  // registers device
       "sys/platform/05:00:10/aml-canvas",
@@ -47,6 +47,9 @@ TEST_F(DeviceEnumerationTest, Vim3Test) {
       "sys/platform/05:06:26/aml-power-impl-composite/power-impl/pd_big_core",
       "sys/platform/05:06:26/aml-power-impl-composite/power-impl/pd_little_core",
       "sys/platform/05:06:26",  // power
+
+      // EMMC
+      "sys/platform/05:00:8/aml_emmc/aml-sd-emmc",
 
       // CPU devices.
       "sys/platform/05:06:1e",
@@ -99,8 +102,8 @@ TEST_F(DeviceEnumerationTest, Vim3Test) {
       "sys/platform/05:00:2/i2c-0/aml-i2c/i2c/i2c-0-81/rtc",
 
       // WLAN
-      "sys/platform/05:00:6/vim3-sdio/aml-sd-emmc/sdmmc/sdmmc-sdio/sdmmc-sdio-1/wifi/brcmfmac-wlanphy",
-      "sys/platform/05:00:6/vim3-sdio/aml-sd-emmc/sdmmc/sdmmc-sdio/sdmmc-sdio-1/wifi/brcmfmac-wlanphy/wlanphy",
+      "sys/platform/05:00:6/vim3_sdio/aml-sd-emmc/sdmmc/sdmmc-sdio/sdmmc-sdio-1/wifi/brcmfmac-wlanphy",
+      "sys/platform/05:00:6/vim3_sdio/aml-sd-emmc/sdmmc/sdmmc-sdio/sdmmc-sdio-1/wifi/brcmfmac-wlanphy/wlanphy",
 
       // GPU
       "sys/platform/05:06:17/aml-gpu-composite/aml-gpu",

@@ -12,18 +12,27 @@
 #include <lib/ddk/device.h>
 #include <lib/ddk/metadata.h>
 #include <lib/ddk/platform-defs.h>
+#include <lib/driver/component/cpp/composite_node_spec.h>
+#include <lib/driver/component/cpp/node_add_args.h>
 #include <lib/mmio/mmio.h>
 #include <lib/zx/handle.h>
 #include <zircon/hw/gpt.h>
 
+#include <bind/fuchsia/amlogic/platform/cpp/bind.h>
+#include <bind/fuchsia/cpp/bind.h>
+#include <bind/fuchsia/gpio/cpp/bind.h>
+#include <bind/fuchsia/platform/cpp/bind.h>
 #include <soc/aml-common/aml-sdmmc.h>
 #include <soc/aml-s905d3/s905d3-gpio.h>
 #include <soc/aml-s905d3/s905d3-hw.h>
 
 #include "nelson-gpios.h"
 #include "nelson.h"
-#include "src/devices/board/drivers/nelson/nelson_emmc_bind.h"
 #include "src/devices/bus/lib/platform-bus-composites/platform-bus-composite.h"
+
+namespace fdf {
+using namespace fuchsia_driver_framework;
+}  // namespace fdf
 
 namespace nelson {
 namespace fpbus = fuchsia_hardware_platform_bus;
@@ -83,6 +92,25 @@ static const std::vector<fpbus::BootMetadata> emmc_boot_metadata{
         .zbi_type = DEVICE_METADATA_PARTITION_MAP,
         .zbi_extra = 0,
     }},
+};
+
+const std::vector<fdf::BindRule> kGpioResetRules = std::vector{
+    fdf::MakeAcceptBindRule(bind_fuchsia::FIDL_PROTOCOL,
+                            bind_fuchsia_gpio::BIND_FIDL_PROTOCOL_SERVICE),
+    fdf::MakeAcceptBindRule(bind_fuchsia::GPIO_PIN, static_cast<uint32_t>(SOC_EMMC_RST_L)),
+};
+
+const std::vector<fdf::NodeProperty> kGpioResetProperties = std::vector{
+    fdf::MakeProperty(bind_fuchsia::FIDL_PROTOCOL, bind_fuchsia_gpio::BIND_FIDL_PROTOCOL_SERVICE),
+    fdf::MakeProperty(bind_fuchsia_gpio::FUNCTION, bind_fuchsia_gpio::FUNCTION_SDMMC_RESET),
+};
+
+const std::vector<fdf::BindRule> kGpioInitRules = std::vector{
+    fdf::MakeAcceptBindRule(bind_fuchsia::INIT_STEP, bind_fuchsia_gpio::BIND_INIT_STEP_GPIO),
+};
+
+const std::vector<fdf::NodeProperty> kGpioInitProperties = std::vector{
+    fdf::MakeProperty(bind_fuchsia::INIT_STEP, bind_fuchsia_gpio::BIND_INIT_STEP_GPIO),
 };
 
 }  // namespace
@@ -162,9 +190,9 @@ zx_status_t Nelson::EmmcInit() {
   static const fpbus::Node emmc_dev = []() {
     fpbus::Node dev = {};
     dev.name() = "nelson-emmc";
-    dev.vid() = PDEV_VID_AMLOGIC;
-    dev.pid() = PDEV_PID_GENERIC;
-    dev.did() = PDEV_DID_AMLOGIC_SDMMC_C;
+    dev.vid() = bind_fuchsia_amlogic_platform::BIND_PLATFORM_DEV_VID_AMLOGIC;
+    dev.pid() = bind_fuchsia_platform::BIND_PLATFORM_DEV_PID_GENERIC;
+    dev.did() = bind_fuchsia_amlogic_platform::BIND_PLATFORM_DEV_DID_SDMMC_C;
     dev.mmio() = emmc_mmios;
     dev.irq() = emmc_irqs;
     dev.bti() = emmc_btis;
@@ -173,19 +201,22 @@ zx_status_t Nelson::EmmcInit() {
     return dev;
   }();
 
+  std::vector<fdf::ParentSpec> kEmmcParents = {
+      fdf::ParentSpec{{kGpioResetRules, kGpioResetProperties}},
+      fdf::ParentSpec{{kGpioInitRules, kGpioInitProperties}}};
+
   fdf::Arena arena('EMMC');
-  auto result = pbus_.buffer(arena)->AddComposite(
+  auto result = pbus_.buffer(arena)->AddCompositeNodeSpec(
       fidl::ToWire(fidl_arena, emmc_dev),
-      platform_bus_composite::MakeFidlFragment(fidl_arena, nelson_emmc_fragments,
-                                               std::size(nelson_emmc_fragments)),
-      "pdev");
+      fidl::ToWire(fidl_arena, fuchsia_driver_framework::CompositeNodeSpec{
+                                   {.name = "nelson_emmc", .parents = kEmmcParents}}));
   if (!result.ok()) {
-    zxlogf(ERROR, "%s: AddComposite Emmc(emmc_dev) request failed: %s", __func__,
+    zxlogf(ERROR, "AddCompositeNodeSpec Emmc(emmc_dev) request failed: %s",
            result.FormatDescription().data());
     return result.status();
   }
   if (result->is_error()) {
-    zxlogf(ERROR, "%s: AddComposite Emmc(emmc_dev) failed: %s", __func__,
+    zxlogf(ERROR, "AddCompositeNodeSpec Emmc(emmc_dev) failed: %s",
            zx_status_get_string(result->error_value()));
     return result->error_value();
   }

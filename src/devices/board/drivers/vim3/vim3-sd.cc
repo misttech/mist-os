@@ -10,15 +10,23 @@
 #include <lib/ddk/debug.h>
 #include <lib/ddk/metadata.h>
 #include <lib/ddk/platform-defs.h>
+#include <lib/driver/component/cpp/composite_node_spec.h>
+#include <lib/driver/component/cpp/node_add_args.h>
 
+#include <bind/fuchsia/amlogic/platform/cpp/bind.h>
 #include <bind/fuchsia/cpp/bind.h>
 #include <bind/fuchsia/gpio/cpp/bind.h>
+#include <bind/fuchsia/platform/cpp/bind.h>
 #include <soc/aml-a311d/a311d-gpio.h>
 #include <soc/aml-a311d/a311d-hw.h>
 #include <soc/aml-common/aml-sdmmc.h>
 
 #include "src/devices/bus/lib/platform-bus-composites/platform-bus-composite.h"
 #include "vim3.h"
+
+namespace fdf {
+using namespace fuchsia_driver_framework;
+}  // namespace fdf
 
 namespace vim3 {
 namespace fpbus = fuchsia_hardware_platform_bus;
@@ -51,14 +59,12 @@ static aml_sdmmc_config_t config = {
     .prefs = 0,
 };
 
-constexpr zx_bind_inst_t sd_gpio_init_match[] = {
-    BI_MATCH_IF(EQ, BIND_INIT_STEP, bind_fuchsia_gpio::BIND_INIT_STEP_GPIO),
+const std::vector<fdf::BindRule> kGpioInitRules = std::vector{
+    fdf::MakeAcceptBindRule(bind_fuchsia::INIT_STEP, bind_fuchsia_gpio::BIND_INIT_STEP_GPIO),
 };
-constexpr device_fragment_part_t sd_gpio_init_fragment[] = {
-    {std::size(sd_gpio_init_match), sd_gpio_init_match},
-};
-constexpr device_fragment_t sd_fragments[] = {
-    {"gpio-init", std::size(sd_gpio_init_fragment), sd_gpio_init_fragment},
+
+const std::vector<fdf::NodeProperty> kGpioInitProperties = std::vector{
+    fdf::MakeProperty(bind_fuchsia::INIT_STEP, bind_fuchsia_gpio::BIND_INIT_STEP_GPIO),
 };
 
 zx_status_t Vim3::SdInit() {
@@ -90,9 +96,9 @@ zx_status_t Vim3::SdInit() {
 
   fpbus::Node sd_dev;
   sd_dev.name() = "aml_sd";
-  sd_dev.vid() = PDEV_VID_AMLOGIC;
-  sd_dev.pid() = PDEV_PID_GENERIC;
-  sd_dev.did() = PDEV_DID_AMLOGIC_SDMMC_B;
+  sd_dev.vid() = bind_fuchsia_amlogic_platform::BIND_PLATFORM_DEV_VID_AMLOGIC;
+  sd_dev.pid() = bind_fuchsia_platform::BIND_PLATFORM_DEV_PID_GENERIC;
+  sd_dev.did() = bind_fuchsia_amlogic_platform::BIND_PLATFORM_DEV_DID_SDMMC_B;
   sd_dev.mmio() = sd_mmios;
   sd_dev.irq() = sd_irqs;
   sd_dev.bti() = sd_btis;
@@ -105,18 +111,21 @@ zx_status_t Vim3::SdInit() {
   gpio_init_steps_.push_back({A311D_GPIOC(4), GpioSetAltFunction(A311D_GPIOC_4_SDCARD_CLK_FN)});
   gpio_init_steps_.push_back({A311D_GPIOC(5), GpioSetAltFunction(A311D_GPIOC_5_SDCARD_CMD_FN)});
 
+  std::vector<fdf::ParentSpec> kSdParents = {
+      fdf::ParentSpec{{kGpioInitRules, kGpioInitProperties}}};
+
   fdf::Arena arena('SD__');
-  auto result = pbus_.buffer(arena)->AddCompositeImplicitPbusFragment(
+  auto result = pbus_.buffer(arena)->AddCompositeNodeSpec(
       fidl::ToWire(fidl_arena, sd_dev),
-      platform_bus_composite::MakeFidlFragment(fidl_arena, sd_fragments, std::size(sd_fragments)),
-      {});
+      fidl::ToWire(fidl_arena, fuchsia_driver_framework::CompositeNodeSpec{
+                                   {.name = "aml_sd", .parents = kSdParents}}));
   if (!result.ok()) {
-    zxlogf(ERROR, "%s: AddCompositeImplicitPbusFragment Sd(sd_dev) request failed: %s", __func__,
+    zxlogf(ERROR, "AddCompositeNodeSpec Sd(sd_dev) request failed: %s",
            result.FormatDescription().data());
     return result.status();
   }
   if (result->is_error()) {
-    zxlogf(ERROR, "%s: AddCompositeImplicitPbusFragment Sd(sd_dev) failed: %s", __func__,
+    zxlogf(ERROR, "AddCompositeNodeSpec Sd(sd_dev) failed: %s",
            zx_status_get_string(result->error_value()));
     return result->error_value();
   }

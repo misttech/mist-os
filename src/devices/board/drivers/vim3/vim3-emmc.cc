@@ -10,14 +10,25 @@
 #include <lib/ddk/debug.h>
 #include <lib/ddk/metadata.h>
 #include <lib/ddk/platform-defs.h>
+#include <lib/driver/component/cpp/composite_node_spec.h>
+#include <lib/driver/component/cpp/node_add_args.h>
 
+#include <bind/fuchsia/amlogic/platform/cpp/bind.h>
+#include <bind/fuchsia/clock/cpp/bind.h>
+#include <bind/fuchsia/cpp/bind.h>
+#include <bind/fuchsia/gpio/cpp/bind.h>
+#include <bind/fuchsia/platform/cpp/bind.h>
 #include <soc/aml-a311d/a311d-gpio.h>
 #include <soc/aml-a311d/a311d-hw.h>
 #include <soc/aml-common/aml-sdmmc.h>
+#include <soc/aml-meson/g12b-clk.h>
 
-#include "src/devices/board/drivers/vim3/vim3-emmc-bind.h"
 #include "src/devices/board/drivers/vim3/vim3.h"
 #include "src/devices/bus/lib/platform-bus-composites/platform-bus-composite.h"
+
+namespace fdf {
+using namespace fuchsia_driver_framework;
+}  // namespace fdf
 
 namespace vim3 {
 namespace fpbus = fuchsia_hardware_platform_bus;
@@ -60,6 +71,35 @@ static const std::vector<fpbus::BootMetadata> emmc_boot_metadata{
     }},
 };
 
+const std::vector<fdf::BindRule> kClockGateRules = std::vector{
+    fdf::MakeAcceptBindRule(bind_fuchsia::FIDL_PROTOCOL,
+                            bind_fuchsia_clock::BIND_FIDL_PROTOCOL_SERVICE),
+    fdf::MakeAcceptBindRule(bind_fuchsia::CLOCK_ID, g12b_clk::G12B_CLK_EMMC_C),
+};
+
+const std::vector<fdf::NodeProperty> kClockGateProperties = std::vector{
+    fdf::MakeProperty(bind_fuchsia::FIDL_PROTOCOL, bind_fuchsia_clock::BIND_FIDL_PROTOCOL_SERVICE),
+};
+
+const std::vector<fdf::BindRule> kGpioResetRules = std::vector{
+    fdf::MakeAcceptBindRule(bind_fuchsia::FIDL_PROTOCOL,
+                            bind_fuchsia_gpio::BIND_FIDL_PROTOCOL_SERVICE),
+    fdf::MakeAcceptBindRule(bind_fuchsia::GPIO_PIN, static_cast<uint32_t>(A311D_GPIOBOOT(12))),
+};
+
+const std::vector<fdf::NodeProperty> kGpioResetProperties = std::vector{
+    fdf::MakeProperty(bind_fuchsia::FIDL_PROTOCOL, bind_fuchsia_gpio::BIND_FIDL_PROTOCOL_SERVICE),
+    fdf::MakeProperty(bind_fuchsia_gpio::FUNCTION, bind_fuchsia_gpio::FUNCTION_SDMMC_RESET),
+};
+
+const std::vector<fdf::BindRule> kGpioInitRules = std::vector{
+    fdf::MakeAcceptBindRule(bind_fuchsia::INIT_STEP, bind_fuchsia_gpio::BIND_INIT_STEP_GPIO),
+};
+
+const std::vector<fdf::NodeProperty> kGpioInitProperties = std::vector{
+    fdf::MakeProperty(bind_fuchsia::INIT_STEP, bind_fuchsia_gpio::BIND_INIT_STEP_GPIO),
+};
+
 zx_status_t Vim3::EmmcInit() {
   fidl::Arena<> fidl_arena;
 
@@ -88,9 +128,9 @@ zx_status_t Vim3::EmmcInit() {
 
   fpbus::Node emmc_dev;
   emmc_dev.name() = "aml_emmc";
-  emmc_dev.vid() = PDEV_VID_AMLOGIC;
-  emmc_dev.pid() = PDEV_PID_GENERIC;
-  emmc_dev.did() = PDEV_DID_AMLOGIC_SDMMC_C;
+  emmc_dev.vid() = bind_fuchsia_amlogic_platform::BIND_PLATFORM_DEV_VID_AMLOGIC;
+  emmc_dev.pid() = bind_fuchsia_platform::BIND_PLATFORM_DEV_PID_GENERIC;
+  emmc_dev.did() = bind_fuchsia_amlogic_platform::BIND_PLATFORM_DEV_DID_SDMMC_C;
   emmc_dev.mmio() = emmc_mmios;
   emmc_dev.irq() = emmc_irqs;
   emmc_dev.bti() = emmc_btis;
@@ -115,19 +155,23 @@ zx_status_t Vim3::EmmcInit() {
 
   gpio_init_steps_.push_back({A311D_GPIOBOOT(14), GpioConfigOut(1)});
 
+  std::vector<fdf::ParentSpec> kEmmcParents = {
+      fdf::ParentSpec{{kClockGateRules, kClockGateProperties}},
+      fdf::ParentSpec{{kGpioInitRules, kGpioInitProperties}},
+      fdf::ParentSpec{{kGpioResetRules, kGpioResetProperties}}};
+
   fdf::Arena arena('EMMC');
-  auto result = pbus_.buffer(arena)->AddComposite(
+  auto result = pbus_.buffer(arena)->AddCompositeNodeSpec(
       fidl::ToWire(fidl_arena, emmc_dev),
-      platform_bus_composite::MakeFidlFragment(fidl_arena, vim3_emmc_fragments,
-                                               std::size(vim3_emmc_fragments)),
-      "pdev");
+      fidl::ToWire(fidl_arena, fuchsia_driver_framework::CompositeNodeSpec{
+                                   {.name = "aml_emmc", .parents = kEmmcParents}}));
   if (!result.ok()) {
-    zxlogf(ERROR, "%s: AddComposite Emmc(emmc_dev) request failed: %s", __func__,
+    zxlogf(ERROR, "AddCompositeNodeSpec Emmc(emmc_dev) request failed: %s",
            result.FormatDescription().data());
     return result.status();
   }
   if (result->is_error()) {
-    zxlogf(ERROR, "%s: AddComposite Emmc(emmc_dev) failed: %s", __func__,
+    zxlogf(ERROR, "AddCompositeNodeSpec Emmc(emmc_dev) failed: %s",
            zx_status_get_string(result->error_value()));
     return result->error_value();
   }

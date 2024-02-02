@@ -38,10 +38,10 @@ TEST_F(DeviceEnumerationTest, AstroTest) {
       "sys/platform/05:00:f/raw_nand/aml-raw_nand/nand/zircon-r/skip-block",
       "sys/platform/05:00:f/raw_nand/aml-raw_nand/nand/sys-config/skip-block",
       "sys/platform/05:00:f/raw_nand/aml-raw_nand/nand/migration/skip-block",
-      "sys/platform/05:00:7/aml-sdio/aml-sd-emmc/sdmmc",
-      "sys/platform/05:00:7/aml-sdio/aml-sd-emmc/sdmmc/sdmmc-sdio",
-      "sys/platform/05:00:7/aml-sdio/aml-sd-emmc/sdmmc/sdmmc-sdio/sdmmc-sdio-1",
-      "sys/platform/05:00:7/aml-sdio/aml-sd-emmc/sdmmc/sdmmc-sdio/sdmmc-sdio-2",
+      "sys/platform/05:00:7/aml_sdio/aml-sd-emmc/sdmmc",
+      "sys/platform/05:00:7/aml_sdio/aml-sd-emmc/sdmmc/sdmmc-sdio",
+      "sys/platform/05:00:7/aml_sdio/aml-sd-emmc/sdmmc/sdmmc-sdio/sdmmc-sdio-1",
+      "sys/platform/05:00:7/aml_sdio/aml-sd-emmc/sdmmc/sdmmc-sdio/sdmmc-sdio-2",
 
       "sys/platform/05:00:2/i2c-0/aml-i2c/i2c/i2c-0-57/tcs3400_light/tcs-3400",
       "sys/platform/05:03:11/clocks",
@@ -90,8 +90,8 @@ TEST_F(DeviceEnumerationTest, AstroTest) {
       "sys/platform/05:03:e/aml_video",
 
       // WLAN
-      "sys/platform/05:00:7/aml-sdio/aml-sd-emmc/sdmmc/sdmmc-sdio/sdmmc-sdio-1/wifi/brcmfmac-wlanphy",
-      "sys/platform/05:00:7/aml-sdio/aml-sd-emmc/sdmmc/sdmmc-sdio/sdmmc-sdio-1/wifi/brcmfmac-wlanphy/wlanphy",
+      "sys/platform/05:00:7/aml_sdio/aml-sd-emmc/sdmmc/sdmmc-sdio/sdmmc-sdio-1/wifi/brcmfmac-wlanphy",
+      "sys/platform/05:00:7/aml_sdio/aml-sd-emmc/sdmmc/sdmmc-sdio/sdmmc-sdio-1/wifi/brcmfmac-wlanphy/wlanphy",
 #endif
 
   };

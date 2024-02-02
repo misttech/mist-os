@@ -9,11 +9,18 @@
 #include <lib/ddk/debug.h>
 #include <lib/ddk/metadata.h>
 #include <lib/ddk/platform-defs.h>
+#include <lib/driver/component/cpp/composite_node_spec.h>
+#include <lib/driver/component/cpp/node_add_args.h>
 #include <lib/mmio/mmio.h>
 #include <lib/zx/handle.h>
 
 #include <optional>
 
+#include <bind/fuchsia/amlogic/platform/cpp/bind.h>
+#include <bind/fuchsia/cpp/bind.h>
+#include <bind/fuchsia/gpio/cpp/bind.h>
+#include <bind/fuchsia/platform/cpp/bind.h>
+#include <bind/fuchsia/pwm/cpp/bind.h>
 #include <fbl/algorithm.h>
 #include <hwreg/bitfields.h>
 #include <soc/aml-common/aml-sdmmc.h>
@@ -22,9 +29,12 @@
 #include <wifi/wifi-config.h>
 
 #include "sherlock.h"
-#include "src/devices/board/drivers/sherlock/sherlock-sdio-bind.h"
 #include "src/devices/board/drivers/sherlock/sherlock-wifi-bind.h"
 #include "src/devices/bus/lib/platform-bus-composites/platform-bus-composite.h"
+
+namespace fdf {
+using namespace fuchsia_driver_framework;
+}  // namespace fdf
 
 namespace sherlock {
 namespace fpbus = fuchsia_hardware_platform_bus;
@@ -115,6 +125,33 @@ static const std::vector<fpbus::Metadata> wifi_metadata{
     }},
 };
 
+const std::vector<fdf::BindRule> kPwmRules = std::vector{
+    fdf::MakeAcceptBindRule(bind_fuchsia::INIT_STEP, bind_fuchsia_pwm::BIND_INIT_STEP_PWM),
+};
+
+const std::vector<fdf::NodeProperty> kPwmProperties = std::vector{
+    fdf::MakeProperty(bind_fuchsia::INIT_STEP, bind_fuchsia_pwm::BIND_INIT_STEP_PWM),
+};
+
+const std::vector<fdf::BindRule> kGpioResetRules = std::vector{
+    fdf::MakeAcceptBindRule(bind_fuchsia::FIDL_PROTOCOL,
+                            bind_fuchsia_gpio::BIND_FIDL_PROTOCOL_SERVICE),
+    fdf::MakeAcceptBindRule(bind_fuchsia::GPIO_PIN, static_cast<uint32_t>(T931_WIFI_REG_ON)),
+};
+
+const std::vector<fdf::NodeProperty> kGpioResetProperties = std::vector{
+    fdf::MakeProperty(bind_fuchsia::FIDL_PROTOCOL, bind_fuchsia_gpio::BIND_FIDL_PROTOCOL_SERVICE),
+    fdf::MakeProperty(bind_fuchsia_gpio::FUNCTION, bind_fuchsia_gpio::FUNCTION_SDMMC_RESET),
+};
+
+const std::vector<fdf::BindRule> kGpioInitRules = std::vector{
+    fdf::MakeAcceptBindRule(bind_fuchsia::INIT_STEP, bind_fuchsia_gpio::BIND_INIT_STEP_GPIO),
+};
+
+const std::vector<fdf::NodeProperty> kGpioInitProperties = std::vector{
+    fdf::MakeProperty(bind_fuchsia::INIT_STEP, bind_fuchsia_gpio::BIND_INIT_STEP_GPIO),
+};
+
 }  // namespace
 
 zx_status_t Sherlock::SdioInit() {
@@ -146,9 +183,9 @@ zx_status_t Sherlock::SdioInit() {
 
   fpbus::Node sdio_dev;
   sdio_dev.name() = "sherlock-sd-emmc";
-  sdio_dev.vid() = PDEV_VID_AMLOGIC;
-  sdio_dev.pid() = PDEV_PID_GENERIC;
-  sdio_dev.did() = PDEV_DID_AMLOGIC_SDMMC_A;
+  sdio_dev.vid() = bind_fuchsia_amlogic_platform::BIND_PLATFORM_DEV_VID_AMLOGIC;
+  sdio_dev.pid() = bind_fuchsia_platform::BIND_PLATFORM_DEV_PID_GENERIC;
+  sdio_dev.did() = bind_fuchsia_amlogic_platform::BIND_PLATFORM_DEV_DID_SDMMC_A;
   sdio_dev.mmio() = sd_emmc_mmios;
   sdio_dev.bti() = sd_emmc_btis;
   sdio_dev.irq() = sd_emmc_irqs;
@@ -191,20 +228,26 @@ zx_status_t Sherlock::SdioInit() {
   gpio_init_steps_.push_back({T931_WIFI_REG_ON, GpioSetAltFunction(T931_WIFI_REG_ON_FN)});
   gpio_init_steps_.push_back({T931_WIFI_HOST_WAKE, GpioSetAltFunction(T931_WIFI_HOST_WAKE_FN)});
 
+  std::vector<fdf::ParentSpec> kSdioParents = {
+      fdf::ParentSpec{{kPwmRules, kPwmProperties}},
+      fdf::ParentSpec{{kGpioInitRules, kGpioInitProperties}},
+      fdf::ParentSpec{{kGpioResetRules, kGpioResetProperties}}};
+
   fdf::Arena sdio_arena('SDIO');
-  auto result = pbus_.buffer(sdio_arena)
-                    ->AddComposite(fidl::ToWire(fidl_arena, sdio_dev),
-                                   platform_bus_composite::MakeFidlFragment(
-                                       fidl_arena, sherlock_sd_emmc_fragments,
-                                       std::size(sherlock_sd_emmc_fragments)),
-                                   "pdev");
+  auto result =
+      pbus_.buffer(sdio_arena)
+          ->AddCompositeNodeSpec(
+              fidl::ToWire(fidl_arena, sdio_dev),
+              fidl::ToWire(fidl_arena, fuchsia_driver_framework::CompositeNodeSpec{
+                                           {.name = "sherlock_sd_emmc", .parents = kSdioParents}}));
+
   if (!result.ok()) {
-    zxlogf(ERROR, "%s: AddComposite Sdio(sdio_dev) request failed: %s", __func__,
+    zxlogf(ERROR, "AddCompositeNodeSpec Sdio(sdio_dev) request failed: %s",
            result.FormatDescription().data());
     return result.status();
   }
   if (result->is_error()) {
-    zxlogf(ERROR, "%s: AddComposite Sdio(sdio_dev) failed: %s", __func__,
+    zxlogf(ERROR, "AddCompositeNodeSpec Sdio(sdio_dev) failed: %s",
            zx_status_get_string(result->error_value()));
     return result->error_value();
   }

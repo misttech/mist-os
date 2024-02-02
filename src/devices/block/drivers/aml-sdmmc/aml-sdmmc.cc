@@ -303,15 +303,13 @@ zx::result<> AmlSdmmc::InitResources(
   }
 
   // Optional protocol.
-  const char* kGpioWifiFragmentNames[2] = {"gpio-wifi-power-on", "gpio"};
-  for (const char* fragment : kGpioWifiFragmentNames) {
-    zx::result result = incoming()->Connect<fuchsia_hardware_gpio::Service::Device>(fragment);
-    if (result.is_ok() && result->is_valid()) {
-      auto gpio = fidl::WireSyncClient<fuchsia_hardware_gpio::Gpio>(std::move(result.value()));
-      if (gpio->GetName().ok()) {
-        reset_gpio_ = std::move(gpio);
-        break;
-      }
+  const char* kGpioFragmentName = "gpio-reset";
+  zx::result gpio_result =
+      incoming()->Connect<fuchsia_hardware_gpio::Service::Device>(kGpioFragmentName);
+  if (gpio_result.is_ok() && gpio_result->is_valid()) {
+    auto gpio = fidl::WireSyncClient<fuchsia_hardware_gpio::Gpio>(std::move(gpio_result.value()));
+    if (gpio->GetName().ok()) {
+      reset_gpio_ = std::move(gpio);
     }
   }
 

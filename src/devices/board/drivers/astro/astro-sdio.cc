@@ -9,9 +9,16 @@
 #include <lib/ddk/debug.h>
 #include <lib/ddk/metadata.h>
 #include <lib/ddk/platform-defs.h>
+#include <lib/driver/component/cpp/composite_node_spec.h>
+#include <lib/driver/component/cpp/node_add_args.h>
 #include <lib/mmio/mmio.h>
 #include <lib/zircon-internal/align.h>
 
+#include <bind/fuchsia/amlogic/platform/cpp/bind.h>
+#include <bind/fuchsia/cpp/bind.h>
+#include <bind/fuchsia/gpio/cpp/bind.h>
+#include <bind/fuchsia/platform/cpp/bind.h>
+#include <bind/fuchsia/pwm/cpp/bind.h>
 #include <fbl/algorithm.h>
 #include <soc/aml-common/aml-sdmmc.h>
 #include <soc/aml-s905d2/s905d2-gpio.h>
@@ -20,9 +27,12 @@
 
 #include "astro-gpios.h"
 #include "astro.h"
-#include "src/devices/board/drivers/astro/astro-aml-sdio-bind.h"
 #include "src/devices/board/drivers/astro/astro-wifi-bind.h"
 #include "src/devices/bus/lib/platform-bus-composites/platform-bus-composite.h"
+
+namespace fdf {
+using namespace fuchsia_driver_framework;
+}  // namespace fdf
 
 namespace astro {
 namespace fpbus = fuchsia_hardware_platform_bus;
@@ -106,6 +116,33 @@ static const std::vector<fpbus::Metadata> wifi_metadata{
             reinterpret_cast<const uint8_t*>(&wifi_config),
             reinterpret_cast<const uint8_t*>(&wifi_config) + sizeof(wifi_config)),
     }},
+};
+
+const std::vector<fdf::BindRule> kPwmRules = std::vector{
+    fdf::MakeAcceptBindRule(bind_fuchsia::INIT_STEP, bind_fuchsia_pwm::BIND_INIT_STEP_PWM),
+};
+
+const std::vector<fdf::NodeProperty> kPwmProperties = std::vector{
+    fdf::MakeProperty(bind_fuchsia::INIT_STEP, bind_fuchsia_pwm::BIND_INIT_STEP_PWM),
+};
+
+const std::vector<fdf::BindRule> kGpioResetRules = std::vector{
+    fdf::MakeAcceptBindRule(bind_fuchsia::FIDL_PROTOCOL,
+                            bind_fuchsia_gpio::BIND_FIDL_PROTOCOL_SERVICE),
+    fdf::MakeAcceptBindRule(bind_fuchsia::GPIO_PIN, static_cast<uint32_t>(GPIO_SDIO_RESET)),
+};
+
+const std::vector<fdf::NodeProperty> kGpioResetProperties = std::vector{
+    fdf::MakeProperty(bind_fuchsia::FIDL_PROTOCOL, bind_fuchsia_gpio::BIND_FIDL_PROTOCOL_SERVICE),
+    fdf::MakeProperty(bind_fuchsia_gpio::FUNCTION, bind_fuchsia_gpio::FUNCTION_SDMMC_RESET),
+};
+
+const std::vector<fdf::BindRule> kGpioInitRules = std::vector{
+    fdf::MakeAcceptBindRule(bind_fuchsia::INIT_STEP, bind_fuchsia_gpio::BIND_INIT_STEP_GPIO),
+};
+
+const std::vector<fdf::NodeProperty> kGpioInitProperties = std::vector{
+    fdf::MakeProperty(bind_fuchsia::INIT_STEP, bind_fuchsia_gpio::BIND_INIT_STEP_GPIO),
 };
 
 zx_status_t Astro::SdEmmcConfigurePortB() {
@@ -219,9 +256,9 @@ zx_status_t Astro::SdioInit() {
 
   fpbus::Node sd_emmc_dev;
   sd_emmc_dev.name() = "aml-sdio";
-  sd_emmc_dev.vid() = PDEV_VID_AMLOGIC;
-  sd_emmc_dev.pid() = PDEV_PID_GENERIC;
-  sd_emmc_dev.did() = PDEV_DID_AMLOGIC_SDMMC_B;
+  sd_emmc_dev.vid() = bind_fuchsia_amlogic_platform::BIND_PLATFORM_DEV_VID_AMLOGIC;
+  sd_emmc_dev.pid() = bind_fuchsia_platform::BIND_PLATFORM_DEV_PID_GENERIC;
+  sd_emmc_dev.did() = bind_fuchsia_amlogic_platform::BIND_PLATFORM_DEV_DID_SDMMC_B;
   sd_emmc_dev.mmio() = sd_emmc_mmios;
   sd_emmc_dev.irq() = sd_emmc_irqs;
   sd_emmc_dev.bti() = sd_emmc_btis;
@@ -229,20 +266,25 @@ zx_status_t Astro::SdioInit() {
 
   SdEmmcConfigurePortB();
 
+  std::vector<fdf::ParentSpec> kSdioParents = {
+      fdf::ParentSpec{{kPwmRules, kPwmProperties}},
+      fdf::ParentSpec{{kGpioInitRules, kGpioInitProperties}},
+      fdf::ParentSpec{{kGpioResetRules, kGpioResetProperties}}};
+
   fdf::Arena sdio_arena('SDIO');
   auto result =
       pbus_.buffer(sdio_arena)
-          ->AddComposite(fidl::ToWire(fidl_arena, sd_emmc_dev),
-                         platform_bus_composite::MakeFidlFragment(fidl_arena, aml_sdio_fragments,
-                                                                  std::size(aml_sdio_fragments)),
-                         "pdev");
+          ->AddCompositeNodeSpec(
+              fidl::ToWire(fidl_arena, sd_emmc_dev),
+              fidl::ToWire(fidl_arena, fuchsia_driver_framework::CompositeNodeSpec{
+                                           {.name = "aml_sdio", .parents = kSdioParents}}));
   if (!result.ok()) {
-    zxlogf(ERROR, "%s: AddComposite Sdio(sd_emmc_dev) request failed: %s", __func__,
+    zxlogf(ERROR, "AddCompositeNodeSpec Sdio(sd_emmc_dev) request failed: %s",
            result.FormatDescription().data());
     return result.status();
   }
   if (result->is_error()) {
-    zxlogf(ERROR, "%s: AddComposite Sdio(sd_emmc_dev) failed: %s", __func__,
+    zxlogf(ERROR, "AddCompositeNodeSpec Sdio(sd_emmc_dev) failed: %s",
            zx_status_get_string(result->error_value()));
     return result->error_value();
   }

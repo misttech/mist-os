@@ -12,17 +12,26 @@
 #include <lib/ddk/device.h>
 #include <lib/ddk/metadata.h>
 #include <lib/ddk/platform-defs.h>
+#include <lib/driver/component/cpp/composite_node_spec.h>
+#include <lib/driver/component/cpp/node_add_args.h>
 #include <lib/mmio/mmio.h>
 #include <lib/zx/handle.h>
 #include <zircon/hw/gpt.h>
 
+#include <bind/fuchsia/amlogic/platform/cpp/bind.h>
+#include <bind/fuchsia/cpp/bind.h>
+#include <bind/fuchsia/gpio/cpp/bind.h>
+#include <bind/fuchsia/platform/cpp/bind.h>
 #include <soc/aml-common/aml-sdmmc.h>
 #include <soc/aml-t931/t931-gpio.h>
 #include <soc/aml-t931/t931-hw.h>
 
 #include "sherlock.h"
-#include "src/devices/board/drivers/sherlock/sherlock-emmc-bind.h"
 #include "src/devices/bus/lib/platform-bus-composites/platform-bus-composite.h"
+
+namespace fdf {
+using namespace fuchsia_driver_framework;
+}  // namespace fdf
 
 namespace sherlock {
 namespace fpbus = fuchsia_hardware_platform_bus;
@@ -76,6 +85,25 @@ static const std::vector<fpbus::BootMetadata> emmc_boot_metadata{
         .zbi_type = DEVICE_METADATA_PARTITION_MAP,
         .zbi_extra = 0,
     }},
+};
+
+const std::vector<fdf::BindRule> kGpioResetRules = std::vector{
+    fdf::MakeAcceptBindRule(bind_fuchsia::FIDL_PROTOCOL,
+                            bind_fuchsia_gpio::BIND_FIDL_PROTOCOL_SERVICE),
+    fdf::MakeAcceptBindRule(bind_fuchsia::GPIO_PIN, static_cast<uint32_t>(T931_EMMC_RST)),
+};
+
+const std::vector<fdf::NodeProperty> kGpioResetProperties = std::vector{
+    fdf::MakeProperty(bind_fuchsia::FIDL_PROTOCOL, bind_fuchsia_gpio::BIND_FIDL_PROTOCOL_SERVICE),
+    fdf::MakeProperty(bind_fuchsia_gpio::FUNCTION, bind_fuchsia_gpio::FUNCTION_SDMMC_RESET),
+};
+
+const std::vector<fdf::BindRule> kGpioInitRules = std::vector{
+    fdf::MakeAcceptBindRule(bind_fuchsia::INIT_STEP, bind_fuchsia_gpio::BIND_INIT_STEP_GPIO),
+};
+
+const std::vector<fdf::NodeProperty> kGpioInitProperties = std::vector{
+    fdf::MakeProperty(bind_fuchsia::INIT_STEP, bind_fuchsia_gpio::BIND_INIT_STEP_GPIO),
 };
 
 }  // namespace
@@ -181,28 +209,31 @@ zx_status_t Sherlock::EmmcInit() {
 
   fpbus::Node emmc_dev;
   emmc_dev.name() = "sherlock-emmc";
-  emmc_dev.vid() = PDEV_VID_AMLOGIC;
-  emmc_dev.pid() = PDEV_PID_GENERIC;
-  emmc_dev.did() = PDEV_DID_AMLOGIC_SDMMC_C;
+  emmc_dev.vid() = bind_fuchsia_amlogic_platform::BIND_PLATFORM_DEV_VID_AMLOGIC;
+  emmc_dev.pid() = bind_fuchsia_platform::BIND_PLATFORM_DEV_PID_GENERIC;
+  emmc_dev.did() = bind_fuchsia_amlogic_platform::BIND_PLATFORM_DEV_DID_SDMMC_C;
   emmc_dev.mmio() = emmc_mmios;
   emmc_dev.irq() = emmc_irqs;
   emmc_dev.bti() = emmc_btis;
   emmc_dev.metadata() = sherlock_emmc_metadata;
   emmc_dev.boot_metadata() = emmc_boot_metadata;
 
+  std::vector<fdf::ParentSpec> kEmmcParents = {
+      fdf::ParentSpec{{kGpioResetRules, kGpioResetProperties}},
+      fdf::ParentSpec{{kGpioInitRules, kGpioInitProperties}}};
+
   fdf::Arena arena('EMMC');
-  auto result = pbus_.buffer(arena)->AddComposite(
+  auto result = pbus_.buffer(arena)->AddCompositeNodeSpec(
       fidl::ToWire(fidl_arena, emmc_dev),
-      platform_bus_composite::MakeFidlFragment(fidl_arena, sherlock_emmc_fragments,
-                                               std::size(sherlock_emmc_fragments)),
-      "pdev");
+      fidl::ToWire(fidl_arena, fuchsia_driver_framework::CompositeNodeSpec{
+                                   {.name = "sherlock_emmc", .parents = kEmmcParents}}));
   if (!result.ok()) {
-    zxlogf(ERROR, "%s: AddComposite Emmc(emmc_dev) request failed: %s", __func__,
+    zxlogf(ERROR, "AddCompositeNodeSpec Emmc(emmc_dev) request failed: %s",
            result.FormatDescription().data());
     return result.status();
   }
   if (result->is_error()) {
-    zxlogf(ERROR, "%s: AddComposite Emmc(emmc_dev) failed: %s", __func__,
+    zxlogf(ERROR, "AddCompositeNodeSpec Emmc(emmc_dev) failed: %s",
            zx_status_get_string(result->error_value()));
     return result->error_value();
   }
