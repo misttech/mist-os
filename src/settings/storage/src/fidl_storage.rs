@@ -407,7 +407,6 @@ mod tests {
     use assert_matches::assert_matches;
     use fasync::TestExecutor;
     use fidl::endpoints::{create_proxy, ServerEnd};
-    use fidl::Vmo;
     use fidl_fuchsia_io::DirectoryMarker;
     use fidl_test_storage::{TestStruct, WrongStruct};
     use fuchsia_async as fasync;
@@ -440,10 +439,7 @@ mod tests {
         }
     }
 
-    fn serve_vfs_dir(
-        root: Arc<impl DirectoryEntry>,
-    ) -> (DirectoryProxy, Arc<Mutex<HashMap<String, Vmo>>>) {
-        let vmo_map = Arc::new(Mutex::new(HashMap::new()));
+    fn serve_vfs_dir(root: Arc<impl DirectoryEntry>) -> DirectoryProxy {
         let fs_scope = ExecutionScope::build()
             .entry_constructor(tree_constructor(move |_, _| {
                 Ok(read_write(b"", /*capacity*/ Some(100)))
@@ -456,7 +452,7 @@ mod tests {
             vfs::path::Path::dot(),
             ServerEnd::new(server.into_channel()),
         );
-        (client, vmo_map)
+        client
     }
 
     #[fasync::run_until_stalled(test)]
@@ -466,7 +462,7 @@ mod tests {
         let fs = mut_pseudo_directory! {
             "xyz.pfidl" => read_write(content, /*capacity*/ None),
         };
-        let (storage_dir, _vmo_map) = serve_vfs_dir(fs);
+        let storage_dir = serve_vfs_dir(fs);
         let (storage, sync_tasks) =
             FidlStorage::with_file_proxy(vec![TestStruct::KEY], storage_dir, move |_| {
                 Ok((String::from("xyz_temp.pfidl"), String::from("xyz.pfidl")))
@@ -484,7 +480,7 @@ mod tests {
     #[fasync::run_until_stalled(test)]
     async fn test_get_default() {
         let fs = mut_pseudo_directory! {};
-        let (storage_dir, _vmo_map) = serve_vfs_dir(fs);
+        let storage_dir = serve_vfs_dir(fs);
 
         let (storage, sync_tasks) =
             FidlStorage::with_file_proxy(vec![TestStruct::KEY], storage_dir, move |_| {
@@ -507,7 +503,7 @@ mod tests {
         executor.set_fake_time(Time::from_nanos(0));
 
         let fs = mut_pseudo_directory! {};
-        let (storage_dir, _vmo_map) = serve_vfs_dir(fs);
+        let storage_dir = serve_vfs_dir(fs);
 
         let storage_fut = FidlStorage::with_file_proxy(
             vec![TestStruct::KEY],
@@ -586,7 +582,7 @@ mod tests {
         executor.set_fake_time(Time::from_nanos(0));
 
         let fs = mut_pseudo_directory! {};
-        let (storage_dir, _vmo_map) = serve_vfs_dir(fs);
+        let storage_dir = serve_vfs_dir(fs);
 
         let storage_fut = FidlStorage::with_file_proxy(
             vec![TestStruct::KEY],
@@ -747,7 +743,7 @@ mod tests {
     #[fasync::run_until_stalled(test)]
     async fn test_write_with_mismatch_type_returns_error() {
         let fs = mut_pseudo_directory! {};
-        let (storage_dir, _vmo_map) = serve_vfs_dir(fs);
+        let storage_dir = serve_vfs_dir(fs);
 
         let (storage, sync_tasks) =
             FidlStorage::with_file_proxy(vec![TestStruct::KEY], storage_dir, move |_| {
@@ -814,7 +810,7 @@ mod tests {
         executor.set_fake_time(Time::from_nanos(0));
 
         let fs = mut_pseudo_directory! {};
-        let (storage_dir, _vmo_map) = serve_vfs_dir(fs);
+        let storage_dir = serve_vfs_dir(fs);
 
         let storage_fut = FidlStorage::with_file_proxy(
             vec![TestStruct::KEY],
@@ -891,12 +887,8 @@ mod tests {
         assert_file!(executor, storage_dir, "xyz.pfidl", value_to_write3);
     }
 
-    fn serve_full_vfs_dir(
-        root: Arc<impl DirectoryEntry>,
-        recovers_after: usize,
-    ) -> (DirectoryProxy, Arc<Mutex<HashMap<String, Vmo>>>) {
+    fn serve_full_vfs_dir(root: Arc<impl DirectoryEntry>, recovers_after: usize) -> DirectoryProxy {
         let attempts = std::sync::Mutex::new(0);
-        let vmo_map = Arc::new(Mutex::new(HashMap::new()));
         let fs_scope = ExecutionScope::build()
             .entry_constructor(tree_constructor(move |_, file_name| {
                 let mut attempts_guard = attempts.lock().unwrap();
@@ -916,7 +908,7 @@ mod tests {
             vfs::path::Path::dot(),
             ServerEnd::new(server.into_channel()),
         );
-        (client, vmo_map)
+        client
     }
 
     // Tests that syncing can recover after a failed write. The test cases list the number of failed
@@ -942,7 +934,7 @@ mod tests {
 
         let fs = mut_pseudo_directory! {};
         // This served directory will allow writes after `retry_count` failed attempts.
-        let (storage_dir, _) = serve_full_vfs_dir(fs, retry_count);
+        let storage_dir = serve_full_vfs_dir(fs, retry_count);
 
         let expected_data = vec![1];
         let cached_storage = Arc::new(Mutex::new(CachedStorage {
