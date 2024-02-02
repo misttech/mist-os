@@ -17,6 +17,7 @@ rustc_library("ubpf") {
     "src/converter.rs",
     "src/error.rs",
     "src/lib.rs",
+    "src/maps.rs",
     "src/program.rs",
     "src/ubpf.rs",
     "src/verifier.rs",

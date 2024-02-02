@@ -2,15 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use linux_uapi::{bpf_insn, c_void, sock_filter};
-
 use crate::{
     converter::cbpf_to_ebpf,
     ubpf::{ubpf_create, ubpf_destroy, ubpf_exec, ubpf_load, ubpf_register, ubpf_vm},
     verifier::verify,
-    UbpfError,
+    CallingContext, MapSchema, UbpfError,
     UbpfError::*,
 };
+use linux_uapi::{bpf_insn, c_void, sock_filter};
 
 // This file contains wrapper logic to build programs and execute
 // them in the ubpf VM.
@@ -18,6 +17,7 @@ use crate::{
 #[derive(Debug)]
 pub struct UbpfVmBuilder {
     vm: *mut ubpf_vm,
+    calling_context: CallingContext,
 }
 
 extern "C" fn ubpf_stub_callback() {
@@ -30,7 +30,11 @@ impl UbpfVmBuilder {
         if vm == std::ptr::null_mut() {
             return Err(VmInitialization);
         }
-        Ok(UbpfVmBuilder { vm })
+        Ok(UbpfVmBuilder { vm, calling_context: Default::default() })
+    }
+
+    pub fn register_map_reference(&mut self, pc: usize, schema: MapSchema) {
+        self.calling_context.register_map_reference(pc, schema);
     }
 
     // This function signature will need more parameters eventually. The client needs to be able to
@@ -55,7 +59,7 @@ impl UbpfVmBuilder {
     }
 
     pub fn load(self, mut code: Vec<bpf_insn>) -> Result<UbpfVm, UbpfError> {
-        verify(&code)?;
+        verify(&code, self.calling_context)?;
         unsafe {
             let mut errmsg = std::ptr::null_mut();
             let success = ubpf_load(

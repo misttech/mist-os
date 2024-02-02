@@ -8,7 +8,7 @@
 use crate::{
     bpf::{
         fs::{get_bpf_object, get_selinux_context, BpfFsDir, BpfFsObject, BpfHandle, BpfObject},
-        map::{Map, MapSchema, MapStore},
+        map::{Map, MapStore},
         program::Program,
     },
     mm::{MemoryAccessor, MemoryAccessorExt},
@@ -32,6 +32,7 @@ use starnix_uapi::{
     user_address::{UserAddress, UserCString, UserRef},
     BPF_F_RDONLY_PROG, PATH_MAX,
 };
+use ubpf::MapSchema;
 use zerocopy::{AsBytes, FromBytes};
 
 /// Read the arguments for a BPF command. The ABI works like this: If the arguments struct

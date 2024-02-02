@@ -7,12 +7,14 @@
 
 pub mod converter;
 pub mod error;
+pub mod maps;
 pub mod program;
 pub mod ubpf;
-
-mod verifier;
+pub mod verifier;
 
 pub use converter::*;
 pub use error::*;
+pub use maps::*;
 pub use program::*;
 pub use ubpf::*;
+pub use verifier::*;

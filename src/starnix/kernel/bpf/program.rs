@@ -35,23 +35,23 @@ pub struct Program {
 
 impl BpfObject for Program {}
 
+fn map_ubpf_error(e: UbpfError) -> Errno {
+    log_error!("Failed to load BPF program: {:?}", e);
+    errno!(EINVAL)
+}
+
 impl Program {
     pub fn new(current_task: &CurrentTask, mut code: Vec<bpf_insn>) -> Result<Program, Errno> {
-        let objects = link(current_task, &mut code)?;
+        let mut builder = UbpfVmBuilder::new().map_err(map_ubpf_error)?;
+        let objects = link(current_task, &mut code, &mut builder)?;
 
-        let create_vm = || -> Result<UbpfVm, UbpfError> {
-            let builder = UbpfVmBuilder::new()?;
+        let vm = (|| {
             builder.register(MAP_LOOKUP_ELEM_INDEX, MAP_LOOKUP_ELEM_NAME)?;
             builder.register(MAP_UPDATE_ELEM_INDEX, MAP_UPDATE_ELEM_NAME)?;
             builder.register(MAP_DELETE_ELEM_INDEX, MAP_DELETE_ELEM_NAME)?;
             builder.load(code)
-        };
-
-        let vm = create_vm().map_err(|e| {
-            log_error!("Failed to load BPF program: {:?}", e);
-            errno!(EINVAL)
-        })?;
-
+        })()
+        .map_err(map_ubpf_error)?;
         Ok(Program { _vm: Some(vm), _objects: objects })
     }
 
@@ -64,22 +64,37 @@ impl Program {
 const BPF_PSEUDO_MAP_FD: u8 = 1;
 
 /// Pre-process the given eBPF code to link the program against existing kernel resources.
-fn link(current_task: &CurrentTask, code: &mut Vec<bpf_insn>) -> Result<Vec<BpfHandle>, Errno> {
+fn link(
+    current_task: &CurrentTask,
+    code: &mut Vec<bpf_insn>,
+    builder: &mut UbpfVmBuilder,
+) -> Result<Vec<BpfHandle>, Errno> {
     let mut objects = vec![];
-    for instruction in code.iter_mut() {
+    let code_len = code.len();
+    for pc in 0..code_len {
+        let instruction = &mut code[pc];
         if instruction.code == EBPF_OP_LDDW as u8 {
+            // EBPF_OP_LDDW requires 2 instructions.
+            if pc >= code_len - 1 {
+                return error!(EINVAL);
+            }
+
             // If the instruction references BPF_PSEUDO_MAP_FD, then we need to look up the map fd
             // and create a reference from this program to that object.
             if instruction.src_reg() == BPF_PSEUDO_MAP_FD {
                 instruction.set_src_reg(0);
                 let fd = FdNumber::from_raw(instruction.imm);
                 let object = get_bpf_object(current_task, fd)?;
-                if object.downcast::<Map>().is_none() {
-                    return error!(EINVAL);
-                }
-                let index = objects.len();
+                let map = object.downcast::<Map>().ok_or_else(|| errno!(EINVAL))?;
+                let map_ptr = (map as *const Map) as u64;
+                let (high, low) = ((map_ptr >> 32) as i32, map_ptr as i32);
+                instruction.imm = low;
+                // The validation that the next instruction op code is correct will be done by
+                // either the verifier or the vm loader.
+                let next_instruction = &mut code[pc + 1];
+                next_instruction.imm = high;
+                builder.register_map_reference(pc, map.schema);
                 objects.push(object);
-                instruction.imm = index as i32;
             }
         }
     }

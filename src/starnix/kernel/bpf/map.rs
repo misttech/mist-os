@@ -7,21 +7,14 @@
 use crate::{bpf::fs::BpfObject, mm::MemoryAccessor, task::CurrentTask};
 use starnix_sync::{BpfMapEntries, Locked, OrderedMutex, Unlocked};
 use starnix_uapi::{
-    bpf_map_type, bpf_map_type_BPF_MAP_TYPE_ARRAY, errno, error, errors::Errno,
-    user_address::UserAddress, BPF_EXIST, BPF_NOEXIST,
+    bpf_map_type_BPF_MAP_TYPE_ARRAY, errno, error, errors::Errno, user_address::UserAddress,
+    BPF_EXIST, BPF_NOEXIST,
 };
 use std::{
     collections::{btree_map::Entry, BTreeMap},
-    ops::{Bound, Deref, DerefMut, Range},
+    ops::{Bound, Deref, DerefMut},
 };
-
-#[derive(Debug, Clone, Copy)]
-pub struct MapSchema {
-    pub map_type: bpf_map_type,
-    pub key_size: u32,
-    pub value_size: u32,
-    pub max_entries: u32,
-}
+use ubpf::MapSchema;
 
 /// The underlying storage for a BPF map.
 ///
@@ -40,14 +33,6 @@ pub struct Map {
     pub entries: OrderedMutex<MapStore, BpfMapEntries>,
 }
 impl BpfObject for Map {}
-
-impl MapSchema {
-    fn array_range_for_index(&self, index: u32) -> Range<usize> {
-        let base = index * self.value_size;
-        let limit = base + self.value_size;
-        (base as usize)..(limit as usize)
-    }
-}
 
 impl MapStore {
     pub fn new(schema: &MapSchema) -> Result<Self, Errno> {
