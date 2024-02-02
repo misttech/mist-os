@@ -11,6 +11,7 @@ use fastboot::{
 use fuchsia_async::{Task, Timer};
 use std::collections::BTreeSet;
 use std::time::Duration;
+use thiserror::Error;
 use usb_bulk::{AsyncInterface as Interface, InterfaceInfo, Open};
 
 // USB fastboot interface IDs
@@ -19,16 +20,98 @@ const FASTBOOT_USB_INTERFACE_CLASS: u8 = 0xff;
 const FASTBOOT_USB_INTERFACE_SUBCLASS: u8 = 0x42;
 const FASTBOOT_USB_INTERFACE_PROTOCOL: u8 = 0x03;
 
+// Valid USB Product Identifiers
+const USB_DEV_PRODUCTS: [u16; 3] = [0x4ee0, 0x0d02, FASTBOOT_AND_CDC_ETH_USB_DEV_PRODUCT];
+
+// Vendor ID
+const USB_DEV_VENDOR: u16 = 0x18d1;
+
 //TODO(https://fxbug.dev/42130068) - serial info will probably get rolled into the target struct
 
+#[derive(Error, Debug, Clone)]
+enum InterfaceCheckError {
+    #[error("Invalid IFC Class. Found {}, want {}", found_class, FASTBOOT_USB_INTERFACE_CLASS)]
+    InvalidIfcClass { found_class: u8 },
+    #[error(
+        "Invalid IFC Subclass. Found {}, want {}",
+        found_subclass,
+        FASTBOOT_USB_INTERFACE_SUBCLASS
+    )]
+    InvalidIfcSubclass { found_subclass: u8 },
+    #[error(
+        "Invalid IFC Protocol. Found {}, want {}",
+        found_protocol,
+        FASTBOOT_USB_INTERFACE_PROTOCOL
+    )]
+    InvalidIfcProtocol { found_protocol: u8 },
+    #[error("Invalid Device Vendor. Found {}, want {}", found_vendor, USB_DEV_VENDOR)]
+    InvalidDevVendor { found_vendor: u16 },
+    #[error("Invalid Device Product. Found {}, want {:?}", found_product, valid_products)]
+    InvalidDevProduct { found_product: u16, valid_products: Vec<u16> },
+}
+
+fn valid_ifc_class(info: &InterfaceInfo) -> Result<(), InterfaceCheckError> {
+    if info.ifc_class == FASTBOOT_USB_INTERFACE_CLASS {
+        Ok(())
+    } else {
+        Err(InterfaceCheckError::InvalidIfcClass { found_class: info.ifc_class })
+    }
+}
+
+fn valid_ifc_subclass(info: &InterfaceInfo) -> Result<(), InterfaceCheckError> {
+    if info.ifc_subclass == FASTBOOT_USB_INTERFACE_SUBCLASS {
+        Ok(())
+    } else {
+        Err(InterfaceCheckError::InvalidIfcSubclass { found_subclass: info.ifc_subclass })
+    }
+}
+
+fn valid_ifc_protocol(info: &InterfaceInfo) -> Result<(), InterfaceCheckError> {
+    if info.ifc_protocol == FASTBOOT_USB_INTERFACE_PROTOCOL {
+        Ok(())
+    } else {
+        Err(InterfaceCheckError::InvalidIfcProtocol { found_protocol: info.ifc_protocol })
+    }
+}
+
+fn valid_dev_vendor(info: &InterfaceInfo) -> Result<(), InterfaceCheckError> {
+    if info.dev_vendor == USB_DEV_VENDOR {
+        Ok(())
+    } else {
+        Err(InterfaceCheckError::InvalidDevVendor { found_vendor: info.dev_vendor })
+    }
+}
+
+fn valid_dev_product(info: &InterfaceInfo) -> Result<(), InterfaceCheckError> {
+    if USB_DEV_PRODUCTS.contains(&info.dev_product) {
+        Ok(())
+    } else {
+        Err(InterfaceCheckError::InvalidDevProduct {
+            found_product: info.dev_product,
+            valid_products: USB_DEV_PRODUCTS.to_vec(),
+        })
+    }
+}
+
 fn is_fastboot_match(info: &InterfaceInfo) -> bool {
-    (info.dev_vendor == 0x18d1)
-        && ((info.dev_product == 0x4ee0)
-            || (info.dev_product == 0x0d02)
-            || (info.dev_product == FASTBOOT_AND_CDC_ETH_USB_DEV_PRODUCT))
-        && (info.ifc_class == FASTBOOT_USB_INTERFACE_CLASS)
-        && (info.ifc_subclass == FASTBOOT_USB_INTERFACE_SUBCLASS)
-        && (info.ifc_protocol == FASTBOOT_USB_INTERFACE_PROTOCOL)
+    let mut results = vec![];
+
+    results.push(valid_dev_vendor(info));
+    results.push(valid_dev_product(info));
+    results.push(valid_ifc_class(info));
+    results.push(valid_ifc_subclass(info));
+    results.push(valid_ifc_protocol(info));
+
+    let errs: Vec<_> = results.into_iter().filter_map(|r| r.err()).collect();
+
+    if !errs.is_empty() {
+        tracing::debug!(
+            "Interface is not valid fastboot match. Encountered errors: \n\t{}",
+            errs.clone().into_iter().map(|e| e.to_string()).collect::<Vec<_>>().join("\n\t")
+        );
+    }
+
+    errs.is_empty()
 }
 
 fn enumerate_interfaces<F>(mut cb: F)
