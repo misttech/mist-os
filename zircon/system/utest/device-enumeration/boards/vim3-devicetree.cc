@@ -23,7 +23,7 @@ TEST_F(DeviceEnumerationTest, Vim3DeviceTreeTest) {
       "sys/platform/dsi-7000/dw-dsi",
       "sys/platform/canvas-ff638000/aml-canvas",
       "sys/platform/adc-9000",
-      "sys/platform/gpio-controller-ff634400",
+      //"sys/platform/gpio-controller-ff634400", - Uncomment when gpio node is getting used.
 
   };
 
