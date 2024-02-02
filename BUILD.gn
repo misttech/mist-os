@@ -1854,6 +1854,35 @@ group("bazel_workspace") {
   ]
 }
 
+# IMPORTANT: Nothing should depend on this target. It is here
+# to ensure that its dependencies are always in the GN build graph,
+# which is critical for a few generated_file() dependencies that
+# need to write their output at `gn gen` time.
+group("root_targets") {
+  testonly = true
+  deps = [
+    "//build/bazel:legacy_ninja_build_outputs",
+
+    # TODO(https://fxbug.dev/323356546): Change this into a proper build API module
+    # since this file is only used after the build by artifactory.
+    "//build/images:delivery_blob_config",
+
+    # These are only required by the core.x64-sdk_source_sets_and_shlibs-apiXX-build_only
+    # builders. TODO(https://fxbug.dev/42082833): Remove these lines once these builders are
+    # removed since they seem no longer necessary.
+    "//build/sdk:sdk_versioned_shared_libraries",
+    "//build/sdk:sdk_versioned_source_sets",
+
+    # This target is listed explicitly by multiple CI bot build configurations.
+    # See https://fxbug.dev/42162374 for context.
+    "//build/images:record_filesystem_sizes",
+
+    # Required by `fx fidldoc` as well as the Fuchsia controller ffx plugin
+    # at runtime!
+    "//build/fidl:all_fidl_json",
+  ]
+}
+
 # A GN pool matching the special Ninja 'console' pool. Any action() that
 # uses this pool will be able to send its stdout/stderr directly to the
 # output terminal, instead of being buffered by Ninja until the command

@@ -11,6 +11,14 @@ buildconfig = "//build/config/BUILDCONFIG.gn"
 # can not be placed directly in the source tree, e.g. for third party source trees.
 secondary_source = "//build/secondary/"
 
+# Only instantiate targets in the default toolchain that are dependencies
+# of any target defined in //BUILD.gn, to significantly reduce the size of the
+# GN build graph and of the Ninja build plan.
+root_patterns = [
+  # All targets defined in //BUILD.gn
+  "//:*",
+]
+
 # The executable used to execute scripts in action and exec_script. This is often an interpreter for
 # projects that use a primary scripting language. In this project, we use several different kinds of
 # programs including scripts in different languages and native binaries. An empty script_executable

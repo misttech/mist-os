@@ -30,9 +30,9 @@ assert(
 #
 #    fx build build/bazel:legacy_ninja_build_outputs
 #
-# IMPORTANT: Nothing in the GN graph should depend on this directly, but this
-# BUILD.gn file must be reachable from //:* to ensure that it is parsed and
-# that this file is generated at `gn gen` time.
+# IMPORTANT: Nothing in the GN graph should depend on this directly, except
+# the top-level //:root_targets group in //BUILD.gn, to ensure
+# that its output is generated at gn-gen time.
 #
 # Doing so allows breaking the testonly boundary, as required to allow
 # non-testonly bazel_action() targets to depend on

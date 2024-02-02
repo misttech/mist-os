@@ -32,7 +32,6 @@ universe_package_labels = []
 
 product_bootfs_labels = []
 base_driver_package_labels = []
-package_flavor_selections = []
 sdk_archive_labels = []
 
 product_bootfs_labels += [
