@@ -162,8 +162,18 @@ void ProfileProvider::SetProfileByRole(SetProfileByRoleRequestView request,
     return;
   }
 
-  // Select the profile parameters based on the role selector.
-  if (auto search = profile_map.find(*role); search != profile_map.cend()) {
+  // The MediaProfileProvider will occasionally request roles with the selector `realm=media`
+  // specified, but for which explicit roles have been configured. The configured roles should
+  // override the requested one, so we search the profile map for a role that only contains the
+  // role name and has no selectors.
+  const fit::result role_without_selectors = Role::Create(role_selector, true);
+  if (role_without_selectors.is_error()) {
+    completer.Reply(role_without_selectors.error_value());
+    return;
+  }
+
+  // Select the profile parameters based on the role name.
+  if (auto search = profile_map.find(*role_without_selectors); search != profile_map.cend()) {
     status = zx_object_set_profile(request->handle.get(), search->second.profile.get(), 0);
     completer.Reply(status);
   } else if (const auto media_role = role->ToMediaRole(); media_role.is_ok()) {
@@ -172,8 +182,8 @@ void ProfileProvider::SetProfileByRole(SetProfileByRoleRequestView request,
       completer.Reply(ZX_ERR_INVALID_ARGS);
       return;
     }
-    // TODO(https://fxbug.dev/42116876): If a media profile is not found in the system config, use the
-    // forwarded parameters. This can be removed once clients are migrated to use defined roles.
+    // TODO(https://fxbug.dev/42116876): If a media profile is not found in the system config, use
+    // the forwarded parameters. This can be removed once clients are migrated to use defined roles.
     // Skip media roles with invalid deadline parameters.
     if (media_role->capacity <= 0 || media_role->deadline <= 0 ||
         media_role->capacity > media_role->deadline) {

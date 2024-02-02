@@ -673,7 +673,8 @@ bool ToDouble(std::string str, double* out) {
   return true;
 }
 
-fit::result<zx_status_t, Role> Role::Create(std::string_view name_with_selectors) {
+fit::result<zx_status_t, Role> Role::Create(std::string_view name_with_selectors,
+                                            bool ignore_selectors) {
   Role role;
   std::string selectors;
   if (!re2::RE2::FullMatch(name_with_selectors, kReRoleParts, &role.name_, &selectors)) {
@@ -681,6 +682,13 @@ fit::result<zx_status_t, Role> Role::Create(std::string_view name_with_selectors
             FX_KV("tag", "RoleManager"));
     return fit::error(ZX_ERR_INVALID_ARGS);
   }
+
+  // If the caller wants to us to ignore the selectors, exit early.
+  if (ignore_selectors) {
+    return fit::ok(std::move(role));
+  }
+
+  // Parse the selectors.
   re2::StringPiece input{selectors};
   std::string key, raw_value;
   while (re2::RE2::Consume(&input, kReSelector, &key, &raw_value)) {

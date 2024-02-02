@@ -58,7 +58,10 @@ class Role {
   // constructed.
   static fit::result<zx_status_t, Role> Create(std::string_view name,
                                                std::vector<fuchsia_scheduler::Parameter> selectors);
-  static fit::result<zx_status_t, Role> Create(std::string_view name_with_selectors);
+  // TODO(https://fxbug.dev/321037780): Remove ignore_selectors once the MediaProfileProvider (and
+  // associated hacks in ProfileProvider) have been deprecated.
+  static fit::result<zx_status_t, Role> Create(std::string_view name_with_selectors,
+                                               bool ignore_selectors = false);
 
   bool IsTestRole() const { return name_ == "fuchsia.test-role"; }
   bool HasSelector(std::string selector) const;
