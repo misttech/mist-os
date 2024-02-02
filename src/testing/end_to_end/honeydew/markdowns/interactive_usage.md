@@ -57,15 +57,6 @@ emu = honeydew.create_device("fuchsia-emulator", transport=honeydew.transports.T
 >>> fd_remote = honeydew.create_device("fuchsia-d88c-796c-e57e", transport=honeydew.transports.TRANSPORT.SL4F, ffx_config=ffx_config.get_config(), device_ip_port=custom_types.IpPort.create_using_ip_and_port("[::1]:8022"))
 
 # You can now start doing host-(fuchsia)target interactions using object returned by `honeydew.create_device()`
-# To check all operations supported, use `dir` command
+# To check all operations, affordances and transports supported, use `dir` command
 >>> dir(emu)
 ```
-
-## Affordances
-* [Bluetooth](bluetooth.md)
-* [Tracing](tracing.md)
-* [Wlan policy](wlan_policy.md)
-* [Wlan](wlan.md)
-
-## Transports
-* [Fastboot](fastboot.md)
