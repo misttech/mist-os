@@ -38,6 +38,7 @@ pub fn fxfs_error_to_fuse_error(err: &anyhow::Error) -> Errno {
             FxfsError::AlreadyBound => libc::EBUSY.into(),
             FxfsError::WrongType => libc::EOPNOTSUPP.into(),
             FxfsError::IntegrityError => libc::EIO.into(),
+            FxfsError::Unavailable => libc::EBUSY.into(),
         };
         info!("Converted from Fxfs error {:?} to libc error {:?}", root_cause, err);
         err

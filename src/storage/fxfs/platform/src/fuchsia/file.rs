@@ -224,7 +224,7 @@ impl FxFile {
                 store
                     .filesystem()
                     .graveyard()
-                    .queue_tombstone(store.store_object_id(), self.object_id());
+                    .queue_tombstone_object(store.store_object_id(), self.object_id());
             });
         } else if old == 1 && self.handle.needs_flush() {
             // If this file is no longer referenced by anything, do a final flush if needed.
@@ -408,9 +408,6 @@ impl File for FxFile {
     }
 
     async fn enable_verity(&self, options: fio::VerificationOptions) -> Result<(), Status> {
-        if self.verified_file() {
-            return Err(Status::ALREADY_EXISTS);
-        }
         self.handle.set_read_only();
         self.handle.flush().await.map_err(map_to_status)?;
         self.handle.uncached_handle().enable_verity(options).await.map_err(map_to_status)

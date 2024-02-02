@@ -33,6 +33,7 @@ use {
         try_join, TryStreamExt,
     },
     fxfs_crypto::{KeyPurpose, WrappedKeys, XtsCipherSet},
+    fxfs_trace::trace,
     std::{
         cmp::min,
         future::Future,
@@ -993,6 +994,64 @@ impl<S: HandleOwner> StoreObjectHandle<S> {
         self.update_allocated_size(transaction, allocated, deallocated).await
     }
 
+    /// Writes an attribute that should not already exist and therefore does not require trimming.
+    /// Breaks up the write into multiple transactions if `data.len()` is larger than `batch_size`.
+    /// If writing the attribute requires multiple transactions, adds the attribute to the
+    /// graveyard. The caller is responsible for removing the attribute from the graveyard when it
+    /// commits the last transaction.
+    #[trace]
+    pub async fn write_new_attr_in_batches<'a>(
+        &'a self,
+        transaction: &mut Transaction<'a>,
+        attribute_id: u64,
+        data: &[u8],
+        batch_size: usize,
+    ) -> Result<(), Error> {
+        transaction.add(
+            self.store().store_object_id,
+            Mutation::replace_or_insert_object(
+                ObjectKey::attribute(self.object_id(), attribute_id, AttributeKey::Attribute),
+                ObjectValue::attribute(data.len() as u64),
+            ),
+        );
+        let chunks = data.chunks(batch_size);
+        let num_chunks = chunks.len();
+        if num_chunks > 1 {
+            transaction.add(
+                self.store().store_object_id,
+                Mutation::replace_or_insert_object(
+                    ObjectKey::graveyard_attribute_entry(
+                        self.store().graveyard_directory_object_id(),
+                        self.object_id(),
+                        attribute_id,
+                    ),
+                    ObjectValue::Some,
+                ),
+            );
+        }
+        let mut start_offset = 0;
+        for (i, chunk) in chunks.enumerate() {
+            let rounded_len = round_up(chunk.len() as u64, self.block_size()).unwrap();
+            let mut buffer = self.store().device.allocate_buffer(rounded_len as usize).await;
+            let slice = buffer.as_mut_slice();
+            slice[..chunk.len()].copy_from_slice(chunk);
+            slice[chunk.len()..].fill(0);
+            self.multi_write(
+                transaction,
+                attribute_id,
+                &[start_offset..start_offset + rounded_len],
+                buffer.as_mut(),
+            )
+            .await?;
+            start_offset += rounded_len;
+            // Do not commit the last chunk.
+            if i < num_chunks - 1 {
+                transaction.commit_and_continue().await?;
+            }
+        }
+        Ok(())
+    }
+
     /// Writes an entire attribute. Returns whether or not the attribute needs to continue being
     /// trimmed - if the new data is shorter than the old data, this will trim any extents beyond
     /// the end of the new size, but if there were too many for a single transaction, a commit
@@ -1318,9 +1377,11 @@ mod tests {
             filesystem::{FxFilesystem, OpenFxFilesystem},
             object_handle::ObjectHandle,
             object_store::{
+                data_object_handle::WRITE_ATTR_BATCH_SIZE,
                 transaction::{lock_keys, Mutation, Options},
                 AttributeKey, DataObjectHandle, Directory, HandleOptions, LockKey, ObjectKey,
                 ObjectStore, ObjectValue, SetExtendedAttributeMode, StoreObjectHandle,
+                FSVERITY_MERKLE_ATTRIBUTE_ID,
             },
         },
         fuchsia_async as fasync,
@@ -1739,7 +1800,7 @@ mod tests {
         .await
         .expect("replace_child failed");
         transaction.commit().await.unwrap();
-        store.tombstone(object.object_id(), Options::default()).await.unwrap();
+        store.tombstone_object(object.object_id(), Options::default()).await.unwrap();
 
         crate::fsck::fsck(fs.clone()).await.unwrap();
 
@@ -1980,6 +2041,42 @@ mod tests {
         transaction.commit().await.unwrap();
 
         crate::fsck::fsck(fs.clone()).await.unwrap();
+
+        fs.close().await.expect("close failed");
+    }
+
+    #[fuchsia::test]
+    async fn write_new_attr_in_batches_multiple_txns() {
+        let (fs, object) = test_filesystem_and_empty_object().await;
+        let handle = object.handle();
+        let merkle_tree = vec![1; 3 * WRITE_ATTR_BATCH_SIZE];
+        let mut transaction = handle.new_transaction(FSVERITY_MERKLE_ATTRIBUTE_ID).await.unwrap();
+        handle
+            .write_new_attr_in_batches(
+                &mut transaction,
+                FSVERITY_MERKLE_ATTRIBUTE_ID,
+                &merkle_tree,
+                WRITE_ATTR_BATCH_SIZE,
+            )
+            .await
+            .expect("failed to write merkle attribute");
+
+        transaction.add(
+            handle.store().store_object_id,
+            Mutation::replace_or_insert_object(
+                ObjectKey::graveyard_attribute_entry(
+                    handle.store().graveyard_directory_object_id(),
+                    handle.object_id(),
+                    FSVERITY_MERKLE_ATTRIBUTE_ID,
+                ),
+                ObjectValue::None,
+            ),
+        );
+        transaction.commit().await.unwrap();
+        assert_eq!(
+            handle.read_attr(FSVERITY_MERKLE_ATTRIBUTE_ID).await.expect("read_attr failed"),
+            Some(merkle_tree.into())
+        );
 
         fs.close().await.expect("close failed");
     }

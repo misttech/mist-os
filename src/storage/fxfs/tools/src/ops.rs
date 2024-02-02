@@ -131,7 +131,7 @@ pub async fn unlink(
     // In FxFile, when a handle goes out of scope we'd deref and potentially tombstone
     // it (delete it from graveyard). We don't refcount so we just manually queue tombstone here.
     if let ReplacedChild::Object(object_id) = replaced_child {
-        fs.graveyard().tombstone(dir.store().store_object_id(), object_id).await?;
+        fs.graveyard().tombstone_object(dir.store().store_object_id(), object_id).await?;
     }
     Ok(())
 }

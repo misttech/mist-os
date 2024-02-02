@@ -270,7 +270,10 @@ impl FxVolume {
         }
         // If this fails, the graveyard should clean it up on next mount.
         self.store
-            .tombstone(object_id, Options { borrow_metadata_space: true, ..Default::default() })
+            .tombstone_object(
+                object_id,
+                Options { borrow_metadata_space: true, ..Default::default() },
+            )
             .await?;
         Ok(())
     }

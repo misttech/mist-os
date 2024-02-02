@@ -39,6 +39,8 @@ use {
 struct ScannedAttributes {
     // A list of attribute IDs found for the object, along with their logical size.
     attributes: Vec<(u64, u64)>,
+    // A list of attributes that have been tombstoned.
+    tombstoned_attributes: Vec<u64>,
     // The object's allocated size, according to its metadata.
     stored_allocated_size: u64,
     // The allocated size of the object (computed by summing up the extents for the file).
@@ -192,6 +194,7 @@ impl<'a> ScannedStore<'a> {
                                 stored_refs: *refs,
                                 attributes: ScannedAttributes {
                                     attributes: Vec::new(),
+                                    tombstoned_attributes: Vec::new(),
                                     stored_allocated_size: *allocated_size,
                                     observed_allocated_size: 0,
                                     in_graveyard: false,
@@ -232,6 +235,7 @@ impl<'a> ScannedStore<'a> {
                                 visited: UnsafeCell::new(false),
                                 attributes: ScannedAttributes {
                                     attributes: Vec::new(),
+                                    tombstoned_attributes: Vec::new(),
                                     stored_allocated_size: *allocated_size,
                                     observed_allocated_size: 0,
                                     in_graveyard: false,
@@ -272,6 +276,7 @@ impl<'a> ScannedStore<'a> {
                                 stored_refs: *refs,
                                 attributes: ScannedAttributes {
                                     attributes: Vec::new(),
+                                    tombstoned_attributes: Vec::new(),
                                     stored_allocated_size: *allocated_size,
                                     observed_allocated_size: 0,
                                     in_graveyard: false,
@@ -548,6 +553,7 @@ impl<'a> ScannedStore<'a> {
                 }
             },
             ObjectKeyData::GraveyardEntry { .. } => {}
+            ObjectKeyData::GraveyardAttributeEntry { .. } => {}
         }
         Ok(())
     }
@@ -661,6 +667,7 @@ impl<'a> ScannedStore<'a> {
             ) => {
                 let ScannedAttributes {
                     attributes,
+                    tombstoned_attributes,
                     observed_allocated_size: allocated_size,
                     in_graveyard,
                     ..
@@ -669,6 +676,7 @@ impl<'a> ScannedStore<'a> {
                     Some((_, size)) => {
                         if device_offset.is_some()
                             && !*in_graveyard
+                            && !tombstoned_attributes.contains(&attribute_id)
                             && range.end > round_up(*size, bs).unwrap()
                         {
                             self.fsck.error(FsckError::ExtentExceedsLength(
@@ -711,24 +719,34 @@ impl<'a> ScannedStore<'a> {
                 AllocatorKey { device_range: device_offset..device_offset + len },
                 AllocatorValue::Abs { count: 1, owner_object_id: self.store_id },
             );
-            let lower_bound = item.key.lower_bound_for_merge_into();
+            let lower_bound: AllocatorKey = item.key.lower_bound_for_merge_into();
             self.fsck.allocations.merge_into(item, &lower_bound, allocator::merge::merge).await;
         }
         Ok(())
     }
 
-    // A graveyard entry can either be for tombstoning a file (if `tombstone` is true), or for
-    // trimming a file.
-    fn handle_graveyard_entry(&mut self, object_id: u64, tombstone: bool) -> Result<(), Error> {
+    // A graveyard entry can either be for tombstoning a file/attribute, or for trimming a file.
+    fn handle_graveyard_entry(
+        &mut self,
+        object_id: u64,
+        attribute_id: Option<u64>,
+        tombstone: bool,
+    ) -> Result<(), Error> {
         match self.objects.get_mut(&object_id) {
             Some(ScannedObject::File(ScannedFile {
                 parents,
-                attributes: ScannedAttributes { in_graveyard, .. },
+                attributes: ScannedAttributes { in_graveyard, tombstoned_attributes, .. },
                 ..
             })) => {
-                *in_graveyard = true;
+                if attribute_id.is_none() {
+                    *in_graveyard = true;
+                }
                 if tombstone {
-                    parents.push(INVALID_OBJECT_ID)
+                    if let Some(attribute_id) = attribute_id {
+                        tombstoned_attributes.push(attribute_id);
+                    } else {
+                        parents.push(INVALID_OBJECT_ID)
+                    }
                 }
             }
             Some(
@@ -736,7 +754,11 @@ impl<'a> ScannedStore<'a> {
                 | ScannedObject::Symlink(ScannedSymlink { attributes, .. }),
             ) => {
                 if tombstone {
-                    attributes.in_graveyard = true;
+                    if let Some(attribute_id) = attribute_id {
+                        attributes.tombstoned_attributes.push(attribute_id);
+                    } else {
+                        attributes.in_graveyard = true;
+                    }
                 } else {
                     self.fsck.error(FsckError::UnexpectedObjectInGraveyard(object_id))?;
                 }
@@ -860,6 +882,7 @@ fn validate_attributes(
 ) -> Result<(), Error> {
     let ScannedAttributes {
         attributes,
+        tombstoned_attributes,
         observed_allocated_size,
         stored_allocated_size,
         extended_attributes,
@@ -883,13 +906,12 @@ fn validate_attributes(
                 let merkle_attribute =
                     attributes.iter().find(|(attr_id, _)| *attr_id == FSVERITY_MERKLE_ATTRIBUTE_ID);
 
-                if (is_verified.is_some() && merkle_attribute.is_none())
-                    || (is_verified.is_none() && merkle_attribute.is_some())
-                {
-                    fsck.error(FsckError::InconsistentVerifiedFile(
-                        store_id,
-                        object_id,
-                        is_verified.is_some(),
+                // Note a merkle attribute can exist for a non-verified file in the case that the
+                // power cut while we were writing the merkle attribute across multiple txns. In
+                // this case, the merkle attribute will be cleaned up on reboot.
+                if is_verified.is_some() && merkle_attribute.is_none() {
+                    fsck.error(FsckError::VerifiedFileDoesNotHaveAMerkleAttribute(
+                        store_id, object_id,
                     ))?;
                 }
 
@@ -912,6 +934,13 @@ fn validate_attributes(
                     }
                 }
             }
+        }
+    }
+
+    // Attributes queued for tombstoning must exist.
+    for attr in tombstoned_attributes {
+        if attributes.iter().find(|(attr_id, _)| *attr_id == *attr).is_none() {
+            fsck.error(FsckError::TombstonedAttributeDoesNotExist(store_id, object_id, *attr))?
         }
     }
 
@@ -1024,11 +1053,23 @@ pub(super) async fn scan_store(
         Graveyard::iter(store.graveyard_directory_object_id(), &mut merger).await,
         FsckFatal::MalformedGraveyard,
     )?;
-    while let Some((object_id, _, value)) = iter.get() {
-        match value {
-            ObjectValue::Some => scanned.handle_graveyard_entry(object_id, true)?,
-            ObjectValue::Trim => scanned.handle_graveyard_entry(object_id, false)?,
-            _ => fsck.error(FsckError::BadGraveyardValue(store_id, object_id))?,
+    while let Some(info) = iter.get() {
+        match info.value() {
+            ObjectValue::Some => {
+                scanned.handle_graveyard_entry(info.object_id(), info.attribute_id(), true)?
+            }
+            ObjectValue::Trim => {
+                if let Some(attribute_id) = info.attribute_id() {
+                    fsck.error(FsckError::TrimValueForGraveyardAttributeEntry(
+                        store_id,
+                        info.object_id(),
+                        attribute_id,
+                    ))?
+                } else {
+                    scanned.handle_graveyard_entry(info.object_id(), None, false)?
+                }
+            }
+            _ => fsck.error(FsckError::BadGraveyardValue(store_id, info.object_id()))?,
         }
         fsck.assert(iter.advance().await, FsckFatal::MalformedGraveyard)?;
     }

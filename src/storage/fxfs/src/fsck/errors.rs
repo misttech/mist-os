@@ -262,9 +262,11 @@ pub enum FsckError {
     ZombieFile(u64, u64, Vec<u64>),
     ZombieDir(u64, u64, u64),
     ZombieSymlink(u64, u64, Vec<u64>),
-    InconsistentVerifiedFile(u64, u64, bool),
+    VerifiedFileDoesNotHaveAMerkleAttribute(u64, u64),
     NonFileMarkedAsVerified(u64, u64),
     IncorrectMerkleTreeSize(u64, u64, u64, u64),
+    TombstonedAttributeDoesNotExist(u64, u64, u64),
+    TrimValueForGraveyardAttributeEntry(u64, u64, u64),
 }
 
 impl FsckError {
@@ -442,20 +444,12 @@ impl FsckError {
                      links from {parent_object_ids:?}",
                 )
             }
-            FsckError::InconsistentVerifiedFile(store_id, object_id, is_verified) => {
-                if *is_verified {
-                    format!(
-                        "Object {} in store {} is marked as fsverity-enabled but is missing a \
-                         merkle attribute",
-                        store_id, object_id
-                    )
-                } else {
-                    format!(
-                        "Object {} in store {} is not marked as fsverity-enabled but a merkle
-                            attribute is present",
-                        store_id, object_id
-                    )
-                }
+            FsckError::VerifiedFileDoesNotHaveAMerkleAttribute(store_id, object_id) => {
+                format!(
+                    "Object {} in store {} is marked as fsverity-enabled but is missing a \
+                        merkle attribute",
+                    store_id, object_id
+                )
             }
             FsckError::NonFileMarkedAsVerified(store_id, object_id) => {
                 format!(
@@ -467,6 +461,20 @@ impl FsckError {
                 format!(
                     "Object {} in store {} has merkle tree of size {} expected {}",
                     object_id, store_id, actual_size, expected_size
+                )
+            }
+            FsckError::TombstonedAttributeDoesNotExist(store_id, object_id, attribute_id) => {
+                format!(
+                    "Object {} in store {} has an attribute {} that is tombstoned but does not
+                        exist.",
+                    object_id, store_id, attribute_id
+                )
+            }
+            FsckError::TrimValueForGraveyardAttributeEntry(store_id, object_id, attribute_id) => {
+                format!(
+                    "Object {} in store {} has a GraveyardAttributeEntry for attribute {} that has
+                        ObjectValue::Trim",
+                    object_id, store_id, attribute_id,
                 )
             }
         }
@@ -594,8 +602,8 @@ impl FsckError {
             FsckError::ZombieSymlink(store_id, oid, parent_oids) => {
                 error!(store_id, oid, ?parent_oids, "Links exists to symlink in graveyard")
             }
-            FsckError::InconsistentVerifiedFile(store_id, oid, is_verified) => {
-                error!(store_id, oid, ?is_verified, "Verified file inconsistency")
+            FsckError::VerifiedFileDoesNotHaveAMerkleAttribute(store_id, oid) => {
+                error!(store_id, oid, "Verified file does not have a merkle attribute")
             }
             FsckError::NonFileMarkedAsVerified(store_id, oid) => {
                 error!(store_id, oid, "Non-file marked as verified")
@@ -604,6 +612,15 @@ impl FsckError {
                 error!(
                     store_id,
                     oid, expected_size, actual_size, "Verified file has incorrect merkle tree size"
+                )
+            }
+            FsckError::TombstonedAttributeDoesNotExist(store_id, oid, attribute_id) => {
+                error!(store_id, oid, attribute_id, "Tombstoned attribute does not exist")
+            }
+            FsckError::TrimValueForGraveyardAttributeEntry(store_id, oid, attribute_id) => {
+                error!(
+                    store_id,
+                    oid, attribute_id, "Invalid Trim value for a graveyard attribute entry",
                 )
             }
         }

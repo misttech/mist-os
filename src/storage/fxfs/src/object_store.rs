@@ -877,8 +877,7 @@ impl ObjectStore {
                     return Err(anyhow!(FxfsError::NotFound));
                 }
                 Some(data) => {
-                    data_object_handle.set_fsverity_state_pending(descriptor, data);
-                    data_object_handle.finalize_fsverity_state();
+                    data_object_handle.set_fsverity_state_some(descriptor, data);
                 }
             }
         }
@@ -1038,7 +1037,11 @@ impl ObjectStore {
     }
 
     // Purges an object that is in the graveyard.
-    pub async fn tombstone(&self, object_id: u64, txn_options: Options<'_>) -> Result<(), Error> {
+    pub async fn tombstone_object(
+        &self,
+        object_id: u64,
+        txn_options: Options<'_>,
+    ) -> Result<(), Error> {
         self.trim_or_tombstone(object_id, true, txn_options).await
     }
 
@@ -1082,7 +1085,11 @@ impl ObjectStore {
                     &mut transaction,
                     object_id,
                     attribute_id,
-                    if for_tombstone { TrimMode::Tombstone } else { TrimMode::UseSize },
+                    if for_tombstone {
+                        TrimMode::Tombstone(TombstoneMode::Object)
+                    } else {
+                        TrimMode::UseSize
+                    },
                 )
                 .await?
             {
@@ -1112,6 +1119,44 @@ impl ObjectStore {
         Ok(())
     }
 
+    // Purges an object's attribute that is in the graveyard.
+    pub async fn tombstone_attribute(
+        &self,
+        object_id: u64,
+        attribute_id: u64,
+        txn_options: Options<'_>,
+    ) -> Result<(), Error> {
+        let fs = self.filesystem();
+        let mut trim_result = TrimResult::Incomplete;
+        while matches!(trim_result, TrimResult::Incomplete) {
+            let mut transaction = fs
+                .clone()
+                .new_transaction(
+                    lock_keys![
+                        LockKey::object_attribute(self.store_object_id, object_id, attribute_id),
+                        LockKey::object(self.store_object_id, object_id),
+                    ],
+                    txn_options,
+                )
+                .await?;
+            trim_result = self
+                .trim_some(
+                    &mut transaction,
+                    object_id,
+                    attribute_id,
+                    TrimMode::Tombstone(TombstoneMode::Attribute),
+                )
+                .await?;
+            if let TrimResult::Done(..) = trim_result {
+                self.remove_attribute_from_graveyard(&mut transaction, object_id, attribute_id)
+            }
+            if !transaction.mutations().is_empty() {
+                transaction.commit().await?;
+            }
+        }
+        Ok(())
+    }
+
     /// Deletes extents for attribute `attribute_id` in object `object_id`.  Also see the comments
     /// for TrimMode and TrimResult. Should hold a lock on the attribute, and the object as it
     /// performs a read-modify-write on the sizes.
@@ -1129,7 +1174,7 @@ impl ObjectStore {
             TrimMode::FromOffset(offset) => {
                 round_up(offset, self.block_size).ok_or(FxfsError::Inconsistent)?
             }
-            TrimMode::Tombstone => 0,
+            TrimMode::Tombstone(..) => 0,
             TrimMode::UseSize => {
                 let iter = merger
                     .seek(Bound::Included(&ObjectKey::attribute(
@@ -1226,13 +1271,16 @@ impl ObjectStore {
             iter.advance().await?;
         }
 
-        let finished_tombstone =
-            matches!(mode, TrimMode::Tombstone) && matches!(result, TrimResult::Done(None));
+        let finished_tombstone_object = matches!(mode, TrimMode::Tombstone(TombstoneMode::Object))
+            && matches!(result, TrimResult::Done(None));
+        let finished_tombstone_attribute =
+            matches!(mode, TrimMode::Tombstone(TombstoneMode::Attribute))
+                && !matches!(result, TrimResult::Incomplete);
         let mut mutation = self.txn_get_object_mutation(transaction, object_id).await?;
         if let ObjectValue::Object { attributes: ObjectAttributes { project_id, .. }, .. } =
             mutation.item.value
         {
-            let nodes = if finished_tombstone { -1 } else { 0 };
+            let nodes = if finished_tombstone_object { -1 } else { 0 };
             if project_id != 0 && (deallocated != 0 || nodes != 0) {
                 transaction.add(
                     self.store_object_id,
@@ -1247,35 +1295,46 @@ impl ObjectStore {
             }
         }
 
-        if finished_tombstone {
-            // Tombstone records *must* be merged so as to consume all other records for the
-            // object.
+        // Deletion marker records *must* be merged so as to consume all other records for the
+        // object.
+        if finished_tombstone_object {
             transaction.add(
                 self.store_object_id,
                 Mutation::merge_object(ObjectKey::object(object_id), ObjectValue::None),
             );
-        } else if deallocated > 0 {
-            transaction.add(
-                self.store_object_id,
-                Mutation::merge_object(
-                    ObjectKey::extent(object_id, attribute_id, aligned_offset..end),
-                    ObjectValue::deleted_extent(),
-                ),
-            );
-
-            // Update allocated size.
-            if let ObjectValue::Object {
-                attributes: ObjectAttributes { allocated_size, .. }, ..
-            } = &mut mutation.item.value
-            {
-                // The only way for these to fail are if the volume is inconsistent.
-                *allocated_size = allocated_size.checked_sub(deallocated).ok_or_else(|| {
-                    anyhow!(FxfsError::Inconsistent).context("Allocated size overflow")
-                })?;
-            } else {
-                panic!("Unexpected object value");
+        } else {
+            if finished_tombstone_attribute {
+                transaction.add(
+                    self.store_object_id,
+                    Mutation::merge_object(
+                        ObjectKey::attribute(object_id, attribute_id, AttributeKey::Attribute),
+                        ObjectValue::None,
+                    ),
+                );
             }
-            transaction.add(self.store_object_id, Mutation::ObjectStore(mutation));
+            if deallocated > 0 {
+                transaction.add(
+                    self.store_object_id,
+                    Mutation::merge_object(
+                        ObjectKey::extent(object_id, attribute_id, aligned_offset..end),
+                        ObjectValue::deleted_extent(),
+                    ),
+                );
+                // Update allocated size.
+                if let ObjectValue::Object {
+                    attributes: ObjectAttributes { allocated_size, .. },
+                    ..
+                } = &mut mutation.item.value
+                {
+                    // The only way for these to fail are if the volume is inconsistent.
+                    *allocated_size = allocated_size.checked_sub(deallocated).ok_or_else(|| {
+                        anyhow!(FxfsError::Inconsistent).context("Allocated size overflow")
+                    })?;
+                } else {
+                    panic!("Unexpected object value");
+                }
+                transaction.add(self.store_object_id, Mutation::ObjectStore(mutation));
+            }
         }
         Ok(result)
     }
@@ -1840,6 +1899,29 @@ impl ObjectStore {
         );
     }
 
+    /// Removes the specified attribute from the graveyard. Unlike object graveyard entries,
+    /// attribute graveyard entries only have one functionality (i.e. to purge deleted attributes)
+    /// so the caller does not need to be concerned about replacing the graveyard attribute entry
+    /// with its prior state when cancelling it. See comment on `remove_from_graveyard()`.
+    pub fn remove_attribute_from_graveyard(
+        &self,
+        transaction: &mut Transaction<'_>,
+        object_id: u64,
+        attribute_id: u64,
+    ) {
+        transaction.add(
+            self.store_object_id,
+            Mutation::replace_or_insert_object(
+                ObjectKey::graveyard_attribute_entry(
+                    self.graveyard_directory_object_id(),
+                    object_id,
+                    attribute_id,
+                ),
+                ObjectValue::None,
+            ),
+        );
+    }
+
     // Roll the mutations key.  The new key will be written for the next encrypted mutation.
     async fn roll_mutations_key(&self, crypt: &dyn Crypt) -> Result<(), Error> {
         let (wrapped_key, unwrapped_key) =
@@ -2096,8 +2178,15 @@ pub enum TrimMode {
     /// Trim extents beyond the supplied offset.
     FromOffset(u64),
 
-    /// Trim all extents and tombstone if complete.
-    Tombstone,
+    /// Remove the object (or attribute) from the store once it is fully trimmed.
+    Tombstone(TombstoneMode),
+}
+
+/// Sets the mode for tombstoning (either at the object or attribute level).
+#[derive(Debug)]
+pub enum TombstoneMode {
+    Object,
+    Attribute,
 }
 
 /// Result of the trim_some method.
@@ -2465,7 +2554,7 @@ mod tests {
             child.object_id()
         };
 
-        root_store.tombstone(child_id, Options::default()).await.expect("tombstone failed");
+        root_store.tombstone_object(child_id, Options::default()).await.expect("tombstone failed");
 
         // Let fsck check allocations.
         fsck(fs.clone()).await.expect("fsck failed");
@@ -2500,7 +2589,7 @@ mod tests {
             child.object_id()
         };
 
-        root_store.tombstone(child_id, Options::default()).await.expect("tombstone failed");
+        root_store.tombstone_object(child_id, Options::default()).await.expect("tombstone failed");
         assert_matches!(
             root_store.tree.find(&ObjectKey::object(child_id)).await.expect("find failed"),
             Some(Item { value: ObjectValue::None, .. })

@@ -63,7 +63,7 @@ pub enum ObjectKeyData {
     /// A child of a directory.
     /// We store the filename as a case-preserving unicode string.
     Child { name: String },
-    /// A graveyard entry.
+    /// A graveyard entry for an entire object.
     GraveyardEntry { object_id: u64 },
     /// Project ID info. This should only be attached to the volume's root node. Used to address the
     /// configured limit and the usage tracking which are ordered after the `project_id` to provide
@@ -72,6 +72,8 @@ pub enum ObjectKeyData {
     /// An extended attribute associated with an object. It stores the name used for the extended
     /// attribute, which has a maximum size of 255 bytes enforced by fuchsia.io.
     ExtendedAttribute { name: Vec<u8> },
+    /// A graveyard entry for an attribute.
+    GraveyardAttributeEntry { object_id: u64, attribute_id: u64 },
 }
 
 #[derive(Debug, Deserialize, Migrate, Serialize, TypeFingerprint)]
@@ -187,9 +189,21 @@ impl ObjectKey {
         Self { object_id, data: ObjectKeyData::Child { name: name.to_owned() } }
     }
 
-    /// Creates a graveyard entry.
+    /// Creates a graveyard entry for an object.
     pub fn graveyard_entry(graveyard_object_id: u64, object_id: u64) -> Self {
         Self { object_id: graveyard_object_id, data: ObjectKeyData::GraveyardEntry { object_id } }
+    }
+
+    /// Creates a graveyard entry for an attribute.
+    pub fn graveyard_attribute_entry(
+        graveyard_object_id: u64,
+        object_id: u64,
+        attribute_id: u64,
+    ) -> Self {
+        Self {
+            object_id: graveyard_object_id,
+            data: ObjectKeyData::GraveyardAttributeEntry { object_id, attribute_id },
+        }
     }
 
     /// Creates an ObjectKey for a ProjectLimit entry.
@@ -277,6 +291,7 @@ impl LayerKey for ObjectKey {
             | ObjectKeyData::Attribute(..)
             | ObjectKeyData::Child { .. }
             | ObjectKeyData::GraveyardEntry { .. }
+            | ObjectKeyData::GraveyardAttributeEntry { .. }
             | ObjectKeyData::Project { property: ProjectProperty::Limit, .. }
             | ObjectKeyData::ExtendedAttribute { .. } => MergeType::OptimizedMerge,
             ObjectKeyData::Project { property: ProjectProperty::Usage, .. } => MergeType::FullMerge,

@@ -1068,7 +1068,7 @@ mod tests {
 
         // Finally tombstone the object.
         root_store
-            .tombstone(object.object_id(), Options::default())
+            .tombstone_object(object.object_id(), Options::default())
             .await
             .expect("tombstone failed");
 

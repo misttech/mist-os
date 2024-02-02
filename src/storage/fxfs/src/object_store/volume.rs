@@ -161,7 +161,7 @@ impl RootVolume {
         transaction.commit_with_callback(|_| callback()).await.context("commit")?;
         // Tombstone the deleted objects.
         for object_id in &objects_to_delete {
-            root_store.tombstone(*object_id, Options::default()).await?;
+            root_store.tombstone_object(*object_id, Options::default()).await?;
         }
         Ok(())
     }

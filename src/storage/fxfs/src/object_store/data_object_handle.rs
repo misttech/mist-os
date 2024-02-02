@@ -34,6 +34,7 @@ use {
     fidl_fuchsia_io as fio,
     fsverity_merkle::{FsVerityHasher, FsVerityHasherOptions, MerkleTreeBuilder},
     futures::{stream::FuturesUnordered, TryStreamExt},
+    fxfs_trace::trace,
     mundane::hash::{Digest, Hasher, Sha256, Sha512},
     std::{
         cmp::min,
@@ -45,6 +46,10 @@ use {
     },
     storage_device::buffer::{Buffer, BufferFuture, BufferRef, MutableBufferRef},
 };
+
+/// How much data each transaction will cover when writing an attribute across batches. Pulled from
+/// `FLUSH_BATCH_SIZE` in paged_object_handle.rs.
+pub const WRITE_ATTR_BATCH_SIZE: usize = 524_288;
 
 /// DataObjectHandle is a typed handle for file-like objects that store data in the default data
 /// attribute. In addition to traditional files, this means things like the journal, superblocks,
@@ -60,12 +65,15 @@ pub struct DataObjectHandle<S: HandleOwner> {
     fsverity_state: Mutex<FsverityState>,
 }
 
+#[derive(Debug)]
 pub enum FsverityState {
     None,
+    Started,
     Pending(FsverityStateInner),
     Some(FsverityStateInner),
 }
 
+#[derive(Debug)]
 pub struct FsverityStateInner {
     descriptor: FsverityMetadata,
     // TODO(b/309656632): This should store the entire merkle tree and not just the leaf nodes.
@@ -122,11 +130,29 @@ impl<S: HandleOwner> DataObjectHandle<S> {
         &self.handle
     }
 
+    /// Sets `self.fsverity_state` to FsverityState::Started. Called at the top of `enable_verity`.
+    /// If another caller has already started but not completed `enabled_verity`, returns
+    /// FxfsError::AlreadyBound. If another caller has already completed `enable_verity`, returns
+    /// FxfsError::AlreadyExists.
+    pub fn set_fsverity_state_started(&self) -> Result<(), Error> {
+        let mut fsverity_guard = self.fsverity_state.lock().unwrap();
+        match *fsverity_guard {
+            FsverityState::None => {
+                *fsverity_guard = FsverityState::Started;
+                Ok(())
+            }
+            FsverityState::Started | FsverityState::Pending(_) => {
+                Err(anyhow!(FxfsError::Unavailable))
+            }
+            FsverityState::Some(_) => Err(anyhow!(FxfsError::AlreadyExists)),
+        }
+    }
+
     /// Sets `self.fsverity_state` to Pending. Must be called before `finalize_fsverity_state()`.
-    /// Asserts that the prior state of `self.fsverity_state` was `FsverityState::None`.
+    /// Asserts that the prior state of `self.fsverity_state` was `FsverityState::Started`.
     pub fn set_fsverity_state_pending(&self, descriptor: FsverityMetadata, merkle_tree: Box<[u8]>) {
         let mut fsverity_guard = self.fsverity_state.lock().unwrap();
-        assert!(matches!(*fsverity_guard, FsverityState::None));
+        assert!(matches!(*fsverity_guard, FsverityState::Started));
         *fsverity_guard = FsverityState::Pending(FsverityStateInner { descriptor, merkle_tree });
     }
 
@@ -138,9 +164,18 @@ impl<S: HandleOwner> DataObjectHandle<S> {
         let fsverity_state = std::mem::replace(mut_fsverity_state, FsverityState::None);
         match fsverity_state {
             FsverityState::None => panic!("Cannot go from FsverityState::None to Some"),
+            FsverityState::Started => panic!("Cannot go from FsverityState::Started to Some"),
             FsverityState::Pending(inner) => *mut_fsverity_state = FsverityState::Some(inner),
             FsverityState::Some(_) => panic!("Fsverity state was already set to Some"),
         }
+    }
+
+    /// Sets `self.fsverity_state` directly to Some without going through the entire state machine.
+    /// Used to set `self.fsverity_state` on open of a verified file.
+    pub fn set_fsverity_state_some(&self, descriptor: FsverityMetadata, merkle_tree: Box<[u8]>) {
+        let mut fsverity_guard = self.fsverity_state.lock().unwrap();
+        assert!(matches!(*fsverity_guard, FsverityState::None));
+        *fsverity_guard = FsverityState::Some(FsverityStateInner { descriptor, merkle_tree });
     }
 
     /// Verifies contents of `buffer` against the corresponding hashes in the stored merkle tree.
@@ -149,13 +184,15 @@ impl<S: HandleOwner> DataObjectHandle<S> {
     async fn verify_data(&self, mut offset: usize, buffer: &[u8]) -> Result<(), Error> {
         let block_size = self.block_size() as usize;
         assert!(offset % block_size == 0);
-        match &*self.fsverity_state.lock().unwrap() {
+        let fsverity_state = self.fsverity_state.lock().unwrap();
+        match &*fsverity_state {
             FsverityState::None => {
                 Err(anyhow!("Tried to verify read on a non verity-enabled file"))
             }
-            FsverityState::Pending(_) => {
-                Err(anyhow!("Mutation for fsverity metadata has not yet been applied"))
-            }
+            FsverityState::Started | FsverityState::Pending(_) => Err(anyhow!(
+                "Enable verity has not yet completed, fsverity state: {:?}",
+                &*fsverity_state
+            )),
             FsverityState::Some(metadata) => {
                 let (hasher, digest_size) = match metadata.descriptor.root_digest {
                     RootDigest::Sha256(_) => {
@@ -265,11 +302,13 @@ impl<S: HandleOwner> DataObjectHandle<S> {
     pub async fn get_descriptor(
         &self,
     ) -> Result<Option<(fio::VerificationOptions, Vec<u8>)>, Error> {
-        match &*self.fsverity_state.lock().unwrap() {
+        let fsverity_state = self.fsverity_state.lock().unwrap();
+        match &*fsverity_state {
             FsverityState::None => Ok(None),
-            FsverityState::Pending(_) => {
-                Err(anyhow!("Mutation for fsverity metadata has not yet been applied"))
-            }
+            FsverityState::Started | FsverityState::Pending(_) => Err(anyhow!(
+                "Enable verity has not yet completed, fsverity state: {:?}",
+                &*fsverity_state
+            )),
             FsverityState::Some(metadata) => {
                 let (options, root_hash) = match &metadata.descriptor.root_digest {
                     RootDigest::Sha256(root_hash) => {
@@ -305,12 +344,27 @@ impl<S: HandleOwner> DataObjectHandle<S> {
     /// `FSVERITY_MERKLE_ATTRIBUTE_ID`. Updates the root_hash of the `descriptor` according to the
     /// computed merkle tree and then replaces the ObjectValue of the data attribute with
     /// ObjectValue::VerifiedAttribute, which stores the `descriptor` inline.
-    /// TODO(b/314195208): Add locking to ensure file is modified while we are computing hashes.
+    #[trace]
     pub async fn enable_verity(&self, options: fio::VerificationOptions) -> Result<(), Error> {
+        self.set_fsverity_state_started()?;
+        // If the merkle attribute was tombstoned in the last attempt of `enable_verity`, flushing
+        // the graveyard should process the tombstone before we start rewriting the attribute.
+        if let Some(_) = self
+            .store()
+            .tree()
+            .find(&ObjectKey::graveyard_attribute_entry(
+                self.store().graveyard_directory_object_id(),
+                self.object_id(),
+                FSVERITY_MERKLE_ATTRIBUTE_ID,
+            ))
+            .await?
+        {
+            self.store().filesystem().graveyard().flush().await;
+        }
+        let mut transaction = self.new_transaction().await?;
         let hash_alg =
             options.hash_algorithm.ok_or_else(|| anyhow!("No hash algorithm provided"))?;
         let salt = options.salt.ok_or_else(|| anyhow!("No salt provided"))?;
-        let mut transaction = self.new_transaction().await?;
         let (root_digest, merkle_tree) = match hash_alg {
             fio::HashAlgorithm::Sha256 => {
                 let hasher = FsVerityHasher::Sha256(FsVerityHasherOptions::new(
@@ -336,14 +390,14 @@ impl<S: HandleOwner> DataObjectHandle<S> {
                 // TODO(b/314194485): Eventually want streaming writes.
                 // The merkle tree attribute should not require trimming because it should not
                 // exist.
-                if self
-                    .handle
-                    .write_attr(&mut transaction, FSVERITY_MERKLE_ATTRIBUTE_ID, &merkle_leaf_nodes)
-                    .await?
-                    .0
-                {
-                    return Err(anyhow!(FxfsError::AlreadyExists));
-                }
+                self.handle
+                    .write_new_attr_in_batches(
+                        &mut transaction,
+                        FSVERITY_MERKLE_ATTRIBUTE_ID,
+                        &merkle_leaf_nodes,
+                        WRITE_ATTR_BATCH_SIZE,
+                    )
+                    .await?;
                 let root: [u8; 32] = tree.root().try_into().unwrap();
                 (RootDigest::Sha256(root), merkle_leaf_nodes)
             }
@@ -371,20 +425,33 @@ impl<S: HandleOwner> DataObjectHandle<S> {
                 // TODO(b/314194485): Eventually want streaming writes.
                 // The merkle tree attribute should not require trimming because it should not
                 // exist.
-                if self
-                    .handle
-                    .write_attr(&mut transaction, FSVERITY_MERKLE_ATTRIBUTE_ID, &merkle_leaf_nodes)
-                    .await?
-                    .0
-                {
-                    return Err(anyhow!(FxfsError::AlreadyExists));
-                }
+                self.handle
+                    .write_new_attr_in_batches(
+                        &mut transaction,
+                        FSVERITY_MERKLE_ATTRIBUTE_ID,
+                        &merkle_leaf_nodes,
+                        WRITE_ATTR_BATCH_SIZE,
+                    )
+                    .await?;
                 (RootDigest::Sha512(tree.root().to_vec()), merkle_leaf_nodes)
             }
             _ => {
                 bail!(anyhow!(FxfsError::NotSupported)
                     .context(format!("hash algorithm not supported")));
             }
+        };
+        if merkle_tree.len() > WRITE_ATTR_BATCH_SIZE {
+            transaction.add(
+                self.store().store_object_id,
+                Mutation::replace_or_insert_object(
+                    ObjectKey::graveyard_attribute_entry(
+                        self.store().graveyard_directory_object_id(),
+                        self.object_id(),
+                        FSVERITY_MERKLE_ATTRIBUTE_ID,
+                    ),
+                    ObjectValue::None,
+                ),
+            );
         };
         let descriptor = FsverityMetadata { root_digest, salt };
         self.set_fsverity_state_pending(descriptor.clone(), merkle_tree.into());
@@ -401,7 +468,6 @@ impl<S: HandleOwner> DataObjectHandle<S> {
             AssocObj::Borrowed(self),
         );
         transaction.commit().await?;
-
         Ok(())
     }
 
@@ -524,8 +590,13 @@ impl<S: HandleOwner> DataObjectHandle<S> {
             return Ok(());
         }
         let (aligned, mut transfer_buf) = self.align_buffer(offset, buf).await?;
-        self.multi_write(transaction, self.attribute_id(), &[aligned], transfer_buf.as_mut())
-            .await?;
+        self.multi_write(
+            transaction,
+            self.attribute_id(),
+            &[aligned.clone()],
+            transfer_buf.as_mut(),
+        )
+        .await?;
         if offset + buf.len() as u64 > self.txn_get_size(transaction) {
             transaction.add_with_object(
                 self.store().store_object_id,
@@ -1391,15 +1462,16 @@ mod tests {
             filesystem::{
                 FxFilesystem, FxFilesystemBuilder, JournalingObject, OpenFxFilesystem, SyncOptions,
             },
-            fsck::{fsck_volume_with_options, fsck_with_options, FsckOptions},
+            fsck::{fsck, fsck_volume_with_options, fsck_with_options, FsckOptions},
             object_handle::{ObjectHandle, ObjectProperties, ReadObjectHandle, WriteObjectHandle},
             object_store::{
+                data_object_handle::WRITE_ATTR_BATCH_SIZE,
                 directory::replace_child,
                 object_record::{ObjectKey, ObjectValue, Timestamp},
                 transaction::{lock_keys, Mutation, Options},
                 volume::root_volume,
                 DataObjectHandle, Directory, HandleOptions, LockKey, ObjectStore, PosixAttributes,
-                TRANSACTION_MUTATION_THRESHOLD,
+                FSVERITY_MERKLE_ATTRIBUTE_ID, TRANSACTION_MUTATION_THRESHOLD,
             },
             round::{round_down, round_up},
         },
@@ -1412,6 +1484,7 @@ mod tests {
         },
         fxfs_crypto::Crypt,
         fxfs_insecure_crypto::InsecureCrypt,
+        mundane::hash::{Digest, Hasher, Sha256},
         rand::Rng,
         std::{
             ops::Range,
@@ -2205,6 +2278,153 @@ mod tests {
     }
 
     #[fuchsia::test]
+    async fn test_enable_verity_large_file() {
+        // Need to make a large FakeDevice to create space for a 67 MB file.
+        let device = DeviceHolder::new(FakeDevice::new(262144, TEST_DEVICE_BLOCK_SIZE));
+        let fs = FxFilesystem::new_empty(device).await.expect("new_empty failed");
+        let root_store = fs.root_store();
+        let mut transaction = fs
+            .clone()
+            .new_transaction(lock_keys![], Options::default())
+            .await
+            .expect("new_transaction failed");
+
+        let handle = ObjectStore::create_object(
+            &root_store,
+            &mut transaction,
+            HandleOptions::default(),
+            None,
+            None,
+        )
+        .await
+        .expect("failed to create object");
+        transaction.commit().await.expect("commit failed");
+        let mut offset = 0;
+
+        // Write a file big enough to trigger multiple transactions on enable_verity().
+        let mut buf = handle.allocate_buffer(WRITE_ATTR_BATCH_SIZE).await;
+        buf.as_mut_slice().fill(1);
+        for _ in 0..130 {
+            handle.write_or_append(Some(offset), buf.as_ref()).await.expect("write failed");
+            offset += WRITE_ATTR_BATCH_SIZE as u64;
+        }
+
+        handle
+            .enable_verity(fio::VerificationOptions {
+                hash_algorithm: Some(fio::HashAlgorithm::Sha256),
+                salt: Some(vec![]),
+                ..Default::default()
+            })
+            .await
+            .expect("set verified file metadata failed");
+
+        let mut buf = handle.allocate_buffer(WRITE_ATTR_BATCH_SIZE).await;
+        offset = 0;
+        for _ in 0..130 {
+            handle.read(offset, buf.as_mut()).await.expect("verification during read should fail");
+            assert_eq!(buf.as_slice(), &[1; WRITE_ATTR_BATCH_SIZE]);
+            offset += WRITE_ATTR_BATCH_SIZE as u64;
+        }
+
+        fsck(fs.clone()).await.expect("fsck failed");
+        fs.close().await.expect("Close failed");
+    }
+
+    #[fuchsia::test]
+    async fn test_retry_enable_verity_on_reboot() {
+        let device = DeviceHolder::new(FakeDevice::new(8192, TEST_DEVICE_BLOCK_SIZE));
+        let fs = FxFilesystem::new_empty(device).await.expect("new_empty failed");
+        let root_store = fs.root_store();
+        let mut transaction = fs
+            .clone()
+            .new_transaction(lock_keys![], Options::default())
+            .await
+            .expect("new_transaction failed");
+
+        let handle = ObjectStore::create_object(
+            &root_store,
+            &mut transaction,
+            HandleOptions::default(),
+            None,
+            None,
+        )
+        .await
+        .expect("failed to create object");
+        transaction.commit().await.expect("commit failed");
+
+        let object_id = {
+            let mut transaction = handle.new_transaction().await.expect("new_transaction failed");
+            transaction.add(
+                root_store.store_object_id(),
+                Mutation::replace_or_insert_object(
+                    ObjectKey::graveyard_attribute_entry(
+                        root_store.graveyard_directory_object_id(),
+                        handle.object_id(),
+                        FSVERITY_MERKLE_ATTRIBUTE_ID,
+                    ),
+                    ObjectValue::Some,
+                ),
+            );
+
+            // This write should span three transactions. This test mimics the behavior when the
+            // last transaction gets interrupted by a filesystem.close().
+            handle
+                .handle()
+                .write_new_attr_in_batches(
+                    &mut transaction,
+                    FSVERITY_MERKLE_ATTRIBUTE_ID,
+                    &vec![0; 2 * WRITE_ATTR_BATCH_SIZE],
+                    WRITE_ATTR_BATCH_SIZE,
+                )
+                .await
+                .expect("failed to write merkle attribute");
+
+            handle.object_id()
+            // Drop the transaction to simulate interrupting the merkle tree creation as well as to
+            // release the transaction locks.
+        };
+
+        fs.close().await.expect("failed to close filesystem");
+        let device = fs.take_device().await;
+        device.reopen(false);
+
+        let fs =
+            FxFilesystemBuilder::new().read_only(true).open(device).await.expect("open failed");
+        fsck(fs.clone()).await.expect("fsck failed");
+        fs.close().await.expect("failed to close filesystem");
+        let device = fs.take_device().await;
+        device.reopen(false);
+
+        // On open, the filesystem will call initial_reap which will call queue_tombstone().
+        let fs = FxFilesystem::open(device).await.expect("open failed");
+        let root_store = fs.root_store();
+        let handle =
+            ObjectStore::open_object(&root_store, object_id, HandleOptions::default(), None)
+                .await
+                .expect("open_object failed");
+        handle
+            .enable_verity(fio::VerificationOptions {
+                hash_algorithm: Some(fio::HashAlgorithm::Sha256),
+                salt: Some(vec![]),
+                ..Default::default()
+            })
+            .await
+            .expect("set verified file metadata failed");
+
+        // `flush` will ensure that initial reap fully processes all the graveyard entries. This
+        // isn't strictly necessary for the test to pass (the graveyard marker was already
+        // processed during `enable_verity`), but it does help catch bugs, such as the attribute
+        // graveyard entry not being removed upon processing.
+        fs.graveyard().flush().await;
+        assert_eq!(
+            handle.read_attr(FSVERITY_MERKLE_ATTRIBUTE_ID).await.expect("read_attr failed"),
+            Some(vec![0; <Sha256 as Hasher>::Digest::DIGEST_LEN].into())
+        );
+        fsck(fs.clone()).await.expect("fsck failed");
+        fs.close().await.expect("Close failed");
+    }
+
+    #[fuchsia::test]
     async fn test_verify_data_corrupt_file() {
         let fs: OpenFxFilesystem = test_filesystem().await;
         let mut transaction = fs
@@ -2523,7 +2743,6 @@ mod tests {
                     .expect("write failed");
             }
             transaction.commit().await.expect("commit failed");
-
             // This should take up more than one transaction.
             WriteObjectHandle::truncate(&object, 0).await.expect("truncate failed");
 
@@ -2602,7 +2821,7 @@ mod tests {
         assert_eq!(allocator.get_allocated_bytes(), allocated_before);
 
         store
-            .tombstone(
+            .tombstone_object(
                 object.object_id(),
                 Options { borrow_metadata_space: true, ..Default::default() },
             )

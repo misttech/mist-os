@@ -121,7 +121,10 @@ impl FuseFs {
 
                 // If the object has no remaining links, immediately tombstones it in the graveyard.
                 if let ReplacedChild::Object(object_id) = replaced_child {
-                    self.fs.graveyard().tombstone(dir.store().store_object_id(), object_id).await?;
+                    self.fs
+                        .graveyard()
+                        .tombstone_object(dir.store().store_object_id(), object_id)
+                        .await?;
 
                     // Remove object's handle from cache if it exists.
                     self.object_handle_cache.write().await.remove(&object_id);
@@ -196,7 +199,10 @@ impl FuseFs {
             // If the object is a file without remaining links,
             // immediately tombstones it in the graveyard.
             if let ReplacedChild::Object(object_id) = replaced_child {
-                self.fs.graveyard().tombstone(new_dir.store().store_object_id(), object_id).await?;
+                self.fs
+                    .graveyard()
+                    .tombstone_object(new_dir.store().store_object_id(), object_id)
+                    .await?;
 
                 // Remove object's handle from cache if it exists.
                 self.object_handle_cache.write().await.remove(&object_id);

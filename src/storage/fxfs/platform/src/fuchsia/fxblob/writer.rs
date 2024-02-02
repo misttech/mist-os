@@ -312,7 +312,7 @@ impl FxNode for FxDeliveryBlob {
             store
                 .filesystem()
                 .graveyard()
-                .queue_tombstone(store.store_object_id(), self.object_id());
+                .queue_tombstone_object(store.store_object_id(), self.object_id());
         }
     }
 

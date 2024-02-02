@@ -48,6 +48,8 @@ pub enum FxfsError {
     WrongType,
     #[error("Data integrity error")]
     IntegrityError,
+    #[error("Unavailable")]
+    Unavailable,
 }
 
 impl FxfsError {
@@ -99,6 +101,7 @@ mod fuchsia {
                 FxfsError::BadPath => Status::BAD_PATH,
                 FxfsError::WrongType => Status::WRONG_TYPE,
                 FxfsError::IntegrityError => Status::IO_DATA_INTEGRITY,
+                FxfsError::Unavailable => Status::UNAVAILABLE,
             }
         }
     }

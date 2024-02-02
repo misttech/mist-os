@@ -53,8 +53,9 @@ pub struct Graveyard {
 }
 
 enum Message {
-    // Tombstone the object identified by <store-id>, <object-id>.
-    Tombstone(u64, u64),
+    // Tombstone the object identified by <store-id>, <object-id>, Option<attribute-id>. If
+    // <attribute-id> is Some, tombstone just the attribute instead of the entire object.
+    Tombstone(u64, u64, Option<u64>),
 
     // Trims the identified object.
     Trim(u64, u64),
@@ -132,9 +133,14 @@ impl Graveyard {
         // Wait and process reap requests.
         while let Some(message) = receiver.next().await {
             match message {
-                Message::Tombstone(store_id, object_id) => {
-                    if let Err(e) = self.tombstone(store_id, object_id).await {
-                        error!(error = ?e, store_id, oid = object_id, "Tombstone error");
+                Message::Tombstone(store_id, object_id, attribute_id) => {
+                    let res = if let Some(attribute_id) = attribute_id {
+                        self.tombstone_attribute(store_id, object_id, attribute_id).await
+                    } else {
+                        self.tombstone_object(store_id, object_id).await
+                    };
+                    if let Err(e) = res {
+                        error!(error = ?e, store_id, oid = object_id, attribute_id, "Tombstone error");
                     }
                 }
                 Message::Trim(store_id, object_id) => {
@@ -165,10 +171,25 @@ impl Graveyard {
         let graveyard_object_id = store.graveyard_directory_object_id();
         let mut iter = Self::iter(graveyard_object_id, &mut merger).await?;
         let store_id = store.store_object_id();
-        while let Some((object_id, _, value)) = iter.get() {
+        while let Some(GraveyardEntryInfo { object_id, attribute_id, sequence: _, value }) =
+            iter.get()
+        {
             match value {
-                ObjectValue::Some => self.queue_tombstone(store_id, object_id),
-                ObjectValue::Trim => self.queue_trim(store_id, object_id),
+                ObjectValue::Some => {
+                    if let Some(attribute_id) = attribute_id {
+                        self.queue_tombstone_attribute(store_id, object_id, attribute_id)
+                    } else {
+                        self.queue_tombstone_object(store_id, object_id)
+                    }
+                }
+                ObjectValue::Trim => {
+                    if attribute_id.is_some() {
+                        return Err(anyhow!(
+                            "Trim is not currently supported for a single attribute"
+                        ));
+                    }
+                    self.queue_trim(store_id, object_id)
+                }
                 _ => bail!(anyhow!(FxfsError::Inconsistent).context("Bad graveyard value")),
             }
             count += 1;
@@ -178,8 +199,17 @@ impl Graveyard {
     }
 
     /// Queues an object for tombstoning.
-    pub fn queue_tombstone(&self, store_id: u64, object_id: u64) {
-        let _ = self.channel.unbounded_send(Message::Tombstone(store_id, object_id));
+    pub fn queue_tombstone_object(&self, store_id: u64, object_id: u64) {
+        let _ = self.channel.unbounded_send(Message::Tombstone(store_id, object_id, None));
+    }
+
+    /// Queues an object's attribute for tombstoning.
+    pub fn queue_tombstone_attribute(&self, store_id: u64, object_id: u64, attribute_id: u64) {
+        let _ = self.channel.unbounded_send(Message::Tombstone(
+            store_id,
+            object_id,
+            Some(attribute_id),
+        ));
     }
 
     fn queue_trim(&self, store_id: u64, object_id: u64) {
@@ -193,9 +223,9 @@ impl Graveyard {
         receiver.await.unwrap();
     }
 
-    /// Immediately tombstones (discards) an object in the graveyard.
+    /// Immediately tombstones (discards) and object in the graveyard.
     /// NB: Code should generally use |queue_tombstone| instead.
-    pub async fn tombstone(&self, store_id: u64, object_id: u64) -> Result<(), Error> {
+    pub async fn tombstone_object(&self, store_id: u64, object_id: u64) -> Result<(), Error> {
         let store = self
             .object_manager
             .store(store_id)
@@ -215,7 +245,37 @@ impl Graveyard {
         } else {
             Options { skip_journal_checks: true, borrow_metadata_space: true, ..Default::default() }
         };
-        store.tombstone(object_id, options).await.context("Failed to tombstone object")
+        store.tombstone_object(object_id, options).await
+    }
+
+    /// Immediately tombstones (discards) and attribute in the graveyard.
+    /// NB: Code should generally use |queue_tombstone| instead.
+    pub async fn tombstone_attribute(
+        &self,
+        store_id: u64,
+        object_id: u64,
+        attribute_id: u64,
+    ) -> Result<(), Error> {
+        let store = self
+            .object_manager
+            .store(store_id)
+            .with_context(|| format!("Failed to get store {}", store_id))?;
+        // For now, it's safe to assume that all objects in the root parent and root store should
+        // return space to the metadata reservation, but we might have to revisit that if we end up
+        // with objects that are in other stores.
+        let options = if store_id == self.object_manager.root_parent_store_object_id()
+            || store_id == self.object_manager.root_store_object_id()
+        {
+            Options {
+                skip_journal_checks: true,
+                borrow_metadata_space: true,
+                allocator_reservation: Some(self.object_manager.metadata_reservation()),
+                ..Default::default()
+            }
+        } else {
+            Options { skip_journal_checks: true, borrow_metadata_space: true, ..Default::default() }
+        };
+        store.tombstone_attribute(object_id, attribute_id, options).await
     }
 
     async fn trim(&self, store_id: u64, object_id: u64) -> Result<(), Error> {
@@ -266,6 +326,30 @@ pub struct GraveyardIterator<'a, 'b> {
     iter: MergerIterator<'a, 'b, ObjectKey, ObjectValue>,
 }
 
+/// Contains information about a graveyard entry associated with a particular object or
+/// attribute.
+#[derive(Debug, PartialEq)]
+pub struct GraveyardEntryInfo {
+    object_id: u64,
+    attribute_id: Option<u64>,
+    sequence: u64,
+    value: ObjectValue,
+}
+
+impl GraveyardEntryInfo {
+    pub fn object_id(&self) -> u64 {
+        self.object_id
+    }
+
+    pub fn attribute_id(&self) -> Option<u64> {
+        self.attribute_id
+    }
+
+    pub fn value(&self) -> &ObjectValue {
+        &self.value
+    }
+}
+
 impl<'a, 'b> GraveyardIterator<'a, 'b> {
     async fn new(
         object_id: u64,
@@ -290,15 +374,33 @@ impl<'a, 'b> GraveyardIterator<'a, 'b> {
         }
     }
 
-    /// Returns a tuple (object_id, sequence, value).
-    pub fn get(&self) -> Option<(u64, u64, ObjectValue)> {
+    pub fn get(&self) -> Option<GraveyardEntryInfo> {
         match self.iter.get() {
             Some(ItemRef {
                 key: ObjectKey { object_id: oid, data: ObjectKeyData::GraveyardEntry { object_id } },
                 value,
                 sequence,
                 ..
-            }) if *oid == self.object_id => Some((*object_id, sequence, value.clone())),
+            }) if *oid == self.object_id => Some(GraveyardEntryInfo {
+                object_id: *object_id,
+                attribute_id: None,
+                sequence,
+                value: value.clone(),
+            }),
+            Some(ItemRef {
+                key:
+                    ObjectKey {
+                        object_id: oid,
+                        data: ObjectKeyData::GraveyardAttributeEntry { object_id, attribute_id },
+                    },
+                value,
+                sequence,
+            }) if *oid == self.object_id => Some(GraveyardEntryInfo {
+                object_id: *object_id,
+                attribute_id: Some(*attribute_id),
+                sequence,
+                value: value.clone(),
+            }),
             _ => None,
         }
     }
@@ -312,11 +414,16 @@ impl<'a, 'b> GraveyardIterator<'a, 'b> {
 #[cfg(test)]
 mod tests {
     use {
-        super::Graveyard,
+        super::{Graveyard, GraveyardEntryInfo, ObjectStore},
         crate::{
-            filesystem::FxFilesystem,
+            errors::FxfsError,
+            filesystem::{FxFilesystem, FxFilesystemBuilder},
+            fsck::fsck,
+            object_handle::ObjectHandle,
+            object_store::data_object_handle::WRITE_ATTR_BATCH_SIZE,
             object_store::object_record::ObjectValue,
             object_store::transaction::{lock_keys, Options},
+            object_store::{HandleOptions, Mutation, ObjectKey, FSVERITY_MERKLE_ATTRIBUTE_ID},
         },
         assert_matches::assert_matches,
         storage_device::{fake_device::FakeDevice, DeviceHolder},
@@ -348,9 +455,25 @@ mod tests {
             let mut iter = Graveyard::iter(root_store.graveyard_directory_object_id(), &mut merger)
                 .await
                 .expect("iter failed");
-            assert_matches!(iter.get().expect("missing entry"), (3, _, ObjectValue::Some));
+            assert_matches!(
+                iter.get().expect("missing entry"),
+                GraveyardEntryInfo {
+                    object_id: 3,
+                    attribute_id: None,
+                    value: ObjectValue::Some,
+                    ..
+                }
+            );
             iter.advance().await.expect("advance failed");
-            assert_matches!(iter.get().expect("missing entry"), (4, _, ObjectValue::Some));
+            assert_matches!(
+                iter.get().expect("missing entry"),
+                GraveyardEntryInfo {
+                    object_id: 4,
+                    attribute_id: None,
+                    value: ObjectValue::Some,
+                    ..
+                }
+            );
             iter.advance().await.expect("advance failed");
             assert_eq!(iter.get(), None);
         }
@@ -370,8 +493,243 @@ mod tests {
         let mut iter = Graveyard::iter(root_store.graveyard_directory_object_id(), &mut merger)
             .await
             .expect("iter failed");
-        assert_matches!(iter.get().expect("missing entry"), (3, _, ObjectValue::Some));
+        assert_matches!(
+            iter.get().expect("missing entry"),
+            GraveyardEntryInfo { object_id: 3, attribute_id: None, value: ObjectValue::Some, .. }
+        );
         iter.advance().await.expect("advance failed");
         assert_eq!(iter.get(), None);
+    }
+
+    #[fuchsia::test]
+    async fn test_tombstone_attribute() {
+        let device = DeviceHolder::new(FakeDevice::new(8192, TEST_DEVICE_BLOCK_SIZE));
+        let fs = FxFilesystem::new_empty(device).await.expect("new_empty failed");
+        let root_store = fs.root_store();
+        let mut transaction = fs
+            .clone()
+            .new_transaction(lock_keys![], Options::default())
+            .await
+            .expect("new_transaction failed");
+
+        let handle = ObjectStore::create_object(
+            &root_store,
+            &mut transaction,
+            HandleOptions::default(),
+            None,
+            None,
+        )
+        .await
+        .expect("failed to create object");
+        transaction.commit().await.expect("commit failed");
+
+        handle
+            .write_attr(FSVERITY_MERKLE_ATTRIBUTE_ID, &[0; 8192])
+            .await
+            .expect("failed to write merkle attribute");
+        let object_id = handle.object_id();
+        let mut transaction = handle.new_transaction().await.expect("new_transaction failed");
+        transaction.add(
+            root_store.store_object_id(),
+            Mutation::replace_or_insert_object(
+                ObjectKey::graveyard_attribute_entry(
+                    root_store.graveyard_directory_object_id(),
+                    object_id,
+                    FSVERITY_MERKLE_ATTRIBUTE_ID,
+                ),
+                ObjectValue::Some,
+            ),
+        );
+
+        transaction.commit().await.expect("commit failed");
+
+        fs.close().await.expect("failed to close filesystem");
+        let device = fs.take_device().await;
+        device.reopen(false);
+
+        let fs =
+            FxFilesystemBuilder::new().read_only(true).open(device).await.expect("open failed");
+        fsck(fs.clone()).await.expect("fsck failed");
+        fs.close().await.expect("failed to close filesystem");
+        let device = fs.take_device().await;
+        device.reopen(false);
+
+        // On open, the filesystem will call initial_reap which will call queue_tombstone().
+        let fs = FxFilesystem::open(device).await.expect("open failed");
+        // `wait_for_reap` ensures that the Message::Tombstone is actually processed.
+        fs.graveyard().wait_for_reap().await;
+        let root_store = fs.root_store();
+
+        let handle =
+            ObjectStore::open_object(&root_store, object_id, HandleOptions::default(), None)
+                .await
+                .expect("failed to open object");
+
+        assert_eq!(
+            handle.read_attr(FSVERITY_MERKLE_ATTRIBUTE_ID).await.expect("read_attr failed"),
+            None
+        );
+        fsck(fs.clone()).await.expect("fsck failed");
+    }
+
+    #[fuchsia::test]
+    async fn test_tombstone_attribute_and_object() {
+        let device = DeviceHolder::new(FakeDevice::new(8192, TEST_DEVICE_BLOCK_SIZE));
+        let fs = FxFilesystem::new_empty(device).await.expect("new_empty failed");
+        let root_store = fs.root_store();
+        let mut transaction = fs
+            .clone()
+            .new_transaction(lock_keys![], Options::default())
+            .await
+            .expect("new_transaction failed");
+
+        let handle = ObjectStore::create_object(
+            &root_store,
+            &mut transaction,
+            HandleOptions::default(),
+            None,
+            None,
+        )
+        .await
+        .expect("failed to create object");
+        transaction.commit().await.expect("commit failed");
+
+        handle
+            .write_attr(FSVERITY_MERKLE_ATTRIBUTE_ID, &[0; 8192])
+            .await
+            .expect("failed to write merkle attribute");
+        let object_id = handle.object_id();
+        let mut transaction = handle.new_transaction().await.expect("new_transaction failed");
+        transaction.add(
+            root_store.store_object_id(),
+            Mutation::replace_or_insert_object(
+                ObjectKey::graveyard_attribute_entry(
+                    root_store.graveyard_directory_object_id(),
+                    object_id,
+                    FSVERITY_MERKLE_ATTRIBUTE_ID,
+                ),
+                ObjectValue::Some,
+            ),
+        );
+        transaction.commit().await.expect("commit failed");
+        let mut transaction = handle.new_transaction().await.expect("new_transaction failed");
+        transaction.add(
+            root_store.store_object_id(),
+            Mutation::replace_or_insert_object(
+                ObjectKey::graveyard_entry(root_store.graveyard_directory_object_id(), object_id),
+                ObjectValue::Some,
+            ),
+        );
+        transaction.commit().await.expect("commit failed");
+
+        fs.close().await.expect("failed to close filesystem");
+        let device = fs.take_device().await;
+        device.reopen(false);
+
+        let fs =
+            FxFilesystemBuilder::new().read_only(true).open(device).await.expect("open failed");
+        fsck(fs.clone()).await.expect("fsck failed");
+        fs.close().await.expect("failed to close filesystem");
+        let device = fs.take_device().await;
+        device.reopen(false);
+
+        // On open, the filesystem will call initial_reap which will call queue_tombstone().
+        let fs = FxFilesystem::open(device).await.expect("open failed");
+        // `wait_for_reap` ensures that the two tombstone messages are processed.
+        fs.graveyard().wait_for_reap().await;
+
+        let root_store = fs.root_store();
+        if let Err(e) =
+            ObjectStore::open_object(&root_store, object_id, HandleOptions::default(), None).await
+        {
+            assert!(FxfsError::NotFound.matches(&e));
+        } else {
+            panic!("open_object succeeded");
+        };
+        fsck(fs.clone()).await.expect("fsck failed");
+    }
+
+    #[fuchsia::test]
+    async fn test_tombstone_large_attribute() {
+        let device = DeviceHolder::new(FakeDevice::new(8192, TEST_DEVICE_BLOCK_SIZE));
+        let fs = FxFilesystem::new_empty(device).await.expect("new_empty failed");
+        let root_store = fs.root_store();
+        let mut transaction = fs
+            .clone()
+            .new_transaction(lock_keys![], Options::default())
+            .await
+            .expect("new_transaction failed");
+
+        let handle = ObjectStore::create_object(
+            &root_store,
+            &mut transaction,
+            HandleOptions::default(),
+            None,
+            None,
+        )
+        .await
+        .expect("failed to create object");
+        transaction.commit().await.expect("commit failed");
+
+        let object_id = {
+            let mut transaction = handle.new_transaction().await.expect("new_transaction failed");
+            transaction.add(
+                root_store.store_object_id(),
+                Mutation::replace_or_insert_object(
+                    ObjectKey::graveyard_attribute_entry(
+                        root_store.graveyard_directory_object_id(),
+                        handle.object_id(),
+                        FSVERITY_MERKLE_ATTRIBUTE_ID,
+                    ),
+                    ObjectValue::Some,
+                ),
+            );
+
+            // This write should span three transactions. This test mimics the behavior when the
+            // last transaction gets interrupted by a filesystem.close().
+            handle
+                .handle()
+                .write_new_attr_in_batches(
+                    &mut transaction,
+                    FSVERITY_MERKLE_ATTRIBUTE_ID,
+                    &vec![0; 3 * WRITE_ATTR_BATCH_SIZE],
+                    WRITE_ATTR_BATCH_SIZE,
+                )
+                .await
+                .expect("failed to write merkle attribute");
+
+            handle.object_id()
+            // Drop the transaction to simulate interrupting the merkle tree creation as well as to
+            // release the transaction locks.
+        };
+
+        fs.close().await.expect("failed to close filesystem");
+        let device = fs.take_device().await;
+        device.reopen(false);
+
+        let fs =
+            FxFilesystemBuilder::new().read_only(true).open(device).await.expect("open failed");
+        fsck(fs.clone()).await.expect("fsck failed");
+        fs.close().await.expect("failed to close filesystem");
+        let device = fs.take_device().await;
+        device.reopen(false);
+
+        // On open, the filesystem will call initial_reap which will call queue_tombstone().
+        let fs = FxFilesystem::open(device).await.expect("open failed");
+        // `wait_for_reap` ensures that the two tombstone messages are processed.
+        fs.graveyard().wait_for_reap().await;
+
+        let root_store = fs.root_store();
+
+        let handle =
+            ObjectStore::open_object(&root_store, object_id, HandleOptions::default(), None)
+                .await
+                .expect("failed to open object");
+
+        assert_eq!(
+            handle.read_attr(FSVERITY_MERKLE_ATTRIBUTE_ID).await.expect("read_attr failed"),
+            None
+        );
+        fsck(fs.clone()).await.expect("fsck failed");
     }
 }

@@ -804,7 +804,7 @@ pub async fn replace_child_with_object<'a, S: HandleOwner>(
             // Directories might have extended attributes which might require multiple transactions
             // to delete, so we delete directories via the graveyard.
             dst.0.store().add_to_graveyard(transaction, old_id);
-            dst.0.store().filesystem().graveyard().queue_tombstone(store_id, old_id);
+            dst.0.store().filesystem().graveyard().queue_tombstone_object(store_id, old_id);
             sub_dirs_delta -= 1;
             ReplacedChild::Directory(old_id)
         }

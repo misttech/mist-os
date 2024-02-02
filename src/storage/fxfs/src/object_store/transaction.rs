@@ -803,6 +803,9 @@ impl<'a> Transaction<'a> {
                 ObjectKeyData::GraveyardEntry { .. } => {
                     // TODO(https://fxbug.dev/42073911): Check lock requirements.
                 }
+                ObjectKeyData::GraveyardAttributeEntry { .. } => {
+                    // TODO(https://fxbug.dev/122974): Check lock requirements.
+                }
                 ObjectKeyData::Keys => {
                     let id = key.object_id;
                     if !self.txn_locks.contains(&LockKey::object(*store_object_id, id))

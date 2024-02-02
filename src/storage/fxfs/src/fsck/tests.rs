@@ -804,7 +804,7 @@ async fn test_missing_object_tree_layer_file() {
             layers.layers[0].handle().unwrap().object_id()
         };
         fs.root_store()
-            .tombstone(id, transaction::Options::default())
+            .tombstone_object(id, transaction::Options::default())
             .await
             .expect("tombstone failed");
     }
@@ -824,7 +824,7 @@ async fn test_missing_object_store_handle() {
             volume.store_object_id()
         };
         fs.root_store()
-            .tombstone(store_id, transaction::Options::default())
+            .tombstone_object(store_id, transaction::Options::default())
             .await
             .expect("tombstone failed");
     }
@@ -1219,51 +1219,7 @@ async fn test_verified_file_merkle_attribute_missing() {
         .expect_err("Fsck should fail");
     assert_matches!(
         test.errors()[..],
-        [FsckIssue::Error(FsckError::InconsistentVerifiedFile(..)), ..]
-    );
-}
-
-#[fuchsia::test]
-async fn test_file_with_merkle_attribute_not_marked_as_verified() {
-    let mut test = FsckTest::new().await;
-
-    let store_id = {
-        let fs = test.filesystem();
-        let root_volume = root_volume(fs.clone()).await.unwrap();
-        let store = root_volume.new_volume("vol", None).await.unwrap();
-
-        install_items_in_store(
-            &fs,
-            store.as_ref(),
-            vec![
-                Item::new(
-                    ObjectKey::object(10),
-                    ObjectValue::Object {
-                        kind: ObjectKind::File { refs: 1 },
-                        attributes: ObjectAttributes { ..Default::default() },
-                    },
-                ),
-                Item::new(
-                    ObjectKey::attribute(10, DEFAULT_DATA_ATTRIBUTE_ID, AttributeKey::Attribute),
-                    ObjectValue::attribute(0),
-                ),
-                Item::new(
-                    ObjectKey::attribute(10, FSVERITY_MERKLE_ATTRIBUTE_ID, AttributeKey::Attribute),
-                    ObjectValue::attribute(0),
-                ),
-            ],
-        )
-        .await;
-        store.store_object_id()
-    };
-
-    test.remount().await.expect("Remount failed");
-    test.run(TestOptions { volume_store_id: Some(store_id), ..Default::default() })
-        .await
-        .expect_err("Fsck should fail");
-    assert_matches!(
-        test.errors()[..],
-        [FsckIssue::Error(FsckError::InconsistentVerifiedFile(..)), ..]
+        [FsckIssue::Error(FsckError::VerifiedFileDoesNotHaveAMerkleAttribute(..)), ..]
     );
 }
 
@@ -1453,6 +1409,102 @@ async fn test_records_for_tombstoned_object() {
     assert_matches!(
         test.errors()[..],
         [FsckIssue::Error(FsckError::TombstonedObjectHasRecords(..)), ..]
+    );
+}
+
+#[fuchsia::test]
+async fn test_invalid_value_graveyard_attribute_entry() {
+    let mut test = FsckTest::new().await;
+
+    let store_id = {
+        let fs = test.filesystem();
+        let root_volume = root_volume(fs.clone()).await.unwrap();
+        let store = root_volume.new_volume("vol", Some(test.get_crypt())).await.unwrap();
+
+        install_items_in_store(
+            &fs,
+            store.as_ref(),
+            vec![
+                Item::new(
+                    ObjectKey::object(10),
+                    ObjectValue::Object {
+                        kind: ObjectKind::File { refs: 1 },
+                        attributes: ObjectAttributes { ..Default::default() },
+                    },
+                ),
+                Item::new(
+                    ObjectKey::attribute(10, 1, AttributeKey::Attribute),
+                    ObjectValue::attribute(100),
+                ),
+                Item::new(
+                    ObjectKey::graveyard_attribute_entry(
+                        store.graveyard_directory_object_id(),
+                        10,
+                        1,
+                    ),
+                    ObjectValue::Trim,
+                ),
+            ],
+        )
+        .await;
+        store.store_object_id()
+    };
+
+    test.remount().await.expect("Remount failed");
+    test.run(TestOptions { volume_store_id: Some(store_id), ..Default::default() })
+        .await
+        .expect_err("Fsck should fail");
+    assert_matches!(
+        test.errors()[..],
+        [
+            FsckIssue::Error(FsckError::MissingEncryptionKeys(..)),
+            FsckIssue::Error(FsckError::TrimValueForGraveyardAttributeEntry(.., 10, 1,)),
+            ..
+        ]
+    );
+}
+
+#[fuchsia::test]
+async fn test_tombstoned_attribute_does_not_exist() {
+    let mut test = FsckTest::new().await;
+
+    let store_id = {
+        let fs = test.filesystem();
+        let root_volume = root_volume(fs.clone()).await.unwrap();
+        let store = root_volume.new_volume("vol", Some(test.get_crypt())).await.unwrap();
+
+        install_items_in_store(
+            &fs,
+            store.as_ref(),
+            vec![
+                Item::new(
+                    ObjectKey::object(10),
+                    ObjectValue::Object {
+                        kind: ObjectKind::Directory { sub_dirs: 0 },
+                        attributes: ObjectAttributes { ..Default::default() },
+                    },
+                ),
+                Item::new(
+                    ObjectKey::graveyard_attribute_entry(
+                        store.graveyard_directory_object_id(),
+                        10,
+                        1,
+                    ),
+                    ObjectValue::Some,
+                ),
+            ],
+        )
+        .await;
+        store.store_object_id()
+    };
+
+    test.remount().await.expect("Remount failed");
+    test.run(TestOptions { volume_store_id: Some(store_id), ..Default::default() })
+        .await
+        .expect_err("Fsck should fail");
+    assert_matches!(
+        test.errors()[..],
+        [FsckIssue::Error(FsckError::TombstonedAttributeDoesNotExist(.., 10, 1)), ..]
     );
 }
 

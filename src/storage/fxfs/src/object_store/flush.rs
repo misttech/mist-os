@@ -277,12 +277,12 @@ impl ObjectStore {
             let object_id = layer.handle().map(|h| h.object_id());
             layer.close_layer().await;
             if let Some(object_id) = object_id {
-                parent_store.tombstone(object_id, txn_options).await?;
+                parent_store.tombstone_object(object_id, txn_options).await?;
             }
         }
 
         if old_encrypted_mutations_object_id != INVALID_OBJECT_ID {
-            parent_store.tombstone(old_encrypted_mutations_object_id, txn_options).await?;
+            parent_store.tombstone_object(old_encrypted_mutations_object_id, txn_options).await?;
         }
 
         Ok(layer_file_sizes)

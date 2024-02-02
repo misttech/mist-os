@@ -833,7 +833,7 @@ mod tests {
             transaction.commit().await.expect("commit failed");
             fs.object_manager()
                 .root_parent_store()
-                .tombstone(object_id, Options::default())
+                .tombstone_object(object_id, Options::default())
                 .await
                 .expect("tombstone failed");
         }
@@ -1050,7 +1050,10 @@ mod tests {
         .expect("create_object failed");
         transaction.commit().await.expect("commit failed");
 
-        store.tombstone(handle.object_id(), Options::default()).await.expect("tombstone failed");
+        store
+            .tombstone_object(handle.object_id(), Options::default())
+            .await
+            .expect("tombstone failed");
 
         // Generate enough work to induce a journal flush.
         let root_store = fs.root_store();
