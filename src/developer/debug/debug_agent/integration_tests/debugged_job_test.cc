@@ -221,7 +221,7 @@ TEST(DebuggedJobIntegrationTest, DISABLED_RepresentativeScenario) {
   agent.Connect(std::move(backend));
   mock_backend.set_remote_api(remote_api);
 
-  FX_VLOGS(1) << "Setting filters.";
+  FX_LOGS(DEBUG) << "Setting filters.";
 
   // Sent the filters.
   UpdateFilterRequest filter_request;
@@ -232,7 +232,7 @@ TEST(DebuggedJobIntegrationTest, DISABLED_RepresentativeScenario) {
   remote_api->OnUpdateFilter(filter_request, &filter_reply);
   ASSERT_TRUE(filter_reply.matched_processes.empty());
 
-  FX_VLOGS(1) << "Launching jobs.";
+  FX_LOGS(DEBUG) << "Launching jobs.";
 
   // We launch some processes.
   zx::job job = CreateJob();
@@ -248,7 +248,7 @@ TEST(DebuggedJobIntegrationTest, DISABLED_RepresentativeScenario) {
   // We resume the processes, which are in the initial waiting state.
   VerifyAllProcessesStarted(mock_backend, {"true", "false"});
 
-  FX_VLOGS(1) << "Starting threads.";
+  FX_LOGS(DEBUG) << "Starting threads.";
 
   // All threads should start
   for (size_t i = 0; i < processes.size(); i++) {
@@ -259,7 +259,7 @@ TEST(DebuggedJobIntegrationTest, DISABLED_RepresentativeScenario) {
   // Now that all threads started, we resume them all.
   ResumeAllProcesses(remote_api, mock_backend);
 
-  FX_VLOGS(1) << "Receiving modules.";
+  FX_LOGS(DEBUG) << "Receiving modules.";
 
   // We should receive all the modules notifications.
   for (size_t i = 0; i < processes.size(); i++) {
@@ -267,7 +267,7 @@ TEST(DebuggedJobIntegrationTest, DISABLED_RepresentativeScenario) {
     ASSERT_EQ(mock_backend.module_events().size(), i + 1);
   }
 
-  FX_VLOGS(1) << "Resuming proceses.";
+  FX_LOGS(DEBUG) << "Resuming proceses.";
 
   // We need to resume the thread again after getting the modules.
   ResumeAllProcesses(remote_api, mock_backend);
@@ -293,7 +293,7 @@ TEST(DebuggedJobIntegrationTest, DISABLED_RepresentativeScenario) {
   processes.clear();
   mock_backend.Reset();
 
-  FX_VLOGS(1) << "Changing filters.";
+  FX_LOGS(DEBUG) << "Changing filters.";
 
   // We change the filters. A partial match should work.
   filter_request.filters = {debug_ipc::Filter{.type = debug_ipc::Filter::Type::kProcessNameSubstr,
@@ -301,7 +301,7 @@ TEST(DebuggedJobIntegrationTest, DISABLED_RepresentativeScenario) {
   remote_api->OnUpdateFilter(filter_request, &filter_reply);
   ASSERT_TRUE(filter_reply.matched_processes.empty());
 
-  FX_VLOGS(1) << "Launching new processes.";
+  FX_LOGS(DEBUG) << "Launching new processes.";
 
   // We launch two processes.
   processes.push_back(LaunchProcess(job, "breakpoint_test_exe", {"/pkg/bin/breakpoint_test_exe"}));
@@ -321,7 +321,7 @@ TEST(DebuggedJobIntegrationTest, DISABLED_RepresentativeScenario) {
 
   ASSERT_EQ(mock_backend.module_events().size(), 1u);
 
-  FX_VLOGS(1) << "Setting up breakpoint.";
+  FX_LOGS(DEBUG) << "Setting up breakpoint.";
 
   // The test .so we load in order to search the offset of the exported symbol
   // within it.
@@ -361,7 +361,7 @@ TEST(DebuggedJobIntegrationTest, DISABLED_RepresentativeScenario) {
 
   message_loop->Run();
 
-  FX_VLOGS(1) << "Hit breakpoint.";
+  FX_LOGS(DEBUG) << "Hit breakpoint.";
 
   // We should've received a breakpoint event.
   ASSERT_EQ(mock_backend.exceptions().size(), 1u);
@@ -374,7 +374,7 @@ TEST(DebuggedJobIntegrationTest, DISABLED_RepresentativeScenario) {
   EXPECT_EQ(breakpoint_stat.hit_count, 1u);
   EXPECT_EQ(breakpoint_stat.should_delete, false);  // Non one-shot breakpoint.
 
-  FX_VLOGS(1) << "Resuming process.";
+  FX_LOGS(DEBUG) << "Resuming process.";
 
   // We resume the thread.
   ResumeAllProcesses(remote_api, mock_backend);
