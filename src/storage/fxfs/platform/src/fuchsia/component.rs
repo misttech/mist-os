@@ -65,7 +65,7 @@ pub struct Component {
     scope: ExecutionScope,
 
     // The root of the pseudo filesystem for the component.
-    outgoing_dir: Arc<vfs::directory::immutable::Simple>,
+    export_dir: Arc<vfs::directory::immutable::Simple>,
 }
 
 // Wrapper type to add `FsInspect` support to an `OpenFxFilesystem`.
@@ -143,7 +143,7 @@ impl Component {
         Arc::new(Self {
             state: Mutex::new(State::ComponentStarted),
             scope: ExecutionScope::new(),
-            outgoing_dir: vfs::directory::immutable::simple(),
+            export_dir: vfs::directory::immutable::simple(),
         })
     }
 
@@ -154,7 +154,7 @@ impl Component {
         lifecycle_channel: Option<zx::Channel>,
     ) -> Result<(), Error> {
         let svc_dir = vfs::directory::immutable::simple();
-        self.outgoing_dir.add_entry("svc", svc_dir.clone()).expect("Unable to create svc dir");
+        self.export_dir.add_entry("svc", svc_dir.clone()).expect("Unable to create svc dir");
 
         let weak = Arc::downgrade(&self);
         svc_dir.add_entry(
@@ -208,9 +208,12 @@ impl Component {
             }),
         )?;
 
-        self.outgoing_dir.clone().open(
+        self.export_dir.clone().open(
             self.scope.clone(),
-            fio::OpenFlags::RIGHT_READABLE,
+            fio::OpenFlags::RIGHT_READABLE
+                | fio::OpenFlags::RIGHT_WRITABLE
+                | fio::OpenFlags::DIRECTORY
+                | fio::OpenFlags::RIGHT_EXECUTABLE,
             Path::dot(),
             outgoing_dir.into(),
         );
@@ -265,7 +268,7 @@ impl Component {
         // TODO(https://fxbug.dev/42174810): This is not very graceful.  It would be better for the client to
         // explicitly shut down all volumes first, and make this fail if there are remaining active
         // connections.  Fix the bug in fs_test which requires this.
-        state.stop(&self.outgoing_dir).await;
+        state.stop(&self.export_dir).await;
         let client = new_block_client(device).await?;
 
         // TODO(https://fxbug.dev/42063349) Add support for block sizes greater than the page size.
@@ -297,14 +300,14 @@ impl Component {
         let volumes =
             VolumesDirectory::new(root_volume, Arc::downgrade(&inspect_tree), mem_monitor).await?;
 
-        self.outgoing_dir.add_entry_may_overwrite(
+        self.export_dir.add_entry_may_overwrite(
             "volumes",
             volumes.directory_node().clone(),
             /* overwrite: */ true,
         )?;
 
         let debug = FxfsDebug::new(&**fs).await?;
-        self.outgoing_dir.add_entry_may_overwrite("debug", debug.root(), true)?;
+        self.export_dir.add_entry_may_overwrite("debug", debug.root(), true)?;
 
         fs.allocator().track_statistics(&metrics::detail(), "allocator");
         fs.journal().track_statistics(&metrics::detail(), "journal");
@@ -406,7 +409,7 @@ impl Component {
     }
 
     async fn shutdown(&self) {
-        self.state.lock().await.stop(&self.outgoing_dir).await;
+        self.state.lock().await.stop(&self.export_dir).await;
         info!("Filesystem terminated");
     }
 
