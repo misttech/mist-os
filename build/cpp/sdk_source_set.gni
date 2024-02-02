@@ -47,6 +47,14 @@ import("//build/sdk/sdk_atom.gni")
 #     List of dependencies that should not be reflected in SDKs.
 #     Mostly useful for code generation.
 #
+#   non_sdk_public_deps (optional)
+#     List of dependencies that will go into `public_deps` field of `source_set`
+#     target.
+#
+#   non_sdk_local_deps (optional)
+#     List of dependencies that will go into `deps` field of `source_set`
+#     target.
+#
 #   sdk_headers_for_internal_use (optional)
 #     Out of the headers specified in `public` or `sources`, some headers are
 #     part of the SDK but not meant for direct inclusion by users, i.e. they are
@@ -110,6 +118,8 @@ template("sdk_source_set") {
                              "include_base",
                              "metadata",
                              "non_sdk_deps",
+                             "non_sdk_public_deps",
+                             "non_sdk_local_deps",
                              "sdk_headers_for_internal_use",
                              "source_dir",
                              "testonly",
@@ -122,6 +132,14 @@ template("sdk_source_set") {
     if (defined(invoker.non_sdk_deps)) {
       deps += invoker.non_sdk_deps
       public_deps += invoker.non_sdk_deps
+    }
+
+    if (defined(invoker.non_sdk_public_deps)) {
+      public_deps += invoker.non_sdk_public_deps
+    }
+
+    if (defined(invoker.non_sdk_local_deps)) {
+      deps += invoker.non_sdk_local_deps
     }
 
     # 'source_set()' targets in the 'partner' or 'public' category that are not
@@ -339,6 +357,14 @@ template("sdk_source_set") {
     # are generated.
     if (defined(invoker.non_sdk_deps)) {
       non_sdk_deps += invoker.non_sdk_deps
+    }
+
+    if (defined(invoker.non_sdk_public_deps)) {
+      non_sdk_deps += invoker.non_sdk_public_deps
+    }
+
+    if (defined(invoker.non_sdk_local_deps)) {
+      non_sdk_deps += invoker.non_sdk_local_deps
     }
 
     metadata = {

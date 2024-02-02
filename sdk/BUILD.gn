@@ -564,11 +564,13 @@ sdk_molecule("core_licenses") {
 
 sdk_molecule("platform_fidls") {
   deps = [
+    "//sdk/fidl/fuchsia.boot:fuchsia.boot_sdk($fidl_toolchain)",
     "//sdk/fidl/fuchsia.debugger:fuchsia.debugger_sdk($fidl_toolchain)",
     "//sdk/fidl/fuchsia.exception:fuchsia.exception_sdk($fidl_toolchain)",
     "//sdk/fidl/fuchsia.hardware.block:fuchsia.hardware.block_sdk($fidl_toolchain)",
     "//sdk/fidl/fuchsia.hardware.clockimpl:fuchsia.hardware.clockimpl_sdk($fidl_toolchain)",
     "//sdk/fidl/fuchsia.hardware.gpioimpl:fuchsia.hardware.gpioimpl_sdk($fidl_toolchain)",
+    "//sdk/fidl/fuchsia.hardware.platform.bus:fuchsia.hardware.platform.bus_sdk($fidl_toolchain)",
     "//sdk/fidl/fuchsia.hardware.platform.device:fuchsia.hardware.platform.device_sdk($fidl_toolchain)",
     "//sdk/fidl/fuchsia.hardware.sdmmc:fuchsia.hardware.sdmmc_sdk($fidl_toolchain)",
     "//sdk/fidl/fuchsia.sys2:fuchsia.sys2_sdk($fidl_toolchain)",
@@ -582,6 +584,9 @@ sdk_molecule("platform_libs") {
   deps = [
     ":version_history",
     "//sdk/lib/driver/compat/cpp:cpp_sdk",
+    "//sdk/lib/driver/devicetree/manager:manager_sdk",
+    "//sdk/lib/driver/devicetree/visitors:load-visitors_sdk",
+    "//sdk/lib/driver/devicetree/visitors/default:default_sdk",
     "//src/developer/debug/ipc:ipc_sdk",
     "//src/developer/debug/shared:shared_sdk",
     "//src/devices/block/lib/sdmmc:sdmmc_sdk",

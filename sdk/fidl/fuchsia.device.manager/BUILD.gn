@@ -5,6 +5,7 @@
 import("//build/fidl/fidl.gni")
 
 fidl("fuchsia.device.manager") {
+  sdk_category = "internal"
   sources = [
     "administrator.fidl",
     "coordinator.fidl",

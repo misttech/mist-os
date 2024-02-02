@@ -2,6 +2,8 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import("//build/cpp/sdk_source_set.gni")
+
 group("tests") {
   deps = [
     "bti:tests",
@@ -10,10 +12,12 @@ group("tests") {
   testonly = true
 }
 
-source_set("default") {
+sdk_source_set("default") {
+  sdk_name = "devicetree-default"
+  category = "internal"
   public = [ "default.h" ]
 
-  deps = [
+  non_sdk_local_deps = [
     "bind-property",
     "bti",
     "mmio",
@@ -21,7 +25,7 @@ source_set("default") {
     "//src/devices/bind/fuchsia.devicetree:fuchsia.devicetree_cpp",
   ]
 
-  public_deps = [
+  non_sdk_public_deps = [
     "//sdk/lib/driver/devicetree/manager:headers",
     "//sdk/lib/driver/devicetree/visitors:multivisitor",
     "//zircon/system/ulib/zx",

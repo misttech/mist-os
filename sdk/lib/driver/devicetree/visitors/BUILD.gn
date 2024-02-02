@@ -2,6 +2,8 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import("//build/cpp/sdk_source_set.gni")
+
 group("tests") {
   deps = [
     "default:tests",
@@ -15,18 +17,20 @@ source_set("registry") {
   public_deps = [ "//sdk/lib/driver/devicetree/manager:headers" ]
 }
 
-source_set("load-visitors") {
+sdk_source_set("load-visitors") {
+  sdk_name = "devicetree-load-visitors"
+  category = "internal"
   sources = [ "load-visitors.cc" ]
 
   public = [ "load-visitors.h" ]
 
-  deps = [
+  non_sdk_local_deps = [
     ":registration",
     "default:default",
     "//sdk/lib/driver/logging/cpp",
   ]
 
-  public_deps = [
+  non_sdk_public_deps = [
     ":registry",
     "//sdk/lib/driver/incoming/cpp",
   ]
