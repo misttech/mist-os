@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use anyhow::{anyhow, bail, Result};
+use anyhow::{anyhow, bail, Context, Result};
 use fastboot::{
     command::{ClientVariable, Command},
     reply::Reply,
@@ -30,23 +30,23 @@ const USB_DEV_VENDOR: u16 = 0x18d1;
 
 #[derive(Error, Debug, Clone)]
 enum InterfaceCheckError {
-    #[error("Invalid IFC Class. Found {}, want {}", found_class, FASTBOOT_USB_INTERFACE_CLASS)]
+    #[error("Invalid IFC Class. Found {:?}, want {:?}", found_class, FASTBOOT_USB_INTERFACE_CLASS)]
     InvalidIfcClass { found_class: u8 },
     #[error(
-        "Invalid IFC Subclass. Found {}, want {}",
+        "Invalid IFC Subclass. Found {:?}, want {:?}",
         found_subclass,
         FASTBOOT_USB_INTERFACE_SUBCLASS
     )]
     InvalidIfcSubclass { found_subclass: u8 },
     #[error(
-        "Invalid IFC Protocol. Found {}, want {}",
+        "Invalid IFC Protocol. Found {:?}, want {:?}",
         found_protocol,
         FASTBOOT_USB_INTERFACE_PROTOCOL
     )]
     InvalidIfcProtocol { found_protocol: u8 },
-    #[error("Invalid Device Vendor. Found {}, want {}", found_vendor, USB_DEV_VENDOR)]
+    #[error("Invalid Device Vendor. Found {:?}, want {:?}", found_vendor, USB_DEV_VENDOR)]
     InvalidDevVendor { found_vendor: u16 },
-    #[error("Invalid Device Product. Found {}, want {:?}", found_product, valid_products)]
+    #[error("Invalid Device Product. Found {:?}, want {:?}", found_product, valid_products)]
     InvalidDevProduct { found_product: u16, valid_products: Vec<u16> },
 }
 
@@ -132,7 +132,8 @@ where
         // Do not open anything.
         false
     };
-    let _result = Interface::open(&mut cb);
+    // Do not open anything. Check does not drain the input queue
+    let _result = Interface::check(&mut cb);
 }
 
 pub fn find_serial_numbers() -> Vec<String> {
@@ -173,7 +174,8 @@ fn extract_serial_number(info: &InterfaceInfo) -> String {
 pub async fn open_interface_with_serial(serial: &str) -> Result<Interface> {
     tracing::debug!("Opening USB fastboot interface with serial number: {}", serial);
     let mut interface =
-        open_interface(|info: &InterfaceInfo| -> bool { extract_serial_number(info) == *serial })?;
+        open_interface(|info: &InterfaceInfo| -> bool { extract_serial_number(info) == *serial })
+            .with_context(|| format!("opening interface with serial number: {}", serial))?;
     match send(Command::GetVar(ClientVariable::Version), &mut interface).await {
         Ok(Reply::Okay(version)) =>
         // Only support 0.4 right now.
@@ -188,7 +190,8 @@ pub async fn open_interface_with_serial(serial: &str) -> Result<Interface> {
     }
 }
 
-trait FastbootUsbTester: Send + 'static {
+#[allow(async_fn_in_trait)]
+pub trait FastbootUsbTester: Send + 'static {
     /// Checks if the interface with the given serial number is in Fastboot
     async fn is_fastboot_usb(&mut self, serial: &str) -> bool;
 }
@@ -198,6 +201,31 @@ struct OpenInterfaceFastbootUsbTester;
 impl FastbootUsbTester for OpenInterfaceFastbootUsbTester {
     async fn is_fastboot_usb(&mut self, serial: &str) -> bool {
         open_interface_with_serial(serial).await.is_ok()
+    }
+}
+
+/// Checks if the USB Interface for the given serial is live and a fastboot match
+/// by inspecting the Interface Information.
+///
+/// This does not mean that the device is ready to respond to any fastboot commands,
+/// only that the USB Device with the given serial number exists and declares itself
+/// to be a Fastboot device.
+///
+/// This calls AsyncInterface::check which does _not_ drain the USB's device's
+/// buffer upon connecting
+pub struct UnversionedFastbootUsbTester;
+
+impl FastbootUsbTester for UnversionedFastbootUsbTester {
+    async fn is_fastboot_usb(&mut self, serial: &str) -> bool {
+        let mut open_cb = |info: &InterfaceInfo| -> bool {
+            if is_fastboot_match(info) {
+                extract_serial_number(info) == *serial
+            } else {
+                // Do not open.
+                false
+            }
+        };
+        Interface::check(&mut open_cb)
     }
 }
 
