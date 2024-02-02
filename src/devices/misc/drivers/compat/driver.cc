@@ -1033,6 +1033,24 @@ zx_status_t Driver::GetFragmentProtocol(const char* fragment, uint32_t proto_id,
   return ZX_OK;
 }
 
+void Driver::CompleteStart(zx::result<> result) {
+  if (start_completer_.has_value()) {
+    start_completer_.value()(result);
+    start_completer_.reset();
+  } else {
+    // This can happen if the driver's bind hook ends up returning an error after successfully
+    // creating a device through DdkAdd. This is because the device add will schedule an InitReply,
+    // inside of which we always call CompleteStart for this initial device. Regardless of if the
+    // InitReply is calling this successfully or with an error, since the driver's bind hook
+    // returned an error already to the start completer, we can just log it.
+    //
+    // TODO(https://fxbug.dev/323581670): Improve the compat driver state flow so this isn't needed.
+    FDF_LOGL(INFO, *logger_,
+             "Called Driver::CompleteStart with %s, but start completer has already been used.",
+             result.status_string());
+  }
+}
+
 }  // namespace compat
 
 EXPORT_FUCHSIA_DRIVER_REGISTRATION_V1(compat::CompatDriverServer::initialize,

@@ -75,7 +75,7 @@ class Driver : public fdf::DriverBase {
 
   Device& GetDevice() { return device_; }
 
-  void CompleteStart(zx::result<> result) { start_completer_.value()(result); }
+  void CompleteStart(zx::result<> result);
 
   // These accessors are used by other classes in the compat driver so we want to expose
   // them publicly since they are protected in DriverBase.
