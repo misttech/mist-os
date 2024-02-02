@@ -103,26 +103,11 @@ const std::vector<fdf::NodeProperty> kGpioInitProperties = std::vector{
 zx_status_t Vim3::EmmcInit() {
   fidl::Arena<> fidl_arena;
 
-  fit::result sdmmc_metadata =
-      fidl::Persist(fuchsia_hardware_sdmmc::wire::SdmmcMetadata::Builder(fidl_arena)
-                        // TODO(https://fxbug.dev/42084501): Use the FIDL SDMMC protocol.
-                        .use_fidl(false)
-                        .Build());
-  if (!sdmmc_metadata.is_ok()) {
-    zxlogf(ERROR, "Failed to encode SDMMC metadata: %s",
-           sdmmc_metadata.error_value().FormatDescription().c_str());
-    return sdmmc_metadata.error_value().status();
-  }
-
   const std::vector<fpbus::Metadata> emmc_metadata{
       {{
           .type = DEVICE_METADATA_PRIVATE,
           .data = std::vector<uint8_t>(reinterpret_cast<const uint8_t*>(&config),
                                        reinterpret_cast<const uint8_t*>(&config) + sizeof(config)),
-      }},
-      {{
-          .type = DEVICE_METADATA_SDMMC,
-          .data = std::move(sdmmc_metadata.value()),
       }},
   };
 
