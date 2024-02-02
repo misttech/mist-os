@@ -677,6 +677,16 @@ void GpuDevice::virtio_gpu_flusher() {
 
     zxlogf(TRACE, "flushing");
 
+    if (fb_change) {
+      uint32_t res_id = displayed_fb_ ? displayed_fb_->resource_id : 0;
+      zx_status_t status =
+          set_scanout(pmode_id_, res_id, pmode_.geometry.width, pmode_.geometry.height);
+      if (status != ZX_OK) {
+        zxlogf(ERROR, "Failed to set scanout: %s", zx_status_get_string(status));
+        continue;
+      }
+    }
+
     if (displayed_fb_) {
       zx_status_t status = transfer_to_host_2d(displayed_fb_->resource_id, pmode_.geometry.width,
                                                pmode_.geometry.height);
@@ -689,16 +699,6 @@ void GpuDevice::virtio_gpu_flusher() {
           flush_resource(displayed_fb_->resource_id, pmode_.geometry.width, pmode_.geometry.height);
       if (status != ZX_OK) {
         zxlogf(ERROR, "Failed to flush resource: %s", zx_status_get_string(status));
-        continue;
-      }
-    }
-
-    if (fb_change) {
-      uint32_t res_id = displayed_fb_ ? displayed_fb_->resource_id : 0;
-      zx_status_t status =
-          set_scanout(pmode_id_, res_id, pmode_.geometry.width, pmode_.geometry.height);
-      if (status != ZX_OK) {
-        zxlogf(ERROR, "Failed to set scanout: %s", zx_status_get_string(status));
         continue;
       }
     }
