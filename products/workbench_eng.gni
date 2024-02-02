@@ -20,7 +20,9 @@
 # Every new addition to this gni file is an instance of tech-debt that must be
 # cleaned up to have a proper platform+product interface. If you need to add a
 # specific artifact to the workbench product, please either add it to the bazel
-# rules: //products/workbench/BUILD.bazel
+# rules:
+#
+# //products/workbench/BUILD.bazel
 #
 # or to the platform AIBs: //build/assembly/BUILD.gn
 #

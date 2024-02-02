@@ -14,6 +14,7 @@
 # Every new addition to this gni file is an instance of tech-debt that must be
 # cleaned up to have a proper platform+product interface. If you need to add a
 # specific artifact to the core product, please consider adding it to:
+#
 # //products/core/BUILD.gn
 #
 # If the artifact is incapable of being put inside that location, reach out to
