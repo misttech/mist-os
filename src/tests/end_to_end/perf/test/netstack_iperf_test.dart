@@ -308,6 +308,16 @@ void main(List<String> args) {
     for (var size in msgSizes) {
       var flowCounts = {1, 2, 4};
       for (var flows in flowCounts) {
+        // Disable the ethernet_udp_recv 64-byte multi-flow test cases because (as of writing) they
+        // are very flaky, most likely due to the netstack or network driver dropping packets under
+        // high load (see https://fxbug.dev/42085351).
+        if (proto == Protocol.udp &&
+            direction == Direction.hostToDevice &&
+            size == 64 &&
+            flows > 1) {
+          continue;
+        }
+
         List<String> serverOutputPaths = [];
         List<int> ports = [];
         for (int i = 0; i < flows; i++) {

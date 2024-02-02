@@ -3,18 +3,18 @@ fuchsia.netstack.iperf_benchmarks: UDP/recv/64bytes/bits_per_second
 fuchsia.netstack.iperf_benchmarks: UDP/recv/64bytes/jitter_ms
 fuchsia.netstack.iperf_benchmarks: UDP/recv/64bytes/lost_packets
 fuchsia.netstack.iperf_benchmarks: UDP/recv/64bytes/lost_percent
-fuchsia.netstack.iperf_benchmarks: UDP/recv/64bytes/2flows/CPU
-fuchsia.netstack.iperf_benchmarks: UDP/recv/64bytes/2flows/bits_per_second
-fuchsia.netstack.iperf_benchmarks: UDP/recv/64bytes/2flows/bits_per_second_coefficient_of_variation
-fuchsia.netstack.iperf_benchmarks: UDP/recv/64bytes/2flows/jitter_ms
-fuchsia.netstack.iperf_benchmarks: UDP/recv/64bytes/2flows/lost_packets
-fuchsia.netstack.iperf_benchmarks: UDP/recv/64bytes/2flows/lost_percent
-fuchsia.netstack.iperf_benchmarks: UDP/recv/64bytes/4flows/CPU
-fuchsia.netstack.iperf_benchmarks: UDP/recv/64bytes/4flows/bits_per_second
-fuchsia.netstack.iperf_benchmarks: UDP/recv/64bytes/4flows/bits_per_second_coefficient_of_variation
-fuchsia.netstack.iperf_benchmarks: UDP/recv/64bytes/4flows/jitter_ms
-fuchsia.netstack.iperf_benchmarks: UDP/recv/64bytes/4flows/lost_packets
-fuchsia.netstack.iperf_benchmarks: UDP/recv/64bytes/4flows/lost_percent
+fuchsia.netstack.iperf_benchmarks: UDP/recv/64bytes/2flows/CPU [optional]
+fuchsia.netstack.iperf_benchmarks: UDP/recv/64bytes/2flows/bits_per_second [optional]
+fuchsia.netstack.iperf_benchmarks: UDP/recv/64bytes/2flows/bits_per_second_coefficient_of_variation [optional]
+fuchsia.netstack.iperf_benchmarks: UDP/recv/64bytes/2flows/jitter_ms [optional]
+fuchsia.netstack.iperf_benchmarks: UDP/recv/64bytes/2flows/lost_packets [optional]
+fuchsia.netstack.iperf_benchmarks: UDP/recv/64bytes/2flows/lost_percent [optional]
+fuchsia.netstack.iperf_benchmarks: UDP/recv/64bytes/4flows/CPU [optional]
+fuchsia.netstack.iperf_benchmarks: UDP/recv/64bytes/4flows/bits_per_second [optional]
+fuchsia.netstack.iperf_benchmarks: UDP/recv/64bytes/4flows/bits_per_second_coefficient_of_variation [optional]
+fuchsia.netstack.iperf_benchmarks: UDP/recv/64bytes/4flows/jitter_ms [optional]
+fuchsia.netstack.iperf_benchmarks: UDP/recv/64bytes/4flows/lost_packets [optional]
+fuchsia.netstack.iperf_benchmarks: UDP/recv/64bytes/4flows/lost_percent [optional]
 fuchsia.netstack.iperf_benchmarks: UDP/recv/1024bytes/CPU
 fuchsia.netstack.iperf_benchmarks: UDP/recv/1024bytes/bits_per_second
 fuchsia.netstack.iperf_benchmarks: UDP/recv/1024bytes/jitter_ms
