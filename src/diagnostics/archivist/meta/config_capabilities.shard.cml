@@ -1,0 +1,37 @@
+// Copyright 2024 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+{
+    use: [
+        {
+            config: "fuchsia.diagnostics.BindServices",
+            config_key: "bind_services",
+            availability: "optional",
+        },
+        {
+            config: "fuchsia.diagnostics.LogsMaxCachedOriginalBytes",
+            config_key: "logs_max_cached_original_bytes",
+            availability: "optional",
+        },
+        {
+            config: "fuchsia.diagnostics.MaximumConcurrentSnapshotsPerReader",
+            config_key: "maximum_concurrent_snapshots_per_reader",
+            availability: "optional",
+        },
+        {
+            config: "fuchsia.diagnostics.NumThreads",
+            config_key: "num_threads",
+            availability: "optional",
+        },
+        {
+            config: "fuchsia.diagnostics.AllowSerialLogs",
+            config_key: "allow_serial_logs",
+            availability: "optional",
+        },
+        {
+            config: "fuchsia.diagnostics.DenySerialLogs",
+            config_key: "deny_serial_logs",
+            availability: "optional",
+        },
+    ],
+}

@@ -4,6 +4,7 @@
 
 use crate::subsystems::prelude::*;
 use anyhow::{anyhow, Context};
+use assembly_config_capabilities::{Config, ConfigNestedValueType, ConfigValueType};
 use assembly_config_schema::platform_config::diagnostics_config::{
     ArchivistConfig, ArchivistPipeline, DiagnosticsConfig,
 };
@@ -49,7 +50,6 @@ impl DefineSubsystemConfiguration<DiagnosticsConfig> for DiagnosticsSubsystem {
         let mut num_threads = 4;
         let mut maximum_concurrent_snapshots_per_reader = 4;
         let mut logs_max_cached_original_bytes = 4194304;
-        let mut archivist_config = builder.package("archivist").component("meta/archivist.cm")?;
 
         match (context.build_type, context.feature_set_level) {
             // Always clear bind_services for bootstrap (bringup) and utility
@@ -81,20 +81,49 @@ impl DefineSubsystemConfiguration<DiagnosticsConfig> for DiagnosticsSubsystem {
         let deny_serial_log_tags: Vec<String> =
             DENIED_SERIAL_LOG_TAGS.iter().map(|ref s| s.to_string()).collect();
 
-        archivist_config
-            .field("bind_services", bind_services.into_iter().collect::<Vec<_>>())?
-            .field("enable_klog", true)?
-            .field("log_to_debuglog", true)?
-            .field("logs_max_cached_original_bytes", logs_max_cached_original_bytes)?
-            .field(
-                "maximum_concurrent_snapshots_per_reader",
-                maximum_concurrent_snapshots_per_reader,
-            )?
-            .field("num_threads", num_threads)?
-            .field("pipelines_path", "/config/data")?
+        builder.set_config_capability(
+            "fuchsia.diagnostics.BindServices",
+            Config::new(
+                ConfigValueType::Vector {
+                    nested_type: ConfigNestedValueType::String { max_size: 256 },
+                    max_count: 10,
+                },
+                bind_services.into_iter().collect::<Vec<_>>().into(),
+            ),
+        )?;
+        builder.set_config_capability(
+            "fuchsia.diagnostics.LogsMaxCachedOriginalBytes",
+            Config::new(ConfigValueType::Uint64, logs_max_cached_original_bytes.into()),
+        )?;
+        builder.set_config_capability(
+            "fuchsia.diagnostics.MaximumConcurrentSnapshotsPerReader",
+            Config::new(ConfigValueType::Uint64, maximum_concurrent_snapshots_per_reader.into()),
+        )?;
+        builder.set_config_capability(
+            "fuchsia.diagnostics.NumThreads",
+            Config::new(ConfigValueType::Uint64, num_threads.into()),
+        )?;
+        builder.set_config_capability(
+            "fuchsia.diagnostics.AllowSerialLogs",
             // LINT.ThenChange(/src/diagnostics/archivist/configs.gni)
-            .field("allow_serial_logs", allow_serial_logs)?
-            .field("deny_serial_log_tags", deny_serial_log_tags)?;
+            Config::new(
+                ConfigValueType::Vector {
+                    nested_type: ConfigNestedValueType::String { max_size: 50 },
+                    max_count: 512,
+                },
+                allow_serial_logs.into(),
+            ),
+        )?;
+        builder.set_config_capability(
+            "fuchsia.diagnostics.DenySerialLogs",
+            Config::new(
+                ConfigValueType::Vector {
+                    nested_type: ConfigNestedValueType::String { max_size: 50 },
+                    max_count: 512,
+                },
+                deny_serial_log_tags.into(),
+            ),
+        )?;
 
         // Add the pipelines on systems that support blobfs, therefore can have a domain config
         // package.
@@ -124,10 +153,10 @@ impl DefineSubsystemConfiguration<DiagnosticsConfig> for DiagnosticsSubsystem {
 
         let exception_handler_available =
             !matches!(context.feature_set_level, FeatureSupportLevel::Bootstrap);
-        builder
-            .package("svchost")
-            .component("meta/svchost.cm")?
-            .field("exception_handler_available", exception_handler_available)?;
+        builder.set_config_capability(
+            "fuchsia.diagnostics.ExceptionHandlerAvailable",
+            Config::new(ConfigValueType::Bool, exception_handler_available.into()),
+        )?;
 
         match context.feature_set_level {
             FeatureSupportLevel::Bootstrap | FeatureSupportLevel::Utility => {}
@@ -223,44 +252,37 @@ mod tests {
 
         DiagnosticsSubsystem::define_configuration(&context, &diagnostics, &mut builder).unwrap();
         let config = builder.build();
-        let archivist_fields = &config.package_configs["archivist"]
-            .components
-            .get("meta/archivist.cm")
-            .unwrap()
-            .fields;
         assert_eq!(
-            archivist_fields.get("bind_services"),
-            Some(&Value::Array(vec![
+            config.configuration_capabilities["fuchsia.diagnostics.BindServices"].value(),
+            Value::Array(vec![
                 "fuchsia.component.DetectBinder".into(),
                 "fuchsia.component.KcounterBinder".into(),
                 "fuchsia.component.PersistenceBinder".into(),
                 "fuchsia.component.SamplerBinder".into(),
-            ]))
-        );
-        assert_eq!(archivist_fields.get("enable_klog"), Some(&Value::Bool(true)));
-        assert_eq!(archivist_fields.get("log_to_debuglog"), Some(&Value::Bool(true)));
-        assert_eq!(
-            archivist_fields.get("logs_max_cached_original_bytes"),
-            Some(&Value::Number(Number::from(4194304)))
+            ])
         );
         assert_eq!(
-            archivist_fields.get("maximum_concurrent_snapshots_per_reader"),
-            Some(&Value::Number(Number::from(4)))
-        );
-        assert_eq!(archivist_fields.get("num_threads"), Some(&Value::Number(Number::from(4))));
-        assert_eq!(
-            archivist_fields.get("pipelines_path"),
-            Some(&Value::String("/config/data".to_string()))
+            config.configuration_capabilities["fuchsia.diagnostics.LogsMaxCachedOriginalBytes"]
+                .value(),
+            Value::Number(Number::from(4194304))
         );
         assert_eq!(
-            archivist_fields.get("allow_serial_logs"),
-            Some(&Value::Array(
-                ALLOWED_SERIAL_LOG_COMPONENTS.iter().cloned().map(Into::into).collect()
-            ))
+            config.configuration_capabilities
+                ["fuchsia.diagnostics.MaximumConcurrentSnapshotsPerReader"]
+                .value(),
+            Value::Number(Number::from(4))
         );
         assert_eq!(
-            archivist_fields.get("deny_serial_log_tags"),
-            Some(&Value::Array(DENIED_SERIAL_LOG_TAGS.iter().cloned().map(Into::into).collect()))
+            config.configuration_capabilities["fuchsia.diagnostics.NumThreads"].value(),
+            Value::Number(Number::from(4))
+        );
+        assert_eq!(
+            config.configuration_capabilities["fuchsia.diagnostics.AllowSerialLogs"].value(),
+            Value::Array(ALLOWED_SERIAL_LOG_COMPONENTS.iter().cloned().map(Into::into).collect())
+        );
+        assert_eq!(
+            config.configuration_capabilities["fuchsia.diagnostics.DenySerialLogs"].value(),
+            Value::Array(DENIED_SERIAL_LOG_TAGS.iter().cloned().map(Into::into).collect())
         );
     }
 
@@ -286,18 +308,13 @@ mod tests {
 
         DiagnosticsSubsystem::define_configuration(&context, &diagnostics, &mut builder).unwrap();
         let config = builder.build();
-        let archivist_fields = &config.package_configs["archivist"]
-            .components
-            .get("meta/archivist.cm")
-            .unwrap()
-            .fields;
 
         let mut serial_log_components = BTreeSet::from_iter(["/core/foo".to_string()].into_iter());
         serial_log_components
             .extend(ALLOWED_SERIAL_LOG_COMPONENTS.iter().map(|ref s| s.to_string()));
         assert_eq!(
-            archivist_fields.get("allow_serial_logs"),
-            Some(&Value::Array(serial_log_components.iter().cloned().map(Into::into).collect()))
+            config.configuration_capabilities["fuchsia.diagnostics.AllowSerialLogs"].value(),
+            Value::Array(serial_log_components.iter().cloned().map(Into::into).collect())
         );
     }
 
@@ -321,19 +338,21 @@ mod tests {
 
         DiagnosticsSubsystem::define_configuration(&context, &diagnostics, &mut builder).unwrap();
         let config = builder.build();
-        let archivist_fields = &config.package_configs["archivist"]
-            .components
-            .get("meta/archivist.cm")
-            .unwrap()
-            .fields;
-        assert_eq!(archivist_fields.get("num_threads"), Some(&Value::Number(Number::from(2))));
+
         assert_eq!(
-            archivist_fields.get("logs_max_cached_original_bytes"),
-            Some(&Value::Number(Number::from(2097152)))
+            config.configuration_capabilities["fuchsia.diagnostics.NumThreads"].value(),
+            Value::Number(Number::from(2))
         );
         assert_eq!(
-            archivist_fields.get("maximum_concurrent_snapshots_per_reader"),
-            Some(&Value::Number(Number::from(2)))
+            config.configuration_capabilities["fuchsia.diagnostics.LogsMaxCachedOriginalBytes"]
+                .value(),
+            Value::Number(Number::from(2097152))
+        );
+        assert_eq!(
+            config.configuration_capabilities
+                ["fuchsia.diagnostics.MaximumConcurrentSnapshotsPerReader"]
+                .value(),
+            Value::Number(Number::from(2))
         );
     }
 
@@ -360,13 +379,15 @@ mod tests {
         )
         .unwrap();
         let config = builder.build();
-        let archivist_fields = &config.package_configs["archivist"]
-            .components
-            .get("meta/archivist.cm")
-            .unwrap()
-            .fields;
-        assert_eq!(archivist_fields.get("num_threads"), Some(&Value::Number(Number::from(4))));
-        assert_eq!(archivist_fields.get("bind_services"), Some(&Value::Array(vec![])));
+
+        assert_eq!(
+            config.configuration_capabilities["fuchsia.diagnostics.NumThreads"].value(),
+            Value::Number(Number::from(4))
+        );
+        assert_eq!(
+            config.configuration_capabilities["fuchsia.diagnostics.BindServices"].value(),
+            Value::Array(Vec::new())
+        );
     }
 
     #[test]
@@ -392,18 +413,13 @@ mod tests {
         )
         .unwrap();
         let config = builder.build();
-        let archivist_fields = &config.package_configs["archivist"]
-            .components
-            .get("meta/archivist.cm")
-            .unwrap()
-            .fields;
         assert_eq!(
-            archivist_fields.get("bind_services"),
-            Some(&Value::Array(vec![
+            config.configuration_capabilities["fuchsia.diagnostics.BindServices"].value(),
+            Value::Array(vec![
                 "fuchsia.component.KcounterBinder".into(),
                 "fuchsia.component.PersistenceBinder".into(),
                 "fuchsia.component.SamplerBinder".into(),
-            ]))
+            ])
         );
     }
 

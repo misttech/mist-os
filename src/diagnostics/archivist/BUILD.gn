@@ -206,6 +206,11 @@ fuchsia_structured_config_values("archivist-embedded-config") {
   values = embedded_config
 }
 
+fuchsia_structured_config_values("archivist-default-config") {
+  cm_label = ":root-manifest"
+  values = default_config
+}
+
 fuchsia_structured_config_rust_lib("archivist-config") {
   cm_label = ":root-manifest"
 }
@@ -226,8 +231,10 @@ group("archivist-for-embedding-bundle") {
 
 fuchsia_package("package") {
   package_name = "archivist"
-  validate_structured_config = false
-  deps = [ ":component" ]
+  deps = [
+    ":archivist-default-config",
+    ":component",
+  ]
 }
 
 fuchsia_package("archivist-for-embedding") {

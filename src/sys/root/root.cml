@@ -35,6 +35,13 @@
             from: "#config",
             to: "#bootstrap",
             config: [
+                "fuchsia.diagnostics.AllowSerialLogs",
+                "fuchsia.diagnostics.BindServices",
+                "fuchsia.diagnostics.DenySerialLogs",
+                "fuchsia.diagnostics.ExceptionHandlerAvailable",
+                "fuchsia.diagnostics.LogsMaxCachedOriginalBytes",
+                "fuchsia.diagnostics.MaximumConcurrentSnapshotsPerReader",
+                "fuchsia.diagnostics.NumThreads",
                 "fuchsia.driver.BindEager",
                 "fuchsia.driver.DelayFallbackUntilBaseDriversIndexed",
                 "fuchsia.driver.DisabledDrivers",

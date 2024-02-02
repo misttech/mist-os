@@ -12,10 +12,10 @@ use serde_json::Value;
 use std::io::Write;
 use std::num::NonZeroU32;
 
-/// The type of a configuration capability.
-pub use cm_rust::ConfigValueType;
 /// The inner type of a vector configuration capability.
 pub use cm_rust::ConfigNestedValueType;
+/// The type of a configuration capability.
+pub use cm_rust::ConfigValueType;
 
 /// A collection of configuration capabilities.
 /// The name is the capability name, and the Config struct contains the configuration type and value.
@@ -34,6 +34,11 @@ impl Config {
     /// Create a new configuration capability.
     pub fn new(type_: ConfigValueType, value: Value) -> Self {
         Config { type_, value }
+    }
+
+    /// The value of this configuration capability.
+    pub fn value(&self) -> Value {
+        self.value.clone()
     }
 
     fn as_capability(&self, name: cml::Name) -> cml::Capability {

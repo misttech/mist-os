@@ -177,6 +177,23 @@
                 "fuchsia.driver.EnableEphemeralDrivers",
             ],
         },
+        {
+            from: "parent",
+            to: "#svchost",
+            config: [ "fuchsia.diagnostics.ExceptionHandlerAvailable" ],
+        },
+        {
+            from: "parent",
+            to: "#archivist",
+            config: [
+                "fuchsia.diagnostics.AllowSerialLogs",
+                "fuchsia.diagnostics.BindServices",
+                "fuchsia.diagnostics.DenySerialLogs",
+                "fuchsia.diagnostics.LogsMaxCachedOriginalBytes",
+                "fuchsia.diagnostics.MaximumConcurrentSnapshotsPerReader",
+                "fuchsia.diagnostics.NumThreads",
+            ],
+        },
 
         // Disable the required offer for Archivist
         {

@@ -55,6 +55,24 @@ impl ArchivistRealmFactory {
         test_realm
             .add_route(archivist_to_parent.clone().from(&archivist).to(Ref::parent()))
             .await?;
+        // Route archivist's configuration from void so the values come from the package.
+        test_realm
+            .add_route(
+                Route::new()
+                    .capability(Capability::configuration("fuchsia.diagnostics.BindServices"))
+                    .capability(Capability::configuration(
+                        "fuchsia.diagnostics.LogsMaxCachedOriginalBytes",
+                    ))
+                    .capability(Capability::configuration(
+                        "fuchsia.diagnostics.MaximumConcurrentSnapshotsPerReader",
+                    ))
+                    .capability(Capability::configuration("fuchsia.diagnostics.NumThreads"))
+                    .capability(Capability::configuration("fuchsia.diagnostics.AllowSerialLogs"))
+                    .capability(Capability::configuration("fuchsia.diagnostics.DenySerialLogs"))
+                    .from(Ref::void())
+                    .to(&archivist),
+            )
+            .await?;
         builder.add_route(archivist_to_parent.from(&test_realm).to(Ref::parent())).await?;
         builder
             .add_route(

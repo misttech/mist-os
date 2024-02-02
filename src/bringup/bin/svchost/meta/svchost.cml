@@ -32,6 +32,10 @@
                 "fuchsia.logger.LogSink",
             ],
         },
+        {
+            config: "fuchsia.diagnostics.ExceptionHandlerAvailable",
+            config_key: "exception_handler_available",
+        },
     ],
     expose: [
         {

@@ -77,10 +77,19 @@ fuchsia_component("component") {
   deps = [ ":svchost" ]
 }
 
+fuchsia_structured_config_values("default_config") {
+  cm_label = ":manifest"
+  values = {
+    exception_handler_available = false
+  }
+}
+
 fuchsia_package("pkg") {
   package_name = "svchost"
-  validate_structured_config = false
-  deps = [ ":component" ]
+  deps = [
+    ":component",
+    ":default_config",
+  ]
 }
 
 test("crashsvc-test") {
