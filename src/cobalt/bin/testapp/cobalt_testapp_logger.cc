@@ -39,7 +39,7 @@ bool CobaltTestAppLogger::LogOccurrence(uint32_t metric_id, std::vector<uint32_t
     FX_LOGS(ERROR) << "LogOccurrence() => " << ResultToString(std::move(result));
     return false;
   }
-  FX_VLOGS(1) << "LogOccurrence(" << count << ") => OK";
+  FX_LOGS(DEBUG) << "LogOccurrence(" << count << ") => OK";
   return true;
 }
 
@@ -51,7 +51,7 @@ bool CobaltTestAppLogger::LogInteger(uint32_t metric_id, std::vector<uint32_t> i
     FX_LOGS(ERROR) << "LogInteger() => " << ResultToString(std::move(result));
     return false;
   }
-  FX_VLOGS(1) << "LogInteger(" << value << ") => OK";
+  FX_LOGS(DEBUG) << "LogInteger(" << value << ") => OK";
   return true;
 }
 
@@ -71,7 +71,7 @@ bool CobaltTestAppLogger::LogIntegerHistogram(uint32_t metric_id, std::vector<ui
     FX_LOGS(ERROR) << "LogString() => " << ResultToString(std::move(result));
     return false;
   }
-  FX_VLOGS(1) << "LogIntegerHistogram() => OK";
+  FX_LOGS(DEBUG) << "LogIntegerHistogram() => OK";
   return true;
 }
 
@@ -83,7 +83,7 @@ bool CobaltTestAppLogger::LogString(uint32_t metric_id, std::vector<uint32_t> in
     FX_LOGS(ERROR) << "LogString() => " << ResultToString(std::move(result));
     return false;
   }
-  FX_VLOGS(1) << "LogString(" << string_value << ") => OK";
+  FX_LOGS(DEBUG) << "LogString(" << string_value << ") => OK";
 
   return true;
 }
@@ -96,9 +96,9 @@ bool CobaltTestAppLogger::CheckForSuccessfulSend() {
   }
 
   bool send_success = false;
-  FX_VLOGS(1) << "Invoking RequestSendSoon() now...";
+  FX_LOGS(DEBUG) << "Invoking RequestSendSoon() now...";
   (*cobalt_controller_)->RequestSendSoon(&send_success);
-  FX_VLOGS(1) << "RequestSendSoon => " << send_success;
+  FX_LOGS(DEBUG) << "RequestSendSoon => " << send_success;
   return send_success;
 }
 
