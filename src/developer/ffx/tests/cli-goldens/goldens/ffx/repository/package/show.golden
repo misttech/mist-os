@@ -30,6 +30,18 @@
       "short": null,
       "description": "if true, package hashes will be displayed in full (i.e. not truncated).",
       "hidden": false
+    },
+    {
+      "kind": {
+        "Option": {
+          "arg_name": "include-subpackages"
+        }
+      },
+      "optionality": "optional",
+      "long": "--include-subpackages",
+      "short": null,
+      "description": "if true, show contents of subpackages contained in the package.",
+      "hidden": false
     }
   ],
   "notes": [],

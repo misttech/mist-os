@@ -16,7 +16,7 @@ use {
     },
     fuchsia_fs::file::Adapter,
     fuchsia_hash::Hash,
-    fuchsia_pkg::MetaContents,
+    fuchsia_pkg::{MetaContents, MetaSubpackages},
     fuchsia_url::RepositoryUrl,
     futures::{
         future::{BoxFuture, Shared},
@@ -34,14 +34,13 @@ use {
         crypto::KeyType,
         metadata::{
             Metadata as _, MetadataPath, MetadataVersion, RawSignedMetadata, RootMetadata,
-            TargetDescription, TargetPath, TargetsMetadata,
+            TargetDescription, TargetPath,
         },
         pouf::Pouf1,
         repository::{
             EphemeralRepository, RepositoryProvider, RepositoryProvider as TufRepositoryProvider,
             RepositoryStorage as TufRepositoryStorage,
         },
-        verify::Verified,
         Database,
     },
 };
@@ -217,7 +216,6 @@ where
 
         let mut packages = vec![];
         for (package_name, package_description) in trusted_targets.targets() {
-            let meta_far_size = package_description.length();
             let Some(meta_far_hash_str) = package_description.custom().get("merkle") else {
                 continue;
             };
@@ -232,61 +230,27 @@ where
 
             let meta_far_hash = Hash::try_from(meta_far_hash_str)?;
 
-            let mut bytes = vec![];
-            self.fetch_blob(&meta_far_hash_str)
-                .await
-                .with_context(|| format!("fetching meta.far blob {meta_far_hash_str}"))?
-                .read_to_end(&mut bytes)
-                .await
-                .with_context(|| format!("reading meta.far blob {meta_far_hash_str}"))?;
+            // Parse the meta.far file.
+            let entries =
+                self.walk_meta_package(&meta_far_hash, package_name.as_str(), &None, true).await?;
 
-            let mut archive =
-                fuchsia_archive::AsyncUtf8Reader::new(Adapter::new(Cursor::new(bytes))).await?;
+            // First entry contains the meta.far entry.
+            let meta_far_modified = match entries.first() {
+                Some(entry) => entry.modified,
+                None => None,
+            };
 
-            let contents = archive
-                .read_file("meta/contents")
-                .await
-                .with_context(|| format!("reading 'meta/contents' from {meta_far_hash_str}"))?;
-
-            let contents = MetaContents::deserialize(contents.as_slice()).with_context(|| {
-                format!("deserializing 'meta/contents' from {meta_far_hash_str}")
-            })?;
-
-            // Concurrently fetch the package blob sizes.
-            // FIXME(https://fxbug.dev/42179393): Use work queue so we can globally control the
-            // concurrency here, rather than limiting fetches per call.
-            let mut tasks = stream::iter(contents.contents().iter().map(|(_, hash)| async move {
-                let blob_size = self
-                    .tuf_client
-                    .remote_repo()
-                    .blob_len(&hash.to_string())
-                    .await
-                    .with_context(|| format!("fetching length of blob {hash}"))?;
-                Ok::<_, anyhow::Error>((hash, blob_size))
-            }))
-            .buffer_unordered(LIST_PACKAGE_CONCURRENCY);
-
+            // Compute the total size of the unique blobs.
             let mut blob_sizes = HashMap::new();
-            while let Some((blob, blob_size)) = tasks.try_next().await? {
-                blob_sizes.insert(blob, blob_size);
+            for entry in entries {
+                if let (Some(hash), Some(size)) = (entry.hash, entry.size) {
+                    blob_sizes.insert(hash, size);
+                }
             }
-            let mut size = meta_far_size;
+            let mut size = 0;
             for blob_size in blob_sizes.values() {
                 size += blob_size;
             }
-
-            // Determine when the meta.far was created.
-            let meta_far_modified = self
-                .tuf_client
-                .remote_repo()
-                .blob_modification_time(&meta_far_hash_str)
-                .await
-                .with_context(|| format!("fetching blob modification time {meta_far_hash_str}"))?
-                .map(|x| -> anyhow::Result<u64> {
-                    Ok(x.duration_since(SystemTime::UNIX_EPOCH)?.as_secs())
-                })
-                .transpose()?;
-
             packages.push(RepositoryPackage {
                 name: package_name.to_string(),
                 hash: meta_far_hash,
@@ -298,18 +262,14 @@ where
         Ok(packages)
     }
 
-    pub async fn show_package(&self, package_name: &str) -> Result<Option<Vec<PackageEntry>>> {
+    pub async fn show_package(
+        &self,
+        package_name: &str,
+        include_subpackages: bool,
+    ) -> Result<Option<Vec<PackageEntry>>> {
         let trusted_targets =
             self.tuf_client.database().trusted_targets().context("expected targets information")?;
 
-        self.show_target_package(trusted_targets, package_name).await
-    }
-
-    async fn show_target_package(
-        &self,
-        trusted_targets: &Verified<TargetsMetadata>,
-        package_name: &str,
-    ) -> Result<Option<Vec<PackageEntry>>> {
         let target_path = TargetPath::new(package_name)?;
         let target = if let Some(target) = trusted_targets.targets().get(&target_path) {
             target
@@ -317,88 +277,149 @@ where
             return Ok(None);
         };
 
-        let size = target.length();
-        let custom = target.custom();
-
-        let hash_str = custom
+        let hash_str = target
+            .custom()
             .get("merkle")
             .ok_or_else(|| anyhow!("package {:?} is missing the `merkle` field", package_name))?;
 
-        let hash_str = hash_str.as_str().ok_or_else(|| {
+        let hash_str: &str = hash_str.as_str().ok_or_else(|| {
             anyhow!("package {:?} hash should be a string, not {:?}", package_name, hash_str)
         })?;
 
         let hash = Hash::try_from(hash_str)?;
 
-        // Read the meta.far.
-        let mut meta_far_bytes = vec![];
-        self.fetch_blob(&hash_str)
-            .await
-            .with_context(|| format!("fetching blob {hash}"))?
-            .read_to_end(&mut meta_far_bytes)
-            .await
-            .with_context(|| format!("reading blob {hash}"))?;
+        Ok(Some(self.walk_meta_package(&hash, package_name, &None, include_subpackages).await?))
+    }
 
-        let mut archive =
-            fuchsia_archive::AsyncUtf8Reader::new(Adapter::new(Cursor::new(meta_far_bytes)))
-                .await?;
+    fn walk_meta_package<'a>(
+        &'a self,
+        hash: &'a Hash,
+        package_name: &'a str,
+        subpackage: &'a Option<String>,
+        include_subpackages: bool,
+    ) -> BoxFuture<'a, Result<Vec<PackageEntry>>> {
+        async move {
+            // Read the meta.far.
+            let hash_str = hash.to_string();
+            let mut meta_far_bytes = vec![];
+            self.fetch_blob(&hash_str)
+                .await
+                .with_context(|| format!("fetching blob {hash}"))?
+                .read_to_end(&mut meta_far_bytes)
+                .await
+                .with_context(|| format!("reading blob {hash}"))?;
+            let size: u64 = meta_far_bytes.len().try_into()?;
 
-        let modified = self
-            .tuf_client
-            .remote_repo()
-            .blob_modification_time(&hash_str)
-            .await?
-            .map(|x| -> anyhow::Result<u64> {
-                Ok(x.duration_since(SystemTime::UNIX_EPOCH)?.as_secs())
-            })
-            .transpose()?;
+            let mut archive =
+                fuchsia_archive::AsyncUtf8Reader::new(Adapter::new(Cursor::new(meta_far_bytes)))
+                    .await?;
 
-        // Add entry for meta.far
-        let mut entries = vec![PackageEntry {
-            path: "meta.far".to_string(),
-            hash: Some(hash),
-            size: Some(size),
-            modified,
-        }];
+            let modified = self
+                .tuf_client
+                .remote_repo()
+                .blob_modification_time(&hash_str)
+                .await?
+                .map(|x| -> anyhow::Result<u64> {
+                    Ok(x.duration_since(SystemTime::UNIX_EPOCH)?.as_secs())
+                })
+                .transpose()?;
 
-        entries.extend(archive.list().map(|item| PackageEntry {
-            path: item.path().to_string(),
-            size: Some(item.length()),
-            modified,
-            ..Default::default()
-        }));
+            // Add entry for meta.far
+            let mut entries = vec![PackageEntry {
+                subpackage: subpackage.clone(),
+                path: "meta.far".to_string(),
+                hash: Some(*hash),
+                size: Some(size),
+                modified,
+            }];
 
-        match archive.read_file("meta/contents").await {
-            Ok(c) => {
-                let contents = MetaContents::deserialize(c.as_slice())?;
-                for (name, hash) in contents.contents() {
-                    let hash_str = hash.to_string();
-                    let size = self.tuf_client.remote_repo().blob_len(&hash_str).await?;
+            entries.extend(archive.list().map(|item| PackageEntry {
+                subpackage: subpackage.clone(),
+                path: item.path().to_string(),
+                hash: None,
+                size: Some(item.length()),
+                modified,
+            }));
 
-                    let modified = self
-                        .tuf_client
-                        .remote_repo()
-                        .blob_modification_time(&hash_str)
-                        .await?
-                        .map(|x| -> anyhow::Result<u64> {
-                            Ok(x.duration_since(SystemTime::UNIX_EPOCH)?.as_secs())
+            match archive.read_file(MetaContents::PATH).await {
+                Ok(c) => {
+                    // Concurrently fetch the package blob sizes.
+                    // FIXME(https://fxbug.dev/42179393): Use work queue so we can globally control the
+                    // concurrency here, rather than limiting fetches per call.
+                    let contents = MetaContents::deserialize(c.as_slice())?;
+                    let futures: Vec<_> = contents
+                        .contents()
+                        .iter()
+                        .map(|(name, hash)| async move {
+                            let hash_str = hash.to_string();
+                            let blob_size = self
+                                .tuf_client
+                                .remote_repo()
+                                .blob_len(&hash_str)
+                                .await
+                                .with_context(|| format!("fetching length of blob {hash}"))?;
+                            let modified = self
+                                .tuf_client
+                                .remote_repo()
+                                .blob_modification_time(&hash_str)
+                                .await?
+                                .map(|x| -> anyhow::Result<u64> {
+                                    Ok(x.duration_since(SystemTime::UNIX_EPOCH)?.as_secs())
+                                })
+                                .transpose()?;
+                            Ok::<_, anyhow::Error>(PackageEntry {
+                                subpackage: subpackage.clone(),
+                                path: name.to_owned(),
+                                hash: Some(*hash),
+                                size: Some(blob_size),
+                                modified,
+                            })
                         })
-                        .transpose()?;
-
-                    entries.push(PackageEntry {
-                        path: name.to_owned(),
-                        hash: Some(*hash),
-                        size: Some(size),
-                        modified,
-                    });
+                        .collect();
+                    let mut tasks =
+                        stream::iter(futures).buffer_unordered(LIST_PACKAGE_CONCURRENCY);
+                    while let Some(entry) = tasks.try_next().await? {
+                        entries.push(entry);
+                    }
+                }
+                Err(e) => {
+                    tracing::warn!(
+                        "failed to read meta/contents for package {}: {}",
+                        package_name,
+                        e
+                    );
                 }
             }
-            Err(e) => {
-                tracing::warn!("failed to read meta/contents for package {}: {}", package_name, e);
-            }
-        }
 
-        Ok(Some(entries))
+            if include_subpackages {
+                match archive.read_file(MetaSubpackages::PATH).await {
+                    Ok(c) => {
+                        let subpackages = MetaSubpackages::deserialize(c.as_slice())?;
+                        for (relative_url, hash) in subpackages.subpackages() {
+                            let subpackage = match subpackage {
+                                None => Some(relative_url.to_string()),
+                                Some(p) => Some(format!("{}/{}", p, relative_url.to_string())),
+                            };
+                            entries.extend(
+                                self.walk_meta_package(
+                                    hash,
+                                    package_name,
+                                    &subpackage,
+                                    include_subpackages,
+                                )
+                                .await?,
+                            );
+                        }
+                    }
+                    Err(_) => {
+                        // Skip if package does not contain subpackages
+                    }
+                }
+            }
+
+            Ok(entries)
+        }
+        .boxed()
     }
 }
 
@@ -555,6 +576,9 @@ pub struct RepositoryPackage {
 /// This describes the metadata about a blob in a package.
 #[derive(Debug, Default, PartialEq, Eq, PartialOrd, Ord, serde::Serialize)]
 pub struct PackageEntry {
+    /// The subpackage hierarchy this entry belongs to relative to the top level package.
+    pub subpackage: Option<String>,
+
     /// The path inside the package namespace.
     pub path: String,
 
@@ -756,7 +780,7 @@ mod tests {
         let bin_modified = get_modtime(blob_dir.join(PKG1_BIN_HASH));
         let lib_modified = get_modtime(blob_dir.join(PKG1_LIB_HASH));
 
-        let mut entries = repo.show_package("package1/0".into()).await.unwrap().unwrap();
+        let mut entries = repo.show_package("package1/0".into(), true).await.unwrap().unwrap();
 
         // show_packages returns contents out of order. Sort the entries so they are consistent.
         entries.sort_unstable_by(|lhs, rhs| lhs.path.cmp(&rhs.path));
@@ -765,48 +789,56 @@ mod tests {
             entries,
             vec![
                 PackageEntry {
+                    subpackage: None,
                     path: "bin/package1".into(),
                     hash: Some(PKG1_BIN_HASH.try_into().unwrap()),
                     size: Some(15),
                     modified: Some(bin_modified),
                 },
                 PackageEntry {
+                    subpackage: None,
                     path: "lib/package1".into(),
                     hash: Some(PKG1_LIB_HASH.try_into().unwrap()),
                     size: Some(12),
                     modified: Some(lib_modified),
                 },
                 PackageEntry {
+                    subpackage: None,
                     path: "meta.far".into(),
                     hash: Some(PKG1_HASH.try_into().unwrap()),
                     size: Some(24576),
                     modified: Some(meta_far_modified),
                 },
                 PackageEntry {
+                    subpackage: None,
                     path: "meta/contents".into(),
                     hash: None,
                     size: Some(156),
                     modified: Some(meta_far_modified),
                 },
                 PackageEntry {
+                    subpackage: None,
                     path: "meta/fuchsia.abi/abi-revision".into(),
                     hash: None,
                     size: Some(8),
                     modified: Some(meta_far_modified),
                 },
                 PackageEntry {
+                    subpackage: None,
                     path: "meta/package".into(),
                     hash: None,
                     size: Some(33),
                     modified: Some(meta_far_modified),
                 },
                 PackageEntry {
+                    subpackage: None,
                     path: "meta/package1.cm".into(),
                     hash: None,
                     size: Some(11),
                     modified: Some(meta_far_modified),
                 },
                 PackageEntry {
+                    subpackage: None,
                     path: "meta/package1.cmx".into(),
                     hash: None,
                     size: Some(12),

@@ -123,7 +123,7 @@ impl Repository {
         let packages = client.list_packages().await.context("listing packages")?;
         for package in &packages {
             if let Some(blobs) =
-                client.show_package(&package.name).await.context("showing package")?
+                client.show_package(&package.name, true).await.context("showing package")?
             {
                 all_blobs.extend(
                     blobs.iter().filter_map(|e| e.hash.map(|hash| hash.to_string().into())),

@@ -676,7 +676,7 @@ impl<T: EventHandlerProvider<R>, R: Registrar> Repo<T, R> {
         // Make sure the repository is up to date.
         update_repository(repository_name, &repo).await?;
 
-        let entries = repo.read().await.show_package(&package_name).await.map_err(|err| {
+        let entries = repo.read().await.show_package(&package_name, false).await.map_err(|err| {
             tracing::error!("Unable to list package contents {:?}: {:#}", package_name, err);
             ffx::RepositoryError::IoError
         })?;

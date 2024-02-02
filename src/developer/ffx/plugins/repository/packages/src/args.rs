@@ -47,6 +47,10 @@ pub struct ShowSubCommand {
     #[argh(switch)]
     pub full_hash: bool,
 
+    /// if true, show contents of subpackages contained in the package.
+    #[argh(option, default = "false")]
+    pub include_subpackages: bool,
+
     #[argh(positional)]
     /// list this package's contents.
     pub package: String,

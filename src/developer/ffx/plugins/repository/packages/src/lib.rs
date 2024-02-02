@@ -71,7 +71,7 @@ async fn show_impl(
     let repo = connect(&repo_name).await?;
 
     let Some(mut blobs) = repo
-        .show_package(&cmd.package)
+        .show_package(&cmd.package, cmd.include_subpackages)
         .await
         .with_context(|| format!("showing package {}", cmd.package))?
     else {
@@ -97,7 +97,10 @@ fn print_blob_table(
     writer: &mut Writer,
 ) -> Result<()> {
     let mut table = Table::new();
-    let header = row!("NAME", "SIZE", "HASH", "MODIFIED");
+    let mut header = row!("NAME", "SIZE", "HASH", "MODIFIED");
+    if cmd.include_subpackages {
+        header.insert_cell(1, cell!("SUBPACKAGE"));
+    }
     table.set_titles(header);
     if let Some(fmt) = table_format {
         table.set_format(fmt);
@@ -106,7 +109,7 @@ fn print_blob_table(
     let mut rows = vec![];
 
     for blob in blobs {
-        let row = row!(
+        let mut row = row!(
             blob.path,
             blob.size
                 .map(|s| s
@@ -119,6 +122,9 @@ fn print_blob_table(
                 .map(|m| DateTime::<Utc>::from(m).to_rfc2822())
                 .unwrap_or_else(String::new)
         );
+        if cmd.include_subpackages {
+            row.insert_cell(1, cell!(blob.subpackage.as_deref().unwrap_or("<root>")));
+        }
         rows.push(row);
     }
 
@@ -159,8 +165,12 @@ async fn list_impl(
         };
 
         if cmd.include_components {
-            package.entries = repo.show_package(&package.name).await?.map(|entries| {
-                entries.into_iter().filter(|entry| entry.path.ends_with(".cm")).collect()
+            package.entries = repo.show_package(&package.name, false).await?.map(|entries| {
+                entries
+                    .into_iter()
+                    .filter(|entry| entry.subpackage.is_none())
+                    .filter(|entry| entry.path.ends_with(".cm"))
+                    .collect()
             });
         };
 
@@ -456,6 +466,7 @@ mod test {
             ShowSubCommand {
                 repository: Some("devhost".to_string()),
                 full_hash: false,
+                include_subpackages: false,
                 package: "package1/0".to_string(),
             },
             &mut writer,
@@ -508,6 +519,7 @@ mod test {
             ShowSubCommand {
                 repository: Some("devhost".to_string()),
                 full_hash: true,
+                include_subpackages: false,
                 package: "package1/0".to_string(),
             },
             &mut writer,
@@ -543,6 +555,59 @@ mod test {
                   meta/package                   33 B   <unknown>                                                         {pkg1_modified} \n \
                   meta/package1.cm               11 B   <unknown>                                                         {pkg1_modified} \n \
                   meta/package1.cmx              12 B   <unknown>                                                         {pkg1_modified} \n"
+            ),
+        );
+
+        assert_eq!(writer.test_error().unwrap(), "");
+    }
+
+    #[fasync::run_singlethreaded(test)]
+    async fn test_show_package_with_subpackages() {
+        let tmp = tempfile::tempdir().unwrap();
+        let _env = setup_repo(tmp.path()).await;
+
+        let mut writer = Writer::new_test(None);
+
+        run_impl_for_show_command(
+            ShowSubCommand {
+                repository: Some("devhost".to_string()),
+                full_hash: false,
+                include_subpackages: true,
+                package: "package1/0".to_string(),
+            },
+            &mut writer,
+        )
+        .await;
+
+        let blobs_path = tmp.path().join("repository/blobs");
+
+        let pkg1_hash = &PKG1_HASH[..MAX_HASH];
+        let pkg1_path = blobs_path.join(PKG1_HASH);
+        let pkg1_modified = to_rfc2822(std::fs::metadata(pkg1_path).unwrap().modified().unwrap());
+
+        let pkg1_bin_hash = &PKG1_BIN_HASH[..MAX_HASH];
+        let pkg1_bin_path = blobs_path.join(PKG1_BIN_HASH);
+        let pkg1_bin_modified =
+            to_rfc2822(std::fs::metadata(pkg1_bin_path).unwrap().modified().unwrap());
+
+        let pkg1_lib_hash = &PKG1_LIB_HASH[..MAX_HASH];
+        let pkg1_lib_path = blobs_path.join(PKG1_LIB_HASH);
+        let pkg1_lib_modified =
+            to_rfc2822(std::fs::metadata(pkg1_lib_path).unwrap().modified().unwrap());
+
+        let actual = writer.test_output().unwrap();
+        assert_eq!(
+            actual,
+            format!(
+                " NAME                           SUBPACKAGE  SIZE   HASH         MODIFIED \n \
+                  bin/package1                   <root>      15 B   {pkg1_bin_hash}  {pkg1_bin_modified} \n \
+                  lib/package1                   <root>      12 B   {pkg1_lib_hash}  {pkg1_lib_modified} \n \
+                  meta.far                       <root>      24 KB  {pkg1_hash}  {pkg1_modified} \n \
+                  meta/contents                  <root>      156 B  <unknown>    {pkg1_modified} \n \
+                  meta/fuchsia.abi/abi-revision  <root>      8 B    <unknown>    {pkg1_modified} \n \
+                  meta/package                   <root>      33 B   <unknown>    {pkg1_modified} \n \
+                  meta/package1.cm               <root>      11 B   <unknown>    {pkg1_modified} \n \
+                  meta/package1.cmx              <root>      12 B   <unknown>    {pkg1_modified} \n"
             ),
         );
 
