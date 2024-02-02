@@ -190,7 +190,7 @@ void App::StartKTrace(uint32_t group_mask, trace_buffering_mode_t buffering_mode
   }
   RequestKtraceStart(*ktrace_controller, buffering_mode, group_mask);
 
-  FX_VLOGS(1) << "Ktrace started";
+  FX_LOGS(DEBUG) << "Ktrace started";
 }
 
 void DrainBuffer(std::unique_ptr<DrainContext> drain_context) {
@@ -246,7 +246,7 @@ void DrainBuffer(std::unique_ptr<DrainContext> drain_context) {
   FX_LOGS(INFO) << "Import of " << drain_context->reader.number_records_read() << " kernel records"
                 << "(" << bytes_read << " bytes) took: " << time_taken.to_msecs()
                 << "ms. MBytes/sec: " << bytes_per_sec;
-  FX_VLOGS(1) << "Ktrace stopped";
+  FX_LOGS(DEBUG) << "Ktrace stopped";
 }
 
 void App::StopKTrace() {

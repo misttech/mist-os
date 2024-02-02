@@ -23,7 +23,7 @@ std::optional<uint64_t> Reader::PeekNextHeader() {
   }
 
   if (AvailableBytes() < sizeof(uint64_t)) {
-    FX_VLOGS(10) << "No more records";
+    FX_LOGS(DEBUG) << "No more records";
     return std::nullopt;
   }
 
@@ -36,7 +36,7 @@ const uint64_t* Reader::ReadNextRecord() {
   }
 
   if (AvailableBytes() < sizeof(uint64_t)) {
-    FX_VLOGS(10) << "No more records";
+    FX_LOGS(DEBUG) << "No more records";
     return nullptr;
   }
 
@@ -55,7 +55,7 @@ const uint64_t* Reader::ReadNextRecord() {
   }
 
   if (AvailableBytes() < record_size_bytes) {
-    FX_VLOGS(10) << "No more records, incomplete last record";
+    FX_LOGS(DEBUG) << "No more records, incomplete last record";
     return nullptr;
   }
 

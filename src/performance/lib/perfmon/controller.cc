@@ -75,8 +75,8 @@ bool Controller::GetProperties(Properties* props) {
 
 static bool Initialize(const fidl::SyncClient<fuchsia_perfmon_cpu::Controller>& controller,
                        uint32_t num_traces, uint32_t buffer_size_in_pages) {
-  FX_VLOGS(2) << fxl::StringPrintf("num_buffers=%u, buffer_size_in_pages=0x%x", num_traces,
-                                   buffer_size_in_pages);
+  FX_LOGS(DEBUG) << fxl::StringPrintf("num_buffers=%u, buffer_size_in_pages=0x%x", num_traces,
+                                      buffer_size_in_pages);
 
   auto result = controller->Initialize({{{
       .num_buffers = num_traces,
@@ -92,14 +92,14 @@ static bool Initialize(const fidl::SyncClient<fuchsia_perfmon_cpu::Controller>& 
   if (result.is_error()) {
     FX_DCHECK(result.error_value().is_domain_error() &&
               result.error_value().domain_error() == ZX_ERR_BAD_STATE);
-    FX_VLOGS(2) << "Got BAD_STATE trying to initialize a trace,"
-                << " resetting device and trying again";
+    FX_LOGS(DEBUG) << "Got BAD_STATE trying to initialize a trace,"
+                   << " resetting device and trying again";
     if (auto status = controller->Stop(); status.is_error()) {
-      FX_VLOGS(2) << "Stopping device failed: status=" << status.error_value();
+      FX_LOGS(DEBUG) << "Stopping device failed: status=" << status.error_value();
       return false;
     }
     if (auto status = controller->Terminate(); status.is_error()) {
-      FX_VLOGS(2) << "Terminating previous trace failed: status=" << status.error_value();
+      FX_LOGS(DEBUG) << "Terminating previous trace failed: status=" << status.error_value();
       return false;
     }
     auto status = controller->Initialize(
@@ -108,7 +108,7 @@ static bool Initialize(const fidl::SyncClient<fuchsia_perfmon_cpu::Controller>& 
       FX_LOGS(ERROR) << "Initialize try #2 failed: status=" << status.error_value();
       return false;
     }
-    FX_VLOGS(2) << "Second Initialize attempt succeeded";
+    FX_LOGS(DEBUG) << "Second Initialize attempt succeeded";
   }
 
   return true;

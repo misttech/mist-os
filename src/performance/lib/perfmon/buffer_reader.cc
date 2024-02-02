@@ -33,8 +33,8 @@ BufferReader::BufferReader(const std::string& name, const void* buffer, size_t c
       ticks_per_second_(header_->ticks_per_second) {}
 
 ReaderStatus BufferReader::AnalyzeHeader(const BufferHeader* header, size_t buffer_size) {
-  FX_VLOGS(2) << "Reading header, buffer version " << header->version << ", " << header->capture_end
-              << " bytes";
+  FX_LOGS(DEBUG) << "Reading header, buffer version " << header->version << ", "
+                 << header->capture_end << " bytes";
 
   // TODO(dje): check magic
 
@@ -58,8 +58,8 @@ ReaderStatus BufferReader::AnalyzeHeader(const BufferHeader* header, size_t buff
   zx_ticks_t user_ticks_per_second = zx_ticks_per_second();
   if (header->ticks_per_second != user_ticks_per_second) {
     FX_LOGS(WARNING) << "Kernel and userspace are using different tracing"
-                     << " timebases, tracks may be misaligned:"
-                     << " kernel_ticks_per_second=" << header->ticks_per_second
+                     << " timebases, tracks may be misaligned:" << " kernel_ticks_per_second="
+                     << header->ticks_per_second
                      << " user_ticks_per_second=" << user_ticks_per_second;
   }
 #endif
@@ -77,8 +77,7 @@ ReaderStatus BufferReader::ReadNextRecord(SampleRecord* record) {
 
   const RecordHeader* hdr = reinterpret_cast<const RecordHeader*>(next_record_);
   if (next_record_ + sizeof(*hdr) > buffer_end_) {
-    FX_LOGS(ERROR) << name_ << ": Bad trace data"
-                   << ", no space for final record header";
+    FX_LOGS(ERROR) << name_ << ": Bad trace data" << ", no space for final record header";
     return set_status(ReaderStatus::kRecordError);
   }
 
@@ -90,15 +89,14 @@ ReaderStatus BufferReader::ReadNextRecord(SampleRecord* record) {
     return set_status(ReaderStatus::kRecordError);
   }
   if (next_record_ + record_size > buffer_end_) {
-    FX_LOGS(ERROR) << name_ << ": Bad trace data"
-                   << ", no space for final record";
+    FX_LOGS(ERROR) << name_ << ": Bad trace data" << ", no space for final record";
     return set_status(ReaderStatus::kRecordError);
   }
 
   // There can be millions of records. This is useful for small test runs,
   // but otherwise is too painful. The verbosity level is chosen to
   // recognize that.
-  FX_VLOGS(10) << "ReadNextRecord: offset=" << (next_record_ - buffer_);
+  FX_LOGS(DEBUG) << "ReadNextRecord: offset=" << (next_record_ - buffer_);
 
   switch (record_type) {
     case kRecordTypeTime:

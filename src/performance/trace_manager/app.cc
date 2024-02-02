@@ -23,7 +23,7 @@ TraceManagerApp::TraceManagerApp(std::unique_ptr<sys::ComponentContext> context,
   FX_DCHECK(status == ZX_OK);
   controller_bindings_.set_empty_set_handler([this]() { trace_manager_.OnEmptyControllerSet(); });
 
-  FX_VLOGS(2) << "TraceManager services registered";
+  FX_LOGS(DEBUG) << "TraceManager services registered";
 }
 
 TraceManagerApp::~TraceManagerApp() = default;

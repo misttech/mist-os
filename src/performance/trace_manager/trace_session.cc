@@ -41,7 +41,7 @@ TraceSession::~TraceSession() {
 
 void TraceSession::AddProvider(TraceProviderBundle* provider) {
   if (state_ == State::kTerminating) {
-    FX_VLOGS(1) << "Ignoring new provider " << *provider << ", terminating";
+    FX_LOGS(DEBUG) << "Ignoring new provider " << *provider << ", terminating";
     return;
   }
 
@@ -59,8 +59,8 @@ void TraceSession::AddProvider(TraceProviderBundle* provider) {
   }
   uint64_t buffer_size = buffer_size_megabytes * 1024 * 1024;
 
-  FX_VLOGS(1) << "Adding provider " << *provider << ", buffer size " << buffer_size_megabytes
-              << "MB";
+  FX_LOGS(DEBUG) << "Adding provider " << *provider << ", buffer size " << buffer_size_megabytes
+                 << "MB";
 
   tracees_.emplace_back(std::make_unique<Tracee>(this, provider));
   std::vector<std::string> categories_clone(provider_specific_categories.begin(),
@@ -117,7 +117,7 @@ void TraceSession::MarkInitialized() { TransitionToState(State::kInitialized); }
 
 void TraceSession::Terminate(fit::function<void(controller::TerminateResult)> callback) {
   if (state_ == State::kTerminating) {
-    FX_VLOGS(1) << "Ignoring terminate request, already terminating";
+    FX_LOGS(DEBUG) << "Ignoring terminate request, already terminating";
     return;
   }
 
@@ -226,15 +226,15 @@ void TraceSession::CheckAllProvidersStarted() {
       std::accumulate(tracees_.begin(), tracees_.end(), true, [](bool value, const auto& tracee) {
         bool ready = (tracee->state() == Tracee::State::kStarted ||
                       // If a provider fails to start continue tracing.
-                      // TODO(https://fxbug.dev/42096895): We should still record what providers failed to
-                      // start (but is that done in timeout handling?).
+                      // TODO(https://fxbug.dev/42096895): We should still record what providers
+                      // failed to start (but is that done in timeout handling?).
                       tracee->state() == Tracee::State::kStopped);
-        FX_VLOGS(5) << "tracee " << *tracee->bundle() << (ready ? "" : " not") << " ready";
+        FX_LOGS(DEBUG) << "tracee " << *tracee->bundle() << (ready ? "" : " not") << " ready";
         return value && ready;
       });
 
   if (all_started) {
-    FX_VLOGS(2) << "All providers reporting started";
+    FX_LOGS(DEBUG) << "All providers reporting started";
     NotifyStarted();
   }
 }
@@ -242,7 +242,7 @@ void TraceSession::CheckAllProvidersStarted() {
 void TraceSession::NotifyStarted() {
   TransitionToState(State::kStarted);
   if (start_callback_) {
-    FX_VLOGS(1) << "Marking session as having started";
+    FX_LOGS(DEBUG) << "Marking session as having started";
     session_start_timeout_.Cancel();
     auto callback = std::move(start_callback_);
     controller::Controller_StartTracing_Result result;
@@ -290,12 +290,12 @@ void TraceSession::CheckAllProvidersStopped() {
   bool all_stopped =
       std::accumulate(tracees_.begin(), tracees_.end(), true, [](bool value, const auto& tracee) {
         bool stopped = tracee->state() == Tracee::State::kStopped;
-        FX_VLOGS(5) << "tracee " << *tracee->bundle() << (stopped ? "" : " not") << " stopped";
+        FX_LOGS(DEBUG) << "tracee " << *tracee->bundle() << (stopped ? "" : " not") << " stopped";
         return value && stopped;
       });
 
   if (all_stopped) {
-    FX_VLOGS(2) << "All providers reporting stopped";
+    FX_LOGS(DEBUG) << "All providers reporting stopped";
     TransitionToState(State::kStopped);
     NotifyStopped();
   }
@@ -303,7 +303,7 @@ void TraceSession::CheckAllProvidersStopped() {
 
 void TraceSession::NotifyStopped() {
   if (stop_callback_) {
-    FX_VLOGS(1) << "Marking session as having stopped";
+    FX_LOGS(DEBUG) << "Marking session as having stopped";
     session_stop_timeout_.Cancel();
     auto callback = std::move(stop_callback_);
     FX_DCHECK(callback);
@@ -313,7 +313,7 @@ void TraceSession::NotifyStopped() {
 
 void TraceSession::FinishStoppingDueToTimeout() {
   if (state_ == State::kStopping) {
-    FX_VLOGS(1) << "Marking session as stopped, timed out waiting for tracee(s)";
+    FX_LOGS(DEBUG) << "Marking session as stopped, timed out waiting for tracee(s)";
     TransitionToState(State::kStopped);
     for (auto& tracee : tracees_) {
       if (tracee->state() != Tracee::State::kStopped)
@@ -364,7 +364,7 @@ void TraceSession::OnProviderTerminated(TraceProviderBundle* bundle) {
 
 void TraceSession::TerminateSessionIfEmpty() {
   if (state_ == State::kTerminating && tracees_.empty()) {
-    FX_VLOGS(1) << "Marking session as terminated, no more tracees";
+    FX_LOGS(DEBUG) << "Marking session as terminated, no more tracees";
 
     session_terminate_timeout_.Cancel();
 
@@ -380,7 +380,7 @@ void TraceSession::FinishTerminatingDueToTimeout() {
   // We do not consider pending_start_tracees_ here as we only
   // terminate them as a best effort.
   if (state_ == State::kTerminating && !tracees_.empty()) {
-    FX_VLOGS(1) << "Marking session as terminated, timed out waiting for tracee(s)";
+    FX_LOGS(DEBUG) << "Marking session as terminated, timed out waiting for tracee(s)";
 
     for (auto& tracee : tracees_) {
       if (tracee->state() != Tracee::State::kTerminated) {
@@ -452,7 +452,7 @@ bool TraceSession::WriteProviderData(Tracee* tracee) {
 }
 
 void TraceSession::Abort() {
-  FX_VLOGS(1) << "Fatal error occurred, aborting session";
+  FX_LOGS(DEBUG) << "Fatal error occurred, aborting session";
 
   tracees_.clear();
   abort_handler_();
@@ -483,7 +483,7 @@ TransferStatus TraceSession::WriteMagicNumberRecord() {
 }
 
 void TraceSession::TransitionToState(State new_state) {
-  FX_VLOGS(2) << "Transitioning from " << state_ << " to " << new_state;
+  FX_LOGS(DEBUG) << "Transitioning from " << state_ << " to " << new_state;
   state_ = new_state;
 }
 

@@ -38,7 +38,7 @@ bool TraceConfig::ProcessCategories(const CategorySpec categories[], size_t num_
   for (size_t i = 0; i < num_categories; ++i) {
     const CategorySpec& cat = categories[i];
     if (is_category_enabled_(cat.name)) {
-      FX_VLOGS(1) << "Category " << cat.name << " enabled";
+      FX_LOGS(DEBUG) << "Category " << cat.name << " enabled";
       switch (cat.group) {
         case CategoryGroup::kOption:
           switch (static_cast<TraceOption>(cat.value)) {
@@ -134,7 +134,7 @@ bool TraceConfig::ProcessTimebase() {
   for (size_t i = 0; i < kNumTimebaseCategories; ++i) {
     const TimebaseSpec& cat = kTimebaseCategories[i];
     if (is_category_enabled_(cat.name)) {
-      FX_VLOGS(1) << "Category " << cat.name << " enabled";
+      FX_LOGS(DEBUG) << "Category " << cat.name << " enabled";
       if (timebase_event_ != perfmon::kEventIdNone) {
         FX_LOGS(ERROR) << "Timebase already specified";
         return false;
@@ -196,7 +196,7 @@ bool TraceConfig::TranslateToDeviceConfig(perfmon::Config* out_config) const {
   if (timebase_event_ != perfmon::kEventIdNone) {
     const perfmon::EventDetails* details;
     FX_CHECK(model_event_manager_->EventIdToEventDetails(timebase_event_, &details));
-    FX_VLOGS(2) << fxl::StringPrintf("Using timebase %s", details->name);
+    FX_LOGS(DEBUG) << fxl::StringPrintf("Using timebase %s", details->name);
     cfg->AddEvent(timebase_event_, sample_rate_, flags | pc_flags | perfmon::Config::kFlagTimebase);
     rate = 0;
   } else {
@@ -230,7 +230,7 @@ bool TraceConfig::TranslateToDeviceConfig(perfmon::Config* out_config) const {
                        << perfmon::Config::StatusToString(status);
         return false;
       }
-      FX_VLOGS(2) << fxl::StringPrintf("Adding %s event id %u to trace", group_name, id);
+      FX_LOGS(DEBUG) << fxl::StringPrintf("Adding %s event id %u to trace", group_name, id);
     }
   }
 

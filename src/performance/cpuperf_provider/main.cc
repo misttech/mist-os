@@ -22,7 +22,7 @@ int main(int argc, const char** argv) {
     return 0;
   }
 
-  FX_VLOGS(2) << argv[0] << ": starting";
+  FX_LOGS(DEBUG) << argv[0] << ": starting";
 
   async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
   trace::TraceProviderWithFdio trace_provider(loop.dispatcher(), "cpuperf_provider");
@@ -30,7 +30,7 @@ int main(int argc, const char** argv) {
   cpuperf_provider::App app(command_line);
   loop.Run();
 
-  FX_VLOGS(2) << argv[0] << ": exiting";
+  FX_LOGS(DEBUG) << argv[0] << ": exiting";
 
   return 0;
 }

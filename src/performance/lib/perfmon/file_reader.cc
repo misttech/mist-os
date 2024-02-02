@@ -49,7 +49,8 @@ bool FileReader::MapBuffer(const std::string& name, uint32_t trace_num) {
 #else
   void* mapped_buffer = mmap(nullptr, file_size_, PROT_READ, MAP_PRIVATE, raw_fd, 0);
   if (mapped_buffer == reinterpret_cast<void*>(-1)) {
-    FX_VLOGS(2) << name << ": Unable to map buffer file: " << file_name << ": " << strerror(errno);
+    FX_LOGS(DEBUG) << name << ": Unable to map buffer file: " << file_name << ": "
+                   << strerror(errno);
   }
 #endif
   if (mapped_buffer == reinterpret_cast<void*>(-1)) {

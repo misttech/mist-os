@@ -17,7 +17,7 @@ namespace internal {
 
 void EventRegistry::RegisterEvents(const char* model_name, const char* group_name,
                                    const EventDetails* events, size_t count) {
-  FX_VLOGS(1) << "Registering " << model_name << " " << group_name << " events";
+  FX_LOGS(DEBUG) << "Registering " << model_name << " " << group_name << " events";
 
   ModelEvents& model_events = (*this)[model_name];
   ModelEventManager::EventTable* table = nullptr;

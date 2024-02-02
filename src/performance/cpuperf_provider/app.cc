@@ -130,7 +130,7 @@ void App::StartTracing(std::unique_ptr<TraceConfig> trace_config) {
     return;
   }
 
-  FX_VLOGS(1) << "Starting trace, config = " << trace_config->ToString();
+  FX_LOGS(DEBUG) << "Starting trace, config = " << trace_config->ToString();
 
   start_time_ = zx_ticks_get();
   if (!controller->Start())

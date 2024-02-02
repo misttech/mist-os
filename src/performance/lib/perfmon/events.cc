@@ -17,7 +17,7 @@ namespace internal {
 
 EventRegistry* GetGlobalEventRegistry() {
   if (g_model_events == nullptr) {
-    FX_VLOGS(2) << "Initializing model event registry";
+    FX_LOGS(DEBUG) << "Initializing model event registry";
     g_model_events = new internal::EventRegistry{};
   }
   return g_model_events;
@@ -57,9 +57,6 @@ std::unique_ptr<ModelEventManager> ModelEventManager::Create(const std::string& 
   auto model_event_manager = std::make_unique<ModelEventManager>(
       ModelEventManager{model_name, &iter->second.arch_events, &iter->second.fixed_events,
                         &iter->second.model_events, &iter->second.misc_events});
-  if (FX_VLOG_IS_ON(4)) {
-    model_event_manager->Dump();
-  }
   return model_event_manager;
 }
 

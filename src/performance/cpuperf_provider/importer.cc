@@ -98,8 +98,8 @@ uint64_t Importer::ImportRecords(perfmon::Reader& reader, const perfmon::Config&
     // There can be millions of records. This log message is useful for small
     // test runs, but otherwise is too painful. The verbosity level is chosen
     // to recognize that.
-    FX_VLOGS(10) << fxl::StringPrintf("Import: cpu=%u, event=0x%x, time=%" PRIu64, cpu, event_id,
-                                      current_time);
+    FX_LOGS(DEBUG) << fxl::StringPrintf("Import: cpu=%u, event=0x%x, time=%" PRIu64, cpu, event_id,
+                                        current_time);
 
     if (record.type() == perfmon::kRecordTypeTime) {
       current_time = reader.time();

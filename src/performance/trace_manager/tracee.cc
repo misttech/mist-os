@@ -178,7 +178,7 @@ void Tracee::Stop(bool write_results) {
 }
 
 void Tracee::TransitionToState(State new_state) {
-  FX_VLOGS(2) << *bundle_ << ": Transitioning from " << state_ << " to " << new_state;
+  FX_LOGS(DEBUG) << *bundle_ << ": Transitioning from " << state_ << " to " << new_state;
   state_ = new_state;
 }
 
@@ -190,7 +190,7 @@ void Tracee::OnHandleReady(async_dispatcher_t* dispatcher, async::WaitBase* wait
   }
 
   zx_signals_t pending = signal->observed;
-  FX_VLOGS(2) << *bundle_ << ": pending=0x" << std::hex << pending;
+  FX_LOGS(DEBUG) << *bundle_ << ": pending=0x" << std::hex << pending;
   FX_DCHECK(pending & (ZX_FIFO_READABLE | ZX_FIFO_PEER_CLOSED));
   FX_DCHECK(state_ != State::kReady && state_ != State::kTerminated);
 
@@ -308,7 +308,7 @@ void Tracee::OnFifoReadable(async_dispatcher_t* dispatcher, async::WaitBase* wai
 }
 
 void Tracee::OnHandleError(zx_status_t status) {
-  FX_VLOGS(2) << *bundle_ << ": error=" << status;
+  FX_LOGS(DEBUG) << *bundle_ << ": error=" << status;
   FX_DCHECK(status == ZX_ERR_CANCELED);
   FX_DCHECK(state_ != State::kReady && state_ != State::kTerminated);
   wait_.set_object(ZX_HANDLE_INVALID);
@@ -373,7 +373,7 @@ TransferStatus Tracee::DoWriteChunk(const zx::socket& socket, uint64_t vmo_offse
   auto status =
       WriteBufferToSocket(socket, reinterpret_cast<const void*>(offset_addr), bytes_written);
   if (status != TransferStatus::kComplete) {
-    FX_VLOGS(1) << *bundle_ << ": Failed to write " << name << " records";
+    FX_LOGS(DEBUG) << *bundle_ << ": Failed to write " << name << " records";
   }
   return status;
 }
@@ -442,8 +442,8 @@ TransferStatus Tracee::TransferRecords(const zx::socket& socket) const {
     // If we can't write the buffer overflow record, it's not the end of the
     // world.
     if (WriteProviderBufferOverflowEvent(socket) != TransferStatus::kComplete) {
-      FX_VLOGS(1) << *bundle_
-                  << ": Failed to write provider event (buffer overflow) record to trace.";
+      FX_LOGS(DEBUG) << *bundle_
+                     << ": Failed to write provider event (buffer overflow) record to trace.";
     }
   }
 
@@ -660,7 +660,7 @@ TransferStatus Tracee::WriteProviderIdRecord(const zx::socket& socket) const {
 }
 
 TransferStatus Tracee::WriteProviderInfoRecord(const zx::socket& socket) const {
-  FX_VLOGS(5) << *bundle_ << ": writing provider info record";
+  FX_LOGS(DEBUG) << *bundle_ << ": writing provider info record";
   std::string label("");  // TODO(https://fxbug.dev/42106751): Provide meaningful labels or remove
                           // labels from the trace wire format altogether.
   size_t num_words = 1u + trace::BytesToWords(trace::Pad(label.size()));
@@ -678,7 +678,7 @@ TransferStatus Tracee::WriteProviderInfoRecord(const zx::socket& socket) const {
 }
 
 TransferStatus Tracee::WriteProviderSectionRecord(const zx::socket& socket) const {
-  FX_VLOGS(2) << *bundle_ << ": writing provider section record";
+  FX_LOGS(DEBUG) << *bundle_ << ": writing provider section record";
   size_t num_words = 1u;
   std::vector<uint64_t> record(num_words);
   record[0] = trace::ProviderSectionMetadataRecordFields::Type::Make(

@@ -64,7 +64,7 @@ TraceManager::~TraceManager() = default;
 void TraceManager::OnEmptyControllerSet() {
   // While one controller could go away and another remain causing a trace
   // to not be terminated, at least handle the common case.
-  FX_VLOGS(5) << "Controller is gone";
+  FX_LOGS(DEBUG) << "Controller is gone";
   if (session_) {
     // Check the state first because the log messages are useful, but not if
     // tracing has ended.
@@ -92,7 +92,7 @@ void TraceManager::handle_unknown_method(uint64_t ordinal, bool method_has_respo
 
 // fidl
 void TraceManager::InitializeTracing(controller::TraceConfig config, zx::socket output) {
-  FX_VLOGS(2) << "InitializeTracing";
+  FX_LOGS(DEBUG) << "InitializeTracing";
 
   if (session_) {
     FX_LOGS(ERROR) << "Ignoring initialize request, trace already initialized";
@@ -182,7 +182,7 @@ void TraceManager::InitializeTracing(controller::TraceConfig config, zx::socket 
 void TraceManager::TerminateTracing(controller::TerminateOptions options,
                                     TerminateTracingCallback terminate_callback) {
   if (!session_) {
-    FX_VLOGS(1) << "Ignoring terminate request, tracing not initialized";
+    FX_LOGS(DEBUG) << "Ignoring terminate request, tracing not initialized";
     controller::TerminateResult result;
     terminate_callback(std::move(result));
     return;
@@ -204,7 +204,7 @@ void TraceManager::TerminateTracing(controller::TerminateOptions options,
 // fidl
 void TraceManager::StartTracing(controller::StartOptions options,
                                 StartTracingCallback start_callback) {
-  FX_VLOGS(2) << "StartTracing";
+  FX_LOGS(DEBUG) << "StartTracing";
 
   controller::Controller_StartTracing_Result result;
 
@@ -273,7 +273,7 @@ void TraceManager::StartTracing(controller::StartOptions options,
 // fidl
 void TraceManager::StopTracing(controller::StopOptions options, StopTracingCallback stop_callback) {
   if (!session_) {
-    FX_VLOGS(1) << "Ignoring stop request, tracing not started";
+    FX_LOGS(DEBUG) << "Ignoring stop request, tracing not started";
     stop_callback();
     return;
   }
@@ -281,7 +281,7 @@ void TraceManager::StopTracing(controller::StopOptions options, StopTracingCallb
   if (session_->state() != TraceSession::State::kInitialized &&
       session_->state() != TraceSession::State::kStarting &&
       session_->state() != TraceSession::State::kStarted) {
-    FX_VLOGS(1) << "Ignoring stop request, state != Initialized,Starting,Started";
+    FX_LOGS(DEBUG) << "Ignoring stop request, state != Initialized,Starting,Started";
     stop_callback();
     return;
   }
@@ -300,7 +300,7 @@ void TraceManager::StopTracing(controller::StopOptions options, StopTracingCallb
 
 // fidl
 void TraceManager::GetProviders(GetProvidersCallback callback) {
-  FX_VLOGS(2) << "GetProviders";
+  FX_LOGS(DEBUG) << "GetProviders";
   std::vector<controller::ProviderInfo> provider_info;
   for (const auto& provider : providers_) {
     controller::ProviderInfo info;
@@ -344,7 +344,7 @@ class CompleterMerger {
 
 // fidl
 void TraceManager::GetKnownCategories(GetKnownCategoriesCallback callback) {
-  FX_VLOGS(2) << "GetKnownCategories";
+  FX_LOGS(DEBUG) << "GetKnownCategories";
   KnownCategorySet known_categories;
   for (const auto& [name, description] : config_.known_categories()) {
     known_categories.insert({.name = name, .description = description});
@@ -379,7 +379,7 @@ void TraceManager::GetKnownCategories(GetKnownCategoriesCallback callback) {
 }
 
 void TraceManager::WatchAlert(WatchAlertCallback cb) {
-  FX_VLOGS(2) << "WatchAlert";
+  FX_LOGS(DEBUG) << "WatchAlert";
   if (alerts_.empty()) {
     watch_alert_callbacks_.push(std::move(cb));
   } else {
@@ -390,7 +390,7 @@ void TraceManager::WatchAlert(WatchAlertCallback cb) {
 
 void TraceManager::RegisterProviderWorker(fidl::InterfaceHandle<provider::Provider> provider,
                                           uint64_t pid, fidl::StringPtr name) {
-  FX_VLOGS(2) << "Registering provider {" << pid << ":" << name.value_or("") << "}";
+  FX_LOGS(DEBUG) << "Registering provider {" << pid << ":" << name.value_or("") << "}";
   auto it = providers_.emplace(providers_.end(), provider.Bind(), next_provider_id_++, pid,
                                name.value_or(""));
 
