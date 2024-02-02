@@ -1020,7 +1020,7 @@ mod tests {
     }
 
     #[test]
-    fn wlansoftmac_startup_fails_startup_during_bootstrap() {
+    fn start_and_serve_fails_on_dropped_usme_bootstrap_client() {
         let mut exec = fasync::TestExecutor::new();
         let (fake_device, fake_device_state) = FakeDevice::new(&exec);
         fake_device_state.lock().usme_bootstrap_client_end = None;
@@ -1032,8 +1032,9 @@ mod tests {
         }
     }
 
+    // Exhaustive feature tests are unit tested on start()
     #[test]
-    fn wlansoftmac_fails_startup_with_wrong_mac_implementation_type() {
+    fn start_and_serve_fails_with_wrong_mac_implementation_type() {
         let mut exec = fasync::TestExecutor::new();
         let (fake_device, _fake_device_state) = FakeDevice::new_with_config(
             &exec,
@@ -1050,7 +1051,7 @@ mod tests {
     }
 
     #[test]
-    fn wlansoftmac_startup_fails_startup_when_mlme_event_stream_is_missing() {
+    fn start_and_serve_fails_on_dropped_mlme_event_stream() {
         let mut exec = fasync::TestExecutor::new();
         let (mut fake_device, _fake_device_state) = FakeDevice::new(&exec);
         let _ = fake_device.take_mlme_event_stream();
@@ -1063,9 +1064,68 @@ mod tests {
     }
 
     #[test]
-    fn stop_leads_to_graceful_shutdown() {
+    fn start_and_serve_fails_on_dropped_generic_sme_client() {
         let mut exec = fasync::TestExecutor::new();
-        let (fake_device, fake_device_state) = FakeDevice::new(&exec);
+        let (fake_device, _fake_device_state) = FakeDevice::new(&exec);
+        let StartAndServeTestHarness {
+            mut start_and_serve_fut,
+            mut softmac_handle_receiver,
+            generic_sme_proxy,
+        } = start_and_serve_with_device(&mut exec, fake_device)
+            .expect("Failed to initiate wlansoftmac setup.");
+        let _handle = assert_variant!(exec.run_until_stalled(&mut softmac_handle_receiver), Poll::Ready(Ok(Ok(handle))) => handle);
+        assert_eq!(exec.run_until_stalled(&mut start_and_serve_fut), Poll::Pending);
+
+        drop(generic_sme_proxy);
+
+        assert_eq!(
+            exec.run_until_stalled(&mut start_and_serve_fut),
+            Poll::Ready(Err(zx::Status::INTERNAL))
+        );
+    }
+
+    #[test]
+    fn start_and_serve_responds_to_generic_sme_requests() {
+        let mut exec = fasync::TestExecutor::new();
+        let (fake_device, _fake_device_state) = FakeDevice::new(&exec);
+        let StartAndServeTestHarness {
+            mut start_and_serve_fut,
+            mut softmac_handle_receiver,
+            generic_sme_proxy,
+        } = start_and_serve_with_device(&mut exec, fake_device)
+            .expect("Failed to initiate wlansoftmac setup.");
+        let _handle = assert_variant!(exec.run_until_stalled(&mut softmac_handle_receiver), Poll::Ready(Ok(Ok(handle))) => handle);
+
+        let (_sme_telemetry_proxy, sme_telemetry_server) =
+            fidl::endpoints::create_proxy().expect("Failed to create_proxy");
+        let (_client_sme_proxy, client_sme_server) =
+            fidl::endpoints::create_proxy().expect("Failed to create_proxy");
+
+        let resp_fut = generic_sme_proxy.get_sme_telemetry(sme_telemetry_server);
+        pin_mut!(resp_fut);
+
+        // First poll `get_sme_telemetry` to send a `GetSmeTelemetry` request to the SME server, and then
+        // poll the SME server process it. Finally, expect `get_sme_telemetry` to complete with `Ok(())`.
+        assert_variant!(exec.run_until_stalled(&mut resp_fut), Poll::Pending);
+        assert_eq!(exec.run_until_stalled(&mut start_and_serve_fut), Poll::Pending);
+        assert_variant!(exec.run_until_stalled(&mut resp_fut), Poll::Ready(Ok(Ok(()))));
+
+        let resp_fut = generic_sme_proxy.get_client_sme(client_sme_server);
+        pin_mut!(resp_fut);
+
+        // First poll `get_client_sme` to send a `GetClientSme` request to the SME server, and then poll the
+        // SME server process it. Finally, expect `get_client_sme` to complete with `Ok(())`.
+        assert_variant!(exec.run_until_stalled(&mut resp_fut), Poll::Pending);
+        assert_eq!(exec.run_until_stalled(&mut start_and_serve_fut), Poll::Pending);
+        exec.run_singlethreaded(resp_fut)
+            .expect("Generic SME proxy failed")
+            .expect("Client SME request failed");
+    }
+
+    #[test]
+    fn start_and_serve_shuts_down_gracefully() {
+        let mut exec = fasync::TestExecutor::new();
+        let (fake_device, _fake_device_state) = FakeDevice::new(&exec);
         let StartAndServeTestHarness {
             mut start_and_serve_fut,
             mut softmac_handle_receiver,
@@ -1074,26 +1134,31 @@ mod tests {
             .expect("Failed to initiate wlansoftmac setup.");
         let (sme_telemetry_proxy, sme_telemetry_server) =
             fidl::endpoints::create_proxy().expect("Failed to create_proxy");
-        let (client_proxy, client_server) =
+        let (client_sme_proxy, client_sme_server) =
             fidl::endpoints::create_proxy().expect("Failed to create_proxy");
         assert_eq!(exec.run_until_stalled(&mut start_and_serve_fut), Poll::Pending);
         let handle = assert_variant!(exec.run_until_stalled(&mut softmac_handle_receiver), Poll::Ready(Ok(Ok(handle))) => handle);
 
         let resp_fut = generic_sme_proxy.get_sme_telemetry(sme_telemetry_server);
         pin_mut!(resp_fut);
+
+        // First poll `get_sme_telemetry` to send a `GetSmeTelemetry` request to the SME server, and then
+        // poll the SME server process it. Finally, expect `get_sme_telemetry` to complete with `Ok(())`.
         assert_variant!(exec.run_until_stalled(&mut resp_fut), Poll::Pending);
         assert_eq!(exec.run_until_stalled(&mut start_and_serve_fut), Poll::Pending);
         assert_variant!(exec.run_until_stalled(&mut resp_fut), Poll::Ready(Ok(Ok(()))));
 
-        let resp_fut = generic_sme_proxy.get_client_sme(client_server);
+        let resp_fut = generic_sme_proxy.get_client_sme(client_sme_server);
         pin_mut!(resp_fut);
+
+        // First poll `get_client_sme` to send a `GetClientSme` request to the SME server, and then poll the
+        // SME server process it. Finally, expect `get_client_sme` to complete with `Ok(())`.
         assert_variant!(exec.run_until_stalled(&mut resp_fut), Poll::Pending);
         assert_eq!(exec.run_until_stalled(&mut start_and_serve_fut), Poll::Pending);
         exec.run_singlethreaded(resp_fut)
             .expect("Generic SME proxy failed")
             .expect("Client SME request failed");
 
-        fake_device_state.lock().wlan_softmac_ifc_bridge_proxy.take();
         let (shutdown_sender, shutdown_receiver) = oneshot::channel::<()>();
         handle.stop(StopCompleter::new(Box::new(move || {
             shutdown_sender.send(()).expect("Failed to signal shutdown completion.")
@@ -1108,6 +1173,6 @@ mod tests {
         // All SME proxies should shutdown.
         assert!(generic_sme_proxy.is_closed());
         assert!(sme_telemetry_proxy.is_closed());
-        assert!(client_proxy.is_closed());
+        assert!(client_sme_proxy.is_closed());
     }
 }
