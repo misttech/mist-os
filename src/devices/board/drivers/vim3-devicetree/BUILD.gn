@@ -36,6 +36,7 @@ devicetree("vim3") {
     "//sdk/lib/driver/devicetree/visitors/drivers/sysmem:sysmem-visitor",
     "//sdk/lib/driver/devicetree/visitors/drivers/interrupt-controllers/arm-gicv2",
     "//sdk/lib/driver/devicetree/visitors/drivers/registers:registers-visitor",
+    "//sdk/lib/driver/devicetree/visitors/drivers/clock-controllers/clockimpl-visitor",
   ]
   golden = "dts/khadas-vim3.golden.dts"
 }
