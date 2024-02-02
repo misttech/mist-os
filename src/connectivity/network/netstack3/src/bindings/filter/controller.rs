@@ -243,8 +243,12 @@ impl Validator {
 
                 match &action {
                     fnet_filter_ext::Action::Jump(target) => {
-                        if !namespace.routines.contains_key(target) {
-                            return Err(fnet_filter::CommitError::RoutineNotFound);
+                        let routine = namespace
+                            .routines
+                            .get(target)
+                            .ok_or(fnet_filter::CommitError::RoutineNotFound)?;
+                        if routine.routine_type.is_installed() {
+                            return Err(fnet_filter::CommitError::TargetRoutineIsInstalled);
                         }
                     }
                     fnet_filter_ext::Action::Accept

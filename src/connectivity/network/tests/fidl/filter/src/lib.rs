@@ -1258,3 +1258,70 @@ async fn commit_failure_clears_pending_changes_and_does_not_change_state(name: &
         "no changes should be observed"
     );
 }
+
+#[netstack_test]
+async fn rule_jumps_to_installed_routine(name: &str) {
+    let sandbox = netemul::TestSandbox::new().expect("create sandbox");
+    let realm = sandbox.create_netstack_realm::<Netstack3, _>(name).expect("create realm");
+    let control =
+        realm.connect_to_protocol::<fnet_filter::ControlMarker>().expect("connect to protocol");
+    let mut controller =
+        fnet_filter_ext::Controller::new(&control, &fnet_filter_ext::ControllerId(name.to_owned()))
+            .await
+            .expect("create controller");
+
+    let routine_id = fnet_filter_ext::RoutineId {
+        namespace: fnet_filter_ext::NamespaceId::test_value(),
+        name: String::from("routine"),
+    };
+    const TARGET_ROUTINE: &str = "target-routine";
+    let target_routine_id = fnet_filter_ext::RoutineId {
+        namespace: fnet_filter_ext::NamespaceId::test_value(),
+        name: TARGET_ROUTINE.to_owned(),
+    };
+    let rule_id = fnet_filter_ext::RuleId { routine: routine_id.clone(), index: 0 };
+    let resources = [
+        fnet_filter_ext::Resource::Namespace(fnet_filter_ext::Namespace::test_value()),
+        fnet_filter_ext::Resource::Routine(fnet_filter_ext::Routine {
+            id: target_routine_id,
+            routine_type: fnet_filter_ext::RoutineType::Ip(Some(
+                fnet_filter_ext::InstalledIpRoutine {
+                    hook: fnet_filter_ext::IpHook::Ingress,
+                    priority: 0,
+                },
+            )),
+        }),
+        fnet_filter_ext::Resource::Routine(fnet_filter_ext::Routine {
+            id: routine_id,
+            routine_type: fnet_filter_ext::RoutineType::Ip(Some(
+                fnet_filter_ext::InstalledIpRoutine {
+                    hook: fnet_filter_ext::IpHook::Ingress,
+                    priority: 0,
+                },
+            )),
+        }),
+        fnet_filter_ext::Resource::Rule(fnet_filter_ext::Rule {
+            id: rule_id.clone(),
+            matchers: fnet_filter_ext::Matchers::default(),
+            action: fnet_filter_ext::Action::Jump(TARGET_ROUTINE.to_owned()),
+        }),
+    ];
+    controller
+        .push_changes(resources.iter().cloned().map(fnet_filter_ext::Change::Create).collect())
+        .await
+        .expect("push changes");
+
+    let errors = assert_matches!(
+        controller.commit().await,
+        Err(fnet_filter_ext::CommitError::ErrorOnChange(errors)) => errors
+    );
+    let (invalid_change, error) = assert_matches!(
+        &errors[..],
+        [error] => error
+    );
+    assert_eq!(
+        invalid_change,
+        &fnet_filter_ext::Change::Create(resources.into_iter().last().unwrap())
+    );
+    assert_eq!(error, &fnet_filter_ext::ChangeCommitError::TargetRoutineIsInstalled);
+}

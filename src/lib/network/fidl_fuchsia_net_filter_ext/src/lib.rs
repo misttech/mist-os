@@ -358,6 +358,17 @@ pub enum RoutineType {
     Nat(Option<InstalledNatRoutine>),
 }
 
+impl RoutineType {
+    pub fn is_installed(&self) -> bool {
+        // The `InstalledIpRoutine` or `InstalledNatRoutine` configuration is
+        // optional, and when omitted, signifies an uninstalled routine.
+        match self {
+            Self::Ip(Some(_)) | Self::Nat(Some(_)) => true,
+            Self::Ip(None) | Self::Nat(None) => false,
+        }
+    }
+}
+
 impl From<RoutineType> for fnet_filter::RoutineType {
     fn from(routine: RoutineType) -> Self {
         match routine {
@@ -1258,6 +1269,8 @@ pub enum ChangeCommitError {
     MatcherUnavailable,
     #[error("rule has an action that is invalid for the rule's routine")]
     InvalidActionForRoutine,
+    #[error("the change includes a rule that jumps to an installed routine")]
+    TargetRoutineIsInstalled,
 }
 
 impl TryFrom<fnet_filter::CommitError> for ChangeCommitError {
@@ -1271,6 +1284,9 @@ impl TryFrom<fnet_filter::CommitError> for ChangeCommitError {
             fnet_filter::CommitError::AlreadyExists => Ok(Self::AlreadyExists),
             fnet_filter::CommitError::MatcherUnavailable => Ok(Self::MatcherUnavailable),
             fnet_filter::CommitError::InvalidActionForRoutine => Ok(Self::InvalidActionForRoutine),
+            fnet_filter::CommitError::TargetRoutineIsInstalled => {
+                Ok(Self::TargetRoutineIsInstalled)
+            }
             fnet_filter::CommitError::Ok | fnet_filter::CommitError::NotReached => {
                 Err(FidlConversionError::NotAnError)
             }
@@ -1432,7 +1448,8 @@ impl Controller {
                         | fnet_filter::CommitError::RuleNotFound
                         | fnet_filter::CommitError::AlreadyExists
                         | fnet_filter::CommitError::MatcherUnavailable
-                        | fnet_filter::CommitError::InvalidActionForRoutine) => {
+                        | fnet_filter::CommitError::InvalidActionForRoutine
+                        | fnet_filter::CommitError::TargetRoutineIsInstalled) => {
                             let error = error
                                 .try_into()
                                 .expect("`Ok` and `NotReached` are handled in another arm");

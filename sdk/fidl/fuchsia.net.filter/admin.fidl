@@ -158,6 +158,8 @@ closed protocol NamespaceController {
             ///
             /// For example, this could be a NAT action in an IP routine.
             INVALID_ACTION_FOR_ROUTINE = 8;
+            /// The change includes a rule that jumps to an installed routine.
+            TARGET_ROUTINE_IS_INSTALLED = 9;
         }>:MAX_COMMIT_SIZE;
     });
 };
