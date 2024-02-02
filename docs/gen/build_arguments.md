@@ -640,14 +640,6 @@ board definition rather than the product definition.
 
 From //build/board.gni:29
 
-### board_pdm_firmware_name
-
-The name of the HW DSP FW that handles Pdm audio data.
-
-**Current value (from the default):** `""`
-
-From //src/media/audio/drivers/lib/aml-dsp/BUILD.gn:10
-
 ### board_recovery_bootfs_labels
 
 A list of binary labels to include in the recovery ZBI.
@@ -672,14 +664,6 @@ A list of binary labels to include in the system_image package.
 **Current value (from the default):** `[]`
 
 From //build/board.gni:61
-
-### board_tdm_firmware_name
-
-The name of the HW DSP FW that handles Tdm audio data.
-
-**Current value (from the default):** `""`
-
-From //src/media/audio/drivers/lib/aml-dsp/BUILD.gn:7
 
 ### board_tools
 
@@ -1386,20 +1370,6 @@ migrated in-place to the specified format when fshost mounts it.
 **Current value (from the default):** `"fxfs"`
 
 From //src/storage/fshost/generated_fshost_config.gni:12
-
-### debian_guest_earlycon
-
-**Current value (from the default):** `false`
-
-From //src/virtualization/packages/debian_guest/BUILD.gn:12
-
-### debian_guest_qcow
-
-Package the rootfs as a QCOW image (as opposed to a flat file).
-
-**Current value (from the default):** `true`
-
-From //src/virtualization/packages/debian_guest/BUILD.gn:11
 
 ### debuginfo
 
@@ -2375,7 +2345,7 @@ created at "$dir_pw_third_party/chre".
 
 **Current value for `target_cpu = "arm64"`:** `"//third_party/chre/src"`
 
-From //.gn:113
+From //.gn:121
 
 **Overridden from the default:** `""`
 
@@ -2383,7 +2353,7 @@ From //third_party/pigweed/src/third_party/chre/chre.gni:19
 
 **Current value for `target_cpu = "x64"`:** `"//third_party/chre/src"`
 
-From //.gn:113
+From //.gn:121
 
 **Overridden from the default:** `""`
 
@@ -2396,7 +2366,7 @@ source code.
 
 **Current value for `target_cpu = "arm64"`:** `"//third_party/github.com/google/emboss/src"`
 
-From //.gn:94
+From //.gn:102
 
 **Overridden from the default:** `""`
 
@@ -2404,7 +2374,7 @@ From //third_party/pigweed/src/third_party/emboss/emboss.gni:20
 
 **Current value for `target_cpu = "x64"`:** `"//third_party/github.com/google/emboss/src"`
 
-From //.gn:94
+From //.gn:102
 
 **Overridden from the default:** `""`
 
@@ -2417,7 +2387,7 @@ mirror of the few Fuchsia source files it uses.
 
 **Current value for `target_cpu = "arm64"`:** `"//"`
 
-From //.gn:88
+From //.gn:96
 
 **Overridden from the default:** `"//third_party/pigweed/src/third_party/fuchsia/repo"`
 
@@ -2425,7 +2395,7 @@ From //third_party/pigweed/src/third_party/fuchsia/fuchsia.gni:20
 
 **Current value for `target_cpu = "x64"`:** `"//"`
 
-From //.gn:88
+From //.gn:96
 
 **Overridden from the default:** `"//third_party/pigweed/src/third_party/fuchsia/repo"`
 
@@ -2451,14 +2421,6 @@ library is created at "$dir_pw_third_party/googletest".
 
 From //third_party/pigweed/src/third_party/googletest/googletest.gni:19
 
-### dir_pw_third_party_llvm_builtins
-
-This should be set to the path of the llvm compiler-rt/builtins directory.
-
-**Current value (from the default):** `""`
-
-From //third_party/pigweed/src/third_party/llvm_builtins/BUILD.gn:23
-
 ### dir_pw_third_party_mbedtls
 
 If compiling backends with mbedtls, this variable is set to the path to the
@@ -2478,16 +2440,6 @@ created at "$dir_pw_third_party/nanopb".
 **Current value (from the default):** `""`
 
 From //third_party/pigweed/src/third_party/nanopb/nanopb.gni:22
-
-### dir_pw_third_party_protobuf
-
-If compiling host tools that use libprotobuf, this variable is set to the
-path to the protobuf installation. When set, a pw_source_set for the
-protobuf library is created at "$dir_pw_third_party/protobuf".
-
-**Current value (from the default):** `""`
-
-From //third_party/pigweed/src/third_party/protobuf/protobuf.gni:19
 
 ### dir_pw_thread
 
@@ -5243,19 +5195,7 @@ the "some_other_flavor" flavor instead of their default flavor
 all other packages using this template would use their default
 package flavors.
 
-**Current value for `target_cpu = "arm64"`:** `[]`
-
-From //products/bringup.gni:35
-
-**Overridden from the default:** `[]`
-
-From //build/packages/prebuilt_package_with_flavors.gni:29
-
-**Current value for `target_cpu = "x64"`:** `[]`
-
-From //products/bringup.gni:35
-
-**Overridden from the default:** `[]`
+**Current value (from the default):** `[]`
 
 From //build/packages/prebuilt_package_with_flavors.gni:29
 
@@ -5445,7 +5385,7 @@ A list of binary labels to include in ZBIs built for this product.
 
 **Current value for `target_cpu = "arm64"`:** `["//products/kernel_cmdline:kernel.oom.behavior--jobkill", "//products/kernel_cmdline:oom.reboot-timeout--low"]`
 
-From //products/bringup.gni:38
+From //products/bringup.gni:37
 
 **Overridden from the default:** `[]`
 
@@ -5453,7 +5393,7 @@ From //build/product.gni:11
 
 **Current value for `target_cpu = "x64"`:** `["//products/kernel_cmdline:kernel.oom.behavior--jobkill", "//products/kernel_cmdline:oom.reboot-timeout--low"]`
 
-From //products/bringup.gni:38
+From //products/bringup.gni:37
 
 **Overridden from the default:** `[]`
 
@@ -5507,72 +5447,13 @@ From //build/config/profile/config.gni:24
 
 From //build/config/features.gni:9
 
-### pw_JAVA_NATIVE_INTERFACE_INCLUDE_DIRS
-
-pw_JAVA_NATIVE_INTERFACE_INCLUDE_DIRS specifies the paths to use for
-building Java Native Interface libraries. If no paths are provided, targets
-that require JNI may not build correctly.
-
-Example JNI include paths for a Linux system:
-
-  pw_JAVA_NATIVE_INTERFACE_INCLUDE_DIRS = [
-    "/usr/local/buildtools/java/jdk/include/",
-    "/usr/local/buildtools/java/jdk/include/linux",
-  ]
-
-
-**Current value (from the default):** `[]`
-
-From //third_party/pigweed/src/pw_tokenizer/BUILD.gn:324
-
-### pw_arduino_build_BOARD
-
-**Current value (from the default):** `""`
-
-From //third_party/pigweed/src/pw_arduino_build/arduino.gni:30
-
-### pw_arduino_build_CORE_NAME
-
-Expected args for an Arduino build:
-
-**Current value (from the default):** `""`
-
-From //third_party/pigweed/src/pw_arduino_build/arduino.gni:24
-
-### pw_arduino_build_CORE_PATH
-
-Enable/disable Arduino builds via group("arduino").
-Set to the full path of where cores are installed.
-
-**Current value (from the default):** `""`
-
-From //third_party/pigweed/src/pw_arduino_build/arduino.gni:21
-
-### pw_arduino_build_MENU_OPTIONS
-
-Menu options should be a list of strings.
-
-**Current value (from the default):** `[]`
-
-From //third_party/pigweed/src/pw_arduino_build/arduino.gni:33
-
-### pw_arduino_build_PACKAGE_NAME
-
-TODO(tonymd): "avr/1.58.1" here should match the folders in this dir:
-"../third_party/arduino/cores/$pw_arduino_build_CORE_NAME/hardware/*")
-For teensy: "avr/1.58.1", for adafruit-samd: "samd/1.6.2"
-
-**Current value (from the default):** `""`
-
-From //third_party/pigweed/src/pw_arduino_build/arduino.gni:29
-
 ### pw_assert_BACKEND
 
 Backend for the pw_assert module's CHECK facade.
 
 **Current value for `target_cpu = "arm64"`:** `"//third_party/pigweed/backends/pw_assert"`
 
-From //.gn:62
+From //.gn:70
 
 **Overridden from the default:** `""`
 
@@ -5580,7 +5461,7 @@ From //third_party/pigweed/src/pw_assert/backend.gni:19
 
 **Current value for `target_cpu = "x64"`:** `"//third_party/pigweed/backends/pw_assert"`
 
-From //.gn:62
+From //.gn:70
 
 **Overridden from the default:** `""`
 
@@ -5615,7 +5496,7 @@ WARNING: This is experimental and *not* guaranteed to work.
 
 **Current value for `target_cpu = "arm64"`:** `["//third_party/pigweed/backends/pw_async_fuchsia:*", "//third_party/pigweed:*", "//src/connectivity/bluetooth/core/bt-host/*"]`
 
-From //.gn:97
+From //.gn:105
 
 **Overridden from the default:** `[]`
 
@@ -5623,7 +5504,7 @@ From //third_party/pigweed/src/pw_async/async.gni:21
 
 **Current value for `target_cpu = "x64"`:** `["//third_party/pigweed/backends/pw_async_fuchsia:*", "//third_party/pigweed:*", "//src/connectivity/bluetooth/core/bt-host/*"]`
 
-From //.gn:97
+From //.gn:105
 
 **Overridden from the default:** `[]`
 
@@ -5635,7 +5516,7 @@ Configures the backend to use for the //pw_async:fake_dispatcher facade.
 
 **Current value for `target_cpu = "arm64"`:** `"//third_party/pigweed/backends/pw_async_fuchsia:fake_dispatcher"`
 
-From //.gn:106
+From //.gn:114
 
 **Overridden from the default:** `""`
 
@@ -5643,7 +5524,7 @@ From //third_party/pigweed/src/pw_async/backend.gni:22
 
 **Current value for `target_cpu = "x64"`:** `"//third_party/pigweed/backends/pw_async_fuchsia:fake_dispatcher"`
 
-From //.gn:106
+From //.gn:114
 
 **Overridden from the default:** `""`
 
@@ -5655,7 +5536,7 @@ Configures the backend to use for the //pw_async:task facade.
 
 **Current value for `target_cpu = "arm64"`:** `"//third_party/pigweed/backends/pw_async_fuchsia:task"`
 
-From //.gn:103
+From //.gn:111
 
 **Overridden from the default:** `""`
 
@@ -5663,7 +5544,7 @@ From //third_party/pigweed/src/pw_async/backend.gni:19
 
 **Current value for `target_cpu = "x64"`:** `"//third_party/pigweed/backends/pw_async_fuchsia:task"`
 
-From //.gn:103
+From //.gn:111
 
 **Overridden from the default:** `""`
 
@@ -5780,7 +5661,7 @@ libraries such as pw_assert.
 
 **Current value for `target_cpu = "arm64"`:** `["//third_party/pigweed/src/pw_assert:impl", "//third_party/pigweed/src/pw_log:impl"]`
 
-From //.gn:82
+From //.gn:90
 
 **Overridden from the default:** `[]`
 
@@ -5788,7 +5669,7 @@ From //third_party/pigweed/src/pw_build/gn_internal/build_target.gni:26
 
 **Current value for `target_cpu = "x64"`:** `["//third_party/pigweed/src/pw_assert:impl", "//third_party/pigweed/src/pw_log:impl"]`
 
-From //.gn:82
+From //.gn:90
 
 **Overridden from the default:** `[]`
 
@@ -5912,23 +5793,13 @@ overriding this variable in your own toolchain.
 
 From //third_party/pigweed/src/pw_build/gn_internal/build_target.gni:32
 
-### pw_checksum_CONFIG
-
-The build target that overrides the default configuration options for this
-module. This should point to a source set that provides defines through a
-public config (which may -include a file or add defines directly).
-
-**Current value (from the default):** `"//third_party/pigweed/src/pw_build:empty"`
-
-From //third_party/pigweed/src/pw_checksum/BUILD.gn:28
-
 ### pw_chre_CONFIG
 
 The configuration for building CHRE.
 
 **Current value for `target_cpu = "arm64"`:** `"//third_party/chre:chre_config"`
 
-From //.gn:114
+From //.gn:122
 
 **Overridden from the default:** `"//third_party/chre:default_chre_config"`
 
@@ -5936,7 +5807,7 @@ From //third_party/pigweed/src/third_party/chre/chre.gni:22
 
 **Current value for `target_cpu = "x64"`:** `"//third_party/chre:chre_config"`
 
-From //.gn:114
+From //.gn:122
 
 **Overridden from the default:** `"//third_party/chre:default_chre_config"`
 
@@ -5948,7 +5819,7 @@ CHRE's platform backend implementation. The default is the Pigweed backend.
 
 **Current value for `target_cpu = "arm64"`:** `"//third_party/pigweed/src/pw_chre:chre_backend"`
 
-From //.gn:115
+From //.gn:123
 
 **Overridden from the default:** `"//pw_chre:chre_backend"`
 
@@ -5956,7 +5827,7 @@ From //third_party/pigweed/src/third_party/chre/chre.gni:28
 
 **Current value for `target_cpu = "x64"`:** `"//third_party/pigweed/src/pw_chre:chre_backend"`
 
-From //.gn:115
+From //.gn:123
 
 **Overridden from the default:** `"//pw_chre:chre_backend"`
 
@@ -5968,7 +5839,7 @@ CHRE's platform backend headers. The default is the Pigweed backend.
 
 **Current value for `target_cpu = "arm64"`:** `"//third_party/pigweed/src/pw_chre:chre_backend_headers"`
 
-From //.gn:117
+From //.gn:125
 
 **Overridden from the default:** `"//pw_chre:chre_backend_headers"`
 
@@ -5976,7 +5847,7 @@ From //third_party/pigweed/src/third_party/chre/chre.gni:25
 
 **Current value for `target_cpu = "x64"`:** `"//third_party/pigweed/src/pw_chre:chre_backend_headers"`
 
-From //.gn:117
+From //.gn:125
 
 **Overridden from the default:** `"//pw_chre:chre_backend_headers"`
 
@@ -5988,7 +5859,7 @@ Backend for the pw_chrono module's system_clock.
 
 **Current value for `target_cpu = "arm64"`:** `"//third_party/pigweed/src/pw_chrono_stl:system_clock"`
 
-From //.gn:65
+From //.gn:73
 
 **Overridden from the default:** `""`
 
@@ -5996,7 +5867,7 @@ From //third_party/pigweed/src/pw_chrono/backend.gni:17
 
 **Current value for `target_cpu = "x64"`:** `"//third_party/pigweed/src/pw_chrono_stl:system_clock"`
 
-From //.gn:65
+From //.gn:73
 
 **Overridden from the default:** `""`
 
@@ -6008,7 +5879,7 @@ Backend for the pw_chrono module's system_timer.
 
 **Current value for `target_cpu = "arm64"`:** `"//third_party/pigweed/src/pw_chrono_stl:system_timer"`
 
-From //.gn:73
+From //.gn:81
 
 **Overridden from the default:** `""`
 
@@ -6016,7 +5887,7 @@ From //third_party/pigweed/src/pw_chrono/backend.gni:20
 
 **Current value for `target_cpu = "x64"`:** `"//third_party/pigweed/src/pw_chrono_stl:system_timer"`
 
-From //.gn:73
+From //.gn:81
 
 **Overridden from the default:** `""`
 
@@ -6041,48 +5912,6 @@ significantly.
 **Current value (from the default):** `false`
 
 From //third_party/pigweed/src/pw_compilation_testing/negative_compilation_test.gni:24
-
-### pw_cpu_exception_ENTRY_BACKEND
-
-Backends for the pw_cpu_exception module.
-
-**Current value (from the default):** `""`
-
-From //third_party/pigweed/src/pw_cpu_exception/backend.gni:17
-
-### pw_cpu_exception_HANDLER_BACKEND
-
-**Current value (from the default):** `""`
-
-From //third_party/pigweed/src/pw_cpu_exception/backend.gni:18
-
-### pw_cpu_exception_SUPPORT_BACKEND
-
-**Current value (from the default):** `""`
-
-From //third_party/pigweed/src/pw_cpu_exception/backend.gni:19
-
-### pw_cpu_exception_cortex_m_CONFIG
-
-The build target that overrides the default configuration options for this
-module. This should point to a source set that provides defines through a
-public config (which may -include a file or add defines directly).
-
-**Current value (from the default):** `"//third_party/pigweed/src/pw_build:empty"`
-
-From //third_party/pigweed/src/pw_cpu_exception_cortex_m/BUILD.gn:28
-
-### pw_crypto_ECDSA_BACKEND
-
-**Current value (from the default):** `""`
-
-From //third_party/pigweed/src/pw_crypto/backend.gni:17
-
-### pw_crypto_SHA256_BACKEND
-
-**Current value (from the default):** `""`
-
-From //third_party/pigweed/src/pw_crypto/backend.gni:16
 
 ### pw_docgen_BUILD_DOCS
 
@@ -6140,7 +5969,7 @@ public config (which may -include a file or add defines directly).
 
 **Current value for `target_cpu = "arm64"`:** `"//third_party/pigweed/src/pw_function:enable_dynamic_allocation"`
 
-From //.gn:79
+From //.gn:87
 
 **Overridden from the default:** `"//third_party/pigweed/src/pw_build:empty"`
 
@@ -6148,7 +5977,7 @@ From //third_party/pigweed/src/pw_function/function.gni:22
 
 **Current value for `target_cpu = "x64"`:** `"//third_party/pigweed/src/pw_function:enable_dynamic_allocation"`
 
-From //.gn:79
+From //.gn:87
 
 **Overridden from the default:** `"//third_party/pigweed/src/pw_build:empty"`
 
@@ -6160,7 +5989,7 @@ Backend for the pw_log module.
 
 **Current value for `target_cpu = "arm64"`:** `"//third_party/pigweed/backends/pw_log"`
 
-From //.gn:63
+From //.gn:71
 
 **Overridden from the default:** `""`
 
@@ -6168,7 +5997,7 @@ From //third_party/pigweed/src/pw_log/backend.gni:17
 
 **Current value for `target_cpu = "x64"`:** `"//third_party/pigweed/backends/pw_log"`
 
-From //.gn:63
+From //.gn:71
 
 **Overridden from the default:** `""`
 
@@ -6192,40 +6021,6 @@ glog adapter portion of this module.
 **Current value (from the default):** `"//third_party/pigweed/src/pw_build:empty"`
 
 From //third_party/pigweed/src/pw_log/BUILD.gn:33
-
-### pw_log_string_CONFIG
-
-**Current value (from the default):** `"//third_party/pigweed/src/pw_build:empty"`
-
-From //third_party/pigweed/src/pw_log_string/BUILD.gn:26
-
-### pw_log_string_HANDLER_BACKEND
-
-The pw_log_string:message_handler backend implements the pw_Log C API
-which is also used by the pw_log_string module's implementation of the
-pw_log facade.
-
-**Current value (from the default):** `""`
-
-From //third_party/pigweed/src/pw_log_string/backend.gni:21
-
-### pw_log_tokenized_CONFIG
-
-The build target that overrides the default configuration options for this
-module. This should point to a source set that provides defines through a
-public config (which may -include a file or add defines directly).
-
-**Current value (from the default):** `"//third_party/pigweed/src/pw_build:empty"`
-
-From //third_party/pigweed/src/pw_log_tokenized/BUILD.gn:29
-
-### pw_log_tokenized_HANDLER_BACKEND
-
-Backend for the pw_log_tokenized log handler.
-
-**Current value (from the default):** `""`
-
-From //third_party/pigweed/src/pw_log_tokenized/backend.gni:17
 
 ### pw_module_docs
 
@@ -6251,30 +6046,6 @@ A list with paths to all Pigweed module. DO NOT SET THIS BUILD ARGUMENT!
 
 From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:205
 
-### pw_perf_test_EXECUTABLE_TARGET_TYPE
-
-Chooses the executable template for performance tests
-
-**Current value (from the default):** `"pw_executable"`
-
-From //third_party/pigweed/src/pw_perf_test/perf_test.gni:31
-
-### pw_perf_test_MAIN_FUNCTION
-
-Chooses the EventHandler for running the perf tests
-
-**Current value (from the default):** `"//third_party/pigweed/src/pw_perf_test:logging_main"`
-
-From //third_party/pigweed/src/pw_perf_test/perf_test.gni:28
-
-### pw_perf_test_TIMER_INTERFACE_BACKEND
-
-Chooses the backend for how the framework calculates time
-
-**Current value (from the default):** `""`
-
-From //third_party/pigweed/src/pw_perf_test/perf_test.gni:25
-
 ### pw_preprocessor_CONFIG
 
 The build target that overrides the default configuration options for this
@@ -6284,16 +6055,6 @@ public config (which may -include a file or add defines directly).
 **Current value (from the default):** `"//third_party/pigweed/src/pw_build:empty"`
 
 From //third_party/pigweed/src/pw_preprocessor/BUILD.gn:26
-
-### pw_protobuf_CONFIG
-
-The build target that overrides the default configuration options for this
-module. This should point to a source set that provides defines through a
-public config (which may -include a file or add defines directly).
-
-**Current value (from the default):** `"//third_party/pigweed/src/pw_build:empty"`
-
-From //third_party/pigweed/src/pw_protobuf/BUILD.gn:31
 
 ### pw_protobuf_compiler_GENERATE_LEGACY_ENUM_SNAKE_CASE_NAMES
 
@@ -6313,7 +6074,7 @@ root_build_dir, to the protoc binary.
 
 **Current value for `target_cpu = "arm64"`:** `"host_x64/protoc"`
 
-From //.gn:110
+From //.gn:118
 
 **Overridden from the default:** `""`
 
@@ -6321,7 +6082,7 @@ From //third_party/pigweed/src/pw_protobuf_compiler/proto.gni:55
 
 **Current value for `target_cpu = "x64"`:** `"host_x64/protoc"`
 
-From //.gn:110
+From //.gn:118
 
 **Overridden from the default:** `""`
 
@@ -6334,7 +6095,7 @@ the protobuf compiler.
 
 **Current value for `target_cpu = "arm64"`:** `"//third_party/protobuf:protoc"`
 
-From //.gn:109
+From //.gn:117
 
 **Overridden from the default:** `""`
 
@@ -6342,7 +6103,7 @@ From //third_party/pigweed/src/pw_protobuf_compiler/proto.gni:38
 
 **Current value for `target_cpu = "x64"`:** `"//third_party/protobuf:protoc"`
 
-From //.gn:109
+From //.gn:117
 
 **Overridden from the default:** `""`
 
@@ -6365,34 +6126,6 @@ From //third_party/pigweed/src/pw_toolchain/rbe.gni:30
 **Current value (from the default):** `""`
 
 From //third_party/pigweed/src/pw_toolchain/rbe.gni:29
-
-### pw_rpc_CONFIG
-
-The build target that overrides the default configuration options for this
-module. This should point to a source set that provides defines through a
-public config (which may -include a file or add defines directly).
-
-**Current value (from the default):** `"//third_party/pigweed/src/pw_build:empty"`
-
-From //third_party/pigweed/src/pw_rpc/config.gni:23
-
-### pw_rpc_system_server_BACKEND
-
-Backend for the pw_rpc_system_server module.
-
-**Current value (from the default):** `""`
-
-From //third_party/pigweed/src/pw_rpc/system_server/backend.gni:17
-
-### pw_software_update_CONFIG
-
-The build target that overrides the default configuration options for this
-module. This should point to a source set that provides defines through a
-public config (which may -include a file or add defines directly).
-
-**Current value (from the default):** `"//third_party/pigweed/src/pw_build:empty"`
-
-From //third_party/pigweed/src/pw_software_update/BUILD.gn:30
 
 ### pw_span_CONFIG
 
@@ -6446,7 +6179,7 @@ Backend for the pw_sync module's binary semaphore.
 
 **Current value for `target_cpu = "arm64"`:** `"//third_party/pigweed/src/pw_sync_stl:binary_semaphore_backend"`
 
-From //.gn:75
+From //.gn:83
 
 **Overridden from the default:** `""`
 
@@ -6454,7 +6187,7 @@ From //third_party/pigweed/src/pw_sync/backend.gni:17
 
 **Current value for `target_cpu = "x64"`:** `"//third_party/pigweed/src/pw_sync_stl:binary_semaphore_backend"`
 
-From //.gn:75
+From //.gn:83
 
 **Overridden from the default:** `""`
 
@@ -6490,7 +6223,7 @@ Backend for the pw_sync module's mutex.
 
 **Current value for `target_cpu = "arm64"`:** `"//third_party/pigweed/src/pw_sync_stl:mutex_backend"`
 
-From //.gn:66
+From //.gn:74
 
 **Overridden from the default:** `""`
 
@@ -6498,7 +6231,7 @@ From //third_party/pigweed/src/pw_sync/backend.gni:26
 
 **Current value for `target_cpu = "x64"`:** `"//third_party/pigweed/src/pw_sync_stl:mutex_backend"`
 
-From //.gn:66
+From //.gn:74
 
 **Overridden from the default:** `""`
 
@@ -6528,7 +6261,7 @@ Backend for the pw_sync module's thread notification.
 
 **Current value for `target_cpu = "arm64"`:** `"//third_party/pigweed/src/pw_sync:binary_semaphore_thread_notification_backend"`
 
-From //.gn:70
+From //.gn:78
 
 **Overridden from the default:** `""`
 
@@ -6536,7 +6269,7 @@ From //third_party/pigweed/src/pw_sync/backend.gni:38
 
 **Current value for `target_cpu = "x64"`:** `"//third_party/pigweed/src/pw_sync:binary_semaphore_thread_notification_backend"`
 
-From //.gn:70
+From //.gn:78
 
 **Overridden from the default:** `""`
 
@@ -6556,7 +6289,7 @@ Backend for the pw_sync module's timed thread notification.
 
 **Current value for `target_cpu = "arm64"`:** `"//third_party/pigweed/src/pw_sync:binary_semaphore_timed_thread_notification_backend"`
 
-From //.gn:71
+From //.gn:79
 
 **Overridden from the default:** `""`
 
@@ -6564,31 +6297,11 @@ From //third_party/pigweed/src/pw_sync/backend.gni:41
 
 **Current value for `target_cpu = "x64"`:** `"//third_party/pigweed/src/pw_sync:binary_semaphore_timed_thread_notification_backend"`
 
-From //.gn:71
+From //.gn:79
 
 **Overridden from the default:** `""`
 
 From //third_party/pigweed/src/pw_sync/backend.gni:41
-
-### pw_sys_io_BACKEND
-
-Backend for the pw_sys_io facade.
-
-**Current value for `target_cpu = "arm64"`:** `"//third_party/pigweed/src/pw_sys_io_stdio"`
-
-From //.gn:67
-
-**Overridden from the default:** `""`
-
-From //third_party/pigweed/src/pw_sys_io/backend.gni:17
-
-**Current value for `target_cpu = "x64"`:** `"//third_party/pigweed/src/pw_sys_io_stdio"`
-
-From //.gn:67
-
-**Overridden from the default:** `""`
-
-From //third_party/pigweed/src/pw_sys_io/backend.gni:17
 
 ### pw_third_party_boringssl_ALIAS
 
@@ -6599,7 +6312,7 @@ use Pigweed's boringssl exclusively.
 
 **Current value for `target_cpu = "arm64"`:** `"//third_party/boringssl"`
 
-From //.gn:91
+From //.gn:99
 
 **Overridden from the default:** `""`
 
@@ -6607,7 +6320,7 @@ From //third_party/pigweed/src/third_party/boringssl/boringssl.gni:25
 
 **Current value for `target_cpu = "x64"`:** `"//third_party/boringssl"`
 
-From //.gn:91
+From //.gn:99
 
 **Overridden from the default:** `""`
 
@@ -6618,23 +6331,6 @@ From //third_party/pigweed/src/third_party/boringssl/boringssl.gni:25
 **Current value (from the default):** `"//third_party/pigweed/src/third_party/emboss:default_overrides"`
 
 From //third_party/pigweed/src/third_party/emboss/emboss.gni:24
-
-### pw_third_party_llvm_builtins_TARGET_BUILTINS
-
-Points to a pw_source_set that enumerates builtins specific to
-the current toolchain.
-
-**Current value (from the default):** `""`
-
-From //third_party/pigweed/src/third_party/llvm_builtins/BUILD.gn:27
-
-### pw_third_party_llvm_builtins_ignore_list
-
-List of files to be excluded from the builtins repo.
-
-**Current value (from the default):** `[]`
-
-From //third_party/pigweed/src/third_party/llvm_builtins/BUILD.gn:30
 
 ### pw_third_party_mbedtls_CONFIG_HEADER
 
@@ -6666,16 +6362,6 @@ public config (which may -include a file or add defines directly).
 
 From //third_party/pigweed/src/third_party/nanopb/nanopb.gni:27
 
-### pw_thread_CONFIG
-
-The build target that overrides the default configuration options for this
-module. This should point to a source set that provides defines through a
-public config (which may -include a file or add defines directly).
-
-**Current value (from the default):** `"//third_party/pigweed/src/pw_build:empty"`
-
-From //third_party/pigweed/src/pw_thread/BUILD.gn:29
-
 ### pw_thread_ID_BACKEND
 
 Backend for the pw_thread module's pw::thread::Id.
@@ -6700,7 +6386,7 @@ Backend for the pw_thread module's pw::thread::sleep_{for,until}.
 
 **Current value for `target_cpu = "arm64"`:** `"//third_party/pigweed/src/pw_thread_stl:sleep"`
 
-From //.gn:68
+From //.gn:76
 
 **Overridden from the default:** `""`
 
@@ -6708,7 +6394,7 @@ From //third_party/pigweed/src/pw_thread/backend.gni:20
 
 **Current value for `target_cpu = "x64"`:** `"//third_party/pigweed/src/pw_thread_stl:sleep"`
 
-From //.gn:68
+From //.gn:76
 
 **Overridden from the default:** `""`
 
@@ -6745,51 +6431,6 @@ Backend for the pw_thread module's pw::thread::yield.
 **Current value (from the default):** `""`
 
 From //third_party/pigweed/src/pw_thread/backend.gni:26
-
-### pw_tokenizer_CONFIG
-
-The build target that overrides the default configuration options for this
-module. This should point to a source set that provides defines through a
-public config (which may -include a file or add defines directly).
-
-**Current value (from the default):** `"//third_party/pigweed/src/pw_build:empty"`
-
-From //third_party/pigweed/src/pw_tokenizer/BUILD.gn:30
-
-### pw_toolchain_ARM_NONE_EABI_PREFIX
-
-This flag allows you to specify a prefix for ARM GCC tools use when
-compiling with an arm-none-eabi toolchain. This is useful for debugging
-toolchain-related issues, or for building with an externally-provided
-toolchain.
-
-Pigweed toolchains should NOT override this variable so projects or users
-can control it via `.gn` or by setting it as a regular gn argument (e.g.
-`gn gen --args='pw_toolchain_ARM_NONE_EABI_PREFIX=/path/to/my-'`).
-
-Examples:
-  pw_toolchain_ARM_NONE_EABI_PREFIX = ""
-  command: "arm-none-eabi-gcc" (from PATH)
-
-  pw_toolchain_ARM_NONE_EABI_PREFIX = "my-"
-  command: "my-arm-none-eabi-gcc" (from PATH)
-
-  pw_toolchain_ARM_NONE_EABI_PREFIX = "/bin/my-"
-  command: "/bin/my-arm-none-eabi-gcc" (absolute path)
-
-  pw_toolchain_ARM_NONE_EABI_PREFIX = "//environment/gcc_next/"
-  command: "../environment/gcc_next/arm-none-eabi-gcc" (relative path)
-
-GN templates should use `arm_gcc_toolchain_tools.*` to get the intended
-command string rather than relying directly on
-pw_toolchain_ARM_NONE_EABI_PREFIX.
-
-If the prefix begins with "//", it will be rebased to be relative to the
-root build directory.
-
-**Current value (from the default):** `""`
-
-From //third_party/pigweed/src/pw_toolchain/arm_gcc/toolchains.gni:55
 
 ### pw_toolchain_CLANG_PREFIX
 
@@ -6945,50 +6586,6 @@ From //third_party/pigweed/src/pw_toolchain/static_analysis_toolchain.gni:33
 
 From //third_party/pigweed/src/pw_toolchain/rbe.gni:20
 
-### pw_trace_BACKEND
-
-Default backend for the pw_trace module is pw_trace:null.
-
-**Current value (from the default):** `"//third_party/pigweed/src/pw_trace:null"`
-
-From //third_party/pigweed/src/pw_trace/backend.gni:19
-
-### pw_trace_CONFIG
-
-The build target that overrides the default configuration options for this
-module. This should point to a source set that provides defines through a
-public config (which may -include a file or add defines directly).
-
-**Current value (from the default):** `"//third_party/pigweed/src/pw_build:empty"`
-
-From //third_party/pigweed/src/pw_trace_tokenized/config.gni:23
-
-### pw_trace_tokenized_BUFFER_SIZE
-
-Trace buffer size in bytes. Set to 0 to disable.
-
-**Current value (from the default):** `256`
-
-From //third_party/pigweed/src/pw_trace_tokenized/config.gni:29
-
-### pw_trace_tokenizer_time
-
-Tokenizer trace time, gets included if provided
-
-**Current value (from the default):** `""`
-
-From //third_party/pigweed/src/pw_trace_tokenized/config.gni:26
-
-### pw_transfer_CONFIG
-
-The build target that overrides the default configuration options for this
-module. This should point to a source set that provides defines through a
-public config (which may -include a file or add defines directly).
-
-**Current value (from the default):** `"//third_party/pigweed/src/pw_build:empty"`
-
-From //third_party/pigweed/src/pw_transfer/BUILD.gn:29
-
 ### pw_unit_test_AUTOMATIC_RUNNER
 
 Path to a test runner to automatically run unit tests after they are built.
@@ -7040,7 +6637,7 @@ Usage: toolchain-controlled only
 
 **Current value for `target_cpu = "arm64"`:** `"//third_party/pigweed/src/pw_unit_test:googletest"`
 
-From //.gn:121
+From //.gn:129
 
 **Overridden from the default:** `"//third_party/pigweed/src/pw_unit_test:light"`
 
@@ -7048,7 +6645,7 @@ From //third_party/pigweed/src/pw_unit_test/test.gni:31
 
 **Current value for `target_cpu = "x64"`:** `"//third_party/pigweed/src/pw_unit_test:googletest"`
 
-From //.gn:121
+From //.gn:129
 
 **Overridden from the default:** `"//third_party/pigweed/src/pw_unit_test:light"`
 
@@ -7090,24 +6687,6 @@ Usage: toolchain-controlled only
 
 From //third_party/pigweed/src/pw_unit_test/test.gni:112
 
-### pw_unit_test_FACADE_TESTS_ENABLED
-
-Controls whether to build and run facade tests. Facade tests add
-considerably to build time, so they are disabled by default.
-
-**Current value (from the default):** `false`
-
-From //third_party/pigweed/src/pw_unit_test/facade_test.gni:24
-
-### pw_unit_test_FACADE_TEST_NAME
-
-Pigweed uses this internally to manage toolchain generation for facade
-tests. This should NEVER be set manually, or depended on as stable API.
-
-**Current value (from the default):** `""`
-
-From //third_party/pigweed/src/pw_unit_test/facade_test.gni:28
-
 ### pw_unit_test_GOOGLETEST_BACKEND
 
 The GoogleTest library target. This is not a pw_unit_test backend (anymore).
@@ -7121,7 +6700,7 @@ Usage: toolchain-controlled only
 
 **Current value for `target_cpu = "arm64"`:** `"//third_party/googletest:gmock_no_testonly"`
 
-From //.gn:120
+From //.gn:128
 
 **Overridden from the default:** `"//third_party/pigweed/src/third_party/googletest"`
 
@@ -7129,7 +6708,7 @@ From //third_party/pigweed/src/pw_unit_test/test.gni:41
 
 **Current value for `target_cpu = "x64"`:** `"//third_party/googletest:gmock_no_testonly"`
 
-From //.gn:120
+From //.gn:128
 
 **Overridden from the default:** `"//third_party/pigweed/src/third_party/googletest"`
 
@@ -7145,7 +6724,7 @@ Usage: toolchain-controlled only
 
 **Current value for `target_cpu = "arm64"`:** `"//src/lib/fxl/test:gtest_main"`
 
-From //.gn:119
+From //.gn:127
 
 **Overridden from the default:** `"//third_party/pigweed/src/pw_unit_test:simple_printing_main"`
 
@@ -7153,7 +6732,7 @@ From //third_party/pigweed/src/pw_unit_test/test.gni:48
 
 **Current value for `target_cpu = "x64"`:** `"//src/lib/fxl/test:gtest_main"`
 
-From //.gn:119
+From //.gn:127
 
 **Overridden from the default:** `"//third_party/pigweed/src/pw_unit_test:simple_printing_main"`
 
@@ -7200,7 +6779,7 @@ compatibility.
 
 **Current value for `target_cpu = "arm64"`:** `true`
 
-From //.gn:122
+From //.gn:130
 
 **Overridden from the default:** `false`
 
@@ -7208,7 +6787,7 @@ From //third_party/pigweed/src/pw_unit_test/test.gni:117
 
 **Current value for `target_cpu = "x64"`:** `true`
 
-From //.gn:122
+From //.gn:130
 
 **Overridden from the default:** `false`
 
@@ -7264,7 +6843,7 @@ From //build/images/args.gni:20
 
 **Current value for `target_cpu = "arm64"`:** `["//third_party/pigweed/src/pw_build:reduced_size"]`
 
-From //.gn:131
+From //.gn:139
 
 **Overridden from the default:** `[]`
 
@@ -7272,7 +6851,7 @@ From //third_party/pigweed/src/pw_build/gn_internal/defaults.gni:36
 
 **Current value for `target_cpu = "x64"`:** `["//third_party/pigweed/src/pw_build:reduced_size"]`
 
-From //.gn:131
+From //.gn:139
 
 **Overridden from the default:** `[]`
 
@@ -7626,7 +7205,7 @@ extension mechanism for IDK bits outside of the main repository.
 
 **Current value for `target_cpu = "arm64"`:** `[]`
 
-From //products/bringup.gni:36
+From //products/bringup.gni:35
 
 **Overridden from the default:** `[]`
 
@@ -7634,7 +7213,7 @@ From //BUILD.gn:118
 
 **Current value for `target_cpu = "x64"`:** `[]`
 
-From //products/bringup.gni:36
+From //products/bringup.gni:35
 
 **Overridden from the default:** `[]`
 
@@ -8095,28 +7674,6 @@ The absolute path of the sysroot that is used with the target toolchain.
 
 From //build/config/sysroot.gni:7
 
-### termina_disk
-
-The termina disk image.
-
-Defaults to the disk image from CIPD, but can be overridden to use a
-custom disk for development purposes.
-
-**Current value (from the default):** `"//prebuilt/virtualization/packages/termina_guest/images/arm64/vm_rootfs.img"`
-
-From //src/virtualization/packages/termina_guest/BUILD.gn:18
-
-### termina_extras
-
-The termina extras disk image.
-
-Defaults to the disk image from CIPD, but can be overridden to use a
-custom disk for development purposes.
-
-**Current value (from the default):** `"//prebuilt/virtualization/packages/termina_guest/images/arm64/vm_extras.img"`
-
-From //src/virtualization/packages/termina_guest/BUILD.gn:30
-
 ### termina_extras_tests
 
 If `true`, adds additional testonly content to extras.img, which will be
@@ -8148,17 +7705,6 @@ connection at runtime.
 
 From //src/virtualization/bin/termina_guest_manager/BUILD.gn:40
 
-### termina_kernel
-
-The termina kernel image.
-
-Defaults to the common linux kernel image from CIPD, but can be overridden to use a
-custom kernel for development purposes.
-
-**Current value (from the default):** `"//prebuilt/virtualization/packages/termina_guest/kernel/arm64/vm_kernel-5.15"`
-
-From //src/virtualization/packages/termina_guest/BUILD.gn:12
-
 ### termina_stateful_partition_size_bytes
 
 Default stateful image size (40GiB).
@@ -8169,17 +7715,6 @@ If you change this value you will need to rebuild the guest partition using
 **Current value (from the default):** `42949672960`
 
 From //src/virtualization/bin/termina_guest_manager/BUILD.gn:31
-
-### termina_tools
-
-The termina tools disk image.
-
-Defaults to the disk image from CIPD, but can be overridden to use a
-custom disk for development purposes.
-
-**Current value (from the default):** `"//prebuilt/virtualization/packages/termina_guest/images/arm64/vm_tools.img"`
-
-From //src/virtualization/packages/termina_guest/BUILD.gn:24
 
 ### termina_user_extras
 
@@ -8995,7 +8530,7 @@ The product assembly config used to configure the Zedboot image.
 
 **Current value for `target_cpu = "arm64"`:** `"//products/zedboot"`
 
-From //products/bringup.gni:43
+From //products/bringup.gni:42
 
 **Overridden from the default:** `false`
 
@@ -9003,7 +8538,7 @@ From //build/product.gni:41
 
 **Current value for `target_cpu = "x64"`:** `"//products/zedboot"`
 
-From //products/bringup.gni:43
+From //products/bringup.gni:42
 
 **Overridden from the default:** `false`
 
