@@ -262,9 +262,9 @@ void RectangleCompositor::DrawBatch(CommandBuffer* cmd_buf,
                                     const ImagePtr& output_image, const TexturePtr& depth_buffer,
                                     bool apply_color_conversion) {
   TRACE_DURATION("gfx", "RectangleCompositor::DrawBatch");
-  // TODO(https://fxbug.dev/42119564): Add custom clear colors. We could either pass in another parameter to
-  // this function or try to embed clear-data into the existing api. For example, one could
-  // check to see if the back rectangle is fullscreen and solid-color, in which case we can
+  // TODO(https://fxbug.dev/42119564): Add custom clear colors. We could either pass in another
+  // parameter to this function or try to embed clear-data into the existing api. For example, one
+  // could check to see if the back rectangle is fullscreen and solid-color, in which case we can
   // treat it as a clear instead of rendering it as a renderable.
   FX_CHECK(cmd_buf && output_image && depth_buffer);
 
@@ -343,12 +343,12 @@ void RectangleCompositor::DrawBatch(CommandBuffer* cmd_buf,
 
 void RectangleCompositor::SetColorConversionParams(
     const ColorConversionParams& color_conversion_params) {
-  FX_VLOGS(1) << "Color conversion params applied.";
+  FX_LOGS(DEBUG) << "Color conversion params applied.";
   color_conversion_params_ = color_conversion_params;
 }
 
-// TODO(https://fxbug.dev/42176127): It doesn't seem like all platforms actually support transient images.
-// So this is going to be a regular image for now.
+// TODO(https://fxbug.dev/42176127): It doesn't seem like all platforms actually support transient
+// images. So this is going to be a regular image for now.
 ImagePtr RectangleCompositor::CreateOrFindTransientImage(const ImagePtr& image) {
   TRACE_DURATION("gfx", "RectangleCompositor::CreateOrFindTransientImage");
   auto itr = transient_image_map_.find(image->info());
@@ -423,8 +423,8 @@ static impl::RenderPassPtr WarmColorConversionDualPass(
       .sample_count = 1,
       .is_transient = false,
   };
-  // TODO(https://fxbug.dev/42176127): Transient images are not supported on all GPUs, so this is going to be a
-  // regular image for now.
+  // TODO(https://fxbug.dev/42176127): Transient images are not supported on all GPUs, so this is
+  // going to be a regular image for now.
   RenderPassInfo::AttachmentInfo transient_info{
       .format = output_format,
       .swapchain_layout = vk::ImageLayout::eUndefined,
@@ -461,11 +461,11 @@ static impl::RenderPassPtr WarmSingleSubpass(Escher* escher, vk::Format output_f
       .is_transient = false,
   };
   RenderPassInfo render_pass_info;
-  RenderPassInfo::InitRenderPassInfo(&render_pass_info, output_info, depth_format,
-                                     vk::Format::eUndefined, /*sample_count=*/1,
-                                     // TODO(https://fxbug.dev/42176127): Transient images are not supported on
-                                     // all GPUs, so this is going to be a regular image for now.
-                                     /*use_transient_depth_and_msaa=*/false);
+  RenderPassInfo::InitRenderPassInfo(
+      &render_pass_info, output_info, depth_format, vk::Format::eUndefined, /*sample_count=*/1,
+      // TODO(https://fxbug.dev/42176127): Transient images are not supported on
+      // all GPUs, so this is going to be a regular image for now.
+      /*use_transient_depth_and_msaa=*/false);
 
   return escher->render_pass_cache()->ObtainRenderPass(render_pass_info,
                                                        /*allow_render_pass_creation*/ true);

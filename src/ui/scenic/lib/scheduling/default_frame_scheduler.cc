@@ -106,7 +106,7 @@ void DefaultFrameScheduler::RequestFrame(zx::time requested_presentation_time) {
   // Output requested presentation time in milliseconds.
   // Logging the first few frames to find common startup bugs.
   if (frame_number_ <= kNumDebugFrames) {
-    FX_VLOGS(1) << "RequestFrame";
+    FX_LOGS(DEBUG) << "RequestFrame";
   }
 
   const auto [new_target_presentation_time, new_wakeup_time] =
@@ -167,8 +167,8 @@ void DefaultFrameScheduler::MaybeRenderFrame(async_dispatcher_t*, async::TaskBas
 
   // Logging the first few frames to find common startup bugs.
   if (frame_number < kNumDebugFrames) {
-    FX_VLOGS(1) << "MaybeRenderFrame target_presentation_time=" << target_presentation_time.get()
-                << " wakeup_time=" << wakeup_time_.get() << " frame_number=" << frame_number;
+    FX_LOGS(DEBUG) << "MaybeRenderFrame target_presentation_time=" << target_presentation_time.get()
+                   << " wakeup_time=" << wakeup_time_.get() << " frame_number=" << frame_number;
   }
 
   // Apply all updates
@@ -196,8 +196,8 @@ void DefaultFrameScheduler::MaybeRenderFrame(async_dispatcher_t*, async::TaskBas
     return;
   }
 
-  // TODO(https://fxbug.dev/42098738) Remove the presentation check, and pipeline frames within a VSYNC
-  // interval.
+  // TODO(https://fxbug.dev/42098738) Remove the presentation check, and pipeline frames within a
+  // VSYNC interval.
   FX_DCHECK(last_presented_frame_number_ <= frame_number);
   // Only one frame is allowed "in flight" at any given. Don't start rendering another frame until
   // the previous frame is on the display.
@@ -253,8 +253,8 @@ void DefaultFrameScheduler::ScheduleUpdateForSession(zx::time requested_presenta
 
   // Logging the first few frames to find common startup bugs.
   if (frame_number_ < kNumDebugFrames) {
-    FX_VLOGS(1) << "ScheduleUpdateForSession session_id: " << id_pair.session_id
-                << " requested_presentation_time: " << requested_presentation_time.get();
+    FX_LOGS(DEBUG) << "ScheduleUpdateForSession session_id: " << id_pair.session_id
+                   << " requested_presentation_time: " << requested_presentation_time.get();
   }
 
   const trace_flow_id_t flow_id = TRACE_NONCE();
@@ -326,8 +326,7 @@ void DefaultFrameScheduler::HandleFramePresented(uint64_t frame_number, zx::time
   FX_DCHECK(vsync_timing_->vsync_interval().get() >= 0);
 
   if (frame_number < kNumDebugFrames) {
-    FX_LOGS(INFO) << "DefaultFrameScheduler::OnFramePresented"
-                  << " frame_number=" << frame_number;
+    FX_LOGS(INFO) << "DefaultFrameScheduler::OnFramePresented" << " frame_number=" << frame_number;
   }
 
   last_presented_frame_number_ = frame_number;
@@ -471,8 +470,8 @@ bool DefaultFrameScheduler::ApplyUpdates(zx::time target_presentation_time, zx::
 
   // Logging the first few frames to find common startup bugs.
   if (frame_number < kNumDebugFrames) {
-    FX_VLOGS(1) << "ApplyScheduledSessionUpdates target_presentation_time="
-                << target_presentation_time.get() << " frame_number=" << frame_number;
+    FX_LOGS(DEBUG) << "ApplyScheduledSessionUpdates target_presentation_time="
+                   << target_presentation_time.get() << " frame_number=" << frame_number;
   }
 
   // NOTE: this name is used by scenic_frame_stats.dart

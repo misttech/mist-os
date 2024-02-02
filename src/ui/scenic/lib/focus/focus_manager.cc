@@ -246,7 +246,7 @@ void FocusManager::SetFocus(zx_koid_t koid) {
 
 void FocusManager::SetFocusChain(std::vector<zx_koid_t> update) {
   if (update != focus_chain_) {
-    FX_VLOGS(1) << "Focus chain update: " << ToString(update);
+    FX_LOGS(DEBUG) << "Focus chain update: " << ToString(update);
     const zx_koid_t old_focus = FocusKoidOf(focus_chain_);
     const zx_koid_t new_focus = FocusKoidOf(update);
 

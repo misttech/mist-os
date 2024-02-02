@@ -163,22 +163,22 @@ void PaperRenderer::SetConfig(const PaperRendererConfig& config) {
   }
 
   if (config.msaa_sample_count != config_.msaa_sample_count) {
-    FX_VLOGS(1) << "PaperRenderer: MSAA sample count set to: " << config.msaa_sample_count
-                << " (was: " << config_.msaa_sample_count << ")";
+    FX_LOGS(DEBUG) << "PaperRenderer: MSAA sample count set to: " << config.msaa_sample_count
+                   << " (was: " << config_.msaa_sample_count << ")";
     depth_buffers_.clear();
     msaa_buffers_.clear();
   }
 
   if (config.depth_stencil_format != config_.depth_stencil_format) {
-    FX_VLOGS(1) << "PaperRenderer: depth_stencil_format set to: "
-                << vk::to_string(config.depth_stencil_format)
-                << " (was: " << vk::to_string(config_.depth_stencil_format) << ")";
+    FX_LOGS(DEBUG) << "PaperRenderer: depth_stencil_format set to: "
+                   << vk::to_string(config.depth_stencil_format)
+                   << " (was: " << vk::to_string(config_.depth_stencil_format) << ")";
     depth_buffers_.clear();
   }
 
   if (config.num_depth_buffers != config_.num_depth_buffers) {
-    FX_VLOGS(1) << "PaperRenderer: num_depth_buffers set to: " << config.num_depth_buffers
-                << " (was: " << config_.num_depth_buffers << ")";
+    FX_LOGS(DEBUG) << "PaperRenderer: num_depth_buffers set to: " << config.num_depth_buffers
+                   << " (was: " << config_.num_depth_buffers << ")";
   }
   // This is done here (instead of the if-statement above) because there may
   // have been a change to the MSAA sample count.
@@ -255,8 +255,8 @@ void PaperRenderer::FinalizeFrame() {
   // We may need to lazily instantiate |debug_font|, or delete it. If the former, this needs to be
   // done before we submit the GPU uploader's tasks.
 
-  // TODO(https://fxbug.dev/42152668): Clean up lazy instantiation. Right now, DebugFont and DebugRects are
-  // created/destroyed from frame-to-frame.
+  // TODO(https://fxbug.dev/42152668): Clean up lazy instantiation. Right now, DebugFont and
+  // DebugRects are created/destroyed from frame-to-frame.
   if (config_.debug_frame_number) {
     DrawDebugText(std::to_string(frame_data_->frame->frame_number()), {10, 10}, 4);
   }
@@ -461,7 +461,8 @@ void PaperRenderer::DrawBoundingBox(const BoundingBox& box, const PaperMaterialP
     return;
   }
   if (material->texture()) {
-    FX_LOGS(ERROR) << "TODO(https://fxbug.dev/42152601): Box meshes do not currently support textures.";
+    FX_LOGS(ERROR)
+        << "TODO(https://fxbug.dev/42152601): Box meshes do not currently support textures.";
     return;
   }
 
@@ -868,8 +869,8 @@ void PaperRenderer::WarmPipelineAndRenderPassCaches(
   // NOTE: different mesh specs are used depending on whether stencil shadows
   // are enabled.  But it doesn't matter, because CommandBuffer will only use whichever attributes
   // are required for the specified shader.
-  // TODO(https://fxbug.dev/42121362): once kShadowVolumeMeshSpec and kStandardMeshSpec are constexpr, we
-  // should be able to use static_assert() here.
+  // TODO(https://fxbug.dev/42121362): once kShadowVolumeMeshSpec and kStandardMeshSpec are
+  // constexpr, we should be able to use static_assert() here.
   FX_DCHECK(PaperShapeCache::kShadowVolumeMeshSpec().attributes[0] ==
             PaperShapeCache::kStandardMeshSpec().attributes[0]);
   FX_DCHECK(PaperShapeCache::kShadowVolumeMeshSpec().attributes[1] ==

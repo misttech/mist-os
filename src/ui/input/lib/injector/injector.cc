@@ -248,7 +248,7 @@ void Injector::InjectPending(InjectorId injector_id) {
 // passthrough, so injection into Scenic may not be aligned on timestamp boundaries.
 void Injector::OnEvent(const fuchsia::ui::input::InputEvent& event) {
   TRACE_DURATION("input", "presentation_on_event");
-  FX_VLOGS(1) << "OnEvent " << event;
+  FX_LOGS(DEBUG) << "OnEvent " << event;
 
   if (!event.is_pointer()) {
     FX_LOGS(ERROR) << "Received unexpected event: \"" << event
