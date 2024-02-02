@@ -4,6 +4,7 @@
 
 use addr::TargetAddr;
 use anyhow::{anyhow, Result};
+use bitflags::bitflags;
 use futures::channel::mpsc::{unbounded, UnboundedReceiver};
 use futures::Stream;
 use manual_targets::watcher::{
@@ -134,10 +135,19 @@ where
     }
 }
 
+bitflags! {
+    pub struct DiscoverySources: u8 {
+        const MDNS = 1 << 0;
+        const USB = 1 << 1;
+        const MANUAL = 1 << 2;
+        // TODO(b/319923485): Emulator
+    }
+}
 pub fn wait_for_devices<F>(
     filter: F,
     notify_added: bool,
     notify_removed: bool,
+    sources: DiscoverySources,
 ) -> Result<TargetStream>
 where
     F: TargetFilter,
@@ -145,37 +155,45 @@ where
     let (sender, queue) = unbounded();
 
     // MDNS Watcher
-    let mdns_sender = sender.clone();
-    let mdns_watcher = recommended_watcher(move |res: Result<ffx::MdnsEventType>| {
-        // Translate the result to a TargetEvent
-        let event = match res {
-            Ok(r) => target_event_from_mdns_event(r),
-            Err(e) => Some(Err(anyhow!(e))),
-        };
-        if let Some(event) = event {
-            let _ = mdns_sender.unbounded_send(event);
-        }
-    })?;
+    let mdns_watcher = if sources.contains(DiscoverySources::MDNS) {
+        let mdns_sender = sender.clone();
+        Some(recommended_watcher(move |res: Result<ffx::MdnsEventType>| {
+            // Translate the result to a TargetEvent
+            let event = match res {
+                Ok(r) => target_event_from_mdns_event(r),
+                Err(e) => Some(Err(anyhow!(e))),
+            };
+            if let Some(event) = event {
+                let _ = mdns_sender.unbounded_send(event);
+            }
+        })?)
+    } else {
+        None
+    };
 
     // USB Fastboot watcher
-    let fastboot_sender = sender.clone();
-    let fastboot_usb_watcher = fastboot_watcher(move |res: Result<FastbootEvent>| {
-        // Translate the result to a TargetEvent
-        tracing::trace!("discovery watcher got fastboot event: {:#?}", res);
-        let event = match res {
-            Ok(r) => {
-                let event: TargetEvent = r.into();
-                Ok(event)
-            }
-            Err(e) => Err(anyhow!(e)),
-        };
-        let _ = fastboot_sender.unbounded_send(event);
-    })?;
+    let fastboot_usb_watcher = if sources.contains(DiscoverySources::USB) {
+        let fastboot_sender = sender.clone();
+        Some(fastboot_watcher(move |res: Result<FastbootEvent>| {
+            // Translate the result to a TargetEvent
+            tracing::trace!("discovery watcher got fastboot event: {:#?}", res);
+            let event = match res {
+                Ok(r) => {
+                    let event: TargetEvent = r.into();
+                    Ok(event)
+                }
+                Err(e) => Err(anyhow!(e)),
+            };
+            let _ = fastboot_sender.unbounded_send(event);
+        })?)
+    } else {
+        None
+    };
 
     // Manual Targets watcher
-    let manual_targets_sender = sender.clone();
-    let manual_targets_watcher =
-        manual_recommended_watcher(move |res: Result<ManualTargetEvent>| {
+    let manual_targets_watcher = if sources.contains(DiscoverySources::MANUAL) {
+        let manual_targets_sender = sender.clone();
+        Some(manual_recommended_watcher(move |res: Result<ManualTargetEvent>| {
             // Translate the result to a TargetEvent
             tracing::trace!("discovery watcher got manual target event: {:#?}", res);
             let event = match res {
@@ -186,16 +204,19 @@ where
                 Err(e) => Err(anyhow!(e)),
             };
             let _ = manual_targets_sender.unbounded_send(event);
-        })?;
+        })?)
+    } else {
+        None
+    };
 
     Ok(TargetStream {
         filter: Some(Box::new(filter)),
         queue,
         notify_added,
         notify_removed,
-        mdns_watcher: Some(mdns_watcher),
-        fastboot_usb_watcher: Some(fastboot_usb_watcher),
-        manual_targets_watcher: Some(manual_targets_watcher),
+        mdns_watcher,
+        fastboot_usb_watcher,
+        manual_targets_watcher,
     })
 }
 
