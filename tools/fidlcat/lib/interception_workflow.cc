@@ -128,8 +128,8 @@ void InterceptingThreadObserver::AddExitBreakpoint(zxdb::Thread* thread,
     settings.scope = zxdb::ExecutionScope(thread->GetProcess()->GetTarget());
   }
 
-  FX_VLOGS(2) << "Thread " << thread->GetKoid() << ": creating return value breakpoint for "
-              << syscall.name() << " at address " << std::hex << address << std::dec;
+  FX_LOGS(DEBUG) << "Thread " << thread->GetKoid() << ": creating return value breakpoint for "
+                 << syscall.name() << " at address " << std::hex << address << std::dec;
 
   if (syscall.exit_bp_instructions().size() > 0) {
     settings.instructions = syscall.exit_bp_instructions();
