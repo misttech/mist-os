@@ -45,7 +45,7 @@ TEST_F(TraceManagerTest, RegisterProviderWithFdio) {
   // to fetch a list of them.
   RunLoopUntilIdle();
 
-  FX_VLOGS(2) << "Providers registered";
+  FX_LOGS(DEBUG) << "Providers registered";
 
   ConnectToControllerService();
   std::vector<controller::ProviderInfo> providers;
@@ -91,7 +91,7 @@ TEST_F(TraceManagerTest, AddFakeProviders) {
   // to fetch a list of them.
   RunLoopUntilIdle();
 
-  FX_VLOGS(2) << "Providers registered";
+  FX_LOGS(DEBUG) << "Providers registered";
 
   std::vector<controller::ProviderInfo> providers;
   controller()->GetProviders([&providers](std::vector<controller::ProviderInfo> in_providers) {
@@ -146,7 +146,7 @@ TEST_F(TraceManagerTest, GetKnownCategories) {
   // to fetch a list of them.
   RunLoopUntilIdle();
 
-  FX_VLOGS(2) << "Providers registered";
+  FX_LOGS(DEBUG) << "Providers registered";
 
   std::vector<fuchsia::tracing::KnownCategory> known_categories;
   controller()->GetKnownCategories(
@@ -204,7 +204,7 @@ TEST_F(TraceManagerTest, GetKnownCategoriesTimeout) {
   // to fetch a list of them.
   RunLoopUntilIdle();
 
-  FX_VLOGS(2) << "Providers registered";
+  FX_LOGS(DEBUG) << "Providers registered";
 
   provider2->MarkUnresponsive();
   provider3->MarkUnresponsive();

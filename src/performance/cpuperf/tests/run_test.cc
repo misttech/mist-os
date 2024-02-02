@@ -63,7 +63,7 @@ static zx_status_t SpawnProgram(const zx::job& job, const std::vector<std::strin
   std::vector<const char*> c_argv;
   StringArgvToCArgv(argv, &c_argv);
 
-  FX_VLOGS(1) << "Running " << fxl::JoinStrings(argv, " ");
+  FX_LOGS(DEBUG) << "Running " << fxl::JoinStrings(argv, " ");
 
   size_t action_count = 0;
   fdio_spawn_action_t* spawn_actions = nullptr;
@@ -128,6 +128,6 @@ bool RunSpec(const std::string& spec_path, const fuchsia_logging::LogSettings& l
     return false;
   }
 
-  FX_VLOGS(1) << "Running spec completed OK";
+  FX_LOGS(DEBUG) << "Running spec completed OK";
   return true;
 }

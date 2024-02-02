@@ -116,7 +116,7 @@ static void SaveTrace(const cpuperf::SessionResultSpec& result_spec,
     return;
   }
 
-  FX_VLOGS(1) << "Saving results of iteration " << iter;
+  FX_LOGS(DEBUG) << "Saving results of iteration " << iter;
 
   for (size_t trace = 0; trace < result_spec.num_traces; ++trace) {
     if (reader->SetTrace(trace) != perfmon::ReaderStatus::kOk) {
@@ -138,15 +138,15 @@ static void SaveTrace(const cpuperf::SessionResultSpec& result_spec,
 
   // Print a summary of this run.
   // In tally mode this is noise, but if verbosity is on sure.
-  if (controller->config().GetMode() != perfmon::CollectionMode::kTally || FX_VLOG_IS_ON(1)) {
-    FX_VLOGS(1) << "Iteration " << iter << " summary";
+  if (controller->config().GetMode() != perfmon::CollectionMode::kTally) {
+    FX_LOGS(DEBUG) << "Iteration " << iter << " summary";
     for (size_t trace = 0; trace < result_spec.num_traces; ++trace) {
       std::string path = result_spec.GetTraceFilePath(iter, trace);
       uint64_t size;
       if (files::GetFileSize(path, &size)) {
-        FX_VLOGS(1) << path << ": " << size << " bytes";
+        FX_LOGS(DEBUG) << path << ": " << size << " bytes";
       } else {
-        FX_VLOGS(1) << path << ": unknown size";
+        FX_LOGS(DEBUG) << path << ": unknown size";
       }
     }
   }

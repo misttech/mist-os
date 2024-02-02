@@ -34,12 +34,12 @@ void TraceManagerTest::TearDown() {
 }
 
 void TraceManagerTest::ConnectToControllerService() {
-  FX_VLOGS(2) << "ConnectToControllerService";
+  FX_LOGS(DEBUG) << "ConnectToControllerService";
   context_provider().ConnectToPublicService(controller_.NewRequest());
 }
 
 void TraceManagerTest::DisconnectFromControllerService() {
-  FX_VLOGS(2) << "DisconnectFromControllerService";
+  FX_LOGS(DEBUG) << "DisconnectFromControllerService";
   controller_.Unbind();
 }
 
@@ -66,7 +66,7 @@ bool TraceManagerTest::AddFakeProvider(zx_koid_t pid, const std::string& name,
 }
 
 void TraceManagerTest::OnSessionStateChange() {
-  FX_VLOGS(2) << "Session state change, QuitLoop";
+  FX_LOGS(DEBUG) << "Session state change, QuitLoop";
   QuitLoop();
 }
 
@@ -110,7 +110,7 @@ void TraceManagerTest::InitializeSessionWorker(controller::TraceConfig config, b
 
   controller_->InitializeTracing(std::move(config), std::move(their_socket));
   RunLoopUntilIdle();
-  FX_VLOGS(2) << "Loop done, expecting session initialized";
+  FX_LOGS(DEBUG) << "Loop done, expecting session initialized";
   ASSERT_EQ(GetSessionState(), SessionState::kInitialized);
 
   // Run one more time to finish up provider initialization. This happens
@@ -131,10 +131,10 @@ void TraceManagerTest::InitializeSessionWorker(controller::TraceConfig config, b
 
 bool TraceManagerTest::InitializeSession(controller::TraceConfig config) {
   bool success{};
-  FX_VLOGS(2) << "Initializing session";
+  FX_LOGS(DEBUG) << "Initializing session";
   InitializeSessionWorker(std::move(config), &success);
   if (success) {
-    FX_VLOGS(2) << "Session initialized";
+    FX_LOGS(DEBUG) << "Session initialized";
   }
   return success;
 }
@@ -149,7 +149,7 @@ controller::StartOptions TraceManagerTest::GetDefaultStartOptions() {
 }
 
 void TraceManagerTest::BeginStartSession(controller::StartOptions options) {
-  FX_VLOGS(2) << "Starting session";
+  FX_LOGS(DEBUG) << "Starting session";
 
   MarkBeginOperation();
 
@@ -169,7 +169,7 @@ bool TraceManagerTest::FinishStartSession() {
   // kStarted before the loop exits. If there are tracees then we need to
   // wait for them to start.
   if (fake_provider_bindings().size() > 0) {
-    FX_VLOGS(2) << "Loop done, expecting session starting";
+    FX_LOGS(DEBUG) << "Loop done, expecting session starting";
     SessionState state = GetSessionState();
     EXPECT_EQ(state, SessionState::kStarting);
     if (state != SessionState::kStarting) {
@@ -187,7 +187,7 @@ bool TraceManagerTest::FinishStartSession() {
   }
 
   // The loop will exit for the transition to kStarted.
-  FX_VLOGS(2) << "Loop done, expecting all providers started";
+  FX_LOGS(DEBUG) << "Loop done, expecting all providers started";
   SessionState state = GetSessionState();
   EXPECT_EQ(state, SessionState::kStarted);
   if (state != SessionState::kStarted) {
@@ -203,7 +203,7 @@ bool TraceManagerTest::FinishStartSession() {
   }
   EXPECT_FALSE(start_state_.start_result.is_err());
 
-  FX_VLOGS(2) << "Session started";
+  FX_LOGS(DEBUG) << "Session started";
   return true;
 }
 
@@ -220,7 +220,7 @@ controller::StopOptions TraceManagerTest::GetDefaultStopOptions() {
 }
 
 void TraceManagerTest::BeginStopSession(controller::StopOptions options) {
-  FX_VLOGS(2) << "Stopping session";
+  FX_LOGS(DEBUG) << "Stopping session";
 
   MarkBeginOperation();
 
@@ -242,7 +242,7 @@ bool TraceManagerTest::FinishStopSession() {
   // kStopped before the loop exits. If there are tracees then we need to
   // wait for them to stop.
   if (fake_provider_bindings().size() > 0) {
-    FX_VLOGS(2) << "Loop done, expecting session stopping";
+    FX_LOGS(DEBUG) << "Loop done, expecting session stopping";
     SessionState state = GetSessionState();
     EXPECT_EQ(state, SessionState::kStopping);
     if (state != SessionState::kStopping) {
@@ -260,7 +260,7 @@ bool TraceManagerTest::FinishStopSession() {
   }
 
   // The loop will exit for the transition to kStopped.
-  FX_VLOGS(2) << "Loop done, expecting session stopped";
+  FX_LOGS(DEBUG) << "Loop done, expecting session stopped";
   SessionState state = GetSessionState();
   EXPECT_EQ(state, SessionState::kStopped);
   if (state != SessionState::kStopped) {
@@ -274,7 +274,7 @@ bool TraceManagerTest::FinishStopSession() {
     return false;
   }
 
-  FX_VLOGS(2) << "Session stopped";
+  FX_LOGS(DEBUG) << "Session stopped";
   return true;
 }
 
@@ -291,7 +291,7 @@ controller::TerminateOptions TraceManagerTest::GetDefaultTerminateOptions() {
 }
 
 void TraceManagerTest::BeginTerminateSession(controller::TerminateOptions options) {
-  FX_VLOGS(2) << "Terminating session";
+  FX_LOGS(DEBUG) << "Terminating session";
 
   MarkBeginOperation();
 
@@ -311,7 +311,7 @@ bool TraceManagerTest::FinishTerminateSession(controller::TerminateResult* resul
   // kTerminated before the loop exits. If there are tracees then we need to
   // wait for them to terminate.
   if (fake_provider_bindings().size() > 0) {
-    FX_VLOGS(2) << "Loop done, expecting session terminating";
+    FX_LOGS(DEBUG) << "Loop done, expecting session terminating";
     SessionState state = GetSessionState();
     EXPECT_EQ(state, SessionState::kTerminating);
     if (state != SessionState::kTerminating) {
@@ -325,7 +325,7 @@ bool TraceManagerTest::FinishTerminateSession(controller::TerminateResult* resul
     RunLoopUntilIdle();
   }
 
-  FX_VLOGS(2) << "Loop done, expecting session terminated";
+  FX_LOGS(DEBUG) << "Loop done, expecting session terminated";
   EXPECT_EQ(GetSessionState(), SessionState::kNonexistent);
 
   // Run the loop one more time to ensure we pick up the result.
@@ -335,7 +335,7 @@ bool TraceManagerTest::FinishTerminateSession(controller::TerminateResult* resul
     return false;
   }
 
-  FX_VLOGS(2) << "Session terminated";
+  FX_LOGS(DEBUG) << "Session terminated";
   if (result) {
     *result = std::move(terminate_state_.terminate_result);
   }
@@ -348,21 +348,21 @@ bool TraceManagerTest::TerminateSession(controller::TerminateOptions options) {
 }
 
 void TraceManagerTest::MarkAllProvidersStarted() {
-  FX_VLOGS(2) << "Marking all providers started";
+  FX_LOGS(DEBUG) << "Marking all providers started";
   for (const auto& p : fake_provider_bindings()) {
     p->impl()->MarkStarted();
   }
 }
 
 void TraceManagerTest::MarkAllProvidersStopped() {
-  FX_VLOGS(2) << "Marking all providers stopped";
+  FX_LOGS(DEBUG) << "Marking all providers stopped";
   for (const auto& p : fake_provider_bindings()) {
     p->impl()->MarkStopped();
   }
 }
 
 void TraceManagerTest::MarkAllProvidersTerminated() {
-  FX_VLOGS(2) << "Marking all providers terminated";
+  FX_LOGS(DEBUG) << "Marking all providers terminated";
   for (const auto& p : fake_provider_bindings()) {
     p->impl()->MarkTerminated();
   }
@@ -389,7 +389,7 @@ void TraceManagerTest::VerifyCounts(int expected_start_count, int expected_stop_
 
 // fidl event
 void TraceManagerTest::FidlOnSessionStateChange(controller::SessionState state) {
-  FX_VLOGS(2) << "FidlOnSessionStateChange " << state;
+  FX_LOGS(DEBUG) << "FidlOnSessionStateChange " << state;
   ++on_session_state_change_event_count_;
   last_session_state_event_ = state;
 }

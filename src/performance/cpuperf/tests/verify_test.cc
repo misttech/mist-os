@@ -132,7 +132,7 @@ static std::unique_ptr<Verifier> LookupVerifier(const cpuperf::SessionResultSpec
 }
 
 void VerifySpec(const std::string& spec_file_path) {
-  FX_VLOGS(1) << "Verifying " << spec_file_path;
+  FX_LOGS(DEBUG) << "Verifying " << spec_file_path;
 
   std::string content;
   ASSERT_TRUE(files::ReadFileToString(spec_file_path, &content));

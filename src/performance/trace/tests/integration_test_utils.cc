@@ -247,7 +247,7 @@ bool VerifyTestEventsFromJson(const std::string& test_output_file, size_t* out_n
     }
   }
 
-  FX_VLOGS(1) << array.Size() << " trace events present";
+  FX_LOGS(DEBUG) << array.Size() << " trace events present";
   *out_num_events = array.Size();
   return true;
 }

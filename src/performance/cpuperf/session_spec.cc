@@ -111,7 +111,7 @@ const char kSessionResultSpecPathKey[] = "session_result_spec_path";
 template <typename T>
 bool DecodeEvents(T events, const perfmon::ModelEventManager* model_event_manager,
                   SessionSpec* out_spec) {
-  FX_VLOGS(1) << "Processing " << events.Size() << " events";
+  FX_LOGS(DEBUG) << "Processing " << events.Size() << " events";
 
   for (const auto& event : events) {
     perfmon::EventId id = perfmon::kEventIdNone;
@@ -158,8 +158,8 @@ bool DecodeEvents(T events, const perfmon::ModelEventManager* model_event_manage
       }
     }
 
-    FX_VLOGS(2) << "Found event: " << group_name << ":" << event_name << ", id 0x" << std::hex << id
-                << ", rate " << std::dec << rate << ", flags 0x" << std::hex << flags;
+    FX_LOGS(DEBUG) << "Found event: " << group_name << ":" << event_name << ", id 0x" << std::hex
+                   << id << ", rate " << std::dec << rate << ", flags 0x" << std::hex << flags;
 
     perfmon::Config::Status status = out_spec->perfmon_config.AddEvent(id, rate, flags);
     if (status != perfmon::Config::Status::OK) {
