@@ -28,7 +28,7 @@ use starnix_uapi::{
     time::duration_from_timespec,
     timespec,
     user_address::{UserAddress, UserRef},
-    user_buffer::UserBuffer,
+    user_buffer::{UserBuffer, UserBuffers},
     vfs::FdEvents,
     MSG_CTRUNC, MSG_DONTWAIT, MSG_TRUNC, MSG_WAITFORONE, SHUT_RD, SHUT_RDWR, SHUT_WR, SOCK_CLOEXEC,
     SOCK_NONBLOCK, UIO_MAXIOV,
@@ -417,7 +417,7 @@ pub fn sys_socketpair(
 fn read_iovec_from_msghdr(
     current_task: &CurrentTask,
     message_header: &msghdr,
-) -> Result<Vec<UserBuffer>, Errno> {
+) -> Result<UserBuffers, Errno> {
     let iovec_count = message_header.msg_iovlen as usize;
 
     // In `CurrentTask::read_iovec()` the same check fails with `EINVAL`. This works for all
@@ -427,7 +427,7 @@ fn read_iovec_from_msghdr(
         return error!(EMSGSIZE);
     }
 
-    current_task.read_objects_to_vec(message_header.msg_iov.into(), iovec_count)
+    current_task.read_objects_to_smallvec(message_header.msg_iov.into(), iovec_count)
 }
 
 fn recvmsg_internal<L>(

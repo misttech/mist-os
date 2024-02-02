@@ -9,12 +9,12 @@ use crate::{
     },
     task::{CurrentTask, Task},
 };
-use smallvec::SmallVec;
+use smallvec::{smallvec, SmallVec};
 use starnix_uapi::{
     errno, error,
     errors::{Errno, ENOTSUP},
     user_address::UserAddress,
-    user_buffer::UserBuffer,
+    user_buffer::{UserBuffer, UserBuffers},
 };
 use std::{
     mem::MaybeUninit,
@@ -359,7 +359,7 @@ impl<T: InputBuffer> InputBufferExt for T {}
 /// An OutputBuffer that write data to user space memory through a `TaskMemoryAccessor`.
 pub struct UserBuffersOutputBuffer<'a, M> {
     mm: &'a M,
-    buffers: Vec<UserBuffer>,
+    buffers: UserBuffers,
     available: usize,
     bytes_written: usize,
 }
@@ -375,9 +375,9 @@ impl<'a, M> std::fmt::Debug for UserBuffersOutputBuffer<'a, M> {
 }
 
 impl<'a, M: TaskMemoryAccessor> UserBuffersOutputBuffer<'a, M> {
-    fn new_inner(mm: &'a M, buffers: Vec<UserBuffer>) -> Result<Self, Errno> {
-        let (mut buffers, available) =
-            UserBuffer::cap_buffers_to_max_rw_count(mm.maximum_valid_address(), buffers)?;
+    fn new_inner(mm: &'a M, mut buffers: UserBuffers) -> Result<Self, Errno> {
+        let available =
+            UserBuffer::cap_buffers_to_max_rw_count(mm.maximum_valid_address(), &mut buffers)?;
         // Reverse the buffers as the element will be removed as they are handled.
         buffers.reverse();
         Ok(Self { mm, buffers, available, bytes_written: 0 })
@@ -411,7 +411,7 @@ impl<'a, M: TaskMemoryAccessor> UserBuffersOutputBuffer<'a, M> {
 }
 
 impl<'a> UserBuffersOutputBuffer<'a, CurrentTask> {
-    pub fn unified_new(mm: &'a CurrentTask, buffers: Vec<UserBuffer>) -> Result<Self, Errno> {
+    pub fn unified_new(mm: &'a CurrentTask, buffers: UserBuffers) -> Result<Self, Errno> {
         Self::new_inner(mm, buffers)
     }
 
@@ -420,12 +420,12 @@ impl<'a> UserBuffersOutputBuffer<'a, CurrentTask> {
         address: UserAddress,
         length: usize,
     ) -> Result<Self, Errno> {
-        Self::unified_new(mm, vec![UserBuffer { address, length }])
+        Self::unified_new(mm, smallvec![UserBuffer { address, length }])
     }
 }
 
 impl<'a> UserBuffersOutputBuffer<'a, Task> {
-    pub fn vmo_new(mm: &'a Task, buffers: Vec<UserBuffer>) -> Result<Self, Errno> {
+    pub fn vmo_new(mm: &'a Task, buffers: UserBuffers) -> Result<Self, Errno> {
         Self::new_inner(mm, buffers)
     }
 }
@@ -537,14 +537,14 @@ impl<'a, M: TaskMemoryAccessor> OutputBuffer for UserBuffersOutputBuffer<'a, M> 
 /// An InputBuffer that read data from user space memory through a `TaskMemoryAccessor`.
 pub struct UserBuffersInputBuffer<'a, M> {
     mm: &'a M,
-    buffers: Vec<UserBuffer>,
+    buffers: UserBuffers,
     available: usize,
     bytes_read: usize,
 }
 
 impl<'a, M> std::fmt::Debug for UserBuffersInputBuffer<'a, M> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("UserBuffersOutputBuffer")
+        f.debug_struct("UserBuffersInputBuffer")
             .field("buffers", &self.buffers)
             .field("available", &self.available)
             .field("bytes_read", &self.bytes_read)
@@ -553,9 +553,9 @@ impl<'a, M> std::fmt::Debug for UserBuffersInputBuffer<'a, M> {
 }
 
 impl<'a, M: TaskMemoryAccessor> UserBuffersInputBuffer<'a, M> {
-    fn new_inner(mm: &'a M, buffers: Vec<UserBuffer>) -> Result<Self, Errno> {
-        let (mut buffers, available) =
-            UserBuffer::cap_buffers_to_max_rw_count(mm.maximum_valid_address(), buffers)?;
+    fn new_inner(mm: &'a M, mut buffers: UserBuffers) -> Result<Self, Errno> {
+        let available =
+            UserBuffer::cap_buffers_to_max_rw_count(mm.maximum_valid_address(), &mut buffers)?;
         // Reverse the buffers as the element will be removed as they are handled.
         buffers.reverse();
         Ok(Self { mm, buffers, available, bytes_read: 0 })
@@ -585,7 +585,7 @@ impl<'a, M: TaskMemoryAccessor> UserBuffersInputBuffer<'a, M> {
 }
 
 impl<'a> UserBuffersInputBuffer<'a, CurrentTask> {
-    pub fn unified_new(mm: &'a CurrentTask, buffers: Vec<UserBuffer>) -> Result<Self, Errno> {
+    pub fn unified_new(mm: &'a CurrentTask, buffers: UserBuffers) -> Result<Self, Errno> {
         Self::new_inner(mm, buffers)
     }
 
@@ -594,12 +594,12 @@ impl<'a> UserBuffersInputBuffer<'a, CurrentTask> {
         address: UserAddress,
         length: usize,
     ) -> Result<Self, Errno> {
-        Self::unified_new(mm, vec![UserBuffer { address, length }])
+        Self::unified_new(mm, smallvec![UserBuffer { address, length }])
     }
 }
 
 impl<'a> UserBuffersInputBuffer<'a, Task> {
-    pub fn vmo_new(mm: &'a Task, buffers: Vec<UserBuffer>) -> Result<Self, Errno> {
+    pub fn vmo_new(mm: &'a Task, buffers: UserBuffers) -> Result<Self, Errno> {
         Self::new_inner(mm, buffers)
     }
 }
@@ -882,7 +882,7 @@ mod tests {
         let mm = current_task.deref();
         mm.write_memory(addr, &data).expect("failed to write test data");
 
-        let input_iovec = vec![
+        let input_iovec = smallvec![
             UserBuffer { address: addr, length: 25 },
             UserBuffer { address: addr + 64usize, length: 12 },
         ];
@@ -955,7 +955,7 @@ mod tests {
         let page_size = *PAGE_SIZE;
         let addr = map_memory(&current_task, UserAddress::default(), 64 * page_size);
 
-        let output_iovec = vec![
+        let output_iovec = smallvec![
             UserBuffer { address: addr, length: 25 },
             UserBuffer { address: addr + 64usize, length: 12 },
         ];

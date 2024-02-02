@@ -19,6 +19,7 @@ use fuchsia_zircon::{
 };
 use once_cell::sync::Lazy;
 use range_map::RangeMap;
+use smallvec::SmallVec;
 use starnix_logging::{
     impossible_error, log_warn, set_zx_name, trace_category_starnix_mm, trace_duration, track_stub,
 };
@@ -31,7 +32,7 @@ use starnix_uapi::{
     resource_limits::Resource,
     signals::{SIGBUS, SIGSEGV},
     user_address::{UserAddress, UserCString, UserRef},
-    user_buffer::UserBuffer,
+    user_buffer::{UserBuffer, UserBuffers},
     MADV_DOFORK, MADV_DONTFORK, MADV_DONTNEED, MADV_KEEPONFORK, MADV_NOHUGEPAGE, MADV_NORMAL,
     MADV_WILLNEED, MADV_WIPEONFORK, MREMAP_DONTUNMAP, MREMAP_FIXED, MREMAP_MAYMOVE, PROT_EXEC,
     PROT_READ, PROT_WRITE, SI_KERNEL, UIO_MAXIOV,
@@ -2180,6 +2181,32 @@ pub trait MemoryAccessorExt: MemoryAccessor {
         }
     }
 
+    /// Read exactly `len` objects from `user`, returning them as a SmallVec.
+    fn read_objects_to_smallvec<T: Clone + FromBytes, const N: usize>(
+        &self,
+        user: UserRef<T>,
+        len: usize,
+    ) -> Result<SmallVec<[T; N]>, Errno> {
+        if len > N {
+            Ok(SmallVec::<[T; N]>::from_vec(self.read_objects_to_vec(user, len)?))
+        } else {
+            // TODO(https://github.com/rust-lang/rust/issues/96097) use MaybeUninit::uninit_array
+            // SAFETY: We are converting from an uninitialized array to an array of uninitialized
+            // elements which is the same. See
+            // https://doc.rust-lang.org/std/mem/union.MaybeUninit.html#initializing-an-array-element-by-element.
+            let mut buffer: [MaybeUninit<T>; N] = unsafe { MaybeUninit::uninit().assume_init() };
+
+            self.read_objects(user, &mut buffer[..len])?;
+
+            // TODO(https://github.com/rust-lang/rust/issues/96097) use MaybeUninit::transpose
+            // SAFETY: MaybeUninit<[T; N]> and [MaybeUninit<T>; N] have the same layout.
+            let buffer: MaybeUninit<[T; N]> = unsafe { std::mem::transmute_copy(&buffer) };
+
+            // SAFETY: `read_objects` guarantees that the first `len` entries are initialized.
+            Ok(unsafe { SmallVec::from_buf_and_len_unchecked(buffer, len) })
+        }
+    }
+
     /// Read exactly `N` objects from `user`, returning them as an array.
     fn read_objects_to_array<T: Copy + FromBytes, const N: usize>(
         &self,
@@ -2195,20 +2222,16 @@ pub trait MemoryAccessorExt: MemoryAccessor {
         }
     }
 
-    /// Read exactly `iovec_count` `UserBuffer`s from `iovec_addr`, returning them as a Vec.
+    /// Read exactly `iovec_count` `UserBuffer`s from `iovec_addr`.
     ///
     /// Fails if `iovec_count` is greater than `UIO_MAXIOV`.
-    fn read_iovec(
-        &self,
-        iovec_addr: UserAddress,
-        iovec_count: i32,
-    ) -> Result<Vec<UserBuffer>, Errno> {
+    fn read_iovec(&self, iovec_addr: UserAddress, iovec_count: i32) -> Result<UserBuffers, Errno> {
         let iovec_count: usize = iovec_count.try_into().map_err(|_| errno!(EINVAL))?;
         if iovec_count > UIO_MAXIOV as usize {
             return error!(EINVAL);
         }
 
-        self.read_objects_to_vec(iovec_addr.into(), iovec_count)
+        self.read_objects_to_smallvec(iovec_addr.into(), iovec_count)
     }
 
     /// Read up to `max_size` bytes from `string`, stopping at the first discovered null byte and

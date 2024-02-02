@@ -53,9 +53,9 @@ rustc_library("starnix-uapi") {
     "//third_party/rust_crates:bstr",
     "//third_party/rust_crates:memoffset",
     "//third_party/rust_crates:once_cell",
-    "//third_party/rust_crates:once_cell",
     "//third_party/rust_crates:paste",
     "//third_party/rust_crates:ref-cast",
+    "//third_party/rust_crates:smallvec",
     "//third_party/rust_crates:static_assertions",
     "//third_party/rust_crates:zerocopy",
   ]
