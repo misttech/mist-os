@@ -271,6 +271,15 @@ def create_model_from_json(root_object: Dict[str, Any]) -> trace_model.Model:
         A Model object.
     """
 
+    def validate_field_type(d: Dict[str, Any], field: str, ty):
+        """
+        Check that a given field exists in the dictionary and has the expected type
+        """
+        if not (field in d and isinstance(d[field], ty)):
+            raise TypeError(
+                f"Expected {d} to have field '{field}' of type '{ty}'"
+            )
+
     # A helper lambda to assert that expected fields in a JSON trace event are
     # present and are of the correct type.  If any of these fields are missing
     # or is of a different type than what is asserted here, then the JSON trace
@@ -385,6 +394,7 @@ def create_model_from_json(root_object: Dict[str, Any]) -> trace_model.Model:
     ] = defaultdict(list)
     # Final list of events to be written into the Model.
     result_events: List[trace_model.Event] = []
+    scheduling_records: Dict[int, List[trace_model.SchedulingRecord]] = {}
 
     dropped_flow_event_counter: int = 0
     dropped_async_event_counter: int = 0
@@ -704,11 +714,92 @@ def create_model_from_json(root_object: Dict[str, Any]) -> trace_model.Model:
                 tid = int(system_trace_event["tid"])
                 name = system_trace_event["name"]
                 tid_to_name[tid] = name
-            elif phase == "k" or phase == "w":
-                # CPU events are currently ignored.  It would be interesting to
-                # support these in the future so we can track CPU durations in
-                # addition to wall durations.
-                pass
+            elif phase == "k":
+                # Context Switch Records
+                #
+                # Contains data about when a thread was scheduled on a cpu.
+                # The incoming or outgoing thread may be the idle thread, which is indicated by a
+                # priority of -0x80000000.
+                validate_field_type(system_trace_event, "ts", (float, int))
+                validate_field_type(system_trace_event, "cpu", int)
+                validate_field_type(system_trace_event, "out", dict)
+                validate_field_type(system_trace_event["out"], "tid", int)
+                validate_field_type(system_trace_event["out"], "state", int)
+                validate_field_type(system_trace_event, "in", dict)
+                validate_field_type(system_trace_event["in"], "tid", int)
+
+                incoming_prio = None
+                outgoing_prio = None
+
+                if "prio" in system_trace_event["in"] and isinstance(
+                    system_trace_event["in"]["prio"], int
+                ):
+                    incoming_prio = system_trace_event["in"]["prio"]
+
+                if "prio" in system_trace_event["out"] and isinstance(
+                    system_trace_event["out"]["prio"], int
+                ):
+                    outgoing_prio = system_trace_event["out"]["prio"]
+
+                timestamp = trace_time.TimePoint.from_epoch_delta(
+                    trace_time.TimeDelta.from_microseconds(
+                        system_trace_event["ts"]
+                    )
+                )
+
+                cpu = system_trace_event["cpu"]
+                scheduling_records.setdefault(cpu, [])
+
+                incoming_tid = system_trace_event["in"]["tid"]
+                outgoing_tid = system_trace_event["out"]["tid"]
+                outgoing_state = system_trace_event["out"]["state"]
+                args = system_trace_event.get("args", {})
+
+                scheduling_records[cpu].append(
+                    trace_model.ContextSwitch(
+                        start=timestamp,
+                        incoming_tid=incoming_tid,
+                        outgoing_tid=outgoing_tid,
+                        incoming_prio=incoming_prio,
+                        outgoing_prio=outgoing_prio,
+                        outgoing_state=outgoing_state,
+                        args=args,
+                    )
+                )
+
+            elif phase == "w":
+                # Waking Record
+                #
+                # Indicates that thread has woken up and is waiting to run on a given cpu. Frequent
+                # and lengthy waking records can indicate high cpu contention or starving threads.
+                validate_field_type(system_trace_event, "ts", (float, int))
+                validate_field_type(system_trace_event, "cpu", int)
+                validate_field_type(system_trace_event, "tid", int)
+
+                # Args and prio are optional, if they exist, make sure they are correct
+                prio = None
+                if "prio" in system_trace_event:
+                    validate_field_type(system_trace_event, "prio", int)
+                    prio = system_trace_event["prio"]
+
+                if "args" in system_trace_event:
+                    validate_field_type(system_trace_event, "args", dict)
+
+                timestamp = trace_time.TimePoint.from_epoch_delta(
+                    trace_time.TimeDelta.from_microseconds(
+                        system_trace_event["ts"]
+                    )
+                )
+                cpu = system_trace_event["cpu"]
+                tid = system_trace_event["tid"]
+                args = system_trace_event.get("args", {})
+                scheduling_records.setdefault(cpu, [])
+                scheduling_records[cpu].append(
+                    trace_model.Waking(
+                        start=timestamp, tid=tid, prio=prio, args=args
+                    )
+                )
+
             else:
                 _LOGGER.warning(
                     f"Unknown phase {phase} from {system_trace_event}"
@@ -736,6 +827,7 @@ def create_model_from_json(root_object: Dict[str, Any]) -> trace_model.Model:
 
     # Construct the final Model.
     model = trace_model.Model()
+    model.scheduling_records = scheduling_records
     for pid, process in sorted(processes.items()):
         process.threads.sort(key=lambda thread: thread.tid)
         if process.pid in pid_to_name:

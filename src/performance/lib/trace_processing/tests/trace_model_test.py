@@ -48,6 +48,38 @@ class TraceModelTest(unittest.TestCase):
         copied_model: trace_model.Model = model.slice(None, None)
         test_utils.assertModelsEqual(self, model, copied_model)
 
+    def test_trace_slicing_sched(self) -> None:
+        model: trace_model.Model = test_utils.get_test_model()
+
+        sliced_model: trace_model.Model = model.slice(
+            trace_time.TimePoint.from_epoch_delta(
+                trace_time.TimeDelta.from_microseconds(697503138)
+            ),
+            trace_time.TimePoint.from_epoch_delta(
+                trace_time.TimeDelta.from_microseconds(697503138.9531089)
+            ),
+        )
+        self.assertEqual(len(sliced_model.scheduling_records[0]), 2)
+        self.assertEqual(len(sliced_model.scheduling_records[1]), 2)
+
+        tail_model: trace_model.Model = model.slice(
+            trace_time.TimePoint.from_epoch_delta(
+                trace_time.TimeDelta.from_microseconds(697503138.9531089)
+            ),
+            None,
+        )
+        self.assertEqual(len(tail_model.scheduling_records[0]), 2)
+        self.assertEqual(len(tail_model.scheduling_records[1]), 2)
+
+        head_model: trace_model.Model = model.slice(
+            None,
+            trace_time.TimePoint.from_epoch_delta(
+                trace_time.TimeDelta.from_microseconds(697503138.9531089)
+            ),
+        )
+        self.assertEqual(len(head_model.scheduling_records[0]), 2)
+        self.assertEqual(len(head_model.scheduling_records[1]), 2)
+
     def test_slice_doesnt_reference_old_model(self) -> None:
         model: trace_model.Model = test_utils.get_test_model()
         sliced_model: trace_model.Model = model.slice(

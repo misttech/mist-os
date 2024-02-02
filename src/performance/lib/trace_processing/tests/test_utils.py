@@ -199,6 +199,70 @@ def get_test_model() -> trace_model.Model:
 
     model = trace_model.Model()
     model.processes = [process7009, process7010]
+    model.scheduling_records[0] = [
+        trace_model.Waking(
+            start=trace_time.TimePoint.from_epoch_delta(
+                trace_time.TimeDelta.from_microseconds(697503138)
+            ),
+            tid=7021,
+            prio=3122,
+            args={},
+        ),
+        trace_model.ContextSwitch(
+            start=trace_time.TimePoint.from_epoch_delta(
+                trace_time.TimeDelta.from_microseconds(697503138.9531089)
+            ),
+            incoming_tid=7022,
+            outgoing_tid=7021,
+            incoming_prio=3122,
+            outgoing_prio=3122,
+            outgoing_state=3,
+            args={},
+        ),
+        trace_model.ContextSwitch(
+            start=trace_time.TimePoint.from_epoch_delta(
+                trace_time.TimeDelta.from_microseconds(697503139.9531089)
+            ),
+            incoming_tid=1036,
+            outgoing_tid=7022,
+            incoming_prio=-2147483648,
+            outgoing_prio=3122,
+            outgoing_state=3,
+            args={},
+        ),
+    ]
+    model.scheduling_records[1] = [
+        trace_model.Waking(
+            start=trace_time.TimePoint.from_epoch_delta(
+                trace_time.TimeDelta.from_microseconds(697503138)
+            ),
+            tid=7021,
+            prio=3122,
+            args={},
+        ),
+        trace_model.ContextSwitch(
+            start=trace_time.TimePoint.from_epoch_delta(
+                trace_time.TimeDelta.from_microseconds(697503138.9531089)
+            ),
+            incoming_tid=7022,
+            outgoing_tid=7021,
+            incoming_prio=3122,
+            outgoing_prio=3122,
+            outgoing_state=3,
+            args={},
+        ),
+        trace_model.ContextSwitch(
+            start=trace_time.TimePoint.from_epoch_delta(
+                trace_time.TimeDelta.from_microseconds(697503139.9531089)
+            ),
+            incoming_tid=1036,
+            outgoing_tid=7022,
+            incoming_prio=-2147483648,
+            outgoing_prio=3122,
+            outgoing_state=3,
+            args={},
+        ),
+    ]
 
     return model
 
@@ -307,6 +371,31 @@ def assertProcessesEqual(
         assertThreadsEqual(test, a_thread, b_thread)
 
 
+def assertSchedulingRecordEqual(
+    test: unittest.TestCase,
+    a: trace_model.SchedulingRecord,
+    b: trace_model.SchedulingRecord,
+) -> None:
+    test.assertIs(type(a), type(b))
+
+    # Check basic [trace_model.SchedulingRecord] fields.
+    test.assertEqual(a.start, b.start)
+    test.assertEqual(a.tid, b.tid)
+    test.assertEqual(a.prio, b.prio)
+
+    # Note: Like for events, rather than trying to handling the possibly complicated object
+    # structure on each event here for equality, we just verify that their key sets are equal.
+    test.assertEqual(len(a.args), len(b.args))
+    test.assertEqual(set(a.args.keys()), b.args.keys())
+
+    if isinstance(a, trace_model.ContextSwitch) and isinstance(
+        b, trace_model.ContextSwitch
+    ):
+        test.assertEqual(a.outgoing_tid, b.outgoing_tid)
+        test.assertEqual(a.outgoing_prio, b.outgoing_prio)
+        test.assertEqual(a.outgoing_state, b.outgoing_state)
+
+
 def assertModelsEqual(
     test: unittest.TestCase, a: trace_model.Model, b: trace_model.Model
 ) -> None:
@@ -318,3 +407,16 @@ def assertModelsEqual(
     )
     for a_process, b_process in zip(a.processes, b.processes):
         assertProcessesEqual(test, a_process, b_process)
+
+    test.assertEqual(
+        len(a.scheduling_records),
+        len(b.scheduling_records),
+        f"Error, model scheduling record lengths did not match: {len(a.scheduling_records)} "
+        f"vs {len(b.scheduling_records)}",
+    )
+
+    for cpu, records in a.scheduling_records.items():
+        for a_record, b_record in zip(
+            a.scheduling_records[cpu], b.scheduling_records[cpu]
+        ):
+            assertSchedulingRecordEqual(test, a_record, b_record)

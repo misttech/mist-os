@@ -10,6 +10,9 @@ from typing import Any, Dict, Iterator, List, Optional, Self
 import trace_processing.trace_time as trace_time
 
 
+INT32_MIN = -0x80000000
+
+
 class InstantEventScope(enum.Enum):
     """Scope within a trace that an `InstantEvent` applies to."""
 
@@ -38,7 +41,7 @@ class Event:
         start: trace_time.TimePoint,
         pid: int,
         tid: int,
-        args: Dict[str, Any] = {},
+        args: Dict[str, Any],
     ) -> None:
         self.category: str = category
         self.name: str = name
@@ -268,6 +271,86 @@ class FlowEvent(Event):
         )
 
 
+class ThreadState(enum.Enum):
+    """Phase within the control flow lifecycle that a `FlowEvent` applies to."""
+
+    # Basic thread states, in zx_info_thread_t.state.
+    ZX_THREAD_STATE_NEW = 0x0000
+    ZX_THREAD_STATE_RUNNING = 0x0001
+    ZX_THREAD_STATE_SUSPENDED = 0x0002
+    # BLOCKED is never returned by itself.
+    # It is always returned with a more precise reason.
+    # See below.
+    ZX_THREAD_STATE_BLOCKED = 0x0003
+    ZX_THREAD_STATE_DYING = 0x0004
+    ZX_THREAD_STATE_DEAD = 0x0005
+
+    # More precise thread states.
+    ZX_THREAD_STATE_BLOCKED_EXCEPTION = 0x0103
+    ZX_THREAD_STATE_BLOCKED_SLEEPING = 0x0203
+    ZX_THREAD_STATE_BLOCKED_FUTEX = 0x0303
+    ZX_THREAD_STATE_BLOCKED_PORT = 0x0403
+    ZX_THREAD_STATE_BLOCKED_CHANNEL = 0x0503
+    ZX_THREAD_STATE_BLOCKED_WAIT_ONE = 0x0603
+    ZX_THREAD_STATE_BLOCKED_WAIT_MANY = 0x0703
+    ZX_THREAD_STATE_BLOCKED_INTERRUPT = 0x0803
+    ZX_THREAD_STATE_BLOCKED_PAGER = 0x0903
+
+
+class SchedulingRecord:
+    """A record giving us information about cpu scheduling decisions"""
+
+    def __init__(
+        self,
+        start: trace_time.TimePoint,
+        tid: int,
+        prio: int | None,
+        args: Dict[str, Any],
+    ) -> None:
+        self.start: trace_time.TimePoint = start
+        self.tid: int = tid
+        self.prio: int | None = prio
+        self.args: Dict[str, Any] = args.copy()
+
+    def is_idle(self) -> bool:
+        """
+        True if the incoming thread is the idle thread
+        """
+        return self.prio == INT32_MIN
+
+
+class ContextSwitch(SchedulingRecord):
+    """A record indicating that a thread has been scheduled on a given cpu"""
+
+    def __init__(
+        self,
+        start: trace_time.TimePoint,
+        incoming_tid: int,
+        outgoing_tid: int,
+        incoming_prio: int | None,
+        outgoing_prio: int | None,
+        outgoing_state: ThreadState,
+        args: Dict[str, Any],
+    ):
+        super().__init__(start, incoming_tid, incoming_prio, args.copy())
+        self.outgoing_tid = outgoing_tid
+        self.outgoing_prio = outgoing_prio
+        self.outgoing_state = outgoing_state
+
+
+class Waking(SchedulingRecord):
+    """A record indicating that a thread has been unblocked and is waiting to run on a given cpu"""
+
+    def __init__(
+        self,
+        start: trace_time.TimePoint,
+        tid: int,
+        prio: int | None,
+        args: Dict[str, Any],
+    ) -> None:
+        super().__init__(start, tid, prio, args.copy())
+
+
 class Thread:
     """A thread within a trace model."""
 
@@ -301,6 +384,7 @@ class Model:
 
     def __init__(self) -> None:
         self.processes: List[Process] = []
+        self.scheduling_records: Dict[int, List[CpuUsage]] = {}
 
     def all_events(self) -> Iterator[Event]:
         for process in self.processes:
@@ -385,4 +469,13 @@ class Model:
                             event.next_flow, None
                         )
 
+        def slice_scheduling_records(record):
+            return (start is None or record.start >= start) and (
+                end is None or record.start <= end
+            )
+
+        result.scheduling_records = {
+            cpu: list(filter(slice_scheduling_records, records))
+            for cpu, records in self.scheduling_records.items()
+        }
         return result

@@ -13,6 +13,7 @@ if (is_host) {
       "data/flow_ids.json",
       "data/id2_async.json",
       "data/model.json",
+      "data/sched_data.json",
     ]
 
     outputs = [ "${target_out_dir}/runtime_deps/{{source_file_part}}" ]

@@ -11,6 +11,7 @@ import unittest
 import trace_processing.trace_importing as trace_importing
 import trace_processing.trace_model as trace_model
 import trace_processing.trace_utils as trace_utils
+from trace_processing.trace_time import TimePoint
 import test_utils
 
 
@@ -282,3 +283,32 @@ class TraceImportingTest(unittest.TestCase):
         self.assertEqual(len(process.threads), 1)
         self.assertEqual(process.name, "Test process")
         self.assertEqual(thread.name, "Test thread")
+
+    def test_scheduling_events(self) -> None:
+        model: trace_model.Model = trace_importing.create_model_from_file_path(
+            os.path.join(self._runtime_deps_path, "sched_data.json")
+        )
+        self.assertEqual(len(model.scheduling_records), 1)
+        self.assertEqual(len(model.scheduling_records[0]), 3)
+
+        self.assertEqual(model.scheduling_records[0][0].start, TimePoint(1000))
+        self.assertEqual(model.scheduling_records[0][0].tid, 1)
+        self.assertEqual(model.scheduling_records[0][0].prio, 3122)
+
+        self.assertEqual(model.scheduling_records[0][1].start, TimePoint(5000))
+        self.assertEqual(model.scheduling_records[0][1].tid, 2)
+        self.assertEqual(model.scheduling_records[0][1].prio, 3122)
+        self.assertEqual(model.scheduling_records[0][1].outgoing_tid, 1)
+        self.assertEqual(model.scheduling_records[0][1].outgoing_prio, 3122)
+        self.assertEqual(model.scheduling_records[0][1].outgoing_state, 3)
+
+        self.assertEqual(
+            model.scheduling_records[0][2].start,
+            TimePoint(10000),
+        )
+        self.assertEqual(model.scheduling_records[0][2].tid, 1036)
+        self.assertEqual(model.scheduling_records[0][2].prio, -0x80000000)
+        self.assertEqual(model.scheduling_records[0][2].outgoing_tid, 2)
+        self.assertEqual(model.scheduling_records[0][2].outgoing_prio, 3122)
+        self.assertEqual(model.scheduling_records[0][2].outgoing_state, 3)
+        self.assertTrue(model.scheduling_records[0][2].is_idle())
