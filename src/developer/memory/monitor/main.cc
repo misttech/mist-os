@@ -50,7 +50,7 @@ int main(int argc, const char** argv) {
   if (!fxl::SetLogSettingsFromCommandLine(command_line, {"memory_monitor"}))
     return 1;
 
-  FX_VLOGS(2) << argv[0] << ": starting";
+  FX_LOGS(DEBUG) << argv[0] << ": starting";
 
   async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
   trace::TraceProviderWithFdio trace_provider(loop.dispatcher(), monitor::Monitor::kTraceName);
@@ -76,7 +76,7 @@ int main(int argc, const char** argv) {
   SetRamDevice(&app);
   loop.Run();
 
-  FX_VLOGS(2) << argv[0] << ": exiting";
+  FX_LOGS(DEBUG) << argv[0] << ": exiting";
 
   return 0;
 }
