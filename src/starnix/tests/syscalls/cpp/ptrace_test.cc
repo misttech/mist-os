@@ -579,6 +579,9 @@ TEST(PtraceTest, PtraceEventStopWithForkAndSeize) {
 }
 
 TEST(PtraceTest, PtraceEventStopWithForkClonePtrace) {
+  if (!test_helper::IsStarnix()) {
+    GTEST_SKIP() << "This test does not work on Linux in CQ";
+  }
   pid_t child_pid = ForkUsingClone3(false, CLONE_PTRACE);
   if (HasFatalFailure()) {
     return;
