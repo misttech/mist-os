@@ -216,7 +216,7 @@ zx_status_t App::StartFdWaiters() {
 
 void App::FdHandler(zx_status_t status, uint32_t zero) {
   if (status == ZX_ERR_CANCELED) {
-    FX_VLOGS(1) << "waiter cancelled, doing nothing";
+    FX_LOGS(DEBUG) << "waiter cancelled, doing nothing";
     return;
   }
 
