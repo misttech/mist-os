@@ -135,6 +135,7 @@ rustc_library("starnix_core") {
     "fs/fuchsia/syslog.rs",
     "fs/fuchsia/timer.rs",
     "fs/fuchsia/zxio.rs",
+    "fs/functionfs.rs",
     "fs/layeredfs.rs",
     "fs/mod.rs",
     "fs/overlayfs.rs",

@@ -5023,6 +5023,273 @@ pub const __NR_process_mrelease: u32 = 448;
 pub const __NR_futex_waitv: u32 = 449;
 pub const __NR_set_mempolicy_home_node: u32 = 450;
 pub const __NR_cachestat: u32 = 451;
+pub const USB_DIR_OUT: u32 = 0;
+pub const USB_DIR_IN: u32 = 128;
+pub const USB_TYPE_MASK: u32 = 96;
+pub const USB_TYPE_STANDARD: u32 = 0;
+pub const USB_TYPE_CLASS: u32 = 32;
+pub const USB_TYPE_VENDOR: u32 = 64;
+pub const USB_TYPE_RESERVED: u32 = 96;
+pub const USB_RECIP_MASK: u32 = 31;
+pub const USB_RECIP_DEVICE: u32 = 0;
+pub const USB_RECIP_INTERFACE: u32 = 1;
+pub const USB_RECIP_ENDPOINT: u32 = 2;
+pub const USB_RECIP_OTHER: u32 = 3;
+pub const USB_RECIP_PORT: u32 = 4;
+pub const USB_RECIP_RPIPE: u32 = 5;
+pub const USB_REQ_GET_STATUS: u32 = 0;
+pub const USB_REQ_CLEAR_FEATURE: u32 = 1;
+pub const USB_REQ_SET_FEATURE: u32 = 3;
+pub const USB_REQ_SET_ADDRESS: u32 = 5;
+pub const USB_REQ_GET_DESCRIPTOR: u32 = 6;
+pub const USB_REQ_SET_DESCRIPTOR: u32 = 7;
+pub const USB_REQ_GET_CONFIGURATION: u32 = 8;
+pub const USB_REQ_SET_CONFIGURATION: u32 = 9;
+pub const USB_REQ_GET_INTERFACE: u32 = 10;
+pub const USB_REQ_SET_INTERFACE: u32 = 11;
+pub const USB_REQ_SYNCH_FRAME: u32 = 12;
+pub const USB_REQ_SET_SEL: u32 = 48;
+pub const USB_REQ_SET_ISOCH_DELAY: u32 = 49;
+pub const USB_REQ_SET_ENCRYPTION: u32 = 13;
+pub const USB_REQ_GET_ENCRYPTION: u32 = 14;
+pub const USB_REQ_RPIPE_ABORT: u32 = 14;
+pub const USB_REQ_SET_HANDSHAKE: u32 = 15;
+pub const USB_REQ_RPIPE_RESET: u32 = 15;
+pub const USB_REQ_GET_HANDSHAKE: u32 = 16;
+pub const USB_REQ_SET_CONNECTION: u32 = 17;
+pub const USB_REQ_SET_SECURITY_DATA: u32 = 18;
+pub const USB_REQ_GET_SECURITY_DATA: u32 = 19;
+pub const USB_REQ_SET_WUSB_DATA: u32 = 20;
+pub const USB_REQ_LOOPBACK_DATA_WRITE: u32 = 21;
+pub const USB_REQ_LOOPBACK_DATA_READ: u32 = 22;
+pub const USB_REQ_SET_INTERFACE_DS: u32 = 23;
+pub const USB_REQ_GET_PARTNER_PDO: u32 = 20;
+pub const USB_REQ_GET_BATTERY_STATUS: u32 = 21;
+pub const USB_REQ_SET_PDO: u32 = 22;
+pub const USB_REQ_GET_VDM: u32 = 23;
+pub const USB_REQ_SEND_VDM: u32 = 24;
+pub const USB_DEVICE_SELF_POWERED: u32 = 0;
+pub const USB_DEVICE_REMOTE_WAKEUP: u32 = 1;
+pub const USB_DEVICE_TEST_MODE: u32 = 2;
+pub const USB_DEVICE_BATTERY: u32 = 2;
+pub const USB_DEVICE_B_HNP_ENABLE: u32 = 3;
+pub const USB_DEVICE_WUSB_DEVICE: u32 = 3;
+pub const USB_DEVICE_A_HNP_SUPPORT: u32 = 4;
+pub const USB_DEVICE_A_ALT_HNP_SUPPORT: u32 = 5;
+pub const USB_DEVICE_DEBUG_MODE: u32 = 6;
+pub const USB_TEST_J: u32 = 1;
+pub const USB_TEST_K: u32 = 2;
+pub const USB_TEST_SE0_NAK: u32 = 3;
+pub const USB_TEST_PACKET: u32 = 4;
+pub const USB_TEST_FORCE_ENABLE: u32 = 5;
+pub const USB_STATUS_TYPE_STANDARD: u32 = 0;
+pub const USB_STATUS_TYPE_PTM: u32 = 1;
+pub const USB_DEVICE_U1_ENABLE: u32 = 48;
+pub const USB_DEVICE_U2_ENABLE: u32 = 49;
+pub const USB_DEVICE_LTM_ENABLE: u32 = 50;
+pub const USB_INTRF_FUNC_SUSPEND: u32 = 0;
+pub const USB_INTR_FUNC_SUSPEND_OPT_MASK: u32 = 65280;
+pub const USB_INTRF_FUNC_SUSPEND_LP: u32 = 256;
+pub const USB_INTRF_FUNC_SUSPEND_RW: u32 = 512;
+pub const USB_INTRF_STAT_FUNC_RW_CAP: u32 = 1;
+pub const USB_INTRF_STAT_FUNC_RW: u32 = 2;
+pub const USB_ENDPOINT_HALT: u32 = 0;
+pub const USB_DEV_STAT_U1_ENABLED: u32 = 2;
+pub const USB_DEV_STAT_U2_ENABLED: u32 = 3;
+pub const USB_DEV_STAT_LTM_ENABLED: u32 = 4;
+pub const USB_DEVICE_BATTERY_WAKE_MASK: u32 = 40;
+pub const USB_DEVICE_OS_IS_PD_AWARE: u32 = 41;
+pub const USB_DEVICE_POLICY_MODE: u32 = 42;
+pub const USB_PORT_PR_SWAP: u32 = 43;
+pub const USB_PORT_GOTO_MIN: u32 = 44;
+pub const USB_PORT_RETURN_POWER: u32 = 45;
+pub const USB_PORT_ACCEPT_PD_REQUEST: u32 = 46;
+pub const USB_PORT_REJECT_PD_REQUEST: u32 = 47;
+pub const USB_PORT_PORT_PD_RESET: u32 = 48;
+pub const USB_PORT_C_PORT_PD_CHANGE: u32 = 49;
+pub const USB_PORT_CABLE_PD_RESET: u32 = 50;
+pub const USB_DEVICE_CHARGING_POLICY: u32 = 54;
+pub const USB_DT_DEVICE: u32 = 1;
+pub const USB_DT_CONFIG: u32 = 2;
+pub const USB_DT_STRING: u32 = 3;
+pub const USB_DT_INTERFACE: u32 = 4;
+pub const USB_DT_ENDPOINT: u32 = 5;
+pub const USB_DT_DEVICE_QUALIFIER: u32 = 6;
+pub const USB_DT_OTHER_SPEED_CONFIG: u32 = 7;
+pub const USB_DT_INTERFACE_POWER: u32 = 8;
+pub const USB_DT_OTG: u32 = 9;
+pub const USB_DT_DEBUG: u32 = 10;
+pub const USB_DT_INTERFACE_ASSOCIATION: u32 = 11;
+pub const USB_DT_SECURITY: u32 = 12;
+pub const USB_DT_KEY: u32 = 13;
+pub const USB_DT_ENCRYPTION_TYPE: u32 = 14;
+pub const USB_DT_BOS: u32 = 15;
+pub const USB_DT_DEVICE_CAPABILITY: u32 = 16;
+pub const USB_DT_WIRELESS_ENDPOINT_COMP: u32 = 17;
+pub const USB_DT_WIRE_ADAPTER: u32 = 33;
+pub const USB_DT_RPIPE: u32 = 34;
+pub const USB_DT_CS_RADIO_CONTROL: u32 = 35;
+pub const USB_DT_PIPE_USAGE: u32 = 36;
+pub const USB_DT_SS_ENDPOINT_COMP: u32 = 48;
+pub const USB_DT_SSP_ISOC_ENDPOINT_COMP: u32 = 49;
+pub const USB_DT_CS_DEVICE: u32 = 33;
+pub const USB_DT_CS_CONFIG: u32 = 34;
+pub const USB_DT_CS_STRING: u32 = 35;
+pub const USB_DT_CS_INTERFACE: u32 = 36;
+pub const USB_DT_CS_ENDPOINT: u32 = 37;
+pub const USB_DT_DEVICE_SIZE: u32 = 18;
+pub const USB_CLASS_PER_INTERFACE: u32 = 0;
+pub const USB_CLASS_AUDIO: u32 = 1;
+pub const USB_CLASS_COMM: u32 = 2;
+pub const USB_CLASS_HID: u32 = 3;
+pub const USB_CLASS_PHYSICAL: u32 = 5;
+pub const USB_CLASS_STILL_IMAGE: u32 = 6;
+pub const USB_CLASS_PRINTER: u32 = 7;
+pub const USB_CLASS_MASS_STORAGE: u32 = 8;
+pub const USB_CLASS_HUB: u32 = 9;
+pub const USB_CLASS_CDC_DATA: u32 = 10;
+pub const USB_CLASS_CSCID: u32 = 11;
+pub const USB_CLASS_CONTENT_SEC: u32 = 13;
+pub const USB_CLASS_VIDEO: u32 = 14;
+pub const USB_CLASS_WIRELESS_CONTROLLER: u32 = 224;
+pub const USB_CLASS_PERSONAL_HEALTHCARE: u32 = 15;
+pub const USB_CLASS_AUDIO_VIDEO: u32 = 16;
+pub const USB_CLASS_BILLBOARD: u32 = 17;
+pub const USB_CLASS_USB_TYPE_C_BRIDGE: u32 = 18;
+pub const USB_CLASS_MISC: u32 = 239;
+pub const USB_CLASS_APP_SPEC: u32 = 254;
+pub const USB_CLASS_VENDOR_SPEC: u32 = 255;
+pub const USB_SUBCLASS_VENDOR_SPEC: u32 = 255;
+pub const USB_DT_CONFIG_SIZE: u32 = 9;
+pub const USB_CONFIG_ATT_ONE: u32 = 128;
+pub const USB_CONFIG_ATT_SELFPOWER: u32 = 64;
+pub const USB_CONFIG_ATT_WAKEUP: u32 = 32;
+pub const USB_CONFIG_ATT_BATTERY: u32 = 16;
+pub const USB_MAX_STRING_LEN: u32 = 126;
+pub const USB_DT_INTERFACE_SIZE: u32 = 9;
+pub const USB_DT_ENDPOINT_SIZE: u32 = 7;
+pub const USB_DT_ENDPOINT_AUDIO_SIZE: u32 = 9;
+pub const USB_ENDPOINT_NUMBER_MASK: u32 = 15;
+pub const USB_ENDPOINT_DIR_MASK: u32 = 128;
+pub const USB_ENDPOINT_XFERTYPE_MASK: u32 = 3;
+pub const USB_ENDPOINT_XFER_CONTROL: u32 = 0;
+pub const USB_ENDPOINT_XFER_ISOC: u32 = 1;
+pub const USB_ENDPOINT_XFER_BULK: u32 = 2;
+pub const USB_ENDPOINT_XFER_INT: u32 = 3;
+pub const USB_ENDPOINT_MAX_ADJUSTABLE: u32 = 128;
+pub const USB_ENDPOINT_MAXP_MASK: u32 = 2047;
+pub const USB_EP_MAXP_MULT_SHIFT: u32 = 11;
+pub const USB_EP_MAXP_MULT_MASK: u32 = 6144;
+pub const USB_ENDPOINT_INTRTYPE: u32 = 48;
+pub const USB_ENDPOINT_INTR_PERIODIC: u32 = 0;
+pub const USB_ENDPOINT_INTR_NOTIFICATION: u32 = 16;
+pub const USB_ENDPOINT_SYNCTYPE: u32 = 12;
+pub const USB_ENDPOINT_SYNC_NONE: u32 = 0;
+pub const USB_ENDPOINT_SYNC_ASYNC: u32 = 4;
+pub const USB_ENDPOINT_SYNC_ADAPTIVE: u32 = 8;
+pub const USB_ENDPOINT_SYNC_SYNC: u32 = 12;
+pub const USB_ENDPOINT_USAGE_MASK: u32 = 48;
+pub const USB_ENDPOINT_USAGE_DATA: u32 = 0;
+pub const USB_ENDPOINT_USAGE_FEEDBACK: u32 = 16;
+pub const USB_ENDPOINT_USAGE_IMPLICIT_FB: u32 = 32;
+pub const USB_DT_SSP_ISOC_EP_COMP_SIZE: u32 = 8;
+pub const USB_DT_SS_EP_COMP_SIZE: u32 = 6;
+pub const USB_OTG_SRP: u32 = 1;
+pub const USB_OTG_HNP: u32 = 2;
+pub const USB_OTG_ADP: u32 = 4;
+pub const OTG_STS_SELECTOR: u32 = 61440;
+pub const USB_DT_INTERFACE_ASSOCIATION_SIZE: u32 = 8;
+pub const USB_ENC_TYPE_UNSECURE: u32 = 0;
+pub const USB_ENC_TYPE_WIRED: u32 = 1;
+pub const USB_ENC_TYPE_CCM_1: u32 = 2;
+pub const USB_ENC_TYPE_RSA_1: u32 = 3;
+pub const USB_DT_BOS_SIZE: u32 = 5;
+pub const USB_CAP_TYPE_WIRELESS_USB: u32 = 1;
+pub const USB_WIRELESS_P2P_DRD: u32 = 2;
+pub const USB_WIRELESS_BEACON_MASK: u32 = 12;
+pub const USB_WIRELESS_BEACON_SELF: u32 = 4;
+pub const USB_WIRELESS_BEACON_DIRECTED: u32 = 8;
+pub const USB_WIRELESS_BEACON_NONE: u32 = 12;
+pub const USB_WIRELESS_PHY_53: u32 = 1;
+pub const USB_WIRELESS_PHY_80: u32 = 2;
+pub const USB_WIRELESS_PHY_107: u32 = 4;
+pub const USB_WIRELESS_PHY_160: u32 = 8;
+pub const USB_WIRELESS_PHY_200: u32 = 16;
+pub const USB_WIRELESS_PHY_320: u32 = 32;
+pub const USB_WIRELESS_PHY_400: u32 = 64;
+pub const USB_WIRELESS_PHY_480: u32 = 128;
+pub const USB_DT_USB_WIRELESS_CAP_SIZE: u32 = 11;
+pub const USB_CAP_TYPE_EXT: u32 = 2;
+pub const USB_LPM_SUPPORT: u32 = 2;
+pub const USB_BESL_SUPPORT: u32 = 4;
+pub const USB_BESL_BASELINE_VALID: u32 = 8;
+pub const USB_BESL_DEEP_VALID: u32 = 16;
+pub const USB_DT_USB_EXT_CAP_SIZE: u32 = 7;
+pub const USB_SS_CAP_TYPE: u32 = 3;
+pub const USB_LTM_SUPPORT: u32 = 2;
+pub const USB_LOW_SPEED_OPERATION: u32 = 1;
+pub const USB_FULL_SPEED_OPERATION: u32 = 2;
+pub const USB_HIGH_SPEED_OPERATION: u32 = 4;
+pub const USB_5GBPS_OPERATION: u32 = 8;
+pub const USB_DT_USB_SS_CAP_SIZE: u32 = 10;
+pub const CONTAINER_ID_TYPE: u32 = 4;
+pub const USB_DT_USB_SS_CONTN_ID_SIZE: u32 = 20;
+pub const USB_PLAT_DEV_CAP_TYPE: u32 = 5;
+pub const USB_SSP_CAP_TYPE: u32 = 10;
+pub const USB_SSP_SUBLINK_SPEED_ATTRIBS: u32 = 31;
+pub const USB_SSP_SUBLINK_SPEED_IDS: u32 = 480;
+pub const USB_SSP_MIN_SUBLINK_SPEED_ATTRIBUTE_ID: u32 = 15;
+pub const USB_SSP_MIN_RX_LANE_COUNT: u32 = 3840;
+pub const USB_SSP_MIN_TX_LANE_COUNT: u32 = 61440;
+pub const USB_SSP_SUBLINK_SPEED_SSID: u32 = 15;
+pub const USB_SSP_SUBLINK_SPEED_LSE: u32 = 48;
+pub const USB_SSP_SUBLINK_SPEED_LSE_BPS: u32 = 0;
+pub const USB_SSP_SUBLINK_SPEED_LSE_KBPS: u32 = 1;
+pub const USB_SSP_SUBLINK_SPEED_LSE_MBPS: u32 = 2;
+pub const USB_SSP_SUBLINK_SPEED_LSE_GBPS: u32 = 3;
+pub const USB_SSP_SUBLINK_SPEED_ST: u32 = 192;
+pub const USB_SSP_SUBLINK_SPEED_ST_SYM_RX: u32 = 0;
+pub const USB_SSP_SUBLINK_SPEED_ST_ASYM_RX: u32 = 1;
+pub const USB_SSP_SUBLINK_SPEED_ST_SYM_TX: u32 = 2;
+pub const USB_SSP_SUBLINK_SPEED_ST_ASYM_TX: u32 = 3;
+pub const USB_SSP_SUBLINK_SPEED_RSVD: u32 = 16128;
+pub const USB_SSP_SUBLINK_SPEED_LP: u32 = 49152;
+pub const USB_SSP_SUBLINK_SPEED_LP_SS: u32 = 0;
+pub const USB_SSP_SUBLINK_SPEED_LP_SSP: u32 = 1;
+pub const USB_SSP_SUBLINK_SPEED_LSM: u32 = 16711680;
+pub const USB_PD_POWER_DELIVERY_CAPABILITY: u32 = 6;
+pub const USB_PD_BATTERY_INFO_CAPABILITY: u32 = 7;
+pub const USB_PD_PD_CONSUMER_PORT_CAPABILITY: u32 = 8;
+pub const USB_PD_PD_PROVIDER_PORT_CAPABILITY: u32 = 9;
+pub const USB_PD_CAP_BATTERY_CHARGING: u32 = 2;
+pub const USB_PD_CAP_USB_PD: u32 = 4;
+pub const USB_PD_CAP_PROVIDER: u32 = 8;
+pub const USB_PD_CAP_CONSUMER: u32 = 16;
+pub const USB_PD_CAP_CHARGING_POLICY: u32 = 32;
+pub const USB_PD_CAP_TYPE_C_CURRENT: u32 = 64;
+pub const USB_PD_CAP_PWR_AC: u32 = 256;
+pub const USB_PD_CAP_PWR_BAT: u32 = 512;
+pub const USB_PD_CAP_PWR_USE_V_BUS: u32 = 16384;
+pub const USB_PD_CAP_CONSUMER_BC: u32 = 1;
+pub const USB_PD_CAP_CONSUMER_PD: u32 = 2;
+pub const USB_PD_CAP_CONSUMER_TYPE_C: u32 = 4;
+pub const USB_PD_CAP_CONSUMER_UNKNOWN_PEAK_POWER_TIME: u32 = 65535;
+pub const USB_PD_CAP_PROVIDER_BC: u32 = 1;
+pub const USB_PD_CAP_PROVIDER_PD: u32 = 2;
+pub const USB_PD_CAP_PROVIDER_TYPE_C: u32 = 4;
+pub const USB_PTM_CAP_TYPE: u32 = 11;
+pub const USB_DT_USB_PTM_ID_SIZE: u32 = 3;
+pub const USB_ENDPOINT_SWITCH_MASK: u32 = 3;
+pub const USB_ENDPOINT_SWITCH_NO: u32 = 0;
+pub const USB_ENDPOINT_SWITCH_SWITCH: u32 = 1;
+pub const USB_ENDPOINT_SWITCH_SCALE: u32 = 2;
+pub const USB3_LPM_DISABLED: u32 = 0;
+pub const USB3_LPM_U1_MAX_TIMEOUT: u32 = 127;
+pub const USB3_LPM_U2_MAX_TIMEOUT: u32 = 254;
+pub const USB3_LPM_DEVICE_INITIATED: u32 = 255;
+pub const USB3_LPM_MAX_U1_SEL_PEL: u32 = 255;
+pub const USB3_LPM_MAX_U2_SEL_PEL: u32 = 65535;
+pub const USB_SELF_POWER_VBUS_MAX_DRAW: u32 = 100;
 pub const __OLD_UTS_LEN: u32 = 8;
 pub const __NEW_UTS_LEN: u32 = 64;
 pub const SO_VM_SOCKETS_BUFFER_SIZE: u32 = 0;
@@ -14856,6 +15123,606 @@ pub struct sockaddr_un {
     pub sun_path: [crate::types::c_char; 108usize],
 }
 impl Default for sockaddr_un {
+    fn default() -> Self {
+        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
+        unsafe {
+            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            s.assume_init()
+        }
+    }
+}
+#[repr(C, packed)]
+#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, NoCell, FromZeros)]
+pub struct usb_ctrlrequest {
+    pub bRequestType: __u8,
+    pub bRequest: __u8,
+    pub wValue: __le16,
+    pub wIndex: __le16,
+    pub wLength: __le16,
+}
+#[repr(C, packed)]
+#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, NoCell, FromZeros)]
+pub struct usb_descriptor_header {
+    pub bLength: __u8,
+    pub bDescriptorType: __u8,
+}
+#[repr(C, packed)]
+#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, NoCell, FromZeros)]
+pub struct usb_device_descriptor {
+    pub bLength: __u8,
+    pub bDescriptorType: __u8,
+    pub bcdUSB: __le16,
+    pub bDeviceClass: __u8,
+    pub bDeviceSubClass: __u8,
+    pub bDeviceProtocol: __u8,
+    pub bMaxPacketSize0: __u8,
+    pub idVendor: __le16,
+    pub idProduct: __le16,
+    pub bcdDevice: __le16,
+    pub iManufacturer: __u8,
+    pub iProduct: __u8,
+    pub iSerialNumber: __u8,
+    pub bNumConfigurations: __u8,
+}
+#[repr(C, packed)]
+#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, NoCell, FromZeros)]
+pub struct usb_config_descriptor {
+    pub bLength: __u8,
+    pub bDescriptorType: __u8,
+    pub wTotalLength: __le16,
+    pub bNumInterfaces: __u8,
+    pub bConfigurationValue: __u8,
+    pub iConfiguration: __u8,
+    pub bmAttributes: __u8,
+    pub bMaxPower: __u8,
+}
+#[repr(C, packed)]
+pub struct usb_string_descriptor {
+    pub bLength: __u8,
+    pub bDescriptorType: __u8,
+    pub __bindgen_anon_1: usb_string_descriptor__bindgen_ty_1,
+}
+#[repr(C)]
+pub struct usb_string_descriptor__bindgen_ty_1 {
+    pub legacy_padding: __BindgenUnionField<__le16>,
+    pub __bindgen_anon_1: __BindgenUnionField<usb_string_descriptor__bindgen_ty_1__bindgen_ty_1>,
+    pub bindgen_union_field: u16,
+}
+#[repr(C)]
+#[derive(Debug, Default)]
+pub struct usb_string_descriptor__bindgen_ty_1__bindgen_ty_1 {
+    pub __empty_wData: usb_string_descriptor__bindgen_ty_1__bindgen_ty_1__bindgen_ty_1,
+    pub wData: __IncompleteArrayField<__le16>,
+}
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, NoCell, FromZeros)]
+pub struct usb_string_descriptor__bindgen_ty_1__bindgen_ty_1__bindgen_ty_1 {}
+impl Default for usb_string_descriptor__bindgen_ty_1 {
+    fn default() -> Self {
+        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
+        unsafe {
+            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            s.assume_init()
+        }
+    }
+}
+impl Default for usb_string_descriptor {
+    fn default() -> Self {
+        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
+        unsafe {
+            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            s.assume_init()
+        }
+    }
+}
+#[repr(C, packed)]
+#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, NoCell, FromZeros)]
+pub struct usb_interface_descriptor {
+    pub bLength: __u8,
+    pub bDescriptorType: __u8,
+    pub bInterfaceNumber: __u8,
+    pub bAlternateSetting: __u8,
+    pub bNumEndpoints: __u8,
+    pub bInterfaceClass: __u8,
+    pub bInterfaceSubClass: __u8,
+    pub bInterfaceProtocol: __u8,
+    pub iInterface: __u8,
+}
+#[repr(C, packed)]
+#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, NoCell, FromZeros)]
+pub struct usb_endpoint_descriptor {
+    pub bLength: __u8,
+    pub bDescriptorType: __u8,
+    pub bEndpointAddress: __u8,
+    pub bmAttributes: __u8,
+    pub wMaxPacketSize: __le16,
+    pub bInterval: __u8,
+    pub bRefresh: __u8,
+    pub bSynchAddress: __u8,
+}
+#[repr(C, packed)]
+#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, NoCell, FromZeros)]
+pub struct usb_ssp_isoc_ep_comp_descriptor {
+    pub bLength: __u8,
+    pub bDescriptorType: __u8,
+    pub wReseved: __le16,
+    pub dwBytesPerInterval: __le32,
+}
+#[repr(C, packed)]
+#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, NoCell, FromZeros)]
+pub struct usb_ss_ep_comp_descriptor {
+    pub bLength: __u8,
+    pub bDescriptorType: __u8,
+    pub bMaxBurst: __u8,
+    pub bmAttributes: __u8,
+    pub wBytesPerInterval: __le16,
+}
+#[repr(C, packed)]
+#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, NoCell, FromZeros)]
+pub struct usb_qualifier_descriptor {
+    pub bLength: __u8,
+    pub bDescriptorType: __u8,
+    pub bcdUSB: __le16,
+    pub bDeviceClass: __u8,
+    pub bDeviceSubClass: __u8,
+    pub bDeviceProtocol: __u8,
+    pub bMaxPacketSize0: __u8,
+    pub bNumConfigurations: __u8,
+    pub bRESERVED: __u8,
+}
+#[repr(C, packed)]
+#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, NoCell, FromZeros)]
+pub struct usb_otg_descriptor {
+    pub bLength: __u8,
+    pub bDescriptorType: __u8,
+    pub bmAttributes: __u8,
+}
+#[repr(C, packed)]
+#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, NoCell, FromZeros)]
+pub struct usb_otg20_descriptor {
+    pub bLength: __u8,
+    pub bDescriptorType: __u8,
+    pub bmAttributes: __u8,
+    pub bcdOTG: __le16,
+}
+#[repr(C, packed)]
+#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, NoCell, FromZeros)]
+pub struct usb_debug_descriptor {
+    pub bLength: __u8,
+    pub bDescriptorType: __u8,
+    pub bDebugInEndpoint: __u8,
+    pub bDebugOutEndpoint: __u8,
+}
+#[repr(C, packed)]
+#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, NoCell, FromZeros)]
+pub struct usb_interface_assoc_descriptor {
+    pub bLength: __u8,
+    pub bDescriptorType: __u8,
+    pub bFirstInterface: __u8,
+    pub bInterfaceCount: __u8,
+    pub bFunctionClass: __u8,
+    pub bFunctionSubClass: __u8,
+    pub bFunctionProtocol: __u8,
+    pub iFunction: __u8,
+}
+#[repr(C, packed)]
+#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, NoCell, FromZeros)]
+pub struct usb_security_descriptor {
+    pub bLength: __u8,
+    pub bDescriptorType: __u8,
+    pub wTotalLength: __le16,
+    pub bNumEncryptionTypes: __u8,
+}
+#[repr(C, packed)]
+pub struct usb_key_descriptor {
+    pub bLength: __u8,
+    pub bDescriptorType: __u8,
+    pub tTKID: [__u8; 3usize],
+    pub bReserved: __u8,
+    pub bKeyData: __IncompleteArrayField<__u8>,
+}
+impl Default for usb_key_descriptor {
+    fn default() -> Self {
+        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
+        unsafe {
+            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            s.assume_init()
+        }
+    }
+}
+#[repr(C, packed)]
+#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, NoCell, FromZeros)]
+pub struct usb_encryption_descriptor {
+    pub bLength: __u8,
+    pub bDescriptorType: __u8,
+    pub bEncryptionType: __u8,
+    pub bEncryptionValue: __u8,
+    pub bAuthKeyIndex: __u8,
+}
+#[repr(C, packed)]
+#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, NoCell, FromZeros)]
+pub struct usb_bos_descriptor {
+    pub bLength: __u8,
+    pub bDescriptorType: __u8,
+    pub wTotalLength: __le16,
+    pub bNumDeviceCaps: __u8,
+}
+#[repr(C, packed)]
+#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, NoCell, FromZeros)]
+pub struct usb_dev_cap_header {
+    pub bLength: __u8,
+    pub bDescriptorType: __u8,
+    pub bDevCapabilityType: __u8,
+}
+#[repr(C, packed)]
+#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, NoCell, FromZeros)]
+pub struct usb_wireless_cap_descriptor {
+    pub bLength: __u8,
+    pub bDescriptorType: __u8,
+    pub bDevCapabilityType: __u8,
+    pub bmAttributes: __u8,
+    pub wPHYRates: __le16,
+    pub bmTFITXPowerInfo: __u8,
+    pub bmFFITXPowerInfo: __u8,
+    pub bmBandGroup: __le16,
+    pub bReserved: __u8,
+}
+#[repr(C, packed)]
+#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, NoCell, FromZeros)]
+pub struct usb_ext_cap_descriptor {
+    pub bLength: __u8,
+    pub bDescriptorType: __u8,
+    pub bDevCapabilityType: __u8,
+    pub bmAttributes: __le32,
+}
+#[repr(C, packed)]
+#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, NoCell, FromZeros)]
+pub struct usb_ss_cap_descriptor {
+    pub bLength: __u8,
+    pub bDescriptorType: __u8,
+    pub bDevCapabilityType: __u8,
+    pub bmAttributes: __u8,
+    pub wSpeedSupported: __le16,
+    pub bFunctionalitySupport: __u8,
+    pub bU1devExitLat: __u8,
+    pub bU2DevExitLat: __le16,
+}
+#[repr(C, packed)]
+#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, NoCell, FromZeros)]
+pub struct usb_ss_container_id_descriptor {
+    pub bLength: __u8,
+    pub bDescriptorType: __u8,
+    pub bDevCapabilityType: __u8,
+    pub bReserved: __u8,
+    pub ContainerID: [__u8; 16usize],
+}
+#[repr(C, packed)]
+pub struct usb_plat_dev_cap_descriptor {
+    pub bLength: __u8,
+    pub bDescriptorType: __u8,
+    pub bDevCapabilityType: __u8,
+    pub bReserved: __u8,
+    pub UUID: [__u8; 16usize],
+    pub CapabilityData: __IncompleteArrayField<__u8>,
+}
+impl Default for usb_plat_dev_cap_descriptor {
+    fn default() -> Self {
+        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
+        unsafe {
+            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            s.assume_init()
+        }
+    }
+}
+#[repr(C, packed)]
+pub struct usb_ssp_cap_descriptor {
+    pub bLength: __u8,
+    pub bDescriptorType: __u8,
+    pub bDevCapabilityType: __u8,
+    pub bReserved: __u8,
+    pub bmAttributes: __le32,
+    pub wFunctionalitySupport: __le16,
+    pub wReserved: __le16,
+    pub __bindgen_anon_1: usb_ssp_cap_descriptor__bindgen_ty_1,
+}
+#[repr(C)]
+pub struct usb_ssp_cap_descriptor__bindgen_ty_1 {
+    pub legacy_padding: __BindgenUnionField<__le32>,
+    pub __bindgen_anon_1: __BindgenUnionField<usb_ssp_cap_descriptor__bindgen_ty_1__bindgen_ty_1>,
+    pub bindgen_union_field: u32,
+}
+#[repr(C)]
+#[derive(Debug, Default)]
+pub struct usb_ssp_cap_descriptor__bindgen_ty_1__bindgen_ty_1 {
+    pub __empty_bmSublinkSpeedAttr:
+        usb_ssp_cap_descriptor__bindgen_ty_1__bindgen_ty_1__bindgen_ty_1,
+    pub bmSublinkSpeedAttr: __IncompleteArrayField<__le32>,
+}
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, NoCell, FromZeros)]
+pub struct usb_ssp_cap_descriptor__bindgen_ty_1__bindgen_ty_1__bindgen_ty_1 {}
+impl Default for usb_ssp_cap_descriptor__bindgen_ty_1 {
+    fn default() -> Self {
+        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
+        unsafe {
+            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            s.assume_init()
+        }
+    }
+}
+impl Default for usb_ssp_cap_descriptor {
+    fn default() -> Self {
+        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
+        unsafe {
+            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            s.assume_init()
+        }
+    }
+}
+#[repr(C, packed)]
+#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, NoCell, FromZeros)]
+pub struct usb_pd_cap_descriptor {
+    pub bLength: __u8,
+    pub bDescriptorType: __u8,
+    pub bDevCapabilityType: __u8,
+    pub bReserved: __u8,
+    pub bmAttributes: __le32,
+    pub bmProviderPorts: __le16,
+    pub bmConsumerPorts: __le16,
+    pub bcdBCVersion: __le16,
+    pub bcdPDVersion: __le16,
+    pub bcdUSBTypeCVersion: __le16,
+}
+#[repr(C, packed)]
+#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, NoCell, FromZeros)]
+pub struct usb_pd_cap_battery_info_descriptor {
+    pub bLength: __u8,
+    pub bDescriptorType: __u8,
+    pub bDevCapabilityType: __u8,
+    pub iBattery: __u8,
+    pub iSerial: __u8,
+    pub iManufacturer: __u8,
+    pub bBatteryId: __u8,
+    pub bReserved: __u8,
+    pub dwChargedThreshold: __le32,
+    pub dwWeakThreshold: __le32,
+    pub dwBatteryDesignCapacity: __le32,
+    pub dwBatteryLastFullchargeCapacity: __le32,
+}
+#[repr(C, packed)]
+#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, NoCell, FromZeros)]
+pub struct usb_pd_cap_consumer_port_descriptor {
+    pub bLength: __u8,
+    pub bDescriptorType: __u8,
+    pub bDevCapabilityType: __u8,
+    pub bReserved: __u8,
+    pub bmCapabilities: __u8,
+    pub wMinVoltage: __le16,
+    pub wMaxVoltage: __le16,
+    pub wReserved: __u16,
+    pub dwMaxOperatingPower: __le32,
+    pub dwMaxPeakPower: __le32,
+    pub dwMaxPeakPowerTime: __le32,
+}
+#[repr(C, packed)]
+pub struct usb_pd_cap_provider_port_descriptor {
+    pub bLength: __u8,
+    pub bDescriptorType: __u8,
+    pub bDevCapabilityType: __u8,
+    pub bReserved1: __u8,
+    pub bmCapabilities: __u8,
+    pub bNumOfPDObjects: __u8,
+    pub bReserved2: __u8,
+    pub wPowerDataObject: __IncompleteArrayField<__le32>,
+}
+impl Default for usb_pd_cap_provider_port_descriptor {
+    fn default() -> Self {
+        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
+        unsafe {
+            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            s.assume_init()
+        }
+    }
+}
+#[repr(C, packed)]
+#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, NoCell, FromZeros)]
+pub struct usb_ptm_cap_descriptor {
+    pub bLength: __u8,
+    pub bDescriptorType: __u8,
+    pub bDevCapabilityType: __u8,
+}
+#[repr(C, packed)]
+#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, NoCell, FromZeros)]
+pub struct usb_wireless_ep_comp_descriptor {
+    pub bLength: __u8,
+    pub bDescriptorType: __u8,
+    pub bMaxBurst: __u8,
+    pub bMaxSequence: __u8,
+    pub wMaxStreamDelay: __le16,
+    pub wOverTheAirPacketSize: __le16,
+    pub bOverTheAirInterval: __u8,
+    pub bmCompAttributes: __u8,
+}
+#[repr(C, packed)]
+#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, NoCell, FromZeros)]
+pub struct usb_handshake {
+    pub bMessageNumber: __u8,
+    pub bStatus: __u8,
+    pub tTKID: [__u8; 3usize],
+    pub bReserved: __u8,
+    pub CDID: [__u8; 16usize],
+    pub nonce: [__u8; 16usize],
+    pub MIC: [__u8; 8usize],
+}
+#[repr(C, packed)]
+#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, NoCell, FromZeros)]
+pub struct usb_connection_context {
+    pub CHID: [__u8; 16usize],
+    pub CDID: [__u8; 16usize],
+    pub CK: [__u8; 16usize],
+}
+pub const usb_device_speed_USB_SPEED_UNKNOWN: usb_device_speed = 0;
+pub const usb_device_speed_USB_SPEED_LOW: usb_device_speed = 1;
+pub const usb_device_speed_USB_SPEED_FULL: usb_device_speed = 2;
+pub const usb_device_speed_USB_SPEED_HIGH: usb_device_speed = 3;
+pub const usb_device_speed_USB_SPEED_WIRELESS: usb_device_speed = 4;
+pub const usb_device_speed_USB_SPEED_SUPER: usb_device_speed = 5;
+pub const usb_device_speed_USB_SPEED_SUPER_PLUS: usb_device_speed = 6;
+pub type usb_device_speed = crate::types::c_uint;
+pub const usb_device_state_USB_STATE_NOTATTACHED: usb_device_state = 0;
+pub const usb_device_state_USB_STATE_ATTACHED: usb_device_state = 1;
+pub const usb_device_state_USB_STATE_POWERED: usb_device_state = 2;
+pub const usb_device_state_USB_STATE_RECONNECTING: usb_device_state = 3;
+pub const usb_device_state_USB_STATE_UNAUTHENTICATED: usb_device_state = 4;
+pub const usb_device_state_USB_STATE_DEFAULT: usb_device_state = 5;
+pub const usb_device_state_USB_STATE_ADDRESS: usb_device_state = 6;
+pub const usb_device_state_USB_STATE_CONFIGURED: usb_device_state = 7;
+pub const usb_device_state_USB_STATE_SUSPENDED: usb_device_state = 8;
+pub type usb_device_state = crate::types::c_uint;
+pub const usb3_link_state_USB3_LPM_U0: usb3_link_state = 0;
+pub const usb3_link_state_USB3_LPM_U1: usb3_link_state = 1;
+pub const usb3_link_state_USB3_LPM_U2: usb3_link_state = 2;
+pub const usb3_link_state_USB3_LPM_U3: usb3_link_state = 3;
+pub type usb3_link_state = crate::types::c_uint;
+#[repr(C, packed)]
+#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, NoCell, FromZeros)]
+pub struct usb_set_sel_req {
+    pub u1_sel: __u8,
+    pub u1_pel: __u8,
+    pub u2_sel: __le16,
+    pub u2_pel: __le16,
+}
+pub const FUNCTIONFS_DESCRIPTORS_MAGIC: _bindgen_ty_60 = 1;
+pub const FUNCTIONFS_STRINGS_MAGIC: _bindgen_ty_60 = 2;
+pub const FUNCTIONFS_DESCRIPTORS_MAGIC_V2: _bindgen_ty_60 = 3;
+pub type _bindgen_ty_60 = crate::types::c_uint;
+pub const functionfs_flags_FUNCTIONFS_HAS_FS_DESC: functionfs_flags = 1;
+pub const functionfs_flags_FUNCTIONFS_HAS_HS_DESC: functionfs_flags = 2;
+pub const functionfs_flags_FUNCTIONFS_HAS_SS_DESC: functionfs_flags = 4;
+pub const functionfs_flags_FUNCTIONFS_HAS_MS_OS_DESC: functionfs_flags = 8;
+pub const functionfs_flags_FUNCTIONFS_VIRTUAL_ADDR: functionfs_flags = 16;
+pub const functionfs_flags_FUNCTIONFS_EVENTFD: functionfs_flags = 32;
+pub const functionfs_flags_FUNCTIONFS_ALL_CTRL_RECIP: functionfs_flags = 64;
+pub const functionfs_flags_FUNCTIONFS_CONFIG0_SETUP: functionfs_flags = 128;
+pub type functionfs_flags = crate::types::c_uint;
+#[repr(C, packed)]
+#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, NoCell, FromZeros)]
+pub struct usb_endpoint_descriptor_no_audio {
+    pub bLength: __u8,
+    pub bDescriptorType: __u8,
+    pub bEndpointAddress: __u8,
+    pub bmAttributes: __u8,
+    pub wMaxPacketSize: __le16,
+    pub bInterval: __u8,
+}
+#[repr(C, packed)]
+#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, NoCell, FromZeros)]
+pub struct usb_functionfs_descs_head_v2 {
+    pub magic: __le32,
+    pub length: __le32,
+    pub flags: __le32,
+}
+#[repr(C, packed)]
+#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, NoCell, FromZeros)]
+pub struct usb_functionfs_descs_head {
+    pub magic: __le32,
+    pub length: __le32,
+    pub fs_count: __le32,
+    pub hs_count: __le32,
+}
+#[repr(C, packed)]
+#[derive(Copy, Clone)]
+pub struct usb_os_desc_header {
+    pub interface: __u8,
+    pub dwLength: __le32,
+    pub bcdVersion: __le16,
+    pub wIndex: __le16,
+    pub __bindgen_anon_1: usb_os_desc_header__bindgen_ty_1,
+}
+#[repr(C)]
+#[derive(Copy, Clone)]
+pub union usb_os_desc_header__bindgen_ty_1 {
+    pub __bindgen_anon_1: usb_os_desc_header__bindgen_ty_1__bindgen_ty_1,
+    pub wCount: __le16,
+}
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, NoCell, FromZeros)]
+pub struct usb_os_desc_header__bindgen_ty_1__bindgen_ty_1 {
+    pub bCount: __u8,
+    pub Reserved: __u8,
+}
+impl Default for usb_os_desc_header__bindgen_ty_1 {
+    fn default() -> Self {
+        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
+        unsafe {
+            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            s.assume_init()
+        }
+    }
+}
+impl Default for usb_os_desc_header {
+    fn default() -> Self {
+        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
+        unsafe {
+            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            s.assume_init()
+        }
+    }
+}
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, NoCell, FromZeros)]
+pub struct usb_ext_compat_desc {
+    pub bFirstInterfaceNumber: __u8,
+    pub Reserved1: __u8,
+    pub CompatibleID: [__u8; 8usize],
+    pub SubCompatibleID: [__u8; 8usize],
+    pub Reserved2: [__u8; 6usize],
+}
+#[repr(C, packed)]
+#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, NoCell, FromZeros)]
+pub struct usb_ext_prop_desc {
+    pub dwSize: __le32,
+    pub dwPropertyDataType: __le32,
+    pub wPropertyNameLength: __le16,
+}
+#[repr(C, packed)]
+#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, NoCell, FromZeros)]
+pub struct usb_functionfs_strings_head {
+    pub magic: __le32,
+    pub length: __le32,
+    pub str_count: __le32,
+    pub lang_count: __le32,
+}
+pub const usb_functionfs_event_type_FUNCTIONFS_BIND: usb_functionfs_event_type = 0;
+pub const usb_functionfs_event_type_FUNCTIONFS_UNBIND: usb_functionfs_event_type = 1;
+pub const usb_functionfs_event_type_FUNCTIONFS_ENABLE: usb_functionfs_event_type = 2;
+pub const usb_functionfs_event_type_FUNCTIONFS_DISABLE: usb_functionfs_event_type = 3;
+pub const usb_functionfs_event_type_FUNCTIONFS_SETUP: usb_functionfs_event_type = 4;
+pub const usb_functionfs_event_type_FUNCTIONFS_SUSPEND: usb_functionfs_event_type = 5;
+pub const usb_functionfs_event_type_FUNCTIONFS_RESUME: usb_functionfs_event_type = 6;
+pub type usb_functionfs_event_type = crate::types::c_uint;
+#[repr(C, packed)]
+#[derive(Copy, Clone)]
+pub struct usb_functionfs_event {
+    pub u: usb_functionfs_event__bindgen_ty_1,
+    pub type_: __u8,
+    pub _pad: [__u8; 3usize],
+}
+#[repr(C, packed)]
+#[derive(Copy, Clone)]
+pub union usb_functionfs_event__bindgen_ty_1 {
+    pub setup: usb_ctrlrequest,
+}
+impl Default for usb_functionfs_event__bindgen_ty_1 {
+    fn default() -> Self {
+        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
+        unsafe {
+            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            s.assume_init()
+        }
+    }
+}
+impl Default for usb_functionfs_event {
     fn default() -> Self {
         let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
         unsafe {

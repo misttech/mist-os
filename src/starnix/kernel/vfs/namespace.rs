@@ -6,8 +6,8 @@ use crate::{
     bpf::fs::BpfFs,
     device::BinderFs,
     fs::{
-        devpts::dev_pts_fs, devtmpfs::dev_tmp_fs, ext4::ExtFilesystem, overlayfs::OverlayFs,
-        proc::proc_fs, sysfs::sys_fs, tmpfs::TmpFs, tracefs::trace_fs,
+        devpts::dev_pts_fs, devtmpfs::dev_tmp_fs, ext4::ExtFilesystem, functionfs::FunctionFs,
+        overlayfs::OverlayFs, proc::proc_fs, sysfs::sys_fs, tmpfs::TmpFs, tracefs::trace_fs,
     },
     mutable_state::{state_accessor, state_implementation},
     selinux::fs::selinux_fs,
@@ -718,6 +718,7 @@ impl FileSystemCreator for CurrentTask {
             b"devpts" => Ok(dev_pts_fs(self, options).clone()),
             b"devtmpfs" => Ok(dev_tmp_fs(self).clone()),
             b"ext4" => ExtFilesystem::new_fs(kernel, self, options),
+            b"functionfs" => FunctionFs::new_fs(self, options),
             b"overlay" => OverlayFs::new_fs(self, options),
             b"proc" => Ok(proc_fs(self, options).clone()),
             b"tracefs" => Ok(trace_fs(self, options).clone()),
