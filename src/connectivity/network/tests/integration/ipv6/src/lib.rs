@@ -449,6 +449,13 @@ async fn slaac_with_privacy_extensions<N: Netstack>(
 /// an interface, DAD should succeed.
 #[netstack_test]
 async fn duplicate_address_detection<N: Netstack>(name: &str) {
+    // TODO(https://fxbug.dev/42182861): Unskip. This test is skipped
+    // because observing DAD failed is very flaky on RISCV builders.
+    #[cfg(target_arch = "riscv64")]
+    if N::VERSION == NetstackVersion::Netstack3 {
+        println!("Skipping this test due to flakes. See https://fxbug.dev/42182861");
+        return;
+    }
     /// Adds `ipv6_consts::LINK_LOCAL_ADDR` to the interface and makes sure a Neighbor Solicitation
     /// message is transmitted by the netstack for DAD.
     ///
