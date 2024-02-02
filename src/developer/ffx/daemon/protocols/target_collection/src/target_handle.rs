@@ -5,16 +5,13 @@
 use crate::reboot;
 use anyhow::{anyhow, Context as _, Result};
 use ffx_daemon_events::{HostPipeErr, TargetEvent};
-use ffx_daemon_target::fastboot::Fastboot as FastbootDaemon;
 use ffx_daemon_target::target::Target;
 use ffx_stream_util::TryStreamUtilExt;
 use fidl::endpoints::ServerEnd;
 use fidl_fuchsia_developer_ffx::{self as ffx};
 use futures::TryStreamExt;
 use protocols::Context;
-use std::sync::Arc;
 use std::{cell::RefCell, future::Future, pin::Pin, rc::Rc, time::Duration};
-use tasks::TaskManager;
 
 // TODO(awdavies): Abstract this to use similar utilities to an actual protocol.
 // This functionally behaves the same with the only caveat being that some
@@ -30,12 +27,7 @@ impl TargetHandle {
     ) -> Result<Pin<Box<dyn Future<Output = ()>>>> {
         let reboot_controller = reboot::RebootController::new(target.clone(), cx.overnet_node()?);
         let keep_alive = target.keep_alive();
-        let inner = TargetHandleInner {
-            target,
-            reboot_controller,
-            tasks: Default::default(),
-            overnet_node: cx.overnet_node()?,
-        };
+        let inner = TargetHandleInner { target, reboot_controller };
         let stream = handle.into_stream()?;
         let fut = Box::pin(async move {
             let _ = stream
@@ -50,30 +42,10 @@ impl TargetHandle {
 
 struct TargetHandleInner {
     target: Rc<Target>,
-    overnet_node: Arc<overnet_core::Router>,
     reboot_controller: reboot::RebootController,
-    tasks: TaskManager,
 }
 
 impl TargetHandleInner {
-    #[tracing::instrument(skip(self))]
-    pub(crate) async fn spawn_fastboot(
-        &self,
-        fastboot: ServerEnd<ffx::FastbootMarker>,
-    ) -> Result<()> {
-        let mut fastboot_manager = FastbootDaemon::new(self.target.clone());
-        let stream = fastboot.into_stream()?;
-        let overnet_node = Arc::clone(&self.overnet_node);
-        self.tasks.spawn(async move {
-            match fastboot_manager.handle_fastboot_requests_from_stream(stream, &overnet_node).await
-            {
-                Ok(_) => tracing::trace!("Fastboot proxy finished - client disconnected"),
-                Err(e) => tracing::error!("Handling fastboot requests: {:?}", e),
-            }
-        });
-        Ok(())
-    }
-
     #[tracing::instrument(skip(self, cx))]
     async fn handle(&self, cx: &Context, req: ffx::TargetRequest) -> Result<()> {
         tracing::debug!("handling request {req:?}");
@@ -148,8 +120,8 @@ impl TargetHandleInner {
                     }
                 }
             }
-            ffx::TargetRequest::OpenFastboot { fastboot, .. } => {
-                self.spawn_fastboot(fastboot).await.map_err(Into::into)
+            ffx::TargetRequest::OpenFastboot { .. } => {
+                unimplemented!();
             }
             ffx::TargetRequest::Reboot { state, responder } => {
                 self.reboot_controller.reboot(state, responder).await
