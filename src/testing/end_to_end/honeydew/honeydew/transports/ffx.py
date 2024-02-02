@@ -15,6 +15,8 @@ from typing import Any
 import fuchsia_controller_py as fuchsia_controller
 
 from honeydew import custom_types, errors
+from honeydew.interfaces.transports import ffx as ffx_interface
+from honeydew.utils import properties
 
 _FFX_BINARY: str = "ffx"
 
@@ -52,9 +54,6 @@ _FFX_CMDS: dict[str, list[str]] = {
 }
 
 _TIMEOUTS: dict[str, float] = {
-    "FFX_CLI": 10,
-    "TARGET_RCS_CONNECTION_WAIT": 15,
-    "TARGET_RCS_DISCONNECTION_WAIT": 15,
     "TARGET_RCS_DISCONNECTION_ATTEMPT_WAIT": 2,
     "SLEEP": 0.5,
 }
@@ -185,7 +184,7 @@ class FfxConfig:
     def _run(
         self,
         cmd: list[str],
-        timeout: float | None = _TIMEOUTS["FFX_CLI"],
+        timeout: float | None = ffx_interface.TIMEOUTS["FFX_CLI"],
     ) -> None:
         """Executes `ffx {cmd}`.
 
@@ -222,7 +221,7 @@ class FfxConfig:
             raise errors.FfxConfigError(f"`{ffx_cmd}` command failed") from err
 
 
-class FFX:
+class FFX(ffx_interface.FFX):
     """Provides methods for Host-(Fuchsia)Target interactions via FFX.
 
     Args:
@@ -250,7 +249,7 @@ class FFX:
                 f"{target_name=} is an IP address instead of target name"
             )
 
-        self.config: custom_types.FFXConfig = config
+        self._config: custom_types.FFXConfig = config
 
         self._target_name: str = target_name
 
@@ -262,9 +261,19 @@ class FFX:
         else:
             self._target = self._target_name
 
+    @properties.PersistentProperty
+    def config(self) -> custom_types.FFXConfig:
+        """Returns the FFX configuration associated with this instance of FFX
+        object.
+
+        Returns:
+            custom_types.FFXConfig
+        """
+        return self._config
+
     def add_target(
         self,
-        timeout: float = _TIMEOUTS["FFX_CLI"],
+        timeout: float = ffx_interface.TIMEOUTS["FFX_CLI"],
     ) -> None:
         """Adds a target to the ffx collection
 
@@ -306,7 +315,8 @@ class FFX:
             raise errors.FfxCommandError(f"`{cmd}` command failed") from err
 
     def check_connection(
-        self, timeout: float = _TIMEOUTS["TARGET_RCS_CONNECTION_WAIT"]
+        self,
+        timeout: float = ffx_interface.TIMEOUTS["TARGET_RCS_CONNECTION_WAIT"],
     ) -> None:
         """Checks the FFX connection from host to Fuchsia device.
 
@@ -325,7 +335,7 @@ class FFX:
             ) from err
 
     def get_target_information(
-        self, timeout: float = _TIMEOUTS["FFX_CLI"]
+        self, timeout: float = ffx_interface.TIMEOUTS["FFX_CLI"]
     ) -> list[dict[str, Any]]:
         """Executed and returns the output of `ffx -t {target} target show`.
 
@@ -358,7 +368,7 @@ class FFX:
             ) from err
 
     def get_target_list(
-        self, timeout: float = _TIMEOUTS["FFX_CLI"]
+        self, timeout: float = ffx_interface.TIMEOUTS["FFX_CLI"]
     ) -> list[dict[str, Any]]:
         """Executed and returns the output of `ffx --machine json target list`.
 
@@ -384,7 +394,9 @@ class FFX:
         except Exception as err:  # pylint: disable=broad-except
             raise errors.FfxCommandError(f"`{cmd}` command failed") from err
 
-    def get_target_name(self, timeout: float = _TIMEOUTS["FFX_CLI"]) -> str:
+    def get_target_name(
+        self, timeout: float = ffx_interface.TIMEOUTS["FFX_CLI"]
+    ) -> str:
         """Returns the target name.
 
         Args:
@@ -433,7 +445,7 @@ class FFX:
             ) from err
 
     def get_target_ssh_address(
-        self, timeout: float | None = _TIMEOUTS["FFX_CLI"]
+        self, timeout: float | None = ffx_interface.TIMEOUTS["FFX_CLI"]
     ) -> custom_types.TargetSshAddress:
         """Returns the target's ssh ip address and port information.
 
@@ -466,7 +478,9 @@ class FFX:
                 f"Failed to get the SSH address of {self._target_name}"
             ) from err
 
-    def get_target_type(self, timeout: float = _TIMEOUTS["FFX_CLI"]) -> str:
+    def get_target_type(
+        self, timeout: float = ffx_interface.TIMEOUTS["FFX_CLI"]
+    ) -> str:
         """Returns the target type.
 
         Args:
@@ -529,7 +543,7 @@ class FFX:
     def run(
         self,
         cmd: list[str],
-        timeout: float | None = _TIMEOUTS["FFX_CLI"],
+        timeout: float | None = ffx_interface.TIMEOUTS["FFX_CLI"],
         exceptions_to_skip: Iterable[type[Exception]] | None = None,
         capture_output: bool = True,
     ) -> str:
@@ -627,7 +641,7 @@ class FFX:
         component_url: str,
         ffx_test_args: list[str] | None = None,
         test_component_args: list[str] | None = None,
-        timeout: float | None = _TIMEOUTS["FFX_CLI"],
+        timeout: float | None = ffx_interface.TIMEOUTS["FFX_CLI"],
         capture_output: bool = True,
     ) -> str:
         """Executes and returns the output of
@@ -675,7 +689,8 @@ class FFX:
         return self.run(cmd, timeout=timeout, capture_output=capture_output)
 
     def wait_for_rcs_connection(
-        self, timeout: float = _TIMEOUTS["TARGET_RCS_CONNECTION_WAIT"]
+        self,
+        timeout: float = ffx_interface.TIMEOUTS["TARGET_RCS_CONNECTION_WAIT"],
     ) -> None:
         """Wait until FFX is able to establish a RCS connection to the target.
 
@@ -712,7 +727,10 @@ class FFX:
             ) from err
 
     def wait_for_rcs_disconnection(
-        self, timeout: float = _TIMEOUTS["TARGET_RCS_DISCONNECTION_WAIT"]
+        self,
+        timeout: float = ffx_interface.TIMEOUTS[
+            "TARGET_RCS_DISCONNECTION_WAIT"
+        ],
     ) -> None:
         """Wait until FFX is able to disconnect RCS connection to the target.
 

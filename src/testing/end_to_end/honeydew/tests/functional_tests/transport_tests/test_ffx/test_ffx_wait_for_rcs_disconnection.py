@@ -9,10 +9,7 @@ import logging
 from fuchsia_base_test import fuchsia_base_test
 from mobly import test_runner
 
-from honeydew.interfaces.device_classes import (
-    fuchsia_device,
-    transports_capable,
-)
+from honeydew.interfaces.device_classes import fuchsia_device
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
@@ -34,8 +31,6 @@ class FFXWaitForRCSDisconnectionTests(fuchsia_base_test.FuchsiaBaseTest):
 
     def test_wait_for_rcs_connection(self) -> None:
         """Test case for FFX.wait_for_rcs_connection()."""
-        assert isinstance(self.device, transports_capable.FFXCapableDevice)
-
         self.device.ffx.wait_for_rcs_connection(timeout=_RCS_CONNECTION_WAIT)
 
         self.device.ffx.run(_REBOOT)

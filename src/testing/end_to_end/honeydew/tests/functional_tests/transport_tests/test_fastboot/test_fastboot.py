@@ -9,10 +9,7 @@ import logging
 from fuchsia_base_test import fuchsia_base_test
 from mobly import asserts, test_runner
 
-from honeydew.interfaces.device_classes import (
-    fuchsia_device,
-    transports_capable,
-)
+from honeydew.interfaces.device_classes import fuchsia_device
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
@@ -30,7 +27,6 @@ class FastbootTransportTests(fuchsia_base_test.FuchsiaBaseTest):
         """
         super().setup_class()
         self.device: fuchsia_device.FuchsiaDevice = self.fuchsia_devices[0]
-        assert isinstance(self.device, transports_capable.FastbootCapableDevice)
 
         # Calling some fastboot method such that Fastboot __init__ gets called
         # which will retrieve the fastboot node-id.
@@ -50,7 +46,6 @@ class FastbootTransportTests(fuchsia_base_test.FuchsiaBaseTest):
             * Ensures device is in fuchsia mode.
         """
         super().teardown_test()
-        assert isinstance(self.device, transports_capable.FastbootCapableDevice)
         if self.device.fastboot.is_in_fastboot_mode():
             _LOGGER.warning(
                 "%s is in fastboot mode which is not expected. "
@@ -61,7 +56,6 @@ class FastbootTransportTests(fuchsia_base_test.FuchsiaBaseTest):
 
     def test_fastboot_node_id(self) -> None:
         """Test case for Fastboot.node_id."""
-        assert isinstance(self.device, transports_capable.FastbootCapableDevice)
         # Note - If "node_id" is specified in "expected_values" in
         # params.yml then compare with it.
         if self.user_params["expected_values"] and self.user_params[
@@ -78,8 +72,6 @@ class FastbootTransportTests(fuchsia_base_test.FuchsiaBaseTest):
     def test_fastboot_methods(self) -> None:
         """Test case that puts the device in fastboot mode, runs a command in
         fastboot mode and reboots the device back to fuchsia mode."""
-        assert isinstance(self.device, transports_capable.FastbootCapableDevice)
-
         self.device.fastboot.boot_to_fastboot_mode()
 
         self.device.fastboot.wait_for_fastboot_mode()

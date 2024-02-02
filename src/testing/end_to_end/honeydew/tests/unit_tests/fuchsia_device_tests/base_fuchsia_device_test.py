@@ -18,7 +18,6 @@ from honeydew.interfaces.device_classes import affordances_capable
 from honeydew.interfaces.device_classes import (
     fuchsia_device as fuchsia_device_interface,
 )
-from honeydew.interfaces.device_classes import transports_capable
 
 # pylint: disable=protected-access
 _INPUT_ARGS: dict[str, Any] = {
@@ -236,21 +235,6 @@ class BaseFuchsiaDeviceTests(unittest.TestCase):
         self.assertIsInstance(
             self.fd_obj, affordances_capable.RebootCapableDevice
         )
-
-    # List all the tests related to transports
-    def test_fuchsia_device_is_fastboot_capable(self) -> None:
-        """Test case to make sure fuchsia device is Fastboot capable"""
-        self.assertIsInstance(
-            self.fd_obj, transports_capable.FastbootCapableDevice
-        )
-
-    def test_fuchsia_device_is_ffx_capable(self) -> None:
-        """Test case to make sure fuchsia device is FFX capable"""
-        self.assertIsInstance(self.fd_obj, transports_capable.FFXCapableDevice)
-
-    def test_fuchsia_device_is_ssh_capable(self) -> None:
-        """Test case to make sure fuchsia device is SSH capable"""
-        self.assertIsInstance(self.fd_obj, transports_capable.SSHCapableDevice)
 
     # List all the tests related to public methods
     def test_close(self) -> None:

@@ -11,17 +11,9 @@ from collections.abc import Iterable
 from typing import Any
 
 from honeydew import custom_types, errors
-from honeydew.transports import ffx
+from honeydew.interfaces.transports import ffx as ffx_interface
+from honeydew.interfaces.transports import sl4f as sl4f_interface
 from honeydew.utils import http_utils, properties
-
-_TIMEOUTS: dict[str, float] = {
-    "RESPONSE": 30,
-}
-
-_DEFAULTS: dict[str, int] = {
-    "ATTEMPTS": 3,
-    "INTERVAL": 3,
-}
 
 _FFX_CMDS: dict[str, list[str]] = {
     "START_SL4F": ["target", "ssh", "start_sl4f"],
@@ -41,12 +33,12 @@ _SL4F_METHODS: dict[str, str] = {
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
 
-class SL4F:
+class SL4F(sl4f_interface.SL4F):
     """Provides methods for Host-(Fuchsia)Target interactions via SL4F.
 
     Args:
         device_name: Fuchsia device name.
-        ffx_transport: ffx.FFX object.
+        ffx_transport: Object to FFX transport interface implementation.
         device_ip: Fuchsia device IP Address.
 
     Raises:
@@ -56,14 +48,14 @@ class SL4F:
     def __init__(
         self,
         device_name: str,
-        ffx_transport: ffx.FFX,
+        ffx_transport: ffx_interface.FFX,
         device_ip: ipaddress.IPv4Address | ipaddress.IPv6Address | None = None,
     ) -> None:
         self._name: str = device_name
         self._ip_address: ipaddress.IPv4Address | ipaddress.IPv6Address | None = (
             device_ip
         )
-        self._ffx_transport: ffx.FFX = ffx_transport
+        self._ffx_transport: ffx_interface.FFX = ffx_transport
 
         self.start_server()
 
@@ -116,9 +108,9 @@ class SL4F:
         self,
         method: str,
         params: dict[str, Any] | None = None,
-        timeout: float = _TIMEOUTS["RESPONSE"],
-        attempts: int = _DEFAULTS["ATTEMPTS"],
-        interval: int = _DEFAULTS["INTERVAL"],
+        timeout: float = sl4f_interface.TIMEOUTS["RESPONSE"],
+        attempts: int = sl4f_interface.DEFAULTS["ATTEMPTS"],
+        interval: int = sl4f_interface.DEFAULTS["INTERVAL"],
         exceptions_to_skip: Iterable[type[Exception]] | None = None,
     ) -> dict[str, Any]:
         """Run the SL4F method on Fuchsia device and return the response.

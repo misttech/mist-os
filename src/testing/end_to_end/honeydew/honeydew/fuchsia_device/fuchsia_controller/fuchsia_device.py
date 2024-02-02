@@ -29,7 +29,9 @@ from honeydew.interfaces.affordances.bluetooth.profiles import (
 )
 from honeydew.interfaces.affordances.ui import user_input
 from honeydew.interfaces.affordances.wlan import wlan, wlan_policy
-from honeydew.interfaces.device_classes import transports_capable
+from honeydew.interfaces.transports import (
+    fuchsia_controller as fuchsia_controller_transport_interface,
+)
 from honeydew.transports import (
     fuchsia_controller as fuchsia_controller_transport,
 )
@@ -65,10 +67,7 @@ _LOG_SEVERITIES: dict[custom_types.LEVEL, f_diagnostics.Severity] = {
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
 
-class FuchsiaDevice(
-    base_fuchsia_device.BaseFuchsiaDevice,
-    transports_capable.FuchsiaControllerCapableDevice,
-):
+class FuchsiaDevice(base_fuchsia_device.BaseFuchsiaDevice):
     """FuchsiaDevice abstract base class implementation using
     Fuchsia-Controller.
 
@@ -105,16 +104,16 @@ class FuchsiaDevice(
     @properties.Transport
     def fuchsia_controller(
         self,
-    ) -> fuchsia_controller_transport.FuchsiaController:
+    ) -> fuchsia_controller_transport_interface.FuchsiaController:
         """Returns the Fuchsia-Controller transport object.
 
         Returns:
-            Fuchsia-Controller transport object.
+            Fuchsia-Controller transport interface implementation.
 
         Raises:
             errors.FuchsiaControllerError: Failed to instantiate.
         """
-        fuchsia_controller_obj: fuchsia_controller_transport.FuchsiaController = fuchsia_controller_transport.FuchsiaController(
+        fuchsia_controller_obj: fuchsia_controller_transport_interface.FuchsiaController = fuchsia_controller_transport.FuchsiaController(
             device_name=self.device_name,
             device_ip=self._ip_address,
             ffx_transport=self.ffx,

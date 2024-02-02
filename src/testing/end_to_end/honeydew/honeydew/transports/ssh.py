@@ -11,7 +11,8 @@ import time
 from typing import Any
 
 from honeydew import custom_types, errors
-from honeydew.transports import ffx
+from honeydew.interfaces.transports import ffx as ffx_interface
+from honeydew.interfaces.transports import ssh as ssh_interface
 
 _DEFAULTS: dict[str, Any] = {
     "USERNAME": "fuchsia",
@@ -44,7 +45,7 @@ _SSH_COMMAND_WITHOUT_PORT: str = (
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
 
-class SSH:
+class SSH(ssh_interface.SSH):
     """Provides methods for Host-(Fuchsia)Target interactions via SSH.
 
     Args:
@@ -53,7 +54,7 @@ class SSH:
         private_key: Absolute path to the SSH private key file needed to SSH
             into fuchsia device.
 
-        ffx_transport: ffx.FFX object.
+        ffx_transport: Object to FFX transport interface implementation.
 
         ip_port: Fuchsia device's SSH IP Address and Port.
 
@@ -65,7 +66,7 @@ class SSH:
         self,
         device_name: str,
         private_key: str,
-        ffx_transport: ffx.FFX,
+        ffx_transport: ffx_interface.FFX,
         ip_port: custom_types.IpPort | None = None,
         username: str | None = None,
     ) -> None:
@@ -74,10 +75,10 @@ class SSH:
         self._private_key: str = private_key
         self._username: str = username or _DEFAULTS["USERNAME"]
 
-        self._ffx_transport: ffx.FFX = ffx_transport
+        self._ffx_transport: ffx_interface.FFX = ffx_transport
 
     def check_connection(
-        self, timeout: float = _TIMEOUTS["CONNECTION"]
+        self, timeout: float = ssh_interface.TIMEOUTS["CONNECTION"]
     ) -> None:
         """Checks the SSH connection from host to Fuchsia device.
 
@@ -106,7 +107,7 @@ class SSH:
         _LOGGER.debug("%s is available via ssh.", self._name)
 
     def get_target_address(
-        self, timeout: float | None = _TIMEOUTS["FFX_CLI"]
+        self, timeout: float | None = ssh_interface.TIMEOUTS["FFX_CLI"]
     ) -> custom_types.TargetSshAddress:
         """Gets the address used on SSH.
 
@@ -125,8 +126,8 @@ class SSH:
     def run(
         self,
         command: str,
-        timeout: float | None = _TIMEOUTS["COMMAND_RESPONSE"],
-        get_ssh_addr_timeout: float | None = _TIMEOUTS["FFX_CLI"],
+        timeout: float | None = ssh_interface.TIMEOUTS["COMMAND_RESPONSE"],
+        get_ssh_addr_timeout: float | None = ssh_interface.TIMEOUTS["FFX_CLI"],
     ) -> str:
         """Run command on Fuchsia device from host via SSH and return output.
 
@@ -164,7 +165,7 @@ class SSH:
     def popen(
         self,
         command: str,
-        get_ssh_addr_timeout: float | None = _TIMEOUTS["FFX_CLI"],
+        get_ssh_addr_timeout: float | None = ssh_interface.TIMEOUTS["FFX_CLI"],
     ) -> subprocess.Popen[Any]:
         """Run command on Fuchsia device from host via SSH and return the underlying subprocess.
 

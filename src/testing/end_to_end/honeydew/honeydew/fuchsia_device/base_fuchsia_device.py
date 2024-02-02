@@ -20,11 +20,19 @@ from honeydew.interfaces.affordances.ui import screenshot
 from honeydew.interfaces.auxiliary_devices import (
     power_switch as power_switch_interface,
 )
+from honeydew.interfaces.device_classes import affordances_capable
 from honeydew.interfaces.device_classes import (
-    affordances_capable,
-    fuchsia_device,
-    transports_capable,
+    fuchsia_device as fuchsia_device_interface,
 )
+from honeydew.interfaces.transports import (
+    fastboot as fastboot_transport_interface,
+)
+from honeydew.interfaces.transports import ffx as ffx_transport_interface
+from honeydew.interfaces.transports import (
+    fuchsia_controller as fuchsia_controller_transport_interface,
+)
+from honeydew.interfaces.transports import sl4f as sl4f_transport_interface
+from honeydew.interfaces.transports import ssh as ssh_transport_interface
 from honeydew.transports import fastboot as fastboot_transport
 from honeydew.transports import ffx as ffx_transport
 from honeydew.transports import ssh as ssh_transport
@@ -34,11 +42,8 @@ _LOGGER: logging.Logger = logging.getLogger(__name__)
 
 
 class BaseFuchsiaDevice(
-    fuchsia_device.FuchsiaDevice,
+    fuchsia_device_interface.FuchsiaDevice,
     affordances_capable.RebootCapableDevice,
-    transports_capable.FastbootCapableDevice,
-    transports_capable.FFXCapableDevice,
-    transports_capable.SSHCapableDevice,
 ):
     """Common implementation for Fuchsia devices using different transports.
     Every device running Fuchsia contains common functionality as well as the
@@ -152,31 +157,36 @@ class BaseFuchsiaDevice(
 
     # List all transports
     @properties.Transport
-    def fastboot(self) -> fastboot_transport.Fastboot:
+    def fastboot(self) -> fastboot_transport_interface.Fastboot:
         """Returns the Fastboot transport object.
 
         Returns:
-            Fastboot object.
+            Fastboot transport interface implementation.
+
+        Raises:
+            errors.FuchsiaDeviceError: Failed to instantiate.
         """
-        fastboot_obj: fastboot_transport.Fastboot = fastboot_transport.Fastboot(
-            device_name=self.device_name,
-            device_ip=self._ip_address,
-            reboot_affordance=self,
-            ffx_transport=self.ffx,
+        fastboot_obj: fastboot_transport_interface.Fastboot = (
+            fastboot_transport.Fastboot(
+                device_name=self.device_name,
+                device_ip=self._ip_address,
+                reboot_affordance=self,
+                ffx_transport=self.ffx,
+            )
         )
         return fastboot_obj
 
     @properties.Transport
-    def ffx(self) -> ffx_transport.FFX:
+    def ffx(self) -> ffx_transport_interface.FFX:
         """Returns the FFX transport object.
 
         Returns:
-            FFX object.
+            FFX transport interface implementation.
 
         Raises:
             errors.FfxCommandError: Failed to instantiate.
         """
-        ffx_obj: ffx_transport.FFX = ffx_transport.FFX(
+        ffx_obj: ffx_transport_interface.FFX = ffx_transport.FFX(
             target_name=self.device_name,
             config=self._ffx_config,
             target_ip_port=self._ip_address_port,
@@ -184,10 +194,26 @@ class BaseFuchsiaDevice(
         return ffx_obj
 
     @properties.Transport
-    def ssh(self) -> ssh_transport.SSH:
-        """Returns the SSH transport object.
+    def fuchsia_controller(
+        self,
+    ) -> fuchsia_controller_transport_interface.FuchsiaController:
+        """Returns the Fuchsia-Controller transport object.
+
         Returns:
-            SSH object.
+            Fuchsia-Controller transport interface implementation.
+
+        Raises:
+            errors.FuchsiaControllerError: Failed to instantiate.
+        """
+        raise NotImplementedError
+
+    @properties.Transport
+    def ssh(self) -> ssh_transport_interface.SSH:
+        """Returns the SSH transport object.
+
+        Returns:
+            SSH transport interface implementation.
+
         Raises:
             errors.SSHCommandError: Failed to instantiate.
         """
@@ -196,7 +222,7 @@ class BaseFuchsiaDevice(
                 "ssh_private_key argument need to be passed during device "
                 "init in-order to SSH into the device"
             )
-        ssh_obj: ssh_transport.SSH = ssh_transport.SSH(
+        ssh_obj: ssh_transport_interface.SSH = ssh_transport.SSH(
             device_name=self.device_name,
             ip_port=self._ip_address_port,
             username=self._ssh_user,
@@ -204,6 +230,18 @@ class BaseFuchsiaDevice(
             ffx_transport=self.ffx,
         )
         return ssh_obj
+
+    @properties.Transport
+    def sl4f(self) -> sl4f_transport_interface.SL4F:
+        """Returns the SL4F transport object.
+
+        Returns:
+            SL4F transport interface implementation.
+
+        Raises:
+            errors.Sl4fError: Failed to instantiate.
+        """
+        raise NotImplementedError
 
     # List all the affordances
     @properties.Affordance
@@ -379,7 +417,7 @@ class BaseFuchsiaDevice(
         return snapshot_file_path
 
     def wait_for_offline(
-        self, timeout: float = fuchsia_device.TIMEOUTS["OFFLINE"]
+        self, timeout: float = fuchsia_device_interface.TIMEOUTS["OFFLINE"]
     ) -> None:
         """Wait for Fuchsia device to go offline.
 
@@ -399,7 +437,7 @@ class BaseFuchsiaDevice(
             ) from err
 
     def wait_for_online(
-        self, timeout: float = fuchsia_device.TIMEOUTS["ONLINE"]
+        self, timeout: float = fuchsia_device_interface.TIMEOUTS["ONLINE"]
     ) -> None:
         """Wait for Fuchsia device to go online.
 

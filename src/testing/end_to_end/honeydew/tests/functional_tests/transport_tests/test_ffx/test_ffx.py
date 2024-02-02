@@ -10,10 +10,7 @@ from fuchsia_base_test import fuchsia_base_test
 from mobly import asserts, test_runner
 
 from honeydew import custom_types
-from honeydew.interfaces.device_classes import (
-    fuchsia_device,
-    transports_capable,
-)
+from honeydew.interfaces.device_classes import fuchsia_device
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
@@ -32,17 +29,14 @@ class FFXTransportTests(fuchsia_base_test.FuchsiaBaseTest):
 
     def test_check_connection(self) -> None:
         """Test case for FFX.check_connection()."""
-        assert isinstance(self.device, transports_capable.FFXCapableDevice)
         self.device.ffx.check_connection()
 
     def test_get_target_information(self) -> None:
         """Test case for FFX.get_target_information()."""
-        assert isinstance(self.device, transports_capable.FFXCapableDevice)
         self.device.ffx.get_target_information()
 
     def test_get_target_list(self) -> None:
         """Test case for FFX.get_target_list()."""
-        assert isinstance(self.device, transports_capable.FFXCapableDevice)
         asserts.assert_true(
             len(self.device.ffx.get_target_list()) >= 1,
             msg=f"{self.device.device_name} is not connected",
@@ -50,14 +44,12 @@ class FFXTransportTests(fuchsia_base_test.FuchsiaBaseTest):
 
     def test_get_target_name(self) -> None:
         """Test case for FFX.get_target_name()."""
-        assert isinstance(self.device, transports_capable.FFXCapableDevice)
         asserts.assert_equal(
             self.device.ffx.get_target_name(), self.device.device_name
         )
 
     def test_get_target_ssh_address(self) -> None:
         """Test case for FFX.get_target_ssh_address()."""
-        assert isinstance(self.device, transports_capable.FFXCapableDevice)
         asserts.assert_is_instance(
             self.device.ffx.get_target_ssh_address(),
             custom_types.TargetSshAddress,
@@ -65,7 +57,6 @@ class FFXTransportTests(fuchsia_base_test.FuchsiaBaseTest):
 
     def test_get_target_type(self) -> None:
         """Test case for FFX.get_target_type()."""
-        assert isinstance(self.device, transports_capable.FFXCapableDevice)
         target_type: str = self.device.ffx.get_target_type()
         # Note - If "target_type" is specified in "expected_values" in
         # params.yml then compare with it.
@@ -81,7 +72,6 @@ class FFXTransportTests(fuchsia_base_test.FuchsiaBaseTest):
 
     def test_ffx_run(self) -> None:
         """Test case for FFX.run()."""
-        assert isinstance(self.device, transports_capable.FFXCapableDevice)
         cmd: list[str] = ["target", "ssh", "ls"]
         self.device.ffx.run(cmd)
 
@@ -91,18 +81,15 @@ class FFXTransportTests(fuchsia_base_test.FuchsiaBaseTest):
         This test requires the test to have `test_data_deps=["//src/developer/ffx/tools/power:ffx_power_test_data"]`
         to ensure the subtool exists.
         """
-        assert isinstance(self.device, transports_capable.FFXCapableDevice)
         cmd: list[str] = ["power", "help"]
         self.device.ffx.run(cmd)
 
     def test_wait_for_rcs_connection(self) -> None:
         """Test case for FFX.wait_for_rcs_connection()."""
-        assert isinstance(self.device, transports_capable.FFXCapableDevice)
         self.device.ffx.wait_for_rcs_connection()
 
     def test_ffx_run_test_component(self) -> None:
         """Test case for FFX.run_test_component()."""
-        assert isinstance(self.device, transports_capable.FFXCapableDevice)
         output: str = self.device.ffx.run_test_component(
             "fuchsia-pkg://fuchsia.com/hello-world-rust-tests#meta/hello-world-rust-tests.cm",
         )

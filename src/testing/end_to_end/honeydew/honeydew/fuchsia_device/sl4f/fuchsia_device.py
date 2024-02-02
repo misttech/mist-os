@@ -35,7 +35,7 @@ from honeydew.interfaces.affordances.wlan import wlan as wlan_interface
 from honeydew.interfaces.affordances.wlan import (
     wlan_policy as wlan_policy_interface,
 )
-from honeydew.interfaces.device_classes import transports_capable
+from honeydew.interfaces.transports import sl4f as sl4f_transport_interface
 from honeydew.transports import sl4f as sl4f_transport
 from honeydew.utils import common, properties
 
@@ -57,10 +57,7 @@ _TIMEOUTS: dict[str, float] = {
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
 
-class FuchsiaDevice(
-    base_fuchsia_device.BaseFuchsiaDevice,
-    transports_capable.SL4FCapableDevice,
-):
+class FuchsiaDevice(base_fuchsia_device.BaseFuchsiaDevice):
     """FuchsiaDevice abstract base class implementation using SL4F.
 
     Args:
@@ -92,16 +89,16 @@ class FuchsiaDevice(
 
     # List all the transports
     @properties.Transport
-    def sl4f(self) -> sl4f_transport.SL4F:
+    def sl4f(self) -> sl4f_transport_interface.SL4F:
         """Returns the SL4F transport object.
 
         Returns:
-            SL4F object.
+            SL4F transport interface implementation.
 
         Raises:
             errors.Sl4fError: Failed to instantiate.
         """
-        sl4f_obj: sl4f_transport.SL4F = sl4f_transport.SL4F(
+        sl4f_obj: sl4f_transport_interface.SL4F = sl4f_transport.SL4F(
             device_name=self.device_name,
             device_ip=self._ip_address,
             ffx_transport=self.ffx,

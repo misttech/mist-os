@@ -12,7 +12,8 @@ from typing import Any
 
 from honeydew import errors
 from honeydew.interfaces.device_classes import affordances_capable
-from honeydew.transports import ffx
+from honeydew.interfaces.transports import fastboot as fastboot_interface
+from honeydew.interfaces.transports import ffx as ffx_interface
 from honeydew.utils import common, properties
 
 _FASTBOOT_CMDS: dict[str, list[str]] = {
@@ -24,9 +25,6 @@ _FFX_CMDS: dict[str, list[str]] = {
 }
 
 _TIMEOUTS: dict[str, float] = {
-    "FASTBOOT_CLI": 30,
-    "FASTBOOT_MODE": 45,
-    "FUCHSIA_MODE": 45,
     "TCP_ADDRESS": 30,
 }
 
@@ -35,13 +33,13 @@ _NO_SERIAL = "<unknown>"
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
 
-class Fastboot:
+class Fastboot(fastboot_interface.Fastboot):
     """Provides methods for Host-(Fuchsia)Target interactions via Fastboot.
 
     Args:
         device_name: Fuchsia device name.
         reboot_affordance: Object to RebootCapableDevice implementation.
-        ffx_transport: ffx.FFX object.
+        ffx_transport: Object to FFX transport interface implementation.
         device_ip: Fuchsia device IP Address.
         fastboot_node_id: Fastboot Node ID.
 
@@ -53,7 +51,7 @@ class Fastboot:
         self,
         device_name: str,
         reboot_affordance: affordances_capable.RebootCapableDevice,
-        ffx_transport: ffx.FFX,
+        ffx_transport: ffx_interface.FFX,
         device_ip: ipaddress.IPv4Address | ipaddress.IPv6Address | None = None,
         fastboot_node_id: str | None = None,
     ) -> None:
@@ -64,7 +62,7 @@ class Fastboot:
         self._reboot_affordance: affordances_capable.RebootCapableDevice = (
             reboot_affordance
         )
-        self._ffx_transport: ffx.FFX = ffx_transport
+        self._ffx_transport: ffx_interface.FFX = ffx_transport
         self._get_fastboot_node(fastboot_node_id)
 
     # List all the public properties
@@ -161,7 +159,7 @@ class Fastboot:
     def run(
         self,
         cmd: list[str],
-        timeout: float = _TIMEOUTS["FASTBOOT_CLI"],
+        timeout: float = fastboot_interface.TIMEOUTS["FASTBOOT_CLI"],
         exceptions_to_skip: Iterable[type[Exception]] | None = None,
     ) -> list[str]:
         """Executes and returns the output of `fastboot -s {node} {cmd}`.
@@ -226,7 +224,7 @@ class Fastboot:
     # pylint: enable=missing-raises-doc
 
     def wait_for_fastboot_mode(
-        self, timeout: float = _TIMEOUTS["FASTBOOT_MODE"]
+        self, timeout: float = fastboot_interface.TIMEOUTS["FASTBOOT_MODE"]
     ) -> None:
         """Wait for Fuchsia device to go to fastboot mode.
 
@@ -252,7 +250,7 @@ class Fastboot:
             ) from err
 
     def wait_for_fuchsia_mode(
-        self, timeout: float = _TIMEOUTS["FUCHSIA_MODE"]
+        self, timeout: float = fastboot_interface.TIMEOUTS["FUCHSIA_MODE"]
     ) -> None:
         """Wait for Fuchsia device to go to fuchsia mode.
 

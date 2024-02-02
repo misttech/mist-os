@@ -18,7 +18,6 @@ from honeydew.fuchsia_device.sl4f import fuchsia_device
 from honeydew.interfaces.device_classes import (
     fuchsia_device as fuchsia_device_interface,
 )
-from honeydew.interfaces.device_classes import transports_capable
 
 _INPUT_ARGS: dict[str, Any] = {
     "device_name": "fuchsia-emulator",
@@ -102,11 +101,6 @@ class FuchsiaDeviceSL4FTests(unittest.TestCase):
         self.assertIsInstance(
             self.fd_obj, fuchsia_device_interface.FuchsiaDevice
         )
-
-    # List all the tests related to transports
-    def test_fuchsia_device_is_sl4f_capable(self) -> None:
-        """Test case to make sure fuchsia device is sl4f capable"""
-        self.assertIsInstance(self.fd_obj, transports_capable.SL4FCapableDevice)
 
     # List all the tests related to public methods
     def test_close(self) -> None:

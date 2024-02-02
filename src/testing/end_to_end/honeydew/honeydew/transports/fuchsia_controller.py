@@ -10,28 +10,27 @@ import logging
 import fuchsia_controller_py as fuchsia_controller
 
 from honeydew import custom_types, errors
-from honeydew.transports import ffx
+from honeydew.interfaces.transports import ffx as ffx_interface
+from honeydew.interfaces.transports import (
+    fuchsia_controller as fuchsia_controller_interface,
+)
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
-_TIMEOUTS: dict[str, float] = {
-    "TARGET_WAIT": 15,
-}
 
-
-class FuchsiaController:
+class FuchsiaController(fuchsia_controller_interface.FuchsiaController):
     """Provides Host-(Fuchsia)Target interactions via Fuchsia-Controller.
 
     Args:
         device_name: Fuchsia device name.
-        ffx_transport: ffx.FFX object.
+        ffx_transport: Object to FFX transport interface implementation.
         device_ip: Fuchsia device IP Address.
     """
 
     def __init__(
         self,
         device_name: str,
-        ffx_transport: ffx.FFX,
+        ffx_transport: ffx_interface.FFX,
         device_ip: ipaddress.IPv4Address | ipaddress.IPv6Address | None = None,
     ) -> None:
         self._name: str = device_name
@@ -45,7 +44,7 @@ class FuchsiaController:
         else:
             self._target = self._name
 
-        self._ffx_transport: ffx.FFX = ffx_transport
+        self._ffx_transport: ffx_interface.FFX = ffx_transport
 
         self.ctx: fuchsia_controller.Context
         self.create_context()
@@ -100,7 +99,8 @@ class FuchsiaController:
         self.check_connection()
 
     def check_connection(
-        self, timeout: float = _TIMEOUTS["TARGET_WAIT"]
+        self,
+        timeout: float = fuchsia_controller_interface.TIMEOUTS["TARGET_WAIT"],
     ) -> None:
         """Checks the Fuchsia-Controller connection from host to Fuchsia device.
 

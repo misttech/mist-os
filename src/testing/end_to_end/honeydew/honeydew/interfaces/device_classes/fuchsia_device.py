@@ -18,6 +18,13 @@ from honeydew.interfaces.affordances.wlan import wlan, wlan_policy
 from honeydew.interfaces.auxiliary_devices import (
     power_switch as power_switch_interface,
 )
+from honeydew.interfaces.transports import fastboot as fastboot_transport
+from honeydew.interfaces.transports import ffx as ffx_transport
+from honeydew.interfaces.transports import (
+    fuchsia_controller as fuchsia_controller_transport,
+)
+from honeydew.interfaces.transports import sl4f as sl4f_transport
+from honeydew.interfaces.transports import ssh as ssh_transport
 from honeydew.utils import properties
 
 TIMEOUTS: dict[str, float] = {
@@ -96,6 +103,69 @@ class FuchsiaDevice(abc.ABC):
 
         Returns:
             Firmware version of the device.
+        """
+
+    # List all the transports
+    @properties.Transport
+    @abc.abstractmethod
+    def fastboot(self) -> fastboot_transport.Fastboot:
+        """Returns the Fastboot transport object.
+
+        Returns:
+            Fastboot object.
+
+        Raises:
+            errors.FuchsiaDeviceError: Failed to instantiate.
+        """
+
+    @properties.Transport
+    @abc.abstractmethod
+    def ffx(self) -> ffx_transport.FFX:
+        """Returns the FFX transport object.
+
+        Returns:
+            FFX object.
+
+        Raises:
+            errors.FfxCommandError: Failed to instantiate.
+        """
+
+    @properties.Transport
+    @abc.abstractmethod
+    def ssh(self) -> ssh_transport.SSH:
+        """Returns the SSH transport object.
+
+        Returns:
+            SSH object.
+
+        Raises:
+            errors.SSHCommandError: Failed to instantiate.
+        """
+
+    @properties.Transport
+    @abc.abstractmethod
+    def fuchsia_controller(
+        self,
+    ) -> fuchsia_controller_transport.FuchsiaController:
+        """Returns the Fuchsia-Controller transport object.
+
+        Returns:
+            Fuchsia-Controller transport object.
+
+        Raises:
+            errors.FuchsiaControllerError: Failed to instantiate.
+        """
+
+    @properties.Transport
+    @abc.abstractmethod
+    def sl4f(self) -> sl4f_transport.SL4F:
+        """Returns the SL4F transport object.
+
+        Returns:
+            SL4F object.
+
+        Raises:
+            errors.Sl4fError: Failed to instantiate.
         """
 
     # List all the affordances
@@ -199,7 +269,7 @@ class FuchsiaDevice(abc.ABC):
     def power_cycle(
         self,
         power_switch: power_switch_interface.PowerSwitch,
-        outlet: int | None = None,
+        outlet: int | None,
     ) -> None:
         """Power cycle (power off, wait for delay, power on) the device.
 
@@ -218,7 +288,7 @@ class FuchsiaDevice(abc.ABC):
         """Register a function that will be called in on_device_boot."""
 
     @abc.abstractmethod
-    def snapshot(self, directory: str, snapshot_file: str | None = None) -> str:
+    def snapshot(self, directory: str, snapshot_file: str | None) -> str:
         """Captures the snapshot of the device.
 
         Args:
