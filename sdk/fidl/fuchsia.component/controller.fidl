@@ -10,7 +10,7 @@ using fuchsia.process;
 @available(added=14)
 const MAX_NAMESPACE_COUNT uint32 = 32;
 
-@available(added=14)
+@available(added=14, replaced=18)
 closed protocol Controller {
     /// Start the component, optionally providing additional handles to be given
     /// to the component. Returns INSTANCE_ALREADY_RUNNING if the instance is
@@ -24,10 +24,25 @@ closed protocol Controller {
     strict IsStarted() -> (resource struct {
         is_started bool;
     }) error Error;
+};
+@available(added=18)
+open protocol Controller {
+    /// Start the component, optionally providing additional handles to be given
+    /// to the component. Returns INSTANCE_ALREADY_RUNNING if the instance is
+    /// currently running.
+    flexible Start(resource struct {
+        args StartChildArgs;
+        execution_controller server_end:ExecutionController;
+    }) -> () error Error;
+
+    /// Returns true if this instance is currently running.
+    flexible IsStarted() -> (resource struct {
+        is_started bool;
+    }) error Error;
 
     /// Returns the dictionary containing the component's exposed capabilities.
     @available(added=HEAD)
-    strict GetExposedDictionary(resource struct {
+    flexible GetExposedDictionary(resource struct {
         dictionary server_end:fuchsia.component.sandbox.Dictionary;
     }) -> () error Error;
 };
@@ -56,7 +71,7 @@ type StartChildArgs = resource table {
     3: dictionary client_end:fuchsia.component.sandbox.Dictionary;
 };
 
-@available(added=14)
+@available(added=14, replaced=18)
 closed protocol ExecutionController {
     /// Initiates a stop action on this component. Once complete, OnStop will be
     /// called with the stopped payload.
@@ -69,6 +84,22 @@ closed protocol ExecutionController {
     /// on its own, or for any other reason, `OnStop` is called and then this
     /// channel is closed.
     strict -> OnStop(struct {
+        stopped_payload StoppedPayload;
+    });
+};
+@available(added=18)
+open protocol ExecutionController {
+    /// Initiates a stop action on this component. Once complete, OnStop will be
+    /// called with the stopped payload.
+    ///
+    /// Note that a component may stop running on its own at any time, so it is
+    /// possible for `OnStop` to be received before `Stop` is called.
+    flexible Stop();
+
+    /// When the child is stopped due to `Stop` being called, the child exiting
+    /// on its own, or for any other reason, `OnStop` is called and then this
+    /// channel is closed.
+    flexible -> OnStop(struct {
         stopped_payload StoppedPayload;
     });
 };

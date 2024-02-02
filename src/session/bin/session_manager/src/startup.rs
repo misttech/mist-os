@@ -281,6 +281,9 @@ mod tests {
                             fcomponent::ControllerRequest::GetExposedDictionary { .. } => {
                                 unimplemented!()
                             }
+                            fcomponent::ControllerRequest::_UnknownMethod { .. } => {
+                                unimplemented!()
+                            }
                         }
                     });
 
@@ -327,6 +330,9 @@ mod tests {
                             }
                             fcomponent::ControllerRequest::IsStarted { .. } => unimplemented!(),
                             fcomponent::ControllerRequest::GetExposedDictionary { .. } => {
+                                unimplemented!()
+                            }
+                            fcomponent::ControllerRequest::_UnknownMethod { .. } => {
                                 unimplemented!()
                             }
                         }

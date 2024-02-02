@@ -526,6 +526,9 @@ async fn run_puppet(url: String) {
         Some(Ok(ExecutionControllerEvent::OnStop {
             stopped_payload: StoppedPayload { status, .. },
         })) => assert_eq!(status, Some(0), "provider should have exited cleanly"),
+        Some(Ok(ExecutionControllerEvent::_UnknownEvent { .. })) => {
+            panic!("unknown event")
+        }
         Some(Err(e)) => panic!("encountered error {e} while waiting for component to stop"),
         None => panic!("execution controller should not be closed before returning OnStop"),
     }

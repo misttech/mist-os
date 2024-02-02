@@ -1855,12 +1855,23 @@ impl ExecutionController {
 
     /// Waits for the current execution of the component to stop.
     pub async fn wait_for_stop(mut self) -> Result<fcomponent::StoppedPayload, anyhow::Error> {
-        match self.execution_event_stream.try_next().await {
-            Ok(Some(fcomponent::ExecutionControllerEvent::OnStop { stopped_payload })) => {
-                Ok(stopped_payload)
+        loop {
+            match self.execution_event_stream.try_next().await {
+                Ok(Some(fcomponent::ExecutionControllerEvent::OnStop { stopped_payload })) => {
+                    return Ok(stopped_payload);
+                }
+                Ok(Some(fcomponent::ExecutionControllerEvent::_UnknownEvent {
+                    ordinal, ..
+                })) => {
+                    warn!(%ordinal, "fuchsia.component/ExecutionController delivered unknown event");
+                }
+                Ok(None) => {
+                    return Err(format_err!("ExecutionController closed and no OnStop received"));
+                }
+                Err(e) => {
+                    return Err(format_err!("failed to wait for OnStop: {:?}", e));
+                }
             }
-            Ok(None) => Err(format_err!("ExecutionController closed and no OnStop received")),
-            Err(e) => Err(format_err!("failed to wait for OnStop: {:?}", e)),
         }
     }
 }

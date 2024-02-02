@@ -125,6 +125,9 @@ pub async fn serve_controller(
                 .await;
                 responder.send(res)?;
             }
+            fcomponent::ControllerRequest::_UnknownMethod { ordinal, .. } => {
+                warn!(%ordinal, "fuchsia.component/Controller received unknown method");
+            }
         }
     }
     Ok(())
@@ -144,6 +147,9 @@ async fn execution_controller_task(
                 let component = component.unwrap();
                 let mut action_set = component.lock_actions().await;
                 let _ = action_set.register_no_wait(&component, StopAction::new(false));
+            }
+            fcomponent::ExecutionControllerRequest::_UnknownMethod { ordinal, .. } => {
+                warn!(%ordinal, "fuchsia.component/ExecutionController received unknown method");
             }
         }
     }

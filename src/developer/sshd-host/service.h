@@ -8,6 +8,7 @@
 #include <fidl/fuchsia.boot/cpp/fidl.h>
 #include <fidl/fuchsia.component/cpp/fidl.h>
 #include <lib/async/dispatcher.h>
+#include <lib/syslog/cpp/macros.h>
 #include <lib/zx/process.h>
 #include <sys/socket.h>
 
@@ -19,6 +20,8 @@
 
 #include <fbl/unique_fd.h>
 
+#include "fidl/fuchsia.component/cpp/markers.h"
+#include "lib/fidl/cpp/wire/unknown_interaction_handler.h"
 #include "src/lib/fsl/tasks/fd_waiter.h"
 
 namespace sshd_host {
@@ -76,6 +79,11 @@ class Service {
     }
     void on_fidl_error(fidl::UnbindInfo error) override {
       service_->OnStop(error.ToError().status(), this);
+    }
+    void handle_unknown_event(
+        fidl::UnknownEventMetadata<fuchsia_component::ExecutionController> metadata) override {
+      FX_LOGS(WARNING) << "fuchsia.component/ExecutionController delivered unknown event "
+                       << metadata.event_ordinal;
     }
 
     fidl::Client<fuchsia_component::ExecutionController>& operator->() { return client_; }

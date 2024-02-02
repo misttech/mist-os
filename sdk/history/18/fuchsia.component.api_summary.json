@@ -49,7 +49,7 @@
     {
         "kind": "protocol/member",
         "name": "fuchsia.component/Controller.IsStarted",
-        "strictness": "strict",
+        "strictness": "flexible",
         "ordinal": "2402079833990398915",
         "direction": "two_way",
         "response": "fuchsia.component/Controller_IsStarted_Response",
@@ -58,7 +58,7 @@
     {
         "kind": "protocol/member",
         "name": "fuchsia.component/Controller.Start",
-        "strictness": "strict",
+        "strictness": "flexible",
         "ordinal": "7532130149195770565",
         "direction": "two_way",
         "request": "fuchsia.component/ControllerStartRequest",
@@ -68,7 +68,7 @@
     {
         "kind": "protocol",
         "name": "fuchsia.component/Controller",
-        "openness": "closed",
+        "openness": "open",
         "transport": "channel"
     },
     {
@@ -437,7 +437,7 @@
     {
         "kind": "protocol/member",
         "name": "fuchsia.component/ExecutionController.OnStop",
-        "strictness": "strict",
+        "strictness": "flexible",
         "ordinal": "7121600095714604415",
         "direction": "event",
         "request": "fuchsia.component/ExecutionControllerOnStopRequest"
@@ -445,14 +445,14 @@
     {
         "kind": "protocol/member",
         "name": "fuchsia.component/ExecutionController.Stop",
-        "strictness": "strict",
+        "strictness": "flexible",
         "ordinal": "6256129817234858263",
         "direction": "one_way"
     },
     {
         "kind": "protocol",
         "name": "fuchsia.component/ExecutionController",
-        "openness": "closed",
+        "openness": "open",
         "transport": "channel"
     },
     {
