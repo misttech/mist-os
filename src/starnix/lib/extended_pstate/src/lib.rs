@@ -112,7 +112,8 @@ impl ExtendedPstateState {
 
     #[cfg(target_arch = "riscv64")]
     pub fn set_riscv64_fp(&mut self, fp_registers: &[u64; 32], fcsr: u32) {
-        self.state = riscv64::State { fp_registers: *fp_registers, fcsr }
+        self.state.fp_registers = *fp_registers;
+        self.state.fcsr = fcsr;
     }
 
     #[cfg(target_arch = "x86_64")]

@@ -19,6 +19,9 @@
 
                 // TODO(b/307595538): Fail with netstack3.
                 "SndRcvBufSockOpt/SndRcvBufSockOpt.DoubledOnGet/*",
+
+                // TODO(b/302340440): Save V registers in `sigcontext`.
+                "ExtendedPstate.Signals",
             ],
         },
         {

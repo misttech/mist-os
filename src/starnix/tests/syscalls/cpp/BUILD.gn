@@ -92,6 +92,14 @@ resource("simple_ext4_image") {
   outputs = [ "data/{{source_file_part}}" ]
 }
 
+config("march") {
+  if (current_cpu == "riscv64") {
+    # Keep `march` consistent with the value used by Android, see
+    # https://cs.android.com/android/platform/superproject/+/master:build/soong/cc/config/riscv64_device.go;drc=726b001ae1a3388f65b571350bef4d373a3768c8;l=36
+    cflags = [ "-march=rv64gcv_zba_zbb_zbs" ]
+  }
+}
+
 test("syscalls_cpp_test_bin") {
   # TODO(https://fxbug.dev/297293167) enable ASan instrumentation for Linux binaries in Starnix
   exclude_toolchain_tags = [ "asan" ]
@@ -174,6 +182,10 @@ test("syscalls_cpp_test_bin") {
 
   # TODO(https://fxbug.dev/42085293): delete the below and fix compiler warnings
   configs += [ "//build/config:Wno-vla-cxx-extension" ]
+
+  # TODO(b/307959737): Compile syscall test with the bionic toolchain and then move this
+  # to the bionic toolchain.
+  configs += [ ":march" ]
 }
 
 test("crash") {

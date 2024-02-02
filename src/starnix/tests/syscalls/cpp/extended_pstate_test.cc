@@ -19,26 +19,41 @@
 namespace {
 
 struct RegistersValue {
-  uint64_t x[2];
+  // The tests below set and then check 32 bytes in FP or SIMD registers. Which registers are
+  // being used is architecture-specific.
+  uint64_t x[4];
 
   bool operator==(const RegistersValue& other) const {
-    return x[0] == other.x[0] && x[1] == other.x[1];
+    return x[0] == other.x[0] && x[1] == other.x[1] && x[2] == other.x[2] && x[3] == other.x[3];
   }
 };
 
 // Stores a 128-bit value in SIMD registers used for the test.
 void SetTestRegisters(const RegistersValue* value) {
 #if defined(__x86_64__)
-  asm volatile("movups (%0), %%xmm0\n" : : "r"(value));
+  asm volatile(
+      "movups  0(%0), %%xmm0\n"
+      "movups 16(%0), %%xmm1\n"
+      :
+      : "r"(value));
 #elif defined(__aarch64__)
-  asm volatile("ldr q0, [%0]\n" : : "r"(value));
+  asm volatile(
+      "ldr q0, [%0, #0]\n"
+      "ldr q1, [%0, #16]\n"
+      :
+      : "r"(value));
 #elif defined(__riscv)
-  // V and Q extensions are not enabled on RISC-V yet. For now this tests uses two D registers.
+  // Save two D registers and one V register.
   asm volatile(
       "fld f0, 0(%0)\n"
       "fld f1, 8(%0)\n"
+      "li      a1, 16\n"
+      "vsetvli zero, a1, e8, m8, ta, ma\n"
+      "addi    %0, %0, 16\n"
+      "vle8.v  v0, (%0)\n"
       :
-      : "r"(value));
+      : "r"(value)
+      : "a1");
 #else
 #error Add support for this architecture
 #endif
@@ -49,15 +64,28 @@ RegistersValue GetTestRegisters() {
   RegistersValue value;
 
 #if defined(__x86_64__)
-  asm volatile("movups %%xmm0, %0\n" : : "m"(value));
+  asm volatile(
+      "movups %%xmm0,  0(%0)\n"
+      "movups %%xmm1, 16(%0)\n"
+      :
+      : "r"(&value));
 #elif defined(__aarch64__)
-  asm volatile("str q0, %0\n" : : "m"(value));
+  asm volatile(
+      "str q0, [%0, #0]\n"
+      "str q1, [%0, #16]\n"
+      :
+      : "r"(&value));
 #elif defined(__riscv)
   asm volatile(
-      "fsd f0, 0 + %0\n"
-      "fsd f1, 8 + %0\n"
+      "fsd     f0, 0(%0)\n"
+      "fsd     f1, 8(%0)\n"
+      "li      a1, 16\n"
+      "vsetvli zero, a1, e8, m8, ta, ma\n"
+      "addi    %0, %0, 16\n"
+      "vse8.v  v0, 0(%0)\n"
       :
-      : "m"(value));
+      : "r"(&value)
+      : "a1");
 #else
 #error Add support for this architecture
 #endif
@@ -112,7 +140,8 @@ TEST(ExtendedPstate, InitialState) {
   test_helper::ForkHelper helper;
   helper.RunInForkedProcess([&child_path] {
     // Set some registers. execve() should reset them to 0.
-    const auto kTestData = RegistersValue{{0x0102030405060708, 0x090a0b0c0d0e0f10}};
+    const auto kTestData = RegistersValue{
+        {0x0102030405060708, 0x090a0b0c0d0e0f10, 0x1112131415161718, 0x191a1b1c1d1e1f20}};
     SetTestRegisters(&kTestData);
 
     char* argv[] = {nullptr};
@@ -124,7 +153,8 @@ TEST(ExtendedPstate, InitialState) {
 
 // Verify that FP/SIMD registers are preserved by syscalls.
 TEST(ExtendedPstate, Syscall) {
-  const auto kTestRegisters = RegistersValue{{0x0102030405060708, 0x090a0b0c0d0e0f10}};
+  const auto kTestRegisters = RegistersValue{
+      {0x0102030405060708, 0x090a0b0c0d0e0f10, 0x1112131415161718, 0x191a1b1c1d1e1f20}};
 
   SetTestRegisters(&kTestRegisters);
 
@@ -186,7 +216,8 @@ TEST(ExtendedPstate, Signals) {
           GetTestRegistersFromUcontext(reinterpret_cast<ucontext_t*>(ucontext));
 
       // Set registers to a value different from what it was outside of the signal handler.
-      const auto kNestedRegs = RegistersValue{{0x090a0b0c0d0e0f10, 0x0102030405060708}};
+      const auto kNestedRegs = RegistersValue{
+          {0x191a1b1c1d1e1f20, 0x1112131415161718, 0x090a0b0c0d0e0f10, 0x0102030405060708}};
       SetTestRegisters(&kNestedRegs);
 
       // Raise another signal.
@@ -204,7 +235,8 @@ TEST(ExtendedPstate, Signals) {
     sigserv_action.sa_flags = SA_SIGINFO;
     SAFE_SYSCALL(sigaction(SIGSEGV, &sigserv_action, nullptr));
 
-    const auto kTestRegsValue = RegistersValue{{0x0102030405060708, 0x090a0b0c0d0e0f10}};
+    const auto kTestRegsValue = RegistersValue{
+        {0x0102030405060708, 0x090a0b0c0d0e0f10, 0x1112131415161718, 0x191a1b1c1d1e1f20}};
     SetTestRegisters(&kTestRegsValue);
 
     // Issue a store that will generate fault which will be fixed in SIGSEGV handler.
