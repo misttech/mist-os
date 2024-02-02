@@ -36,7 +36,11 @@ impl EnvironmentKind {
 
     /// Whether this is an isolated context.
     pub fn is_isolated(&self) -> bool {
-        matches!(self, EnvironmentKind::Isolated { .. })
+        matches!(
+            self,
+            EnvironmentKind::Isolated { .. }
+                | EnvironmentKind::ConfigDomain { isolate_root: Some(_), .. }
+        )
     }
 }
 
