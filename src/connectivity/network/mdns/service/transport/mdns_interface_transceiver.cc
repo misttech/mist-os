@@ -58,8 +58,8 @@ bool MdnsInterfaceTransceiver::Start(InboundMessageCallback callback) {
   FX_DCHECK(callback);
   FX_DCHECK(!socket_fd_.is_valid()) << "Start called when already started.";
 
-  std::cout << "Starting mDNS on interface " << name_ << " using port " << MdnsAddresses::port()
-            << "\n";
+  FX_LOGS(INFO) << "Starting mDNS on interface " << name_ << " using port "
+                << MdnsAddresses::port();
 
   socket_fd_ = fbl::unique_fd(socket(address_.family(), SOCK_DGRAM, 0));
 
