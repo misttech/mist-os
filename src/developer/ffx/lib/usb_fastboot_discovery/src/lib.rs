@@ -97,7 +97,6 @@ fn is_fastboot_match(info: &InterfaceInfo) -> bool {
     let mut results = vec![];
 
     results.push(valid_dev_vendor(info));
-    results.push(valid_dev_product(info));
     results.push(valid_ifc_class(info));
     results.push(valid_ifc_subclass(info));
     results.push(valid_ifc_protocol(info));
@@ -109,9 +108,16 @@ fn is_fastboot_match(info: &InterfaceInfo) -> bool {
             "Interface is not valid fastboot match. Encountered errors: \n\t{}",
             errs.clone().into_iter().map(|e| e.to_string()).collect::<Vec<_>>().join("\n\t")
         );
+        false
+    } else {
+        if let Err(e) = valid_dev_product(info) {
+            tracing::debug!(
+                "Interface is a valid Fastboot match, but may not be a Fuchsia Product: {}",
+                e
+            );
+        }
+        true
     }
-
-    errs.is_empty()
 }
 
 fn enumerate_interfaces<F>(mut cb: F)
