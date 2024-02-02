@@ -247,8 +247,9 @@ type IcmpBoundSockets<I, D> = datagram::BoundSockets<I, D, IcmpAddrSpec, (Icmp, 
 impl<I: IpExt, D: WeakId> PortAllocImpl for IcmpBoundSockets<I, D> {
     const EPHEMERAL_RANGE: core::ops::RangeInclusive<u16> = 1..=u16::MAX;
     type Id = DatagramFlowId<I::Addr, ()>;
+    type PortAvailableArg = ();
 
-    fn is_port_available(&self, id: &Self::Id, port: u16) -> bool {
+    fn is_port_available(&self, id: &Self::Id, port: u16, (): &()) -> bool {
         // We can safely unwrap here, because the ports received in
         // `is_port_available` are guaranteed to be in `EPHEMERAL_RANGE`.
         let port = NonZeroU16::new(port).unwrap();

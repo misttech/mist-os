@@ -1403,11 +1403,23 @@ impl<I: DualStackIpExt, D: device::WeakId, BT: TcpBindingsTypes> PortAllocImpl
 {
     const EPHEMERAL_RANGE: RangeInclusive<u16> = 49152..=65535;
     type Id = Option<SocketIpAddr<I::Addr>>;
+    /// The TCP port allocator takes an extra optional argument with a port to
+    /// avoid.
+    ///
+    /// This is used to sidestep possible self-connections when allocating a
+    /// local port on a connect call with an unset local port.
+    type PortAvailableArg = Option<NonZeroU16>;
 
-    fn is_port_available(&self, addr: &Self::Id, port: u16) -> bool {
+    fn is_port_available(&self, addr: &Self::Id, port: u16, arg: &Option<NonZeroU16>) -> bool {
         // We can safely unwrap here, because the ports received in
         // `is_port_available` are guaranteed to be in `EPHEMERAL_RANGE`.
         let port = NonZeroU16::new(port).unwrap();
+
+        // Reject ports matching the argument.
+        if arg.is_some_and(|a| a == port) {
+            return false;
+        }
+
         let root_addr = AddrVec::from(ListenerAddr {
             ip: ListenerIpAddr { addr: *addr, identifier: port },
             device: None,
@@ -3810,7 +3822,16 @@ where
         let DemuxState { port_alloc, socketmap } = demux;
 
         let local_port = local_port.map_or_else(
-            || match port_alloc.try_alloc(&Some(*ip_sock.local_ip()), socketmap) {
+            // NB: Pass the remote port into the allocator to avoid unexpected
+            // self-connections when allocating a local port. This could be
+            // optimized by checking if the IP socket has resolved to local
+            // delivery, but excluding a single port should be enough here and
+            // avoids adding more dependencies.
+            || match port_alloc.try_alloc_with(
+                &Some(*ip_sock.local_ip()),
+                socketmap,
+                &Some(remote_port),
+            ) {
                 Some(port) => Ok(NonZeroU16::new(port).expect("ephemeral ports must be non-zero")),
                 None => Err(ConnectError::NoPort),
             },
@@ -5187,6 +5208,15 @@ mod tests {
             )
         });
         assert_eq!(result, expected_result.map_err(From::from));
+
+        // Now close the socket and try a connect call to ourselves on the
+        // available port. Self-connection protection should always prevent us
+        // from doing that even when the port is in the ephemeral range.
+        api.close(socket);
+        let socket = api.create(Default::default());
+        let result =
+            api.connect(&socket, Some(ZonedAddr::Unzoned(I::FAKE_CONFIG.local_ip)), available_port);
+        assert_eq!(result, Err(ConnectError::NoPort));
     }
 
     #[ip_test]

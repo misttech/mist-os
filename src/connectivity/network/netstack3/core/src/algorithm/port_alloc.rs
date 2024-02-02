@@ -92,7 +92,10 @@ pub(crate) trait PortAllocImpl {
     /// identify the flow information of a connection.
     type Id: Hash;
 
-    /// Returns the number of ephemeral ports avaiable in `EPHEMERAL_RANGE`.
+    /// An extra argument passed to `is_port_available`.
+    type PortAvailableArg;
+
+    /// Returns the number of ephemeral ports available in `EPHEMERAL_RANGE`.
     fn num_ephemeral() -> usize {
         usize::from(Self::EPHEMERAL_RANGE.end() - Self::EPHEMERAL_RANGE.start()) + 1
     }
@@ -113,7 +116,12 @@ pub(crate) trait PortAllocImpl {
     /// the `EPHEMERAL_RANGE`.
     ///
     /// [RFC 6056]: https://tools.ietf.org/html/rfc6056#section-2.2
-    fn is_port_available(&self, id: &Self::Id, port: PortNumber) -> bool;
+    fn is_port_available(
+        &self,
+        id: &Self::Id,
+        port: PortNumber,
+        arg: &Self::PortAvailableArg,
+    ) -> bool;
 }
 
 /// Provides a port allocation algorithm, following the guidelines in [RFC
@@ -206,7 +214,12 @@ impl<I: PortAllocImpl> PortAlloc<I> {
     /// (`state` provides the availability checks) or `None` otherwise.
     ///
     /// [RFC 6056]: https://tools.ietf.org/html/rfc6056
-    pub(crate) fn try_alloc(&mut self, id: &I::Id, state: &I) -> Option<PortNumber> {
+    pub(crate) fn try_alloc_with(
+        &mut self,
+        id: &I::Id,
+        state: &I,
+        arg: &I::PortAvailableArg,
+    ) -> Option<PortNumber> {
         let num_ephemeral = I::num_ephemeral();
         let offset = hmac_with_secret(id, &self.secret_a[..]);
         let table_index = hmac_with_secret(id, &self.secret_b[..]) % self.table.len();
@@ -217,11 +230,19 @@ impl<I: PortAllocImpl> PortAlloc<I> {
             // num_ephemeral operation above.
             let port = I::EPHEMERAL_RANGE.start() + (local_off as PortNumber);
             *table_val = table_val.wrapping_add(1);
-            if state.is_port_available(id, port) {
+            if state.is_port_available(id, port, arg) {
                 return Some(port);
             }
         }
         None
+    }
+
+    /// Like `try_alloc_with`, but uses the default value for `arg`.
+    pub(crate) fn try_alloc(&mut self, id: &I::Id, state: &I) -> Option<PortNumber>
+    where
+        I::PortAvailableArg: Default,
+    {
+        self.try_alloc_with(id, state, &Default::default())
     }
 
     /// Updates the internal secrets used in the Hash-Based port selection.
@@ -304,8 +325,9 @@ mod tests {
         const TABLE_SIZE: NonZeroUsize = const_unwrap_option(NonZeroUsize::new(2));
         const EPHEMERAL_RANGE: RangeInclusive<u16> = 100..=200;
         type Id = FakeId;
+        type PortAvailableArg = ();
 
-        fn is_port_available(&self, _id: &Self::Id, port: u16) -> bool {
+        fn is_port_available(&self, _id: &Self::Id, port: u16, (): &()) -> bool {
             match self.available {
                 FakeAvailable::AllowEvens => (port & 1) == 0,
                 FakeAvailable::DenyAll => false,
