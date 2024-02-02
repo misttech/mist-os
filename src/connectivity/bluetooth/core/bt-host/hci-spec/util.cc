@@ -6,8 +6,6 @@
 
 #include <endian.h>
 
-#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/assert.h"
-
 #pragma clang diagnostic ignored "-Wswitch-enum"
 
 namespace bt::hci_spec {
