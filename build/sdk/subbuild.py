@@ -18,9 +18,7 @@ from pathlib import Path
 from typing import Dict, List, Set, Tuple
 
 _ARGS_GN_TEMPLATE = r"""# Auto-generated - DO NOT EDIT
-import("//products/bringup.gni")
-import("//boards/{cpu}.gni")
-
+target_cpu = "{cpu}"
 build_info_board = "{cpu}"
 build_info_product = "bringup"
 is_debug = false
@@ -28,7 +26,7 @@ is_debug = false
 cxx_rbe_enable = {cxx_rbe_enable}
 rust_rbe_enable = {rust_rbe_enable}
 use_goma = {use_goma}
-universe_package_labels += [{sdk_labels_list}]
+universe_package_labels = [{sdk_labels_list}]
 """
 
 
@@ -306,6 +304,7 @@ def main():
             [
                 gn_path,
                 "--root=%s" % fuchsia_dir.resolve(),
+                "--root-pattern=//:developer_universe_packages",
                 "gen",
                 build_dir,
             ]
