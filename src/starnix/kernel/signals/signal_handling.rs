@@ -317,9 +317,6 @@ pub fn dispatch_signal_handler(
     siginfo: SignalInfo,
     action: sigaction_t,
 ) -> Result<(), Errno> {
-    let signal_stack_frame =
-        SignalStackFrame::new(task, registers, extended_pstate, signal_state, &siginfo, action);
-
     let main_stack = registers.stack_pointer_register().checked_sub(RED_ZONE_SIZE);
     let stack_bottom = if (action.sa_flags & SA_ONSTACK as u64) != 0 {
         match signal_state.alt_stack {
@@ -357,6 +354,16 @@ pub fn dispatch_signal_handler(
             return error!(EINVAL);
         }
     }
+
+    let signal_stack_frame = SignalStackFrame::new(
+        task,
+        registers,
+        extended_pstate,
+        signal_state,
+        &siginfo,
+        action,
+        UserAddress::from(stack_pointer),
+    );
 
     // Write the signal stack frame at the updated stack pointer.
     task.write_memory(UserAddress::from(stack_pointer), signal_stack_frame.as_bytes())?;

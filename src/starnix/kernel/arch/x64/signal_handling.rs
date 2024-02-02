@@ -10,11 +10,14 @@ use crate::{
     task::{CurrentTask, Task},
 };
 use extended_pstate::ExtendedPstateState;
+use starnix_logging::log_debug;
 use starnix_uapi::{
-    __NR_restart_syscall, _fpstate_64,
+    self as uapi, __NR_restart_syscall, error,
     errors::{Errno, ErrnoCode, ERESTART_RESTARTBLOCK},
     sigaction, sigaltstack, sigcontext, siginfo_t, ucontext,
+    user_address::UserAddress,
 };
+use static_assertions::const_assert_eq;
 
 /// The size of the red zone.
 ///
@@ -49,10 +52,31 @@ pub struct SignalStackFrame {
 
     /// The state of the thread at the time the signal was handled.
     pub context: ucontext,
-    /// The FPU state. Must be immediately after the ucontext field, since Bionic considers this to
-    /// be part of the ucontext for some reason.
-    fpstate: _fpstate_64,
+
+    /// Extended CPU state, i.e, FPU, SSE & AVX registers.
+    xstate: XState,
 }
+
+/// CPU state that needs to restored when returning from the signal handler and that is not
+/// include in the `ucontext`. Currently it contains just `uapi::_xstate` that stores  X87, SSE
+/// and AVX registers. This matches the set of extensions supported by Zircon. In the future it
+/// may be extended with a buffer for other extensions (e.g. AVX-512). That buffer should be added
+/// between `xstate` and `xstate_magic2`.
+/// See https://github.com/google/gvisor/blob/master/pkg/sentry/arch/fpu/fpu_amd64_unsafe.go
+/// for the corresponding code in GVisor.
+#[repr(C, packed)]
+struct XState {
+    base_xstate: uapi::_xstate,
+
+    // Magic value marking the end of the `xstate`. Should be set to `FP_XSTATE_MAGIC2`.
+    xstate_magic2: u32,
+}
+
+// There should be no padding in front of `xstate_magic2`.
+const_assert_eq!(
+    std::mem::size_of::<XState>(),
+    std::mem::size_of::<uapi::_xstate>() + std::mem::size_of::<u32>()
+);
 
 pub const SIG_STACK_SIZE: usize = std::mem::size_of::<SignalStackFrame>();
 
@@ -60,11 +84,17 @@ impl SignalStackFrame {
     pub fn new(
         _task: &Task,
         registers: &RegisterState,
-        _extended_pstate: &ExtendedPstateState,
+        extended_pstate: &ExtendedPstateState,
         signal_state: &SignalState,
         siginfo: &SignalInfo,
         action: sigaction,
+        stack_pointer: UserAddress,
     ) -> SignalStackFrame {
+        let fpstate_addr = (uapi::uaddr {
+            addr: stack_pointer.ptr() as u64
+                + memoffset::offset_of!(SignalStackFrame, xstate) as u64,
+        })
+        .into();
         let context = ucontext {
             uc_mcontext: sigcontext {
                 r8: registers.r8,
@@ -86,7 +116,7 @@ impl SignalStackFrame {
                 rip: registers.rip,
                 eflags: registers.rflags,
                 oldmask: signal_state.mask().into(),
-                // TODO(b/311770726): Save `extended_pstate`.
+                fpstate: fpstate_addr,
                 ..Default::default()
             },
             uc_stack: signal_state
@@ -105,7 +135,7 @@ impl SignalStackFrame {
             context,
             siginfo_bytes: siginfo.as_siginfo_bytes(),
             restorer_address: action.sa_restorer.addr,
-            fpstate: Default::default(),
+            xstate: get_xstate(extended_pstate),
         }
     }
 
@@ -125,6 +155,31 @@ impl SignalStackFrame {
 /// is due to alignment-requiring SSE instructions.
 pub fn align_stack_pointer(pointer: u64) -> u64 {
     pointer - (pointer % 16 + 8)
+}
+
+fn get_xstate(extended_pstate: &ExtendedPstateState) -> XState {
+    const_assert_eq!(std::mem::size_of::<uapi::_xstate>(), extended_pstate::X64_XSAVE_AREA_SIZE);
+
+    let mut xstate = XState {
+        // `_xstate` layout matches the layout of the XSAVE area.
+        base_xstate: unsafe { std::mem::transmute(extended_pstate.get_x64_xsave_area()) },
+        xstate_magic2: uapi::FP_XSTATE_MAGIC2,
+    };
+
+    xstate.base_xstate.fpstate.__bindgen_anon_1.sw_reserved = uapi::_fpx_sw_bytes {
+        // `FP_XSTATE_MAGIC1` is used to indicate that the signal stack contains the `xstate`,
+        // which includes not just the default X87 registers (included in `fpstate`), but also
+        // other extensions, such as SSE and AVX. The end of the `xstate` buffer is marked with
+        // `FP_XSTATE_MAGIC2`.
+        magic1: uapi::FP_XSTATE_MAGIC1,
+        extended_size: std::mem::size_of::<XState>() as u32,
+        // TODO: CPU features should be detected dynamically.
+        xfeatures: extended_pstate::X64_SUPPORTED_XSAVE_FEATURES,
+        xstate_size: std::mem::size_of::<uapi::_xstate>() as u32,
+        ..Default::default()
+    };
+
+    xstate
 }
 
 pub fn restore_registers(
@@ -156,6 +211,23 @@ pub fn restore_registers(
         gs_base: current_task.thread_state.registers.gs_base,
     }
     .into();
+
+    let xstate = &signal_stack_frame.xstate;
+    let fpx_sw_bytes = unsafe { xstate.base_xstate.fpstate.__bindgen_anon_1.sw_reserved };
+    if fpx_sw_bytes.magic1 != uapi::FP_XSTATE_MAGIC1
+        || fpx_sw_bytes.extended_size != std::mem::size_of::<XState>() as u32
+        || fpx_sw_bytes.xfeatures != extended_pstate::X64_SUPPORTED_XSAVE_FEATURES
+        || fpx_sw_bytes.xstate_size != std::mem::size_of::<uapi::_xstate>() as u32
+        || xstate.xstate_magic2 != uapi::FP_XSTATE_MAGIC2
+    {
+        log_debug!("Invalid xstate found in signal stack frame.");
+        return error!(EINVAL);
+    }
+
+    current_task
+        .thread_state
+        .extended_pstate
+        .set_x64_xsave_area(unsafe { std::mem::transmute(xstate.base_xstate) });
 
     Ok(())
 }

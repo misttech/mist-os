@@ -15,6 +15,7 @@ use starnix_uapi::{
     __NR_restart_syscall,
     errors::{Errno, ErrnoCode, ERESTART_RESTARTBLOCK},
     sigaction, sigaltstack, sigcontext, sigcontext__bindgen_ty_1, siginfo_t, ucontext,
+    user_address::UserAddress,
 };
 
 /// The size of the red zone.
@@ -44,6 +45,7 @@ impl SignalStackFrame {
         signal_state: &SignalState,
         siginfo: &SignalInfo,
         _action: sigaction,
+        _stack_pointer: UserAddress,
     ) -> SignalStackFrame {
         let context = ucontext {
             uc_flags: 0,

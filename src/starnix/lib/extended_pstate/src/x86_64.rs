@@ -6,10 +6,21 @@ use once_cell::sync::Lazy;
 use static_assertions::const_assert_eq;
 
 #[derive(Clone, Copy)]
-pub struct State {
-    buffer: XSaveArea,
+pub(crate) struct State {
+    pub(crate) buffer: XSaveArea,
     strategy: Strategy,
 }
+
+// Size of the XSAVE area.
+pub const XSAVE_AREA_SIZE: usize = 832;
+
+const XSAVE_FEATURE_X87: u64 = 1 << 0;
+const XSAVE_FEATURE_SSE: u64 = 1 << 1;
+const XSAVE_FEATURE_AVX: u64 = 1 << 2;
+
+// Save FPU, SSE and AVX registers. This matches the set of features supported by Zircon (see
+// zircon/kernel/arch/x86/registers.cc ).
+pub const SUPPORTED_XSAVE_FEATURES: u64 = XSAVE_FEATURE_X87 | XSAVE_FEATURE_SSE | XSAVE_FEATURE_AVX;
 
 #[derive(Clone, Copy, Default)]
 #[repr(C)]
@@ -81,7 +92,7 @@ impl Default for FXSaveArea {
 
 #[derive(Clone, Copy)]
 #[repr(C, align(64))]
-struct XSaveArea {
+pub(crate) struct XSaveArea {
     fxsave_area: FXSaveArea,
     xsave_header: [u8; 64],
     // High 128 bits of ymm0-15 registers
@@ -90,7 +101,7 @@ struct XSaveArea {
     // See [intel/vol1] 13.5 XSAVE-MANAGED STATE
 }
 
-const_assert_eq!(std::mem::size_of::<XSaveArea>(), 832);
+const_assert_eq!(std::mem::size_of::<XSaveArea>(), XSAVE_AREA_SIZE);
 
 impl XSaveArea {
     fn addr(&self) -> *const u8 {
@@ -140,10 +151,10 @@ impl State {
     pub(crate) fn save(&mut self) {
         match self.strategy {
             Strategy::XSaveOpt => unsafe {
-                std::arch::x86_64::_xsaveopt(self.buffer.addr_mut(), u64::MAX);
+                std::arch::x86_64::_xsaveopt(self.buffer.addr_mut(), SUPPORTED_XSAVE_FEATURES);
             },
             Strategy::XSave => unsafe {
-                std::arch::x86_64::_xsave(self.buffer.addr_mut(), u64::MAX);
+                std::arch::x86_64::_xsave(self.buffer.addr_mut(), SUPPORTED_XSAVE_FEATURES);
             },
             Strategy::FXSave => unsafe {
                 std::arch::x86_64::_fxsave(self.buffer.addr_mut());
@@ -156,7 +167,7 @@ impl State {
     pub(crate) unsafe fn restore(&self) {
         match self.strategy {
             Strategy::XSave | Strategy::XSaveOpt => {
-                std::arch::x86_64::_xrstor(self.buffer.addr(), u64::MAX)
+                std::arch::x86_64::_xrstor(self.buffer.addr(), SUPPORTED_XSAVE_FEATURES)
             }
             Strategy::FXSave => std::arch::x86_64::_fxrstor(self.buffer.addr()),
         }
@@ -168,6 +179,14 @@ impl State {
 
     fn initialize_saved_area(&mut self) {
         *self = Default::default()
+    }
+
+    pub(crate) fn set_xsave_area(&mut self, xsave_area: [u8; XSAVE_AREA_SIZE]) {
+        self.buffer = unsafe { std::mem::transmute(xsave_area) };
+
+        // The tail of the FXSAVE are is unused and is ignored. It may be modified when returning
+        // from a signal handler. Reset it to zeros.
+        self.buffer.fxsave_area._reserved = [0u8; 96];
     }
 }
 

@@ -5,10 +5,7 @@
     actions: [
         {
             type: "expect_failure",
-            matchers: [
-                // TODO(b/302340440)
-                "ExtendedPstate.Signals",
-            ],
+            matchers: [],
         },
     ],
 }

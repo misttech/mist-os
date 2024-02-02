@@ -69,8 +69,19 @@ RegistersValue GetTestRegistersFromUcontext(ucontext_t* ucontext) {
   RegistersValue result;
 
 #if defined(__x86_64__)
-  memcpy(&result, reinterpret_cast<void*>(ucontext->uc_mcontext.fpregs->_xmm), sizeof(result));
-  // Issue store that will generate fault which will be fixed in SIGSEGV handler
+  auto fpregs = ucontext->uc_mcontext.fpregs;
+  memcpy(&result, reinterpret_cast<void*>(fpregs->_xmm), sizeof(result));
+  auto fpstate_ptr = reinterpret_cast<char*>(fpregs);
+
+  // Bytes 464..512 in the XSAVE area are not used by XSAVE. Linux uses these bytes to store
+  // `struct _fpx_sw_bytes`, which declares the set of extensions that may follow immediately
+  // after `fpstate`. The region is marked with two "magic" values. Check that they are set
+  // correctly.
+  auto sw_bytes = reinterpret_cast<_fpx_sw_bytes*>(fpstate_ptr + 464);
+  EXPECT_EQ(sw_bytes->magic1, FP_XSTATE_MAGIC1);
+  uint32_t* magic2_ptr =
+      reinterpret_cast<uint32_t*>(fpstate_ptr + sw_bytes->extended_size - FP_XSTATE_MAGIC2_SIZE);
+  EXPECT_EQ(*magic2_ptr, FP_XSTATE_MAGIC2);
 #elif defined(__aarch64__)
   fpsimd_context* fp_context = reinterpret_cast<fpsimd_context*>(ucontext->uc_mcontext.__reserved);
   EXPECT_EQ(fp_context->head.magic, static_cast<uint32_t>(FPSIMD_MAGIC));

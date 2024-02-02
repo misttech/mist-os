@@ -5,6 +5,12 @@
 #[cfg(target_arch = "x86_64")]
 pub mod x86_64;
 
+#[cfg(target_arch = "x86_64")]
+pub use x86_64::XSAVE_AREA_SIZE as X64_XSAVE_AREA_SIZE;
+
+#[cfg(target_arch = "x86_64")]
+pub use x86_64::SUPPORTED_XSAVE_FEATURES as X64_SUPPORTED_XSAVE_FEATURES;
+
 #[cfg(not(target_arch = "x86_64"))]
 // Rustdoc struggles in our build with conditional dependencies. Allow this to be unconditionally
 // specified in BUILD.gn without triggering unused dep warnings on other architectures.
@@ -107,6 +113,16 @@ impl ExtendedPstateState {
     #[cfg(target_arch = "riscv64")]
     pub fn set_riscv64_fp(&mut self, fp_registers: &[u64; 32], fcsr: u32) {
         self.state = riscv64::State { fp_registers: *fp_registers, fcsr }
+    }
+
+    #[cfg(target_arch = "x86_64")]
+    pub fn get_x64_xsave_area(&self) -> [u8; X64_XSAVE_AREA_SIZE] {
+        unsafe { std::mem::transmute(self.state.buffer) }
+    }
+
+    #[cfg(target_arch = "x86_64")]
+    pub fn set_x64_xsave_area(&mut self, xsave_area: [u8; X64_XSAVE_AREA_SIZE]) {
+        self.state.set_xsave_area(xsave_area);
     }
 }
 

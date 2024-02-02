@@ -17,7 +17,9 @@ use starnix_uapi::{
     errors::{Errno, ErrnoCode, ERESTART_RESTARTBLOCK},
     esr_context, fpsimd_context, sigaction, sigaltstack, sigcontext, siginfo_t,
     signals::{SIGBUS, SIGSEGV},
-    ucontext, ESR_MAGIC, EXTRA_MAGIC, FPSIMD_MAGIC,
+    ucontext,
+    user_address::UserAddress,
+    ESR_MAGIC, EXTRA_MAGIC, FPSIMD_MAGIC,
 };
 use zerocopy::{AsBytes, FromBytes};
 
@@ -47,6 +49,7 @@ impl SignalStackFrame {
         signal_state: &SignalState,
         siginfo: &SignalInfo,
         _action: sigaction,
+        _stack_pointer: UserAddress,
     ) -> SignalStackFrame {
         let mut regs = registers.r.to_vec();
         regs.push(registers.lr);
