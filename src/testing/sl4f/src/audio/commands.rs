@@ -6,7 +6,7 @@ use crate::audio::types::AudioMethod;
 use crate::server::Facade;
 use anyhow::{Context, Error};
 use async_trait::async_trait;
-use base64;
+use base64::engine::{general_purpose::STANDARD as BASE64_STANDARD, Engine as _};
 use fidl_fuchsia_media::{AudioRenderUsage, AudioSampleFormat, AudioStreamType};
 use fidl_fuchsia_media_sounds::{PlayerMarker, PlayerProxy};
 use fidl_fuchsia_test_audio_recording::{AudioRecordingControlMarker, AudioRecordingControlProxy};
@@ -52,7 +52,7 @@ impl AudioFacade {
         let data = args.get("data").ok_or(format_err!("PutInputAudio failed, no data"))?;
         let data = data.as_str().ok_or(format_err!("PutInputAudio failed, data not string"))?;
 
-        let wave_data_vec = base64::decode(data)?;
+        let wave_data_vec = BASE64_STANDARD.decode(data)?;
         let max_buffer_bytes = 8192;
         let wave_data_iter: Vec<&[u8]> = wave_data_vec.chunks(max_buffer_bytes).collect();
 
@@ -129,7 +129,7 @@ impl AudioFacade {
         let buffer_size = result.get_size()?;
         let mut buffer = vec![0; buffer_size.try_into().unwrap()];
         result.read(&mut buffer, 0)?;
-        Ok(to_value(base64::encode(&buffer))?)
+        Ok(to_value(BASE64_STANDARD.encode(&buffer))?)
     }
 
     // This will play a 440Hz sine wave to the default sound device.

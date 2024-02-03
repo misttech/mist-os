@@ -6,7 +6,7 @@ use anyhow::Error;
 
 use crate::factory_store::types::{FactoryStoreProvider, ListFilesRequest, ReadFileRequest};
 
-use base64;
+use base64::engine::{general_purpose::STANDARD as BASE64_STANDARD, Engine as _};
 use fidl::endpoints::create_proxy;
 use fidl_fuchsia_factory::{
     AlphaFactoryStoreProviderMarker, CastCredentialsFactoryStoreProviderMarker,
@@ -80,7 +80,7 @@ impl FactoryStoreFacade {
             fio::OpenFlags::RIGHT_READABLE,
         )?;
         let contents = fuchsia_fs::file::read(&file).await?;
-        Ok(to_value(base64::encode(&contents))?)
+        Ok(to_value(BASE64_STANDARD.encode(&contents))?)
     }
 
     /// Gets a `DirectoryProxy` that is connected to the given `provider`.
@@ -227,7 +227,7 @@ mod tests {
                     .read_file(json!({ "provider": provider, "filename": filename }))
                     .await?;
                 let contents_base64: String = from_value(contents_value)?;
-                let contents = base64::decode(contents_base64.as_bytes())?;
+                let contents = BASE64_STANDARD.decode(contents_base64.as_bytes())?;
                 assert_eq!(expected_contents.as_bytes(), &contents[..]);
             }
         }

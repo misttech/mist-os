@@ -4,7 +4,7 @@
 
 use {
     anyhow::{Context, Error},
-    base64,
+    base64::engine::{general_purpose::STANDARD as BASE64_STANDARD, Engine as _},
     fidl_fuchsia_feedback::{DataProviderMarker, GetSnapshotParameters},
     fuchsia_component::client::connect_to_protocol,
     fuchsia_zircon::DurationNum,
@@ -32,7 +32,7 @@ impl FeedbackDataProviderFacade {
             Some(archive) => {
                 let mut buf = vec![0; archive.value.size as usize];
                 archive.value.vmo.read(&mut buf, 0).context("reading vmo")?;
-                let result = base64::encode(&buf);
+                let result = BASE64_STANDARD.encode(&buf);
                 return Ok(serde_json::json!({
                     "zip": result,
                 }));

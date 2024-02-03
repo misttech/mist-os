@@ -4,6 +4,7 @@
 
 use {
     anyhow::{Context, Result},
+    base64::engine::{general_purpose::STANDARD as BASE64_STANDARD, Engine as _},
     fuchsia_merkle::Hash,
     scrutiny::{
         model::controller::{DataController, HintDataType},
@@ -46,7 +47,7 @@ impl DataController for BlobController {
         let resp = BlobResponse {
             merkle: req.merkle.clone(),
             encoding: "base64".to_string(),
-            data: base64::encode(&data),
+            data: BASE64_STANDARD.encode(&data),
         };
         Ok(serde_json::to_value(resp)?)
     }

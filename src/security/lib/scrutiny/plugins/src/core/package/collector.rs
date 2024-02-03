@@ -21,6 +21,7 @@ use {
         zbi::Zbi,
     },
     anyhow::{anyhow, Context, Result},
+    base64::engine::{general_purpose::STANDARD as BASE64_STANDARD, Engine as _},
     cm_fidl_analyzer::{match_absolute_pkg_urls, PkgUrlMatch},
     cm_fidl_validator,
     fidl::unpersist,
@@ -214,7 +215,7 @@ impl PackageDataCollector {
 
             let cf_manifest = {
                 if let ComponentManifest::Version2(decl_bytes) = &cm {
-                    let cm_base64 = base64::encode(&decl_bytes);
+                    let cm_base64 = BASE64_STANDARD.encode(&decl_bytes);
                     let mut cvf_bytes = None;
 
                     if let Ok(cm_decl) = unpersist::<fdecl::Component>(&decl_bytes) {
@@ -370,7 +371,7 @@ impl PackageDataCollector {
         file_data: &Vec<u8>,
     ) -> Result<()> {
         info!(%file_name, "Extracting bootfs manifest");
-        let cm_base64 = base64::encode(&file_data);
+        let cm_base64 = BASE64_STANDARD.encode(&file_data);
         if let Ok(cm_decl) = unpersist::<fdecl::Component>(&file_data) {
             if let Err(err) = cm_fidl_validator::validate(&cm_decl) {
                 warn!(%file_name, %err, "Invalid cm");
@@ -550,6 +551,7 @@ pub mod tests {
             util::types::{PackageDefinition, PartialPackageDefinition},
         },
         crate::zbi::Zbi,
+        base64::engine::{general_purpose::STANDARD as BASE64_STANDARD, Engine as _},
         cm_rust::{ComponentDecl, NativeIntoFidl},
         fidl_fuchsia_component_decl as fdecl,
         fuchsia_hash::{Hash, HASH_SIZE},
@@ -569,7 +571,7 @@ pub mod tests {
 
     fn make_v2_manifest_data(decl: ComponentDecl) -> ManifestData {
         let decl_fidl: fdecl::Component = decl.native_into_fidl();
-        let cm_base64 = base64::encode(&persist(&decl_fidl).unwrap());
+        let cm_base64 = BASE64_STANDARD.encode(&persist(&decl_fidl).unwrap());
         ManifestData { cm_base64, cvf_bytes: None }
     }
 

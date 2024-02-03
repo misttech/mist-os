@@ -6,7 +6,7 @@ use crate::tracing::types::{
     InitializeRequest, ResultsDestination, TerminateRequest, TerminateResponse,
 };
 use anyhow::Error;
-use base64;
+use base64::engine::{general_purpose::STANDARD as BASE64_STANDARD, Engine as _};
 use fidl_fuchsia_tracing_controller::{
     ControllerMarker, ControllerProxy, StartErrorCode, StartOptions, StopOptions, TerminateOptions,
     TraceConfig,
@@ -184,7 +184,7 @@ impl TracingFacade {
                 let (_terminate_result, drain_result) =
                     future::try_join(terminate_fut, drain_fut).await?;
 
-                TerminateResponse { data: Some(base64::encode(&drain_result)) }
+                TerminateResponse { data: Some(BASE64_STANDARD.encode(&drain_result)) }
             }
         };
 

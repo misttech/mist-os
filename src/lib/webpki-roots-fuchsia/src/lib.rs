@@ -5,6 +5,7 @@
 #[macro_use]
 extern crate lazy_static;
 
+use base64::engine::{general_purpose::STANDARD as BASE64_STANDARD, Engine as _};
 use webpki::trust_anchor_util::cert_der_as_trust_anchor;
 
 static CERT_PATH: &'static str = "/config/ssl/cert.pem";
@@ -39,7 +40,7 @@ lazy_static! {
             i += 1;
             let cert_base64 = &lines[start + 1..end].join("");
 
-            let cert_bytes = base64::decode(cert_base64.as_bytes())
+            let cert_bytes = BASE64_STANDARD.decode(cert_base64.as_bytes())
                 .expect("Invalid base64 encoding in root store");
             cert_ders.push(cert_bytes);
         }

@@ -5,7 +5,7 @@
 use {
     crate::{metrics::Metrics, puppet::DiffType},
     anyhow::{bail, format_err, Error},
-    base64,
+    base64::engine::{general_purpose::STANDARD as BASE64_STANDARD, Engine as _},
     diagnostics_hierarchy::{
         ArrayContent, DiagnosticsHierarchy, ExponentialHistogram, LinearHistogram,
         Property as iProperty,
@@ -169,7 +169,7 @@ impl ToGeneric for Payload {
             Payload::UintArray(val, format) => handle_array(stringify_list(val), format),
             Payload::DoubleArray(val, format) => handle_array(stringify_list(val), format),
             Payload::StringArray(val) => handle_array(val, ArrayFormat::Default),
-            Payload::Bytes(val) => Payload::String(format!("b64:{}", base64::encode(&val))),
+            Payload::Bytes(val) => Payload::String(format!("b64:{}", BASE64_STANDARD.encode(&val))),
             Payload::Int(val) => Payload::GenericNumber(to_string(val)),
             Payload::Uint(val) => Payload::GenericNumber(to_string(val)),
             Payload::Double(val) => Payload::GenericNumber(to_string(val)),

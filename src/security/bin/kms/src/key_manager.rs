@@ -9,7 +9,7 @@ use crate::crypto_provider::{
 use crate::kms_asymmetric_key::KmsAsymmetricKey;
 use crate::kms_sealing_key::{KmsSealingKey, SEALING_KEY_NAME};
 use anyhow::format_err;
-use base64;
+use base64::engine::{general_purpose::URL_SAFE as BASE64_URL_SAFE, Engine as _};
 use fidl::endpoints::ServerEnd;
 use fidl_fuchsia_kms::{
     AsymmetricKeyAlgorithm, AsymmetricPrivateKeyMarker, Error, KeyManagerRequest, KeyOrigin,
@@ -567,7 +567,7 @@ impl KeyManager {
     fn get_key_attributes_path(&self, key_name: &str, is_user_key: bool) -> PathBuf {
         // We base64 encode the key name to prevent special characters.
         self.get_key_folder(is_user_key)
-            .join(format!("key_{}.attr", base64::encode_config(key_name, base64::URL_SAFE)))
+            .join(format!("key_{}.attr", BASE64_URL_SAFE.encode(key_name)))
     }
 
     fn key_file_exists(&self, key_name: &str, is_user_key: bool) -> bool {

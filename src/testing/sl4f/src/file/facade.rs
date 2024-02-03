@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 use anyhow::{format_err, Error};
+use base64::engine::{general_purpose::STANDARD as BASE64_STANDARD, Engine as _};
 use serde_json::{to_value, Value};
 use std::{fs, io, path::Path};
 
@@ -56,7 +57,7 @@ impl FileFacade {
         let path = path.as_str().ok_or(format_err!("ReadFile failed, path not string"))?;
 
         let contents = fs::read(path)?;
-        let encoded_contents = base64::encode(&contents);
+        let encoded_contents = BASE64_STANDARD.encode(&contents);
 
         Ok(to_value(encoded_contents)?)
     }
@@ -67,7 +68,7 @@ impl FileFacade {
         let data = args.get("data").ok_or(format_err!("WriteFile failed, no data"))?;
         let data = data.as_str().ok_or(format_err!("WriteFile failed, data not string"))?;
 
-        let contents = base64::decode(data)?;
+        let contents = BASE64_STANDARD.decode(data)?;
 
         let destination =
             args.get("dst").ok_or(format_err!("WriteFile failed, no destination path given"))?;

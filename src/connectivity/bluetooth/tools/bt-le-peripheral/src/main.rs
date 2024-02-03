@@ -4,7 +4,10 @@
 
 use {
     anyhow::{format_err, Context as _, Error},
-    base64,
+    base64::engine::{
+        general_purpose::{GeneralPurpose, GeneralPurposeConfig},
+        DecodePaddingMode, Engine as _,
+    },
     fidl::client::QueryResponseFut,
     fidl::endpoints::create_request_stream,
     fidl_fuchsia_bluetooth::Appearance,
@@ -124,7 +127,12 @@ fn parse_binary_data(raw: &str) -> Result<(&str, Vec<u8>), Error> {
         return Err(format_err!("Argument must be a ':' delimited pair."));
     }
     let id = elements[0];
-    let payload = base64::decode(elements[1])?;
+    // Allow for payloads that do not have canonical padding.
+    let base64_indifferent_padding = GeneralPurpose::new(
+        &base64::alphabet::STANDARD,
+        GeneralPurposeConfig::new().with_decode_padding_mode(DecodePaddingMode::Indifferent),
+    );
+    let payload = base64_indifferent_padding.decode(elements[1])?;
     Ok((id, payload))
 }
 

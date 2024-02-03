@@ -2,7 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use base64::display::Base64Display;
+use base64::{
+    display::Base64Display,
+    prelude::{Engine as _, BASE64_STANDARD},
+};
 use ffx_config::{api::ConfigError, query};
 use ring::{
     rand::{self, SystemRandom},
@@ -397,7 +400,8 @@ fn get_public_key_data(pubkey: &[u8]) -> Result<Vec<u8>, std::io::Error> {
 /// Builds the authorized_keys entry for the given public key.
 fn build_public_key_entry(key_type: &str, public_key: &[u8]) -> Result<String, std::io::Error> {
     let public_key_data = get_public_key_data(public_key)?;
-    let pubkey_b64 = Base64Display::with_config(&public_key_data, base64::STANDARD);
+    let pubkey_b64 =
+        Base64Display::new(&public_key_data, &base64::engine::general_purpose::STANDARD);
     Ok(format!("{} {}", key_type, pubkey_b64))
 }
 
@@ -499,7 +503,11 @@ fn write_private_key(
     let mut w =
         OpenOptions::new().write(true).read(true).create_new(true).mode(0o600).open(&path)?;
     writeln!(&mut w, "{}", begin)?;
-    writeln!(&mut w, "{}", Base64Display::with_config(&priv_out_bytes, base64::STANDARD))?;
+    writeln!(
+        &mut w,
+        "{}",
+        Base64Display::new(&priv_out_bytes, &base64::engine::general_purpose::STANDARD)
+    )?;
     writeln!(&mut w, "{}", end)?;
     // File is closed when it goes out of scope.
     Ok(())
@@ -526,7 +534,7 @@ fn read_public_key_from_private(path: &PathBuf) -> Result<(String, Vec<u8>), Ssh
         }
     }
     // decode the base64 string into bytes.
-    let data = base64::decode(&encoded)?;
+    let data = BASE64_STANDARD.decode(&encoded)?;
     let mut buf = Cursor::new(data);
 
     let mut element: Vec<u8> = vec![];

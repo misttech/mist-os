@@ -253,6 +253,7 @@ impl NetworkTimeClient {
 mod test {
     use super::*;
     use anyhow::Error;
+    use base64::engine::{general_purpose::STANDARD as BASE64_STANDARD, Engine as _};
     use fuchsia_async as fasync;
     use futures::{
         future::{ready, TryFutureExt},
@@ -360,7 +361,7 @@ mod test {
             } else if line.starts_with("-----END") {
                 let encoded = current_encoded.join("");
                 current_encoded = vec![];
-                parsed.push(base64::decode(&encoded).unwrap());
+                parsed.push(BASE64_STANDARD.decode(&encoded).unwrap());
             } else {
                 current_encoded.push(line.trim());
             }

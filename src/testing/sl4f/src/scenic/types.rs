@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use anyhow::format_err;
-use base64;
+use base64::engine::{general_purpose::STANDARD as BASE64_STANDARD, Engine as _};
 use fidl_fuchsia_images::{AlphaFormat, ColorSpace, ImageInfo, PixelFormat, Tiling, Transform};
 use fidl_fuchsia_mem::Buffer;
 use fidl_fuchsia_ui_scenic::ScreenshotData;
@@ -90,7 +90,7 @@ where
     let mut data = vec![0; buffer.size as usize];
     use serde::ser::Error;
     buffer.vmo.read(&mut data, 0).map_err(Error::custom)?;
-    serializer.serialize_str(&base64::encode(&data))
+    serializer.serialize_str(&BASE64_STANDARD.encode(&data))
 }
 
 #[derive(Serialize, Debug)]

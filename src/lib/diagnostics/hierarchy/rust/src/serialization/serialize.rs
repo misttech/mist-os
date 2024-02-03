@@ -4,7 +4,7 @@
 
 use {
     crate::{ArrayContent, DiagnosticsHierarchy, ExponentialHistogram, LinearHistogram, Property},
-    base64,
+    base64::engine::{general_purpose::STANDARD as BASE64_STANDARD, Engine as _},
     serde::ser::{Serialize, SerializeMap, SerializeSeq, Serializer},
 };
 
@@ -50,7 +50,7 @@ where
                 }
                 Property::Bool(_, value) => s.serialize_entry(name, &value)?,
                 Property::Bytes(_, array) => {
-                    s.serialize_entry(name, &format!("b64:{}", base64::encode(&array)))?
+                    s.serialize_entry(name, &format!("b64:{}", BASE64_STANDARD.encode(&array)))?
                 }
                 Property::DoubleArray(_, array) => {
                     s.serialize_entry(name, &array)?;

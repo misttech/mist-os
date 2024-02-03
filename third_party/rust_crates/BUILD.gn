@@ -106,7 +106,7 @@ group("atty") {
 }
 
 group("base64") {
-  public_deps = [ ":base64-v0_13_0" ]
+  public_deps = [ ":base64-v0_21_7" ]
 }
 
 group("bincode") {
@@ -2230,6 +2230,39 @@ rust_library("base64-v0_13_0") {
   visibility += [ "//*" ]
 
   applicable_licenses = [ ":base64-v0_13_0.license" ]
+}
+
+license("base64-v0_21_7.license") {
+  public_package_name = "base64"
+  license_files = [
+    "//third_party/rust_crates/vendor/base64-0.21.7/LICENSE-APACHE",
+    "//third_party/rust_crates/vendor/base64-0.21.7/LICENSE-MIT",
+  ]
+}
+
+rust_library("base64-v0_21_7") {
+  crate_name = "base64"
+  crate_root = "//third_party/rust_crates/vendor/base64-0.21.7/src/lib.rs"
+  output_name = "base64-893dd6c5b101d98e"
+  configs -= [ "//build/config/rust:2018_idioms" ]
+
+  deps = []
+
+  rustenv = []
+
+  rustflags = [
+    "--cap-lints=allow",
+    "--edition=2018",
+    "-Cmetadata=893dd6c5b101d98e",
+    "-Cextra-filename=-893dd6c5b101d98e",
+    "--cfg=feature=\"alloc\"",
+    "--cfg=feature=\"default\"",
+    "--cfg=feature=\"std\"",
+  ]
+
+  visibility = [ ":*" ]
+
+  applicable_licenses = [ ":base64-v0_21_7.license" ]
 }
 
 license("base64ct-v1_6_0.license") {

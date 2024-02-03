@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use anyhow::Error;
-use base64;
+use base64::engine::{general_purpose::STANDARD as BASE64_STANDARD, Engine as _};
 use serde_json::{to_value, Value};
 
 use std::collections::HashMap;
@@ -52,7 +52,7 @@ impl TraceutilFacade {
         let mut contents = Vec::new();
         file.by_ref().take(MAX_CHUNK_SIZE as u64).read_to_end(&mut contents)?;
 
-        let encoded_contents = base64::encode(&contents);
+        let encoded_contents = BASE64_STANDARD.encode(&contents);
 
         let mut result: HashMap<String, Value> = HashMap::new();
         result.insert("data".to_owned(), to_value(encoded_contents)?);

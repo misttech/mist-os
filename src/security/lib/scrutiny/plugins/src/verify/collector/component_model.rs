@@ -12,6 +12,7 @@ use {
         zbi::Zbi,
     },
     anyhow::{anyhow, Context, Result},
+    base64::engine::{general_purpose::STANDARD as BASE64_STANDARD, Engine as _},
     cm_config::RuntimeConfig,
     cm_fidl_analyzer::component_model::ModelBuilderForAnalyzer,
     cm_rust::{ComponentDecl, FidlIntoNative, RegistrationSource, RunnerRegistration},
@@ -89,7 +90,8 @@ impl V2ComponentModelDataCollector {
             match urls.remove(&manifest.component_id) {
                 Some(url) => {
                     let result: Result<fdecl::Component, fidl::Error> = unpersist(
-                        &base64::decode(&cm_base64)
+                        &BASE64_STANDARD
+                            .decode(&cm_base64)
                             .context("Unable to decode base64 v2 manifest")?,
                     );
                     match result {

@@ -325,6 +325,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "904dfeac50f3cdaba28fc6f57fdcddb75f49ed61346676a78c4ffe55877802fd"
 
 [[package]]
+name = "base64"
+version = "0.21.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9d297deb1925b89f2ccc13d7635fa0714f12c87adce1c75356b39ca9b7178567"
+
+[[package]]
 name = "base64ct"
 version = "1.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1300,7 +1306,7 @@ dependencies = [
  "async-stream",
  "async-trait",
  "atty",
- "base64",
+ "base64 0.21.7",
  "bincode",
  "bit-set",
  "bit-vec",
@@ -2749,7 +2755,7 @@ version = "0.8.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "fd56cbd21fea48d0c440b41cd69c589faacade08c992d9a54e471b79d0fd13eb"
 dependencies = [
- "base64",
+ "base64 0.13.0",
  "once_cell",
  "regex",
 ]
@@ -3672,7 +3678,7 @@ dependencies = [
 name = "rustls"
 version = "0.19.1"
 dependencies = [
- "base64",
+ "base64 0.13.0",
  "log",
  "ring",
  "sct",

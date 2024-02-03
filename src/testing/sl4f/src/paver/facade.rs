@@ -4,6 +4,7 @@
 
 use crate::common_utils::common::LazyProxy;
 use anyhow::{bail, Error};
+use base64::engine::{general_purpose::STANDARD as BASE64_STANDARD, Engine as _};
 use fidl_fuchsia_paver::{PaverMarker, PaverProxy};
 use fuchsia_zircon::Status;
 use serde::{Deserialize, Serialize};
@@ -129,7 +130,7 @@ impl PaverFacade {
 
         let mut res = vec![0; buffer.size as usize];
         buffer.vmo.read(&mut res[..], 0)?;
-        Ok(base64::encode(&res))
+        Ok(BASE64_STANDARD.encode(&res))
     }
 }
 

@@ -192,6 +192,7 @@ mod tests {
             zbi::Zbi,
         },
         anyhow::Result,
+        base64::engine::{general_purpose::STANDARD as BASE64_STANDARD, Engine as _},
         cm_config::RuntimeConfig,
         cm_fidl_analyzer::component_model::ModelBuilderForAnalyzer,
         cm_rust::{
@@ -344,7 +345,7 @@ mod tests {
 
     fn make_v2_manifest(component_id: i32, decl: ComponentDecl) -> Result<Manifest> {
         let decl_fidl: fdecl::Component = decl.native_into_fidl();
-        let cm_base64 = base64::encode(&persist(&decl_fidl)?);
+        let cm_base64 = BASE64_STANDARD.encode(&persist(&decl_fidl)?);
         Ok(Manifest { component_id, manifest: ManifestData { cm_base64, cvf_bytes: None } })
     }
 

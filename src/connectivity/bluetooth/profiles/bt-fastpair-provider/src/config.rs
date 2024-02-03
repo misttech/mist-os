@@ -3,6 +3,10 @@
 // found in the LICENSE file.
 
 use anyhow::format_err;
+use base64::engine::{
+    general_purpose::{GeneralPurpose, GeneralPurposeConfig},
+    DecodePaddingMode, Engine as _,
+};
 use fastpair_provider_config::Config as StructuredConfig;
 use p256::SecretKey;
 use std::convert::TryFrom;
@@ -20,8 +24,17 @@ pub struct Config {
 impl Config {
     pub fn load() -> Result<Self, Error> {
         let config = StructuredConfig::take_from_startup_handle();
-        let private_key_bytes = base64::decode(config.private_key)
+
+        // Allow for payloads that do not have canonical padding.
+        let base64_indifferent_padding = GeneralPurpose::new(
+            &base64::alphabet::STANDARD,
+            GeneralPurposeConfig::new().with_decode_padding_mode(DecodePaddingMode::Indifferent),
+        );
+
+        let private_key_bytes = base64_indifferent_padding
+            .decode(config.private_key)
             .map_err(|e| format_err!("Couldn't decode base64 key: {:?}", e))?;
+
         Ok(Self {
             model_id: ModelId::try_from(config.model_id)?,
             firmware_revision: config.firmware_revision,

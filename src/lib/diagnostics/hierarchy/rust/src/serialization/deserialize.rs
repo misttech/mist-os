@@ -4,6 +4,7 @@
 
 use {
     crate::{ArrayContent, DiagnosticsHierarchy, ExponentialHistogram, LinearHistogram, Property},
+    base64::engine::{general_purpose::STANDARD as BASE64_STANDARD, Engine as _},
     paste,
     serde::{
         de::{self, MapAccess, SeqAccess, Visitor},
@@ -484,7 +485,8 @@ where
     {
         if value.starts_with("b64:") {
             let bytes64 = value.replace("b64:", "");
-            let bytes = base64::decode(&bytes64)
+            let bytes = BASE64_STANDARD
+                .decode(&bytes64)
                 .map_err(|_| de::Error::custom("failed to decode bytes"))?;
             return Ok(FieldValue::Bytes(bytes));
         }

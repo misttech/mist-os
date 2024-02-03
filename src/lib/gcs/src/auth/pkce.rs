@@ -14,6 +14,7 @@ use {
         error::GcsError,
     },
     anyhow::{bail, Context, Result},
+    base64::engine::{general_purpose::URL_SAFE_NO_PAD as BASE64_URL_SAFE_NO_PAD, Engine as _},
     hyper::{Body, Method, Request},
     serde::{Deserialize, Serialize},
     serde_json,
@@ -314,7 +315,7 @@ fn random_base64_url_encoded(count: usize) -> String {
 ///
 /// See also https://datatracker.ietf.org/doc/html/rfc4648#section-5
 fn base64_url(buf: &[u8]) -> String {
-    base64::encode_config(buf, base64::URL_SAFE_NO_PAD)
+    BASE64_URL_SAFE_NO_PAD.encode(buf)
 }
 
 #[cfg(test)]

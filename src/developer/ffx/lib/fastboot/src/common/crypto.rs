@@ -6,6 +6,7 @@ use crate::common::{done_time, handle_upload_progress_for_staging, is_locked};
 use crate::file_resolver::FileResolver;
 use anyhow::{anyhow, bail, Result};
 use async_fs::OpenOptions;
+use base64::engine::{general_purpose::STANDARD as BASE64_STANDARD, Engine as _};
 use byteorder::{ByteOrder, LittleEndian};
 use chrono::Utc;
 use errors::{ffx_bail, ffx_error};
@@ -124,7 +125,7 @@ impl UnlockCredentials {
             .replace("\n", "")
             .replace(PRIVATE_KEY_END, "");
 
-        let private_key_pem_bytes = base64::decode(&private_key_pem)?;
+        let private_key_pem_bytes = BASE64_STANDARD.decode(&private_key_pem)?;
 
         let mut result = Self {
             intermediate_cert: [0; EXPECTED_CERTIFICATE_SIZE],
