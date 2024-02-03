@@ -46,8 +46,10 @@
  */
 #if TRACE_USB
 #define WARN(x...) fprintf(stderr, x)
+#define DBG(x...) fprintf(stderr, x)
 #else
 #define WARN(x...)
+#define DBG(x...)
 #endif
 #define TOSTR1(x) #x
 #define TOSTR(x) TOSTR1(x)
@@ -490,7 +492,7 @@ ssize_t UsbInterface::Read(void *data, size_t len) {
   if (result == 0) {
     return (int)numBytes;
   } else {
-    ERR("usb_read failed with status %x\n", result);
+    DBG("usb_read failed with status %x\n", result);
   }
 
   return -1;
