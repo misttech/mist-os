@@ -884,19 +884,19 @@ impl TargetCollection {
     fn select_preferred_target(new: &Rc<Target>, current: &mut Rc<Target>) {
         'preferred: {
             if new.is_host_pipe_running() && !current.is_host_pipe_running() {
-                tracing::info!("Prioritizing duplicate with established connection");
+                tracing::debug!("Prioritizing duplicate with established connection");
                 break 'preferred;
             } else if new.rcs().is_some() && !current.rcs().is_some() {
-                tracing::info!("Prioritizing duplicate with RCS connection");
+                tracing::debug!("Prioritizing duplicate with RCS connection");
                 break 'preferred;
             }
 
             if new.is_connected() {
                 if !current.is_connected() {
-                    tracing::info!("Prioritizing duplicate, other one has expired");
+                    tracing::debug!("Prioritizing duplicate, other one has expired");
                     break 'preferred;
                 } else if new.last_response() > current.last_response() {
-                    tracing::info!("Prioritizing recently seen duplicate");
+                    tracing::debug!("Prioritizing recently seen duplicate");
                     break 'preferred;
                 }
             }
@@ -925,7 +925,7 @@ impl TargetCollection {
                 if (query.is_query_on_identity() && selected.identity_matches(target))
                     || query.is_query_on_address()
                 {
-                    tracing::info!("Found duplicate target with matching identity: {target:?}");
+                    tracing::debug!("Found duplicate target with matching identity: {target:?}");
                     Self::select_preferred_target(target, selected);
                 } else {
                     if !found_multiple {
