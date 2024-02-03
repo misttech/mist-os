@@ -34,9 +34,6 @@ Honeydew and add more and more interactions that others can also benefit.
   for the development and testing of Honeydew
 * Follow [instructions on how to submit contributions to the Fuchsia project]
   for the Gerrit developer work flow
-* If you are using [vscode IDE] then I recommend installing these
-  [vscode extensions] from [vscode extension marketplace] and using these
-  [vscode settings]
 
 ### Best Practices
 Here are some of the best practices that should be followed while contributing
@@ -167,12 +164,3 @@ If you like to use Honeydew in an interactive Python terminal refer to
 [instructions on how to submit contributions to the Fuchsia project]: https://fuchsia.dev/fuchsia-src/development/source_code/contribute_changes
 
 [Fastboot transport]: markdowns/fastboot.md
-
-[vscode IDE]: https://code.visualstudio.com/docs/python/python-tutorial
-
-[vscode extension marketplace]: https://code.visualstudio.com/docs/editor/extension-marketplace
-
-[vscode extensions]: vscode/extensions.json
-
-[vscode settings]: vscode/settings.json
-
