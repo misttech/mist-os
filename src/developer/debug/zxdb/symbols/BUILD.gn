@@ -18,6 +18,8 @@ static_library("symbols") {
   ]
 
   public = [
+    "address_range_map.h",
+    "address_range_map_builder.h",
     "arch.h",
     "array_type.h",
     "base_type.h",
@@ -84,6 +86,7 @@ static_library("symbols") {
   ]
 
   sources = [
+    "address_range_map_builder.cc",
     "arch.cc",
     "array_type.cc",
     "base_type.cc",
@@ -282,6 +285,8 @@ source_set("tests") {
   testonly = true
 
   sources = [
+    "address_range_map_builder_unittest.cc",
+    "address_range_map_unittest.cc",
     "build_id_index_unittest.cc",
     "code_block_unittest.cc",
     "collection_unittest.cc",

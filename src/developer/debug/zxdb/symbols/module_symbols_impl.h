@@ -6,6 +6,7 @@
 #define SRC_DEVELOPER_DEBUG_ZXDB_SYMBOLS_MODULE_SYMBOLS_IMPL_H_
 
 #include <map>
+#include <unordered_map>
 
 #include "gtest/gtest_prod.h"
 #include "llvm/BinaryFormat/ELF.h"
@@ -64,8 +65,8 @@ class ModuleSymbolsImpl final : public ModuleSymbols, public DwarfSymbolFactory:
   std::vector<Location> ResolveInputLocation(
       const SymbolContext& symbol_context, const InputLocation& input_location,
       const ResolveOptions& options = ResolveOptions()) const override;
-  fxl::RefPtr<DwarfUnit> GetDwarfUnit(const SymbolContext& symbol_context,
-                                      uint64_t absolute_address) const override;
+  fxl::RefPtr<DwarfUnit> GetDwarfUnitForAddress(const SymbolContext& symbol_context,
+                                                uint64_t absolute_address) const override;
   LineDetails LineDetailsForAddress(const SymbolContext& symbol_context, uint64_t absolute_address,
                                     bool greedy) const override;
   std::vector<std::string> FindFileMatches(std::string_view name) const override;
@@ -175,9 +176,11 @@ class ModuleSymbolsImpl final : public ModuleSymbols, public DwarfSymbolFactory:
   std::unique_ptr<DwarfBinaryImpl> binary_;  // Guaranteed non-null after Load() succeeds.
 
   // .dwo files are separate per-source symbols that are referenced by the main binary. Populated
-  // by CreateIndex().
+  // by CreateIndex(). The dwo_skeleton_offset_to_index_ maps the SkeletonUnit's skeleton_die_offset
+  // to the index of the DWO in the dwos_ array.
   class DwoInfo;
   std::vector<std::unique_ptr<DwoInfo>> dwos_;
+  std::unordered_map<uint64_t, size_t> dwo_skeleton_offset_to_index_;
 
   std::string build_dir_;
 

@@ -169,6 +169,7 @@ class ModuleSymbolsImpl::DwoInfo final : public DwarfSymbolFactory::Delegate {
   }
 
   DwarfBinaryImpl* binary() { return binary_.get(); }
+  const SkeletonUnit& skeleton() const { return skeleton_; }
   const SymbolFactory* symbol_factory() { return binary_->GetSymbolFactory(); }
 
   // DwarfSymbolFactory::Delegate implementation.
@@ -269,15 +270,39 @@ std::vector<Location> ModuleSymbolsImpl::ResolveInputLocation(const SymbolContex
   }
 }
 
-fxl::RefPtr<DwarfUnit> ModuleSymbolsImpl::GetDwarfUnit(const SymbolContext& symbol_context,
-                                                       uint64_t absolute_address) const {
-  return binary_->UnitForRelativeAddress(symbol_context.AbsoluteToRelative(absolute_address));
+fxl::RefPtr<DwarfUnit> ModuleSymbolsImpl::GetDwarfUnitForAddress(
+    const SymbolContext& symbol_context, uint64_t absolute_address) const {
+  fxl::RefPtr<DwarfUnit> main_unit =
+      binary_->UnitForRelativeAddress(symbol_context.AbsoluteToRelative(absolute_address));
+  // The dwos_.empty() check is an optimization to avoid checking the skeleton units when we know
+  // there are none.
+  if (!main_unit || dwos_.empty()) {
+    return main_unit;
+  }
+
+  // In the case of debug fission, we want to return the full unit in the .dwo file. This needs to
+  // be looked up if the unit that was matched was a skeleton.
+  llvm::DWARFDie llvm_die = main_unit->GetUnitDie();
+  if (static_cast<int>(llvm_die.getTag()) != static_cast<int>(DwarfTag::kSkeletonUnit)) {
+    // Not a skeleton unit.
+    return main_unit;
+  }
+
+  // Look up the DWO for this skeleton.
+  uint64_t skeleton_offset = llvm_die.getOffset();
+  auto found_skeleton_index = dwo_skeleton_offset_to_index_.find(skeleton_offset);
+  if (found_skeleton_index == dwo_skeleton_offset_to_index_.end()) {
+    // Some invalid DWO reference, give up and return the skeleton one.
+    return main_unit;
+  }
+
+  FX_CHECK(found_skeleton_index->second < dwos_.size());
+  return dwos_[found_skeleton_index->second]->binary()->GetDwoUnit();
 }
 
 LineDetails ModuleSymbolsImpl::LineDetailsForAddress(const SymbolContext& symbol_context,
                                                      uint64_t absolute_address, bool greedy) const {
-  uint64_t relative_address = symbol_context.AbsoluteToRelative(absolute_address);
-  auto unit = binary_->UnitForRelativeAddress(relative_address);
+  fxl::RefPtr<DwarfUnit> unit = GetDwarfUnitForAddress(symbol_context, absolute_address);
   if (!unit)
     return LineDetails();
 
@@ -286,6 +311,7 @@ LineDetails ModuleSymbolsImpl::LineDetailsForAddress(const SymbolContext& symbol
   if (!line_table || line_table->Rows.empty())
     return LineDetails();
 
+  uint64_t relative_address = symbol_context.AbsoluteToRelative(absolute_address);
   const auto& rows = line_table->Rows;
   uint32_t found_row_index = line_table->lookupAddress({relative_address});
 
@@ -544,13 +570,11 @@ std::optional<Location> ModuleSymbolsImpl::DwarfLocationForAddress(
     const SymbolContext& symbol_context, uint64_t absolute_address, const ResolveOptions& options,
     const Function* optional_func) const {
   // TODO(bug 5544) handle addresses that aren't code like global variables.
-  uint64_t relative_address = symbol_context.AbsoluteToRelative(absolute_address);
-  fxl::RefPtr<DwarfUnit> unit = binary_->UnitForRelativeAddress(relative_address);
-  if (!unit)  // No DWARF unit symbol.
+  fxl::RefPtr<DwarfUnit> unit = GetDwarfUnitForAddress(symbol_context, absolute_address);
+  if (!unit)  // No DWARF symbol.
     return std::nullopt;
 
-  // TODO(brettw) add support for skeleton compilation units here.
-
+  uint64_t relative_address = symbol_context.AbsoluteToRelative(absolute_address);
   FileLine file_line;
   int column = 0;
 
@@ -828,10 +852,6 @@ void ModuleSymbolsImpl::ResolveLineInputLocationForFile(const SymbolContext& sym
       continue;  // Already checked this function.
     checked_functions.insert(match.function_die_offset);
 
-    auto unit = binary_->UnitForRelativeAddress(match.address);
-    if (!unit)
-      continue;  // Some kind of corruption.
-
     if (auto fn =
             RefPtrTo(GetSymbolFactory()->CreateSymbol(match.function_die_offset)->As<Function>())) {
       // Make sure we have the outermost function and not some random code block inside it.
@@ -922,6 +942,12 @@ void ModuleSymbolsImpl::CreateIndex() {
     index_.root().MergeFrom(dwo_index.root());
 
     dwos_.push_back(std::move(dwo_info));
+  }
+
+  // Index the DWOs array by skeleton die offset.
+  dwo_skeleton_offset_to_index_.reserve(dwos_.size());
+  for (size_t i = 0; i < dwos_.size(); i++) {
+    dwo_skeleton_offset_to_index_[dwos_[i]->skeleton().skeleton_die_offset] = i;
   }
 }
 

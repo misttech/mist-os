@@ -92,6 +92,15 @@ class DwarfBinary {
   // table (of address-sized entries) rather than a byte index.
   virtual std::optional<uint64_t> GetDebugAddrEntry(uint64_t addr_base, uint64_t index) const = 0;
 
+  // Returns the main unit in a .dwo file. When using DWARF "debug fission" the main binary will
+  // have "skeleton units" that reference .dwo files containing the real unit information. These
+  // files will normally have exactly one unit in them. This getter returns that unit.
+  //
+  // It's theoretically possible for a .dwo file to have more than one unit. If that happens, it
+  // would be possible to disambiguate them by name. Currently this does not happen so this just
+  // returns the first DWO unit.
+  fxl::RefPtr<DwarfUnit> GetDwoUnit() { return GetUnitAtIndex(UnitIndex(true, 0)); }
+
   // Looks up a DIE by offset. This DIE can be in any unit.
   virtual llvm::DWARFDie GetLLVMDieAtOffset(uint64_t offset) const = 0;
 };

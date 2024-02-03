@@ -5,6 +5,9 @@
 #ifndef SRC_DEVELOPER_DEBUG_ZXDB_SYMBOLS_DWARF_UNIT_IMPL_H_
 #define SRC_DEVELOPER_DEBUG_ZXDB_SYMBOLS_DWARF_UNIT_IMPL_H_
 
+#include <map>
+
+#include "src/developer/debug/zxdb/symbols/address_range_map.h"
 #include "src/developer/debug/zxdb/symbols/dwarf_unit.h"
 #include "src/developer/debug/zxdb/symbols/line_table_impl.h"
 #include "src/lib/fxl/memory/weak_ptr.h"
@@ -16,6 +19,7 @@ class DWARFUnit;
 
 namespace zxdb {
 
+class AddressRangeMapBuilder;
 class DwarfBinaryImpl;
 
 class DwarfUnitImpl : public DwarfUnit {
@@ -46,6 +50,14 @@ class DwarfUnitImpl : public DwarfUnit {
 
   DwarfUnitImpl(DwarfBinaryImpl* binary, llvm::DWARFUnit* unit);
 
+  // Call every time before using func_addr_to_die_offset_ to make sure it's lazily populated.
+  void EnsureFuncAddrMap() const;
+
+  // Recursive helper for EnsureFuncAddrMap(). Takes a pre-decoded non-weak reference to the binary_
+  // weak member to avoid checking for weak pointers each time.
+  void AddDieToFuncAddr(const DwarfBinary& binary, const llvm::DWARFDie& die,
+                        AddressRangeMapBuilder& builder) const;
+
   // The binary that owns us.
   fxl::WeakPtr<DwarfBinaryImpl> binary_;
 
@@ -53,6 +65,16 @@ class DwarfUnitImpl : public DwarfUnit {
   // here is a bit messy. In practice this means that the DwarfBinary outlives all DwarfUnits, and
   // users should check that the binary_ is still valid before dereferencing.
   llvm::DWARFUnit* unit_;
+
+  // Maps the begin address of each code range in this DIE (the key) to the DIE offset of the
+  // function covering that address (the value). Computed lazily by EnsureFuncAddrMap().
+  //
+  // This could be optimized for reading. During population we actually need to decode each symbol
+  // to get the address ranges, and then throw everything away except the DIE offset. We could store
+  // a LazySymbol here or actually the full symbol information. Currently, we assume that the
+  // debugger is more memory-limited than CPU limited and that decoding symbols is relatively
+  // inexpensive, so it's better to have the smaller data.
+  mutable AddressRangeMap func_addr_to_die_offset_;
 
   // The line table. Computed lazily.
   mutable std::optional<LineTableImpl> line_table_;

@@ -6,9 +6,14 @@
 
 #include <lib/syslog/cpp/macros.h>
 
+#include <algorithm>
+
 #include "llvm/DebugInfo/DWARF/DWARFContext.h"
 #include "src/developer/debug/zxdb/common/ref_ptr_to.h"
+#include "src/developer/debug/zxdb/symbols/address_range_map_builder.h"
 #include "src/developer/debug/zxdb/symbols/dwarf_binary_impl.h"
+#include "src/developer/debug/zxdb/symbols/function.h"
+#include "src/developer/debug/zxdb/symbols/lazy_symbol.h"
 #include "src/developer/debug/zxdb/symbols/line_table_impl.h"
 
 namespace zxdb {
@@ -25,13 +30,8 @@ int DwarfUnitImpl::GetDwarfVersion() const { return unit_->getVersion(); }
 llvm::DWARFDie DwarfUnitImpl::GetUnitDie() const { return unit_->getUnitDIE(true); }
 
 uint64_t DwarfUnitImpl::FunctionDieOffsetForRelativeAddress(uint64_t relative_address) const {
-  if (!binary_)
-    return 0;
-
-  llvm::DWARFDie die = unit_->getSubroutineForAddress(relative_address);
-  if (!die.isValid())
-    return 0;
-  return die.getOffset();
+  EnsureFuncAddrMap();
+  return func_addr_to_die_offset_.Lookup(relative_address);
 }
 
 uint64_t DwarfUnitImpl::GetOffset() const {
@@ -80,6 +80,34 @@ llvm::DWARFDie DwarfUnitImpl::GetLLVMDieAtOffset(uint64_t offset) const {
 
 uint64_t DwarfUnitImpl::GetIndexForLLVMDie(const llvm::DWARFDie& die) const {
   return unit_->getDIEIndex(die);
+}
+
+void DwarfUnitImpl::EnsureFuncAddrMap() const {
+  if (binary_ && func_addr_to_die_offset_.empty()) {
+    // Recursively collect all DIEs and their begin ranges.
+    AddressRangeMapBuilder builder;
+    AddDieToFuncAddr(*binary_, GetUnitDie(), builder);
+    func_addr_to_die_offset_ = builder.GetMap();
+  }
+}
+
+void DwarfUnitImpl::AddDieToFuncAddr(const DwarfBinary& binary, const llvm::DWARFDie& die,
+                                     AddressRangeMapBuilder& builder) const {
+  // Add all functions and inlines to the map.
+  llvm::dwarf::Tag tag = die.getTag();
+  if (tag == llvm::dwarf::DW_TAG_subprogram || tag == llvm::dwarf::DW_TAG_inlined_subroutine) {
+    auto lazy_func = binary.GetSymbolFactory()->MakeLazy(die.getOffset());
+    if (const Function* func = lazy_func.Get()->As<Function>()) {
+      builder.AddRanges(func->code_ranges(), die.getOffset());
+    }
+  }
+
+  // Recurse into children.
+  llvm::DWARFDie cur = die.getFirstChild();
+  while (cur.isValid()) {
+    AddDieToFuncAddr(binary, cur, builder);
+    cur = cur.getSibling();
+  }
 }
 
 }  // namespace zxdb

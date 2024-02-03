@@ -27,6 +27,10 @@ namespace zxdb {
 
 namespace {
 
+// The address stored in the main binary for the CallOther function in the "fission" test binary
+// (referenced via the address table). This may change if the sample binary is recompiled.
+constexpr uint64_t kFissionCallOtherRelativeAddr = 0x114f;
+
 class ScopedUnlink {
  public:
   explicit ScopedUnlink(const char* name) : name_(name) {}
@@ -625,10 +629,39 @@ TEST(ModuleSymbols, IndexFission) {
       symbol_context, InputLocation(Identifier(IdentifierComponent("CallOther"))));
   ASSERT_EQ(1u, result.size());
 
-  // The 114f is the address stored in the main binary for the CallOther function (referenced via
-  // the address table). This may change if the sample binary is recompiled.
-  constexpr uint64_t kCallOtherRelativeAddr = 0x114f;
-  EXPECT_EQ(symbol_context.RelativeToAbsolute(kCallOtherRelativeAddr), result[0].address());
+  EXPECT_EQ(symbol_context.RelativeToAbsolute(kFissionCallOtherRelativeAddr), result[0].address());
+}
+
+// Tests that address-to-symbol lookup works for stuff in .dwo files.
+TEST(ModuleSymbols, FissionAddress) {
+  std::string fission_data_dir = TestSymbolModule::GetTestDataDir() + "fission/";
+  TestSymbolModule setup(fission_data_dir + "fission", "fission");
+  // Passint "true" here creates the unified index.
+  ASSERT_TRUE(setup.Init(fission_data_dir, true).ok());
+
+  // Resolve the address of the "CallOther" function.
+  SymbolContext symbol_context(0x10000000);
+  std::vector<Location> result = setup.symbols()->ResolveInputLocation(
+      symbol_context, InputLocation(symbol_context.load_address() + kFissionCallOtherRelativeAddr));
+  ASSERT_EQ(1u, result.size());
+
+  ASSERT_TRUE(result[0].is_valid());
+  ASSERT_TRUE(result[0].has_symbols());
+
+// TODO finish implemeting debug fission support so this works.
+#if 0
+  EXPECT_EQ(result[0].file_line().file(), "foo");
+  EXPECT_EQ(result[0].file_line().line(), 999999);
+
+  const Symbol* symbol = result[0].symbol().Get();
+  ASSERT_TRUE(symbol);
+  EXPECT_EQ("CallOther()", symbol->GetFullName());
+
+  // This should resolve to a real DWARF symbol. If the name matches above but it doesn't appear as
+  // a function here, that means it matched the ELF symbol which bypasses all of the debug fission
+  // stuff. That means the Fission address lookup failed.
+  ASSERT_TRUE(symbol->As<Function>());
+#endif
 }
 
 }  // namespace zxdb

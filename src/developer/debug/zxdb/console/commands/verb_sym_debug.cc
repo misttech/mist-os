@@ -235,7 +235,7 @@ OutputBuffer DumpLineTable(ProcessSymbols* process_symbols, uint64_t address,
   SymbolContext symbol_context = loaded_module->symbol_context();
 
   fxl::RefPtr<DwarfUnit> unit =
-      loaded_module->module_symbols()->GetDwarfUnit(symbol_context, address);
+      loaded_module->module_symbols()->GetDwarfUnitForAddress(symbol_context, address);
   if (!unit) {
     return OutputBuffer("This address " + to_hex_string(address) +
                         " is not covered by a compilation unit.\n");
