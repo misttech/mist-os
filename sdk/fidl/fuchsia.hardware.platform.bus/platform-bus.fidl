@@ -15,6 +15,11 @@ type Mmio = table {
     /// Length of MMIO region in bytes.
     /// Does not need to be page aligned.
     2: length uint64;
+    /// Name that can be used to retrieve the Mmio using
+    /// [`fuchsia.hardware.platform.device/GetMmioByName`].
+    /// It is valid for this to be empty, however the resource will only be able
+    /// to be retrieved using [`fuchsia.hardware.platform.device/GetMmioById`].
+    3: name string:fuchsia.driver.framework.MAX_RESOURCE_NAME_LENGTH;
 };
 
 type Irq = table {
@@ -25,11 +30,21 @@ type Irq = table {
     /// Properties for this interrupt's fragment. Only used in DFv2.
     3: properties
             vector<fuchsia.driver.framework.NodeProperty>:fuchsia.driver.framework.MAX_PROPERTY_COUNT;
+    /// Name that can be used to retrieve the irq using
+    /// [`fuchsia.hardware.platform.device/GetInterruptByName`].
+    /// It is valid for this to be empty, however the resource will only be able
+    /// to be retrieved using [`fuchsia.hardware.platform.device/GetInterruptById`].
+    4: name string:fuchsia.driver.framework.MAX_RESOURCE_NAME_LENGTH;
 };
 
 type Bti = table {
     1: iommu_index uint32;
     2: bti_id uint32;
+    /// Name that can be used to retrieve the bti using
+    /// [`fuchsia.hardware.platform.device/GetBtiByName`].
+    /// It is valid for this to be empty, however the resource will only be able
+    /// to be retrieved using [`fuchsia.hardware.platform.device/GetBtiById`].
+    3: name string:fuchsia.driver.framework.MAX_RESOURCE_NAME_LENGTH;
 };
 
 type Smc = table {
@@ -39,6 +54,11 @@ type Smc = table {
     2: count uint32;
     /// The device has exclusive access to this smc range.
     3: exclusive bool;
+    /// Name that can be used to retrieve the smc using
+    /// [`fuchsia.hardware.platform.device/GetSmcByName`].
+    /// It is valid for this to be empty, however the resource will only be able
+    /// to be retrieved using [`fuchsia.hardware.platform.device/GetSmcById`].
+    4: name string:fuchsia.driver.framework.MAX_RESOURCE_NAME_LENGTH;
 };
 
 /// Device metadata.

@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 library fuchsia.hardware.platform.device;
 
+using fuchsia.driver.framework;
 using fuchsia.hardware.power;
 using zx;
 
@@ -51,12 +52,32 @@ type Mmio = resource table {
 @discoverable
 open protocol Device {
     /// Returns a memory mapped IO (MMIO) resource for the given |index|.
+    /// DEPRECATED: Use `GetMmioById`.
     flexible GetMmio(struct {
         index uint32;
     }) -> (Mmio) error zx.Status;
 
+    /// Returns a memory mapped IO (MMIO) resource for the given |index|.
+    /// * error `ZX_ERR_OUT_OF_RANGE` if |index| is equal or greater than the number of
+    /// mmios.
+    /// * error `ZX_ERR_INTERNAL` if the retrieved mmio is not valid.
+    /// * error `ZX_ERR_NOT_FOUND` if the retrieved mmio's base address is NULL.
+    flexible GetMmioById(struct {
+        index uint32;
+    }) -> (Mmio) error zx.Status;
+
+    /// Returns a memory mapped IO (MMIO) resource for the given |name|.
+    /// * error `ZX_ERR_INVALID_ARGS` if |name| is an empty string.
+    /// * error `ZX_ERR_OUT_OF_RANGE` if |name| is not found.
+    /// * error `ZX_ERR_INTERNAL` if the retrieved mmio is not valid.
+    /// * error `ZX_ERR_NOT_FOUND` if the retrieved's mmio base address is NULL.
+    flexible GetMmioByName(struct {
+        name string:fuchsia.driver.framework.MAX_RESOURCE_NAME_LENGTH;
+    }) -> (Mmio) error zx.Status;
+
     /// Returns an interrupt handle for the given |index|.
     /// |flags| is forwarded as the |options| parameter to `zx_interrupt_create`.
+    /// DEPRECATED: Use `GetInterruptById`.
     flexible GetInterrupt(struct {
         index uint32;
         flags uint32;
@@ -64,16 +85,82 @@ open protocol Device {
         irq zx.Handle:INTERRUPT;
     }) error zx.Status;
 
-    /// Returns an bus transaction initiator (bti) handle for the given |index|.
+    /// Returns an interrupt handle for the given |index|.
+    /// |flags| is forwarded as the |options| parameter to `zx_interrupt_create`.
+    /// * error `ZX_ERR_OUT_OF_RANGE` if |index| is equal or greater than the number of
+    /// interrupts.
+    /// * error `ZX_ERR_INTERNAL` if the retrieved interrupt is not valid.
+    flexible GetInterruptById(struct {
+        index uint32;
+        flags uint32;
+    }) -> (resource struct {
+        irq zx.Handle:INTERRUPT;
+    }) error zx.Status;
+
+    /// Returns an interrupt handle for the given |name|.
+    /// |flags| is forwarded as the |options| parameter to `zx_interrupt_create`.
+    /// * error `ZX_ERR_INVALID_ARGS` if |name| is an empty string.
+    /// * error `ZX_ERR_OUT_OF_RANGE` if |name| is not found.
+    /// * error `ZX_ERR_INTERNAL` if the retrieved interrupt is not valid.
+    flexible GetInterruptByName(struct {
+        name string:fuchsia.driver.framework.MAX_RESOURCE_NAME_LENGTH;
+        flags uint32;
+    }) -> (resource struct {
+        irq zx.Handle:INTERRUPT;
+    }) error zx.Status;
+
+    /// Returns a bus transaction initiator (bti) handle for the given |index|.
+    /// DEPRECATED: Use `GetBtiById`.
     flexible GetBti(struct {
         index uint32;
     }) -> (resource struct {
         bti zx.Handle:BTI;
     }) error zx.Status;
 
-    /// Returns an secure monitor call (smc) handle for the given |index|.
+    /// Returns a bus transaction initiator (bti) handle for the given |index|.
+    /// * error `ZX_ERR_OUT_OF_RANGE` if |index| is equal or greater than the number of
+    /// btis.
+    /// * error `ZX_ERR_INTERNAL` if the retrieved bti is not valid.
+    flexible GetBtiById(struct {
+        index uint32;
+    }) -> (resource struct {
+        bti zx.Handle:BTI;
+    }) error zx.Status;
+
+    /// Returns a bus transaction initiator (bti) handle for the given |name|.
+    /// * error `ZX_ERR_INVALID_ARGS` if |name| is an empty string.
+    /// * error `ZX_ERR_OUT_OF_RANGE` if |name| is not found.
+    /// * error `ZX_ERR_INTERNAL` if the retrieved bti is not valid.
+    flexible GetBtiByName(struct {
+        name string:fuchsia.driver.framework.MAX_RESOURCE_NAME_LENGTH;
+    }) -> (resource struct {
+        bti zx.Handle:BTI;
+    }) error zx.Status;
+
+    /// Returns a secure monitor call (smc) handle for the given |index|.
+    /// DEPRECATED: Use `GetSmcById`.
     flexible GetSmc(struct {
         index uint32;
+    }) -> (resource struct {
+        smc zx.Handle:RESOURCE;
+    }) error zx.Status;
+
+    /// Returns a secure monitor call (smc) handle for the given |index|.
+    /// * error `ZX_ERR_OUT_OF_RANGE` if |index| is equal or greater than the number of
+    /// smcs.
+    /// * error `ZX_ERR_INTERNAL` if the retrieved smc is not valid.
+    flexible GetSmcById(struct {
+        index uint32;
+    }) -> (resource struct {
+        smc zx.Handle:RESOURCE;
+    }) error zx.Status;
+
+    /// Returns a secure monitor call (smc) handle for the given |name|.
+    /// * error `ZX_ERR_INVALID_ARGS` if |name| is an empty string.
+    /// * error `ZX_ERR_OUT_OF_RANGE` if |name| is not found.
+    /// * error `ZX_ERR_INTERNAL` if the retrieved smc is not valid.
+    flexible GetSmcByName(struct {
+        name string:fuchsia.driver.framework.MAX_RESOURCE_NAME_LENGTH;
     }) -> (resource struct {
         smc zx.Handle:RESOURCE;
     }) error zx.Status;

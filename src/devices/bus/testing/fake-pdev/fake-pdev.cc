@@ -30,6 +30,32 @@ void FakePDevFidl::GetMmio(GetMmioRequestView request, GetMmioCompleter::Sync& c
   completer.ReplySuccess(builder.Build());
 }
 
+void FakePDevFidl::GetMmioById(GetMmioByIdRequestView request,
+                               GetMmioByIdCompleter::Sync& completer) {
+  auto mmio = config_.mmios.find(request->index);
+  if (mmio == config_.mmios.end()) {
+    completer.ReplyError(ZX_ERR_NOT_FOUND);
+    return;
+  }
+  fidl::Arena arena;
+  auto builder = fuchsia_hardware_platform_device::wire::Mmio::Builder(arena);
+  if (auto* mmio_info = std::get_if<MmioInfo>(&mmio->second); mmio_info) {
+    builder.offset(mmio_info->offset).size(mmio_info->size);
+    zx::vmo dup;
+    mmio_info->vmo.duplicate(ZX_RIGHT_SAME_RIGHTS, &dup);
+    builder.vmo(std::move(dup));
+  } else {
+    auto& mmio_buffer = std::get<fdf::MmioBuffer>(mmio->second);
+    builder.offset(reinterpret_cast<size_t>(&mmio_buffer));
+  }
+  completer.ReplySuccess(builder.Build());
+}
+
+void FakePDevFidl::GetMmioByName(GetMmioByNameRequestView request,
+                                 GetMmioByNameCompleter::Sync& completer) {
+  completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
+}
+
 void FakePDevFidl::GetInterrupt(GetInterruptRequestView request,
                                 GetInterruptCompleter::Sync& completer) {
   auto itr = config_.irqs.find(request->index);
@@ -51,6 +77,32 @@ void FakePDevFidl::GetInterrupt(GetInterruptRequestView request,
   completer.ReplySuccess(std::move(irq));
 }
 
+void FakePDevFidl::GetInterruptById(GetInterruptByIdRequestView request,
+                                    GetInterruptByIdCompleter::Sync& completer) {
+  auto itr = config_.irqs.find(request->index);
+  if (itr == config_.irqs.end()) {
+    if (!config_.use_fake_irq) {
+      completer.ReplyError(ZX_ERR_NOT_FOUND);
+      return;
+    }
+    zx::interrupt irq;
+    if (zx_status_t status = zx::interrupt::create(zx::resource(), 0, ZX_INTERRUPT_VIRTUAL, &irq);
+        status != ZX_OK) {
+      completer.ReplyError(status);
+      return;
+    }
+    return completer.ReplySuccess(std::move(irq));
+  }
+  zx::interrupt irq;
+  itr->second.duplicate(ZX_RIGHT_SAME_RIGHTS, &irq);
+  completer.ReplySuccess(std::move(irq));
+}
+
+void FakePDevFidl::GetInterruptByName(GetInterruptByNameRequestView request,
+                                      GetInterruptByNameCompleter::Sync& completer) {
+  completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
+}
+
 void FakePDevFidl::GetBti(GetBtiRequestView request, GetBtiCompleter::Sync& completer) {
   zx::bti bti;
   auto itr = config_.btis.find(request->index);
@@ -70,6 +122,30 @@ void FakePDevFidl::GetBti(GetBtiRequestView request, GetBtiCompleter::Sync& comp
   completer.ReplySuccess(std::move(bti));
 }
 
+void FakePDevFidl::GetBtiById(GetBtiByIdRequestView request, GetBtiByIdCompleter::Sync& completer) {
+  zx::bti bti;
+  auto itr = config_.btis.find(request->index);
+  if (itr == config_.btis.end()) {
+    if (!config_.use_fake_bti) {
+      completer.ReplyError(ZX_ERR_NOT_FOUND);
+      return;
+    }
+    zx_status_t status = fake_bti_create(bti.reset_and_get_address());
+    if (status != ZX_OK) {
+      completer.ReplyError(status);
+      return;
+    }
+  } else {
+    itr->second.duplicate(ZX_RIGHT_SAME_RIGHTS, &bti);
+  }
+  completer.ReplySuccess(std::move(bti));
+}
+
+void FakePDevFidl::GetBtiByName(GetBtiByNameRequestView request,
+                                GetBtiByNameCompleter::Sync& completer) {
+  completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
+}
+
 void FakePDevFidl::GetSmc(GetSmcRequestView request, GetSmcCompleter::Sync& completer) {
   zx::resource smc;
   auto itr = config_.smcs.find(request->index);
@@ -87,6 +163,30 @@ void FakePDevFidl::GetSmc(GetSmcRequestView request, GetSmcCompleter::Sync& comp
     itr->second.duplicate(ZX_RIGHT_SAME_RIGHTS, &smc);
   }
   completer.ReplySuccess(std::move(smc));
+}
+
+void FakePDevFidl::GetSmcById(GetSmcByIdRequestView request, GetSmcByIdCompleter::Sync& completer) {
+  zx::resource smc;
+  auto itr = config_.smcs.find(request->index);
+  if (itr == config_.smcs.end()) {
+    if (!config_.use_fake_smc) {
+      completer.ReplyError(ZX_ERR_NOT_FOUND);
+      return;
+    }
+    zx_status_t status = fake_root_resource_create(smc.reset_and_get_address());
+    if (status != ZX_OK) {
+      completer.ReplyError(status);
+      return;
+    }
+  } else {
+    itr->second.duplicate(ZX_RIGHT_SAME_RIGHTS, &smc);
+  }
+  completer.ReplySuccess(std::move(smc));
+}
+
+void FakePDevFidl::GetSmcByName(GetSmcByNameRequestView request,
+                                GetSmcByNameCompleter::Sync& completer) {
+  completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
 }
 
 void FakePDevFidl::GetNodeDeviceInfo(GetNodeDeviceInfoCompleter::Sync& completer) {

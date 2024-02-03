@@ -24,6 +24,9 @@ const MAX_PROPERTY_COUNT uint8 = 64;
 const MAX_NODE_NAME_LENGTH uint8 = 128;
 const MAX_SYMBOL_NAME_LENGTH uint8 = 128;
 
+@available(added=HEAD)
+const MAX_RESOURCE_NAME_LENGTH uint8 = 128;
+
 alias NodePropertyVector = vector<NodeProperty>:MAX_PROPERTY_COUNT;
 alias NodeName = string:MAX_NODE_NAME_LENGTH;
 
