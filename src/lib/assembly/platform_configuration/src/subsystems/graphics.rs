@@ -39,7 +39,7 @@ mod tests {
     #[test]
     fn test_user_default() {
         let context = ConfigurationContext {
-            feature_set_level: &FeatureSupportLevel::Minimal,
+            feature_set_level: &FeatureSupportLevel::Standard,
             build_type: &BuildType::User,
             ..ConfigurationContext::default_for_tests()
         };
@@ -53,7 +53,7 @@ mod tests {
     #[test]
     fn test_user_disabled() {
         let context = ConfigurationContext {
-            feature_set_level: &FeatureSupportLevel::Minimal,
+            feature_set_level: &FeatureSupportLevel::Standard,
             build_type: &BuildType::User,
             ..ConfigurationContext::default_for_tests()
         };
@@ -67,7 +67,7 @@ mod tests {
     #[test]
     fn test_user_enabled() {
         let context = ConfigurationContext {
-            feature_set_level: &FeatureSupportLevel::Minimal,
+            feature_set_level: &FeatureSupportLevel::Standard,
             build_type: &BuildType::User,
             ..ConfigurationContext::default_for_tests()
         };

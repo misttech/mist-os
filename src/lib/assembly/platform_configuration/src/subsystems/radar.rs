@@ -12,7 +12,7 @@ impl DefineSubsystemConfiguration<()> for RadarSubsystemConfig {
         builder: &mut dyn ConfigurationBuilder,
     ) -> anyhow::Result<()> {
         if context.board_info.provides_feature("fuchsia::radar")
-            && matches!(context.feature_set_level, FeatureSupportLevel::Minimal)
+            && matches!(context.feature_set_level, FeatureSupportLevel::Standard)
         {
             if matches!(context.build_type, BuildType::Eng | BuildType::UserDebug) {
                 builder.platform_bundle("radar_proxy_with_injector");

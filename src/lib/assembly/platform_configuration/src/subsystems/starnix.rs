@@ -15,7 +15,7 @@ impl DefineSubsystemConfiguration<PlatformStarnixConfig> for StarnixSubsystem {
     ) -> anyhow::Result<()> {
         if starnix_config.enabled {
             ensure!(
-                *context.feature_set_level == FeatureSupportLevel::Minimal,
+                *context.feature_set_level == FeatureSupportLevel::Standard,
                 "Starnix is only supported in the default feature set level"
             );
             builder.platform_bundle("starnix_support");

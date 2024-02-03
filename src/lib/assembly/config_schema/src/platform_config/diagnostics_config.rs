@@ -94,7 +94,6 @@ mod tests {
         let json5 = r#"
         {
           build_type: "eng",
-          feature_set_level: "minimal",
         }
     "#;
 
@@ -117,7 +116,6 @@ mod tests {
         let json5 = r#"
         {
           build_type: "eng",
-          feature_set_level: "minimal",
           diagnostics: {}
         }
     "#;
@@ -141,7 +139,6 @@ mod tests {
         let json5 = r#"
         {
           build_type: "eng",
-          feature_set_level: "minimal",
           diagnostics: {
             additional_serial_log_components: [
                 "/foo",

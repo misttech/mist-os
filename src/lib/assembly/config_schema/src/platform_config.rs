@@ -218,9 +218,9 @@ pub enum FeatureSupportLevel {
     /// ship a production-level product.
     ///
     /// This is the default level unless otherwise specified.
-    #[serde(rename = "minimal")]
+    #[serde(rename = "standard")]
     #[default]
-    Minimal,
+    Standard,
 }
 // LINT.ThenChange(../../platform_configuration/src/common.rs)
 

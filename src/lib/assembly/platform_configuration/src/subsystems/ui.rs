@@ -55,7 +55,7 @@ impl DefineSubsystemConfiguration<PlatformUiConfig> for UiSubsystem {
         }
 
         ensure!(
-            *context.feature_set_level == FeatureSupportLevel::Minimal,
+            *context.feature_set_level == FeatureSupportLevel::Standard,
             "UI is only supported in the default feature set level"
         );
 

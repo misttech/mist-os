@@ -138,7 +138,7 @@ impl DefineSubsystemConfiguration<()> for CommonBundles {
             (FeatureSupportLevel::Utility, BuildType::User) => {
                 vec!["bootstrap", "core_realm", "core_realm_user_and_userdebug"]
             }
-            (FeatureSupportLevel::Minimal, BuildType::Eng) => {
+            (FeatureSupportLevel::Standard, BuildType::Eng) => {
                 vec![
                     "bootstrap",
                     "bootstrap_userdebug",
@@ -146,31 +146,31 @@ impl DefineSubsystemConfiguration<()> for CommonBundles {
                     "core_realm",
                     "core_realm_eng",
                     "core_realm_development_access",
-                    "common_minimal",
-                    "minimal_eng",
-                    "minimal_userdebug_and_eng",
+                    "common_standard",
+                    "standard_eng",
+                    "standard_userdebug_and_eng",
                     "testing_support",
                 ]
             }
-            (FeatureSupportLevel::Minimal, BuildType::UserDebug) => {
+            (FeatureSupportLevel::Standard, BuildType::UserDebug) => {
                 vec![
                     "bootstrap",
                     "bootstrap_userdebug",
                     "core_realm",
                     "core_realm_development_access",
                     "core_realm_user_and_userdebug",
-                    "common_minimal",
-                    "minimal_userdebug",
-                    "minimal_userdebug_and_eng",
+                    "common_standard",
+                    "standard_userdebug",
+                    "standard_userdebug_and_eng",
                 ]
             }
-            (FeatureSupportLevel::Minimal, BuildType::User) => {
+            (FeatureSupportLevel::Standard, BuildType::User) => {
                 vec![
                     "bootstrap",
                     "core_realm",
                     "core_realm_user_and_userdebug",
-                    "common_minimal",
-                    "minimal_user",
+                    "common_standard",
+                    "standard_user",
                 ]
             }
         } {

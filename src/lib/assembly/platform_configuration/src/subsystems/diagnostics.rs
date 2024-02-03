@@ -58,8 +58,8 @@ impl DefineSubsystemConfiguration<DiagnosticsConfig> for DiagnosticsSubsystem {
                 bind_services.clear();
             }
             // Detect isn't present on user builds.
-            (BuildType::User, FeatureSupportLevel::Minimal) => {}
-            (_, FeatureSupportLevel::Minimal) => {
+            (BuildType::User, FeatureSupportLevel::Standard) => {}
+            (_, FeatureSupportLevel::Standard) => {
                 bind_services.insert("fuchsia.component.DetectBinder");
             }
         };
@@ -129,7 +129,7 @@ impl DefineSubsystemConfiguration<DiagnosticsConfig> for DiagnosticsSubsystem {
         // package.
         if matches!(
             context.feature_set_level,
-            FeatureSupportLevel::Utility | FeatureSupportLevel::Minimal
+            FeatureSupportLevel::Utility | FeatureSupportLevel::Standard
         ) {
             let pipelines = builder
                 .add_domain_config(PackageSetDestination::Boot(
@@ -160,7 +160,7 @@ impl DefineSubsystemConfiguration<DiagnosticsConfig> for DiagnosticsSubsystem {
 
         match context.feature_set_level {
             FeatureSupportLevel::Bootstrap | FeatureSupportLevel::Utility => {}
-            FeatureSupportLevel::Minimal => {
+            FeatureSupportLevel::Standard => {
                 if context.board_info.provides_feature("fuchsia::mali_gpu") {
                     builder.platform_bundle("diagnostics_triage_detect_mali");
                 }
@@ -241,7 +241,7 @@ mod tests {
         serde_json::to_writer(&mut buckets_config, &json!([])).unwrap();
 
         let context = ConfigurationContext {
-            feature_set_level: &FeatureSupportLevel::Minimal,
+            feature_set_level: &FeatureSupportLevel::Standard,
             build_type: &BuildType::Eng,
             resource_dir,
             ..ConfigurationContext::default_for_tests()
@@ -295,7 +295,7 @@ mod tests {
         serde_json::to_writer(&mut buckets_config, &json!([])).unwrap();
 
         let context = ConfigurationContext {
-            feature_set_level: &FeatureSupportLevel::Minimal,
+            feature_set_level: &FeatureSupportLevel::Standard,
             build_type: &BuildType::Eng,
             resource_dir,
             ..ConfigurationContext::default_for_tests()
@@ -327,7 +327,7 @@ mod tests {
         serde_json::to_writer(&mut buckets_config, &json!([])).unwrap();
 
         let context = ConfigurationContext {
-            feature_set_level: &FeatureSupportLevel::Minimal,
+            feature_set_level: &FeatureSupportLevel::Standard,
             build_type: &BuildType::Eng,
             resource_dir,
             ..ConfigurationContext::default_for_tests()
@@ -399,7 +399,7 @@ mod tests {
         serde_json::to_writer(&mut buckets_config, &json!([])).unwrap();
 
         let context = ConfigurationContext {
-            feature_set_level: &FeatureSupportLevel::Minimal,
+            feature_set_level: &FeatureSupportLevel::Standard,
             build_type: &BuildType::User,
             resource_dir,
             ..ConfigurationContext::default_for_tests()
@@ -446,7 +446,7 @@ mod tests {
         .unwrap();
 
         let context = ConfigurationContext {
-            feature_set_level: &FeatureSupportLevel::Minimal,
+            feature_set_level: &FeatureSupportLevel::Standard,
             build_type: &BuildType::User,
             resource_dir,
             ..ConfigurationContext::default_for_tests()
@@ -479,7 +479,7 @@ mod tests {
         .unwrap();
 
         let context = ConfigurationContext {
-            feature_set_level: &FeatureSupportLevel::Minimal,
+            feature_set_level: &FeatureSupportLevel::Standard,
             build_type: &BuildType::User,
             resource_dir,
             ..ConfigurationContext::default_for_tests()

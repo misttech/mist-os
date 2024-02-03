@@ -27,16 +27,17 @@ use assembly_util::{
 /// provide the basis for all other products:
 ///
 /// bringup.gni  (Bootstrap)
-///   +--> minimal.gni  (Minimal)
+///   +--> minimal.gni  (Standard)
 ///         +--> core.gni
 ///               +--> (everything else)
 ///
-/// The `Utility` level is between `Bootstrap` and `Minimal`, adding the `/core`
+/// The `Utility` level is between `Bootstrap` and `Standard`, adding the `/core`
 /// realm and those children of `/core` needed by all systems that include
 /// `/core`.
 ///
-/// The standard, default, level is `Minimal`, and is the level that should be
-/// used by products' main system.
+/// The standard, default, level is `Standard`, and is the level that should be
+/// used by products' main system.  As it's the default, it should not be named
+/// directly in the platform configuration of products.
 ///
 /// Note:  This version of the enum does not contain the
 /// `assembly_config_schema::FeatureSetLevel::Empty` option, as that is instead
@@ -61,7 +62,7 @@ pub(crate) enum FeatureSupportLevel {
     /// ship a production-level product.
     ///
     /// This is the default level unless otherwise specified.
-    Minimal,
+    Standard,
 }
 impl FeatureSupportLevel {
     /// Convert a deserialized assembly_config_schema:: FeatureSetLevel into an
@@ -77,8 +78,8 @@ impl FeatureSupportLevel {
             assembly_config_schema::FeatureSupportLevel::Utility => {
                 Some(FeatureSupportLevel::Utility)
             }
-            assembly_config_schema::FeatureSupportLevel::Minimal => {
-                Some(FeatureSupportLevel::Minimal)
+            assembly_config_schema::FeatureSupportLevel::Standard => {
+                Some(FeatureSupportLevel::Standard)
             }
         }
     }
@@ -764,14 +765,14 @@ impl ConfigurationContext<'_> {
     /// ```
     ///  use crate::subsystems::prelude::*;
     ///  let context = ConfigurationContext {
-    ///      feature_set_level: &FeatureSupportLevel::Minimal,
+    ///      feature_set_level: &FeatureSupportLevel::Standard,
     ///      build_type: &BuildType::Eng,
     ///      ..Default::default()
     ///  };
     ///  ```
     pub(crate) fn default_for_tests() -> Self {
         Self {
-            feature_set_level: &FeatureSupportLevel::Minimal,
+            feature_set_level: &FeatureSupportLevel::Standard,
             build_type: &BuildType::User,
             board_info: &tests::BOARD_INFORMATION_FOR_TESTS,
             ramdisk_image: false,

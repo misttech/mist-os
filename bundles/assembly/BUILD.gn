@@ -524,7 +524,7 @@ assembly_input_bundle("clock_development_tools") {
 # other AIBs in this group add shards and optional children of `/core`.
 #
 # This is "less than minimal".  "utility" systems include this to get a `/core`
-# realm, but do not include the `common_minimal` AIB as that brings in too much
+# realm, but do not include the `common_standard` AIB as that brings in too much
 # functionality for these specialized systems.
 #
 # All children in `/core` receive InspectSink and LogSink.
@@ -591,7 +591,7 @@ assembly_input_bundle("core_realm") {
 # they are in separate AIBs.
 #
 # "Utility" systems get this in the 'user' build-type only if they request that
-# networking is added.  All other build-types (and all "minimal" systems) get
+# networking is added.  All other build-types (and all "standard" systems) get
 # this AIB by mandatory inclusion.
 assembly_input_bundle("core_realm_networking") {
   base_packages = [
@@ -1302,22 +1302,20 @@ assembly_input_bundle("factory_reset_trigger") {
 
 ########
 #
-# The "minimal" AIBs
+# The "standard" AIBs
 #
-# These correspond to the use of "minimal.gni" as a platform configuration.  Its
-# contents are being moved into the `core_realm` and feature- or subsystem-
-# specific AIBs that are are included in various different combinations of the
-# feature_set_level and the build-type.
+# These historically corresponded to the use of "minimal.gni" as a basis for
+# other products.
 #
 # All components here receive InspectSink and LogSink.
 #
-# TODO(https://fxbug.dev/42065169) Move the contents of common_minimal to the right
+# TODO(https://fxbug.dev/42065169) Move the contents of common_standard to the right
 # feature- or subsystem-specific AIBs (if not to the core realm AIBs).
 #
 # WARNING:  The only way to remove items from this AIB for a given product is to
 # move them to other AIBs that are included by all other products.
 #
-assembly_input_bundle("common_minimal") {
+assembly_input_bundle("common_standard") {
   bootfs_files_labels = [ "//src/sys/core:bootfs" ]
 
   base_packages = [
@@ -1494,7 +1492,7 @@ assembly_input_bundle("common_minimal") {
 
 # This is exclusive to user builds on the minimal support level.
 #
-assembly_input_bundle("minimal_user") {
+assembly_input_bundle("standard_user") {
   base_packages = [
     # memory_monitor with profiling disabled.
     "//src/developer/memory/monitor:monitor_without_memory_sampler",
@@ -1531,7 +1529,7 @@ assembly_input_bundle("minimal_user") {
 
 # This is exclusive to userdebug builds on the minimal support level.
 #
-assembly_input_bundle("minimal_userdebug") {
+assembly_input_bundle("standard_userdebug") {
   config_data = [
     {
       package_name = "cobalt"
@@ -1574,7 +1572,7 @@ assembly_input_bundle("minimal_userdebug") {
 # This is common across all eng-mode products, at the minimal or higher service
 # level.
 #
-assembly_input_bundle("minimal_eng") {
+assembly_input_bundle("standard_eng") {
   testonly = true
   base_packages = []
   cache_packages = [
@@ -1617,7 +1615,7 @@ assembly_input_bundle("minimal_eng") {
 # This is common across all eng-mode and user-debug products, at the minimal or
 # higher service level.
 #
-assembly_input_bundle("minimal_userdebug_and_eng") {
+assembly_input_bundle("standard_userdebug_and_eng") {
   base_packages = [
     "//src/diagnostics/detect:triage-detect",
     "//src/sys/pkg/bin/pkgctl",
@@ -1864,7 +1862,7 @@ assembly_input_bundle("starnix_support") {
 }
 
 # This AIB enables testing support, and is meant to be used with either the
-# `common_minimal_eng` and `common_minimal_userdebug` AIBs.
+# `common_standard_eng` and `common_standard_userdebug` AIBs.
 #
 # This includes testing support in the platform `base` package set, not just
 # via `universe`

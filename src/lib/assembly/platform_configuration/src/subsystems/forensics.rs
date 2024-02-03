@@ -35,7 +35,7 @@ impl DefineSubsystemConfiguration<ForensicsConfig> for ForensicsSubsystem {
         // Cobalt may be added to anything utility and higher.
         if matches!(
             context.feature_set_level,
-            FeatureSupportLevel::Minimal | FeatureSupportLevel::Utility
+            FeatureSupportLevel::Standard | FeatureSupportLevel::Utility
         ) {
             util::add_build_type_config_data("cobalt", context, builder)?;
             if let Some(api_key) = &config.cobalt.api_key {

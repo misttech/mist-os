@@ -13,7 +13,7 @@ impl DefineSubsystemConfiguration<PlatformMediaConfig> for MediaSubsystem {
         media_config: &PlatformMediaConfig,
         builder: &mut dyn ConfigurationBuilder,
     ) -> anyhow::Result<()> {
-        if *context.feature_set_level == FeatureSupportLevel::Minimal
+        if *context.feature_set_level == FeatureSupportLevel::Standard
             && *context.build_type == BuildType::Eng
         {
             builder.platform_bundle("audio_development_support");

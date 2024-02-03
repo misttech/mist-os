@@ -19,13 +19,13 @@ impl DefineSubsystemConfiguration<(&PlatformSessionConfig, &String)> for Session
 
         if session_config.enabled {
             ensure!(
-                *context.feature_set_level == FeatureSupportLevel::Minimal,
+                *context.feature_set_level == FeatureSupportLevel::Standard,
                 "The platform session manager is only supported in the default feature set level"
             );
             builder.platform_bundle("session_manager");
         }
 
-        if *context.feature_set_level == FeatureSupportLevel::Minimal {
+        if *context.feature_set_level == FeatureSupportLevel::Standard {
             // Configure the session URL.
             ensure!(
                 session_url.is_empty() || session_url.starts_with("fuchsia-pkg://"),
@@ -35,7 +35,7 @@ impl DefineSubsystemConfiguration<(&PlatformSessionConfig, &String)> for Session
         } else {
             ensure!(
                 session_url.is_empty(),
-                "sessions are only supported with the 'Minimal' feature set level"
+                "sessions are only supported with the 'Standard' feature set level"
             );
         }
         builder.set_config_capability(
@@ -49,7 +49,7 @@ impl DefineSubsystemConfiguration<(&PlatformSessionConfig, &String)> for Session
 
         if session_config.include_element_manager {
             ensure!(
-                *context.feature_set_level == FeatureSupportLevel::Minimal,
+                *context.feature_set_level == FeatureSupportLevel::Standard,
                 "The platform element manager is only supported in the default feature set level"
             );
             builder.platform_bundle("element_manager");

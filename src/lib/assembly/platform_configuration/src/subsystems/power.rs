@@ -39,7 +39,7 @@ impl DefineSubsystemConfiguration<PowerConfig> for PowerManagementSubsystem {
             ensure!(
                 matches!(
                     context.feature_set_level,
-                    FeatureSupportLevel::Minimal | FeatureSupportLevel::Utility
+                    FeatureSupportLevel::Standard | FeatureSupportLevel::Utility
                 ) && *context.build_type == BuildType::Eng
             );
             builder.platform_bundle("power_framework");
@@ -47,7 +47,7 @@ impl DefineSubsystemConfiguration<PowerConfig> for PowerManagementSubsystem {
 
         match (&context.board_info.configuration.power_metrics_recorder, &context.feature_set_level)
         {
-            (Some(config), FeatureSupportLevel::Minimal) => {
+            (Some(config), FeatureSupportLevel::Standard) => {
                 builder.platform_bundle("power_metrics_recorder");
                 builder.package("metrics-logger-standalone").config_data(FileEntry {
                     source: config.as_utf8_pathbuf().into(),

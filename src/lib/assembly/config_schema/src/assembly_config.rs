@@ -171,7 +171,7 @@ mod tests {
         let mut cursor = std::io::Cursor::new(json5);
         let config: AssemblyConfig = util::from_reader(&mut cursor).unwrap();
         assert_eq!(config.platform.build_type, BuildType::Eng);
-        assert_eq!(config.platform.feature_set_level, FeatureSupportLevel::Minimal);
+        assert_eq!(config.platform.feature_set_level, FeatureSupportLevel::Standard);
     }
 
     #[test]
@@ -197,7 +197,6 @@ mod tests {
         let json5 = r#"
         {
           platform: {
-            feature_set_level: "minimal",
             build_type: "eng",
           },
           product: {},
@@ -207,7 +206,7 @@ mod tests {
         let mut cursor = std::io::Cursor::new(json5);
         let config: AssemblyConfig = util::from_reader(&mut cursor).unwrap();
         assert_eq!(config.platform.build_type, BuildType::Eng);
-        assert_eq!(config.platform.feature_set_level, FeatureSupportLevel::Minimal);
+        assert_eq!(config.platform.feature_set_level, FeatureSupportLevel::Standard);
     }
 
     #[test]

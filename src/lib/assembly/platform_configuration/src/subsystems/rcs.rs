@@ -17,7 +17,7 @@ impl DefineSubsystemConfiguration<()> for RcsSubsystemConfig {
         if matches!(
             (context.feature_set_level, context.build_type),
             (
-                FeatureSupportLevel::Utility | FeatureSupportLevel::Minimal,
+                FeatureSupportLevel::Utility | FeatureSupportLevel::Standard,
                 BuildType::UserDebug | BuildType::Eng
             )
         ) {

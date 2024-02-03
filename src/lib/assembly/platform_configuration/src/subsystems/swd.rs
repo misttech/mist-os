@@ -79,8 +79,8 @@ impl DefineSubsystemConfiguration<SwdConfig> for SwdSubsystemConfig {
             // The product does not specify. Set based on feature set level.
             None => {
                 match context.feature_set_level {
-                    // Minimal has an update checker
-                    FeatureSupportLevel::Minimal => {
+                    // Standard has an update checker
+                    FeatureSupportLevel::Standard => {
                         let update_checker =
                             UpdateChecker::default_by_build_type(context.build_type);
                         Self::set_update_checker(&update_checker, context.build_type, builder)?;

@@ -10,7 +10,6 @@ assert(
 
 product_assembly_configuration("minimal_boot_user") {
   platform = {
-    feature_set_level = "minimal"
     build_type = "user"
     diagnostics = {
       additional_serial_log_components = [
