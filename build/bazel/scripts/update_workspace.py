@@ -286,7 +286,11 @@ def all_sdk_metas(sdk_root):
     part_metas = [
         os.path.join(sdk_root, part["meta"]) for part in sdk_manifest["parts"]
     ]
-    return [sdk_manifest_path] + part_metas
+    # Important: resolve symlinks now to ensure that the content hash
+    # computed from these files reflect their content, not the symlink
+    # target paths they point to.
+    # See https://fxbug.dev/323590606
+    return [os.path.realpath(p) for p in [sdk_manifest_path] + part_metas]
 
 
 def find_clang_content_files(clang_install_dir):
