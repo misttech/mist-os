@@ -17,13 +17,15 @@ rustc_binary("funnel_bin") {
   ]
   with_unit_tests = true
   deps = [
-    "//src/developer/ffx/fidl:fuchsia.developer.ffx_rust",
     "//src/developer/ffx/lib/addr:lib",
+    "//src/developer/ffx/lib/discovery:lib",
     "//src/developer/ffx/lib/logging:lib",
-    "//src/developer/ffx/lib/mdns_discovery:lib",
+    "//src/developer/ffx/lib/timeout:lib",
+    "//src/lib/fuchsia-async",
     "//src/lib/fuchsia-async",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:argh",
+    "//third_party/rust_crates:futures",
     "//third_party/rust_crates:lazy_static",
     "//third_party/rust_crates:rand",
     "//third_party/rust_crates:tracing",
@@ -31,6 +33,7 @@ rustc_binary("funnel_bin") {
   ]
   test_deps = [
     "//sdk/fidl/fuchsia.net:fuchsia.net_rust",
+    "//src/developer/ffx/fidl:fuchsia.developer.ffx_rust",
     "//src/lib/fuchsia-async",
     "//third_party/rust_crates:pretty_assertions",
   ]

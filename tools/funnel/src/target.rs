@@ -1,22 +1,22 @@
 // Copyright 2023 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-//
+
+use addr::TargetAddr;
 use anyhow::{anyhow, bail, Result};
-use fidl_fuchsia_developer_ffx::TargetInfo;
 use std::io::{stdin, stdout, BufRead, Write};
 
-pub(crate) async fn choose_target(
-    targets: Vec<TargetInfo>,
-    def: Option<String>,
-) -> Result<TargetInfo> {
+#[derive(Debug, Clone, PartialEq, Default)]
+pub(crate) struct TargetInfo {
+    pub(crate) nodename: String,
+    pub(crate) addresses: Vec<TargetAddr>,
+}
+
+pub async fn choose_target(targets: Vec<TargetInfo>, def: Option<String>) -> Result<TargetInfo> {
     // If they specified a target...
     if let Some(t) = def {
-        let filtered_targets = targets
-            .iter()
-            .filter(|x| x.nodename.as_ref().unwrap() == &t)
-            .cloned()
-            .collect::<Vec<TargetInfo>>();
+        let filtered_targets =
+            targets.iter().filter(|x| x.nodename == t).cloned().collect::<Vec<TargetInfo>>();
         let found_target = filtered_targets.first();
         if found_target.is_none() {
             anyhow::bail!("Specified target does not exist")
@@ -55,7 +55,7 @@ where
 {
     writeln!(output, "Multiple devices detected. Please choose the target by number:")?;
     for (i, t) in targets.iter().enumerate() {
-        let name = t.clone().nodename.unwrap_or("unknown".to_string());
+        let name = t.clone().nodename;
         writeln!(output, "  {i}: {name}")?;
     }
     write!(output, "Choice: ")?;
@@ -87,15 +87,12 @@ mod test {
         let input = b"1";
         let output = Vec::new();
         let targets = vec![
-            TargetInfo { nodename: Some("cytherera".to_string()), ..Default::default() },
-            TargetInfo { nodename: Some("alecto".to_string()), ..Default::default() },
+            TargetInfo { nodename: "cytherera".to_string(), ..Default::default() },
+            TargetInfo { nodename: "alecto".to_string(), ..Default::default() },
         ];
 
         let res = prompt_for_target(&input[..], output, targets).await?;
-        assert_eq!(
-            res,
-            TargetInfo { nodename: Some("cytherera".to_string()), ..Default::default() }
-        );
+        assert_eq!(res, TargetInfo { nodename: "cytherera".to_string(), ..Default::default() });
         Ok(())
     }
 
@@ -104,8 +101,8 @@ mod test {
         let input = b"asdf";
         let output = Vec::new();
         let targets = vec![
-            TargetInfo { nodename: Some("cytherera".to_string()), ..Default::default() },
-            TargetInfo { nodename: Some("alecto".to_string()), ..Default::default() },
+            TargetInfo { nodename: "cytherera".to_string(), ..Default::default() },
+            TargetInfo { nodename: "alecto".to_string(), ..Default::default() },
         ];
 
         let res = prompt_for_target(&input[..], output, targets).await;
@@ -119,8 +116,8 @@ mod test {
         let input = b"4";
         let output = Vec::new();
         let targets = vec![
-            TargetInfo { nodename: Some("cytherera".to_string()), ..Default::default() },
-            TargetInfo { nodename: Some("alecto".to_string()), ..Default::default() },
+            TargetInfo { nodename: "cytherera".to_string(), ..Default::default() },
+            TargetInfo { nodename: "alecto".to_string(), ..Default::default() },
         ];
 
         let res = prompt_for_target(&input[..], output, targets).await;
