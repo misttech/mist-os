@@ -790,7 +790,29 @@ void PlatformDevice::GetMmioById(GetMmioByIdRequestView request,
 
 void PlatformDevice::GetMmioByName(GetMmioByNameRequestView request,
                                    GetMmioByNameCompleter::Sync& completer) {
-  completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
+  if (request->name.empty()) {
+    return completer.ReplyError(ZX_ERR_INVALID_ARGS);
+  }
+  std::optional<uint32_t> index = GetMmioIndex(node_, request->name.get());
+  if (!index.has_value()) {
+    return completer.ReplyError(ZX_ERR_OUT_OF_RANGE);
+  }
+
+  pdev_mmio_t banjo_mmio;
+  zx_status_t status = PDevGetMmio(index.value(), &banjo_mmio);
+  if (status != ZX_OK) {
+    completer.ReplyError(status);
+    return;
+  }
+
+  fidl::Arena arena;
+  fuchsia_hardware_platform_device::wire::Mmio mmio =
+      fuchsia_hardware_platform_device::wire::Mmio::Builder(arena)
+          .offset(banjo_mmio.offset)
+          .size(banjo_mmio.size)
+          .vmo(zx::vmo(banjo_mmio.vmo))
+          .Build();
+  completer.ReplySuccess(std::move(mmio));
 }
 
 void PlatformDevice::GetInterrupt(GetInterruptRequestView request,
@@ -817,7 +839,20 @@ void PlatformDevice::GetInterruptById(GetInterruptByIdRequestView request,
 
 void PlatformDevice::GetInterruptByName(GetInterruptByNameRequestView request,
                                         GetInterruptByNameCompleter::Sync& completer) {
-  completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
+  if (request->name.empty()) {
+    return completer.ReplyError(ZX_ERR_INVALID_ARGS);
+  }
+  std::optional<uint32_t> index = GetIrqIndex(node_, request->name.get());
+  if (!index.has_value()) {
+    return completer.ReplyError(ZX_ERR_OUT_OF_RANGE);
+  }
+  zx::interrupt interrupt;
+  zx_status_t status = PDevGetInterrupt(index.value(), request->flags, &interrupt);
+  if (status == ZX_OK) {
+    completer.ReplySuccess(std::move(interrupt));
+  } else {
+    completer.ReplyError(status);
+  }
 }
 
 void PlatformDevice::GetBti(GetBtiRequestView request, GetBtiCompleter::Sync& completer) {
@@ -843,7 +878,20 @@ void PlatformDevice::GetBtiById(GetBtiByIdRequestView request,
 
 void PlatformDevice::GetBtiByName(GetBtiByNameRequestView request,
                                   GetBtiByNameCompleter::Sync& completer) {
-  completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
+  if (request->name.empty()) {
+    return completer.ReplyError(ZX_ERR_INVALID_ARGS);
+  }
+  std::optional<uint32_t> index = GetBtiIndex(node_, request->name.get());
+  if (!index.has_value()) {
+    return completer.ReplyError(ZX_ERR_OUT_OF_RANGE);
+  }
+  zx::bti bti;
+  zx_status_t status = PDevGetBti(index.value(), &bti);
+  if (status == ZX_OK) {
+    completer.ReplySuccess(std::move(bti));
+  } else {
+    completer.ReplyError(status);
+  }
 }
 
 void PlatformDevice::GetSmc(GetSmcRequestView request, GetSmcCompleter::Sync& completer) {
@@ -869,7 +917,20 @@ void PlatformDevice::GetSmcById(GetSmcByIdRequestView request,
 
 void PlatformDevice::GetSmcByName(GetSmcByNameRequestView request,
                                   GetSmcByNameCompleter::Sync& completer) {
-  completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
+  if (request->name.empty()) {
+    return completer.ReplyError(ZX_ERR_INVALID_ARGS);
+  }
+  std::optional<uint32_t> index = GetSmcIndex(node_, request->name.get());
+  if (!index.has_value()) {
+    return completer.ReplyError(ZX_ERR_OUT_OF_RANGE);
+  }
+  zx::resource resource;
+  zx_status_t status = PDevGetSmc(index.value(), &resource);
+  if (status == ZX_OK) {
+    completer.ReplySuccess(std::move(resource));
+  } else {
+    completer.ReplyError(status);
+  }
 }
 
 void PlatformDevice::GetPowerConfiguration(GetPowerConfigurationCompleter::Sync& completer) {

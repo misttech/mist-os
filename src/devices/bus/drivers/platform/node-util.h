@@ -36,6 +36,17 @@ constexpr bool IsValid(const fuchsia_hardware_platform_bus::Metadata& meta) {
 constexpr bool IsValid(const fuchsia_hardware_platform_bus::BootMetadata& meta) {
   return (meta.zbi_extra() != std::nullopt) && (meta.zbi_type() != std::nullopt);
 }
+
+// Returns the index of the resource matching the resource name.
+std::optional<uint32_t> GetMmioIndex(const fuchsia_hardware_platform_bus::Node& node,
+                                     std::string_view mmio_name);
+std::optional<uint32_t> GetIrqIndex(const fuchsia_hardware_platform_bus::Node& node,
+                                    std::string_view irq_name);
+std::optional<uint32_t> GetBtiIndex(const fuchsia_hardware_platform_bus::Node& node,
+                                    std::string_view bti_name);
+std::optional<uint32_t> GetSmcIndex(const fuchsia_hardware_platform_bus::Node& node,
+                                    std::string_view smc_name);
+
 }  // namespace platform_bus
 
 #endif  // SRC_DEVICES_BUS_DRIVERS_PLATFORM_NODE_UTIL_H_

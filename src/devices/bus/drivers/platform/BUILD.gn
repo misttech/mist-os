@@ -22,6 +22,7 @@ driver_bind_rules("platform-bus-bind") {
 fuchsia_driver("platform-bus-driver") {
   output_name = "platform-bus"
   sources = [
+    "node-util.cc",
     "platform-bus.cc",
     "platform-device.cc",
     "platform-interrupt.cc",
@@ -99,6 +100,7 @@ fuchsia_driver_component("platform-bus.proxy") {
 
 test("platform-bus-unittest") {
   sources = [
+    "node-util.cc",
     "platform-bus-unittest.cc",
     "platform-bus.cc",
     "platform-device.cc",
