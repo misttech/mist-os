@@ -153,9 +153,6 @@ def main():
     parser.add_argument(
         "--kernel-cmdline", type=argparse.FileType("r"), required=True
     )
-    parser.add_argument(
-        "--kernel-clock-backstop", type=argparse.FileType("r"), required=True
-    )
     parser.add_argument("--boot-args", type=argparse.FileType("r"))
     parser.add_argument("--bootfs-packages-list", type=argparse.FileType("r"))
 
@@ -274,7 +271,6 @@ def main():
 
     kernel = KernelInfo()
     kernel.args.update(json.load(args.kernel_cmdline))
-    kernel.clock_backstop = json.load(args.kernel_clock_backstop)
 
     boot_args = []
     if args.boot_args is not None:

@@ -7,7 +7,6 @@ import("//build/assembly/bootfs_files_for_assembly.gni")
 import("//build/assembly/package_manifests_list.gni")
 import("//build/config.gni")
 import("//build/dist/distribution_manifest.gni")
-import("//build/info/info.gni")
 import("//build/python/python_action.gni")
 import("//build/zbi/kernel_cmdline.gni")
 
@@ -576,8 +575,6 @@ template("legacy_assembly_input_bundle") {
       rebase_path(files.bootfs_package_list, root_build_dir),
       "--kernel-cmdline",
       rebase_path(files.kernel_cmdline_args, root_build_dir),
-      "--kernel-clock-backstop",
-      rebase_path(build_info_files.minimum_utc_stamp, root_build_dir),
       "--boot-args",
       rebase_path(files.boot_args, root_build_dir),
       "--outdir",
@@ -612,7 +609,6 @@ template("legacy_assembly_input_bundle") {
       files.extra_base_list,
       files.extra_base_deps_list,
       files.bootfs_package_list,
-      build_info_files.minimum_utc_stamp,
       files.kernel_cmdline_args,
       files.boot_args,
       files.base_driver_package_list,
@@ -635,7 +631,6 @@ template("legacy_assembly_input_bundle") {
       ":${labels.extra_base_deps_list}",
       ":${labels.extra_base_list}",
       ":${labels.kernel_cmdline_args}",
-      "//build/info:build_info_files",
     ]
 
     if (_shell_command_packages != []) {
