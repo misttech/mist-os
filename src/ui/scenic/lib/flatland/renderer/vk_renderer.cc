@@ -816,7 +816,7 @@ void VkRenderer::Render(const ImageMetadata& render_target,
         VK_QUEUE_FAMILY_FOREIGN_EXT, escher_->device()->vk_main_queue_family());
   }
 
-  std::vector<const escher::TexturePtr> textures;
+  std::vector<escher::TexturePtr> textures;
   std::vector<escher::RectangleCompositor::ColorData> color_data;
   for (const auto& image : images) {
     auto texture_ptr = local_texture_map.at(image.identifier);

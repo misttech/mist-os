@@ -51,9 +51,9 @@ class RectangleCompositor {
   // Depth is implicit. Renderables are drawn in the order they appear in the input
   // vector, with the first entry being the furthest back, and the last the closest.
   void DrawBatch(CommandBuffer* cmd_buf, const std::vector<Rectangle2D>& rectangles,
-                 const std::vector<const TexturePtr>& textures,
-                 const std::vector<ColorData>& color_data, const ImagePtr& output_image,
-                 const TexturePtr& depth_buffer, bool apply_color_conversion = false);
+                 const std::vector<TexturePtr>& textures, const std::vector<ColorData>& color_data,
+                 const ImagePtr& output_image, const TexturePtr& depth_buffer,
+                 bool apply_color_conversion = false);
 
   // This data is used to apply a color-conversion post processing effect over the entire
   // rendered output, when making a call to |DrawBatch|. The color conversion formula

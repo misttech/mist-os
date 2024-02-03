@@ -371,7 +371,7 @@ VK_TEST_F(RectangleCompositorTest, MultiRenderableTest) {
 
   std::vector<Rectangle2D> rectangles;
   std::vector<RectangleCompositor::ColorData> color_datas;
-  std::vector<const TexturePtr> textures;
+  std::vector<TexturePtr> textures;
   vec4 colors[4] = {vec4{1, 0, 0, 1}, vec4(0, 1, 0, 1), vec4(0, 0, 1, 1), vec4(1, 1, 1, 1)};
   for (uint32_t i = 0; i < 4; i++) {
     Rectangle2D rectangle(vec2(128 * i, 0), vec2(128, 512));
@@ -416,7 +416,7 @@ VK_TEST_F(RectangleCompositorTest, OverlapTest) {
 
   std::vector<Rectangle2D> rectangles;
   std::vector<RectangleCompositor::ColorData> color_datas;
-  std::vector<const TexturePtr> textures;
+  std::vector<TexturePtr> textures;
   vec4 colors[2] = {vec4{1, 0, 0, 1}, vec4(0, 1, 0, 1)};
   for (uint32_t i = 0; i < 2; i++) {
     Rectangle2D rectangle(vec2(200, 200), vec2(100, 100));
@@ -462,7 +462,7 @@ VK_TEST_F(RectangleCompositorTest, TransparencyTest) {
 
   std::vector<Rectangle2D> rectangles;
   std::vector<RectangleCompositor::ColorData> color_datas;
-  std::vector<const TexturePtr> textures;
+  std::vector<TexturePtr> textures;
 
   vec4 colors[2] = {vec4{1, 0, 0, 1}, vec4(0, 0, 1, 0.6)};
   for (uint32_t i = 0; i < 2; i++) {
@@ -506,7 +506,7 @@ VK_TEST_F(RectangleCompositorTest, TransparencyFlagOffTest) {
 
   std::vector<Rectangle2D> rectangles;
   std::vector<RectangleCompositor::ColorData> color_datas;
-  std::vector<const TexturePtr> textures;
+  std::vector<TexturePtr> textures;
 
   vec4 colors[2] = {vec4{1, 0, 0, 1}, vec4(0, 0, 1, 0.6)};
   for (uint32_t i = 0; i < 2; i++) {
@@ -547,7 +547,7 @@ VK_TEST_F(RectangleCompositorTest, StressTest) {
 
   std::vector<Rectangle2D> rectangles;
   std::vector<RectangleCompositor::ColorData> color_datas;
-  std::vector<const TexturePtr> textures;
+  std::vector<TexturePtr> textures;
   uint32_t max_renderables = 100;
   for (uint32_t i = 0; i < max_renderables; i++) {
     Rectangle2D rectangle(vec2(i, 0), vec2(1, 1));
