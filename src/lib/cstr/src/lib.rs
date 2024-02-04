@@ -23,10 +23,13 @@ macro_rules! cstr {
             const CSTR: Result<&'static ::core::ffi::CStr, ::core::ffi::FromBytesUntilNulError> =
                 ::core::ffi::CStr::from_bytes_until_nul(concat!($s, "\0").as_bytes());
             $crate::__reexport::const_assert!(CSTR.is_ok());
-            // SAFETY: from_bytes_until_nul will only produce an error if there is no nul byte.
-            // Since we add one, unwrap should always be ok. We also assert at compile time just in
+            // from_bytes_until_nul only produces an error if there is no nul byte.
+            // Since we add one, unwrap is always ok. We also assert at compile time just in
             // case this assumption changes from under us.
-            unsafe { CSTR.unwrap_unchecked() }
+            match CSTR {
+                Ok(v) => v,
+                Err(_) => unreachable!(),
+            }
         }
     };
 }
@@ -60,5 +63,10 @@ mod tests {
         let cstr = cstr!("test\0 string");
 
         assert_eq!(cstring_cstr, cstr);
+    }
+
+    #[test]
+    fn cstr_compatible_with_const() {
+        const _TEST_STRING: &'static ffi::CStr = cstr!("test string");
     }
 }
