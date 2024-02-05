@@ -952,4 +952,17 @@ void TestBase::RequestTopologies() {
   ASSERT_FALSE(topologies_.empty());
 }
 
+// Request that the driver return its gain capabilities and current state, expecting a response.
+void TestBase::RetrieveIsBridgeable() {
+  ASSERT_TRUE(device_entry().isCodec());
+
+  // We reconnect the stream every time we run a test, and by driver interface definition the driver
+  // must reply to the first watch request, so we get gain state by issuing a watch FIDL call.
+  codec()->IsBridgeable(AddCallback("IsBridgeable", [this](bool supports_bridged_mode) {
+    supports_bridged_mode_ = supports_bridged_mode;
+  }));
+  ExpectCallbacks();
+  ASSERT_TRUE(supports_bridged_mode_);
+}
+
 }  // namespace media::audio::drivers::test
