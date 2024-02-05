@@ -16,6 +16,7 @@ use netlink::{
 };
 use netlink_packet_core::{NetlinkMessage, NetlinkSerializable};
 use netlink_packet_route::rtnl::RtnlMessage;
+use netlink_packet_sock_diag::message::SockDiagMessage;
 use netlink_packet_utils::Emitable as _;
 use starnix_sync::{Locked, Mutex, ReadOps, WriteOps};
 use std::{marker::PhantomData, num::NonZeroU32, sync::Arc};
@@ -39,7 +40,7 @@ use crate::{
         },
     },
 };
-use starnix_logging::{log_error, log_info, log_warn, track_stub};
+use starnix_logging::{log_debug, log_error, log_info, log_warn, track_stub};
 use starnix_uapi::{
     auth::CAP_NET_ADMIN, errno, error, errors::Errno, nlmsghdr, sockaddr_nl, socklen_t, ucred,
     user_buffer::UserBuffer, vfs::FdEvents, AF_NETLINK, NETLINK_ADD_MEMBERSHIP, NETLINK_AUDIT,
@@ -73,6 +74,7 @@ pub fn new_netlink_socket(
         NetlinkFamily::KobjectUevent => Box::new(UEventNetlinkSocket::new(kernel)),
         NetlinkFamily::Route => Box::new(RouteNetlinkSocket::new(kernel)?),
         NetlinkFamily::Generic => Box::new(GenericNetlinkSocket::new(kernel)?),
+        NetlinkFamily::SockDiag => Box::new(DiagnosticNetlinkSocket::new(kernel)?),
         _ => Box::new(BaseNetlinkSocket::new(family)),
     };
     Ok(ops)
@@ -981,6 +983,146 @@ impl SocketOps for RouteNetlinkSocket {
     ) -> Result<(), Errno> {
         // TODO(https://issuetracker.google.com/283827094): Support add/del
         // multicast group membership.
+        self.inner.lock().setsockopt(task, level, optname, user_opt)
+    }
+}
+
+/// Socket implementation for the NETLINK_SOCK_DIAG family of netlink sockets.
+struct DiagnosticNetlinkSocket {
+    /// The inner Netlink socket implementation
+    inner: Arc<Mutex<NetlinkSocketInner>>,
+}
+
+impl DiagnosticNetlinkSocket {
+    pub fn new(_kernel: &Arc<Kernel>) -> Result<Self, Errno> {
+        Ok(Self {
+            inner: Arc::new(Mutex::new(NetlinkSocketInner {
+                family: NetlinkFamily::SockDiag,
+                messages: MessageQueue::new(SOCKET_DEFAULT_SIZE),
+                waiters: WaitQueue::default(),
+                address: None,
+                passcred: false,
+                timestamp: false,
+            })),
+        })
+    }
+}
+
+impl SocketOps for DiagnosticNetlinkSocket {
+    fn connect(
+        &self,
+        _socket: &SocketHandle,
+        current_task: &CurrentTask,
+        peer: SocketPeer,
+    ) -> Result<(), Errno> {
+        self.inner.lock().connect(current_task, peer)
+    }
+
+    fn listen(&self, _socket: &Socket, _backlog: i32, _credentials: ucred) -> Result<(), Errno> {
+        error!(EOPNOTSUPP)
+    }
+
+    fn accept(&self, _socket: &Socket) -> Result<SocketHandle, Errno> {
+        error!(EOPNOTSUPP)
+    }
+
+    fn bind(
+        &self,
+        _socket: &Socket,
+        current_task: &CurrentTask,
+        socket_address: SocketAddress,
+    ) -> Result<(), Errno> {
+        self.inner.lock().bind(current_task, socket_address)
+    }
+
+    fn read(
+        &self,
+        _locked: &mut Locked<'_, ReadOps>,
+        _socket: &Socket,
+        _current_task: &CurrentTask,
+        data: &mut dyn OutputBuffer,
+        _flags: SocketMessageFlags,
+    ) -> Result<MessageReadInfo, Errno> {
+        self.inner.lock().read_datagram(data)
+    }
+
+    fn write(
+        &self,
+        _locked: &mut Locked<'_, WriteOps>,
+        _socket: &Socket,
+        _current_task: &CurrentTask,
+        data: &mut dyn InputBuffer,
+        _dest_address: &mut Option<SocketAddress>,
+        _ancillary_data: &mut Vec<AncillaryData>,
+    ) -> Result<usize, Errno> {
+        let data = data.read_all()?;
+        match NetlinkMessage::<SockDiagMessage>::deserialize(&data) {
+            Ok(msg) => {
+                log_debug!(?msg, "got write to NETLINK_SOCK_DIAG");
+                track_stub!(
+                    TODO("https://fxbug.dev/323590076"),
+                    "NETLINK_SOCK_DIAG handle request"
+                );
+                Ok(data.len())
+            }
+            Err(err) => {
+                log_warn!(tag = NETLINK_LOG_TAG, ?err, "Failed to process write");
+                error!(EINVAL)
+            }
+        }
+    }
+
+    fn wait_async(
+        &self,
+        _socket: &Socket,
+        _current_task: &CurrentTask,
+        waiter: &Waiter,
+        events: FdEvents,
+        handler: EventHandler,
+    ) -> WaitCanceler {
+        self.inner.lock().wait_async(waiter, events, handler)
+    }
+
+    fn query_events(
+        &self,
+        _socket: &Socket,
+        _current_task: &CurrentTask,
+    ) -> Result<FdEvents, Errno> {
+        Ok(self.inner.lock().query_events() & FdEvents::POLLIN)
+    }
+
+    fn shutdown(&self, _socket: &Socket, _how: SocketShutdownFlags) -> Result<(), Errno> {
+        error!(EOPNOTSUPP)
+    }
+
+    fn close(&self, _socket: &Socket) {}
+
+    fn getsockname(&self, _socket: &Socket) -> Vec<u8> {
+        self.inner.lock().getsockname()
+    }
+
+    fn getpeername(&self, _socket: &Socket) -> Result<Vec<u8>, Errno> {
+        self.inner.lock().getpeername()
+    }
+
+    fn getsockopt(
+        &self,
+        _socket: &Socket,
+        level: u32,
+        optname: u32,
+        _optlen: u32,
+    ) -> Result<Vec<u8>, Errno> {
+        self.inner.lock().getsockopt(level, optname)
+    }
+
+    fn setsockopt(
+        &self,
+        _socket: &Socket,
+        task: &Task,
+        level: u32,
+        optname: u32,
+        user_opt: UserBuffer,
+    ) -> Result<(), Errno> {
         self.inner.lock().setsockopt(task, level, optname, user_opt)
     }
 }
