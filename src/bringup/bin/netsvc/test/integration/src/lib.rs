@@ -12,7 +12,10 @@ use itertools::Itertools as _;
 use net_declare::{fidl_mac, std_ip_v6};
 use net_types::Witness as _;
 use netemul::RealmUdpSocket as _;
-use netstack_testing_common::realms::{Netstack2, TestSandboxExt as _};
+use netstack_testing_common::{
+    interfaces::TestInterfaceExt as _,
+    realms::{Netstack2, TestSandboxExt as _},
+};
 use netstack_testing_macros::netstack_test;
 use netsvc_proto::{debuglog, netboot, tftp};
 use packet::{
@@ -446,6 +449,7 @@ async fn with_netsvc_and_netstack_full<F1, F2, Fut2, X, A, V>(
 
     let interface: netemul::TestInterface<'_> =
         netstack_realm.join_network(&network, &ns_name).await.expect("join network");
+    interface.apply_nud_flake_workaround().await.expect("nud flake workaround");
 
     let _: net_types::ip::Ipv6Addr = netstack_testing_common::interfaces::wait_for_v6_ll(
         &netstack_realm
