@@ -24,7 +24,8 @@ TEST_F(DeviceEnumerationTest, Vim3DeviceTreeTest) {
       "sys/platform/canvas-ff638000/aml-canvas",
       "sys/platform/adc-9000",
       //"sys/platform/gpio-controller-ff634400", - Uncomment when gpio node is getting used.
-
+      "sys/platform/gpu-ffe40000/gpu-ffe40000_group/aml-gpu",
+      "sys/platform/arm-mali-ffe40000",
   };
 
   ASSERT_NO_FATAL_FAILURE(TestRunner(kDevicePaths, std::size(kDevicePaths)));

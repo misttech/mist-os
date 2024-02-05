@@ -205,7 +205,12 @@ zx::result<> RegistersVisitor::ParseRegisterChild(fdf_devicetree::Node& child,
   register_entry.mmio_id(0);
   controller.registers[name] = register_entry;
 
-  return AddChildNodeSpec(child, register_name);
+  // Add register bind rules only once per register name.
+  if (register_it == controller.registers.end()) {
+    return AddChildNodeSpec(child, register_name);
+  }
+
+  return zx::ok();
 }
 
 zx::result<> RegistersVisitor::DriverFinalizeNode(fdf_devicetree::Node& node) {

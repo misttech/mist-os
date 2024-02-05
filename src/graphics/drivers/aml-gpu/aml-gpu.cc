@@ -409,6 +409,29 @@ zx::result<> AmlGpu::Start() {
     return zx::error(status);
   }
 
+  if (info.vid == PDEV_VID_GENERIC && info.pid == PDEV_PID_GENERIC &&
+      info.did == PDEV_DID_DEVICETREE_NODE) {
+    // TODO(https://fxbug.dev/318736574) : Remove and rely only on GetDeviceInfo.
+    pdev_board_info_t board_info;
+    if ((status = pdev_.GetBoardInfo(&board_info)) != ZX_OK) {
+      FDF_LOG(ERROR, "GetBoardInfo failed");
+      return zx::error(status);
+    }
+    if (board_info.vid == PDEV_VID_KHADAS) {
+      switch (board_info.pid) {
+        case PDEV_PID_VIM3:
+          info.pid = PDEV_PID_AMLOGIC_A311D;
+          break;
+        default:
+          FDF_LOG(ERROR, "Unsupported PID 0x%x for VID 0x%x", board_info.pid, board_info.vid);
+          return zx::error(ZX_ERR_INVALID_ARGS);
+      }
+    } else {
+      FDF_LOG(ERROR, "Unsupported VID 0x%x", board_info.vid);
+      return zx::error(ZX_ERR_INVALID_ARGS);
+    }
+  }
+
   switch (info.pid) {
     case PDEV_PID_AMLOGIC_S912:
       gpu_block_ = &s912_gpu_blocks;

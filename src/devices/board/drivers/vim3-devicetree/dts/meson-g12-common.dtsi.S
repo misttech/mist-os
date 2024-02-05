@@ -92,6 +92,26 @@
 				#size-cells = <0>;
 			};
 		};
+
+		aml_gpu: gpu@ffe40000 {
+			compatible = "amlogic,gpu";
+			reg = <0x0 0xffe40000 0x0 0x40000>, // MALI GPU
+				<0x0 0xff63c000 0x0 0x2000>;   // HUI
+			registers = <&reset A311D_RESET0_MASK 4 0x0 0x100000>,
+					<&reset A311D_RESET0_LEVEL 4 0x0 0x100000>,
+					<&reset A311D_RESET2_MASK 4 0x0 0x4000>,
+					<&reset A311D_RESET2_LEVEL 4 0x0 0x4000>;
+		};
+
+		arm-mali@ffe40000 {
+			compatible = "arm,mali-gpu";
+			reg = <0x0 0xffe40000 0x0 0x40000>;
+			interrupts = <GIC_SPI 162 GIC_IRQ_MODE_LEVEL_HIGH>,
+				<GIC_SPI 161 GIC_IRQ_MODE_LEVEL_HIGH>,
+				<GIC_SPI 160 GIC_IRQ_MODE_LEVEL_HIGH>;
+			mali-gpu-parent = <&aml_gpu>;
+			iommus = <&dummy_iommu 5>;
+		};
 	};
 
 	nna@ff100000 {
