@@ -154,10 +154,6 @@ class TestBase : public media::audio::test::TestFixture {
   void SignalProcessingConnect();
   void RequestTopologies();
 
-  // This (Codec-only) function is a BasicTest as-is, and is a prerequisite for an AdminTest.
-  void RetrieveIsBridgeable();
-  bool CanBeBridged() { return supports_bridged_mode_.value_or(false); }
-
   fidl::InterfacePtr<fuchsia::hardware::audio::Codec>& codec() { return codec_; }
   fidl::InterfacePtr<fuchsia::hardware::audio::Composite>& composite() { return composite_; }
   fidl::InterfacePtr<fuchsia::hardware::audio::Dai>& dai() { return dai_; }
@@ -201,8 +197,6 @@ class TestBase : public media::audio::test::TestFixture {
 
   std::optional<uint64_t> ring_buffer_id_;  // Ring buffer process element id.
   std::optional<uint64_t> dai_id_;          // DAI interconnect process element id.
-
-  std::optional<bool> supports_bridged_mode_;  // r...    Required/used only by Codec drivers
 };
 
 inline std::ostream& operator<<(std::ostream& out, const DriverType& dev_dir) {

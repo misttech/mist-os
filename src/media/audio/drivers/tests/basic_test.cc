@@ -462,11 +462,6 @@ DEFINE_BASIC_TEST_CLASS(WatchPlugSecondTimeNoResponse, {
   WaitForError();
 });
 
-DEFINE_BASIC_TEST_CLASS(IsBridgeable, {
-  RetrieveIsBridgeable();
-  WaitForError();
-});
-
 // Verify that a valid toplogy is successfully received.
 DEFINE_BASIC_TEST_CLASS(Topology, { RequestTopologies(); });
 
@@ -484,7 +479,6 @@ void RegisterBasicTestsForDevice(const DeviceEntry& device_entry) {
   if (device_entry.isCodec()) {
     REGISTER_BASIC_TEST(Health, device_entry);
     REGISTER_BASIC_TEST(GetProperties, device_entry);
-    REGISTER_BASIC_TEST(IsBridgeable, device_entry);
     REGISTER_BASIC_TEST(DaiFormats, device_entry);
     REGISTER_BASIC_TEST(GetInitialPlugState, device_entry);
     REGISTER_BASIC_TEST(WatchPlugSecondTimeNoResponse, device_entry);

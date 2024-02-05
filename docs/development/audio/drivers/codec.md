@@ -166,10 +166,10 @@ samples is valid, it specifies only the 3 valid combinations:
 2.  32 bits slot with 32 bits samples
 3.  32 bits slot with 16 bits samples
 
-Using the information provided by the codec in `IsBridgeable` and
-`GetDaiFormat`, what is supported by the controller, and any other requirements,
-the controller specifies the format to use in the DAI with the `SetDaiFormat`
-function. This functions takes a parameter that specifies:
+Using the information provided by the codec in`GetDaiFormat`, what is supported
+by the controller, and any other requirements, the controller specifies the
+format to use in the DAI with the `SetDaiFormat` function. This functions takes
+a parameter that specifies:
 
 1.  A number of channels. This is the number of channels to be used in the DAI
     (for instance number of channels on a TDM bus, i.e. "on the wire"). For I2S

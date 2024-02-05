@@ -30,8 +30,6 @@ class Test : public SimpleCodecServer {
   }
   zx_status_t Stop() override { return ZX_OK; }
   zx_status_t Start() override { return ZX_OK; }
-  bool IsBridgeable() override { return false; }
-  void SetBridgedMode(bool enable_bridged_mode) override {}
   DaiSupportedFormats GetDaiFormats() override {
     return {
         .number_of_channels = {2, 4, 6, 8},
