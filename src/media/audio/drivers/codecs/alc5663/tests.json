@@ -1,18 +1,40 @@
 [
     {
-        "device": {
-            "fuchsia.BIND_PROTOCOL": "fuchsia.bluetooth.BIND_PROTOCOL.DEVICE"
-        },
-        "expected": "abort",
-        "name": "Protocol"
+        "node": "acpi",
+        "tests": [
+            {
+                "name": "Match",
+                "expected": "match",
+                "device": {
+                    "fuchsia.BIND_PROTOCOL": "fuchsia.acpi.BIND_PROTOCOL.DEVICE",
+                    "fuchsia.BIND_ACPI_BUS_TYPE": "fuchsia.acpi.BIND_ACPI_BUS_TYPE.I2C",
+                    "fuchsia.acpi.HID": "\"10EC5663\""
+                }
+            }
+        ]
     },
     {
-        "device": {
-            "fuchsia.BIND_ACPI_BUS_TYPE": "fuchsia.acpi.BIND_ACPI_BUS_TYPE.I2C",
-            "fuchsia.acpi.HID": "\"10EC5663\"",
-            "fuchsia.BIND_COMPOSITE": "1"
-        },
-        "expected": "match",
-        "name": "Match"
+        "node": "irq000",
+        "tests": [
+            {
+                "name": "Match",
+                "expected": "match",
+                "device": {
+                    "fuchsia.hardware.interrupt.Service": "fuchsia.hardware.interrupt.Service.ZirconTransport"
+                }
+            }
+        ]
+    },
+    {
+        "node": "sysmem",
+        "tests": [
+            {
+                "name": "Match",
+                "expected": "match",
+                "device": {
+                    "fuchsia.BIND_FIDL_PROTOCOL": "fuchsia.sysmem.BIND_FIDL_PROTOCOL.DEVICE"
+                }
+            }
+        ]
     }
 ]

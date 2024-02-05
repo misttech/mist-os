@@ -1,27 +1,49 @@
 [
     {
-        "device": {
-            "fuchsia.BIND_PROTOCOL": "fuchsia.bluetooth.BIND_PROTOCOL.DEVICE"
-        },
-        "expected": "abort",
-        "name": "Protocol"
+        "node": "acpi",
+        "tests": [
+            {
+                "name": "Match",
+                "expected": "match",
+                "device": {
+                    "fuchsia.BIND_PROTOCOL": "fuchsia.acpi.BIND_PROTOCOL.DEVICE",
+                    "fuchsia.BIND_ACPI_BUS_TYPE": "fuchsia.acpi.BIND_ACPI_BUS_TYPE.I2C",
+                    "fuchsia.acpi.HID": "\"MX98373\""
+                }
+            },
+            {
+                "name": "Match",
+                "expected": "match",
+                "device": {
+                    "fuchsia.BIND_PROTOCOL": "fuchsia.acpi.BIND_PROTOCOL.DEVICE",
+                    "fuchsia.BIND_PLATFORM_DEV_VID": "fuchsia.maxim.platform.BIND_PLATFORM_DEV_VID.MAXIM",
+                    "fuchsia.BIND_PLATFORM_DEV_DID": "fuchsia.maxim.platform.BIND_PLATFORM_DEV_DID.MAX98373"
+                }
+            }
+        ]
     },
     {
-        "device": {
-            "fuchsia.BIND_ACPI_BUS_TYPE": "fuchsia.acpi.BIND_ACPI_BUS_TYPE.I2C",
-            "fuchsia.BIND_COMPOSITE": "1",
-            "fuchsia.acpi.HID": "\"MX98373\""
-        },
-        "expected": "match",
-        "name": "max98373"
+        "node": "irq000",
+        "tests": [
+            {
+                "name": "Match",
+                "expected": "match",
+                "device": {
+                    "fuchsia.hardware.interrupt.Service": "fuchsia.hardware.interrupt.Service.ZirconTransport"
+                }
+            }
+        ]
     },
     {
-        "device": {
-            "fuchsia.BIND_COMPOSITE": "1",
-            "fuchsia.BIND_PLATFORM_DEV_DID": "fuchsia.maxim.platform.BIND_PLATFORM_DEV_DID.MAX98373",
-            "fuchsia.BIND_PLATFORM_DEV_VID": "fuchsia.maxim.platform.BIND_PLATFORM_DEV_VID.MAXIM"
-        },
-        "expected": "match",
-        "name": "maxim98373"
+        "node": "sysmem",
+        "tests": [
+            {
+                "name": "Match",
+                "expected": "match",
+                "device": {
+                    "fuchsia.BIND_FIDL_PROTOCOL": "fuchsia.sysmem.BIND_FIDL_PROTOCOL.DEVICE"
+                }
+            }
+        ]
     }
 ]

@@ -9,8 +9,9 @@ driver_bind_rules("alc5663_bind") {
   rules = "alc5663.bind"
   tests = "tests.json"
   deps = [
+    "//sdk/fidl/fuchsia.hardware.interrupt:fuchsia.hardware.interrupt_bindlib",
     "//src/devices/bind/fuchsia.acpi",
-    "//src/devices/bind/fuchsia.i2c",
+    "//src/devices/bind/fuchsia.sysmem",
   ]
 }
 

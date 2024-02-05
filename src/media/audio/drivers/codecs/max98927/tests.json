@@ -1,20 +1,40 @@
 [
     {
-        "device": {
-            "fuchsia.BIND_ACPI_BUS_TYPE": "fuchsia.acpi.BIND_ACPI_BUS_TYPE.I2C",
-            "fuchsia.acpi.HID": "\"MX98927\"",
-            "fuchsia.BIND_COMPOSITE": "1"
-        },
-        "expected": "match",
-        "name": "Match"
+        "node": "acpi",
+        "tests": [
+            {
+                "name": "Match",
+                "expected": "match",
+                "device": {
+                    "fuchsia.BIND_PROTOCOL": "fuchsia.acpi.BIND_PROTOCOL.DEVICE",
+                    "fuchsia.BIND_ACPI_BUS_TYPE": "fuchsia.acpi.BIND_ACPI_BUS_TYPE.I2C",
+                    "fuchsia.acpi.HID": "\"MX98927\""
+                }
+            }
+        ]
     },
     {
-        "device": {
-            "fuchsia.BIND_ACPI_BUS_TYPE": "fuchsia.acpi.BIND_ACPI_BUS_TYPE.SPI",
-            "fuchsia.acpi.HID": "\"MX98927\"",
-            "fuchsia.BIND_COMPOSITE": "1"
-        },
-        "expected": "abort",
-        "name": "Bad bus type"
+        "node": "irq000",
+        "tests": [
+            {
+                "name": "Match",
+                "expected": "match",
+                "device": {
+                    "fuchsia.hardware.interrupt.Service": "fuchsia.hardware.interrupt.Service.ZirconTransport"
+                }
+            }
+        ]
+    },
+    {
+        "node": "sysmem",
+        "tests": [
+            {
+                "name": "Match",
+                "expected": "match",
+                "device": {
+                    "fuchsia.BIND_FIDL_PROTOCOL": "fuchsia.sysmem.BIND_FIDL_PROTOCOL.DEVICE"
+                }
+            }
+        ]
     }
 ]

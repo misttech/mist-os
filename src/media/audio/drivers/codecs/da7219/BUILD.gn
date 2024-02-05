@@ -27,7 +27,11 @@ group("tests") {
 driver_bind_rules("bind") {
   rules = "da7219.bind"
   bind_output = "da7219.bindbc"
-  deps = [ "//src/devices/bind/fuchsia.acpi" ]
+  deps = [
+    "//sdk/fidl/fuchsia.hardware.interrupt:fuchsia.hardware.interrupt_bindlib",
+    "//src/devices/bind/fuchsia.acpi",
+    "//src/devices/bind/fuchsia.sysmem",
+  ]
 }
 
 config("logging-dfv1") {

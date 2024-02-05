@@ -11,8 +11,10 @@ driver_bind_rules("max98373-bind") {
   rules = "max98373.bind"
   tests = "tests.json"
   deps = [
+    "//sdk/fidl/fuchsia.hardware.interrupt:fuchsia.hardware.interrupt_bindlib",
     "//src/devices/bind/fuchsia.acpi",
     "//src/devices/bind/fuchsia.maxim.platform",
+    "//src/devices/bind/fuchsia.sysmem",
   ]
 }
 

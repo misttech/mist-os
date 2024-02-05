@@ -2,13 +2,27 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+composite max98373;
+
 using fuchsia.acpi;
+using fuchsia.hardware.interrupt;
+using fuchsia.sysmem;
 using fuchsia.maxim.platform;
 
-fuchsia.BIND_COMPOSITE == 1;
-if fuchsia.BIND_ACPI_BUS_TYPE == fuchsia.acpi.BIND_ACPI_BUS_TYPE.I2C {
-  fuchsia.acpi.HID == "MX98373";
-} else {
-  fuchsia.BIND_PLATFORM_DEV_VID == fuchsia.maxim.platform.BIND_PLATFORM_DEV_VID.MAXIM;
-  fuchsia.BIND_PLATFORM_DEV_DID == fuchsia.maxim.platform.BIND_PLATFORM_DEV_DID.MAX98373;
+primary node "acpi" {
+  fuchsia.BIND_PROTOCOL == fuchsia.acpi.BIND_PROTOCOL.DEVICE;
+  if fuchsia.BIND_ACPI_BUS_TYPE == fuchsia.acpi.BIND_ACPI_BUS_TYPE.I2C {
+    fuchsia.acpi.HID == "MX98373";
+  } else {
+    fuchsia.BIND_PLATFORM_DEV_VID == fuchsia.maxim.platform.BIND_PLATFORM_DEV_VID.MAXIM;
+    fuchsia.BIND_PLATFORM_DEV_DID == fuchsia.maxim.platform.BIND_PLATFORM_DEV_DID.MAX98373;
+  }
+}
+
+node "irq000" {
+  fuchsia.hardware.interrupt.Service == fuchsia.hardware.interrupt.Service.ZirconTransport;
+}
+
+node "sysmem" {
+  fuchsia.BIND_FIDL_PROTOCOL == fuchsia.sysmem.BIND_FIDL_PROTOCOL.DEVICE;
 }
