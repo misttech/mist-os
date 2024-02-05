@@ -550,7 +550,6 @@
                 "PtraceTest.85",
                 "PtraceTest.ChangeRegSetInOptSyscall",
                 "PtraceTest.ExitWhenParentIsNotTracer_Syscall_TraceVfork_TraceVforkDone",
-                "PtraceTest.Int3",
                 "PtraceTest.Sysemu_PokeUser",
 
                 // raw_socket_icmp

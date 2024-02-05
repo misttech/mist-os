@@ -11,7 +11,8 @@ use crate::{
     signals::{deliver_signal, SignalActions, SignalInfo},
     task::{
         ptrace_attach_from_state, CurrentTask, ExceptionResult, ExitStatus, Kernel, ProcessGroup,
-        PtraceCoreState, Task, TaskBuilder, TaskFlags, ThreadGroup, ThreadGroupWriteGuard,
+        PtraceCoreState, StopState, Task, TaskBuilder, TaskFlags, ThreadGroup,
+        ThreadGroupWriteGuard,
     },
 };
 use anyhow::{format_err, Error};
@@ -540,7 +541,16 @@ fn process_completed_exception(current_task: &mut CurrentTask, exception_result:
             let mut registers = current_task.thread_state.registers;
             registers.reset_flags();
             {
-                let task_state = current_task.task.write();
+                let mut task_state = current_task.task.write();
+                if task_state.ptrace_on_signal_consume() {
+                    task_state.set_stopped(
+                        StopState::SignalDeliveryStopping,
+                        Some(signal.clone()),
+                        Some(&current_task),
+                        None,
+                    );
+                    return;
+                }
 
                 if let Some(status) = deliver_signal(
                     current_task,
