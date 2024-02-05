@@ -9,11 +9,9 @@ template("fidl_api_compatibility_test") {
   assert(defined(invoker.target_api_level), "target_api_level is required")
   assert(defined(invoker.golden), "golden is required")
   assert(defined(invoker.current), "current is required")
+  assert(defined(invoker.policy), "policy is required")
 
-  policy = "no_breaking_changes"
-  if (defined(invoker.policy)) {
-    policy = invoker.policy
-  }
+  policy = invoker.policy
 
   # Let command-line build args override values from target declarations.
   if (update_goldens) {

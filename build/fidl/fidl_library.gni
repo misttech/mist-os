@@ -228,7 +228,7 @@ template("fidl_library") {
   if (requires_compatibility_tests) {
     # The current level might be a supported level. Don't double count it.
     current_level = platform_version.in_development_api_level
-    policy_for_current_level = "no_breaking_changes"
+    policy_for_current_level = "ack_changes"
 
     # policy_for_current_level is unused when regenerating golden files.
     not_needed([ "policy_for_current_level" ])
