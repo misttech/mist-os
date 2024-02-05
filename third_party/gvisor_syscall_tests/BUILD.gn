@@ -448,6 +448,10 @@ syscall_test_suite(loopback_test_label) {
   num_shards = 10
 }
 syscall_test_suite(loopback_isolated_test_label) {
+  # The loopback_isolated suite was previously manually sharded into multiple
+  # different suites because it is longer-running and has more cases than many
+  # of the other suites. To compensate for this, use additional shards.
+  num_shards = 10
 }
 syscall_test_suite(raw_packet_test_label) {
 }
@@ -461,22 +465,12 @@ syscall_test_suite(udp_unbound_test_label) {
 syscall_test_suite(tcp_blocking_test_label) {
   run_with_fast_udp = false
 }
-syscall_test_suite(loopback_isolated_tcp_fin_wait_test_label) {
-  run_with_fast_udp = false
-  test_srcs_target = ":${loopback_isolated_test_label}_socket_tests"
-}
-syscall_test_suite(loopback_isolated_tcp_linger_timeout_test_label) {
-  run_with_fast_udp = false
-  test_srcs_target = ":${loopback_isolated_test_label}_socket_tests"
-}
 syscall_test_suite(tcp_test_label) {
   run_with_fast_udp = false
 }
 
 suite_labels = [
   generic_test_label,
-  loopback_isolated_tcp_fin_wait_test_label,
-  loopback_isolated_tcp_linger_timeout_test_label,
   loopback_isolated_test_label,
   loopback_test_label,
   raw_packet_test_label,

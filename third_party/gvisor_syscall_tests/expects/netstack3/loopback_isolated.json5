@@ -10,17 +10,27 @@
             ],
         },
         {
-            include: "../loopback_isolated_filter.json5",
-        },
-        {
             type: "skip",
             matchers: [
-                // TODO(https://fxbug.dev/42095034): Netstack3 does not support
-                // dual-stack TCP sockets yet.
-                "All/SocketInetLoopbackIsolatedTest.TCPActiveCloseTimeWaitTest/ListenV6Any_ConnectV4Any",
-                "All/SocketInetLoopbackIsolatedTest.TCPConnectionReuseAddrConflicts/ListenV6Any_ConnectV4Any",
-                "All/SocketInetLoopbackIsolatedTest.TCPConnectionReuseAddrConflicts/ListenV6Any_ConnectV4Loopback",
-                "All/SocketInetLoopbackIsolatedTest.TCPLinger2TimeoutAfterClose/ListenV6Any_ConnectV4Any",
+                // TODO(https://fxbug.dev/42082655): Deflake and unskip.
+                "All/SocketInetLoopbackIsolatedTest.TCPLinger2TimeoutAfterClose/ListenV4Any_ConnectV4Any",
+                "All/SocketInetLoopbackIsolatedTest.TCPLinger2TimeoutAfterClose/ListenV4Any_ConnectV4Loopback",
+                "All/SocketInetLoopbackIsolatedTest.TCPLinger2TimeoutAfterClose/ListenV4Any_ConnectV4MappedAny",
+                "All/SocketInetLoopbackIsolatedTest.TCPLinger2TimeoutAfterClose/ListenV4Any_ConnectV4MappedLoopback",
+                "All/SocketInetLoopbackIsolatedTest.TCPLinger2TimeoutAfterClose/ListenV4Loopback_ConnectV4Any",
+                "All/SocketInetLoopbackIsolatedTest.TCPLinger2TimeoutAfterClose/ListenV4Loopback_ConnectV4Loopback",
+                "All/SocketInetLoopbackIsolatedTest.TCPLinger2TimeoutAfterClose/ListenV4Loopback_ConnectV4MappedLoopback",
+                "All/SocketInetLoopbackIsolatedTest.TCPLinger2TimeoutAfterClose/ListenV4MappedAny_ConnectV4Any",
+                "All/SocketInetLoopbackIsolatedTest.TCPLinger2TimeoutAfterClose/ListenV4MappedAny_ConnectV4Loopback",
+                "All/SocketInetLoopbackIsolatedTest.TCPLinger2TimeoutAfterClose/ListenV4MappedAny_ConnectV4MappedAny",
+                "All/SocketInetLoopbackIsolatedTest.TCPLinger2TimeoutAfterClose/ListenV4MappedAny_ConnectV4MappedLoopback",
+                "All/SocketInetLoopbackIsolatedTest.TCPLinger2TimeoutAfterClose/ListenV4MappedLoopback_ConnectV4Any",
+                "All/SocketInetLoopbackIsolatedTest.TCPLinger2TimeoutAfterClose/ListenV4MappedLoopback_ConnectV4Loopback",
+                "All/SocketInetLoopbackIsolatedTest.TCPLinger2TimeoutAfterClose/ListenV4MappedLoopback_ConnectV4MappedLoopback",
+                "All/SocketInetLoopbackIsolatedTest.TCPLinger2TimeoutAfterClose/ListenV6Any_ConnectV6Any",
+                "All/SocketInetLoopbackIsolatedTest.TCPLinger2TimeoutAfterClose/ListenV6Any_ConnectV6Loopback",
+                "All/SocketInetLoopbackIsolatedTest.TCPLinger2TimeoutAfterClose/ListenV6Loopback_ConnectV6Any",
+                "All/SocketInetLoopbackIsolatedTest.TCPLinger2TimeoutAfterClose/ListenV6Loopback_ConnectV6Loopback",
 
                 // TODO(https://issues.fuchsia.dev/319117141): Support time wait
                 // reuse for dual stack sockets.
@@ -32,9 +42,6 @@
                 "All/SocketInetLoopbackIsolatedTest.TCPPassiveCloseNoTimeWaitReuseTest/ListenV4MappedLoopback_ConnectV4Loopback",
                 "All/SocketInetLoopbackIsolatedTest.TCPPassiveCloseNoTimeWaitReuseTest/ListenV4MappedLoopback_ConnectV4MappedAny",
                 "All/SocketInetLoopbackIsolatedTest.TCPPassiveCloseNoTimeWaitReuseTest/ListenV4MappedLoopback_ConnectV4MappedLoopback",
-
-                // TODO(https://fxbug.dev/42082655): Deflake and unskip.
-                "All/SocketInetLoopbackIsolatedTest.TCPLinger2TimeoutAfterClose/*",
             ],
         },
         {
@@ -42,17 +49,41 @@
             matchers: [
                 "AllFamilies/SocketMultiProtocolInetLoopbackIsolatedTest.BindToDeviceReusePort/TCP",
 
-                // TODO(https://fxbug.dev/21198): Support listeners in both
-                // stacks.
-                "All/SocketInetLoopbackIsolatedTest.*/ListenV6Any_ConnectV4Any",
-                "All/SocketInetLoopbackIsolatedTest.*/ListenV6Any_ConnectV4Loopback",
-                "All/SocketInetLoopbackIsolatedTest.*/ListenV6Any_ConnectV4MappedAny",
-                "All/SocketInetLoopbackIsolatedTest.*/ListenV6Any_ConnectV4MappedLoopback",
-
                 // Netstack3 does not have complete support for multicast sockets.
                 "AllFamilies/SocketMultiProtocolInetLoopbackIsolatedTest.V4EphemeralPortReservedReuseAddr/UDP",
                 "AllFamilies/SocketMultiProtocolInetLoopbackIsolatedTest.V4MappedEphemeralPortReservedReuseAddr/UDP",
                 "AllFamilies/SocketMultiProtocolInetLoopbackIsolatedTest.V6EphemeralPortReservedReuseAddr/UDP",
+
+                // TODO(https://fxbug.dev/21198): Support listeners in both
+                // stacks.
+                "All/SocketInetLoopbackIsolatedTest.TCPActiveCloseTimeWaitReuseTest/ListenV6Any_ConnectV4Any",
+                "All/SocketInetLoopbackIsolatedTest.TCPActiveCloseTimeWaitReuseTest/ListenV6Any_ConnectV4Loopback",
+                "All/SocketInetLoopbackIsolatedTest.TCPActiveCloseTimeWaitReuseTest/ListenV6Any_ConnectV4MappedAny",
+                "All/SocketInetLoopbackIsolatedTest.TCPActiveCloseTimeWaitReuseTest/ListenV6Any_ConnectV4MappedLoopback",
+                "All/SocketInetLoopbackIsolatedTest.TCPActiveCloseTimeWaitTest/ListenV6Any_ConnectV4Any",
+                "All/SocketInetLoopbackIsolatedTest.TCPActiveCloseTimeWaitTest/ListenV6Any_ConnectV4Loopback",
+                "All/SocketInetLoopbackIsolatedTest.TCPActiveCloseTimeWaitTest/ListenV6Any_ConnectV4MappedAny",
+                "All/SocketInetLoopbackIsolatedTest.TCPActiveCloseTimeWaitTest/ListenV6Any_ConnectV4MappedLoopback",
+                "All/SocketInetLoopbackIsolatedTest.TCPConnectionReuseAddrConflicts/ListenV6Any_ConnectV4Any",
+                "All/SocketInetLoopbackIsolatedTest.TCPConnectionReuseAddrConflicts/ListenV6Any_ConnectV4Loopback",
+                "All/SocketInetLoopbackIsolatedTest.TCPConnectionReuseAddrConflicts/ListenV6Any_ConnectV4MappedAny",
+                "All/SocketInetLoopbackIsolatedTest.TCPConnectionReuseAddrConflicts/ListenV6Any_ConnectV4MappedLoopback",
+                "All/SocketInetLoopbackIsolatedTest.TCPFinWait2Test/ListenV6Any_ConnectV4Any",
+                "All/SocketInetLoopbackIsolatedTest.TCPFinWait2Test/ListenV6Any_ConnectV4Loopback",
+                "All/SocketInetLoopbackIsolatedTest.TCPFinWait2Test/ListenV6Any_ConnectV4MappedAny",
+                "All/SocketInetLoopbackIsolatedTest.TCPFinWait2Test/ListenV6Any_ConnectV4MappedLoopback",
+                "All/SocketInetLoopbackIsolatedTest.TCPLinger2TimeoutAfterClose/ListenV6Any_ConnectV4Any",
+                "All/SocketInetLoopbackIsolatedTest.TCPLinger2TimeoutAfterClose/ListenV6Any_ConnectV4Loopback",
+                "All/SocketInetLoopbackIsolatedTest.TCPLinger2TimeoutAfterClose/ListenV6Any_ConnectV4MappedAny",
+                "All/SocketInetLoopbackIsolatedTest.TCPLinger2TimeoutAfterClose/ListenV6Any_ConnectV4MappedLoopback",
+                "All/SocketInetLoopbackIsolatedTest.TCPPassiveCloseNoTimeWaitReuseTest/ListenV6Any_ConnectV4Any",
+                "All/SocketInetLoopbackIsolatedTest.TCPPassiveCloseNoTimeWaitReuseTest/ListenV6Any_ConnectV4Loopback",
+                "All/SocketInetLoopbackIsolatedTest.TCPPassiveCloseNoTimeWaitReuseTest/ListenV6Any_ConnectV4MappedAny",
+                "All/SocketInetLoopbackIsolatedTest.TCPPassiveCloseNoTimeWaitReuseTest/ListenV6Any_ConnectV4MappedLoopback",
+                "All/SocketInetLoopbackIsolatedTest.TCPPassiveCloseNoTimeWaitTest/ListenV6Any_ConnectV4Any",
+                "All/SocketInetLoopbackIsolatedTest.TCPPassiveCloseNoTimeWaitTest/ListenV6Any_ConnectV4Loopback",
+                "All/SocketInetLoopbackIsolatedTest.TCPPassiveCloseNoTimeWaitTest/ListenV6Any_ConnectV4MappedAny",
+                "All/SocketInetLoopbackIsolatedTest.TCPPassiveCloseNoTimeWaitTest/ListenV6Any_ConnectV4MappedLoopback",
             ],
         },
     ],
