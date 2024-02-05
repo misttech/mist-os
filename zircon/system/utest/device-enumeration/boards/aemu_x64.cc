@@ -24,15 +24,15 @@ TEST_F(DeviceEnumerationTest, AemuX64Test) {
       "sys/platform/pt/PCI0/bus/00:0b.0/00_0b_0/goldfish-address-space",
 
       // Verify goldfish pipe root device created.
-      "sys/platform/pt/acpi/acpi-_SB_/acpi-GFPP/pt/acpi-GFPP-composite/goldfish-pipe",
+      "sys/platform/pt/acpi/acpi-_SB_/acpi-GFPP/pt/acpi-GFPP-composite-spec/goldfish-pipe",
       // Verify goldfish pipe child devices created.
-      "sys/platform/pt/acpi/acpi-_SB_/acpi-GFPP/pt/acpi-GFPP-composite/goldfish-pipe/goldfish-pipe-control",
-      "sys/platform/pt/acpi/acpi-_SB_/acpi-GFPP/pt/acpi-GFPP-composite/goldfish-pipe/goldfish-pipe-sensor",
-      "sys/platform/pt/acpi/acpi-_SB_/acpi-GFSK/pt/acpi-GFSK-composite/goldfish-sync",
+      "sys/platform/pt/acpi/acpi-_SB_/acpi-GFPP/pt/acpi-GFPP-composite-spec/goldfish-pipe/goldfish-pipe-control",
+      "sys/platform/pt/acpi/acpi-_SB_/acpi-GFPP/pt/acpi-GFPP-composite-spec/goldfish-pipe/goldfish-pipe-sensor",
+      "sys/platform/pt/acpi/acpi-_SB_/acpi-GFSK/pt/acpi-GFSK-composite-spec/goldfish-sync",
 
-      "sys/platform/pt/acpi/acpi-_SB_/acpi-GFPP/pt/acpi-GFPP-composite/goldfish-pipe/goldfish-pipe-control/goldfish-control-2/goldfish-control",
-      "sys/platform/pt/acpi/acpi-_SB_/acpi-GFPP/pt/acpi-GFPP-composite/goldfish-pipe/goldfish-pipe-control/goldfish-control-2/goldfish-control/goldfish-display",
-      "sys/platform/pt/acpi/acpi-_SB_/acpi-GFPP/pt/acpi-GFPP-composite/goldfish-pipe/goldfish-pipe-control/goldfish-control-2",
+      "sys/platform/pt/acpi/acpi-_SB_/acpi-GFPP/pt/acpi-GFPP-composite-spec/goldfish-pipe/goldfish-pipe-control/goldfish-control-2/goldfish-control",
+      "sys/platform/pt/acpi/acpi-_SB_/acpi-GFPP/pt/acpi-GFPP-composite-spec/goldfish-pipe/goldfish-pipe-control/goldfish-control-2/goldfish-control/goldfish-display",
+      "sys/platform/pt/acpi/acpi-_SB_/acpi-GFPP/pt/acpi-GFPP-composite-spec/goldfish-pipe/goldfish-pipe-control/goldfish-control-2",
   };
 
   ASSERT_NO_FATAL_FAILURE(TestRunner(kAemuDevicePaths, std::size(kAemuDevicePaths)));

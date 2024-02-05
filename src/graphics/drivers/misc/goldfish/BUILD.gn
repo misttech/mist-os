@@ -10,7 +10,11 @@ import("//build/test.gni")
 driver_bind_rules("goldfish-bind") {
   rules = "goldfish.bind"
   tests = "tests.json"
-  deps = [ "//src/devices/bind/fuchsia.acpi" ]
+  deps = [
+    "//sdk/fidl/fuchsia.hardware.interrupt:fuchsia.hardware.interrupt_bindlib",
+    "//src/devices/bind/fuchsia.acpi",
+    "//src/devices/bind/fuchsia.sysmem",
+  ]
 }
 
 common_deps = [
