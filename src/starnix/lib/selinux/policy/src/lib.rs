@@ -258,6 +258,20 @@ impl<PS: ParseStrategy> Policy<PS> {
             target_class_name,
         )
     }
+
+    #[cfg(feature = "selinux_policy_test_api")]
+    pub fn print_permissions(&self) {
+        let parsed_policy = self.0.parsed_policy();
+        for class in parsed_policy.classes().into_iter() {
+            println!("{}", std::str::from_utf8(class.name_bytes()).expect("class name"));
+            for permission in class.permissions().into_iter() {
+                println!(
+                    "    {}",
+                    std::str::from_utf8(permission.name_bytes()).expect("permission name")
+                );
+            }
+        }
+    }
 }
 
 impl<PS: ParseStrategy> AccessVectorComputer for Policy<PS> {

@@ -103,6 +103,36 @@ pub(crate) fn update_state_on_exec(
     }
 }
 
+/// Checks if source with state `source_state` may exercise the "getsched" permission on target with
+/// state `target_state` according to SELinux server status `status` and permission checker
+/// `permission`.
+pub fn check_getsched_access(
+    status: &impl SecurityServerStatus,
+    permission_check: &impl PermissionCheck,
+    source_state: &Option<SeLinuxThreadGroupState>,
+    target_state: &Option<SeLinuxThreadGroupState>,
+) -> Result<(), Errno> {
+    if status.is_fake() || !status.is_enforcing() {
+        // No-op if SELinux is in fake mode or not enforcing.
+        return Ok(());
+    }
+
+    if let (Some(source_state), Some(target_state)) = (source_state, target_state) {
+        if permission_check.has_permission(
+            source_state.current_sid.clone(),
+            target_state.current_sid.clone(),
+            ProcessPermission::GetScheduler,
+        ) {
+            Ok(())
+        } else {
+            error!(EACCES)
+        }
+    } else {
+        // Insufficient SELinux state to make sound access control decision.
+        error!(EACCES)
+    }
+}
+
 /// The SELinux security structure for `ThreadGroup`.
 #[derive(Default, Clone, Debug, PartialEq)]
 pub struct SeLinuxThreadGroupState {
@@ -432,6 +462,124 @@ mod tests {
                 previous_sid: initial_state.previous_sid,
                 sockcreate_sid: initial_state.sockcreate_sid,
             }
+        );
+    }
+
+    #[fuchsia::test]
+    fn getsched_access_allowed_for_fake_mode() {
+        let security_server = SecurityServer::new(Mode::Fake);
+        security_server.set_enforcing(true);
+        let selinux_state = Some(SeLinuxThreadGroupState::new_default(&security_server));
+
+        assert_eq!(
+            check_getsched_access(
+                security_server.as_ref(),
+                &security_server.as_permission_check(),
+                &selinux_state,
+                &selinux_state
+            ),
+            Ok(())
+        );
+    }
+
+    #[fuchsia::test]
+    fn getsched_access_allowed_for_permissive_mode() {
+        let security_server = SecurityServer::new(Mode::Enable);
+        security_server.set_enforcing(false);
+        let selinux_state = Some(SeLinuxThreadGroupState::new_default(&security_server));
+
+        assert_eq!(
+            check_getsched_access(
+                security_server.as_ref(),
+                &security_server.as_permission_check(),
+                &selinux_state,
+                &selinux_state
+            ),
+            Ok(())
+        );
+    }
+
+    #[fuchsia::test]
+    fn getsched_access_allowed_for_allowed_type() {
+        let policy_bytes = HOOKS_TESTS_BINARY_POLICY.to_vec();
+        let security_server = SecurityServer::new(Mode::Enable);
+        security_server.set_enforcing(true);
+        security_server.load_policy(policy_bytes).expect("policy load failed");
+
+        let source_security_context = SecurityContext::try_from("u:object_r:test_getsched_yes_t")
+            .expect("invalid security context");
+        let target_security_context =
+            SecurityContext::try_from("u:object_r:test_getsched_target_t")
+                .expect("invalid security context");
+        let source_sid = security_server.security_context_to_sid(&source_security_context);
+        let target_sid = security_server.security_context_to_sid(&target_security_context);
+        let source_state: Option<SeLinuxThreadGroupState> = Some(SeLinuxThreadGroupState {
+            current_sid: source_sid.clone(),
+            exec_sid: None,
+            fscreate_sid: None,
+            keycreate_sid: None,
+            previous_sid: source_sid,
+            sockcreate_sid: None,
+        });
+        let target_state = Some(SeLinuxThreadGroupState {
+            current_sid: target_sid.clone(),
+            exec_sid: None,
+            fscreate_sid: None,
+            keycreate_sid: None,
+            previous_sid: target_sid,
+            sockcreate_sid: None,
+        });
+
+        assert_eq!(
+            check_getsched_access(
+                security_server.as_ref(),
+                &security_server.as_permission_check(),
+                &source_state,
+                &target_state
+            ),
+            Ok(())
+        );
+    }
+
+    #[fuchsia::test]
+    fn getsched_access_denied_for_denied_type() {
+        let policy_bytes = HOOKS_TESTS_BINARY_POLICY.to_vec();
+        let security_server = SecurityServer::new(Mode::Enable);
+        security_server.set_enforcing(true);
+        security_server.load_policy(policy_bytes).expect("policy load failed");
+
+        let source_security_context = SecurityContext::try_from("u:object_r:test_getsched_no_t")
+            .expect("invalid security context");
+        let target_security_context =
+            SecurityContext::try_from("u:object_r:test_getsched_target_t")
+                .expect("invalid security context");
+        let source_sid = security_server.security_context_to_sid(&source_security_context);
+        let target_sid = security_server.security_context_to_sid(&target_security_context);
+        let source_state = Some(SeLinuxThreadGroupState {
+            current_sid: source_sid.clone(),
+            exec_sid: None,
+            fscreate_sid: None,
+            keycreate_sid: None,
+            previous_sid: source_sid,
+            sockcreate_sid: None,
+        });
+        let target_state = Some(SeLinuxThreadGroupState {
+            current_sid: target_sid.clone(),
+            exec_sid: None,
+            fscreate_sid: None,
+            keycreate_sid: None,
+            previous_sid: target_sid,
+            sockcreate_sid: None,
+        });
+
+        assert_eq!(
+            check_getsched_access(
+                security_server.as_ref(),
+                &security_server.as_permission_check(),
+                &source_state,
+                &target_state
+            ),
+            error!(EACCES)
         );
     }
 }

@@ -698,6 +698,7 @@ pub fn sys_sched_getscheduler(
 
     let weak = get_task_or_current(current_task, pid);
     let target_task = Task::from_weak(&weak)?;
+    selinux_hooks::check_getsched_access(current_task, target_task.as_ref())?;
     let current_policy = target_task.read().scheduler_policy;
     Ok(current_policy.raw_policy())
 }

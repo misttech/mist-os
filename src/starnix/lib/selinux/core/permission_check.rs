@@ -195,8 +195,7 @@ mod tests {
         match permission_ref {
             ProcessPermission::Fork => ACCESS_VECTOR_0001,
             ProcessPermission::Transition => ACCESS_VECTOR_0010,
-            // Code below will be needed when `ProcessPermission` has more than two variants.
-            // _ => AccessVector::NONE,
+            _ => AccessVector::NONE,
         }
     }
 
@@ -288,7 +287,9 @@ mod tests {
         let mut deny_all: DenyAllPermissions = Default::default();
         let mut allow_all: AllowAllPermissions = Default::default();
 
-        let permissions = ProcessPermission::all_variants();
+        // Use permissions that are mapped to access vector bits in
+        // `access_vector_from_permission`.
+        let permissions = vec![ProcessPermission::Fork, ProcessPermission::Transition];
         for permission in permissions.iter() {
             // DenyAllPermissions denies.
             assert_eq!(

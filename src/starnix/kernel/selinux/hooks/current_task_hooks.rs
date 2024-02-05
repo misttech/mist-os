@@ -3,7 +3,8 @@
 // found in the LICENSE file.
 
 use super::thread_group_hooks::{self, SeLinuxResolvedElfState};
-use crate::task::CurrentTask;
+use crate::task::{CurrentTask, Task};
+
 use starnix_uapi::errors::Errno;
 
 /// Check if creating a task is allowed, if SELinux is enabled. Access is allowed if SELinux is disabled.
@@ -52,6 +53,27 @@ pub fn update_state_on_exec(
             &mut thread_group_state.selinux_state,
             elf_selinux_state,
         );
+    }
+}
+
+/// Checks if `source` may exercise the "getsched" permission on `target`. Access is allowed if
+/// SELinux is disabled.
+pub fn check_getsched_access(source: &CurrentTask, target: &Task) -> Result<(), Errno> {
+    match &source.kernel().security_server {
+        None => return Ok(()),
+        Some(security_server) => {
+            // TODO(b/323856891): Consider holding `source.thread_group` and `target.thread_group`
+            // read locks for duration of access check.
+            let source_state = { source.thread_group.read().selinux_state.clone() };
+            let target_state = { target.thread_group.read().selinux_state.clone() };
+
+            thread_group_hooks::check_getsched_access(
+                security_server.as_ref(),
+                &security_server.as_permission_check(),
+                &source_state,
+                &target_state,
+            )
+        }
     }
 }
 

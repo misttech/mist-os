@@ -217,6 +217,8 @@ class_permission_enum! {
         Fork,
         /// Permission to transition to a different security domain.
         Transition,
+        /// Permission to get scheduling policy currently applied to a process.
+        GetScheduler,
     }
 }
 
@@ -225,6 +227,7 @@ impl ProcessPermission {
         match self {
             ProcessPermission::Fork => "fork",
             ProcessPermission::Transition => "transition",
+            ProcessPermission::GetScheduler => "getsched",
         }
     }
 }
