@@ -77,33 +77,16 @@ impl Route for RouteRequest {
 }
 
 // Helper function to log and return an error if the capability is void.
-fn check_source_for_void(
-    source: &CapabilitySource,
-    moniker: &moniker::Moniker,
-) -> Result<(), RouteOrOpenError> {
-    if let CapabilitySource::Void { ref capability, .. } = source {
-        debug!(
-            "Optional {} `{}` was not available for target component `{}`\n{}",
-            capability.type_name(),
-            capability.source_name(),
-            &moniker,
-            ROUTE_ERROR_HELP
-        );
-        return Err(crate::model::error::OpenError::SourceInstanceNotFound.into());
+fn check_source_for_void(source: &CapabilitySource) -> Result<(), RouteOrOpenError> {
+    if let CapabilitySource::Void { .. } = source {
+        return Err(RoutingError::SourceCapabilityIsVoid.into());
     };
     Ok(())
 }
 
-fn capability_into_open(
-    capability: AnyCapability,
-    moniker: &moniker::Moniker,
-) -> Result<Open, RouteOrOpenError> {
+pub(super) fn capability_into_open(capability: AnyCapability) -> Result<Open, RouteOrOpenError> {
     if let Ok(_) = Unit::try_from(capability.clone()) {
-        debug!(
-            "Optional capability was not available for target component `{}`\n{}",
-            &moniker, ROUTE_ERROR_HELP
-        );
-        return Err(crate::model::error::OpenError::SourceInstanceNotFound.into());
+        return Err(RoutingError::SourceCapabilityIsVoid.into());
     };
     let open: Open = capability
         .try_into_open()
@@ -121,7 +104,7 @@ pub(super) async fn open_capability(
     path: vfs::path::Path,
     server_end: zx::Channel,
 ) {
-    match capability_into_open(capability, &target.moniker) {
+    match capability_into_open(capability) {
         Ok(open) => open.open(scope, flags, path, server_end),
         Err(err) => report_routing_failure(route_request, target, err.into(), server_end).await,
     }
@@ -140,7 +123,7 @@ pub(super) async fn route_and_open_capability(
     match route_request.clone() {
         r @ RouteRequest::UseStorage(_) | r @ RouteRequest::OfferStorage(_) => {
             let storage_source = r.route(target).await?;
-            check_source_for_void(&storage_source.source, &target.moniker)?;
+            check_source_for_void(&storage_source.source)?;
 
             let backing_dir_info =
                 storage::route_backing_directory(storage_source.source.clone()).await?;
@@ -150,7 +133,7 @@ pub(super) async fn route_and_open_capability(
         }
         r => {
             let route_source = r.route(target).await?;
-            check_source_for_void(&route_source.source, &target.moniker)?;
+            check_source_for_void(&route_source.source)?;
 
             // clone the source as additional context in case of an error
 
@@ -229,6 +212,9 @@ pub async fn report_routing_failure(
                         RouteOrOpenError::RoutingError(RoutingError::AvailabilityRoutingError(
                             AvailabilityRoutingError::FailedToRouteToOptionalTarget { .. },
                         )),
+                }
+                | ModelError::RouteOrOpenError {
+                    err: RouteOrOpenError::RoutingError(RoutingError::SourceCapabilityIsVoid),
                 } => {
                     // If the target declared the capability as optional, but
                     // the capability could not be routed (such as if the source

@@ -289,6 +289,13 @@ pub enum RoutingError {
 
     #[error(transparent)]
     MonikerError(#[from] MonikerError),
+
+    #[error(
+        "source capability is void. \
+    If the offer/expose declaration has `source_availability` set to `unknown`, \
+    the source component instance likely isn't defined in the component declaration"
+    )]
+    SourceCapabilityIsVoid,
 }
 
 impl RoutingError {
@@ -337,6 +344,7 @@ impl RoutingError {
             RoutingError::ComponentInstanceError(err) => err.as_zx_status(),
             RoutingError::RightsRoutingError(err) => err.as_zx_status(),
             RoutingError::PolicyError(err) => err.as_zx_status(),
+            RoutingError::SourceCapabilityIsVoid => zx::Status::NOT_FOUND,
         }
     }
 

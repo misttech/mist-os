@@ -68,6 +68,12 @@ async fn verify_routing_failure_messages() {
                 EventMatcher::ok()
                     .r#type(events::Stopped::TYPE)
                     .moniker(
+                        "root/routing-tests/offers-to-children-unavailable-but-optional/child-for-offer-from-void",
+                    )
+                    .stop(Some(ExitStatusMatcher::AnyCrash)),
+                EventMatcher::ok()
+                    .r#type(events::Stopped::TYPE)
+                    .moniker(
                         "root/routing-tests/offers-to-children-unavailable/child-open-unrequested",
                     )
                     .stop(Some(ExitStatusMatcher::AnyCrash)),
