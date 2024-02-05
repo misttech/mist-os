@@ -126,9 +126,6 @@ pub fn sys_bpf(
         }
 
         bpf_cmd_BPF_MAP_LOOKUP_ELEM => {
-            if !current_task.kernel().features.bpf_v2 {
-                return error!(EINVAL);
-            }
             let elem_attr: bpf_attr__bindgen_ty_2 = read_attr(current_task, attr_addr, attr_size)?;
             log_trace!("BPF_MAP_LOOKUP_ELEM");
             let map_fd = FdNumber::from_raw(elem_attr.map_fd as i32);
